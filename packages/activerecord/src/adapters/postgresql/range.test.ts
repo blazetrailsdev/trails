@@ -3,8 +3,11 @@ import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { RangeType } from "../../connection-adapters/postgresql/oid/range.js";
 import { Range } from "../../relation.js";
 import { Base } from "../../index.js";
+import { defaultTimezone } from "../../active-record.js";
+import { ArgumentError } from "@blazetrails/ruby-compat";
+import { inTimeZone } from "../../cases/helper.js";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { TimeWithZone, TimeZone, setZone, BigDecimal } from "@blazetrails/activesupport";
+import { TimeZone, setZone, zone, BigDecimal } from "@blazetrails/activesupport";
 import { BigIntegerType, FloatType, IntegerType, StringType } from "@blazetrails/activemodel";
 import { Date as OidDate } from "../../connection-adapters/postgresql/oid/date.js";
 import { Decimal } from "../../connection-adapters/postgresql/oid/decimal.js";
@@ -396,639 +399,836 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(rows[0].r).toBe(1);
     });
 
-    it("data type of range types", () => {
-      const int4 = int4Range.castValue("[1,10)")!;
-      expect(int4).toBeInstanceOf(Range);
-      expect(int4.begin).toBe(1);
+    describe("Rails range_test.rb", () => {
+      let connection: PostgreSQLAdapter;
+      let newRange: any;
+      let firstRange: any;
+      let secondRange: any;
+      let thirdRange: any;
+      let fourthRange: any;
+      let emptyRange: any;
 
-      const empty = int4Range.castValue("empty");
-      expect(empty).toBeNull();
-    });
+      const insertRange = async (values: Record<string, unknown>) => {
+        await connection.execute(`
+          INSERT INTO postgresql_ranges (
+            id,
+            date_range,
+            num_range,
+            ts_range,
+            tstz_range,
+            int4_range,
+            int8_range,
+            float_range
+          ) VALUES (
+            ${values.id},
+            '${values.date_range}',
+            '${values.num_range}',
+            '${values.ts_range}',
+            '${values.tstz_range}',
+            '${values.int4_range}',
+            '${values.int8_range}',
+            '${values.float_range}'
+          )
+        `);
+      };
 
-    it("int4range values", () => {
-      const r = int4Range.castValue("[1,10)")!;
-      expect(r.begin).toBe(1);
-      expect(r.end).toBe(10);
-      expect(r.excludeEnd).toBe(true);
-    });
+      const roundTrip = async (range: any, attribute: string, value: unknown) => {
+        range[attribute] = value;
+        expect(await range.save()).toBeTruthy();
+        expect(await range.reload()).toBeTruthy();
+      };
 
-    it("int8range values", () => {
-      const r = int8Range.castValue("[10,100)")!;
-      expect(r.begin).toBe(10);
-      expect(r.end).toBe(100);
-    });
+      const assertEqualRoundTrip = async (range: any, attribute: string, value: unknown) => {
+        await roundTrip(range, attribute, value);
+        expect(range[attribute]).toEqual(value);
+      };
 
-    it("daterange values", () => {
-      const r = dateRange.castValue("[2012-01-02,2012-01-05)")!;
-      expect((r.begin as Temporal.PlainDate).toString()).toBe("2012-01-02");
-      expect((r.end as Temporal.PlainDate).toString()).toBe("2012-01-05");
-    });
+      const assertNilRoundTrip = async (range: any, attribute: string, value: unknown) => {
+        await roundTrip(range, attribute, value);
+        expect(range[attribute]).toBeNull();
+      };
 
-    it("numrange values", () => {
-      const r = numRange.castValue("[0.1,0.2]")!;
-      expect((r.begin as BigDecimal).toString("F")).toBe("0.1");
-      expect((r.end as BigDecimal).toString("F")).toBe("0.2");
-      expect(r.excludeEnd).toBe(false);
+      beforeEach(async () => {
+        connection = adapter;
+        await insertRange({
+          id: 101,
+          date_range: "[''2012-01-02'', ''2012-01-04'']",
+          num_range: "[0.1, 0.2]",
+          ts_range: "[''2010-01-01 14:30'', ''2011-01-01 14:30'']",
+          tstz_range: "[''2010-01-01 14:30:00+05'', ''2011-01-01 14:30:00-03'']",
+          int4_range: "[1, 10]",
+          int8_range: "[10, 100]",
+          float_range: "[0.5, 0.7]",
+        });
 
-      const third = numRange.castValue("[0.1,)")!;
-      expect((third.begin as BigDecimal).toString("F")).toBe("0.1");
-      expect((third.end as BigDecimal).isInfinite()).toBe(1);
+        await insertRange({
+          id: 102,
+          date_range: "[''2012-01-02'', ''2012-01-04'')",
+          num_range: "[0.1, 0.2)",
+          ts_range: "[''2010-01-01 14:30'', ''2011-01-01 14:30'')",
+          tstz_range: "[''2010-01-01 14:30:00+05'', ''2011-01-01 14:30:00-03'')",
+          int4_range: "[1, 10)",
+          int8_range: "[10, 100)",
+          float_range: "[0.5, 0.7)",
+        });
 
-      const fourth = numRange.castValue("[,]")!;
-      expect((fourth.begin as BigDecimal).isInfinite()).toBe(-1);
-      expect((fourth.end as BigDecimal).isInfinite()).toBe(1);
-    });
+        await insertRange({
+          id: 103,
+          date_range: "[''2012-01-02'',]",
+          num_range: "[0.1,]",
+          ts_range: "[''2010-01-01 14:30'',]",
+          tstz_range: "[''2010-01-01 14:30:00+05'',]",
+          int4_range: "[1,]",
+          int8_range: "[10,]",
+          float_range: "[0.5,]",
+        });
 
-    it("tsrange values", () => {
-      const r = tsRange.castValue('["2010-01-01 14:30:00","2011-01-01 14:30:00")')!;
-      expect((r.begin as RubyTime).toS()).toContain("2010-01-01");
-      expect((r.end as RubyTime).toS()).toContain("2011-01-01");
-    });
+        await insertRange({
+          id: 104,
+          date_range: "[,]",
+          num_range: "[,]",
+          ts_range: "[,]",
+          tstz_range: "[,]",
+          int4_range: "[,]",
+          int8_range: "[,]",
+          float_range: "[,]",
+        });
 
-    it("tstzrange values", () => {
-      const r = tstzRange.castValue('["2010-01-01 14:30:00+00","2011-01-01 14:30:00+00")')!;
-      expect((r.begin as RubyTime).toS()).toContain("2010-01-01");
-    });
+        await insertRange({
+          id: 105,
+          date_range: "[''2012-01-02'', ''2012-01-02'')",
+          num_range: "[0.1, 0.1)",
+          ts_range: "[''2010-01-01 14:30'', ''2010-01-01 14:30'')",
+          tstz_range: "[''2010-01-01 14:30:00+05'', ''2010-01-01 06:30:00-03'')",
+          int4_range: "[1, 1)",
+          int8_range: "[10, 10)",
+          float_range: "[0.5, 0.5)",
+        });
 
-    it("custom range values", () => {
-      expect(floatRange.castValue("[0.5,0.7]")!.excludeEnd).toBe(false);
-      expect(floatRange.castValue("[0.5,0.7)")!.excludeEnd).toBe(true);
-      const endless = floatRange.castValue("[0.5,)")!;
-      expect(endless.begin).toBeCloseTo(0.5);
-      expect(endless.end).toBe(Infinity);
-      const infinite = floatRange.castValue("[,]")!;
-      expect(infinite.begin).toBe(-Infinity);
-      expect(infinite.end).toBe(Infinity);
-      expect(floatRange.castValue("empty")).toBeNull();
-    });
-    it("timezone awareness tzrange", async () => {
-      const tz = "Pacific Time (US & Canada)";
-      const zone = TimeZone.find(tz)!;
-      setZone(tz);
-      const timeString = "2020-06-15T10:00:00-07:00";
-      const instant = Temporal.Instant.from(timeString);
+        newRange = new PostgresqlRanges();
+        firstRange = await PostgresqlRanges.find(101);
+        secondRange = await PostgresqlRanges.find(102);
+        thirdRange = await PostgresqlRanges.find(103);
+        fourthRange = await PostgresqlRanges.find(104);
+        emptyRange = await PostgresqlRanges.find(105);
+      });
 
-      const r = new PostgresqlRangesTz({ tstz_range: new Range(timeString, timeString, false) });
-      const range1 = r.tstz_range as Range;
-      expect(range1.begin).toBeInstanceOf(TimeWithZone);
-      expect((range1.begin as TimeWithZone).utc().toTime().epochMilliseconds).toBe(
-        instant.epochMilliseconds,
-      );
-      expect((range1.begin as TimeWithZone).timeZone.name).toBe(zone.name);
+      it("data type of range types", () => {
+        expect(firstRange.columnForAttribute("date_range").type).toEqual("daterange");
+        expect(firstRange.columnForAttribute("num_range").type).toEqual("numrange");
+        expect(firstRange.columnForAttribute("ts_range").type).toEqual("tsrange");
+        expect(firstRange.columnForAttribute("tstz_range").type).toEqual("tstzrange");
+        expect(firstRange.columnForAttribute("int4_range").type).toEqual("int4range");
+        expect(firstRange.columnForAttribute("int8_range").type).toEqual("int8range");
+      });
 
-      await r.saveBang();
-      await r.reload();
-      const range2 = r.tstz_range as Range;
-      expect(range2.begin).toBeInstanceOf(TimeWithZone);
-      expect((range2.begin as TimeWithZone).utc().toTime().epochMilliseconds).toBe(
-        instant.epochMilliseconds,
-      );
-      expect((range2.begin as TimeWithZone).timeZone.name).toBe(zone.name);
-    });
-    it("timezone awareness endless tzrange", async () => {
-      const tz = "Pacific Time (US & Canada)";
-      const zone = TimeZone.find(tz)!;
-      setZone(tz);
-      const timeString = "2020-06-15T10:00:00-07:00";
-      const instant = Temporal.Instant.from(timeString);
+      it("int4range values", () => {
+        expect(firstRange.int4_range).toEqual(new Range(1, 11, true));
+        expect(secondRange.int4_range).toEqual(new Range(1, 10, true));
+        expect(thirdRange.int4_range).toEqual(new Range(1, Infinity, true));
+        expect(fourthRange.int4_range).toEqual(new Range(-Infinity, Infinity, true));
+        expect(emptyRange.int4_range).toBeNull();
+      });
 
-      const r = new PostgresqlRangesTz({ tstz_range: new Range(timeString, null, true) });
-      const range1 = r.tstz_range as Range;
-      expect(range1.begin).toBeInstanceOf(TimeWithZone);
-      expect((range1.begin as TimeWithZone).utc().toTime().epochMilliseconds).toBe(
-        instant.epochMilliseconds,
-      );
-      expect((range1.begin as TimeWithZone).timeZone.name).toBe(zone.name);
-      expect(range1.end).toBeNull();
+      it("int8range values", () => {
+        expect(firstRange.int8_range).toEqual(new Range(10, 101, true));
+        expect(secondRange.int8_range).toEqual(new Range(10, 100, true));
+        expect(thirdRange.int8_range).toEqual(new Range(10, Infinity, true));
+        expect(fourthRange.int8_range).toEqual(new Range(-Infinity, Infinity, true));
+        expect(emptyRange.int8_range).toBeNull();
+      });
 
-      await r.saveBang();
-      await r.reload();
-      const range2 = r.tstz_range as Range;
-      expect(range2.begin).toBeInstanceOf(TimeWithZone);
-      expect((range2.begin as TimeWithZone).utc().toTime().epochMilliseconds).toBe(
-        instant.epochMilliseconds,
-      );
-      expect((range2.begin as TimeWithZone).timeZone.name).toBe(zone.name);
-      expect(range2.end).toBeNull();
-    });
-    it("timezone awareness beginless tzrange", async () => {
-      const tz = "Pacific Time (US & Canada)";
-      const zone = TimeZone.find(tz)!;
-      setZone(tz);
-      const timeString = "2020-06-15T10:00:00-07:00";
-      const instant = Temporal.Instant.from(timeString);
+      it.skip("daterange values", () => {
+        // BLOCKED: port-bug — an endless daterange reads back with a null end instead of Infinity (postgresql-endless-daterange-end-reads-null)
+        expect(firstRange.date_range).toEqual(
+          new Range(
+            Temporal.PlainDate.from("2012-01-02"),
+            Temporal.PlainDate.from("2012-01-05"),
+            true,
+          ),
+        );
+        expect(secondRange.date_range).toEqual(
+          new Range(
+            Temporal.PlainDate.from("2012-01-02"),
+            Temporal.PlainDate.from("2012-01-04"),
+            true,
+          ),
+        );
+        expect(thirdRange.date_range).toEqual(
+          new Range<unknown>(Temporal.PlainDate.from("2012-01-02"), Infinity, true),
+        );
+        expect(fourthRange.date_range).toEqual(new Range(-Infinity, Infinity, true));
+        expect(emptyRange.date_range).toBeNull();
+      });
 
-      const r = new PostgresqlRangesTz({ tstz_range: new Range(null, timeString, false) });
-      const range1 = r.tstz_range as Range;
-      expect(range1.begin).toBeNull();
-      expect(range1.end).toBeInstanceOf(TimeWithZone);
-      expect((range1.end as TimeWithZone).utc().toTime().epochMilliseconds).toBe(
-        instant.epochMilliseconds,
-      );
-      expect((range1.end as TimeWithZone).timeZone.name).toBe(zone.name);
+      it("numrange values", () => {
+        expect(firstRange.num_range).toEqual(
+          new Range(new BigDecimal("0.1"), new BigDecimal("0.2")),
+        );
+        expect(secondRange.num_range).toEqual(
+          new Range(new BigDecimal("0.1"), new BigDecimal("0.2"), true),
+        );
+        expect(thirdRange.num_range).toEqual(
+          new Range(new BigDecimal("0.1"), new BigDecimal("Infinity"), true),
+        );
+        expect(fourthRange.num_range).toEqual(
+          new Range(new BigDecimal("-Infinity"), new BigDecimal("Infinity"), true),
+        );
+        expect(emptyRange.num_range).toBeNull();
+      });
 
-      await r.saveBang();
-      await r.reload();
-      const range2 = r.tstz_range as Range;
-      expect(range2.begin).toBeNull();
-      expect(range2.end).toBeInstanceOf(TimeWithZone);
-      expect((range2.end as TimeWithZone).utc().toTime().epochMilliseconds).toBe(
-        instant.epochMilliseconds,
-      );
-      expect((range2.end as TimeWithZone).timeZone.name).toBe(zone.name);
-    });
-    it("timezone array awareness tzrange", async () => {
-      const tz = "Pacific Time (US & Canada)";
-      const zone = TimeZone.find(tz)!;
-      setZone(tz);
+      it("tsrange values", () => {
+        const tz = defaultTimezone();
+        expect(firstRange.ts_range).toEqual(
+          new Range(RubyTime[tz](2010, 1, 1, 14, 30, 0), RubyTime[tz](2011, 1, 1, 14, 30, 0)),
+        );
+        expect(secondRange.ts_range).toEqual(
+          new Range(RubyTime[tz](2010, 1, 1, 14, 30, 0), RubyTime[tz](2011, 1, 1, 14, 30, 0), true),
+        );
+        expect(thirdRange.ts_range).toEqual(
+          new Range(RubyTime[tz](2010, 1, 1, 14, 30, 0), null, true),
+        );
+        expect(fourthRange.ts_range).toEqual(new Range(-Infinity, Infinity, true));
+        expect(emptyRange.ts_range).toBeNull();
+      });
 
-      const fromStr = "2020-06-15T10:00:00-07:00";
-      const toStr = "2020-06-15T11:00:00-07:00";
-      const fromInstant = Temporal.Instant.from(fromStr);
-      const toInstant = Temporal.Instant.from(toStr);
+      it("tstzrange values", () => {
+        expect(firstRange.tstz_range).toEqual(
+          new Range(
+            RubyTime.parse("2010-01-01 09:30:00 UTC"),
+            RubyTime.parse("2011-01-01 17:30:00 UTC"),
+          ),
+        );
+        expect(secondRange.tstz_range).toEqual(
+          new Range(
+            RubyTime.parse("2010-01-01 09:30:00 UTC"),
+            RubyTime.parse("2011-01-01 17:30:00 UTC"),
+            true,
+          ),
+        );
+        expect(thirdRange.tstz_range).toEqual(
+          new Range(RubyTime.parse("2010-01-01 09:30:00 UTC"), null, true),
+        );
+        expect(fourthRange.tstz_range).toEqual(new Range(-Infinity, Infinity, true));
+        expect(emptyRange.tstz_range).toBeNull();
+      });
 
-      const ranges = [
-        new Range(fromStr, toStr, true),
-        new Range(fromStr, toStr, false),
-        new Range(fromStr, null, true),
-        new Range(null, toStr, false),
-      ];
-      const r = new PostgresqlRangesTz({ tstz_ranges: ranges });
-      const pre = r.tstz_ranges as Range[];
-      expect(pre[0].begin).toBeInstanceOf(TimeWithZone);
-      expect((pre[0].begin as TimeWithZone).timeZone.name).toBe(zone.name);
-      expect((pre[0].begin as TimeWithZone).utc().toTime().epochMilliseconds).toBe(
-        fromInstant.epochMilliseconds,
-      );
+      it("custom range values", () => {
+        expect(firstRange.float_range).toEqual(new Range(0.5, 0.7));
+        expect(secondRange.float_range).toEqual(new Range(0.5, 0.7, true));
+        expect(thirdRange.float_range).toEqual(new Range(0.5, Infinity, true));
+        expect(fourthRange.float_range).toEqual(new Range(-Infinity, Infinity, true));
+        expect(emptyRange.float_range).toBeNull();
+      });
 
-      await r.saveBang();
-      await r.reload();
-      const post = r.tstz_ranges as Range[];
-      expect(post).toHaveLength(4);
-      expect(post[0].begin).toBeInstanceOf(TimeWithZone);
-      expect((post[0].begin as TimeWithZone).timeZone.name).toBe(zone.name);
-      expect((post[0].begin as TimeWithZone).utc().toTime().epochMilliseconds).toBe(
-        fromInstant.epochMilliseconds,
-      );
-      expect((post[0].end as TimeWithZone).utc().toTime().epochMilliseconds).toBe(
-        toInstant.epochMilliseconds,
-      );
-      expect(post[2].begin).toBeInstanceOf(TimeWithZone);
-      expect(post[2].end).toBeNull();
-      expect(post[3].begin).toBeNull();
-      expect(post[3].end).toBeInstanceOf(TimeWithZone);
-    });
-    it("create tstzrange", async () => {
-      const begin = Temporal.Instant.from("2010-01-01T13:30:00Z");
-      const end = Temporal.Instant.from("2011-02-02T19:30:00Z");
-      const r = await PostgresqlRanges.create({ tstz_range: new Range(begin, end, true) });
-      await r.reload();
-      const result = r.tstz_range as Range;
-      expect(result).toBeInstanceOf(Range);
-      expect((result.begin as RubyTime).toF() * 1000).toBe(begin.epochMilliseconds);
-      expect((result.end as RubyTime).toF() * 1000).toBe(end.epochMilliseconds);
-      expect(result.excludeEnd).toBe(true);
-    });
-    it("update tstzrange", async () => {
-      const begin = Temporal.Instant.from("2010-01-01T19:30:00Z");
-      const end = Temporal.Instant.from("2011-02-02T13:30:00Z");
-      const r = await PostgresqlRanges.create({ tstz_range: new Range(begin, end, true) });
-      await r.reload();
-      expect(((r.tstz_range as Range).begin as RubyTime).toF() * 1000).toBe(
-        begin.epochMilliseconds,
-      );
-      expect(((r.tstz_range as Range).end as RubyTime).toF() * 1000).toBe(end.epochMilliseconds);
-      const sameInstant = Temporal.Instant.from("2010-01-01T13:30:00Z");
-      r.tstz_range = new Range(sameInstant, sameInstant, true);
-      await r.saveBang();
-      await r.reload();
-      expect(r.tstz_range).toBeNull();
-    });
-    it("escaped tstzrange", async () => {
-      const bcBegin = Temporal.ZonedDateTime.from(
-        { year: -1000, month: 1, day: 1, hour: 19, minute: 30, second: 0, timeZone: "UTC" },
-        { overflow: "reject" },
-      ).toInstant();
-      const end = Temporal.Instant.from("2020-02-02T13:30:00Z");
-      const r = await PostgresqlRanges.create({ tstz_range: new Range(bcBegin, end, true) });
-      await r.reload();
-      const result = r.tstz_range as Range;
-      expect((result.begin as RubyTime).toF() * 1000).toBe(bcBegin.epochMilliseconds);
-      expect((result.end as RubyTime).toF() * 1000).toBe(end.epochMilliseconds);
-    });
-    it("unbounded tstzrange", async () => {
-      const t = Temporal.Instant.from("2010-01-01T19:30:00Z");
-      const r1 = await PostgresqlRanges.create({ tstz_range: new Range(t, null, true) });
-      await r1.reload();
-      const res1 = r1.tstz_range as Range;
-      expect((res1.begin as RubyTime).toF() * 1000).toBe(t.epochMilliseconds);
-      expect(res1.end).toBeNull();
-      expect(res1.excludeEnd).toBe(true);
-      const r2 = await PostgresqlRanges.create({ tstz_range: new Range(null, t, false) });
-      await r2.reload();
-      const res2 = r2.tstz_range as Range;
-      expect(res2.begin).toBeNull();
-      expect((res2.end as RubyTime).toF() * 1000).toBe(t.epochMilliseconds);
-      expect(res2.excludeEnd).toBe(false);
-    });
-    it("create tsrange", async () => {
-      const begin = Temporal.Instant.from("2010-01-01T14:30:00Z");
-      const end = Temporal.Instant.from("2011-02-02T14:30:00Z");
-      const r = await PostgresqlRanges.create({ ts_range: new Range(begin, end, true) });
-      await r.reload();
-      const result = r.ts_range as Range;
-      expect(result).toBeInstanceOf(Range);
-      expect((result.begin as RubyTime).toF() * 1000).toBe(begin.epochMilliseconds);
-      expect((result.end as RubyTime).toF() * 1000).toBe(end.epochMilliseconds);
-      expect(result.excludeEnd).toBe(true);
-    });
-    it("update tsrange", async () => {
-      const begin = Temporal.Instant.from("2010-01-01T14:30:00Z");
-      const end = Temporal.Instant.from("2011-02-02T14:30:00Z");
-      const r = await PostgresqlRanges.create({ ts_range: new Range(begin, end, true) });
-      await r.reload();
-      expect(((r.ts_range as Range).begin as RubyTime).toF() * 1000).toBe(begin.epochMilliseconds);
-      expect(((r.ts_range as Range).end as RubyTime).toF() * 1000).toBe(end.epochMilliseconds);
-      r.ts_range = new Range(begin, begin, true);
-      await r.saveBang();
-      await r.reload();
-      expect(r.ts_range).toBeNull();
-    });
-    it("escaped tsrange", async () => {
-      const bcBegin = Temporal.ZonedDateTime.from(
-        { year: -1000, month: 1, day: 1, hour: 14, minute: 30, second: 0, timeZone: "UTC" },
-        { overflow: "reject" },
-      ).toInstant();
-      const end = Temporal.Instant.from("2020-02-02T14:30:00Z");
-      const r = await PostgresqlRanges.create({ ts_range: new Range(bcBegin, end, true) });
-      await r.reload();
-      const result = r.ts_range as Range;
-      expect((result.begin as RubyTime).toF() * 1000).toBe(bcBegin.epochMilliseconds);
-      expect((result.end as RubyTime).toF() * 1000).toBe(end.epochMilliseconds);
-    });
-    it("unbounded tsrange", async () => {
-      const t = Temporal.Instant.from("2010-01-01T14:30:00Z");
-      const r1 = await PostgresqlRanges.create({ ts_range: new Range(t, null, true) });
-      await r1.reload();
-      const res1 = r1.ts_range as Range;
-      expect((res1.begin as RubyTime).toF() * 1000).toBe(t.epochMilliseconds);
-      expect(res1.end).toBeNull();
-      expect(res1.excludeEnd).toBe(true);
-      const r2 = await PostgresqlRanges.create({ ts_range: new Range(null, t, false) });
-      await r2.reload();
-      const res2 = r2.ts_range as Range;
-      expect(res2.begin).toBeNull();
-      expect((res2.end as RubyTime).toF() * 1000).toBe(t.epochMilliseconds);
-      expect(res2.excludeEnd).toBe(false);
-    });
-    it("timezone awareness tsrange", async () => {
-      const tz = "Pacific Time (US & Canada)";
-      const zone = TimeZone.find(tz)!;
-      setZone(tz);
-      const timeString = "2020-06-15T10:00:00-07:00";
-      const instant = Temporal.Instant.from(timeString);
+      it("timezone awareness tzrange", async () => {
+        const tz = "Pacific Time (US & Canada)";
 
-      const r = new PostgresqlRangesTz({ ts_range: new Range(timeString, timeString, false) });
-      const range1 = r.ts_range as Range;
-      expect(range1.begin).toBeInstanceOf(TimeWithZone);
-      expect((range1.begin as TimeWithZone).utc().toTime().epochMilliseconds).toBe(
-        instant.epochMilliseconds,
-      );
-      expect((range1.begin as TimeWithZone).timeZone.name).toBe(zone.name);
+        await inTimeZone(tz, async () => {
+          void PostgresqlRangesTz.resetColumnInformation();
+          await PostgresqlRangesTz.loadSchema();
+          const timeString = zone()!.now().toString();
+          const time = zone()!.parse(timeString)!;
 
-      await r.saveBang();
-      await r.reload();
-      const range2 = r.ts_range as Range;
-      expect(range2.begin).toBeInstanceOf(TimeWithZone);
-      expect((range2.begin as TimeWithZone).utc().toTime().epochMilliseconds).toBe(
-        instant.epochMilliseconds,
-      );
-      expect((range2.begin as TimeWithZone).timeZone.name).toBe(zone.name);
-    });
-    it("timezone awareness endless tsrange", async () => {
-      const tz = "Pacific Time (US & Canada)";
-      const zone = TimeZone.find(tz)!;
-      setZone(tz);
-      const timeString = "2020-06-15T10:00:00-07:00";
-      const instant = Temporal.Instant.from(timeString);
+          const record = new PostgresqlRangesTz({ tstz_range: new Range(timeString, timeString) });
+          expect(record.tstz_range).toEqual(new Range(time, time));
+          expect(record.tstz_range.begin.timeZone).toEqual(TimeZone.find(tz));
 
-      const r = new PostgresqlRangesTz({ ts_range: new Range(timeString, null, true) });
-      const range1 = r.ts_range as Range;
-      expect(range1.begin).toBeInstanceOf(TimeWithZone);
-      expect((range1.begin as TimeWithZone).utc().toTime().epochMilliseconds).toBe(
-        instant.epochMilliseconds,
-      );
-      expect((range1.begin as TimeWithZone).timeZone.name).toBe(zone.name);
-      expect(range1.end).toBeNull();
+          await record.saveBang();
+          await record.reload();
 
-      await r.saveBang();
-      await r.reload();
-      const range2 = r.ts_range as Range;
-      expect(range2.begin).toBeInstanceOf(TimeWithZone);
-      expect((range2.begin as TimeWithZone).utc().toTime().epochMilliseconds).toBe(
-        instant.epochMilliseconds,
-      );
-      expect((range2.begin as TimeWithZone).timeZone.name).toBe(zone.name);
-      expect(range2.end).toBeNull();
-    });
-    it("timezone awareness beginless tsrange", async () => {
-      const tz = "Pacific Time (US & Canada)";
-      const zone = TimeZone.find(tz)!;
-      setZone(tz);
-      const timeString = "2020-06-15T10:00:00-07:00";
-      const instant = Temporal.Instant.from(timeString);
+          expect(record.tstz_range).toEqual(new Range(time, time));
+          expect(record.tstz_range.begin.timeZone).toEqual(TimeZone.find(tz));
+        });
+      });
 
-      const r = new PostgresqlRangesTz({ ts_range: new Range(null, timeString, false) });
-      const range1 = r.ts_range as Range;
-      expect(range1.begin).toBeNull();
-      expect(range1.end).toBeInstanceOf(TimeWithZone);
-      expect((range1.end as TimeWithZone).utc().toTime().epochMilliseconds).toBe(
-        instant.epochMilliseconds,
-      );
-      expect((range1.end as TimeWithZone).timeZone.name).toBe(zone.name);
+      it("timezone awareness endless tzrange", async () => {
+        const tz = "Pacific Time (US & Canada)";
 
-      await r.saveBang();
-      await r.reload();
-      const range2 = r.ts_range as Range;
-      expect(range2.begin).toBeNull();
-      expect(range2.end).toBeInstanceOf(TimeWithZone);
-      expect((range2.end as TimeWithZone).utc().toTime().epochMilliseconds).toBe(
-        instant.epochMilliseconds,
-      );
-      expect((range2.end as TimeWithZone).timeZone.name).toBe(zone.name);
-    });
-    it("timezone array awareness tsrange", async () => {
-      const tz = "Pacific Time (US & Canada)";
-      const zone = TimeZone.find(tz)!;
-      setZone(tz);
+        await inTimeZone(tz, async () => {
+          void PostgresqlRangesTz.resetColumnInformation();
+          await PostgresqlRangesTz.loadSchema();
+          const timeString = zone()!.now().toString();
+          const time = zone()!.parse(timeString)!;
 
-      const fromStr = "2020-06-15T10:00:00-07:00";
-      const toStr = "2020-06-15T11:00:00-07:00";
-      const fromInstant = Temporal.Instant.from(fromStr);
-      const toInstant = Temporal.Instant.from(toStr);
+          const record = new PostgresqlRangesTz({ tstz_range: new Range(timeString, null, true) });
+          expect(record.tstz_range).toEqual(new Range(time, null, true));
+          expect(record.tstz_range.begin.timeZone).toEqual(TimeZone.find(tz));
 
-      const ranges = [
-        new Range(fromStr, toStr, true),
-        new Range(fromStr, toStr, false),
-        new Range(fromStr, null, true),
-        new Range(null, toStr, false),
-      ];
-      const r = new PostgresqlRangesTz({ ts_ranges: ranges });
-      const pre = r.ts_ranges as Range[];
-      expect(pre[0].begin).toBeInstanceOf(TimeWithZone);
-      expect((pre[0].begin as TimeWithZone).timeZone.name).toBe(zone.name);
-      expect((pre[0].begin as TimeWithZone).utc().toTime().epochMilliseconds).toBe(
-        fromInstant.epochMilliseconds,
-      );
+          await record.saveBang();
+          await record.reload();
 
-      await r.saveBang();
-      await r.reload();
-      const post = r.ts_ranges as Range[];
-      expect(post).toHaveLength(4);
-      expect(post[0].begin).toBeInstanceOf(TimeWithZone);
-      expect((post[0].begin as TimeWithZone).timeZone.name).toBe(zone.name);
-      expect((post[0].begin as TimeWithZone).utc().toTime().epochMilliseconds).toBe(
-        fromInstant.epochMilliseconds,
-      );
-      expect((post[0].end as TimeWithZone).utc().toTime().epochMilliseconds).toBe(
-        toInstant.epochMilliseconds,
-      );
-      expect(post[2].begin).toBeInstanceOf(TimeWithZone);
-      expect(post[2].end).toBeNull();
-      expect(post[3].begin).toBeNull();
-      expect(post[3].end).toBeInstanceOf(TimeWithZone);
-    });
-    it("create tstzrange preserve usec", async () => {
-      const begin = Temporal.Instant.from("2010-01-01T13:30:00.670277Z");
-      const end = Temporal.Instant.from("2011-02-02T19:30:00.745125Z");
-      const r = await PostgresqlRanges.create({ tstz_range: new Range(begin, end, true) });
-      await r.reload();
-      const result = r.tstz_range as Range;
-      expect((result.begin as RubyTime).getutc().xmlschema(9)).toBe(
-        begin.toString({ fractionalSecondDigits: 9 }),
-      );
-      expect((result.end as RubyTime).getutc().xmlschema(9)).toBe(
-        end.toString({ fractionalSecondDigits: 9 }),
-      );
-    });
-    it("update tstzrange preserve usec", async () => {
-      const begin = Temporal.Instant.from("2010-01-01T19:30:00.245124Z");
-      const end = Temporal.Instant.from("2011-02-02T13:30:00.451274Z");
-      const r = await PostgresqlRanges.create({ tstz_range: new Range(begin, end, true) });
-      await r.reload();
-      expect(((r.tstz_range as Range).begin as RubyTime).getutc().xmlschema(9)).toBe(
-        begin.toString({ fractionalSecondDigits: 9 }),
-      );
-      expect(((r.tstz_range as Range).end as RubyTime).getutc().xmlschema(9)).toBe(
-        end.toString({ fractionalSecondDigits: 9 }),
-      );
-      const sameInstant = Temporal.Instant.from("2010-01-01T13:30:00.245124Z");
-      r.tstz_range = new Range(sameInstant, sameInstant, true);
-      await r.saveBang();
-      await r.reload();
-      expect(r.tstz_range).toBeNull();
-    });
-    it("create tsrange preserve usec", async () => {
-      const begin = Temporal.Instant.from("2010-01-01T14:30:00.125435Z");
-      const end = Temporal.Instant.from("2011-02-02T14:30:00.225435Z");
-      const r = await PostgresqlRanges.create({ ts_range: new Range(begin, end, true) });
-      await r.reload();
-      const result = r.ts_range as Range;
-      expect((result.begin as RubyTime).getutc().xmlschema(9)).toBe(
-        begin.toString({ fractionalSecondDigits: 9 }),
-      );
-      expect((result.end as RubyTime).getutc().xmlschema(9)).toBe(
-        end.toString({ fractionalSecondDigits: 9 }),
-      );
-    });
-    it("update tsrange preserve usec", async () => {
-      const begin = Temporal.Instant.from("2010-01-01T14:30:00.142432Z");
-      const end = Temporal.Instant.from("2011-02-02T14:30:00.224242Z");
-      const r = await PostgresqlRanges.create({ ts_range: new Range(begin, end, true) });
-      await r.reload();
-      expect(((r.ts_range as Range).begin as RubyTime).getutc().xmlschema(9)).toBe(
-        begin.toString({ fractionalSecondDigits: 9 }),
-      );
-      expect(((r.ts_range as Range).end as RubyTime).getutc().xmlschema(9)).toBe(
-        end.toString({ fractionalSecondDigits: 9 }),
-      );
-      r.ts_range = new Range(begin, begin, true);
-      await r.saveBang();
-      await r.reload();
-      expect(r.ts_range).toBeNull();
-    });
-    it("timezone awareness tsrange preserve usec", async () => {
-      const tz = "Pacific Time (US & Canada)";
-      const zone = TimeZone.find(tz)!;
-      setZone(tz);
-      const timeString = "2017-09-26T07:30:59.132451-07:00";
-      const instant = Temporal.Instant.from(timeString);
-      expect(instant.toString()).toContain(".132451");
+          expect(record.tstz_range).toEqual(new Range(time, null, true));
+          expect(record.tstz_range.begin.timeZone).toEqual(TimeZone.find(tz));
+        });
+      });
 
-      const r = new PostgresqlRangesTz({ ts_range: new Range(timeString, timeString, false) });
-      const range1 = r.ts_range as Range;
-      expect(range1.begin).toBeInstanceOf(TimeWithZone);
-      expect((range1.begin as TimeWithZone).timeZone.name).toBe(zone.name);
-      expect((range1.begin as TimeWithZone).utc().toTime().toInstant().toString()).toBe(
-        instant.toString(),
-      );
+      it("timezone awareness beginless tzrange", async () => {
+        const tz = "Pacific Time (US & Canada)";
 
-      await r.saveBang();
-      await r.reload();
-      const range2 = r.ts_range as Range;
-      expect(range2.begin).toBeInstanceOf(TimeWithZone);
-      expect((range2.begin as TimeWithZone).timeZone.name).toBe(zone.name);
-      expect((range2.begin as TimeWithZone).utc().toTime().toInstant().toString()).toBe(
-        instant.toString(),
-      );
-    });
-    it("create numrange", async () => {
-      const range = new Range("0.5", "1", true);
-      const r = await PostgresqlRanges.create({ num_range: range });
-      await r.reload();
-      const result = r.num_range as Range;
-      expect(result).toBeInstanceOf(Range);
-      expect((result.begin as BigDecimal).toString("F")).toBe("0.5");
-      expect((result.end as BigDecimal).toString("F")).toBe("1.0");
-      expect(result.excludeEnd).toBe(true);
-    });
-    it("update numrange", async () => {
-      const range = new Range("0.5", "1", true);
-      const r = await PostgresqlRanges.create({ num_range: range });
-      await r.reload();
-      expect(((r.num_range as Range).begin as BigDecimal).toString("F")).toBe("0.5");
-      expect(((r.num_range as Range).end as BigDecimal).toString("F")).toBe("1.0");
-      r.num_range = new Range("0.5", "0.5", true);
-      await r.saveBang();
-      await r.reload();
-      expect(r.num_range).toBeNull();
-    });
-    it("create daterange", async () => {
-      const range = new Range("2012-01-01", "2013-01-01", true);
-      const r = await PostgresqlRanges.create({ date_range: range });
-      await r.reload();
-      const result = r.date_range as Range;
-      expect(result).toBeInstanceOf(Range);
-      expect((result.begin as Temporal.PlainDate).toString()).toBe("2012-01-01");
-      expect((result.end as Temporal.PlainDate).toString()).toBe("2013-01-01");
-      expect(result.excludeEnd).toBe(true);
-    });
-    it("update daterange", async () => {
-      const range = new Range("2012-02-03", "2012-02-10", true);
-      const r = await PostgresqlRanges.create({ date_range: range });
-      await r.reload();
-      const result = r.date_range as Range;
-      expect((result.begin as Temporal.PlainDate).toString()).toBe("2012-02-03");
-      expect((result.end as Temporal.PlainDate).toString()).toBe("2012-02-10");
-      r.date_range = new Range("2012-02-03", "2012-02-03", true);
-      await r.saveBang();
-      await r.reload();
-      expect(r.date_range).toBeNull();
-    });
-    it("create int4range", async () => {
-      const range = new Range(3, 50, true);
-      const r = await PostgresqlRanges.create({ int4_range: range });
-      await r.reload();
-      const result = r.int4_range as Range;
-      expect(result).toBeInstanceOf(Range);
-      expect(result.begin).toBe(3);
-      expect(result.end).toBe(50);
-      expect(result.excludeEnd).toBe(true);
-    });
-    it("update int4range", async () => {
-      const range = new Range(6, 10, true);
-      const r = await PostgresqlRanges.create({ int4_range: range });
-      await r.reload();
-      expect((r.int4_range as Range).begin).toBe(6);
-      expect((r.int4_range as Range).end).toBe(10);
-      r.int4_range = new Range(3, 3, true);
-      await r.saveBang();
-      await r.reload();
-      expect(r.int4_range).toBeNull();
-    });
-    it("create int8range", async () => {
-      const range = new Range(30, 50, true);
-      const r = await PostgresqlRanges.create({ int8_range: range });
-      await r.reload();
-      const result = r.int8_range as Range;
-      expect(result).toBeInstanceOf(Range);
-      expect(result.begin).toBe(30);
-      expect(result.end).toBe(50);
-      expect(result.excludeEnd).toBe(true);
-    });
-    it("update int8range", async () => {
-      const range = new Range(60000, 10000000, true);
-      const r = await PostgresqlRanges.create({ int8_range: range });
-      await r.reload();
-      expect((r.int8_range as Range).begin).toBe(60000);
-      expect((r.int8_range as Range).end).toBe(10000000);
-      r.int8_range = new Range(39999, 39999, true);
-      await r.saveBang();
-      await r.reload();
-      expect(r.int8_range).toBeNull();
-    });
-    it("exclude beginning for subtypes without succ method is not supported", () => {
-      expect(() => numRange.castValue("(0.1,0.2]")).toThrow();
-      expect(() => int4Range.castValue("(1,10]")).toThrow();
-      expect(() => dateRange.castValue("(2012-01-02,2012-01-04]")).toThrow();
-    });
-    it("where by attribute with range", async () => {
-      const range = new Range(1, 100, false);
-      const record = await PostgresqlRanges.create({ int4_range: range });
-      const found = await PostgresqlRanges.where({ int4_range: range }).take();
-      expect(found).not.toBeNull();
-      expect(found!.id).toBe(record.id);
-    });
-    it("where by attribute with range in array", async () => {
-      const range = new Range(1, 100, false);
-      const record = await PostgresqlRanges.create({ int4_range: range });
-      const found = await PostgresqlRanges.where({ int4_range: [range] }).take();
-      expect(found).not.toBeNull();
-      expect(found!.id).toBe(record.id);
-    });
-    it("update all with ranges", async () => {
-      await PostgresqlRanges.create({});
-      await PostgresqlRanges.updateAll({ int8_range: new Range(1, 100, false) });
-      const first = await PostgresqlRanges.first();
-      expect(first!.int8_range).toBeInstanceOf(Range);
-      expect((first!.int8_range as Range).begin).toBe(1);
-      expect((first!.int8_range as Range).end).toBe(101);
-      expect((first!.int8_range as Range).excludeEnd).toBe(true);
-    });
-    it("ranges correctly escape input", async () => {
-      const range = new Range("-1,2]'\"; DROP TABLE postgresql_ranges; --", "a", false);
-      await PostgresqlRanges.create({});
-      await PostgresqlRanges.updateAll({ int8_range: range }).catch(() => {});
-      await expect(PostgresqlRanges.first()).resolves.not.toBeNull();
-    });
-    it("ranges correctly unescape output", () => {
-      const r = stringRange.castValue('["ca""t","do\\\\g")')!;
-      expect(r.begin).toBe('ca"t');
-      expect(r.end).toBe("do\\g");
-      expect(r.excludeEnd).toBe(true);
-    });
+        await inTimeZone(tz, async () => {
+          void PostgresqlRangesTz.resetColumnInformation();
+          await PostgresqlRangesTz.loadSchema();
+          const timeString = zone()!.now().toString();
+          const time = zone()!.parse(timeString)!;
 
-    it("infinity values", async () => {
-      await adapter.execute(`INSERT INTO postgresql_ranges (int4_range) VALUES ('(,)')`);
-      const rows = await adapter.execute(`SELECT int4_range FROM postgresql_ranges`);
-      const range = int4Range.castValue(rows[0].int4_range as string)!;
-      expect(range.begin).toBe(-Infinity);
-      expect(range.end).toBe(Infinity);
-    });
+          const record = new PostgresqlRangesTz({ tstz_range: new Range(null, timeString) });
+          expect(record.tstz_range).toEqual(new Range(null, time));
+          expect(record.tstz_range.end.timeZone).toEqual(TimeZone.find(tz));
 
-    it("endless range values", async () => {
-      await adapter.execute(`INSERT INTO postgresql_ranges (int4_range) VALUES ('[1,)')`);
-      const rows = await adapter.execute(`SELECT int4_range FROM postgresql_ranges`);
-      const range = int4Range.castValue(rows[0].int4_range as string)!;
-      expect(range.begin).toBe(1);
-      expect(range.end).toBe(Infinity);
-    });
+          await record.saveBang();
+          await record.reload();
 
-    it("empty string range values", async () => {
-      await adapter.execute(`INSERT INTO postgresql_ranges (int4_range) VALUES ('empty')`);
-      const rows = await adapter.execute(`SELECT int4_range FROM postgresql_ranges`);
-      const range = int4Range.castValue(rows[0].int4_range as string);
-      expect(range).toBeNull();
+          expect(record.tstz_range).toEqual(new Range(null, time));
+          expect(record.tstz_range.end.timeZone).toEqual(TimeZone.find(tz));
+        });
+      });
+
+      it("timezone array awareness tzrange", async () => {
+        const tz = "Pacific Time (US & Canada)";
+
+        await inTimeZone(tz, async () => {
+          void PostgresqlRangesTz.resetColumnInformation();
+          await PostgresqlRangesTz.loadSchema();
+
+          const fromTimeString = zone()!.now().toString();
+          const fromTime = zone()!.parse(fromTimeString)!;
+          const toTimeString = fromTime.advance({ hours: 1 }).toString();
+          const toTime = zone()!.parse(toTimeString)!;
+
+          const record = new PostgresqlRangesTz({
+            tstz_ranges: [
+              new Range(fromTimeString, toTimeString, true),
+              new Range(fromTimeString, toTimeString),
+              new Range(fromTimeString, null, true),
+              new Range(null, toTimeString),
+            ],
+          });
+          expect(record.tstz_ranges).toEqual([
+            new Range(fromTime, toTime, true),
+            new Range(fromTime, toTime),
+            new Range(fromTime, null, true),
+            new Range(null, toTime),
+          ]);
+          for (const range of record.tstz_ranges) {
+            if (range.begin) expect(range.begin.timeZone).toEqual(TimeZone.find(tz));
+            if (range.end) expect(range.end.timeZone).toEqual(TimeZone.find(tz));
+          }
+
+          await record.saveBang();
+          await record.reload();
+
+          expect(record.tstz_ranges).toEqual([
+            new Range(fromTime, toTime, true),
+            new Range(fromTime, toTime),
+            new Range(fromTime, null, true),
+            new Range(null, toTime),
+          ]);
+          for (const range of record.tstz_ranges) {
+            if (range.begin) expect(range.begin.timeZone).toEqual(TimeZone.find(tz));
+            if (range.end) expect(range.end.timeZone).toEqual(TimeZone.find(tz));
+          }
+        });
+      });
+
+      it("create tstzrange", async () => {
+        const tstzrange = new Range(
+          RubyTime.parse("2010-01-01 14:30:00 +0100"),
+          RubyTime.parse("2011-02-02 14:30:00 CDT"),
+          true,
+        );
+        await roundTrip(newRange, "tstz_range", tstzrange);
+        expect(tstzrange).toEqual(newRange.tstz_range);
+        expect(
+          new Range(
+            RubyTime.parse("2010-01-01 13:30:00 UTC"),
+            RubyTime.parse("2011-02-02 19:30:00 UTC"),
+            true,
+          ),
+        ).toEqual(newRange.tstz_range);
+      });
+
+      it("update tstzrange", async () => {
+        await assertEqualRoundTrip(
+          firstRange,
+          "tstz_range",
+          new Range(
+            RubyTime.parse("2010-01-01 14:30:00 CDT"),
+            RubyTime.parse("2011-02-02 14:30:00 CET"),
+            true,
+          ),
+        );
+        await assertNilRoundTrip(
+          firstRange,
+          "tstz_range",
+          new Range(
+            RubyTime.parse("2010-01-01 14:30:00 +0100"),
+            RubyTime.parse("2010-01-01 13:30:00 +0000"),
+            true,
+          ),
+        );
+      });
+
+      it("escaped tstzrange", async () => {
+        await assertEqualRoundTrip(
+          firstRange,
+          "tstz_range",
+          new Range(
+            RubyTime.parse("-1000-01-01 14:30:00 CDT"),
+            RubyTime.parse("2020-02-02 14:30:00 CET"),
+            true,
+          ),
+        );
+      });
+
+      it("unbounded tstzrange", async () => {
+        await assertEqualRoundTrip(
+          firstRange,
+          "tstz_range",
+          new Range(RubyTime.parse("2010-01-01 14:30:00 CDT"), null, true),
+        );
+        await assertEqualRoundTrip(
+          firstRange,
+          "tstz_range",
+          new Range(null, RubyTime.parse("2010-01-01 14:30:00 CDT")),
+        );
+      });
+
+      it("create tsrange", async () => {
+        const tz = defaultTimezone();
+        await assertEqualRoundTrip(
+          newRange,
+          "ts_range",
+          new Range(RubyTime[tz](2010, 1, 1, 14, 30, 0), RubyTime[tz](2011, 2, 2, 14, 30, 0), true),
+        );
+      });
+
+      it("update tsrange", async () => {
+        const tz = defaultTimezone();
+        await assertEqualRoundTrip(
+          firstRange,
+          "ts_range",
+          new Range(RubyTime[tz](2010, 1, 1, 14, 30, 0), RubyTime[tz](2011, 2, 2, 14, 30, 0), true),
+        );
+        await assertNilRoundTrip(
+          firstRange,
+          "ts_range",
+          new Range(RubyTime[tz](2010, 1, 1, 14, 30, 0), RubyTime[tz](2010, 1, 1, 14, 30, 0), true),
+        );
+      });
+
+      it("escaped tsrange", async () => {
+        const tz = defaultTimezone();
+        await assertEqualRoundTrip(
+          firstRange,
+          "ts_range",
+          new Range(
+            RubyTime[tz](-1000, 1, 1, 14, 30, 0),
+            RubyTime[tz](2020, 2, 2, 14, 30, 0),
+            true,
+          ),
+        );
+      });
+
+      it("unbounded tsrange", async () => {
+        const tz = defaultTimezone();
+        await assertEqualRoundTrip(
+          firstRange,
+          "ts_range",
+          new Range(RubyTime[tz](2010, 1, 1, 14, 30, 0), null, true),
+        );
+        await assertEqualRoundTrip(
+          firstRange,
+          "ts_range",
+          new Range(null, RubyTime[tz](2010, 1, 1, 14, 30, 0)),
+        );
+      });
+
+      it("timezone awareness tsrange", async () => {
+        const tz = "Pacific Time (US & Canada)";
+
+        await inTimeZone(tz, async () => {
+          void PostgresqlRangesTz.resetColumnInformation();
+          await PostgresqlRangesTz.loadSchema();
+          const timeString = zone()!.now().toString();
+          const time = zone()!.parse(timeString)!;
+
+          const record = new PostgresqlRangesTz({ ts_range: new Range(timeString, timeString) });
+          expect(record.ts_range).toEqual(new Range(time, time));
+          expect(record.ts_range.begin.timeZone).toEqual(TimeZone.find(tz));
+
+          await record.saveBang();
+          await record.reload();
+
+          expect(record.ts_range).toEqual(new Range(time, time));
+          expect(record.ts_range.begin.timeZone).toEqual(TimeZone.find(tz));
+        });
+      });
+
+      it("timezone awareness endless tsrange", async () => {
+        const tz = "Pacific Time (US & Canada)";
+
+        await inTimeZone(tz, async () => {
+          void PostgresqlRangesTz.resetColumnInformation();
+          await PostgresqlRangesTz.loadSchema();
+          const timeString = zone()!.now().toString();
+          const time = zone()!.parse(timeString)!;
+
+          const record = new PostgresqlRangesTz({ ts_range: new Range(timeString, null, true) });
+          expect(record.ts_range).toEqual(new Range(time, null, true));
+          expect(record.ts_range.begin.timeZone).toEqual(TimeZone.find(tz));
+
+          await record.saveBang();
+          await record.reload();
+
+          expect(record.ts_range).toEqual(new Range(time, null, true));
+          expect(record.ts_range.begin.timeZone).toEqual(TimeZone.find(tz));
+        });
+      });
+
+      it("timezone awareness beginless tsrange", async () => {
+        const tz = "Pacific Time (US & Canada)";
+
+        await inTimeZone(tz, async () => {
+          void PostgresqlRangesTz.resetColumnInformation();
+          await PostgresqlRangesTz.loadSchema();
+          const timeString = zone()!.now().toString();
+          const time = zone()!.parse(timeString)!;
+
+          const record = new PostgresqlRangesTz({ ts_range: new Range(null, timeString) });
+          expect(record.ts_range).toEqual(new Range(null, time));
+          expect(record.ts_range.end.timeZone).toEqual(TimeZone.find(tz));
+
+          await record.saveBang();
+          await record.reload();
+
+          expect(record.ts_range).toEqual(new Range(null, time));
+          expect(record.ts_range.end.timeZone).toEqual(TimeZone.find(tz));
+        });
+      });
+
+      it("timezone array awareness tsrange", async () => {
+        const tz = "Pacific Time (US & Canada)";
+
+        await inTimeZone(tz, async () => {
+          void PostgresqlRangesTz.resetColumnInformation();
+          await PostgresqlRangesTz.loadSchema();
+
+          const fromTimeString = zone()!.now().toString();
+          const fromTime = zone()!.parse(fromTimeString)!;
+          const toTimeString = fromTime.advance({ hours: 1 }).toString();
+          const toTime = zone()!.parse(toTimeString)!;
+
+          const record = new PostgresqlRangesTz({
+            ts_ranges: [
+              new Range(fromTimeString, toTimeString, true),
+              new Range(fromTimeString, toTimeString),
+              new Range(fromTimeString, null, true),
+              new Range(null, toTimeString),
+            ],
+          });
+          expect(record.ts_ranges).toEqual([
+            new Range(fromTime, toTime, true),
+            new Range(fromTime, toTime),
+            new Range(fromTime, null, true),
+            new Range(null, toTime),
+          ]);
+          for (const range of record.ts_ranges) {
+            if (range.begin) expect(range.begin.timeZone).toEqual(TimeZone.find(tz));
+            if (range.end) expect(range.end.timeZone).toEqual(TimeZone.find(tz));
+          }
+
+          await record.saveBang();
+          await record.reload();
+
+          expect(record.ts_ranges).toEqual([
+            new Range(fromTime, toTime, true),
+            new Range(fromTime, toTime),
+            new Range(fromTime, null, true),
+            new Range(null, toTime),
+          ]);
+          for (const range of record.ts_ranges) {
+            if (range.begin) expect(range.begin.timeZone).toEqual(TimeZone.find(tz));
+            if (range.end) expect(range.end.timeZone).toEqual(TimeZone.find(tz));
+          }
+        });
+      });
+
+      it("create tstzrange preserve usec", async () => {
+        const tstzrange = new Range(
+          RubyTime.parse("2010-01-01 14:30:00.670277 +0100"),
+          RubyTime.parse("2011-02-02 14:30:00.745125 CDT"),
+          true,
+        );
+        await roundTrip(newRange, "tstz_range", tstzrange);
+        expect(tstzrange).toEqual(newRange.tstz_range);
+        expect(
+          new Range(
+            RubyTime.parse("2010-01-01 13:30:00.670277 UTC"),
+            RubyTime.parse("2011-02-02 19:30:00.745125 UTC"),
+            true,
+          ),
+        ).toEqual(newRange.tstz_range);
+      });
+
+      it("update tstzrange preserve usec", async () => {
+        await assertEqualRoundTrip(
+          firstRange,
+          "tstz_range",
+          new Range(
+            RubyTime.parse("2010-01-01 14:30:00.245124 CDT"),
+            RubyTime.parse("2011-02-02 14:30:00.451274 CET"),
+            true,
+          ),
+        );
+        await assertNilRoundTrip(
+          firstRange,
+          "tstz_range",
+          new Range(
+            RubyTime.parse("2010-01-01 14:30:00.245124 +0100"),
+            RubyTime.parse("2010-01-01 13:30:00.245124 +0000"),
+            true,
+          ),
+        );
+      });
+
+      it("create tsrange preserve usec", async () => {
+        const tz = defaultTimezone();
+        await assertEqualRoundTrip(
+          newRange,
+          "ts_range",
+          new Range(
+            RubyTime[tz](2010, 1, 1, 14, 30, 0, 125435),
+            RubyTime[tz](2011, 2, 2, 14, 30, 0, 225435),
+            true,
+          ),
+        );
+      });
+
+      it("update tsrange preserve usec", async () => {
+        const tz = defaultTimezone();
+        await assertEqualRoundTrip(
+          firstRange,
+          "ts_range",
+          new Range(
+            RubyTime[tz](2010, 1, 1, 14, 30, 0, 142432),
+            RubyTime[tz](2011, 2, 2, 14, 30, 0, 224242),
+            true,
+          ),
+        );
+        await assertNilRoundTrip(
+          firstRange,
+          "ts_range",
+          new Range(
+            RubyTime[tz](2010, 1, 1, 14, 30, 0, 142432),
+            RubyTime[tz](2010, 1, 1, 14, 30, 0, 142432),
+            true,
+          ),
+        );
+      });
+
+      it("timezone awareness tsrange preserve usec", async () => {
+        const tz = "Pacific Time (US & Canada)";
+
+        await inTimeZone(tz, async () => {
+          void PostgresqlRangesTz.resetColumnInformation();
+          await PostgresqlRangesTz.loadSchema();
+          const timeString = "2017-09-26 07:30:59.132451 -0700";
+          const time = zone()!.parse(timeString)!;
+          expect(time.usec > 0).toBeTruthy();
+
+          const record = new PostgresqlRangesTz({ ts_range: new Range(timeString, timeString) });
+          expect(record.ts_range).toEqual(new Range(time, time));
+          expect(record.ts_range.begin.timeZone).toEqual(TimeZone.find(tz));
+          expect(record.ts_range.begin.usec).toEqual(time.usec);
+
+          await record.saveBang();
+          await record.reload();
+
+          expect(record.ts_range).toEqual(new Range(time, time));
+          expect(record.ts_range.begin.timeZone).toEqual(TimeZone.find(tz));
+          expect(record.ts_range.begin.usec).toEqual(time.usec);
+        });
+      });
+
+      it("create numrange", async () => {
+        await assertEqualRoundTrip(
+          newRange,
+          "num_range",
+          new Range(new BigDecimal("0.5"), new BigDecimal("1"), true),
+        );
+      });
+
+      it("update numrange", async () => {
+        await assertEqualRoundTrip(
+          firstRange,
+          "num_range",
+          new Range(new BigDecimal("0.5"), new BigDecimal("1"), true),
+        );
+        await assertNilRoundTrip(
+          firstRange,
+          "num_range",
+          new Range(new BigDecimal("0.5"), new BigDecimal("0.5"), true),
+        );
+      });
+
+      it("create daterange", async () => {
+        await assertEqualRoundTrip(
+          newRange,
+          "date_range",
+          new Range(
+            Temporal.PlainDate.from("2012-01-01"),
+            Temporal.PlainDate.from("2013-01-01"),
+            true,
+          ),
+        );
+      });
+
+      it("update daterange", async () => {
+        await assertEqualRoundTrip(
+          firstRange,
+          "date_range",
+          new Range(
+            Temporal.PlainDate.from("2012-02-03"),
+            Temporal.PlainDate.from("2012-02-10"),
+            true,
+          ),
+        );
+        await assertNilRoundTrip(
+          firstRange,
+          "date_range",
+          new Range(
+            Temporal.PlainDate.from("2012-02-03"),
+            Temporal.PlainDate.from("2012-02-03"),
+            true,
+          ),
+        );
+      });
+
+      it("create int4range", async () => {
+        await assertEqualRoundTrip(newRange, "int4_range", new Range(3, 50, true));
+      });
+
+      it("update int4range", async () => {
+        await assertEqualRoundTrip(firstRange, "int4_range", new Range(6, 10, true));
+        await assertNilRoundTrip(firstRange, "int4_range", new Range(3, 3, true));
+      });
+
+      it("create int8range", async () => {
+        await assertEqualRoundTrip(newRange, "int8_range", new Range(30, 50, true));
+      });
+
+      it("update int8range", async () => {
+        await assertEqualRoundTrip(firstRange, "int8_range", new Range(60000, 10000000, true));
+        await assertNilRoundTrip(firstRange, "int8_range", new Range(39999, 39999, true));
+      });
+
+      it("exclude beginning for subtypes without succ method is not supported", async () => {
+        await expect(PostgresqlRanges.createBang({ num_range: "(0.1, 0.2]" })).rejects.toThrow(
+          ArgumentError,
+        );
+        await expect(PostgresqlRanges.createBang({ float_range: "(0.5, 0.7]" })).rejects.toThrow(
+          ArgumentError,
+        );
+        await expect(PostgresqlRanges.createBang({ int4_range: "(1, 10]" })).rejects.toThrow(
+          ArgumentError,
+        );
+        await expect(PostgresqlRanges.createBang({ int8_range: "(10, 100]" })).rejects.toThrow(
+          ArgumentError,
+        );
+        await expect(
+          PostgresqlRanges.createBang({ date_range: "('2012-01-02', '2012-01-04']" }),
+        ).rejects.toThrow(ArgumentError);
+        await expect(
+          PostgresqlRanges.createBang({ ts_range: "('2010-01-01 14:30', '2011-01-01 14:30']" }),
+        ).rejects.toThrow(ArgumentError);
+        await expect(
+          PostgresqlRanges.createBang({
+            tstz_range: "('2010-01-01 14:30:00+05', '2011-01-01 14:30:00-03']",
+          }),
+        ).rejects.toThrow(ArgumentError);
+      });
+
+      it("where by attribute with range", async () => {
+        const range = new Range(1, 100);
+        const record = await PostgresqlRanges.createBang({ int4_range: range });
+        expect((await PostgresqlRanges.where({ int4_range: range }).take()).id).toEqual(record.id);
+      });
+
+      it("where by attribute with range in array", async () => {
+        const range = new Range(1, 100);
+        const record = await PostgresqlRanges.createBang({ int4_range: range });
+        expect((await PostgresqlRanges.where({ int4_range: [range] }).take()).id).toEqual(
+          record.id,
+        );
+      });
+
+      it("update all with ranges", async () => {
+        await PostgresqlRanges.createBang();
+
+        await PostgresqlRanges.updateAll({ int8_range: new Range(1, 100) });
+
+        expect((await PostgresqlRanges.first()).int8_range).toEqual(new Range(1, 101, true));
+      });
+
+      it("ranges correctly escape input", async () => {
+        const range = new Range("-1,2]'; DROP TABLE postgresql_ranges; --", "a");
+        await PostgresqlRanges.updateAll({ int8_range: range });
+
+        await expect(PostgresqlRanges.first()).resolves.not.toThrow();
+      });
+
+      it("ranges correctly unescape output", async () => {
+        await connection.execute(`
+          INSERT INTO postgresql_ranges (id, string_range)
+          VALUES (106, '["ca""t","do\\\\g")')
+        `);
+
+        const escapedRange = await PostgresqlRanges.find(106);
+        expect(escapedRange.string_range).toEqual(new Range('ca"t', "do\\g", true));
+      });
+
+      it("infinity values", async () => {
+        await PostgresqlRanges.createBang({
+          int4_range: new Range(1, Infinity),
+          int8_range: new Range(-Infinity, 0),
+          float_range: new Range(-Infinity, Infinity),
+        });
+
+        const record = await PostgresqlRanges.first();
+
+        expect(record.int4_range).toEqual(new Range(1, Infinity, true));
+        expect(record.int8_range).toEqual(new Range(-Infinity, 1, true));
+        expect(record.float_range).toEqual(new Range(-Infinity, Infinity, true));
+      });
+
+      it("endless range values", async () => {
+        let record = await PostgresqlRanges.createBang({
+          int4_range: new Range(1, null),
+          int8_range: new Range(10, null),
+          float_range: new Range(0.5, null),
+        });
+
+        record = await PostgresqlRanges.find(record.id);
+
+        expect(record.int4_range).toEqual(new Range(1, Infinity, true));
+        expect(record.int8_range).toEqual(new Range(10, Infinity, true));
+        expect(record.float_range).toEqual(new Range(0.5, Infinity, true));
+      });
+
+      it("empty string range values", async () => {
+        let record = await PostgresqlRanges.createBang({
+          int4_range: "",
+          int8_range: "",
+          float_range: "",
+        });
+
+        record = await PostgresqlRanges.find(record.id);
+
+        expect(record.int4_range).toBeNull();
+        expect(record.int8_range).toBeNull();
+        expect(record.float_range).toBeNull();
+      });
     });
   });
 });
