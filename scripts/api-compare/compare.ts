@@ -278,13 +278,13 @@ import {
 // The activerecord+actionview population itself has since shrunk from the
 // 106 rows measured above to 8 (unrelated convergence work, not this
 // mechanism), which changes the economics but not the finding: of the 8,
-// `Errors#empty?` (`validations.rb`, `valid?`) is exactly the danger case this
-// note warns about — a real Rails object with its own `#empty?`, not an
-// Array — and would be a wrong credit if aliased. Two rows chain off a Hash
-// local RFC 0129 already proves (`shards.keys.first`,
+// `Errors#empty?` (`activerecord/validations.rb:72`, `valid?`) is exactly the
+// danger case this note warns about — a real Rails object with its own
+// `#empty?`, not an Array — and would be a wrong credit if aliased. Two rows
+// chain off a Hash local RFC 0129 already proves (`shards.keys.first`,
 // `connection_handling.rb:96`) or off core Ruby methods with statically-known
 // Array returns (`String#split`/`String#scan`,
-// `attribute_assignment.rb:63,79`); crediting those needs a NEW kind of proof
+// `attribute_assignment.rb:64,79`); crediting those needs a NEW kind of proof
 // — a call chain rooted in a known-safe method NAME — that is weaker than
 // every existing entry in `receiver_kind` (extract-ruby-api.rb): the others
 // are all proven by Ripper reading a literal or an assignment; this one would
