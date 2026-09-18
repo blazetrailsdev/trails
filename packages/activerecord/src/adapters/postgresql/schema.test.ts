@@ -3,12 +3,16 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } 
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { itIfSupports } from "../../support/supports.js";
 import { StatementInvalid } from "../../errors.js";
+import { assertQueriesMatch } from "../../testing/query-assertions.js";
+import { Name } from "../../connection-adapters/postgresql/utils.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { fixtures } from "../../test-fixtures.js";
-import { dumpAllTableSchema } from "../../support/schema-dumping-helper.js";
+import { dumpAllTableSchema, dumpTableSchema } from "../../support/schema-dumping-helper.js";
 import type { SchemaSource } from "../../schema-dumper.js";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { Base, registerModel, modelRegistry } from "../../index.js";
+import { Default } from "../../test-helpers/models/default.js";
+import { BigDecimal } from "@blazetrails/activesupport";
 
 type ModelCtor = typeof Base;
 
@@ -116,6 +120,8 @@ const COLUMNS = [
 const PK_TABLE_NAME = "table_with_pk";
 const UNMATCHED_SEQUENCE_NAME = "unmatched_primary_key_default_value_seq";
 const UNMATCHED_PK_TABLE_NAME = "table_with_unmatched_sequence_for_pk";
+const PARTITIONED_TABLE = "measurements";
+const PARTITIONED_TABLE_INDEX = "index_measurements_on_logdate_and_city_id";
 
 async function setupSchemas(adapter: PostgreSQLAdapter) {
   await adapter.execute(
@@ -191,6 +197,20 @@ fixtures({}, { useTransactionalTests: false });
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   let defaultSearchPath: string;
+
+  const withSchemaSearchPath = async (
+    schemaSearchPath: string | null,
+    block?: () => Promise<void>,
+  ) => {
+    try {
+      await adapter.setSchemaSearchPath(schemaSearchPath);
+      adapter.schemaCache.clearBang();
+      if (block) await block();
+    } finally {
+      await adapter.setSchemaSearchPath("'$user', public");
+      adapter.schemaCache.clearBang();
+    }
+  };
   beforeAll(async () => {
     defaultSearchPath = await (Base.connection as PostgreSQLAdapter).schemaSearchPath();
   });
@@ -210,6 +230,62 @@ describeIfPg("PostgreSQLAdapter", () => {
     afterEach(async () => {
       await teardownSchemas(adapter);
     });
+
+    const columns = async (tableName: string) =>
+      (await adapter.columnDefinitions(tableName)).map(
+        ([name, type, def]) => `${name} ${type}` + (def ? ` default ${def}` : ""),
+      );
+
+    const createPartitionedTable = () =>
+      adapter.execute(
+        `CREATE TABLE ${SCHEMA_NAME}."${PARTITIONED_TABLE}" (city_id integer not null, logdate date not null) PARTITION BY LIST (city_id)`,
+      );
+
+    const createPartitionedTableIndex = () =>
+      adapter.execute(
+        `CREATE INDEX ${PARTITIONED_TABLE_INDEX} ON ${SCHEMA_NAME}.${PARTITIONED_TABLE} (logdate, city_id)`,
+      );
+
+    const doDumpIndexAssertionsForOneIndex = (
+      thisIndex: any,
+      thisIndexName: string,
+      thisIndexColumn: string,
+    ) => {
+      expect(thisIndex.table).toEqual(TABLE_NAME);
+      expect(thisIndex.columns.length).toEqual(1);
+      expect(thisIndex.columns[0]).toEqual(thisIndexColumn);
+      expect(thisIndex.name).toEqual(thisIndexName);
+    };
+
+    const doDumpIndexTestsForSchema = async (
+      thisSchemaName: string,
+      firstIndexColumnName: string,
+      secondIndexColumnName: string,
+      thirdIndexColumnName: string,
+      fourthIndexColumnName: string,
+    ) => {
+      await withSchemaSearchPath(thisSchemaName, async () => {
+        const indexes = (await adapter.indexes(TABLE_NAME)).sort((a, b) =>
+          a.name.localeCompare(b.name),
+        );
+        expect(indexes.length).toEqual(5);
+
+        const [indexA, indexB, indexC, indexD, indexE] = indexes;
+
+        doDumpIndexAssertionsForOneIndex(indexA, INDEX_A_NAME, firstIndexColumnName);
+        doDumpIndexAssertionsForOneIndex(indexB, INDEX_B_NAME, secondIndexColumnName);
+        doDumpIndexAssertionsForOneIndex(indexD, INDEX_D_NAME, thirdIndexColumnName);
+        doDumpIndexAssertionsForOneIndex(indexE, INDEX_E_NAME, fourthIndexColumnName);
+
+        expect(indexA.using).toEqual("btree");
+        expect(indexB.using).toEqual("btree");
+        expect(indexC.using).toEqual("gin");
+        expect(indexD.using).toEqual("btree");
+        expect(indexE.using).toEqual("gin");
+
+        expect(indexD.orders).toEqual("desc");
+      });
+    };
 
     it("schema test 1", async () => {
       await adapter.setSchemaSearchPath(SCHEMA_NAME);
@@ -247,17 +323,21 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema names", async () => {
-      const names = await adapter.schemaNames();
-      expect(names).toContain("public");
-      expect(names).toContain("test_schema");
-      expect(names).toContain("test_schema2");
+      const schemaNames = await adapter.schemaNames();
+      expect(schemaNames).toContain("public");
+      expect(schemaNames).toContain("test_schema");
+      expect(schemaNames).toContain("test_schema2");
+      // eslint-disable-next-line blazetrails/no-conditional-in-test -- mirrors Rails' `assert_includes schema_names, "hint_plan" if @connection.supports_optimizer_hints?` (schema_test.rb:115)
+      if (await adapter.supportsOptimizerHints()) expect(schemaNames).toContain("hint_plan");
     });
 
     it("create schema", async () => {
-      await adapter.createSchema("test_schema3");
-      const names = await adapter.schemaNames();
-      expect(names).toContain("test_schema3");
-      await adapter.dropSchema("test_schema3");
+      try {
+        await adapter.createSchema("test_schema3");
+        expect((await adapter.schemaNames()).includes("test_schema3")).toBeTruthy();
+      } finally {
+        await adapter.dropSchema("test_schema3");
+      }
     });
 
     it("raise create schema with existing schema", async () => {
@@ -267,19 +347,37 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("force create schema", async () => {
-      await adapter.createSchema("test_schema3");
-      await adapter.createSchema("test_schema3", { force: true });
-      const names = await adapter.schemaNames();
-      expect(names).toContain("test_schema3");
-      await adapter.dropSchema("test_schema3");
+      try {
+        await adapter.createSchema("test_schema3");
+        await assertQueriesMatch(
+          /DROP SCHEMA IF EXISTS "test_schema3"/,
+          undefined,
+          false,
+          async () => {
+            await adapter.createSchema("test_schema3", { force: true });
+          },
+        );
+        expect((await adapter.schemaNames()).includes("test_schema3")).toBeTruthy();
+      } finally {
+        await adapter.dropSchema("test_schema3");
+      }
     });
 
     it("create schema if not exists", async () => {
-      await adapter.createSchema("test_schema3");
-      await adapter.createSchema("test_schema3", { ifNotExists: true });
-      const names = await adapter.schemaNames();
-      expect(names).toContain("test_schema3");
-      await adapter.dropSchema("test_schema3");
+      try {
+        await adapter.createSchema("test_schema3");
+        await assertQueriesMatch(
+          /CREATE SCHEMA IF NOT EXISTS "test_schema3"/,
+          undefined,
+          false,
+          async () => {
+            await adapter.createSchema("test_schema3", { ifNotExists: true });
+          },
+        );
+        expect((await adapter.schemaNames()).includes("test_schema3")).toBeTruthy();
+      } finally {
+        await adapter.dropSchema("test_schema3");
+      }
     });
 
     it("create schema raises if both force and if not exists provided", async () => {
@@ -330,82 +428,118 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("raise wrapped exception on bad prepare", async () => {
       await expect(
-        adapter.execQuery(
-          "select * from _schema_test_nonexistent_table_xyz where id = ?",
-          "sql",
-          [1],
-        ),
-      ).rejects.toBeInstanceOf(StatementInvalid);
+        adapter.execQuery("select * from developers where id = ?", "sql", [1]),
+      ).rejects.toThrow(StatementInvalid);
     });
     it("schema change with prepared stmt", async () => {
-      expect(adapter.preparedStatements).toBe(true);
-      const tbl = "schema_prepared_stmt_devs";
-      await adapter.execute(`DROP TABLE IF EXISTS ${tbl}`);
-      await adapter.execute(`CREATE TABLE ${tbl} (id serial primary key, name varchar(255))`);
+      // eslint-disable-next-line blazetrails/no-conditional-in-test -- mirrors Rails' `if ActiveRecord::Base.lease_connection.prepared_statements` (schema_test.rb:210)
+      if (!adapter.preparedStatements) return;
       let altered = false;
       try {
-        await adapter.execQuery(`select * from ${tbl} where id = $1`, "sql", [1]);
-        await adapter.execQuery(`alter table ${tbl} add column zomg int`, "sql", []);
-        altered = true;
-        await adapter.execQuery(`select * from ${tbl} where id = $1`, "sql", [1]);
+        await expect(
+          (async () => {
+            await adapter.execQuery("select * from developers where id = $1", "sql", [1]);
+            await adapter.execQuery("alter table developers add column zomg int", "sql", []);
+            altered = true;
+            await adapter.execQuery("select * from developers where id = $1", "sql", [1]);
+          })(),
+        ).resolves.not.toThrow();
       } finally {
         if (altered) {
-          await adapter.execQuery(`alter table ${tbl} drop column zomg`, "sql", []);
+          await adapter.execQuery("alter table developers drop column zomg", "sql", []);
         }
-        await adapter.execute(`DROP TABLE IF EXISTS ${tbl}`);
       }
     });
 
     it("data source exists?", async () => {
-      expect(await adapter.dataSourceExists(`${SCHEMA_NAME}.${TABLE_NAME}`)).toBe(true);
-      expect(await adapter.dataSourceExists(`${SCHEMA2_NAME}.${TABLE_NAME}`)).toBe(true);
-      expect(await adapter.dataSourceExists(`${SCHEMA_NAME}."${TABLE_NAME}.table"`)).toBe(true);
-      expect(await adapter.dataSourceExists(`${SCHEMA_NAME}."${CAPITALIZED_TABLE_NAME}"`)).toBe(
-        true,
-      );
+      const { Thing1, Thing2, Thing3, Thing4 } = await makeThingModels();
+      for (const klass of [Thing1, Thing2, Thing3, Thing4]) {
+        const name = klass.tableName;
+        expect(
+          await adapter.dataSourceExists(name),
+          `'${name}' data_source should exist`,
+        ).toBeTruthy();
+      }
     });
 
     it("data source exists when on schema search path", async () => {
-      await adapter.setSchemaSearchPath(SCHEMA_NAME);
-      expect(await adapter.dataSourceExists(TABLE_NAME)).toBe(true);
+      await withSchemaSearchPath(SCHEMA_NAME, async () => {
+        expect(
+          await adapter.dataSourceExists(TABLE_NAME),
+          "data_source should exist and be found",
+        ).toBeTruthy();
+      });
     });
 
     it("data source exists when not on schema search path", async () => {
-      await adapter.setSchemaSearchPath("public");
-      expect(await adapter.dataSourceExists(TABLE_NAME)).toBe(false);
+      await withSchemaSearchPath("PUBLIC", async () => {
+        expect(
+          await adapter.dataSourceExists(TABLE_NAME),
+          "data_source exists but should not be found",
+        ).toBeFalsy();
+      });
     });
 
     it("data source exists wrong schema", async () => {
-      expect(await adapter.dataSourceExists("foo.things")).toBe(false);
+      expect(
+        await adapter.dataSourceExists("foo.things"),
+        "data_source should not exist",
+      ).toBeFalsy();
     });
 
     it("data source exists quoted names", async () => {
-      expect(await adapter.dataSourceExists(`"${SCHEMA_NAME}"."${TABLE_NAME}"`)).toBe(true);
-      expect(await adapter.dataSourceExists(`${SCHEMA_NAME}."${TABLE_NAME}"`)).toBe(true);
+      for (const given of [
+        `"${SCHEMA_NAME}"."${TABLE_NAME}"`,
+        `${SCHEMA_NAME}."${TABLE_NAME}"`,
+        `${SCHEMA_NAME}."${TABLE_NAME}"`,
+      ]) {
+        expect(
+          await adapter.dataSourceExists(given),
+          `data_source should exist when specified as ${given}`,
+        ).toBeTruthy();
+      }
+      await withSchemaSearchPath(SCHEMA_NAME, async () => {
+        const given = `"${TABLE_NAME}"`;
+        expect(
+          await adapter.dataSourceExists(given),
+          `data_source should exist when specified as ${given}`,
+        ).toBeTruthy();
+      });
     });
 
     it("data source exists quoted table", async () => {
-      await adapter.setSchemaSearchPath(SCHEMA_NAME);
-      expect(await adapter.dataSourceExists(`"${TABLE_NAME}.table"`)).toBe(true);
+      await withSchemaSearchPath(SCHEMA_NAME, async () => {
+        expect(
+          await adapter.dataSourceExists('"things.table"'),
+          "data_source should exist",
+        ).toBeTruthy();
+      });
     });
 
     it("with schema prefixed table name", async () => {
-      const cols = await adapter.columns(`${SCHEMA_NAME}.${TABLE_NAME}`);
-      const colNames = cols.map((c) => c.name);
-      expect(colNames).toEqual(["id", "name", "email", "description", "name_vector", "moment"]);
+      await expect(
+        (async () => {
+          expect(await columns(`${SCHEMA_NAME}.${TABLE_NAME}`)).toEqual(COLUMNS);
+        })(),
+      ).resolves.not.toThrow();
     });
 
     it("with schema prefixed capitalized table name", async () => {
-      const cols = await adapter.columns(`${SCHEMA_NAME}."${CAPITALIZED_TABLE_NAME}"`);
-      const colNames = cols.map((c) => c.name);
-      expect(colNames).toEqual(["id", "name", "email", "description", "name_vector", "moment"]);
+      await expect(
+        (async () => {
+          expect(await columns(`${SCHEMA_NAME}.${CAPITALIZED_TABLE_NAME}`)).toEqual(COLUMNS);
+        })(),
+      ).resolves.not.toThrow();
     });
 
     it("with schema search path", async () => {
-      await adapter.setSchemaSearchPath(SCHEMA_NAME);
-      const cols = await adapter.columns(TABLE_NAME);
-      const colNames = cols.map((c) => c.name);
-      expect(colNames).toEqual(["id", "name", "email", "description", "name_vector", "moment"]);
+      await expect(
+        (async () => {
+          await withSchemaSearchPath(SCHEMA_NAME, async () => {
+            expect(await columns(TABLE_NAME)).toEqual(COLUMNS);
+          });
+        })(),
+      ).resolves.not.toThrow();
     });
 
     it("proper encoding of table name", async () => {
@@ -434,85 +568,79 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(names).toEqual(["thing1"]);
     });
     it("classes with qualified schema name", async () => {
-      const { Thing1, Thing2, Thing3, Thing4 } = await makeThingModels();
-      expect(await (Thing1 as any).count()).toBe(0);
-      expect(await (Thing2 as any).count()).toBe(0);
-      expect(await (Thing3 as any).count()).toBe(0);
-      expect(await (Thing4 as any).count()).toBe(0);
-      await (Thing1 as any).create({ id: 1, name: "thing1", email: "thing1@localhost" });
-      expect(await (Thing1 as any).count()).toBe(1);
-      expect(await (Thing2 as any).count()).toBe(0);
-      expect(await (Thing3 as any).count()).toBe(0);
-      expect(await (Thing4 as any).count()).toBe(0);
-      await (Thing2 as any).create({ id: 1, name: "thing1", email: "thing1@localhost" });
-      expect(await (Thing1 as any).count()).toBe(1);
-      expect(await (Thing2 as any).count()).toBe(1);
-      expect(await (Thing3 as any).count()).toBe(0);
-      expect(await (Thing4 as any).count()).toBe(0);
-      await (Thing3 as any).create({ id: 1, name: "thing1", email: "thing1@localhost" });
-      expect(await (Thing3 as any).count()).toBe(1);
-      expect(await (Thing4 as any).count()).toBe(0);
-      await (Thing4 as any).create({ id: 1, name: "thing1", email: "thing1@localhost" });
-      expect(await (Thing1 as any).count()).toBe(1);
-      expect(await (Thing2 as any).count()).toBe(1);
-      expect(await (Thing3 as any).count()).toBe(1);
-      expect(await (Thing4 as any).count()).toBe(1);
+      const { Thing1, Thing2, Thing3, Thing4 } = (await makeThingModels()) as Record<string, any>;
+      expect(await Thing1.count()).toEqual(0);
+      expect(await Thing2.count()).toEqual(0);
+      expect(await Thing3.count()).toEqual(0);
+      expect(await Thing4.count()).toEqual(0);
+
+      await Thing1.create({ id: 1, name: "thing1", email: "thing1@localhost", moment: new Date() });
+      expect(await Thing1.count()).toEqual(1);
+      expect(await Thing2.count()).toEqual(0);
+      expect(await Thing3.count()).toEqual(0);
+      expect(await Thing4.count()).toEqual(0);
+
+      await Thing2.create({ id: 1, name: "thing1", email: "thing1@localhost", moment: new Date() });
+      expect(await Thing1.count()).toEqual(1);
+      expect(await Thing2.count()).toEqual(1);
+      expect(await Thing3.count()).toEqual(0);
+      expect(await Thing4.count()).toEqual(0);
+
+      await Thing3.create({ id: 1, name: "thing1", email: "thing1@localhost", moment: new Date() });
+      expect(await Thing1.count()).toEqual(1);
+      expect(await Thing2.count()).toEqual(1);
+      expect(await Thing3.count()).toEqual(1);
+      expect(await Thing4.count()).toEqual(0);
+
+      await Thing4.create({ id: 1, name: "thing1", email: "thing1@localhost", moment: new Date() });
+      expect(await Thing1.count()).toEqual(1);
+      expect(await Thing2.count()).toEqual(1);
+      expect(await Thing3.count()).toEqual(1);
+      expect(await Thing4.count()).toEqual(1);
     });
     it("raise on unquoted schema name", async () => {
-      await expect(adapter.setSchemaSearchPath("$user,public")).rejects.toBeInstanceOf(
-        StatementInvalid,
-      );
+      await expect(withSchemaSearchPath("$user,public")).rejects.toThrow(StatementInvalid);
     });
     it("without schema search path", async () => {
-      await adapter.setSchemaSearchPath("public");
-      expect(await adapter.dataSourceExists(TABLE_NAME)).toBe(false);
-      expect(await adapter.dataSourceExists(`${SCHEMA_NAME}.${TABLE_NAME}`)).toBe(true);
+      await expect(columns(TABLE_NAME)).rejects.toThrow(StatementInvalid);
     });
 
     it("ignore nil schema search path", async () => {
-      await adapter.setSchemaSearchPath(null);
-      const path = await adapter.schemaSearchPath();
-      expect(path).toBeDefined();
+      await expect(withSchemaSearchPath(null)).resolves.not.toThrow();
     });
 
     it("index name exists", async () => {
-      await adapter.setSchemaSearchPath(SCHEMA_NAME);
-      expect(await adapter.indexNameExists(TABLE_NAME, INDEX_A_NAME)).toBe(true);
-      expect(await adapter.indexNameExists(TABLE_NAME, INDEX_B_NAME)).toBe(true);
-      expect(await adapter.indexNameExists(TABLE_NAME, INDEX_C_NAME)).toBe(true);
-      expect(await adapter.indexNameExists(TABLE_NAME, INDEX_D_NAME)).toBe(true);
-      expect(await adapter.indexNameExists(TABLE_NAME, INDEX_E_NAME)).toBe(true);
-      expect(await adapter.indexNameExists(TABLE_NAME, "missing_index")).toBe(false);
-      expect(await adapter.indexNameExists(`${SCHEMA_NAME}.${TABLE_NAME}`, INDEX_A_NAME)).toBe(
-        true,
-      );
+      await withSchemaSearchPath(SCHEMA_NAME, async () => {
+        expect(await adapter.indexNameExists(TABLE_NAME, INDEX_A_NAME)).toBeTruthy();
+        expect(await adapter.indexNameExists(TABLE_NAME, INDEX_B_NAME)).toBeTruthy();
+        expect(await adapter.indexNameExists(TABLE_NAME, INDEX_C_NAME)).toBeTruthy();
+        expect(await adapter.indexNameExists(TABLE_NAME, INDEX_D_NAME)).toBeTruthy();
+        expect(await adapter.indexNameExists(TABLE_NAME, INDEX_E_NAME)).toBeTruthy();
+        expect(await adapter.indexNameExists(TABLE_NAME, INDEX_E_NAME)).toBeTruthy();
+        expect(await adapter.indexNameExists(TABLE_NAME, "missing_index")).toBeFalsy();
+
+        if (await adapter.supportsPartitionedIndexes()) {
+          await createPartitionedTable();
+          await createPartitionedTableIndex();
+          expect(
+            await adapter.indexNameExists(PARTITIONED_TABLE, PARTITIONED_TABLE_INDEX),
+          ).toBeTruthy();
+        }
+      });
+
+      expect(
+        await adapter.indexNameExists(`${SCHEMA_NAME}.${TABLE_NAME}`, INDEX_A_NAME),
+      ).toBeTruthy();
     });
 
     it("dump indexes for schema one", async () => {
-      await adapter.setSchemaSearchPath(SCHEMA_NAME);
-      const indexes = (await adapter.indexes(TABLE_NAME)).sort((a, b) =>
-        a.name.localeCompare(b.name),
+      await doDumpIndexTestsForSchema(
+        SCHEMA_NAME,
+        INDEX_A_COLUMN,
+        INDEX_B_COLUMN_S1,
+        INDEX_D_COLUMN,
+        INDEX_E_COLUMN,
       );
-      expect(indexes).toHaveLength(5);
-
-      expect(indexes[0].name).toBe(INDEX_A_NAME);
-      expect(indexes[0].columns).toEqual([INDEX_A_COLUMN]);
-      expect(indexes[0].using).toBe("btree");
-
-      expect(indexes[1].name).toBe(INDEX_B_NAME);
-      expect(indexes[1].columns).toEqual([INDEX_B_COLUMN_S1]);
-      expect(indexes[1].using).toBe("btree");
-
-      expect(indexes[2].name).toBe(INDEX_C_NAME);
-      expect(indexes[2].using).toBe("gin");
-
-      expect(indexes[3].name).toBe(INDEX_D_NAME);
-      expect(indexes[3].columns).toEqual([INDEX_D_COLUMN]);
-      expect(indexes[3].using).toBe("btree");
-
-      expect(indexes[4].name).toBe(INDEX_E_NAME);
-      expect(indexes[4].columns).toEqual([INDEX_E_COLUMN]);
-      expect(indexes[4].using).toBe("gin");
     });
 
     it("indexes report their validity", async () => {
@@ -523,66 +651,123 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("dump indexes for schema two", async () => {
-      await adapter.setSchemaSearchPath(SCHEMA2_NAME);
-      const indexes = (await adapter.indexes(TABLE_NAME)).sort((a, b) =>
-        a.name.localeCompare(b.name),
+      await doDumpIndexTestsForSchema(
+        SCHEMA2_NAME,
+        INDEX_A_COLUMN,
+        INDEX_B_COLUMN_S2,
+        INDEX_D_COLUMN,
+        INDEX_E_COLUMN,
       );
-      expect(indexes).toHaveLength(5);
-
-      expect(indexes[0].name).toBe(INDEX_A_NAME);
-      expect(indexes[0].columns).toEqual([INDEX_A_COLUMN]);
-
-      expect(indexes[1].name).toBe(INDEX_B_NAME);
-      expect(indexes[1].columns).toEqual([INDEX_B_COLUMN_S2]);
     });
 
     it("dump indexes for schema multiple schemas in search path", async () => {
-      await adapter.setSchemaSearchPath(`public, ${SCHEMA_NAME}`);
-      const indexes = (await adapter.indexes(TABLE_NAME)).sort((a, b) =>
-        a.name.localeCompare(b.name),
+      await doDumpIndexTestsForSchema(
+        `public, ${SCHEMA_NAME}`,
+        INDEX_A_COLUMN,
+        INDEX_B_COLUMN_S1,
+        INDEX_D_COLUMN,
+        INDEX_E_COLUMN,
       );
-      expect(indexes).toHaveLength(5);
-      expect(indexes[0].columns).toEqual([INDEX_A_COLUMN]);
-      expect(indexes[1].columns).toEqual([INDEX_B_COLUMN_S1]);
     });
 
     it("dump indexes for table with scheme specified in name", async () => {
-      const indexes = await adapter.indexes(`${SCHEMA_NAME}.${TABLE_NAME}`);
-      expect(indexes).toHaveLength(5);
+      let indexes = await adapter.indexes(`${SCHEMA_NAME}.${TABLE_NAME}`);
+      expect(indexes.length).toEqual(5);
+
+      // eslint-disable-next-line blazetrails/no-conditional-in-test -- mirrors Rails' `if supports_partitioned_indexes?` (schema_test.rb:386)
+      if (await adapter.supportsPartitionedIndexes()) {
+        await createPartitionedTable();
+        await createPartitionedTableIndex();
+        indexes = await adapter.indexes(`${SCHEMA_NAME}.${PARTITIONED_TABLE}`);
+        expect(indexes.length).toEqual(1);
+      }
     });
 
     it("with uppercase index name", async () => {
-      await adapter.setSchemaSearchPath(SCHEMA_NAME);
-      await adapter.addIndex(TABLE_NAME, ["name"], { name: "UpperCaseIdx" });
-      expect(await adapter.indexNameExists(TABLE_NAME, "UpperCaseIdx")).toBe(true);
-      await adapter.removeIndex(TABLE_NAME, { name: "UpperCaseIdx" });
-      expect(await adapter.indexNameExists(TABLE_NAME, "UpperCaseIdx")).toBe(false);
+      await adapter.execute(`CREATE INDEX "things_Index" ON ${SCHEMA_NAME}.things (name)`);
+
+      await withSchemaSearchPath(SCHEMA_NAME, async () => {
+        await expect(
+          adapter.removeIndex("things", { name: "things_Index" }),
+        ).resolves.not.toThrow();
+      });
+
+      // eslint-disable-next-line blazetrails/no-conditional-in-test -- mirrors Rails' `if supports_partitioned_indexes?` (schema_test.rb:401)
+      if (await adapter.supportsPartitionedIndexes()) {
+        await createPartitionedTable();
+        await adapter.execute(
+          `CREATE INDEX "${PARTITIONED_TABLE}_Index" ON ${SCHEMA_NAME}.${PARTITIONED_TABLE} (logdate, city_id)`,
+        );
+
+        await withSchemaSearchPath(SCHEMA_NAME, async () => {
+          await expect(
+            adapter.removeIndex(PARTITIONED_TABLE, { name: `${PARTITIONED_TABLE}_Index` }),
+          ).resolves.not.toThrow();
+        });
+      }
     });
 
     it("remove index when schema specified", async () => {
-      const createIndex = () =>
-        adapter.execute(
-          `CREATE INDEX "things_Index" ON ${SCHEMA_NAME}.${TABLE_NAME} (${INDEX_A_COLUMN})`,
-        );
-
-      await createIndex();
-      await adapter.removeIndex(TABLE_NAME, { name: `${SCHEMA_NAME}.things_Index` });
-
-      await createIndex();
-      await adapter.removeIndex(`${SCHEMA_NAME}.${TABLE_NAME}`, { name: "things_Index" });
-
-      await createIndex();
-      await adapter.removeIndex(`${SCHEMA_NAME}.${TABLE_NAME}`, {
-        name: `${SCHEMA_NAME}.things_Index`,
-      });
-
-      await createIndex();
+      await adapter.execute(`CREATE INDEX "things_Index" ON ${SCHEMA_NAME}.things (name)`);
       await expect(
-        adapter.removeIndex(`${SCHEMA2_NAME}.${TABLE_NAME}`, {
-          name: `${SCHEMA_NAME}.things_Index`,
-        }),
+        adapter.removeIndex("things", { name: `${SCHEMA_NAME}.things_Index` }),
+      ).resolves.not.toThrow();
+
+      await adapter.execute(`CREATE INDEX "things_Index" ON ${SCHEMA_NAME}.things (name)`);
+      await expect(
+        adapter.removeIndex(`${SCHEMA_NAME}.things`, { name: "things_Index" }),
+      ).resolves.not.toThrow();
+
+      await adapter.execute(`CREATE INDEX "things_Index" ON ${SCHEMA_NAME}.things (name)`);
+      await expect(
+        adapter.removeIndex(`${SCHEMA_NAME}.things`, { name: `${SCHEMA_NAME}.things_Index` }),
+      ).resolves.not.toThrow();
+
+      await adapter.execute(`CREATE INDEX "things_Index" ON ${SCHEMA_NAME}.things (name)`);
+      await expect(
+        adapter.removeIndex(`${SCHEMA2_NAME}.things`, { name: `${SCHEMA_NAME}.things_Index` }),
       ).rejects.toThrow(ArgumentError);
-      await adapter.execute(`DROP INDEX ${SCHEMA_NAME}."things_Index"`);
+
+      // eslint-disable-next-line blazetrails/no-conditional-in-test -- mirrors Rails' `if supports_partitioned_indexes?` (schema_test.rb:424)
+      if (await adapter.supportsPartitionedIndexes()) {
+        await createPartitionedTable();
+
+        await adapter.execute(
+          `CREATE INDEX "${PARTITIONED_TABLE}_Index" ON ${SCHEMA_NAME}.${PARTITIONED_TABLE} (logdate, city_id)`,
+        );
+        await expect(
+          adapter.removeIndex(PARTITIONED_TABLE, {
+            name: `${SCHEMA_NAME}.${PARTITIONED_TABLE}_Index`,
+          }),
+        ).resolves.not.toThrow();
+
+        await adapter.execute(
+          `CREATE INDEX "${PARTITIONED_TABLE}_Index" ON ${SCHEMA_NAME}.${PARTITIONED_TABLE} (logdate, city_id)`,
+        );
+        await expect(
+          adapter.removeIndex(`${SCHEMA_NAME}.${PARTITIONED_TABLE}`, {
+            name: `${PARTITIONED_TABLE}_Index`,
+          }),
+        ).resolves.not.toThrow();
+
+        await adapter.execute(
+          `CREATE INDEX "${PARTITIONED_TABLE}_Index" ON ${SCHEMA_NAME}.${PARTITIONED_TABLE} (logdate, city_id)`,
+        );
+        await expect(
+          adapter.removeIndex(`${SCHEMA_NAME}.${PARTITIONED_TABLE}`, {
+            name: `${SCHEMA_NAME}.${PARTITIONED_TABLE}_Index`,
+          }),
+        ).resolves.not.toThrow();
+
+        await adapter.execute(
+          `CREATE INDEX "${PARTITIONED_TABLE}_Index" ON ${SCHEMA_NAME}.${PARTITIONED_TABLE} (logdate, city_id)`,
+        );
+        await expect(
+          adapter.removeIndex(`${SCHEMA2_NAME}.${PARTITIONED_TABLE}`, {
+            name: `${SCHEMA_NAME}.${PARTITIONED_TABLE}_Index`,
+          }),
+        ).rejects.toThrow(ArgumentError);
+      }
     });
 
     it("primary key with schema specified", async () => {
@@ -601,68 +786,65 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("pk and sequence for with schema specified", async () => {
-      const result1 = await adapter.pkAndSequenceFor(`"${SCHEMA_NAME}"."${PK_TABLE_NAME}"`);
-      expect(result1).not.toBeNull();
-      expect(result1![0]).toBe("id");
-      expect(result1![1]!.schema).toBe(SCHEMA_NAME);
-      expect(result1![1]!.identifier).toBe(`${PK_TABLE_NAME}_id_seq`);
-
-      const result2 = await adapter.pkAndSequenceFor(
+      for (const given of [
+        `"${SCHEMA_NAME}"."${PK_TABLE_NAME}"`,
         `"${SCHEMA_NAME}"."${UNMATCHED_PK_TABLE_NAME}"`,
-      );
-      expect(result2).not.toBeNull();
-      expect(result2![0]).toBe("id");
-      expect(result2![1]!.schema).toBe(SCHEMA_NAME);
-      expect(result2![1]!.identifier).toBe(UNMATCHED_SEQUENCE_NAME);
+      ]) {
+        const [pk, seq] = (await adapter.pkAndSequenceFor(given))!;
+        expect(pk, `primary key should be found when table referenced as ${given}`).toEqual("id");
+        if (given === `"${SCHEMA_NAME}"."${PK_TABLE_NAME}"`)
+          expect(seq, `sequence name should be found when table referenced as ${given}`).toEqual(
+            new Name(SCHEMA_NAME, `${PK_TABLE_NAME}_id_seq`),
+          );
+        if (given === `"${SCHEMA_NAME}"."${UNMATCHED_PK_TABLE_NAME}"`)
+          expect(seq, `sequence name should be found when table referenced as ${given}`).toEqual(
+            new Name(SCHEMA_NAME, UNMATCHED_SEQUENCE_NAME),
+          );
+      }
     });
 
     it("current schema", async () => {
-      await adapter.setSchemaSearchPath(`'$user',public`);
-      expect(await adapter.currentSchema()).toBe("public");
-
-      await adapter.setSchemaSearchPath(SCHEMA_NAME);
-      expect(await adapter.currentSchema()).toBe(SCHEMA_NAME);
-
-      await adapter.setSchemaSearchPath(`${SCHEMA2_NAME},${SCHEMA_NAME},public`);
-      expect(await adapter.currentSchema()).toBe(SCHEMA2_NAME);
-
-      await adapter.setSchemaSearchPath(`public,${SCHEMA2_NAME},${SCHEMA_NAME}`);
-      expect(await adapter.currentSchema()).toBe("public");
+      for (const [given, expected] of Object.entries({
+        [`'$user',public`]: "public",
+        [SCHEMA_NAME]: SCHEMA_NAME,
+        [`${SCHEMA2_NAME},${SCHEMA_NAME},public`]: SCHEMA2_NAME,
+        [`public,${SCHEMA2_NAME},${SCHEMA_NAME}`]: "public",
+      })) {
+        await withSchemaSearchPath(given, async () => {
+          expect(await adapter.currentSchema()).toEqual(expected);
+        });
+      }
     });
 
     it("prepared statements with multiple schemas", async () => {
-      const Thing5 = makeThing5Model();
-      try {
-        await adapter.beginTransaction({ _lazy: false });
-        await adapter.setSchemaSearchPath(SCHEMA_NAME);
-        await (Thing5 as any).loadSchema();
-        await adapter.commitTransaction();
-      } catch (e) {
-        await adapter.rollbackTransaction();
-        throw e;
-      }
-      for (const schema of [SCHEMA_NAME, SCHEMA2_NAME]) {
-        await adapter.setSchemaSearchPath(schema);
-        await (Thing5 as any).create({
-          id: 1,
-          name: `thing inside ${schema}`,
-          email: "thing1@localhost",
+      const Thing5 = makeThing5Model() as Record<string, any>;
+      for (const schemaName of [SCHEMA_NAME, SCHEMA2_NAME]) {
+        await withSchemaSearchPath(schemaName, async () => {
+          await Thing5.create({
+            id: 1,
+            name: `thing inside ${SCHEMA_NAME}`,
+            email: "thing1@localhost",
+            moment: new Date(),
+          });
         });
       }
-      for (const schema of [SCHEMA_NAME, SCHEMA2_NAME]) {
-        await adapter.setSchemaSearchPath(schema);
-        expect(await (Thing5 as any).count()).toBe(1);
-        const row = await (Thing5 as any).where({ id: 1 }).first();
-        expect(row?.name).toBe(`thing inside ${schema}`);
+
+      for (const schemaName of [SCHEMA_NAME, SCHEMA2_NAME]) {
+        await withSchemaSearchPath(schemaName, async () => {
+          expect(await Thing5.count()).toEqual(1);
+        });
       }
-      await adapter.setSchemaSearchPath("'$user', public");
     });
 
     it("schema exists?", async () => {
-      expect(await adapter.schemaExists("public")).toBe(true);
-      expect(await adapter.schemaExists(SCHEMA_NAME)).toBe(true);
-      expect(await adapter.schemaExists(SCHEMA2_NAME)).toBe(true);
-      expect(await adapter.schemaExists("darkside")).toBe(false);
+      for (const [given, expected] of Object.entries({
+        public: true,
+        [SCHEMA_NAME]: true,
+        [SCHEMA2_NAME]: true,
+        darkside: false,
+      })) {
+        expect(await adapter.schemaExists(given)).toEqual(expected);
+      }
     });
 
     it("reset pk sequence", async () => {
@@ -689,13 +871,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("rename index", async () => {
       const oldName = INDEX_A_NAME;
       const newName = `${oldName}_new`;
-      const qualifiedTable = `${SCHEMA_NAME}.${TABLE_NAME}`;
-
-      await adapter.setSchemaSearchPath(SCHEMA_NAME);
-      await adapter.renameIndex(qualifiedTable, oldName, newName);
-
-      expect(await adapter.indexNameExists(qualifiedTable, oldName)).toBe(false);
-      expect(await adapter.indexNameExists(qualifiedTable, newName)).toBe(true);
+      await adapter.renameIndex(`${SCHEMA_NAME}.${TABLE_NAME}`, oldName, newName);
+      expect(await adapter.indexNameExists(`${SCHEMA_NAME}.${TABLE_NAME}`, oldName)).toBeFalsy();
+      expect(await adapter.indexNameExists(`${SCHEMA_NAME}.${TABLE_NAME}`, newName)).toBeTruthy();
     });
 
     it("dumping schemas", async () => {
@@ -737,193 +915,181 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("create foreign key same schema", async () => {
-      await adapter.execute(`CREATE TABLE my_schema.trains (id serial primary key)`);
-      await adapter.execute(
-        `CREATE TABLE my_schema.wagons (id serial primary key, train_id integer)`,
-      );
+      await adapter.createTable("my_schema.trains");
+      await adapter.createTable("my_schema.wagons", (t) => {
+        t.integer("train_id");
+      });
       await adapter.addForeignKey("my_schema.wagons", "my_schema.trains");
-      expect(await adapter.foreignKeyExists("my_schema.wagons", "my_schema.trains")).toBe(true);
+      expect(await adapter.foreignKeyExists("my_schema.wagons", "my_schema.trains")).toBeTruthy();
     });
 
     it("create foreign key different schemas", async () => {
-      await adapter.dropSchema("my_other_schema", { ifExists: true });
-      await adapter.createSchema("my_other_schema");
-      await adapter.execute(`CREATE TABLE my_schema.trains (id serial primary key)`);
-      await adapter.execute(
-        `CREATE TABLE my_other_schema.wagons (id serial primary key, train_id integer)`,
-      );
-      await adapter.addForeignKey("my_other_schema.wagons", "my_schema.trains");
-      expect(await adapter.foreignKeyExists("my_other_schema.wagons", "my_schema.trains")).toBe(
-        true,
-      );
+      try {
+        await adapter.createSchema("my_other_schema");
+        await adapter.createTable("my_schema.trains");
+        await adapter.createTable("my_other_schema.wagons", (t) => {
+          t.integer("train_id");
+        });
+        await adapter.addForeignKey("my_other_schema.wagons", "my_schema.trains");
+        expect(
+          await adapter.foreignKeyExists("my_other_schema.wagons", "my_schema.trains"),
+        ).toBeTruthy();
+      } finally {
+        await adapter.dropSchema("my_other_schema", { ifExists: true });
+      }
     });
   });
 
   describe("SchemaIndexOpclassTest", () => {
+    beforeEach(async () => {
+      await adapter.createTable("trains", (t) => {
+        t.string("name");
+        t.string("position");
+        t.text("description");
+      });
+    });
+    afterEach(async () => {
+      await adapter.dropTable("trains", { ifExists: true });
+    });
+
     it("string opclass is dumped", async () => {
-      try {
-        await adapter.execute(
-          `CREATE TABLE trains (id serial primary key, name varchar(50), description text)`,
-        );
-        await adapter.execute(
-          `CREATE INDEX trains_name_and_description ON trains USING btree(name text_pattern_ops, description text_pattern_ops)`,
-        );
-        const lines = new StringIO();
-        await adapter.createSchemaDumper({}).dumpTable(lines, "trains");
-        expect(lines.string()).toContain(`opclass: "text_pattern_ops"`);
-      } finally {
-        await adapter.execute(`DROP TABLE IF EXISTS trains`);
-      }
+      await adapter.execute(
+        `CREATE INDEX trains_name_and_description ON trains USING btree(name text_pattern_ops, description text_pattern_ops)`,
+      );
+
+      const output = await dumpTableSchema(adapter, "trains");
+
+      expect(output).toMatch(/opclass: "text_pattern_ops"/);
     });
     it("non default opclass is dumped", async () => {
-      try {
-        await adapter.execute(
-          `CREATE TABLE trains (id serial primary key, name varchar(50), description text)`,
-        );
-        await adapter.execute(
-          `CREATE INDEX trains_name_and_description ON trains USING btree(name, description text_pattern_ops)`,
-        );
-        const lines = new StringIO();
-        await adapter.createSchemaDumper({}).dumpTable(lines, "trains");
-        expect(lines.string()).toContain(`opclass: { description: "text_pattern_ops" }`);
-      } finally {
-        await adapter.execute(`DROP TABLE IF EXISTS trains`);
-      }
+      await adapter.execute(
+        `CREATE INDEX trains_name_and_description ON trains USING btree(name, description text_pattern_ops)`,
+      );
+
+      const output = await dumpTableSchema(adapter, "trains");
+
+      expect(output).toMatch(/opclass: \{ description: "text_pattern_ops" \}/);
     });
     it("opclass class parsing on non reserved and cannot be function or type keyword", async () => {
-      try {
-        await adapter.execute(
-          `CREATE TABLE trains (id serial primary key, name varchar(50), position varchar(50))`,
-        );
-        await adapter.execute(`CREATE EXTENSION IF NOT EXISTS pg_trgm`);
-        await adapter.execute(
-          `CREATE INDEX trains_position ON trains USING gin(position gin_trgm_ops)`,
-        );
-        await adapter.execute(
-          `CREATE INDEX trains_name_and_position ON trains USING btree(name, position text_pattern_ops)`,
-        );
-        const lines = new StringIO();
-        await adapter.createSchemaDumper({}).dumpTable(lines, "trains");
-        const output = lines.string();
-        expect(output).toContain(`opclass: "gin_trgm_ops"`);
-        expect(output).toContain(`opclass: { position: "text_pattern_ops" }`);
-      } finally {
-        await adapter.execute(`DROP TABLE IF EXISTS trains`);
-      }
+      await adapter.enableExtension("pg_trgm");
+      await adapter.execute(
+        `CREATE INDEX trains_position ON trains USING gin(position gin_trgm_ops)`,
+      );
+      await adapter.execute(
+        `CREATE INDEX trains_name_and_position ON trains USING btree(name, position text_pattern_ops)`,
+      );
+
+      const output = await dumpTableSchema(adapter, "trains");
+
+      expect(output).toMatch(/opclass: "gin_trgm_ops"/);
+      expect(output).toMatch(/opclass: \{ position: "text_pattern_ops" \}/);
     });
   });
 
   describe("SchemaIndexNullsOrderTest", () => {
+    beforeEach(async () => {
+      await adapter.createTable("trains", (t) => {
+        t.string("name");
+        t.text("description");
+      });
+    });
+    afterEach(async () => {
+      await adapter.dropTable("trains", { ifExists: true });
+    });
+
     it("nulls order is dumped", async () => {
-      try {
-        await adapter.execute(
-          `CREATE TABLE trains (id serial primary key, name varchar(50), description text)`,
-        );
-        await adapter.execute(
-          `CREATE INDEX trains_name_and_description ON trains USING btree(name NULLS FIRST, description)`,
-        );
-        const lines = new StringIO();
-        await adapter.createSchemaDumper({}).dumpTable(lines, "trains");
-        expect(lines.string()).toContain(`order: { name: "NULLS FIRST" }`);
-      } finally {
-        await adapter.execute(`DROP TABLE IF EXISTS trains`);
-      }
+      await adapter.execute(
+        `CREATE INDEX trains_name_and_description ON trains USING btree(name NULLS FIRST, description)`,
+      );
+      const output = await dumpTableSchema(adapter, "trains");
+      expect(output).toMatch(/order: \{ name: "NULLS FIRST" \}/);
     });
     it("non default order with nulls is dumped", async () => {
-      try {
-        await adapter.execute(
-          `CREATE TABLE trains (id serial primary key, name varchar(50), description text)`,
-        );
-        await adapter.execute(
-          `CREATE INDEX trains_name_and_desc ON trains USING btree(name DESC NULLS LAST, description)`,
-        );
-        const lines = new StringIO();
-        await adapter.createSchemaDumper({}).dumpTable(lines, "trains");
-        expect(lines.string()).toContain(`order: { name: "DESC NULLS LAST" }`);
-      } finally {
-        await adapter.execute(`DROP TABLE IF EXISTS trains`);
-      }
+      await adapter.execute(
+        `CREATE INDEX trains_name_and_desc ON trains USING btree(name DESC NULLS LAST, description)`,
+      );
+      const output = await dumpTableSchema(adapter, "trains");
+      expect(output).toMatch(/order: \{ name: "DESC NULLS LAST" \}/);
     });
   });
 
   describe("DefaultsUsingMultipleSchemasAndDomainTest", () => {
-    const DOMAIN_SCHEMA = "schema_1";
     let oldSearchPath: string;
 
     beforeEach(async () => {
-      await adapter.dropSchema(DOMAIN_SCHEMA, { ifExists: true });
-      await adapter.createSchema(DOMAIN_SCHEMA);
-      await adapter.execute(`CREATE DOMAIN ${DOMAIN_SCHEMA}.text AS text`);
-      await adapter.execute(`CREATE DOMAIN ${DOMAIN_SCHEMA}.varchar AS varchar`);
-      await adapter.execute(`CREATE DOMAIN ${DOMAIN_SCHEMA}.numeric AS numeric`);
-      await adapter.execute(`CREATE DOMAIN ${DOMAIN_SCHEMA}.bpchar AS bpchar`);
+      await adapter.dropSchema("schema_1", { ifExists: true });
+      await adapter.execute("CREATE SCHEMA schema_1");
+      await adapter.execute("CREATE DOMAIN schema_1.text AS text");
+      await adapter.execute("CREATE DOMAIN schema_1.varchar AS varchar");
+      await adapter.execute("CREATE DOMAIN schema_1.bpchar AS bpchar");
+
       oldSearchPath = await adapter.schemaSearchPath();
-      await adapter.setSchemaSearchPath(`${DOMAIN_SCHEMA}, pg_catalog`);
-      // eslint-disable-next-line blazetrails/require-table-teardown
-      await adapter.execute(`
-        CREATE TABLE defaults (
-          id serial primary key,
-          text_col ${DOMAIN_SCHEMA}.text DEFAULT 'some value',
-          string_col ${DOMAIN_SCHEMA}.varchar DEFAULT 'some value',
-          decimal_col ${DOMAIN_SCHEMA}.numeric DEFAULT 3.14159265358979323846
-        )
-      `);
+      await adapter.setSchemaSearchPath("schema_1, pg_catalog");
+      // eslint-disable-next-line blazetrails/require-table-teardown -- dropped with schema_1 (teardown drop_schema)
+      await adapter.createTable("defaults", (t) => {
+        t.text("text_col", { default: "some value" });
+        t.string("string_col", { default: "some value" });
+        t.decimal("decimal_col", { default: "3.14159265358979323846" });
+      });
+      void Default.resetColumnInformation();
+      await Default.loadSchema();
     });
     afterEach(async () => {
       await adapter.setSchemaSearchPath(oldSearchPath);
-      await adapter.dropSchema(DOMAIN_SCHEMA, { ifExists: true });
+      await adapter.dropSchema("schema_1", { ifExists: true });
+      void Default.resetColumnInformation();
     });
 
     it("text defaults in new schema when overriding domain", async () => {
-      const cols = await adapter.columns("defaults");
-      const textCol = cols.find((c) => c.name === "text_col");
-      expect(textCol).toBeDefined();
-      expect(textCol!.default).toMatch(/some value/);
+      expect(
+        (new Default() as any).text_col,
+        "Default of text column was not correctly parsed",
+      ).toEqual("some value");
     });
 
     it("string defaults in new schema when overriding domain", async () => {
-      const cols = await adapter.columns("defaults");
-      const stringCol = cols.find((c) => c.name === "string_col");
-      expect(stringCol).toBeDefined();
-      expect(stringCol!.default).toMatch(/some value/);
+      expect(
+        (new Default() as any).string_col,
+        "Default of string column was not correctly parsed",
+      ).toEqual("some value");
     });
 
     it("decimal defaults in new schema when overriding domain", async () => {
-      const cols = await adapter.columns("defaults");
-      const decimalCol = cols.find((c) => c.name === "decimal_col");
-      expect(decimalCol).toBeDefined();
-      expect(decimalCol!.default).toMatch(/3\.14159265358979323846/);
+      expect(
+        (new Default() as any).decimal_col,
+        "Default of decimal column was not correctly parsed",
+      ).toEqual(new BigDecimal("3.14159265358979323846"));
     });
 
     it("bpchar defaults in new schema when overriding domain", async () => {
-      await adapter.execute(
-        `ALTER TABLE defaults ADD bpchar_col ${DOMAIN_SCHEMA}.bpchar DEFAULT 'some value'`,
-      );
-      const cols = await adapter.columns("defaults");
-      const bpcharCol = cols.find((c) => c.name === "bpchar_col");
-      expect(bpcharCol).toBeDefined();
-      expect(bpcharCol!.default).toMatch(/some value/);
+      await adapter.execute("ALTER TABLE defaults ADD bpchar_col bpchar DEFAULT 'some value'");
+      void Default.resetColumnInformation();
+      await Default.loadSchema();
+      expect(
+        (new Default() as any).bpchar_col,
+        "Default of bpchar column was not correctly parsed",
+      ).toEqual("some value");
     });
 
     it("text defaults after updating column default", async () => {
       await adapter.execute(
-        `ALTER TABLE defaults ALTER COLUMN text_col SET DEFAULT 'some text'::${DOMAIN_SCHEMA}.text`,
+        "ALTER TABLE defaults ALTER COLUMN text_col SET DEFAULT 'some text'::schema_1.text",
       );
-      const cols = await adapter.columns("defaults");
-      const textCol = cols.find((c) => c.name === "text_col");
-      expect(textCol).toBeDefined();
-      const slot = textCol!.default ?? textCol!.defaultFunction ?? "";
-      expect(String(slot)).toMatch(/some text/);
+      void Default.resetColumnInformation();
+      await Default.loadSchema();
+      expect(
+        (new Default() as any).text_col,
+        "Default of text column was not correctly parsed after updating default using '::text' since postgreSQL will add parens to the default in db",
+      ).toEqual("some text");
     });
 
     it("default containing quote and colons", async () => {
       await adapter.execute(
-        `ALTER TABLE defaults ALTER COLUMN string_col SET DEFAULT 'foo''::bar'`,
+        "ALTER TABLE defaults ALTER COLUMN string_col SET DEFAULT 'foo''::bar'",
       );
-      const cols = await adapter.columns("defaults");
-      const stringCol = cols.find((c) => c.name === "string_col");
-      expect(stringCol).toBeDefined();
-      expect(stringCol!.default).toMatch(/foo.*::bar/);
+      void Default.resetColumnInformation();
+      await Default.loadSchema();
+      expect((new Default() as any).string_col).toEqual("foo'::bar");
     });
   });
 
@@ -938,11 +1104,12 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("rename_table", async () => {
-      await adapter.setSchemaSearchPath('"my.schema"');
-      await adapter.execute(`CREATE TABLE "my.schema".posts (id serial primary key)`);
-      await adapter.renameTable("posts", "articles");
-      const tbls = await adapter.tables();
-      expect(tbls).toContain("articles");
+      await withSchemaSearchPath('"my.schema"', async () => {
+        // eslint-disable-next-line blazetrails/require-table-teardown -- dropped with the my.schema schema (SchemaWithDotsTest teardown)
+        await adapter.createTable("posts");
+        await adapter.renameTable("posts", "articles");
+        expect(await adapter.tables()).toEqual(["articles"]);
+      });
     });
 
     it("Active Record basics", async () => {
@@ -969,80 +1136,75 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("SchemaJoinTablesTest", () => {
+    beforeEach(async () => {
+      await adapter.createSchema("test_schema");
+    });
+    afterEach(async () => {
+      await adapter.dropSchema("test_schema", { ifExists: true });
+    });
+
     it("create join table", async () => {
-      try {
-        await adapter.execute(`CREATE SCHEMA IF NOT EXISTS some_schema`);
-        await adapter.createJoinTable("some_schema.users", "some_schema.roles");
-        expect(await adapter.tableExists("some_schema.roles_users")).toBe(true);
-        const cols = await adapter.columns("some_schema.roles_users");
-        const colNames = cols.map((c) => c.name);
-        expect(colNames).toContain("role_id");
-        expect(colNames).toContain("user_id");
-      } finally {
-        await adapter.execute(`DROP TABLE IF EXISTS some_schema.roles_users`);
-        await adapter.execute(`DROP SCHEMA IF EXISTS some_schema CASCADE`);
-      }
+      await adapter.createJoinTable("test_schema.posts", "test_schema.comments");
+      expect(await adapter.tableExists("test_schema.comments_posts")).toBeTruthy();
+      const columns = (await adapter.columns("test_schema.comments_posts")).map((c) => c.name);
+      expect(columns.sort()).toEqual(["comment_id", "post_id"]);
+
+      await adapter.dropJoinTable("test_schema.posts", "test_schema.comments");
+      expect(await adapter.tableExists("test_schema.comments_posts")).toBeFalsy();
     });
   });
 
   describe("SchemaIndexIncludeColumnsTest", () => {
     it("schema dumps index included columns", async () => {
-      await adapter.getDatabaseVersion();
-      const lines = new StringIO();
-      await adapter.createSchemaDumper({}).dumpTable(lines, "companies");
-      const indexLine = lines
-        .string()
-        .split("\n")
-        .find((l) => l.includes("company_include_index"))
-        ?.trim();
-      expect(indexLine).toBeDefined();
-      expect(indexLine).toContain(`t.index(["firm_id", "type"]`);
-      expect(indexLine).not.toContain(`["firm_id", "type", "name"`);
-      expect(indexLine?.includes(`include: ["name","account_id"]`)).toBe(
-        await adapter.supportsIndexInclude(),
-      );
+      const indexDefinition = (await dumpTableSchema(adapter, "companies"))
+        .split(/\n/)
+        .filter((l) => /t\.index.*company_include_index/.test(l))[0]
+        .trim();
+      // eslint-disable-next-line blazetrails/no-conditional-in-test -- mirrors Rails' `if ActiveRecord::Base.lease_connection.supports_index_include?` (schema_test.rb:824)
+      if (await adapter.supportsIndexInclude()) {
+        expect(indexDefinition).toEqual(
+          `t.index(["firm_id", "type"], { name: "company_include_index", include: ${JSON.stringify(["name", "account_id"])} });`,
+        );
+      } else {
+        expect(indexDefinition).toEqual(
+          't.index(["firm_id", "type"], { name: "company_include_index" });',
+        );
+      }
     });
   });
 
   describe("SchemaIndexNullsNotDistinctTest", () => {
+    beforeEach(async () => {
+      await adapter.createTable("trains", (t) => {
+        t.string("name");
+      });
+    });
+    afterEach(async () => {
+      await adapter.dropTable("trains", { ifExists: true });
+    });
+
     itIfSupports("nulls_not_distinct", "nulls not distinct is dumped", async () => {
-      try {
-        await adapter.execute(`CREATE TABLE trains (id serial primary key, name varchar(50))`);
-        if (!(await adapter.supportsNullsNotDistinct())) return;
-        await adapter.execute(
-          `CREATE INDEX trains_name ON trains USING btree(name) NULLS NOT DISTINCT`,
-        );
-        const lines = new StringIO();
-        await adapter.createSchemaDumper({}).dumpTable(lines, "trains");
-        expect(lines.string()).toContain("nullsNotDistinct: true");
-      } finally {
-        await adapter.execute(`DROP TABLE IF EXISTS trains`);
-      }
+      await adapter.execute(
+        `CREATE INDEX trains_name ON trains USING btree(name) NULLS NOT DISTINCT`,
+      );
+
+      const output = await dumpTableSchema(adapter, "trains");
+
+      expect(output).toMatch(/nullsNotDistinct: true/);
     });
     itIfSupports("nulls_not_distinct", "nulls distinct is dumped", async () => {
-      try {
-        await adapter.execute(`CREATE TABLE trains (id serial primary key, name varchar(50))`);
-        if (!(await adapter.supportsNullsNotDistinct())) return;
-        await adapter.execute(
-          `CREATE INDEX trains_name ON trains USING btree(name) NULLS DISTINCT`,
-        );
-        const lines = new StringIO();
-        await adapter.createSchemaDumper({}).dumpTable(lines, "trains");
-        expect(lines.string()).not.toContain("nullsNotDistinct");
-      } finally {
-        await adapter.execute(`DROP TABLE IF EXISTS trains`);
-      }
+      await adapter.execute(`CREATE INDEX trains_name ON trains USING btree(name) NULLS DISTINCT`);
+
+      const output = await dumpTableSchema(adapter, "trains");
+
+      expect(output).not.toMatch(/nullsNotDistinct/);
     });
     it("nulls not set is dumped", async () => {
-      try {
-        await adapter.execute(`CREATE TABLE trains (id serial primary key, name varchar(50))`);
-        await adapter.execute(`CREATE INDEX trains_name ON trains USING btree(name)`);
-        const lines = new StringIO();
-        await adapter.createSchemaDumper({}).dumpTable(lines, "trains");
-        expect(lines.string()).not.toContain("nullsNotDistinct");
-      } finally {
-        await adapter.execute(`DROP TABLE IF EXISTS trains`);
-      }
+      await adapter.execute(`CREATE INDEX trains_name ON trains USING btree(name)`);
+
+      const output = await dumpTableSchema(adapter, "trains");
+
+      expect(output).not.toMatch(/nullsNotDistinct/);
     });
   });
 
@@ -1053,24 +1215,28 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     itIfSupports("native_partitioning", "list partition options is dumped", async () => {
       const options = "PARTITION BY LIST (kind)";
+
       await adapter.createTable("trains", { id: false, options }, (t) => {
         t.string("name");
         t.string("kind");
       });
-      const lines = new StringIO();
-      await adapter.createSchemaDumper({}).dumpTable(lines, "trains");
-      expect(lines.string()).toContain(`options: "${options}"`);
+
+      const output = await dumpTableSchema(adapter, "trains");
+
+      expect(output).toMatch(`options: "${options}"`);
     });
 
     itIfSupports("native_partitioning", "range partition options is dumped", async () => {
       const options = "PARTITION BY RANGE (created_at)";
+
       await adapter.createTable("trains", { id: false, options }, (t) => {
         t.string("name");
         t.datetime("created_at", { null: false });
       });
-      const lines = new StringIO();
-      await adapter.createSchemaDumper({}).dumpTable(lines, "trains");
-      expect(lines.string()).toContain(`options: "${options}"`);
+
+      const output = await dumpTableSchema(adapter, "trains");
+
+      expect(output).toMatch(`options: "${options}"`);
     });
 
     it("inherited table options is dumped", async () => {
@@ -1078,34 +1244,42 @@ describeIfPg("PostgreSQLAdapter", () => {
         t.string("name");
         t.string("kind");
       });
+
       const options = "INHERITS (transportation_modes)";
+
       await adapter.createTable("trains", { options });
-      const lines = new StringIO();
-      await adapter.createSchemaDumper({}).dumpTable(lines, "trains");
-      expect(lines.string()).toContain(`options: "${options}"`);
+
+      const output = await dumpTableSchema(adapter, "trains");
+
+      expect(output).toMatch(`options: "${options}"`);
     });
 
     it("multiple inherited table options is dumped", async () => {
       await adapter.createTable("vehicles", (t) => {
         t.string("name");
       });
+
       await adapter.createTable("transportation_modes", (t) => {
         t.string("kind");
       });
+
       const options = "INHERITS (transportation_modes, vehicles)";
+
       await adapter.createTable("trains", { options });
-      const lines = new StringIO();
-      await adapter.createSchemaDumper({}).dumpTable(lines, "trains");
-      expect(lines.string()).toContain(`options: "${options}"`);
+
+      const output = await dumpTableSchema(adapter, "trains");
+
+      expect(output).toMatch(`options: "${options}"`);
     });
 
     it("no partition options are dumped", async () => {
       await adapter.createTable("trains", (t) => {
         t.string("name");
       });
-      const lines = new StringIO();
-      await adapter.createSchemaDumper({}).dumpTable(lines, "trains");
-      expect(lines.string()).not.toContain("options:");
+
+      const output = await dumpTableSchema(adapter, "trains");
+
+      expect(output).not.toMatch("options:");
     });
   });
 
