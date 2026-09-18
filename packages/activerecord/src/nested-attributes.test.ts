@@ -572,7 +572,8 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
     await (ship as any).delete();
     const newShip = await (pirate as any).createUpdateOnlyShip({ name: "Nights Dirty Lightning" });
     await pirate.update({ updateOnlyShipAttributes: { name: "Mayflower" } });
-    expect((await Ship.find(newShip.id)).name).toBe("Mayflower");
+    expect((await newShip.reload()).name).toBe("Mayflower");
+    expect((await shipOf(await pirate.reload()))!.id).toEqual(newShip.id);
   });
 
   it("should update existing when update only is true and id is given", async () => {
@@ -580,7 +581,8 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
     await (ship as any).delete();
     const newShip = await (pirate as any).createUpdateOnlyShip({ name: "Nights Dirty Lightning" });
     await pirate.update({ updateOnlyShipAttributes: { name: "Mayflower", id: newShip.id } });
-    expect((await Ship.find(newShip.id)).name).toBe("Mayflower");
+    expect((await newShip.reload()).name).toBe("Mayflower");
+    expect((await shipOf(await pirate.reload()))!.id).toEqual(newShip.id);
   });
 
   it("should destroy existing when update only is true and id is given and is marked for destruction", async () => {
@@ -598,9 +600,10 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
 
   it("should raise an argument error if something other than a hash is passed in", async () => {
     const { pirate } = await setup();
-    await expect(pirate.update({ shipAttributes: "foo" } as any)).rejects.toThrow(
-      /Hash expected for `ship` attributes, got String/,
+    const exception = await assertRaise([ArgumentError], {}, () =>
+      pirate.update({ shipAttributes: "foo" } as any),
     );
+    expect(exception.message).toBe("Hash expected for `ship` attributes, got String");
   });
 });
 
@@ -614,9 +617,9 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
     return { ship, pirate };
   }
 
-  it("should define an attribute writer method for the association", () => {
-    const ship = new Ship();
-    expect(typeof (ship as any).setPirateAttributes).toBe("function");
+  it("should define an attribute writer method for the association", async () => {
+    const { ship } = await setup();
+    assertRespondTo(ship, "setPirateAttributes");
   });
 
   it("should build a new record if there is no id", async () => {
@@ -678,12 +681,13 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
 
   it("should raise RecordNotFound if an id is given but doesnt return a record", async () => {
     const { ship } = await setup();
-    await expect(
-      (async () => {
-        await (ship as any).setPirateAttributes({ id: 1234567890 });
-        await ship.save();
-      })(),
-    ).rejects.toThrow(RecordNotFound);
+    const exception = await assertRaise([RecordNotFound], {}, async () => {
+      await (ship as any).setPirateAttributes({ id: 1234567890 });
+      await ship.save();
+    });
+    expect(exception.message).toBe(
+      `Couldn't find Pirate with ID=1234567890 for Ship with ID=${ship.id}`,
+    );
   });
 
   it("should take a hash with string keys and update the associated model", async () => {
@@ -718,13 +722,13 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
     const { ship, pirate } = await setup();
     const originalId = pirate.id;
     await ship.updateBang({ pirateAttributes: { id: pirate.id, _destroy: true } });
-    expect((await Pirate.where({ id: originalId })).length).toBe(0);
-    expect((ship as any).pirate_id).toBeFalsy();
+    assertEmpty(await Pirate.where({ id: originalId }));
+    expect((ship as any).pirate_id).toBeNull();
     expect(await pirateOf(ship)).toBeNull();
 
     await ship.reload();
-    expect((await Pirate.where({ id: originalId })).length).toBe(0);
-    expect((ship as any).pirate_id).toBeFalsy();
+    assertEmpty(await Pirate.where({ id: originalId }));
+    expect((ship as any).pirate_id).toBeNull();
     expect(await pirateOf(ship)).toBeNull();
   });
 
@@ -732,7 +736,7 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
     const { ship, pirate } = await setup();
     for (const notTruth of [null, "0", 0, "false", false]) {
       await ship.update({ pirateAttributes: { id: pirate.id, _destroy: notTruth } });
-      await expect(Pirate.find(pirate.id)).resolves.toBeTruthy();
+      await assertNothingRaised(async () => (await pirateOf(ship))!.reload());
     }
   });
 
@@ -743,7 +747,7 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
       rejectIf: (a) => Object.keys(a).length === 0,
     });
     await ship.update({ pirateAttributes: { id: pirate.id, _destroy: "1" } });
-    await expect(Pirate.find(pirate.id)).resolves.toBeTruthy();
+    await assertNothingRaised(async () => (await pirateOf(ship))!.reload());
     Ship.acceptsNestedAttributesFor("pirate", {
       allowDestroy: true,
       rejectIf: (a) => Object.keys(a).length === 0,
@@ -764,7 +768,7 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
   it("should not destroy the associated model until the parent is saved", async () => {
     const { ship, pirate } = await setup();
     (ship as any).attributes = { pirateAttributes: { id: pirate.id, _destroy: true } };
-    await expect(Pirate.find(pirate.id)).resolves.toBeTruthy();
+    await assertNothingRaised(() => Pirate.find(pirate.id));
     await ship.save();
     await expect(Pirate.find(pirate.id)).rejects.toThrow(RecordNotFound);
   });
@@ -777,10 +781,10 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
     const { ship, pirate } = await setup();
     await (pirate as any).delete();
     const s = await Ship.find(ship.id);
-    await s.update({ updateOnlyPirateAttributes: { catchphrase: "Arr" } });
+    (await s.reload()).attributes = { updateOnlyPirateAttributes: { catchphrase: "Arr" } };
     expect(
-      await (await Ship.find(ship.id)).association("updateOnlyPirate").loadTarget(),
-    ).not.toBeNull();
+      ((await s.association("updateOnlyPirate").loadTarget()) as Pirate).isPersisted(),
+    ).toBeFalsy();
   });
 
   it("should update existing when update only is true and no id is given", async () => {
@@ -788,7 +792,11 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
     await (pirate as any).delete();
     const newPirate = await (ship as any).createUpdateOnlyPirate({ catchphrase: "Aye" });
     await ship.update({ updateOnlyPirateAttributes: { catchphrase: "Arr" } });
-    expect(((await Pirate.find(newPirate.id)) as any).catchphrase).toBe("Arr");
+    expect((await newPirate.reload()).catchphrase).toBe("Arr");
+    await ship.reload();
+    expect(((await ship.association("updateOnlyPirate").loadTarget()) as Pirate).id).toEqual(
+      newPirate.id,
+    );
   });
 
   it("should update existing when update only is true and id is given", async () => {
@@ -796,7 +804,11 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
     await (pirate as any).delete();
     const newPirate = await (ship as any).createUpdateOnlyPirate({ catchphrase: "Aye" });
     await ship.update({ updateOnlyPirateAttributes: { catchphrase: "Arr", id: newPirate.id } });
-    expect(((await Pirate.find(newPirate.id)) as any).catchphrase).toBe("Arr");
+    expect((await newPirate.reload()).catchphrase).toBe("Arr");
+    await ship.reload();
+    expect(((await ship.association("updateOnlyPirate").loadTarget()) as Pirate).id).toEqual(
+      newPirate.id,
+    );
   });
 
   it("should destroy existing when update only is true and id is given and is marked for destruction", async () => {
@@ -813,9 +825,10 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
 
   it("should raise an argument error if something other than a hash is passed in", async () => {
     const { ship } = await setup();
-    await expect(ship.update({ pirateAttributes: "foo" } as any)).rejects.toThrow(
-      /Hash expected for `pirate` attributes, got String/,
+    const exception = await assertRaise([ArgumentError], {}, () =>
+      ship.update({ pirateAttributes: "foo" } as any),
     );
+    expect(exception.message).toBe("Hash expected for `pirate` attributes, got String");
   });
 });
 

@@ -272,7 +272,7 @@ export function assignNestedAttributesForOneToOneAssociation(
   attributes: Record<string, unknown>,
 ): Promise<void> | void {
   if (typeof attributes !== "object" || attributes === null || Array.isArray(attributes)) {
-    throw new Error(
+    throw new ArgumentError(
       `Hash expected for \`${associationName}\` attributes, got ${nestedTypeName(attributes)}`,
     );
   }
