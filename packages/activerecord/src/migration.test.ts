@@ -46,7 +46,7 @@ import { loadSchemaFromAdapter } from "./model-schema.js";
 import { itIfSupports, describeIfSupports } from "./support/supports.js";
 import { describeIfPostgresqlAdapter } from "./support/describe-if-postgresql-adapter.js";
 import { Temporal } from "@blazetrails/date";
-import { Dir, File, Hash, Zlib } from "@blazetrails/ruby-compat";
+import { Dir, File, Zlib, block, fetch } from "@blazetrails/ruby-compat";
 import { Mysql2Adapter } from "./connection-adapters/mysql2-adapter.js";
 import { describeIfMysqlAdapter } from "./support/describe-if-mysql-adapter.js";
 import { leaseMysqlAdapter } from "./adapters/abstract-mysql-adapter/test-helper.js";
@@ -1670,12 +1670,12 @@ AND query LIKE '%${lockId}%'`;
 
     it("adding multiple columns", async () => {
       const classname = Base.connection.constructor.name;
-      const expectedQueryCount = Hash.fetch(
+      const expectedQueryCount = fetch(
         { Mysql2Adapter: 1, TrilogyAdapter: 1, PostgreSQLAdapter: 2 },
         classname,
-        (): number => {
+        block((): number => {
           throw new Error(`need an expected query count for ${classname}`);
-        },
+        }),
       );
 
       await assertQueriesCount(expectedQueryCount, false, async () => {
@@ -1785,12 +1785,12 @@ AND query LIKE '%${lockId}%'`;
       });
 
       const classname = Base.connection.constructor.name;
-      const expectedQueryCount = Hash.fetch(
+      const expectedQueryCount = fetch(
         { Mysql2Adapter: 1, TrilogyAdapter: 1, PostgreSQLAdapter: 3 },
         classname,
-        (): number => {
+        block((): number => {
           throw new Error(`need an expected query count for ${classname}`);
-        },
+        }),
       );
 
       await assertQueriesCount(expectedQueryCount, false, async () => {
@@ -1819,12 +1819,12 @@ AND query LIKE '%${lockId}%'`;
       expect(await index("index_delete_me_on_name")).toBeTruthy();
 
       const classname = Base.connection.constructor.name;
-      const expectedQueryCount = Hash.fetch(
+      const expectedQueryCount = fetch(
         { Mysql2Adapter: 1, TrilogyAdapter: 1, PostgreSQLAdapter: 2 },
         classname,
-        (): number => {
+        block((): number => {
           throw new Error(`need an expected query count for ${classname}`);
-        },
+        }),
       );
 
       await assertQueriesCount(expectedQueryCount, false, async () => {
@@ -1850,12 +1850,12 @@ AND query LIKE '%${lockId}%'`;
       expect((await index("username_index"))!.unique).toBeFalsy();
 
       const classname = Base.connection.constructor.name;
-      const expectedQueryCount = Hash.fetch(
+      const expectedQueryCount = fetch(
         { Mysql2Adapter: 1, TrilogyAdapter: 1, PostgreSQLAdapter: 2 },
         classname,
-        (): number => {
+        block((): number => {
           throw new Error(`need an expected query count for ${classname}`);
-        },
+        }),
       );
 
       await assertQueriesCount(expectedQueryCount, false, async () => {
@@ -2398,12 +2398,12 @@ describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
     expect(cols.find((c) => c.name === "birthdate")!.type).toBe("date");
 
     const classname = Base.connection.constructor.name;
-    const expectedQueryCount = Hash.fetch(
+    const expectedQueryCount = fetch(
       { Mysql2Adapter: 3, TrilogyAdapter: 3, PostgreSQLAdapter: 3 },
       classname,
-      (): number => {
+      block((): number => {
         throw new Error(`need an expected query count for ${classname}`);
-      },
+      }),
     );
     await assertQueriesCount(expectedQueryCount, true, async () => {
       await adapter.changeTable("delete_me", { bulk: true }, (t: any) => {
@@ -2430,12 +2430,12 @@ describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
     expect(preCols.find((c) => c.name === "birthdate")!.type).toBe("date");
 
     const classname = Base.connection.constructor.name;
-    const expectedQueryCount = Hash.fetch(
+    const expectedQueryCount = fetch(
       { Mysql2Adapter: 7, TrilogyAdapter: 7, PostgreSQLAdapter: 5 },
       classname,
-      (): number => {
+      block((): number => {
         throw new Error(`need an expected query count for ${classname}`);
-      },
+      }),
     );
     await assertQueriesCount(expectedQueryCount, true, async () => {
       await adapter.changeTable("delete_me", { bulk: true }, (t: any) => {

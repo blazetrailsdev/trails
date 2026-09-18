@@ -29,19 +29,19 @@ function blockGivenP(value: unknown): value is Block<unknown> {
  */
 export function fetch<T>(hash: Record<string, unknown>, key: string): T;
 /**
- * The two-argument arm: the STORED value whenever the key exists — including a
- * stored `nil` or `false` — and otherwise `defaultValue`, which is what `??`
- * gets wrong.
- * @noRailsEquivalent PERMANENT — Ruby core `Hash#fetch` (`vendor/ruby/hash.c:2176`).
- */
-export function fetch<T>(hash: Record<string, unknown>, key: string, defaultValue: T): T;
-/**
  * The block arm: on a miss `rb_hash_fetch_m` yields the key and returns what
  * the block returns, which is what `Rack::Request::Env#fetch_header`
  * (`vendor/rack/lib/rack/request.rb:106-108`) installs a default through.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#fetch` (`vendor/ruby/hash.c:2176`).
  */
 export function fetch<T>(hash: Record<string, unknown>, key: string, block: Block<T>): T;
+/**
+ * The two-argument arm: the STORED value whenever the key exists — including a
+ * stored `nil` or `false` — and otherwise `defaultValue`, which is what `??`
+ * gets wrong.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#fetch` (`vendor/ruby/hash.c:2176`).
+ */
+export function fetch<T>(hash: Record<string, unknown>, key: string, defaultValue: T): T;
 /**
  * `rb_hash_fetch_m` dispatches on `argc` and `rb_block_given_p`, so the arms
  * share one body over a rest parameter: an absent second argument is the
