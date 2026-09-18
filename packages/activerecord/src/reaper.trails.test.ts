@@ -29,7 +29,7 @@ describe("Reaper", () => {
     vi.useRealTimers();
   });
 
-  it("keeps ticking after a reap() failure, logging it instead of raising it unhandled", async () => {
+  it("keeps ticking after a reap() failure, logging it instead of raising it unhandled (interim shape, story reaper-tick-rescue-scope-too-broad)", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
       let attempt = 0;
