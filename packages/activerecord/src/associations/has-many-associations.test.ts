@@ -1333,11 +1333,45 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("no sql should be fired if association already loaded", async () => {
-    const author = await HmAuthor.create({ name: "Alice" });
-    await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts1 = await author.posts;
-    const posts2 = await author.posts;
-    expect(posts1.length).toBe(posts2.length);
+    await Car.create({ name: "honda" });
+    const bulbs = (await Car.first())!.bulbs as any;
+    await bulbs.toArray();
+
+    await assertNoQueries(false, async () => {
+      await bulbs.first();
+    });
+
+    await assertNoQueries(false, async () => {
+      await bulbs.second();
+    });
+
+    await assertNoQueries(false, async () => {
+      await bulbs.third();
+    });
+
+    await assertNoQueries(false, async () => {
+      await bulbs.fourth();
+    });
+
+    await assertNoQueries(false, async () => {
+      await bulbs.fifth();
+    });
+
+    await assertNoQueries(false, async () => {
+      await bulbs.fortyTwo();
+    });
+
+    await assertNoQueries(false, async () => {
+      await bulbs.thirdToLast();
+    });
+
+    await assertNoQueries(false, async () => {
+      await bulbs.secondToLast();
+    });
+
+    await assertNoQueries(false, async () => {
+      await bulbs.last();
+    });
   });
 
   it("association with extend option", () => {
@@ -1969,42 +2003,40 @@ describe("HasManyAssociationsTest", () => {
     ).not.toBe(0);
   });
   it("build and create should not happen within scope", async () => {
-    const author = await HmAuthor.create({ name: "Alice" });
-    const post = await HmPost.create({ author_id: author.id, title: "Created", body: "body" });
-    expect(post.isNewRecord()).toBe(false);
-    expect((post as any).author_id).toBe(Number(author.id));
+    const car = (await Car.create({ name: "honda" })) as any;
+    const scope = car.fooBulbs.whereValuesHash();
+
+    let bulb = car.fooBulbs.build();
+    expect(bulb.scopeAfterInitialize.whereValuesHash()).not.toEqual(scope);
+
+    bulb = await car.fooBulbs.create();
+    expect(bulb.scopeAfterInitialize.whereValuesHash()).not.toEqual(scope);
+
+    bulb = await car.fooBulbs.createBang();
+    expect(bulb.scopeAfterInitialize.whereValuesHash()).not.toEqual(scope);
   });
   it("finder method with dirty target", async () => {
-    class FinderDirtyAuthor extends Base {
-      declare finder_dirty_posts: AssociationProxy<FinderDirtyPost>;
-      declare name: string | null;
+    const company = (await HmFirm.create({ name: "First Firm" })) as any;
+    await company.clientsOfFirm.create({ name: "Existing Client I" });
+    await company.clientsOfFirm.create({ name: "Existing Client II" });
+    await company.reload();
+    const newClients: any[] = [];
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("finder_dirty_posts", {
-          className: "FinderDirtyPost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class FinderDirtyPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
+    await assertQueriesCount(0, false, async () => {
+      newClients.push(company.clientsOfFirm.build({ name: "Another Client" }));
+      newClients.push(company.clientsOfFirm.build({ name: "Another Client II" }));
+      newClients.push(company.clientsOfFirm.build({ name: "Another Client III" }));
+    });
 
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(FinderDirtyAuthor);
-    registerModel(FinderDirtyPost);
-    const author = await FinderDirtyAuthor.create({ name: "Alice" });
-    const post = await FinderDirtyPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await author.finder_dirty_posts;
-    const found = posts.find((p: any) => p.id === post.id);
-    expect(found).toBeDefined();
+    expect(company.clientsOfFirm.loaded).toBeFalsy();
+    await assertQueriesCount(1, false, async () => {
+      expect(await company.clientsOfFirm.third()).toBe(newClients[0]);
+      expect(await company.clientsOfFirm.fourth()).toBe(newClients[1]);
+      expect(await company.clientsOfFirm.fifth()).toBe(newClients[2]);
+      expect(await company.clientsOfFirm.thirdToLast()).toBe(newClients[0]);
+      expect(await company.clientsOfFirm.secondToLast()).toBe(newClients[1]);
+      expect(await company.clientsOfFirm.last()).toBe(newClients[2]);
+    });
   });
 
   it("finding array compatibility", async () => {
