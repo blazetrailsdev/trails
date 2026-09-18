@@ -92,6 +92,26 @@ function buildPkWhere(pk: string[], tuple: unknown[]): Record<string, unknown> {
 }
 
 export async function find(this: FinderRelation, ...args: unknown[]): Promise<any> {
+  const block = args[args.length - 1];
+  if (typeof block === "function") {
+    const ifnoneArgs = args.slice(0, -1);
+    if (ifnoneArgs.length > 1) {
+      throw new ArgumentError(
+        `wrong number of arguments (given ${ifnoneArgs.length}, expected 0..1)`,
+      );
+    }
+    const ifnone = ifnoneArgs[0];
+    for (const record of await this.toArray()) {
+      if (await (block as (record: unknown) => unknown)(record)) return record;
+    }
+    if (ifnone == null) return null;
+    if (typeof ifnone !== "function") {
+      const desc =
+        typeof ifnone === "boolean" ? String(ifnone) : `an instance of ${rbObjClass(ifnone)}`;
+      throw new NoMethodError(`undefined method \`call' for ${desc}`);
+    }
+    return await ifnone();
+  }
   return findWithIds.call(this, ...args);
 }
 
