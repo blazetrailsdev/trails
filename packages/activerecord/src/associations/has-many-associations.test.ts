@@ -28,6 +28,10 @@ import { Car } from "../test-helpers/models/car.js";
 import { Bulb } from "../test-helpers/models/bulb.js";
 import { Developer, AuditLog } from "../test-helpers/models/developer.js";
 import { Project } from "../test-helpers/models/project.js";
+import { Speedometer } from "../test-helpers/models/speedometer.js";
+import { Minivan } from "../test-helpers/models/minivan.js";
+import { Invoice } from "../test-helpers/models/invoice.js";
+import { LineItem as HmLineItem } from "../test-helpers/models/line-item.js";
 import { Associations, isAssociationCached } from "../associations.js";
 import { DeleteRestrictionError } from "./errors.js";
 import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
@@ -365,18 +369,15 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTestForReorderWithJoinDependency", () => {
-  fixtures([]);
+  const { authors } = fixtures(["authors", "authorAddresses", "posts", "comments"]);
 
-  it("should generate valid sql", () => {
-    class Post extends Base {
-      declare title: string | null;
-
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const sql = Post.order("title").reorder("title DESC").toSql();
-    expect(sql).toContain("ORDER BY");
+  it("should generate valid sql", async () => {
+    const author = authors("david") as any;
+    const last = await author.postsWithCommentsSortedByCommentId
+      .where("comments.id > 0")
+      .reorder({ "posts.comments_count": "desc", "posts.tags_count": "desc" })
+      .last();
+    expect(last).toBeTruthy();
   });
 });
 
@@ -1292,6 +1293,21 @@ describe("HasManyAssociationsTest", () => {
 describe("HasManyAssociationsTest", () => {
   fixtures([]);
 
+  beforeAll(async () => {
+    await Developer.loadSchema();
+    await Project.loadSchema();
+    await Speedometer.loadSchema();
+    await Minivan.loadSchema();
+    await Invoice.loadSchema();
+    await HmLineItem.loadSchema();
+  });
+  registerModel(Developer);
+  registerModel(Project);
+  registerModel(Speedometer);
+  registerModel(Minivan);
+  registerModel(Invoice);
+  registerModel(HmLineItem);
+
   it("select query method", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "Hello", body: "body" });
@@ -1386,35 +1402,31 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("anonymous has many", async () => {
-    class AnonAuthor extends Base {
-      declare name: string | null;
-      declare anon_posts: AssociationProxy<AnonPost>;
+    class AnonDeveloper extends Base {
+      declare developerProjects: AssociationProxy<AnonDeveloperProject>;
 
       static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("anon_posts", {
-          className: "AnonPost",
-          foreignKey: "author_id",
+        this.tableName = "developers";
+        this.hasMany("developerProjects", {
+          className: "AnonDeveloperProject",
+          foreignKey: "developer_id",
         });
       }
     }
-    class AnonPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
+    class AnonDeveloperProject extends Base {
       static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
+        this.tableName = "developers_projects";
+        this.belongsTo("developer", { className: "AnonDeveloper" });
       }
     }
-    registerModel(AnonAuthor);
-    registerModel(AnonPost);
-    const author = await AnonAuthor.create({ name: "Alice" });
-    await AnonPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await author.anon_posts;
-    expect(posts.length).toBe(1);
+    registerModel(AnonDeveloper);
+    registerModel(AnonDeveloperProject);
+    const dev = (await AnonDeveloper.first()) as any;
+    const named = (await Developer.find(dev.id)) as any;
+    expect(await dev.developerProjects.count()).toBeGreaterThan(0);
+    const namedProjectIds = (await named.projects).map((p: any) => p.id).sort();
+    const devProjectIds = (await dev.developerProjects).map((p: any) => p.project_id).sort();
+    expect(namedProjectIds).toEqual(devProjectIds);
   });
   it("default scope on relations is not cached", async () => {
     let counter = 0;
@@ -1478,137 +1490,84 @@ describe("HasManyAssociationsTest", () => {
     expect((reloaded as any).updated_at).toEqual(originalUpdatedAt);
   });
   it("create from association should respect default scope", async () => {
-    class DefScopeAuthor extends Base {
-      declare name: string | null;
+    const car = (await Car.create({ name: "honda" })) as any;
+    expect(car.name).toBe("honda");
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    class DefScopePost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
+    let bulb = (await Bulb.create()) as any;
+    expect(bulb.name).toBe("defaulty");
 
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(DefScopeAuthor);
-    registerModel(DefScopePost);
-    const author = await DefScopeAuthor.create({ name: "Alice" });
-    const post = await DefScopePost.create({ author_id: author.id, title: "Scoped", body: "body" });
-    expect(post.isNewRecord()).toBe(false);
-    expect((post as any).author_id).toBe(Number(author.id));
+    bulb = car.bulbs.build();
+    expect(bulb.name).toBe("defaulty");
+
+    bulb = await car.bulbs.create();
+    expect(bulb.name).toBe("defaulty");
+
+    bulb = await car.bulbs.createBang();
+    expect(bulb.name).toBe("defaulty");
   });
   it("build and create from association should respect passed attributes over default scope", async () => {
-    class AttrAuthor extends Base {
-      declare name: string | null;
+    const car = (await Car.create({ name: "honda" })) as any;
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    class AttrPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
+    let bulb = car.bulbs.where({ name: "exotic" }).build();
+    expect(bulb.name).toBe("exotic");
+    expect(bulb.countAfterCreate).toBeUndefined();
 
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(AttrAuthor);
-    registerModel(AttrPost);
-    const author = await AttrAuthor.create({ name: "Alice" });
-    const post = await AttrPost.create({ author_id: author.id, title: "Custom", body: "body" });
-    expect((post as any).title).toBe("Custom");
+    bulb = await car.bulbs.where({ name: "exotic" }).create();
+    expect(bulb.name).toBe("exotic");
+    expect(bulb.countAfterCreate).toBe(0);
+
+    bulb = await car.bulbs.where({ name: "exotic" }).createBang();
+    expect(bulb.name).toBe("exotic");
+    expect(bulb.countAfterCreate).toBe(0);
+
+    bulb = car.bulbs.build({ name: "exotic" });
+    expect(bulb.name).toBe("exotic");
+
+    bulb = await car.bulbs.create({ name: "exotic" });
+    expect(bulb.name).toBe("exotic");
+
+    bulb = await car.bulbs.createBang({ name: "exotic" });
+    expect(bulb.name).toBe("exotic");
+
+    bulb = car.awesomeBulbs.build({ frickinawesome: false });
+    expect(bulb.frickinawesome).toBe(false);
+
+    bulb = await car.awesomeBulbs.create({ frickinawesome: false });
+    expect(bulb.frickinawesome).toBe(false);
+
+    bulb = await car.awesomeBulbs.createBang({ frickinawesome: false });
+    expect(bulb.frickinawesome).toBe(false);
   });
   it("build and create from association should respect unscope over default scope", async () => {
-    class UnscopeAuthor extends Base {
-      declare name: string | null;
+    const car = (await Car.create({ name: "honda" })) as any;
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    class UnscopePost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
+    let bulb = car.bulbs.unscope({ where: "name" }).build();
+    expect(bulb.name).toBeNull();
 
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(UnscopeAuthor);
-    registerModel(UnscopePost);
-    const author = await UnscopeAuthor.create({ name: "Alice" });
-    const post = await UnscopePost.create({
-      author_id: author.id,
-      title: "Unscoped",
-      body: "body",
-    });
-    expect((post as any).title).toBe("Unscoped");
-    expect((post as any).author_id).toBe(Number(author.id));
+    bulb = await car.bulbs.unscope({ where: "name" }).create();
+    expect(bulb.name).toBeNull();
+
+    bulb = await car.bulbs.unscope({ where: "name" }).createBang();
+    expect(bulb.name).toBeNull();
+
+    bulb = car.awesomeBulbs.unscope({ where: "frickinawesome" }).build();
+    expect(bulb.frickinawesome).toBe(false);
+
+    bulb = await car.awesomeBulbs.unscope({ where: "frickinawesome" }).create();
+    expect(bulb.frickinawesome).toBe(false);
+
+    bulb = await car.awesomeBulbs.unscope({ where: "frickinawesome" }).createBang();
+    expect(bulb.frickinawesome).toBe(false);
   });
   it("build from association should respect scope", async () => {
-    class ScopeAuthor extends Base {
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    class ScopePost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(ScopeAuthor);
-    registerModel(ScopePost);
-    const author = await ScopeAuthor.create({ name: "Alice" });
-    const post = ScopePost.new({ author_id: author.id, title: "Built" });
-    expect((post as any).author_id).toBe(Number(author.id));
-    expect(post.isNewRecord()).toBe(true);
+    const author = HmAuthor.new() as any;
+    const post = author.thinkingPosts.build();
+    expect(post.title).toBe("So I was thinking");
   });
   it("build from association sets inverse instance", async () => {
-    class InvAuthor extends Base {
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    class InvPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(InvAuthor);
-    registerModel(InvPost);
-    const author = await InvAuthor.create({ name: "Alice" });
-    const post = InvPost.new({ author_id: author.id, title: "Built" });
-    expect((post as any).author_id).toBe(Number(author.id));
-    expect(post.isNewRecord()).toBe(true);
+    const car = Car.new({ name: "honda" }) as any;
+    const bulb = car.bulbs.build();
+    expect(await bulb.car).toBe(car);
   });
   it("delete all on association is the same as not loaded", async () => {
     class DelAllAuthor extends Base {
@@ -1900,68 +1859,82 @@ describe("HasManyAssociationsTest", () => {
     expect(() => proxy.build({ type: "UnrelatedModel" })).toThrow(SubclassNotFound);
   });
   it("build the association with an array", async () => {
-    const author = await HmAuthor.create({ name: "Alice" });
-    const posts = [
-      HmPost.new({ author_id: author.id, title: "A" }),
-      HmPost.new({ author_id: author.id, title: "B" }),
-    ];
-    expect(posts.length).toBe(2);
-    expect(posts.every((p) => p.isNewRecord())).toBe(true);
+    const speedometer = Speedometer.new({ speedometer_id: "a" }) as any;
+    const data = [{ name: "first" }, { name: "second" }];
+    speedometer.minivans.where({ color: "blue" }).build(data);
+
+    expect(await speedometer.minivans.size()).toBe(2);
+    expect(await speedometer.save()).toBe(true);
+
+    await speedometer.reload();
+
+    const minivans = (await speedometer.minivans) as any[];
+    expect(minivans.map((m) => m.name).sort()).toEqual(["first", "second"]);
+    expect(minivans.map((m) => m.color)).toEqual(["blue", "blue"]);
   });
 
   it("new the association with an array", async () => {
-    const author = await HmAuthor.create({ name: "Alice" });
-    const posts = [
-      HmPost.new({ author_id: author.id, title: "X" }),
-      HmPost.new({ author_id: author.id, title: "Y" }),
-    ];
-    expect(posts.length).toBe(2);
-    expect(posts[0].isNewRecord()).toBe(true);
+    const speedometer = Speedometer.new({ speedometer_id: "a" }) as any;
+    const data = [{ name: "first" }, { name: "second" }];
+    speedometer.minivans.where({ color: "blue" }).new(data);
+
+    expect(await speedometer.minivans.size()).toBe(2);
+    expect(await speedometer.save()).toBe(true);
+
+    await speedometer.reload();
+
+    const minivans = (await speedometer.minivans) as any[];
+    expect(minivans.map((m) => m.name).sort()).toEqual(["first", "second"]);
+    expect(minivans.map((m) => m.color)).toEqual(["blue", "blue"]);
   });
 
   it("create the association with an array", async () => {
-    const author = await HmAuthor.create({ name: "Alice" });
-    const posts = await Promise.all([
-      HmPost.create({ author_id: author.id, title: "A", body: "body" }),
-      HmPost.create({ author_id: author.id, title: "B", body: "body" }),
-    ]);
-    expect(posts.length).toBe(2);
-    expect(posts.every((p) => !p.isNewRecord())).toBe(true);
+    const speedometer = (await Speedometer.createBang({ speedometer_id: "a" })) as any;
+    const data = [{ name: "first" }, { name: "second" }];
+    await speedometer.minivans.where({ color: "blue" }).create(data);
+
+    expect(await speedometer.minivans.size()).toBe(2);
+
+    await speedometer.reload();
+
+    const minivans = (await speedometer.minivans) as any[];
+    expect(minivans.map((m) => m.name).sort()).toEqual(["first", "second"]);
+    expect(minivans.map((m) => m.color)).toEqual(["blue", "blue"]);
   });
 
   it("create! the association with an array", async () => {
-    const author = await HmAuthor.create({ name: "Alice" });
-    const posts = await Promise.all([
-      HmPost.create({ author_id: author.id, title: "A", body: "body" }),
-      HmPost.create({ author_id: author.id, title: "B", body: "body" }),
-    ]);
-    expect(posts.length).toBe(2);
-    expect(posts.every((p) => !p.isNewRecord())).toBe(true);
+    const speedometer = (await Speedometer.createBang({ speedometer_id: "a" })) as any;
+    const data = [{ name: "first" }, { name: "second" }];
+    await speedometer.minivans.where({ color: "blue" }).createBang(data);
+
+    expect(await speedometer.minivans.size()).toBe(2);
+
+    await speedometer.reload();
+
+    const minivans = (await speedometer.minivans) as any[];
+    expect(minivans.map((m) => m.name).sort()).toEqual(["first", "second"]);
+    expect(minivans.map((m) => m.color)).toEqual(["blue", "blue"]);
   });
   it("association protect foreign key", async () => {
-    class ProtAuthor extends Base {
-      declare name: string | null;
+    const invoice = (await Invoice.create()) as any;
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    class ProtPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
+    let lineItem = invoice.lineItems.new();
+    expect(lineItem.invoice_id).toBe(Number(invoice.id));
 
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(ProtAuthor);
-    registerModel(ProtPost);
-    const author = await ProtAuthor.create({ name: "Alice" });
-    const post = await ProtPost.create({ author_id: author.id, title: "A", body: "body" });
-    expect((post as any).author_id).toBe(Number(author.id));
+    lineItem = invoice.lineItems.new({ invoice_id: Number(invoice.id) + 1 });
+    expect(lineItem.invoice_id).toBe(Number(invoice.id));
+
+    lineItem = invoice.lineItems.build();
+    expect(lineItem.invoice_id).toBe(Number(invoice.id));
+
+    lineItem = invoice.lineItems.build({ invoice_id: Number(invoice.id) + 1 });
+    expect(lineItem.invoice_id).toBe(Number(invoice.id));
+
+    lineItem = await invoice.lineItems.create();
+    expect(lineItem.invoice_id).toBe(Number(invoice.id));
+
+    lineItem = await invoice.lineItems.create({ invoice_id: Number(invoice.id) + 1 });
+    expect(lineItem.invoice_id).toBe(Number(invoice.id));
   });
   it("association enum works properly", async () => {
     class SpecialAuthor extends Base {
