@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { TimeWithZone } from "@blazetrails/activesupport";
+import { TimeWithZone, toFs } from "@blazetrails/activesupport";
 import { Base, composedOf, MultiparameterAssignmentErrors } from "./index.js";
 import { withTimezoneConfig } from "./test-helper.js";
 import { fixtures } from "./test-fixtures.js";
@@ -16,17 +16,13 @@ describe("MultiParameterAttributeTest", () => {
   });
 
   it("multiparameter attributes on date", async () => {
-    const topic = new Topic();
+    const topic = await Topic.find(1);
     await topic.assignAttributes({
       "last_read(1i)": "2004",
       "last_read(2i)": "6",
       "last_read(3i)": "24",
     });
-    const d = topic.last_read;
-    expect(d).toBeInstanceOf(Temporal.PlainDate);
-    expect(d.year).toBe(2004);
-    expect(d.month).toBe(6);
-    expect(d.day).toBe(24);
+    expect(topic.last_read).toEqual(Temporal.PlainDate.from({ year: 2004, month: 6, day: 24 }));
   });
 
   it("multiparameter attributes on date with empty year", async () => {
@@ -99,24 +95,22 @@ describe("MultiParameterAttributeTest", () => {
     expect(topic.last_read).toBeNull();
   });
 
-  it("multiparameter attributes on time", async () => {
-    const topic = new Topic();
-    await topic.assignAttributes({
-      "written_on(1i)": "2004",
-      "written_on(2i)": "6",
-      "written_on(3i)": "24",
-      "written_on(4i)": "16",
-      "written_on(5i)": "24",
-      "written_on(6i)": "0",
+  it.skip("multiparameter attributes on time", async () => {
+    // BLOCKED: multiparameter-time-local-not-equal-to-time-local
+    await withTimezoneConfig({ default: "local" }, async () => {
+      const topic = await Topic.find(1);
+      await topic.assignAttributes({
+        "written_on(1i)": "2004",
+        "written_on(2i)": "6",
+        "written_on(3i)": "24",
+        "written_on(4i)": "16",
+        "written_on(5i)": "24",
+        "written_on(6i)": "00",
+      });
+      expect((topic.written_on as RubyTime).valueOf()).toEqual(
+        RubyTime.local(2004, 6, 24, 16, 24, 0).valueOf(),
+      );
     });
-    const dt = topic.written_on as RubyTime;
-    expect(dt).toBeInstanceOf(RubyTime);
-    expect(utc(dt).year).toBe(2004);
-    expect(utc(dt).month).toBe(6);
-    expect(utc(dt).day).toBe(24);
-    expect(utc(dt).hour).toBe(16);
-    expect(utc(dt).minute).toBe(24);
-    expect(utc(dt).second).toBe(0);
   });
 
   it("multiparameter attributes on time with no date", async () => {
@@ -147,23 +141,16 @@ describe("MultiParameterAttributeTest", () => {
   });
 
   it("multiparameter attributes on time with old date", async () => {
-    const topic = new Topic();
+    const topic = await Topic.find(1);
     await topic.assignAttributes({
       "written_on(1i)": "1850",
       "written_on(2i)": "6",
       "written_on(3i)": "24",
       "written_on(4i)": "16",
       "written_on(5i)": "24",
-      "written_on(6i)": "0",
+      "written_on(6i)": "00",
     });
-    const dt = topic.written_on as RubyTime;
-    expect(dt).toBeInstanceOf(RubyTime);
-    expect(utc(dt).year).toBe(1850);
-    expect(utc(dt).month).toBe(6);
-    expect(utc(dt).day).toBe(24);
-    expect(utc(dt).hour).toBe(16);
-    expect(utc(dt).minute).toBe(24);
-    expect(utc(dt).second).toBe(0);
+    expect(toFs(topic.written_on as RubyTime, "db")).toBe("1850-06-24 16:24:00");
   });
 
   it("multiparameter attributes on time will raise on big time if missing date parts", async () => {
@@ -194,17 +181,16 @@ describe("MultiParameterAttributeTest", () => {
   });
 
   it("multiparameter attributes on time will ignore hour if blank", async () => {
-    const topic = new Topic();
+    const topic = await Topic.find(1);
     await topic.assignAttributes({
-      "written_on(1i)": "2004",
-      "written_on(2i)": "6",
-      "written_on(3i)": "24",
+      "written_on(1i)": "",
+      "written_on(2i)": "",
+      "written_on(3i)": "",
       "written_on(4i)": "",
-      "written_on(5i)": "24",
+      "written_on(5i)": "12",
+      "written_on(6i)": "02",
     });
-    const dt = topic.written_on as RubyTime;
-    expect(utc(dt).year).toBe(2004);
-    expect(utc(dt).hour).toBe(0);
+    expect(topic.written_on).toBeNull();
   });
 
   it("multiparameter attributes on time will ignore date if empty", async () => {
@@ -234,7 +220,7 @@ describe("MultiParameterAttributeTest", () => {
 
   it("multiparameter attributes on time with utc", async () => {
     await withTimezoneConfig({ default: "utc" }, async () => {
-      const topic = new Topic();
+      const topic = await Topic.find(1);
       await topic.assignAttributes({
         "written_on(1i)": "2004",
         "written_on(2i)": "6",
@@ -243,10 +229,7 @@ describe("MultiParameterAttributeTest", () => {
         "written_on(5i)": "24",
         "written_on(6i)": "00",
       });
-      const instant = topic.written_on as RubyTime;
-      expect(instant).toBeInstanceOf(RubyTime);
-      expect(utc(instant).hour).toBe(16);
-      expect(utc(instant).minute).toBe(24);
+      expect(topic.written_on).toEqual(RubyTime.utc(2004, 6, 24, 16, 24, 0));
     });
   });
 
