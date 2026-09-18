@@ -105,6 +105,7 @@ export class Reaper {
               console.warn(
                 `[trails] AR Pool Reaper: ${err instanceof Error ? err.message : String(err)}`,
               );
+              running();
             });
           };
           scheduleNext();

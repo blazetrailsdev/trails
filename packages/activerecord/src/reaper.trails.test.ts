@@ -29,7 +29,7 @@ describe("Reaper", () => {
     vi.useRealTimers();
   });
 
-  it("logs an unrescued reap() failure and stops ticking that frequency, matching a Rails reaper thread dying", async () => {
+  it("logs an unrescued reap() failure, stops ticking, and lets a later registerPool spawn a fresh reaper, matching a Rails reaper thread dying", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
       let attempts = 0;
