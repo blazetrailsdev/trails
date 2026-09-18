@@ -152,6 +152,11 @@ export class Topic extends Base {
     this.afterInitialize((record: Topic) => {
       (record as any).setEmailAddress();
     });
+  }
+
+  changeApprovedBeforeSave: boolean | null | undefined;
+
+  static {
     this.beforeSave((record: Topic) => (record as any).changeApprovedCallback());
     this.afterInitialize(() => {
       Topic.afterInitializeCalled = true;
@@ -160,8 +165,6 @@ export class Topic extends Base {
       record.afterTouchCalled = (record.afterTouchCalled ?? 0) + 1;
     });
   }
-
-  changeApprovedBeforeSave: boolean | null | undefined;
 
   static afterInitializeCalled: boolean | null = null;
 
