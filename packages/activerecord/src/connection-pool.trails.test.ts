@@ -174,10 +174,10 @@ it("reaper flushes idle connections after idle_timeout", async () => {
     pool.checkin(conn);
     expect(pool.stat().connections).toBe(1);
 
-    vi.advanceTimersByTime(2000);
+    await vi.advanceTimersByTimeAsync(2000);
     expect(pool.stat().connections).toBe(1);
 
-    vi.advanceTimersByTime(10_000);
+    await vi.advanceTimersByTimeAsync(10_000);
     expect(pool.stat().connections).toBe(0);
   } finally {
     (Reaper as any)._timers.forEach((t: any) => clearInterval(t));
@@ -1096,7 +1096,7 @@ describe("execution context at Rails thread-spawn sites", () => {
   it("one reaper timer keeps one context; two frequencies get distinct ones", async () => {
     const seen = new Map<number, number[]>();
     const pools = [0.01, 0.02].map((frequency) => ({
-      reap: () => {
+      reap: async () => {
         const ids = seen.get(frequency) ?? [];
         ids.push(Thread.current().id);
         seen.set(frequency, ids);

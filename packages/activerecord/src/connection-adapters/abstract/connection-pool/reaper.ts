@@ -1,7 +1,7 @@
 import { Thread } from "@blazetrails/ruby-compat";
 
 export interface ReapablePool {
-  reap?(): void;
+  reap?(): Promise<void>;
   flush?(): Promise<void>;
   isDiscarded?(): boolean;
 }
@@ -29,7 +29,7 @@ export class Reaper {
   }
 
   private static _pools = new Map<number, WeakRef<ReapablePool>[]>();
-  private static _timers = new Map<number, ReturnType<typeof setInterval>>();
+  private static _timers = new Map<number, ReturnType<typeof setTimeout>>();
 
   /** @missingRailsCall spawn_thread — PERMANENT */
   static registerPool(pool: ReapablePool, frequency: number): void {
@@ -55,47 +55,62 @@ export class Reaper {
     Reaper._pools.set(frequency, alive);
   }
 
-  private static _spawnTimer(frequency: number): ReturnType<typeof setInterval> {
-    let timer!: ReturnType<typeof setInterval>;
+  private static _spawnTimer(frequency: number): ReturnType<typeof setTimeout> {
+    let timer!: ReturnType<typeof setTimeout>;
+    const scheduleNext = (): void => {
+      timer = setTimeout(tick, frequency * 1000);
+      Reaper._timers.set(frequency, timer);
+      if (typeof timer === "object" && "unref" in timer) {
+        timer.unref();
+      }
+    };
+    let tick!: () => void;
     void new Thread(
       () =>
         new Promise<void>((running) => {
-          timer = setInterval(() => {
-            const refs = Reaper._pools.get(frequency);
-            if (!refs) {
-              Reaper._stopTimer(frequency);
-              running();
-              return;
-            }
-
-            const alive = refs.filter((ref) => {
-              const p = ref.deref();
-              return p != null && !p.isDiscarded?.();
-            });
-
-            if (alive.length === 0) {
-              Reaper._pools.delete(frequency);
-              Reaper._stopTimer(frequency);
-              running();
-              return;
-            }
-
-            Reaper._pools.set(frequency, alive);
-
-            for (const ref of alive) {
-              const p = ref.deref();
-              if (p) {
-                p.reap?.();
-                void p.flush?.()?.catch(() => {});
+          tick = () => {
+            (async () => {
+              const refs = Reaper._pools.get(frequency);
+              if (!refs) {
+                Reaper._stopTimer(frequency);
+                running();
+                return;
               }
-            }
-          }, frequency * 1000);
+
+              const alive = refs.filter((ref) => {
+                const p = ref.deref();
+                return p != null && !p.isDiscarded?.();
+              });
+
+              if (alive.length === 0) {
+                Reaper._pools.delete(frequency);
+                Reaper._stopTimer(frequency);
+                running();
+                return;
+              }
+
+              Reaper._pools.set(frequency, alive);
+
+              for (const ref of alive) {
+                const p = ref.deref();
+                if (p) {
+                  await p.reap?.();
+                  await p.flush?.();
+                }
+              }
+
+              scheduleNext();
+            })().catch((err: unknown) => {
+              Reaper._timers.delete(frequency);
+              console.warn(
+                `[trails] AR Pool Reaper: ${err instanceof Error ? err.message : String(err)}`,
+              );
+              running();
+            });
+          };
+          scheduleNext();
         }),
     );
-
-    if (typeof timer === "object" && "unref" in timer) {
-      timer.unref();
-    }
 
     return timer;
   }
@@ -103,18 +118,18 @@ export class Reaper {
   private static _stopTimer(frequency: number): void {
     const timer = Reaper._timers.get(frequency);
     if (timer) {
-      clearInterval(timer);
+      clearTimeout(timer);
       Reaper._timers.delete(frequency);
     }
   }
 }
 
 /** @internal */
-function spawnThread(frequency: number): ReturnType<typeof setInterval> | null {
+function spawnThread(frequency: number): ReturnType<typeof setTimeout> | null {
   if (!frequency || frequency <= 0 || !Number.isFinite(frequency)) return null;
   const internals = Reaper as unknown as {
-    _timers: Map<number, ReturnType<typeof setInterval>>;
-    _spawnTimer: (f: number) => ReturnType<typeof setInterval>;
+    _timers: Map<number, ReturnType<typeof setTimeout>>;
+    _spawnTimer: (f: number) => ReturnType<typeof setTimeout>;
   };
   const existing = internals._timers.get(frequency);
   if (existing) return existing;

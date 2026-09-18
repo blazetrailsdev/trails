@@ -560,7 +560,9 @@ export class ConnectionPool implements ReapablePool {
     }
     let conn = this._available?.poll() ?? this.tryToCheckoutNewConnection();
     if (!conn) {
-      this.reap();
+      void this.reap().catch((err) => {
+        console.warn(`[trails] reap failed: ${err instanceof Error ? err.message : String(err)}`);
+      });
       conn = this._available?.poll() ?? this.tryToCheckoutNewConnection();
     }
     if (!conn) {
@@ -711,13 +713,24 @@ export class ConnectionPool implements ReapablePool {
     await this.clearReloadableConnections(false);
   }
 
-  /**
-   * @missingRailsCall checkin — PERMANENT
-   * @missingRailsCall remove — PERMANENT
-   * @missingRailsCall select — PERMANENT
-   */
-  reap(): void {
-    if (this.isDiscarded()) return;
+  async reap(): Promise<void> {
+    const staleConnections = await (synchronize<DatabaseAdapter[]>).call(this, () => {
+      if (this.isDiscarded()) return [];
+      const stale = (this._connections ?? []).filter(
+        (conn) => conn.inUse && !conn.owner!.isAlive(),
+      );
+      for (const conn of stale) conn.stealBang();
+      return stale;
+    });
+
+    for (const conn of staleConnections) {
+      if (await conn.active()) {
+        await conn.resetBang();
+        this.checkin(conn);
+      } else {
+        this.remove(conn);
+      }
+    }
   }
 
   async flush(minimumIdle?: number | null): Promise<void> {
@@ -753,7 +766,7 @@ export class ConnectionPool implements ReapablePool {
   }
 
   async flushBang(): Promise<void> {
-    this.reap();
+    await this.reap();
     await this.flush(-1);
   }
 
@@ -974,8 +987,8 @@ async function attemptToCheckoutAllExistingConnections(
   let releaseNewlyCheckedOut = false;
   const newlyCheckedOut: DatabaseAdapter[] = [];
   try {
-    const collectedConns = await (synchronize<DatabaseAdapter[]>).call(this, () => {
-      this.reap();
+    const collectedConns = await (synchronize<DatabaseAdapter[]>).call(this, async () => {
+      await this.reap();
 
       return (this._connections as DatabaseAdapter[]).filter(
         (conn) =>
@@ -1067,10 +1080,7 @@ async function withNewConnectionsBlocked<R>(this: Pool, block: () => Promise<R>)
 }
 
 /** @internal */
-function acquireConnection(
-  this: Pool,
-  checkoutTimeout: number,
-): DatabaseAdapter | Promise<DatabaseAdapter> {
+async function acquireConnection(this: Pool, checkoutTimeout: number): Promise<DatabaseAdapter> {
   const tagPool = (err: unknown) => {
     if (err instanceof ConnectionTimeoutError) err.setPool(this);
     return err;
@@ -1092,29 +1102,21 @@ function acquireConnection(
     if (conn) return accept(conn);
     conn = this.tryToCheckoutNewConnection() ?? undefined;
     if (conn) return conn;
-    this.reap();
+    await this.reap();
     conn = this._available?.poll() as DatabaseAdapter | undefined;
     if (conn) return accept(conn);
     conn = this.tryToCheckoutNewConnection() ?? undefined;
     if (conn) return conn;
-    const result = this._available?.poll(checkoutTimeout);
-    if (result instanceof Promise) {
-      return result.then(
-        (c) => {
-          ensureLive();
-          return accept(c);
-        },
-        (err: unknown) => {
-          throw tagPool(err);
-        },
-      );
-    }
+    const polled = this._available?.poll(checkoutTimeout);
+    const waited = polled instanceof Promise;
+    const result = await polled;
     if (result == null) {
       throw new ConnectionTimeoutError(
         `Could not obtain a connection from the pool within ${checkoutTimeout} seconds`,
         { connectionPool: this },
       );
     }
+    if (waited) ensureLive();
     return accept(result);
   } catch (err) {
     throw tagPool(err);
