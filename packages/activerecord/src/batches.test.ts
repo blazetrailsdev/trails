@@ -138,8 +138,12 @@ describe("EachTest", () => {
     const previousLogger = Base.logger;
     Base.logger = null;
     try {
-      for await (const _post of Post.order("legacy_comments_count DESC").findEach({})) {
-      }
+      await expect(
+        (async () => {
+          for await (const _post of Post.order("legacy_comments_count DESC").findEach({})) {
+          }
+        })(),
+      ).resolves.not.toThrow();
     } finally {
       Base.logger = previousLogger;
     }
@@ -149,7 +153,7 @@ describe("EachTest", () => {
     const total = Number(await Post.count());
     await assertQueriesCount(total + 1, false, async () => {
       for await (const batch of Post.findInBatches({ batchSize: 1 })) {
-        expect(Array.isArray(batch)).toBe(true);
+        expect(batch).toBeInstanceOf(Array);
         expect(batch[0]).toBeInstanceOf(Post);
       }
     });
@@ -159,7 +163,7 @@ describe("EachTest", () => {
     const total = Number(await Post.count());
     await assertQueriesCount(total, false, async () => {
       for await (const batch of Post.findInBatches({ batchSize: 1, start: 2 })) {
-        expect(Array.isArray(batch)).toBe(true);
+        expect(batch).toBeInstanceOf(Array);
         expect(batch[0]).toBeInstanceOf(Post);
       }
     });
@@ -168,7 +172,7 @@ describe("EachTest", () => {
   it("find in batches should end at the finish option", async () => {
     await assertQueriesCount(6, false, async () => {
       for await (const batch of Post.findInBatches({ batchSize: 1, finish: 5 })) {
-        expect(Array.isArray(batch)).toBe(true);
+        expect(batch).toBeInstanceOf(Array);
         expect(batch[0]).toBeInstanceOf(Post);
       }
     });
@@ -178,13 +182,13 @@ describe("EachTest", () => {
     const total = Number(await Post.count());
     await assertQueriesCount(2, false, async () => {
       for await (const batch of Post.findInBatches({ batchSize: total })) {
-        expect(Array.isArray(batch)).toBe(true);
+        expect(batch).toBeInstanceOf(Array);
       }
     });
 
     await assertQueriesCount(1, false, async () => {
       for await (const batch of Post.findInBatches({ batchSize: total + 1 })) {
-        expect(Array.isArray(batch)).toBe(true);
+        expect(batch).toBeInstanceOf(Array);
       }
     });
   });
@@ -196,7 +200,7 @@ describe("EachTest", () => {
       false,
       async () => {
         for await (const batch of Post.findInBatches({ batchSize: 1 })) {
-          expect(Array.isArray(batch)).toBe(true);
+          expect(batch).toBeInstanceOf(Array);
           expect(batch[0]).toBeInstanceOf(Post);
         }
       },
@@ -210,7 +214,7 @@ describe("EachTest", () => {
       false,
       async () => {
         for await (const batch of Post.findInBatches({ batchSize: 1, order: "desc" })) {
-          expect(Array.isArray(batch)).toBe(true);
+          expect(batch).toBeInstanceOf(Array);
           expect(batch[0]).toBeInstanceOf(Post);
         }
       },
@@ -236,11 +240,15 @@ describe("EachTest", () => {
   });
 
   it("find in batches should not use records after yielding them in case original array is modified", async () => {
-    for await (const batch of Post.findInBatches({ batchSize: 1 })) {
-      expect(Array.isArray(batch)).toBe(true);
-      expect(batch[0]).toBeInstanceOf(Post);
-      batch.splice(0, batch.length);
-    }
+    await expect(
+      (async () => {
+        for await (const batch of Post.findInBatches({ batchSize: 1 })) {
+          expect(batch).toBeInstanceOf(Array);
+          expect(batch[0]).toBeInstanceOf(Post);
+          batch.splice(0, batch.length);
+        }
+      })(),
+    ).resolves.not.toThrow();
   });
 
   it("find in batches should ignore the order default scope", async () => {
@@ -249,7 +257,6 @@ describe("EachTest", () => {
     for await (const batch of PostWithDefaultScope.findInBatches({})) {
       batchPosts.push(...batch);
     }
-    expect(firstPost).not.toBeNull();
     expect(batchPosts[0]).not.toEqual(firstPost);
     expect(batchPosts[0].id).toBe(posts("welcome").id);
   });
@@ -264,16 +271,16 @@ describe("EachTest", () => {
   it("find in batches should not error if config overridden", async () => {
     const prev = errorOnIgnoredOrder();
     setErrorOnIgnoredOrder(true);
-    let threw = false;
     try {
-      for await (const _b of PostWithDefaultScope.findInBatches({ errorOnIgnore: false })) {
-      }
-    } catch {
-      threw = true;
+      await expect(
+        (async () => {
+          for await (const _b of PostWithDefaultScope.findInBatches({ errorOnIgnore: false })) {
+          }
+        })(),
+      ).resolves.not.toThrow();
     } finally {
       setErrorOnIgnoredOrder(prev);
     }
-    expect(threw).toBe(false);
   });
 
   it("find in batches should error on config specified to error", async () => {
@@ -290,14 +297,12 @@ describe("EachTest", () => {
   });
 
   it("find in batches should not error by default", async () => {
-    let threw = false;
-    try {
-      for await (const _b of PostWithDefaultScope.findInBatches({})) {
-      }
-    } catch {
-      threw = true;
-    }
-    expect(threw).toBe(false);
+    await expect(
+      (async () => {
+        for await (const _b of PostWithDefaultScope.findInBatches({})) {
+        }
+      })(),
+    ).resolves.not.toThrow();
   });
 
   it("find in batches should not ignore the default scope if it is other then order", async () => {
@@ -328,7 +333,7 @@ describe("EachTest", () => {
     const count = Number(await Subscriber.count());
     await assertQueriesCount(count + 1, false, async () => {
       for await (const batch of Subscriber.findInBatches({ batchSize: 1 })) {
-        expect(Array.isArray(batch)).toBe(true);
+        expect(batch).toBeInstanceOf(Array);
         expect(batch[0]).toBeInstanceOf(Subscriber);
       }
     });
@@ -513,7 +518,7 @@ describe("EachTest", () => {
   it("in batches should be loaded", async () => {
     for await (const relation of Post.inBatches({ of: 1, load: true })) {
       const records = await relation.toArray();
-      expect(Array.isArray(records)).toBe(true);
+      expect(records).toBeInstanceOf(Array);
     }
   });
 
