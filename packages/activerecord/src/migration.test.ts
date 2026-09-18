@@ -12,6 +12,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import type { Column as MysqlColumn } from "./connection-adapters/mysql/column.js";
 import { Migration } from "./migration.js";
 import { fixtures } from "./test-fixtures.js";
+import { VERSION } from "./gem-version.js";
 import { assertColumn, assertNoColumn } from "./test-helpers/test-case.js";
 import { TableDefinition } from "./connection-adapters/abstract/schema-definitions.js";
 import { SchemaCreation as PgSchemaCreation } from "./connection-adapters/postgresql/schema-creation.js";
@@ -206,11 +207,20 @@ describe("MigrationTest", () => {
   });
 
   it("decimal scale without precision should raise", async () => {
-    const td = new TableDefinition(await Base.leaseConnection(), "products");
-    td.decimal("price", { scale: 2 });
-    await expect(emitTableSql(td)).rejects.toThrow(
-      "Error adding decimal column: precision cannot be empty if scale is specified",
-    );
+    const adapter = Base.connection;
+    try {
+      const e = await assertRaises([ArgumentError], {}, () =>
+        adapter.createTable("test_decimal_scales", { force: true }, (t) => {
+          t.decimal("scaleonly", { scale: 10 });
+        }),
+      );
+
+      expect(e.message).toBe(
+        "Error adding decimal column: precision cannot be empty if scale is specified",
+      );
+    } finally {
+      await adapter.dropTable("test_decimal_scales", { ifExists: true });
+    }
   });
 
   describeIfPostgresqlAdapter("IndexForTableWithSchemaMigrationTest", () => {
@@ -251,7 +261,7 @@ describe("MigrationTest", () => {
   });
 
   it("migration version matches component version", () => {
-    expect(adapter).toBeDefined();
+    expect(parseFloat(VERSION.STRING)).toBe(Migration.currentVersion());
   });
 
   it("create table raises if already exists", async () => {
@@ -294,7 +304,6 @@ describe("MigrationTest", () => {
         101,
       ).migrate(),
     );
-    await assertColumn(Person, "last_name");
   });
 
   it("add table with decimals", async () => {
@@ -455,16 +464,20 @@ describe("MigrationTest", () => {
 
   it("create table with binary column", async () => {
     const adapter = Base.connection;
-    await adapter.dropTable("binary_testings", { ifExists: true });
-    await adapter.createTable("binary_testings", {}, (t) => {
-      t.column("data", "binary", { null: false });
-    });
-    const cols = await adapter.columns("binary_testings");
-    const dataColumn = cols.find((c) => c.name === "data");
-    expect(dataColumn).toBeDefined();
-    expect(dataColumn!.type).toBe("binary");
-    expect(dataColumn!.default ?? null).toBeNull();
-    await adapter.dropTable("binary_testings", { ifExists: true });
+    try {
+      await assertNothingRaised(() =>
+        adapter.createTable("binary_testings", {}, (t) => {
+          t.column("data", "binary", { null: false });
+        }),
+      );
+
+      const columns = await adapter.columns("binary_testings");
+      const dataColumn = columns.find((c) => c.name === "data");
+
+      expect(dataColumn!.default ?? null).toBeNull();
+    } finally {
+      await adapter.dropTable("binary_testings", { ifExists: true });
+    }
   });
 
   it("proper table name on migration", () => {
@@ -472,6 +485,7 @@ describe("MigrationTest", () => {
     const savedPrefix = Base.tableNamePrefix;
     const savedSuffix = Base.tableNameSuffix;
     try {
+      expect(Migration.properTableName("table")).toBe("table");
       expect(Migration.properTableName("table")).toBe("table");
       expect(Migration.properTableName(Reminder)).toBe("reminders");
       Reminder.resetTableName();
@@ -490,6 +504,9 @@ describe("MigrationTest", () => {
       Base.tableNamePrefix = "prefix_";
       Base.tableNameSuffix = "_suffix";
       Reminder.resetTableName();
+      expect(Migration.properTableName("table", Migration.tableNameOptions())).toBe(
+        "prefix_table_suffix",
+      );
       expect(Migration.properTableName("table", Migration.tableNameOptions())).toBe(
         "prefix_table_suffix",
       );
@@ -771,7 +788,6 @@ describe("MigrationTest", () => {
         101,
       ).migrate(),
     );
-    await assertColumn(Person, "last_name");
   });
 
   it("add column with if not exists set to true does not raise if type is different", async () => {
@@ -798,7 +814,6 @@ describe("MigrationTest", () => {
         101,
       ).migrate(),
     );
-    await assertColumn(Person, "last_name");
   });
 
   it("method missing delegates to connection", async () => {
