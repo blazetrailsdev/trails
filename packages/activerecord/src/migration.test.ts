@@ -1,6 +1,12 @@
 import { describe, it, expect, beforeEach, afterAll, afterEach, vi } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { BigDecimal, Logger, assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
+import {
+  BigDecimal,
+  Logger,
+  assertNoChanges,
+  assertNothingRaised,
+  assertRaises,
+} from "@blazetrails/activesupport";
 import { Base, Migrator, RecordNotUnique, Rollback, StatementInvalid } from "./index.js";
 import { SchemaMigration, NullSchemaMigration } from "./schema-migration.js";
 import type { MigrationProxy } from "./migration.js";
@@ -27,9 +33,11 @@ function emitTableSql(td: TableDefinition): Promise<string> {
   return new SQLite3SchemaCreation(adapter).accept(td);
 }
 import { Person } from "./test-helpers/models/person.js";
+import { personFixtureData } from "./test-helpers/fixtures/people.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
 import { itIfSupports, describeIfSupports } from "./support/supports.js";
 import { describeIfPostgresqlAdapter } from "./support/describe-if-postgresql-adapter.js";
+import { Zlib } from "@blazetrails/ruby-compat";
 import { Mysql2Adapter } from "./connection-adapters/mysql2-adapter.js";
 import { describeIfMysqlAdapter } from "./support/describe-if-mysql-adapter.js";
 import { leaseMysqlAdapter } from "./adapters/abstract-mysql-adapter/test-helper.js";
@@ -48,6 +56,14 @@ async function freshAdapterWithPeople(): Promise<DatabaseAdapter> {
 
 function envName(adapter: DatabaseAdapter): string {
   return (adapter.pool as { dbConfig: { envName: string } }).dbConfig.envName;
+}
+
+function anonymousMigrationProxy(): MigrationProxy {
+  return migrationProxy({
+    version: 100,
+    name: "Migration100",
+    migration: () => anonymousMigration(),
+  });
 }
 
 function migrateProxy(version: number, body: (m: Migration) => Promise<void>): MigrationProxy {
@@ -88,7 +104,7 @@ async function personColumnNames(): Promise<string[]> {
   return Person.columnNames();
 }
 
-fixtures({}, { useTransactionalTests: false });
+fixtures({ people: [Person, personFixtureData] }, { useTransactionalTests: false });
 
 afterEach(async () => {
   const adapter = Base.connection;
@@ -238,10 +254,10 @@ describe("MigrationTest", () => {
         });
 
         await adapter.addIndex("my_schema.values", "value");
-        expect(await adapter.indexExists("my_schema.values", "value")).toBe(true);
+        expect(await adapter.indexExists("my_schema.values", "value")).toBeTruthy();
 
         await adapter.removeIndex("my_schema.values", { column: "value" });
-        expect(await adapter.indexExists("my_schema.values", "value")).toBe(false);
+        expect(await adapter.indexExists("my_schema.values", "value")).toBeFalsy();
       } finally {
         await adapter.dropSchema("my_schema");
       }
@@ -451,15 +467,18 @@ describe("MigrationTest", () => {
   });
 
   it.skipIf(adapterType === "sqlite")("out of range integer limit should raise", async () => {
-    const adapter = await freshAdapter();
-    const error = await adapter
-      .createTable("test_integer_limits", { force: true }, (t) => {
-        t.column("bigone", "integer", { limit: 10 });
-      })
-      .catch((e) => e);
-    expect(error).toBeInstanceOf(ArgumentError);
-    expect(error.message).toContain("No integer type has byte size 10");
-    await adapter.dropTable("test_integer_limits", { ifExists: true });
+    const adapter = Base.connection;
+    try {
+      const e = await assertRaises([ArgumentError], {}, () =>
+        adapter.createTable("test_integer_limits", { force: true }, (t) => {
+          t.column("bigone", "integer", { limit: 10 });
+        }),
+      );
+
+      expect(e.message).toContain("No integer type has byte size 10");
+    } finally {
+      await adapter.dropTable("test_integer_limits", { ifExists: true });
+    }
   });
 
   it("create table with binary column", async () => {
@@ -1236,184 +1255,182 @@ describe("MigrationTest", () => {
   });
 
   it("create table with query", async () => {
-    const adapter = await freshAdapter();
-    await adapter.createTable("people_src", {}, (t) => {
-      t.integer("person_id");
-    });
-    await adapter.execute(`INSERT INTO people_src (person_id) VALUES (1)`);
+    const adapter = Base.connection;
+    try {
+      await adapter.createTable("table_from_query_testings", {
+        as: "SELECT id FROM people WHERE id = 1",
+      });
 
-    await adapter.createTable("table_from_query_testings", {
-      as: `SELECT person_id FROM people_src WHERE person_id = 1`,
-    });
-    const rows = (await adapter.selectAll(`SELECT * FROM table_from_query_testings`)).toArray();
-    expect(rows).toHaveLength(1);
-    expect(await adapter.columnExists("table_from_query_testings", "person_id")).toBe(true);
-
-    const cols = await adapter.columns("table_from_query_testings");
-    const pid = cols.find((c) => c.name === "person_id");
-    expect(pid?.type).toBe("integer");
-
-    await adapter.dropTable("table_from_query_testings", "people_src");
+      const columns = await adapter.columns("table_from_query_testings");
+      expect(await adapter.selectValues("SELECT * FROM table_from_query_testings")).toEqual([1]);
+      expect(columns.length).toBe(1);
+      expect(columns[0].name).toBe("id");
+    } finally {
+      await adapter.dropTable("table_from_query_testings", { ifExists: true });
+    }
   });
 
   it("create table with query from relation", async () => {
-    const adapter = await freshAdapter();
-    await adapter.createTable("people_src2", {}, (t) => {
-      t.integer("person_id");
-    });
-    await adapter.execute(`INSERT INTO people_src2 (person_id) VALUES (1)`);
+    const adapter = Base.connection;
+    try {
+      await adapter.createTable("table_from_query_testings", {
+        as: Person.select("id").where({ id: 1 }),
+      });
 
-    const t = adapter.quoteTableName("people_src2");
-    const c = `${t}.${adapter.quoteColumnName("person_id")}`;
-    const sql = `SELECT ${c} FROM ${t} WHERE ${c} = 1`;
-    await adapter.createTable("table_from_query_testings2", { as: sql });
-    const rows = (await adapter.selectAll(`SELECT * FROM table_from_query_testings2`)).toArray();
-    expect(rows).toHaveLength(1);
-
-    await adapter.dropTable("table_from_query_testings2", "people_src2");
+      const columns = await adapter.columns("table_from_query_testings");
+      expect(await adapter.selectValues("SELECT * FROM table_from_query_testings")).toEqual([1]);
+      expect(columns.length).toBe(1);
+      expect(columns[0].name).toBe("id");
+    } finally {
+      await adapter.dropTable("table_from_query_testings", { ifExists: true });
+    }
   });
 
   it.skipIf(adapterType !== "sqlite")(
     "allows sqlite3 rollback on invalid column type",
     async () => {
-      const adapter = await freshAdapter();
-      await adapter.createTable("something", { force: true }, (t) => {
-        t.integer("number");
-        t.string("name");
-        t.column("foo", "bar" as any);
-      });
-      expect(await adapter.columnExists("something", "foo")).toBe(true);
-      await adapter.removeColumn("something", "foo");
-      expect(await adapter.columnExists("something", "foo")).toBe(false);
-      expect(await adapter.columnExists("something", "name")).toBe(true);
-      expect(await adapter.columnExists("something", "number")).toBe(true);
-      await adapter.dropTable("something");
+      const adapter = Base.connection;
+      try {
+        await adapter.createTable("something", { force: true }, (t) => {
+          t.column("number", "integer");
+          t.column("name", "string");
+          t.column("foo", "bar" as any);
+        });
+        expect(await adapter.columnExists("something", "foo")).toBeTruthy();
+        await assertNothingRaised(() => adapter.removeColumn("something", "foo", "bar"));
+        expect(await adapter.columnExists("something", "foo")).toBeFalsy();
+        expect(await adapter.columnExists("something", "name")).toBeTruthy();
+        expect(await adapter.columnExists("something", "number")).toBeTruthy();
+      } finally {
+        await adapter.dropTable("something", { ifExists: true });
+      }
     },
   );
 
   itIfSupports("advisory_locks", "migrator generates valid lock id", async () => {
-    const realAdapter = Base.connection;
+    const adapter = Base.connection;
     const migrator = new Migrator(
       "up",
-      [],
-      new SchemaMigration(realAdapter.pool),
-      new InternalMetadata(realAdapter.pool),
+      [anonymousMigrationProxy()],
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
+      100,
     );
+
     const lockId = await migrator.generateMigratorAdvisoryLockId();
-    const acquired = await (realAdapter as any).getAdvisoryLock(lockId);
-    try {
-      expect(acquired).toBe(true);
-    } finally {
-      if (acquired) {
-        const released = await (realAdapter as any).releaseAdvisoryLock(lockId);
-        expect(released).toBe(true);
-      }
-    }
+
+    expect(
+      await adapter.getAdvisoryLock(lockId),
+      "the Migrator should have generated a valid lock id, but it didn't",
+    ).toBeTruthy();
+    expect(
+      await adapter.releaseAdvisoryLock(lockId),
+      "the Migrator should have generated a valid lock id, but it didn't",
+    ).toBeTruthy();
   });
 
   itIfSupports("advisory_locks", "generate migrator advisory lock id", async () => {
-    const testAdapter = Base.connection;
+    const adapter = Base.connection;
     const migrator = new Migrator(
       "up",
-      [],
-      new SchemaMigration(testAdapter.pool),
-      new InternalMetadata(testAdapter.pool),
+      [anonymousMigrationProxy()],
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
+      100,
     );
+
     const lockId = await migrator.generateMigratorAdvisoryLockId();
-    expect(lockId).toBeGreaterThanOrEqual(0n);
-    expect(lockId.toString(2).length).toBeLessThanOrEqual(63);
+
+    const currentDatabase = await adapter.currentDatabase();
+    const salt = 2053462845n;
+    const expectedId = BigInt(Zlib.crc32(currentDatabase)) * salt;
+
+    expect(
+      lockId === expectedId,
+      `expected lock id generated by the migrator to be ${expectedId}, but it was ${lockId} instead`,
+    ).toBeTruthy();
+    expect(
+      lockId.toString(2).length <= 63,
+      "lock id must be a signed integer of max 63 bits magnitude",
+    ).toBeTruthy();
   });
 
   itIfSupports("advisory_locks", "migrator one up with unavailable lock", async () => {
-    const ran: string[] = [];
-    const proxy: MigrationProxy = migrationProxy({
-      version: 100,
-      name: "Broken",
-      migration: () =>
-        anonymousMigration(
-          "Broken",
-          100,
-          async () => {
-            ran.push("ran");
-          },
-          async () => {},
-        ),
-    });
+    await assertNoColumn(Person, "last_name");
+
     const adapter = Base.connection;
+    const migrator = new Migrator(
+      "up",
+      [migrateProxy(100, (m) => m.addColumn("people", "last_name", "string"))],
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
+      100,
+    );
     const getSpy = vi.spyOn(adapter as any, "getAdvisoryLock").mockResolvedValue(false);
     try {
-      const migrator = new Migrator(
-        "up",
-        [proxy],
-        new SchemaMigration(adapter.pool),
-        new InternalMetadata(adapter.pool),
-      );
-      await expect(migrator.migrate()).rejects.toThrow(ConcurrentMigrationError);
+      await assertRaises([ConcurrentMigrationError], {}, () => migrator.migrate());
     } finally {
       getSpy.mockRestore();
     }
-    expect(ran).toEqual([]);
+
+    await assertNoColumn(
+      Person,
+      "last_name",
+      "without an advisory lock, the Migrator should not make any changes, but it did.",
+    );
   });
 
   itIfSupports("advisory_locks", "migrator one up with unavailable lock using run", async () => {
-    const ran: string[] = [];
-    const proxy: MigrationProxy = migrationProxy({
-      version: 100,
-      name: "Broken",
-      migration: () =>
-        anonymousMigration(
-          "Broken",
-          100,
-          async () => {
-            ran.push("ran");
-          },
-          async () => {},
-        ),
-    });
+    await assertNoColumn(Person, "last_name");
+
     const adapter = Base.connection;
+    const migrator = new Migrator(
+      "up",
+      [migrateProxy(100, (m) => m.addColumn("people", "last_name", "string"))],
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
+      100,
+    );
     const getSpy = vi.spyOn(adapter as any, "getAdvisoryLock").mockResolvedValue(false);
     try {
-      const migrator = new Migrator(
-        "up",
-        [proxy],
-        new SchemaMigration(adapter.pool),
-        new InternalMetadata(adapter.pool),
-        100,
-      );
-      await expect(migrator.run()).rejects.toThrow(ConcurrentMigrationError);
+      await assertRaises([ConcurrentMigrationError], {}, () => migrator.run());
     } finally {
       getSpy.mockRestore();
     }
-    expect(ran).toEqual([]);
+
+    await assertNoColumn(
+      Person,
+      "last_name",
+      "without an advisory lock, the Migrator should not make any changes, but it did.",
+    );
   });
 
   itIfSupports.skipIf(adapterType !== "postgres")(
     "advisory_locks",
     "with advisory lock closes connection",
     async () => {
-      const realAdapter = Base.connection;
-      const getSpy = vi.spyOn(realAdapter as any, "getAdvisoryLock");
-      const releaseSpy = vi.spyOn(realAdapter as any, "releaseAdvisoryLock");
-      try {
-        const proxy: MigrationProxy = migrationProxy({
-          version: 200,
-          name: "NoOp",
-          migration: () => anonymousMigration("NoOp", 200),
-        });
-        const migrator = new Migrator(
-          "up",
-          [proxy],
-          new SchemaMigration(realAdapter.pool),
-          new InternalMetadata(realAdapter.pool),
-        );
-        await migrator.migrate();
-        expect(getSpy).toHaveBeenCalledTimes(1);
-        expect(releaseSpy).toHaveBeenCalledWith(getSpy.mock.calls[0][0]);
-        expect([...(await migrator.migrated())]).toContain(200);
-      } finally {
-        getSpy.mockRestore();
-        releaseSpy.mockRestore();
-      }
+      const adapter = Base.connection;
+      const migrator = new Migrator(
+        "up",
+        [migrateProxy(100, async () => {})],
+        new SchemaMigration(adapter.pool),
+        new InternalMetadata(adapter.pool),
+        100,
+      );
+      const lockId = await migrator.generateMigratorAdvisoryLockId();
+
+      const query = `SELECT query
+FROM pg_stat_activity
+WHERE datname = '${adapter.pool.dbConfig.database}'
+AND state = 'idle'
+AND query LIKE '%${lockId}%'`;
+
+      await assertNoChanges(
+        async () => (await adapter.execQuery(query)).rows.flat(),
+        null,
+        {},
+        () => migrator.migrate(),
+      );
     },
   );
 
@@ -1421,67 +1438,73 @@ describe("MigrationTest", () => {
     "advisory_locks",
     "with advisory lock raises the right error when it fails to release lock",
     async () => {
-      const realAdapter = Base.connection;
-      const proxy: MigrationProxy = migrationProxy({
-        version: 100,
-        name: "NoOp",
-        migration: () => anonymousMigration("NoOp", 100),
-      });
+      const adapter = Base.connection;
       const migrator = new Migrator(
         "up",
-        [proxy],
-        new SchemaMigration(realAdapter.pool),
-        new InternalMetadata(realAdapter.pool),
+        [anonymousMigrationProxy()],
+        new SchemaMigration(adapter.pool),
+        new InternalMetadata(adapter.pool),
         100,
       );
       const lockId = await migrator.generateMigratorAdvisoryLockId();
-      const error = await migrator
-        .withAdvisoryLock(async () => {
-          await realAdapter.releaseAdvisoryLock(lockId);
-        })
-        .catch((e) => e);
-      expect(error).toBeInstanceOf(ConcurrentMigrationError);
-      expect(error.message).toMatch(ConcurrentMigrationError.RELEASE_LOCK_FAILED_MESSAGE);
+
+      const e = await assertRaises([ConcurrentMigrationError], {}, () =>
+        migrator.withAdvisoryLock(async () => {
+          await adapter.releaseAdvisoryLock(lockId);
+        }),
+      );
+
+      expect(e.message).toMatch(ConcurrentMigrationError.RELEASE_LOCK_FAILED_MESSAGE);
     },
   );
 
   it.skipIf(adapterType === "sqlite")("out of range text limit should raise", async () => {
-    const adapter = await freshAdapter();
-    const error = await adapter
-      .createTable("test_text_limits", { force: true }, (t) => {
-        t.text("bigtext", { limit: 0xfffffffff });
-      })
-      .catch((e) => e);
-    expect(error).toBeInstanceOf(ArgumentError);
-    expect(error.message).toContain(`No text type has byte size ${0xfffffffff}`);
-    await adapter.dropTable("test_text_limits", { ifExists: true });
+    const adapter = Base.connection;
+    try {
+      const e = await assertRaises([ArgumentError], {}, () =>
+        adapter.createTable("test_text_limits", { force: true }, (t) => {
+          t.text("bigtext", { limit: 0xfffffffff });
+        }),
+      );
+
+      expect(e.message).toContain(`No text type has byte size ${0xfffffffff}`);
+    } finally {
+      await adapter.dropTable("test_text_limits", { ifExists: true });
+    }
   });
 
   it.skipIf(adapterType === "sqlite")("out of range binary limit should raise", async () => {
-    const adapter = await freshAdapter();
-    const error = await adapter
-      .createTable("test_binary_limits", { force: true }, (t) => {
-        t.binary("bigbinary", { limit: 0xfffffffff });
-      })
-      .catch((e) => e);
-    expect(error).toBeInstanceOf(ArgumentError);
-    expect(error.message).toContain(`No binary type has byte size ${0xfffffffff}`);
-    await adapter.dropTable("test_binary_limits", { ifExists: true });
+    const adapter = Base.connection;
+    try {
+      const e = await assertRaises([ArgumentError], {}, () =>
+        adapter.createTable("test_binary_limits", { force: true }, (t) => {
+          t.binary("bigbinary", { limit: 0xfffffffff });
+        }),
+      );
+
+      expect(e.message).toContain(`No binary type has byte size ${0xfffffffff}`);
+    } finally {
+      await adapter.dropTable("test_binary_limits", { ifExists: true });
+    }
   });
 
   it.skipIf(adapterType !== "mysql")("invalid text size should raise", async () => {
-    const adapter = await freshAdapter();
-    const error = await adapter
-      .createTable("test_text_sizes", { force: true }, (t) => {
-        t.text("bigtext", { size: 0xfffffffff } as any);
-      })
-      .catch((e) => e);
-    expect(error).toBeInstanceOf(ArgumentError);
-    expect(error.message).toBe(
-      `${0xfffffffff} is invalid :size value. Only :tiny, :medium, and :long are allowed.`,
-    );
-    await adapter.dropTable("test_text_sizes", { ifExists: true });
+    const adapter = Base.connection;
+    try {
+      const e = await assertRaises([ArgumentError], {}, () =>
+        adapter.createTable("test_text_sizes", { force: true }, (t) => {
+          t.text("bigtext", { size: 0xfffffffff } as any);
+        }),
+      );
+
+      expect(e.message).toBe(
+        `${0xfffffffff} is invalid :size value. Only :tiny, :medium, and :long are allowed.`,
+      );
+    } finally {
+      await adapter.dropTable("test_text_sizes", { ifExists: true });
+    }
   });
+
   describe("ReservedWordsMigrationTest", () => {
     it("drop index from table named values", async () => {
       const connection = Base.connection;
@@ -1489,10 +1512,10 @@ describe("MigrationTest", () => {
         t.integer("value");
       });
       try {
-        await connection.addIndex("values", "value");
-        expect(await connection.indexExists("values", "value")).toBe(true);
-        await connection.removeIndex("values", "value");
-        expect(await connection.indexExists("values", "value")).toBe(false);
+        await assertNothingRaised(async () => {
+          await connection.addIndex("values", "value");
+          await connection.removeIndex("values", "value");
+        });
       } finally {
         await connection.dropTable("values", { ifExists: true });
       }
@@ -1506,10 +1529,10 @@ describe("MigrationTest", () => {
         t.integer("value");
       });
       try {
-        await connection.addIndex("values", "value", { name: "a_different_name" });
-        expect(await connection.indexExists("values", "value")).toBe(true);
-        await connection.removeIndex("values", "value", { name: "a_different_name" });
-        expect(await connection.indexExists("values", "value")).toBe(false);
+        await assertNothingRaised(async () => {
+          await connection.addIndex("values", "value", { name: "a_different_name" });
+          await connection.removeIndex("values", "value", { name: "a_different_name" });
+        });
       } finally {
         await connection.dropTable("values", { ifExists: true });
       }
@@ -2275,7 +2298,7 @@ function mockMigration(): { migration: Migration; sql: string[] } {
 }
 
 describe("MigrationTest", () => {
-  fixtures({}, { useTransactionalTests: false });
+  fixtures({ people: [Person, personFixtureData] }, { useTransactionalTests: false });
 
   it("migration instance has connection", async () => {
     const migration = new (class extends Migration {})();
