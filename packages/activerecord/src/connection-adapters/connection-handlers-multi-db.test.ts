@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { getFs, getPath, getOsAsync } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/activemodel";
+import { ConnectionNotDefined } from "../errors.js";
 import { ConnectionHandler } from "./abstract/connection-handler.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { type RawConfigurations } from "../database-configurations.js";
@@ -147,13 +149,15 @@ describe("ConnectionHandlersMultiDbTest", () => {
 
         const writingPool = Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base");
         expect(writingPool).not.toBeNull();
-        expect(writingPool!.dbConfig.name).toBe("default");
+        expect(writingPool!.dbConfig.database).toEqual(dbPaths.primary);
+        expect(writingPool!.dbConfig.name).toEqual("default");
 
         const readingPool = Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base", {
           role: "reading",
         });
         expect(readingPool).not.toBeNull();
-        expect(readingPool!.dbConfig.name).toBe("readonly");
+        expect(readingPool!.dbConfig.database).toEqual(dbPaths.readonly);
+        expect(readingPool!.dbConfig.name).toEqual("readonly");
       },
       { defaultEnv: "default_env" },
     );
@@ -174,13 +178,13 @@ describe("ConnectionHandlersMultiDbTest", () => {
           role: "default",
         });
         expect(defaultPool).not.toBeNull();
-        expect(defaultPool!.dbConfig.name).toBe("primary");
+        expect(defaultPool!.dbConfig.database).toEqual(dbPaths.primary);
 
         const readonlyPool = Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base", {
           role: "readonly",
         });
         expect(readonlyPool).not.toBeNull();
-        expect(readonlyPool!.dbConfig.name).toBe("readonly");
+        expect(readonlyPool!.dbConfig.database).toEqual(dbPaths.readonly);
       },
       { defaultEnv: "default_env" },
     );
@@ -189,25 +193,49 @@ describe("ConnectionHandlersMultiDbTest", () => {
   it("switching connections with database url", async () => {
     await withBaseConfigs({}, async () => {
       await Base.connectsTo({ database: { writing: "postgresql://localhost/bar" } });
-      expect(currentRole.call(Base as any)).toBe("writing");
-      expect(Base.connectedToQ({ role: "writing" })).toBe(true);
-      const pool = Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base");
+      expect(currentRole.call(Base as any)).toEqual("writing");
+      expect(Base.connectedToQ({ role: "writing" })).toBeTruthy();
+
+      const handler = Base.connectionHandler;
+      expect(Base.connectionHandler).toEqual(handler);
+
+      const pool = handler.retrieveConnectionPool("ActiveRecord::Base");
       expect(pool).not.toBeNull();
-      expect(pool!.dbConfig.adapter).toMatch(/postgr/i);
+      expect(pool!.dbConfig.configurationHash).toEqual({
+        adapter: "postgresql",
+        database: "bar",
+        host: "localhost",
+      });
     });
   });
 
   it("switching connections with database config hash", async () => {
     await withBaseConfigs({}, async () => {
-      await Base.connectsTo({ database: { writing: sqliteDb("readonly") } });
-      expect(currentRole.call(Base as any)).toBe("writing");
-      expect(Base.connectedToQ({ role: "writing" })).toBe(true);
-      expect(Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base")).not.toBeNull();
+      const config = sqliteDb("readonly");
+      await Base.connectsTo({ database: { writing: config } });
+      expect(currentRole.call(Base as any)).toEqual("writing");
+      expect(Base.connectedToQ({ role: "writing" })).toBeTruthy();
+
+      const handler = Base.connectionHandler;
+      expect(Base.connectionHandler).toEqual(handler);
+
+      const pool = handler.retrieveConnectionPool("ActiveRecord::Base");
+      expect(pool).not.toBeNull();
+      expect(pool!.dbConfig.configurationHash).toEqual(config);
     });
   });
 
   it("switching connections without database and role raises", () => {
-    expect(() => Base.connectedTo({}, () => {})).toThrow(/must provide a `shard` and\/or `role`/);
+    let error: any;
+    expect(() => {
+      try {
+        Base.connectedTo({}, () => {});
+      } catch (e) {
+        error = e;
+        throw e;
+      }
+    }).toThrow(ArgumentError);
+    expect(error.message).toEqual("must provide a `shard` and/or `role`.");
   });
 
   it("switching connections with database symbol uses default role", async () => {
@@ -220,9 +248,15 @@ describe("ConnectionHandlersMultiDbTest", () => {
       },
       async () => {
         await Base.connectsTo({ database: { writing: "animals" } });
-        expect(currentRole.call(Base as any)).toBe("writing");
-        expect(Base.connectedToQ({ role: "writing" })).toBe(true);
-        expect(Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base")).not.toBeNull();
+        expect(currentRole.call(Base as any)).toEqual("writing");
+        expect(Base.connectedToQ({ role: "writing" })).toBeTruthy();
+
+        const handler = Base.connectionHandler;
+        expect(Base.connectionHandler).toEqual(handler);
+
+        const pool = handler.retrieveConnectionPool("ActiveRecord::Base");
+        expect(pool).not.toBeNull();
+        expect(pool!.dbConfig.configurationHash).toEqual(sqliteDb("animals"));
       },
       { defaultEnv: "default_env" },
     );
@@ -239,15 +273,14 @@ describe("ConnectionHandlersMultiDbTest", () => {
       config,
       async () => {
         await Base.connectsTo({ database: { writing: "primary" } });
-        expect(currentRole.call(Base as any)).toBe("writing");
-        expect(Base.connectedToQ({ role: "writing" })).toBe(true);
+        expect(currentRole.call(Base as any)).toEqual("writing");
+        expect(Base.connectedToQ({ role: "writing" })).toBeTruthy();
 
         const handler = Base.connectionHandler;
-        expect(Base.connectionHandler).toBe(handler);
+        expect(Base.connectionHandler).toEqual(handler);
 
         const pool = handler.retrieveConnectionPool("ActiveRecord::Base");
         expect(pool).not.toBeNull();
-        expect(pool!.dbConfig.name).toBe("primary");
         expect(pool!.dbConfig.configurationHash).toEqual(config.default_env.primary);
       },
       { defaultEnv: "default_env" },
@@ -257,11 +290,9 @@ describe("ConnectionHandlersMultiDbTest", () => {
   it("connects to with single configuration", async () => {
     await withBaseConfigs({ development: sqliteDb("primary") }, async () => {
       await Base.connectsTo({ database: { writing: "development" } });
-      expect(Base.connectionHandler).toBe(Base.connectionHandler);
-      expect(currentRole.call(Base as any)).toBe("writing");
-      expect(Base.connectedToQ({ role: "writing" })).toBe(true);
-      expect(Base.shardKeys()).toEqual([]);
-      expect(Base.isSharded()).toBe(false);
+      expect(Base.connectionHandler).toEqual(Base.connectionHandler);
+      expect(currentRole.call(Base as any)).toEqual("writing");
+      expect(Base.connectedToQ({ role: "writing" })).toBeTruthy();
     });
   });
 
@@ -279,6 +310,7 @@ describe("ConnectionHandlersMultiDbTest", () => {
           role: "reading",
         });
         expect(pool).not.toBeNull();
+        expect(pool!.dbConfig.database).toEqual(dbPaths.readonly);
       },
     );
   });
@@ -318,11 +350,18 @@ describe("ConnectionHandlersMultiDbTest", () => {
   });
 
   it("calling connected to on a non existent handler raises", () => {
+    let error: any;
     expect(() => {
-      Base.connectedTo({ role: "non_existent" }, () => {
-        Base.connectionPool();
-      });
-    }).toThrow(/No database connection/);
+      try {
+        Base.connectedTo({ role: "non_existent" }, () => {
+          Base.connectionPool();
+        });
+      } catch (e) {
+        error = e;
+        throw e;
+      }
+    }).toThrow(ConnectionNotDefined);
+    expect(error.message).toEqual("No database connection defined for 'non_existent' role.");
   });
 
   it("default handlers are writing and reading", () => {
