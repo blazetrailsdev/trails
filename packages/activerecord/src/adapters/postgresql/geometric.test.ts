@@ -476,18 +476,82 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(column.type).toBe(type);
     };
 
-    for (const type of ["point", "line", "lseg", "box", "path", "polygon", "circle"]) {
-      it(`creating column with ${type} type`, async () => {
-        await adapter.dropTable(tableName, { ifExists: true });
-        await adapter.createTable(tableName, (t: TableDefinition) => {
-          (t as unknown as Record<string, (name: string) => void>)[type](`foo_${type}`);
-        });
-
-        await assertColumnExists(`foo_${type}`);
-        await assertTypeCorrect(`foo_${type}`, type);
-        await adapter.dropTable(tableName, { ifExists: true });
+    it("creating column with point type", async () => {
+      await adapter.dropTable(tableName, { ifExists: true });
+      await adapter.createTable(tableName, (t: TableDefinition) => {
+        t.point("foo_point");
       });
-    }
+
+      await assertColumnExists("foo_point");
+      await assertTypeCorrect("foo_point", "point");
+      await adapter.dropTable(tableName, { ifExists: true });
+    });
+
+    it("creating column with line type", async () => {
+      await adapter.dropTable(tableName, { ifExists: true });
+      await adapter.createTable(tableName, (t: TableDefinition) => {
+        t.line("foo_line");
+      });
+
+      await assertColumnExists("foo_line");
+      await assertTypeCorrect("foo_line", "line");
+      await adapter.dropTable(tableName, { ifExists: true });
+    });
+
+    it("creating column with lseg type", async () => {
+      await adapter.dropTable(tableName, { ifExists: true });
+      await adapter.createTable(tableName, (t: TableDefinition) => {
+        t.lseg("foo_lseg");
+      });
+
+      await assertColumnExists("foo_lseg");
+      await assertTypeCorrect("foo_lseg", "lseg");
+      await adapter.dropTable(tableName, { ifExists: true });
+    });
+
+    it("creating column with box type", async () => {
+      await adapter.dropTable(tableName, { ifExists: true });
+      await adapter.createTable(tableName, (t: TableDefinition) => {
+        t.box("foo_box");
+      });
+
+      await assertColumnExists("foo_box");
+      await assertTypeCorrect("foo_box", "box");
+      await adapter.dropTable(tableName, { ifExists: true });
+    });
+
+    it("creating column with path type", async () => {
+      await adapter.dropTable(tableName, { ifExists: true });
+      await adapter.createTable(tableName, (t: TableDefinition) => {
+        t.path("foo_path");
+      });
+
+      await assertColumnExists("foo_path");
+      await assertTypeCorrect("foo_path", "path");
+      await adapter.dropTable(tableName, { ifExists: true });
+    });
+
+    it("creating column with polygon type", async () => {
+      await adapter.dropTable(tableName, { ifExists: true });
+      await adapter.createTable(tableName, (t: TableDefinition) => {
+        t.polygon("foo_polygon");
+      });
+
+      await assertColumnExists("foo_polygon");
+      await assertTypeCorrect("foo_polygon", "polygon");
+      await adapter.dropTable(tableName, { ifExists: true });
+    });
+
+    it("creating column with circle type", async () => {
+      await adapter.dropTable(tableName, { ifExists: true });
+      await adapter.createTable(tableName, (t: TableDefinition) => {
+        t.circle("foo_circle");
+      });
+
+      await assertColumnExists("foo_circle");
+      await assertTypeCorrect("foo_circle", "circle");
+      await adapter.dropTable(tableName, { ifExists: true });
+    });
   });
 
   describe("PostgreSQLGeometricTest", () => {
@@ -597,7 +661,11 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     }
 
-    beforeEach(async () => {
+    let skipped = false;
+
+    beforeEach(async (ctx) => {
+      skipped = (await adapter.databaseVersion) < 9_04_00;
+      if (skipped) ctx.skip();
       await adapter.dropTable("postgresql_lines", { ifExists: true });
       await adapter.createTable("postgresql_lines", (t: TableDefinition) => {
         t.line("a_line");
@@ -606,6 +674,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await PostgresqlLine.loadSchema();
     });
     afterEach(async () => {
+      if (skipped) return;
       await adapter.dropTable("postgresql_lines", { ifExists: true });
     });
 
