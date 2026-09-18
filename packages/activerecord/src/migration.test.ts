@@ -1716,8 +1716,7 @@ AND query LIKE '%${lockId}%'`;
       expect(await column("qualification_experience")).toBeTruthy();
     });
 
-    it.skip("removing columns", async () => {
-      // BLOCKED: port bug — see 0155-assertion-surfaced-port-bugs/remove-columns-for-alter-takes-array-not-splat
+    it("removing columns", async () => {
       await withBulkChangeTable((t) => {
         t.string("qualification", "experience");
       });
@@ -1739,8 +1738,7 @@ AND query LIKE '%${lockId}%'`;
       expect(await column("qualification_experience")).toBeTruthy();
     });
 
-    it.skip("adding timestamps", async () => {
-      // BLOCKED: port bug — see 0155-assertion-surfaced-port-bugs/remove-columns-for-alter-takes-array-not-splat
+    it("adding timestamps", async () => {
       await withBulkChangeTable((t) => {
         t.string("title");
       });

@@ -760,10 +760,9 @@ export class SchemaStatements {
         "You must specify at least one column name. Example: remove_columns(:people, :first_name)",
       );
     }
-    const fragments = this.removeColumnsForAlter(tableName, columns, { ...opts } as Record<
-      string,
-      unknown
-    >);
+    const fragments = this.removeColumnsForAlter(tableName, ...columns, {
+      ...opts,
+    } as Record<string, unknown>);
     await this.execute(`ALTER TABLE ${this.quoteTableName(tableName)} ${fragments.join(", ")}`);
   }
 
@@ -1848,9 +1847,12 @@ export class SchemaStatements {
   /** @internal */
   removeColumnsForAlter(
     tableName: string,
-    columnNames: string[],
-    _options: Record<string, unknown> = {},
+    ...args: Array<string | Record<string, unknown>>
   ): string[] {
+    const last = args[args.length - 1];
+    const columnNames = (
+      typeof last === "object" && last !== null ? args.slice(0, -1) : args
+    ) as string[];
     return columnNames.map((columnName) => this.removeColumnForAlter(tableName, columnName));
   }
 
@@ -1872,7 +1874,7 @@ export class SchemaStatements {
 
   /** @internal */
   removeTimestampsForAlter(tableName: string, _options: Record<string, unknown> = {}): string[] {
-    return this.removeColumnsForAlter(tableName, ["updated_at", "created_at"]);
+    return this.removeColumnsForAlter(tableName, "updated_at", "created_at");
   }
 
   /** @internal */

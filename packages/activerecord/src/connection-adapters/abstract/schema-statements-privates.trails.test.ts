@@ -364,7 +364,7 @@ describe("SchemaStatements privates (PR 8)", () => {
 
   it("removeColumnsForAlter produces multiple DROP COLUMN fragments", () => {
     const ss = makeStatements();
-    expect(ss.removeColumnsForAlter("users", ["a", "b"])).toEqual([
+    expect(ss.removeColumnsForAlter("users", "a", "b")).toEqual([
       `DROP COLUMN "a"`,
       `DROP COLUMN "b"`,
     ]);
