@@ -30,7 +30,7 @@ import { Reference } from "../test-helpers/models/reference.js";
 import { Job } from "../test-helpers/models/job.js";
 import { Reader } from "../test-helpers/models/reader.js";
 import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
-import { assertEmpty, assertNotEmpty } from "@blazetrails/activesupport";
+import { assert, assertNot, assertEmpty, assertNotEmpty } from "@blazetrails/activesupport";
 
 async function withAutomaticScopeInversing(
   reflections: any[],
@@ -193,8 +193,8 @@ describe("NestedThroughAssociationsTest", () => {
     const tagReflection = (Tagging as any).reflectOnAssociation("tag");
     const taggingsReflection = (Tag as any).reflectOnAssociation("taggings");
 
-    expect(tagReflection.scope).toBeTruthy();
-    expect(taggingsReflection.scope).toBeFalsy();
+    assert(tagReflection.scope);
+    assertNot(taggingsReflection.scope);
 
     await withAutomaticScopeInversing([tagReflection, taggingsReflection], async () => {
       await assertQueriesCount(4, false, async () => {
@@ -530,8 +530,8 @@ describe("NestedThroughAssociationsTest", () => {
     const tagReflection = (Tagging as any).reflectOnAssociation("tag");
     const taggingsReflection = (Tag as any).reflectOnAssociation("taggings");
 
-    expect(tagReflection.scope).toBeTruthy();
-    expect(taggingsReflection.scope).toBeFalsy();
+    assert(tagReflection.scope);
+    assertNot(taggingsReflection.scope);
 
     await withAutomaticScopeInversing([tagReflection, taggingsReflection], async () => {
       await assertQueriesCount(4, false, async () => {
