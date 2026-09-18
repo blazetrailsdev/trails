@@ -16,6 +16,7 @@ import "./support/canonical-model-index.js";
 import { CpkBook, CpkReview } from "./test-helpers/models/cpk.js";
 import { Entrant } from "./test-helpers/models/entrant.js";
 import { ClothingItem } from "./test-helpers/models/clothing-item.js";
+import { NonPrimaryKey } from "./test-helpers/models/non-primary-key.js";
 import { adapterType } from "./test-adapter.js";
 import {
   Topic as CanonicalTopic,
@@ -52,7 +53,11 @@ import {
 } from "./test-helpers/models/company.js";
 import { PreparedStatementInvalid, StatementInvalid, UnknownPrimaryKey } from "./index.js";
 import { ForbiddenAttributesError, MissingAttributeError } from "@blazetrails/activemodel";
-import { assertRespondTo, assertNotEmpty, assertNotCalled } from "@blazetrails/activesupport";
+import { assertRespondTo, assertNotEmpty } from "@blazetrails/activesupport";
+
+function assertNotCalledFlag(called: boolean): void {
+  if (called) throw new Error("Expected instantiate not to be called");
+}
 import { ProtectedParams } from "./support/stubs/strong-parameters.js";
 import { withTimezoneConfig } from "./test-helper.js";
 import { assertAsyncEqual } from "./support/async-helper.js";
@@ -558,6 +563,7 @@ describe("FinderTest", () => {
   registerModel(CanonicalDeveloper);
   registerModel("Cpk::Book", CpkBook);
   registerModel("Cpk::Review", CpkReview);
+  registerModel(NonPrimaryKey);
   const Topic = CanonicalTopic;
   const Post = CanonicalPost;
   const Customer = CanonicalCustomer;
@@ -573,22 +579,25 @@ describe("FinderTest", () => {
 
   it("find with proc parameter and block", async () => {
     const all = await Topic.all();
+    const findOrIfnone = (title: string | null, message: string): InstanceType<typeof Topic> => {
+      const found = all.find((e) => (e as { title: string }).title === title);
+      if (found === undefined) throw new Error(message);
+      return found;
+    };
 
-    let exception: unknown;
+    let exception: Error | undefined;
     try {
-      const found = all.find((e) => (e as { title: string }).title === "non-existing-title");
-      if (found === undefined) throw new Error("should happen");
+      findOrIfnone("non-existing-title", "should happen");
     } catch (e) {
-      exception = e;
+      exception = e as Error;
     }
     expect(() => {
-      throw exception as Error;
+      throw exception;
     }).toThrow();
-    expect((exception as Error).message).toBe("should happen");
+    expect(exception!.message).toBe("should happen");
 
     expect(() => {
-      const found = all.find((e) => (e as { title: string }).title === topics("first").title);
-      if (found === undefined) throw new Error("should not happen");
+      findOrIfnone(topics("first").title, "should not happen");
     }).not.toThrow();
   });
 
@@ -841,10 +850,23 @@ describe("FinderTest", () => {
   });
 
   it("implicit order for model without primary key", async () => {
-    // @noRailsEquivalent CONVERGEABLE implicit-order-column-non-primary-key-model
-    await assertQueriesMatch(/ORDER BY/i, undefined, false, async () => {
-      await Topic.last();
-    });
+    const oldImplicitOrderColumn = NonPrimaryKey.implicitOrderColumn;
+    NonPrimaryKey.implicitOrderColumn = "created_at";
+    try {
+      await assertQueriesMatch(
+        new RegExp(
+          `ORDER BY ${regexpEscape(quoteTableName("non_primary_keys.created_at"))} DESC LIMIT`,
+          "i",
+        ),
+        undefined,
+        false,
+        async () => {
+          await NonPrimaryKey.last();
+        },
+      );
+    } finally {
+      NonPrimaryKey.implicitOrderColumn = oldImplicitOrderColumn;
+    }
   });
 
   it("implicit order column reorders query constraints", async () => {
@@ -1069,17 +1091,18 @@ describe("FinderTest", () => {
 
   it("find by invalid method syntax", async () => {
     expect(() => (Topic as any).failToFindByTitle("The First Topic")).toThrow();
-    expect(() => (Topic as any).findByTitleQ("The First Topic")).toThrow();
+    expect(() => (Topic as any).isFindByTitle("The First Topic")).toThrow();
     expect(() => (Topic as any).failToFindOrCreateByTitle("Nonexistent Title")).toThrow();
-    expect(() => (Topic as any).findOrCreateByTitleQ("Nonexistent Title")).toThrow();
+    expect(() => (Topic as any).isFindOrCreateByTitle("Nonexistent Title")).toThrow();
   });
 
   it("with limiting with custom select", async () => {
-    const postsResult = (await Post.references(":authors")
-      .includes(":author")
-      .select('posts.*, authors.id as "author_id"')
-      .limit(3)
-      .order("posts.id")) as unknown[];
+    const postsResult = (await Post.references(":authors").merge({
+      includes: ":author",
+      select: 'posts.*, authors.id as "author_id"',
+      limit: 3,
+      order: "posts.id",
+    } as never)) as unknown[];
     expect(postsResult.length).toBe(3);
     expect(postsResult.map((p) => (p as { author_id: number | null }).author_id)).toEqual([
       1,
@@ -2262,10 +2285,17 @@ describe("FinderTest", () => {
   });
 
   it("exists does not instantiate records", async () => {
-    let promise: Promise<unknown> | undefined;
-    assertNotCalled(Developer as unknown as object, "instantiate" as never, null, () => {
-      promise = Developer.exists();
-    });
-    await promise;
+    const original = (Developer as any).instantiate;
+    let called = false;
+    (Developer as any).instantiate = function (this: unknown, ...args: unknown[]) {
+      called = true;
+      return original.apply(this, args);
+    };
+    try {
+      await Developer.exists();
+    } finally {
+      (Developer as any).instantiate = original;
+    }
+    assertNotCalledFlag(called);
   });
 });
