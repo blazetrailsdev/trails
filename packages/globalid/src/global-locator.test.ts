@@ -112,14 +112,20 @@ describe("GlobalLocatorTest", () => {
   });
 
   it("by GID with only: restriction with match", async () => {
-    const found = await Locator.locate(personGid, { only: Person as unknown as LocatorModel });
+    const found = (await Locator.locate(personGid, {
+      only: Person as unknown as LocatorModel,
+    })) as Person;
     expect(found).toBeInstanceOf(Person);
+    expect(found.id).toBe(personGid.modelId);
   });
 
   it("by GID with only: restriction with match subclass", async () => {
     const childGid = GlobalID.create(new PersonChild("1"));
-    const found = await Locator.locate(childGid, { only: Person as unknown as LocatorModel });
+    const found = (await Locator.locate(childGid, {
+      only: Person as unknown as LocatorModel,
+    })) as PersonChild;
     expect(found).toBeInstanceOf(PersonChild);
+    expect(found.id).toBe(childGid.modelId);
   });
 
   it("by GID with only: restriction with no match", async () => {
@@ -130,13 +136,14 @@ describe("GlobalLocatorTest", () => {
   });
 
   it("by GID with only: restriction by multiple types", async () => {
-    const found = await Locator.locate(personGid, {
+    const found = (await Locator.locate(personGid, {
       only: [
         CompositePrimaryKeyModel as unknown as LocatorModel,
         Person as unknown as LocatorModel,
       ],
-    });
+    })) as Person;
     expect(found).toBeInstanceOf(Person);
+    expect(found.id).toBe(personGid.modelId);
   });
 
   it("by many GIDs of one class", async () => {
@@ -144,21 +151,19 @@ describe("GlobalLocatorTest", () => {
       GlobalID.create(new Person("1")),
       GlobalID.create(new Person("2")),
     ]);
-    expect(found).toHaveLength(2);
-    expect((found[0] as Person).id).toBe("1");
-    expect((found[1] as Person).id).toBe("2");
+    expect(found).toStrictEqual([new Person("1"), new Person("2")]);
   });
 
   it("by many GIDs of a UUID pk class", async () => {
+    const expected = [uuidGid, uuidGid].map(() => new PersonUuid(UUID));
     const found = await Locator.locateMany([uuidGid, uuidGid]);
-    expect(found).toHaveLength(2);
-    expect((found[0] as PersonUuid).id).toBe(UUID);
+    expect(found).toStrictEqual(expected);
   });
 
   it("by many GIDs of a UUID pk class with ignore missing", async () => {
     const gids = [uuidGid, GlobalID.create(new PersonUuid("missing")), uuidGid];
     const found = await Locator.locateMany(gids, { ignoreMissing: true });
-    expect(found).toHaveLength(2);
+    expect(found).toStrictEqual([new PersonUuid(UUID), new PersonUuid(UUID)]);
   });
 
   it("#locate_many by composite primary key GIDs of the same class", async () => {
@@ -166,21 +171,17 @@ describe("GlobalLocatorTest", () => {
       new CompositePrimaryKeyModel(["tenant-key-value", "id-value"]),
       new CompositePrimaryKeyModel(["tenant-key-value2", "id-value2"]),
     ];
-    const found = await Locator.locateMany(records.map((r) => GlobalID.create(r)));
-    expect(found).toHaveLength(2);
-    expect((found[0] as CompositePrimaryKeyModel).id).toEqual(["tenant-key-value", "id-value"]);
-    expect((found[1] as CompositePrimaryKeyModel).id).toEqual(["tenant-key-value2", "id-value2"]);
+    const located = await Locator.locateMany(records.map((r) => GlobalID.create(r)));
+    expect(located).toStrictEqual(records);
   });
 
   it("#locate_many by composite primary key GIDs of different classes", async () => {
     const records = [
-      GlobalID.create(new CompositePrimaryKeyModel(["tenant-key-value", "id-value"])),
-      GlobalID.create(new Person("1")),
+      new CompositePrimaryKeyModel(["tenant-key-value", "id-value"]),
+      new Person("1"),
     ];
-    const found = await Locator.locateMany(records);
-    expect(found).toHaveLength(2);
-    expect(found[0]).toBeInstanceOf(CompositePrimaryKeyModel);
-    expect(found[1]).toBeInstanceOf(Person);
+    const located = await Locator.locateMany(records.map((r) => GlobalID.create(r)));
+    expect(located).toStrictEqual(records);
   });
 
   it("by many GIDs of mixed classes", async () => {
@@ -189,10 +190,7 @@ describe("GlobalLocatorTest", () => {
       GlobalID.create(new PersonChild("1")),
       GlobalID.create(new Person("2")),
     ]);
-    expect(found).toHaveLength(3);
-    expect((found[0] as Person).id).toBe("1");
-    expect(found[1]).toBeInstanceOf(PersonChild);
-    expect((found[2] as Person).id).toBe("2");
+    expect(found).toStrictEqual([new Person("1"), new PersonChild("1"), new Person("2")]);
   });
 
   it("by many GIDs with only: restriction to match subclass", async () => {
@@ -204,8 +202,7 @@ describe("GlobalLocatorTest", () => {
       ],
       { only: PersonChild as unknown as LocatorModel },
     );
-    expect(found).toHaveLength(1);
-    expect(found[0]).toBeInstanceOf(PersonChild);
+    expect(found).toStrictEqual([new PersonChild("1")]);
   });
 
   it("by SGID", async () => {
@@ -221,20 +218,22 @@ describe("GlobalLocatorTest", () => {
   });
 
   it("by SGID with only: restriction with match", async () => {
-    const found = await Locator.locateSigned(personSgid, {
+    const found = (await Locator.locateSigned(personSgid, {
       verifier,
       only: Person as unknown as LocatorModel,
-    });
+    })) as Person;
     expect(found).toBeInstanceOf(Person);
+    expect(found.id).toBe(personSgid.modelId);
   });
 
   it("by SGID with only: restriction with match subclass", async () => {
     const sgid = SignedGlobalID.create(new PersonChild("1"), { verifier });
-    const found = await Locator.locateSigned(sgid, {
+    const found = (await Locator.locateSigned(sgid, {
       verifier,
       only: Person as unknown as LocatorModel,
-    });
+    })) as PersonChild;
     expect(found).toBeInstanceOf(PersonChild);
+    expect(found.id).toBe(sgid.modelId);
   });
 
   it("by SGID with only: restriction with no match", async () => {
@@ -246,14 +245,15 @@ describe("GlobalLocatorTest", () => {
   });
 
   it("by SGID with only: restriction by multiple types", async () => {
-    const found = await Locator.locateSigned(personSgid, {
+    const found = (await Locator.locateSigned(personSgid, {
       verifier,
       only: [
         CompositePrimaryKeyModel as unknown as LocatorModel,
         Person as unknown as LocatorModel,
       ],
-    });
+    })) as Person;
     expect(found).toBeInstanceOf(Person);
+    expect(found.id).toBe(personSgid.modelId);
   });
 
   it("by many SGIDs of one class", async () => {
@@ -262,22 +262,17 @@ describe("GlobalLocatorTest", () => {
       SignedGlobalID.create(new Person("2"), { verifier }),
     ];
     const found = await Locator.locateManySigned(sgids, { verifier });
-    expect(found).toHaveLength(2);
-    expect((found[0] as Person).id).toBe("1");
-    expect((found[1] as Person).id).toBe("2");
+    expect(found).toStrictEqual([new Person("1"), new Person("2")]);
   });
 
   it("by many SGIDs of the same composite primary key class", async () => {
-    const sgids = [
-      SignedGlobalID.create(new CompositePrimaryKeyModel(["tenant-key-value", "id-value"]), {
-        verifier,
-      }),
-      SignedGlobalID.create(new CompositePrimaryKeyModel(["tenant-key-value2", "id-value2"]), {
-        verifier,
-      }),
+    const records = [
+      new CompositePrimaryKeyModel(["tenant-key-value", "id-value"]),
+      new CompositePrimaryKeyModel(["tenant-key-value2", "id-value2"]),
     ];
-    const found = await Locator.locateManySigned(sgids, { verifier });
-    expect(found).toHaveLength(2);
+    const sgids = records.map((r) => SignedGlobalID.create(r, { verifier }));
+    const located = await Locator.locateManySigned(sgids, { verifier });
+    expect(located).toStrictEqual(records);
   });
 
   it("by many SGIDs of mixed classes", async () => {
@@ -287,20 +282,17 @@ describe("GlobalLocatorTest", () => {
       SignedGlobalID.create(new Person("2"), { verifier }),
     ];
     const found = await Locator.locateManySigned(sgids, { verifier });
-    expect(found).toHaveLength(3);
+    expect(found).toStrictEqual([new Person("1"), new PersonChild("1"), new Person("2")]);
   });
 
   it("by many SGIDs of composite primary key model mixed with other models", async () => {
-    const sgids = [
-      SignedGlobalID.create(new CompositePrimaryKeyModel(["tenant-key-value", "id-value"]), {
-        verifier,
-      }),
-      SignedGlobalID.create(new Person("1"), { verifier }),
+    const records = [
+      new CompositePrimaryKeyModel(["tenant-key-value", "id-value"]),
+      new Person("1"),
     ];
-    const found = await Locator.locateManySigned(sgids, { verifier });
-    expect(found).toHaveLength(2);
-    expect(found[0]).toBeInstanceOf(CompositePrimaryKeyModel);
-    expect(found[1]).toBeInstanceOf(Person);
+    const sgids = records.map((r) => SignedGlobalID.create(r, { verifier }));
+    const located = await Locator.locateManySigned(sgids, { verifier });
+    expect(located).toStrictEqual(records);
   });
 
   it("by many SGIDs with only: restriction to match subclass", async () => {
@@ -313,8 +305,7 @@ describe("GlobalLocatorTest", () => {
       verifier,
       only: PersonChild as unknown as LocatorModel,
     });
-    expect(found).toHaveLength(1);
-    expect(found[0]).toBeInstanceOf(PersonChild);
+    expect(found).toStrictEqual([new PersonChild("1")]);
   });
 
   it("by GID string", async () => {
@@ -326,6 +317,7 @@ describe("GlobalLocatorTest", () => {
   it("by SGID string", async () => {
     const found = (await Locator.locateSigned(personSgid.toString(), { verifier })) as Person;
     expect(found).toBeInstanceOf(Person);
+    expect(found.id).toBe("id");
   });
 
   it("by many SGID strings with for: restriction to match purpose", async () => {
@@ -339,8 +331,7 @@ describe("GlobalLocatorTest", () => {
       for: "adoption",
       only: PersonChild as unknown as LocatorModel,
     });
-    expect(found).toHaveLength(1);
-    expect((found[0] as PersonChild).id).toBe("2");
+    expect(found).toStrictEqual([new PersonChild("2")]);
   });
 
   it("by to_param encoding", async () => {
@@ -371,6 +362,7 @@ describe("GlobalLocatorTest", () => {
   });
 
   it("locating by a GID URI with a mismatching model_id returns nil", async () => {
+    expect(await Locator.locate("gid://app/Person/1/2")).toBeNull();
     expect(
       await Locator.locate(
         "gid://app/CompositePrimaryKeyModel/tenant-key-value/id-value/something_else",
@@ -381,34 +373,43 @@ describe("GlobalLocatorTest", () => {
   });
 
   it("use locator with block", async () => {
-    Locator.use("foo", (gid) => `block-located:${gid.modelName}:${gid.modelId}`);
+    Locator.use("foo", () => ":foo");
     try {
       const found = await Locator.locate("gid://foo/Person/1");
-      expect(found).toBe("block-located:Person:1");
+      expect(found).toBe(":foo");
     } finally {
       _resetLocators();
     }
   });
 
   it("use locator with class", async () => {
-    class CustomLocator extends BlockLocator {
+    class BarLocator extends BlockLocator {
       constructor() {
-        super((gid) => `class-located:${gid.modelId}`);
+        super(() => ":bar");
+      }
+      override async locateMany(
+        gids: GlobalID[],
+        _options?: Record<string, unknown>,
+      ): Promise<unknown[]> {
+        return gids.map((g) => g.modelId);
       }
     }
-    Locator.use("bar", new CustomLocator());
+    Locator.use("bar", new BarLocator());
     try {
-      expect(await Locator.locate("gid://bar/Person/9")).toBe("class-located:9");
+      expect(await Locator.locate("gid://bar/Person/1")).toBe(":bar");
+      expect(await Locator.locateMany(["gid://bar/Person/1", "gid://bar/Person/2"])).toStrictEqual([
+        "1",
+        "2",
+      ]);
     } finally {
       _resetLocators();
     }
   });
 
   it("app locator is case insensitive", async () => {
-    Locator.use("MyApp", (gid) => `case-test:${gid.modelId}`);
+    Locator.use("insensitive", () => ":insensitive");
     try {
-      expect(await Locator.locate("gid://myapp/Person/3")).toBe("case-test:3");
-      expect(await Locator.locate("gid://MYAPP/Person/4")).toBe("case-test:4");
+      expect(await Locator.locate("gid://InSeNsItIvE/Person/1")).toBe(":insensitive");
     } finally {
       _resetLocators();
     }
@@ -454,9 +455,7 @@ describe("GlobalLocatorTest", () => {
 
   it("by many with one record missing not leading to a raise when ignoring missing", async () => {
     const gids = [GlobalID.create(new Person("1")), GlobalID.create(new Person("missing"))];
-    const found = (await Locator.locateMany(gids, { ignoreMissing: true })) as Person[];
-    expect(found).toHaveLength(1);
-    expect(found[0].id).toBe("1");
+    await expect(Locator.locateMany(gids, { ignoreMissing: true })).resolves.not.toThrow();
   });
 
   it("by GID without a primary key method", async () => {
@@ -488,12 +487,12 @@ describe("GlobalLocatorTest", () => {
 
     const gid2 = GlobalID.create(new PersonNoPk("id2"));
     const many = (await Locator.locateMany([gid, gid2])) as PersonNoPk[];
-    expect(many).toHaveLength(2);
+    expect(many.length).toBe(2);
 
     const manyIgnore = (await Locator.locateMany([gid, gid2], {
       ignoreMissing: true,
     })) as PersonNoPk[];
-    expect(manyIgnore).toHaveLength(2);
+    expect(manyIgnore.length).toBe(2);
   });
 
   it("can set default_locator", async () => {
@@ -575,19 +574,14 @@ describe("ScopedRecordLocatingTest", () => {
 
   it("by many with scoped records", async () => {
     const gids = [GlobalID.create(new PersonScoped("1")), GlobalID.create(new PersonScoped("2"))];
-    const found = (await Locator.locateMany(gids)) as PersonScoped[];
-    expect(found).toHaveLength(2);
-    expect(found.every((r) => r instanceof PersonScoped)).toBe(true);
-    expect(found.map((r) => r.id)).toEqual(["1", "2"]);
+    const found = await Locator.locateMany(gids);
+    expect(found).toStrictEqual([new PersonScoped("1"), new PersonScoped("2")]);
   });
 
   it("by many with scoped and unscoped records", async () => {
     const gids = [GlobalID.create(new PersonScoped("1")), GlobalID.create(new Person("2"))];
-    const found = (await Locator.locateMany(gids)) as Person[];
-    expect(found).toHaveLength(2);
-    expect(found[0]).toBeInstanceOf(PersonScoped);
-    expect(found[1]).toBeInstanceOf(Person);
-    expect(found.map((r) => r.id)).toEqual(["1", "2"]);
+    const found = await Locator.locateMany(gids);
+    expect(found).toStrictEqual([new PersonScoped("1"), new Person("2")]);
   });
 });
 
