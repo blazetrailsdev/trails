@@ -106,7 +106,9 @@ export async function find(this: FinderRelation, ...args: unknown[]): Promise<an
     }
     if (ifnone == null) return null;
     if (typeof ifnone !== "function") {
-      throw new NoMethodError(`undefined method \`call' for ${rbInspect(ifnone)}`);
+      const desc =
+        typeof ifnone === "boolean" ? String(ifnone) : `an instance of ${rbObjClass(ifnone)}`;
+      throw new NoMethodError(`undefined method \`call' for ${desc}`);
     }
     return await ifnone();
   }
