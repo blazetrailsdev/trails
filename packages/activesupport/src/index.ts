@@ -563,7 +563,6 @@ export {
   assertInDelta,
   assertEmpty,
   assertNotEmpty,
-  assertIncludes,
   assertSame,
   assertNotSame,
   assertRaises,

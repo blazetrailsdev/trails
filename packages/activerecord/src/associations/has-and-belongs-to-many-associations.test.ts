@@ -10,7 +10,6 @@ import {
   assertNotPredicate,
   assertEmpty,
   assertNotEmpty,
-  assertIncludes,
   assertNoDifference,
   assertDifference,
   assertNothingRaised,
@@ -165,6 +164,15 @@ class Source extends Base {
       associationForeignKey: "sink_id",
     });
   }
+}
+
+async function assertIncludes(
+  collection: { isInclude(obj: unknown): boolean | Promise<boolean> },
+  obj: unknown,
+  message?: string,
+): Promise<void> {
+  assertRespondTo(collection, "isInclude");
+  assert(await collection.isInclude(obj), message ?? `Expected the collection to include ${obj}`);
 }
 
 describe("HasAndBelongsToManyAssociationsTest", () => {
@@ -428,7 +436,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
 
     let proj!: Project;
     await assertQueriesCount(0, false, async () => {
-      proj = (devel.projects as any).new({ name: "Projekt" });
+      proj = devel.projects.new({ name: "Projekt" });
     });
     assertNotPredicate(devel.projects, (r) => r.loaded);
 
@@ -1132,8 +1140,8 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     const proxy = dev.projects;
     await assertNoQueries(false, async () => {
       expect(await proxy).toEqual([]);
-      expect(await (proxy as any).where({ title: "omg" }).toArray()).toEqual([]);
-      expect(await (proxy as any).pluck("title")).toEqual([]);
+      expect(await proxy.where({ title: "omg" })).toEqual([]);
+      expect(await proxy.pluck("title")).toEqual([]);
       expect(await proxy.count()).toBe(0);
     });
   });

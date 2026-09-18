@@ -427,22 +427,6 @@ function collectionSize(actual: unknown): number {
   return Object.keys(actual as object).length;
 }
 
-interface AsyncIncludable {
-  isInclude(obj: unknown): boolean | Promise<boolean>;
-}
-
-/** @noRailsEquivalent PERMANENT */
-export async function assertIncludes(
-  collection: AsyncIncludable | unknown[],
-  obj: unknown,
-  message?: string,
-): Promise<void> {
-  const isAsyncIncludable = !Array.isArray(collection);
-  assertRespondTo(collection, isAsyncIncludable ? "isInclude" : "includes");
-  const included = isAsyncIncludable ? await collection.isInclude(obj) : collection.includes(obj);
-  assert(included, message ?? `Expected ${inspect(collection)} to include ${inspect(obj)}`);
-}
-
 /** @noRailsEquivalent PERMANENT */
 export function assertSame(expected: unknown, actual: unknown, message?: string): void {
   assert(
