@@ -100,11 +100,11 @@ export async function find(this: FinderRelation, ...args: unknown[]): Promise<an
         `wrong number of arguments (given ${ifnoneArgs.length}, expected 0..1)`,
       );
     }
-    const ifnone = ifnoneArgs[0] as (() => unknown) | undefined;
+    const ifnone = ifnoneArgs[0];
     for (const record of await this.toArray()) {
       if (await (block as (record: unknown) => unknown)(record)) return record;
     }
-    return ifnone ? await ifnone() : null;
+    return ifnone == null ? null : await (ifnone as () => unknown)();
   }
   return findWithIds.call(this, ...args);
 }
