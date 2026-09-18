@@ -12,7 +12,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import type { Column as MysqlColumn } from "./connection-adapters/mysql/column.js";
 import { Migration } from "./migration.js";
 import { fixtures } from "./test-fixtures.js";
-import { assertColumn } from "./test-helpers/test-case.js";
+import { assertColumn, assertNoColumn } from "./test-helpers/test-case.js";
 import { TableDefinition } from "./connection-adapters/abstract/schema-definitions.js";
 import { SchemaCreation as PgSchemaCreation } from "./connection-adapters/postgresql/schema-creation.js";
 import { SchemaCreation as MysqlSchemaCreation } from "./connection-adapters/mysql/schema-creation.js";
@@ -61,6 +61,24 @@ function migrateProxy(version: number, body: (m: Migration) => Promise<void>): M
         override async down(): Promise<void> {}
       })(),
   });
+}
+
+async function migrateRemovingMissingColumn(migrator: Migrator): Promise<void> {
+  if (adapterType === "sqlite") {
+    await assertNothingRaised(() => migrator.migrate());
+  } else {
+    const error = await assertRaises([Error], {}, () => migrator.migrate());
+
+    if (adapterType === "mysql") {
+      if (await (Base.connection as any).isMariadb()) {
+        expect(error.message).toMatch(/Can't DROP COLUMN `last_name`; check that it exists/);
+      } else {
+        expect(error.message).toMatch(/check that column\/key exists/);
+      }
+    } else if (adapterType === "postgres") {
+      expect(error.message).toMatch(/column "last_name" of relation "people" does not exist/);
+    }
+  }
 }
 
 async function personColumnNames(): Promise<string[]> {
@@ -143,9 +161,9 @@ describe("MigrationTest", () => {
       new InternalMetadata(adapter.pool),
       100,
     ).migrate();
-    expect(await personColumnNames()).toContain("last_name");
+    await assertColumn(Person, "last_name");
 
-    await expect(
+    await assertRaises([Error], {}, () =>
       new Migrator(
         "up",
         [migrateProxy(101, (m) => m.addColumn("people", "last_name", "string"))],
@@ -153,7 +171,7 @@ describe("MigrationTest", () => {
         new InternalMetadata(adapter.pool),
         101,
       ).migrate(),
-    ).rejects.toThrow();
+    );
   });
 
   it("rename table with prefix and suffix", async () => {
@@ -261,20 +279,22 @@ describe("MigrationTest", () => {
       new InternalMetadata(adapter.pool),
       100,
     ).migrate();
-    expect(await personColumnNames()).toContain("last_name");
+    await assertColumn(Person, "last_name");
 
-    await new Migrator(
-      "up",
-      [
-        migrateProxy(101, (m) =>
-          m.addColumn("people", "last_name", "string", { ifNotExists: true }),
-        ),
-      ],
-      new SchemaMigration(adapter.pool),
-      new InternalMetadata(adapter.pool),
-      101,
-    ).migrate();
-    expect(await personColumnNames()).toContain("last_name");
+    await assertNothingRaised(() =>
+      new Migrator(
+        "up",
+        [
+          migrateProxy(101, (m) =>
+            m.addColumn("people", "last_name", "string", { ifNotExists: true }),
+          ),
+        ],
+        new SchemaMigration(adapter.pool),
+        new InternalMetadata(adapter.pool),
+        101,
+      ).migrate(),
+    );
+    await assertColumn(Person, "last_name");
   });
 
   it("add table with decimals", async () => {
@@ -366,23 +386,23 @@ describe("MigrationTest", () => {
   it("instance based migration up", async () => {
     const migration = new MockMigration();
     (migration as any).adapter = await freshAdapter();
-    expect(migration.wentUp).toBe(false);
-    expect(migration.wentDown).toBe(false);
+    expect(migration.wentUp, "have not gone up").toBeFalsy();
+    expect(migration.wentDown, "have not gone down").toBeFalsy();
 
     await migration.migrate("up");
-    expect(migration.wentUp).toBe(true);
-    expect(migration.wentDown).toBe(false);
+    expect(migration.wentUp, "have gone up").toBeTruthy();
+    expect(migration.wentDown, "have not gone down").toBeFalsy();
   });
 
   it("instance based migration down", async () => {
     const migration = new MockMigration();
     (migration as any).adapter = await freshAdapter();
-    expect(migration.wentUp).toBe(false);
-    expect(migration.wentDown).toBe(false);
+    expect(migration.wentUp, "have not gone up").toBeFalsy();
+    expect(migration.wentDown, "have not gone down").toBeFalsy();
 
     await migration.migrate("down");
-    expect(migration.wentUp).toBe(false);
-    expect(migration.wentDown).toBe(true);
+    expect(migration.wentUp, "have gone up").toBeFalsy();
+    expect(migration.wentDown, "have not gone down").toBeTruthy();
   });
 
   it("schema migrations table name", async () => {
@@ -480,7 +500,7 @@ describe("MigrationTest", () => {
       new InternalMetadata(adapter.pool),
       100,
     ).migrate();
-    expect(await personColumnNames()).toContain("last_name");
+    await assertColumn(Person, "last_name");
 
     await new Migrator(
       "up",
@@ -489,22 +509,17 @@ describe("MigrationTest", () => {
       new InternalMetadata(adapter.pool),
       101,
     ).migrate();
-    expect(await personColumnNames()).not.toContain("last_name");
+    await assertNoColumn(Person, "last_name");
 
-    const error: unknown = await new Migrator(
+    const migrator = new Migrator(
       "up",
       [migrateProxy(102, (m) => m.removeColumn("people", "last_name"))],
       new SchemaMigration(adapter.pool),
       new InternalMetadata(adapter.pool),
       102,
-    )
-      .migrate()
-      .catch((e: unknown) => e);
-    expect((error as Error | undefined)?.message ?? "").toMatch(
-      adapterType === "sqlite"
-        ? /^$/
-        : /column "last_name" of relation "people" does not exist|check that.*exists/i,
     );
+
+    await migrateRemovingMissingColumn(migrator);
   });
 
   it("migration context with default schema migration", async () => {
@@ -706,7 +721,7 @@ describe("MigrationTest", () => {
       new InternalMetadata(adapter.pool),
       100,
     ).migrate();
-    expect(await personColumnNames()).toContain("last_name");
+    await assertColumn(Person, "last_name");
 
     await new Migrator(
       "up",
@@ -715,16 +730,16 @@ describe("MigrationTest", () => {
       new InternalMetadata(adapter.pool),
       101,
     ).migrate();
-    expect(await personColumnNames()).not.toContain("last_name");
+    await assertNoColumn(Person, "last_name");
 
-    await new Migrator(
+    const migrator = new Migrator(
       "up",
       [migrateProxy(102, (m) => m.removeColumn("people", "last_name", { ifExists: true }))],
       new SchemaMigration(adapter.pool),
       new InternalMetadata(adapter.pool),
       102,
-    ).migrate();
-    expect(await personColumnNames()).not.toContain("last_name");
+    );
+    await assertNothingRaised(() => migrator.migrate());
   });
 
   it("add column with casted type if not exists set to true", async () => {
@@ -737,16 +752,18 @@ describe("MigrationTest", () => {
       new InternalMetadata(adapter.pool),
       100,
     ).migrate();
-    expect(await personColumnNames()).toContain("last_name");
+    await assertColumn(Person, "last_name");
 
-    await new Migrator(
-      "up",
-      [migrateProxy(101, (m) => m.addColumn("people", "last_name", type, { ifNotExists: true }))],
-      new SchemaMigration(adapter.pool),
-      new InternalMetadata(adapter.pool),
-      101,
-    ).migrate();
-    expect(await personColumnNames()).toContain("last_name");
+    await assertNothingRaised(() =>
+      new Migrator(
+        "up",
+        [migrateProxy(101, (m) => m.addColumn("people", "last_name", type, { ifNotExists: true }))],
+        new SchemaMigration(adapter.pool),
+        new InternalMetadata(adapter.pool),
+        101,
+      ).migrate(),
+    );
+    await assertColumn(Person, "last_name");
   });
 
   it("add column with if not exists set to true does not raise if type is different", async () => {
@@ -758,20 +775,22 @@ describe("MigrationTest", () => {
       new InternalMetadata(adapter.pool),
       100,
     ).migrate();
-    expect(await personColumnNames()).toContain("last_name");
+    await assertColumn(Person, "last_name");
 
-    await new Migrator(
-      "up",
-      [
-        migrateProxy(101, (m) =>
-          m.addColumn("people", "last_name", "boolean", { ifNotExists: true }),
-        ),
-      ],
-      new SchemaMigration(adapter.pool),
-      new InternalMetadata(adapter.pool),
-      101,
-    ).migrate();
-    expect(await personColumnNames()).toContain("last_name");
+    await assertNothingRaised(() =>
+      new Migrator(
+        "up",
+        [
+          migrateProxy(101, (m) =>
+            m.addColumn("people", "last_name", "boolean", { ifNotExists: true }),
+          ),
+        ],
+        new SchemaMigration(adapter.pool),
+        new InternalMetadata(adapter.pool),
+        101,
+      ).migrate(),
+    );
+    await assertColumn(Person, "last_name");
   });
 
   it("method missing delegates to connection", async () => {
@@ -787,9 +806,10 @@ describe("MigrationTest", () => {
   });
 
   it("filtering migrations", async () => {
+    class Reminder extends Base {}
     const adapter = Base.connection;
-    expect(await adapter.columnExists("people", "last_name")).toBe(false);
-    expect(await adapter.tableExists("reminders")).toBe(false);
+    await assertNoColumn(Person, "last_name");
+    expect(await Reminder.tableExists()).toBeFalsy();
 
     const nameFilter = (migration: MigrationProxy): boolean =>
       migration.name === "ValidPeopleHaveLastNames";
@@ -800,13 +820,13 @@ describe("MigrationTest", () => {
     );
     await migrator.migrate(null, nameFilter);
 
-    expect(await adapter.columnExists("people", "last_name")).toBe(true);
-    expect(await adapter.tableExists("reminders")).toBe(false);
+    await assertColumn(Person, "last_name");
+    await assertRaises([StatementInvalid], {}, () => Reminder.first());
 
     await migrator.down(null, nameFilter);
 
-    expect(await adapter.columnExists("people", "last_name")).toBe(false);
-    expect(await adapter.tableExists("reminders")).toBe(false);
+    await assertNoColumn(Person, "last_name");
+    await assertRaises([StatementInvalid], {}, () => Reminder.first());
   });
 
   itIfSupports("ddl_transactions", "migrator one up with exception and rollback", async () => {
