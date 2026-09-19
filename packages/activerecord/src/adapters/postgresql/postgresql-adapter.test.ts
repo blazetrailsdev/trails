@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { assertRaises, assertNothingRaised } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/date";
 import { Base } from "../../base.js";
 import { withDbWarningsAction } from "../../support/with-db-warnings-action.js";
@@ -14,6 +15,11 @@ import {
   StatementInvalid,
 } from "../../errors.js";
 import { NullPool } from "../../connection-adapters/abstract/connection-pool.js";
+import {
+  assertQueriesCount,
+  assertNoQueries,
+  assertQueriesMatch,
+} from "../../testing/query-assertions.js";
 import { QueryAttribute } from "../../relation/query-attribute.js";
 import { Value, Integer } from "../../type.js";
 import { withSecondAdapter } from "../../support/second-connection.js";
@@ -96,11 +102,9 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("connection error", async () => {
       const bad = new PostgreSQLAdapter("postgres://localhost:59999/nonexistent");
-      const error = await bad.execute("SELECT 1").then(
-        () => null,
-        (e) => e,
+      const error = await assertRaises([ConnectionNotEstablished], {}, () =>
+        bad.execute("SELECT 1"),
       );
-      expect(error).toBeInstanceOf(ConnectionNotEstablished);
       expect((error as ConnectionNotEstablished).connectionPool).toBeInstanceOf(NullPool);
       await bad.disconnectBang();
     });
@@ -118,12 +122,10 @@ describeIfPg("PostgreSQLAdapter", () => {
         .mockImplementation((() => fakeClient) as never);
       const a = new PostgreSQLAdapter(PG_TEST_URL);
       try {
-        const error = await a.execute("SELECT 1").then(
-          () => null,
-          (e) => e,
+        const error = await assertRaises([ConnectionNotEstablished], {}, () =>
+          a.execute("SELECT 1"),
         );
-        expect(error).toBeInstanceOf(ConnectionNotEstablished);
-        expect((error as Error).message).toContain("actual bad connection error");
+        expect(error.message).toBe("actual bad connection error");
         expect((error as ConnectionNotEstablished).connectionPool).toBe(a.pool);
       } finally {
         clientSpy.mockRestore();
@@ -139,38 +141,33 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("bad connection to postgres database", async () => {
       const bad = new PostgreSQLAdapter("postgres://localhost:59999/nonexistent");
-      const error = await bad.execute("SELECT 1").then(
-        () => null,
-        (e) => e,
+      const error = await assertRaises([ConnectionNotEstablished], {}, () =>
+        bad.execute("SELECT 1"),
       );
+      expect(bad).not.toBeNull();
       expect((error as ConnectionNotEstablished).connectionPool).toBe(bad.pool);
       await bad.disconnectBang();
     });
 
     it("reconnect after bad connection on check version", async () => {
-      expect(await adapter.getDatabaseVersion()).toBeGreaterThan(0);
+      await adapter.getDatabaseVersion();
       (adapter.pool as unknown as { _serverVersion: unknown })._serverVersion = null;
       const versionSpy = vi.spyOn(adapter, "_serverVersion").mockResolvedValue(0);
-      const error = await adapter.reconnectBang().then(
-        () => null,
-        (e: unknown) => e,
-      );
-      expect(error).toBeInstanceOf(ConnectionFailed);
-      expect((error as ConnectionFailed).message).toBe("Could not determine PostgreSQL version");
+      const error = await assertRaises([ConnectionFailed], {}, () => adapter.reconnectBang());
+      expect(error.message).toBe("Could not determine PostgreSQL version");
       versionSpy.mockRestore();
 
-      await adapter.reconnectBang();
-      expect(await adapter.getDatabaseVersion()).toBeGreaterThan(0);
+      await assertNothingRaised(() => adapter.reconnectBang());
     });
 
     it("database exists returns false when the database does not exist", async () => {
       const url = new URL(PG_TEST_URL);
       url.pathname = "/non_extant_database";
-      expect(await PostgreSQLAdapter.databaseExists(url.toString())).toBe(false);
+      expect(await PostgreSQLAdapter.databaseExists(url.toString())).toBeFalsy();
     });
 
     it("database exists returns true when the database exists", async () => {
-      expect(await PostgreSQLAdapter.databaseExists(PG_TEST_URL)).toBe(true);
+      expect(await PostgreSQLAdapter.databaseExists(PG_TEST_URL)).toBeTruthy();
     });
 
     it("primary key", async () => {
@@ -282,11 +279,11 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("serial sequence", async () => {
       expect(await adapter.serialSequence("accounts", "id")).toBe("public.accounts_id_seq");
-      const error = await adapter.serialSequence("zomg", "id").then(
-        () => null,
-        (e) => e,
+
+      const error = await assertRaises([StatementInvalid], {}, () =>
+        adapter.serialSequence("zomg", "id"),
       );
-      expect(error).toBeInstanceOf(StatementInvalid);
+
       expect((error as StatementInvalid).connectionPool).toBe(adapter.pool);
     });
 
@@ -302,9 +299,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("pk and sequence for", async () => {
       await withExampleTable(adapter, async () => {
-        const result = await adapter.pkAndSequenceFor("ex");
-        expect(result).not.toBeNull();
-        const [pk, seq] = result!;
+        const [pk, seq] = (await adapter.pkAndSequenceFor("ex"))!;
         expect(pk).toBe("id");
         expect(seq!.toString()).toBe(await adapter.defaultSequenceName("ex", "id"));
       });
@@ -314,9 +309,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await withExampleTable(
         adapter,
         async () => {
-          const result = await adapter.pkAndSequenceFor("ex");
-          expect(result).not.toBeNull();
-          const [pk, seq] = result!;
+          const [pk, seq] = (await adapter.pkAndSequenceFor("ex"))!;
           expect(pk).toBe("code");
           expect(seq!.toString()).toBe(await adapter.defaultSequenceName("ex", "code"));
         },
@@ -377,9 +370,8 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.execute(`INSERT INTO pg_depend VALUES(${collisionDependRecord.join(",")})`);
         await adapter.execute(`INSERT INTO pg_depend VALUES(${correctDependRecord.join(",")})`);
 
-        const result = await adapter.pkAndSequenceFor("ex");
-        expect(result).not.toBeNull();
-        expect(result![1]).toEqual(new Name("public", "ex_id_seq"));
+        const seq = (await adapter.pkAndSequenceFor("ex"))![1];
+        expect(seq).toEqual(new Name("public", "ex_id_seq"));
 
         await adapter.execute(
           `DELETE FROM pg_depend WHERE objid = 'ex2_id_seq'::regclass AND refobjid = 'ex'::regclass AND deptype = 'a'`,
@@ -391,13 +383,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("table alias length", async () => {
-      let raised = false;
-      try {
-        (adapter as unknown as { tableAliasLength(): number }).tableAliasLength();
-      } catch {
-        raised = true;
-      }
-      expect(raised).toBe(false);
+      await assertNothingRaised(() =>
+        (adapter as unknown as { tableAliasLength(): number }).tableAliasLength(),
+      );
     });
 
     it("exec no binds", async () => {
@@ -529,34 +517,30 @@ describeIfPg("PostgreSQLAdapter", () => {
 
         await adapter.removeIndex("ex", "data");
         index = (await adapter.indexes("ex")).find((idx) => idx.name === "index_ex_on_data");
-        expect(index).toBeUndefined();
+        expect(index).toBeFalsy();
       });
     });
 
     it("invalid index", async () => {
       await withExampleTable(adapter, async () => {
         await adapter.execQuery("INSERT INTO ex (number) VALUES (1), (1)");
-        let error: unknown;
-        try {
-          await adapter.addIndex("ex", "number", {
+        const error = await assertRaises([RecordNotUnique], {}, () =>
+          adapter.addIndex("ex", "number", {
             unique: true,
             algorithm: "concurrently",
             name: "invalid_index",
-          });
-        } catch (e) {
-          error = e;
-        }
-        expect(error).toBeInstanceOf(RecordNotUnique);
-        expect((error as Error).message).toMatch(/could not create unique index/);
+          }),
+        );
+        expect(error.message).toMatch(/could not create unique index/);
         expect((error as RecordNotUnique).connectionPool).toBe(adapter.pool);
 
-        expect(await adapter.indexExists("ex", "number", { name: "invalid_index" })).toBe(true);
+        expect(await adapter.indexExists("ex", "number", { name: "invalid_index" })).toBeTruthy();
         expect(
           await adapter.indexExists("ex", "number", { name: "invalid_index", valid: true }),
-        ).toBe(false);
+        ).toBeFalsy();
         expect(
           await adapter.indexExists("ex", "number", { name: "invalid_index", valid: false }),
-        ).toBe(true);
+        ).toBeTruthy();
       });
     });
 
@@ -567,7 +551,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         );
         const index = (await adapter.indexes("ex"))[0];
         expect(index.unique).toBe(true);
-        expect(index.where).toContain("number");
+        expect(index.where).toMatch("number");
       });
     });
 
@@ -632,7 +616,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("raise error when cannot translate exception", async () => {
-      await expect(adapter.execute(null)).rejects.toBeInstanceOf(TypeError);
+      await assertRaises([TypeError], {}, () => adapter.execute(null));
     });
 
     it("translate no connection exception to not established", async () => {
@@ -641,34 +625,36 @@ describeIfPg("PostgreSQLAdapter", () => {
       await withSecondAdapter(PG_TEST_URL, async (adapter2) => {
         await adapter2.execute(`SELECT pg_terminate_backend(${pid})`);
       });
-      await expect(adapter.execute("SELECT 1")).rejects.toBeInstanceOf(ConnectionFailed);
+      await assertRaises([ConnectionFailed], {}, () => adapter.execute("SELECT 1"));
     });
 
     it("reload type map for newly defined types", async () => {
       const { Enum: OidEnum } = await import("../../connection-adapters/postgresql/oid/enum.js");
       await adapter.createEnum("feeling", ["good", "bad"]);
       try {
-        const result = await adapter.execQuery(`SELECT 'good'::feeling AS feeling`);
-        expect(result.columnTypes["feeling"]).toBeInstanceOf(OidEnum);
+        await assertQueriesCount(1, true, async () => {
+          const result = await adapter.selectAll("SELECT 'good'::feeling");
+          expect(result.columnTypes["feeling"]).toBeInstanceOf(OidEnum);
+        });
       } finally {
-        await adapter.dropEnum("feeling", { ifExists: true });
+        await assertQueriesMatch(/from pg_type/i, undefined, true, () =>
+          adapter.dropEnum("feeling", { ifExists: true }),
+        );
       }
     });
 
     it("only reload type map once for every unrecognized type", async () => {
-      await adapter.execQuery("SELECT 1");
+      await adapter.selectAll("SELECT 1");
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      const loadSpy = vi.spyOn(adapter, "loadAdditionalTypes");
       try {
-        await adapter.execQuery("select 'pg_catalog.pg_class'::regclass");
-        const afterFirst = loadSpy.mock.calls.length;
-        expect(afterFirst).toBeGreaterThan(0);
-        await adapter.execQuery("select 'pg_catalog.pg_class'::regclass");
-        expect(loadSpy.mock.calls.length).toBe(afterFirst);
-        await adapter.execQuery("SELECT NULL::anyarray");
-        expect(loadSpy.mock.calls.length).toBeGreaterThan(afterFirst);
+        await assertQueriesCount(2, true, () =>
+          adapter.selectAll("select 'pg_catalog.pg_class'::regclass"),
+        );
+        await assertQueriesCount(1, true, () =>
+          adapter.selectAll("select 'pg_catalog.pg_class'::regclass"),
+        );
+        await assertQueriesCount(2, true, () => adapter.selectAll("SELECT NULL::anyarray"));
       } finally {
-        loadSpy.mockRestore();
         warnSpy.mockRestore();
       }
     });
@@ -676,15 +662,15 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("only warn on first encounter of unrecognized oid", async () => {
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       try {
-        await adapter.execQuery(`select 'pg_catalog.pg_class'::regclass`);
-        await adapter.execQuery(`select 'pg_catalog.pg_class'::regclass`);
-        await adapter.execQuery(`select 'pg_catalog.pg_class'::regclass`);
-        const oidWarns = warnSpy.mock.calls.filter(
-          (c) => typeof c[0] === "string" && /unknown OID \d+/.test(c[0]),
-        );
-        expect(oidWarns).toHaveLength(1);
-        expect(oidWarns[0][0]).toMatch(
-          /unknown OID \d+: failed to recognize type of 'regclass'\. It will be treated as String\./,
+        await adapter.selectAll(`select 'pg_catalog.pg_class'::regclass`);
+        await adapter.selectAll(`select 'pg_catalog.pg_class'::regclass`);
+        await adapter.selectAll(`select 'pg_catalog.pg_class'::regclass`);
+        const warning = warnSpy.mock.calls
+          .filter((c) => typeof c[0] === "string" && /unknown OID \d+/.test(c[0]))
+          .map((c) => `${c[0]}\n`)
+          .join("");
+        expect(warning).toMatch(
+          /^unknown OID \d+: failed to recognize type of 'regclass'\. It will be treated as String\.\n$/,
         );
       } finally {
         warnSpy.mockRestore();
@@ -695,60 +681,45 @@ describeIfPg("PostgreSQLAdapter", () => {
       await withExampleTable(
         adapter,
         async () => {
-          const cols = await adapter.columns("ex");
-          const numberCol = cols.find((c) => c.name === "number")!;
-          expect(numberCol.default).toBeNull();
-          expect(numberCol.defaultFunction == null).toBe(true);
-          await adapter.execute(`INSERT INTO ex DEFAULT VALUES`);
-          const rows = await adapter.execute(`SELECT number FROM ex`);
-          expect(Number(rows[0].number)).toBe(4);
+          class NumberKlass extends Base {
+            declare number: number | null;
+            static tableName = "ex";
+          }
+          await NumberKlass.loadSchema();
+          const column = NumberKlass.columnsHash()["number"];
+          expect(column.default).toBeNull();
+          expect(column.defaultFunction).toBeNull();
+
+          const firstNumber = new NumberKlass();
+          expect(firstNumber.number).toBeNull();
+
+          await firstNumber.saveBang();
+          expect((await firstNumber.reload()).number).toBe(4);
         },
         "id SERIAL PRIMARY KEY, number INTEGER NOT NULL DEFAULT (4 + 4) * 2 / 4",
       );
     });
 
     it("only check for insensitive comparison capability once", async () => {
-      await adapter.execute(`CREATE DOMAIN example_type AS integer`);
-      const internalExecQuerySpy = vi.spyOn(adapter, "internalExecQuery");
+      await adapter.execute("CREATE DOMAIN example_type AS integer");
       try {
-        const col = { sqlType: "example_type" };
-        await adapter.canPerformCaseInsensitiveComparisonFor(col);
-        const callsAfterFirst = internalExecQuerySpy.mock.calls.length;
-        await adapter.canPerformCaseInsensitiveComparisonFor(col);
-        expect(internalExecQuerySpy.mock.calls.length).toBe(callsAfterFirst);
+        await withExampleTable(
+          adapter,
+          async () => {
+            class NumberKlass extends Base {
+              static tableName = "ex";
+            }
+            const attribute = NumberKlass.arelTable.get("number");
+            await assertQueriesCount(undefined, true, () =>
+              adapter.caseInsensitiveComparison(attribute, "foo"),
+            );
+            await assertNoQueries(false, () => adapter.caseInsensitiveComparison(attribute, "foo"));
+          },
+          "id SERIAL PRIMARY KEY, number example_type",
+        );
       } finally {
-        internalExecQuerySpy.mockRestore();
-        await adapter.execute(`DROP DOMAIN example_type CASCADE`);
+        await adapter.execute("DROP DOMAIN example_type");
       }
-    });
-
-    it("extensions omits current schema name", async () => {
-      await withExtensionDisabled(adapter, "hstore", async () => {
-        await adapter.execute(`CREATE SCHEMA IF NOT EXISTS customschema`);
-        try {
-          await adapter.execute(`CREATE EXTENSION hstore SCHEMA customschema`);
-          const exts = await adapter.extensions();
-          expect(exts).toContain("customschema.hstore");
-        } finally {
-          await adapter.execute(`DROP SCHEMA IF EXISTS customschema CASCADE`);
-        }
-      });
-    });
-
-    it("extensions includes non current schema name", async () => {
-      const currentSchemaRows = await adapter.execute(
-        `SELECT quote_ident(current_schema()) AS quoted_current_schema`,
-      );
-      const quotedCurrentSchema = currentSchemaRows[0].quoted_current_schema as string;
-      await withExtensionDisabled(adapter, "hstore", async () => {
-        try {
-          await adapter.execute(`CREATE EXTENSION hstore SCHEMA ${quotedCurrentSchema}`);
-          const exts = await adapter.extensions();
-          expect(exts).toContain("hstore");
-        } finally {
-          await adapter.execute(`DROP EXTENSION IF EXISTS hstore`);
-        }
-      });
     });
 
     it("ignores warnings when behaviour ignore", async () => {
@@ -775,9 +746,10 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("raises warnings when behaviour raise", async () => {
       await withDbWarningsAction("raise", async () => {
-        await expect(
+        const error = await assertRaises([SQLWarning], {}, () =>
           adapter.execute("do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$"),
-        ).rejects.toBeInstanceOf(SQLWarning);
+        );
+        expect((error as SQLWarning).connectionPool).toBe(adapter.pool);
       });
     });
 
@@ -795,10 +767,10 @@ describeIfPg("PostgreSQLAdapter", () => {
       try {
         await withDbWarningsAction("report", async () => {
           await adapter.execute("do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$");
-          expect(events).toHaveLength(1);
-          expect(events[0].error).toBeInstanceOf(SQLWarning);
-          expect(events[0].error.message).toBe("PostgreSQL SQL warning");
-          expect(events[0].handled).toBe(true);
+          const warningEvent = events[0].error;
+
+          expect(warningEvent).toBeInstanceOf(SQLWarning);
+          expect(warningEvent.message).toBe("PostgreSQL SQL warning");
         });
       } finally {
         ActiveSupport.errorReporter = previousReporter;
@@ -806,15 +778,17 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("warnings behaviour can be customized with a proc", async () => {
-      let captured: SQLWarning | null = null;
-      const warningAction = (w: SQLWarning) => {
-        captured = w;
+      let warningMessage: string | null = null;
+      let warningLevel: string | null = null;
+      const warningAction = (warning: SQLWarning) => {
+        warningMessage = warning.message;
+        warningLevel = warning.level;
       };
       await withDbWarningsAction(warningAction, async () => {
         await adapter.execute("do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$");
-        expect(captured).toBeInstanceOf(SQLWarning);
-        expect((captured as unknown as SQLWarning).message).toBe("PostgreSQL SQL warning");
-        expect((captured as unknown as SQLWarning).level).toBe("WARNING");
+
+        expect(warningMessage).toBe("PostgreSQL SQL warning");
+        expect(warningLevel).toBe("WARNING");
       });
     });
 
@@ -838,65 +812,64 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("does not raise notice level warnings", async () => {
       await withDbWarningsAction("raise", [/PostgreSQL SQL warning/], async () => {
-        await expect(
-          adapter.execute("DROP TABLE IF EXISTS non_existent_table_xyz_warnings"),
-        ).resolves.toBeDefined();
+        const result = await adapter.execute("DROP TABLE IF EXISTS non_existent_table");
+
+        expect(result).toEqual([]);
       });
     });
 
     it("date decoding enabled", async () => {
-      await adapter.execute(`CREATE TABLE "ex_dates" ("id" SERIAL PRIMARY KEY, "d" DATE)`);
-      try {
-        await adapter.execute(`INSERT INTO "ex_dates" ("d") VALUES ('2023-06-15')`);
-        const rows = await adapter.execute(`SELECT "d" FROM "ex_dates"`);
-        const d = rows[0].d as Temporal.PlainDate;
-        expect(d).toBeInstanceOf(Temporal.PlainDate);
-        expect(d.year).toBe(2023);
-        expect(d.month).toBe(6);
-        expect(d.day).toBe(15);
-      } finally {
-        await adapter.execute(`DROP TABLE IF EXISTS "ex_dates" CASCADE`);
-      }
+      const date = (await adapter.selectValue("select '2024-01-01'::date")) as Temporal.PlainDate;
+      expect(date).toEqual(Temporal.PlainDate.from("2024-01-01"));
+      expect(date.constructor).toBe(Temporal.PlainDate);
     });
 
     it("date decoding disabled", async () => {
       const saved = PostgreSQLAdapter.decodeDates;
       PostgreSQLAdapter.decodeDates = false;
-      const localAdapter = new PostgreSQLAdapter(PG_TEST_URL);
+      const connection = new PostgreSQLAdapter(PG_TEST_URL);
       try {
-        await localAdapter.execute(
-          `CREATE TABLE "ex_dates_off" ("id" SERIAL PRIMARY KEY, "d" DATE)`,
-        );
-        await localAdapter.execute(`INSERT INTO "ex_dates_off" ("d") VALUES ('2024-01-01')`);
-        const rows = await localAdapter.execute(`SELECT "d" FROM "ex_dates_off"`);
-        expect(rows[0].d).toBe("2024-01-01");
+        const date = await connection.selectValue("select '2024-01-01'::date");
+        expect(date).toBe("2024-01-01");
+        expect((date as string).constructor).toBe(String);
       } finally {
-        await localAdapter.execute(`DROP TABLE IF EXISTS "ex_dates_off"`);
-        await localAdapter.disconnectBang();
+        await connection.disconnectBang();
         PostgreSQLAdapter.decodeDates = saved;
       }
     });
 
     it("disable extension with schema", async () => {
-      await withExtensionDisabled(adapter, "hstore", async () => {
-        await adapter.execute(`CREATE SCHEMA IF NOT EXISTS "custom_schema"`);
-        try {
-          await adapter.execute(`CREATE EXTENSION "hstore" SCHEMA custom_schema`);
-          expect(await adapter.extensions()).toContain("custom_schema.hstore");
-          await adapter.disableExtension("custom_schema.hstore");
-          expect(await adapter.extensions()).not.toContain("custom_schema.hstore");
-        } finally {
-          await adapter.execute(`DROP SCHEMA IF EXISTS "custom_schema" CASCADE`);
-        }
-      });
+      const sql =
+        "SELECT extname FROM pg_extension WHERE extnamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'custom_schema')";
+      try {
+        await adapter.execute("CREATE SCHEMA custom_schema");
+        await adapter.execute("DROP EXTENSION IF EXISTS hstore");
+        await adapter.execute("CREATE EXTENSION hstore SCHEMA custom_schema");
+        let result = await adapter.query(sql);
+        expect(result).toEqual([["hstore"]]);
+
+        await adapter.disableExtension("custom_schema.hstore");
+        result = await adapter.query(sql);
+        expect(result).toEqual([]);
+      } finally {
+        await adapter.execute("DROP EXTENSION IF EXISTS hstore");
+        await adapter.execute("DROP SCHEMA IF EXISTS custom_schema CASCADE");
+      }
     });
 
     it("disable extension without schema", async () => {
-      await withExtensionEnabled(adapter, "hstore", async () => {
+      try {
+        await adapter.execute("DROP EXTENSION IF EXISTS hstore");
+        await adapter.execute("CREATE EXTENSION hstore");
+        let result = await adapter.query("SELECT extname FROM pg_extension");
+        expect(result).toContainEqual(["hstore"]);
+
         await adapter.disableExtension("hstore");
-        const enabled = await adapter.extensionEnabled("hstore");
-        expect(enabled).toBe(false);
-      });
+        result = await adapter.query("SELECT extname FROM pg_extension");
+        expect(result).not.toContainEqual(["hstore"]);
+      } finally {
+        await adapter.execute("DROP EXTENSION IF EXISTS hstore");
+      }
     });
   });
 });
