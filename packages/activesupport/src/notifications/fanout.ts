@@ -279,7 +279,7 @@ export class Fanout {
 
   inspect(): string {
     const totalPatterns = this.stringSubscribers.size + this.otherSubscribers.length;
-    return `#<ActiveSupport::Notifications::Fanout (${totalPatterns} patterns)>`;
+    return `#<${this.constructor.name} (${totalPatterns} patterns)>`;
   }
 
   subscribe(

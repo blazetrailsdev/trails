@@ -352,7 +352,7 @@ describe("InspectTest", () => {
   afterEach(teardownTestCase);
 
   it("inspect output is small", () => {
-    const expected = "#<ActiveSupport::Notifications::Fanout (2 patterns)>";
+    const expected = "#<Fanout (2 patterns)>";
     expect(notifier.inspect()).toBe(expected);
   });
 });
