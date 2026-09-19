@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import "../index.js";
+import { assertRaises } from "@blazetrails/activesupport";
+import { ArgumentError } from "@blazetrails/activemodel";
 import { fixtures } from "../test-fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
 
@@ -19,14 +21,22 @@ describe("AndTest", () => {
 
   it("and with non relation attribute", async () => {
     const hash = { id: 123 };
-    expect(() => Author.and(hash as any)).toThrow(
+    const error = await assertRaises([ArgumentError], {}, () => {
+      Author.and(hash as any);
+    });
+
+    expect(error.message).toBe(
       "You have passed Hash object to #and. Pass an ActiveRecord::Relation object instead.",
     );
   });
 
   it("and with structurally incompatible scope", async () => {
     const postsScope = Author.unscope("order").limit(10).offset(10).select("id").order("id");
-    expect(() => Author.limit(10).select("id").order("name").and(postsScope)).toThrow(
+    const error = await assertRaises([ArgumentError], {}, () => {
+      Author.limit(10).select("id").order("name").and(postsScope);
+    });
+
+    expect(error.message).toBe(
       "Relation passed to #and must be structurally compatible. Incompatible values: [:order, :offset]",
     );
   });

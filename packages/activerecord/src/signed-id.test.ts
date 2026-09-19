@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { travel, travelBack } from "@blazetrails/activesupport";
+import { assertRaises, travel, travelBack } from "@blazetrails/activesupport";
 import { Base, RecordNotFound, registerModel } from "./index.js";
 import { UnknownPrimaryKey } from "./errors.js";
 import { Account } from "./test-helpers/models/account.js";
@@ -70,9 +70,10 @@ describe("SignedIdTest", () => {
   });
 
   it("find signed record raises UnknownPrimaryKey when a model has no primary key", async () => {
-    await expect(Matey.findSigned("this will not be even verified")).rejects.toThrow(
-      UnknownPrimaryKey,
+    const error = await assertRaises([UnknownPrimaryKey], {}, () =>
+      Matey.findSigned("this will not be even verified"),
     );
+    expect(error.message).toBe("Unknown primary key for table mateys in model Matey.");
   });
 
   it("find signed record with a bang", async () => {
@@ -221,7 +222,7 @@ describe("SignedIdTest", () => {
 
   it("always output url_safe", async () => {
     const signedId = (account as any).signedId({ purpose: "~~~~~~~~~" });
-    expect(signedId.includes("+")).toBe(false);
+    expect(signedId.includes("+")).toBeFalsy();
   });
 
   it("use a custom verifier", async () => {

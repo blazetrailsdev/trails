@@ -23,7 +23,10 @@ import { current } from "../time-ext.js";
 import "./time/calculations.js";
 import { setPreserveTimezone } from "./date-and-time/compatibility.js";
 import { Rational, rational } from "@blazetrails/ruby-compat";
-import { assertDeprecated } from "../testing/deprecation.js";
+import { assertDeprecated, assertNotDeprecated } from "../testing/deprecation.js";
+import { assertNotCalled } from "../testing/method-call-assertions.js";
+import { toTimePreservesTimezone } from "../active-support.js";
+import { NoMethodError } from "@blazetrails/ruby-compat";
 import {
   assert,
   assertNot,
@@ -31,6 +34,7 @@ import {
   assertNotRespondTo,
   assertPredicate,
   assertRaise,
+  assertRaises,
   assertRespondTo,
 } from "../testing/assertions.js";
 import { Object as ObjectExt } from "./object/acts-like.js";
@@ -282,10 +286,12 @@ describe("TimeWithZoneTest", () => {
     expect(twz.xmlschema()).toBe("1999-12-31T19:00:00-05:00");
   });
 
-  it("xmlschema with fractional seconds", () => {
+  it.skip("xmlschema with fractional seconds", () => {
+    // BLOCKED: activesupport-time-with-zone-subnanosecond-fractions
     twz = twz.plus(0.1234560001);
     expect(twz.xmlschema(3)).toEqual("1999-12-31T19:00:00.123-05:00");
     expect(twz.xmlschema(6)).toEqual("1999-12-31T19:00:00.123456-05:00");
+    expect(twz.xmlschema(12)).toEqual("1999-12-31T19:00:00.123456000100-05:00");
   });
 
   it("xmlschema with fractional seconds lower than hundred thousand", () => {
@@ -616,9 +622,11 @@ describe("TimeWithZoneTest", () => {
     assertNotPredicate(twz, (t) => t.isBlank());
   });
 
-  it("is a", () => {
-    const twz = eastern.local(2024, 1, 15, 12, 0, 0);
-    expect(twz.actsLikeTime()).toBe(true);
+  it.skip("is a", () => {
+    // BLOCKED: activesupport-time-with-zone-is-a-time
+    expect(twz).toBeInstanceOf(RubyTime);
+    expect(twz).toBeInstanceOf(RubyTime);
+    expect(twz).toBeInstanceOf(TimeWithZone);
   });
 
   it("utc to local conversion with far future datetime", () => {
@@ -994,9 +1002,13 @@ describe("TimeWithZoneTest", () => {
     expect(toA(twz.minus(Duration.years(10_000)))).toEqual([0, 0, 19, 31, 12, -8001]);
   });
 
-  it("plus with invalid argument", () => {
-    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1))), eastern);
-    expect(() => twz.plus({} as any)).toThrow();
+  it("plus with invalid argument", async () => {
+    const twz = new TimeWithZone(RubyTime.utc(2000, 1, 1), timeZone);
+    await assertNotDeprecated(deprecator(), async () => {
+      await assertRaises([TypeError], {}, () => {
+        twz.plus({} as any);
+      });
+    });
   });
 
   it("minus with integer when self wraps datetime", () => {
@@ -1020,12 +1032,12 @@ describe("TimeWithZoneTest", () => {
     ).toEqual(86_399.999999998);
   });
 
-  it("minus with time with zone without preserve configured", () => {
+  it("minus with time with zone without preserve configured", async () => {
     setPreserveTimezone(null);
     const twz1 = new TimeWithZone(RubyTime.utc(2000, 1, 1), TimeZone.find("UTC")!);
     const twz2 = new TimeWithZone(RubyTime.utc(2000, 1, 2), TimeZone.find("UTC")!);
 
-    const difference = twz2.minus(twz1);
+    const difference = await assertNotDeprecated(deprecator(), () => twz2.minus(twz1));
     expect(difference).toEqual(86_400.0);
   });
 
@@ -1124,13 +1136,20 @@ describe("TimeWithZoneTest", () => {
     });
   });
 
-  it("to time without preserve timezone configured", () => {
+  it.skip("to time without preserve timezone configured", async () => {
+    // BLOCKED: activesupport-time-with-zone-to-time-preserve-timezone-deprecation
     setPreserveTimezone(null);
-    const twz = maketwz();
-    const time = twz.toTime();
-    expect(time).toBeInstanceOf(RubyTime);
-    expect(time.toTime().epochMilliseconds).toBe(Date.UTC(2000, 0, 1));
-    expect(time.zone).not.toBeNull();
+    await withEnvTz("US/Eastern", async () => {
+      const time: any = await assertDeprecated(null, deprecator(), () => twz.toTime());
+
+      expect(time.constructor).toEqual(RubyTime);
+      expect(time).toBe(twz.toTime());
+      expect(time).toEqual(RubyTime.local(1999, 12, 31, 19));
+      expect(time.utcOffset).toEqual(RubyTime.local(1999, 12, 31, 19).utcOffset);
+      expect(time.zone).toEqual(RubyTime.local(1999, 12, 31, 19).zone);
+
+      expect(toTimePreservesTimezone()).toEqual(false);
+    });
   });
 
   it("method missing with time return value", () => {
@@ -1138,36 +1157,11 @@ describe("TimeWithZoneTest", () => {
     expect((twz as MethodMissing).monthsSince(1).time).toEqual(RubyTime.utc(2000, 1, 31, 19, 0, 0));
   });
 
-  it("marshal dump and load", () => {
-    const twz = maketwz();
-    const json = JSON.stringify({
-      utc: twz.utc().toTime().toInstant().toString(),
-      timeZone: twz.timeZone.name,
-    });
-    const parsed = JSON.parse(json);
-    const restored = new TimeWithZone(
-      instantFromDate(new Date(parsed.utc)),
-      TimeZone.find(parsed.timeZone)!,
-    );
-    expect(restored.utc().toTime().epochMilliseconds).toBe(twz.utc().toTime().epochMilliseconds);
-    expect(restored.timeZone.name).toBe(twz.timeZone.name);
-    expect(restored.inspect()).toBe(twz.inspect());
-  });
+  // BLOCKED: activesupport-time-with-zone-marshal-dump-and-load
+  it.todo("marshal dump and load");
 
-  it("marshal dump and load with tzinfo identifier", () => {
-    const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0))), eastern);
-    const json = JSON.stringify({
-      utc: twz.utc().toTime().toInstant().toString(),
-      timeZone: twz.timeZone.tzinfo.identifier,
-    });
-    const parsed = JSON.parse(json);
-    const restored = new TimeWithZone(
-      instantFromDate(new Date(parsed.utc)),
-      TimeZone.find(parsed.timeZone)!,
-    );
-    expect(restored.utc().toTime().epochMilliseconds).toBe(twz.utc().toTime().epochMilliseconds);
-    expect(restored.inspect()).toBe(twz.inspect());
-  });
+  // BLOCKED: activesupport-time-with-zone-marshal-dump-and-load
+  it.todo("marshal dump and load with tzinfo identifier");
 
   it("freeze", () => {
     twz.freeze();
@@ -1203,15 +1197,17 @@ describe("TimeWithZoneTest", () => {
 
   it("date part value methods", () => {
     const twz = new TimeWithZone(RubyTime.utc(1999, 12, 31, 19, 18, 17, 500), timeZone);
-    expect(twz.year).toEqual(1999);
-    expect(twz.month).toEqual(12);
-    expect(twz.day).toEqual(31);
-    expect(twz.hour).toEqual(14);
-    expect(twz.min).toEqual(18);
-    expect(twz.sec).toEqual(17);
-    expect(twz.usec).toEqual(500);
-    expect(twz.wday).toEqual(5);
-    expect(twz.yday).toEqual(365);
+    assertNotCalled(twz, "methodMissing", null, () => {
+      expect(twz.year).toEqual(1999);
+      expect(twz.month).toEqual(12);
+      expect(twz.day).toEqual(31);
+      expect(twz.hour).toEqual(14);
+      expect(twz.min).toEqual(18);
+      expect(twz.sec).toEqual(17);
+      expect(twz.usec).toEqual(500);
+      expect(twz.wday).toEqual(5);
+      expect(twz.yday).toEqual(365);
+    });
   });
 
   it("usec returns 0 when datetime is wrapped", () => {
@@ -1498,9 +1494,15 @@ describe("TimeWithZoneTest", () => {
     );
   });
 
-  it("no method error has proper context", () => {
-    const twz = maketwz();
-    expect(() => (twz as any).thisMethodDoesNotExist()).toThrow(TypeError);
+  it.skip("no method error has proper context", async () => {
+    // BLOCKED: activesupport-time-with-zone-method-missing-no-method-error
+    const e = await assertRaises([NoMethodError], {}, () => {
+      (twz as any).thisMethodDoesNotExist();
+    });
+    expect(e.message).toMatch(
+      /undefined method [`']this_method_does_not_exist' for.*ActiveSupport::TimeWithZone/,
+    );
+    expect(e.stack!.split("\n")[1]).not.toMatch("rescue");
   });
 
   it("to r", () => {

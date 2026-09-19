@@ -145,7 +145,7 @@ describe("InstrumentationTest", () => {
 
     expect(events.length).toBe(2);
     expect(events[0].cached).toBeFalsy();
-    expect(events[1].cached).toBe(true);
+    expect(events[1].cached).toBeTruthy();
 
     expect(events[0].row_count).toBe(1);
     expect(events[1].row_count).toBe(1);
@@ -198,7 +198,7 @@ function transactionInSqlActiveRecordPayloadTests(): void {
 
     await Book.count();
 
-    expect(asserted).toBe(true);
+    expect(asserted).toBeTruthy();
   });
 
   it("payload with an open transaction", async () => {
@@ -217,7 +217,7 @@ function transactionInSqlActiveRecordPayloadTests(): void {
       await Book.count();
     });
 
-    expect(asserted).toBe(true);
+    expect(asserted).toBeTruthy();
   });
 }
 

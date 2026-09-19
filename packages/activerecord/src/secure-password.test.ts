@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { User } from "./test-helpers/models/user.js";
 import { SecurePassword } from "@blazetrails/activemodel";
+import { assertCalledWith, assertInDelta } from "@blazetrails/activesupport";
 import { assertNoQueries } from "./testing/query-assertions.js";
 import { fixtures } from "./test-fixtures.js";
 
@@ -36,65 +37,53 @@ describe("SecurePasswordTest", () => {
   });
 
   it("authenticate_by authenticates when password is correct", async () => {
-    expect(
-      (await (User as any).authenticateBy({ token: user.token, password: user.password }))?.id,
-    ).toBe(user.id);
+    expect((await User.authenticateBy({ token: user.token, password: user.password }))?.id).toBe(
+      user.id,
+    );
   });
 
   it("authenticate_by does not authenticate when password is incorrect", async () => {
-    expect(await (User as any).authenticateBy({ token: user.token, password: "wrong" })).toBeNull();
+    expect(await User.authenticateBy({ token: user.token, password: "wrong" })).toBeNull();
   });
 
   it("authenticate_by takes the same amount of time regardless of whether record is found", async () => {
-    await (User as any).authenticateBy({ token: user.token, password: user.password });
-    await (User as any).authenticateBy({ token: "wrong", password: user.password });
+    await User.authenticateBy({ token: user.token, password: user.password });
 
     await retryFlakyTest(async () => {
-      const SAMPLES = 8;
-      let foundCorrectMs = Infinity;
-      let wrongPasswordMs = Infinity;
-      let notFoundMs = Infinity;
-      for (let i = 0; i < SAMPLES; i++) {
+      let foundAverageTimeInMs = 0;
+      for (let i = 0; i < 1000; i++) {
         const t0 = performance.now();
-        expect(
-          (await (User as any).authenticateBy({ token: user.token, password: user.password }))?.id,
-        ).toBe(user.id);
-        foundCorrectMs = Math.min(foundCorrectMs, performance.now() - t0);
-
-        const t1 = performance.now();
-        expect(
-          await (User as any).authenticateBy({ token: user.token, password: "wrong" }),
-        ).toBeNull();
-        wrongPasswordMs = Math.min(wrongPasswordMs, performance.now() - t1);
-
-        const t2 = performance.now();
-        expect(
-          await (User as any).authenticateBy({ token: "wrong", password: user.password }),
-        ).toBeNull();
-        notFoundMs = Math.min(notFoundMs, performance.now() - t2);
+        await User.authenticateBy({ token: user.token, password: user.password });
+        foundAverageTimeInMs += (performance.now() - t0) / 1000;
       }
 
-      expect(notFoundMs).toBeGreaterThan(foundCorrectMs * 0.3);
-      expect(notFoundMs).toBeGreaterThan(wrongPasswordMs * 0.3);
+      let notFoundAverageTimeInMs = 0;
+      for (let i = 0; i < 1000; i++) {
+        const t0 = performance.now();
+        await User.authenticateBy({ token: "wrong", password: user.password });
+        notFoundAverageTimeInMs += (performance.now() - t0) / 1000;
+      }
+
+      assertInDelta(foundAverageTimeInMs, notFoundAverageTimeInMs, 0.5);
     });
-  });
+  }, 120_000);
 
   it("authenticate_by short circuits when password is nil", async () => {
     await assertNoQueries(false, async () => {
-      expect(await (User as any).authenticateBy({ token: user.token, password: null })).toBeNull();
+      expect(await User.authenticateBy({ token: user.token, password: null })).toBeNull();
     });
   });
 
   it("authenticate_by short circuits when password is an empty string", async () => {
     await assertNoQueries(false, async () => {
-      expect(await (User as any).authenticateBy({ token: user.token, password: "" })).toBeNull();
+      expect(await User.authenticateBy({ token: user.token, password: "" })).toBeNull();
     });
   });
 
   it("authenticate_by finds record using multiple attributes", async () => {
     expect(
       (
-        await (User as any).authenticateBy({
+        await User.authenticateBy({
           token: user.token,
           auth_token: user.auth_token,
           password: user.password,
@@ -102,7 +91,7 @@ describe("SecurePasswordTest", () => {
       )?.id,
     ).toBe(user.id);
     expect(
-      await (User as any).authenticateBy({
+      await User.authenticateBy({
         token: user.token,
         auth_token: "wrong",
         password: user.password,
@@ -113,7 +102,7 @@ describe("SecurePasswordTest", () => {
   it("authenticate_by authenticates using multiple passwords", async () => {
     expect(
       (
-        await (User as any).authenticateBy({
+        await User.authenticateBy({
           token: user.token,
           password: user.password,
           recovery_password: user.recovery_password,
@@ -121,7 +110,7 @@ describe("SecurePasswordTest", () => {
       )?.id,
     ).toBe(user.id);
     expect(
-      await (User as any).authenticateBy({
+      await User.authenticateBy({
         token: user.token,
         password: user.password,
         recovery_password: "wrong",
@@ -130,26 +119,42 @@ describe("SecurePasswordTest", () => {
   });
 
   it("authenticate_by requires at least one password", async () => {
-    await expect((User as any).authenticateBy({ token: user.token })).rejects.toThrow();
+    await expect(User.authenticateBy({ token: user.token })).rejects.toThrow();
   });
 
   it("authenticate_by requires at least one attribute", async () => {
-    await expect((User as any).authenticateBy({ password: user.password })).rejects.toThrow();
+    await expect(User.authenticateBy({ password: user.password })).rejects.toThrow();
   });
 
   it("authenticate_by accepts any object that implements to_h", async () => {
-    expect(
-      (
-        await (User as any).authenticateBy({
-          toH: () => ({ token: user.token, password: user.password }),
-        })
-      )?.id,
-    ).toBe(user.id);
+    const params = {
+      toH: (): Record<string, unknown> => {
+        throw new Error("must access via to_h");
+      },
+    };
 
-    expect(
-      await (User as any).authenticateBy({
-        toH: () => ({ token: "wrong", password: user.password }),
-      }),
-    ).toBeNull();
+    let found: Promise<unknown> | undefined;
+    assertCalledWith(
+      params,
+      "toH",
+      [],
+      { returns: { token: user.token, password: user.password } },
+      () => {
+        found = User.authenticateBy(params);
+      },
+    );
+    expect(((await found) as User | null)?.id).toBe(user.id);
+
+    let notFound: Promise<unknown> | undefined;
+    assertCalledWith(
+      params,
+      "toH",
+      [],
+      { returns: { token: "wrong", password: user.password } },
+      () => {
+        notFound = User.authenticateBy(params);
+      },
+    );
+    expect(await notFound).toBeNull();
   });
 });

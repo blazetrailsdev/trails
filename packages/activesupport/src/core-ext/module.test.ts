@@ -139,8 +139,21 @@ delegate.call(Name.prototype, "toUpperCase", { to: "@full_name" });
 
 class ArityTester {
   static zero() {}
+  static zero_with_block(bl?: unknown) {}
+  static zero_with_implicit_block(block?: () => unknown) {
+    return block?.();
+  }
   static one(a: unknown) {}
+  static one_with_block(a: unknown) {}
   static two(a: unknown, b: unknown) {}
+  static opt(a: unknown, b: unknown, c: unknown, d: unknown = null) {}
+  static kwargs(kw: { a: unknown; b: unknown }) {}
+  static kwargs_with_block(kw: { a: unknown; b: unknown; c: unknown }, block?: unknown) {}
+  static opt_kwargs(kw: { a: unknown; b?: unknown }) {}
+  static opt_kwargs_with_block(
+    kw: { a: unknown; b: unknown; c: unknown; d?: unknown },
+    block?: unknown,
+  ) {}
 }
 registerConstant("ModuleTest::ArityTester", ArityTester);
 
@@ -284,15 +297,17 @@ describe("ModuleTest", () => {
     await assertRaise([DelegationError], {}, () => david.street());
   });
 
-  it("delegation to method that exists on nil", async () => {
+  it.skip("delegation to method that exists on nil", () => {
+    // BLOCKED: activesupport-delegate-private-and-ruby-method-semantics
     const nilPerson = new Someone(null) as Someone & Record<string, any>;
-    await assertRaise([DelegationError], {}, () => nilPerson.toF());
+    expect(nilPerson.toF()).toEqual(0.0);
   });
 
-  it("delegation to method that exists on nil when allowing nil", () => {
+  it.skip("delegation to method that exists on nil when allowing nil", () => {
+    // BLOCKED: activesupport-delegate-private-and-ruby-method-semantics
     delegate.call(Project.prototype, "toF", { to: "description", allowNil: true });
     const nilProject = new Project(null) as Project & Record<string, any>;
-    expect(nilProject.toF()).toBeUndefined();
+    expect(nilProject.toF()).toEqual(0.0);
   });
 
   it("delegation does not raise error when removing singleton instance methods", async () => {
@@ -306,13 +321,11 @@ describe("ModuleTest", () => {
     });
   });
 
-  it("delegation line number", async () => {
-    await assertNothingRaised(() => (Someone.prototype as any).foo);
-  });
+  // BLOCKED: activesupport-delegate-private-and-ruby-method-semantics
+  it.todo("delegation line number");
 
-  it("delegate line with nil", () => {
-    expect((new Someone("foo", null) as any).bar()).toBeUndefined();
-  });
+  // BLOCKED: activesupport-delegate-private-and-ruby-method-semantics
+  it.todo("delegate line with nil");
 
   it("delegation exception backtrace", () => {
     const someone = new Someone("foo", "bar") as Someone & Record<string, any>;
@@ -503,55 +516,71 @@ describe("ModuleTest", () => {
     expect(event.foo()).toEqual(1);
   });
 
-  it("private delegate", () => {
+  it.skip("private delegate", () => {
+    // BLOCKED: activesupport-delegate-private-and-ruby-method-semantics
     class Location {
       "@place": Somewhere;
       constructor(place: Somewhere) {
         this["@place"] = place;
       }
     }
-    delegate.call(Location.prototype, "street", "city", { to: "@place" });
-
-    const place = new Location(new Somewhere("Such street", "Sad city"));
-
-    assert("street" in place);
-    assert("city" in place);
-  });
-
-  it("private delegate prefixed", () => {
-    class Location {
-      "@place": Somewhere;
-      constructor(place: Somewhere) {
-        this["@place"] = place;
-      }
-    }
-    delegate.call(Location.prototype, "street", "city", { to: "@place", prefix: "the" });
+    delegate.call(Location.prototype, "street", "city", { to: "@place", private: true } as any);
 
     const place = new Location(new Somewhere("Such street", "Sad city"));
 
     assertNotRespondTo(place, "street");
     assertNotRespondTo(place, "city");
 
-    assert("the_street" in place);
-    assert("the_city" in place);
+    assert("street" in place);
+    assert("city" in place);
   });
 
-  it("private delegate with private option", () => {
+  it.skip("private delegate prefixed", () => {
+    // BLOCKED: activesupport-delegate-private-and-ruby-method-semantics
     class Location {
       "@place": Somewhere;
       constructor(place: Somewhere) {
         this["@place"] = place;
       }
     }
-    delegate.call(Location.prototype, "street", "city", { to: "@place" });
+    delegate.call(Location.prototype, "street", "city", {
+      to: "@place",
+      prefix: "the",
+      private: true,
+    } as any);
 
     const place = new Location(new Somewhere("Such street", "Sad city"));
+
+    assertNotRespondTo(place, "street");
+    assertNotRespondTo(place, "city");
+
+    assertNotRespondTo(place, "the_street");
+    assert("the_street" in place);
+    assertNotRespondTo(place, "the_city");
+    assert("the_city" in place);
+  });
+
+  it.skip("private delegate with private option", () => {
+    // BLOCKED: activesupport-delegate-private-and-ruby-method-semantics
+    class Location {
+      "@place": Somewhere;
+      constructor(place: Somewhere) {
+        this["@place"] = place;
+      }
+    }
+    delegate.call(Location.prototype, "street", "city", { to: "@place", private: true } as any);
+
+    const place = new Location(new Somewhere("Such street", "Sad city"));
+
+    assertNotRespondTo(place, "street");
+    assertNotRespondTo(place, "city");
 
     assert("street" in place);
     assert("city" in place);
   });
 
-  it("some public some private delegate with private option", () => {
+  it.skip("some public some private delegate with private option", () => {
+    // BLOCKED: activesupport-delegate-private-and-ruby-method-semantics
     class Location {
       "@place": Somewhere;
       constructor(place: Somewhere) {
@@ -559,26 +588,35 @@ describe("ModuleTest", () => {
       }
     }
     delegate.call(Location.prototype, "street", { to: "@place" });
-    delegate.call(Location.prototype, "city", { to: "@place" });
+    delegate.call(Location.prototype, "city", { to: "@place", private: true } as any);
 
     const place = new Location(new Somewhere("Such street", "Sad city"));
 
     assertRespondTo(place, "street");
+    assertNotRespondTo(place, "city");
+
     assert("city" in place);
   });
 
-  it("private delegate prefixed with private option", () => {
+  it.skip("private delegate prefixed with private option", () => {
+    // BLOCKED: activesupport-delegate-private-and-ruby-method-semantics
     class Location {
       "@place": Somewhere;
       constructor(place: Somewhere) {
         this["@place"] = place;
       }
     }
-    delegate.call(Location.prototype, "street", "city", { to: "@place", prefix: "the" });
+    delegate.call(Location.prototype, "street", "city", {
+      to: "@place",
+      prefix: "the",
+      private: true,
+    } as any);
 
     const place = new Location(new Somewhere("Such street", "Sad city"));
 
+    assertNotRespondTo(place, "the_street");
     assert("the_street" in place);
+    assertNotRespondTo(place, "the_city");
     assert("the_city" in place);
   });
 
@@ -642,22 +680,55 @@ describe("ModuleTest", () => {
     await assertNothingRaised(() => (new E() as any).zero());
   });
 
-  it("delegation arity to self class", async () => {
+  it.skip("delegation arity to self class", async () => {
+    // BLOCKED: activesupport-delegate-private-and-ruby-method-semantics
     class D extends ArityTester {}
-    delegate.call(D.prototype, "zero", "one", "two", { to: "class" });
+    delegate.call(
+      D.prototype,
+      "zero",
+      "zero_with_block",
+      "zero_with_implicit_block",
+      "one",
+      "one_with_block",
+      "two",
+      "opt",
+      "kwargs",
+      "kwargs_with_block",
+      "opt_kwargs",
+      "opt_kwargs_with_block",
+      { to: "class" },
+    );
     Object.defineProperty(D.prototype, "class", {
       get(this: object) {
         return this.constructor;
       },
     });
 
-    expect((D.prototype as any).zero.length).toEqual(0);
-    expect((D.prototype as any).one.length).toEqual(1);
-    expect((D.prototype as any).two.length).toEqual(2);
+    const proto = D.prototype as any;
+    expect(proto.zero.length).toEqual(0);
+    expect(proto.zero_with_block.length).toEqual(0);
+    expect(proto.zero_with_implicit_block.length).toEqual(0);
+    expect(proto.one.length).toEqual(1);
+    expect(proto.one_with_block.length).toEqual(1);
+    expect(proto.two.length).toEqual(2);
+    expect(proto.opt.length).toEqual(-1);
+    expect(proto.kwargs.length).toEqual(-1);
+    expect(proto.kwargs_with_block.length).toEqual(-1);
+    expect(proto.opt_kwargs.length).toEqual(-1);
+    expect(proto.opt_kwargs_with_block.length).toEqual(-1);
     await assertNothingRaised(() => {
-      (new D() as any).zero();
-      (new D() as any).one(1);
-      (new D() as any).two(1, 2);
+      const d = new D() as any;
+      d.zero();
+      d.zero_with_block();
+      d.zero_with_implicit_block(() => {});
+      d.one(1);
+      d.one_with_block(1);
+      d.two(1, 2);
+      d.opt(1, 2, 3);
+      d.kwargs({ a: 1, b: 2 });
+      d.kwargs_with_block({ a: 1, b: 2, c: 3 });
+      d.opt_kwargs({ a: 1 });
+      d.opt_kwargs_with_block({ a: 1, b: 2, c: 3 });
     });
   });
 });

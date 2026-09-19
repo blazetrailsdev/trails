@@ -104,8 +104,24 @@ describe("TimePrecisionTest", () => {
     ).rejects.toThrow(ArgumentError);
   });
 
-  itIfSupports("datetime_with_precision", "formatting time according to precision", () => {
-    // BLOCKED: type — PlainTime WHERE-clause quoting needed + time.to_s Rails-format comparison
+  itIfSupports("datetime_with_precision", "formatting time according to precision", async () => {
+    await adapter.createTable("foos", { force: true }, (t) => {
+      t.time("start", { precision: 0 });
+      t.time("finish", { precision: 4 });
+    });
+    const Foo = makeFoo();
+    await Foo.loadSchema();
+
+    const time = RubyTime.utc(2000, 1, 1, 12, 30, 0, 999999);
+    await Foo.createBang({ start: time, finish: time });
+
+    const foo = (await Foo.findBy({ start: time })) as any;
+    expect(foo).toBeTruthy();
+    expect(await Foo.where({ finish: time }).count()).toBe(1);
+    expect(foo.start.toString()).toBe(time.toString());
+    expect(foo.finish.toString()).toBe(time.toString());
+    expect(foo.start.usec).toBe(0);
+    expect(foo.finish.usec).toBe(999900);
   });
 
   itIfSupports("datetime_with_precision", "schema dump includes time precision", async () => {
@@ -121,8 +137,14 @@ describe("TimePrecisionTest", () => {
   itIfSupports.skipIf(adapterType !== "postgres")(
     "datetime_with_precision",
     "time precision with zero should be dumped",
-    () => {
-      // BLOCKED: adapter-pg — postgres-only test (current_adapter?(:PostgreSQLAdapter))
+    async () => {
+      await adapter.createTable("foos", { force: true }, (t) => {
+        t.time("start", { precision: 0 });
+        t.time("finish", { precision: 0 });
+      });
+      const output = await dumpTableSchema(adapter, "foos");
+      expect(output).toMatch(/t\.time\("start",\s*\{[^}]*precision:\s*0/);
+      expect(output).toMatch(/t\.time\("finish",\s*\{[^}]*precision:\s*0/);
     },
   );
 });

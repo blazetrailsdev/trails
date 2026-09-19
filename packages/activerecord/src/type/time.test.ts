@@ -1,12 +1,28 @@
 import { describe, it, expect } from "vitest";
 import { Time as RubyTime } from "@blazetrails/date";
 import { Time, Value } from "./time.js";
+import { fixtures } from "../test-fixtures.js";
+import { Topic } from "../test-helpers/models/topic.js";
 
 describe("TimeTest", () => {
-  it("default year is correct", () => {
-    const type = new Time();
-    const result = type.cast({ 4: 10, 5: 30 }) as RubyTime;
-    expect(result).toEqual(RubyTime.utc(2000, 1, 1, 10, 30, 0));
+  fixtures(["topics"]);
+
+  it("default year is correct", async () => {
+    const expectedTime = RubyTime.utc(2000, 1, 1, 10, 30, 0);
+    const topic = Topic.new({ bonus_time: { 4: 10, 5: 30 } });
+
+    expect(topic.bonus_time).toEqual(expectedTime);
+    expect(topic.bonus_time).toBeInstanceOf(RubyTime);
+
+    await topic.saveBang();
+
+    expect(topic.bonus_time).toEqual(expectedTime);
+    expect(topic.bonus_time).toBeInstanceOf(RubyTime);
+
+    await topic.reload();
+
+    expect(topic.bonus_time).toEqual(expectedTime);
+    expect(topic.bonus_time).toBeInstanceOf(RubyTime);
   });
 
   it("serialize wraps the cast time in Type::Time::Value", () => {
@@ -27,5 +43,11 @@ describe("TimeTest", () => {
     const type = new Time({ precision: 1 });
     const value = type.cast("1999-12-31T12:34:56.789-10:00") as RubyTime;
     expect(type.serialize(value)).toEqual(type.serializeCastValue(value));
+    expect(Object(type.serializeCastValue(value))).toBeInstanceOf(
+      Object(type.serialize(value)).constructor,
+    );
+    expect(Object(type.serializeCastValue(null))).toBeInstanceOf(
+      Object(type.serialize(null)).constructor,
+    );
   });
 });
