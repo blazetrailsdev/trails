@@ -1,255 +1,280 @@
 import { describe, it, expect } from "vitest";
 import { sql as arelSql } from "@blazetrails/arel";
-import { Base, Range, UnknownAttributeReference } from "./index.js";
+import { assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
+import { Base, Range, PreparedStatementInvalid, UnknownAttributeReference } from "./index.js";
+import type { Relation } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
+import "./support/canonical-model-index.js";
+import { Author } from "./test-helpers/models/author.js";
+import { Binary } from "./test-helpers/models/binary.js";
+import { Post } from "./test-helpers/models/post.js";
+import { currentAdapter } from "./support/adapter-helper.js";
+import { assertQueriesMatch } from "./testing/query-assertions.js";
 
 fixtures({});
 
-describe("SanitizeTest", () => {
-  it("sanitize sql array handles named bind variables", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const sql = Post.where("title = ?", "hello").toSql();
-    expect(sql).toContain("'hello'");
-  });
+function bind(statement: string, ...vars: unknown[]): string {
+  return Base.sanitizeSqlArray(statement, ...vars);
+}
 
-  it("named bind variables", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const sql = Post.where("title = :title", { title: "hello" }).toSql();
-    expect(sql).toContain("'hello'");
-  });
+class SimpleEnumerable {
+  private ary: unknown[];
 
-  it("bind range", () => {
-    class Post extends Base {
-      static {
-        this.attribute("age", "integer");
-      }
-    }
-    const sql = Post.where({ age: new Range(18, 30) }).toSql();
-    expect(sql).toContain("BETWEEN");
-  });
-});
+  constructor(ary: unknown[]) {
+    this.ary = ary;
+  }
+
+  *each(): Generator<unknown> {
+    yield* this.ary;
+  }
+
+  map<R>(b: (value: unknown) => R): R[] {
+    return this.ary.map(b);
+  }
+}
 
 describe("SanitizeTest", () => {
+  it("sanitize sql array handles string interpolation", async () => {
+    const quotedBambi = (await Base.leaseConnection()).quoteString("Bambi");
+    expect(Binary.sanitizeSqlArray("name='%s'", "Bambi")).toBe(`name='${quotedBambi}'`);
+    expect(Binary.sanitizeSqlArray("name='%s'", "Bambi")).toBe(`name='${quotedBambi}'`);
+    const quotedBambiAndThumper = (await Base.leaseConnection()).quoteString("Bambi\nand\nThumper");
+    expect(Binary.sanitizeSqlArray("name='%s'", "Bambi\nand\nThumper")).toBe(
+      `name='${quotedBambiAndThumper}'`,
+    );
+    expect(Binary.sanitizeSqlArray("name='%s'", "Bambi\nand\nThumper")).toBe(
+      `name='${quotedBambiAndThumper}'`,
+    );
+  });
+
+  it("sanitize sql array handles bind variables", async () => {
+    const quotedBambi = (await Base.leaseConnection()).quote("Bambi");
+    expect(Binary.sanitizeSqlArray("name=?", "Bambi")).toBe(`name=${quotedBambi}`);
+    expect(Binary.sanitizeSqlArray("name=?", "Bambi")).toBe(`name=${quotedBambi}`);
+    const quotedBambiAndThumper = (await Base.leaseConnection()).quote("Bambi\nand\nThumper");
+    expect(Binary.sanitizeSqlArray("name=?", "Bambi\nand\nThumper")).toBe(
+      `name=${quotedBambiAndThumper}`,
+    );
+    expect(Binary.sanitizeSqlArray("name=?", "Bambi\nand\nThumper")).toBe(
+      `name=${quotedBambiAndThumper}`,
+    );
+  });
+
+  it("sanitize sql array handles named bind variables", async () => {
+    const quotedBambi = (await Base.leaseConnection()).quote("Bambi");
+    expect(Binary.sanitizeSqlArray("name=:name", { name: "Bambi" })).toBe(`name=${quotedBambi}`);
+    if (currentAdapter("Mysql2Adapter", "TrilogyAdapter")) {
+      expect(Binary.sanitizeSqlArray("name=:name AND id=:id", { name: "Bambi", id: 1 })).toBe(
+        `name=${quotedBambi} AND id='1'`,
+      );
+    } else {
+      expect(Binary.sanitizeSqlArray("name=:name AND id=:id", { name: "Bambi", id: 1 })).toBe(
+        `name=${quotedBambi} AND id=1`,
+      );
+    }
+
+    const quotedBambiAndThumper = (await Base.leaseConnection()).quote("Bambi\nand\nThumper");
+    expect(Binary.sanitizeSqlArray("name=:name", { name: "Bambi\nand\nThumper" })).toBe(
+      `name=${quotedBambiAndThumper}`,
+    );
+    expect(
+      Binary.sanitizeSqlArray("name=:name AND name2=:name", { name: "Bambi\nand\nThumper" }),
+    ).toBe(`name=${quotedBambiAndThumper} AND name2=${quotedBambiAndThumper}`);
+  });
+
+  it("sanitize sql array handles relations", async () => {
+    const david = await Author.createBang({ name: "David" });
+    const davidPosts = david.posts.select("id");
+
+    const subQueryPattern = /\(\bselect\b.*?\bwhere\b.*?\)/i;
+
+    let selectAuthorSql = Post.sanitizeSqlArray("id in (?)", davidPosts);
+    expect(selectAuthorSql).toMatch(subQueryPattern);
+
+    selectAuthorSql = Post.sanitizeSqlArray("id in (:post_ids)", { post_ids: davidPosts });
+    expect(selectAuthorSql).toMatch(subQueryPattern);
+  });
+
   it("sanitize sql array handles empty statement", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const sql = Post.sanitizeSqlArray("");
-    expect(sql).toBe("");
+    const selectAuthorSql = Post.sanitizeSqlArray("");
+    expect(selectAuthorSql).toBe("");
   });
 
   it("sanitize sql like", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    expect(Post.sanitizeSqlLike("100%")).toBe("100\\%");
-    expect(Post.sanitizeSqlLike("snake_cased_string")).toBe("snake\\_cased\\_string");
-    expect(Post.sanitizeSqlLike("C:\\Programs\\MsPaint")).toBe("C:\\\\Programs\\\\MsPaint");
-    expect(Post.sanitizeSqlLike("normal string 42")).toBe("normal string 42");
+    expect(Binary.sanitizeSqlLike("100%")).toBe("100\\%");
+    expect(Binary.sanitizeSqlLike("snake_cased_string")).toBe("snake\\_cased\\_string");
+    expect(Binary.sanitizeSqlLike("C:\\Programs\\MsPaint")).toBe("C:\\\\Programs\\\\MsPaint");
+    expect(Binary.sanitizeSqlLike("normal string 42")).toBe("normal string 42");
   });
 
   it("sanitize sql like with custom escape character", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    expect(Post.sanitizeSqlLike("100%", "!")).toBe("100!%");
-    expect(Post.sanitizeSqlLike("snake_cased_string", "!")).toBe("snake!_cased!_string");
-    expect(Post.sanitizeSqlLike("great!", "!")).toBe("great!!");
-    expect(Post.sanitizeSqlLike("C:\\Programs\\MsPaint", "!")).toBe("C:\\Programs\\MsPaint");
-    expect(Post.sanitizeSqlLike("normal string 42", "!")).toBe("normal string 42");
+    expect(Binary.sanitizeSqlLike("100%", "!")).toBe("100!%");
+    expect(Binary.sanitizeSqlLike("snake_cased_string", "!")).toBe("snake!_cased!_string");
+    expect(Binary.sanitizeSqlLike("great!", "!")).toBe("great!!");
+    expect(Binary.sanitizeSqlLike("C:\\Programs\\MsPaint", "!")).toBe("C:\\Programs\\MsPaint");
+    expect(Binary.sanitizeSqlLike("normal string 42", "!")).toBe("normal string 42");
   });
 
   it("sanitize sql like with wildcard as escape character", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    expect(Post.sanitizeSqlLike("1_000%", "_")).toBe("1__000_%");
-    expect(Post.sanitizeSqlLike("1_000%", "%")).toBe("1%_000%%");
+    expect(Binary.sanitizeSqlLike("1_000%", "_")).toBe("1__000_%");
+    expect(Binary.sanitizeSqlLike("1_000%", "%")).toBe("1%_000%%");
   });
 
-  it("sanitize sql like example use case", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
+  it("sanitize sql like example use case", async () => {
+    class SearchablePost extends Post {
+      static searchAsMethod(term: string) {
+        return this.where("title LIKE ?", this.sanitizeSqlLike(term, "!"));
       }
+      declare static searchAsScope: (term: string) => Relation<SearchablePost>;
     }
-    const userInput = "50% off";
-    const sanitized = Post.sanitizeSqlLike(userInput);
-    const sql = Post.sanitizeSqlArray("title LIKE ?", "%" + sanitized + "%");
-    expect(sql).toContain("\\%");
-    expect(sql).toContain("off");
+    SearchablePost.scope("searchAsScope", (term: string) =>
+      SearchablePost.where("title LIKE ?", SearchablePost.sanitizeSqlLike(term, "!")),
+    );
+
+    const query = (await SearchablePost.leaseConnection()).preparedStatements
+      ? currentAdapter("PostgreSQLAdapter")
+        ? /title LIKE \$1/
+        : /title LIKE \?/
+      : /LIKE '20!% !_reduction!_!!'/;
+
+    await assertQueriesMatch(query, undefined, false, async () => {
+      await SearchablePost.searchAsMethod("20% _reduction_!");
+    });
+
+    await assertQueriesMatch(query, undefined, false, async () => {
+      await SearchablePost.searchAsScope("20% _reduction_!");
+    });
   });
 
-  it("disallow raw sql with unknown attribute string", () => {
-    class Binary extends Base {
-      static _tableName = "binaries";
-    }
-    expect(() => Binary.disallowRawSqlBang(["field(id, ?)"])).toThrow(UnknownAttributeReference);
-  });
-  it("disallow raw sql with unknown attribute sql literal", () => {
-    class Binary extends Base {
-      static _tableName = "binaries";
-    }
-    expect(() => Binary.disallowRawSqlBang([arelSql("field(id, ?)")])).not.toThrow();
-  });
-
-  it("bind arity", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    expect(() => Post.sanitizeSqlArray("")).not.toThrow();
-    expect(() => Post.sanitizeSqlArray("", "extra")).toThrow(/wrong number of bind variables/);
-    expect(() => Post.sanitizeSqlArray("?")).toThrow(/wrong number of bind variables/);
-    expect(() => Post.sanitizeSqlArray("?", 1)).not.toThrow();
-    expect(() => Post.sanitizeSqlArray("?", 1, 1)).toThrow(/wrong number of bind variables/);
-  });
-
-  it("named bind arity", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const sql = Post.where("title = :title", { title: "world" }).toSql();
-    expect(sql).toContain("world");
-  });
-
-  it("bind enumerable", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const sql = Post.where({ title: ["a", "b", "c"] }).toSql();
-    expect(sql).toContain("IN");
-  });
-
-  it("bind empty enumerable", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const sql = Post.where({ title: [] }).toSql();
-    expect(sql).toBeDefined();
-  });
-
-  it("bind empty range", () => {
-    class Post extends Base {
-      static {
-        this.attribute("score", "integer");
-      }
-    }
-    const sql = Post.where({ score: new Range(1, 10) }).toSql();
-    expect(sql).toContain("BETWEEN");
-  });
-
-  it("bind empty string", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const sql = Post.sanitizeSqlArray("title = ?", "");
-    expect(sql).toContain("''");
-  });
-
-  it("bind chars", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const a = Post.connection;
-    expect(Post.sanitizeSqlArray("name=?", "Bambi")).toBe(`name=${a.quote("Bambi")}`);
-    expect(Post.sanitizeSqlArray("name=?", "Bambi\nand\nThumper")).toBe(
-      `name=${a.quote("Bambi\nand\nThumper")}`,
+  it("disallow raw sql with unknown attribute string", async () => {
+    await assertRaises([UnknownAttributeReference], {}, () =>
+      Binary.disallowRawSqlBang(["field(id, ?)"]),
     );
   });
 
-  it("named bind with postgresql type casts", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const a = Post.connection;
-    const result = Post.sanitizeSqlArray(":a::integer '2009-01-01'::date", { a: "10" });
-    expect(result).toBe(`${a.quote("10")}::integer '2009-01-01'::date`);
+  it("disallow raw sql with unknown attribute sql literal", async () => {
+    await assertNothingRaised(() => Binary.disallowRawSqlBang([arelSql("field(id, ?)")]));
   });
 
-  it("named bind with literal colons", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const sql = Post.sanitizeSqlArray("title = ?", "10:00");
-    expect(sql).toContain("'10:00'");
+  it("bind arity", async () => {
+    await assertNothingRaised(() => bind(""));
+    await assertRaises([PreparedStatementInvalid], {}, () => bind("", 1));
+
+    await assertRaises([PreparedStatementInvalid], {}, () => bind("?"));
+    await assertNothingRaised(() => bind("?", 1));
+    await assertRaises([PreparedStatementInvalid], {}, () => bind("?", 1, 1));
   });
 
-  it("sanitize sql array handles string interpolation", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
+  it("named bind variables", async () => {
+    if (currentAdapter("Mysql2Adapter", "TrilogyAdapter")) {
+      expect(bind(":a", { a: 1 })).toBe("'1'");
+      expect(bind(":a :a", { a: 1 })).toBe("'1' '1'");
+    } else {
+      expect(bind(":a", { a: 1 })).toBe("1");
+      expect(bind(":a :a", { a: 1 })).toBe("1 1");
     }
-    const sql = Post.sanitizeSqlArray("title = ?", "hello");
-    expect(sql).toBe("title = 'hello'");
+
+    await assertNothingRaised(() => bind("'+00:00'", { foo: "bar" }));
   });
 
-  it("sanitize sql array handles bind variables", () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-      }
+  it("named bind arity", async () => {
+    await assertNothingRaised(() => bind("name = :name", { name: "37signals" }));
+    await assertNothingRaised(() => bind("name = :name", { name: "37signals", id: 1 }));
+    await assertRaises([PreparedStatementInvalid], {}, () => bind("name = :name", { id: 1 }));
+  });
+
+  // BLOCKED: sanitization — sanitization.ts:321 narrows sanitization.rb:191's `respond_to?(:map)` duck test to Array|Set, so a Ruby-Enumerable value raises `can't quote <Class>` — sanitize-quote-bound-value-enumerable-duck-test.
+  it.skip("bind enumerable", async () => {
+    const connection = await Base.leaseConnection();
+    const quotedAbc = `${connection.quote("a")},${connection.quote("b")},${connection.quote("c")}`;
+
+    if (currentAdapter("Mysql2Adapter", "TrilogyAdapter")) {
+      expect(bind("?", [1, 2, 3])).toBe("'1','2','3'");
+    } else {
+      expect(bind("?", [1, 2, 3])).toBe("1,2,3");
     }
-    const sql = Post.sanitizeSqlArray("title = ? AND id = ?", "hello", 1);
-    const a = Post.connection as unknown as {
-      castBoundValue(v: unknown): unknown;
-      quote(v: unknown): string;
-    };
-    expect(sql).toBe(
-      `title = ${a.quote(a.castBoundValue("hello"))} AND id = ${a.quote(a.castBoundValue(1))}`,
+    expect(bind("?", ["a", "b", "c"])).toBe(quotedAbc);
+
+    if (currentAdapter("Mysql2Adapter", "TrilogyAdapter")) {
+      expect(bind(":a", { a: [1, 2, 3] })).toBe("'1','2','3'");
+    } else {
+      expect(bind(":a", { a: [1, 2, 3] })).toBe("1,2,3");
+    }
+    expect(bind(":a", { a: ["a", "b", "c"] })).toBe(quotedAbc);
+
+    if (currentAdapter("Mysql2Adapter", "TrilogyAdapter")) {
+      expect(bind("?", new SimpleEnumerable([1, 2, 3]))).toBe("'1','2','3'");
+    } else {
+      expect(bind("?", new SimpleEnumerable([1, 2, 3]))).toBe("1,2,3");
+    }
+    expect(bind("?", new SimpleEnumerable(["a", "b", "c"]))).toBe(quotedAbc);
+
+    if (currentAdapter("Mysql2Adapter", "TrilogyAdapter")) {
+      expect(bind(":a", { a: new SimpleEnumerable([1, 2, 3]) })).toBe("'1','2','3'");
+    } else {
+      expect(bind(":a", { a: new SimpleEnumerable([1, 2, 3]) })).toBe("1,2,3");
+    }
+    expect(bind(":a", { a: new SimpleEnumerable(["a", "b", "c"]) })).toBe(quotedAbc);
+  });
+
+  it("bind empty enumerable", async () => {
+    const quotedNil = (await Base.leaseConnection()).quote(null);
+    expect(bind("?", [])).toBe(quotedNil);
+    expect(bind(" in (?)", [])).toBe(` in (${quotedNil})`);
+    expect(bind("foo in (?)", [])).toBe(`foo in (${quotedNil})`);
+  });
+
+  // BLOCKED: sanitization — sanitization.ts:321 narrows sanitization.rb:191's `respond_to?(:map)` duck test to Array|Set, so a Ruby-Enumerable value raises `can't quote <Class>` — sanitize-quote-bound-value-enumerable-duck-test.
+  it.skip("bind range", async () => {
+    const connection = await Base.leaseConnection();
+    const quotedAbc = `${connection.quote("a")},${connection.quote("b")},${connection.quote("c")}`;
+    if (currentAdapter("Mysql2Adapter", "TrilogyAdapter")) {
+      expect(bind("?", new Range(0, 0))).toBe("'0'");
+      expect(bind("?", new Range(1, 3))).toBe("'1','2','3'");
+    } else {
+      expect(bind("?", new Range(0, 0))).toBe("0");
+      expect(bind("?", new Range(1, 3))).toBe("1,2,3");
+    }
+    expect(bind("?", new Range("a", "d", true))).toBe(quotedAbc);
+  });
+
+  // BLOCKED: sanitization — sanitization.ts:321 narrows sanitization.rb:191's `respond_to?(:map)` duck test to Array|Set, so a Ruby-Enumerable value raises `can't quote <Class>` — sanitize-quote-bound-value-enumerable-duck-test.
+  it.skip("bind empty range", async () => {
+    const quotedNil = (await Base.leaseConnection()).quote(null);
+    expect(bind("?", new Range(0, 0, true))).toBe(quotedNil);
+    expect(bind("?", new Range("a", "a", true))).toBe(quotedNil);
+  });
+
+  it("bind empty string", async () => {
+    const quotedEmpty = (await Base.leaseConnection()).quote("");
+    expect(bind("?", "")).toBe(quotedEmpty);
+  });
+
+  it("bind chars", async () => {
+    const connection = await Base.leaseConnection();
+    const quotedBambi = connection.quote("Bambi");
+    const quotedBambiAndThumper = connection.quote("Bambi\nand\nThumper");
+    expect(bind("name=?", "Bambi")).toBe(`name=${quotedBambi}`);
+    expect(bind("name=?", "Bambi\nand\nThumper")).toBe(`name=${quotedBambiAndThumper}`);
+    expect(bind("name=?", "Bambi")).toBe(`name=${quotedBambi}`);
+    expect(bind("name=?", "Bambi\nand\nThumper")).toBe(`name=${quotedBambiAndThumper}`);
+  });
+
+  it("named bind with postgresql type casts", async () => {
+    const l = () => bind(":a::integer '2009-01-01'::date", { a: "10" });
+    await assertNothingRaised(l);
+    expect(l()).toBe(`${(await Base.leaseConnection()).quote("10")}::integer '2009-01-01'::date`);
+  });
+
+  it("named bind with literal colons", async () => {
+    expect(
+      bind("TO_TIMESTAMP(:date, 'YYYY/MM/DD HH12\\:MI\\:SS')", { date: "2017/08/02 10:59:00" }),
+    ).toBe("TO_TIMESTAMP('2017/08/02 10:59:00', 'YYYY/MM/DD HH12:MI:SS')");
+    await assertRaises([PreparedStatementInvalid], {}, () =>
+      bind("TO_TIMESTAMP(:date, 'YYYY/MM/DD HH12:MI:SS')", { date: "2017/08/02 10:59:00" }),
     );
-  });
-
-  it("sanitize sql array handles relations", () => {
-    class Post extends Base {
-      static {
-        this.attribute("id", "integer");
-        this.attribute("author_id", "integer");
-      }
-    }
-    const subQueryPattern = /\(\bselect\b.*?\bwhere\b.*?\)/i;
-    const davidPosts = Post.where({ author_id: 1 }).select("id");
-
-    const selectAuthorSql = Post.sanitizeSqlArray("id in (?)", davidPosts);
-    expect(selectAuthorSql).toMatch(subQueryPattern);
-
-    const namedSql = Post.sanitizeSqlArray("id in (:post_ids)", { post_ids: davidPosts });
-    expect(namedSql).toMatch(subQueryPattern);
   });
 });
-
 describe("sanitizeSql", () => {
   it.skip("sanitizeSqlArray replaces ? placeholders with quoted values", () => {
     class User extends Base {

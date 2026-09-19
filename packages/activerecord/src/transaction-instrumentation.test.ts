@@ -3,6 +3,7 @@ import { Base } from "./index.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Rollback } from "./errors.js";
 import { Notifications } from "@blazetrails/activesupport";
+import { assertEmpty, assertNot, assertSame } from "@blazetrails/activesupport";
 import type { NotificationSubscriber } from "@blazetrails/activesupport";
 import { fixtures } from "./test-fixtures.js";
 import { topicFixtureData } from "./test-helpers/fixtures/topics.js";
@@ -32,50 +33,52 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("start transaction is triggered when the transaction is materialized", async () => {
-    const startEvents: any[] = [];
+    const transactions: any[] = [];
     Notifications.subscribe("start_transaction.active_record", (event: any) => {
-      startEvents.push(event);
+      expect(event.payload.connection).toBeTruthy();
+      transactions.push(event.payload.transaction);
     });
 
-    await Topic.transaction(async () => {
-      expect(startEvents).toHaveLength(0);
+    await Topic.transaction(async (transaction) => {
+      assertEmpty(transactions);
       await topics("first").touch();
-      expect(startEvents).toHaveLength(1);
-      expect(startEvents[0].payload.connection).toBeTruthy();
+      expect(transactions).toEqual([transaction]);
     });
   });
 
   it("start transaction is not triggered for ordinary nested calls", async () => {
-    const startEvents: any[] = [];
+    const transactions: any[] = [];
     Notifications.subscribe("start_transaction.active_record", (event: any) => {
-      startEvents.push(event);
+      expect(event.payload.connection).toBeTruthy();
+      transactions.push(event.payload.transaction);
     });
 
-    await Topic.transaction(async () => {
+    await Topic.transaction(async (t1) => {
       await topics("first").touch();
-      expect(startEvents).toHaveLength(1);
+      expect(transactions).toEqual([t1]);
 
-      await Topic.transaction(async () => {
+      await Topic.transaction(async (_t2) => {
         await topics("first").touch();
-        expect(startEvents).toHaveLength(1);
+        expect(transactions).toEqual([t1]);
       });
     });
   });
 
   it("start transaction is triggered for requires new", async () => {
-    const startEvents: any[] = [];
+    const transactions: any[] = [];
     Notifications.subscribe("start_transaction.active_record", (event: any) => {
-      startEvents.push(event);
+      expect(event.payload.connection).toBeTruthy();
+      transactions.push(event.payload.transaction);
     });
 
-    await Topic.transaction(async () => {
+    await Topic.transaction(async (t1) => {
       await topics("first").touch();
-      expect(startEvents).toHaveLength(1);
+      expect(transactions).toEqual([t1]);
 
       await Topic.transaction(
-        async () => {
+        async (t2) => {
           await topics("first").touch();
-          expect(startEvents).toHaveLength(2);
+          expect(transactions).toEqual([t1, t2]);
         },
         { requiresNew: true },
       );
@@ -83,89 +86,112 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("transaction instrumentation on commit", async () => {
-    const events: any[] = [];
+    const topic = topics("fifth");
+
+    let notified = false;
+    let expectedTransaction: any = null;
+
     Notifications.subscribe("transaction.active_record", (event: any) => {
-      events.push(event);
+      expect(event.payload.connection).toBeTruthy();
+      assertSame(expectedTransaction, event.payload.transaction);
+      expect(event.payload.outcome).toBe("commit");
+      notified = true;
     });
 
-    await Topic.transaction(async () => {
-      await topics("fifth").update({ title: "Ruby on Rails" });
+    await Base.transaction(async (transaction) => {
+      expectedTransaction = transaction;
+      await topic.update({ title: "Ruby on Rails" });
     });
 
-    expect(events).toHaveLength(1);
-    expect(events[0].payload.connection).toBeTruthy();
-    expect(events[0].payload.transaction).toBeTruthy();
-    expect(events[0].payload.outcome).toBe("commit");
+    expect(notified).toBeTruthy();
   });
 
   it("transaction instrumentation on rollback", async () => {
-    const events: any[] = [];
+    const topic = topics("fifth");
+
+    let notified = false;
+    let expectedTransaction: any = null;
+
     Notifications.subscribe("transaction.active_record", (event: any) => {
-      events.push(event);
+      expect(event.payload.connection).toBeTruthy();
+      assertSame(expectedTransaction, event.payload.transaction);
+      expect(event.payload.outcome).toBe("rollback");
+      notified = true;
     });
 
-    await Topic.transaction(async () => {
-      await topics("fifth").update({ title: "Ruby on Rails" });
+    await Base.transaction(async (transaction) => {
+      expectedTransaction = transaction;
+      await topic.update({ title: "Ruby on Rails" });
       throw new Rollback();
     });
 
-    expect(events).toHaveLength(1);
-    expect(events[0].payload.connection).toBeTruthy();
-    expect(events[0].payload.transaction).toBeTruthy();
-    expect(events[0].payload.outcome).toBe("rollback");
+    expect(notified).toBeTruthy();
   });
 
   it("transaction instrumentation with savepoints", async () => {
+    const topic = topics("fifth");
+
     const events: any[] = [];
     Notifications.subscribe("transaction.active_record", (event: any) => {
       events.push(event);
     });
 
-    await Topic.transaction(async () => {
-      await topics("fifth").update({ title: "Sinatra" });
-      await Topic.transaction(
-        async () => {
-          await topics("fifth").update({ title: "Ruby on Rails" });
+    let realTransaction: any = null;
+    let savepointTransaction: any = null;
+    await Base.transaction(async (transaction) => {
+      realTransaction = transaction;
+      await topic.update({ title: "Sinatra" });
+      await Base.transaction(
+        async (transaction) => {
+          savepointTransaction = transaction;
+          await topic.update({ title: "Ruby on Rails" });
         },
         { requiresNew: true },
       );
     });
 
-    expect(events).toHaveLength(2);
+    expect(events.length).toBe(2);
     const [savepointEvent, realEvent] = events;
+
+    assertSame(savepointTransaction, savepointEvent.payload.transaction);
     expect(savepointEvent.payload.outcome).toBe("commit");
+
+    assertSame(realTransaction, realEvent.payload.transaction);
     expect(realEvent.payload.outcome).toBe("commit");
-    expect(savepointEvent.payload.transaction).not.toBe(realEvent.payload.transaction);
   });
 
   it("transaction instrumentation with restart parent transaction on commit", async () => {
+    const topic = topics("fifth");
+
     const events: any[] = [];
     Notifications.subscribe("transaction.active_record", (event: any) => {
       events.push(event);
     });
 
-    await Topic.transaction(async () => {
-      await Topic.transaction(
+    await Base.transaction(async () => {
+      await Base.transaction(
         async () => {
-          await topics("fifth").update({ title: "Ruby on Rails" });
+          await topic.update({ title: "Ruby on Rails" });
         },
         { requiresNew: true },
       );
     });
 
-    expect(events).toHaveLength(1);
+    expect(events.length).toBe(1);
   });
 
   it("transaction instrumentation with restart parent transaction on rollback", async () => {
+    const topic = topics("fifth");
+
     const events: any[] = [];
     Notifications.subscribe("transaction.active_record", (event: any) => {
       events.push(event);
     });
 
-    await Topic.transaction(async () => {
-      await Topic.transaction(
+    await Base.transaction(async () => {
+      await Base.transaction(
         async () => {
-          await topics("fifth").update({ title: "Ruby on Rails" });
+          await topic.update({ title: "Ruby on Rails" });
           throw new Rollback();
         },
         { requiresNew: true },
@@ -173,7 +199,7 @@ describe("TransactionInstrumentationTest", () => {
       throw new Rollback();
     });
 
-    expect(events).toHaveLength(2);
+    expect(events.length).toBe(2);
     const [restart, real] = events;
     expect(restart.payload.outcome).toBe("restart");
     expect(real.payload.outcome).toBe("rollback");
@@ -185,8 +211,8 @@ describe("TransactionInstrumentationTest", () => {
       events.push(event);
     });
 
-    await Topic.transaction(async () => {
-      await Topic.transaction(
+    await Base.transaction(async () => {
+      await Base.transaction(
         async () => {
           throw new Rollback();
         },
@@ -194,18 +220,19 @@ describe("TransactionInstrumentationTest", () => {
       );
     });
 
-    expect(events).toHaveLength(0);
+    expect(events.length).toBe(0);
   });
 
   it("transaction instrumentation with materialized restart parent transactions", async () => {
+    const topic = topics("fifth");
     const events: any[] = [];
     Notifications.subscribe("transaction.active_record", (event: any) => {
       events.push(event);
     });
 
-    await Topic.transaction(async () => {
-      await topics("fifth").update({ title: "Sinatra" });
-      await Topic.transaction(
+    await Base.transaction(async () => {
+      await topic.update({ title: "Sinatra" });
+      await Base.transaction(
         async () => {
           throw new Rollback();
         },
@@ -213,23 +240,26 @@ describe("TransactionInstrumentationTest", () => {
       );
     });
 
-    expect(events).toHaveLength(1);
-    expect(events[0].payload.outcome).toBe("commit");
+    expect(events.length).toBe(1);
+    const event = events[0];
+    expect(event.payload.outcome).toBe("commit");
   });
 
   it("transaction instrumentation with restart savepoint parent transactions", async () => {
+    const topic = topics("fifth");
+
     const events: any[] = [];
     Notifications.subscribe("transaction.active_record", (event: any) => {
       events.push(event);
     });
 
-    await Topic.transaction(async () => {
-      await topics("fifth").update({ title: "Sinatry" });
-      await Topic.transaction(
+    await Base.transaction(async () => {
+      await topic.update({ title: "Sinatry" });
+      await Base.transaction(
         async () => {
-          await Topic.transaction(
+          await Base.transaction(
             async () => {
-              await topics("fifth").update({ title: "Ruby on Rails" });
+              await topic.update({ title: "Ruby on Rails" });
               throw new Rollback();
             },
             { requiresNew: true },
@@ -239,7 +269,7 @@ describe("TransactionInstrumentationTest", () => {
       );
     });
 
-    expect(events).toHaveLength(3);
+    expect(events.length).toBe(3);
     const [restart, savepoint, real] = events;
     expect(restart.payload.outcome).toBe("restart");
     expect(savepoint.payload.outcome).toBe("commit");
@@ -247,42 +277,45 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("transaction instrumentation with restart savepoint parent transactions on commit", async () => {
+    const topic = topics("fifth");
+
     const events: any[] = [];
     Notifications.subscribe("transaction.active_record", (event: any) => {
       events.push(event);
     });
 
-    await Topic.transaction(async () => {
-      await topics("fifth").update({ title: "Sinatra" });
-      await Topic.transaction(async () => {}, { requiresNew: true });
+    await Base.transaction(async () => {
+      await topic.update({ title: "Sinatra" });
+      await Base.transaction(async () => {}, { requiresNew: true });
     });
 
-    expect(events).toHaveLength(1);
-    expect(events[0].payload.outcome).toBe("commit");
+    expect(events.length).toBe(1);
+    const event = events[0];
+    expect(event.payload.outcome).toBe("commit");
   });
 
   it("transaction instrumentation only fires if materialized", async () => {
-    const events: any[] = [];
-    Notifications.subscribe("transaction.active_record", (event: any) => {
-      events.push(event);
+    let notified = false;
+    Notifications.subscribe("transaction.active_record", () => {
+      notified = true;
     });
 
-    await Topic.transaction(async () => {});
+    await Base.transaction(async () => {});
 
-    expect(events).toHaveLength(0);
+    assertNot(notified);
   });
 
   it("transaction instrumentation only fires on rollback if materialized", async () => {
-    const events: any[] = [];
-    Notifications.subscribe("transaction.active_record", (event: any) => {
-      events.push(event);
+    let notified = false;
+    Notifications.subscribe("transaction.active_record", () => {
+      notified = true;
     });
 
-    await Topic.transaction(async () => {
+    await Base.transaction(async () => {
       throw new Rollback();
     });
 
-    expect(events).toHaveLength(0);
+    assertNot(notified);
   });
 
   it("reconnecting after materialized transaction starts new event", async () => {
@@ -290,137 +323,148 @@ describe("TransactionInstrumentationTest", () => {
     Notifications.subscribe("transaction.active_record", (event: any) => {
       events.push(event);
     });
-
     await Topic.transaction(async () => {
       await (Base.connection as any).materializeTransactions();
       await (Base.connection as any).reconnectBang({ restoreTransactions: true });
     });
 
-    expect(events).toHaveLength(2);
+    expect(events.length).toBe(2);
   });
 
   it("transaction instrumentation fires before after commit callbacks", async () => {
-    const { Topic } = makeTopic();
-    const order: string[] = [];
-
+    let notified = false;
     let afterCommitTriggered = false;
-    Topic.afterCommit(function () {
+
+    const { Topic: topicModel } = makeTopic();
+    topicModel.afterCommit(function () {
       afterCommitTriggered = true;
-      order.push("after_commit");
     });
 
     Notifications.subscribe("transaction.active_record", () => {
-      expect(afterCommitTriggered).toBe(false);
-      order.push("notification");
+      assertNot(
+        afterCommitTriggered,
+        "Transaction notification fired after the after_commit callback",
+      );
+      notified = true;
     });
 
-    await Topic.create({ title: "test" });
+    await topicModel.createBang();
 
-    expect(order).toEqual(["notification", "after_commit"]);
+    expect(notified).toBeTruthy();
+    expect(afterCommitTriggered).toBeTruthy();
   });
 
   it("transaction instrumentation fires before after rollback callbacks", async () => {
-    const { Topic } = makeTopic();
-    const order: string[] = [];
+    let notified = false;
+    let afterRollbackTriggered = false;
 
-    Topic.afterRollback(function () {
-      order.push("after_rollback");
+    const { Topic: topicModel } = makeTopic();
+    topicModel.afterRollback(function () {
+      afterRollbackTriggered = true;
     });
 
     Notifications.subscribe("transaction.active_record", () => {
-      order.push("notification");
+      assertNot(
+        afterRollbackTriggered,
+        "Transaction notification fired after the after_rollback callback",
+      );
+      notified = true;
     });
 
-    await Topic.transaction(async () => {
-      await Topic.create({ title: "test" });
+    await topicModel.transaction(async () => {
+      await topicModel.createBang();
       throw new Rollback();
     });
 
-    expect(order).toEqual(["notification", "after_rollback"]);
+    expect(notified).toBeTruthy();
+    expect(afterRollbackTriggered).toBeTruthy();
   });
 
   it("transaction instrumentation on failed commit", async () => {
-    const events: any[] = [];
-    Notifications.subscribe("transaction.active_record", (event: any) => {
-      events.push(event);
+    const topic = topics("fifth");
+
+    let notified = false;
+    Notifications.subscribe("transaction.active_record", () => {
+      notified = true;
     });
 
-    const MyError = class extends Error {};
-    const conn = Base.connection;
-    vi.spyOn(conn as any, "commitDbTransaction").mockImplementationOnce(async () => {
-      throw new MyError("commit failed");
+    const error = class extends Error {};
+    vi.spyOn(Base.connection as any, "commitDbTransaction").mockImplementationOnce(async () => {
+      throw new error();
     });
-
     await expect(
-      Topic.transaction(async () => {
-        await topics("fifth").update({ title: "Ruby on Rails" });
+      Base.transaction(async () => {
+        await topic.update({ title: "Ruby on Rails" });
       }),
-    ).rejects.toThrow(MyError);
+    ).rejects.toThrow(error);
 
-    expect(events).toHaveLength(1);
+    expect(notified).toBeTruthy();
   });
 
   it.skipIf(inMemoryDb())("transaction instrumentation on failed rollback", async () => {
-    const events: any[] = [];
+    const topic = topics("fifth");
+
+    let notified = false;
     Notifications.subscribe("transaction.active_record", (event: any) => {
-      events.push(event);
+      expect(event.payload.outcome).toBe("incomplete");
+      notified = true;
     });
 
-    const MyError = class extends Error {};
-    const conn = Base.connection;
-    vi.spyOn(conn as any, "rollbackDbTransaction").mockImplementationOnce(async () => {
-      throw new MyError("rollback failed");
+    const error = class extends Error {};
+    vi.spyOn(Base.connection as any, "rollbackDbTransaction").mockImplementationOnce(async () => {
+      throw new error();
     });
-
     await expect(
-      Topic.transaction(async () => {
-        await topics("fifth").update({ title: "Ruby on Rails" });
+      Base.transaction(async () => {
+        await topic.update({ title: "Ruby on Rails" });
         throw new Rollback();
       }),
-    ).rejects.toThrow(MyError);
+    ).rejects.toThrow(error);
 
-    expect(events).toHaveLength(1);
-    expect(events[0].payload.outcome).toBe("incomplete");
+    expect(notified).toBeTruthy();
   });
 
   it.skipIf(inMemoryDb())(
     "transaction instrumentation on failed rollback when unmaterialized",
     async () => {
-      const events: any[] = [];
-      Notifications.subscribe("transaction.active_record", (event: any) => {
-        events.push(event);
+      let notified = false;
+      Notifications.subscribe("transaction.active_record", () => {
+        notified = true;
       });
 
-      const MyError = class extends Error {};
-      const conn = Base.connection;
-      vi.spyOn((conn as any).transactionManager, "rollbackTransaction").mockImplementationOnce(
-        async () => {
-          throw new MyError("rollback failed");
-        },
-      );
-
+      const error = class extends Error {};
+      vi.spyOn(
+        (Base.connection as any).transactionManager,
+        "rollbackTransaction",
+      ).mockImplementationOnce(async () => {
+        throw new error();
+      });
       await expect(
         Topic.transaction(async () => {
           throw new Rollback();
         }),
-      ).rejects.toThrow(MyError);
-
-      expect(events).toHaveLength(0);
+      ).rejects.toThrow(error);
+      assertNot(notified);
     },
   );
 
   it("transaction instrumentation on broken subscription", async () => {
-    const MyError = class extends Error {};
-    const sub: NotificationSubscriber = Notifications.subscribe("transaction.active_record", () => {
-      throw new MyError("broken subscriber");
-    });
+    const topic = topics("fifth");
+
+    const error = class extends Error {};
+    const subscriber: NotificationSubscriber = Notifications.subscribe(
+      "transaction.active_record",
+      () => {
+        throw new error();
+      },
+    );
 
     await expect(
-      Topic.transaction(async () => {
-        await topics("fifth").update({ title: "Ruby on Rails" });
+      Base.transaction(async () => {
+        await topic.update({ title: "Ruby on Rails" });
       }),
-    ).rejects.toThrow(MyError);
+    ).rejects.toThrow(error);
 
-    Notifications.unsubscribe(sub);
+    Notifications.unsubscribe(subscriber);
   });
 });
