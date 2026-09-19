@@ -173,7 +173,7 @@ describe("RelationMergingTest", () => {
 
     const onlyDavid = Author.where(`${authorId} IN (?)`, david);
 
-    const preparedStatements = ((await Author.leaseConnection()) as any).preparedStatements;
+    const preparedStatements = (await Author.leaseConnection()).preparedStatements;
     const matcher = preparedStatements
       ? currentAdapter("PostgreSQLAdapter")
         ? new RegExp(`WHERE \\(${regexpEscape(authorId)} IN \\(\\$1\\)\\)$`)

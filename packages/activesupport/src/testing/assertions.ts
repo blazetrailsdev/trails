@@ -412,17 +412,22 @@ function findDescriptor(object: object, name: string): PropertyDescriptor | unde
 
 /** @noRailsEquivalent PERMANENT */
 export function assertEmpty(actual: unknown, message?: string): void {
-  assert(collectionSize(actual) === 0, message ?? `Expected ${inspect(actual)} to be empty`);
+  assert(isEmptyCollection(actual), message ?? `Expected ${inspect(actual)} to be empty`);
 }
 
 /** @noRailsEquivalent PERMANENT */
 export function assertNotEmpty(actual: unknown, message?: string): void {
-  assert(collectionSize(actual) !== 0, message ?? `Expected ${inspect(actual)} to not be empty`);
+  assert(!isEmptyCollection(actual), message ?? `Expected ${inspect(actual)} to not be empty`);
+}
+
+function isEmptyCollection(actual: unknown): boolean {
+  const collection = actual as { isEmpty?: () => boolean };
+  if (typeof collection?.isEmpty === "function") return collection.isEmpty();
+  return collectionSize(actual) === 0;
 }
 
 function collectionSize(actual: unknown): number {
-  const collection = actual as { length?: number; size?: number; isEmpty?: () => boolean };
-  if (typeof collection?.isEmpty === "function") return collection.isEmpty() ? 0 : 1;
+  const collection = actual as { length?: number; size?: number };
   if (typeof collection?.length === "number") return collection.length;
   if (typeof collection?.size === "number") return collection.size;
   return Object.keys(actual as object).length;
