@@ -677,7 +677,7 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
       const t = new PersonalLegacyThing({ person: p1 });
       await t.saveBang();
       await p1.reload();
-      expect(p1.personal_legacy_things_count).toBe(1);
+      expect(p1.readAttribute("personal_legacy_things_count")).toBe(1);
       expect(await p1.destroy()).toBeTruthy();
       expect(p1.isFrozen()).toBe(true);
       await assertRaises([RecordNotFound], {}, () => Person.find(p1.id));

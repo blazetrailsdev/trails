@@ -974,6 +974,7 @@ describe("TransactionCallbacksTest", () => {
   describe("CallbacksOnMultipleActionsTest", () => {
     it("after commit on multiple actions", async () => {
       class TopicWithCallbacksOnMultipleActions extends Base {
+        declare approved: boolean;
         history: string[] = [];
         static {
           this._tableName = "topics";
@@ -993,7 +994,7 @@ describe("TransactionCallbacksTest", () => {
         }
       }
 
-      const topic = new TopicWithCallbacksOnMultipleActions() as any;
+      const topic = new TopicWithCallbacksOnMultipleActions();
       await topic.save();
       expect(topic.history).toEqual(["create_and_update", "create_and_destroy"]);
 

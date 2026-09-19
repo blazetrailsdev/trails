@@ -672,8 +672,7 @@ it("subsequent pinned checkout verifies and reconnects a connection that died mi
   await pool.unpinConnectionBang();
 });
 
-it.skip("inspect does not show secrets", async () => {
-  // BLOCKED: pool-inspect-matches-rails-class-name-and-symbol-role
+it("inspect does not show secrets", async () => {
   const pool = makePool();
   expect(pool.inspect()).toMatch(
     /#<ActiveRecord::ConnectionAdapters::ConnectionPool env_name="\w+" role=:writing>/,
