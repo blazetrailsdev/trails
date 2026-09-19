@@ -53,14 +53,21 @@ describe("ReadOnlyTest", () => {
       })(),
     ).resolves.not.toThrow();
 
-    let e = await catchError(dev.save());
-    await expect(dev.save()).rejects.toThrow(ReadOnlyRecord);
+    let e = null as Error | null;
+    e = await catchError(dev.save());
+    expect(() => {
+      throw e;
+    }).toThrow(ReadOnlyRecord);
     expect(e?.message).toBe("Developer is marked as readonly");
     e = await catchError(dev.saveBang());
-    await expect(dev.saveBang()).rejects.toThrow(ReadOnlyRecord);
+    expect(() => {
+      throw e;
+    }).toThrow(ReadOnlyRecord);
     expect(e?.message).toBe("Developer is marked as readonly");
     e = await catchError(dev.destroy());
-    await expect(dev.destroy()).rejects.toThrow(ReadOnlyRecord);
+    expect(() => {
+      throw e;
+    }).toThrow(ReadOnlyRecord);
     expect(e?.message).toBe("Developer is marked as readonly");
   });
 
@@ -72,14 +79,18 @@ describe("ReadOnlyTest", () => {
     expect(dev.isReadonly()).toBeTruthy();
 
     const e = await catchError(dev.touch());
-    await expect(dev.touch()).rejects.toThrow(ReadOnlyRecord);
+    expect(() => {
+      throw e;
+    }).toThrow(ReadOnlyRecord);
     expect(e?.message).toBe("Developer is marked as readonly");
   });
 
   it("cant touch readonly column", async () => {
     const person = await Person.find(people("michael").id);
     const e = await catchError(person.touch("born_at"));
-    await expect(person.touch("born_at")).rejects.toThrow(ActiveRecordError);
+    expect(() => {
+      throw e;
+    }).toThrow(ActiveRecordError);
     expect(e?.message).toBe("born_at is marked as readonly");
   });
 
@@ -91,7 +102,9 @@ describe("ReadOnlyTest", () => {
     expect(dev.isReadonly()).toBeTruthy();
 
     const e = await catchError(dev.updateColumn("name", "New name"));
-    await expect(dev.updateColumn("name", "New name")).rejects.toThrow(ReadOnlyRecord);
+    expect(() => {
+      throw e;
+    }).toThrow(ReadOnlyRecord);
     expect(e?.message).toBe("Developer is marked as readonly");
   });
 
@@ -103,7 +116,9 @@ describe("ReadOnlyTest", () => {
     expect(dev.isReadonly()).toBeTruthy();
 
     const e = await catchError(dev.updateColumns({ name: "New name" }));
-    await expect(dev.updateColumns({ name: "New name" })).rejects.toThrow(ReadOnlyRecord);
+    expect(() => {
+      throw e;
+    }).toThrow(ReadOnlyRecord);
     expect(e?.message).toBe("Developer is marked as readonly");
   });
 
