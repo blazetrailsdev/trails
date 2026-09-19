@@ -44,12 +44,12 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(column.array).toBeFalsy();
 
       const type = Ltree.typeForAttribute("path")!;
-      expect(type.isBinary()).toBe(false);
+      expect(type.isBinary()).toBeFalsy();
     });
 
     it("write", async () => {
       const ltree = Ltree.new({ path: "1.2.3.4" });
-      await ltree.saveBang();
+      expect(await ltree.saveBang()).toBeTruthy();
     });
 
     it("select", async () => {

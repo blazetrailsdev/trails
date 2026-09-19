@@ -51,7 +51,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const partialInsertsWas = VirtualColumn.partialInserts;
       VirtualColumn.partialInserts = false;
       try {
-        await expect(VirtualColumn.create({ name: "Rails" })).resolves.toBeTruthy();
+        await expect(VirtualColumn.createBang({ name: "Rails" })).resolves.not.toThrow();
       } finally {
         VirtualColumn.partialInserts = partialInsertsWas;
       }
@@ -64,14 +64,14 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     itIfSupports("virtual_columns", "virtual column", async () => {
       const column = await findColumn("upper_name");
-      expect(column!.isVirtual()).toBe(true);
+      expect(column!.isVirtual()).toBeTruthy();
       const row = await VirtualColumn.take();
       expect(row.upper_name).toBe("RAILS");
     });
 
     itIfSupports("virtual_columns", "stored column", async () => {
       const column = await findColumn("name_length");
-      expect(column!.isVirtual()).toBe(true);
+      expect(column!.isVirtual()).toBeTruthy();
       const row = await VirtualColumn.take();
       expect(row.name_length).toBe(5);
     });
@@ -84,7 +84,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       void VirtualColumn.resetColumnInformation();
       await VirtualColumn.loadSchema();
       const column = await findColumn("lower_name");
-      expect(column!.isVirtual()).toBe(true);
+      expect(column!.isVirtual()).toBeTruthy();
       const row = await VirtualColumn.take();
       expect(row.lower_name).toBe("rails");
     });

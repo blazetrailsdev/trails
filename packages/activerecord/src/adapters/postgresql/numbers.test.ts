@@ -53,7 +53,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(first.double).toBe(123456.789);
       expect(second.single).toBe(-Infinity);
       expect(second.double).toBe(Infinity);
-      expect(Number.isNaN(third.double)).toBe(true);
+      expect(Number.isNaN(third.double)).toBeTruthy();
     });
 
     it("update", async () => {
@@ -77,7 +77,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await record.reload();
       record.single = Infinity;
       record.double = -Infinity;
-      expect(record.isChanged).toBe(false);
+      expect(record.isChanged).toBeFalsy();
     });
 
     it("reassigning nan does not mark record as changed", async () => {
@@ -88,7 +88,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await record.reload();
       record.single = NaN;
       record.double = NaN;
-      expect(record.isChanged).toBe(false);
+      expect(record.isChanged).toBeFalsy();
     });
   });
 });

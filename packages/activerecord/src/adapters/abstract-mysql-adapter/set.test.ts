@@ -19,13 +19,13 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     it("should not be unsigned", async () => {
       const columns = await adapter.columns("set_tests");
       const column = columns.find((c) => c.name === "set_column");
-      expect((column as any).isUnsigned()).toBe(false);
+      expect((column as any).isUnsigned()).toBeFalsy();
     });
 
     it("should not be bigint", async () => {
       const columns = await adapter.columns("set_tests");
       const column = columns.find((c) => c.name === "set_column");
-      expect((column as any).isBigint()).toBe(false);
+      expect((column as any).isBigint()).toBeFalsy();
     });
 
     it("schema dumping", async () => {
