@@ -627,6 +627,7 @@ export class ConnectionPool implements ReapablePool {
     size: number;
     connections: number;
     busy: number;
+    dead: number;
     idle: number;
     waiting: number;
     checkoutTimeout: number;
@@ -634,7 +635,8 @@ export class ConnectionPool implements ReapablePool {
     return {
       size: this.size,
       connections: this._connections?.length ?? 0,
-      busy: this._checkedOut.size,
+      busy: this._connections?.filter((c) => c.inUse && c.owner!.isAlive()).length ?? 0,
+      dead: this._connections?.filter((c) => c.inUse && !c.owner!.isAlive()).length ?? 0,
       idle: this._connections?.filter((c) => !c.inUse).length ?? 0,
       waiting: this.numWaitingInQueue(),
       checkoutTimeout: this.checkoutTimeout,

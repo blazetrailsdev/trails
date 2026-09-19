@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { assertNothingRaised } from "@blazetrails/activesupport";
 import { Base, TransactionIsolationError } from "./index.js";
 import { adapterType, ambientPoolConfiguration } from "./test-adapter.js";
 import { currentAdapter } from "./support/adapter-helper.js";
@@ -127,7 +128,9 @@ describe("TransactionIsolationTest", () => {
     async () => {
       await Tag.transaction(
         async () => {
-          await Tag.create({});
+          await assertNothingRaised(async () => {
+            await Tag.create({});
+          });
         },
         { isolation: ":serializable" },
       );

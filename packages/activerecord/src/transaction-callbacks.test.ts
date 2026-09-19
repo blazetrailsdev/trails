@@ -4,6 +4,10 @@ import { describe, it, expect, vi } from "vitest";
 import { Base, transaction, currentTransaction, Rollback, registerModel } from "./index.js";
 import { Owner } from "./test-helpers/models/owner.js";
 import { Pet } from "./test-helpers/models/pet.js";
+import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
+import { ArgumentError, assertEmpty, assertRaise } from "@blazetrails/activesupport";
+
+import { kernelThrow } from "@blazetrails/ruby-compat";
 import { fixtures } from "./test-fixtures.js";
 import { setRunAfterTransactionCallbacksInOrderDefined } from "./active-record.js";
 
@@ -27,6 +31,66 @@ function defineBehaviourTopic() {
   };
 }
 
+type CommitBlock = (record: any) => unknown;
+
+class TopicWithCallbacks extends Base {
+  history: any[] = [];
+  abortBeforeUpdate?: boolean;
+  abortBeforeDestroy?: boolean;
+  _beforeCommit: Record<string, CommitBlock[]> = {};
+  _afterCommit: Record<string, CommitBlock[]> = {};
+  _afterRollback: Record<string, CommitBlock[]> = {};
+
+  static {
+    this._tableName = "topics";
+    this.hasMany("replies", { className: "ReplyWithCallbacks", foreignKey: "parent_id" });
+    this.beforeUpdate((r: any) => {
+      if (r.abortBeforeUpdate) kernelThrow(":abort");
+    });
+    this.beforeDestroy((r: any) => {
+      if (r.abortBeforeDestroy) kernelThrow(":abort");
+    });
+    this.beforeDestroy(async (r: any) => {
+      if (r.isPersisted()) await (await TopicWithCallbacks.find(r.id)).touch();
+    });
+    this.beforeCommit((r: any) => r.doBeforeCommit(null));
+    this.afterCommit((r: any) => r.doAfterCommit(null));
+    this.afterSaveCommit((r: any) => r.doAfterCommit("save"));
+    this.afterCreateCommit((r: any) => r.doAfterCommit("create"));
+    this.afterUpdateCommit((r: any) => r.doAfterCommit("update"));
+    this.afterDestroyCommit((r: any) => r.doAfterCommit("destroy"));
+    this.afterRollback((r: any) => r.doAfterRollback(null));
+    this.afterRollback((r: any) => r.doAfterRollback("create"), { on: "create" });
+    this.afterRollback((r: any) => r.doAfterRollback("update"), { on: "update" });
+    this.afterRollback((r: any) => r.doAfterRollback("destroy"), { on: "destroy" });
+  }
+
+  beforeCommitBlock(on: string | null, block: CommitBlock) {
+    (this._beforeCommit[String(on)] ??= []).push(block);
+  }
+
+  afterCommitBlock(on: string | null, block: CommitBlock) {
+    (this._afterCommit[String(on)] ??= []).push(block);
+  }
+
+  afterRollbackBlock(on: string | null, block: CommitBlock) {
+    (this._afterRollback[String(on)] ??= []).push(block);
+  }
+
+  async doBeforeCommit(on: string | null) {
+    for (const b of this._beforeCommit[String(on)] ?? []) await b(this);
+  }
+
+  async doAfterCommit(on: string | null) {
+    for (const b of this._afterCommit[String(on)] ?? []) await b(this);
+  }
+
+  async doAfterRollback(on: string | null) {
+    for (const b of this._afterRollback[String(on)] ?? []) await b(this);
+  }
+}
+registerModel(TopicWithCallbacks);
+
 fixtures(["topics", "owners", "pets"], {
   usesTransaction: [
     "trigger once on multiple deletion within transaction",
@@ -39,22 +103,30 @@ fixtures(["topics", "owners", "pets"], {
   ],
 });
 
+function addTransactionExecutionBlocks(record: TopicWithCallbacks) {
+  record.afterCommitBlock("create", (r) => r.history.push("commit_on_create"));
+  record.afterCommitBlock("update", (r) => r.history.push("commit_on_update"));
+  record.afterCommitBlock("destroy", (r) => r.history.push("commit_on_destroy"));
+  record.afterRollbackBlock("create", (r) => r.history.push("rollback_on_create"));
+  record.afterRollbackBlock("update", (r) => r.history.push("rollback_on_update"));
+  record.afterRollbackBlock("destroy", (r) => r.history.push("rollback_on_destroy"));
+}
+
 describe("TransactionCallbacksTest", () => {
   it("before commit exception should pop transaction stack", async () => {
-    class Topic extends Base {
-      declare title: string;
-
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    Topic.beforeCommit(function () {
+    const first = await TopicWithCallbacks.find(1);
+    first.beforeCommitBlock(null, () => {
       throw new Error("better pop this txn from the stack!");
     });
+
     const originalTxn = currentTransaction();
-    const t = new Topic({ title: "x" });
-    await expect(t.saveBang()).rejects.toThrow("better pop this txn from the stack!");
-    expect(currentTransaction()).toBe(originalTxn);
+
+    try {
+      await first.saveBang();
+      throw new Error("fail");
+    } catch {
+      expect(currentTransaction()).toBe(originalTxn);
+    }
   });
 
   it("call after commit after transaction commits", async () => {
@@ -78,90 +150,53 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it("dont call any callbacks after transaction commits for invalid record", async () => {
-    class Topic extends Base {
-      declare title: string;
+    const first = await TopicWithCallbacks.find(1);
+    first.afterCommitBlock(null, (r) => r.history.push("after_commit"));
+    first.afterRollbackBlock(null, (r) => r.history.push("after_rollback"));
 
-      static {
-        this.attribute("title", "string");
-        this.validates("title", { presence: true });
-      }
-    }
-    const called: string[] = [];
-    Topic.afterCommit(function () {
-      called.push("after_commit");
-    });
-    const t = new Topic({});
-    const saved = await t.save();
-    expect(saved).toBe(false);
-    expect(called).toEqual([]);
+    first.isValid = async () => false;
+
+    expect(await first.save()).toBeFalsy();
+    expect(first.history).toEqual([]);
   });
 
   it("dont call any callbacks after explicit transaction commits for invalid record", async () => {
-    class Topic extends Base {
-      declare title: string;
+    const first = await TopicWithCallbacks.find(1);
+    first.afterCommitBlock(null, (r) => r.history.push("after_commit"));
+    first.afterRollbackBlock(null, (r) => r.history.push("after_rollback"));
 
-      static {
-        this.attribute("title", "string");
-        this.validates("title", { presence: true });
-      }
-    }
-    const called: string[] = [];
-    Topic.afterCommit(function () {
-      called.push("after_commit");
+    first.isValid = async () => false;
+
+    await transaction(TopicWithCallbacks, async () => {
+      expect(await first.save()).toBeFalsy();
     });
-    await transaction(Topic, async () => {
-      const t = new Topic({});
-      await t.save();
-    });
-    expect(called).toEqual([]);
+    expect(first.history).toEqual([]);
   });
 
   it("dont call after commit on update based on previous transaction", async () => {
-    class Topic extends Base {
-      declare title: string;
+    const first = await TopicWithCallbacks.find(1);
+    await first.saveBang();
+    addTransactionExecutionBlocks(first);
 
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const called: string[] = [];
-    Topic.afterCommit(function () {
-      called.push("after_commit");
+    first.abortBeforeUpdate = true;
+    await transaction(TopicWithCallbacks, async () => {
+      await first.save();
     });
-    let topic: any;
-    await transaction(Topic, async () => {
-      topic = await Topic.create({ title: "first" });
-    });
-    expect(called).toEqual(["after_commit"]);
-    called.length = 0;
-    await transaction(Topic, async () => {
-      await topic.update({ title: "updated" });
-    });
-    expect(called).toEqual(["after_commit"]);
+
+    assertEmpty(first.history);
   });
 
   it("dont call after commit on destroy based on previous transaction", async () => {
-    class Topic extends Base {
-      declare title: string;
+    const first = await TopicWithCallbacks.find(1);
+    await first.destroyBang();
+    addTransactionExecutionBlocks(first);
 
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const called: string[] = [];
-    Topic.afterCommit(function () {
-      called.push("after_commit");
+    first.abortBeforeDestroy = true;
+    await transaction(TopicWithCallbacks, async () => {
+      await first.destroy();
     });
-    const t = await Topic.create({ title: "test" });
-    await transaction(Topic, async () => {
-      await t.update({ title: "updated" });
-    });
-    expect(called).toEqual(["after_commit", "after_commit"]);
-    called.length = 0;
-    await transaction(Topic, async () => {
-      await t.destroy();
-    });
-    expect(called).toEqual(["after_commit"]);
+
+    assertEmpty(first.history);
   });
 
   it("only call after commit on save after transaction commits for saving record", async () => {
@@ -184,44 +219,19 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it("only call after commit on update after transaction commits for existing record", async () => {
-    class Topic extends Base {
-      declare title: string;
+    const first = await TopicWithCallbacks.find(1);
+    addTransactionExecutionBlocks(first);
 
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const topic = await Topic.create({ title: "original" });
-    const called: string[] = [];
-    Topic.afterCommit(function () {
-      called.push("after_commit");
-    });
-    await transaction(Topic, async () => {
-      await topic.update({ title: "updated" });
-      expect(called).toEqual([]);
-    });
-    expect(called).toEqual(["after_commit"]);
+    await first.saveBang();
+    expect(first.history).toEqual(["commit_on_update"]);
   });
 
   it("only call after commit on destroy after transaction commits for destroyed record", async () => {
-    class Topic extends Base {
-      declare title: string;
+    const first = await TopicWithCallbacks.find(1);
+    addTransactionExecutionBlocks(first);
 
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const called: string[] = [];
-    Topic.afterCommit(function () {
-      called.push("after_commit");
-    });
-    const t = await Topic.create({ title: "test" });
-    called.length = 0;
-    await transaction(Topic, async () => {
-      await t.destroy();
-      expect(called).toEqual([]);
-    });
-    expect(called).toEqual(["after_commit"]);
+    await first.destroy();
+    expect(first.history).toEqual(["commit_on_destroy"]);
   });
 
   it("only call after commit on create after transaction commits for new record if create succeeds creating through association", async () => {
@@ -303,52 +313,29 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it("only call after commit on update after transaction commits for existing record on touch", async () => {
-    class Topic extends Base {
-      declare title: string;
-      declare updated_at: Temporal.Instant | Temporal.PlainDateTime;
+    const first = await TopicWithCallbacks.find(1);
+    addTransactionExecutionBlocks(first);
 
-      static {
-        this.attribute("title", "string");
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    const topic = await Topic.create({ title: "original" });
-    const called: string[] = [];
-    Topic.afterCommit(function () {
-      called.push("after_commit");
-    });
-    await transaction(Topic, async () => {
-      await topic.touch();
-      expect(called).toEqual([]);
-    });
-    expect(called).toEqual(["after_commit"]);
+    await first.touch();
+    expect(first.history).toEqual(["commit_on_update"]);
   });
-  it("only call after commit on top level transactions", async () => {
-    class Topic extends Base {
-      declare title: string;
-      declare updated_at: Temporal.Instant | Temporal.PlainDateTime;
 
-      static {
-        this.attribute("title", "string");
-        this.attribute("updated_at", "datetime");
-      }
-    }
-    const topic = await Topic.create({ title: "original" });
-    const called: string[] = [];
-    Topic.afterCommit(function () {
-      called.push("after_commit");
-    });
-    await transaction(Topic, async () => {
+  it("only call after commit on top level transactions", async () => {
+    const first = await TopicWithCallbacks.find(1);
+    first.afterCommitBlock(null, (r) => r.history.push("after_commit"));
+    assertEmpty(first.history);
+
+    await transaction(TopicWithCallbacks, async () => {
       await transaction(
-        Topic,
+        TopicWithCallbacks,
         async () => {
-          await topic.touch();
+          await first.touch();
         },
         { requiresNew: true },
       );
-      expect(called).toEqual([]);
+      assertEmpty(first.history);
     });
-    expect(called).toEqual(["after_commit"]);
+    expect(first.history).toEqual(["after_commit"]);
   });
 
   it("call after rollback after transaction rollsback", async () => {
@@ -589,24 +576,26 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it("after commit callback when raise should not restore state", async () => {
-    class Topic extends Base {
-      declare title: string;
-
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    Topic.afterCommit(function () {
+    const first = new TopicWithCallbacks();
+    const second = new TopicWithCallbacks();
+    first.afterCommitBlock(null, () => {
       throw new Error("boom");
     });
-    let record: any;
+    second.afterCommitBlock(null, () => {
+      throw new Error("boom");
+    });
+
     try {
-      await transaction(Topic, async () => {
-        record = await Topic.create({ title: "persisted" });
+      await transaction(CanonicalTopic, async () => {
+        await first.saveBang();
+        expect(first.id).not.toBeNull();
+        await second.saveBang();
+        expect(second.id).not.toBeNull();
       });
     } catch {}
-    expect(record.id).not.toBeNull();
-    expect(await Topic.find(record.id)).toBeTruthy();
+    expect(first.id).not.toBeNull();
+    expect(second.id).not.toBeNull();
+    expect(await first.reload()).toBeTruthy();
   });
 
   it("after rollback callback should not swallow errors when set to raise", async () => {
@@ -631,27 +620,25 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it("after commit callback should not rollback state that already been succeeded", async () => {
-    class Topic extends Base {
-      declare title: string;
-
+    class Klass extends TopicWithCallbacks {
       static {
-        this.attribute("title", "string");
+        this.inheritanceColumn = null;
+        this.validates("title", { presence: true });
       }
     }
-    let commitCalled = false;
-    let record: any;
-    Topic.afterCommit(function () {
-      commitCalled = true;
-      throw new Error("callback error");
-    });
+
+    const first = new Klass({ title: "foo" });
     try {
-      await transaction(Topic, async () => {
-        record = await Topic.create({ title: "saved" });
+      first.afterCommitBlock(null, async (r) => {
+        if (r.isPersisted()) await r.update({ title: null });
       });
-    } catch {}
-    expect(commitCalled).toBe(true);
-    expect(record.id).not.toBeNull();
-    expect(await Topic.find(record.id)).toBeTruthy();
+      await first.saveBang();
+
+      expect(first.isPersisted()).toBeTruthy();
+      expect(first.id).not.toBeNull();
+    } finally {
+      await first.destroyBang();
+    }
   });
 
   it("after rollback callback when raise should restore state", async () => {
@@ -683,27 +670,25 @@ describe("TransactionCallbacksTest", () => {
     expect(second.id).toBeNull();
   });
   it("after rollback callbacks should validate on condition", async () => {
-    class Topic extends Base {
-      declare title: string;
-
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    expect(() => Topic.afterRollback(() => {}, { on: "save" })).toThrow(
+    await assertRaise([ArgumentError], {}, () =>
+      CanonicalTopic.afterRollback(() => {}, { on: "save" }),
+    );
+    const e = await assertRaise([ArgumentError], {}, () =>
+      CanonicalTopic.afterRollback(() => {}, { on: "destroy_all" }),
+    );
+    expect(e.message).toMatch(
       /:on conditions for after_commit and after_rollback callbacks have to be one of \[:create, :destroy, :update\]/,
     );
   });
 
   it("after commit callbacks should validate on condition", async () => {
-    class Topic extends Base {
-      declare title: string;
-
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    expect(() => Topic.afterCommit(() => {}, { on: "save" })).toThrow(
+    await assertRaise([ArgumentError], {}, () =>
+      CanonicalTopic.afterCommit(() => {}, { on: "save" }),
+    );
+    const e = await assertRaise([ArgumentError], {}, () =>
+      CanonicalTopic.afterCommit(() => {}, { on: "destroy_all" }),
+    );
+    expect(e.message).toMatch(
       /:on conditions for after_commit and after_rollback callbacks have to be one of \[:create, :destroy, :update\]/,
     );
   });
@@ -743,65 +728,54 @@ describe("TransactionCallbacksTest", () => {
     pet.writeAttribute("name", "Fluffy the Third");
     await pet.save();
 
-    expect(flag).toBe(true);
+    expect(flag).toBeTruthy();
   });
 
   it("saving two records that override object id should run after commit callbacks for both", async () => {
-    class Topic extends Base {
-      declare title: string;
+    class Klass extends TopicWithCallbacks {}
 
-      static {
-        this.attribute("title", "string");
+    const records = [new Klass(), new Klass()];
+
+    await transaction(Klass, async () => {
+      for (const record of records) {
+        record.afterCommitBlock(null, (r) => r.history.push("after_commit"));
+        await record.saveBang();
       }
-    }
-    const called: string[] = [];
-    Topic.afterCommit(function () {
-      called.push("after_commit");
     });
-    await transaction(Topic, async () => {
-      await Topic.create({ title: "first" });
-      await Topic.create({ title: "second" });
-    });
-    expect(called.length).toBe(2);
+
+    expect(records[0].history).toEqual(["after_commit"]);
+    expect(records[1].history).toEqual(["after_commit"]);
   });
 
   it("saving two records that override object id should run after rollback callbacks for both", async () => {
-    class Topic extends Base {
-      declare title: string;
+    class Klass extends TopicWithCallbacks {}
 
-      static {
-        this.attribute("title", "string");
+    const records = [new Klass(), new Klass()];
+
+    await transaction(Klass, async () => {
+      for (const record of records) {
+        record.afterRollbackBlock(null, (r) => r.history.push("after_rollback"));
+        await record.saveBang();
       }
-    }
-    const called: string[] = [];
-    Topic.afterRollback(function () {
-      called.push("after_rollback");
+      throw new Rollback();
     });
-    try {
-      await transaction(Topic, async () => {
-        await Topic.create({ title: "first" });
-        await Topic.create({ title: "second" });
-        throw new Error("rollback");
-      });
-    } catch {}
-    expect(called.length).toBe(2);
+
+    expect(records[0].history).toEqual(["after_rollback"]);
+    expect(records[1].history).toEqual(["after_rollback"]);
   });
 
   it("after commit does not mutate the if options array", async () => {
-    const opts = ["create", "update"];
-    const original = [...opts];
-    class Topic extends Base {
-      declare title: string;
+    const opts: unknown[] = [];
 
+    class Klass extends Base {
       static {
-        this.attribute("title", "string");
+        this._tableName = "topics";
+        this.afterCommit(() => {}, { if: opts, on: "create" });
       }
     }
-    Topic.afterCommit(function () {});
-    await transaction(Topic, async () => {
-      await Topic.create({ title: "test" });
-    });
-    expect(opts).toEqual(original);
+    void Klass;
+
+    assertEmpty(opts);
   });
 
   it("only call after commit on create after transaction commits for new record", async () => {
@@ -999,31 +973,38 @@ describe("TransactionCallbacksTest", () => {
 
   describe("CallbacksOnMultipleActionsTest", () => {
     it("after commit on multiple actions", async () => {
-      const log: string[] = [];
-      class Post extends Base {
-        declare title: string;
-
+      class TopicWithCallbacksOnMultipleActions extends Base {
+        history: string[] = [];
         static {
           this._tableName = "topics";
-          this.attribute("title", "string");
-          this.afterCreate(function () {
-            log.push("created");
+          this.afterCommit((record: any) => record.history.push("create_and_destroy"), {
+            on: ["create", "destroy"],
           });
-          this.afterUpdate(function () {
-            log.push("updated");
+          this.afterCommit((record: any) => record.history.push("create_and_update"), {
+            on: ["create", "update"],
           });
-          this.afterDestroy(function () {
-            log.push("destroyed");
+          this.afterCommit((record: any) => record.history.push("update_and_destroy"), {
+            on: ["update", "destroy"],
           });
         }
+
+        clearHistory() {
+          this.history = [];
+        }
       }
-      const p = await Post.create({ title: "a" });
-      expect(log).toContain("created");
-      p.title = "b";
-      await p.save();
-      expect(log).toContain("updated");
-      await p.destroy();
-      expect(log).toContain("destroyed");
+
+      const topic = new TopicWithCallbacksOnMultipleActions() as any;
+      await topic.save();
+      expect(topic.history).toEqual(["create_and_update", "create_and_destroy"]);
+
+      topic.clearHistory();
+      topic.approved = true;
+      await topic.save();
+      expect(topic.history).toEqual(["update_and_destroy", "create_and_update"]);
+
+      topic.clearHistory();
+      await topic.destroy();
+      expect(topic.history).toEqual(["update_and_destroy", "create_and_destroy"]);
     });
 
     it("before commit actions", async () => {
@@ -1213,8 +1194,8 @@ describe("TransactionCallbacksTest", () => {
         throw new Rollback();
       });
 
-      expect(topic.isDestroyed()).toBe(false);
-      expect(topicClone.isDestroyed()).toBe(false);
+      expect(topic.isDestroyed()).toBeFalsy();
+      expect(topicClone.isDestroyed()).toBeFalsy();
       expect(topic.attributeChangeToBeSaved("author_name")).toEqual([null, "Test Author"]);
       expect(topicClone.attributeChangeToBeSaved("author_name")).toEqual([
         null,
@@ -1424,7 +1405,7 @@ describe("TransactionCallbacksTest", () => {
         }
       }
       let topic = await TopicWithCallbacksOnUpdate.create({ title: "New topic" });
-      expect(history).toEqual([]);
+      assertEmpty(history);
 
       await topic.update({ title: "Updated topic 1" });
       const expectedHistory = ["after_commit_on_update_2", "after_commit_on_update_1"];
