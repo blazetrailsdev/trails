@@ -602,11 +602,13 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("index", async () => {
-    await adapter.execute(`CREATE UNIQUE INDEX "fun" ON "items" ("id")`);
-    const indexes = (await adapter.indexes("items")) as any[];
+    await createExampleTable();
+    await adapter.addIndex("ex", "id", { unique: true, name: "fun" });
+    const indexes = (await adapter.indexes("ex")) as any[];
     const index = indexes.find((idx) => idx.name === "fun");
-    expect(index.table).toBe("items");
-    expect(index.unique).toBe(true);
+
+    expect(index.table).toEqual("ex");
+    expect(index.unique).toBeTruthy();
     expect(index.columns).toEqual(["id"]);
   });
 
@@ -688,9 +690,16 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("primary key", async () => {
-    const cols = (await adapter.execute(`PRAGMA table_info("items")`))!;
-    const pkCol = cols.find((c: any) => c.pk === 1);
-    expect(pkCol!.name).toBe("id");
+    await createExampleTable();
+    expect(await adapter.primaryKey("ex")).toEqual("id");
+    await adapter.execute(
+      `CREATE TABLE "foos" (internet integer PRIMARY KEY AUTOINCREMENT, number integer not null)`,
+    );
+    try {
+      expect(await adapter.primaryKey("foos")).toEqual("internet");
+    } finally {
+      await adapter.execute(`DROP TABLE IF EXISTS "foos"`);
+    }
   });
 
   it("no primary key", async () => {
