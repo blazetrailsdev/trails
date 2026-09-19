@@ -2,11 +2,23 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { SchemaCache, SchemaReflection, BoundSchemaReflection, FakePool } from "./schema-cache.js";
 import { Column } from "./column.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
-import { setSchemaCacheIgnoredTables } from "../active-record.js";
+import {
+  setSchemaCacheIgnoredTables,
+  schemaCacheIgnoredTables,
+  isSchemaCacheIgnoredTable,
+  lazilyLoadSchemaCache,
+  setLazilyLoadSchemaCache,
+} from "../active-record.js";
 import { StatementInvalid } from "../errors.js";
 import { SchemaStatements } from "./abstract/schema-statements.js";
 import type { SchemaQuoter } from "./abstract/assert-schema-adapter.js";
-import { include } from "@blazetrails/activesupport";
+import { include, assertRaises } from "@blazetrails/activesupport";
+import { File, Tempfile } from "@blazetrails/ruby-compat";
+import { Base } from "../base.js";
+import { fixtures } from "../test-fixtures.js";
+import { withSecondPool } from "../support/setup-second-pool.js";
+import { ARUnit2Model } from "../test-helpers/models/arunit2-model.js";
+import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
 import { TableDefinition } from "./abstract/schema-definitions.js";
 import { SQLite3Adapter } from "./sqlite3-adapter.js";
 import type { AbstractAdapter } from "./abstract-adapter.js";
@@ -46,85 +58,112 @@ async function warm(
 }
 
 describe("SchemaCacheTest", () => {
-  let tmpDir: string;
+  fixtures({}, { useTransactionalTests: false });
+  withSecondPool();
 
-  beforeEach(() => {
+  let tmpDir: string;
+  let pool: ConnectionPool;
+  let cache: BoundSchemaReflection;
+  let checkSchemaCacheDumpVersionWas: boolean;
+
+  function newBoundReflection(boundPool: unknown = pool): BoundSchemaReflection {
+    return new BoundSchemaReflection(new SchemaReflection(null), boundPool);
+  }
+
+  async function loadBoundReflection(
+    filename: string,
+    boundPool: unknown = pool,
+  ): Promise<BoundSchemaReflection> {
+    return new BoundSchemaReflection(new SchemaReflection(filename), boundPool).loadBang();
+  }
+
+  beforeEach(async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "schema-cache-test-"));
+    pool = ARUnit2Model.connectionPool();
+    cache = newBoundReflection();
+    checkSchemaCacheDumpVersionWas = SchemaReflection.checkSchemaCacheDumpVersion;
   });
 
   afterEach(() => {
+    SchemaReflection.checkSchemaCacheDumpVersion = checkSchemaCacheDumpVersionWas;
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
   it("cached?", async () => {
-    const cache = new SchemaCache();
-    expect(cache.isCached("courses")).toBe(false);
-    cache.setColumns("courses", [makeColumn("id", "integer")]);
-    expect(cache.isCached("courses")).toBe(true);
+    let cache = newBoundReflection();
+    expect(await cache.isCached("courses")).toBeFalsy();
 
-    const filename = path.join(tmpDir, "schema_cache.json");
-    await cache.dumpTo(filename);
-    const loaded = await SchemaCache._loadFrom(filename);
-    expect(loaded).not.toBeNull();
-    expect(loaded!.isCached("courses")).toBe(true);
+    void (await cache.columns("courses"))!.length;
+    expect(await cache.isCached("courses")).toBeTruthy();
+
+    const tempfile = Tempfile.new(["schema_cache-", ".yml"], tmpDir);
+    await cache.dumpTo(tempfile.path()!);
+
+    const reflection = new SchemaReflection(tempfile.path());
+
+    expect(await reflection.isCached("courses")).toBeFalsy();
+
+    SchemaReflection.checkSchemaCacheDumpVersion = false;
+    expect(await reflection.isCached("courses")).toBeTruthy();
+
+    cache = new BoundSchemaReflection(reflection, "__unused_pool__");
+    expect(await cache.isCached("courses")).toBeTruthy();
   });
 
   it("yaml dump and load", async () => {
-    const cache = new SchemaCache();
-    const cols = [
-      makeColumn("id", "integer", { null: false }),
-      makeColumn("name", "varchar(255)"),
-      makeColumn("created_at", "timestamp"),
-    ];
-    await warm(cache, "users", "id", cols);
+    let cache = newBoundReflection();
 
-    const filename = path.join(tmpDir, "schema_cache.json");
-    await cache.dumpTo(filename);
+    const tempfile = Tempfile.new(["schema_cache-", ".yml"], tmpDir);
+    await cache.dumpTo(tempfile.path()!);
 
-    const loaded = await SchemaCache._loadFrom(filename);
-    expect(loaded).not.toBeNull();
-    expect(loaded!.isCached("users")).toBe(true);
+    cache = await loadBoundReflection(tempfile.path()!);
 
-    const loadedCols = loaded!.getCachedColumnsHash("users");
-    expect(loadedCols).toBeDefined();
-    expect(loadedCols!["id"]).toBeInstanceOf(Column);
-    expect(loadedCols!["id"].sqlType).toBe("integer");
-    expect(loadedCols!["id"].null).toBe(false);
-    expect(loadedCols!["name"].sqlType).toBe("varchar(255)");
-    expect(loadedCols!["name"].humanName()).toBe("Name");
+    await assertNoQueries(false, async () => {
+      expect((await cache.columns("courses"))!.length).toBe(3);
+      expect(Object.keys((await cache.columnsHash("courses"))!).length).toBe(3);
+      expect(await cache.dataSourceExists("courses")).toBeTruthy();
+      expect(await cache.primaryKeys("courses")).toBe("id");
+      expect((await cache.indexes("courses")).length).toBe(1);
+    });
   });
 
   it("cache path can be in directory", async () => {
-    const cache = new SchemaCache();
-    cache.setColumns("posts", [makeColumn("id", "integer")]);
+    const cache = newBoundReflection();
+    const tmp_dir = fs.mkdtempSync(path.join(os.tmpdir(), "schema-cache-dir-"));
+    const filename = path.join(tmp_dir, "schema.json");
 
-    const nested = path.join(tmpDir, "sub", "dir", "schema_cache.json");
-    await cache.dumpTo(nested);
-
-    expect(fs.existsSync(nested)).toBe(true);
-    const loaded = await SchemaCache._loadFrom(nested);
-    expect(loaded).not.toBeNull();
-    expect(loaded!.isCached("posts")).toBe(true);
+    expect(File.isExist(filename)).toBeFalsy();
+    expect(await cache.dumpTo(filename)).toBeTruthy();
+    expect(File.isExist(filename)).toBeTruthy();
   });
 
   it("yaml dump and load with gzip", async () => {
-    const cache = new SchemaCache();
-    await warm(cache, "courses", "id", [
-      makeColumn("id", "integer", { null: false }),
-      makeColumn("name", "varchar(255)"),
-      makeColumn("created_at", "timestamp"),
-    ]);
+    let cache: BoundSchemaReflection | SchemaCache = newBoundReflection();
 
-    const filename = path.join(tmpDir, "schema_cache.json.gz");
-    await cache.dumpTo(filename);
-    expect(fs.existsSync(filename)).toBe(true);
+    const tempfile = Tempfile.new(["schema_cache-", ".yml.gz"], tmpDir);
+    await cache.dumpTo(tempfile.path()!);
 
-    const loaded = await SchemaCache._loadFrom(filename);
-    expect(loaded).not.toBeNull();
-    expect(loaded!.isCached("courses")).toBe(true);
-    const cols = loaded!.getCachedColumnsHash("courses");
-    expect(Object.keys(cols!)).toEqual(["id", "name", "created_at"]);
-    expect(cols!["id"]).toBeInstanceOf(Column);
+    cache = (await SchemaCache._loadFrom(tempfile.path()!))!;
+
+    await assertNoQueries(false, async () => {
+      expect((await (cache as SchemaCache).columns(pool, "courses"))!.length).toBe(3);
+      expect(Object.keys((await (cache as SchemaCache).columnsHash(pool, "courses"))!).length).toBe(
+        3,
+      );
+      expect(await (cache as SchemaCache).dataSourceExists(pool, "courses")).toBeTruthy();
+      expect(await (cache as SchemaCache).primaryKeys(pool, "courses")).toBe("id");
+      expect((await (cache as SchemaCache).indexes(pool, "courses")).length).toBe(1);
+    });
+
+    cache = await loadBoundReflection(tempfile.path()!);
+
+    await assertNoQueries(false, async () => {
+      expect((await cache.columns("courses"))!.length).toBe(3);
+      expect(Object.keys((await cache.columnsHash("courses"))!).length).toBe(3);
+      expect(await cache.dataSourceExists("courses")).toBeTruthy();
+      expect(await cache.primaryKeys("courses")).toBe("id");
+      expect((await cache.indexes("courses")).length).toBe(1);
+    });
   });
   it.skip("yaml loads 5 1 dump", () => {
     // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — yaml
@@ -134,17 +173,11 @@ describe("SchemaCacheTest", () => {
   });
 
   it("primary key for existent table", async () => {
-    const cache = new SchemaCache();
-    await warm(cache, "users", "id");
-    const pk = await cache.primaryKeys(null, "users");
-    expect(pk).toBe("id");
+    expect(await cache.primaryKeys("courses")).toBe("id");
   });
 
   it("primary key for non existent table", async () => {
-    const cache = new SchemaCache();
-    await warm(cache, "other", null);
-    const pk = await cache.primaryKeys(null, "other");
-    expect(pk).toBeNull();
+    expect(await cache.primaryKeys("omgponies")).toBeUndefined();
   });
 
   it("getCachedPrimaryKeys is undefined for an unwarmed table", () => {
@@ -159,217 +192,189 @@ describe("SchemaCacheTest", () => {
   });
 
   it("columns for existent table", async () => {
-    const cache = new SchemaCache();
-    cache.setColumns("courses", [
-      makeColumn("id", "integer"),
-      makeColumn("name", "text"),
-      makeColumn("college_id", "integer"),
-    ]);
-    const cols = await cache.columns(null, "courses");
-    expect(cols!.length).toBe(3);
+    expect((await cache.columns("courses"))!.length).toBe(3);
   });
 
-  it("columns for non existent table", () => {
-    const cache = new SchemaCache();
-    expect(cache.isCached("missing")).toBe(false);
-    expect(cache.getCachedColumnsHash("missing")).toBeUndefined();
+  it("columns for non existent table", async () => {
+    await assertRaises([StatementInvalid], {}, async () => {
+      await cache.columns("omgponies");
+    });
   });
 
   it("columns hash for existent table", async () => {
-    const cache = new SchemaCache();
-    cache.setColumns("courses", [
-      makeColumn("id", "integer"),
-      makeColumn("name", "text"),
-      makeColumn("college_id", "integer"),
-    ]);
-    const hash = await cache.columnsHash(null, "courses");
-    expect(Object.keys(hash!).length).toBe(3);
+    expect(Object.keys((await cache.columnsHash("courses"))!).length).toBe(3);
   });
 
-  it("columns hash for non existent table", () => {
-    const cache = new SchemaCache();
-    expect(cache.getCachedColumnsHash("missing")).toBeUndefined();
+  it("columns hash for non existent table", async () => {
+    await assertRaises([StatementInvalid], {}, async () => {
+      await cache.columnsHash("omgponies");
+    });
   });
 
   it("indexes for existent table", async () => {
-    const fakeConn = {
-      indexes: async () => [{ name: "idx_users_email", columns: ["email"] }],
-      dataSourceExists: async () => true,
-      dataSources: async () => ["users"],
-    };
-    const pool = new FakePool(fakeConn);
-    const cache = new SchemaCache();
-    const idx = await cache.indexes(pool, "users");
-    expect(idx).toHaveLength(1);
+    expect((await cache.indexes("courses")).length).toBe(1);
   });
 
   it("indexes for non existent table", async () => {
-    const fakeConn = {
-      indexes: async () => [],
-      dataSourceExists: async () => false,
-      dataSources: async () => [],
-    };
-    const pool = new FakePool(fakeConn);
-    const cache = new SchemaCache();
-    const idx = await cache.indexes(pool, "missing");
-    expect(idx).toEqual([]);
+    expect(await cache.indexes("omgponies")).toEqual([]);
   });
 
   it("clearing", async () => {
-    const cache = new SchemaCache();
-    await warm(cache, "users", "id", [makeColumn("id", "integer")]);
-    expect(cache.size).toBeGreaterThan(0);
+    await cache.columns("courses");
+    await cache.columnsHash("courses");
+    await cache.dataSourceExists("courses");
+    await cache.primaryKeys("courses");
+    await cache.indexes("courses");
 
-    const reflection = new SchemaReflection(null, cache);
-    reflection.clearBang();
-    expect(reflection.loadedCache!.size).toBe(0);
-    expect(reflection.loadedCache!.isCached("users")).toBe(false);
+    cache.clearBang();
+
+    expect(await cache.size()).toBe(0);
   });
 
   it("marshal dump and load", async () => {
-    const cache = new SchemaCache();
-    await warm(cache, "users", "id", [
-      makeColumn("id", "integer"),
-      makeColumn("email", "varchar(255)"),
-    ]);
+    let cache: BoundSchemaReflection | SchemaCache = newBoundReflection();
 
-    const dumped = cache.marshalDump();
-    const restored = new SchemaCache();
-    restored.marshalLoad(dumped);
+    await cache.add("courses");
 
-    expect(restored.isCached("users")).toBe(true);
-    const hash = restored.getCachedColumnsHash("users");
-    expect(hash!["id"]).toBeInstanceOf(Column);
-    expect(hash!["id"].sqlType).toBe("integer");
-    expect(hash!["email"].sqlType).toBe("varchar(255)");
+    const dumped = new SchemaCache();
+    dumped.marshalLoad(
+      (
+        cache as unknown as { _schemaReflection: SchemaReflection }
+      )._schemaReflection.loadedCache!.marshalDump(),
+    );
+    cache = dumped;
+
+    await assertNoQueries(false, async () => {
+      expect((await cache.columns(pool, "courses"))!.length).toBe(3);
+      expect(Object.keys((await cache.columnsHash(pool, "courses"))!).length).toBe(3);
+      expect(await cache.dataSourceExists(pool, "courses")).toBeTruthy();
+      expect(await cache.primaryKeys(pool, "courses")).toBe("id");
+      expect((await cache.indexes(pool, "courses")).length).toBe(1);
+    });
   });
 
   it("marshal dump and load via disk", async () => {
-    const cache = new SchemaCache();
-    await warm(cache, "posts", "id", [makeColumn("title", "text")]);
+    let cache = newBoundReflection();
 
-    const dumped = JSON.stringify(cache.marshalDump());
-    const parsed = JSON.parse(dumped);
-    const restored = new SchemaCache();
-    restored.marshalLoad(parsed);
+    const tempfile = Tempfile.new(["schema_cache-", ".dump"], tmpDir);
+    await cache.dumpTo(tempfile.path()!);
 
-    expect(restored.isCached("posts")).toBe(true);
-    const hash = restored.getCachedColumnsHash("posts");
-    expect(hash!["title"]).toBeInstanceOf(Column);
-    expect(hash!["title"].sqlType).toBe("text");
+    cache = await loadBoundReflection(tempfile.path()!);
+
+    await assertNoQueries(false, async () => {
+      expect((await cache.columns("courses"))!.length).toBe(3);
+      expect(Object.keys((await cache.columnsHash("courses"))!).length).toBe(3);
+      expect(await cache.dataSourceExists("courses")).toBeTruthy();
+      expect(await cache.primaryKeys("courses")).toBe("id");
+      expect((await cache.indexes("courses")).length).toBe(1);
+    });
   });
 
   it("marshal dump and load with ignored tables", async () => {
-    setSchemaCacheIgnoredTables(["professors"]);
+    const oldIgnore = schemaCacheIgnoredTables();
     try {
-      const fakeConn = {
-        primaryKey: async (t: string) => (t === "courses" ? "id" : null),
-        dataSourceExists: async (t: string) => t === "courses" || t === "professors",
-        dataSources: async () => ["courses", "professors"],
-        columns: async (t: string) =>
-          t === "courses"
-            ? [
-                makeColumn("id", "integer"),
-                makeColumn("name", "varchar(255)"),
-                makeColumn("created_at", "timestamp"),
-              ]
-            : [makeColumn("id", "integer")],
-        indexes: async (t: string) =>
-          t === "courses" ? [{ name: "idx_courses_name", columns: ["name"] }] : [],
-      };
-      const pool = new FakePool(fakeConn);
-      const source = new SchemaCache();
-      await source.add(pool, "courses");
-      await source.add(pool, "professors");
+      expect(isSchemaCacheIgnoredTable("professors")).toBeFalsy();
+      setSchemaCacheIgnoredTables(["professors"]);
+      expect(isSchemaCacheIgnoredTable("professors")).toBeTruthy();
+      let cache = newBoundReflection();
 
-      const dumped = JSON.parse(JSON.stringify(source.marshalDump()));
-      const cache = new SchemaCache();
-      cache.marshalLoad(dumped);
+      const tempfile = Tempfile.new(["schema_cache-", ".dump"], tmpDir);
+      await cache.dumpTo(tempfile.path()!);
 
-      expect((await cache.columns(pool, "courses"))!.length).toBe(3);
-      expect(Object.keys((await cache.columnsHash(pool, "courses"))!)).toHaveLength(3);
-      expect(await cache.dataSourceExists(pool, "courses")).toBe(true);
-      expect(await cache.primaryKeys(pool, "courses")).toBe("id");
-      expect((await cache.indexes(pool, "courses")).length).toBe(1);
+      cache = await loadBoundReflection(tempfile.path()!);
 
-      expect(await cache.dataSourceExists(pool, "professors")).toBeUndefined();
-      await expect(cache.columns(pool, "professors")).rejects.toBeInstanceOf(StatementInvalid);
-      await expect(cache.columnsHash(pool, "professors")).rejects.toBeInstanceOf(StatementInvalid);
-      expect(await cache.primaryKeys(pool, "professors")).toBeNull();
-      expect(await cache.indexes(pool, "professors")).toEqual([]);
+      expect(await cache.dataSourceExists("courses")).toBeTruthy();
+      expect((await cache.columns("courses"))!.length).toBe(3);
+      expect(Object.keys((await cache.columnsHash("courses"))!).length).toBe(3);
+      expect(await cache.dataSourceExists("courses")).toBeTruthy();
+      expect(await cache.primaryKeys("courses")).toBe("id");
+      expect((await cache.indexes("courses")).length).toBe(1);
+
+      expect(await cache.dataSourceExists("professors")).toBeUndefined();
+      await assertRaises([StatementInvalid], {}, async () => {
+        await cache.columns("professors");
+      });
+      await assertRaises([StatementInvalid], {}, async () => {
+        void Object.keys((await cache.columnsHash("professors"))!).length;
+      });
+      expect(await cache.primaryKeys("professors")).toBeNull();
+      expect(await cache.indexes("professors")).toEqual([]);
     } finally {
-      setSchemaCacheIgnoredTables([]);
+      setSchemaCacheIgnoredTables(oldIgnore);
     }
   });
+
   it("marshal dump and load with gzip", async () => {
-    const cache = new SchemaCache();
-    await warm(cache, "courses", "id", [
-      makeColumn("id", "integer"),
-      makeColumn("name", "varchar(255)"),
-      makeColumn("created_at", "timestamp"),
-    ]);
+    let cache: BoundSchemaReflection | SchemaCache = newBoundReflection();
 
-    const filename = path.join(tmpDir, "schema_cache.dump.gz");
-    await cache.dumpTo(filename);
-    const loaded = await SchemaCache._loadFrom(filename);
-    expect(loaded).not.toBeNull();
-    expect(loaded!.isCached("courses")).toBe(true);
-    expect(await loaded!.primaryKeys(null, "courses")).toBe("id");
+    const tempfile = Tempfile.new(["schema_cache-", ".dump.gz"], tmpDir);
+    await cache.dumpTo(tempfile.path()!);
+
+    cache = (await SchemaCache._loadFrom(tempfile.path()!))!;
+
+    await assertNoQueries(false, async () => {
+      expect((await (cache as SchemaCache).columns(pool, "courses"))!.length).toBe(3);
+      expect(Object.keys((await (cache as SchemaCache).columnsHash(pool, "courses"))!).length).toBe(
+        3,
+      );
+      expect(await (cache as SchemaCache).dataSourceExists(pool, "courses")).toBeTruthy();
+      expect(await (cache as SchemaCache).primaryKeys(pool, "courses")).toBe("id");
+      expect((await (cache as SchemaCache).indexes(pool, "courses")).length).toBe(1);
+    });
+
+    cache = await loadBoundReflection(tempfile.path()!);
+
+    await assertNoQueries(false, async () => {
+      expect((await cache.columns("courses"))!.length).toBe(3);
+      expect(Object.keys((await cache.columnsHash("courses"))!).length).toBe(3);
+      expect(await cache.dataSourceExists("courses")).toBeTruthy();
+      expect(await cache.primaryKeys("courses")).toBe("id");
+      expect((await cache.indexes("courses")).length).toBe(1);
+    });
   });
+
   it("gzip dumps identical", async () => {
-    const cache = new SchemaCache();
-    await warm(cache, "posts", "id", [makeColumn("id", "integer")]);
+    const cache = newBoundReflection();
 
-    const a = path.join(tmpDir, "schema_cache_a.json.gz");
-    const b = path.join(tmpDir, "schema_cache_b.json.gz");
-    await cache.dumpTo(a);
-    await cache.dumpTo(b);
+    const tempfileA = Tempfile.new(["schema_cache-", ".yml.gz"], tmpDir);
+    await cache.dumpTo(tempfileA.path()!);
+    const digestA = fs.readFileSync(tempfileA.path()!).toString("base64");
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const tempfileB = Tempfile.new(["schema_cache-", ".yml.gz"], tmpDir);
+    await cache.dumpTo(tempfileB.path()!);
+    const digestB = fs.readFileSync(tempfileB.path()!).toString("base64");
 
-    const bufA = fs.readFileSync(a);
-    const bufB = fs.readFileSync(b);
-    expect(bufA.equals(bufB)).toBe(true);
-
-    const loaded = await SchemaCache._loadFrom(a);
-    expect(loaded!.isCached("posts")).toBe(true);
+    expect(digestB).toBe(digestA);
   });
 
   it("data source exist", async () => {
-    const cache = new SchemaCache();
-    const pool = new FakePool({
-      dataSources: async () => ["users"],
-      dataSourceExists: async () => true,
-    });
-    expect(await cache.dataSourceExists(pool, "users")).toBe(true);
-    expect(cache.isCached("users")).toBe(false);
-    cache.setColumns("users", [makeColumn("id", "integer")]);
-    expect(cache.isCached("users")).toBe(true);
+    expect(await cache.dataSourceExists("courses")).toBeTruthy();
+    expect(await cache.dataSourceExists("foo")).toBeFalsy();
   });
 
   it("clear data source cache", async () => {
-    const cache = new SchemaCache();
-    await warm(cache, "users", "id", [makeColumn("id", "integer")]);
-    expect(cache.isCached("users")).toBe(true);
+    expect(await cache.dataSourceExists("courses")).toBeTruthy();
 
-    cache.clearDataSourceCacheBang(null, "users");
-    expect(cache.isCached("users")).toBe(false);
+    await cache.clearDataSourceCacheBang("courses");
+    await assertQueriesCount(1, true, async () => {
+      await cache.dataSourceExists("courses");
+    });
   });
 
   it("#columns_hash? is populated by #columns_hash", async () => {
-    const cache = new SchemaCache();
-    cache.setColumns("users", [makeColumn("id", "integer")]);
-    expect(cache.isColumnsHash(null, "users")).toBe(true);
-    const hash = await cache.columnsHash(null, "users");
-    expect(hash!["id"]).toBeInstanceOf(Column);
+    expect(await cache.isColumnsHash("courses")).toBeFalsy();
+
+    await cache.columnsHash("courses");
+
+    expect(await cache.isColumnsHash("courses")).toBeTruthy();
   });
 
   it("#columns_hash? is not populated by #data_source_exists?", async () => {
-    const cache = new SchemaCache();
-    const pool = new FakePool({
-      dataSources: async () => ["users"],
-      dataSourceExists: async () => true,
-    });
-    expect(await cache.dataSourceExists(pool, "users")).toBe(true);
-    expect(cache.isColumnsHash(null, "users")).toBe(false);
+    expect(await cache.isColumnsHash("courses")).toBeFalsy();
+
+    await cache.dataSourceExists("courses");
+
+    expect(await cache.isColumnsHash("courses")).toBeFalsy();
   });
 
   it("keeps _columns and _columnsHash in sync across set and clear", () => {
@@ -384,21 +389,38 @@ describe("SchemaCacheTest", () => {
   });
 
   it("when lazily load schema cache is set cache is lazily populated when est connection", async () => {
-    const cachePath = path.join(tmpDir, "schema_cache.json");
-    const cache = new SchemaCache();
-    await warm(cache, "gadgets", "id", [makeColumn("id", "integer")]);
-    await cache.dumpTo(cachePath);
+    const tempfile = Tempfile.new(["schema_cache-", ".yml"], tmpDir);
+    const originalConfig = Base.configurations().configsFor({
+      envName: "arunit2",
+      name: "primary",
+    });
+    const newConfig = { ...originalConfig!.configurationHash, schemaCachePath: tempfile.path()! };
 
-    const prevCheck = SchemaReflection.checkSchemaCacheDumpVersion;
-    SchemaReflection.checkSchemaCacheDumpVersion = false;
+    const oldConfig = lazilyLoadSchemaCache();
     try {
-      const reflection = new SchemaReflection(cachePath);
-      expect(reflection.loadedCache).toBeNull();
-      await reflection.loadBang(new FakePool({}));
-      expect(reflection.loadedCache).not.toBeNull();
-      expect(reflection.loadedCache!.isCached("gadgets")).toBe(true);
+      await Base.establishConnection(newConfig);
+
+      expect(Base.connectionPool().schemaReflection.loadedCache).toBeNull();
+
+      expect(await (await Base.schemaCache()).version()).not.toBeNull();
+
+      expect(File.isExist(tempfile.path()!)).toBeTruthy();
+      expect(Base.connectionPool().schemaReflection.loadedCache).not.toBeNull();
+
+      await Base.establishConnection(newConfig);
+
+      expect(File.isExist(tempfile.path()!)).toBeTruthy();
+      expect(Base.connectionPool().schemaReflection.loadedCache).toBeNull();
+
+      setLazilyLoadSchemaCache(true);
+      await Base.establishConnection(newConfig);
+      await (await Base.connectionPool().leaseConnection()).verifyBang();
+
+      expect(File.isExist(tempfile.path()!)).toBeTruthy();
+      expect(Base.connectionPool().schemaReflection.loadedCache).not.toBeNull();
     } finally {
-      SchemaReflection.checkSchemaCacheDumpVersion = prevCheck;
+      setLazilyLoadSchemaCache(oldConfig);
+      await Base.establishConnection("arunit");
     }
   });
   it("#init_with skips deduplication if told to", () => {
@@ -424,18 +446,31 @@ describe("SchemaCacheTest", () => {
     expect(columnsHash.get("t")!["id"]).toBe(col);
   });
 
-  it("#encode_with sorts members", async () => {
-    const cache = new SchemaCache();
-    await warm(cache, "zebras", "id", [makeColumn("id", "integer")]);
-    await warm(cache, "alpacas", "id", [makeColumn("id", "integer")]);
+  it("#encode_with sorts members", () => {
+    const values: [string, null][] = [
+      ["z", null],
+      ["y", null],
+      ["x", null],
+    ];
+    const expected = Object.fromEntries([...values].sort((a, b) => (a[0] < b[0] ? -1 : 1)));
 
-    const coder: Record<string, unknown> = {};
-    cache.encodeWith(coder);
+    const coder: Record<string, unknown> = {
+      columns: values,
+      primary_keys: values,
+      data_sources: values,
+      indexes: values,
+      deduplicated: true,
+    };
 
-    const colKeys = Object.keys(coder["columns"] as Record<string, unknown>);
-    expect(colKeys).toEqual(["alpacas", "zebras"]);
-    const pkKeys = Object.keys(coder["primary_keys"] as Record<string, unknown>);
-    expect(pkKeys).toEqual(["alpacas", "zebras"]);
+    const schemaCache = new SchemaCache();
+    schemaCache.initWith(coder);
+    schemaCache.encodeWith(coder);
+
+    expect(coder["columns"]).toEqual(expected);
+    expect(coder["primary_keys"]).toEqual(expected);
+    expect(coder["data_sources"]).toEqual(expected);
+    expect(coder["indexes"]).toEqual(expected);
+    expect("version" in coder).toBeTruthy();
   });
 
   it("stores and round-trips composite primary keys as arrays", async () => {
