@@ -259,7 +259,7 @@ describe("SerializedAttributeTest", () => {
         this.serialize("content", { type: HashObject });
       }
     }
-    const topic = await FlexTopic.create({ content: { zomg: true } as any });
+    const topic = new FlexTopic({ content: { zomg: true } } as any);
     expect(await topic.save()).toBeTruthy();
     FlexTopic.serialize("content", { type: Array });
     const found = await FlexTopic.find(topic.id as number);

@@ -62,8 +62,13 @@ describe("WhereChainTest", () => {
 
   it("associated with invalid association name", async () => {
     const run = async () => Post.all().where().associated("cars");
-    await expect(run()).rejects.toThrow(ArgumentError);
-    const e = await run().catch((err: Error) => err);
+    const e = await run().then(
+      () => undefined,
+      (err: Error) => err,
+    );
+    expect(() => {
+      throw e;
+    }).toThrow(ArgumentError);
     expect((e as Error).message).toMatch(
       /An association named `:cars` does not exist on the model `Post`\./,
     );
@@ -229,8 +234,13 @@ describe("WhereChainTest", () => {
 
   it("missing with invalid association name", async () => {
     const run = async () => Post.all().where().missing("cars");
-    await expect(run()).rejects.toThrow(ArgumentError);
-    const e = await run().catch((err: Error) => err);
+    const e = await run().then(
+      () => undefined,
+      (err: Error) => err,
+    );
+    expect(() => {
+      throw e;
+    }).toThrow(ArgumentError);
     expect((e as Error).message).toMatch(
       /An association named `:cars` does not exist on the model `Post`\./,
     );
