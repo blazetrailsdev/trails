@@ -13,7 +13,7 @@ import { StatementInvalid } from "../errors.js";
 import { SchemaStatements } from "./abstract/schema-statements.js";
 import type { SchemaQuoter } from "./abstract/assert-schema-adapter.js";
 import { include, assertRaises } from "@blazetrails/activesupport";
-import { File, Tempfile } from "@blazetrails/ruby-compat";
+import { File, FileUtils, Tempfile } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { fixtures } from "../test-fixtures.js";
 import { withSecondPool } from "../support/setup-second-pool.js";
@@ -129,12 +129,16 @@ describe("SchemaCacheTest", () => {
 
   it("cache path can be in directory", async () => {
     const cache = newBoundReflection();
-    const tmp_dir = fs.mkdtempSync(path.join(os.tmpdir(), "schema-cache-dir-"));
-    const filename = path.join(tmp_dir, "schema.json");
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "schema-cache-dir-"));
+    const filename = path.join(tmpDir, "schema.json");
 
-    expect(File.isExist(filename)).toBeFalsy();
-    expect(await cache.dumpTo(filename)).toBeTruthy();
-    expect(File.isExist(filename)).toBeTruthy();
+    try {
+      expect(File.isExist(filename)).toBeFalsy();
+      expect(await cache.dumpTo(filename)).toBeTruthy();
+      expect(File.isExist(filename)).toBeTruthy();
+    } finally {
+      FileUtils.rmR(tmpDir);
+    }
   });
 
   it("yaml dump and load with gzip", async () => {
