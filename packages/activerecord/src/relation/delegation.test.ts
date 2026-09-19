@@ -479,8 +479,6 @@ describe("DelegationCachingTest", () => {
     expect("target" in Relation.prototype).toEqual(false);
     expect("target" in CollectionProxy.prototype).toEqual(true);
 
-    const project = projects("active_record");
-    const proxy = (project as any).developersWithCallbacks;
     const original_owner = Object.getOwnPropertyDescriptor(
       CollectionProxy.prototype,
       "target",
@@ -489,6 +487,5 @@ describe("DelegationCachingTest", () => {
     expect(Object.getOwnPropertyDescriptor(CollectionProxy.prototype, "target")?.get).toEqual(
       original_owner,
     );
-    void proxy;
   });
 });
