@@ -1,7 +1,12 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { UnknownAttributeError, RecordNotUnique } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { assertDifference, assertEmpty, assertNoDifference } from "@blazetrails/activesupport";
+import {
+  assertDifference,
+  assertEmpty,
+  assertNoDifference,
+  assertRaises,
+} from "@blazetrails/activesupport";
 import { adapterType } from "./test-adapter.js";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { fixtures } from "./test-fixtures.js";
@@ -359,25 +364,18 @@ describe("InsertAllTest", () => {
     "insert all and upsert all raises when index is missing",
     async () => {
       for (const missingOrNonUniqueBy of ["cats", ["author_id", "isbn"], "author_id"] as const) {
-        let error!: Error;
-        await expect(
+        let error = await assertRaises([ArgumentError], {}, () =>
           Book.insertAll([{ name: "Rework", author_id: 1 }], {
             uniqueBy: missingOrNonUniqueBy as any,
-          }).catch((e: Error) => {
-            error = e;
-            throw e;
           }),
-        ).rejects.toThrow(ArgumentError);
+        );
         expect(error.message).toMatch("No unique index");
 
-        await expect(
+        error = await assertRaises([ArgumentError], {}, () =>
           Book.upsertAll([{ name: "Rework", author_id: 1 }], {
             uniqueBy: missingOrNonUniqueBy as any,
-          }).catch((e: Error) => {
-            error = e;
-            throw e;
           }),
-        ).rejects.toThrow(ArgumentError);
+        );
         expect(error.message).toMatch("No unique index");
       }
     },
@@ -425,13 +423,9 @@ describe("InsertAllTest", () => {
         },
       );
 
-      let error!: Error;
-      await expect(
-        Cart.insertAllBang([{ id: 2, shop_id: 1, title: "My cart" }]).catch((e: Error) => {
-          error = e;
-          throw e;
-        }),
-      ).rejects.toThrow(ArgumentError);
+      const error = await assertRaises([ArgumentError], {}, () =>
+        Cart.insertAllBang([{ id: 2, shop_id: 1, title: "My cart" }]),
+      );
       expect(error.message).toMatch("No unique index found for id");
     },
   );
@@ -596,15 +590,9 @@ describe("InsertAllTest", () => {
     "insert_conflict_target",
     "upsert all updates existing record by configured primary key fails when database supports insert conflict target",
     async () => {
-      let error!: Error;
-      await expect(
-        Speedometer.upsertAll([{ speedometer_id: "s1", name: "New Speedometer" }]).catch(
-          (e: Error) => {
-            error = e;
-            throw e;
-          },
-        ),
-      ).rejects.toThrow(ArgumentError);
+      const error = await assertRaises([ArgumentError], {}, () =>
+        Speedometer.upsertAll([{ speedometer_id: "s1", name: "New Speedometer" }]),
+      );
       expect(error.message).toMatch("No unique index found for speedometer_id");
     },
   );
@@ -1257,15 +1245,9 @@ describe("InsertAllTest", () => {
     "upsert all with unique by fails cleanly for adapters not supporting insert conflict target",
     async () => {
       const connection = await Base.leaseConnection();
-      let error!: Error;
-      await expect(
-        Book.upsertAll([{ name: "Rework", author_id: 1 }], { uniqueBy: "isbn" }).catch(
-          (e: Error) => {
-            error = e;
-            throw e;
-          },
-        ),
-      ).rejects.toThrow(ArgumentError);
+      const error = await assertRaises([ArgumentError], {}, () =>
+        Book.upsertAll([{ name: "Rework", author_id: 1 }], { uniqueBy: "isbn" }),
+      );
       expect(error.message).toMatch(`${connection.constructor.name} does not support :unique_by`);
     },
   );
