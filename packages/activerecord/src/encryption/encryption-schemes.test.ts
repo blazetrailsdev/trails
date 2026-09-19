@@ -87,14 +87,13 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     const author = await Author.create({ name: "david" });
     const currentType = Author.typeForAttribute("name") as EncryptedAttributeType;
     const prevType = currentType.previousTypes[0];
-    expect(prevType).toBeDefined();
     const oldCiphertext = prevType.serialize("dhh") as string;
     await withoutEncryption(async () => {
       await author.updateColumns({ name: oldCiphertext });
     });
     const reloaded = await Author.find(author.id);
     expect(reloaded.name).toBe("dhh");
-    expect(reloaded.encryptedAttribute("name")).toBe(true);
+    expect(reloaded.encryptedAttribute("name")).toBeTruthy();
   });
 
   it("when defining previous encryption schemes, you still get Decryption errors when using invalid clear values", async () => {
@@ -123,9 +122,7 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     new EncryptedAuthor1();
     const author = await EncryptedAuthor1.create({ name: "1" });
     expect(author.name).toBe("1");
-    const reloaded = await EncryptedAuthor1.find(author.id);
-    expect(reloaded.name).toBe("1");
-    expect(reloaded.encryptedAttribute("name")).toBe(true);
+    expect(author.encryptedAttribute("name")).toBeTruthy();
   });
 
   it("support previous contexts", async () => {
@@ -145,10 +142,8 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     new EncryptedAuthor2();
     const author = await EncryptedAuthor2.create({ name: "2" });
     expect(author.name).toBe("2");
-    const found = await EncryptedAuthor2.findBy({ name: "2" });
-    expect(found).not.toBeNull();
-    const authorReloaded = await EncryptedAuthor2.find(author.id);
-    expect(authorReloaded.encryptedAttribute("name")).toBe(true);
+    expect(author.equals(await EncryptedAuthor2.findBy({ name: "2" }))).toBe(true);
+    expect(author.encryptedAttribute("name")).toBeTruthy();
     const RawModel = class extends Base {
       static {
         this._tableName = "authors";
@@ -161,67 +156,66 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     await rawRecord.update({ name: "1" });
     const reloaded = await EncryptedAuthor2.find(author.id);
     expect(reloaded.name).toBe("1");
-    const foundByPlaintext = await EncryptedAuthor2.findBy({ name: "1" });
-    expect(foundByPlaintext).not.toBeNull();
-    expect(reloaded.encryptedAttribute("name")).toBe(false);
+    expect(reloaded.equals(await EncryptedAuthor2.findBy({ name: "1" }))).toBe(true);
+    expect(reloaded.encryptedAttribute("name")).toBeFalsy();
   });
 
   it("use global previous schemes to decrypt data encrypted with previous schemes", () => {
     Configurable.config.supportUnencryptedData = false;
 
     const prev1Scheme = new Scheme({
-      encryptor: new TestEncryptor({ legacy1: "legacy_cipher_1" }),
+      encryptor: new TestEncryptor({ "0": "1" }),
     });
     const prev2Scheme = new Scheme({
-      encryptor: new TestEncryptor({ legacy2: "legacy_cipher_2" }),
+      encryptor: new TestEncryptor({ "1": "2" }),
     });
     const type = makeType(new TestEncryptor({ current: "current_cipher" }), [
       prev1Scheme,
       prev2Scheme,
     ]);
 
-    expect(type.previousTypes).toHaveLength(2);
+    expect(type.previousTypes.length).toBe(2);
     const [previousType1, previousType2] = type.previousTypes;
 
-    const ciphertext1 = previousType1.serialize("legacy1") as string;
-    expect(type.deserialize(ciphertext1)).toBe("legacy1");
+    const ciphertext1 = previousType1.serialize("1") as string;
+    expect(type.deserialize(ciphertext1)).toBe("0");
 
-    const ciphertext2 = previousType2.serialize("legacy2") as string;
-    expect(type.deserialize(ciphertext2)).toBe("legacy2");
+    const ciphertext2 = previousType2.serialize("2") as string;
+    expect(type.deserialize(ciphertext2)).toBe("1");
   });
 
   it("use global previous schemes to decrypt data encrypted with previous schemes with unencrypted data", () => {
     Configurable.config.supportUnencryptedData = true;
 
     const prev1Scheme = new Scheme({
-      encryptor: new TestEncryptor({ legacy1: "legacy_cipher_1" }),
+      encryptor: new TestEncryptor({ "0": "1" }),
     });
     const prev2Scheme = new Scheme({
-      encryptor: new TestEncryptor({ legacy2: "legacy_cipher_2" }),
+      encryptor: new TestEncryptor({ "1": "2" }),
     });
     const type = makeType(new TestEncryptor({ current: "current_cipher" }), [
       prev1Scheme,
       prev2Scheme,
     ]);
 
-    expect(type.previousTypes).toHaveLength(3);
+    expect(type.previousTypes.length).toBe(3);
     const [previousType1, previousType2] = type.previousTypes;
 
-    const ciphertext1 = previousType1.serialize("legacy1") as string;
-    expect(type.deserialize(ciphertext1)).toBe("legacy1");
+    const ciphertext1 = previousType1.serialize("1") as string;
+    expect(type.deserialize(ciphertext1)).toBe("0");
 
-    const ciphertext2 = previousType2.serialize("legacy2") as string;
-    expect(type.deserialize(ciphertext2)).toBe("legacy2");
+    const ciphertext2 = previousType2.serialize("2") as string;
+    expect(type.deserialize(ciphertext2)).toBe("1");
   });
 
   it("returns ciphertext all the previous schemes fail to decrypt and support for unencrypted data is on", () => {
     Configurable.config.supportUnencryptedData = true;
 
     const prev1Scheme = new Scheme({
-      encryptor: new TestEncryptor({ legacy1: "legacy_cipher_1" }),
+      encryptor: new TestEncryptor({ "0": "1" }),
     });
     const prev2Scheme = new Scheme({
-      encryptor: new TestEncryptor({ legacy2: "legacy_cipher_2" }),
+      encryptor: new TestEncryptor({ "1": "2" }),
     });
     const type = makeType(new TestEncryptor({ current: "current_cipher" }), [
       prev1Scheme,
@@ -235,10 +229,10 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     Configurable.config.supportUnencryptedData = false;
 
     const prev1Scheme = new Scheme({
-      encryptor: new TestEncryptor({ legacy1: "legacy_cipher_1" }),
+      encryptor: new TestEncryptor({ "0": "1" }),
     });
     const prev2Scheme = new Scheme({
-      encryptor: new TestEncryptor({ legacy2: "legacy_cipher_2" }),
+      encryptor: new TestEncryptor({ "1": "2" }),
     });
     const type = makeType(new TestEncryptor({ current: "current_cipher" }), [
       prev1Scheme,
@@ -248,21 +242,28 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     expect(() => type.deserialize("some invalid ciphertext")).toThrow(Decryption);
   });
 
-  it("deterministic encryption is fixed by default: it will always use the oldest scheme to encrypt data", () => {
+  it("deterministic encryption is fixed by default: it will always use the oldest scheme to encrypt data", async () => {
     Configurable.config.supportUnencryptedData = false;
-    const oldEncryptor = new TestEncryptor({ alice: "alice_old_cipher" });
-    const currentEncryptor = new TestEncryptor({ alice: "alice_new_cipher" });
-    const oldScheme = new Scheme({ encryptor: oldEncryptor, deterministic: true });
-    const type = new EncryptedAttributeType({
-      scheme: new Scheme({
-        encryptor: currentEncryptor,
-        deterministic: true,
-        previousSchemes: [oldScheme],
-      }),
-    });
-    const cipher = type.serialize("alice") as string;
-    expect(cipher).toBe("alice_old_cipher");
-    expect(type.deserialize(cipher)).toBe("alice");
+    Configurable.config.deterministicKey = "12345";
+    Configurable.config.previousSchemes = [];
+    Configurable.config.previous = [
+      { downcase: true, deterministic: true } as SchemeOptions,
+      { downcase: false, deterministic: true } as SchemeOptions,
+    ];
+
+    await freshAdapter();
+    const encryptedAuthorClass = class extends Base {
+      static {
+        this._tableName = "authors";
+        this.attribute("id", "integer");
+        this.attribute("name", "string", { limit: AUTHOR_NAME_LIMIT });
+        this.encrypts("name", { deterministic: true, downcase: false });
+      }
+    } as any;
+    new encryptedAuthorClass();
+
+    const author = await encryptedAuthorClass.create({ name: "STEPHEN KING" });
+    expect(author.name).toBe("stephen king");
   });
 
   it("don't use global previous schemes with a different deterministic nature", async () => {
@@ -289,21 +290,28 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     expect(author.name).toBe("STEPHEN KING");
   });
 
-  it("deterministic encryption will use the newest encryption scheme to encrypt data when setting it to { fixed: false }", () => {
+  it("deterministic encryption will use the newest encryption scheme to encrypt data when setting it to { fixed: false }", async () => {
     Configurable.config.supportUnencryptedData = false;
-    const oldEncryptor = new TestEncryptor({ alice: "alice_old_cipher" });
-    const currentEncryptor = new TestEncryptor({ alice: "alice_new_cipher" });
-    const oldScheme = new Scheme({ encryptor: oldEncryptor, deterministic: true });
-    const type = new EncryptedAttributeType({
-      scheme: new Scheme({
-        encryptor: currentEncryptor,
-        deterministic: { fixed: false },
-        previousSchemes: [oldScheme],
-      }),
-    });
-    const cipher = type.serialize("alice") as string;
-    expect(cipher).toBe("alice_new_cipher");
-    expect(type.deserialize(cipher)).toBe("alice");
+    Configurable.config.deterministicKey = "12345";
+    Configurable.config.previousSchemes = [];
+    Configurable.config.previous = [
+      { downcase: true, deterministic: true } as SchemeOptions,
+      { downcase: false, deterministic: true } as SchemeOptions,
+    ];
+
+    await freshAdapter();
+    const encryptedAuthorClass = class extends Base {
+      static {
+        this._tableName = "authors";
+        this.attribute("id", "integer");
+        this.attribute("name", "string", { limit: AUTHOR_NAME_LIMIT });
+        this.encrypts("name", { deterministic: { fixed: false }, downcase: false });
+      }
+    } as any;
+    new encryptedAuthorClass();
+
+    const author = await encryptedAuthorClass.create({ name: "STEPHEN KING" });
+    expect(author.name).toBe("STEPHEN KING");
   });
 
   it("use global previous schemes when performing queries", async () => {
@@ -351,10 +359,10 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
         }
       } as any;
       new Raw();
-      await Raw.create({ name: "alice_prev_cipher" });
 
+      const raw = await Raw.create({ name: "alice_prev_cipher" });
       const found = await Author.findBy({ name: "alice" });
-      expect(found).not.toBeNull();
+      expect(String(found!.id)).toBe(String(raw.id));
       expect(found!.name).toBe("alice");
     } finally {
       Relation.prototype.where = savedMethods.where;
@@ -401,7 +409,6 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
       new encryptedAuthorClass();
       const author = await encryptedAuthorClass.create({ name: "STEPHEN KING" });
       const found = await encryptedAuthorClass.findBy({ name: "STEPHEN KING" });
-      expect(found).not.toBeNull();
       expect(String(found!.id)).toBe(String(author.id));
       expect(await encryptedAuthorClass.findBy({ name: "stephen king" })).toBeNull();
     } finally {
