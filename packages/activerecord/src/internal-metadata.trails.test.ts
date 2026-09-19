@@ -38,6 +38,7 @@ describe("InternalMetadata#currentTime", () => {
   });
 
   afterAll(() => {
+    vi.restoreAllMocks();
     vi.useRealTimers();
     vi.unstubAllEnvs();
     resetLocalTimeZoneId();
