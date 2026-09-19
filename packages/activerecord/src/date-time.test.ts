@@ -106,12 +106,12 @@ describe("DateTimeTest", () => {
   it("date time with string value with subsecond precision", async () => {
     const stringValue = "2017-07-04 14:19:00.5";
     const topic = await Topic.create({ written_on: stringValue });
-    expect((await Topic.findBy({ written_on: stringValue }))?.id).toEqual(topic.id);
+    expect(topic.equals(await Topic.findBy({ written_on: stringValue }))).toBe(true);
   });
 
   it("date time with string value with non iso format", async () => {
     const stringValue = "04/07/2017 2:19pm";
     const topic = await Topic.create({ written_on: stringValue });
-    expect((await Topic.findBy({ written_on: stringValue }))?.id).toEqual(topic.id);
+    expect(topic.equals(await Topic.findBy({ written_on: stringValue }))).toBe(true);
   });
 });
