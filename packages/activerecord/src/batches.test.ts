@@ -540,10 +540,14 @@ describe("EachTest", () => {
     await posts;
     const total = Number(await Post.count());
     let batchCount = 0;
+    let lastId = Math.min(...(await posts).map((p: any) => p.id));
     await assertQueriesCount(0, false, async () => {
       for await (const relation of posts.inBatches({ of: 1 })) {
         batchCount++;
         expect(relation).toBeInstanceOf(Relation);
+        const ids = (await relation.toArray()).map((p: any) => p.id);
+        expect(lastId).toBeLessThanOrEqual(Math.min(...ids));
+        lastId = Math.min(...ids);
       }
     });
     expect(batchCount).toBe(total);
@@ -554,10 +558,14 @@ describe("EachTest", () => {
     await allPosts;
     const total = Number(await Post.count());
     let batchCount = 0;
+    let lastId = Math.max(...(await allPosts).map((p: any) => p.id));
     await assertQueriesCount(0, false, async () => {
       for await (const relation of allPosts.inBatches({ of: 1, order: "desc" })) {
         batchCount++;
         expect(relation).toBeInstanceOf(Relation);
+        const ids = (await relation.toArray()).map((p: any) => p.id);
+        expect(lastId).toBeGreaterThanOrEqual(Math.max(...ids));
+        lastId = Math.max(...ids);
       }
     });
     expect(batchCount).toBe(total);
