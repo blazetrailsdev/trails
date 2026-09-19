@@ -79,7 +79,6 @@
   "packages/activerecord/src/autosave-association.test.ts::Post::belongsTo::author",
   "packages/activerecord/src/autosave-association.trails.test.ts::Child::belongsTo::parent",
   "packages/activerecord/src/autosave-association.trails.test.ts::Post::belongsTo::author",
-  "packages/activerecord/src/locking.test.ts::LockPerson::hasMany::lockPersonalLegacyThings",
   "packages/activerecord/src/reflection.test.ts::<dynamic>::belongsTo::author",
   "packages/activerecord/src/reflection.test.ts::<dynamic>::belongsTo::post",
   "packages/activerecord/src/reflection.test.ts::<dynamic>::hasMany::comments",
