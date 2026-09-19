@@ -36,7 +36,7 @@ describe("DefaultTest", () => {
     const columns = Entrant.columnsHash();
     for (const name of ["id", "name", "course_id"]) {
       const column = columns[name];
-      expect(column.null).toBe(false);
+      expect(column.null).toBeFalsy();
       expect(column.default).toBeFalsy();
     }
   });
@@ -50,7 +50,7 @@ describe.skipIf(adapterType === "mysql")("DefaultTest", () => {
     }
     await Default.loadSchema();
     const multiline = (new Default() as any).multiline_default;
-    expect(["--- []\n\n", "--- []\\012\\012"]).toContain(multiline);
+    expect(multiline === "--- []\n\n" || multiline === "--- []\\012\\012").toBeTruthy();
   });
 });
 
@@ -202,16 +202,31 @@ describeIfPostgresqlAdapter("PostgresqlDefaultExpressionTest", () => {
 
   it("schema dump includes default expression", async () => {
     const output = await dumpTableSchema(adapter as unknown as SchemaSource, "defaults");
-    expect(output).toMatch(/t\.date\("modified_date", \{ default: \(\) => "CURRENT_DATE" \}\)/);
-    expect(output).toMatch(
-      /t\.datetime\("modified_time", \{ default: \(\) => "CURRENT_TIMESTAMP" \}\)/,
-    );
-    expect(output).toMatch(
-      /t\.datetime\("modified_time_without_precision", \{ precision: null, default: \(\) => "CURRENT_TIMESTAMP" \}\)/,
-    );
-    expect(output).toMatch(
-      /t\.datetime\("modified_time_with_precision_0", \{ precision: 0, default: \(\) => "CURRENT_TIMESTAMP" \}\)/,
-    );
+    const version = await adapter.databaseVersion;
+    // eslint-disable-next-line blazetrails/no-conditional-in-test -- mirrors defaults_test.rb:152
+    if (typeof version === "number" && version >= 100000) {
+      expect(output).toMatch(/t\.date\("modified_date", \{ default: \(\) => "CURRENT_DATE" \}\)/);
+      expect(output).toMatch(
+        /t\.datetime\("modified_time", \{ default: \(\) => "CURRENT_TIMESTAMP" \}\)/,
+      );
+      expect(output).toMatch(
+        /t\.datetime\("modified_time_without_precision", \{ precision: null, default: \(\) => "CURRENT_TIMESTAMP" \}\)/,
+      );
+      expect(output).toMatch(
+        /t\.datetime\("modified_time_with_precision_0", \{ precision: 0, default: \(\) => "CURRENT_TIMESTAMP" \}\)/,
+      );
+    } else {
+      expect(output).toMatch(
+        /t\.date\("modified_date", \{ default: \(\) => "\('now'::text\)::date" \}\)/,
+      );
+      expect(output).toMatch(/t\.datetime\("modified_time", \{ default: \(\) => "now\(\)" \}\)/);
+      expect(output).toMatch(
+        /t\.datetime\("modified_time_without_precision", \{ precision: null, default: \(\) => "now\(\)" \}\)/,
+      );
+      expect(output).toMatch(
+        /t\.datetime\("modified_time_with_precision_0", \{ precision: 0, default: \(\) => "now\(\)" \}\)/,
+      );
+    }
     expect(output).toMatch(/t\.date\("modified_date_function", \{ default: \(\) => "now\(\)" \}\)/);
     expect(output).toMatch(
       /t\.datetime\("modified_time_function", \{ default: \(\) => "now\(\)" \}\)/,
@@ -334,7 +349,6 @@ describeIfMysqlAdapter("DefaultsTestWithoutTransactionalFixtures", () => {
       expect((record as any).non_null_integer).toBe(0);
       expect((record as any).non_null_string).toBe("");
       expect((record as any).non_null_text).toBe("");
-      expect(new Uint8Array((record as any).non_null_blob)).toEqual(new Uint8Array(0));
       expect(decodeBinaryDefault((record as any).non_null_blob)).toBe("");
     });
   });

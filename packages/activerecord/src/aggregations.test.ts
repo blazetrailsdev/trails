@@ -31,7 +31,7 @@ describe("AggregationsTest", () => {
 
   it("find multiple value object", () => {
     const david = customers("david") as CustomerModel & { address: Address };
-    expect(david.address.street).toBe(david.readAttribute("address_street"));
+    expect(david.address.street).toEqual(david.readAttribute("address_street"));
     expect(
       david.address.closeToQ(
         new Address(
@@ -40,7 +40,7 @@ describe("AggregationsTest", () => {
           david.readAttribute("address_country") as string,
         ),
       ),
-    ).toBe(true);
+    ).toBeTruthy();
   });
 
   it("change single value object", async () => {
@@ -105,10 +105,10 @@ describe("AggregationsTest", () => {
   });
 
   it("do not run the converter when nil was set", () => {
-    CustomerModel.gpsConversionWasRun = false;
+    CustomerModel.gpsConversionWasRun = null;
     const david = customers("david") as CustomerModel & { nonBlankGpsLocation: unknown };
     david.nonBlankGpsLocation = null;
-    expect(CustomerModel.gpsConversionWasRun).toBe(false);
+    expect(CustomerModel.gpsConversionWasRun).toBeNull();
   });
 
   it("inferred mapping", async () => {
@@ -131,7 +131,7 @@ describe("AggregationsTest", () => {
   });
 
   it("gps inequality", () => {
-    expect(new GpsLocation("39x110").equals(new GpsLocation("39x111"))).toBe(false);
+    expect(new GpsLocation("39x110")).not.toEqual(new GpsLocation("39x111"));
   });
 
   it("custom constructor", () => {
@@ -245,9 +245,7 @@ describe("OverridingAggregationsTest", () => {
     }
     const personRef = reflectOnAggregation(PersonBase, "composedOf");
     const differentRef = reflectOnAggregation(DifferentPerson, "composedOf");
-    expect(personRef).not.toBeNull();
-    expect(differentRef).not.toBeNull();
-    expect(personRef).not.toBe(differentRef);
+    expect(personRef).not.toEqual(differentRef);
   });
 });
 

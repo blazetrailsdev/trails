@@ -93,7 +93,7 @@ export class Fullname {
 
 export class Customer extends Base {
   declare address: Address | null;
-  static gpsConversionWasRun = false;
+  static gpsConversionWasRun: boolean | null = null;
 
   static {
     composedOf(this, "address", {

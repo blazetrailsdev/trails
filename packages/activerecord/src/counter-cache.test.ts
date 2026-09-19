@@ -21,7 +21,9 @@ import { Category } from "./test-helpers/models/category.js";
 import { Categorization } from "./test-helpers/models/categorization.js";
 import { CpkOrder, CpkBook } from "./test-helpers/models/cpk.js";
 import { fixtures } from "./test-fixtures.js";
-import { assertQueriesCount } from "./testing/query-assertions.js";
+import { ArgumentError } from "@blazetrails/ruby-compat";
+import { assertNothingRaised } from "@blazetrails/activesupport";
+import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
 
 for (const model of [
   Topic,
@@ -276,19 +278,12 @@ describe("CounterCacheTest", () => {
 
   it("reset counter with belongs_to which has class_name", async () => {
     const car = cars("honda");
-    let error: unknown;
-    try {
+    await assertNothingRaised(async () => {
       await Car.resetCounters(car.id, "engines");
-    } catch (e) {
-      error = e;
-    }
-    expect(error).toBeUndefined();
-    try {
+    });
+    await assertNothingRaised(async () => {
       await Car.resetCounters(car.id, "wheels");
-    } catch (e) {
-      error = e;
-    }
-    expect(error).toBeUndefined();
+    });
   });
 
   it("reset the right counter if two have the same class_name", async () => {
@@ -439,13 +434,9 @@ describe("CounterCacheTest", () => {
 
   it("reset the right counter if two have the same foreign key", async () => {
     const michael = people("michael");
-    let error: unknown;
-    try {
+    await assertNothingRaised(async () => {
       await Person.resetCounters(michael.id, "friendsToo");
-    } catch (e) {
-      error = e;
-    }
-    expect(error).toBeUndefined();
+    });
   });
 
   it("reset counter of has_many :through association", async () => {
@@ -468,13 +459,13 @@ describe("CounterCacheTest", () => {
   });
 
   it("the passed symbol needs to be an association name or counter name", async () => {
-    let message = "";
-    try {
-      await Topic.resetCounters(topic.id, "undefined_count");
-    } catch (e) {
-      message = (e as Error).message;
-    }
-    expect(message).toBe("'Topic' has no association called 'undefined_count'");
+    const e: unknown = await Topic.resetCounters(topic.id, "undefined_count").catch((err) => err);
+    expect(() => {
+      throw e;
+    }).toThrow(ArgumentError);
+    expect((e as ArgumentError).message).toEqual(
+      "'Topic' has no association called 'undefined_count'",
+    );
   });
 
   it("reset counter works with select declared on association", async () => {
@@ -741,8 +732,8 @@ describe("CounterCacheTest", () => {
   });
 
   it("counter_cache_column?", () => {
-    expect(Person.isCounterCacheColumn("cars_count")).toBe(true);
-    expect(Car.isCounterCacheColumn("cars_count")).toBe(false);
+    expect(Person.isCounterCacheColumn("cars_count")).toBeTruthy();
+    expect(Car.isCounterCacheColumn("cars_count")).toBeFalsy();
   });
 
   it("inactive counter cache", async () => {
@@ -750,15 +741,15 @@ describe("CounterCacheTest", () => {
     await association(car, "bulbs").replace([new Bulb(), new Bulb()]);
     await car.save();
 
-    expect(car.bulbs_count).toBe(2);
+    expect(car.bulbs_count).toEqual(2);
     await car.reload();
 
     await assertQueriesCount(5, false, async () => {
-      expect(await (car as any).bulbs.size()).toBe(2);
-      expect(await (car as any).bulbs.count()).toBe(2);
-      expect(await (car as any).bulbs.isEmpty()).toBe(false);
-      expect(await (car as any).bulbs.isAny()).toBe(true);
-      expect(await (car as any).bulbs.isNone()).toBe(false);
+      expect(await (car as any).bulbs.size()).toEqual(2);
+      expect(await (car as any).bulbs.count()).toEqual(2);
+      expect(await (car as any).bulbs.isEmpty()).toBeFalsy();
+      expect(await (car as any).bulbs.isAny()).toBeTruthy();
+      expect(await (car as any).bulbs.isNone()).toBeFalsy();
     });
   });
 
@@ -767,18 +758,18 @@ describe("CounterCacheTest", () => {
     await association(car, "tyres").replace([new Tyre(), new Tyre()]);
     await car.save();
 
-    expect(car.custom_tyres_count).toBe(2);
+    expect(car.custom_tyres_count).toEqual(2);
     await car.reload();
 
-    await assertQueriesCount(0, false, async () => {
-      expect(await (car as any).tyres.size()).toBe(2);
-      expect(await (car as any).tyres.isEmpty()).toBe(false);
-      expect(await (car as any).tyres.isAny()).toBe(true);
-      expect(await (car as any).tyres.isNone()).toBe(false);
+    await assertNoQueries(false, async () => {
+      expect(await (car as any).tyres.size()).toEqual(2);
+      expect(await (car as any).tyres.isEmpty()).toBeFalsy();
+      expect(await (car as any).tyres.isAny()).toBeTruthy();
+      expect(await (car as any).tyres.isNone()).toBeFalsy();
     });
 
     await assertQueriesCount(1, false, async () => {
-      expect(await (car as any).tyres.count()).toBe(2);
+      expect(await (car as any).tyres.count()).toEqual(2);
     });
   });
 });

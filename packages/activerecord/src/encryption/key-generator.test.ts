@@ -45,9 +45,7 @@ describe("ActiveRecord::Encryption::KeyGeneratorTest", () => {
   it("generate_random_hex_key generates random hexadecimal keys with the cipher key length by default", () => {
     const gen = new KeyGenerator();
     expect(gen.generateRandomHexKey()).not.toBe(gen.generateRandomHexKey());
-    const key = gen.generateRandomHexKey();
-    expect(key.length).toBe(64);
-    expect(key).toMatch(/^[0-9a-f]+$/);
+    expect(Buffer.from(gen.generateRandomHexKey(), "hex").length).toBe(32);
   });
 
   it("generate_random_hex_key generates random hexadecimal keys with a custom length", () => {
@@ -55,9 +53,7 @@ describe("ActiveRecord::Encryption::KeyGeneratorTest", () => {
     expect(gen.generateRandomHexKey({ length: 10 })).not.toBe(
       gen.generateRandomHexKey({ length: 10 }),
     );
-    const key = gen.generateRandomHexKey({ length: 10 });
-    expect(key.length).toBe(20);
-    expect(key).toMatch(/^[0-9a-f]+$/);
+    expect(Buffer.from(gen.generateRandomHexKey({ length: 10 }), "hex").length).toBe(10);
   });
 
   it("derive keys using the configured digest algorithm", () => {

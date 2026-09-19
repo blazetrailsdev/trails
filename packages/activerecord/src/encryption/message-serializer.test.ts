@@ -1,46 +1,41 @@
 import { describe, it, expect } from "vitest";
 import { MessageSerializer } from "./message-serializer.js";
 import { Message } from "./message.js";
+import { ArgumentError, JSON as RubyJSON } from "@blazetrails/ruby-compat";
 import { Decryption, ForbiddenClass } from "./errors.js";
 
 describe("ActiveRecord::Encryption::MessageSerializerTest", () => {
   it("serializes messages", () => {
     const serializer = new MessageSerializer();
-    const message = new Message({ payload: "hello" });
-    message.headers.set("iv", "test-iv");
-    const serialized = serializer.dump(message);
-    const loaded = serializer.load(serialized);
-    expect(loaded.payload.toString()).toBe("hello");
-    expect((loaded.headers.get("iv") as Buffer).toString()).toBe("test-iv");
-    expect(message.equals(loaded)).toBe(true);
+    const message = new Message({ payload: "some payload", headers: { key_1: "1" } });
+    const deserialized_message = serializer.load(serializer.dump(message));
+    expect(deserialized_message.equals(message)).toEqual(true);
   });
 
   it("serializes messages with nested messages in their headers", () => {
     const serializer = new MessageSerializer();
-    const inner = new Message({ payload: "inner-payload" });
-    inner.headers.set("iv", "inner-iv");
+    const message = new Message({ payload: "some payload", headers: { key_1: "1" } });
+    message.headers.set(
+      "other_message",
+      new Message({
+        payload: "some other secret payload",
+        headers: { some_header: "some other value" },
+      }),
+    );
 
-    const outer = new Message({ payload: "outer-payload" });
-    outer.headers.set("nested", inner);
-
-    const serialized = serializer.dump(outer);
-    const loaded = serializer.load(serialized);
-    expect(loaded.payload.toString()).toBe("outer-payload");
-    const nested = loaded.headers.get("nested") as Message;
-    expect(nested).toBeInstanceOf(Message);
-    expect(nested.payload.toString()).toBe("inner-payload");
-    expect(outer.equals(loaded)).toBe(true);
+    const deserialized_message = serializer.load(serializer.dump(message));
+    expect(deserialized_message.equals(message)).toEqual(true);
   });
 
   it("won't load classes from JSON", () => {
     const serializer = new MessageSerializer();
-    const malicious = JSON.stringify({
-      p: Buffer.from("test").toString("base64"),
-      h: {},
-      __proto__: { admin: true },
+    const class_loading_payload = RubyJSON.dump({
+      p: Buffer.from("Some payload").toString("base64"),
+      json_class: "MessageSerializerTest::SomeClassThatWillNeverExist",
     });
-    const loaded = serializer.load(malicious);
-    expect(loaded.payload.toString()).toBe("test");
+
+    expect(() => RubyJSON.load(class_loading_payload)).toThrow(ArgumentError);
+    expect(() => serializer.load(class_loading_payload)).not.toThrow();
   });
 
   it("detects random JSON data and raises a decryption error", () => {

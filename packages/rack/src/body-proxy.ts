@@ -6,6 +6,16 @@ export class BodyProxy {
   constructor(body: any, block: () => void) {
     this.body = body;
     this.block = block;
+    return new Proxy(this, {
+      has: (target, prop) =>
+        Reflect.has(target, prop) || (typeof prop === "string" && target.respondTo(prop)),
+      get: (target, prop, receiver) => {
+        if (Reflect.has(target, prop) || typeof prop !== "string" || !target.respondTo(prop)) {
+          return Reflect.get(target, prop, receiver);
+        }
+        return (...args: unknown[]) => target.delegate(prop, ...args);
+      },
+    });
   }
 
   close(): void {
@@ -72,7 +82,7 @@ export class BodyProxy {
     return typeof this.body?.[method] === "function";
   }
 
-  delegate(method: string, ...args: any[]): any {
+  delegate(method: string, ...args: unknown[]): any {
     if (method === "toStr" || method === "to_str") {
       throw new Error("NoMethodError: undefined method 'to_str'");
     }

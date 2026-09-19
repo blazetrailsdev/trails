@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-namespace -- Ruby's `JSON` module is a
    namespace of module functions; ESM syntax cannot spell `JSON.dump`. */
+import { ArgumentError } from "./argument-error.js";
+
 const globalJSON = globalThis.JSON;
 
 /**
@@ -22,11 +24,33 @@ const globalJSON = globalThis.JSON;
  * with the interpreter, so no Rails file defines them.
  */
 export namespace JSON {
+  /** @noRailsEquivalent PERMANENT */
+  export function deepConstGet(path: string): unknown {
+    let constant: unknown = globalThis;
+    for (const name of path.split("::").filter((segment, i) => i > 0 || segment !== "")) {
+      if (
+        constant === null ||
+        (typeof constant !== "object" && typeof constant !== "function") ||
+        !(name in constant)
+      ) {
+        throw new ArgumentError(`can't get const ${path}: uninitialized constant ${name}`);
+      }
+      constant = (constant as Record<string, unknown>)[name];
+    }
+    return constant;
+  }
+
   export function dump(value: unknown): string {
     return globalJSON.stringify(value) ?? "null";
   }
 
   export function load(dumped: string): unknown {
-    return globalJSON.parse(dumped);
+    return globalJSON.parse(dumped, (_key, value) => {
+      if (value !== null && typeof value === "object" && typeof value.json_class === "string") {
+        const klass = deepConstGet(value.json_class) as { jsonCreate?: (hash: object) => unknown };
+        if (typeof klass?.jsonCreate === "function") return klass.jsonCreate(value);
+      }
+      return value;
+    });
   }
 }

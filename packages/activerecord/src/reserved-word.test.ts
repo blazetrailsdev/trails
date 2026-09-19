@@ -4,6 +4,7 @@ import "./relation.js";
 import { Associations } from "./associations.js";
 import { fixtures } from "./test-fixtures.js";
 import { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
+import { assertNothingRaised } from "@blazetrails/activesupport";
 import { assertNoQueries } from "./testing/query-assertions.js";
 import { FixtureSet } from "./fixtures.js";
 import { reservedWordsGroupFixtureData } from "./test-helpers/fixtures/reserved-words/group.js";
@@ -90,15 +91,15 @@ async function createTestFixtures(...names: (keyof typeof fixturesDirectory)[]):
 describe("ReservedWordTest", () => {
   it("create tables", async () => {
     const conn = schema();
-    expect(await conn.tableExists("order")).toBe(false);
+    expect(await conn.tableExists("order")).toBeFalsy();
     await conn.createTable("order", { force: true }, (t) => {
       t.string("group");
     });
-    expect(await conn.tableExists("order")).toBe(true);
+    expect(await conn.tableExists("order")).toBeTruthy();
   });
 
   it("rename tables", async () => {
-    await expect(schema().renameTable("group", "order")).resolves.toBeUndefined();
+    await assertNothingRaised(() => schema().renameTable("group", "order"));
   });
 
   it("change columns", async () => {
@@ -107,9 +108,9 @@ describe("ReservedWordTest", () => {
       changeColumn(t: string, c: string, ty: string, o?: Record<string, unknown>): Promise<void>;
       renameColumn(t: string, c: string, n: string): Promise<void>;
     };
-    await conn.changeColumnDefault("group", "order", "whatever");
-    await conn.changeColumn("group", "order", "text", { default: null });
-    await conn.renameColumn("group", "order", "values");
+    await assertNothingRaised(() => conn.changeColumnDefault("group", "order", "whatever"));
+    await assertNothingRaised(() => conn.changeColumn("group", "order", "text", { default: null }));
+    await assertNothingRaised(() => conn.renameColumn("group", "order", "values"));
   });
 
   it("introspect", async () => {
@@ -134,7 +135,7 @@ describe("ReservedWordTest", () => {
     await createTestFixtures("values");
     expect(await Values.order(":as").limit(1).offset(1).deleteAll()).toBe(1);
     await expect(Values.find(2)).rejects.toThrow(RecordNotFound);
-    expect(await Values.find(1)).not.toBeNull();
+    expect(await Values.find(1)).toBeTruthy();
   });
 
   it("has one associations", async () => {
@@ -163,7 +164,7 @@ describe("ReservedWordTest", () => {
   });
 
   it("activerecord introspection", async () => {
-    expect(await Group.tableExists()).toBe(true);
+    expect(await Group.tableExists()).toBeTruthy();
     const cols = Group.columns()
       .map((c: { name: string }) => c.name)
       .sort();

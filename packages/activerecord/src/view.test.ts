@@ -48,15 +48,15 @@ describeIfSupports("views", "ViewWithPrimaryKeyTest", () => {
   });
 
   itIfSupports("views", "view exists", async () => {
-    expect(await (await conn()).viewExists(Ebook._tableName)).toBe(true);
+    expect(await (await conn()).viewExists(Ebook._tableName)).toBeTruthy();
   });
 
   itIfSupports("views", "table exists", async () => {
-    expect(await (await conn()).tableExists(Ebook._tableName)).toBe(false);
+    expect(await (await conn()).tableExists(Ebook._tableName)).toBeFalsy();
   });
 
   itIfSupports("views", "views ara valid data sources", async () => {
-    expect(await (await conn()).dataSourceExists(Ebook._tableName)).toBe(true);
+    expect(await (await conn()).dataSourceExists(Ebook._tableName)).toBeTruthy();
   });
 
   itIfSupports("views", "column definitions", async () => {
@@ -122,11 +122,11 @@ describeIfSupports("views", "ViewWithoutPrimaryKeyTest", () => {
   });
 
   itIfSupports("views", "view exists", async () => {
-    expect(await (await conn()).viewExists(Paperback._tableName)).toBe(true);
+    expect(await (await conn()).viewExists(Paperback._tableName)).toBeTruthy();
   });
 
   itIfSupports("views", "table exists", async () => {
-    expect(await (await conn()).tableExists(Paperback._tableName)).toBe(false);
+    expect(await (await conn()).tableExists(Paperback._tableName)).toBeFalsy();
   });
 
   itIfSupports("views", "column definitions", async () => {
@@ -203,7 +203,7 @@ describe("UpdateableViewTest", () => {
         format: "paperback",
       });
       expect((book as any).id).not.toBeNull();
-      expect((book as any).id).toBeGreaterThan(0);
+      expect((book as any).id > 0).toBeTruthy();
     },
   );
 
