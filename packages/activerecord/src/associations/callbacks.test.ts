@@ -1,5 +1,5 @@
 import { kernelThrow } from "@blazetrails/ruby-compat";
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import {
   Base,
   collectionProxyFor as association,
@@ -7,6 +7,7 @@ import {
   registerSubclass,
 } from "../index.js";
 
+import { assertEmpty } from "@blazetrails/activesupport";
 import { fixtures } from "../test-fixtures.js";
 import { Project } from "../test-helpers/models/project.js";
 import { Developer, AuditLog } from "../test-helpers/models/developer.js";
@@ -45,42 +46,91 @@ function setupAuthorPostSuite(): void {
 }
 
 describe("AssociationCallbacksTest", () => {
-  setupAuthorPostSuite();
+  const { authors, posts } = fixtures(["authors", "posts"]);
+  let david: any;
+  let thinking: any;
+
+  beforeEach(() => {
+    david = authors("david");
+    thinking = posts("thinking");
+    assertEmpty(david.postLog);
+  });
+
+  it("adding macro callbacks", async () => {
+    await david.postsWithCallbacks.push(thinking);
+    expect(david.postLog).toEqual([`before_adding${thinking.id}`, `after_adding${thinking.id}`]);
+    await david.postsWithCallbacks.push(thinking);
+    expect(david.postLog).toEqual([
+      `before_adding${thinking.id}`,
+      `after_adding${thinking.id}`,
+      `before_adding${thinking.id}`,
+      `after_adding${thinking.id}`,
+    ]);
+  });
 
   it("adding with proc callbacks", async () => {
-    const log: string[] = [];
-    const { Author, Post } = makeAuthorWithCallbacks({
-      beforeAdd: (_owner: any, record: any) => {
-        log.push("before:" + record.title);
-      },
-      afterAdd: (_owner: any, record: any) => {
-        log.push("after:" + record.title);
-      },
-    });
-    const author = await Author.create({ name: "David" });
-    const proxy = association(author, "posts");
-    const p = new (Post as any)({ title: "World", body: "Body", author_id: author.id });
-    await proxy.push(p);
-    expect(log).toContain("before:World");
-    expect(log).toContain("after:World");
+    await david.postsWithProcCallbacks.push(thinking);
+    expect(david.postLog).toEqual([`before_adding${thinking.id}`, `after_adding${thinking.id}`]);
+    await david.postsWithProcCallbacks.push(thinking);
+    expect(david.postLog).toEqual([
+      `before_adding${thinking.id}`,
+      `after_adding${thinking.id}`,
+      `before_adding${thinking.id}`,
+      `after_adding${thinking.id}`,
+    ]);
+  });
+
+  it("removing with macro callbacks", async () => {
+    const [firstPost, secondPost] = (await david.postsWithCallbacks.toArray()).slice(0, 2);
+    await david.postsWithCallbacks.delete(firstPost);
+    expect(david.postLog).toEqual([
+      `before_removing${firstPost.id}`,
+      `after_removing${firstPost.id}`,
+    ]);
+    await david.postsWithCallbacks.delete(secondPost);
+    expect(david.postLog).toEqual([
+      `before_removing${firstPost.id}`,
+      `after_removing${firstPost.id}`,
+      `before_removing${secondPost.id}`,
+      `after_removing${secondPost.id}`,
+    ]);
   });
 
   it("removing with proc callbacks", async () => {
-    const log: string[] = [];
-    const { Author, Post } = makeAuthorWithCallbacks({
-      beforeRemove: (_owner: any, record: any) => {
-        log.push("before:remove:" + record.title);
-      },
-      afterRemove: (_owner: any, record: any) => {
-        log.push("after:remove:" + record.title);
-      },
-    });
-    const author = await Author.create({ name: "David" });
-    const p = await (Post as any).create({ title: "Bye", body: "Body", author_id: author.id });
-    const proxy = association(author, "posts");
-    await proxy.delete(p);
-    expect(log).toContain("before:remove:Bye");
-    expect(log).toContain("after:remove:Bye");
+    const [firstPost, secondPost] = (await david.postsWithCallbacks.toArray()).slice(0, 2);
+    await david.postsWithProcCallbacks.delete(firstPost);
+    expect(david.postLog).toEqual([
+      `before_removing${firstPost.id}`,
+      `after_removing${firstPost.id}`,
+    ]);
+    await david.postsWithProcCallbacks.delete(secondPost);
+    expect(david.postLog).toEqual([
+      `before_removing${firstPost.id}`,
+      `after_removing${firstPost.id}`,
+      `before_removing${secondPost.id}`,
+      `after_removing${secondPost.id}`,
+    ]);
+  });
+
+  it("multiple callbacks", async () => {
+    await david.postsWithMultipleCallbacks.push(thinking);
+    expect(david.postLog).toEqual([
+      `before_adding${thinking.id}`,
+      `before_adding_proc${thinking.id}`,
+      `after_adding${thinking.id}`,
+      `after_adding_proc${thinking.id}`,
+    ]);
+    await david.postsWithMultipleCallbacks.push(thinking);
+    expect(david.postLog).toEqual([
+      `before_adding${thinking.id}`,
+      `before_adding_proc${thinking.id}`,
+      `after_adding${thinking.id}`,
+      `after_adding_proc${thinking.id}`,
+      `before_adding${thinking.id}`,
+      `before_adding_proc${thinking.id}`,
+      `after_adding${thinking.id}`,
+      `after_adding_proc${thinking.id}`,
+    ]);
   });
 });
 
@@ -334,7 +384,7 @@ describe("AssociationCallbacksTest", () => {
     const proxy = association(author, "posts");
     const p = await proxy.create({ title: "Blocked", body: "Body" });
     expect(p.isNewRecord()).toBe(true);
-    const all = await (Post as any).all().toArray();
+    const all = await (Post as any).where({ author_id: author.id }).toArray();
     expect(all.length).toBe(0);
   });
 
@@ -408,7 +458,7 @@ describe("AssociationCallbacksTest", () => {
     proxy.build({ title: "Call me back!", body: "Body" });
     expect(log).toEqual(["before_adding<new>", "after_adding<new>"]);
     expect(await author.save()).toBe(true);
-    expect((await (Post as any).all().toArray()).length).toBe(1);
+    expect((await (Post as any).where({ author_id: author.id }).toArray()).length).toBe(1);
     expect(log).toEqual(["before_adding<new>", "after_adding<new>"]);
   });
 
@@ -564,56 +614,5 @@ describe("AssociationCallbacksTest", () => {
     expect(await project.save()).toBe(true);
     expect((await proxy).length).toBe(1);
     expect(project.developersLog).toEqual(callbackLog);
-  });
-});
-
-describe("AssociationCallbacksTest", () => {
-  const { authors, posts } = fixtures(["authors", "posts"]);
-
-  it("adding macro callbacks", async () => {
-    const david = authors("david") as any;
-    const thinking = posts("thinking") as any;
-    await david.postsWithCallbacks.push(thinking);
-    expect(david.postLog).toEqual([`before_adding${thinking.id}`, `after_adding${thinking.id}`]);
-    await david.postsWithCallbacks.push(thinking);
-    expect(david.postLog).toEqual([
-      `before_adding${thinking.id}`,
-      `after_adding${thinking.id}`,
-      `before_adding${thinking.id}`,
-      `after_adding${thinking.id}`,
-    ]);
-  });
-
-  it("removing with macro callbacks", async () => {
-    const david = authors("david") as any;
-    const [firstPost, secondPost] = (await david.postsWithCallbacks.toArray()).slice(0, 2);
-    await david.postsWithCallbacks.delete(firstPost);
-    expect(david.postLog).toEqual([
-      `before_removing${firstPost.id}`,
-      `after_removing${firstPost.id}`,
-    ]);
-    await david.postsWithCallbacks.delete(secondPost);
-    expect(david.postLog).toEqual([
-      `before_removing${firstPost.id}`,
-      `after_removing${firstPost.id}`,
-      `before_removing${secondPost.id}`,
-      `after_removing${secondPost.id}`,
-    ]);
-  });
-
-  it("multiple callbacks", async () => {
-    const david = authors("david") as any;
-    const thinking = posts("thinking") as any;
-    const id = thinking.id;
-    const once = [
-      `before_adding${id}`,
-      `before_adding_proc${id}`,
-      `after_adding${id}`,
-      `after_adding_proc${id}`,
-    ];
-    await david.postsWithMultipleCallbacks.push(thinking);
-    expect(david.postLog).toEqual(once);
-    await david.postsWithMultipleCallbacks.push(thinking);
-    expect(david.postLog).toEqual([...once, ...once]);
   });
 });
