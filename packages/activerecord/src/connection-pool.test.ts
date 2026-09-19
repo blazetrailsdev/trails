@@ -56,6 +56,16 @@ function makeAmbientPool(
 
 const activeConnections = (pool: ConnectionPool) => pool.connections.filter((c) => c.inUse);
 
+async function createPosts(pool: ConnectionPool): Promise<void> {
+  if (inMemoryDb()) {
+    await pool.withConnection(async (connection) => {
+      await connection.createTable("posts", (t) => {
+        t.integer("cololumn");
+      });
+    });
+  }
+}
+
 function makePool(size: number = 5): ConnectionPool {
   return makeAmbientPool({ pool: size });
 }
@@ -455,6 +465,7 @@ it("connection notification is called for shard", async () => {
 
 it("sets pool schema reflection", async () => {
   const pool = makePool();
+  await createPosts(pool);
   await pool.schemaCache.add("posts");
   expect(await pool.schemaCache.isCached("posts")).toBeTruthy();
 
@@ -467,6 +478,7 @@ it("sets pool schema reflection", async () => {
 
 it("pool sets connection schema cache", async () => {
   const pool = makePool();
+  await createPosts(pool);
   await pool.schemaCache.add("posts");
   const connection = await pool.checkout();
 
