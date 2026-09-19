@@ -1,4 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import "./index.js";
+import { fixtures } from "../test-fixtures.js";
+import { Book } from "../test-helpers/models/book.js";
 import { Scheme } from "./scheme.js";
 import { Encryptor } from "./encryptor.js";
 import { Configuration } from "./errors.js";
@@ -7,15 +10,23 @@ import { Contexts } from "./contexts.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { DeterministicKeyProvider } from "./deterministic-key-provider.js";
 
-function assertInvalidDeclaration(options: ConstructorParameters<typeof Scheme>[0]): void {
-  expect(() => new Scheme(options)).toThrow(Configuration);
+function declareEncryptsWith(options: Record<string, unknown>): unknown {
+  class Sub extends Book {}
+  Sub.encrypts("name", options);
+  return Sub.typeForAttribute("name");
 }
 
-function assertValidDeclaration(options: ConstructorParameters<typeof Scheme>[0]): void {
-  expect(() => new Scheme(options)).not.toThrow();
+function assertInvalidDeclaration(options: Record<string, unknown>): void {
+  expect(() => declareEncryptsWith(options)).toThrow(Configuration);
+}
+
+function assertValidDeclaration(options: Record<string, unknown>): void {
+  expect(() => declareEncryptsWith(options)).not.toThrow();
 }
 
 describe("ActiveRecord::Encryption::SchemeTest", () => {
+  fixtures({});
+
   it("validates config options when using encrypted attributes", () => {
     const zlib = { deflate: () => Buffer.alloc(0), inflate: () => "" };
     assertInvalidDeclaration({ deterministic: false, ignoreCase: true });

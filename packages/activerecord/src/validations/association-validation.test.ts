@@ -140,7 +140,6 @@ describe("AssociationValidationTest", () => {
     Reply.validatesAssociated("topic", { on: "create" });
     Topic.validatesPresenceOf("content", { on: "create" });
     const t = await Topic.create({ title: "uhoh", content: "stuff" });
-    t.writeAttribute("content", null);
     await t.updateBang({ content: null });
     const r = await (t as any).replies.create({ title: "A reply", content: "with content!" });
 
