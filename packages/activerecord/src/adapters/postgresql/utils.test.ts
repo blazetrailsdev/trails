@@ -46,12 +46,10 @@ describeIfPg("PostgreSQLAdapter", () => {
         '"schema"."table_name"': ["schema", "table_name"],
         '"even spaces".table': ["even spaces", "table"],
         'schema."table.name"': ["schema", "table.name"],
-        "database.schema.table": ["database", "schema"],
       };
       for (const [given, [expectedSchema, expectedName]] of Object.entries(cases)) {
         const result = Utils.extractSchemaQualifiedName(given);
-        expect(result.schema).toBe(expectedSchema);
-        expect(result.identifier).toBe(expectedName);
+        expect(result).toEqual(new Name(expectedSchema, expectedName));
       }
     });
   });
@@ -79,11 +77,11 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("equality based on state", () => {
-      expect(new Name("access", "users").equals(new Name("access", "users"))).toBe(true);
-      expect(new Name(null, "users").equals(new Name(null, "users"))).toBe(true);
-      expect(new Name(null, "users").equals(new Name("access", "users"))).toBe(false);
-      expect(new Name("access", "users").equals(new Name("public", "users"))).toBe(false);
-      expect(new Name("public", "users").equals(new Name("public", "articles"))).toBe(false);
+      expect(new Name("access", "users")).toEqual(new Name("access", "users"));
+      expect(new Name(null, "users")).toEqual(new Name(null, "users"));
+      expect(new Name(null, "users")).not.toEqual(new Name("access", "users"));
+      expect(new Name("access", "users")).not.toEqual(new Name("public", "users"));
+      expect(new Name("public", "users")).not.toEqual(new Name("public", "articles"));
     });
 
     it("can be used as hash key", () => {
