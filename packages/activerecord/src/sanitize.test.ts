@@ -127,9 +127,9 @@ describe("SanitizeTest", () => {
       }
       declare static searchAsScope: (term: string) => Relation<SearchablePost>;
     }
-    SearchablePost.scope("searchAsScope", (term: string) =>
-      SearchablePost.where("title LIKE ?", SearchablePost.sanitizeSqlLike(term, "!")),
-    );
+    SearchablePost.scope("searchAsScope", function (this: Relation<SearchablePost>, term: string) {
+      return this.where("title LIKE ?", this.sanitizeSqlLike(term, "!"));
+    });
 
     const query = (await SearchablePost.leaseConnection()).preparedStatements
       ? currentAdapter("PostgreSQLAdapter")

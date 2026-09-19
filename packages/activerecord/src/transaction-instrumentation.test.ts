@@ -11,19 +11,6 @@ import { fixtures } from "./test-fixtures.js";
 import { topicFixtureData } from "./test-helpers/fixtures/topics.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
 
-function makeTopic() {
-  class TransactionTopic extends Base {
-    static _tableName = "topics";
-    static {
-      this.attribute("id", "integer");
-      this.attribute("title", "string");
-      this.attribute("created_at", "datetime");
-      this.attribute("updated_at", "datetime");
-    }
-  }
-  return { Topic: TransactionTopic };
-}
-
 describe("TransactionInstrumentationTest", () => {
   const { topics } = fixtures(
     { topics: [Topic, topicFixtureData] },
@@ -337,8 +324,16 @@ describe("TransactionInstrumentationTest", () => {
     let notified = false;
     let afterCommitTriggered = false;
 
-    const { Topic: topicModel } = makeTopic();
-    topicModel.afterCommit(function () {
+    class TopicModel extends Base {
+      static _tableName = "topics";
+      static {
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("created_at", "datetime");
+        this.attribute("updated_at", "datetime");
+      }
+    }
+    TopicModel.afterCommit(function () {
       afterCommitTriggered = true;
     });
 
@@ -350,7 +345,7 @@ describe("TransactionInstrumentationTest", () => {
       notified = true;
     });
 
-    await topicModel.createBang();
+    await TopicModel.createBang();
 
     expect(notified).toBeTruthy();
     expect(afterCommitTriggered).toBeTruthy();
@@ -360,8 +355,16 @@ describe("TransactionInstrumentationTest", () => {
     let notified = false;
     let afterRollbackTriggered = false;
 
-    const { Topic: topicModel } = makeTopic();
-    topicModel.afterRollback(function () {
+    class TopicModel extends Base {
+      static _tableName = "topics";
+      static {
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("created_at", "datetime");
+        this.attribute("updated_at", "datetime");
+      }
+    }
+    TopicModel.afterRollback(function () {
       afterRollbackTriggered = true;
     });
 
@@ -373,8 +376,8 @@ describe("TransactionInstrumentationTest", () => {
       notified = true;
     });
 
-    await topicModel.transaction(async () => {
-      await topicModel.createBang();
+    await TopicModel.transaction(async () => {
+      await TopicModel.createBang();
       throw new Rollback();
     });
 
