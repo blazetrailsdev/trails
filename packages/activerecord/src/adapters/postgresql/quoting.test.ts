@@ -48,18 +48,18 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("quote column name", () => {
       const conn = adapter;
-      for (const adapter of [conn, conn.constructor as typeof conn]) {
-        expect(a.quoteColumnName("foo")).toBe('"foo"');
-        expect(a.quoteColumnName('hel"lo')).toBe('"hel""lo"');
+      for (const adapter of [conn, conn.constructor as typeof PostgreSQLAdapter]) {
+        expect(adapter.quoteColumnName("foo")).toBe('"foo"');
+        expect(adapter.quoteColumnName('hel"lo')).toBe('"hel""lo"');
       }
     });
 
     it("quote table name", () => {
       const conn = adapter;
-      for (const adapter of [conn, conn.constructor as typeof conn]) {
-        expect(a.quoteTableName("foo")).toBe('"foo"');
-        expect(a.quoteTableName("foo.bar")).toBe('"foo"."bar"');
-        expect(a.quoteColumnName('hel"lo.wol\\d')).toBe('"hel""lo.wol\\d"');
+      for (const adapter of [conn, conn.constructor as typeof PostgreSQLAdapter]) {
+        expect(adapter.quoteTableName("foo")).toBe('"foo"');
+        expect(adapter.quoteTableName("foo.bar")).toBe('"foo"."bar"');
+        expect(adapter.quoteColumnName('hel"lo.wol\\d')).toBe('"hel""lo.wol\\d"');
       }
     });
 
