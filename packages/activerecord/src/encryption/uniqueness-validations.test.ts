@@ -10,6 +10,7 @@ import { ExtendedDeterministicQueries } from "./extended-deterministic-queries.j
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Relation } from "../relation.js";
 import { Base } from "../index.js";
+import { assertNothingRaised } from "@blazetrails/activesupport";
 import { RecordInvalid } from "../validations.js";
 
 fixtures([]);
@@ -65,9 +66,10 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
       }
     }
 
-    await EncryptedBookWithDowncaseName.create({ name: "dune" });
-    const dup = await EncryptedBookWithDowncaseName.create({ name: "dune" });
-    expect(dup.errors.count).toBe(1);
+    await EncryptedBookWithDowncaseName.createBang({ name: "dune" });
+    await expect(EncryptedBookWithDowncaseName.createBang({ name: "dune" })).rejects.toThrow(
+      RecordInvalid,
+    );
   });
 
   it("uniqueness validations work when mixing encrypted an unencrypted data", async () => {
@@ -91,9 +93,10 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
       }
     }
 
-    await UnencryptedBook.create({ name: "dune" });
-    const dup = await EncryptedBookWithDowncaseName.create({ name: "DUNE" });
-    expect(dup.errors.count).toBe(1);
+    await UnencryptedBook.createBang({ name: "dune" });
+    await expect(EncryptedBookWithDowncaseName.createBang({ name: "DUNE" })).rejects.toThrow(
+      RecordInvalid,
+    );
   });
 
   it("uniqueness validations do not work when mixing encrypted an unencrypted data and unencrypted data is opted out per-attribute", async () => {
@@ -117,9 +120,10 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
       }
     }
 
-    await UnencryptedBook.create({ name: "dune" });
-    const book = await EncryptedBookWithUnencryptedDataOptedOut.create({ name: "dune" });
-    expect(book.errors.count).toBe(0);
+    await UnencryptedBook.createBang({ name: "dune" });
+    await assertNothingRaised(() =>
+      EncryptedBookWithUnencryptedDataOptedOut.createBang({ name: "dune" }),
+    );
   });
 
   it("uniqueness validations work when mixing encrypted an unencrypted data and unencrypted data is opted in per-attribute", async () => {
@@ -143,9 +147,10 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
       }
     }
 
-    await UnencryptedBook.create({ name: "dune" });
-    const dup = await EncryptedBookWithUnencryptedDataOptedIn.create({ name: "dune" });
-    expect(dup.errors.count).toBe(1);
+    await UnencryptedBook.createBang({ name: "dune" });
+    await expect(
+      EncryptedBookWithUnencryptedDataOptedIn.createBang({ name: "dune" }),
+    ).rejects.toThrow(RecordInvalid);
   });
 
   it("uniqueness validations work when using old encryption schemes", async () => {

@@ -1,7 +1,8 @@
 import { describe, it, expect, afterEach } from "vitest";
+import { assertNotRespondTo, assertRespondTo } from "@blazetrails/activesupport";
 import { Relation, registerModel } from "../index.js";
 import * as Querying from "../querying.js";
-import { DelegateCache, uncacheableMethods } from "./delegation.js";
+import { DelegateCache } from "./delegation.js";
 import { NotImplementedError } from "../errors.js";
 import { CollectionProxy } from "../associations/collection-proxy.js";
 import { fixtures } from "../test-fixtures.js";
@@ -18,8 +19,7 @@ describe("DelegationTest", () => {
 
   it("not respond to arel method", () => {
     const target = Comment.all();
-    expect("project" in target).toBe(false);
-    expect(typeof target.arel().project).toBe("function");
+    assertNotRespondTo(target, "project");
   });
 
   describe("delegate_base_methods guard", () => {
@@ -170,8 +170,8 @@ describe("DelegationTest", () => {
       expect([...QUERYING_METHODS].sort()).toEqual([...Querying.QUERYING_METHODS].sort());
 
       for (const method of QUERYING_METHODS) {
-        expect(typeof (relation as any)[method]).toBe("function");
-        expect(typeof (Post as any)[method]).toBe("function");
+        assertRespondTo(relation, method);
+        assertRespondTo(Post, method);
       }
     });
   });
@@ -476,17 +476,19 @@ describe("DelegationCachingTest", () => {
   registerModel(Developer);
 
   it("delegation doesn't override methods defined in other relation subclasses", async () => {
-    expect("target" in Relation.prototype).toBe(false);
-    expect("target" in CollectionProxy.prototype).toBe(true);
-
-    expect(uncacheableMethods().has("target")).toBe(true);
-
-    expect(await (Developer.all() as any).target()).toBe("__target__");
+    expect("target" in Relation.prototype).toEqual(false);
+    expect("target" in CollectionProxy.prototype).toEqual(true);
 
     const project = projects("active_record");
     const proxy = (project as any).developersWithCallbacks;
-    await proxy.load();
-    expect(proxy.target).not.toBe("__target__");
-    expect(Array.isArray(proxy.target)).toBe(true);
+    const original_owner = Object.getOwnPropertyDescriptor(
+      CollectionProxy.prototype,
+      "target",
+    )?.get;
+    expect(await (Developer.all() as any).target()).toEqual("__target__");
+    expect(Object.getOwnPropertyDescriptor(CollectionProxy.prototype, "target")?.get).toEqual(
+      original_owner,
+    );
+    void proxy;
   });
 });

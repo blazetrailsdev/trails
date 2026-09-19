@@ -135,7 +135,12 @@ describe("CommentTest", () => {
       await adapter.changeColumn("commenteds", "content", "string", {
         comment: "Whoa, content describes itself!",
       });
+      await adapter.changeColumn("commenteds", "content", "string");
       await adapter.changeColumn("commenteds", "obvious", "string", { comment: null as any });
+      await (adapter as any).addIndex("commenteds", "obvious", {
+        name: "idx_obvious",
+        comment: "We need to see obvious comments",
+      });
       const output = await dumpTableSchema(adapter, "commenteds");
       expect(output).toMatch(/createTable.*"commenteds".*comment:\s*"A table with comment"/);
       expect(output).toMatch(
@@ -148,6 +153,12 @@ describe("CommentTest", () => {
       expect(output).toMatch(
         /t\.\w+\("rating"[^)]*\{[^}]*comment:\s*"I am running out of imagination"/,
       );
+      expect(output).toMatch(
+        /t\.index\(.+comment:\s*"\\"Very important\\" index that powers all the performance\.\\nAnd it's fun!"/,
+      );
+      expect(output).toMatch(
+        /t\.index\(.+name:\s*"idx_obvious",\s*comment:\s*"We need to see obvious comments"/,
+      );
     },
     60_000,
   );
@@ -159,10 +170,14 @@ describe("CommentTest", () => {
       const output = await dumpTableSchema(adapter, "blank_comments");
       expect(output).toMatch(/createTable.*"blank_comments"/);
       expect(output).not.toMatch(/createTable.*"blank_comments".*comment:/);
-      for (const field of ["space_comment", "empty_comment", "nil_comment", "absent_comment"]) {
-        expect(output).toMatch(new RegExp(`t\\.\\w+\\("${field}"\\)\\s*;`));
-        expect(output).not.toMatch(new RegExp(`t\\.\\w+\\("${field}"[^)]*comment:`));
-      }
+      expect(output).toMatch(/t\.\w+\("space_comment"\)\s*;/);
+      expect(output).not.toMatch(/t\.\w+\("space_comment"[^)]*comment:/);
+      expect(output).toMatch(/t\.\w+\("empty_comment"\)\s*;/);
+      expect(output).not.toMatch(/t\.\w+\("empty_comment"[^)]*comment:/);
+      expect(output).toMatch(/t\.\w+\("nil_comment"\)\s*;/);
+      expect(output).not.toMatch(/t\.\w+\("nil_comment"[^)]*comment:/);
+      expect(output).toMatch(/t\.\w+\("absent_comment"\)\s*;/);
+      expect(output).not.toMatch(/t\.\w+\("absent_comment"[^)]*comment:/);
     },
     60_000,
   );
@@ -182,9 +197,9 @@ describe("CommentTest", () => {
   itIfSupports("comments", "change column comment", async () => {
     await (adapter as any).changeColumnComment("commenteds", "id", "Edited column comment");
     const col = (await (adapter as any).columns("commenteds")).find((c: any) => c.name === "id")!;
-    expect(col.comment).toBe("Edited column comment");
+    expect(col.comment).toEqual("Edited column comment");
     if (adapterType === "mysql") {
-      expect(col.isAutoIncrement()).toBe(true);
+      expect(col.isAutoIncrement()).toBeTruthy();
     }
   });
 

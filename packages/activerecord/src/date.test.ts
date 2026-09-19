@@ -19,16 +19,14 @@ describe("DateTest", () => {
     });
     const topic = await Topic.create({ last_read: timeValue });
     const found = await Topic.findBy({ last_read: timeValue });
-    expect(found).not.toBeNull();
-    expect(found!.id).toBe(topic.id);
+    expect(found!.id).toEqual(topic.id);
   });
 
   it("date with string value", async () => {
     const stringValue = "2016-05-11 19:00:00";
     const topic = await Topic.create({ last_read: stringValue });
     const found = await Topic.findBy({ last_read: stringValue });
-    expect(found).not.toBeNull();
-    expect(found!.id).toBe(topic.id);
+    expect(found!.id).toEqual(topic.id);
   });
 
   it("assign valid dates", () => {
@@ -59,20 +57,18 @@ describe("DateTest", () => {
         "last_read(2i)": String(m),
         "last_read(3i)": String(d),
       });
-      expect(topic.last_read.equals(Temporal.PlainDate.from({ year: y, month: m, day: d }))).toBe(
-        true,
-      );
+      expect(topic.last_read).toEqual(Temporal.PlainDate.from({ year: y, month: m, day: d }));
     }
 
     for (const [[y, m, d], [ey, em, ed]] of invalidDates) {
-      const topic = Topic.new({
-        "last_read(1i)": String(y),
-        "last_read(2i)": String(m),
-        "last_read(3i)": String(d),
-      });
-      expect(
-        topic.last_read.equals(Temporal.PlainDate.from({ year: ey, month: em, day: ed })),
-      ).toBe(true);
+      expect(() => {
+        const topic = Topic.new({
+          "last_read(1i)": String(y),
+          "last_read(2i)": String(m),
+          "last_read(3i)": String(d),
+        });
+        expect(topic.last_read).toEqual(Temporal.PlainDate.from({ year: ey, month: em, day: ed }));
+      }).not.toThrow();
     }
   });
 });

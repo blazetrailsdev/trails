@@ -1,3 +1,4 @@
+import { assertNoChanges } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "../base.js";
@@ -146,14 +147,19 @@ describe("Migration", () => {
         dropSchema(name: string): Promise<void>;
       };
       try {
-        const before = (await connection.checkConstraints("trades")).length;
-        await schemas.createSchema("test_schema");
-        // eslint-disable-next-line blazetrails/require-table-teardown -- Rails' `ensure` drops the whole schema (check_constraint_test.rb:97-98), and PG's DROP SCHEMA is a CASCADE (postgresql/schema_statements.rb:70), so the table goes with it.
-        await connection.createTable("test_schema.trades", {}, (t) => {
-          t.integer("quantity");
-        });
-        await connection.addCheckConstraint("test_schema.trades", "quantity > 0");
-        expect((await connection.checkConstraints("trades")).length).toBe(before);
+        await assertNoChanges(
+          async () => (await connection.checkConstraints("trades")).length,
+          null,
+          {},
+          async () => {
+            await schemas.createSchema("test_schema");
+            // eslint-disable-next-line blazetrails/require-table-teardown -- Rails' `ensure` drops the whole schema (check_constraint_test.rb:97-98), and PG's DROP SCHEMA is a CASCADE (postgresql/schema_statements.rb:70), so the table goes with it.
+            await connection.createTable("test_schema.trades", {}, (t) => {
+              t.integer("quantity");
+            });
+            await connection.addCheckConstraint("test_schema.trades", "quantity > 0");
+          },
+        );
       } finally {
         await schemas.dropSchema("test_schema");
       }
@@ -251,13 +257,13 @@ describe("Migration", () => {
         name: "quantity_check",
         validate: false,
       });
-      expect((await connection.checkConstraints("trades"))[0].isValidate).toBe(false);
+      expect((await connection.checkConstraints("trades"))[0].isValidate).toBeFalsy();
 
       await (connection as unknown as ValidateConstraintStatements).validateCheckConstraint(
         "trades",
         { name: "quantity_check" },
       );
-      expect((await connection.checkConstraints("trades"))[0].isValidate).toBe(true);
+      expect((await connection.checkConstraints("trades"))[0].isValidate).toBeTruthy();
     });
 
     itIfSupports("validate_constraints", "validated check constraint exists", async () => {
@@ -271,7 +277,7 @@ describe("Migration", () => {
           name: "quantity_check",
           validate: true,
         }),
-      ).toBe(false);
+      ).toBeFalsy();
 
       await (connection as unknown as ValidateConstraintStatements).validateCheckConstraint(
         "trades",
@@ -282,7 +288,7 @@ describe("Migration", () => {
           name: "quantity_check",
           validate: true,
         }),
-      ).toBe(true);
+      ).toBeTruthy();
     });
 
     itIfSupports(
@@ -337,23 +343,23 @@ describe("Migration", () => {
       });
 
       const checkConstraints = await connection.checkConstraints("trades");
-      expect(checkConstraints.length).toBe(1);
+      expect(checkConstraints.length).toEqual(1);
 
       const cc = checkConstraints[0];
-      expect(cc.isValidate).toBe(true);
+      expect(cc.isValidate).toBeTruthy();
     });
 
     it("check constraint exists", async () => {
       const connection = await ambientConnection();
       await connection.addCheckConstraint("trades", "quantity > 0", { name: "quantity_check" });
 
-      expect(await connection.checkConstraintExists("trades", { name: "quantity_check" })).toBe(
-        true,
-      );
-      expect(await connection.checkConstraintExists("non_trades", { name: "quantity_check" })).toBe(
-        false,
-      );
-      expect(await connection.checkConstraintExists("trades", { name: "other_check" })).toBe(false);
+      expect(
+        await connection.checkConstraintExists("trades", { name: "quantity_check" }),
+      ).toBeTruthy();
+      expect(
+        await connection.checkConstraintExists("non_trades", { name: "quantity_check" }),
+      ).toBeFalsy();
+      expect(await connection.checkConstraintExists("trades", { name: "other_check" })).toBeFalsy();
     });
 
     it("check constraint exists ensures required options", async () => {

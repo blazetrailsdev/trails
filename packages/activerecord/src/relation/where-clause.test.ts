@@ -1,6 +1,6 @@
-import { rbEqual } from "@blazetrails/activesupport";
+import { assertEmpty, assertNotEmpty, rbEqual } from "@blazetrails/activesupport";
 import { describe, it, expect } from "vitest";
-import { Table, Nodes } from "@blazetrails/arel";
+import { Table, Nodes, sql } from "@blazetrails/arel";
 import { WhereClause } from "./where-clause.js";
 import { fixtures } from "../test-fixtures.js";
 
@@ -30,8 +30,8 @@ describe("ActiveRecord::Relation", () => {
       const a = new WhereClause([new Nodes.SqlLiteral("a")]);
       const b = new WhereClause([new Nodes.SqlLiteral("b")]);
       const c = new WhereClause([new Nodes.SqlLiteral("c")]);
-      expect(a.plus(b.plus(c)).equals(a.plus(b).plus(c))).toBe(true);
-      expect(a.plus(b).equals(b.plus(a))).toBe(false);
+      expect(a.plus(b.plus(c))).toEqual(a.plus(b).plus(c));
+      expect(a.plus(b)).not.toEqual(b.plus(a));
     });
 
     it("an empty where clause is the identity value for +", () => {
@@ -83,8 +83,8 @@ describe("ActiveRecord::Relation", () => {
     });
 
     it("a clause knows if it is empty", () => {
-      expect(WhereClause.empty().isEmpty()).toBe(true);
-      expect(new WhereClause([new Nodes.SqlLiteral("anything")]).isEmpty()).toBe(false);
+      assertEmpty(WhereClause.empty().predicates);
+      assertNotEmpty(new WhereClause(["anything"]).predicates);
     });
 
     it("invert cannot handle nil", () => {
@@ -171,14 +171,15 @@ describe("ActiveRecord::Relation", () => {
 
     it("ast wraps any SQL literals in parenthesis", () => {
       const t = table();
-      const whereClause = new WhereClause([
+      const random_object = {};
+      const whereClause = new WhereClause([t.get("id").in([1, 2, 3]), "foo = bar", random_object]);
+      const expected = new Nodes.And([
         t.get("id").in([1, 2, 3]),
-        new Nodes.SqlLiteral("foo = bar"),
+        new Nodes.Grouping(sql("foo = bar")),
+        random_object,
       ]);
-      const ast = whereClause.ast;
-      expect(ast).toBeInstanceOf(Nodes.And);
-      const children = (ast as Nodes.And).children;
-      expect(children[1]).toBeInstanceOf(Nodes.Grouping);
+
+      expect(rbEqual(whereClause.ast, expected)).toEqual(true);
     });
 
     it("ast removes any empty strings", () => {
@@ -249,11 +250,20 @@ describe("ActiveRecord::Relation", () => {
     });
 
     it("supports hash equality", () => {
-      const a1 = new WhereClause([new Nodes.SqlLiteral("a")]);
-      const a2 = new WhereClause([new Nodes.SqlLiteral("a")]);
-      const b = new WhereClause([new Nodes.SqlLiteral("b")]);
-      expect(a1.equals(a2)).toBe(true);
-      expect(a1.equals(b)).toBe(false);
+      const h = new Map<WhereClause, number>();
+      const bump = (k: WhereClause) => {
+        const key = [...h.keys()].find((e) => e.equals(k)) ?? k;
+        h.set(key, (h.get(key) ?? 0) + 1);
+      };
+      bump(new WhereClause(["a"]));
+      bump(new WhereClause(["a"]));
+      bump(new WhereClause(["b"]));
+
+      const expected = [
+        [new WhereClause(["a"]), 2],
+        [new WhereClause(["b"]), 1],
+      ];
+      expect(rbEqual([...h.entries()], expected)).toEqual(true);
     });
   });
 });

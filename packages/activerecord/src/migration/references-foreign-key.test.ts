@@ -1,3 +1,4 @@
+import { assertDifference, assertNothingRaised } from "@blazetrails/activesupport";
 import { describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
@@ -109,9 +110,13 @@ describeIfSupports("foreign_keys", "Migration", () => {
           t.references("testing_parent", { index: true, foreignKey: true });
         });
 
-        const before = (await conn.foreignKeys("testings")).length;
-        await conn.removeReference("testings", "testing_parent", { foreignKey: true });
-        expect((await conn.foreignKeys("testings")).length).toBe(before - 1);
+        await assertDifference(
+          async () => (await conn.foreignKeys("testings")).length,
+          -1,
+          async () => {
+            await conn.removeReference("testings", "testing_parent", { foreignKey: true });
+          },
+        );
       });
     });
 
@@ -122,9 +127,13 @@ describeIfSupports("foreign_keys", "Migration", () => {
           t.references("testing_parent", { index: true, foreignKey: true });
         });
 
-        const before = (await conn.foreignKeys("testings")).length;
-        await conn.removeColumn("testings", "testing_parent_id");
-        expect((await conn.foreignKeys("testings")).length).toBe(before - 1);
+        await assertDifference(
+          async () => (await conn.foreignKeys("testings")).length,
+          -1,
+          async () => {
+            await conn.removeColumn("testings", "testing_parent_id");
+          },
+        );
       });
     });
 
@@ -157,11 +166,15 @@ describeIfSupports("foreign_keys", "Migration", () => {
           t.references("parent2", { foreignKey: { toTable: "testing_parents" } });
         });
 
-        const before = (await conn.foreignKeys("testings")).length;
-        await conn.removeReference("testings", "parent1", {
-          foreignKey: { toTable: "testing_parents" },
-        });
-        expect((await conn.foreignKeys("testings")).length).toBe(before - 1);
+        await assertDifference(
+          async () => (await conn.foreignKeys("testings")).length,
+          -1,
+          async () => {
+            await conn.removeReference("testings", "parent1", {
+              foreignKey: { toTable: "testing_parents" },
+            });
+          },
+        );
 
         const fks = (await conn.foreignKeys("testings")).sort((a, b) =>
           String(a.column).localeCompare(String(b.column)),
@@ -188,9 +201,13 @@ describeIfSupports("foreign_keys", "Migration", () => {
           expect(fk.fromTable).toBe("testing_parents");
           expect(fk.toTable).toBe("testing");
 
-          const before = (await conn.foreignKeys("testing_parents")).length;
-          await conn.removeReference("testing_parents", "testing", { foreignKey: true });
-          expect((await conn.foreignKeys("testing_parents")).length).toBe(before - 1);
+          await assertDifference(
+            async () => (await conn.foreignKeys("testing_parents")).length,
+            -1,
+            async () => {
+              await conn.removeReference("testing_parents", "testing", { foreignKey: true });
+            },
+          );
         });
       } finally {
         Base.pluralizeTableNames = originalPluralizeTableNames;
@@ -203,9 +220,9 @@ describeIfSupports("foreign_keys", "Migration", () => {
       await withTestingTables(conn, async () => {
         await conn.createTable("testings");
 
-        await expect(
+        await assertNothingRaised(() =>
           conn.removeReference("testings", "nonexistent", { foreignKey: true, ifExists: true }),
-        ).resolves.toBeUndefined();
+        );
       });
     });
 
@@ -216,9 +233,9 @@ describeIfSupports("foreign_keys", "Migration", () => {
           t.references("testing", { foreignKey: true });
         });
 
-        await expect(
+        await assertNothingRaised(() =>
           conn.addReference("testings", "testing", { foreignKey: true, ifNotExists: true }),
-        ).resolves.toBeUndefined();
+        );
       });
     });
 
