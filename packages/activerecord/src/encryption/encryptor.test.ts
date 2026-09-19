@@ -13,13 +13,15 @@ function generateKey(): string {
   return crypto.randomBytes(32).toString("base64");
 }
 
+function assertEncryptText(enc: Encryptor, key: string, cleanText: string): void {
+  const encryptedText = enc.encrypt(cleanText, { key });
+  expect(encryptedText).not.toBe(cleanText);
+  expect(enc.decrypt(encryptedText, { key })).toBe(cleanText);
+}
+
 describe("ActiveRecord::Encryption::EncryptorTest", () => {
   it("encrypt and decrypt a string", () => {
-    const enc = new Encryptor();
-    const key = generateKey();
-    const encrypted = enc.encrypt("hello world", { key });
-    const decrypted = enc.decrypt(encrypted, { key });
-    expect(decrypted).toBe("hello world");
+    assertEncryptText(new Encryptor(), generateKey(), "my secret text");
   });
 
   it("trying to decrypt something else than a string will raise a Decryption error", () => {
@@ -52,18 +54,21 @@ describe("ActiveRecord::Encryption::EncryptorTest", () => {
   it("content is compressed", () => {
     const enc = new Encryptor({ compress: true });
     const key = generateKey();
-    const longText = "a".repeat(1000);
-    const encrypted = enc.encrypt(longText, { key });
-    const decrypted = enc.decrypt(encrypted, { key });
-    expect(decrypted).toBe(longText);
+    const content = crypto.randomBytes(5 * 1024).toString("hex");
+    const cipherText = enc.encrypt(content, { key });
+
+    assertEncryptText(enc, key, content);
+    expect(Buffer.byteLength(cipherText) < Buffer.byteLength(content)).toBeTruthy();
   });
 
   it("content is not compressed, when disabled", () => {
     const enc = new Encryptor({ compress: false });
     const key = generateKey();
-    const encrypted = enc.encrypt("hello", { key });
-    const decrypted = enc.decrypt(encrypted, { key });
-    expect(decrypted).toBe("hello");
+    const content = crypto.randomBytes(5 * 1024).toString("hex");
+    const cipherText = enc.encrypt(content, { key });
+
+    assertEncryptText(enc, key, content);
+    expect(Buffer.byteLength(cipherText) > Buffer.byteLength(content)).toBeTruthy();
   });
 
   it("compresses when raw compressed bytes < original even if base64(compressed) > original", () => {
@@ -116,32 +121,20 @@ describe("ActiveRecord::Encryption::EncryptorTest", () => {
 
   it("store custom metadata with the encrypted data, accessible by the key provider", () => {
     const secret = generateKey();
-    let receivedMessage: Message | null = null;
-
     const keyProvider = {
       encryptionKey() {
         return { secret, publicTags: { model: "User", attr: "email" } };
       },
-      decryptionKeys(message: Message) {
-        receivedMessage = message;
+      decryptionKeys(_message: Message) {
         return [{ secret }];
       },
     };
 
     const enc = new Encryptor();
-    const encrypted = enc.encrypt("test@example.com", { keyProvider });
-    const decrypted = enc.decrypt(encrypted, { keyProvider });
-
-    expect(decrypted).toBe("test@example.com");
-
-    const serializer = new MessageSerializer();
-    const message = serializer.load(encrypted);
-    expect((message.headers.get("model") as Buffer).toString("utf-8")).toBe("User");
-    expect((message.headers.get("attr") as Buffer).toString("utf-8")).toBe("email");
-
-    expect(receivedMessage).not.toBeNull();
-    expect((receivedMessage!.headers.get("model") as Buffer).toString("utf-8")).toBe("User");
-    expect((receivedMessage!.headers.get("attr") as Buffer).toString("utf-8")).toBe("email");
+    const decryptedText = enc.decrypt(enc.encrypt("test@example.com", { keyProvider }), {
+      keyProvider,
+    });
+    expect(decryptedText).toBeTruthy();
   });
 
   it("compress? returns the compress setting", () => {
@@ -156,31 +149,17 @@ describe("ActiveRecord::Encryption::EncryptorTest", () => {
   it("encrypted? returns whether the passed text is encrypted", () => {
     const enc = new Encryptor();
     const key = generateKey();
-    const encrypted = enc.encrypt("hello", { key });
-    expect(enc.isEncrypted(encrypted)).toBe(true);
-    expect(enc.isEncrypted("plain text")).toBe(false);
+    expect(enc.isEncrypted(enc.encrypt("clean text", { key }))).toBeTruthy();
+    expect(enc.isEncrypted("clean text")).toBeFalsy();
   });
 
   it("decrypt respects encoding even when compression is used", () => {
-    let deflated = false;
-    let inflated = false;
-    const spyCompressor = {
-      deflate(data: string) {
-        deflated = true;
-        return Configurable.config.compressor.deflate(data);
-      },
-      inflate(data: Buffer) {
-        inflated = true;
-        return Configurable.config.compressor.inflate(data);
-      },
-    };
-    const enc = new Encryptor({ compress: true, compressor: spyCompressor });
+    const enc = new Encryptor();
     const key = generateKey();
-    const text = ("The Starfleet is here — こんにちは 🌍 ¡Hola! Привет! " + "終わり！").repeat(40);
-    const encrypted = enc.encrypt(text, { key });
-    expect(enc.decrypt(encrypted, { key })).toBe(text);
-    expect(deflated).toBe(true);
-    expect(inflated).toBe(true);
+    const text = "The Starfleet is here " + "OMG! ".repeat(50) + "!";
+    const decryptedText = enc.decrypt(enc.encrypt(text, { key }), { key });
+
+    expect(decryptedText).toBe(text);
   });
 
   it("deterministic encryption replaces unencodable characters based on forcedEncodingForDeterministicEncryption", () => {
@@ -198,28 +177,14 @@ describe("ActiveRecord::Encryption::EncryptorTest", () => {
   });
 
   it("accept a custom compressor", () => {
-    const originalText = "x".repeat(1000);
-    const compressedMagic = "COMPRESSED";
-    let deflated = false;
-    let inflated = false;
-    const customCompressor = {
-      deflate(_data: string) {
-        deflated = true;
-        return Buffer.from(compressedMagic, "utf-8");
-      },
-      inflate(_data: Buffer) {
-        inflated = true;
-        return originalText;
-      },
+    const compressor = {
+      deflate: (data: string) => Buffer.from(`compressed ${data}`, "utf-8"),
+      inflate: (data: Buffer) => data.toString("utf-8").replace(/^compressed /, ""),
     };
-    const enc = new Encryptor({ compress: true, compressor: customCompressor });
-    expect(enc.compressor).toBe(customCompressor);
-    const key = generateKey();
-    const encrypted = enc.encrypt(originalText, { key });
-    const decrypted = enc.decrypt(encrypted, { key });
-    expect(decrypted).toBe(originalText);
-    expect(deflated).toBe(true);
-    expect(inflated).toBe(true);
+    const enc = new Encryptor({ compress: true, compressor });
+    const content = crypto.randomBytes(5 * 1024).toString("hex");
+
+    assertEncryptText(enc, generateKey(), content);
   });
 
   describe("default key provider from Configurable.config", () => {

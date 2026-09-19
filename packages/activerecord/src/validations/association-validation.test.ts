@@ -32,15 +32,15 @@ describe("AssociationValidationTest", () => {
       content: "non-empty",
     }) as Reply;
 
-    expect(await t.isValid()).toBe(false);
-    expect(t.errors.messagesFor("replies").length).toBeGreaterThan(0);
+    expect(await t.isValid()).toBeFalsy();
+    expect(t.errors.messagesFor("replies").length > 0).toBeTruthy();
     expect(r.errors.count).toBe(1);
     expect(r2.errors.count).toBe(0);
     expect(r3.errors.count).toBe(1);
     expect(r4.errors.count).toBe(0);
     r.writeAttribute("content", "non-empty");
     r3.writeAttribute("content", "non-empty");
-    expect(await t.isValid()).toBe(true);
+    expect(await t.isValid()).toBeTruthy();
   });
 
   it("validates associated one", async () => {
@@ -49,10 +49,10 @@ describe("AssociationValidationTest", () => {
     const r = new Reply({ title: "A reply", content: "with content!" });
     const topic = await Topic.create({ title: "uhohuhoh" });
     r.topic = topic;
-    expect(await r.isValid()).toBe(false);
-    expect(r.errors.messagesFor("topic").length).toBeGreaterThan(0);
+    expect(await r.isValid()).toBeFalsy();
+    expect(r.errors.messagesFor("topic").length > 0).toBeTruthy();
     topic.writeAttribute("content", "non-empty");
-    expect(await r.isValid()).toBe(true);
+    expect(await r.isValid()).toBeTruthy();
   });
 
   it("validates associated with multiple attributes and array forms", async () => {
@@ -61,9 +61,9 @@ describe("AssociationValidationTest", () => {
     const t = new Topic();
     association(t, "replies").build({ title: "A reply" });
     association(t, "openReplies").build({ title: "A reply" });
-    expect(await t.isValid()).toBe(false);
-    expect(t.errors.messagesFor("replies").length).toBeGreaterThan(0);
-    expect(t.errors.messagesFor("openReplies").length).toBeGreaterThan(0);
+    expect(await t.isValid()).toBeFalsy();
+    expect(t.errors.messagesFor("replies").length > 0).toBeTruthy();
+    expect(t.errors.messagesFor("openReplies").length > 0).toBeTruthy();
   });
 
   it("validates associated marked for destruction", async () => {
@@ -71,16 +71,16 @@ describe("AssociationValidationTest", () => {
     Reply.validatesPresenceOf("content");
     const t = new Topic();
     const reply = association(t, "replies").build() as Reply;
-    expect(await t.isInvalid()).toBe(true);
+    expect(await t.isInvalid()).toBeTruthy();
     reply.markForDestruction();
-    expect(await t.isValid()).toBe(true);
+    expect(await t.isValid()).toBeTruthy();
   });
 
   it("validates associated without marked for destruction", async () => {
     Topic.validatesAssociated("replies");
     const t = new Topic();
     association(t, "replies").build({ title: "A reply" });
-    expect(await t.isValid()).toBe(true);
+    expect(await t.isValid()).toBeTruthy();
   });
 
   it("validates associated with custom message using quotes", async () => {
@@ -91,7 +91,7 @@ describe("AssociationValidationTest", () => {
     const r = await Reply.create({ title: "A reply", content: "with content!" });
     const topic = await Topic.create({ title: "uhohuhoh" });
     r.topic = topic;
-    expect(await r.isValid()).toBe(false);
+    expect(await r.isValid()).toBeFalsy();
     expect(r.errors.messagesFor("topic")).toEqual([
       "This string contains 'single' and \"double\" quotes",
     ]);
@@ -100,11 +100,11 @@ describe("AssociationValidationTest", () => {
   it("validates associated missing", async () => {
     Reply.validatesPresenceOf("topic");
     const r = await Reply.create({ title: "A reply", content: "with content!" });
-    expect(await r.isValid()).toBe(false);
-    expect(r.errors.messagesFor("topic").length).toBeGreaterThan(0);
+    expect(await r.isValid()).toBeFalsy();
+    expect(r.errors.messagesFor("topic").length > 0).toBeTruthy();
 
     r.topic = (await Topic.first()) as Topic;
-    expect(await r.isValid()).toBe(true);
+    expect(await r.isValid()).toBeTruthy();
   });
 
   it("validates presence of belongs to association  parent is new record", async () => {
@@ -112,7 +112,7 @@ describe("AssociationValidationTest", () => {
       Interest.validatesPresenceOf("human");
       const human = new Human({ name: "John" });
       const interest = association(human, "interests").build({ topic: "Airplanes" }) as Interest;
-      expect(await interest.isValid()).toBe(true);
+      expect(await interest.isValid()).toBeTruthy();
     });
   });
 
@@ -121,7 +121,7 @@ describe("AssociationValidationTest", () => {
       Interest.validatesPresenceOf("human");
       const human = await Human.createBang({ name: "John" });
       const interest = association(human, "interests").build({ topic: "Airplanes" }) as Interest;
-      expect(await interest.isValid()).toBe(true);
+      expect(await interest.isValid()).toBeTruthy();
     });
   });
 
@@ -131,8 +131,8 @@ describe("AssociationValidationTest", () => {
     const r = await Reply.create({ title: "A reply", content: "with content!" });
     const topic = await Topic.create({ title: "uhohuhoh" });
     r.topic = topic;
-    expect(await r.isValid()).toBe(true);
-    expect(await r.isValid("custom")).toBe(false);
+    expect(await r.isValid()).toBeTruthy();
+    expect(await r.isValid("custom")).toBeFalsy();
     expect(r.errors.messagesFor("topic")).toEqual(["is invalid"]);
   });
 
@@ -141,11 +141,10 @@ describe("AssociationValidationTest", () => {
     Topic.validatesPresenceOf("content", { on: "create" });
     const t = await Topic.create({ title: "uhoh", content: "stuff" });
     t.writeAttribute("content", null);
-    expect(await t.save()).toBe(true);
-    const r = await Reply.create({ title: "A reply", content: "with content!" });
-    r.topic = t;
+    await t.updateBang({ content: null });
+    const r = await (t as any).replies.create({ title: "A reply", content: "with content!" });
 
-    expect(await t.isValid()).toBe(true);
-    expect(await r.isValid()).toBe(true);
+    expect(await t.isValid()).toBeTruthy();
+    expect(await r.isValid()).toBeTruthy();
   });
 });
