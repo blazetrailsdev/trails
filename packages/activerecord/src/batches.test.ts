@@ -426,26 +426,32 @@ describe("EachTest", () => {
   });
 
   it("in batches each record should yield record if block is given", async () => {
-    for await (const post of Post.inBatches({ of: 2 }).eachRecord()) {
-      expect(isPresent(post.readAttribute("title"))).toBeTruthy();
-      expect(post).toBeInstanceOf(Post);
-    }
+    await assertQueriesCount(6, false, async () => {
+      for await (const post of Post.inBatches({ of: 2 }).eachRecord()) {
+        expect(isPresent(post.readAttribute("title"))).toBeTruthy();
+        expect(post).toBeInstanceOf(Post);
+      }
+    });
   });
 
   it("in batches each record should return enumerator if no block given", async () => {
-    for await (const post of Post.inBatches({ of: 2 }).eachRecord()) {
-      expect(isPresent(post.readAttribute("title"))).toBeTruthy();
-      expect(post).toBeInstanceOf(Post);
-    }
+    await assertQueriesCount(6, false, async () => {
+      for await (const post of Post.inBatches({ of: 2 }).eachRecord()) {
+        expect(isPresent(post.readAttribute("title"))).toBeTruthy();
+        expect(post).toBeInstanceOf(Post);
+      }
+    });
   });
 
   it("in batches each record should be ordered by id", async () => {
     const ids = (await Post.order("id ASC")).map((p: any) => p.id);
-    let i = 0;
-    for await (const post of Post.inBatches({ of: 2 }).eachRecord()) {
-      expect(post.id).toBe(ids[i]);
-      i++;
-    }
+    await assertQueriesCount(6, false, async () => {
+      let i = 0;
+      for await (const post of Post.inBatches({ of: 2 }).eachRecord()) {
+        expect(post.id).toBe(ids[i]);
+        i++;
+      }
+    });
   });
 
   it("in batches update all affect all records", async () => {
@@ -667,11 +673,13 @@ describe("EachTest", () => {
       await orderedPosts;
       const expected = await Post.order("id desc");
       const collected: any[] = [];
-      for await (const post of orderedPosts
-        .inBatches({ of: 1, cursor: "id", order: "desc" })
-        .eachRecord()) {
-        collected.push(post);
-      }
+      await assertNoQueries(false, async () => {
+        for await (const post of orderedPosts
+          .inBatches({ of: 1, cursor: "id", order: "desc" })
+          .eachRecord()) {
+          collected.push(post);
+        }
+      });
       expect(collected.map((p: any) => p.id)).toEqual(expected.map((p: any) => p.id));
     } finally {
       await Post.withConnection(async (conn) => {
@@ -703,13 +711,15 @@ describe("EachTest", () => {
 
   it("in batches should end at the finish option", async () => {
     const post = await Post.order("id DESC").where("id <= ?", 5).first();
-    const batches: any[] = [];
-    for await (const rel of Post.inBatches({ of: 1, finish: 5, load: true })) {
-      batches.push(rel);
-    }
-    const lastBatch = batches[batches.length - 1];
-    const records = await lastBatch.toArray();
-    expect(records[records.length - 1].id).toBe((post as any).id);
+    await assertQueriesCount(7, false, async () => {
+      const batches: any[] = [];
+      for await (const rel of Post.inBatches({ of: 1, finish: 5, load: true })) {
+        batches.push(rel);
+      }
+      const lastBatch = batches[batches.length - 1];
+      const records = await lastBatch.toArray();
+      expect(records[records.length - 1].id).toBe((post as any).id);
+    });
   });
 
   it("in batches executes range queries when unconstrained", async () => {
@@ -921,12 +931,18 @@ describe("EachTest", () => {
     await assertNoQueries(false, () => {
       enumerator = Post.inBatches({ of: 1 });
     });
-    let count = 0;
-    for await (const relation of enumerator!) {
+    const relations: any[] = [];
+    await assertQueriesCount(4, false, async () => {
+      let count = 0;
+      for await (const relation of enumerator!) {
+        relations.push(relation);
+        count++;
+        if (count >= 4) break;
+      }
+    });
+    for (const relation of relations) {
       expect(relation).toBeInstanceOf(Relation);
       expect(await relation.first()).toBeInstanceOf(Post);
-      count++;
-      if (count >= 4) break;
     }
   });
 
