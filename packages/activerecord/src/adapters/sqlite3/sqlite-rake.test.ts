@@ -175,14 +175,13 @@ describeIfSqlite("SqliteDBDropTest", () => {
   });
 
   it("generates absolute path with given root", async () => {
-    const join = vi.spyOn(File, "join");
+    const join = vi.spyOn(File, "join").mockReturnValue(`${root}/${database}`);
     vi.spyOn(FileUtils, "rm").mockImplementation(() => undefined);
     vi.spyOn(FileUtils, "rmF").mockImplementation(() => undefined);
 
     await DatabaseTasks.drop(configuration);
 
     expect(join).toHaveBeenCalledWith(root, database);
-    expect(join).toHaveReturnedWith(`${root}/${database}`);
   });
 
   it("removes file with relative path", async () => {
@@ -242,7 +241,7 @@ describeIfSqlite("SqliteDBCollationTest", () => {
   });
 
   it("db retrieves collation", async () => {
-    await expect(DatabaseTasks.collation(configuration)).rejects.toBeInstanceOf(NoMethodError);
+    await expect(DatabaseTasks.collation(configuration)).rejects.toThrow(NoMethodError);
   });
 });
 

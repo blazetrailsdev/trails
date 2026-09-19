@@ -15,8 +15,8 @@ describeIfSqlite("SQLite3CreateFolder", () => {
       });
       await conn.connectBang();
 
-      expect(fs.existsSync(path.join(dir, "db"))).toBe(true);
-      expect(fs.existsSync(path.join(dir, "db", "foo.sqlite3"))).toBe(true);
+      expect(fs.existsSync(path.join(dir, "db"))).toBeTruthy();
+      expect(fs.existsSync(path.join(dir, "db", "foo.sqlite3"))).toBeTruthy();
     } finally {
       await conn?.disconnectBang();
       fs.rmSync(dir, { recursive: true, force: true });

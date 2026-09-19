@@ -54,10 +54,13 @@ describeIfSqlite("SQLite3AdapterPreventWritesTest", () => {
   });
 
   it("doesnt error when a select query is called while preventing writes", async () => {
-    await adapter.execute(`CREATE TABLE "pw5" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
+    await adapter.execute(`CREATE TABLE "pw5" ("id" int, "data" string)`);
+    await adapter.execute(`INSERT INTO pw5 (data) VALUES ('138853948594')`);
+
     await Base.whilePreventingWrites(async () => {
-      const rows = (await adapter.execute(`SELECT * FROM "pw5"`))!;
-      expect(rows).toHaveLength(0);
+      expect(
+        (await adapter.execute(`SELECT data from pw5 WHERE data = '138853948594'`))!.length,
+      ).toEqual(1);
     });
   });
 

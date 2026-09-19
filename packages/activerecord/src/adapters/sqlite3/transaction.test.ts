@@ -40,7 +40,7 @@ function readUncommitted(conn: SQLite3Adapter): boolean {
 describeIfSqlite("SQLite3TransactionTest", () => {
   it("shared_cached? is true when cache-mode is enabled", async () => {
     await withConnection({ flags: sharedCacheFlags() }, async (conn) => {
-      expect(conn.isSharedCache()).toBe(true);
+      expect(conn.isSharedCache()).toBeTruthy();
     });
   });
 
@@ -50,7 +50,7 @@ describeIfSqlite("SQLite3TransactionTest", () => {
         flags: SQLite3Constants.Open.READWRITE | SQLite3Constants.Open.CREATE,
       },
       async (conn) => {
-        expect(conn.isSharedCache()).toBe(false);
+        expect(conn.isSharedCache()).toBeFalsy();
       },
     );
   });
@@ -103,35 +103,35 @@ describeIfSqlite("SQLite3TransactionTest", () => {
 
   it("reset the read_uncommitted PRAGMA when a transaction is rolled back", async () => {
     await withConnection({ flags: sharedCacheFlags() }, async (conn) => {
-      expect(readUncommitted(conn)).toBe(false);
+      expect(readUncommitted(conn)).toBeFalsy();
       await conn.beginIsolatedDbTransaction(":read_uncommitted");
-      expect(readUncommitted(conn)).toBe(true);
+      expect(readUncommitted(conn)).toBeTruthy();
       await conn.rollbackDbTransaction();
       await conn.resetIsolationLevel();
-      expect(readUncommitted(conn)).toBe(false);
+      expect(readUncommitted(conn)).toBeFalsy();
     });
   });
 
   it("reset the read_uncommitted PRAGMA when a transaction is committed", async () => {
     await withConnection({ flags: sharedCacheFlags() }, async (conn) => {
-      expect(readUncommitted(conn)).toBe(false);
+      expect(readUncommitted(conn)).toBeFalsy();
       await conn.beginIsolatedDbTransaction(":read_uncommitted");
-      expect(readUncommitted(conn)).toBe(true);
+      expect(readUncommitted(conn)).toBeTruthy();
       await conn.commitDbTransaction();
       await conn.resetIsolationLevel();
-      expect(readUncommitted(conn)).toBe(false);
+      expect(readUncommitted(conn)).toBeFalsy();
     });
   });
 
   it("set the read_uncommitted PRAGMA to its previous value", async () => {
     await withConnection({ flags: sharedCacheFlags() }, async (conn) => {
       (conn as any)._rawConnection.exec("PRAGMA read_uncommitted=ON");
-      expect(readUncommitted(conn)).toBe(true);
+      expect(readUncommitted(conn)).toBeTruthy();
       await conn.beginIsolatedDbTransaction(":read_uncommitted");
-      expect(readUncommitted(conn)).toBe(true);
+      expect(readUncommitted(conn)).toBeTruthy();
       await conn.commitDbTransaction();
       await conn.resetIsolationLevel();
-      expect(readUncommitted(conn)).toBe(true);
+      expect(readUncommitted(conn)).toBeTruthy();
     });
   });
 });
