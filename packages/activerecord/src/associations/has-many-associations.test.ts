@@ -3845,11 +3845,12 @@ describe("HasManyAssociationsTest", () => {
       // BLOCKED: has-many-build-accepts-block
       const company = firms2("first_firm") as any;
 
-      const newClient = await assertQueriesCount(0, false, async () =>
-        company.clientsOfFirm.build((client: any) => {
+      let newClient: any;
+      await assertQueriesCount(0, false, async () => {
+        newClient = company.clientsOfFirm.build((client: any) => {
           client.name = "Another Client";
-        }),
-      );
+        });
+      });
       expect(company.clientsOfFirm.loaded).toBeFalsy();
 
       expect(newClient.name).toBe("Another Client");
