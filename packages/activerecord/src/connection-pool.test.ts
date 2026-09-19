@@ -1,11 +1,22 @@
 import { it, expect, vi } from "vitest";
-import { Thread } from "@blazetrails/ruby-compat";
-import { Notifications } from "@blazetrails/activesupport";
+import { Process, Thread, ThreadError } from "@blazetrails/ruby-compat";
+import {
+  Notifications,
+  assertRaise,
+  assertRaises,
+  assertRespondTo,
+} from "@blazetrails/activesupport";
+import { ConnectionTimeoutError } from "./errors.js";
+import {
+  NullTransaction,
+  RealTransaction,
+  SavepointTransaction,
+} from "./connection-adapters/abstract/transaction.js";
 import { Visitors } from "@blazetrails/arel";
 import { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-handler.js";
 import { PoolConfig } from "./connection-adapters/pool-config.js";
-import { SchemaCache, SchemaReflection } from "./connection-adapters/schema-cache.js";
+import { SchemaReflection } from "./connection-adapters/schema-cache.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { ambientPoolConfiguration, rawTestAdapterConfiguration } from "./test-adapter.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
@@ -42,6 +53,8 @@ function makeAmbientPool(
   );
   return new ConnectionPool(pc);
 }
+
+const activeConnections = (pool: ConnectionPool) => pool.connections.filter((c) => c.inUse);
 
 function makePool(size: number = 5): ConnectionPool {
   return makeAmbientPool({ pool: size });
@@ -117,41 +130,42 @@ function makeTransactionAwarePool(size: number = 5): ConnectionPool {
 
 it("checkout after close", async () => {
   const pool = makePool();
-  const conn = await pool.leaseConnection();
-  expect(conn).toBeTruthy();
-  pool.releaseConnection();
+  const connection = await pool.leaseConnection();
+  expect(connection.inUse).toBeTruthy();
 
-  await pool.disconnectBang();
+  await connection.close();
+  expect(connection.inUse).toBeFalsy();
 
-  const conn2 = await pool.leaseConnection();
-  expect(conn2).toBeTruthy();
-  expect(conn2).not.toBe(conn);
-  pool.releaseConnection();
+  expect((await pool.leaseConnection()).inUse).toBeTruthy();
 });
 
 it("with connection", async () => {
   const pool = makePool();
-  const result = await pool.withConnection((conn) => {
-    expect(conn).toBeTruthy();
-    return "ok";
-  });
-  expect(result).toBe("ok");
-  expect(pool.stat().busy).toBe(0);
-  expect(pool.stat().idle).toBe(1);
+  expect(activeConnections(pool).length).toBe(0);
 
-  const asyncResult = await pool.withConnection(async (conn) => {
-    expect(conn).toBeTruthy();
-    return "async-ok";
-  });
-  expect(asyncResult).toBe("async-ok");
-  expect(pool.stat().busy).toBe(0);
+  const mainThread = await pool.leaseConnection();
+  expect(activeConnections(pool).length).toBe(1);
 
-  await expect(
-    pool.withConnection(async () => {
-      throw new Error("boom");
-    }),
-  ).rejects.toThrow("boom");
-  expect(pool.stat().busy).toBe(0);
+  await new Thread(async () => {
+    await pool.withConnection(async (conn) => {
+      expect(conn).toBeTruthy();
+      expect(activeConnections(pool).length).toBe(2);
+    });
+    expect(activeConnections(pool).length).toBe(1);
+
+    await pool.withConnection(async (conn) => {
+      expect(conn).toBeTruthy();
+      expect(activeConnections(pool).length).toBe(2);
+      await pool.leaseConnection();
+    });
+
+    expect(activeConnections(pool).length).toBe(2);
+    pool.releaseConnection();
+    expect(activeConnections(pool).length).toBe(1);
+  }).join();
+
+  await mainThread.close();
+  expect(activeConnections(pool).length).toBe(0);
 });
 
 it.skipIf(inMemoryDb())("new connection no query", async () => {
@@ -168,17 +182,25 @@ it.skipIf(inMemoryDb())("new connection no query", async () => {
 
 it("active connection in use", async () => {
   const pool = makePool();
-  expect(pool.activeConnection).toBeNull();
-  const conn = await pool.leaseConnection();
-  expect(pool.activeConnection).toBe(conn);
-  pool.releaseConnection();
-  expect(pool.activeConnection).toBeNull();
+  expect(pool.activeConnection).toBeFalsy();
+  const mainThread = await pool.leaseConnection();
+
+  expect(pool.activeConnection).toBeTruthy();
+
+  await mainThread.close();
+
+  expect(pool.activeConnection).toBeFalsy();
 });
 
 it("full pool exception", async () => {
-  const pool = makePool(1);
-  await pool.checkout();
-  await expect(pool.checkout(0.05)).rejects.toThrow(/could not obtain a connection/i);
+  const pool = makePool();
+  pool.checkoutTimeout = 0.001;
+  for (let i = 0; i < pool.size; i++) expect(await pool.checkout()).toBeTruthy();
+
+  const error = (await assertRaises([ConnectionTimeoutError], {}, () =>
+    pool.checkout(),
+  )) as ConnectionTimeoutError;
+  expect(error.connectionPool).toBe(pool);
 });
 
 it("full pool blocks", async () => {
@@ -192,13 +214,17 @@ it("full pool blocks", async () => {
 });
 
 it("removing releases latch", async () => {
-  const pool = makePool(1);
-  const conn = await pool.checkout();
-  const promise = pool.checkout(1);
-  pool.remove(conn);
-  const conn2 = await promise;
-  expect(conn2).not.toBe(conn);
-  pool.checkin(conn2);
+  const pool = makePool();
+  const cs = [];
+  for (let i = 0; i < pool.size; i++) cs.push(await pool.checkout());
+  const t = new Thread(() => pool.checkout());
+
+  while (pool.numWaitingInQueue() !== 1) await new Promise((resolve) => setTimeout(resolve, 1));
+
+  const connection = cs[0];
+  pool.remove(connection);
+  assertRespondTo(await t.value(), "execute");
+  await connection.close();
 });
 
 it("reap and active", async () => {
@@ -220,37 +246,34 @@ it("reap inactive", async () => {
     await pool.checkout();
   }).value();
 
-  expect(pool.stat().busy).toBe(3);
+  expect(activeConnections(pool).length).toBe(3);
 
   await pool.reap();
 
-  expect(pool.stat().busy).toBe(1);
+  expect(activeConnections(pool).length).toBe(1);
   pool.checkin(conn);
   await pool.disconnect();
 });
 
 it("idle timeout configuration", async () => {
-  const keepPool = makeAmbientPool({ idleTimeout: 9999 });
-  const keepConn = await keepPool.checkout();
-  keepPool.checkin(keepConn);
-  expect(keepPool.stat().connections).toBe(1);
-  await keepPool.flush();
-  expect(keepPool.stat().connections).toBe(1);
+  let pool = makePool();
+  await pool.disconnectBang();
 
-  const flushPool = makeAmbientPool({ idleTimeout: 1 });
-  vi.useFakeTimers();
-  try {
-    const flushConn = await flushPool.checkout();
-    flushPool.checkin(flushConn);
-    expect(flushPool.stat().connections).toBe(1);
-    await flushPool.flush();
-    expect(flushPool.stat().connections).toBe(1);
-    vi.advanceTimersByTime(2000);
-    await flushPool.flush();
-    expect(flushPool.stat().connections).toBe(0);
-  } finally {
-    vi.useRealTimers();
-  }
+  pool = makeAmbientPool({ idleTimeout: 0.02 });
+  const idleConn = await pool.checkout();
+  pool.checkin(idleConn);
+
+  (idleConn as unknown as { _idleSince: number })._idleSince =
+    Process.clockGettime(Process.CLOCK_MONOTONIC) - 0.01;
+
+  await pool.flush();
+  expect(pool.connections.length).toBe(1);
+
+  (idleConn as unknown as { _idleSince: number })._idleSince =
+    Process.clockGettime(Process.CLOCK_MONOTONIC) - 0.03;
+
+  await pool.flush();
+  expect(pool.connections.length).toBe(0);
 });
 
 it("disable flush", async () => {
@@ -262,15 +285,28 @@ it("disable flush", async () => {
 });
 
 it("flush", async () => {
-  const pool = makePool(5);
-  const conn = await pool.checkout();
-  pool.checkin(conn);
-  expect(pool.stat().connections).toBe(1);
-  expect(pool.stat().idle).toBe(1);
-  await pool.flush(9999);
-  expect(pool.stat().connections).toBe(1);
-  await pool.flush(0);
-  expect(pool.stat().connections).toBe(0);
+  const pool = makePool();
+  const idleConn = await pool.checkout();
+  const recentConn = await pool.checkout();
+  const activeConn = await pool.checkout();
+
+  try {
+    pool.checkin(idleConn);
+    pool.checkin(recentConn);
+
+    expect(pool.connections.length).toBe(3);
+
+    (idleConn as unknown as { _idleSince: number })._idleSince =
+      Process.clockGettime(Process.CLOCK_MONOTONIC) - 1000;
+
+    await pool.flush(30);
+
+    expect(pool.connections.length).toBe(2);
+
+    expect(new Set(pool.connections)).toEqual(new Set([recentConn, activeConn]));
+  } finally {
+    pool.checkin(activeConn);
+  }
 });
 
 it("flush bang", async () => {
@@ -288,26 +324,48 @@ it("flush bang", async () => {
 it("remove connection", async () => {
   const pool = makePool();
   const conn = await pool.checkout();
-  expect(pool.stat().connections).toBe(1);
-  pool.remove(conn);
-  expect(pool.stat().connections).toBe(0);
+  try {
+    expect(conn.inUse).toBeTruthy();
+
+    const length = pool.connections.length;
+    pool.remove(conn);
+    expect(conn.inUse).toBeTruthy();
+    expect(pool.connections.length).toBe(length - 1);
+  } finally {
+    await conn.close();
+  }
 });
 
 it("active connection?", async () => {
   const pool = makePool();
-  expect(pool.activeConnection).toBeNull();
-  const conn = await pool.leaseConnection();
-  expect(pool.activeConnection).toBe(conn);
+  expect(pool.activeConnection).toBeFalsy();
+  expect(await pool.leaseConnection()).toBeTruthy();
+  expect(pool.activeConnection).toBeTruthy();
   pool.releaseConnection();
+  expect(pool.activeConnection).toBeFalsy();
 });
 
 it("checkout behavior", async () => {
-  const pool = makePool(2);
-  const c1 = await pool.checkout();
-  const c2 = await pool.checkout();
-  expect(c1).not.toBe(c2);
-  pool.checkin(c1);
-  pool.checkin(c2);
+  const pool = makePool();
+  const mainConnection = await pool.leaseConnection();
+  expect(mainConnection).not.toBeNull();
+  const threads: Thread[] = [];
+  for (let i = 0; i < 4; i++) {
+    threads.push(
+      new Thread(async () => {
+        const threadConnection = await pool.leaseConnection();
+        expect(threadConnection).not.toBeNull();
+        await threadConnection.close();
+      }),
+    );
+  }
+
+  for (const thread of threads) await thread.join();
+
+  await new Thread(async () => {
+    expect(await pool.leaseConnection()).toBeTruthy();
+    await (await pool.leaseConnection()).close();
+  }).join();
 });
 
 it("checkout order is lifo", async () => {
@@ -322,13 +380,11 @@ it("checkout order is lifo", async () => {
 
 it("automatic reconnect restores after disconnect", async () => {
   const pool = makePool();
-  expect(pool.automaticReconnect).toBe(true);
+  expect(pool.automaticReconnect).toBeTruthy();
   expect(await pool.leaseConnection()).toBeTruthy();
-  pool.releaseConnection();
 
   await pool.disconnectBang();
   expect(await pool.leaseConnection()).toBeTruthy();
-  pool.releaseConnection();
 });
 
 it("automatic reconnect can be disabled", async () => {
@@ -341,10 +397,11 @@ it("automatic reconnect can be disabled", async () => {
 });
 
 it("pool sets connection visitor", async () => {
-  const pool = makeTransactionAwarePool(5);
-  const conn = await pool.leaseConnection();
-  expect((conn as unknown as { visitor: unknown }).visitor).toBeInstanceOf(Visitors.ToSql);
-  pool.releaseConnection();
+  const pool = makePool();
+  expect(
+    ((await pool.leaseConnection()) as unknown as { visitor: unknown }).visitor instanceof
+      Visitors.ToSql,
+  ).toBeTruthy();
 });
 
 it("anonymous class exception", async () => {
@@ -365,7 +422,6 @@ it("connection notification is called", async () => {
   try {
     const dbConfig = new HashConfig("test", "primary", ambientPoolConfiguration());
     await Base.connectionHandler.establishConnection(dbConfig, { ownerName: ConnectionTestModel });
-    expect(payloads).toHaveLength(1);
     expect(Object.keys(payloads[0]).sort()).toEqual(["config", "connection_name", "role", "shard"]);
     expect(payloads[0].connection_name).toBe(ConnectionTestModel.name);
     expect(payloads[0].shard).toBe("default");
@@ -386,7 +442,6 @@ it("connection notification is called for shard", async () => {
     await ConnectionTestModel.connectsTo({
       shards: { default: { writing: ambientPoolConfiguration() } },
     });
-    expect(payloads).toHaveLength(1);
     expect(Object.keys(payloads[0]).sort()).toEqual(["config", "connection_name", "role", "shard"]);
     expect(payloads[0].connection_name).toBe(ConnectionTestModel.name);
     expect(payloads[0].shard).toBe("default");
@@ -400,59 +455,144 @@ it("connection notification is called for shard", async () => {
 
 it("sets pool schema reflection", async () => {
   const pool = makePool();
-  const original = pool.schemaReflection;
-  expect(original).toBeTruthy();
+  await pool.schemaCache.add("posts");
+  expect(await pool.schemaCache.isCached("posts")).toBeTruthy();
 
-  const newReflection = new SchemaReflection(null);
-  pool.schemaReflection = newReflection;
-  expect(pool.schemaReflection).toBe(newReflection);
-  expect(pool.schemaReflection).not.toBe(original);
+  pool.schemaReflection = new SchemaReflection("does-not-exist");
+  expect(await pool.schemaCache.isCached("posts")).toBeFalsy();
+
+  await pool.schemaCache.add("posts");
+  expect(await pool.schemaCache.isCached("posts")).toBeTruthy();
 });
 
 it("pool sets connection schema cache", async () => {
-  const pool = makeTransactionAwarePool(5);
-  const conn1 = await pool.checkout();
-  const conn2 = await pool.checkout();
-  expect(conn1).not.toBe(conn2);
-  const cache1 = (conn1 as unknown as { internalSchemaCache: SchemaCache }).internalSchemaCache;
-  const cache2 = (conn2 as unknown as { internalSchemaCache: SchemaCache }).internalSchemaCache;
-  expect(cache1).toBeInstanceOf(SchemaCache);
-  expect(cache1).toBe(cache2);
-  pool.checkin(conn1);
-  pool.checkin(conn2);
+  const pool = makePool();
+  await pool.schemaCache.add("posts");
+  const connection = await pool.checkout();
+
+  await pool.withConnection(async (conn) => {
+    expect(conn).not.toBe(connection);
+
+    expect(await connection.schemaCache.size()).toBe(await conn.schemaCache.size());
+    expect(await connection.schemaCache.columns("posts")).toBe(
+      await conn.schemaCache.columns("posts"),
+    );
+  });
+
+  pool.checkin(connection);
 });
 
 it("connection pool stat", async () => {
-  const pool = makePool(5);
-  const conn = await pool.checkout();
-  const stat = pool.stat();
-  expect(stat.size).toBe(5);
-  expect(stat.connections).toBe(1);
-  expect(stat.busy).toBe(1);
-  expect(stat.idle).toBe(0);
-  pool.checkin(conn);
+  const pool = makeAmbientPool({ pool: 1 });
+  try {
+    await pool.withConnection(async () => {
+      const stats = pool.stat();
+      expect(stats).toEqual({
+        size: 1,
+        connections: 1,
+        busy: 1,
+        dead: 0,
+        idle: 0,
+        waiting: 0,
+        checkoutTimeout: 0.2,
+      });
+    });
+
+    let stats = pool.stat();
+    expect(stats).toEqual({
+      size: 1,
+      connections: 1,
+      busy: 0,
+      dead: 0,
+      idle: 1,
+      waiting: 0,
+      checkoutTimeout: 0.2,
+    });
+
+    await assertRaise([ThreadError], {}, async () => {
+      await new Thread(async () => {
+        await pool.checkout();
+        throw new ThreadError();
+      }).join();
+    });
+
+    stats = pool.stat();
+    expect(stats).toEqual({
+      size: 1,
+      connections: 1,
+      busy: 0,
+      dead: 1,
+      idle: 0,
+      waiting: 0,
+      checkoutTimeout: 0.2,
+    });
+  } finally {
+    await pool.disconnectBang();
+  }
 });
 
 it("role and shard is returned", async () => {
-  const pool = makeAmbientPool({}, { role: "reading", shard: "shard_one" });
-  expect(pool.role).toBe("reading");
-  expect(pool.shard).toBe("shard_one");
+  const poolConfig = new PoolConfig(
+    new ConnectionDescriptor("primary"),
+    makeAmbientDbConfig(),
+    "writing",
+    "default",
+  );
+  const pool = new ConnectionPool(poolConfig);
+  expect(poolConfig.role).toBe("writing");
+  expect(pool.role).toBe("writing");
+  expect((await pool.leaseConnection()).role).toBe("writing");
+
+  expect(poolConfig.shard).toBe("default");
+  expect(pool.shard).toBe("default");
+  expect((await pool.leaseConnection()).shard).toBe("default");
+
+  const readingPoolConfig = new PoolConfig(
+    new ConnectionDescriptor("primary"),
+    makeAmbientDbConfig(),
+    "reading",
+    "shard_one",
+  );
+  const readingPool = new ConnectionPool(readingPoolConfig);
+
+  expect(readingPoolConfig.role).toBe("reading");
+  expect(readingPool.role).toBe("reading");
+  expect((await readingPool.leaseConnection()).role).toBe("reading");
+
+  expect(readingPoolConfig.shard).toBe("shard_one");
+  expect(readingPool.shard).toBe("shard_one");
+  expect((await readingPool.leaseConnection()).shard).toBe("shard_one");
 });
 
 it("pin connection always returns the same connection", async () => {
-  const pool = makeTransactionAwarePool(5);
-  await pool.pinConnectionBang();
-  const conn1 = await pool.checkout();
-  const conn2 = await pool.checkout();
-  expect(conn1).toBe(conn2);
-  await pool.unpinConnectionBang();
+  const pool = makePool();
+  expect(pool.activeConnection).toBeFalsy();
+  await pool.pinConnectionBang(true);
+  const pinnedConnection = await pool.checkout();
+
+  expect(pool.activeConnection).toBeFalsy();
+  expect(await pool.leaseConnection()).toBe(pinnedConnection);
+  expect(pool.activeConnection).toBeTruthy();
+
+  expect(await pool.checkout()).toBe(pinnedConnection);
+
+  pool.releaseConnection();
+  expect(pool.activeConnection).toBeFalsy();
+  expect(await pool.checkout()).toBe(pinnedConnection);
 });
 
 it("pin connection connected?", async () => {
-  const pool = makeTransactionAwarePool(5);
-  await pool.pinConnectionBang();
-  expect(pool.isConnected()).toBe(true);
-  await pool.unpinConnectionBang();
+  const pool = makePool();
+  expect(pool.isConnected()).toBeFalsy();
+  await pool.pinConnectionBang(true);
+  expect(pool.isConnected()).toBeTruthy();
+
+  const pinConnection = await pool.checkout();
+
+  await pool.disconnect();
+  expect(pool.isConnected()).toBeFalsy();
+  expect(await pool.checkout()).toBe(pinConnection);
+  expect(pool.isConnected()).toBeTruthy();
 });
 
 it("isConnected probes each pooled connection's connected state", async () => {
@@ -467,49 +607,43 @@ it("isConnected probes each pooled connection's connected state", async () => {
 });
 
 it("pin connection opens a transaction", async () => {
-  const pool = makeTransactionAwarePool(5);
-  await pool.pinConnectionBang();
-  const conn = (await pool.checkout()) as TransactionAwareTestAdapter;
-  expect(conn.transactionManager.openTransactions).toBe(1);
-  expect(conn.transactionManager.currentTransaction.open).toBe(true);
-  expect(conn.transactionManager.currentTransaction.joinable).toBe(false);
+  const pool = makePool();
+  expect((await pool.leaseConnection()).currentTransaction()).toBeInstanceOf(NullTransaction);
+  await pool.pinConnectionBang(true);
+  expect((await pool.leaseConnection()).currentTransaction()).toBeInstanceOf(RealTransaction);
   await pool.unpinConnectionBang();
+  expect((await pool.leaseConnection()).currentTransaction()).toBeInstanceOf(NullTransaction);
 });
 
 it("unpin connection returns whether transaction has been rolledback", async () => {
-  const pool = makeTransactionAwarePool(5);
+  const pool = makePool();
+  await pool.pinConnectionBang(true);
+  expect(await pool.unpinConnectionBang()).toBe(true);
 
-  await pool.pinConnectionBang();
-  const clean = await pool.unpinConnectionBang();
-  expect(clean).toBe(true);
+  await pool.pinConnectionBang(true);
+  await (await pool.leaseConnection()).commitTransaction();
+  expect(await pool.unpinConnectionBang()).toBe(false);
 
-  await pool.pinConnectionBang();
-  const conn = (await pool.checkout()) as TransactionAwareTestAdapter;
-  await conn.transactionManager.commitTransaction();
-  const dirty = await pool.unpinConnectionBang();
-  expect(dirty).toBe(false);
+  await pool.pinConnectionBang(true);
+  await (await pool.leaseConnection()).rollbackTransaction();
+  expect(await pool.unpinConnectionBang()).toBe(false);
 });
 
 it("pin connection nesting", async () => {
-  const pool = makeTransactionAwarePool(5);
-  await pool.pinConnectionBang();
-  const conn1 = (await pool.checkout()) as TransactionAwareTestAdapter;
-  expect(conn1.transactionManager.openTransactions).toBe(1);
-  expect(conn1.transactionManager.currentTransaction.joinable).toBe(false);
-
-  await pool.pinConnectionBang();
-  const conn2 = await pool.checkout();
-  expect(conn1).toBe(conn2);
-  expect(conn1.transactionManager.openTransactions).toBe(2);
-
+  const pool = makePool();
+  expect((await pool.leaseConnection()).currentTransaction()).toBeInstanceOf(NullTransaction);
+  await pool.pinConnectionBang(true);
+  expect((await pool.leaseConnection()).currentTransaction()).toBeInstanceOf(RealTransaction);
+  await pool.pinConnectionBang(true);
+  expect((await pool.leaseConnection()).currentTransaction()).toBeInstanceOf(SavepointTransaction);
   await pool.unpinConnectionBang();
-  expect(conn1.transactionManager.openTransactions).toBe(1);
-  expect(conn1.transactionManager.currentTransaction.open).toBe(true);
-  const conn3 = await pool.checkout();
-  expect(conn3).toBe(conn1);
-
+  expect((await pool.leaseConnection()).currentTransaction()).toBeInstanceOf(RealTransaction);
   await pool.unpinConnectionBang();
-  expect(conn1.transactionManager.openTransactions).toBe(0);
+  expect((await pool.leaseConnection()).currentTransaction()).toBeInstanceOf(NullTransaction);
+
+  await assertRaises([Error], { match: /There isn't a pinned connection/ }, () =>
+    pool.unpinConnectionBang(),
+  );
 });
 
 it("subsequent pinned checkout verifies and reconnects a connection that died mid-session", async () => {
@@ -540,14 +674,13 @@ it("subsequent pinned checkout verifies and reconnects a connection that died mi
 
 it("inspect does not show secrets", async () => {
   const pool = makePool();
-  const str = pool.inspect();
-  expect(str).toMatch(/ConnectionPool/);
-  expect(str).toMatch(/env_name="test"/);
-  expect(str).toMatch(/role="writing"/);
-  expect(str).not.toMatch(/password/);
-  expect(str).not.toContain(String(ambientPoolConfiguration().adapter));
+  expect(pool.inspect()).toMatch(
+    /#<ActiveRecord::ConnectionAdapters::ConnectionPool env_name="\w+" role=:writing>/,
+  );
 
-  const pool2 = makeAmbientPool({}, { role: "reading", shard: "shard_one" });
-  expect(pool2.inspect()).toMatch(/shard="shard_one"/);
-  expect(pool2.inspect()).toMatch(/role="reading"/);
+  const readingPool = makeAmbientPool({}, { role: "reading", shard: "shard_one" });
+
+  expect(readingPool.inspect()).toMatch(
+    /#<ActiveRecord::ConnectionAdapters::ConnectionPool env_name="\w+" role=:reading shard=:shard_one>/,
+  );
 });

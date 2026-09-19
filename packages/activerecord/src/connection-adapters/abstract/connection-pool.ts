@@ -300,11 +300,14 @@ export class ConnectionPool implements ReapablePool {
 
   inspect(): string {
     const q = (v: string) => JSON.stringify(String(v));
-    const parts = [`env_name=${q(this.dbConfig.envName)}`];
-    if (this.dbConfig.name !== "primary") parts.push(`name=${q(this.dbConfig.name)}`);
-    parts.push(`role=${q(this.role)}`);
-    if (this.shard !== "default") parts.push(`shard=${q(this.shard)}`);
-    return `#<ConnectionPool ${parts.join(" ")}>`;
+    const nameField = this.dbConfig.name === "primary" ? "" : ` name=${q(this.dbConfig.name)}`;
+    const shardField = this.shard === "default" ? "" : ` shard=:${this.shard}`;
+    const className =
+      this.constructor === ConnectionPool
+        ? "ActiveRecord::ConnectionAdapters::ConnectionPool"
+        : this.constructor.name;
+
+    return `#<${className} env_name=${q(this.dbConfig.envName)}${nameField} role=:${this.role}${shardField}>`;
   }
 
   /** @noRailsEquivalent PERMANENT */
@@ -627,6 +630,7 @@ export class ConnectionPool implements ReapablePool {
     size: number;
     connections: number;
     busy: number;
+    dead: number;
     idle: number;
     waiting: number;
     checkoutTimeout: number;
@@ -634,7 +638,8 @@ export class ConnectionPool implements ReapablePool {
     return {
       size: this.size,
       connections: this._connections?.length ?? 0,
-      busy: this._checkedOut.size,
+      busy: this._connections?.filter((c) => c.inUse && c.owner!.isAlive()).length ?? 0,
+      dead: this._connections?.filter((c) => c.inUse && !c.owner!.isAlive()).length ?? 0,
       idle: this._connections?.filter((c) => !c.inUse).length ?? 0,
       waiting: this.numWaitingInQueue(),
       checkoutTimeout: this.checkoutTimeout,
