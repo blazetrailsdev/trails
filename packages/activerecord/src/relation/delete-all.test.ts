@@ -1,4 +1,9 @@
 import { describe, it, expect } from "vitest";
+import { assertDifference, assertRaise } from "@blazetrails/activesupport";
+import { regexpEscape } from "@blazetrails/ruby-compat";
+import { adapterType } from "../test-adapter.js";
+import { captureSql } from "../testing/sql-capture.js";
+import { quoteTableName } from "../support/quote-regex.js";
 import { fixtures } from "../test-fixtures.js";
 import { Author, AuthorAddress } from "../test-helpers/models/author.js";
 import { Comment } from "../test-helpers/models/comment.js";
@@ -29,23 +34,33 @@ describe("DeleteAllTest", () => {
     const davids = Author.where({ name: "David" });
 
     expect(await davids).toEqual([authors("david")]);
-    expect(davids.isLoaded).toBe(true);
+    expect(davids.isLoaded).toBeTruthy();
 
-    const destroyed = await davids.destroyAll();
-    expect(destroyed).toHaveLength(1);
-    expect(destroyed[0].id).toBe(authors("david").id);
-    expect(destroyed[0].isDestroyed()).toBe(true);
+    await assertDifference(
+      () => Author.count() as Promise<number>,
+      -1,
+      null,
+      async () => {
+        const destroyed = await davids.destroyAll();
+        expect(destroyed.map((r) => r.id)).toEqual([authors("david").id]);
+        expect(destroyed[0].isFrozen()).toBeTruthy();
+      },
+    );
 
     expect(await davids).toEqual([]);
+    expect(davids.isLoaded).toBeTruthy();
   });
 
   it("delete all", async () => {
     const davids = Author.where({ name: "David" });
 
-    const before = (await Author.count()) as number;
-    await davids.deleteAll();
-    expect(await Author.count()).toBe(before - 1);
-    expect(davids.isLoaded).toBe(false);
+    await assertDifference(
+      () => Author.count() as Promise<number>,
+      -1,
+      null,
+      () => davids.deleteAll(),
+    );
+    expect(davids.isLoaded).toBeFalsy();
   });
 
   it("delete all with index hint", async () => {
@@ -53,24 +68,30 @@ describe("DeleteAllTest", () => {
       `${Author.quotedTableName} /*! USE INDEX (PRIMARY) */`,
     );
 
-    const before = (await Author.count()) as number;
-    await davids.deleteAll();
-    expect(await Author.count()).toBe(before - 1);
-    expect(davids.isLoaded).toBe(false);
+    await assertDifference(
+      () => Author.count() as Promise<number>,
+      -1,
+      null,
+      () => davids.deleteAll(),
+    );
+    expect(davids.isLoaded).toBeFalsy();
   });
 
   it("delete all loaded", async () => {
     const davids = Author.where({ name: "David" });
 
     expect(await davids).toEqual([authors("david")]);
-    expect(davids.isLoaded).toBe(true);
+    expect(davids.isLoaded).toBeTruthy();
 
-    const before = (await Author.count()) as number;
-    await davids.deleteAll();
-    expect(await Author.count()).toBe(before - 1);
+    await assertDifference(
+      () => Author.count() as Promise<number>,
+      -1,
+      null,
+      () => davids.deleteAll(),
+    );
 
     expect(await davids).toEqual([]);
-    expect(davids.isLoaded).toBe(true);
+    expect(davids.isLoaded).toBeTruthy();
   });
 
   it("delete all with group by and having", async () => {
@@ -78,12 +99,15 @@ describe("DeleteAllTest", () => {
     const postsToBeDeleted = await Post.mostCommented(minimumCommentsCount);
     expect(postsToBeDeleted.length).toBeGreaterThan(0);
 
-    const before = (await Post.count()) as number;
-    await Post.mostCommented(minimumCommentsCount).deleteAll();
-    expect(await Post.count()).toBe(before - postsToBeDeleted.length);
+    await assertDifference(
+      () => Post.count() as Promise<number>,
+      -postsToBeDeleted.length,
+      null,
+      () => Post.mostCommented(minimumCommentsCount).deleteAll(),
+    );
 
     for (const deletedPost of postsToBeDeleted) {
-      await expect(deletedPost.reload()).rejects.toThrow(RecordNotFound);
+      await assertRaise([RecordNotFound], {}, () => deletedPost.reload());
     }
   });
 
@@ -100,8 +124,20 @@ describe("DeleteAllTest", () => {
     const pets = Pet.joins(":toys").where({ toys: { name: "Bone" } });
 
     expect(await pets.exists()).toBe(true);
-    const countBefore = await pets.count();
-    expect(await pets.deleteAll()).toBe(countBefore);
+    const sqls = await captureSql(async () => {
+      const count = await pets.count();
+      expect(await pets.deleteAll()).toBe(count);
+    });
+
+    if (adapterType === "mysql") {
+      expect(sqls[sqls.length - 1]).not.toMatch(
+        new RegExp(`SELECT DISTINCT ${regexpEscape(quoteTableName("pets.pet_id"))}`),
+      );
+    } else {
+      expect(sqls[sqls.length - 1]).toMatch(
+        new RegExp(`SELECT ${regexpEscape(quoteTableName("pets.pet_id"))}`),
+      );
+    }
   });
 
   it("delete all with joins and where part is not hash", async () => {

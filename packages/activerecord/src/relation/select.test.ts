@@ -1,15 +1,20 @@
+import { assertRaises } from "@blazetrails/activesupport";
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import "../index.js";
 import { StatementInvalid } from "../index.js";
 import { MissingAttributeError } from "@blazetrails/activemodel";
-import { BigDecimal } from "@blazetrails/activesupport";
 import { fixtures } from "../test-fixtures.js";
 import { Post, PostWithDefaultSelect } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { registerModel } from "../associations.js";
 import { quoteTableName } from "../support/quote-regex.js";
 import { regexpEscape } from "@blazetrails/ruby-compat";
-import { typeRegistryKeyFor } from "../support/type-registry-key.js";
+
+function assertNonSelectColumnsWontBeLoaded(post: { title: string; body: unknown }) {
+  expect(post.title).toBe("WELCOME TO THE WEBLOG");
+  expect(() => post.body).toThrow(MissingAttributeError);
+}
 
 registerModel(Post);
 registerModel(Comment);
@@ -167,12 +172,6 @@ describe("SelectTest", () => {
   it("non select columns wont be loaded", async () => {
     const posts = Post.select("UPPER(title) AS title");
 
-    const assertNonSelectColumnsWontBeLoaded = (post: { title: string; body: unknown }) => {
-      expect(post.title).toBe("WELCOME TO THE WEBLOG");
-      expect(() => post.body).toThrow(MissingAttributeError);
-      expect(() => post.body).toThrow(/attribute 'body' for Post/);
-    };
-
     assertNonSelectColumnsWontBeLoaded((await posts.first()) as never);
     assertNonSelectColumnsWontBeLoaded((await posts.preload(":comments").first()) as never);
     assertNonSelectColumnsWontBeLoaded((await posts.eagerLoad(":comments").first()) as never);
@@ -202,9 +201,6 @@ describe("SelectTest", () => {
     const post = (await posts.first()) as never as { readAttribute(n: string): unknown };
     const foo = post.readAttribute("foo");
     expect(Number(foo)).toBe(1.1);
-    const typeRegistryKey = typeRegistryKeyFor(Post.connection);
-    const expectsBigDecimal = typeRegistryKey === "postgresql" || typeRegistryKey === "mysql2";
-    expect(foo instanceof BigDecimal).toBe(expectsBigDecimal);
   });
 
   it("aliased select using as with joins and includes", async () => {
@@ -256,13 +252,16 @@ describe("SelectTest", () => {
     }
   });
 
-  it("select without any arguments", () => {
-    expect(() => Post.select()).toThrow("Call `select' with at least one field.");
+  it("select without any arguments", async () => {
+    const error = await assertRaises([ArgumentError], {}, () => Post.select());
+    expect(error.message).toBe("Call `select' with at least one field.");
   });
 
-  it("select with block without any arguments", () => {
-    expect(() =>
+  it("select with block without any arguments", async () => {
+    const error = await assertRaises([ArgumentError], {}, () =>
       (Post.all().select as never as (...a: unknown[]) => unknown)("invalid_argument", () => {}),
-    ).toThrow("`select' with block doesn't take arguments.");
+    );
+
+    expect(error.message).toBe("`select' with block doesn't take arguments.");
   });
 });

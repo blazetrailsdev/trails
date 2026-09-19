@@ -1,3 +1,4 @@
+import { assertRaises } from "@blazetrails/activesupport";
 import { afterEach, beforeEach, describe, it, expect } from "vitest";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import type { RawConfigurations } from "../database-configurations.js";
@@ -24,8 +25,11 @@ describe("PoolConfig", () => {
     it("url invalid adapter", async () => {
       const dbConfig = resolveDbConfig("ridiculous://foo?encoding=utf8");
       const handler = new ConnectionHandler();
-      await expect(handler.establishConnection(dbConfig)).rejects.toThrow(AdapterNotFound);
-      await expect(handler.establishConnection(dbConfig)).rejects.toThrow(
+      const error = await assertRaises([AdapterNotFound], {}, () =>
+        handler.establishConnection(dbConfig),
+      );
+
+      expect(error.message).toMatch(
         /^Database configuration specifies nonexistent 'ridiculous' adapter\. Available adapters are: .+\. Ensure that the adapter is spelled correctly in config\/database\.yml and that you've added the necessary adapter package to your package\.json if it's not in the list of available adapters\.$/,
       );
     });
@@ -34,7 +38,7 @@ describe("PoolConfig", () => {
       const poolConfig = resolveDbConfig("production", {
         production: "abstract://foo?encoding=utf8",
       });
-      expect(poolConfig.configurationHash).toMatchObject({
+      expect(poolConfig.configurationHash).toEqual({
         adapter: "abstract",
         host: "foo",
         encoding: "utf8",
@@ -45,7 +49,7 @@ describe("PoolConfig", () => {
       const poolConfig = resolveDbConfig("production", {
         production: { url: "abstract://foo?encoding=utf8" },
       });
-      expect(poolConfig.configurationHash).toMatchObject({
+      expect(poolConfig.configurationHash).toEqual({
         adapter: "abstract",
         host: "foo",
         encoding: "utf8",
@@ -60,7 +64,7 @@ describe("PoolConfig", () => {
         pool: "3",
       };
       const poolConfig = resolveDbConfig("production", { production: hash });
-      expect(poolConfig.configurationHash).toMatchObject({
+      expect(poolConfig.configurationHash).toEqual({
         adapter: "abstract",
         host: "foo",
         encoding: "utf8",
@@ -71,7 +75,7 @@ describe("PoolConfig", () => {
     it("url sub key merges correctly when query param", () => {
       const hash = { url: "abstract:///?user=user&password=passwd&dbname=app" };
       const poolConfig = resolveDbConfig("production", { production: hash });
-      expect(poolConfig.configurationHash).toMatchObject({
+      expect(poolConfig.configurationHash).toEqual({
         adapter: "abstract",
         user: "user",
         password: "passwd",
@@ -81,7 +85,7 @@ describe("PoolConfig", () => {
 
     it("url host no db", () => {
       const poolConfig = resolveDbConfig("abstract://foo?encoding=utf8");
-      expect(poolConfig.configurationHash).toMatchObject({
+      expect(poolConfig.configurationHash).toEqual({
         adapter: "abstract",
         host: "foo",
         encoding: "utf8",
@@ -92,7 +96,7 @@ describe("PoolConfig", () => {
 
     it("url host db", () => {
       const poolConfig = resolveDbConfig("abstract://foo/bar?encoding=utf8");
-      expect(poolConfig.configurationHash).toMatchObject({
+      expect(poolConfig.configurationHash).toEqual({
         adapter: "abstract",
         database: "bar",
         host: "foo",
@@ -102,7 +106,7 @@ describe("PoolConfig", () => {
 
     it("url port", () => {
       const poolConfig = resolveDbConfig("abstract://foo:123?encoding=utf8");
-      expect(poolConfig.configurationHash).toMatchObject({
+      expect(poolConfig.configurationHash).toEqual({
         adapter: "abstract",
         port: 123,
         host: "foo",
@@ -141,7 +145,7 @@ describe("PoolConfig", () => {
       const poolConfig = resolveDbConfig("production", {
         production: { url: "sqlite3:foo?encoding=utf8" },
       });
-      expect(poolConfig.configurationHash).toMatchObject({
+      expect(poolConfig.configurationHash).toEqual({
         adapter: "sqlite3",
         database: "foo",
         encoding: "utf8",

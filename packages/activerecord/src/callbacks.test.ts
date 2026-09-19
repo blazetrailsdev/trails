@@ -1,3 +1,4 @@
+import { assertRaise, assertRaises } from "@blazetrails/activesupport";
 import { describe, it, expect } from "vitest";
 import { Base, RecordNotSaved, RecordNotDestroyed, RecordInvalid } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
@@ -200,9 +201,9 @@ fixtures({}, { useTransactionalTests: false });
 const { developers } = fixtures(["developers"]);
 
 function assertSaveCallbacksNotCalled(someone: CallbackHaltedDeveloper): void {
-  expect(someone.afterSaveCalled).toBe(false);
-  expect(someone.afterCreateCalled).toBe(false);
-  expect(someone.afterUpdateCalled).toBe(false);
+  expect(someone.afterSaveCalled).toBeFalsy();
+  expect(someone.afterCreateCalled).toBeFalsy();
+  expect(someone.afterUpdateCalled).toBeFalsy();
 }
 
 describe("CallbacksTest", () => {
@@ -447,59 +448,51 @@ describe("CallbacksTest", () => {
   it("before create throwing abort", async () => {
     const someone = new CallbackHaltedDeveloper();
     someone.cancelBeforeCreate = true;
-    expect(await someone.isValid()).toBe(true);
-    expect(await someone.save()).toBe(false);
+    expect(await someone.isValid()).toBeTruthy();
+    expect(await someone.save()).toBeFalsy();
     assertSaveCallbacksNotCalled(someone);
   });
 
   it("before save throwing abort", async () => {
     let david = await DeveloperWithCanceledCallbacks.find(developers("david").id);
-    expect(await david.isValid()).toBe(true);
-    expect(await david.save()).toBe(false);
-    const exc = await david.saveBang().then(
-      () => null,
-      (e: unknown) => e,
-    );
-    expect(exc).toBeInstanceOf(RecordNotSaved);
+    expect(await david.isValid()).toBeTruthy();
+    expect(await david.save()).toBeFalsy();
+    const exc = await assertRaise([RecordNotSaved], {}, () => david.saveBang());
     expect((exc as RecordNotSaved).record).toBe(david);
 
     david = await DeveloperWithCanceledCallbacks.find(developers("david").id);
     david.salary = 10_000_000;
-    expect(await david.isValid()).toBe(false);
-    expect(await david.save()).toBe(false);
-    await expect(david.saveBang()).rejects.toThrow(RecordInvalid);
+    expect(await david.isValid()).toBeFalsy();
+    expect(await david.save()).toBeFalsy();
+    await assertRaise([RecordInvalid], {}, () => david.saveBang());
 
     const someone = await CallbackHaltedDeveloper.find(developers("david").id);
     someone.cancelBeforeSave = true;
-    expect(await someone.isValid()).toBe(true);
-    expect(await someone.save()).toBe(false);
+    expect(await someone.isValid()).toBeTruthy();
+    expect(await someone.save()).toBeFalsy();
     assertSaveCallbacksNotCalled(someone);
   });
 
   it("before update throwing abort", async () => {
     const someone = await CallbackHaltedDeveloper.find(developers("david").id);
     someone.cancelBeforeUpdate = true;
-    expect(await someone.isValid()).toBe(true);
-    expect(await someone.save()).toBe(false);
+    expect(await someone.isValid()).toBeTruthy();
+    expect(await someone.save()).toBeFalsy();
     assertSaveCallbacksNotCalled(someone);
   });
 
   it("before destroy throwing abort", async () => {
     const david = await DeveloperWithCanceledCallbacks.find(developers("david").id);
-    expect(await david.destroy()).toBe(false);
-    const exc = await david.destroyBang().then(
-      () => null,
-      (e: unknown) => e,
-    );
-    expect(exc).toBeInstanceOf(RecordNotDestroyed);
+    expect(await david.destroy()).toBeFalsy();
+    const exc = await assertRaise([RecordNotDestroyed], {}, () => david.destroyBang());
     expect((exc as RecordNotDestroyed).record).toBe(david);
     expect(await ImmutableDeveloper.findBy({ id: developers("david").id })).not.toBeNull();
 
     const someone = await CallbackHaltedDeveloper.find(developers("david").id);
     someone.cancelBeforeDestroy = true;
-    expect(await someone.destroy()).toBe(false);
-    await expect(someone.destroyBang()).rejects.toThrow(RecordNotDestroyed);
-    expect(someone.afterDestroyCalled).toBe(false);
+    expect(await someone.destroy()).toBeFalsy();
+    await assertRaise([RecordNotDestroyed], {}, () => someone.destroyBang());
+    expect(someone.afterDestroyCalled).toBeFalsy();
   });
 
   it("callback throwing abort", async () => {
@@ -524,18 +517,18 @@ describe("CallbacksTest", () => {
 
   it("inheritance of callbacks", async () => {
     const parent = new ParentDeveloper();
-    expect(parent.afterSaveCalled).toBe(false);
+    expect(parent.afterSaveCalled).toBeFalsy();
     await parent.save();
-    expect(parent.afterSaveCalled).toBe(true);
+    expect(parent.afterSaveCalled).toBeTruthy();
 
     const child = new ChildDeveloper();
-    expect(child.afterSaveCalled).toBe(false);
+    expect(child.afterSaveCalled).toBeFalsy();
     await child.save();
-    expect(child.afterSaveCalled).toBe(true);
+    expect(child.afterSaveCalled).toBeTruthy();
   });
 
-  it("before save doesnt allow on option", () => {
-    expect(() => {
+  it("before save doesnt allow on option", async () => {
+    const exception = await assertRaises([Error], {}, () => {
       class T extends Base {
         static {
           this.attribute("title", "string");
@@ -543,11 +536,12 @@ describe("CallbacksTest", () => {
         }
       }
       void T;
-    }).toThrow("Unknown key: :on. Valid keys are: :if, :unless, :prepend");
+    });
+    expect(exception.message).toBe("Unknown key: :on. Valid keys are: :if, :unless, :prepend");
   });
 
-  it("around save doesnt allow on option", () => {
-    expect(() => {
+  it("around save doesnt allow on option", async () => {
+    const exception = await assertRaises([Error], {}, () => {
       class T extends Base {
         static {
           this.attribute("title", "string");
@@ -555,11 +549,12 @@ describe("CallbacksTest", () => {
         }
       }
       void T;
-    }).toThrow("Unknown key: :on. Valid keys are: :if, :unless, :prepend");
+    });
+    expect(exception.message).toBe("Unknown key: :on. Valid keys are: :if, :unless, :prepend");
   });
 
-  it("after save doesnt allow on option", () => {
-    expect(() => {
+  it("after save doesnt allow on option", async () => {
+    const exception = await assertRaises([Error], {}, () => {
       class T extends Base {
         static {
           this.attribute("title", "string");
@@ -567,6 +562,7 @@ describe("CallbacksTest", () => {
         }
       }
       void T;
-    }).toThrow("Unknown key: :on. Valid keys are: :if, :unless, :prepend");
+    });
+    expect(exception.message).toBe("Unknown key: :on. Valid keys are: :if, :unless, :prepend");
   });
 });

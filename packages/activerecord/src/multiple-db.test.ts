@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import "./index.js";
 import { Base } from "./base.js";
+import { assertRaises } from "@blazetrails/activesupport";
 import { StatementInvalid } from "./errors.js";
 import { fixtures } from "./test-fixtures.js";
 import { withSecondPool } from "./support/setup-second-pool.js";
@@ -35,8 +36,8 @@ describe("MultipleDbTest", () => {
   );
 
   it("connected", async () => {
-    expect(await Entrant.leaseConnection()).toBeTruthy();
-    expect(await Course.leaseConnection()).toBeTruthy();
+    expect(await Entrant.leaseConnection()).not.toBeNull();
+    expect(await Course.leaseConnection()).not.toBeNull();
   });
 
   it("proper connection", async () => {
@@ -87,8 +88,11 @@ describe("MultipleDbTest", () => {
 
   it("course connection should survive reloads", async () => {
     expect(await Course.leaseConnection()).toBeTruthy();
+
     const reloaded = (await import("./test-helpers/models/course.js")).Course;
+    expect(reloaded).toBeTruthy();
     expect(await reloaded.leaseConnection()).toBeTruthy();
+    expect(await Course.leaseConnection()).toBeTruthy();
   });
 
   it("transactions across databases", async () => {
@@ -133,16 +137,11 @@ describe("MultipleDbTest", () => {
   });
 
   it("exception contains connection pool", async () => {
-    let error: StatementInvalid | undefined;
-    try {
-      await Course.where({ wrong_column: "wrong" }).firstBang();
-    } catch (e) {
-      error = e as StatementInvalid;
-    }
-    expect(error).toBeInstanceOf(StatementInvalid);
-    expect(error!.connectionPool).toBe(
-      ((await Course.leaseConnection()) as { pool: unknown }).pool,
-    );
+    const error = (await assertRaises([StatementInvalid], {}, () =>
+      Course.where({ wrong_column: "wrong" }).firstBang(),
+    )) as StatementInvalid;
+
+    expect(error.connectionPool).toBe(((await Course.leaseConnection()) as { pool: unknown }).pool);
   });
 
   it("exception contains correct pool", async () => {
@@ -157,20 +156,16 @@ describe("MultipleDbTest", () => {
 
     expect(courseConn).not.toBe(entrantConn);
 
-    let courseError: StatementInvalid | undefined;
-    try {
-      await courseConn.execute("SELECT * FROM entrants");
-    } catch (e) {
-      courseError = e as StatementInvalid;
-    }
-    expect(courseError!.connectionPool).toBe(courseConn.pool);
+    const courseError = (await assertRaises([StatementInvalid], {}, () =>
+      courseConn.execute("SELECT * FROM entrants"),
+    )) as StatementInvalid;
 
-    let entrantError: StatementInvalid | undefined;
-    try {
-      await entrantConn.execute("SELECT * FROM courses");
-    } catch (e) {
-      entrantError = e as StatementInvalid;
-    }
-    expect(entrantError!.connectionPool).toBe(entrantConn.pool);
+    expect(courseError.connectionPool).toBe(courseConn.pool);
+
+    const entrantError = (await assertRaises([StatementInvalid], {}, () =>
+      entrantConn.execute("SELECT * FROM courses"),
+    )) as StatementInvalid;
+
+    expect(entrantError.connectionPool).toBe(entrantConn.pool);
   });
 });

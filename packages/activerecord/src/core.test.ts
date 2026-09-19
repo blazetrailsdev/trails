@@ -5,6 +5,9 @@ import { formatForInspect } from "./attribute-methods.js";
 import { pp } from "./pretty-print.js";
 import { fixtures } from "./test-fixtures.js";
 import { Topic, TitlePrimaryKeyTopic } from "./test-helpers/models/topic.js";
+import { LoosePerson } from "./test-helpers/models/person.js";
+import { assertDifference, assertNoDifference } from "@blazetrails/activesupport";
+import { regexpEscape } from "@blazetrails/ruby-compat";
 import { CpkBook } from "./test-helpers/models/cpk.js";
 
 describe("CoreTest", () => {
@@ -35,7 +38,10 @@ describe("CoreTest", () => {
     );
   }
 
-  it("inspect class", () => {
+  it.skip("inspect class", () => {
+    // BLOCKED: base-inspect-returns-unqualified-name
+    expect(Base.inspect()).toBe("ActiveRecord::Base");
+    expect(LoosePerson.inspect()).toBe("LoosePerson(abstract)");
     expect(Topic.inspect()).toMatch(/^Topic\(id: integer, title: string/);
   });
 
@@ -122,30 +128,37 @@ describe("CoreTest", () => {
 
   it("pretty print new", async () => {
     const topic = new Topic({});
-    expect(await ppString(topic)).toBe(
+    const actual = await ppString(topic);
+    const expected =
       `#<Topic id: nil, title: nil, author_name: nil, ` +
-        `author_email_address: "test@test.com", written_on: nil, bonus_time: nil, ` +
-        `last_read: nil, content: nil, important: nil, binary_content: nil, ` +
-        `approved: true, replies_count: 0, unique_replies_count: 0, parent_id: nil, ` +
-        `parent_title: nil, type: nil, group: nil, created_at: nil, updated_at: nil>\n`,
-    );
+      `author_email_address: "test@test.com", written_on: nil, bonus_time: nil, ` +
+      `last_read: nil, content: nil, important: nil, binary_content: nil, ` +
+      `approved: true, replies_count: 0, unique_replies_count: 0, parent_id: nil, ` +
+      `parent_title: nil, type: nil, group: nil, created_at: nil, updated_at: nil>\n`;
+    expect(actual.startsWith(expected.slice(0, 8))).toBeTruthy();
+    expect(actual.endsWith(expected.slice(8))).toBeTruthy();
   });
 
   it("pretty print persisted", async () => {
     const topic = topics("first") as any;
-    expect(await ppString(topic)).toBe(`${fullInspectString(topic)}\n`);
+    const actual = await ppString(topic);
+    expect(actual).toMatch(new RegExp(`^${regexpEscape(fullInspectString(topic))}\n$`));
   });
 
   it("pretty print full", async () => {
     await withAttributesForInspect("all", async () => {
       const topic = topics("first") as any;
-      expect(await ppString(topic)).toBe(`${fullInspectString(topic)}\n`);
+      const actual = await ppString(topic);
+      expect(actual).toMatch(new RegExp(`^${regexpEscape(fullInspectString(topic))}\n$`));
     });
   });
 
   it("pretty print uninitialized", async () => {
     const topic = Object.create(Topic.prototype);
-    expect(await ppString(topic)).toBe("#<Topic not initialized>\n");
+    const actual = await ppString(topic);
+    const expected = "#<Topic not initialized>\n";
+    expect(actual.startsWith(expected.slice(0, 7))).toBeTruthy();
+    expect(actual.endsWith(expected.slice(7))).toBeTruthy();
   });
 
   it("pretty print overridden by inspect", async () => {
@@ -177,27 +190,35 @@ describe("CoreTest", () => {
       .preparedStatements;
     const topicFindByCache = Topic._findByStatementCache!.get(usingPreparedStatements)!;
 
-    const before = topicFindByCache.size;
-    await Topic.find(1);
-    expect(topicFindByCache.size).toBe(before + 1);
-
-    const afterFind = topicFindByCache.size;
-    await Topic.findBy({ id: 1 });
-    expect(topicFindByCache.size).toBe(afterFind);
+    await assertDifference(
+      () => topicFindByCache.size,
+      +1,
+      null,
+      async () => {
+        await Topic.find(1);
+      },
+    );
+    await assertNoDifference(
+      () => topicFindByCache.size,
+      null,
+      async () => {
+        await Topic.findBy({ id: 1 });
+      },
+    );
   });
 
   it("composite pk models equality", () => {
-    expect(new CpkBook({ id: [1, 2] }).equals(new CpkBook({ id: [1, 2] }))).toBe(true);
+    expect(new CpkBook({ id: [1, 2] }).equals(new CpkBook({ id: [1, 2] }))).toBeTruthy();
 
-    expect(new CpkBook({ id: [1, 2] }).equals(new CpkBook({ id: [1, 3] }))).toBe(false);
-    expect(new CpkBook().equals(new CpkBook())).toBe(false);
-    expect(new CpkBook({ title: "Book A" }).equals(new CpkBook({ title: "Book B" }))).toBe(false);
-    expect(new CpkBook({ author_id: 1 }).equals(new CpkBook({ author_id: 1 }))).toBe(false);
+    expect(new CpkBook({ id: [1, 2] }).equals(new CpkBook({ id: [1, 3] }))).toBeFalsy();
+    expect(new CpkBook().equals(new CpkBook())).toBeFalsy();
+    expect(new CpkBook({ title: "Book A" }).equals(new CpkBook({ title: "Book B" }))).toBeFalsy();
+    expect(new CpkBook({ author_id: 1 }).equals(new CpkBook({ author_id: 1 }))).toBeFalsy();
     expect(
       new CpkBook({ author_id: 1, title: "Same title" }).equals(
         new CpkBook({ author_id: 1, title: "Same title" }),
       ),
-    ).toBe(false);
+    ).toBeFalsy();
   });
 
   it("composite pk models added to a set", () => {

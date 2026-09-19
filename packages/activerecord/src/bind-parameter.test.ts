@@ -1,3 +1,4 @@
+import { assertRaises } from "@blazetrails/activesupport";
 import { describe, it, expect, afterEach, beforeAll } from "vitest";
 import { Notifications, NotificationEvent as Event, Logger } from "@blazetrails/activesupport";
 import { IntegerType, StringType, ValueType } from "@blazetrails/activemodel";
@@ -51,6 +52,22 @@ async function logBinds(
   });
   subscriber.sql(event);
   return subscriber.capture.debugs[0] ?? "";
+}
+
+async function assertLogsBinds(binds: unknown[]) {
+  expect(await logBinds(binds)).toMatch(/\["id",10\]\]$/);
+}
+
+async function assertLogsUnnamedBinds(binds: unknown[]) {
+  expect(await logBinds(binds, "select * from topics where title = $1")).toMatch(
+    /\[null,"abcd"\]\]$/,
+  );
+}
+
+async function assertFilteredLogBinds(binds: unknown[]) {
+  expect(await logBinds(binds, "select * from users where auth_token = ?")).toMatch(
+    /\["auth_token","\[FILTERED\]"\]/,
+  );
 }
 
 describe("BindParameterTest", () => {
@@ -119,7 +136,7 @@ describe("BindParameterTest", () => {
     const topicSql = cachedStatement(conn, Topic, [Topic.primaryKey as string]);
     expect(statementCacheKeys(conn)).toContain(toSqlKey(conn, topicSql));
 
-    await expect(Author.find(999999)).rejects.toBeInstanceOf(RecordNotFound);
+    await assertRaises([RecordNotFound], {}, () => Author.find(999999));
     const authorSql = cachedStatement(conn, Author, [Author.primaryKey as string]);
     expect(statementCacheKeys(conn)).toContain(toSqlKey(conn, authorSql));
 
@@ -136,7 +153,7 @@ describe("BindParameterTest", () => {
     const topicSql = cachedStatement(conn, Topic, ["id"]);
     expect(statementCacheKeys(conn)).toContain(toSqlKey(conn, topicSql));
 
-    await expect(Author.findByBang({ id: 999999 })).rejects.toBeInstanceOf(RecordNotFound);
+    await assertRaises([RecordNotFound], {}, () => Author.findByBang({ id: 999999 }));
     const authorSql = cachedStatement(conn, Author, ["id"]);
     expect(statementCacheKeys(conn)).toContain(toSqlKey(conn, authorSql));
 
@@ -252,22 +269,18 @@ describe("BindParameterTest", () => {
 
   it("logs binds after type cast", async () => {
     const binds = [new QueryAttribute("id", "10", new IntegerType())];
-    expect(await logBinds(binds)).toMatch(/\["id",10\]\]$/);
+    await assertLogsBinds(binds);
   });
 
   it("logs unnamed binds", async () => {
     const binds = ["abcd"];
-    expect(await logBinds(binds, "select * from topics where title = $1")).toMatch(
-      /\[null,"abcd"\]\]$/,
-    );
+    await assertLogsUnnamedBinds(binds);
   });
 
   it("binds with filtered attributes", async () => {
     Base.filterAttributes = ["auth"];
     const binds = [new QueryAttribute("auth_token", "abcd", new StringType())];
-    expect(await logBinds(binds, "select * from users where auth_token = ?")).toContain(
-      '["auth_token","[FILTERED]"]',
-    );
+    await assertFilteredLogBinds(binds);
   });
 
   function bindParams(conn: any, ids: (number | string)[]): string {
@@ -324,18 +337,18 @@ describe("BindParameterTest", () => {
   it("nested unprepared statements", async (ctx) => {
     const conn = (await Topic.leaseConnection()) as any;
     ctx.skip(!conn.preparedStatements);
-    expect(conn.preparedStatements).toBe(true);
+    expect(conn.preparedStatements).toBeTruthy();
 
     await conn.unpreparedStatement(async () => {
-      expect(conn.preparedStatements).toBe(false);
+      expect(conn.preparedStatements).toBeFalsy();
 
       await conn.unpreparedStatement(async () => {
-        expect(conn.preparedStatements).toBe(false);
+        expect(conn.preparedStatements).toBeFalsy();
       });
 
-      expect(conn.preparedStatements).toBe(false);
+      expect(conn.preparedStatements).toBeFalsy();
     });
 
-    expect(conn.preparedStatements).toBe(true);
+    expect(conn.preparedStatements).toBeTruthy();
   });
 });

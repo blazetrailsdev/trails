@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import { registerModel } from "../index.js";
 import { adapterType } from "../test-adapter.js";
 import { fixtures } from "../test-fixtures.js";
@@ -74,22 +76,26 @@ describe("OrTest", () => {
     ).toEqual(expected);
   });
 
-  it("or with incompatible single value relations", () => {
-    expect(() =>
+  it("or with incompatible single value relations", async () => {
+    const error = await assertRaises([ArgumentError], {}, () =>
       Post.distinct()
         .where("id = 1")
         .or(Post.where({ id: [2, 3] })),
-    ).toThrow(
+    );
+
+    expect(error.message).toBe(
       "Relation passed to #or must be structurally compatible. Incompatible values: [:distinct]",
     );
   });
 
-  it("or with incompatible multi value relations", () => {
-    expect(() =>
+  it("or with incompatible multi value relations", async () => {
+    const error = await assertRaises([ArgumentError], {}, () =>
       Post.order("body asc")
         .where("id = 1")
         .or(Post.order("id desc").where({ id: [2, 3] })),
-    ).toThrow(
+    );
+
+    expect(error.message).toBe(
       "Relation passed to #or must be structurally compatible. Incompatible values: [:order]",
     );
   });
@@ -120,13 +126,15 @@ describe("OrTest", () => {
     ).toEqual(expected);
   });
 
-  it("or with incompatible unscope", () => {
-    expect(() =>
+  it("or with incompatible unscope", async () => {
+    const error = await assertRaises([ArgumentError], {}, () =>
       Post.order("body asc")
         .where("id = 1")
         .unscope("order")
         .or(Post.order("body asc").where("id = 2")),
-    ).toThrow(
+    );
+
+    expect(error.message).toBe(
       "Relation passed to #or must be structurally compatible. Incompatible values: [:order]",
     );
   });
@@ -164,8 +172,12 @@ describe("OrTest", () => {
     expect(await p.or(Post.where("id = 2"))).toEqual(expected);
   });
 
-  it("or with non relation object raises error", () => {
-    expect(() => Post.where({ id: [1, 2, 3] }).or({ title: "Rails" } as any)).toThrow(
+  it("or with non relation object raises error", async () => {
+    const error = await assertRaises([ArgumentError], {}, () =>
+      Post.where({ id: [1, 2, 3] }).or({ title: "Rails" } as any),
+    );
+
+    expect(error.message).toBe(
       "You have passed Hash object to #or. Pass an ActiveRecord::Relation object instead.",
     );
   });
@@ -185,13 +197,7 @@ describe("OrTest", () => {
 
   it("or with scope on association", async () => {
     const author = (await Author.first()) as any;
-    let threw = false;
-    try {
-      await author.topPosts.or(author.otherTopPosts).toArray();
-    } catch {
-      threw = true;
-    }
-    expect(threw).toBe(false);
+    await assertNothingRaised(() => author.topPosts.or(author.otherTopPosts));
   });
 
   it("or with annotate", () => {
@@ -211,9 +217,8 @@ describe("OrTest", () => {
     );
   });
 
-  it("structurally incompatible values", () => {
-    let threw = false;
-    try {
+  it("structurally incompatible values", async () => {
+    await assertNothingRaised(() => {
       Post.includes(":author").includes(":author").or(Post.includes(":author"));
       Post.eagerLoad(":author").eagerLoad(":author").or(Post.eagerLoad(":author"));
       Post.preload(":author").preload(":author").or(Post.preload(":author"));
@@ -221,10 +226,7 @@ describe("OrTest", () => {
       Post.joins(":author").joins(":author").or(Post.joins(":author"));
       Post.leftOuterJoins(":author").leftOuterJoins(":author").or(Post.leftOuterJoins(":author"));
       Post.from("posts").or(Post.from("posts"));
-    } catch {
-      threw = true;
-    }
-    expect(threw).toBe(false);
+    });
   });
 });
 

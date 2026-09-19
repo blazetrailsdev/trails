@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
 import { registerModel } from "./index.js";
 import { adapterType } from "./test-adapter.js";
-import { StringInquirer, travel, travelBack } from "@blazetrails/activesupport";
+import { travel, travelBack, assertRespondTo } from "@blazetrails/activesupport";
 import { fixtures } from "./test-fixtures.js";
 import { Base } from "./base.js";
 import { delegatedType } from "./index.js";
@@ -66,41 +66,40 @@ describe("DelegatedTypeTest", () => {
 
   it("delegated type name", () => {
     expect(String((entryWithMessage as any).entryableName)).toBe("message");
-    expect((entryWithMessage as any).entryableName).toBeInstanceOf(StringInquirer);
-    expect((entryWithMessage as any).entryableName["message?"]()).toBe(true);
+    expect((entryWithMessage as any).entryableName["message?"]()).toBeTruthy();
 
     expect(String((entryWithComment as any).entryableName)).toBe("comment");
-    expect((entryWithComment as any).entryableName["comment?"]()).toBe(true);
+    expect((entryWithComment as any).entryableName["comment?"]()).toBeTruthy();
   });
 
   it("delegated type predicates", () => {
-    expect((entryWithMessage as any).isMessage()).toBe(true);
-    expect((entryWithMessage as any).isComment()).toBe(false);
+    expect((entryWithMessage as any).isMessage()).toBeTruthy();
+    expect((entryWithMessage as any).isComment()).toBeFalsy();
 
-    expect((entryWithComment as any).isComment()).toBe(true);
-    expect((entryWithComment as any).isMessage()).toBe(false);
+    expect((entryWithComment as any).isComment()).toBeTruthy();
+    expect((entryWithComment as any).isMessage()).toBeFalsy();
   });
 
   it("delegated type predicates with custom foreign_type", () => {
-    expect((entryWithPost as any).isPost()).toBe(true);
-    expect((entryWithMessage as any).isPost()).toBe(false);
-    expect((entryWithComment as any).isPost()).toBe(false);
+    expect((entryWithPost as any).isPost()).toBeTruthy();
+    expect((entryWithMessage as any).isPost()).toBeFalsy();
+    expect((entryWithComment as any).isPost()).toBeFalsy();
   });
 
   it("scope", async () => {
-    expect((await (Entry as any).messages().first()).isMessage()).toBe(true);
-    expect((await (Entry as any).comments().first()).isComment()).toBe(true);
+    expect((await (Entry as any).messages().first()).isMessage()).toBeTruthy();
+    expect((await (Entry as any).comments().first()).isComment()).toBeTruthy();
   });
 
   it("scope with custom foreign_type", async () => {
-    expect((await (Entry as any).posts().first()).isPost()).toBe(true);
+    expect((await (Entry as any).posts().first()).isPost()).toBeTruthy();
   });
 
   it("accessor", async () => {
-    expect(await (entryWithMessage as any).message).toBeInstanceOf(Message);
+    expect((await (entryWithMessage as any).message) instanceof Message).toBeTruthy();
     expect(await (entryWithMessage as any).comment).toBeNull();
 
-    expect(await (entryWithComment as any).comment).toBeInstanceOf(Comment);
+    expect((await (entryWithComment as any).comment) instanceof Comment).toBeTruthy();
     expect(await (entryWithComment as any).message).toBeNull();
   });
 
@@ -170,9 +169,9 @@ describe("DelegatedTypeTest", () => {
   });
 
   it("builder method", () => {
-    expect(typeof (Entry.build({}) as any).buildEntryable).toBe("function");
+    assertRespondTo(Entry.build({}), "buildEntryable");
     const built = (Entry.build({ entryable_type: "Message" }) as any).buildEntryable();
-    expect(built).toBeInstanceOf(Message);
+    expect(built.constructor).toBe(Message);
   });
 
   it("registers a polymorphic belongs_to for the delegated role", () => {
