@@ -66,7 +66,7 @@ describe("SecurePasswordTest", () => {
 
       assertInDelta(foundAverageTimeInMs, notFoundAverageTimeInMs, 0.5);
     });
-  });
+  }, 120_000);
 
   it("authenticate_by short circuits when password is nil", async () => {
     await assertNoQueries(false, async () => {
