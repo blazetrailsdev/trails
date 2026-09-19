@@ -149,7 +149,7 @@ export class InternalMetadata {
   }
 
   private currentTime(connection: DatabaseAdapter): string {
-    const opts = { smallestUnit: "millisecond", roundingMode: "trunc" } as const;
+    const opts = { smallestUnit: "microsecond", roundingMode: "trunc" } as const;
     if (connection.defaultTimezone === "utc") {
       return Temporal.Now.instant().toString(opts).replace("T", " ").replace("Z", "");
     }
