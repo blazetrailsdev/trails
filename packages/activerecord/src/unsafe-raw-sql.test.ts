@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { UnknownAttributeReference, registerModel } from "./index.js";
+import { assertRaises, assertNotEmpty } from "@blazetrails/activesupport";
 import { sql as arelSql } from "@blazetrails/arel";
 import { quoteTableName } from "./support/quote-regex.js";
 import { adapterType } from "./test-adapter.js";
@@ -100,9 +101,9 @@ describe("UnsafeRawSqlTest", () => {
   );
 
   it("order: disallows invalid column name", async () => {
-    await expect(async () => {
+    await assertRaises([UnknownAttributeReference], {}, async () => {
       await Post.order("REPLACE(title, 'misc', 'zzzz') asc").pluck("id");
-    }).rejects.toBeInstanceOf(UnknownAttributeReference);
+    });
   });
 
   it("order: disallows invalid direction", async () => {
@@ -112,14 +113,14 @@ describe("UnsafeRawSqlTest", () => {
   });
 
   it("order: disallows invalid column with direction", async () => {
-    await expect(async () => {
+    await assertRaises([UnknownAttributeReference], {}, async () => {
       await Post.order({ "REPLACE(title, 'misc', 'zzzz')": "asc" }).pluck("id");
-    }).rejects.toBeInstanceOf(UnknownAttributeReference);
+    });
   });
 
   it("order: always allows Arel", async () => {
     const titles = await Post.order(arelSql("length(title)")).pluck("title");
-    expect(titles.length).toBeGreaterThan(0);
+    assertNotEmpty(titles);
   });
 
   it("order: allows Arel.sql with binds", async () => {
@@ -129,15 +130,15 @@ describe("UnsafeRawSqlTest", () => {
   });
 
   it("order: disallows invalid bind statement", async () => {
-    await expect(async () => {
+    await assertRaises([UnknownAttributeReference], {}, async () => {
       await Post.order(["REPLACE(title, ?, ?), id", "misc", "zzzz"]).pluck("id");
-    }).rejects.toBeInstanceOf(UnknownAttributeReference);
+    });
   });
 
   it("order: disallows invalid Array arguments", async () => {
-    await expect(async () => {
+    await assertRaises([UnknownAttributeReference], {}, async () => {
       await Post.order(["author_id", "REPLACE(title, 'misc', 'zzzz')"]).pluck("id");
-    }).rejects.toBeInstanceOf(UnknownAttributeReference);
+    });
   });
 
   it("order: allows valid Array arguments", async () => {
@@ -164,16 +165,10 @@ describe("UnsafeRawSqlTest", () => {
   });
 
   it("order: disallows dangerous query method", async () => {
-    let error: unknown;
-    try {
+    const e = await assertRaises([UnknownAttributeReference], {}, async () => {
       await Post.order("REPLACE(title, 'misc', 'zzzz')").pluck("id");
-    } catch (e) {
-      error = e;
-    }
-    expect(error).toBeInstanceOf(UnknownAttributeReference);
-    expect((error as UnknownAttributeReference).message).toMatch(
-      /Dangerous query method.*called with non-attribute argument\(s\):/,
-    );
+    });
+    expect(e.message).toMatch(/Dangerous query method.*called with non-attribute argument\(s\):/);
   });
 
   it("pluck: allows string column name", async () => {
@@ -207,8 +202,9 @@ describe("UnsafeRawSqlTest", () => {
   });
 
   it("pluck: allows auto-generated attributes", async () => {
+    const valuesExpected = await Post.pluck(arelSql("tags_count"));
     const values = await Post.pluck("tags_count");
-    expect(values.length).toBeGreaterThan(0);
+    expect(values).toEqual(valuesExpected);
   });
 
   it("pluck: allows table and column names", async () => {
@@ -224,26 +220,27 @@ describe("UnsafeRawSqlTest", () => {
   });
 
   it("pluck: allows nested functions", async () => {
-    const lengths = await Post.pluck("length(trim(title))");
-    expect(lengths.length).toBeGreaterThan(0);
+    const titleLengthsExpected = await Post.pluck(arelSql("length(trim(title))"));
+    const titleLengths = await Post.pluck("length(trim(title))");
+    expect(titleLengths).toEqual(titleLengthsExpected);
   });
 
   it("pluck: disallows invalid column name", async () => {
-    await expect(Post.pluck("REPLACE(title, 'misc', 'zzzz')")).rejects.toBeInstanceOf(
-      UnknownAttributeReference,
-    );
+    await assertRaises([UnknownAttributeReference], {}, async () => {
+      await Post.pluck("REPLACE(title, 'misc', 'zzzz')");
+    });
   });
 
   it("pluck: disallows invalid column name amongst valid names", async () => {
-    await expect(Post.pluck("title", "REPLACE(title, 'misc', 'zzzz')")).rejects.toBeInstanceOf(
-      UnknownAttributeReference,
-    );
+    await assertRaises([UnknownAttributeReference], {}, async () => {
+      await Post.pluck("title", "REPLACE(title, 'misc', 'zzzz')");
+    });
   });
 
   it("pluck: disallows invalid column names with includes", async () => {
-    await expect(
-      Post.includes(":comments").pluck("title", "REPLACE(title, 'misc', 'zzzz')"),
-    ).rejects.toBeInstanceOf(UnknownAttributeReference);
+    await assertRaises([UnknownAttributeReference], {}, async () => {
+      await Post.includes(":comments").pluck("title", "REPLACE(title, 'misc', 'zzzz')");
+    });
   });
 
   it("pluck: always allows Arel", async () => {
@@ -255,15 +252,9 @@ describe("UnsafeRawSqlTest", () => {
   });
 
   it("pluck: disallows dangerous query method", async () => {
-    let error: unknown;
-    try {
+    const e = await assertRaises([UnknownAttributeReference], {}, async () => {
       await Post.pluck("title", "REPLACE(title, 'misc', 'zzzz')");
-    } catch (e) {
-      error = e;
-    }
-    expect(error).toBeInstanceOf(UnknownAttributeReference);
-    expect((error as UnknownAttributeReference).message).toMatch(
-      /Dangerous query method.*called with non-attribute argument\(s\):/,
-    );
+    });
+    expect(e.message).toMatch(/Dangerous query method.*called with non-attribute argument\(s\):/);
   });
 });
