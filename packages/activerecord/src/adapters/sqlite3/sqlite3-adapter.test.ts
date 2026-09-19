@@ -78,13 +78,13 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     const a = new BetterSQLite3Adapter({ database: dbPath });
     await a.connectBang();
     expect(a.isActive()).toBe(true);
-    expect(await BetterSQLite3Adapter.databaseExists({ database: dbPath })).toBe(true);
+    expect(await BetterSQLite3Adapter.databaseExists({ database: dbPath })).toBeTruthy();
     await a.disconnectBang();
     fs.rmSync(baseDir, { recursive: true, force: true });
   });
 
   it("database exists returns false when the database does not exist", async () => {
-    expect(await BetterSQLite3Adapter.databaseExists({ database: "non_extant_db" })).toBe(false);
+    expect(await BetterSQLite3Adapter.databaseExists({ database: "non_extant_db" })).toBeFalsy();
   });
 
   it("database exists returns true when database exists", async () => {
@@ -95,7 +95,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     const a = new BetterSQLite3Adapter({ database: dbPath });
     try {
       await a.connectBang();
-      expect(await BetterSQLite3Adapter.databaseExists({ database: dbPath })).toBe(true);
+      expect(await BetterSQLite3Adapter.databaseExists({ database: dbPath })).toBeTruthy();
     } finally {
       await a.disconnectBang();
       fs.rmSync(dbPath, { force: true });
@@ -103,20 +103,20 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("database exists returns true for an in memory db", async () => {
-    expect(await BetterSQLite3Adapter.databaseExists({ database: ":memory:" })).toBe(true);
+    expect(await BetterSQLite3Adapter.databaseExists({ database: ":memory:" })).toBeTruthy();
   });
 
   it("connect with url", async () => {
     const a = new BetterSQLite3Adapter({ database: ":memory:" });
     await a.connectBang();
-    expect(a.isActive()).toBe(true);
+    expect(a.isActive()).toBeTruthy();
     await a.disconnectBang();
   });
 
   it("connect memory with url", async () => {
     const a = new BetterSQLite3Adapter({ database: ":memory:" });
     await a.connectBang();
-    expect(a.isActive()).toBe(true);
+    expect(a.isActive()).toBeTruthy();
     await a.disconnectBang();
   });
 
@@ -202,14 +202,15 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("nil timeout", async () => {
-    const a = new BetterSQLite3Adapter({ database: ":memory:" });
-    expect(a).toBeDefined();
+    const a = new BetterSQLite3Adapter({ database: ":memory:", timeout: null });
+    await a.connectBang();
+    expect(a).toBeTruthy();
     await a.disconnectBang();
   });
 
   it("connect", async () => {
     const a = new BetterSQLite3Adapter({ database: ":memory:" });
-    expect(a).toBeDefined();
+    expect(a).toBeTruthy();
     await a.disconnectBang();
   });
 
@@ -415,7 +416,20 @@ describeIfSqlite("SQLite3AdapterTest", () => {
       `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`,
     ))!;
     const names = rows.map((r: any) => r.name);
-    expect(names).toContain("items");
+    expect(names).toEqual(["items"]);
+    try {
+      await adapter.execute(
+        `CREATE TABLE "people" ("id" integer PRIMARY KEY AUTOINCREMENT, "number" integer)`,
+      );
+      const both = (
+        (await adapter.execute(
+          `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`,
+        )) as any[]
+      ).map((r: any) => r.name);
+      expect(both.sort()).toEqual(["items", "people"].sort());
+    } finally {
+      await adapter.execute(`DROP TABLE IF EXISTS "people"`);
+    }
   });
 
   it("columns", async () => {
