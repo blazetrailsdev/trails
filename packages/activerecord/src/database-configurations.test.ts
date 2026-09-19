@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { DatabaseConfig } from "./database-configurations/database-config.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
 import { Base } from "./base.js";
+import { DEFAULT_ENV } from "./connection-handling.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
 
 describe("DatabaseConfigurationsTest", () => {
@@ -17,7 +17,8 @@ describe("DatabaseConfigurationsTest", () => {
     Base.configurations(config);
 
     try {
-      expect(Base.configurations().empty).toBe(true);
+      expect(Base.configurations().empty).toBeTruthy();
+      expect(Base.configurations().blank).toBeTruthy();
     } finally {
       Base.configurations(oldConfig);
     }
@@ -29,8 +30,9 @@ describe("DatabaseConfigurationsTest", () => {
       test: { adapter: "sqlite3", database: "test.db" },
     });
     const devConfigs = configs.configsFor({ envName: "development" });
-    expect(devConfigs).toHaveLength(1);
-    expect(devConfigs[0].database).toBe("dev.db");
+
+    expect(devConfigs.length).toBe(1);
+    expect(devConfigs.map((c) => c.envName)).toEqual(["development"]);
   });
 
   it("configs for getter with name", () => {
@@ -75,66 +77,125 @@ describe("DatabaseConfigurationsTest", () => {
   });
 
   it("find db config returns first config for env", () => {
-    const configs = new DatabaseConfigurations({
-      development: { adapter: "sqlite3", database: "dev.db" },
-      test: { adapter: "sqlite3", database: "test.db" },
+    const config = new DatabaseConfigurations({
+      test: {
+        config_1: { adapter: "abstract", database: "db" },
+        config_2: { adapter: "abstract", database: "db" },
+        config_3: { adapter: "abstract", database: "db" },
+      },
     });
-    const config = configs.findDbConfig("development");
-    expect(config).toBeDefined();
-    expect(config!.database).toBe("dev.db");
+
+    expect(config.findDbConfig("test")!.name).toBe("config_1");
   });
 
   it("find db config returns a db config object for the given env", () => {
-    const configs = new DatabaseConfigurations({
-      development: { adapter: "sqlite3", database: "dev.db" },
-    });
-    const config = configs.findDbConfig("development");
-    expect(config).toBeInstanceOf(DatabaseConfig);
+    const config = new DatabaseConfigurations({
+      arunit2: { primary: { adapter: "sqlite3", database: "primary.db" } },
+    }).findDbConfig("arunit2")!;
+
+    expect(config.envName).toBe("arunit2");
+    expect(config.name).toBe("primary");
   });
 
   it("find db config prioritize db config object for the current env", () => {
-    const configs = new DatabaseConfigurations({
-      development: { adapter: "sqlite3", database: "dev.db" },
-      test: { adapter: "sqlite3", database: "test.db" },
-    });
-    const config = configs.findDbConfig("test");
-    expect(config!.database).toBe("test.db");
+    const config = new DatabaseConfigurations({
+      primary: { adapter: "abstract" },
+      [DEFAULT_ENV()]: {
+        primary: { adapter: "sqlite3", database: ":memory:" },
+      },
+    }).findDbConfig("primary")!;
+
+    expect(config.name).toBe("primary");
+    expect(config.envName).toBe(DEFAULT_ENV());
+    expect(config.database).toBe(":memory:");
   });
 
-  it("registering a custom config object", () => {
-    class CustomConfig extends HashConfig {
-      constructor(envName: string, name: string, config: any) {
-        super(envName, name, config);
-      }
+  class CustomHashConfig extends HashConfig {
+    isSharded(): boolean {
+      return this.customConfig().sharded ?? false;
     }
-    const handler = (envName: string, name: string, _url: string | undefined, config: any) => {
-      if ("custom_key" in config) return new CustomConfig(envName, name, config);
-      return null;
-    };
-    DatabaseConfigurations.registerDbConfigHandler(handler);
+
+    private customConfig(): Record<string, any> {
+      return this.configurationHash.custom_config as Record<string, any>;
+    }
+  }
+
+  it("registering a custom config object", () => {
+    const previousHandlers = [...DatabaseConfigurations.dbConfigHandlers];
+
+    DatabaseConfigurations.registerDbConfigHandler((envName, name, _url, config) => {
+      if (!("custom_config" in config)) return null;
+      return new CustomHashConfig(envName, name, config);
+    });
+
     try {
       const configs = new DatabaseConfigurations({
-        development: { adapter: "sqlite3", database: "dev.db", custom_key: true },
-      });
-      const result = configs.configsFor({ envName: "development" });
-      expect(result[0]).toBeInstanceOf(CustomConfig);
+        test: {
+          config_1: { adapter: "abstract", database: "db", custom_config: { sharded: 1 } },
+          config_2: { adapter: "abstract", database: "db" },
+        },
+      }).configurations;
+
+      const customConfig = configs[0];
+      const hashConfig = configs[configs.length - 1];
+
+      expect(customConfig instanceof CustomHashConfig).toBeTruthy();
+      expect(hashConfig instanceof HashConfig).toBeTruthy();
+
+      expect((customConfig as CustomHashConfig).isSharded()).toBeTruthy();
     } finally {
-      const idx = DatabaseConfigurations.dbConfigHandlers.lastIndexOf(handler);
-      if (idx >= 0) DatabaseConfigurations.dbConfigHandlers.splice(idx, 1);
+      DatabaseConfigurations.dbConfigHandlers.splice(
+        0,
+        DatabaseConfigurations.dbConfigHandlers.length,
+        ...previousHandlers,
+      );
     }
   });
 
   it("configs for with custom key", () => {
-    DatabaseTasks.env = "development";
-    const configs = new DatabaseConfigurations({
-      development: {
-        primary: { adapter: "sqlite3", database: "primary.db" },
-        cache: { adapter: "sqlite3", database: "cache.db" },
-      },
+    const previousHandlers = [...DatabaseConfigurations.dbConfigHandlers];
+
+    DatabaseConfigurations.registerDbConfigHandler((envName, name, _url, config) => {
+      if (!("custom_config" in config)) return null;
+      return new CustomHashConfig(envName, name, config);
     });
-    const cache = configs.configsFor({ name: "cache" });
-    expect(cache).toBeDefined();
-    expect(cache!.database).toBe("cache.db");
+
+    try {
+      const configs = new DatabaseConfigurations({
+        default_env: {
+          primary: {
+            adapter: "sqlite3",
+            database: "test/db/primary.sqlite3",
+            custom_config: { sharded: 1 },
+          },
+          replica: {
+            adapter: "sqlite3",
+            database: "test/db/hidden.sqlite3",
+            replica: true,
+            custom_config: { sharded: 1 },
+          },
+          secondary: { adapter: "sqlite3", database: "test/db/secondary.sqlite3" },
+        },
+      });
+
+      expect(
+        configs.configsFor({ envName: "default_env", configKey: "custom_config" }).length,
+      ).toBe(1);
+      expect(
+        configs.configsFor({
+          envName: "default_env",
+          configKey: "custom_config",
+          includeHidden: true,
+        }).length,
+      ).toBe(2);
+      expect(configs.configsFor({ envName: "default_env" }).length).toBe(2);
+    } finally {
+      DatabaseConfigurations.dbConfigHandlers.splice(
+        0,
+        DatabaseConfigurations.dbConfigHandlers.length,
+        ...previousHandlers,
+      );
+    }
   });
 
   it("resolve returns current-env config when same name exists in multiple envs", () => {
@@ -246,15 +307,14 @@ describe("DatabaseConfigurationsTest", () => {
 
   it("configs for with include hidden", () => {
     const configs = new DatabaseConfigurations({
-      development: {
-        primary: { adapter: "sqlite3", database: "primary.db" },
-        hidden: { adapter: "sqlite3", database: "hidden.db", _hidden: true },
+      default_env: {
+        readonly: { adapter: "sqlite3", database: "test/db/readonly.sqlite3", replica: true },
+        hidden: { adapter: "sqlite3", database: "test/db/hidden.sqlite3", databaseTasks: false },
+        default: { adapter: "sqlite3", database: "test/db/primary.sqlite3" },
       },
     });
-    const visible = configs.configsFor({ envName: "development" });
-    expect(visible).toHaveLength(1);
 
-    const all = configs.configsFor({ envName: "development", includeHidden: true });
-    expect(all).toHaveLength(2);
+    expect(configs.configsFor({ envName: "default_env" }).length).toBe(1);
+    expect(configs.configsFor({ envName: "default_env", includeHidden: true }).length).toBe(3);
   });
 });
