@@ -710,7 +710,7 @@ describe("EachTest", () => {
       false,
       async () => {
         for await (const relation of Post.inBatches({ of: 2 })) {
-          await relation.toArray();
+          expect(await relation.first()).toBeInstanceOf(Post);
           break;
         }
       },
@@ -725,7 +725,7 @@ describe("EachTest", () => {
       false,
       async () => {
         for await (const relation of Post.inBatches({ of: 2, useRanges: false })) {
-          await relation.toArray();
+          expect(await relation.first()).toBeInstanceOf(Post);
           break;
         }
       },
@@ -740,7 +740,7 @@ describe("EachTest", () => {
       false,
       async () => {
         for await (const relation of Post.where("id < ?", 5).inBatches({ of: 2 })) {
-          await relation.toArray();
+          expect(await relation.first()).toBeInstanceOf(Post);
           break;
         }
       },
@@ -758,7 +758,7 @@ describe("EachTest", () => {
           of: 2,
           useRanges: true,
         })) {
-          await relation.toArray();
+          expect(await relation.first()).toBeInstanceOf(Post);
           break;
         }
       },
@@ -800,6 +800,7 @@ describe("EachTest", () => {
       async () => {
         for await (const relation of Post.inBatches({ of: 1 })) {
           expect(relation).toBeInstanceOf(Relation);
+          expect(await relation.first()).toBeInstanceOf(Post);
           break;
         }
       },
@@ -814,6 +815,7 @@ describe("EachTest", () => {
       async () => {
         for await (const relation of Post.inBatches({ of: 1, order: "desc" })) {
           expect(relation).toBeInstanceOf(Relation);
+          expect(await relation.first()).toBeInstanceOf(Post);
           break;
         }
       },
