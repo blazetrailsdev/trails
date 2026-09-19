@@ -46,15 +46,17 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(adapter.quoteString("'")).toBe("''");
     });
 
-    it("quote column name", async () => {
-      for (const a of [adapter, adapter.constructor as typeof adapter]) {
+    it("quote column name", () => {
+      const conn = adapter;
+      for (const adapter of [conn, conn.constructor as typeof conn]) {
         expect(a.quoteColumnName("foo")).toBe('"foo"');
         expect(a.quoteColumnName('hel"lo')).toBe('"hel""lo"');
       }
     });
 
-    it("quote table name", async () => {
-      for (const a of [adapter, adapter.constructor as typeof adapter]) {
+    it("quote table name", () => {
+      const conn = adapter;
+      for (const adapter of [conn, conn.constructor as typeof conn]) {
         expect(a.quoteTableName("foo")).toBe('"foo"');
         expect(a.quoteTableName("foo.bar")).toBe('"foo"."bar"');
         expect(a.quoteColumnName('hel"lo.wol\\d')).toBe('"hel""lo.wol\\d"');
@@ -110,7 +112,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(adapter.quote(type.serialize(value)!)).toBeNull();
     });
 
-    it("quote table name with spaces", async () => {
+    it("quote table name with spaces", () => {
       const value = "user posts";
       expect(adapter.quoteTableName(value)).toBe('"user posts"');
     });
