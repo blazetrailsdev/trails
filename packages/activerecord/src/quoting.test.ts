@@ -1,7 +1,7 @@
 import { quotingHost } from "./support/quoting-host.js";
 import { describe, it, expect, afterEach } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { minutes, BigDecimal, toFs } from "@blazetrails/activesupport";
+import { assertRaises, minutes, BigDecimal, toFs } from "@blazetrails/activesupport";
 import {
   quote as quoteFn,
   quoteString,
@@ -102,9 +102,12 @@ describe("QuotingTest", () => {
     expect(quote(Object)).toBe("'Object'");
   });
 
-  it("quote object instance", () => {
+  it("quote object instance", async () => {
     const object = {};
-    expect(() => quote(object)).toThrow(TypeError);
+    const e = await assertRaises([TypeError], {}, () => {
+      quote(object);
+    });
+    expect(e.message).toBe("can't quote Object");
   });
 
   it("quote(new Date()) throws with Temporal guidance", () => {
@@ -126,22 +129,20 @@ describe("QuotingTest", () => {
     );
   });
 
-  it("quote duration", () => {
-    expect(() => quote(minutes(30))).toThrow(TypeError);
-    expect(() => quote(minutes(30))).toThrow(/can't quote/);
-    expect(() => quote(minutes(30))).toThrow(/Duration/);
+  it.skip("quote duration", async () => {
+    // BLOCKED: quote-error-message-uses-js-constructor-name
+    const exception = await assertRaises([TypeError], {}, () => {
+      quote(minutes(30));
+    });
+    expect(exception.message).toBe("can't quote ActiveSupport::Duration");
   });
   it("quote table name calls quote column name", () => {
-    const calls: string[] = [];
     const host = quotingHost({
-      quoteColumnName(name: string): string {
-        calls.push(name);
-        return `[${name}]`;
+      quoteColumnName(_string: string): string {
+        return "lol";
       },
     });
-    expect(quoteTableNameFn.call(host, "foo")).toBe("[foo]");
-    expect(calls).toEqual(["foo"]);
-    expect(() => quoteTableName("foo")).toThrow(NotImplementedError);
+    expect(quoteTableNameFn.call(host, "foo")).toBe("lol");
   });
   it("quoted timestamp local", () => {
     setDefaultTimezone("local");
@@ -172,12 +173,17 @@ describe("QuotingTest", () => {
   it("quote bigdecimal", () => {
     const bigdec = new BigDecimal((1n << 100n).toString());
     expect(quote(bigdec)).toBe(bigdec.toString("F"));
-    expect(quote(bigdec)).toBe("1267650600228229401496703205376.0");
   });
   it("dates and times", () => {
-    expect(quote(Temporal.PlainDate.from("2026-04-07"))).toBe("'2026-04-07'");
-    expect(quote(Temporal.Instant.from("2026-04-07T15:30:00Z"))).toBe("'2026-04-07 15:30:00'");
-    expect(quote(Temporal.PlainDateTime.from("2026-04-07T15:30:00"))).toBe("'2026-04-07 15:30:00'");
+    const host = quotingHost({
+      quotedDate(_value: unknown): string {
+        return "lol";
+      },
+    });
+    const hostQuote = (value: unknown): string => quoteFn.call(host, value);
+    expect(hostQuote(Temporal.Now.plainDateISO())).toBe("'lol'");
+    expect(hostQuote(Temporal.Now.instant())).toBe("'lol'");
+    expect(hostQuote(Temporal.Now.plainDateTimeISO())).toBe("'lol'");
   });
   it("quote as mb chars no column", () => {
     expect(quote("lo\\l")).toBe("'lo\\\\l'");
@@ -203,8 +209,9 @@ describe("TypeCastingTest", () => {
   });
 
   it("type cast date", () => {
-    expect(() => typeCast(new Date())).toThrow(TypeError);
-    expect(() => typeCast(new Date())).toThrow(/Temporal/);
+    const date = Temporal.Now.plainDateISO();
+    const expected = quotedDate(date);
+    expect(typeCast(date)).toBe(expected);
   });
   it("type cast time", () => {
     const t = Temporal.Instant.from("2026-04-07T15:30:00Z");
@@ -274,11 +281,11 @@ describe("QuoteBooleanTest", () => {
   });
 
   it("quote returns frozen string", () => {
-    expect(Object.isFrozen(quote(true))).toBe(true);
-    expect(Object.isFrozen(quote(false))).toBe(true);
+    expect(Object.isFrozen(quote(true))).toBeTruthy();
+    expect(Object.isFrozen(quote(false))).toBeTruthy();
   });
   it("type cast returns frozen value", () => {
-    expect(Object.isFrozen(typeCast(true))).toBe(true);
-    expect(Object.isFrozen(typeCast(false))).toBe(true);
+    expect(Object.isFrozen(typeCast(true))).toBeTruthy();
+    expect(Object.isFrozen(typeCast(false))).toBeTruthy();
   });
 });

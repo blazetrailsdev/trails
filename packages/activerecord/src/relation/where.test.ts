@@ -5,7 +5,15 @@ import { ForbiddenAttributesError } from "@blazetrails/activemodel";
 import { registerModel } from "../associations.js";
 import { ProtectedParams } from "../support/stubs/strong-parameters.js";
 import { adapterType } from "../test-adapter.js";
-import { seconds } from "@blazetrails/activesupport";
+import {
+  assertEmpty,
+  assertNothingRaised,
+  assertRaises,
+  seconds,
+} from "@blazetrails/activesupport";
+import { ArgumentError, ValueType } from "@blazetrails/activemodel";
+import { assertQueriesCount } from "../testing/query-assertions.js";
+import { assertNotCalledOnInstanceOf } from "../testing/method-call-assertions.js";
 import { fixtures } from "../test-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
@@ -90,8 +98,17 @@ describe("WhereTest", () => {
 
   it("type cast is not evaluated at relation build time", async () => {
     const welcome = posts("welcome");
-    expect(ids(await Post.where({ id: "1-foo" }))).toStrictEqual([(welcome as any).id]);
-    expect(ids(await Post.where({ id: ["1-foo", "bar"] }))).toStrictEqual([(welcome as any).id]);
+    let relation: any = null;
+
+    await assertNotCalledOnInstanceOf(ValueType, "cast", () => {
+      relation = Post.where({ id: "1-foo" });
+    });
+    expect(ids(await relation)).toStrictEqual([(welcome as any).id]);
+
+    await assertNotCalledOnInstanceOf(ValueType, "cast", () => {
+      relation = Post.where({ id: ["1-foo", "bar"] });
+    });
+    expect(ids(await relation)).toStrictEqual([(welcome as any).id]);
   });
 
   it("where copies bind params", async () => {
@@ -128,11 +145,11 @@ describe("WhereTest", () => {
   it("where with invalid value", async () => {
     const first = topics("first") as any;
     await first.update({ parent_id: 0, written_on: null, bonus_time: null, last_read: null });
-    expect(await Topic.where({ parent_id: "not-a-number" })).toHaveLength(0);
-    expect(await Topic.where({ parent_id: ["not-a-number"] })).toHaveLength(0);
-    expect(await Topic.where({ written_on: "" })).toHaveLength(0);
-    expect(await Topic.where({ bonus_time: "" })).toHaveLength(0);
-    expect(await Topic.where({ last_read: "" })).toHaveLength(0);
+    assertEmpty(await Topic.where({ parent_id: new (class {})() }));
+    assertEmpty(await Topic.where({ parent_id: "not-a-number" }));
+    assertEmpty(await Topic.where({ written_on: "" }));
+    assertEmpty(await Topic.where({ bonus_time: "" }));
+    assertEmpty(await Topic.where({ last_read: "" }));
   });
 
   it("rewhere on root", async () => {
@@ -189,11 +206,11 @@ describe("WhereTest", () => {
         ],
       ]),
     );
-    expect(r3).toHaveLength(0);
+    assertEmpty(r3);
   });
 
-  it("where with tuple syntax with incorrect arity", () => {
-    expect(() =>
+  it("where with tuple syntax with incorrect arity", async () => {
+    let error = await assertRaises([ArgumentError], {}, () => {
       CpkBook.where(
         new Map([
           [
@@ -201,11 +218,16 @@ describe("WhereTest", () => {
             [1, 2, 3],
           ],
         ]),
-      ),
-    ).toThrow(/Expected corresponding value for.*to be an Array/);
-    expect(() => CpkBook.where(new Map([[["one", "two"], 1]]))).toThrow(
-      /Expected corresponding value for.*to be an Array/,
-    );
+      );
+    });
+
+    expect(error.message).toMatch(/Expected corresponding value for.*to be an Array/);
+
+    error = await assertRaises([ArgumentError], {}, () => {
+      CpkBook.where(new Map([[["one", "two"], 1]]));
+    });
+
+    expect(error.message).toMatch(/Expected corresponding value for.*to be an Array/);
   });
 
   it("where with tuple syntax and regular syntax combined", async () => {
@@ -253,17 +275,12 @@ describe("WhereTest", () => {
       shop_id: (order as any).readAttribute("shop_id"),
       order_id: (order as any).readAttribute("id"),
     });
-    const hasBook = (recs: unknown[]): boolean =>
-      recs.some(
-        (r) => (r as any).readAttribute("author_id") === 3 && (r as any).readAttribute("id") === 4,
-      );
+    const keys = (recs: unknown[]): string[] => recs.map((r) => JSON.stringify((r as any).id));
 
-    const found = await CpkBook.where({ order });
-    expect(hasBook(found)).toBe(true);
+    expect(keys(await CpkBook.where({ order }))).toContain(JSON.stringify(book.id));
 
     await book.update({ shop_id: null, order_id: null });
-    const foundNil = await CpkBook.where({ order: null });
-    expect(hasBook(foundNil)).toBe(true);
+    expect(keys(await CpkBook.where({ order: null }))).toContain(JSON.stringify(book.id));
   });
 
   it("belongs to shallow where", () => {
@@ -328,6 +345,7 @@ describe("WhereTest", () => {
       ...sapphireEstimateIds,
     ];
     const expected = allIds.filter((id) => !sapphireEstimateIds.includes(id));
+    expect(sortedIds(await PriceEstimate.all())).toStrictEqual(allIds.slice().sort());
     expect(sortedIds(actual)).toStrictEqual(expected.slice().sort());
     expect(sortedIds(only)).toStrictEqual(sapphireEstimateIds.slice().sort());
   });
@@ -353,6 +371,7 @@ describe("WhereTest", () => {
       ...sapphireEstimateIds,
     ];
     const expected = allIds.filter((id) => !sapphireEstimateIds.includes(id));
+    expect(sortedIds(await PriceEstimate.all())).toStrictEqual(allIds.slice().sort());
     expect(sortedIds(actual)).toStrictEqual(expected.slice().sort());
     expect(sortedIds(only)).toStrictEqual(sapphireEstimateIds.slice().sort());
   });
@@ -469,13 +488,9 @@ describe("WhereTest", () => {
   });
 
   it("where error", async () => {
-    let raised = false;
-    try {
+    await assertNothingRaised(async () => {
       await Post.where({ id: { "posts.author_id": 10 } }).first();
-    } catch {
-      raised = true;
-    }
-    expect(raised).toBe(false);
+    });
   });
 
   it("where with table name", async () => {
@@ -499,7 +514,7 @@ describe("WhereTest", () => {
   it("where with blank conditions", async () => {
     for (const blank of [[], {}, null, ""]) {
       const result = await Edge.where(blank as any).order("sink_id");
-      expect(result).toHaveLength(4);
+      expect(result.length).toBe(4);
     }
   });
 
@@ -532,8 +547,8 @@ describe("WhereTest", () => {
   it("where with emoji for binary column", async () => {
     await Binary.create({ data: "🥦" });
     const sql = Binary.where({ data: ["🥦", "🍦"] }).toSql();
-    expect(sql).toContain("f09fa5a6");
-    expect(sql).toContain("f09f8da6");
+    expect(sql.includes("f09fa5a6")).toBeTruthy();
+    expect(sql.includes("f09f8da6")).toBeTruthy();
   });
 
   it("where on association with custom primary key", async () => {
@@ -550,11 +565,9 @@ describe("WhereTest", () => {
 
   it("where on association with relation performs subselect not two queries", async () => {
     const author = authors("david") as any;
-    const sql = Essay.where({ writer: Author.where({ id: author.id }) }).toSql();
-    expect(sql).toContain("IN");
-    expect(sql).toContain("SELECT");
-    const result = await Essay.where({ writer: Author.where({ id: author.id }) });
-    expect(result.length).toBeGreaterThan(0);
+    await assertQueriesCount(1, false, async () => {
+      await Essay.where({ writer: Author.where({ id: author.id }) });
+    });
   });
 
   it("where on association with custom primary key with array of base", async () => {

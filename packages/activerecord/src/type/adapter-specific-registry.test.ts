@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { AdapterSpecificRegistry, TypeConflictError } from "./adapter-specific-registry.js";
-import { ValueType } from "@blazetrails/activemodel";
+import { assertRaises } from "@blazetrails/activesupport";
+import { ArgumentError, ValueType } from "@blazetrails/activemodel";
 
 class TestType extends ValueType<unknown> {
   readonly name = "test";
@@ -71,19 +72,28 @@ describe("AdapterSpecificRegistryTest", () => {
     registry.register("foo", FooType);
     registry.register("bar", BarType);
 
-    expect(registry.lookup("foo")).toBeInstanceOf(FooType);
-    expect(registry.lookup("bar")).toBeInstanceOf(BarType);
+    expect(registry.lookup("foo")).toEqual(new FooType());
+    expect(registry.lookup("bar")).toEqual(new BarType());
   });
 
   it("a block can be registered", () => {
     const registry = new AdapterSpecificRegistry();
-    registry.register("foo", null, undefined, (symbol, opts) => new TestType([symbol, opts]));
-    registry.register("bar", null, undefined, (symbol, opts) => new TestType([symbol, opts]));
+    registry.register(
+      "foo",
+      null,
+      undefined,
+      (...args) => [...args, "block for foo"] as unknown as ValueType,
+    );
+    registry.register(
+      "bar",
+      null,
+      undefined,
+      (...args) => [...args, "block for bar"] as unknown as ValueType,
+    );
 
-    const foo = registry.lookup("foo") as TestType;
-    expect((foo.args as unknown[]).at(0)).toBe("foo");
-    const bar = registry.lookup("bar") as TestType;
-    expect((bar.args as unknown[]).at(0)).toBe("bar");
+    expect(registry.lookup("foo", 1)).toEqual(["foo", 1, "block for foo"]);
+    expect(registry.lookup("foo", 2)).toEqual(["foo", 2, "block for foo"]);
+    expect(registry.lookup("bar", 1, 2, 3)).toEqual(["bar", 1, 2, 3, "block for bar"]);
   });
 
   it("filtering by adapter", () => {
@@ -91,17 +101,19 @@ describe("AdapterSpecificRegistryTest", () => {
     registry.register("foo", FooType, { adapter: "sqlite3" });
     registry.register("foo", BarType, { adapter: "postgresql" });
 
-    expect(registry.lookup("foo", { adapter: "sqlite3" })).toBeInstanceOf(FooType);
-    expect(registry.lookup("foo", { adapter: "postgresql" })).toBeInstanceOf(BarType);
+    expect(registry.lookup("foo", { adapter: "sqlite3" })).toEqual(new FooType());
+    expect(registry.lookup("foo", { adapter: "postgresql" })).toEqual(new BarType());
   });
 
-  it("an error is raised if both a generic and adapter specific type match", () => {
+  it("an error is raised if both a generic and adapter specific type match", async () => {
     const registry = new AdapterSpecificRegistry();
     registry.register("foo", FooType);
     registry.register("foo", BarType, { adapter: "postgresql" });
 
-    expect(() => registry.lookup("foo", { adapter: "postgresql" })).toThrow(TypeConflictError);
-    expect(registry.lookup("foo", { adapter: "sqlite3" })).toBeInstanceOf(FooType);
+    await assertRaises([TypeConflictError], {}, () => {
+      registry.lookup("foo", { adapter: "postgresql" });
+    });
+    expect(registry.lookup("foo", { adapter: "sqlite3" })).toEqual(new FooType());
   });
 
   it("a generic type can explicitly override an adapter specific type", () => {
@@ -109,8 +121,8 @@ describe("AdapterSpecificRegistryTest", () => {
     registry.register("foo", FooType, { override: true });
     registry.register("foo", BarType, { adapter: "postgresql" });
 
-    expect(registry.lookup("foo", { adapter: "postgresql" })).toBeInstanceOf(FooType);
-    expect(registry.lookup("foo", { adapter: "sqlite3" })).toBeInstanceOf(FooType);
+    expect(registry.lookup("foo", { adapter: "postgresql" })).toEqual(new FooType());
+    expect(registry.lookup("foo", { adapter: "sqlite3" })).toEqual(new FooType());
   });
 
   it("a generic type can explicitly allow an adapter type to be used instead", () => {
@@ -118,13 +130,16 @@ describe("AdapterSpecificRegistryTest", () => {
     registry.register("foo", FooType, { override: false });
     registry.register("foo", BarType, { adapter: "postgresql" });
 
-    expect(registry.lookup("foo", { adapter: "postgresql" })).toBeInstanceOf(BarType);
-    expect(registry.lookup("foo", { adapter: "sqlite3" })).toBeInstanceOf(FooType);
+    expect(registry.lookup("foo", { adapter: "postgresql" })).toEqual(new BarType());
+    expect(registry.lookup("foo", { adapter: "sqlite3" })).toEqual(new FooType());
   });
 
-  it("a reasonable error is given when no type is found", () => {
+  it("a reasonable error is given when no type is found", async () => {
     const registry = new AdapterSpecificRegistry();
-    expect(() => registry.lookup("foo")).toThrow("Unknown type :foo");
+    const e = await assertRaises([ArgumentError], {}, () => {
+      registry.lookup("foo");
+    });
+    expect(e.message).toBe("Unknown type :foo");
   });
 
   it("construct args are passed to the type", () => {
@@ -132,6 +147,7 @@ describe("AdapterSpecificRegistryTest", () => {
     registry.register("foo", TestType);
 
     expect(registry.lookup("foo")).toEqual(new TestType());
+    expect(registry.lookup("foo", ":ordered_arg")).toEqual(new TestType(":ordered_arg"));
     expect(registry.lookup("foo", { keyword: "arg" })).toEqual(new TestType({ keyword: "arg" }));
     expect(registry.lookup("foo", { keyword: "arg", adapter: "postgresql" })).toEqual(
       new TestType({ keyword: "arg" }),
@@ -146,7 +162,7 @@ describe("AdapterSpecificRegistryTest", () => {
 
     expect(registry.lookup("foo", { array: true })).toEqual(new Decoration(new FooType()));
     expect(registry.lookup("bar", { array: true })).toEqual(new Decoration(new BarType()));
-    expect(registry.lookup("foo")).toBeInstanceOf(FooType);
+    expect(registry.lookup("foo")).toEqual(new FooType());
   });
 
   it("registering multiple modifiers", () => {
@@ -155,7 +171,7 @@ describe("AdapterSpecificRegistryTest", () => {
     registry.addModifier({ array: true }, Decoration);
     registry.addModifier({ range: true }, OtherDecoration);
 
-    expect(registry.lookup("foo")).toBeInstanceOf(FooType);
+    expect(registry.lookup("foo")).toEqual(new FooType());
     expect(registry.lookup("foo", { array: true })).toEqual(new Decoration(new FooType()));
     expect(registry.lookup("foo", { range: true })).toEqual(new OtherDecoration(new FooType()));
     expect(registry.lookup("foo", { array: true, range: true })).toEqual(

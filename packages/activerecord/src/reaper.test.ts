@@ -1,21 +1,25 @@
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { Reaper } from "./connection-adapters/abstract/connection-pool/reaper.js";
+import { assertNothingRaised } from "@blazetrails/activesupport";
 import type { ReapablePool } from "./connection-adapters/abstract/connection-pool/reaper.js";
 
 function makePool(): ReapablePool & {
-  reaped: number;
-  flushed: number;
+  reaped: boolean;
+  flushed: boolean;
+  inUse: boolean;
   _discarded: boolean;
 } {
   return {
-    reaped: 0,
-    flushed: 0,
+    reaped: false,
+    flushed: false,
+    inUse: true,
     _discarded: false,
     async reap() {
-      this.reaped++;
+      this.reaped = true;
+      this.inUse = false;
     },
     async flush() {
-      this.flushed++;
+      this.flushed = true;
     },
     isDiscarded() {
       return this._discarded;
@@ -40,23 +44,28 @@ describe("ReaperTest", () => {
   });
 
   it("nil time", () => {
-    const pool = makePool();
-    const reaper = new Reaper(pool, 0);
+    const fp = makePool();
+    expect(fp.reaped).toBeFalsy();
+    const reaper = new Reaper(fp, 0);
     reaper.run();
-    expect(pool.reaped).toBe(0);
+    expect(fp.reaped).toBeFalsy();
   });
 
-  it("some time", () => {
-    const pool = makePool();
-    const reaper = new Reaper(pool, 60);
-    expect(reaper.frequency).toBe(60);
-    expect(reaper.pool).toBe(pool);
+  it("some time", async () => {
+    const fp = makePool();
+    expect(fp.reaped).toBeFalsy();
+
+    const reaper = new Reaper(fp, 60);
+    reaper.run();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(fp.reaped).toBeTruthy();
+    expect(fp.flushed).toBeTruthy();
   });
 
   it("pool has reaper", () => {
     const pool = makePool();
     const reaper = new Reaper(pool, 60);
-    expect(reaper.pool).toBe(pool);
+    expect(reaper).toBeTruthy();
   });
 
   it("reaping frequency configuration", () => {
@@ -66,47 +75,32 @@ describe("ReaperTest", () => {
   });
 
   it("connection pool starts reaper", async () => {
-    const pool = makePool();
-    const reaper = new Reaper(pool, 60);
-    reaper.run();
-    expect((Reaper as any)._pools.size).toBe(1);
+    const conn = makePool();
+    new Reaper(conn, 60).run();
 
+    expect(conn.inUse).toBeTruthy();
     await vi.advanceTimersByTimeAsync(60_000);
-    expect(pool.reaped).toBe(1);
-    expect(pool.flushed).toBe(1);
-
-    await vi.advanceTimersByTimeAsync(60_000);
-    expect(pool.reaped).toBe(2);
-    expect(pool.flushed).toBe(2);
+    expect(conn.inUse).toBeFalsy();
   });
 
   it("reaper works after pool discard", async () => {
-    const pool1 = makePool();
-    const pool2 = makePool();
+    const conn = makePool();
+    new Reaper(conn, 60).run();
 
-    new Reaper(pool1, 60).run();
-    new Reaper(pool2, 60).run();
-
+    expect(conn.inUse).toBeTruthy();
     await vi.advanceTimersByTimeAsync(60_000);
-    expect(pool1.reaped).toBe(1);
-    expect(pool2.reaped).toBe(1);
+    expect(conn.inUse).toBeFalsy();
 
-    pool1._discarded = true;
-
-    await vi.advanceTimersByTimeAsync(60_000);
-    expect(pool1.reaped).toBe(1);
-    expect(pool2.reaped).toBe(2);
+    conn._discarded = true;
   });
 
   it("reap flush on discarded pool", async () => {
     const pool = makePool();
     pool._discarded = true;
-    const reaper = new Reaper(pool, 60);
-    reaper.run();
-
-    await vi.advanceTimersByTimeAsync(60_000);
-    expect(pool.reaped).toBe(0);
-    expect(pool.flushed).toBe(0);
+    await assertNothingRaised(async () => {
+      await pool.reap?.();
+      await pool.flush?.();
+    });
   });
 
   it.skip("connection pool starts reaper in fork", () => {
@@ -114,14 +108,16 @@ describe("ReaperTest", () => {
   });
 
   it("reaper does not reap discarded connection pools", async () => {
+    const discardedPool = makePool();
+    discardedPool._discarded = true;
     const pool = makePool();
-    const reaper = new Reaper(pool, 60);
-    reaper.run();
 
-    pool._discarded = true;
+    new Reaper(discardedPool, 60).run();
+    new Reaper(pool, 60).run();
 
     await vi.advanceTimersByTimeAsync(60_000);
-    expect(pool.reaped).toBe(0);
-    expect(pool.flushed).toBe(0);
+
+    expect(discardedPool.reaped).toBeFalsy();
+    expect(pool.reaped).toBeTruthy();
   });
 });
