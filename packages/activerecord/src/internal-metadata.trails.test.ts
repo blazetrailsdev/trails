@@ -23,8 +23,8 @@ function currentTime(defaultTimezone: string): string {
 }
 
 const FIXED_INSTANT = "2026-07-25T23:25:21.123Z";
-const FIXED_UTC = "2026-07-25 23:25:21.123";
-const FIXED_LOCAL = "2026-07-25 19:25:21.123";
+const FIXED_UTC = "2026-07-25 23:25:21.123000";
+const FIXED_LOCAL = "2026-07-25 19:25:21.123000";
 
 describe("InternalMetadata#currentTime", () => {
   beforeAll(() => {
@@ -32,9 +32,13 @@ describe("InternalMetadata#currentTime", () => {
     resetLocalTimeZoneId();
     vi.useFakeTimers();
     vi.setSystemTime(new Date(FIXED_INSTANT));
+    vi.spyOn(performance, "timeOrigin", "get").mockReturnValue(
+      Date.parse(FIXED_INSTANT) - performance.now(),
+    );
   });
 
   afterAll(() => {
+    vi.restoreAllMocks();
     vi.useRealTimers();
     vi.unstubAllEnvs();
     resetLocalTimeZoneId();
@@ -42,7 +46,7 @@ describe("InternalMetadata#currentTime", () => {
 
   it("formats as YYYY-MM-DD HH:mm:ss.SSS with no zone designator", () => {
     for (const tz of ["utc", "local"]) {
-      expect(currentTime(tz)).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}$/);
+      expect(currentTime(tz)).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{6}$/);
     }
   });
 

@@ -1,4 +1,4 @@
-import { Temporal } from "@blazetrails/date";
+import { Time } from "@blazetrails/date";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ConnectionPool, NullPool } from "./connection-adapters/abstract/connection-pool.js";
 import type { BoundSchemaReflection } from "./connection-adapters/schema-cache.js";
@@ -149,11 +149,8 @@ export class InternalMetadata {
   }
 
   private currentTime(connection: DatabaseAdapter): string {
-    const opts = { smallestUnit: "millisecond", roundingMode: "trunc" } as const;
-    if (connection.defaultTimezone === "utc") {
-      return Temporal.Now.instant().toString(opts).replace("T", " ").replace("Z", "");
-    }
-    return Temporal.Now.plainDateTimeISO().toString(opts).replace("T", " ");
+    const now = connection.defaultTimezone === "utc" ? Time.now().getutc() : Time.now();
+    return now.strftime("%Y-%m-%d %H:%M:%S.%6N");
   }
 
   private async selectEntry(
