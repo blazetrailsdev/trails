@@ -15,6 +15,8 @@ import { QueryAttribute } from "../../relation/query-attribute.js";
 import { ValueType, IntegerType } from "@blazetrails/activemodel";
 import { assertLogged } from "./test-helper.js";
 import { newSqlitePool } from "../../support/pooled-sqlite-adapter.js";
+import { NullPool } from "../../connection-adapters/abstract/connection-pool.js";
+import { StatementInvalid } from "../../errors.js";
 import type { ConnectionPool } from "../../connection-adapters/abstract/connection-pool.js";
 
 let adapter: SQLite3Adapter;
@@ -209,9 +211,14 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("bad timeout", async () => {
-    const a = new BetterSQLite3Adapter({ database: ":memory:" });
-    expect(a).toBeDefined();
-    await a.disconnectBang();
+    const a = new BetterSQLite3Adapter({ database: ":memory:", timeout: "usa" });
+    const exception: any = await a.connectBang().then(
+      () => null,
+      (e) => e,
+    );
+    expect(exception).toBeInstanceOf(StatementInvalid);
+    expect(exception.message).toMatch(/TypeError/);
+    expect(exception.connectionPool).toBeInstanceOf(NullPool);
   });
 
   it("nil timeout", async () => {
