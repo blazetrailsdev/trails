@@ -29,12 +29,12 @@ describe("ExplainTest", () => {
     });
 
     const [sql, binds] = queries[0];
-    expect(sql).toContain("SELECT");
+    expect(sql).toMatch("SELECT");
     if (binds.length > 0) {
       expect(binds.length).toBe(1);
       expect((binds[binds.length - 1] as { value: unknown }).value).toBe("honda");
     } else {
-      expect(sql).toContain("honda");
+      expect(sql).toMatch("honda");
     }
   });
 
@@ -46,7 +46,7 @@ describe("ExplainTest", () => {
     )[0];
     const message = await Car.all().explain().average("id");
     expect(message).toMatch(/^EXPLAIN/m);
-    expect(message).toContain(expectedQuery);
+    expect(message).toMatch(expectedQuery);
   });
 
   itIfSupports("explain", "relation explain with count", async () => {
@@ -57,7 +57,7 @@ describe("ExplainTest", () => {
     )[0];
     const message = await Car.all().explain().count();
     expect(message).toMatch(/^EXPLAIN/m);
-    expect(message).toContain(expectedQuery);
+    expect(message).toMatch(expectedQuery);
   });
 
   itIfSupports("explain", "relation explain with count and argument", async () => {
@@ -68,7 +68,7 @@ describe("ExplainTest", () => {
     )[0];
     const message = await (Car.all().explain() as any).count("id");
     expect(message).toMatch(/^EXPLAIN/m);
-    expect(message).toContain(expectedQuery);
+    expect(message).toMatch(expectedQuery);
   });
 
   itIfSupports("explain", "relation explain with minimum", async () => {
@@ -79,7 +79,7 @@ describe("ExplainTest", () => {
     )[0];
     const message = await Car.all().explain().minimum("id");
     expect(message).toMatch(/^EXPLAIN/m);
-    expect(message).toContain(expectedQuery);
+    expect(message).toMatch(expectedQuery);
   });
 
   itIfSupports("explain", "relation explain with maximum", async () => {
@@ -90,7 +90,7 @@ describe("ExplainTest", () => {
     )[0];
     const message = await Car.all().explain().maximum("id");
     expect(message).toMatch(/^EXPLAIN/m);
-    expect(message).toContain(expectedQuery);
+    expect(message).toMatch(expectedQuery);
   });
 
   itIfSupports("explain", "relation explain with sum", async () => {
@@ -101,7 +101,7 @@ describe("ExplainTest", () => {
     )[0];
     const message = await Car.all().explain().sum("id");
     expect(message).toMatch(/^EXPLAIN/m);
-    expect(message).toContain(expectedQuery);
+    expect(message).toMatch(expectedQuery);
   });
 
   itIfSupports("explain", "relation explain with first", async () => {
@@ -112,7 +112,7 @@ describe("ExplainTest", () => {
     )[0].replace(/LIMIT[\s\S]*/, "");
     const message = await Car.all().explain().first();
     expect(message).toMatch(/^EXPLAIN/m);
-    expect(message).toContain(expectedQuery);
+    expect(message).toMatch(expectedQuery);
   });
 
   itIfSupports("explain", "relation explain with last", async () => {
@@ -123,7 +123,7 @@ describe("ExplainTest", () => {
     )[0].replace(/LIMIT[\s\S]*/, "");
     const message = await Car.all().explain().last();
     expect(message).toMatch(/^EXPLAIN/m);
-    expect(message).toContain(expectedQuery);
+    expect(message).toMatch(expectedQuery);
   });
 
   itIfSupports("explain", "relation explain with pluck", async () => {
@@ -134,7 +134,7 @@ describe("ExplainTest", () => {
     )[0];
     const message = await Car.all().explain().pluck();
     expect(message).toMatch(/^EXPLAIN/m);
-    expect(message).toContain(expectedQuery);
+    expect(message).toMatch(expectedQuery);
   });
 
   itIfSupports("explain", "relation explain with pluck with args", async () => {
@@ -145,7 +145,7 @@ describe("ExplainTest", () => {
     )[0];
     const message = await Car.all().explain().pluck("id", "name");
     expect(message).toMatch(/^EXPLAIN/m);
-    expect(message).toContain(expectedQuery);
+    expect(message).toMatch(expectedQuery);
   });
 
   itIfSupports("explain", "exec explain with no binds", async () => {

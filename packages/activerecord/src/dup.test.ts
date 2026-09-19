@@ -27,40 +27,40 @@ describe("DupTest", () => {
   it("dup", () => {
     const topic = new Topic({});
     topic.freeze();
-    expect(topic.dup().isFrozen()).toBe(false);
+    expect(topic.dup().isFrozen()).toBeFalsy();
   });
 
   it("not readonly", async () => {
     const topic = await Topic.first();
     const duped = topic!.dup();
-    expect(duped.isReadonly()).toBe(false);
+    expect(duped.isReadonly()).toBeFalsy();
   });
 
   it("is readonly", async () => {
     const topic = await Topic.first();
     topic!.readonlyBang();
     const duped = topic!.dup();
-    expect(duped.isReadonly()).toBe(true);
+    expect(duped.isReadonly()).toBeTruthy();
   });
 
   it("dup not persisted", async () => {
     const topic = await Topic.first();
     const duped = topic!.dup();
-    expect(duped.isPersisted()).toBe(false);
-    expect(duped.isNewRecord()).toBe(true);
+    expect(duped.isPersisted()).toBeFalsy();
+    expect(duped.isNewRecord()).toBeTruthy();
   });
 
   it("dup not previously new record", async () => {
     const topic = await Topic.first();
     const duped = topic!.dup();
-    expect(duped.isPreviouslyNewRecord()).toBe(false);
+    expect(duped.isPreviouslyNewRecord()).toBeFalsy();
   });
 
   it("dup not destroyed", async () => {
     const topic = await Topic.first();
     await topic!.destroy();
     const duped = topic!.dup();
-    expect(duped.isDestroyed()).toBe(false);
+    expect(duped.isDestroyed()).toBeFalsy();
   });
 
   it("dup has no id", async () => {
@@ -146,15 +146,15 @@ describe("DupTest", () => {
 
     car!.lock_version += 1;
     const newCar = car!.dup();
-    expect(newCar.attributeChanged("lock_version")).toBe(false);
+    expect(newCar.attributeChanged("lock_version")).toBeFalsy();
   });
 
   it("dup after initialize callbacks", () => {
     const topic = new Topic({});
-    expect(Topic.afterInitializeCalled).toBe(true);
+    expect(Topic.afterInitializeCalled).toBeTruthy();
     Topic.afterInitializeCalled = false;
     topic.dup();
-    expect(Topic.afterInitializeCalled).toBe(true);
+    expect(Topic.afterInitializeCalled).toBeTruthy();
   });
 
   it("dup runs after_initialize against the duped attributes", async () => {
@@ -173,12 +173,12 @@ describe("DupTest", () => {
 
       const duped = topic.dup();
       duped.title = null;
-      expect(await duped.isInvalid()).toBe(true);
+      expect(await duped.isInvalid()).toBeTruthy();
 
       topic.title = null;
       duped.title = "Mathematics";
-      expect(await topic.isInvalid()).toBe(true);
-      expect(await duped.isValid()).toBe(true);
+      expect(await topic.isInvalid()).toBeTruthy();
+      expect(await duped.isValid()).toBeTruthy();
     });
   });
 
@@ -199,31 +199,21 @@ describe("DupTest", () => {
     }
     const record = await ParrotsPirate.create({});
 
-    let raised = false;
-    try {
-      record.dup();
-    } catch {
-      raised = true;
-    }
-    expect(raised).toBe(false);
+    expect(() => record.dup()).not.toThrow();
   });
 
   it("dup record not persisted after rollback transaction", async () => {
     const movie = new Movie({ name: "test" });
 
-    let raised = false;
-    try {
-      await Movie.transaction(async () => {
+    await expect(
+      Movie.transaction(async () => {
         await movie.saveBang();
         const duped = movie.dup();
         await duped.assignAttributes({ name: null });
         await duped.saveBang();
-      });
-    } catch (e) {
-      if (e instanceof RecordInvalid) raised = true;
-      else throw e;
-    }
-    expect(raised).toBe(true);
-    expect(movie.isPersisted()).toBe(false);
+      }),
+    ).rejects.toThrow(RecordInvalid);
+
+    expect(movie.isPersisted()).toBeFalsy();
   });
 });

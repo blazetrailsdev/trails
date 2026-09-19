@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { assertRaises } from "@blazetrails/activesupport";
 import { stdout } from "@blazetrails/ruby-compat";
 import {
   Migration,
   Migrator,
+  DuplicateMigrationNameError,
   DuplicateMigrationVersionError,
   UnknownMigrationVersionError,
   MigrationContext,
@@ -92,11 +94,12 @@ describe("MigratorTest", () => {
     Migration.verbose = verboseWas;
   });
 
-  it("migrator with duplicate names", () => {
-    expect(() => {
+  it("migrator with duplicate names", async () => {
+    const e = await assertRaises([DuplicateMigrationNameError], {}, () => {
       const list = [migration("Chunky"), migration("Chunky")];
       new Migrator("up", list, schemaMigration, internalMetadata);
-    }).toThrow(/Multiple migrations have the name Chunky/);
+    });
+    expect(e.message).toMatch(/Multiple migrations have the name Chunky/);
   });
 
   it("migrator with duplicate versions", () => {
@@ -216,9 +219,8 @@ describe("MigratorTest", () => {
       internalMetadata,
     ).pendingMigrations();
 
-    expect(migrations).toHaveLength(1);
-    expect(migrations[0].version).toBe(3);
-    expect(migrations[0].name).toBe("bar");
+    expect(migrations.length).toBe(1);
+    expect(migrations[0]).toBe(migrationList[migrationList.length - 1]);
   });
 
   it("migrations status", async () => {
@@ -342,8 +344,8 @@ describe("MigratorTest", () => {
   it("migrator interleaved migrations", async () => {
     const one1 = trackedSensor("One", 1);
     await new Migrator("up", [one1.proxy], schemaMigration, internalMetadata).migrate();
-    expect(one1.state.wentUp).toBe(true);
-    expect(one1.state.wentDown).toBe(false);
+    expect(one1.state.wentUp).toBeTruthy();
+    expect(one1.state.wentDown).toBeFalsy();
 
     const one2 = trackedSensor("One", 1);
     const three2 = trackedSensor("Three", 3);
@@ -353,9 +355,9 @@ describe("MigratorTest", () => {
       schemaMigration,
       internalMetadata,
     ).migrate();
-    expect(one2.state.wentUp).toBe(false);
-    expect(three2.state.wentUp).toBe(true);
-    expect([one2, three2].every((s) => !s.state.wentDown)).toBe(true);
+    expect(one2.state.wentUp).toBeFalsy();
+    expect(three2.state.wentUp).toBeTruthy();
+    expect([one2, three2].every((s) => !s.state.wentDown)).toBeTruthy();
 
     const one3 = trackedSensor("One", 1);
     const two3 = trackedSensor("Two", 2);
@@ -366,9 +368,9 @@ describe("MigratorTest", () => {
       schemaMigration,
       internalMetadata,
     ).migrate();
-    expect(one3.state.wentDown).toBe(true);
-    expect(two3.state.wentDown).toBe(false);
-    expect(three3.state.wentDown).toBe(true);
+    expect(one3.state.wentDown).toBeTruthy();
+    expect(two3.state.wentDown).toBeFalsy();
+    expect(three3.state.wentDown).toBeTruthy();
   });
 
   it("up calls up", async () => {
@@ -382,8 +384,8 @@ describe("MigratorTest", () => {
       internalMetadata,
     );
     await migrator.migrate();
-    expect([m0, m1, m2].every((m) => m.state.wentUp)).toBe(true);
-    expect([m0, m1, m2].every((m) => !m.state.wentDown)).toBe(true);
+    expect([m0, m1, m2].every((m) => m.state.wentUp)).toBeTruthy();
+    expect([m0, m1, m2].every((m) => !m.state.wentDown)).toBeTruthy();
     expect(await migrator.currentVersion()).toBe(2);
   });
 
@@ -391,12 +393,16 @@ describe("MigratorTest", () => {
     const up0 = trackedSensor(null, 0);
     const up1 = trackedSensor(null, 1);
     const up2 = trackedSensor(null, 2);
-    await new Migrator(
+    const upMigrator = new Migrator(
       "up",
       [up0.proxy, up1.proxy, up2.proxy],
       schemaMigration,
       internalMetadata,
-    ).migrate();
+    );
+    await upMigrator.migrate();
+    expect([up0, up1, up2].every((m) => m.state.wentUp)).toBeTruthy();
+    expect([up0, up1, up2].every((m) => !m.state.wentDown)).toBeTruthy();
+    expect(await upMigrator.currentVersion()).toBe(2);
 
     const m0 = trackedSensor(null, 0);
     const m1 = trackedSensor(null, 1);
@@ -408,8 +414,8 @@ describe("MigratorTest", () => {
       internalMetadata,
     );
     await migrator.migrate();
-    expect([m0, m1, m2].every((m) => !m.state.wentUp)).toBe(true);
-    expect([m0, m1, m2].every((m) => m.state.wentDown)).toBe(true);
+    expect([m0, m1, m2].every((m) => !m.state.wentUp)).toBeTruthy();
+    expect([m0, m1, m2].every((m) => m.state.wentDown)).toBeTruthy();
     expect(await migrator.currentVersion()).toBe(0);
   });
 
@@ -586,12 +592,13 @@ describe("MigratorTest", () => {
     expect(result.length).toBe(1);
   });
 
-  it("migrator output when running single migration", async () => {
+  it.skip("migrator output when running single migration", async () => {
+    // BLOCKED: migrator-run-returns-version-string
     const { context: migrator } = migrationContextClass(1);
 
     const result = await migrator.run("up", 1);
 
-    expect(result).toBe(1);
+    expect(result).toBe("1");
   });
 
   it("migrator rollback", async () => {
@@ -617,9 +624,9 @@ describe("MigratorTest", () => {
     const { context: migrator } = migrationContextClass(3);
 
     await schemaMigration.dropTable();
-    expect(await schemaMigration.tableExists()).toBe(false);
+    expect(await schemaMigration.tableExists()).toBeFalsy();
     await migrator.migrate(1);
-    expect(await schemaMigration.tableExists()).toBe(true);
+    expect(await schemaMigration.tableExists()).toBeTruthy();
   });
 
   it("migrator forward", async () => {

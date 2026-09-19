@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { assertNot, assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
+import { regexpEscape } from "@blazetrails/ruby-compat";
+import { adapterType } from "../test-adapter.js";
+import { captureSql } from "../testing/sql-capture.js";
+import { assertQueriesMatch } from "../testing/query-assertions.js";
+import { quoteTableName } from "../support/quote-regex.js";
+import { ActiveRecordError } from "../errors.js";
 import { fixtures } from "../test-fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Comment } from "../test-helpers/models/comment.js";
@@ -91,17 +98,22 @@ describe("UpdateAllTest", () => {
   });
 
   it("update all with blank argument", async () => {
-    const error = await Comment.updateAll({} as any).catch((e: unknown) => e);
-    expect(error).toBeInstanceOf(ArgumentError);
-    expect((error as Error).message).toBe("Empty list of attributes to change");
+    const error = await assertRaises([ArgumentError], {}, () => Comment.updateAll({} as any));
+
+    expect(error.message).toBe("Empty list of attributes to change");
   });
 
   it("update all with group by", async () => {
     const minimumCommentsCount = 2;
     await Post.mostCommented(minimumCommentsCount).updateAll({ title: "ig" });
     const updatedPosts = await Post.mostCommented(minimumCommentsCount);
+
     expect(updatedPosts.length).toBeGreaterThan(0);
-    updatedPosts.forEach((post: any) => expect(post.title).toBe("ig"));
+    const commentsLengths = await Promise.all(
+      updatedPosts.map(async (post: any) => (await post.comments).length),
+    );
+    expect(commentsLengths.every((n) => n >= minimumCommentsCount)).toBeTruthy();
+    expect(updatedPosts.every((post: any) => "ig" === post.title)).toBeTruthy();
 
     const nonUpdated = await Post.joins(":comments")
       .group("posts.id")
@@ -114,8 +126,20 @@ describe("UpdateAllTest", () => {
     const petsScope = Pet.joins(":toys").where({ toys: { name: "Bone" } });
 
     expect(await petsScope.exists()).toBe(true);
-    const countBefore = await petsScope.count();
-    expect(await petsScope.updateAll({ name: "Bob" })).toBe(countBefore);
+    const sqls = await captureSql(async () => {
+      const count = await petsScope.count();
+      expect(await petsScope.updateAll({ name: "Bob" })).toBe(count);
+    });
+
+    if (adapterType === "mysql") {
+      expect(sqls[sqls.length - 1]).not.toMatch(
+        new RegExp(`SELECT DISTINCT ${regexpEscape(quoteTableName("pets.pet_id"))}`),
+      );
+    } else {
+      expect(sqls[sqls.length - 1]).toMatch(
+        new RegExp(`SELECT ${regexpEscape(quoteTableName("pets.pet_id"))}`),
+      );
+    }
   });
 
   it("update all with left joins", async () => {
@@ -174,7 +198,7 @@ describe("UpdateAllTest", () => {
 
   it("update counters with joins", async () => {
     const parrot = pets("parrot");
-    expect(parrot.integer).toBeFalsy();
+    expect(parrot.integer).toBeNull();
 
     await Pet.joins(":toys")
       .where({ toys: { name: "Bone" } })
@@ -213,7 +237,9 @@ describe("UpdateAllTest", () => {
   });
 
   it("touch all with aliased for update timestamp", async () => {
-    expect(Object.keys((Developer as any).attributeAliases ?? {})).toContain("updated_at");
+    expect(
+      Object.keys((Developer as any).attributeAliases ?? {}).includes("updated_at"),
+    ).toBeTruthy();
 
     const developer = developers("david");
     const previouslyCreatedAt = developer.legacy_created_at;
@@ -446,26 +472,41 @@ describe("UpdateAllTest", () => {
   });
 
   it("update all ignores order without limit from association", async () => {
-    const david = await Author.find(authors("david").id);
-    const postsWithCats = await (david as any).postsWithCommentsAndCategories.toArray();
-    expect(postsWithCats.length).toBeGreaterThan(0);
-    const count = await (david as any).postsWithCommentsAndCategories.updateAll([
-      "body = ?",
-      "bulk update!",
-    ]);
-    expect(count).toBe(postsWithCats.length);
+    const author = await Author.find(authors("david").id);
+    await assertNothingRaised(async () => {
+      const postsWithCats = await (author as any).postsWithCommentsAndCategories.toArray();
+      expect(postsWithCats.length).toBe(
+        await (author as any).postsWithCommentsAndCategories.updateAll([
+          "body = ?",
+          "bulk update!",
+        ]),
+      );
+    });
   });
 
   it("update all doesnt ignore order", async () => {
-    const david = authors("david");
-    const mary = authors("mary");
-    expect(Number(mary.id)).toBe(Number(david.id) + 1);
+    expect(Number(authors("david").id) + 1).toBe(Number(authors("mary").id));
+    const testUpdateWithOrderSucceeds = async (order: string) => {
+      try {
+        return await (Author.order(order).updateAll as any)("id = id + 1");
+      } catch (e) {
+        if (e instanceof ActiveRecordError) return false;
+        throw e;
+      }
+    };
 
-    try {
-      await (Author.order("id DESC").updateAll as any)("id = id + 1");
-    } catch {
-      return;
+    // eslint-disable-next-line blazetrails/no-conditional-in-test -- mirrors Rails' `if test_update_with_order_succeeds.call("id DESC")` (update_all_test.rb:339)
+    if (await testUpdateWithOrderSucceeds("id DESC")) {
+      assertNot(await testUpdateWithOrderSucceeds("id ASC"));
+    } else {
+      await assertQueriesMatch(
+        /^UPDATE .+ \(SELECT .* ORDER BY id DESC\)$/i,
+        undefined,
+        false,
+        async () => {
+          await testUpdateWithOrderSucceeds("id DESC");
+        },
+      );
     }
-    await expect((Author.order("id ASC").updateAll as any)("id = id + 1")).rejects.toThrow();
   });
 });

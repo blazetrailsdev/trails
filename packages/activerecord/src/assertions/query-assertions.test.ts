@@ -7,7 +7,7 @@ import {
   assertQueriesMatch,
   assertNoQueriesMatch,
 } from "../testing/query-assertions.js";
-import { Notifications } from "@blazetrails/activesupport";
+import { Notifications, assertRaises } from "@blazetrails/activesupport";
 
 function instrumentSql(sql: string, name?: string, cached = false): void {
   Notifications.instrument("sql.active_record", { sql, name: name ?? "SQL", cached });
@@ -23,17 +23,19 @@ describe("QueryAssertionsTest", () => {
       instrumentSql("SELECT 1");
     });
 
-    await expect(
+    let error = await assertRaises([Error], {}, () =>
       assertQueriesCount(2, false, async () => {
         instrumentSql("SELECT 1");
       }),
-    ).rejects.toThrow(/1 instead of 2 queries/);
+    );
+    expect(error.message).toMatch(/1 instead of 2 queries/);
 
-    await expect(
+    error = await assertRaises([Error], {}, () =>
       assertQueriesCount(0, false, async () => {
         instrumentSql("SELECT 1");
       }),
-    ).rejects.toThrow(/1 instead of 0 queries/);
+    );
+    expect(error.message).toMatch(/1 instead of 0 queries/);
   });
 
   it("assert queries count any", async () => {
@@ -65,25 +67,28 @@ describe("QueryAssertionsTest", () => {
       instrumentSql("SELECT * FROM posts LIMIT 1");
     });
 
-    await expect(
+    let error = await assertRaises([Error], {}, () =>
       assertQueriesMatch(/LIMIT/i, 2, false, async () => {
         instrumentSql("SELECT * FROM posts LIMIT 1");
       }),
-    ).rejects.toThrow(/1 instead of 2 queries/);
+    );
+    expect(error.message).toMatch(/1 instead of 2 queries/);
 
-    await expect(
+    error = await assertRaises([Error], {}, () =>
       assertQueriesMatch(/LIMIT/i, 0, false, async () => {
         instrumentSql("SELECT * FROM posts LIMIT 1");
       }),
-    ).rejects.toThrow(/1 instead of 0 queries/);
+    );
+    expect(error.message).toMatch(/1 instead of 0 queries/);
   });
 
   it("assert queries match with matcher", async () => {
-    await expect(
+    const error = await assertRaises([Error], {}, () =>
       assertQueriesMatch(/WHERE "posts"\."id" = \? LIMIT \?/, 1, false, async () => {
         instrumentSql('SELECT * FROM posts WHERE "posts"."id" = $1 LIMIT 1');
       }),
-    ).rejects.toThrow(/0 instead of 1 queries/);
+    );
+    expect(error.message).toMatch(/0 instead of 1 queries/);
   });
 
   it("assert queries match when there are no queries", async () => {
@@ -97,11 +102,12 @@ describe("QueryAssertionsTest", () => {
       instrumentSql("SELECT 1");
     });
 
-    await expect(
+    const error = await assertRaises([Error], {}, () =>
       assertNoQueriesMatch(/ORDER BY/i, false, async () => {
         instrumentSql("SELECT * FROM posts ORDER BY id");
       }),
-    ).rejects.toThrow(/1 instead of 0/);
+    );
+    expect(error.message).toMatch(/1 instead of 0/);
   });
 
   it("assert no queries match matcher", async () => {
