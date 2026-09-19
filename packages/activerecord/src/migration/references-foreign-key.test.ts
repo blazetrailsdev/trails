@@ -113,6 +113,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
         await assertDifference(
           async () => (await conn.foreignKeys("testings")).length,
           -1,
+          null,
           async () => {
             await conn.removeReference("testings", "testing_parent", { foreignKey: true });
           },
@@ -130,6 +131,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
         await assertDifference(
           async () => (await conn.foreignKeys("testings")).length,
           -1,
+          null,
           async () => {
             await conn.removeColumn("testings", "testing_parent_id");
           },
@@ -169,6 +171,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
         await assertDifference(
           async () => (await conn.foreignKeys("testings")).length,
           -1,
+          null,
           async () => {
             await conn.removeReference("testings", "parent1", {
               foreignKey: { toTable: "testing_parents" },
@@ -204,6 +207,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
           await assertDifference(
             async () => (await conn.foreignKeys("testing_parents")).length,
             -1,
+            null,
             async () => {
               await conn.removeReference("testing_parents", "testing", { foreignKey: true });
             },

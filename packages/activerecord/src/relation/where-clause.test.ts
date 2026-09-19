@@ -171,7 +171,7 @@ describe("ActiveRecord::Relation", () => {
 
     it("ast wraps any SQL literals in parenthesis", () => {
       const t = table();
-      const random_object = {};
+      const random_object = t.get("id").eq(4);
       const whereClause = new WhereClause([t.get("id").in([1, 2, 3]), "foo = bar", random_object]);
       const expected = new Nodes.And([
         t.get("id").in([1, 2, 3]),

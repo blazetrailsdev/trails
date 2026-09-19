@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { MessageSerializer } from "./message-serializer.js";
 import { Message } from "./message.js";
-import { ArgumentError, JSON } from "@blazetrails/ruby-compat";
+import { ArgumentError, JSON as RubyJSON } from "@blazetrails/ruby-compat";
 import { Decryption, ForbiddenClass } from "./errors.js";
 
 describe("ActiveRecord::Encryption::MessageSerializerTest", () => {
@@ -30,12 +30,12 @@ describe("ActiveRecord::Encryption::MessageSerializerTest", () => {
   it.skip("won't load classes from JSON", () => {
     // BLOCKED: ruby-compat-json-load-create-additions-argument-error
     const serializer = new MessageSerializer();
-    const class_loading_payload = JSON.dump({
+    const class_loading_payload = RubyJSON.dump({
       p: Buffer.from("Some payload").toString("base64"),
       json_class: "MessageSerializerTest::SomeClassThatWillNeverExist",
     });
 
-    expect(() => JSON.load(class_loading_payload)).toThrow(ArgumentError);
+    expect(() => RubyJSON.load(class_loading_payload)).toThrow(ArgumentError);
     expect(() => serializer.load(class_loading_payload)).not.toThrow();
   });
 
