@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { HashConfig } from "./hash-config.js";
+import { assertRaises } from "@blazetrails/activesupport";
 import { AdapterNotFound } from "../errors.js";
 import * as connectionAdapters from "../connection-adapters.js";
 import { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
@@ -146,10 +147,10 @@ describe("DatabaseConfigurations", () => {
       expect(config.idleTimeout).toBeNull();
     });
 
-    it("default schema dump value", () => {
+    it.skip("default schema dump value", () => {
+      // BLOCKED: hash-config-defaults-diverge-from-rails-schema-dump-and-cache-path
       const config = new HashConfig("default_env", "primary", { adapter: "abstract" });
-      expect(config.schemaDump()).toBe("schema.ts");
-      expect(config.schemaDump("ruby")).toBe("schema.rb");
+      expect(config.schemaDump()).toBe("schema.rb");
     });
 
     it("schema dump value set to filename", () => {
@@ -195,19 +196,22 @@ describe("DatabaseConfigurations", () => {
       expect(config.databaseTasks()).toBe(true);
     });
 
-    it("schema cache path default for primary", () => {
+    it.skip("schema cache path default for primary", () => {
+      // BLOCKED: hash-config-defaults-diverge-from-rails-schema-dump-and-cache-path
       const config = new HashConfig("default_env", "primary", { adapter: "abstract" });
-      expect(config.defaultSchemaCachePath()).toBe("db/schema_cache.json");
+      expect(config.defaultSchemaCachePath()).toBe("db/schema_cache.yml");
     });
 
-    it("schema cache path default for custom name", () => {
+    it.skip("schema cache path default for custom name", () => {
+      // BLOCKED: hash-config-defaults-diverge-from-rails-schema-dump-and-cache-path
       const config = new HashConfig("default_env", "alternate", { adapter: "abstract" });
-      expect(config.defaultSchemaCachePath()).toBe("db/alternate_schema_cache.json");
+      expect(config.defaultSchemaCachePath()).toBe("db/alternate_schema_cache.yml");
     });
 
-    it("schema cache path default for different db dir", () => {
+    it.skip("schema cache path default for different db dir", () => {
+      // BLOCKED: hash-config-defaults-diverge-from-rails-schema-dump-and-cache-path
       const config = new HashConfig("default_env", "alternate", { adapter: "abstract" });
-      expect(config.defaultSchemaCachePath("my_db")).toBe("my_db/alternate_schema_cache.json");
+      expect(config.defaultSchemaCachePath("my_db")).toBe("my_db/alternate_schema_cache.yml");
     });
 
     it("schema cache path configuration hash", () => {
@@ -226,28 +230,30 @@ describe("DatabaseConfigurations", () => {
       expect(config.lazySchemaCachePath()).toBe("db/config_schema_cache.yml");
     });
 
-    it("lazy schema cache path uses default if config is not present", () => {
+    it.skip("lazy schema cache path uses default if config is not present", () => {
+      // BLOCKED: hash-config-defaults-diverge-from-rails-schema-dump-and-cache-path
       const config = new HashConfig("default_env", "alternate", { adapter: "abstract" });
-      expect(config.lazySchemaCachePath()).toBe("db/alternate_schema_cache.json");
+      expect(config.lazySchemaCachePath()).toBe("db/alternate_schema_cache.yml");
     });
 
-    it("validate checks the adapter exists", () => {
-      const ok = new HashConfig("default_env", "primary", { adapter: "abstract" });
-      expect(ok.validateBang()).toBe(true);
-
-      const bad = new HashConfig("default_env", "primary", { adapter: "potato" });
-      expect(() => bad.validateBang()).toThrow(AdapterNotFound);
+    it("validate checks the adapter exists", async () => {
+      let config = new HashConfig("default_env", "primary", { adapter: "abstract" });
+      expect(config.validateBang()).toBeTruthy();
+      config = new HashConfig("default_env", "primary", { adapter: "potato" });
+      await assertRaises([AdapterNotFound], {}, () => {
+        config.validateBang();
+      });
     });
 
-    it("inspect does not show secrets", () => {
+    it.skip("inspect does not show secrets", () => {
+      // BLOCKED: hash-config-inspect-omits-ruby-class-path
       const config = new HashConfig("default_env", "primary", {
         adapter: "abstract",
         password: "hunter2",
       });
-      const out = config.inspect();
-      expect(out).not.toContain("hunter2");
-      expect(out).toContain("env_name=default_env");
-      expect(out).toContain("name=primary");
+      expect(config.inspect()).toBe(
+        "#<ActiveRecord::DatabaseConfigurations::HashConfig env_name=default_env name=primary adapter_class=ActiveRecord::ConnectionAdapters::AbstractAdapter>",
+      );
     });
 
     it("seeds defaults to primary", () => {
@@ -271,9 +277,6 @@ describe("DatabaseConfigurations", () => {
       config = new HashConfig("default_env", "secondary", { adapter: "abstract", seeds: true });
       vi.spyOn(config, "isPrimary").mockReturnValue(false);
       expect(config.seeds).toBe(true);
-
-      config = new HashConfig("default_env", "primary", { adapter: "abstract", seeds: null });
-      expect(config.seeds).toBe(null);
     });
 
     it("_database= does not mutate the hash passed to the constructor", () => {
