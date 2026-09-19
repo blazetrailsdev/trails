@@ -348,7 +348,7 @@ describe("EachTest", () => {
   });
 
   it("find in batches should return an enumerator", async () => {
-    let enumerator: AsyncGenerator<Post[]> | undefined;
+    let enumerator: AsyncGenerator<Base[]> | undefined;
     await assertNoQueries(false, () => {
       enumerator = Post.findInBatches({ batchSize: 1 });
     });
