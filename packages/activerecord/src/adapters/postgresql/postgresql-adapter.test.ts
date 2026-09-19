@@ -104,13 +104,26 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("bad connection to postgres database", async () => {
-      const bad = new PostgreSQLAdapter("postgres://localhost:59999/nonexistent");
-      const error = await assertRaises([ConnectionNotEstablished], {}, () =>
-        bad.execute("SELECT 1"),
-      );
-      expect(bad).not.toBeNull();
-      expect((error as ConnectionNotEstablished).connectionPool).toBe(bad.pool);
-      await bad.disconnectBang();
+      const pgModule = (await import("pg")).default;
+      const clientSpy = vi.spyOn(pgModule, "Client" as never).mockImplementation((() => ({
+        connect: () => Promise.reject(new Error('FATAL:  database "postgres" does not exist')),
+        end: () => Promise.resolve(),
+        on() {
+          return this;
+        },
+      })) as never);
+      let connection: PostgreSQLAdapter | null = null;
+      try {
+        const error = await assertRaises([ConnectionNotEstablished], {}, async () => {
+          connection = new PostgreSQLAdapter(PG_TEST_URL.replace(/\/[^/?]*(\?|$)/, "/postgres$1"));
+          await connection.execQuery("SELECT 1");
+        });
+        expect(connection).not.toBeNull();
+        expect((error as ConnectionNotEstablished).connectionPool).toBe(connection!.pool);
+      } finally {
+        clientSpy.mockRestore();
+        await (connection as PostgreSQLAdapter | null)?.disconnectBang().catch(() => {});
+      }
     });
 
     it("reconnect after bad connection on check version", async () => {

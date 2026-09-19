@@ -506,6 +506,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       setZone(tz);
       try {
         class PgArrays extends Base {
+          declare datetimes: any;
           static tableName = "pg_arrays";
           static timeZoneAwareAttributes = true;
           static {
@@ -516,15 +517,15 @@ describeIfPg("PostgreSQLAdapter", () => {
         const timeString = "2020-06-15T10:00:00-07:00";
         const time = zone.parse(timeString);
 
-        const record = new PgArrays({ datetimes: [timeString] } as any);
-        expect((record as any).datetimes).toEqual([time]);
-        expect((record as any).datetimes[0].timeZone).toEqual(zone);
+        const record = new PgArrays({ datetimes: [timeString] });
+        expect(record.datetimes).toEqual([time]);
+        expect(record.datetimes[0].timeZone).toEqual(zone);
 
-        await (record as any).saveBang();
-        await (record as any).reload();
+        await record.saveBang();
+        await record.reload();
 
-        expect((record as any).datetimes).toEqual([time]);
-        expect((record as any).datetimes[0].timeZone).toEqual(zone);
+        expect(record.datetimes).toEqual([time]);
+        expect(record.datetimes[0].timeZone).toEqual(zone);
       } finally {
         setZone(null);
       }
