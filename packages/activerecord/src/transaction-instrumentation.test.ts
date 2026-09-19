@@ -1,8 +1,10 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { Base } from "./index.js";
+import { Base, Transaction } from "./index.js";
+import type { DatabaseStatementsHost } from "./connection-adapters/abstract/database-statements.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Rollback } from "./errors.js";
 import { Notifications } from "@blazetrails/activesupport";
+import type { NotificationEvent } from "@blazetrails/activesupport";
 import { assertEmpty, assertNot, assertSame } from "@blazetrails/activesupport";
 import type { NotificationSubscriber } from "@blazetrails/activesupport";
 import { fixtures } from "./test-fixtures.js";
@@ -33,8 +35,8 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("start transaction is triggered when the transaction is materialized", async () => {
-    const transactions: any[] = [];
-    Notifications.subscribe("start_transaction.active_record", (event: any) => {
+    const transactions: unknown[] = [];
+    Notifications.subscribe("start_transaction.active_record", (event: NotificationEvent) => {
       expect(event.payload.connection).toBeTruthy();
       transactions.push(event.payload.transaction);
     });
@@ -47,8 +49,8 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("start transaction is not triggered for ordinary nested calls", async () => {
-    const transactions: any[] = [];
-    Notifications.subscribe("start_transaction.active_record", (event: any) => {
+    const transactions: unknown[] = [];
+    Notifications.subscribe("start_transaction.active_record", (event: NotificationEvent) => {
       expect(event.payload.connection).toBeTruthy();
       transactions.push(event.payload.transaction);
     });
@@ -65,8 +67,8 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("start transaction is triggered for requires new", async () => {
-    const transactions: any[] = [];
-    Notifications.subscribe("start_transaction.active_record", (event: any) => {
+    const transactions: unknown[] = [];
+    Notifications.subscribe("start_transaction.active_record", (event: NotificationEvent) => {
       expect(event.payload.connection).toBeTruthy();
       transactions.push(event.payload.transaction);
     });
@@ -89,9 +91,9 @@ describe("TransactionInstrumentationTest", () => {
     const topic = topics("fifth");
 
     let notified = false;
-    let expectedTransaction: any = null;
+    let expectedTransaction: Transaction | null = null;
 
-    Notifications.subscribe("transaction.active_record", (event: any) => {
+    Notifications.subscribe("transaction.active_record", (event: NotificationEvent) => {
       expect(event.payload.connection).toBeTruthy();
       assertSame(expectedTransaction, event.payload.transaction);
       expect(event.payload.outcome).toBe("commit");
@@ -110,9 +112,9 @@ describe("TransactionInstrumentationTest", () => {
     const topic = topics("fifth");
 
     let notified = false;
-    let expectedTransaction: any = null;
+    let expectedTransaction: Transaction | null = null;
 
-    Notifications.subscribe("transaction.active_record", (event: any) => {
+    Notifications.subscribe("transaction.active_record", (event: NotificationEvent) => {
       expect(event.payload.connection).toBeTruthy();
       assertSame(expectedTransaction, event.payload.transaction);
       expect(event.payload.outcome).toBe("rollback");
@@ -131,13 +133,13 @@ describe("TransactionInstrumentationTest", () => {
   it("transaction instrumentation with savepoints", async () => {
     const topic = topics("fifth");
 
-    const events: any[] = [];
-    Notifications.subscribe("transaction.active_record", (event: any) => {
+    const events: NotificationEvent[] = [];
+    Notifications.subscribe("transaction.active_record", (event: NotificationEvent) => {
       events.push(event);
     });
 
-    let realTransaction: any = null;
-    let savepointTransaction: any = null;
+    let realTransaction: Transaction | null = null;
+    let savepointTransaction: Transaction | null = null;
     await Base.transaction(async (transaction) => {
       realTransaction = transaction;
       await topic.update({ title: "Sinatra" });
@@ -163,8 +165,8 @@ describe("TransactionInstrumentationTest", () => {
   it("transaction instrumentation with restart parent transaction on commit", async () => {
     const topic = topics("fifth");
 
-    const events: any[] = [];
-    Notifications.subscribe("transaction.active_record", (event: any) => {
+    const events: NotificationEvent[] = [];
+    Notifications.subscribe("transaction.active_record", (event: NotificationEvent) => {
       events.push(event);
     });
 
@@ -183,8 +185,8 @@ describe("TransactionInstrumentationTest", () => {
   it("transaction instrumentation with restart parent transaction on rollback", async () => {
     const topic = topics("fifth");
 
-    const events: any[] = [];
-    Notifications.subscribe("transaction.active_record", (event: any) => {
+    const events: NotificationEvent[] = [];
+    Notifications.subscribe("transaction.active_record", (event: NotificationEvent) => {
       events.push(event);
     });
 
@@ -206,8 +208,8 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("transaction instrumentation with unmaterialized restart parent transactions", async () => {
-    const events: any[] = [];
-    Notifications.subscribe("transaction.active_record", (event: any) => {
+    const events: NotificationEvent[] = [];
+    Notifications.subscribe("transaction.active_record", (event: NotificationEvent) => {
       events.push(event);
     });
 
@@ -225,8 +227,8 @@ describe("TransactionInstrumentationTest", () => {
 
   it("transaction instrumentation with materialized restart parent transactions", async () => {
     const topic = topics("fifth");
-    const events: any[] = [];
-    Notifications.subscribe("transaction.active_record", (event: any) => {
+    const events: NotificationEvent[] = [];
+    Notifications.subscribe("transaction.active_record", (event: NotificationEvent) => {
       events.push(event);
     });
 
@@ -248,8 +250,8 @@ describe("TransactionInstrumentationTest", () => {
   it("transaction instrumentation with restart savepoint parent transactions", async () => {
     const topic = topics("fifth");
 
-    const events: any[] = [];
-    Notifications.subscribe("transaction.active_record", (event: any) => {
+    const events: NotificationEvent[] = [];
+    Notifications.subscribe("transaction.active_record", (event: NotificationEvent) => {
       events.push(event);
     });
 
@@ -279,8 +281,8 @@ describe("TransactionInstrumentationTest", () => {
   it("transaction instrumentation with restart savepoint parent transactions on commit", async () => {
     const topic = topics("fifth");
 
-    const events: any[] = [];
-    Notifications.subscribe("transaction.active_record", (event: any) => {
+    const events: NotificationEvent[] = [];
+    Notifications.subscribe("transaction.active_record", (event: NotificationEvent) => {
       events.push(event);
     });
 
@@ -319,13 +321,13 @@ describe("TransactionInstrumentationTest", () => {
   });
 
   it("reconnecting after materialized transaction starts new event", async () => {
-    const events: any[] = [];
-    Notifications.subscribe("transaction.active_record", (event: any) => {
+    const events: NotificationEvent[] = [];
+    Notifications.subscribe("transaction.active_record", (event: NotificationEvent) => {
       events.push(event);
     });
     await Topic.transaction(async () => {
-      await (Base.connection as any).materializeTransactions();
-      await (Base.connection as any).reconnectBang({ restoreTransactions: true });
+      await Base.connection.materializeTransactions();
+      await Base.connection.reconnectBang({ restoreTransactions: true });
     });
 
     expect(events.length).toBe(2);
@@ -389,7 +391,10 @@ describe("TransactionInstrumentationTest", () => {
     });
 
     const error = class extends Error {};
-    vi.spyOn(Base.connection as any, "commitDbTransaction").mockImplementationOnce(async () => {
+    vi.spyOn(
+      Base.connection as unknown as Required<Pick<DatabaseStatementsHost, "commitDbTransaction">>,
+      "commitDbTransaction",
+    ).mockImplementationOnce(async () => {
       throw new error();
     });
     await expect(
@@ -405,13 +410,13 @@ describe("TransactionInstrumentationTest", () => {
     const topic = topics("fifth");
 
     let notified = false;
-    Notifications.subscribe("transaction.active_record", (event: any) => {
+    Notifications.subscribe("transaction.active_record", (event: NotificationEvent) => {
       expect(event.payload.outcome).toBe("incomplete");
       notified = true;
     });
 
     const error = class extends Error {};
-    vi.spyOn(Base.connection as any, "rollbackDbTransaction").mockImplementationOnce(async () => {
+    vi.spyOn(Base.connection, "rollbackDbTransaction").mockImplementationOnce(async () => {
       throw new error();
     });
     await expect(
@@ -433,12 +438,11 @@ describe("TransactionInstrumentationTest", () => {
       });
 
       const error = class extends Error {};
-      vi.spyOn(
-        (Base.connection as any).transactionManager,
-        "rollbackTransaction",
-      ).mockImplementationOnce(async () => {
-        throw new error();
-      });
+      vi.spyOn(Base.connection.transactionManager, "rollbackTransaction").mockImplementationOnce(
+        async () => {
+          throw new error();
+        },
+      );
       await expect(
         Topic.transaction(async () => {
           throw new Rollback();
