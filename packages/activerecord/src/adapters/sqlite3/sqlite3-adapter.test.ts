@@ -9,6 +9,7 @@ import { BinaryData } from "@blazetrails/activemodel";
 import { QueryAttribute } from "../../relation/query-attribute.js";
 import { ValueType, IntegerType } from "@blazetrails/activemodel";
 import { assertLogged } from "./test-helper.js";
+import type { Column as SQLite3Column } from "../../connection-adapters/sqlite3/column.js";
 import { assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
 import { newSqlitePool } from "../../support/pooled-sqlite-adapter.js";
 import { NullPool } from "../../connection-adapters/abstract/connection-pool.js";
@@ -898,28 +899,46 @@ describeIfSqlite("SQLite3AdapterTest", () => {
 
   it("rowid column", async () => {
     await adapter.execute(`CREATE TABLE "ex" (id_uppercase INTEGER PRIMARY KEY)`);
-    expect(indexBy(await adapter.columns("ex"), (c) => c.name)["id_uppercase"].rowid).toBeTruthy();
+    expect(
+      indexBy((await adapter.columns("ex")) as SQLite3Column[], (c: SQLite3Column) => c.name)[
+        "id_uppercase"
+      ].rowid,
+    ).toBeTruthy();
   });
 
   it("lowercase rowid column", async () => {
     await adapter.execute(`CREATE TABLE "ex" (id_lowercase integer PRIMARY KEY)`);
-    expect(indexBy(await adapter.columns("ex"), (c) => c.name)["id_lowercase"].rowid).toBeTruthy();
+    expect(
+      indexBy((await adapter.columns("ex")) as SQLite3Column[], (c: SQLite3Column) => c.name)[
+        "id_lowercase"
+      ].rowid,
+    ).toBeTruthy();
   });
 
   it("non integer column returns false for rowid", async () => {
     await adapter.execute(`CREATE TABLE "ex" (id_int_short int PRIMARY KEY)`);
-    expect(indexBy(await adapter.columns("ex"), (c) => c.name)["id_int_short"].rowid).toBeFalsy();
+    expect(
+      indexBy((await adapter.columns("ex")) as SQLite3Column[], (c: SQLite3Column) => c.name)[
+        "id_int_short"
+      ].rowid,
+    ).toBeFalsy();
   });
 
   it("mixed case integer colum returns true for rowid", async () => {
     await adapter.execute(`CREATE TABLE "ex" (id_mixed_case InTeGeR PRIMARY KEY)`);
-    expect(indexBy(await adapter.columns("ex"), (c) => c.name)["id_mixed_case"].rowid).toBeTruthy();
+    expect(
+      indexBy((await adapter.columns("ex")) as SQLite3Column[], (c: SQLite3Column) => c.name)[
+        "id_mixed_case"
+      ].rowid,
+    ).toBeTruthy();
   });
 
   it("rowid column with autoincrement returns true for rowid", async () => {
     await adapter.execute(`CREATE TABLE "ex" (id_autoincrement integer PRIMARY KEY AUTOINCREMENT)`);
     expect(
-      indexBy(await adapter.columns("ex"), (c) => c.name)["id_autoincrement"].rowid,
+      indexBy((await adapter.columns("ex")) as SQLite3Column[], (c: SQLite3Column) => c.name)[
+        "id_autoincrement"
+      ].rowid,
     ).toBeTruthy();
   });
 
@@ -927,7 +946,9 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     await adapter.execute(
       `CREATE TABLE "cpk_table" (id integer, shop_id integer, PRIMARY KEY (shop_id, id))`,
     );
-    expect((await adapter.columns("cpk_table")).some((c) => c.rowid)).toBeFalsy();
+    expect(
+      ((await adapter.columns("cpk_table")) as SQLite3Column[]).some((c) => c.rowid),
+    ).toBeFalsy();
   });
 
   it("tables logs name", async () => {
