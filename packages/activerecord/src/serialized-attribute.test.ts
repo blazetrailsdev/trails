@@ -143,9 +143,8 @@ describe("SerializedAttributeTest", () => {
     const t = new JsonTopic({ content: myPost } as any);
     await t.save();
     const reloaded = await JsonTopic.find(t.id as number);
-    expect(typeof (reloaded as any).content).toBe("object");
-    expect((reloaded as any).content).not.toBeNull();
-    expect(String((reloaded as any).content.id)).toBe(String(myPost.id));
+    expect((reloaded as any).content).toBeInstanceOf(Object);
+    expect((reloaded as any).content.id).toEqual(myPost.id);
     expect((reloaded as any).content.title).toEqual(myPost.title);
   });
 
@@ -236,9 +235,8 @@ describe("SerializedAttributeTest", () => {
         this.serialize("content", { coder: JSON });
       }
     }
-    await JsonTopic.create({ content: null as any });
-    const count = await JsonTopic.where({ content: null }).count();
-    expect(Number(count)).toBeGreaterThanOrEqual(1);
+    expect(await new JsonTopic({ content: null } as any).save()).toBeTruthy();
+    expect(await JsonTopic.where({ content: null }).count()).toEqual(1);
   });
 
   it("nil not serialized with class constraint", async () => {
@@ -247,9 +245,8 @@ describe("SerializedAttributeTest", () => {
         this.serialize("content", { type: HashObject });
       }
     }
-    await HashTopic.create({ content: null as any });
-    const count = await HashTopic.where({ content: null }).count();
-    expect(Number(count)).toBeGreaterThanOrEqual(1);
+    expect(await new HashTopic({ content: null } as any).save()).toBeTruthy();
+    expect(await HashTopic.where({ content: null }).count()).toEqual(1);
   });
 
   it.skip("serialized attribute should raise exception on assignment with wrong type", () => {
@@ -263,6 +260,7 @@ describe("SerializedAttributeTest", () => {
       }
     }
     const topic = await FlexTopic.create({ content: { zomg: true } as any });
+    expect(await topic.save()).toBeTruthy();
     FlexTopic.serialize("content", { type: Array });
     const found = await FlexTopic.find(topic.id as number);
     expect(() => (found as any).content).toThrow(SerializationTypeMismatch);
@@ -275,7 +273,8 @@ describe("SerializedAttributeTest", () => {
       }
     }
     const settings = { color: "blue" };
-    const topic = await HashTopic.create({ content: settings as any });
+    const topic = new HashTopic({ content: settings } as any);
+    expect(await topic.save()).toBeTruthy();
     const found = await HashTopic.find(topic.id as number);
     expect((found as any).content).toEqual(settings);
   });
@@ -323,13 +322,12 @@ describe("SerializedAttributeTest", () => {
       }
     }
     const topic = new HashTopic();
-    expect(typeof (topic as any).content).toBe("object");
-    expect(Array.isArray((topic as any).content)).toBe(false);
-    expect((topic as any).readAttribute("content")).not.toBeNull();
+    expect((topic as any).content.constructor).toEqual(Object);
+    expect((topic as any).readAttribute("content").constructor).toEqual(Object);
     (topic as any).content["beer"] = "MadridRb";
-    await topic.save();
+    expect(await topic.save()).toBeTruthy();
     const reloaded = await topic.reload();
-    expect(typeof (reloaded as any).content).toBe("object");
+    expect((reloaded as any).content.constructor).toEqual(Object);
     expect((reloaded as any).content["beer"]).toBe("MadridRb");
   });
 
@@ -344,8 +342,10 @@ describe("SerializedAttributeTest", () => {
         this.serialize("content", { coder: JSON });
       }
     }
-    const topic = await (await JsonTopic.create({ content: true as any })).reload();
-    expect((topic as any).content).toBe(true);
+    let topic: any = new JsonTopic({ content: true } as any);
+    expect(await topic.save()).toBeTruthy();
+    topic = await topic.reload();
+    expect(topic.content).toBe(true);
   });
 
   it("serialized boolean value false", async () => {
@@ -354,8 +354,10 @@ describe("SerializedAttributeTest", () => {
         this.serialize("content", { coder: JSON });
       }
     }
-    const topic = await (await JsonTopic.create({ content: false as any })).reload();
-    expect((topic as any).content).toBe(false);
+    let topic: any = new JsonTopic({ content: false } as any);
+    expect(await topic.save()).toBeTruthy();
+    topic = await topic.reload();
+    expect(topic.content).toBe(false);
   });
 
   it("serialize with coder", async () => {
@@ -377,6 +379,7 @@ describe("SerializedAttributeTest", () => {
     const topic = new CoderTopic({ content: { foo: "my value" } } as any);
     await topic.save();
     const reloaded = await CoderTopic.find(topic.id as number);
+    expect((reloaded as any).content).toBeInstanceOf(Object);
     expect((reloaded as any).content).toEqual({ foo: "my value" });
   });
 
@@ -387,8 +390,8 @@ describe("SerializedAttributeTest", () => {
   it("serialize attribute can be serialized in an integer column", async () => {
     const insures = ["life"];
     const person = new SerializedPerson({ first_name: "David", insures: insures as any });
-    await person.save();
-    const reloaded = await SerializedPerson.find(person.id as number);
+    expect(await person.save()).toBeTruthy();
+    const reloaded = await person.reload();
     expect((reloaded as any).insures).toEqual(insures);
   });
 
@@ -407,16 +410,17 @@ describe("SerializedAttributeTest", () => {
     const topic = await FlexTopic.create({ content: { zomg: true } as any });
     FlexTopic.serialize("content", { type: Array });
     const reloaded = await FlexTopic.find(topic.id as number);
-    const error = (() => {
+    let error: any;
+    expect(() => {
       try {
         return (reloaded as any).content;
       } catch (e) {
-        return e;
+        error = e;
+        throw e;
       }
-    })();
-    expect(error).toBeInstanceOf(SerializationTypeMismatch);
+    }).toThrow(SerializationTypeMismatch);
     const expected = `can't load \`content\`: was supposed to be a Array, but was a Object. -- ${{ zomg: true }}`;
-    expect((error as Error).message).toBe(expected);
+    expect(error.message).toEqual(expected);
   });
 
   it("serialized column should unserialize after update column", async () => {
@@ -454,7 +458,7 @@ describe("SerializedAttributeTest", () => {
       }
     }
     const topic = new ArrayTopic({ content: null } as any);
-    expect(topic.attributeChanged("content")).toBe(false);
+    expect(topic.attributeChanged("content")).toBeFalsy();
   });
 
   it.skip("classes without no arg constructors are not supported", () => {
@@ -491,10 +495,11 @@ describe("SerializedAttributeTest", () => {
     }
     const topic = await HashTopic.create({ content: {} as any });
     const topic2 = await HashTopic.create({ content: null as any });
-    const found = await HashTopic.where({ content: null }).order("id");
-    const ids = found.map((t: any) => t.id as number);
-    expect(ids).toContain(topic.id);
-    expect(ids).toContain(topic2.id);
+    const found = await HashTopic.where({ content: null });
+    expect(found.sort((a: any, b: any) => a.id - b.id).map((t: any) => t.id)).toEqual([
+      topic.id,
+      topic2.id,
+    ]);
   });
 
   it("serialized attribute can be defined in abstract classes", async () => {
@@ -511,9 +516,8 @@ describe("SerializedAttributeTest", () => {
       }
     }
     const topic = await Subclass.create({ content: { foo: 1 } as any });
-    const byId = await Subclass.where({ id: topic.id });
-    expect(byId.length).toBe(1);
-    expect((byId[0] as any).content).toEqual({ foo: 1 });
+    const found = await Subclass.where({ content: { foo: 1 } });
+    expect(found.map((t: any) => t.id)).toEqual([topic.id]);
   });
 
   it("nil is always persisted as null", async () => {
@@ -525,7 +529,7 @@ describe("SerializedAttributeTest", () => {
     const topic = await HashTopic.create({ content: { foo: "bar" } as any });
     await topic.updateAttribute("content", null);
     const found = await HashTopic.where({ content: null });
-    expect(found.map((t: any) => t.id as number)).toContain(topic.id);
+    expect(found.map((t: any) => t.id)).toEqual([topic.id]);
   });
 
   it.skip("decorated type with type for attribute", () => {
@@ -572,7 +576,7 @@ describe("SerializedAttributeTest", () => {
     }
     const topic = await CoderTopic.create({ content: "bar" as any });
     void (topic as any).content;
-    expect(topic.isChanged).toBe(false);
+    expect(topic.isChanged).toBeFalsy();
   });
 
   it.skip("serialized attribute works under concurrent initial access", () => {
@@ -617,7 +621,7 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
     const topic = await HashTopic.create({ content: { foo: "bar" } as any });
     await topic.updateAttribute("content", null);
     const found = await HashTopic.where({ content: null });
-    expect(found.map((t: any) => t.id as number)).toContain(topic.id);
+    expect(found.map((t: any) => t.id)).toEqual([topic.id]);
   });
 
   it("serialized attribute with default", () => {
@@ -670,16 +674,17 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
     const topic = await FlexTopic.create({ content: { zomg: true } as any });
     FlexTopic.serialize("content", { type: Array });
     const reloaded = await FlexTopic.find(topic.id as number);
-    const error = (() => {
+    let error: any;
+    expect(() => {
       try {
         return (reloaded as any).content;
       } catch (e) {
-        return e;
+        error = e;
+        throw e;
       }
-    })();
-    expect(error).toBeInstanceOf(SerializationTypeMismatch);
+    }).toThrow(SerializationTypeMismatch);
     const expected = `can't load \`content\`: was supposed to be a Array, but was a Object. -- ${{ zomg: true }}`;
-    expect((error as Error).message).toBe(expected);
+    expect(error.message).toEqual(expected);
   });
 
   it("serialize attribute via select method when time zone available", async () => {
@@ -702,7 +707,8 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
         this.serialize("content", { type: HashObject });
       }
     }
-    const topic = await FlexTopic.create({ content: { somevalue: "thevalue" } as any });
+    const topic = new FlexTopic({ content: { somevalue: "thevalue" } } as any);
+    expect(await topic.save()).toBeTruthy();
     FlexTopic.serialize("content", { type: Array });
     const found = await FlexTopic.find(topic.id as number);
     expect(() => (found as any).content).toThrow(SerializationTypeMismatch);
