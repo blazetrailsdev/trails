@@ -277,6 +277,11 @@ export class Fanout {
     );
   }
 
+  inspect(): string {
+    const totalPatterns = this.stringSubscribers.size + this.otherSubscribers.length;
+    return `#<ActiveSupport::Notifications::Fanout (${totalPatterns} patterns)>`;
+  }
+
   subscribe(
     pattern: string | RegExp | null,
     callable: EventedListener | TimedCallback | EventObjectCallback | CallableListener,

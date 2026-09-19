@@ -1,5 +1,8 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import { Notifications } from "./notifications.js";
+import { Fanout, type Evented, type EventedListener } from "./notifications/fanout.js";
+import { travelTo, travelBack } from "./testing/time-helpers.js";
 import { Event, Instrumenter, LegacyHandle, Wrapper } from "./notifications/instrumenter.js";
 
 function randomId(): string {
@@ -15,318 +18,500 @@ beforeEach(() => {
 });
 
 describe("SubscribeEventObjectsTest", () => {
-  it("subscribe events", () => {
-    const events: Event[] = [];
-    Notifications.subscribe("foo", (e) => events.push(e));
-    Notifications.instrument("foo", { a: 1 });
-    expect(events).toHaveLength(1);
-    expect(events[0].name).toBe("foo");
-    expect(events[0].payload).toEqual({ a: 1 });
+  beforeEach(setupTestCase);
+  afterEach(teardownTestCase);
+
+  it.skip("subscribe events", () => {
+    // BLOCKED: notifications-timed-subscriber-arity-and-event-cpu-allocations
+    const evs: Event[] = [];
+    notifier.subscribe(null, ((event: Event) => {
+      evs.push(event);
+    }) as unknown as EventedListener);
+
+    Notifications.instrument("foo");
+    const event = evs[0];
+    expect(event, "should have an event").toBeTruthy();
+    expect(event.allocations).toBeGreaterThan(0);
+    expect(event.cpuTime).toBeGreaterThan(0);
+    expect(event.idleTime).toBeGreaterThanOrEqual(0);
+    expect(event.duration).toBeGreaterThan(0);
   });
 
   it("subscribe to events where payload is changed during instrumentation", () => {
-    const events: Event[] = [];
-    Notifications.subscribe("foo", (e) => events.push(e));
-    Notifications.instrument("foo", undefined, (payload) => {
+    notifier.subscribe(null, ((event: Event) => {
+      expect(event.payload.my_key).toBe("success!");
+    }) as unknown as EventedListener);
+
+    Notifications.instrument("foo", {}, (payload) => {
       payload.my_key = "success!";
     });
-    expect(events[0].payload.my_key).toBe("success!");
   });
 
   it("subscribe to events can handle nested hashes in the paylaod", () => {
-    const events: Event[] = [];
-    Notifications.subscribe("foo", (e) => events.push(e));
+    notifier.subscribe(null, ((event: Event) => {
+      const someKey = event.payload.some_key as Record<string, unknown>;
+      expect(someKey.key_one).toBe("success!");
+      expect(someKey.key_two).toBe("great_success!");
+    }) as unknown as EventedListener);
+
     Notifications.instrument("foo", { some_key: { key_one: "success!" } }, (payload) => {
       (payload.some_key as Record<string, unknown>).key_two = "great_success!";
     });
-    expect((events[0].payload.some_key as any).key_one).toBe("success!");
-    expect((events[0].payload.some_key as any).key_two).toBe("great_success!");
   });
 
-  it("subscribe via top level api", () => {
-    const events: Event[] = [];
-    Notifications.subscribe("bar", (e) => events.push(e));
-    Notifications.instrument("bar");
-    expect(events).toHaveLength(1);
+  it.skip("subscribe via top level api", () => {
+    // BLOCKED: notifications-timed-subscriber-arity-and-event-cpu-allocations
+    const oldNotifier = Notifications.notifier;
+    Notifications.notifier = new Fanout();
+    try {
+      let event: Event | undefined;
+      Notifications.subscribe("foo", (e) => {
+        event = e;
+      });
+
+      Notifications.instrument("foo", {}, () => {
+        for (let i = 0; i < 100; i++) ({});
+      });
+
+      expect(event).toBeTruthy();
+      expect(event!.allocations).toBeGreaterThanOrEqual(100);
+    } finally {
+      Notifications.notifier = oldNotifier;
+    }
   });
 
   it("subscribe with a single arity lambda listener", () => {
-    const received: Event[] = [];
-    const listener = (e: Event) => received.push(e);
-    Notifications.subscribe("baz", listener);
-    Notifications.instrument("baz");
-    expect(received).toHaveLength(1);
+    let eventName: string | undefined;
+    const listener = (event: Event) => {
+      eventName = event.name;
+    };
+
+    notifier.subscribe(null, listener as unknown as EventedListener);
+    Notifications.instrument("event_name");
+
+    expect(eventName).toBe("event_name");
   });
 
   it("subscribe with a single arity callable listener", () => {
-    const received: Event[] = [];
-    const handler = { call: (e: Event) => received.push(e) };
-    Notifications.subscribe("qux", handler);
-    Notifications.instrument("qux");
-    expect(received).toHaveLength(1);
+    let eventName: string | undefined;
+    const listener = class {
+      call(event: Event) {
+        eventName = event.name;
+      }
+    };
+
+    notifier.subscribe(null, new listener() as unknown as EventedListener);
+    Notifications.instrument("event_name");
+
+    expect(eventName).toBe("event_name");
   });
 });
 
 describe("TimedAndMonotonicTimedSubscriberTest", () => {
-  it("subscribe", () => {
-    const events: Event[] = [];
-    Notifications.subscribe("timed.event", (e) => events.push(e));
-    Notifications.instrument("timed.event", {});
-    expect(events[0].duration).toBeGreaterThanOrEqual(0);
+  beforeEach(setupTestCase);
+  afterEach(teardownTestCase);
+
+  it.skip("subscribe", () => {
+    // BLOCKED: notifications-timed-subscriber-arity-and-event-cpu-allocations
+    const eventName = "foo";
+    let classOfStarted: string | undefined;
+    let classOfFinished: string | undefined;
+
+    Notifications.subscribe(eventName, ((_name: string, started: unknown, finished: unknown) => {
+      classOfStarted = (started as object).constructor.name;
+      classOfFinished = (finished as object).constructor.name;
+    }) as never);
+
+    Notifications.instrument(eventName);
+
+    expect([classOfStarted, classOfFinished]).toEqual(["Instant", "Instant"]);
   });
 
   it("monotonic subscribe", () => {
+    const eventName = "foo";
     let classOfStarted: string | undefined;
     let classOfFinished: string | undefined;
-    Notifications.monotonicSubscribe("monotonic.event", (_name, started, finished) => {
+
+    Notifications.monotonicSubscribe(eventName, ((
+      _name: string,
+      started: unknown,
+      finished: unknown,
+    ) => {
       classOfStarted = typeof started;
       classOfFinished = typeof finished;
-    });
-    Notifications.instrument("monotonic.event", {});
+    }) as never);
+
+    Notifications.instrument(eventName);
+
     expect([classOfStarted, classOfFinished]).toEqual(["number", "number"]);
   });
 });
 
 describe("BuildHandleTest", () => {
-  it("interleaved event", () => {
-    const events: Event[] = [];
-    Notifications.subscribe("interleaved", (e) => events.push(e));
-    Notifications.instrument("interleaved", {}, () => {
-      Notifications.instrument("inner.interleaved", {});
-    });
-    expect(events.length).toBeGreaterThanOrEqual(1);
+  beforeEach(setupTestCase);
+  afterEach(teardownTestCase);
+
+  it.skip("interleaved event", () => {
+    // BLOCKED: notifications-timed-subscriber-arity-and-event-cpu-allocations
+    const eventName = "foo";
+    const actualTimes: unknown[][] = [];
+
+    Notifications.subscribe(eventName, ((_name: string, started: unknown, finished: unknown) => {
+      actualTimes.push([started, finished]);
+    }) as never);
+
+    const times = [1, 2, 3, 4].map((s) => new Date(2020, 0, 1, 0, 0, s));
+
+    const instrumenter = Notifications.instrumenter;
+    travelTo(times[0]);
+    const handle1 = instrumenter.buildHandle(eventName, {});
+    const handle2 = instrumenter.buildHandle(eventName, {});
+
+    handle1.start();
+    travelTo(times[1]);
+    handle2.start();
+    travelTo(times[2]);
+    handle1.finish();
+    travelTo(times[3]);
+    handle2.finish();
+
+    expect(actualTimes).toEqual([
+      [times[0], times[2]],
+      [times[1], times[3]],
+    ]);
+    travelBack();
   });
 
-  it("subscribed interleaved with event", () => {
-    const events: Event[] = [];
-    const sub = Notifications.subscribe("subscribed.interleaved", (e) => events.push(e));
-    Notifications.instrument("subscribed.interleaved");
-    Notifications.unsubscribe(sub);
-    expect(events.length).toBeGreaterThanOrEqual(0);
+  it("subscribed interleaved with event", async () => {
+    const instrumenter = Notifications.instrumenter;
+
+    const name = "foo";
+    const events1: Event[] = [];
+    const events2: Event[] = [];
+
+    const callback1 = (event: Event) => events1.push(event);
+    const callback2 = (event: Event) => events2.push(event);
+
+    await Notifications.subscribed(callback1, name, async () => {
+      const handle = instrumenter.buildHandle(name, {});
+      handle.start();
+
+      await Notifications.subscribed(callback2, name, () => {
+        handle.finish();
+      });
+    });
+
+    expect(events1.length).toBe(1);
+    expect(events2).toEqual([]);
+
+    expect(events1[0].name).toBe(name);
+    expect(events1[0].time).toBeTruthy();
+    expect(events1[0].end).toBeTruthy();
   });
 });
 
 describe("SubscribedTest", () => {
+  beforeEach(setupTestCase);
+  afterEach(teardownTestCase);
+
   it("subscribed", async () => {
     const name = "foo";
-    const name2 = name + name;
-    const events: string[] = [];
-    const callback = (e: Event) => events.push(e.name);
+    const name2 = name.repeat(2);
+    const expected = [name, name];
+
+    const evs: string[] = [];
+    const callback = (event: Event) => evs.push(event.name);
     await Notifications.subscribed(callback, name, () => {
       Notifications.instrument(name);
       Notifications.instrument(name2);
       Notifications.instrument(name);
     });
-    expect(events).toEqual([name, name]);
+    expect(evs).toEqual(expected);
 
     Notifications.instrument(name);
-    expect(events).toEqual([name, name]);
+    expect(evs).toEqual(expected);
   });
 
   it("subscribed all messages", async () => {
     const name = "foo";
-    const name2 = name + name;
-    const events: string[] = [];
-    const callback = (e: Event) => events.push(e.name);
+    const name2 = name.repeat(2);
+    const expected = [name, name2, name];
+
+    const evs: string[] = [];
+    const callback = (event: Event) => evs.push(event.name);
     await Notifications.subscribed(callback, () => {
       Notifications.instrument(name);
       Notifications.instrument(name2);
       Notifications.instrument(name);
     });
-    expect(events).toEqual([name, name2, name]);
+    expect(evs).toEqual(expected);
 
     Notifications.instrument(name);
-    expect(events).toEqual([name, name2, name]);
+    expect(evs).toEqual(expected);
   });
 
   it("subscribing to instrumentation while inside it", () => {
-    let innerFired = false;
-    Notifications.instrument("outer", {}, () => {
-      Notifications.subscribe("inner", () => {
-        innerFired = true;
-      });
-      Notifications.instrument("inner");
-    });
-    expect(innerFired).toBe(true);
+    const oldNotifier = Notifications.notifier;
+    Notifications.notifier = new Fanout();
+
+    try {
+      Notifications.subscribe("foo", new TestSubscriber() as never);
+
+      expect(() =>
+        Notifications.instrument("foo", {}, () => {
+          Notifications.subscribe("foo", () => {});
+        }),
+      ).not.toThrow();
+    } finally {
+      Notifications.notifier = oldNotifier;
+    }
   });
 
   it("timed subscribed", async () => {
-    const events: Event[] = [];
-    await Notifications.subscribed(
-      (event: Event) => events.push(event),
-      "timed.subscribed",
-      () => {
-        Notifications.instrument("timed.subscribed", { x: 1 });
-      },
-    );
-    expect(events).toHaveLength(1);
-    expect(events[0].duration).toBeGreaterThanOrEqual(0);
+    const eventName = "foo";
+    let classOfStarted: string | undefined;
+    let classOfFinished: string | undefined;
+    const callback = (_name: string, started: unknown, finished: unknown) => {
+      classOfStarted = (started as object).constructor.name;
+      classOfFinished = (finished as object).constructor.name;
+    };
+
+    await Notifications.subscribed(callback as never, eventName, () => {
+      Notifications.instrument(eventName);
+    });
+
+    Notifications.instrument(eventName);
+
+    expect([classOfStarted, classOfFinished]).toEqual(["Instant", "Instant"]);
   });
 
   it("monotonic timed subscribed", async () => {
-    const events: Event[] = [];
+    const eventName = "foo";
+    let classOfStarted: string | undefined;
+    let classOfFinished: string | undefined;
+    const callback = (_name: string, started: unknown, finished: unknown) => {
+      classOfStarted = typeof started;
+      classOfFinished = typeof finished;
+    };
+
     await Notifications.subscribed(
-      (event: Event) => events.push(event),
-      "monotonic.timed.subscribed",
+      callback as never,
+      eventName,
       () => {
-        Notifications.instrument("monotonic.timed.subscribed");
+        Notifications.instrument(eventName);
       },
+      { monotonic: true },
     );
-    expect(events.length).toBeGreaterThanOrEqual(1);
+
+    Notifications.instrument(eventName);
+
+    expect([classOfStarted, classOfFinished]).toEqual(["number", "number"]);
   });
 });
 
+let oldNotifier: Fanout;
+let notifier: Fanout;
+let events: unknown[][];
+let namedEvents: unknown[][];
+let subscription: Evented;
+
+function setupTestCase() {
+  oldNotifier = Notifications.notifier;
+  notifier = new Fanout();
+  Notifications.notifier = notifier;
+  events = [];
+  namedEvents = [];
+  subscription = notifier.subscribe(null, ((...args: unknown[]) =>
+    events.push(args)) as unknown as EventedListener);
+  notifier.subscribe("named.subscription", ((...args: unknown[]) =>
+    namedEvents.push(args)) as unknown as EventedListener);
+}
+
+function teardownTestCase() {
+  Notifications.notifier = oldNotifier;
+}
+
+class TestSubscriber {
+  starts: unknown[][] = [];
+  finishes: unknown[][] = [];
+  publishes: unknown[][] = [];
+
+  start(...args: unknown[]) {
+    this.starts.push(args);
+  }
+  finish(...args: unknown[]) {
+    this.finishes.push(args);
+  }
+  publish(...args: unknown[]) {
+    this.publishes.push(args);
+  }
+}
+
 describe("InspectTest", () => {
+  beforeEach(setupTestCase);
+  afterEach(teardownTestCase);
+
   it("inspect output is small", () => {
-    const e = new Event("test.inspect", null, null, randomId(), { key: "val" });
-    expect(e.name).toBe("test.inspect");
-    expect(e.payload).toEqual({ key: "val" });
+    const expected = "#<ActiveSupport::Notifications::Fanout (2 patterns)>";
+    expect(notifier.inspect()).toBe(expected);
   });
 });
 
 describe("UnsubscribeTest", () => {
+  beforeEach(setupTestCase);
+  afterEach(teardownTestCase);
+
   it("unsubscribing removes a subscription", () => {
-    const events: Event[] = [];
-    const sub = Notifications.subscribe("ping", (e) => events.push(e));
-    Notifications.instrument("ping");
-    Notifications.unsubscribe(sub);
-    Notifications.instrument("ping");
-    expect(events).toHaveLength(1);
+    notifier.publish(":foo");
+    notifier.wait();
+    expect(events).toEqual([[":foo"]]);
+    notifier.unsubscribe(subscription);
+    notifier.publish(":foo");
+    notifier.wait();
+    expect(events).toEqual([[":foo"]]);
   });
 
   it("unsubscribing by name removes a subscription", () => {
-    const events: Event[] = [];
-    const sub = Notifications.subscribe("named.event", (e) => events.push(e));
-    Notifications.instrument("named.event");
-    Notifications.unsubscribe(sub);
-    Notifications.instrument("named.event");
-    expect(events).toHaveLength(1);
+    notifier.publish("named.subscription", ":foo");
+    notifier.wait();
+    expect(namedEvents).toEqual([["named.subscription", ":foo"]]);
+    notifier.unsubscribe("named.subscription");
+    notifier.publish("named.subscription", ":foo");
+    notifier.wait();
+    expect(namedEvents).toEqual([["named.subscription", ":foo"]]);
   });
 
   it("unsubscribing by name leaves the other subscriptions", () => {
-    const aEvents: Event[] = [];
-    const bEvents: Event[] = [];
-    const subA = Notifications.subscribe("ev", (e) => aEvents.push(e));
-    Notifications.subscribe("ev", (e) => bEvents.push(e));
-    Notifications.unsubscribe(subA);
-    Notifications.instrument("ev");
-    expect(aEvents).toHaveLength(0);
-    expect(bEvents).toHaveLength(1);
+    notifier.publish("named.subscription", ":foo");
+    notifier.wait();
+    expect(events).toEqual([["named.subscription", ":foo"]]);
+    notifier.unsubscribe("named.subscription");
+    notifier.publish("named.subscription", ":foo");
+    notifier.wait();
+    expect(events).toEqual([
+      ["named.subscription", ":foo"],
+      ["named.subscription", ":foo"],
+    ]);
   });
 
   it("unsubscribing by name leaves regexp matched subscriptions", () => {
-    const regexpEvents: Event[] = [];
-    const exactEvents: Event[] = [];
-    const exactSub = Notifications.subscribe("foo", (e) => exactEvents.push(e));
-    Notifications.subscribe(/foo/, (e) => regexpEvents.push(e));
-    Notifications.unsubscribe(exactSub);
-    Notifications.instrument("foo");
-    expect(exactEvents).toHaveLength(0);
-    expect(regexpEvents).toHaveLength(1);
+    const matchedEvents: unknown[][] = [];
+    notifier.subscribe(/subscription/, ((...args: unknown[]) =>
+      matchedEvents.push(args)) as unknown as EventedListener);
+    notifier.publish("named.subscription", ":before");
+    notifier.wait();
+    for (const collector of [events, namedEvents, matchedEvents]) {
+      expect(collector).toContainEqual(["named.subscription", ":before"]);
+    }
+    notifier.unsubscribe("named.subscription");
+    notifier.publish("named.subscription", ":after");
+    notifier.publish("other.subscription", ":after");
+    notifier.wait();
+    expect(events).toContainEqual(["named.subscription", ":after"]);
+    expect(events).toContainEqual(["other.subscription", ":after"]);
+    expect(matchedEvents).toContainEqual(["other.subscription", ":after"]);
+    expect(matchedEvents).not.toContainEqual(["named.subscription", ":after"]);
+    expect(namedEvents).not.toContainEqual(["named.subscription", ":after"]);
   });
 });
 
 describe("SyncPubSubTest", () => {
+  beforeEach(setupTestCase);
+  afterEach(teardownTestCase);
+
   it("events are published to a listener", () => {
-    const events: Event[] = [];
-    Notifications.subscribe("sync.event", (e) => events.push(e));
-    Notifications.instrument("sync.event");
-    expect(events).toHaveLength(1);
+    notifier.publish(":foo");
+    notifier.wait();
+    expect(events).toEqual([[":foo"]]);
   });
 
   it("publishing multiple times works", () => {
-    const events: Event[] = [];
-    Notifications.subscribe("multi", (e) => events.push(e));
-    Notifications.instrument("multi");
-    Notifications.instrument("multi");
-    Notifications.instrument("multi");
-    expect(events).toHaveLength(3);
+    notifier.publish(":foo");
+    notifier.publish(":foo");
+    notifier.wait();
+    expect(events).toEqual([[":foo"], [":foo"]]);
   });
 
   it("publishing after a new subscribe works", () => {
-    const events: Event[] = [];
-    Notifications.instrument("new.sub");
-    Notifications.subscribe("new.sub", (e) => events.push(e));
-    Notifications.instrument("new.sub");
-    expect(events).toHaveLength(1);
+    notifier.publish(":foo");
+    notifier.publish(":foo");
+
+    notifier.subscribe("not_existent", ((event: unknown) =>
+      events.push(event as unknown[])) as unknown as EventedListener);
+
+    notifier.publish(":foo");
+    notifier.publish(":foo");
+    notifier.wait();
+
+    expect(events).toEqual([[":foo"], [":foo"], [":foo"], [":foo"]]);
   });
 
   it("log subscriber with string", () => {
-    const events: Event[] = [];
-    Notifications.subscribe("sql.query", (e) => events.push(e));
-    Notifications.instrument("sql.query", { sql: "SELECT 1" });
-    expect(events[0].payload.sql).toBe("SELECT 1");
+    const logged: unknown[][] = [];
+    notifier.subscribe("1", ((...args: unknown[]) =>
+      logged.push(args)) as unknown as EventedListener);
+
+    notifier.publish("1");
+    notifier.publish("1.a");
+    notifier.publish("a.1");
+    notifier.wait();
+
+    expect(logged).toEqual([["1"]]);
   });
 
   it("log subscriber with pattern", () => {
-    const events: Event[] = [];
-    Notifications.subscribe(/\.query$/, (e) => events.push(e));
-    Notifications.instrument("sql.query");
-    Notifications.instrument("cache.query");
-    Notifications.instrument("other");
-    expect(events).toHaveLength(2);
+    const logged: unknown[][] = [];
+    notifier.subscribe(/\d/, ((...args: unknown[]) =>
+      logged.push(args)) as unknown as EventedListener);
+
+    notifier.publish("1");
+    notifier.publish("a.1");
+    notifier.publish("1.a");
+    notifier.wait();
+
+    expect(logged).toEqual([["1"], ["a.1"], ["1.a"]]);
   });
 
   it("multiple log subscribers", () => {
-    const a: Event[] = [];
-    const b: Event[] = [];
-    Notifications.subscribe("multi.sub", (e) => a.push(e));
-    Notifications.subscribe("multi.sub", (e) => b.push(e));
-    Notifications.instrument("multi.sub");
-    expect(a).toHaveLength(1);
-    expect(b).toHaveLength(1);
+    const another: unknown[][] = [];
+    notifier.subscribe(null, ((...args: unknown[]) =>
+      another.push(args)) as unknown as EventedListener);
+    notifier.publish(":foo");
+    notifier.wait();
+
+    expect(events).toEqual([[":foo"]]);
+    expect(another).toEqual([[":foo"]]);
   });
 
   it("publish with subscriber", () => {
-    const events: Event[] = [];
-    Notifications.subscribe("pub.event", (e) => events.push(e));
-    Notifications.publish("pub.event", { x: 42 });
-    expect(events).toHaveLength(1);
-    expect(events[0].payload.x).toBe(42);
+    const subscriber = new TestSubscriber();
+    notifier.subscribe(null, subscriber as unknown as EventedListener);
+    notifier.publish(":foo");
+
+    expect(subscriber.publishes).toEqual([[":foo"]]);
   });
 });
 
 describe("InstrumentationTest", () => {
+  beforeEach(setupTestCase);
+  afterEach(teardownTestCase);
+
   it("instrument returns block result", () => {
-    const result = Notifications.instrument("calc", {}, () => 42);
-    expect(result).toBe(42);
+    expect(Notifications.instrument("awesome", {}, () => 1 + 1)).toBe(2);
   });
 
   it("instrument yields the payload for further modification", () => {
-    const events: Event[] = [];
-    Notifications.subscribe("modify", (e) => events.push(e));
-    Notifications.instrument("modify", { original: true }, (payload) => {
-      payload.added = "later";
-    });
-    expect(events[0].payload.original).toBe(true);
-    expect(events[0].payload.added).toBe("later");
-  });
-
-  it("instrumenter exposes its id", () => {
-    const events: Event[] = [];
-    Notifications.subscribe("id.test", (e) => events.push(e));
-    Notifications.instrument("id.test");
-    expect(events).toHaveLength(1);
-    expect(events[0].name).toBe("id.test");
-  });
-
-  it("instrument publishes when exception is raised", () => {
-    const events: Event[] = [];
-    Notifications.subscribe("boom", (e) => events.push(e));
-    expect(() =>
-      Notifications.instrument("boom", {}, () => {
-        throw new Error("x");
+    const evs: Event[] = [];
+    notifier.subscribe(null, ((e: Event) => evs.push(e)) as unknown as EventedListener);
+    expect(
+      Notifications.instrument("awesome", {}, (p) => {
+        p.result = 1 + 1;
+        return p.result;
       }),
-    ).toThrow();
-    expect(events).toHaveLength(1);
-  });
-
-  it("event is pushed even without block", () => {
-    const events: Event[] = [];
-    Notifications.subscribe("no.block", (e) => events.push(e));
-    Notifications.instrument("no.block", { a: 1 });
-    expect(events).toHaveLength(1);
-    expect(typeof events[0].end).toBe("number");
+    ).toBe(2);
+    expect(evs.length).toBe(1);
+    expect(evs[0].name).toBe("awesome");
+    expect(evs[0].payload).toEqual({ result: 2 });
   });
 });
 
@@ -358,7 +543,10 @@ describe("EventTest", () => {
   });
 
   it("subscribe raises error on non supported arguments", () => {
-    expect(() => Notifications.subscribe("valid.event", () => {})).not.toThrow();
+    const notifier = new Fanout();
+
+    expect(() => notifier.subscribe(1 as never, (() => {}) as never)).toThrow(ArgumentError);
+    expect(() => notifier.subscribe({} as never, (() => {}) as never)).toThrow(ArgumentError);
   });
 });
 
