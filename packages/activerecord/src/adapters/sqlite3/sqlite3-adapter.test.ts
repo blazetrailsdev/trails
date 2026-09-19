@@ -202,7 +202,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("nil timeout", async () => {
-    const a = new BetterSQLite3Adapter({ database: ":memory:", timeout: null });
+    const a = new BetterSQLite3Adapter({ database: ":memory:", timeout: undefined });
     await a.connectBang();
     expect(a).toBeTruthy();
     await a.disconnectBang();
