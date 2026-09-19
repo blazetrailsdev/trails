@@ -7,7 +7,7 @@ import {
   RecordNotUnique,
   RecordNotFound,
 } from "./index.js";
-import { Associations, collectionProxyFor as association } from "./associations.js";
+import { collectionProxyFor as association } from "./associations.js";
 
 import { fixtures } from "./test-fixtures.js";
 import { Person, RichPerson } from "./test-helpers/models/person.js";
@@ -27,10 +27,21 @@ import { Wheel } from "./test-helpers/models/wheel.js";
 import { Bulb, CustomBulb, FunkyBulb, FailedBulb } from "./test-helpers/models/bulb.js";
 import { Engine } from "./test-helpers/models/engine.js";
 import { Reader } from "./test-helpers/models/reader.js";
-import { travel, travelBack } from "@blazetrails/activesupport";
+import {
+  assertDifference,
+  assertEmpty,
+  assertNotDeprecated,
+  assertNotEmpty,
+  assertNothingRaised,
+  assertRaise,
+  assertRaises,
+  travel,
+  travelBack,
+} from "@blazetrails/activesupport";
 import { Time as RubyTime } from "@blazetrails/date";
 import { assertQueriesCount, assertQueriesMatch } from "./testing/query-assertions.js";
 import { adapterType } from "./test-adapter.js";
+import { deprecator } from "./deprecator.js";
 
 describe("OptimisticLockingTest", () => {
   const { people, stringKeyObjects, legacyThings, references } = fixtures([
@@ -91,9 +102,12 @@ describe("OptimisticLockingTest", () => {
     expect(s1.lock_version).toBe(1);
     expect(s2.lock_version).toBe(0);
     await expect(s2.destroy()).rejects.toThrow(StaleObjectError);
-    await s1.destroy();
-    expect(s1.isDestroyed()).toBe(true);
-    await expect(StringKeyObject.find(stringKeyObjects("first").id)).rejects.toThrow();
+    expect(await s1.destroy()).toBeTruthy();
+    expect(s1.isFrozen()).toBeTruthy();
+    expect(s1.isDestroyed()).toBeTruthy();
+    await expect(StringKeyObject.find(stringKeyObjects("first").id)).rejects.toThrow(
+      RecordNotFound,
+    );
   });
 
   it("lock existing", async () => {
@@ -129,9 +143,10 @@ describe("OptimisticLockingTest", () => {
     expect(p1.lock_version).toBe(1);
     expect(p2.lock_version).toBe(0);
     await expect(p2.destroy()).rejects.toThrow(StaleObjectError);
-    await p1.destroy();
-    expect(p1.isDestroyed()).toBe(true);
-    await expect(LockPerson.find(people("michael").id)).rejects.toThrow();
+    expect(await p1.destroy()).toBeTruthy();
+    expect(p1.isFrozen()).toBeTruthy();
+    expect(p1.isDestroyed()).toBeTruthy();
+    await expect(LockPerson.find(people("michael").id)).rejects.toThrow(RecordNotFound);
   });
 
   it("lock repeating", async () => {
@@ -176,14 +191,9 @@ describe("OptimisticLockingTest", () => {
     p1.first_name = "mira3";
     await p1.saveBang();
     p2.first_name = "sue";
-    let error: any;
-    try {
-      await p2.saveBang();
-    } catch (e) {
-      error = e;
-    }
-    expect(error).toBeDefined();
-    expect(error.name).toBe("ActiveRecord::StaleObjectError");
+    const error = (await assertRaise([StaleObjectError], {}, () =>
+      p2.saveBang(),
+    )) as StaleObjectError;
     expect(error.record).toBe(p2);
   });
 
@@ -204,7 +214,8 @@ describe("OptimisticLockingTest", () => {
     expect(p1.lock_version).toBe(0);
     await p1.touch();
     expect(p1.lock_version).toBe(1);
-    expect(p1.isChanged).toBe(false);
+    expect(p1.isChanged).toBeFalsy();
+    expect(p1.isSavedChanges()).toBeTruthy();
     expect(Object.keys(p1.savedChanges).sort()).toEqual(["lock_version", "updated_at"]);
   });
 
@@ -213,24 +224,22 @@ describe("OptimisticLockingTest", () => {
     const stalePerson = await Person.find(person.id);
     await person.updateAttribute("gender", "M");
     await expect(stalePerson.touch()).rejects.toThrow(StaleObjectError);
-    expect(Object.keys(stalePerson.savedChanges).length).toBe(0);
+    expect(stalePerson.isSavedChanges()).toBeFalsy();
   });
 
   it("update with dirty primary key", async () => {
-    await expect(
-      (async () => {
-        const person = await Person.find(1);
-        person.id = 2;
-        await person.saveBang();
-      })(),
-    ).rejects.toBeInstanceOf(RecordNotUnique);
+    await assertRaises([RecordNotUnique], {}, async () => {
+      const person = await Person.find(1);
+      person.id = 2;
+      await person.saveBang();
+    });
 
     const person = await Person.find(1);
     person.id = 42;
     await person.saveBang();
 
-    expect(await Person.find(42)).toBeDefined();
-    await expect(Person.find(1)).rejects.toBeInstanceOf(RecordNotFound);
+    expect(await Person.find(42)).toBeTruthy();
+    await assertRaises([RecordNotFound], {}, () => Person.find(1));
   });
 
   it("delete with dirty primary key", async () => {
@@ -238,8 +247,8 @@ describe("OptimisticLockingTest", () => {
     person.id = 2;
     await person.delete();
 
-    expect(await Person.find(2)).toBeDefined();
-    await expect(Person.find(1)).rejects.toBeInstanceOf(RecordNotFound);
+    expect(await Person.find(2)).toBeTruthy();
+    await assertRaises([RecordNotFound], {}, () => Person.find(1));
   });
 
   it("destroy with dirty primary key", async () => {
@@ -247,8 +256,8 @@ describe("OptimisticLockingTest", () => {
     person.id = 2;
     await person.destroy();
 
-    expect(await Person.find(2)).toBeDefined();
-    await expect(Person.find(1)).rejects.toBeInstanceOf(RecordNotFound);
+    expect(await Person.find(2)).toBeTruthy();
+    await assertRaises([RecordNotFound], {}, () => Person.find(1));
   });
 
   it("touch with dirty primary key", async () => {
@@ -268,7 +277,7 @@ describe("OptimisticLockingTest", () => {
     const person = await Person.find(people("michael").id);
     person.first_name = "Douglas Adams";
     person.lock_version = 42;
-    expect(person.attributeChanged("lock_version")).toBe(true);
+    expect(person.attributeChanged("lock_version")).toBeTruthy();
     await expect(person.save()).rejects.toThrow(StaleObjectError);
   });
 
@@ -298,22 +307,27 @@ describe("OptimisticLockingTest", () => {
   it("lock without default sets version to zero", async () => {
     const t1 = new LockWithoutDefault();
     expect(t1.lock_version).toBe(0);
+    expect(t1.readAttributeBeforeTypeCast("lock_version")).toBeNull();
+
     await t1.saveBang();
     await t1.reload();
+
     expect(t1.lock_version).toBe(0);
+    expect(t1.readAttributeBeforeTypeCast("lock_version")).toBe(0);
   });
 
   it("touch existing lock without default should work with null in the database", async () => {
     await Base.connection.execute("INSERT INTO lock_without_defaults(title) VALUES('title1')");
     const t1 = (await LockWithoutDefault.last())!;
     expect(t1.lock_version).toBe(0);
+    expect(t1.readAttributeBeforeTypeCast("lock_version")).toBeNull();
+
     await t1.touch();
+
     expect(t1.lock_version).toBe(1);
-    expect(t1.isChanged).toBe(false);
-    expect(Object.keys(t1.savedChanges).length).toBeGreaterThan(0);
-    expect(Object.keys(t1.savedChanges).sort()).toEqual(
-      expect.arrayContaining(["lock_version", "updated_at"]),
-    );
+    expect(t1.isChanged).toBeFalsy();
+    expect(t1.isSavedChanges()).toBeTruthy();
+    expect(Object.keys(t1.savedChanges).sort()).toEqual(["lock_version", "updated_at"]);
   });
 
   it("touch stale object with lock without default", async () => {
@@ -321,7 +335,7 @@ describe("OptimisticLockingTest", () => {
     const staleObject = await LockWithoutDefault.find(t1.id);
     await t1.update({ title: "title2" });
     await expect(staleObject.touch()).rejects.toThrow(StaleObjectError);
-    expect(Object.keys(staleObject.savedChanges).length).toBe(0);
+    expect(staleObject.isSavedChanges()).toBeFalsy();
   });
 
   it("lock without default should work with null in the database", async () => {
@@ -334,7 +348,7 @@ describe("OptimisticLockingTest", () => {
     expect(t2.readAttributeBeforeTypeCast("lock_version")).toBeNull();
     t1.title = "new title1";
     t2.title = "new title2";
-    await t1.saveBang();
+    await assertNothingRaised(() => t1.saveBang());
     expect(t1.lock_version).toBe(1);
     expect(t1.title).toBe("new title1");
     await expect(t2.saveBang()).rejects.toThrow(StaleObjectError);
@@ -351,7 +365,7 @@ describe("OptimisticLockingTest", () => {
     t1.lock_version = t1.lock_version;
     expect(t1.lock_version).toBe(0);
     expect(t1.readAttributeBeforeTypeCast("lock_version")).toBe(0);
-    await t1.update({ title: "new title1" });
+    await assertNothingRaised(() => t1.updateBang({ title: "new title1" }));
     expect(t1.lock_version).toBe(1);
     expect(t1.title).toBe("new title1");
   });
@@ -365,8 +379,8 @@ describe("OptimisticLockingTest", () => {
     t1.lock_version = t1.lock_version;
     expect(t1.lock_version).toBe(0);
     expect(t1.readAttributeBeforeTypeCast("lock_version")).toBe(0);
-    await t1.destroyBang();
-    expect(t1.isDestroyed()).toBe(true);
+    await assertNothingRaised(() => t1.destroyBang());
+    expect(t1.isDestroyed()).toBeTruthy();
   });
 
   it("lock without default queries count", async () => {
@@ -396,9 +410,13 @@ describe("OptimisticLockingTest", () => {
   it("lock with custom column without default sets version to zero", async () => {
     const t1 = new LockWithCustomColumnWithoutDefault();
     expect(t1.custom_lock_version).toBe(0);
+    expect(t1.readAttributeBeforeTypeCast("custom_lock_version")).toBeNull();
+
     await t1.saveBang();
     await t1.reload();
+
     expect(t1.custom_lock_version).toBe(0);
+    expect(t1.readAttributeBeforeTypeCast("custom_lock_version")).toBe(0);
   });
 
   it("lock with custom column without default should work with null in the database", async () => {
@@ -411,7 +429,7 @@ describe("OptimisticLockingTest", () => {
     expect(t2.readAttributeBeforeTypeCast("custom_lock_version")).toBeNull();
     t1.title = "new title1";
     t2.title = "new title2";
-    await t1.saveBang();
+    await assertNothingRaised(() => t1.saveBang());
     expect(t1.custom_lock_version).toBe(1);
     expect(t1.title).toBe("new title1");
     await expect(t2.saveBang()).rejects.toThrow(StaleObjectError);
@@ -461,21 +479,20 @@ describe("OptimisticLockingTest", () => {
   it("quote table name reserved word references", async () => {
     const ref = await Reference.find(references("michael_magician").id);
     ref.favorite = !ref.favorite;
-    await ref.save();
-    expect(ref.favorite).toBe(true);
-    expect(ref.lock_version).toBe(1);
+    expect(await ref.save()).toBeTruthy();
   });
 
   it("update without attributes does not only update lock version", async () => {
-    const p1 = await Person.createBang({ first_name: "anika" });
-    const lockVersion = p1.lock_version;
-    await p1.save();
-    await p1.reload();
-    expect(p1.lock_version).toBe(lockVersion);
+    await assertNothingRaised(async () => {
+      const p1 = await Person.createBang({ first_name: "anika" });
+      const lockVersion = p1.lock_version;
+      await p1.save();
+      await p1.reload();
+      expect(p1.lock_version).toBe(lockVersion);
+    });
   });
 
-  const after = (a: unknown, b: unknown): boolean =>
-    (a as RubyTime).toR().cmp((b as RubyTime).toR()) > 0;
+  const cmp = (a: unknown, b: unknown): number => (a as RubyTime).toR().cmp((b as RubyTime).toR());
 
   it("counter cache with touch and lock version", async () => {
     const car = await Car.createBang({});
@@ -495,8 +512,8 @@ describe("OptimisticLockingTest", () => {
     await car.reload();
     expect(car.wheels_count).toBe(1);
     expect(car.lock_version).toBe(1);
-    expect(after(car.updated_at, previouslyUpdatedAt)).toBe(true);
-    expect(after(car.wheels_owned_at, previouslyWheelsOwnedAt)).toBe(true);
+    expect(cmp(car.updated_at, previouslyUpdatedAt)).toBeGreaterThan(0);
+    expect(cmp(car.wheels_owned_at, previouslyWheelsOwnedAt)).toBeGreaterThan(0);
 
     previouslyUpdatedAt = car.updated_at;
     previouslyWheelsOwnedAt = car.wheels_owned_at;
@@ -510,8 +527,8 @@ describe("OptimisticLockingTest", () => {
     await car.reload();
     expect(car.wheels_count).toBe(1);
     expect(car.lock_version).toBe(2);
-    expect(after(car.updated_at, previouslyUpdatedAt)).toBe(true);
-    expect(after(car.wheels_owned_at, previouslyWheelsOwnedAt)).toBe(true);
+    expect(cmp(car.updated_at, previouslyUpdatedAt)).toBeGreaterThan(0);
+    expect(cmp(car.wheels_owned_at, previouslyWheelsOwnedAt)).toBeGreaterThan(0);
 
     previouslyUpdatedAt = car.updated_at;
     previouslyWheelsOwnedAt = car.wheels_owned_at;
@@ -525,44 +542,50 @@ describe("OptimisticLockingTest", () => {
     await car.reload();
     expect(car.wheels_count).toBe(0);
     expect(car.lock_version).toBe(3);
-    expect(after(car.updated_at, previouslyUpdatedAt)).toBe(true);
-    expect(after(car.wheels_owned_at, previouslyWheelsOwnedAt)).toBe(true);
+    expect(cmp(car.updated_at, previouslyUpdatedAt)).toBeGreaterThan(0);
+    expect(cmp(car.wheels_owned_at, previouslyWheelsOwnedAt)).toBeGreaterThan(0);
 
     await association(car, "wheels").push(await Wheel.createBang({}));
     expect(car.wheels_count).toBe(1);
     expect(car.lock_version).toBe(4);
-    expect((car as any).attributeChanged("lock_version")).toBe(false);
-    await car.update({ name: "herbie" });
+    expect((car as any).attributeChanged("lock_version")).toBeFalsy();
+    await assertNothingRaised(() => car.update({ name: "herbie" }));
   });
 
   it("polymorphic destroy with dependencies and lock version", async () => {
     const car = await Car.createBang({});
 
     const wheels = association(car, "wheels");
-    const beforeCreate = (await wheels.count()) as number;
-    await wheels.create({});
-    expect(await wheels.count()).toBe(beforeCreate + 1);
-
-    const reloaded = await car.reload();
-    const beforeDestroy = Number(await Wheel.where({ wheelable_id: reloaded.id }).count());
-    expect(beforeDestroy).toBe(1);
-    await reloaded.destroy();
-    const afterDestroy = Number(await Wheel.where({ wheelable_id: reloaded.id }).count());
-    expect(afterDestroy).toBe(beforeDestroy - 1);
-    expect(reloaded.isDestroyed()).toBe(true);
+    await assertDifference(
+      () => wheels.count() as Promise<number>,
+      1,
+      null,
+      async () => {
+        await wheels.create({});
+      },
+    );
+    await assertDifference(
+      () => wheels.count() as Promise<number>,
+      -1,
+      null,
+      async () => {
+        await (await car.reload()).destroy();
+      },
+    );
+    expect(car.isDestroyed()).toBeTruthy();
   });
   it("removing has and belongs to many associations upon destroy", async () => {
     const p = await RichPerson.createBang({ first_name: "Jon" });
     const proxy = association(p, "treasures");
     await proxy.create({});
-    expect(await proxy.isEmpty()).toBe(false);
+    assertNotEmpty(await proxy);
     await p.destroy();
-    await proxy.reload();
-    expect(await proxy.isEmpty()).toBe(true);
-    const rows = await (Base.connection as any).selectRows(
-      `SELECT * FROM peoples_treasures WHERE rich_person_id = ${p.id}`,
+    assertEmpty(await proxy);
+    assertEmpty(
+      await Base.connection.selectAll(
+        `SELECT * FROM peoples_treasures WHERE rich_person_id = ${p.id}`,
+      ),
     );
-    expect(rows.length).toBe(0);
   });
 
   it("yaml dumping with lock column", async () => {
@@ -589,15 +612,15 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
     usesTransaction: schemaChangeTests,
   });
 
-  async function addCounterColumnTo(model: typeof Base): Promise<void> {
-    await (Base.connection as any).addColumn(model.tableName, "test_count", "integer", {
+  async function addCounterColumnTo(model: typeof Base, col = "test_count"): Promise<void> {
+    await (Base.connection as any).addColumn(model.tableName, col, "integer", {
       null: false,
       default: 0,
     });
     void model.resetColumnInformation();
   }
-  async function removeCounterColumnFrom(model: typeof Base): Promise<void> {
-    await (Base.connection as any).removeColumn(model.tableName, "test_count");
+  async function removeCounterColumnFrom(model: typeof Base, col = "test_count"): Promise<void> {
+    await (Base.connection as any).removeColumn(model.tableName, col);
     void model.resetColumnInformation();
   }
 
@@ -643,39 +666,26 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
   });
 
   it("destroy dependents", async () => {
-    class LockPerson extends Base {
-      static {
-        this.attribute("id", "integer");
-        this._tableName = "people";
-        this.attribute("first_name", "string");
-        this.attribute("lock_version", "integer", { default: 0 });
-        this.attribute("created_at", "datetime");
-        this.attribute("updated_at", "datetime");
-      }
+    await addCounterColumnTo(Person, "personal_legacy_things_count");
+    void PersonalLegacyThing.resetColumnInformation();
+    await Person.loadSchema();
+    await PersonalLegacyThing.loadSchema();
+
+    try {
+      const p1 = new Person({ first_name: "fjord" });
+      await p1.saveBang();
+      const t = new PersonalLegacyThing({ person: p1 });
+      await t.saveBang();
+      await p1.reload();
+      expect(p1.personal_legacy_things_count).toBe(1);
+      expect(await p1.destroy()).toBeTruthy();
+      expect(p1.isFrozen()).toBe(true);
+      await assertRaises([RecordNotFound], {}, () => Person.find(p1.id));
+      await assertRaises([RecordNotFound], {}, () => PersonalLegacyThing.find(t.id));
+    } finally {
+      await removeCounterColumnFrom(Person, "personal_legacy_things_count");
+      void PersonalLegacyThing.resetColumnInformation();
     }
-    class LockPersonalLegacyThing extends Base {
-      static {
-        this.attribute("id", "integer");
-        this._tableName = "personal_legacy_things";
-        this.lockingColumn = "version";
-        this.attribute("person_id", "integer");
-        this.attribute("version", "integer", { default: 0 });
-      }
-    }
-    registerModel("LockPerson", LockPerson);
-    registerModel("LockPersonalLegacyThing", LockPersonalLegacyThing);
-    Associations.hasMany.call(LockPerson, "lockPersonalLegacyThings", {
-      className: "LockPersonalLegacyThing",
-      foreignKey: "person_id",
-      dependent: "destroy",
-    });
-    const p1 = await LockPerson.create({ first_name: "fjord" });
-    const t = await LockPersonalLegacyThing.create({ person_id: p1.id });
-    await p1.reload();
-    await p1.destroy();
-    expect(p1.isDestroyed()).toBe(true);
-    await expect(LockPerson.find(p1.id)).rejects.toThrow();
-    await expect(LockPersonalLegacyThing.find(t.id)).rejects.toThrow();
   });
 
   it("destroy existing object with locking column value null in the database", async () => {
@@ -684,7 +694,8 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
     expect(t1.lock_version).toBe(0);
     expect(t1.readAttributeBeforeTypeCast("lock_version")).toBeNull();
     await t1.destroy();
-    expect(t1.isDestroyed()).toBe(true);
+
+    expect(t1.isDestroyed()).toBeTruthy();
   });
 
   it("destroy stale object", async () => {
@@ -692,7 +703,7 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
     const staleObject = await LockWithoutDefault.find(t1.id);
     await t1.update({ title: "title2" });
     await expect(staleObject.destroyBang()).rejects.toThrow(StaleObjectError);
-    expect(staleObject.isDestroyed()).toBe(false);
+    expect(staleObject.isDestroyed()).toBeFalsy();
   });
 });
 
@@ -706,33 +717,41 @@ describe("PessimisticLockingTest", () => {
   });
 
   it("typical find with lock", async () => {
-    await Person.transaction(async () => {
-      const locked = await Person.all().lock().find(people("michael").id);
-      expect(locked.first_name).toBe("Michael");
+    await assertNothingRaised(async () => {
+      await Person.transaction(async () => {
+        await Person.all().lock().find(people("michael").id);
+      });
     });
   });
 
   it.skipIf(adapterType === "postgres")("eager find with lock", async () => {
-    await Person.transaction(async () => {
-      await Person.includes(":readers").lock().find(people("michael").id);
+    await assertNothingRaised(async () => {
+      await Person.transaction(async () => {
+        await Person.includes(":readers").lock().find(people("michael").id);
+      });
     });
   });
 
   it("lock does not raise when the object is not dirty", async () => {
     const person = await Person.find(people("michael").id);
-    await person.lockBang();
+    await assertNothingRaised(() => person.lockBang());
   });
 
   it("lock raises when the record is dirty", async () => {
     const person = await Person.find(people("michael").id);
     person.first_name = "fooman";
-    await expect(person.lockBang()).rejects.toThrow(/Changed attributes: "first_name"/);
+    const error = await assertRaises([Error], {}, () => person.lockBang());
+    expect(error.message).toMatch(/Changed attributes: "first_name"/);
   });
 
   it("locking in after save callback", async () => {
-    const frog = await Frog.create({ name: "Old Frog" });
-    frog.name = "New Frog";
-    await frog.saveBang();
+    await assertNothingRaised(async () => {
+      const frog = await Frog.create({ name: "Old Frog" });
+      frog.name = "New Frog";
+      await assertNotDeprecated(deprecator(), async () => {
+        await frog.saveBang();
+      });
+    });
   });
 
   it("with lock commits transaction", async () => {
@@ -793,8 +812,8 @@ describe("PessimisticLockingTest", () => {
 
   it.skipIf(adapterType !== "postgres")("with lock locks with no args", async () => {
     const p = await Person.find(people("michael").id);
-    await p.withLock(async () => {
-      expect(p.first_name).toBe("Michael");
+    await assertQueriesMatch(/LIMIT \$?\d FOR UPDATE/i, undefined, false, async () => {
+      await p.withLock(async () => {});
     });
   });
 
