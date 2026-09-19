@@ -23,22 +23,22 @@ const globalJSON = globalThis.JSON;
  * (`vendor/ruby/ext/json/lib/json/common.rb:541`) and `JSON.load` (`:615`) ship
  * with the interpreter, so no Rails file defines them.
  */
-function deepConstGet(path: string): unknown {
-  let constant: unknown = globalThis;
-  for (const name of path.split("::").filter((segment, i) => i > 0 || segment !== "")) {
-    if (
-      constant === null ||
-      (typeof constant !== "object" && typeof constant !== "function") ||
-      !(name in constant)
-    ) {
-      throw new ArgumentError(`can't get const ${path}: uninitialized constant ${name}`);
-    }
-    constant = (constant as Record<string, unknown>)[name];
-  }
-  return constant;
-}
-
 export namespace JSON {
+  export function deepConstGet(path: string): unknown {
+    let constant: unknown = globalThis;
+    for (const name of path.split("::").filter((segment, i) => i > 0 || segment !== "")) {
+      if (
+        constant === null ||
+        (typeof constant !== "object" && typeof constant !== "function") ||
+        !(name in constant)
+      ) {
+        throw new ArgumentError(`can't get const ${path}: uninitialized constant ${name}`);
+      }
+      constant = (constant as Record<string, unknown>)[name];
+    }
+    return constant;
+  }
+
   export function dump(value: unknown): string {
     return globalJSON.stringify(value) ?? "null";
   }
