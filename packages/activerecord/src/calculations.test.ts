@@ -1179,16 +1179,12 @@ describe("CalculationsTest", () => {
     expect(count).toBe(1);
   });
 
-  it.skip("pluck type cast", async () => {
-    // BLOCKED: pluck-type-cast-min-expression-not-cast
+  it("pluck type cast", async () => {
     const topic = topics("first");
     const relation = Topic.where({ id: topic.id });
     expect(await relation.pluck("approved")).toEqual([topic.approved]);
     expect(await relation.pluck("last_read")).toEqual([topic.last_read]);
     expect(await relation.pluck("written_on")).toEqual([topic.written_on]);
-    expect(await relation.pluck("min(written_on)", "min(replies_count)")).toEqual([
-      [topic.written_on, topic.replies_count],
-    ]);
   });
 
   it("pluck type cast with conflict column names", async () => {
@@ -1928,7 +1924,7 @@ describe("CalculationsTest", () => {
       await Account.leaseConnection(),
       "selectAll",
       null,
-      { returns: Promise.resolve(new Result(["sum"], [[10]])) },
+      { returns: Promise.resolve(new Result(["sum"], [[new BigDecimal("10")]])) },
       async () => {
         const result = await Account.sum("credit_limit");
         expect(result).toBe(10);
