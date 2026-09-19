@@ -64,7 +64,9 @@ describe("WhereChainTest", () => {
     const run = async () => Post.all().where().associated("cars");
     await expect(run()).rejects.toThrow(ArgumentError);
     const e = await run().catch((err: Error) => err);
-    expect(e.message).toMatch(/An association named `:cars` does not exist on the model `Post`\./);
+    expect((e as Error).message).toMatch(
+      /An association named `:cars` does not exist on the model `Post`\./,
+    );
   });
 
   it("associated merged with scope on association", async () => {
@@ -229,7 +231,9 @@ describe("WhereChainTest", () => {
     const run = async () => Post.all().where().missing("cars");
     await expect(run()).rejects.toThrow(ArgumentError);
     const e = await run().catch((err: Error) => err);
-    expect(e.message).toMatch(/An association named `:cars` does not exist on the model `Post`\./);
+    expect((e as Error).message).toMatch(
+      /An association named `:cars` does not exist on the model `Post`\./,
+    );
   });
 
   it("missing with multiple association", async () => {
