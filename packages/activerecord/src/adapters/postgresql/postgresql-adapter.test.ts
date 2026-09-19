@@ -44,42 +44,6 @@ function connectionWithoutInsertReturning(): PostgreSQLAdapter {
   return new PostgreSQLAdapter({ connectionString: PG_TEST_URL, insertReturning: false });
 }
 
-async function withExtensionDisabled(
-  adapter: PostgreSQLAdapter,
-  ext: string,
-  fn: () => Promise<void>,
-): Promise<void> {
-  const wasEnabled = await adapter.extensionEnabled(ext);
-  const ensureDisabled = wasEnabled ? () => adapter.disableExtension(ext) : async () => {};
-  const restore = wasEnabled
-    ? () => adapter.enableExtension(ext)
-    : () => adapter.disableExtension(ext);
-  await ensureDisabled();
-  try {
-    await fn();
-  } finally {
-    await restore();
-  }
-}
-
-async function withExtensionEnabled(
-  adapter: PostgreSQLAdapter,
-  ext: string,
-  fn: () => Promise<void>,
-): Promise<void> {
-  const wasEnabled = await adapter.extensionEnabled(ext);
-  const ensureEnabled = wasEnabled ? async () => {} : () => adapter.enableExtension(ext);
-  const restore = wasEnabled
-    ? () => adapter.enableExtension(ext)
-    : () => adapter.disableExtension(ext);
-  await ensureEnabled();
-  try {
-    await fn();
-  } finally {
-    await restore();
-  }
-}
-
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
 
@@ -719,6 +683,28 @@ describeIfPg("PostgreSQLAdapter", () => {
         );
       } finally {
         await adapter.execute("DROP DOMAIN example_type");
+      }
+    });
+
+    it("extensions omits current schema name", async () => {
+      try {
+        await adapter.execute("DROP EXTENSION IF EXISTS hstore");
+        await adapter.execute("CREATE SCHEMA customschema");
+        await adapter.execute("CREATE EXTENSION hstore SCHEMA customschema");
+        expect(await adapter.extensions()).toContain("customschema.hstore");
+      } finally {
+        await adapter.execute("DROP SCHEMA IF EXISTS customschema CASCADE");
+        await adapter.execute("DROP EXTENSION IF EXISTS hstore");
+      }
+    });
+
+    it("extensions includes non current schema name", async () => {
+      try {
+        await adapter.execute("DROP EXTENSION IF EXISTS hstore");
+        await adapter.execute("CREATE EXTENSION hstore");
+        expect(await adapter.extensions()).toContain("hstore");
+      } finally {
+        await adapter.execute("DROP EXTENSION IF EXISTS hstore");
       }
     });
 

@@ -54,6 +54,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     class PgArray extends Base {
       declare tags: any;
       declare ratings: any;
+      declare datetimes: any;
+      declare timestamps: any;
       static tableName = "pg_arrays";
     }
     let column: any;
@@ -70,7 +72,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(column.isArray()).toBeTruthy();
       expect(type.isBinary()).toBeFalsy();
 
-      const ratingsColumn = PgArray.columnsHash()["ratings"] as any;
+      const ratingsColumn = PgArray.columnsHash()["ratings"];
       expect(ratingsColumn.type).toBe("integer");
       expect(ratingsColumn.isArray()).toBeTruthy();
     });
@@ -114,7 +116,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(record.tags).toBeInstanceOf(MyTags);
       expect((record.tags as MyTags).toArray()).toEqual(["one", "two"]);
 
-      (record as any).tags = new MyTags(["three", "four"]);
+      record.tags = new MyTags(["three", "four"]);
       await record.save();
       await (record as any).reload();
       expect((record.tags as MyTags).toArray()).toEqual(["three", "four"]);
@@ -187,9 +189,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.addColumn("pg_arrays", "snippets", "string", { array: true, default: [] });
       await adapter.changeColumn("pg_arrays", "snippets", "text", { array: true, default: [] });
       await PgArray.resetColumnInformation();
-      const column = PgArray.columnsHash()["snippets"] as any;
+      const column = PgArray.columnsHash()["snippets"];
       expect(column.type).toBe("text");
-      expect((PgArray as any).columnDefaults["snippets"]).toEqual([]);
+      expect(PgArray.columnDefaults["snippets"]).toEqual([]);
       expect(column.isArray()).toBeTruthy();
     });
     it("change column from non array to array", async () => {
@@ -200,9 +202,9 @@ describeIfPg("PostgreSQLAdapter", () => {
         using: `string_to_array("snippets", ',')`,
       });
       await PgArray.resetColumnInformation();
-      const column = PgArray.columnsHash()["snippets"] as any;
+      const column = PgArray.columnsHash()["snippets"];
       expect(column.type).toBe("text");
-      expect((PgArray as any).columnDefaults["snippets"]).toEqual([]);
+      expect(PgArray.columnDefaults["snippets"]).toEqual([]);
       expect(column.isArray()).toBeTruthy();
     });
     it("change column cant make non array column to array", async () => {
@@ -232,7 +234,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("type cast integers", async () => {
-      const x = new PgArray({ ratings: ["1", "2"] } as any);
+      const x = new PgArray({ ratings: ["1", "2"] });
 
       expect(x.ratings).toEqual([1, 2]);
 
@@ -449,7 +451,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         "ten\r",
         "NULL",
       ];
-      const x = await PgArray.createBang({ tags } as any);
+      const x = await PgArray.createBang({ tags });
       await x.reload();
 
       expect(x.isChanged).toBeFalsy();
@@ -471,7 +473,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("mutate array", async () => {
-      const x = await PgArray.createBang({ tags: ["one", "two"] } as any);
+      const x = await PgArray.createBang({ tags: ["one", "two"] });
 
       x.tags.push("three");
       await x.saveBang();
@@ -536,10 +538,10 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
       await PgArrays.loadSchema();
       const record = new PgArrays({ tags: "not-an-array" } as any);
-      expect((record as any).tags).toEqual([]);
+      expect(record.tags).toEqual([]);
       expect((record as any).attributeBeforeTypeCast("tags")).toBe("not-an-array");
       expect(await record.save()).toBeTruthy();
-      expect((record as any).tags).toEqual(((await record.reload()) as any).tags);
+      expect(record.tags).toEqual((await record.reload()).tags);
     });
     it("assigning empty string", async () => {
       class PgArrays extends Base {
@@ -550,10 +552,10 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
       await PgArrays.loadSchema();
       const record = new PgArrays({ tags: "" } as any);
-      expect((record as any).tags).toEqual([]);
+      expect(record.tags).toEqual([]);
       expect((record as any).attributeBeforeTypeCast("tags")).toBe("");
       expect(await record.save()).toBeTruthy();
-      expect((record as any).tags).toEqual(((await record.reload()) as any).tags);
+      expect(record.tags).toEqual((await record.reload()).tags);
     });
     it("assigning valid pg array literal", async () => {
       class PgArrays extends Base {
@@ -564,16 +566,16 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
       await PgArrays.loadSchema();
       const record = new PgArrays({ tags: "{1,2,3}" } as any);
-      expect((record as any).tags).toEqual(["1", "2", "3"]);
+      expect(record.tags).toEqual(["1", "2", "3"]);
       expect((record as any).attributeBeforeTypeCast("tags")).toBe("{1,2,3}");
       expect(await record.save()).toBeTruthy();
-      expect((record as any).tags).toEqual(((await record.reload()) as any).tags);
+      expect(record.tags).toEqual((await record.reload()).tags);
     });
 
     it("where by attribute with array", async () => {
       const tags = ["black", "blue"];
-      const record = await PgArray.createBang({ tags } as any);
-      expect(((await PgArray.where({ tags }).take()) as any).id).toEqual(record.id);
+      const record = await PgArray.createBang({ tags });
+      expect((await PgArray.where({ tags }).take())!.id).toEqual(record.id);
     });
 
     it("uniqueness validation", async () => {
@@ -585,10 +587,10 @@ describeIfPg("PostgreSQLAdapter", () => {
           return new ModelName(PgArray.name);
         }
       }
-      const e1 = await Klass.create({ tags: ["black", "blue"] } as any);
+      const e1 = await Klass.create({ tags: ["black", "blue"] });
       expect(e1.isPersisted(), "Saving e1").toBeTruthy();
 
-      const e2 = await Klass.create({ tags: ["black", "blue"] } as any);
+      const e2 = await Klass.create({ tags: ["black", "blue"] });
       expect(e2.isPersisted(), "e2 shouldn't be valid").toBeFalsy();
       expect(e2.errors.get("tags").length > 0, "Should have errors for tags").toBeTruthy();
       expect(e2.errors.get("tags"), "Should have uniqueness message for tags").toEqual([
@@ -606,11 +608,11 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("precision is respected on timestamp columns", async () => {
       const time = timeChange(RubyTime.now(), { usec: 123 });
-      const record = await PgArray.createBang({ timestamps: [time] } as any);
+      const record = await PgArray.createBang({ timestamps: [time] });
 
-      expect((record as any).timestamps[0].usec).toBe(123);
+      expect(record.timestamps[0].usec).toBe(123);
       await record.reload();
-      expect((record as any).timestamps[0].usec).toBe(123);
+      expect(record.timestamps[0].usec).toBe(123);
     });
   });
 
