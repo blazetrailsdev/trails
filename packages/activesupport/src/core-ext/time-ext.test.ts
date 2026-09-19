@@ -1915,17 +1915,14 @@ describe("TimeExtCalculationsTest", () => {
 
   it.skip("case equality", () => {
     // BLOCKED: activesupport-time-at-in-option-and-case-equality
-    const T = RubyTime as any;
-    const utcZone = TimeZone.find("UTC")!;
     class Sub extends RubyTime {}
-    expect(T[Symbol.hasInstance](RubyTime.utc(2000))).toBeTruthy();
-    expect(T[Symbol.hasInstance](new TimeWithZone(RubyTime.utc(2000), utcZone))).toBeTruthy();
-    expect(T[Symbol.hasInstance](Sub.utc(2000))).toBeTruthy();
-    expect(T[Symbol.hasInstance](RubyDateTime.civil(2000))).toEqual(false);
-    expect((Sub as any)[Symbol.hasInstance](RubyTime.utc(2000))).toEqual(false);
-    expect((Sub as any)[Symbol.hasInstance](new TimeWithZone(RubyTime.utc(2000), utcZone))).toEqual(
-      false,
-    );
+    const utcZone = TimeZone.find("UTC")!;
+    expect(RubyTime.utc(2000) instanceof RubyTime).toBeTruthy();
+    expect(new TimeWithZone(RubyTime.utc(2000), utcZone) instanceof RubyTime).toBeTruthy();
+    expect(Sub.utc(2000) instanceof RubyTime).toBeTruthy();
+    expect(RubyDateTime.civil(2000) instanceof RubyTime).toEqual(false);
+    expect(RubyTime.utc(2000) instanceof Sub).toEqual(false);
+    expect(new TimeWithZone(RubyTime.utc(2000), utcZone) instanceof Sub).toEqual(false);
   });
 
   it("all day with timezone", () => {

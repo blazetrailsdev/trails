@@ -1157,32 +1157,11 @@ describe("TimeWithZoneTest", () => {
     expect((twz as MethodMissing).monthsSince(1).time).toEqual(RubyTime.utc(2000, 1, 31, 19, 0, 0));
   });
 
-  it.skip("marshal dump and load", () => {
-    // BLOCKED: activesupport-time-with-zone-marshal-dump-and-load
-    const Marshal = (globalThis as any).Marshal;
-    const marshalStr = Marshal.dump(twz);
-    const mtime = Marshal.load(marshalStr);
-    expect(mtime.utc()).toEqual(RubyTime.utc(2000, 1, 1, 0));
-    assertPredicate(mtime.utc(), (t: any) => t.isUtc());
-    expect(mtime.timeZone).toEqual(TimeZone.find("Eastern Time (US & Canada)"));
-    expect(mtime.time).toEqual(RubyTime.utc(1999, 12, 31, 19));
-    assertPredicate(mtime.time, (t: any) => t.isUtc());
-    expect(mtime.inspect()).toEqual(twz.inspect());
-  });
+  // BLOCKED: activesupport-time-with-zone-marshal-dump-and-load
+  it.todo("marshal dump and load");
 
-  it.skip("marshal dump and load with tzinfo identifier", () => {
-    // BLOCKED: activesupport-time-with-zone-marshal-dump-and-load
-    const Marshal = (globalThis as any).Marshal;
-    const twz = new TimeWithZone(utc, eastern.tzinfo as any);
-    const marshalStr = Marshal.dump(twz);
-    const mtime = Marshal.load(marshalStr);
-    expect(mtime.utc()).toEqual(RubyTime.utc(2000, 1, 1, 0));
-    assertPredicate(mtime.utc(), (t: any) => t.isUtc());
-    expect(mtime.timeZone.name).toEqual("America/New_York");
-    expect(mtime.time).toEqual(RubyTime.utc(1999, 12, 31, 19));
-    assertPredicate(mtime.time, (t: any) => t.isUtc());
-    expect(mtime.inspect()).toEqual(twz.inspect());
-  });
+  // BLOCKED: activesupport-time-with-zone-marshal-dump-and-load
+  it.todo("marshal dump and load with tzinfo identifier");
 
   it("freeze", () => {
     twz.freeze();

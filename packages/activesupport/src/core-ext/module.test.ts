@@ -321,17 +321,11 @@ describe("ModuleTest", () => {
     });
   });
 
-  it.skip("delegation line number", () => {
-    // BLOCKED: activesupport-delegate-private-and-ruby-method-semantics
-    const [, line] = (Someone.prototype as any).foo.sourceLocation ?? [];
-    expect(line).toEqual((Someone as any).FAILED_DELEGATE_LINE);
-  });
+  // BLOCKED: activesupport-delegate-private-and-ruby-method-semantics
+  it.todo("delegation line number");
 
-  it.skip("delegate line with nil", () => {
-    // BLOCKED: activesupport-delegate-private-and-ruby-method-semantics
-    const [, line] = (Someone.prototype as any).bar.sourceLocation ?? [];
-    expect(line).toEqual((Someone as any).FAILED_DELEGATE_LINE_2);
-  });
+  // BLOCKED: activesupport-delegate-private-and-ruby-method-semantics
+  it.todo("delegate line with nil");
 
   it("delegation exception backtrace", () => {
     const someone = new Someone("foo", "bar") as Someone & Record<string, any>;
