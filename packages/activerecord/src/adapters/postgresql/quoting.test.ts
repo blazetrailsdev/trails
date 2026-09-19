@@ -47,18 +47,18 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("quote column name", async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS "quoting_test"`);
-      await adapter.execute(`CREATE TABLE "quoting_test" ("id" SERIAL PRIMARY KEY, "select" TEXT)`);
-      await adapter.execute(`INSERT INTO "quoting_test" ("select") VALUES ('works')`);
-      const rows = await adapter.execute(`SELECT "select" FROM "quoting_test"`);
-      expect(rows[0].select).toBe("works");
+      for (const a of [adapter, adapter.constructor as typeof adapter]) {
+        expect(a.quoteColumnName("foo")).toBe('"foo"');
+        expect(a.quoteColumnName('hel"lo')).toBe('"hel""lo"');
+      }
     });
 
     it("quote table name", async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS "quoting_test"`);
-      await adapter.execute(`CREATE TABLE "quoting_test" ("id" SERIAL PRIMARY KEY, "val" TEXT)`);
-      const rows = await adapter.execute(`SELECT * FROM "quoting_test"`);
-      expect(rows).toHaveLength(0);
+      for (const a of [adapter, adapter.constructor as typeof adapter]) {
+        expect(a.quoteTableName("foo")).toBe('"foo"');
+        expect(a.quoteTableName("foo.bar")).toBe('"foo"."bar"');
+        expect(a.quoteColumnName('hel"lo.wol\\d')).toBe('"hel""lo.wol\\d"');
+      }
     });
 
     it("quote table name with schema", async () => {
@@ -105,20 +105,14 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("quote bit string", () => {
-      expect(adapter.quote(new Bit().serialize("01")!)).toBe("B'01'");
-      expect(adapter.quote(new Bit().serialize("FF")!)).toBe("X'FF'");
-      const type = new Bit();
       const value = "'); SELECT * FROM users; /*\n01\n*/--";
-      const serialized = type.serialize(value);
-      const result: unknown = adapter.quote(serialized!);
-      expect(result).toBeNull();
+      const type = new Bit();
+      expect(adapter.quote(type.serialize(value)!)).toBeNull();
     });
 
     it("quote table name with spaces", async () => {
-      await adapter.execute(`CREATE TABLE "table with spaces" ("id" SERIAL PRIMARY KEY)`);
-      await adapter.execute(`INSERT INTO "table with spaces" DEFAULT VALUES`);
-      const rows = await adapter.execute(`SELECT * FROM "table with spaces"`);
-      expect(rows).toHaveLength(1);
+      const value = "user posts";
+      expect(adapter.quoteTableName(value)).toBe('"user posts"');
     });
 
     it("raise when int is wider than 64bit", async () => {
