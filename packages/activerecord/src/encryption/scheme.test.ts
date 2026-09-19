@@ -1,4 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import "./index.js";
+import { fixtures } from "../test-fixtures.js";
+import { Book } from "../test-helpers/models/book.js";
 import { Scheme } from "./scheme.js";
 import { Encryptor } from "./encryptor.js";
 import { Configuration } from "./errors.js";
@@ -7,29 +10,36 @@ import { Contexts } from "./contexts.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { DeterministicKeyProvider } from "./deterministic-key-provider.js";
 
+function declareEncryptsWith(options: Record<string, unknown>): unknown {
+  class Sub extends Book {}
+  Sub.encrypts("name", options);
+  return Sub.typeForAttribute("name");
+}
+
+function assertInvalidDeclaration(options: Record<string, unknown>): void {
+  expect(() => declareEncryptsWith(options)).toThrow(Configuration);
+}
+
+function assertValidDeclaration(options: Record<string, unknown>): void {
+  expect(() => declareEncryptsWith(options)).not.toThrow();
+}
+
 describe("ActiveRecord::Encryption::SchemeTest", () => {
+  fixtures({});
+
   it("validates config options when using encrypted attributes", () => {
-    expect(() => new Scheme({ ignoreCase: true, deterministic: false })).toThrow(Configuration);
-    expect(() => new Scheme({ key: "k", keyProvider: {} })).toThrow(Configuration);
-    expect(
-      () =>
-        new Scheme({
-          compressor: { deflate: () => Buffer.alloc(0), inflate: () => "" },
-          encryptor: {
-            encrypt: (v) => v,
-            decrypt: (v) => v,
-            isEncrypted: () => false,
-            isBinary: () => false,
-          },
-        }),
-    ).toThrow(Configuration);
-    expect(
-      () =>
-        new Scheme({
-          compress: false,
-          compressor: { deflate: () => Buffer.alloc(0), inflate: () => "" },
-        }),
-    ).toThrow(Configuration);
+    const zlib = { deflate: () => Buffer.alloc(0), inflate: () => "" };
+    assertInvalidDeclaration({ deterministic: false, ignoreCase: true });
+    assertInvalidDeclaration({
+      key: "1234",
+      keyProvider: new DerivedSecretKeyProvider("my secret"),
+    });
+    assertInvalidDeclaration({ compress: false, compressor: zlib });
+    assertInvalidDeclaration({ compressor: zlib, encryptor: new Encryptor() });
+
+    assertValidDeclaration({ deterministic: true });
+    assertValidDeclaration({ key: "1234" });
+    assertValidDeclaration({ keyProvider: new DerivedSecretKeyProvider("my secret") });
   });
 
   it("keyProvider resolves from bare key: option via DerivedSecretKeyProvider, using config salt", () => {
@@ -117,12 +127,12 @@ describe("ActiveRecord::Encryption::SchemeTest", () => {
       inflate: (data: Buffer | Uint8Array) => Buffer.from(data).toString("utf-8"),
     };
     const scheme = new Scheme({ compressor: customCompressor });
-    expect(scheme.toH().encryptor).toBeTruthy();
+    expect((scheme.toH().encryptor as Encryptor).compressor).toBe(customCompressor);
   });
 
   it("should create a encryptor well when compress is false", () => {
     const scheme = new Scheme({ compress: false });
-    expect(scheme.toH().encryptor).toBeTruthy();
+    expect((scheme.toH().encryptor as Encryptor).isCompress()).toBeFalsy();
   });
 
   describe("isSupportUnencryptedData", () => {

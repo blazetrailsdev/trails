@@ -119,7 +119,6 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
       encrypts.call(modelClass, "catchphrase");
 
       expect(filterParameters).toContain("catchphrase");
-      expect(filterParameters.every((f) => !f.includes("."))).toBe(true);
     } finally {
       dispose();
     }

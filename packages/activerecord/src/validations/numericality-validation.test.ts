@@ -26,7 +26,7 @@ describe("NumericalityValidationTest", () => {
 
     const subject = modelClassVar.new({ unscaled_bank_balance: 10_000_000.121 });
 
-    expect(await subject.isValid()).toBe(true);
+    expect(await subject.isValid()).toBeTruthy();
   });
 
   it("column with precision higher than double fig", async () => {
@@ -37,7 +37,7 @@ describe("NumericalityValidationTest", () => {
 
     const subject = modelClassVar.new({ decimal_number_big_precision: 10_000_000.3 });
 
-    expect(await subject.isValid()).toBe(true);
+    expect(await subject.isValid()).toBeTruthy();
   });
 
   it("column with scale", async () => {
@@ -46,7 +46,7 @@ describe("NumericalityValidationTest", () => {
 
     const subject = modelClassVar.new({ bank_balance: 10.001 });
 
-    expect(await subject.isValid()).toBe(false);
+    expect(await subject.isValid()).toBeFalsy();
   });
 
   it("no column precision", async () => {
@@ -57,7 +57,7 @@ describe("NumericalityValidationTest", () => {
 
     const subject = modelClassVar.new({ decimal_number: 1_000_000_000.1234545 });
 
-    expect(await subject.isValid()).toBe(true);
+    expect(await subject.isValid()).toBeTruthy();
   });
 
   it("virtual attribute", async () => {
@@ -69,7 +69,7 @@ describe("NumericalityValidationTest", () => {
 
     const subject = modelClassVar.new({ virtual_decimal_number: 1_000_000_000.1234545 });
 
-    expect(await subject.isValid()).toBe(true);
+    expect(await subject.isValid()).toBeTruthy();
   });
 
   it("on abstract class", async () => {
@@ -86,7 +86,7 @@ describe("NumericalityValidationTest", () => {
     }
     const subject = MyClass.new({ bank_balance: 10_000_000.12 });
 
-    expect(await subject.isValid()).toBe(true);
+    expect(await subject.isValid()).toBeTruthy();
   });
 
   it("virtual attribute without precision", async () => {
@@ -98,7 +98,7 @@ describe("NumericalityValidationTest", () => {
 
     const subject = modelClassVar.new({ virtual_decimal_number: 65.6 });
 
-    expect(await subject.isValid()).toBe(true);
+    expect(await subject.isValid()).toBeTruthy();
   });
 
   it("virtual attribute with precision round down", async () => {
@@ -108,7 +108,7 @@ describe("NumericalityValidationTest", () => {
 
     const subject = modelClassVar.new({ virtual_decimal_number: 123.454 });
 
-    expect(await subject.isValid()).toBe(true);
+    expect(await subject.isValid()).toBeTruthy();
   });
 
   it("virtual attribute with precision round half even", async () => {
@@ -118,7 +118,7 @@ describe("NumericalityValidationTest", () => {
 
     const subject = modelClassVar.new({ virtual_decimal_number: 123.455 });
 
-    expect(await subject.isValid()).toBe(false);
+    expect(await subject.isValid()).toBeFalsy();
   });
 
   it("virtual attribute with precision round up", async () => {
@@ -128,7 +128,7 @@ describe("NumericalityValidationTest", () => {
 
     const subject = modelClassVar.new({ virtual_decimal_number: 123.456 });
 
-    expect(await subject.isValid()).toBe(false);
+    expect(await subject.isValid()).toBeFalsy();
   });
 
   it("virtual attribute with scale", async () => {
@@ -138,7 +138,7 @@ describe("NumericalityValidationTest", () => {
 
     const subject = modelClassVar.new({ virtual_decimal_number: 1.001 });
 
-    expect(await subject.isValid()).toBe(false);
+    expect(await subject.isValid()).toBeFalsy();
   });
 
   it("virtual attribute with precision and scale", async () => {
@@ -153,7 +153,7 @@ describe("NumericalityValidationTest", () => {
       expect((subject.virtual_decimal_number as BigDecimal).toString("F")).toBe(
         new BigDecimal("99.99").toString("F"),
       );
-      expect(await subject.isValid()).toBe(true);
+      expect(await subject.isValid()).toBeTruthy();
     }
 
     for (const rawValue of ["99.999", 99.999, new BigDecimal("99.999")]) {
@@ -161,7 +161,7 @@ describe("NumericalityValidationTest", () => {
       expect((subject.virtual_decimal_number as BigDecimal).toString("F")).toBe(
         new BigDecimal("100.00").toString("F"),
       );
-      expect(await subject.isValid()).toBe(false);
+      expect(await subject.isValid()).toBeFalsy();
     }
   });
 
@@ -171,7 +171,7 @@ describe("NumericalityValidationTest", () => {
 
     const subject = modelClassVar.new({ new_bank_balance: "abcd" });
 
-    expect(await subject.isValid()).toBe(false);
+    expect(await subject.isValid()).toBeFalsy();
   });
 
   it("allow nil works for casted value", async () => {
@@ -180,6 +180,6 @@ describe("NumericalityValidationTest", () => {
 
     const subject = modelClassVar.new({ bank_balance: "" });
 
-    expect(await subject.isValid()).toBe(true);
+    expect(await subject.isValid()).toBeTruthy();
   });
 });

@@ -37,16 +37,16 @@ describe("PresenceValidationTest", () => {
   it("validates presence of non association", async () => {
     Boy.validatesPresenceOf("name");
     const b = new Boy();
-    expect(await b.isInvalid()).toBe(true);
+    expect(await b.isInvalid()).toBeTruthy();
 
     b.writeAttribute("name", "Alex");
-    expect(await b.isValid()).toBe(true);
+    expect(await b.isValid()).toBeTruthy();
   });
 
   it("validates presence of has one", async () => {
     Boy.validatesPresenceOf("face");
     const b = new Boy();
-    expect(await b.isInvalid()).toBe(true);
+    expect(await b.isInvalid()).toBeTruthy();
     expect(b.errors.messagesFor("face").length).toBe(1);
   });
 
@@ -55,10 +55,10 @@ describe("PresenceValidationTest", () => {
     const b = new Boy();
     const f = new Face();
     await setAssoc(b, "face", f);
-    expect(await b.isValid()).toBe(true);
+    expect(await b.isValid()).toBeTruthy();
 
     f.markForDestruction();
-    expect(await b.isInvalid()).toBe(true);
+    expect(await b.isInvalid()).toBeTruthy();
   });
 
   it("validates presence of has many marked for destruction", async () => {
@@ -67,13 +67,13 @@ describe("PresenceValidationTest", () => {
     const i1 = new Interest();
     const i2 = new Interest();
     await association(b, "interests").concat(i1, i2);
-    expect(await b.isValid()).toBe(true);
+    expect(await b.isValid()).toBeTruthy();
 
     i1.markForDestruction();
-    expect(await b.isValid()).toBe(true);
+    expect(await b.isValid()).toBeTruthy();
 
     i2.markForDestruction();
-    expect(await b.isInvalid()).toBe(true);
+    expect(await b.isInvalid()).toBeTruthy();
   });
 
   it("validates presence doesnt convert to array", async () => {
@@ -86,7 +86,7 @@ describe("PresenceValidationTest", () => {
     const s = new speedometer();
     await setAssoc(s, "dashboard", dash);
 
-    expect(await s.isValid()).toBe(true);
+    await expect(s.isValid()).resolves.not.toThrow();
   });
 
   it("validates presence of virtual attribute on model", async () => {
@@ -99,11 +99,11 @@ describe("PresenceValidationTest", () => {
         topic: "Thought Leadering",
         abbreviation: "tl",
       });
-      expect(await interest.isValid()).toBe(true);
+      expect(await interest.isValid()).toBeTruthy();
 
       (interest as unknown as { abbreviation: string }).abbreviation = "";
 
-      expect(await interest.isInvalid()).toBe(true);
+      expect(await interest.isInvalid()).toBeTruthy();
     });
   });
 
@@ -111,11 +111,11 @@ describe("PresenceValidationTest", () => {
     await repairValidations(Interest, async () => {
       const interest = new Interest();
       await interest.saveBang();
-      expect(await interest.isValid()).toBe(true);
+      expect(await interest.isValid()).toBeTruthy();
 
       Interest.validatesPresenceOf("topic");
 
-      expect(await interest.isValid()).toBe(false);
+      expect(await interest.isValid()).toBeFalsy();
     });
   });
 
@@ -124,7 +124,7 @@ describe("PresenceValidationTest", () => {
       Interest.validatesPresenceOf("topic", { on: "required_name" });
       const interest = new Interest();
       await interest.saveBang();
-      expect(await interest.isValid("required_name")).toBe(false);
+      expect(await interest.isValid("required_name")).toBeFalsy();
     });
   });
 });

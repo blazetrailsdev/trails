@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { BigDecimal } from "@blazetrails/activesupport";
+import { BigDecimal, assertEmpty, assertNotEmpty } from "@blazetrails/activesupport";
 import { DecimalType } from "@blazetrails/activemodel";
 import { Base, RecordInvalid } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
@@ -22,8 +22,8 @@ describe("ValidationsTest", () => {
   it("valid uses create context when new", async () => {
     const r = new WrongReply();
     r.title = "Wrong Create";
-    expect(await r.isValid()).toBe(false);
-    expect(r.errors.messagesFor("title").length).toBeGreaterThan(0);
+    expect(await r.isValid()).toBeFalsy();
+    expect(r.errors.messagesFor("title").length > 0).toBeTruthy();
     expect(r.errors.messagesFor("title")).toEqual(["is Wrong Create"]);
   });
 
@@ -31,35 +31,35 @@ describe("ValidationsTest", () => {
     const r = new WrongReply();
     r.title = "Bad";
     r.content = "Good";
-    expect(await r.save()).toBe(true);
+    expect(await r.save()).toBeTruthy();
 
     r.title = "Wrong Update";
-    expect(await r.isValid()).toBe(false);
+    expect(await r.isValid()).toBeFalsy();
 
-    expect(r.errors.messagesFor("title").length).toBeGreaterThan(0);
+    expect(r.errors.messagesFor("title").length > 0).toBeTruthy();
     expect(r.errors.messagesFor("title")).toEqual(["is Wrong Update"]);
   });
 
   it("valid using special context", async () => {
     const r = new WrongReply({ title: "Valid title" });
-    expect(await r.isValid("specialCase")).toBe(false);
+    expect(await r.isValid("specialCase")).toBeFalsy();
     expect(r.errors.messagesFor("author_name").join("")).toBe("Invalid");
 
     r.author_name = "secret";
     r.content = "Good";
-    expect(await r.isValid("specialCase")).toBe(true);
+    expect(await r.isValid("specialCase")).toBeTruthy();
 
     r.author_name = null as unknown as string;
-    expect(await r.isValid("specialCase")).toBe(false);
+    expect(await r.isValid("specialCase")).toBeFalsy();
     expect(r.errors.messagesFor("author_name").join("")).toBe("Invalid");
 
     r.author_name = "secret";
-    expect(await r.isValid("specialCase")).toBe(true);
+    expect(await r.isValid("specialCase")).toBeTruthy();
   });
 
   it("invalid using multiple contexts", async () => {
     const r = new WrongReply({ title: "Wrong Create" });
-    expect(await r.isInvalid(["specialCase", "create"])).toBe(true);
+    expect(await r.isInvalid(["specialCase", "create"])).toBeTruthy();
     expect(r.errors.messagesFor("author_name").join("")).toBe("Invalid");
     expect(r.errors.messagesFor("title").join("")).toBe("is Wrong Create");
   });
@@ -68,43 +68,48 @@ describe("ValidationsTest", () => {
     const r = new WrongReply();
 
     await r.validate();
-    expect(r.errors.messagesFor("author_name")).toEqual([]);
+    assertEmpty(r.errors.messagesFor("author_name"));
 
     await r.validate("specialCase");
-    expect(r.errors.messagesFor("author_name").length).toBeGreaterThan(0);
+    assertNotEmpty(r.errors.messagesFor("author_name"));
 
     r.author_name = "secret";
 
     await r.validate("specialCase");
-    expect(r.errors.messagesFor("author_name")).toEqual([]);
+    assertEmpty(r.errors.messagesFor("author_name"));
   });
 
   it("invalid record exception", async () => {
-    await expect(WrongReply.createBang()).rejects.toBeInstanceOf(RecordInvalid);
-    await expect(new WrongReply().saveBang()).rejects.toBeInstanceOf(RecordInvalid);
+    await expect(WrongReply.createBang()).rejects.toThrow(RecordInvalid);
+    await expect(new WrongReply().saveBang()).rejects.toThrow(RecordInvalid);
 
     const r = new WrongReply();
-    const invalid = await r.saveBang().catch((e) => e);
-    expect(invalid).toBeInstanceOf(RecordInvalid);
-    expect(invalid.record).toBe(r);
+    let invalid: RecordInvalid | undefined;
+    await expect(
+      r.saveBang().catch((e) => {
+        invalid = e;
+        throw e;
+      }),
+    ).rejects.toThrow(RecordInvalid);
+    expect(invalid!.record).toBe(r);
   });
 
   it("validate with bang", async () => {
-    await expect(async () => new WrongReply().validateBang()).rejects.toBeInstanceOf(RecordInvalid);
+    await expect(async () => new WrongReply().validateBang()).rejects.toThrow(RecordInvalid);
   });
 
   it("validate with bang and context", async () => {
-    await expect(async () => new WrongReply().validateBang("specialCase")).rejects.toBeInstanceOf(
+    await expect(async () => new WrongReply().validateBang("specialCase")).rejects.toThrow(
       RecordInvalid,
     );
     const r = new WrongReply({ title: "Valid title", author_name: "secret", content: "Good" });
-    expect(await r.validateBang("specialCase")).toBe(true);
+    expect(await r.validateBang("specialCase")).toBeTruthy();
   });
 
   it("exception on create bang many", async () => {
     await expect(
       WrongReply.createBang([{ title: "OK" }, { title: "Wrong Create" }]),
-    ).rejects.toBeInstanceOf(RecordInvalid);
+    ).rejects.toThrow(RecordInvalid);
   });
 
   it("exception on create bang with block", async () => {
@@ -112,7 +117,7 @@ describe("ValidationsTest", () => {
       WrongReply.createBang({ title: "OK" }, (r: WrongReply) => {
         r.content = null as unknown as string;
       }),
-    ).rejects.toBeInstanceOf(RecordInvalid);
+    ).rejects.toThrow(RecordInvalid);
   });
 
   it("exception on create bang many with block", async () => {
@@ -120,13 +125,13 @@ describe("ValidationsTest", () => {
       WrongReply.createBang([{ title: "OK" }, { title: "Wrong Create" }], (r: WrongReply) => {
         r.content = null as unknown as string;
       }),
-    ).rejects.toBeInstanceOf(RecordInvalid);
+    ).rejects.toThrow(RecordInvalid);
   });
 
   it("save without validation", async () => {
     const reply = new WrongReply();
-    expect(await reply.save()).toBe(false);
-    expect(await reply.save({ validate: false })).toBe(true);
+    expect(await reply.save()).toBeFalsy();
+    expect(await reply.save({ validate: false })).toBeTruthy();
   });
 
   it("validates acceptance of with non existent table", () => {
@@ -137,7 +142,7 @@ describe("ValidationsTest", () => {
 
   it("throw away typing", async () => {
     const d = new Developer({ name: "David", salary: "100,000" });
-    expect(await d.isValid()).toBe(false);
+    expect(await d.isValid()).toBeFalsy();
     expect(d.salary).toBe(100);
     expect(d.readAttributeBeforeTypeCast("salary")).toBe("100,000");
   });
@@ -178,7 +183,7 @@ describe("ValidationsTest", () => {
     const topic = Klass.new({ wibble: "123-4567" });
     topic.writeAttribute("wibble", String(topic.readAttribute("wibble")).replaceAll("-", ""));
 
-    expect(await topic.isValid()).toBe(true);
+    expect(await topic.isValid()).toBeTruthy();
   });
 
   it("numericality validation checks against raw value", async () => {
@@ -191,13 +196,13 @@ describe("ValidationsTest", () => {
     for (const rawValue of ["97.179", 97.179, new BigDecimal("97.179")]) {
       const subject = Klass.new({ wibble: rawValue });
       expect((subject.readAttribute("wibble") as BigDecimal).toString()).toBe("97.18");
-      expect(await subject.isValid()).toBe(true);
+      expect(await subject.isValid()).toBeTruthy();
     }
 
     for (const rawValue of ["97.174", 97.174, new BigDecimal("97.174")]) {
       const subject = Klass.new({ wibble: rawValue });
       expect((subject.readAttribute("wibble") as BigDecimal).toString()).toBe("97.17");
-      expect(await subject.isValid()).toBe(false);
+      expect(await subject.isValid()).toBeFalsy();
     }
   });
 
@@ -208,17 +213,17 @@ describe("ValidationsTest", () => {
     expect(priceEstimate.readAttributeBeforeTypeCast("price")).toBe(50);
     expect(priceEstimate.readAttribute("price")).toBe(50);
 
-    expect((priceEstimate as unknown as { priceCameFromUser: boolean }).priceCameFromUser).toBe(
-      true,
-    );
-    expect(await priceEstimate.isValid()).toBe(true);
+    expect(
+      (priceEstimate as unknown as { priceCameFromUser: boolean }).priceCameFromUser,
+    ).toBeTruthy();
+    expect(await priceEstimate.isValid()).toBeTruthy();
 
     await priceEstimate.saveBang();
 
-    expect((priceEstimate as unknown as { priceCameFromUser: boolean }).priceCameFromUser).toBe(
-      false,
-    );
-    expect(await priceEstimate.isValid()).toBe(true);
+    expect(
+      (priceEstimate as unknown as { priceCameFromUser: boolean }).priceCameFromUser,
+    ).toBeFalsy();
+    expect(await priceEstimate.isValid()).toBeTruthy();
   });
 
   it("acceptance validator doesnt require db connection", async () => {
