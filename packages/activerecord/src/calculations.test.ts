@@ -3,6 +3,8 @@ import "./encryption.js";
 import { describe, it, expect } from "vitest";
 import { sql as arelSql, star as arelStar } from "@blazetrails/arel";
 import { TypeError } from "@blazetrails/ruby-compat";
+import { assertCalled } from "@blazetrails/activesupport";
+import { Result } from "./result.js";
 import {
   assert,
   assertPredicate,
@@ -1786,6 +1788,7 @@ describe("CalculationsTest", () => {
     expect(await Topic.order("id").pick("heading")).toEqual("The First Topic");
     await assertNoQueries(false, async () => {
       expect(await Topic.none().pick("heading")).toBeNull();
+      expect(await Topic.where({ id: 9999999999999999999n }).pick("heading")).toBeNull();
     });
 
     await assertAsyncEqual("The First Topic", Topic.order("id").asyncPick("heading"));
@@ -1798,6 +1801,9 @@ describe("CalculationsTest", () => {
     ]);
     await assertNoQueries(false, async () => {
       expect(await Topic.none().pick("author_name", "author_email_address")).toBeNull();
+      expect(
+        await Topic.where({ id: 9999999999999999999n }).pick("author_name", "author_email_address"),
+      ).toBeNull();
     });
 
     await assertAsyncEqual(
@@ -1900,15 +1906,31 @@ describe("CalculationsTest", () => {
   });
 
   it("count takes attribute type precedence over database type", async () => {
-    const result = await Account.count();
-    expect(result).toBe(6);
-    expect(typeof result).toBe("number");
+    await assertCalled(
+      await Account.leaseConnection(),
+      "selectAll",
+      null,
+      { returns: Promise.resolve(new Result(["count"], [["10"]])) },
+      async () => {
+        const result = await Account.count();
+        expect(result).toBe(10);
+        expect(typeof result).toBe("number");
+      },
+    );
   });
 
   it("sum takes attribute type precedence over database type", async () => {
-    const result = await Account.sum("credit_limit");
-    expect(typeof result).toBe("number");
-    expect(Number(result)).toBe(318);
+    await assertCalled(
+      await Account.leaseConnection(),
+      "selectAll",
+      null,
+      { returns: Promise.resolve(new Result(["sum"], [[new BigDecimal("10")]])) },
+      async () => {
+        const result = await Account.sum("credit_limit");
+        expect(result).toBe(10);
+        expect(typeof result).toBe("number");
+      },
+    );
   });
 
   it("group by attribute with custom type", async () => {
