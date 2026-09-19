@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { travel, travelBack } from "@blazetrails/activesupport";
+import { assertInDelta, assertNothingRaised, travel, travelBack } from "@blazetrails/activesupport";
 import { Base, registerModel } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
 import {
@@ -71,10 +71,10 @@ describe("TimestampTest", () => {
 
     expect(developer.legacy_updated_at).not.toEqual(previouslyUpdatedAt);
     expect(developer.salary).toBe(previousSalary + 10000);
-    expect(developer.attributeChanged("salary")).toBe(true);
-    expect(developer.isChanged).toBe(true);
+    expect(developer.attributeChanged("salary")).toBeTruthy();
+    expect(developer.isChanged).toBeTruthy();
     expect(developer.changedAttributeNamesToSave).toEqual(["salary"]);
-    expect((developer as any).isSavedChanges()).toBe(true);
+    expect((developer as any).isSavedChanges()).toBeTruthy();
     expect(Object.keys(developer.savedChanges).sort()).toEqual([
       "legacy_updated_at",
       "legacy_updated_on",
@@ -89,8 +89,8 @@ describe("TimestampTest", () => {
     await dev.touch();
 
     expect(dev.legacy_updated_at).not.toEqual(previouslyUpdatedAt);
-    expect(dev.isChanged).toBe(false);
-    expect((dev as any).isSavedChanges()).toBe(true);
+    expect(dev.isChanged).toBeFalsy();
+    expect((dev as any).isSavedChanges()).toBeTruthy();
     expect(Object.keys(dev.savedChanges).sort()).toEqual([
       "legacy_updated_at",
       "legacy_updated_on",
@@ -113,7 +113,7 @@ describe("TimestampTest", () => {
 
   it("saving when instance record timestamps is false doesnt update its timestamp", async () => {
     (developer as any).recordTimestamps = false;
-    expect((Developer as any).recordTimestamps).toBe(true);
+    expect((Developer as any).recordTimestamps).toBeTruthy();
 
     developer.name = "John Smith";
     await developer.save();
@@ -140,8 +140,8 @@ describe("TimestampTest", () => {
       travelBack();
     }
 
-    expect(developer.attributeChanged("legacy_created_at")).toBe(false);
-    expect(developer.isChanged).toBe(false);
+    expect(developer.attributeChanged("legacy_created_at")).toBeFalsy();
+    expect(developer.isChanged).toBeFalsy();
     expect(developer.legacy_created_at).not.toEqual(previousCreatedAt);
     expect(developer.legacy_updated_at).not.toEqual(previouslyUpdatedAt);
   });
@@ -154,8 +154,8 @@ describe("TimestampTest", () => {
       travelBack();
     }
 
-    expect(developer.attributeChanged("legacy_updated_at")).toBe(false);
-    expect(developer.isChanged).toBe(false);
+    expect(developer.attributeChanged("legacy_updated_at")).toBeFalsy();
+    expect(developer.isChanged).toBeFalsy();
     expect(developer.legacy_updated_at).not.toEqual(previouslyUpdatedAt);
   });
 
@@ -164,8 +164,7 @@ describe("TimestampTest", () => {
     const previousValue = task.ending;
     await task.touch("ending");
     expect(task.ending).not.toEqual(previousValue);
-    const diffMs = Math.abs((task.ending as RubyTime).toF() * 1000 - Date.now());
-    expect(diffMs).toBeLessThan(1000);
+    assertInDelta(RubyTime.now().toF(), (task.ending as RubyTime).toF(), 1);
   });
 
   it("touching an attribute updates timestamp with given time", async () => {
@@ -190,31 +189,26 @@ describe("TimestampTest", () => {
 
     expect(task.starting).not.toEqual(previousStarting);
     expect(task.ending).not.toEqual(previousEnding);
-    const nowMs = Date.now();
-    expect(Math.abs((task.starting as RubyTime).toF() * 1000 - nowMs)).toBeLessThan(1000);
-    expect(Math.abs((task.ending as RubyTime).toF() * 1000 - nowMs)).toBeLessThan(1000);
+    assertInDelta(RubyTime.now().toF(), (task.starting as RubyTime).toF(), 1);
+    assertInDelta(RubyTime.now().toF(), (task.ending as RubyTime).toF(), 1);
   });
 
   it("touching a record without timestamps is unexceptional", async () => {
     const car = await Car.find(cars("honda").id);
-    let threw = false;
-    try {
+    await assertNothingRaised(async () => {
       await car.touch();
-    } catch {
-      threw = true;
-    }
-    expect(threw).toBe(false);
+    });
   });
 
   it("touching a no touching object", async () => {
     await Developer.noTouching(async () => {
-      expect(developer.isNoTouching()).toBe(true);
-      expect(owner.isNoTouching()).toBe(false);
+      expect(developer.isNoTouching()).toBeTruthy();
+      expect(owner.isNoTouching()).toBeFalsy();
       await developer.touch();
     });
 
-    expect(developer.isNoTouching()).toBe(false);
-    expect(owner.isNoTouching()).toBe(false);
+    expect(developer.isNoTouching()).toBeFalsy();
+    expect(owner.isNoTouching()).toBeFalsy();
     expect(developer.legacy_updated_at).toEqual(previouslyUpdatedAt);
   });
 
@@ -232,29 +226,28 @@ describe("TimestampTest", () => {
 
   it("global no touching", async () => {
     await Base.noTouching(async () => {
-      expect(developer.isNoTouching()).toBe(true);
-      expect(owner.isNoTouching()).toBe(true);
+      expect(developer.isNoTouching()).toBeTruthy();
+      expect(owner.isNoTouching()).toBeTruthy();
       await developer.touch();
     });
 
-    expect(developer.isNoTouching()).toBe(false);
-    expect(owner.isNoTouching()).toBe(false);
+    expect(developer.isNoTouching()).toBeFalsy();
+    expect(owner.isNoTouching()).toBeFalsy();
     expect(developer.legacy_updated_at).toEqual(previouslyUpdatedAt);
   });
 
   it("no touching threadsafe", async () => {
-    expect(developer.isNoTouching()).toBe(false);
     await Developer.noTouching(async () => {
-      expect(developer.isNoTouching()).toBe(true);
+      expect(developer.isNoTouching()).toBeTruthy();
     });
-    expect(developer.isNoTouching()).toBe(false);
+    expect(developer.isNoTouching()).toBeFalsy();
   });
 
   it("no touching with callbacks", async () => {
     const dev = await DevWithAfterTouch.find(developers("david").id);
     await DevWithAfterTouch.noTouching(async () => {
       await dev.touch();
-      expect(dev.afterTouchCalled).toBe(false);
+      expect(dev.afterTouchCalled).toBeFalsy();
     });
   });
 
@@ -348,7 +341,7 @@ describe("TimestampTest", () => {
     const pet = new Pet({ owner: new InvalidOwner() });
     await pet.save();
 
-    expect((pet as any).owner.isNewRecord()).toBe(true);
+    expect((pet as any).owner.isNewRecord()).toBeTruthy();
   });
 
   it("saving a record with a belongs to that specifies touching a specific attribute the parent should update that attribute", async () => {
