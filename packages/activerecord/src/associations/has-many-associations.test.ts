@@ -3865,7 +3865,7 @@ describe("HasManyAssociationsTest", () => {
 
       const newClient = await firm.clientsOfFirm.create({ name: "Another Client" });
       expect(newClient.isPersisted()).toBe(true);
-      expect((await firm.clientsOfFirm.last()).id).toBe(newClient.id);
+      expect(await firm.clientsOfFirm.last()).toBe(newClient);
       expect((await (await firm.clientsOfFirm.reload()).last()).id).toBe(newClient.id);
     });
 
