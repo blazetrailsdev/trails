@@ -38,21 +38,6 @@ class DivergentPrimaryKeyBook extends Book {
   }
 }
 
-async function assertInsertAllReturningAlias(): Promise<void> {
-  if (!supportsInsertReturning) return;
-  await assertDifference(
-    () => Book.count() as Promise<number>,
-    1,
-    null,
-    async () => {
-      const result = await Book.insertAll([{ title: "Remote", author_id: 1 }], {
-        returning: ":title",
-      });
-      expect(result.columns).toContain("title");
-    },
-  );
-}
-
 function getYear(val: unknown): number {
   if (val == null) return 0;
   if (val instanceof RubyTime) return val.getutc().year;
@@ -63,6 +48,13 @@ function getYear(val: unknown): number {
     return (val as any).year as number;
   }
   return 0;
+}
+
+function epochSeconds(val: unknown): number {
+  if (val instanceof RubyTime) return val.toF();
+  if (val instanceof Temporal.Instant) return val.epochMilliseconds / 1000;
+  if (val instanceof Date) return val.getTime() / 1000;
+  return new Date(String(val)).getTime() / 1000;
 }
 
 function usec(instant: RubyTime): number {
@@ -100,8 +92,15 @@ describe("InsertAllTest", () => {
 
   itIfSupports("insert_on_duplicate_skip", "insert", async () => {
     const id = 1_000_000;
-    await Book.insert({ id, name: "Rework", author_id: 1 });
-    expect(await Book.exists(id)).toBe(true);
+    await assertDifference(
+      () => Book.count() as Promise<number>,
+      +1,
+      null,
+      async () => {
+        await Book.insert({ id, name: "Rework", author_id: 1 });
+      },
+    );
+
     await Book.upsert({ id, name: "Remote", author_id: 1 });
     expect(((await Book.find(id)) as any).name).toBe("Remote");
   });
@@ -244,12 +243,17 @@ describe("InsertAllTest", () => {
     "insert_on_duplicate_skip",
     "insert all with skip duplicates and autonumber id not given",
     async () => {
-      const before = (await Book.count()) as number;
-      await Book.insertAll([
-        { author_id: 8, name: "Refactoring" },
-        { author_id: 8, name: "Refactoring" },
-      ]);
-      expect(((await Book.count()) as number) - before).toBe(1);
+      await assertDifference(
+        () => Book.count() as Promise<number>,
+        1,
+        null,
+        async () => {
+          await Book.insertAll([
+            { author_id: 8, name: "Refactoring" },
+            { author_id: 8, name: "Refactoring" },
+          ]);
+        },
+      );
     },
   );
 
@@ -257,12 +261,17 @@ describe("InsertAllTest", () => {
     "insert_on_duplicate_skip",
     "insert all with skip duplicates and autonumber id given",
     async () => {
-      const before = (await Book.count()) as number;
-      await Book.insertAll([
-        { id: 200, author_id: 8, name: "Refactoring" },
-        { id: 201, author_id: 8, name: "Refactoring" },
-      ]);
-      expect(((await Book.count()) as number) - before).toBe(1);
+      await assertDifference(
+        () => Book.count() as Promise<number>,
+        1,
+        null,
+        async () => {
+          await Book.insertAll([
+            { id: 200, author_id: 8, name: "Refactoring" },
+            { id: 201, author_id: 8, name: "Refactoring" },
+          ]);
+        },
+      );
     },
   );
 
@@ -271,9 +280,14 @@ describe("InsertAllTest", () => {
     "skip duplicates strategy does not secretly upsert",
     async () => {
       const book = await Book.create({ format: "EXPECTED", author_id: 8, name: "Refactoring" });
-      const before = (await Book.count()) as number;
-      await Book.insertAll([{ format: "UNEXPECTED", author_id: 8, name: "Refactoring" }]);
-      expect((await Book.count()) as number).toBe(before);
+      await assertNoDifference(
+        () => Book.count() as Promise<number>,
+        null,
+        async () => {
+          await Book.insertAll([{ format: "UNEXPECTED", author_id: 8, name: "Refactoring" }]);
+        },
+      );
+
       await book.reload();
       expect(book.format).toBe("EXPECTED");
     },
@@ -295,14 +309,21 @@ describe("InsertAllTest", () => {
     "insert_conflict_target",
     "insert all and upsert all with index finding options",
     async () => {
-      const before = (await Book.count()) as number;
-      await Book.insertAll([{ name: "Rework", author_id: 1 }], { uniqueBy: "isbn" });
-      await Book.insertAll([{ name: "Remote", author_id: 1 }], { uniqueBy: ["author_id", "name"] });
-      await Book.insertAll([{ name: "Renote", author_id: 1 }], {
-        uniqueBy: "index_books_on_isbn",
-      });
-      await Book.insertAll([{ name: "Recoat", author_id: 1 }], { uniqueBy: "id" });
-      expect(((await Book.count()) as number) - before).toBe(4);
+      await assertDifference(
+        () => Book.count() as Promise<number>,
+        +4,
+        null,
+        async () => {
+          await Book.insertAll([{ name: "Rework", author_id: 1 }], { uniqueBy: "isbn" });
+          await Book.insertAll([{ name: "Remote", author_id: 1 }], {
+            uniqueBy: ["author_id", "name"],
+          });
+          await Book.insertAll([{ name: "Renote", author_id: 1 }], {
+            uniqueBy: "index_books_on_isbn",
+          });
+          await Book.insertAll([{ name: "Recoat", author_id: 1 }], { uniqueBy: "id" });
+        },
+      );
 
       await expect(
         Book.upsertAll([{ name: "Rework", author_id: 1 }], { uniqueBy: "isbn" }),
@@ -315,11 +336,15 @@ describe("InsertAllTest", () => {
     "insert all and upsert all with expression index",
     async () => {
       const book = await Book.create({ external_id: "abc" });
-      const before = (await Book.count()) as number;
-      await Book.insertAll([{ external_id: "ABC" }], {
-        uniqueBy: "index_books_on_lower_external_id",
-      });
-      expect(((await Book.count()) as number) - before).toBe(0);
+      await assertNoDifference(
+        () => Book.count() as Promise<number>,
+        null,
+        async () => {
+          await Book.insertAll([{ external_id: "ABC" }], {
+            uniqueBy: "index_books_on_lower_external_id",
+          });
+        },
+      );
 
       await Book.upsertAll([{ external_id: "Abc" }], {
         uniqueBy: "index_books_on_lower_external_id",
@@ -333,13 +358,27 @@ describe("InsertAllTest", () => {
     "insert_conflict_target",
     "insert all and upsert all raises when index is missing",
     async () => {
-      for (const missing of ["cats", ["author_id", "isbn"], "author_id"] as const) {
+      for (const missingOrNonUniqueBy of ["cats", ["author_id", "isbn"], "author_id"] as const) {
+        let error!: Error;
         await expect(
-          Book.insertAll([{ name: "Rework", author_id: 1 }], { uniqueBy: missing as any }),
-        ).rejects.toThrow(/No unique index/);
+          Book.insertAll([{ name: "Rework", author_id: 1 }], {
+            uniqueBy: missingOrNonUniqueBy as any,
+          }).catch((e: Error) => {
+            error = e;
+            throw e;
+          }),
+        ).rejects.toThrow(ArgumentError);
+        expect(error.message).toMatch("No unique index");
+
         await expect(
-          Book.upsertAll([{ name: "Rework", author_id: 1 }], { uniqueBy: missing as any }),
-        ).rejects.toThrow(/No unique index/);
+          Book.upsertAll([{ name: "Rework", author_id: 1 }], {
+            uniqueBy: missingOrNonUniqueBy as any,
+          }).catch((e: Error) => {
+            error = e;
+            throw e;
+          }),
+        ).rejects.toThrow(ArgumentError);
+        expect(error.message).toMatch("No unique index");
       }
     },
   );
@@ -348,10 +387,22 @@ describe("InsertAllTest", () => {
     "insert_conflict_target",
     "insert all and upsert all finds index with inverted unique by columns",
     async () => {
-      const before = (await Book.count()) as number;
-      await Book.insertAll([{ name: "Remote", author_id: 1 }], { uniqueBy: ["name", "author_id"] });
-      await Book.upsertAll([{ name: "Rework", author_id: 1 }], { uniqueBy: ["name", "author_id"] });
-      expect(((await Book.count()) as number) - before).toBe(2);
+      const columns = ["author_id", "name"];
+      expect(await (await Base.leaseConnection()).indexExists("books", columns)).toBeTruthy();
+
+      await assertDifference(
+        () => Book.count() as Promise<number>,
+        +2,
+        null,
+        async () => {
+          await Book.insertAll([{ name: "Remote", author_id: 1 }], {
+            uniqueBy: [...columns].reverse(),
+          });
+          await Book.upsertAll([{ name: "Rework", author_id: 1 }], {
+            uniqueBy: [...columns].reverse(),
+          });
+        },
+      );
     },
   );
 
@@ -359,18 +410,29 @@ describe("InsertAllTest", () => {
     "insert_conflict_target",
     "insert all and upsert all works with composite primary keys when unique by is provided",
     async () => {
-      const before = (await Cart.count()) as number;
-      await Cart.insertAll([{ id: 1, shop_id: 1, title: "My cart" }], {
-        uniqueBy: ["shop_id", "id"],
-      });
-      await Cart.upsertAll([{ id: 3, shop_id: 2, title: "My other cart" }], {
-        uniqueBy: ["shop_id", "id"],
-      });
-      expect(((await Cart.count()) as number) - before).toBe(2);
+      await assertDifference(
+        () => Cart.count() as Promise<number>,
+        2,
+        null,
+        async () => {
+          await Cart.insertAll([{ id: 1, shop_id: 1, title: "My cart" }], {
+            uniqueBy: ["shop_id", "id"],
+          });
 
-      await expect(Cart.insertAllBang([{ id: 2, shop_id: 1, title: "My cart" }])).rejects.toThrow(
-        /No unique index found for id/,
+          await Cart.upsertAll([{ id: 3, shop_id: 2, title: "My other cart" }], {
+            uniqueBy: ["shop_id", "id"],
+          });
+        },
       );
+
+      let error!: Error;
+      await expect(
+        Cart.insertAllBang([{ id: 2, shop_id: 1, title: "My cart" }]).catch((e: Error) => {
+          error = e;
+          throw e;
+        }),
+      ).rejects.toThrow(ArgumentError);
+      expect(error.message).toMatch("No unique index found for id");
     },
   );
 
@@ -416,7 +478,19 @@ describe("InsertAllTest", () => {
     "insert_on_duplicate_update",
     "insert all and upsert all with aliased attributes",
     async () => {
-      await assertInsertAllReturningAlias();
+      if (supportsInsertReturning) {
+        await assertDifference(
+          () => Book.count() as Promise<number>,
+          1,
+          null,
+          async () => {
+            const result = await Book.insertAll([{ title: "Remote", author_id: 1 }], {
+              returning: ":title",
+            });
+            expect(result.columns).toContain("title");
+          },
+        );
+      }
 
       await Book.upsertAll([{ id: 101, title: "Perelandra", author_id: 7, isbn: "1974522598" }]);
       await Book.upsertAll([{ id: 101, title: "Perelandra 2", author_id: 6, isbn: "111111" }], {
@@ -522,9 +596,16 @@ describe("InsertAllTest", () => {
     "insert_conflict_target",
     "upsert all updates existing record by configured primary key fails when database supports insert conflict target",
     async () => {
+      let error!: Error;
       await expect(
-        Speedometer.upsertAll([{ speedometer_id: "s1", name: "New Speedometer" }]),
-      ).rejects.toThrow(/No unique index found for speedometer_id/);
+        Speedometer.upsertAll([{ speedometer_id: "s1", name: "New Speedometer" }]).catch(
+          (e: Error) => {
+            error = e;
+            throw e;
+          },
+        ),
+      ).rejects.toThrow(ArgumentError);
+      expect(error.message).toMatch("No unique index found for speedometer_id");
     },
   );
 
@@ -648,7 +729,10 @@ describe("InsertAllTest", () => {
       await Book.upsertAll([
         { id: 101, name: "Out of the Silent Planet", published_on: "1938-04-01" },
       ]);
-      expect(getYear(((await Book.find(101)) as any).updated_at)).toBe(2018);
+      expect(epochSeconds(((await Book.find(101)) as any).updated_at)).toBeCloseTo(
+        epochSeconds(updatedAt),
+        0,
+      );
     },
   );
 
@@ -699,7 +783,7 @@ describe("InsertAllTest", () => {
         const ua = ((await Book.find(101)) as any).updated_at as RubyTime | null;
         if (ua) hasSubsecond = usec(ua) > 0;
       }
-      expect(hasSubsecond).toBe(true);
+      expect(hasSubsecond).toBeTruthy();
     },
   );
 
@@ -727,7 +811,10 @@ describe("InsertAllTest", () => {
           updated_at: updatedAt,
         },
       ]);
-      expect(getYear(((await Book.find(101)) as any).updated_at)).toBe(2025);
+      expect(epochSeconds(((await Book.find(101)) as any).updated_at)).toBeCloseTo(
+        epochSeconds(updatedAt),
+        0,
+      );
     },
   );
 
@@ -836,7 +923,7 @@ describe("InsertAllTest", () => {
           if (ca) hasSubsecond = usec(ca) > 0;
         }
       });
-      expect(hasSubsecond).toBe(true);
+      expect(hasSubsecond).toBeTruthy();
     },
   );
 
@@ -1170,13 +1257,16 @@ describe("InsertAllTest", () => {
     "upsert all with unique by fails cleanly for adapters not supporting insert conflict target",
     async () => {
       const connection = await Base.leaseConnection();
-      const error = await Book.upsertAll([{ name: "Rework", author_id: 1 }], {
-        uniqueBy: "isbn",
-      }).catch((e: unknown) => e);
-      expect(error).toBeInstanceOf(ArgumentError);
-      expect((error as Error).message).toContain(
-        `${connection.constructor.name} does not support :unique_by`,
-      );
+      let error!: Error;
+      await expect(
+        Book.upsertAll([{ name: "Rework", author_id: 1 }], { uniqueBy: "isbn" }).catch(
+          (e: Error) => {
+            error = e;
+            throw e;
+          },
+        ),
+      ).rejects.toThrow(ArgumentError);
+      expect(error.message).toMatch(`${connection.constructor.name} does not support :unique_by`);
     },
   );
 
