@@ -3841,13 +3841,12 @@ describe("HasManyAssociationsTest", () => {
       expect((await firstTopic.replies.toArray()).length).toBe(2);
     });
 
-    it.skip("build via block", async () => {
-      // BLOCKED: has-many-build-accepts-block
+    it("build via block", async () => {
       const company = firms2("first_firm") as any;
 
       let newClient: any;
       await assertQueriesCount(0, false, async () => {
-        newClient = company.clientsOfFirm.build((client: any) => {
+        newClient = company.clientsOfFirm.build(undefined, (client: any) => {
           client.name = "Another Client";
         });
       });
