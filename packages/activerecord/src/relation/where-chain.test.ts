@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import "../index.js";
 import { Range } from "../index.js";
+import { ArgumentError } from "@blazetrails/activemodel";
+import { isBlank as blank } from "@blazetrails/activesupport";
+import { Nodes } from "@blazetrails/arel";
 import { registerModel } from "../associations.js";
 import { fixtures } from "../test-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
@@ -22,8 +25,6 @@ registerModel(CpkAuthor);
 registerModel(CpkBook);
 
 const ids = (records: unknown[]): unknown[] => records.map((r) => (r as any).id);
-const includesRecord = (records: unknown[], record: unknown): boolean =>
-  records.some((r) => (r as any).id === (record as any).id);
 
 describe("WhereChainTest", () => {
   const { posts, comments, authors, humans } = fixtures([
@@ -41,26 +42,34 @@ describe("WhereChainTest", () => {
 
   it("associated with association", async () => {
     const relation = await Post.all().where().associated("author");
-    expect(includesRecord(relation, posts("welcome"))).toBe(true);
-    expect(includesRecord(relation, posts("sti_habtm"))).toBe(true);
-    expect(includesRecord(relation, posts("authorless"))).toBe(false);
+    expect(relation).toContainEqual(posts("welcome"));
+    expect(relation).toContainEqual(posts("sti_habtm"));
+    expect(relation).not.toContainEqual(posts("authorless"));
   });
 
   it("associated with child association", async () => {
     const relation = await Comment.all().where().associated("children");
-    expect(includesRecord(relation, comments("greetings"))).toBe(true);
-    expect(includesRecord(relation, comments("more_greetings"))).toBe(false);
+    expect(relation).toContainEqual(comments("greetings"));
+    expect(relation).not.toContainEqual(comments("more_greetings"));
   });
 
   it("associated with multiple associations", async () => {
     const relation = await Post.all().where().associated("author", "comments");
-    expect(includesRecord(relation, posts("welcome"))).toBe(true);
-    expect(includesRecord(relation, posts("sti_habtm"))).toBe(false);
-    expect(includesRecord(relation, posts("authorless"))).toBe(false);
+    expect(relation).toContainEqual(posts("welcome"));
+    expect(relation).not.toContainEqual(posts("sti_habtm"));
+    expect(relation).not.toContainEqual(posts("authorless"));
   });
 
-  it("associated with invalid association name", () => {
-    expect(() => Post.all().where().associated("cars")).toThrow(
+  it("associated with invalid association name", async () => {
+    const run = async () => Post.all().where().associated("cars");
+    const e = await run().then(
+      () => undefined,
+      (err: Error) => err,
+    );
+    expect(() => {
+      throw e;
+    }).toThrow(ArgumentError);
+    expect((e as Error).message).toMatch(
       /An association named `:cars` does not exist on the model `Post`\./,
     );
   });
@@ -189,46 +198,56 @@ describe("WhereChainTest", () => {
 
   it("associated with add joins before", async () => {
     const relation = await Comment.joins(":children").where().associated("children");
-    expect(includesRecord(relation, comments("greetings"))).toBe(true);
-    expect(includesRecord(relation, comments("more_greetings"))).toBe(false);
+    expect(relation).toContainEqual(comments("greetings"));
+    expect(relation).not.toContainEqual(comments("more_greetings"));
   });
 
   it("associated with add left joins before", async () => {
     const relation = await Comment.leftJoins(":children").where().associated("children");
-    expect(includesRecord(relation, comments("greetings"))).toBe(true);
-    expect(includesRecord(relation, comments("more_greetings"))).toBe(false);
+    expect(relation).toContainEqual(comments("greetings"));
+    expect(relation).not.toContainEqual(comments("more_greetings"));
   });
 
   it("associated with add left outer joins before", async () => {
     const relation = await Comment.leftOuterJoins(":children").where().associated("children");
-    expect(includesRecord(relation, comments("greetings"))).toBe(true);
-    expect(includesRecord(relation, comments("more_greetings"))).toBe(false);
+    expect(relation).toContainEqual(comments("greetings"));
+    expect(relation).not.toContainEqual(comments("more_greetings"));
   });
 
   it("associated with composite primary key", async () => {
     const author = await CpkAuthor.create({ name: "Cpk" });
     await CpkBook.create({ id: [(author as any).id, 2] });
-    expect(await CpkAuthor.all().where().associated("books").exists()).toBe(true);
+    expect(await CpkAuthor.all().where().associated("books").isAny()).toBeTruthy();
   });
 
   it("missing with association", async () => {
+    expect(blank(await (posts("authorless") as any).author)).toBeTruthy();
     const relation = await Post.all().where().missing("author");
     expect(ids(relation)).toEqual([posts("authorless").id]);
   });
 
   it("missing with child association", async () => {
     const relation = await Comment.all().where().missing("children");
-    expect(includesRecord(relation, comments("more_greetings"))).toBe(true);
-    expect(includesRecord(relation, comments("greetings"))).toBe(false);
+    expect(relation).toContainEqual(comments("more_greetings"));
+    expect(relation).not.toContainEqual(comments("greetings"));
   });
 
-  it("missing with invalid association name", () => {
-    expect(() => Post.all().where().missing("cars")).toThrow(
+  it("missing with invalid association name", async () => {
+    const run = async () => Post.all().where().missing("cars");
+    const e = await run().then(
+      () => undefined,
+      (err: Error) => err,
+    );
+    expect(() => {
+      throw e;
+    }).toThrow(ArgumentError);
+    expect((e as Error).message).toMatch(
       /An association named `:cars` does not exist on the model `Post`\./,
     );
   });
 
   it("missing with multiple association", async () => {
+    expect(await (posts("authorless") as any).comments.isEmpty()).toBeTruthy();
     const relation = await Post.all().where().missing("author", "comments");
     expect(ids(relation)).toEqual([posts("authorless").id]);
   });
@@ -354,7 +373,7 @@ describe("WhereChainTest", () => {
 
   it("missing with composite primary key", async () => {
     await CpkBook.create({ id: [1, 2] });
-    expect(await CpkBook.all().where().missing("author").exists()).toBe(true);
+    expect(await CpkBook.all().where().missing("author").isAny()).toBeTruthy();
   });
 
   it("not inverts where clause", () => {
@@ -372,29 +391,27 @@ describe("WhereChainTest", () => {
   });
 
   it("association not eq", () => {
+    const expected = (Comment as any).arelTable.get("title").notEq(new Nodes.BindParam(1));
     const relation = Post.joins(":comments")
       .where()
       .not({ comments: { title: "hello" } });
-    const sql = relation.toSql();
-    expect(sql).toMatch(/comments/);
-    expect(sql).toMatch(/title/);
-    expect(sql).toMatch(/!=|<>|IS NOT/);
+    expect(relation.whereClause.ast.toSql()).toEqual(expected.toSql());
   });
 
   it("not eq with preceding where", () => {
     const relation = Post.where({ title: "hello" }).where().not({ title: "world" });
-    const sql = relation.toSql();
-    expect(sql).toContain("hello");
-    expect(sql).toContain("world");
-    expect(sql).toMatch(/!=|<>/);
+    const expectedWhereClause = Post.where({ title: "hello" }).whereClause.plus(
+      Post.where({ title: "world" }).whereClause.invert(),
+    );
+    expect(relation.whereClause).toEqual(expectedWhereClause);
   });
 
   it("not eq with succeeding where", () => {
     const relation = Post.all().where().not({ title: "hello" }).where({ title: "world" });
-    const sql = relation.toSql();
-    expect(sql).toContain("hello");
-    expect(sql).toContain("world");
-    expect(sql).toMatch(/!=|<>/);
+    const expectedWhereClause = Post.where({ title: "hello" })
+      .whereClause.invert()
+      .plus(Post.where({ title: "world" }).whereClause);
+    expect(relation.whereClause).toEqual(expectedWhereClause);
   });
 
   it("chaining multiple", () => {
@@ -403,9 +420,10 @@ describe("WhereChainTest", () => {
       .not({ author_id: [1, 2] })
       .where()
       .not({ title: "ruby on rails" });
-    const sql = relation.toSql();
-    expect(sql).toContain("ruby on rails");
-    expect(sql).toMatch(/NOT IN|!=|<>/);
+    const expectedWhereClause = Post.where({ author_id: [1, 2] })
+      .whereClause.invert()
+      .plus(Post.where({ title: "ruby on rails" }).whereClause.invert());
+    expect(relation.whereClause).toEqual(expectedWhereClause);
   });
 
   it("rewhere with one condition", async () => {
