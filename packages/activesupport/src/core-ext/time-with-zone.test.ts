@@ -1140,7 +1140,7 @@ describe("TimeWithZoneTest", () => {
     // BLOCKED: activesupport-time-with-zone-to-time-preserve-timezone-deprecation
     setPreserveTimezone(null);
     await withEnvTz("US/Eastern", async () => {
-      const time = await assertDeprecated(deprecator(), () => twz.toTime());
+      const time: any = await assertDeprecated(null, deprecator(), () => twz.toTime());
 
       expect(time.constructor).toEqual(RubyTime);
       expect(time).toBe(twz.toTime());
@@ -1163,10 +1163,10 @@ describe("TimeWithZoneTest", () => {
     const marshalStr = Marshal.dump(twz);
     const mtime = Marshal.load(marshalStr);
     expect(mtime.utc()).toEqual(RubyTime.utc(2000, 1, 1, 0));
-    assertPredicate(mtime.utc(), "isUtc");
+    assertPredicate(mtime.utc(), (t: any) => t.isUtc());
     expect(mtime.timeZone).toEqual(TimeZone.find("Eastern Time (US & Canada)"));
     expect(mtime.time).toEqual(RubyTime.utc(1999, 12, 31, 19));
-    assertPredicate(mtime.time, "isUtc");
+    assertPredicate(mtime.time, (t: any) => t.isUtc());
     expect(mtime.inspect()).toEqual(twz.inspect());
   });
 
@@ -1177,10 +1177,10 @@ describe("TimeWithZoneTest", () => {
     const marshalStr = Marshal.dump(twz);
     const mtime = Marshal.load(marshalStr);
     expect(mtime.utc()).toEqual(RubyTime.utc(2000, 1, 1, 0));
-    assertPredicate(mtime.utc(), "isUtc");
+    assertPredicate(mtime.utc(), (t: any) => t.isUtc());
     expect(mtime.timeZone.name).toEqual("America/New_York");
     expect(mtime.time).toEqual(RubyTime.utc(1999, 12, 31, 19));
-    assertPredicate(mtime.time, "isUtc");
+    assertPredicate(mtime.time, (t: any) => t.isUtc());
     expect(mtime.inspect()).toEqual(twz.inspect());
   });
 

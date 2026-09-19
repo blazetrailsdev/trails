@@ -44,7 +44,7 @@ describe("SuppressorTest", () => {
   });
 
   it("suppresses create in callback", async () => {
-    await assertDifference(userCount, async () => {
+    await assertDifference(userCount, 1, null, async () => {
       await assertNoDifference(notificationCount, null, async () => {
         await Notification.suppress(async () => {
           await UserWithNotification.createBang();
@@ -58,7 +58,7 @@ describe("SuppressorTest", () => {
       await UserWithNotification.createBang();
     });
 
-    await assertDifference(notificationCount, async () => {
+    await assertDifference(notificationCount, 1, null, async () => {
       await Notification.createBang({ message: "New Comment" });
     });
   });

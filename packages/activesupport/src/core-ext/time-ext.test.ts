@@ -617,7 +617,7 @@ describe("TimeExtCalculationsTest", () => {
 
   it.skip("since with instance of time deprecated", async () => {
     // BLOCKED: activesupport-time-since-time-instance-deprecation
-    await assertDeprecated(deprecator(), () => {
+    await assertDeprecated(null, deprecator(), () => {
       (RubyTime.now() as any).since(RubyTime.now());
     });
   });
@@ -1040,7 +1040,7 @@ describe("TimeExtCalculationsTest", () => {
         new Rational(99, 100),
         timeZone(),
       ).plus(0);
-      const time2 = change(time, { month: 1 });
+      const time2 = change(time, { month: 1 }) as any;
 
       expect(time.inspect()).toEqual("2005-10-30 00:00:00.99 -0400");
       expect(time2.inspect()).toEqual("2005-01-30 00:00:00.99 -0500");
