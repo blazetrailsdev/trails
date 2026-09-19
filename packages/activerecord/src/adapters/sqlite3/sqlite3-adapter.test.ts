@@ -585,11 +585,10 @@ describeIfSqlite("SQLite3AdapterTest", () => {
 
   it("columns with not null", async () => {
     await adapter.execute(
-      `CREATE TABLE "strict_items" ("id" INTEGER PRIMARY KEY, "name" TEXT NOT NULL)`,
+      `CREATE TABLE "ex" (id integer PRIMARY KEY AUTOINCREMENT, number integer not null)`,
     );
-    const cols = (await adapter.execute(`PRAGMA table_info("strict_items")`))!;
-    const nameCol = cols.find((c: any) => c.name === "name");
-    expect(nameCol!.notnull).toBe(1);
+    const column = (await adapter.columns("ex")).find((x) => x.name === "number")!;
+    expect(column.null).toBeFalsy();
   });
 
   it("add column with not null", async () => {
@@ -611,18 +610,19 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("index with if not exists", async () => {
-    await adapter.execute(`CREATE INDEX IF NOT EXISTS "idx_items_name" ON "items" ("name")`);
-    await adapter.execute(`CREATE INDEX IF NOT EXISTS "idx_items_name" ON "items" ("name")`);
-    const rows = (await adapter.execute(`PRAGMA index_list("items")`))!;
-    const matching = rows.filter((r: any) => r.name === "idx_items_name");
-    expect(matching).toHaveLength(1);
+    await createExampleTable();
+    await adapter.addIndex("ex", "id");
+
+    await assertNothingRaised(async () => {
+      await adapter.addIndex("ex", "id", { ifNotExists: true });
+    });
   });
 
   it("non unique index", async () => {
     await adapter.execute(`CREATE INDEX "fun" ON "items" ("id")`);
     const indexes = (await adapter.indexes("items")) as any[];
     const index = indexes.find((idx) => idx.name === "fun");
-    expect(index.unique).toBe(false);
+    expect(index.unique).toBeFalsy();
   });
 
   it("compound index", async () => {
@@ -693,10 +693,8 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("no primary key", async () => {
-    await adapter.execute(`CREATE TABLE "no_pk" ("a" TEXT, "b" TEXT)`);
-    const cols = (await adapter.execute(`PRAGMA table_info("no_pk")`))!;
-    const pkCols = cols.filter((c: any) => c.pk > 0);
-    expect(pkCols).toHaveLength(0);
+    await adapter.execute(`CREATE TABLE "ex" (number integer not null)`);
+    expect(await adapter.primaryKey("ex")).toBeNull();
   });
 
   it("copy table with existing records have custom primary key", async () => {
