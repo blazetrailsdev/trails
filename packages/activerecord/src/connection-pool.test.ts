@@ -1,4 +1,5 @@
-import { it, expect, vi } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+import { fixtures } from "./test-fixtures.js";
 import { Process, Thread, ThreadError } from "@blazetrails/ruby-compat";
 import {
   Notifications,
@@ -453,33 +454,37 @@ it("connection notification is called for shard", async () => {
   }
 });
 
-it("sets pool schema reflection", async () => {
-  const pool = makePool();
-  await pool.schemaCache.add("posts");
-  expect(await pool.schemaCache.isCached("posts")).toBeTruthy();
+describe("ConnectionPoolTest", () => {
+  fixtures(["posts"]);
 
-  pool.schemaReflection = new SchemaReflection("does-not-exist");
-  expect(await pool.schemaCache.isCached("posts")).toBeFalsy();
+  it("sets pool schema reflection", async () => {
+    const pool = makePool();
+    await pool.schemaCache.add("posts");
+    expect(await pool.schemaCache.isCached("posts")).toBeTruthy();
 
-  await pool.schemaCache.add("posts");
-  expect(await pool.schemaCache.isCached("posts")).toBeTruthy();
-});
+    pool.schemaReflection = new SchemaReflection("does-not-exist");
+    expect(await pool.schemaCache.isCached("posts")).toBeFalsy();
 
-it("pool sets connection schema cache", async () => {
-  const pool = makePool();
-  await pool.schemaCache.add("posts");
-  const connection = await pool.checkout();
-
-  await pool.withConnection(async (conn) => {
-    expect(conn).not.toBe(connection);
-
-    expect(await connection.schemaCache.size()).toBe(await conn.schemaCache.size());
-    expect(await connection.schemaCache.columns("posts")).toBe(
-      await conn.schemaCache.columns("posts"),
-    );
+    await pool.schemaCache.add("posts");
+    expect(await pool.schemaCache.isCached("posts")).toBeTruthy();
   });
 
-  pool.checkin(connection);
+  it("pool sets connection schema cache", async () => {
+    const pool = makePool();
+    await pool.schemaCache.add("posts");
+    const connection = await pool.checkout();
+
+    await pool.withConnection(async (conn) => {
+      expect(conn).not.toBe(connection);
+
+      expect(await connection.schemaCache.size()).toBe(await conn.schemaCache.size());
+      expect(await connection.schemaCache.columns("posts")).toBe(
+        await conn.schemaCache.columns("posts"),
+      );
+    });
+
+    pool.checkin(connection);
+  });
 });
 
 it("connection pool stat", async () => {
