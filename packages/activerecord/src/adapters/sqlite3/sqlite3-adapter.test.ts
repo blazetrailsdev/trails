@@ -412,32 +412,26 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("tables", async () => {
-    const rows = (await adapter.execute(
-      `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`,
-    ))!;
-    const names = rows.map((r: any) => r.name);
-    expect(names).toEqual(["items"]);
+    await adapter.execute(`DROP TABLE IF EXISTS items`);
+    await createExampleTable();
+    expect(await adapter.tables()).toEqual(["ex"]);
+    await adapter.execute(
+      `CREATE TABLE "people" ("id" integer PRIMARY KEY AUTOINCREMENT, "number" integer)`,
+    );
     try {
-      await adapter.execute(
-        `CREATE TABLE "people" ("id" integer PRIMARY KEY AUTOINCREMENT, "number" integer)`,
-      );
-      const both = (
-        (await adapter.execute(
-          `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`,
-        )) as any[]
-      ).map((r: any) => r.name);
-      expect(both.sort()).toEqual(["items", "people"].sort());
+      expect((await adapter.tables()).sort()).toEqual(["ex", "people"].sort());
     } finally {
       await adapter.execute(`DROP TABLE IF EXISTS "people"`);
     }
   });
 
   it("columns", async () => {
-    const cols = (await adapter.execute(`PRAGMA table_info("items")`))!;
-    const names = cols.map((c: any) => c.name);
-    expect(names).toContain("id");
-    expect(names).toContain("name");
-    expect(names).toContain("price");
+    await createExampleTable();
+    const columns = (await adapter.columns("ex")).sort((a, b) => a.name.localeCompare(b.name));
+    expect(columns.length).toEqual(2);
+    expect(columns.map((c) => c.name)).toEqual(["id", "number"]);
+    expect(columns.map((c) => c.default)).toEqual([null, null]);
+    expect(columns.map((c) => c.null)).toEqual([true, true]);
   });
 
   it("columns with default", async () => {
