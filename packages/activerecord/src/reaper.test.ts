@@ -98,8 +98,8 @@ describe("ReaperTest", () => {
     const pool = makePool();
     pool._discarded = true;
     await assertNothingRaised(async () => {
-      await pool.reap();
-      await pool.flush();
+      await pool.reap?.();
+      await pool.flush?.();
     });
   });
 
