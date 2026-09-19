@@ -2,6 +2,7 @@ import { describe, expect, beforeEach, afterEach } from "vitest";
 
 import { ExplainSubscriber } from "./explain-subscriber.js";
 import { ExplainRegistry } from "./explain-registry.js";
+import { assertEmpty } from "@blazetrails/activesupport";
 import { itIfSupports } from "./support/supports.js";
 
 const SUBSCRIBER = new ExplainSubscriber();
@@ -18,20 +19,20 @@ describe("ExplainSubscriberTest", () => {
 
   itIfSupports("explain", "collects nothing if the payload has an exception", () => {
     SUBSCRIBER.finish(null, null, { exception: new Error("boom") });
-    expect(ExplainRegistry.queries).toEqual([]);
+    assertEmpty(ExplainRegistry.queries);
   });
 
   itIfSupports("explain", "collects nothing for ignored payloads", () => {
     for (const ip of ExplainSubscriber.IGNORED_PAYLOADS) {
       SUBSCRIBER.finish(null, null, { name: ip });
     }
-    expect(ExplainRegistry.queries).toEqual([]);
+    assertEmpty(ExplainRegistry.queries);
   });
 
   itIfSupports("explain", "collects nothing if collect is false", () => {
     ExplainRegistry.collect = false;
     SUBSCRIBER.finish(null, null, { name: "SQL", sql: "select 1 from users", binds: [1, 2] });
-    expect(ExplainRegistry.queries).toEqual([]);
+    assertEmpty(ExplainRegistry.queries);
   });
 
   itIfSupports("explain", "collects pairs of queries and binds", () => {
@@ -45,12 +46,12 @@ describe("ExplainSubscriberTest", () => {
 
   itIfSupports("explain", "collects nothing if the statement is not explainable", () => {
     SUBSCRIBER.finish(null, null, { name: "SQL", sql: "SHOW max_identifier_length" });
-    expect(ExplainRegistry.queries).toEqual([]);
+    assertEmpty(ExplainRegistry.queries);
   });
 
   itIfSupports("explain", "collects nothing if the statement is only partially matched", () => {
     SUBSCRIBER.finish(null, null, { name: "SQL", sql: "select_db yo_mama" });
-    expect(ExplainRegistry.queries).toEqual([]);
+    assertEmpty(ExplainRegistry.queries);
   });
 
   itIfSupports("explain", "collects cte queries", () => {

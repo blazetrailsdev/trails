@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { assertEmpty } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { adapterType } from "./test-adapter.js";
@@ -6,9 +7,8 @@ import { PreparedStatementCacheExpired } from "./errors.js";
 import type { StatementPool } from "./connection-adapters/postgresql-adapter.js";
 import { fixtures } from "./test-fixtures.js";
 
-function preparedStatementCacheSize(adapter: DatabaseAdapter): number {
-  const pool = (adapter as unknown as { _statements?: StatementPool })._statements;
-  return pool?.length ?? 0;
+function getPreparedStatementCache(connection: DatabaseAdapter): StatementPool {
+  return (connection as unknown as { _statements: StatementPool })._statements;
 }
 
 describe("HotCompatibilityTest", () => {
@@ -81,66 +81,67 @@ describe("HotCompatibilityTest", () => {
     }
   });
 
-  async function assertPreparedStatementCleanup(
-    ddlConnection: DatabaseAdapter,
-    staleReload: (model: typeof Base, record: { reload(): Promise<unknown> }) => Promise<unknown>,
-  ): Promise<void> {
-    const adapter = await Base.leaseConnection();
-    await adapter.createTable("hot_compatibilities", { force: true }, (t) => {
-      t.string("foo");
-      t.string("bar");
-    });
-    try {
-      class HotCompatibility extends Base {}
-      HotCompatibility.tableName = "hot_compatibilities";
-
-      const record = await HotCompatibility.create({ bar: "bar" });
-
-      await HotCompatibility.transaction(async () => {
-        await record.reload();
-      });
-
-      expect(preparedStatementCacheSize(adapter)).toBeGreaterThan(0);
-
-      await ddlConnection.addColumn("hot_compatibilities", "baz", "string");
-
-      await expect(staleReload(HotCompatibility, record)).rejects.toBeInstanceOf(
-        PreparedStatementCacheExpired,
-      );
-
-      expect(preparedStatementCacheSize(adapter)).toBe(0);
-    } finally {
-      await adapter.dropTable("hot_compatibilities", { ifExists: true });
-    }
-  }
-
   it.skipIf(adapterType !== "postgres")(
     "cleans up after prepared statement failure in a transaction",
     async () => {
-      await withTwoConnections((ddlConnection) =>
-        assertPreparedStatementCleanup(ddlConnection, (model, record) =>
-          model.transaction(async () => {
+      await withTwoConnections(async (ddlConnection) => {
+        const { klass, adapter } = await setupHotCompatibility();
+        try {
+          const record = await klass.createBang({ bar: "bar" });
+
+          await klass.transaction(async () => {
             await record.reload();
-          }),
-        ),
-      );
+          });
+
+          expect(getPreparedStatementCache(adapter).length > 0).toBeTruthy();
+
+          await ddlConnection.addColumn("hot_compatibilities", "baz", "string");
+
+          await expect(
+            klass.transaction(async () => {
+              await record.reload();
+            }),
+          ).rejects.toThrow(PreparedStatementCacheExpired);
+
+          assertEmpty(getPreparedStatementCache(adapter));
+        } finally {
+          await adapter.dropTable("hot_compatibilities", { ifExists: true });
+        }
+      });
     },
   );
 
   it.skipIf(adapterType !== "postgres")(
     "cleans up after prepared statement failure in nested transactions",
     async () => {
-      await withTwoConnections((ddlConnection) =>
-        assertPreparedStatementCleanup(ddlConnection, (model, record) =>
-          model.transaction(async () => {
-            await model.transaction(async () => {
-              await model.transaction(async () => {
-                await record.reload();
+      await withTwoConnections(async (ddlConnection) => {
+        const { klass, adapter } = await setupHotCompatibility();
+        try {
+          const record = await klass.createBang({ bar: "bar" });
+
+          await klass.transaction(async () => {
+            await record.reload();
+          });
+
+          expect(getPreparedStatementCache(adapter).length > 0).toBeTruthy();
+
+          await ddlConnection.addColumn("hot_compatibilities", "baz", "string");
+
+          await expect(
+            klass.transaction(async () => {
+              await klass.transaction(async () => {
+                await klass.transaction(async () => {
+                  await record.reload();
+                });
               });
-            });
-          }),
-        ),
-      );
+            }),
+          ).rejects.toThrow(PreparedStatementCacheExpired);
+
+          assertEmpty(getPreparedStatementCache(adapter));
+        } finally {
+          await adapter.dropTable("hot_compatibilities", { ifExists: true });
+        }
+      });
     },
   );
 });

@@ -421,7 +421,8 @@ export function assertNotEmpty(actual: unknown, message?: string): void {
 }
 
 function collectionSize(actual: unknown): number {
-  const collection = actual as { length?: number; size?: number };
+  const collection = actual as { length?: number; size?: number; isEmpty?: () => boolean };
+  if (typeof collection?.isEmpty === "function") return collection.isEmpty() ? 0 : 1;
   if (typeof collection?.length === "number") return collection.length;
   if (typeof collection?.size === "number") return collection.size;
   return Object.keys(actual as object).length;

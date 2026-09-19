@@ -753,6 +753,10 @@ describe("FinderTest", () => {
     expect(developersRel.every((d) => (d as { salary: number }).salary > 10000)).toBeTruthy();
   });
 
+  it("find with string", async () => {
+    expect((await Topic.find(1)).title).toBe((await Topic.find("1")).title);
+  });
+
   it("find with entire select statement", async () => {
     const topicsResult = await Topic.findBySql("SELECT * FROM topics WHERE author_name = 'Mary'");
 

@@ -30,7 +30,7 @@ describe("NumericDataTest", () => {
       world_population: 6000000000,
       my_house_population: 3,
     });
-    expect(await m.save()).toBe(true);
+    expect(await m.save()).toBeTruthy();
     expect(await NumericData.where("bank_balance > ?", 2000.0).count()).toBe(0);
   });
 
@@ -41,17 +41,17 @@ describe("NumericDataTest", () => {
       world_population: 2n ** 62n,
       my_house_population: 3,
     });
-    expect(await m.save()).toBe(true);
+    expect(await m.save()).toBeTruthy();
 
     const m1 = await NumericData.findBy({
       bank_balance: 1586.43,
       big_bank_balance: "1000234000567.95",
     });
 
-    expect(typeof m1!.world_population).toBe("bigint");
+    expect(Object(m1!.world_population)).toBeInstanceOf(BigInt);
     expect(m1!.world_population).toBe(2n ** 62n);
 
-    expect(typeof m1!.my_house_population).toBe("number");
+    expect(Object(m1!.my_house_population)).toBeInstanceOf(Number);
     expect(m1!.my_house_population).toBe(3);
 
     expect(m1!.bank_balance).toBeInstanceOf(BigDecimal);
@@ -68,17 +68,17 @@ describe("NumericDataTest", () => {
       world_population: 2n ** 62n,
       my_house_population: 3,
     });
-    expect(await m.save()).toBe(true);
+    expect(await m.save()).toBeTruthy();
 
     const m1 = await NumericData.findBy({
       bank_balance: 1586.43122334,
       big_bank_balance: "234000567.952344",
     });
 
-    expect(typeof m1!.world_population).toBe("bigint");
+    expect(Object(m1!.world_population)).toBeInstanceOf(BigInt);
     expect(m1!.world_population).toBe(2n ** 62n);
 
-    expect(typeof m1!.my_house_population).toBe("number");
+    expect(Object(m1!.my_house_population)).toBeInstanceOf(Number);
     expect(m1!.my_house_population).toBe(3);
 
     expect(m1!.bank_balance).toBeInstanceOf(BigDecimal);
@@ -95,16 +95,16 @@ describe("NumericDataTest", () => {
       world_population: 2n ** 62n,
       my_house_population: 3,
     });
-    expect(m.bank_balance!.isNan()).toBe(true);
-    expect(m.big_bank_balance!.isNan()).toBe(true);
-    expect(await m.save()).toBe(true);
+    expect(m.bank_balance!.isNan()).toBeTruthy();
+    expect(m.big_bank_balance!.isNan()).toBeTruthy();
+    expect(await m.save()).toBeTruthy();
 
     const m1 = await NumericData.findBy({
       bank_balance: BigDecimal.NAN,
       big_bank_balance: BigDecimal.NAN,
     });
 
-    expect(m1!.bank_balance!.isNan()).toBe(true);
-    expect(m1!.big_bank_balance!.isNan()).toBe(true);
+    expect(m1!.bank_balance!.isNan()).toBeTruthy();
+    expect(m1!.big_bank_balance!.isNan()).toBeTruthy();
   });
 });

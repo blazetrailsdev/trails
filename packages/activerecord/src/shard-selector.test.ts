@@ -31,7 +31,7 @@ describe("ShardSelectorTest", () => {
   it("middleware locks to shard by default", async () => {
     const middleware = new ShardSelector(
       async () => {
-        expect(Base.isShardSwappingProhibited()).toBe(true);
+        expect(Base.isShardSwappingProhibited()).toBeTruthy();
         return [200, {}, ["body"]];
       },
       () => "shard_one",
@@ -43,7 +43,7 @@ describe("ShardSelectorTest", () => {
   it("middleware can turn off lock option", async () => {
     const middleware = new ShardSelector(
       async () => {
-        expect(Base.isShardSwappingProhibited()).toBe(false);
+        expect(Base.isShardSwappingProhibited()).toBeFalsy();
         return [200, {}, ["body"]];
       },
       () => "shard_one",
@@ -57,7 +57,7 @@ describe("ShardSelectorTest", () => {
     await setupShards();
     const middleware = new ShardSelector(
       async () => {
-        expect(Base.connectedToQ({ role: "writing", shard: "shard_one" })).toBe(true);
+        expect(Base.connectedToQ({ role: "writing", shard: "shard_one" })).toBeTruthy();
         return [200, {}, ["body"]];
       },
       () => "shard_one",
@@ -69,7 +69,7 @@ describe("ShardSelectorTest", () => {
     await setupShards();
     const middleware = new ShardSelector(
       async () => {
-        expect(Base.connectedToQ({ role: "writing", shard: "shard_one" })).toBe(true);
+        expect(Base.connectedToQ({ role: "writing", shard: "shard_one" })).toBeTruthy();
         return [200, {}, ["body"]];
       },
       () => "shard_one",

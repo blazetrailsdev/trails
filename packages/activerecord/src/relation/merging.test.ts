@@ -9,6 +9,8 @@ import { itIfSupports } from "../support/supports.js";
 import { assertQueriesCount, assertQueriesMatch } from "../testing/query-assertions.js";
 import { quoteTableName } from "../support/quote-regex.js";
 import { regexpEscape } from "@blazetrails/ruby-compat";
+import { assertEmpty, assertNotEmpty } from "@blazetrails/activesupport";
+import { currentAdapter } from "../support/adapter-helper.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Developer } from "../test-helpers/models/developer.js";
 import { Comment, CommentThatAutomaticallyAltersPostBody } from "../test-helpers/models/comment.js";
@@ -168,6 +170,21 @@ describe("RelationMergingTest", () => {
         expect(await ids(nonMaryAndBob.merge(nonMaryAndBob))).toEqual([david.id]);
       },
     );
+
+    const onlyDavid = Author.where(`${authorId} IN (?)`, david);
+
+    const preparedStatements = ((await Author.leaseConnection()) as any).preparedStatements;
+    const matcher = preparedStatements
+      ? currentAdapter("PostgreSQLAdapter")
+        ? new RegExp(`WHERE \\(${regexpEscape(authorId)} IN \\(\\$1\\)\\)$`)
+        : new RegExp(`WHERE \\(${regexpEscape(authorId)} IN \\(\\?\\)\\)$`)
+      : currentAdapter("Mysql2Adapter", "TrilogyAdapter")
+        ? new RegExp(`WHERE \\(${regexpEscape(authorId)} IN \\('1'\\)\\)$`)
+        : new RegExp(`WHERE \\(${regexpEscape(authorId)} IN \\(1\\)\\)$`);
+
+    await assertQueriesMatch(matcher, undefined, false, async () => {
+      expect(await ids(onlyDavid.merge(onlyDavid))).toEqual([david.id]);
+    });
   });
 
   it("relation merging", async () => {
@@ -341,9 +358,9 @@ describe("RelationMergingTest", () => {
 
   it("merging with from clause", () => {
     let relation = Post.all();
-    expect(relation.fromClause.isEmpty()).toBe(true);
+    assertEmpty(relation.fromClause);
     relation = relation.merge(Post.from("posts"));
-    expect(relation.fromClause.isEmpty()).toBe(false);
+    assertNotEmpty(relation.fromClause);
   });
 
   it("merging with from clause on different class", async () => {

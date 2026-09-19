@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { User } from "./test-helpers/models/user.js";
 import { SecurePassword } from "@blazetrails/activemodel";
+import { assertCalledWith, assertInDelta } from "@blazetrails/activesupport";
 import { assertNoQueries } from "./testing/query-assertions.js";
 import { fixtures } from "./test-fixtures.js";
 
@@ -47,35 +48,23 @@ describe("SecurePasswordTest", () => {
 
   it("authenticate_by takes the same amount of time regardless of whether record is found", async () => {
     await (User as any).authenticateBy({ token: user.token, password: user.password });
-    await (User as any).authenticateBy({ token: "wrong", password: user.password });
 
     await retryFlakyTest(async () => {
-      const SAMPLES = 8;
-      let foundCorrectMs = Infinity;
-      let wrongPasswordMs = Infinity;
-      let notFoundMs = Infinity;
-      for (let i = 0; i < SAMPLES; i++) {
+      let foundAverageTimeInMs = 0;
+      for (let i = 0; i < 1000; i++) {
         const t0 = performance.now();
-        expect(
-          (await (User as any).authenticateBy({ token: user.token, password: user.password }))?.id,
-        ).toBe(user.id);
-        foundCorrectMs = Math.min(foundCorrectMs, performance.now() - t0);
-
-        const t1 = performance.now();
-        expect(
-          await (User as any).authenticateBy({ token: user.token, password: "wrong" }),
-        ).toBeNull();
-        wrongPasswordMs = Math.min(wrongPasswordMs, performance.now() - t1);
-
-        const t2 = performance.now();
-        expect(
-          await (User as any).authenticateBy({ token: "wrong", password: user.password }),
-        ).toBeNull();
-        notFoundMs = Math.min(notFoundMs, performance.now() - t2);
+        await (User as any).authenticateBy({ token: user.token, password: user.password });
+        foundAverageTimeInMs += (performance.now() - t0) / 1000;
       }
 
-      expect(notFoundMs).toBeGreaterThan(foundCorrectMs * 0.3);
-      expect(notFoundMs).toBeGreaterThan(wrongPasswordMs * 0.3);
+      let notFoundAverageTimeInMs = 0;
+      for (let i = 0; i < 1000; i++) {
+        const t0 = performance.now();
+        await (User as any).authenticateBy({ token: "wrong", password: user.password });
+        notFoundAverageTimeInMs += (performance.now() - t0) / 1000;
+      }
+
+      assertInDelta(foundAverageTimeInMs, notFoundAverageTimeInMs, 0.5);
     });
   });
 
@@ -138,18 +127,34 @@ describe("SecurePasswordTest", () => {
   });
 
   it("authenticate_by accepts any object that implements to_h", async () => {
-    expect(
-      (
-        await (User as any).authenticateBy({
-          toH: () => ({ token: user.token, password: user.password }),
-        })
-      )?.id,
-    ).toBe(user.id);
+    const params = {
+      toH: (): Record<string, unknown> => {
+        throw new Error("must access via to_h");
+      },
+    };
 
-    expect(
-      await (User as any).authenticateBy({
-        toH: () => ({ token: "wrong", password: user.password }),
-      }),
-    ).toBeNull();
+    let found: Promise<unknown> | undefined;
+    assertCalledWith(
+      params,
+      "toH",
+      [],
+      { returns: { token: user.token, password: user.password } },
+      () => {
+        found = (User as any).authenticateBy(params);
+      },
+    );
+    expect(((await found) as User | null)?.id).toBe(user.id);
+
+    let notFound: Promise<unknown> | undefined;
+    assertCalledWith(
+      params,
+      "toH",
+      [],
+      { returns: { token: "wrong", password: user.password } },
+      () => {
+        notFound = (User as any).authenticateBy(params);
+      },
+    );
+    expect(await notFound).toBeNull();
   });
 });

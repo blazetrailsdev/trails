@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Base } from "./base.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
+import { assertEmpty } from "@blazetrails/activesupport";
 
 describe("ShardsKeysTest", () => {
   class UnshardedBase extends Base {
@@ -61,7 +62,7 @@ describe("ShardsKeysTest", () => {
   });
 
   it("connects to sets shard keys", () => {
-    expect(Base.shardKeys()).toEqual([]);
+    assertEmpty(Base.shardKeys());
     expect(ShardedBase.shardKeys()).toEqual(["shard_one", "shard_two"]);
   });
 
@@ -70,12 +71,12 @@ describe("ShardsKeysTest", () => {
   });
 
   it("sharded?", () => {
-    expect(Base.isSharded()).toBe(false);
-    expect(UnshardedBase.isSharded()).toBe(false);
-    expect(UnshardedModel.isSharded()).toBe(false);
+    expect(Base.isSharded()).toBeFalsy();
+    expect(UnshardedBase.isSharded()).toBeFalsy();
+    expect(UnshardedModel.isSharded()).toBeFalsy();
 
-    expect(ShardedBase.isSharded()).toBe(true);
-    expect(ShardedModel.isSharded()).toBe(true);
+    expect(ShardedBase.isSharded()).toBeTruthy();
+    expect(ShardedModel.isSharded()).toBeTruthy();
   });
 
   it("connected to all shards", () => {
@@ -87,7 +88,7 @@ describe("ShardsKeysTest", () => {
       return ShardedBase.connectionPool().dbConfig.name;
     });
 
-    expect(unshardedResults).toEqual([]);
+    assertEmpty(unshardedResults);
     expect(shardedResults).toEqual(["shard_one", "shard_two"]);
   });
 
@@ -100,7 +101,7 @@ describe("ShardsKeysTest", () => {
   });
 
   it("connected to all shards respects preventing writes", () => {
-    expect(ShardedBase.currentPreventingWrites()).toBe(false);
+    expect(ShardedBase.currentPreventingWrites()).toBeFalsy();
 
     const results = ShardedBase.connectedToAllShards(
       { role: "writing", preventWrites: true },

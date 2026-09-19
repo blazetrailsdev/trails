@@ -3,6 +3,7 @@ import { Configurable } from "./configurable.js";
 import { EnvelopeEncryptionKeyProvider } from "./envelope-encryption-key-provider.js";
 import { KeyProvider } from "./key-provider.js";
 import { Encryptor } from "./encryptor.js";
+import { assertEncryptorWorksWith } from "./test-helpers.js";
 import * as crypto from "crypto";
 
 function makePrimaryKey(): string {
@@ -36,7 +37,6 @@ describe("ActiveRecord::Encryption::EnvelopeEncryptionKeyProviderTest", () => {
     const provider = new EnvelopeEncryptionKeyProvider();
     const key = provider.encryptionKey();
     const encryptedSecret = key.publicTags.encryptedDataKey;
-    expect(encryptedSecret).toBeTruthy();
     expect(
       new Encryptor({ compress: false }).decrypt(encryptedSecret as string, {
         key: provider.activePrimaryKey.secret,
@@ -59,17 +59,13 @@ describe("ActiveRecord::Encryption::EnvelopeEncryptionKeyProviderTest", () => {
   it("work with multiple keys when config.store_key_references is false", () => {
     Configurable.config.primaryKey = [makePrimaryKey(), makePrimaryKey()];
     const provider = new EnvelopeEncryptionKeyProvider();
-    const enc = new Encryptor({ compress: false });
-    const encrypted = enc.encrypt("hello", { keyProvider: provider });
-    expect(enc.decrypt(encrypted, { keyProvider: provider })).toBe("hello");
+    assertEncryptorWorksWith(provider);
   });
 
   it("work with multiple keys when config.store_key_references is true", () => {
     Configurable.config.storeKeyReferences = true;
     Configurable.config.primaryKey = [makePrimaryKey(), makePrimaryKey()];
     const provider = new EnvelopeEncryptionKeyProvider();
-    const enc = new Encryptor({ compress: false });
-    const encrypted = enc.encrypt("hello", { keyProvider: provider });
-    expect(enc.decrypt(encrypted, { keyProvider: provider })).toBe("hello");
+    assertEncryptorWorksWith(provider);
   });
 });

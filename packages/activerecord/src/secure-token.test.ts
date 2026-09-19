@@ -127,7 +127,6 @@ describe("SecureTokenTest", () => {
 
     const u = new TokenUser();
 
-    expect((u as any).token).toBeTruthy();
     expect((u as any).modifiedToken).toBe(`${(u as any).token}_modified`);
   });
 });

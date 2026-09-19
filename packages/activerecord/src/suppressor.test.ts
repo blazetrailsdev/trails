@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Thread } from "@blazetrails/ruby-compat";
+import { assertDifference, assertNoDifference } from "@blazetrails/activesupport";
 import * as Suppressor from "./suppressor.js";
 import { fixtures } from "./test-fixtures.js";
 import { Notification } from "./test-helpers/models/notification.js";
@@ -8,15 +9,18 @@ import { User, UserWithNotification } from "./test-helpers/models/user.js";
 fixtures([]);
 
 describe("SuppressorTest", () => {
+  const notificationCount = () => Notification.count() as Promise<number>;
+  const userCount = () => User.count() as Promise<number>;
+
   it("suppresses create", async () => {
-    const before = await Notification.count();
-    await Notification.suppress(async () => {
-      await Notification.create();
-      await Notification.createBang();
-      await new Notification().save();
-      await new Notification().saveBang();
+    await assertNoDifference(notificationCount, null, async () => {
+      await Notification.suppress(async () => {
+        await Notification.create();
+        await Notification.createBang();
+        await new Notification().save();
+        await new Notification().saveBang();
+      });
     });
-    expect(await Notification.count()).toBe(before);
   });
 
   it("suppresses update", async () => {
@@ -40,13 +44,13 @@ describe("SuppressorTest", () => {
   });
 
   it("suppresses create in callback", async () => {
-    const usersBefore = (await User.count()) as number;
-    const notificationsBefore = await Notification.count();
-    await Notification.suppress(async () => {
-      await UserWithNotification.createBang();
+    await assertDifference(userCount, async () => {
+      await assertNoDifference(notificationCount, null, async () => {
+        await Notification.suppress(async () => {
+          await UserWithNotification.createBang();
+        });
+      });
     });
-    expect(await User.count()).toBe(usersBefore + 1);
-    expect(await Notification.count()).toBe(notificationsBefore);
   });
 
   it("resumes saving after suppression complete", async () => {
@@ -54,32 +58,32 @@ describe("SuppressorTest", () => {
       await UserWithNotification.createBang();
     });
 
-    const before = (await Notification.count()) as number;
-    await Notification.createBang({ message: "New Comment" });
-    expect(await Notification.count()).toBe(before + 1);
+    await assertDifference(notificationCount, async () => {
+      await Notification.createBang({ message: "New Comment" });
+    });
   });
 
   it("suppresses validations on create", async () => {
-    const before = await Notification.count();
-    await Notification.suppress(async () => {
-      await User.create();
-      await User.createBang();
-      await new User().save();
-      await new User().saveBang();
+    await assertNoDifference(notificationCount, null, async () => {
+      await Notification.suppress(async () => {
+        await User.create();
+        await User.createBang();
+        await new User().save();
+        await new User().saveBang();
+      });
     });
-    expect(await Notification.count()).toBe(before);
   });
 
   it("suppresses when nested multiple times", async () => {
-    const before = await Notification.count();
-    await Notification.suppress(async () => {
-      await Notification.suppress(async () => {});
-      await Notification.create();
-      await Notification.createBang();
-      await new Notification().save();
-      await new Notification().saveBang();
+    await assertNoDifference(notificationCount, null, async () => {
+      await Notification.suppress(async () => {
+        await Notification.suppress(async () => {});
+        await Notification.create();
+        await Notification.createBang();
+        await new Notification().save();
+        await new Notification().saveBang();
+      });
     });
-    expect(await Notification.count()).toBe(before);
   });
 });
 

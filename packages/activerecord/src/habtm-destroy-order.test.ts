@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
+  assertNoDifference,
+  assertNotEmpty,
+  assertNothingRaised,
+} from "@blazetrails/activesupport";
+import {
   collectionProxyFor as association,
   registerModel,
   resetCallbacks,
@@ -20,17 +25,25 @@ describe("HabtmDestroyOrderTest", () => {
     const ben = await Student.create({ name: "Ben Bitdiddle" });
     await association(sicp, "students").push(ben);
 
-    const before = Number(await Lesson.count());
-    await expect(sicp.destroy()).rejects.toThrow(LessonError);
-    expect(Number(await Lesson.count())).toBe(before);
-    expect(sicp.isDestroyed()).toBe(false);
+    await expect(
+      assertNoDifference(
+        async () => Number(await Lesson.count()),
+        null,
+        async () => {
+          await sicp.destroy();
+        },
+      ),
+    ).rejects.toThrow(/LessonError/);
+    expect(sicp.isDestroyed()).toBeFalsy();
   });
 
   it("should not raise error if have foreign key in the join table", async () => {
     const student = await Student.create({ name: "Ben Bitdiddle" });
     const lesson = await Lesson.create({ name: "SICP" });
     await association(lesson, "students").push(student);
-    await student.destroy();
+    await assertNothingRaised(async () => {
+      await student.destroy();
+    });
   });
 
   it("not destroying a student with lessons leaves student<=>lesson association intact", async () => {
@@ -44,7 +57,7 @@ describe("HabtmDestroyOrderTest", () => {
 
       await ben.destroy();
       await ben.reload();
-      expect(await association(ben, "lessons").isEmpty()).toBe(false);
+      assertNotEmpty(await association(ben, "lessons"));
     });
   });
 
@@ -55,6 +68,6 @@ describe("HabtmDestroyOrderTest", () => {
 
     await expect(sicp.destroy()).rejects.toThrow(LessonError);
     await sicp.reload();
-    expect(await association(sicp, "students").isEmpty()).toBe(false);
+    assertNotEmpty(await association(sicp, "students"));
   });
 });

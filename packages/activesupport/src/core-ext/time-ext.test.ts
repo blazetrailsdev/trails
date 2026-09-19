@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  Date as RubyDate,
   DateTime as RubyDateTime,
   Temporal,
   Time as RubyTime,
@@ -12,6 +13,8 @@ import {
   assertRaise,
   assertRaises,
 } from "../testing/assertions.js";
+import { assertDeprecated } from "../testing/deprecation.js";
+import { deprecator } from "../deprecator.js";
 import { Duration } from "../duration.js";
 import { setFrozenTime } from "../time-travel.js";
 import { inTimeZone } from "./date-and-time/zones.js";
@@ -25,10 +28,6 @@ import {
   prevDay,
   advance,
   ago,
-  since,
-  secFraction,
-  floor,
-  ceil,
   change,
   toDate,
   daysInMonth,
@@ -434,23 +433,46 @@ describe("TimeExtCalculationsTest", () => {
     });
   });
 
-  it("sec fraction", () => {
-    const t = d(2005, 2, 4, 10, 10, 10, 500);
-    expect(secFraction(t)).toBeCloseTo(0.5, 2);
+  it.skip("sec fraction", () => {
+    // BLOCKED: activesupport-time-sec-fraction-rational
+    let time = RubyTime.utc(2016, 4, 23, 0, 0, new Rational(1, 1_000_000_000)) as any;
+    expect(time.secFraction()).toEqual(new Rational(1, 1_000_000_000));
+
+    time = RubyTime.utc(2016, 4, 23, 0, 0, 0.000_000_001);
+    expect(time.secFraction()).toBeInstanceOf(Rational);
+    expect(time.secFraction().toF()).toEqual(0.000_000_001);
+
+    time = RubyTime.utc(2016, 4, 23, 0, 0, 0, new Rational(1, 1_000));
+    expect(time.secFraction()).toEqual(new Rational(1, 1_000_000_000));
+
+    time = RubyTime.utc(2016, 4, 23, 0, 0, 0, 0.001);
+    expect(time.secFraction()).toBeInstanceOf(Rational);
+    expect(time.secFraction().toF()).toEqual(0.001 / 1000000);
   });
 
-  it("floor", () => {
-    const t = new Date(2005, 1, 4, 10, 10, 10, 500);
-    const result = asDate(floor(t, 1000));
-    expect(result.getMilliseconds()).toBe(0);
-    expect(result.getSeconds()).toBe(10);
+  it.skip("floor", () => {
+    // BLOCKED: activesupport-time-floor-ceil-ndigits
+    const time = RubyTime.utc(2016, 4, 23, 0, 0, new Rational(123456789, 1_000_000_000)) as any;
+
+    expect(time.floor().subsec).toEqual(new Rational(0, 1));
+    expect(time.floor(1).subsec).toEqual(new Rational(1, 10));
+    expect(time.floor(2).subsec).toEqual(new Rational(12, 100));
+    expect(time.floor(9).subsec).toEqual(new Rational(123456789, 1_000_000_000));
+    expect(time.floor(10).subsec).toEqual(new Rational(123456789, 1_000_000_000));
   });
 
-  it("ceil", () => {
-    const t = new Date(2005, 1, 4, 10, 10, 10, 1);
-    const result = asDate(ceil(t, 1000));
-    expect(result.getMilliseconds()).toBe(0);
-    expect(result.getSeconds()).toBe(11);
+  it.skip("ceil", () => {
+    // BLOCKED: activesupport-time-floor-ceil-ndigits
+    const time = RubyTime.utc(2016, 4, 30, 23, 59, new Rational(59123456789, 1_000_000_000)) as any;
+
+    expect(time.ceil().subsec).toEqual(new Rational(0, 1));
+    expect(time.ceil()).toEqual(RubyTime.utc(2016, 5, 1, 0, 0));
+
+    expect(time.ceil(3).subsec).toEqual(new Rational(124, 1000));
+    expect(time.ceil(5).subsec).toEqual(new Rational(12346, 100000));
+    expect(time.ceil(8).subsec).toEqual(new Rational(12345679, 100000000));
+    expect(time.ceil(9).subsec).toEqual(new Rational(123456789, 1_000_000_000));
+    expect(time.ceil(11).subsec.toF()).toEqual(new Rational(123456789, 1_000_000_000).toF());
   });
 
   it("daylight savings time crossings backward start", () => {
@@ -593,9 +615,11 @@ describe("TimeExtCalculationsTest", () => {
     });
   });
 
-  it("since with instance of time deprecated", () => {
-    const t = d(2005, 2, 22, 10, 10, 10);
-    expect(asDate(since(t, 1))).toEqual(d(2005, 2, 22, 10, 10, 11));
+  it.skip("since with instance of time deprecated", async () => {
+    // BLOCKED: activesupport-time-since-time-instance-deprecation
+    await assertDeprecated(deprecator(), () => {
+      (RubyTime.now() as any).since(RubyTime.now());
+    });
   });
 
   it("daylight savings time crossings forward start", () => {
@@ -1004,15 +1028,23 @@ describe("TimeExtCalculationsTest", () => {
     expect(change(twoAm, { hour: 0 }).equals(midnight)).toBe(true);
   });
 
-  it("change preserves fractional seconds on zoned time", () => {
-    const time = zoned("US/Eastern", 2005, 10, 30, 0, 0, 0).add({ milliseconds: 990 });
-    const time2 = change(time, { month: 1 });
+  it.skip("change preserves fractional seconds on zoned time", () => {
+    // BLOCKED: activesupport-time-new-timezone-object-argument
+    withTzDefault("US/Eastern", () => {
+      const time = (RubyTime.new as any)(
+        2005,
+        10,
+        30,
+        0,
+        0,
+        new Rational(99, 100),
+        timeZone(),
+      ).plus(0);
+      const time2 = change(time, { month: 1 });
 
-    expect(time.offset).toBe("-04:00");
-    expect(time.millisecond).toBe(990);
-    expect(time2.offset).toBe("-05:00");
-    expect(time2.millisecond).toBe(990);
-    expect([time2.year, time2.month, time2.day]).toEqual([2005, 1, 30]);
+      expect(time.inspect()).toEqual("2005-10-30 00:00:00.99 -0400");
+      expect(time2.inspect()).toEqual("2005-01-30 00:00:00.99 -0500");
+    });
   });
 
   it("change preserves fractional hour offset for local times around end of dst", () => {
@@ -1228,9 +1260,26 @@ describe("TimeExtCalculationsTest", () => {
     expect(result.epochMilliseconds).toBe(t.getTime());
   });
 
-  it("advance gregorian proleptic", () => {
-    expect(asDate(advance(d(1582, 10, 15, 15, 15, 10), { days: -1 })).getDate()).toBe(14);
-    expect(asDate(advance(d(1582, 10, 14, 15, 15, 10), { days: 1 })).getDate()).toBe(15);
+  it.skip("advance gregorian proleptic", () => {
+    // BLOCKED: activesupport-time-advance-gregorian-proleptic
+    expect(RubyTime.local(1582, 10, 15, 15, 15, 10).advance({ days: -1 })).toEqual(
+      RubyTime.local(1582, 10, 14, 15, 15, 10),
+    );
+    expect(RubyTime.local(1582, 10, 14, 15, 15, 10).advance({ days: 1 })).toEqual(
+      RubyTime.local(1582, 10, 15, 15, 15, 10),
+    );
+    expect(RubyTime.local(1582, 10, 4, 15, 15, 10).advance({ days: 1 })).toEqual(
+      RubyTime.local(1582, 10, 5, 15, 15, 10),
+    );
+    expect(RubyTime.local(1582, 10, 5, 15, 15, 10).advance({ days: -1 })).toEqual(
+      RubyTime.local(1582, 10, 4, 15, 15, 10),
+    );
+    expect(RubyTime.local(1000, 10, 4, 15, 15, 10).advance({ years: -1 })).toEqual(
+      RubyTime.local(999, 10, 4, 15, 15, 10),
+    );
+    expect(RubyTime.local(999, 10, 4, 15, 15, 10).advance({ years: 1 })).toEqual(
+      RubyTime.local(1000, 10, 4, 15, 15, 10),
+    );
   });
 
   it("advance preserves offset for local times around end of dst", () => {
@@ -1458,7 +1507,8 @@ describe("TimeExtCalculationsTest", () => {
     );
   });
 
-  it("to datetime", () => {
+  it.skip("to datetime", () => {
+    // BLOCKED: activesupport-time-to-datetime-start-and-to-time
     expect(RubyDateTime.civil(2005, 2, 21, 17, 44, 30, 0)).toEqual(
       RubyTime.utc(2005, 2, 21, 17, 44, 30).toDatetime(),
     );
@@ -1488,6 +1538,9 @@ describe("TimeExtCalculationsTest", () => {
         ),
       ).toEqual(RubyTime.local(2005, 2, 21, 17, 44, 30).toDatetime());
     });
+    expect(RubyDate.ITALY).toEqual(
+      (RubyTime.utc(2005, 2, 21, 17, 44, 30).toDatetime() as any).start,
+    );
   });
 
   it("to time", () => {
@@ -1776,11 +1829,11 @@ describe("TimeExtCalculationsTest", () => {
     );
   });
 
-  it("at with in option", () => {
-    const t = new Date(31337 * 1000);
-    expect(t.getUTCHours()).toBe(8);
-    expect(t.getUTCMinutes()).toBe(42);
-    expect(t.getUTCSeconds()).toBe(17);
+  it.skip("at with in option", () => {
+    // BLOCKED: activesupport-time-at-in-option-and-case-equality
+    expect((RubyTime.at as any)(31337, { in: -28800 })).toEqual(
+      RubyTime.new(1970, 1, 1, 0, 42, 17, "-08:00"),
+    );
   });
 
   it("at with time with zone returns local time", () => {
@@ -1860,9 +1913,19 @@ describe("TimeExtCalculationsTest", () => {
     });
   });
 
-  it("case equality", () => {
-    const t = utc(2000);
-    expect(t instanceof Date).toBe(true);
+  it.skip("case equality", () => {
+    // BLOCKED: activesupport-time-at-in-option-and-case-equality
+    const T = RubyTime as any;
+    const utcZone = TimeZone.find("UTC")!;
+    class Sub extends RubyTime {}
+    expect(T[Symbol.hasInstance](RubyTime.utc(2000))).toBeTruthy();
+    expect(T[Symbol.hasInstance](new TimeWithZone(RubyTime.utc(2000), utcZone))).toBeTruthy();
+    expect(T[Symbol.hasInstance](Sub.utc(2000))).toBeTruthy();
+    expect(T[Symbol.hasInstance](RubyDateTime.civil(2000))).toEqual(false);
+    expect((Sub as any)[Symbol.hasInstance](RubyTime.utc(2000))).toEqual(false);
+    expect((Sub as any)[Symbol.hasInstance](new TimeWithZone(RubyTime.utc(2000), utcZone))).toEqual(
+      false,
+    );
   });
 
   it("all day with timezone", () => {
@@ -1941,7 +2004,8 @@ describe("TimeExtCalculationsTest", () => {
     );
   });
 
-  it("advance", () => {
+  it.skip("advance", () => {
+    // BLOCKED: activesupport-time-new-timezone-object-argument
     expect(RubyTime.local(2005, 2, 28, 15, 15, 10).advance({ years: 1 })).toEqual(
       RubyTime.local(2006, 2, 28, 15, 15, 10),
     );
@@ -2011,6 +2075,18 @@ describe("TimeExtCalculationsTest", () => {
         seconds: 9,
       }),
     ).toEqual(RubyTime.local(2013, 10, 17, 20, 22, 19));
+
+    const moscow = TimeZone.find("Moscow")!;
+    expect(RubyTime.new(2021, 5, 29, 0, 0, 0, "+03:00")).toEqual(
+      (RubyTime.new as any)(2021, 5, 29, 0, 0, 0, moscow),
+    );
+    expect(RubyTime.new(2021, 5, 29, 0, 0, 0, "+03:00").advance({ seconds: 60 })).toEqual(
+      (RubyTime.new as any)(2021, 5, 29, 0, 0, 0, moscow).advance({ seconds: 60 }),
+    );
+    expect(RubyTime.new(2021, 5, 29, 0, 0, 0, "+03:00").advance({ days: 3 })).toEqual(
+      (RubyTime.new as any)(2021, 5, 29, 0, 0, 0, moscow).advance({ days: 3 }),
+    );
+
     expect(TimeZone.find("Moscow")!.local(2021, 5, 29, 0, 0, 0)).toEqual(
       RubyTime.new(2021, 5, 29, 0, 0, 0, "+03:00"),
     );

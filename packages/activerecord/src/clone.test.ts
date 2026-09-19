@@ -8,11 +8,11 @@ describe("CloneTest", () => {
   it("persisted", async () => {
     const topic = await Topic.first();
     const cloned = topic!.clone();
-    expect(topic!.isPersisted()).toBe(true);
-    expect(cloned.isPersisted()).toBe(true);
-    expect(cloned.isNewRecord()).toBe(false);
-    expect(cloned.isPreviouslyNewRecord()).toBe(false);
-    expect(cloned.isPreviouslyPersisted()).toBe(false);
+    expect(topic!.isPersisted()).toBeTruthy();
+    expect(cloned.isPersisted()).toBeTruthy();
+    expect(cloned.isNewRecord()).toBeFalsy();
+    expect(cloned.isPreviouslyNewRecord()).toBeFalsy();
+    expect(cloned.isPreviouslyPersisted()).toBeFalsy();
   });
 
   it("stays frozen", async () => {
@@ -20,9 +20,9 @@ describe("CloneTest", () => {
     topic!.freeze();
 
     const cloned = topic!.clone();
-    expect(cloned.isPersisted()).toBe(true);
-    expect(cloned.isNewRecord()).toBe(false);
-    expect(cloned.isFrozen()).toBe(true);
+    expect(cloned.isPersisted()).toBeTruthy();
+    expect(cloned.isNewRecord()).toBeFalsy();
+    expect(cloned.isFrozen()).toBeTruthy();
     expect(() => {
       cloned.author_name = "Aaron";
     }).toThrow(/frozen/i);
@@ -39,7 +39,7 @@ describe("CloneTest", () => {
     const cloned = new Topic({});
     const clone = cloned.clone();
     cloned.freeze();
-    expect(clone.isFrozen()).toBe(false);
+    expect(clone.isFrozen()).toBeFalsy();
     expect(() => {
       cloned.author_name = "Aaron";
     }).toThrow(/frozen/i);
