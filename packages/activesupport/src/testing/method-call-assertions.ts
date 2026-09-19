@@ -17,11 +17,17 @@ export function assertCalled<T extends object>(
   methodName: keyof T & string,
   message: string | null,
   { times = 1, returns = null }: { times?: number; returns?: unknown } = {},
-  block?: () => void,
-): void {
+  block?: () => void | Promise<void>,
+): void | Promise<void> {
   let timesCalled = 0;
 
-  stub(
+  const check = () => {
+    let error = `Expected ${methodName} to be called ${times} times, but was called ${timesCalled} times`;
+    if (message) error = `${message}.\n${error}`;
+    assertEqual(times, timesCalled, error);
+  };
+
+  const result = stub(
     object,
     methodName,
     () => {
@@ -30,10 +36,8 @@ export function assertCalled<T extends object>(
     },
     block,
   );
-
-  let error = `Expected ${methodName} to be called ${times} times, but was called ${timesCalled} times`;
-  if (message) error = `${message}.\n${error}`;
-  assertEqual(times, timesCalled, error);
+  if (result) return result.then(check);
+  check();
 }
 
 /**
@@ -68,9 +72,9 @@ export function assertNotCalled<T extends object>(
   object: T,
   methodName: keyof T & string,
   message: string | null,
-  block?: () => void,
-): void {
-  assertCalled(object, methodName, message, { times: 0 }, block);
+  block?: () => void | Promise<void>,
+): void | Promise<void> {
+  return assertCalled(object, methodName, message, { times: 0 }, block);
 }
 
 /** @internal */
@@ -140,15 +144,25 @@ function stub<T extends object>(
   object: T,
   methodName: keyof T & string,
   replacement: (...args: unknown[]) => unknown,
-  block?: () => void,
-): void {
+  block?: () => void | Promise<void>,
+): Promise<void> | undefined {
   const original = object[methodName];
-  (object as Record<string, unknown>)[methodName] = replacement;
-  try {
-    block?.();
-  } finally {
+  const restore = () => {
     (object as Record<string, unknown>)[methodName] = original;
+  };
+  (object as Record<string, unknown>)[methodName] = replacement;
+  let result: void | Promise<void>;
+  try {
+    result = block?.();
+  } catch (e) {
+    restore();
+    throw e;
   }
+  if (result && typeof result.then === "function") {
+    return result.finally(restore);
+  }
+  restore();
+  return undefined;
 }
 
 function assertMock(mock: Mock): void {

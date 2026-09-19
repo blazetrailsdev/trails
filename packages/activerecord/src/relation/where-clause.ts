@@ -1,4 +1,5 @@
 import { rbEqual } from "@blazetrails/activesupport";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import { Nodes, fetchAttribute, sql } from "@blazetrails/arel";
 import { ArgumentError, Attribute as ModelAttribute } from "@blazetrails/activemodel";
@@ -112,8 +113,7 @@ export class WhereClause {
       }
       if (node instanceof Nodes.Equality) {
         const right = (node as any).right;
-        if (right && typeof right === "object" && "unboundable" in right && right.unboundable)
-          return true;
+        if (rbObjRespondTo(right, "isUnboundable") && right.isUnboundable()) return true;
       }
     }
     return false;
