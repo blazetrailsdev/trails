@@ -479,13 +479,20 @@ describe("DelegationCachingTest", () => {
     expect("target" in Relation.prototype).toEqual(false);
     expect("target" in CollectionProxy.prototype).toEqual(true);
 
-    const original_owner = Object.getOwnPropertyDescriptor(
-      CollectionProxy.prototype,
-      "target",
-    )?.get;
-    expect(await (Developer.all() as any).target()).toEqual("__target__");
-    expect(Object.getOwnPropertyDescriptor(CollectionProxy.prototype, "target")?.get).toEqual(
-      original_owner,
+    const ownerOf = (object: object, name: string): object | undefined => {
+      for (let o: object | null = object; o; o = Object.getPrototypeOf(o)) {
+        if (Object.prototype.hasOwnProperty.call(o, name)) return o;
+      }
+      return undefined;
+    };
+
+    const project = projects("active_record");
+    const proxy = (project as unknown as { developersWithCallbacks: object })
+      .developersWithCallbacks;
+    const original_owner = ownerOf(proxy, "target");
+    expect(await (Developer.all() as unknown as { target(): Promise<string> }).target()).toEqual(
+      "__target__",
     );
+    expect(ownerOf(proxy, "target")).toBe(original_owner);
   });
 });

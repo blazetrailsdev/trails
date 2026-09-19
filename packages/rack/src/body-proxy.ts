@@ -6,6 +6,16 @@ export class BodyProxy {
   constructor(body: any, block: () => void) {
     this.body = body;
     this.block = block;
+    return new Proxy(this, {
+      has: (target, prop) =>
+        Reflect.has(target, prop) || (typeof prop === "string" && target.respondTo(prop)),
+      get: (target, prop, receiver) => {
+        if (Reflect.has(target, prop) || typeof prop !== "string" || !target.respondTo(prop)) {
+          return Reflect.get(target, prop, receiver);
+        }
+        return (...args: any[]) => target.delegate(prop, ...args);
+      },
+    });
   }
 
   close(): void {

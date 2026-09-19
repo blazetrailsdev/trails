@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-namespace -- Ruby's `JSON` module is a
    namespace of module functions; ESM syntax cannot spell `JSON.dump`. */
+import { ArgumentError } from "./argument-error.js";
+
 const globalJSON = globalThis.JSON;
 
 /**
@@ -27,6 +29,13 @@ export namespace JSON {
   }
 
   export function load(dumped: string): unknown {
-    return globalJSON.parse(dumped);
+    return globalJSON.parse(dumped, (_key, value) => {
+      if (value !== null && typeof value === "object" && typeof value.json_class === "string") {
+        throw new ArgumentError(
+          `can't get const ${value.json_class}: uninitialized constant ${value.json_class.split("::")[0]}`,
+        );
+      }
+      return value;
+    });
   }
 }

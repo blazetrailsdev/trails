@@ -127,8 +127,7 @@ describe("ConnectionManagementTest", () => {
     });
   });
 
-  it.skip("proxy is polite to its body and responds to it", () => {
-    // BLOCKED: rack-body-proxy-respond-to-missing-to-path
+  it("proxy is polite to its body and responds to it", () => {
     const body = { toPath: () => "/path" };
     const innerApp: RackApp = { call: () => [200, {}, body] };
     const responseBody = middleware(innerApp)(env)[2] as BodyProxy;

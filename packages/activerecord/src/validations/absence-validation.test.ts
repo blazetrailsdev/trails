@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { SingularAssociation } from "../associations/singular-association.js";
 import { assertNothingRaised } from "@blazetrails/activesupport";
-import { Base, registerModel } from "../index.js";
+import { registerModel } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
 import { Human } from "../test-helpers/models/human.js";
 import { Interest } from "../test-helpers/models/interest.js";
@@ -11,16 +11,6 @@ registerModel(Interest);
 fixtures({});
 
 describe("AbsenceValidationTest", () => {
-  function makeModel() {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("body", "string");
-        this.validates("body", { absence: true });
-      }
-    }
-    return { Topic };
-  }
   it("non association", async () => {
     class Boy extends Human {
       static name = "Boy";

@@ -27,8 +27,7 @@ describe("ActiveRecord::Encryption::MessageSerializerTest", () => {
     expect(deserialized_message.equals(message)).toEqual(true);
   });
 
-  it.skip("won't load classes from JSON", () => {
-    // BLOCKED: ruby-compat-json-load-create-additions-argument-error
+  it("won't load classes from JSON", () => {
     const serializer = new MessageSerializer();
     const class_loading_payload = RubyJSON.dump({
       p: Buffer.from("Some payload").toString("base64"),

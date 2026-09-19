@@ -459,11 +459,13 @@ describe("CounterCacheTest", () => {
   });
 
   it("the passed symbol needs to be an association name or counter name", async () => {
-    const e: any = await Topic.resetCounters(topic.id, "undefined_count").catch((err) => err);
+    const e: unknown = await Topic.resetCounters(topic.id, "undefined_count").catch((err) => err);
     expect(() => {
       throw e;
     }).toThrow(ArgumentError);
-    expect(e.message).toEqual("'Topic' has no association called 'undefined_count'");
+    expect((e as ArgumentError).message).toEqual(
+      "'Topic' has no association called 'undefined_count'",
+    );
   });
 
   it("reset counter works with select declared on association", async () => {

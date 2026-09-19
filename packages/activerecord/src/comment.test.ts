@@ -137,7 +137,7 @@ describe("CommentTest", () => {
       });
       await adapter.changeColumn("commenteds", "content", "string");
       await adapter.changeColumn("commenteds", "obvious", "string", { comment: null as any });
-      await (adapter as any).addIndex("commenteds", "obvious", {
+      await adapter.addIndex("commenteds", "obvious", {
         name: "idx_obvious",
         comment: "We need to see obvious comments",
       });
