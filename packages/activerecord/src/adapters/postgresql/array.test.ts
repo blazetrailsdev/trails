@@ -72,7 +72,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(column.isArray()).toBeTruthy();
       expect(type.isBinary()).toBeFalsy();
 
-      const ratingsColumn = PgArray.columnsHash()["ratings"];
+      const ratingsColumn: any = PgArray.columnsHash()["ratings"];
       expect(ratingsColumn.type).toBe("integer");
       expect(ratingsColumn.isArray()).toBeTruthy();
     });
@@ -189,7 +189,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.addColumn("pg_arrays", "snippets", "string", { array: true, default: [] });
       await adapter.changeColumn("pg_arrays", "snippets", "text", { array: true, default: [] });
       await PgArray.resetColumnInformation();
-      const column = PgArray.columnsHash()["snippets"];
+      const column: any = PgArray.columnsHash()["snippets"];
       expect(column.type).toBe("text");
       expect(PgArray.columnDefaults["snippets"]).toEqual([]);
       expect(column.isArray()).toBeTruthy();
@@ -202,7 +202,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         using: `string_to_array("snippets", ',')`,
       });
       await PgArray.resetColumnInformation();
-      const column = PgArray.columnsHash()["snippets"];
+      const column: any = PgArray.columnsHash()["snippets"];
       expect(column.type).toBe("text");
       expect(PgArray.columnDefaults["snippets"]).toEqual([]);
       expect(column.isArray()).toBeTruthy();
@@ -531,6 +531,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
     it("assigning non array value", async () => {
       class PgArrays extends Base {
+        declare tags: any;
         static tableName = "pg_arrays";
         static {
           this.attribute("id", "integer");
@@ -545,6 +546,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
     it("assigning empty string", async () => {
       class PgArrays extends Base {
+        declare tags: any;
         static tableName = "pg_arrays";
         static {
           this.attribute("id", "integer");
@@ -559,6 +561,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
     it("assigning valid pg array literal", async () => {
       class PgArrays extends Base {
+        declare tags: any;
         static tableName = "pg_arrays";
         static {
           this.attribute("id", "integer");

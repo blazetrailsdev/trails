@@ -611,13 +611,15 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.selectAll("SELECT 1");
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       try {
-        await assertQueriesCount(2, true, () =>
-          adapter.selectAll("select 'pg_catalog.pg_class'::regclass"),
-        );
-        await assertQueriesCount(1, true, () =>
-          adapter.selectAll("select 'pg_catalog.pg_class'::regclass"),
-        );
-        await assertQueriesCount(2, true, () => adapter.selectAll("SELECT NULL::anyarray"));
+        await assertQueriesCount(2, true, async () => {
+          await adapter.selectAll("select 'pg_catalog.pg_class'::regclass");
+        });
+        await assertQueriesCount(1, true, async () => {
+          await adapter.selectAll("select 'pg_catalog.pg_class'::regclass");
+        });
+        await assertQueriesCount(2, true, async () => {
+          await adapter.selectAll("SELECT NULL::anyarray");
+        });
       } finally {
         warnSpy.mockRestore();
       }
@@ -674,10 +676,12 @@ describeIfPg("PostgreSQLAdapter", () => {
               static tableName = "ex";
             }
             const attribute = NumberKlass.arelTable.get("number");
-            await assertQueriesCount(undefined, true, () =>
-              adapter.caseInsensitiveComparison(attribute, "foo"),
-            );
-            await assertNoQueries(false, () => adapter.caseInsensitiveComparison(attribute, "foo"));
+            await assertQueriesCount(undefined, true, async () => {
+              await adapter.caseInsensitiveComparison(attribute, "foo");
+            });
+            await assertNoQueries(false, async () => {
+              await adapter.caseInsensitiveComparison(attribute, "foo");
+            });
           },
           "id SERIAL PRIMARY KEY, number example_type",
         );
