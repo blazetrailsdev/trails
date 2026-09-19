@@ -24,6 +24,7 @@ const globalJSON = globalThis.JSON;
  * with the interpreter, so no Rails file defines them.
  */
 export namespace JSON {
+  /** @noRailsEquivalent PERMANENT */
   export function deepConstGet(path: string): unknown {
     let constant: unknown = globalThis;
     for (const name of path.split("::").filter((segment, i) => i > 0 || segment !== "")) {
