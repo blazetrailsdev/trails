@@ -1,3 +1,9 @@
+import {
+  assertNothingRaised,
+  assertEmpty,
+  assertNotEmpty,
+  assertRespondTo,
+} from "@blazetrails/activesupport";
 import { describe, it, expect } from "vitest";
 import { registerModel, registerSubclass } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
@@ -69,12 +75,14 @@ describe("LeftOuterJoinAssociationTest", () => {
   });
 
   it("construct finder sql does not table name collide on duplicate associations", async () => {
-    const queries = await captureSql(async () => {
-      await Person.leftOuterJoins({ ":agents": { ":agents": ":agents" } }).leftOuterJoins({
-        ":agents": { ":agents": { ":primaryContact": ":agents" } },
+    await assertNothingRaised(async () => {
+      const queries = await captureSql(async () => {
+        await Person.leftOuterJoins({ ":agents": { ":agents": ":agents" } }).leftOuterJoins({
+          ":agents": { ":agents": { ":primaryContact": ":agents" } },
+        });
       });
+      expect(queries.some((sql) => /agents_people_4/i.test(sql))).toBeTruthy();
     });
-    expect(queries.some((sql) => /agents_people_4/i.test(sql))).toBe(true);
   });
 
   it("left outer joins count is same as size of loaded results", async () => {
@@ -105,29 +113,29 @@ describe("LeftOuterJoinAssociationTest", () => {
     const queries = await captureSql(async () => {
       await Author.leftOuterJoins(":posts");
     });
-    expect(queries.some((sql) => /LEFT OUTER JOIN/i.test(sql))).toBe(true);
+    expect(queries.some((sql) => /LEFT OUTER JOIN/i.test(sql))).toBeTruthy();
   });
 
   it("left outer joins is deduped when same association is joined", async () => {
     const queries = await captureSql(async () => {
       await Author.joins(":posts").leftOuterJoins(":posts");
     });
-    expect(queries.some((sql) => /INNER JOIN/i.test(sql))).toBe(true);
-    expect(queries.some((sql) => /LEFT OUTER JOIN/i.test(sql))).toBe(false);
+    expect(queries.some((sql) => /INNER JOIN/i.test(sql))).toBeTruthy();
+    expect(queries.every((sql) => !/LEFT OUTER JOIN/i.test(sql))).toBeTruthy();
   });
 
   it("construct finder sql ignores empty left outer joins hash", async () => {
     const queries = await captureSql(async () => {
       await Author.leftOuterJoins({});
     });
-    expect(queries.some((sql) => /LEFT OUTER JOIN/i.test(sql))).toBe(false);
+    expect(queries.every((sql) => !/LEFT OUTER JOIN/i.test(sql))).toBeTruthy();
   });
 
   it("construct finder sql ignores empty left outer joins array", async () => {
     const queries = await captureSql(async () => {
       await Author.leftOuterJoins([]);
     });
-    expect(queries.some((sql) => /LEFT OUTER JOIN/i.test(sql))).toBe(false);
+    expect(queries.every((sql) => !/LEFT OUTER JOIN/i.test(sql))).toBeTruthy();
   });
 
   it("left outer joins forbids to use string as argument", async () => {
@@ -159,8 +167,8 @@ describe("LeftOuterJoinAssociationTest", () => {
     const queries = await captureSql(async () => {
       await Author.leftOuterJoins(":essays");
     });
-    expect(queries.some((sql) => /writer_type.*?=.*?(Author|\?|\$1|:a1)/i.test(sql))).toBe(true);
-    expect(queries.some((sql) => /WHERE/i.test(sql))).toBe(false);
+    expect(queries.some((sql) => /writer_type.*?=.*?(Author|\?|\$1|:a1)/i.test(sql))).toBeTruthy();
+    expect(queries.every((sql) => !/WHERE/i.test(sql))).toBeTruthy();
   });
 
   it("find with sti join", async () => {
@@ -168,18 +176,18 @@ describe("LeftOuterJoinAssociationTest", () => {
       id: (posts("sti_comments") as any).id,
     });
 
-    expect(await scope.where({ "comments.type": "Comment" })).toHaveLength(0);
-    expect((await scope.where({ "comments.type": "SpecialComment" })).length).toBeGreaterThan(0);
-    expect((await scope.where({ "comments.type": "SubSpecialComment" })).length).toBeGreaterThan(0);
+    assertEmpty(await scope.where({ "comments.type": "Comment" }));
+    assertNotEmpty(await scope.where({ "comments.type": "SpecialComment" }));
+    assertNotEmpty(await scope.where({ "comments.type": "SubSpecialComment" }));
   });
 
   it("does not override select", async () => {
     const selected = Author.select(
       "authors.name, (authors.author_address_id || ' ' || authors.author_address_extra_id) as addr_id",
     ).leftOuterJoins(":posts");
-    expect(await selected.exists()).toBe(true);
+    expect(await selected.exists()).toBeTruthy();
     const first = await selected.first();
-    expect((first as any).attributes).toHaveProperty("addr_id");
+    assertRespondTo(first, "addr_id");
   });
 
   it("the default scope of the target is applied when joining associations", async () => {
@@ -198,8 +206,8 @@ describe("LeftOuterJoinAssociationTest", () => {
         ":followerFavoriteReferenceJob",
       ]);
     });
-    const sql = queries.join("\n");
-    expect(/["`]friendships["`]\.["`]friend_id["`]/i.test(sql)).toBe(true);
-    expect(/["`]friendships["`]\.["`]follower_id["`]/i.test(sql)).toBe(true);
+    const [sql] = queries;
+    expect(sql).toMatch(/["`]friendships["`]\.["`]friend_id["`]/);
+    expect(sql).toMatch(/["`]friendships["`]\.["`]follower_id["`]/);
   });
 });
