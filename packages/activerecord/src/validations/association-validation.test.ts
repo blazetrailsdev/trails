@@ -8,6 +8,13 @@ import { Reply } from "../test-helpers/models/reply.js";
 import { Human } from "../test-helpers/models/human.js";
 import { Interest } from "../test-helpers/models/interest.js";
 
+async function assertNotOperator(
+  receiver: { isValid(): Promise<boolean> },
+  operator: "isValid",
+): Promise<void> {
+  expect(await receiver[operator]()).toBeFalsy();
+}
+
 describe("AssociationValidationTest", () => {
   fixtures(["topics"]);
 
@@ -91,7 +98,7 @@ describe("AssociationValidationTest", () => {
     const r = await Reply.create({ title: "A reply", content: "with content!" });
     const topic = await Topic.create({ title: "uhohuhoh" });
     r.topic = topic;
-    expect(await r.isValid()).toBeFalsy();
+    await assertNotOperator(r, "isValid");
     expect(r.errors.messagesFor("topic")).toEqual([
       "This string contains 'single' and \"double\" quotes",
     ]);
