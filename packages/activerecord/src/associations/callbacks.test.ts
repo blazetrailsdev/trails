@@ -458,7 +458,7 @@ describe("AssociationCallbacksTest", () => {
     proxy.build({ title: "Call me back!", body: "Body" });
     expect(log).toEqual(["before_adding<new>", "after_adding<new>"]);
     expect(await author.save()).toBe(true);
-    expect((await (Post as any).where({ author_id: author.id }).toArray()).length).toBe(1);
+    expect(await proxy.count()).toBe(1);
     expect(log).toEqual(["before_adding<new>", "after_adding<new>"]);
   });
 
