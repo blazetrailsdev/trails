@@ -9,7 +9,7 @@ import { BinaryData } from "@blazetrails/activemodel";
 import { QueryAttribute } from "../../relation/query-attribute.js";
 import { ValueType, IntegerType } from "@blazetrails/activemodel";
 import { assertLogged } from "./test-helper.js";
-import { assertNothingRaised } from "@blazetrails/activesupport";
+import { assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
 import { newSqlitePool } from "../../support/pooled-sqlite-adapter.js";
 import { NullPool } from "../../connection-adapters/abstract/connection-pool.js";
 import { StatementInvalid } from "../../errors.js";
@@ -218,12 +218,10 @@ describeIfSqlite("SQLite3AdapterTest", () => {
 
   it("bad timeout", async () => {
     const a = new BetterSQLite3Adapter({ database: ":memory:", timeout: "usa" });
-    const exception: any = await a.connectBang().then(
-      () => null,
-      (e) => e,
-    );
-    expect(exception).toBeInstanceOf(StatementInvalid);
-    expect(exception.message).toMatch(/TypeError/);
+    const exception: any = await assertRaises([StatementInvalid], {}, async () => {
+      await a.connectBang();
+    });
+    expect(exception.message).toMatch("TypeError");
     expect(exception.connectionPool).toBeInstanceOf(NullPool);
   });
 
@@ -824,11 +822,9 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     const conn = new BetterSQLite3Adapter({ database: ":memory:", readonly: true });
     await conn.connectBang();
 
-    const exception: any = await conn.execute("CREATE TABLE test(id integer)").then(
-      () => null,
-      (e) => e,
-    );
-    expect(exception).toBeInstanceOf(StatementInvalid);
+    const exception: any = await assertRaises([StatementInvalid], {}, async () => {
+      await conn.execute("CREATE TABLE test(id integer)");
+    });
     expect(exception.message).toMatch("SQLite3::ReadOnlyException");
     expect(exception.connectionPool).toEqual(conn.pool);
     await conn.disconnectBang();
@@ -848,10 +844,9 @@ describeIfSqlite("SQLite3AdapterTest", () => {
       conn = new BetterSQLite3Adapter({ database: ":memory:" });
       await conn.createTable("testings");
 
-      const error: any = await conn.addIndex("testings", "non_existent2").then(
-        () => null,
-        (e) => e,
-      );
+      const error: any = await assertRaises([Error], {}, async () => {
+        await conn.addIndex("testings", "non_existent2");
+      });
       expect(error.message).toMatch(/no such column: "?non_existent2"?/);
       expect(error.connectionPool).toEqual(conn.pool);
       await conn.disconnectBang();
@@ -862,10 +857,9 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     let conn = new BetterSQLite3Adapter({ database: ":memory:", strict: true });
     await conn.createTable("testings");
 
-    let error: any = await conn.addIndex("testings", "non_existent").then(
-      () => null,
-      (e) => e,
-    );
+    let error: any = await assertRaises([Error], {}, async () => {
+      await conn.addIndex("testings", "non_existent");
+    });
     expect(error.message).toMatch(/no such column: "?non_existent"?/);
     expect(error.connectionPool).toEqual(conn.pool);
     await conn.disconnectBang();
@@ -874,10 +868,9 @@ describeIfSqlite("SQLite3AdapterTest", () => {
       conn = new BetterSQLite3Adapter({ database: ":memory:", strict: true });
       await conn.createTable("testings");
 
-      error = await conn.addIndex("testings", "non_existent2").then(
-        () => null,
-        (e) => e,
-      );
+      error = await assertRaises([Error], {}, async () => {
+        await conn.addIndex("testings", "non_existent2");
+      });
       expect(error.message).toMatch(/no such column: "?non_existent2"?/);
       expect(error.connectionPool).toEqual(conn.pool);
       await conn.disconnectBang();
