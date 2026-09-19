@@ -202,8 +202,9 @@ describeIfPostgresqlAdapter("PostgresqlDefaultExpressionTest", () => {
 
   it("schema dump includes default expression", async () => {
     const output = await dumpTableSchema(adapter as unknown as SchemaSource, "defaults");
+    const version = await adapter.databaseVersion;
     // eslint-disable-next-line blazetrails/no-conditional-in-test -- mirrors defaults_test.rb:152
-    if (((await adapter.databaseVersion) as number) >= 100000) {
+    if (typeof version === "number" && version >= 100000) {
       expect(output).toMatch(/t\.date\("modified_date", \{ default: \(\) => "CURRENT_DATE" \}\)/);
       expect(output).toMatch(
         /t\.datetime\("modified_time", \{ default: \(\) => "CURRENT_TIMESTAMP" \}\)/,

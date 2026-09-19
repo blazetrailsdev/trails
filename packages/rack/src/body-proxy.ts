@@ -13,7 +13,7 @@ export class BodyProxy {
         if (Reflect.has(target, prop) || typeof prop !== "string" || !target.respondTo(prop)) {
           return Reflect.get(target, prop, receiver);
         }
-        return (...args: any[]) => target.delegate(prop, ...args);
+        return (...args: unknown[]) => target.delegate(prop, ...args);
       },
     });
   }
@@ -82,7 +82,7 @@ export class BodyProxy {
     return typeof this.body?.[method] === "function";
   }
 
-  delegate(method: string, ...args: any[]): any {
+  delegate(method: string, ...args: unknown[]): any {
     if (method === "toStr" || method === "to_str") {
       throw new Error("NoMethodError: undefined method 'to_str'");
     }
