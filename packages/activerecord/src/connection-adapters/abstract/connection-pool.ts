@@ -300,11 +300,14 @@ export class ConnectionPool implements ReapablePool {
 
   inspect(): string {
     const q = (v: string) => JSON.stringify(String(v));
-    const parts = [`env_name=${q(this.dbConfig.envName)}`];
-    if (this.dbConfig.name !== "primary") parts.push(`name=${q(this.dbConfig.name)}`);
-    parts.push(`role=:${this.role}`);
-    if (this.shard !== "default") parts.push(`shard=:${this.shard}`);
-    return `#<ActiveRecord::ConnectionAdapters::ConnectionPool ${parts.join(" ")}>`;
+    const nameField = this.dbConfig.name === "primary" ? "" : ` name=${q(this.dbConfig.name)}`;
+    const shardField = this.shard === "default" ? "" : ` shard=:${this.shard}`;
+    const className =
+      this.constructor === ConnectionPool
+        ? "ActiveRecord::ConnectionAdapters::ConnectionPool"
+        : this.constructor.name;
+
+    return `#<${className} env_name=${q(this.dbConfig.envName)}${nameField} role=:${this.role}${shardField}>`;
   }
 
   /** @noRailsEquivalent PERMANENT */
