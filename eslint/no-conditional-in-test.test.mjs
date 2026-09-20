@@ -14,6 +14,7 @@ tester.run("no-conditional-in-test", rule, {
     'it("x", () => { if (adapterType === "sqlite") { expect(1).toBe(1); } else { expect(2).toBe(2); } });',
     'it("x", async () => { if (adapterType === "postgres") {} else if (adapterType === "mysql") {} else {} });',
     'test("x", () => { if (currentAdapter("postgres")) {} });',
+    'it("x", () => { if (isMariaDb) { expect(1).toBe(1); } else { expect(2).toBe(2); } });',
     'it("x", () => { if (adapterType === "mysql" || !currentAdapter("postgres")) {} });',
     "function helper(x) { if (x) {} }",
     'describe("x", () => { beforeEach(() => { if (y) {} }); });',
@@ -25,6 +26,10 @@ tester.run("no-conditional-in-test", rule, {
     },
     {
       code: 'it("x", () => { if (adapterType === "mysql" && supportsJsonSchemaValid) {} });',
+      errors: [{ messageId: "noConditionalInTest" }],
+    },
+    {
+      code: 'it("x", () => { if (isMariaDbLike) {} });',
       errors: [{ messageId: "noConditionalInTest" }],
     },
     {

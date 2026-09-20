@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { assertRaises } from "@blazetrails/activesupport";
 import * as ConnectionAdapters from "../connection-adapters.js";
 import { AdapterNotFound } from "../errors.js";
 
@@ -7,58 +8,78 @@ class FakeActiveRecordAdapter {}
 describe("RegistrationTest", () => {
   it("#register registers a new database adapter and #resolve can find it and raises if it cannot", async () => {
     const name = "fake_reg_a";
-    expect(() => ConnectionAdapters.resolve(name)).toThrow(AdapterNotFound);
-    expect(() => ConnectionAdapters.resolve(name)).toThrow(
+    const exception = await assertRaises([AdapterNotFound], {}, () =>
+      ConnectionAdapters.resolve(name),
+    );
+
+    expect(exception.message).toMatch(
       /Database configuration specifies nonexistent 'fake_reg_a' adapter\. Available adapters are:/,
     );
+
     ConnectionAdapters.register(
       name,
       "FakeActiveRecordAdapter",
       "./fake-active-record-adapter.js",
       async () => FakeActiveRecordAdapter as any,
     );
-    const klass = await ConnectionAdapters.resolve(name);
-    expect(klass.name).toBe("FakeActiveRecordAdapter");
+
+    expect((await ConnectionAdapters.resolve(name)).name).toBe("FakeActiveRecordAdapter");
   });
 
   it("#register allows for symbol key", async () => {
     const name = "fake_reg_b";
-    expect(() => ConnectionAdapters.resolve(name)).toThrow(AdapterNotFound);
-    expect(() => ConnectionAdapters.resolve(name)).toThrow(
+    const exception = await assertRaises([AdapterNotFound], {}, () =>
+      ConnectionAdapters.resolve(name),
+    );
+
+    expect(exception.message).toMatch(
       /Database configuration specifies nonexistent 'fake_reg_b' adapter\. Available adapters are:/,
     );
+
     ConnectionAdapters.register(
       name,
       "FakeActiveRecordAdapter",
       "./fake-active-record-adapter.js",
       async () => FakeActiveRecordAdapter as any,
     );
-    const klass = await ConnectionAdapters.resolve(name);
-    expect(klass.name).toBe("FakeActiveRecordAdapter");
+
+    expect((await ConnectionAdapters.resolve(name)).name).toBe("FakeActiveRecordAdapter");
   });
 
   it("#resolve allows for symbol key", async () => {
     const name = "fake_reg_c";
-    expect(() => ConnectionAdapters.resolve(name)).toThrow(AdapterNotFound);
-    expect(() => ConnectionAdapters.resolve(name)).toThrow(
+    const exception = await assertRaises([AdapterNotFound], {}, () =>
+      ConnectionAdapters.resolve(name),
+    );
+
+    expect(exception.message).toMatch(
       /Database configuration specifies nonexistent 'fake_reg_c' adapter\. Available adapters are:/,
     );
+
     ConnectionAdapters.register(
       name,
       "FakeActiveRecordAdapter",
       "./fake-active-record-adapter.js",
       async () => FakeActiveRecordAdapter as any,
     );
-    const klass = await ConnectionAdapters.resolve(name);
-    expect(klass.name).toBe("FakeActiveRecordAdapter");
+
+    expect((await ConnectionAdapters.resolve(name)).name).toBe("FakeActiveRecordAdapter");
   });
 });
 
 describe("RegistrationIsolatedTest", () => {
-  it("#resolve raises if the adapter is using the pre 7.2 adapter registration API", () => {
-    expect(() => ConnectionAdapters.resolve("fake_legacy")).toThrow(AdapterNotFound);
-    expect(() => ConnectionAdapters.resolve("fake_legacy")).toThrow(
-      /Database configuration specifies nonexistent 'fake_legacy' adapter\. Available adapters are:/,
+  it("#resolve raises if the adapter is using the pre 7.2 adapter registration API", async () => {
+    const exception = await assertRaises([AdapterNotFound], {}, () =>
+      ConnectionAdapters.resolve("fake_legacy"),
     );
+
+    const availableAdapters = /Available adapters are: (.*?)\./.exec(exception.message)![1];
+    const expectedMessage =
+      `Database configuration specifies nonexistent 'fake_legacy' adapter. ` +
+      `Available adapters are: ${availableAdapters}. ` +
+      `Ensure that the adapter is spelled correctly in config/database.yml and that you've added the necessary ` +
+      `adapter package to your package.json if it's not in the list of available adapters.`;
+
+    expect(exception.message).toBe(expectedMessage);
   });
 });
