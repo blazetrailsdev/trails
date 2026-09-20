@@ -139,9 +139,12 @@ class BarcodeCustomPk extends Base {
 }
 
 class BarcodeCpk extends Base {
+  declare region: string;
+  declare code: string;
+
   static {
     this._tableName = "barcode_cpks";
-    this._primaryKey = ["region", "code"] as unknown as string;
+    this._primaryKey = ["region", "code"];
   }
 }
 
@@ -670,6 +673,24 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     expect(id).toEqual(idval);
   });
 
+  it("exec insert with returning disabled", async () => {
+    const originalConn = adapter;
+    adapter = new BetterSQLite3Adapter({
+      database: ":memory:",
+      insertReturning: false,
+    }) as unknown as SQLite3Adapter;
+    await createExampleTable();
+    const result = await adapter.execInsert(
+      "insert into ex (number) VALUES ('foo')",
+      null,
+      [],
+      "id",
+    );
+    const expected = (await adapter.query("select max(id) from ex"))[0][0];
+    expect(result.rows[0][0]).toEqual(Number(expected));
+    adapter = originalConn;
+  });
+
   it("exec insert default values with returning disabled", async () => {
     const originalConn = adapter;
     adapter = new BetterSQLite3Adapter({
@@ -865,12 +886,12 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("copy table with existing records have custom primary key", async () => {
-    const connection = (await BarcodeCustomPk.leaseConnection()) as any;
+    const connection = (await BarcodeCustomPk.leaseConnection()) as unknown as SQLite3Adapter;
     try {
       await connection.createTable(
         "barcode_custom_pks",
         { primaryKey: "code", id: { type: "string", limit: 42 }, force: true },
-        (t: any) => {
+        (t) => {
           t.text("other_attr");
         },
       );
@@ -887,12 +908,12 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("copy table with composite primary keys", async () => {
-    const connection = (await BarcodeCpk.leaseConnection()) as any;
+    const connection = (await BarcodeCpk.leaseConnection()) as unknown as SQLite3Adapter;
     try {
       await connection.createTable(
         "barcode_cpks",
         { primaryKey: ["region", "code"], force: true },
-        (t: any) => {
+        (t) => {
           t.string("region");
           t.string("code");
           t.text("other_attr");
@@ -906,7 +927,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
 
       expect(await connection.primaryKeys("barcode_cpks")).toEqual(["region", "code"]);
 
-      const barcode = (await BarcodeCpk.first()) as any;
+      const barcode = (await BarcodeCpk.first())!;
       expect(barcode.region).toEqual(region);
       expect(barcode.code).toEqual(code);
     } finally {
@@ -916,9 +937,9 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("custom primary key in create table", async () => {
-    const connection = (await Barcode.leaseConnection()) as any;
+    const connection = (await Barcode.leaseConnection()) as unknown as SQLite3Adapter;
     try {
-      await connection.createTable("barcodes", { id: false, force: true }, (t: any) => {
+      await connection.createTable("barcodes", { id: false, force: true }, (t) => {
         t.primaryKey("id", "string");
       });
 
@@ -937,12 +958,12 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("custom primary key in change table", async () => {
-    const connection = (await Barcode.leaseConnection()) as any;
+    const connection = (await Barcode.leaseConnection()) as unknown as SQLite3Adapter;
     try {
-      await connection.createTable("barcodes", { id: false, force: true }, (t: any) => {
+      await connection.createTable("barcodes", { id: false, force: true }, (t) => {
         t.integer("dummy");
       });
-      await connection.changeTable("barcodes", {}, async (t: any) => {
+      await connection.changeTable("barcodes", {}, async (t) => {
         await t.primaryKey("id", "string");
       });
 
@@ -961,9 +982,9 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("add column with custom primary key", async () => {
-    const connection = (await Barcode.leaseConnection()) as any;
+    const connection = (await Barcode.leaseConnection()) as unknown as SQLite3Adapter;
     try {
-      await connection.createTable("barcodes", { id: false, force: true }, (t: any) => {
+      await connection.createTable("barcodes", { id: false, force: true }, (t) => {
         t.integer("dummy");
       });
       await connection.addColumn("barcodes", "id", "string", { primaryKey: true });
@@ -983,9 +1004,9 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("remove column preserves index options", async () => {
-    const connection = (await Barcode.leaseConnection()) as any;
+    const connection = (await Barcode.leaseConnection()) as unknown as SQLite3Adapter;
     try {
-      await connection.createTable("barcodes", { force: true }, (t: any) => {
+      await connection.createTable("barcodes", { force: true }, (t) => {
         t.string("code");
         t.string("region");
         t.boolean("bool_attr");
@@ -996,16 +1017,16 @@ describeIfSqlite("SQLite3AdapterTest", () => {
       });
       await connection.removeColumn("barcodes", "region");
 
-      const indexes = (await connection.indexes("barcodes")) as any[];
+      const indexes = await connection.indexes("barcodes");
 
       const partialIndex = indexes.find((idx) => idx.name === "partial");
-      expect(partialIndex.where).toEqual("bool_attr");
+      expect(partialIndex!.where).toEqual("bool_attr");
 
       const uniqueIndex = indexes.find((idx) => idx.name === "unique");
-      expect(uniqueIndex.unique).toBeTruthy();
+      expect(uniqueIndex!.unique).toBeTruthy();
 
       const orderedIndex = indexes.find((idx) => idx.name === "ordered");
-      expect(orderedIndex.orders).toEqual("desc");
+      expect(orderedIndex!.orders).toEqual("desc");
     } finally {
       await Barcode.resetColumnInformation();
       await connection.dropTable("barcodes", { ifExists: true });
@@ -1013,14 +1034,14 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("auto increment preserved on table changes", async () => {
-    const connection = (await Barcode.leaseConnection()) as any;
+    const connection = (await Barcode.leaseConnection()) as unknown as SQLite3Adapter;
     try {
-      await connection.createTable("barcodes", { force: true }, (t: any) => {
+      await connection.createTable("barcodes", { force: true }, (t) => {
         t.string("code");
       });
 
       let pkColumn = (await connection.columns("barcodes")).find(
-        (col: SQLite3Column) => col.name === "id",
+        (col) => col.name === "id",
       ) as SQLite3Column;
       let sql = (
         await connection.execQuery("SELECT sql FROM sqlite_master WHERE tbl_name='barcodes'")
@@ -1032,7 +1053,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
       await connection.changeColumn("barcodes", "code", "integer");
 
       pkColumn = (await connection.columns("barcodes")).find(
-        (col: SQLite3Column) => col.name === "id",
+        (col) => col.name === "id",
       ) as SQLite3Column;
       sql = (await connection.execQuery("SELECT sql FROM sqlite_master WHERE tbl_name='barcodes'"))
         .rows[0][0] as string;
@@ -1045,24 +1066,29 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     }
   });
 
-  // BLOCKED: sqlite3-statement-closed-busy-parity
-  it.skip("statement closed", async () => {
+  it("statement closed", async () => {
     await adapter.connectBang();
 
     const rawConnection = (await adapter.rawConnection()) as unknown as SqliteConnection;
     const statement = await rawConnection.prepare(
       "CREATE TABLE statement_test (number integer not null)",
     );
-    vi.spyOn(statement, "all").mockImplementation(() => {
-      throw new Error("busy");
-    });
-    vi.spyOn(rawConnection, "prepare").mockImplementation(() => statement);
-    await assertCalled(statement, "close", null, {}, async () => {
-      const error: any = await assertRaises([StatementTimeout], {}, async () => {
-        await adapter.execQuery("select * from statement_test");
+    const step = () => {
+      throw Object.assign(new Error("busy"), { code: "SQLITE_BUSY" });
+    };
+    vi.spyOn(statement, "all").mockImplementation(step);
+    vi.spyOn(statement, "run").mockImplementation(step);
+    try {
+      await assertCalled(statement, "close", null, {}, async () => {
+        vi.spyOn(rawConnection, "prepare").mockImplementation(() => statement);
+        const error: any = await assertRaises([StatementTimeout], {}, async () => {
+          await adapter.execQuery("select * from statement_test");
+        });
+        expect(error.connectionPool).toEqual(adapter.pool);
       });
-      expect(error.connectionPool).toEqual(adapter.pool);
-    });
+    } finally {
+      vi.restoreAllMocks();
+    }
   });
 
   it("db is not readonly when readonly option is false", async () => {
