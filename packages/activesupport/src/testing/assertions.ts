@@ -420,6 +420,24 @@ export function assertNotEmpty(actual: unknown, message?: string): void {
   assert(!isEmptyCollection(actual), message ?? `Expected ${inspect(actual)} to not be empty`);
 }
 
+/** @noRailsEquivalent PERMANENT */
+export function assertIncludes(collection: unknown, obj: unknown, message?: string): void {
+  assertRespondTo(collection, "include");
+  assert(
+    (collection as { include(obj: unknown): boolean }).include(obj),
+    message ?? `Expected ${inspect(collection)} to include ${inspect(obj)}`,
+  );
+}
+
+/** @noRailsEquivalent PERMANENT */
+export function assertNotIncludes(collection: unknown, obj: unknown, message?: string): void {
+  assertRespondTo(collection, "include");
+  assertNot(
+    (collection as { include(obj: unknown): boolean }).include(obj),
+    message ?? `Expected ${inspect(collection)} to not include ${inspect(obj)}`,
+  );
+}
+
 function isEmptyCollection(actual: unknown): boolean {
   const collection = actual as { isEmpty?: () => boolean };
   if (typeof collection?.isEmpty === "function") return collection.isEmpty();
