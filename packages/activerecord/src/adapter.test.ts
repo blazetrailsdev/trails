@@ -8,7 +8,7 @@ import {
   assertRaises,
 } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { Process } from "@blazetrails/ruby-compat";
+import { Process, StandardError } from "@blazetrails/ruby-compat";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { AdapterError, ConnectionFailed } from "./errors.js";
@@ -405,12 +405,12 @@ describe("AdapterTest", () => {
   );
 
   it("exceptions from notifications are not translated", async () => {
-    const originalError = new Error("This StandardError shouldn't get translated");
+    const originalError = new StandardError("This StandardError shouldn't get translated");
     const subscriber = Notifications.subscribe("sql.active_record", () => {
       throw originalError;
     });
     try {
-      const actualError = await assertRaises([Error], {}, async () => {
+      const actualError = await assertRaises([StandardError], {}, async () => {
         await Base.connection.execute("SELECT * FROM posts");
       });
       expect(actualError).toBe(originalError);

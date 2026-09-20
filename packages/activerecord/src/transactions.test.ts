@@ -1,4 +1,4 @@
-import { kernelThrow, FrozenError } from "@blazetrails/ruby-compat";
+import { kernelThrow, FrozenError, RuntimeError } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { transaction, Rollback, registerModel, RecordInvalid } from "./index.js";
 import { afterAllTransactionsCommit } from "./active-record.js";
@@ -537,11 +537,11 @@ describe("TransactionTest", () => {
 
   it("raising exception in callback rollbacks in save", async () => {
     first.afterSaveForTransaction = () => {
-      throw new Error("Make the transaction rollback");
+      throw new RuntimeError("Make the transaction rollback");
     };
 
     first.approved = true;
-    const e = await assertRaises([Error], {}, async () => {
+    const e = await assertRaises([RuntimeError], {}, async () => {
       await first.save();
     });
     expect(e.message).toBe("Make the transaction rollback");
@@ -567,7 +567,7 @@ describe("TransactionTest", () => {
   it("raising exception in nested transaction restore state in save", async () => {
     const topic = Topic.new() as any;
     topic.afterSaveForTransaction = () => {
-      throw new Error("Make the transaction rollback");
+      throw new RuntimeError("Make the transaction rollback");
     };
 
     await expect(
@@ -653,7 +653,7 @@ describe("TransactionTest", () => {
   it("callback rollback in create", async () => {
     class CallbackRollbackTopic extends Topic {}
     (CallbackRollbackTopic.prototype as any).afterCreateForTransaction = function () {
-      throw new Error("Make the transaction rollback");
+      throw new RuntimeError("Make the transaction rollback");
     };
     registerModel(CallbackRollbackTopic as any);
 
@@ -671,7 +671,7 @@ describe("TransactionTest", () => {
 
     for (let i = 0; i < 2; i++) {
       newTopic.approved = true;
-      const e = await assertRaises([Error], {}, async () => {
+      const e = await assertRaises([RuntimeError], {}, async () => {
         await newTopic.save();
       });
       expect(e.message).toBe("Make the transaction rollback");
@@ -950,11 +950,11 @@ describe("TransactionTest", () => {
 
     await assertCalled(connection, "beginDbTransaction", null, {}, async () => {
       const spy = vi.spyOn(connection, "commitDbTransaction").mockImplementation(async () => {
-        throw new Error("OH NOES");
+        throw new RuntimeError("OH NOES");
       });
       try {
         await assertCalled(connection, "rollbackDbTransaction", null, {}, async () => {
-          const e = await assertRaises([Error], {}, async () => {
+          const e = await assertRaises([RuntimeError], {}, async () => {
             await Topic.transaction(async () => {
               await connection.materializeTransactions();
             });
@@ -1345,13 +1345,13 @@ describe.skipIf(inMemoryDb())("TransactionTest", () => {
     const connection = await (Topic as any).leaseConnection();
     const pool = (Topic as any).connectionPool();
     connection.transactionManager.commitTransaction = async () => {
-      throw new Error("commit failed");
+      throw new RuntimeError("commit failed");
     };
     connection.transactionManager.rollbackTransaction = async () => {
-      throw new Error("rollback failed");
+      throw new RuntimeError("rollback failed");
     };
 
-    const exception = await assertRaises([Error], {}, async () => {
+    const exception = await assertRaises([RuntimeError], {}, async () => {
       await Topic.transaction(async () => {
         topic.title = "Updated title";
         await topic.save();
@@ -1369,10 +1369,10 @@ describe.skipIf(inMemoryDb())("TransactionTest", () => {
     const pool = (Topic as any).connectionPool();
     await connection.disableLazyTransactionsBang();
     connection.beginDbTransaction = async () => {
-      throw new Error("begin failed");
+      throw new RuntimeError("begin failed");
     };
 
-    const exception = await assertRaises([Error], {}, async () => {
+    const exception = await assertRaises([RuntimeError], {}, async () => {
       await Topic.transaction(async () => {});
     });
     expect(exception.message).toBe("begin failed");
