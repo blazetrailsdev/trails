@@ -1,17 +1,14 @@
-import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { fixtures } from "../../test-fixtures.js";
-import { Base } from "../../index.js";
+import { Base, registerModel } from "../../index.js";
+import { Author } from "../../test-helpers/models/author.js";
+import { Post } from "../../test-helpers/models/post.js";
 
-beforeAll(() => {
-  vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
-});
+registerModel(Author);
+registerModel(Post);
 
-afterAll(() => {
-  vi.unstubAllEnvs();
-});
-
-fixtures([]);
+fixtures(["authors", "authorAddresses"]);
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
@@ -25,8 +22,11 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
   describe("PostgresqlExplainTest", () => {
     it("explain for one query", async () => {
-      const result = await adapter.explain("SELECT 1");
-      expect(result).toContain("Result");
+      const explain = await Author.where({ id: 1 }).explain().inspect();
+      expect(explain).toMatch(
+        /EXPLAIN SELECT "authors"\.\* FROM "authors" WHERE "authors"\."id" = (?:\$1 \[\["id", 1\]\]|1)/,
+      );
+      expect(explain).toMatch("QUERY PLAN");
     });
 
     it("Relation#explain on PG captures the SELECT via sql.active_record", async () => {
@@ -46,7 +46,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("Relation#explain on PG captures preload queries", async () => {
-      const { registerModel } = await import("../../index.js");
       class ExAuthor extends Base {
         static {
           this.attribute("id", "integer");
@@ -94,8 +93,13 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("explain with options as strings", async () => {
-      const result = await adapter.explain("SELECT 1 AS val");
-      expect(result).toContain("Result");
+      const explain = await Author.where({ id: 1 })
+        .explain("VERBOSE", "ANALYZE", "FORMAT JSON")
+        .inspect();
+      expect(explain).toMatch(
+        /EXPLAIN \(VERBOSE, ANALYZE, FORMAT JSON\) SELECT "authors"\.\* FROM "authors" WHERE "authors"\."id" = (?:\$1 \[\["id", 1\]\]|1)/,
+      );
+      expect(explain).toMatch("QUERY PLAN");
     });
 
     it("buildExplainClause renders FORMAT JSON", async () => {
@@ -120,37 +124,17 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("explain options with eager loading", async () => {
-      const { registerModel } = await import("../../index.js");
-      class OpAuthor extends Base {
-        static {
-          this.attribute("id", "integer");
-          this.attribute("name", "string");
-        }
-      }
-      class OpPost extends Base {
-        static {
-          this.attribute("id", "integer");
-          this.attribute("title", "string");
-          this.attribute("op_author_id", "integer");
-        }
-      }
-      OpAuthor.hasMany("opPosts", { className: "OpPost" });
-      registerModel(OpAuthor);
-      registerModel(OpPost);
-      await adapter.execute(`CREATE TABLE "op_authors" ("id" SERIAL PRIMARY KEY, "name" TEXT)`);
-      await adapter.execute(
-        `CREATE TABLE "op_posts" ("id" SERIAL PRIMARY KEY, "title" TEXT, "op_author_id" INTEGER)`,
+      const explain = await Author.where({ id: 1 })
+        .includes(":posts")
+        .explain(":analyze")
+        .inspect();
+      expect(explain).toMatch("QUERY PLAN");
+      expect(explain).toMatch(
+        /EXPLAIN \(ANALYZE\) SELECT "authors"\.\* FROM "authors" WHERE "authors"\."id" = (?:\$1 \[\["id", 1\]\]|1)/,
       );
-      const author = (await OpAuthor.create({ name: "A" })) as any;
-      await OpPost.create({ title: "B", op_author_id: author.id });
-
-      const plan = await OpAuthor.where({ id: author.id }).includes(":opPosts").explain("analyze");
-      expect(plan).toContain("QUERY PLAN");
-      expect(plan).toMatch(/EXPLAIN \(ANALYZE\)/);
-      const analyzeBlocks = plan.split("\n\n").filter((b) => /EXPLAIN \(ANALYZE\)/.test(b));
-      expect(analyzeBlocks.length).toBeGreaterThanOrEqual(2);
-      expect(plan).toContain("op_authors");
-      expect(plan).toContain("op_posts");
+      expect(explain).toMatch(
+        /EXPLAIN \(ANALYZE\) SELECT "posts"\.\* FROM "posts" WHERE "posts"\."author_id" = (?:\$1 \[\["author_id", 1\]\]|1)/,
+      );
     });
   });
 });

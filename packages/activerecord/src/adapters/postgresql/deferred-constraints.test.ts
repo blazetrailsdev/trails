@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { InvalidForeignKey } from "../../errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { assertNothingRaised } from "@blazetrails/activesupport";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
@@ -27,7 +28,9 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.beginTransaction({ _lazy: false });
         try {
           await adapter.setConstraints("deferred");
-          await adapter.execute(`INSERT INTO dc_ch (par_id) VALUES (-1)`);
+          await assertNothingRaised(async () => {
+            await adapter.execute(`INSERT INTO dc_ch (par_id) VALUES (-1)`);
+          });
           await expect(adapter.setConstraints("immediate")).rejects.toThrow(InvalidForeignKey);
         } finally {
           await adapter.rollbackTransaction().catch(() => {});
@@ -53,7 +56,9 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.beginTransaction({ _lazy: false });
         try {
           await adapter.setConstraints("deferred", fkName);
-          await adapter.execute(`INSERT INTO dc_ch (par_id) VALUES (-1)`);
+          await assertNothingRaised(async () => {
+            await adapter.execute(`INSERT INTO dc_ch (par_id) VALUES (-1)`);
+          });
           await expect(adapter.setConstraints("immediate", fkName)).rejects.toThrow(
             InvalidForeignKey,
           );
@@ -89,7 +94,9 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.beginTransaction({ _lazy: false });
         try {
           await adapter.setConstraints("deferred", "dc_m_fk1", "dc_m_fk2");
-          await adapter.execute(`INSERT INTO dc_m_ch (p1_id, p2_id) VALUES (-1, -1)`);
+          await assertNothingRaised(async () => {
+            await adapter.execute(`INSERT INTO dc_m_ch (p1_id, p2_id) VALUES (-1, -1)`);
+          });
           await expect(adapter.setConstraints("immediate", "dc_m_fk1", "dc_m_fk2")).rejects.toThrow(
             InvalidForeignKey,
           );

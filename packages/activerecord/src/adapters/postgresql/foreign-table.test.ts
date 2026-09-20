@@ -1,4 +1,5 @@
 import { describe, expect, beforeEach, afterEach } from "vitest";
+import { assertDifference } from "@blazetrails/activesupport";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Base } from "../../index.js";
@@ -67,11 +68,11 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("ForeignTableTest", () => {
     itIfSupports("foreign_tables", "table exists", async () => {
-      expect(await adapter.tableExists("foreign_professors")).toBe(false);
+      expect(await adapter.tableExists("foreign_professors")).toBeFalsy();
     });
 
     itIfSupports("foreign_tables", "foreign tables are valid data sources", async () => {
-      expect(await adapter.dataSourceExists("foreign_professors")).toBe(true);
+      expect(await adapter.dataSourceExists("foreign_professors")).toBeTruthy();
     });
 
     itIfSupports("foreign_tables", "foreign tables", async () => {
@@ -79,10 +80,11 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     itIfSupports("foreign_tables", "foreign table exists", async () => {
-      expect(await adapter.foreignTableExists("foreign_professors")).toBe(true);
-      expect(await adapter.foreignTableExists("nonexistingtable")).toBe(false);
-      expect(await adapter.foreignTableExists("'")).toBe(false);
-      expect(await adapter.foreignTableExists(null as unknown as string)).toBe(false);
+      expect(await adapter.foreignTableExists("foreign_professors")).toBeTruthy();
+      expect(await adapter.foreignTableExists("foreign_professors")).toBeTruthy();
+      expect(await adapter.foreignTableExists("nonexistingtable")).toBeFalsy();
+      expect(await adapter.foreignTableExists("'")).toBeFalsy();
+      expect(await adapter.foreignTableExists(null as unknown as string)).toBeFalsy();
     });
 
     itIfSupports("foreign_tables", "attribute names", async () => {
@@ -99,9 +101,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       await Professor.loadSchema();
       await ForeignProfessorWithPk.loadSchema();
       const created = await Professor.create({ name: "Nicola" });
-      const found = await ForeignProfessorWithPk.find(created.readAttribute("id"));
-      expect(found.readAttribute("name")).toBe("Nicola");
-      expect(Number(found.readAttribute("id"))).toBe(Number(created.readAttribute("id")));
+      const professor = await ForeignProfessorWithPk.find(created.readAttribute("id"));
+      expect(professor.attributes).toEqual(created.attributes);
     });
 
     itIfSupports("foreign_tables", "insert record", async () => {
@@ -127,14 +128,14 @@ describeIfPg("PostgreSQLAdapter", () => {
       await ForeignProfessorWithPk.loadSchema();
       const created = await Professor.create({ name: "Nicola" });
       const prof = await ForeignProfessorWithPk.find(created.readAttribute("id"));
-      const countAll = async (): Promise<number> => {
-        const rows = await adapter.execute("SELECT COUNT(*) AS c FROM foreign_professors");
-        return Number((rows[0] as { c: string | number }).c);
-      };
-      const before = await countAll();
-      await prof.destroy();
-      const after = await countAll();
-      expect(after).toBe(before - 1);
+      await assertDifference(
+        () => ForeignProfessor.count() as Promise<number>,
+        -1,
+        null,
+        async () => {
+          await prof.destroy();
+        },
+      );
     });
   });
 });

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { assertRespondTo } from "@blazetrails/activesupport";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Base, Migration } from "../../index.js";
@@ -89,24 +90,24 @@ describeIfPg("PostgreSQLAdapter", () => {
     }
 
     it("hstore included in extensions", async () => {
-      expect(typeof connection.extensions).toBe("function");
-      const exts = await connection.extensions();
-      expect(exts).toContain("hstore");
+      assertRespondTo(connection, "extensions");
+      expect(await connection.extensions()).toContain("hstore");
     });
 
     it("disable enable hstore", async () => {
-      expect(await connection.extensionEnabled("hstore")).toBe(true);
+      expect(await connection.extensionEnabled("hstore")).toBeTruthy();
       await connection.disableExtension("hstore", { force: "cascade" });
-      expect(await connection.extensionEnabled("hstore")).toBe(false);
+      expect(await connection.extensionEnabled("hstore")).toBeFalsy();
       await connection.enableExtension("hstore");
-      expect(await connection.extensionEnabled("hstore")).toBe(true);
+      expect(await connection.extensionEnabled("hstore")).toBeTruthy();
     });
 
     it("column", async () => {
       expect(column.type).toBe("hstore");
       expect(column.sqlType).toBe("hstore");
-      expect(column.array).toBeFalsy();
-      expect(type.type()).not.toBe("binary");
+      expect(column.isArray()).toBeFalsy();
+
+      expect(type.isBinary()).toBeFalsy();
     });
 
     it("default", async () => {
@@ -211,16 +212,16 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("changes with store accessors", async () => {
       const x = Hstore.new({ language: "de" });
-      expect((x as any).languageChanged()).toBe(true);
+      expect((x as any).languageChanged()).toBeTruthy();
       expect((x as any).languageWas()).toBeNull();
       expect((x as any).languageChange()).toEqual([null, "de"]);
       await (x as any).saveBang();
 
-      expect((x as any).languageChanged()).toBe(false);
+      expect((x as any).languageChanged()).toBeFalsy();
       await (x as any).reload();
 
       (x as any).settings = null;
-      expect((x as any).languageChanged()).toBe(true);
+      expect((x as any).languageChanged()).toBeTruthy();
       expect((x as any).languageWas()).toBe("de");
       expect((x as any).languageChange()).toEqual(["de", null]);
     });
@@ -231,7 +232,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await (hstore as any).saveBang();
       await (hstore as any).reload();
       expect((hstore as any).settings["three"]).toBe("four");
-      expect((hstore as any).isChanged).toBe(false);
+      expect((hstore as any).isChanged).toBeFalsy();
     });
 
     it("dirty from user equal", async () => {
@@ -239,7 +240,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const hstore = await Hstore.createBang({ settings });
       (hstore as any).settings = { key: "value", alongkey: "anything" };
       expect((hstore as any).settings).toEqual(settings);
-      expect((hstore as any).isChanged).toBe(false);
+      expect((hstore as any).isChanged).toBeFalsy();
     });
 
     it("hstore dirty from database equal", async () => {
@@ -248,7 +249,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await (hstore as any).reload();
       expect((hstore as any).settings).toEqual(settings);
       (hstore as any).settings = settings;
-      expect((hstore as any).isChanged).toBe(false);
+      expect((hstore as any).isChanged).toBeFalsy();
     });
 
     it("spaces", async () => {
@@ -287,7 +288,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await connection.execute("insert into hstores (tags) VALUES ('1=>2')");
       const x = await Hstore.first();
       (x as any).tags = { "\"a'": "b" };
-      await (x as any).saveBang();
+      expect(await (x as any).saveBang()).toBeTruthy();
     });
 
     it("select", async () => {

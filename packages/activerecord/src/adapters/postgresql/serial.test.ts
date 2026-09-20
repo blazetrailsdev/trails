@@ -37,14 +37,14 @@ describeIfPg("PostgreSQLAdapter", () => {
       const column = await columnNamed("postgresql_serials", "seq");
       expect(column.type).toBe("integer");
       expect(column.sqlType).toBe("integer");
-      expect(column.isSerial()).toBe(true);
+      expect(column.isSerial()).toBeTruthy();
     });
 
     it("not serial column", async () => {
       const column = await columnNamed("postgresql_serials", "serials_id");
       expect(column.type).toBe("integer");
       expect(column.sqlType).toBe("integer");
-      expect(column.isSerial()).toBe(false);
+      expect(column.isSerial()).toBeFalsy();
     });
 
     it("schema dump with shorthand", async () => {
@@ -78,14 +78,14 @@ describeIfPg("PostgreSQLAdapter", () => {
       const column = await columnNamed("postgresql_big_serials", "seq");
       expect(column.type).toBe("integer");
       expect(column.sqlType).toBe("bigint");
-      expect(column.isSerial()).toBe(true);
+      expect(column.isSerial()).toBeTruthy();
     });
 
     it("not bigserial column", async () => {
       const column = await columnNamed("postgresql_big_serials", "serials_id");
       expect(column.type).toBe("integer");
       expect(column.sqlType).toBe("bigint");
-      expect(column.isSerial()).toBe(false);
+      expect(column.isSerial()).toBeFalsy();
     });
 
     it("schema dump with shorthand", async () => {
@@ -120,7 +120,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const columns = (await adapter.columns("foo")) as Column[];
       for (const column of columns) {
         expect(column.type).toBe("integer");
-        expect(column.isSerial()).toBe(true);
+        expect(column.isSerial()).toBeTruthy();
       }
     });
 
@@ -154,7 +154,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const columns = (await adapter.columns(tableName)) as Column[];
       for (const column of columns) {
         expect(column.type).toBe("integer");
-        expect(column.isSerial()).toBe(true);
+        expect(column.isSerial()).toBeTruthy();
       }
     });
 

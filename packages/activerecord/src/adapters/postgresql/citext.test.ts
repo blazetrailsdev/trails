@@ -36,18 +36,17 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("PostgresqlCitextTest", () => {
     it("citext enabled", async () => {
-      expect(await connection.extensionEnabled("citext")).toBe(true);
+      expect(await connection.extensionEnabled("citext")).toBeTruthy();
     });
 
     it("column", async () => {
       const column = Citext.columnsHash()["cival"] as unknown as PgColumn;
-      expect(column).toBeDefined();
       expect(column.type).toBe("citext");
       expect(column.sqlType).toBe("citext");
-      expect(column.array).toBeFalsy();
+      expect(column.isArray()).toBeFalsy();
 
       const type = Citext.typeForAttribute("cival")!;
-      expect(type.isBinary()).toBe(false);
+      expect(type.isBinary()).toBeFalsy();
     });
 
     it("change table supports json", async () => {

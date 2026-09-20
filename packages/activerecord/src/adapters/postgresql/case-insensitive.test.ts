@@ -24,12 +24,21 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("case insensitiveness", async () => {
       const table = new Arel.Table("pg_case_insensitive_defaults");
 
-      for (const col of ["char1", "char2", "char3", "multiline_default"]) {
-        const attr = table.get(col);
-        const comparison = await adapter.caseInsensitiveComparison(attr, null);
-        const sql = adapter.visitor.compile(comparison);
-        expect(sql).toMatch(/lower/i);
-      }
+      let attr = table.get("char1");
+      let comparison = await adapter.caseInsensitiveComparison(attr, null);
+      expect(adapter.visitor.compile(comparison)).toMatch(/lower/i);
+
+      attr = table.get("char2");
+      comparison = await adapter.caseInsensitiveComparison(attr, null);
+      expect(adapter.visitor.compile(comparison)).toMatch(/lower/i);
+
+      attr = table.get("char3");
+      comparison = await adapter.caseInsensitiveComparison(attr, null);
+      expect(adapter.visitor.compile(comparison)).toMatch(/lower/i);
+
+      attr = table.get("multiline_default");
+      comparison = await adapter.caseInsensitiveComparison(attr, null);
+      expect(adapter.visitor.compile(comparison)).toMatch(/lower/i);
     });
   });
 });

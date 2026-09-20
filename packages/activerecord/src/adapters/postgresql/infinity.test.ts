@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { describeIfPg, leasePgAdapter, PostgreSQLAdapter } from "./test-helper.js";
+import { BigDecimal } from "@blazetrails/ruby-compat";
 import { Range } from "../../index.js";
 import { setZone } from "@blazetrails/activesupport";
 import { withTransactionalFixtures } from "../../test-fixtures/with-transactional-fixtures.js";
@@ -58,7 +59,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       record = new (M as any)({ float: "-Infinity" });
       expect(record.float).toBe(Number.NEGATIVE_INFINITY);
       record = new (M as any)({ float: "NaN" });
-      expect(Number.isNaN(record.float)).toBe(true);
+      expect(Number.isNaN(record.float)).toBeTruthy();
     });
 
     it("updateColumns with infinity on a float column", async () => {
@@ -122,13 +123,16 @@ describeIfPg("PostgreSQLAdapter", () => {
 
         let record = await (PostgresqlInfinity as any).create({ datetime: "infinity" });
         expect(record.datetime).toBe(Number.POSITIVE_INFINITY);
-        await record.reload();
-        expect(record.datetime).toBe(Number.POSITIVE_INFINITY);
+        expect((await record.reload()).datetime).toBe(record.datetime);
 
         record = await (PostgresqlInfinity as any).create({ datetime: Number.POSITIVE_INFINITY });
         expect(record.datetime).toBe(Number.POSITIVE_INFINITY);
-        await record.reload();
-        expect(record.datetime).toBe(Number.POSITIVE_INFINITY);
+        expect((await record.reload()).datetime).toBe(record.datetime);
+
+        record = await (PostgresqlInfinity as any).create({ datetime: BigDecimal.INFINITY });
+        const datetime = (record.datetime as BigDecimal).toF();
+        expect(datetime).toEqual(Number.POSITIVE_INFINITY);
+        expect((await record.reload()).datetime).toEqual(datetime);
       } finally {
         setZone(null);
       }
@@ -136,16 +140,32 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("where clause with infinite range on a datetime column", async () => {
       const M = await modelClass();
-      const created = await (M as any).create({ datetime: "2020-01-01 00:00:00" });
-      const found = await (M as any).where({ datetime: new Range(-Infinity, Infinity) }).take();
-      expect(found.id).toBe(created.id);
+      const record = await (M as any).create({ datetime: "2020-01-01 00:00:00" });
+
+      const string = (M as any).where({ datetime: new Range("-infinity", "infinity") });
+      expect((await string.take()).id).toBe(record.id);
+
+      const infinity = (M as any).where({
+        datetime: new Range(Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY),
+      });
+      expect((await infinity.take()).id).toBe(record.id);
+
+      expect(infinity.toSql()).toBe(string.toSql());
     });
 
     it("where clause with infinite range on a date column", async () => {
       const M = await modelClass();
-      const created = await (M as any).create({ date: "2020-01-01" });
-      const found = await (M as any).where({ date: new Range(-Infinity, Infinity) }).take();
-      expect(found.id).toBe(created.id);
+      const record = await (M as any).create({ date: "2020-01-01" });
+
+      const string = (M as any).where({ date: new Range("-infinity", "infinity") });
+      expect((await string.take()).id).toBe(record.id);
+
+      const infinity = (M as any).where({
+        date: new Range(Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY),
+      });
+      expect((await infinity.take()).id).toBe(record.id);
+
+      expect(infinity.toSql()).toBe(string.toSql());
     });
   });
 });

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Base } from "../../index.js";
@@ -57,11 +57,25 @@ describeIfPg("PostgreSQLAdapter", () => {
   }
 
   describe("PostgresqlCompositeTest", () => {
+    let stderr = "";
+
+    function ensureWarningIsIssued(): void {
+      expect(stderr).toMatch(
+        /unknown OID \d+: failed to recognize type of 'address'\. It will be treated as String\./,
+      );
+    }
+
     beforeEach(async () => {
       connection = Base.connection as PostgreSQLAdapter;
       await setupCompositeType();
       void PostgresqlComposite.resetColumnInformation();
-      await PostgresqlComposite.loadSchema();
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        await PostgresqlComposite.loadSchema();
+        stderr = warnSpy.mock.calls.map((c) => `${String(c[0])}\n`).join("");
+      } finally {
+        warnSpy.mockRestore();
+      }
     });
 
     afterEach(async () => {
@@ -69,24 +83,31 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("column", async () => {
-      const col = (PostgresqlComposite as any).columnsHash()["address"];
-      expect(col.type).toBeNull();
-      expect(col.sqlType).toBe("full_address");
-      expect(col.array).toBeFalsy();
+      ensureWarningIsIssued();
+
+      const column = (PostgresqlComposite as any).columnsHash()["address"];
+      expect(column.type).toBeNull();
+      expect(column.sqlType).toBe("full_address");
+      expect(column.isArray()).toBeFalsy();
+
       const type = PostgresqlComposite.typeForAttribute("address")!;
-      expect(type.isBinary()).toBe(false);
+      expect(type.isBinary()).toBeFalsy();
     });
 
     it("composite mapping", async () => {
+      ensureWarningIsIssued();
+
       await connection.execute(
         `INSERT INTO postgresql_composites VALUES (1, ROW('Paris', 'Champs-Élysées'))`,
       );
       const composite = (await PostgresqlComposite.first())!;
       expect((composite as any).address).toBe("(Paris,Champs-Élysées)");
+
       (composite as any).address = "(Paris,Rue Basse)";
       await (composite as any).saveBang();
+
       const reloaded = (await PostgresqlComposite.first())!;
-      expect((reloaded as any).address).toMatch(/Rue Basse/);
+      expect((reloaded as any).address).toBe('(Paris,"Rue Basse")');
     });
   });
 
@@ -104,12 +125,13 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("column", async () => {
-      const col = (PostgresqlComposite as any).columnsHash()["address"];
-      expect(col.type).toBe("full_address");
-      expect(col.sqlType).toBe("full_address");
-      expect(col.array).toBeFalsy();
+      const column = (PostgresqlComposite as any).columnsHash()["address"];
+      expect(column.type).toBe("full_address");
+      expect(column.sqlType).toBe("full_address");
+      expect(column.isArray()).toBeFalsy();
+
       const type = PostgresqlComposite.typeForAttribute("address")!;
-      expect(type.isBinary()).toBe(false);
+      expect(type.isBinary()).toBeFalsy();
     });
 
     it("composite mapping", async () => {
