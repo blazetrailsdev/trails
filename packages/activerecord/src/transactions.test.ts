@@ -985,16 +985,16 @@ describe("TransactionTest", () => {
   });
 
   it("restore active record state for all records in a transaction", async () => {
-    class TopicWithoutCallbacks extends Base {
+    const topicWithoutCallbacks = class extends Base {
       static {
         this._tableName = "topics";
       }
-    }
-    registerModel(TopicWithoutCallbacks as any);
+    };
+    registerModel(topicWithoutCallbacks as any);
 
     const topic1 = Topic.new({ title: "test_1" }) as any;
     const topic2 = Topic.new({ title: "test_2" }) as any;
-    const topic3 = TopicWithoutCallbacks.new({ title: "test_3" }) as any;
+    const topic3 = topicWithoutCallbacks.new({ title: "test_3" }) as any;
 
     await Topic.transaction(async () => {
       expect(await topic1.save()).toBeTruthy();
