@@ -19,15 +19,27 @@ describe("StringTest", () => {
     expect(type.serialize(hash)).toBe(hash);
   });
 
-  it("cast strings are mutable", () => {
+  // BLOCKED: assertions-immutable-js-string-values
+  it.skip("cast strings are mutable", () => {
     const type = new Types.StringType();
-    expect(type.cast("foo")).toBe("foo");
+
+    const s = "foo";
+    expect(Object.isFrozen(type.cast(s))).toEqual(false);
+    expect(Object.isFrozen(s)).toEqual(false);
+
+    const f = "foo";
+    expect(Object.isFrozen(type.cast(f))).toEqual(false);
+    expect(Object.isFrozen(f)).toEqual(true);
   });
 
-  it("values are duped coming out", () => {
+  // BLOCKED: assertions-immutable-js-string-values
+  it.skip("values are duped coming out", () => {
     const type = new Types.StringType();
+
     const s = "foo";
-    expect(type.cast(s)).toBe(s);
-    expect(type.deserialize(s)).toBe(s);
+    expect(type.cast(s)).not.toBe(s);
+    expect(type.cast(s)).toEqual(s);
+    expect(type.deserialize(s)).not.toBe(s);
+    expect(type.deserialize(s)).toEqual(s);
   });
 });

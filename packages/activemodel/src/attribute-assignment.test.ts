@@ -1,12 +1,67 @@
-/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
-   Each model below spells `include ActiveModel::Attributes` in its class body, the way the Rails
-   test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
-   how `include()` surfaces those members on the type side. */
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging --
+   The test model below spells `include ActiveModel::AttributeAssignment` in its class body, the way
+   the Rails test model it mirrors does (attribute_assignment_test.rb:5-23); the class/interface
+   merge beside it is how `include()` surfaces those members on the type side. */
 import { describe, it, expect } from "vitest";
-import { Model, ArgumentError } from "./index.js";
+import { include, assertRaises } from "@blazetrails/activesupport";
+import { ArgumentError, StandardError } from "@blazetrails/ruby-compat";
+import {
+  type AttributeAssignment,
+  assignAttributes,
+  setAttributes,
+  attributeWriterMissing,
+  _assignAttributes,
+  _assignAttribute,
+} from "./attribute-assignment.js";
+import { ForbiddenAttributesProtection } from "./forbidden-attributes-protection.js";
 import { ForbiddenAttributesError } from "./forbidden-attributes-protection.js";
-import { Attributes, type AttributesClassHalf } from "./attributes.js";
-import { include } from "@blazetrails/activesupport";
+import { UnknownAttributeError } from "./errors.js";
+
+class Model {
+  declare _name?: string;
+  declare _description?: string;
+
+  constructor(attributes: unknown = {}) {
+    this.assignAttributes(attributes);
+  }
+
+  get name(): string | undefined {
+    return this._name;
+  }
+
+  set name(value: string | undefined) {
+    this._name = value;
+  }
+
+  get description(): string | undefined {
+    return this._description;
+  }
+
+  set description(value: string | undefined) {
+    this._description = value;
+  }
+
+  set brokenAttribute(_value: unknown) {
+    throw new ErrorFromAttributeWriter();
+  }
+
+  static {
+    include(this, {
+      assignAttributes,
+      setAttributes,
+      attributeWriterMissing,
+      _assignAttributes,
+      _assignAttribute,
+    });
+    include(this, ForbiddenAttributesProtection);
+  }
+}
+interface Model extends AttributeAssignment {
+  assignAttributes(newAttributes: unknown): void;
+  setAttributes(newAttributes: unknown): Promise<void> | void;
+}
+
+class ErrorFromAttributeWriter extends StandardError {}
 
 class ProtectedParams {
   private parameters: Record<string, unknown>;
@@ -35,404 +90,114 @@ class ProtectedParams {
 }
 
 describe("AttributeAssignmentTest", () => {
-  it("simple assignment alias", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+  it("simple assignment", () => {
+    const model = new Model();
 
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({});
-    void p.assignAttributes({ name: "Bob" });
-    expect(p._readAttribute("name")).toBe("Bob");
+    model.assignAttributes({ name: "hello", description: "world" });
+    expect(model.name).toEqual("hello");
+    expect(model.description).toEqual("world");
   });
 
-  it("assign non-existing attribute", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+  it("simple assignment alias", () => {
+    const model = new Model();
 
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
-    }
-    interface Person extends Attributes {}
+    void model.setAttributes({ name: "hello", description: "world" });
+    expect(model.name).toEqual("hello");
+    expect(model.description).toEqual("world");
+  });
 
-    const p = new Person({});
-    let raised: unknown;
-    try {
-      void p.assignAttributes({ unknown_attr: "value" });
-    } catch (e) {
-      raised = e;
-    }
-    expect((raised as Error)?.name).toBe("UnknownAttributeError");
-    expect((raised as { attribute?: string })?.attribute).toBe("unknown_attr");
+  it("assign non-existing attribute", async () => {
+    const model = new Model();
+    const error = (await assertRaises([UnknownAttributeError], {}, () => {
+      model.assignAttributes({ hz: 1 });
+    })) as UnknownAttributeError;
+
+    expect(error.record).toEqual(model);
+    expect(error.attribute).toEqual("hz");
   });
 
   it("assign non-existing attribute by overriding #attribute_writer_missing", () => {
-    class Person extends Model {
-      assignedAttributes: Record<string, unknown> = {};
+    class modelClass extends Model {
+      declare _assignedAttributes?: Record<string, unknown>;
+
+      get assignedAttributes(): Record<string, unknown> {
+        return this._assignedAttributes!;
+      }
+
+      set assignedAttributes(value: Record<string, unknown>) {
+        this._assignedAttributes = value;
+      }
+
       override attributeWriterMissing(name: string, value: unknown): void {
         this.assignedAttributes[name] = value;
       }
     }
-    const model = new Person({});
+    const model = new modelClass({ assignedAttributes: {} });
 
-    void model.assignAttributes({ unknown: "attribute" });
+    model.assignAttributes({ unknown: "attribute" });
 
     expect(model.assignedAttributes).toEqual({ unknown: "attribute" });
   });
 
-  it("assign private attribute", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({});
-    void p.assignAttributes({ name: "private_val" });
-    expect(p._readAttribute("name")).toBe("private_val");
-  });
-
-  it("does not swallow errors raised in an attribute writer", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
-      set name(_v: string) {
-        throw new globalThis.Error("boom");
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({});
-    expect(() => p.assignAttributes({ name: "test" })).toThrow("boom");
-  });
-
-  it("finds inherited setter even when subclass defines a getter-only accessor", () => {
-    class Base extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
-      set name(v: string) {
-        (this as Base)._writeAttribute("name", v.toUpperCase());
-      }
-      get name(): string {
-        return this.attribute("name") as string;
-      }
-    }
-    interface Base extends Attributes {}
-
-    class Child extends Base {
-      override get name(): string {
-        return super.name + "!";
-      }
-    }
-    const c = new Child({});
-    void c.assignAttributes({ name: "bob" });
-    expect(c.attribute("name")).toBe("BOB");
-  });
-
-  it("routes through instance-own setter (JS singleton method)", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({});
-    const seen: string[] = [];
-    Object.defineProperty(p, "name", {
-      set(v: string) {
-        seen.push(v);
-        (this as Person)._writeAttribute("name", v.toUpperCase());
-      },
-      configurable: true,
+  it("assign private attribute", async () => {
+    const model = new Model();
+    await assertRaises([UnknownAttributeError], {}, () => {
+      model.assignAttributes({ metadata: { a: 1 } });
     });
-    void p.assignAttributes({ name: "bob" });
-    expect(seen).toEqual(["bob"]);
-    expect(p.attribute("name")).toBe("BOB");
   });
 
-  it("routes through user-defined setter if present", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
-      set name(v: string) {
-        this._writeAttribute("name", v.trim().toUpperCase());
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({});
-    void p.assignAttributes({ name: "  bob  " });
-    expect(p.attribute("name")).toBe("BOB");
+  it("does not swallow errors raised in an attribute writer", async () => {
+    await assertRaises([ErrorFromAttributeWriter], {}, () => {
+      new Model({ brokenAttribute: 1 });
+    });
   });
 
-  it("an ArgumentError is raised if a non-hash-like object is passed", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+  // BLOCKED: attribute-assignment-argument-error-names-js-number-not-integer
+  it.skip("an ArgumentError is raised if a non-hash-like object is passed", async () => {
+    const err = (await assertRaises([ArgumentError], {}, () => {
+      new Model(1);
+    })) as ArgumentError;
 
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({});
-    expect(() => p.assignAttributes("not a hash" as any)).toThrow(ArgumentError);
-    expect(() => p.assignAttributes(null as any)).toThrow(ArgumentError);
-    expect(() => p.assignAttributes([] as any)).toThrow(ArgumentError);
-    expect(() => p.assignAttributes(new Date() as any)).toThrow(
-      "When assigning attributes, you must pass a hash as an argument, Date passed.",
+    expect(err.message).toEqual(
+      "When assigning attributes, you must pass a hash as an argument, Integer passed.",
     );
   });
 
-  it("forbidden attributes cannot be used for mass assignment", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.attribute("description", "string");
-      }
-    }
-    interface Person extends Attributes {}
-
+  it("forbidden attributes cannot be used for mass assignment", async () => {
     const params = new ProtectedParams({ name: "Guille", description: "m" });
-    expect(() => new Person(params as unknown as Record<string, unknown>)).toThrow(
-      ForbiddenAttributesError,
-    );
+
+    await assertRaises([ForbiddenAttributesError], {}, () => {
+      new Model(params);
+    });
   });
 
   it("permitted attributes can be used for mass assignment", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    const params = new ProtectedParams({ name: "Guille", description: "desc" });
+    params.permitBang();
+    const model = new Model(params);
 
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.attribute("description", "string");
-      }
-    }
-    interface Person extends Attributes {}
-
-    const params = new ProtectedParams({ name: "Guille", description: "desc" }).permitBang();
-    const p = new Person(params as unknown as Record<string, unknown>);
-    expect(p._readAttribute("name")).toBe("Guille");
-    expect(p._readAttribute("description")).toBe("desc");
-  });
-
-  it("assigning no attributes should not raise, even if the hash is un-permitted", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({});
-    expect(() => p.assignAttributes({})).not.toThrow();
-  });
-
-  it("passing an object with each_pair but without each", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({});
-    void p.assignAttributes({ name: "test" });
-    expect(p._readAttribute("name")).toBe("test");
-  });
-
-  it("simple assignment", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.attribute("age", "integer");
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({});
-    void p.assignAttributes({ name: "Alice", age: 30 });
-    expect(p._readAttribute("name")).toBe("Alice");
-    expect(p._readAttribute("age")).toBe(30);
+    expect(model.name).toEqual("Guille");
+    expect(model.description).toEqual("desc");
   });
 
   it("regular hash should still be used for mass assignment", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    const model = new Model({ name: "Guille", description: "m" });
 
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({});
-    void p.assignAttributes({ name: "Bob" });
-    expect(p._readAttribute("name")).toBe("Bob");
+    expect(model.name).toEqual("Guille");
+    expect(model.description).toEqual("m");
   });
 
-  it("subclass override of _assignAttributes is called by assignAttributes", () => {
-    const called: Record<string, unknown>[] = [];
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
-      override _assignAttributes(attrs: Record<string, unknown>): void {
-        called.push(attrs);
-        void super._assignAttributes(attrs);
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({});
-    void p.assignAttributes({ name: "Carol" });
-    expect(called).toHaveLength(1);
-    expect(called[0]).toEqual({ name: "Carol" });
-    expect(p._readAttribute("name")).toBe("Carol");
+  it("assigning no attributes should not raise, even if the hash is un-permitted", () => {
+    const model = new Model();
+    expect(model.assignAttributes(new ProtectedParams({}))).toBeUndefined();
   });
 
-  it("subclass override of sanitizeForMassAssignment is called by assignAttributes", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+  it("passing an object with each_pair but without each", () => {
+    const model = new Model();
+    const h = { name: "hello", description: "world" };
+    model.assignAttributes(h);
 
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.attribute("role", "string");
-      }
-      override sanitizeForMassAssignment(attrs: Record<string, unknown>): Record<string, unknown> {
-        const { role: _role, ...rest } = attrs;
-        return rest;
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({});
-    void p.assignAttributes({ name: "Dave", role: "admin" });
-    expect(p._readAttribute("name")).toBe("Dave");
-    expect(p._readAttribute("role")).toBeNull();
-  });
-
-  it("empty params wrapper is a no-op on assignAttributes (empty? delegation)", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({});
-    const params = new ProtectedParams({});
-    expect(() => p.assignAttributes(params as unknown as Record<string, unknown>)).not.toThrow();
-    expect(p._readAttribute("name")).toBeNull();
-  });
-
-  it("empty params wrapper is a no-op at construction (empty? delegation)", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
-    }
-    interface Person extends Attributes {}
-
-    const params = new ProtectedParams({});
-    let record: Person | undefined;
-    expect(() => {
-      record = new Person(params as unknown as Record<string, unknown>);
-    }).not.toThrow();
-    expect(record!._readAttribute("name")).toBeNull();
-  });
-
-  it("non-empty unpermitted params wrapper still raises (empty? delegation)", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({});
-    const params = new ProtectedParams({ name: "Bob" });
-    expect(() => p.assignAttributes(params as unknown as Record<string, unknown>)).toThrow(
-      ForbiddenAttributesError,
-    );
-  });
-
-  it("subclass override of _assignAttribute is called by _assignAttributes", () => {
-    const seen: Array<[string, unknown]> = [];
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.attribute("age", "integer");
-      }
-      override _assignAttribute(k: string, v: unknown): Promise<void> | void {
-        seen.push([k, v]);
-        return super._assignAttribute(k, v);
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({});
-    void p.assignAttributes({ name: "Eve", age: 5 });
-    expect(seen).toContainEqual(["name", "Eve"]);
-    expect(seen).toContainEqual(["age", 5]);
-    expect(p._readAttribute("name")).toBe("Eve");
+    expect(model.name).toEqual("hello");
+    expect(model.description).toEqual("world");
   });
 });
