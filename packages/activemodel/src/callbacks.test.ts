@@ -24,18 +24,17 @@ describe("CallbacksTest", () => {
   class CallbackValidator {
     aroundCreate(model: ModelCallbacks, proceed: () => void | Promise<void>): unknown {
       model.callbacks.push("before_around_create");
-      const result = proceed();
+      void proceed();
       model.callbacks.push("after_around_create");
-      void result;
       return false;
     }
   }
 
   class ModelCallbacks {
     callbacks: string[];
-    _valid: boolean | undefined;
-    _beforeCreateReturns: boolean;
-    _beforeCreateThrows: string | undefined;
+    valid: boolean | undefined;
+    beforeCreateReturns: boolean;
+    beforeCreateThrows: string | undefined;
 
     declare runCallbacks: (event: string, block: () => unknown) => Promise<unknown>;
 
@@ -76,21 +75,21 @@ describe("CallbacksTest", () => {
       } = {},
     ) {
       this.callbacks = [];
-      this._valid = options.valid;
-      this._beforeCreateReturns = options.beforeCreateReturns ?? true;
-      this._beforeCreateThrows = options.beforeCreateThrows;
+      this.valid = options.valid;
+      this.beforeCreateReturns = options.beforeCreateReturns ?? true;
+      this.beforeCreateThrows = options.beforeCreateThrows;
     }
 
     beforeCreate(): boolean {
       this.callbacks.push("before_create");
-      if (this._beforeCreateThrows != null) kernelThrow(this._beforeCreateThrows);
-      return this._beforeCreateReturns;
+      if (this.beforeCreateThrows != null) kernelThrow(this.beforeCreateThrows);
+      return this.beforeCreateReturns;
     }
 
     create(): Promise<unknown> {
       return this.runCallbacks("create", () => {
         this.callbacks.push("create");
-        return this._valid;
+        return this.valid;
       });
     }
   }
@@ -158,12 +157,11 @@ describe("CallbacksTest", () => {
   it("the :if option array should not be mutated by an after callback", () => {
     const opts: unknown[] = [];
 
-    class _Anonymous extends ModelCallbacks {
+    void class extends ModelCallbacks {
       static {
         generated(this).afterCreate(() => {}, { if: opts });
       }
-    }
-    void _Anonymous;
+    };
 
     assertEmpty(opts);
   });

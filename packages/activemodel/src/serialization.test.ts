@@ -164,17 +164,13 @@ describe("SerializationTest", () => {
   });
 
   class FriendList {
-    _friends: unknown[];
+    friends: unknown[];
     constructor(friends: unknown[]) {
-      this._friends = friends;
-    }
-
-    toAry(): unknown[] {
-      return this._friends;
+      this.friends = friends;
     }
 
     [Symbol.iterator](): Iterator<unknown> {
-      return this._friends[Symbol.iterator]();
+      return this.friends[Symbol.iterator]();
     }
   }
 
