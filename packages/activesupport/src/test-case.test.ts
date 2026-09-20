@@ -1,8 +1,9 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { SecureRandom } from "@blazetrails/ruby-compat";
 import { NameError } from "./core-ext/name-error.js";
 import { ArgumentError } from "./hash-utils.js";
 import { Logger } from "./logger.js";
+import { ActiveSupport } from "./index.js";
 import { TestCase } from "./test-case.js";
 import {
   Assertion,
@@ -810,37 +811,68 @@ describe("ExceptionsInsideAssertionsTest", () => {
   });
 });
 
+class SetupAndTeardownTestCase extends TestCase {
+  calledBack: string[] = [];
+
+  resetCallbackRecord(): void {
+    this.calledBack = [];
+  }
+
+  foo(): void {
+    this.calledBack.push(":foo");
+  }
+
+  sentinel(): void {
+    expect(this.calledBack).toEqual([":foo"]);
+  }
+}
+SetupAndTeardownTestCase.setup(":resetCallbackRecord", ":foo");
+SetupAndTeardownTestCase.teardown(":foo", ":sentinel");
+
+class SubclassSetupAndTeardownTestCase extends SetupAndTeardownTestCase {
+  bar(): void {
+    this.calledBack.push(":bar");
+  }
+
+  override sentinel(): void {
+    expect(this.calledBack).toEqual([":foo", ":bar", ":bar"]);
+  }
+}
+SubclassSetupAndTeardownTestCase.setup(":bar");
+SubclassSetupAndTeardownTestCase.teardown(":bar");
+
 describe("SetupAndTeardownTest", () => {
   it.skip("inherited setup callbacks", () => {
     // BLOCKED: activesupport-test-case-setup-callback-chain-is-not-introspectable
-    const klass = class extends TestCase {};
-    expect(peekCallbackChain(klass, "setup")?.entries.map((c) => c.filter)).toEqual([
-      ":resetCallbackRecord",
-      ":foo",
-    ]);
-    expect([":foo"]).toEqual([":foo"]);
-    expect(peekCallbackChain(klass, "teardown")?.entries.map((c) => c.filter)).toEqual([
-      ":foo",
-      ":sentinel",
-    ]);
+    const instance = new SetupAndTeardownTestCase();
+    instance.resetCallbackRecord();
+    instance.foo();
+
+    expect(
+      peekCallbackChain(SetupAndTeardownTestCase, "setup")?.entries.map((c) => c.filter),
+    ).toEqual([":resetCallbackRecord", ":foo"]);
+    expect(instance.calledBack).toEqual([":foo"]);
+    expect(
+      peekCallbackChain(SetupAndTeardownTestCase, "teardown")?.entries.map((c) => c.filter),
+    ).toEqual([":foo", ":sentinel"]);
   });
 });
 
 describe("SubclassSetupAndTeardownTest", () => {
   it.skip("inherited setup callbacks", () => {
     // BLOCKED: activesupport-test-case-setup-callback-chain-is-not-introspectable
-    const klass = class extends TestCase {};
-    expect(peekCallbackChain(klass, "setup")?.entries.map((c) => c.filter)).toEqual([
-      ":resetCallbackRecord",
-      ":foo",
-      ":bar",
-    ]);
-    expect([":foo", ":bar"]).toEqual([":foo", ":bar"]);
-    expect(peekCallbackChain(klass, "teardown")?.entries.map((c) => c.filter)).toEqual([
-      ":foo",
-      ":sentinel",
-      ":bar",
-    ]);
+    const instance = new SubclassSetupAndTeardownTestCase();
+    instance.resetCallbackRecord();
+    instance.foo();
+    instance.bar();
+
+    expect(
+      peekCallbackChain(SubclassSetupAndTeardownTestCase, "setup")?.entries.map((c) => c.filter),
+    ).toEqual([":resetCallbackRecord", ":foo", ":bar"]);
+    expect(instance.calledBack).toEqual([":foo", ":bar"]);
+    expect(
+      peekCallbackChain(SubclassSetupAndTeardownTestCase, "teardown")?.entries.map((c) => c.filter),
+    ).toEqual([":foo", ":sentinel", ":bar"]);
   });
 });
 
@@ -854,22 +886,48 @@ describe("TestCaseTaggedLoggingTest", () => {
 });
 
 describe("TestOrderTest", () => {
+  const TestOrder = TestCase as unknown as {
+    testOrder: string;
+    setTestOrder(order: string | null): void;
+  };
+  const ActiveSupportTestOrder = ActiveSupport as unknown as {
+    testOrder: string;
+    setTestOrder(order: string | null): void;
+  };
+  let originalTestOrder: string;
+
+  beforeEach(() => {
+    originalTestOrder = TestOrder.testOrder;
+  });
+
+  afterEach(() => {
+    TestOrder.setTestOrder(originalTestOrder);
+  });
+
   it.skip("defaults to random", () => {
     // BLOCKED: activesupport-test-case-has-no-test-order
-    expect(":random").toEqual(":random");
-    expect(":random").toEqual(":random");
+    TestOrder.setTestOrder(null);
+
+    expect(TestOrder.testOrder).toEqual(":random");
+
+    expect(ActiveSupportTestOrder.testOrder).toEqual(":random");
   });
 
   it.skip("test order is global", () => {
     // BLOCKED: activesupport-test-case-has-no-test-order
-    expect(":sorted").toEqual(":sorted");
-    expect(":sorted").toEqual(":sorted");
-    expect(":sorted").toEqual(":sorted");
-    expect(":sorted").toEqual(":sorted");
-    expect(":random").toEqual(":random");
-    expect(":random").toEqual(":random");
-    expect(":random").toEqual(":random");
-    expect(":random").toEqual(":random");
+    TestOrder.setTestOrder(":sorted");
+
+    expect(ActiveSupportTestOrder.testOrder).toEqual(":sorted");
+    expect(TestOrder.testOrder).toEqual(":sorted");
+    expect(TestOrder.testOrder).toEqual(":sorted");
+    expect((class extends TestCase {} as unknown as typeof TestOrder).testOrder).toEqual(":sorted");
+
+    ActiveSupportTestOrder.setTestOrder(":random");
+
+    expect(ActiveSupportTestOrder.testOrder).toEqual(":random");
+    expect(TestOrder.testOrder).toEqual(":random");
+    expect(TestOrder.testOrder).toEqual(":random");
+    expect((class extends TestCase {} as unknown as typeof TestOrder).testOrder).toEqual(":random");
   });
 });
 
