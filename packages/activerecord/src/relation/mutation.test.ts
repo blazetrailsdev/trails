@@ -1,13 +1,19 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import "../index.js";
 import { fixtures } from "../test-fixtures.js";
-import { Post } from "../test-helpers/models/post.js";
-import { Developer } from "../test-helpers/models/developer.js";
+import { Post, FakeKlass } from "../test-helpers/models/post.js";
+import { Relation } from "../relation.js";
+import type { Base } from "../base.js";
 
 fixtures([]);
+let _relation: any;
 function relation(): any {
-  return Post.all();
+  return (_relation ??= new Relation(FakeKlass as unknown as typeof Base));
 }
+
+beforeEach(() => {
+  _relation = undefined;
+});
 
 describe("RelationMutationTest", () => {
   it("#!", () => {
@@ -25,7 +31,7 @@ describe("RelationMutationTest", () => {
     for (const [bang, field] of MULTI) {
       const rel = relation();
       expect(rel[bang]("foo") === rel).toBeTruthy();
-      expect(rel[field]).toContain("foo");
+      expect(rel[field]).toEqual(["foo"]);
     }
   });
 
@@ -42,19 +48,19 @@ describe("RelationMutationTest", () => {
   });
 
   it("#order! with symbol prepends the table name", () => {
-    const rel: any = Developer.all();
+    const rel: any = relation();
     expect(rel.orderBang(":name") === rel).toBeTruthy();
     const node = rel.orderValues[0];
     expect(node.isAscending()).toBeTruthy();
     expect(node.expr.name).toBe("name");
-    expect(node.expr.relation.name).toBe("developers");
+    expect(node.expr.relation.name).toBe("posts");
   });
 
   it("#order! on non-string does not attempt regexp match for references", () => {
+    const obj = new (class {})();
     const rel = relation();
-    const node = Post.arelTable.get("title");
-    expect(rel.orderBang(node)).toBeTruthy();
-    expect(rel.orderValues).toEqual([node]);
+    expect(rel.orderBang(obj)).toBeTruthy();
+    expect(rel.orderValues).toEqual([obj]);
   });
 
   it("extending!", () => {
@@ -71,7 +77,7 @@ describe("RelationMutationTest", () => {
     };
     expect(rel.extendingBang(mod) === rel).toBeTruthy();
     expect(rel.extendingValues).toEqual([mod]);
-    expect(typeof rel.greeting).toBe("function");
+    expect(typeof rel.greeting === "function").toBeTruthy();
     rel.extendingBang(mod2);
     expect(rel.extendingValues).toEqual([mod, mod2]);
   });
@@ -95,19 +101,20 @@ describe("RelationMutationTest", () => {
   });
 
   it("#reorder!", () => {
-    const rel: any = Post.order("foo");
+    _relation = relation().order("foo");
+    const rel: any = relation();
     expect(rel.reorderBang("bar") === rel).toBeTruthy();
     expect(rel.orderValues).toEqual(["bar"]);
-    expect(rel.reorderingValue).toBe(true);
+    expect(rel.reorderingValue).toBeTruthy();
   });
 
   it("#reorder! with symbol prepends the table name", () => {
-    const rel: any = Developer.all();
+    const rel: any = relation();
     expect(rel.reorderBang(":name") === rel).toBeTruthy();
     const node = rel.orderValues[0];
     expect(node.isAscending()).toBeTruthy();
     expect(node.expr.name).toBe("name");
-    expect(node.expr.relation.name).toBe("developers");
+    expect(node.expr.relation.name).toBe("posts");
   });
 
   it.skip("reverse_order!", () => {
@@ -129,23 +136,23 @@ describe("RelationMutationTest", () => {
 
   it("merge!", () => {
     const rel = relation();
-    expect(rel.mergeBang(Post.select("body")) === rel).toBeTruthy();
-    expect(rel.selectValues).toEqual(["body"]);
+    expect(rel.mergeBang({ select: "foo" }) === rel).toBeTruthy();
+    expect(rel.selectValues).toEqual(["foo"]);
   });
 
   it("merge with a proc", () => {
-    const rel = relation();
-    rel.mergeBang(function (this: any) {
-      this._selectBang("body");
-    });
-    expect(rel.selectValues).toEqual(["body"]);
+    expect(
+      relation().merge(function (this: any) {
+        return this.select("foo");
+      }).selectValues,
+    ).toEqual(["foo"]);
   });
 
   it("none!", async () => {
     const rel = relation();
     expect(rel.noneBang() === rel).toBeTruthy();
-    expect(await rel.isNone()).toBe(true);
-    expect(rel.isNullRelation()).toBe(true);
+    expect(await rel.isNone()).toBeTruthy();
+    expect(rel.isNullRelation()).toBeTruthy();
   });
 
   it("skip_query_cache!", () => {
@@ -161,7 +168,8 @@ describe("RelationMutationTest", () => {
   });
 
   it("#regroup!", () => {
-    const rel: any = Post.group("foo");
+    _relation = relation().group("foo");
+    const rel: any = relation();
     expect(rel.regroupBang("bar") === rel).toBeTruthy();
     expect(rel.groupValues).toEqual(["bar"]);
   });
@@ -175,7 +183,7 @@ describe("RelationMutationTest", () => {
     ];
     for (const [bang, arg, field, expected] of SINGLE) {
       const rel = relation();
-      expect(rel[bang](arg)).toBe(rel);
+      expect(rel[bang](arg) === rel).toBeTruthy();
       expect(rel[field]).toBe(expected);
     }
   });

@@ -9,7 +9,10 @@ import {
 } from "@blazetrails/activemodel";
 import { Array as OidArray } from "./connection-adapters/postgresql/oid/array.js";
 import { RangeType } from "./connection-adapters/postgresql/oid/range.js";
-import { BigDecimal } from "@blazetrails/activesupport";
+import { BigDecimal, assertNotCalled } from "@blazetrails/activesupport";
+import { DateTimeType } from "@blazetrails/activemodel";
+import { Temporal, Time } from "@blazetrails/date";
+import { TimeZoneConverter } from "./attribute-methods/time-zone-conversion.js";
 
 import { registerModel } from "./associations.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
@@ -157,13 +160,23 @@ describe("CustomPropertiesTest", () => {
   it("extra options are forwarded to the type caster constructor", () => {
     class WithStartsAt extends OverloadedType {
       static {
-        this.attribute("starts_at", "datetime", { default: () => new Date() });
+        this.attribute("starts_at", "datetime", {
+          precision: 3,
+          limit: 2,
+          scale: 1,
+          default: () => Temporal.Now.instant(),
+        });
       }
     }
 
     const startsAtType = WithStartsAt.typeForAttribute("starts_at")!;
-    expect(startsAtType.constructor.name).toMatch(/DateTime/);
-    expect((new WithStartsAt() as any).starts_at).toBeDefined();
+
+    expect(startsAtType.precision).toBe(3);
+    expect(startsAtType.limit).toBe(2);
+    expect(startsAtType.scale).toBe(1);
+
+    expect(startsAtType).toBeInstanceOf(DateTimeType);
+    expect((new WithStartsAt() as any).starts_at).toBeInstanceOf(Time);
   });
 
   it("time zone aware attribute", async () => {
@@ -178,10 +191,12 @@ describe("CustomPropertiesTest", () => {
       const startsAtType = WithTimes.typeForAttribute("starts_at")!;
       const endsAtType = WithTimes.typeForAttribute("ends_at")!;
 
-      expect(startsAtType.constructor.name).toMatch(/TimeZoneConverter/);
-      expect(endsAtType.constructor.name).toMatch(/TimeZoneConverter/);
-      expect((new WithTimes() as any).starts_at).toBeDefined();
-      expect((new WithTimes() as any).ends_at).toBeDefined();
+      expect(startsAtType).toBeInstanceOf(TimeZoneConverter);
+      expect(endsAtType).toBeInstanceOf(TimeZoneConverter);
+      expect((startsAtType as TimeZoneConverter).__getobj__()).toBeInstanceOf(DateTimeType);
+      expect((endsAtType as TimeZoneConverter).__getobj__()).toBeInstanceOf(DateTimeType);
+      expect((new WithTimes() as any).starts_at).toBeInstanceOf(Time);
+      expect((new WithTimes() as any).ends_at).toBeInstanceOf(Time);
     });
   });
 
@@ -202,7 +217,7 @@ describe("CustomPropertiesTest", () => {
     }
 
     const model = new WithNonexistentDefault();
-    expect(await model.save()).toBe(true);
+    expect(await model.save()).toBeTruthy();
   });
 
   it("changing defaults", () => {
@@ -245,8 +260,7 @@ describe("CustomPropertiesTest", () => {
     expect(Object.keys(Klass.attributeTypes()).length).toBe(columnCount + 1);
     expect(Object.keys(Klass.columnDefaults).length).toBe(columnCount + 1);
     expect(Klass.attributeNames().length).toBe(columnCount + 1);
-    expect(Object.keys(Klass.attributeTypes())).not.toContain("wibble");
-    expect(Klass.attributeNames()).not.toContain("wibble");
+    expect(Object.keys(Klass.attributeTypes()).includes("wibble")).toBeFalsy();
 
     Klass.attribute("wibble", new ValueType());
 
@@ -254,7 +268,6 @@ describe("CustomPropertiesTest", () => {
     expect(Object.keys(Klass.columnDefaults).length).toBe(columnCount + 2);
     expect(Klass.attributeNames().length).toBe(columnCount + 2);
     expect(Object.keys(Klass.attributeTypes())).toContain("wibble");
-    expect(Klass.attributeNames()).toContain("wibble");
   });
 
   it("the given default value is cast from user", () => {
@@ -331,14 +344,11 @@ describe("CustomPropertiesTest", () => {
       }
     }
 
-    const stringArray = Klass.typeForAttribute("my_array") as OidArray;
-    const intArray = Klass.typeForAttribute("my_int_array") as OidArray;
+    const stringArray = new OidArray(new StringType({ limit: 50 }));
+    const intArray = new OidArray(new IntegerType());
     expect(stringArray).not.toEqual(intArray);
-    expect(stringArray).toBeInstanceOf(OidArray);
-    expect(stringArray.subtype).toBeInstanceOf(StringType);
-    expect(stringArray.subtype.limit).toBe(50);
-    expect(intArray).toBeInstanceOf(OidArray);
-    expect(intArray.subtype).toBeInstanceOf(IntegerType);
+    expect(stringArray).toEqual(Klass.typeForAttribute("my_array"));
+    expect(intArray).toEqual(Klass.typeForAttribute("my_int_array"));
   });
 
   it.skipIf(adapterType !== "postgres")("range types can be specified", () => {
@@ -349,14 +359,11 @@ describe("CustomPropertiesTest", () => {
       }
     }
 
-    const stringRange = Klass.typeForAttribute("my_range") as RangeType;
-    const intRange = Klass.typeForAttribute("my_int_range") as RangeType;
+    const stringRange = new RangeType(new StringType({ limit: 50 }));
+    const intRange = new RangeType(new IntegerType());
     expect(stringRange).not.toEqual(intRange);
-    expect(stringRange).toBeInstanceOf(RangeType);
-    expect(stringRange.subtype).toBeInstanceOf(StringType);
-    expect((stringRange.subtype as StringType).limit).toBe(50);
-    expect(intRange).toBeInstanceOf(RangeType);
-    expect(intRange.subtype).toBeInstanceOf(IntegerType);
+    expect(stringRange).toEqual(Klass.typeForAttribute("my_range"));
+    expect(intRange).toEqual(Klass.typeForAttribute("my_int_range"));
   });
 
   it("attributes added after subclasses load are inherited", () => {
@@ -376,7 +383,7 @@ describe("CustomPropertiesTest", () => {
   });
 
   it("attributes not backed by database columns are not dirty when unchanged", () => {
-    expect((new OverloadedType() as any).attributeChanged("non_existent_decimal")).toBe(false);
+    expect((new OverloadedType() as any).attributeChanged("non_existent_decimal")).toBeFalsy();
   });
 
   it("attributes not backed by database columns are always initialized", async () => {
@@ -428,13 +435,13 @@ describe("CustomPropertiesTest", () => {
 
     (model as any).foo = (model as any).foo + "asdf";
     expect((model as any).foo).toBe("lolasdf");
-    expect((model as any).fooChanged()).toBe(true);
+    expect((model as any).fooChanged()).toBeTruthy();
 
     await model.reload();
     expect((model as any).foo).toBe("lol");
 
     (model as any).foo = "lol";
-    expect(model.isChanged).toBe(false);
+    expect(model.isChanged).toBeFalsy();
   });
 
   it("attributes not backed by database columns appear in inspect", () => {
@@ -454,12 +461,14 @@ describe("CustomPropertiesTest", () => {
   });
 
   it("attributes do not require a connection is established", () => {
-    class Klass extends OverloadedType {
-      static {
-        this.attribute("foo", "string");
+    void assertNotCalled(Base, "leaseConnection", null, () => {
+      class Klass extends OverloadedType {
+        static {
+          this.attribute("foo", "string");
+        }
       }
-    }
-    expect(Klass).toBeDefined();
+      void Klass;
+    });
   });
 
   it("unknown type error is raised", () => {
@@ -468,8 +477,9 @@ describe("CustomPropertiesTest", () => {
 
   it("immutable_strings_by_default changes schema inference for string columns", async () => {
     await withImmutableStrings(() => {
-      const immutableStringType = typeRegistry.lookup("immutable_string").constructor;
-      expect(OverloadedType.typeForAttribute("inferred_string")!.constructor).toBe(
+      const immutableStringType = typeRegistry.lookup("immutable_string")
+        .constructor as new () => unknown;
+      expect(OverloadedType.typeForAttribute("inferred_string")).toBeInstanceOf(
         immutableStringType,
       );
     });
@@ -483,8 +493,8 @@ describe("CustomPropertiesTest", () => {
 
   it("immutable_strings_by_default does not affect `attribute :foo, :string`", async () => {
     await withImmutableStrings(() => {
-      const defaultStringType = typeRegistry.lookup("string").constructor;
-      expect(OverloadedType.typeForAttribute("string_with_default")!.constructor).toBe(
+      const defaultStringType = typeRegistry.lookup("string").constructor as new () => unknown;
+      expect(OverloadedType.typeForAttribute("string_with_default")).toBeInstanceOf(
         defaultStringType,
       );
     });

@@ -32,8 +32,10 @@ export class Session {
     return Session.convertTimestampToTime(Number.isFinite(raw) ? (raw as number) : undefined);
   }
 
-  updateLastWriteTimestamp(): void {
-    this.session.set("lastWrite", Session.convertTimeToTimestamp(Temporal.Now.instant()));
+  updateLastWriteTimestamp(): number {
+    const lastWrite = Session.convertTimeToTimestamp(Temporal.Now.instant());
+    this.session.set("lastWrite", lastWrite);
+    return lastWrite;
   }
 
   save(_response: unknown): void {}

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
+import { assertNothingRaised } from "@blazetrails/activesupport";
 import {
   freshAdapter,
   configureEncryption,
@@ -12,6 +13,8 @@ import {
   makeEncryptedAuthorWithPreviousSchemes,
   makeKeyProvider,
   assertEncryptedAttribute,
+  assertNotEncryptedAttribute,
+  assertCiphertextDecryptsTo,
   withoutEncryption,
 } from "./test-helpers.js";
 import { Scheme } from "./scheme.js";
@@ -49,19 +52,13 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
 
     await assertEncryptedAttribute(post, "title", title);
     await assertEncryptedAttribute(post, "body", body);
-
-    const reloaded = await Post.find(post.id);
-    expect(reloaded.readAttributeBeforeTypeCast("title")).not.toBe(title);
-    expect(reloaded.readAttributeBeforeTypeCast("body")).not.toBe(body);
-    expect(reloaded.title).toBe(title);
-    expect(reloaded.body).toBe(body);
   });
 
   it("encrypt won't fail for classes without attributes to encrypt", async () => {
     await freshAdapter();
     const PlainPost = makePlainPost();
     const post = await PlainPost.create({ title: "hello", body: "world" });
-    await expect(post.encrypt()).resolves.toBeUndefined();
+    await assertNothingRaised(() => post.encrypt());
   });
 
   it("decrypt decrypts encrypted attributes", async () => {
@@ -71,12 +68,12 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
     const body = "<p>the Starfleet is here, we are safe now!</p>";
     const post = await Post.create({ title, body });
     await assertEncryptedAttribute(post, "title", title);
+    await assertEncryptedAttribute(post, "body", body);
 
     await post.decrypt();
 
-    const reloaded = await Post.find(post.id);
-    expect(reloaded.readAttributeBeforeTypeCast("title")).toBe(title);
-    expect(reloaded.title).toBe(title);
+    assertNotEncryptedAttribute(await post.reload(), "title", title);
+    assertNotEncryptedAttribute(post, "body", body);
   });
 
   it("decrypt can be invoked multiple times", async () => {
@@ -89,8 +86,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
 
     for (let i = 0; i < 3; i++) await post.decrypt();
 
-    const reloaded = await Post.find(post.id);
-    expect(reloaded.readAttributeBeforeTypeCast("title")).toBe("the Starfleet is here");
+    assertNotEncryptedAttribute(await post.reload(), "title", "the Starfleet is here");
+    assertNotEncryptedAttribute(post, "body", "<p>the Starfleet is here, we are safe now!</p>");
   });
 
   it("encrypt can be invoked multiple times", async () => {
@@ -103,16 +100,15 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
 
     for (let i = 0; i < 3; i++) await post.encrypt();
 
-    const reloaded = await Post.find(post.id);
-    await assertEncryptedAttribute(reloaded, "title", "the Starfleet is here");
-    expect(reloaded.encryptedAttribute("title")).toBe(true);
+    await assertEncryptedAttribute(await post.reload(), "title", "the Starfleet is here");
+    await assertEncryptedAttribute(post, "body", "<p>the Starfleet is here, we are safe now!</p>");
   });
 
   it("encrypted_attribute? returns false for regular attributes", async () => {
     await freshAdapter();
     const Book = makeEncryptedBook();
     const book = await Book.create({ name: "Dune" });
-    expect(book.encryptedAttribute("id")).toBe(false);
+    expect(book.encryptedAttribute("id")).toBeFalsy();
   });
 
   it("encrypted_attribute? returns true for encrypted attributes which content is encrypted", async () => {
@@ -120,25 +116,21 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
     const Book = makeEncryptedBook();
     const book = await Book.create({ name: "Dune" });
     const reloaded = await Book.find(book.id);
-    expect(reloaded.encryptedAttribute("name")).toBe(true);
+    expect(reloaded.encryptedAttribute("name")).toBeTruthy();
   });
 
   it("encrypted_attribute? returns false for encrypted attributes which content is not encrypted", async () => {
     await freshAdapter();
     const Book = makeEncryptedBook();
     const book = await withoutEncryption(() => Book.create({ name: "Dune" }));
-    expect(book.encryptedAttribute("name")).toBe(false);
+    expect(book.encryptedAttribute("name")).toBeFalsy();
   });
 
   it("ciphertext_for returns the ciphertext for a given attribute", async () => {
     await freshAdapter();
     const Book = makeEncryptedBook();
     const book = await Book.create({ name: "Dune" });
-    const ciphertext = book.ciphertextFor("name");
-    expect(typeof ciphertext).toBe("string");
-    expect(ciphertext).not.toBe("Dune");
-    const type = Book.typeForAttribute("name");
-    expect(type.deserialize(ciphertext)).toBe("Dune");
+    assertCiphertextDecryptsTo(book, "name", book.ciphertextFor("name"));
   });
 
   it("ciphertext_for returns the persisted ciphertext for a non-deterministically encrypted attribute", async () => {
@@ -148,11 +140,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
       title: "Fear is the mind-killer",
       body: "Fear is the little-death...",
     });
-    const reloaded = await Post.find(post.id);
-    const ciphertext = reloaded.ciphertextFor("title");
-    expect(ciphertext).toBe(reloaded.readAttributeBeforeTypeCast("title"));
-    const type = Post.typeForAttribute("title");
-    expect(type.deserialize(ciphertext)).toBe("Fear is the mind-killer");
+    expect(post.readAttributeBeforeTypeCast("title")).toBe(post.ciphertextFor("title"));
+    assertCiphertextDecryptsTo(post, "title", post.ciphertextFor("title"));
   });
 
   it("ciphertext_for returns the ciphertext of a new value", async () => {
@@ -160,9 +149,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
     const Book = makeEncryptedBook();
     const book = await Book.create({ name: "Dune" });
     book.name = "Arrakis";
-    const ciphertext = book.ciphertextFor("name");
-    const type = Book.typeForAttribute("name");
-    expect(type.deserialize(ciphertext)).toBe("Arrakis");
+
+    assertCiphertextDecryptsTo(book, "name", book.ciphertextFor("name"));
   });
 
   it("ciphertext_for returns the ciphertext of a decrypted value", async () => {
@@ -170,9 +158,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
     const Book = makeEncryptedBook();
     const book = await Book.create({ name: "Dune" });
     await book.decrypt();
-    const ciphertext = book.ciphertextFor("name");
-    const type = Book.typeForAttribute("name");
-    expect(type.deserialize(ciphertext)).toBe("Dune");
+
+    assertCiphertextDecryptsTo(book, "name", book.ciphertextFor("name"));
   });
 
   it("ciphertext_for returns the ciphertext of a value when the record is new", async () => {
@@ -180,9 +167,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
     const Book = makeEncryptedBook();
     const book = new Book();
     book.name = "Dune";
-    const ciphertext = book.ciphertextFor("name");
-    const type = Book.typeForAttribute("name");
-    expect(type.deserialize(ciphertext)).toBe("Dune");
+
+    assertCiphertextDecryptsTo(book, "name", book.ciphertextFor("name"));
   });
 
   it("encrypt attributes encrypted with a previous encryption scheme", async () => {
@@ -194,19 +180,12 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
 
     const author = await Author.create({ name: "david" });
 
-    const type = Author.typeForAttribute("name");
-    expect(type.previousTypes.length).toBeGreaterThan(0);
-    const prevType = type.previousTypes[0];
-    const oldCiphertext = prevType.serialize("dhh") as string;
-    expect(typeof oldCiphertext).toBe("string");
+    const oldType = Author.typeForAttribute("name").previousTypes[0];
+    const valueEncryptedWithOldType = oldType.serialize("dhh") as string;
+    await withoutEncryption(() => author.updateColumns({ name: valueEncryptedWithOldType }));
 
-    await withoutEncryption(() => author.updateColumns({ name: oldCiphertext }));
-    const authorWithOldCiphertext = await Author.find(author.id);
-    await authorWithOldCiphertext.encrypt();
-
-    const reloaded = await Author.find(authorWithOldCiphertext.id);
-    expect(reloaded.name).toBe("dhh");
-    expect(reloaded.readAttributeBeforeTypeCast("name")).not.toBe(oldCiphertext);
+    await (await author.reload()).encrypt();
+    expect((await author.reload()).name).toBe("dhh");
   });
 
   it("encrypt won't change the encoding of strings even when compression is used", async () => {

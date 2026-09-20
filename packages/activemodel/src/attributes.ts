@@ -48,6 +48,8 @@ export function attributeNames(this: { attributeTypes(): Record<string, ValueTyp
 export interface AttributeOptions {
   default?: unknown;
   limit?: number | null;
+  precision?: number | null;
+  scale?: number | null;
   array?: boolean;
   range?: boolean;
 }

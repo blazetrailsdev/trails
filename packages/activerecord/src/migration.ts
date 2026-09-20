@@ -846,11 +846,11 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
   }
 
-  async reversible(fn?: (dir: ReversibleBlockHelper) => void): Promise<void> {
+  async reversible(fn?: (dir: ReversibleBlockHelper) => void | Promise<void>): Promise<void> {
     if (!fn) return;
     const helper = new ReversibleBlockHelper(this.isReverting());
     await this.executeBlock(async () => {
-      fn(helper);
+      await fn(helper);
       for (const f of helper[toRun]) await f();
     });
   }
