@@ -886,7 +886,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("copy table with existing records have custom primary key", async () => {
-    const connection = (await BarcodeCustomPk.leaseConnection()) as unknown as SQLite3Adapter;
+    const connection = await BarcodeCustomPk.leaseConnection();
     try {
       await connection.createTable(
         "barcode_custom_pks",
@@ -908,7 +908,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("copy table with composite primary keys", async () => {
-    const connection = (await BarcodeCpk.leaseConnection()) as unknown as SQLite3Adapter;
+    const connection = (await BarcodeCpk.leaseConnection()) as SQLite3Adapter;
     try {
       await connection.createTable(
         "barcode_cpks",
@@ -937,7 +937,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("custom primary key in create table", async () => {
-    const connection = (await Barcode.leaseConnection()) as unknown as SQLite3Adapter;
+    const connection = await Barcode.leaseConnection();
     try {
       await connection.createTable("barcodes", { id: false, force: true }, (t) => {
         t.primaryKey("id", "string");
@@ -958,7 +958,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("custom primary key in change table", async () => {
-    const connection = (await Barcode.leaseConnection()) as unknown as SQLite3Adapter;
+    const connection = await Barcode.leaseConnection();
     try {
       await connection.createTable("barcodes", { id: false, force: true }, (t) => {
         t.integer("dummy");
@@ -982,7 +982,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("add column with custom primary key", async () => {
-    const connection = (await Barcode.leaseConnection()) as unknown as SQLite3Adapter;
+    const connection = await Barcode.leaseConnection();
     try {
       await connection.createTable("barcodes", { id: false, force: true }, (t) => {
         t.integer("dummy");
@@ -1004,7 +1004,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("remove column preserves index options", async () => {
-    const connection = (await Barcode.leaseConnection()) as unknown as SQLite3Adapter;
+    const connection = await Barcode.leaseConnection();
     try {
       await connection.createTable("barcodes", { force: true }, (t) => {
         t.string("code");
@@ -1034,7 +1034,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("auto increment preserved on table changes", async () => {
-    const connection = (await Barcode.leaseConnection()) as unknown as SQLite3Adapter;
+    const connection = await Barcode.leaseConnection();
     try {
       await connection.createTable("barcodes", { force: true }, (t) => {
         t.string("code");
