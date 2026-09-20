@@ -5,6 +5,23 @@ import { AdapterNotFound } from "../errors.js";
 
 class FakeActiveRecordAdapter {}
 
+describe("RegistrationIsolatedTest", () => {
+  it("#resolve raises if the adapter is using the pre 7.2 adapter registration API", async () => {
+    const exception = await assertRaises([AdapterNotFound], {}, () =>
+      ConnectionAdapters.resolve("fake_legacy"),
+    );
+
+    const expectedMessage =
+      "Database configuration specifies nonexistent 'fake_legacy' adapter. " +
+      "Available adapters are: expo-sqlite, fake, libsql, libsql-remote, libsql-replica, mysql2, " +
+      "node-sqlite, postgresql, sqlite3. Ensure that the adapter is spelled correctly in " +
+      "config/database.yml and that you've added the necessary adapter package to your " +
+      "package.json if it's not in the list of available adapters.";
+
+    expect(exception.message).toBe(expectedMessage);
+  });
+});
+
 describe("RegistrationTest", () => {
   it("#register registers a new database adapter and #resolve can find it and raises if it cannot", async () => {
     const name = "fake_reg_a";
@@ -64,22 +81,5 @@ describe("RegistrationTest", () => {
     );
 
     expect((await ConnectionAdapters.resolve(name)).name).toBe("FakeActiveRecordAdapter");
-  });
-});
-
-describe("RegistrationIsolatedTest", () => {
-  it("#resolve raises if the adapter is using the pre 7.2 adapter registration API", async () => {
-    const exception = await assertRaises([AdapterNotFound], {}, () =>
-      ConnectionAdapters.resolve("fake_legacy"),
-    );
-
-    const availableAdapters = /Available adapters are: (.*?)\./.exec(exception.message)![1];
-    const expectedMessage =
-      `Database configuration specifies nonexistent 'fake_legacy' adapter. ` +
-      `Available adapters are: ${availableAdapters}. ` +
-      `Ensure that the adapter is spelled correctly in config/database.yml and that you've added the necessary ` +
-      `adapter package to your package.json if it's not in the list of available adapters.`;
-
-    expect(exception.message).toBe(expectedMessage);
   });
 });
