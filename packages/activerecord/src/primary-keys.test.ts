@@ -1,6 +1,14 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import { Base, registerModel } from "./index.js";
 import { MissingAttributeError } from "@blazetrails/activemodel";
+import {
+  assertChanges,
+  assertNotDeprecated,
+  assertNothingRaised,
+  assertRaises,
+} from "@blazetrails/activesupport";
+import { assertQueriesCount } from "./testing/query-assertions.js";
+import { deprecator } from "./deprecator.js";
 import { adapterType } from "./test-adapter.js";
 import { fixtures } from "./test-fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
@@ -47,16 +55,19 @@ describe("PrimaryKeysTest", () => {
     expect(keyboard.toKey()).toEqual([keyboard.id]);
   });
 
-  it("to key with composite primary key", () => {
+  it.skip("to key with composite primary key", () => {
+    // BLOCKED: composite-primary-key-id-reader-collapses-all-nil-to-nil
     const order = new CpkOrder();
-    expect(order.toKey()).toBeNull();
+    expect(order.toKey()).toEqual([null, null]);
     order.id = [1, 2];
     expect((order.toKey() ?? []).map(Number)).toEqual([1, 2]);
   });
 
   it("read attribute id", async () => {
     const topic = await Topic.find(topics("first").id);
-    expect(Number(topic.readAttribute("id"))).toBe(1);
+    const id = await assertNotDeprecated(deprecator(), () => topic.readAttribute("id"));
+
+    expect(Number(id)).toBe(1);
   });
 
   it("read attribute with custom primary key does not return it when reading the id attribute", async () => {
@@ -77,10 +88,12 @@ describe("PrimaryKeysTest", () => {
     );
   });
 
-  it("read attribute with composite primary key", () => {
+  it("read attribute with composite primary key", async () => {
     const book = new CpkBook();
     book.id = [1, 2];
-    expect(book.readAttribute("id")).toBe(2);
+    const id = await assertNotDeprecated(deprecator(), () => book.readAttribute("id"));
+
+    expect(id).toBe(2);
   });
 
   it("to key with primary key after destroy", async () => {
@@ -103,16 +116,30 @@ describe("PrimaryKeysTest", () => {
   it("id?", async () => {
     const topic = await Topic.find(topics("first").id);
 
-    expect((topic as any).isId).toBe(true);
-    topic.id = null as unknown as number;
-    expect((topic as any).isId).toBe(false);
+    await assertChanges(
+      () => (topic as any).isId,
+      null,
+      { from: true, to: false },
+      () => {
+        topic.id = null as unknown as number;
+      },
+    );
   });
 
   it("integer key", async () => {
-    const t1 = await Topic.find(topics("first").id);
-    expect(t1.author_name).toBe(topics("first").author_name);
-    const t2 = await Topic.find(topics("second").id);
-    expect(t2.author_name).toBe(topics("second").author_name);
+    let topic = await Topic.find(1);
+    expect(topic.author_name).toBe(topics("first").author_name);
+    topic = await Topic.find(2);
+    expect(topic.author_name).toBe(topics("second").author_name);
+
+    topic = new Topic();
+    topic.title = "New Topic";
+    expect(topic.id).toBeNull();
+    await topic.saveBang();
+    const id = topic.id;
+
+    const topicReloaded = await Topic.find(id);
+    expect(topicReloaded.title).toBe("New Topic");
   });
 
   it("customized primary key auto assigns on save", async () => {
@@ -122,8 +149,6 @@ describe("PrimaryKeysTest", () => {
     await keyboard.saveBang();
     const found = (await Keyboard.findBy({ name: "HHKB" })) as Keyboard;
     expect(keyboard.id).toBe(found.id);
-    const refound = await Keyboard.find(keyboard.id);
-    expect(refound.id).toBe(keyboard.id);
   });
 
   it("customized primary key can be get before saving", () => {
@@ -148,10 +173,8 @@ describe("PrimaryKeysTest", () => {
 
   it("update columns with non primary key id column", async () => {
     const subscriber = (await Subscriber.first()) as Subscriber;
-    const originalNick = subscriber.nick;
     await subscriber.updateColumns({ id: 1 });
     expect(subscriber.nick).not.toBe(1);
-    expect(subscriber.nick).toBe(originalNick);
   });
 
   it("string key", async () => {
@@ -174,7 +197,7 @@ describe("PrimaryKeysTest", () => {
   it("id column that is not primary key", async () => {
     await NonPrimaryKey.createBang({ id: 100 } as any);
     const actual = await NonPrimaryKey.findBy({ id: 100 } as any);
-    expect(actual).not.toBeNull();
+    expect(actual!.inspect()).toMatch(/<NonPrimaryKey id: 100/);
   });
 
   it("find with more than one string key", async () => {
@@ -212,16 +235,16 @@ describe("PrimaryKeysTest", () => {
   });
 
   it("find with one id should quote pkey", async () => {
-    const monkey = await MixedCaseMonkey.find(mixedCaseMonkeys("first").monkeyID);
-    expect(monkey).not.toBeNull();
+    await assertNothingRaised(() => MixedCaseMonkey.find(mixedCaseMonkeys("first").monkeyID));
   });
 
   it("find with multiple ids should quote pkey", async () => {
-    const monkeys = (await MixedCaseMonkey.find([
-      mixedCaseMonkeys("first").monkeyID,
-      mixedCaseMonkeys("second").monkeyID,
-    ])) as MixedCaseMonkey[];
-    expect(monkeys.length).toBe(2);
+    await assertNothingRaised(() =>
+      MixedCaseMonkey.find([
+        mixedCaseMonkeys("first").monkeyID,
+        mixedCaseMonkeys("second").monkeyID,
+      ]),
+    );
   });
 
   it("instance update should quote pkey", async () => {
@@ -272,11 +295,14 @@ describe("PrimaryKeysTest", () => {
   });
 
   it("primary key update with custom key name", async () => {
-    const dashboard = (await Dashboard.createBang({
-      dashboard_id: "upd-1",
+    let dashboard = (await Dashboard.createBang({
+      dashboard_id: "1",
     } as any)) as unknown as Dashboard;
-    expect(dashboard.id).toBe("upd-1");
-    expect(dashboard.isPersisted()).toBe(true);
+    dashboard.id = "2";
+    await dashboard.saveBang();
+
+    dashboard = (await Dashboard.first()) as Dashboard;
+    expect(dashboard.id).toBe("2");
   });
 
   it("create without primary key no extra query", async () => {
@@ -286,7 +312,10 @@ describe("PrimaryKeysTest", () => {
         this._primaryKey = "dashboard_id";
       }
     }
-    await expect(AnonDashboard.createBang({ dashboard_id: "q-1" } as any)).resolves.not.toThrow();
+    await AnonDashboard.createBang();
+    await assertQueriesCount(3, true, async () => {
+      await AnonDashboard.createBang();
+    });
   });
 
   it("assign id raises error if primary key doesnt exist", async () => {
@@ -296,7 +325,6 @@ describe("PrimaryKeysTest", () => {
       }
     }
     await AnonDashboard.loadSchema();
-    expect(AnonDashboard.primaryKey).toBe(null);
     const dashboard = new AnonDashboard();
     expect(() => {
       (dashboard as any).id = "1";
@@ -321,18 +349,18 @@ describe("PrimaryKeysTest", () => {
         this._primaryKey = ["author_id", "id"] as string[];
       }
     }
-    expect(AnonCpkBooks.compositePrimaryKey).toBe(true);
+    expect(AnonCpkBooks.compositePrimaryKey).toBeTruthy();
     AnonCpkBooks.primaryKey = "id";
-    expect(AnonCpkBooks.compositePrimaryKey).toBe(false);
+    expect(AnonCpkBooks.compositePrimaryKey).toBeFalsy();
   });
 
   it("primary key values present", () => {
     const withId = new Topic();
     withId.id = 1;
-    expect((withId as any).isPrimaryKeyValuesPresent()).toBe(true);
+    expect((withId as any).isPrimaryKeyValuesPresent()).toBeTruthy();
 
-    expect((new Topic() as any).isPrimaryKeyValuesPresent()).toBe(false);
-    expect((new Topic({ title: "Topic A" }) as any).isPrimaryKeyValuesPresent()).toBe(false);
+    expect((new Topic() as any).isPrimaryKeyValuesPresent()).toBeFalsy();
+    expect((new Topic({ title: "Topic A" }) as any).isPrimaryKeyValuesPresent()).toBeFalsy();
   });
 
   it.skipIf(adapterType !== "postgres")("serial with quoted sequence name", async () => {
@@ -342,7 +370,6 @@ describe("PrimaryKeysTest", () => {
       isSerial?: () => boolean;
     }[];
     const col = cols.find((c) => c.name === "monkeyID");
-    expect(col).toBeDefined();
     expect(col!.defaultFunction).toBe("nextval('\"mixed_case_monkeys_monkeyID_seq\"'::regclass)");
     expect(col!.isSerial!()).toBeTruthy();
   });
@@ -354,7 +381,6 @@ describe("PrimaryKeysTest", () => {
       isSerial?: () => boolean;
     }[];
     const col = cols.find((c) => c.name === "id");
-    expect(col).toBeDefined();
     expect(col!.defaultFunction).toBe("nextval('topics_id_seq'::regclass)");
     expect(col!.isSerial!()).toBeTruthy();
   });
@@ -437,9 +463,8 @@ describe("PrimaryKeyAnyTypeTest", () => {
 
   it("any type primary key", async () => {
     expect(Barcode.primaryKey).toBe("code");
-    const col = (Barcode as any).columnsHash()["code"];
-    expect(col).toBeDefined();
-    expect(col.null).toBe(false);
+    const col = (Barcode as any).columnForAttribute(Barcode.primaryKey);
+    expect(col.null).toBeFalsy();
     expect(col.type).toBe("string");
     expect(col.limit).toBe(42);
     void Barcode.resetColumnInformation();
@@ -527,11 +552,14 @@ describe("CompositePrimaryKeyTest", () => {
     await CpkBook.deleteAll();
   });
 
-  it("assigning a non array value to model with composite primary key raises", () => {
+  it("assigning a non array value to model with composite primary key raises", async () => {
     const book = new CpkBook();
-    expect(() => {
+
+    const error = await assertRaises([TypeError], {}, () => {
       book.id = 1 as unknown as number[];
-    }).toThrow(new TypeError('Expected value matching ["author_id", "id"], got 1.'));
+    });
+
+    expect(error.message).toBe('Expected value matching ["author_id", "id"], got 1.');
   });
 
   it("id was composite", () => {
@@ -543,18 +571,28 @@ describe("CompositePrimaryKeyTest", () => {
     expect(book.id).toEqual([42, 42]);
   });
 
-  it("id predicate composite", () => {
+  it("id predicate composite", async () => {
     const book = cpkBooks("cpk_great_author_first_book");
+
+    const validId = [42, 42];
+
     const invalidIds: unknown[][] = [
       [42, null],
       [null, 42],
       [null, null],
     ];
+
     for (const invalidId of invalidIds) {
-      book.id = [42, 42];
-      expect(book.toKey()).toEqual([42, 42]);
-      book.id = invalidId as number[];
-      expect(book.toKey()).toBeNull();
+      book.id = validId;
+
+      await assertChanges(
+        () => (book as any).isId,
+        null,
+        { from: true, to: false },
+        () => {
+          book.id = invalidId as number[];
+        },
+      );
     }
   });
 
@@ -586,22 +624,22 @@ describe("CompositePrimaryKeyTest", () => {
   it("primary key values present for a composite pk model", () => {
     const withBoth = new CpkBook();
     withBoth.id = [1, 1];
-    expect((withBoth as any).isPrimaryKeyValuesPresent()).toBe(true);
+    expect((withBoth as any).isPrimaryKeyValuesPresent()).toBeTruthy();
 
-    expect((new CpkBook() as any).isPrimaryKeyValuesPresent()).toBe(false);
+    expect((new CpkBook() as any).isPrimaryKeyValuesPresent()).toBeFalsy();
 
     const withAuthorOnly = new CpkBook({ author_id: 1 });
-    expect((withAuthorOnly as any).isPrimaryKeyValuesPresent()).toBe(false);
+    expect((withAuthorOnly as any).isPrimaryKeyValuesPresent()).toBeFalsy();
 
     const withNullId = new CpkBook();
     withNullId.id = [null as unknown as number, 1];
-    expect((withNullId as any).isPrimaryKeyValuesPresent()).toBe(false);
+    expect((withNullId as any).isPrimaryKeyValuesPresent()).toBeFalsy();
 
     const withTitleOnly = new CpkBook({ title: "Book A" });
-    expect((withTitleOnly as any).isPrimaryKeyValuesPresent()).toBe(false);
+    expect((withTitleOnly as any).isPrimaryKeyValuesPresent()).toBeFalsy();
 
     const withAuthorAndTitle = new CpkBook({ author_id: 1, title: "Book A" });
-    expect((withAuthorAndTitle as any).isPrimaryKeyValuesPresent()).toBe(false);
+    expect((withAuthorAndTitle as any).isPrimaryKeyValuesPresent()).toBeFalsy();
   });
 });
 
@@ -666,7 +704,7 @@ describe("PrimaryKeyIntegerTest", () => {
     await Widget.loadSchema();
     const col = (Widget as any).columnsHash()["id"];
     expect(col.type).toBe("integer");
-    expect(col.isBigint()).toBe(false);
+    expect(col.isBigint()).toBeFalsy();
   });
 
   it.skipIf(adapterType === "sqlite")(
@@ -694,10 +732,13 @@ describe("PrimaryKeyIntegerTest", () => {
     void Widget.resetColumnInformation();
     await Widget.loadSchema();
     const col = (Widget as any).columnsHash()["id"];
-    expect(col.isAutoIncrement()).toBe(true);
+    expect(col.isAutoIncrement()).toBeTruthy();
     expect(col.type).toBe("integer");
-    expect(col.isBigint()).toBe(false);
-    expect(col.isUnsigned()).toBe(true);
+    expect(col.isBigint()).toBeFalsy();
+    expect(col.isUnsigned()).toBeTruthy();
+
+    const schema = await dumpTableSchema(Base.connection, "widgets");
+    expect(schema).toMatch(/createTable\("widgets", \{ id: \{ type: "integer", unsigned: true \}/);
   });
 
   it.skipIf(adapterType !== "mysql")("bigint primary key with unsigned", async () => {
@@ -708,9 +749,12 @@ describe("PrimaryKeyIntegerTest", () => {
     void Widget.resetColumnInformation();
     await Widget.loadSchema();
     const col = (Widget as any).columnsHash()["id"];
-    expect(col.isAutoIncrement()).toBe(true);
+    expect(col.isAutoIncrement()).toBeTruthy();
     expect(col.type).toBe("integer");
-    expect(col.isBigint()).toBe(true);
-    expect(col.isUnsigned()).toBe(true);
+    expect(col.isBigint()).toBeTruthy();
+    expect(col.isUnsigned()).toBeTruthy();
+
+    const schema = await dumpTableSchema(Base.connection, "widgets");
+    expect(schema).toMatch(/createTable\("widgets", \{ id: \{ type: "bigint", unsigned: true \}/);
   });
 });

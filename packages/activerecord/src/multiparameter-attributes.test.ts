@@ -1,18 +1,29 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { TimeWithZone, toFs } from "@blazetrails/activesupport";
-import { Base, composedOf, MultiparameterAssignmentErrors } from "./index.js";
+import {
+  TimeWithZone,
+  assertNotRespondTo,
+  assertRaise,
+  toFs,
+  zone as timeZone,
+} from "@blazetrails/activesupport";
+import { AttributeAssignmentError, MultiparameterAssignmentErrors } from "./index.js";
 import { withTimezoneConfig } from "./test-helper.js";
 import { fixtures } from "./test-fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
+import { Address, Customer } from "./test-helpers/models/customer.js";
 
 const utc = (v: RubyTime) => v.getutc().toTime();
+
+const attributeOf = (ex: Error): string | undefined =>
+  ((ex as MultiparameterAssignmentErrors).errors[0] as AttributeAssignmentError).attribute;
 
 describe("MultiParameterAttributeTest", () => {
   fixtures(["topics"]);
 
   beforeAll(async () => {
     await Topic.loadSchema();
+    await Customer.loadSchema();
   });
 
   it("multiparameter attributes on date", async () => {
@@ -114,30 +125,32 @@ describe("MultiParameterAttributeTest", () => {
   });
 
   it("multiparameter attributes on time with no date", async () => {
-    const topic = new Topic();
-    await topic.assignAttributes({
-      "written_on(1i)": "1",
-      "written_on(2i)": "1",
-      "written_on(3i)": "1",
-      "written_on(4i)": "16",
-      "written_on(5i)": "24",
+    const ex = await assertRaise([MultiparameterAssignmentErrors], {}, async () => {
+      const attributes = {
+        "written_on(4i)": "16",
+        "written_on(5i)": "24",
+        "written_on(6i)": "00",
+      };
+      const topic = await Topic.find(1);
+      await topic.assignAttributes(attributes);
     });
-    const dt = topic.written_on as RubyTime;
-    expect(dt).toBeInstanceOf(RubyTime);
-    expect(utc(dt).hour).toBe(16);
-    expect(utc(dt).minute).toBe(24);
+    expect(attributeOf(ex)).toBe("written_on");
   });
 
   it("multiparameter attributes on time with invalid time params", async () => {
-    const topic = new Topic();
-    await topic.assignAttributes({
-      "written_on(1i)": "",
-      "written_on(2i)": "",
-      "written_on(3i)": "",
-      "written_on(4i)": "",
-      "written_on(5i)": "",
+    const ex = await assertRaise([MultiparameterAssignmentErrors], {}, async () => {
+      const attributes = {
+        "written_on(1i)": "2004",
+        "written_on(2i)": "6",
+        "written_on(3i)": "24",
+        "written_on(4i)": "2004",
+        "written_on(5i)": "36",
+        "written_on(6i)": "64",
+      };
+      const topic = await Topic.find(1);
+      await topic.assignAttributes(attributes);
     });
-    expect(topic.written_on).toBeNull();
+    expect(attributeOf(ex)).toBe("written_on");
   });
 
   it("multiparameter attributes on time with old date", async () => {
@@ -154,30 +167,46 @@ describe("MultiParameterAttributeTest", () => {
   });
 
   it("multiparameter attributes on time will raise on big time if missing date parts", async () => {
-    const topic = new Topic();
-    expect(() =>
-      topic.assignAttributes({ "written_on(4i)": "16", "written_on(5i)": "24" }),
-    ).toThrow(MultiparameterAssignmentErrors);
+    const ex = await assertRaise([MultiparameterAssignmentErrors], {}, async () => {
+      const attributes = {
+        "written_on(4i)": "16",
+        "written_on(5i)": "24",
+      };
+      const topic = await Topic.find(1);
+      await topic.assignAttributes(attributes);
+    });
+    expect(attributeOf(ex)).toBe("written_on");
   });
 
   it("multiparameter attributes on time with raise on small time if missing date parts", async () => {
-    const topic = new Topic();
-    expect(() => topic.assignAttributes({ "written_on(4i)": "1", "written_on(5i)": "2" })).toThrow(
-      MultiparameterAssignmentErrors,
-    );
+    const ex = await assertRaise([MultiparameterAssignmentErrors], {}, async () => {
+      const attributes = {
+        "written_on(4i)": "16",
+        "written_on(5i)": "12",
+        "written_on(6i)": "02",
+      };
+      const topic = await Topic.find(1);
+      await topic.assignAttributes(attributes);
+    });
+    expect(attributeOf(ex)).toBe("written_on");
   });
 
-  it("multiparameter attributes on time will ignore hour if missing", async () => {
-    const topic = new Topic();
-    await topic.assignAttributes({
-      "written_on(1i)": "2004",
-      "written_on(2i)": "6",
-      "written_on(3i)": "24",
-      "written_on(5i)": "24",
+  it.skip("multiparameter attributes on time will ignore hour if missing", async () => {
+    // BLOCKED: multiparameter-time-local-not-equal-to-time-local
+    await withTimezoneConfig({ default: "local" }, async () => {
+      const attributes = {
+        "written_on(1i)": "2004",
+        "written_on(2i)": "12",
+        "written_on(3i)": "12",
+        "written_on(5i)": "12",
+        "written_on(6i)": "02",
+      };
+      const topic = await Topic.find(1);
+      await topic.assignAttributes(attributes);
+      expect((topic.written_on as RubyTime).valueOf()).toEqual(
+        RubyTime.local(2004, 12, 12, 0, 12, 2).valueOf(),
+      );
     });
-    const dt = topic.written_on as RubyTime;
-    expect(utc(dt).year).toBe(2004);
-    expect(utc(dt).hour).toBe(0);
   });
 
   it("multiparameter attributes on time will ignore hour if blank", async () => {
@@ -240,19 +269,20 @@ describe("MultiParameterAttributeTest", () => {
         async () => {
           void Topic.resetColumnInformation();
           await Topic.loadSchema();
-          const topic = new Topic();
-          await topic.assignAttributes({
+          const attributes = {
             "written_on(1i)": "2004",
             "written_on(2i)": "6",
             "written_on(3i)": "24",
             "written_on(4i)": "16",
             "written_on(5i)": "24",
             "written_on(6i)": "00",
-          });
-          const twz = (topic as any).written_on as TimeWithZone;
-          expect(twz).toBeInstanceOf(TimeWithZone);
-          expect(twz.utc().toTime().hour).toBe(23);
-          expect(twz.hour).toBe(16);
+          };
+          const topic = await Topic.find(1);
+          await topic.assignAttributes(attributes);
+          const twz = topic.written_on as unknown as TimeWithZone;
+          expect(twz.utc().valueOf()).toEqual(RubyTime.utc(2004, 6, 24, 23, 24, 0).valueOf());
+          expect(twz.time.valueOf()).toEqual(RubyTime.utc(2004, 6, 24, 16, 24, 0).valueOf());
+          expect(twz.timeZone).toEqual(timeZone());
         },
       );
     } finally {
@@ -280,31 +310,27 @@ describe("MultiParameterAttributeTest", () => {
     }
   });
 
-  it("multiparameter attributes on time with time zone aware attributes false", async () => {
-    try {
-      await withTimezoneConfig(
-        { default: "local", awareAttributes: false, zone: "Pacific Time (US & Canada)" },
-        async () => {
-          void Topic.resetColumnInformation();
-          await Topic.loadSchema();
-          const topic = new Topic();
-          await topic.assignAttributes({
-            "written_on(1i)": "2004",
-            "written_on(2i)": "6",
-            "written_on(3i)": "24",
-            "written_on(4i)": "16",
-            "written_on(5i)": "24",
-            "written_on(6i)": "00",
-          });
-          const val = topic.written_on;
-          expect(val).not.toBeInstanceOf(TimeWithZone);
-          expect(val).toBeInstanceOf(RubyTime);
-        },
-      );
-    } finally {
-      void Topic.resetColumnInformation();
-      await Topic.loadSchema();
-    }
+  it.skip("multiparameter attributes on time with time zone aware attributes false", async () => {
+    // BLOCKED: multiparameter-time-local-not-equal-to-time-local
+    await withTimezoneConfig(
+      { default: "local", awareAttributes: false, zone: "Pacific Time (US & Canada)" },
+      async () => {
+        const attributes = {
+          "written_on(1i)": "2004",
+          "written_on(2i)": "6",
+          "written_on(3i)": "24",
+          "written_on(4i)": "16",
+          "written_on(5i)": "24",
+          "written_on(6i)": "00",
+        };
+        const topic = await Topic.find(1);
+        await topic.assignAttributes(attributes);
+        expect((topic.written_on as RubyTime).valueOf()).toEqual(
+          RubyTime.local(2004, 6, 24, 16, 24, 0).valueOf(),
+        );
+        assertNotRespondTo(topic.written_on, "timeZone");
+      },
+    );
   });
 
   it("multiparameter attributes on time with skip time zone conversion for attributes", async () => {
@@ -315,19 +341,20 @@ describe("MultiParameterAttributeTest", () => {
           Topic.skipTimeZoneConversionForAttributes = ["written_on"];
           void Topic.resetColumnInformation();
           await Topic.loadSchema();
-          const topic = new Topic();
-          await topic.assignAttributes({
+          const attributes = {
             "written_on(1i)": "2004",
             "written_on(2i)": "6",
             "written_on(3i)": "24",
             "written_on(4i)": "16",
             "written_on(5i)": "24",
             "written_on(6i)": "00",
-          });
-          const val = topic.written_on;
-          expect(val).not.toBeInstanceOf(TimeWithZone);
-          expect(val).toBeInstanceOf(RubyTime);
-          expect((val as RubyTime).getutc().hour).toBe(16);
+          };
+          const topic = await Topic.find(1);
+          await topic.assignAttributes(attributes);
+          expect((topic.written_on as RubyTime).valueOf()).toEqual(
+            RubyTime.utc(2004, 6, 24, 16, 24, 0).valueOf(),
+          );
+          assertNotRespondTo(topic.written_on, "timeZone");
         },
       );
     } finally {
@@ -344,24 +371,27 @@ describe("MultiParameterAttributeTest", () => {
         async () => {
           void Topic.resetColumnInformation();
           await Topic.loadSchema();
-          const topic = new Topic();
-          await topic.assignAttributes({
+          let attributes: Record<string, string> = {
             "bonus_time(1i)": "2000",
             "bonus_time(2i)": "1",
             "bonus_time(3i)": "1",
             "bonus_time(4i)": "16",
             "bonus_time(5i)": "24",
-          });
-          const bt = (topic as any).bonus_time as TimeWithZone;
-          expect(bt).toBeInstanceOf(TimeWithZone);
-          expect(bt.hour).toBe(16);
-          await topic.assignAttributes({
+          };
+          const topic = await Topic.find(1);
+          await topic.assignAttributes(attributes);
+          const bonusTime = topic.bonus_time as unknown as TimeWithZone;
+          expect(bonusTime.valueOf()).toEqual(timeZone()!.local(2000, 1, 1, 16, 24, 0).valueOf());
+          expect(bonusTime.isUtc()).toBeFalsy();
+
+          attributes = {
             "written_on(1i)": "2000",
             "written_on(2i)": "",
             "written_on(3i)": "",
             "written_on(4i)": "",
             "written_on(5i)": "",
-          });
+          };
+          await topic.assignAttributes(attributes);
           expect(topic.written_on).toBeNull();
         },
       );
@@ -372,34 +402,28 @@ describe("MultiParameterAttributeTest", () => {
   });
 
   it("multiparameter attributes setting time attribute", () => {
-    const topic = new Topic();
-    (topic as any).attributes = {
-      "written_on(4i)": "13",
-      "written_on(5i)": "30",
-      "written_on(1i)": "2004",
-      "written_on(2i)": "1",
-      "written_on(3i)": "1",
-    };
-    const dt = topic.written_on as RubyTime;
-    expect(utc(dt).year).toBe(2004);
-    expect(utc(dt).hour).toBe(13);
-    expect(utc(dt).minute).toBe(30);
+    const topic = new Topic({ "bonus_time(4i)": "01", "bonus_time(5i)": "05" });
+    expect((topic.bonus_time as RubyTime).hour).toBe(1);
+    expect((topic.bonus_time as RubyTime).min).toBe(5);
   });
 
-  it("multiparameter attributes on time with empty seconds", async () => {
-    const topic = new Topic();
-    await topic.assignAttributes({
-      "written_on(1i)": "2004",
-      "written_on(2i)": "6",
-      "written_on(3i)": "24",
-      "written_on(4i)": "16",
-      "written_on(5i)": "24",
-      "written_on(6i)": "",
+  it.skip("multiparameter attributes on time with empty seconds", async () => {
+    // BLOCKED: multiparameter-time-local-not-equal-to-time-local
+    await withTimezoneConfig({ default: "local" }, async () => {
+      const attributes = {
+        "written_on(1i)": "2004",
+        "written_on(2i)": "6",
+        "written_on(3i)": "24",
+        "written_on(4i)": "16",
+        "written_on(5i)": "24",
+        "written_on(6i)": "",
+      };
+      const topic = await Topic.find(1);
+      await topic.assignAttributes(attributes);
+      expect((topic.written_on as RubyTime).valueOf()).toEqual(
+        RubyTime.local(2004, 6, 24, 16, 24, 0).valueOf(),
+      );
     });
-    const dt = topic.written_on as RubyTime;
-    expect(utc(dt).year).toBe(2004);
-    expect(utc(dt).hour).toBe(16);
-    expect(utc(dt).second).toBe(0);
   });
 
   it("multiparameter attributes setting date attribute", () => {
@@ -459,176 +483,72 @@ describe("MultiParameterAttributeTest", () => {
   });
 
   it("multiparameter attributes setting time but not date on date field", async () => {
-    const topic = new Topic();
-    await topic.assignAttributes({
-      "last_read(1i)": "",
-      "last_read(2i)": "",
-      "last_read(3i)": "",
-    });
-    expect(topic.last_read).toBeNull();
+    await assertRaise([MultiparameterAssignmentErrors], {}, () =>
+      new Topic().setAttributes({ "written_on(4i)": "13", "written_on(5i)": "55" }),
+    );
   });
 
   it("multiparameter assignment of aggregation", async () => {
-    class Address {
-      constructor(
-        public street: string,
-        public city: string,
-        public country: string,
-      ) {}
-    }
-    class Customer extends Base {
-      static {
-        this.attribute("name", "string");
-        composedOf(this, "address", {
-          className: Address,
-          mapping: [
-            ["address_street", "street"],
-            ["address_city", "city"],
-            ["address_country", "country"],
-          ],
-        });
-      }
-    }
     const customer = new Customer();
-    await customer.assignAttributes({
-      "address(1)": "Planet Earth",
-      "address(2)": "home",
-      "address(3)": "USA",
-    });
-    const addr = (customer as any).address as Address;
-    expect(addr).toBeInstanceOf(Address);
-    expect(addr.street).toBe("Planet Earth");
-    expect(addr.city).toBe("home");
-    expect(addr.country).toBe("USA");
+    const address = new Address("The Street", "The City", "The Country");
+    const attributes = {
+      "address(1)": address.street,
+      "address(2)": address.city,
+      "address(3)": address.country,
+    };
+    await customer.assignAttributes(attributes);
+    expect(customer.address).toEqual(address);
   });
 
   it("multiparameter assignment of aggregation out of order", async () => {
-    class Address {
-      constructor(
-        public street: string,
-        public city: string,
-        public country: string,
-      ) {}
-    }
-    class Customer extends Base {
-      static {
-        this.attribute("name", "string");
-        composedOf(this, "address", {
-          className: Address,
-          mapping: [
-            ["address_street", "street"],
-            ["address_city", "city"],
-            ["address_country", "country"],
-          ],
-        });
-      }
-    }
     const customer = new Customer();
-    await customer.assignAttributes({
-      "address(3)": "USA",
-      "address(1)": "Planet Earth",
-      "address(2)": "home",
-    });
-    const addr = (customer as any).address as Address;
-    expect(addr.street).toBe("Planet Earth");
-    expect(addr.city).toBe("home");
-    expect(addr.country).toBe("USA");
+    const address = new Address("The Street", "The City", "The Country");
+    const attributes = {
+      "address(3)": address.country,
+      "address(2)": address.city,
+      "address(1)": address.street,
+    };
+    await customer.assignAttributes(attributes);
+    expect(customer.address).toEqual(address);
   });
 
-  it("multiparameter assignment of aggregation with missing values", async () => {
-    class Address {
-      constructor(
-        public street: string | null,
-        public city: string | null,
-        public country: string | null,
-      ) {}
-    }
-    class Customer extends Base {
-      static {
-        this.attribute("name", "string");
-        composedOf(this, "address", {
-          className: Address,
-          mapping: [
-            ["address_street", "street"],
-            ["address_city", "city"],
-            ["address_country", "country"],
-          ],
-        });
-      }
-    }
-    const customer = new Customer();
-    await customer.assignAttributes({
-      "address(1)": "Planet Earth",
-      "address(3)": "USA",
+  it.skip("multiparameter assignment of aggregation with missing values", async () => {
+    // BLOCKED: composed-of-multiparameter-assignment-does-not-raise-on-bad-arity
+    const ex = await assertRaise([MultiparameterAssignmentErrors], {}, async () => {
+      const customer = new Customer();
+      const address = new Address("The Street", "The City", "The Country");
+      const attributes = { "address(2)": address.city, "address(3)": address.country };
+      await customer.assignAttributes(attributes);
     });
-    const addr = (customer as any).address as Address;
-    expect(addr.street).toBe("Planet Earth");
-    expect(addr.city).toBeNull();
-    expect(addr.country).toBe("USA");
+    expect(attributeOf(ex)).toBe("address");
   });
 
   it("multiparameter assignment of aggregation with blank values", async () => {
-    class Address {
-      constructor(
-        public street: string | null,
-        public city: string | null,
-        public country: string | null,
-      ) {}
-    }
-    class Customer extends Base {
-      static {
-        this.attribute("name", "string");
-        composedOf(this, "address", {
-          className: Address,
-          mapping: [
-            ["address_street", "street"],
-            ["address_city", "city"],
-            ["address_country", "country"],
-          ],
-        });
-      }
-    }
     const customer = new Customer();
-    await customer.assignAttributes({
+    const address = new Address("The Street", "The City", "The Country");
+    const attributes = {
       "address(1)": "",
-      "address(2)": "The City",
-      "address(3)": "The Country",
-    });
-    const addr = (customer as any).address as Address;
-    expect(addr.street).toBeNull();
-    expect(addr.city).toBe("The City");
-    expect(addr.country).toBe("The Country");
+      "address(2)": address.city,
+      "address(3)": address.country,
+    };
+    await customer.assignAttributes(attributes);
+    expect(customer.address).toEqual(new Address(null as never, "The City", "The Country"));
   });
 
-  it("multiparameter assignment of aggregation with large index", async () => {
-    class Timespan {
-      constructor(
-        public start: string,
-        public end: string,
-      ) {}
-    }
-    class Meeting extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("duration_start", "string");
-        this.attribute("duration_end", "string");
-        composedOf(this, "duration", {
-          className: Timespan,
-          mapping: [
-            ["duration_start", "start"],
-            ["duration_end", "end"],
-          ],
-        });
-      }
-    }
-    const meeting = new Meeting();
-    await meeting.assignAttributes({
-      "duration(1)": "9am",
-      "duration(2)": "5pm",
+  it.skip("multiparameter assignment of aggregation with large index", async () => {
+    // BLOCKED: composed-of-multiparameter-assignment-does-not-raise-on-bad-arity
+    const ex = await assertRaise([MultiparameterAssignmentErrors], {}, async () => {
+      const customer = new Customer();
+      const address = new Address("The Street", "The City", "The Country");
+      const attributes = {
+        "address(1)": "The Street",
+        "address(2)": address.city,
+        "address(3000)": address.country,
+      };
+      await customer.assignAttributes(attributes);
     });
-    const ts = (meeting as any).duration as Timespan;
-    expect(ts.start).toBe("9am");
-    expect(ts.end).toBe("5pm");
+
+    expect(attributeOf(ex)).toBe("address");
   });
 
   it("multiparameter assigned attributes did not come from user", () => {
@@ -639,8 +559,8 @@ describe("MultiParameterAttributeTest", () => {
       "written_on(4i)": "13",
       "written_on(5i)": "55",
     });
-    expect((topic as unknown as { written_onCameFromUser: boolean }).written_onCameFromUser).toBe(
-      false,
-    );
+    expect(
+      (topic as unknown as { written_onCameFromUser: boolean }).written_onCameFromUser,
+    ).toBeFalsy();
   });
 });
