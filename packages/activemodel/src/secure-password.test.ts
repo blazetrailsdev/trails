@@ -319,7 +319,7 @@ describe("SecurePasswordTest", () => {
 
   it("password_salt", () => {
     user.password = "secret";
-    expect(bcrypt.getSalt(user.password_digest!)).toEqual(user.passwordSalt);
+    expect(user.passwordSalt).toEqual(bcrypt.getSalt(user.password_digest!));
   });
 
   it("password_salt should return nil when password is nil", () => {
@@ -336,21 +336,21 @@ describe("SecurePasswordTest", () => {
     SecurePassword.minCost = false;
 
     user.password = "secret";
-    expect(12).toEqual(Number(user.password_digest!.split("$")[2]));
+    expect(bcrypt.getRounds(user.password_digest!)).toEqual(12);
   });
 
   it("Password digest cost honors bcrypt cost attribute when min_cost is false", () => {
     SecurePassword.minCost = false;
 
     user.password = "secret";
-    expect(12).toEqual(Number(user.password_digest!.split("$")[2]));
+    expect(bcrypt.getRounds(user.password_digest!)).toEqual(12);
   });
 
   it("Password digest cost can be set to bcrypt min cost to speed up tests", () => {
     SecurePassword.minCost = true;
 
     user.password = "secret";
-    expect(4).toEqual(Number(user.password_digest!.split("$")[2]));
+    expect(bcrypt.getRounds(user.password_digest!)).toEqual(4);
   });
 
   it("password reset token", () => {

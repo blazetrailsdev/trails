@@ -17,8 +17,6 @@ const SecurePasswordModel = Model as unknown as {
 
 export class User extends SecurePasswordModel {
   declare static attribute: AttributesClassHalf["attribute"];
-  declare static validate: (typeof Model)["validate"];
-  declare static validatesConfirmationOf: (typeof Model)["validatesConfirmationOf"];
 
   static {
     include(this, Attributes);
