@@ -392,6 +392,10 @@ export function assertInDelta(exp: number, act: number, delta: number = 0.001, m
 }
 
 function respondsTo(object: object, name: string): boolean {
+  const override = findDescriptor(object, "respondTo");
+  if (override && typeof override.value === "function") {
+    return (override.value as (name: string) => unknown).call(object, name) !== false;
+  }
   if (name in object) {
     const descriptor = findDescriptor(object, name);
     if (descriptor && "value" in descriptor && descriptor.value === undefined) return false;

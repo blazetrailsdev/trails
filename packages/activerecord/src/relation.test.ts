@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { ValueType } from "@blazetrails/activemodel";
+import { assert, assertNot, assertNotRespondTo, assertRaises } from "@blazetrails/activesupport";
+import { isEmpty } from "@blazetrails/ruby-compat";
 import { Relation } from "./index.js";
 import { WhereClause } from "./relation/where-clause.js";
 import { Base } from "./base.js";
@@ -7,7 +9,9 @@ import { registerModel } from "./associations.js";
 
 import { fixtures } from "./test-fixtures.js";
 import { quoteTableName as canonicalQuoteTableName } from "./support/quote-regex.js";
-import { Post as CanonPost } from "./test-helpers/models/post.js";
+import { ArgumentError } from "@blazetrails/ruby-compat";
+import { HashMerger } from "./relation/merger.js";
+import { Post as CanonPost, NullPost, FirstPost } from "./test-helpers/models/post.js";
 import {
   Comment as CanonComment,
   SpecialComment as CanonSpecialComment,
@@ -16,6 +20,7 @@ import { Rating as CanonRating } from "./test-helpers/models/rating.js";
 import { Author as CanonAuthor } from "./test-helpers/models/author.js";
 import { Categorization as CanonCategorization } from "./test-helpers/models/categorization.js";
 import { captureSql } from "./testing/sql-capture.js";
+import { assertQueriesCount, assertQueriesMatch } from "./testing/query-assertions.js";
 
 class EnsureRoundTripTypeCasting extends ValueType {
   override type(): string {
@@ -115,14 +120,18 @@ describe("RelationTest", () => {
     expect(ids.length).toBe(before + 2);
   });
 
-  it("select quotes when using from clause", () => {
-    const sql = CanonPost.select("title").from("posts").toSql();
-    expect(sql).toContain("FROM");
+  it("select quotes when using from clause", async () => {
+    const selected = (
+      await CanonPost.select(":join").from(
+        CanonPost.select(`id as ${canonicalQuoteTableName("join")}`),
+      )
+    ).map((p: any) => p.join);
+    expect(selected.sort()).toEqual((await CanonPost.pluck("id")).sort());
   });
 
   it("relation with annotation includes comment in to sql", () => {
-    const sql = CanonPost.all().annotate("my comment").toSql();
-    expect(sql).toContain("my comment");
+    const postWithAnnotation = CanonPost.where({ id: 1 }).annotate("foo");
+    expect(postWithAnnotation.toSql()).toMatch(/= 1 \/\* foo \*\//);
   });
 
   it("scope for create", () => {
@@ -139,8 +148,9 @@ describe("RelationTest", () => {
   });
 
   it("no queries on empty relation exists?", async () => {
-    const exists = await CanonPost.all().none().exists();
-    expect(exists).toBe(false);
+    await assertQueriesCount(0, false, async () => {
+      await CanonPost.where({ id: [] }).exists(123);
+    });
   });
 
   it("last", async () => {
@@ -178,8 +188,9 @@ describe("RelationTest", () => {
   });
 
   it("no queries on empty condition exists?", async () => {
-    const exists = await CanonPost.all().exists();
-    expect(exists).toBe(true);
+    await assertQueriesCount(0, false, async () => {
+      await CanonPost.all().exists({ id: [] });
+    });
   });
 
   it("finding with subquery", () => {
@@ -204,9 +215,12 @@ describe("RelationTest", () => {
     expect(p.isPersisted()).toBe(true);
   });
 
-  it("relation with annotation includes comment in count query", () => {
-    const sql = CanonPost.all().annotate("counting").toSql();
-    expect(sql).toContain("counting");
+  it("relation with annotation includes comment in count query", async () => {
+    const postWithAnnotation = CanonPost.annotate("foo");
+    const allCount = (await CanonPost.all()).length;
+    await assertQueriesMatch(/\/\* foo \*\//, undefined, false, async () => {
+      expect(await postWithAnnotation.count()).toBe(allCount);
+    });
   });
 
   it("joins with string array", () => {
@@ -224,27 +238,35 @@ describe("RelationTest", () => {
   });
 
   it("construction", () => {
-    const rel = CanonPost.all();
-    expect(rel).toBeDefined();
-    expect(rel.toSql()).toContain("SELECT");
+    const table = CanonPost.arelTable;
+    const relation = new Relation(CanonPost, table);
+    expect(relation.model).toBe(CanonPost);
+    expect(relation.table).toBe(table);
+    assertNot(relation.isLoaded, "relation is not loaded");
   });
 
   it("initialize single values", () => {
-    const rel = CanonPost.where({ title: "test" });
-    expect(rel.toSql()).toContain("WHERE");
+    const relation = new Relation(CanonPost);
+    for (const method of Relation.SINGLE_VALUE_METHODS.filter((m) => m !== "createWith")) {
+      expect((relation as any)[`${method}Value`]).toBeNull();
+    }
+    const value = relation.createWithValue;
+    expect(value).toEqual({});
+    expect(Object.isFrozen(value)).toBeTruthy();
   });
 
   it("multi value initialize", () => {
-    const rel = CanonPost.where({ title: "test" }).order("title").limit(5);
-    expect(rel.toSql()).toContain("WHERE");
-    expect(rel.toSql()).toContain("ORDER BY");
-    expect(rel.toSql()).toContain("LIMIT");
+    const relation = new Relation(CanonPost);
+    for (const method of Relation.MULTI_VALUE_METHODS) {
+      const values = (relation as any)[`${method}Values`];
+      expect(values).toEqual([]);
+      expect(Object.isFrozen(values)).toBeTruthy();
+    }
   });
 
   it("extensions", () => {
-    expect(typeof CanonPost.all().where).toBe("function");
-    expect(typeof CanonPost.all().order).toBe("function");
-    expect(typeof CanonPost.all().limit).toBe("function");
+    const relation = new Relation(CanonPost);
+    expect(relation.extensions).toEqual([]);
   });
 
   it("has values", () => {
@@ -265,42 +287,63 @@ describe("RelationTest", () => {
   });
 
   it("create with value with wheres", () => {
-    const rel = CanonPost.where({ body: "published" }).createWith({ title: "Default" });
-    expect(rel.toSql()).toContain("SELECT");
+    const relation = new Relation(CanonPost);
+    expect(relation.scopeForCreate()).toEqual({});
+
+    relation.whereBang({ id: 10 });
+    expect(relation.scopeForCreate()).toEqual({ id: 10 });
+
+    relation.createWithValue = { hello: "world" };
+    expect(relation.scopeForCreate()).toEqual({ hello: "world", id: 10 });
   });
 
-  it("empty scope", async () => {
-    const count = await CanonPost.all().count();
-    expect(typeof count).toBe("number");
+  it("empty scope", () => {
+    const relation = new Relation(CanonPost);
+    expect(relation.isEmptyScope).toBeTruthy();
+
+    relation.mergeBang(relation);
+    expect(relation.isEmptyScope).toBeTruthy();
+
+    expect(NullPost.all().isEmptyScope).toBeFalsy();
+    expect(FirstPost.all().isEmptyScope).toBeFalsy();
   });
 
-  it("bad constants raise errors", () => {
-    expect((Relation as any).HelloWorld).toBeUndefined();
+  it("bad constants raise errors", async () => {
+    await assertRaises([TypeError], {}, () => {
+      new (Relation as any).HelloWorld();
+    });
   });
 
   it("empty eager loading?", () => {
-    const rel = CanonPost.all();
-    expect(rel.toSql()).toContain("SELECT");
+    const relation = new Relation(CanonPost);
+    expect(relation.isEagerLoading).toBeFalsy();
   });
 
   it("eager load values", () => {
-    const rel = CanonPost.all().includes(":comments");
-    expect(rel.toSql()).toContain("SELECT");
+    const relation = new Relation(CanonPost);
+    relation.eagerLoadBang(":comments");
+    expect(relation.isEagerLoading).toBeTruthy();
   });
 
   it("references values", () => {
-    const sql = CanonPost.all().includes(":comments").toSql();
-    expect(sql).toContain("SELECT");
+    let relation = new Relation(CanonPost);
+    expect(relation.referencesValues).toEqual([]);
+    relation = relation.references(":foo").references(":omg", ":lol");
+    expect(relation.referencesValues).toEqual([":foo", ":omg", ":lol"]);
   });
 
   it("references values dont duplicate", () => {
-    const sql = CanonPost.all().includes(":comments").includes(":comments").toSql();
-    expect(sql).toContain("SELECT");
+    let relation = new Relation(CanonPost);
+    relation = relation.references(":foo").references(":foo");
+    expect(relation.referencesValues).toEqual([":foo"]);
   });
 
   it("merging a hash into a relation", () => {
-    const rel = CanonPost.where({ title: "a" }).merge(CanonPost.where({ body: "x" }));
-    expect(rel.toSql()).toContain("WHERE");
+    let relation = new Relation(CanonPost);
+    relation = relation.merge({ where: { title: ":lol" }, readonly: true } as any);
+
+    expect(relation.whereClause.toH()).toEqual({ title: ":lol" });
+    expect(relation.readonlyValue).toBe(true);
   });
 
   it("merging an empty hash into a relation", () => {
@@ -308,32 +351,35 @@ describe("RelationTest", () => {
     expect(merged.whereClause).toEqual(WhereClause.empty());
   });
 
-  it("merging a hash with unknown keys raises", () => {
-    expect(() => CanonPost.all().merge({ omg: "lol" } as any)).toThrow();
-    let error: unknown;
-    try {
-      CanonPost.all().merge({ omg: "lol" } as any);
-    } catch (err) {
-      error = err;
-    }
-    expect((error as Error).name).toBe("ArgumentError");
+  it("merging a hash with unknown keys raises", async () => {
+    await assertRaises([ArgumentError], {}, () => new HashMerger(null, { omg: "lol" }));
   });
 
-  it("merging nil or false raises", () => {
-    const relation = CanonPost.all();
-    expect(() => relation.merge(null as any)).toThrow("invalid argument: nil.");
-    expect(() => relation.merge(false as any)).toThrow("invalid argument: false.");
+  it("merging nil or false raises", async () => {
+    let relation = new Relation(CanonPost);
+
+    let e = await assertRaises([ArgumentError], {}, () => {
+      relation = relation.merge(null as any);
+    });
+
+    expect(e.message).toBe("invalid argument: nil.");
+
+    e = await assertRaises([ArgumentError], {}, () => {
+      relation = relation.merge(false as any);
+    });
+
+    expect(e.message).toBe("invalid argument: false.");
   });
 
   it("relations can be created with a values hash", () => {
-    const rel = CanonPost.where({ title: "test" });
-    expect(rel.toSql()).toContain("test");
+    const relation = new Relation(CanonPost, undefined, undefined, { select: [":foo"] });
+    expect(relation.selectValues).toEqual([":foo"]);
   });
 
   it("merging a hash interpolates conditions", () => {
-    const rel = CanonPost.where({ title: "a" }).merge(CanonPost.where({ body: "b" }));
-    const sql = rel.toSql();
-    expect(sql).toContain("a");
+    const relation = new Relation(CanonPost);
+    relation.mergeBang({ where: ["title = ?", "bar"] } as any);
+    expect(relation.whereClause.toH()).toEqual({});
   });
 
   it("merging readonly false", () => {
@@ -360,36 +406,61 @@ describe("RelationTest", () => {
   });
 
   it("respond to for non selected element", async () => {
-    const post: any = await CanonPost.select("title").first();
-    expect(() => post.body).toThrow();
+    let post = await CanonPost.select("title").first();
+    assertNotRespondTo(
+      post,
+      "body",
+      "post should not respond_to?(:body) since invoking it raises exception",
+    );
+
+    post = await CanonPost.select("'title' as post_title").first();
+    assertNotRespondTo(
+      post,
+      "title",
+      "post should not respond_to?(:body) since invoking it raises exception",
+    );
   });
 
-  it("selecting aliased attribute quotes column name when from is used", () => {
-    const sql = CanonPost.select("title").from("posts").toSql();
-    expect(sql).toContain("title");
+  it("selecting aliased attribute quotes column name when from is used", async () => {
+    class KeywordColumn extends Base {
+      static {
+        this._tableName = "test_with_keyword_column_name";
+        this.aliasAttribute("description", "desc");
+      }
+    }
+    await KeywordColumn.create({ description: "foo" });
+
+    expect(
+      (await KeywordColumn.select("description").from(KeywordColumn.all())).map((r: any) => r.desc),
+    ).toEqual(["foo"]);
+    expect(
+      (await KeywordColumn.reselect("description").from(KeywordColumn.all())).map(
+        (r: any) => r.desc,
+      ),
+    ).toEqual(["foo"]);
   });
 
-  it("relation merging keeps joining order", () => {
-    const r1 = CanonPost.where({ title: "a" });
-    const r2 = CanonPost.where({ body: "b" });
-    const sql = r1.merge(r2).toSql();
-    expect(sql).toContain("WHERE");
+  it("relation merging keeps joining order", async () => {
+    const authors = CanonAuthor.where({ id: 1 });
+    const posts = CanonPost.joins(":author").merge(authors);
+    const comments = CanonComment.joins(":post").merge(posts);
+    const ratings = CanonRating.joins(":comment").merge(comments);
+
+    expect(await ratings.count()).toBe(3);
   });
 
   it("relation with annotation includes comment in sql", async () => {
     const postWithAnnotation = CanonPost.where({ id: 1 }).annotate("foo");
-    const queries = await captureSql(async () => {
-      expect(await postWithAnnotation.first()).not.toBeNull();
+    await assertQueriesMatch(/\/\* foo \*\//, undefined, false, async () => {
+      assert(await postWithAnnotation.first(), "record should be found");
     });
-    expect(queries.some((sql) => /\/\* foo \*\//.test(sql))).toBe(true);
   });
 
   it("relation with annotation chains sql comments", async () => {
     const postWithAnnotation = CanonPost.where({ id: 1 }).annotate("foo").annotate("bar");
-    const queries = await captureSql(async () => {
-      expect(await postWithAnnotation.first()).not.toBeNull();
+    await assertQueriesMatch(/\/\* foo \*\/ \/\* bar \*\//, undefined, false, async () => {
+      assert(await postWithAnnotation.first(), "record should be found");
     });
-    expect(queries.some((sql) => /\/\* foo \*\/ \/\* bar \*\//.test(sql))).toBe(true);
   });
 
   it("relation with annotation filters sql comment delimiters", () => {
@@ -397,9 +468,13 @@ describe("RelationTest", () => {
     expect(postWithAnnotation.toSql()).toContain("= 1 /* ** //foo// ** */");
   });
 
-  it("relation without annotation does not include an empty comment", () => {
-    const sql = CanonPost.all().toSql();
-    expect(sql).not.toContain("/*  */");
+  it("relation without annotation does not include an empty comment", async () => {
+    const log = await captureSql(async () => {
+      await CanonPost.where({ id: 1 }).first();
+    });
+
+    expect(isEmpty(log)).toBeFalsy();
+    expect(isEmpty(log.filter((query) => /\/\*/.test(query)))).toBeTruthy();
   });
 
   it("relation with optimizer hints filters sql comment delimiters", () => {
@@ -418,13 +493,15 @@ describe("RelationTest", () => {
   });
 
   it("no queries on empty IN", async () => {
-    const results = await CanonPost.where({ id: [] });
-    expect(results).toEqual([]);
+    await assertQueriesCount(0, false, async () => {
+      await CanonPost.where({ id: [] }).load();
+    });
   });
 
-  it("can unscope empty IN", () => {
-    const sql = CanonPost.where({ id: [] }).unscope({ where: "id" }).toSql();
-    expect(sql).not.toContain("WHERE");
+  it("can unscope empty IN", async () => {
+    await assertQueriesCount(1, false, async () => {
+      await CanonPost.where({ id: [] }).unscope({ where: "id" }).load();
+    });
   });
 
   it("responds to model and returns klass", () => {
@@ -438,11 +515,11 @@ describe("RelationTest", () => {
   });
 
   it("#values returns a dup of the values", () => {
-    const rel = CanonPost.where({ title: "test" });
-    const vals1 = rel.whereValuesHash();
-    const vals2 = rel.whereValuesHash();
-    expect(vals1).toEqual(vals2);
-    expect(vals1).not.toBe(vals2);
+    const relation = new Relation(CanonPost).whereBang({ title: ":foo" });
+    const values = relation.values();
+
+    values["where"] = null;
+    expect(relation.whereClause).not.toBeNull();
   });
 
   it("does not duplicate optimizer hints on merge", () => {
@@ -494,10 +571,6 @@ describe("RelationTest", () => {
       .merge(specialCommentsWithRatings);
     const merged = (authors("david") as any).posts.merge(postsWithSpecialCommentsWithRatings);
 
-    const sql = merged.toSql();
-    expect(sql).toContain(`INNER JOIN ${canonicalQuoteTableName("comments")}`);
-    expect(sql).toContain(joinString);
-
     expect(await merged.count()).toEqual(
       new Map([
         [2, 1],
@@ -527,7 +600,10 @@ describe("RelationTest", () => {
       0,
     );
     expect(nbInnerJoin).toBe(2);
-    expect(queries.some((sql) => /LEFT\s+(OUTER)?\s+JOIN/i.test(sql))).toBe(false);
+    assert(
+      queries.every((sql) => !/LEFT\s+(OUTER)?\s+JOIN/i.test(sql)),
+      "Shouldn't have any LEFT JOIN in query",
+    );
   });
 
   it("relation merging with merged symbol joins has correct size and count", async () => {
@@ -566,7 +642,10 @@ describe("RelationTest", () => {
       `INNER\\s+JOIN\\s+${canonicalQuoteTableName("authors")}\\s+\\Wauthors_categorizations\\W`,
       "i",
     );
-    expect(queries.some((sql) => aliasPattern.test(sql))).toBe(true);
+    assert(
+      queries.some((sql) => aliasPattern.test(sql)),
+      "Should be aliasing the child INNER JOINs in query",
+    );
   });
 
   it("relation with merged joins aliased works", async () => {

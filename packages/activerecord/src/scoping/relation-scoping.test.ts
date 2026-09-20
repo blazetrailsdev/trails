@@ -454,13 +454,13 @@ describe("RelationScopingTest", () => {
     const dev1 = (await Author.where({ organization_id: "agency_1" }).first()) as Base;
     const dev2 = (await Author.where({ organization_id: "agency_1" }).last()) as Base;
     await Author.where({ organization_id: "agency_1" }).scoping(async () => {
-      await (dev1 as any).delete();
+      const deleteSql = (await captureSql(() => (dev1 as any).delete()))[0];
+      expect(deleteSql).not.toMatch(/organization_id/);
     });
     await Author.where({ organization_id: "agency_1" }).scoping({ allQueries: true }, async () => {
-      await (dev2 as any).delete();
+      const deleteScopedSql = (await captureSql(() => (dev2 as any).delete()))[0];
+      expect(deleteScopedSql).toMatch(/organization_id/);
     });
-    expect(await Author.exists(dev1.id)).toBe(false);
-    expect(await Author.exists(dev2.id)).toBe(false);
   });
 
   it("scoping applies to reload with all queries", async () => {

@@ -614,6 +614,20 @@ describe("RelationTest", () => {
     registerModel(CanonCategorization);
   });
 
+  it("merging a string join keeps both the association join and the merged string", () => {
+    const joinString = `LEFT OUTER JOIN ${quoteTableName("ratings")} ON ${quoteTableName(
+      "comments",
+    )}.id = ${quoteTableName("ratings")}.comment_id`;
+    const specialCommentsWithRatings = CanonSpecialComment.joins(joinString);
+    const postsWithSpecialCommentsWithRatings = CanonPost.group("posts.id")
+      .joins(":specialComments")
+      .merge(specialCommentsWithRatings);
+    const sql = (authors("david") as any).posts.merge(postsWithSpecialCommentsWithRatings).toSql();
+
+    expect(sql).toContain(`INNER JOIN ${quoteTableName("comments")}`);
+    expect(sql).toContain(joinString);
+  });
+
   it("where with eager-loading limited collection relation subquery materializes distinct primary keys at load time", async () => {
     const subquery = CanonAuthor.eagerLoad(":posts").order({ id: "asc" }).limit(2);
 

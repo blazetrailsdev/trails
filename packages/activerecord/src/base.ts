@@ -170,6 +170,7 @@ import {
   type HashWithIndifferentAccess,
 } from "@blazetrails/activesupport";
 import {
+  respondTo as _respondTo,
   hasAttribute as _hasAttribute,
   _hasAttribute as _privateHasAttribute,
   attributePresent as _attributePresent,
@@ -2864,6 +2865,7 @@ include(Base, {
   cacheVersion: _cacheVersion,
   serializableHash: Serialization.serializableHash,
   readAttributeBeforeTypeCast: _readAttributeBeforeTypeCast,
+  respondTo: _respondTo,
   hasAttribute: _hasAttribute,
   attributePresent: _attributePresent,
   accessedFields: _accessedFields,

@@ -1,4 +1,5 @@
 import { CodeGenerator, include, Module, TimeWithZone, toFs } from "@blazetrails/activesupport";
+import { AttributeMethods as AMAttributeMethods } from "@blazetrails/activemodel";
 import { isEmpty, rbInspect as inspect } from "@blazetrails/ruby-compat";
 import {
   ArgumentError,
@@ -54,6 +55,26 @@ export interface InstanceMethodHost {
   /** @internal */
   _readAttribute(name: string, block?: (name: string) => unknown): unknown;
   _writeAttribute(name: string, value: unknown): void;
+}
+
+export function respondTo(
+  this: AttributeRecord & InstanceMethodHost,
+  name: string,
+  includePrivate: boolean = false,
+): boolean {
+  if (!AMAttributeMethods.InstanceMethods.respondTo.call(this as never, name, includePrivate))
+    return false;
+
+  if (this._attributes) {
+    const column = (
+      this.constructor as unknown as { symbolColumnToString(name: string): string | undefined }
+    ).symbolColumnToString(name);
+    if (column != null) {
+      return _hasAttribute.call(this, column);
+    }
+  }
+
+  return true;
 }
 
 export function hasAttribute(this: AttributeRecord, attrName: string): boolean {

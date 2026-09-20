@@ -423,16 +423,7 @@ interface DeleteRecord {
 }
 
 async function deleteRow<T extends DeleteRecord>(this: T): Promise<T> {
-  const ctor = this.constructor;
-  if (this.isPersisted()) {
-    const dm = new DeleteManager()
-      .from(ctor.arelTable)
-      .where(ctor._buildQueryConstraintsWhereNode(_queryConstraintsHash.call(this as any)));
-    const adapter =
-      connectionPool.call(ctor as unknown as typeof import("./base.js").Base).activeConnection ??
-      ctor.connection;
-    await adapter.delete(dm, "Delete");
-  }
+  if (this.isPersisted()) await _deleteRow.call(this as any);
   this._destroyed = true;
   this._previouslyNewRecord = false;
   this.freeze();
