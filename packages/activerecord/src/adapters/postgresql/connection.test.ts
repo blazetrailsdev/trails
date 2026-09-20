@@ -247,8 +247,10 @@ describeIfPg("PostgresqlConnectionTest", () => {
 
   it("release non existent advisory lock", async () => {
     const fakeLockId = 2940075057017742022n;
-    const result = await adapter.releaseAdvisoryLock(fakeLockId);
-    expect(result).toBe(false);
+    await withWarningSuppression(async () => {
+      const releasedNonExistentLock = await adapter.releaseAdvisoryLock(fakeLockId);
+      expect(releasedNonExistentLock).toBe(false);
+    });
   });
 
   it("non-default minMessages is applied to connection", async () => {
@@ -319,4 +321,11 @@ describeIfPg("PostgresqlConnectionTest", () => {
       await a.disconnectBang();
     }
   });
+
+  async function withWarningSuppression(block: () => Promise<void>): Promise<void> {
+    const logLevel = await adapter.clientMinMessages();
+    await adapter.setClientMinMessages("error");
+    await block();
+    await adapter.setClientMinMessages(logLevel);
+  }
 });

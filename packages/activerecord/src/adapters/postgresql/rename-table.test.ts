@@ -95,14 +95,13 @@ describeIfPg("PostgreSQLAdapter", () => {
     }
 
     async function numIndicesNamed(name: string): Promise<number> {
-      const rows = (
-        await adapter.execQuery(
-          `SELECT 1 FROM pg_index JOIN pg_class ON pg_index.indexrelid = pg_class.oid WHERE pg_class.relname = $1`,
-          "SQL",
-          [name],
-        )
-      ).toArray();
-      return rows.length;
+      return (
+        await adapter.execute(`
+          SELECT 1 FROM "pg_index"
+            JOIN "pg_class" ON "pg_index"."indexrelid" = "pg_class"."oid"
+            WHERE "pg_class"."relname" = '${name}'
+        `)
+      ).length;
     }
   });
 });
