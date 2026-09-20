@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { TimeWithZone } from "@blazetrails/activesupport";
+import { Duration, TimeWithZone } from "@blazetrails/activesupport";
 import { DateInfinity, DateNegativeInfinity } from "@blazetrails/activemodel";
 import {
   describeIfPg,
@@ -8,12 +8,18 @@ import {
   withPostgresqlDatetimeType,
   withNativeDatabaseTypeOverrides,
 } from "./test-helper.js";
-import { DateTime as OidDateTime } from "../../connection-adapters/postgresql/oid/date-time.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Topic } from "../../test-helpers/models/topic.js";
+import { Developer } from "../../test-helpers/models/developer.js";
 import { withTimezoneConfig } from "../../test-helper.js";
 import { Base } from "../../index.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
+
+function infinite(value: unknown): number | null {
+  if (value === Infinity) return 1;
+  if (value === -Infinity) return -1;
+  return null;
+}
 
 fixtures(["topics"], { useTransactionalTests: false });
 
@@ -290,29 +296,15 @@ describeIfPg("PostgreSQLAdapter", () => {
       for (const k of keys) expect(k).toBeInstanceOf(RubyTime);
     });
     it("load infinity and beyond", async () => {
-      class Dev extends Base {
-        static tableName = "ts_infinity_dev";
-      }
-      await adapter.execute(`DROP TABLE IF EXISTS ts_infinity_dev`);
-      await adapter.execute(
-        `CREATE TABLE ts_infinity_dev (id serial primary key, updated_at timestamp)`,
-      );
-      try {
-        await adapter.execute(
-          `INSERT INTO ts_infinity_dev (updated_at) VALUES ('infinity'::timestamp)`,
-        );
-        await adapter.execute(
-          `INSERT INTO ts_infinity_dev (updated_at) VALUES ('-infinity'::timestamp)`,
-        );
-        await Dev.loadSchema();
-        const records = await (Dev as any).all();
-        const timestamps = records.map((r: any) => r.updated_at);
-        expect(timestamps).toContain(DateInfinity);
-        expect(timestamps).toContain(DateNegativeInfinity);
-      } finally {
-        await adapter.execute(`DROP TABLE IF EXISTS ts_infinity_dev`);
-      }
+      let d = await Developer.findBySql("select 'infinity'::timestamp as legacy_updated_at");
+      expect(infinite(d[0].updated_at)).toBeTruthy();
+
+      d = await Developer.findBySql("select '-infinity'::timestamp as legacy_updated_at");
+      const time = d[0].updated_at;
+      expect(infinite(time)).toBeTruthy();
+      expect(time as unknown as number).toBeLessThan(0);
     });
+
     it("save infinity and beyond", async () => {
       class Dev extends Base {
         static tableName = "ts_infinity_dev";
@@ -342,37 +334,19 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
     it("bc timestamp", async () => {
-      const oidType = new OidDateTime();
-      const instant = oidType.castValue("0002-12-25 00:00:00 BC") as RubyTime;
-      expect(instant.year).toBe(-1);
-      const serialized = adapter.quotedDate(instant);
-      expect(serialized).toBe("0002-12-25 00:00:00 BC");
-      const rows = await adapter.execute(`SELECT '${serialized}'::timestamp AS val`);
-      const roundTripped = rows[0].val as Temporal.Instant;
-      expect(roundTripped).toBeInstanceOf(Temporal.Instant);
-      expect(roundTripped.epochMilliseconds).toBe(instant.toI() * 1000);
+      const date = RubyTime.utc(0, 1, 1).minus(Duration.weeks(1).toI()) as RubyTime;
+      await Developer.createBang({ name: "aaron", updated_at: date });
+      expect((await Developer.findBy({ name: "aaron" }))!.updated_at).toEqual(date);
     });
     it("bc timestamp leap year", async () => {
-      const oidType = new OidDateTime();
-      const instant = oidType.castValue("0005-02-29 00:00:00 BC") as RubyTime;
-      expect(instant.year).toBe(-4);
-      const serialized = adapter.quotedDate(instant);
-      expect(serialized).toBe("0005-02-29 00:00:00 BC");
-      const rows = await adapter.execute(`SELECT '${serialized}'::timestamp AS val`);
-      const roundTripped = rows[0].val as Temporal.Instant;
-      expect(roundTripped).toBeInstanceOf(Temporal.Instant);
-      expect(roundTripped.epochMilliseconds).toBe(instant.toI() * 1000);
+      const date = RubyTime.utc(-4, 2, 29);
+      await Developer.createBang({ name: "taihou", updated_at: date });
+      expect((await Developer.findBy({ name: "taihou" }))!.updated_at).toEqual(date);
     });
     it("bc timestamp year zero", async () => {
-      const oidType = new OidDateTime();
-      const instant = oidType.castValue("0001-04-07 00:00:00 BC") as RubyTime;
-      expect(instant.year).toBe(0);
-      const serialized = adapter.quotedDate(instant);
-      expect(serialized).toBe("0001-04-07 00:00:00 BC");
-      const rows = await adapter.execute(`SELECT '${serialized}'::timestamp AS val`);
-      const roundTripped = rows[0].val as Temporal.Instant;
-      expect(roundTripped).toBeInstanceOf(Temporal.Instant);
-      expect(roundTripped.epochMilliseconds).toBe(instant.toI() * 1000);
+      const date = RubyTime.utc(0, 4, 7);
+      await Developer.createBang({ name: "yahagi", updated_at: date });
+      expect((await Developer.findBy({ name: "yahagi" }))!.updated_at).toEqual(date);
     });
   });
 
@@ -414,8 +388,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         `SELECT data_type, udt_name FROM information_schema.columns
          WHERE table_name = 'postgresql_timestamp_with_zones' AND column_name = 'times'`,
       );
-      expect(rows[0]?.data_type).toBe("USER-DEFINED");
-      expect(rows[0]?.udt_name).toBe("custom_time_format");
+      expect(rows[0]).toEqual({ data_type: "USER-DEFINED", udt_name: "custom_time_format" });
     });
   });
 });

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
+import type { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
@@ -72,22 +73,24 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("bit string column", async () => {
       const cols = await adapter.columns("postgresql_bit_strings");
-      const col = cols.find((c) => c.name === "a_bit")!;
-      expect(col).toBeDefined();
-      expect(col.type).toBe("bit");
-      expect(col.sqlType).toBe("bit(8)");
-      expect((col as any).isArray()).toBe(false);
-      expect(col.type).not.toBe("binary");
+      const column = cols.find((c) => c.name === "a_bit") as unknown as PgColumn;
+      expect(column.type).toBe("bit");
+      expect(column.sqlType).toBe("bit(8)");
+      expect(column.isArray()).toBeFalsy();
+
+      const type = await adapter.lookupCastTypeFromColumn(column);
+      expect(type.isBinary()).toBeFalsy();
     });
 
     it("bit string varying column", async () => {
       const cols = await adapter.columns("postgresql_bit_strings");
-      const col = cols.find((c) => c.name === "a_bit_varying")!;
-      expect(col).toBeDefined();
-      expect(col.type).toBe("bit_varying");
-      expect(col.sqlType).toBe("bit varying(4)");
-      expect((col as any).isArray()).toBe(false);
-      expect(col.type).not.toBe("binary");
+      const column = cols.find((c) => c.name === "a_bit_varying") as unknown as PgColumn;
+      expect(column.type).toBe("bit_varying");
+      expect(column.sqlType).toBe("bit varying(4)");
+      expect(column.isArray()).toBeFalsy();
+
+      const type = await adapter.lookupCastTypeFromColumn(column);
+      expect(type.isBinary()).toBeFalsy();
     });
 
     it("assigning invalid hex string raises exception", async () => {

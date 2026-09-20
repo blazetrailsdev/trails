@@ -25,11 +25,11 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("prepared statements do not get stuck on query interruption", async () => {
       await expect(
         adapter.internalExecQuery("SELECT 1 / $1::int", "SQL", [0], { prepare: true }),
-      ).rejects.toThrow();
-      const rows = (
-        await adapter.internalExecQuery("SELECT 1 / $1::int", "SQL", [1], { prepare: true })
-      ).toArray();
-      expect(rows[0]).toBeDefined();
+      ).rejects.toThrow(/division by zero/);
+
+      await expect(
+        adapter.internalExecQuery("SELECT 1 / $1::int", "SQL", [0], { prepare: true }),
+      ).rejects.toThrow(/division by zero/);
     });
   });
 });

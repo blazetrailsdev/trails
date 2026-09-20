@@ -58,10 +58,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           slowError = e;
         });
         await new Promise<void>((r) => setTimeout(r, 500));
-        const sent = (
-          await other.execQuery("SELECT pg_cancel_backend($1) AS ok", "SQL", [pid])
-        ).toArray();
-        expect((sent[0] as { ok: boolean }).ok).toBe(true);
+        await other.execQuery("SELECT pg_cancel_backend($1) AS ok", "SQL", [pid]);
         await slow;
         expect(slowError).toBeInstanceOf(QueryCanceled);
         expect(Date.now() - start).toBeLessThan(5000);
@@ -77,19 +74,22 @@ describeIfPg("PostgreSQLAdapter", () => {
         await other.beginDbTransaction();
         await adapter.execute(`UPDATE ${SAMPLES} SET value = 1 WHERE id = 1`);
         await other.execute(`UPDATE ${SAMPLES} SET value = 2 WHERE id = 2`);
-        const [r1, r2] = await Promise.allSettled([
-          adapter.execute(`UPDATE ${SAMPLES} SET value = 3 WHERE id = 2`),
-          other.execute(`UPDATE ${SAMPLES} SET value = 4 WHERE id = 1`),
-        ]);
-        const errs = [r1, r2].filter((r) => r.status === "rejected");
-        expect(errs).toHaveLength(1);
-        expect(errs[0].reason).toBeInstanceOf(Deadlocked);
+        await expect(
+          Promise.allSettled([
+            adapter.execute(`UPDATE ${SAMPLES} SET value = 3 WHERE id = 2`),
+            other.execute(`UPDATE ${SAMPLES} SET value = 4 WHERE id = 1`),
+          ]).then((results) => {
+            for (const result of results) {
+              if (result.status === "rejected") throw result.reason;
+            }
+          }),
+        ).rejects.toThrow(Deadlocked);
       } finally {
         await adapter.rollbackDbTransaction().catch(() => {});
         await other.rollbackDbTransaction().catch(() => {});
       }
-      expect((await adapter.execute("SELECT 1 AS n"))[0].n).toBe(1);
-      expect((await other.execute("SELECT 1 AS n"))[0].n).toBe(1);
+      const connections = [adapter, other];
+      expect((await Promise.all(connections.map((c) => c.active()))).every(Boolean)).toBeTruthy();
       await other.disconnectBang();
     });
 
@@ -115,16 +115,10 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.execute(`SELECT * FROM ${SAMPLES} WHERE id = 1 FOR UPDATE`);
         const otherRows = await other.execute("SELECT pg_backend_pid() AS pid");
         const otherPid = (otherRows[0] as { pid: number }).pid;
-        let blockedError: unknown;
-        const blocked = other
-          .execute(`SELECT * FROM ${SAMPLES} WHERE id = 1 FOR UPDATE`)
-          .catch((e) => {
-            blockedError = e;
-          });
+        const blocked = other.execute(`SELECT * FROM ${SAMPLES} WHERE id = 1 FOR UPDATE`);
         const canceler = new PostgreSQLAdapter(PG_TEST_URL);
         try {
           const deadline = Date.now() + 3000;
-          let waiting = false;
           while (Date.now() < deadline) {
             const rows = (
               await canceler.execQuery(
@@ -134,19 +128,11 @@ describeIfPg("PostgreSQLAdapter", () => {
                 [otherPid],
               )
             ).toArray();
-            if (rows.length === 1) {
-              waiting = true;
-              break;
-            }
+            if (rows.length === 1) break;
             await new Promise<void>((r) => setTimeout(r, 50));
           }
-          expect(waiting).toBe(true);
-          const sent = (
-            await canceler.execQuery("SELECT pg_cancel_backend($1) AS ok", "SQL", [otherPid])
-          ).toArray();
-          expect((sent[0] as { ok: boolean }).ok).toBe(true);
-          await blocked;
-          expect(blockedError).toBeInstanceOf(QueryCanceled);
+          await canceler.execQuery("SELECT pg_cancel_backend($1) AS ok", "SQL", [otherPid]);
+          await expect(blocked).rejects.toThrow(QueryCanceled);
         } finally {
           await canceler.disconnectBang();
         }

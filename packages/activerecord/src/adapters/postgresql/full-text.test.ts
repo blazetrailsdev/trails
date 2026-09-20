@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
+import type { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
@@ -17,12 +18,13 @@ describeIfPg("PostgreSQLAdapter", () => {
   describe("PostgresqlFullTextTest", () => {
     it("tsvector column", async () => {
       const cols = await adapter.columns("tsvectors");
-      const col = cols.find((c) => c.name === "text_vector")!;
-      expect(col).toBeDefined();
-      expect(col.type).toBe("tsvector");
-      expect(col.sqlType).toBe("tsvector");
-      expect((col as any).isArray()).toBe(false);
-      expect(col.type).not.toBe("binary");
+      const column = cols.find((c) => c.name === "text_vector") as unknown as PgColumn;
+      expect(column.type).toBe("tsvector");
+      expect(column.sqlType).toBe("tsvector");
+      expect(column.isArray()).toBeFalsy();
+
+      const type = await adapter.lookupCastTypeFromColumn(column);
+      expect(type.isBinary()).toBeFalsy();
     });
 
     it("full text search", async () => {
@@ -49,6 +51,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         `UPDATE tsvectors SET text_vector = $$'new' 'text' 'vector'$$::tsvector`,
       );
       const updated = await adapter.execute(`SELECT text_vector FROM tsvectors`);
+      expect(updated).toBeTruthy();
       expect(String(updated[0].text_vector)).toBe("'new' 'text' 'vector'");
     });
   });

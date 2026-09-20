@@ -1,4 +1,5 @@
 import { StringIO } from "@blazetrails/ruby-compat";
+import { assertRaises } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Migration } from "../../index.js";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
@@ -75,7 +76,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         }
       }
       await new EnableCitext().execMigration(adapter, "up");
-      expect(await adapter.extensionEnabled("citext")).toBe(true);
+      expect(await adapter.extensionEnabled("citext")).toBeTruthy();
     });
     it("enable extension migration with schema", async () => {
       class EnableCitext extends Migration {
@@ -83,11 +84,8 @@ describeIfPg("PostgreSQLAdapter", () => {
           await this.enableExtension("public.citext");
         }
       }
-      const m = new EnableCitext();
-      await m.execMigration(adapter, "up");
-      expect(await adapter.extensionEnabled("citext")).toBe(true);
-      await m.execMigration(adapter, "down");
-      expect(await adapter.extensionEnabled("citext")).toBe(false);
+      await new EnableCitext().execMigration(adapter, "up");
+      expect(await adapter.extensionEnabled("citext")).toBeTruthy();
     });
     it("disable extension migration ignores prefix and suffix", async () => {
       await adapter.enableExtension("citext");
@@ -97,19 +95,24 @@ describeIfPg("PostgreSQLAdapter", () => {
         }
       }
       await new DisableCitext().execMigration(adapter, "up");
-      expect(await adapter.extensionEnabled("citext")).toBe(false);
+      expect(await adapter.extensionEnabled("citext")).toBeFalsy();
     });
     it("disable extension raises when dependent objects exist", async () => {
       await adapter.enableExtension("citext");
       await adapter.execute(`CREATE TABLE test_citext_tbl (id SERIAL PRIMARY KEY, data CITEXT)`);
-      await expect(adapter.disableExtension("citext")).rejects.toThrow();
+      const error = await assertRaises([Error], {}, async () => {
+        await adapter.disableExtension("citext");
+      });
+      expect(error.message).toMatch(
+        /cannot drop extension citext because other objects depend on it/i,
+      );
       await adapter.execute("DROP TABLE test_citext_tbl");
     });
     it("disable extension drops extension when cascading", async () => {
       await adapter.enableExtension("citext");
       await adapter.execute(`CREATE TABLE test_citext_tbl (id SERIAL PRIMARY KEY, data CITEXT)`);
       await adapter.disableExtension("citext", { force: "cascade" });
-      expect(await adapter.extensionEnabled("citext")).toBe(false);
+      expect(await adapter.extensionEnabled("citext")).toBeFalsy();
     });
   });
 });

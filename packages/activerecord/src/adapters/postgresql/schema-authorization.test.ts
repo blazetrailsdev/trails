@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { StatementInvalid } from "../../errors.js";
+import { assertNothingRaised } from "@blazetrails/activesupport";
 import { fixtures } from "../../test-fixtures.js";
 import { Base } from "../../index.js";
 
@@ -56,39 +57,43 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("schema invisible", async () => {
       await adapter.sessionAuth("default");
-      await expect(adapter.execute(`SELECT * FROM ${TABLE_NAME}`)).rejects.toBeInstanceOf(
+      await expect(adapter.execute(`SELECT * FROM ${TABLE_NAME}`)).rejects.toThrow(
         StatementInvalid,
       );
     });
 
     it("session auth=", async () => {
       await adapter.sessionAuth("DEFAULT");
-      await expect(adapter.execute(`SELECT * FROM ${TABLE_NAME}`)).rejects.toBeInstanceOf(
+      await expect(adapter.execute(`SELECT * FROM ${TABLE_NAME}`)).rejects.toThrow(
         StatementInvalid,
       );
     });
 
     it("setting auth clears stmt cache", async () => {
-      await adapter.sessionAuth("default");
-      for (const u of USERS) {
-        await adapter.sessionAuth(u);
-        const value = await adapter.selectValue(`SELECT name FROM ${TABLE_NAME} WHERE id = 1`);
-        expect(value).toBe(u);
+      await assertNothingRaised(async () => {
         await adapter.sessionAuth("default");
-      }
+        for (const u of USERS) {
+          await adapter.sessionAuth(u);
+          const value = await adapter.selectValue(`SELECT name FROM ${TABLE_NAME} WHERE id = 1`);
+          expect(value).toBe(u);
+          await adapter.sessionAuth("default");
+        }
+      });
     });
 
     it("auth with bind", async () => {
-      await adapter.sessionAuth("default");
-      for (const u of USERS) {
-        await adapter.clearCacheBang();
-        await adapter.sessionAuth(u);
-        const result = (
-          await adapter.execQuery(`SELECT name FROM ${TABLE_NAME} WHERE id = $1`, "SQL", [1])
-        ).toArray();
-        expect(result[0]?.name).toBe(u);
+      await assertNothingRaised(async () => {
         await adapter.sessionAuth("default");
-      }
+        for (const u of USERS) {
+          await adapter.clearCacheBang();
+          await adapter.sessionAuth(u);
+          const result = (
+            await adapter.execQuery(`SELECT name FROM ${TABLE_NAME} WHERE id = $1`, "SQL", [1])
+          ).toArray();
+          expect(result[0]?.name).toBe(u);
+          await adapter.sessionAuth("default");
+        }
+      });
     });
 
     it("sequence schema caching", async () => {
@@ -96,15 +101,16 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.sessionAuth(USERS[0]);
       await SchemaThing.loadSchema();
       await adapter.sessionAuth("default");
-      for (const u of USERS) {
-        await adapter.sessionAuth(u);
-        const st1 = await (SchemaThing as any).create({ name: "TEST1" });
-        expect(st1.id).toBeDefined();
-        const st2 = new (SchemaThing as any)({ id: 5, name: "TEST2" });
-        await st2.save();
-        expect(st2.id).toBe(5);
-        await adapter.sessionAuth("default");
-      }
+      await assertNothingRaised(async () => {
+        for (const u of USERS) {
+          await adapter.sessionAuth(u);
+          let st = new (SchemaThing as any)({ name: "TEST1" });
+          await st.saveBang();
+          st = new (SchemaThing as any)({ id: 5, name: "TEST2" });
+          await st.saveBang();
+          await adapter.sessionAuth("default");
+        }
+      });
     });
 
     it("tables in current schemas", async () => {

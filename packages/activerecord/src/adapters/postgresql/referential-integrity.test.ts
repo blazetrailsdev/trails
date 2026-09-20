@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { assertRaises, isBlank } from "@blazetrails/activesupport";
 import { InvalidForeignKey, StatementInvalid } from "../../errors.js";
 
 const isReferentialIntegritySql = (sql: unknown): boolean =>
@@ -60,11 +61,12 @@ describeIfPg("PostgreSQLAdapter", () => {
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       try {
         await withDummyTable(adapter, async () => {
-          await expect(
-            adapter.disableReferentialIntegrity(async () => {
+          const e = await assertRaises([InvalidForeignKey], {}, async () => {
+            await adapter.disableReferentialIntegrity(async () => {
               throw new InvalidForeignKey("Should be re-raised", { sql: "", binds: [] });
-            }),
-          ).rejects.toThrow("Should be re-raised");
+            });
+          });
+          expect(e.message).toBe("Should be re-raised");
         });
         const warning = warnSpy.mock.calls.map((c) => String(c[0])).join("\n");
         expect(warning).toMatch(/WARNING: Rails was not able to disable referential integrity/);
@@ -79,13 +81,15 @@ describeIfPg("PostgreSQLAdapter", () => {
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       try {
         await withDummyTable(adapter, async () => {
-          await expect(
-            adapter.disableReferentialIntegrity(async () => {
+          const e = await assertRaises([StatementInvalid], {}, async () => {
+            await adapter.disableReferentialIntegrity(async () => {
               throw new StatementInvalid("Should be re-raised", { sql: "", binds: [] });
-            }),
-          ).rejects.toThrow("Should be re-raised");
+            });
+          });
+          expect(e.message).toBe("Should be re-raised");
         });
-        expect(warnSpy).not.toHaveBeenCalled();
+        const warning = warnSpy.mock.calls.map((c) => String(c[0])).join("\n");
+        expect(isBlank(warning)).toBeTruthy();
       } finally {
         warnSpy.mockRestore();
       }
@@ -151,7 +155,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         `);
         expect(Number(rows[0].count)).toBe(1);
 
-        await expect(adapter.checkAllForeignKeysValidBang()).resolves.toBeUndefined();
+        await adapter.checkAllForeignKeysValidBang();
       } finally {
         await adapter.execute(`DROP SCHEMA IF EXISTS referential_integrity_test_schema CASCADE`);
       }
@@ -207,7 +211,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
         await adapter.beginTransaction({ _lazy: false });
         try {
-          await expect(adapter.checkAllForeignKeysValidBang()).resolves.toBeUndefined();
+          await adapter.checkAllForeignKeysValidBang();
 
           const result = await adapter.execute("SELECT 1 AS n");
           expect(result[0].n).toBe(1);

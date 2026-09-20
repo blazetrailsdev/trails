@@ -39,30 +39,30 @@ describeIfPg("PostgreSQLAdapter", () => {
       const column = PostgresqlNetworkAddress.columnsHash()["cidr_address"] as unknown as PgColumn;
       expect(column.type).toBe("cidr");
       expect(column.sqlType).toBe("cidr");
-      expect(column.array).toBeFalsy();
+      expect(column.isArray()).toBeFalsy();
 
       const type = PostgresqlNetworkAddress.typeForAttribute("cidr_address")!;
-      expect(type.isBinary()).toBe(false);
+      expect(type.isBinary()).toBeFalsy();
     });
 
     it("inet column", async () => {
       const column = PostgresqlNetworkAddress.columnsHash()["inet_address"] as unknown as PgColumn;
       expect(column.type).toBe("inet");
       expect(column.sqlType).toBe("inet");
-      expect(column.array).toBeFalsy();
+      expect(column.isArray()).toBeFalsy();
 
       const type = PostgresqlNetworkAddress.typeForAttribute("inet_address")!;
-      expect(type.isBinary()).toBe(false);
+      expect(type.isBinary()).toBeFalsy();
     });
 
     it("macaddr column", async () => {
       const column = PostgresqlNetworkAddress.columnsHash()["mac_address"] as unknown as PgColumn;
       expect(column.type).toBe("macaddr");
       expect(column.sqlType).toBe("macaddr");
-      expect(column.array).toBeFalsy();
+      expect(column.isArray()).toBeFalsy();
 
       const type = PostgresqlNetworkAddress.typeForAttribute("mac_address")!;
-      expect(type.isBinary()).toBe(false);
+      expect(type.isBinary()).toBeFalsy();
     });
 
     it("network types", async () => {
@@ -97,7 +97,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(invalidAddress.inet_address).toBeNull();
       expect(invalidAddress.cidr_addressBeforeTypeCast).toBe("invalid addr");
       expect(invalidAddress.inet_addressBeforeTypeCast).toBe("invalid addr");
-      expect(await invalidAddress.save()).toBe(true);
+      expect(await invalidAddress.save()).toBeTruthy();
 
       await invalidAddress.reload();
       expect(invalidAddress.cidr_address).toBeNull();
@@ -122,13 +122,13 @@ describeIfPg("PostgreSQLAdapter", () => {
         cidr_address: "192.168.1.0/24",
       })) as any;
       model.cidr_address = "192.168.1.0/24";
-      expect(model.isChanged).toBe(false);
+      expect(model.isChanged).toBeFalsy();
 
       model.cidr_address = "192.168.2.0/24";
-      expect(model.isChanged).toBe(true);
+      expect(model.isChanged).toBeTruthy();
 
       model.cidr_address = "192.168.1.0/25";
-      expect(model.isChanged).toBe(true);
+      expect(model.isChanged).toBeTruthy();
     });
 
     it("mac address change case does not mark dirty", async () => {
@@ -138,7 +138,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       model.mac_address = (model.mac_address as string).replace(/[a-zA-Z]/g, (c: string) =>
         c === c.toUpperCase() ? c.toLowerCase() : c.toUpperCase(),
       );
-      expect(model.isChanged).toBe(false);
+      expect(model.isChanged).toBeFalsy();
     });
   });
 });

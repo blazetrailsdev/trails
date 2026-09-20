@@ -30,7 +30,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await Base.whilePreventingWrites(async () => {
           await expect(
             connection.execute("INSERT INTO ex (data) VALUES ('138853948594')"),
-          ).rejects.toBeInstanceOf(ReadOnlyError);
+          ).rejects.toThrow(ReadOnlyError);
         });
       });
     });
@@ -42,7 +42,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await Base.whilePreventingWrites(async () => {
           await expect(
             connection.execute("UPDATE ex SET data = '9989' WHERE data = '138853948594'"),
-          ).rejects.toBeInstanceOf(ReadOnlyError);
+          ).rejects.toThrow(ReadOnlyError);
         });
       });
     });
@@ -54,7 +54,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await Base.whilePreventingWrites(async () => {
           await expect(
             connection.execute("DELETE FROM ex where data = '138853948594'"),
-          ).rejects.toBeInstanceOf(ReadOnlyError);
+          ).rejects.toThrow(ReadOnlyError);
         });
       });
     });
@@ -65,7 +65,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
         await Base.whilePreventingWrites(async () => {
           const rows = await connection.execute("SELECT * FROM ex WHERE data = '138853948594'");
-          expect(rows).toHaveLength(1);
+          expect((rows as unknown[]).length).toBe(1);
         });
       });
     });
@@ -73,7 +73,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("doesnt error when a show query is called while preventing writes", async () => {
       await Base.whilePreventingWrites(async () => {
         const rows = await connection.execute("SHOW TIME ZONE");
-        expect(rows).toHaveLength(1);
+        expect((rows as unknown[]).length).toBe(1);
       });
     });
 
@@ -91,7 +91,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           const rows = await connection.execute(
             "/*action:index*/(\n( SELECT * FROM ex WHERE data = '138853948594' ) )",
           );
-          expect(rows).toHaveLength(1);
+          expect((rows as unknown[]).length).toBe(1);
         });
       });
     });

@@ -66,6 +66,18 @@ describeIfPg("PostgreSQLAdapter", () => {
       column = PgArray.columnsHash()["tags"];
       type = PgArray.typeForAttribute("tags");
     });
+    async function assertCycle(field: string, array: unknown): Promise<void> {
+      let x = await (PgArray as any).createBang({ [field]: array });
+      await x.reload();
+      expect(x[field]).toEqual(array);
+
+      x = await (PgArray as any).createBang({ [field]: [] });
+      x[field] = array;
+      await x.saveBang();
+      await x.reload();
+      expect(x[field]).toEqual(array);
+    }
+
     it("column", async () => {
       expect(column.type).toBe("string");
       expect(column.sqlType).toBe("character varying(255)");
@@ -285,103 +297,57 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("multi dimensional with strings", async () => {
-      await adapter.execute(`INSERT INTO pg_arrays (tags) VALUES ('{{"1","2"},{"2","3"}}')`);
-      const rows = await adapter.execute(`SELECT tags FROM pg_arrays`);
-      expect(rows[0].tags).toEqual([
-        ["1", "2"],
-        ["2", "3"],
+      await assertCycle("tags", [
+        [["1"], ["2"]],
+        [["2"], ["3"]],
       ]);
     });
 
     it("with empty strings", async () => {
-      await adapter.execute(`INSERT INTO pg_arrays (tags) VALUES ('{"1","2","","4","","5"}')`);
-      const rows = await adapter.execute(`SELECT tags FROM pg_arrays`);
-      expect(rows[0].tags).toEqual(["1", "2", "", "4", "", "5"]);
+      await assertCycle("tags", ["1", "2", "", "4", "", "5"]);
     });
 
     it("with multi dimensional empty strings", async () => {
-      class PgArrays extends Base {
-        static tableName = "pg_arrays";
-        static {
-          this.attribute("id", "integer");
-        }
-      }
-      await PgArrays.loadSchema();
-      const arr = [
+      await assertCycle("tags", [
         [
           ["1", "2"],
           ["", "4"],
           ["", "5"],
         ],
-      ];
-      const r = await (PgArrays as any).create({ tags: arr });
-      await r.reload();
-      expect(r.tags).toEqual(arr);
+      ]);
     });
 
     it("with arbitrary whitespace", async () => {
-      class PgArrays extends Base {
-        static tableName = "pg_arrays";
-        static {
-          this.attribute("id", "integer");
-        }
-      }
-      await PgArrays.loadSchema();
-      const arr = [
+      await assertCycle("tags", [
         [
           ["1", "2"],
           ["    ", "4"],
           ["    ", "5"],
         ],
-      ];
-      const r = await (PgArrays as any).create({ tags: arr });
-      await r.reload();
-      expect(r.tags).toEqual(arr);
+      ]);
     });
 
     it("multi dimensional with integers", async () => {
-      await adapter.execute(`INSERT INTO pg_arrays (ratings) VALUES ('{{1,7},{8,10}}')`);
-      const rows = await adapter.execute(`SELECT ratings FROM pg_arrays`);
-      expect(rows[0].ratings).toEqual([
-        [1, 7],
-        [8, 10],
+      await assertCycle("ratings", [
+        [[1], [7]],
+        [[8], [10]],
       ]);
     });
 
     it("strings with quotes", async () => {
-      const tags = ["this has", 'some "s that need to be escaped"'];
-      await adapter.execQuery(`INSERT INTO pg_arrays (tags) VALUES ($1)`, "SQL", [
-        textArray.serialize(tags),
-      ]);
-      const rows = await adapter.execute(`SELECT tags FROM pg_arrays`);
-      expect(rows[0].tags).toEqual(tags);
+      await assertCycle("tags", ["this has", 'some "s that need to be escaped"']);
     });
 
     it("strings with commas", async () => {
-      const tags = ["this,has", "many,values"];
-      await adapter.execQuery(`INSERT INTO pg_arrays (tags) VALUES ($1)`, "SQL", [
-        textArray.serialize(tags),
-      ]);
-      const rows = await adapter.execute(`SELECT tags FROM pg_arrays`);
-      expect(rows[0].tags).toEqual(tags);
+      await assertCycle("tags", ["this,has", "many,values"]);
     });
 
     it("strings with array delimiters", async () => {
-      const tags = ["{", "}"];
-      await adapter.execQuery(`INSERT INTO pg_arrays (tags) VALUES ($1)`, "SQL", [
-        textArray.serialize(tags),
-      ]);
-      const rows = await adapter.execute(`SELECT tags FROM pg_arrays`);
-      expect(rows[0].tags).toEqual(tags);
+      await assertCycle("tags", ["{", "}"]);
     });
 
     it("strings with null strings", async () => {
-      const tags = ["NULL", "NULL"];
-      await adapter.execQuery(`INSERT INTO pg_arrays (tags) VALUES ($1)`, "SQL", [
-        textArray.serialize(tags),
-      ]);
-      const rows = await adapter.execute(`SELECT tags FROM pg_arrays`);
-      expect(rows[0].tags).toEqual(tags);
+      await assertCycle("tags", ["NULL", "NULL"]);
     });
 
     it("insert fixture", async () => {

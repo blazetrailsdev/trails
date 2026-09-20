@@ -26,6 +26,11 @@ describeIfPg("PostgreSQLAdapter", () => {
         stub: adapter,
       });
       expect(sqls[0]).toBe(`CREATE DATABASE "aimonetti" ENCODING = 'latin1'`);
+
+      sqls = await captureSql(() => adapter.createDatabase("aimonetti", { encoding: "latin1" }), {
+        stub: adapter,
+      });
+      expect(sqls[0]).toBe(`CREATE DATABASE "aimonetti" ENCODING = 'latin1'`);
     });
 
     it("create database with collation and ctype", async () => {
@@ -82,6 +87,16 @@ describeIfPg("PostgreSQLAdapter", () => {
         ),
       ).toBe(
         `CREATE INDEX CONCURRENTLY IF NOT EXISTS "index_people_on_last_name" ON "people" ("last_name")`,
+      );
+
+      expect(
+        await sql(() =>
+          adapter.addIndex("people", ["last_name", "first_name"], {
+            order: { last_name: "desc", first_name: "asc" },
+          }),
+        ),
+      ).toBe(
+        `CREATE INDEX "index_people_on_last_name_and_first_name" ON "people" ("last_name" DESC, "first_name" ASC)`,
       );
 
       expect(

@@ -1,83 +1,53 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { Temporal } from "@blazetrails/date";
-import { DateInfinity, DateNegativeInfinity } from "@blazetrails/activemodel";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
-import { Date as OidDate } from "../../connection-adapters/postgresql/oid/date.js";
+import { describe, it, expect } from "vitest";
+import { Temporal, Time } from "@blazetrails/date";
+import { describeIfPg } from "./test-helper.js";
+import { fixtures } from "../../test-fixtures.js";
+import { Topic } from "../../test-helpers/models/topic.js";
+
+function infinite(value: unknown): number | null {
+  if (value === Infinity) return 1;
+  if (value === -Infinity) return -1;
+  return null;
+}
 
 describeIfPg("PostgreSQLAdapter", () => {
-  let adapter: PostgreSQLAdapter;
-  beforeEach(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
-  });
-  afterEach(async () => {
-    await adapter.disconnectBang();
-  });
+  fixtures([]);
 
   describe("PostgresqlDateTest", () => {
     it("load infinity and beyond", async () => {
-      const pos = await adapter.execute("SELECT 'infinity'::date AS val");
-      expect(pos[0].val).toBe(DateInfinity);
-      const neg = await adapter.execute("SELECT '-infinity'::date AS val");
-      expect(neg[0].val).toBe(DateNegativeInfinity);
+      let topic = (await Topic.findBySql("SELECT 'infinity'::date AS last_read"))[0];
+      expect(infinite(topic.last_read)).toBeTruthy();
+      expect(topic.last_read as unknown as number).toBeGreaterThan(0);
+
+      topic = (await Topic.findBySql("SELECT '-infinity'::date AS last_read"))[0];
+      expect(infinite(topic.last_read)).toBeTruthy();
+      expect(topic.last_read as unknown as number).toBeLessThan(0);
     });
 
     it("save infinity and beyond", async () => {
-      const oidDate = new OidDate();
-      await adapter.execute("DROP TABLE IF EXISTS pg_dates_inf");
-      await adapter.execute("CREATE TABLE pg_dates_inf (id serial primary key, last_read date)");
-      try {
-        const posStr = oidDate.serialize(DateInfinity)!;
-        const negStr = oidDate.serialize(DateNegativeInfinity)!;
-        await adapter.execute(`INSERT INTO pg_dates_inf (last_read) VALUES ('${posStr}'::date)`);
-        await adapter.execute(`INSERT INTO pg_dates_inf (last_read) VALUES ('${negStr}'::date)`);
-        const rows = await adapter.execute("SELECT last_read FROM pg_dates_inf ORDER BY id");
-        expect(rows[0].last_read).toBe(DateInfinity);
-        expect(rows[1].last_read).toBe(DateNegativeInfinity);
-      } finally {
-        await adapter.execute("DROP TABLE IF EXISTS pg_dates_inf");
-      }
+      let topic = await Topic.createBang({ last_read: 1.0 / 0.0 });
+      expect(topic.last_read).toEqual(1.0 / 0.0);
+
+      topic = await Topic.createBang({ last_read: -1.0 / 0.0 });
+      expect(topic.last_read).toEqual(-1.0 / 0.0);
     });
 
     it("bc date", async () => {
-      const oidDate = new OidDate();
-      const date = oidDate.castValue("0002-12-25 BC") as Temporal.PlainDate;
-      expect(date.year).toBe(-1);
-      expect(date.month).toBe(12);
-      expect(date.day).toBe(25);
-      const rows = await adapter.execute("SELECT '0002-12-25 BC'::date AS val");
-      const roundTripped = rows[0].val as Temporal.PlainDate;
-      expect(roundTripped).toBeInstanceOf(Temporal.PlainDate);
-      expect(roundTripped.year).toBe(-1);
-      expect(roundTripped.month).toBe(12);
-      expect(roundTripped.day).toBe(25);
+      const date = new Temporal.PlainDate(0, 1, 1).subtract({ weeks: 1 });
+      const topic = await Topic.createBang({ last_read: date });
+      expect((await Topic.find(topic.id)).last_read).toEqual(date);
     });
 
     it("bc date leap year", async () => {
-      const oidDate = new OidDate();
-      const date = oidDate.castValue("0005-02-29 BC") as Temporal.PlainDate;
-      expect(date.year).toBe(-4);
-      expect(date.month).toBe(2);
-      expect(date.day).toBe(29);
-      const rows = await adapter.execute("SELECT '0005-02-29 BC'::date AS val");
-      const roundTripped = rows[0].val as Temporal.PlainDate;
-      expect(roundTripped).toBeInstanceOf(Temporal.PlainDate);
-      expect(roundTripped.year).toBe(-4);
-      expect(roundTripped.month).toBe(2);
-      expect(roundTripped.day).toBe(29);
+      const date = Time.utc(-4, 2, 29).toDate();
+      const topic = await Topic.createBang({ last_read: date });
+      expect((await Topic.find(topic.id)).last_read).toEqual(date);
     });
 
     it("bc date year zero", async () => {
-      const oidDate = new OidDate();
-      const date = oidDate.castValue("0001-04-07 BC") as Temporal.PlainDate;
-      expect(date.year).toBe(0);
-      expect(date.month).toBe(4);
-      expect(date.day).toBe(7);
-      const rows = await adapter.execute("SELECT '0001-04-07 BC'::date AS val");
-      const roundTripped = rows[0].val as Temporal.PlainDate;
-      expect(roundTripped).toBeInstanceOf(Temporal.PlainDate);
-      expect(roundTripped.year).toBe(0);
-      expect(roundTripped.month).toBe(4);
-      expect(roundTripped.day).toBe(7);
+      const date = Time.utc(0, 4, 7).toDate();
+      const topic = await Topic.createBang({ last_read: date });
+      expect((await Topic.find(topic.id)).last_read).toEqual(date);
     });
   });
 });

@@ -68,17 +68,15 @@ describeIfPg("PostgreSQLAdapter", () => {
         `INSERT INTO postgresql_times (id, time_interval, scaled_time_interval) VALUES (1, '1 year 2 days ago', '3 weeks ago')`,
       );
       const first = await (M as any).find(1);
-      expect((M as any).columnForAttribute("time_interval").type).toBe("interval");
-      expect((M as any).columnForAttribute("scaled_time_interval").type).toBe("interval");
-      expect(first).toBeDefined();
+      expect(first.columnForAttribute("time_interval").type).toBe("interval");
+      expect(first.columnForAttribute("scaled_time_interval").type).toBe("interval");
     });
 
     it("data type of oid types", async () => {
       const M = await setupOidsTable();
       await adapter.execute(`INSERT INTO postgresql_oids (id, obj_id) VALUES (1, 1234)`);
       const first = await (M as any).find(1);
-      expect((M as any).columnForAttribute("obj_id").type).toBe("oid");
-      expect(first).toBeDefined();
+      expect(first.columnForAttribute("obj_id").type).toBe("oid");
     });
 
     it("time values", async () => {
@@ -102,7 +100,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const seventyYearsSeconds = Duration.years(70).inSeconds();
       first.scaled_time_interval = seventyYearsSeconds;
       expect(await first.save()).toBeTruthy();
-      await first.reload();
+      expect(await first.reload()).toBeTruthy();
       expect(first.scaled_time_interval.eql(Duration.years(70))).toBe(true);
     });
 
@@ -120,7 +118,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const newValue = 2147483648;
       first.obj_id = newValue;
       expect(await first.save()).toBeTruthy();
-      await first.reload();
+      expect(await first.reload()).toBeTruthy();
       expect(first.obj_id).toBe(newValue);
     });
 
@@ -134,17 +132,15 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("name column type", async () => {
       await adapter.execute(`CREATE TABLE ex (data name)`);
       const cols = await adapter.columns("ex");
-      const col = cols.find((c) => c.name === "data");
-      expect(col).toBeDefined();
-      expect(col!.type).toBe("string");
+      const column = cols.find((c) => c.name === "data")!;
+      expect(column.type).toBe("string");
     });
 
     it("char column type", async () => {
       await adapter.execute(`CREATE TABLE ex (data "char")`);
       const cols = await adapter.columns("ex");
-      const col = cols.find((c) => c.name === "data");
-      expect(col).toBeDefined();
-      expect(col!.type).toBe("string");
+      const column = cols.find((c) => c.name === "data")!;
+      expect(column.type).toBe("string");
     });
   });
 });

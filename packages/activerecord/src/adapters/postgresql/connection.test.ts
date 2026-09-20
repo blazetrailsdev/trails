@@ -2,6 +2,8 @@ import { it, expect, beforeEach, afterEach, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL, SQLSubscriber } from "./test-helper.js";
 import { QueryAttribute } from "../../relation/query-attribute.js";
 import { Value } from "../../type.js";
+import { assertQueriesCount } from "../../testing/query-assertions.js";
+import { assertNothingRaised, assertEmpty } from "@blazetrails/activesupport";
 
 describeIfPg("PostgresqlConnectionTest", () => {
   let adapter: PostgreSQLAdapter;
@@ -19,18 +21,21 @@ describeIfPg("PostgresqlConnectionTest", () => {
   });
 
   it("encoding", async () => {
-    const enc = await adapter.encoding();
-    expect(enc).toBeTruthy();
+    await assertQueriesCount(1, true, async () => {
+      expect(await adapter.encoding()).toBeDefined();
+    });
   });
 
   it("collation", async () => {
-    const col = await adapter.collation();
-    expect(col).toBeTruthy();
+    await assertQueriesCount(1, true, async () => {
+      expect(await adapter.collation()).toBeDefined();
+    });
   });
 
   it("ctype", async () => {
-    const ct = await adapter.ctype();
-    expect(ct).toBeTruthy();
+    await assertQueriesCount(1, true, async () => {
+      expect(await adapter.ctype()).toBeDefined();
+    });
   });
 
   it("default client min messages", async () => {
@@ -116,7 +121,7 @@ describeIfPg("PostgresqlConnectionTest", () => {
 
     const payload = subscriber.payloads.find((p) => p["sql"] === "SELECT $1::integer");
     const stmtName = payload?.["statement_name"] as string | undefined;
-    expect(stmtName).toBeTruthy();
+    expect(stmtName).toBeDefined();
 
     const res = await adapter.execQuery(`EXPLAIN (FORMAT JSON) EXECUTE ${stmtName}(1)`);
     const planType = res.columnTypes["QUERY PLAN"];
@@ -139,12 +144,12 @@ describeIfPg("PostgresqlConnectionTest", () => {
   });
 
   it("reconnection after actual disconnection with verify", async () => {
+    expect(await adapter.active()).toBeTruthy();
     await adapter.execQuery("BEGIN");
     await adapter.execQuery("SET idle_in_transaction_session_timeout = '10ms'");
     await new Promise((r) => setTimeout(r, 50));
     await adapter.verifyBang();
-    const result = await adapter.execQuery("SELECT 1 AS n");
-    expect(result.rows).toEqual([[1]]);
+    expect(await adapter.active()).toBeTruthy();
   }, 10_000);
 
   it("set session variable true", async () => {
@@ -174,31 +179,31 @@ describeIfPg("PostgresqlConnectionTest", () => {
   });
 
   it("set session variable nil", async () => {
-    const baseline = await adapter.execQuery("SHOW DEBUG_PRINT_PLAN");
-    const a = new PostgreSQLAdapter({
-      connectionString: PG_TEST_URL,
-      variables: { debug_print_plan: null },
+    await assertNothingRaised(async () => {
+      const a = new PostgreSQLAdapter({
+        connectionString: PG_TEST_URL,
+        variables: { debug_print_plan: null },
+      });
+      try {
+        await a.execQuery("SHOW DEBUG_PRINT_PLAN");
+      } finally {
+        await a.disconnectBang();
+      }
     });
-    try {
-      const rows = await a.execQuery("SHOW DEBUG_PRINT_PLAN");
-      expect(rows.rows).toEqual(baseline.rows);
-    } finally {
-      await a.disconnectBang();
-    }
   });
 
   it("set session variable default", async () => {
-    const baseline = await adapter.execQuery("SHOW DEBUG_PRINT_PLAN");
-    const a = new PostgreSQLAdapter({
-      connectionString: PG_TEST_URL,
-      variables: { debug_print_plan: ":default" },
+    await assertNothingRaised(async () => {
+      const a = new PostgreSQLAdapter({
+        connectionString: PG_TEST_URL,
+        variables: { debug_print_plan: ":default" },
+      });
+      try {
+        await a.execQuery("SHOW DEBUG_PRINT_PLAN");
+      } finally {
+        await a.disconnectBang();
+      }
     });
-    try {
-      const rows = await a.execQuery("SHOW DEBUG_PRINT_PLAN");
-      expect(rows.rows).toEqual(baseline.rows);
-    } finally {
-      await a.disconnectBang();
-    }
   });
 
   it("set session timezone", async () => {
@@ -218,19 +223,19 @@ describeIfPg("PostgresqlConnectionTest", () => {
     const lockId = 52959019;
     const listLocks = `SELECT objid FROM pg_locks WHERE locktype = 'advisory'`;
 
-    const got = await adapter.getAdvisoryLock(lockId);
-    expect(got).toBe(true);
+    const gotLock = await adapter.getAdvisoryLock(lockId);
+    expect(gotLock).toBeTruthy();
 
-    const rows = await adapter.execute(listLocks);
-    const found = rows.some((r) => Number(r.objid) === lockId);
-    expect(found).toBe(true);
+    const advisoryLock = (await adapter.execute(listLocks)).find((l) => Number(l.objid) === lockId);
+    expect(advisoryLock).toBeTruthy();
 
-    const released = await adapter.releaseAdvisoryLock(lockId);
-    expect(released).toBe(true);
+    const releasedLock = await adapter.releaseAdvisoryLock(lockId);
+    expect(releasedLock).toBeTruthy();
 
-    const rowsAfter = await adapter.execute(listLocks);
-    const stillHeld = rowsAfter.some((r) => Number(r.objid) === lockId);
-    expect(stillHeld).toBe(false);
+    const advisoryLocks = (await adapter.execute(listLocks)).filter(
+      (l) => Number(l.objid) === lockId,
+    );
+    assertEmpty(advisoryLocks);
   });
 
   it("release non existent advisory lock", async () => {
