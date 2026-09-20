@@ -1,9 +1,66 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Migration } from "../../index.js";
+import type { TableDefinitionOf } from "../../connection-adapters/abstract/schema-definitions.js";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
+
+  class SilentMigration extends Migration<PostgreSQLAdapter> {
+    override write(..._args: unknown[]): void {}
+  }
+
+  class ExpressionIndexMigration extends SilentMigration {
+    async change() {
+      await this.createTable("settings", (t) => {
+        t.column("data", "jsonb");
+      });
+
+      await this.addIndex("settings", "(data->'foo')", {
+        using: "gin",
+        name: "index_settings_data_foo",
+      });
+    }
+  }
+
+  class CreateEnumMigration extends SilentMigration {
+    async change() {
+      await this.createEnum("color", ["blue", "green"]);
+      await this.createTable("enums", (t) => {
+        t.enum("best_color", { enumType: "color", default: "blue", null: false });
+      });
+    }
+  }
+
+  class DropEnumMigration extends SilentMigration {
+    async change() {
+      await this.dropEnum("color", ["blue", "green"], { ifExists: true });
+    }
+  }
+
+  class RenameEnumValueMigration extends SilentMigration {
+    async change() {
+      await this.renameEnumValue("color", { from: "blue", to: "red" });
+    }
+  }
+
+  class AddAndValidateCheckConstraint extends SilentMigration {
+    async change() {
+      await this.addCheckConstraint("settings", "value >= 0", {
+        name: "positive_value",
+        validate: false,
+      });
+      await this.validateCheckConstraint("settings", { name: "positive_value" });
+    }
+  }
+
+  class AddAndValidateForeignKey extends SilentMigration {
+    async change() {
+      await this.addForeignKey("bars", "foos", { validate: false });
+      await this.validateForeignKey("bars", "foos");
+    }
+  }
+
   beforeEach(async () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
   });
@@ -31,132 +88,83 @@ describeIfPg("PostgreSQLAdapter", () => {
       await m.execMigration(adapter, "down");
       expect(await adapter.tableExists("settings")).toBe(false);
     });
-    it("migrate revert add index with expression", async () => {
-      class ExpressionIndexMigration extends Migration {
-        async change() {
-          await this.createTable("settings", (t) => {
-            t.column("data", "jsonb");
-          });
-          await this.addIndex("settings", "(data->'foo')", {
-            using: "gin",
-            name: "index_settings_data_foo",
-          });
-        }
-      }
-      const m = new ExpressionIndexMigration();
-      await m.execMigration(adapter, "up");
 
-      expect(await adapter.tableExists("settings")).toBe(true);
-      expect(await adapter.indexExists("settings", null, { name: "index_settings_data_foo" })).toBe(
-        true,
-      );
+    it("migrate revert add index with expression", async () => {
+      await new ExpressionIndexMigration().execMigration(adapter, "up");
+
+      expect(await adapter.tableExists("settings")).toBeTruthy();
+      expect(
+        await adapter.indexExists("settings", null, { name: "index_settings_data_foo" }),
+      ).toBeTruthy();
 
       await new ExpressionIndexMigration().execMigration(adapter, "down");
 
-      expect(await adapter.tableExists("settings")).toBe(false);
-      expect(await adapter.indexExists("settings", null, { name: "index_settings_data_foo" })).toBe(
-        false,
-      );
+      expect(await adapter.tableExists("settings")).toBeFalsy();
+      expect(
+        await adapter.indexExists("settings", null, { name: "index_settings_data_foo" }),
+      ).toBeFalsy();
     });
+
     it("migrate revert create enum", async () => {
-      class CreateEnumMig extends Migration {
-        async change() {
-          await this.createEnum("color", ["blue", "green"]);
-          await this.createTable("enums");
-        }
-      }
-      const m = new CreateEnumMig();
-      await m.execMigration(adapter, "up");
-      await adapter.execute(
-        `ALTER TABLE enums ADD COLUMN best_color color NOT NULL DEFAULT 'blue'`,
-      );
-      const enumsBefore = await adapter.enumTypes();
-      expect(enumsBefore.some(([name]) => name === "color")).toBe(true);
+      await new CreateEnumMigration().execMigration(adapter, "up");
 
-      await m.execMigration(adapter, "down");
-      const enumsAfter = await adapter.enumTypes();
-      expect(enumsAfter.some(([name]) => name === "color")).toBe(false);
-      expect(await adapter.tableExists("enums")).toBe(false);
+      expect(
+        await adapter.columnExists("enums", "best_color", null, { default: "blue", null: false }),
+      ).toBeTruthy();
+      expect(await adapter.enumTypes()).toEqual([["color", ["blue", "green"]]]);
+
+      await new CreateEnumMigration().execMigration(adapter, "down");
+
+      expect(await adapter.tableExists("enums")).toBeFalsy();
+      expect(await adapter.enumTypes()).toEqual([]);
     });
+
     it("migrate revert drop enum", async () => {
-      await adapter.createEnum("color", ["blue", "green"]);
+      expect(await adapter.enumTypes()).toEqual([]);
 
-      class DropEnumMig extends Migration {
-        async change() {
-          await this.dropEnum("color", ["blue", "green"], { ifExists: true });
-        }
-      }
-      const m = new DropEnumMig();
-      await m.execMigration(adapter, "up");
-      const enumsAfterDrop = await adapter.enumTypes();
-      expect(enumsAfterDrop.some(([name]) => name === "color")).toBe(false);
+      await expect(new DropEnumMigration().execMigration(adapter, "up")).resolves.not.toThrow();
+      expect(await adapter.enumTypes()).toEqual([]);
 
-      await m.execMigration(adapter, "down");
-      const enumsRestored = await adapter.enumTypes();
-      expect(enumsRestored.some(([name]) => name === "color")).toBe(true);
+      await new DropEnumMigration().execMigration(adapter, "down");
+      expect(await adapter.enumTypes()).toEqual([["color", ["blue", "green"]]]);
     });
+
     it("migrate revert rename enum value", async () => {
-      await adapter.createEnum("color", ["blue", "green"]);
+      await new CreateEnumMigration().execMigration(adapter, "up");
+      expect(await adapter.enumTypes()).toEqual([["color", ["blue", "green"]]]);
 
-      class RenameEnumMig extends Migration {
-        async change() {
-          await this.renameEnumValue("color", { from: "blue", to: "red" });
-        }
-      }
-      const m = new RenameEnumMig();
-      await m.execMigration(adapter, "up");
-      const afterRename = await adapter.enumTypes();
-      const colorValues = afterRename.find(([name]) => name === "color")?.[1] ?? [];
-      expect(colorValues).toContain("red");
-      expect(colorValues).not.toContain("blue");
+      await new RenameEnumValueMigration().execMigration(adapter, "up");
+      expect(await adapter.enumTypes()).toEqual([["color", ["red", "green"]]]);
 
-      await m.execMigration(adapter, "down");
-      const afterRevert = await adapter.enumTypes();
-      const revertedValues = afterRevert.find(([name]) => name === "color")?.[1] ?? [];
-      expect(revertedValues).toContain("blue");
-      expect(revertedValues).not.toContain("red");
+      await new RenameEnumValueMigration().execMigration(adapter, "down");
+      expect(await adapter.enumTypes()).toEqual([["color", ["blue", "green"]]]);
     });
+
     it("migrate revert add and validate check constraint", async () => {
-      await adapter.execute(`CREATE TABLE settings (id SERIAL PRIMARY KEY, value INTEGER)`);
+      await adapter.createTable("settings", (t: TableDefinitionOf<PostgreSQLAdapter>) => {
+        t.integer("value");
+      });
 
-      class AddAndValidateCheckMig extends Migration {
-        async change() {
-          await this.addCheckConstraint("settings", "value >= 0", {
-            name: "positive_value",
-            validate: false,
-          });
-          await this.validateCheckConstraint("settings", { name: "positive_value" });
-        }
-      }
-      const m = new AddAndValidateCheckMig();
-      await m.execMigration(adapter, "up");
-      const before = await adapter.checkConstraints("settings");
-      expect(before.some((c: any) => c.name === "positive_value")).toBe(true);
-
-      await m.execMigration(adapter, "down");
-      const after = await adapter.checkConstraints("settings");
-      expect(after.some((c: any) => c.name === "positive_value")).toBe(false);
+      await new AddAndValidateCheckConstraint().execMigration(adapter, "up");
+      expect(
+        await adapter.checkConstraintExists("settings", { name: "positive_value" }),
+      ).toBeTruthy();
+      await new AddAndValidateCheckConstraint().execMigration(adapter, "down");
+      expect(
+        await adapter.checkConstraintExists("settings", { name: "positive_value" }),
+      ).toBeFalsy();
     });
+
     it("migrate revert add and validate foreign key", async () => {
-      await adapter.execute(`CREATE TABLE foos (id SERIAL PRIMARY KEY)`);
-      await adapter.execute(`CREATE TABLE bars (id SERIAL PRIMARY KEY, foo_id INTEGER)`);
+      await adapter.createTable("foos");
+      await adapter.createTable("bars", (t: TableDefinitionOf<PostgreSQLAdapter>) => {
+        t.integer("foo_id");
+      });
 
-      class AddAndValidateFKMig extends Migration {
-        async change() {
-          await this.addForeignKey("bars", "foos", {
-            column: "foo_id",
-            name: "fk_bars_foos",
-            validate: false,
-          });
-          await this.validateForeignKey("bars", "foos", { name: "fk_bars_foos" });
-        }
-      }
-      const m = new AddAndValidateFKMig();
-      await m.execMigration(adapter, "up");
-      expect(await adapter.foreignKeyExists("bars", "foos")).toBe(true);
-
-      await m.execMigration(adapter, "down");
-      expect(await adapter.foreignKeyExists("bars", "foos")).toBe(false);
+      await new AddAndValidateForeignKey().execMigration(adapter, "up");
+      expect(await adapter.foreignKeyExists("bars", "foos")).toBeTruthy();
+      await new AddAndValidateForeignKey().execMigration(adapter, "down");
+      expect(await adapter.foreignKeyExists("bars", "foos")).toBeFalsy();
     });
   });
 });
