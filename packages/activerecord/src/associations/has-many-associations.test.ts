@@ -38,6 +38,13 @@ import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions
 import { assertDifference, assertNothingRaised } from "@blazetrails/activesupport";
 
 import { fixtures } from "../test-fixtures.js";
+
+async function forceSignal37ToLoadAllClientsOfFirm(
+  companies: (name: string) => unknown,
+): Promise<unknown> {
+  return await (companies("first_firm") as any).clientsOfFirm.loadTarget();
+}
+
 import "../support/canonical-model-index.js";
 import {
   Author as HmAuthor,
@@ -384,7 +391,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("destroy all", async () => {
-    await forceSignal37ToLoadAllClientsOfFirm();
+    await forceSignal37ToLoadAllClientsOfFirm(companies);
 
     expect((companies("first_firm") as any).clientsOfFirm.loaded).toBeTruthy();
 
@@ -406,10 +413,6 @@ describe("HasManyAssociationsTest", () => {
     const removed = await firstFirm.clientsOfFirm.destroy(first);
     expect(removed.map((r: any) => r.id)).toEqual([first.id]);
   });
-
-  async function forceSignal37ToLoadAllClientsOfFirm(): Promise<unknown> {
-    return await (companies("first_firm") as any).clientsOfFirm.loadTarget();
-  }
 });
 
 describe("HasManyAssociationsTestForReorderWithJoinDependency", () => {
@@ -660,6 +663,10 @@ describe("HasManyAssociationsTest", () => {
   registerSubclass(HmFirm);
   registerSubclass(Client);
 
+  beforeEach(() => {
+    Client.destroyedClientIds.clear();
+  });
+
   it("counting", async () => {
     const firm = (await HmFirm.first()) as any;
     expect(await firm.plainClients.count()).toBe(3);
@@ -860,7 +867,7 @@ describe("HasManyAssociationsTest", () => {
 
   it.skip("deleting a item which is not in the collection", async () => {
     // BLOCKED: CollectionAssociation#delete nullifies the FK of a record outside the association scope (has-many-delete-nullify-out-of-scope)
-    await forceSignal37ToLoadAllClientsOfFirm();
+    await forceSignal37ToLoadAllClientsOfFirm(companies);
 
     expect((companies("first_firm") as any).clientsOfFirm.loaded).toBeTruthy();
 
@@ -898,7 +905,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("deleting", async () => {
-    await forceSignal37ToLoadAllClientsOfFirm();
+    await forceSignal37ToLoadAllClientsOfFirm(companies);
 
     expect((companies("first_firm") as any).clientsOfFirm.loaded).toBeTruthy();
 
@@ -917,10 +924,6 @@ describe("HasManyAssociationsTest", () => {
     await newFirm.clientsOfFirm.delete(newClient);
     expect(await newFirm.clientsOfFirm.size()).toBe(0);
   });
-
-  async function forceSignal37ToLoadAllClientsOfFirm(): Promise<unknown> {
-    return await (companies("first_firm") as any).clientsOfFirm.loadTarget();
-  }
 });
 
 describe("HasManyAssociationsTest", () => {
@@ -2504,13 +2507,6 @@ describe("HasManyAssociationsTest", () => {
     const posts = await author.posts;
     const selected = posts.filter((p: any) => p.title === "A");
     expect(selected.length).toBe(1);
-  });
-  it("select without foreign key", async () => {
-    const author = await HmAuthor.create({ name: "Alice" });
-    await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await author.posts;
-    expect(posts.length).toBe(1);
-    expect((posts[0] as any).title).toBe("A");
   });
   it("create with bang on has many raises when record not saved", async () => {
     const author = HmAuthor.new({ name: "Unsaved" });
@@ -5798,10 +5794,15 @@ describe("AsyncHasManyAssociationsTest", () => {
 describe("HasManyAssociationsTest", () => {
   const { companies, topics } = fixtures(["companies", "accounts", "topics"]);
 
+  beforeEach(() => {
+    Client.destroyedClientIds.clear();
+  });
+
   beforeAll(() => {
     registerModel(Company);
     registerModel(HmFirm);
     registerModel(Client);
+    registerModel(Account);
     registerModel(DependentFirm);
     registerModel(RestrictedWithExceptionFirm);
     Company.inheritanceColumn = "type";
@@ -5817,8 +5818,14 @@ describe("HasManyAssociationsTest", () => {
     registerSubclass(HmDefaultRejectedTopic);
   });
 
+  it("select without foreign key", async () => {
+    expect(
+      (await (companies("first_firm") as any).accounts.select("credit_limit").first()).credit_limit,
+    ).toBe((await (companies("first_firm") as any).accounts.first()).credit_limit);
+  });
+
   it("adding", async () => {
-    await forceSignal37ToLoadAllClientsOfFirm();
+    await forceSignal37ToLoadAllClientsOfFirm(companies);
 
     expect((companies("first_firm") as any).clientsOfFirm.loaded).toBeTruthy();
 
@@ -5921,7 +5928,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("deleting a collection", async () => {
-    await forceSignal37ToLoadAllClientsOfFirm();
+    await forceSignal37ToLoadAllClientsOfFirm(companies);
 
     expect((companies("first_firm") as any).clientsOfFirm.loaded).toBeTruthy();
 
@@ -5956,10 +5963,6 @@ describe("HasManyAssociationsTest", () => {
     expect(await RestrictedWithExceptionFirm.exists({ name: "restrict" })).toBe(true);
     expect(await firm.companies.exists({ name: "child" })).toBe(true);
   });
-
-  async function forceSignal37ToLoadAllClientsOfFirm(): Promise<unknown> {
-    return await (companies("first_firm") as any).clientsOfFirm.loadTarget();
-  }
 });
 
 describe("HasManyAssociationsTest", () => {
