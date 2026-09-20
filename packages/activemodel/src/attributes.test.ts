@@ -59,7 +59,7 @@ describe("AttributesTest", () => {
     }
   }
 
-  class ModelWithGeneratedAttributeMethods extends Model {
+  class ModelWithGeneratedAttributeMethods {
     declare static attribute: AttributesClassHalf["attribute"];
 
     static {
@@ -69,7 +69,7 @@ describe("AttributesTest", () => {
   }
   interface ModelWithGeneratedAttributeMethods extends Attributes {}
 
-  class ModelWithProxiedAttributeMethods extends Model {
+  class ModelWithProxiedAttributeMethods {
     declare static attributeMethodSuffix: AttributeMethodsClassHalf["attributeMethodSuffix"];
     declare static defineAttributeMethod: AttributeMethodsClassHalf["defineAttributeMethod"];
 
