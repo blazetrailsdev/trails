@@ -57,7 +57,14 @@ describe("Migration", () => {
       const connection = await ambientConnection();
       const tooLongIndexName = goodIndexName(connection) + "x";
       await connection.addIndex(tableName, ["foo"], { name: "old_idx" });
-      await expect(connection.renameIndex(tableName, "old_idx", tooLongIndexName)).rejects.toThrow(
+      let e: Error | undefined;
+      await expect(
+        connection.renameIndex(tableName, "old_idx", tooLongIndexName).catch((error: Error) => {
+          e = error;
+          throw error;
+        }),
+      ).rejects.toThrow(ArgumentError);
+      expect(e?.message).toMatch(
         new RegExp(`too long; the limit is ${connection.indexNameLength()} characters`),
       );
 
@@ -83,9 +90,14 @@ describe("Migration", () => {
       const connection = await ambientConnection();
       const tooLongIndexName = goodIndexName(connection) + "x";
 
+      let e: Error | undefined;
       await expect(
-        connection.addIndex(tableName, "foo", { name: tooLongIndexName }),
-      ).rejects.toThrow(
+        connection.addIndex(tableName, "foo", { name: tooLongIndexName }).catch((error: Error) => {
+          e = error;
+          throw error;
+        }),
+      ).rejects.toThrow(ArgumentError);
+      expect(e?.message).toMatch(
         new RegExp(`too long; the limit is ${connection.indexNameLength()} characters`),
       );
 
@@ -97,7 +109,9 @@ describe("Migration", () => {
       const connection = await ambientConnection();
       await connection.addIndex(tableName, "foo");
 
-      await connection.addIndex(tableName, "foo", { ifNotExists: true });
+      await expect(
+        connection.addIndex(tableName, "foo", { ifNotExists: true }),
+      ).resolves.not.toThrow();
 
       expect(await connection.indexNameExists(tableName, "index_testings_on_foo")).toBeTruthy();
     });
@@ -111,7 +125,9 @@ describe("Migration", () => {
 
       expect(await connection.indexNameExists(tableName, "index_testings_on_foo_bar")).toBeTruthy();
 
-      await connection.addIndex(tableName, ["foo", "bar"], { unique: true, ifNotExists: true });
+      await expect(
+        connection.addIndex(tableName, ["foo", "bar"], { unique: true, ifNotExists: true }),
+      ).resolves.not.toThrow();
 
       expect(
         await connection.indexNameExists(tableName, "index_testings_on_foo_and_bar"),
@@ -143,7 +159,9 @@ describe("Migration", () => {
 
       await expect(connection.removeIndex(tableName, "foo")).rejects.toThrow(ArgumentError);
 
-      await connection.removeIndex(tableName, "foo", { ifExists: true });
+      await expect(
+        connection.removeIndex(tableName, "foo", { ifExists: true }),
+      ).resolves.not.toThrow();
     });
 
     it("remove index with name which does not exist doesnt raise with option", async () => {
@@ -163,7 +181,9 @@ describe("Migration", () => {
 
       expect(await connection.indexExists(tableName, "foo", { name: "foo" })).toBeTruthy();
 
-      await connection.removeIndex(tableName, { column: ["foo", "bar"], ifExists: true });
+      await expect(
+        connection.removeIndex(tableName, { column: ["foo", "bar"], ifExists: true }),
+      ).resolves.not.toThrow();
 
       expect(await connection.indexExists(tableName, "foo", { name: "foo" })).toBeTruthy();
       expect(

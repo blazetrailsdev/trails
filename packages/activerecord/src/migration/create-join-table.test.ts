@@ -1,3 +1,4 @@
+import { isBlank } from "@blazetrails/activesupport";
 import { describe, it, expect, afterEach } from "vitest";
 import { ambientConnection } from "../support/rocket-tables.js";
 import { adapterType } from "../test-adapter.js";
@@ -109,7 +110,7 @@ describe("Migration", () => {
       const connection = await ambientConnection();
       await connection.createJoinTable("artists", "musics");
 
-      expect(await connection.indexes("artists_musics")).toEqual([]);
+      expect(isBlank(await connection.indexes("artists_musics"))).toBeTruthy();
     });
 
     it("create join table with index", async () => {

@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
+import { Thread } from "@blazetrails/ruby-compat";
 import { Notifications, type NotificationEvent } from "@blazetrails/activesupport";
 import { Base } from "../index.js";
 import { AsynchronousQueriesTracker } from "../asynchronous-queries-tracker.js";
@@ -38,11 +39,17 @@ describe("LoadAsyncTest", () => {
   it("notification forwarding", async () => {
     const expectedRecords = await Post.where({ author_id: 1 });
 
-    const status: { executed?: boolean; async?: unknown; lock_wait?: unknown } = {};
+    const status: {
+      executed?: boolean;
+      async?: unknown;
+      thread_id?: unknown;
+      lock_wait?: unknown;
+    } = {};
     const subscriber = Notifications.subscribe("sql.active_record", (event: NotificationEvent) => {
       if (event.payload.name === "Post Load") {
         status.executed = true;
         status.async = event.payload.async;
+        status.thread_id = Thread.current().id;
         status.lock_wait = event.payload.lock_wait;
       }
     });
@@ -56,8 +63,9 @@ describe("LoadAsyncTest", () => {
         supportsConcurrentConnections(): boolean;
       };
       expect(status.async).toBe(connection.supportsConcurrentConnections());
+      expect(status.thread_id).toBe(Thread.current().id);
       if (connection.supportsConcurrentConnections()) {
-        expect(typeof status.lock_wait).toBe("number");
+        expect(Object(status.lock_wait)).toBeInstanceOf(Number);
       } else {
         expect(status.lock_wait).toBeUndefined();
       }

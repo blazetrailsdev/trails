@@ -11,7 +11,7 @@ import { inMemoryDb } from "./support/adapter-helper.js";
 import type { TestDatabaseAdapter } from "./test-adapter.js";
 import { itIfSupports, adapterSupports } from "./support/supports.js";
 import { fixtures } from "./test-fixtures.js";
-import { Current } from "./migration.js";
+import { Current, Migration } from "./migration.js";
 import type { TableDefinition as PostgreSQLTableDefinition } from "./connection-adapters/postgresql/schema-definitions.js";
 import { ARUnit2Model } from "./test-helpers/models/arunit2-model.js";
 import {
@@ -837,15 +837,63 @@ describe("SchemaDumperTest", () => {
       });
     },
   );
-  it.skipIf(adapterType !== "postgres")("timestamps schema dump before rails 7", (ctx) => {
-    ctx.skip();
-    // BLOCKED: Migration::Compatibility stops at V7_1, so Migration[6.1] has no counterpart.
-  });
+  it.skipIf(adapterType !== "postgres")(
+    "timestamps schema dump before rails 7",
+    { timeout: FULL_DUMP_TIMEOUT_MS },
+    async (ctx) => {
+      // BLOCKED: migration-compatibility-v6-1-for-pre-rails-7-dump-tests
+      ctx.skip();
+      class TimestampsMigration extends Migration.get(6.1) {
+        override async up(): Promise<void> {
+          await this.createTable("timestamps", (t) => {
+            t.datetime("this_should_remain_datetime");
+            t.timestamp("this_is_an_alias_of_datetime");
+            t.column("this_is_also_an_alias_of_datetime", "timestamp");
+          });
+        }
+        override async down(): Promise<void> {
+          await this.dropTable("timestamps");
+        }
+      }
+      const migration = new TimestampsMigration();
+      await migration.migrate("up");
+
+      const output = await dumpTableSchema(Base.connection, "timestamps");
+      expect(output.includes('t.datetime("this_should_remain_datetime"')).toBeTruthy();
+      expect(output.includes('t.datetime("this_is_an_alias_of_datetime"')).toBeTruthy();
+      expect(output.includes('t.datetime("this_is_also_an_alias_of_datetime"')).toBeTruthy();
+      await migration.migrate("down");
+    },
+  );
   it.skipIf(adapterType !== "postgres")(
     "timestamps schema dump before rails 7 with timestamptz setting",
-    (ctx) => {
+    { timeout: FULL_DUMP_TIMEOUT_MS },
+    async (ctx) => {
+      // BLOCKED: migration-compatibility-v6-1-for-pre-rails-7-dump-tests
       ctx.skip();
-      // BLOCKED: Migration::Compatibility stops at V7_1, so Migration[6.1] has no counterpart.
+      let migration!: Migration;
+      await withPostgresqlDatetimeType("timestamptz", async () => {
+        class TimestampsMigration extends Migration.get(6.1) {
+          override async up(): Promise<void> {
+            await this.createTable("timestamps", (t) => {
+              t.datetime("this_should_change_to_timestamp");
+              t.timestamp("this_should_stay_as_timestamp");
+              t.column("this_should_also_stay_as_timestamp", "timestamp");
+            });
+          }
+          override async down(): Promise<void> {
+            await this.dropTable("timestamps");
+          }
+        }
+        migration = new TimestampsMigration();
+        await migration.migrate("up");
+
+        const output = await dumpTableSchema(Base.connection, "timestamps");
+        expect(output.includes('t.timestamp("this_should_change_to_timestamp"')).toBeTruthy();
+        expect(output.includes('t.timestamp("this_should_stay_as_timestamp"')).toBeTruthy();
+        expect(output.includes('t.timestamp("this_should_also_stay_as_timestamp"')).toBeTruthy();
+      });
+      await migration.migrate("down");
     },
   );
   it.skipIf(adapterType !== "postgres")(
@@ -909,30 +957,89 @@ describe("SchemaDumperTest", () => {
 
   it.skipIf(adapterType !== "postgres")(
     "schema dump with correct timestamp types via add column before rails 7",
-    (ctx) => {
+    { timeout: FULL_DUMP_TIMEOUT_MS },
+    async (ctx) => {
+      // BLOCKED: migration-compatibility-v6-1-for-pre-rails-7-dump-tests
       ctx.skip();
-      // BLOCKED: Migration::Compatibility stops at V7_1, so Migration[6.1] has no counterpart.
+      class TimestampsMigration extends Migration.get(6.1) {
+        override async up(): Promise<void> {
+          await this.createTable("timestamps");
+
+          await this.addColumn("timestamps", "default_format", "datetime");
+          await this.addColumn("timestamps", "without_time_zone", "datetime");
+          await this.addColumn("timestamps", "also_without_time_zone", "timestamp");
+        }
+        override async down(): Promise<void> {
+          await this.dropTable("timestamps");
+        }
+      }
+      const migration = new TimestampsMigration();
+      await migration.migrate("up");
+
+      const output = await dumpTableSchema(Base.connection, "timestamps");
+      expect(output.includes('t.datetime("default_format"')).toBeTruthy();
+      expect(output.includes('t.datetime("without_time_zone"')).toBeTruthy();
+      expect(output.includes('t.datetime("also_without_time_zone"')).toBeTruthy();
+      await migration.migrate("down");
     },
   );
   it.skipIf(adapterType !== "postgres")(
     "schema dump with correct timestamp types via add column before rails 7 with timestamptz setting",
-    (ctx) => {
+    { timeout: FULL_DUMP_TIMEOUT_MS },
+    async (ctx) => {
+      // BLOCKED: migration-compatibility-v6-1-for-pre-rails-7-dump-tests
       ctx.skip();
-      // BLOCKED: Migration::Compatibility stops at V7_1, so Migration[6.1] has no counterpart.
+      let migration!: Migration;
+      await withPostgresqlDatetimeType("timestamptz", async () => {
+        class TimestampsMigration extends Migration.get(6.1) {
+          override async up(): Promise<void> {
+            await this.createTable("timestamps");
+
+            await this.addColumn("timestamps", "this_should_change_to_timestamp", "datetime");
+            await this.addColumn("timestamps", "this_should_stay_as_timestamp", "timestamp");
+          }
+          override async down(): Promise<void> {
+            await this.dropTable("timestamps");
+          }
+        }
+        migration = new TimestampsMigration();
+        await migration.migrate("up");
+
+        const output = await dumpTableSchema(Base.connection, "timestamps");
+        expect(output.includes('t.timestamp("this_should_change_to_timestamp"')).toBeTruthy();
+        expect(output.includes('t.timestamp("this_should_stay_as_timestamp"')).toBeTruthy();
+      });
+      await migration.migrate("down");
     },
   );
 
   it.skipIf(adapterType !== "postgres")(
     "schema dump with correct timestamp types via add column with type as string",
     { timeout: FULL_DUMP_TIMEOUT_MS },
-    async () => {
-      await Base.connection.createTable("timestamps", { force: true }, (t) => {
-        t.string("title");
+    async (ctx) => {
+      // BLOCKED: migration-compatibility-v6-1-for-pre-rails-7-dump-tests
+      ctx.skip();
+      let migration!: Migration;
+      await withPostgresqlDatetimeType("timestamptz", async () => {
+        class TimestampsMigration extends Migration.get(6.1) {
+          override async up(): Promise<void> {
+            await this.createTable("timestamps");
+
+            await this.addColumn("timestamps", "this_should_change_to_timestamp", "datetime");
+            await this.addColumn("timestamps", "this_should_stay_as_timestamp", "timestamp");
+          }
+          override async down(): Promise<void> {
+            await this.dropTable("timestamps");
+          }
+        }
+        migration = new TimestampsMigration();
+        await migration.migrate("up");
+
+        const output = await dumpTableSchema(Base.connection, "timestamps");
+        expect(output.includes('t.timestamp("this_should_change_to_timestamp"')).toBeTruthy();
+        expect(output.includes('t.timestamp("this_should_stay_as_timestamp"')).toBeTruthy();
       });
-      await Base.connection.addColumn("timestamps", "posted_at", "datetime");
-      const output = await dumpTableSchema(Base.connection, "timestamps");
-      expect(output).toContain("datetime");
-      expect(output).toContain("posted_at");
+      await migration.migrate("down");
     },
   );
 });
