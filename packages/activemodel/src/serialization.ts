@@ -43,18 +43,16 @@ export function serializableHash(
 
   const result = serializableAttributes(record, keys);
 
-  if (options.methods) {
-    for (const method of options.methods) {
-      const value = (record as Record<string, unknown>)[method];
-      if (typeof value === "function") {
-        safeSet(result, method, (value as () => unknown).call(record));
-      } else if (method in record) {
-        safeSet(result, method, value);
-      } else {
-        throw new NoMethodError(
-          `undefined method '${method}' for an instance of ${record.constructor.name}`,
-        );
-      }
+  for (const method of rubyArray(options.methods)) {
+    const value = (record as Record<string, unknown>)[method];
+    if (typeof value === "function") {
+      safeSet(result, method, (value as () => unknown).call(record));
+    } else if (method in record) {
+      safeSet(result, method, value);
+    } else {
+      throw new NoMethodError(
+        `undefined method '${method}' for an instance of ${record.constructor.name}`,
+      );
     }
   }
 
@@ -110,7 +108,7 @@ export class Serialization {
 export interface SerializeOptions {
   only?: string | string[];
   except?: string | string[];
-  methods?: string[];
+  methods?: string | string[];
   include?:
     | Record<string, SerializeOptions>
     | Array<string | Record<string, SerializeOptions>>

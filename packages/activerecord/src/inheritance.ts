@@ -277,7 +277,7 @@ export function findStiClass(baseClass: typeof Base, typeName: string): typeof B
 
   if (!(subclass === baseClass || baseClass.descendants.includes(subclass))) {
     throw new SubclassNotFound(
-      `Invalid single-table inheritance type: ${subclass.name} is not a subclass of ${baseClass.name}`,
+      `Invalid single-table inheritance type: ${qualifiedName(subclass)} is not a subclass of ${qualifiedName(baseClass)}`,
     );
   }
 
