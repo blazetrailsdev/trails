@@ -420,7 +420,7 @@ export function assertNotEmpty(actual: unknown, message?: string): void {
   assert(!isEmptyCollection(actual), message ?? `Expected ${inspect(actual)} to not be empty`);
 }
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE minitest-assertion-ports-score-as-novel-surface */
 export function assertIncludes(collection: unknown, obj: unknown, message?: string): void {
   assert(respondsToInclude(collection), `Expected ${inspect(collection)} to respond to include?`);
   assert(
@@ -429,7 +429,7 @@ export function assertIncludes(collection: unknown, obj: unknown, message?: stri
   );
 }
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE minitest-assertion-ports-score-as-novel-surface */
 export function assertNotIncludes(collection: unknown, obj: unknown, message?: string): void {
   assert(respondsToInclude(collection), `Expected ${inspect(collection)} to respond to include?`);
   assertNot(

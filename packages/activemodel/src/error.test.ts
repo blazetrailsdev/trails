@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { assertNotRespondTo, assertNothingRaised } from "@blazetrails/activesupport";
 import { Errors } from "./errors.js";
 import { I18n } from "./i18n.js";
-import { ModelName } from "./naming.js";
+import { ModelName, type ModelLike } from "./naming.js";
 import { Error as ModelError } from "./error.js";
 import { resetI18n } from "./test-helpers/i18n.js";
 
@@ -30,7 +30,7 @@ class Person {
 
 class Manager extends Person {
   static moduleName = "ErrorTest";
-  static modelName = new ModelName(Manager as never);
+  static modelName: ModelName = new ModelName(Manager);
 
   override readAttributeForValidation(attr: string): unknown {
     return (this as unknown as Record<string, unknown>)[attr];
@@ -38,7 +38,7 @@ class Manager extends Person {
 
   static i18nScope = "activemodel";
 
-  static override lookupAncestors(): unknown[] {
+  static override lookupAncestors(): Array<ModelLike & { modelName: ModelName }> {
     return [this];
   }
 }
