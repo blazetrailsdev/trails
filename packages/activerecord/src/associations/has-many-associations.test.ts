@@ -188,6 +188,10 @@ describe("HasManyAssociationsTest", () => {
     await Account.loadSchema();
   });
 
+  beforeEach(() => {
+    Client.destroyedClientIds.clear();
+  });
+
   it("transaction when deleting persisted", async () => {
     const good = Client.new({ name: "Good" }) as any;
     const bad = Client.new({ name: "Bad" }) as any;
@@ -212,6 +216,23 @@ describe("HasManyAssociationsTest", () => {
       const client = Client.new({ name: "New Client" });
       await firm.clientsOfFirm.concat(client);
       await firm.clientsOfFirm.destroy(client);
+    });
+  });
+
+  it("clearing an association collection", async () => {
+    const firm = companies("first_firm") as any;
+    const clientId = (await firm.clientsOfFirm.first()).id;
+    expect(await firm.clientsOfFirm.size()).toBe(2);
+
+    await firm.clientsOfFirm.clear();
+
+    expect(await firm.clientsOfFirm.size()).toBe(0);
+    await firm.clientsOfFirm.reload();
+    expect(await firm.clientsOfFirm.size()).toBe(0);
+    expect(Client.destroyedClientIds.get(firm.id as number) ?? []).toEqual([]);
+
+    await assertNothingRaised(async () => {
+      expect(await (await Client.find(clientId)).firm).toBeNull();
     });
   });
 
@@ -362,12 +383,33 @@ describe("HasManyAssociationsTest", () => {
     expect(await firstFirm.clientsOfFirm.size()).toBe(1);
   });
 
+  it("destroy all", async () => {
+    await forceSignal37ToLoadAllClientsOfFirm();
+
+    expect((companies("first_firm") as any).clientsOfFirm.loaded).toBeTruthy();
+
+    const clients = await (companies("first_firm") as any).clientsOfFirm.toArray();
+    expect(clients.length === 0).toBeFalsy();
+    const destroyed = await (companies("first_firm") as any).clientsOfFirm.destroyAll();
+    expect([...destroyed].sort((a: any, b: any) => Number(a.id) - Number(b.id))).toEqual(
+      [...clients].sort((a: any, b: any) => Number(a.id) - Number(b.id)),
+    );
+    expect(destroyed.every((client: any) => client.isFrozen())).toBeTruthy();
+    expect(await (companies("first_firm") as any).clientsOfFirm.isEmpty()).toBeTruthy();
+    await (companies("first_firm") as any).clientsOfFirm.reload();
+    expect(await (companies("first_firm") as any).clientsOfFirm.isEmpty()).toBeTruthy();
+  });
+
   it("destroy returns the removed records", async () => {
     const firstFirm = companies("first_firm") as any;
     const first = await firstFirm.clientsOfFirm.first();
     const removed = await firstFirm.clientsOfFirm.destroy(first);
     expect(removed.map((r: any) => r.id)).toEqual([first.id]);
   });
+
+  async function forceSignal37ToLoadAllClientsOfFirm(): Promise<unknown> {
+    return await (companies("first_firm") as any).clientsOfFirm.loadTarget();
+  }
 });
 
 describe("HasManyAssociationsTestForReorderWithJoinDependency", () => {
@@ -512,11 +554,31 @@ describe("HasManyAssociationsTest", () => {
   registerSubclass(Client);
   registerSubclass(RestrictedWithErrorFirm);
 
+  beforeEach(() => {
+    Client.destroyedClientIds.clear();
+  });
+
   it("dependence", async () => {
     const firm = companies("first_firm") as any;
     expect(await firm.clients.size()).toBe(3);
     await firm.destroy();
     expect((await Client.where(`firm_id=${firm.id}`)).length).toBe(0);
+  });
+
+  it("clearing a dependent association collection", async () => {
+    const firm = companies("first_firm") as any;
+    const clientId = (await firm.dependentClientsOfFirm.first()).id;
+    expect(await firm.dependentClientsOfFirm.size()).toBe(2);
+    expect((await Client.findBy({ id: clientId }))!.client_of).toBe(1);
+
+    await firm.dependentClientsOfFirm.clear();
+
+    expect(await firm.dependentClientsOfFirm.size()).toBe(0);
+    await firm.dependentClientsOfFirm.reload();
+    expect(await firm.dependentClientsOfFirm.size()).toBe(0);
+    expect(Client.destroyedClientIds.get(firm.id as number) ?? []).toEqual([]);
+
+    expect(await Client.findBy({ id: clientId })).toBeNull();
   });
 
   it("delete all with option delete all", async () => {
@@ -539,6 +601,23 @@ describe("HasManyAssociationsTest", () => {
   it("delete all accepts limited parameters", async () => {
     const firm = companies("first_firm") as any;
     await expect(firm.dependentClientsOfFirm.deleteAll("destroy")).rejects.toThrow();
+  });
+
+  it("clearing an exclusively dependent association collection", async () => {
+    const firm = companies("first_firm") as any;
+    const clientId = (await firm.exclusivelyDependentClientsOfFirm.first()).id;
+    expect(await firm.exclusivelyDependentClientsOfFirm.size()).toBe(2);
+
+    expect(Client.destroyedClientIds.get(firm.id as number) ?? []).toEqual([]);
+
+    await firm.exclusivelyDependentClientsOfFirm.clear();
+
+    expect(await firm.exclusivelyDependentClientsOfFirm.size()).toBe(0);
+    await firm.exclusivelyDependentClientsOfFirm.reload();
+    expect(await firm.exclusivelyDependentClientsOfFirm.size()).toBe(0);
+    expect(Client.destroyedClientIds.get(firm.id as number) ?? []).toEqual([]);
+
+    expect(await Client.findBy({ id: clientId })).toBeNull();
   });
 
   it("dependence on account", async () => {
@@ -779,6 +858,20 @@ describe("HasManyAssociationsTest", () => {
     });
   });
 
+  it.skip("deleting a item which is not in the collection", async () => {
+    // BLOCKED: CollectionAssociation#delete nullifies the FK of a record outside the association scope (has-many-delete-nullify-out-of-scope)
+    await forceSignal37ToLoadAllClientsOfFirm();
+
+    expect((companies("first_firm") as any).clientsOfFirm.loaded).toBeTruthy();
+
+    const summit = (await Client.findBy({ name: "Summit" }))!;
+    await (companies("first_firm") as any).clientsOfFirm.delete(summit);
+    expect(await (companies("first_firm") as any).clientsOfFirm.size()).toBe(2);
+    await (companies("first_firm") as any).clientsOfFirm.reload();
+    expect(await (companies("first_firm") as any).clientsOfFirm.size()).toBe(2);
+    expect(summit.client_of).toBe(2);
+  });
+
   it("deleting by integer id", async () => {
     const david = (await Developer.find(1)) as any;
     const before = await david.projects.count();
@@ -804,6 +897,19 @@ describe("HasManyAssociationsTest", () => {
     expect(await david.projects.size()).toBe(1);
   });
 
+  it("deleting", async () => {
+    await forceSignal37ToLoadAllClientsOfFirm();
+
+    expect((companies("first_firm") as any).clientsOfFirm.loaded).toBeTruthy();
+
+    await (companies("first_firm") as any).clientsOfFirm.delete(
+      await (companies("first_firm") as any).clientsOfFirm.first(),
+    );
+    expect(await (companies("first_firm") as any).clientsOfFirm.size()).toBe(1);
+    await (companies("first_firm") as any).clientsOfFirm.reload();
+    expect(await (companies("first_firm") as any).clientsOfFirm.size()).toBe(1);
+  });
+
   it("deleting before save", async () => {
     const newFirm = HmFirm.new({ name: "A New Firm, Inc." }) as any;
     const newClient = newFirm.clientsOfFirm.build({ name: "Another Client" });
@@ -811,6 +917,10 @@ describe("HasManyAssociationsTest", () => {
     await newFirm.clientsOfFirm.delete(newClient);
     expect(await newFirm.clientsOfFirm.size()).toBe(0);
   });
+
+  async function forceSignal37ToLoadAllClientsOfFirm(): Promise<unknown> {
+    return await (companies("first_firm") as any).clientsOfFirm.loadTarget();
+  }
 });
 
 describe("HasManyAssociationsTest", () => {
@@ -5686,7 +5796,7 @@ describe("AsyncHasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  const { topics } = fixtures(["companies", "accounts", "topics"]);
+  const { companies, topics } = fixtures(["companies", "accounts", "topics"]);
 
   beforeAll(() => {
     registerModel(Company);
@@ -5705,6 +5815,41 @@ describe("HasManyAssociationsTest", () => {
     HmTopic.inheritanceColumn = "type";
     registerSubclass(HmReply);
     registerSubclass(HmDefaultRejectedTopic);
+  });
+
+  it("adding", async () => {
+    await forceSignal37ToLoadAllClientsOfFirm();
+
+    expect((companies("first_firm") as any).clientsOfFirm.loaded).toBeTruthy();
+
+    const natural = Client.new({ name: "Natural Company" });
+    await (companies("first_firm") as any).clientsOfFirm.concat(natural);
+    expect(await (companies("first_firm") as any).clientsOfFirm.size()).toBe(3);
+    await (companies("first_firm") as any).clientsOfFirm.reload();
+    expect(await (companies("first_firm") as any).clientsOfFirm.size()).toBe(3);
+    expect((await (companies("first_firm") as any).clientsOfFirm.last()).equals(natural)).toBe(
+      true,
+    );
+  });
+
+  it("adding using create", async () => {
+    const firstFirm = companies("first_firm") as any;
+    expect(await firstFirm.plainClients.size()).toBe(3);
+    await firstFirm.plainClients.create({ name: "Natural Company" });
+    expect((await firstFirm.plainClients.toArray()).length).toBe(4);
+    expect(await firstFirm.plainClients.size()).toBe(4);
+  });
+
+  it("adding a mismatch class", async () => {
+    await expect((companies("first_firm") as any).clientsOfFirm.concat(null)).rejects.toThrow(
+      AssociationTypeMismatch,
+    );
+    await expect((companies("first_firm") as any).clientsOfFirm.concat(1)).rejects.toThrow(
+      AssociationTypeMismatch,
+    );
+    await expect(
+      (companies("first_firm") as any).clientsOfFirm.concat(await HmTopic.find(1)),
+    ).rejects.toThrow(AssociationTypeMismatch);
   });
 
   it("custom named counter cache", async () => {
@@ -5775,6 +5920,34 @@ describe("HasManyAssociationsTest", () => {
     expect(((await HmTopic.find(3)) as any).replies_count).toBe(originalCount2);
   });
 
+  it("deleting a collection", async () => {
+    await forceSignal37ToLoadAllClientsOfFirm();
+
+    expect((companies("first_firm") as any).clientsOfFirm.loaded).toBeTruthy();
+
+    await (companies("first_firm") as any).clientsOfFirm.create({ name: "Another Client" });
+    expect(await (companies("first_firm") as any).clientsOfFirm.size()).toBe(3);
+    const clientsOfFirm = await (companies("first_firm") as any).clientsOfFirm.toArray();
+    await (companies("first_firm") as any).clientsOfFirm.delete([
+      clientsOfFirm[0],
+      clientsOfFirm[1],
+      clientsOfFirm[2],
+    ]);
+    expect(await (companies("first_firm") as any).clientsOfFirm.size()).toBe(0);
+    await (companies("first_firm") as any).clientsOfFirm.reload();
+    expect(await (companies("first_firm") as any).clientsOfFirm.size()).toBe(0);
+  });
+
+  it("clearing without initial access", async () => {
+    const firm = companies("first_firm") as any;
+
+    await firm.clientsOfFirm.clear();
+
+    expect(await firm.clientsOfFirm.size()).toBe(0);
+    await firm.clientsOfFirm.reload();
+    expect(await firm.clientsOfFirm.size()).toBe(0);
+  });
+
   it("restrict with exception", async () => {
     const firm = (await RestrictedWithExceptionFirm.create({ name: "restrict" })) as any;
     await firm.companies.create({ name: "child" });
@@ -5783,6 +5956,10 @@ describe("HasManyAssociationsTest", () => {
     expect(await RestrictedWithExceptionFirm.exists({ name: "restrict" })).toBe(true);
     expect(await firm.companies.exists({ name: "child" })).toBe(true);
   });
+
+  async function forceSignal37ToLoadAllClientsOfFirm(): Promise<unknown> {
+    return await (companies("first_firm") as any).clientsOfFirm.loadTarget();
+  }
 });
 
 describe("HasManyAssociationsTest", () => {
@@ -6038,186 +6215,4 @@ describe("HasManyAssociationsTest", () => {
     expect(user.comments_count).toBe(before2 + 1);
     expect(post.comments_count).toBe(postBefore2);
   });
-});
-
-describe("HasManyAssociationsTest", () => {
-  const { companies } = fixtures(["accounts", "companies", "topics"]);
-
-  beforeAll(async () => {
-    registerModel(Company);
-    registerModel(HmFirm);
-    registerModel(Client);
-    registerModel(Account);
-    registerModel(HmTopic);
-    Company.inheritanceColumn = "type";
-    registerSubclass(HmFirm);
-    registerSubclass(Client);
-    await Company.loadSchema();
-    await Account.loadSchema();
-  });
-
-  beforeEach(() => {
-    Client.destroyedClientIds.clear();
-  });
-
-  it("adding", async () => {
-    await forceSignal37ToLoadAllClientsOfFirm();
-
-    expect((companies("first_firm") as any).clientsOfFirm.loaded).toBeTruthy();
-
-    const natural = Client.new({ name: "Natural Company" });
-    await (companies("first_firm") as any).clientsOfFirm.concat(natural);
-    expect(await (companies("first_firm") as any).clientsOfFirm.size()).toBe(3);
-    await (companies("first_firm") as any).clientsOfFirm.reload();
-    expect(await (companies("first_firm") as any).clientsOfFirm.size()).toBe(3);
-    expect((await (companies("first_firm") as any).clientsOfFirm.last()).equals(natural)).toBe(
-      true,
-    );
-  });
-
-  it("adding using create", async () => {
-    const firstFirm = companies("first_firm") as any;
-    expect(await firstFirm.plainClients.size()).toBe(3);
-    await firstFirm.plainClients.create({ name: "Natural Company" });
-    expect((await firstFirm.plainClients.toArray()).length).toBe(4);
-    expect(await firstFirm.plainClients.size()).toBe(4);
-  });
-
-  it("adding a mismatch class", async () => {
-    await expect((companies("first_firm") as any).clientsOfFirm.concat(null)).rejects.toThrow(
-      AssociationTypeMismatch,
-    );
-    await expect((companies("first_firm") as any).clientsOfFirm.concat(1)).rejects.toThrow(
-      AssociationTypeMismatch,
-    );
-    await expect(
-      (companies("first_firm") as any).clientsOfFirm.concat(await HmTopic.find(1)),
-    ).rejects.toThrow(AssociationTypeMismatch);
-  });
-
-  it("deleting", async () => {
-    await forceSignal37ToLoadAllClientsOfFirm();
-
-    expect((companies("first_firm") as any).clientsOfFirm.loaded).toBeTruthy();
-
-    await (companies("first_firm") as any).clientsOfFirm.delete(
-      await (companies("first_firm") as any).clientsOfFirm.first(),
-    );
-    expect(await (companies("first_firm") as any).clientsOfFirm.size()).toBe(1);
-    await (companies("first_firm") as any).clientsOfFirm.reload();
-    expect(await (companies("first_firm") as any).clientsOfFirm.size()).toBe(1);
-  });
-
-  it("deleting a collection", async () => {
-    await forceSignal37ToLoadAllClientsOfFirm();
-
-    expect((companies("first_firm") as any).clientsOfFirm.loaded).toBeTruthy();
-
-    await (companies("first_firm") as any).clientsOfFirm.create({ name: "Another Client" });
-    expect(await (companies("first_firm") as any).clientsOfFirm.size()).toBe(3);
-    const clientsOfFirm = await (companies("first_firm") as any).clientsOfFirm.toArray();
-    await (companies("first_firm") as any).clientsOfFirm.delete([
-      clientsOfFirm[0],
-      clientsOfFirm[1],
-      clientsOfFirm[2],
-    ]);
-    expect(await (companies("first_firm") as any).clientsOfFirm.size()).toBe(0);
-    await (companies("first_firm") as any).clientsOfFirm.reload();
-    expect(await (companies("first_firm") as any).clientsOfFirm.size()).toBe(0);
-  });
-
-  it("clearing an association collection", async () => {
-    const firm = companies("first_firm") as any;
-    const clientId = (await firm.clientsOfFirm.first()).id;
-    expect(await firm.clientsOfFirm.size()).toBe(2);
-
-    await firm.clientsOfFirm.clear();
-
-    expect(await firm.clientsOfFirm.size()).toBe(0);
-    await firm.clientsOfFirm.reload();
-    expect(await firm.clientsOfFirm.size()).toBe(0);
-    expect(Client.destroyedClientIds.get(firm.id as number) ?? []).toEqual([]);
-
-    await assertNothingRaised(async () => {
-      expect(await (await Client.find(clientId)).firm).toBeNull();
-    });
-  });
-
-  it("clearing a dependent association collection", async () => {
-    const firm = companies("first_firm") as any;
-    const clientId = (await firm.dependentClientsOfFirm.first()).id;
-    expect(await firm.dependentClientsOfFirm.size()).toBe(2);
-    expect((await Client.findBy({ id: clientId }))!.client_of).toBe(1);
-
-    await firm.dependentClientsOfFirm.clear();
-
-    expect(await firm.dependentClientsOfFirm.size()).toBe(0);
-    await firm.dependentClientsOfFirm.reload();
-    expect(await firm.dependentClientsOfFirm.size()).toBe(0);
-    expect(Client.destroyedClientIds.get(firm.id as number) ?? []).toEqual([]);
-
-    expect(await Client.findBy({ id: clientId })).toBeNull();
-  });
-
-  it("clearing an exclusively dependent association collection", async () => {
-    const firm = companies("first_firm") as any;
-    const clientId = (await firm.exclusivelyDependentClientsOfFirm.first()).id;
-    expect(await firm.exclusivelyDependentClientsOfFirm.size()).toBe(2);
-
-    expect(Client.destroyedClientIds.get(firm.id as number) ?? []).toEqual([]);
-
-    await firm.exclusivelyDependentClientsOfFirm.clear();
-
-    expect(await firm.exclusivelyDependentClientsOfFirm.size()).toBe(0);
-    await firm.exclusivelyDependentClientsOfFirm.reload();
-    expect(await firm.exclusivelyDependentClientsOfFirm.size()).toBe(0);
-    expect(Client.destroyedClientIds.get(firm.id as number) ?? []).toEqual([]);
-
-    expect(await Client.findBy({ id: clientId })).toBeNull();
-  });
-
-  it("clearing without initial access", async () => {
-    const firm = companies("first_firm") as any;
-
-    await firm.clientsOfFirm.clear();
-
-    expect(await firm.clientsOfFirm.size()).toBe(0);
-    await firm.clientsOfFirm.reload();
-    expect(await firm.clientsOfFirm.size()).toBe(0);
-  });
-
-  it.skip("deleting a item which is not in the collection", async () => {
-    // BLOCKED: CollectionAssociation#delete nullifies the FK of a record outside the association scope (has-many-delete-nullify-out-of-scope)
-    await forceSignal37ToLoadAllClientsOfFirm();
-
-    expect((companies("first_firm") as any).clientsOfFirm.loaded).toBeTruthy();
-
-    const summit = (await Client.findBy({ name: "Summit" }))!;
-    await (companies("first_firm") as any).clientsOfFirm.delete(summit);
-    expect(await (companies("first_firm") as any).clientsOfFirm.size()).toBe(2);
-    await (companies("first_firm") as any).clientsOfFirm.reload();
-    expect(await (companies("first_firm") as any).clientsOfFirm.size()).toBe(2);
-    expect(summit.client_of).toBe(2);
-  });
-
-  it("destroy all", async () => {
-    await forceSignal37ToLoadAllClientsOfFirm();
-
-    expect((companies("first_firm") as any).clientsOfFirm.loaded).toBeTruthy();
-
-    const clients = await (companies("first_firm") as any).clientsOfFirm.toArray();
-    expect(clients.length === 0).toBeFalsy();
-    const destroyed = await (companies("first_firm") as any).clientsOfFirm.destroyAll();
-    expect([...destroyed].sort((a: any, b: any) => Number(a.id) - Number(b.id))).toEqual(
-      [...clients].sort((a: any, b: any) => Number(a.id) - Number(b.id)),
-    );
-    expect(destroyed.every((client: any) => client.isFrozen())).toBeTruthy();
-    expect(await (companies("first_firm") as any).clientsOfFirm.isEmpty()).toBeTruthy();
-    await (companies("first_firm") as any).clientsOfFirm.reload();
-    expect(await (companies("first_firm") as any).clientsOfFirm.isEmpty()).toBeTruthy();
-  });
-
-  async function forceSignal37ToLoadAllClientsOfFirm(): Promise<unknown> {
-    return await (companies("first_firm") as any).clientsOfFirm.loadTarget();
-  }
 });
