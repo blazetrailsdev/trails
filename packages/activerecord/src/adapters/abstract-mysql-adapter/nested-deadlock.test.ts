@@ -1,4 +1,5 @@
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
+import { assertRaises } from "@blazetrails/activesupport";
 import { Thread } from "@blazetrails/ruby-compat";
 import { describeIfMysqlAdapter, leaseMysqlAdapter } from "./test-helper.js";
 import { fixtures } from "../../test-fixtures.js";
@@ -71,46 +72,46 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
     it("deadlock correctly raises Deadlocked inside nested SavepointTransaction", async () => {
       const connection = await Sample.leaseConnection();
-      const barrier = cyclicBarrier(2);
+      await assertRaises([Deadlocked], {}, async () => {
+        const barrier = cyclicBarrier(2);
 
-      const s1 = await Sample.create({ value: 1 });
-      const s2 = await Sample.create({ value: 2 });
+        const s1 = await Sample.create({ value: 1 });
+        const s2 = await Sample.create({ value: 2 });
 
-      const thread = new Thread(async () =>
-        Sample.transaction(async () => {
+        const thread = new Thread(async () =>
+          Sample.transaction(async () => {
+            await makeParentTransactionDirty();
+            await Sample.transaction(
+              async () => {
+                await assertCurrentTransactionIsSavepointTransaction();
+                await s1.lockBang();
+                await barrier.wait();
+                await s2.update({ value: 1 });
+              },
+              { requiresNew: true },
+            );
+          }),
+        ).value();
+
+        const main = Sample.transaction(async () => {
           await makeParentTransactionDirty();
           await Sample.transaction(
             async () => {
               await assertCurrentTransactionIsSavepointTransaction();
-              await s1.lockBang();
+              await s2.lockBang();
               await barrier.wait();
-              await s2.update({ value: 1 });
+              await s1.update({ value: 2 });
             },
             { requiresNew: true },
           );
-        }),
-      ).value();
+        });
 
-      const main = Sample.transaction(async () => {
-        await makeParentTransactionDirty();
-        await Sample.transaction(
-          async () => {
-            await assertCurrentTransactionIsSavepointTransaction();
-            await s2.lockBang();
-            await barrier.wait();
-            await s1.update({ value: 2 });
-          },
-          { requiresNew: true },
-        );
+        const outcomes = await Promise.allSettled([thread, main]);
+        const errors = outcomes.filter((o) => o.status === "rejected").map((o) => o.reason);
+        flunkOnLostSavepoint(errors);
+        if (errors.length > 0) throw errors[0];
       });
-
-      const outcomes = await Promise.allSettled([thread, main]);
-      const errors = outcomes.filter((o) => o.status === "rejected").map((o) => o.reason);
-      flunkOnLostSavepoint(errors);
-      expect(errors).toHaveLength(1);
-      expect(errors[0]).toBeInstanceOf(Deadlocked);
-
-      expect(await connection.active()).toBe(true);
+      expect(await connection.active()).toBeTruthy();
     });
 
     it("rollback exception is swallowed after a rollback", async () => {
@@ -120,16 +121,40 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       const s1 = await Sample.create({ value: 1 });
       const s2 = await Sample.create({ value: 2 });
 
-      const side = async (locked: Sample, updated: Sample, value: number): Promise<void> =>
+      const thread = new Thread(async () =>
         Sample.transaction(async () => {
           await makeParentTransactionDirty();
           await Sample.transaction(
             async () => {
               try {
                 await assertCurrentTransactionIsSavepointTransaction();
-                await locked.lockBang();
+                await s1.lockBang();
                 await barrier.wait();
-                await updated.update({ value });
+                await s2.update({ value: 4 });
+              } catch (e) {
+                if (!(e instanceof Deadlocked)) throw e;
+                deadlocks += 1;
+
+                throw new Rollback();
+              }
+            },
+            { requiresNew: true },
+          );
+
+          await s2.update({ value: 10 });
+        }),
+      ).value();
+
+      try {
+        await Sample.transaction(async () => {
+          await makeParentTransactionDirty();
+          await Sample.transaction(
+            async () => {
+              try {
+                await assertCurrentTransactionIsSavepointTransaction();
+                await s2.lockBang();
+                await barrier.wait();
+                await s1.update({ value: 3 });
               } catch (e) {
                 if (!(e instanceof Deadlocked)) throw e;
                 deadlocks += 1;
@@ -138,14 +163,13 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
             },
             { requiresNew: true },
           );
-          await updated.update({ value: 10 });
+          await s1.update({ value: 10 });
         });
+      } finally {
+        await thread;
+      }
 
-      const thread = new Thread(async () => side(s1, s2, 4)).value();
-      await side(s2, s1, 3);
-      await thread;
-
-      expect(deadlocks).toBe(1);
+      expect(deadlocks).toEqual(1);
       expect(await Sample.pluck("value")).toEqual([10, 10]);
     });
 
@@ -156,16 +180,16 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       const s1 = await Sample.create({ value: 1 });
       const s2 = await Sample.create({ value: 2 });
 
-      const side = async (locked: Sample, updated: Sample, value: number): Promise<void> =>
+      const thread = new Thread(async () =>
         Sample.transaction(async () => {
           await makeParentTransactionDirty();
           try {
             await Sample.transaction(
               async () => {
                 await assertCurrentTransactionIsSavepointTransaction();
-                await locked.lockBang();
+                await s1.lockBang();
                 await barrier.wait();
-                await updated.update({ value });
+                await s2.update({ value: 4 });
               },
               { requiresNew: true },
             );
@@ -173,14 +197,34 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
             if (!(e instanceof Deadlocked)) throw e;
             deadlocks += 1;
           }
-          await updated.update({ value: 10 });
+          await s2.update({ value: 10 });
+        }),
+      ).value();
+
+      try {
+        await Sample.transaction(async () => {
+          await makeParentTransactionDirty();
+          try {
+            await Sample.transaction(
+              async () => {
+                await assertCurrentTransactionIsSavepointTransaction();
+                await s2.lockBang();
+                await barrier.wait();
+                await s1.update({ value: 3 });
+              },
+              { requiresNew: true },
+            );
+          } catch (e) {
+            if (!(e instanceof Deadlocked)) throw e;
+            deadlocks += 1;
+          }
+          await s1.update({ value: 10 });
         });
+      } finally {
+        await thread;
+      }
 
-      const thread = new Thread(async () => side(s1, s2, 4)).value();
-      await side(s2, s1, 3);
-      await thread;
-
-      expect(deadlocks).toBe(1);
+      expect(deadlocks).toEqual(1);
       expect(await Sample.pluck("value")).toEqual([10, 10]);
     });
   });
