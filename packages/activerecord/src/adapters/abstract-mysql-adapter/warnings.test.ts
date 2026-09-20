@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { assertRaises } from "@blazetrails/activesupport";
 import {
   describeIfMysqlAdapter,
   leaseMysqlAdapter,
@@ -22,7 +23,11 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
   describe("WarningsTest", () => {
     it("db_warnings_action :raise on warning", async () => {
       await withDbWarningsAction("raise", async () => {
-        await expect(adapter.execute(`SELECT 1 + 'foo'`)).rejects.toBeInstanceOf(SQLWarning);
+        const error = await assertRaises([SQLWarning], {}, () =>
+          adapter.execute(`SELECT 1 + 'foo'`),
+        );
+
+        expect((error as SQLWarning).connectionPool).toEqual(adapter.pool);
       });
     });
 
@@ -49,26 +54,44 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("db_warnings_action :report on warning", async () => {
-      await withDbWarningsAction("report", async () => {
-        await expect(adapter.execute(`SELECT 1 + 'foo'`)).resolves.toBeDefined();
+      const { ActiveSupport, ErrorReporter } = await import("@blazetrails/activesupport");
+      const previousReporter = ActiveSupport.errorReporter;
+      const errorReporter = new ErrorReporter();
+      const events: Error[] = [];
+      errorReporter.subscribe({
+        report: (error) => {
+          events.push(error);
+        },
       });
+      ActiveSupport.errorReporter = errorReporter;
+      try {
+        await withDbWarningsAction("report", async () => {
+          await adapter.execute(`SELECT 1 + 'foo'`);
+
+          const warningEvent = events[0];
+
+          expect(warningEvent).toBeInstanceOf(SQLWarning);
+          expect(warningEvent.message).toEqual(`Truncated incorrect DOUBLE value: 'foo'`);
+        });
+      } finally {
+        ActiveSupport.errorReporter = previousReporter;
+      }
     });
 
     it("db_warnings_action custom proc on warning", async () => {
-      let captured: SQLWarning | null = null;
-      await withDbWarningsAction(
-        (w) => {
-          captured = w;
-        },
-        async () => {
-          await adapter.execute(`SELECT 1 + 'foo'`);
-        },
-      );
-      expect(captured).toBeInstanceOf(SQLWarning);
-      expect((captured as unknown as SQLWarning).message).toBe(
-        `Truncated incorrect DOUBLE value: 'foo'`,
-      );
-      expect((captured as unknown as SQLWarning).level).toBe("Warning");
+      let warningMessage: string | null = null;
+      let warningLevel: string | null = null;
+      const warningAction = (warning: SQLWarning) => {
+        warningMessage = warning.message;
+        warningLevel = warning.level;
+      };
+
+      await withDbWarningsAction(warningAction, async () => {
+        await adapter.execute(`SELECT 1 + 'foo'`);
+
+        expect(warningMessage).toEqual(`Truncated incorrect DOUBLE value: 'foo'`);
+        expect(warningLevel).toEqual("Warning");
+      });
     });
 
     it("db_warnings_action allows a list of warnings to ignore", async () => {
@@ -87,9 +110,11 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
     it("db_warnings_action ignores note level warnings", async () => {
       await withDbWarningsAction("raise", async () => {
-        await expect(
-          adapter.execute("DROP TABLE IF EXISTS non_existent_table_warnings_test"),
-        ).resolves.toBeDefined();
+        const result = (await adapter.execute(
+          "DROP TABLE IF EXISTS non_existent_table_warnings_test",
+        )) as Mysql2RawResult;
+
+        expect(result.rows ?? []).toEqual([]);
       });
     });
 
@@ -99,11 +124,10 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
           adapter as unknown as { warningCount: () => Promise<number> },
           "warningCount",
         ).mockResolvedValue(1);
-        const raised = adapter.execute(`SELECT 'x'`);
-        await expect(raised).rejects.toBeInstanceOf(SQLWarning);
-        await expect(raised).rejects.toThrow(
-          `Query had warning_count=1 but ‘SHOW WARNINGS’ did not return the warnings. Check MySQL logs or database configuration.`,
-        );
+        const error = await assertRaises([SQLWarning], {}, () => adapter.execute(`SELECT 'x'`));
+
+        const expected = `Query had warning_count=1 but ‘SHOW WARNINGS’ did not return the warnings. Check MySQL logs or database configuration.`;
+        expect(error.message).toEqual(expected);
       });
     });
   });

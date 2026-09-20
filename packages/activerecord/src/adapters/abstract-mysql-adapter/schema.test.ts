@@ -1,4 +1,5 @@
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
+import { assertNothingRaised } from "@blazetrails/activesupport";
 import {
   describeIfMysqlAdapter,
   leaseMysqlAdapter,
@@ -74,20 +75,20 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     it("data source exists?", async () => {
       await withOmgPost(async (OmgPost) => {
         const name = OmgPost.tableName;
-        expect(await adapter.dataSourceExists(name)).toBe(true);
+        expect(await adapter.dataSourceExists(name)).toBeTruthy();
       });
     });
 
     it("data source exists wrong schema", async () => {
       const db = await adapter.currentDatabase();
-      expect(await adapter.dataSourceExists(`${db}.zomg`)).toBe(false);
+      expect(await adapter.dataSourceExists(`${db}.zomg`)).toBeFalsy();
     });
 
     it("dump indexes", async () => {
       const indexes = (await adapter.indexes("key_tests")).sort((a, b) =>
         a.name.localeCompare(b.name),
       );
-      expect(indexes).toHaveLength(3);
+      expect(indexes.length).toEqual(3);
       const byName = (n: string) => indexes.find((i) => i.name === n)!;
       expect(byName("index_key_tests_on_snack").using).toBe("btree");
       expect(byName("index_key_tests_on_snack").type).toBeUndefined();
@@ -100,8 +101,10 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     it("drop temporary table", async () => {
       await adapter.transaction(async () => {
         await adapter.createTable("temp_table", { temporary: true });
-        // eslint-disable-next-line blazetrails/require-table-teardown
-        await adapter.dropTable("temp_table", { temporary: true });
+        await assertNothingRaised(async () => {
+          // eslint-disable-next-line blazetrails/require-table-teardown
+          await adapter.dropTable("temp_table", { temporary: true });
+        });
       });
     });
   });

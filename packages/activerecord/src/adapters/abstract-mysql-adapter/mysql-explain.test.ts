@@ -30,7 +30,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       const supportsExplainAnalyze = isMariaDb
         ? new Version("10.0").compare(String(ver)) >= 0
         : ver.compare("6.0") >= 0;
-      explainOpt = supportsAnalyze || supportsExplainAnalyze ? "analyze" : "extended";
+      explainOpt = supportsAnalyze || supportsExplainAnalyze ? ":analyze" : ":extended";
       expectedClause = supportsAnalyze
         ? "ANALYZE"
         : supportsExplainAnalyze
@@ -38,34 +38,34 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
           : "EXPLAIN EXTENDED";
     });
 
+    it("explain for one query", async () => {
+      const explain = await Author.where({ id: 1 }).explain();
+      expect(explain).toMatch("EXPLAIN SELECT `authors`.* FROM `authors` WHERE `authors`.`id` = 1");
+      expect(explain).toMatch(/authors \|.* const/);
+    });
+
     it("explain with options as symbol", async () => {
-      const result = await Author.where({ id: authors("david").id }).explain(explainOpt);
-      expect(result).toContain(expectedClause);
-      expect(result).toContain("SELECT `authors`");
+      const explain = await Author.where({ id: 1 }).explain(explainOpt);
+      expect(explain).toMatch(
+        `${expectedClause} SELECT \`authors\`.* FROM \`authors\` WHERE \`authors\`.\`id\` = 1`,
+      );
     });
 
     it("explain with options as strings", async () => {
-      const result = await Author.where({ id: authors("david").id }).explain(
-        explainOpt.toUpperCase(),
+      const explain = await Author.where({ id: 1 }).explain(explainOpt.slice(1).toUpperCase());
+      expect(explain).toMatch(
+        `${expectedClause} SELECT \`authors\`.* FROM \`authors\` WHERE \`authors\`.\`id\` = 1`,
       );
-      expect(result).toContain(expectedClause);
-      expect(result).toContain("SELECT `authors`");
     });
 
     it("explain options with eager loading", async () => {
-      const result = await Author.where({ id: authors("david").id })
-        .includes(":posts")
-        .explain(explainOpt);
-      expect(result).toContain(expectedClause);
-      const blocks = result.split("\n\n").filter((b) => /EXPLAIN|ANALYZE/.test(b));
-      expect(blocks.length).toBeGreaterThanOrEqual(2);
-    });
-
-    it("explain for one query", async () => {
-      const result = await adapter.explain("SELECT 1");
-      expect(result).toBeDefined();
-      expect(typeof result).toBe("string");
-      expect(result.length).toBeGreaterThan(0);
+      const explain = await Author.where({ id: 1 }).includes(":posts").explain(explainOpt);
+      expect(explain).toMatch(
+        `${expectedClause} SELECT \`authors\`.* FROM \`authors\` WHERE \`authors\`.\`id\` = 1`,
+      );
+      expect(explain).toMatch(
+        `${expectedClause} SELECT \`posts\`.* FROM \`posts\` WHERE \`posts\`.\`author_id\` = 1`,
+      );
     });
 
     it("Relation#explain on MySQL captures the SELECT via sql.active_record", async () => {

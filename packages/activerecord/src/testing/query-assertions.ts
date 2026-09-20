@@ -72,21 +72,22 @@ export async function assertNoQueries(
   await assertQueriesCount(0, includeSchema, fn);
 }
 
-export async function assertQueriesMatch(
-  match: RegExp,
+export async function assertQueriesMatch<T>(
+  match: RegExp | string,
   count: number | undefined,
   includeSchema = false,
-  fn: () => void | Promise<void>,
-): Promise<void> {
+  fn: () => T | Promise<T>,
+): Promise<T> {
   const counter = new SQLCounter();
-  await Notifications.subscribed(counter, "sql.active_record", async () => {
-    await fn();
+  return await Notifications.subscribed(counter, "sql.active_record", async () => {
+    const result = await fn();
     const queries = includeSchema ? counter.logAll : counter.log;
     const matchedQueries = queries.filter((query) => {
+      if (typeof match === "string") return match === query;
       match.lastIndex = 0;
       return match.test(query);
     });
-    match.lastIndex = 0;
+    if (typeof match !== "string") match.lastIndex = 0;
 
     if (count !== undefined) {
       if (matchedQueries.length !== count) {
@@ -101,13 +102,15 @@ export async function assertQueriesMatch(
         );
       }
     }
+
+    return result;
   });
 }
 
-export async function assertNoQueriesMatch(
-  match: RegExp,
+export async function assertNoQueriesMatch<T>(
+  match: RegExp | string,
   includeSchema = false,
-  fn: () => void | Promise<void>,
-): Promise<void> {
-  await assertQueriesMatch(match, 0, includeSchema, fn);
+  fn: () => T | Promise<T>,
+): Promise<T> {
+  return await assertQueriesMatch(match, 0, includeSchema, fn);
 }

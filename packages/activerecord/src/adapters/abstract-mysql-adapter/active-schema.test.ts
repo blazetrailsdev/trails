@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { captureSql } from "../../testing/sql-capture.js";
+import { assertQueriesMatch } from "../../testing/query-assertions.js";
+import { assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
 import { isRowFormatDynamicByDefault } from "../../connection-adapters/mysql/schema-statements.js";
 import { fixtures } from "../../test-fixtures.js";
 
@@ -36,6 +38,13 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       expect(sqls[0]).toBe(
         "CREATE INDEX `index_people_on_last_name_and_first_name` ON `people` (`last_name`(15), `first_name`(15))",
       );
+      sqls = await captureSql(
+        () => adapter.addIndex("people", ["last_name", "first_name"], { length: 15 }),
+        { stub: adapter },
+      );
+      expect(sqls[0]).toBe(
+        "CREATE INDEX `index_people_on_last_name_and_first_name` ON `people` (`last_name`(15), `first_name`(15))",
+      );
 
       sqls = await captureSql(
         () =>
@@ -45,7 +54,25 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       expect(sqls[0]).toBe(
         "CREATE INDEX `index_people_on_last_name_and_first_name` ON `people` (`last_name`(15), `first_name`)",
       );
+      sqls = await captureSql(
+        () =>
+          adapter.addIndex("people", ["last_name", "first_name"], { length: { last_name: 15 } }),
+        { stub: adapter },
+      );
+      expect(sqls[0]).toBe(
+        "CREATE INDEX `index_people_on_last_name_and_first_name` ON `people` (`last_name`(15), `first_name`)",
+      );
 
+      sqls = await captureSql(
+        () =>
+          adapter.addIndex("people", ["last_name", "first_name"], {
+            length: { last_name: 15, first_name: 10 },
+          }),
+        { stub: adapter },
+      );
+      expect(sqls[0]).toBe(
+        "CREATE INDEX `index_people_on_last_name_and_first_name` ON `people` (`last_name`(15), `first_name`(10))",
+      );
       sqls = await captureSql(
         () =>
           adapter.addIndex("people", ["last_name", "first_name"], {
@@ -95,10 +122,11 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
       try {
         await adapter.addIndex("people", "first_name");
-        expect(await adapter.indexExists("people", "first_name")).toBe(true);
-        await expect(
-          adapter.addIndex("people", "first_name", { ifNotExists: true }),
-        ).resolves.toBeUndefined();
+        expect(await adapter.indexExists("people", "first_name")).toBeTruthy();
+
+        await assertNothingRaised(async () => {
+          await adapter.addIndex("people", "first_name", { ifNotExists: true });
+        });
       } finally {
         await adapter.removeIndex("people", "first_name", { ifExists: true });
       }
@@ -146,27 +174,28 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
     it("index in bulk change", async () => {
       for (const type of ["SPATIAL", "FULLTEXT", "UNIQUE"]) {
-        const sqls = await captureSql(
+        const expected = `ALTER TABLE \`people\` ADD ${type} INDEX \`index_people_on_last_name\` (\`last_name\`)`;
+        await captureSql(
           () =>
-            adapter.changeTable("people", { bulk: true }, (t) => {
-              return t.index("last_name", { type });
-            }),
+            assertQueriesMatch(expected, undefined, false, () =>
+              adapter.changeTable("people", { bulk: true }, (t) => {
+                return t.index("last_name", { type });
+              }),
+            ),
           { stub: adapter },
-        );
-        expect(sqls[0]).toBe(
-          `ALTER TABLE \`people\` ADD ${type} INDEX \`index_people_on_last_name\` (\`last_name\`)`,
         );
       }
 
-      const sqls = await captureSql(
+      const expected =
+        "ALTER TABLE `people` ADD INDEX `index_people_on_last_name` USING btree (`last_name`(10)), ALGORITHM = COPY";
+      await captureSql(
         () =>
-          adapter.changeTable("people", { bulk: true }, (t) => {
-            return t.index("last_name", { length: 10, using: "btree", algorithm: "copy" });
-          }),
+          assertQueriesMatch(expected, undefined, false, () =>
+            adapter.changeTable("people", { bulk: true }, (t) => {
+              return t.index("last_name", { length: 10, using: "btree", algorithm: "copy" });
+            }),
+          ),
         { stub: adapter },
-      );
-      expect(sqls[0]).toBe(
-        "ALTER TABLE `people` ADD INDEX `index_people_on_last_name` USING btree (`last_name`(10)), ALGORITHM = COPY",
       );
     });
 
@@ -189,11 +218,12 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         const sqls = await captureSql(() => adapter.createDatabase("matt"), { stub: adapter });
         expect(sqls[0]).toBe("CREATE DATABASE `matt` DEFAULT CHARACTER SET `utf8mb4`");
       } else {
-        await expect(
+        const error = await assertRaises([Error], {}, () =>
           captureSql(() => adapter.createDatabase("matt"), { stub: adapter }),
-        ).rejects.toThrow(
-          "Configure a supported :charset and ensure innodb_large_prefix is enabled to support indexes on varchar(255) string columns.",
         );
+        const expected =
+          "Configure a supported :charset and ensure innodb_large_prefix is enabled to support indexes on varchar(255) string columns.";
+        expect(error.message).toBe(expected);
       }
 
       let sqls = await captureSql(
@@ -210,11 +240,13 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("recreate mysql database with encoding", async () => {
+      await captureSql(() => adapter.createDatabase("luca", { charset: "latin1" }), {
+        stub: adapter,
+      });
       const sqls = await captureSql(() => adapter.recreateDatabase("luca", { charset: "latin1" }), {
         stub: adapter,
       });
-      expect(sqls).toContain("DROP DATABASE IF EXISTS `luca`");
-      expect(sqls).toContain("CREATE DATABASE `luca` DEFAULT CHARACTER SET `latin1`");
+      expect(sqls[sqls.length - 1]).toBe("CREATE DATABASE `luca` DEFAULT CHARACTER SET `latin1`");
     });
 
     it("add column", async () => {
@@ -249,8 +281,8 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       try {
         await ss.createTable("delete_me", { force: true });
         await ss.addTimestamps("delete_me", { null: true });
-        expect(await ss.columnExists("delete_me", "updated_at")).toBe(true);
-        expect(await ss.columnExists("delete_me", "created_at")).toBe(true);
+        expect(await ss.columnExists("delete_me", "updated_at", "datetime")).toBeTruthy();
+        expect(await ss.columnExists("delete_me", "created_at", "datetime")).toBeTruthy();
       } finally {
         await ss.dropTable("delete_me", { ifExists: true });
       }
@@ -262,8 +294,8 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
           t.timestamps({ null: true });
         });
         await ss.removeTimestamps("delete_me");
-        expect(await ss.columnExists("delete_me", "updated_at")).toBe(false);
-        expect(await ss.columnExists("delete_me", "created_at")).toBe(false);
+        expect(await ss.columnExists("delete_me", "updated_at", "datetime")).toBeFalsy();
+        expect(await ss.columnExists("delete_me", "created_at", "datetime")).toBeFalsy();
       } finally {
         await ss.dropTable("delete_me", { ifExists: true });
       }
