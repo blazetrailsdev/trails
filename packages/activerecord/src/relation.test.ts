@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { ValueType } from "@blazetrails/activemodel";
 import { assert, assertNot, assertNotRespondTo, assertRaises } from "@blazetrails/activesupport";
 import { isEmpty } from "@blazetrails/ruby-compat";
+import { sql as arelSql } from "@blazetrails/arel";
 import { Relation } from "./index.js";
 import { WhereClause } from "./relation/where-clause.js";
 import { Base } from "./base.js";
@@ -340,9 +341,9 @@ describe("RelationTest", () => {
 
   it("merging a hash into a relation", () => {
     let relation = new Relation(CanonPost);
-    relation = relation.merge({ where: { title: ":lol" }, readonly: true } as any);
+    relation = relation.merge({ where: { name: ":lol" }, readonly: true } as any);
 
-    expect(relation.whereClause.toH()).toEqual({ title: ":lol" });
+    expect(relation.whereClause.toH()).toEqual({ name: ":lol" });
     expect(relation.readonlyValue).toBe(true);
   });
 
@@ -377,9 +378,16 @@ describe("RelationTest", () => {
   });
 
   it("merging a hash interpolates conditions", () => {
-    const relation = new Relation(CanonPost);
-    relation.mergeBang({ where: ["title = ?", "bar"] } as any);
-    expect(relation.whereClause.toH()).toEqual({});
+    class Klass extends CanonPost {
+      static override sanitizeSql(args: unknown): string {
+        if (JSON.stringify(args) !== JSON.stringify(["foo = ?", "bar"])) throw new Error();
+        return "foo = bar";
+      }
+    }
+
+    const relation = new Relation(Klass);
+    relation.mergeBang({ where: ["foo = ?", "bar"] } as any);
+    expect(relation.whereClause).toEqual(new WhereClause([arelSql("(foo = ?)", "bar")]));
   });
 
   it("merging readonly false", () => {
