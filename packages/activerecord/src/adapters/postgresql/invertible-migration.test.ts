@@ -5,20 +5,9 @@ import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
-  beforeEach(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
-  });
-  afterEach(async () => {
-    await adapter.dropTable("enums", { ifExists: true }).catch(() => {});
-    await adapter.dropTable("settings", { ifExists: true }).catch(() => {});
-    await adapter.dropTable("bars", { ifExists: true }).catch(() => {});
-    await adapter.dropTable("foos", { ifExists: true }).catch(() => {});
-    await adapter.dropEnum("color", { ifExists: true }).catch(() => {});
-    await adapter.disconnectBang();
-  });
 
   class SilentMigration extends Migration<PostgreSQLAdapter> {
-    override write(): void {}
+    override write(..._args: unknown[]): void {}
   }
 
   class ExpressionIndexMigration extends SilentMigration {
@@ -71,6 +60,18 @@ describeIfPg("PostgreSQLAdapter", () => {
       await this.validateForeignKey("bars", "foos");
     }
   }
+
+  beforeEach(async () => {
+    adapter = new PostgreSQLAdapter(PG_TEST_URL);
+  });
+  afterEach(async () => {
+    await adapter.dropTable("enums", { ifExists: true }).catch(() => {});
+    await adapter.dropTable("settings", { ifExists: true }).catch(() => {});
+    await adapter.dropTable("bars", { ifExists: true }).catch(() => {});
+    await adapter.dropTable("foos", { ifExists: true }).catch(() => {});
+    await adapter.dropEnum("color", { ifExists: true }).catch(() => {});
+    await adapter.disconnectBang();
+  });
 
   describe("PostgresqlInvertibleMigrationTest", () => {
     it("migrate and revert", async () => {
