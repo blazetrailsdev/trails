@@ -17,7 +17,11 @@ describeIfPg("PostgreSQLAdapter", () => {
     await adapter.disconnectBang();
   });
 
-  class ExpressionIndexMigration extends Migration {
+  class SilentMigration extends Migration<PostgreSQLAdapter> {
+    override write(): void {}
+  }
+
+  class ExpressionIndexMigration extends SilentMigration {
     async change() {
       await this.createTable("settings", (t) => {
         t.column("data", "jsonb");
@@ -30,28 +34,28 @@ describeIfPg("PostgreSQLAdapter", () => {
     }
   }
 
-  class CreateEnumMigration extends Migration<PostgreSQLAdapter> {
+  class CreateEnumMigration extends SilentMigration {
     async change() {
       await this.createEnum("color", ["blue", "green"]);
       await this.createTable("enums", (t) => {
-        t.enum("bestColor", { enumType: "color", default: "blue", null: false });
+        t.enum("best_color", { enumType: "color", default: "blue", null: false });
       });
     }
   }
 
-  class DropEnumMigration extends Migration {
+  class DropEnumMigration extends SilentMigration {
     async change() {
       await this.dropEnum("color", ["blue", "green"], { ifExists: true });
     }
   }
 
-  class RenameEnumValueMigration extends Migration {
+  class RenameEnumValueMigration extends SilentMigration {
     async change() {
       await this.renameEnumValue("color", { from: "blue", to: "red" });
     }
   }
 
-  class AddAndValidateCheckConstraint extends Migration {
+  class AddAndValidateCheckConstraint extends SilentMigration {
     async change() {
       await this.addCheckConstraint("settings", "value >= 0", {
         name: "positive_value",
@@ -61,7 +65,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     }
   }
 
-  class AddAndValidateForeignKey extends Migration {
+  class AddAndValidateForeignKey extends SilentMigration {
     async change() {
       await this.addForeignKey("bars", "foos", { validate: false });
       await this.validateForeignKey("bars", "foos");
@@ -104,7 +108,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await new CreateEnumMigration().execMigration(adapter, "up");
 
       expect(
-        await adapter.columnExists("enums", "bestColor", null, { default: "blue", null: false }),
+        await adapter.columnExists("enums", "best_color", null, { default: "blue", null: false }),
       ).toBeTruthy();
       expect(await adapter.enumTypes()).toEqual([["color", ["blue", "green"]]]);
 
