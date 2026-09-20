@@ -604,7 +604,8 @@ describe("TransactionTest", () => {
   });
 
   it("cancellation from before destroy rollbacks in destroy", async () => {
-    first.beforeDestroyForTransaction = () => {
+    first.beforeDestroyForTransaction = async () => {
+      await Book.create({});
       kernelThrow(":abort");
     };
     const nbooksBeforeDestroy = await Book.count();

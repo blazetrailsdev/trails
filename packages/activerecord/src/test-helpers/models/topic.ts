@@ -140,15 +140,9 @@ export class Topic extends Base {
     });
     this.beforeValidation((record: Topic) => (record as any).beforeValidationForTransaction());
     this.beforeSave((record: Topic) => (record as any).beforeSaveForTransaction());
-    this.beforeDestroy((record: Topic) => {
-      (record as any).beforeDestroyForTransaction();
-    });
-    this.afterSave((record: Topic) => {
-      (record as any).afterSaveForTransaction();
-    });
-    this.afterCreate((record: Topic) => {
-      (record as any).afterCreateForTransaction();
-    });
+    this.beforeDestroy((record: Topic) => (record as any).beforeDestroyForTransaction());
+    this.afterSave((record: Topic) => (record as any).afterSaveForTransaction());
+    this.afterCreate((record: Topic) => (record as any).afterCreateForTransaction());
     this.afterInitialize((record: Topic) => {
       (record as any).setEmailAddress();
     });
