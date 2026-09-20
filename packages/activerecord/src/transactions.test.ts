@@ -1,4 +1,4 @@
-import { kernelThrow } from "@blazetrails/ruby-compat";
+import { kernelThrow, FrozenError } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { transaction, Rollback, registerModel, RecordInvalid } from "./index.js";
 import { afterAllTransactionsCommit } from "./active-record.js";
@@ -18,6 +18,14 @@ import { assertQueriesMatch, assertNoQueries } from "./testing/query-assertions.
 import { captureSql } from "./testing/sql-capture.js";
 import { StatementInvalid, RecordNotUnique } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
+import {
+  assertCalled,
+  assertNoDifference,
+  assertNotCalled,
+  assertNothingRaised,
+  assertRaises,
+} from "@blazetrails/activesupport";
+import { ARUnit2Model } from "./test-helpers/models/arunit2-model.js";
 
 const Topic = CanonicalTopic;
 for (const klass of [
@@ -70,24 +78,24 @@ describe("TransactionTest", () => {
   });
 
   it("transaction open?", async () => {
-    expect(Topic.currentTransaction().isClosed()).toBe(true);
+    expect(Topic.currentTransaction().isClosed()).toBeTruthy();
 
     let committedTransaction: any = null;
     await Topic.transaction(async () => {
-      expect(Topic.currentTransaction().isOpen()).toBe(true);
+      expect(Topic.currentTransaction().isOpen()).toBeTruthy();
       committedTransaction = Topic.currentTransaction();
     });
-    expect(committedTransaction.isClosed()).toBe(true);
+    expect(committedTransaction.isClosed()).toBeTruthy();
 
     let rolledbackTransaction: any = null;
     await expect(
       Topic.transaction(async () => {
-        expect(Topic.currentTransaction().isOpen()).toBe(true);
+        expect(Topic.currentTransaction().isOpen()).toBeTruthy();
         rolledbackTransaction = Topic.currentTransaction();
         throw new Error("SomeError");
       }),
     ).rejects.toThrow("SomeError");
-    expect(rolledbackTransaction.isClosed()).toBe(true);
+    expect(rolledbackTransaction.isClosed()).toBeTruthy();
   });
 
   it("after all transactions commit", async () => {
@@ -197,6 +205,18 @@ describe("TransactionTest", () => {
     });
     expect(called).toBe(0);
 
+    called = 0;
+    await ARUnit2Model.transaction(async () => {
+      await Topic.transaction(async () => {
+        await Topic.currentTransaction().afterCommit(() => {
+          called += 1;
+        });
+        expect(called).toBe(0);
+      });
+      expect(called).toBe(1);
+    });
+    expect(called).toBe(1);
+
     let committedTransaction: any = null;
     await Topic.transaction(async () => {
       committedTransaction = Topic.currentTransaction();
@@ -248,15 +268,17 @@ describe("TransactionTest", () => {
 
     called = 0;
     await Topic.transaction(async () => {
-      await Topic.transaction(
-        async () => {
-          Topic.currentTransaction().afterRollback(() => {
-            called += 1;
-          });
-          throw new Rollback();
-        },
-        { requiresNew: true },
-      );
+      await assertNothingRaised(async () => {
+        await Topic.transaction(
+          async () => {
+            Topic.currentTransaction().afterRollback(() => {
+              called += 1;
+            });
+            throw new Rollback();
+          },
+          { requiresNew: true },
+        );
+      });
       expect(called).toBe(1);
     });
     expect(called).toBe(1);
@@ -271,9 +293,9 @@ describe("TransactionTest", () => {
   });
 
   it("blank?", async () => {
-    expect(Topic.currentTransaction().isBlank()).toBe(true);
+    expect(Topic.currentTransaction().isBlank()).toBeTruthy();
     await Topic.transaction(async () => {
-      expect(Topic.currentTransaction().isBlank()).toBe(false);
+      expect(Topic.currentTransaction().isBlank()).toBeFalsy();
     });
   });
 
@@ -357,21 +379,21 @@ describe("TransactionTest", () => {
 
   it("persisted in a model with custom primary key after failed save", async () => {
     const movie = (await Movie.create({})) as any;
-    expect(movie.isPersisted()).toBe(false);
+    expect(movie.isPersisted()).toBeFalsy();
   });
 
   it("raise after destroy", async () => {
-    expect(first.isFrozen()).toBe(false);
+    expect(first.isFrozen()).toBeFalsy();
 
     await expect(
       Topic.transaction(async () => {
         await first.destroy();
-        expect(first.isFrozen()).toBe(true);
+        expect(first.isFrozen()).toBeTruthy();
         throw new Error("boom");
       }),
     ).rejects.toThrow();
 
-    expect(first.isFrozen()).toBe(false);
+    expect(first.isFrozen()).toBeFalsy();
   });
 
   it("successful", async () => {
@@ -382,8 +404,8 @@ describe("TransactionTest", () => {
       await second.save();
     });
 
-    expect(((await Topic.find(1)) as any).approved).toBe(true);
-    expect(((await Topic.find(2)) as any).approved).toBe(false);
+    expect(((await Topic.find(1)) as any).approved).toBeTruthy();
+    expect(((await Topic.find(2)) as any).approved).toBeFalsy();
   });
 
   it("add to null transaction", async () => {
@@ -413,10 +435,10 @@ describe("TransactionTest", () => {
         );
         return;
       });
-      expect(committed).toBe(true);
+      expect(committed).toBeTruthy();
 
-      expect(((await Topic.find(1)) as any).approved).toBe(true);
-      expect(((await Topic.find(2)) as any).approved).toBe(false);
+      expect(((await Topic.find(1)) as any).approved).toBeTruthy();
+      expect(((await Topic.find(2)) as any).approved).toBeFalsy();
     } finally {
       spy.mockRestore();
     }
@@ -430,24 +452,37 @@ describe("TransactionTest", () => {
     await first.transaction(async () => {
       expect(first.approved).toBeFalsy();
       await first.updateBang({ approved: true });
-      return;
+
+      if (true as boolean) return;
+
+      expect(first.approved).toBeTruthy();
+      await first.updateBang({ approved: false });
     });
 
-    expect(((await Topic.find(1)) as any).approved).toBe(true);
+    expect(((await Topic.find(1)) as any).approved).toBeTruthy();
+    expect(((await Topic.find(2)) as any).approved).toBeTruthy();
   });
 
   it.skip("throw from transaction commits", () => {
     // PERMANENT-SKIP: Ruby-only — catch/throw is non-exceptional control flow
   });
 
-  it("return from transaction commits", async () => {
+  async function _testReturnFromTransaction71Behavior() {
     await first.transaction(async () => {
       expect(first.approved).toBeFalsy();
       await first.updateBang({ approved: true });
-      return;
-    });
 
-    expect(((await Topic.find(1)) as any).approved).toBe(true);
+      if (true as boolean) return;
+
+      expect(first.approved).toBeTruthy();
+      await first.updateBang({ approved: false });
+    });
+  }
+
+  it("return from transaction commits", async () => {
+    await _testReturnFromTransaction71Behavior();
+    expect(((await Topic.find(1)) as any).approved).toBeTruthy();
+    expect(((await Topic.find(2)) as any).approved).toBeTruthy();
   });
 
   it("number of transactions in commit", async () => {
@@ -478,8 +513,8 @@ describe("TransactionTest", () => {
       await second.save();
     });
 
-    expect(((await Topic.find(1)) as any).approved).toBe(true);
-    expect(((await Topic.find(2)) as any).approved).toBe(false);
+    expect(((await Topic.find(1)) as any).approved).toBeTruthy();
+    expect(((await Topic.find(2)) as any).approved).toBeFalsy();
   });
 
   it("failing on exception", async () => {
@@ -493,11 +528,11 @@ describe("TransactionTest", () => {
       });
     } catch {}
 
-    expect(first.approved).toBe(true);
-    expect(second.approved).toBe(false);
+    expect(first.approved).toBeTruthy();
+    expect(second.approved).toBeFalsy();
 
-    expect(((await Topic.find(1)) as any).approved).toBe(false);
-    expect(((await Topic.find(2)) as any).approved).toBe(true);
+    expect(((await Topic.find(1)) as any).approved).toBeFalsy();
+    expect(((await Topic.find(2)) as any).approved).toBeTruthy();
   });
 
   it("raising exception in callback rollbacks in save", async () => {
@@ -506,12 +541,11 @@ describe("TransactionTest", () => {
     };
 
     first.approved = true;
-    const e = await first.save().then(
-      () => null,
-      (err: unknown) => err,
-    );
-    expect((e as Error).message).toBe("Make the transaction rollback");
-    expect(((await Topic.find(1)) as any).approved).toBe(false);
+    const e = await assertRaises([Error], {}, async () => {
+      await first.save();
+    });
+    expect(e.message).toBe("Make the transaction rollback");
+    expect(((await Topic.find(1)) as any).approved).toBeFalsy();
   });
 
   it("rolling back in a callback rollbacks before save", async () => {
@@ -520,9 +554,11 @@ describe("TransactionTest", () => {
     };
     expect(first.approved).toBeFalsy();
 
-    await Topic.transaction(async () => {
-      first.approved = true;
-      await first.saveBang();
+    await assertNotCalled(first, "rolledbackBang", null, async () => {
+      await Topic.transaction(async () => {
+        first.approved = true;
+        await first.saveBang();
+      });
     });
 
     expect(((await Topic.find(first.id)) as any).approved).toBeFalsy();
@@ -540,20 +576,20 @@ describe("TransactionTest", () => {
       }),
     ).rejects.toThrow("Make the transaction rollback");
 
-    expect(topic.isNewRecord()).toBe(true);
+    expect(topic.isNewRecord()).toBeTruthy();
   });
 
   it("transaction state is cleared when record is persisted", async () => {
     const author = (await Author.createBang({ name: "foo" })) as any;
     author.name = null;
     expect(await author.save()).toBeFalsy();
-    expect(author.isNewRecord()).toBe(false);
+    expect(author.isNewRecord()).toBeFalsy();
   });
 
   it("update should rollback on failure", async () => {
     const author = (await Author.find(1)) as any;
     const postsCount = await author.posts.size();
-    expect(postsCount).toBeGreaterThan(0);
+    expect(postsCount > 0).toBeTruthy();
     const status = await author.update({ name: null, postIds: [] });
     expect(status).toBeFalsy();
     expect(await (await author.posts.reload()).size()).toBe(postsCount);
@@ -562,7 +598,7 @@ describe("TransactionTest", () => {
   it("update should rollback on failure!", async () => {
     const author = (await Author.find(1)) as any;
     const postsCount = await author.posts.size();
-    expect(postsCount).toBeGreaterThan(0);
+    expect(postsCount > 0).toBeTruthy();
     await expect(author.updateBang({ name: null, postIds: [] })).rejects.toThrow(RecordInvalid);
     expect(await (await author.posts.reload()).size()).toBe(postsCount);
   });
@@ -571,10 +607,11 @@ describe("TransactionTest", () => {
     first.beforeDestroyForTransaction = () => {
       kernelThrow(":abort");
     };
+    const nbooksBeforeDestroy = await Book.count();
     const status = await first.destroy();
     expect(status).toBeFalsy();
     await first.reload();
-    expect(await Topic.find(first.id)).toBeDefined();
+    expect(await Book.count()).toBe(nbooksBeforeDestroy);
   });
 
   for (const filter of ["validation", "save"] as const) {
@@ -629,13 +666,22 @@ describe("TransactionTest", () => {
     }) as any;
 
     const newRecordSnapshot = !newTopic.isPersisted();
+    const idPresent = newTopic.hasAttribute(Topic.primaryKey);
     const idSnapshot = newTopic.id;
 
     for (let i = 0; i < 2; i++) {
       newTopic.approved = true;
-      await expect(newTopic.save()).rejects.toThrow("Make the transaction rollback");
+      const e = await assertRaises([Error], {}, async () => {
+        await newTopic.save();
+      });
+      expect(e.message).toBe("Make the transaction rollback");
       expect(!newTopic.isPersisted()).toBe(newRecordSnapshot);
-      expect(newTopic.id).toBe(idSnapshot);
+      if (idSnapshot == null) {
+        expect(newTopic.id).toBeNull();
+      } else {
+        expect(newTopic.id).toBe(idSnapshot);
+      }
+      expect(newTopic.hasAttribute(Topic.primaryKey)).toBe(idPresent);
     }
   });
 
@@ -647,7 +693,7 @@ describe("TransactionTest", () => {
     registerModel(RecordInvalidTopic as any);
 
     const newTopic = (await RecordInvalidTopic.create({ title: "A new topic" })) as any;
-    expect(newTopic.isPersisted()).toBe(false);
+    expect(newTopic.isPersisted()).toBeFalsy();
     expect(newTopic.id).toBeNull();
   });
 
@@ -659,7 +705,7 @@ describe("TransactionTest", () => {
     registerModel(RollbackTopic as any);
 
     const newTopic = (await RollbackTopic.create({ title: "A new topic" })) as any;
-    expect(newTopic.isPersisted()).toBe(false);
+    expect(newTopic.isPersisted()).toBeFalsy();
     expect(newTopic.id).toBeNull();
   });
 
@@ -673,8 +719,8 @@ describe("TransactionTest", () => {
       });
     });
 
-    expect(((await Topic.find(1)) as any).approved).toBe(true);
-    expect(((await Topic.find(2)) as any).approved).toBe(false);
+    expect(((await Topic.find(1)) as any).approved).toBeTruthy();
+    expect(((await Topic.find(2)) as any).approved).toBeFalsy();
   });
 
   it("nested transaction with new transaction applies parent state on rollback", async () => {
@@ -686,16 +732,16 @@ describe("TransactionTest", () => {
       await Topic.transaction(
         async () => {
           await topicTwo.save();
-          expect(topicOne.isPersisted()).toBe(true);
-          expect(topicTwo.isPersisted()).toBe(true);
+          expect(topicOne.isPersisted()).toBeTruthy();
+          expect(topicTwo.isPersisted()).toBeTruthy();
         },
         { requiresNew: true },
       );
       throw new Rollback();
     });
 
-    expect(topicOne.isPersisted()).toBe(false);
-    expect(topicTwo.isPersisted()).toBe(false);
+    expect(topicOne.isPersisted()).toBeFalsy();
+    expect(topicTwo.isPersisted()).toBeFalsy();
   });
 
   it("nested transaction without new transaction applies parent state on rollback", async () => {
@@ -706,14 +752,14 @@ describe("TransactionTest", () => {
       await topicOne.save();
       await Topic.transaction(async () => {
         await topicTwo.save();
-        expect(topicOne.isPersisted()).toBe(true);
-        expect(topicTwo.isPersisted()).toBe(true);
+        expect(topicOne.isPersisted()).toBeTruthy();
+        expect(topicTwo.isPersisted()).toBeTruthy();
       });
       throw new Rollback();
     });
 
-    expect(topicOne.isPersisted()).toBe(false);
-    expect(topicTwo.isPersisted()).toBe(false);
+    expect(topicOne.isPersisted()).toBeFalsy();
+    expect(topicTwo.isPersisted()).toBeFalsy();
   });
 
   it("double nested transaction applies parent state on rollback", async () => {
@@ -729,15 +775,15 @@ describe("TransactionTest", () => {
           await topicThree.save();
         });
       });
-      expect(topicOne.isPersisted()).toBe(true);
-      expect(topicTwo.isPersisted()).toBe(true);
-      expect(topicThree.isPersisted()).toBe(true);
+      expect(topicOne.isPersisted()).toBeTruthy();
+      expect(topicTwo.isPersisted()).toBeTruthy();
+      expect(topicThree.isPersisted()).toBeTruthy();
       throw new Rollback();
     });
 
-    expect(topicOne.isPersisted()).toBe(false);
-    expect(topicTwo.isPersisted()).toBe(false);
-    expect(topicThree.isPersisted()).toBe(false);
+    expect(topicOne.isPersisted()).toBeFalsy();
+    expect(topicTwo.isPersisted()).toBeFalsy();
+    expect(topicThree.isPersisted()).toBeFalsy();
   });
 
   it("manually rolling back a transaction", async () => {
@@ -749,11 +795,11 @@ describe("TransactionTest", () => {
       throw new Rollback();
     });
 
-    expect(first.approved).toBe(true);
-    expect(second.approved).toBe(false);
+    expect(first.approved).toBeTruthy();
+    expect(second.approved).toBeFalsy();
 
-    expect(((await Topic.find(1)) as any).approved).toBe(false);
-    expect(((await Topic.find(2)) as any).approved).toBe(true);
+    expect(((await Topic.find(1)) as any).approved).toBeFalsy();
+    expect(((await Topic.find(2)) as any).approved).toBeTruthy();
   });
 
   it("invalid keys for transaction", async () => {
@@ -781,8 +827,8 @@ describe("TransactionTest", () => {
       } catch {}
     });
 
-    expect((await first.reload()).approved).toBe(true);
-    expect((await second.reload()).approved).toBe(false);
+    expect((await first.reload()).approved).toBeTruthy();
+    expect((await second.reload()).approved).toBeFalsy();
   });
 
   itIfSupports("savepoints", "force savepoint on instance", async () => {
@@ -804,8 +850,8 @@ describe("TransactionTest", () => {
       } catch {}
     });
 
-    expect((await first.reload()).approved).toBe(true);
-    expect((await second.reload()).approved).toBe(false);
+    expect((await first.reload()).approved).toBeTruthy();
+    expect((await second.reload()).approved).toBeFalsy();
   });
 
   itIfSupports("savepoints", "no savepoint in nested transaction without force", async () => {
@@ -824,8 +870,8 @@ describe("TransactionTest", () => {
       } catch {}
     });
 
-    expect((await first.reload()).approved).toBe(false);
-    expect((await second.reload()).approved).toBe(false);
+    expect((await first.reload()).approved).toBeFalsy();
+    expect((await second.reload()).approved).toBeFalsy();
   });
 
   itIfSupports("savepoints", "many savepoints", async () => {
@@ -890,39 +936,47 @@ describe("TransactionTest", () => {
       first.approved = false;
       await first.saveBang();
       await connection.rollbackToSavepoint("first");
-      expect((await first.reload()).approved).toBe(true);
+      expect((await first.reload()).approved).toBeTruthy();
 
       first.approved = false;
       await first.saveBang();
       await connection.releaseSavepoint("first");
-      expect((await first.reload()).approved).toBe(false);
+      expect((await first.reload()).approved).toBeFalsy();
     });
   });
 
   it("rollback when commit raises", async () => {
     const connection = await (Topic as any).leaseConnection();
-    const spy = vi.spyOn(connection, "commitDbTransaction").mockImplementation(async () => {
-      throw new Error("OH NOES");
-    });
 
-    try {
-      await expect(
-        Topic.transaction(async () => {
-          await connection.materializeTransactions();
-        }),
-      ).rejects.toThrow("OH NOES");
-    } finally {
-      spy.mockRestore();
-    }
+    await assertCalled(connection, "beginDbTransaction", null, {}, async () => {
+      const spy = vi.spyOn(connection, "commitDbTransaction").mockImplementation(async () => {
+        throw new Error("OH NOES");
+      });
+      try {
+        await assertCalled(connection, "rollbackDbTransaction", null, {}, async () => {
+          const e = await assertRaises([Error], {}, async () => {
+            await Topic.transaction(async () => {
+              await connection.materializeTransactions();
+            });
+          });
+          expect(e.message).toBe("OH NOES");
+        });
+      } finally {
+        spy.mockRestore();
+      }
+    });
   });
 
   it("rollback when saving a frozen record", async () => {
     const topic = Topic.new({ title: "test" }) as any;
     topic.freeze();
-    await expect(topic.save()).rejects.toThrow(/frozen/i);
-    expect(topic.isPersisted()).toBe(false);
+    const e = await assertRaises([FrozenError], {}, async () => {
+      await topic.save();
+    });
+    expect(e.message).toMatch(/frozen/i);
+    expect(topic.isPersisted()).toBeFalsy();
     expect(topic.id).toBeNull();
-    expect(topic.isFrozen()).toBe(true);
+    expect(topic.isFrozen()).toBeTruthy();
   });
 
   it.skip("rollback when thread killed", () => {
@@ -930,31 +984,44 @@ describe("TransactionTest", () => {
   });
 
   it("restore active record state for all records in a transaction", async () => {
+    class TopicWithoutCallbacks extends Base {
+      static {
+        this._tableName = "topics";
+      }
+    }
+    registerModel(TopicWithoutCallbacks as any);
+
     const topic1 = Topic.new({ title: "test_1" }) as any;
     const topic2 = Topic.new({ title: "test_2" }) as any;
+    const topic3 = TopicWithoutCallbacks.new({ title: "test_3" }) as any;
 
     await Topic.transaction(async () => {
       expect(await topic1.save()).toBeTruthy();
       expect(await topic2.save()).toBeTruthy();
+      expect(await topic3.save()).toBeTruthy();
       await first.save();
       await second.destroy();
-      expect(topic1.isPersisted()).toBe(true);
+      expect(topic1.isPersisted()).toBeTruthy();
       expect(topic1.id).not.toBeNull();
-      expect(topic2.isPersisted()).toBe(true);
+      expect(topic2.isPersisted()).toBeTruthy();
       expect(topic2.id).not.toBeNull();
-      expect(first.isPersisted()).toBe(true);
+      expect(topic3.isPersisted()).toBeTruthy();
+      expect(topic3.id).not.toBeNull();
+      expect(first.isPersisted()).toBeTruthy();
       expect(first.id).not.toBeNull();
-      expect(second.isDestroyed()).toBe(true);
+      expect(second.isDestroyed()).toBeTruthy();
       throw new Rollback();
     });
 
-    expect(topic1.isPersisted()).toBe(false);
+    expect(topic1.isPersisted()).toBeFalsy();
     expect(topic1.id).toBeNull();
-    expect(topic2.isPersisted()).toBe(false);
+    expect(topic2.isPersisted()).toBeFalsy();
     expect(topic2.id).toBeNull();
-    expect(first.isPersisted()).toBe(true);
+    expect(topic3.isPersisted()).toBeFalsy();
+    expect(topic3.id).toBeNull();
+    expect(first.isPersisted()).toBeTruthy();
     expect(first.id).not.toBeNull();
-    expect(second.isDestroyed()).toBe(false);
+    expect(second.isDestroyed()).toBeFalsy();
   });
 
   it("restore frozen state after double destroy", async () => {
@@ -967,8 +1034,8 @@ describe("TransactionTest", () => {
       throw new Rollback();
     });
 
-    expect(reply.isFrozen()).toBe(false);
-    expect(topic.isFrozen()).toBe(false);
+    expect(reply.isFrozen()).toBeFalsy();
+    expect(topic.isFrozen()).toBeFalsy();
   });
 
   it("restore new record after double save", async () => {
@@ -981,7 +1048,7 @@ describe("TransactionTest", () => {
     });
 
     expect(topic.id).toBeNull();
-    expect(topic.isNewRecord()).toBe(true);
+    expect(topic.isNewRecord()).toBeTruthy();
   });
 
   it("dont restore new record in subsequent transaction", async () => {
@@ -997,8 +1064,8 @@ describe("TransactionTest", () => {
       throw new Rollback();
     });
 
-    expect(topic.isPersisted()).toBe(true);
-    expect(topic.isNewRecord()).toBe(false);
+    expect(topic.isPersisted()).toBeTruthy();
+    expect(topic.isNewRecord()).toBeFalsy();
   });
 
   it("restore previously new record after double save", async () => {
@@ -1010,12 +1077,11 @@ describe("TransactionTest", () => {
       throw new Rollback();
     });
 
-    expect(topic.isPreviouslyNewRecord()).toBe(true);
+    expect(topic.isPreviouslyNewRecord()).toBeTruthy();
   });
 
   it("restore composite id after rollback", async () => {
     const book = (await CpkBook.createBang({ id: [1, 2] })) as any;
-    expect(book.id).toEqual([1, 2]);
 
     try {
       await CpkBook.transaction(async () => {
@@ -1145,7 +1211,7 @@ describe("TransactionTest", () => {
       throw new Rollback();
     });
 
-    expect(topic.isFrozen()).toBe(true);
+    expect(topic.isFrozen()).toBeTruthy();
   });
 
   it("rollback for freshly persisted records", async () => {
@@ -1156,7 +1222,7 @@ describe("TransactionTest", () => {
       throw new Rollback();
     });
 
-    expect(topic.isPersisted()).toBe(true);
+    expect(topic.isPersisted()).toBeTruthy();
   });
 
   it("transactions state from rollback", async () => {
@@ -1164,14 +1230,14 @@ describe("TransactionTest", () => {
     const connection = await (Topic as any).leaseConnection();
     const txn = await new TransactionManager(connection).beginTransaction();
 
-    expect(txn.open).toBe(true);
-    expect(txn.state.isRolledback()).toBe(false);
-    expect(txn.state.committed).toBe(false);
+    expect(txn.open).toBeTruthy();
+    expect(txn.state.isRolledback()).toBeFalsy();
+    expect(txn.state.committed).toBeFalsy();
 
     await txn.rollback();
 
-    expect(txn.state.isRolledback()).toBe(true);
-    expect(txn.state.committed).toBe(false);
+    expect(txn.state.isRolledback()).toBeTruthy();
+    expect(txn.state.committed).toBeFalsy();
   });
 
   it("transactions state from commit", async () => {
@@ -1179,14 +1245,14 @@ describe("TransactionTest", () => {
     const connection = await (Topic as any).leaseConnection();
     const txn = await new TransactionManager(connection).beginTransaction();
 
-    expect(txn.open).toBe(true);
-    expect(txn.state.isRolledback()).toBe(false);
-    expect(txn.state.committed).toBe(false);
+    expect(txn.open).toBeTruthy();
+    expect(txn.state.isRolledback()).toBeFalsy();
+    expect(txn.state.committed).toBeFalsy();
 
     await txn.commit();
 
-    expect(txn.state.isRolledback()).toBe(false);
-    expect(txn.state.committed).toBe(true);
+    expect(txn.state.isRolledback()).toBeFalsy();
+    expect(txn.state.committed).toBeTruthy();
   });
 
   it("mark transaction state as committed", async () => {
@@ -1245,8 +1311,8 @@ describe.skipIf(inMemoryDb())("TransactionTest", () => {
       throw new Rollback();
     });
 
-    expect(await connection.active()).toBe(false);
-    expect(pool.connections.includes(connection)).toBe(false);
+    expect(await connection.active()).toBeFalsy();
+    expect(pool.connections.includes(connection)).toBeFalsy();
   });
 
   it("rollback dirty changes even with raise during rollback doesnt commit transaction", async () => {
@@ -1285,15 +1351,16 @@ describe.skipIf(inMemoryDb())("TransactionTest", () => {
       throw new Error("rollback failed");
     };
 
-    await expect(
-      Topic.transaction(async () => {
+    const exception = await assertRaises([Error], {}, async () => {
+      await Topic.transaction(async () => {
         topic.title = "Updated title";
         await topic.save();
-      }),
-    ).rejects.toThrow("rollback failed");
+      });
+    });
+    expect(exception.message).toBe("rollback failed");
 
-    expect(await connection.active()).toBe(false);
-    expect(pool.connections.includes(connection)).toBe(false);
+    expect(await connection.active()).toBeFalsy();
+    expect(pool.connections.includes(connection)).toBeFalsy();
     expect((await topic.reload()).title).toBe("The Fifth Topic of the day");
   });
 
@@ -1305,10 +1372,13 @@ describe.skipIf(inMemoryDb())("TransactionTest", () => {
       throw new Error("begin failed");
     };
 
-    await expect(Topic.transaction(async () => {})).rejects.toThrow("begin failed");
+    const exception = await assertRaises([Error], {}, async () => {
+      await Topic.transaction(async () => {});
+    });
+    expect(exception.message).toBe("begin failed");
 
-    expect(await connection.active()).toBe(false);
-    expect(pool.connections.includes(connection)).toBe(false);
+    expect(await connection.active()).toBeFalsy();
+    expect(pool.connections.includes(connection)).toBeFalsy();
   });
 
   it.skip("connection removed from pool when thread killed in begin after successfully beginning a transaction", () => {
@@ -1432,7 +1502,7 @@ describe("TransactionTest", () => {
       /DELETE/i,
       /COMMIT/i,
     ];
-    expect(actualQueries).toHaveLength(expectedQueries.length);
+    expect(actualQueries.length).toBe(expectedQueries.length);
     expectedQueries.forEach((expected, i) => expect(actualQueries[i]).toMatch(expected));
   });
 
@@ -1463,7 +1533,7 @@ describe("TransactionTest", () => {
     );
 
     const expectedQueries = [/BEGIN/i, /DELETE/i, /^SAVEPOINT/i, /^RELEASE/i, /DELETE/i, /COMMIT/i];
-    expect(actualQueries).toHaveLength(expectedQueries.length);
+    expect(actualQueries.length).toBe(expectedQueries.length);
     expectedQueries.forEach((expected, i) => expect(actualQueries[i]).toMatch(expected));
   });
 
@@ -1551,12 +1621,16 @@ describe("TransactionTest", () => {
           this.afterCommit(() => {});
         }
       }
-      const before = await K.count();
-      await K.transaction(async () => {
-        await K.createBang({});
-        throw new Rollback();
-      });
-      expect(await K.count()).toBe(before);
+      await assertNoDifference(
+        () => K.count() as Promise<number>,
+        null,
+        async () => {
+          await K.transaction(async () => {
+            await K.createBang({});
+            throw new Rollback();
+          });
+        },
+      );
     } finally {
       await connection.dropTable("transaction_without_primary_keys", { ifExists: true });
     }
@@ -1565,18 +1639,30 @@ describe("TransactionTest", () => {
   it.skipIf(adapterType !== "sqlite")("sqlite add column in transaction", async () => {
     const connection = await (Topic as any).leaseConnection();
     try {
-      void (Topic as any).resetColumnInformation();
-      await connection.addColumn("topics", "stuff", "string");
-      expect((await connection.columns("topics")).map((c: any) => c.name)).toContain("stuff");
-
-      void (Topic as any).resetColumnInformation();
-      await connection.removeColumn("topics", "stuff");
-      expect((await connection.columns("topics")).map((c: any) => c.name)).not.toContain("stuff");
-
-      await Topic.transaction(async () => {
+      await assertNothingRaised(async () => {
+        void (Topic as any).resetColumnInformation();
         await connection.addColumn("topics", "stuff", "string");
+        expect((await connection.columns("topics")).map((c: any) => c.name)).toContain("stuff");
+
+        void (Topic as any).resetColumnInformation();
+        await connection.removeColumn("topics", "stuff");
+        expect((await connection.columns("topics")).map((c: any) => c.name)).not.toContain("stuff");
       });
-      expect((await connection.columns("topics")).map((c: any) => c.name)).toContain("stuff");
+
+      if (connection.supportsDdlTransactions()) {
+        await assertNothingRaised(async () => {
+          await Topic.transaction(async () => {
+            await connection.addColumn("topics", "stuff", "string");
+          });
+        });
+      } else {
+        await Topic.transaction(async () => {
+          await assertRaises([StatementInvalid], {}, async () => {
+            await connection.addColumn("topics", "stuff", "string");
+          });
+          throw new Rollback();
+        });
+      }
     } finally {
       try {
         await connection.removeColumn("topics", "stuff");
