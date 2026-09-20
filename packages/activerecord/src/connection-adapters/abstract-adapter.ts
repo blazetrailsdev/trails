@@ -1760,7 +1760,7 @@ export class AbstractAdapter implements Quoting {
   }
 
   async schemaVersion(): Promise<number> {
-    return (await (this.pool as ConnectionPool).migrationContext.currentVersion()) ?? 0;
+    return 0;
   }
 
   static validateDefaultTimezone(config: unknown): string | undefined {

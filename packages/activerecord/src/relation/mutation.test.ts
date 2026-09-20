@@ -141,11 +141,11 @@ describe("RelationMutationTest", () => {
   });
 
   it("merge with a proc", () => {
-    const rel = relation();
-    rel.mergeBang(function (this: any) {
-      this._selectBang("body");
-    });
-    expect(rel.selectValues).toEqual(["body"]);
+    expect(
+      relation().merge(function (this: any) {
+        return this.select("foo");
+      }).selectValues,
+    ).toEqual(["foo"]);
   });
 
   it("none!", async () => {
