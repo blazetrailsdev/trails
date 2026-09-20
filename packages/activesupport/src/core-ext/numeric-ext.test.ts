@@ -37,8 +37,7 @@ describe("NumericExtTimeAndDateTimeTest", () => {
     }
   });
 
-  it.skip("irregular durations", () => {
-    // BLOCKED: duration-since-rejects-a-datetime-receiver
+  it("irregular durations", () => {
     expect(Duration.days(3000).since(now)).toEqual(now.advance({ days: 3000 }));
     expect(Duration.month(1).since(now)).toEqual(now.advance({ months: 1 }));
     expect(Duration.month(1).until(now)).toEqual(now.advance({ months: -1 }));
@@ -49,8 +48,7 @@ describe("NumericExtTimeAndDateTimeTest", () => {
     expect(Duration.years(20).since(dtnow)).toEqual(DateTimeExt.advance(dtnow, { years: 20 }));
   });
 
-  it.skip("duration addition", () => {
-    // BLOCKED: duration-since-rejects-a-datetime-receiver
+  it("duration addition", () => {
     expect(Duration.day(1).plus(Duration.month(1)).since(now)).toEqual(
       now.advance({ days: 1 }).advance({ months: 1 }),
     );
@@ -71,8 +69,7 @@ describe("NumericExtTimeAndDateTimeTest", () => {
     );
   });
 
-  it.skip("time plus duration", () => {
-    // BLOCKED: duration-since-rejects-a-datetime-receiver
+  it("time plus duration", () => {
     expect(timePlusWithDuration.call(now, Duration.seconds(8))).toEqual(
       timePlusWithDuration.call(now, 8),
     );
@@ -87,8 +84,7 @@ describe("NumericExtTimeAndDateTimeTest", () => {
     expect(Duration.month(1).since(dtnow)).toEqual(DateTimeExt.advance(dtnow, { months: 1 }));
   });
 
-  it.skip("chaining duration operations", () => {
-    // BLOCKED: duration-since-rejects-a-datetime-receiver
+  it("chaining duration operations", () => {
     expect(Duration.days(2).minus(Duration.months(3)).since(now)).toEqual(
       now.advance({ days: 2 }).advance({ months: -3 }),
     );
@@ -103,8 +99,7 @@ describe("NumericExtTimeAndDateTimeTest", () => {
     );
   });
 
-  it.skip("duration after conversion is no longer accurate", () => {
-    // BLOCKED: duration-since-rejects-a-datetime-receiver
+  it("duration after conversion is no longer accurate", () => {
     expect(Duration.seconds(Duration.month(1).toI()).since(now)).toEqual(
       Duration.seconds(Duration.year(1).dividedBy(12).toI()).since(now),
     );

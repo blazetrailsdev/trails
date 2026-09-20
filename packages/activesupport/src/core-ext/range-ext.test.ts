@@ -307,8 +307,7 @@ describe("RangeTest", () => {
     expect(new Range(twz.minus(hours(1)), twz).caseEquals(twz)).toBeTruthy();
   });
 
-  it.skip("date time with each", () => {
-    // BLOCKED: range-step-is-numeric-only-where-ruby-uses-succ
+  it("date time with each", () => {
     const datetime = DateTime.now();
     expect([...new Range(DateTimeExt.ago(datetime, 3600), datetime).each()]).toBeTruthy();
   });
@@ -355,8 +354,7 @@ describe("RangeTest", () => {
     expect(points(succ("\u{07FF}"))).toEqual([0x1, 0x80]);
   });
 
-  it.skip("date time with step", () => {
-    // BLOCKED: range-step-is-numeric-only-where-ruby-uses-succ
+  it("date time with step", () => {
     const datetime = DateTime.now();
     expect([...new Range(DateTimeExt.ago(datetime, 3600), datetime).step(1)]).toBeTruthy();
   });

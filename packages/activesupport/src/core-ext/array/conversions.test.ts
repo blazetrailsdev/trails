@@ -13,8 +13,7 @@ describe("ToSentenceTest", () => {
     expect(toSentence(["one", "two", "three"])).toBe("one, two, and three");
   });
 
-  it.skip("to sentence with words connector", () => {
-    // BLOCKED: to-sentence-does-not-stringify-elements-or-nil-connectors
+  it("to sentence with words connector", () => {
     expect(toSentence(["one", "two", "three"], { wordsConnector: " " })).toBe("one two, and three");
     expect(toSentence(["one", "two", "three"], { wordsConnector: " & " })).toBe(
       "one & two, and three",
@@ -24,8 +23,7 @@ describe("ToSentenceTest", () => {
     );
   });
 
-  it.skip("to sentence with last word connector", () => {
-    // BLOCKED: to-sentence-does-not-stringify-elements-or-nil-connectors
+  it("to sentence with last word connector", () => {
     expect(toSentence(["one", "two", "three"], { lastWordConnector: ", and also " })).toBe(
       "one, two, and also three",
     );
@@ -52,8 +50,7 @@ describe("ToSentenceTest", () => {
     expect(Object(toSentence(elements))).not.toBe(elements[0]);
   });
 
-  it.skip("one non string element", () => {
-    // BLOCKED: to-sentence-does-not-stringify-elements-or-nil-connectors
+  it("one non string element", () => {
     expect(toSentence([1] as never)).toBe("1");
   });
 
@@ -83,8 +80,7 @@ describe("ToSentenceTest", () => {
     );
   });
 
-  it.skip("always returns string", () => {
-    // BLOCKED: to-sentence-does-not-stringify-elements-or-nil-connectors
+  it("always returns string", () => {
     expect(Object(toSentence([new SafeBuffer("one")] as never))).toBeInstanceOf(String);
     expect(Object(toSentence([new SafeBuffer("one"), "two"] as never))).toBeInstanceOf(String);
     expect(Object(toSentence([new SafeBuffer("one"), "two", "three"] as never))).toBeInstanceOf(

@@ -111,8 +111,7 @@ describe("DurationTest", () => {
     expect(Duration.minute(1).eql("foo")).toBeFalsy();
   });
 
-  it.skip("inspect", () => {
-    // BLOCKED: duration-divide-by-integer-keeps-float-parts
+  it("inspect", () => {
     expect(Duration.seconds(0).inspect()).toEqual("0 seconds");
     expect(Duration.days(0).inspect()).toEqual("0 days");
     expect(Duration.month(1).inspect()).toEqual("1 month");
@@ -457,8 +456,7 @@ describe("DurationTest", () => {
     expect(cased).toEqual("ok");
   });
 
-  it.skip("respond to", () => {
-    // BLOCKED: duration-has-no-zero-predicate
+  it("respond to", () => {
     assertRespondTo(Duration.day(1), "since");
     assertRespondTo(Duration.day(1), "isZero");
   });

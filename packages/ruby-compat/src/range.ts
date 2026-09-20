@@ -29,6 +29,24 @@ function rLess(a: unknown, b: unknown): number {
 }
 
 /**
+ * `rb_funcall(v, id_succ, 0, 0)` as `range_step` and `range_each` reach it
+ * (`vendor/ruby/range.c:556`). Ruby dispatches `succ` on the object; JS has no
+ * such method on the built-ins a Range is built over, so the discrete types
+ * trails ranges actually carry are spelled out. `Date#succ` is +1 day
+ * (`vendor/ruby/ext/date/date_core.c` `d_lite_next`).
+ *
+ * A type with no `succ` is Ruby's `!discrete_object_p` arm, which raises
+ * `TypeError: can\'t iterate from <class>`.
+ */
+function objSucc<T>(v: T): T {
+  if (typeof v === "string") return succ(v) as T;
+  if (typeof v === "number") return (v + 1) as T;
+  const o = v as { add?: (d: { days: number }) => T };
+  if (typeof o?.add === "function") return o.add({ days: 1 });
+  throw new TypeError(`can't iterate from ${(v as object)?.constructor?.name ?? String(v)}`);
+}
+
+/**
  * Ruby's core `Range`. Only the members Rails' reopenings and the framework
  * call are defined; `begin`, `end` and `exclude_end?` are the three readers
  * every one of them reads off the receiver.
@@ -216,6 +234,11 @@ export class Range<T = unknown> {
 
   /** `vendor/ruby/range.c:439` `range_step`. */
   *step(n: number = 1): Generator<T> {
+    if (typeof this.begin !== "number" && this.begin !== null) {
+      yield* this.stepBySucc(n);
+      return;
+    }
+
     let current = this.first() as number;
     while (true) {
       if (this.end !== null) {
@@ -224,6 +247,26 @@ export class Range<T = unknown> {
       }
       yield current as T;
       current += n;
+    }
+  }
+
+  /**
+   * `range_step`'s final arm (`vendor/ruby/range.c:540-560`), which drives a
+   * non-numeric range through `succ` and yields every `n`-th element. Ruby
+   * raises `TypeError` for a begin that is not `discrete_object_p` — one that
+   * does not respond to `succ`.
+   */
+  private *stepBySucc(n: number): Generator<T> {
+    let current = this.begin as T;
+    let i = 0;
+    while (true) {
+      if (this.end !== null) {
+        const c = rLess(current, this.end);
+        if (this.excludeEnd ? c >= 0 : c > 0) break;
+      }
+      if (i % n === 0) yield current;
+      i++;
+      current = objSucc(current);
     }
   }
 }
