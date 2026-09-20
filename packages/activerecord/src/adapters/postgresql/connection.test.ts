@@ -11,6 +11,7 @@ describeIfPg("PostgresqlConnectionTest", () => {
 
   beforeEach(async () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    await adapter.verifyBang();
     subscriber = new SQLSubscriber();
     subscriber.start();
   });

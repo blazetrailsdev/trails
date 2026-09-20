@@ -10,9 +10,9 @@ import {
 } from "./test-helper.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Topic } from "../../test-helpers/models/topic.js";
-import { Developer } from "../../test-helpers/models/developer.js";
+import { Developer, AuditLog, AuditLogRequired } from "../../test-helpers/models/developer.js";
 import { withTimezoneConfig } from "../../test-helper.js";
-import { Base } from "../../index.js";
+import { Base, registerModel } from "../../index.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
 function infinite(value: unknown): number | null {
@@ -20,6 +20,8 @@ function infinite(value: unknown): number | null {
   if (value === -Infinity) return -1;
   return null;
 }
+
+registerModel([Developer, AuditLog, AuditLogRequired]);
 
 fixtures(["topics"], { useTransactionalTests: false });
 

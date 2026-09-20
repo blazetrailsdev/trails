@@ -130,8 +130,9 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect((await record.reload()).datetime).toBe(record.datetime);
 
         record = await (PostgresqlInfinity as any).create({ datetime: BigDecimal.INFINITY });
-        expect(record.datetime).toBe(Number.POSITIVE_INFINITY);
-        expect((await record.reload()).datetime).toBe(record.datetime);
+        const datetime = (record.datetime as BigDecimal).toF();
+        expect(datetime).toEqual(Number.POSITIVE_INFINITY);
+        expect((await record.reload()).datetime).toEqual(datetime);
       } finally {
         setZone(null);
       }
