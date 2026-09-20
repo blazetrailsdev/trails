@@ -71,26 +71,35 @@ describe("ErrorsTest", () => {
     assertIncludes(errors, "foo", "errors should include 'foo' as :foo");
   });
 
-  it("each when arity is negative", () => {
+  it.skip("each when arity is negative", () => {
+    // BLOCKED: activemodel-errors-does-not-include-enumerable
     const errors = new Errors(new Person());
     errors.add("name", ":blank");
     errors.add("gender", ":blank");
 
-    expect(errors.objects.map((e) => e.attribute)).toEqual(["name", "gender"]);
+    expect(
+      (errors as unknown as { map(fn: (e: ModelError) => string): string[] }).map(
+        (e) => e.attribute,
+      ),
+    ).toEqual(["name", "gender"]);
   });
 
-  it("any?", () => {
+  it.skip("any?", () => {
+    // BLOCKED: activemodel-errors-does-not-include-enumerable
     const errors = new Errors(new Person());
     errors.add("name");
     assertPredicate(errors, (e) => e.any, "any? should return true");
-    expect(errors.objects.some(() => true)).toBeTruthy();
+    expect(
+      (errors as unknown as { any(fn: (e: ModelError) => boolean): boolean }).any(() => true),
+    ).toBeTruthy();
   });
 
-  it("first", () => {
+  it.skip("first", () => {
+    // BLOCKED: activemodel-errors-does-not-include-enumerable
     const errors = new Errors(new Person());
     errors.add("name", ":blank");
 
-    const error = errors.objects[0];
+    const error = (errors as unknown as { first: ModelError }).first;
     expect(error).toBeInstanceOf(ModelError);
   });
 
@@ -733,9 +742,24 @@ describe("ErrorsTest", () => {
     expect(Object.fromEntries(serialized.details)).toEqual(Object.fromEntries(errors.details));
   });
 
-  it("errors are compatible with YAML dumped from Rails 6.x", () => {
-    const errors = new Errors(new Person());
-    errors.add("name", ":invalid");
+  it.skip("errors are compatible with YAML dumped from Rails 6.x", () => {
+    // BLOCKED: activemodel-errors-not-loadable-from-rails-6-yaml
+    const yaml = `--- !ruby/object:ActiveModel::Errors
+base: &1 !ruby/object:ErrorsTest::Person
+  errors: !ruby/object:ActiveModel::Errors
+    base: *1
+    errors: []
+errors:
+- !ruby/object:ActiveModel::Error
+  base: *1
+  attribute: :name
+  type: :invalid
+  raw_type: :invalid
+  options: {}
+`;
+
+    const YAML = undefined as unknown as { unsafeLoad(yaml: string): Errors<Person> };
+    const errors = YAML.unsafeLoad(yaml);
 
     expect(Object.fromEntries(errors.messages)).toEqual({ name: ["is invalid"] });
     expect(Object.fromEntries(errors.details)).toEqual({ name: [{ error: ":invalid" }] });
