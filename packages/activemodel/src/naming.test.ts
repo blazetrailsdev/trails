@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Model } from "./index.js";
 import { ModelName, Naming } from "./naming.js";
-import { assert, assertNot } from "@blazetrails/activesupport";
+import { assert, assertNot, inflections } from "@blazetrails/activesupport";
 
 describe("NamingTest", () => {
   const modelName = new ModelName("Post::TrackBack");
@@ -192,13 +192,17 @@ describe("NamingWithSuppliedModelNameTest", () => {
 });
 
 describe("NamingWithSuppliedLocaleTest", () => {
+  inflections("cs", (inflect) => {
+    inflect.plural(/(e)l$/i, "$1lé");
+  });
+
+  const modelName = new ModelName("Blog::Post", null, "Uzivatel", "cs");
+
   it("singular", () => {
-    const name = new ModelName("Person");
-    expect(name.singular).toBe("person");
+    expect(modelName.singular).toEqual("uzivatel");
   });
   it("plural", () => {
-    const name = new ModelName("Person");
-    expect(name.plural).toBe("people");
+    expect(modelName.plural).toEqual("uzivatelé");
   });
 });
 

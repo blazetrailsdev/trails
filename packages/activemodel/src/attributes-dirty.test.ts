@@ -2,253 +2,232 @@
    Each model below spells `include ActiveModel::Dirty` in its class body, the way the Rails test
    model it mirrors does; the empty class/interface merge beside it is how `include()` surfaces
    those members on the type side. */
-import { include } from "@blazetrails/activesupport";
+import { describe, it, expect, beforeEach } from "vitest";
+import {
+  assert,
+  assertNot,
+  assertPredicate,
+  assertNotPredicate,
+  include,
+} from "@blazetrails/activesupport";
 import { Dirty } from "./dirty.js";
-import { describe, it, expect } from "vitest";
 import { Model } from "./index.js";
 import { Attributes, type AttributesClassHalf } from "./attributes.js";
 
 describe("AttributesDirtyTest", () => {
-  it("changing the attribute reports a change only when the cast value changes", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        include(this, Dirty);
-        this.attribute("age", "integer");
-      }
-    }
-    interface Person extends Attributes, Dirty {}
-    const p = new Person({ age: 25 });
-    p.changesApplied();
-    p._writeAttribute("age", "25");
-    expect(p.attributeChanged("age")).toBe(false);
-  });
-
-  it("changes accessible through both strings and symbols", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        include(this, Dirty);
-        this.attribute("name", "string");
-      }
-    }
-    interface Person extends Attributes, Dirty {}
-    const p = new Person({ name: "Alice" });
-    p.changesApplied();
-    p._writeAttribute("name", "Bob");
-    expect(p.changes["name"]).toEqual(["Alice", "Bob"]);
-  });
-
-  it("be consistent with symbols arguments after the changes are applied", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        include(this, Dirty);
-        this.attribute("name", "string");
-      }
-    }
-    interface Person extends Attributes, Dirty {}
-    const p = new Person({ name: "Alice" });
-    p.changesApplied();
-    p._writeAttribute("name", "Bob");
-    p.changesApplied();
-    expect(p.previousChanges["name"]).toEqual(["Alice", "Bob"]);
-    expect(p.attributeChanged("name")).toBe(false);
-  });
-
-  it("restore_attributes can restore only some attributes", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        include(this, Dirty);
-        this.attribute("name", "string");
-        this.attribute("age", "integer");
-      }
-    }
-    interface Person extends Attributes, Dirty {}
-    const p = new Person({ name: "Alice", age: 25 });
-    p.changesApplied();
-    p._writeAttribute("name", "Bob");
-    p._writeAttribute("age", 30);
-    p.clearAttributeChanges(["name"]);
-    expect(p.attributeChanged("name")).toBe(false);
-    expect(p.attributeChanged("age")).toBe(true);
-  });
-
-  class DirtyPerson extends Model {
+  class DirtyModel extends Model {
     declare static attribute: AttributesClassHalf["attribute"];
 
     static {
       include(this, Attributes);
       include(this, Dirty);
       this.attribute("name", "string");
-      this.attribute("age", "integer");
       this.attribute("color", "string");
+      this.attribute("size", "integer");
+    }
+
+    save(): void {
+      this.changesApplied();
     }
   }
-  interface DirtyPerson extends Attributes, Dirty {}
+  interface DirtyModel extends Attributes, Dirty {
+    name: string;
+    color: string;
+    size: number;
+
+    nameChanged(options?: { from?: unknown; to?: unknown }): boolean;
+    colorChanged(): boolean;
+    sizeChanged(): boolean;
+    namePreviouslyChanged(): boolean;
+    nameChange: [unknown, unknown] | null;
+    namePreviousChange: [unknown, unknown] | null;
+    nameWas: unknown;
+    restoreName(): void;
+  }
+
+  let model: DirtyModel;
+
+  beforeEach(() => {
+    model = new DirtyModel();
+  });
 
   it("setting attribute will result in change", () => {
-    const p = new DirtyPerson({ name: "Alice" });
-    p.changesApplied();
-    p._writeAttribute("name", "Bob");
-    expect(p.isChanged).toBe(true);
+    assertNotPredicate(model, (m) => m.isChanged);
+    assertNotPredicate(model, (m) => m.nameChanged());
+    model.name = "Ringo";
+    assertPredicate(model, (m) => m.isChanged);
+    assertPredicate(model, (m) => m.nameChanged());
   });
 
   it("list of changed attribute keys", () => {
-    const p = new DirtyPerson({ name: "Alice", age: 25 });
-    p.changesApplied();
-    p._writeAttribute("name", "Bob");
-    expect(p.changed).toContain("name");
-    expect(p.changed).not.toContain("age");
+    expect(model.changed).toEqual([]);
+    model.name = "Paul";
+    expect(model.changed).toEqual(["name"]);
   });
 
   it("changes to attribute values", () => {
-    const p = new DirtyPerson({ name: "Alice" });
-    p.changesApplied();
-    p._writeAttribute("name", "Bob");
-    expect(p.attributeChange("name")).toEqual(["Alice", "Bob"]);
+    assertNot(model.changes["name"]);
+    model.name = "John";
+    expect(model.changes["name"]).toEqual([null, "John"]);
   });
 
   it("checking if an attribute has changed to a particular value", () => {
-    const p = new DirtyPerson({ name: "Alice" });
-    p.changesApplied();
-    p._writeAttribute("name", "Bob");
-    expect(p.attributeChanged("name", { to: "Bob" })).toBe(true);
-    expect(p.attributeChanged("name", { to: "Charlie" })).toBe(false);
+    model.name = "Ringo";
+    assert(model.nameChanged({ from: null, to: "Ringo" }));
+    assertNot(model.nameChanged({ from: "Pete", to: "Ringo" }));
+    assert(model.nameChanged({ to: "Ringo" }));
+    assertNot(model.nameChanged({ to: "Pete" }));
+    assert(model.nameChanged({ from: null }));
+    assertNot(model.nameChanged({ from: "Pete" }));
   });
 
-  it("setting color to same value should not result in change being recorded", () => {
-    const p = new DirtyPerson({ color: "red" });
-    p.changesApplied();
-    p._writeAttribute("color", "red");
-    expect(p.isChanged).toBe(false);
+  it("changes accessible through both strings and symbols", () => {
+    model.name = "David";
+    expect(model.changes["name"]).not.toBeUndefined();
+    expect(model.changes["name"]).not.toBeUndefined();
   });
 
-  it("saving should reset model's changed status", () => {
-    const p = new DirtyPerson({ name: "Alice" });
-    p.changesApplied();
-    p._writeAttribute("name", "Bob");
-    expect(p.isChanged).toBe(true);
-    p.changesApplied();
-    expect(p.isChanged).toBe(false);
+  it("be consistent with symbols arguments after the changes are applied", () => {
+    model.name = "David";
+    assert(model.attributeChanged("name"));
+    model.save();
+    model.name = "Rafael";
+    assert(model.attributeChanged("name"));
   });
 
-  it("saving should preserve previous changes", () => {
-    const p = new DirtyPerson({ name: "Alice" });
-    p.changesApplied();
-    p._writeAttribute("name", "Bob");
-    p.changesApplied();
-    expect(p.previousChanges).toEqual({ name: ["Alice", "Bob"] });
-  });
-
-  it("setting new attributes should not affect previous changes", () => {
-    const p = new DirtyPerson({ name: "Alice" });
-    p.changesApplied();
-    p._writeAttribute("name", "Bob");
-    p.changesApplied();
-    p._writeAttribute("name", "Charlie");
-    expect(p.previousChanges).toEqual({ name: ["Alice", "Bob"] });
-  });
-
-  it("saving should preserve model's previous changed status", () => {
-    const p = new DirtyPerson({ name: "Alice" });
-    p.changesApplied();
-    p._writeAttribute("name", "Bob");
-    p.changesApplied();
-    expect(p.attributePreviouslyChanged("name")).toBe(true);
-  });
-
-  it("previous value is preserved when changed after save", () => {
-    const p = new DirtyPerson({ name: "Alice" });
-    p.changesApplied();
-    p._writeAttribute("name", "Bob");
-    p.changesApplied();
-    p._writeAttribute("name", "Charlie");
-    expect(p.previousChanges).toEqual({ name: ["Alice", "Bob"] });
-    expect(p.changes).toEqual({ name: ["Bob", "Charlie"] });
-  });
-
-  it("changing the same attribute multiple times retains the correct original value", () => {
-    const p = new DirtyPerson({ name: "Alice" });
-    p.changesApplied();
-    p._writeAttribute("name", "Bob");
-    p._writeAttribute("name", "Charlie");
-    expect(p.attributeChange("name")).toEqual(["Alice", "Charlie"]);
-  });
-
-  it("clear_changes_information should reset all changes", () => {
-    const p = new DirtyPerson({ name: "Alice" });
-    p.changesApplied();
-    p._writeAttribute("name", "Bob");
-    p.changesApplied();
-    p._writeAttribute("name", "Charlie");
-    p.clearChangesInformation();
-    expect(p.isChanged).toBe(false);
-    expect(Object.keys(p.previousChanges).length).toBe(0);
-  });
-
-  it("restore_attributes should restore all previous data", () => {
-    const p = new DirtyPerson({ name: "Alice", age: 25 });
-    p.changesApplied();
-    p._writeAttribute("name", "Bob");
-    p._writeAttribute("age", 30);
-    p.restoreAttributes();
-    expect(p._readAttribute("name")).toBe("Alice");
-    expect(p._readAttribute("age")).toBe(25);
-    expect(p.isChanged).toBe(false);
+  // BLOCKED: assertions-immutable-js-string-values
+  it.skip("attribute mutation", () => {
+    model.name = "Yam";
+    model.save();
+    assertNotPredicate(model, (m) => m.nameChanged());
+    (model.name as unknown as { replace(other: string): void }).replace("Hadad");
+    assertPredicate(model, (m) => m.nameChanged());
   });
 
   it("resetting attribute", () => {
-    const p = new DirtyPerson({ name: "Alice" });
-    p.changesApplied();
-    p._writeAttribute("name", "Bob");
-    expect(p.isChanged).toBe(true);
-    p._writeAttribute("name", "Alice");
-    expect(p.isChanged).toBe(false);
+    model.name = "Bob";
+    model.restoreName();
+    expect(model.name).toBeNull();
+    assertNotPredicate(model, (m) => m.nameChanged());
   });
-  it("attribute mutation", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
 
-      static {
-        include(this, Attributes);
-        include(this, Dirty);
-        this.attribute("name", "string");
-      }
-    }
-    interface Person extends Attributes, Dirty {}
-    const p = new Person({ name: "Alice" });
-    p.changesApplied();
-    expect(p.isChanged).toBe(false);
-    p._writeAttribute("name", "Bob");
-    expect(p.isChanged).toBe(true);
-    expect(p.changes).toEqual({ name: ["Alice", "Bob"] });
+  it("setting color to same value should not result in change being recorded", () => {
+    model.color = "red";
+    assertPredicate(model, (m) => m.colorChanged());
+    model.save();
+    assertNotPredicate(model, (m) => m.colorChanged());
+    assertNotPredicate(model, (m) => m.isChanged);
+    model.color = "red";
+    assertNotPredicate(model, (m) => m.colorChanged());
+    assertNotPredicate(model, (m) => m.isChanged);
+  });
+
+  it("saving should reset model's changed status", () => {
+    model.name = "Alf";
+    assertPredicate(model, (m) => m.isChanged);
+    model.save();
+    assertNotPredicate(model, (m) => m.isChanged);
+    assertNotPredicate(model, (m) => m.nameChanged());
+  });
+
+  it("saving should preserve previous changes", () => {
+    model.name = "Jericho Cane";
+    model.save();
+    expect(model.previousChanges["name"]).toEqual([null, "Jericho Cane"]);
+  });
+
+  it("setting new attributes should not affect previous changes", () => {
+    model.name = "Jericho Cane";
+    model.save();
+    model.name = "DudeFella ManGuy";
+    expect(model.namePreviousChange).toEqual([null, "Jericho Cane"]);
+  });
+
+  it("saving should preserve model's previous changed status", () => {
+    model.name = "Jericho Cane";
+    model.save();
+    assertPredicate(model, (m) => m.namePreviouslyChanged());
+  });
+
+  it("previous value is preserved when changed after save", () => {
+    expect(model.changedAttributes).toEqual({});
+    model.name = "Paul";
+    expect(model.changedAttributes).toEqual({ name: null });
+
+    model.save();
+
+    model.name = "John";
+    expect(model.changedAttributes).toEqual({ name: "Paul" });
+  });
+
+  it("changing the same attribute multiple times retains the correct original value", () => {
+    model.name = "Otto";
+    model.save();
+    model.name = "DudeFella ManGuy";
+    model.name = "Mr. Manfredgensonton";
+    expect(model.nameChange).toEqual(["Otto", "Mr. Manfredgensonton"]);
+    expect(model.nameWas).toBe("Otto");
   });
 
   it("using attribute_will_change! with a symbol", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    model.size = 1;
+    assertPredicate(model, (m) => m.sizeChanged());
+  });
 
-      static {
-        include(this, Attributes);
-        include(this, Dirty);
-        this.attribute("name", "string");
-      }
-    }
-    interface Person extends Attributes, Dirty {}
-    const p = new Person({ name: "Alice" });
-    p.changesApplied();
-    p._writeAttribute("name", "Bob");
-    expect(p.attributeChanged("name")).toBe(true);
-    expect(p.attributeWas("name")).toBe("Alice");
+  it("clear_changes_information should reset all changes", () => {
+    model.name = "Dmitry";
+    model.nameChanged();
+    model.save();
+    model.name = "Bob";
+
+    expect(model.previousChanges["name"]).toEqual([null, "Dmitry"]);
+    expect(model.changedAttributes["name"]).toBe("Dmitry");
+
+    model.clearChangesInformation();
+
+    expect(model.previousChanges).toEqual({});
+    expect(model.changedAttributes).toEqual({});
+  });
+
+  it("restore_attributes should restore all previous data", () => {
+    model.name = "Dmitry";
+    model.color = "Red";
+    model.save();
+    model.name = "Bob";
+    model.color = "White";
+
+    model.restoreAttributes();
+
+    assertNotPredicate(model, (m) => m.isChanged);
+    expect(model.name).toBe("Dmitry");
+    expect(model.color).toBe("Red");
+  });
+
+  it("restore_attributes can restore only some attributes", () => {
+    model.name = "Dmitry";
+    model.color = "Red";
+    model.save();
+    model.name = "Bob";
+    model.color = "White";
+
+    model.restoreAttributes(["name"]);
+
+    assertPredicate(model, (m) => m.isChanged);
+    expect(model.name).toBe("Dmitry");
+    expect(model.color).toBe("White");
+  });
+
+  it("changing the attribute reports a change only when the cast value changes", () => {
+    model.size = "2.3" as unknown as number;
+    model.save();
+    model.size = "2.1" as unknown as number;
+
+    expect(model.isChanged).toBe(false);
+
+    model.size = "5.1" as unknown as number;
+
+    expect(model.isChanged).toBe(true);
+    expect(model.sizeChanged()).toBe(true);
+    expect(model.changes).toEqual({ size: [2, 5] });
   });
 });
