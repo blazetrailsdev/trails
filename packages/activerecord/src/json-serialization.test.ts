@@ -48,52 +48,60 @@ describe("JsonSerializationTest", () => {
   it("should demodulize root in json", () => {
     setIncludeRootInJson(true, () => {
       const contact = new NamespacedContact({ name: "whatever" });
-      const json = contact.asJson();
-      const keys = Object.keys(json);
-      expect(keys.length).toBe(1);
-      expect(keys[0]).toBe("namespaced_contact");
+      const json = JSON.stringify(contact.asJson());
+      expect(json).toMatch(/^\{"namespaced_contact":\{/);
     });
   });
 
   it("should include root in json", () => {
     setIncludeRootInJson(true, () => {
-      const json = newContact().asJson();
-      const keys = Object.keys(json);
-      expect(keys).toEqual(["contact"]);
-      const root = json.contact as Record<string, unknown>;
-      expect(root.name).toBe("Konata Izumi");
-      expect(root.age).toBe(16);
-      expect(root.created_at).toBeDefined();
-      expect(root.awesome).toBe(true);
-      expect(root.preferences).toEqual({ shows: "anime" });
+      const json = JSON.stringify(newContact().asJson());
+
+      expect(json).toMatch(/^\{"contact":\{/);
+      expect(json).toMatch(/"name":"Konata Izumi"/);
+      expect(json).toMatch(/"age":16/);
+      expect(json).toContain(
+        `"created_at":${ActiveSupportJSON.encode(new Date(Date.UTC(2006, 7, 1)))}`,
+      );
+      expect(json).toMatch(/"awesome":true/);
+      expect(json).toMatch(/"preferences":\{"shows":"anime"\}/);
     });
   });
 
   it("should encode all encodable attributes", () => {
-    const json = newContact().asJson();
-    expect(json.name).toBe("Konata Izumi");
-    expect(json.age).toBe(16);
-    expect(json.created_at).toBeDefined();
-    expect(json.awesome).toBe(true);
-    expect(json.preferences).toEqual({ shows: "anime" });
+    const json = JSON.stringify(newContact().asJson());
+
+    expect(json).toMatch(/"name":"Konata Izumi"/);
+    expect(json).toMatch(/"age":16/);
+    expect(json).toContain(
+      `"created_at":${ActiveSupportJSON.encode(new Date(Date.UTC(2006, 7, 1)))}`,
+    );
+    expect(json).toMatch(/"awesome":true/);
+    expect(json).toMatch(/"preferences":\{"shows":"anime"\}/);
   });
 
   it("should allow attribute filtering with only", () => {
-    const json = newContact().asJson({ only: ["name", "age"] });
-    expect(json.name).toBe("Konata Izumi");
-    expect(json.age).toBe(16);
-    expect(json.awesome).toBeUndefined();
-    expect(json.created_at).toBeUndefined();
-    expect(json.preferences).toBeUndefined();
+    const json = JSON.stringify(newContact().asJson({ only: ["name", "age"] }));
+
+    expect(json).toMatch(/"name":"Konata Izumi"/);
+    expect(json).toMatch(/"age":16/);
+    expect(json).not.toMatch(/"awesome":true/);
+    expect(json).not.toContain(
+      `"created_at":${ActiveSupportJSON.encode(new Date(Date.UTC(2006, 7, 1)))}`,
+    );
+    expect(json).not.toMatch(/"preferences":\{"shows":"anime"\}/);
   });
 
   it("should allow attribute filtering with except", () => {
-    const json = newContact().asJson({ except: ["name", "age"] });
-    expect(json.name).toBeUndefined();
-    expect(json.age).toBeUndefined();
-    expect(json.awesome).toBe(true);
-    expect(json.created_at).toBeDefined();
-    expect(json.preferences).toEqual({ shows: "anime" });
+    const json = JSON.stringify(newContact().asJson({ except: ["name", "age"] }));
+
+    expect(json).not.toMatch(/"name":"Konata Izumi"/);
+    expect(json).not.toMatch(/"age":16/);
+    expect(json).toMatch(/"awesome":true/);
+    expect(json).toContain(
+      `"created_at":${ActiveSupportJSON.encode(new Date(Date.UTC(2006, 7, 1)))}`,
+    );
+    expect(json).toMatch(/"preferences":\{"shows":"anime"\}/);
   });
 
   it("methods are called on object", () => {
@@ -102,12 +110,15 @@ describe("JsonSerializationTest", () => {
     (contact as unknown as { favoriteQuote: () => string }).favoriteQuote = () =>
       "Constraints are liberating";
 
-    const single = contact.asJson({ only: ["name"], methods: ["label"] });
-    expect(single.label).toBe("Has cheezburger");
+    expect(JSON.stringify(contact.asJson({ only: "name", methods: "label" }))).toMatch(
+      /"label":"Has cheezburger"/,
+    );
 
-    const both = contact.asJson({ only: ["name"], methods: ["label", "favoriteQuote"] });
-    expect(both.label).toBe("Has cheezburger");
-    expect(both.favoriteQuote).toBe("Constraints are liberating");
+    const methodsJson = JSON.stringify(
+      contact.asJson({ only: "name", methods: ["label", "favoriteQuote"] }),
+    );
+    expect(methodsJson).toMatch(/"label":"Has cheezburger"/);
+    expect(methodsJson).toMatch(/"favoriteQuote":"Constraints are liberating"/);
   });
 
   it("uses serializable hash with frozen hash", () => {
@@ -118,10 +129,10 @@ describe("JsonSerializationTest", () => {
       return Base.prototype.serializableHash.call(this, Object.freeze({ only: ["name"] }));
     };
 
-    const json = contact.asJson();
-    expect(json.name).toBe("Konata Izumi");
-    expect(json.awesome).toBeUndefined();
-    expect(json.age).toBeUndefined();
+    const json = JSON.stringify(contact.asJson());
+    expect(json).toMatch(/"name":"Konata Izumi"/);
+    expect(json).not.toMatch(/awesome/);
+    expect(json).not.toMatch(/age/);
   });
 
   it("uses serializable hash with only option", () => {
@@ -132,10 +143,10 @@ describe("JsonSerializationTest", () => {
       return Base.prototype.serializableHash.call(this, { only: ["name"] });
     };
 
-    const json = contact.asJson();
-    expect(json.name).toBe("Konata Izumi");
-    expect(json.awesome).toBeUndefined();
-    expect(json.age).toBeUndefined();
+    const json = JSON.stringify(contact.asJson());
+    expect(json).toMatch(/"name":"Konata Izumi"/);
+    expect(json).not.toMatch(/awesome/);
+    expect(json).not.toMatch(/age/);
   });
 
   it("uses serializable hash with except option", () => {
@@ -146,20 +157,20 @@ describe("JsonSerializationTest", () => {
       return Base.prototype.serializableHash.call(this, { except: ["age"] });
     };
 
-    const json = contact.asJson();
-    expect(json.name).toBe("Konata Izumi");
-    expect(json.awesome).toBe(true);
-    expect(json.age).toBeUndefined();
+    const json = JSON.stringify(contact.asJson());
+    expect(json).toMatch(/"name":"Konata Izumi"/);
+    expect(json).toMatch(/"awesome":true/);
+    expect(json).not.toMatch(/age/);
   });
 
   it("does not include inheritance column from sti", () => {
     const contact = new ContactSti(newContact().attributes);
     expect(contact.type).toBe("ContactSti");
 
-    const json = contact.asJson();
-    expect(json.name).toBe("Konata Izumi");
-    expect(json.type).toBeUndefined();
-    expect(Object.values(json)).not.toContain("ContactSti");
+    const json = JSON.stringify(contact.asJson());
+    expect(json).toMatch(/"name":"Konata Izumi"/);
+    expect(json).not.toMatch(/type/);
+    expect(json).not.toMatch(/ContactSti/);
   });
 
   it("serializable hash with default except option and excluding inheritance column from sti", () => {
@@ -175,11 +186,11 @@ describe("JsonSerializationTest", () => {
       });
     };
 
-    const json = contact.asJson();
-    expect(json.name).toBe("Konata Izumi");
-    expect(json.age).toBeUndefined();
-    expect(json.type).toBeUndefined();
-    expect(Object.values(json)).not.toContain("ContactSti");
+    const json = JSON.stringify(contact.asJson());
+    expect(json).toMatch(/"name":"Konata Izumi"/);
+    expect(json).not.toMatch(/age/);
+    expect(json).not.toMatch(/type/);
+    expect(json).not.toMatch(/ContactSti/);
   });
 
   it("serializable hash should not modify options in argument", () => {
@@ -204,75 +215,85 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
 
   it("includes uses association name", async () => {
     const david = await getDavid();
-    const json = await david.asJson({ include: "posts" });
+    const json = JSON.stringify(await david.asJson({ include: "posts" }));
 
-    const posts = json.posts as Array<Record<string, unknown>>;
-    expect(Array.isArray(posts)).toBe(true);
-    expect(Number(json.id)).toBe(1);
-    expect(json.name).toBe("David");
+    expect(json).toMatch(/"posts":\[/);
 
-    const welcome = posts.find((p) => p.title === "Welcome to the weblog")!;
-    expect(Number(welcome.author_id)).toBe(1);
-    expect(welcome.body).toBe("Such a lovely day");
+    expect(json).toMatch(/"id":1/);
+    expect(json).toMatch(/"name":"David"/);
 
-    const thinking = posts.find((p) => p.title === "So I was thinking")!;
-    expect(thinking.body).toBe("Like I hopefully always am");
+    expect(json).toMatch(/"author_id":1/);
+    expect(json).toMatch(/"title":"Welcome to the weblog"/);
+    expect(json).toMatch(/"body":"Such a lovely day"/);
+
+    expect(json).toMatch(/"title":"So I was thinking"/);
+    expect(json).toMatch(/"body":"Like I hopefully always am"/);
   });
 
   it("includes uses association name and applies attribute filters", async () => {
     const david = await getDavid();
-    const json = await david.asJson({ include: { posts: { only: ["title"] } } });
+    const json = JSON.stringify(await david.asJson({ include: { posts: { only: "title" } } }));
 
-    expect(json.name).toBe("David");
-    const posts = json.posts as Array<Record<string, unknown>>;
-    expect(Array.isArray(posts)).toBe(true);
+    expect(json).toMatch(/"name":"David"/);
+    expect(json).toMatch(/"posts":\[/);
 
-    const welcome = posts.find((p) => p.title === "Welcome to the weblog")!;
-    expect(welcome.title).toBe("Welcome to the weblog");
-    expect(welcome.body).toBeUndefined();
+    expect(json).toMatch(/"title":"Welcome to the weblog"/);
+    expect(json).not.toMatch(/"body":"Such a lovely day"/);
 
-    expect(posts.some((p) => p.title === "So I was thinking")).toBe(true);
+    expect(json).toMatch(/"title":"So I was thinking"/);
+    expect(json).not.toMatch(/"body":"Like I hopefully always am"/);
   });
 
   it("includes fetches second level associations", async () => {
     const david = await getDavid();
-    const json = await david.asJson({
-      include: { posts: { include: { comments: { only: ["body"] } } } },
-    });
-
-    expect(json.name).toBe("David");
-    const posts = json.posts as Array<Record<string, unknown>>;
-    const bodies = posts.flatMap((p) =>
-      (p.comments as Array<Record<string, unknown>>).map((c) => c.body),
+    const json = JSON.stringify(
+      await david.asJson({ include: { posts: { include: { comments: { only: "body" } } } } }),
     );
-    expect(bodies).toContain("Thank you again for the welcome");
-    expect(bodies).toContain("Don't think too hard");
-    for (const p of posts) {
-      for (const c of p.comments as Array<Record<string, unknown>>) {
-        expect(c.post_id).toBeUndefined();
-      }
-    }
+
+    expect(json).toMatch(/"name":"David"/);
+    expect(json).toMatch(/"posts":\[/);
+
+    expect(json).toMatch(/"comments":\[/);
+    expect(json).toMatch(/\{"body":"Thank you again for the welcome"\}/);
+    expect(json).toMatch(/\{"body":"Don't think too hard"\}/);
+    expect(json).not.toMatch(/"post_id":/);
   });
 
   it("includes fetches nth level associations", async () => {
     const david = await getDavid();
-    const json = await david.asJson({
-      include: { posts: { include: { taggings: { include: { tag: { only: ["name"] } } } } } },
-    });
-
-    expect(json.name).toBe("David");
-    const posts = json.posts as Array<Record<string, unknown>>;
-    const tags = posts.flatMap((p) =>
-      (p.taggings as Array<Record<string, unknown>>).map((t) => t.tag as Record<string, unknown>),
+    const json = JSON.stringify(
+      await david.asJson({
+        include: {
+          posts: {
+            include: {
+              taggings: {
+                include: {
+                  tag: { only: "name" },
+                },
+              },
+            },
+          },
+        },
+      }),
     );
-    expect(tags).toContainEqual({ name: "General" });
+
+    expect(json).toMatch(/"name":"David"/);
+    expect(json).toMatch(/"posts":\[/);
+
+    expect(json).toMatch(/"taggings":\[/);
+    expect(json).toMatch(/"tag":\{"name":"General"\}/);
   });
 
   it("includes doesnt merge opts from base", async () => {
     const david = await getDavid();
-    const json = await david.asJson({ only: ["id"], include: "posts" });
-    const posts = json.posts as Array<Record<string, unknown>>;
-    expect(posts.some((p) => p.title === "Welcome to the weblog")).toBe(true);
+    const json = JSON.stringify(
+      await david.asJson({
+        only: "id",
+        include: "posts",
+      }),
+    );
+
+    expect(json).toMatch('"title":"Welcome to the weblog"');
   });
 
   it("should not call methods on associations that dont respond", async () => {
@@ -320,17 +341,27 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
 
   it("should allow includes for list of authors", async () => {
     const [david, mary] = [await getDavid(), await getMary()];
-    const json = await Promise.all(
-      [david, mary].map((a) => a.asJson({ only: ["name"], include: { posts: { only: ["id"] } } })),
+    const json = JSON.stringify(
+      await Promise.all(
+        [david, mary].map((a) => a.asJson({ only: "name", include: { posts: { only: "id" } } })),
+      ),
     );
 
-    const davidPosts = (json[0].posts as Array<Record<string, unknown>>).map((p) => Number(p.id));
-    expect(json[0].name).toBe("David");
-    for (const id of [1, 2, 4, 5, 6]) expect(davidPosts).toContain(id);
-
-    const maryPosts = (json[1].posts as Array<Record<string, unknown>>).map((p) => Number(p.id));
-    expect(json[1].name).toBe("Mary");
-    for (const id of [7, 9]) expect(maryPosts).toContain(id);
+    for (const fragment of [
+      '"name":"David"',
+      '"posts":[',
+      '{"id":1}',
+      '{"id":2}',
+      '{"id":4}',
+      '{"id":5}',
+      '{"id":6}',
+      '"name":"Mary"',
+      '"posts":[',
+      '{"id":7}',
+      '{"id":9}',
+    ]) {
+      expect(json).toContain(fragment);
+    }
   });
 
   it("should allow options for hash of authors", async () => {

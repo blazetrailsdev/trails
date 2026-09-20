@@ -11,12 +11,20 @@ import { collectionProxyFor as association } from "./associations.js";
 import { Rollback } from "./errors.js";
 import { assertQueriesCount, assertNoQueries } from "./testing/query-assertions.js";
 import { QueryCache } from "./query-cache.js";
+import { Result } from "./result.js";
 import { Store } from "./connection-adapters/abstract/query-cache.js";
 import { LogSubscriber } from "./log-subscriber.js";
 import {
   Notifications,
   Logger,
   Executor,
+  assert,
+  assertNot,
+  assertPredicate,
+  assertNotPredicate,
+  assertNothingRaised,
+  assertChanges,
+  assertNoChanges,
   type NotificationEvent,
 } from "@blazetrails/activesupport";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
@@ -166,7 +174,7 @@ describe("QueryCacheTest", () => {
 
     const mw = middleware(async () => {
       for (const pool of Base.connectionHandler.connectionPoolList("all")) {
-        expect((await pool.leaseConnection()).queryCacheEnabled).toBe(true);
+        assertPredicate(await pool.leaseConnection(), (c) => c.queryCacheEnabled);
       }
     });
 
@@ -251,7 +259,7 @@ describe("QueryCacheTest", () => {
       return [200, {}, null];
     });
     await mw();
-    expect(called).toBe(true);
+    assert(called, "middleware should delegate");
   });
 
   it("middleware caches", async () => {
@@ -279,9 +287,7 @@ describe("QueryCacheTest", () => {
     const post = await Post.first();
     await Post.cache(async () => {
       const query = association(post as never, "categories").select("post_id");
-      const result = await (await Post.leaseConnection()).selectAll(query as never);
-      expect(result).toBeDefined();
-      expect(typeof result.toArray).toBe("function");
+      assert((await (await Post.leaseConnection()).selectAll(query as never)) instanceof Result);
     });
   });
 
@@ -462,7 +468,7 @@ describe("QueryCacheTest", () => {
       Base.logger = savedLogger;
     }
 
-    expect(logger.exception).toBe(false);
+    assertNotPredicate(logger, (l) => l.exception);
   });
 
   it.skip("query cache does not allow sql key mutation", () => {
@@ -519,7 +525,7 @@ describe("QueryCacheTest", () => {
     const originalConnection = await Base.removeConnection();
 
     await Base.establishConnection(dbConfig);
-    expect(Task.connectedQ()).toBe(false);
+    assertNotPredicate(Task, (k) => k.connectedQ());
 
     try {
       await Task.cache(async () => {
@@ -603,16 +609,30 @@ describe("QueryCacheTest", () => {
   });
 
   it("query cache does not establish connection if unconnected", async () => {
-    const mw = middleware(async () => {});
-    await mw();
+    Base.connectionHandler.clearActiveConnectionsBang("all");
+    assertNot(Base.connectionHandler.activeConnectionsQ("all"));
+
+    await middleware(() => {
+      assertNot(
+        Base.connectionHandler.activeConnectionsQ("all"),
+        "QueryCache forced ActiveRecord::Base to establish a connection in setup",
+      );
+    })();
+
+    assertNot(
+      Base.connectionHandler.activeConnectionsQ("all"),
+      "QueryCache forced ActiveRecord::Base to establish a connection in cleanup",
+    );
   });
 
   it("query cache is enabled on connections established after middleware runs", async () => {
-    const mw = middleware(async () => {
-      expect((await Base.leaseConnection()).queryCacheEnabled).toBe(true);
-    });
-    await mw();
-    expect((await Base.leaseConnection()).queryCacheEnabled).toBe(false);
+    Base.connectionHandler.clearActiveConnectionsBang("all");
+    assertNot(Base.connectionHandler.activeConnectionsQ("all"));
+
+    await middleware(async () => {
+      assertPredicate(await Base.leaseConnection(), (c) => c.queryCacheEnabled);
+    })();
+    assertNotPredicate(await Base.leaseConnection(), (c) => c.queryCacheEnabled);
   });
 
   it.skip("query caching is local to the current thread", () => {
@@ -620,10 +640,12 @@ describe("QueryCacheTest", () => {
   });
 
   it("query cache is enabled on all connection pools", async () => {
-    const mw = middleware(async () => {
-      expect(Base.connectionPool().queryCacheEnabled).toBe(true);
-    });
-    await mw();
+    await middleware(async () => {
+      for (const pool of Base.connectionHandler.connectionPoolList("all")) {
+        assert(pool.queryCacheEnabled);
+        assert(await pool.withConnection((c) => c.queryCacheEnabled));
+      }
+    })();
   });
 
   it.skipIf(inMemoryDb())("clear query cache is called on all connections", async () => {
@@ -638,7 +660,7 @@ describe("QueryCacheTest", () => {
         topic = await Topic.first();
       });
 
-      expect(topic).not.toBeNull();
+      assert(topic);
 
       await Base.connectedTo({ role: "writing" }, async () => {
         topic!.title = "Topic title";
@@ -666,23 +688,33 @@ describe("QueryCacheTest", () => {
   it("query cache uncached dirties", async () => {
     const mw = middleware(async () => {
       await Post.first();
-      const before = Base.connectionPool().queryCache.size;
-      await Post.uncached(
+      await assertNoChanges(
+        () => Base.connectionPool().queryCache.size,
+        null,
+        {},
         async () => {
-          await Post.create({ title: "a new post", body: "and a body" });
+          await Post.uncached(
+            async () => {
+              await Post.create({ title: "a new post", body: "and a body" });
+            },
+            { dirties: false },
+          );
         },
-        { dirties: false },
       );
-      expect(Base.connectionPool().queryCache.size).toBe(before);
 
-      expect(Base.connectionPool().queryCache.size).toBe(1);
-      await Post.uncached(
+      await assertChanges(
+        () => Base.connectionPool().queryCache.size,
+        null,
+        { from: 1, to: 0 },
         async () => {
-          await Post.create({ title: "a new post", body: "and a body" });
+          await Post.uncached(
+            async () => {
+              await Post.create({ title: "a new post", body: "and a body" });
+            },
+            { dirties: true },
+          );
         },
-        { dirties: true },
       );
-      expect(Base.connectionPool().queryCache.size).toBe(0);
     });
     await mw();
   });
@@ -690,27 +722,37 @@ describe("QueryCacheTest", () => {
   it("query cache connection uncached dirties", async () => {
     const mw = middleware(async () => {
       await Post.first();
-      const before = Base.connectionPool().queryCache.size;
-      await (
-        await Post.leaseConnection()
-      ).uncached(
+      await assertNoChanges(
+        () => Base.connectionPool().queryCache.size,
+        null,
+        {},
         async () => {
-          await Post.create({ title: "a new post", body: "and a body" });
+          await (
+            await Post.leaseConnection()
+          ).uncached(
+            async () => {
+              await Post.create({ title: "a new post", body: "and a body" });
+            },
+            { dirties: false },
+          );
         },
-        { dirties: false },
       );
-      expect(Base.connectionPool().queryCache.size).toBe(before);
 
-      expect(Base.connectionPool().queryCache.size).toBe(1);
-      await (
-        await Post.leaseConnection()
-      ).uncached(
+      await assertChanges(
+        () => Base.connectionPool().queryCache.size,
+        null,
+        { from: 1, to: 0 },
         async () => {
-          await Post.create({ title: "a new post", body: "and a body" });
+          await (
+            await Post.leaseConnection()
+          ).uncached(
+            async () => {
+              await Post.create({ title: "a new post", body: "and a body" });
+            },
+            { dirties: true },
+          );
         },
-        { dirties: true },
       );
-      expect(Base.connectionPool().queryCache.size).toBe(0);
     });
     await mw();
   });
@@ -718,32 +760,42 @@ describe("QueryCacheTest", () => {
   it("query cache uncached dirties disabled with nested cache", async () => {
     const mw = middleware(async () => {
       await Post.first();
-      expect(Base.connectionPool().queryCache.size).toBe(1);
-      await Post.uncached(
+      await assertChanges(
+        () => Base.connectionPool().queryCache.size,
+        null,
+        { from: 1, to: 0 },
         async () => {
-          await Post.cache(async () => {
-            await Post.create({ title: "a new post", body: "and a body" });
-          });
+          await Post.uncached(
+            async () => {
+              await Post.cache(async () => {
+                await Post.create({ title: "a new post", body: "and a body" });
+              });
+            },
+            { dirties: false },
+          );
         },
-        { dirties: false },
       );
-      expect(Base.connectionPool().queryCache.size).toBe(0);
 
       await Post.first();
-      expect(Base.connectionPool().queryCache.size).toBe(1);
-      await (
-        await Post.leaseConnection()
-      ).uncached(
+      await assertChanges(
+        () => Base.connectionPool().queryCache.size,
+        null,
+        { from: 1, to: 0 },
         async () => {
           await (
             await Post.leaseConnection()
-          ).cache(async () => {
-            await Post.create({ title: "a new post", body: "and a body" });
-          });
+          ).uncached(
+            async () => {
+              await (
+                await Post.leaseConnection()
+              ).cache(async () => {
+                await Post.create({ title: "a new post", body: "and a body" });
+              });
+            },
+            { dirties: false },
+          );
         },
-        { dirties: false },
       );
-      expect(Base.connectionPool().queryCache.size).toBe(0);
     });
     await mw();
   });
@@ -805,7 +857,9 @@ describe("QueryCacheExpiryTest", () => {
   it("cache gets cleared after migration", async () => {
     await Post.find(1);
     await (await Post.leaseConnection()).changeColumn("posts", "title", "string", { limit: 80 });
-    await expect(Post.find(1)).resolves.toBeDefined();
+    await assertNothingRaised(async () => {
+      await Post.find(1);
+    });
     await (await Post.leaseConnection()).changeColumn("posts", "title", "string");
   });
 
@@ -827,19 +881,19 @@ describe("QueryCacheExpiryTest", () => {
 
   it("find", async () => {
     await assertClears(1, async () => {
-      expect(Task.connectionPool().queryCacheEnabled).toBe(false);
+      assertNot(Task.connectionPool().queryCacheEnabled);
       await Task.cache(async () => {
-        expect(Task.connectionPool().queryCacheEnabled).toBe(true);
+        assert(Task.connectionPool().queryCacheEnabled);
         await Task.find(1);
 
         await Task.uncached(async () => {
-          expect(Task.connectionPool().queryCacheEnabled).toBe(false);
+          assertNot(Task.connectionPool().queryCacheEnabled);
           await Task.find(1);
         });
 
-        expect(Task.connectionPool().queryCacheEnabled).toBe(true);
+        assert(Task.connectionPool().queryCacheEnabled);
       });
-      expect(Task.connectionPool().queryCacheEnabled).toBe(false);
+      assertNot(Task.connectionPool().queryCacheEnabled);
     });
   });
 
@@ -936,9 +990,9 @@ describe("QueryCacheExpiryTest", () => {
     await Base.cache(async () => {
       await assertClears(1, async () => {
         const p = (await Post.find(1)) as never as {
-          categories: { count(): Promise<number>; deleteAll(): Promise<unknown> };
+          categories: { isAny(): Promise<boolean>; deleteAll(): Promise<unknown> };
         };
-        expect(await p.categories.count()).toBeGreaterThan(0);
+        assert(await p.categories.isAny());
         await p.categories.deleteAll();
       });
     });
@@ -1004,7 +1058,7 @@ describe("TransactionInCachedSqlActiveRecordPayloadTest", () => {
     } finally {
       Notifications.unsubscribe(sub);
     }
-    expect(asserted).toBe(true);
+    assert(asserted);
   });
 
   it("payload with open transaction", async () => {
@@ -1028,6 +1082,6 @@ describe("TransactionInCachedSqlActiveRecordPayloadTest", () => {
     } finally {
       Notifications.unsubscribe(sub);
     }
-    expect(asserted).toBe(true);
+    assert(asserted);
   });
 });

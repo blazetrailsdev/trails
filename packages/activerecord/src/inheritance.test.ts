@@ -1,5 +1,16 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { StringType } from "@blazetrails/activemodel";
+import {
+  assert,
+  assertNot,
+  assertNothingRaised,
+  assertPredicate,
+  assertNotPredicate,
+  assertRaises,
+} from "@blazetrails/activesupport";
+import { regexpEscape } from "@blazetrails/ruby-compat";
+import { Nodes } from "@blazetrails/arel";
+import { assertQueriesMatch } from "./testing/query-assertions.js";
 import { classify, underscore } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
 import * as Type from "./type.js";
@@ -87,8 +98,12 @@ describe("InheritanceTest", () => {
     expect(Company.computeType("Author")).toBe(Author);
   });
 
-  it("compute type nonexistent constant", () => {
-    expect(() => Company.computeType("NonexistentModel")).toThrow(NameError);
+  it("compute type nonexistent constant", async () => {
+    const e = await assertRaises([NameError], {}, () => {
+      Company.computeType("NonexistentModel");
+    });
+    expect(e.message).toMatch("uninitialized constant Company::NonexistentModel");
+    expect((e as NameError).constantName).toBe("Company::NonexistentModel");
   });
 
   it.skip("compute type no method error", () => {
@@ -123,54 +138,67 @@ describe("InheritanceTest", () => {
   });
 
   it("descends from active record", async () => {
-    expect(LoosePerson.isDescendsFromActiveRecord()).toBe(true);
-    expect(LooseDescendant.isDescendsFromActiveRecord()).toBe(true);
-    expect(TightPerson.isDescendsFromActiveRecord()).toBe(true);
-    expect(TightDescendant.isDescendsFromActiveRecord()).toBe(true);
-    expect(Post.isDescendsFromActiveRecord()).toBe(true);
+    assertNotPredicate(Base, (k) => k.isDescendsFromActiveRecord());
+    assertPredicate(LoosePerson, (k) => k.isDescendsFromActiveRecord());
+    assertPredicate(LooseDescendant, (k) => k.isDescendsFromActiveRecord());
+    assertPredicate(TightPerson, (k) => k.isDescendsFromActiveRecord());
+    assertPredicate(TightDescendant, (k) => k.isDescendsFromActiveRecord());
+    assertPredicate(Post, (k) => k.isDescendsFromActiveRecord());
     await Post.loadSchema();
-    expect(StiPost.isDescendsFromActiveRecord()).toBe(false);
-    expect(SubStiPost.isDescendsFromActiveRecord()).toBe(false);
-    expect(AbstractStiPost.isDescendsFromActiveRecord()).toBe(false);
-    expect(SubAbstractStiPost.isDescendsFromActiveRecord()).toBe(false);
+    assertNotPredicate(StiPost, (k) => k.isDescendsFromActiveRecord());
+    assertNotPredicate(SubStiPost, (k) => k.isDescendsFromActiveRecord());
+    assertNotPredicate(AbstractStiPost, (k) => k.isDescendsFromActiveRecord());
+    assertNotPredicate(SubAbstractStiPost, (k) => k.isDescendsFromActiveRecord());
   });
 
   it("company descends from active record", async () => {
-    expect(AbstractCompany.isDescendsFromActiveRecord()).toBe(true);
-    expect(Company.isDescendsFromActiveRecord()).toBe(true);
+    assertNotPredicate(Base, (k) => k.isDescendsFromActiveRecord());
+    assertPredicate(
+      AbstractCompany,
+      (k) => k.isDescendsFromActiveRecord(),
+      "AbstractCompany should descend from ActiveRecord::Base",
+    );
+    assertPredicate(
+      Company,
+      (k) => k.isDescendsFromActiveRecord(),
+      "Company should descend from ActiveRecord::Base",
+    );
     await Company.loadSchema();
     class LocalCompanySubclass extends Company {}
-    expect(LocalCompanySubclass.isDescendsFromActiveRecord()).toBe(false);
+    assertNot(
+      LocalCompanySubclass.isDescendsFromActiveRecord(),
+      "Company subclass should not descend from ActiveRecord::Base",
+    );
   });
 
   it("abstract class", () => {
-    expect(Base.abstractClass).toBe(false);
-    expect(LoosePerson.abstractClass).toBe(true);
-    expect(LooseDescendant.abstractClass).toBe(false);
+    assertNotPredicate(Base, (k) => k.abstractClass);
+    assertPredicate(LoosePerson, (k) => k.abstractClass);
+    assertNotPredicate(LooseDescendant, (k) => k.abstractClass);
   });
 
   it("inheritance base class", () => {
     expect(baseClass.call(Post)).toBe(Post);
-    expect(isBaseClass(Post)).toBe(true);
+    assertPredicate(Post, (k) => isBaseClass(k));
     expect(baseClass.call(SpecialPost)).toBe(Post);
-    expect(isBaseClass(SpecialPost)).toBe(false);
+    assertNotPredicate(SpecialPost, (k) => isBaseClass(k));
     expect(baseClass.call(StiPost)).toBe(Post);
-    expect(isBaseClass(StiPost)).toBe(false);
+    assertNotPredicate(StiPost, (k) => isBaseClass(k));
     expect(baseClass.call(SubStiPost)).toBe(Post);
-    expect(isBaseClass(SubStiPost)).toBe(false);
+    assertNotPredicate(SubStiPost, (k) => isBaseClass(k));
     expect(baseClass.call(SubAbstractStiPost)).toBe(SubAbstractStiPost);
-    expect(isBaseClass(SubAbstractStiPost)).toBe(true);
+    assertPredicate(SubAbstractStiPost, (k) => isBaseClass(k));
   });
 
   it("abstract inheritance base class", () => {
     expect(baseClass.call(LoosePerson)).toBe(LoosePerson);
-    expect(isBaseClass(LoosePerson)).toBe(true);
+    assertPredicate(LoosePerson, (k) => isBaseClass(k));
     expect(baseClass.call(LooseDescendant)).toBe(LooseDescendant);
-    expect(isBaseClass(LooseDescendant)).toBe(true);
+    assertPredicate(LooseDescendant, (k) => isBaseClass(k));
     expect(baseClass.call(TightPerson)).toBe(TightPerson);
-    expect(isBaseClass(TightPerson)).toBe(true);
+    assertPredicate(TightPerson, (k) => isBaseClass(k));
     expect(baseClass.call(TightDescendant)).toBe(TightPerson);
-    expect(isBaseClass(TightDescendant)).toBe(false);
+    assertNotPredicate(TightDescendant, (k) => isBaseClass(k));
   });
 
   it.skip("base class activerecord error", () => {
@@ -290,16 +318,18 @@ describe("InheritanceTest", () => {
     expect(firm.constructor).toBe(Firm);
   });
 
-  it("new with abstract class", () => {
-    expect(() => AbstractCompany.new()).toThrow(NotImplementedError);
-    expect(() => AbstractCompany.new()).toThrow(
-      "AbstractCompany is an abstract class and cannot be instantiated.",
-    );
+  it("new with abstract class", async () => {
+    const e = await assertRaises([NotImplementedError], {}, () => {
+      AbstractCompany.new();
+    });
+    expect(e.message).toBe("AbstractCompany is an abstract class and cannot be instantiated.");
   });
 
-  it("new with ar base", () => {
-    expect(() => Base.new()).toThrow(NotImplementedError);
-    expect(() => Base.new()).toThrow("Base is an abstract class and cannot be instantiated.");
+  it("new with ar base", async () => {
+    const e = await assertRaises([NotImplementedError], {}, () => {
+      Base.new();
+    });
+    expect(e.message).toBe("Base is an abstract class and cannot be instantiated.");
   });
 
   it("new with invalid type", () => {
@@ -336,19 +366,21 @@ describe("InheritanceTest", () => {
     await expect(Company.where({ type: "Account" }).createBang()).rejects.toThrow(SubclassNotFound);
   });
 
-  it("new with unrelated namespaced type", () => {
+  it("new with unrelated namespaced type", async () => {
     Base.storeFullStiClass = false;
-    expect(() => NamespacedCompany.new({ type: "Firm" })).toThrow(SubclassNotFound);
+    const e = await assertRaises([SubclassNotFound], {}, () => {
+      NamespacedCompany.new({ type: "Firm" });
+    });
+
+    expect(e.message).toBe(
+      "Invalid single-table inheritance type: Namespaced::Firm is not a subclass of Namespaced::Company",
+    );
   });
 
-  it("new with complex inheritance", () => {
-    let error: unknown;
-    try {
+  it("new with complex inheritance", async () => {
+    await assertNothingRaised(() => {
       Client.new({ type: "VerySpecialClient" });
-    } catch (e) {
-      error = e;
-    }
-    expect(error).toBeUndefined();
+    });
   });
 
   it("new without storing full sti class", () => {
@@ -375,24 +407,16 @@ describe("InheritanceTest", () => {
 
   it("finding incorrect type data", async () => {
     await expect(Firm.find(2)).rejects.toThrow(RecordNotFound);
-    let error: unknown;
-    try {
+    await assertNothingRaised(async () => {
       await Firm.find(1);
-    } catch (e) {
-      error = e;
-    }
-    expect(error).toBeUndefined();
+    });
   });
 
   it("alt finding incorrect type data", async () => {
     await expect(Cucumber.find(2)).rejects.toThrow(RecordNotFound);
-    let error: unknown;
-    try {
+    await assertNothingRaised(async () => {
       await Cucumber.find(1);
-    } catch (e) {
-      error = e;
-    }
-    expect(error).toBeUndefined();
+    });
   });
 
   it("update all within inheritance", async () => {
@@ -458,22 +482,35 @@ describe("InheritanceTest", () => {
 
   it("eager load belongs to something inherited", async () => {
     const account = await Account.includes(":firm").find(1);
-    expect(account.association("firm").loaded).toBe(true);
+    assertPredicate(
+      account.association("firm"),
+      (a) => a.loaded,
+      "association was not eager loaded",
+    );
   });
 
   it("alt eager loading", async () => {
     const cabbage = await RedCabbage.includes(":seller").find(4);
-    expect(cabbage.association("seller").loaded).toBe(true);
+    assertPredicate(
+      cabbage.association("seller"),
+      (a) => a.loaded,
+      "association was not eager loaded",
+    );
   });
 
   it("eager load belongs to primary key quoting", async () => {
-    let error: unknown;
-    try {
-      await Account.includes(":firm").find(1);
-    } catch (e) {
-      error = e;
-    }
-    expect(error).toBeUndefined();
+    const bindParam = new Nodes.BindParam(null);
+    await assertQueriesMatch(
+      new RegExp(
+        `${regexpEscape(Base.connection.quoteTableName("companies.id"))} = (?:${regexpEscape(bindParam.toSql())}|1)`,
+        "i",
+      ),
+      undefined,
+      false,
+      async () => {
+        await Account.includes(":firm").find(1);
+      },
+    );
   });
 
   it("inherits custom primary key", () => {
@@ -482,26 +519,20 @@ describe("InheritanceTest", () => {
 
   it("inheritance without mapping", async () => {
     expect(await SpecialSubscriber.find("webster132")).toBeInstanceOf(SpecialSubscriber);
-    let error: unknown;
-    try {
+    await assertNothingRaised(async () => {
       const s = SpecialSubscriber.new({ name: "And breaaaaathe!" });
       (s as any).id = "roger";
       await s.save();
-    } catch (e) {
-      error = e;
-    }
-    expect(error).toBeUndefined();
+    });
   });
 
   it("scope inherited properly", async () => {
-    let error: unknown;
-    try {
+    await assertNothingRaised(async () => {
       await Company.ofFirstFirm();
+    });
+    await assertNothingRaised(async () => {
       await Client.ofFirstFirm();
-    } catch (e) {
-      error = e;
-    }
-    expect(error).toBeUndefined();
+    });
   });
 
   it("inheritance with default scope", async () => {
@@ -519,13 +550,7 @@ describe("InheritanceComputeTypeTest", () => {
   it("sti type from attributes disabled in non sti class", async () => {
     const phone = ShopProductType.new({ name: "Phone" });
     const product = ShopProduct.new({ type: phone } as Record<string, unknown>);
-    let error: unknown;
-    try {
-      await product.save();
-    } catch (e) {
-      error = e;
-    }
-    expect(error).toBeUndefined();
+    assert(await product.save());
   });
 
   it("inheritance new with subclass as default", async () => {
@@ -563,13 +588,21 @@ describe("InheritanceAttributeTest", () => {
   fixtures(["companies"]);
 
   class AttrTestCompany extends Base {
+    static moduleName = "InheritanceAttributeTest";
+    static _demodulizedName = "Company";
     static {
       this.tableName = "companies";
-      this.attribute("type", "string", { default: "AttrTestStartup" });
+      this.attribute("type", "string", { default: "InheritanceAttributeTest::Startup" });
     }
   }
-  class AttrTestStartup extends AttrTestCompany {}
-  class AttrTestEmpire extends AttrTestCompany {}
+  class AttrTestStartup extends AttrTestCompany {
+    static moduleName = "InheritanceAttributeTest";
+    static _demodulizedName = "Startup";
+  }
+  class AttrTestEmpire extends AttrTestCompany {
+    static moduleName = "InheritanceAttributeTest";
+    static _demodulizedName = "Empire";
+  }
 
   registerModel([AttrTestCompany, AttrTestStartup, AttrTestEmpire]);
   registerSubclass(AttrTestStartup);
@@ -577,11 +610,11 @@ describe("InheritanceAttributeTest", () => {
 
   it("inheritance new with subclass as default", () => {
     const startup = AttrTestCompany.new();
-    expect((startup as any).type).toBe("AttrTestStartup");
+    expect((startup as any).type).toBe("InheritanceAttributeTest::Startup");
     expect(startup).toBeInstanceOf(AttrTestStartup);
 
-    const empire = AttrTestCompany.new({ type: "AttrTestEmpire" });
-    expect((empire as any).type).toBe("AttrTestEmpire");
+    const empire = AttrTestCompany.new({ type: "InheritanceAttributeTest::Empire" });
+    expect((empire as any).type).toBe("InheritanceAttributeTest::Empire");
     expect(empire).toBeInstanceOf(AttrTestEmpire);
   });
 });
@@ -608,13 +641,21 @@ describe("InheritanceAttributeMappingTest", () => {
   Type.register("omg_sti", OmgStiType);
 
   class IamtCompany extends Base {
+    static moduleName = "InheritanceAttributeMappingTest";
+    static _demodulizedName = "Company";
     static {
       this.tableName = "companies";
       this.attribute("type", "omg_sti");
     }
   }
-  class IamtStartup extends IamtCompany {}
-  class IamtEmpire extends IamtCompany {}
+  class IamtStartup extends IamtCompany {
+    static moduleName = "InheritanceAttributeMappingTest";
+    static _demodulizedName = "Startup";
+  }
+  class IamtEmpire extends IamtCompany {
+    static moduleName = "InheritanceAttributeMappingTest";
+    static _demodulizedName = "Empire";
+  }
 
   registerModel([IamtCompany, IamtStartup, IamtEmpire]);
   registerSubclass(IamtStartup);
@@ -644,43 +685,37 @@ describe("InheritanceAttributeMappingTest", () => {
     await IamtStartup.create({ name: "a Startup" });
     await IamtEmpire.create({ name: "an Empire" });
 
-    const rawRows = (
-      await Base.connection.selectAll("SELECT name, type FROM companies ORDER BY id")
-    ).toArray() as Array<{ name: string; type: string }>;
-    expect(rawRows[0]).toMatchObject({
-      name: "a Startup",
-      type: `omg_${underscore("IamtStartup")}`,
-    });
-    expect(rawRows[1]).toMatchObject({
-      name: "an Empire",
-      type: `omg_${underscore("IamtEmpire")}`,
-    });
-
-    const modelPairs = (await IamtCompany.all()).map((a: any) => [a.name, a.type]).sort() as Array<
-      [string, string]
-    >;
-    expect(modelPairs[0]).toEqual(["a Startup", "IamtStartup"]);
-    expect(modelPairs[1]).toEqual(["an Empire", "IamtEmpire"]);
+    expect((await Base.connection.selectRows("SELECT name, type FROM companies")).sort()).toEqual([
+      ["a Startup", "omg_inheritance_attribute_mapping_test/startup"],
+      ["an Empire", "omg_inheritance_attribute_mapping_test/empire"],
+    ]);
+    expect((await IamtCompany.all()).map((a: any) => [a.name, a.type]).sort()).toEqual([
+      ["a Startup", "InheritanceAttributeMappingTest::Startup"],
+      ["an Empire", "InheritanceAttributeMappingTest::Empire"],
+    ]);
 
     const startup = await IamtStartup.first();
-    const startupAsEmpire = startup!.becomesBang(IamtEmpire);
-    await startupAsEmpire.save();
+    startup!.becomesBang(IamtEmpire);
+    await startup!.save();
 
-    const afterPairs = (await IamtCompany.all()).map((a: any) => [a.name, a.type]).sort() as Array<
-      [string, string]
-    >;
-    expect(afterPairs[0]).toEqual(["a Startup", "IamtEmpire"]);
-    expect(afterPairs[1]).toEqual(["an Empire", "IamtEmpire"]);
+    expect((await Base.connection.selectRows("SELECT name, type FROM companies")).sort()).toEqual([
+      ["a Startup", "omg_inheritance_attribute_mapping_test/empire"],
+      ["an Empire", "omg_inheritance_attribute_mapping_test/empire"],
+    ]);
+
+    expect((await IamtCompany.all()).map((a: any) => [a.name, a.type]).sort()).toEqual([
+      ["a Startup", "InheritanceAttributeMappingTest::Empire"],
+      ["an Empire", "InheritanceAttributeMappingTest::Empire"],
+    ]);
   });
 
   it("polymorphic associations custom type", async () => {
     const startup = await IamtStartup.create({ name: "a Startup" });
     const sponsor = await IamtSponsor.create({ sponsorable: startup });
 
-    const rawTypes = (await Base.connection.selectValues(
-      "SELECT sponsorable_type FROM sponsors",
-    )) as string[];
-    expect(rawTypes[0]).toMatch(/^omg_/);
+    expect(await Base.connection.selectValues("SELECT sponsorable_type FROM sponsors")).toEqual([
+      "omg_inheritance_attribute_mapping_test/company",
+    ]);
 
     const reloaded = await IamtSponsor.includes(":sponsorable").find(sponsor.id);
     expect((reloaded as any).sponsorable?.id).toBe(startup.id);
