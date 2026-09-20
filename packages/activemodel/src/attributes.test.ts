@@ -76,7 +76,7 @@ describe("AttributesTest", () => {
     static {
       include(this, AttributeMethods);
 
-      this.attributeMethodSuffix("=", { parameters: "value" });
+      this.attributeMethodSuffix("=");
 
       this.defineAttributeMethod("foo");
     }
