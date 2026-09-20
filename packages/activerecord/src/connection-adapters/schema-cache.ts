@@ -36,11 +36,18 @@ const COLUMN_CLASSES: Record<string, { prototype: Column }> = {
 
 function rehydrateColumn(data: unknown): Column {
   if (data instanceof Column) return data;
+  if (data == null || typeof data !== "object") return data as Column;
   const coder = data as ColumnCoder;
   const klass = COLUMN_CLASSES[coder["class"] as string] ?? Column;
   const column = Object.create(klass.prototype) as Column;
   column.initWith(coder);
   return column;
+}
+
+/** @noRailsEquivalent PERMANENT */
+function coderEntries<T>(value: unknown): [string, T][] {
+  if (Array.isArray(value)) return value as [string, T][];
+  return Object.entries((value ?? {}) as Record<string, T>);
 }
 
 function expandIndexOption<T>(
@@ -55,6 +62,7 @@ function expandIndexOption<T>(
 
 function rehydrateIndex(data: unknown): IndexDefinition {
   if (data instanceof IndexDefinition) return data;
+  if (data == null || typeof data !== "object") return data as IndexDefinition;
   const row = data as Record<string, unknown>;
   const columns = (row["columns"] ?? []) as string | string[];
   return new IndexDefinition(
@@ -127,7 +135,10 @@ export class SchemaCache {
     coder["columns"] = Object.fromEntries(
       [...this._columns]
         .sort(byKey)
-        .map(([table, cols]) => [table, cols.map((c) => serializeColumn(c))]),
+        .map(([table, cols]) => [
+          table,
+          Array.isArray(cols) ? cols.map((c) => serializeColumn(c)) : cols,
+        ]),
     );
     coder["primary_keys"] = Object.fromEntries([...this._primaryKeys].sort(byKey));
     coder["data_sources"] = Object.fromEntries([...this._dataSourceExists].sort(byKey));
@@ -137,35 +148,31 @@ export class SchemaCache {
 
   initWith(coder: Record<string, unknown>): void {
     this._columns = new Map(
-      Object.entries((coder["columns"] as Record<string, unknown[]>) ?? {}).map(([table, cols]) => [
+      coderEntries<unknown[]>(coder["columns"]).map(([table, cols]) => [
         table,
-        cols.map((c) => rehydrateColumn(c)),
+        Array.isArray(cols) ? cols.map((c) => rehydrateColumn(c)) : cols,
       ]),
     );
 
     this._columnsHash = new Map(
-      Object.entries((coder["columns_hash"] as Record<string, Record<string, unknown>>) ?? {}).map(
-        ([table, hash]) => [
-          table,
-          Object.fromEntries(
-            Object.entries(hash).map(([name, col]) => [name, rehydrateColumn(col)]),
-          ),
-        ],
-      ),
+      coderEntries<Record<string, unknown>>(coder["columns_hash"]).map(([table, hash]) => [
+        table,
+        hash == null
+          ? hash
+          : Object.fromEntries(
+              Object.entries(hash).map(([name, col]) => [name, rehydrateColumn(col)]),
+            ),
+      ]),
     );
 
-    this._primaryKeys = new Map(
-      Object.entries((coder["primary_keys"] as Record<string, string | string[] | null>) ?? {}),
-    );
+    this._primaryKeys = new Map(coderEntries<string | string[] | null>(coder["primary_keys"]));
 
-    this._dataSourceExists = new Map(
-      Object.entries((coder["data_sources"] as Record<string, boolean>) ?? {}),
-    );
+    this._dataSourceExists = new Map(coderEntries<boolean>(coder["data_sources"]));
 
     this._indexes = new Map(
-      Object.entries((coder["indexes"] as Record<string, unknown[]>) ?? {}).map(([table, idx]) => [
+      coderEntries<unknown[]>(coder["indexes"]).map(([table, idx]) => [
         table,
-        idx.map((i) => rehydrateIndex(i)),
+        Array.isArray(idx) ? idx.map((i) => rehydrateIndex(i)) : idx,
       ]),
     );
 
@@ -592,12 +599,12 @@ export class SchemaReflection {
     return this._cache?.isCached(tableName);
   }
 
-  async dumpTo(pool: unknown, filename: string): Promise<void> {
+  async dumpTo(pool: unknown, filename: string): Promise<SchemaCache> {
     const freshCache = this.emptyCache();
     await freshCache.addAll(pool);
     await freshCache.dumpTo(filename);
-    this._cache = freshCache;
     this._cachePromise = null;
+    return (this._cache = freshCache);
   }
 
   private async cache(pool: unknown): Promise<SchemaCache> {
@@ -742,7 +749,7 @@ export class BoundSchemaReflection {
     return this._schemaReflection.clearDataSourceCacheBang(this._pool, name);
   }
 
-  async dumpTo(filename: string): Promise<void> {
+  async dumpTo(filename: string): Promise<SchemaCache> {
     return this._schemaReflection.dumpTo(this._pool, filename);
   }
 }
