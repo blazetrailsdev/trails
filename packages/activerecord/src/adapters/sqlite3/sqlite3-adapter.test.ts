@@ -51,7 +51,7 @@ async function withFileConnection(
 ): Promise<void> {
   options = { ...options };
   const dbConfig = ARUnit2Model.connectionDbConfig();
-  options["database"] ??= dbConfig.database;
+  options["database"] ||= dbConfig.database;
   const conn = new BetterSQLite3Adapter(options);
 
   try {
@@ -166,7 +166,6 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     await assertNothingRaised(async () => {
       const connection = new BetterSQLite3Adapter({ database: dbPath });
       await connection.dropTable("ex", { ifExists: true });
-      await connection.disconnectBang();
     });
     expect(await BetterSQLite3Adapter.databaseExists({ database: dbPath })).toBeTruthy();
     await fs.promises.rm(dir, { recursive: true, force: true });
@@ -218,9 +217,11 @@ describeIfSqlite("SQLite3AdapterTest", () => {
         .join(", ");
       const result = await (
         await Owner.leaseConnection()
-      ).execQuery(
-        `SELECT ${select}\nFROM   ${Owner.tableName}\nWHERE  ${Owner.primaryKey} = ${owner.id}\n`,
-      );
+      ).execQuery(`
+        SELECT ${select}
+        FROM   ${Owner.tableName}
+        WHERE  ${Owner.primaryKey} = ${owner.id}
+      `);
 
       expect(result.rows[0].includes("blob")).toBeFalsy();
     } finally {
@@ -706,7 +707,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
 
   it("select rows", async () => {
     await createExampleTable();
-    for (const i of [0, 1]) {
+    for (let i = 0; i < 2; i++) {
       await adapter.create(`INSERT INTO ex (number) VALUES (${i})`);
     }
     const rows = await adapter.selectRows("select number, id from ex");
@@ -945,7 +946,6 @@ describeIfSqlite("SQLite3AdapterTest", () => {
 
       expect(await connection.primaryKey("barcodes")).toEqual("id");
 
-      await Barcode.resetColumnInformation();
       await Barcode.loadSchema();
       const customPk = Barcode.columnsHash()["id"];
 
@@ -969,7 +969,6 @@ describeIfSqlite("SQLite3AdapterTest", () => {
 
       expect(await connection.primaryKey("barcodes")).toEqual("id");
 
-      await Barcode.resetColumnInformation();
       await Barcode.loadSchema();
       const customPk = Barcode.columnsHash()["id"];
 
@@ -991,7 +990,6 @@ describeIfSqlite("SQLite3AdapterTest", () => {
 
       expect(await connection.primaryKey("barcodes")).toEqual("id");
 
-      await Barcode.resetColumnInformation();
       await Barcode.loadSchema();
       const customPk = Barcode.columnsHash()["id"];
 
@@ -1076,18 +1074,23 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     const step = () => {
       throw Object.assign(new Error("busy"), { code: "SQLITE_BUSY" });
     };
-    vi.spyOn(statement, "all").mockImplementation(step);
-    vi.spyOn(statement, "run").mockImplementation(step);
+    const all = vi.spyOn(statement, "all").mockImplementation(step);
+    const run = vi.spyOn(statement, "run").mockImplementation(step);
     try {
       await assertCalled(statement, "close", null, {}, async () => {
-        vi.spyOn(rawConnection, "prepare").mockImplementation(() => statement);
-        const error: any = await assertRaises([StatementTimeout], {}, async () => {
-          await adapter.execQuery("select * from statement_test");
-        });
-        expect(error.connectionPool).toEqual(adapter.pool);
+        const prepare = vi.spyOn(rawConnection, "prepare").mockImplementation(() => statement);
+        try {
+          const error: any = await assertRaises([StatementTimeout], {}, async () => {
+            await adapter.execQuery("select * from statement_test");
+          });
+          expect(error.connectionPool).toEqual(adapter.pool);
+        } finally {
+          prepare.mockRestore();
+        }
       });
     } finally {
-      vi.restoreAllMocks();
+      all.mockRestore();
+      run.mockRestore();
     }
   });
 
