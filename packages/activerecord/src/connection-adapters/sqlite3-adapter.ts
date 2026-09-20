@@ -1011,16 +1011,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return sqliteDataSourceSql(name ?? undefined, { type: opts.type });
   }
 
-  async primaryKey(tableName: string): Promise<string | string[] | null> {
-    const rows = (
-      await this.internalExecQuery(`PRAGMA table_info(${quoteTableName(tableName)})`, "SCHEMA")
-    ).toArray() as Array<{ name: string; pk: number }>;
-    const pks = rows.filter((r) => r.pk > 0).sort((a, b) => a.pk - b.pk);
-    if (pks.length === 0) return null;
-    if (pks.length === 1) return pks[0].name;
-    return pks.map((r) => r.name);
-  }
-
   /** @internal */
   private newColumnFromField(
     tableName: string,
