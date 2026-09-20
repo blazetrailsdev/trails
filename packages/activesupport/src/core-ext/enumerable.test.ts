@@ -45,7 +45,15 @@ describe("EnumerableTests", () => {
 
   it.skip("nil sums", () => {
     // BLOCKED: enumerable-sum-index-with-and-excluding-port-gaps
-    expect(sum([])).toBe(0);
+    const expectedRaise = TypeError;
+
+    expect(() => sum([5, 15, null] as never[])).toThrow(expectedRaise);
+    expect(() => sum([null] as never[])).toThrow(expectedRaise);
+
+    const payments = [new Payment(5), new Payment(15), new Payment(10), new Payment(null)];
+    expect(() => sum(payments, (p) => p.price as number)).toThrow(expectedRaise);
+
+    expect(sum(payments, (p) => (p.price ?? 0) * 2)).toBe(60);
   });
 
   it.skip("empty sums", () => {
@@ -103,7 +111,18 @@ describe("EnumerableTests", () => {
 
   it.skip("excluding", () => {
     // BLOCKED: enumerable-sum-index-with-and-excluding-port-gaps
-    expect(excluding([1, 2, 3, 4], 2, 3)).toEqual([1, 4]);
+    expect(excluding([1, 2, 3, 4, 5], 3, 5)).toEqual([1, 2, 4]);
+    expect(excluding([1, 2, 3, 4, 5], [1, 2] as never)).toEqual([3, 4, 5]);
+    expect(
+      excluding(
+        [
+          [0, 1],
+          [1, 0],
+        ],
+        [[1, 0]] as never,
+      ),
+    ).toEqual([[0, 1]]);
+    expect(excluding([1, 2, 3, 4, 5], 3, 5)).toEqual([1, 2, 4]);
   });
 
   it("without", () => {
@@ -219,13 +238,16 @@ describe("EnumerableTests", () => {
 
   it.skip("index with", () => {
     // BLOCKED: enumerable-sum-index-with-and-excluding-port-gaps
-    expect(indexWith([5, 15, 10], (price) => price)).toEqual(
+    const payments = [new Payment(5), new Payment(15), new Payment(10)];
+
+    expect(indexWith(payments, (p) => p.price)).toEqual(
       new Map([
-        [5, 5],
-        [15, 15],
-        [10, 10],
+        [payments[0], 5],
+        [payments[1], 15],
+        [payments[2], 10],
       ]),
     );
+
     expect(indexWith(["title", "body"], null)).toEqual(
       new Map([
         ["title", null],
@@ -236,6 +258,12 @@ describe("EnumerableTests", () => {
       new Map([
         ["title", []],
         ["body", []],
+      ]),
+    );
+    expect(indexWith(["title", "body"], {})).toEqual(
+      new Map([
+        ["title", {}],
+        ["body", {}],
       ]),
     );
   });
