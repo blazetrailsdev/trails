@@ -24,6 +24,7 @@ import { ModelName, type ModelLike } from "@blazetrails/activemodel";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { Base } from "../../base.js";
 import type { ColumnLike } from "../../model-schema.js";
+import { ScopeRegistry } from "../../scoping.js";
 import { registerSubclass } from "../../inheritance.js";
 import type { Comment } from "./comment.js";
 import type { Tagging } from "./tagging.js";
@@ -814,13 +815,59 @@ export class PostWithDestroyCallback extends Base {
   }
 }
 
-export class FakeKlass extends Base {
-  static {
-    this._tableName = "posts";
+export class FakeKlass {
+  static scopeRegistry(): ScopeRegistry {
+    return ScopeRegistry.instance();
   }
 
-  static override columnsHash(): Record<string, ColumnLike> {
+  static adapterClassSync(): unknown {
+    return Post.adapterClassSync();
+  }
+
+  static leaseConnection(): unknown {
+    return Post.leaseConnection();
+  }
+
+  static get tableName(): string {
+    return "posts";
+  }
+
+  static get attributeAliases(): Record<string, string> {
+    return {};
+  }
+
+  static sanitizeSql(sql: unknown): unknown {
+    return sql;
+  }
+
+  static sanitizeSqlForOrder(sql: unknown): unknown {
+    return sql;
+  }
+
+  static disallowRawSqlBang(..._args: unknown[]): void {}
+
+  static columnsHash(): Record<string, ColumnLike> {
     return { name: null as unknown as ColumnLike };
+  }
+
+  static get arelTable(): unknown {
+    return Post.arelTable;
+  }
+
+  static get predicateBuilder(): unknown {
+    return Post.predicateBuilder;
+  }
+
+  static isFinderNeedsTypeCondition(): boolean {
+    return false;
+  }
+
+  static isBaseClass(): boolean {
+    return true;
+  }
+
+  static deterministicEncryptedAttributes(): undefined {
+    return undefined;
   }
 }
 

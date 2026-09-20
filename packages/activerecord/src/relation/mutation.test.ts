@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import "../index.js";
 import { fixtures } from "../test-fixtures.js";
 import { Post, FakeKlass } from "../test-helpers/models/post.js";
+import { Relation } from "../relation.js";
+import type { Base } from "../base.js";
 
 fixtures([]);
 function relation(): any {
@@ -41,7 +43,7 @@ describe("RelationMutationTest", () => {
   });
 
   it("#order! with symbol prepends the table name", () => {
-    const rel: any = FakeKlass.all();
+    const rel: any = new Relation(FakeKlass as unknown as typeof Base);
     expect(rel.orderBang(":name") === rel).toBeTruthy();
     const node = rel.orderValues[0];
     expect(node.isAscending()).toBeTruthy();
@@ -101,7 +103,7 @@ describe("RelationMutationTest", () => {
   });
 
   it("#reorder! with symbol prepends the table name", () => {
-    const rel: any = FakeKlass.all();
+    const rel: any = new Relation(FakeKlass as unknown as typeof Base);
     expect(rel.reorderBang(":name") === rel).toBeTruthy();
     const node = rel.orderValues[0];
     expect(node.isAscending()).toBeTruthy();
