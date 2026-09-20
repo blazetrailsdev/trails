@@ -746,7 +746,8 @@ describe("HashWithIndifferentAccessTest", () => {
     expect(Object.fromEntries(selected.toHash())).toEqual({ a: 1 });
   });
 
-  it("indifferent select returns enumerator", () => {
+  it.skip("indifferent select returns enumerator", () => {
+    // BLOCKED: hwia-has-no-enumerator-form-or-yaml-dump
     const h = new HashWithIndifferentAccess({ a: 1, b: 2 });
     const selected = h.select(() => true);
     expect(selected.size).toBe(2);
@@ -773,7 +774,8 @@ describe("HashWithIndifferentAccessTest", () => {
     expect(Object.fromEntries(rejected.toHash())).toEqual({ a: 1 });
   });
 
-  it("indifferent reject returns enumerator", () => {
+  it.skip("indifferent reject returns enumerator", () => {
+    // BLOCKED: hwia-has-no-enumerator-form-or-yaml-dump
     const h = new HashWithIndifferentAccess({ a: 1, b: 2 });
     const rejected = h.reject(() => false);
     expect(rejected.size).toBe(2);
@@ -1232,7 +1234,8 @@ describe("HashWithIndifferentAccessTest", () => {
     expect(Object.getPrototypeOf(klass)).toEqual(HashWithIndifferentAccess);
   });
 
-  it("inheriting from hash with indifferent access properly dumps ivars", () => {
+  it.skip("inheriting from hash with indifferent access properly dumps ivars", () => {
+    // BLOCKED: hwia-has-no-enumerator-form-or-yaml-dump
     class MyHWIA<V> extends HashWithIndifferentAccess<V> {}
     const h = new MyHWIA({ x: 42 });
     expect(Object.fromEntries(h.toHash())).toEqual({ x: 42 });

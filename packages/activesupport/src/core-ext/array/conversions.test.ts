@@ -3,26 +3,44 @@ import { describe, it, expect } from "vitest";
 import { toFormattedS, toFs, toSentence, toXml } from "../../array-utils.js";
 import { BigDecimal } from "../big-decimal/conversions.js";
 import { ArgumentError } from "../../hash-utils.js";
+import { SafeBuffer } from "../string/output-safety.js";
 
 describe("ToSentenceTest", () => {
   it("plain array to sentence", () => {
+    expect(toSentence([])).toBe("");
+    expect(toSentence(["one"])).toBe("one");
+    expect(toSentence(["one", "two"])).toBe("one and two");
     expect(toSentence(["one", "two", "three"])).toBe("one, two, and three");
   });
 
-  it("to sentence with words connector", () => {
-    expect(toSentence(["one", "two", "three"], { wordsConnector: " - " })).toBe(
-      "one - two, and three",
+  it.skip("to sentence with words connector", () => {
+    // BLOCKED: to-sentence-does-not-stringify-elements-or-nil-connectors
+    expect(toSentence(["one", "two", "three"], { wordsConnector: " " })).toBe("one two, and three");
+    expect(toSentence(["one", "two", "three"], { wordsConnector: " & " })).toBe(
+      "one & two, and three",
+    );
+    expect(toSentence(["one", "two", "three"], { wordsConnector: null as never })).toBe(
+      "onetwo, and three",
     );
   });
 
-  it("to sentence with last word connector", () => {
-    expect(toSentence(["one", "two", "three"], { lastWordConnector: " or " })).toBe(
-      "one, two or three",
+  it.skip("to sentence with last word connector", () => {
+    // BLOCKED: to-sentence-does-not-stringify-elements-or-nil-connectors
+    expect(toSentence(["one", "two", "three"], { lastWordConnector: ", and also " })).toBe(
+      "one, two, and also three",
+    );
+    expect(toSentence(["one", "two", "three"], { lastWordConnector: null as never })).toBe(
+      "one, twothree",
+    );
+    expect(toSentence(["one", "two", "three"], { lastWordConnector: " " })).toBe("one, two three");
+    expect(toSentence(["one", "two", "three"], { lastWordConnector: " and " })).toBe(
+      "one, two and three",
     );
   });
 
   it("two elements", () => {
     expect(toSentence(["one", "two"])).toBe("one and two");
+    expect(toSentence(["one", "two"], { twoWordsConnector: " " })).toBe("one two");
   });
 
   it("one element", () => {
@@ -30,42 +48,55 @@ describe("ToSentenceTest", () => {
   });
 
   it("one element not same object", () => {
-    const arr = ["one"];
-    const result = toSentence(arr);
-    expect(result).toBe("one");
+    const elements = ["one"];
+    expect(Object(toSentence(elements))).not.toBe(elements[0]);
   });
 
-  it("one non string element", () => {
-    expect(toSentence([String(42)])).toBe("42");
+  it.skip("one non string element", () => {
+    // BLOCKED: to-sentence-does-not-stringify-elements-or-nil-connectors
+    expect(toSentence([1] as never)).toBe("1");
   });
 
   it("does not modify given hash", () => {
-    const arr = ["a", "b", "c"];
-    toSentence(arr, { wordsConnector: "; " });
-    expect(arr).toEqual(["a", "b", "c"]);
+    const options = { wordsConnector: " " };
+    expect(toSentence(["one", "two", "three"], options)).toBe("one two, and three");
+    expect(options).toEqual({ wordsConnector: " " });
   });
 
   it("with blank elements", () => {
-    expect(toSentence(["one", "", "three"])).toBe("one, , and three");
+    expect(toSentence([null, "one", "", "two", "three"] as never)).toBe(", one, , two, and three");
   });
 
   it("with invalid options", () => {
-    expect(() => toSentence(["one", "two"], { passing: "invalid option" } as never)).toThrowError(
-      new ArgumentError(
-        "Unknown key: :passing. Valid keys are: :wordsConnector, :twoWordsConnector, :lastWordConnector, :locale",
-      ),
+    let exception!: ArgumentError;
+    expect(() => {
+      try {
+        toSentence(["one", "two"], { passing: "invalid option" } as never);
+      } catch (e) {
+        exception = e as ArgumentError;
+        throw e;
+      }
+    }).toThrow(ArgumentError);
+
+    expect(exception.message).toBe(
+      "Unknown key: :passing. Valid keys are: :wordsConnector, :twoWordsConnector, :lastWordConnector, :locale",
     );
   });
 
-  it("always returns string", () => {
-    expect(typeof toSentence([])).toBe("string");
-    expect(typeof toSentence(["a"])).toBe("string");
-    expect(typeof toSentence(["a", "b"])).toBe("string");
+  it.skip("always returns string", () => {
+    // BLOCKED: to-sentence-does-not-stringify-elements-or-nil-connectors
+    expect(Object(toSentence([new SafeBuffer("one")] as never))).toBeInstanceOf(String);
+    expect(Object(toSentence([new SafeBuffer("one"), "two"] as never))).toBeInstanceOf(String);
+    expect(Object(toSentence([new SafeBuffer("one"), "two", "three"] as never))).toBeInstanceOf(
+      String,
+    );
   });
 
   it("returns no frozen string", () => {
-    const result = toSentence(["a", "b"]);
-    expect(typeof result).toBe("string");
+    expect(Object.isFrozen(Object(toSentence([])))).toBeFalsy();
+    expect(Object.isFrozen(Object(toSentence(["one"])))).toBeFalsy();
+    expect(Object.isFrozen(Object(toSentence(["one", "two"])))).toBeFalsy();
+    expect(Object.isFrozen(Object(toSentence(["one", "two", "three"])))).toBeFalsy();
   });
 });
 

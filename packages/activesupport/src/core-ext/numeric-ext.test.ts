@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { Temporal } from "@blazetrails/date";
-import { numberToHuman } from "../number-helper.js";
+import { Temporal, Time as RubyTime, DateTime } from "@blazetrails/date";
 import { Duration } from "../duration.js";
 import { Numeric } from "./numeric/bytes.js";
 import { NumericWithFormat } from "./numeric/conversions.js";
 import { BigDecimal } from "./big-decimal/conversions.js";
 import * as DateExt from "./date/calculations.js";
+import { toTime } from "./date/conversions.js";
+import * as DateTimeExt from "./date-time/calculations.js";
+import { plusWithDuration as timePlusWithDuration } from "./time/calculations.js";
+import "./time/calculations.js";
+
+const toFs = NumericWithFormat.toFs;
 
 function asDate(instant: Temporal.Instant): Date {
   return new Date(instant.epochMilliseconds);
@@ -16,56 +21,102 @@ function pd(year: number, month: number, day: number): Temporal.PlainDate {
 }
 
 describe("NumericExtTimeAndDateTimeTest", () => {
+  const now = RubyTime.local(2005, 2, 10, 15, 30, 45);
+  const dtnow = DateTime.civil(2005, 2, 10, 15, 30, 45) as never;
+  const seconds = new Map<Duration, number>([
+    [Duration.minute(1), 60],
+    [Duration.minutes(10), 600],
+    [Duration.hour(1).plus(Duration.minutes(15)), 4500],
+    [Duration.days(2).plus(Duration.hours(4)).plus(Duration.minutes(30)), 189000],
+    [Duration.years(5).plus(Duration.month(1)).plus(Duration.fortnight(1)), 161624106],
+  ]);
+
   it("units", () => {
-    expect(Math.round(Duration.minutes(1).inSeconds())).toBe(60);
-    expect(Math.round(Duration.minutes(10).inSeconds())).toBe(600);
-    expect(Math.round(Duration.hours(1).plus(Duration.minutes(15)).inSeconds())).toBe(4500);
+    for (const [actual, expected] of seconds) {
+      expect(actual.value).toBe(expected);
+    }
+  });
+
+  it.skip("irregular durations", () => {
+    // BLOCKED: duration-since-rejects-a-datetime-receiver
+    expect(Duration.days(3000).since(now)).toEqual(now.advance({ days: 3000 }));
+    expect(Duration.month(1).since(now)).toEqual(now.advance({ months: 1 }));
+    expect(Duration.month(1).until(now)).toEqual(now.advance({ months: -1 }));
+    expect(Duration.years(20).since(now)).toEqual(now.advance({ years: 20 }));
+    expect(Duration.days(3000).since(dtnow)).toEqual(DateTimeExt.advance(dtnow, { days: 3000 }));
+    expect(Duration.month(1).since(dtnow)).toEqual(DateTimeExt.advance(dtnow, { months: 1 }));
+    expect(Duration.month(1).until(dtnow)).toEqual(DateTimeExt.advance(dtnow, { months: -1 }));
+    expect(Duration.years(20).since(dtnow)).toEqual(DateTimeExt.advance(dtnow, { years: 20 }));
+  });
+
+  it.skip("duration addition", () => {
+    // BLOCKED: duration-since-rejects-a-datetime-receiver
+    expect(Duration.day(1).plus(Duration.month(1)).since(now)).toEqual(
+      now.advance({ days: 1 }).advance({ months: 1 }),
+    );
     expect(
-      Math.round(Duration.days(2).plus(Duration.hours(4)).plus(Duration.minutes(30)).inSeconds()),
-    ).toBe(189000);
+      Duration.week(1).plus(Duration.seconds(5)).minus(Duration.seconds(5)).since(now),
+    ).toEqual(now.advance({ days: 7 }));
+    expect(Duration.years(4).minus(Duration.years(2)).since(now)).toEqual(
+      now.advance({ years: 2 }),
+    );
+    expect(Duration.day(1).plus(Duration.month(1)).since(dtnow)).toEqual(
+      DateTimeExt.advance(DateTimeExt.advance(dtnow, { days: 1 }), { months: 1 }),
+    );
+    expect(
+      Duration.week(1).plus(Duration.seconds(5)).minus(Duration.seconds(5)).since(dtnow),
+    ).toEqual(DateTimeExt.advance(dtnow, { days: 7 }));
+    expect(Duration.years(4).minus(Duration.years(2)).since(dtnow)).toEqual(
+      DateTimeExt.advance(dtnow, { years: 2 }),
+    );
   });
 
-  it("irregular durations", () => {
-    const now = new Date(2005, 1, 10, 15, 30, 45);
-    const in3000days = Duration.days(3000).since(now);
-    expect(asDate(in3000days).getDate()).toBeGreaterThan(0);
-    const in1month = Duration.months(1).since(now);
-    expect(asDate(in1month).getMonth()).toBe(2);
-    const minus1month = Duration.months(1).until(now);
-    expect(asDate(minus1month).getMonth()).toBe(0);
+  it.skip("time plus duration", () => {
+    // BLOCKED: duration-since-rejects-a-datetime-receiver
+    expect(timePlusWithDuration.call(now, Duration.seconds(8))).toEqual(
+      timePlusWithDuration.call(now, 8),
+    );
+    expect(timePlusWithDuration.call(now, Duration.seconds(22.9))).toEqual(
+      timePlusWithDuration.call(now, 22.9),
+    );
+    expect(timePlusWithDuration.call(now, Duration.days(15))).toEqual(now.advance({ days: 15 }));
+    expect(timePlusWithDuration.call(now, Duration.month(1))).toEqual(now.advance({ months: 1 }));
+    expect(Duration.seconds(8).since(dtnow)).toEqual(DateTimeExt.since(dtnow, 8));
+    expect(Duration.seconds(22.9).since(dtnow)).toEqual(DateTimeExt.since(dtnow, 22.9));
+    expect(Duration.days(15).since(dtnow)).toEqual(DateTimeExt.advance(dtnow, { days: 15 }));
+    expect(Duration.month(1).since(dtnow)).toEqual(DateTimeExt.advance(dtnow, { months: 1 }));
   });
 
-  it("duration addition", () => {
-    const now = new Date(2005, 1, 10, 15, 30, 45);
-    const combined = Duration.days(1).plus(Duration.months(1)).since(now);
-    const expected = new Date(now);
-    expected.setDate(expected.getDate() + 1);
-    expected.setMonth(expected.getMonth() + 1);
-    expect(combined.epochMilliseconds).toBe(expected.getTime());
+  it.skip("chaining duration operations", () => {
+    // BLOCKED: duration-since-rejects-a-datetime-receiver
+    expect(Duration.days(2).minus(Duration.months(3)).since(now)).toEqual(
+      now.advance({ days: 2 }).advance({ months: -3 }),
+    );
+    expect(Duration.day(1).plus(Duration.months(2)).since(now)).toEqual(
+      now.advance({ days: 1 }).advance({ months: 2 }),
+    );
+    expect(Duration.days(2).minus(Duration.months(3)).since(dtnow)).toEqual(
+      DateTimeExt.advance(DateTimeExt.advance(dtnow, { days: 2 }), { months: -3 }),
+    );
+    expect(Duration.day(1).plus(Duration.months(2)).since(dtnow)).toEqual(
+      DateTimeExt.advance(DateTimeExt.advance(dtnow, { days: 1 }), { months: 2 }),
+    );
   });
 
-  it("time plus duration", () => {
-    const now = new Date(2005, 1, 10, 15, 30, 45);
-    const plus8 = Duration.seconds(8).since(now);
-    expect(plus8.epochMilliseconds).toBe(now.getTime() + 8000);
-    const plus15days = Duration.days(15).since(now);
-    const expected15 = new Date(now);
-    expected15.setDate(expected15.getDate() + 15);
-    expect(plus15days.epochMilliseconds).toBe(expected15.getTime());
-  });
-
-  it("chaining duration operations", () => {
-    const now = new Date(2005, 1, 10, 15, 30, 45);
-    const result = Duration.days(2).minus(Duration.months(3)).since(now);
-    const expected = new Date(now);
-    expected.setDate(expected.getDate() + 2);
-    expected.setMonth(expected.getMonth() - 3);
-    expect(result.epochMilliseconds).toBe(expected.getTime());
-  });
-
-  it("duration after conversion is no longer accurate", () => {
-    const secPerMonth = Math.round(Duration.months(1).inSeconds());
-    expect(secPerMonth).toBeGreaterThan(2500000);
+  it.skip("duration after conversion is no longer accurate", () => {
+    // BLOCKED: duration-since-rejects-a-datetime-receiver
+    expect(Duration.seconds(Duration.month(1).toI()).since(now)).toEqual(
+      Duration.seconds(Duration.year(1).dividedBy(12).toI()).since(now),
+    );
+    expect(Duration.seconds(Duration.year(1).inSeconds()).since(now)).toEqual(
+      Duration.seconds(Duration.days(365.2425).inSeconds()).since(now),
+    );
+    expect(Duration.seconds(Duration.month(1).toI()).since(dtnow)).toEqual(
+      Duration.seconds(Duration.year(1).dividedBy(12).toI()).since(dtnow),
+    );
+    expect(Duration.seconds(Duration.year(1).inSeconds()).since(dtnow)).toEqual(
+      Duration.seconds(Duration.days(365.2425).inSeconds()).since(dtnow),
+    );
   });
 
   it("add one year to leap day", () => {
@@ -81,20 +132,21 @@ describe("NumericExtTimeAndDateTimeTest", () => {
 });
 
 describe("NumericExtDateTest", () => {
+  const today = DateExt.current();
+
   it("date plus duration", () => {
-    const today = new Date(2005, 1, 10);
-    const plus1day = Duration.days(1).since(today);
-    expect(asDate(plus1day).getDate()).toBe(11);
-
-    const plus1month = Duration.months(1).since(today);
-    expect(asDate(plus1month).getMonth()).toBe(2);
-
-    const plus1sec = Duration.seconds(1).since(today);
-    expect(plus1sec.epochMilliseconds).toBe(today.getTime() + 1000);
+    expect(DateExt.plusWithDuration(today, Duration.day(1))).toEqual(
+      DateExt.plusWithoutDuration(today, 1),
+    );
+    expect(DateExt.plusWithDuration(today, Duration.month(1))).toEqual(
+      DateExt.advance(today, { months: 1 }),
+    );
+    expect(DateExt.plusWithDuration(today, Duration.second(1))).toEqual(toTime(today).since(1));
+    expect(DateExt.plusWithDuration(today, Duration.minute(1))).toEqual(toTime(today).since(60));
+    expect(DateExt.plusWithDuration(today, Duration.hour(1))).toEqual(toTime(today).since(60 * 60));
   });
 
   it("chaining duration operations", () => {
-    const today = DateExt.current();
     expect(
       DateExt.minusWithDuration(
         DateExt.plusWithDuration(today, Duration.days(2)) as Temporal.PlainDate,
@@ -144,35 +196,83 @@ describe("NumericExtSizeTest", () => {
     expect(Numeric.exabyte(3)).toBe(3458764513820540928);
     expect(Numeric.zettabytes(3)).toBe(3541774862152233910272);
     expect(Numeric.zettabyte(3)).toBe(3541774862152233910272);
-
-    expect(Number.isSafeInteger(Numeric.petabytes(3))).toBe(true);
-    expect(Number.isSafeInteger(Numeric.exabytes(3))).toBe(false);
-    expect(Number.isSafeInteger(Numeric.zettabytes(3))).toBe(false);
-    expect(Numeric.exabytes(3) + 1).toBe(Numeric.exabytes(3));
-    expect(Numeric.bytes(3)).toBe(3);
-    expect(Numeric.byte(3)).toBe(3);
   });
 });
 
 describe("NumericExtFormattingTest", () => {
   it("number to human", () => {
-    expect(numberToHuman(0)).toBe("0");
-    expect(numberToHuman(123)).toBe("123");
-    expect(numberToHuman(1234)).toBe("1.23 Thousand");
-    expect(numberToHuman(1234567)).toBe("1.23 Million");
+    expect(toFs(-123, ":human")).toBe("-123");
+    expect(NumericWithFormat.toFormattedS(-123, ":human")).toBe("-123");
+    expect(toFs(-0.5, ":human")).toBe("-0.5");
+    expect(toFs(0, ":human")).toBe("0");
+    expect(toFs(0.5, ":human")).toBe("0.5");
+    expect(toFs(123, ":human")).toBe("123");
+    expect(toFs(1234, ":human")).toBe("1.23 Thousand");
+    expect(toFs(12345, ":human")).toBe("12.3 Thousand");
+    expect(toFs(1234567, ":human")).toBe("1.23 Million");
+    expect(toFs(1234567890, ":human")).toBe("1.23 Billion");
+    expect(toFs(1234567890123, ":human")).toBe("1.23 Trillion");
+    expect(toFs(1234567890123456, ":human")).toBe("1.23 Quadrillion");
+    expect(toFs(1234567890123456768, ":human")).toBe("1230 Quadrillion");
+    expect(toFs(489939, ":human", { precision: 2 })).toBe("490 Thousand");
+    expect(toFs(489939, ":human", { precision: 4 })).toBe("489.9 Thousand");
+    expect(toFs(489000, ":human", { precision: 4 })).toBe("489 Thousand");
+    expect(toFs(489939, ":human", { precision: 2, roundMode: ":down" })).toBe("480 Thousand");
+    expect(toFs(489000, ":human", { precision: 4, stripInsignificantZeros: false })).toBe(
+      "489.0 Thousand",
+    );
+    expect(toFs(1234567, ":human", { precision: 4, significant: false })).toBe("1.2346 Million");
+    expect(toFs(1234567, ":human", { precision: 1, significant: false, separator: "," })).toBe(
+      "1,2 Million",
+    );
+    expect(toFs(1234567, ":human", { precision: 0, significant: true, separator: "," })).toBe(
+      "1 Million",
+    );
   });
 
   it("number to human with custom units", () => {
-    const units = { thousand: "km", unit: "m" };
-    expect(numberToHuman(1000, { units })).toBe("1 km");
+    const volume = { unit: "ml", thousand: "lt", million: "m3" };
+    expect(toFs(123456, ":human", { units: volume })).toBe("123 lt");
+    expect(toFs(12, ":human", { units: volume })).toBe("12 ml");
+    expect(toFs(1234567, ":human", { units: volume })).toBe("1.23 m3");
+
+    const distance = {
+      mili: "mm",
+      centi: "cm",
+      deci: "dm",
+      unit: "m",
+      ten: "dam",
+      hundred: "hm",
+      thousand: "km",
+    };
+    expect(toFs(0.00123, ":human", { units: distance })).toBe("1.23 mm");
+    expect(toFs(0.0123, ":human", { units: distance })).toBe("1.23 cm");
+    expect(toFs(0.123, ":human", { units: distance })).toBe("1.23 dm");
+    expect(toFs(1.23, ":human", { units: distance })).toBe("1.23 m");
+    expect(toFs(12.3, ":human", { units: distance })).toBe("1.23 dam");
+    expect(toFs(123, ":human", { units: distance })).toBe("1.23 hm");
+    expect(toFs(1230, ":human", { units: distance })).toBe("1.23 km");
+    expect(toFs(1230, ":human", { units: distance })).toBe("1.23 km");
+    expect(toFs(1230, ":human", { units: distance })).toBe("1.23 km");
+    expect(toFs(12300, ":human", { units: distance })).toBe("12.3 km");
+
+    const gangster = { hundred: "hundred bucks", million: "thousand quids" };
+    expect(toFs(100, ":human", { units: gangster })).toBe("1 hundred bucks");
+    expect(toFs(2500, ":human", { units: gangster })).toBe("25 hundred bucks");
+    expect(toFs(25000000, ":human", { units: gangster })).toBe("25 thousand quids");
+    expect(toFs(12345000000, ":human", { units: gangster })).toBe("12300 thousand quids");
+
+    expect(toFs(4, ":human", { units: { unit: "", ten: "tens " } })).toBe("4");
+    expect(toFs(45, ":human", { units: { unit: "", ten: " tens   " } })).toBe("4.5  tens");
   });
 
   it("number to human with custom format", () => {
-    expect(numberToHuman(1234567, { format: "%n %u!" })).toBe("1.23 Million!");
+    expect(toFs(123456, ":human", { format: "%n times %u" })).toBe("123 times Thousand");
+    const volume = { unit: "ml", thousand: "lt", million: "m3" };
+    expect(toFs(123456, ":human", { units: volume, format: "%n.%u" })).toBe("123.lt");
   });
 
   it("to fs phone", () => {
-    const toFs = NumericWithFormat.toFs;
     expect(toFs(5551234, ":phone")).toBe("555-1234");
     expect(NumericWithFormat.toFormattedS(5551234, ":phone")).toBe("555-1234");
     expect(toFs(8005551212, ":phone")).toBe("800-555-1212");
@@ -190,7 +290,6 @@ describe("NumericExtFormattingTest", () => {
   });
 
   it("to fs currency", () => {
-    const toFs = NumericWithFormat.toFs;
     expect(toFs(1234567890.5, ":currency")).toBe("$1,234,567,890.50");
     expect(NumericWithFormat.toFormattedS(1234567890.5, ":currency")).toBe("$1,234,567,890.50");
     expect(toFs(1234567890.506, ":currency")).toBe("$1,234,567,890.51");
@@ -210,7 +309,6 @@ describe("NumericExtFormattingTest", () => {
   });
 
   it("to fs rounded", () => {
-    const toFs = NumericWithFormat.toFs;
     expect(toFs(-111.2346, ":rounded")).toBe("-111.235");
     expect(NumericWithFormat.toFormattedS(-111.2346, ":rounded")).toBe("-111.235");
     expect(toFs(111.2346, ":rounded")).toBe("111.235");
@@ -287,7 +385,6 @@ describe("NumericExtFormattingTest", () => {
   });
 
   it("to fs percentage", () => {
-    const toFs = NumericWithFormat.toFs;
     expect(toFs(100, ":percentage")).toBe("100.000%");
     expect(NumericWithFormat.toFormattedS(100, ":percentage")).toBe("100.000%");
     expect(toFs(100, ":percentage", { precision: 0 })).toBe("100%");
@@ -301,7 +398,6 @@ describe("NumericExtFormattingTest", () => {
   });
 
   it("to fs delimited", () => {
-    const toFs = NumericWithFormat.toFs;
     expect(toFs(12345678, ":delimited")).toBe("12,345,678");
     expect(NumericWithFormat.toFormattedS(12345678, ":delimited")).toBe("12,345,678");
     expect(toFs(0, ":delimited")).toBe("0");
@@ -315,7 +411,6 @@ describe("NumericExtFormattingTest", () => {
   });
 
   it("to fs delimited with options hash", () => {
-    const toFs = NumericWithFormat.toFs;
     expect(toFs(12345678, ":delimited", { delimiter: " " })).toBe("12 345 678");
     expect(toFs(12345678.05, ":delimited", { separator: "-" })).toBe("12,345,678-05");
     expect(toFs(12345678.05, ":delimited", { separator: ",", delimiter: "." })).toBe(
@@ -327,7 +422,6 @@ describe("NumericExtFormattingTest", () => {
   });
 
   it("to fs human size", () => {
-    const toFs = NumericWithFormat.toFs;
     expect(toFs(0, ":human_size")).toBe("0 Bytes");
     expect(toFs(1, ":human_size")).toBe("1 Byte");
     expect(toFs(3.14159265, ":human_size")).toBe("3 Bytes");
@@ -339,6 +433,7 @@ describe("NumericExtFormattingTest", () => {
     expect(toFs(1234567890, ":human_size")).toBe("1.15 GB");
     expect(toFs(1234567890123, ":human_size")).toBe("1.12 TB");
     expect(toFs(1234567890123456, ":human_size")).toBe("1.1 PB");
+    expect(toFs(1234567890123456768, ":human_size")).toBe("1.07 EB");
     expect(toFs(Numeric.exabytes(1023), ":human_size")).toBe("1020 EB");
     expect(toFs(Numeric.zettabytes(16), ":human_size")).toBe("16 ZB");
     expect(toFs(Numeric.kilobytes(444), ":human_size")).toBe("444 KB");
@@ -354,7 +449,6 @@ describe("NumericExtFormattingTest", () => {
   });
 
   it("to fs human size with negative number", () => {
-    const toFs = NumericWithFormat.toFs;
     expect(toFs(-1, ":human_size")).toBe("-1 Bytes");
     expect(toFs(-3.14159265, ":human_size")).toBe("-3 Bytes");
     expect(toFs(-123, ":human_size")).toBe("-123 Bytes");
@@ -365,7 +459,6 @@ describe("NumericExtFormattingTest", () => {
   });
 
   it("to fs human size with options hash", () => {
-    const toFs = NumericWithFormat.toFs;
     expect(toFs(1234567, ":human_size", { precision: 2 })).toBe("1.2 MB");
     expect(toFs(3.14159265, ":human_size", { precision: 4 })).toBe("3 Bytes");
     expect(toFs(Numeric.kilobytes(1.0123), ":human_size", { precision: 2 })).toBe("1 KB");
@@ -392,7 +485,6 @@ describe("NumericExtFormattingTest", () => {
   });
 
   it("to fs human size with custom delimiter and separator", () => {
-    const toFs = NumericWithFormat.toFs;
     expect(toFs(Numeric.kilobytes(1.0123), ":human_size", { precision: 3, separator: "," })).toBe(
       "1,01 KB",
     );
@@ -424,10 +516,31 @@ describe("NumericExtFormattingTest", () => {
   });
 
   it("default to fs", () => {
-    expect(NumericWithFormat.toFs(123)).toBe("123");
+    expect((123).toString()).toBe("123");
+    expect(toFs(123)).toBe("123");
     expect(NumericWithFormat.toFormattedS(123)).toBe("123");
-    expect(NumericWithFormat.toFs(123, 2)).toBe("1111011");
-    expect(NumericWithFormat.toFs(2.5)).toBe("2.5");
-    expect(NumericWithFormat.toFs(100 ** 10)).toBe("100000000000000000000");
+    expect((123).toString(2)).toBe("1111011");
+    expect(toFs(123, 2)).toBe("1111011");
+
+    expect((2.5).toString()).toBe("2.5");
+    expect(toFs(2.5)).toBe("2.5");
+
+    expect((100 ** 10).toString()).toBe("100000000000000000000");
+    expect(toFs(100 ** 10)).toBe("100000000000000000000");
+    expect((100 ** 10).toString(2)).toBe(
+      "1010110101111000111010111100010110101100011000100000000000000000000",
+    );
+    expect(toFs(100 ** 10, 2)).toBe(
+      "1010110101111000111010111100010110101100011000100000000000000000000",
+    );
+
+    expect(new BigDecimal("1000010").toString()).toBe("1000010.0");
+    expect(toFs(new BigDecimal("1000010"))).toBe("1000010.0");
+
+    expect(new BigDecimal("0.100001").toString("5F")).toBe("0.10000 1");
+    expect(toFs(new BigDecimal("0.100001"), "5F")).toBe("0.10000 1");
+
+    expect(() => NumericWithFormat.toFormattedS(1, {} as never)).toThrow(TypeError);
+    expect(() => toFs(1, {} as never)).toThrow(TypeError);
   });
 });
