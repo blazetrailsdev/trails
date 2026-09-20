@@ -420,7 +420,7 @@ export function assertNotEmpty(actual: unknown, message?: string): void {
   assert(!isEmptyCollection(actual), message ?? `Expected ${inspect(actual)} to not be empty`);
 }
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE assert-includes-receipt-is-a-scoring-gap-not-permanent */
 export function assertIncludes(collection: unknown, obj: unknown, message?: string): void {
   assert(respondsToInclude(collection), `Expected ${inspect(collection)} to respond to include?`);
   assert(
