@@ -610,8 +610,8 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   it("index", async () => {
     await createExampleTable();
     await adapter.addIndex("ex", "id", { unique: true, name: "fun" });
-    const indexes = (await adapter.indexes("ex")) as any[];
-    const index = indexes.find((idx) => idx.name === "fun");
+    const indexes = await adapter.indexes("ex");
+    const index = indexes.find((idx) => idx.name === "fun")!;
 
     expect(index.table).toEqual("ex");
     expect(index.unique).toBeTruthy();
@@ -652,16 +652,16 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   itIfSupports("expression_index", "expression index", async () => {
     await createExampleTable();
     await adapter.execute(`CREATE INDEX "expression" ON "ex" (max(id, number))`);
-    const indexes = (await adapter.indexes("ex")) as any[];
-    const index = indexes.find((idx) => idx.name === "expression");
+    const indexes = await adapter.indexes("ex");
+    const index = indexes.find((idx) => idx.name === "expression")!;
     expect(index.columns).toBe("max(id, number)");
   });
 
   itIfSupports("expression_index", "expression index with trailing comment", async () => {
     await createExampleTable();
     await adapter.execute(`CREATE INDEX expression on ex (number % 10) /* comment */`);
-    const indexes = (await adapter.indexes("ex")) as any[];
-    const index = indexes.find((idx) => idx.name === "expression");
+    const indexes = await adapter.indexes("ex");
+    const index = indexes.find((idx) => idx.name === "expression")!;
     expect(index.columns).toBe("number % 10");
   });
 
@@ -670,8 +670,8 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     await adapter.execute(
       `CREATE INDEX "expression" ON "ex" (id % 10, max(id, number)) WHERE id > 1000`,
     );
-    const indexes = (await adapter.indexes("ex")) as any[];
-    const index = indexes.find((idx) => idx.name === "expression");
+    const indexes = await adapter.indexes("ex");
+    const index = indexes.find((idx) => idx.name === "expression")!;
     expect(index.columns).toBe("id % 10, max(id, number)");
     expect(index.where).toBe("id > 1000");
   });
@@ -681,8 +681,8 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     await adapter.execute(
       `CREATE INDEX expression ON ex (id % 10, (CASE WHEN number > 0 THEN max(id, number) END))WHERE(id > 1000)`,
     );
-    const indexes = (await adapter.indexes("ex")) as any[];
-    const index = indexes.find((idx) => idx.name === "expression");
+    const indexes = await adapter.indexes("ex");
+    const index = indexes.find((idx) => idx.name === "expression")!;
     expect(index.columns).toBe("id % 10, (CASE WHEN number > 0 THEN max(id, number) END)");
     expect(index.where).toBe("(id > 1000)");
   });
@@ -690,8 +690,8 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   itIfSupports("expression_index", "not everything an expression", async () => {
     await createExampleTable();
     await adapter.execute(`CREATE INDEX "expression" ON "ex" (id, max(id, number))`);
-    const indexes = (await adapter.indexes("ex")) as any[];
-    const index = indexes.find((idx) => idx.name === "expression");
+    const indexes = await adapter.indexes("ex");
+    const index = indexes.find((idx) => idx.name === "expression")!;
     expect(index.columns).toBe("id, max(id, number)");
   });
 
