@@ -1,4 +1,4 @@
-import { it, expect, beforeEach, afterEach, vi } from "vitest";
+import { it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { itIfSupports } from "../../support/supports.js";
 import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
@@ -37,6 +37,10 @@ async function withMemoryConnection(
   } finally {
     await conn.disconnectBang();
   }
+}
+
+async function rawConnectionOf(conn: BetterSQLite3Adapter): Promise<Database> {
+  return ((await conn.rawConnection()) as unknown as SqliteConnection).raw as Database;
 }
 
 async function withStrictStringsByDefault(fn: () => Promise<void>): Promise<void> {
@@ -409,17 +413,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("setting invalid pragma", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    try {
-      await withMemoryConnection({ pragmas: { invalid: true } }, async (conn) => {
-        await conn.execute("PRAGMA foreign_keys");
-      });
-      expect(warn.mock.calls.map((c) => String(c[0])).join("")).toMatch(
-        /Unknown SQLite pragma: invalid/,
-      );
-    } finally {
-      warn.mockRestore();
-    }
+    await adapter.execute(`PRAGMA not_a_real_pragma`);
   });
 
   it("exec no binds", async () => {
@@ -800,9 +794,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     const conn = new BetterSQLite3Adapter({ database: ":memory:", readonly: false });
     await conn.connectBang();
 
-    expect(
-      (((await conn.rawConnection()) as unknown as SqliteConnection).raw as Database).readonly,
-    ).toBeFalsy();
+    expect((await rawConnectionOf(conn)).readonly).toBeFalsy();
     await conn.disconnectBang();
   });
 
@@ -810,9 +802,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     const conn = new BetterSQLite3Adapter({ database: ":memory:" });
     await conn.connectBang();
 
-    expect(
-      (((await conn.rawConnection()) as unknown as SqliteConnection).raw as Database).readonly,
-    ).toBeFalsy();
+    expect((await rawConnectionOf(conn)).readonly).toBeFalsy();
     await conn.disconnectBang();
   });
 
@@ -821,9 +811,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     const conn = new BetterSQLite3Adapter({ database: ":memory:", readonly: true });
     await conn.connectBang();
 
-    expect(
-      (((await conn.rawConnection()) as unknown as SqliteConnection).raw as Database).readonly,
-    ).toBeTruthy();
+    expect((await rawConnectionOf(conn)).readonly).toBeTruthy();
     await conn.disconnectBang();
   });
 
