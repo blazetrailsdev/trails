@@ -4,6 +4,8 @@ import { itIfSupports } from "../../support/supports.js";
 import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
 import { Notifications, indexBy } from "@blazetrails/activesupport";
+import type { Database } from "better-sqlite3";
+import type { SqliteConnection } from "../../sqlite-adapter.js";
 import { BinaryData } from "@blazetrails/activemodel";
 
 import { QueryAttribute } from "../../relation/query-attribute.js";
@@ -35,6 +37,10 @@ async function withMemoryConnection(
   } finally {
     await conn.disconnectBang();
   }
+}
+
+async function rawConnectionOf(conn: BetterSQLite3Adapter): Promise<Database> {
+  return ((await conn.rawConnection()) as unknown as SqliteConnection).raw as Database;
 }
 
 async function withStrictStringsByDefault(fn: () => Promise<void>): Promise<void> {
@@ -804,7 +810,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     const conn = new BetterSQLite3Adapter({ database: ":memory:", readonly: false });
     await conn.connectBang();
 
-    expect((conn.rawConnection as any).readonly).toBeFalsy();
+    expect((await rawConnectionOf(conn)).readonly).toBeFalsy();
     await conn.disconnectBang();
   });
 
@@ -812,7 +818,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     const conn = new BetterSQLite3Adapter({ database: ":memory:" });
     await conn.connectBang();
 
-    expect((conn.rawConnection as any).readonly).toBeFalsy();
+    expect((await rawConnectionOf(conn)).readonly).toBeFalsy();
     await conn.disconnectBang();
   });
 
@@ -821,7 +827,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     const conn = new BetterSQLite3Adapter({ database: ":memory:", readonly: true });
     await conn.connectBang();
 
-    expect((conn.rawConnection as any).readonly).toBeTruthy();
+    expect((await rawConnectionOf(conn)).readonly).toBeTruthy();
     await conn.disconnectBang();
   });
 
