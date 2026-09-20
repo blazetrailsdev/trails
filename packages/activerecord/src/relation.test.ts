@@ -462,10 +462,12 @@ describe("RelationTest", () => {
     await KeywordColumn.create({ description: "foo" });
 
     expect(
-      (await KeywordColumn.select("description").from(KeywordColumn.all())).map((r: any) => r.desc),
+      (await KeywordColumn.select(":description").from(KeywordColumn.all())).map(
+        (r: any) => r.desc,
+      ),
     ).toEqual(["foo"]);
     expect(
-      (await KeywordColumn.reselect("description").from(KeywordColumn.all())).map(
+      (await KeywordColumn.reselect(":description").from(KeywordColumn.all())).map(
         (r: any) => r.desc,
       ),
     ).toEqual(["foo"]);
