@@ -39,11 +39,9 @@ import { assertDifference, assertNothingRaised } from "@blazetrails/activesuppor
 
 import { fixtures } from "../test-fixtures.js";
 
-async function forceSignal37ToLoadAllClientsOfFirm(
-  companies: (name: string) => unknown,
-): Promise<unknown> {
-  return await (companies("first_firm") as any).clientsOfFirm.loadTarget();
-}
+beforeEach(() => {
+  Client.destroyedClientIds.clear();
+});
 
 import "../support/canonical-model-index.js";
 import {
@@ -193,10 +191,6 @@ describe("HasManyAssociationsTest", () => {
     registerSubclass(Client);
     await Company.loadSchema();
     await Account.loadSchema();
-  });
-
-  beforeEach(() => {
-    Client.destroyedClientIds.clear();
   });
 
   it("transaction when deleting persisted", async () => {
@@ -557,10 +551,6 @@ describe("HasManyAssociationsTest", () => {
   registerSubclass(Client);
   registerSubclass(RestrictedWithErrorFirm);
 
-  beforeEach(() => {
-    Client.destroyedClientIds.clear();
-  });
-
   it("dependence", async () => {
     const firm = companies("first_firm") as any;
     expect(await firm.clients.size()).toBe(3);
@@ -662,10 +652,6 @@ describe("HasManyAssociationsTest", () => {
   Company.inheritanceColumn = "type";
   registerSubclass(HmFirm);
   registerSubclass(Client);
-
-  beforeEach(() => {
-    Client.destroyedClientIds.clear();
-  });
 
   it("counting", async () => {
     const firm = (await HmFirm.first()) as any;
@@ -5794,10 +5780,6 @@ describe("AsyncHasManyAssociationsTest", () => {
 describe("HasManyAssociationsTest", () => {
   const { companies, topics } = fixtures(["companies", "accounts", "topics"]);
 
-  beforeEach(() => {
-    Client.destroyedClientIds.clear();
-  });
-
   beforeAll(() => {
     registerModel(Company);
     registerModel(HmFirm);
@@ -6219,3 +6201,9 @@ describe("HasManyAssociationsTest", () => {
     expect(post.comments_count).toBe(postBefore2);
   });
 });
+
+async function forceSignal37ToLoadAllClientsOfFirm(
+  companies: (name: string) => unknown,
+): Promise<unknown> {
+  return await (companies("first_firm") as any).clientsOfFirm.loadTarget();
+}
