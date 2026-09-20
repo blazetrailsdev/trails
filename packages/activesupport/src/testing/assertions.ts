@@ -443,8 +443,12 @@ export function assertNotIncludes(collection: unknown, obj: unknown, message?: s
 
 function respondsToInclude(collection: unknown): boolean {
   if (typeof collection === "string" || Array.isArray(collection)) return true;
-  const target = collection as { include?: unknown; has?: unknown };
-  return typeof target?.include === "function" || typeof target?.has === "function";
+  const target = collection as { include?: unknown; isInclude?: unknown; has?: unknown };
+  return (
+    typeof target?.include === "function" ||
+    typeof target?.isInclude === "function" ||
+    typeof target?.has === "function"
+  );
 }
 
 function collectionIncludes(collection: unknown, obj: unknown): boolean {
@@ -452,9 +456,11 @@ function collectionIncludes(collection: unknown, obj: unknown): boolean {
   if (Array.isArray(collection)) return collection.some((element) => rbEqual(element, obj));
   const target = collection as {
     include?: (obj: never) => boolean;
+    isInclude?: (obj: never) => boolean;
     has?: (obj: never) => boolean;
   };
   if (typeof target.include === "function") return target.include(obj as never);
+  if (typeof target.isInclude === "function") return target.isInclude(obj as never);
   if (typeof target.has === "function") return target.has(obj as never);
   return false;
 }

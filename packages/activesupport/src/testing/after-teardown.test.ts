@@ -1,38 +1,48 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { resetCallbacks } from "../callbacks.js";
-import { UnexpectedError } from "./assertions.js";
+import { UnexpectedError, assert, assertChanges } from "./assertions.js";
 import { afterTeardown, prepended, teardown } from "./setup-and-teardown.js";
 import type { RunningTest } from "./tests-without-assertions.js";
 
 class MyError extends Error {}
 
 describe("AfterTeardownTest", () => {
-  it("teardown raise but all after teardown method are called", () => {
-    const klass = {};
-    prepended(klass);
-    const test: Pick<RunningTest, "failures"> = { failures: [] };
-    let witness = false;
+  const klass = {};
+  const test: Pick<RunningTest, "failures"> = { failures: [] };
+  let witness = false;
 
+  beforeEach(() => {
+    prepended(klass);
+    witness = false;
+    test.failures.length = 0;
     teardown.call(klass, () => {
       throw new MyError("Test raises an error, all after_teardown should still get called");
     });
+  });
 
-    const otherAfterTeardown = () => {
-      afterTeardown.call(klass, test);
-      witness = true;
-    };
-
+  afterEach(async () => {
     try {
-      expect(test.failures.length).toBe(0);
-      otherAfterTeardown();
-      expect(test.failures.length).toBe(1);
+      await assertChanges(
+        () => test.failures.length,
+        null,
+        { from: 0, to: 1 },
+        () => {
+          afterTeardown.call(klass, test);
+          witness = true;
+        },
+      );
+
       expect(test.failures[0]).toBeInstanceOf(UnexpectedError);
       expect((test.failures[0] as UnexpectedError).error).toBeInstanceOf(MyError);
-
       expect(witness).toBe(true);
+      test.failures.length = 0;
     } finally {
       resetCallbacks(klass, "teardown");
     }
+  });
+
+  it("teardown raise but all after teardown method are called", () => {
+    assert(true);
   });
 });

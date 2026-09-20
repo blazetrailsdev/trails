@@ -1,8 +1,8 @@
-import { expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 
 import { afterTeardown } from "./tests-without-assertions.js";
 
-it("without assertions", () => {
+afterEach(() => {
   const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
   try {
     afterTeardown({
@@ -22,3 +22,5 @@ it("without assertions", () => {
     warn.mockRestore();
   }
 });
+
+it("without assertions", () => {});
