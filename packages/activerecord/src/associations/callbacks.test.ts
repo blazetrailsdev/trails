@@ -179,14 +179,17 @@ describe("AssociationCallbacksTest", () => {
   });
 
   it("dont add if before callback raises exception", async () => {
-    expect(await david.unchangeablePosts.toArray()).not.toContain(authorless);
+    const unchangeablePostIds = async (): Promise<unknown[]> =>
+      (await david.unchangeablePosts.toArray()).map((p: any) => p.id);
+
+    expect(await unchangeablePostIds()).not.toContain(authorless.id);
     try {
       await david.unchangeablePosts.push(authorless);
     } catch {}
     assertEmpty(david.postLog);
-    expect(await david.unchangeablePosts.toArray()).not.toContain(authorless);
+    expect(await unchangeablePostIds()).not.toContain(authorless.id);
     await david.reload();
-    expect(await david.unchangeablePosts.toArray()).not.toContain(authorless);
+    expect(await unchangeablePostIds()).not.toContain(authorless.id);
   });
 });
 

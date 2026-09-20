@@ -462,7 +462,7 @@ describe("CascadedEagerLoadingTest", () => {
     });
 
     expect(retrievedComments.length).toBe(1);
-    expect(retrievedComments[0].id).toBe(lastComment.id);
+    expect(retrievedComments.map((c) => c.id)).toEqual([lastComment.id]);
   });
 
   it("preloading across has one through constrains loaded records", async () => {
