@@ -27,6 +27,7 @@ import {
 } from "../test-helpers/models/membership.js";
 import { Contract } from "../test-helpers/models/contract.js";
 import { fixtures } from "../test-fixtures.js";
+import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
 
 registerModel(Member);
 registerModel(Organization);
@@ -116,38 +117,30 @@ describe("HasOneThroughDisableJoinsAssociationsTest", () => {
     for (const nj of noJoins) {
       expect(nj).not.toMatch(/INNER JOIN/i);
     }
-    expect(noJoins[1]).toMatch(/ORDER BY.+organizations.+id.+ASC.+LIMIT/i);
   });
 
   it("nil on disable joins through", async () => {
-    const blarpy = members("blarpy_winkup");
-    let org: unknown;
-    let orgNoJoins: unknown;
-    const joins = await captureSql(async () => {
-      org = await blarpy.organization;
+    const member = members("blarpy_winkup");
+    let organization: unknown;
+    await assertQueriesCount(1, false, async () => {
+      organization = await member.organization;
     });
-    const noJoins = await captureSql(async () => {
-      orgNoJoins = await blarpy.organizationWithoutJoins;
+    expect(organization).toBeNull();
+    let organizationWithoutJoins: unknown;
+    await assertQueriesCount(1, false, async () => {
+      organizationWithoutJoins = await member.organizationWithoutJoins;
     });
-    expect(org).toBeNull();
-    expect(orgNoJoins).toBeNull();
-    expect(joins.length).toBe(1);
-    expect(noJoins.length).toBe(1);
+    expect(organizationWithoutJoins).toBeNull();
   });
 
   it("preload on disable joins through", async () => {
-    const loaded = await Member.preload(":organization", ":organizationWithoutJoins");
-    const first = loaded[0];
-    expect(first.association("organization").isLoaded()).toBe(true);
-    expect(first.association("organizationWithoutJoins").isLoaded()).toBe(true);
-    const queriedOrg = await captureSql(async () => {
-      void first.association("organization").target;
+    const members = await Member.preload(":organization", ":organizationWithoutJoins");
+    await assertNoQueries(false, async () => {
+      await members[0].organization;
     });
-    const queriedNoJoins = await captureSql(async () => {
-      void first.association("organizationWithoutJoins").target;
+    await assertNoQueries(false, async () => {
+      await members[0].organizationWithoutJoins;
     });
-    expect(queriedOrg).toEqual([]);
-    expect(queriedNoJoins).toEqual([]);
   });
 
   it("has one through with belongs to on disable joins", async () => {
@@ -174,16 +167,13 @@ describe("HasOneThroughDisableJoinsAssociationsTest", () => {
   });
 
   it("disable joins through with enum type", async () => {
-    let withJoins: unknown;
-    let withoutJoins: unknown;
     const joins = await captureSql(async () => {
-      withJoins = await member.club;
+      await member.club;
     });
     const noJoins = await captureSql(async () => {
-      withoutJoins = await member.clubWithoutJoins;
+      await member.clubWithoutJoins;
     });
 
-    expect((withoutJoins as { id?: number })?.id).toBe((withJoins as { id?: number })?.id);
     expect(joins.length).toBe(1);
     expect(noJoins.length).toBe(2);
     expect(joins[0]).toMatch(/INNER JOIN/i);

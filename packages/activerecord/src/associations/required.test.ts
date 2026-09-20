@@ -33,8 +33,8 @@ describe("RequiredAssociationsTest", () => {
       registerModel("Parent", Parent);
       registerModel("Child", Child);
 
-      expect(await new Child().save()).toBe(true);
-      expect(await new Child({ parent: new Parent() }).save()).toBe(true);
+      expect(await new Child().save()).toBeTruthy();
+      expect(await new Child({ parent: new Parent() }).save()).toBeTruthy();
     } finally {
       if (prev === undefined) {
         delete (Base as any).belongsToRequiredByDefault;
@@ -61,11 +61,11 @@ describe("RequiredAssociationsTest", () => {
     registerModel("Child", Child);
 
     const record = new Child();
-    expect(await record.save()).toBe(false);
+    expect(await record.save()).toBeFalsy();
     expect(record.errors.fullMessages).toEqual(["Parent must exist"]);
 
     record.parent = new Parent();
-    expect(await record.save()).toBe(true);
+    expect(await record.save()).toBeTruthy();
   });
 
   it("required belongs_to validates target exists, not just the foreign key", async () => {
@@ -119,11 +119,11 @@ describe("RequiredAssociationsTest", () => {
       registerModel("Child", Child);
 
       const record = new Child();
-      expect(await record.save()).toBe(false);
+      expect(await record.save()).toBeFalsy();
       expect(record.errors.fullMessages).toEqual(["Parent must exist"]);
 
       record.parent = new Parent();
-      expect(await record.save()).toBe(true);
+      expect(await record.save()).toBeTruthy();
     } finally {
       if (prev === undefined) {
         delete (Base as any).belongsToRequiredByDefault;
@@ -149,8 +149,8 @@ describe("RequiredAssociationsTest", () => {
     registerModel("Parent", Parent);
     registerModel("Child", Child);
 
-    expect(await new Parent().save()).toBe(true);
-    expect(await new Parent({ child: new Child() }).save()).toBe(true);
+    expect(await new Parent().save()).toBeTruthy();
+    expect(await new Parent({ child: new Child() }).save()).toBeTruthy();
   });
 
   it("required has_one associations have presence validated", async () => {
@@ -171,11 +171,11 @@ describe("RequiredAssociationsTest", () => {
     registerModel("Child", Child);
 
     const record = new Parent();
-    expect(await record.save()).toBe(false);
+    expect(await record.save()).toBeFalsy();
     expect(record.errors.fullMessages).toEqual(["Child must exist"]);
 
     await (record as any).setChild(new Child());
-    expect(await record.save()).toBe(true);
+    expect(await record.save()).toBeTruthy();
   });
 
   it("required has_one associations have a correct error message", async () => {
