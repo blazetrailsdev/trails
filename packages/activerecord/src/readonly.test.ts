@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
+import { assertNotEmpty } from "@blazetrails/activesupport";
 
 import { fixtures } from "./test-fixtures.js";
 import { registerModel } from "./associations.js";
@@ -156,7 +157,7 @@ describe("ReadOnlyTest", () => {
 
   it("has many find readonly", async () => {
     const post = await Post.find(posts("welcome").id);
-    expect(await (post as any).comments.toArray()).not.toHaveLength(0);
+    assertNotEmpty(await (post as any).comments.toArray());
     expect(await (post as any).comments.isAny((c: any) => c.isReadonly())).toBeFalsy();
     const arr = await (post as any).comments.toArray();
     expect(arr.some((c: any) => c.isReadonly())).toBeFalsy();

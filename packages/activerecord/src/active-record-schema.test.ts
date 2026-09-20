@@ -8,6 +8,8 @@ import { adapterType } from "./test-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { itIfSupports } from "./support/supports.js";
 import { fixtures } from "./test-fixtures.js";
+import { assertDifference, assertNothingRaised } from "@blazetrails/activesupport";
+import { Temporal } from "@blazetrails/date";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -32,11 +34,9 @@ describe("ActiveRecordSchemaTest", () => {
       "schema_test",
       "fruits",
       "nep_fruits",
-      "multi_idx",
-      "ts_change",
+      "multiple_indexes",
       "has_timestamps",
       "ts_opts",
-      "ts_add",
       { ifExists: true },
     );
   });
@@ -49,9 +49,14 @@ describe("ActiveRecordSchemaTest", () => {
       expect(schemaMigration.primaryKey).toBe("version");
 
       await schemaMigration.createTable();
-      const before = await schemaMigration.count();
-      await schemaMigration.createVersion("12");
-      expect(await schemaMigration.count()).toBe(before + 1);
+      await assertDifference(
+        () => schemaMigration.count(),
+        1,
+        null,
+        async () => {
+          await schemaMigration.createVersion("12");
+        },
+      );
     } finally {
       await schemaMigration.deleteVersion("12");
       Base.primaryKeyPrefixType = oldPrimaryKeyPrefixType;
@@ -59,8 +64,10 @@ describe("ActiveRecordSchemaTest", () => {
   });
 
   it("schema without version is the current version schema", () => {
-    const s = new Schema();
-    expect(s).toBeInstanceOf(Schema);
+    const schemaClass = Schema;
+    expect(schemaClass.prototype instanceof Migration.get(Migration.currentVersion())).toBeTruthy();
+    expect(schemaClass.prototype instanceof Migration.get(7.1)).toBeFalsy();
+    expect(typeof schemaClass.prototype.define === "function").toBeTruthy();
   });
 
   it("schema version accessor", () => {
@@ -72,16 +79,18 @@ describe("ActiveRecordSchemaTest", () => {
   });
 
   it("schema define", async () => {
-    await Schema.define(async (schema) => {
-      await schema.createTable("schema_test", (t) => {
-        t.string("title");
-        t.integer("count");
+    await Schema.define({ version: 7 }, async (schema) => {
+      await schema.createTable("fruits", (t) => {
+        t.column("color", "string");
+        t.column("fruit_size", "string");
+        t.column("texture", "string");
+        t.column("flavor", "string");
       });
     });
-    await adapter.execute(`INSERT INTO schema_test (title, count) VALUES ('hello', 1)`);
-    const rows = (await adapter.selectAll(`SELECT * FROM schema_test`)).toArray();
-    expect(rows.length).toBe(1);
-    expect(rows[0].title).toBe("hello");
+
+    await assertNothingRaised(() => adapter.selectAll("SELECT * FROM fruits"));
+    await assertNothingRaised(() => adapter.selectAll("SELECT * FROM schema_migrations"));
+    expect(await adapter.schemaVersion()).toBe(7);
   });
 
   it("schema define with table name prefix", async () => {
@@ -112,48 +121,80 @@ describe("ActiveRecordSchemaTest", () => {
     expect(() => (td as any).unknownType("col")).toThrow();
   });
 
-  it("schema subclass", () => {
+  it("schema subclass", async () => {
     class MySchema extends Schema {}
-    const s = new MySchema();
-    expect(s).toBeInstanceOf(Schema);
-    expect(s).toBeInstanceOf(MySchema);
+    await MySchema.define({ version: 9 }, async (schema) => {
+      await schema.createTable("fruits");
+    });
+    await assertNothingRaised(() => adapter.selectAll("SELECT * FROM fruits"));
   });
 
   it("normalize version", () => {
-    class NormalMig extends Migration {
-      async change() {}
-    }
-    expect(new NormalMig(undefined, 1).version).toBe(1);
+    expect(SchemaMigration.normalizeMigrationNumber("0000118")).toBe("118");
+    expect(SchemaMigration.normalizeMigrationNumber("2")).toBe("002");
+    expect(SchemaMigration.normalizeMigrationNumber("0017")).toBe("017");
+    expect(SchemaMigration.normalizeMigrationNumber("20131219224947")).toBe("20131219224947");
   });
 
   it("schema load with multiple indexes for column of different names", async () => {
     await Schema.define(async (schema) => {
-      await schema.createTable("multi_idx", (t) => {
-        t.string("email");
-        t.index(["email"], { name: "idx_email_1" });
-        t.index(["email"], { name: "idx_email_2", unique: true });
+      await schema.createTable("multiple_indexes", (t) => {
+        t.string("foo");
+        t.index(["foo"], { name: "multiple_indexes_foo_1" });
+        t.index(["foo"], { name: "multiple_indexes_foo_2" });
       });
     });
-    await adapter.execute(`INSERT INTO multi_idx (email) VALUES ('test@test.com')`);
-    const rows = (await adapter.selectAll(`SELECT * FROM multi_idx`)).toArray();
-    expect(rows.length).toBe(1);
+
+    const indexes = await adapter.indexes("multiple_indexes");
+
+    expect(indexes.length).toBe(2);
+    expect(indexes.map((i) => i.name).sort()).toEqual([
+      "multiple_indexes_foo_1",
+      "multiple_indexes_foo_2",
+    ]);
   });
 
   it.skipIf(adapterType !== "postgres")("timestamps with and without zones", async () => {
-    const td = new TableDefinition(adapter, "tz_test");
-    td.timestamps();
-    const colNames = td.columns.map((c) => c.name);
-    expect(colNames).toContain("created_at");
-    expect(colNames).toContain("updated_at");
-    const createdAt = td.columns.find((c) => c.name === "created_at");
-    expect(createdAt!.type).toBe("datetime");
+    await Schema.define(async (schema) => {
+      await schema.createTable("has_timestamps", (t) => {
+        t.datetime("default_format");
+        t.datetime("without_time_zone");
+        t.timestamp("also_without_time_zone");
+        (t as any).timestamptz("with_time_zone");
+      });
+    });
+
+    expect(await adapter.columnExists("has_timestamps", "default_format", "datetime")).toBeTruthy();
+    expect(
+      await adapter.columnExists("has_timestamps", "without_time_zone", "datetime"),
+    ).toBeTruthy();
+    expect(
+      await adapter.columnExists("has_timestamps", "also_without_time_zone", "datetime"),
+    ).toBeTruthy();
+    expect(
+      await adapter.columnExists("has_timestamps", "with_time_zone", "timestamptz"),
+    ).toBeTruthy();
   });
 
   it("timestamps with implicit default on create table", async () => {
-    const td = new TableDefinition(adapter, "ts_default");
-    td.timestamps();
-    const createdAt = td.columns.find((c) => c.name === "created_at");
-    expect(createdAt!.options.null).toBe(false);
+    await Schema.define(async (schema) => {
+      await schema.createTable("has_timestamps", (t) => {
+        t.timestamps();
+      });
+    });
+
+    expect(
+      await adapter.columnExists("has_timestamps", "created_at", null, {
+        precision: 6,
+        null: false,
+      }),
+    ).toBeTruthy();
+    expect(
+      await adapter.columnExists("has_timestamps", "updated_at", null, {
+        precision: 6,
+        null: false,
+      }),
+    ).toBeTruthy();
   });
 
   it("timestamps with custom options on create table", async () => {
@@ -168,60 +209,52 @@ describe("ActiveRecordSchemaTest", () => {
   });
 
   it("timestamps with implicit default on change table", async () => {
-    class TsMig extends Migration {
-      async up() {
-        await this.createTable("ts_change", (t) => {
-          t.string("name");
-        });
-        await this.addTimestamps("ts_change");
-      }
-      async down() {
-        await this.dropTable("ts_change");
-      }
-    }
-    const m = new TsMig();
-    m.connection = adapter;
-    await m.up();
-    await adapter.execute(
-      `INSERT INTO ts_change (name, created_at, updated_at) VALUES ('test', '2023-01-01', '2023-01-01')`,
-    );
-    const rows = (await adapter.selectAll(`SELECT * FROM ts_change`)).toArray();
-    expect(rows.length).toBe(1);
-    const createdAt = rows[0].created_at;
+    await Schema.define(async (schema) => {
+      await schema.createTable("has_timestamps");
+
+      await schema.changeTable("has_timestamps", async (t) => {
+        await t.timestamps({ default: Temporal.Now.instant() });
+      });
+    });
+
     expect(
-      createdAt instanceof Date
-        ? createdAt.toISOString().slice(0, 10)
-        : String(createdAt).slice(0, 10),
-    ).toBe("2023-01-01");
+      await adapter.columnExists("has_timestamps", "created_at", null, {
+        precision: 6,
+        null: false,
+      }),
+    ).toBeTruthy();
+    expect(
+      await adapter.columnExists("has_timestamps", "updated_at", null, {
+        precision: 6,
+        null: false,
+      }),
+    ).toBeTruthy();
   });
 
   itIfSupports(
     "bulk_alter",
     "timestamps with implicit default on change table with bulk",
     async () => {
-      class BulkTsMig extends Migration {
-        async up() {
-          await this.createTable("has_timestamps", (t) => {
-            t.string("name");
-          });
-          await this.changeTable("has_timestamps", { bulk: true }, async (t) => {
-            await t.timestamps();
-          });
-        }
-        async down() {
-          await this.dropTable("has_timestamps");
-        }
-      }
-      const m = new BulkTsMig();
-      m.connection = adapter;
-      await m.up();
-      await adapter.execute(
-        `INSERT INTO has_timestamps (name, created_at, updated_at) VALUES ('x', '2023-01-01', '2023-01-01')`,
-      );
-      const rows = (await adapter.selectAll(`SELECT * FROM has_timestamps`)).toArray();
-      expect(rows.length).toBe(1);
-      expect(rows[0].created_at).not.toBeNull();
-      expect(rows[0].updated_at).not.toBeNull();
+      await Schema.define(async (schema) => {
+        await schema.createTable("has_timestamps");
+
+        await schema.changeTable("has_timestamps", { bulk: true }, async (t) => {
+          await t.timestamps({ default: Temporal.Now.instant() });
+        });
+      });
+
+      expect(
+        await adapter.columnExists("has_timestamps", "created_at", null, {
+          precision: 6,
+          null: false,
+        }),
+      ).toBeTruthy();
+      expect(
+        await adapter.columnExists("has_timestamps", "updated_at", null, {
+          precision: 6,
+          null: false,
+        }),
+      ).toBeTruthy();
     },
   );
 
@@ -248,30 +281,22 @@ describe("ActiveRecordSchemaTest", () => {
   });
 
   it("timestamps with implicit default on add timestamps", async () => {
-    class AddTsMig extends Migration {
-      async up() {
-        await this.createTable("ts_add", (t) => {
-          t.string("name");
-        });
-        await this.addTimestamps("ts_add", { null: false });
-      }
-      async down() {
-        await this.dropTable("ts_add");
-      }
-    }
-    const m = new AddTsMig();
-    m.connection = adapter;
-    await m.up();
-    await adapter.execute(
-      `INSERT INTO ts_add (name, created_at, updated_at) VALUES ('test', '2023-01-01', '2023-01-01')`,
-    );
-    const rows = (await adapter.selectAll(`SELECT * FROM ts_add`)).toArray();
-    expect(rows.length).toBe(1);
-    const createdAt = rows[0].created_at;
+    await Schema.define(async (schema) => {
+      await schema.createTable("has_timestamps");
+      await schema.addTimestamps("has_timestamps", { default: Temporal.Now.instant() });
+    });
+
     expect(
-      createdAt instanceof Date
-        ? createdAt.toISOString().slice(0, 10)
-        : String(createdAt).slice(0, 10),
-    ).toBe("2023-01-01");
+      await adapter.columnExists("has_timestamps", "created_at", null, {
+        precision: 6,
+        null: false,
+      }),
+    ).toBeTruthy();
+    expect(
+      await adapter.columnExists("has_timestamps", "updated_at", null, {
+        precision: 6,
+        null: false,
+      }),
+    ).toBeTruthy();
   });
 });

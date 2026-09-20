@@ -1,8 +1,7 @@
 import { describe, it, expect } from "vitest";
 import "../index.js";
 import { fixtures } from "../test-fixtures.js";
-import { Post } from "../test-helpers/models/post.js";
-import { Developer } from "../test-helpers/models/developer.js";
+import { Post, FakeKlass } from "../test-helpers/models/post.js";
 
 fixtures([]);
 function relation(): any {
@@ -25,7 +24,7 @@ describe("RelationMutationTest", () => {
     for (const [bang, field] of MULTI) {
       const rel = relation();
       expect(rel[bang]("foo") === rel).toBeTruthy();
-      expect(rel[field]).toContain("foo");
+      expect(rel[field]).toEqual(["foo"]);
     }
   });
 
@@ -42,12 +41,12 @@ describe("RelationMutationTest", () => {
   });
 
   it("#order! with symbol prepends the table name", () => {
-    const rel: any = Developer.all();
+    const rel: any = FakeKlass.all();
     expect(rel.orderBang(":name") === rel).toBeTruthy();
     const node = rel.orderValues[0];
     expect(node.isAscending()).toBeTruthy();
     expect(node.expr.name).toBe("name");
-    expect(node.expr.relation.name).toBe("developers");
+    expect(node.expr.relation.name).toBe("posts");
   });
 
   it("#order! on non-string does not attempt regexp match for references", () => {
@@ -71,7 +70,7 @@ describe("RelationMutationTest", () => {
     };
     expect(rel.extendingBang(mod) === rel).toBeTruthy();
     expect(rel.extendingValues).toEqual([mod]);
-    expect(typeof rel.greeting).toBe("function");
+    expect(typeof rel.greeting === "function").toBeTruthy();
     rel.extendingBang(mod2);
     expect(rel.extendingValues).toEqual([mod, mod2]);
   });
@@ -98,16 +97,16 @@ describe("RelationMutationTest", () => {
     const rel: any = Post.order("foo");
     expect(rel.reorderBang("bar") === rel).toBeTruthy();
     expect(rel.orderValues).toEqual(["bar"]);
-    expect(rel.reorderingValue).toBe(true);
+    expect(rel.reorderingValue).toBeTruthy();
   });
 
   it("#reorder! with symbol prepends the table name", () => {
-    const rel: any = Developer.all();
+    const rel: any = FakeKlass.all();
     expect(rel.reorderBang(":name") === rel).toBeTruthy();
     const node = rel.orderValues[0];
     expect(node.isAscending()).toBeTruthy();
     expect(node.expr.name).toBe("name");
-    expect(node.expr.relation.name).toBe("developers");
+    expect(node.expr.relation.name).toBe("posts");
   });
 
   it.skip("reverse_order!", () => {
@@ -144,8 +143,8 @@ describe("RelationMutationTest", () => {
   it("none!", async () => {
     const rel = relation();
     expect(rel.noneBang() === rel).toBeTruthy();
-    expect(await rel.isNone()).toBe(true);
-    expect(rel.isNullRelation()).toBe(true);
+    expect(await rel.isNone()).toBeTruthy();
+    expect(rel.isNullRelation()).toBeTruthy();
   });
 
   it("skip_query_cache!", () => {
@@ -175,7 +174,7 @@ describe("RelationMutationTest", () => {
     ];
     for (const [bang, arg, field, expected] of SINGLE) {
       const rel = relation();
-      expect(rel[bang](arg)).toBe(rel);
+      expect(rel[bang](arg) === rel).toBeTruthy();
       expect(rel[field]).toBe(expected);
     }
   });

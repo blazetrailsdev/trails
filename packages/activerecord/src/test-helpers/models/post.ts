@@ -813,6 +813,16 @@ export class PostWithDestroyCallback extends Base {
   }
 }
 
+export class FakeKlass extends Base {
+  static {
+    this._tableName = "posts";
+  }
+
+  static override columnsHash(): Record<string, never> {
+    return { name: null } as unknown as Record<string, never>;
+  }
+}
+
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Postesque extends Base {
   declare author_id: string;

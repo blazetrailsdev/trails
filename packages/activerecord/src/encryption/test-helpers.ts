@@ -359,6 +359,17 @@ function _isBinaryAttribute(model: any, attrName: string): boolean {
   return false;
 }
 
+export function assertCiphertextDecryptsTo(
+  model: any,
+  attributeName: string,
+  ciphertext: unknown,
+): void {
+  expect(model[attributeName]).not.toBe(ciphertext);
+  expect(model.readAttribute(attributeName)).not.toBe(ciphertext);
+  const cleartext = model.constructor.typeForAttribute(attributeName).deserialize(ciphertext);
+  expect(model.readAttribute(attributeName)).toBe(cleartext);
+}
+
 export async function assertEncryptedAttribute(
   model: any,
   attrName: string,
