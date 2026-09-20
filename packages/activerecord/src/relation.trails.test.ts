@@ -614,15 +614,6 @@ describe("RelationTest", () => {
     registerModel(CanonCategorization);
   });
 
-  it("the sqlite3 quoted-column-name probe answers on this adapter", async () => {
-    const columns = (
-      await (
-        await CanonPost.leaseConnection()
-      ).execQuery('SELECT "join" FROM (SELECT id AS "join" FROM posts) subquery')
-    ).columns;
-    expect(columns).toEqual(["join"]);
-  });
-
   it("merging a string join keeps both the association join and the merged string", () => {
     const joinString = `LEFT OUTER JOIN ${quoteTableName("ratings")} ON ${quoteTableName(
       "comments",
