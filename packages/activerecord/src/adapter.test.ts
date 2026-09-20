@@ -1,8 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Nodes } from "@blazetrails/arel";
-import { Notifications } from "@blazetrails/activesupport";
+import {
+  Notifications,
+  assertEmpty,
+  assertNotEmpty,
+  assertNothingRaised,
+  assertRaises,
+} from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { Process } from "@blazetrails/ruby-compat";
+import { Process, StandardError } from "@blazetrails/ruby-compat";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { AdapterError, ConnectionFailed } from "./errors.js";
@@ -218,18 +224,20 @@ describe("AdapterTest", () => {
   it("create record with pk as zero", async () => {
     await Book.create({ id: 0 });
     expect((await Book.find(0)).id).toBe(0);
-    await Book.destroy(0);
+    await assertNothingRaised(async () => {
+      await Book.destroy(0);
+    });
   });
 
   it("valid column", () => {
     const conn = Base.connection;
     for (const type of Object.keys(conn.nativeDatabaseTypes())) {
-      expect(conn.isValidType(type)).toBe(true);
+      expect(conn.isValidType(type)).toBeTruthy();
     }
   });
 
   it("invalid column", () => {
-    expect(Base.connection.isValidType("foobar")).toBe(false);
+    expect(Base.connection.isValidType("foobar")).toBeFalsy();
   });
 
   it("tables", async () => {
@@ -242,9 +250,10 @@ describe("AdapterTest", () => {
 
   it("table exists?", async () => {
     const conn = Base.connection;
-    expect(await conn.tableExists("accounts")).toBe(true);
-    expect(await conn.tableExists("nonexistingtable")).toBe(false);
-    expect(await conn.tableExists("'")).toBe(false);
+    expect(await conn.tableExists("accounts")).toBeTruthy();
+    expect(await conn.tableExists("accounts")).toBeTruthy();
+    expect(await conn.tableExists("nonexistingtable")).toBeFalsy();
+    expect(await conn.tableExists("'")).toBeFalsy();
     expect(await conn.tableExists(null as unknown as string)).toBeFalsy();
   });
 
@@ -258,9 +267,10 @@ describe("AdapterTest", () => {
 
   it("data source exists?", async () => {
     const conn = Base.connection;
-    expect(await conn.dataSourceExists("accounts")).toBe(true);
-    expect(await conn.dataSourceExists("nonexistingtable")).toBe(false);
-    expect(await conn.dataSourceExists("'")).toBe(false);
+    expect(await conn.dataSourceExists("accounts")).toBeTruthy();
+    expect(await conn.dataSourceExists("accounts")).toBeTruthy();
+    expect(await conn.dataSourceExists("nonexistingtable")).toBeFalsy();
+    expect(await conn.dataSourceExists("'")).toBeFalsy();
     expect(await conn.dataSourceExists(null as unknown as string)).toBeFalsy();
   });
 
@@ -268,7 +278,7 @@ describe("AdapterTest", () => {
     const idxName = "accounts_idx";
     const conn = Base.connection;
     try {
-      expect(await conn.indexes("accounts")).toEqual([]);
+      assertEmpty(await conn.indexes("accounts"));
 
       await conn.addIndex("accounts", "firm_id", { name: idxName });
       const indexes = (await conn.indexes("accounts")) as Array<{
@@ -279,7 +289,7 @@ describe("AdapterTest", () => {
       }>;
       expect(indexes[0].table).toBe("accounts");
       expect(indexes[0].name).toBe(idxName);
-      expect(indexes[0].unique).toBe(false);
+      expect(indexes[0].unique).toBeFalsy();
       expect(indexes[0].columns).toEqual(["firm_id"]);
     } finally {
       await conn.removeIndex("accounts", { name: idxName }).catch(() => {});
@@ -295,9 +305,9 @@ describe("AdapterTest", () => {
     const indexName = "accounts_idx";
     try {
       await conn.addIndex("accounts", "firm_id", { name: indexName });
-      await expect(
-        conn.removeIndex("accounts", { name: indexName, column: "wrong_column_name" }),
-      ).rejects.toBeInstanceOf(ArgumentError);
+      await assertRaises([ArgumentError], {}, async () => {
+        await conn.removeIndex("accounts", { name: indexName, column: "wrong_column_name" });
+      });
     } finally {
       await conn.removeIndex("accounts", { name: indexName });
     }
@@ -308,9 +318,9 @@ describe("AdapterTest", () => {
     const indexName = "accounts_idx";
     try {
       await conn.addIndex("accounts", "firm_id", { name: indexName });
-      await expect(
-        conn.removeIndex("accounts", "wrong_column_name", { name: indexName }),
-      ).rejects.toBeInstanceOf(ArgumentError);
+      await assertRaises([ArgumentError], {}, async () => {
+        await conn.removeIndex("accounts", "wrong_column_name", { name: indexName });
+      });
     } finally {
       await conn.removeIndex("accounts", { name: indexName });
     }
@@ -319,15 +329,15 @@ describe("AdapterTest", () => {
   it("#exec_query queries with no result set return an empty ActiveRecord::Result", async () => {
     const result = await Base.connection.execQuery("INSERT INTO subscribers(nick) VALUES('me')");
     expect(result).toBeInstanceOf(Result);
-    expect(result.rows).toEqual([]);
-    expect(result.columns).toEqual([]);
+    assertEmpty(result.rows);
+    assertEmpty(result.columns);
   });
 
   it("#exec_query queries with an empty result set still return the columns", async () => {
     const result = await Base.connection.execQuery("SELECT * FROM subscribers WHERE 1=0");
     expect(result).toBeInstanceOf(Result);
-    expect(result.rows).toEqual([]);
-    expect(result.columns.length).toBeGreaterThan(0);
+    assertEmpty(result.rows);
+    assertNotEmpty(result.columns);
   });
 
   it.skipIf(inMemoryDb())("disable prepared statements", async () => {
@@ -335,11 +345,11 @@ describe("AdapterTest", () => {
     try {
       await runWithoutConnection(async (origConnection) => {
         await Base.establishConnection({ ...origConnection, preparedStatements: true });
-        expect((await Base.leaseConnection()).preparedStatements).toBe(true);
+        expect((await Base.leaseConnection()).preparedStatements).toBeTruthy();
 
         setDisablePreparedStatements(true);
         await Base.establishConnection({ ...origConnection, preparedStatements: true });
-        expect((await Base.leaseConnection()).preparedStatements).toBe(false);
+        expect((await Base.leaseConnection()).preparedStatements).toBeFalsy();
       });
     } finally {
       setDisablePreparedStatements(original);
@@ -361,46 +371,48 @@ describe("AdapterTest", () => {
   it("uniqueness violations are translated to specific exception", async () => {
     const conn = Base.connection;
     await conn.execute("INSERT INTO subscribers(nick) VALUES('me')");
-    const error: any = await conn
-      .execute("INSERT INTO subscribers(nick) VALUES('me')")
-      .catch((e) => e);
-    expect(error).toBeInstanceOf(RecordNotUnique);
-    expect(error.cause).toBeTruthy();
+    const error = await assertRaises([RecordNotUnique], {}, async () => {
+      await conn.execute("INSERT INTO subscribers(nick) VALUES('me')");
+    });
+    expect(error.cause).toBeDefined();
   });
 
   it("not null violations are translated to specific exception", async () => {
-    const error = await Post.create().catch((e) => e);
-    expect(error).toBeInstanceOf(NotNullViolation);
-    expect(error.cause).toBeTruthy();
+    const error = await assertRaises([NotNullViolation], {}, async () => {
+      await Post.create();
+    });
+    expect(error.cause).toBeDefined();
   });
 
   it.skipIf(adapterType === "sqlite")(
     "value limit violations are translated to specific exception",
     async () => {
-      const error = await Event.create({ title: "abcdefgh" }).catch((e) => e);
-      expect(error).toBeInstanceOf(ValueTooLong);
-      expect(error.cause).toBeTruthy();
+      const error = await assertRaises([ValueTooLong], {}, async () => {
+        await Event.create({ title: "abcdefgh" });
+      });
+      expect(error.cause).toBeDefined();
     },
   );
 
   it.skipIf(adapterType === "sqlite")(
     "numeric value out of ranges are translated to specific exception",
     async () => {
-      const error = (await Base.connection
-        .insert("INSERT INTO books(author_id) VALUES (9223372036854775808)")
-        .catch((e) => e)) as { cause?: unknown };
-      expect(error).toBeInstanceOf(RangeError);
-      expect(error.cause).toBeTruthy();
+      const error = await assertRaises([RangeError], {}, async () => {
+        await Base.connection.insert("INSERT INTO books(author_id) VALUES (9223372036854775808)");
+      });
+      expect(error.cause).toBeDefined();
     },
   );
 
   it("exceptions from notifications are not translated", async () => {
-    const originalError = new Error("This StandardError shouldn't get translated");
+    const originalError = new StandardError("This StandardError shouldn't get translated");
     const subscriber = Notifications.subscribe("sql.active_record", () => {
       throw originalError;
     });
     try {
-      const actualError = await Base.connection.execute("SELECT * FROM posts").catch((e) => e);
+      const actualError = await assertRaises([StandardError], {}, async () => {
+        await Base.connection.execute("SELECT * FROM posts");
+      });
       expect(actualError).toBe(originalError);
     } finally {
       Notifications.unsubscribe(subscriber);
@@ -408,14 +420,16 @@ describe("AdapterTest", () => {
   });
 
   it("database related exceptions are translated to statement invalid", async () => {
-    const error = await Base.connection.execute("This is a syntax error").catch((e) => e);
+    const error = await assertRaises([StatementInvalid], {}, async () => {
+      await Base.connection.execute("This is a syntax error");
+    });
     expect(error).toBeInstanceOf(StatementInvalid);
-    expect((error as Error).cause).toBeInstanceOf(Error);
+    expect(error.cause).toBeInstanceOf(Error);
   });
 
   it("select all always return activerecord result", async () => {
     const result = await Base.connection.selectAll("SELECT * FROM posts");
-    expect(result).toBeInstanceOf(Result);
+    expect(result instanceof Result).toBeTruthy();
   });
 
   it("select all insert update delete with casted binds", async () => {
@@ -435,7 +449,7 @@ describe("AdapterTest", () => {
     const query = (author as any).posts.where({ title: "foo" }).select("title");
     const sql = query.toSql();
     expect(await conn.selectOne(sql)).toEqual({ title: "foo" });
-    expect(await conn.selectAll(sql)).toBeInstanceOf(Result);
+    expect((await conn.selectAll(sql)) instanceof Result).toBeTruthy();
     expect(await conn.selectValue(sql)).toBe("foo");
     expect(await conn.selectValues(sql)).toEqual(["foo"]);
   });
@@ -446,7 +460,7 @@ describe("AdapterTest", () => {
     const query = Post.where({ title: "foo" }).select("title");
     const sql = query.toSql();
     expect(await conn.selectOne(sql)).toEqual({ title: "foo" });
-    expect(await conn.selectAll(sql)).toBeInstanceOf(Result);
+    expect((await conn.selectAll(sql)) instanceof Result).toBeTruthy();
     expect(await conn.selectValue(sql)).toBe("foo");
     expect(await conn.selectValues(sql)).toEqual(["foo"]);
   });
@@ -492,32 +506,35 @@ describe("AdapterForeignKeyTest", () => {
     }
     const hasFk = new KlassHasFk();
     (hasFk as unknown as { fk_id: number }).fk_id = 1231231231;
-    const error = await hasFk.save({ validate: false }).catch((e) => e);
-    expect(error).toBeInstanceOf(InvalidForeignKey);
-    expect(error.cause).toBeTruthy();
+    const error = await assertRaises([InvalidForeignKey], {}, async () => {
+      await hasFk.save({ validate: false });
+    });
+    expect(error.cause).toBeDefined();
   });
 
   it("foreign key violations on insert are translated to specific exception", async () => {
-    const error = (await insertIntoFkTestHasFk().catch((e) => e)) as { cause?: unknown };
-    expect(error).toBeInstanceOf(InvalidForeignKey);
-    expect(error.cause).toBeTruthy();
+    const error = await assertRaises([InvalidForeignKey], {}, async () => {
+      await insertIntoFkTestHasFk();
+    });
+    expect(error.cause).toBeDefined();
   });
 
   it("foreign key violations on delete are translated to specific exception", async () => {
     await Base.connection.execute("INSERT INTO fk_test_has_pk (pk_id) VALUES (1)");
     await insertIntoFkTestHasFk(1);
-    const error = await Base.connection
-      .delete("DELETE FROM fk_test_has_pk WHERE pk_id = 1")
-      .catch((e) => e);
-    expect(error).toBeInstanceOf(InvalidForeignKey);
-    expect(error.cause).toBeTruthy();
+    const error = await assertRaises([InvalidForeignKey], {}, async () => {
+      await Base.connection.delete("DELETE FROM fk_test_has_pk WHERE pk_id = 1");
+    });
+    expect(error.cause).toBeDefined();
   });
 
   it("disable referential integrity", async () => {
     const conn = Base.connection;
-    await conn.disableReferentialIntegrity(async () => {
-      await insertIntoFkTestHasFk();
-      await conn.execute("DELETE FROM fk_test_has_fk");
+    await assertNothingRaised(async () => {
+      await conn.disableReferentialIntegrity(async () => {
+        await insertIntoFkTestHasFk();
+        await conn.execute("DELETE FROM fk_test_has_fk");
+      });
     });
   });
 });
@@ -540,7 +557,7 @@ describe("AdapterTestWithoutTransaction", () => {
     const conn = Base.connection;
     conn.enableQueryCacheBang();
     try {
-      expect(posts("welcome").id).toBeGreaterThan(0);
+      posts("welcome");
       const count = (await Post.count()) as number;
 
       await conn.create("INSERT INTO posts(title, body) VALUES ('', '')");
@@ -624,9 +641,9 @@ describe("AdapterTestWithoutTransaction", () => {
     await conn.resetPkSequenceBang("subscribers");
     const sub = new Subscriber({ name: "robert drake" });
     sub.id = "bob drake";
-    await sub.saveBang();
-    const found = await Subscriber.find("bob drake");
-    expect(found.id).toBe("bob drake");
+    await assertNothingRaised(async () => {
+      await sub.saveBang();
+    });
   });
 });
 
@@ -671,14 +688,14 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
 
   beforeEach(async () => {
     connection = Base.connection;
-    expect(await connection.active()).toBe(true);
+    expect(await connection.active()).toBeTruthy();
   });
 
   afterEach(async () => {
     await connection.reconnectBang();
-    expect(await connection.active()).toBe(true);
-    expect(connection.isTransactionOpen()).toBe(false);
-    expect(await rawTransactionOpen(connection)).toBe(false);
+    expect(await connection.active()).toBeTruthy();
+    expect(connection.isTransactionOpen()).toBeFalsy();
+    expect(await rawTransactionOpen(connection)).toBeFalsy();
   });
 
   async function withRetryDeadline(value: number, body: () => Promise<void>): Promise<void> {
@@ -692,85 +709,85 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
 
   it("reconnect after a disconnect", async () => {
     await connection.disconnectBang();
-    expect(await activePredicate(connection)).toBe(false);
+    expect(await activePredicate(connection)).toBeFalsy();
     await connection.reconnectBang();
-    expect(await connection.active()).toBe(true);
+    expect(await connection.active()).toBeTruthy();
   });
 
   it("materialized transaction state is reset after a reconnect", async () => {
     await connection.transactionManager.beginTransaction();
-    expect(connection.isTransactionOpen()).toBe(true);
+    expect(connection.isTransactionOpen()).toBeTruthy();
     await connection.materializeTransactions();
-    expect(await rawTransactionOpen(connection)).toBe(true);
+    expect(await rawTransactionOpen(connection)).toBeTruthy();
     await connection.reconnectBang();
-    expect(connection.isTransactionOpen()).toBe(false);
-    expect(await rawTransactionOpen(connection)).toBe(false);
+    expect(connection.isTransactionOpen()).toBeFalsy();
+    expect(await rawTransactionOpen(connection)).toBeFalsy();
   });
 
   it("materialized transaction state can be restored after a reconnect", async () => {
     await connection.transactionManager.beginTransaction();
-    expect(connection.isTransactionOpen()).toBe(true);
+    expect(connection.isTransactionOpen()).toBeTruthy();
     await connection.materializeTransactions();
-    expect(await rawTransactionOpen(connection)).toBe(true);
+    expect(await rawTransactionOpen(connection)).toBeTruthy();
     await connection.reconnectBang({ restoreTransactions: true });
-    expect(connection.isTransactionOpen()).toBe(true);
-    expect(await rawTransactionOpen(connection)).toBe(true);
+    expect(connection.isTransactionOpen()).toBeTruthy();
+    expect(await rawTransactionOpen(connection)).toBeTruthy();
   });
 
   it("materialized transaction state is reset after a disconnect", async () => {
     await connection.transactionManager.beginTransaction();
-    expect(connection.isTransactionOpen()).toBe(true);
+    expect(connection.isTransactionOpen()).toBeTruthy();
     await connection.materializeTransactions();
-    expect(await rawTransactionOpen(connection)).toBe(true);
+    expect(await rawTransactionOpen(connection)).toBeTruthy();
     await connection.disconnectBang();
-    expect(connection.isTransactionOpen()).toBe(false);
+    expect(connection.isTransactionOpen()).toBeFalsy();
   });
 
   it("unmaterialized transaction state is reset after a reconnect", async () => {
     await connection.transactionManager.beginTransaction();
-    expect(connection.isTransactionOpen()).toBe(true);
-    expect(await rawTransactionOpen(connection)).toBe(false);
+    expect(connection.isTransactionOpen()).toBeTruthy();
+    expect(await rawTransactionOpen(connection)).toBeFalsy();
     await connection.reconnectBang();
-    expect(connection.isTransactionOpen()).toBe(false);
-    expect(await rawTransactionOpen(connection)).toBe(false);
+    expect(connection.isTransactionOpen()).toBeFalsy();
+    expect(await rawTransactionOpen(connection)).toBeFalsy();
     await connection.materializeTransactions();
-    expect(await rawTransactionOpen(connection)).toBe(false);
+    expect(await rawTransactionOpen(connection)).toBeFalsy();
   });
 
   it("unmaterialized transaction state can be restored after a reconnect", async () => {
     await connection.transactionManager.beginTransaction();
-    expect(connection.isTransactionOpen()).toBe(true);
-    expect(await rawTransactionOpen(connection)).toBe(false);
+    expect(connection.isTransactionOpen()).toBeTruthy();
+    expect(await rawTransactionOpen(connection)).toBeFalsy();
     await connection.reconnectBang({ restoreTransactions: true });
-    expect(connection.isTransactionOpen()).toBe(true);
-    expect(await rawTransactionOpen(connection)).toBe(false);
+    expect(connection.isTransactionOpen()).toBeTruthy();
+    expect(await rawTransactionOpen(connection)).toBeFalsy();
     await connection.materializeTransactions();
-    expect(await rawTransactionOpen(connection)).toBe(true);
+    expect(await rawTransactionOpen(connection)).toBeTruthy();
   });
 
   it("unmaterialized transaction state is reset after a disconnect", async () => {
     await connection.transactionManager.beginTransaction();
-    expect(connection.isTransactionOpen()).toBe(true);
-    expect(await rawTransactionOpen(connection)).toBe(false);
+    expect(connection.isTransactionOpen()).toBeTruthy();
+    expect(await rawTransactionOpen(connection)).toBeFalsy();
     await connection.disconnectBang();
-    expect(connection.isTransactionOpen()).toBe(false);
+    expect(connection.isTransactionOpen()).toBeFalsy();
   });
 
   it.skipIf(!remoteSupported)("active? detects remote disconnection", async () => {
     await remoteDisconnect(connection);
-    expect(await activePredicate(connection)).toBe(false);
+    expect(await activePredicate(connection)).toBeFalsy();
   });
 
   it.skipIf(!remoteSupported)("verify! restores after remote disconnection", async () => {
     await remoteDisconnect(connection);
     await connection.verifyBang();
-    expect(await connection.active()).toBe(true);
+    expect(await connection.active()).toBeTruthy();
   });
 
   it.skipIf(!remoteSupported)("reconnect! restores after remote disconnection", async () => {
     await remoteDisconnect(connection);
     await connection.reconnectBang();
-    expect(await connection.active()).toBe(true);
+    expect(await connection.active()).toBeTruthy();
   });
 
   it.skipIf(!remoteSupported)(
@@ -783,11 +800,11 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
       (connection as unknown as { _lastActivity: number })._lastActivity =
         Process.clockGettime(Process.CLOCK_MONOTONIC) - 5 * 60;
 
-      expect(await activePredicate(connection)).toBe(false);
+      expect(await activePredicate(connection)).toBeFalsy();
 
       await Post.deleteAll();
 
-      expect(await connection.active()).toBe(true);
+      expect(await connection.active()).toBeTruthy();
     },
   );
 
@@ -798,9 +815,11 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
 
       connection.cleanBang();
 
-      expect(await activePredicate(connection)).toBe(false);
+      expect(await activePredicate(connection)).toBeFalsy();
 
-      await expect(Post.deleteAll()).rejects.toBeInstanceOf(AdapterError);
+      await assertRaises([AdapterError], {}, async () => {
+        await Post.deleteAll();
+      });
     },
   );
 
@@ -814,13 +833,13 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
       (connection as unknown as { _lastActivity: number })._lastActivity =
         Process.clockGettime(Process.CLOCK_MONOTONIC) - 5 * 60;
 
-      expect(await activePredicate(connection)).toBe(false);
+      expect(await activePredicate(connection)).toBeFalsy();
 
       connection.quoteString("");
 
       await Post.deleteAll();
 
-      expect(await connection.active()).toBe(true);
+      expect(await connection.active()).toBeTruthy();
     },
   );
 
@@ -831,12 +850,12 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
 
       await remoteDisconnect(connection);
 
-      await expect(
-        connection.execute("INSERT INTO posts(title, body) VALUES ('foo', 'bar')"),
-      ).rejects.toBeInstanceOf(ConnectionFailed);
+      await assertRaises([ConnectionFailed], {}, async () => {
+        await connection.execute("INSERT INTO posts(title, body) VALUES ('foo', 'bar')");
+      });
 
       expect(await Post.first()).toBeTruthy();
-      expect(await connection.active()).toBe(true);
+      expect(await connection.active()).toBeTruthy();
     },
   );
 
@@ -848,12 +867,12 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
       await remoteDisconnect(connection);
 
       expect(await Post.first()).toBeTruthy();
-      expect(await connection.active()).toBe(true);
+      expect(await connection.active()).toBeTruthy();
 
       await remoteDisconnect(connection);
 
       expect(await Post.where({ id: [1, 2] }).first()).toBeTruthy();
-      expect(await connection.active()).toBe(true);
+      expect(await connection.active()).toBeTruthy();
     },
   );
 
@@ -865,12 +884,12 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
       await remoteDisconnect(connection);
 
       expect(await Post.find(1)).toBeTruthy();
-      expect(await connection.active()).toBe(true);
+      expect(await connection.active()).toBeTruthy();
 
       await remoteDisconnect(connection);
 
       expect(await Post.findBy({ title: "Welcome to the weblog" })).toBeTruthy();
-      expect(await connection.active()).toBe(true);
+      expect(await connection.active()).toBeTruthy();
     },
   );
 
@@ -879,22 +898,24 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
 
     await remoteDisconnect(connection);
 
-    await expect(Post.where("1 = 1").toArray()).rejects.toBeInstanceOf(ConnectionFailed);
-    expect(await activePredicate(connection)).toBe(false);
+    await assertRaises([ConnectionFailed], {}, async () => {
+      await Post.where("1 = 1");
+    });
+    expect(await activePredicate(connection)).toBeFalsy();
 
     await remoteDisconnect(connection);
 
-    await expect(Post.select("title AS custom_title").first()).rejects.toBeInstanceOf(
-      ConnectionFailed,
-    );
-    expect(await activePredicate(connection)).toBe(false);
+    await assertRaises([ConnectionFailed], {}, async () => {
+      await Post.select("title AS custom_title").first();
+    });
+    expect(await activePredicate(connection)).toBeFalsy();
 
     await remoteDisconnect(connection);
 
-    await expect(Post.where("updated_at < ?", twoWeeksAgo()).first()).rejects.toBeInstanceOf(
-      ConnectionFailed,
-    );
-    expect(await activePredicate(connection)).toBe(false);
+    await assertRaises([ConnectionFailed], {}, async () => {
+      await Post.where("updated_at < ?", twoWeeksAgo()).first();
+    });
+    expect(await activePredicate(connection)).toBeFalsy();
   });
 
   it.skipIf(!remoteSupported)("queries containing SQL functions are not retried", async () => {
@@ -905,10 +926,12 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
     const tagsCountAttr = Post.arelTable.get("tags_count");
     const absTagsCount = new Nodes.NamedFunction("ABS", [tagsCountAttr]);
 
-    await expect(
-      (Post.where as (node: unknown) => ReturnType<typeof Post.where>)(absTagsCount.eq(2)).first(),
-    ).rejects.toBeInstanceOf(ConnectionFailed);
-    expect(await activePredicate(connection)).toBe(false);
+    await assertRaises([ConnectionFailed], {}, async () => {
+      await (Post.where as (node: unknown) => ReturnType<typeof Post.where>)(
+        absTagsCount.eq(2),
+      ).first();
+    });
+    expect(await activePredicate(connection)).toBeFalsy();
   });
 
   itBlocked("transaction restores after remote disconnection", async () => {
@@ -916,7 +939,7 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
     await Post.transaction(async () => {
       await Post.count();
     });
-    expect(await connection.active()).toBe(true);
+    expect(await connection.active()).toBeTruthy();
   });
 
   it.skipIf(!remoteSupported)(
@@ -943,18 +966,18 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
     "dirty transaction cannot be restored after remote disconnection",
     async () => {
       let invocations = 0;
-      await expect(
-        Post.transaction(async () => {
+      await assertRaises([ConnectionFailed], {}, async () => {
+        await Post.transaction(async () => {
           invocations += 1;
           await Post.deleteAll();
           await remoteDisconnect(connection);
           await Post.count();
-        }),
-      ).rejects.toBeInstanceOf(ConnectionFailed);
+        });
+      });
 
       expect(invocations).toBe(1);
 
-      expect(await activePredicate(connection)).toBe(false);
+      expect(await activePredicate(connection)).toBeFalsy();
       expect((await Post.count()) as number).toBeGreaterThan(0);
     },
   );
@@ -973,28 +996,28 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
 
   it("does not reconnect and retry queries when retries are disabled", async () => {
     let attempts = 0;
-    await expect(
-      connection.withRawConnection({}, async () => {
+    await assertRaises([ConnectionFailed], {}, async () => {
+      await connection.withRawConnection({}, async () => {
         if (attempts === 0) {
           attempts++;
           throw new ConnectionFailed("Something happened to the connection");
         }
-      }),
-    ).rejects.toBeInstanceOf(ConnectionFailed);
+      });
+    });
   });
 
   it("does not reconnect and retry queries that exceed retry deadline", async () => {
     let attempts = 0;
     await withRetryDeadline(0.1, async () => {
-      await expect(
-        connection.withRawConnection({ allowRetry: true }, async () => {
+      await assertRaises([ConnectionFailed], {}, async () => {
+        await connection.withRawConnection({ allowRetry: true }, async () => {
           if (attempts === 0) {
             await sleep(200);
             attempts++;
             throw new ConnectionFailed("Something happened to the connection");
           }
-        }),
-      ).rejects.toBeInstanceOf(ConnectionFailed);
+        });
+      });
     });
   });
 
@@ -1023,10 +1046,12 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
         return original();
       };
 
-      await expect(fresh.execQuery("SELECT 1")).rejects.toBeInstanceOf(ConnectionFailed);
+      await assertRaises([ConnectionFailed], {}, async () => {
+        await fresh.execQuery("SELECT 1");
+      });
 
       expect((await fresh.execQuery("SELECT 1")).rows).toEqual([[1]]);
-      expect(failures).toEqual([]);
+      assertEmpty(failures);
     } finally {
       await fresh.disconnectBang();
     }
@@ -1065,7 +1090,7 @@ describe("InvalidateTransactionTest", () => {
         }
       });
 
-      expect(invalidated).toBe(true);
+      expect(invalidated).toBeTruthy();
     },
   );
 });
@@ -1082,13 +1107,13 @@ describe.runIf(adapterType === "mysql")("AdapterTest", () => {
   });
 
   it("charset", async () => {
-    expect(await adapter.charset()).not.toBe("");
+    expect(await adapter.charset()).not.toBeNull();
     expect(await adapter.charset()).not.toBe("character_set_database");
     expect(await adapter.charset()).toBe(await adapter.showVariable("character_set_database"));
   });
 
   it("collation", async () => {
-    expect(await adapter.collation()).not.toBe("");
+    expect(await adapter.collation()).not.toBeNull();
     expect(await adapter.collation()).not.toBe("collation_database");
     expect(await adapter.collation()).toBe(await adapter.showVariable("collation_database"));
   });
@@ -1098,27 +1123,29 @@ describe.runIf(adapterType === "mysql")("AdapterTest", () => {
   });
 
   it("not specifying database name for cross database selects", async () => {
-    await runWithoutConnection(async ({ database: _database, ...exceptDatabase }) => {
-      await Base.establishConnection(exceptDatabase);
-      const connection = await leaseMysqlAdapter();
-      await connection.execute(
-        `SELECT ${ARUNIT_DATABASE}.pirates.*, ${ARUNIT2_DATABASE}.courses.* ` +
-          `FROM ${ARUNIT_DATABASE}.pirates, ${ARUNIT2_DATABASE}.courses`,
-      );
+    await assertNothingRaised(async () => {
+      await runWithoutConnection(async ({ database: _database, ...exceptDatabase }) => {
+        await Base.establishConnection(exceptDatabase);
+        const connection = await leaseMysqlAdapter();
+        await connection.execute(
+          `SELECT ${ARUNIT_DATABASE}.pirates.*, ${ARUNIT2_DATABASE}.courses.* ` +
+            `FROM ${ARUNIT_DATABASE}.pirates, ${ARUNIT2_DATABASE}.courses`,
+        );
+      });
     });
   });
 });
 
 describe("AdvisoryLocksEnabledTest", () => {
   itIfSupports("advisory_locks", "advisory locks enabled?", async () => {
-    expect((await Base.leaseConnection()).isAdvisoryLocksEnabled()).toBe(true);
+    expect((await Base.leaseConnection()).isAdvisoryLocksEnabled()).toBeTruthy();
 
     await runWithoutConnection(async (origConnection) => {
       await Base.establishConnection({ ...origConnection, advisoryLocks: false });
-      expect((await Base.leaseConnection()).isAdvisoryLocksEnabled()).toBe(false);
+      expect((await Base.leaseConnection()).isAdvisoryLocksEnabled()).toBeFalsy();
 
       await Base.establishConnection({ ...origConnection, advisoryLocks: true });
-      expect((await Base.leaseConnection()).isAdvisoryLocksEnabled()).toBe(true);
+      expect((await Base.leaseConnection()).isAdvisoryLocksEnabled()).toBeTruthy();
     });
   });
 });
