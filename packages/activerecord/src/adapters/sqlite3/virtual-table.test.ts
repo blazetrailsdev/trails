@@ -42,6 +42,6 @@ describeIfSqlite("SQLite3VirtualTableTest", () => {
       ]);
     });
 
-    expect(await adapter.virtualTableExists("emails")).toBe(true);
+    expect(await adapter.virtualTableExists("emails")).toBeTruthy();
   });
 });
