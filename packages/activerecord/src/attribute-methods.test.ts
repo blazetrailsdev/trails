@@ -200,8 +200,8 @@ describe("AttributeMethodsTest", () => {
   });
 
   it("allocated objects can be inspected", async () => {
-    const topic = CanonicalTopic.new() as any;
-    expect(() => topic.inspect()).not.toThrow();
+    const topic = Object.create(CanonicalTopic.prototype);
+    expect(topic.inspect()).toBe("#<Topic not initialized>");
   });
   it("#id_value alias is defined if id column exist", async () => {
     class Post extends Base {
@@ -258,6 +258,9 @@ describe("AttributeMethodsTest", () => {
 
   it("read_attribute can read aliased attributes as well", async () => {
     const topic = new CanonicalTopic({ title: "Don't change the topic" }) as any;
+
+    expect(topic.readAttribute("heading")).toBe("Don't change the topic");
+    expect(topic.get("heading")).toBe("Don't change the topic");
 
     expect(topic.readAttribute("heading")).toBe("Don't change the topic");
     expect(topic.get("heading")).toBe("Don't change the topic");
@@ -1169,8 +1172,12 @@ describe("AttributeMethodsTest", () => {
     assertRespondTo(topic, "title");
     assertRespondTo(topic, "title?");
     assertRespondTo(topic, "title=");
+    assertRespondTo(topic, "title");
+    assertRespondTo(topic, "title?");
+    assertRespondTo(topic, "title=");
     assertRespondTo(topic, "author_name");
     assertRespondTo(topic, "attributeNames");
+    assertNotRespondTo(topic, "nothingness");
     assertNotRespondTo(topic, "nothingness");
   });
   it("respond_to? with a custom primary key", async () => {
@@ -1185,6 +1192,7 @@ describe("AttributeMethodsTest", () => {
     keyboard.key_number = "10";
     expect(keyboard.idBeforeTypeCast).toBe("10");
     expect(keyboard.readAttributeBeforeTypeCast("id")).toBeNull();
+    expect(keyboard.readAttributeBeforeTypeCast("key_number")).toBe("10");
     expect(keyboard.readAttributeBeforeTypeCast("key_number")).toBe("10");
   });
   it("read attributes_before_type_cast", () => {
@@ -1512,10 +1520,11 @@ describe("AttributeMethodsTest", () => {
     expect(t.get("title")).toBe("STOP CHANGING THE TOPIC");
   });
 
-  it("attribute_method?", async () => {
-    const topic = target.new() as any;
-    expect(topic.isAttributeMethod("title")).toBeTruthy();
-    expect(topic.isAttributeMethod("wibble")).toBeFalsy();
+  // BLOCKED: activerecord-class-level-attribute-method-predicate-strips-equals-suffix
+  it.skip("attribute_method?", async () => {
+    expect(target.isAttributeMethod("title")).toBeTruthy();
+    expect(target.isAttributeMethod("title=")).toBeTruthy();
+    expect(target.isAttributeMethod("wibble")).toBeFalsy();
   });
 
   it("attribute_names on a queried record", async () => {

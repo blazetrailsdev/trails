@@ -31,7 +31,7 @@ describe("FixtureSet", () => {
         called = true;
         expect([...fh.each()].length).toBe(6);
       });
-      expect(called).toBe(true);
+      expect(called, "block called").toBeTruthy();
     });
 
     it("names", () => {

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import "./index.js";
 import { fixtures } from "./test-fixtures.js";
 import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
+import { assertAsyncEqual } from "./support/async-helper.js";
 import { collectionProxyFor as association, registerModel } from "./associations.js";
 import { Developer } from "./test-helpers/models/developer.js";
 import { Comment } from "./test-helpers/models/comment.js";
@@ -94,8 +95,8 @@ describe("NullRelationTest", () => {
 
   it("null relation count async", async () => {
     await assertNoQueries(false, async () => {
-      expect(await Comment.none().asyncCount("id")).toBe(0);
-      expect(await Comment.none().group("post_id").asyncCount("id")).toEqual(new Map());
+      await assertAsyncEqual(0, Comment.none().asyncCount("id"));
+      await assertAsyncEqual(new Map(), Comment.none().group("post_id").asyncCount("id"));
     });
   });
 
@@ -108,8 +109,8 @@ describe("NullRelationTest", () => {
 
   it("null relation sum async", async () => {
     await assertNoQueries(false, async () => {
-      expect(Number(await Comment.none().asyncSum("id"))).toBe(0);
-      expect(await Comment.none().group("post_id").asyncSum("id")).toEqual(new Map());
+      await assertAsyncEqual(0, Comment.none().asyncSum("id"));
+      await assertAsyncEqual(new Map(), Comment.none().group("post_id").asyncSum("id"));
     });
   });
 
@@ -122,8 +123,8 @@ describe("NullRelationTest", () => {
 
   it("null relation average async", async () => {
     await assertNoQueries(false, async () => {
-      expect(await Comment.none().asyncAverage("id")).toBeNull();
-      expect(await Comment.none().group("post_id").asyncAverage("id")).toEqual(new Map());
+      await assertAsyncEqual(null, Comment.none().asyncAverage("id"));
+      await assertAsyncEqual(new Map(), Comment.none().group("post_id").asyncAverage("id"));
     });
   });
 
@@ -136,8 +137,8 @@ describe("NullRelationTest", () => {
 
   it("null relation minimum async", async () => {
     await assertNoQueries(false, async () => {
-      expect(await Comment.none().asyncMinimum("id")).toBeNull();
-      expect(await Comment.none().group("post_id").asyncMinimum("id")).toEqual(new Map());
+      await assertAsyncEqual(null, Comment.none().asyncMinimum("id"));
+      await assertAsyncEqual(new Map(), Comment.none().group("post_id").asyncMinimum("id"));
     });
   });
 
@@ -150,8 +151,8 @@ describe("NullRelationTest", () => {
 
   it("null relation maximum async", async () => {
     await assertNoQueries(false, async () => {
-      expect(await Comment.none().asyncMaximum("id")).toBeNull();
-      expect(await Comment.none().group("post_id").asyncMaximum("id")).toEqual(new Map());
+      await assertAsyncEqual(null, Comment.none().asyncMaximum("id"));
+      await assertAsyncEqual(new Map(), Comment.none().group("post_id").asyncMaximum("id"));
     });
   });
 

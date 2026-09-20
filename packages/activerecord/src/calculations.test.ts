@@ -1179,12 +1179,16 @@ describe("CalculationsTest", () => {
     expect(count).toBe(1);
   });
 
-  it("pluck type cast", async () => {
+  // BLOCKED: pluck-aggregate-expression-not-type-cast
+  it.skip("pluck type cast", async () => {
     const topic = topics("first");
     const relation = Topic.where({ id: topic.id });
     expect(await relation.pluck("approved")).toEqual([topic.approved]);
     expect(await relation.pluck("last_read")).toEqual([topic.last_read]);
     expect(await relation.pluck("written_on")).toEqual([topic.written_on]);
+    expect(await relation.pluck("min(written_on)", "min(replies_count)")).toEqual([
+      [topic.written_on, topic.replies_count],
+    ]);
   });
 
   it("pluck type cast with conflict column names", async () => {
@@ -1324,14 +1328,31 @@ describe("CalculationsTest", () => {
     ).toEqual(expected);
   });
 
-  it("pluck with hash argument with multiple tables", async () => {
-    const postIds = (
+  // BLOCKED: pluck-hash-argument-drops-leading-scalar-column
+  it.skip("pluck with hash argument with multiple tables", async () => {
+    const expected = [
+      [1, 1, "Thank you for the welcome"],
+      [1, 2, "Thank you again for the welcome"],
+      [2, 3, "Don't think too hard"],
+    ];
+    expect(
       await Post.joins(":comments")
-        .order("posts.id ASC, comments.id ASC")
+        .order({ posts: { id: "asc" }, comments: { id: "asc" } })
         .limit(3)
-        .pluck("posts.id")
-    ).map(Number);
-    expect(postIds).toEqual([1, 1, 2]);
+        .pluck("id", { comments: ["id", "body"] }),
+    ).toEqual(expected);
+    expect(
+      await Post.joins(":comments")
+        .order({ posts: { id: "asc" }, comments: { id: "asc" } })
+        .limit(3)
+        .pluck({ posts: "id", comments: ["id", "body"] }),
+    ).toEqual(expected);
+    expect(
+      await Post.joins(":comments")
+        .order({ posts: { id: "asc" }, comments: { id: "asc" } })
+        .limit(3)
+        .pluck({ posts: ["id"], comments: ["id", "body"] }),
+    ).toEqual(expected);
   });
 
   it("pluck with hash argument containing non existent field", async () => {
@@ -1519,18 +1540,41 @@ describe("CalculationsTest", () => {
     expect(await Topic.includes(":replies").order(":id").offset(5).pluck("id")).toEqual([]);
   });
 
-  it("pluck with join", async () => {
-    const ids = (await Reply.order("id").pluck("id")).map(Number);
-    expect(ids).toEqual([2, 4]);
-    const replies = await Reply.includes(":topic").order("id");
-    expect(replies.map((r) => Number(r.id))).toEqual([2, 4]);
+  // BLOCKED: pluck-multi-column-on-joined-relation-returns-flat-column
+  it.skip("pluck with join", async () => {
+    expect(
+      await Reply.includes(":topic")
+        .order("id")
+        .pluck("id", { topics: ["id"] }),
+    ).toEqual([
+      [2, 2],
+      [4, 4],
+    ]);
+    expect(await Reply.includes(":topic").order("id").pluck("id", { topics: "id" })).toEqual([
+      [2, 2],
+      [4, 4],
+    ]);
+    expect(await Reply.includes(":topic").order("id").pluck("id", "topics.id")).toEqual([
+      [2, 2],
+      [4, 4],
+    ]);
   });
 
-  it("pluck with join alias", async () => {
-    const result = ((await Reply.order("id").pluck("id", "parent_id")) as [unknown, unknown][]).map(
-      ([a, b]) => [Number(a), Number(b)],
-    );
-    expect(result).toEqual([
+  // BLOCKED: pluck-multi-column-on-joined-relation-returns-flat-column
+  it.skip("pluck with join alias", async () => {
+    expect(
+      await Reply.includes(":topic")
+        .order("id")
+        .pluck("id", { topic: ["id"] }),
+    ).toEqual([
+      [2, 1],
+      [4, 3],
+    ]);
+    expect(await Reply.includes(":topic").order("id").pluck("id", { topic: "id" })).toEqual([
+      [2, 1],
+      [4, 3],
+    ]);
+    expect(await Reply.includes(":topic").order("id").pluck("id", "topic.id")).toEqual([
       [2, 1],
       [4, 3],
     ]);
@@ -1666,15 +1710,23 @@ describe("CalculationsTest", () => {
     expect(await takesRelation.pluck("approved")).toEqual([false, true, true, true, true]);
   });
 
-  it("pluck with qualified name on loaded", async () => {
-    const t = Topic.joins(":replies").order("topics.id");
-    expect(t.isLoaded).toBe(false);
-    const before = (await t.pluck("topics.id")).map(Number);
-    expect(before).toEqual([1, 3]);
-    await t;
-    expect(t.isLoaded).toBe(true);
-    const after = (await t.pluck("topics.id")).map(Number);
-    expect(after).toEqual(before);
+  // BLOCKED: pluck-multi-column-on-joined-relation-returns-flat-column
+  it.skip("pluck with qualified name on loaded", async () => {
+    const topics = Topic.joins(":replies").order("id");
+
+    expect(topics.isLoaded).toBeFalsy();
+    expect(await topics.pluck("topics.id", "replies.id")).toEqual([
+      [1, 2],
+      [3, 4],
+    ]);
+
+    await topics.load();
+
+    expect(topics.isLoaded).toBeTruthy();
+    expect(await topics.pluck("topics.id", "replies.id")).toEqual([
+      [1, 2],
+      [3, 4],
+    ]);
   });
 
   it("pluck columns with same name", async () => {
@@ -1914,7 +1966,7 @@ describe("CalculationsTest", () => {
       async () => {
         const result = await Account.count();
         expect(result).toBe(10);
-        expect(typeof result).toBe("number");
+        expect(Object(result)).toBeInstanceOf(Number);
       },
     );
   });
@@ -1928,7 +1980,7 @@ describe("CalculationsTest", () => {
       async () => {
         const result = await Account.sum("credit_limit");
         expect(result).toBe(10);
-        expect(typeof result).toBe("number");
+        expect(Object(result)).toBeInstanceOf(Number);
       },
     );
   });

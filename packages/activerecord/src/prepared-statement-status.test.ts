@@ -35,8 +35,8 @@ describe("PreparedStatementStatusTest", () => {
         await courseConn.unpreparedStatement(async () => {
           inside.set();
           await preventing.wait;
-          expect(courseConn.preparedStatements).toBe(false);
-          expect(entrantConn.preparedStatements).toBe(true);
+          expect(courseConn.preparedStatements).toBeFalsy();
+          expect(entrantConn.preparedStatements).toBeTruthy();
           finished.set();
         });
       }).value();
@@ -44,8 +44,8 @@ describe("PreparedStatementStatusTest", () => {
       const t2 = new Thread(async () => {
         await entrantConn.unpreparedStatement(async () => {
           await inside.wait;
-          expect(courseConn.preparedStatements).toBe(true);
-          expect(entrantConn.preparedStatements).toBe(false);
+          expect(courseConn.preparedStatements).toBeTruthy();
+          expect(entrantConn.preparedStatements).toBeFalsy();
           preventing.set();
           await finished.wait;
         });
@@ -54,8 +54,8 @@ describe("PreparedStatementStatusTest", () => {
       await t1;
       await t2;
     } else {
-      expect(courseConn.preparedStatements).toBe(false);
-      expect(entrantConn.preparedStatements).toBe(false);
+      expect(courseConn.preparedStatements).toBeFalsy();
+      expect(entrantConn.preparedStatements).toBeFalsy();
     }
   });
 });

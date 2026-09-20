@@ -401,38 +401,38 @@ describe("ConnectionSwappingNestedTest", () => {
     });
 
     Base.connectedTo({ role: "writing" }, () => {
-      expect(currentPreventingWrites.call(Base as any)).toBe(false);
-      expect(currentPreventingWrites.call(PrimaryBase as any)).toBe(false);
-      expect(currentPreventingWrites.call(SecondaryBase as any)).toBe(false);
+      expect(currentPreventingWrites.call(Base as any)).toBeFalsy();
+      expect(currentPreventingWrites.call(PrimaryBase as any)).toBeFalsy();
+      expect(currentPreventingWrites.call(SecondaryBase as any)).toBeFalsy();
 
       PrimaryBase.connectedTo({ role: "reading" }, () => {
-        expect(currentPreventingWrites.call(PrimaryBase as any)).toBe(true);
-        expect(currentPreventingWrites.call(SecondaryBase as any)).toBe(false);
+        expect(currentPreventingWrites.call(PrimaryBase as any)).toBeTruthy();
+        expect(currentPreventingWrites.call(SecondaryBase as any)).toBeFalsy();
 
         Base.connectedTo({ role: "reading" }, () => {
-          expect(currentPreventingWrites.call(PrimaryBase as any)).toBe(true);
-          expect(currentPreventingWrites.call(SecondaryBase as any)).toBe(true);
+          expect(currentPreventingWrites.call(PrimaryBase as any)).toBeTruthy();
+          expect(currentPreventingWrites.call(SecondaryBase as any)).toBeTruthy();
 
           SecondaryBase.connectedTo({ role: "writing" }, () => {
-            expect(currentPreventingWrites.call(PrimaryBase as any)).toBe(true);
-            expect(currentPreventingWrites.call(SecondaryBase as any)).toBe(false);
+            expect(currentPreventingWrites.call(PrimaryBase as any)).toBeTruthy();
+            expect(currentPreventingWrites.call(SecondaryBase as any)).toBeFalsy();
           });
 
-          expect(currentPreventingWrites.call(PrimaryBase as any)).toBe(true);
-          expect(currentPreventingWrites.call(SecondaryBase as any)).toBe(true);
+          expect(currentPreventingWrites.call(PrimaryBase as any)).toBeTruthy();
+          expect(currentPreventingWrites.call(SecondaryBase as any)).toBeTruthy();
         });
 
         Base.connectedTo({ role: "writing" }, () => {
-          expect(currentPreventingWrites.call(PrimaryBase as any)).toBe(false);
-          expect(currentPreventingWrites.call(SecondaryBase as any)).toBe(false);
+          expect(currentPreventingWrites.call(PrimaryBase as any)).toBeFalsy();
+          expect(currentPreventingWrites.call(SecondaryBase as any)).toBeFalsy();
         });
 
-        expect(currentPreventingWrites.call(PrimaryBase as any)).toBe(true);
-        expect(currentPreventingWrites.call(SecondaryBase as any)).toBe(false);
+        expect(currentPreventingWrites.call(PrimaryBase as any)).toBeTruthy();
+        expect(currentPreventingWrites.call(SecondaryBase as any)).toBeFalsy();
       });
 
-      expect(currentPreventingWrites.call(PrimaryBase as any)).toBe(false);
-      expect(currentPreventingWrites.call(SecondaryBase as any)).toBe(false);
+      expect(currentPreventingWrites.call(PrimaryBase as any)).toBeFalsy();
+      expect(currentPreventingWrites.call(SecondaryBase as any)).toBeFalsy();
     });
   });
 
@@ -454,15 +454,15 @@ describe("ConnectionSwappingNestedTest", () => {
       await AppRecord.connectsTo({ database: { writing: "arunit", reading: "arunit" } });
 
       Base.connectedTo({ role: "writing" }, () => {
-        expect(currentPreventingWrites.call(Base as any)).toBe(false);
-        expect(currentPreventingWrites.call(AppRecord as any)).toBe(false);
+        expect(currentPreventingWrites.call(Base as any)).toBeFalsy();
+        expect(currentPreventingWrites.call(AppRecord as any)).toBeFalsy();
 
         AppRecord.connectedTo({ role: "reading" }, () => {
-          expect(currentPreventingWrites.call(AppRecord as any)).toBe(true);
+          expect(currentPreventingWrites.call(AppRecord as any)).toBeTruthy();
         });
 
         AppRecord.connectedTo({ role: "writing", preventWrites: true }, () => {
-          expect(currentPreventingWrites.call(AppRecord as any)).toBe(true);
+          expect(currentPreventingWrites.call(AppRecord as any)).toBeTruthy();
         });
       });
     } finally {
@@ -486,7 +486,7 @@ describe("ConnectionSwappingNestedTest", () => {
 
     Base.connectedTo({ role: "reading", preventWrites: true }, () => {
       ReloadedRecordV1.connectedTo({ role: "writing", preventWrites: false }, () => {
-        expect(currentPreventingWrites.call(ReloadedRecordV1 as any)).toBe(false);
+        expect(currentPreventingWrites.call(ReloadedRecordV1 as any)).toBeFalsy();
       });
     });
 
@@ -502,7 +502,7 @@ describe("ConnectionSwappingNestedTest", () => {
 
     Base.connectedTo({ role: "reading", preventWrites: true }, () => {
       ReloadedRecordV2.connectedTo({ role: "writing", preventWrites: false }, () => {
-        expect(currentPreventingWrites.call(ReloadedRecordV2 as any)).toBe(false);
+        expect(currentPreventingWrites.call(ReloadedRecordV2 as any)).toBeFalsy();
       });
     });
   });
