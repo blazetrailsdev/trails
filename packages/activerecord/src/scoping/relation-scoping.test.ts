@@ -1,4 +1,9 @@
 import { describe, it, expect } from "vitest";
+import { ArgumentError } from "@blazetrails/activemodel";
+import { assertRaises, isBlank } from "@blazetrails/activesupport";
+import { isEmpty } from "@blazetrails/ruby-compat";
+import { captureSql } from "../testing/sql-capture.js";
+import { assertQueriesMatch } from "../testing/query-assertions.js";
 import { Base, Range, RecordNotFound, registerModel } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
 import {
@@ -50,7 +55,7 @@ describe("RelationScopingTest", () => {
       await author.reload();
       return author.firstPost;
     });
-    expect(post).not.toBeNull();
+    expect(post).toBeTruthy();
   });
 
   it("scope breaks caching on collections", async () => {
@@ -124,7 +129,7 @@ describe("RelationScopingTest", () => {
 
   it("scoped find", async () => {
     await Developer.where("name = 'David'").scoping(async () => {
-      await expect(Developer.find(1)).resolves.toBeTruthy();
+      await expect(Developer.find(1)).resolves.not.toThrow();
     });
   });
 
@@ -175,9 +180,7 @@ describe("RelationScopingTest", () => {
 
   it("scoped find all", async () => {
     await Developer.where("name = 'David'").scoping(async () => {
-      const all = await Developer.all();
-      expect(all.length).toBe(1);
-      expect(all[0].id).toBe(developers("david").id);
+      expect((await Developer.all()).map((d: any) => d.id)).toEqual([developers("david").id]);
     });
   });
 
@@ -185,7 +188,7 @@ describe("RelationScopingTest", () => {
     await Developer.select("id, name").scoping(async () => {
       const developer = (await Developer.where("name = 'David'").first()) as Developer;
       expect(developer.name).toBe("David");
-      expect(developer.hasAttribute("salary")).toBe(false);
+      expect(developer.hasAttribute("salary")).toBeFalsy();
     });
   });
 
@@ -195,9 +198,9 @@ describe("RelationScopingTest", () => {
         .where("name = 'David'")
         .first()) as Developer;
       expect(developer.salary).toBe(80000);
-      expect(developer.hasAttribute("id")).toBe(true);
-      expect(developer.hasAttribute("name")).toBe(true);
-      expect(developer.hasAttribute("salary")).toBe(true);
+      expect(developer.hasAttribute("id")).toBeTruthy();
+      expect(developer.hasAttribute("name")).toBeTruthy();
+      expect(developer.hasAttribute("salary")).toBeTruthy();
     });
   });
 
@@ -213,10 +216,11 @@ describe("RelationScopingTest", () => {
 
   it("scoped find with annotation", async () => {
     await Developer.annotate("scoped").scoping(async () => {
-      const sql = Developer.where("name = 'David'").toSql();
-      expect(sql).toContain("/* scoped */");
-      const developer = (await Developer.where("name = 'David'").first()) as Developer;
-      expect(developer.name).toBe("David");
+      let developer: Developer | null = null;
+      await assertQueriesMatch(/\/\* scoped \*\//, undefined, false, async () => {
+        developer = (await Developer.where("name = 'David'").first()) as Developer;
+      });
+      expect(developer!.name).toBe("David");
     });
   });
 
@@ -224,18 +228,31 @@ describe("RelationScopingTest", () => {
     await Developer.annotate("scoped")
       .unscoped()
       .scoping(async () => {
-        const sql = Developer.where("name = 'David'").toSql();
-        expect(sql).not.toContain("/* scoped */");
-        const developer = (await Developer.where("name = 'David'").first()) as Developer;
-        expect(developer.name).toBe("David");
+        let developer: Developer | null = null;
+        const log = await captureSql(async () => {
+          developer = (await Developer.where("name = 'David'").first()) as Developer;
+        });
+
+        expect(isEmpty(log)).toBeFalsy();
+        expect(isEmpty(log.filter((query) => /\/\* scoped \*\//.test(query)))).toBeTruthy();
+
+        expect(developer!.name).toBe("David");
       });
   });
 
   it("find with annotation unscope", async () => {
-    const rel = Developer.annotate("unscope").where("name = 'David'").unscope("annotate");
-    expect(rel.toSql()).not.toContain("/* unscope */");
-    const developer = (await rel.first()) as Developer;
-    expect(developer.name).toBe("David");
+    let developer: Developer | null = null;
+    const log = await captureSql(async () => {
+      developer = (await Developer.annotate("unscope")
+        .where("name = 'David'")
+        .unscope("annotate")
+        .first()) as Developer;
+    });
+
+    expect(isEmpty(log)).toBeFalsy();
+    expect(isEmpty(log.filter((query) => /\/\* unscope \*\//.test(query)))).toBeTruthy();
+
+    expect(developer!.name).toBe("David");
   });
 
   it("scoped find include", async () => {
@@ -256,6 +273,9 @@ describe("RelationScopingTest", () => {
     expect(scopedDevelopers.map((d: any) => d.id)).toContain(developers("david").id);
     expect(scopedDevelopers.map((d: any) => d.id)).not.toContain(developers("jamis").id);
     expect(scopedDevelopers.length).toBe(1);
+    expect((await Developer.find(developers("david").id)).attributes).toEqual(
+      scopedDevelopers[0].attributes,
+    );
   });
 
   it("scoped create with where", async () => {
@@ -317,7 +337,7 @@ describe("RelationScopingTest", () => {
         throw new Error("an exception");
       });
     } catch {}
-    expect(Developer.all().toSql()).not.toContain("name = 'Jamis'");
+    expect(Developer.all().toSql().includes("name = 'Jamis'")).toBeFalsy();
   });
 
   it("default scope filters on joins", async () => {
@@ -343,19 +363,19 @@ describe("RelationScopingTest", () => {
 
   it("current scope does not pollute sibling subclasses", async () => {
     await Comment.none().scoping(async () => {
-      expect((await SpecialComment.all()).length).toBe(0);
-      expect((await VerySpecialComment.all()).length).toBe(0);
-      expect((await SubSpecialComment.all()).length).toBe(0);
+      expect(await SpecialComment.all().isAny()).toBeFalsy();
+      expect(await VerySpecialComment.all().isAny()).toBeFalsy();
+      expect(await SubSpecialComment.all().isAny()).toBeFalsy();
     });
     await SpecialComment.none().scoping(async () => {
-      expect((await Comment.all()).length).toBeGreaterThan(0);
-      expect((await VerySpecialComment.all()).length).toBeGreaterThan(0);
-      expect((await SubSpecialComment.all()).length).toBe(0);
+      expect(await Comment.all().isAny()).toBeTruthy();
+      expect(await VerySpecialComment.all().isAny()).toBeTruthy();
+      expect(await SubSpecialComment.all().isAny()).toBeFalsy();
     });
     await SubSpecialComment.none().scoping(async () => {
-      expect((await Comment.all()).length).toBeGreaterThan(0);
-      expect((await VerySpecialComment.all()).length).toBeGreaterThan(0);
-      expect((await SpecialComment.all()).length).toBeGreaterThan(0);
+      expect(await Comment.all().isAny()).toBeTruthy();
+      expect(await VerySpecialComment.all().isAny()).toBeTruthy();
+      expect(await SpecialComment.all().isAny()).toBeTruthy();
     });
   });
 
@@ -415,14 +435,18 @@ describe("RelationScopingTest", () => {
   it("scoping applies to update with all queries", async () => {
     await Author.all().limit(5).updateAll({ organization_id: "agency_1" });
     const dev = (await Author.where({ organization_id: "agency_1" }).first()) as Author;
+
     await Author.where({ organization_id: "agency_1" }).scoping(async () => {
-      await (dev as any).update({ name: "Eileen" });
+      const updateSql = (await captureSql(() => (dev as any).update({ name: "Eileen" })))[0];
+      expect(updateSql).not.toMatch(/organization_id/);
     });
-    expect((await Author.find(dev.id)).name).toBe("Eileen");
+
     await Author.where({ organization_id: "agency_1" }).scoping({ allQueries: true }, async () => {
-      await (dev as any).update({ name: "Not Eileen" });
+      const updateScopedSql = (
+        await captureSql(() => (dev as any).update({ name: "Not Eileen" }))
+      )[1];
+      expect(updateScopedSql).toMatch(/organization_id/);
     });
-    expect((await Author.find(dev.id)).name).toBe("Not Eileen");
   });
 
   it("scoping applies to delete with all queries", async () => {
@@ -442,39 +466,64 @@ describe("RelationScopingTest", () => {
   it("scoping applies to reload with all queries", async () => {
     await Author.all().limit(5).updateAll({ organization_id: "agency_1" });
     const dev1 = (await Author.where({ organization_id: "agency_1" }).first()) as Base;
-    await Author.where({ organization_id: "no_match" }).scoping(async () => {
-      await (dev1 as any).reload();
-      expect(dev1.id).toBeTruthy();
+    await Author.where({ organization_id: "agency_1" }).scoping(async () => {
+      const reloadSql = (await captureSql(() => (dev1 as any).reload()))[0];
+      expect(reloadSql).not.toMatch(/organization_id/);
     });
-    await expect(
-      Author.where({ organization_id: "no_match" }).scoping({ allQueries: true }, async () => {
-        await (dev1 as any).reload();
-      }),
-    ).rejects.toThrow(RecordNotFound);
+
+    await Author.where({ organization_id: "agency_1" }).scoping({ allQueries: true }, async () => {
+      const scopedReloadSql = (await captureSql(() => (dev1 as any).reload()))[0];
+      expect(scopedReloadSql).toMatch(/organization_id/);
+    });
   });
 
   it("nested scoping applies with all queries set", async () => {
     await Author.all().limit(5).updateAll({ organization_id: "agency_1" });
     await Author.where({ organization_id: "agency_1" }).scoping({ allQueries: true }, async () => {
-      const first = await Author.first();
-      expect(first).not.toBeNull();
+      const selectSql = (
+        await captureSql(async () => {
+          await Author.first();
+        })
+      )[0];
+      expect(selectSql).toMatch(/organization_id/);
+
       await Author.where({ owned_essay_id: null }).scoping(async () => {
-        const second = await Author.first();
-        expect(second).not.toBeNull();
+        const secondSelectSql = (
+          await captureSql(async () => {
+            await Author.first();
+          })
+        )[0];
+        expect(secondSelectSql).toMatch(/organization_id/);
+        expect(secondSelectSql).toMatch(/owned_essay_id/);
       });
-      const third = await Author.first();
-      expect((third as any).id).toBe((first as any).id);
+
+      const thirdSelectSql = (
+        await captureSql(async () => {
+          await Author.first();
+        })
+      )[0];
+      expect(thirdSelectSql).toMatch(/organization_id/);
+      expect(thirdSelectSql).not.toMatch(/owned_essay_id/);
     });
   });
 
   it("raises error if all queries is set to false while nested", async () => {
     await Author.all().limit(5).updateAll({ organization_id: "agency_1" });
     await Author.where({ organization_id: "agency_1" }).scoping({ allQueries: true }, async () => {
-      const first = await Author.first();
-      expect(first).not.toBeNull();
-      expect(() =>
+      const selectSql = (
+        await captureSql(async () => {
+          await Author.first();
+        })
+      )[0];
+      expect(selectSql).toMatch(/organization_id/);
+
+      const error = await assertRaises([ArgumentError], {}, () =>
         Author.where({ organization_id: "agency_1" }).scoping({ allQueries: false }, () => {}),
-      ).toThrow("Scoping is set to apply to all queries and cannot be unset in a nested block.");
+      );
+
+      expect(error.message).toBe(
+        "Scoping is set to apply to all queries and cannot be unset in a nested block.",
+      );
     });
   });
 });
@@ -484,7 +533,7 @@ describe("NestedRelationScopingTest", () => {
     await Developer.where("salary = 80000").scoping(async () => {
       await Developer.limit(10).scoping(async () => {
         const sql = Developer.all().toSql();
-        expect(sql).toContain("salary = 80000");
+        expect(sql).toMatch("(salary = 80000)");
         expect(sql).toMatch(/LIMIT 10|ROWNUM <= 10|FETCH FIRST 10 ROWS ONLY/);
       });
     });
@@ -548,7 +597,7 @@ describe("NestedRelationScopingTest", () => {
         .createWith({ post_id: 1 })
         .scoping(async () => {
           const blank = Comment.all().build({}) as any;
-          expect(blank.body).toBeFalsy();
+          expect(isBlank(blank.body)).toBeTruthy();
           return Comment.create({ body: "Hey guys" });
         }),
     );
@@ -621,16 +670,20 @@ describe("HasManyScopingTest", () => {
     const welcome = (await Post.find(1)) as Base;
     await (welcome as any).comments.updateAll({ author_id: 1 });
 
-    const baseline = await (await (welcome as any).comments.reload()).toArray();
-    expect(baseline.length).toBeGreaterThan(0);
+    const commentsSql = (await captureSql(() => (welcome as any).comments.toArray())).at(-1);
+    expect(commentsSql).not.toMatch(/author_id/);
 
-    await Comment.where({ author_id: 2 }).scoping({ allQueries: true }, async () => {
-      const scoped = await (await (welcome as any).comments.reload()).toArray();
-      expect(scoped.length).toBe(0);
+    await Comment.where({ author_id: 1 }).scoping({ allQueries: true }, async () => {
+      const scopedCommentsSql = (
+        await captureSql(async () => (await (welcome as any).comments.reload()).toArray())
+      ).at(-1);
+      expect(scopedCommentsSql).toMatch(/author_id/);
     });
 
-    const after = await (await (welcome as any).comments.reload()).toArray();
-    expect(after.length).toBe(baseline.length);
+    const unscopedCommentsSql = (
+      await captureSql(async () => (await (welcome as any).comments.reload()).toArray())
+    ).at(-1);
+    expect(unscopedCommentsSql).not.toMatch(/author_id/);
   });
 });
 

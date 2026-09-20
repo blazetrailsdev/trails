@@ -1,4 +1,5 @@
 import { ArgumentError } from "@blazetrails/activemodel";
+import { assertDifference, assertEmpty, assertNotEmpty } from "@blazetrails/activesupport";
 import { describe, it, expect } from "vitest";
 import { Nodes } from "@blazetrails/arel";
 import { Temporal } from "@blazetrails/date";
@@ -373,6 +374,14 @@ describe("DefaultScopingTest", () => {
       ).unscope({ where: "name" }),
     );
     expect(received6.sort()).toEqual(expected6.sort());
+
+    const expected7 = names(await Developer.order("salary DESC"));
+    const received7 = names(
+      await DeveloperOrderedBySalary.where(
+        Developer.arelTable.get("name").eq("David") as any,
+      ).unscope({ where: "name" }),
+    );
+    expect(received7.sort()).toEqual(expected7.sort());
   });
 
   it("unscope multiple where clauses", async () => {
@@ -495,6 +504,13 @@ describe("DefaultScopingTest", () => {
     expect((await DeveloperCalledJamis.unscoped()).length).toBe(11);
     expect((await (DeveloperCalledJamis as any).poor().toArray()).length).toBe(1);
     expect((await (DeveloperCalledJamis.unscoped() as any).poor().toArray()).length).toBe(10);
+    expect(
+      (
+        await DeveloperCalledJamis.unscoped(async () =>
+          (DeveloperCalledJamis as any).poor().toArray(),
+        )
+      ).length,
+    ).toBe(10);
   });
 
   it("default scope select ignored by aggregations", async () => {
@@ -508,7 +524,7 @@ describe("DefaultScopingTest", () => {
   });
 
   it("default scope find last", async () => {
-    expect(await DeveloperOrderedBySalary.count()).toBeGreaterThan(1);
+    expect(((await DeveloperOrderedBySalary.count()) as number) > 1).toBeTruthy();
     const lowest = (await DeveloperOrderedBySalary.find(developers("poor_jamis").id)) as any;
     expect(((await DeveloperOrderedBySalary.last()) as any).id).toBe(lowest.id);
   });
@@ -672,14 +688,25 @@ describe("DefaultScopingTest", () => {
       .new();
     expect(aaron.salary).toBe(20);
     expect(aaron.name).toBe("Aaron");
+
+    const aaron2 = (PoorDeveloperCalledJamis.createWith({ name: "foo", salary: 20 }) as any)
+      .createWith({ name: "Aaron" })
+      .new();
+    expect(aaron2.salary).toBe(20);
+    expect(aaron2.name).toBe("Aaron");
   });
 
   it("create with nested attributes", async () => {
-    const before = (await Project.count()) as number;
-    await (Developer.createWith({ projectsAttributes: [{ name: "p1" }] }) as any).scoping(() =>
-      Developer.create({ name: "Aaron" }),
+    await assertDifference(
+      () => Project.count() as Promise<number>,
+      1,
+      null,
+      async () => {
+        await (Developer.createWith({ projectsAttributes: [{ name: "p1" }] }) as any).scoping(() =>
+          Developer.create({ name: "Aaron" }),
+        );
+      },
     );
-    expect(await Project.count()).toBe(before + 1);
   });
 
   it("default scope with all queries runs on update columns", async () => {
@@ -762,8 +789,8 @@ describe("DefaultScopingTest", () => {
 
   it("unscope merging", () => {
     const merged = Developer.where({ name: "Jamis" }).merge(Developer.unscope("where"));
-    expect((merged as any).whereClause.isEmpty()).toBe(true);
-    expect((merged.where({ name: "Jon" }) as any).whereClause.isEmpty()).toBe(false);
+    assertEmpty((merged as any).whereClause);
+    assertNotEmpty((merged.where({ name: "Jon" }) as any).whereClause);
   });
 
   it("order to unscope reordering", () => {
