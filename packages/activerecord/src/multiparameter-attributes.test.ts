@@ -15,9 +15,6 @@ import { Address, Customer } from "./test-helpers/models/customer.js";
 
 const utc = (v: RubyTime) => v.getutc().toTime();
 
-const attributeOf = (ex: Error): string | undefined =>
-  ((ex as MultiparameterAssignmentErrors).errors[0] as AttributeAssignmentError).attribute;
-
 describe("MultiParameterAttributeTest", () => {
   fixtures(["topics"]);
 
@@ -125,7 +122,7 @@ describe("MultiParameterAttributeTest", () => {
   });
 
   it("multiparameter attributes on time with no date", async () => {
-    const ex = await assertRaise([MultiparameterAssignmentErrors], {}, async () => {
+    const ex = (await assertRaise([MultiparameterAssignmentErrors], {}, async () => {
       const attributes = {
         "written_on(4i)": "16",
         "written_on(5i)": "24",
@@ -133,12 +130,12 @@ describe("MultiParameterAttributeTest", () => {
       };
       const topic = await Topic.find(1);
       await topic.assignAttributes(attributes);
-    });
-    expect(attributeOf(ex)).toBe("written_on");
+    })) as MultiparameterAssignmentErrors;
+    expect((ex.errors[0] as AttributeAssignmentError).attribute).toBe("written_on");
   });
 
   it("multiparameter attributes on time with invalid time params", async () => {
-    const ex = await assertRaise([MultiparameterAssignmentErrors], {}, async () => {
+    const ex = (await assertRaise([MultiparameterAssignmentErrors], {}, async () => {
       const attributes = {
         "written_on(1i)": "2004",
         "written_on(2i)": "6",
@@ -149,8 +146,8 @@ describe("MultiParameterAttributeTest", () => {
       };
       const topic = await Topic.find(1);
       await topic.assignAttributes(attributes);
-    });
-    expect(attributeOf(ex)).toBe("written_on");
+    })) as MultiparameterAssignmentErrors;
+    expect((ex.errors[0] as AttributeAssignmentError).attribute).toBe("written_on");
   });
 
   it("multiparameter attributes on time with old date", async () => {
@@ -167,19 +164,19 @@ describe("MultiParameterAttributeTest", () => {
   });
 
   it("multiparameter attributes on time will raise on big time if missing date parts", async () => {
-    const ex = await assertRaise([MultiparameterAssignmentErrors], {}, async () => {
+    const ex = (await assertRaise([MultiparameterAssignmentErrors], {}, async () => {
       const attributes = {
         "written_on(4i)": "16",
         "written_on(5i)": "24",
       };
       const topic = await Topic.find(1);
       await topic.assignAttributes(attributes);
-    });
-    expect(attributeOf(ex)).toBe("written_on");
+    })) as MultiparameterAssignmentErrors;
+    expect((ex.errors[0] as AttributeAssignmentError).attribute).toBe("written_on");
   });
 
   it("multiparameter attributes on time with raise on small time if missing date parts", async () => {
-    const ex = await assertRaise([MultiparameterAssignmentErrors], {}, async () => {
+    const ex = (await assertRaise([MultiparameterAssignmentErrors], {}, async () => {
       const attributes = {
         "written_on(4i)": "16",
         "written_on(5i)": "12",
@@ -187,8 +184,8 @@ describe("MultiParameterAttributeTest", () => {
       };
       const topic = await Topic.find(1);
       await topic.assignAttributes(attributes);
-    });
-    expect(attributeOf(ex)).toBe("written_on");
+    })) as MultiparameterAssignmentErrors;
+    expect((ex.errors[0] as AttributeAssignmentError).attribute).toBe("written_on");
   });
 
   it.skip("multiparameter attributes on time will ignore hour if missing", async () => {
@@ -483,8 +480,10 @@ describe("MultiParameterAttributeTest", () => {
   });
 
   it("multiparameter attributes setting time but not date on date field", async () => {
-    await assertRaise([MultiparameterAssignmentErrors], {}, () =>
-      new Topic().setAttributes({ "written_on(4i)": "13", "written_on(5i)": "55" }),
+    await assertRaise(
+      [MultiparameterAssignmentErrors],
+      {},
+      () => new Topic({ "written_on(4i)": "13", "written_on(5i)": "55" }),
     );
   });
 
@@ -514,13 +513,13 @@ describe("MultiParameterAttributeTest", () => {
 
   it.skip("multiparameter assignment of aggregation with missing values", async () => {
     // BLOCKED: composed-of-multiparameter-assignment-does-not-raise-on-bad-arity
-    const ex = await assertRaise([MultiparameterAssignmentErrors], {}, async () => {
+    const ex = (await assertRaise([MultiparameterAssignmentErrors], {}, async () => {
       const customer = new Customer();
       const address = new Address("The Street", "The City", "The Country");
       const attributes = { "address(2)": address.city, "address(3)": address.country };
       await customer.assignAttributes(attributes);
-    });
-    expect(attributeOf(ex)).toBe("address");
+    })) as MultiparameterAssignmentErrors;
+    expect((ex.errors[0] as AttributeAssignmentError).attribute).toBe("address");
   });
 
   it("multiparameter assignment of aggregation with blank values", async () => {
@@ -532,12 +531,14 @@ describe("MultiParameterAttributeTest", () => {
       "address(3)": address.country,
     };
     await customer.assignAttributes(attributes);
-    expect(customer.address).toEqual(new Address(null as never, "The City", "The Country"));
+    expect(customer.address).toEqual(
+      new Address(null as unknown as string, "The City", "The Country"),
+    );
   });
 
   it.skip("multiparameter assignment of aggregation with large index", async () => {
     // BLOCKED: composed-of-multiparameter-assignment-does-not-raise-on-bad-arity
-    const ex = await assertRaise([MultiparameterAssignmentErrors], {}, async () => {
+    const ex = (await assertRaise([MultiparameterAssignmentErrors], {}, async () => {
       const customer = new Customer();
       const address = new Address("The Street", "The City", "The Country");
       const attributes = {
@@ -546,9 +547,9 @@ describe("MultiParameterAttributeTest", () => {
         "address(3000)": address.country,
       };
       await customer.assignAttributes(attributes);
-    });
+    })) as MultiparameterAssignmentErrors;
 
-    expect(attributeOf(ex)).toBe("address");
+    expect((ex.errors[0] as AttributeAssignmentError).attribute).toBe("address");
   });
 
   it("multiparameter assigned attributes did not come from user", () => {

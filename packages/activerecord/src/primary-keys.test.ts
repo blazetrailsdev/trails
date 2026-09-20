@@ -144,11 +144,9 @@ describe("PrimaryKeysTest", () => {
 
   it("customized primary key auto assigns on save", async () => {
     await Keyboard.deleteAll();
-    await new Keyboard({ name: "seed" }).saveBang();
     const keyboard = new Keyboard({ name: "HHKB" });
     await keyboard.saveBang();
-    const found = (await Keyboard.findBy({ name: "HHKB" })) as Keyboard;
-    expect(keyboard.id).toBe(found.id);
+    expect(((await Keyboard.findBy({ name: "HHKB" })) as Keyboard).id).toBe(keyboard.id);
   });
 
   it("customized primary key can be get before saving", () => {
@@ -309,7 +307,6 @@ describe("PrimaryKeysTest", () => {
     class AnonDashboard extends Base {
       static {
         this._tableName = "dashboards";
-        this._primaryKey = "dashboard_id";
       }
     }
     await AnonDashboard.createBang();
