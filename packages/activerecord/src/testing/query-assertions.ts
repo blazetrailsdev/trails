@@ -73,7 +73,7 @@ export async function assertNoQueries(
 }
 
 export async function assertQueriesMatch(
-  match: RegExp,
+  match: RegExp | string,
   count: number | undefined,
   includeSchema = false,
   fn: () => void | Promise<void>,
@@ -83,10 +83,11 @@ export async function assertQueriesMatch(
     await fn();
     const queries = includeSchema ? counter.logAll : counter.log;
     const matchedQueries = queries.filter((query) => {
+      if (typeof match === "string") return match === query;
       match.lastIndex = 0;
       return match.test(query);
     });
-    match.lastIndex = 0;
+    if (typeof match !== "string") match.lastIndex = 0;
 
     if (count !== undefined) {
       if (matchedQueries.length !== count) {
@@ -105,7 +106,7 @@ export async function assertQueriesMatch(
 }
 
 export async function assertNoQueriesMatch(
-  match: RegExp,
+  match: RegExp | string,
   includeSchema = false,
   fn: () => void | Promise<void>,
 ): Promise<void> {

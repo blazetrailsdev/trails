@@ -177,7 +177,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         const expected = `ALTER TABLE \`people\` ADD ${type} INDEX \`index_people_on_last_name\` (\`last_name\`)`;
         await captureSql(
           () =>
-            assertQueriesMatch(new RegExp(expected), undefined, false, () =>
+            assertQueriesMatch(expected, undefined, false, () =>
               adapter.changeTable("people", { bulk: true }, (t) => {
                 return t.index("last_name", { type });
               }),
@@ -190,7 +190,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         "ALTER TABLE `people` ADD INDEX `index_people_on_last_name` USING btree (`last_name`(10)), ALGORITHM = COPY";
       await captureSql(
         () =>
-          assertQueriesMatch(new RegExp(expected), undefined, false, () =>
+          assertQueriesMatch(expected, undefined, false, () =>
             adapter.changeTable("people", { bulk: true }, (t) => {
               return t.index("last_name", { length: 10, using: "btree", algorithm: "copy" });
             }),
