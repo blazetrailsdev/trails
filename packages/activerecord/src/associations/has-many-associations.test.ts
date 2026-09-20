@@ -39,9 +39,11 @@ import { assertDifference, assertNothingRaised } from "@blazetrails/activesuppor
 
 import { fixtures } from "../test-fixtures.js";
 
-beforeEach(() => {
-  Client.destroyedClientIds.clear();
-});
+function setup(): void {
+  beforeEach(() => {
+    Client.destroyedClientIds.clear();
+  });
+}
 
 import "../support/canonical-model-index.js";
 import {
@@ -180,6 +182,7 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
 
 describe("HasManyAssociationsTest", () => {
   const { companies } = fixtures(["companies", "accounts"]);
+  setup();
 
   beforeAll(async () => {
     registerModel(Company);
@@ -433,6 +436,7 @@ describe("HasManyAssociationsTest", () => {
     "taggings",
     "people",
   ]);
+  setup();
 
   beforeAll(async () => {
     registerModel(HmPost);
@@ -537,6 +541,7 @@ describe("HasManyAssociationsTest", () => {
 
 describe("HasManyAssociationsTest", () => {
   const { companies } = fixtures(["companies", "accounts"]);
+  setup();
   beforeAll(async () => {
     await Company.loadSchema();
     await Account.loadSchema();
@@ -638,6 +643,7 @@ describe("HasManyAssociationsTest", () => {
 
 describe("HasManyAssociationsTest", () => {
   const { companies } = fixtures(["companies", "developers", "projects", "developersProjects"]);
+  setup();
   beforeAll(async () => {
     await Company.loadSchema();
     await Developer.loadSchema();
@@ -914,6 +920,7 @@ describe("HasManyAssociationsTest", () => {
 
 describe("HasManyAssociationsTest", () => {
   fixtures([]);
+  setup();
 
   it("delete all with not yet loaded association collection", async () => {
     class DeleteAllUnloadedAuthor extends Base {
@@ -1105,6 +1112,7 @@ describe("HasManyAssociationsTest", () => {
 
 describe("HasManyAssociationsTest", () => {
   const { companies } = fixtures(["companies"]);
+  setup();
   beforeAll(async () => {
     void Car.resetColumnInformation();
     void Bulb.resetColumnInformation();
@@ -1206,6 +1214,7 @@ describe("HasManyAssociationsTest", () => {
 
 describe("HasManyAssociationsTest", () => {
   const { companies } = fixtures(["companies"]);
+  setup();
   beforeAll(async () => {
     await Company.loadSchema();
     await HmPost.loadSchema();
@@ -1282,6 +1291,7 @@ describe("HasManyAssociationsTest", () => {
 
 describe("HasManyAssociationsTest", () => {
   fixtures([]);
+  setup();
 
   beforeAll(async () => {
     await Developer.loadSchema();
@@ -5217,6 +5227,7 @@ describe("HasManyAssociationsTest", () => {
 
 describe("HasManyAssociationsTest", () => {
   const { posts } = fixtures(["posts", "tags", "taggings"]);
+  setup();
 
   beforeAll(async () => {
     registerModel(HmPost);
@@ -5246,6 +5257,7 @@ describe("HasManyAssociationsTest", () => {
 
 describe("HasManyAssociationsTest", () => {
   fixtures([]);
+  setup();
 
   beforeAll(() => {
     registerModel(HmAuthor);
@@ -5301,6 +5313,7 @@ describe("HasManyAssociationsTest", () => {
 
 describe("HasManyAssociationsTest", () => {
   fixtures([]);
+  setup();
   beforeAll(async () => {
     registerModel(HmCar);
     registerModel(HmBulb);
@@ -5359,6 +5372,7 @@ describe("HasManyAssociationsTest", () => {
 
 describe("HasManyAssociationsTest", () => {
   const { authors } = fixtures(["authors", "posts", "people", "readers"]);
+  setup();
 
   beforeAll(async () => {
     registerModel(HmAuthor);
@@ -5450,6 +5464,7 @@ describe("HasManyAssociationsTest", () => {
     "cars",
     "bulbs",
   ]);
+  setup();
 
   beforeAll(() => {
     registerModel(Company);
@@ -5779,6 +5794,7 @@ describe("AsyncHasManyAssociationsTest", () => {
 
 describe("HasManyAssociationsTest", () => {
   const { companies, topics } = fixtures(["companies", "accounts", "topics"]);
+  setup();
 
   beforeAll(() => {
     registerModel(Company);
@@ -5949,6 +5965,7 @@ describe("HasManyAssociationsTest", () => {
 
 describe("HasManyAssociationsTest", () => {
   const { cars, posts } = fixtures(["cars", "topics", "ships", "treasures", "posts", "comments"]);
+  setup();
 
   beforeAll(() => {
     registerModel(HmCar);
@@ -6047,6 +6064,7 @@ describe("HasManyAssociationsTest", () => {
 
 describe("HasManyAssociationsTest", () => {
   fixtures([]);
+  setup();
 
   it("deleting composite-key records scopes by tuple, not cartesian product", async () => {
     registerModel([CpkOrder, CpkBook]);
@@ -6086,6 +6104,7 @@ describe("HasManyAssociationsTest", () => {
     "shardedBlogPosts",
     "shardedComments",
   ]);
+  setup();
 
   beforeAll(async () => {
     const cpk = await import("../test-helpers/models/cpk.js");
@@ -6139,6 +6158,7 @@ describe("HasManyAssociationsTest", () => {
 
 describe("HasManyAssociationsTest", () => {
   const { categories } = fixtures(["categories", "categorizations"]);
+  setup();
 
   beforeAll(() => {
     registerModel(Category);
@@ -6173,6 +6193,7 @@ describe("HasManyAssociationsTest", () => {
     post_comments_counts: [PostCommentsCount, {}],
     comment_overlapping_counter_caches: [CommentOverlappingCounterCache, {}],
   });
+  setup();
 
   beforeAll(() => {
     registerModel(CommentOverlappingCounterCache);
