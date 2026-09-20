@@ -9,7 +9,8 @@
  *   `<=>`-comparable value. Temporal-typed ranges live elsewhere.
  */
 
-import { cmp } from "./comparable.js";
+import { ArgumentError } from "./argument-error.js";
+import { cmp, rbCmpint } from "./comparable.js";
 import { succ } from "./string/succ.js";
 import { rbEqual } from "./rb-equal.js";
 
@@ -26,6 +27,38 @@ function rLess(a: unknown, b: unknown): number {
   const r = cmp(a, b);
   if (r === null) return INT_MAX;
   return r;
+}
+
+/**
+ * `vendor/ruby/range.c:369` `check_step_domain`. The comparison goes through
+ * `rb_cmpint` (`vendor/ruby/bignum.c:2959`), NOT through {@link rLess}: a step
+ * that cannot be placed against 0 — `Float::NAN` — has a nil `<=>`, and
+ * `rb_cmpint` raises `ArgumentError` for it where `r_less` would answer
+ * `INT_MAX` and let it through. MRI: `(1..5).step(Float::NAN)` raises
+ * `comparison of Float with 0 failed`.
+ */
+function checkStepDomain(step: number): void {
+  const c = rbCmpint(cmp(step, 0), step, 0);
+  if (c < 0) throw new ArgumentError("step can't be negative");
+  if (c === 0) throw new ArgumentError("step can't be 0");
+}
+
+/**
+ * `rb_funcall(v, id_succ, 0, 0)` as `range_step` and `range_each` reach it
+ * (`vendor/ruby/range.c:556`). Ruby dispatches `succ` on the object; JS has no
+ * such method on the built-ins a Range is built over, so the discrete types
+ * trails ranges actually carry are spelled out. `Date#succ` is +1 day
+ * (`vendor/ruby/ext/date/date_core.c` `d_lite_next`).
+ *
+ * A type with no `succ` is Ruby's `!discrete_object_p` arm, which raises
+ * `TypeError: can\'t iterate from <class>`.
+ */
+function objSucc<T>(v: T): T {
+  if (typeof v === "string") return succ(v) as T;
+  if (typeof v === "number") return (v + 1) as T;
+  const o = v as { add?: (d: { days: number }) => T };
+  if (typeof o?.add === "function") return o.add({ days: 1 });
+  throw new TypeError(`can't iterate from ${(v as object)?.constructor?.name ?? String(v)}`);
 }
 
 /**
@@ -216,6 +249,28 @@ export class Range<T = unknown> {
 
   /** `vendor/ruby/range.c:439` `range_step`. */
   *step(n: number = 1): Generator<T> {
+    checkStepDomain(n);
+
+    if (typeof this.begin !== "number" && this.begin !== null) {
+      /* `step_i_iter` (`vendor/ruby/range.c:312-325`) counts DOWN from `iter[0]`,
+         which `range_step` seeds at 1 (`:465`), and reseeds it to `step` on each
+         yield. So the first element always yields, and a fractional step never
+         lands on 0 again — which is exactly what MRI does here. */
+      let iter = 1;
+      let v = this.begin as T;
+      while (
+        this.end === null ||
+        (this.excludeEnd ? rLess(v, this.end) < 0 : rLess(v, this.end) <= 0)
+      ) {
+        if (--iter === 0) {
+          yield v;
+          iter = n;
+        }
+        v = objSucc(v);
+      }
+      return;
+    }
+
     let current = this.first() as number;
     while (true) {
       if (this.end !== null) {

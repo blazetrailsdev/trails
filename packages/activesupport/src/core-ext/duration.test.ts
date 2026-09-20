@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Duration, Scalar, days } from "../duration.js";
-import { cmp, rbEqual, rbInspect as inspect } from "@blazetrails/ruby-compat";
+import { cmp, rbEqual, rbInspect as inspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { assertNothingRaised, assertRaise, assertRaises } from "../testing/assertions.js";
 import { TimeWithZone } from "../time-with-zone.js";
 import { TimeZone } from "../values/time-zone.js";
@@ -16,6 +16,14 @@ import { current, minusWithDuration, plusWithDuration } from "./date/calculation
 
 function asDate(instant: Temporal.Instant): Date {
   return new Date(instant.epochMilliseconds);
+}
+
+function assertRespondTo(obj: unknown, method: string): void {
+  expect(rbObjRespondTo(obj, method)).toBe(true);
+}
+
+function assertNotInstanceOf(cls: abstract new (...args: never[]) => unknown, obj: unknown): void {
+  expect(obj).not.toBeInstanceOf(cls);
 }
 
 describe("DurationTest", () => {
@@ -128,6 +136,7 @@ describe("DurationTest", () => {
     expect(Duration.fortnight(1).inspect()).toEqual("2 weeks");
     expect(new Scalar(10).modulo(Duration.seconds(5)).inspect()).toEqual("0 seconds");
     expect(Duration.minutes(10).plus(Duration.seconds(0)).inspect()).toEqual("10 minutes");
+    expect(Duration.day(1).dividedBy(24).inspect()).toEqual("3600 seconds");
   });
 
   it("inspect ignores locale", () => {
@@ -348,9 +357,9 @@ describe("DurationTest", () => {
       .spyOn(clock, "now")
       .mockReturnValue(Temporal.Instant.fromEpochMilliseconds(new Date(2000, 0, 1).getTime()));
     try {
-      expect(Duration.seconds(5).since()).not.toBeInstanceOf(TimeWithZone);
+      assertNotInstanceOf(TimeWithZone, Duration.seconds(5).since());
       expect(Duration.seconds(5).since()).toEqual(RubyTime.local(2000, 1, 1, 0, 0, 5));
-      expect(Duration.seconds(5).ago()).not.toBeInstanceOf(TimeWithZone);
+      assertNotInstanceOf(TimeWithZone, Duration.seconds(5).ago());
       expect(Duration.seconds(5).ago()).toEqual(RubyTime.local(1999, 12, 31, 23, 59, 55));
     } finally {
       now.mockRestore();
@@ -448,9 +457,8 @@ describe("DurationTest", () => {
   });
 
   it("respond to", () => {
-    const d = Duration.days(1);
-    expect(typeof d.since).toBe("function");
-    expect(d.inSeconds() === 0).toBe(false);
+    assertRespondTo(Duration.day(1), "since");
+    assertRespondTo(Duration.day(1), "isZero");
   });
 
   it("hash", () => {

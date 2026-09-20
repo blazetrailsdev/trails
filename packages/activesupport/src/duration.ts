@@ -11,6 +11,10 @@ import { cmp, equals as cmpEquals, rbEqual, rbObjClass, rubyClass } from "@blaze
 import { instantFrom } from "./temporal.js";
 import { advance as dateAdvance, since as dateSince } from "./core-ext/date/calculations.js";
 import {
+  advance as datetimeAdvance,
+  since as datetimeSince,
+} from "./core-ext/date-time/calculations.js";
+import {
   advance as timeAdvance,
   current as timeCurrent,
   since as timeSince,
@@ -211,8 +215,8 @@ export class Duration {
   dividedBy(other: Duration | Scalar | number): Duration | number {
     if (other instanceof Scalar) {
       return new Duration(
-        this.value / other.value,
-        this.transformValues((number) => number / other.value),
+        numericDiv(this.value, other.value),
+        this.transformValues((number) => numericDiv(number, other.value)),
         this._variable,
       );
     }
@@ -221,8 +225,8 @@ export class Duration {
     }
     if (typeof other === "number") {
       return new Duration(
-        this.value / other,
-        this.transformValues((number) => number / other),
+        numericDiv(this.value, other),
+        this.transformValues((number) => numericDiv(number, other)),
         this._variable,
       );
     }
@@ -258,6 +262,26 @@ export class Duration {
 
   toI(): number {
     return Math.trunc(this.inSeconds());
+  }
+
+  toF(): number {
+    return this.value;
+  }
+
+  isPositive(): boolean {
+    return this.value > 0;
+  }
+
+  isNegative(): boolean {
+    return this.value < 0;
+  }
+
+  isZero(): boolean {
+    return this.value === 0;
+  }
+
+  abs(): number {
+    return Math.abs(this.value);
   }
 
   inSeconds(): number {
@@ -404,6 +428,7 @@ export class Duration {
         time instanceof Temporal.Instant ||
         time instanceof Temporal.PlainDate ||
         time instanceof RubyTime ||
+        isDateTime(time) ||
         (time != null && time.actsLikeTime?.() === true)
       )
     ) {
@@ -413,12 +438,13 @@ export class Duration {
     if (isEmpty(this._partKeys)) {
       if (time instanceof Temporal.PlainDate) return dateSince(time, sign * this.inSeconds());
       if (time instanceof RubyTime) return timeSince.call(time, sign * this.inSeconds());
+      if (isDateTime(time)) return datetimeSince(time, sign * this.inSeconds());
       if (!(time instanceof Date || time instanceof Temporal.Instant))
         return time.since(sign * this.inSeconds());
       return applyDurationPreservingNs(time, this.parts, sign);
     }
 
-    if (!(time instanceof Date || time instanceof Temporal.Instant))
+    if (isDateTime(time) || !(time instanceof Date || time instanceof Temporal.Instant))
       return applyDurationToDate(time, this.parts, this._partKeys, sign);
     return applyDurationPreservingNs(time, this.parts, sign);
   }
@@ -514,8 +540,15 @@ export function years(n: number): Duration {
   return Duration.years(n);
 }
 
-type DurationReceiver = Date | Temporal.Instant | Temporal.PlainDate | TimeWithZone | RubyTime;
-type DurationResult = Temporal.Instant | Temporal.PlainDate | TimeWithZone | RubyTime;
+type DateTime = Temporal.PlainDateTime | Temporal.ZonedDateTime;
+type DurationReceiver =
+  | Date
+  | Temporal.Instant
+  | Temporal.PlainDate
+  | DateTime
+  | TimeWithZone
+  | RubyTime;
+type DurationResult = Temporal.Instant | Temporal.PlainDate | DateTime | TimeWithZone | RubyTime;
 
 function toDateInput(date: Date | Temporal.Instant): Date {
   if (date instanceof Date) return date;
@@ -523,13 +556,18 @@ function toDateInput(date: Date | Temporal.Instant): Date {
   throw new TypeError(`expected a time or date, got ${JSON.stringify(date)}`);
 }
 
+function numericDiv(a: number, b: number): number {
+  if (Number.isInteger(a) && Number.isInteger(b) && b !== 0) return Math.floor(a / b);
+  return a / b;
+}
+
 function applyDurationToDate(
-  date: Temporal.PlainDate | TimeWithZone | RubyTime,
+  date: Temporal.PlainDate | DateTime | TimeWithZone | RubyTime,
   parts: DurationParts,
   partKeys: readonly (keyof DurationParts)[],
   sign: 1 | -1,
-): Temporal.PlainDate | TimeWithZone | RubyTime {
-  let time: Temporal.PlainDate | TimeWithZone | RubyTime = date;
+): Temporal.PlainDate | DateTime | TimeWithZone | RubyTime {
+  let time: Temporal.PlainDate | DateTime | TimeWithZone | RubyTime = date;
 
   for (const type of partKeys) {
     const number = parts[type];
@@ -548,21 +586,27 @@ function applyDurationToDate(
   return time;
 }
 
+function isDateTime(t: unknown): t is Temporal.PlainDateTime | Temporal.ZonedDateTime {
+  return t instanceof Temporal.PlainDateTime || t instanceof Temporal.ZonedDateTime;
+}
+
 function dateOrTimeSince(
-  t: Temporal.PlainDate | TimeWithZone | RubyTime,
+  t: Temporal.PlainDate | DateTime | TimeWithZone | RubyTime,
   seconds: number,
-): TimeWithZone | RubyTime {
+): DateTime | TimeWithZone | RubyTime {
   if (t instanceof Temporal.PlainDate) return dateSince(t, seconds);
   if (t instanceof RubyTime) return timeSince.call(t, seconds);
+  if (isDateTime(t)) return datetimeSince(t, seconds);
   return t.since(seconds);
 }
 
 function dateOrTimeAdvance(
-  t: Temporal.PlainDate | TimeWithZone | RubyTime,
+  t: Temporal.PlainDate | DateTime | TimeWithZone | RubyTime,
   options: Partial<DurationParts>,
-): Temporal.PlainDate | TimeWithZone | RubyTime {
+): Temporal.PlainDate | DateTime | TimeWithZone | RubyTime {
   if (t instanceof Temporal.PlainDate) return dateAdvance(t, options);
   if (t instanceof RubyTime) return timeAdvance.call(t, options);
+  if (isDateTime(t)) return datetimeAdvance(t, options);
   return t.advance(options);
 }
 

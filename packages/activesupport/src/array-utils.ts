@@ -82,15 +82,15 @@ export function toSentence(
     }
   }
   for (const [k, v] of Object.entries(options)) {
-    if (v !== undefined) defaultConnectors[k] = v as string;
+    if (v !== undefined) defaultConnectors[k] = (v ?? "") as string;
   }
   const { wordsConnector, twoWordsConnector, lastWordConnector } = defaultConnectors;
 
   if (array.length === 0) return "";
-  if (array.length === 1) return array[0];
-  if (array.length === 2) return array[0] + twoWordsConnector + array[1];
+  if (array.length === 1) return `${array[0]}`;
+  if (array.length === 2) return `${array[0]}${twoWordsConnector}${array[1]}`;
 
-  return array.slice(0, -1).join(wordsConnector) + lastWordConnector + array[array.length - 1];
+  return `${array.slice(0, -1).join(wordsConnector)}${lastWordConnector}${array[array.length - 1]}`;
 }
 
 export function inGroups<T>(
