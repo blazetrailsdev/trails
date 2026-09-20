@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
+  assert,
+  assertNot,
+  assertPredicate,
+  assertNotPredicate,
   asJson as objectAsJson,
   include,
   prepend,
@@ -149,11 +153,11 @@ describe("DirtyTest", () => {
   });
 
   it("setting attribute will result in change", () => {
-    expect(model.isChanged).toBe(false);
-    expect(model.nameChanged()).toBe(false);
+    assertNotPredicate(model, (m) => m.isChanged);
+    assertNotPredicate(model, (m) => m.nameChanged());
     model.name = "Ringo";
-    expect(model.isChanged).toBe(true);
-    expect(model.nameChanged()).toBe(true);
+    assertPredicate(model, (m) => m.isChanged);
+    assertPredicate(model, (m) => m.nameChanged());
   });
 
   it("list of changed attribute keys", () => {
@@ -163,68 +167,69 @@ describe("DirtyTest", () => {
   });
 
   it("changes to attribute values", () => {
-    expect(model.changes["name"]).toBeUndefined();
+    assertNot(model.changes["name"]);
     model.name = "John";
     expect(model.changes["name"]).toEqual([null, "John"]);
   });
 
   it("checking if an attribute has changed to a particular value", () => {
     model.name = "Ringo";
-    expect(model.nameChanged({ from: null, to: "Ringo" })).toBe(true);
-    expect(model.nameChanged({ from: "Pete", to: "Ringo" })).toBe(false);
-    expect(model.nameChanged({ to: "Ringo" })).toBe(true);
-    expect(model.nameChanged({ to: "Pete" })).toBe(false);
-    expect(model.nameChanged({ from: null })).toBe(true);
-    expect(model.nameChanged({ from: "Pete" })).toBe(false);
+    assert(model.nameChanged({ from: null, to: "Ringo" }));
+    assertNot(model.nameChanged({ from: "Pete", to: "Ringo" }));
+    assert(model.nameChanged({ to: "Ringo" }));
+    assertNot(model.nameChanged({ to: "Pete" }));
+    assert(model.nameChanged({ from: null }));
+    assertNot(model.nameChanged({ from: "Pete" }));
   });
 
   it("changes accessible through both strings and symbols", () => {
     model.name = "David";
     expect(model.changes["name"]).not.toBeNull();
+    expect(model.changes["name"]).not.toBeNull();
   });
 
   it("be consistent with symbols arguments after the changes are applied", () => {
     model.name = "David";
-    expect(model.attributeChanged("name")).toBe(true);
+    assert(model.attributeChanged("name"));
     model.save();
     model.name = "Rafael";
-    expect(model.attributeChanged("name")).toBe(true);
+    assert(model.attributeChanged("name"));
   });
 
   it("attribute mutation", () => {
     Object.defineProperty(model, "name", { value: "Yam", enumerable: true, configurable: true });
-    expect(model.nameChanged()).toBe(false);
+    assertNotPredicate(model, (m) => m.nameChanged());
     Object.defineProperty(model, "name", { value: "Hadad", enumerable: true, configurable: true });
-    expect(model.nameChanged()).toBe(false);
+    assertNotPredicate(model, (m) => m.nameChanged());
     model.nameWillChange();
     Object.defineProperty(model, "name", { value: "Baal", enumerable: true, configurable: true });
-    expect(model.nameChanged()).toBe(true);
+    assertPredicate(model, (m) => m.nameChanged());
   });
 
   it("resetting attribute", () => {
     model.name = "Bob";
     model.restoreName();
     expect(model.name).toBeNull();
-    expect(model.nameChanged()).toBe(false);
+    assertNotPredicate(model, (m) => m.nameChanged());
   });
 
   it("setting color to same value should not result in change being recorded", () => {
     model.color = "red";
-    expect(model.colorChanged()).toBe(true);
+    assertPredicate(model, (m) => m.colorChanged());
     model.save();
-    expect(model.colorChanged()).toBe(false);
-    expect(model.isChanged).toBe(false);
+    assertNotPredicate(model, (m) => m.colorChanged());
+    assertNotPredicate(model, (m) => m.isChanged);
     model.color = "red";
-    expect(model.colorChanged()).toBe(false);
-    expect(model.isChanged).toBe(false);
+    assertNotPredicate(model, (m) => m.colorChanged());
+    assertNotPredicate(model, (m) => m.isChanged);
   });
 
   it("saving should reset model's changed status", () => {
     model.name = "Alf";
-    expect(model.isChanged).toBe(true);
+    assertPredicate(model, (m) => m.isChanged);
     model.save();
-    expect(model.isChanged).toBe(false);
-    expect(model.nameChanged()).toBe(false);
+    assertNotPredicate(model, (m) => m.isChanged);
+    assertNotPredicate(model, (m) => m.nameChanged());
   });
 
   it("saving should preserve previous changes", () => {
@@ -248,18 +253,18 @@ describe("DirtyTest", () => {
   it("saving should preserve model's previous changed status", () => {
     model.name = "Jericho Cane";
     model.save();
-    expect(model.namePreviouslyChanged()).toBe(true);
+    assertPredicate(model, (m) => m.namePreviouslyChanged());
   });
 
   it("checking if an attribute was previously changed to a particular value", () => {
     model.name = "Ringo";
     model.save();
-    expect(model.namePreviouslyChanged({ from: null, to: "Ringo" })).toBe(true);
-    expect(model.namePreviouslyChanged({ from: "Pete", to: "Ringo" })).toBe(false);
-    expect(model.namePreviouslyChanged({ to: "Ringo" })).toBe(true);
-    expect(model.namePreviouslyChanged({ to: "Pete" })).toBe(false);
-    expect(model.namePreviouslyChanged({ from: null })).toBe(true);
-    expect(model.namePreviouslyChanged({ from: "Pete" })).toBe(false);
+    assert(model.namePreviouslyChanged({ from: null, to: "Ringo" }));
+    assertNot(model.namePreviouslyChanged({ from: "Pete", to: "Ringo" }));
+    assert(model.namePreviouslyChanged({ to: "Ringo" }));
+    assertNot(model.namePreviouslyChanged({ to: "Pete" }));
+    assert(model.namePreviouslyChanged({ from: null }));
+    assertNot(model.namePreviouslyChanged({ from: "Pete" }));
   });
 
   it("previous value is preserved when changed after save", () => {
@@ -290,7 +295,7 @@ describe("DirtyTest", () => {
 
   it("using attribute_will_change! with a symbol", () => {
     model.size = 1;
-    expect(model.sizeChanged()).toBe(true);
+    assertPredicate(model, (m) => m.sizeChanged());
   });
 
   it("clear_changes_information should reset all changes", () => {
@@ -317,7 +322,7 @@ describe("DirtyTest", () => {
 
     model.restoreAttributes();
 
-    expect(model.isChanged).toBe(false);
+    assertNotPredicate(model, (m) => m.isChanged);
     expect(model.name).toBe("Dmitry");
     expect(model.color).toBe("Red");
   });
@@ -331,7 +336,7 @@ describe("DirtyTest", () => {
 
     model.restoreAttributes(["name"]);
 
-    expect(model.isChanged).toBe(true);
+    assertPredicate(model, (m) => m.isChanged);
     expect(model.name).toBe("Dmitry");
     expect(model.color).toBe("White");
   });

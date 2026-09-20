@@ -1,374 +1,291 @@
-/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging --
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
    Each model below spells `include ActiveModel::Serialization` in its class body, the way the
    Rails test model it mirrors does; the empty class/interface merge beside it is how
    `include()` surfaces those members on the type side. */
-import { describe, it, expect } from "vitest";
-import { include } from "@blazetrails/activesupport";
+import { describe, it, expect, beforeEach } from "vitest";
+import { include, exceptBang, InstanceVariablesObject } from "@blazetrails/activesupport";
 import { Serialization } from "./serialization.js";
-import { Model } from "./index.js";
 import { NoMethodError } from "./attribute-assignment.js";
-import { Attributes, type AttributesClassHalf } from "./attributes.js";
-
-function setAssociationAccessors(record: unknown, entries: Record<string, unknown>): void {
-  for (const [name, value] of Object.entries(entries)) {
-    (record as Record<string, unknown>)[name] = value;
-  }
-}
 
 describe("SerializationTest", () => {
-  it("should use read attribute for serialization", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+  class User {
+    name: string;
+    email: string;
+    gender: string;
+    address?: Address;
+    friends: unknown;
 
-      static {
-        include(this, Attributes);
-        include(this, Serialization);
-        this.attribute("name", "string");
-      }
+    static {
+      include(this, Serialization);
     }
-    interface Person extends Attributes, Serialization {}
 
-    const p = new Person({ name: "Alice" });
-    (
-      p as unknown as { readAttributeForSerialization(n: string): unknown }
-    ).readAttributeForSerialization = () => "Jon";
-    expect(p.serializableHash({ only: ["name"] })).toEqual({ name: "Jon" });
+    constructor(name: string, email: string, gender: string) {
+      this.name = name;
+      this.email = email;
+      this.gender = gender;
+      this.friends = [];
+    }
+
+    get attributes(): Record<string, unknown> {
+      return exceptBang(InstanceVariablesObject.instanceValues(this), "address", "friends");
+    }
+
+    bar(): string {
+      return "i_am_bar";
+    }
+
+    foo(): string {
+      return "i_am_foo";
+    }
+  }
+  interface User extends Serialization {}
+
+  class Address {
+    street?: string;
+    city?: string;
+    state?: string;
+    zip?: number;
+
+    static {
+      include(this, Serialization);
+    }
+
+    get attributes(): Record<string, unknown> {
+      return InstanceVariablesObject.instanceValues(this);
+    }
+  }
+  interface Address extends Serialization {}
+
+  let user: User;
+
+  beforeEach(() => {
+    user = new User("David", "david@example.com", "male");
+    user.address = new Address();
+    user.address.street = "123 Lane";
+    user.address.city = "Springfield";
+    user.address.state = "CA";
+    user.address.zip = 11111;
+    user.friends = [
+      new User("Joe", "joe@example.com", "male"),
+      new User("Sue", "sue@example.com", "female"),
+    ];
   });
 
-  it("include option with empty association", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        include(this, Serialization);
-        this.attribute("name", "string");
-      }
-    }
-    interface Person extends Attributes, Serialization {}
-
-    const p = new Person({ name: "Alice" });
-    setAssociationAccessors(p, { posts: [] });
-    const hash = p.serializableHash({ include: "posts" });
-    expect(hash["name"]).toBe("Alice");
-    expect(hash["posts"]).toEqual([]);
+  it("method serializable hash should work", () => {
+    const expected = { name: "David", gender: "male", email: "david@example.com" };
+    expect(user.serializableHash()).toEqual(expected);
   });
 
-  it("include option with ary", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        include(this, Serialization);
-        this.attribute("name", "string");
-      }
-    }
-    interface Person extends Attributes, Serialization {}
-
-    const friend = new Person({ name: "Joe" });
-    const friendList: Iterable<unknown> = {
-      [Symbol.iterator]: () => [friend][Symbol.iterator](),
-    };
-    const p = new Person({ name: "Alice" });
-    setAssociationAccessors(p, { friends: friendList });
-    const hash = p.serializableHash({ include: "friends" });
-    expect(hash["name"]).toBe("Alice");
-    expect((hash["friends"] as Array<{ name: string }>)[0].name).toBe("Joe");
+  it("method serializable hash should work with only option", () => {
+    const expected = { name: "David" };
+    expect(user.serializableHash({ only: ["name"] })).toEqual(expected);
   });
 
-  it("only include", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        include(this, Serialization);
-        this.attribute("name", "string");
-        this.attribute("age", "integer");
-      }
-    }
-    interface Person extends Attributes, Serialization {}
-
-    const p = new Person({ name: "Alice", age: 25 });
-    const hash = p.serializableHash({ only: ["name"] });
-    expect(hash["name"]).toBe("Alice");
-    expect(hash["age"]).toBeUndefined();
-  });
-
-  it("except include", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        include(this, Serialization);
-        this.attribute("name", "string");
-        this.attribute("age", "integer");
-      }
-    }
-    interface Person extends Attributes, Serialization {}
-
-    const p = new Person({ name: "Alice", age: 25 });
-    const hash = p.serializableHash({ except: ["age"] });
-    expect(hash["name"]).toBe("Alice");
-    expect(hash["age"]).toBeUndefined();
-  });
-
-  it("should raise NoMethodError for non existing method", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        include(this, Serialization);
-        this.attribute("name", "string");
-      }
-    }
-    interface Person extends Attributes, Serialization {}
-
-    const p = new Person({ name: "test" });
-    expect(() => p.serializableHash({ methods: ["nonexistent"] })).toThrow(NoMethodError);
-    expect(() => p.serializableHash({ methods: ["nonexistent"] })).toThrow(
-      /undefined method 'nonexistent'/,
+  it("method serializable hash should work with only option with order of given keys", () => {
+    const expected = { name: "David", email: "david@example.com" };
+    expect(Object.keys(user.serializableHash({ only: ["name", "email"] }))).toEqual(
+      Object.keys(expected),
     );
   });
 
-  it("multiple includes", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+  it("method serializable hash should work with except option", () => {
+    const expected = { gender: "male", email: "david@example.com" };
+    expect(user.serializableHash({ except: ["name"] })).toEqual(expected);
+  });
 
-      static {
-        include(this, Attributes);
-        include(this, Serialization);
-        this.attribute("name", "string");
-      }
+  it("method serializable hash should work with methods option", () => {
+    const expected = {
+      name: "David",
+      gender: "male",
+      foo: "i_am_foo",
+      bar: "i_am_bar",
+      email: "david@example.com",
+    };
+    expect(user.serializableHash({ methods: ["foo", "bar"] })).toEqual(expected);
+  });
+
+  it("method serializable hash should work with only and methods", () => {
+    const expected = { foo: "i_am_foo", bar: "i_am_bar" };
+    expect(user.serializableHash({ only: [], methods: ["foo", "bar"] })).toEqual(expected);
+  });
+
+  it("method serializable hash should work with except and methods", () => {
+    const expected = { gender: "male", foo: "i_am_foo", bar: "i_am_bar" };
+    expect(user.serializableHash({ except: ["name", "email"], methods: ["foo", "bar"] })).toEqual(
+      expected,
+    );
+  });
+
+  it("should raise NoMethodError for non existing method", () => {
+    expect(() => user.serializableHash({ methods: ["nada"] })).toThrow(NoMethodError);
+  });
+
+  it("should use read attribute for serialization", () => {
+    (
+      user as unknown as { readAttributeForSerialization(n: string): unknown }
+    ).readAttributeForSerialization = () => "Jon";
+
+    const expected = { name: "Jon" };
+    expect(user.serializableHash({ only: "name" })).toEqual(expected);
+  });
+
+  it("include option with singular association", () => {
+    const expected = {
+      name: "David",
+      gender: "male",
+      email: "david@example.com",
+      address: { street: "123 Lane", city: "Springfield", state: "CA", zip: 11111 },
+    };
+    expect(user.serializableHash({ include: "address" })).toEqual(expected);
+  });
+
+  it("include option with plural association", () => {
+    const expected = {
+      email: "david@example.com",
+      gender: "male",
+      name: "David",
+      friends: [
+        { name: "Joe", email: "joe@example.com", gender: "male" },
+        { name: "Sue", email: "sue@example.com", gender: "female" },
+      ],
+    };
+    expect(user.serializableHash({ include: "friends" })).toEqual(expected);
+  });
+
+  it("include option with empty association", () => {
+    user.friends = [];
+    const expected = {
+      email: "david@example.com",
+      gender: "male",
+      name: "David",
+      friends: [],
+    };
+    expect(user.serializableHash({ include: "friends" })).toEqual(expected);
+  });
+
+  class FriendList {
+    _friends: unknown[];
+    constructor(friends: unknown[]) {
+      this._friends = friends;
     }
-    interface Person extends Attributes, Serialization {}
 
-    const p = new Person({ name: "test" });
-    const hash = p.serializableHash();
-    expect(hash).toHaveProperty("name", "test");
+    toAry(): unknown[] {
+      return this._friends;
+    }
+
+    [Symbol.iterator](): Iterator<unknown> {
+      return this._friends[Symbol.iterator]();
+    }
+  }
+
+  it("include option with ary", () => {
+    user.friends = new FriendList(user.friends as unknown[]);
+    const expected = {
+      email: "david@example.com",
+      gender: "male",
+      name: "David",
+      friends: [
+        { name: "Joe", email: "joe@example.com", gender: "male" },
+        { name: "Sue", email: "sue@example.com", gender: "female" },
+      ],
+    };
+    expect(user.serializableHash({ include: "friends" })).toEqual(expected);
+  });
+
+  it("multiple includes", () => {
+    const expected = {
+      email: "david@example.com",
+      gender: "male",
+      name: "David",
+      address: { street: "123 Lane", city: "Springfield", state: "CA", zip: 11111 },
+      friends: [
+        { name: "Joe", email: "joe@example.com", gender: "male" },
+        { name: "Sue", email: "sue@example.com", gender: "female" },
+      ],
+    };
+    expect(user.serializableHash({ include: ["address", "friends"] })).toEqual(expected);
+  });
+
+  it("include with options", () => {
+    const expected = {
+      email: "david@example.com",
+      gender: "male",
+      name: "David",
+      address: { street: "123 Lane" },
+    };
+    expect(user.serializableHash({ include: { address: { only: "street" } } })).toEqual(expected);
   });
 
   it("nested include", () => {
-    class User extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        include(this, Serialization);
-        this.attribute("name", "string");
-        this.attribute("email", "string");
-        this.attribute("gender", "string");
-      }
-    }
-    interface User extends Attributes, Serialization {}
-
-    const david = new User({ name: "David", email: "david@example.com", gender: "male" });
-    const joe = new User({ name: "Joe", email: "joe@example.com", gender: "male" });
-    const sue = new User({ name: "Sue", email: "sue@example.com", gender: "female" });
-    setAssociationAccessors(joe, { friends: [david] });
-    setAssociationAccessors(sue, { friends: [] });
-    setAssociationAccessors(david, { friends: [joe, sue] });
-
-    const hash = david.serializableHash({ include: { friends: { include: "friends" } } });
-    expect(hash).toEqual({
-      name: "David",
+    (user.friends as User[])[0].friends = [user];
+    const expected = {
       email: "david@example.com",
       gender: "male",
+      name: "David",
       friends: [
         {
           name: "Joe",
           email: "joe@example.com",
           gender: "male",
-          friends: [{ name: "David", email: "david@example.com", gender: "male" }],
+          friends: [{ email: "david@example.com", gender: "male", name: "David" }],
         },
-        {
-          name: "Sue",
-          email: "sue@example.com",
-          gender: "female",
-          friends: [],
-        },
+        { name: "Sue", email: "sue@example.com", gender: "female", friends: [] },
       ],
-    });
+    };
+    expect(user.serializableHash({ include: { friends: { include: "friends" } } })).toEqual(
+      expected,
+    );
+  });
+
+  it("only include", () => {
+    const expected = { name: "David", friends: [{ name: "Joe" }, { name: "Sue" }] };
+    expect(user.serializableHash({ only: "name", include: { friends: { only: "name" } } })).toEqual(
+      expected,
+    );
+  });
+
+  it("except include", () => {
+    const expected = {
+      name: "David",
+      email: "david@example.com",
+      friends: [
+        { name: "Joe", email: "joe@example.com" },
+        { name: "Sue", email: "sue@example.com" },
+      ],
+    };
+    expect(
+      user.serializableHash({ except: "gender", include: { friends: { except: "gender" } } }),
+    ).toEqual(expected);
   });
 
   it("multiple includes with options", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        include(this, Serialization);
-        this.attribute("name", "string");
-        this.attribute("age", "integer");
-      }
-    }
-    interface Person extends Attributes, Serialization {}
-
-    const p = new Person({ name: "test", age: 25 });
-    const hash = p.serializableHash({ only: ["name"] });
-    expect(hash).toHaveProperty("name", "test");
-    expect(hash).not.toHaveProperty("age");
+    const expected = {
+      email: "david@example.com",
+      gender: "male",
+      name: "David",
+      address: { street: "123 Lane" },
+      friends: [
+        { name: "Joe", email: "joe@example.com", gender: "male" },
+        { name: "Sue", email: "sue@example.com", gender: "female" },
+      ],
+    };
+    expect(
+      user.serializableHash({ include: [{ address: { only: "street" } }, "friends"] }),
+    ).toEqual(expected);
   });
 
   it("all includes with options", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        include(this, Serialization);
-        this.attribute("name", "string");
-        this.attribute("age", "integer");
-      }
-    }
-    interface Person extends Attributes, Serialization {}
-
-    const p = new Person({ name: "test", age: 25 });
-    const hash = p.serializableHash();
-    expect(hash).toHaveProperty("name", "test");
-    expect(hash).toHaveProperty("age", 25);
-  });
-
-  class SerPerson extends Model {
-    declare static attribute: AttributesClassHalf["attribute"];
-
-    static {
-      include(this, Attributes);
-      include(this, Serialization);
-      this.attribute("name", "string");
-      this.attribute("age", "integer");
-      this.attribute("email", "string");
-    }
-    get greeting(): string {
-      return `Hi ${this._readAttribute("name")}`;
-    }
-  }
-
-  interface SerPerson extends Attributes, Serialization {}
-
-  it("method serializable hash should work", () => {
-    const p = new SerPerson({ name: "Alice", age: 30, email: "a@b.com" });
-    const hash = p.serializableHash();
-    expect(hash.name).toBe("Alice");
-    expect(hash.age).toBe(30);
-    expect(hash.email).toBe("a@b.com");
-  });
-
-  it("method serializable hash should work with only option", () => {
-    const p = new SerPerson({ name: "Alice", age: 30, email: "a@b.com" });
-    const hash = p.serializableHash({ only: ["name"] });
-    expect(hash.name).toBe("Alice");
-    expect(hash.age).toBeUndefined();
-  });
-
-  it("method serializable hash should work with except option", () => {
-    const p = new SerPerson({ name: "Alice", age: 30, email: "a@b.com" });
-    const hash = p.serializableHash({ except: ["email"] });
-    expect(hash.name).toBe("Alice");
-    expect(hash.email).toBeUndefined();
-  });
-
-  it("method serializable hash should work with methods option", () => {
-    const p = new SerPerson({ name: "Alice", age: 30, email: "a@b.com" });
-    const hash = p.serializableHash({ methods: ["greeting"] });
-    expect(hash.greeting).toBe("Hi Alice");
-  });
-
-  it("method serializable hash should work with only and methods", () => {
-    const p = new SerPerson({ name: "Alice", age: 30, email: "a@b.com" });
-    const hash = p.serializableHash({ only: ["name"], methods: ["greeting"] });
-    expect(Object.keys(hash).sort()).toEqual(["greeting", "name"]);
-  });
-
-  it("method serializable hash should work with except and methods", () => {
-    const p = new SerPerson({ name: "Alice", age: 30, email: "a@b.com" });
-    const hash = p.serializableHash({ except: ["email", "age"], methods: ["greeting"] });
-    expect(hash.name).toBe("Alice");
-    expect(hash.email).toBeUndefined();
-    expect(hash.greeting).toBe("Hi Alice");
-  });
-
-  class Post extends Model {
-    declare static attribute: AttributesClassHalf["attribute"];
-
-    static {
-      include(this, Attributes);
-      include(this, Serialization);
-      this.attribute("title", "string");
-      this.attribute("body", "string");
-      this.attribute("rating", "integer");
-    }
-  }
-
-  interface Post extends Attributes, Serialization {}
-
-  class Comment extends Model {
-    declare static attribute: AttributesClassHalf["attribute"];
-
-    static {
-      include(this, Attributes);
-      include(this, Serialization);
-      this.attribute("text", "string");
-      this.attribute("author", "string");
-    }
-  }
-  interface Comment extends Attributes, Serialization {}
-
-  it("include option with singular association", () => {
-    const p = new Post({ title: "Hello", body: "World", rating: 5 });
-    const comment = new Comment({ text: "Great!" });
-    setAssociationAccessors(p, { comments: [comment] });
-    const result = p.serializableHash({ include: ["comments"] });
-    expect(Array.isArray(result.comments)).toBe(true);
-    expect((result.comments as any[])[0].text).toBe("Great!");
-  });
-
-  it("include with options", () => {
-    const p = new Post({ title: "Hello", body: "World", rating: 5 });
-    const comment = new Comment({ text: "Great!", author: "Bob" });
-    setAssociationAccessors(p, { comments: [comment] });
-    const result = p.serializableHash({ include: { comments: { only: ["text"] } } });
-    expect((result.comments as any[])[0].text).toBe("Great!");
-    expect((result.comments as any[])[0].author).toBeUndefined();
-  });
-
-  it("method serializable hash should work with only option with order of given keys", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        include(this, Serialization);
-        this.attribute("name", "string");
-        this.attribute("age", "integer");
-        this.attribute("email", "string");
-      }
-    }
-    interface Person extends Attributes, Serialization {}
-
-    const p = new Person({ name: "Alice", age: 25, email: "a@b.com" });
-    const result = p.serializableHash({ only: ["email", "name"] });
-    expect(Object.keys(result)).toEqual(["email", "name"]);
-    expect(result.age).toBeUndefined();
-  });
-
-  it("include option with plural association", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        include(this, Serialization);
-        this.attribute("name", "string");
-      }
-    }
-    interface Person extends Attributes, Serialization {}
-
-    const p = new Person({ name: "Alice" });
-    const result = p.serializableHash();
-    expect(result.name).toBe("Alice");
+    const expected = {
+      email: "david@example.com",
+      gender: "male",
+      name: "David",
+      address: { street: "123 Lane" },
+      friends: [{ name: "Joe" }, { name: "Sue" }],
+    };
+    expect(
+      user.serializableHash({
+        include: [{ address: { only: "street" }, friends: { only: "name" } }],
+      }),
+    ).toEqual(expected);
   });
 });
