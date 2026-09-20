@@ -789,6 +789,21 @@ describe("HasManyAssociationsTest", () => {
     expect(await david.projects.size()).toBe(1);
   });
 
+  it("deleting by string id", async () => {
+    const david = (await Developer.find(1)) as any;
+
+    await assertDifference(
+      async () => Number(await david.projects.count()),
+      -1,
+      null,
+      async () => {
+        expect(((await david.projects.delete("1")) as any[]).length).toBe(1);
+      },
+    );
+
+    expect(await david.projects.size()).toBe(1);
+  });
+
   it("deleting before save", async () => {
     const newFirm = HmFirm.new({ name: "A New Firm, Inc." }) as any;
     const newClient = newFirm.clientsOfFirm.build({ name: "Another Client" });
@@ -6026,14 +6041,7 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  const { companies } = fixtures([
-    "accounts",
-    "companies",
-    "developers",
-    "projects",
-    "developersProjects",
-    "topics",
-  ]);
+  const { companies } = fixtures(["accounts", "companies", "topics"]);
 
   beforeAll(async () => {
     registerModel(Company);
@@ -6041,8 +6049,6 @@ describe("HasManyAssociationsTest", () => {
     registerModel(Client);
     registerModel(Account);
     registerModel(HmTopic);
-    registerModel(Developer);
-    registerModel(Project);
     Company.inheritanceColumn = "type";
     registerSubclass(HmFirm);
     registerSubclass(Client);
@@ -6053,10 +6059,6 @@ describe("HasManyAssociationsTest", () => {
   beforeEach(() => {
     Client.destroyedClientIds.clear();
   });
-
-  async function forceSignal37ToLoadAllClientsOfFirm(): Promise<unknown> {
-    return await (companies("first_firm") as any).clientsOfFirm.loadTarget();
-  }
 
   it("adding", async () => {
     await forceSignal37ToLoadAllClientsOfFirm();
@@ -6198,21 +6200,6 @@ describe("HasManyAssociationsTest", () => {
     expect(summit.client_of).toBe(2);
   });
 
-  it("deleting by string id", async () => {
-    const david = (await Developer.find(1)) as any;
-
-    await assertDifference(
-      async () => Number(await david.projects.count()),
-      -1,
-      null,
-      async () => {
-        expect(((await david.projects.delete("1")) as any[]).length).toBe(1);
-      },
-    );
-
-    expect(await david.projects.size()).toBe(1);
-  });
-
   it("destroy all", async () => {
     await forceSignal37ToLoadAllClientsOfFirm();
 
@@ -6229,4 +6216,8 @@ describe("HasManyAssociationsTest", () => {
     await (companies("first_firm") as any).clientsOfFirm.reload();
     expect(await (companies("first_firm") as any).clientsOfFirm.isEmpty()).toBeTruthy();
   });
+
+  async function forceSignal37ToLoadAllClientsOfFirm(): Promise<unknown> {
+    return await (companies("first_firm") as any).clientsOfFirm.loadTarget();
+  }
 });
