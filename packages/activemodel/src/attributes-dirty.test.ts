@@ -83,8 +83,8 @@ describe("AttributesDirtyTest", () => {
 
   it("changes accessible through both strings and symbols", () => {
     model.name = "David";
-    expect(model.changes["name"]).not.toBeNull();
-    expect(model.changes["name"]).not.toBeNull();
+    expect(model.changes["name"]).not.toBeUndefined();
+    expect(model.changes["name"]).not.toBeUndefined();
   });
 
   it("be consistent with symbols arguments after the changes are applied", () => {
@@ -95,7 +95,7 @@ describe("AttributesDirtyTest", () => {
     assert(model.attributeChanged("name"));
   });
 
-  // BLOCKED: attributes-dirty-attribute-mutation-needs-in-place-string-mutation
+  // BLOCKED: assertions-immutable-js-string-values
   it.skip("attribute mutation", () => {
     model.name = "Yam";
     model.save();
