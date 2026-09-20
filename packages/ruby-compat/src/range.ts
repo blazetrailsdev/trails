@@ -10,7 +10,7 @@
  */
 
 import { ArgumentError } from "./argument-error.js";
-import { cmp } from "./comparable.js";
+import { cmp, rbCmpint } from "./comparable.js";
 import { succ } from "./string/succ.js";
 import { rbEqual } from "./rb-equal.js";
 
@@ -29,9 +29,16 @@ function rLess(a: unknown, b: unknown): number {
   return r;
 }
 
-/** `vendor/ruby/range.c:369` `check_step_domain`. */
+/**
+ * `vendor/ruby/range.c:369` `check_step_domain`. The comparison goes through
+ * `rb_cmpint` (`vendor/ruby/bignum.c:2959`), NOT through {@link rLess}: a step
+ * that cannot be placed against 0 — `Float::NAN` — has a nil `<=>`, and
+ * `rb_cmpint` raises `ArgumentError` for it where `r_less` would answer
+ * `INT_MAX` and let it through. MRI: `(1..5).step(Float::NAN)` raises
+ * `comparison of Float with 0 failed`.
+ */
 function checkStepDomain(step: number): void {
-  const c = rLess(step, 0);
+  const c = rbCmpint(cmp(step, 0), step, 0);
   if (c < 0) throw new ArgumentError("step can't be negative");
   if (c === 0) throw new ArgumentError("step can't be 0");
 }
@@ -245,14 +252,20 @@ export class Range<T = unknown> {
     checkStepDomain(n);
 
     if (typeof this.begin !== "number" && this.begin !== null) {
+      /* `step_i_iter` (`vendor/ruby/range.c:312-325`) counts DOWN from `iter[0]`,
+         which `range_step` seeds at 1 (`:465`), and reseeds it to `step` on each
+         yield. So the first element always yields, and a fractional step never
+         lands on 0 again — which is exactly what MRI does here. */
+      let iter = 1;
       let v = this.begin as T;
-      let i = 0;
       while (
         this.end === null ||
         (this.excludeEnd ? rLess(v, this.end) < 0 : rLess(v, this.end) <= 0)
       ) {
-        if (i % n === 0) yield v;
-        i++;
+        if (--iter === 0) {
+          yield v;
+          iter = n;
+        }
         v = objSucc(v);
       }
       return;
