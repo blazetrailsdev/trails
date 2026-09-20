@@ -1,6 +1,6 @@
 import { indexWith } from "../enumerable-utils.js";
 
-import { Dir, env } from "@blazetrails/ruby-compat";
+import { Dir, env, rbEqual } from "@blazetrails/ruby-compat";
 import { _testCaseIdentity, taggedLogger } from "./tagged-logging.js";
 
 /** @noRailsEquivalent PERMANENT */
@@ -418,6 +418,41 @@ export function assertEmpty(actual: unknown, message?: string): void {
 /** @noRailsEquivalent PERMANENT */
 export function assertNotEmpty(actual: unknown, message?: string): void {
   assert(!isEmptyCollection(actual), message ?? `Expected ${inspect(actual)} to not be empty`);
+}
+
+/** @noRailsEquivalent CONVERGEABLE assert-includes-receipt-is-a-scoring-gap-not-permanent */
+export function assertIncludes(collection: unknown, obj: unknown, message?: string): void {
+  assert(respondsToInclude(collection), `Expected ${inspect(collection)} to respond to include?`);
+  assert(
+    collectionIncludes(collection, obj),
+    message ?? `Expected ${inspect(collection)} to include ${inspect(obj)}`,
+  );
+}
+
+export function assertNotIncludes(collection: unknown, obj: unknown, message?: string): void {
+  assert(respondsToInclude(collection), `Expected ${inspect(collection)} to respond to include?`);
+  assertNot(
+    collectionIncludes(collection, obj),
+    message ?? `Expected ${inspect(collection)} to not include ${inspect(obj)}`,
+  );
+}
+
+function respondsToInclude(collection: unknown): boolean {
+  if (typeof collection === "string" || Array.isArray(collection)) return true;
+  const target = collection as { include?: unknown; has?: unknown };
+  return typeof target?.include === "function" || typeof target?.has === "function";
+}
+
+function collectionIncludes(collection: unknown, obj: unknown): boolean {
+  if (typeof collection === "string") return collection.includes(obj as string);
+  if (Array.isArray(collection)) return collection.some((element) => rbEqual(element, obj));
+  const target = collection as {
+    include?: (obj: never) => boolean;
+    has?: (obj: never) => boolean;
+  };
+  if (typeof target.include === "function") return target.include(obj as never);
+  if (typeof target.has === "function") return target.has(obj as never);
+  return false;
 }
 
 function isEmptyCollection(actual: unknown): boolean {

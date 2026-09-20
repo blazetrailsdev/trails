@@ -20,6 +20,7 @@ import {
 import { UnexpectedError } from "./testing/assertions.js";
 import {
   assertNot,
+  assertNotIncludes,
   assertRaises,
   assertRaise,
   assertNothingRaised,
@@ -68,6 +69,7 @@ export class TestCase {
   }
 
   static assertNot = assertNot;
+  static assertNotIncludes = assertNotIncludes;
   static assertRaises = assertRaises;
   static assertRaise = assertRaise;
   static assertNothingRaised = assertNothingRaised;

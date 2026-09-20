@@ -6,7 +6,9 @@ import {
   assertDifference,
   assertNoChanges,
   assertNoDifference,
+  assertIncludes,
   assertNot,
+  assertNotIncludes,
   assertNothingRaised,
   assertRaises,
   UnexpectedError,
@@ -17,6 +19,23 @@ describe("AssertionsTest", () => {
     assertNot(null);
     assertNot(false);
     expect(() => assertNot("foo")).toThrow(/Expected "foo" to be nil or false/);
+  });
+
+  it("assert includes", () => {
+    assertIncludes(["foo", "bar"], "foo");
+    assertIncludes("foobar", "oba");
+    assertIncludes(new Set(["foo"]), "foo");
+    assertIncludes({ include: (attr: string) => attr === "foo" }, "foo");
+    expect(() => assertIncludes(["bar"], "foo")).toThrow(/to include/);
+    expect(() => assertIncludes(42, "foo")).toThrow(/to respond to include\?/);
+  });
+
+  it("assert not includes", () => {
+    assertNotIncludes(["bar"], "foo");
+    assertNotIncludes("bar", "foo");
+    assertNotIncludes(new Set(["bar"]), "foo");
+    assertNotIncludes({ include: (attr: string) => attr === "bar" }, "foo");
+    expect(() => assertNotIncludes(["foo"], "foo")).toThrow(/to not include/);
   });
 
   it("assert raises with match", async () => {
