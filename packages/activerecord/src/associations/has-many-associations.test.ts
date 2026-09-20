@@ -6145,7 +6145,7 @@ describe("HasManyAssociationsTest", () => {
     const firm = companies("first_firm") as any;
     const clientId = (await firm.dependentClientsOfFirm.first()).id;
     expect(await firm.dependentClientsOfFirm.size()).toBe(2);
-    expect((await Client.findBy({ id: clientId })).client_of).toBe(1);
+    expect((await Client.findBy({ id: clientId }))!.client_of).toBe(1);
 
     await firm.dependentClientsOfFirm.clear();
 
@@ -6190,7 +6190,7 @@ describe("HasManyAssociationsTest", () => {
 
     expect((companies("first_firm") as any).clientsOfFirm.loaded).toBeTruthy();
 
-    const summit = await Client.findBy({ name: "Summit" });
+    const summit = (await Client.findBy({ name: "Summit" }))!;
     await (companies("first_firm") as any).clientsOfFirm.delete(summit);
     expect(await (companies("first_firm") as any).clientsOfFirm.size()).toBe(2);
     await (companies("first_firm") as any).clientsOfFirm.reload();
