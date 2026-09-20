@@ -23,6 +23,7 @@ import type { VerySpecialComment } from "./comment.js";
 import { ModelName, type ModelLike } from "@blazetrails/activemodel";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { Base } from "../../base.js";
+import type { ColumnLike } from "../../model-schema.js";
 import { registerSubclass } from "../../inheritance.js";
 import type { Comment } from "./comment.js";
 import type { Tagging } from "./tagging.js";
@@ -818,8 +819,8 @@ export class FakeKlass extends Base {
     this._tableName = "posts";
   }
 
-  static override columnsHash(): Record<string, never> {
-    return { name: null } as unknown as Record<string, never>;
+  static override columnsHash(): Record<string, ColumnLike> {
+    return { name: null as unknown as ColumnLike };
   }
 }
 
