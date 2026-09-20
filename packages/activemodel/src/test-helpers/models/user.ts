@@ -23,9 +23,9 @@ export class User extends SecurePasswordModel {
     include(this, Dirty);
     defineModelCallbacks.call<object, [string], void>(this, "create");
     this.attribute("password_digest");
-    hasSecurePassword.call(this as unknown as typeof Model, "password");
+    hasSecurePassword.call(this, "password");
     this.attribute("recovery_password_digest");
-    hasSecurePassword.call(this as unknown as typeof Model, "recovery_password", {
+    hasSecurePassword.call(this, "recovery_password", {
       validations: false,
     });
   }

@@ -13,7 +13,8 @@ export class Pilot extends Model {
 
   static expiresIn: number | null = null;
 
-  static generatesTokenFor(_purpose: string, { expiresIn }: { expiresIn?: number } = {}): void {
+  static generatesTokenFor(purpose: string, { expiresIn }: { expiresIn?: number } = {}): void {
+    void purpose;
     Pilot.expiresIn = expiresIn ?? null;
   }
 

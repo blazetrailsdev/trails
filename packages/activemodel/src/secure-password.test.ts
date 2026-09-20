@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging --
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
    Each model below spells `include ActiveModel::Dirty` in its class body, the way the Rails test
    model it mirrors does; the empty class/interface merge beside it is how `include()` surfaces
    those members on the type side. */
@@ -7,9 +7,11 @@ import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Dirty } from "./dirty.js";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import bcrypt from "bcryptjs";
+import { Engine } from "./bcrypt.js";
 import { Model } from "./index.js";
 import { hasSecurePassword, SecurePassword } from "./secure-password.js";
 import { Attributes, type AttributesClassHalf } from "./attributes.js";
+import { Validations } from "./validations.js";
 import { User } from "./test-helpers/models/user.js";
 import { Visitor } from "./test-helpers/models/visitor.js";
 import { Pilot } from "./test-helpers/models/pilot.js";
@@ -29,7 +31,7 @@ beforeEach(() => {
   pilot = new Pilot();
 
   existingUser = new User();
-  existingUser.password_digest = bcrypt.hashSync("password", 4);
+  existingUser.password_digest = bcrypt.hashSync("password", Engine.MIN_COST);
   existingUser.changesApplied();
 });
 
@@ -58,8 +60,7 @@ describe("SecurePasswordTest", () => {
     assertRespondTo(user, "isValid");
   });
 
-  // BLOCKED: assertion-surfaced-secure-password-visitor-always-validatable
-  it.skip("don't include ActiveModel::Validations when validations are disabled", () => {
+  it("don't include ActiveModel::Validations when validations are disabled", () => {
     assertNotRespondTo(visitor, "isValid");
   });
 
@@ -239,8 +240,7 @@ describe("SecurePasswordTest", () => {
     expect(existingUser.errors.messagesFor("passwordChallenge")).toEqual(["is invalid"]);
   });
 
-  // BLOCKED: assertion-surfaced-secure-password-challenge-respond-to
-  it.skip("updating a user without dirty tracking and a correct password challenge", async () => {
+  it("updating a user without dirty tracking and a correct password challenge", async () => {
     class ValidatableVisitor extends Visitor {
       untracked_digest: string | null = null;
 
@@ -248,6 +248,7 @@ describe("SecurePasswordTest", () => {
         hasSecurePassword.call(this, "untracked");
       }
     }
+    interface ValidatableVisitor extends Validations {}
     const validatableVisitor = new ValidatableVisitor() as ValidatableVisitor & {
       untracked: unknown;
       untrackedChallenge: unknown;
@@ -336,21 +337,27 @@ describe("SecurePasswordTest", () => {
     SecurePassword.minCost = false;
 
     user.password = "secret";
-    expect(bcrypt.getRounds(user.password_digest!)).toEqual(12);
+    expect(bcrypt.getRounds(user.password_digest!)).toEqual(Engine.DEFAULT_COST);
   });
 
   it("Password digest cost honors bcrypt cost attribute when min_cost is false", () => {
-    SecurePassword.minCost = false;
+    const originalBcryptCost = Engine.cost;
+    try {
+      SecurePassword.minCost = false;
+      Engine.cost = 5;
 
-    user.password = "secret";
-    expect(bcrypt.getRounds(user.password_digest!)).toEqual(12);
+      user.password = "secret";
+      expect(bcrypt.getRounds(user.password_digest!)).toEqual(Engine.cost);
+    } finally {
+      Engine.cost = originalBcryptCost;
+    }
   });
 
   it("Password digest cost can be set to bcrypt min cost to speed up tests", () => {
     SecurePassword.minCost = true;
 
     user.password = "secret";
-    expect(bcrypt.getRounds(user.password_digest!)).toEqual(4);
+    expect(bcrypt.getRounds(user.password_digest!)).toEqual(Engine.MIN_COST);
   });
 
   it("password reset token", () => {

@@ -1,10 +1,11 @@
 import bcrypt from "bcryptjs";
 import { camelize, include, isBlank, Module } from "@blazetrails/activesupport";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { Engine } from "./bcrypt.js";
+import { Validations } from "./validations.js";
 import { Model } from "./model.js";
 
 const MAX_PASSWORD_LENGTH_ALLOWED = 72;
-const MIN_COST = 4;
-const DEFAULT_COST = 12;
 const textEncoder = new TextEncoder();
 
 export class SecurePassword {
@@ -22,7 +23,7 @@ export namespace SecurePassword {
 }
 
 export function hasSecurePassword(
-  this: typeof Model,
+  this: object,
   attribute: string = "password",
   options: { validations?: boolean; resetToken?: boolean } = {},
 ) {
@@ -37,14 +38,17 @@ export function hasSecurePassword(
   );
 
   if (validations) {
-    this.validate((record: Model) => {
+    include(this as unknown as new (...args: unknown[]) => unknown, Validations);
+    const klass = this as unknown as typeof Model;
+
+    klass.validate((record: Model) => {
       if (isBlank(publicSend(record, digestAttr))) record.errors.add(attribute, ":blank");
     });
 
-    this.validate((record: Model & { respondTo(method: string): boolean }) => {
+    klass.validate((record: Model) => {
       const challenge = publicSend(record, challengeAttr);
       if (challenge != null && challenge !== false) {
-        const digestWas = record.respondTo(`${digestAttr}Was`)
+        const digestWas = rbObjRespondTo(record, `${digestAttr}Was`)
           ? (publicSend(record, `${digestAttr}Was`) as string | null | undefined)
           : undefined;
         if (isBlank(digestWas) || !bcrypt.compareSync(String(challenge), digestWas as string)) {
@@ -53,7 +57,7 @@ export function hasSecurePassword(
       }
     });
 
-    this.validate((record: Model) => {
+    klass.validate((record: Model) => {
       const passwordValue = publicSend(record, attribute) as string | null;
       if (
         !isBlank(passwordValue) &&
@@ -63,7 +67,7 @@ export function hasSecurePassword(
       }
     });
 
-    this.validatesConfirmationOf(attribute, { allowBlank: true });
+    klass.validatesConfirmationOf(attribute, { allowBlank: true });
   }
 
   const tokenHost = this as unknown as TokenHost;
@@ -127,7 +131,7 @@ export class InstanceMethodsOnActivation extends Module {
           } else if (String(unencryptedPassword) !== "") {
             (this as unknown as Record<string, unknown>)[passwordIvar] =
               String(unencryptedPassword);
-            const cost = SecurePassword.minCost ? MIN_COST : DEFAULT_COST;
+            const cost = SecurePassword.minCost ? Engine.MIN_COST : Engine.cost;
             publicSendWriter(this, digestAttr, bcrypt.hashSync(String(unencryptedPassword), cost));
           }
         },
