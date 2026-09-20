@@ -1,607 +1,933 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { SecureRandom } from "@blazetrails/ruby-compat";
 import { NameError } from "./core-ext/name-error.js";
+import { ArgumentError } from "./hash-utils.js";
+import { Logger } from "./logger.js";
+import { ActiveSupport } from "./index.js";
+import { TestCase } from "./test-case.js";
+import {
+  Assertion,
+  UnexpectedError,
+  assert,
+  assertChanges,
+  assertDifference,
+  assertIncludes,
+  assertNoChanges,
+  assertNoDifference,
+  assertNot,
+  assertRaises,
+} from "./testing/assertions.js";
+import { peekCallbackChain } from "./callbacks.js";
 import { stubConst } from "./testing/constant-stubbing.js";
 
-function mbLength(str: string): number {
-  return [...str].length;
-}
-function mbReverse(str: string): string {
-  return [...str].reverse().join("");
-}
-function mbSlice(str: string, start: number, length?: number): string {
-  const chars = [...str];
-  if (length === undefined) return chars.slice(start).join("");
-  return chars.slice(start, start + length).join("");
-}
-function mbUpcase(str: string): string {
-  return str.toUpperCase();
-}
-function mbDowncase(str: string): string {
-  return str.toLowerCase();
+class Numbered {
+  num = 0;
+
+  increment(): void {
+    this.num += 1;
+  }
+
+  decrement(): void {
+    this.num -= 1;
+  }
 }
 
 describe("AssertionsTest", () => {
-  function assertDifference<T>(
-    expr: () => T,
-    diff: T extends number ? number : never,
-    fn: () => void,
-  ): void {
-    const before = expr() as number;
-    fn();
-    const after = expr() as number;
-    expect(after - before).toBe(diff as number);
-  }
+  let object: Numbered;
 
-  function assertNoDifference<T>(expr: () => T, fn: () => void): void {
-    const before = expr();
-    fn();
-    const after = expr();
-    expect(after).toBe(before);
-  }
-
-  function assertChanges<T>(expr: () => T, options: { from?: T; to?: T }, fn: () => void): void {
-    const before = expr();
-    if (options.from !== undefined) {
-      expect(before).toBe(options.from);
-    }
-    fn();
-    const after = expr();
-    if (options.to !== undefined) {
-      expect(after).toBe(options.to);
-    } else {
-      expect(after).not.toBe(before);
-    }
-  }
-
-  it("assert not", () => {
-    expect(false).not.toBe(true);
-    expect(null).toBeFalsy();
+  beforeEach(() => {
+    object = new Numbered();
+    object.num = 0;
   });
 
-  it("assert raises with match pass", () => {
-    expect(() => {
-      throw new Error("something went wrong");
-    }).toThrow(/something/);
+  it.skip("assert not", async () => {
+    // BLOCKED: activesupport-assert-not-returns-void-where-rails-returns-true
+    expect(assertNot(null)).toEqual(true);
+    expect(assertNot(false)).toEqual(true);
+
+    let e = await assertRaises([Assertion], {}, () => {
+      assertNot(true);
+    });
+    expect(e.message).toEqual("Expected true to be nil or false");
+
+    e = await assertRaises([Assertion], {}, () => {
+      assertNot(true, "custom");
+    });
+    expect(e.message).toEqual("custom");
   });
 
-  it("assert raises with match fail", () => {
-    expect(() => {
-      throw new Error("something went wrong");
-    }).not.toThrow(/xyz/);
+  it("assert raises with match pass", async () => {
+    await assertRaises([ArgumentError], { match: /incorrect/i }, () => {
+      throw new ArgumentError("Incorrect argument");
+    });
   });
 
-  it("assert no difference pass", () => {
-    const count = 5;
-    assertNoDifference(
-      () => count,
+  it.skip("assert raises with match fail", async () => {
+    // BLOCKED: activesupport-assertion-failure-messages-diverge-from-minitest
+    await assertRaises(
+      [Assertion],
+      { match: 'Expected /incorrect/i to match "Wrong argument".' },
+      async () => {
+        await assertRaises([ArgumentError], { match: /incorrect/i }, () => {
+          throw new ArgumentError("Wrong argument");
+        });
+      },
+    );
+  });
+
+  it("assert no difference pass", async () => {
+    await assertNoDifference(
+      () => object.num,
+      null,
       () => {},
     );
   });
 
-  it("assert no difference fail", () => {
-    let count = 5;
-    expect(() => {
-      assertNoDifference(
-        () => count,
+  it.skip("assert no difference fail", async () => {
+    // BLOCKED: activesupport-assertion-failure-messages-diverge-from-minitest
+    const error = await assertRaises([Assertion], {}, async () => {
+      await assertNoDifference(
+        () => object.num,
+        null,
         () => {
-          count += 1;
+          object.increment();
         },
       );
-    }).toThrow();
+    });
+    expect(error.message).toEqual(
+      "`object.num` didn't change by 0, but by 1.\nExpected: 0\n  Actual: 1",
+    );
   });
 
-  it("assert no difference with message fail", () => {
-    let count = 0;
-    expect(() => {
-      assertNoDifference(
-        () => count,
+  it.skip("assert no difference with message fail", async () => {
+    // BLOCKED: activesupport-assertion-failure-messages-diverge-from-minitest
+    const error = await assertRaises([Assertion], {}, async () => {
+      await assertNoDifference(
+        () => object.num,
+        "Object Changed",
         () => {
-          count++;
+          object.increment();
         },
       );
-    }).toThrow();
-  });
-
-  it("assert no difference with multiple expressions pass", () => {
-    const a = 1,
-      b = 2;
-    assertNoDifference(
-      () => a,
-      () => {},
-    );
-    assertNoDifference(
-      () => b,
-      () => {},
+    });
+    expect(error.message).toEqual(
+      "Object Changed.\n`object.num` didn't change by 0, but by 1.\nExpected: 0\n  Actual: 1",
     );
   });
 
-  it("assert no difference with multiple expressions fail", () => {
-    let a = 1;
-    expect(() => {
-      assertNoDifference(
-        () => a,
+  it("assert no difference with multiple expressions pass", async () => {
+    const anotherObject = new Numbered();
+    await assertNoDifference([() => object.num, () => anotherObject.num], null, () => {});
+  });
+
+  it("assert no difference with multiple expressions fail", async () => {
+    const anotherObject = new Numbered();
+    await assertRaises([Assertion], {}, async () => {
+      await assertNoDifference(
+        [() => object.num, () => anotherObject.num],
+        "Another Object Changed",
         () => {
-          a++;
+          anotherObject.increment();
         },
       );
-    }).toThrow();
+    });
   });
 
-  it("assert difference", () => {
-    let count = 0;
-    assertDifference(
-      () => count,
-      1 as never,
+  it("assert difference", async () => {
+    await assertDifference(
+      () => object.num,
+      +1,
+      null,
       () => {
-        count++;
+        object.increment();
       },
     );
   });
 
-  it("assert difference retval", () => {
-    let count = 0;
-    const before = count;
-    count++;
-    expect(count - before).toBe(1);
+  it("assert difference retval", async () => {
+    const incremented = await assertDifference(
+      () => object.num,
+      +1,
+      null,
+      () => {
+        object.increment();
+        return 1;
+      },
+    );
+
+    expect(incremented).toEqual(1);
   });
 
-  it("assert difference with implicit difference", () => {
-    let count = 0;
-    assertDifference(
-      () => count,
-      1 as never,
+  it("assert difference with implicit difference", async () => {
+    await assertDifference(
+      () => object.num,
+      undefined,
+      null,
       () => {
-        count += 1;
+        object.increment();
       },
     );
   });
 
-  it("arbitrary expression", () => {
-    const arr: number[] = [];
-    assertDifference(
-      () => arr.length,
-      1 as never,
+  it("arbitrary expression", async () => {
+    await assertDifference(
+      () => object.num + 1,
+      +2,
+      null,
       () => {
-        arr.push(1);
+        object.increment();
+        object.increment();
       },
     );
   });
 
-  it("negative differences", () => {
-    let count = 5;
-    assertDifference(
-      () => count,
-      -1 as never,
+  it("negative differences", async () => {
+    await assertDifference(
+      () => object.num,
+      -1,
+      null,
       () => {
-        count--;
+        object.decrement();
       },
     );
   });
 
-  it("expression is evaluated in the appropriate scope", () => {
-    let outer = 0;
-    assertDifference(
-      () => outer,
-      1 as never,
+  it("expression is evaluated in the appropriate scope", async () => {
+    const localScope = "foo";
+    void localScope;
+    await assertDifference(
+      () => object.num,
+      undefined,
+      null,
       () => {
-        outer++;
+        object.increment();
       },
     );
-    expect(outer).toBe(1);
   });
 
-  it("array of expressions", () => {
-    let a = 0,
-      b = 0;
-    assertDifference(
-      () => a,
-      1 as never,
-      () => {
-        a++;
-      },
-    );
-    assertDifference(
-      () => b,
-      1 as never,
-      () => {
-        b++;
-      },
-    );
-    expect(a).toBe(1);
-    expect(b).toBe(1);
+  it("array of expressions", async () => {
+    await assertDifference([() => object.num, () => object.num + 1], +1, null, () => {
+      object.increment();
+    });
   });
 
-  it("array of expressions identify failure", () => {
-    let a = 0;
-    expect(() => {
-      assertDifference(
-        () => a,
-        2 as never,
+  it("array of expressions identify failure", async () => {
+    await assertRaises([Assertion], {}, async () => {
+      await assertDifference([() => object.num, () => 1 + 1], undefined, null, () => {
+        object.increment();
+      });
+    });
+  });
+
+  it("array of expressions identify failure when message provided", async () => {
+    await assertRaises([Assertion], {}, async () => {
+      await assertDifference([() => object.num, () => 1 + 1], 1, "something went wrong", () => {
+        object.increment();
+      });
+    });
+  });
+
+  it("hash of expressions", async () => {
+    await assertDifference(
+      new Map([
+        [() => object.num, 1],
+        [() => object.num + 1, 1],
+      ]),
+      null,
+      () => {
+        object.increment();
+      },
+    );
+  });
+
+  it.skip("hash of expressions with message", async () => {
+    // BLOCKED: activesupport-assertion-failure-messages-diverge-from-minitest
+    const error = await assertRaises([Assertion], {}, async () => {
+      await assertDifference(new Map([[() => object.num, 0]]), "Object Changed", () => {
+        object.increment();
+      });
+    });
+    expect(error.message).toEqual(
+      "Object Changed.\n`object.num` didn't change by 0, but by 1.\nExpected: 0\n  Actual: 1",
+    );
+  });
+
+  it.skip("assert difference message includes change", async () => {
+    // BLOCKED: activesupport-assertion-failure-messages-diverge-from-minitest
+    const error = await assertRaises([Assertion], {}, async () => {
+      await assertDifference(
+        () => object.num,
+        +5,
+        null,
         () => {
-          a++;
+          object.increment();
+          object.increment();
         },
       );
-    }).toThrow();
-  });
-
-  it("array of expressions identify failure when message provided", () => {
-    let a = 0;
-    expect(() => {
-      assertDifference(
-        () => a,
-        2 as never,
-        () => {
-          a++;
-        },
-      );
-    }).toThrow();
-  });
-
-  it("hash of expressions", () => {
-    const counters = { posts: 0, comments: 0 };
-    assertDifference(
-      () => counters.posts,
-      1 as never,
-      () => {
-        counters.posts++;
-      },
-    );
-    assertDifference(
-      () => counters.comments,
-      1 as never,
-      () => {
-        counters.comments++;
-      },
-    );
-    expect(counters.posts).toBe(1);
-    expect(counters.comments).toBe(1);
-  });
-
-  it("hash of expressions with message", () => {
-    const c = { x: 0 };
-    assertDifference(
-      () => c.x,
-      1 as never,
-      () => {
-        c.x++;
-      },
-    );
-    expect(c.x).toBe(1);
-  });
-
-  it("assert difference message includes change", () => {
-    let count = 0;
-    const before = count;
-    count++;
-    const msg = `Expected change of 1, got ${count - before}`;
-    expect(msg).toContain("1");
-  });
-
-  it("assert difference message with lambda", () => {
-    const expr = () => 42;
-    expect(expr()).toBe(42);
-  });
-
-  it("hash of lambda expressions", () => {
-    const exprs = [() => 1, () => 2, () => 3];
-    exprs.forEach((e) => expect(e()).toBeGreaterThan(0));
-  });
-
-  it("hash of expressions identify failure", () => {
-    let count = 0;
-    expect(() => {
-      assertDifference(
-        () => count,
-        5 as never,
-        () => {
-          count++;
-        },
-      );
-    }).toThrow();
-  });
-
-  it("assert changes pass", () => {
-    let val = "before";
-    assertChanges(
-      () => val,
-      { from: "before", to: "after" },
-      () => {
-        val = "after";
-      },
+    });
+    expect(error.message).toEqual(
+      "`object.num` didn't change by 5, but by 2.\nExpected: 5\n  Actual: 2",
     );
   });
 
-  it("assert changes pass with lambda", () => {
-    let n = 0;
-    assertChanges(
-      () => n,
-      { to: 1 },
-      () => {
-        n = 1;
-      },
-    );
-  });
-
-  it("assert changes with from option", () => {
-    let val = "old";
-    assertChanges(
-      () => val,
-      { from: "old" },
-      () => {
-        val = "new";
-      },
-    );
-  });
-
-  it("assert changes with from option with wrong value", () => {
-    let val = "actual";
-    expect(() => {
-      assertChanges(
-        () => val,
-        { from: "wrong" },
-        () => {
-          val = "new";
-        },
-      );
-    }).toThrow();
-  });
-
-  it("assert changes with from option with nil", () => {
-    let val: string | null = null;
-    assertChanges(
-      () => val,
-      { from: null },
-      () => {
-        val = "something";
-      },
-    );
-  });
-
-  it("assert changes with to option", () => {
-    let val = "start";
-    assertChanges(
-      () => val,
-      { to: "end" },
-      () => {
-        val = "end";
-      },
-    );
-  });
-
-  it("assert changes with to option but no change has special message", () => {
-    const val = "same";
-    expect(() => {
-      assertChanges(
-        () => val,
-        { to: "same" },
+  it.skip("assert difference message with lambda", async () => {
+    // BLOCKED: activesupport-assertion-failure-messages-diverge-from-minitest
+    const error = await assertRaises([Assertion], {}, async () => {
+      await assertDifference(
+        () => object.num,
+        1,
+        "Object Changed",
         () => {},
       );
-      expect(val).not.toBe("different");
-    }).not.toThrow();
+    });
+    expect(error.message).toEqual(
+      "Object Changed.\n`object.num` didn't change by 1, but by 0.\nExpected: 1\n  Actual: 0",
+    );
   });
 
-  it("assert changes message with lambda", () => {
-    const label = () => "value";
-    expect(label()).toBe("value");
-  });
-
-  it("assert changes with wrong to option", () => {
-    let val = "a";
-    expect(() => {
-      assertChanges(
-        () => val,
-        { to: "c" },
-        () => {
-          val = "b";
-        },
-      );
-    }).toThrow();
-  });
-
-  it("assert changes with from option and to option", () => {
-    let val = 1;
-    assertChanges(
-      () => val,
-      { from: 1, to: 2 },
+  it("hash of lambda expressions", async () => {
+    await assertDifference(
+      new Map([
+        [() => object.num, 1],
+        [() => object.num + 1, 1],
+      ]),
+      null,
       () => {
-        val = 2;
+        object.increment();
       },
     );
   });
 
-  it("assert changes with from and to options and wrong to value", () => {
-    let val = 1;
-    expect(() => {
-      assertChanges(
-        () => val,
-        { from: 1, to: 99 },
+  it("hash of expressions identify failure", async () => {
+    await assertRaises([Assertion], {}, async () => {
+      await assertDifference(
+        new Map([
+          [() => object.num, 1],
+          [() => 1 + 1, 1],
+        ]),
+        null,
         () => {
-          val = 2;
+          object.increment();
         },
       );
-    }).toThrow();
+    });
   });
 
-  it("assert changes works with any object", () => {
-    const obj = { count: 0 };
-    const before = obj.count;
-    obj.count = 5;
-    expect(obj.count).not.toBe(before);
-  });
-
-  it("assert changes works with nil", () => {
-    let val: string | null = null;
-    assertChanges(
-      () => val,
+  it("assert changes pass", async () => {
+    await assertChanges(
+      () => object.num,
+      null,
       {},
       () => {
-        val = "new";
+        object.increment();
       },
     );
-    expect(val).toBe("new");
   });
 
-  it("assert changes with to and case operator", () => {
-    let val: number | string = 0;
-    assertChanges(
-      () => val,
-      { to: "hello" },
+  it("assert changes pass with lambda", async () => {
+    await assertChanges(
+      () => object.num,
+      null,
+      {},
       () => {
-        val = "hello";
+        object.increment();
       },
     );
   });
 
-  it("assert changes with to and from and case operator", () => {
-    let val: number | string = 0;
-    assertChanges(
-      () => val,
-      { from: 0, to: "hello" },
+  it("assert changes with from option", async () => {
+    await assertChanges(
+      () => object.num,
+      null,
+      { from: 0 },
       () => {
-        val = "hello";
+        object.increment();
       },
     );
   });
 
-  it("assert changes with message", () => {
-    let val = "a";
-    const before = val;
-    val = "b";
-    expect(val).not.toBe(before);
+  it("assert changes with from option with wrong value", async () => {
+    await assertRaises([Assertion], {}, async () => {
+      await assertChanges(
+        () => object.num,
+        null,
+        { from: -1 },
+        () => {
+          object.increment();
+        },
+      );
+    });
   });
 
-  it("assert no changes pass", () => {
-    const val = "stable";
-    assertNoDifference(
-      () => val,
+  it("assert changes with from option with nil", async () => {
+    const error = await assertRaises([Assertion], {}, async () => {
+      await assertChanges(
+        () => object.num,
+        null,
+        { from: null },
+        () => {
+          object.increment();
+        },
+      );
+    });
+
+    expect(error.message).toEqual("Expected change from nil, got 0");
+  });
+
+  it("assert changes with to option", async () => {
+    await assertChanges(
+      () => object.num,
+      null,
+      { to: 1 },
+      () => {
+        object.increment();
+      },
+    );
+  });
+
+  it.skip("assert changes with to option but no change has special message", async () => {
+    // BLOCKED: activesupport-assertion-failure-messages-diverge-from-minitest
+    const error = await assertRaises([Assertion], {}, async () => {
+      await assertChanges(
+        () => object.num,
+        null,
+        { to: 0 },
+        () => {},
+      );
+    });
+
+    expect(error.message).toEqual(
+      "`object.num` didn't change. It was already 0.\nExpected 0 to not be equal to 0.",
+    );
+  });
+
+  it.skip("assert changes message with lambda", async () => {
+    // BLOCKED: activesupport-assertion-failure-messages-diverge-from-minitest
+    const error = await assertRaises([Assertion], {}, async () => {
+      await assertChanges(
+        () => object.num,
+        null,
+        { to: 0 },
+        () => {},
+      );
+    });
+
+    expect(error.message).toEqual(
+      "`object.num` didn't change. It was already 0.\nExpected 0 to not be equal to 0.",
+    );
+  });
+
+  it("assert changes with wrong to option", async () => {
+    await assertRaises([Assertion], {}, async () => {
+      await assertChanges(
+        () => object.num,
+        null,
+        { to: 2 },
+        () => {
+          object.increment();
+        },
+      );
+    });
+  });
+
+  it("assert changes with from option and to option", async () => {
+    await assertChanges(
+      () => object.num,
+      null,
+      { from: 0, to: 1 },
+      () => {
+        object.increment();
+      },
+    );
+  });
+
+  it("assert changes with from and to options and wrong to value", async () => {
+    await assertRaises([Assertion], {}, async () => {
+      await assertChanges(
+        () => object.num,
+        null,
+        { from: 0, to: 2 },
+        () => {
+          object.increment();
+        },
+      );
+    });
+  });
+
+  it("assert changes works with any object", async () => {
+    let newObject: unknown = null;
+    const retval = await assertChanges(
+      () => newObject,
+      null,
+      { from: null, to: 42 },
+      () => {
+        newObject = 42;
+        return 42;
+      },
+    );
+
+    expect(retval).toEqual(42);
+  });
+
+  it("assert changes works with nil", async () => {
+    const oldval: unknown = object;
+    let current: unknown = object;
+
+    const retval = await assertChanges(
+      () => current,
+      null,
+      { from: oldval, to: null },
+      () => {
+        current = null;
+        return null;
+      },
+    );
+
+    expect(retval).toBeNull();
+  });
+
+  it("assert changes with to and case operator", async () => {
+    let token: string | null = null;
+
+    await assertChanges(
+      () => token,
+      null,
+      { to: /\w{32}/ },
+      () => {
+        token = SecureRandom.hex();
+      },
+    );
+  });
+
+  it("assert changes with to and from and case operator", async () => {
+    let token = SecureRandom.hex();
+
+    await assertChanges(
+      () => token,
+      null,
+      { from: /\w{32}/, to: /\w{32}/ },
+      () => {
+        token = SecureRandom.hex();
+      },
+    );
+  });
+
+  it.skip("assert changes with message", async () => {
+    // BLOCKED: activesupport-assertion-failure-messages-diverge-from-minitest
+    const error = await assertRaises([Assertion], {}, async () => {
+      await assertChanges(
+        () => object.num,
+        "object.num should be 1",
+        { to: 1 },
+        () => {
+          object.decrement();
+        },
+      );
+    });
+
+    expect(error.message).toEqual("object.num should be 1.\nExpected change to 1, got -1\n");
+  });
+
+  it("assert no changes pass", async () => {
+    await assertNoChanges(
+      () => object.num,
+      null,
+      {},
       () => {},
     );
   });
 
-  it("assert no changes with from option", () => {
-    const val = "x";
-    expect(val).toBe("x");
-    expect(val).toBe("x");
-  });
-
-  it("assert no changes with from option with wrong value", () => {
-    const val = "actual";
-    expect(() => {
-      expect(val).toBe("wrong");
-    }).toThrow();
-  });
-
-  it("assert no changes with from option with nil", () => {
-    const val: string | null = null;
-    assertNoDifference(
-      () => val,
-      () => {},
-    );
-    expect(val).toBeNull();
-  });
-
-  it("assert no changes with from and case operator", () => {
-    const val = 42;
-    expect(val).toBe(42);
-  });
-
-  it("assert no changes with message", () => {
-    const val = "constant";
-    assertNoDifference(
-      () => val,
+  it("assert no changes with from option", async () => {
+    await assertNoChanges(
+      () => object.num,
+      null,
+      { from: 0 },
       () => {},
     );
   });
 
-  it("assert no changes message with lambda", () => {
-    const expr = () => "stable";
-    const before = expr();
-    const after = expr();
-    expect(after).toBe(before);
+  it("assert no changes with from option with wrong value", async () => {
+    await assertRaises([Assertion], {}, async () => {
+      await assertNoChanges(
+        () => object.num,
+        null,
+        { from: -1 },
+        () => {},
+      );
+    });
   });
 
-  it("assert no changes message with multi line lambda", () => {
-    const count = 0;
-    const expr = () => {
-      return count;
+  it("assert no changes with from option with nil", async () => {
+    const error = await assertRaises([Assertion], {}, async () => {
+      await assertNoChanges(
+        () => object.num,
+        null,
+        { from: null },
+        () => {
+          object.increment();
+        },
+      );
+    });
+    expect(error.message).toEqual("Expected initial value of nil, got 0");
+  });
+
+  it("assert no changes with from and case operator", async () => {
+    const token = SecureRandom.hex();
+
+    await assertNoChanges(
+      () => token,
+      null,
+      { from: /\w{32}/ },
+      () => {},
+    );
+  });
+
+  it.skip("assert no changes with message", async () => {
+    // BLOCKED: activesupport-assertion-failure-messages-diverge-from-minitest
+    const error = await assertRaises([Assertion], {}, async () => {
+      await assertNoChanges(
+        () => object.num,
+        "object.num should not change",
+        {},
+        () => {
+          object.increment();
+        },
+      );
+    });
+
+    expect(error.message).toEqual(
+      "object.num should not change.\n`object.num` changed.\nExpected: 0\n  Actual: 1",
+    );
+  });
+
+  it.skip("assert no changes message with lambda", async () => {
+    // BLOCKED: activesupport-assertion-failure-messages-diverge-from-minitest
+    let error = await assertRaises([Assertion], {}, async () => {
+      await assertNoChanges(
+        () => object.num,
+        null,
+        {},
+        () => {
+          object.increment();
+        },
+      );
+    });
+    expect(error.message).toEqual("`object.num` changed.\nExpected: 0\n  Actual: 1");
+
+    let check = () => object.num;
+    error = await assertRaises([Assertion], {}, async () => {
+      await assertNoChanges(check, null, {}, () => {
+        object.increment();
+      });
+    });
+    expect(error.message).toEqual("`object.num` changed.\nExpected: 1\n  Actual: 2");
+
+    check = () => object.num;
+    error = await assertRaises([Assertion], {}, async () => {
+      await assertNoChanges(check, null, {}, () => {
+        object.increment();
+      });
+    });
+    expect(error.message).toEqual("`object.num` changed.\nExpected: 2\n  Actual: 3");
+
+    error = await assertRaises([Assertion], {}, async () => {
+      await assertNoChanges(
+        () => object.num,
+        null,
+        {},
+        () => {
+          object.increment();
+        },
+      );
+    });
+    expect(error.message).toEqual("`object.num` changed.\nExpected: 3\n  Actual: 4");
+
+    error = await assertRaises([Assertion], {}, async () => {
+      await assertNoChanges(
+        (a = null) => (void a, object.num),
+        null,
+        {},
+        () => {
+          object.increment();
+        },
+      );
+    });
+    expect(error.message).toMatch(/#<Proc:0x.*changed/);
+  });
+
+  it.skip("assert no changes message with multi line lambda", async () => {
+    // BLOCKED: activesupport-assertion-failure-messages-diverge-from-minitest
+    let check = () => {
+      "title".toUpperCase();
+      return object.num;
     };
-    const before = expr();
-    expect(expr()).toBe(before);
+    let error = await assertRaises([Assertion], {}, async () => {
+      await assertNoChanges(check, null, {}, () => {
+        object.increment();
+      });
+    });
+    expect(error.message).toMatch(/#<Proc:0x.*changed/);
+
+    check = () => {
+      "title".toUpperCase();
+      return object.num;
+    };
+    error = await assertRaises([Assertion], {}, async () => {
+      await assertNoChanges(check, null, {}, () => {
+        object.increment();
+      });
+    });
+    expect(error.message).toMatch(/#<Proc:0x.*changed/);
   });
 
-  it("assert no changes message with not real callable", () => {
-    const notCallable = "a string";
-    expect(typeof notCallable).toBe("string");
-    expect(typeof notCallable === "function").toBe(false);
+  it.skip("assert no changes message with not real callable", async () => {
+    // BLOCKED: activesupport-assertion-failure-messages-diverge-from-minitest
+    const check = { call: () => object.num };
+
+    const error = await assertRaises([Assertion], {}, async () => {
+      await assertNoChanges(check as unknown as () => unknown, null, {}, () => {
+        object.increment();
+      });
+    });
+    expect(error.message).toMatch(/#<Object:0x.*changed/);
   });
 
-  it("assert no changes with long string wont output everything", () => {
-    const long = "a".repeat(1000);
-    expect(long.length).toBe(1000);
-    const before = long;
-    expect(long).toBe(before);
+  it.skip("assert no changes with long string wont output everything", async () => {
+    // BLOCKED: activesupport-assertion-failure-messages-diverge-from-minitest
+    let lines = "HEY\n".repeat(12);
+
+    const error = await assertRaises([Assertion], {}, async () => {
+      await assertNoChanges(
+        () => lines,
+        null,
+        {},
+        () => {
+          lines += "HEY ALSO\n";
+        },
+      );
+    });
+
+    expect(error.message).toMatch(
+      '`lines` changed.\n--- expected\n+++ actual\n@@ -10,4 +10,5 @@\n HEY\n HEY\n HEY\n+HEY ALSO\n "\n',
+    );
   });
 });
 
 describe("ExceptionsInsideAssertionsTest", () => {
-  it("warning is logged if caught internally", () => {
-    expect(() => {
-      throw new Error("internal error");
-    }).toThrow("internal error");
+  let out: string[];
+
+  beforeEach(() => {
+    out = [];
+    TestCase.setTaggedLogger(new Logger({ write: (s: string) => out.push(s) }) as never);
   });
 
-  it("warning is not logged if caught correctly by user", () => {
-    const result = (() => {
-      try {
-        throw new Error("test error");
-      } catch {
-        return "caught";
-      }
-    })();
-    expect(result).toBe("caught");
+  async function runTestThatShouldPassAndLogAWarning(): Promise<void> {
+    await assertRaises([UnexpectedError], {}, async () => {
+      await assertNoChanges(
+        () => 1,
+        null,
+        {},
+        () => {
+          throw new ArgumentError();
+        },
+      );
+    });
+  }
+
+  async function runTestThatShouldFailConfusingly(): Promise<void> {
+    await assertRaises([ArgumentError], {}, async () => {
+      await assertNoChanges(
+        () => 1,
+        null,
+        {},
+        () => {
+          throw new ArgumentError();
+        },
+      );
+    });
+  }
+
+  async function runTestThatShouldPassAndNotLogAWarning(): Promise<void> {
+    await assertNoChanges(
+      () => 1,
+      null,
+      {},
+      async () => {
+        await assertRaises([ArgumentError], {}, () => {
+          throw new ArgumentError();
+        });
+      },
+    );
+  }
+
+  async function runTestThatShouldFailButNotLogAWarning(): Promise<void> {
+    await assertNoChanges(
+      () => Math.random(),
+      null,
+      {},
+      async () => {
+        await assertRaises([ArgumentError], {}, () => {
+          throw new ArgumentError();
+        });
+      },
+    );
+  }
+
+  it("warning is logged if caught internally", async () => {
+    await runTestThatShouldPassAndLogAWarning();
+    const expected =
+      "ExceptionsInsideAssertionsTest - warning is logged if caught internally: ArgumentError raised.\n" +
+      "If you expected this exception, use `assert_raises` as near to the code that raises as possible.\n" +
+      "Other block based assertions (e.g. `assert_no_changes`) can be used, as long as `assert_raises` is inside their block.\n";
+    assertIncludes(out.join(""), expected);
   });
 
-  it("warning is not logged if assertions are nested correctly", () => {
-    expect(() => {
-      expect(1 + 1).toBe(2);
-    }).not.toThrow();
+  it("warning is not logged if caught correctly by user", async () => {
+    await runTestThatShouldPassAndNotLogAWarning();
+    assertNot(out.join("").includes("assert_nothing_raised"));
   });
 
-  it("fails and warning is logged if wrong error caught", () => {
-    expect(() => {
-      expect(() => {
-        throw new TypeError("wrong type");
-      }).toThrow(RangeError);
-    }).toThrow();
+  it.skip("warning is not logged if assertions are nested correctly", async () => {
+    // BLOCKED: activesupport-exceptions-inside-assertions-warning-is-not-emitted
+    const error = await assertRaises([Assertion], {}, async () => {
+      await runTestThatShouldFailButNotLogAWarning();
+    });
+    assertNot(out.join("").includes("assert_nothing_raised"));
+    assert(error.message.includes("`rand` changed"));
+  });
+
+  it.skip("fails and warning is logged if wrong error caught", async () => {
+    // BLOCKED: activesupport-exceptions-inside-assertions-warning-is-not-emitted
+    const error = await assertRaises([Assertion], {}, async () => {
+      await runTestThatShouldFailConfusingly();
+    });
+    const expected =
+      "ExceptionsInsideAssertionsTest - fails and warning is logged if wrong error caught: ArgumentError raised.\n" +
+      "If you expected this exception, use `assert_raises` as near to the code that raises as possible.\n" +
+      "Other block based assertions (e.g. `assert_no_changes`) can be used, as long as `assert_raises` is inside their block.\n";
+    assertIncludes(out.join(""), expected);
+    assertIncludes(error.message, "ArgumentError: ArgumentError");
+    assertIncludes(error.message, "runTestThatShouldFailConfusingly");
   });
 });
 
+class SetupAndTeardownTestCase extends TestCase {
+  calledBack: string[] = [];
+
+  resetCallbackRecord(): void {
+    this.calledBack = [];
+  }
+
+  foo(): void {
+    this.calledBack.push(":foo");
+  }
+
+  sentinel(): void {
+    expect(this.calledBack).toEqual([":foo"]);
+  }
+}
+SetupAndTeardownTestCase.setup(":resetCallbackRecord", ":foo");
+SetupAndTeardownTestCase.teardown(":foo", ":sentinel");
+
+class SubclassSetupAndTeardownTestCase extends SetupAndTeardownTestCase {
+  bar(): void {
+    this.calledBack.push(":bar");
+  }
+
+  override sentinel(): void {
+    expect(this.calledBack).toEqual([":foo", ":bar", ":bar"]);
+  }
+}
+SubclassSetupAndTeardownTestCase.setup(":bar");
+SubclassSetupAndTeardownTestCase.teardown(":bar");
+
 describe("SetupAndTeardownTest", () => {
-  it("inherited setup callbacks", () => {
-    const log: string[] = [];
-    const setup = () => log.push("setup");
-    setup();
-    expect(log).toEqual(["setup"]);
+  it.skip("inherited setup callbacks", () => {
+    // BLOCKED: activesupport-test-case-setup-callback-chain-is-not-introspectable
+    const instance = new SetupAndTeardownTestCase();
+    instance.resetCallbackRecord();
+    instance.foo();
+
+    expect(
+      peekCallbackChain(SetupAndTeardownTestCase, "setup")?.entries.map((c) => c.filter),
+    ).toEqual([":resetCallbackRecord", ":foo"]);
+    expect(instance.calledBack).toEqual([":foo"]);
+    expect(
+      peekCallbackChain(SetupAndTeardownTestCase, "teardown")?.entries.map((c) => c.filter),
+    ).toEqual([":foo", ":sentinel"]);
+  });
+});
+
+describe("SubclassSetupAndTeardownTest", () => {
+  it.skip("inherited setup callbacks", () => {
+    // BLOCKED: activesupport-test-case-setup-callback-chain-is-not-introspectable
+    const instance = new SubclassSetupAndTeardownTestCase();
+    instance.resetCallbackRecord();
+    instance.foo();
+    instance.bar();
+
+    expect(
+      peekCallbackChain(SubclassSetupAndTeardownTestCase, "setup")?.entries.map((c) => c.filter),
+    ).toEqual([":resetCallbackRecord", ":foo", ":bar"]);
+    expect(instance.calledBack).toEqual([":foo", ":bar"]);
+    expect(
+      peekCallbackChain(SubclassSetupAndTeardownTestCase, "teardown")?.entries.map((c) => c.filter),
+    ).toEqual([":foo", ":sentinel", ":bar"]);
   });
 });
 
 describe("TestCaseTaggedLoggingTest", () => {
-  it("logs tagged with current test case", () => {
-    const output = { string: "" };
-    const tag = "TestCase";
-    const msg = `[${tag}] test message`;
-    output.string += msg;
-    expect(output.string).toContain("[TestCase]");
+  it.skip("logs tagged with current test case", () => {
+    // BLOCKED: activesupport-test-case-does-not-tag-the-logger-with-the-running-test
+    const out: string[] = [];
+    TestCase.setTaggedLogger(new Logger({ write: (s: string) => out.push(s) }) as never);
+    expect(out.join("")).toMatch("TestCaseTaggedLoggingTest: logs tagged with current test case\n");
   });
 });
 
 describe("TestOrderTest", () => {
-  it("defaults to random", () => {
-    expect(true).toBe(true);
+  const TestOrder = TestCase as unknown as {
+    testOrder: string;
+    setTestOrder(order: string | null): void;
+  };
+  const ActiveSupportTestOrder = ActiveSupport as unknown as {
+    testOrder: string;
+    setTestOrder(order: string | null): void;
+  };
+  let originalTestOrder: string;
+
+  beforeEach(() => {
+    originalTestOrder = TestOrder.testOrder;
   });
 
-  it("test order is global", () => {
-    expect(typeof describe).toBe("function");
+  afterEach(() => {
+    TestOrder.setTestOrder(originalTestOrder);
+  });
+
+  it.skip("defaults to random", () => {
+    // BLOCKED: activesupport-test-case-has-no-test-order
+    TestOrder.setTestOrder(null);
+
+    expect(TestOrder.testOrder).toEqual(":random");
+
+    expect(ActiveSupportTestOrder.testOrder).toEqual(":random");
+  });
+
+  it.skip("test order is global", () => {
+    // BLOCKED: activesupport-test-case-has-no-test-order
+    TestOrder.setTestOrder(":sorted");
+
+    expect(ActiveSupportTestOrder.testOrder).toEqual(":sorted");
+    expect(TestOrder.testOrder).toEqual(":sorted");
+    expect(TestOrder.testOrder).toEqual(":sorted");
+    expect((class extends TestCase {} as unknown as typeof TestOrder).testOrder).toEqual(":sorted");
+
+    ActiveSupportTestOrder.setTestOrder(":random");
+
+    expect(ActiveSupportTestOrder.testOrder).toEqual(":random");
+    expect(TestOrder.testOrder).toEqual(":random");
+    expect(TestOrder.testOrder).toEqual(":random");
+    expect((class extends TestCase {} as unknown as typeof TestOrder).testOrder).toEqual(":random");
   });
 });
 
@@ -641,35 +967,29 @@ describe("TestConstStubbing", () => {
     }).toThrow(NameError);
   });
 
-  it("stubbing a constant that does not exist can be done with `exists: false`", () => {
+  it("stubbing a constant that does not exist can be done with `exists: false`", async () => {
     stubConst(
       ConstStubbable as never,
       "NOT_A_CONSTANT",
       1,
       () => {
-        expect((ConstStubbable as { NOT_A_CONSTANT?: number }).NOT_A_CONSTANT).toBe(1);
+        expect((ConstStubbable as { NOT_A_CONSTANT?: number }).NOT_A_CONSTANT).toEqual(1);
       },
       { exists: false },
     );
 
-    expect((ConstStubbable as { NOT_A_CONSTANT?: number }).NOT_A_CONSTANT).toBeUndefined();
+    await assertRaises([NameError], {}, () => {
+      constantLookup(ConstStubbable, "NOT_A_CONSTANT");
+    });
 
     const namespace = { ConstStubbable } as unknown as Record<string, unknown>;
-    expect(() => {
+    await assertRaises([NameError], {}, () => {
       stubConst(namespace, "ConstStubbable", 1, () => {}, { exists: false });
-    }).toThrow(NameError);
+    });
   });
 });
 
-describe("SubclassSetupAndTeardownTest", () => {
-  it("inherited setup callbacks", () => {
-    const log: string[] = [];
-    const parentSetup = () => log.push("parent");
-    const childSetup = () => {
-      parentSetup();
-      log.push("child");
-    };
-    childSetup();
-    expect(log).toEqual(["parent", "child"]);
-  });
-});
+function constantLookup(receiver: object, name: string): unknown {
+  if (!(name in receiver)) throw new NameError(`uninitialized constant ${name}`);
+  return (receiver as Record<string, unknown>)[name];
+}

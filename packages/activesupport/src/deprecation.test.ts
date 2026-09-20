@@ -1,17 +1,112 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { ActiveSupport } from "./index.js";
-import { Deprecation, DeprecationException, type CallerLocation } from "./deprecation.js";
-import { deprecator } from "./deprecator.js";
-import { ErrorReporter } from "./error-reporter.js";
-import { ErrorSubscriber } from "./error-reporter/test-helper.js";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Thread, stderr } from "@blazetrails/ruby-compat";
+import {
+  Deprecation,
+  DeprecationException,
+  callerLocations,
+  type CallerLocation,
+  type DeprecationBehaviorCallable,
+} from "./deprecation.js";
+import {
+  DeprecatedConstantProxy,
+  DeprecatedInstanceVariableProxy,
+  DeprecatedObjectProxy,
+} from "./deprecation/proxy-wrappers.js";
+import { sole } from "./enumerable-utils.js";
+import { VERSION } from "./gem-version.js";
+import { ArgumentError } from "./hash-utils.js";
+import { registerConstant } from "./inflector.js";
 import { Logger } from "./logger.js";
 import { Notifications } from "./notifications.js";
 import { _setTrailsLogger } from "./trails-logger-slot.js";
+import {
+  Assertion,
+  assert,
+  assertEmpty,
+  assertIncludes,
+  assertNot,
+  assertNotEmpty,
+  assertNothingRaised,
+  assertRaise,
+  assertRaises,
+  assertSame,
+} from "./testing/assertions.js";
+import { assertErrorReported } from "./testing/error-reporter-assertions.js";
+import {
+  assertDeprecated,
+  assertNotDeprecated,
+  collectDeprecations,
+} from "./testing/deprecation.js";
 
-function withTrailsLogger<T>(logger: Logger | null, fn: () => T): T {
+class Deprecatee {
+  private _fubar: unknown;
+  private _fooBar: unknown;
+
+  fubar(): unknown {
+    return this._fubar;
+  }
+  setFubar(value: unknown): void {
+    this._fubar = value;
+  }
+  fooBar(): unknown {
+    return this._fooBar;
+  }
+  setFooBar(value: unknown): void {
+    this._fooBar = value;
+  }
+
+  zero(): number {
+    return 0;
+  }
+  one(a: unknown): unknown {
+    return a;
+  }
+  multi(a: unknown, b: unknown, c: unknown): unknown[] {
+    return [a, b, c];
+  }
+}
+
+const UndeprecatedFoo: Record<string, unknown> = { BAR: "foo bar" };
+registerConstant("Undeprecated::Foo", UndeprecatedFoo);
+registerConstant("Undeprecated::Foo::BAR", UndeprecatedFoo.BAR);
+
+class CallerLocationFixture implements CallerLocation {
+  path = "packages/activesupport/src/deprecation.test.ts";
+  lineno: number;
+  label: string;
+
+  constructor(label: string, lineno: number) {
+    this.label = label;
+    this.lineno = lineno;
+  }
+
+  get absolutePath(): string {
+    return this.path;
+  }
+
+  toString(): string {
+    return `${this.path}:${this.lineno}:in '${this.label}'`;
+  }
+}
+
+function capture(_stream: ":stderr", block: () => void): string {
+  const chunks: string[] = [];
+  const spy = vi.spyOn(stderr, "write").mockImplementation((chunk) => {
+    chunks.push(String(chunk));
+    return true;
+  });
+  try {
+    block();
+  } finally {
+    spy.mockRestore();
+  }
+  return chunks.join("");
+}
+
+function withTrailsLogger<T>(logger: Logger | null, block: (logger: Logger | null) => T): T {
   _setTrailsLogger(logger);
   try {
-    return fn();
+    return block(logger);
   } finally {
     _setTrailsLogger(null);
   }
@@ -29,623 +124,351 @@ function callDeprecatedMethodWarning(
   ).deprecatedMethodWarning(methodName, message);
 }
 
+class DeprecatorWithMessages extends Deprecation {
+  messages: string[] = [];
+
+  constructor() {
+    super();
+    this.behavior = (message: string) => {
+      this.messages.push(message);
+    };
+  }
+}
+
+function deprecatorWithMessages(): DeprecatorWithMessages {
+  return new DeprecatorWithMessages();
+}
+
+async function collectDisallowed<T>(
+  deprecator: Deprecation,
+  block: () => T | Promise<T>,
+): Promise<[T, string[]]> {
+  const originalDisallowedBehavior = deprecator.disallowedBehavior;
+  const disallowed: string[] = [];
+  deprecator.disallowedBehavior = ((message: string) => {
+    disallowed.push(message);
+  }) as DeprecationBehaviorCallable;
+  try {
+    const result = await block();
+    return [result, disallowed];
+  } finally {
+    deprecator.disallowedBehavior = originalDisallowedBehavior;
+  }
+}
+
+async function assertDisallowed<T>(
+  match: RegExp | string | Deprecation | null,
+  deprecator: Deprecation | null,
+  block: () => T | Promise<T>,
+): Promise<T> {
+  if (match instanceof Deprecation) [match, deprecator] = [null, match];
+  const [result, disallowed] = await collectDisallowed(deprecator!, block);
+  assertNotEmpty(
+    disallowed,
+    "Expected a disallowed deprecation within the block but received none",
+  );
+  if (match != null) {
+    const matcher = match instanceof RegExp ? match : new RegExp(match);
+    assert(
+      disallowed.some((message) => matcher.test(message)),
+      `No disallowed deprecations matched ${matcher}: ${disallowed.join(", ")}`,
+    );
+  }
+  return result;
+}
+
+function assertCallbacksCalledWith(
+  matchers: { deprecator?: Deprecation; message?: RegExp },
+  block: (callbacks: DeprecationBehaviorCallable[]) => void,
+): void {
+  const expected: Record<string, unknown> = {};
+  if (matchers.message) expected.message = matchers.message;
+  if (matchers.deprecator) {
+    expected.deprecationHorizon = matchers.deprecator.deprecationHorizon;
+    expected.gemName = matchers.deprecator.gemName;
+    expected.deprecator = matchers.deprecator;
+  }
+
+  const bindings: Record<string, unknown>[] = [];
+
+  const callbacks = [
+    (message: string, callstack: unknown[], deprecator: Deprecation) => {
+      bindings.push({ message, callstack, deprecator });
+    },
+    (message: string, callstack: unknown[], deprecationHorizon: string, gemName: string) => {
+      bindings.push({ message, callstack, deprecationHorizon, gemName });
+    },
+    (message: string, callstack: unknown[]) => {
+      bindings.push({ message, callstack });
+    },
+    (message: string) => {
+      bindings.push({ message });
+    },
+    () => {
+      bindings.push({});
+    },
+  ] as unknown as DeprecationBehaviorCallable[];
+
+  block(callbacks);
+
+  expect(bindings.length).toEqual(callbacks.length);
+
+  for (const bound of bindings) {
+    if ("callstack" in bound) expect(Array.isArray(bound.callstack)).toBe(true);
+    for (const [name, matcher] of Object.entries(expected)) {
+      if (!(name in bound)) continue;
+      if (matcher instanceof RegExp) {
+        expect(String(bound[name])).toMatch(matcher);
+      } else {
+        expect(bound[name]).toEqual(matcher);
+      }
+    }
+  }
+}
+
 describe("DeprecationTest", () => {
-  let dep: Deprecation;
+  let deprecator: Deprecation;
 
   beforeEach(() => {
-    dep = new Deprecation();
+    deprecator = new Deprecation();
   });
 
-  it(":raise behavior", () => {
-    dep.behavior = "raise";
-    expect(() => dep.warn("old API")).toThrow(DeprecationException);
-    expect(() => dep.warn("old API")).toThrow("old API");
-  });
-
-  it(":silence behavior", () => {
-    dep.behavior = "silence";
-    expect(() => dep.warn("something")).not.toThrow();
-  });
-
-  it(":stderr behavior writes to stderr", () => {
-    dep.behavior = "stderr";
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    dep.warn("fubar");
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining("fubar"));
-    spy.mockRestore();
-  });
-
-  it("nil behavior is ignored", () => {
-    dep.behavior = null;
-    expect(() => dep.warn("fubar")).not.toThrow();
-  });
-
-  it("silence", () => {
-    expect(dep.silenced).toBe(false);
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-
-    dep.silence(() => {
-      dep.warn("should be silent");
+  it("assert_deprecated", async () => {
+    await assertDeprecated(/fubar/, deprecator, () => {
+      deprecator.warn("using fubar is deprecated");
     });
-    expect(spy).not.toHaveBeenCalled();
 
-    spy.mockRestore();
+    await assertDeprecated(deprecator, null, () => {
+      deprecator.warn("whatever");
+    });
   });
 
-  it("silence returns the result of the block", () => {
-    expect(dep.silence(() => 123)).toBe(123);
-  });
-
-  it("silence ensures silencing is reverted after an error is raised", () => {
-    expect(() => {
-      dep.silence(() => {
-        throw new Error("oops");
+  it("assert_deprecated requires a deprecator", async () => {
+    await assertRaises([ArgumentError], {}, async () => {
+      await assertDeprecated(null, null, () => {
+        Deprecation._instance().warn();
       });
-    }).toThrow("oops");
-
-    dep.behavior = "raise";
-    expect(() => dep.warn("still active")).toThrow();
-  });
-
-  it("silenced=true suppresses all warnings", () => {
-    dep.silenced = true;
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    dep.warn("should be silent");
-    expect(spy).not.toHaveBeenCalled();
-    spy.mockRestore();
-  });
-
-  it("deprecateMethod wraps method with warning", () => {
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    const obj = { greet: () => "hello" };
-    dep.behavior = "stderr";
-    dep.deprecateMethod(obj, "greet", "greet is deprecated");
-    const result = obj.greet();
-    expect(result).toBe("hello");
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining("greet is deprecated"));
-    spy.mockRestore();
-  });
-
-  it("behavior as function callback", () => {
-    const messages: string[] = [];
-    dep.behavior = (msg: unknown) => {
-      messages.push(String(msg));
-    };
-    dep.warn("fubar");
-    expect(messages.some((m) => m.includes("fubar"))).toBe(true);
-  });
-
-  it("behavior as array of behaviors", () => {
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    dep.behavior = ["stderr", "silence"];
-    dep.warn("multi");
-    expect(spy).toHaveBeenCalled();
-    spy.mockRestore();
-  });
-
-  it("warn with no message produces default message", () => {
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    dep.warn();
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining("DEPRECATION WARNING"));
-    spy.mockRestore();
-  });
-
-  it("disallowed_warnings is empty by default", () => {
-    expect(dep.disallowedWarnings).toEqual([]);
-  });
-
-  it("disallowed_warnings can be configured", () => {
-    const warnings = ["unsafe_method is going away"];
-    dep.disallowedWarnings = warnings;
-    expect(dep.disallowedWarnings).toEqual(warnings);
-  });
-
-  it("deprecator singleton is a Deprecation instance", () => {
-    expect(deprecator()).toBeInstanceOf(Deprecation);
-  });
-
-  it("gem option stored on instance", () => {
-    const d = new Deprecation("8.1", "MyGem");
-    expect(d.gemName).toBe("MyGem");
-  });
-
-  it("horizon option stored on instance", () => {
-    const d = new Deprecation("3.0");
-    expect(d.deprecationHorizon).toBe("3.0");
-  });
-
-  it("silenced option in constructor", () => {
-    const d = new Deprecation();
-    d.silenced = true;
-    expect(d.silenced).toBe(true);
-  });
-
-  it("warn with empty callstack", () => {
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    dep.warn("msg", []);
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining("msg"));
-    spy.mockRestore();
-  });
-
-  it("disallowed_behavior does not trigger when disallowed_warnings is empty", () => {
-    dep.behavior = "silence";
-    dep.disallowedWarnings = [];
-    dep.disallowedBehavior = "raise";
-    expect(() => dep.warn("something")).not.toThrow();
-  });
-
-  it("disallowed_behavior does not trigger when disallowed_warnings does not match the warning", () => {
-    dep.disallowedWarnings = ["other thing"];
-    dep.disallowedBehavior = "raise";
-    dep.behavior = "silence";
-    expect(() => dep.warn("something else")).not.toThrow();
-  });
-
-  it("disallowed_warnings can match using a substring", () => {
-    dep.disallowedWarnings = ["old"];
-    dep.disallowedBehavior = "raise";
-    expect(() => dep.warn("using old API")).toThrow(DeprecationException);
-  });
-
-  it("disallowed_warnings can match using a regexp", () => {
-    dep.disallowedWarnings = [/old.*/];
-    dep.disallowedBehavior = "raise";
-    expect(() => dep.warn("old API is gone")).toThrow(DeprecationException);
-  });
-
-  it("disallowed_warnings matches all warnings when set to :all", () => {
-    dep.disallowedWarnings = ":all";
-    expect(() => dep.warn("using fubar is deprecated")).toThrow(/fubar/);
-  });
-
-  it("different behaviors for allowed and disallowed warnings", () => {
-    dep.disallowedWarnings = ":all";
-    dep.behavior = () => expect.unreachable("the allowed behavior must not run");
-
-    expect(() => dep.warn("using fubar is deprecated")).toThrow(/fubar/);
-  });
-
-  it("disallowed_behavior callbacks", () => {
-    const messages: string[] = [];
-    dep.disallowedWarnings = ["bad"];
-    dep.disallowedBehavior = (msg: unknown) => messages.push(String(msg));
-    dep.warn("bad warning");
-    expect(messages.some((m) => m.includes("bad warning"))).toBe(true);
-  });
-
-  it("allow", () => {
-    dep.disallowedWarnings = ":all";
-
-    expect(() => dep.warn()).toThrow(DeprecationException);
-
-    dep.allow(":all", {}, () => {
-      expect(() => dep.warn()).not.toThrow();
     });
   });
 
-  it("allow only allows matching warnings using a substring", () => {
-    dep.disallowedWarnings = ":all";
+  it("assert_not_deprecated", async () => {
+    await assertNotDeprecated(deprecator, () => 1 + 1);
+  });
 
-    dep.allow(["foo bar", "baz qux"], {}, () => {
-      expect(() => dep.warn("foo bar")).not.toThrow();
-      expect(() => dep.warn("baz qux")).not.toThrow();
-      expect(() => dep.warn("fubar")).toThrow(/fubar/);
+  it.skip("assert_not_deprecated requires a deprecator", async () => {
+    // BLOCKED: testing-deprecation-helpers-do-not-require-a-deprecator
+    await assertRaises([ArgumentError], {}, async () => {
+      await assertNotDeprecated(null as unknown as Deprecation, () => {});
     });
   });
 
-  it("allow only allows matching warnings using a regexp", () => {
-    dep.disallowedWarnings = ":all";
+  it("collect_deprecations returns the return value of the block and the deprecations collected", async () => {
+    const result = await collectDeprecations(deprecator, () => {
+      deprecator.warn();
+      return ":result";
+    });
+    expect(result.length).toEqual(2);
+    expect(result[0]).toEqual(":result");
+    expect(sole(result[1])).toMatch("DEPRECATION WARNING:");
+  });
 
-    dep.allow([/(foo|baz) (bar|qux)/], {}, () => {
-      expect(() => dep.warn("foo bar")).not.toThrow();
-      expect(() => dep.warn("baz qux")).not.toThrow();
-      expect(() => dep.warn("fubar")).toThrow(/fubar/);
+  it.skip("collect_deprecations requires a deprecator", async () => {
+    // BLOCKED: testing-deprecation-helpers-do-not-require-a-deprecator
+    await assertRaises([ArgumentError], {}, async () => {
+      await collectDeprecations(null as unknown as Deprecation, () => {});
     });
   });
 
-  it("allow only affects its block", () => {
-    dep.disallowedWarnings = ":all";
-
-    dep.allow(":all", {}, () => {
-      expect(() => dep.warn()).not.toThrow();
-    });
-
-    expect(() => dep.warn()).toThrow(DeprecationException);
-  });
-
-  it("allow with :if option", () => {
-    dep.disallowedWarnings = ":all";
-
-    dep.allow(["fubar"], { if: true }, () => {
-      expect(() => dep.warn("fubar")).not.toThrow();
-    });
-
-    dep.allow(["fubar"], { if: false }, () => {
-      expect(() => dep.warn("fubar")).toThrow(/fubar/);
-    });
-  });
-
-  it("allow with :if option as a proc", () => {
-    dep.disallowedWarnings = ":all";
-
-    dep.allow(["fubar"], { if: () => true }, () => {
-      expect(() => dep.warn("fubar")).not.toThrow();
-    });
-
-    dep.allow(["fubar"], { if: () => false }, () => {
-      expect(() => dep.warn("fubar")).toThrow(/fubar/);
-    });
-  });
-
-  it("allow with the default warning message", () => {
-    dep.disallowedWarnings = ":all";
-
-    dep.allow(":all", {}, () => {
-      expect(() => dep.warn()).not.toThrow();
-    });
-
-    dep.allow(["fubar"], {}, () => {
-      expect(() => dep.warn()).toThrow(DeprecationException);
-    });
-  });
-
-  it("custom gem_name", () => {
-    const deprecator = new Deprecation("2.0", "Custom");
-
-    const message = callDeprecatedMethodWarning(
-      deprecator,
-      "deprecated_method",
-      "You are calling deprecated method",
+  it("Module::deprecate", async () => {
+    const klass = class extends Deprecatee {};
+    deprecator.deprecateMethods(
+      klass.prototype as unknown as Record<string, unknown>,
+      "zero",
+      "one",
+      "multi",
+      { deprecator },
     );
-    expect(message).toMatch(/is deprecated and will be removed from Custom/);
+
+    await assertDeprecated(/zero is deprecated/, deprecator, () => {
+      expect(new klass().zero()).toEqual(0);
+    });
+
+    await assertDeprecated(/one is deprecated/, deprecator, () => {
+      expect(new klass().one(1)).toEqual(1);
+    });
+
+    await assertDeprecated(/multi is deprecated/, deprecator, () => {
+      expect(new klass().multi(1, 2, 3)).toEqual([1, 2, 3]);
+    });
   });
 
-  it("default gem_name is Rails", () => {
-    const deprecator = new Deprecation();
-
-    const message = callDeprecatedMethodWarning(
-      deprecator,
-      "deprecated_method",
-      "You are calling deprecated method",
+  it("Module::deprecate does not expand Hash positional argument", async () => {
+    const klass = class extends Deprecatee {
+      ["one!"](a: unknown): unknown {
+        return Deprecatee.prototype.one.call(this, a);
+      }
+    };
+    deprecator.deprecateMethods(
+      klass.prototype as unknown as Record<string, unknown>,
+      "one",
+      "one!",
+      { deprecator },
     );
-    expect(message).toMatch(/is deprecated and will be removed from Rails/);
-  });
 
-  it("default deprecation_horizon is greater than the current Rails version", () => {
-    const d = new Deprecation();
-    expect(d.deprecationHorizon > "8.0.2").toBe(true);
-  });
+    const hash = { k: 1 };
 
-  it("disallowed_warnings with the default warning message", () => {
-    dep.disallowedWarnings = ":all";
-    expect(() => dep.warn()).toThrow(DeprecationException);
-
-    dep.disallowedWarnings = ["fubar"];
-    expect(() => dep.warn()).not.toThrow();
-  });
-
-  it("assert_deprecated without match argument", () => {
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    dep.warn("any warning");
-    expect(spy).toHaveBeenCalled();
-    spy.mockRestore();
-  });
-
-  it("assert_deprecated matches any warning from block", () => {
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    dep.warn("some warning message");
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining("some warning message"));
-    spy.mockRestore();
-  });
-
-  it("assert_not_deprecated returns the result of the block", () => {
-    const result = dep.silence(() => 42);
-    expect(result).toBe(42);
-  });
-
-  it("assert_deprecated returns the result of the block", () => {
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    dep.warn("something");
-    expect(spy).toHaveBeenCalled();
-    spy.mockRestore();
-  });
-
-  it("silence only affects the current thread", () => {
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    dep.silence(() => {
-      dep.warn("silenced inside");
+    await assertDeprecated(/one is deprecated/, deprecator, () => {
+      assertSame(hash, new klass().one(hash));
     });
-    dep.warn("not silenced outside");
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining("not silenced outside"));
-    spy.mockRestore();
-  });
 
-  it("Module::deprecate with method name only", () => {
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    const obj = { greet: () => "hello" };
-    dep.deprecateMethod(obj, "greet", "greet is deprecated");
-    obj.greet();
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining("greet is deprecated"));
-    spy.mockRestore();
-  });
-
-  it("Module::deprecate with alternative method", () => {
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    const obj = { oldMethod: () => "result" };
-    dep.deprecateMethod(obj, "oldMethod", "use newMethod instead");
-    obj.oldMethod();
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining("use newMethod instead"));
-    spy.mockRestore();
-  });
-
-  it("Module::deprecate with message", () => {
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    const obj = { compute: () => 42 };
-    const msg = "compute is going away in version 2.0";
-    dep.deprecateMethod(obj, "compute", msg);
-    obj.compute();
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining(msg));
-    spy.mockRestore();
-  });
-
-  it("overriding deprecated_method_warning", () => {
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    const obj = { fn: () => "ok" };
-    dep.deprecateMethod(obj, "fn", "custom override message");
-    obj.fn();
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining("custom override message"));
-    spy.mockRestore();
-  });
-
-  it("Module::deprecate with custom deprecator", () => {
-    const custom = new Deprecation();
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    const obj = { fn: () => "ok" };
-    custom.deprecateMethod(obj, "fn", "custom deprecator message");
-    obj.fn();
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining("custom deprecator message"));
-    spy.mockRestore();
-  });
-
-  it("Module::deprecate can be called before the target method is defined", () => {
-    const obj: any = {};
-    obj.myMethod = () => "result";
-    dep.deprecateMethod(obj, "myMethod", "myMethod deprecated");
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    obj.myMethod();
-    expect(spy).toHaveBeenCalled();
-    spy.mockRestore();
-  });
-
-  it("DeprecatedConstantProxy with explicit deprecator", () => {
-    const d = new Deprecation();
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    d.warn("constant deprecated");
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining("constant deprecated"));
-    spy.mockRestore();
-  });
-
-  it("DeprecatedConstantProxy with message", () => {
-    const d = new Deprecation();
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    d.warn("CONSTANT is deprecated, use NEW_CONSTANT");
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining("CONSTANT is deprecated"));
-    spy.mockRestore();
-  });
-
-  it("disallowed_warnings can match using a substring as a symbol", () => {
-    dep.disallowedWarnings = [":fubar"];
-
-    expect(() => dep.warn("using fubar is deprecated")).toThrow(/fubar/);
-  });
-
-  it("allow only allows matching warnings using a substring as a symbol", () => {
-    dep.disallowedWarnings = ":all";
-
-    dep.allow([":foo bar", ":baz qux"], {}, () => {
-      expect(() => dep.warn("foo bar")).not.toThrow();
-      expect(() => dep.warn("baz qux")).not.toThrow();
-      expect(() => dep.warn("fubar")).toThrow(/fubar/);
+    await assertDeprecated(/one! is deprecated/, deprecator, () => {
+      assertSame(hash, new klass()["one!"](hash));
     });
   });
 
-  it("allow only affects the current thread", () => {
-    dep.disallowedWarnings = ":all";
-
-    dep.allow(":all", {}, () => {
-      expect(() => dep.warn()).not.toThrow();
+  it.skip("Module::deprecate requires a deprecator", async () => {
+    // BLOCKED: activesupport-has-no-module-deprecate
+    const klass = class extends Deprecatee {};
+    await assertRaises([ArgumentError], {}, () => {
+      (klass as unknown as { deprecate(name: string): void }).deprecate("zero");
     });
-
-    expect(() => dep.warn()).toThrow(DeprecationException);
   });
 
-  const frame = (path: string, lineno = 1, label = "block"): CallerLocation => ({
-    path,
-    lineno,
-    label,
-    toString: () => `${path}:${lineno}:in '${label}'`,
+  it("DeprecatedObjectProxy", async () => {
+    const deprecatedObject = DeprecatedObjectProxy.new({}, ":bomb:", deprecator);
+    await assertDeprecated(/:bomb:/, deprecator, () =>
+      (deprecatedObject as { toS(): unknown }).toS(),
+    );
   });
 
-  it("warn deprecation skips the internal caller locations", () => {
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    dep.warn("test callstack message");
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining("test callstack message"));
-    spy.mockRestore();
+  it.skip("DeprecatedObjectProxy requires a deprecator", async () => {
+    // BLOCKED: deprecation-proxies-do-not-require-a-deprecator
+    await assertRaises([ArgumentError], {}, () => {
+      DeprecatedObjectProxy.new({}, ":bomb:");
+    });
   });
 
-  it("warn deprecation can blame code generated with eval", () => {
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    dep.warn("eval blame message", [frame("(eval)")]);
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining("eval blame message"));
-    spy.mockRestore();
-  });
-
-  it("warn deprecation can blame code from internal methods", () => {
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    dep.warn("internal method blame", [frame("<internal:kernel>")]);
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining("internal method blame"));
-    spy.mockRestore();
-  });
-
-  it("assert_deprecated", () => {
-    dep.behavior = "raise";
-    expect(() => dep.warn("deprecated!")).toThrow(DeprecationException);
-  });
-
-  it("assert_deprecated requires a deprecator", () => {
-    const customDep = new Deprecation();
-    customDep.behavior = "raise";
-    expect(() => customDep.warn("x")).toThrow(DeprecationException);
-  });
-
-  it("assert_not_deprecated", () => {
-    dep.behavior = "silence";
-    expect(() => dep.warn("silenced")).not.toThrow();
-  });
-
-  it("assert_not_deprecated requires a deprecator", () => {
-    const customDep = new Deprecation();
-    customDep.behavior = "silence";
-    expect(() => customDep.warn("silenced")).not.toThrow();
-  });
-
-  it("collect_deprecations returns the return value of the block and the deprecations collected", () => {
-    const collected: string[] = [];
-    dep.behavior = (msg: unknown) => {
-      collected.push(String(msg));
-    };
-    const result = (() => {
-      dep.warn("collected!");
-      return 42;
-    })();
-    expect(result).toBe(42);
-    expect(collected.some((m) => m.includes("collected!"))).toBe(true);
-  });
-
-  it("collect_deprecations requires a deprecator", () => {
-    const customDep = new Deprecation();
-    const collected: string[] = [];
-    customDep.behavior = (msg: unknown) => {
-      collected.push(String(msg));
-    };
-    customDep.warn("x");
-    expect(collected.length).toBeGreaterThan(0);
-  });
-
-  it("Module::deprecate", () => {
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    const obj = { greet: () => "hello" };
-    dep.deprecateMethod(obj, "greet", "greet is deprecated");
-    expect(obj.greet()).toBe("hello");
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining("greet is deprecated"));
-    spy.mockRestore();
-  });
-
-  it("Module::deprecate does not expand Hash positional argument", () => {
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    const obj = { fn: (x: unknown) => x };
-    dep.deprecateMethod(obj, "fn", "fn deprecated");
-    const result = obj.fn({ key: "value" });
-    expect(result).toEqual({ key: "value" });
-    spy.mockRestore();
-  });
-
-  it("Module::deprecate requires a deprecator", () => {
-    const customDep = new Deprecation();
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    const obj = { fn: () => 1 };
-    customDep.deprecateMethod(obj, "fn", "fn deprecated");
-    obj.fn();
-    expect(spy).toHaveBeenCalled();
-    spy.mockRestore();
-  });
-
-  it("DeprecatedObjectProxy", () => {
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    const obj = { getValue: () => 42 };
-    dep.deprecateMethod(obj, "getValue", "getValue deprecated");
-    expect(obj.getValue()).toBe(42);
-    spy.mockRestore();
-  });
-
-  it("DeprecatedObjectProxy requires a deprecator", () => {
-    const customDep = new Deprecation();
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    const obj = { fn: () => "result" };
-    customDep.deprecateMethod(obj, "fn", "deprecated");
-    expect(obj.fn()).toBe("result");
-    spy.mockRestore();
+  it("nil behavior is ignored", async () => {
+    deprecator.behavior = null;
+    await assertDeprecated("fubar", deprecator, () => {
+      deprecator.warn("fubar");
+    });
   });
 
   it("behavior callbacks", () => {
-    const messages: string[] = [];
-    dep.behavior = (msg: unknown) => {
-      messages.push(String(msg));
-    };
-    dep.warn("fubar");
-    expect(messages.some((m) => m.includes("fubar"))).toBe(true);
+    assertCallbacksCalledWith({ deprecator, message: /fubar/ }, (callbacks) => {
+      deprecator.behavior = callbacks;
+      deprecator.warn("fubar");
+    });
   });
 
-  it("behavior callbacks with callable objects", () => {
-    const collected: string[] = [];
-    dep.behavior = (msg: unknown) => {
-      collected.push(String(msg));
-    };
-    dep.warn("callable");
-    expect(collected.length).toBeGreaterThan(0);
+  it.skip("behavior callbacks with callable objects", () => {
+    // BLOCKED: deprecation-behavior-does-not-accept-callable-objects
+    assertCallbacksCalledWith({ deprecator, message: /fubar/ }, (callbacks) => {
+      assertNotEmpty(callbacks);
+
+      deprecator.behavior = callbacks.map(
+        (callback) => ({ call: callback }) as unknown as DeprecationBehaviorCallable,
+      );
+      deprecator.warn("fubar");
+    });
+  });
+
+  it(":raise behavior", async () => {
+    deprecator.behavior = "raise";
+
+    const message = "Revise this deprecated stuff now!";
+    const callstack = callerLocations();
+
+    const e = await assertRaise([DeprecationException], {}, () => {
+      deprecator.behavior[0](message, callstack, deprecator);
+    });
+    expect(e.message).toEqual(message);
+    expect(e.stack?.split("\n")).toEqual(callstack.map((l) => String(l)));
   });
 
   it(":stderr behavior", () => {
-    dep.behavior = "stderr";
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    dep.warn("fubar");
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining("fubar"));
-    spy.mockRestore();
+    deprecator.behavior = "stderr";
+    const behavior = deprecator.behavior[0];
+
+    const output = capture(":stderr", () => {
+      behavior("Some error!", ["call stack!"], deprecator);
+    });
+
+    expect(output).toMatch("Some error!");
+    expect(output).not.toMatch("call stack!");
   });
 
   it(":stderr behavior with debug", () => {
-    dep.behavior = "stderr";
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    dep.warn("debug message");
-    expect(spy).toHaveBeenCalled();
-    spy.mockRestore();
+    deprecator.behavior = "stderr";
+    const behavior = deprecator.behavior[0];
+    deprecator.debug = true;
+
+    const output = capture(":stderr", () => {
+      behavior("Some error!", ["call stack!"], deprecator);
+    });
+
+    expect(output).toMatch("Some error!");
+    expect(output).toMatch("call stack!");
+  });
+
+  it(":stderr behavior with #warn", () => {
+    deprecator.behavior = "stderr";
+
+    const output = capture(":stderr", () => {
+      deprecator.warn("Instance error!", [new CallerLocationFixture("instance call stack!", 1)]);
+    });
+
+    expect(output).toMatch(/Instance error!/);
+    expect(output).toMatch(/instance call stack!/);
   });
 
   it(":log behavior", () => {
-    dep.behavior = "log";
+    deprecator.behavior = "log";
     const output: string[] = [];
 
     withTrailsLogger(new Logger({ write: (s) => output.push(s) }), () => {
-      dep.behavior[0]("fubar", ["call stack!"], dep);
+      deprecator.behavior[0]("fubar", ["call stack!"], deprecator);
     });
 
-    expect(output.join("")).toContain("fubar");
-    expect(output.join("")).not.toContain("call stack!");
+    expect(output.join("")).toMatch("fubar");
+    expect(output.join("")).not.toMatch("call stack!");
   });
 
   it(":log behavior with debug", () => {
-    dep.behavior = "log";
-    dep.debug = true;
+    deprecator.behavior = "log";
+    deprecator.debug = true;
     const output: string[] = [];
 
     withTrailsLogger(new Logger({ write: (s) => output.push(s) }), () => {
-      dep.behavior[0]("fubar", ["call stack!"], dep);
+      deprecator.behavior[0]("fubar", ["call stack!"], deprecator);
     });
 
-    expect(output.join("")).toContain("fubar");
-    expect(output.join("")).toContain("call stack!");
+    expect(output.join("")).toMatch("fubar");
+    expect(output.join("")).toMatch("call stack!");
   });
 
   it(":log behavior without Rails.logger", () => {
-    dep.behavior = "log";
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    deprecator.behavior = "log";
 
-    withTrailsLogger(null, () => {
-      dep.behavior[0]("fubar", ["call stack!"], dep);
+    const output = capture(":stderr", () => {
+      withTrailsLogger(null, () => {
+        deprecator.behavior[0]("fubar", ["call stack!"], deprecator);
+      });
     });
 
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining("fubar"));
-    spy.mockRestore();
+    expect(output).toMatch("fubar");
+  });
+
+  it(":silence behavior", () => {
+    deprecator.behavior = "silence";
+    const behavior = deprecator.behavior[0];
+
+    const output = capture(":stderr", () => {
+      behavior("Some error!", ["call stack!"], deprecator);
+    });
+
+    assertEmpty(output);
   });
 
   it(":notify behavior", () => {
@@ -670,96 +493,663 @@ describe("DeprecationTest", () => {
     }
   });
 
-  it(":report_error behavior", () => {
+  it(":report_error behavior", async () => {
     const deprecator = new Deprecation("horizon", "MyGem::Custom");
     deprecator.behavior = "report";
-    const previousReporter = ActiveSupport.errorReporter;
-    const reporter = new ErrorReporter();
-    const subscriber = new ErrorSubscriber();
-    reporter.subscribe(subscriber);
-    ActiveSupport.errorReporter = reporter;
-    try {
+    const report = await assertErrorReported(DeprecationException, () => {
       deprecator.warn();
-    } finally {
-      ActiveSupport.errorReporter = previousReporter;
-    }
-    const [error, handled, severity, source] = subscriber.events[0];
-    expect(error).toBeInstanceOf(DeprecationException);
-    expect(handled).toBe(true);
-    expect(severity).toBe("warning");
-    expect(source).toBe("application");
+    });
+    expect(report?.handled).toEqual(true);
+    expect(report?.severity).toEqual("warning");
+    expect(report?.source).toEqual("application");
   });
 
-  it("invalid behavior", () => {
-    expect(() => {
-      dep.behavior = "invalid" as never;
-    }).toThrow(":invalid is not a valid deprecation behavior.");
+  it("invalid behavior", async () => {
+    const e = await assertRaises([ArgumentError], {}, () => {
+      deprecator.behavior = "invalid" as never;
+    });
+
+    expect(e.message).toEqual(":invalid is not a valid deprecation behavior.");
   });
 
-  it("DeprecatedInstanceVariableProxy", () => {
-    const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    const obj = { getValue: () => 99 };
-    dep.deprecateMethod(obj, "getValue", "use newValue instead");
-    expect(obj.getValue()).toBe(99);
+  it.skip("DeprecatedInstanceVariableProxy", async () => {
+    // BLOCKED: deprecation-proxy-cannot-intercept-object-prototype-methods
+    const instance = new Deprecatee();
+    instance.setFubar(
+      DeprecatedInstanceVariableProxy.new(instance, "fooBar", "@fubar", { deprecator }),
+    );
+    instance.setFooBar("foo bar!");
+
+    const fubarSize = await assertDeprecated("@fubar.size", deprecator, () =>
+      (instance.fubar() as { size(): unknown }).size(),
+    );
+    expect(fubarSize).toEqual((instance.fooBar() as string).length);
+
+    const fubarS = await assertDeprecated("@fubar.to_s", deprecator, () =>
+      (instance.fubar() as { toS(): unknown }).toS(),
+    );
+    expect(fubarS).toEqual(String(instance.fooBar()));
+  });
+
+  it("DeprecatedInstanceVariableProxy does not warn on inspect", async () => {
+    const instance = new Deprecatee();
+    instance.setFubar(
+      DeprecatedInstanceVariableProxy.new(instance, "fooBar", "@fubar", { deprecator }),
+    );
+    instance.setFooBar("foo bar!");
+
+    const fubarInspected = await assertNotDeprecated(deprecator, () =>
+      (instance.fubar() as { inspect(): unknown }).inspect(),
+    );
+    expect(fubarInspected).toEqual(JSON.stringify(instance.fooBar()));
+  });
+
+  it.skip("DeprecatedInstanceVariableProxy requires a deprecator", async () => {
+    // BLOCKED: deprecation-proxies-do-not-require-a-deprecator
+    await assertRaises([ArgumentError], {}, () => {
+      DeprecatedInstanceVariableProxy.new(new Deprecatee(), "foobar", "@fubar");
+    });
+  });
+
+  it.skip("DeprecatedConstantProxy", async () => {
+    // BLOCKED: deprecated-constant-proxy-is-not-transparent-to-equality
+    const proxy = DeprecatedConstantProxy.new("FUBAR", "Undeprecated::Foo::BAR", deprecator);
+
+    await assertDeprecated("FUBAR", deprecator, () => {
+      expect(proxy).toEqual(UndeprecatedFoo.BAR);
+    });
+  });
+
+  it("DeprecatedConstantProxy does not warn on .class", async () => {
+    const proxy = DeprecatedConstantProxy.new("FUBAR", "Undeprecated::Foo::BAR", deprecator);
+
+    const fubarClass = await assertNotDeprecated(deprecator, () =>
+      (proxy as { class(): unknown }).class(),
+    );
+    expect(fubarClass).toEqual((UndeprecatedFoo.BAR as string).constructor);
+  });
+
+  it.skip("DeprecatedConstantProxy with child constant", async () => {
+    // BLOCKED: deprecated-constant-proxy-does-not-raise-on-a-missing-child-constant
+    const proxy = DeprecatedConstantProxy.new("Fuu", "Undeprecated::Foo", deprecator);
+
+    await assertDeprecated("Fuu", deprecator, () => {
+      expect((proxy as { BAR(): unknown }).BAR()).toEqual(UndeprecatedFoo.BAR);
+    });
+
+    await assertDeprecated("Fuu", deprecator, async () => {
+      await assertRaises([Error], {}, () => {
+        (proxy as { DOES_NOT_EXIST(): unknown }).DOES_NOT_EXIST();
+      });
+    });
+  });
+
+  it.skip("DeprecatedConstantProxy requires a deprecator", async () => {
+    // BLOCKED: deprecation-proxies-do-not-require-a-deprecator
+    await assertRaise([ArgumentError], {}, () => {
+      DeprecatedConstantProxy.new("Fuu", "Undeprecated::Foo");
+    });
+  });
+
+  it.skip("deprecate_constant", async () => {
+    // BLOCKED: activesupport-has-no-deprecated-constant-accessor
+    const legacy = {} as {
+      FUBAR: unknown;
+      deprecateConstant(a: string, b: string, o: object): void;
+    };
+    legacy.deprecateConstant("FUBAR", "Undeprecated::Foo::BAR", { deprecator });
+
+    await assertDeprecated("Legacy::FUBAR", deprecator, () => {
+      expect(legacy.FUBAR).toEqual(UndeprecatedFoo.BAR);
+    });
+  });
+
+  it.skip("deprecate_constant when rescuing a deprecated error", async () => {
+    // BLOCKED: activesupport-has-no-deprecated-constant-accessor
+    const legacy = {} as {
+      Error: new () => Error;
+      deprecateConstant(a: string, b: string, o: object): void;
+    };
+    legacy.deprecateConstant("Error", "Undeprecated::Error", { deprecator });
+
+    await assertDeprecated("Legacy::Error", deprecator, async () => {
+      await assertNothingRaised(() => {
+        try {
+          throw new Error("Undeprecated::Error");
+        } catch (e) {
+          if (!(e instanceof legacy.Error)) throw e;
+        }
+      });
+    });
+  });
+
+  it.skip("deprecate_constant requires a deprecator", async () => {
+    // BLOCKED: activesupport-has-no-deprecated-constant-accessor
+    const legacy = {} as { deprecateConstant(a: string, b: string): void };
+    await assertRaises([ArgumentError], {}, () => {
+      legacy.deprecateConstant("OLD", "NEW");
+    });
+  });
+
+  it("assert_deprecated raises when no deprecation warning", async () => {
+    await assertRaises([Assertion], {}, async () => {
+      await assertDeprecated(deprecator, null, () => 1 + 1);
+    });
+  });
+
+  it("assert_not_deprecated raises when some deprecation warning", async () => {
+    await assertRaises([Assertion], {}, async () => {
+      await assertNotDeprecated(deprecator, () => {
+        deprecator.warn();
+      });
+    });
+  });
+
+  it("assert_deprecated without match argument", async () => {
+    await assertDeprecated(deprecator, null, () => {
+      deprecator.warn();
+    });
+  });
+
+  it("assert_deprecated matches any warning from block", async () => {
+    await assertDeprecated("abc", deprecator, () => {
+      deprecator.warn("abc");
+      deprecator.warn("def");
+    });
+  });
+
+  it("assert_not_deprecated returns the result of the block", async () => {
+    expect(await assertNotDeprecated(deprecator, () => 123)).toEqual(123);
+  });
+
+  it("assert_deprecated returns the result of the block", async () => {
+    const result = await assertDeprecated("abc", deprecator, () => {
+      deprecator.warn("abc");
+      return 123;
+    });
+    expect(result).toEqual(123);
+  });
+
+  it("silence", async () => {
+    assertNot(deprecator.silenced);
+
+    await deprecator.silence(async () => {
+      await assertNotDeprecated(deprecator, () => {
+        deprecator.warn();
+      });
+    });
+
+    await assertDeprecated(deprecator, null, () => {
+      deprecator.warn();
+    });
+
+    deprecator.silenced = true;
+    assert(deprecator.silenced);
+
+    await assertNotDeprecated(deprecator, () => {
+      deprecator.warn();
+    });
+  });
+
+  it("silence returns the result of the block", () => {
+    expect(deprecator.silence(() => 123)).toEqual(123);
+  });
+
+  it("silence ensures silencing is reverted after an error is raised", async () => {
+    await assertRaises([Error], {}, () => {
+      deprecator.silence(() => {
+        throw new Error();
+      });
+    });
+
+    await assertDeprecated(deprecator, null, () => {
+      deprecator.warn();
+    });
+  });
+
+  it.skip("silence only affects the current thread", async () => {
+    // BLOCKED: deprecation-silence-and-allow-restore-before-an-async-block-settles
+    await deprecator.silence(async () => {
+      await assertNotDeprecated(deprecator, () => {
+        deprecator.warn();
+      });
+
+      await new Thread(async () => {
+        await assertDeprecated(deprecator, null, () => {
+          deprecator.warn();
+        });
+
+        await deprecator.silence(async () => {
+          await assertNotDeprecated(deprecator, () => {
+            deprecator.warn();
+          });
+        });
+
+        await assertDeprecated(deprecator, null, () => {
+          deprecator.warn();
+        });
+      }).join();
+
+      await assertNotDeprecated(deprecator, () => {
+        deprecator.warn();
+      });
+    });
+  });
+
+  it("Module::deprecate with method name only", async () => {
+    const klass = class extends Deprecatee {};
+    deprecator.deprecateMethods(
+      klass.prototype as unknown as Record<string, unknown>,
+      "fubar",
+      "setFubar",
+      { deprecator },
+    );
+
+    await assertDeprecated(deprecator, null, () => new klass().fubar());
+    await assertDeprecated(deprecator, null, () => {
+      new klass().setFubar(":foo");
+    });
+  });
+
+  it("Module::deprecate with alternative method", async () => {
+    const klass = class extends Deprecatee {};
+    deprecator.deprecateMethods(klass.prototype as unknown as Record<string, unknown>, {
+      fubar: ":fooBar",
+      deprecator,
+    });
+
+    await assertDeprecated(/use fooBar instead/, deprecator, () => new klass().fubar());
+  });
+
+  it("Module::deprecate with message", async () => {
+    const klass = class extends Deprecatee {};
+    deprecator.deprecateMethods(klass.prototype as unknown as Record<string, unknown>, {
+      fubar: "this is the old way",
+      deprecator,
+    });
+
+    await assertDeprecated(/this is the old way/, deprecator, () => new klass().fubar());
+  });
+
+  it("overriding deprecated_method_warning", () => {
+    const deprecator = deprecatorWithMessages();
+    Object.assign(deprecator, {
+      deprecatedMethodWarning(method: string): string {
+        return `deprecator.deprecated_method_warning.${method}`;
+      },
+    });
+
+    const deprecatee = class {
+      method(): void {}
+    };
+    deprecator.deprecateMethods(
+      deprecatee.prototype as unknown as Record<string, unknown>,
+      "method",
+      { deprecator },
+    );
+
+    new deprecatee().method();
+    assert(
+      /DEPRECATION WARNING: deprecator\.deprecated_method_warning\.method/.test(
+        deprecator.messages[0],
+      ),
+    );
+  });
+
+  it("Module::deprecate with custom deprecator", () => {
+    const custom = new Deprecation();
+    const spy = vi.spyOn(stderr, "write").mockImplementation(() => true);
+    const obj = { fn: () => "ok" };
+    custom.deprecateMethod(obj, "fn", "custom deprecator message");
+    obj.fn();
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining("custom deprecator message"));
     spy.mockRestore();
   });
 
-  it("DeprecatedInstanceVariableProxy does not warn on inspect", () => {
+  it("DeprecatedConstantProxy with explicit deprecator", () => {
     const d = new Deprecation();
-    expect(() => d.toString()).not.toThrow();
+    const spy = vi.spyOn(stderr, "write").mockImplementation(() => true);
+    d.warn("constant deprecated");
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining("constant deprecated"));
+    spy.mockRestore();
   });
 
-  it("DeprecatedInstanceVariableProxy requires a deprecator", () => {
-    const customDep = new Deprecation();
-    expect(customDep).toBeInstanceOf(Deprecation);
+  it("DeprecatedConstantProxy with message", () => {
+    const deprecator = deprecatorWithMessages();
+
+    const OLD = DeprecatedConstantProxy.new("klass::OLD", "Undeprecated::Foo::BAR", deprecator, {
+      message: "foo",
+    });
+
+    (OLD as { toS(): unknown }).toS();
+    expect(deprecator.messages[deprecator.messages.length - 1]).toMatch("foo");
   });
 
-  it("DeprecatedConstantProxy", () => {
-    expect(Deprecation).toBeDefined();
+  it("default deprecation_horizon is greater than the current Rails version", () => {
+    expect(new Deprecation().deprecationHorizon.localeCompare(VERSION.STRING)).toBeGreaterThan(0);
   });
 
-  it("DeprecatedConstantProxy does not warn on .class", () => {
-    expect(Deprecation).toBeDefined();
+  it("default gem_name is Rails", () => {
+    const deprecator = new Deprecation();
+
+    const message = callDeprecatedMethodWarning(
+      deprecator,
+      "deprecated_method",
+      "You are calling deprecated method",
+    );
+    expect(message).toMatch(/is deprecated and will be removed from Rails/);
   });
 
-  it("DeprecatedConstantProxy with child constant", () => {
-    expect(Deprecation).toBeDefined();
+  it("custom gem_name", () => {
+    const deprecator = new Deprecation("2.0", "Custom");
+
+    const message = callDeprecatedMethodWarning(
+      deprecator,
+      "deprecated_method",
+      "You are calling deprecated method",
+    );
+    expect(message).toMatch(/is deprecated and will be removed from Custom/);
   });
 
-  it("DeprecatedConstantProxy requires a deprecator", () => {
-    const customDep = new Deprecation();
-    expect(customDep).toBeInstanceOf(Deprecation);
+  it("Module::deprecate can be called before the target method is defined", async () => {
+    const base = class extends Deprecatee {};
+    const klass = class extends base {};
+    deprecator.deprecateMethods(klass.prototype as unknown as Record<string, unknown>, "multi!", {
+      deprecator,
+    });
+    (base.prototype as unknown as Record<string, unknown>)["multi!"] = Deprecatee.prototype.multi;
+
+    await assertDeprecated(/multi! is deprecated/, deprecator, () => {
+      expect(
+        (new klass() as unknown as Record<string, (...a: unknown[]) => unknown>)["multi!"](1, 2, 3),
+      ).toEqual([1, 2, 3]);
+    });
   });
 
-  it("deprecate_constant", () => {
-    dep.behavior = "raise";
-    expect(() => dep.warn("constant deprecated")).toThrow(DeprecationException);
+  it("warn with empty callstack", async () => {
+    deprecator.behavior = "silence";
+
+    await assertNothingRaised(async () => {
+      deprecator.warn("message", []);
+      await new Thread(() => {
+        deprecator.warn("message");
+      }).join();
+    });
   });
 
-  it("deprecate_constant when rescuing a deprecated error", () => {
-    dep.behavior = "raise";
-    let caught = false;
-    try {
-      dep.warn("constant deprecated");
-    } catch (e) {
-      caught = e instanceof DeprecationException;
-    }
-    expect(caught).toBe(true);
+  it("disallowed_warnings is empty by default", () => {
+    expect(deprecator.disallowedWarnings).toEqual([]);
   });
 
-  it("deprecate_constant requires a deprecator", () => {
-    const customDep = new Deprecation();
-    customDep.behavior = "raise";
-    expect(() => customDep.warn("x")).toThrow(DeprecationException);
+  it("disallowed_warnings can be configured", () => {
+    const configWarnings = ["unsafe_method is going away"];
+    deprecator.disallowedWarnings = configWarnings;
+    expect(deprecator.disallowedWarnings).toEqual(configWarnings);
   });
 
-  it("assert_deprecated raises when no deprecation warning", () => {
-    dep.behavior = "silence";
-    expect(() => dep.warn("x")).not.toThrow();
+  it("disallowed_behavior does not trigger when disallowed_warnings is empty", async () => {
+    deprecator.disallowedBehavior = () => expect.unreachable("flunk");
+
+    await assertDeprecated(/fubar/, deprecator, () => {
+      deprecator.warn("using fubar is deprecated");
+    });
   });
 
-  it("assert_not_deprecated raises when some deprecation warning", () => {
-    dep.behavior = "raise";
-    expect(() => dep.warn("unexpected deprecation")).toThrow(DeprecationException);
+  it("disallowed_behavior does not trigger when disallowed_warnings does not match the warning", async () => {
+    deprecator.disallowedBehavior = () => expect.unreachable("flunk");
+    deprecator.disallowedWarnings = ["foo bar"];
+
+    await assertDeprecated(/fubar/, deprecator, () => {
+      deprecator.warn("using fubar is deprecated");
+    });
+  });
+
+  it("disallowed_warnings can match using a substring", async () => {
+    deprecator.disallowedWarnings = ["fubar"];
+
+    await assertDisallowed(/fubar/, deprecator, () => {
+      deprecator.warn("using fubar is deprecated");
+    });
+  });
+
+  it("disallowed_warnings can match using a substring as a symbol", async () => {
+    deprecator.disallowedWarnings = [":fubar"];
+
+    await assertDisallowed(/fubar/, deprecator, () => {
+      deprecator.warn("using fubar is deprecated");
+    });
+  });
+
+  it("disallowed_warnings can match using a regexp", async () => {
+    deprecator.disallowedWarnings = [/f[aeiou]+bar/];
+
+    await assertDisallowed(/fubar/, deprecator, () => {
+      deprecator.warn("using fubar is deprecated");
+    });
+  });
+
+  it("disallowed_warnings matches all warnings when set to :all", async () => {
+    deprecator.disallowedWarnings = ":all";
+
+    await assertDisallowed(/fubar/, deprecator, () => {
+      deprecator.warn("using fubar is deprecated");
+    });
+  });
+
+  it("different behaviors for allowed and disallowed warnings", async () => {
+    deprecator.disallowedWarnings = ":all";
+    deprecator.behavior = () => expect.unreachable("flunk");
+
+    await assertDisallowed(/fubar/, deprecator, () => {
+      deprecator.warn("using fubar is deprecated");
+    });
+  });
+
+  it("disallowed_warnings with the default warning message", async () => {
+    deprecator.disallowedWarnings = ":all";
+    await assertDisallowed(deprecator, null, () => {
+      deprecator.warn();
+    });
+
+    deprecator.disallowedWarnings = ["fubar"];
+    await assertDeprecated(deprecator, null, () => {
+      deprecator.warn();
+    });
+  });
+
+  it("disallowed_behavior callbacks", () => {
+    assertCallbacksCalledWith({ deprecator, message: /fubar/ }, (callbacks) => {
+      deprecator.disallowedBehavior = callbacks;
+      deprecator.disallowedWarnings = ["fubar"];
+      deprecator.warn("fubar");
+    });
+  });
+
+  it("allow", async () => {
+    deprecator.disallowedWarnings = ":all";
+
+    await assertDisallowed(deprecator, null, () => {
+      deprecator.warn();
+    });
+
+    await deprecator.allow(":all", {}, async () => {
+      await assertDeprecated(deprecator, null, () => {
+        deprecator.warn();
+      });
+    });
+  });
+
+  it("allow only allows matching warnings using a substring", async () => {
+    deprecator.disallowedWarnings = ":all";
+
+    await deprecator.allow(["foo bar", "baz qux"], {}, async () => {
+      await assertDeprecated(/foo bar/, deprecator, () => {
+        deprecator.warn("foo bar");
+      });
+      await assertDeprecated(/baz qux/, deprecator, () => {
+        deprecator.warn("baz qux");
+      });
+      await assertDisallowed(/fubar/, deprecator, () => {
+        deprecator.warn("fubar");
+      });
+    });
+  });
+
+  it("allow only allows matching warnings using a substring as a symbol", async () => {
+    deprecator.disallowedWarnings = ":all";
+
+    await deprecator.allow([":foo bar", ":baz qux"], {}, async () => {
+      await assertDeprecated(/foo bar/, deprecator, () => {
+        deprecator.warn("foo bar");
+      });
+      await assertDeprecated(/baz qux/, deprecator, () => {
+        deprecator.warn("baz qux");
+      });
+      await assertDisallowed(/fubar/, deprecator, () => {
+        deprecator.warn("fubar");
+      });
+    });
+  });
+
+  it("allow only allows matching warnings using a regexp", async () => {
+    deprecator.disallowedWarnings = ":all";
+
+    await deprecator.allow([/(foo|baz) (bar|qux)/], {}, async () => {
+      await assertDeprecated(/foo bar/, deprecator, () => {
+        deprecator.warn("foo bar");
+      });
+      await assertDeprecated(/baz qux/, deprecator, () => {
+        deprecator.warn("baz qux");
+      });
+      await assertDisallowed(/fubar/, deprecator, () => {
+        deprecator.warn("fubar");
+      });
+    });
+  });
+
+  it("allow only affects its block", async () => {
+    deprecator.disallowedWarnings = ":all";
+
+    await deprecator.allow(":all", {}, async () => {
+      await assertDeprecated(deprecator, null, () => {
+        deprecator.warn();
+      });
+    });
+
+    await assertDisallowed(deprecator, null, () => {
+      deprecator.warn();
+    });
+  });
+
+  it("allow only affects the current thread", async () => {
+    deprecator.disallowedWarnings = ":all";
+
+    await deprecator.allow(":all", {}, async () => {
+      await assertDeprecated(deprecator, null, () => {
+        deprecator.warn();
+      });
+
+      await new Thread(async () => {
+        await assertDisallowed(deprecator, null, () => {
+          deprecator.warn();
+        });
+
+        await deprecator.allow(":all", {}, async () => {
+          await assertDeprecated(deprecator, null, () => {
+            deprecator.warn();
+          });
+        });
+
+        await assertDisallowed(deprecator, null, () => {
+          deprecator.warn();
+        });
+      }).join();
+
+      await assertDeprecated(deprecator, null, () => {
+        deprecator.warn();
+      });
+    });
+  });
+
+  it("allow with :if option", async () => {
+    deprecator.disallowedWarnings = ":all";
+
+    await deprecator.allow(["fubar"], { if: true }, async () => {
+      await assertDeprecated(/fubar/, deprecator, () => {
+        deprecator.warn("fubar");
+      });
+    });
+
+    await deprecator.allow(["fubar"], { if: false }, async () => {
+      await assertDisallowed(/fubar/, deprecator, () => {
+        deprecator.warn("fubar");
+      });
+    });
+  });
+
+  it("allow with :if option as a proc", async () => {
+    deprecator.disallowedWarnings = ":all";
+
+    await deprecator.allow(["fubar"], { if: () => true }, async () => {
+      await assertDeprecated(/fubar/, deprecator, () => {
+        deprecator.warn("fubar");
+      });
+    });
+
+    await deprecator.allow(["fubar"], { if: () => false }, async () => {
+      await assertDisallowed(/fubar/, deprecator, () => {
+        deprecator.warn("fubar");
+      });
+    });
+  });
+
+  it("allow with the default warning message", async () => {
+    deprecator.disallowedWarnings = ":all";
+
+    await deprecator.allow(":all", {}, async () => {
+      await assertDeprecated(deprecator, null, () => {
+        deprecator.warn();
+      });
+    });
+
+    await deprecator.allow(["fubar"], {}, async () => {
+      await assertDisallowed(deprecator, null, () => {
+        deprecator.warn();
+      });
+    });
+  });
+
+  it.skip("warn deprecation skips the internal caller locations", () => {
+    // BLOCKED: deprecation-callstack-blame-has-no-eval-file-attribution
+    let callstack: CallerLocation[] = [];
+    deprecator.behavior = (_message: string, frames: unknown[]) => {
+      callstack = frames as CallerLocation[];
+    };
+    deprecator.warn();
+    expect(callstack[0].absolutePath ?? callstack[0].path).toEqual(import.meta.url);
+    expect(callstack[0].lineno).toEqual(0);
+  });
+
+  it.skip("warn deprecation can blame code generated with eval", () => {
+    // BLOCKED: deprecation-callstack-blame-has-no-eval-file-attribution
+    let message = "";
+    deprecator.behavior = (emitted: string) => {
+      message = emitted;
+    };
+    deprecator.warn("Here", [new CallerLocationFixture("generatedMethodThatCallDeprecation", 2)]);
+    expect(message).toEqual(
+      "DEPRECATION WARNING: Here (called from generatedMethodThatCallDeprecation at /path/to/template.html.tse:2)",
+    );
+  });
+
+  it.skip("warn deprecation can blame code from internal methods", () => {
+    // BLOCKED: deprecation-callstack-blame-has-no-eval-file-attribution
+    let message = "";
+    deprecator.behavior = (emitted: string) => {
+      message = emitted;
+    };
+    deprecator.warn();
+
+    assertIncludes(message, "/path/to/user/code.ts");
   });
 });
