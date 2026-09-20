@@ -429,7 +429,6 @@ export function assertIncludes(collection: unknown, obj: unknown, message?: stri
   );
 }
 
-/** @noRailsEquivalent CONVERGEABLE minitest-assertion-ports-score-as-novel-surface */
 export function assertNotIncludes(collection: unknown, obj: unknown, message?: string): void {
   assert(respondsToInclude(collection), `Expected ${inspect(collection)} to respond to include?`);
   assertNot(
