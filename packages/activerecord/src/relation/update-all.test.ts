@@ -508,5 +508,25 @@ describe("UpdateAllTest", () => {
         },
       );
     }
+
+    async function testUpdateAllWithOrderAndLimitUpdatesSubsetOnly() {
+      const author = await Author.find(authors("david").id);
+      const limitedPosts = (author as any).postsSortedByIdLimited;
+      expect(await limitedPosts.size()).toBe(1);
+      expect(await limitedPosts.limit(2).size()).toBe(2);
+      expect(await limitedPosts.updateAll(["body = ?", "bulk update!"])).toBe(1);
+      expect(posts("welcome").body).toBe("bulk update!");
+      expect(posts("thinking").body).not.toBe("bulk update!");
+    }
+
+    async function testUpdateAllWithOrderAndLimitAndOffsetUpdatesSubsetOnly() {
+      const author = await Author.find(authors("david").id);
+      const limitedPosts = (author as any).postsSortedByIdLimited.offset(1);
+      expect(await limitedPosts.size()).toBe(1);
+      expect(await limitedPosts.limit(2).size()).toBe(2);
+      expect(await limitedPosts.updateAll(["body = ?", "bulk update!"])).toBe(1);
+      expect(posts("thinking").body).toBe("bulk update!");
+      expect(posts("welcome").body).not.toBe("bulk update!");
+    }
   });
 });
