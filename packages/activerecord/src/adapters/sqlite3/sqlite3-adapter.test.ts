@@ -82,6 +82,8 @@ afterEach(async () => {
   await adapter.execute(`DROP TABLE IF EXISTS auto_inc`);
   await adapter.execute(`DROP TABLE IF EXISTS cpk`);
   await adapter.execute(`DROP TABLE IF EXISTS cpk_table`);
+  await adapter.execute(`DROP TABLE IF EXISTS people`);
+  await adapter.execute(`DROP TABLE IF EXISTS foos`);
   await adapter.execute(`DROP TABLE IF EXISTS ex`);
   await adapter.execute(`DROP TABLE IF EXISTS json_defs`);
   await pool.disconnect();
@@ -566,11 +568,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     await adapter.execute(
       `CREATE TABLE "people" ("id" integer PRIMARY KEY AUTOINCREMENT, "number" integer)`,
     );
-    try {
-      expect((await adapter.tables()).sort()).toEqual(["ex", "people"].sort());
-    } finally {
-      await adapter.execute(`DROP TABLE IF EXISTS "people"`);
-    }
+    expect((await adapter.tables()).sort()).toEqual(["ex", "people"].sort());
   });
 
   it("columns", async () => {
@@ -701,11 +699,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     await adapter.execute(
       `CREATE TABLE "foos" (internet integer PRIMARY KEY AUTOINCREMENT, number integer not null)`,
     );
-    try {
-      expect(await adapter.primaryKey("foos")).toEqual("internet");
-    } finally {
-      await adapter.execute(`DROP TABLE IF EXISTS "foos"`);
-    }
+    expect(await adapter.primaryKey("foos")).toEqual("internet");
   });
 
   it("no primary key", async () => {
