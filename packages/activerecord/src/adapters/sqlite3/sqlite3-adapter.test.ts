@@ -39,10 +39,6 @@ async function withMemoryConnection(
   }
 }
 
-async function rawConnectionOf(conn: BetterSQLite3Adapter): Promise<Database> {
-  return ((await conn.rawConnection()) as unknown as SqliteConnection).raw as Database;
-}
-
 async function withStrictStringsByDefault(fn: () => Promise<void>): Promise<void> {
   SQLite3Adapter.strictStringsByDefault = true;
   try {
@@ -804,7 +800,9 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     const conn = new BetterSQLite3Adapter({ database: ":memory:", readonly: false });
     await conn.connectBang();
 
-    expect((await rawConnectionOf(conn)).readonly).toBeFalsy();
+    expect(
+      (((await conn.rawConnection()) as unknown as SqliteConnection).raw as Database).readonly,
+    ).toBeFalsy();
     await conn.disconnectBang();
   });
 
@@ -812,7 +810,9 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     const conn = new BetterSQLite3Adapter({ database: ":memory:" });
     await conn.connectBang();
 
-    expect((await rawConnectionOf(conn)).readonly).toBeFalsy();
+    expect(
+      (((await conn.rawConnection()) as unknown as SqliteConnection).raw as Database).readonly,
+    ).toBeFalsy();
     await conn.disconnectBang();
   });
 
@@ -821,7 +821,9 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     const conn = new BetterSQLite3Adapter({ database: ":memory:", readonly: true });
     await conn.connectBang();
 
-    expect((await rawConnectionOf(conn)).readonly).toBeTruthy();
+    expect(
+      (((await conn.rawConnection()) as unknown as SqliteConnection).raw as Database).readonly,
+    ).toBeTruthy();
     await conn.disconnectBang();
   });
 
