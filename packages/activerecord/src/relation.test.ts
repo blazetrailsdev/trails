@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, type TestContext } from "vitest";
 import { ValueType } from "@blazetrails/activemodel";
 import { assert, assertNot, assertNotRespondTo, assertRaises } from "@blazetrails/activesupport";
 import { isEmpty } from "@blazetrails/ruby-compat";
@@ -21,6 +21,7 @@ import { Rating as CanonRating } from "./test-helpers/models/rating.js";
 import { Author as CanonAuthor } from "./test-helpers/models/author.js";
 import { Categorization as CanonCategorization } from "./test-helpers/models/categorization.js";
 import { captureSql } from "./testing/sql-capture.js";
+import { currentAdapter } from "./support/adapter-helper.js";
 import { assertQueriesCount, assertQueriesMatch } from "./testing/query-assertions.js";
 
 class EnsureRoundTripTypeCasting extends ValueType {
@@ -48,6 +49,26 @@ class UpdateAllTestModel extends Base {
   static {
     this._tableName = "posts";
     this.attribute("body", new EnsureRoundTripTypeCasting());
+  }
+}
+
+async function skipIfSqlite3VersionIncludesQuotingBug(ctx: TestContext): Promise<void> {
+  if (await sqlite3VersionIncludesQuotingBug()) {
+    ctx.skip(
+      "You are using an outdated version of SQLite3 which has a bug in quoted column names. " +
+        "Please update SQLite3 and rebuild the sqlite3 ruby gem",
+    );
+  }
+}
+
+async function sqlite3VersionIncludesQuotingBug(): Promise<boolean | undefined> {
+  if (currentAdapter("SQLite3Adapter")) {
+    const selectedQuotedColumnNames = (
+      await (
+        await Base.leaseConnection()
+      ).execQuery('SELECT "join" FROM (SELECT id AS "join" FROM posts) subquery')
+    ).columns;
+    return JSON.stringify(["join"]) !== JSON.stringify(selectedQuotedColumnNames);
   }
 }
 
@@ -121,7 +142,8 @@ describe("RelationTest", () => {
     expect(ids.length).toBe(before + 2);
   });
 
-  it("select quotes when using from clause", async () => {
+  it("select quotes when using from clause", async (ctx) => {
+    await skipIfSqlite3VersionIncludesQuotingBug(ctx);
     const selected = (
       await CanonPost.select(":join").from(
         CanonPost.select(`id as ${canonicalQuoteTableName("join")}`),
@@ -429,7 +451,8 @@ describe("RelationTest", () => {
     );
   });
 
-  it("selecting aliased attribute quotes column name when from is used", async () => {
+  it("selecting aliased attribute quotes column name when from is used", async (ctx) => {
+    await skipIfSqlite3VersionIncludesQuotingBug(ctx);
     class KeywordColumn extends Base {
       static {
         this._tableName = "test_with_keyword_column_name";
