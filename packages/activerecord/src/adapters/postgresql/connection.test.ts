@@ -220,26 +220,33 @@ describeIfPg("PostgresqlConnectionTest", () => {
   });
 
   it("get and release advisory lock", async () => {
-    const lockId = 52959019;
-    const listLocks = `SELECT objid FROM pg_locks WHERE locktype = 'advisory'`;
+    const lockId = 5295901941911233559n;
+    const listAdvisoryLocks = `
+      SELECT locktype,
+            (classid::bigint << 32) | objid::bigint AS lock_id
+      FROM pg_locks
+      WHERE locktype = 'advisory'
+    `;
 
     const gotLock = await adapter.getAdvisoryLock(lockId);
     expect(gotLock).toBeTruthy();
 
-    const advisoryLock = (await adapter.execute(listLocks)).find((l) => Number(l.objid) === lockId);
+    const advisoryLock = (await adapter.execute(listAdvisoryLocks)).find(
+      (l) => BigInt(l.lock_id as string) === lockId,
+    );
     expect(advisoryLock).toBeTruthy();
 
     const releasedLock = await adapter.releaseAdvisoryLock(lockId);
     expect(releasedLock).toBeTruthy();
 
-    const advisoryLocks = (await adapter.execute(listLocks)).filter(
-      (l) => Number(l.objid) === lockId,
+    const advisoryLocks = (await adapter.execute(listAdvisoryLocks)).filter(
+      (l) => BigInt(l.lock_id as string) === lockId,
     );
     assertEmpty(advisoryLocks);
   });
 
   it("release non existent advisory lock", async () => {
-    const fakeLockId = 29400750;
+    const fakeLockId = 2940075057017742022n;
     const result = await adapter.releaseAdvisoryLock(fakeLockId);
     expect(result).toBe(false);
   });

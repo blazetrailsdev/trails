@@ -66,18 +66,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       column = PgArray.columnsHash()["tags"];
       type = PgArray.typeForAttribute("tags");
     });
-    async function assertCycle(field: string, array: unknown): Promise<void> {
-      let x = await (PgArray as any).createBang({ [field]: array });
-      await x.reload();
-      expect(x[field]).toEqual(array);
-
-      x = await (PgArray as any).createBang({ [field]: [] });
-      x[field] = array;
-      await x.saveBang();
-      await x.reload();
-      expect(x[field]).toEqual(array);
-    }
-
     it("column", async () => {
       expect(column.type).toBe("string");
       expect(column.sqlType).toBe("character varying(255)");
@@ -584,6 +572,18 @@ describeIfPg("PostgreSQLAdapter", () => {
       await record.reload();
       expect(record.timestamps[0].usec).toBe(123);
     });
+
+    async function assertCycle(field: string, array: unknown): Promise<void> {
+      let x = await (PgArray as any).createBang({ [field]: array });
+      await x.reload();
+      expect(x[field]).toEqual(array);
+
+      x = await (PgArray as any).createBang({ [field]: [] });
+      x[field] = array;
+      await x.saveBang();
+      await x.reload();
+      expect(x[field]).toEqual(array);
+    }
   });
 
   describe("array datetime inline-quoting (trails)", () => {

@@ -2,33 +2,6 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { assertChanges } from "@blazetrails/activesupport";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 
-async function numIndicesNamed(adapter: PostgreSQLAdapter, name: string): Promise<number> {
-  const rows = (
-    await adapter.execQuery(
-      `SELECT 1 FROM pg_index JOIN pg_class ON pg_index.indexrelid = pg_class.oid WHERE pg_class.relname = $1`,
-      "SQL",
-      [name],
-    )
-  ).toArray();
-  return rows.length;
-}
-
-async function assertRenamesIndex(
-  adapter: PostgreSQLAdapter,
-  from: string,
-  to: string,
-  block: () => Promise<void>,
-): Promise<void> {
-  await assertChanges(
-    () => numIndicesNamed(adapter, from),
-    null,
-    { from: 1, to: 0 },
-    async () => {
-      await assertChanges(() => numIndicesNamed(adapter, to), null, { from: 0, to: 1 }, block);
-    },
-  );
-}
-
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
@@ -77,7 +50,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("renaming a table also renames the primary key index", async () => {
       await adapter.execute("CREATE TABLE before_rename (id serial primary key, name text)");
-      await assertRenamesIndex(adapter, "before_rename_pkey", "after_rename_pkey", async () => {
+      await assertRenamesIndex("before_rename_pkey", "after_rename_pkey", async () => {
         await adapter.renameTable("before_rename", "after_rename");
       });
     });
@@ -92,7 +65,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execute(
         `CREATE TABLE before_rename (id uuid DEFAULT uuid_generate_v4() PRIMARY KEY)`,
       );
-      await assertRenamesIndex(adapter, "before_rename_pkey", "after_rename_pkey", async () => {
+      await assertRenamesIndex("before_rename_pkey", "after_rename_pkey", async () => {
         await adapter.renameTable("before_rename", "after_rename");
       });
     });
@@ -101,9 +74,35 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execute(
         `CREATE TABLE before_rename (id uuid DEFAULT gen_random_uuid() PRIMARY KEY)`,
       );
-      await assertRenamesIndex(adapter, "before_rename_pkey", "after_rename_pkey", async () => {
+      await assertRenamesIndex("before_rename_pkey", "after_rename_pkey", async () => {
         await adapter.renameTable("before_rename", "after_rename");
       });
     });
+
+    async function assertRenamesIndex(
+      from: string,
+      to: string,
+      block: () => Promise<void>,
+    ): Promise<void> {
+      await assertChanges(
+        () => numIndicesNamed(from),
+        null,
+        { from: 1, to: 0 },
+        async () => {
+          await assertChanges(() => numIndicesNamed(to), null, { from: 0, to: 1 }, block);
+        },
+      );
+    }
+
+    async function numIndicesNamed(name: string): Promise<number> {
+      const rows = (
+        await adapter.execQuery(
+          `SELECT 1 FROM pg_index JOIN pg_class ON pg_index.indexrelid = pg_class.oid WHERE pg_class.relname = $1`,
+          "SQL",
+          [name],
+        )
+      ).toArray();
+      return rows.length;
+    }
   });
 });
