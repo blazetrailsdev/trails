@@ -9,6 +9,7 @@
  *   `<=>`-comparable value. Temporal-typed ranges live elsewhere.
  */
 
+import { ArgumentError } from "./argument-error.js";
 import { cmp } from "./comparable.js";
 import { succ } from "./string/succ.js";
 import { rbEqual } from "./rb-equal.js";
@@ -26,6 +27,13 @@ function rLess(a: unknown, b: unknown): number {
   const r = cmp(a, b);
   if (r === null) return INT_MAX;
   return r;
+}
+
+/** `vendor/ruby/range.c:369` `check_step_domain`. */
+function checkStepDomain(step: number): void {
+  const c = rLess(step, 0);
+  if (c < 0) throw new ArgumentError("step can't be negative");
+  if (c === 0) throw new ArgumentError("step can't be 0");
 }
 
 /**
@@ -234,8 +242,19 @@ export class Range<T = unknown> {
 
   /** `vendor/ruby/range.c:439` `range_step`. */
   *step(n: number = 1): Generator<T> {
+    checkStepDomain(n);
+
     if (typeof this.begin !== "number" && this.begin !== null) {
-      yield* this.stepBySucc(n);
+      let v = this.begin as T;
+      let i = 0;
+      while (
+        this.end === null ||
+        (this.excludeEnd ? rLess(v, this.end) < 0 : rLess(v, this.end) <= 0)
+      ) {
+        if (i % n === 0) yield v;
+        i++;
+        v = objSucc(v);
+      }
       return;
     }
 
@@ -247,26 +266,6 @@ export class Range<T = unknown> {
       }
       yield current as T;
       current += n;
-    }
-  }
-
-  /**
-   * `range_step`'s final arm (`vendor/ruby/range.c:540-560`), which drives a
-   * non-numeric range through `succ` and yields every `n`-th element. Ruby
-   * raises `TypeError` for a begin that is not `discrete_object_p` — one that
-   * does not respond to `succ`.
-   */
-  private *stepBySucc(n: number): Generator<T> {
-    let current = this.begin as T;
-    let i = 0;
-    while (true) {
-      if (this.end !== null) {
-        const c = rLess(current, this.end);
-        if (this.excludeEnd ? c >= 0 : c > 0) break;
-      }
-      if (i % n === 0) yield current;
-      i++;
-      current = objSucc(current);
     }
   }
 }
