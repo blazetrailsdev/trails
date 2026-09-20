@@ -25,6 +25,7 @@ import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { Base } from "../../base.js";
 import type { ColumnLike } from "../../model-schema.js";
 import { ScopeRegistry } from "../../scoping.js";
+import { DelegateCache } from "../../relation/delegation.js";
 import { registerSubclass } from "../../inheritance.js";
 import type { Comment } from "./comment.js";
 import type { Tagging } from "./tagging.js";
@@ -816,6 +817,12 @@ export class PostWithDestroyCallback extends Base {
 }
 
 export class FakeKlass {
+  static relationDelegateClass = DelegateCache.relationDelegateClass;
+  static initializeRelationDelegateCache = DelegateCache.initializeRelationDelegateCache;
+  static generateRelationMethod = DelegateCache.generateRelationMethod;
+  static generatedRelationMethods = DelegateCache.generatedRelationMethods;
+  static includeRelationMethods = DelegateCache.includeRelationMethods;
+
   static scopeRegistry(): ScopeRegistry {
     return ScopeRegistry.instance();
   }
@@ -868,6 +875,10 @@ export class FakeKlass {
 
   static deterministicEncryptedAttributes(): undefined {
     return undefined;
+  }
+
+  static {
+    FakeKlass.initializeRelationDelegateCache.call(this as unknown as typeof Base);
   }
 }
 
