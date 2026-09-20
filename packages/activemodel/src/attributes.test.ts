@@ -1,257 +1,237 @@
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
    Each model below spells `include ActiveModel::Attributes` in its class body, the way the Rails
    test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
-   how `include()` surfaces those members on the type side. */
+   how `include()` surfaces those members on the type side, and a generated attribute member is an
+   accessor pair (CLAUDE.md § "Generated attribute readers are properties"). */
 import { describe, it, expect } from "vitest";
+import { BigDecimal, assertNothingRaised, assertRaise, include } from "@blazetrails/activesupport";
+import { Date as RubyDate, type Temporal } from "@blazetrails/date";
+import { ArgumentError, FrozenError } from "@blazetrails/ruby-compat";
 import { Model } from "./index.js";
-import { Attributes, type AttributesClassHalf } from "./attributes.js";
-import { include } from "@blazetrails/activesupport";
+import { UnknownAttributeError } from "./errors.js";
+import {
+  Attributes,
+  type AttributeMethodsClassHalf,
+  type AttributesClassHalf,
+} from "./attributes.js";
+import { AttributeMethods } from "./attribute-methods.js";
+import { StringType } from "./type/string.js";
 
 describe("AttributesTest", () => {
-  class User extends Model {
+  class ModelForAttributesTest extends Model {
+    declare static aliasAttribute: AttributesClassHalf["aliasAttribute"];
+    declare static attribute: AttributesClassHalf["attribute"];
+    declare static attributeNames: AttributesClassHalf["attributeNames"];
+    declare static attributeTypes: AttributesClassHalf["attributeTypes"];
+    declare static typeForAttribute: AttributesClassHalf["typeForAttribute"];
+
+    static {
+      include(this, Attributes);
+      this.attribute("integer_field", "integer");
+      this.attribute("string_field", "string");
+      this.attribute("decimal_field", "decimal");
+      this.attribute("string_with_default", "string", { default: "default string" });
+      this.attribute("date_field", "date", { default: () => new RubyDate(2016, 1, 1) });
+      this.attribute("boolean_field", "boolean");
+    }
+  }
+  interface ModelForAttributesTest extends Attributes {
+    get integer_field(): number | null;
+    set integer_field(value: unknown);
+    get string_field(): string | null;
+    set string_field(value: unknown);
+    get decimal_field(): BigDecimal | null;
+    set decimal_field(value: unknown);
+    get string_with_default(): string | null;
+    set string_with_default(value: unknown);
+    get date_field(): Temporal.PlainDate | null;
+    set date_field(value: unknown);
+    get boolean_field(): boolean | null;
+    set boolean_field(value: unknown);
+  }
+
+  class ChildModelForAttributesTest extends ModelForAttributesTest {}
+
+  class GrandchildModelForAttributesTest extends ChildModelForAttributesTest {
+    static {
+      this.attribute("integer_field", "string");
+      this.attribute("string_field", { default: "default string" });
+    }
+  }
+
+  class ModelWithGeneratedAttributeMethods {
     declare static attribute: AttributesClassHalf["attribute"];
 
     static {
       include(this, Attributes);
-      this.attribute("name", "string");
-      this.attribute("age", "integer", { default: 0 });
-      this.attribute("score", "float");
-      this.attribute("active", "boolean", { default: true });
+      this.attribute("foo");
     }
   }
-  interface User extends Attributes {}
+  interface ModelWithGeneratedAttributeMethods extends Attributes {}
 
-  it("models that proxy attributes do not conflict with models with generated methods", () => {
-    class ModelA extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+  class ModelWithProxiedAttributeMethods {
+    declare static attributeMethodSuffix: AttributeMethodsClassHalf["attributeMethodSuffix"];
+    declare static defineAttributeMethod: AttributeMethodsClassHalf["defineAttributeMethod"];
 
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
-    }
-    interface ModelA extends Attributes {}
+    static {
+      include(this, AttributeMethods);
 
-    class ModelB extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+      this.attributeMethodSuffix("=");
 
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
+      this.defineAttributeMethod("foo");
     }
 
-    interface ModelB extends Attributes {}
+    "attribute="(_: string, __: unknown): void {}
+  }
+  interface ModelWithProxiedAttributeMethods {
+    set foo(value: unknown);
+  }
 
-    const a = new ModelA({ name: "Alice" });
-    const b = new ModelB({ name: "Bob" });
-    expect(a._readAttribute("name")).toBe("Alice");
-    expect(b._readAttribute("name")).toBe("Bob");
-  });
+  it("models that proxy attributes do not conflict with models with generated methods", async () => {
+    new ModelWithGeneratedAttributeMethods();
 
-  it("nonexistent attribute", () => {
-    class MyModel extends Model {
-      declare static aliasAttribute: AttributesClassHalf["aliasAttribute"];
-      declare static attribute: AttributesClassHalf["attribute"];
-      declare static typeForAttribute: AttributesClassHalf["typeForAttribute"];
+    const model = new ModelWithProxiedAttributeMethods();
 
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
-    }
-    interface MyModel extends Attributes {}
-
-    const m = new MyModel({});
-    expect(m.attribute("nonexistent")).toBeNull();
-  });
-
-  it("attributes with proc defaults can be marshalled", () => {
-    class MyModel extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("tags", "string", { default: () => "default" });
-      }
-    }
-    interface MyModel extends Attributes {}
-
-    const m = new MyModel({});
-    expect(m._readAttribute("tags")).toBe("default");
-  });
-
-  it("can't modify attributes if frozen", () => {
-    class MyModel extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
-    }
-    interface MyModel extends Attributes {}
-
-    const m = new MyModel({ name: "test" });
-    m.freeze();
-    expect(Object.isFrozen(m)).toBe(true);
-    expect(() => {
-      (m as any).name = "changed";
-    }).toThrow(/frozen/i);
-    expect(() => m._attributes.writeFromUser("name", "changed")).toThrow(/frozen/i);
-  });
-
-  it("attributes can be frozen again", () => {
-    class MyModel extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
-    }
-    interface MyModel extends Attributes {}
-
-    const m = new MyModel({ name: "test" });
-    m.freeze();
-    expect(() => m.freeze()).not.toThrow();
-  });
-
-  it(".type_for_attribute supports attribute aliases", () => {
-    class MyModel extends Model {
-      declare static aliasAttribute: AttributesClassHalf["aliasAttribute"];
-      declare static attribute: AttributesClassHalf["attribute"];
-      declare static typeForAttribute: AttributesClassHalf["typeForAttribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.aliasAttribute("fullName", "name");
-      }
-    }
-    interface MyModel extends Attributes {}
-
-    expect(MyModel.typeForAttribute("name")).not.toBeNull();
+    await assertNothingRaised(() => {
+      model.foo = "foo";
+    });
   });
 
   it("properties assignment", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-      declare static attributeNames: AttributesClassHalf["attributeNames"];
+    const data = new ModelForAttributesTest({
+      integer_field: "2.3",
+      string_field: "Rails FTW",
+      decimal_field: "12.3",
+      boolean_field: "0",
+    });
 
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.attribute("age", "integer");
-      }
-    }
-    interface Person extends Attributes {}
+    expect(data.integer_field).toEqual(2);
+    expect(data.string_field).toEqual("Rails FTW");
+    expect(data.decimal_field).toEqual(new BigDecimal("12.3"));
+    expect(data.string_with_default).toEqual("default string");
+    expect(data.date_field).toEqual(new RubyDate(2016, 1, 1));
+    expect(data.boolean_field).toEqual(false);
 
-    const p = new Person({ name: "Alice", age: 30 });
-    expect(p._readAttribute("name")).toBe("Alice");
-    expect(p._readAttribute("age")).toBe(30);
+    data.integer_field = 10;
+    data.string_with_default = null;
+    data.boolean_field = "1";
+
+    expect(data.integer_field).toEqual(10);
+    expect(data.string_with_default).toBeNull();
+    expect(data.boolean_field).toEqual(true);
   });
 
   it("reading attributes", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    const data = new ModelForAttributesTest({
+      integer_field: 1.1,
+      string_field: 1.1,
+      decimal_field: 1.1,
+      boolean_field: 1.1,
+    });
 
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.attribute("age", "integer");
-      }
-    }
-    interface Person extends Attributes {}
+    const expectedAttributes = {
+      integer_field: 1,
+      string_field: "1.1",
+      decimal_field: new BigDecimal("1.1"),
+      string_with_default: "default string",
+      date_field: new RubyDate(2016, 1, 1),
+      boolean_field: true,
+    };
 
-    const p = new Person({ name: "Alice", age: 30 });
-    const attrs = p.attributes;
-    expect(attrs.name).toBe("Alice");
-    expect(attrs.age).toBe(30);
+    expect(data.attributes).toEqual(expectedAttributes);
   });
 
   it("reading attribute names", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-      declare static attributeNames: AttributesClassHalf["attributeNames"];
+    const names = [
+      "integer_field",
+      "string_field",
+      "decimal_field",
+      "string_with_default",
+      "date_field",
+      "boolean_field",
+    ];
 
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.attribute("age", "integer");
-      }
-    }
-    interface Person extends Attributes {}
-
-    expect(Person.attributeNames()).toEqual(["name", "age"]);
+    expect(ModelForAttributesTest.attributeNames()).toEqual(names);
+    expect(new ModelForAttributesTest().attributeNames()).toEqual(names);
   });
 
-  it("children can override parents", () => {
-    class Parent extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string", { default: "parent" });
-      }
-    }
-    interface Parent extends Attributes {}
-
-    class Child extends Parent {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        this.attribute("name", "string", { default: "child" });
-      }
-    }
-    expect(new Child()._readAttribute("name")).toBe("child");
-    expect(new Parent()._readAttribute("name")).toBe("parent");
-  });
-
-  it("attributes can be dup-ed", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({ name: "Alice" });
-    const attrs = { ...p.attributes };
-    attrs.name = "Bob";
-    expect(p._readAttribute("name")).toBe("Alice");
+  it("nonexistent attribute", async () => {
+    await assertRaise([UnknownAttributeError], {}, () => {
+      new ModelForAttributesTest({ nonexistent: "nonexistent" });
+    });
   });
 
   it("children inherit attributes", () => {
-    class Parent extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    const data = new ChildModelForAttributesTest({ integer_field: "4.4" });
 
-      static {
-        include(this, Attributes);
-        this.attribute("integer_field", "integer");
-      }
-    }
-    interface Parent extends Attributes {}
-
-    class Child extends Parent {}
-    const data = new Child({ integer_field: "4.4" });
-    expect(data._readAttribute("integer_field")).toBe(4);
+    expect(data.integer_field).toEqual(4);
   });
 
-  it("unknown type error is raised", () => {
-    expect(() => {
-      class BadModel extends Model {
-        declare static attribute: AttributesClassHalf["attribute"];
+  it("children can override parents", () => {
+    const klass = GrandchildModelForAttributesTest;
 
-        static {
-          include(this, Attributes);
-          this.attribute("foo", "unknown_type_xyz");
-        }
+    expect(klass.attributeTypes()["integer_field"]).toBeInstanceOf(StringType);
+    expect(klass.attributeTypes()["string_field"]).toBeInstanceOf(StringType);
+
+    const data = new GrandchildModelForAttributesTest({ integer_field: "4.4" });
+
+    expect(data.integer_field).toEqual("4.4");
+    expect(data.string_field).toEqual("default string");
+  });
+
+  it.skip("attributes with proc defaults can be marshalled", () => {
+    // BLOCKED: activemodel-attributes-have-no-marshal-round-trip
+    const data = new ModelForAttributesTest();
+    const attributes = data._attributes;
+    const roundTripped = (data as unknown as { dup(): ModelForAttributesTest }).dup();
+    const newAttributes = roundTripped._attributes;
+
+    expect(attributes).toEqual(newAttributes);
+  });
+
+  it("attributes can be dup-ed", () => {
+    const data = new ModelForAttributesTest();
+    data.integer_field = 1;
+
+    const duped = (data as unknown as { dup(): ModelForAttributesTest }).dup();
+
+    expect(data.integer_field).toEqual(1);
+    expect(duped.integer_field).toEqual(1);
+
+    duped.integer_field = 2;
+
+    expect(data.integer_field).toEqual(1);
+    expect(duped.integer_field).toEqual(2);
+  });
+
+  it("can't modify attributes if frozen", async () => {
+    const data = new ModelForAttributesTest();
+    data.freeze();
+    expect(Object.isFrozen(data)).toBeTruthy();
+    await assertRaise([FrozenError], {}, () => {
+      data.integer_field = 1;
+    });
+  });
+
+  it("attributes can be frozen again", async () => {
+    const data = new ModelForAttributesTest();
+    data.freeze();
+    await assertNothingRaised(() => data.freeze());
+  });
+
+  it("unknown type error is raised", async () => {
+    await assertRaise([ArgumentError], {}, () => {
+      ModelForAttributesTest.attribute("foo", "unknown");
+    });
+  });
+
+  it(".type_for_attribute supports attribute aliases", () => {
+    const withAlias = class extends ModelForAttributesTest {
+      static {
+        this.aliasAttribute("integer_field", "x");
       }
-      interface BadModel extends Attributes {}
-    }).toThrow();
+    };
+
+    expect(withAlias.typeForAttribute("integer_field")).toEqual(withAlias.typeForAttribute("x"));
   });
 });
