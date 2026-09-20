@@ -30,15 +30,11 @@ describeIfPg("PostgreSQLAdapter", () => {
     }
   }
 
-  class CreateEnumMigration extends Migration {
+  class CreateEnumMigration extends Migration<PostgreSQLAdapter> {
     async change() {
       await this.createEnum("color", ["blue", "green"]);
       await this.createTable("enums", (t) => {
-        (t as unknown as { enum: (...args: unknown[]) => unknown }).enum("bestColor", {
-          enumType: "color",
-          default: "blue",
-          null: false,
-        });
+        t.enum("bestColor", { enumType: "color", default: "blue", null: false });
       });
     }
   }
