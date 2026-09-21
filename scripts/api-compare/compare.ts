@@ -2901,8 +2901,10 @@ export function rubyMethodToTsForFqn(
 }
 
 /**
- * Dedup expected Ruby methods by Ruby method name (NOT first TS
- * candidate). Two distinct Ruby methods can produce the same first TS
+ * Dedup expected Ruby methods by (level, Ruby method name) — NOT first TS
+ * candidate, and NOT name alone: `ClassMethods#attribute_method?` and the
+ * instance `attribute_method?` (attribute_methods.rb:224, :470) are two
+ * methods, and keying on the name let either TS member satisfy both. Two distinct Ruby methods can produce the same first TS
  * candidate (`is_number?` and `number?` both → `"isNumber"`); keying
  * by the TS candidate would silently drop the second method from the
  * expected set. Caller supplies a per-file `seen` map (keyed by method
@@ -2916,14 +2918,17 @@ export function dedupeRubyMethodInto(
   rm: MethodInfo,
   itemFqn: string,
   rubyFile?: string,
+  klass = false,
 ): void {
   if (rubyMethodToTsForFqn(itemFqn, rm.name) === null) return;
   if (isRubyOnlyClass(itemFqn)) return;
   const tsMirrorNames = rubyFile === undefined ? null : scopedSkipMirrorName(rm.name, rubyFile);
   if (rubyFile !== undefined && tsMirrorNames === null && isScopedSkip(rm.name, rubyFile)) return;
-  const key = rm.name;
+  const level = rubyOwnerSeat(itemFqn, klass);
+  const key = rubyLevelKey(level, rm.name);
   if (!seen.has(key)) {
     seen.set(key, {
+      level,
       ...(tsMirrorNames === null ? {} : { tsMirrorNames }),
       rubyName: rm.name,
       rubyModule: itemFqn,
@@ -2934,8 +2939,43 @@ export function dedupeRubyMethodInto(
   }
 }
 
+/**
+ * The `seen` key for a Ruby method at one level: `self.foo` for the singleton
+ * seat, bare `foo` for the instance seat — Ruby's own `def self.foo` / `def foo`
+ * spellings, so a file declaring both keeps two expected rows.
+ */
+export function rubyLevelKey(level: OwnerSeat, name: string): string {
+  return level === "class" ? `self.${name}` : name;
+}
+
+/**
+ * How `tsFile` declares `tsName` for a Ruby method at `level`: `"seat"` when
+ * some owner states that seat (a static is the class seat, an instance member
+ * the instance seat — see `tsOwnerSeat`), `"neutral"` when the only fitting
+ * declaration states no seat (a top-level `this`-typed function, or an owner
+ * whose seat cannot be told), `undefined` when every owner is on the other
+ * seat. A name with no recorded owner is not second-guessed.
+ */
+export function tsDeclaresOnLevel(
+  level: OwnerSeat,
+  tsOwners: ReadonlySet<string> | undefined,
+  staticOwners: ReadonlySet<string> | undefined,
+  instanceOwners: ReadonlySet<string> | undefined,
+): "seat" | "neutral" | undefined {
+  if (tsOwners === undefined || tsOwners.size === 0) return "neutral";
+  let neutral = false;
+  for (const owner of tsOwners) {
+    const seat = owner === "" ? undefined : tsOwnerSeat(owner, staticOwners, instanceOwners);
+    if (seat === level) return "seat";
+    if (seat === undefined) neutral = true;
+  }
+  return neutral ? "neutral" : undefined;
+}
+
 /** One deduped Ruby method expected from a Ruby file (see `dedupeRubyMethodInto`). */
 export interface SeenRubyMethod {
+  /** The seat Ruby defines it on — the other half of the dedup key. */
+  level?: OwnerSeat;
   rubyName: string;
   rubyModule: string;
   /** The Ruby extractor's classification — `"class_attribute"` for an `mattr_accessor`/`class_attribute`-generated reader. */
@@ -3979,6 +4019,7 @@ export function main() {
         const f = flattenIncludedMethodInfos(item.info, item.fqn, rubyPkg, moduleFqnByShort, pkg);
         const rubyMethods = [...f.instance, ...f.klass];
         const klassNames = new Set(f.klass.map((rm) => rm.name));
+        const klassMethods = new Set(f.klass);
         const itemShort = item.fqn.split("::").at(-1) ?? item.fqn;
         rubyOwnerShortNames.add(itemShort);
         if (rubyMethods.some((rm) => rm.name === "initialize")) {
@@ -3990,7 +4031,7 @@ export function main() {
           // public-mode run would otherwise never see the declaration.
           if (rm.reader) rubyReaderNames.add(ownerKey(item.fqn, rm.name));
           if (!methodMatchesMode(rm)) continue;
-          dedupeRubyMethodInto(seen, rm, item.fqn, rubyFile);
+          dedupeRubyMethodInto(seen, rm, item.fqn, rubyFile, klassMethods.has(rm));
           if (!rubyParamsByName.has(rm.name)) {
             rubyParamsByName.set(rm.name, rm.params);
             if (isForwardingRubyEntry(rm)) rubyForwardingNames.add(rm.name);
@@ -4626,9 +4667,10 @@ export function main() {
         ),
       ]);
 
+      const neutralClaims = new Set<string>();
       for (const [
         _dedupeKey,
-        { rubyName, rubyModule, notes, mixinFile, definedInFile, tsMirrorNames },
+        { level, rubyName, rubyModule, notes, mixinFile, definedInFile, tsMirrorNames },
       ] of seen) {
         // Null once the sibling set is known (`new` beside `initialize`), so it
         // is dropped the way `seen`'s own no-candidate gate drops one.
@@ -4639,7 +4681,36 @@ export function main() {
         if (tsCandidates === null) continue;
 
         // Check direct match first — find which candidate matched
-        const directMatch = tsCandidates.find((c) => tsMethods.has(c));
+        // Where the file expects the name at BOTH levels, a candidate counts
+        // only if it is declared on this row's seat. A seat-neutral declaration
+        // is one TS member, so it answers one of the two rows — the first
+        // sighted — and the other reads missing: `attribute_methods.rb` defines
+        // `attribute_method?` on the instance and in `ClassMethods` (:224), and
+        // one top-level `isAttributeMethod` cannot port both. The candidates
+        // are spellings of ONE port, so once the other row holds a neutral one
+        // a later spelling (`attributeMethod`, the private `:499` port) is the
+        // same seat-less port again, not this row's.
+        const bothLevels =
+          seen.has(rubyLevelKey("class", rubyName)) && seen.has(rubyLevelKey("instance", rubyName));
+        let neutralTaken = false;
+        const directMatch = tsCandidates.find((c) => {
+          if (!tsMethods.has(c)) return false;
+          if (!bothLevels || level === undefined) return true;
+          const declared = tsDeclaresOnLevel(
+            level,
+            tsOwnersByFileName.get(expectedTs)?.get(c),
+            tsStaticOwnersByFileName.get(expectedTs)?.get(c),
+            tsInstanceOwnersByFileName.get(expectedTs)?.get(c),
+          );
+          if (declared === "seat") return true;
+          if (declared === undefined || neutralTaken) return false;
+          if (neutralClaims.has(c)) {
+            neutralTaken = true;
+            return false;
+          }
+          neutralClaims.add(c);
+          return true;
+        });
         // A candidate whose only declaration here is a bodyless signature is
         // not a port — see `declarationOnlyInFile`. The direct-match arm is
         // skipped so the mixin / reopening / misplaced arms below still get
@@ -4712,7 +4783,19 @@ export function main() {
         let matchedCandidate: string | null = null;
         for (const candidate of tsCandidates) {
           for (const { file, methods } of includerMethodSetsByOwner.get(rubyModule) ?? []) {
-            if (methods.has(candidate)) {
+            // An includer re-exposing the seat-less port the other row already
+            // holds (base.ts's `isAttributeMethod: _isAttributeMethod`) is that
+            // same port, so only a declaration on this row's seat counts.
+            if (
+              methods.has(candidate) &&
+              (!neutralTaken ||
+                tsDeclaresOnLevel(
+                  level!,
+                  tsOwnersByFileName.get(file)?.get(candidate),
+                  tsStaticOwnersByFileName.get(file)?.get(candidate),
+                  tsInstanceOwnersByFileName.get(file)?.get(candidate),
+                ) === "seat")
+            ) {
               foundViaInclude = file;
               matchedCandidate = candidate;
               break;

@@ -3,7 +3,7 @@ import { SignedGlobalID } from "./signed-global-id.js";
 import { validateApp } from "./uri/gid.js";
 import { safeConstantize } from "@blazetrails/activesupport";
 import type { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, except } from "@blazetrails/ruby-compat";
 
 /** @noRailsEquivalent PERMANENT */
 export interface LocatorModel {
@@ -165,22 +165,21 @@ export class Locator {
     gid: string | GlobalID,
     options: LocateOptions = {},
   ): Promise<unknown | null> {
-    const parsed = GlobalID.parse(gid);
-    if (!parsed) return null;
-    const klass = safeConstantize(parsed.modelName) as LocatorModel | undefined;
+    gid = GlobalID.parse(gid) as GlobalID;
+    if (!gid) return null;
+    const klass = safeConstantize(gid.modelName) as LocatorModel | undefined;
     if (!klass) return null;
     if (!Locator.findAllowed(klass, options.only)) return null;
-    if (!modelIdArityMatches(klass, parsed.modelId)) return null;
-    const locator = Locator.locatorFor(parsed);
+    if (!modelIdArityMatches(klass, gid.modelId)) return null;
+    const locator = Locator.locatorFor(gid);
 
     if (methodArity(locator.locate) === 1) {
       GlobalID.deprecator().warn(
         "It seems your locator is defining the `locate` method only with one argument. Please make sure your locator is receiving the options argument as well, like `locate(gid, options = {})`.",
       );
-      return locator.locate(parsed);
+      return locator.locate(gid);
     } else {
-      const { only: _, ...rest } = options;
-      return locator.locate(parsed, rest);
+      return locator.locate(gid, except(options as Record<string, unknown>, "only"));
     }
   }
 
@@ -188,13 +187,13 @@ export class Locator {
     gids: Array<string | GlobalID>,
     options: LocateOptions = {},
   ): Promise<unknown[]> {
-    const allowed = Locator.parseAllowed(gids, options.only);
-    if (allowed.length === 0) return [];
-    const app = Locator.normalizeApp(allowed[0].app);
-    const sameApp = allowed.filter((g) => Locator.normalizeApp(g.app) === app);
-    const locator = Locator.locatorFor(allowed[0]);
-    const { only: _, ...rest } = options;
-    return locator.locateMany(sameApp, rest);
+    const allowedGids = Locator.parseAllowed(gids, options.only);
+    if (allowedGids.length > 0) {
+      const locator = Locator.locatorFor(allowedGids[0]);
+      return locator.locateMany(allowedGids, options);
+    } else {
+      return [];
+    }
   }
 
   static async locateSigned(

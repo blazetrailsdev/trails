@@ -14,6 +14,8 @@ import {
   resolveModuleName,
   buildModuleIncluderFqns,
   dedupeRubyMethodInto,
+  rubyLevelKey,
+  tsDeclaresOnLevel,
   type SeenRubyMethod,
   NAME_COLLISION_CLUSTERS,
   selectMisplacedFile,
@@ -1783,11 +1785,46 @@ describe("dedupeRubyMethodInto", () => {
     expect(seen.size).toBe(1);
     // First insertion wins, so the FQN points at the first observer.
     expect([...seen.values()][0]).toEqual({
+      level: "instance",
       rubyName: "invert",
       rubyModule: "Foo::A",
       definedInFile: "x.rb",
     });
   });
+  it("keeps a class method and an instance method of one name as two rows", () => {
+    // attribute_methods.rb:224 (ClassMethods) and :499 (instance) are two methods.
+    const seen = new Map<string, SeenRubyMethod>();
+    dedupeRubyMethodInto(seen, rm("attribute_method?"), "ActiveRecord::AttributeMethods");
+    dedupeRubyMethodInto(
+      seen,
+      rm("attribute_method?"),
+      "ActiveRecord::AttributeMethods",
+      undefined,
+      true,
+    );
+    expect([...seen.keys()]).toEqual(["attribute_method?", "self.attribute_method?"]);
+    expect([...seen.values()].map((v) => v.level)).toEqual(["instance", "class"]);
+  });
+
+  it("scores a ClassMethods fold once, whether seen on the parent or the submodule", () => {
+    // collectRubyEntities folds `Foo::ClassMethods#bar` into `Foo`'s class
+    // methods; either sighting is the class seat, so it is one row.
+    const seen = new Map<string, SeenRubyMethod>();
+    dedupeRubyMethodInto(seen, rm("bar"), "Foo", undefined, true);
+    dedupeRubyMethodInto(seen, rm("bar"), "Foo::ClassMethods");
+    expect([...seen.keys()]).toEqual([rubyLevelKey("class", "bar")]);
+  });
+
+  it("scores an `extend self` module's method once", () => {
+    // The extractor records an `extend self` module's `def foo` as an instance
+    // method only, so it stays one instance row however the port seats it.
+    const seen = new Map<string, SeenRubyMethod>();
+    dedupeRubyMethodInto(seen, rm("foo"), "Mod");
+    dedupeRubyMethodInto(seen, rm("foo"), "Mod");
+    expect([...seen.keys()]).toEqual(["foo"]);
+    expect(seen.get("foo")!.level).toBe("instance");
+  });
+
   it("expects a scoped skip that names its TS spellings, keeping a bare scoped skip dropped", () => {
     const seen = new Map<string, SeenRubyMethod>();
     const file = "core_ext/module/attr_internal.rb";
@@ -1798,6 +1835,31 @@ describe("dedupeRubyMethodInto", () => {
       "getAttrInternalNamingFormat",
       "setAttrInternalNamingFormat",
     ]);
+  });
+});
+
+describe("tsDeclaresOnLevel", () => {
+  const owners = (...o: string[]) => new Set(o);
+
+  it("lets a static satisfy only the class row", () => {
+    expect(tsDeclaresOnLevel("class", owners("Base"), owners("Base"), undefined)).toBe("seat");
+    expect(
+      tsDeclaresOnLevel("instance", owners("Base"), owners("Base"), undefined),
+    ).toBeUndefined();
+  });
+
+  it("lets an instance member satisfy only the instance row", () => {
+    expect(tsDeclaresOnLevel("instance", owners("Base"), undefined, owners("Base"))).toBe("seat");
+    expect(tsDeclaresOnLevel("class", owners("Base"), undefined, owners("Base"))).toBeUndefined();
+  });
+
+  it("reads a top-level function as seat-neutral", () => {
+    expect(tsDeclaresOnLevel("class", owners(""), undefined, undefined)).toBe("neutral");
+    expect(tsDeclaresOnLevel("instance", owners(""), undefined, undefined)).toBe("neutral");
+  });
+
+  it("prefers a seat declaration over a neutral one", () => {
+    expect(tsDeclaresOnLevel("class", owners("", "Base"), owners("Base"), undefined)).toBe("seat");
   });
 });
 
