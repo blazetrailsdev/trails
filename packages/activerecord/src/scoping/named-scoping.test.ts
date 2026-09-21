@@ -1,7 +1,19 @@
 import { describe, it, expect } from "vitest";
+import { ArgumentError } from "@blazetrails/activemodel";
+import {
+  assertNotCalled,
+  assertNotEmpty,
+  assertNothingRaised,
+  assertRaises,
+  assertRespondTo,
+} from "@blazetrails/activesupport";
 import "../index.js";
 import { registerModel } from "../index.js";
-import { captureSql } from "../testing/sql-capture.js";
+import {
+  assertNoQueries,
+  assertQueriesCount,
+  assertQueriesMatch,
+} from "../testing/query-assertions.js";
 import { fixtures } from "../test-fixtures.js";
 import { adapterType } from "../test-adapter.js";
 import { Temporal } from "@blazetrails/date";
@@ -23,8 +35,6 @@ registerModel(Developer);
 
 const ids = (rows: any[]) => rows.map((r) => r.id);
 const sortedIds = (rows: any[]) => ids(rows).sort((a, b) => Number(a) - Number(b));
-const capSql = (fn: () => unknown) =>
-  captureSql(fn as () => Promise<void>, { includeSchema: false });
 
 describe("NamedScopingTest", () => {
   const { topics, posts, authors } = fixtures([
@@ -36,18 +46,20 @@ describe("NamedScopingTest", () => {
   ]);
 
   it("implements enumerable", async () => {
-    expect((await Topic.all()).length).toBeGreaterThan(0);
+    assertNotEmpty(await Topic.all());
+
+    expect(ids(await Topic.base())).toEqual(ids(await Topic.all()));
     expect(ids(await Topic.base())).toEqual(ids(await Topic.all()));
     expect((await Topic.base().first())!.id).toBe((await Topic.first())!.id);
+    expect(ids((await Topic.base()).map((i: any) => i))).toEqual(ids(await Topic.all()));
   });
 
   it("found items are cached", async () => {
     const allPosts = Topic.base();
-    const sql = await capSql(async () => {
+    await assertQueriesCount(1, false, async () => {
       await allPosts;
       await allPosts;
     });
-    expect(sql.length).toBe(1);
   });
 
   it("reload expires cache of found items", async () => {
@@ -61,9 +73,14 @@ describe("NamedScopingTest", () => {
   });
 
   it("delegates finds and calculations to the base class", async () => {
-    expect((await Topic.all()).length).toBeGreaterThan(0);
+    assertNotEmpty(await Topic.all());
+
     expect(ids(await Topic.base())).toEqual(ids(await Topic.all()));
+    expect((await Topic.base().first())!.id).toBe((await Topic.first())!.id);
     expect((await Topic.count()) as number).toBe(await Topic.base().count());
+    expect(await Topic.average("replies_count")).toEqual(
+      await Topic.base().average("replies_count"),
+    );
   });
 
   it("calling merge at first in scope", async () => {
@@ -90,18 +107,18 @@ describe("NamedScopingTest", () => {
   });
 
   it("define scope for reserved words", async () => {
-    expect((await Topic.true()).every((t: any) => t.approved === true)).toBe(true);
-    expect((await Topic.false()).every((t: any) => t.approved !== true)).toBe(true);
+    expect((await Topic.true()).every((t: any) => t.approved === true)).toBeTruthy();
+    expect((await Topic.false()).every((t: any) => t.approved !== true)).toBeTruthy();
   });
 
   it("scope should respond to own methods and methods of the proxy", () => {
-    const approved = Topic.approved();
-    expect(typeof approved.limit).toBe("function");
-    expect(typeof approved.count).toBe("function");
+    assertRespondTo(Topic.approved(), "limit");
+    assertRespondTo(Topic.approved(), "count");
+    assertRespondTo(Topic.approved(), "length");
   });
 
   it("scopes with options limit finds to those matching the criteria specified", async () => {
-    expect((await Topic.where({ approved: true })).length).toBeGreaterThan(0);
+    assertNotEmpty(await Topic.where({ approved: true }));
     expect(sortedIds(await Topic.approved())).toEqual(
       sortedIds(await Topic.where({ approved: true })),
     );
@@ -116,11 +133,16 @@ describe("NamedScopingTest", () => {
 
   it("scopes are composable", async () => {
     const approved = sortedIds(await Topic.where({ approved: true }));
+    expect(sortedIds(await Topic.approved())).toEqual(approved);
     const replied = sortedIds(await Topic.where("replies_count > 0"));
-    expect(approved).not.toEqual(replied);
-    expect(sortedIds(await (Topic as any).approved().replied().toArray())).toEqual(
-      approved.filter((id) => replied.includes(id)),
-    );
+    expect(sortedIds(await Topic.replied())).toEqual(replied);
+    expect(
+      approved.length === replied.length && approved.every((id, i) => id === replied[i]),
+    ).toBeFalsy();
+    const both = approved.filter((id) => replied.includes(id));
+    assertNotEmpty(both);
+
+    expect(sortedIds(await (Topic as any).approved().replied().toArray())).toEqual(both);
   });
 
   it("procedural scopes", async () => {
@@ -152,21 +174,22 @@ describe("NamedScopingTest", () => {
   it("scope with object", async () => {
     const objects = await Topic.withObject();
     expect(objects.length).toBeGreaterThan(0);
-    expect(objects.every((t: any) => t.approved === true)).toBe(true);
+    expect(objects.every((t: any) => t.approved === true)).toBeTruthy();
   });
 
   it("scope with kwargs", async () => {
     const approved = await Topic.withKwargs(true);
     expect(approved.length).toBeGreaterThan(0);
-    expect(approved.every((t: any) => t.approved === true)).toBe(true);
+    expect(approved.every((t: any) => t.approved === true)).toBeTruthy();
 
     const none = await Topic.withKwargs();
-    expect(none.every((t: any) => t.approved !== true)).toBe(true);
+    expect(none.length).toBeGreaterThan(0);
+    expect(none.every((t: any) => t.approved !== true)).toBeTruthy();
   });
 
   it("has many associations have access to scopes", async () => {
     const containingA = await (Post as any).containingTheLetterA().toArray();
-    expect(containingA.length).toBeGreaterThan(0);
+    assertNotEmpty(containingA);
     const david = authors("david");
     const davidPosts = await ((await Author.find(david.id)) as any).posts.toArray();
     expect(ids(davidPosts)).not.toEqual(ids(containingA));
@@ -188,9 +211,10 @@ describe("NamedScopingTest", () => {
 
   it("has many through associations have access to scopes", async () => {
     const containingE = await (Comment as any).containingTheLetterE().toArray();
-    expect(containingE.length).toBeGreaterThan(0);
+    assertNotEmpty(containingE);
     const david = authors("david");
     const davidComments = await ((await Author.find(david.id)) as any).comments.toArray();
+    expect(ids(davidComments)).not.toEqual(ids(containingE));
     const expected = sortedIds(davidComments.filter((c: any) => ids(containingE).includes(c.id)));
     const got = sortedIds(
       await ((await Author.find(david.id)) as any).comments.containingTheLetterE().toArray(),
@@ -205,41 +229,50 @@ describe("NamedScopingTest", () => {
     const postTop = await Post.top(5).toArray();
     const davidTop = await david.posts.top(5).toArray();
 
-    expect(postRanked.length).toBeGreaterThan(0);
-    expect(davidRanked.length).toBeGreaterThan(0);
+    assertNotEmpty(postRanked);
+    assertNotEmpty(davidRanked);
     expect(ids(postRanked)).not.toEqual(ids(davidRanked));
     expect(ids(postTop)).not.toEqual(ids(davidTop));
     expect(sortedIds(davidRanked)).toEqual(sortedIds(davidTop));
     expect(ids(postRanked)).toEqual(ids(postTop));
   });
 
-  it("scopes body is a callable", () => {
+  it("scopes body is a callable", async () => {
     const klass = class extends Post {};
-    expect(() =>
+    const e = await assertRaises([ArgumentError], {}, () =>
       (klass as any).scope("containingTheLetterZ", Post.where("body LIKE '%z%'")),
-    ).toThrow("The scope body needs to be callable.");
+    );
+    expect(e.message).toBe("The scope body needs to be callable.");
   });
 
-  it("scopes name is relation method", () => {
+  it("scopes name is relation method", async () => {
     const conflicts = ["records", "toArray", "toSql", "explain"];
     for (const name of conflicts) {
       const klass = class extends Post {};
-      expect(() =>
+      const e = await assertRaises([ArgumentError], {}, () =>
         (klass as any).scope(name, function (this: any) {
           return this.where({ approved: true });
         }),
-      ).toThrow(new RegExp(`You tried to define a scope named "${name}" on the model`));
+      );
+      expect(e.message).toMatch(
+        new RegExp(`You tried to define a scope named "${name}" on the model`),
+      );
     }
   });
 
   it("active records have scope named  all  ", async () => {
-    expect((await Topic.all()).length).toBeGreaterThan(0);
+    assertNotEmpty(await Topic.all());
+
     expect(ids(await Topic.base())).toEqual(ids(await Topic.all()));
   });
 
   it("active records have scope named  scoped  ", async () => {
     const scope = Topic.where("content LIKE '%Have%'");
-    expect((await scope).length).toBeGreaterThan(0);
+    assertNotEmpty(await scope);
+
+    expect(sortedIds(await scope)).toEqual(
+      sortedIds(await Topic.all().mergeBang({ where: "content LIKE '%Have%'" })),
+    );
   });
 
   it("first and last should allow integers for limit", async () => {
@@ -253,128 +286,124 @@ describe("NamedScopingTest", () => {
   it("first and last should not use query when results are loaded", async () => {
     const t = Topic.base();
     await t.load();
-    const sql = await capSql(async () => {
+    await assertNoQueries(false, async () => {
       await t.first();
       await t.last();
     });
-    expect(sql.length).toBe(0);
   });
 
   it("empty should not load results", async () => {
     const t = Topic.base();
-    const sql = await capSql(async () => {
+    await assertQueriesCount(2, false, async () => {
       await t.isEmpty();
       await t.load();
       await t.isEmpty();
     });
-    expect(sql.length).toBe(2);
   });
 
   it("any should not load results", async () => {
     const t = Topic.base();
-    const sql = await capSql(async () => {
+    await assertQueriesCount(2, false, async () => {
       await t.isAny();
       await t.load();
       await t.isAny();
     });
-    expect(sql.length).toBe(2);
   });
 
   it("any should call proxy found if using a block", async () => {
     const t = Topic.base();
-    const sql = await capSql(async () => {
-      await t.isAny();
+    await assertQueriesCount(1, false, async () => {
+      await assertNotCalled(t, "isEmpty", null, async () => {
+        await t.isAny(() => true);
+      });
     });
-    expect(sql.length).toBe(1);
   });
 
   it("any should not fire query if scope loaded", async () => {
     const t = Topic.base();
     await t.load();
-    const sql = await capSql(async () => {
-      expect(await t.isAny()).toBe(true);
+    await assertNoQueries(false, async () => {
+      expect(await t.isAny()).toBeTruthy();
     });
-    expect(sql.length).toBe(0);
   });
 
   it("model class should respond to any", async () => {
-    expect(await Topic.isAny()).toBe(true);
+    expect(await Topic.isAny()).toBeTruthy();
     await Topic.deleteAll();
-    expect(await Topic.isAny()).toBe(false);
+    expect(await Topic.isAny()).toBeFalsy();
   });
 
   it("many should not load results", async () => {
     const t = Topic.base();
-    const sql = await capSql(async () => {
+    await assertQueriesCount(2, false, async () => {
       await t.isMany();
       await t.load();
       await t.isMany();
     });
-    expect(sql.length).toBe(2);
   });
 
   it("many should call proxy found if using a block", async () => {
     const t = Topic.base();
-    const sql = await capSql(async () => {
-      await t.isMany();
+    await assertQueriesCount(1, false, async () => {
+      await assertNotCalled(t, "size", null, async () => {
+        await t.isMany(() => true);
+      });
     });
-    expect(sql.length).toBe(1);
   });
 
   it("many should not fire query if scope loaded", async () => {
     const t = Topic.base();
     await t.load();
-    const sql = await capSql(async () => {
-      expect(await t.isMany()).toBe(true);
+    await assertNoQueries(false, async () => {
+      expect(await t.isMany()).toBeTruthy();
     });
-    expect(sql.length).toBe(0);
   });
 
   it("many should return false if none or one", async () => {
-    expect(await Topic.base().where({ id: 0 }).isMany()).toBe(false);
-    expect(await Topic.base().where({ id: 1 }).isMany()).toBe(false);
+    expect(await Topic.base().where({ id: 0 }).isMany()).toBeFalsy();
+    expect(await Topic.base().where({ id: 1 }).isMany()).toBeFalsy();
   });
 
   it("many should return true if more than one", async () => {
-    expect(await Topic.base().isMany()).toBe(true);
+    expect(await Topic.base().isMany()).toBeTruthy();
   });
 
   it("model class should respond to many", async () => {
     await Topic.deleteAll();
-    expect(await Topic.isMany()).toBe(false);
+    expect(await Topic.isMany()).toBeFalsy();
     await Topic.create({});
-    expect(await Topic.isMany()).toBe(false);
+    expect(await Topic.isMany()).toBeFalsy();
     await Topic.create({});
-    expect(await Topic.isMany()).toBe(true);
+    expect(await Topic.isMany()).toBeTruthy();
   });
 
   it("should build on top of scope", async () => {
     const topic = Topic.approved().build({});
-    expect(topic.approved).toBe(true);
+    expect(topic.approved).toBeTruthy();
   });
 
   it("should build new on top of scope", async () => {
     const topic = Topic.approved().new({});
-    expect(topic.approved).toBe(true);
+    expect(topic.approved).toBeTruthy();
   });
 
   it("should create on top of scope", async () => {
     const topic = await Topic.approved().create({});
-    expect(topic.approved).toBe(true);
+    expect(topic.approved).toBeTruthy();
   });
 
   it("should create with bang on top of scope", async () => {
-    const topic = await Topic.approved().create({});
-    expect(topic.approved).toBe(true);
+    const topic = await Topic.approved().createBang({});
+    expect(topic.approved).toBeTruthy();
   });
 
   it("should build on top of chained scopes", async () => {
     const topic = (Topic as any).approved().byLifo().build({});
-    expect(topic.approved).toBe(true);
+    expect(topic.approved).toBeTruthy();
     expect(topic.author_name).toBe("lifo");
   });
 
-  it("reserved scope names", () => {
+  it("reserved scope names", async () => {
     class ReservedKlass extends Topic {
       static pub() {}
       static pri() {}
@@ -398,30 +427,34 @@ describe("NamedScopingTest", () => {
     ];
     for (const name of conflicts) {
       const re = new RegExp(`You tried to define a scope named "${name}" on the model`);
-      expect(() =>
+      let e = await assertRaises([ArgumentError], {}, () =>
         (ReservedKlass as any).scope(name, function (this: any) {
           return this.where({ approved: true });
         }),
-      ).toThrow(re);
-      expect(() =>
+      );
+      expect(e.message).toMatch(re);
+
+      e = await assertRaises([ArgumentError], {}, () =>
         (ReservedSubklass as any).scope(name, function (this: any) {
           return this.where({ approved: true });
         }),
-      ).toThrow(re);
+      );
+      expect(e.message).toMatch(re);
     }
 
     const nonConflicts = ["findByTitle", "approved", "pub", "pri", "pro", "open"];
     for (const name of nonConflicts) {
-      expect(() =>
+      await assertNothingRaised(() =>
         (ReservedKlass as any).scope(name, function (this: any) {
           return this.where({ approved: true });
         }),
-      ).not.toThrow();
-      expect(() =>
+      );
+
+      await assertNothingRaised(() =>
         (ReservedSubklass as any).scope(name, function (this: any) {
           return this.where({ approved: true });
         }),
-      ).not.toThrow();
+      );
     }
   });
 
@@ -455,20 +488,17 @@ describe("NamedScopingTest", () => {
 
   it("size should use count when results are not loaded", async () => {
     const t = Topic.base();
-    const sql = await capSql(async () => {
-      await t.size();
+    await assertQueriesCount(1, false, async () => {
+      await assertQueriesMatch(/COUNT/i, undefined, false, () => t.size());
     });
-    expect(sql.length).toBe(1);
-    expect(sql[0]).toMatch(/COUNT/i);
   });
 
   it("size should use length when results are loaded", async () => {
     const t = Topic.base();
     await t.load();
-    const sql = await capSql(async () => {
+    await assertNoQueries(false, async () => {
       await t.size();
     });
-    expect(sql.length).toBe(0);
   });
 
   it("should not duplicates where values", () => {
@@ -485,10 +515,17 @@ describe("NamedScopingTest", () => {
   });
 
   it("chaining applies last conditions when creating", () => {
-    expect(Topic.rejected().new({}).approved).toBe(false);
-    expect((Topic as any).rejected().approved().new({}).approved).toBe(true);
-    expect((Topic as any).approved().rejected().new({}).approved).toBe(false);
-    expect((Topic as any).approved().rejected().approved().new({}).approved).toBe(true);
+    let post = Topic.rejected().new({});
+    expect(post.approved).toBeFalsy();
+
+    post = (Topic as any).rejected().approved().new({});
+    expect(post.approved).toBeTruthy();
+
+    post = (Topic as any).approved().rejected().new({});
+    expect(post.approved).toBeFalsy();
+
+    post = (Topic as any).approved().rejected().approved().new({});
+    expect(post.approved).toBeTruthy();
   });
 
   it("chaining combines conditions when searching", async () => {
@@ -528,27 +565,23 @@ describe("NamedScopingTest", () => {
   });
 
   it("scopes batch finders", async () => {
-    const approvedCount = await Topic.approved().count();
-    const collected: any[] = [];
-    for await (const t of Topic.approved().findEach({ batchSize: 1 })) {
-      expect(t.approved).toBe(true);
-      collected.push(t);
-    }
-    expect(collected.length).toBe(approvedCount);
+    expect(await Topic.approved().count()).toBe(4);
 
-    const grouped: any[] = [];
-    for await (const group of Topic.approved().findInBatches({ batchSize: 2 })) {
-      for (const t of group) {
-        expect(t.approved).toBe(true);
-        grouped.push(t);
+    await assertQueriesCount(5, false, async () => {
+      for await (const t of Topic.approved().findEach({ batchSize: 1 })) {
+        expect(t.approved).toBeTruthy();
       }
-    }
-    expect(grouped.length).toBe(approvedCount);
+    });
+
+    await assertQueriesCount(3, false, async () => {
+      for await (const group of Topic.approved().findInBatches({ batchSize: 2 })) {
+        for (const t of group) expect(t.approved).toBeTruthy();
+      }
+    });
   });
 
   it("table names for chaining scopes with and without table name included", async () => {
-    const rows = await (Comment as any).forFirstPost().forFirstAuthor().toArray();
-    expect(Array.isArray(rows)).toBe(true);
+    await assertNothingRaised(() => (Comment as any).forFirstPost().forFirstAuthor().toArray());
   });
 
   it("scopes on relations", async () => {
@@ -562,11 +595,11 @@ describe("NamedScopingTest", () => {
     const approved = Topic.approved().order("id ASC");
     const arr = await approved;
     expect(arr[0].id).toBe(topics("second").id);
-    expect(approved.isLoaded).toBe(true);
+    expect(approved.isLoaded).toBeTruthy();
   });
 
   it("nested scopes queries size", async () => {
-    const sql = await capSql(async () => {
+    await assertQueriesCount(1, false, async () => {
       await (Topic as any)
         .approved()
         .byLifo()
@@ -574,21 +607,17 @@ describe("NamedScopingTest", () => {
         .writtenBefore(Temporal.Now.instant())
         .toArray();
     });
-    expect(sql.length).toBe(1);
   });
 
   it("scopes are cached on associations", async () => {
     const post = (await Post.find(posts("welcome").id)) as any;
     await Post.cache(async () => {
-      const first = await capSql(async () => {
+      await assertQueriesCount(1, false, async () => {
         await post.comments.containingTheLetterE().toArray();
       });
-      expect(first.length).toBe(1);
-
-      const second = await capSql(async () => {
+      await assertNoQueries(false, async () => {
         await post.comments.containingTheLetterE().toArray();
       });
-      expect(second.length).toBe(0);
     });
   });
 
@@ -596,28 +625,23 @@ describe("NamedScopingTest", () => {
     const post = (await Post.find(posts("welcome").id)) as any;
     await Post.cache(async () => {
       let one: any[] = [];
-      const firstOne = await capSql(async () => {
+      await assertQueriesCount(1, false, async () => {
         one = await post.comments.limitBy(1).toArray();
       });
-      expect(firstOne.length).toBe(1);
       expect(one.length).toBe(1);
 
       let two: any[] = [];
-      const firstTwo = await capSql(async () => {
+      await assertQueriesCount(1, false, async () => {
         two = await post.comments.limitBy(2).toArray();
       });
-      expect(firstTwo.length).toBe(1);
       expect(two.length).toBe(2);
 
-      const cachedOne = await capSql(async () => {
+      await assertNoQueries(false, async () => {
         await post.comments.limitBy(1).toArray();
       });
-      expect(cachedOne.length).toBe(0);
-
-      const cachedTwo = await capSql(async () => {
+      await assertNoQueries(false, async () => {
         await post.comments.limitBy(2).toArray();
       });
-      expect(cachedTwo.length).toBe(0);
     });
   });
 
@@ -637,13 +661,10 @@ describe("NamedScopingTest", () => {
       await post.association("comments")[method]();
       expect(post.comments.containingTheLetterE()).not.toBe(before);
     }
-
-    expect(await Comment.where({ post_id: post.id }).count()).toBe(0);
   });
 
   it("scoped are lazy loaded if table still does not exist", async () => {
-    const mod = await import("../test-helpers/models/without-table.js");
-    expect(mod.WithoutTable).toBeDefined();
+    await assertNothingRaised(() => import("../test-helpers/models/without-table.js"));
   });
 
   it("eager default scope relations are remove", () => {
@@ -661,27 +682,27 @@ describe("NamedScopingTest", () => {
   });
 
   it("model class should respond to none", async () => {
-    expect(await Topic.isNone()).toBe(false);
+    expect(await Topic.isNone()).toBeFalsy();
     await Topic.deleteAll();
-    expect(await Topic.isNone()).toBe(true);
+    expect(await Topic.isNone()).toBeTruthy();
   });
 
   it("model class should respond to one", async () => {
-    expect(await Topic.isOne()).toBe(false);
+    expect(await Topic.isOne()).toBeFalsy();
     await Topic.deleteAll();
-    expect(await Topic.isOne()).toBe(false);
+    expect(await Topic.isOne()).toBeFalsy();
     await Topic.create({});
-    expect(await Topic.isOne()).toBe(true);
+    expect(await Topic.isOne()).toBeTruthy();
   });
 
   it("scope with annotation", async () => {
     Topic.scope("includingAnnotateInScope", function (this: any) {
       return this.annotate("from-scope");
     });
-    const sql = (Topic as any).includingAnnotateInScope().toSql();
-    expect(sql).toContain("from-scope");
-    expect(sortedIds(await (Topic as any).includingAnnotateInScope().toArray())).toEqual(
-      sortedIds(await Topic.all()),
-    );
+    await assertQueriesMatch(/\/\* from-scope \*\//, undefined, false, async () => {
+      expect(sortedIds(await (Topic as any).includingAnnotateInScope().toArray())).toEqual(
+        sortedIds(await Topic.all()),
+      );
+    });
   });
 });
