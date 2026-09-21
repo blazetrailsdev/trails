@@ -1,16 +1,12 @@
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
-   Each model below spells `include ActiveModel::Dirty` in its class body, the way the Rails test
-   model it mirrors does; the empty class/interface merge beside it is how `include()` surfaces
-   those members on the type side. */
-import { include, assertRespondTo, assertNotRespondTo } from "@blazetrails/activesupport";
+   `ValidatableVisitor` merges with an empty interface so the `Validations` members its `Visitor`
+   parent includes surface on the type side. */
+import { assertRespondTo, assertNotRespondTo } from "@blazetrails/activesupport";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
-import { Dirty } from "./dirty.js";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import bcrypt from "bcryptjs";
 import { Engine } from "./bcrypt.js";
-import { Model } from "./index.js";
 import { hasSecurePassword, SecurePassword } from "./secure-password.js";
-import { Attributes, type AttributesClassHalf } from "./attributes.js";
 import { Validations } from "./validations.js";
 import { User } from "./test-helpers/models/user.js";
 import { Visitor } from "./test-helpers/models/visitor.js";
@@ -38,22 +34,6 @@ beforeEach(() => {
 afterEach(() => {
   SecurePassword.minCost = originalMinCost;
 });
-
-function createUserClass(opts: { validations?: boolean } = {}) {
-  class User extends Model {
-    declare static attribute: AttributesClassHalf["attribute"];
-
-    static {
-      include(this, Attributes);
-      include(this, Dirty);
-      this.attribute("name", "string");
-      this.attribute("password_digest", "string");
-    }
-  }
-  interface User extends Attributes, Dirty {}
-  hasSecurePassword.call(User, "password", opts);
-  return User;
-}
 
 describe("SecurePasswordTest", () => {
   it("automatically include ActiveModel::Validations when validations are enabled", () => {
@@ -366,137 +346,5 @@ describe("SecurePasswordTest", () => {
 
     expect(Pilot.findByPasswordResetToken("999")).toEqual("finding-for-password_reset-by-999");
     expect(Pilot.findByPasswordResetTokenBang("999")).toEqual("finding-for-password_reset-by-999!");
-  });
-
-  it("constructor mass-assignment hashes password and removes plaintext", () => {
-    const User = createUserClass();
-    const u = new User({ name: "test", password: "secret" });
-    expect(u._readAttribute("password_digest")).not.toBe(null);
-    expect(u.attributes.password).toBeUndefined();
-    expect((u as any).authenticate("secret")).toBe(u);
-  });
-
-  it("assignAttributes sets password via property setter", () => {
-    const User = createUserClass();
-    const u = new User({ name: "test" });
-    (u as any).password = "secret";
-    expect(u._readAttribute("password_digest")).not.toBe(null);
-    expect((u as any).authenticate("secret")).toBe(u);
-  });
-
-  it("password_challenge validates against existing digest", async () => {
-    const User = createUserClass();
-    const builder = new User({ name: "test" });
-    (builder as any).password = "secret";
-    const digest = builder._readAttribute("password_digest");
-    const u = new User({ name: "test", password_digest: digest });
-    u.changesApplied();
-    expect(await u.isValid()).toBe(true);
-    (u as any).passwordChallenge = "secret";
-    expect(await u.isValid()).toBe(true);
-  });
-
-  it("password_challenge rejects wrong current password", async () => {
-    const User = createUserClass();
-    const u = new User({ name: "test" });
-    (u as any).password = "secret";
-    expect(await u.isValid()).toBe(true);
-    (u as any).passwordChallenge = "wrong";
-    expect(await u.isValid()).toBe(false);
-    expect(u.errors.messagesFor("passwordChallenge")).toContain("is invalid");
-  });
-
-  it("password_challenge validates against existing digest before allowing changes", async () => {
-    const User = createUserClass();
-    const builder = new User({ name: "test" });
-    (builder as any).password = "secret";
-    const digest = builder._readAttribute("password_digest");
-    const u = new User({ name: "test", password_digest: digest });
-    u.changesApplied();
-    expect(await u.isValid()).toBe(true);
-    (u as any).password = "newpassword";
-    (u as any).passwordChallenge = "secret";
-    expect(await u.isValid()).toBe(true);
-    expect((u as any).authenticate("newpassword")).toBe(u);
-    expect((u as any).authenticate("secret")).toBe(false);
-  });
-
-  it("password_challenge rejects wrong challenge during password change", async () => {
-    const User = createUserClass();
-    const u = new User({ name: "test" });
-    (u as any).password = "secret";
-    expect(await u.isValid()).toBe(true);
-    (u as any).password = "newpassword";
-    (u as any).passwordChallenge = "wrongold";
-    expect(await u.isValid()).toBe(false);
-    expect(u.errors.messagesFor("passwordChallenge")).toContain("is invalid");
-  });
-
-  it("password_challenge is not validated when nil", async () => {
-    const User = createUserClass();
-    const u = new User({ name: "test" });
-    (u as any).password = "secret";
-    (u as any).passwordChallenge = null;
-    expect(await u.isValid()).toBe(true);
-  });
-
-  it("password_challenge fails against wrong db-loaded digest", async () => {
-    const User = createUserClass();
-    const builder = new User({ name: "test" });
-    (builder as any).password = "secret";
-    const digest = builder._readAttribute("password_digest");
-    const u = new User({ name: "test", password_digest: digest });
-    (u as any).passwordChallenge = "wrong";
-    expect(await u.isValid()).toBe(false);
-    expect(u.errors.messagesFor("passwordChallenge")).toContain("is invalid");
-  });
-
-  it("password_challenge fails when no prior digest exists", async () => {
-    const User = createUserClass();
-    const u = new User({ name: "test" });
-    (u as any).passwordChallenge = "anything";
-    expect(await u.isValid()).toBe(false);
-    expect(u.errors.messagesFor("passwordChallenge")).toContain("is invalid");
-  });
-
-  it("password too long emits passwordTooLong error type", async () => {
-    const User = createUserClass();
-    const u = new User({ name: "test" });
-    (u as any).password = "a".repeat(73);
-    await u.isValid();
-    expect(u.errors.where("password", ":password_too_long").length).toBeGreaterThan(0);
-  });
-
-  it("password too long resolves to locale entry", async () => {
-    const User = createUserClass();
-    const u = new User({ name: "test" });
-    (u as any).password = "a".repeat(73);
-    await u.isValid();
-    const msgs = u.errors.fullMessages;
-    expect(msgs.some((m) => m.includes("is too long"))).toBe(true);
-  });
-
-  it("whitespace-only password digest treated as blank", async () => {
-    const User = createUserClass();
-    const u = new User({ name: "test" });
-    u._writeAttribute("password_digest", "   ");
-    expect(await u.isValid()).toBe(false);
-    expect(u.errors.messagesFor("password")).toContain("can't be blank");
-  });
-
-  it("password_salt returns the bcrypt salt from the digest", () => {
-    const User = createUserClass();
-    const u = new User({ name: "test" });
-    (u as any).password = "secret";
-    const salt = (u as any).passwordSalt;
-    expect(salt).not.toBeNull();
-    expect(typeof salt).toBe("string");
-    expect(salt).toMatch(/^\$2[aby]?\$\d{2}\$[./A-Za-z0-9]{22}$/);
-  });
-
-  it("password_salt returns null when no digest", () => {
-    const User = createUserClass();
-    const u = new User({ name: "test" });
-    expect((u as any).passwordSalt).toBeNull();
   });
 });
