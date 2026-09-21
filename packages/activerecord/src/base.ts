@@ -946,7 +946,7 @@ export class Base extends Model {
   static get connectionSpecificationName(): string {
     return ConnectionHandling.connectionSpecificationName.call(this);
   }
-  static set connectionSpecificationName(name: string) {
+  static set connectionSpecificationName(name: string | null) {
     (this as any)._connectionSpecificationName = name;
   }
   declare static connectedQ: typeof ConnectionHandling.connectedQ;

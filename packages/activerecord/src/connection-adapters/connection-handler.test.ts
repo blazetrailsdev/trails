@@ -395,8 +395,7 @@ describe("ConnectionHandlerTest", () => {
     }
   });
 
-  it.skip("remove connection should not remove parent", async () => {
-    // BLOCKED: remove-connection-reads-inherited-specification-name
+  it("remove connection should not remove parent", async () => {
     class Klass2 extends Base {}
     await Klass2.removeConnection();
     expect(await Base.leaseConnection()).not.toBeNull();

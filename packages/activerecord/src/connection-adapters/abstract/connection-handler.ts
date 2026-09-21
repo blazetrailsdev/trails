@@ -252,7 +252,7 @@ export class ConnectionHandler {
   }
 
   async removeConnectionPool(
-    connectionName: string,
+    connectionName: string | null | undefined,
     options?: { role?: string; shard?: string },
   ): Promise<HashConfig | undefined> {
     const role = options?.role ?? "writing";
@@ -261,7 +261,7 @@ export class ConnectionHandler {
     if (poolManager) {
       const dbConfig = await this.disconnectPoolFromPoolManager(poolManager, role, shard);
       if (poolManager.roleNames.length === 0) {
-        this._connectionNameToPoolManager.delete(connectionName);
+        this._connectionNameToPoolManager.delete(connectionName!);
       }
       return dbConfig;
     }
@@ -269,7 +269,7 @@ export class ConnectionHandler {
   }
 
   retrieveConnectionPool(
-    connectionName: string,
+    connectionName: string | null | undefined,
     options?: { role?: string; shard?: string; strict?: boolean },
   ): ConnectionPool | undefined {
     const role = options?.role ?? "writing";
@@ -303,8 +303,8 @@ export class ConnectionHandler {
   }
 
   /** @internal */
-  private getPoolManager(connectionName: string): PoolManager | undefined {
-    return this._connectionNameToPoolManager.get(connectionName);
+  private getPoolManager(connectionName: string | null | undefined): PoolManager | undefined {
+    return this._connectionNameToPoolManager.get(connectionName as string);
   }
 
   /** @internal */

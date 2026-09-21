@@ -163,6 +163,35 @@ describe("ConnectionHandlersMultiDbTest", () => {
     );
   });
 
+  it("switching connections via handler", async () => {
+    await withBaseConfigs(
+      {
+        default_env: {
+          readonly: sqliteDb("readonly"),
+          primary: sqliteDb("primary"),
+        },
+      },
+      async () => {
+        await Base.connectsTo({ database: { writing: "primary", reading: "readonly" } });
+
+        await Base.connectedTo({ role: "reading" }, async () => {
+          expect(currentRole.call(Base as any)).toEqual("reading");
+          expect(Base.connectedToQ({ role: "reading" })).toBeTruthy();
+          expect(Base.connectedToQ({ role: "writing" })).toBeFalsy();
+          expect((await Base.leaseConnection()).isPreventingWrites()).toBeTruthy();
+        });
+
+        await Base.connectedTo({ role: "writing" }, async () => {
+          expect(currentRole.call(Base as any)).toEqual("writing");
+          expect(Base.connectedToQ({ role: "writing" })).toBeTruthy();
+          expect(Base.connectedToQ({ role: "reading" })).toBeFalsy();
+          expect((await Base.leaseConnection()).isPreventingWrites()).toBeFalsy();
+        });
+      },
+      { defaultEnv: "default_env" },
+    );
+  });
+
   it("establish connection using 3 levels config with non default handlers", async () => {
     await withBaseConfigs(
       {
@@ -337,6 +366,28 @@ describe("ConnectionHandlersMultiDbTest", () => {
     expect(handler.connectionPoolList("writing")).toEqual([rwPool]);
     expect(handler.connectionPoolList("reading")).toEqual([roPool]);
     expect(handler.connectionPoolList()).toEqual([rwPool, roPool]);
+  });
+
+  it("retrieve connection", async () => {
+    expect(await handler.retrieveConnection(connectionName)).toBeTruthy();
+    expect(await handler.retrieveConnection(connectionName, { role: "reading" })).toBeTruthy();
+  });
+
+  it("active connections?", async () => {
+    expect(handler.activeConnectionsQ()).toBeFalsy();
+
+    expect(await handler.retrieveConnection(connectionName)).toBeTruthy();
+    expect(await handler.retrieveConnection(connectionName, { role: "reading" })).toBeTruthy();
+
+    expect(handler.activeConnectionsQ()).toBeTruthy();
+
+    handler.clearActiveConnectionsBang("writing");
+
+    expect(handler.activeConnectionsQ()).toBeTruthy();
+
+    handler.clearActiveConnectionsBang("all");
+
+    expect(handler.activeConnectionsQ()).toBeFalsy();
   });
 
   it("retrieve connection pool", () => {
