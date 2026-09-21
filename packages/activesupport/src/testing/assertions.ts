@@ -340,10 +340,7 @@ function _callableToSourceString(callable: unknown): string {
 
 let _assertions = 0;
 
-/**
- * @internal
- * @noRailsEquivalent PERMANENT
- */
+/** @internal */
 export function _takeAssertions(): number {
   const count = _assertions;
   _assertions = 0;
