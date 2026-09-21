@@ -1,3 +1,4 @@
+import { RuntimeError } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
@@ -218,7 +219,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         const sqls = await captureSql(() => adapter.createDatabase("matt"), { stub: adapter });
         expect(sqls[0]).toBe("CREATE DATABASE `matt` DEFAULT CHARACTER SET `utf8mb4`");
       } else {
-        const error = await assertRaises([Error], {}, () =>
+        const error = await assertRaises([RuntimeError], {}, () =>
           captureSql(() => adapter.createDatabase("matt"), { stub: adapter }),
         );
         const expected =

@@ -92,6 +92,11 @@ tester.run("rails-error-parity", rule, {
   valid: [
     // errors.ts mirrors every manifest class with correct parents.
     { filename: errorsFile, code: nl(ARE, AD, RNF, SI) },
+    // A root class may extend the ruby-compat port of its exact Ruby base.
+    {
+      filename: errorsFile,
+      code: nl("export class ActiveRecordError extends StandardError {}", AD, RNF, SI),
+    },
     // Throwing a ported error class is allowed.
     { filename: baseFile, code: `throw new RecordNotFound("nope");\n` },
     // An imported name shadows the global of the same spelling, so a ported

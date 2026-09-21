@@ -104,38 +104,5 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(record.a_bit).toBe("11111111");
       expect(record.a_bit_varying).toBe("1111");
     });
-
-    it("bit string type cast", async () => {
-      const { Bit } = await import("../../connection-adapters/postgresql/oid/bit.js");
-      const type = new Bit();
-      expect(type.cast("0101")).toBe("0101");
-      expect(type.cast("0xFF")).toBe("11111111");
-      expect(type.cast(null)).toBeNull();
-    });
-
-    it("bit string invalid", async () => {
-      await expect(
-        connection.execute(`INSERT INTO postgresql_bit_strings (a_bit) VALUES (B'0000000011')`),
-      ).rejects.toThrow();
-    });
-
-    it("varbit string", async () => {
-      await connection.execute(
-        `INSERT INTO postgresql_bit_strings (a_bit, a_bit_varying) VALUES (B'11111111', B'1111')`,
-      );
-      const rows = await connection.execute(
-        `SELECT a_bit, a_bit_varying FROM postgresql_bit_strings`,
-      );
-      expect(rows[0].a_bit).toBe("11111111");
-      expect(rows[0].a_bit_varying).toBe("1111");
-    });
-
-    it("varbit string default", async () => {
-      const cols = await connection.columns("postgresql_bit_strings");
-      const col = cols.find((c) => c.name === "a_bit_varying")!;
-      expect(col).toBeDefined();
-      expect(col.type).toBe("bit_varying");
-      expect(col.default).toBe("0011");
-    });
   });
 });

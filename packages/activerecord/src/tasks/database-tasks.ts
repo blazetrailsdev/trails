@@ -20,6 +20,7 @@ import {
   File,
   FileUtils,
   getPath,
+  RuntimeError,
 } from "@blazetrails/ruby-compat";
 import { NoMethodError } from "@blazetrails/activemodel";
 import { ActiveRecordError } from "../errors.js";
@@ -362,7 +363,7 @@ export class DatabaseTasks {
   static checkTargetVersion(): void {
     const version = getEnv("VERSION");
     if (this.targetVersion() !== null && !Migration.isValidVersionFormat(version ?? "")) {
-      throw new Error(`Invalid format of target version: \`VERSION=${version}\``);
+      throw new RuntimeError(`Invalid format of target version: \`VERSION=${version}\``);
     }
   }
 

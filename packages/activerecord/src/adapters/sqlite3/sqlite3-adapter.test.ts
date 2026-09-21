@@ -1146,7 +1146,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
       conn = new BetterSQLite3Adapter({ database: ":memory:" });
       await conn.createTable("testings");
 
-      const error: any = await assertRaises([Error], {}, async () => {
+      const error: any = await assertRaises([StatementInvalid], {}, async () => {
         await conn.addIndex("testings", "non_existent2");
       });
       expect(error.message).toMatch(/no such column: "?non_existent2"?/);
@@ -1159,7 +1159,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     let conn = new BetterSQLite3Adapter({ database: ":memory:", strict: true });
     await conn.createTable("testings");
 
-    let error: any = await assertRaises([Error], {}, async () => {
+    let error: any = await assertRaises([StatementInvalid], {}, async () => {
       await conn.addIndex("testings", "non_existent");
     });
     expect(error.message).toMatch(/no such column: "?non_existent"?/);
@@ -1170,7 +1170,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
       conn = new BetterSQLite3Adapter({ database: ":memory:", strict: true });
       await conn.createTable("testings");
 
-      error = await assertRaises([Error], {}, async () => {
+      error = await assertRaises([StatementInvalid], {}, async () => {
         await conn.addIndex("testings", "non_existent2");
       });
       expect(error.message).toMatch(/no such column: "?non_existent2"?/);

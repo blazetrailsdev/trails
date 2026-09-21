@@ -574,6 +574,7 @@ export {
   assertNoDifference,
   assertChanges,
   assertNoChanges,
+  Assertion,
   UnexpectedError,
   UNTRACKED,
   BacktraceFilter,

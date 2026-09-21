@@ -1,204 +1,146 @@
-/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
-   Each model below spells `include ActiveModel::Attributes` in its class body, the way the Rails
-   test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
-   how `include()` surfaces those members on the type side. */
-import { describe, it, expect } from "vitest";
-import { Model } from "../index.js";
-import { Attributes, type AttributesClassHalf } from "../attributes.js";
-import { include } from "@blazetrails/activesupport";
+import { describe, it, expect, afterEach } from "vitest";
+import { assert, assertPredicate, Duration } from "@blazetrails/activesupport";
+import { Range } from "@blazetrails/ruby-compat";
+import { Topic } from "../test-helpers/models/topic.js";
+import { Person } from "../test-helpers/models/person.js";
 
 describe("ExclusionValidationTest", () => {
-  it("validates exclusion of with lambda without arguments", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("role", "string");
-        this.validates("role", { exclusion: { in: () => ["banned"] } });
-      }
-    }
-    interface Person extends Attributes {}
-
-    expect(await new Person({ role: "admin" }).isValid()).toBe(true);
-    expect(await new Person({ role: "banned" }).isValid()).toBe(false);
-  });
-
-  it("validates exclusion of beginless numeric range", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("role", "string");
-        this.validates("role", { exclusion: { in: ["banned"] } });
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({ role: "user" });
-    expect(await p.isValid()).toBe(true);
-  });
-
-  it("validates exclusion of endless numeric range", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("role", "string");
-        this.validates("role", { exclusion: { in: ["banned"] } });
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({ role: "admin" });
-    expect(await p.isValid()).toBe(true);
-  });
-
-  it("validates exclusion of with time range", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("status", "string");
-        this.validates("status", { exclusion: { in: ["deleted", "archived"] } });
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({ status: "active" });
-    expect(await p.isValid()).toBe(true);
+  afterEach(() => {
+    Topic.clearValidatorsBang();
   });
 
   it("validates exclusion of", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    Topic.validatesExclusionOf("title", { in: ["abe", "monkey"] });
 
-      static {
-        include(this, Attributes);
-        this.attribute("karma", "string");
-        this.validates("karma", { exclusion: { in: ["ow", "ar"] } });
-      }
-    }
-    interface Person extends Attributes {}
-
-    expect(await new Person({ karma: "ow" }).isValid()).toBe(false);
-    expect(await new Person({ karma: "other" }).isValid()).toBe(true);
+    assertPredicate(await new Topic({ title: "something", content: "abc" }).isValid(), (v) => v);
+    assertPredicate(await new Topic({ title: "monkey", content: "abc" }).isInvalid(), (v) => v);
   });
 
   it("validates exclusion of with formatted message", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    Topic.validatesExclusionOf("title", {
+      in: ["abe", "monkey"],
+      message: "option %{value} is restricted",
+    });
 
-      static {
-        include(this, Attributes);
-        this.attribute("karma", "string");
-        this.validates("karma", { exclusion: { in: ["ow"], message: "is not allowed" } });
-      }
-    }
-    interface Person extends Attributes {}
+    assert(new Topic({ title: "something", content: "abc" }));
 
-    const p = new Person({ karma: "ow" });
-    await p.isValid();
-    expect(p.errors.messagesFor("karma")).toContain("is not allowed");
-  });
-
-  it("validates exclusion of with lambda", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("status", "string");
-        this.validates("status", { exclusion: { in: () => ["banned", "suspended"] } });
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({ status: "banned" });
-    expect(await p.isValid()).toBe(false);
-    const p2 = new Person({ status: "active" });
-    expect(await p2.isValid()).toBe(true);
+    const t = new Topic({ title: "monkey" });
+    assertPredicate(await t.isInvalid(), (v) => v);
+    assertPredicate(t.errors.get("title"), (e) => e.length > 0);
+    expect(t.errors.get("title")).toEqual(["option monkey is restricted"]);
   });
 
   it("validates exclusion of with within option", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    Topic.validatesExclusionOf("title", { within: ["abe", "monkey"] });
 
-      static {
-        include(this, Attributes);
-        this.attribute("status", "string");
-        this.validates("status", { exclusion: { within: ["banned", "suspended"] } });
-      }
-    }
-    interface Person extends Attributes {}
+    assert(new Topic({ title: "something", content: "abc" }));
 
-    expect(await new Person({ status: "active" }).isValid()).toBe(true);
-    expect(await new Person({ status: "banned" }).isValid()).toBe(false);
+    const t = new Topic({ title: "monkey" });
+    assertPredicate(await t.isInvalid(), (v) => v);
+    assertPredicate(t.errors.get("title"), (e) => e.length > 0);
   });
 
   it("validates exclusion of for ruby class", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    try {
+      Person.validatesExclusionOf("karma", { in: ["abe", "monkey"] });
 
-      static {
-        include(this, Attributes);
-      }
+      const p = new Person();
+      p.karma = "abe";
+      assertPredicate(await p.isInvalid(), (v) => v);
+
+      expect(p.errors.get("karma")).toEqual(["is reserved"]);
+
+      p.karma = "Lifo";
+      assertPredicate(await p.isValid(), (v) => v);
+    } finally {
+      Person.clearValidatorsBang();
     }
-    interface Person extends Attributes {}
-    Person.attribute("username", "string");
-    Person.validates("username", { exclusion: { in: ["admin", "root"] } });
-    expect(await new Person({ username: "dean" }).isValid()).toBe(true);
-    expect(await new Person({ username: "admin" }).isValid()).toBe(false);
+  });
+
+  it("validates exclusion of with lambda", async () => {
+    Topic.validatesExclusionOf("title", {
+      in: (topic: Topic) =>
+        topic.authorName === "sikachu" ? ["monkey", "elephant"] : ["abe", "wasabi"],
+    });
+
+    const t = new Topic();
+    t.title = "elephant";
+    t.authorName = "sikachu";
+    assertPredicate(await t.isInvalid(), (v) => v);
+
+    t.title = "wasabi";
+    assertPredicate(await t.isValid(), (v) => v);
+  });
+
+  it("validates exclusion of with lambda without arguments", async () => {
+    Topic.validatesExclusionOf("title", { in: () => ["monkey", "elephant"] });
+
+    const t = new Topic();
+    t.title = "monkey";
+    assertPredicate(await t.isInvalid(), (v) => v);
+
+    t.title = "wasabi";
+    assertPredicate(await t.isValid(), (v) => v);
   });
 
   it("validates exclusion of with range", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    Topic.validatesExclusionOf("content", { in: new Range("a", "g") });
 
-      static {
-        include(this, Attributes);
-        this.attribute("status", "string");
-        this.validates("status", { exclusion: { in: ["deleted", "banned", "suspended"] } });
-      }
-    }
-    interface Person extends Attributes {}
+    assertPredicate(await new Topic({ content: "g" }).isInvalid(), (v) => v);
+    assertPredicate(await new Topic({ content: "h" }).isValid(), (v) => v);
+  });
 
-    expect(await new Person({ status: "active" }).isValid()).toBe(true);
-    expect(await new Person({ status: "deleted" }).isValid()).toBe(false);
+  it("validates exclusion of beginless numeric range", async () => {
+    const rangeEnd = 1000;
+    Topic.validatesExclusionOf("rawPrice", { in: new Range(null, rangeEnd) });
+    assertPredicate(await new Topic({ title: "aaa", price: -100 }).isInvalid(), (v) => v);
+    assertPredicate(await new Topic({ title: "aaa", price: 0 }).isInvalid(), (v) => v);
+    assertPredicate(await new Topic({ title: "aaa", price: 100 }).isInvalid(), (v) => v);
+    assertPredicate(await new Topic({ title: "aaa", price: 2000 }).isValid(), (v) => v);
+    assertPredicate(await new Topic({ title: "aaa", price: rangeEnd }).isInvalid(), (v) => v);
+  });
+
+  it("validates exclusion of endless numeric range", async () => {
+    const rangeBegin = 0;
+    Topic.validatesExclusionOf("rawPrice", { in: new Range(rangeBegin, null) });
+    assertPredicate(await new Topic({ title: "aaa", price: -1 }).isValid(), (v) => v);
+    assertPredicate(await new Topic({ title: "aaa", price: -100 }).isValid(), (v) => v);
+    assertPredicate(await new Topic({ title: "aaa", price: 100 }).isInvalid(), (v) => v);
+    assertPredicate(await new Topic({ title: "aaa", price: 2000 }).isInvalid(), (v) => v);
+    assertPredicate(await new Topic({ title: "aaa", price: rangeBegin }).isInvalid(), (v) => v);
+  });
+
+  it("validates exclusion of with time range", async () => {
+    Topic.validatesExclusionOf("createdAt", {
+      in: new Range(Duration.days(6).ago(), Duration.days(2).ago()),
+    });
+
+    assertPredicate(await new Topic({ createdAt: Duration.days(5).ago() }).isInvalid(), (v) => v);
+    assertPredicate(await new Topic({ createdAt: Duration.days(3).ago() }).isInvalid(), (v) => v);
+    assertPredicate(await new Topic({ createdAt: Duration.days(7).ago() }).isValid(), (v) => v);
+    assertPredicate(await new Topic({ createdAt: Duration.days(1).ago() }).isValid(), (v) => v);
   });
 
   it("validates inclusion of with symbol", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    try {
+      Person.validatesExclusionOf("karma", { in: ":reservedKarmas" });
 
-      static {
-        include(this, Attributes);
-        this.attribute("status", "string");
-        this.validates("status", { exclusion: { in: () => ["banned"] } });
-      }
+      let p = new Person();
+      p.karma = "abe";
+
+      Object.assign(p, { reservedKarmas: () => ["abe"] });
+
+      assertPredicate(await p.isInvalid(), (v) => v);
+      expect(p.errors.get("karma")).toEqual(["is reserved"]);
+
+      p = new Person();
+      p.karma = "abe";
+
+      Object.assign(p, { reservedKarmas: () => [] });
+
+      assertPredicate(await p.isValid(), (v) => v);
+    } finally {
+      Person.clearValidatorsBang();
     }
-    interface Person extends Attributes {}
-
-    expect(await new Person({ status: "active" }).isValid()).toBe(true);
-    expect(await new Person({ status: "banned" }).isValid()).toBe(false);
-  });
-});
-describe("exclusion allowNil", () => {
-  it("skips nil by default", async () => {
-    class WithNil extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("role", "string");
-        this.validates("role", { exclusion: { in: ["admin"] } });
-      }
-    }
-    interface WithNil extends Attributes {}
-
-    expect(await new WithNil({}).isValid()).toBe(true);
   });
 });

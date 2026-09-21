@@ -86,6 +86,9 @@ export function cmp(a: unknown, b: unknown): number | null {
   if (isComparable(a)) return a.compareTo(b) ?? null;
   if (isCmpSpelling(a)) return a.cmp(b) ?? null;
   if (rbObjClass(a) === "Time" && rbObjClass(b) === "Time") {
+    if (typeof (a as { compare?: unknown }).compare === "function") {
+      return (a as { compare(o: unknown): number | null }).compare(b) ?? null;
+    }
     const x = (a as { epochNanoseconds: bigint }).epochNanoseconds;
     const y = (b as { epochNanoseconds: bigint }).epochNanoseconds;
     return x < y ? -1 : x > y ? 1 : 0;

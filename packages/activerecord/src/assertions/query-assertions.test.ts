@@ -7,7 +7,7 @@ import {
   assertQueriesMatch,
   assertNoQueriesMatch,
 } from "../testing/query-assertions.js";
-import { Notifications, assertRaises } from "@blazetrails/activesupport";
+import { Assertion, Notifications, assertRaises } from "@blazetrails/activesupport";
 
 function instrumentSql(sql: string, name?: string, cached = false): void {
   Notifications.instrument("sql.active_record", { sql, name: name ?? "SQL", cached });
@@ -23,14 +23,14 @@ describe("QueryAssertionsTest", () => {
       instrumentSql("SELECT 1");
     });
 
-    let error = await assertRaises([Error], {}, () =>
+    let error = await assertRaises([Assertion], {}, () =>
       assertQueriesCount(2, false, async () => {
         instrumentSql("SELECT 1");
       }),
     );
     expect(error.message).toMatch(/1 instead of 2 queries/);
 
-    error = await assertRaises([Error], {}, () =>
+    error = await assertRaises([Assertion], {}, () =>
       assertQueriesCount(0, false, async () => {
         instrumentSql("SELECT 1");
       }),
@@ -67,14 +67,14 @@ describe("QueryAssertionsTest", () => {
       instrumentSql("SELECT * FROM posts LIMIT 1");
     });
 
-    let error = await assertRaises([Error], {}, () =>
+    let error = await assertRaises([Assertion], {}, () =>
       assertQueriesMatch(/LIMIT/i, 2, false, async () => {
         instrumentSql("SELECT * FROM posts LIMIT 1");
       }),
     );
     expect(error.message).toMatch(/1 instead of 2 queries/);
 
-    error = await assertRaises([Error], {}, () =>
+    error = await assertRaises([Assertion], {}, () =>
       assertQueriesMatch(/LIMIT/i, 0, false, async () => {
         instrumentSql("SELECT * FROM posts LIMIT 1");
       }),
@@ -83,7 +83,7 @@ describe("QueryAssertionsTest", () => {
   });
 
   it("assert queries match with matcher", async () => {
-    const error = await assertRaises([Error], {}, () =>
+    const error = await assertRaises([Assertion], {}, () =>
       assertQueriesMatch(/WHERE "posts"\."id" = \? LIMIT \?/, 1, false, async () => {
         instrumentSql('SELECT * FROM posts WHERE "posts"."id" = $1 LIMIT 1');
       }),
@@ -102,7 +102,7 @@ describe("QueryAssertionsTest", () => {
       instrumentSql("SELECT 1");
     });
 
-    const error = await assertRaises([Error], {}, () =>
+    const error = await assertRaises([Assertion], {}, () =>
       assertNoQueriesMatch(/ORDER BY/i, false, async () => {
         instrumentSql("SELECT * FROM posts ORDER BY id");
       }),

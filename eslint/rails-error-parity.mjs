@@ -156,8 +156,9 @@ function checkParity(context, exportedClasses) {
       continue;
     }
     if (ROOT_BASES.has(entry.parent)) {
-      // Root class must still extend a global Error type (`class Foo {}` isn't).
-      if (!found.parent || !NATIVE_ERRORS.has(found.parent)) {
+      // Root class must extend a global Error type (`class Foo {}` isn't), or the
+      // ruby-compat port of its exact Ruby base (`StandardError`, `RuntimeError`, …).
+      if (!found.parent || !(NATIVE_ERRORS.has(found.parent) || found.parent === entry.parent)) {
         context.report({
           loc: { line: 1, column: 0 },
           messageId: "rootExtends",
