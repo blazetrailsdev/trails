@@ -21,6 +21,10 @@ function isStringLiteral(node) {
 
 function isAdapterCondition(node) {
   switch (node.type) {
+    // Rails' `mariadb?` is the same adapter-flavour branch as `current_adapter?`
+    // (activerecord/test/cases/adapters/mysql2/check_constraint_quoting_test.rb:28).
+    case "Identifier":
+      return node.name === "isMariaDb";
     case "CallExpression":
       return node.callee.type === "Identifier" && node.callee.name === "currentAdapter";
     case "BinaryExpression":
@@ -42,7 +46,7 @@ export default {
   meta: {
     type: "problem",
     docs: {
-      description: "disallow conditionals in tests, except a current_adapter? branch",
+      description: "disallow conditionals in tests, except a current_adapter?/mariadb? branch",
     },
     messages: { noConditionalInTest: "Remove conditional tests" },
     schema: [],

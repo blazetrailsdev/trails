@@ -1,7 +1,7 @@
 import { it, expect, beforeAll } from "vitest";
 import { describeIfMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { describeIfSupports } from "../../support/supports.js";
-import { captureSql } from "../../testing/sql-capture.js";
+import { assertQueriesMatch } from "../../testing/query-assertions.js";
 import { Base } from "../../index.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Post } from "../../test-helpers/models/post.js";
@@ -20,20 +20,18 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("optimizer hints", async () => {
-      const hint = "NO_RANGE_OPTIMIZATION(posts index_posts_on_author_id)";
-      const sqls = await captureSql(async () => {
-        await Post.optimizerHints(hint)
-          .select("id")
-          .where({ author_id: [0, 1] });
-      });
-      expect(sqls[0]).toMatch(
+      await assertQueriesMatch(
         /^SELECT \/\*\+ NO_RANGE_OPTIMIZATION\(posts index_posts_on_author_id\) \*\//,
+        undefined,
+        false,
+        async () => {
+          let posts = Post.optimizerHints("NO_RANGE_OPTIMIZATION(posts index_posts_on_author_id)");
+          posts = posts.select("id").where({ author_id: [0, 1] });
+          expect(await posts.explain()).toContain(
+            "| index | index_posts_on_author_id | index_posts_on_author_id |",
+          );
+        },
       );
-      const plan = await Post.optimizerHints(hint)
-        .select("id")
-        .where({ author_id: [0, 1] })
-        .explain();
-      expect(plan).toContain("index_posts_on_author_id");
     });
   });
 });

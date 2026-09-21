@@ -27,10 +27,11 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       expect(checkConstraints.length).toBe(1);
 
       const expression = checkConstraints[0].expression;
-      const expected = isMariaDb
-        ? "`name` <> 'forbidden_string'"
-        : "`name` <> _utf8mb4'forbidden_string'";
-      expect(expression).toBe(expected);
+      if (isMariaDb) {
+        expect(expression).toBe("`name` <> 'forbidden_string'");
+      } else {
+        expect(expression).toBe("`name` <> _utf8mb4'forbidden_string'");
+      }
     });
   });
 });
