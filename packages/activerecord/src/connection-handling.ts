@@ -366,7 +366,7 @@ export function adapterClassSync(
 }
 
 export async function removeConnection(this: typeof Base): Promise<HashConfig | undefined> {
-  let name: string | undefined;
+  let name: string | null | undefined;
   if (Object.prototype.hasOwnProperty.call(this, "_connectionSpecificationName")) {
     name = (this as any)._connectionSpecificationName;
   }
