@@ -6,6 +6,23 @@ import { itIfSupports } from "../../support/supports.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Base, registerModel } from "../../index.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
+import { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
+import {
+  assert,
+  assertEmpty,
+  assertNotPredicate,
+  assertPredicate,
+  assertRaises,
+  isPresent,
+} from "@blazetrails/activesupport";
+
+class UUIDType extends Base {
+  declare guid: string | null;
+
+  static {
+    this.tableName = "uuid_data_type";
+  }
+}
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -22,7 +39,8 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   beforeAll(async () => {
     adapter = Base.connection as PostgreSQLAdapter;
-    await adapter.execute(`CREATE EXTENSION IF NOT EXISTS "pgcrypto"`);
+    await adapter.enableExtension("uuid-ossp");
+    if (await adapter.supportsPgcryptoUuid()) await adapter.enableExtension("pgcrypto");
   });
 
   beforeEach(async () => {
@@ -502,75 +520,63 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("change column default", async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS uuid_default_test`);
-      await adapter.execute(`
-        CREATE TABLE uuid_default_test (
-          id serial primary key,
-          guid uuid DEFAULT gen_random_uuid()
-        )
-      `);
       try {
-        let rows = await adapter.execute(`
-          SELECT column_default FROM information_schema.columns
-          WHERE table_name = 'uuid_default_test' AND column_name = 'guid'
-        `);
-        expect(rows[0].column_default).toMatch(/gen_random_uuid/);
+        await adapter.addColumn("uuid_data_type", "thingy", "uuid", {
+          null: false,
+          default: "uuid_generate_v1()",
+        });
+        void UUIDType.resetColumnInformation();
+        await UUIDType.loadSchema();
+        let column = UUIDType.columnsHash()["thingy"] as unknown as PgColumn;
+        expect(column.defaultFunction).toBe("uuid_generate_v1()");
 
-        await adapter.execute(
-          `ALTER TABLE uuid_default_test ALTER COLUMN guid SET DEFAULT '00000000-0000-0000-0000-000000000000'::uuid`,
-        );
-        rows = await adapter.execute(`
-          SELECT column_default FROM information_schema.columns
-          WHERE table_name = 'uuid_default_test' AND column_name = 'guid'
-        `);
-        expect(rows[0].column_default).toMatch(/00000000/);
+        await adapter.changeColumn("uuid_data_type", "thingy", "uuid", {
+          null: false,
+          default: "uuid_generate_v4()",
+        });
+        void UUIDType.resetColumnInformation();
+        await UUIDType.loadSchema();
+        column = UUIDType.columnsHash()["thingy"] as unknown as PgColumn;
+        expect(column.defaultFunction).toBe("uuid_generate_v4()");
       } finally {
-        await adapter.execute(`DROP TABLE IF EXISTS uuid_default_test`);
+        void UUIDType.resetColumnInformation();
       }
     });
 
     it("add column with null true and default nil", async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS uuid_null_test`);
-      await adapter.execute(`
-        CREATE TABLE uuid_null_test (id serial primary key)
-      `);
-      try {
-        await adapter.execute(`ALTER TABLE uuid_null_test ADD COLUMN guid uuid DEFAULT NULL`);
-        const rows = await adapter.execute(`
-          SELECT column_default, is_nullable FROM information_schema.columns
-          WHERE table_name = 'uuid_null_test' AND column_name = 'guid'
-        `);
-        expect(rows[0].is_nullable).toBe("YES");
-      } finally {
-        await adapter.execute(`DROP TABLE IF EXISTS uuid_null_test`);
-      }
+      await adapter.addColumn("uuid_data_type", "thingy", "uuid", { null: true, default: null });
+
+      void UUIDType.resetColumnInformation();
+      await UUIDType.loadSchema();
+      const column = UUIDType.columnsHash()["thingy"] as unknown as PgColumn;
+
+      assert(column.null);
+      expect(column.default).toBeNull();
     });
 
     it("add column with default array", async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS uuid_arr_default_test`);
-      await adapter.execute(`
-        CREATE TABLE uuid_arr_default_test (id serial primary key)
-      `);
-      try {
-        await adapter.execute(
-          `ALTER TABLE uuid_arr_default_test ADD COLUMN guids uuid[] DEFAULT '{}'`,
-        );
-        const rows = await adapter.execute(`
-          SELECT column_default FROM information_schema.columns
-          WHERE table_name = 'uuid_arr_default_test' AND column_name = 'guids'
-        `);
-        expect(rows[0].column_default).toMatch(/\{\}/);
-      } finally {
-        await adapter.execute(`DROP TABLE IF EXISTS uuid_arr_default_test`);
-      }
+      await adapter.addColumn("uuid_data_type", "thingy", "uuid", { array: true, default: [] });
+
+      void UUIDType.resetColumnInformation();
+      await UUIDType.loadSchema();
+      const column = UUIDType.columnsHash()["thingy"] as unknown as PgColumn;
+
+      assertPredicate(column, (c: PgColumn) => c.isArray());
+      expect(column.default).toBe("{}");
+
+      const schema = await dumpTableSchema(adapter, "uuid_data_type");
+      expect(schema).toMatch(/t\.uuid\("thingy", \{ default: \[\], array: true \}\);?$/m);
     });
 
     it("data type of uuid types", async () => {
-      const rows = await adapter.execute(`
-        SELECT data_type FROM information_schema.columns
-        WHERE table_name = 'uuid_data_type' AND column_name = 'guid'
-      `);
-      expect(rows[0].data_type).toBe("uuid");
+      await UUIDType.loadSchema();
+      const column = UUIDType.columnsHash()["guid"] as unknown as PgColumn;
+      expect(column.type).toBe("uuid");
+      expect(column.sqlType).toBe("uuid");
+      assertNotPredicate(column, (c: PgColumn) => c.isArray());
+
+      const type = UUIDType.typeForAttribute("guid");
+      assertNotPredicate(type!, (t) => t.isBinary());
     });
 
     it("treat blank uuid as nil", () => {
@@ -581,27 +587,28 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(new Uuid().cast("foobar")).toBeNull();
     });
 
-    it("invalid uuid dont modify before type cast", () => {
-      const raw = "foobar";
-      expect(new Uuid().cast(raw)).toBeNull();
-      expect(raw).toBe("foobar");
+    it("invalid uuid dont modify before type cast", async () => {
+      await UUIDType.loadSchema();
+      const uuid = new UUIDType({ guid: "foobar" });
+      expect(uuid.readAttributeBeforeTypeCast("guid")).toBe("foobar");
     });
 
     it("invalid uuid dont match to nil", async () => {
-      await adapter.execute(`INSERT INTO uuid_data_type (guid) VALUES (NULL)`);
-      await expect(
-        adapter
-          .execQuery(`SELECT * FROM uuid_data_type WHERE guid = $1`, "SQL", ["foobar"])
-          .then((r) => r.toArray()),
-      ).rejects.toThrow();
+      await UUIDType.createBang();
+      assertEmpty(await UUIDType.where({ guid: "" }));
+      assertEmpty(await UUIDType.where({ guid: "foobar" }));
     });
 
-    it("uuid change format does not mark dirty", () => {
-      const a = new Uuid().cast("A0EEBC99-9C0B-4EF8-BB6D-6BB9BD380A11");
-      const b = new Uuid().cast("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11");
-      const c = new Uuid().cast("{a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11}");
-      expect(a).toBe(b);
-      expect(b).toBe(c);
+    it("uuid change format does not mark dirty", async () => {
+      await UUIDType.loadSchema();
+      const model = await UUIDType.createBang({ guid: "abcd-0123-4567-89ef-dead-beef-0101-1010" });
+      model.guid = (model.guid as string).replace(/[a-z]/gi, (c) =>
+        c === c.toLowerCase() ? c.toUpperCase() : c.toLowerCase(),
+      );
+      assertNotPredicate(model, (m: UUIDType) => m.isChanged);
+
+      model.guid = `{${model.guid}}`;
+      assertNotPredicate(model, (m: UUIDType) => m.isChanged);
     });
 
     it.skip("acceptable uuid regex", () => {
@@ -647,172 +654,125 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("uniqueness validation ignores uuid", async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS uuid_uniqueness_validation_test`);
-      await adapter.execute(`
-        CREATE TABLE uuid_uniqueness_validation_test (
-          id serial primary key,
-          guid uuid UNIQUE
-        )
-      `);
-      try {
-        class UuidUniq extends Base {
-          static tableName = "uuid_uniqueness_validation_test";
-          static {
-            this.attribute("id", "integer");
-            this.validatesUniquenessOf("guid", { caseSensitive: false });
-          }
+      class klass extends Base {
+        declare guid: string | null;
+
+        static {
+          this.tableName = "uuid_data_type";
+          this.validates("guid", { uniqueness: { caseSensitive: false } });
         }
-        await UuidUniq.loadSchema();
 
-        const uuid = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
-        const r1 = await UuidUniq.create({ guid: uuid });
-        expect(r1.isPersisted()).toBe(true);
-
-        const r2 = new UuidUniq({ guid: uuid });
-        const saved = await r2.save();
-        expect(saved).toBe(false);
-        expect(r2.errors.messagesFor("guid")).toBeTruthy();
-
-        const r3 = new UuidUniq({ guid: "b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11" });
-        expect(await r3.save()).toBe(true);
-      } finally {
-        await adapter.execute(`DROP TABLE IF EXISTS uuid_uniqueness_validation_test`);
+        static override get name() {
+          return "UUIDType";
+        }
       }
+      await klass.loadSchema();
+
+      const record = await klass.createBang({ guid: "a0ee-bc99-9c0b-4ef8-bb6d-6bb9-bd38-0a11" });
+      const duplicate = new klass({ guid: record.guid });
+
+      assertPredicate(record.guid, isPresent);
+      assertNotPredicate(await duplicate.isValid(), (v: boolean) => v);
     });
   });
 
   describe("PostgreSQLUUIDGenerationTest", () => {
-    it("id is uuid", async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS uuid_gen_test`);
-      await adapter.execute(`
-        CREATE TABLE uuid_gen_test (
-          id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-          name text
-        )
-      `);
-      try {
-        const rows = await adapter.execute(`
-          SELECT data_type FROM information_schema.columns
-          WHERE table_name = 'uuid_gen_test' AND column_name = 'id'
-        `);
-        expect(rows[0].data_type).toBe("uuid");
-      } finally {
-        await adapter.execute(`DROP TABLE IF EXISTS uuid_gen_test`);
+    class UUID extends Base {
+      static {
+        this.tableName = "pg_uuids";
       }
+    }
+
+    let supportsPgcryptoUuid: boolean;
+    const uuidFunction = () => (supportsPgcryptoUuid ? "gen_random_uuid()" : "uuid_generate_v4()");
+    const uuidDefault = () => (supportsPgcryptoUuid ? {} : { default: uuidFunction() });
+
+    beforeEach(async () => {
+      supportsPgcryptoUuid = await adapter.supportsPgcryptoUuid();
+      await adapter.createTable("pg_uuids", { id: "uuid", default: "uuid_generate_v1()" }, (t) => {
+        t.string("name");
+        t.uuid("other_uuid", { default: "uuid_generate_v4()" });
+      });
+
+      await adapter.execute(`
+        CREATE OR REPLACE FUNCTION my_uuid_generator() RETURNS uuid
+        AS $$ SELECT * FROM ${uuidFunction()} $$
+        LANGUAGE SQL VOLATILE;
+      `);
+
+      await adapter.createTable(
+        "pg_uuids_2",
+        { id: "uuid", default: "my_uuid_generator()" },
+        (t) => {
+          t.string("name");
+          t.uuid("other_uuid_2", { default: "my_uuid_generator()" });
+        },
+      );
+
+      await adapter.createTable("pg_uuids_3", { id: "uuid", ...uuidDefault() }, (t) => {
+        t.string("name");
+      });
+      void UUID.resetColumnInformation();
+      await UUID.loadSchema();
+    });
+
+    afterEach(async () => {
+      await adapter.dropTable("pg_uuids", "pg_uuids_2", "pg_uuids_3", { ifExists: true });
+      await adapter.execute("DROP FUNCTION IF EXISTS my_uuid_generator();");
+      void UUID.resetColumnInformation();
+    });
+
+    it("id is uuid", () => {
+      expect(UUID.columnsHash()["id"].type).toBe("uuid");
+      assert(UUID.primaryKey);
     });
 
     it("id has a default", async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS uuid_gen_test`);
-      await adapter.execute(`
-        CREATE TABLE uuid_gen_test (
-          id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-          name text
-        )
-      `);
-      try {
-        await adapter.execQuery(`INSERT INTO uuid_gen_test (name) VALUES ($1)`, "SQL", ["test"]);
-        const rows = await adapter.execute(`SELECT id FROM uuid_gen_test`);
-        expect(rows[0].id).toBeTruthy();
-        expect(ACCEPTABLE_UUID.test(rows[0].id as string)).toBe(true);
-      } finally {
-        await adapter.execute(`DROP TABLE IF EXISTS uuid_gen_test`);
-      }
+      const u = await UUID.create();
+      expect(u.id).not.toBeNull();
     });
 
     it("auto create uuid", async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS uuid_gen_test`);
-      await adapter.execute(`
-        CREATE TABLE uuid_gen_test (
-          id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-          other uuid DEFAULT gen_random_uuid(),
-          name text
-        )
-      `);
-      try {
-        await adapter.execQuery(`INSERT INTO uuid_gen_test (name) VALUES ($1)`, "SQL", ["test"]);
-        const rows = await adapter.execute(`SELECT id, other FROM uuid_gen_test`);
-        expect(ACCEPTABLE_UUID.test(rows[0].id as string)).toBe(true);
-        expect(ACCEPTABLE_UUID.test(rows[0].other as string)).toBe(true);
-        expect(rows[0].id).not.toBe(rows[0].other);
-      } finally {
-        await adapter.execute(`DROP TABLE IF EXISTS uuid_gen_test`);
-      }
+      const u = await UUID.create();
+      await u.reload();
+      expect(u.readAttribute("other_uuid")).not.toBeNull();
     });
 
     it("pk and sequence for uuid primary key", async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS uuid_gen_test`);
-      await adapter.execute(`
-        CREATE TABLE uuid_gen_test (
-          id uuid DEFAULT gen_random_uuid() PRIMARY KEY
-        )
-      `);
-      try {
-        const rows = await adapter.execute(`
-          SELECT pg_get_serial_sequence('uuid_gen_test', 'id') AS seq
-        `);
-        expect(rows[0].seq).toBeNull();
-      } finally {
-        await adapter.execute(`DROP TABLE IF EXISTS uuid_gen_test`);
-      }
+      const [pk, seq] = (await adapter.pkAndSequenceFor("pg_uuids"))!;
+      expect(pk).toBe("id");
+      expect(seq).toBeNull();
     });
 
     it("schema dumper for uuid primary key", async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS pg_uuids`);
-      await adapter.execute(`
-        CREATE TABLE pg_uuids (
-          id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-          name text,
-          other_uuid uuid DEFAULT gen_random_uuid()
-        )
-      `);
-      try {
-        const output = await dumpTableSchema(adapter, "pg_uuids");
-        expect(output).toMatch(/createTable\("pg_uuids".*id: "uuid"/);
-        expect(output).toMatch(/default: \(\) => "gen_random_uuid\(\)"/);
-      } finally {
-        await adapter.execute(`DROP TABLE IF EXISTS pg_uuids`);
-      }
+      const schema = await dumpTableSchema(adapter, "pg_uuids");
+      expect(schema).toMatch(
+        /\bcreateTable\("pg_uuids", \{ id: "uuid", default: \(\) => "uuid_generate_v1\(\)"/,
+      );
+      expect(schema).toMatch(/t\.uuid\("other_uuid", \{ default: \(\) => "uuid_generate_v4\(\)"/);
     });
 
     it("schema dumper for uuid primary key with custom default", async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS pg_uuids_2`);
-      await adapter.execute(`DROP FUNCTION IF EXISTS my_uuid_generator()`);
-      try {
-        await adapter.execute(`
-          CREATE OR REPLACE FUNCTION my_uuid_generator() RETURNS uuid
-          AS $$ SELECT gen_random_uuid() $$ LANGUAGE SQL VOLATILE
-        `);
-        await adapter.execute(`
-          CREATE TABLE pg_uuids_2 (
-            id uuid DEFAULT my_uuid_generator() PRIMARY KEY,
-            name text
-          )
-        `);
-        const output = await dumpTableSchema(adapter, "pg_uuids_2");
-        expect(output).toMatch(
-          /createTable\("pg_uuids_2".*id: "uuid".*default: \(\) => "my_uuid_generator\(\)"/,
-        );
-      } finally {
-        await adapter.execute(`DROP TABLE IF EXISTS pg_uuids_2`);
-        await adapter.execute(`DROP FUNCTION IF EXISTS my_uuid_generator()`);
-      }
+      const schema = await dumpTableSchema(adapter, "pg_uuids_2");
+      expect(schema).toMatch(
+        /\bcreateTable\("pg_uuids_2", \{ id: "uuid", default: \(\) => "my_uuid_generator\(\)"/,
+      );
+      expect(schema).toMatch(
+        /t\.uuid\("other_uuid_2", \{ default: \(\) => "my_uuid_generator\(\)"/,
+      );
     });
 
     it("schema dumper for uuid primary key default", async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS pg_uuids_3`);
-      await adapter.execute(`
-        CREATE TABLE pg_uuids_3 (
-          id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-          name text
-        )
-      `);
-      try {
-        const output = await dumpTableSchema(adapter, "pg_uuids_3");
-        expect(output).toMatch(
-          /createTable\("pg_uuids_3".*id: "uuid".*default: \(\) => "gen_random_uuid\(\)"/,
+      const schema = await dumpTableSchema(adapter, "pg_uuids_3");
+      // eslint-disable-next-line blazetrails/no-conditional-in-test -- uuid_test.rb:289 branches on supports_pgcrypto_uuid? and parity:test counts both arms
+      if (supportsPgcryptoUuid) {
+        expect(schema).toMatch(
+          /\bcreateTable\("pg_uuids_3", \{ id: "uuid", default: \(\) => "gen_random_uuid\(\)"/,
         );
-      } finally {
-        await adapter.execute(`DROP TABLE IF EXISTS pg_uuids_3`);
+      } else {
+        expect(schema).toMatch(
+          /\bcreateTable\("pg_uuids_3", \{ id: "uuid", default: \(\) => "uuid_generate_v4\(\)"/,
+        );
       }
     });
 
@@ -932,14 +892,14 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("collection association with uuid", async () => {
       const post = await UuidPost.createBang({});
       const comment = await post.uuidComments.createBang({});
-      const found = await post.uuidComments.find(comment.id);
-      expect(found).toBeTruthy();
-      expect(found.id).toBe(comment.id);
+      assert(await post.uuidComments.find(comment.id));
     });
 
     it("find with uuid", async () => {
       await UuidPost.createBang({});
-      await expect(UuidPost.find(123456)).rejects.toBeInstanceOf(RecordNotFound);
+      await assertRaises([RecordNotFound], {}, async () => {
+        await UuidPost.find(123456);
+      });
     });
 
     it("find by with uuid", async () => {
