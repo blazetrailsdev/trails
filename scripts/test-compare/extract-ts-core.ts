@@ -136,11 +136,6 @@ function resolveHelper(helpers: HelperMap, name: string, pos: number): HelperDef
  * only where it is written, and its call sites contribute nothing — including
  * when the local is itself named `assert*`, which `isAssertionCallee` would
  * otherwise read as an assertion.
- *
- * Only the lambda shape gets this treatment. A `function` declaration in the
- * test body is the port of a Ruby `def` there, which Ripper does see: its body
- * counts lexically AND each call site counts again (as one assertion when the
- * name is `assert_*`, else by expansion), so the TS side scores it the same way.
  */
 function isInlineDef(def: HelperDef, rootStart: number, rootEnd: number): boolean {
   return def.lambda && def.body.pos >= rootStart && def.body.end <= rootEnd;

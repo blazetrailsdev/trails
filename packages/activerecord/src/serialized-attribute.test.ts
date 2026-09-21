@@ -37,10 +37,9 @@ describe("SerializedAttributeTest", () => {
   afterAll(() => setUseYamlUnsafeLoad(false));
 
   it("serialize does not eagerly load columns", async () => {
-    class LocalTopic extends Topic {}
-    LocalTopic.resetColumnInformation();
+    Topic.resetColumnInformation();
     await assertNoQueries(false, () => {
-      LocalTopic.serialize("content");
+      Topic.serialize("content");
     });
   });
 

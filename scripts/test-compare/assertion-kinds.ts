@@ -113,13 +113,7 @@ const RAILS_MAP: Record<string, CanonicalKind> = {
   refute_respond_to: "notRespondTo",
   assert_operator: "operator",
   assert_in_delta: "inDelta",
-  // minitest/lib/minitest/assertions.rb: `assert_in_epsilon` is
-  // `assert_in_delta exp, act, [exp.abs, act.abs].min * epsilon`.
   assert_in_epsilon: "inDelta",
-  // activerecord/lib/active_record/testing/query_assertions.rb:22,47,66,94.
-  // `assert_no_queries` IS `assert_queries_count(0)`, but it keeps its own kind
-  // so a port asserting no query where Rails asserts one (or the reverse) is a
-  // kind mismatch rather than two unmapped rows that cancel out.
   assert_queries_count: "queriesCount",
   assert_no_queries: "noQueries",
   assert_queries_match: "queriesMatch",
