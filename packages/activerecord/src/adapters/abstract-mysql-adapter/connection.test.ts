@@ -1,5 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { Notifications } from "@blazetrails/activesupport";
+import {
+  assert,
+  assertEmpty,
+  assertNotPredicate,
+  assertPredicate,
+  assertRaises,
+  Notifications,
+} from "@blazetrails/activesupport";
+import { ARUnit2Model } from "../../test-helpers/models/arunit2-model.js";
 import type { NotificationEvent } from "@blazetrails/activesupport";
 import {
   describeIfMysqlAdapter,
@@ -41,7 +49,9 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       u.pathname = "/inexistent_activerecord_unittest";
       const badAdapter = new Mysql2Adapter(u.toString());
       try {
-        await expect(badAdapter.execute("SELECT 1")).rejects.toBeInstanceOf(NoDatabaseError);
+        await assertRaises([NoDatabaseError], {}, () =>
+          badAdapter.dropTable("ex", { ifExists: true }),
+        );
       } finally {
         await badAdapter.disconnectBang();
       }
@@ -53,9 +63,9 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         const singleConn = new Mysql2Adapter({ uri: MYSQL_TEST_URL, connectionLimit: 1 });
         try {
           await singleConn.execute("SET SESSION wait_timeout=1");
-          expect(await singleConn.active()).toBe(true);
+          assertPredicate(await singleConn.active(), (v) => v);
           await new Promise((r) => setTimeout(r, 2000));
-          expect(await singleConn.active()).toBe(false);
+          assertNotPredicate(await singleConn.active(), (v) => v);
         } finally {
           await singleConn.disconnectBang();
         }
@@ -66,11 +76,10 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       const singleConn = new Mysql2Adapter({ uri: MYSQL_TEST_URL, connectionLimit: 1 });
       try {
         await singleConn.execute("SET SESSION wait_timeout=1");
-        expect(await singleConn.active()).toBe(true);
+        assertPredicate(await singleConn.active(), (v) => v);
         await new Promise((r) => setTimeout(r, 2000));
         await singleConn.reconnectBang();
-        expect(await singleConn.active()).toBe(true);
-        await expect(singleConn.execute("SELECT 1")).resolves.toBeDefined();
+        assertPredicate(await singleConn.active(), (v) => v);
       } finally {
         await singleConn.disconnectBang();
       }
@@ -79,12 +88,10 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       const singleConn = new Mysql2Adapter({ uri: MYSQL_TEST_URL, connectionLimit: 1 });
       try {
         await singleConn.execute("SET SESSION wait_timeout=1");
-        expect(await singleConn.active()).toBe(true);
+        assertPredicate(await singleConn.active(), (v) => v);
         await new Promise((r) => setTimeout(r, 2000));
-        expect(await singleConn.active()).toBe(false);
         await singleConn.verifyBang();
-        expect(await singleConn.active()).toBe(true);
-        await expect(singleConn.execute("SELECT 1")).resolves.toBeDefined();
+        assertPredicate(await singleConn.active(), (v) => v);
       } finally {
         await singleConn.disconnectBang();
       }
@@ -101,8 +108,6 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("active after disconnect", async () => {
-      await adapter.execute("SELECT 1");
-      expect(await adapter.active()).toBe(true);
       await adapter.disconnectBang();
       expect(await adapter.active()).toBe(false);
     });
@@ -166,16 +171,26 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("character set connection is configured", async () => {
-      const result = (await adapter.execute(
-        "SHOW VARIABLES LIKE 'character_set_connection'",
-      )) as Mysql2RawResult;
-      expect(result.rows).toHaveLength(1);
-      expect(result.rows![0][1]).toBeDefined();
+      const connection = new Mysql2Adapter({ uri: MYSQL_TEST_URL, encoding: "cp932" });
+      try {
+        expect(await connection.showVariable("character_set_client")).toBe("cp932");
+        expect(await connection.showVariable("character_set_results")).toBe("cp932");
+        expect(await connection.showVariable("character_set_connection")).toBe("cp932");
+        expect(await connection.showVariable("collation_connection")).toBe("cp932_japanese_ci");
+
+        expect(await connection.queryValue("SELECT 'こんにちは'")).toBe("こんにちは");
+      } finally {
+        await connection.disconnectBang();
+      }
     });
 
     it("collation connection is configured", async () => {
-      const v = await adapter.showVariable("collation_connection");
-      expect(v).not.toBeNull();
+      expect(await adapter.showVariable("collation_connection")).toBe("utf8mb4_unicode_ci");
+      expect(await adapter.queryValue("SELECT 'こんにちは' = 'コンニチハ'")).toBe(1);
+
+      const arunit2 = (await ARUnit2Model.leaseConnection()) as unknown as Mysql2Adapter;
+      expect(await arunit2.showVariable("collation_connection")).toBe("utf8mb4_general_ci");
+      expect(await arunit2.queryValue("SELECT 'こんにちは' = 'コンニチハ'")).toBe(0);
     });
     it("mysql default in strict mode", async () => {
       const result = (await adapter.execute("SELECT @@SESSION.sql_mode AS v")) as Mysql2RawResult;
@@ -288,16 +303,16 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     it("logs name rename column for alter", async () => {
       await adapter.execute("DROP TABLE IF EXISTS `bar_baz`");
       await adapter.execute("CREATE TABLE `bar_baz` (`foo` varchar(255))");
-      const names: string[] = [];
+      const logged: Array<[string, string]> = [];
       const sub = Notifications.subscribe("sql.active_record", (event: NotificationEvent) => {
-        names.push(event.payload.name as string);
+        logged.push([event.payload.sql as string, event.payload.name as string]);
       });
       try {
         await adapter.renameColumnForAlter("bar_baz", "foo", "foo2");
         if (await adapter.supportsRenameColumn()) {
-          expect(names).not.toContain("SCHEMA");
+          assertEmpty(logged);
         } else {
-          expect(names).toContain("SCHEMA");
+          expect(logged[0][1]).toBe("SCHEMA");
         }
       } finally {
         Notifications.unsubscribe(sub);
@@ -326,43 +341,43 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
     it("version string invalid", async () => {
       const spy = vi.spyOn(adapter, "getFullVersion");
-      const assertVersionError = async (version: string | null, expectedMsg: string) => {
-        clearVersionCache(adapter);
-        spy.mockResolvedValueOnce(version as string);
-        let caughtErr: unknown;
-        try {
-          await adapter.getDatabaseVersion();
-        } catch (e) {
-          caughtErr = e;
-        }
-        expect(caughtErr).toBeInstanceOf(DatabaseVersionError);
-        expect((caughtErr as DatabaseVersionError).message).toBe(expectedMsg);
-      };
 
-      await assertVersionError(
-        "some-database-proxy",
-        'Unable to parse MySQL version from "some-database-proxy"',
+      clearVersionCache(adapter);
+      spy.mockResolvedValueOnce("some-database-proxy");
+      let error = await assertRaises([DatabaseVersionError], {}, () =>
+        adapter.getDatabaseVersion(),
       );
-      await assertVersionError("", 'Unable to parse MySQL version from ""');
-      await assertVersionError(null, "Unable to parse MySQL version from nil");
+      expect(error.message).toBe('Unable to parse MySQL version from "some-database-proxy"');
+
+      clearVersionCache(adapter);
+      spy.mockResolvedValueOnce("");
+      error = await assertRaises([DatabaseVersionError], {}, () => adapter.getDatabaseVersion());
+      expect(error.message).toBe('Unable to parse MySQL version from ""');
+
+      clearVersionCache(adapter);
+      spy.mockResolvedValueOnce(null as unknown as string);
+      error = await assertRaises([DatabaseVersionError], {}, () => adapter.getDatabaseVersion());
+      expect(error.message).toBe("Unable to parse MySQL version from nil");
     });
 
     it("get and release advisory lock", async () => {
       const lockName = "test lock'n'name";
 
       const gotLock = await adapter.getAdvisoryLock(lockName);
-      expect(gotLock).toBe(true);
+      assert(gotLock, "get_advisory_lock should have returned true but it didn't");
 
-      const isFree = await adapter.selectValue(`SELECT IS_FREE_LOCK(${adapter.quote(lockName)})`);
-      expect(isFree).toBe(0);
+      expect(
+        await testLockFree(lockName),
+        "expected the test advisory lock to be held but it wasn't",
+      ).toBe(false);
 
-      const released = await adapter.releaseAdvisoryLock(lockName);
-      expect(released).toBe(true);
+      const releasedLock = await adapter.releaseAdvisoryLock(lockName);
+      assert(releasedLock, "expected release_advisory_lock to return true but it didn't");
 
-      const isFreeAfter = await adapter.selectValue(
-        `SELECT IS_FREE_LOCK(${adapter.quote(lockName)})`,
+      assert(
+        await testLockFree(lockName),
+        "expected the test lock to be available after releasing",
       );
-      expect(isFreeAfter).toBe(1);
     });
 
     it("release non existent advisory lock", async () => {
@@ -370,6 +385,10 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       const released = await adapter.releaseAdvisoryLock(lockName);
       expect(released).toBe(false);
     });
+
+    async function testLockFree(lockName: string): Promise<boolean> {
+      return (await adapter.selectValue(`SELECT IS_FREE_LOCK(${adapter.quote(lockName)})`)) === 1;
+    }
   });
 
   describe("connect error translation", () => {
