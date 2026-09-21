@@ -857,8 +857,7 @@ describe("HasManyAssociationsTest", () => {
     });
   });
 
-  it.skip("deleting a item which is not in the collection", async () => {
-    // BLOCKED: CollectionAssociation#delete nullifies the FK of a record outside the association scope (has-many-delete-nullify-out-of-scope)
+  it("deleting a item which is not in the collection", async () => {
     await forceSignal37ToLoadAllClientsOfFirm(companies);
 
     expect((companies("first_firm") as any).clientsOfFirm.loaded).toBeTruthy();

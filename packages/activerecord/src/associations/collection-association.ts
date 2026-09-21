@@ -655,11 +655,6 @@ export abstract class CollectionAssociation extends Association {
     this._lastRemoveAborted = false;
     const pruned = (): boolean => {
       this._targetStore = this.target.filter((r) => !includesRecord(records, r));
-      for (const record of records) {
-        if (typeof (record as any).isDestroyed === "function" && (record as any).isDestroyed())
-          continue;
-        this.removeInverseInstance(record);
-      }
       this._associationIds = null;
       for (const record of records) this.callback("afterRemove", record);
       return true;
