@@ -10,6 +10,18 @@ import { assertPredicate, include } from "@blazetrails/activesupport";
 import { Topic } from "../test-helpers/models/topic.js";
 import { Person } from "../test-helpers/models/person.js";
 
+declare module "../test-helpers/models/topic.js" {
+  interface Topic {
+    titleConfirmation: unknown;
+    approvedConfirmation: unknown;
+  }
+}
+declare module "../test-helpers/models/person.js" {
+  interface Person {
+    karmaConfirmation: unknown;
+  }
+}
+
 describe("ConfirmationValidationTest", () => {
   afterEach(() => {
     Topic.clearValidatorsBang();
@@ -21,14 +33,14 @@ describe("ConfirmationValidationTest", () => {
     const t = new Topic({ authorName: "Plutarch" });
     assertPredicate(await t.isValid(), (valid) => valid);
 
-    (t as any).titleConfirmation = "Parallel Lives";
+    t.titleConfirmation = "Parallel Lives";
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
 
-    (t as any).titleConfirmation = null;
+    t.titleConfirmation = null;
     t.title = "Parallel Lives";
     assertPredicate(await t.isValid(), (valid) => valid);
 
-    (t as any).titleConfirmation = "Parallel Lives";
+    t.titleConfirmation = "Parallel Lives";
     assertPredicate(await t.isValid(), (valid) => valid);
   });
 
@@ -38,7 +50,7 @@ describe("ConfirmationValidationTest", () => {
     const t = new Topic({ title: "We should be confirmed", titleConfirmation: "" });
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
 
-    (t as any).titleConfirmation = "We should be confirmed";
+    t.titleConfirmation = "We should be confirmed";
     assertPredicate(await t.isValid(), (valid) => valid);
   });
 
@@ -48,10 +60,10 @@ describe("ConfirmationValidationTest", () => {
     const t = new Topic({ approved: true, approvedConfirmation: null });
     assertPredicate(await t.isValid(), (valid) => valid);
 
-    (t as any).approvedConfirmation = false;
+    t.approvedConfirmation = false;
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
 
-    (t as any).approvedConfirmation = true;
+    t.approvedConfirmation = true;
     assertPredicate(await t.isValid(), (valid) => valid);
   });
 
@@ -60,7 +72,7 @@ describe("ConfirmationValidationTest", () => {
       Person.validatesConfirmationOf("karma");
 
       const p = new Person();
-      (p as any).karmaConfirmation = "None";
+      p.karmaConfirmation = "None";
       assertPredicate(await p.isInvalid(), (invalid) => invalid);
 
       expect(p.errors.messagesFor("karmaConfirmation")).toEqual(["doesn't match Karma"]);
@@ -105,19 +117,16 @@ describe("ConfirmationValidationTest", () => {
 
   it("does not override confirmation writer if present", () => {
     class Klass extends Model {
-      declare private _titleConfirmation: string | undefined;
-
-      get titleConfirmation(): string | undefined {
-        return this._titleConfirmation;
-      }
-
-      set titleConfirmation(_value: string | undefined) {
-        this._titleConfirmation = "expected title";
+      set titleConfirmation(_value: string) {
+        (this as { _titleConfirmation?: string })._titleConfirmation = "expected title";
       }
 
       static {
         this.validatesConfirmationOf("title");
       }
+    }
+    interface Klass {
+      get titleConfirmation(): string;
     }
 
     const model = new Klass();
