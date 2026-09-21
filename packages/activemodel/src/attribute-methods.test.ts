@@ -1,650 +1,541 @@
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
-   Each model below spells `include ActiveModel::Attributes` in its class body, the way the Rails
-   test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
-   how `include()` surfaces those members on the type side. */
+   Each model below spells `include ActiveModel::AttributeMethods` in its class body, the way the
+   Rails test model it mirrors does (attribute_methods_test.rb:5-104); the class/interface merge
+   beside it is how `include()` surfaces those members and the generated methods on the type side. */
 import { describe, it, expect } from "vitest";
-import { Model } from "./index.js";
-import { type AttributeMethod, InstanceMethods } from "./attribute-methods.js";
-import { Attributes, type AttributesClassHalf } from "./attributes.js";
-import { include } from "@blazetrails/activesupport";
+import {
+  assertNotRespondTo,
+  assertRaises,
+  assertRespondTo,
+  include,
+} from "@blazetrails/activesupport";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { NoMethodError } from "./attribute-assignment.js";
+import {
+  AttributeMethods,
+  type AttributeMethodHost,
+  type InstanceMethodsHost,
+} from "./attribute-methods.js";
+import type { AttributeMethodsClassHalf } from "./attributes.js";
+
+type Host = Omit<InstanceMethodsHost, "attributes" | "constructor">;
+
+class ModelWithAttributes {
+  declare static aliasAttribute: AttributeMethodsClassHalf["aliasAttribute"];
+  declare static attributeAliases: AttributeMethodHost["attributeAliases"];
+  declare static attributeMethodPatterns: AttributeMethodHost["attributeMethodPatterns"];
+  declare static defineAttributeMethod: AttributeMethodsClassHalf["defineAttributeMethod"];
+  declare static defineAttributeMethods: AttributeMethodsClassHalf["defineAttributeMethods"];
+  declare static generatedAttributeMethods: AttributeMethodsClassHalf["generatedAttributeMethods"];
+  declare static undefineAttributeMethods: AttributeMethodsClassHalf["undefineAttributeMethods"];
+
+  static {
+    include(this, AttributeMethods);
+  }
+
+  static bar(): string {
+    return "original bar";
+  }
+
+  attributes(): Record<string, unknown> {
+    return { foo: "value of foo", baz: "value of baz" };
+  }
+
+  private attribute(name: string): unknown {
+    return this.attributes()[name];
+  }
+}
+interface ModelWithAttributes extends Host {
+  foo(): unknown;
+  baz(): unknown;
+}
+
+class ModelWithAttributes2 {
+  declare static attributeMethodPatterns: AttributeMethodHost["attributeMethodPatterns"];
+  declare static attributeMethodSuffix: AttributeMethodsClassHalf["attributeMethodSuffix"];
+  declare static defineAttributeMethods: AttributeMethodsClassHalf["defineAttributeMethods"];
+  declare static undefineAttributeMethods: AttributeMethodsClassHalf["undefineAttributeMethods"];
+
+  static {
+    include(this, AttributeMethods);
+    this.attributeMethodSuffix("_test", "_kw");
+  }
+
+  attributes: Record<string, unknown> = {};
+
+  private attribute(name: string): unknown {
+    return this.attributes[name];
+  }
+
+  private attribute_test(name: string, attrs: Record<string, unknown> = {}): unknown {
+    return (attrs[name] = this.attribute(name));
+  }
+
+  private attribute_kw(name: string, { kw: _kw = 1 }: { kw?: number } = {}): unknown {
+    return this.attribute(name);
+  }
+
+  private private_method(): string {
+    return "<3 <3";
+  }
+
+  protected protected_method(): string {
+    return "O_o O_o";
+  }
+}
+interface ModelWithAttributes2 extends Host {
+  foo(): unknown;
+  foo_kw(options?: { kw?: number }): unknown;
+  foo_test(attrs?: Record<string, unknown>): unknown;
+}
+
+class ModelWithAttributesWithSpaces {
+  declare static aliasAttribute: AttributeMethodsClassHalf["aliasAttribute"];
+  declare static defineAttributeMethods: AttributeMethodsClassHalf["defineAttributeMethods"];
+  declare static undefineAttributeMethods: AttributeMethodsClassHalf["undefineAttributeMethods"];
+
+  static {
+    include(this, AttributeMethods);
+  }
+
+  attributes(): Record<string, unknown> {
+    return { "foo bar": "value of foo bar" };
+  }
+
+  private attribute(name: string): unknown {
+    return this.attributes()[name];
+  }
+}
+interface ModelWithAttributesWithSpaces extends Host {
+  "foo bar"(): unknown;
+  foo_bar(): unknown;
+}
+
+class ModelWithWeirdNamesAttributes {
+  declare static defineAttributeMethod: AttributeMethodsClassHalf["defineAttributeMethod"];
+  declare static undefineAttributeMethods: AttributeMethodsClassHalf["undefineAttributeMethods"];
+
+  static {
+    include(this, AttributeMethods);
+  }
+
+  static "c?d"(): string {
+    return "original c?d";
+  }
+
+  attributes(): Record<string, unknown> {
+    return { "a?b": "value of a?b" };
+  }
+
+  private attribute(name: string): unknown {
+    return this.attributes()[name];
+  }
+}
+interface ModelWithWeirdNamesAttributes extends Host {
+  "a?b"(): unknown;
+}
+
+class ModelWithRubyKeywordNamedAttributes {
+  declare static aliasAttribute: AttributeMethodsClassHalf["aliasAttribute"];
+  declare static defineAttributeMethods: AttributeMethodsClassHalf["defineAttributeMethods"];
+  declare static undefineAttributeMethods: AttributeMethodsClassHalf["undefineAttributeMethods"];
+
+  static {
+    include(this, AttributeMethods);
+  }
+
+  attributes(): Record<string, unknown> {
+    return { begin: "value of begin", end: "value of end" };
+  }
+
+  private attribute(name: string): unknown {
+    return this.attributes()[name];
+  }
+}
+interface ModelWithRubyKeywordNamedAttributes extends Host {
+  from(): unknown;
+  to(): unknown;
+}
+
+class ModelWithoutAttributesMethod {
+  static {
+    include(this, AttributeMethods);
+  }
+}
+interface ModelWithoutAttributesMethod extends Host {}
 
 describe("AttributeMethodsTest", () => {
-  it("#missing_attribute applies the supplied stack to the raised error", () => {
-    class Person extends Model {
-      declare static aliasAttribute: AttributesClassHalf["aliasAttribute"];
-      declare static attribute: AttributesClassHalf["attribute"];
-      declare static attributeAliases: AttributesClassHalf["attributeAliases"];
-      declare static attributeMethodPrefix: AttributesClassHalf["attributeMethodPrefix"];
-      declare static attributeMethodSuffix: AttributesClassHalf["attributeMethodSuffix"];
-      declare static undefineAttributeMethods: AttributesClassHalf["undefineAttributeMethods"];
+  it("method missing works correctly even if attributes method is not defined", async () => {
+    await assertRaises([NoMethodError], {}, () =>
+      new ModelWithoutAttributesMethod().methodMissing("foo"),
+    );
+  });
+
+  it("unrelated classes should not share attribute method matchers", () => {
+    expect(ModelWithAttributes.attributeMethodPatterns).not.toEqual(
+      ModelWithAttributes2.attributeMethodPatterns,
+    );
+  });
+
+  it("#define_attribute_method generates attribute method", () => {
+    try {
+      ModelWithAttributes.defineAttributeMethod("foo");
+
+      assertRespondTo(new ModelWithAttributes(), "foo");
+      expect(new ModelWithAttributes().foo()).toEqual("value of foo");
+    } finally {
+      ModelWithAttributes.undefineAttributeMethods();
+    }
+  });
+
+  it("#define_attribute_methods defines alias attribute methods after undefining", () => {
+    class topic_class {
+      declare static aliasAttribute: AttributeMethodsClassHalf["aliasAttribute"];
+      declare static defineAttributeMethods: AttributeMethodsClassHalf["defineAttributeMethods"];
+      declare static undefineAttributeMethods: AttributeMethodsClassHalf["undefineAttributeMethods"];
 
       static {
-        include(this, Attributes);
-        this.attribute("name", "string");
+        include(this, AttributeMethods);
+        this.defineAttributeMethods("title");
+        this.aliasAttribute("aliased_title_to_be_redefined", "title");
+      }
+
+      attributes(): Record<string, unknown> {
+        return { title: "Active Model Topic" };
+      }
+
+      private attribute(name: string): unknown {
+        return this.attributes()[name];
       }
     }
-    interface Person extends Attributes {}
-
-    const p = new Person({ name: "test" });
-    const stack = "custom backtrace line";
-    const call = () =>
-      (
-        InstanceMethods.missingAttribute as (
-          this: unknown,
-          attrName: string,
-          stack?: string,
-        ) => never
-      ).call(p, "title", stack);
-    let caught: Error | undefined;
-    try {
-      call();
-    } catch (err) {
-      caught = err as Error;
+    interface topic_class extends Host {
+      aliased_title_to_be_redefined(): unknown;
     }
-    expect(caught?.message).toContain("missing attribute 'title'");
-    expect(caught?.stack).toBe(stack);
+
+    const topic = new topic_class();
+    expect(topic.aliased_title_to_be_redefined()).toEqual("Active Model Topic");
+    topic_class.undefineAttributeMethods();
+
+    assertNotRespondTo(topic, "aliased_title_to_be_redefined");
+
+    topic_class.defineAttributeMethods("title");
+
+    assertRespondTo(topic, "aliased_title_to_be_redefined");
+    expect(topic.aliased_title_to_be_redefined()).toEqual("Active Model Topic");
   });
 
   it("#define_attribute_method does not generate attribute method if already defined in attribute module", () => {
-    class Person extends Model {
-      declare static defineAttributeMethod: AttributesClassHalf["defineAttributeMethod"];
-      declare static generatedAttributeMethods: AttributesClassHalf["generatedAttributeMethods"];
-      declare static attribute: AttributesClassHalf["attribute"];
-      declare static attributeMethodSuffix: AttributesClassHalf["attributeMethodSuffix"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
-    }
-    interface Person extends Attributes {}
-
-    Person.attributeMethodSuffix("Short");
-    Person.generatedAttributeMethods().moduleEval((mod) => {
-      Object.defineProperty(mod, "nameShort", {
+    class klass extends ModelWithAttributes {}
+    klass.generatedAttributeMethods().moduleEval((mod) => {
+      Object.defineProperty(mod, "foo", {
         value: () => "<3",
         writable: true,
         configurable: true,
       });
     });
-    Person.defineAttributeMethod("name");
+    klass.defineAttributeMethod("foo");
 
-    expect((new Person({ name: "Alice" }) as unknown as { nameShort(): string }).nameShort()).toBe(
-      "<3",
-    );
+    expect(new klass().foo()).toEqual("<3");
   });
 
   it("#define_attribute_method generates a method that is already defined on the host", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
+    class klass extends ModelWithAttributes {
+      override foo(): unknown {
+        return super.foo();
       }
     }
-    interface Person extends Attributes {}
+    klass.defineAttributeMethod("foo");
 
-    const p = new Person({ name: "test" });
-    expect(p._readAttribute("name")).toBe("test");
+    expect(new klass().foo()).toEqual("value of foo");
   });
 
   it("#define_attribute_method generates attribute method with invalid identifier characters", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    try {
+      ModelWithWeirdNamesAttributes.defineAttributeMethod("a?b");
 
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
+      assertRespondTo(new ModelWithWeirdNamesAttributes(), "a?b");
+      expect(new ModelWithWeirdNamesAttributes()["a?b"]()).toEqual("value of a?b");
+    } finally {
+      ModelWithWeirdNamesAttributes.undefineAttributeMethods();
     }
-    interface Person extends Attributes {}
-
-    const p = new Person({ name: "test" });
-    expect(p._readAttribute("name")).toBe("test");
   });
 
   it("#define_attribute_methods works passing multiple arguments", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    try {
+      ModelWithAttributes.defineAttributeMethods("foo", "baz");
 
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.attribute("age", "integer");
-      }
+      expect(new ModelWithAttributes().foo()).toEqual("value of foo");
+      expect(new ModelWithAttributes().baz()).toEqual("value of baz");
+    } finally {
+      ModelWithAttributes.undefineAttributeMethods();
     }
-    interface Person extends Attributes {}
-
-    const p = new Person({ name: "Alice", age: 30 });
-    expect(p._readAttribute("name")).toBe("Alice");
-    expect(p._readAttribute("age")).toBe(30);
   });
 
   it("#define_attribute_methods generates attribute methods", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    try {
+      ModelWithAttributes.defineAttributeMethods("foo");
 
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
+      assertRespondTo(new ModelWithAttributes(), "foo");
+      expect(new ModelWithAttributes().foo()).toEqual("value of foo");
+    } finally {
+      ModelWithAttributes.undefineAttributeMethods();
     }
-    interface Person extends Attributes {}
-
-    const p = new Person({ name: "Alice" });
-    expect(p._readAttribute("name")).toBe("Alice");
   });
 
   it("#alias_attribute generates attribute_aliases lookup hash", () => {
-    class Person extends Model {
-      declare static aliasAttribute: AttributesClassHalf["aliasAttribute"];
-      declare static attribute: AttributesClassHalf["attribute"];
-      declare static attributeAliases: AttributesClassHalf["attributeAliases"];
-
+    class klass extends ModelWithAttributes {
       static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.aliasAttribute("fullName", "name");
+        this.defineAttributeMethods("foo");
+        this.aliasAttribute("bar", "foo");
       }
     }
-    interface Person extends Attributes {}
 
-    const p = new Person({ name: "Alice" });
-    expect((p as any).fullName).toBe("Alice");
-    expect(Person.attributeAliases).toEqual({ fullName: "name" });
+    expect(klass.attributeAliases).toEqual({ bar: "foo" });
   });
 
   it("#define_attribute_methods generates attribute methods with spaces in their names", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    try {
+      ModelWithAttributesWithSpaces.defineAttributeMethods("foo bar");
 
-      static {
-        include(this, Attributes);
-        this.attribute("first_name", "string");
-      }
+      assertRespondTo(new ModelWithAttributesWithSpaces(), "foo bar");
+      expect(new ModelWithAttributesWithSpaces()["foo bar"]()).toEqual("value of foo bar");
+    } finally {
+      ModelWithAttributesWithSpaces.undefineAttributeMethods();
     }
-    interface Person extends Attributes {}
-
-    const p = new Person({ first_name: "Alice" });
-    expect(p._readAttribute("first_name")).toBe("Alice");
   });
 
   it("#alias_attribute works with attributes with spaces in their names", () => {
-    class Person extends Model {
-      declare static aliasAttribute: AttributesClassHalf["aliasAttribute"];
-      declare static attribute: AttributesClassHalf["attribute"];
+    try {
+      ModelWithAttributesWithSpaces.defineAttributeMethods("foo bar");
+      ModelWithAttributesWithSpaces.aliasAttribute("foo_bar", "foo bar");
 
-      static {
-        include(this, Attributes);
-        this.attribute("first_name", "string");
-        this.aliasAttribute("firstName", "first_name");
-      }
+      expect(new ModelWithAttributesWithSpaces().foo_bar()).toEqual("value of foo bar");
+    } finally {
+      ModelWithAttributesWithSpaces.undefineAttributeMethods();
     }
-    interface Person extends Attributes {}
-
-    const p = new Person({ first_name: "Alice" });
-    expect((p as any).firstName).toBe("Alice");
   });
 
   it("#alias_attribute works with attributes named as a ruby keyword", () => {
-    class Person extends Model {
-      declare static aliasAttribute: AttributesClassHalf["aliasAttribute"];
-      declare static attribute: AttributesClassHalf["attribute"];
+    try {
+      ModelWithRubyKeywordNamedAttributes.defineAttributeMethods("begin", "end");
+      ModelWithRubyKeywordNamedAttributes.aliasAttribute("from", "begin");
+      ModelWithRubyKeywordNamedAttributes.aliasAttribute("to", "end");
 
-      static {
-        include(this, Attributes);
-        this.attribute("class_name", "string");
-        this.aliasAttribute("className", "class_name");
-      }
+      expect(new ModelWithRubyKeywordNamedAttributes().from()).toEqual("value of begin");
+      expect(new ModelWithRubyKeywordNamedAttributes().to()).toEqual("value of end");
+    } finally {
+      ModelWithRubyKeywordNamedAttributes.undefineAttributeMethods();
     }
-    interface Person extends Attributes {}
-
-    const p = new Person({ class_name: "Admin" });
-    expect((p as any).className).toBe("Admin");
   });
 
-  it("#undefine_attribute_methods undefines alias attribute methods", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-      declare static attributeMethodPrefix: AttributesClassHalf["attributeMethodPrefix"];
-      declare static undefineAttributeMethods: AttributesClassHalf["undefineAttributeMethods"];
+  it("#undefine_attribute_methods removes attribute methods", async () => {
+    ModelWithAttributes.defineAttributeMethods("foo");
+    ModelWithAttributes.undefineAttributeMethods();
 
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.attributeMethodPrefix("clear_");
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({ name: "Alice" });
-    expect(typeof (p as any).clear_name).toBe("function");
-    Person.undefineAttributeMethods();
-    const p2 = new Person({ name: "Bob" });
-    expect((p2 as any).clear_name).toBeUndefined();
+    assertNotRespondTo(new ModelWithAttributes(), "foo");
+    await assertRaises([NoMethodError], {}, () => new ModelWithAttributes().methodMissing("foo"));
   });
 
-  it("defined attribute doesn't expand positional hash argument", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+  it("#undefine_attribute_methods undefines alias attribute methods", async () => {
+    class topic_class {
+      declare static aliasAttribute: AttributeMethodsClassHalf["aliasAttribute"];
+      declare static defineAttributeMethods: AttributeMethodsClassHalf["defineAttributeMethods"];
+      declare static undefineAttributeMethods: AttributeMethodsClassHalf["undefineAttributeMethods"];
 
       static {
-        include(this, Attributes);
-        this.attribute("name", "string");
+        include(this, AttributeMethods);
+        this.defineAttributeMethods("title");
+        this.aliasAttribute("subject_to_be_undefined", "title");
+      }
+
+      attributes(): Record<string, unknown> {
+        return { title: "Active Model Topic" };
+      }
+
+      private attribute(name: string): unknown {
+        return this.attributes()[name];
       }
     }
-    interface Person extends Attributes {}
-
-    const p = new Person({ name: "test" });
-    expect(p._readAttribute("name")).toBe("test");
-  });
-
-  it("should not interfere with respond_to? if the attribute has a private/protected method", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({ name: "Alice" });
-    expect(p.respondTo("_readAttribute")).toBe(true);
-  });
-
-  it("alias attribute respects user defined method", () => {
-    class Person extends Model {
-      declare static aliasAttribute: AttributesClassHalf["aliasAttribute"];
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.aliasAttribute("display_name", "name");
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({ name: "Alice" });
-    expect((p as any).display_name).toBe("Alice");
-  });
-
-  it("alias attribute respects user defined method in parent classes", () => {
-    class Person extends Model {
-      declare static aliasAttribute: AttributesClassHalf["aliasAttribute"];
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.aliasAttribute("display_name", "name");
-      }
-    }
-    interface Person extends Attributes {}
-
-    class Employee extends Person {}
-    const e = new Employee({ name: "Bob" });
-    expect((e as any).display_name).toBe("Bob");
-  });
-
-  it("method missing works correctly even if attributes method is not defined", () => {
-    class Bare extends Model {
-      static {
-        include(this, Attributes);
-      }
-    }
-    interface Bare extends Attributes {}
-    const b = new Bare();
-    expect(b.attribute("nonexistent")).toBe(null);
-  });
-
-  it("unrelated classes should not share attribute method matchers", () => {
-    class A extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-      declare static attributeMethodPatterns: AttributesClassHalf["attributeMethodPatterns"];
-      declare static attributeMethodPrefix: AttributesClassHalf["attributeMethodPrefix"];
-      declare static attributeNames: AttributesClassHalf["attributeNames"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("x", "string");
-      }
-    }
-    interface A extends Attributes {}
-
-    class B extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-      declare static attributeMethodPatterns: AttributesClassHalf["attributeMethodPatterns"];
-      declare static attributeNames: AttributesClassHalf["attributeNames"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("y", "string");
-      }
+    interface topic_class extends Host {
+      subject_to_be_undefined(): unknown;
     }
 
-    interface B extends Attributes {}
+    expect(new topic_class().subject_to_be_undefined()).toEqual("Active Model Topic");
+    topic_class.undefineAttributeMethods();
 
-    expect(A.attributeNames()).toEqual(["x"]);
-    expect(B.attributeNames()).toEqual(["y"]);
-    A.attributeMethodPrefix("clear_");
-    expect(A.attributeMethodPatterns).not.toEqual(B.attributeMethodPatterns);
-  });
-
-  it("#define_attribute_method generates attribute method", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-      declare static attributeMethodPrefix: AttributesClassHalf["attributeMethodPrefix"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.attributeMethodPrefix("clear_");
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({ name: "Alice" });
-    expect(typeof (p as any).clear_name).toBe("function");
-  });
-
-  it("#define_attribute_methods defines alias attribute methods after undefining", () => {
-    class Person extends Model {
-      declare static aliasAttribute: AttributesClassHalf["aliasAttribute"];
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.aliasAttribute("full_name", "name");
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({ name: "Alice" });
-    expect((p as any).full_name).toBe("Alice");
-    (p as any).full_name = "Bob";
-    expect(p._readAttribute("name")).toBe("Bob");
-  });
-
-  it("#undefine_attribute_methods removes attribute methods", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-      declare static attributeMethodSuffix: AttributesClassHalf["attributeMethodSuffix"];
-      declare static undefineAttributeMethods: AttributesClassHalf["undefineAttributeMethods"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.attributeMethodSuffix("_changed");
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({ name: "Alice" });
-    expect(typeof (p as any).name_changed).toBe("function");
-    Person.undefineAttributeMethods();
-    const p2 = new Person({ name: "Bob" });
-    expect((p2 as any).name_changed).toBeUndefined();
+    await assertRaises(
+      [NoMethodError],
+      { match: /undefined method [`']subject_to_be_undefined'/ },
+      () => new topic_class().methodMissing("subject_to_be_undefined"),
+    );
   });
 
   it("accessing a suffixed attribute", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-      declare static attributeMethodSuffix: AttributesClassHalf["attributeMethodSuffix"];
+    const m = new ModelWithAttributes2();
+    m.attributes = { foo: "bar" };
+    const attrs: Record<string, unknown> = {};
 
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.attributeMethodSuffix("_changed");
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({ name: "Alice" });
-    expect(typeof (p as any).name_changed).toBe("function");
+    expect(m.methodMissing("foo")).toEqual("bar");
+    expect(m.methodMissing("foo_kw", { kw: 2 })).toEqual("bar");
+    expect(m.methodMissing("foo_test", attrs)).toEqual("bar");
+    expect(attrs["foo"]).toEqual("bar");
   });
 
-  it("should not interfere with method_missing if the attr has a private/protected method", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+  it("defined attribute doesn't expand positional hash argument", () => {
+    try {
+      ModelWithAttributes2.defineAttributeMethods("foo");
 
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
-      customName() {
-        return "custom";
-      }
+      const m = new ModelWithAttributes2();
+      m.attributes = { foo: "bar" };
+      const attrs: Record<string, unknown> = {};
+
+      expect(m.foo()).toEqual("bar");
+      expect(m.foo_kw({ kw: 2 })).toEqual("bar");
+      expect(m.foo_test(attrs)).toEqual("bar");
+      expect(attrs["foo"]).toEqual("bar");
+    } finally {
+      ModelWithAttributes2.undefineAttributeMethods();
     }
-    interface Person extends Attributes {}
+  });
 
-    const p = new Person({ name: "Alice" });
-    expect(p.customName()).toBe("custom");
-    expect(p._readAttribute("name")).toBe("Alice");
+  it("should not interfere with method_missing if the attr has a private/protected method", async () => {
+    const m = new ModelWithAttributes2();
+    m.attributes = { private_method: "<3", protected_method: "O_o" };
+
+    expect(m["private_method"]()).toEqual("<3 <3");
+    expect(m["protected_method"]()).toEqual("O_o O_o");
+
+    await assertRaises([NoMethodError], {}, () => m.methodMissing("private_method"));
+    await assertRaises([NoMethodError], {}, () => m.methodMissing("protected_method"));
+  });
+
+  class ClassWithProtected {
+    protected protected_method(): void {}
+  }
+
+  it("should not interfere with respond_to? if the attribute has a private/protected method", () => {
+    const m = new ModelWithAttributes2();
+    m.attributes = { private_method: "<3", protected_method: "O_o" };
+
+    expect(m.respondTo("private_method", true)).toBeTruthy();
+
+    const c = new ClassWithProtected();
+
+    expect(m.respondTo("protected_method")).toEqual(rbObjRespondTo(c, "protected_method"));
+    expect(m.respondTo("protected_method", true)).toBeTruthy();
   });
 
   it("should use attribute_missing to dispatch a missing attribute", () => {
-    class ModelWithAttributes2 extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-      declare static attributeMethodSuffix: AttributesClassHalf["attributeMethodSuffix"];
+    const m = new ModelWithAttributes2();
+    m.attributes = { foo: "bar" };
 
-      static {
-        include(this, Attributes);
-        this.attributeMethodSuffix("Test");
-        this.attribute("foo", "string");
-      }
-      attributeMissing(match: AttributeMethod): unknown {
-        return match;
-      }
-    }
-    interface ModelWithAttributes2 extends Attributes {}
+    m.attributeMissing = (match) => match;
 
-    const m = new ModelWithAttributes2({ foo: "bar" });
-    const match = (
-      m as unknown as { fooTest(): { attrName: string; proxyTarget: string } }
-    ).fooTest();
-    expect(match.attrName).toBe("foo");
-    expect(match.proxyTarget).toBe("attributeTest");
+    const match = m.methodMissing("foo_test") as { attrName: string; proxyTarget: string };
+
+    expect(match.attrName).toEqual("foo");
+    expect(match.proxyTarget).toEqual("attribute_test");
   });
+
+  class Model1 {
+    declare static attributeMethodSuffix: AttributeMethodsClassHalf["attributeMethodSuffix"];
+    declare static defineAttributeMethods: AttributeMethodsClassHalf["defineAttributeMethods"];
+
+    static {
+      include(this, AttributeMethods);
+      this.attributeMethodSuffix("_changed?");
+      this.defineAttributeMethods("x");
+    }
+
+    x: unknown;
+
+    private "attribute_changed?"(_name: string): string {
+      return ":model_1";
+    }
+  }
+  interface Model1 extends Host {
+    "x_changed?"(): unknown;
+  }
+
+  class Model2 {
+    declare static attributeMethodSuffix: AttributeMethodsClassHalf["attributeMethodSuffix"];
+    declare static defineAttributeMethods: AttributeMethodsClassHalf["defineAttributeMethods"];
+
+    static {
+      include(this, AttributeMethods);
+      this.attributeMethodSuffix("?");
+      this.defineAttributeMethods("x_changed");
+    }
+
+    x_changed: unknown;
+
+    private "attribute?"(_name: string): string {
+      return ":model_2";
+    }
+  }
+  interface Model2 extends Host {
+    "x_changed?"(): unknown;
+  }
 
   it("name clashes are handled", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({ name: "Alice" });
-    expect(p._readAttribute("name")).toBe("Alice");
-  });
-});
-describe("attribute method prefix/suffix/affix", () => {
-  it("defines prefixed methods for attributes", () => {
-    class User extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-      declare static attributeMethodAffix: AttributesClassHalf["attributeMethodAffix"];
-      declare static attributeMethodPrefix: AttributesClassHalf["attributeMethodPrefix"];
-      declare static attributeMethodSuffix: AttributesClassHalf["attributeMethodSuffix"];
-      declare static attributeNames: AttributesClassHalf["attributeNames"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.attributeMethodPrefix("clear_");
-      }
-      clear_attribute(attr: string): unknown {
-        return this._readAttribute(attr);
-      }
-    }
-    interface User extends Attributes {}
-
-    const u = new User({ name: "Alice" });
-    expect((u as any)["clear_name"]()).toBe("Alice");
+    expect(new Model1()["x_changed?"]()).toEqual(":model_1");
+    expect(new Model2()["x_changed?"]()).toEqual(":model_2");
   });
 
-  it("defines suffixed methods for attributes", () => {
-    class User extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-      declare static attributeMethodSuffix: AttributesClassHalf["attributeMethodSuffix"];
+  it("alias attribute respects user defined method", () => {
+    class model {
+      declare static aliasAttribute: AttributeMethodsClassHalf["aliasAttribute"];
+      declare static defineAttributeMethods: AttributeMethodsClassHalf["defineAttributeMethods"];
 
       static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.attributeMethodSuffix("_before_type_cast");
+        include(this, AttributeMethods);
+        this.defineAttributeMethods("name");
+        this.aliasAttribute("nickname", "name");
       }
-      attribute_before_type_cast(attr: string): unknown {
-        return this._readAttribute(attr);
+
+      name: unknown;
+
+      constructor(name: unknown) {
+        this.name = name;
       }
     }
-    interface User extends Attributes {}
+    interface model extends Host {
+      nickname(): unknown;
+    }
 
-    const u = new User({ name: "Alice" });
-    expect((u as any)["name_before_type_cast"]()).toBe("Alice");
+    const instance = new model("George");
+    expect(instance.name).toEqual("George");
+    expect(instance.nickname()).toEqual("George");
   });
 
-  it("defines affix methods with both prefix and suffix", () => {
-    class User extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-      declare static attributeMethodAffix: AttributesClassHalf["attributeMethodAffix"];
+  it("alias attribute respects user defined method in parent classes", () => {
+    class model {
+      declare static aliasAttribute: AttributeMethodsClassHalf["aliasAttribute"];
+      declare static defineAttributeMethods: AttributeMethodsClassHalf["defineAttributeMethods"];
 
       static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.attributeMethodAffix({ prefix: "reset_", suffix: "_to_default" });
+        include(this, AttributeMethods);
+        this.defineAttributeMethods("name");
       }
-      reset_attribute_to_default(attr: string): unknown {
-        return this._readAttribute(attr);
+
+      name: unknown;
+
+      constructor(name: unknown) {
+        this.name = name;
       }
     }
-    interface User extends Attributes {}
 
-    const u = new User({ name: "Alice" });
-    expect((u as any)["reset_name_to_default"]()).toBe("Alice");
-  });
-});
-
-describe("respondTo", () => {
-  it("returns true for defined methods", () => {
-    class User extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
+    class subclass extends model {
       static {
-        include(this, Attributes);
-        this.attribute("name", "string");
+        this.aliasAttribute("nickname", "name");
       }
     }
-    interface User extends Attributes {}
-
-    const u = new User({ name: "Alice" });
-    expect(u.respondTo("_readAttribute")).toBe(true);
-    expect(u.respondTo("isValid")).toBe(true);
-  });
-
-  it("returns true for attributes", () => {
-    class User extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
+    interface subclass extends Host {
+      nickname(): unknown;
     }
-    interface User extends Attributes {}
 
-    const u = new User({ name: "Alice" });
-    expect(u.respondTo("name")).toBe(true);
-  });
-
-  it("returns false for non-existent methods/attributes", () => {
-    class User extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
-    }
-    interface User extends Attributes {}
-
-    const u = new User({ name: "Alice" });
-    expect(u.respondTo("nonExistentMethod")).toBe(false);
-  });
-});
-
-describe("attributeMissing", () => {
-  it("returns null by default for unknown attributes", () => {
-    class User extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-      }
-      constructor(attrs: Record<string, unknown> = {}) {
-        super(attrs);
-      }
-    }
-    interface User extends Attributes {}
-    User.attribute("name", "string");
-
-    const u = new User({ name: "Alice" });
-    expect(u.attribute("nonexistent")).toBeNull();
-  });
-
-  it("can be overridden to provide custom behavior", () => {
-    class User extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-      declare static attributeMethodSuffix: AttributesClassHalf["attributeMethodSuffix"];
-
-      static {
-        include(this, Attributes);
-      }
-      constructor(attrs: Record<string, unknown> = {}) {
-        super(attrs);
-      }
-      attributeMissing(match: AttributeMethod): unknown {
-        return `intercepted:${match.proxyTarget}:${match.attrName}`;
-      }
-    }
-    interface User extends Attributes {}
-    User.attributeMethodSuffix("Contrived");
-    User.attribute("name", "string");
-
-    const u = new User({ name: "Alice" });
-    expect((u as unknown as { nameContrived(): string }).nameContrived()).toBe(
-      "intercepted:attributeContrived:name",
-    );
-    expect(u._readAttribute("name")).toBe("Alice");
-  });
-});
-
-describe("attributeNames (instance)", () => {
-  it("returns the same names as the class method", () => {
-    class User extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-      declare static attributeNames: AttributesClassHalf["attributeNames"];
-
-      static {
-        include(this, Attributes);
-      }
-      constructor(attrs: Record<string, unknown> = {}) {
-        super(attrs);
-      }
-    }
-    interface User extends Attributes {}
-    User.attribute("name", "string");
-    User.attribute("age", "integer");
-
-    const u = new User({ name: "Alice", age: 25 });
-    expect(u.attributeNames()).toEqual(User.attributeNames());
-    expect(u.attributeNames()).toContain("name");
-    expect(u.attributeNames()).toContain("age");
+    const instance = new subclass("George");
+    expect(instance.name).toEqual("George");
+    expect(instance.nickname()).toEqual("George");
   });
 });
