@@ -61,13 +61,13 @@ export class Schema<A extends DatabaseAdapter = DatabaseAdapter> extends Current
   private static _classForVersion?: Map<string | number, typeof Migration>;
 
   static get(version: string | number): typeof Migration {
-    this._classForVersion ??= new Map();
-    if (!this._classForVersion.has(version)) {
+    if (!Object.hasOwn(this, "_classForVersion")) this._classForVersion = new Map();
+    if (!this._classForVersion!.has(version)) {
       const klass = class extends (Migration.get(version) as new () => object) {};
       include(klass, Definition);
-      this._classForVersion.set(version, klass as unknown as typeof Migration);
+      this._classForVersion!.set(version, klass as unknown as typeof Migration);
     }
-    return this._classForVersion.get(version)!;
+    return this._classForVersion!.get(version)!;
   }
 }
 
