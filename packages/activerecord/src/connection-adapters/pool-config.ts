@@ -198,6 +198,7 @@ export interface MysqlAdapterOptions extends TrailsAdapterOptions {
   waitTimeout?: number | string;
   readTimeout?: number;
   encoding?: string;
+  collation?: string;
   variables?: Record<string, string | number | boolean | null | ":default">;
   /** @internal */
   initSql?: string;
