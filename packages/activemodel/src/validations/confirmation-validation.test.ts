@@ -2,171 +2,150 @@
    Each model below spells `include ActiveModel::Attributes` in its class body, the way the Rails
    test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
    how `include()` surfaces those members on the type side. */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { Model, I18n } from "../index.js";
 import { resetI18n } from "../test-helpers/i18n.js";
 import { Attributes, type AttributesClassHalf } from "../attributes.js";
-import { include } from "@blazetrails/activesupport";
+import { assertPredicate, include } from "@blazetrails/activesupport";
+import { Topic } from "../test-helpers/models/topic.js";
+import { Person } from "../test-helpers/models/person.js";
+
+declare module "../test-helpers/models/topic.js" {
+  interface Topic {
+    titleConfirmation: unknown;
+    approvedConfirmation: unknown;
+  }
+}
+declare module "../test-helpers/models/person.js" {
+  interface Person {
+    karmaConfirmation: unknown;
+  }
+}
 
 describe("ConfirmationValidationTest", () => {
-  it("validates confirmation of with boolean attribute", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-      declare static attributeNames: AttributesClassHalf["attributeNames"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("password", "string");
-        this.validates("password", { confirmation: true });
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({ password: "secret", passwordConfirmation: "wrong" });
-    expect(await p.isValid()).toBe(false);
-  });
-
-  it("validates confirmation of for ruby class", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("email", "string");
-        this.validates("email", { confirmation: true });
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({ email: "a@b.com", emailConfirmation: "a@b.com" });
-    expect(await p.isValid()).toBe(true);
-  });
-
-  it("does not override confirmation reader if present", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("email", "string");
-        this.validates("email", { confirmation: true });
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({ email: "test@test.com" });
-    expect(await p.isValid()).toBe(true);
-  });
-
-  it("does not override confirmation writer if present", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("email", "string");
-        this.validates("email", { confirmation: true });
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({ email: "test@test.com" });
-    expect(await p.isValid()).toBe(true);
+  afterEach(() => {
+    Topic.clearValidatorsBang();
   });
 
   it("no title confirmation", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    Topic.validatesConfirmationOf("title");
 
-      static {
-        include(this, Attributes);
-        this.attribute("title", "string");
-        this.validates("title", { confirmation: true });
-      }
-    }
-    interface Person extends Attributes {}
+    const t = new Topic({ authorName: "Plutarch" });
+    assertPredicate(await t.isValid(), (valid) => valid);
 
-    const p = new Person({ title: "A", titleConfirmation: "B" });
-    expect(await p.isValid()).toBe(false);
-    expect(p.errors.messagesFor("titleConfirmation")).toContain("doesn't match Title");
+    t.titleConfirmation = "Parallel Lives";
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+
+    t.titleConfirmation = null;
+    t.title = "Parallel Lives";
+    assertPredicate(await t.isValid(), (valid) => valid);
+
+    t.titleConfirmation = "Parallel Lives";
+    assertPredicate(await t.isValid(), (valid) => valid);
   });
 
   it("title confirmation", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    Topic.validatesConfirmationOf("title");
 
-      static {
-        include(this, Attributes);
-        this.attribute("title", "string");
-        this.validates("title", { confirmation: true });
-      }
-    }
-    interface Person extends Attributes {}
+    const t = new Topic({ title: "We should be confirmed", titleConfirmation: "" });
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
 
-    const p = new Person({ title: "A", titleConfirmation: "A" });
-    expect(await p.isValid()).toBe(true);
+    t.titleConfirmation = "We should be confirmed";
+    assertPredicate(await t.isValid(), (valid) => valid);
   });
 
-  it("title confirmation with case sensitive option true", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+  it("validates confirmation of with boolean attribute", async () => {
+    Topic.validatesConfirmationOf("approved");
 
-      static {
-        include(this, Attributes);
-        this.attribute("title", "string");
-        this.validates("title", { confirmation: { caseSensitive: true } });
-      }
-    }
-    interface Person extends Attributes {}
+    const t = new Topic({ approved: true, approvedConfirmation: null });
+    assertPredicate(await t.isValid(), (valid) => valid);
 
-    const p = new Person({ title: "Hello" });
-    (p as any).titleConfirmation = "hello";
-    expect(await p.isValid()).toBe(false);
+    t.approvedConfirmation = false;
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+
+    t.approvedConfirmation = true;
+    assertPredicate(await t.isValid(), (valid) => valid);
   });
 
-  it("title confirmation with case sensitive option false", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+  it("validates confirmation of for ruby class", async () => {
+    try {
+      Person.validatesConfirmationOf("karma");
 
-      static {
-        include(this, Attributes);
-        this.attribute("title", "string");
-        this.validates("title", { confirmation: { caseSensitive: false } });
-      }
+      const p = new Person();
+      p.karmaConfirmation = "None";
+      assertPredicate(await p.isInvalid(), (invalid) => invalid);
+
+      expect(p.errors.messagesFor("karmaConfirmation")).toEqual(["doesn't match Karma"]);
+
+      p.karma = "None";
+      assertPredicate(await p.isValid(), (valid) => valid);
+    } finally {
+      Person.clearValidatorsBang();
     }
-    interface Person extends Attributes {}
-
-    const p = new Person({ title: "Hello" });
-    (p as any).titleConfirmation = "hello";
-    expect(await p.isValid()).toBe(true);
   });
 
   it("title confirmation with i18n attribute", async () => {
-    I18n.backend().storeTranslations("en", {
-      activemodel: {
-        attributes: {
-          person: {
-            title: "Custom Title",
-          },
-        },
-      },
-    });
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    try {
+      I18n.backend().storeTranslations("en", {
+        errors: { messages: { confirmation: "doesn't match %{attribute}" } },
+        activemodel: { attributes: { topic: { title: "Test Title" } } },
+      });
+
+      Topic.validatesConfirmationOf("title");
+
+      const t = new Topic({ title: "We should be confirmed", titleConfirmation: "" });
+      assertPredicate(await t.isInvalid(), (invalid) => invalid);
+      expect(t.errors.messagesFor("titleConfirmation")).toEqual(["doesn't match Test Title"]);
+    } finally {
+      resetI18n();
+    }
+  });
+
+  it("does not override confirmation reader if present", () => {
+    class Klass extends Model {
+      get titleConfirmation(): string {
+        return "expected title";
+      }
 
       static {
-        include(this, Attributes);
-        this.attribute("title", "string");
-        this.validates("title", { confirmation: true });
+        this.validatesConfirmationOf("title");
       }
     }
-    interface Person extends Attributes {}
 
-    const p = new Person({ title: "We the People" });
-    (p as any).titleConfirmation = "We the Robots";
-    expect(await p.isValid()).toBe(false);
-    expect(p.errors.messagesFor("titleConfirmation")[0]).toBe("doesn't match Custom Title");
-    resetI18n();
+    expect(new Klass().titleConfirmation).toEqual("expected title");
+  });
+
+  it("does not override confirmation writer if present", () => {
+    class Klass extends Model {
+      set titleConfirmation(value: string) {
+        (this as { _titleConfirmation?: string })._titleConfirmation = "expected title";
+      }
+
+      static {
+        this.validatesConfirmationOf("title");
+      }
+    }
+    interface Klass {
+      get titleConfirmation(): string;
+    }
+
+    const model = new Klass();
+    model.titleConfirmation = "new title";
+    expect(model.titleConfirmation).toEqual("expected title");
+  });
+
+  it("title confirmation with case sensitive option true", async () => {
+    Topic.validatesConfirmationOf("title", { caseSensitive: true });
+
+    const t = new Topic({ title: "title", titleConfirmation: "Title" });
+    assertPredicate(await t.isInvalid(), (invalid) => invalid);
+  });
+
+  it("title confirmation with case sensitive option false", async () => {
+    Topic.validatesConfirmationOf("title", { caseSensitive: false });
+
+    const t = new Topic({ title: "title", titleConfirmation: "Title" });
+    assertPredicate(await t.isValid(), (valid) => valid);
   });
 
   it("setup! auto-defines confirmation attribute", async () => {

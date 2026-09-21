@@ -1,182 +1,148 @@
 import { kernelThrow } from "@blazetrails/ruby-compat";
-/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
-   Each model below spells `include ActiveModel::Attributes` in its class body, the way the Rails
-   test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
-   how `include()` surfaces those members on the type side. */
 import { describe, it, expect } from "vitest";
-import { include } from "@blazetrails/activesupport";
+import { assertEmpty, include } from "@blazetrails/activesupport";
 import { Model } from "../index.js";
-import { Attributes, type AttributesClassHalf } from "../attributes.js";
 import { Callbacks as ValidationsCallbacks } from "./callbacks.js";
 
 class Dog extends Model {
-  declare static attribute: AttributesClassHalf["attribute"];
   declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];
   declare static afterValidation: (typeof ValidationsCallbacks.ClassMethods)["afterValidation"];
 
-  history: string[] = [];
   static {
     include(this, ValidationsCallbacks);
-    include(this, Attributes);
-    this.attribute("name", "string");
+  }
+
+  name: string | null = null;
+  history: string[] = [];
+}
+
+class DogWithMethodCallbacks extends Dog {
+  static {
+    this.beforeValidation(":setBeforeValidationMarker");
+    this.afterValidation(":setAfterValidationMarker");
+  }
+
+  setBeforeValidationMarker(): void {
+    this.history.push("before_validation_marker");
+  }
+  setAfterValidationMarker(): void {
+    this.history.push("after_validation_marker");
   }
 }
-interface Dog extends Attributes {}
+
+class DogValidatorsAreProc extends Dog {
+  static {
+    this.beforeValidation((d: Dog) => d.history.push("before_validation_marker"));
+    this.afterValidation((d: Dog) => d.history.push("after_validation_marker"));
+  }
+}
+
+class DogWithTwoValidators extends Dog {
+  static {
+    this.beforeValidation((d: Dog) => d.history.push("before_validation_marker1"));
+    this.beforeValidation((d: Dog) => d.history.push("before_validation_marker2"));
+  }
+}
+
+class DogBeforeValidatorReturningFalse extends Dog {
+  static {
+    this.beforeValidation(() => false);
+    this.beforeValidation((d: Dog) => d.history.push("before_validation_marker2"));
+  }
+}
+
+class DogBeforeValidatorThrowingAbort extends Dog {
+  static {
+    this.beforeValidation(() => kernelThrow(":abort"));
+    this.beforeValidation((d: Dog) => d.history.push("before_validation_marker2"));
+  }
+}
+
+class DogAfterValidatorReturningFalse extends Dog {
+  static {
+    this.afterValidation(() => false);
+    this.afterValidation((d: Dog) => d.history.push("after_validation_marker"));
+  }
+}
+
+class DogWithMissingName extends Dog {
+  static {
+    this.beforeValidation((d: Dog) => d.history.push("before_validation_marker"));
+    this.validatesPresenceOf("name");
+  }
+}
 
 class DogValidatorWithOnCondition extends Dog {
   static {
-    this.beforeValidation(
-      (d: DogValidatorWithOnCondition) => {
-        d.history.push("before_validation_marker");
-      },
-      { on: "create" },
-    );
-    this.afterValidation(
-      (d: DogValidatorWithOnCondition) => {
-        d.history.push("after_validation_marker");
-      },
-      { on: "create" },
-    );
+    this.beforeValidation(":setBeforeValidationMarker", { on: "create" });
+    this.afterValidation(":setAfterValidationMarker", { on: "create" });
+  }
+
+  setBeforeValidationMarker(): void {
+    this.history.push("before_validation_marker");
+  }
+  setAfterValidationMarker(): void {
+    this.history.push("after_validation_marker");
   }
 }
 
 class DogValidatorWithOnMultipleCondition extends Dog {
   static {
-    this.beforeValidation(
-      (d: DogValidatorWithOnMultipleCondition) => {
-        d.history.push("before_validation_marker on context_a");
-      },
-      { on: "context_a" },
-    );
-    this.beforeValidation(
-      (d: DogValidatorWithOnMultipleCondition) => {
-        d.history.push("before_validation_marker on context_b");
-      },
-      { on: "context_b" },
-    );
-    this.afterValidation(
-      (d: DogValidatorWithOnMultipleCondition) => {
-        d.history.push("after_validation_marker on context_a");
-      },
-      { on: "context_a" },
-    );
-    this.afterValidation(
-      (d: DogValidatorWithOnMultipleCondition) => {
-        d.history.push("after_validation_marker on context_b");
-      },
-      { on: "context_b" },
-    );
+    this.beforeValidation(":setBeforeValidationMarkerOnContextA", { on: "context_a" });
+    this.beforeValidation(":setBeforeValidationMarkerOnContextB", { on: "context_b" });
+    this.afterValidation(":setAfterValidationMarkerOnContextA", { on: "context_a" });
+    this.afterValidation(":setAfterValidationMarkerOnContextB", { on: "context_b" });
+  }
+
+  setBeforeValidationMarkerOnContextA(): void {
+    this.history.push("before_validation_marker on context_a");
+  }
+  setBeforeValidationMarkerOnContextB(): void {
+    this.history.push("before_validation_marker on context_b");
+  }
+  setAfterValidationMarkerOnContextA(): void {
+    this.history.push("after_validation_marker on context_a");
+  }
+  setAfterValidationMarkerOnContextB(): void {
+    this.history.push("after_validation_marker on context_b");
+  }
+}
+
+class DogValidatorWithIfCondition extends Dog {
+  static {
+    this.beforeValidation(":setBeforeValidationMarker1", { if: () => true });
+    this.beforeValidation(":setBeforeValidationMarker2", { if: () => false });
+
+    this.afterValidation(":setAfterValidationMarker1", { if: () => true });
+    this.afterValidation(":setAfterValidationMarker2", { if: () => false });
+  }
+
+  setBeforeValidationMarker1(): void {
+    this.history.push("before_validation_marker1");
+  }
+  setBeforeValidationMarker2(): void {
+    this.history.push("before_validation_marker2");
+  }
+
+  setAfterValidationMarker1(): void {
+    this.history.push("after_validation_marker1");
+  }
+  setAfterValidationMarker2(): void {
+    this.history.push("after_validation_marker2");
   }
 }
 
 describe("CallbacksWithMethodNamesShouldBeCalled", () => {
-  it("before validation and after validation callbacks should be called", async () => {
-    const order: string[] = [];
-    class Person extends Model {
-      declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];
-      declare static afterValidation: (typeof ValidationsCallbacks.ClassMethods)["afterValidation"];
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, ValidationsCallbacks);
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.validates("name", { presence: true });
-        this.beforeValidation(":setBeforeValidationMarker");
-        this.afterValidation(":setAfterValidationMarker");
-      }
-      setBeforeValidationMarker(): void {
-        order.push("before_validation");
-      }
-      setAfterValidationMarker(): void {
-        order.push("after_validation");
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({ name: "Alice" });
-    await p.isValid();
-    expect(order).toContain("before_validation");
-    expect(order).toContain("after_validation");
+  it("if condition is respected for before validation", async () => {
+    const d = new DogValidatorWithIfCondition();
+    await d.isValid();
+    expect(d.history).toEqual(["before_validation_marker1", "after_validation_marker1"]);
   });
 
-  it("before validation and after validation callbacks should be called in declared order", async () => {
-    const order: string[] = [];
-    class Person extends Model {
-      declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];
-      declare static afterValidation: (typeof ValidationsCallbacks.ClassMethods)["afterValidation"];
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, ValidationsCallbacks);
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.beforeValidation(() => {
-          order.push("first_before");
-        });
-        this.beforeValidation(() => {
-          order.push("second_before");
-        });
-        this.afterValidation(() => {
-          order.push("first_after");
-        });
-        this.afterValidation(() => {
-          order.push("second_after");
-        });
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({ name: "Alice" });
-    await p.isValid();
-    expect(order.indexOf("first_before")).toBeLessThan(order.indexOf("second_before"));
-    expect(order.indexOf("first_after")).toBeLessThan(order.indexOf("second_after"));
-  });
-
-  it("further callbacks should not be called if before validation throws abort", async () => {
-    const order: string[] = [];
-    class Person extends Model {
-      declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];
-      declare static afterValidation: (typeof ValidationsCallbacks.ClassMethods)["afterValidation"];
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, ValidationsCallbacks);
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.beforeValidation(() => {
-          order.push("before");
-          kernelThrow(":abort");
-        });
-        this.afterValidation(() => {
-          order.push("after");
-        });
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({ name: "Alice" });
-    await p.isValid();
-    expect(order).toContain("before");
-    expect(order).not.toContain("after");
-  });
-
-  it("validation test should be done", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.validates("name", { presence: true });
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({ name: "Alice" });
-    expect(await p.isValid()).toBe(true);
-    const p2 = new Person({});
-    expect(await p2.isValid()).toBe(false);
+  it("on condition is respected for validation with matching context", async () => {
+    const d = new DogValidatorWithOnCondition();
+    await d.isValid("create");
+    expect(d.history).toEqual(["before_validation_marker", "after_validation_marker"]);
   });
 
   it("on condition is respected for validation without matching context", async () => {
@@ -192,23 +158,23 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
   });
 
   it("on multiple condition is respected for validation with matching context", async () => {
-    const d1 = new DogValidatorWithOnMultipleCondition();
-    await d1.isValid("context_a");
-    expect(d1.history).toEqual([
+    let d = new DogValidatorWithOnMultipleCondition();
+    await d.isValid("context_a");
+    expect(d.history).toEqual([
       "before_validation_marker on context_a",
       "after_validation_marker on context_a",
     ]);
 
-    const d2 = new DogValidatorWithOnMultipleCondition();
-    await d2.isValid("context_b");
-    expect(d2.history).toEqual([
+    d = new DogValidatorWithOnMultipleCondition();
+    await d.isValid("context_b");
+    expect(d.history).toEqual([
       "before_validation_marker on context_b",
       "after_validation_marker on context_b",
     ]);
 
-    const d3 = new DogValidatorWithOnMultipleCondition();
-    await d3.isValid(["context_a", "context_b"]);
-    expect(d3.history).toEqual([
+    d = new DogValidatorWithOnMultipleCondition();
+    await d.isValid(["context_a", "context_b"]);
+    expect(d.history).toEqual([
       "before_validation_marker on context_a",
       "before_validation_marker on context_b",
       "after_validation_marker on context_a",
@@ -228,139 +194,72 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
     expect(d.history).toEqual([]);
   });
 
-  it("further callbacks should be called if before validation returns false", async () => {
-    const log: string[] = [];
-    class Person extends Model {
-      declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];
-      declare static afterValidation: (typeof ValidationsCallbacks.ClassMethods)["afterValidation"];
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, ValidationsCallbacks);
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.afterValidation(() => {
-          log.push("after");
-        });
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({ name: "test" });
-    await p.isValid();
-    expect(log).toContain("after");
-  });
-
-  it("further callbacks should be called if after validation returns false", async () => {
-    const log: string[] = [];
-    class Person extends Model {
-      declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];
-      declare static afterValidation: (typeof ValidationsCallbacks.ClassMethods)["afterValidation"];
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, ValidationsCallbacks);
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.afterValidation(() => {
-          log.push("first");
-          return false;
-        });
-        this.afterValidation(() => {
-          log.push("second");
-        });
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({ name: "test" });
-    await p.isValid();
-    expect(log).toContain("first");
-  });
-
-  it("before validation does not mutate the if options array", () => {
-    const opts: Array<(r: any) => boolean> = [];
-    class CreateDog extends Dog {
-      static {
-        this.beforeValidation(() => {}, { if: opts, on: "create" });
-      }
-    }
-    void CreateDog;
-    expect(opts).toEqual([]);
-  });
-
-  it("after validation does not mutate the if options array", () => {
-    const opts: Array<(r: any) => boolean> = [];
-    class CreateDog extends Dog {
-      static {
-        this.afterValidation(() => {}, { if: opts, on: "create" });
-      }
-    }
-    void CreateDog;
-    expect(opts).toEqual([]);
+  it("before validation and after validation callbacks should be called", async () => {
+    const d = new DogWithMethodCallbacks();
+    await d.isValid();
+    expect(d.history).toEqual(["before_validation_marker", "after_validation_marker"]);
   });
 
   it("before validation and after validation callbacks should be called with proc", async () => {
-    const log: string[] = [];
-    class Person extends Model {
-      declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];
-      declare static afterValidation: (typeof ValidationsCallbacks.ClassMethods)["afterValidation"];
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, ValidationsCallbacks);
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.validates("name", { presence: true });
-        this.beforeValidation((_r: any) => {
-          log.push("before_proc");
-        });
-        this.afterValidation((_r: any) => {
-          log.push("after_proc");
-        });
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({ name: "Alice" });
-    await p.isValid();
-    expect(log).toContain("before_proc");
-    expect(log).toContain("after_proc");
-  });
-
-  it("if condition is respected for before validation", async () => {
-    const log: string[] = [];
-    class Person extends Model {
-      declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];
-      declare static afterValidation: (typeof ValidationsCallbacks.ClassMethods)["afterValidation"];
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, ValidationsCallbacks);
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.beforeValidation(
-          (_r: any) => {
-            log.push("before");
-          },
-          { if: (r: any) => r._readAttribute("name") === "trigger" },
-        );
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p1 = new Person({ name: "Alice" });
-    await p1.isValid();
-    expect(log).toEqual([]);
-
-    const p2 = new Person({ name: "trigger" });
-    await p2.isValid();
-    expect(log).toEqual(["before"]);
-  });
-
-  it("on condition is respected for validation with matching context", async () => {
-    const d = new DogValidatorWithOnCondition();
-    await d.isValid("create");
+    const d = new DogValidatorsAreProc();
+    await d.isValid();
     expect(d.history).toEqual(["before_validation_marker", "after_validation_marker"]);
+  });
+
+  it("before validation and after validation callbacks should be called in declared order", async () => {
+    const d = new DogWithTwoValidators();
+    await d.isValid();
+    expect(d.history).toEqual(["before_validation_marker1", "before_validation_marker2"]);
+  });
+
+  it("further callbacks should not be called if before validation throws abort", async () => {
+    const d = new DogBeforeValidatorThrowingAbort();
+    const output = await d.isValid();
+    expect(d.history).toEqual([]);
+    expect(output).toEqual(false);
+  });
+
+  it("further callbacks should be called if before validation returns false", async () => {
+    const d = new DogBeforeValidatorReturningFalse();
+    const output = await d.isValid();
+    expect(d.history).toEqual(["before_validation_marker2"]);
+    expect(output).toEqual(true);
+  });
+
+  it("further callbacks should be called if after validation returns false", async () => {
+    const d = new DogAfterValidatorReturningFalse();
+    await d.isValid();
+    expect(d.history).toEqual(["after_validation_marker"]);
+  });
+
+  it("validation test should be done", async () => {
+    const d = new DogWithMissingName();
+    const output = await d.isValid();
+    expect(d.history).toEqual(["before_validation_marker"]);
+    expect(output).toEqual(false);
+  });
+
+  it("before validation does not mutate the if options array", () => {
+    const opts: Array<() => boolean> = [];
+
+    void class extends Dog {
+      static {
+        this.beforeValidation(() => {}, { if: opts, on: "create" });
+      }
+    };
+
+    assertEmpty(opts);
+  });
+
+  it("after validation does not mutate the if options array", () => {
+    const opts: Array<() => boolean> = [];
+
+    void class extends Dog {
+      static {
+        this.afterValidation(() => {}, { if: opts, on: "create" });
+      }
+    };
+
+    assertEmpty(opts);
   });
 });
