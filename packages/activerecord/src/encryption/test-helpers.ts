@@ -20,6 +20,9 @@ import "../encryption.js";
 import type { Encryptor } from "../encryption.js";
 import { MessagePackMessageSerializer } from "./message-pack-message-serializer.js";
 
+import { withEncryptionContext } from "../encryption.js";
+import { Key } from "./key.js";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 export { withEncryptionContext, withoutEncryption } from "../encryption.js";
 export { Decryption, Encryption };
 
@@ -126,6 +129,16 @@ export function makeEncryptedAuthorWithPreviousSchemes(previousSchemes: Scheme[]
   } as any;
 }
 
+class MutableDerivedSecretKeyProvider extends DerivedSecretKeyProvider {
+  get keys(): Key[] {
+    return this._keys;
+  }
+
+  set keys(keys: Key[]) {
+    this._keys = keys;
+  }
+}
+
 export function makeEncryptedPost() {
   return class EncryptedPost extends Base {
     static {
@@ -134,7 +147,9 @@ export function makeEncryptedPost() {
       this.attribute("title", "string");
       this.attribute("body", "text");
       this.encrypts("title");
-      this.encrypts("body");
+      this.encrypts("body", {
+        keyProvider: new MutableDerivedSecretKeyProvider("my post body secret!"),
+      });
     }
   } as any;
 }
@@ -486,6 +501,49 @@ function _assertEncryptedAttributeOnModel(
           `(DB value ≠ plaintext), but valuesForDatabase() returned the plaintext unchanged.`,
       );
     }
+  }
+}
+
+export async function assertInvalidKeyCantReadAttribute(
+  model: any,
+  attributeName: string,
+): Promise<void> {
+  if (rbObjRespondTo(model.constructor.typeForAttribute(attributeName).keyProvider, "keys")) {
+    await assertInvalidKeyCantReadAttributeWithCustomKeyProvider(model, attributeName);
+  } else {
+    await assertInvalidKeyCantReadAttributeWithDefaultKeyProvider(model, attributeName);
+  }
+}
+
+async function assertInvalidKeyCantReadAttributeWithDefaultKeyProvider(
+  model: any,
+  attributeName: string,
+): Promise<void> {
+  await model.reload();
+
+  await withEncryptionContext(
+    { keyProvider: new DerivedSecretKeyProvider("a different 256 bits key for now") },
+    () => {
+      expect(() => model[attributeName]).toThrow(Decryption);
+    },
+  );
+}
+
+async function assertInvalidKeyCantReadAttributeWithCustomKeyProvider(
+  model: any,
+  attributeName: string,
+): Promise<void> {
+  const attributeType = model.constructor.typeForAttribute(attributeName);
+
+  await model.reload();
+
+  const originalKeys = attributeType.keyProvider.keys;
+  try {
+    attributeType.keyProvider.keys = [Key.deriveFrom("other custom attribute secret")];
+
+    expect(() => model[attributeName]).toThrow(Decryption);
+  } finally {
+    attributeType.keyProvider.keys = originalKeys;
   }
 }
 

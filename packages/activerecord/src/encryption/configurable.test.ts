@@ -45,7 +45,6 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
   });
 
   it(".configure configures initial config properties", () => {
-    Configurable.config.keyDerivationSalt = "the salt";
     const previousKeyProvider = new DerivedSecretKeyProvider("some secret");
 
     Configurable.configure({
@@ -59,7 +58,7 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
     expect(config.primaryKey).toBe("the primary key");
     expect(config.deterministicKey).toBe("the deterministic key");
     expect(config.keyDerivationSalt).toBe("the salt");
-    expect(config.previousSchemes[0]).toMatchObject({ keyProvider: previousKeyProvider });
+    expect(config.previousSchemes[0].keyProvider).toEqual(previousKeyProvider);
   });
 
   it("can add listeners that will get invoked when declaring encrypted attributes", () => {
