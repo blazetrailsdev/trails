@@ -1,7 +1,8 @@
 export { NotImplementedError } from "@blazetrails/ruby-compat";
+import { StandardError } from "@blazetrails/ruby-compat";
 import type { Column } from "./connection-adapters/column.js";
 
-export class ActiveRecordError extends Error {
+export class ActiveRecordError extends StandardError {
   constructor(message?: string, options?: ErrorOptions) {
     super(message, options);
     this.name = "ActiveRecord::ActiveRecordError";

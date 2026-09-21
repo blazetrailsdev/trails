@@ -12,7 +12,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { assertEmpty, assertNothingRaised, assertRaises, getEnv } from "@blazetrails/activesupport";
-import { stdout, stderr, setEnv, getProcessAdapter } from "@blazetrails/ruby-compat";
+import { stdout, stderr, setEnv, getProcessAdapter, RuntimeError } from "@blazetrails/ruby-compat";
 import { DatabaseTasks, DatabaseNotSupported } from "./database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
@@ -1100,35 +1100,35 @@ describe("DatabaseTasksMigrateErrorTest", () => {
 
     try {
       setEnv("VERSION", "unknown");
-      e = await assertRaises([Error], {}, () => DatabaseTasks.migrate());
+      e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.migrate());
       expect(e.message).toMatch(/Invalid format of target version/);
 
       setEnv("VERSION", "0.1.11");
-      e = await assertRaises([Error], {}, () => DatabaseTasks.migrate());
+      e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.migrate());
       expect(e.message).toMatch(/Invalid format of target version/);
 
       setEnv("VERSION", "1.1.11");
-      e = await assertRaises([Error], {}, () => DatabaseTasks.migrate());
+      e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.migrate());
       expect(e.message).toMatch(/Invalid format of target version/);
 
       setEnv("VERSION", "0 ");
-      e = await assertRaises([Error], {}, () => DatabaseTasks.migrate());
+      e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.migrate());
       expect(e.message).toMatch(/Invalid format of target version/);
 
       setEnv("VERSION", "1.");
-      e = await assertRaises([Error], {}, () => DatabaseTasks.migrate());
+      e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.migrate());
       expect(e.message).toMatch(/Invalid format of target version/);
 
       setEnv("VERSION", "1_");
-      e = await assertRaises([Error], {}, () => DatabaseTasks.migrate());
+      e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.migrate());
       expect(e.message).toMatch(/Invalid format of target version/);
 
       setEnv("VERSION", "1__1");
-      e = await assertRaises([Error], {}, () => DatabaseTasks.migrate());
+      e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.migrate());
       expect(e.message).toMatch(/Invalid format of target version/);
 
       setEnv("VERSION", "1_name");
-      e = await assertRaises([Error], {}, () => DatabaseTasks.migrate());
+      e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.migrate());
       expect(e.message).toMatch(/Invalid format of target version/);
     } finally {
       setEnv("VERSION", undefined);
@@ -1137,10 +1137,10 @@ describe("DatabaseTasksMigrateErrorTest", () => {
 
   it("migrate raise error on failed check target version", async () => {
     const spy = vi.spyOn(DatabaseTasks, "checkTargetVersion").mockImplementation(() => {
-      throw new Error("foo");
+      throw new RuntimeError("foo");
     });
     try {
-      const e = await assertRaises([Error], {}, () => DatabaseTasks.migrate());
+      const e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.migrate());
       expect(e.message).toBe("foo");
     } finally {
       spy.mockRestore();
@@ -1445,31 +1445,31 @@ describe("DatabaseTaskCheckTargetVersionTest", () => {
     let e: Error;
 
     setEnv("VERSION", "unknown");
-    e = await assertRaises([Error], {}, () => DatabaseTasks.checkTargetVersion());
+    e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.checkTargetVersion());
     expect(e.message).toMatch(/Invalid format of target version/);
 
     setEnv("VERSION", "0.1.11");
-    e = await assertRaises([Error], {}, () => DatabaseTasks.checkTargetVersion());
+    e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.checkTargetVersion());
     expect(e.message).toMatch(/Invalid format of target version/);
 
     setEnv("VERSION", "1.1.11");
-    e = await assertRaises([Error], {}, () => DatabaseTasks.checkTargetVersion());
+    e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.checkTargetVersion());
     expect(e.message).toMatch(/Invalid format of target version/);
 
     setEnv("VERSION", "0 ");
-    e = await assertRaises([Error], {}, () => DatabaseTasks.checkTargetVersion());
+    e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.checkTargetVersion());
     expect(e.message).toMatch(/Invalid format of target version/);
 
     setEnv("VERSION", "1.");
-    e = await assertRaises([Error], {}, () => DatabaseTasks.checkTargetVersion());
+    e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.checkTargetVersion());
     expect(e.message).toMatch(/Invalid format of target version/);
 
     setEnv("VERSION", "1_");
-    e = await assertRaises([Error], {}, () => DatabaseTasks.checkTargetVersion());
+    e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.checkTargetVersion());
     expect(e.message).toMatch(/Invalid format of target version/);
 
     setEnv("VERSION", "1_name");
-    e = await assertRaises([Error], {}, () => DatabaseTasks.checkTargetVersion());
+    e = await assertRaises([RuntimeError], {}, () => DatabaseTasks.checkTargetVersion());
     expect(e.message).toMatch(/Invalid format of target version/);
   });
 

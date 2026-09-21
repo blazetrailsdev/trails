@@ -1,3 +1,4 @@
+import { StandardError } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
@@ -644,7 +645,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
         await conn.removeForeignKey("astronauts", "rockets");
         expect(await conn.foreignKeys("astronauts")).toEqual([]);
 
-        const error = await assertRaises([Error], {}, () =>
+        const error = await assertRaises([StandardError], {}, () =>
           conn.removeForeignKey("astronauts", "rockets"),
         );
 
@@ -703,7 +704,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
           return;
         }
 
-        const error = await assertRaises([Error], {}, () =>
+        const error = await assertRaises([StandardError], {}, () =>
           conn.addForeignKey("astronauts", "rockets"),
         );
         const message = error.message;

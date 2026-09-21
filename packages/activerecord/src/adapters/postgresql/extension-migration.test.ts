@@ -1,4 +1,4 @@
-import { StringIO } from "@blazetrails/ruby-compat";
+import { StandardError, StringIO } from "@blazetrails/ruby-compat";
 import { assertRaises } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Migration } from "../../index.js";
@@ -100,7 +100,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("disable extension raises when dependent objects exist", async () => {
       await adapter.enableExtension("citext");
       await adapter.execute(`CREATE TABLE test_citext_tbl (id SERIAL PRIMARY KEY, data CITEXT)`);
-      const error = await assertRaises([Error], {}, async () => {
+      const error = await assertRaises([StandardError], {}, async () => {
         await adapter.disableExtension("citext");
       });
       expect(error.message).toMatch(

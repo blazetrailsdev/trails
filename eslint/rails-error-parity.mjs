@@ -132,7 +132,7 @@ function newCalleeName(callee) {
   return null;
 }
 
-function checkParity(context, exportedClasses) {
+function checkParity(context, exportedClasses, rubyCompatImports) {
   const scope = repoRel(context.filename ?? context.getFilename?.() ?? "");
   if (!scope) return;
   const pkg = scope.pkg;
@@ -157,7 +157,13 @@ function checkParity(context, exportedClasses) {
     }
     if (ROOT_BASES.has(entry.parent)) {
       // Root class must still extend a global Error type (`class Foo {}` isn't).
-      if (!found.parent || !NATIVE_ERRORS.has(found.parent)) {
+      if (
+        !found.parent ||
+        !(
+          NATIVE_ERRORS.has(found.parent) ||
+          (found.parent === entry.parent && rubyCompatImports.has(found.parent))
+        )
+      ) {
         context.report({
           loc: { line: 1, column: 0 },
           messageId: "rootExtends",
@@ -205,10 +211,17 @@ const rule = {
     // `throw new RangeError` after `import { RangeError } from "../errors.js"`
     // is a ported class, not the native one.
     const importedNames = new Set();
+    const rubyCompatImports = new Set();
 
     return {
       ImportSpecifier(node) {
         importedNames.add(node.local.name);
+        if (
+          node.parent?.source?.value === "@blazetrails/ruby-compat" &&
+          node.imported?.name === node.local.name
+        ) {
+          rubyCompatImports.add(node.local.name);
+        }
       },
       ThrowStatement(node) {
         const arg = node.argument;
@@ -225,7 +238,7 @@ const rule = {
         exportedClasses.set(node.id.name, { parent: superClassName(node) });
       },
       "Program:exit"() {
-        checkParity(context, exportedClasses);
+        checkParity(context, exportedClasses, rubyCompatImports);
       },
     };
   },

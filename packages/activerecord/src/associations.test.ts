@@ -56,7 +56,7 @@ import "./test-helpers/models/bird.js";
 import "./test-helpers/models/treasure.js";
 import "./test-helpers/models/price-estimate.js";
 
-import { NoMethodError, regexpEscape } from "@blazetrails/ruby-compat";
+import { NoMethodError, regexpEscape, StandardError } from "@blazetrails/ruby-compat";
 
 import { Preloader } from "./associations/preloader.js";
 
@@ -1217,7 +1217,7 @@ describe("PreloaderTest", () => {
     const someOtherRecord = categories("general") as any;
     await someOtherRecord.updateBang({ id: 54321 });
 
-    await assertRaises([Error], {}, () => someOtherRecord.association("author"));
+    await assertRaises([StandardError], {}, () => someOtherRecord.association("author"));
 
     await assertNothingRaised(async () => {
       await new Preloader({

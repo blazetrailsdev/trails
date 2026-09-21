@@ -11,7 +11,7 @@ import {
   explain as mysqlExplain,
 } from "./mysql/database-statements.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
-import { fetch, rbInspect } from "@blazetrails/ruby-compat";
+import { fetch, rbInspect, RuntimeError } from "@blazetrails/ruby-compat";
 import { Result } from "../result.js";
 import { isRubyTruthy } from "../ruby-truthy.js";
 import { transactionIsolationLevels } from "./abstract/database-statements.js";
@@ -459,7 +459,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
         `CREATE DATABASE ${this.quoteTableName(name)} DEFAULT CHARACTER SET \`utf8mb4\``,
       );
     } else {
-      throw new Error(
+      throw new RuntimeError(
         "Configure a supported :charset and ensure innodb_large_prefix is enabled to support indexes on varchar(255) string columns.",
       );
     }
