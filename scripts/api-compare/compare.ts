@@ -2955,6 +2955,13 @@ export function rubyLevelKey(level: OwnerSeat, name: string): string {
  * declaration states no seat (a top-level `this`-typed function, or an owner
  * whose seat cannot be told), `undefined` when every owner is on the other
  * seat. A name with no recorded owner is not second-guessed.
+ *
+ * Consulted only where a file expects the name at BOTH levels. A neutral
+ * declaration is one TS member, so it answers the first-sighted row only:
+ * `attribute_methods.rb` defines `attribute_method?` on the instance (:499)
+ * and in `ClassMethods` (:224), and one top-level `isAttributeMethod` cannot
+ * port both. Once the other row holds it, neither a later candidate spelling
+ * nor an includer re-exposing it (base.ts) counts unless it is on this seat.
  */
 export function tsDeclaresOnLevel(
   level: OwnerSeat,
@@ -4681,15 +4688,6 @@ export function main() {
         if (tsCandidates === null) continue;
 
         // Check direct match first — find which candidate matched
-        // Where the file expects the name at BOTH levels, a candidate counts
-        // only if it is declared on this row's seat. A seat-neutral declaration
-        // is one TS member, so it answers one of the two rows — the first
-        // sighted — and the other reads missing: `attribute_methods.rb` defines
-        // `attribute_method?` on the instance and in `ClassMethods` (:224), and
-        // one top-level `isAttributeMethod` cannot port both. The candidates
-        // are spellings of ONE port, so once the other row holds a neutral one
-        // a later spelling (`attributeMethod`, the private `:499` port) is the
-        // same seat-less port again, not this row's.
         const bothLevels =
           seen.has(rubyLevelKey("class", rubyName)) && seen.has(rubyLevelKey("instance", rubyName));
         let neutralTaken = false;
@@ -4783,9 +4781,6 @@ export function main() {
         let matchedCandidate: string | null = null;
         for (const candidate of tsCandidates) {
           for (const { file, methods } of includerMethodSetsByOwner.get(rubyModule) ?? []) {
-            // An includer re-exposing the seat-less port the other row already
-            // holds (base.ts's `isAttributeMethod: _isAttributeMethod`) is that
-            // same port, so only a declaration on this row's seat counts.
             if (
               methods.has(candidate) &&
               (!neutralTaken ||
