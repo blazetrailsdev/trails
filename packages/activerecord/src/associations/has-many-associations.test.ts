@@ -912,8 +912,8 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("find grouped", async () => {
-    const allClientsOfFirm1 = await Client.all().merge({ where: "firm_id = 1" });
-    const groupedClientsOfFirm1 = await Client.all().merge({
+    const allClientsOfFirm1 = await Client.all().mergeBang({ where: "firm_id = 1" });
+    const groupedClientsOfFirm1 = await Client.all().mergeBang({
       where: "firm_id = 1",
       group: "firm_id",
       select: "firm_id, count(id) as clients_count",
