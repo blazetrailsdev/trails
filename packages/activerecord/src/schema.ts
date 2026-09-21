@@ -1,7 +1,8 @@
 import { isPresent } from "@blazetrails/activesupport";
 import { extend, include, included } from "@blazetrails/ruby-compat";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
-import { Current, Migration } from "./migration.js";
+import { Current, type Migration } from "./migration.js";
+import { _Compatibility } from "./migration/compatibility-slot.js";
 
 export interface SchemaDefineInfo {
   version?: string | number;
@@ -60,10 +61,11 @@ export class Schema<A extends DatabaseAdapter = DatabaseAdapter> extends Current
 
   private static _classForVersion?: Map<string | number, typeof Migration>;
 
+  /** @missingRailsArgs include — PERMANENT */
   static get(version: string | number): typeof Migration {
     if (!Object.hasOwn(this, "_classForVersion")) this._classForVersion = new Map();
     if (!this._classForVersion!.has(version)) {
-      const klass = class extends (Migration.get(version) as new () => object) {};
+      const klass = class extends (_Compatibility!.find(version) as new () => object) {};
       include(klass, Definition);
       this._classForVersion!.set(version, klass as unknown as typeof Migration);
     }
