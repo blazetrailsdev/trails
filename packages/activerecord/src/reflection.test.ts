@@ -594,41 +594,59 @@ describe("ReflectionTest", () => {
     );
   });
   it("join table with common prefix", () => {
-    const category = { tableName: "catalog_categories", pluralizeTableNames: true };
-    const product = { tableName: "catalog_products", pluralizeTableNames: true };
+    const category: Pick<typeof Base, "tableName" | "pluralizeTableNames"> = {
+      tableName: "catalog_categories",
+      pluralizeTableNames: true,
+    };
+    const product: Pick<typeof Base, "tableName" | "pluralizeTableNames"> = {
+      tableName: "catalog_products",
+      pluralizeTableNames: true,
+    };
 
-    let reflection = createReflection("hasMany", "categories", null, {}, product as any);
+    let reflection = createReflection("hasMany", "categories", null, {}, product as typeof Base);
     Object.defineProperty(reflection, "klass", { value: category });
     expect(reflection.joinTable).toBe("catalog_categories_products");
 
-    reflection = createReflection("hasMany", "products", null, {}, category as any);
+    reflection = createReflection("hasMany", "products", null, {}, category as typeof Base);
     Object.defineProperty(reflection, "klass", { value: product });
     expect(reflection.joinTable).toBe("catalog_categories_products");
   });
 
   it("join table with different prefix", () => {
-    const category = { tableName: "catalog_categories", pluralizeTableNames: true };
-    const page = { tableName: "content_pages", pluralizeTableNames: true };
+    const category: Pick<typeof Base, "tableName" | "pluralizeTableNames"> = {
+      tableName: "catalog_categories",
+      pluralizeTableNames: true,
+    };
+    const page: Pick<typeof Base, "tableName" | "pluralizeTableNames"> = {
+      tableName: "content_pages",
+      pluralizeTableNames: true,
+    };
 
-    let reflection = createReflection("hasMany", "categories", null, {}, page as any);
+    let reflection = createReflection("hasMany", "categories", null, {}, page as typeof Base);
     Object.defineProperty(reflection, "klass", { value: category });
     expect(reflection.joinTable).toBe("catalog_categories_content_pages");
 
-    reflection = createReflection("hasMany", "pages", null, {}, category as any);
+    reflection = createReflection("hasMany", "pages", null, {}, category as typeof Base);
     Object.defineProperty(reflection, "klass", { value: page });
     expect(reflection.joinTable).toBe("catalog_categories_content_pages");
   });
 
   it("join table can be overridden", () => {
-    const category = { tableName: "categories", pluralizeTableNames: true };
-    const product = { tableName: "products", pluralizeTableNames: true };
+    const category: Pick<typeof Base, "tableName" | "pluralizeTableNames"> = {
+      tableName: "categories",
+      pluralizeTableNames: true,
+    };
+    const product: Pick<typeof Base, "tableName" | "pluralizeTableNames"> = {
+      tableName: "products",
+      pluralizeTableNames: true,
+    };
 
     let reflection = createReflection(
       "hasMany",
       "categories",
       null,
       { joinTable: "product_categories" },
-      product as any,
+      product as typeof Base,
     );
     Object.defineProperty(reflection, "klass", { value: category });
     expect(reflection.joinTable).toBe("product_categories");
@@ -638,7 +656,7 @@ describe("ReflectionTest", () => {
       "products",
       null,
       { joinTable: "product_categories" },
-      category as any,
+      category as typeof Base,
     );
     Object.defineProperty(reflection, "klass", { value: product });
     expect(reflection.joinTable).toBe("product_categories");
@@ -1038,47 +1056,22 @@ describe("ReflectionTest", () => {
   });
 
   it("belongs to reflection with query constraints infers correct foreign key", () => {
-    class BlogPost extends Base {
-      declare blog_id: number | null;
+    const blogForeignKey = ShardedComment.reflectOnAssociation("blog")!.foreignKey();
+    const blogPostForeignKey = ShardedComment.reflectOnAssociation("blogPost")!.foreignKey();
 
-      static _primaryKey: string | string[] = ["blog_id", "id"];
-      static {
-        this.attribute("blog_id", "integer");
-        this.attribute("id", "integer");
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class RfComment extends Base {
-      declare blog_post_id: number | null;
-
-      static {
-        this.attribute("id", "integer");
-        this.attribute("blog_post_id", "integer");
-        this.belongsTo("blogPost", { className: "BlogPost" });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface RfComment {
-      get blogPost(): BlogPost | null | Promise<BlogPost | null>;
-      set blogPost(value: BlogPost | null);
-    }
-    registerModel(BlogPost);
-    registerModel(RfComment);
-
-    const ref = reflectOnAssociation(RfComment, "blogPost")!;
-    expect(ref.foreignKey()).toBe("blog_post_id");
-    expect(ref.associationPrimaryKey()).toBe("id");
+    expect(blogForeignKey).toBe("blog_id");
+    expect(blogPostForeignKey).toEqual(["blog_id", "blog_post_id"]);
   });
 
   function assertReflection(
     klass: typeof Base,
     association: string,
-    options: Record<string, unknown>,
+    options: Partial<Record<keyof AssociationReflection, unknown>>,
   ) {
-    let reflection;
-    assert((reflection = klass.reflectOnAssociation(association)));
+    const reflection = klass.reflectOnAssociation(association);
+    assert(reflection);
     for (const [method, value] of Object.entries(options)) {
-      expect((reflection as any)[method]).toEqual(value);
+      expect(Reflect.get(reflection!, method)).toEqual(value);
     }
   }
 });
