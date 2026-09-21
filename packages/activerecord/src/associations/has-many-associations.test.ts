@@ -835,6 +835,102 @@ describe("HasManyAssociationsTest", () => {
     expect(firm.clients.loaded).toBeFalsy();
   });
 
+  it("find each with conditions", async () => {
+    const firm = companies("first_firm") as any;
+
+    await assertQueriesCount(2, false, async () => {
+      for await (const c of firm.clients.where({ name: "Microsoft" }).findEach({ batchSize: 1 })) {
+        expect(c.firm_id).toBe(firm.id);
+        expect(c.name).toBe("Microsoft");
+      }
+    });
+
+    expect(firm.clients.loaded).toBeFalsy();
+  });
+
+  it("find in batches", async () => {
+    const firm = companies("first_firm") as any;
+
+    expect(firm.clients.loaded).toBeFalsy();
+
+    await assertQueriesCount(2, false, async () => {
+      for await (const clients of firm.clients.findInBatches({ batchSize: 2 })) {
+        for (const c of clients) expect(c.firm_id).toBe(firm.id);
+      }
+    });
+
+    expect(firm.clients.loaded).toBeFalsy();
+  });
+
+  it("find all sanitized", async () => {
+    const firm = (await HmFirm.first()) as any;
+    const summit = await firm.clients.where("name = 'Summit'").toArray();
+    expect(await firm.clients.where("name = ?", "Summit").toArray()).toEqual(summit);
+    expect(await firm.clients.where("name = :name", { name: "Summit" }).toArray()).toEqual(summit);
+  });
+
+  it("find first sanitized", async () => {
+    const QUOTED_TYPE = (Base.connection as any).quoteColumnName("type");
+    const firm = (await HmFirm.first()) as any;
+    const client2 = await Client.find(2);
+    expect(await firm.clients.where(`${QUOTED_TYPE} = ?`, "Client").first()).toEqual(client2);
+    expect(await firm.clients.where(`${QUOTED_TYPE} = :type`, { type: "Client" }).first()).toEqual(
+      client2,
+    );
+  });
+
+  it("find first after reset scope", async () => {
+    const firm = (await HmFirm.first()) as any;
+    const collection = firm.clients;
+
+    const originalObject = await collection.first();
+    expect(
+      await collection.first(),
+      "Expected second call to #first to cache the same object",
+    ).toBe(originalObject);
+
+    expect(await firm.clients.first(), "Expected #first to return a new object").not.toBe(
+      originalObject,
+    );
+  });
+
+  it("find first after reload", async () => {
+    const firm = (await HmFirm.first()) as any;
+    const collection = firm.clients;
+
+    const originalObject = await collection.first();
+    expect(
+      await collection.first(),
+      "Expected second call to #first to cache the same object",
+    ).toBe(originalObject);
+    await collection.reload();
+
+    expect(
+      await collection.first(),
+      "Expected #first after #reload to return a new object",
+    ).not.toBe(originalObject);
+  });
+
+  it("find grouped", async () => {
+    const allClientsOfFirm1 = await Client.all().mergeBang({ where: "firm_id = 1" });
+    const groupedClientsOfFirm1 = await Client.all().mergeBang({
+      where: "firm_id = 1",
+      group: "firm_id",
+      select: "firm_id, count(id) as clients_count",
+    });
+    expect(allClientsOfFirm1.length).toBe(3);
+    expect(groupedClientsOfFirm1.length).toBe(1);
+  });
+
+  it("find scoped grouped", async () => {
+    expect(await (companies("first_firm") as any).clientsGroupedByFirmId.size()).toBe(1);
+    expect((await (companies("first_firm") as any).clientsGroupedByFirmId.toArray()).length).toBe(
+      1,
+    );
+    expect(await (companies("first_firm") as any).clientsGroupedByName.size()).toBe(3);
+    expect((await (companies("first_firm") as any).clientsGroupedByName.toArray()).length).toBe(3);
+  });
+
   it("finder bang method with dirty target", async () => {
     const company = companies("first_firm") as any;
     const newClients: any[] = [];
@@ -2237,124 +2333,6 @@ describe("HasManyAssociationsTest", () => {
     const posts = await author.upd_all_fk_posts;
     expect((posts[0] as any).title).toBe("Updated");
   });
-  it("find each with conditions", async () => {
-    const author = await HmAuthor.create({ name: "Alice" });
-    await HmPost.create({ author_id: author.id, title: "match", body: "body" });
-    await HmPost.create({ author_id: author.id, title: "other", body: "body" });
-    const posts = await author.posts;
-    const matched: any[] = [];
-    for (const p of posts) {
-      if ((p as any).title === "match") matched.push(p);
-    }
-    expect(matched.length).toBe(1);
-  });
-  it("find in batches", async () => {
-    class FibAuthor extends Base {
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    class FibPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(FibAuthor);
-    registerModel(FibPost);
-    const author = await FibAuthor.create({ name: "Writer" });
-    for (let i = 0; i < 5; i++) {
-      await FibPost.create({ author_id: author.id, title: `Post ${i}`, body: "body" });
-    }
-    const allPosts = await FibPost.where({ author_id: author.id });
-    expect(allPosts).toHaveLength(5);
-  });
-  it("find all sanitized", async () => {
-    const author = await HmAuthor.create({ name: "Alice" });
-    await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    await HmPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await author.posts;
-    expect(posts.length).toBe(2);
-  });
-  it("find first sanitized", async () => {
-    const author = await HmAuthor.create({ name: "Alice" });
-    await HmPost.create({ author_id: author.id, title: "First", body: "body" });
-    const posts = await author.posts;
-    expect(posts[0]).toBeDefined();
-  });
-  it("find first after reset scope", async () => {
-    class ResetAuthor extends Base {
-      declare reset_posts: AssociationProxy<ResetPost>;
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("reset_posts", {
-          className: "ResetPost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class ResetPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(ResetAuthor);
-    registerModel(ResetPost);
-    const author = await ResetAuthor.create({ name: "Alice" });
-    await ResetPost.create({ author_id: author.id, title: "First", body: "body" });
-    const posts = await author.reset_posts;
-    expect(posts[0]).toBeDefined();
-    expect((posts[0] as any).title).toBe("First");
-  });
-  it("find first after reload", async () => {
-    class ReloadAuthor extends Base {
-      declare reload_posts: AssociationProxy<ReloadPost>;
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("reload_posts", {
-          className: "ReloadPost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class ReloadPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(ReloadAuthor);
-    registerModel(ReloadPost);
-    const author = await ReloadAuthor.create({ name: "Alice" });
-    await ReloadPost.create({ author_id: author.id, title: "First", body: "body" });
-    const posts1 = await author.reload_posts;
-    expect(posts1[0]).toBeDefined();
-    const posts2 = await author.reload_posts;
-    expect(posts2[0]).toBeDefined();
-    expect((posts2[0] as any).title).toBe("First");
-  });
   it("reload with query cache", async () => {
     class ReloadQcAuthor extends Base {
       declare name: string | null;
@@ -2437,31 +2415,6 @@ describe("HasManyAssociationsTest", () => {
         .where({ "audit_logs.message": null, name: "Smith" })
         .toArray(),
     ).resolves.not.toThrow();
-  });
-  it("find grouped", async () => {
-    const author = await HmAuthor.create({ name: "Alice" });
-    await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    await HmPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await author.posts;
-    const groups: Record<string, any[]> = {};
-    for (const p of posts) {
-      const title = (p as any).title;
-      if (!groups[title]) groups[title] = [];
-      groups[title].push(p);
-    }
-    expect(Object.keys(groups).length).toBe(2);
-    expect(groups["A"].length).toBe(2);
-    expect(groups["B"].length).toBe(1);
-  });
-  it("find scoped grouped", async () => {
-    const author = await HmAuthor.create({ name: "Alice" });
-    await HmPost.create({ author_id: author.id, title: "X", body: "body" });
-    await HmPost.create({ author_id: author.id, title: "X", body: "body" });
-    await HmPost.create({ author_id: author.id, title: "Y", body: "body" });
-    const posts = await author.posts;
-    const xPosts = posts.filter((p: any) => p.title === "X");
-    expect(xPosts.length).toBe(2);
   });
   it("default select", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
