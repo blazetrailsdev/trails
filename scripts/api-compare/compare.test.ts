@@ -1792,7 +1792,6 @@ describe("dedupeRubyMethodInto", () => {
     });
   });
   it("keeps a class method and an instance method of one name as two rows", () => {
-    // attribute_methods.rb:224 (ClassMethods) and :499 (instance) are two methods.
     const seen = new Map<string, SeenRubyMethod>();
     dedupeRubyMethodInto(seen, rm("attribute_method?"), "ActiveRecord::AttributeMethods");
     dedupeRubyMethodInto(
@@ -1807,8 +1806,6 @@ describe("dedupeRubyMethodInto", () => {
   });
 
   it("scores a ClassMethods fold once, whether seen on the parent or the submodule", () => {
-    // collectRubyEntities folds `Foo::ClassMethods#bar` into `Foo`'s class
-    // methods; either sighting is the class seat, so it is one row.
     const seen = new Map<string, SeenRubyMethod>();
     dedupeRubyMethodInto(seen, rm("bar"), "Foo", undefined, true);
     dedupeRubyMethodInto(seen, rm("bar"), "Foo::ClassMethods");
@@ -1816,8 +1813,6 @@ describe("dedupeRubyMethodInto", () => {
   });
 
   it("scores an `extend self` module's method once", () => {
-    // The extractor records an `extend self` module's `def foo` as an instance
-    // method only, so it stays one instance row however the port seats it.
     const seen = new Map<string, SeenRubyMethod>();
     dedupeRubyMethodInto(seen, rm("foo"), "Mod");
     dedupeRubyMethodInto(seen, rm("foo"), "Mod");
