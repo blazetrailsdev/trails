@@ -117,7 +117,7 @@ describe("ConfirmationValidationTest", () => {
 
   it("does not override confirmation writer if present", () => {
     class Klass extends Model {
-      set titleConfirmation(_value: string) {
+      set titleConfirmation(value: string) {
         (this as { _titleConfirmation?: string })._titleConfirmation = "expected title";
       }
 
