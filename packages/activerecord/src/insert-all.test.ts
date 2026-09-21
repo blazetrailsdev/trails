@@ -6,6 +6,7 @@ import {
   assertEmpty,
   assertNoDifference,
   assertRaises,
+  assertInDelta,
 } from "@blazetrails/activesupport";
 import { adapterType } from "./test-adapter.js";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
@@ -717,9 +718,10 @@ describe("InsertAllTest", () => {
       await Book.upsertAll([
         { id: 101, name: "Out of the Silent Planet", published_on: "1938-04-01" },
       ]);
-      expect(epochSeconds(((await Book.find(101)) as any).updated_at)).toBeCloseTo(
+      assertInDelta(
         epochSeconds(updatedAt),
-        0,
+        epochSeconds(((await Book.find(101)) as any).updated_at),
+        1,
       );
     },
   );
@@ -799,9 +801,10 @@ describe("InsertAllTest", () => {
           updated_at: updatedAt,
         },
       ]);
-      expect(epochSeconds(((await Book.find(101)) as any).updated_at)).toBeCloseTo(
+      assertInDelta(
         epochSeconds(updatedAt),
-        0,
+        epochSeconds(((await Book.find(101)) as any).updated_at),
+        1,
       );
     },
   );

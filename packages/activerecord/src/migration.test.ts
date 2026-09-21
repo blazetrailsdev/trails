@@ -8,6 +8,7 @@ import {
   camelize,
   assertNothingRaised,
   assertRaises,
+  assertInDelta,
 } from "@blazetrails/activesupport";
 import { Base, Migrator, RecordNotUnique, Rollback, StatementInvalid } from "./index.js";
 import { SchemaMigration } from "./schema-migration.js";
@@ -78,9 +79,10 @@ function checkValueOfE(valueOfE: unknown, typeRegistryKey: string | null): void 
     expect((valueOfE as BigDecimal).toString("F")).toBe("2.7182818284590452353602875");
   } else if (typeRegistryKey === "sqlite3") {
     expect(valueOfE).toBeInstanceOf(BigDecimal);
-    expect(Number((valueOfE as BigDecimal).toString("F"))).toBeCloseTo(
+    assertInDelta(
       2.71828182845905,
-      -Math.log10(2 * 0.00000000000001),
+      Number((valueOfE as BigDecimal).toString("F")),
+      0.00000000000001,
     );
   } else {
     expect(Object(valueOfE)).toBeInstanceOf(Number);
