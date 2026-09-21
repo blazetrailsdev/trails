@@ -2994,6 +2994,17 @@ export function includerAdmitsOnLevel(
   return declared === "neutral" && !neutralTaken;
 }
 
+/**
+ * The key a Ruby body is looked up by when one Ruby file defines a name more
+ * than once: its declaring owner AND its level. The `ClassMethods` fold puts
+ * `attribute_methods.rb`'s class `attribute_method?` (:224) and instance one
+ * (:499) on the same owner, so the owner alone would hand both matched pairs
+ * the first body.
+ */
+export function rubyBodyKey(owner: string, level: OwnerSeat, name: string): string {
+  return `${owner}\u0000${rubyLevelKey(level, name)}`;
+}
+
 /** One deduped Ruby method expected from a Ruby file (see `dedupeRubyMethodInto`). */
 export interface SeenRubyMethod {
   /** The seat Ruby defines it on — the other half of the dedup key. */
@@ -4038,6 +4049,9 @@ export function main() {
       // rubyOwnerSeat).
       const rubyKlassOwnerNames = new Set<string>();
       const ownerKey = (owner: string, name: string) => `${owner}\u0000${name}`;
+      const ownsBody = (name: string) =>
+        (rubyOwnersByName.get(name)?.size ?? 0) > 1 ||
+        (seen.has(rubyLevelKey("class", name)) && seen.has(rubyLevelKey("instance", name)));
       for (const item of items) {
         const f = flattenIncludedMethodInfos(item.info, item.fqn, rubyPkg, moduleFqnByShort, pkg);
         const rubyMethods = [...f.instance, ...f.klass];
@@ -4055,6 +4069,7 @@ export function main() {
           if (rm.reader) rubyReaderNames.add(ownerKey(item.fqn, rm.name));
           if (!methodMatchesMode(rm)) continue;
           dedupeRubyMethodInto(seen, rm, item.fqn, rubyFile, klassMethods.has(rm));
+          const rmLevel = rubyOwnerSeat(item.fqn, klassMethods.has(rm));
           if (!rubyParamsByName.has(rm.name)) {
             rubyParamsByName.set(rm.name, rm.params);
             if (isForwardingRubyEntry(rm)) rubyForwardingNames.add(rm.name);
@@ -4072,18 +4087,24 @@ export function main() {
             rubyWeakCallsByName.set(rm.name, rm.weakCalls ?? []);
             rubyCallReceiversByName.set(rm.name, rm.callReceivers ?? {});
           }
-          if (rm.calls && !rubyCallsByOwnerName.has(ownerKey(item.fqn, rm.name))) {
-            rubyCallsByOwnerName.set(ownerKey(item.fqn, rm.name), {
+          if (rm.calls && !rubyCallsByOwnerName.has(rubyBodyKey(item.fqn, rmLevel, rm.name))) {
+            rubyCallsByOwnerName.set(rubyBodyKey(item.fqn, rmLevel, rm.name), {
               calls: rm.calls,
               weak: rm.weakCalls ?? [],
               receivers: rm.callReceivers ?? {},
             });
           }
-          if (rm.callArgs && !rubyCallArgsByOwnerName.has(ownerKey(item.fqn, rm.name))) {
-            rubyCallArgsByOwnerName.set(ownerKey(item.fqn, rm.name), rm.callArgs);
+          if (
+            rm.callArgs &&
+            !rubyCallArgsByOwnerName.has(rubyBodyKey(item.fqn, rmLevel, rm.name))
+          ) {
+            rubyCallArgsByOwnerName.set(rubyBodyKey(item.fqn, rmLevel, rm.name), rm.callArgs);
           }
-          if (rm.skeleton && !rubySkeletonByOwnerName.has(ownerKey(item.fqn, rm.name))) {
-            rubySkeletonByOwnerName.set(ownerKey(item.fqn, rm.name), rm.skeleton);
+          if (
+            rm.skeleton &&
+            !rubySkeletonByOwnerName.has(rubyBodyKey(item.fqn, rmLevel, rm.name))
+          ) {
+            rubySkeletonByOwnerName.set(rubyBodyKey(item.fqn, rmLevel, rm.name), rm.skeleton);
           }
           if (rm.skeleton && !rubySkeletonByName.has(rm.name)) {
             rubySkeletonByName.set(rm.name, rm.skeleton);
@@ -4208,18 +4229,23 @@ export function main() {
       // (b) are absent from the TS body's call-set. A coarse body-fidelity
       // signal — never affects the parity %. Lossy: legitimate restructuring
       // (extracted helper, inlined call) shows up here, so it's advisory.
-      const checkCalls = (rubyName: string, tsName: string, tsFile: string, rubyModule: string) => {
+      const checkCalls = (
+        rubyName: string,
+        tsName: string,
+        tsFile: string,
+        rubyModule: string,
+        level: OwnerSeat,
+      ) => {
         // The call set is computed only under `--calls`, the mode that
         // writes and gates the artifact (see the artifact write below).
         if (!callsGate) return;
-        const rubyOwned =
-          (rubyOwnersByName.get(rubyName)?.size ?? 0) > 1
-            ? rubyCallsByOwnerName.get(ownerKey(rubyModule, rubyName))
-            : {
-                calls: rubyCallsByName.get(rubyName) ?? [],
-                weak: rubyWeakCallsByName.get(rubyName) ?? [],
-                receivers: rubyCallReceiversByName.get(rubyName) ?? {},
-              };
+        const rubyOwned = ownsBody(rubyName)
+          ? rubyCallsByOwnerName.get(rubyBodyKey(rubyModule, level, rubyName))
+          : {
+              calls: rubyCallsByName.get(rubyName) ?? [],
+              weak: rubyWeakCallsByName.get(rubyName) ?? [],
+              receivers: rubyCallReceiversByName.get(rubyName) ?? {},
+            };
         // A body whose every Ruby call is weak still gets compared:
         // significantMissingCalls returns empty for an empty `rubyCalls`, so the
         // pair is counted and found clean rather than leaving the population.
@@ -4291,10 +4317,9 @@ export function main() {
           negatedTsCalls,
           rubyOwned?.calls ?? rubyCalls,
         );
-        const rubySkeleton =
-          (rubyOwnersByName.get(rubyName)?.size ?? 0) > 1
-            ? rubySkeletonByOwnerName.get(ownerKey(rubyModule, rubyName))
-            : rubySkeletonByName.get(rubyName);
+        const rubySkeleton = ownsBody(rubyName)
+          ? rubySkeletonByOwnerName.get(rubyBodyKey(rubyModule, level, rubyName))
+          : rubySkeletonByName.get(rubyName);
         const tsSkeletons = tsSkeletonByFileName.get(tsFile)?.get(tsName);
         if (rubySkeleton !== undefined && tsSkeletons?.length === 1) {
           const tsSkeletonOf = (name: string) => {
@@ -4381,6 +4406,7 @@ export function main() {
         tsName: string,
         tsFile: string,
         rubyModule: string,
+        level: OwnerSeat,
       ) => {
         if (!callsGate) return;
         // Near the exclusion checkCalls makes through `dropWeakCalls`: a call on
@@ -4391,10 +4417,9 @@ export function main() {
         // only drop whole NAMES, but here a name that is weak at one site and a
         // genuine call at another would lose both sites to a name filter. See
         // {@link comparableRubySites} below for when a weak site is kept.
-        const rubyOwnSites =
-          (rubyOwnersByName.get(rubyName)?.size ?? 0) > 1
-            ? rubyCallArgsByOwnerName.get(ownerKey(rubyModule, rubyName))
-            : rubyCallArgsByName.get(rubyName);
+        const rubyOwnSites = ownsBody(rubyName)
+          ? rubyCallArgsByOwnerName.get(rubyBodyKey(rubyModule, level, rubyName))
+          : rubyCallArgsByName.get(rubyName);
         // Also dropped: a receiver-less zero-arg read of an `attr_reader` name.
         // Ruby spells such a read exactly like a call, so `if foreign_key`
         // (schema_definitions.rb:241) arrives as a second, zero-arg
@@ -4537,12 +4562,13 @@ export function main() {
         // guessed onto `abstract-renderer.ts` reported two). Parameter NAMES are
         // skipped for it; every other check still compares the pair.
         guessedFile = false,
+        level: OwnerSeat = rubyOwnerSeat(rubyModule, false),
       ) => {
         checkOptionKeys(rubyName, tsName, tsFile);
         checkLiterals(rubyName, tsName, tsFile);
         if (!skipCalls) {
-          checkCalls(rubyName, tsName, tsFile, rubyModule);
-          checkCallArgs(rubyName, tsName, tsFile, rubyModule);
+          checkCalls(rubyName, tsName, tsFile, rubyModule, level);
+          checkCallArgs(rubyName, tsName, tsFile, rubyModule, level);
         }
         checkBody(rubyName, tsName, tsFile);
         if (isArityOverridden(rubyName, rubyFile)) return;
@@ -4782,6 +4808,8 @@ export function main() {
             seam ||
               claimedByAnother ||
               writerPairedWithReader(rubyName, directMatch, siblingRubyNames),
+            false,
+            level,
           );
           continue;
         }
@@ -4833,6 +4861,8 @@ export function main() {
             foundViaInclude,
             rubyModule,
             writerPairedWithReader(rubyName, matchedCandidate!, siblingRubyNames),
+            false,
+            level,
           );
           moves.push({
             tsName: matchedCandidate!,
@@ -4877,7 +4907,15 @@ export function main() {
         );
         if (creditedToReopening) {
           fileMatched++;
-          checkArity(rubyName, creditedToReopening.tsName, creditedToReopening.tsFile, rubyModule);
+          checkArity(
+            rubyName,
+            creditedToReopening.tsName,
+            creditedToReopening.tsFile,
+            rubyModule,
+            false,
+            false,
+            level,
+          );
           moves.push({
             tsName: creditedToReopening.tsName,
             rubyName,
@@ -4905,7 +4943,15 @@ export function main() {
           const misplacedMatch = verdict.kind === "match" ? verdict.tsName : undefined;
           if (misplacedMatch) {
             fileMatched++;
-            checkArity(rubyName, misplacedMatch, misplacedActualFile!, rubyModule, false, true);
+            checkArity(
+              rubyName,
+              misplacedMatch,
+              misplacedActualFile!,
+              rubyModule,
+              false,
+              true,
+              level,
+            );
             moves.push({
               tsName: misplacedMatch,
               rubyName,

@@ -17,6 +17,7 @@ import {
   rubyLevelKey,
   tsDeclaresOnLevel,
   includerAdmitsOnLevel,
+  rubyBodyKey,
   type SeenRubyMethod,
   NAME_COLLISION_CLUSTERS,
   selectMisplacedFile,
@@ -1881,6 +1882,21 @@ describe("includerAdmitsOnLevel", () => {
     expect(
       includerAdmitsOnLevel(tsDeclaresOnLevel("class", owners(""), undefined, undefined), false),
     ).toBe(true);
+  });
+});
+
+describe("rubyBodyKey", () => {
+  it("keeps a folded ClassMethods body apart from the same owner's instance body", () => {
+    const owner = "ActiveRecord::AttributeMethods";
+    const bodies = new Map<string, string>();
+    bodies.set(rubyBodyKey(owner, "class", "attribute_method?"), "attribute_methods.rb:224");
+    bodies.set(rubyBodyKey(owner, "instance", "attribute_method?"), "attribute_methods.rb:499");
+    expect(bodies.get(rubyBodyKey(owner, "class", "attribute_method?"))).toBe(
+      "attribute_methods.rb:224",
+    );
+    expect(bodies.get(rubyBodyKey(owner, "instance", "attribute_method?"))).toBe(
+      "attribute_methods.rb:499",
+    );
   });
 });
 
