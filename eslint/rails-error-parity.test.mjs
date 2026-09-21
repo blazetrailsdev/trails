@@ -95,7 +95,13 @@ tester.run("rails-error-parity", rule, {
     // A root class may extend the ruby-compat port of its exact Ruby base.
     {
       filename: errorsFile,
-      code: nl("export class ActiveRecordError extends StandardError {}", AD, RNF, SI),
+      code: nl(
+        'import { StandardError } from "@blazetrails/ruby-compat";',
+        "export class ActiveRecordError extends StandardError {}",
+        AD,
+        RNF,
+        SI,
+      ),
     },
     // Throwing a ported error class is allowed.
     { filename: baseFile, code: `throw new RecordNotFound("nope");\n` },
@@ -142,6 +148,29 @@ tester.run("rails-error-parity", rule, {
       filename: baseFile,
       code: `throw new globalThis.Error("boom");\n`,
       errors: [{ messageId: "bareThrow" }],
+    },
+    // A same-named base not imported from ruby-compat is flagged.
+    {
+      filename: errorsFile,
+      code: nl(
+        "class StandardError {}",
+        "export class ActiveRecordError extends StandardError {}",
+        AD,
+        RNF,
+        SI,
+      ),
+      errors: [{ messageId: "rootExtends" }],
+    },
+    {
+      filename: errorsFile,
+      code: nl(
+        'import { StandardError } from "./local.js";',
+        "export class ActiveRecordError extends StandardError {}",
+        AD,
+        RNF,
+        SI,
+      ),
+      errors: [{ messageId: "rootExtends" }],
     },
     // Root class with no `extends` is not an Error subtype — flagged.
     {
