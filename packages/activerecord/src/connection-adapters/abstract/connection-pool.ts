@@ -1,4 +1,11 @@
-import { Fiber, isMonOwned, Mutex, synchronize, Thread } from "@blazetrails/ruby-compat";
+import {
+  Fiber,
+  isMonOwned,
+  Mutex,
+  RuntimeError,
+  synchronize,
+  Thread,
+} from "@blazetrails/ruby-compat";
 import { IsolatedExecutionState } from "@blazetrails/activesupport";
 import { NoMethodError } from "@blazetrails/activemodel";
 import { AsyncExecutor } from "../../ar-config.js";
@@ -496,7 +503,7 @@ export class ConnectionPool implements ReapablePool {
 
   async unpinConnectionBang(): Promise<boolean> {
     if (!this._pinnedConnection) {
-      throw new Error(`There isn't a pinned connection ${this.inspect()}`);
+      throw new RuntimeError(`There isn't a pinned connection ${this.inspect()}`);
     }
 
     let clean = true;

@@ -49,6 +49,21 @@ describe("TS extractor assertion-count collection", () => {
     expect(tsAssertionCounts(src)["inline assert local"]).toBe(1);
   });
 
+  it("counts an inline def-shaped assert* helper lexically and once per call site", () => {
+    const src = `
+      it("inline def", () => {
+        function assertEqualAfterSort(a, b) {
+          expect(a).toEqual(b);
+          expect(b).toEqual(a);
+        }
+        assertEqualAfterSort(x, y);
+        assertEqualAfterSort(y, z);
+        assertEqualAfterSort(z, x);
+      });
+    `;
+    expect(tsAssertionCounts(src)["inline def"]).toBe(5);
+  });
+
   it("still expands a helper declared outside the test body per call site", () => {
     const src = `
       describe("s", () => {

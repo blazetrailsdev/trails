@@ -524,7 +524,7 @@ describe("TransactionTest", () => {
         second.approved = false;
         await first.save();
         await second.save();
-        throw new Error("Bad things!");
+        throw new RuntimeError("Bad things!");
       });
     } catch {}
 
@@ -1560,11 +1560,11 @@ describe("TransactionTest", () => {
 
   it("raising does not materialize transaction", async () => {
     await assertNoQueries(false, async () => {
-      await expect(
+      await assertRaises([RuntimeError], {}, () =>
         Topic.transaction(async () => {
-          throw new Error("Expected");
+          throw new RuntimeError("Expected");
         }),
-      ).rejects.toThrow("Expected");
+      );
     });
   });
 

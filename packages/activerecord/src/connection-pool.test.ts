@@ -1,5 +1,5 @@
 import { it, expect, vi } from "vitest";
-import { Process, Thread, ThreadError } from "@blazetrails/ruby-compat";
+import { Process, RuntimeError, Thread, ThreadError } from "@blazetrails/ruby-compat";
 import {
   Notifications,
   assertRaise,
@@ -653,7 +653,7 @@ it("pin connection nesting", async () => {
   await pool.unpinConnectionBang();
   expect((await pool.leaseConnection()).currentTransaction()).toBeInstanceOf(NullTransaction);
 
-  await assertRaises([Error], { match: /There isn't a pinned connection/ }, () =>
+  await assertRaises([RuntimeError], { match: /There isn't a pinned connection/ }, () =>
     pool.unpinConnectionBang(),
   );
 });

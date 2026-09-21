@@ -62,7 +62,7 @@ import { Bird } from "./test-helpers/models/bird.js";
 import { LoosePerson, LooseDescendant } from "./test-helpers/models/person.js";
 import "./support/canonical-model-index.js";
 import { MultiparameterAssignmentErrors, type AttributeAssignmentError } from "./errors.js";
-import { Range as ArRange } from "@blazetrails/ruby-compat";
+import { Range as ArRange, RuntimeError } from "@blazetrails/ruby-compat";
 import { raiseOnAssignToAttrReadonly, setRaiseOnAssignToAttrReadonly } from "./active-record.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -215,9 +215,9 @@ describe("BasicsTest", () => {
 
     const adapter = Topic.connection as any;
     vi.spyOn(adapter, "internalSchemaCache", "get").mockImplementation(() => {
-      throw new Error("Some Error");
+      throw new RuntimeError("Some Error");
     });
-    await assertRaises([Error], {}, () => (Topic as any).columnsHash());
+    await assertRaises([RuntimeError], {}, () => (Topic as any).columnsHash());
     vi.restoreAllMocks();
 
     expect(((await Topic.first()) as any).content).toEqual(payload);
