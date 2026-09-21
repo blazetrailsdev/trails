@@ -3,6 +3,15 @@ import { describeIfPg, PostgreSQLAdapter, pgServerVersion } from "./test-helper.
 import { SchemaDumper } from "../../connection-adapters/abstract/schema-dumper.js";
 import { Base, Schema } from "../../index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
+import {
+  assert,
+  assertNotPredicate,
+  assertNothingRaised,
+  assertPredicate,
+  assertRaises,
+  isBlank,
+} from "@blazetrails/activesupport";
+import { StatementInvalid } from "../../errors.js";
 import { fixtures } from "../../test-fixtures.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
@@ -76,23 +85,23 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("PostgresqlEnumTest", () => {
     it("column", async () => {
-      const cols = await adapter.columns("postgresql_enums");
-      const col = cols.find((c) => c.name === "current_mood");
-      expect(col).toBeDefined();
-      expect(col!.type).toBe("enum");
-      expect(col!.sqlType).toBe("mood");
-      expect((col as any).array).toBeFalsy();
+      await PostgresqlEnum.loadSchema();
+      const column = PostgresqlEnum.columnsHash()["current_mood"] as any;
+      expect(column.type).toBe("enum");
+      expect(column.sqlType).toBe("mood");
+      assertNotPredicate(column, (c: any) => c.isArray());
+
+      const type = PostgresqlEnum.typeForAttribute("current_mood");
+      assertNotPredicate(type, (t: any) => t.isBinary());
     });
 
     it("enum defaults", async () => {
-      await adapter.execute(
-        `ALTER TABLE "postgresql_enums" ADD COLUMN "good_mood" mood DEFAULT 'happy'`,
-      );
+      await adapter.addColumn("postgresql_enums", "good_mood", "mood", { default: "happy" });
       void PostgresqlEnum.resetColumnInformation();
-      const cols = await adapter.columns("postgresql_enums");
-      const col = cols.find((c) => c.name === "good_mood");
-      expect(col).toBeDefined();
-      expect(col!.default).toBe("happy");
+      await PostgresqlEnum.loadSchema();
+
+      expect((PostgresqlEnum as any).columnDefaults["good_mood"]).toBe("happy");
+      expect((new PostgresqlEnum() as any).good_mood).toBe("happy");
     });
 
     it("enum mapping", async () => {
@@ -100,10 +109,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       const enumRecord = await PostgresqlEnum.first();
       expect((enumRecord as any).readAttribute("current_mood")).toBe("sad");
       (enumRecord as any).writeAttribute("current_mood", "happy");
-      const saved = await enumRecord!.save();
-      expect(saved).toBeTruthy();
-      await (enumRecord as any).reload();
-      expect((enumRecord as any).readAttribute("current_mood")).toBe("happy");
+      await enumRecord!.saveBang();
+
+      expect((await (enumRecord as any).reload()).readAttribute("current_mood")).toBe("happy");
     });
 
     it("invalid enum update", async () => {
@@ -116,9 +124,13 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("no oid warning", async () => {
       await adapter.execute(`INSERT INTO "postgresql_enums" VALUES (1, 'sad')`);
-      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const stderrOutput: string[] = [];
+      vi.spyOn(console, "warn").mockImplementation((...args) => {
+        stderrOutput.push(args.join(" "));
+      });
       await PostgresqlEnum.first();
-      expect(warn).not.toHaveBeenCalled();
+
+      assertPredicate(stderrOutput.join(""), isBlank);
     });
 
     it("enum type cast", async () => {
@@ -172,8 +184,12 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.addEnumValue("mood", "angry", { before: "ok" });
       await adapter.addEnumValue("mood", "nervous", { after: "ok" });
       await adapter.addEnumValue("mood", "glad");
-      await adapter.addEnumValue("mood", "glad", { ifNotExists: true });
-      await adapter.addEnumValue("mood", "curious", { ifNotExists: true });
+
+      await assertNothingRaised(async () => {
+        await adapter.addEnumValue("mood", "glad", { ifNotExists: true });
+        await adapter.addEnumValue("mood", "curious", { ifNotExists: true });
+      });
+
       const output = await dumpTableSchema(adapter, "postgresql_enums");
       expect(output).toContain(
         'await ctx.createEnum("mood", ["sad","angry","ok","nervous","happy","glad","curious"]);',
@@ -197,47 +213,57 @@ describeIfPg("PostgreSQLAdapter", () => {
           });
         });
       });
-      void PostgresqlEnum.resetColumnInformation();
-      const cols = await adapter.columns("postgresql_enums");
-      const col = cols.find((c) => c.name === "best_color");
-      expect(col).toBeDefined();
-      expect(col!.sqlType).toBe("color");
-      expect(col!.default).toBe("blue");
-      expect(col!.null).toBe(false);
+
+      assert(
+        await adapter.columnExists("postgresql_enums", "best_color", null, {
+          sqlType: "color",
+          default: "blue",
+          null: false,
+        } as never),
+      );
     });
 
     it("drop enum", async () => {
       await adapter.createEnum("unused", []);
-      await adapter.dropEnum("unused");
-      await expect(adapter.dropEnum("unused", { ifExists: true })).resolves.toBeUndefined();
-      await expect(adapter.dropEnum("unused")).rejects.toThrow();
+
+      await assertNothingRaised(async () => {
+        await adapter.dropEnum("unused");
+      });
+
+      await assertNothingRaised(async () => {
+        await adapter.dropEnum("unused", { ifExists: true });
+      });
+
+      await assertRaises([StatementInvalid], {}, async () => {
+        await adapter.dropEnum("unused");
+      });
     });
 
     it("works with activerecord enum", async () => {
-      let model = await PostgresqlEnum.create();
-      (model as any).currentMoodOkayBang();
-      await model.save();
+      let model = await PostgresqlEnum.createBang();
+      await (model as any).currentMoodOkayBang();
 
       model = (await PostgresqlEnum.find((model as any).id))!;
       expect((model as any).current_mood).toBe("okay");
 
       (model as any).current_mood = "happy";
-      await model.save();
+      await model.saveBang();
 
       model = (await PostgresqlEnum.find((model as any).id))!;
-      expect((model as any).isCurrentMoodHappy()).toBe(true);
+      assertPredicate(model, (m: any) => m.isCurrentMoodHappy());
     });
 
     it("enum type scoped to schemas", async () => {
       await withTestSchema(adapter, "test_schema", async () => {
         await adapter.createEnum("mood_in_other_schema", ["sad", "ok", "happy"]);
-        await adapter.execute(`
-          CREATE TABLE "postgresql_enums_in_other_schema" (
-            "id" SERIAL PRIMARY KEY,
-            "current_mood" mood_in_other_schema DEFAULT 'happy' NOT NULL
-          )
-        `);
-        expect(await adapter.dataSourceExists("postgresql_enums_in_other_schema")).toBe(true);
+
+        await assertNothingRaised(async () => {
+          await adapter.createTable("postgresql_enums_in_other_schema", (t) => {
+            t.column("current_mood", "mood_in_other_schema", { default: "happy", null: false });
+          });
+        });
+
+        assert(await adapter.tableExists("postgresql_enums_in_other_schema"));
       });
     });
 
@@ -246,19 +272,18 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.createSchema("test_schema");
       try {
         await adapter.createEnum("test_schema.mood_in_other_schema", ["sad", "ok", "happy"]);
-        await adapter.execute(`
-          CREATE TABLE "test_schema"."postgresql_enums_in_other_schema" (
-            "id" SERIAL PRIMARY KEY,
-            "current_mood" "test_schema"."mood_in_other_schema"
-          )
-        `);
-        expect(await adapter.dataSourceExists("test_schema.postgresql_enums_in_other_schema")).toBe(
-          true,
-        );
-        await expect(
-          adapter.dropTable("test_schema.postgresql_enums_in_other_schema"),
-        ).resolves.not.toThrow();
-        await expect(adapter.dropEnum("test_schema.mood_in_other_schema")).resolves.not.toThrow();
+
+        await adapter.createTable("test_schema.postgresql_enums_in_other_schema", (t) => {
+          t.column("current_mood", "test_schema.mood_in_other_schema");
+        });
+
+        assert(await adapter.tableExists("test_schema.postgresql_enums_in_other_schema"));
+
+        await assertNothingRaised(async () => {
+          // eslint-disable-next-line blazetrails/require-table-teardown -- the drop is under test; the finally drops the schema
+          await adapter.dropTable("test_schema.postgresql_enums_in_other_schema");
+          await adapter.dropEnum("test_schema.mood_in_other_schema");
+        });
       } finally {
         await adapter.dropSchema("test_schema", { ifExists: true });
       }
@@ -311,18 +336,25 @@ describeIfPg("PostgreSQLAdapter", () => {
               );
             });
 
-            const cols = await adapter.columns("postgresql_enums_in_test_schema");
-            const col = cols.find((c) => c.name === "current_mood");
-            expect(col).toBeDefined();
-            expect(col!.sqlType).toBe("mood_in_test_schema");
+            assert(
+              await adapter.columnExists("postgresql_enums_in_test_schema", "current_mood", null, {
+                sqlType: "mood_in_test_schema",
+              } as never),
+            );
           },
           { drop: false },
         );
 
-        const cols = await adapter.columns("test_schema.postgresql_enums_in_test_schema");
-        const col = cols.find((c) => c.name === "current_mood");
-        expect(col).toBeDefined();
-        expect(col!.sqlType).toBe("test_schema.mood_in_test_schema");
+        assert(
+          await adapter.columnExists(
+            "test_schema.postgresql_enums_in_test_schema",
+            "current_mood",
+            null,
+            {
+              sqlType: "test_schema.mood_in_test_schema",
+            } as never,
+          ),
+        );
       } finally {
         await adapter.dropSchema("test_schema", { ifExists: true });
       }

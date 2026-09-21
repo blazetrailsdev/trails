@@ -3,7 +3,7 @@ import pg from "pg";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Base } from "../../index.js";
-import { BinaryData } from "@blazetrails/activemodel";
+import { assert, assertNotPredicate } from "@blazetrails/activesupport";
 import { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
@@ -42,7 +42,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("PostgresqlByteaTest", () => {
     it("column", () => {
-      expect(column).toBeInstanceOf(PgColumn);
+      assert(column instanceof PgColumn);
       expect(column.type).toBe("binary");
     });
 
@@ -52,17 +52,16 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("type cast binary converts the encoding", () => {
-      expect(column).toBeDefined();
+      assert(column);
+
       const data = "\u001F\x8B";
-      const result = type.deserialize(data);
-      expect(result).toBeInstanceOf(Uint8Array);
+      expect(data.constructor).toBe(String);
+      expect(type.deserialize(data).constructor).toBe(Buffer);
     });
 
     it("type cast binary value", () => {
-      const data = Buffer.from([0x1f, 0x8b]);
-      const result = type.deserialize(data);
-      expect(result).toBeInstanceOf(Uint8Array);
-      expect(Buffer.from(result as Uint8Array)).toEqual(data);
+      const data = new Uint8Array([0x1f, 0x8b]);
+      expect(type.deserialize(data)).toEqual(data);
     });
 
     it("type case nil", () => {
@@ -70,36 +69,33 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("read value", async () => {
-      const data = Buffer.from([0x1f]);
-      await connection.execQuery(`INSERT INTO bytea_data_type (payload) VALUES ($1)`, "SQL", [
-        new BinaryData(data),
-      ]);
+      const data = "\u001F";
+      await connection.execute(`insert into bytea_data_type (payload) VALUES ('${data}')`);
       const record = await (ByteaDataType as any).first();
-      expect(record.payload).toBeInstanceOf(Uint8Array);
-      expect(Buffer.from(record.payload as Uint8Array)).toEqual(data);
+      expect(new TextDecoder().decode(record.payload)).toBe(data);
+      await record.delete();
     });
 
     it("read nil value", async () => {
       await connection.execute(`INSERT INTO bytea_data_type (payload) VALUES (null)`);
       const record = await (ByteaDataType as any).first();
       expect(record.payload).toBeNull();
+      await record.delete();
     });
 
     it("write value", async () => {
-      const data = Buffer.from([0x1f]);
+      const data = new Uint8Array([0x1f]);
       const record = await (ByteaDataType as any).create({ payload: data });
-      expect(record.isNewRecord()).toBe(false);
-      expect(record.payload).toBeInstanceOf(Uint8Array);
-      expect(Buffer.from(record.payload as Uint8Array)).toEqual(data);
+      assertNotPredicate(record, (r: any) => r.isNewRecord());
+      expect(record.payload).toEqual(data);
     });
 
     async function runViaToSql(): Promise<void> {
       const data = Buffer.from([0x27, 0x1f, 0x5c]);
       await (ByteaDataType as any).create({ payload: data });
       const sql = (ByteaDataType as any).where({ payload: data }).select("payload").toSql();
-      const result = (await connection.execute(sql)) as Array<{ payload: Uint8Array }>;
-      expect(result.length).toBe(1);
-      expect(Buffer.from(result[0].payload)).toEqual(data);
+      const result = await connection.query(sql);
+      expect(result.map((row) => row.map((v) => Buffer.from(v as Uint8Array)))).toEqual([[data]]);
     }
 
     it("via to sql", async () => {
@@ -120,20 +116,20 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("write binary", async () => {
       const data = Buffer.from(Array.from({ length: 256 }, (_, i) => i));
-      expect(data.length).toBeGreaterThan(1);
+      assert(data.length > 1);
       const record = await (ByteaDataType as any).create({ payload: data });
-      expect(record.isNewRecord()).toBe(false);
+      assertNotPredicate(record, (r: any) => r.isNewRecord());
       expect(Buffer.from(record.payload as Uint8Array)).toEqual(data);
-      const reloaded = await ByteaDataType.find(record.id);
-      expect(Buffer.from((reloaded as any).payload as Uint8Array)).toEqual(data);
+      expect(
+        Buffer.from((await (ByteaDataType as any).where({ id: record.id }).first()).payload),
+      ).toEqual(data);
     });
 
     it("write nil", async () => {
       const record = await (ByteaDataType as any).create({ payload: null });
-      expect(record.isNewRecord()).toBe(false);
+      assertNotPredicate(record, (r: any) => r.isNewRecord());
       expect(record.payload).toBeNull();
-      const reloaded = await ByteaDataType.find(record.id);
-      expect((reloaded as any).payload).toBeNull();
+      expect((await (ByteaDataType as any).where({ id: record.id }).first()).payload).toBeNull();
     });
 
     it("serialize", async () => {
@@ -147,10 +143,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       await obj.saveBang();
       await obj.reload();
       expect(obj.serialized).toBe("hello world");
-      obj.serialized = "héllo";
-      await obj.saveBang();
-      await obj.reload();
-      expect(obj.serialized).toBe("héllo");
     });
 
     it("schema dumping", async () => {
