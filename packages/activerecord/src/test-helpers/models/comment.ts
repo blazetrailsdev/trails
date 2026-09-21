@@ -101,6 +101,11 @@ export class Comment extends Base {
     this.hasMany("ratings");
     this.belongsTo("firstPost", { foreignKey: "post_id" });
     this.belongsTo("specialPostWithDefaultScope", { foreignKey: "post_id" });
+
+    this.hasOne("postWithInverse", (q: any, comment: any) => q.where({ id: comment.post_id }), {
+      className: "FirstPost",
+      inverseOf: "commentWithInverse",
+    });
     this.hasMany("children", { className: "Comment", inverseOf: "parent" });
     this.belongsTo("parent", {
       className: "Comment",
@@ -145,6 +150,8 @@ export interface Comment {
   get company(): Company | null | Promise<Company | null>;
   set company(value: Company | null);
   get firstPost(): FirstPost | null | Promise<FirstPost | null>;
+  get postWithInverse(): FirstPost | null | Promise<FirstPost | null>;
+  set postWithInverse(value: FirstPost | null);
   set firstPost(value: FirstPost | null);
   get parent(): Comment | null | Promise<Comment | null>;
   set parent(value: Comment | null);
