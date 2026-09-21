@@ -40,7 +40,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   beforeAll(async () => {
     adapter = Base.connection as PostgreSQLAdapter;
     await adapter.enableExtension("uuid-ossp");
-    await adapter.enableExtension("pgcrypto");
+    if (await adapter.supportsPgcryptoUuid()) await adapter.enableExtension("pgcrypto");
   });
 
   beforeEach(async () => {
@@ -764,7 +764,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("schema dumper for uuid primary key default", async () => {
       const schema = await dumpTableSchema(adapter, "pg_uuids_3");
-      // eslint-disable-next-line blazetrails/no-conditional-in-test -- mirrors uuid_test.rb:280
+      // eslint-disable-next-line blazetrails/no-conditional-in-test -- uuid_test.rb:289 branches on supports_pgcrypto_uuid? and parity:test counts both arms
       if (supportsPgcryptoUuid) {
         expect(schema).toMatch(
           /\bcreateTable\("pg_uuids_3", \{ id: "uuid", default: \(\) => "gen_random_uuid\(\)"/,
