@@ -245,4 +245,46 @@ describe("assertionValueMismatch", () => {
       ),
     ).toBeNull();
   });
+
+  it("folds a trails schema-dump statement onto the Rails DSL line", () => {
+    expect(
+      assertionValueMismatch(
+        ["assert_includes", "assert_includes"],
+        [
+          's:create_enum "mood", ["sad", "ok", "happy"]',
+          's:t.enum "good_mood", null: false, enum_type: "mood"',
+        ],
+        ["toContain", "toContain"],
+        [
+          's:await ctx.createEnum("mood", ["sad","ok","happy"]);',
+          's:t.enum("good_mood", { null: false, enumType: "mood" })',
+        ],
+        false,
+      ),
+    ).toBeNull();
+  });
+
+  it("still flags a folded dump statement whose values differ", () => {
+    expect(
+      assertionValueMismatch(
+        ["assert_includes"],
+        ['s:create_enum "mood", ["sad", "ok"]'],
+        ["toContain"],
+        ['s:await ctx.createEnum("mood", ["sad","okay"]);'],
+        false,
+      ),
+    ).not.toBeNull();
+  });
+
+  it("folds a dumped comment and an unterminated dump-call prefix", () => {
+    expect(
+      assertionValueMismatch(
+        ["assert_includes", "assert_not_includes"],
+        ["s:# Note", 's:create_enum "other_schema.mood"'],
+        ["toContain", "not.toContain"],
+        ["s:// Note", 's:await ctx.createEnum("other_schema.mood"'],
+        false,
+      ),
+    ).toBeNull();
+  });
 });

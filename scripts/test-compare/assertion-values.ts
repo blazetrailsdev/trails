@@ -109,7 +109,7 @@ function collectSide(
     const value = values?.[i];
     if (value != null) {
       if (LOOSE_RAILS_KINDS.has(kinds[i])) entry.loose.add(entry.captured.length);
-      entry.captured.push(foldNameToken(foldSymbolToken(value)));
+      entry.captured.push(foldNameToken(foldDumpStatementToken(foldSymbolToken(value))));
     }
   }
   return map;
@@ -126,6 +126,33 @@ function collectSide(
  */
 function foldSymbolToken(token: string): string {
   return token.startsWith("s::") ? `s:${token.slice(3)}` : token;
+}
+
+/**
+ * Fold a trails schema-dump line onto the Ruby DSL line Rails dumps. The trails
+ * SchemaDumper writes a TS schema file where Rails' writes `schema.rb`, so the
+ * same dumped statement is `await ctx.createEnum("mood", ["sad","ok"]);` /
+ * `t.enum("current_mood", { enumType: "mood" })` on the trails side and
+ * `create_enum "mood", ["sad", "ok"]` / `t.enum "current_mood", enum_type: "mood"`
+ * on the Rails side (activerecord/test/cases/adapters/postgresql/enum_test.rb:108-117),
+ * and a dumped `// ` comment is Ruby's `# `. That is the dump file's host
+ * language, not a fidelity divergence. The fold turns a `ctx.` / `t.` call's
+ * parentheses into Ruby's bare call (an unterminated prefix such as
+ * `await ctx.createEnum("x"` folds too, for `assert_not_includes` at
+ * enum_test.rb:254), unwraps a trailing options object into kwargs and spaces
+ * a string array's commas as Ruby's `inspect` does; foldNameToken then aligns
+ * `create_enum` / `enum_type`. Ruby tokens never carry either prefix, so they
+ * pass through untouched.
+ */
+const DUMP_STATEMENT_RE =
+  /^s:(?:await ctx\.|(?=t\.))((?:t\.)?[A-Za-z_][A-Za-z0-9_]*)\((.*?)(?:\);?)?$/s;
+
+function foldDumpStatementToken(token: string): string {
+  if (token.startsWith("s:// ")) return `s:# ${token.slice(5)}`;
+  const match = DUMP_STATEMENT_RE.exec(token);
+  if (!match) return token;
+  const args = match[2].replace(/, \{ (.*) \}$/s, ", $1").replace(/",(?=")/g, '", ');
+  return `s:${match[1]} ${args}`;
 }
 
 /**
