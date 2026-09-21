@@ -1759,8 +1759,8 @@ export class AbstractAdapter implements Quoting {
     checkVersionMixin.call(this as any);
   }
 
-  async schemaVersion(): Promise<number> {
-    return 0;
+  async schemaVersion(): Promise<number | undefined> {
+    return (this.pool as ConnectionPool).migrationContext.currentVersion();
   }
 
   static validateDefaultTimezone(config: unknown): string | undefined {
