@@ -40,8 +40,8 @@ export class UniquenessValidator extends EachValidator {
         scopeRepr = String(options.scope);
       }
       throw new ArgumentError(
-        `${scopeRepr} is not a supported format for :scope option. ` +
-          "Pass a string or an array of strings instead.",
+        `${scopeRepr} is not supported format for :scope option. ` +
+          "Pass a symbol or an array of symbols instead: `scope: :user_id`",
       );
     }
     if (

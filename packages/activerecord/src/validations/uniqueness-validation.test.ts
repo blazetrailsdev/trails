@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { Base } from "../index.js";
+import { Base, StatementInvalid, UnknownPrimaryKey, ValueTooLong } from "../index.js";
 import { registerModel } from "../associations.js";
 import { registerSubclass } from "../inheritance.js";
 import { adapterType } from "../test-adapter.js";
@@ -17,8 +17,15 @@ import { Author } from "../test-helpers/models/author.js";
 import { Person } from "../test-helpers/models/person.js";
 import { Essay } from "../test-helpers/models/essay.js";
 import { CpkAuthor, CpkBook } from "../test-helpers/models/cpk.js";
+import { UuidItem, UuidValidatingItem } from "../test-helpers/models/uuid-item.js";
 import "../support/canonical-model-index.js";
 import { Range } from "@blazetrails/ruby-compat";
+import {
+  assertChanges,
+  assertEmpty,
+  assertNothingRaised,
+  assertRaises,
+} from "@blazetrails/activesupport";
 
 const INT_MAX_VALUE = 2147483647;
 
@@ -141,7 +148,7 @@ describe("UniquenessValidationTest", () => {
 
     Topic.validatesUniquenessOf("title");
     const t2 = new Topic({ title: "abc" });
-    expect(await t2.save()).toBeFalsy();
+    expect(await t2.isValid()).toBeFalsy();
   });
 
   it("validate uniqueness with alias attribute", async () => {
@@ -158,6 +165,7 @@ describe("UniquenessValidationTest", () => {
     expect(await t.save()).toBeTruthy();
 
     const t2 = new Topic({ title: null });
+    expect(await t2.isValid()).toBeFalsy();
     expect(await t2.save()).toBeFalsy();
     expect(t2.errors.messagesFor("title")).toEqual(["has already been taken"]);
   });
@@ -220,12 +228,17 @@ describe("UniquenessValidationTest", () => {
 
     r2.writeAttribute("content", "something else");
     expect(await r2.save()).toBeTruthy();
+
+    const t2 = await Topic.create({ title: "I'm unique too!" });
+    const r3 = await (t2 as any).replies.create({ title: "r3", content: "hello world" });
+    expect(r3.isPersisted()).toBeTruthy();
   });
 
-  it("validate uniqueness with scope invalid syntax", () => {
-    expect(() => {
+  it("validate uniqueness with scope invalid syntax", async () => {
+    const error = await assertRaises([ArgumentError], {}, () => {
       Reply.validatesUniquenessOf("content", { scope: { parent_id: false } as any });
-    }).toThrow(ArgumentError);
+    });
+    expect(error.message).toMatch(/Pass a symbol or an array of symbols instead/);
   });
 
   it("validate uniqueness with object scope", async () => {
@@ -354,22 +367,34 @@ describe("UniquenessValidationTest", () => {
     expect(await t.save()).toBeTruthy();
 
     const t2 = new Topic({ title: "I'm UNIQUE!", parent_id: 1 });
+    expect(await t2.isValid()).toBeFalsy();
     expect(await t2.save()).toBeFalsy();
-    expect(t2.errors.messagesFor("title").length).toBeGreaterThan(0);
-    expect(t2.errors.messagesFor("parent_id").length).toBeGreaterThan(0);
+    expect(t2.errors.messagesFor("title").length > 0).toBeTruthy();
+    expect(t2.errors.messagesFor("parent_id").length > 0).toBeTruthy();
     expect(t2.errors.messagesFor("title")).toEqual(["has already been taken"]);
 
     t2.writeAttribute("title", "I'm truly UNIQUE!");
+    expect(await t2.isValid()).toBeFalsy();
     expect(await t2.save()).toBeFalsy();
-    expect(t2.errors.messagesFor("title")).toEqual([]);
-    expect(t2.errors.messagesFor("parent_id").length).toBeGreaterThan(0);
+    assertEmpty(t2.errors.messagesFor("title"));
+    expect(t2.errors.messagesFor("parent_id").length > 0).toBeTruthy();
 
     t2.writeAttribute("parent_id", 4);
     expect(await t2.save()).toBeTruthy();
 
     t2.writeAttribute("parent_id", null);
     t2.writeAttribute("title", null);
+    expect(await t2.isValid()).toBeTruthy();
     expect(await t2.save()).toBeTruthy();
+
+    const tUtf8 = new Topic({ title: "Я тоже уникальный!" });
+    expect(await tUtf8.save()).toBeTruthy();
+
+    if (adapterType !== "sqlite") {
+      const t2Utf8 = new Topic({ title: "я тоже УНИКАЛЬНЫЙ!" });
+      expect(await t2Utf8.isValid()).toBeFalsy();
+      expect(await t2Utf8.save()).toBeFalsy();
+    }
   });
 
   it("validate uniqueness of with multiple attributes and array forms", async () => {
@@ -428,14 +453,27 @@ describe("UniquenessValidationTest", () => {
     Topic.validatesUniquenessOf("author_email_address");
 
     const topic1 = new Topic({ author_email_address: "david@loudthinking.com" });
+    const topic2 = new Topic({ author_email_address: "David@loudthinking.com" });
 
     expect(await Topic.where({ author_email_address: "david@loudthinking.com" }).count()).toBe(1);
 
+    expect(await topic1.isValid()).toBeFalsy();
     expect(await topic1.save()).toBeFalsy();
+
+    if (adapterType === "mysql") {
+      expect(await topic2.isValid()).toBeFalsy();
+      expect(await topic2.save()).toBeFalsy();
+    } else {
+      expect(await topic2.isValid()).toBeTruthy();
+      expect(await topic2.save()).toBeTruthy();
+    }
+
+    expect(await Topic.where({ author_email_address: "david@loudthinking.com" }).count()).toBe(1);
+    expect(await Topic.where({ author_email_address: "David@loudthinking.com" }).count()).toBe(1);
   });
 
   it("validate case sensitive uniqueness", async () => {
-    Topic.validatesUniquenessOf("title", { caseSensitive: true });
+    Topic.validatesUniquenessOf("title", { caseSensitive: true, allowNil: true });
 
     const t = new Topic({ title: "I'm unique!" });
     expect(await t.save()).toBeTruthy();
@@ -444,12 +482,18 @@ describe("UniquenessValidationTest", () => {
     expect(await t.save()).toBeTruthy();
 
     const t2 = new Topic({ title: "I'M UNIQUE!" });
+    expect(await t2.isValid()).toBeTruthy();
     expect(await t2.save()).toBeTruthy();
-    expect(t2.errors.messagesFor("title")).toEqual([]);
+    assertEmpty(t2.errors.messagesFor("title"));
+    assertEmpty(t2.errors.messagesFor("parent_id"));
+    expect(t2.errors.messagesFor("title")).not.toEqual(["has already been taken"]);
 
     const t3 = new Topic({ title: "I'M uNiQUe!" });
+    expect(await t3.isValid()).toBeTruthy();
     expect(await t3.save()).toBeTruthy();
-    expect(t3.errors.messagesFor("title")).toEqual([]);
+    assertEmpty(t3.errors.messagesFor("title"));
+    assertEmpty(t3.errors.messagesFor("parent_id"));
+    expect(t3.errors.messagesFor("title")).not.toEqual(["has already been taken"]);
   });
 
   it("validate case sensitive uniqueness with attribute passed as integer", async () => {
@@ -463,8 +507,8 @@ describe("UniquenessValidationTest", () => {
 
   it("validate uniqueness with non standard table names", async () => {
     const i1 = await WarehouseThing.create({ value: 1000 });
-    expect(i1.isPersisted()).toBeFalsy();
-    expect(i1.errors.messagesFor("value").length).toBeGreaterThan(0);
+    expect(await i1.isValid()).toBeFalsy();
+    expect(i1.errors.messagesFor("value").length > 0).toBeTruthy();
   });
 
   it("validates uniqueness inside scoping", async () => {
@@ -482,56 +526,65 @@ describe("UniquenessValidationTest", () => {
     try {
       const g = new Guid();
       g.writeAttribute("key", "foo");
-      let raised = false;
-      try {
-        await g.isValid();
-      } catch {
-        raised = true;
-      }
-      expect(raised).toBeFalsy();
+      await assertNothingRaised(async () => !(await g.isValid()));
     } finally {
       Guid.clearValidatorsBang();
     }
   });
 
-  const limitTest = (longTitle: string) =>
-    adapterType === "sqlite"
-      ? async () => {
-          const e1 = await Event.create({ title: longTitle });
-          expect(e1.isPersisted()).toBeTruthy();
+  it("validate uniqueness with limit", async () => {
+    if (adapterType === "sqlite") {
+      const e1 = await Event.create({ title: "abcdefgh" });
+      expect(await e1.isValid()).toBeTruthy();
 
-          const e2 = await Event.create({ title: longTitle });
-          expect(e2.isPersisted()).toBeFalsy();
-        }
-      : async () => {
-          await expect(Event.create({ title: longTitle })).rejects.toThrow();
-        };
+      const e2 = await Event.create({ title: "abcdefgh" });
+      expect(await e2.isValid()).toBeFalsy();
+    } else if (adapterType === "mysql" || adapterType === "postgres") {
+      await expect(Event.create({ title: "abcdefgh" })).rejects.toThrow(ValueTooLong);
+    } else {
+      await expect(Event.create({ title: "abcdefgh" })).rejects.toThrow(StatementInvalid);
+    }
+  });
 
-  it("validate uniqueness with limit", limitTest("abcdefgh"));
+  it("validate uniqueness with limit and utf8", async () => {
+    if (adapterType === "sqlite") {
+      const e1 = await Event.create({ title: "一二三四五六七八" });
+      expect(await e1.isValid()).toBeTruthy();
 
-  it("validate uniqueness with limit and utf8", limitTest("一二三四五六七八"));
+      const e2 = await Event.create({ title: "一二三四五六七八" });
+      expect(await e2.isValid()).toBeFalsy();
+    } else if (adapterType === "mysql" || adapterType === "postgres") {
+      await expect(Event.create({ title: "一二三四五六七八" })).rejects.toThrow(ValueTooLong);
+    } else {
+      await expect(Event.create({ title: "一二三四五六七八" })).rejects.toThrow(StatementInvalid);
+    }
+  });
 
   it("validate straight inheritance uniqueness", async () => {
     const w1 = await IneptWizard.create({ name: "Rincewind", city: "Ankh-Morpork" });
-    expect(w1.isPersisted()).toBeTruthy();
+    expect(await w1.isValid()).toBeTruthy();
 
     const w2 = new IneptWizard({ name: "Rincewind", city: "Quirm" });
-    expect(await w2.save()).toBeFalsy();
+    expect(await w2.isValid()).toBeFalsy();
+    expect(w2.errors.messagesFor("name").length > 0).toBeTruthy();
     expect(w2.errors.messagesFor("name")).toEqual(["has already been taken"]);
 
     const w3 = new Conjurer({ name: "Rincewind", city: "Quirm" });
-    expect(await w3.save()).toBeFalsy();
+    expect(await w3.isValid()).toBeFalsy();
+    expect(w3.errors.messagesFor("name").length > 0).toBeTruthy();
     expect(w3.errors.messagesFor("name")).toEqual(["has already been taken"]);
 
     const w4 = await Conjurer.create({ name: "The Amazing Bonko", city: "Quirm" });
-    expect(w4.isPersisted()).toBeTruthy();
+    expect(await w4.isValid()).toBeTruthy();
 
     const w5 = new Thaumaturgist({ name: "The Amazing Bonko", city: "Lancre" });
-    expect(await w5.save()).toBeFalsy();
+    expect(await w5.isValid()).toBeFalsy();
+    expect(w5.errors.messagesFor("name").length > 0).toBeTruthy();
     expect(w5.errors.messagesFor("name")).toEqual(["has already been taken"]);
 
     const w6 = new Thaumaturgist({ name: "Mustrum Ridcully", city: "Quirm" });
-    expect(await w6.save()).toBeFalsy();
+    expect(await w6.isValid()).toBeFalsy();
+    expect(w6.errors.messagesFor("city").length > 0).toBeTruthy();
     expect(w6.errors.messagesFor("city")).toEqual(["has already been taken"]);
   });
 
@@ -570,10 +623,10 @@ describe("UniquenessValidationTest", () => {
     expect(await todays.save()).toBeTruthy();
 
     const duplicate = new Topic({ title: "Highlights of the Day", author_name: "A" });
-    expect(await duplicate.save()).toBeFalsy();
+    expect(await duplicate.isInvalid()).toBeTruthy();
 
     const other = new Topic({ title: "Highlights of the Day", author_name: "B" });
-    expect(await other.save()).toBeTruthy();
+    expect(await other.isValid()).toBeTruthy();
   });
 
   it("validate uniqueness on existing relation", async () => {
@@ -606,12 +659,15 @@ describe("UniquenessValidationTest", () => {
 
   it("validate uniqueness without primary key", async () => {
     const abc = await DashboardWithoutPrimaryKey.createBang({ dashboard_id: "abc" });
-    expect(await new DashboardWithoutPrimaryKey({ dashboard_id: "xyz" }).save()).toBeTruthy();
-    expect(await new DashboardWithoutPrimaryKey({ dashboard_id: "abc" }).save()).toBeFalsy();
+    expect(await new DashboardWithoutPrimaryKey({ dashboard_id: "xyz" }).isValid()).toBeTruthy();
+    expect(await new DashboardWithoutPrimaryKey({ dashboard_id: "abc" }).isValid()).toBeFalsy();
 
     abc.writeAttribute("dashboard_id", "def");
-    await expect(abc.saveBang()).rejects.toThrow(
-      /Unknown primary key for table dashboards in model[\s\S]*Cannot validate uniqueness for persisted record without primary key\.$/,
+
+    const e = await assertRaises([UnknownPrimaryKey], {}, () => abc.saveBang());
+    expect(e.message).toMatch(/^Unknown primary key for table dashboards in model/);
+    expect(e.message).toMatch(
+      /Cannot validate uniqueness for persisted record without primary key.$/,
     );
   });
 
@@ -623,6 +679,7 @@ describe("UniquenessValidationTest", () => {
 
     const id = t.readAttribute("id");
     t.writeAttribute("id", typeof id === "bigint" ? id + 1n : (id as number) + 1);
+    expect(await t.isValid()).toBeTruthy();
     expect(await t.save()).toBeTruthy();
   });
 
@@ -640,11 +697,22 @@ describe("UniquenessValidationTest", () => {
     }
   });
 
-  it.skipIf(adapterType !== "postgres")("validate uniqueness uuid", async () => {});
+  it.skipIf(adapterType !== "postgres")("validate uniqueness uuid", async () => {
+    const item = await UuidItem.createBang({ uuid: crypto.randomUUID(), title: "item1" });
+    await item.update({ title: "item1-title2" });
+    assertEmpty(item.errors);
+
+    const item2 = await UuidValidatingItem.createBang({
+      uuid: crypto.randomUUID(),
+      title: "item2",
+    });
+    await item2.update({ title: "item2-title2" });
+    assertEmpty(item2.errors);
+  });
 
   it("validate uniqueness regular id", async () => {
     const item = await CoolTopic.createBang({ title: "MyItem" });
-    expect(item.errors.empty).toBeTruthy();
+    assertEmpty(item.errors);
 
     const item2 = new CoolTopic({ id: (item as { id: number }).id, title: "MyItem2" });
     expect(await item2.save()).toBeFalsy();
@@ -893,10 +961,16 @@ describe("UniquenessWithCompositeKey", () => {
       revision: 37,
     });
 
-    expect(bookOne.readAttribute("revision")).not.toBe(bookTwo.readAttribute("revision"));
+    expect(bookOne.readAttribute("revision")).not.toEqual(bookTwo.readAttribute("revision"));
 
-    bookTwo.writeAttribute("revision", bookOne.readAttribute("revision"));
-    expect(await bookTwo.save()).toBeFalsy();
+    await assertChanges(
+      () => bookTwo.isValid(),
+      null,
+      { from: true, to: false },
+      () => {
+        bookTwo.writeAttribute("revision", bookOne.readAttribute("revision"));
+      },
+    );
   });
 });
 
