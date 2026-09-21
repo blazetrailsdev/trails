@@ -7,6 +7,11 @@ import { adapterType } from "./test-adapter.js";
 import { fixtures } from "./test-fixtures.js";
 import { itIfSupports } from "./support/supports.js";
 import { dumpTableSchema } from "./support/schema-dumping-helper.js";
+import { withTimezoneConfig } from "./test-helper.js";
+import { inTimeZone } from "./cases/helper.js";
+import { withPostgresqlDatetimeType } from "./support/with-postgresql-datetime-type.js";
+import { zone } from "@blazetrails/activesupport";
+import { inTimeZone as dateInTimeZone } from "@blazetrails/activesupport/core-ext/date-and-time/zones";
 
 function nsec(v: RubyTime): number {
   return v.nsec;
@@ -63,15 +68,19 @@ describe("DateTimePrecisionTest", () => {
     "datetime_with_precision",
     "no datetime precision isnt truncated on assignment",
     async () => {
-      await adapter.createTable("foos", { force: true }, (t) => {
-        t.datetime("happened_at");
-      });
+      await adapter.createTable("foos", { force: true }, () => {});
+      await adapter.addColumn("foos", "created_at", "datetime", { precision: null });
+      await adapter.addColumn("foos", "updated_at", "datetime");
       const Foo = makeFoo();
       await Foo.loadSchema();
-      expect((Foo.columnsHash() as any)["happened_at"].precision).toBe(6);
-      const time = Temporal.Instant.from("2000-01-01T12:00:00.123456789Z");
-      const foo = new Foo({ happened_at: time });
-      expect(nsec((foo as any).happened_at)).toBe(123456000);
+      const time = RubyTime.now().change({ nsec: 123 });
+      const foo = new Foo({ created_at: time, updated_at: time });
+      expect(nsec((foo as any).created_at)).toBe(123);
+      expect(nsec((foo as any).updated_at)).toBe(0);
+      await (foo as any).save();
+      await (foo as any).reload();
+      expect(nsec((foo as any).created_at)).toBe(0);
+      expect(nsec((foo as any).updated_at)).toBe(0);
     },
   );
 
@@ -121,7 +130,7 @@ describe("DateTimePrecisionTest", () => {
       await (Foo as any).create({ created_at: date, updated_at: date });
 
       const foo = await (Foo as any).findBy({ created_at: date });
-      expect(foo).not.toBeNull();
+      expect(foo).toBeTruthy();
       expect(await (Foo as any).where({ updated_at: date }).count()).toBe(1);
       expect((foo.created_at as RubyTime).toI()).toBe(date.toI());
       expect((foo.created_at as RubyTime).toS()).toBe(date.toS());
@@ -134,24 +143,89 @@ describe("DateTimePrecisionTest", () => {
   itIfSupports(
     "datetime_with_precision",
     "formatting datetime according to precision when time zone aware",
-    () => {
-      // BLOCKED: type — withTimezoneConfig helper exists (test-helper.ts) but
+    async () => {
+      await withTimezoneConfig(
+        { awareAttributes: true, zone: "Pacific Time (US & Canada)" },
+        async () => {
+          await adapter.createTable("foos", { force: true }, (t) => {
+            t.datetime("created_at", { precision: 0 });
+            t.datetime("updated_at", { precision: 4 });
+          });
+          const Foo = makeFoo();
+          await Foo.loadSchema();
+
+          const date = RubyTime.utc(2014, 8, 17, 12, 30, 0, 999999);
+          await (Foo as any).create({ created_at: date, updated_at: date });
+
+          const foo = await (Foo as any).findBy({ created_at: date });
+          expect(foo).toBeTruthy();
+          expect(await (Foo as any).where({ updated_at: date }).count()).toBe(1);
+          expect(foo.created_at.toI()).toBe(date.toI());
+          expect(foo.created_at.toString()).toBe(dateInTimeZone(date).toString());
+          expect(foo.updated_at.toString()).toBe(dateInTimeZone(date).toString());
+          expect(foo.created_at.usec).toBe(0);
+          expect(foo.updated_at.usec).toBe(999900);
+        },
+      );
     },
   );
 
   itIfSupports.skipIf(adapterType !== "postgres")(
     "datetime_with_precision",
     "formatting datetime according to precision using timestamptz",
-    () => {
-      // BLOCKED: adapter-pg — postgres-only (with_postgresql_datetime_type(:timestamptz))
+    async () => {
+      await withPostgresqlDatetimeType("timestamptz", async () => {
+        await adapter.createTable("foos", { force: true }, (t) => {
+          t.datetime("created_at", { precision: 0 });
+          t.datetime("updated_at", { precision: 4 });
+        });
+        const Foo = makeFoo();
+        await Foo.loadSchema();
+
+        const date = RubyTime.utc(2014, 8, 17, 12, 30, 0, 999999);
+        await (Foo as any).create({ created_at: date, updated_at: date });
+
+        const foo = await (Foo as any).findBy({ created_at: date });
+        expect(foo).toBeTruthy();
+        expect(await (Foo as any).where({ updated_at: date }).count()).toBe(1);
+        expect(foo.created_at.toI()).toBe(date.toI());
+        expect(foo.created_at.toS()).toBe(date.toS());
+        expect(foo.updated_at.toS()).toBe(date.toS());
+        expect(foo.created_at.usec).toBe(0);
+        expect(foo.updated_at.usec).toBe(999900);
+      });
     },
   );
 
   itIfSupports.skipIf(adapterType !== "postgres")(
     "datetime_with_precision",
     "formatting datetime according to precision when time zone aware using timestamptz",
-    () => {
-      // BLOCKED: adapter-pg — postgres-only + TimeZoneAware extension
+    async () => {
+      await withPostgresqlDatetimeType("timestamptz", async () => {
+        await withTimezoneConfig(
+          { awareAttributes: true, zone: "Pacific Time (US & Canada)" },
+          async () => {
+            await adapter.createTable("foos", { force: true }, (t) => {
+              t.datetime("created_at", { precision: 0 });
+              t.datetime("updated_at", { precision: 4 });
+            });
+            const Foo = makeFoo();
+            await Foo.loadSchema();
+
+            const date = RubyTime.utc(2014, 8, 17, 12, 30, 0, 999999);
+            await (Foo as any).create({ created_at: date, updated_at: date });
+
+            const foo = await (Foo as any).findBy({ created_at: date });
+            expect(foo).toBeTruthy();
+            expect(await (Foo as any).where({ updated_at: date }).count()).toBe(1);
+            expect(foo.created_at.toI()).toBe(date.toI());
+            expect(foo.created_at.toString()).toBe(dateInTimeZone(date).toString());
+            expect(foo.updated_at.toString()).toBe(dateInTimeZone(date).toString());
+            expect(foo.created_at.usec).toBe(0);
+            expect(foo.updated_at.usec).toBe(999900);
+          },
+        );
+      });
     },
   );
 
@@ -189,24 +263,50 @@ describe("DateTimePrecisionTest", () => {
   itIfSupports.skipIf(adapterType !== "postgres")(
     "datetime_with_precision",
     "writing a blank attribute timestamptz",
-    () => {
-      // BLOCKED: adapter-pg — postgres-only (with_postgresql_datetime_type(:timestamptz))
+    async () => {
+      await withPostgresqlDatetimeType("timestamptz", async () => {
+        await adapter.createTable("foos", { force: true }, (t) => {
+          t.datetime("happened_at");
+        });
+        const Foo = makeFoo();
+        await Foo.loadSchema();
+        expect((await (Foo as any).create({ happened_at: null })).happened_at).toBeNull();
+        expect((await (Foo as any).create({ happened_at: "" })).happened_at).toBeNull();
+      });
     },
   );
 
   itIfSupports.skipIf(adapterType !== "postgres")(
     "datetime_with_precision",
     "writing a date attribute timestamptz",
-    () => {
-      // BLOCKED: adapter-pg — postgres-only
+    async () => {
+      await withPostgresqlDatetimeType("timestamptz", async () => {
+        await adapter.createTable("foos", { force: true }, (t) => {
+          t.datetime("happened_at");
+        });
+        const Foo = makeFoo();
+        await Foo.loadSchema();
+        const date = Temporal.PlainDate.from("2001-02-03");
+        expect((await (Foo as any).create({ happened_at: date })).happened_at).toEqual(date);
+      });
     },
   );
 
   itIfSupports.skipIf(adapterType !== "postgres")(
     "datetime_with_precision",
     "writing a time with zone attribute timestamptz",
-    () => {
-      // BLOCKED: adapter-pg — postgres-only
+    async () => {
+      await withPostgresqlDatetimeType("timestamptz", async () => {
+        await adapter.createTable("foos", { force: true }, (t) => {
+          t.datetime("happened_at");
+        });
+        const Foo = makeFoo();
+        await Foo.loadSchema();
+        await inTimeZone("Pacific Time (US & Canada)", () => {
+          const time = zone()!.now();
+          expect((new Foo({ happened_at: time }) as any).happened_at.zone).toBe(time.zone);
+        });
+      });
     },
   );
 
@@ -218,8 +318,8 @@ describe("DateTimePrecisionTest", () => {
         t.timestamps({ precision: 6 });
       });
       const output = await dumpTableSchema(adapter, "foos");
-      expect(output).toMatch(/t\.datetime\("created_at",\s*\{[^}]*null:\s*false/);
-      expect(output).not.toMatch(/precision/);
+      expect(output).toMatch(/t\.datetime\("created_at",\s*\{\s*null:\s*false\s*\}\)/);
+      expect(output).toMatch(/t\.datetime\("updated_at",\s*\{\s*null:\s*false\s*\}\)/);
     },
   );
 
@@ -239,8 +339,17 @@ describe("DateTimePrecisionTest", () => {
   itIfSupports.skipIf(adapterType !== "postgres")(
     "datetime_with_precision",
     "datetime precision with zero should be dumped",
-    () => {
-      // BLOCKED: adapter-pg — postgres-only test (current_adapter?(:PostgreSQLAdapter))
+    async () => {
+      await adapter.createTable("foos", { force: true }, (t) => {
+        t.timestamps({ precision: 0 });
+      });
+      const output = await dumpTableSchema(adapter, "foos");
+      expect(output).toMatch(
+        /t\.datetime\("created_at",\s*\{\s*precision:\s*0,\s*null:\s*false\s*\}\)/,
+      );
+      expect(output).toMatch(
+        /t\.datetime\("updated_at",\s*\{\s*precision:\s*0,\s*null:\s*false\s*\}\)/,
+      );
     },
   );
 });
