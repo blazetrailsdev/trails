@@ -576,7 +576,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       assertNotPredicate(column, (c: PgColumn) => c.isArray());
 
       const type = UUIDType.typeForAttribute("guid");
-      assertNotPredicate(type, (t: { isBinary(): boolean }) => t.isBinary());
+      assertNotPredicate(type, (t) => t?.isBinary());
     });
 
     it("treat blank uuid as nil", () => {
