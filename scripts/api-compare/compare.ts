@@ -4167,6 +4167,7 @@ export function main() {
         tsName: string,
         tsFile: string,
         rubyModule: string,
+        level: OwnerSeat,
       ): {
         tsClass: string | undefined;
         ambiguous: boolean;
@@ -4178,9 +4179,9 @@ export function main() {
           tsBodylessOwnersByFileName.get(tsFile)?.get(tsName),
           tsBodiedOwnersByFileName.get(tsFile)?.get(tsName),
         );
-        const first = resolveOwnerIn(declared, rubyName, tsName, tsFile, rubyModule);
+        const first = resolveOwnerIn(declared, rubyName, tsName, tsFile, rubyModule, level);
         if (!first.ambiguous || bodied === declared) return { ...first, tsOwners: declared };
-        const retry = resolveOwnerIn(bodied, rubyName, tsName, tsFile, rubyModule);
+        const retry = resolveOwnerIn(bodied, rubyName, tsName, tsFile, rubyModule, level);
         return retry.ambiguous ? { ...first, tsOwners: declared } : { ...retry, tsOwners: bodied };
       };
 
@@ -4190,10 +4191,11 @@ export function main() {
         tsName: string,
         tsFile: string,
         rubyModule: string,
+        level: OwnerSeat,
       ): { tsClass: string | undefined; ambiguous: boolean } => {
         const rubySeatOf = (rubyOwner: string) =>
           rubyOwnerSeat(rubyOwner, rubyKlassOwnerNames.has(ownerKey(rubyOwner, rubyName)));
-        const rubySeat = rubySeatOf(rubyModule);
+        const rubySeat = ownsBody(rubyName) ? level : rubySeatOf(rubyModule);
         const seatOf = (tsOwner: string) =>
           tsOwnerSeat(
             tsOwner,
@@ -4202,7 +4204,17 @@ export function main() {
           );
         const rubyOwners = rubyOwnersByName.get(rubyName);
         const rubySeats = new Set([...(rubyOwners ?? [])].map(rubySeatOf));
-        const tsClass = resolveTsOwner(tsOwners, rubyModule, {
+        const bothLevels =
+          seen.has(rubyLevelKey("class", rubyName)) && seen.has(rubyLevelKey("instance", rubyName));
+        const exactSeat = [...(tsOwners ?? [])].filter((o) => seatOf(o) === level);
+        const onSeat = !bothLevels
+          ? tsOwners
+          : new Set(
+              exactSeat.length > 0
+                ? exactSeat
+                : [...(tsOwners ?? [])].filter((o) => seatOf(o) === undefined),
+            );
+        const tsClass = resolveTsOwner(onSeat, rubyModule, {
           hosts: includeHosts(tsFile, rubyModule),
           seatOf,
           rubySeat,
@@ -4214,8 +4226,8 @@ export function main() {
         });
         const tsSeat = tsClass === undefined ? undefined : seatOf(tsClass);
         const ambiguous =
-          ambiguousTsOwner(tsOwners, tsClass) ||
-          ambiguousRubyOwner(rubyOwners, tsOwners, {
+          ambiguousTsOwner(onSeat, tsClass) ||
+          ambiguousRubyOwner(rubyOwners, onSeat, {
             rubySeat,
             tsSeat,
             rubyOwnersOnTsSeat: [...(rubyOwners ?? [])].filter((o) => rubySeatOf(o) === tsSeat)
@@ -4252,7 +4264,13 @@ export function main() {
         // Returning early here keyed the denominator on the RUBY side alone, so
         // converging a false-positive class read as LOST coverage (RFC 0108).
         const rubyCalls = dropWeakCalls(rubyOwned?.calls, rubyOwned?.weak);
-        const { tsClass, ambiguous, tsOwners } = resolveOwner(rubyName, tsName, tsFile, rubyModule);
+        const { tsClass, ambiguous, tsOwners } = resolveOwner(
+          rubyName,
+          tsName,
+          tsFile,
+          rubyModule,
+          level,
+        );
         if (ambiguous) return;
         if (
           ownerRecordsNothing(
@@ -4439,7 +4457,13 @@ export function main() {
         // Two overloads/overrides under one (file, name) give no ground for
         // choosing whose call sites the Ruby ones pair against — as for a
         // skeleton record, only an unambiguous TS body compares.
-        const { tsClass, ambiguous, tsOwners } = resolveOwner(rubyName, tsName, tsFile, rubyModule);
+        const { tsClass, ambiguous, tsOwners } = resolveOwner(
+          rubyName,
+          tsName,
+          tsFile,
+          rubyModule,
+          level,
+        );
         if (ambiguous) return;
         if (
           ownerRecordsNothing(

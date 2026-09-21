@@ -93,6 +93,7 @@ export function cacheKeyWithVersion(this: Identifiable): string {
 }
 
 export const ClassMethods = {
+  /** @missingRailsCall define_method — PERMANENT */
   toParam(this: { name: string; prototype: any }, methodName?: string): string | undefined {
     if (methodName == null) {
       return this.name;

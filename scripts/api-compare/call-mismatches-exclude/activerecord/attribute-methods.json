@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "attribute-methods.ts",
-    "rubyName": "attribute_names",
-    "call": "table_exists?",
-    "reason": "Newly measured by key-expected-set-on-level-and-name: the class-level row now pairs with its own ClassMethods body instead of the instance one. The omission is pre-existing and unconverged — burndown is tracked by the `converge-class-level-call-rows-surfaced-by-level-keyed-bodies` story."
-  }
-]
