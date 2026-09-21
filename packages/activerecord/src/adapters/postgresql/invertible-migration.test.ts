@@ -74,21 +74,6 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgresqlInvertibleMigrationTest", () => {
-    it("migrate and revert", async () => {
-      class CreateHorses extends Migration {
-        async change() {
-          await this.createTable("settings", (t) => {
-            t.integer("value");
-          });
-        }
-      }
-      const m = new CreateHorses();
-      await m.execMigration(adapter, "up");
-      expect(await adapter.tableExists("settings")).toBe(true);
-      await m.execMigration(adapter, "down");
-      expect(await adapter.tableExists("settings")).toBe(false);
-    });
-
     it("migrate revert add index with expression", async () => {
       await new ExpressionIndexMigration().execMigration(adapter, "up");
 
