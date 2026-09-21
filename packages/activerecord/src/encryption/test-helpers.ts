@@ -129,6 +129,16 @@ export function makeEncryptedAuthorWithPreviousSchemes(previousSchemes: Scheme[]
   } as any;
 }
 
+class MutableDerivedSecretKeyProvider extends DerivedSecretKeyProvider {
+  get keys(): Key[] {
+    return this._keys;
+  }
+
+  set keys(keys: Key[]) {
+    this._keys = keys;
+  }
+}
+
 export function makeEncryptedPost() {
   return class EncryptedPost extends Base {
     static {
@@ -137,7 +147,9 @@ export function makeEncryptedPost() {
       this.attribute("title", "string");
       this.attribute("body", "text");
       this.encrypts("title");
-      this.encrypts("body");
+      this.encrypts("body", {
+        keyProvider: new MutableDerivedSecretKeyProvider("my post body secret!"),
+      });
     }
   } as any;
 }
@@ -492,32 +504,11 @@ function _assertEncryptedAttributeOnModel(
   }
 }
 
-export function assertNotEncryptedAttribute(
-  model: any,
-  attrName: string,
-  expectedValue: unknown,
-): void {
-  const readValue = model[attrName];
-  if (!_valuesEqual(readValue, expectedValue, _isBinaryAttribute(model, attrName))) {
-    throw new Error(
-      `assertNotEncryptedAttribute: expected ${attrName} to read as ` +
-        `${JSON.stringify(expectedValue)}, got ${JSON.stringify(readValue)}`,
-    );
-  }
-  const rawValue = model.readAttributeBeforeTypeCast(attrName);
-  if (!_valuesEqual(rawValue, expectedValue)) {
-    throw new Error(
-      `assertNotEncryptedAttribute: expected before-type-cast ${attrName} to equal ` +
-        `${JSON.stringify(expectedValue)} (stored as plaintext), got ${JSON.stringify(rawValue)}`,
-    );
-  }
-}
-
 export async function assertInvalidKeyCantReadAttribute(
   model: any,
   attributeName: string,
 ): Promise<void> {
-  if (rbObjRespondTo(model.constructor.typeForAttribute(attributeName).keyProvider, "keys=")) {
+  if (rbObjRespondTo(model.constructor.typeForAttribute(attributeName).keyProvider, "keys")) {
     await assertInvalidKeyCantReadAttributeWithCustomKeyProvider(model, attributeName);
   } else {
     await assertInvalidKeyCantReadAttributeWithDefaultKeyProvider(model, attributeName);
@@ -553,6 +544,27 @@ async function assertInvalidKeyCantReadAttributeWithCustomKeyProvider(
     expect(() => model[attributeName]).toThrow(Decryption);
   } finally {
     attributeType.keyProvider.keys = originalKeys;
+  }
+}
+
+export function assertNotEncryptedAttribute(
+  model: any,
+  attrName: string,
+  expectedValue: unknown,
+): void {
+  const readValue = model[attrName];
+  if (!_valuesEqual(readValue, expectedValue, _isBinaryAttribute(model, attrName))) {
+    throw new Error(
+      `assertNotEncryptedAttribute: expected ${attrName} to read as ` +
+        `${JSON.stringify(expectedValue)}, got ${JSON.stringify(readValue)}`,
+    );
+  }
+  const rawValue = model.readAttributeBeforeTypeCast(attrName);
+  if (!_valuesEqual(rawValue, expectedValue)) {
+    throw new Error(
+      `assertNotEncryptedAttribute: expected before-type-cast ${attrName} to equal ` +
+        `${JSON.stringify(expectedValue)} (stored as plaintext), got ${JSON.stringify(rawValue)}`,
+    );
   }
 }
 

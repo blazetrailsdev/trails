@@ -5,7 +5,7 @@ import { Configurable } from "./configurable-slot.js";
 import type { Message } from "./message.js";
 
 export class KeyProvider {
-  private _keys: Key[];
+  protected _keys: Key[];
   private _encryptionKey: Key | undefined;
   private _keysGroupedById: Map<string, Key[]> | undefined;
 
