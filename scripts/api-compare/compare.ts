@@ -4019,6 +4019,7 @@ export function main() {
       // First-sighting Ruby body digest per name (source-hash pinning, RFC 0025).
       const rubyBodyDigestByName = new Map<string, string>();
       const rubySkeletonByName = new Map<string, string[]>();
+      const rubySkeletonByOwnerName = new Map<string, string[]>();
       const rubyCallArgsByName = new Map<string, CallSite[]>();
       // The same two populations keyed by (declaring class, name): one Ruby FILE
       // can declare a name twice, and first-sighting keying then hands the first
@@ -4080,6 +4081,9 @@ export function main() {
           }
           if (rm.callArgs && !rubyCallArgsByOwnerName.has(ownerKey(item.fqn, rm.name))) {
             rubyCallArgsByOwnerName.set(ownerKey(item.fqn, rm.name), rm.callArgs);
+          }
+          if (rm.skeleton && !rubySkeletonByOwnerName.has(ownerKey(item.fqn, rm.name))) {
+            rubySkeletonByOwnerName.set(ownerKey(item.fqn, rm.name), rm.skeleton);
           }
           if (rm.skeleton && !rubySkeletonByName.has(rm.name)) {
             rubySkeletonByName.set(rm.name, rm.skeleton);
@@ -4287,7 +4291,10 @@ export function main() {
           negatedTsCalls,
           rubyOwned?.calls ?? rubyCalls,
         );
-        const rubySkeleton = rubySkeletonByName.get(rubyName);
+        const rubySkeleton =
+          (rubyOwnersByName.get(rubyName)?.size ?? 0) > 1
+            ? rubySkeletonByOwnerName.get(ownerKey(rubyModule, rubyName))
+            : rubySkeletonByName.get(rubyName);
         const tsSkeletons = tsSkeletonByFileName.get(tsFile)?.get(tsName);
         if (rubySkeleton !== undefined && tsSkeletons?.length === 1) {
           const tsSkeletonOf = (name: string) => {
