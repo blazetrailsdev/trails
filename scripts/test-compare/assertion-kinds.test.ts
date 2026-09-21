@@ -45,7 +45,6 @@ describe("normalizeRailsKind", () => {
   });
 
   it("returns null for an unmapped assertion helper", () => {
-    expect(normalizeRailsKind("assert_queries_count")).toBeNull();
     expect(normalizeRailsKind("assert_cycle")).toBeNull();
     expect(normalizeRailsKind("must_be_frobnicated")).toBeNull();
     expect(normalizeRailsKind("wont_be_kind_of")).toBeNull();
@@ -107,6 +106,26 @@ describe("buildHistogram", () => {
 });
 
 describe("diffHistograms", () => {
+  it("maps the query-count family on both sides and tells no-queries from a count apart", () => {
+    expect(normalizeRailsKind("assert_queries_count")).toBe("queriesCount");
+    expect(normalizeRailsKind("assert_no_queries")).toBe("noQueries");
+    expect(normalizeRailsKind("assert_queries_match")).toBe("queriesMatch");
+    expect(normalizeRailsKind("assert_no_queries_match")).toBe("noQueriesMatch");
+    expect(normalizeTrailsKind("assertQueriesCount")).toBe("queriesCount");
+    expect(normalizeTrailsKind("assertNoQueriesMatch")).toBe("noQueriesMatch");
+
+    const rails = buildHistogram(["assert_queries_count"], "rails");
+    const trails = buildHistogram(["assertNoQueries"], "trails");
+    expect(diffHistograms(rails.histogram, trails.histogram)).toEqual([
+      { kind: "noQueries", rails: 0, trails: 1 },
+      { kind: "queriesCount", rails: 1, trails: 0 },
+    ]);
+  });
+
+  it("maps assert_in_epsilon onto inDelta", () => {
+    expect(normalizeRailsKind("assert_in_epsilon")).toBe("inDelta");
+  });
+
   it("returns per-kind deltas where counts differ", () => {
     // Rails asserts 2 equalities + 1 nil; trails collapses to 3 truthiness checks.
     const rails = buildHistogram(["assert_equal", "assert_equal", "assert_nil"], "rails");

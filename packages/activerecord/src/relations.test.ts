@@ -857,7 +857,7 @@ describe("RelationTest", () => {
       .order("comments.body, very_special_comments_posts.body")
       .where("posts.id = 4");
     expect(loaded.map((a) => a.id)).toEqual([authors("david").id]);
-    await assertQueriesCount(0, false, () => {
+    await assertNoQueries(false, () => {
       const target = (rec: Base, name: string) => (rec.association(name) as any).target;
       const post = target(target(loaded[0], "posts")[0], "specialComments")[0].association("post")
         .target as Base;

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
+import { assertNoQueries } from "./testing/query-assertions.js";
 import { ValueType, MissingAttributeError } from "@blazetrails/activemodel";
 import { Base, SerializationTypeMismatch } from "./index.js";
 import { HashObject } from "./attribute-methods/serialization.js";
@@ -35,12 +36,12 @@ describe("SerializedAttributeTest", () => {
   beforeEach(() => setUseYamlUnsafeLoad(true));
   afterAll(() => setUseYamlUnsafeLoad(false));
 
-  it("serialize does not eagerly load columns", () => {
-    const spy = vi.spyOn(Base, "leaseConnection" as any);
+  it("serialize does not eagerly load columns", async () => {
     class LocalTopic extends Topic {}
-    LocalTopic.serialize("content");
-    expect(spy).not.toHaveBeenCalled();
-    spy.mockRestore();
+    LocalTopic.resetColumnInformation();
+    await assertNoQueries(false, () => {
+      LocalTopic.serialize("content");
+    });
   });
 
   it("serialized attribute", async () => {

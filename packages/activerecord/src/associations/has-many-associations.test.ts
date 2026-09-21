@@ -5709,7 +5709,9 @@ describe("HasManyAssociationsTest", () => {
     const reply1 = await HmReply.create({ title: "re: zoom", content: "speedy quick!" });
     const reply2 = await HmReply.create({ title: "re: zoom 2", content: "OMG lol!" });
 
-    await topic.replies.push(reply1, reply2);
+    await assertQueriesCount(6, false, async () => {
+      await topic.replies.push(reply1, reply2);
+    });
 
     expect(topic.replies_count).toBe(2);
     expect(((await HmTopic.find(topic.id)) as any).replies_count).toBe(2);
@@ -5854,7 +5856,9 @@ describe("HasManyAssociationsTest", () => {
     const categorization1 = await Categorization.create({});
     const categorization2 = await Categorization.create({});
 
-    await category.categorizations.push(categorization1, categorization2);
+    await assertQueriesCount(6, false, async () => {
+      await category.categorizations.push(categorization1, categorization2);
+    });
 
     expect(category.categorizations_count).toBe(2);
     expect(((await Category.find(category.id)) as any).categorizations_count).toBe(2);

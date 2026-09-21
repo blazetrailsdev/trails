@@ -59,7 +59,6 @@ import "./test-helpers/models/price-estimate.js";
 import { NoMethodError, regexpEscape } from "@blazetrails/ruby-compat";
 
 import { Preloader } from "./associations/preloader.js";
-import { LoaderQuery } from "./associations/preloader/association.js";
 
 function quoteTableName(name: string): string {
   return (Base.connection as { quoteTableName(n: string): string }).quoteTableName(name);
@@ -1003,12 +1002,13 @@ describe("PreloaderTest", () => {
     otherDogComment.origin_type = otherDog.constructor.name;
     otherDogComment.origin_id = otherDog.id;
 
-    const spy = vi.spyOn(LoaderQuery.prototype, "loadRecordsInBatch");
-    await new Preloader({
-      records: [dogComment, otherDogComment],
-      associations: ["origin"],
-    }).call();
-    expect(spy).toHaveBeenCalledTimes(2);
+    await assertQueriesCount(2, false, async () => {
+      const preloader = new Preloader({
+        records: [dogComment, otherDogComment],
+        associations: "origin",
+      });
+      await preloader.call();
+    });
   });
 
   it("preload with available records", async () => {

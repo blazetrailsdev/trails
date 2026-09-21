@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, vi } from "vitest";
 import { readFile } from "fs/promises";
 import { fileURLToPath } from "url";
 import { Base, registerModel, AssociationTypeMismatch, ReadOnlyRecord } from "../index.js";
-import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
+import { assertQueriesCount } from "../testing/query-assertions.js";
 import {
   assert,
   assertNot,
@@ -991,7 +991,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   it("get ids for loaded associations", async () => {
     const developer = developers("david");
     await developer.projects.reload();
-    await assertNoQueries(false, async () => {
+    await assertQueriesCount(0, false, async () => {
       await (developer as any).projectIds;
       await (developer as any).projectIds;
     });
@@ -1138,7 +1138,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   it("has and belongs to many associations on new records use null relations", async () => {
     const dev = new Developer({});
     const proxy = dev.projects;
-    await assertNoQueries(false, async () => {
+    await assertQueriesCount(0, false, async () => {
       expect(await proxy).toEqual([]);
       expect(await proxy.where({ title: "omg" })).toEqual([]);
       expect(await proxy.pluck("title")).toEqual([]);
