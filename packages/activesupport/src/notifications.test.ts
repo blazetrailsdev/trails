@@ -3,6 +3,7 @@ import { ArgumentError } from "@blazetrails/ruby-compat";
 import { Notifications } from "./notifications.js";
 import { Fanout, type Evented, type EventedListener } from "./notifications/fanout.js";
 import { travelTo, travelBack } from "./testing/time-helpers.js";
+import { assertEmpty } from "./testing/assertions.js";
 import { Event, Instrumenter, LegacyHandle, Wrapper } from "./notifications/instrumenter.js";
 
 function randomId(): string {
@@ -202,7 +203,7 @@ describe("BuildHandleTest", () => {
     });
 
     expect(events1.length).toBe(1);
-    expect(events2).toEqual([]);
+    assertEmpty(events2);
 
     expect(events1[0].name).toBe(name);
     expect(events1[0].time).toBeTruthy();

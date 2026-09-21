@@ -12,7 +12,7 @@ import {
   symbolizeKeys,
 } from "@blazetrails/activesupport";
 import { stdout, rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
-import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
+import { Dir, File, FileUtils, StandardError } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Zlib } from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/date";
@@ -1779,7 +1779,7 @@ export class Migrator {
     } catch (e) {
       const useTx = await this.isUseTransaction(migration);
       const msg = `An error has occurred, ${useTx ? "this and " : ""}all later migrations canceled:\n\n${e instanceof Error ? e.message : e}`;
-      throw Object.assign(new Error(msg), { cause: e });
+      throw Object.assign(new StandardError(msg), { cause: e });
     }
     return migration.version;
   }

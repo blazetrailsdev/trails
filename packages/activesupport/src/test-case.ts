@@ -17,7 +17,7 @@ import {
   afterTeardown as testsWithoutAssertionsAfterTeardown,
   type RunningTest,
 } from "./testing/tests-without-assertions.js";
-import { UnexpectedError } from "./testing/assertions.js";
+import { UnexpectedError, _takeAssertions } from "./testing/assertions.js";
 import {
   assertNot,
   assertNotIncludes,
@@ -97,6 +97,7 @@ export class TestCase {
 setupAndTeardownPrepended(TestCase);
 
 beforeEach(() => {
+  _takeAssertions();
   TestCase.beforeSetup();
 });
 
@@ -114,7 +115,7 @@ function _runningTest(context: TestContext): RunningTest {
     result?: { state?: string; errors?: unknown[] };
   };
   return {
-    assertions: expect.getState().assertionCalls ?? 0,
+    assertions: (expect.getState().assertionCalls ?? 0) + _takeAssertions(),
     skipped: task.mode === "skip" || task.mode === "todo",
     error: task.result?.state === "fail" || (task.result?.errors?.length ?? 0) > 0,
     name: task.name,

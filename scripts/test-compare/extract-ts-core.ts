@@ -53,6 +53,7 @@ const MAX_HELPER_DEPTH = 5;
  */
 interface HelperDef {
   body: ts.Node;
+  lambda: boolean;
   scopeStart: number;
   scopeEnd: number;
 }
@@ -78,18 +79,18 @@ type HelperMap = Map<string, HelperDef[]>;
 
 function collectHelpers(sourceFile: ts.SourceFile): HelperMap {
   const helpers: HelperMap = new Map();
-  const add = (name: string, body: ts.Node, scope: ts.Node) => {
+  const add = (name: string, body: ts.Node, scope: ts.Node, lambda: boolean) => {
     const defs = helpers.get(name) ?? [];
-    defs.push({ body, scopeStart: scope.pos, scopeEnd: scope.end });
+    defs.push({ body, lambda, scopeStart: scope.pos, scopeEnd: scope.end });
     helpers.set(name, defs);
   };
   const walk = (n: ts.Node, scope: ts.Node) => {
     if (ts.isFunctionDeclaration(n) && n.name && n.body) {
-      add(n.name.text, n.body, scope);
+      add(n.name.text, n.body, scope, false);
     } else if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && n.initializer) {
       const init = n.initializer;
       if ((ts.isArrowFunction(init) || ts.isFunctionExpression(init)) && init.body) {
-        add(n.name.text, init.body, scope);
+        add(n.name.text, init.body, scope, true);
       }
     }
     const inner = ts.isBlock(n) || ts.isModuleBlock(n) || ts.isCaseBlock(n) ? n : scope;
@@ -137,7 +138,7 @@ function resolveHelper(helpers: HelperMap, name: string, pos: number): HelperDef
  * otherwise read as an assertion.
  */
 function isInlineDef(def: HelperDef, rootStart: number, rootEnd: number): boolean {
-  return def.body.pos >= rootStart && def.body.end <= rootEnd;
+  return def.lambda && def.body.pos >= rootStart && def.body.end <= rootEnd;
 }
 
 /**

@@ -132,6 +132,7 @@ export async function assertRaises(
   if (!exp.some((klass) => error instanceof klass)) {
     assert(false, `${exp.map((e) => e.name).join(", ")} expected, not ${error.name}`);
   }
+  assert(true);
   if (match) assertMatch(match, error.message);
   return error;
 }
@@ -337,8 +338,18 @@ function _callableToSourceString(callable: unknown): string {
   return source;
 }
 
+let _assertions = 0;
+
+/** @internal */
+export function _takeAssertions(): number {
+  const count = _assertions;
+  _assertions = 0;
+  return count;
+}
+
 /** @noRailsEquivalent PERMANENT */
 export function assert(value: unknown, message: string | (() => string) = ""): void {
+  _assertions += 1;
   if (value == null || value === false) {
     throw new Assertion(typeof message === "function" ? message() : message);
   }

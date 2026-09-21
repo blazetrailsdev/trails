@@ -47,7 +47,15 @@ import { loadSchemaFromAdapter } from "./model-schema.js";
 import { itIfSupports, describeIfSupports } from "./support/supports.js";
 import { describeIfPostgresqlAdapter } from "./support/describe-if-postgresql-adapter.js";
 import { Temporal } from "@blazetrails/date";
-import { Dir, File, Zlib, block, fetch } from "@blazetrails/ruby-compat";
+import {
+  Dir,
+  File,
+  RuntimeError,
+  StandardError,
+  Zlib,
+  block,
+  fetch,
+} from "@blazetrails/ruby-compat";
 import { Mysql2Adapter } from "./connection-adapters/mysql2-adapter.js";
 import { describeIfMysqlAdapter } from "./support/describe-if-mysql-adapter.js";
 import { leaseMysqlAdapter } from "./adapters/abstract-mysql-adapter/test-helper.js";
@@ -134,7 +142,7 @@ async function migrateRemovingMissingColumn(migrator: Migrator): Promise<void> {
   if (adapterType === "sqlite") {
     await assertNothingRaised(() => migrator.migrate());
   } else {
-    const error = await assertRaises([Error], {}, () => migrator.migrate());
+    const error = await assertRaises([StandardError], {}, () => migrator.migrate());
 
     if (adapterType === "mysql") {
       if (await (Base.connection as any).isMariadb()) {
@@ -232,7 +240,7 @@ describe("MigrationTest", () => {
     ).migrate();
     await assertColumn(Person, "last_name");
 
-    await assertRaises([Error], {}, () =>
+    await assertRaises([StandardError], {}, () =>
       new Migrator(
         "up",
         [migrateProxy(101, (m) => m.addColumn("people", "last_name", "string"))],
@@ -918,7 +926,7 @@ describe("MigrationTest", () => {
       [
         migrateProxy(100, async (m) => {
           await m.addColumn("people", "last_name", "string");
-          throw new Error("Something broke");
+          throw new RuntimeError("Something broke");
         }),
       ],
       new SchemaMigration(adapter.pool),
@@ -926,7 +934,7 @@ describe("MigrationTest", () => {
       100,
     );
 
-    const e = await assertRaises([Error], {}, () => migrator.migrate());
+    const e = await assertRaises([StandardError], {}, () => migrator.migrate());
 
     expect(e.message).toBe(
       "An error has occurred, this and all later migrations canceled:\n\nSomething broke",
@@ -951,7 +959,7 @@ describe("MigrationTest", () => {
         [
           migrateProxy(100, async (m) => {
             await m.addColumn("people", "last_name", "string");
-            throw new Error("Something broke");
+            throw new RuntimeError("Something broke");
           }),
         ],
         new SchemaMigration(adapter.pool),
@@ -959,7 +967,7 @@ describe("MigrationTest", () => {
         100,
       );
 
-      const e = await assertRaises([Error], {}, () => migrator.run());
+      const e = await assertRaises([StandardError], {}, () => migrator.run());
 
       expect(e.message).toBe(
         "An error has occurred, this and all later migrations canceled:\n\nSomething broke",
@@ -983,7 +991,7 @@ describe("MigrationTest", () => {
       }
       async up() {
         await this.addColumn("people", "last_name", "string");
-        throw new Error("Something broke");
+        throw new RuntimeError("Something broke");
       }
       async down() {}
     }
@@ -995,7 +1003,7 @@ describe("MigrationTest", () => {
       new InternalMetadata(adapter.pool),
       101,
     );
-    const e = await assertRaises([Error], {}, () => migrator.migrate());
+    const e = await assertRaises([StandardError], {}, () => migrator.migrate());
     expect(e.message).toBe(
       "An error has occurred, all later migrations canceled:\n\nSomething broke",
     );
@@ -1067,14 +1075,14 @@ describe("MigrationTest", () => {
       "up",
       [
         migrateProxy(101, async () => {
-          throw new Error("Something broke");
+          throw new RuntimeError("Something broke");
         }),
       ],
       new SchemaMigration(adapter.pool),
       im,
       101,
     );
-    await assertRaises([Error], {}, () => migrator.migrate());
+    await assertRaises([StandardError], {}, () => migrator.migrate());
     expect(await im.get("environment")).toBe(currentEnv);
   });
 

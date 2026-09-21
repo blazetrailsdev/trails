@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
+import { RuntimeError } from "@blazetrails/ruby-compat";
 import {
   Base,
   registerModel,
@@ -740,7 +741,7 @@ describe("PessimisticLockingTest", () => {
   it("lock raises when the record is dirty", async () => {
     const person = await Person.find(people("michael").id);
     person.first_name = "fooman";
-    const error = await assertRaises([Error], {}, () => person.lockBang());
+    const error = await assertRaises([RuntimeError], {}, () => person.lockBang());
     expect(error.message).toMatch(/Changed attributes: "first_name"/);
   });
 

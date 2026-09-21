@@ -1,4 +1,4 @@
-import { Notifications } from "@blazetrails/activesupport";
+import { Notifications, assert } from "@blazetrails/activesupport";
 
 /** @internal */
 export interface SqlPayload {
@@ -52,15 +52,12 @@ export async function assertQueriesCount(
     await fn();
     const queries = includeSchema ? counter.logAll : counter.log;
     if (count !== undefined) {
-      if (queries.length !== count) {
-        throw new Error(
-          `${queries.length} instead of ${count} queries were executed. Queries: ${queries.join("\n\n")}`,
-        );
-      }
+      assert(
+        queries.length === count,
+        `${queries.length} instead of ${count} queries were executed. Queries: ${queries.join("\n\n")}`,
+      );
     } else {
-      if (queries.length < 1) {
-        throw new Error("1 or more queries expected, but none were executed.");
-      }
+      assert(queries.length >= 1, "1 or more queries expected, but none were executed.");
     }
   });
 }
@@ -90,17 +87,15 @@ export async function assertQueriesMatch<T>(
     if (typeof match !== "string") match.lastIndex = 0;
 
     if (count !== undefined) {
-      if (matchedQueries.length !== count) {
-        throw new Error(
-          `${matchedQueries.length} instead of ${count} queries were executed.${queries.length === 0 ? "" : `\nQueries:\n${queries.join("\n")}`}`,
-        );
-      }
+      assert(
+        matchedQueries.length === count,
+        `${matchedQueries.length} instead of ${count} queries were executed.${queries.length === 0 ? "" : `\nQueries:\n${queries.join("\n")}`}`,
+      );
     } else {
-      if (matchedQueries.length < 1) {
-        throw new Error(
-          `1 or more queries expected, but none were executed.${queries.length === 0 ? "" : `\nQueries:\n${queries.join("\n")}`}`,
-        );
-      }
+      assert(
+        matchedQueries.length >= 1,
+        `1 or more queries expected, but none were executed.${queries.length === 0 ? "" : `\nQueries:\n${queries.join("\n")}`}`,
+      );
     }
 
     return result;

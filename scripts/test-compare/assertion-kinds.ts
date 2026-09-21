@@ -37,7 +37,11 @@ export type CanonicalKind =
   | "notRespondTo"
   | "operator"
   | "length"
-  | "inDelta";
+  | "inDelta"
+  | "queriesCount"
+  | "noQueries"
+  | "queriesMatch"
+  | "noQueriesMatch";
 
 // Pairs a canonical kind with its logical negation, used to fold a trails
 // `not:` chain (`expect(x).not.toBeNull()`) onto the negated category so it
@@ -109,6 +113,11 @@ const RAILS_MAP: Record<string, CanonicalKind> = {
   refute_respond_to: "notRespondTo",
   assert_operator: "operator",
   assert_in_delta: "inDelta",
+  assert_in_epsilon: "inDelta",
+  assert_queries_count: "queriesCount",
+  assert_no_queries: "noQueries",
+  assert_queries_match: "queriesMatch",
+  assert_no_queries_match: "noQueriesMatch",
 };
 
 const MSPEC_MAP: Record<string, CanonicalKind> = {

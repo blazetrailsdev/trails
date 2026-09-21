@@ -648,7 +648,7 @@ describe("EachTest", () => {
     const startId = (expected[0] as any).id;
     const finishId = (expected[expected.length - 1] as any).id;
     const collected: any[] = [];
-    await assertQueriesCount(0, false, async () => {
+    await assertNoQueries(false, async () => {
       for await (const order of incorrectlySorted.findEach({
         batchSize: 1,
         start: startId,

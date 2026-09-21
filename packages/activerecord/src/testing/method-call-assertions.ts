@@ -2,6 +2,8 @@
 
 /** @noRailsEquivalent PERMANENT MOVED-BY-SHORT-NAME: assertCalledOnInstanceOf, assertNotCalledOnInstanceOf. */
 
+import { assert } from "@blazetrails/activesupport";
+
 type ClassLike = { prototype: object; name: string };
 
 export interface CallAssertionOptions {
@@ -78,11 +80,9 @@ export async function assertCalledOnInstanceOf(
   { times = 1, returns = null, message }: CallAssertionOptions = {},
 ): Promise<void> {
   const count = await countInstanceCalls(klass, methodName, returns, block);
-  if (count !== times) {
-    let error = `Expected ${methodName} to be called ${times} times, but was called ${count} times`;
-    if (message) error = `${message}.\n${error}`;
-    throw new Error(error);
-  }
+  let error = `Expected ${methodName} to be called ${times} times, but was called ${count} times`;
+  if (message) error = `${message}.\n${error}`;
+  assert(count === times, error);
 }
 
 export async function assertNotCalledOnInstanceOf(

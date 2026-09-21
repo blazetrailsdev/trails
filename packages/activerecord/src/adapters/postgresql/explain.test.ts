@@ -29,6 +29,17 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(explain).toMatch("QUERY PLAN");
     });
 
+    it("explain with eager loading", async () => {
+      const explain = await Author.where({ id: 1 }).includes(":posts").explain().inspect();
+      expect(explain).toMatch("QUERY PLAN");
+      expect(explain).toMatch(
+        /EXPLAIN SELECT "authors"\.\* FROM "authors" WHERE "authors"\."id" = (?:\$1 \[\["id", 1\]\]|1)/,
+      );
+      expect(explain).toMatch(
+        /EXPLAIN SELECT "posts"\.\* FROM "posts" WHERE "posts"\."author_id" = (?:\$1 \[\["author_id", 1\]\]|1)/,
+      );
+    });
+
     it("Relation#explain on PG captures the SELECT via sql.active_record", async () => {
       class ExRelation extends Base {
         static {

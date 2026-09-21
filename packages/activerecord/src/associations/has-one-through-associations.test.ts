@@ -452,7 +452,7 @@ describe("HasOneThroughAssociationsTest", () => {
       loaded = await Member.all().includes(":club").where("name = ?", "Groucho Marx");
     });
     expect(loaded.length).toBe(1);
-    await assertQueriesCount(0, false, async () => {
+    await assertNoQueries(false, async () => {
       expect(loaded[0].association("club").target).not.toBeNull();
     });
   });
@@ -463,7 +463,7 @@ describe("HasOneThroughAssociationsTest", () => {
       loaded = await Member.all().includes(":sponsorClub").where("name = ?", "Groucho Marx");
     });
     expect(loaded.length).toBe(1);
-    await assertQueriesCount(0, false, async () => {
+    await assertNoQueries(false, async () => {
       expect(loaded[0].association("sponsorClub").target).not.toBeNull();
     });
   });
@@ -500,7 +500,7 @@ describe("HasOneThroughAssociationsTest", () => {
     const loaded = await Club.all()
       .includes(":sponsoredMember")
       .where("name = ?", "Moustache and Eyebrow Fancier Club");
-    await assertQueriesCount(0, false, () => {
+    await assertNoQueries(false, () => {
       expect(loaded[0].association("sponsoredMember").target).not.toBeNull();
     });
   });
@@ -515,7 +515,7 @@ describe("HasOneThroughAssociationsTest", () => {
         .references("clubs");
     });
     expect(loaded.length).toBe(1);
-    await assertQueriesCount(0, false, () => {
+    await assertNoQueries(false, () => {
       expect(loaded[0].association("club").target).not.toBeNull();
     });
   });
@@ -530,7 +530,7 @@ describe("HasOneThroughAssociationsTest", () => {
         .references("clubs");
     });
     expect(loaded.length).toBe(1);
-    await assertQueriesCount(0, false, () => {
+    await assertNoQueries(false, () => {
       expect(loaded[0].association("sponsorClub").target).not.toBeNull();
     });
   });
@@ -547,7 +547,7 @@ describe("HasOneThroughAssociationsTest", () => {
         .references("clubs");
     });
     expect(loaded.length).toBe(1);
-    await assertQueriesCount(0, false, () => {
+    await assertNoQueries(false, () => {
       expect(loaded[0].association("sponsorClub").target).not.toBeNull();
     });
     expect(loaded[0].association("sponsorClub").target?.id).toBe(clubs("outrageous_club").id);

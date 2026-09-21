@@ -1,10 +1,11 @@
+import { RuntimeError } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 
 export async function lockBang<T extends Base>(this: T, lock: boolean | string = true): Promise<T> {
   if (this.isPersisted()) {
     if (this.isChanged) {
       const dirtyAttrs = this.changedAttributeNamesToSave.map((a) => `"${a}"`).join(", ");
-      throw new Error(
+      throw new RuntimeError(
         "Locking a record with unpersisted changes is not supported. Use " +
           "`save` to persist the changes, or `reload` to discard them " +
           `explicitly. Changed attributes: ${dirtyAttrs}.`,

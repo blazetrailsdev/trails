@@ -1,4 +1,4 @@
-import { kernelThrow, FrozenError, RuntimeError } from "@blazetrails/ruby-compat";
+import { kernelThrow, FrozenError, RuntimeError, StandardError } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { transaction, Rollback, registerModel, RecordInvalid } from "./index.js";
 import { afterAllTransactionsCommit } from "./active-record.js";
@@ -28,6 +28,8 @@ import {
 import { ARUnit2Model } from "./test-helpers/models/arunit2-model.js";
 
 const Topic = CanonicalTopic;
+
+class SomeError extends StandardError {}
 for (const klass of [
   Topic,
   Reply,
@@ -88,13 +90,13 @@ describe("TransactionTest", () => {
     expect(committedTransaction.isClosed()).toBeTruthy();
 
     let rolledbackTransaction: any = null;
-    await expect(
+    await assertRaises([SomeError], {}, () =>
       Topic.transaction(async () => {
         expect(Topic.currentTransaction().isOpen()).toBeTruthy();
         rolledbackTransaction = Topic.currentTransaction();
-        throw new Error("SomeError");
+        throw new SomeError();
       }),
-    ).rejects.toThrow("SomeError");
+    );
     expect(rolledbackTransaction.isClosed()).toBeTruthy();
   });
 
@@ -385,13 +387,13 @@ describe("TransactionTest", () => {
   it("raise after destroy", async () => {
     expect(first.isFrozen()).toBeFalsy();
 
-    await expect(
+    await assertRaises([RuntimeError], {}, () =>
       Topic.transaction(async () => {
         await first.destroy();
         expect(first.isFrozen()).toBeTruthy();
-        throw new Error("boom");
+        throw new RuntimeError();
       }),
-    ).rejects.toThrow();
+    );
 
     expect(first.isFrozen()).toBeFalsy();
   });
@@ -524,7 +526,7 @@ describe("TransactionTest", () => {
         second.approved = false;
         await first.save();
         await second.save();
-        throw new Error("Bad things!");
+        throw new RuntimeError("Bad things!");
       });
     } catch {}
 
@@ -821,7 +823,7 @@ describe("TransactionTest", () => {
           async () => {
             first.approved = false;
             await first.saveBang();
-            throw new Error("rollback savepoint");
+            throw new RuntimeError();
           },
           { requiresNew: true },
         );
@@ -844,7 +846,7 @@ describe("TransactionTest", () => {
           async () => {
             first.approved = false;
             await first.saveBang();
-            throw new Error("rollback savepoint");
+            throw new RuntimeError();
           },
           { requiresNew: true },
         );
@@ -866,7 +868,7 @@ describe("TransactionTest", () => {
         await Topic.transaction(async () => {
           first.approved = false;
           await first.saveBang();
-          throw new Error("rollback inner");
+          throw new RuntimeError();
         });
       } catch {}
     });
@@ -899,21 +901,21 @@ describe("TransactionTest", () => {
                       async () => {
                         first.content = "Four";
                         await first.saveBang();
-                        throw new Error("roll back to Three");
+                        throw new RuntimeError();
                       },
                       { requiresNew: true },
                     );
                   } catch {}
 
                   three = (await first.reload()).content;
-                  throw new Error("roll back to Two");
+                  throw new RuntimeError();
                 },
                 { requiresNew: true },
               );
             } catch {}
 
             two = (await first.reload()).content;
-            throw new Error("roll back to One");
+            throw new RuntimeError();
           },
           { requiresNew: true },
         );
@@ -1560,11 +1562,11 @@ describe("TransactionTest", () => {
 
   it("raising does not materialize transaction", async () => {
     await assertNoQueries(false, async () => {
-      await expect(
+      await assertRaises([RuntimeError], {}, () =>
         Topic.transaction(async () => {
-          throw new Error("Expected");
+          throw new RuntimeError("Expected");
         }),
-      ).rejects.toThrow("Expected");
+      );
     });
   });
 
@@ -1692,7 +1694,7 @@ describe("TransactionsWithTransactionalFixturesTest", () => {
       await Topic.transaction(async () => {
         first.approved = true;
         await first.saveBang();
-        throw new Error("boom");
+        throw new RuntimeError();
       });
     } catch {
       expect((await first.reload()).approved).toBeFalsy();
@@ -1710,7 +1712,7 @@ describe("TransactionsWithTransactionalFixturesTest", () => {
         await Topic.transaction(async () => {
           first.approved = false;
           await first.saveBang();
-          throw new Error("boom");
+          throw new RuntimeError();
         });
       } catch {}
     });

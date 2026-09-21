@@ -3,7 +3,7 @@ import { describe, it, expect } from "vitest";
 import { Base, RecordNotSaved, RecordNotDestroyed, RecordInvalid } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
 import { ContextualCallbacksDeveloper } from "./test-helpers/models/contextual-callbacks-developer.js";
-import { Range, kernelThrow } from "@blazetrails/ruby-compat";
+import { ArgumentError, Range, kernelThrow } from "@blazetrails/ruby-compat";
 
 type HistoryEntry = [string, string];
 
@@ -528,7 +528,7 @@ describe("CallbacksTest", () => {
   });
 
   it("before save doesnt allow on option", async () => {
-    const exception = await assertRaises([Error], {}, () => {
+    const exception = await assertRaises([ArgumentError], {}, () => {
       class T extends Base {
         static {
           this.attribute("title", "string");
@@ -541,7 +541,7 @@ describe("CallbacksTest", () => {
   });
 
   it("around save doesnt allow on option", async () => {
-    const exception = await assertRaises([Error], {}, () => {
+    const exception = await assertRaises([ArgumentError], {}, () => {
       class T extends Base {
         static {
           this.attribute("title", "string");
@@ -554,7 +554,7 @@ describe("CallbacksTest", () => {
   });
 
   it("after save doesnt allow on option", async () => {
-    const exception = await assertRaises([Error], {}, () => {
+    const exception = await assertRaises([ArgumentError], {}, () => {
       class T extends Base {
         static {
           this.attribute("title", "string");
