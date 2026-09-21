@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll, vi } from "vitest";
 import { Time as RubyTime } from "@blazetrails/date";
 import { assertDifference, assertNothingRaised } from "@blazetrails/activesupport";
+import { isModuleIncluded } from "@blazetrails/ruby-compat";
 import { Base, Migration, Schema, TableDefinition } from "./index.js";
+import { Definition } from "./schema.js";
 import { Migrator } from "./migration.js";
 import { SchemaMigration } from "./schema-migration.js";
 import { InternalMetadata } from "./internal-metadata.js";
@@ -63,8 +65,9 @@ describe("ActiveRecordSchemaTest", () => {
   });
 
   it("schema without version is the current version schema", () => {
-    const s = new Schema();
-    expect(s).toBeInstanceOf(Schema);
+    const schemaClass = Schema;
+    expect(schemaClass.prototype instanceof Migration.get(Migration.currentVersion())).toBeTruthy();
+    expect(isModuleIncluded(schemaClass, Definition)).toBeTruthy();
   });
 
   it("schema version accessor", () => {
