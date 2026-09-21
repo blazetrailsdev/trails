@@ -36,17 +36,11 @@ describe("AssociationsExtensionsTest", () => {
   it("proxy association after scoped", async () => {
     const post = posts("welcome");
     const proxy = association(post, "comments") as unknown as CollectionProxy & {
-      theAssociation: () => { owner: Base; reflection: { name: string } };
+      theAssociation: () => unknown;
     };
-    expect(proxy).toBeInstanceOf(CollectionProxy);
-    expect(proxy.theAssociation().owner).toBe(post);
-    expect(proxy.theAssociation().reflection.name).toBe("comments");
-
-    const scoped = proxy.where("1=1") as unknown as {
-      theAssociation: () => { owner: Base; reflection: { name: string } };
-    };
-    expect(scoped.theAssociation().owner).toBe(post);
-    expect(scoped.theAssociation().reflection.name).toBe("comments");
+    expect(post.association("comments")).toBe(proxy.theAssociation());
+    const scoped = proxy.where("1=1") as unknown as { theAssociation: () => unknown };
+    expect(post.association("comments")).toBe(scoped.theAssociation());
   });
 
   it("extension with dirty target", async () => {

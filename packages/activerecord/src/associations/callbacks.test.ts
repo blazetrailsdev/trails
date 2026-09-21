@@ -49,10 +49,12 @@ describe("AssociationCallbacksTest", () => {
   const { authors, posts } = fixtures(["authors", "posts"]);
   let david: any;
   let thinking: any;
+  let authorless: any;
 
   beforeEach(() => {
     david = authors("david");
     thinking = posts("thinking");
+    authorless = posts("authorless");
     assertEmpty(david.postLog);
   });
 
@@ -131,6 +133,63 @@ describe("AssociationCallbacksTest", () => {
       `after_adding${thinking.id}`,
       `after_adding_proc${thinking.id}`,
     ]);
+  });
+
+  it("has many callbacks halt execution when abort is trown when adding to association", async () => {
+    const author = await Author.createBang({ name: "Roger" });
+    const post = await Post.createBang({ title: "hello", body: "abc" });
+    await (author as any).postsWithThrownCallbacks.push(post);
+
+    assertEmpty(await (author as any).postsWithCallbacks.toArray());
+  });
+
+  it("has many callbacks halt execution when abort is trown when removing from association", async () => {
+    const author = await Author.createBang({ name: "Roger" });
+    const post = await Post.createBang({ title: "hello", body: "abc", author });
+
+    expect(await (author as any).postsWithThrownCallbacks.size()).toBe(1);
+    await (author as any).postsWithThrownCallbacks.destroy(post.id);
+    expect(await (author as any).postsWithThrownCallbacks.size()).toBe(1);
+  });
+
+  it("has many callbacks with create", async () => {
+    const morten = await Author.create({ name: "Morten" });
+    const post = await (morten as any).postsWithProcCallbacks.createBang({
+      title: "Hello",
+      body: "How are you doing?",
+    });
+    expect((morten as any).postLog).toEqual(["before_adding<new>", `after_adding${post.id}`]);
+  });
+
+  it("has many callbacks for save on parent", async () => {
+    const jack = new Author({ name: "Jack" });
+    (jack as any).postsWithCallbacks.build({
+      title: "Call me back!",
+      body: "Before you wake up and after you sleep",
+    });
+
+    const callbackLog = [
+      "before_adding<new>",
+      `after_adding${(await (jack as any).postsWithCallbacks.first()).id}`,
+    ];
+    expect((jack as any).postLog).toEqual(callbackLog);
+    expect(await jack.save()).toBeTruthy();
+    expect(await (jack as any).postsWithCallbacks.count()).toBe(1);
+    expect((jack as any).postLog).toEqual(callbackLog);
+  });
+
+  it("dont add if before callback raises exception", async () => {
+    const unchangeablePostIds = async (): Promise<unknown[]> =>
+      (await david.unchangeablePosts.toArray()).map((p: any) => p.id);
+
+    expect(await unchangeablePostIds()).not.toContain(authorless.id);
+    try {
+      await david.unchangeablePosts.push(authorless);
+    } catch {}
+    assertEmpty(david.postLog);
+    expect(await unchangeablePostIds()).not.toContain(authorless.id);
+    await david.reload();
+    expect(await unchangeablePostIds()).not.toContain(authorless.id);
   });
 });
 
@@ -343,23 +402,6 @@ describe("AssociationCallbacksTest", () => {
     expect(log).toContain("ar:" + p2.id);
   });
 
-  it("has many callbacks with create", async () => {
-    const log: string[] = [];
-    const { Author } = makeAuthorWithCallbacks({
-      beforeAdd: (_owner: any, record: any) => {
-        log.push("before:" + (record.id ?? "<new>"));
-      },
-      afterAdd: (_owner: any, record: any) => {
-        log.push("after:" + record.id);
-      },
-    });
-    const author = await Author.create({ name: "David" });
-    const proxy = association(author, "posts");
-    const p = await proxy.create({ title: "Created", body: "Body" });
-    expect(log[0]).toBe("before:<new>");
-    expect(log[1]).toBe("after:" + p.id);
-  });
-
   it("has many callbacks with build", async () => {
     const log: string[] = [];
     const { Author } = makeAuthorWithCallbacks({
@@ -386,26 +428,6 @@ describe("AssociationCallbacksTest", () => {
     expect(p.isNewRecord()).toBe(true);
     const all = await (Post as any).where({ author_id: author.id }).toArray();
     expect(all.length).toBe(0);
-  });
-
-  it("has many callbacks halt execution when abort is trown when adding to association", async () => {
-    const { Author, Post } = makeAuthorWithCallbacks({ beforeAdd: () => kernelThrow(":abort") });
-    const author = await Author.create({ name: "David" });
-    const proxy = association(author, "posts");
-    const p = new (Post as any)({ title: "abc", body: "Body", author_id: author.id });
-    await proxy.push(p);
-    expect((await proxy).length).toBe(0);
-  });
-
-  it("has many callbacks halt execution when abort is trown when removing from association", async () => {
-    const { Author, Post } = makeAuthorWithCallbacks({ beforeRemove: () => kernelThrow(":abort") });
-    const author = await Author.create({ name: "David" });
-    const p = await (Post as any).create({ title: "abc", body: "Body", author_id: author.id });
-    const proxy = association(author, "posts");
-    expect((await proxy).length).toBe(1);
-    await proxy.destroy(p.id);
-    expect((await proxy).length).toBe(1);
-    expect(await (Post as any).exists(p.id)).toBe(true);
   });
 
   it("before_remove abort halts the whole removal, not just the current record", async () => {
@@ -441,42 +463,6 @@ describe("AssociationCallbacksTest", () => {
     const proxy = association(author, "posts");
     const p = await proxy.createBang({ title: "Hello", body: "Body" });
     expect(log).toEqual(["before_adding<new>", "after_adding" + p.id]);
-  });
-
-  it("has many callbacks for save on parent", async () => {
-    const log: string[] = [];
-    const { Author, Post } = makeAuthorWithCallbacks({
-      beforeAdd: (_owner: any, record: any) => {
-        log.push("before_adding" + (record.id ?? "<new>"));
-      },
-      afterAdd: (_owner: any, record: any) => {
-        log.push("after_adding" + (record.id ?? "<new>"));
-      },
-    });
-    const author = new (Author as any)({ name: "Jack" });
-    const proxy = association(author, "posts");
-    proxy.build({ title: "Call me back!", body: "Body" });
-    expect(log).toEqual(["before_adding<new>", "after_adding<new>"]);
-    expect(await author.save()).toBe(true);
-    expect(await proxy.count()).toBe(1);
-    expect(log).toEqual(["before_adding<new>", "after_adding<new>"]);
-  });
-
-  it("dont add if before callback raises exception", async () => {
-    const log: string[] = [];
-    const { Author, Post } = makeAuthorWithCallbacks({
-      beforeAdd: () => {
-        log.push("before");
-        throw new Error("nope");
-      },
-    });
-    const author = await Author.create({ name: "David" });
-    const proxy = association(author, "posts");
-    const p = new (Post as any)({ title: "blocked", body: "Body", author_id: author.id });
-    try {
-      await proxy.push(p);
-    } catch {}
-    expect((await proxy).length).toBe(0);
   });
 
   it("after_add callback throwing abort propagates (not swallowed)", async () => {
@@ -517,7 +503,7 @@ describe("AssociationCallbacksTest", () => {
   it("has and belongs to many add callback", async () => {
     const david = developers("david");
     const ar = projects("active_record");
-    expect(ar.developersLog).toEqual([]);
+    assertEmpty(ar.developersLog);
     const proxy = association(ar, "developersWithCallbacks");
     await proxy.push(david);
     expect(ar.developersLog).toEqual([`before_adding${david.id}`, `after_adding${david.id}`]);
@@ -554,13 +540,14 @@ describe("AssociationCallbacksTest", () => {
     const alice = new Developer({ name: "alice" });
     await association(rec, "developersWithCallbacks").push(alice);
     expect(dev).toBe(alice);
-    expect(newDev).toBe(true);
-    expect(alice.isNewRecord()).toBe(false);
+    expect(newDev).toBeDefined();
+    expect(newDev).toBeTruthy();
+    expect(alice.isNewRecord()).toBeFalsy();
   });
 
   it("has and belongs to many after add called after save", async () => {
     const ar = projects("active_record");
-    expect(ar.developersLog).toEqual([]);
+    assertEmpty(ar.developersLog);
     const proxy = association(ar, "developersWithCallbacks");
 
     const alice = new Developer({ name: "alice" });
@@ -578,7 +565,7 @@ describe("AssociationCallbacksTest", () => {
     const david = developers("david");
     const jamis = developers("jamis");
     const activerecord = projects("active_record");
-    expect(activerecord.developersLog).toEqual([]);
+    assertEmpty(activerecord.developersLog);
     const proxy = association(activerecord, "developersWithCallbacks");
     await proxy.delete(david);
     expect(activerecord.developersLog).toEqual([
@@ -597,11 +584,18 @@ describe("AssociationCallbacksTest", () => {
 
   it("has and belongs to many does not fire callbacks on clear", async () => {
     const activerecord = projects("active_record");
-    expect(activerecord.developersLog).toEqual([]);
+    assertEmpty(activerecord.developersLog);
     const proxy = association(activerecord, "developersWithCallbacks");
-    expect((await proxy).length).toBeGreaterThan(0);
-    await proxy.clear();
-    expect(activerecord.developersLog).toEqual([]);
+    // eslint-disable-next-line blazetrails/no-conditional-in-test
+    if ((await proxy.size()) === 0) {
+      await association(activerecord, "developers").push(developers("david"));
+      await association(activerecord, "developers").push(developers("jamis"));
+      await activerecord.reload();
+      expect((await proxy.size()) === 2).toBeTruthy();
+    }
+    (await proxy).flatMap((d: any) => [`before_removing${d.id}`, `after_removing${d.id}`]).sort();
+    expect(await proxy.clear()).toBeTruthy();
+    assertEmpty(activerecord.developersLog);
   });
 
   it("has and belongs to many callbacks for save on parent", async () => {
@@ -611,7 +605,7 @@ describe("AssociationCallbacksTest", () => {
 
     const callbackLog = ["before_adding<new>", "after_adding<new>"];
     expect(project.developersLog).toEqual(callbackLog);
-    expect(await project.save()).toBe(true);
+    expect(await project.save()).toBeTruthy();
     expect((await proxy).length).toBe(1);
     expect(project.developersLog).toEqual(callbackLog);
   });
