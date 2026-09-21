@@ -1,4 +1,4 @@
-import { Assertion } from "./assertions.js";
+import { assert } from "./assertions.js";
 
 /** @noRailsEquivalent PERMANENT */
 export class MockExpectationError extends Error {
@@ -182,9 +182,12 @@ function assertMock(mock: Mock): void {
       );
     }
   }
+  assert(true);
 }
 
 function assertEqual(expected: unknown, actual: unknown, message: string): void {
-  if (!Object.is(expected, actual))
-    throw new Assertion(`${message}.\nExpected: ${expected}\n  Actual: ${actual}`);
+  assert(
+    Object.is(expected, actual),
+    () => `${message}.\nExpected: ${expected}\n  Actual: ${actual}`,
+  );
 }

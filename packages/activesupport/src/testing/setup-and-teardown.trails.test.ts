@@ -7,6 +7,7 @@ import {
   afterTeardown as testsWithoutAssertionsAfterTeardown,
   type RunningTest,
 } from "./tests-without-assertions.js";
+import { _takeAssertions, assertNot, assertRaises } from "./assertions.js";
 import { TestCase } from "../test-case.js";
 
 function testCase(): Record<string, never> {
@@ -121,5 +122,15 @@ describe("TestCase after_teardown chain", () => {
       warn.mockRestore();
       resetCallbacks(TestCase, "teardown");
     }
+  });
+
+  it("counts an assert helper as an assertion", async () => {
+    _takeAssertions();
+    assertNot(false);
+    await assertRaises([RangeError], {}, () => {
+      throw new RangeError("boom");
+    });
+
+    expect(_takeAssertions()).toBe(2);
   });
 });
