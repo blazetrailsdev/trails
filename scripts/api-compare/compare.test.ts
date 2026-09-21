@@ -16,6 +16,7 @@ import {
   dedupeRubyMethodInto,
   rubyLevelKey,
   tsDeclaresOnLevel,
+  includerAdmitsOnLevel,
   type SeenRubyMethod,
   NAME_COLLISION_CLUSTERS,
   selectMisplacedFile,
@@ -1855,6 +1856,31 @@ describe("tsDeclaresOnLevel", () => {
 
   it("prefers a seat declaration over a neutral one", () => {
     expect(tsDeclaresOnLevel("class", owners("", "Base"), owners("Base"), undefined)).toBe("seat");
+  });
+});
+
+describe("includerAdmitsOnLevel", () => {
+  const owners = (...o: string[]) => new Set(o);
+
+  it("rejects an includer member on the opposite seat", () => {
+    const declared = tsDeclaresOnLevel("class", owners("Base"), undefined, owners("Base"));
+    expect(includerAdmitsOnLevel(declared, false)).toBe(false);
+  });
+
+  it("rejects a seat-neutral re-export of the port the other row already holds", () => {
+    const declared = tsDeclaresOnLevel("class", owners(""), undefined, undefined);
+    expect(includerAdmitsOnLevel(declared, true)).toBe(false);
+  });
+
+  it("admits an includer member on the row's own seat", () => {
+    const declared = tsDeclaresOnLevel("class", owners("Base"), owners("Base"), undefined);
+    expect(includerAdmitsOnLevel(declared, true)).toBe(true);
+  });
+
+  it("admits a seat-neutral includer member no other row holds", () => {
+    expect(
+      includerAdmitsOnLevel(tsDeclaresOnLevel("class", owners(""), undefined, undefined), false),
+    ).toBe(true);
   });
 });
 

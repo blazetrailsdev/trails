@@ -2979,6 +2979,21 @@ export function tsDeclaresOnLevel(
   return neutral ? "neutral" : undefined;
 }
 
+/**
+ * Whether an includer's declaration can credit a row whose name the Ruby file
+ * expects at BOTH levels: a declaration on the row's seat can, one on the
+ * opposite seat cannot, and a seat-neutral one can only while the file's own
+ * seat-neutral port has not already answered the other row (base.ts's
+ * `isAttributeMethod: _isAttributeMethod` re-exposes attribute-methods.ts's).
+ */
+export function includerAdmitsOnLevel(
+  declared: "seat" | "neutral" | undefined,
+  neutralTaken: boolean,
+): boolean {
+  if (declared === "seat") return true;
+  return declared === "neutral" && !neutralTaken;
+}
+
 /** One deduped Ruby method expected from a Ruby file (see `dedupeRubyMethodInto`). */
 export interface SeenRubyMethod {
   /** The seat Ruby defines it on — the other half of the dedup key. */
@@ -4783,13 +4798,17 @@ export function main() {
           for (const { file, methods } of includerMethodSetsByOwner.get(rubyModule) ?? []) {
             if (
               methods.has(candidate) &&
-              (!neutralTaken ||
-                tsDeclaresOnLevel(
-                  level!,
-                  tsOwnersByFileName.get(file)?.get(candidate),
-                  tsStaticOwnersByFileName.get(file)?.get(candidate),
-                  tsInstanceOwnersByFileName.get(file)?.get(candidate),
-                ) === "seat")
+              (!bothLevels ||
+                level === undefined ||
+                includerAdmitsOnLevel(
+                  tsDeclaresOnLevel(
+                    level,
+                    tsOwnersByFileName.get(file)?.get(candidate),
+                    tsStaticOwnersByFileName.get(file)?.get(candidate),
+                    tsInstanceOwnersByFileName.get(file)?.get(candidate),
+                  ),
+                  neutralTaken,
+                ))
             ) {
               foundViaInclude = file;
               matchedCandidate = candidate;
