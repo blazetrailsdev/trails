@@ -17,9 +17,16 @@ import {
 } from "../../errors.js";
 import { AbstractMysqlAdapter } from "../../connection-adapters/abstract-mysql-adapter.js";
 import { NullPool } from "../../connection-adapters/abstract/connection-pool.js";
-import { Result } from "../../result.js";
 import { Base } from "../../base.js";
-import { Logger } from "@blazetrails/activesupport";
+import {
+  assert,
+  assertChanges,
+  assertIncludes,
+  assertNot,
+  assertNothingRaised,
+  assertRaises,
+  Logger,
+} from "@blazetrails/activesupport";
 import * as Arel from "@blazetrails/arel";
 
 describeIfMysqlAdapter("Mysql2AdapterTest", () => {
@@ -34,11 +41,9 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
   it("connection error", async () => {
     const badAdapter = new Mysql2Adapter({ socketPath: "/dev/null", preparedStatements: false });
     try {
-      const error = await badAdapter
-        .connectBang()
-        .then(() => null)
-        .catch((e) => e);
-      expect(error).toBeInstanceOf(ConnectionNotEstablished);
+      const error = (await assertRaises([ConnectionNotEstablished], {}, () =>
+        badAdapter.connectBang(),
+      )) as ConnectionNotEstablished;
       expect(error.connectionPool).toBeInstanceOf(NullPool);
     } finally {
       await badAdapter.disconnectBang();
@@ -48,11 +53,9 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
   it("reconnection error", async () => {
     const badAdapter = new Mysql2Adapter({ socketPath: "/dev/null", preparedStatements: false });
     try {
-      const error = await badAdapter
-        .reconnectBang()
-        .then(() => null)
-        .catch((e) => e);
-      expect(error).toBeInstanceOf(ConnectionNotEstablished);
+      const error = (await assertRaises([ConnectionNotEstablished], {}, () =>
+        badAdapter.reconnectBang(),
+      )) as ConnectionNotEstablished;
       expect(error.connectionPool).toBe(badAdapter.pool);
     } finally {
       await badAdapter.disconnectBang();
@@ -66,19 +69,16 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
 
   it("exec query with prepared statements", async () => {
     const result = await adapter.execQuery("SELECT 1", "SQL", [], { prepare: true });
-    expect(result).toBeInstanceOf(Result);
     expect(result.toArray()).toEqual([{ "1": 1 }]);
   });
 
   it("exec query nothing raises with no result queries", async () => {
     await adapter.execute("CREATE TABLE IF NOT EXISTS `ex` (`number` INT) ENGINE=InnoDB");
     try {
-      await expect(
-        adapter.execQuery("INSERT INTO `ex` (number) VALUES (1)"),
-      ).resolves.toBeInstanceOf(Result);
-      await expect(adapter.execQuery("DELETE FROM `ex` WHERE number = 1")).resolves.toBeInstanceOf(
-        Result,
-      );
+      await assertNothingRaised(async () => {
+        await adapter.execQuery("INSERT INTO `ex` (number) VALUES (1)");
+        await adapter.execQuery("DELETE FROM `ex` WHERE number = 1");
+      });
     } finally {
       await adapter.execute("DROP TABLE IF EXISTS `ex`");
     }
@@ -87,13 +87,11 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
   it("database exists returns false if database does not exist", async () => {
     const url = new URL(MYSQL_TEST_URL);
     url.pathname = "/inexistent_activerecord_unittest";
-    const exists = await Mysql2Adapter.databaseExists(url.toString());
-    expect(exists).toBe(false);
+    assertNot(await Mysql2Adapter.databaseExists(url.toString()), "expected database to not exist");
   });
 
   it("database exists returns true when the database exists", async () => {
-    const exists = await Mysql2Adapter.databaseExists(MYSQL_TEST_URL);
-    expect(exists).toBe(true);
+    assert(await Mysql2Adapter.databaseExists(MYSQL_TEST_URL), "expected database to exist");
   });
 
   it("columns for distinct zero orders", () => {
@@ -143,22 +141,18 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
 
   it("errors for bigint fks on integer pk table in alter table", async () => {
     try {
-      const error = await adapter
-        .addReference("engines", "old_car")
-        .then(() => adapter.addForeignKey("engines", "old_cars"))
-        .then(() => null)
-        .catch((e) => e);
-
-      expect(error).toBeInstanceOf(MismatchedForeignKey);
+      const error = await assertRaises([MismatchedForeignKey], {}, async () => {
+        await adapter.addReference("engines", "old_car");
+        await adapter.addForeignKey("engines", "old_cars");
+      });
       expect(error.message).toMatch(
-        /Column `old_car_id` on table `engines` does not match column `id` on `old_cars`/,
+        /Column `old_car_id` on table `engines` does not match column `id` on `old_cars`, which has type `int(\(11\))?`\./,
       );
-      expect(error.message).toMatch(/which has type `int/i);
       expect(error.message).toMatch(
-        /To resolve this issue, change the type of the `old_car_id` column on `engines` to be :integer/,
+        /To resolve this issue, change the type of the `old_car_id` column on `engines` to be :integer\. \(For example `t.integer :old_car_id`\)\./,
       );
-      expect(error.cause).toBeInstanceOf(Error);
-      expect(error.connectionPool).toBe(adapter.pool);
+      expect(error.cause).not.toBeNull();
+      expect((error as MismatchedForeignKey).connectionPool).toBe(adapter.pool);
     } finally {
       await adapter.execute("ALTER TABLE engines DROP COLUMN old_car_id").catch(() => null);
     }
@@ -168,19 +162,18 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
     "errors for multiple fks on mismatched types for pk table in alter table",
     async () => {
       try {
-        const error = await adapter
-          .addReference("engines", "person", { foreignKey: true })
-          .then(() => adapter.addReference("engines", "old_car", { foreignKey: true }))
-          .then(() => null)
-          .catch((e) => e);
-
-        expect(error).toBeInstanceOf(MismatchedForeignKey);
+        const error = await assertRaises([MismatchedForeignKey], {}, async () => {
+          await adapter.addReference("engines", "person", { foreignKey: true });
+          await adapter.addReference("engines", "old_car", { foreignKey: true });
+        });
         expect(error.message).toMatch(
-          /Column `old_car_id` on table `engines` does not match column `id` on `old_cars`/,
+          /Column `old_car_id` on table `engines` does not match column `id` on `old_cars`, which has type `int(\(11\))?`\./,
         );
-        expect(error.message).toMatch(/which has type `int/i);
-        expect(error.cause).toBeInstanceOf(Error);
-        expect(error.connectionPool).toBe(adapter.pool);
+        expect(error.message).toMatch(
+          /To resolve this issue, change the type of the `old_car_id` column on `engines` to be :integer\. \(For example `t.integer :old_car_id`\)\./,
+        );
+        expect(error.cause).not.toBeNull();
+        expect((error as MismatchedForeignKey).connectionPool).toBe(adapter.pool);
       } finally {
         await adapter.removeReference("engines", "person");
         await adapter.removeReference("engines", "old_car");
@@ -190,8 +183,8 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
 
   it("errors for bigint fks on integer pk table in create table", async () => {
     try {
-      const error = await adapter
-        .execute(
+      const error = await assertRaises([MismatchedForeignKey], {}, () =>
+        adapter.execute(
           `
             CREATE TABLE \`foos\` (
               \`id\` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -200,20 +193,16 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
               CONSTRAINT \`fk_foos_old_car\` FOREIGN KEY (\`old_car_id\`) REFERENCES \`old_cars\` (\`id\`)
             ) ENGINE=InnoDB
           `,
-        )
-        .then(() => null)
-        .catch((e) => e);
-
-      expect(error).toBeInstanceOf(MismatchedForeignKey);
-      expect(error.message).toMatch(
-        /Column `old_car_id` on table `foos` does not match column `id` on `old_cars`/,
+        ),
       );
-      expect(error.message).toMatch(/which has type `int/i);
       expect(error.message).toMatch(
-        /To resolve this issue, change the type of the `old_car_id` column on `foos` to be :integer/,
+        /Column `old_car_id` on table `foos` does not match column `id` on `old_cars`, which has type `int(\(11\))?`\./,
       );
-      expect(error.cause).toBeInstanceOf(Error);
-      expect(error.connectionPool).toBe(adapter.pool);
+      expect(error.message).toMatch(
+        /To resolve this issue, change the type of the `old_car_id` column on `foos` to be :integer\. \(For example `t.integer :old_car_id`\)\./,
+      );
+      expect(error.cause).not.toBeNull();
+      expect((error as MismatchedForeignKey).connectionPool).toBe(adapter.pool);
     } finally {
       await adapter.dropTable("foos", { ifExists: true });
     }
@@ -221,8 +210,8 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
 
   it("errors for integer fks on bigint pk table in create table", async () => {
     try {
-      const error = await adapter
-        .execute(
+      const error = await assertRaises([MismatchedForeignKey], {}, () =>
+        adapter.execute(
           `
             CREATE TABLE \`foos\` (
               \`id\` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -231,20 +220,16 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
               CONSTRAINT \`fk_foos_car\` FOREIGN KEY (\`car_id\`) REFERENCES \`cars\` (\`id\`)
             ) ENGINE=InnoDB
           `,
-        )
-        .then(() => null)
-        .catch((e) => e);
-
-      expect(error).toBeInstanceOf(MismatchedForeignKey);
-      expect(error.message).toMatch(
-        /Column `car_id` on table `foos` does not match column `id` on `cars`/,
+        ),
       );
-      expect(error.message).toMatch(/which has type `bigint/i);
       expect(error.message).toMatch(
-        /To resolve this issue, change the type of the `car_id` column on `foos` to be :bigint/,
+        /Column `car_id` on table `foos` does not match column `id` on `cars`, which has type `bigint(\(20\))?`\./,
       );
-      expect(error.cause).toBeInstanceOf(Error);
-      expect(error.connectionPool).toBe(adapter.pool);
+      expect(error.message).toMatch(
+        /To resolve this issue, change the type of the `car_id` column on `foos` to be :bigint\. \(For example `t.bigint :car_id`\)\./,
+      );
+      expect(error.cause).not.toBeNull();
+      expect((error as MismatchedForeignKey).connectionPool).toBe(adapter.pool);
     } finally {
       await adapter.dropTable("foos", { ifExists: true });
     }
@@ -252,8 +237,8 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
 
   it("errors for bigint fks on string pk table in create table", async () => {
     try {
-      const error = await adapter
-        .execute(
+      const error = await assertRaises([MismatchedForeignKey], {}, () =>
+        adapter.execute(
           `
             CREATE TABLE \`foos\` (
               \`id\` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -262,58 +247,62 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
               CONSTRAINT \`fk_foos_subscriber\` FOREIGN KEY (\`subscriber_id\`) REFERENCES \`subscribers\` (\`nick\`)
             ) ENGINE=InnoDB
           `,
-        )
-        .then(() => null)
-        .catch((e) => e);
-
-      expect(error).toBeInstanceOf(MismatchedForeignKey);
-      expect(error.message).toMatch(
-        /Column `subscriber_id` on table `foos` does not match column `nick` on `subscribers`/,
+        ),
       );
-      expect(error.message).toMatch(/which has type `varchar/i);
-      expect(error.message).toMatch(
-        /To resolve this issue, change the type of the `subscriber_id` column on `foos` to be :string/,
+      assertIncludes(
+        error.message,
+        "Column `subscriber_id` on table `foos` does not match column `nick` on `subscribers`, " +
+          "which has type `varchar(255)`. To resolve this issue, change the type of the `subscriber_id` " +
+          "column on `foos` to be :string. (For example `t.string :subscriber_id`).",
       );
-      expect(error.cause).toBeInstanceOf(Error);
-      expect(error.connectionPool).toBe(adapter.pool);
+      expect(error.cause).not.toBeNull();
+      expect((error as MismatchedForeignKey).connectionPool).toBe(adapter.pool);
     } finally {
       await adapter.dropTable("foos", { ifExists: true });
     }
   });
 
-  it("read timeout exception", () => {
+  it("read timeout exception", async () => {
     const driverErr = Object.assign(new Error("read ETIMEDOUT"), {
       code: "PROTOCOL_SEQUENCE_TIMEOUT",
     });
-    const translated = adapter.translateExceptionClass(driverErr, "SELECT SLEEP(2)", []);
-    expect(translated).toBeInstanceOf(AdapterTimeout);
-    expect(translated).toBeInstanceOf(QueryAborted);
-    expect((translated as AdapterTimeout).cause).toBe(driverErr);
-    expect((translated as AdapterTimeout).connectionPool).toBe(adapter.pool);
+    const error = (await assertRaises([AdapterTimeout], {}, () => {
+      throw adapter.translateExceptionClass(driverErr, "SELECT SLEEP(2)", []);
+    })) as AdapterTimeout;
+    expect(error).toBeInstanceOf(QueryAborted);
+    expect(error.cause).toBe(driverErr);
+    expect(error.connectionPool).toBe(adapter.pool);
   });
 
-  it("statement timeout error codes", () => {
-    for (const errno of [
-      AbstractMysqlAdapter.ER_QUERY_TIMEOUT,
-      AbstractMysqlAdapter.ER_FILSORT_ABORT,
-    ]) {
-      const driverErr = Object.assign(new Error("fail"), { errno });
-      const translated = adapter.translateExceptionClass(driverErr, "SELECT 1", []);
-      expect(translated).toBeInstanceOf(StatementTimeout);
-      expect((translated as StatementTimeout).cause).toBe(driverErr);
-      expect((translated as StatementTimeout).connectionPool).toBe(adapter.pool);
-    }
+  it("statement timeout error codes", async () => {
+    await adapter.execute("SELECT 1");
+    const rawConn = adapter._clientForTest()!;
+    vi.spyOn(rawConn, "query").mockRejectedValueOnce(
+      Object.assign(new Error("fail"), { errno: AbstractMysqlAdapter.ER_FILSORT_ABORT }),
+    );
+    let error = (await assertRaises([StatementTimeout], {}, () =>
+      adapter.execute("SELECT 1"),
+    )) as StatementTimeout;
+    expect(error.connectionPool).toBe(adapter.pool);
+
+    vi.spyOn(rawConn, "query").mockRejectedValueOnce(
+      Object.assign(new Error("fail"), { errno: AbstractMysqlAdapter.ER_QUERY_TIMEOUT }),
+    );
+    error = (await assertRaises([StatementTimeout], {}, () =>
+      adapter.execute("SELECT 1"),
+    )) as StatementTimeout;
+    expect(error.connectionPool).toBe(adapter.pool);
   });
 
   it("database timezone changes synced to connection", async () => {
-    await adapter.execute("SELECT 1");
-    expect(adapter._databaseTimezone).toBe("utc");
     await withTimezoneConfig({ default: "local" }, async () => {
-      await adapter.execute("SELECT 1");
-      expect(adapter._databaseTimezone).toBe("local");
+      await assertChanges(
+        () => adapter._databaseTimezone,
+        null,
+        { from: "utc", to: "local" },
+        () => adapter.execute("SELECT 1"),
+      );
     });
-    await adapter.execute("SELECT 1");
-    expect(adapter._databaseTimezone).toBe("utc");
   });
 
   it("warnings do not change returned value of exec update", async () => {
