@@ -99,14 +99,14 @@ export class ExclusiveConnectionTimeoutError extends ConnectionTimeoutError {
 }
 
 export class ConnectionNotDefined extends ConnectionNotEstablished {
-  readonly connectionName?: string;
+  readonly connectionName?: string | null;
   readonly role?: string;
   readonly shard?: string;
 
   constructor(
     message?: string,
     options?: {
-      connectionName?: string;
+      connectionName?: string | null;
       role?: string;
       shard?: string;
       connectionPool?: unknown;

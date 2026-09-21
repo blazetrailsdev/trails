@@ -372,14 +372,14 @@ export async function removeConnection(this: typeof Base): Promise<HashConfig | 
   }
 
   if (
-    this.connectionHandler.retrieveConnectionPool(name!, {
+    this.connectionHandler.retrieveConnectionPool(name, {
       role: this.currentRole(),
       shard: this.currentShard(),
     })
   ) {
-    (this as any)._connectionSpecificationName = undefined;
+    this.connectionSpecificationName = null;
   }
-  return this.connectionHandler.removeConnectionPool(name!, {
+  return this.connectionHandler.removeConnectionPool(name, {
     role: this.currentRole(),
     shard: this.currentShard(),
   });
