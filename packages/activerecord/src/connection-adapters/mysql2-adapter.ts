@@ -207,6 +207,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       advisoryLocks,
       strict,
       waitTimeout,
+      readTimeout: _readTimeout,
       variables,
       _fakeConnection: fake,
       ...mysqlConfig

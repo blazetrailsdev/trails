@@ -151,7 +151,7 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
       expect(error.message).toMatch(
         /To resolve this issue, change the type of the `old_car_id` column on `engines` to be :integer\. \(For example `t.integer :old_car_id`\)\./,
       );
-      expect(error.cause).not.toBeNull();
+      expect(error.cause ?? null).not.toBeNull();
       expect((error as MismatchedForeignKey).connectionPool).toBe(adapter.pool);
     } finally {
       await adapter.execute("ALTER TABLE engines DROP COLUMN old_car_id").catch(() => null);
@@ -172,7 +172,7 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
         expect(error.message).toMatch(
           /To resolve this issue, change the type of the `old_car_id` column on `engines` to be :integer\. \(For example `t.integer :old_car_id`\)\./,
         );
-        expect(error.cause).not.toBeNull();
+        expect(error.cause ?? null).not.toBeNull();
         expect((error as MismatchedForeignKey).connectionPool).toBe(adapter.pool);
       } finally {
         await adapter.removeReference("engines", "person");
@@ -201,7 +201,7 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
       expect(error.message).toMatch(
         /To resolve this issue, change the type of the `old_car_id` column on `foos` to be :integer\. \(For example `t.integer :old_car_id`\)\./,
       );
-      expect(error.cause).not.toBeNull();
+      expect(error.cause ?? null).not.toBeNull();
       expect((error as MismatchedForeignKey).connectionPool).toBe(adapter.pool);
     } finally {
       await adapter.dropTable("foos", { ifExists: true });
@@ -228,7 +228,7 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
       expect(error.message).toMatch(
         /To resolve this issue, change the type of the `car_id` column on `foos` to be :bigint\. \(For example `t.bigint :car_id`\)\./,
       );
-      expect(error.cause).not.toBeNull();
+      expect(error.cause ?? null).not.toBeNull();
       expect((error as MismatchedForeignKey).connectionPool).toBe(adapter.pool);
     } finally {
       await adapter.dropTable("foos", { ifExists: true });
@@ -255,7 +255,7 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
           "which has type `varchar(255)`. To resolve this issue, change the type of the `subscriber_id` " +
           "column on `foos` to be :string. (For example `t.string :subscriber_id`).",
       );
-      expect(error.cause).not.toBeNull();
+      expect(error.cause ?? null).not.toBeNull();
       expect((error as MismatchedForeignKey).connectionPool).toBe(adapter.pool);
     } finally {
       await adapter.dropTable("foos", { ifExists: true });
@@ -263,15 +263,17 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
   });
 
   it("read timeout exception", async () => {
-    const driverErr = Object.assign(new Error("read ETIMEDOUT"), {
-      code: "PROTOCOL_SEQUENCE_TIMEOUT",
-    });
-    const error = (await assertRaises([AdapterTimeout], {}, () => {
-      throw adapter.translateExceptionClass(driverErr, "SELECT SLEEP(2)", []);
-    })) as AdapterTimeout;
-    expect(error).toBeInstanceOf(QueryAborted);
-    expect(error.cause).toBe(driverErr);
-    expect(error.connectionPool).toBe(adapter.pool);
+    const connection = new Mysql2Adapter({ uri: MYSQL_TEST_URL, readTimeout: 1 });
+    try {
+      const error = (await assertRaises([AdapterTimeout], {}, () =>
+        connection.execute("SELECT SLEEP(2)"),
+      )) as AdapterTimeout;
+      expect(error).toBeInstanceOf(QueryAborted);
+      expect((error.cause as { code?: string }).code).toBe("PROTOCOL_SEQUENCE_TIMEOUT");
+      expect(error.connectionPool).toBe(connection.pool);
+    } finally {
+      await connection.disconnectBang();
+    }
   });
 
   it("statement timeout error codes", async () => {

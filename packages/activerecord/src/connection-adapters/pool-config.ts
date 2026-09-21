@@ -196,6 +196,8 @@ export interface SQLite3Config extends TrailsAdapterOptions {
 export interface MysqlAdapterOptions extends TrailsAdapterOptions {
   strict?: boolean | ":default";
   waitTimeout?: number | string;
+  readTimeout?: number;
+  encoding?: string;
   variables?: Record<string, string | number | boolean | null | ":default">;
   /** @internal */
   initSql?: string;

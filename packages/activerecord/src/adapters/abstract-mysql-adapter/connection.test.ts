@@ -33,8 +33,6 @@ function clearVersionCache(adapter: Mysql2Adapter): void {
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
-  const testLockFree = async (lockName: string): Promise<boolean> =>
-    (await adapter.selectValue(`SELECT IS_FREE_LOCK(${adapter.quote(lockName)})`)) === 1;
   beforeEach(async () => {
     adapter = await leaseMysqlAdapter();
   });
@@ -387,6 +385,10 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       const released = await adapter.releaseAdvisoryLock(lockName);
       expect(released).toBe(false);
     });
+
+    async function testLockFree(lockName: string): Promise<boolean> {
+      return (await adapter.selectValue(`SELECT IS_FREE_LOCK(${adapter.quote(lockName)})`)) === 1;
+    }
   });
 
   describe("connect error translation", () => {

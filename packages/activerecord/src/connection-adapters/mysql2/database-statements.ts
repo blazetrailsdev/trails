@@ -55,6 +55,7 @@ interface PerformQueryHost {
   verified?(): void;
   _trackPrepared?(conn: unknown, sql: string): void;
   quotedDate(value: unknown): string;
+  _config?: { readTimeout?: number };
 }
 
 /** @internal */
@@ -176,9 +177,11 @@ export async function performQuery(
   let rawFields: mysql.FieldPacket[] | undefined;
   let stmtToClose: { close(): void } | undefined;
   if (!hasBinds) {
+    const readTimeout = this._config?.readTimeout;
     [rawResult, rawFields] = (await rawConnection.query({
       sql,
       rowsAsArray: true,
+      ...(readTimeout != null ? { timeout: readTimeout * 1000 } : {}),
     } as any)) as [unknown, mysql.FieldPacket[]];
   } else if (prepare) {
     try {
