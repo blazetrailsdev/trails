@@ -2901,8 +2901,10 @@ export function rubyMethodToTsForFqn(
 }
 
 /**
- * Dedup expected Ruby methods by Ruby method name (NOT first TS
- * candidate). Two distinct Ruby methods can produce the same first TS
+ * Dedup expected Ruby methods by (level, Ruby method name) — NOT first TS
+ * candidate, and NOT name alone: `ClassMethods#attribute_method?` and the
+ * instance `attribute_method?` (attribute_methods.rb:224, :470) are two
+ * methods, and keying on the name let either TS member satisfy both. Two distinct Ruby methods can produce the same first TS
  * candidate (`is_number?` and `number?` both → `"isNumber"`); keying
  * by the TS candidate would silently drop the second method from the
  * expected set. Caller supplies a per-file `seen` map (keyed by method
@@ -2916,14 +2918,17 @@ export function dedupeRubyMethodInto(
   rm: MethodInfo,
   itemFqn: string,
   rubyFile?: string,
+  klass = false,
 ): void {
   if (rubyMethodToTsForFqn(itemFqn, rm.name) === null) return;
   if (isRubyOnlyClass(itemFqn)) return;
   const tsMirrorNames = rubyFile === undefined ? null : scopedSkipMirrorName(rm.name, rubyFile);
   if (rubyFile !== undefined && tsMirrorNames === null && isScopedSkip(rm.name, rubyFile)) return;
-  const key = rm.name;
+  const level = rubyOwnerSeat(itemFqn, klass);
+  const key = rubyLevelKey(level, rm.name);
   if (!seen.has(key)) {
     seen.set(key, {
+      level,
       ...(tsMirrorNames === null ? {} : { tsMirrorNames }),
       rubyName: rm.name,
       rubyModule: itemFqn,
@@ -2934,8 +2939,76 @@ export function dedupeRubyMethodInto(
   }
 }
 
+/**
+ * The `seen` key for a Ruby method at one level: `self.foo` for the singleton
+ * seat, bare `foo` for the instance seat — Ruby's own `def self.foo` / `def foo`
+ * spellings, so a file declaring both keeps two expected rows.
+ */
+export function rubyLevelKey(level: OwnerSeat, name: string): string {
+  return level === "class" ? `self.${name}` : name;
+}
+
+/**
+ * How `tsFile` declares `tsName` for a Ruby method at `level`: `"seat"` when
+ * some owner states that seat (a static is the class seat, an instance member
+ * the instance seat — see `tsOwnerSeat`), `"neutral"` when the only fitting
+ * declaration states no seat (a top-level `this`-typed function, or an owner
+ * whose seat cannot be told), `undefined` when every owner is on the other
+ * seat. A name with no recorded owner is not second-guessed.
+ *
+ * Consulted only where a file expects the name at BOTH levels. A neutral
+ * declaration is one TS member, so it answers the first-sighted row only:
+ * `attribute_methods.rb` defines `attribute_method?` on the instance (:499)
+ * and in `ClassMethods` (:224), and one top-level `isAttributeMethod` cannot
+ * port both. Once the other row holds it, neither a later candidate spelling
+ * nor an includer re-exposing it (base.ts) counts unless it is on this seat.
+ */
+export function tsDeclaresOnLevel(
+  level: OwnerSeat,
+  tsOwners: ReadonlySet<string> | undefined,
+  staticOwners: ReadonlySet<string> | undefined,
+  instanceOwners: ReadonlySet<string> | undefined,
+): "seat" | "neutral" | undefined {
+  if (tsOwners === undefined || tsOwners.size === 0) return "neutral";
+  let neutral = false;
+  for (const owner of tsOwners) {
+    const seat = owner === "" ? undefined : tsOwnerSeat(owner, staticOwners, instanceOwners);
+    if (seat === level) return "seat";
+    if (seat === undefined) neutral = true;
+  }
+  return neutral ? "neutral" : undefined;
+}
+
+/**
+ * Whether an includer's declaration can credit a row whose name the Ruby file
+ * expects at BOTH levels: a declaration on the row's seat can, one on the
+ * opposite seat cannot, and a seat-neutral one can only while the file's own
+ * seat-neutral port has not already answered the other row (base.ts's
+ * `isAttributeMethod: _isAttributeMethod` re-exposes attribute-methods.ts's).
+ */
+export function includerAdmitsOnLevel(
+  declared: "seat" | "neutral" | undefined,
+  neutralTaken: boolean,
+): boolean {
+  if (declared === "seat") return true;
+  return declared === "neutral" && !neutralTaken;
+}
+
+/**
+ * The key a Ruby body is looked up by when one Ruby file defines a name more
+ * than once: its declaring owner AND its level. The `ClassMethods` fold puts
+ * `attribute_methods.rb`'s class `attribute_method?` (:224) and instance one
+ * (:499) on the same owner, so the owner alone would hand both matched pairs
+ * the first body.
+ */
+export function rubyBodyKey(owner: string, level: OwnerSeat, name: string): string {
+  return `${owner}\u0000${rubyLevelKey(level, name)}`;
+}
+
 /** One deduped Ruby method expected from a Ruby file (see `dedupeRubyMethodInto`). */
 export interface SeenRubyMethod {
+  /** The seat Ruby defines it on — the other half of the dedup key. */
+  level?: OwnerSeat;
   rubyName: string;
   rubyModule: string;
   /** The Ruby extractor's classification — `"class_attribute"` for an `mattr_accessor`/`class_attribute`-generated reader. */
@@ -3957,6 +4030,7 @@ export function main() {
       // First-sighting Ruby body digest per name (source-hash pinning, RFC 0025).
       const rubyBodyDigestByName = new Map<string, string>();
       const rubySkeletonByName = new Map<string, string[]>();
+      const rubySkeletonByOwnerName = new Map<string, string[]>();
       const rubyCallArgsByName = new Map<string, CallSite[]>();
       // The same two populations keyed by (declaring class, name): one Ruby FILE
       // can declare a name twice, and first-sighting keying then hands the first
@@ -3975,10 +4049,14 @@ export function main() {
       // rubyOwnerSeat).
       const rubyKlassOwnerNames = new Set<string>();
       const ownerKey = (owner: string, name: string) => `${owner}\u0000${name}`;
+      const ownsBody = (name: string) =>
+        (rubyOwnersByName.get(name)?.size ?? 0) > 1 ||
+        (seen.has(rubyLevelKey("class", name)) && seen.has(rubyLevelKey("instance", name)));
       for (const item of items) {
         const f = flattenIncludedMethodInfos(item.info, item.fqn, rubyPkg, moduleFqnByShort, pkg);
         const rubyMethods = [...f.instance, ...f.klass];
         const klassNames = new Set(f.klass.map((rm) => rm.name));
+        const klassMethods = new Set(f.klass);
         const itemShort = item.fqn.split("::").at(-1) ?? item.fqn;
         rubyOwnerShortNames.add(itemShort);
         if (rubyMethods.some((rm) => rm.name === "initialize")) {
@@ -3990,7 +4068,8 @@ export function main() {
           // public-mode run would otherwise never see the declaration.
           if (rm.reader) rubyReaderNames.add(ownerKey(item.fqn, rm.name));
           if (!methodMatchesMode(rm)) continue;
-          dedupeRubyMethodInto(seen, rm, item.fqn, rubyFile);
+          dedupeRubyMethodInto(seen, rm, item.fqn, rubyFile, klassMethods.has(rm));
+          const rmLevel = rubyOwnerSeat(item.fqn, klassMethods.has(rm));
           if (!rubyParamsByName.has(rm.name)) {
             rubyParamsByName.set(rm.name, rm.params);
             if (isForwardingRubyEntry(rm)) rubyForwardingNames.add(rm.name);
@@ -4008,15 +4087,24 @@ export function main() {
             rubyWeakCallsByName.set(rm.name, rm.weakCalls ?? []);
             rubyCallReceiversByName.set(rm.name, rm.callReceivers ?? {});
           }
-          if (rm.calls && !rubyCallsByOwnerName.has(ownerKey(item.fqn, rm.name))) {
-            rubyCallsByOwnerName.set(ownerKey(item.fqn, rm.name), {
+          if (rm.calls && !rubyCallsByOwnerName.has(rubyBodyKey(item.fqn, rmLevel, rm.name))) {
+            rubyCallsByOwnerName.set(rubyBodyKey(item.fqn, rmLevel, rm.name), {
               calls: rm.calls,
               weak: rm.weakCalls ?? [],
               receivers: rm.callReceivers ?? {},
             });
           }
-          if (rm.callArgs && !rubyCallArgsByOwnerName.has(ownerKey(item.fqn, rm.name))) {
-            rubyCallArgsByOwnerName.set(ownerKey(item.fqn, rm.name), rm.callArgs);
+          if (
+            rm.callArgs &&
+            !rubyCallArgsByOwnerName.has(rubyBodyKey(item.fqn, rmLevel, rm.name))
+          ) {
+            rubyCallArgsByOwnerName.set(rubyBodyKey(item.fqn, rmLevel, rm.name), rm.callArgs);
+          }
+          if (
+            rm.skeleton &&
+            !rubySkeletonByOwnerName.has(rubyBodyKey(item.fqn, rmLevel, rm.name))
+          ) {
+            rubySkeletonByOwnerName.set(rubyBodyKey(item.fqn, rmLevel, rm.name), rm.skeleton);
           }
           if (rm.skeleton && !rubySkeletonByName.has(rm.name)) {
             rubySkeletonByName.set(rm.name, rm.skeleton);
@@ -4079,6 +4167,7 @@ export function main() {
         tsName: string,
         tsFile: string,
         rubyModule: string,
+        level: OwnerSeat,
       ): {
         tsClass: string | undefined;
         ambiguous: boolean;
@@ -4090,9 +4179,9 @@ export function main() {
           tsBodylessOwnersByFileName.get(tsFile)?.get(tsName),
           tsBodiedOwnersByFileName.get(tsFile)?.get(tsName),
         );
-        const first = resolveOwnerIn(declared, rubyName, tsName, tsFile, rubyModule);
+        const first = resolveOwnerIn(declared, rubyName, tsName, tsFile, rubyModule, level);
         if (!first.ambiguous || bodied === declared) return { ...first, tsOwners: declared };
-        const retry = resolveOwnerIn(bodied, rubyName, tsName, tsFile, rubyModule);
+        const retry = resolveOwnerIn(bodied, rubyName, tsName, tsFile, rubyModule, level);
         return retry.ambiguous ? { ...first, tsOwners: declared } : { ...retry, tsOwners: bodied };
       };
 
@@ -4102,10 +4191,11 @@ export function main() {
         tsName: string,
         tsFile: string,
         rubyModule: string,
+        level: OwnerSeat,
       ): { tsClass: string | undefined; ambiguous: boolean } => {
         const rubySeatOf = (rubyOwner: string) =>
           rubyOwnerSeat(rubyOwner, rubyKlassOwnerNames.has(ownerKey(rubyOwner, rubyName)));
-        const rubySeat = rubySeatOf(rubyModule);
+        const rubySeat = ownsBody(rubyName) ? level : rubySeatOf(rubyModule);
         const seatOf = (tsOwner: string) =>
           tsOwnerSeat(
             tsOwner,
@@ -4114,7 +4204,17 @@ export function main() {
           );
         const rubyOwners = rubyOwnersByName.get(rubyName);
         const rubySeats = new Set([...(rubyOwners ?? [])].map(rubySeatOf));
-        const tsClass = resolveTsOwner(tsOwners, rubyModule, {
+        const bothLevels =
+          seen.has(rubyLevelKey("class", rubyName)) && seen.has(rubyLevelKey("instance", rubyName));
+        const exactSeat = [...(tsOwners ?? [])].filter((o) => seatOf(o) === level);
+        const onSeat = !bothLevels
+          ? tsOwners
+          : new Set(
+              exactSeat.length > 0
+                ? exactSeat
+                : [...(tsOwners ?? [])].filter((o) => seatOf(o) === undefined),
+            );
+        const tsClass = resolveTsOwner(onSeat, rubyModule, {
           hosts: includeHosts(tsFile, rubyModule),
           seatOf,
           rubySeat,
@@ -4126,8 +4226,8 @@ export function main() {
         });
         const tsSeat = tsClass === undefined ? undefined : seatOf(tsClass);
         const ambiguous =
-          ambiguousTsOwner(tsOwners, tsClass) ||
-          ambiguousRubyOwner(rubyOwners, tsOwners, {
+          ambiguousTsOwner(onSeat, tsClass) ||
+          ambiguousRubyOwner(rubyOwners, onSeat, {
             rubySeat,
             tsSeat,
             rubyOwnersOnTsSeat: [...(rubyOwners ?? [])].filter((o) => rubySeatOf(o) === tsSeat)
@@ -4141,25 +4241,36 @@ export function main() {
       // (b) are absent from the TS body's call-set. A coarse body-fidelity
       // signal — never affects the parity %. Lossy: legitimate restructuring
       // (extracted helper, inlined call) shows up here, so it's advisory.
-      const checkCalls = (rubyName: string, tsName: string, tsFile: string, rubyModule: string) => {
+      const checkCalls = (
+        rubyName: string,
+        tsName: string,
+        tsFile: string,
+        rubyModule: string,
+        level: OwnerSeat,
+      ) => {
         // The call set is computed only under `--calls`, the mode that
         // writes and gates the artifact (see the artifact write below).
         if (!callsGate) return;
-        const rubyOwned =
-          (rubyOwnersByName.get(rubyName)?.size ?? 0) > 1
-            ? rubyCallsByOwnerName.get(ownerKey(rubyModule, rubyName))
-            : {
-                calls: rubyCallsByName.get(rubyName) ?? [],
-                weak: rubyWeakCallsByName.get(rubyName) ?? [],
-                receivers: rubyCallReceiversByName.get(rubyName) ?? {},
-              };
+        const rubyOwned = ownsBody(rubyName)
+          ? rubyCallsByOwnerName.get(rubyBodyKey(rubyModule, level, rubyName))
+          : {
+              calls: rubyCallsByName.get(rubyName) ?? [],
+              weak: rubyWeakCallsByName.get(rubyName) ?? [],
+              receivers: rubyCallReceiversByName.get(rubyName) ?? {},
+            };
         // A body whose every Ruby call is weak still gets compared:
         // significantMissingCalls returns empty for an empty `rubyCalls`, so the
         // pair is counted and found clean rather than leaving the population.
         // Returning early here keyed the denominator on the RUBY side alone, so
         // converging a false-positive class read as LOST coverage (RFC 0108).
         const rubyCalls = dropWeakCalls(rubyOwned?.calls, rubyOwned?.weak);
-        const { tsClass, ambiguous, tsOwners } = resolveOwner(rubyName, tsName, tsFile, rubyModule);
+        const { tsClass, ambiguous, tsOwners } = resolveOwner(
+          rubyName,
+          tsName,
+          tsFile,
+          rubyModule,
+          level,
+        );
         if (ambiguous) return;
         if (
           ownerRecordsNothing(
@@ -4224,7 +4335,9 @@ export function main() {
           negatedTsCalls,
           rubyOwned?.calls ?? rubyCalls,
         );
-        const rubySkeleton = rubySkeletonByName.get(rubyName);
+        const rubySkeleton = ownsBody(rubyName)
+          ? rubySkeletonByOwnerName.get(rubyBodyKey(rubyModule, level, rubyName))
+          : rubySkeletonByName.get(rubyName);
         const tsSkeletons = tsSkeletonByFileName.get(tsFile)?.get(tsName);
         if (rubySkeleton !== undefined && tsSkeletons?.length === 1) {
           const tsSkeletonOf = (name: string) => {
@@ -4311,6 +4424,7 @@ export function main() {
         tsName: string,
         tsFile: string,
         rubyModule: string,
+        level: OwnerSeat,
       ) => {
         if (!callsGate) return;
         // Near the exclusion checkCalls makes through `dropWeakCalls`: a call on
@@ -4321,10 +4435,9 @@ export function main() {
         // only drop whole NAMES, but here a name that is weak at one site and a
         // genuine call at another would lose both sites to a name filter. See
         // {@link comparableRubySites} below for when a weak site is kept.
-        const rubyOwnSites =
-          (rubyOwnersByName.get(rubyName)?.size ?? 0) > 1
-            ? rubyCallArgsByOwnerName.get(ownerKey(rubyModule, rubyName))
-            : rubyCallArgsByName.get(rubyName);
+        const rubyOwnSites = ownsBody(rubyName)
+          ? rubyCallArgsByOwnerName.get(rubyBodyKey(rubyModule, level, rubyName))
+          : rubyCallArgsByName.get(rubyName);
         // Also dropped: a receiver-less zero-arg read of an `attr_reader` name.
         // Ruby spells such a read exactly like a call, so `if foreign_key`
         // (schema_definitions.rb:241) arrives as a second, zero-arg
@@ -4344,7 +4457,13 @@ export function main() {
         // Two overloads/overrides under one (file, name) give no ground for
         // choosing whose call sites the Ruby ones pair against — as for a
         // skeleton record, only an unambiguous TS body compares.
-        const { tsClass, ambiguous, tsOwners } = resolveOwner(rubyName, tsName, tsFile, rubyModule);
+        const { tsClass, ambiguous, tsOwners } = resolveOwner(
+          rubyName,
+          tsName,
+          tsFile,
+          rubyModule,
+          level,
+        );
         if (ambiguous) return;
         if (
           ownerRecordsNothing(
@@ -4467,12 +4586,13 @@ export function main() {
         // guessed onto `abstract-renderer.ts` reported two). Parameter NAMES are
         // skipped for it; every other check still compares the pair.
         guessedFile = false,
+        level: OwnerSeat = rubyOwnerSeat(rubyModule, false),
       ) => {
         checkOptionKeys(rubyName, tsName, tsFile);
         checkLiterals(rubyName, tsName, tsFile);
         if (!skipCalls) {
-          checkCalls(rubyName, tsName, tsFile, rubyModule);
-          checkCallArgs(rubyName, tsName, tsFile, rubyModule);
+          checkCalls(rubyName, tsName, tsFile, rubyModule, level);
+          checkCallArgs(rubyName, tsName, tsFile, rubyModule, level);
         }
         checkBody(rubyName, tsName, tsFile);
         if (isArityOverridden(rubyName, rubyFile)) return;
@@ -4626,9 +4746,10 @@ export function main() {
         ),
       ]);
 
+      const neutralClaims = new Set<string>();
       for (const [
         _dedupeKey,
-        { rubyName, rubyModule, notes, mixinFile, definedInFile, tsMirrorNames },
+        { level, rubyName, rubyModule, notes, mixinFile, definedInFile, tsMirrorNames },
       ] of seen) {
         // Null once the sibling set is known (`new` beside `initialize`), so it
         // is dropped the way `seen`'s own no-candidate gate drops one.
@@ -4639,7 +4760,27 @@ export function main() {
         if (tsCandidates === null) continue;
 
         // Check direct match first — find which candidate matched
-        const directMatch = tsCandidates.find((c) => tsMethods.has(c));
+        const bothLevels =
+          seen.has(rubyLevelKey("class", rubyName)) && seen.has(rubyLevelKey("instance", rubyName));
+        let neutralTaken = false;
+        const directMatch = tsCandidates.find((c) => {
+          if (!tsMethods.has(c)) return false;
+          if (!bothLevels || level === undefined) return true;
+          const declared = tsDeclaresOnLevel(
+            level,
+            tsOwnersByFileName.get(expectedTs)?.get(c),
+            tsStaticOwnersByFileName.get(expectedTs)?.get(c),
+            tsInstanceOwnersByFileName.get(expectedTs)?.get(c),
+          );
+          if (declared === "seat") return true;
+          if (declared === undefined || neutralTaken) return false;
+          if (neutralClaims.has(c)) {
+            neutralTaken = true;
+            return false;
+          }
+          neutralClaims.add(c);
+          return true;
+        });
         // A candidate whose only declaration here is a bodyless signature is
         // not a port — see `declarationOnlyInFile`. The direct-match arm is
         // skipped so the mixin / reopening / misplaced arms below still get
@@ -4691,6 +4832,8 @@ export function main() {
             seam ||
               claimedByAnother ||
               writerPairedWithReader(rubyName, directMatch, siblingRubyNames),
+            false,
+            level,
           );
           continue;
         }
@@ -4712,7 +4855,20 @@ export function main() {
         let matchedCandidate: string | null = null;
         for (const candidate of tsCandidates) {
           for (const { file, methods } of includerMethodSetsByOwner.get(rubyModule) ?? []) {
-            if (methods.has(candidate)) {
+            if (
+              methods.has(candidate) &&
+              (!bothLevels ||
+                level === undefined ||
+                includerAdmitsOnLevel(
+                  tsDeclaresOnLevel(
+                    level,
+                    tsOwnersByFileName.get(file)?.get(candidate),
+                    tsStaticOwnersByFileName.get(file)?.get(candidate),
+                    tsInstanceOwnersByFileName.get(file)?.get(candidate),
+                  ),
+                  neutralTaken,
+                ))
+            ) {
               foundViaInclude = file;
               matchedCandidate = candidate;
               break;
@@ -4729,6 +4885,8 @@ export function main() {
             foundViaInclude,
             rubyModule,
             writerPairedWithReader(rubyName, matchedCandidate!, siblingRubyNames),
+            false,
+            level,
           );
           moves.push({
             tsName: matchedCandidate!,
@@ -4773,7 +4931,15 @@ export function main() {
         );
         if (creditedToReopening) {
           fileMatched++;
-          checkArity(rubyName, creditedToReopening.tsName, creditedToReopening.tsFile, rubyModule);
+          checkArity(
+            rubyName,
+            creditedToReopening.tsName,
+            creditedToReopening.tsFile,
+            rubyModule,
+            false,
+            false,
+            level,
+          );
           moves.push({
             tsName: creditedToReopening.tsName,
             rubyName,
@@ -4801,7 +4967,15 @@ export function main() {
           const misplacedMatch = verdict.kind === "match" ? verdict.tsName : undefined;
           if (misplacedMatch) {
             fileMatched++;
-            checkArity(rubyName, misplacedMatch, misplacedActualFile!, rubyModule, false, true);
+            checkArity(
+              rubyName,
+              misplacedMatch,
+              misplacedActualFile!,
+              rubyModule,
+              false,
+              true,
+              level,
+            );
             moves.push({
               tsName: misplacedMatch,
               rubyName,

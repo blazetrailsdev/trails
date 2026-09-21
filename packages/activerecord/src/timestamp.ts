@@ -90,6 +90,7 @@ export function allTimestampAttributesInModel(this: TimestampHost): string[] {
   return this._allTimestampAttributesInModel;
 }
 
+/** @missingRailsCall with_connection — CONVERGEABLE converge-class-level-call-rows-surfaced-by-level-keyed-bodies */
 export function currentTimeFromProperTimezone(): RubyTime {
   const now = RubyTime.at(new Rational(currentTimeInstant().epochNanoseconds, 1_000_000_000n));
   return isUtc() ? now.getutc() : now.getlocal();

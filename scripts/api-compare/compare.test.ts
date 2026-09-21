@@ -14,6 +14,10 @@ import {
   resolveModuleName,
   buildModuleIncluderFqns,
   dedupeRubyMethodInto,
+  rubyLevelKey,
+  tsDeclaresOnLevel,
+  includerAdmitsOnLevel,
+  rubyBodyKey,
   type SeenRubyMethod,
   NAME_COLLISION_CLUSTERS,
   selectMisplacedFile,
@@ -1783,11 +1787,41 @@ describe("dedupeRubyMethodInto", () => {
     expect(seen.size).toBe(1);
     // First insertion wins, so the FQN points at the first observer.
     expect([...seen.values()][0]).toEqual({
+      level: "instance",
       rubyName: "invert",
       rubyModule: "Foo::A",
       definedInFile: "x.rb",
     });
   });
+  it("keeps a class method and an instance method of one name as two rows", () => {
+    const seen = new Map<string, SeenRubyMethod>();
+    dedupeRubyMethodInto(seen, rm("attribute_method?"), "ActiveRecord::AttributeMethods");
+    dedupeRubyMethodInto(
+      seen,
+      rm("attribute_method?"),
+      "ActiveRecord::AttributeMethods",
+      undefined,
+      true,
+    );
+    expect([...seen.keys()]).toEqual(["attribute_method?", "self.attribute_method?"]);
+    expect([...seen.values()].map((v) => v.level)).toEqual(["instance", "class"]);
+  });
+
+  it("scores a ClassMethods fold once, whether seen on the parent or the submodule", () => {
+    const seen = new Map<string, SeenRubyMethod>();
+    dedupeRubyMethodInto(seen, rm("bar"), "Foo", undefined, true);
+    dedupeRubyMethodInto(seen, rm("bar"), "Foo::ClassMethods");
+    expect([...seen.keys()]).toEqual([rubyLevelKey("class", "bar")]);
+  });
+
+  it("scores an `extend self` module's method once", () => {
+    const seen = new Map<string, SeenRubyMethod>();
+    dedupeRubyMethodInto(seen, rm("foo"), "Mod");
+    dedupeRubyMethodInto(seen, rm("foo"), "Mod");
+    expect([...seen.keys()]).toEqual(["foo"]);
+    expect(seen.get("foo")!.level).toBe("instance");
+  });
+
   it("expects a scoped skip that names its TS spellings, keeping a bare scoped skip dropped", () => {
     const seen = new Map<string, SeenRubyMethod>();
     const file = "core_ext/module/attr_internal.rb";
@@ -1798,6 +1832,71 @@ describe("dedupeRubyMethodInto", () => {
       "getAttrInternalNamingFormat",
       "setAttrInternalNamingFormat",
     ]);
+  });
+});
+
+describe("tsDeclaresOnLevel", () => {
+  const owners = (...o: string[]) => new Set(o);
+
+  it("lets a static satisfy only the class row", () => {
+    expect(tsDeclaresOnLevel("class", owners("Base"), owners("Base"), undefined)).toBe("seat");
+    expect(
+      tsDeclaresOnLevel("instance", owners("Base"), owners("Base"), undefined),
+    ).toBeUndefined();
+  });
+
+  it("lets an instance member satisfy only the instance row", () => {
+    expect(tsDeclaresOnLevel("instance", owners("Base"), undefined, owners("Base"))).toBe("seat");
+    expect(tsDeclaresOnLevel("class", owners("Base"), undefined, owners("Base"))).toBeUndefined();
+  });
+
+  it("reads a top-level function as seat-neutral", () => {
+    expect(tsDeclaresOnLevel("class", owners(""), undefined, undefined)).toBe("neutral");
+    expect(tsDeclaresOnLevel("instance", owners(""), undefined, undefined)).toBe("neutral");
+  });
+
+  it("prefers a seat declaration over a neutral one", () => {
+    expect(tsDeclaresOnLevel("class", owners("", "Base"), owners("Base"), undefined)).toBe("seat");
+  });
+});
+
+describe("includerAdmitsOnLevel", () => {
+  const owners = (...o: string[]) => new Set(o);
+
+  it("rejects an includer member on the opposite seat", () => {
+    const declared = tsDeclaresOnLevel("class", owners("Base"), undefined, owners("Base"));
+    expect(includerAdmitsOnLevel(declared, false)).toBe(false);
+  });
+
+  it("rejects a seat-neutral re-export of the port the other row already holds", () => {
+    const declared = tsDeclaresOnLevel("class", owners(""), undefined, undefined);
+    expect(includerAdmitsOnLevel(declared, true)).toBe(false);
+  });
+
+  it("admits an includer member on the row's own seat", () => {
+    const declared = tsDeclaresOnLevel("class", owners("Base"), owners("Base"), undefined);
+    expect(includerAdmitsOnLevel(declared, true)).toBe(true);
+  });
+
+  it("admits a seat-neutral includer member no other row holds", () => {
+    expect(
+      includerAdmitsOnLevel(tsDeclaresOnLevel("class", owners(""), undefined, undefined), false),
+    ).toBe(true);
+  });
+});
+
+describe("rubyBodyKey", () => {
+  it("keeps a folded ClassMethods body apart from the same owner's instance body", () => {
+    const owner = "ActiveRecord::AttributeMethods";
+    const bodies = new Map<string, string>();
+    bodies.set(rubyBodyKey(owner, "class", "attribute_method?"), "attribute_methods.rb:224");
+    bodies.set(rubyBodyKey(owner, "instance", "attribute_method?"), "attribute_methods.rb:499");
+    expect(bodies.get(rubyBodyKey(owner, "class", "attribute_method?"))).toBe(
+      "attribute_methods.rb:224",
+    );
+    expect(bodies.get(rubyBodyKey(owner, "instance", "attribute_method?"))).toBe(
+      "attribute_methods.rb:499",
+    );
   });
 });
 

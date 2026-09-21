@@ -622,6 +622,7 @@ function classHasAttribute(
 }
 
 export const ClassMethods = {
+  /** @missingRailsCall table_exists? — PERMANENT */
   attributeNames: classAttributeNames,
   _hasAttribute: classHasAttribute,
 };

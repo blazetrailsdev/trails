@@ -61,19 +61,19 @@ export class ClassMethods {
   static appendViewPath(this: ViewPathsClass, path: ViewPathsInput): void {
     writeInternalViewPaths.call(
       this,
-      readViewPaths.call(this).plus(ClassMethods._buildViewPaths.call(this, path)),
+      ClassMethods.viewPaths.call(this).plus(ClassMethods._buildViewPaths.call(this, path)),
     );
   }
 
   static prependViewPath(this: ViewPathsClass, path: ViewPathsInput): void {
     writeInternalViewPaths.call(
       this,
-      ClassMethods._buildViewPaths.call(this, path).plus(readViewPaths.call(this)),
+      ClassMethods._buildViewPaths.call(this, path).plus(ClassMethods.viewPaths.call(this)),
     );
   }
 
-  static viewPaths(this: ViewPathsClass): PathSet;
   static viewPaths(this: ViewPathsClass, paths: ViewPathsInput): void;
+  static viewPaths(this: ViewPathsClass): PathSet;
   static viewPaths(this: ViewPathsClass, paths?: ViewPathsInput): PathSet | void {
     if (paths === undefined) return readInternalViewPaths.call(this);
     writeInternalViewPaths.call(this, ClassMethods._buildViewPaths.call(this, paths));
@@ -88,7 +88,6 @@ export class ClassMethods {
 const readInternalViewPaths: (this: ViewPathsClass) => PathSet = ClassMethods._viewPaths;
 const writeInternalViewPaths: (this: ViewPathsClass, paths: PathSet) => void =
   ClassMethods._viewPaths;
-const readViewPaths: (this: ViewPathsClass) => PathSet = ClassMethods.viewPaths;
 
 /** @internal */
 export function _prefixes(this: ViewPaths): string[] {

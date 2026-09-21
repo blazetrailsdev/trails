@@ -80,8 +80,8 @@ export function normalizeFlatKeys(
   scope: unknown,
   separator: string | false | null | undefined,
 ): string {
-  const flatKey = Flatten.normalizeFlatKeys(locale, key, scope, separator);
-  return this.resolveLink(locale, flatKey);
+  key = Flatten.normalizeFlatKeys(locale, key, scope, separator);
+  return this.resolveLink(locale, key as string);
 }
 
 export function links(this: FlattenHost): Map<string, Map<string, string>> {
