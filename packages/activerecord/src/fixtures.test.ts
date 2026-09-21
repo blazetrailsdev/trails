@@ -12,6 +12,7 @@ import {
   Notifications,
   Duration,
   Logger,
+  assertInDelta,
 } from "@blazetrails/activesupport";
 import { primaryKeyErrorFixtureData } from "./test-helpers/fixtures/primary-key-error/primary-key-error.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
@@ -479,9 +480,7 @@ describe("FixturesTest", () => {
       aircrafts: Aircraft,
     });
     const aircraft = await Aircraft.findBy({ name: "boeing-with-no-manufactured-at" });
-    expect(
-      Math.abs(Time.now().toF() - (aircraft!.manufactured_at as Time).toF()),
-    ).toBeLessThanOrEqual(1.1);
+    assertInDelta(Time.now().toF(), (aircraft!.manufactured_at as Time).toF(), 1.1);
   });
 
   it("insert with default value", async () => {
