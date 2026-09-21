@@ -44,6 +44,16 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       expect(explain).toMatch(/authors \|.* const/);
     });
 
+    it("explain with eager loading", async () => {
+      const explain = await Author.where({ id: 1 }).includes(":posts").explain();
+      expect(explain).toMatch("EXPLAIN SELECT `authors`.* FROM `authors` WHERE `authors`.`id` = 1");
+      expect(explain).toMatch(/authors |.* const/);
+      expect(explain).toMatch(
+        "EXPLAIN SELECT `posts`.* FROM `posts` WHERE `posts`.`author_id` = 1",
+      );
+      expect(explain).toMatch(/posts |.* ALL/);
+    });
+
     it("explain with options as symbol", async () => {
       const explain = await Author.where({ id: 1 }).explain(explainOpt);
       expect(explain).toMatch(
