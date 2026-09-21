@@ -366,16 +366,20 @@ export function adapterClassSync(
 }
 
 export async function removeConnection(this: typeof Base): Promise<HashConfig | undefined> {
-  const name = connectionSpecificationName.call(this);
+  let name: string | undefined;
+  if (Object.prototype.hasOwnProperty.call(this, "_connectionSpecificationName")) {
+    name = (this as any)._connectionSpecificationName;
+  }
+
   if (
-    this.connectionHandler.retrieveConnectionPool(name, {
+    this.connectionHandler.retrieveConnectionPool(name!, {
       role: this.currentRole(),
       shard: this.currentShard(),
     })
   ) {
     (this as any)._connectionSpecificationName = undefined;
   }
-  return this.connectionHandler.removeConnectionPool(name, {
+  return this.connectionHandler.removeConnectionPool(name!, {
     role: this.currentRole(),
     shard: this.currentShard(),
   });
