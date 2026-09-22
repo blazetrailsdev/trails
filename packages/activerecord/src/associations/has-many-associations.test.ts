@@ -109,6 +109,13 @@ import { CompositePrimaryKeyMismatchError } from "./errors.js";
 import { TypedEssay } from "../test-helpers/models/essay.js";
 import { PersonWithPolymorphicDependentNullifyComments } from "../test-helpers/models/person.js";
 
+expect.addEqualityTesters([
+  function rubyEquals(a: unknown, b: unknown): boolean | undefined {
+    if (a instanceof Base && b instanceof Base) return a.equals(b);
+    return undefined;
+  },
+]);
+
 describe("HasManyAssociationsTestPrimaryKeys", () => {
   const { people } = fixtures([
     "authors",
@@ -2990,13 +2997,11 @@ describe("HasManyAssociationsTest", () => {
 
     await company.association("contracts").idsWriter([contractA.id, contractB.id]);
     expect(await company.contractIds).toEqual([contractA.id, contractB.id]);
-    expect((await company.contracts.toArray()).map(recordId)).toEqual(
-      [contractA, contractB].map(recordId),
-    );
+    expect(await company.contracts.toArray()).toEqual([contractA, contractB]);
 
     await company.saveBang();
-    expect(recordId(await ((await contractA.reload()) as any).company)).toBe(recordId(company));
-    expect(recordId(await ((await contractB.reload()) as any).company)).toBe(recordId(company));
+    expect(await ((await contractA.reload()) as any).company).toEqual(company);
+    expect(await ((await contractB.reload()) as any).company).toEqual(company);
   });
 });
 
