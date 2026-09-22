@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ArgumentError } from "./argument-error.js";
+import { TypeError } from "./type-error.js";
 import { arySlice, compact, pack, uniq } from "./array.js";
 
 describe("Array#pack", () => {
@@ -102,5 +103,6 @@ describe("arySlice", () => {
     expect(() => (arySlice as (...a: unknown[]) => unknown)([1])).toThrow(ArgumentError);
     expect(() => (arySlice as (...a: unknown[]) => unknown)([1], 0, 1, 2)).toThrow(ArgumentError);
     expect(arySlice([1, 2, 3], 1, 2)).toEqual([2, 3]);
+    expect(() => arySlice([1, 2, 3], 0, undefined)).toThrow(TypeError);
   });
 });

@@ -2,6 +2,7 @@ import { rbEql } from "./rb-equal.js";
 import { rbHash } from "./rb-hash.js";
 import { ArgumentError } from "./argument-error.js";
 import { Range } from "./range.js";
+import { TypeError } from "./type-error.js";
 
 /** `toofew` (`vendor/ruby/pack.c:120`). */
 const toofew = "too few arguments";
@@ -145,7 +146,8 @@ export function arySlice<T>(
     throw new ArgumentError(`wrong number of arguments (given ${argc}, expected 1..2)`);
   }
   const alen = ary.length;
-  if (length !== undefined) {
+  if (argc === 2) {
+    if (length == null) throw new TypeError("no implicit conversion from nil to integer");
     let beg = arg as number;
     if (beg < 0) beg += alen;
     return subseq(ary, beg, length);
