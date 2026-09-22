@@ -99,7 +99,9 @@ const TS_API_PATH = path.join(OUTPUT_DIR, "ts-api.json");
  * never removed to turn a red run green.
  */
 export const NAMING_ENROLLED_PACKAGES: readonly string[] = [
+  "activemodel",
   "activerecord-test-support",
+  "arel",
   "globalid",
   "i18n",
 ];

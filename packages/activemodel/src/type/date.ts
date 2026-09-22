@@ -62,7 +62,10 @@ export class DateType extends ValueType<DateCastResult> {
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsName toI — PERMANENT
+   */
   protected fastStringToDate(string: string): Temporal.PlainDate | null {
     const m = ISO_DATE.exec(string);
     if (!m) return null;

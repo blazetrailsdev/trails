@@ -6,7 +6,7 @@ import { PlainString } from "../collectors/plain-string.js";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import { temporalClassName } from "../temporal-tag.js";
 import { isHashAnalogue, rubyConstantName } from "./ruby-class.js";
-import { underscore } from "@blazetrails/activesupport";
+import { camelize } from "@blazetrails/activesupport";
 
 type AppendableCollector = { append(s: string): unknown; value: string };
 
@@ -73,7 +73,7 @@ export class Dot extends Visitor {
   protected visitRegexp(o: Nodes.Regexp | Nodes.NotRegexp): void {
     this.visitEdge(o, "left");
     this.visitEdge(o, "right");
-    this.visitEdge(o, "caseSensitive");
+    this.visitEdge(o, "case_sensitive");
   }
 
   protected visitArelNodesRegexp(o: Nodes.Regexp): void {
@@ -156,8 +156,8 @@ export class Dot extends Visitor {
     this.visitEdge(o, "groups");
     this.visitEdge(o, "comment");
     this.visitEdge(o, "havings");
-    this.visitEdge(o, "setQuantifier");
-    this.visitEdge(o, "optimizerHints");
+    this.visitEdge(o, "set_quantifier");
+    this.visitEdge(o, "optimizer_hints");
   }
 
   protected visitArelNodesSelectStatement(o: Nodes.SelectStatement): void {
@@ -282,7 +282,7 @@ export class Dot extends Visitor {
   }
 
   protected visitActiveModelAttribute(o: ModelAttribute): void {
-    this.visitEdge(o, "valueBeforeTypeCast");
+    this.visitEdge(o, "value_before_type_cast");
   }
 
   protected visitHash(o: Record<string, unknown>): void {
@@ -312,12 +312,12 @@ export class Dot extends Visitor {
   }
 
   protected visitEdge(o: object, method: string): void {
-    if (!(method in o)) {
+    if (!(camelize(method, false) in o)) {
       const klass = rubyConstantName(o.constructor) ?? "Object";
       // eslint-disable-next-line blazetrails/rails-error-parity -- Ruby raises NoMethodError/TypeError here; TypeError is its JS analogue, not a missing ported class.
       throw new TypeError(`undefined method '${method}' for ${klass}`);
     }
-    this.edge(underscore(method), () => this.visit((o as Record<string, unknown>)[method]));
+    this.edge(method, () => this.visit((o as Record<string, unknown>)[camelize(method, false)]));
   }
 
   protected override visit(object: unknown, _collector?: unknown): unknown {

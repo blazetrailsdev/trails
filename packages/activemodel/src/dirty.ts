@@ -106,7 +106,10 @@ export class Dirty {
     this.mutationsFromDatabase.forgetChange(attrName);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsName attributes — PERMANENT
+   */
   get mutationsFromDatabase(): AttributeMutationTracker {
     return (this._mutationsFromDatabase ??=
       this._attributes != null

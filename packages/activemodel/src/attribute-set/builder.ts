@@ -61,6 +61,7 @@ export class LazyAttributeSet extends AttributeSet {
     );
   }
 
+  /** @missingRailsName attributes — PERMANENT */
   override keys(): string[] {
     const keys = new Set([
       ...Object.keys(this.values),
@@ -205,7 +206,7 @@ export class LazyAttributeHash {
     const keys = new Set([
       ...Object.keys(this.types),
       ...Object.keys(this.values),
-      ...Object.keys(this.delegate),
+      ...Object.keys(this.delegateHash()),
     ]);
     for (const key of keys) fn(key);
   }
