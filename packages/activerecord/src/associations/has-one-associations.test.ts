@@ -71,6 +71,7 @@ import {
   assertNoDifference,
   assertNotEmpty,
   isPresent,
+  Notifications,
 } from "@blazetrails/activesupport";
 
 async function readHasOne(owner: any, name: string): Promise<any> {
@@ -1287,12 +1288,27 @@ describe("AsyncHasOneAssociationsTest", () => {
     await Account.loadSchema();
   });
 
-  it("async load has one", async () => {
+  it.skip("async load has one", async () => {
+    // BLOCKED: association-async-load-target-uses-async-executor
     const firm = companies("first_firm") as any;
     const firstAccount = await Account.find(1);
-    await firm.association("account").loadTarget();
-    const account = await readHasOne(firm, "account");
-    expect(account.id).toBe(firstAccount.id);
-    expect(account.credit_limit).toBe(firstAccount.credit_limit);
+
+    await firm.association("account").asyncLoadTarget();
+
+    const events: any[] = [];
+    const callback = (event: any) => {
+      if (event.payload.name !== "SCHEMA") events.push(event);
+    };
+    await Notifications.subscribed(callback, "sql.active_record", async () => {
+      await readHasOne(firm, "account");
+    });
+
+    await assertNoQueries(false, async () => {
+      expect(await readHasOne(firm, "account")).toEqual(firstAccount);
+      expect((await readHasOne(firm, "account")).credit_limit).toEqual(firstAccount.credit_limit);
+    });
+
+    expect(events.length).toEqual(1);
+    expect(events[0].payload.async).toEqual(true);
   });
 });

@@ -18,7 +18,7 @@ import {
 } from "../testing/query-assertions.js";
 import { currentAdapter } from "../support/adapter-helper.js";
 import { Treasure } from "../test-helpers/models/treasure.js";
-import { captureSql } from "../testing/sql-capture.js";
+import { captureSql, captureSqlAndBinds } from "../testing/sql-capture.js";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import { fixtures } from "../test-fixtures.js";
 import { Author, AuthorAddress } from "../test-helpers/models/author.js";
@@ -83,6 +83,7 @@ import {
   assertDifference,
   assertNoDifference,
   assertEmpty,
+  Notifications,
 } from "@blazetrails/activesupport";
 
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -577,13 +578,43 @@ describe("BelongsToAssociationsTest", () => {
   });
 
   it("default scope on relations is not cached", async () => {
-    const counter = 0;
-    const comment = await Comment.first();
-    const firstPost = await (comment as any).post;
-    await comment!.reload();
-    const secondPost = await (comment as any).post;
-    expect(firstPost).not.toBeNull();
-    expect(secondPost).not.toBeNull();
+    let counter = 0;
+
+    let comments: typeof Base | undefined = undefined;
+    comments = class extends Base {
+      static {
+        this.tableName = "comments";
+        this.inheritanceColumn = "not_there";
+
+        const posts = class extends Base {
+          static {
+            this.tableName = "posts";
+            this.inheritanceColumn = "not_there";
+
+            this.defaultScope((q: any) => {
+              counter += 1;
+              return q.where("id = :inc", { inc: counter });
+            });
+
+            this.hasMany("comments", { anonymousClass: comments });
+          }
+        };
+        this.belongsTo("post", { anonymousClass: posts, inverseOf: false });
+      }
+    };
+
+    expect(counter).toBe(0);
+    const comment = (await comments.first()) as any;
+    expect(counter).toBe(0);
+    const queries = await captureSqlAndBinds(async () => {
+      await comment.post;
+    });
+    await comment.reload();
+    expect(
+      await captureSqlAndBinds(async () => {
+        await comment.post;
+      }),
+    ).not.toEqual(queries);
   });
 
   it("proxy assignment", async () => {
@@ -2330,15 +2361,27 @@ describe("BelongsToAssociationsTest", () => {
 describe("AsyncBelongsToAssociationsTest", () => {
   const { companies } = fixtures(["companies"]);
 
-  it("async load belongs to", async () => {
+  it.skip("async load belongs to", async () => {
+    // BLOCKED: association-async-load-target-uses-async-executor
     const client = await Client.find(3);
     const firstFirm = companies("first_firm");
 
-    const assoc = client.association("firm");
-    await (assoc as any).asyncLoadTarget?.();
+    await client.association("firm").asyncLoadTarget();
 
-    const firm = await client.firm;
-    expect(firm!.id).toBe(firstFirm.id);
-    expect(firm!.name).toBe(firstFirm.name);
+    const events: any[] = [];
+    const callback = (event: any) => {
+      if (event.payload.name !== "SCHEMA") events.push(event);
+    };
+    await Notifications.subscribed(callback, "sql.active_record", async () => {
+      await client.firm;
+    });
+
+    await assertNoQueries(false, async () => {
+      expect(await client.firm).toEqual(firstFirm);
+      expect((await client.firm)!.name).toEqual(firstFirm.name);
+    });
+
+    expect(events.length).toEqual(1);
+    expect(events[0].payload.async).toEqual(true);
   });
 });

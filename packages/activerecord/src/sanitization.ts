@@ -1,4 +1,6 @@
 import { Nodes, sql as arelSql } from "@blazetrails/arel";
+import { ActsLikeObject } from "@blazetrails/activesupport";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import type { Quoting } from "./connection-adapters/abstract/quoting.js";
 import { columnNameMatcher as abstractColumnNameMatcher } from "./connection-adapters/abstract/quoting.js";
 import {
@@ -284,42 +286,21 @@ function replaceNamedBindVariables(
 
 /** @internal */
 function quoteBoundValue(connection: Quoter, value: unknown): string {
-  if (hasIdForDatabase(value)) {
-    const cast = connection.castBoundValue(value.idForDatabase);
-    return connection.quote(cast);
-  }
-
-  if (isEnumerable(value)) {
-    const values = Array.from(value);
+  if (rbObjRespondTo(value, "map") && !ActsLikeObject.actsLike(value, "string")) {
+    const values = (value as { map<R>(b: (v: unknown) => R): R[] }).map((v) =>
+      rbObjRespondTo(v, "idForDatabase") ? (v as { idForDatabase: unknown }).idForDatabase : v,
+    );
     if (values.length === 0) {
-      const cast = connection.castBoundValue(null);
-      return connection.quote(cast);
+      return connection.quote(connection.castBoundValue(null));
+    } else {
+      return values.map((v) => connection.quote(connection.castBoundValue(v))).join(",");
     }
-    return values
-      .map((v) => {
-        const idVal = hasIdForDatabase(v) ? v.idForDatabase : v;
-        const cast = connection.castBoundValue(idVal);
-        return connection.quote(cast);
-      })
-      .join(",");
+  } else {
+    if (rbObjRespondTo(value, "idForDatabase")) {
+      value = (value as { idForDatabase: unknown }).idForDatabase;
+    }
+    return connection.quote(connection.castBoundValue(value));
   }
-
-  const cast = connection.castBoundValue(value);
-  return connection.quote(cast);
-}
-
-function hasIdForDatabase(value: unknown): value is { idForDatabase: unknown } {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    !Array.isArray(value) &&
-    !(value instanceof Set) &&
-    "idForDatabase" in value
-  );
-}
-
-function isEnumerable(value: unknown): value is Iterable<unknown> {
-  return Array.isArray(value) || value instanceof Set;
 }
 
 function isPlainHash(value: unknown): boolean {

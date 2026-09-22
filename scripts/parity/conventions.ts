@@ -938,18 +938,6 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   },
   {
     reason:
-      "`ActiveSupport::Multibyte.proxy_class` / `proxy_class=` (multibyte.rb:14-22) " +
-      "configure which class `String#mb_chars` wraps a String in, defaulting to " +
-      "ActiveSupport::Multibyte::Chars. That proxy has no port and is skipped " +
-      "for the reason in the multibyte/chars.rb group below, and `mb_chars` " +
-      "itself (core_ext/string/multibyte.rb) is an excluded file — so this is an " +
-      "accessor whose only value, only default and only reader would all be " +
-      "absent. Scoped to multibyte.rb.",
-    names: ["proxy_class", "proxy_class="],
-    rubyFiles: ["multibyte.rb"],
-  },
-  {
-    reason:
       "ActiveSupport::Concurrency::ShareLock (concurrency/share_lock.rb) is a " +
       "reader-writer lock built on `Monitor` + `ConditionVariable`: it tracks " +
       "per-Thread share counts, blocks a thread until the waiters it conflicts " +
@@ -1006,45 +994,6 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "set_process_title",
     ],
     rubyFiles: ["testing/parallelization/server.rb", "testing/parallelization/worker.rb"],
-  },
-  {
-    reason:
-      "ActiveSupport::Multibyte::Chars (multibyte/chars.rb) is a proxy that " +
-      "wraps a String, force-encodes it to UTF-8 and re-implements " +
-      "`split`/`slice!`/`reverse`/`limit`/`grapheme_length`/`tidy_bytes` so they " +
-      "count characters rather than bytes — the problem Ruby has because a " +
-      "String is a byte sequence with an encoding. A JS string is a UTF-16 code " +
-      "unit sequence and `[...str]` already iterates by code point, so every " +
-      "member of the proxy is either the identity or a plain string operation; " +
-      "there is no wrapper to hold. Nothing in the port reaches for it: " +
-      "`mb_chars` has no caller in Rails' own activesupport lib outside " +
-      "core_ext/string/multibyte.rb (Inflector never uses it), and trails' " +
-      "multibyte suites assert the code-point semantics directly against JS " +
-      "strings. Scoped to multibyte/chars.rb so `split`, `reverse`, `compose`, " +
-      "`as_json` and the rest stay expected in every other file.",
-    names: [
-      "wrapped_string",
-      "to_s",
-      "to_str",
-      "match?",
-      "acts_like_string?",
-      "initialize",
-      "split",
-      "slice!",
-      "reverse",
-      "limit",
-      "titleize",
-      "titlecase",
-      "decompose",
-      "compose",
-      "grapheme_length",
-      "tidy_bytes",
-      "as_json",
-      "reverse!",
-      "tidy_bytes!",
-      "chars",
-    ],
-    rubyFiles: ["multibyte/chars.rb"],
   },
   {
     reason:

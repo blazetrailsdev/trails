@@ -168,13 +168,13 @@ export function lookupModuleTableNameSuffix(moduleName: string | undefined): str
   );
 }
 
-export function stiName(modelClass: typeof Base): string {
-  const name = qualifiedName(modelClass);
+export function stiName(modelClass: typeof Base): string | null {
+  const name = modelClass.name === "" ? null : qualifiedName(modelClass);
   const klass = modelClass as typeof Base & {
     storeFullStiClass?: boolean;
     storeFullClassName?: boolean;
   };
-  return klass.storeFullStiClass && klass.storeFullClassName ? name : demodulize(name);
+  return klass.storeFullStiClass && klass.storeFullClassName ? name : demodulize(name!);
 }
 
 export function polymorphicName(modelClass: typeof Base): string {

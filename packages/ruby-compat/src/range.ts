@@ -247,6 +247,13 @@ export class Range<T = unknown> {
     yield* this.step(1);
   }
 
+  /** @noRailsEquivalent PERMANENT */
+  map<R>(block: (value: T) => R): R[] {
+    const ary: R[] = [];
+    for (const v of this.each()) ary.push(block(v));
+    return ary;
+  }
+
   /** `vendor/ruby/range.c:439` `range_step`. */
   *step(n: number = 1): Generator<T> {
     checkStepDomain(n);

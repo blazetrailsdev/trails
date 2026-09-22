@@ -133,6 +133,7 @@ export { LoadError } from "./load-error.js";
 export { IPAddr } from "./ipaddr.js";
 export { PROTOCOL_PROBES, methodMissingProxy } from "./method-missing-proxy.js";
 export { NameError } from "./name-error.js";
+export { NilClass } from "./nil-class.js";
 export { NoMethodError } from "./no-method-error.js";
 export { anybits, round } from "./numeric.js";
 export { NotImplementedError } from "./not-implemented-error.js";

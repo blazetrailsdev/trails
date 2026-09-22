@@ -2299,7 +2299,7 @@ export class Base extends Model {
     return inheritancePolymorphicName(this);
   }
 
-  static stiName(): string {
+  static stiName(): string | null {
     return stiName(this);
   }
 
