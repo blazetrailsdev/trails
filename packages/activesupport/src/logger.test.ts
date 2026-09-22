@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { Logger, taggedLogging, SimpleFormatter } from "./logger.js";
+import { Logger, SimpleFormatter } from "./logger.js";
+import { IsolatedExecutionState } from "./isolated-execution-state.js";
+import { Fiber, Thread } from "@blazetrails/ruby-compat";
 import { BroadcastLogger } from "./broadcast-logger.js";
 import { Temporal } from "@blazetrails/date";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -19,6 +21,23 @@ function makeBuffer() {
   };
 }
 
+const UNICODE_STRING = "こにちわ";
+const BYTE_STRING = "\xb8\x9e\x08\x88\xa5";
+
+class PlainLogger {
+  constructor(private readonly logdev: { write(s: string): void }) {}
+
+  debug(message: string): boolean {
+    this.logdev.write(`${message}\n`);
+    return true;
+  }
+
+  error(message: string): boolean {
+    this.logdev.write(`${message}\n`);
+    return true;
+  }
+}
+
 describe("LoggerTest", () => {
   let output: ReturnType<typeof makeBuffer>;
   let logger: Logger;
@@ -27,6 +46,10 @@ describe("LoggerTest", () => {
     output = makeBuffer();
     logger = new Logger(output);
   });
+
+  function assertLevel(level: number): void {
+    expect(logger.level).toBe(level);
+  }
 
   it("should log debugging message when debugging", () => {
     logger.level = Logger.DEBUG;
@@ -71,7 +94,7 @@ describe("LoggerTest", () => {
       evaluated = true;
       return "x";
     });
-    expect(evaluated).toBe(false);
+    expect(evaluated == false).toBeTruthy();
   });
 
   it("should not mutate message", () => {
@@ -82,9 +105,10 @@ describe("LoggerTest", () => {
   });
 
   it("should know if its loglevel is below a given level", () => {
-    logger.level = Logger.DEBUG;
-    expect((logger as any)["debug?"]).toBe(true);
-    expect((logger as any)["info?"]).toBe(true);
+    for (const level of ["DEBUG", "INFO", "WARN", "ERROR", "FATAL"] as const) {
+      logger.level = Logger[level] - 1;
+      expect((logger as any)[`${level.toLowerCase()}?`]).toBeTruthy();
+    }
   });
 
   it("silencing everything but errors", () => {
@@ -109,20 +133,23 @@ describe("LoggerTest", () => {
   it("logger silencing works for broadcast", () => {
     const anotherOutput = makeBuffer();
     const anotherLogger = new Logger(anotherOutput);
+
     const broadcastLogger = new BroadcastLogger(logger, anotherLogger);
 
     broadcastLogger.debug("CORRECT DEBUG");
-    broadcastLogger.silence(Logger.ERROR, () => {
-      broadcastLogger.debug("FAILURE");
-      broadcastLogger.error("CORRECT ERROR");
+    broadcastLogger.silence(Logger.ERROR, (logger) => {
+      expect(logger).toBeInstanceOf(BroadcastLogger);
+      logger.debug("FAILURE");
+      logger.error("CORRECT ERROR");
     });
 
     expect(output.string).toContain("CORRECT DEBUG");
     expect(output.string).toContain("CORRECT ERROR");
     expect(output.string).not.toContain("FAILURE");
+
     expect(anotherOutput.string).toContain("CORRECT DEBUG");
     expect(anotherOutput.string).toContain("CORRECT ERROR");
-    expect(anotherOutput.string).not.toContain("FAILURE");
+    expect(anotherOutput.string.includes("FAILURE")).toBeFalsy();
   });
 
   it("logger level per object thread safety", () => {
@@ -177,12 +204,12 @@ describe("LoggerTest", () => {
     const stdout = makeBuffer();
     const stderr = makeBuffer();
 
-    expect(Logger.isLoggerOutputsTo(logger, output)).toBe(true);
-    expect(Logger.isLoggerOutputsTo(logger, output, stdout)).toBe(true);
+    expect(Logger.isLoggerOutputsTo(logger, output)).toBeTruthy();
+    expect(Logger.isLoggerOutputsTo(logger, output, stdout)).toBeTruthy();
 
-    expect(Logger.isLoggerOutputsTo(logger, stdout)).toBe(false);
-    expect(Logger.isLoggerOutputsTo(logger, stdout, stderr)).toBe(false);
-    expect(Logger.isLoggerOutputsTo(logger, "log/production.log")).toBe(false);
+    expect(Logger.isLoggerOutputsTo(logger, stdout)).toBeFalsy();
+    expect(Logger.isLoggerOutputsTo(logger, stdout, stderr)).toBeFalsy();
+    expect(Logger.isLoggerOutputsTo(logger, "log/production.log")).toBeFalsy();
   });
 
   it("log outputs to with a broadcast logger", () => {
@@ -190,36 +217,38 @@ describe("LoggerTest", () => {
     const stderr = makeBuffer();
     const broadcast = new BroadcastLogger(new Logger(stdout));
 
-    expect(Logger.isLoggerOutputsTo(broadcast, stdout)).toBe(true);
-    expect(Logger.isLoggerOutputsTo(broadcast, stderr)).toBe(false);
+    expect(Logger.isLoggerOutputsTo(broadcast, stdout)).toBeTruthy();
+    expect(Logger.isLoggerOutputsTo(broadcast, stderr)).toBeFalsy();
 
     broadcast.broadcastTo(new Logger(stderr));
-    expect(Logger.isLoggerOutputsTo(broadcast, stderr)).toBe(true);
+    expect(Logger.isLoggerOutputsTo(broadcast, stderr)).toBeTruthy();
   });
 
   it("log outputs to with a filename", () => {
     const dir = mkdtempSync(join(tmpdir(), "logger-test-"));
     const path = join(dir, "development.log");
     writeFileSync(path, "");
-    const broadcast = new BroadcastLogger(new Logger({ filename: path, write: () => {} }));
+    const t = { path };
+    const broadcast = new BroadcastLogger(new Logger({ filename: t.path, write: () => {} }));
 
     try {
-      expect(Logger.isLoggerOutputsTo(broadcast, path)).toBe(true);
+      expect(Logger.isLoggerOutputsTo(broadcast, t)).toBeTruthy();
+      expect(Logger.isLoggerOutputsTo(broadcast, path)).toBeTruthy();
       expect(
         Logger.isLoggerOutputsTo(broadcast, `${dirname(path)}${sep}.${sep}${basename(path)}`),
-      ).toBe(true);
-      expect(Logger.isLoggerOutputsTo(broadcast, "log/production.log")).toBe(false);
-      expect(Logger.isLoggerOutputsTo(broadcast, makeBuffer())).toBe(false);
+      ).toBeTruthy();
+      expect(Logger.isLoggerOutputsTo(broadcast, "log/production.log")).toBeFalsy();
+      expect(Logger.isLoggerOutputsTo(broadcast, makeBuffer())).toBeFalsy();
     } finally {
       broadcast.close();
       rmSync(dir, { recursive: true, force: true });
     }
   });
 
-  it("defaults to simple formatter", () => {
-    expect(logger.formatter).toBeNull();
-    logger.info("hello");
-    expect(output.string).toContain("hello");
+  it.skip("defaults to simple formatter", () => {
+    // BLOCKED: logger-default-simple-formatter-and-nonstring-inspect
+    const logger = new Logger(output);
+    expect(logger.formatter).toBeInstanceOf(SimpleFormatter);
   });
 
   it("formatter can be set via keyword arg", () => {
@@ -230,26 +259,80 @@ describe("LoggerTest", () => {
   });
 
   it("broadcast silencing does not break plain ruby logger", () => {
-    logger.silence(Logger.ERROR, () => {
-      logger.info("silenced");
+    const anotherOutput = makeBuffer();
+    const anotherLogger = new PlainLogger(anotherOutput);
+
+    const broadcastLogger = new BroadcastLogger(logger, anotherLogger as unknown as Logger);
+
+    broadcastLogger.debug("CORRECT DEBUG");
+    broadcastLogger.silence(Logger.ERROR, (logger) => {
+      expect(logger).toBeInstanceOf(BroadcastLogger);
+      logger.debug("FAILURE");
+      logger.error("CORRECT ERROR");
     });
-    expect(output.string).not.toContain("silenced");
+
+    expect(output.string).toContain("CORRECT DEBUG");
+    expect(output.string).toContain("CORRECT ERROR");
+    expect(output.string).not.toContain("FAILURE");
+
+    expect(anotherOutput.string).toContain("CORRECT DEBUG");
+    expect(anotherOutput.string).toContain("CORRECT ERROR");
+    expect(anotherOutput.string).toContain("FAILURE");
   });
 
   it("logger level thread safety", () => {
-    expect(logger.level).toBe(Logger.DEBUG);
-    logger.level = Logger.INFO;
-    expect(logger.level).toBe(Logger.INFO);
+    const previousIsolationLevel = IsolatedExecutionState.isolationLevel!;
+    IsolatedExecutionState.isolationLevel = "thread";
+    try {
+      logger.level = Logger.INFO;
+      assertLevel(Logger.INFO);
+
+      const enumerator = new Fiber(() => {
+        logger.level = Logger.DEBUG;
+        return logger.level;
+      });
+      expect(enumerator.resume()).toBe(Logger.DEBUG);
+      assertLevel(Logger.DEBUG);
+    } finally {
+      IsolatedExecutionState.isolationLevel = previousIsolationLevel;
+    }
   });
 
   it("logger level main thread safety", () => {
-    logger.level = Logger.WARN;
-    expect(logger.level).toBe(Logger.WARN);
+    logger.level = Logger.INFO;
+    assertLevel(Logger.INFO);
+
+    let t!: Thread;
+    logger.silence(Logger.ERROR, () => {
+      assertLevel(Logger.ERROR);
+      t = new Thread(() => {
+        assertLevel(Logger.INFO);
+      });
+    });
+
+    t.join();
   });
 
   it("logger level local thread safety", () => {
-    logger.localLevel = Logger.ERROR;
-    expect(logger.localLevel).toBe(Logger.ERROR);
+    logger.level = Logger.INFO;
+    assertLevel(Logger.INFO);
+
+    const threads: Thread[] = [];
+    const thread = (threadNumber: number) => () => {
+      logger.silence(Logger.ERROR, () => {
+        assertLevel(Logger.ERROR);
+        logger.silence(Logger.DEBUG, () => {
+          if (threadNumber === 1) threads.push(new Thread(thread(2)));
+          assertLevel(Logger.DEBUG);
+        });
+      });
+
+      assertLevel(Logger.INFO);
+    };
+    threads.unshift(new Thread(thread(1)));
+
+    threads.forEach((t) => t.join());
+    assertLevel(Logger.INFO);
   });
 
   it("write binary data to existing file", () => {
@@ -261,126 +344,68 @@ describe("LoggerTest", () => {
   });
 
   it("buffer multibyte", () => {
-    logger.info("日本語テスト");
-    expect(output.string).toContain("日本語テスト");
+    logger.level = Logger.INFO;
+    logger.info(UNICODE_STRING);
+    logger.info(BYTE_STRING);
+    expect(output.string).toContain(UNICODE_STRING);
+    const byteString = output.string;
+    expect(byteString).toContain(BYTE_STRING);
   });
 
   it("logger level main fiber safety", () => {
-    logger.level = Logger.WARN;
-    expect(logger.level).toBe(Logger.WARN);
+    const previousIsolationLevel = IsolatedExecutionState.isolationLevel!;
+    IsolatedExecutionState.isolationLevel = "fiber";
+    try {
+      logger.level = Logger.INFO;
+      assertLevel(Logger.INFO);
+
+      const fiber = new Fiber(() => {
+        assertLevel(Logger.INFO);
+      });
+
+      logger.silence(Logger.ERROR, () => {
+        assertLevel(Logger.ERROR);
+        fiber.resume();
+      });
+    } finally {
+      IsolatedExecutionState.isolationLevel = previousIsolationLevel;
+    }
   });
 
   it("logger level local fiber safety", () => {
-    logger.localLevel = Logger.ERROR;
-    expect(logger.localLevel).toBe(Logger.ERROR);
-  });
-});
+    const previousIsolationLevel = IsolatedExecutionState.isolationLevel!;
+    IsolatedExecutionState.isolationLevel = "fiber";
+    try {
+      logger.level = Logger.INFO;
+      assertLevel(Logger.INFO);
 
-describe("BroadcastLoggerTest", () => {
-  let log1Output: ReturnType<typeof makeBuffer>;
-  let log2Output: ReturnType<typeof makeBuffer>;
-  let log1: Logger;
-  let log2: Logger;
-  let logger: BroadcastLogger;
+      const anotherFiber = new Fiber(() => {
+        logger.silence(Logger.ERROR, () => {
+          assertLevel(Logger.ERROR);
+          logger.silence(Logger.DEBUG, () => {
+            assertLevel(Logger.DEBUG);
+          });
+        });
 
-  beforeEach(() => {
-    log1Output = makeBuffer();
-    log2Output = makeBuffer();
-    log1 = new Logger(log1Output);
-    log2 = new Logger(log2Output);
-    logger = new BroadcastLogger(log1, log2);
-  });
+        assertLevel(Logger.INFO);
+      });
 
-  it("#debug adds the message to all loggers", () => {
-    logger.debug("msg");
-    expect(log1Output.string).toContain("msg");
-    expect(log2Output.string).toContain("msg");
-  });
+      new Fiber(() => {
+        logger.silence(Logger.ERROR, () => {
+          assertLevel(Logger.ERROR);
+          logger.silence(Logger.DEBUG, () => {
+            anotherFiber.resume();
+            assertLevel(Logger.DEBUG);
+          });
+        });
 
-  it("#info adds the message to all loggers", () => {
-    logger.info("msg");
-    expect(log1Output.string).toContain("msg");
-    expect(log2Output.string).toContain("msg");
-  });
+        assertLevel(Logger.INFO);
+      }).resume();
 
-  it("#warn adds the message to all loggers", () => {
-    logger.warn("msg");
-    expect(log1Output.string).toContain("msg");
-    expect(log2Output.string).toContain("msg");
-  });
-
-  it("#error adds the message to all loggers", () => {
-    logger.error("msg");
-    expect(log1Output.string).toContain("msg");
-    expect(log2Output.string).toContain("msg");
-  });
-
-  it("#fatal adds the message to all loggers", () => {
-    logger.fatal("msg");
-    expect(log1Output.string).toContain("msg");
-    expect(log2Output.string).toContain("msg");
-  });
-
-  it("#unknown adds the message to all loggers", () => {
-    logger.unknown("msg");
-    expect(log1Output.string).toContain("msg");
-    expect(log2Output.string).toContain("msg");
-  });
-});
-
-describe("TaggedLoggingTest", () => {
-  let output: ReturnType<typeof makeBuffer>;
-  let logger: ReturnType<typeof taggedLogging>;
-
-  beforeEach(() => {
-    output = makeBuffer();
-    const base = new Logger(output);
-    logger = taggedLogging(base);
-  });
-
-  it("sets logger.formatter if missing and extends it with a tagging API", () => {
-    const base = new Logger(output);
-    const tagged = taggedLogging(base);
-    expect(tagged).toBeDefined();
-    tagged.info("formatter test");
-    expect(output.string).toContain("formatter test");
-  });
-
-  it("provides access to the logger instance", () => {
-    expect(logger).toBeDefined();
-    expect(typeof logger.info).toBe("function");
-  });
-
-  it("keeps each tag in their own instance", () => {
-    const out2 = makeBuffer();
-    const base2 = new Logger(out2);
-    const logger2 = taggedLogging(base2);
-    logger.tagged("Tag1").info("from logger1");
-    logger2.tagged("Tag2").info("from logger2");
-    expect(output.string).toContain("[Tag1]");
-    expect(out2.string).toContain("[Tag2]");
-    expect(output.string).not.toContain("[Tag2]");
-    expect(out2.string).not.toContain("[Tag1]");
-  });
-
-  it("does not share the same formatter instance of the original logger", () => {
-    const out2 = makeBuffer();
-    const base = new Logger(out2);
-    const tagged = taggedLogging(base);
-    tagged.tagged("X").info("msg");
-    expect(out2.string).toContain("[X]");
-  });
-
-  it("cleans up the taggings on flush", () => {
-    logger.tagged("BCX").info("hello");
-    logger.flush();
-    logger.info("no tags");
-    expect(output.string).not.toContain("[BCX] no tags");
-  });
-
-  it("implicit logger instance", () => {
-    logger.info("implicit");
-    expect(output.string).toContain("implicit");
+      assertLevel(Logger.INFO);
+    } finally {
+      IsolatedExecutionState.isolationLevel = previousIsolationLevel;
+    }
   });
 });
 

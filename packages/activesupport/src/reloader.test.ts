@@ -25,12 +25,12 @@ describe("ReloaderTest", () => {
     assertNot(prepared);
     assertNot(completed);
     reloader.prepareBang();
-    expect(prepared).toBe(true);
+    expect(prepared).toBeTruthy();
     assertNot(completed);
 
     prepared = false;
     reloader.wrap(() => {
-      expect(prepared).toBe(true);
+      expect(prepared).toBeTruthy();
       prepared = false;
     });
     assertNot(prepared);
@@ -50,7 +50,7 @@ describe("ReloaderTest", () => {
     let invoked = false;
     r.toRun(() => (invoked = true));
     r.wrap(() => {});
-    expect(invoked).toBe(true);
+    expect(invoked).toBeTruthy();
 
     r = newReloader(() => false);
     invoked = false;

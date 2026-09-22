@@ -199,10 +199,11 @@ describe("ErrorReporterTest", () => {
     const error = new Error("Oops");
     delete (error as { stack?: string }).stack;
     expect(error.stack).toBeUndefined();
+    expect(error.stack?.split("\n").slice(1)).toBeUndefined();
 
     expect(reporter.report(error)).toBeNull();
-    expect(error.stack).not.toBe("");
-    expect(error.stack).toBeTruthy();
+    expect(error.stack!.length === 0).toBeFalsy();
+    expect(error.stack!.split("\n").slice(1).length === 0).toBeFalsy();
   });
 
   it("#record passes through the return value", () => {
@@ -214,7 +215,8 @@ describe("ErrorReporterTest", () => {
     const error = new Error("Oops");
     expect(reporter.unexpected(error)).toBeNull();
     expect(subscriber.events).toEqual([[error, true, "warning", "application", {}]]);
-    expect(error.stack).toBeTruthy();
+    expect(error.stack!.length === 0).toBeFalsy();
+    expect(error.stack!.split("\n").slice(1).length === 0).toBeFalsy();
   });
 
   it("#unexpected accepts an error message", () => {
@@ -226,7 +228,7 @@ describe("ErrorReporterTest", () => {
 
     expect((error as Error).message).toBe("Oops");
     expect((error as Error).name).toBe("RuntimeError");
-    expect((error as Error).stack).toBeTruthy();
+    expect((error as Error).stack!.length === 0).toBeFalsy();
   });
 
   it("#unexpected re-raise errors in development and test", async () => {
