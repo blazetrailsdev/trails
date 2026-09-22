@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { Date as RubyDate } from "@blazetrails/date";
+import { Date as RubyDate, Time } from "@blazetrails/date";
+import { TimeZone } from "../values/time-zone.js";
+import { setZone, zone as timeZone } from "../time-zone-config.js";
 import { ActiveSupportJSON, parseJsonTimes, setParseJsonTimes } from "../json.js";
 
 function withParseJsonTimes<T>(value: boolean, fn: () => T): T {
@@ -12,49 +14,111 @@ function withParseJsonTimes<T>(value: boolean, fn: () => T): T {
   }
 }
 
-describe("TestJSONDecoding", () => {
-  it("JSON decodes ", () => {
-    expect(ActiveSupportJSON.decode('{"returnTo":{"/categories":"/"}}')).toEqual({
-      returnTo: { "/categories": "/" },
-    });
-    expect(ActiveSupportJSON.decode('{"returnTo":{"/categories":1}}')).toEqual({
-      returnTo: { "/categories": 1 },
-    });
-    expect(ActiveSupportJSON.decode('{"returnTo":[1,"a"]}')).toEqual({ returnTo: [1, "a"] });
-    expect(ActiveSupportJSON.decode('{"a": "\'", "b": "5,000"}')).toEqual({ a: "'", b: "5,000" });
-    expect(ActiveSupportJSON.decode('{"matzue": "松江", "asakusa": "浅草"}')).toEqual({
-      matzue: "松江",
-      asakusa: "浅草",
-    });
-    expect(ActiveSupportJSON.decode("[]")).toEqual([]);
-    expect(ActiveSupportJSON.decode("{}")).toEqual({});
-    expect(ActiveSupportJSON.decode('{"a":1}')).toEqual({ a: 1 });
-    expect(ActiveSupportJSON.decode('{"a": ""}')).toEqual({ a: "" });
-    expect(ActiveSupportJSON.decode('{"a": null}')).toEqual({ a: null });
-    expect(ActiveSupportJSON.decode('{"a": true}')).toEqual({ a: true });
-    expect(ActiveSupportJSON.decode('{"a": false}')).toEqual({ a: false });
-    expect(ActiveSupportJSON.decode('{"a": "\\u003cunicode\\u0020escape\\u003e"}')).toEqual({
-      a: "<unicode escape>",
-    });
-    expect(ActiveSupportJSON.decode('{"a": "\\u003cbr /\\u003e"}')).toEqual({ a: "<br />" });
-    expect(ActiveSupportJSON.decode('{"a":"\\n"}')).toEqual({ a: "\n" });
-    expect(ActiveSupportJSON.decode('{"a":"\\u000a"}')).toEqual({ a: "\n" });
-    expect(ActiveSupportJSON.decode('{"a":"Line1\\u000aLine2"}')).toEqual({ a: "Line1\nLine2" });
-    expect(ActiveSupportJSON.decode('"a string"')).toBe("a string");
-    expect(ActiveSupportJSON.decode("1.1")).toBe(1.1);
-    expect(ActiveSupportJSON.decode("1")).toBe(1);
-    expect(ActiveSupportJSON.decode("-1")).toBe(-1);
-    expect(ActiveSupportJSON.decode("true")).toBe(true);
-    expect(ActiveSupportJSON.decode("false")).toBe(false);
-    expect(ActiveSupportJSON.decode("null")).toBe(null);
+expect.addEqualityTesters([
+  (a: unknown, b: unknown) => {
+    if (a instanceof Time) return a.compareWithCoercion(b) === 0;
+    if (b instanceof Time) return b.compareWithCoercion(a) === 0;
+    return undefined;
+  },
+]);
 
-    withParseJsonTimes(true, () => {
-      expect(ActiveSupportJSON.decode('{"d":"1970-01-01", "s":"\\u0020escape"}')).toEqual({
-        d: RubyDate.parse("1970-01-01"),
-        s: " escape",
+function withTzDefault<T>(tz: TimeZone | string | null, fn: () => T): T {
+  const oldTz = timeZone();
+  setZone(tz);
+  try {
+    return fn();
+  } finally {
+    setZone(oldTz);
+  }
+}
+
+describe("TestJSONDecoding", () => {
+  const TESTS: [string, unknown][] = [
+    ['{"returnTo":{"\\/categories":"\\/"}}', { returnTo: { "/categories": "/" } }],
+    ['{"return\\"To\\":":{"\\/categories":"\\/"}}', { 'return"To":': { "/categories": "/" } }],
+    ['{"returnTo":{"\\/categories":1}}', { returnTo: { "/categories": 1 } }],
+    ['{"returnTo":[1,"a"]}', { returnTo: [1, "a"] }],
+    ['{"returnTo":[1,"\\"a\\",", "b"]}', { returnTo: [1, '"a",', "b"] }],
+    ['{"a": "\'", "b": "5,000"}', { a: "'", b: "5,000" }],
+    ['{"a": "a\'s, b\'s and c\'s", "b": "5,000"}', { a: "a's, b's and c's", b: "5,000" }],
+    ['{"matzue": "松江", "asakusa": "浅草"}', { matzue: "松江", asakusa: "浅草" }],
+    ['{"a": "2007-01-01"}', { a: RubyDate.civil(2007, 1, 1) }],
+    ['{"a": "2007-01-01 01:12:34 Z"}', { a: Time.utc(2007, 1, 1, 1, 12, 34) }],
+    ['["2007-01-01 01:12:34 Z"]', [Time.utc(2007, 1, 1, 1, 12, 34)]],
+    [
+      '["2007-01-01 01:12:34 Z", "2007-01-01 01:12:35 Z"]',
+      [Time.utc(2007, 1, 1, 1, 12, 34), Time.utc(2007, 1, 1, 1, 12, 35)],
+    ],
+    ['{"a": "2007-01-01 01:12:34"}', { a: Time.new(2007, 1, 1, 1, 12, 34, "-05:00") }],
+    ['{"a": "1089-10-40"}', { a: "1089-10-40" }],
+    ['{"a": "2009-08-10T19:01:02"}', { a: Time.new(2009, 8, 10, 19, 1, 2, "-04:00") }],
+    ['{"a": "2009-08-10T19:01:02Z"}', { a: Time.utc(2009, 8, 10, 19, 1, 2) }],
+    ['{"a": "2009-08-10T19:01:02+02:00"}', { a: Time.utc(2009, 8, 10, 17, 1, 2) }],
+    ['{"a": "2009-08-10T19:01:02-05:00"}', { a: Time.utc(2009, 8, 11, 0, 1, 2) }],
+    ['{"a": " 2007-01-01 01:12:34 Z "}', { a: " 2007-01-01 01:12:34 Z " }],
+    ['{"a": "2007-01-01 : it\'s your birthday"}', { a: "2007-01-01 : it's your birthday" }],
+    ['{"a": "Today is:\\n2020-05-21"}', { a: "Today is:\n2020-05-21" }],
+    [
+      '{"a": "2007-01-01 01:12:34 Z\\nwas my birthday"}',
+      { a: "2007-01-01 01:12:34 Z\nwas my birthday" },
+    ],
+    ["[]", []],
+    ["{}", {}],
+    ['{"a":1}', { a: 1 }],
+    ['{"a": ""}', { a: "" }],
+    ['{"a":"\\""}', { a: '"' }],
+    ['{"a": null}', { a: null }],
+    ['{"a": true}', { a: true }],
+    ['{"a": false}', { a: false }],
+    ['{"bad":"\\\\","trailing":""}', { bad: "\\", trailing: "" }],
+    ['{"a": "http:\\/\\/test.host\\/posts\\/1"}', { a: "http://test.host/posts/1" }],
+    ['{"a": "\\u003cunicode\\u0020escape\\u003e"}', { a: "<unicode escape>" }],
+    ['{"a": "\\\\u0020skip double backslashes"}', { a: "\\u0020skip double backslashes" }],
+    ['{"a": "\\u003cbr /\\u003e"}', { a: "<br />" }],
+    ['{"b":["\\u003ci\\u003e","\\u003cb\\u003e","\\u003cu\\u003e"]}', { b: ["<i>", "<b>", "<u>"] }],
+    [
+      '[{"d":"1970-01-01", "s":"\\u0020escape"},{"d":"1970-01-01", "s":"\\u0020escape"}]',
+      [
+        { d: RubyDate.civil(1970, 1, 1), s: " escape" },
+        { d: RubyDate.civil(1970, 1, 1), s: " escape" },
+      ],
+    ],
+    [
+      '[{"d":"1970-01-01","s":"http:\\/\\/example.com"},{"d":"1970-01-01","s":"http:\\/\\/example.com"}]',
+      [
+        { d: RubyDate.civil(1970, 1, 1), s: "http://example.com" },
+        { d: RubyDate.civil(1970, 1, 1), s: "http://example.com" },
+      ],
+    ],
+    ['{"a":"\\n"}', { a: "\n" }],
+    ['{"a":"\\u000a"}', { a: "\n" }],
+    ['{"a":"Line1\\u000aLine2"}', { a: "Line1\nLine2" }],
+    ['{"json_class":"TestJSONDecoding::Foo"}', { json_class: "TestJSONDecoding::Foo" }],
+    ['"a string"', "a string"],
+    ["1.1", 1.1],
+    ["1", 1],
+    ["-1", -1],
+    ["true", true],
+    ["false", false],
+    ["null", null],
+  ];
+
+  it("JSON decodes ", () => {
+    for (const [json, expected] of TESTS) {
+      const failMessage = `JSON decoding failed for ${json}`;
+
+      withTzDefault("Eastern Time (US & Canada)", () => {
+        withParseJsonTimes(true, () => {
+          if (expected == null) {
+            // eslint-disable-next-line vitest/no-conditional-expect
+            expect(ActiveSupportJSON.decode(json), failMessage).toBeNull();
+          } else {
+            // eslint-disable-next-line vitest/no-conditional-expect
+            expect(ActiveSupportJSON.decode(json), failMessage).toEqual(expected);
+          }
+        });
       });
-      expect(ActiveSupportJSON.decode('{"a":"Line1\\u000aLine2"}')).toEqual({ a: "Line1\nLine2" });
-    });
+    }
   });
 
   it("JSON decodes time JSON with time parsing disabled", () => {

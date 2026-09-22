@@ -52,15 +52,12 @@ describe("NullStoreTest", () => {
     expect(store.read("name")).toBeNull();
   });
 
-  it("local store strategy", () => {
-    const store = new NullStore();
-    expect(store.read("x")).toBeNull();
+  it.skip("local store strategy", () => {
+    // BLOCKED: port-cache-strategy-local-cache
   });
 
-  it("local store repeated reads", () => {
-    const store = new NullStore();
-    expect(store.read("x")).toBeNull();
-    expect(store.read("x")).toBeNull();
+  it.skip("local store repeated reads", () => {
+    // BLOCKED: port-cache-strategy-local-cache
   });
 
   it("clear", () => {

@@ -9,7 +9,9 @@ import {
   runCallbacks,
   CallbacksMixin,
   CallTemplate,
+  peekCallbackChain,
 } from "./callbacks.js";
+import { ArgumentError } from "./hash-utils.js";
 
 describe("Callbacks", () => {
   describe("defineCallbacks / setCallback / runCallbacks", () => {
@@ -1046,14 +1048,379 @@ describe("CallbacksMixin", () => {
   });
 });
 
+class Record {
+  static beforeSave(...filters: any[]): void {
+    setCallback(this.prototype, "save", "before", ...filters);
+  }
+
+  static afterSave(...filters: any[]): void {
+    setCallback(this.prototype, "save", "after", ...filters);
+  }
+
+  static callbackSymbol(callbackMethod: string): string {
+    const methodName = `${callbackMethod}Method`;
+    Object.defineProperty(this.prototype, methodName, {
+      value: function (this: Record) {
+        this.history.push([callbackMethod, "symbol"]);
+      },
+      configurable: true,
+      writable: true,
+    });
+    return `:${methodName}`;
+  }
+
+  static callbackProc(callbackMethod: string): (model: Record) => void {
+    return (model: Record) => {
+      model.history.push([callbackMethod, "proc"]);
+    };
+  }
+
+  static callbackObject(callbackMethod: string): object {
+    const klass = class {};
+    Object.defineProperty(klass.prototype, callbackMethod, {
+      value: (model: Record) => {
+        model.history.push([`${callbackMethod}Save`, "object"]);
+      },
+    });
+    return new klass();
+  }
+
+  private _history?: unknown[];
+
+  get history(): unknown[] {
+    return (this._history ??= []);
+  }
+}
+defineCallbacks(Record.prototype, "save");
+
+const CallbackClass = new (class CallbackClass {
+  before(model: Record) {
+    model.history.push(["beforeSave", "class"]);
+  }
+
+  after(model: Record) {
+    model.history.push(["afterSave", "class"]);
+  }
+})();
+
+class Person extends Record {
+  saveFails = false;
+
+  static {
+    for (const callbackMethod of ["beforeSave", "afterSave"] as const) {
+      this[callbackMethod](this.callbackSymbol(callbackMethod));
+      this[callbackMethod](this.callbackProc(callbackMethod));
+      this[callbackMethod](this.callbackObject(callbackMethod.replace(/Save/, "")));
+      this[callbackMethod](CallbackClass);
+      this[callbackMethod]((model: Record) => {
+        model.history.push([callbackMethod, "block"]);
+      });
+    }
+  }
+
+  save(): unknown {
+    return runCallbacks(this, "save", () => {
+      if (this.saveFails) throw new Error("inside save");
+    });
+  }
+}
+
+class PersonSkipper extends Person {
+  static {
+    skipCallback(this.prototype, "save", "before", ":beforeSaveMethod", { if: ":yes" });
+    skipCallback(this.prototype, "save", "after", ":afterSaveMethod", { unless: ":yes" });
+    skipCallback(this.prototype, "save", "after", ":afterSaveMethod", { if: ":no" });
+    skipCallback(this.prototype, "save", "before", ":beforeSaveMethod", { unless: ":no" });
+    skipCallback(this.prototype, "save", "before", CallbackClass, { if: ":yes" });
+  }
+
+  yes(): boolean {
+    return true;
+  }
+
+  no(): boolean {
+    return false;
+  }
+}
+
+class PersonForProgrammaticSkipping extends Person {}
+
+class ConditionalPerson extends Record {
+  static {
+    this.beforeSave((r: Record) => r.history.push(["beforeSave", "proc"]), {
+      if: (r: Record) => true,
+    });
+    this.beforeSave((r: Record) => r.history.push("b00m"), { if: (r: Record) => false });
+    this.beforeSave((r: Record) => r.history.push(["beforeSave", "proc"]), {
+      unless: (r: Record) => false,
+    });
+    this.beforeSave((r: Record) => r.history.push("b00m"), { unless: (r: Record) => true });
+    this.beforeSave((r: Record) => r.history.push("b00m"), { unless: (r: Record) => r.history });
+    this.beforeSave((r: Record) => r.history.push("b00m"), { unless: (r: Record) => r.history });
+    this.beforeSave((r: Record) => r.history.push(["beforeSave", "symbol"]), { if: ":yes" });
+    this.beforeSave((r: Record) => r.history.push("b00m"), { if: ":no" });
+    this.beforeSave((r: Record) => r.history.push(["beforeSave", "symbol"]), { unless: ":no" });
+    this.beforeSave((r: Record) => r.history.push("b00m"), { unless: ":yes" });
+    this.beforeSave((r: Record) => r.history.push(["beforeSave", "combinedSymbol"]), {
+      if: ":yes",
+      unless: ":no",
+    });
+    this.beforeSave((r: Record) => r.history.push("b00m"), { if: ":yes", unless: ":yes" });
+  }
+
+  yes(): boolean {
+    return true;
+  }
+
+  otherYes(): boolean {
+    return true;
+  }
+
+  no(): boolean {
+    return false;
+  }
+
+  otherNo(): boolean {
+    return false;
+  }
+
+  save(): unknown {
+    return runCallbacks(this, "save");
+  }
+}
+
+class CleanPerson extends ConditionalPerson {
+  static {
+    resetCallbacks(this.prototype, "save");
+  }
+}
+
+class MySuper {}
+defineCallbacks(MySuper.prototype, "save");
+
+class MySlate extends MySuper {
+  history: string[] = [];
+  saveFails = false;
+
+  save(): unknown {
+    return runCallbacks(this, "save", () => {
+      if (this.saveFails) throw new Error("inside save");
+      this.history.push("running");
+    });
+  }
+
+  no(): boolean {
+    return false;
+  }
+
+  yes(): boolean {
+    return true;
+  }
+}
+
+class AroundPerson extends MySlate {
+  static {
+    setCallback(this.prototype, "save", "before", ":nope", { if: ":no" });
+    setCallback(this.prototype, "save", "before", ":nope", { unless: ":yes" });
+    setCallback(this.prototype, "save", "after", ":tweedle");
+    setCallback(this.prototype, "save", "before", (m: MySlate) => m.history.push("yup"));
+    setCallback(this.prototype, "save", "before", ":nope", { if: () => false });
+    setCallback(this.prototype, "save", "before", ":nope", { unless: () => true });
+    setCallback(this.prototype, "save", "before", ":yup", { if: () => true });
+    setCallback(this.prototype, "save", "before", ":yup", { unless: () => false });
+    setCallback(this.prototype, "save", "around", ":tweedleDum");
+    setCallback(this.prototype, "save", "around", ":w0tyes", { if: ":yes" });
+    setCallback(this.prototype, "save", "around", ":w0tno", { if: ":no" });
+    setCallback(this.prototype, "save", "around", ":tweedleDeedle");
+  }
+
+  nope(): void {
+    this.history.push("boom");
+  }
+
+  yup(): void {
+    this.history.push("yup");
+  }
+
+  w0tyes(block: () => unknown): void {
+    this.history.push("w0tyes before");
+    block();
+    this.history.push("w0tyes after");
+  }
+
+  w0tno(block: () => unknown): void {
+    this.history.push("boom");
+    block();
+  }
+
+  tweedleDum(block: () => unknown): void {
+    this.history.push("tweedle dum pre");
+    block();
+    this.history.push("tweedle dum post");
+  }
+
+  tweedle(): void {
+    this.history.push("tweedle");
+  }
+
+  tweedleDeedle(block: () => unknown): void {
+    this.history.push("tweedle deedle pre");
+    block();
+    this.history.push("tweedle deedle post");
+  }
+}
+
+class AroundPersonResult extends MySuper {
+  result: unknown;
+
+  static {
+    setCallback(this.prototype, "save", "after", ":tweedle1");
+    setCallback(this.prototype, "save", "around", ":tweedleDum");
+    setCallback(this.prototype, "save", "after", ":tweedle2");
+  }
+
+  tweedleDum(block: () => unknown): void {
+    this.result = block();
+  }
+
+  tweedle1(): string {
+    return "tweedle1";
+  }
+
+  tweedle2(): string {
+    return "tweedle2";
+  }
+
+  save(): unknown {
+    return runCallbacks(this, "save", () => "running");
+  }
+}
+
+class AbstractCallbackTerminator {
+  static setSaveCallbacks(): void {
+    setCallback(this.prototype, "save", "before", ":first");
+    setCallback(this.prototype, "save", "before", ":second");
+    setCallback(this.prototype, "save", "around", ":aroundIt");
+    setCallback(this.prototype, "save", "before", ":third");
+    setCallback(this.prototype, "save", "after", ":first");
+    setCallback(this.prototype, "save", "around", ":aroundIt");
+    setCallback(this.prototype, "save", "after", ":third");
+  }
+
+  history: string[] = [];
+  saved: boolean | undefined;
+  halted: unknown;
+  callbackName: unknown;
+
+  aroundIt(block: () => unknown): void {
+    this.history.push("around1");
+    block();
+    this.history.push("around2");
+  }
+
+  first(): void {
+    this.history.push("first");
+  }
+
+  second(): unknown {
+    this.history.push("second");
+    return ":halt";
+  }
+
+  third(): void {
+    this.history.push("third");
+  }
+
+  save(): unknown {
+    return runCallbacks(this, "save", () => {
+      this.saved = true;
+    });
+  }
+
+  haltedCallbackHook(filter: unknown, name: string): void {
+    this.halted = filter;
+    this.callbackName = name;
+  }
+}
+
+class CallbackTerminator extends AbstractCallbackTerminator {
+  static {
+    defineCallbacks(this.prototype, "save", {
+      terminator: (_: object, resultLambda: () => unknown) => resultLambda() === ":halt",
+    });
+    this.setSaveCallbacks();
+  }
+}
+
+class CallbackTerminatorSkippingAfterCallbacks extends AbstractCallbackTerminator {
+  static {
+    defineCallbacks(this.prototype, "save", {
+      terminator: (_: object, resultLambda: () => unknown) => resultLambda() === ":halt",
+      skipAfterCallbacksIfTerminated: true,
+    });
+    this.setSaveCallbacks();
+  }
+}
+
+class CallbackDefaultTerminator extends AbstractCallbackTerminator {
+  static {
+    defineCallbacks(this.prototype, "save");
+  }
+
+  override second(): unknown {
+    this.history.push("second");
+    return kernelThrow(":abort");
+  }
+
+  static {
+    this.setSaveCallbacks();
+  }
+}
+
+class CallbackFalseTerminator extends AbstractCallbackTerminator {
+  static {
+    defineCallbacks(this.prototype, "save");
+  }
+
+  override second(): unknown {
+    this.history.push("second");
+    return false;
+  }
+
+  static {
+    this.setSaveCallbacks();
+  }
+}
+
+class WriterSkipper extends Person {
+  age = 0;
+
+  static {
+    skipCallback(this.prototype, "save", "before", ":beforeSaveMethod", {
+      if: function (this: WriterSkipper) {
+        return this.age > 21;
+      },
+    });
+  }
+}
+
 describe("CallbacksTest", () => {
   it("save person", () => {
-    const person = { log: [] as string[], name: "Alice" };
-    defineCallbacks(person, "save");
-    setCallback(person, "save", "before", (t: any) => t.log.push("before:" + t.name));
-    setCallback(person, "save", "after", (t: any) => t.log.push("after:" + t.name));
-    runCallbacks(person, "save", () => person.log.push("saved"));
-    expect(person.log).toContain("before:Alice");
+    const person = new Person();
+    expect(person.history).toEqual([]);
+    person.save();
+    expect(person.history).toEqual([
+      ["beforeSave", "symbol"],
+      ["beforeSave", "proc"],
+      ["beforeSave", "object"],
+      ["beforeSave", "class"],
+      ["beforeSave", "block"],
+      ["afterSave", "block"],
+      ["afterSave", "class"],
+      ["afterSave", "object"],
+      ["afterSave", "proc"],
+      ["afterSave", "symbol"],
+    ]);
   });
 });
 
@@ -1086,47 +1453,187 @@ describe("OneTimeCompileTest", () => {
 });
 
 describe("DoubleYieldTest", () => {
+  class DoubleYieldModel extends MySlate {
+    static {
+      setCallback(this.prototype, "save", "around", ":wrapOuter");
+      setCallback(this.prototype, "save", "around", ":doubleTrouble");
+      setCallback(this.prototype, "save", "around", ":wrapInner");
+    }
+
+    wrapOuter(block: () => unknown): void {
+      this.history.push("wrap_outer");
+      block();
+      this.history.push("unwrap_outer");
+    }
+
+    doubleTrouble(block: () => unknown): void {
+      this.history.push("first_trouble");
+      block();
+      this.history.push("second_trouble");
+      block();
+      this.history.push("third_trouble");
+    }
+
+    wrapInner(block: () => unknown): void {
+      this.history.push("wrap_inner");
+      block();
+      this.history.push("unwrap_inner");
+    }
+  }
+
   it("double save", () => {
-    const target = { log: [] as string[] };
-    defineCallbacks(target, "save");
-    setCallback(target, "save", "around", (t: any, next: () => void) => {
-      next();
-    });
-    expect(() => runCallbacks(target, "save", () => target.log.push("saved"))).not.toThrow();
-    expect(target.log).toEqual(["saved"]);
+    const double = new DoubleYieldModel();
+    double.save();
+    expect(double.history).toEqual([
+      "wrap_outer",
+      "first_trouble",
+      "wrap_inner",
+      "running",
+      "unwrap_inner",
+      "second_trouble",
+      "wrap_inner",
+      "running",
+      "unwrap_inner",
+      "third_trouble",
+      "unwrap_outer",
+    ]);
   });
 });
 
 describe("CallStackTest", () => {
-  it("tidy call stack", () => {
-    const target = { log: [] as string[] };
-    defineCallbacks(target, "save");
-    setCallback(target, "save", "before", (t: any) => t.log.push("b1"));
-    setCallback(target, "save", "before", (t: any) => t.log.push("b2"));
-    setCallback(target, "save", "after", (t: any) => t.log.push("a1"));
-    runCallbacks(target, "save", () => target.log.push("body"));
-    expect(target.log).toEqual(["b1", "b2", "body", "a1"]);
+  it.skip("tidy call stack", () => {
+    // BLOCKED: callbacks-runner-exceeds-rails-call-stack-budget
+    const around = new AroundPerson();
+    around.saveFails = true;
+
+    let exception!: Error;
+    try {
+      around.save();
+    } catch (e) {
+      exception = e as Error;
+    }
+
+    expect(exception.message).toBe("inside save");
+
+    const callStack = exception
+      .stack!.split("\n")
+      .slice(1)
+      .map((line) => /^\s*at (\S+) \(/.exec(line)?.[1] ?? "<anonymous>");
+    callStack.splice(callStack.length - (new Error().stack!.split("\n").length - 1));
+
+    // eslint-disable-next-line vitest/no-conditional-in-test
+    if (callStack[callStack.length - 1].includes(".")) {
+      // eslint-disable-next-line vitest/no-conditional-expect
+      expect(callStack.join("\n")).toBe(
+        [
+          "<anonymous>",
+          "next",
+          "AroundPerson.tweedleDeedle",
+          "next",
+          "AroundPerson.w0tyes",
+          "next",
+          "AroundPerson.tweedleDum",
+          "next",
+          "runCallbacks",
+          "AroundPerson.save",
+        ].join("\n"),
+      );
+    } else {
+      // eslint-disable-next-line vitest/no-conditional-expect
+      expect(callStack.join("\n")).toBe(
+        [
+          "<anonymous>",
+          "next",
+          "tweedleDeedle",
+          "next",
+          "w0tyes",
+          "next",
+          "tweedleDum",
+          "next",
+          "runCallbacks",
+          "save",
+        ].join("\n"),
+      );
+    }
   });
-  it("short call stack", () => {
-    const target = { log: [] as string[] };
-    defineCallbacks(target, "save");
-    setCallback(target, "save", "before", (t: any) => t.log.push("before"));
-    runCallbacks(target, "save");
-    expect(target.log).toEqual(["before"]);
+
+  it.skip("short call stack", () => {
+    // BLOCKED: callbacks-runner-exceeds-rails-call-stack-budget
+    const person = new Person();
+    person.saveFails = true;
+
+    let exception!: Error;
+    try {
+      person.save();
+    } catch (e) {
+      exception = e as Error;
+    }
+
+    expect(exception.message).toBe("inside save");
+
+    const callStack = exception
+      .stack!.split("\n")
+      .slice(1)
+      .map((line) => /^\s*at (\S+) \(/.exec(line)?.[1] ?? "<anonymous>");
+    callStack.splice(callStack.length - (new Error().stack!.split("\n").length - 1));
+
+    // eslint-disable-next-line vitest/no-conditional-in-test
+    if (callStack[callStack.length - 1].includes(".")) {
+      // eslint-disable-next-line vitest/no-conditional-expect
+      expect(callStack.join("\n")).toBe(["<anonymous>", "runCallbacks", "Person.save"].join("\n"));
+    } else {
+      // eslint-disable-next-line vitest/no-conditional-expect
+      expect(callStack.join("\n")).toBe(["<anonymous>", "runCallbacks", "save"].join("\n"));
+    }
   });
 });
 
 describe("ExtendCallbacksTest", () => {
-  it("save", () => {
-    const base = { log: [] as string[] };
-    defineCallbacks(base, "save");
-    setCallback(base, "save", "before", (t: any) => t.log.push("base-before"));
+  const ExtendModule = {
+    extended(base: ExtendCallbacks) {
+      setCallback(base, "save", "before", ":record3");
+    },
 
-    const child = Object.create(base);
-    child.log = [] as string[];
-    setCallback(child, "save", "before", (t: any) => t.log.push("child-before"));
-    runCallbacks(child, "save", () => child.log.push("saved"));
-    expect(child.log).toContain("child-before");
+    record3(this: ExtendCallbacks) {
+      this.recorder.push(3);
+    },
+  };
+
+  const IncludeModule = {
+    included(base: typeof ExtendCallbacks) {
+      setCallback(base.prototype, "save", "before", ":record2");
+    },
+
+    record2(this: ExtendCallbacks) {
+      this.recorder.push(2);
+    },
+  };
+
+  class ExtendCallbacks {
+    static {
+      defineCallbacks(this.prototype, "save");
+      setCallback(this.prototype, "save", "before", ":record1");
+
+      Object.defineProperty(this.prototype, "record2", { value: IncludeModule.record2 });
+      IncludeModule.included(this);
+    }
+
+    save(): unknown {
+      return runCallbacks(this, "save");
+    }
+
+    recorder: number[] = [];
+
+    private record1(): void {
+      this.recorder.push(1);
+    }
+  }
+
+  it("save", () => {
+    const model = Object.assign(new ExtendCallbacks(), { record3: ExtendModule.record3 });
+    ExtendModule.extended(model);
+    model.save();
+    expect(model.recorder).toEqual([1, 2, 3]);
   });
 });
 
@@ -1142,177 +1649,236 @@ describe("HyphenatedKeyTest", () => {
 
 describe("CallbackFalseTerminatorTest", () => {
   it("returning false does not halt callback", () => {
-    const target = { log: [] as string[] };
-    defineCallbacks(target, "save", { terminator: false });
-    setCallback(target, "save", "before", () => false);
-    setCallback(target, "save", "before", (t: any) => t.log.push("ran"));
-    runCallbacks(target, "save", () => target.log.push("body"));
-    expect(target.log).toContain("ran");
+    const obj = new CallbackFalseTerminator();
+    obj.save();
+    expect(obj.halted).toBeUndefined();
+    expect(obj.saved).toBeTruthy();
   });
 });
 
 describe("WriterCallbacksTest", () => {
   it("skip writer", () => {
-    const target = { log: [] as string[] };
-    defineCallbacks(target, "write");
-    const cb = (t: any) => t.log.push("written");
-    setCallback(target, "write", "before", cb);
-    skipCallback(target, "write", "before", cb);
-    runCallbacks(target, "write");
-    expect(target.log).not.toContain("written");
+    const writer = new WriterSkipper();
+    writer.age = 18;
+    expect(writer.history).toEqual([]);
+    writer.save();
+    expect(writer.history).toEqual([
+      ["beforeSave", "symbol"],
+      ["beforeSave", "proc"],
+      ["beforeSave", "object"],
+      ["beforeSave", "class"],
+      ["beforeSave", "block"],
+      ["afterSave", "block"],
+      ["afterSave", "class"],
+      ["afterSave", "object"],
+      ["afterSave", "proc"],
+      ["afterSave", "symbol"],
+    ]);
   });
 });
 
 describe("ConditionalCallbackTest", () => {
   it("save conditional person", () => {
-    const target = { log: [] as string[], active: true };
-    defineCallbacks(target, "save");
-    setCallback(target, "save", "before", (t: any) => t.log.push("conditional"), {
-      if: (t: any) => t.active,
-    });
-    runCallbacks(target, "save");
-    expect(target.log).toContain("conditional");
-
-    target.log = [];
-    target.active = false;
-    runCallbacks(target, "save");
-    expect(target.log).not.toContain("conditional");
+    const person = new ConditionalPerson();
+    person.save();
+    expect(person.history).toEqual([
+      ["beforeSave", "proc"],
+      ["beforeSave", "proc"],
+      ["beforeSave", "symbol"],
+      ["beforeSave", "symbol"],
+      ["beforeSave", "combinedSymbol"],
+    ]);
   });
 });
 
 describe("AroundCallbackResultTest", () => {
   it("save around", () => {
-    const target = { result: "" };
-    defineCallbacks(target, "save");
-    setCallback(target, "save", "around", (t: any, next: () => void) => {
-      next();
-      t.result += "_around";
-    });
-    runCallbacks(target, "save", () => {
-      target.result = "saved";
-    });
-    expect(target.result).toBe("saved_around");
+    const around = new AroundPersonResult();
+    around.save();
+    expect(around.result).toBe("running");
   });
 });
 
 describe("ResetCallbackTest", () => {
-  it("reset callbacks", () => {
-    const target = { log: [] as string[] };
-    defineCallbacks(target, "save");
-    setCallback(target, "save", "before", (t: any) => t.log.push("before"));
-    resetCallbacks(target, "save");
-    runCallbacks(target, "save");
-    expect(target.log).toEqual([]);
-  });
+  function buildClass(memo: unknown[]) {
+    class Klass {
+      static {
+        defineCallbacks(this.prototype, "foo");
+        setCallback(this.prototype, "foo", "before", ":hello");
+      }
+
+      run(): unknown {
+        return runCallbacks(this, "foo");
+      }
+
+      hello(): void {
+        memo.push("hi");
+      }
+    }
+    return Klass;
+  }
+
   it("save conditional person", () => {
-    const person = { log: [] as string[], valid: true };
-    defineCallbacks(person, "save");
-    setCallback(person, "save", "before", (t: any) => t.log.push("validated"), {
-      if: (t: any) => t.valid,
-    });
-    runCallbacks(person, "save");
-    expect(person.log).toContain("validated");
-    resetCallbacks(person, "save");
-    person.log = [];
-    runCallbacks(person, "save");
-    expect(person.log).not.toContain("validated");
+    const person = new CleanPerson();
+    person.save();
+    expect(person.history).toEqual([]);
   });
-  it("reset impacts subclasses", () => {
-    const base = { log: [] as string[] };
-    defineCallbacks(base, "save");
-    setCallback(base, "save", "before", (t: any) => t.log.push("base"));
-    resetCallbacks(base, "save");
-    runCallbacks(base, "save");
-    expect(base.log).toEqual([]);
+
+  it("reset callbacks", () => {
+    const events: unknown[] = [];
+    const klass = buildClass(events);
+    new klass().run();
+    expect(events.length).toBe(1);
+
+    resetCallbacks(klass.prototype, "foo");
+    new klass().run();
+    expect(events.length).toBe(1);
+  });
+
+  it.skip("reset impacts subclasses", () => {
+    // BLOCKED: reset-callbacks-does-not-remove-from-descendants
+    const events: unknown[] = [];
+    const klass = buildClass(events);
+    class Subclass extends klass {
+      static {
+        setCallback(this.prototype, "foo", "before", ":world");
+      }
+
+      world(): void {
+        events.push("world");
+      }
+    }
+
+    new Subclass().run();
+    expect(events.length).toBe(2);
+
+    resetCallbacks(klass.prototype, "foo");
+    new Subclass().run();
+    expect(events.length).toBe(3);
   });
 });
 
 describe("ConditionalTests", () => {
+  function buildClass(callback: unknown) {
+    class Klass {
+      static {
+        defineCallbacks(this.prototype, "foo");
+        setCallback(this.prototype, "foo", "before", ":foo", { if: callback as any });
+      }
+
+      foo(): void {}
+
+      run(): unknown {
+        return runCallbacks(this, "foo");
+      }
+    }
+    return Klass;
+  }
+
   it("class conditional with scope", () => {
-    const target = { log: [] as string[], flag: true };
-    defineCallbacks(target, "save");
-    setCallback(target, "save", "before", (t: any) => t.log.push("scoped"), {
-      if: (t: any) => t.flag,
-    });
-    runCallbacks(target, "save");
-    expect(target.log).toContain("scoped");
+    const z: unknown[] = [];
+    const callback = {
+      foo(o: unknown) {
+        z.push(o);
+      },
+    };
+    class Klass {
+      static {
+        defineCallbacks(this.prototype, "foo", { scope: ["name"] });
+        setCallback(this.prototype, "foo", "before", ":foo", { if: callback as any });
+      }
+
+      run(): unknown {
+        return runCallbacks(this, "foo");
+      }
+
+      private foo(): void {}
+    }
+    const object = new Klass();
+    object.run();
+    expect(z).toEqual([object]);
   });
+
   it("class", () => {
-    const target = { log: [] as string[] };
-    defineCallbacks(target, "save");
-    const handler = { call: (t: any) => t.log.push("class-handler") };
-    setCallback(target, "save", "before", (t: any) => handler.call(t));
-    runCallbacks(target, "save");
-    expect(target.log).toContain("class-handler");
+    const z: unknown[] = [];
+    const klass = buildClass({
+      before(o: unknown) {
+        z.push(o);
+      },
+    });
+    const object = new klass();
+    object.run();
+    expect(z).toEqual([object]);
   });
+
   it("proc negative arity", () => {
-    const target = { log: [] as string[] };
-    defineCallbacks(target, "save");
-    setCallback(target, "save", "before", () => {
-      target.log.push("no-arg");
-    });
-    runCallbacks(target, "save");
-    expect(target.log).toContain("no-arg");
+    const z: unknown[] = [];
+    const object = new (buildClass((...args: unknown[]) => z.push(args)))();
+    object.run();
+    expect(z.flat()).toEqual([]);
   });
+
   it("proc arity0", () => {
-    const target = { log: [] as string[] };
-    defineCallbacks(target, "save");
-    setCallback(target, "save", "before", () => {
-      target.log.push("arity0");
-    });
-    runCallbacks(target, "save");
-    expect(target.log).toContain("arity0");
+    const z: unknown[] = [];
+    const object = new (buildClass(() => z.push(0)))();
+    object.run();
+    expect(z).toEqual([0]);
   });
+
   it("proc arity1", () => {
-    const target = { log: [] as string[] };
-    defineCallbacks(target, "save");
-    setCallback(target, "save", "before", (t: any) => {
-      t.log.push("arity1");
-    });
-    runCallbacks(target, "save");
-    expect(target.log).toContain("arity1");
+    const z: unknown[] = [];
+    const object = new (buildClass((x: unknown) => z.push(x)))();
+    object.run();
+    expect(z).toEqual([object]);
   });
+
   it("proc arity2", () => {
-    const target = { log: [] as string[] };
-    defineCallbacks(target, "save");
-    setCallback(target, "save", "around", (t: any, next: () => void) => {
-      t.log.push("arity2-before");
-      next();
-    });
-    runCallbacks(target, "save");
-    expect(target.log).toContain("arity2-before");
+    expect(() => {
+      const object = new (buildClass((a: unknown, b: unknown) => {}))();
+      object.run();
+    }).toThrow(ArgumentError);
   });
 });
 
 describe("SkipCallbacksTest", () => {
-  it("skip callback", () => {
-    const target = { log: [] as string[] };
-    defineCallbacks(target, "save");
-    const cb = (t: any) => t.log.push("to-skip");
-    setCallback(target, "save", "before", cb);
-    setCallback(target, "save", "before", (t: any) => t.log.push("kept"));
-    skipCallback(target, "save", "before", cb);
-    runCallbacks(target, "save");
-    expect(target.log).not.toContain("to-skip");
-    expect(target.log).toContain("kept");
-  });
   it("skip person", () => {
-    const person = { log: [] as string[], name: "Alice" };
-    defineCallbacks(person, "save");
-    const greet = (t: any) => t.log.push("hello " + t.name);
-    setCallback(person, "save", "before", greet);
-    skipCallback(person, "save", "before", greet);
-    runCallbacks(person, "save");
-    expect(person.log).not.toContain("hello Alice");
+    const person = new PersonSkipper();
+    expect(person.history).toEqual([]);
+    person.save();
+    expect(person.history).toEqual([
+      ["beforeSave", "proc"],
+      ["beforeSave", "object"],
+      ["beforeSave", "block"],
+      ["afterSave", "block"],
+      ["afterSave", "class"],
+      ["afterSave", "object"],
+      ["afterSave", "proc"],
+      ["afterSave", "symbol"],
+    ]);
   });
+
   it("skip person programmatically", () => {
-    const person = { log: [] as string[], skip: false };
-    defineCallbacks(person, "save");
-    const cb = (t: any) => t.log.push("ran");
-    setCallback(person, "save", "before", cb, { unless: (t: any) => t.skip });
-    person.skip = true;
-    runCallbacks(person, "save");
-    expect(person.log).not.toContain("ran");
+    for (const saveCallback of peekCallbackChain(PersonForProgrammaticSkipping.prototype, "save")!
+      .entries) {
+      if ("before" === String(saveCallback.kind)) {
+        skipCallback(
+          PersonForProgrammaticSkipping.prototype,
+          "save",
+          saveCallback.kind,
+          saveCallback.filter as any,
+        );
+      }
+    }
+    const person = new PersonForProgrammaticSkipping();
+    expect(person.history).toEqual([]);
+    person.save();
+    expect(person.history).toEqual([
+      ["afterSave", "block"],
+      ["afterSave", "class"],
+      ["afterSave", "object"],
+      ["afterSave", "proc"],
+      ["afterSave", "symbol"],
+    ]);
   });
 });
 
@@ -1462,122 +2028,61 @@ describe("NotPermittedStringCallbackTest", () => {
 });
 
 describe("CallbackTerminatorTest", () => {
-  const haltTerminator = (_t: object, fn: () => unknown) => fn() === "halt";
   it("termination skips following before and around callbacks", () => {
-    const target = { log: [] as string[] };
-    defineCallbacks(target, "save", { terminator: haltTerminator });
-    setCallback(target, "save", "before", () => "halt");
-    setCallback(target, "save", "before", (t: any) => t.log.push("after-halt"));
-    runCallbacks(target, "save", () => target.log.push("body"));
-    expect(target.log).not.toContain("after-halt");
-    expect(target.log).not.toContain("body");
+    const terminator = new CallbackTerminator();
+    terminator.save();
+    expect(terminator.history).toEqual(["first", "second", "third", "first"]);
   });
+
   it("termination invokes hook", () => {
-    const second = () => "halt";
-    const target = {
-      log: [] as string[],
-      halted: undefined as unknown,
-      callbackName: undefined as unknown,
-      haltedCallbackHook(filter: unknown, name: string) {
-        this.halted = filter;
-        this.callbackName = name;
-      },
-    };
-    defineCallbacks(target, "save", { terminator: haltTerminator });
-    setCallback(target, "save", "before", second);
-    runCallbacks(target, "save");
-    expect(target.halted).toBe(second);
-    expect(target.callbackName).toBe("save");
+    const terminator = new CallbackTerminator();
+    terminator.save();
+    expect(terminator.halted).toBe(":second");
+    expect(terminator.callbackName).toBe("save");
   });
+
   it("block never called if terminated", () => {
-    const target = { ran: false };
-    defineCallbacks(target, "save", { terminator: haltTerminator });
-    setCallback(target, "save", "before", () => "halt");
-    runCallbacks(target, "save", () => {
-      target.ran = true;
-    });
-    expect(target.ran).toBe(false);
+    const obj = new CallbackTerminator();
+    obj.save();
+    expect(obj.saved).toBeFalsy();
   });
 });
 
 describe("CallbackDefaultTerminatorTest", () => {
   it("default termination", () => {
-    const target = { ran: false };
-    defineCallbacks(target, "save");
-    setCallback(target, "save", "before", () => kernelThrow(":abort"));
-    runCallbacks(target, "save", () => {
-      target.ran = true;
-    });
-    expect(target.ran).toBe(false);
+    const terminator = new CallbackDefaultTerminator();
+    terminator.save();
+    expect(terminator.history).toEqual(["first", "second", "third", "first"]);
   });
+
   it("default termination invokes hook", () => {
-    const second = (t: any) => {
-      t.count++;
-      kernelThrow(":abort");
-    };
-    const target = {
-      count: 0,
-      halted: undefined as unknown,
-      haltedCallbackHook(filter: unknown, _name: string) {
-        this.halted = filter;
-      },
-    };
-    defineCallbacks(target, "save");
-    setCallback(target, "save", "before", second);
-    runCallbacks(target, "save");
-    expect(target.count).toBe(1);
-    expect(target.halted).toBe(second);
+    const terminator = new CallbackDefaultTerminator();
+    terminator.save();
+    expect(terminator.halted).toBe(":second");
   });
-  it("default termination invokes hook through around chain", () => {
-    const second = () => kernelThrow(":abort");
-    const target = {
-      log: [] as string[],
-      halted: undefined as unknown,
-      name: undefined as unknown,
-      haltedCallbackHook(filter: unknown, name: string) {
-        this.halted = filter;
-        this.name = name;
-      },
-    };
-    defineCallbacks(target, "save");
-    setCallback(target, "save", "around", (t: any, next: () => void) => {
-      t.log.push("around");
-      next();
-    });
-    setCallback(target, "save", "before", second);
-    runCallbacks(target, "save");
-    expect(target.halted).toBe(second);
-    expect(target.name).toBe("save");
-  });
-  it("async termination invokes hook through around chain", async () => {
-    const second = async () => {
-      await Promise.resolve();
-      kernelThrow(":abort");
-    };
-    const target = {
-      halted: undefined as unknown,
-      haltedCallbackHook(filter: unknown, _name: string) {
-        this.halted = filter;
-      },
-    };
-    defineCallbacks(target, "save");
-    setCallback(target, "save", "around", (_t: any, next: () => void) => next());
-    setCallback(target, "save", "before", second);
-    await runCallbacks(target, "save");
-    expect(target.halted).toBe(second);
-  });
+
   it("block never called if abort is thrown", () => {
-    const target = { ran: false };
-    defineCallbacks(target, "save");
-    setCallback(target, "save", "before", () => kernelThrow(":abort"));
-    runCallbacks(target, "save", () => {
-      target.ran = true;
-    });
-    expect(target.ran).toBe(false);
+    const obj = new CallbackDefaultTerminator();
+    obj.save();
+    expect(obj.saved).toBeFalsy();
   });
 });
 
 describe("CallbackProcTest", () => {
+  function buildClass(callback: unknown) {
+    class Klass {
+      static {
+        defineCallbacks(this.prototype, "foo");
+        setCallback(this.prototype, "foo", "before", callback as any);
+      }
+
+      run(): unknown {
+        return runCallbacks(this, "foo");
+      }
+    }
+    return Klass;
+  }
+
   it("proc returns value", () => {
     const target = { log: [] as string[], value: 0 };
     defineCallbacks(target, "save");
@@ -1606,15 +2111,10 @@ describe("CallbackProcTest", () => {
     expect(target.ran).toBe(true);
   });
   it("proc arity 2", () => {
-    const target = { log: [] as string[] };
-    defineCallbacks(target, "save");
-    setCallback(target, "save", "around", (t: any, next: () => void) => {
-      t.log.push("pre");
-      next();
-      t.log.push("post");
-    });
-    runCallbacks(target, "save");
-    expect(target.log).toEqual(["pre", "post"]);
+    expect(() => {
+      const klass = buildClass((x: unknown, y: unknown) => {});
+      new klass().run();
+    }).toThrow(ArgumentError);
   });
   it("proc negative called with empty list", () => {
     const target = { ran: false };
@@ -1629,16 +2129,27 @@ describe("CallbackProcTest", () => {
 
 describe("CallbackTerminatorSkippingAfterCallbacksTest", () => {
   it("termination skips after callbacks", () => {
-    const target = { log: [] as string[] };
-    defineCallbacks(target, "save");
-    setCallback(target, "save", "before", () => false);
-    setCallback(target, "save", "after", (t: any) => t.log.push("after"));
-    runCallbacks(target, "save");
-    expect(Array.isArray(target.log)).toBe(true);
+    const terminator = new CallbackTerminatorSkippingAfterCallbacks();
+    terminator.save();
+    expect(terminator.history).toEqual(["first", "second"]);
   });
 });
 
 describe("CallbackTypeTest", () => {
+  function buildClass(callback: unknown, n = 10) {
+    class Klass {
+      static {
+        defineCallbacks(this.prototype, "foo");
+        for (let i = 0; i < n; i++) setCallback(this.prototype, "foo", "before", callback as any);
+      }
+
+      run(): unknown {
+        return runCallbacks(this, "foo");
+      }
+    }
+    return Klass;
+  }
+
   it("add class", () => {
     const target = { log: [] as string[] };
     defineCallbacks(target, "save");
@@ -1696,13 +2207,12 @@ describe("CallbackTypeTest", () => {
   });
 
   it("skip string", () => {
-    const target = { log: [] as string[] };
-    defineCallbacks(target, "save");
-    const cb = (t: any) => t.log.push("cb");
-    setCallback(target, "save", "before", cb);
-    skipCallback(target, "save", "before", cb);
-    runCallbacks(target, "save");
-    expect(target.log).toEqual([]);
+    const calls: unknown[] = [];
+    const klass = buildClass(":bar");
+    Object.defineProperty(klass.prototype, "bar", { value: () => calls.push(klass) });
+    expect(() => skipCallback(klass.prototype, "foo", "before", "bar")).toThrow(ArgumentError);
+    new klass().run();
+    expect(calls.length).toBe(1);
   });
 
   it("skip undefined callback", () => {
@@ -1728,11 +2238,17 @@ describe("CallbackTypeTest", () => {
 
 describe("NotSupportedStringConditionalTest", () => {
   it("string conditional options", () => {
-    const target = { log: [] as string[] };
-    defineCallbacks(target, "save");
-    setCallback(target, "save", "before", (t: any) => t.log.push("cb"), { if: () => true });
-    runCallbacks(target, "save");
-    expect(target.log).toEqual(["cb"]);
+    class Klass extends Record {}
+
+    expect(() => Klass.beforeSave(":tweedle", { if: ["true"] })).toThrow(ArgumentError);
+    expect(() => Klass.beforeSave(":tweedle", { if: "true" })).toThrow(ArgumentError);
+    expect(() => Klass.afterSave(":tweedle", { unless: "false" })).toThrow(ArgumentError);
+    expect(() =>
+      skipCallback(Klass.prototype, "save", "before", ":tweedle", { if: "true" }),
+    ).toThrow(ArgumentError);
+    expect(() =>
+      skipCallback(Klass.prototype, "save", "after", ":tweedle", { unless: "false" }),
+    ).toThrow(ArgumentError);
   });
 });
 

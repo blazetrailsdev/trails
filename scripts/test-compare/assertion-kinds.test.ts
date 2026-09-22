@@ -122,6 +122,33 @@ describe("diffHistograms", () => {
     ]);
   });
 
+  it("maps the ActiveRecord::TestCase helpers and scores their ports alike", () => {
+    expect(normalizeRailsKind("assert_column")).toBe("includes");
+    expect(normalizeRailsKind("assert_no_column")).toBe("excludes");
+    expect(normalizeRailsKind("assert_async_equal")).toBe("equal");
+    expect(normalizeTrailsKind("assertColumn")).toBe("includes");
+    expect(normalizeTrailsKind("assertNoColumn")).toBe("excludes");
+    expect(normalizeTrailsKind("assertAsyncEqual")).toBe("equal");
+
+    const rails = buildHistogram(["assert_column"], "rails");
+    const trails = buildHistogram(["toContain"], "trails");
+    expect(diffHistograms(rails.histogram, trails.histogram)).toEqual([]);
+  });
+
+  it("leaves the call-counting and delta helpers deliberately unmapped", () => {
+    for (const name of [
+      "assert_called",
+      "assert_called_with",
+      "assert_not_called",
+      "assert_difference",
+      "assert_no_changes",
+      "assert_deprecated",
+      "assert_error_reported",
+    ]) {
+      expect(normalizeRailsKind(name)).toBeNull();
+    }
+  });
+
   it("maps assert_in_epsilon onto inDelta", () => {
     expect(normalizeRailsKind("assert_in_epsilon")).toBe("inDelta");
   });

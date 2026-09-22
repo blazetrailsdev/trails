@@ -67,8 +67,8 @@ function engineTests({ engine, backendModule, expansionAttackError }: EngineTest
         </blog>
     `)) as { blog: { logo: typeof FileLike } };
 
-      expect(Object.hasOwn(hash, "blog")).toBe(true);
-      expect(Object.hasOwn(hash.blog, "logo")).toBe(true);
+      expect(Object.hasOwn(hash, "blog")).toBeTruthy();
+      expect(Object.hasOwn(hash.blog, "logo")).toBeTruthy();
 
       const file = hash.blog.logo;
       expect(file.originalFilename).toBe("logo.png");

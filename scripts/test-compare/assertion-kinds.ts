@@ -118,6 +118,30 @@ const RAILS_MAP: Record<string, CanonicalKind> = {
   assert_no_queries: "noQueries",
   assert_queries_match: "queriesMatch",
   assert_no_queries_match: "noQueriesMatch",
+  // The assertion helpers ActiveRecord::TestCase itself defines. `assert_column`
+  // is `assert_includes model.column_names, column_name.to_s`
+  // (activerecord/test/cases/test_case.rb:128-131) and `assert_no_column` its
+  // `assert_not_includes` twin (test_case.rb:133-136).
+  assert_column: "includes",
+  assert_no_column: "excludes",
+  // AsyncHelper#assert_async_equal (activerecord/test/support/async_helper.rb:5-14)
+  // checks the result is a Promise, then asserts its value equals `expected`.
+  assert_async_equal: "equal",
+  // Deliberately unmapped: the helpers ActiveRecord::TestCase mixes in
+  // (test_case.rb:22-29) and inherits from ActiveSupport::TestCase whose check
+  // is not one canonical kind — they count or compare calls, blocks and deltas.
+  // Both sides spell them by name, so they surface as unmapped, never divergent:
+  //   assert_called / assert_called_with / assert_not_called /
+  //   assert_called_on_instance_of / assert_not_called_on_instance_of
+  //     (activesupport/lib/active_support/testing/method_call_assertions.rb:9-60)
+  //   assert_difference / assert_no_difference / assert_changes / assert_no_changes
+  //     (activesupport/lib/active_support/testing/assertions.rb:101-252)
+  //   assert_deprecated / assert_not_deprecated
+  //     (activesupport/lib/active_support/testing/deprecation.rb:30-55)
+  //   assert_error_reported / assert_no_error_reported
+  //     (activesupport/lib/active_support/testing/error_reporter_assertions.rb:62-88)
+  // Stream, TestFixtures, ValidationsRepairHelper, AdapterHelper and
+  // LoadSchemaHelper (test_case.rb:23-29) define no assertions.
 };
 
 const MSPEC_MAP: Record<string, CanonicalKind> = {
