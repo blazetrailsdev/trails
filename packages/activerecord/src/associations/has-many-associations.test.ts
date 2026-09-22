@@ -338,70 +338,87 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("destroying", async () => {
-    const firstFirm = companies("first_firm") as any;
-    await firstFirm.clientsOfFirm.load();
-    expect(firstFirm.clientsOfFirm.loaded).toBe(true);
+    await forceSignal37ToLoadAllClientsOfFirm(companies);
 
-    const before = (await Client.count()) as number;
-    const first = await firstFirm.clientsOfFirm.first();
-    await firstFirm.clientsOfFirm.destroy(first);
-    expect(await Client.count()).toBe(before - 1);
+    expect((companies("first_firm") as any).clientsOfFirm.loaded).toBeTruthy();
 
-    await firstFirm.reload();
-    expect(await firstFirm.clientsOfFirm.size()).toBe(1);
-    await firstFirm.clientsOfFirm.reload();
-    expect(await firstFirm.clientsOfFirm.size()).toBe(1);
+    await assertDifference(
+      async () => Number(await Client.count()),
+      -1,
+      null,
+      async () => {
+        await (companies("first_firm") as any).clientsOfFirm.destroy(
+          await (companies("first_firm") as any).clientsOfFirm.first(),
+        );
+      },
+    );
+
+    expect(await (await (companies("first_firm") as any).reload()).clientsOfFirm.size()).toBe(1);
+    expect(await (await (companies("first_firm") as any).clientsOfFirm.reload()).size()).toBe(1);
   });
 
   it("destroying by integer id", async () => {
-    const firstFirm = companies("first_firm") as any;
-    await firstFirm.clientsOfFirm.load();
-    expect(firstFirm.clientsOfFirm.loaded).toBe(true);
+    await forceSignal37ToLoadAllClientsOfFirm(companies);
 
-    const before = (await Client.count()) as number;
-    const first = await firstFirm.clientsOfFirm.first();
-    await firstFirm.clientsOfFirm.destroy(first.id);
-    expect(await Client.count()).toBe(before - 1);
+    expect((companies("first_firm") as any).clientsOfFirm.loaded).toBeTruthy();
 
-    await firstFirm.reload();
-    expect(await firstFirm.clientsOfFirm.size()).toBe(1);
-    await firstFirm.clientsOfFirm.reload();
-    expect(await firstFirm.clientsOfFirm.size()).toBe(1);
+    await assertDifference(
+      async () => Number(await Client.count()),
+      -1,
+      null,
+      async () => {
+        await (companies("first_firm") as any).clientsOfFirm.destroy(
+          (await (companies("first_firm") as any).clientsOfFirm.first()).id,
+        );
+      },
+    );
+
+    expect(await (await (companies("first_firm") as any).reload()).clientsOfFirm.size()).toBe(1);
+    expect(await (await (companies("first_firm") as any).clientsOfFirm.reload()).size()).toBe(1);
   });
 
   it("destroying by string id", async () => {
-    const firstFirm = companies("first_firm") as any;
-    await firstFirm.clientsOfFirm.load();
-    expect(firstFirm.clientsOfFirm.loaded).toBe(true);
+    await forceSignal37ToLoadAllClientsOfFirm(companies);
 
-    const before = (await Client.count()) as number;
-    const first = await firstFirm.clientsOfFirm.first();
-    await firstFirm.clientsOfFirm.destroy(String(first.id));
-    expect(await Client.count()).toBe(before - 1);
+    expect((companies("first_firm") as any).clientsOfFirm.loaded).toBeTruthy();
 
-    await firstFirm.reload();
-    expect(await firstFirm.clientsOfFirm.size()).toBe(1);
-    await firstFirm.clientsOfFirm.reload();
-    expect(await firstFirm.clientsOfFirm.size()).toBe(1);
+    await assertDifference(
+      async () => Number(await Client.count()),
+      -1,
+      null,
+      async () => {
+        await (companies("first_firm") as any).clientsOfFirm.destroy(
+          String((await (companies("first_firm") as any).clientsOfFirm.first()).id),
+        );
+      },
+    );
+
+    expect(await (await (companies("first_firm") as any).reload()).clientsOfFirm.size()).toBe(1);
+    expect(await (await (companies("first_firm") as any).clientsOfFirm.reload()).size()).toBe(1);
   });
 
   it("destroying a collection", async () => {
-    const firstFirm = companies("first_firm") as any;
-    await firstFirm.clientsOfFirm.load();
-    expect(firstFirm.clientsOfFirm.loaded).toBe(true);
+    await forceSignal37ToLoadAllClientsOfFirm(companies);
 
-    await firstFirm.clientsOfFirm.create({ name: "Another Client" });
-    expect(await firstFirm.clientsOfFirm.size()).toBe(3);
+    expect((companies("first_firm") as any).clientsOfFirm.loaded).toBeTruthy();
 
-    const all = (await firstFirm.clientsOfFirm.load()) as any[];
-    const before = (await Client.count()) as number;
-    await firstFirm.clientsOfFirm.destroy([all[0], all[1]]);
-    expect(await Client.count()).toBe(before - 2);
+    await (companies("first_firm") as any).clientsOfFirm.create({ name: "Another Client" });
+    expect(await (companies("first_firm") as any).clientsOfFirm.size()).toBe(3);
 
-    await firstFirm.reload();
-    expect(await firstFirm.clientsOfFirm.size()).toBe(1);
-    await firstFirm.clientsOfFirm.reload();
-    expect(await firstFirm.clientsOfFirm.size()).toBe(1);
+    await assertDifference(
+      async () => Number(await Client.count()),
+      -2,
+      null,
+      async () => {
+        await (companies("first_firm") as any).clientsOfFirm.destroy([
+          (await (companies("first_firm") as any).clientsOfFirm.load())[0],
+          (await (companies("first_firm") as any).clientsOfFirm.load())[1],
+        ]);
+      },
+    );
+
+    expect(await (await (companies("first_firm") as any).reload()).clientsOfFirm.size()).toBe(1);
+    expect(await (await (companies("first_firm") as any).clientsOfFirm.reload()).size()).toBe(1);
   });
 
   it("destroy all", async () => {
@@ -4356,9 +4373,15 @@ describe("HasManyAssociationsTest", () => {
 
   it("deleting updates counter cache without dependent option", async () => {
     const post = posts("welcome") as any;
-    const before = ((await HmPost.find(post.id)) as any).tags_count as number;
-    await post.taggings.delete(await post.taggings.first());
-    expect(((await HmPost.find(post.id)) as any).tags_count).toBe(before - 1);
+
+    await assertDifference(
+      async () => Number((await post.reload()).tags_count),
+      -1,
+      null,
+      async () => {
+        await post.taggings.delete(await post.taggings.first());
+      },
+    );
   });
 });
 
@@ -4955,16 +4978,28 @@ describe("HasManyAssociationsTest", () => {
 
   it("custom named counter cache", async () => {
     const topic = topics("first") as any;
-    const before = topic.replies_count as number;
-    await topic.approvedReplies.clear();
-    expect((await HmTopic.find(topic.id)).replies_count).toBe(before - 1);
+
+    await assertDifference(
+      async () => Number((await topic.reload()).replies_count),
+      -1,
+      null,
+      async () => {
+        await topic.approvedReplies.clear();
+      },
+    );
   });
 
   it("clearing updates counter cache", async () => {
     const topic = (await HmTopic.first()) as any;
-    const before = topic.replies_count as number;
-    await topic.replies.clear();
-    expect(((await HmTopic.find(topic.id)) as any).replies_count).toBe(before - 1);
+
+    await assertDifference(
+      async () => Number((await topic.reload()).replies_count),
+      -1,
+      null,
+      async () => {
+        await topic.replies.clear();
+      },
+    );
   });
 
   it("updates counter cache when default scope is given", async () => {
@@ -5138,18 +5173,30 @@ describe("HasManyAssociationsTest", () => {
 
   it("clearing updates counter cache when inverse counter cache is a symbol with dependent destroy", async () => {
     const car = (await HmCar.first()) as any;
-    await car.engines.create({});
-    const before = ((await HmCar.find(car.id)) as any).engines_count as number;
-    await car.engines.clear();
-    expect(((await HmCar.find(car.id)) as any).engines_count).toBe(before - 1);
+    await car.engines.createBang();
+
+    await assertDifference(
+      async () => Number((await car.reload()).engines_count),
+      -1,
+      null,
+      async () => {
+        await car.engines.clear();
+      },
+    );
   });
 
   it("pushing association updates counter cache", async () => {
-    const topic = (await HmTopic.create({ title: "PushTest" })) as any;
-    const reply = new HmReply({ title: "r" }) as any;
-    await topic.replies.push(reply);
-    const reloaded = (await HmTopic.find(topic.id)) as any;
-    expect(reloaded.replies_count).toBe(1);
+    const topic = (await HmTopic.order("id ASC").first()) as any;
+    const reply = await HmReply.createBang();
+
+    await assertDifference(
+      async () => Number((await topic.reload()).replies_count),
+      1,
+      null,
+      async () => {
+        await topic.replies.push(reply);
+      },
+    );
   });
 
   it("calling empty with counter cache", async () => {
