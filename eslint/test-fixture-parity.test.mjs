@@ -22,9 +22,21 @@ beforeAll(() => {
   fs.writeFileSync(
     TMP_MAP,
     JSON.stringify({
-      "aggregations.test.ts": ["find single value object", "find multiple value object"],
-      "associations/eager.test.ts": ["eager loading", "excluded eager test"],
-      "excluded.test.ts": ["find single value object"],
+      "aggregations.test.ts": {
+        classes: ["AggregationsTest", "OtherAggregationsTest"],
+        tests: [
+          "AggregationsTest > find single value object",
+          "AggregationsTest > find multiple value object",
+        ],
+      },
+      "associations/eager.test.ts": {
+        classes: ["EagerTest"],
+        tests: ["EagerTest > eager loading", "EagerTest > excluded eager test"],
+      },
+      "excluded.test.ts": {
+        classes: ["ExcludedTest"],
+        tests: ["ExcludedTest > find single value object"],
+      },
     }),
   );
   fs.writeFileSync(
@@ -33,7 +45,7 @@ beforeAll(() => {
       "packages/activerecord/src/excluded.test.ts",
       {
         file: "packages/activerecord/src/associations/eager.test.ts",
-        tests: ["Excluded Eager Test"],
+        tests: ["EagerTest > excluded eager test"],
       },
     ]),
   );
@@ -137,6 +149,11 @@ describe("test-fixture-parity rule", () => {
           code: `describe("X", () => { it("find single value object", () => { expect(1).toBe(1); }); });`,
         },
         {
+          name: "same title in a Rails class whose body reads no fixture → no warning",
+          filename: AR("aggregations.test.ts"),
+          code: `describe("OtherAggregationsTest", () => { it("find single value object", () => {}); });`,
+        },
+        {
           name: "per-test excluded entry (ratcheted backlog) → no warning for that test",
           filename: AR("associations/eager.test.ts"),
           code: `describe("EagerTest", () => { it("excluded eager test", () => {}); });`,
@@ -177,6 +194,18 @@ describe("test-fixture-parity rule", () => {
           name: "subdirectory file without accessor call → warns (per-test entry covers only its test)",
           filename: AR("associations/eager.test.ts"),
           code: `describe("EagerTest", () => { it("eager loading", () => {}); });`,
+          errors: [{ messageId: "missing" }],
+        },
+        {
+          name: "same title in the mapped Rails class → warns",
+          filename: AR("aggregations.test.ts"),
+          code: `describe("AggregationsTest", () => { it("find single value object", () => {}); });`,
+          errors: [{ messageId: "missing" }],
+        },
+        {
+          name: "per-test excluded entry does not cover the same title in another class → warns",
+          filename: AR("associations/eager.test.ts"),
+          code: `describe("Elsewhere", () => { it("excluded eager test", () => {}); });`,
           errors: [{ messageId: "missing" }],
         },
         {

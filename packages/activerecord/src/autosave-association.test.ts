@@ -1047,7 +1047,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
   function cacheAssoc(record: Base, name: string, value: unknown) {
     setAssociationTarget(record, name, value);
   }
-  fixtures(["companies", "accounts"]);
+  const { companies } = fixtures(["companies", "accounts"]);
   beforeAll(() => {
     registerModel(CanonicalCompany);
     registerModel(Firm);
@@ -1177,7 +1177,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
   });
 
   it("should not load the associated model", async () => {
-    const firm = (await Firm.find(1)) as any;
+    const firm = companies("first_firm") as any;
     firm.resetUnvalidatedAccount();
     await assertNoQueries(false, async () => {
       await firm.saveBang();
