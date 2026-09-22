@@ -1,393 +1,213 @@
-/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
-   Each model below spells `include ActiveModel::Attributes` in its class body, the way the Rails
-   test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
-   how `include()` surfaces those members on the type side. */
-import { describe, it, expect, vi } from "vitest";
-import { Model, Errors } from "../index.js";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import {
+  assert,
+  assertEmpty,
+  assertIncludes,
+  assertNotPredicate,
+  assertPredicate,
+  assertRaise,
+} from "@blazetrails/activesupport";
+import { Errors } from "../index.js";
 import { WithValidator } from "./with.js";
-import { Attributes, type AttributesClassHalf } from "../attributes.js";
-import { include } from "@blazetrails/activesupport";
+import { EachValidator, Validator } from "../validator.js";
+import { ArgumentError } from "../attribute-assignment.js";
+import { Topic } from "../test-helpers/models/topic.js";
 
 describe("ValidatesWithTest", () => {
+  afterEach(() => {
+    Topic.clearValidatorsBang();
+  });
+
   const ERROR_MESSAGE = "Validation error from validator";
+  const OTHER_ERROR_MESSAGE = "Validation error from other validator";
 
-  it("validates_with with options", async () => {
-    class CustomValidator {
-      private minLength: number;
-      constructor(options: any = {}) {
-        this.minLength = options.minLength ?? 3;
-      }
-      validate(record: any) {
-        const name = record._readAttribute("name");
-        if (typeof name === "string" && name.length < this.minLength) {
-          record.errors.add("name", ":invalid", { message: "too short" });
-        }
+  class ValidatorThatAddsErrors extends Validator {
+    validate(record: Topic): void {
+      record.errors.add("base", ":invalid", { message: ERROR_MESSAGE });
+    }
+  }
+
+  class OtherValidatorThatAddsErrors extends Validator {
+    validate(record: Topic): void {
+      record.errors.add("base", ":invalid", { message: OTHER_ERROR_MESSAGE });
+    }
+  }
+
+  class ValidatorThatDoesNotAddErrors extends Validator {
+    validate(_record: Topic): void {}
+  }
+
+  class ValidatorThatClearsOptions extends ValidatorThatDoesNotAddErrors {
+    constructor(options: Record<string, unknown>) {
+      super(options);
+      for (const key of Object.keys(options)) delete options[key];
+    }
+  }
+
+  class ValidatorThatValidatesOptions extends Validator {
+    validate(record: Topic): void {
+      if (this.options.field === ":firstName") {
+        record.errors.add("base", ":invalid", { message: ERROR_MESSAGE });
       }
     }
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+  }
 
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.validatesWith(CustomValidator, { minLength: 5 });
-      }
+  class ValidatorPerEachAttribute extends EachValidator {
+    validateEach(record: Topic, attribute: string, value: unknown): void {
+      record.errors.add(attribute, ":invalid", { message: `Value is ${value ?? ""}` });
     }
-    interface Person extends Attributes {}
+  }
 
-    const p = new Person({ name: "ab" });
-    expect(await p.isValid()).toBe(false);
-    const p2 = new Person({ name: "alice" });
-    expect(await p2.isValid()).toBe(true);
-  });
-
-  it("with multiple classes", async () => {
-    class V1 {
-      validate(record: any) {
-        if (!record._readAttribute("name")) {
-          record.errors.add("name", ":blank");
-        }
-      }
+  class ValidatorCheckValidity extends EachValidator {
+    checkValidityBang(): void {
+      throw new Error("boom!");
     }
-    class V2 {
-      validate(record: any) {
-        if (!record._readAttribute("age")) {
-          record.errors.add("age", ":blank");
-        }
-      }
-    }
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.attribute("age", "integer");
-        this.validatesWith(V1);
-        this.validatesWith(V2);
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person();
-    await p.isValid();
-    expect(p.errors.count).toBe(2);
-  });
-
-  it("validates_with preserves standard options", async () => {
-    class CustomValidator {
-      validate(record: any) {
-        if (!record._readAttribute("name")) {
-          record.errors.add("name", ":blank");
-        }
-      }
-    }
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.validatesWith(CustomValidator);
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({});
-    await p.isValid();
-    expect(p.errors.count).toBeGreaterThan(0);
-  });
-
-  it("validates_with preserves validator options", async () => {
-    class CustomValidator {
-      options: any;
-      constructor(options: any = {}) {
-        this.options = options;
-      }
-      validate(_record: any) {}
-    }
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.validatesWith(CustomValidator, { custom: true });
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({});
-    expect(await p.isValid()).toBe(true);
-  });
-
-  it("instance validates_with method preserves validator options", async () => {
-    class ValidatorThatDoesNotAddErrors {
-      validate(_record: any) {}
-    }
-    class ValidatorThatClearsOptions extends ValidatorThatDoesNotAddErrors {
-      constructor(options: any) {
-        super();
-        for (const key of Object.keys(options)) delete options[key];
-      }
-    }
-    class ValidatorThatValidatesOptions {
-      options: any;
-      constructor(options: any = {}) {
-        this.options = options;
-      }
-      validate(record: any) {
-        if (this.options.field === "first_name") {
-          record.errors.add("base", ":invalid", { message: ERROR_MESSAGE });
-        }
-      }
-    }
-    class Topic extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("title", "string");
-      }
-    }
-    interface Topic extends Attributes {}
-
-    const topic = new Topic({});
-    await topic.validatesWith(ValidatorThatClearsOptions, ValidatorThatValidatesOptions, {
-      field: "first_name",
-    });
-    expect(topic.errors.messagesFor("base")).toContain(ERROR_MESSAGE);
-  });
-
-  it("each validator checks validity", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
-    }
-    interface Person extends Attributes {}
-
-    Person.validatesEach(["name"], (record, attr, value) => {
-      if (!value) record.errors.add(attr, ":blank");
-    });
-    const p = new Person({});
-    await p.isValid();
-    expect(p.errors.count).toBeGreaterThan(0);
-  });
-
-  it("each validator expects attributes to be given", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
-    }
-    interface Person extends Attributes {}
-
-    Person.validatesEach(["name"], (record, attr, value) => {
-      if (!value) record.errors.add(attr, ":blank");
-    });
-    const p = new Person({});
-    await p.isValid();
-    expect(p.errors.messagesFor("name").length).toBeGreaterThan(0);
-  });
-
-  it("each validator skip nil values if :allow_nil is set to true", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
-    }
-    interface Person extends Attributes {}
-
-    Person.validatesEach(["name"], (record, attr, value) => {
-      if (value !== null && value !== undefined && !value) {
-        record.errors.add(attr, ":blank");
-      }
-    });
-    const p = new Person({});
-    await p.isValid();
-    expect(p.errors.count).toBe(0);
-  });
-
-  it("each validator skip blank values if :allow_blank is set to true", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
-    }
-    interface Person extends Attributes {}
-
-    Person.validatesEach(["name"], (record, attr, value) => {
-      if (value && typeof value === "string" && value.trim() === "") {
-        return;
-      }
-      if (value === null || value === undefined) return;
-      record.errors.add(attr, ":invalid");
-    });
-    const p = new Person({ name: "  " });
-    await p.isValid();
-    expect(p.errors.count).toBe(0);
-  });
-
-  it("validates_with can validate with an instance method", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
-      customValidation() {
-        if (!this._readAttribute("name")) {
-          this.errors.add("name", ":blank");
-        }
-      }
-    }
-    interface Person extends Attributes {}
-
-    Person.validate(":customValidation");
-    const p = new Person({});
-    await p.isValid();
-    expect(p.errors.count).toBeGreaterThan(0);
-  });
-
-  it("optionally pass in the attribute being validated when validating with an instance method", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
-      checkName() {
-        if (!this._readAttribute("name")) {
-          this.errors.add("name", ":blank");
-        }
-      }
-    }
-    interface Person extends Attributes {}
-
-    Person.validate(":checkName");
-    const p = new Person({});
-    await p.isValid();
-    expect(p.errors.messagesFor("name").length).toBeGreaterThan(0);
-  });
-
-  it("validates_with each validator", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.attribute("age", "integer");
-      }
-    }
-    interface Person extends Attributes {}
-
-    Person.validatesEach(["name", "age"], (record, attr, value) => {
-      if (value === null || value === undefined) {
-        record.errors.add(attr, ":blank");
-      }
-    });
-    const p = new Person({});
-    await p.isValid();
-    expect(p.errors.count).toBe(2);
-    expect(p.errors.messagesFor("name").length).toBeGreaterThan(0);
-    expect(p.errors.messagesFor("age").length).toBeGreaterThan(0);
-  });
+  }
 
   it("validation with class that adds errors", async () => {
-    class CustomValidator {
-      validate(record: any) {
-        const val = record._readAttribute("name");
-        if (!val || val === "") {
-          record.errors.add("name", ":blank");
-        }
-      }
-    }
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.validatesWith(CustomValidator);
-      }
-    }
-    interface Person extends Attributes {}
-
-    expect(await new Person({}).isValid()).toBe(false);
-    expect(await new Person({ name: "Alice" }).isValid()).toBe(true);
+    Topic.validatesWith(ValidatorThatAddsErrors);
+    const topic = new Topic();
+    assertPredicate(
+      await topic.isInvalid(),
+      (v) => v,
+      "A class that adds errors causes the record to be invalid",
+    );
+    assertIncludes(topic.errors.get("base"), ERROR_MESSAGE);
   });
 
   it("with a class that returns valid", async () => {
-    class PassValidator {
-      validate(_record: any) {}
-    }
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    Topic.validatesWith(ValidatorThatDoesNotAddErrors);
+    const topic = new Topic();
+    assertPredicate(
+      await topic.isValid(),
+      (v) => v,
+      "A class that does not add errors does not cause the record to be invalid",
+    );
+  });
 
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.validatesWith(PassValidator);
-      }
-    }
-    interface Person extends Attributes {}
-
-    expect(await new Person({}).isValid()).toBe(true);
+  it("with multiple classes", async () => {
+    Topic.validatesWith(ValidatorThatAddsErrors, OtherValidatorThatAddsErrors);
+    const topic = new Topic();
+    assertPredicate(await topic.isInvalid(), (v) => v);
+    assertIncludes(topic.errors.get("base"), ERROR_MESSAGE);
+    assertIncludes(topic.errors.get("base"), OTHER_ERROR_MESSAGE);
   });
 
   it("passes all configuration options to the validator class", async () => {
-    let capturedOpts: Record<string, unknown> | undefined;
-    class MinLenValidator {
-      min: number;
-      constructor(opts: any = {}) {
-        capturedOpts = opts;
-        this.min = opts.minimum ?? 0;
+    const topic = new Topic();
+    const validate = vi.fn();
+    const construct = vi.fn();
+    class MockValidator {
+      constructor(options: Record<string, unknown>) {
+        construct(options);
       }
-      validate(record: any) {
-        const val = record._readAttribute("name");
-        if (typeof val === "string" && val.length < this.min) {
-          record.errors.add("name", ":too_short");
-        }
+      validate(record: Topic): void {
+        validate(record);
       }
     }
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
 
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.validatesWith(MinLenValidator, { minimum: 5, if: ":conditionIsTrue", foo: "bar" });
-      }
-      conditionIsTrue(): boolean {
-        return true;
-      }
-    }
-    interface Person extends Attributes {}
+    Topic.validatesWith(MockValidator, { if: ":conditionIsTrue", foo: ":bar" });
+    assertPredicate(await topic.isValid(), (v) => v);
+    expect(construct).toHaveBeenCalledWith({ foo: ":bar", if: ":conditionIsTrue", class: Topic });
+    expect(validate).toHaveBeenCalledWith(topic);
+    expect(construct).toHaveBeenCalledTimes(1);
+  });
 
-    expect(capturedOpts).toEqual({
-      minimum: 5,
-      if: ":conditionIsTrue",
-      foo: "bar",
-      class: Person,
+  it("validates_with with options", async () => {
+    Topic.validatesWith(ValidatorThatValidatesOptions, { field: ":firstName" });
+    const topic = new Topic();
+    assertPredicate(await topic.isInvalid(), (v) => v);
+    assertIncludes(topic.errors.get("base"), ERROR_MESSAGE);
+  });
+
+  it("validates_with preserves standard options", async () => {
+    Topic.validatesWith(ValidatorThatClearsOptions, ValidatorThatAddsErrors, {
+      on: ":specificContext",
     });
-    expect(await new Person({ name: "ab" }).isValid()).toBe(false);
-    expect(await new Person({ name: "abcde" }).isValid()).toBe(true);
+    const topic = new Topic();
+    assert(await topic.isInvalid(":specificContext"), "validation should work");
+    assertPredicate(await topic.isValid(), (v) => v, "Standard options should be preserved");
+  });
+
+  it("validates_with preserves validator options", async () => {
+    Topic.validatesWith(ValidatorThatClearsOptions, ValidatorThatValidatesOptions, {
+      field: ":firstName",
+    });
+    const topic = new Topic();
+    assertPredicate(await topic.isInvalid(), (v) => v, "Validator options should be preserved");
+  });
+
+  it("instance validates_with method preserves validator options", async () => {
+    const topic = new Topic();
+    await topic.validatesWith(ValidatorThatClearsOptions, ValidatorThatValidatesOptions, {
+      field: ":firstName",
+    });
+    assertIncludes(
+      topic.errors.get("base"),
+      ERROR_MESSAGE,
+      "Validator options should be preserved",
+    );
+  });
+
+  it("validates_with each validator", async () => {
+    Topic.validatesWith(ValidatorPerEachAttribute, { attributes: ["title", "content"] });
+    const topic = new Topic({ title: "Title", content: "Content" });
+    assertPredicate(await topic.isInvalid(), (v) => v);
+    expect(topic.errors.get("title")).toEqual(["Value is Title"]);
+    expect(topic.errors.get("content")).toEqual(["Value is Content"]);
+  });
+
+  it("each validator checks validity", async () => {
+    await assertRaise([Error], {}, () =>
+      Topic.validatesWith(ValidatorCheckValidity, { attributes: ["title"] }),
+    );
+  });
+
+  it("each validator expects attributes to be given", async () => {
+    await assertRaise([ArgumentError], {}, () => Topic.validatesWith(ValidatorPerEachAttribute));
+  });
+
+  it("each validator skip nil values if :allow_nil is set to true", async () => {
+    Topic.validatesWith(ValidatorPerEachAttribute, {
+      attributes: ["title", "content"],
+      allowNil: true,
+    });
+    const topic = new Topic({ content: "" });
+    assertPredicate(await topic.isInvalid(), (v) => v);
+    assertEmpty(topic.errors.get("title"));
+    expect(topic.errors.get("content")).toEqual(["Value is "]);
+  });
+
+  it("each validator skip blank values if :allow_blank is set to true", async () => {
+    Topic.validatesWith(ValidatorPerEachAttribute, {
+      attributes: ["title", "content"],
+      allowBlank: true,
+    });
+    const topic = new Topic({ content: "" });
+    assertPredicate(await topic.isValid(), (v) => v);
+    assertEmpty(topic.errors.get("title"));
+    assertEmpty(topic.errors.get("content"));
+  });
+
+  it("validates_with can validate with an instance method", async () => {
+    Topic.validates("title", { with: ":myValidation" });
+
+    let topic = new Topic({ title: "foo" });
+    assertPredicate(await topic.isValid(), (v) => v);
+    assertEmpty(topic.errors.get("title"));
+
+    topic = new Topic();
+    assertNotPredicate(await topic.isValid(), (v) => v);
+    expect(topic.errors.get("title")).toEqual(["is missing"]);
+  });
+
+  it("optionally pass in the attribute being validated when validating with an instance method", async () => {
+    Topic.validates("title", "content", { with: ":myValidationWithArg" });
+
+    const topic = new Topic({ title: "foo" });
+    assertNotPredicate(await topic.isValid(), (v) => v);
+    assertEmpty(topic.errors.get("title"));
+    expect(topic.errors.get("content")).toEqual(["is missing"]);
   });
 });
 

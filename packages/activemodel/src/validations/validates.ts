@@ -18,6 +18,7 @@ import { InclusionValidator } from "./inclusion.js";
 import { LengthValidator } from "./length.js";
 import { NumericalityValidator } from "./numericality.js";
 import { PresenceValidator } from "./presence.js";
+import { WithValidator } from "./with.js";
 import { Range } from "@blazetrails/ruby-compat";
 
 type ValidatorClass = new (options: Record<string, unknown>) => Validator;
@@ -33,6 +34,7 @@ const BUNDLED_VALIDATORS: Record<string, ValidatorClass> = {
   LengthValidator,
   NumericalityValidator,
   PresenceValidator,
+  WithValidator,
 };
 
 export interface ValidatesHost {

@@ -7,7 +7,9 @@ import { ArgumentError, NameError } from "../attribute-assignment.js";
 export class WithValidator extends EachValidator {
   validateEach(record: ValidatableRecord, attr: string, _val: unknown): void {
     const methodName = this.options.with as string;
-    const method = (record as unknown as Record<string, unknown>)[methodName];
+    const method = (record as unknown as Record<string, unknown>)[
+      methodName.startsWith(":") ? methodName.slice(1) : methodName
+    ];
     if (typeof method !== "function") {
       throw new NameError(`undefined method '${methodName}' for ${String(record)}`);
     }

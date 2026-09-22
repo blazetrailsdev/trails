@@ -2,285 +2,212 @@
    Each model below spells `include ActiveModel::Attributes` in its class body, the way the Rails
    test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
    how `include()` surfaces those members on the type side. */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
+import {
+  assertEmpty,
+  assertNothingRaised,
+  assertPredicate,
+  assertRaise,
+  include,
+} from "@blazetrails/activesupport";
 import { Model } from "../index.js";
 import { Attributes, type AttributesClassHalf } from "../attributes.js";
-import { include } from "@blazetrails/activesupport";
+import { ArgumentError } from "../attribute-assignment.js";
+import { Topic } from "../test-helpers/models/topic.js";
+import { Person } from "../test-helpers/models/person.js";
+
+const A = "(?<![\\s\\S])";
+const Z = "(?![\\s\\S])";
 
 describe("FormatValidationTest", () => {
-  it("validates format of with multiline regexp and option", () => {
-    expect(() => {
-      class Person extends Model {
-        declare static attribute: AttributesClassHalf["attribute"];
-
-        static {
-          include(this, Attributes);
-          this.attribute("name", "string");
-          this.validates("name", { format: { with: /^foo$/m } });
-        }
-      }
-      interface Person extends Attributes {}
-    }).toThrow(/multiline/i);
-  });
-
-  it("validates format of without lambda without arguments", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.validates("name", { format: { with: /^[a-z]+$/, multiline: true } });
-      }
-    }
-    interface Person extends Attributes {}
-
-    expect(await new Person({ name: "alice" }).isValid()).toBe(true);
-    expect(await new Person({ name: "Alice123" }).isValid()).toBe(false);
-  });
-
-  it("validates format of with both regexps should raise error", () => {
-    expect(() => {
-      class Person extends Model {
-        declare static attribute: AttributesClassHalf["attribute"];
-
-        static {
-          include(this, Attributes);
-          this.attribute("email", "string");
-          this.validates("email", { format: { with: /@/, without: /test/ } });
-        }
-      }
-      interface Person extends Attributes {}
-    }).toThrow(/but not both/);
-  });
-
-  it("validates format of when with isnt a regexp should raise error", () => {
-    expect(() => {
-      class Person extends Model {
-        declare static attribute: AttributesClassHalf["attribute"];
-
-        static {
-          include(this, Attributes);
-          this.attribute("name", "string");
-          this.validates("name", { format: { with: "not a regexp" as any } });
-        }
-      }
-      interface Person extends Attributes {}
-
-      void Person;
-    }).toThrow(/regular expression or a proc or lambda must be supplied as :with/);
-  });
-
-  it("validates format of when not isnt a regexp should raise error", () => {
-    expect(() => {
-      class Person extends Model {
-        declare static attribute: AttributesClassHalf["attribute"];
-
-        static {
-          include(this, Attributes);
-          this.attribute("name", "string");
-          this.validates("name", { format: { without: "not a regexp" as any } });
-        }
-      }
-      interface Person extends Attributes {}
-
-      void Person;
-    }).toThrow(/regular expression or a proc or lambda must be supplied as :without/);
-  });
-
-  it("validates format of without lambda", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("email", "string");
-        this.validates("email", { format: { with: /@/ } });
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({ email: "invalid" });
-    await p.isValid();
-    expect(p.errors.count).toBeGreaterThan(0);
+  afterEach(() => {
+    Topic.clearValidatorsBang();
   });
 
   it("validate format", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    Topic.validatesFormatOf("title", "content", {
+      with: new RegExp(`${A}Validation\\smacros \\w+!${Z}`),
+      message: "is bad data",
+    });
 
-      static {
-        include(this, Attributes);
-        this.attribute("title", "string");
-        this.validates("title", { format: { with: /^[A-Z]/, multiline: true } });
-      }
-    }
-    interface Person extends Attributes {}
+    const t = new Topic({ title: "i'm incorrect", content: "Validation macros rule!" });
+    assertPredicate(await t.isInvalid(), (v) => v, "Shouldn't be valid");
+    expect(t.errors.get("title")).toEqual(["is bad data"]);
+    assertEmpty(t.errors.get("content"));
 
-    expect(await new Person({ title: "Hello" }).isValid()).toBe(true);
-    expect(await new Person({ title: "hello" }).isValid()).toBe(false);
-  });
+    t.title = "Validation macros rule!";
 
-  it("validate format with not option", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    assertPredicate(await t.isValid(), (v) => v);
+    assertEmpty(t.errors.get("title"));
 
-      static {
-        include(this, Attributes);
-        this.attribute("title", "string");
-        this.validates("title", { format: { without: /\d/ } });
-      }
-    }
-    interface Person extends Attributes {}
-
-    expect(await new Person({ title: "hello" }).isValid()).toBe(true);
-    expect(await new Person({ title: "hello123" }).isValid()).toBe(false);
-  });
-
-  it("validate format with formatted message", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("title", "string");
-        this.validates("title", {
-          format: { with: /^[A-Z]/, multiline: true, message: "must start with uppercase" },
-        });
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({ title: "hello" });
-    await p.isValid();
-    expect(p.errors.messagesFor("title")).toContain("must start with uppercase");
+    await assertRaise([ArgumentError], {}, () => Topic.validatesFormatOf("title", "content"));
   });
 
   it("validate format with allow blank", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("title", "string");
-        this.validates("title", {
-          format: { with: /^[A-Z]/, multiline: true, allowBlank: true },
-        });
-      }
-    }
-    interface Person extends Attributes {}
-
-    expect(await new Person({ title: "" }).isValid()).toBe(true);
-    expect(await new Person({ title: "Hello" }).isValid()).toBe(true);
-    expect(await new Person({ title: "hello" }).isValid()).toBe(false);
+    Topic.validatesFormatOf("title", {
+      with: new RegExp(`${A}Validation\\smacros \\w+!${Z}`),
+      allowBlank: true,
+    });
+    assertPredicate(await new Topic({ title: "Shouldn't be valid" }).isInvalid(), (v) => v);
+    assertPredicate(await new Topic({ title: "" }).isValid(), (v) => v);
+    assertPredicate(await new Topic({ title: null }).isValid(), (v) => v);
+    assertPredicate(await new Topic({ title: "Validation macros rule!" }).isValid(), (v) => v);
   });
 
   it("validate format numeric", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    Topic.validatesFormatOf("title", "content", {
+      with: new RegExp(`${A}[1-9][0-9]*${Z}`),
+      message: "is bad data",
+    });
 
-      static {
-        include(this, Attributes);
-        this.attribute("value", "string");
-        this.validates("value", { format: { with: /^\d+$/, multiline: true } });
-      }
-    }
-    interface Person extends Attributes {}
+    const t = new Topic({ title: "72x", content: "6789" });
+    assertPredicate(await t.isInvalid(), (v) => v, "Shouldn't be valid");
 
-    expect(await new Person({ value: "123" }).isValid()).toBe(true);
-    expect(await new Person({ value: "abc" }).isValid()).toBe(false);
+    expect(t.errors.get("title")).toEqual(["is bad data"]);
+    assertEmpty(t.errors.get("content"));
+
+    t.title = "-11";
+    assertPredicate(await t.isInvalid(), (v) => v, "Shouldn't be valid");
+
+    t.title = "03";
+    assertPredicate(await t.isInvalid(), (v) => v, "Shouldn't be valid");
+
+    t.title = "z44";
+    assertPredicate(await t.isInvalid(), (v) => v, "Shouldn't be valid");
+
+    t.title = "5v7";
+    assertPredicate(await t.isInvalid(), (v) => v, "Shouldn't be valid");
+
+    t.title = "1";
+
+    assertPredicate(await t.isValid(), (v) => v);
+    assertEmpty(t.errors.get("title"));
   });
 
-  it("validate format of with multiline regexp should raise error", () => {
-    expect(() => {
-      class Person extends Model {
-        declare static attribute: AttributesClassHalf["attribute"];
-
-        static {
-          include(this, Attributes);
-          this.attribute("name", "string");
-          this.validates("name", { format: { with: /^foo$/m } });
-        }
-      }
-      interface Person extends Attributes {}
-    }).toThrow(/multiline/i);
+  it("validate format with formatted message", async () => {
+    Topic.validatesFormatOf("title", {
+      with: new RegExp(`${A}Valid Title${Z}`),
+      message: "can't be %{value}",
+    });
+    const t = new Topic({ title: "Invalid title" });
+    assertPredicate(await t.isInvalid(), (v) => v);
+    expect(t.errors.get("title")).toEqual(["can't be Invalid title"]);
   });
 
-  it("validate format of with multiline regexp and option", () => {
-    expect(() => {
-      class Person extends Model {
-        declare static attribute: AttributesClassHalf["attribute"];
-
-        static {
-          include(this, Attributes);
-          this.attribute("name", "string");
-          this.validates("name", { format: { with: new RegExp("^foo$", "m") } });
-        }
-      }
-      interface Person extends Attributes {}
-    }).toThrow(/multiline/i);
+  it("validate format of with multiline regexp should raise error", async () => {
+    await assertRaise([ArgumentError], {}, () =>
+      Topic.validatesFormatOf("title", { with: /^Valid Title$/m }),
+    );
   });
 
-  it("validate format of without any regexp should raise error", () => {
-    expect(() => {
-      class Person extends Model {
-        declare static attribute: AttributesClassHalf["attribute"];
+  it("validate format of with multiline regexp and option", async () => {
+    await assertNothingRaised(() => {
+      Topic.validatesFormatOf("title", { with: /^Valid Title$/m, multiline: true });
+    });
+  });
 
-        static {
-          include(this, Attributes);
-          this.attribute("name", "string");
-          this.validates("name", { format: {} as any });
-        }
-      }
-      interface Person extends Attributes {}
-    }).toThrow(/Either :with or :without must be supplied/);
+  it("validate format with not option", async () => {
+    Topic.validatesFormatOf("title", { without: /foo/, message: "should not contain foo" });
+    const t = new Topic();
+
+    t.title = "foobar";
+    await t.isValid();
+    expect(t.errors.get("title")).toEqual(["should not contain foo"]);
+
+    t.title = "something else";
+    await t.isValid();
+    expect(t.errors.get("title")).toEqual([]);
+  });
+
+  it("validate format of without any regexp should raise error", async () => {
+    await assertRaise([ArgumentError], {}, () => Topic.validatesFormatOf("title"));
+  });
+
+  it("validates format of with both regexps should raise error", async () => {
+    await assertRaise([ArgumentError], {}, () =>
+      Topic.validatesFormatOf("title", { with: /this/, without: /that/ }),
+    );
+  });
+
+  it("validates format of when with isnt a regexp should raise error", async () => {
+    await assertRaise([ArgumentError], {}, () =>
+      Topic.validatesFormatOf("title", { with: "clearly not a regexp" }),
+    );
+  });
+
+  it("validates format of when not isnt a regexp should raise error", async () => {
+    await assertRaise([ArgumentError], {}, () =>
+      Topic.validatesFormatOf("title", { without: "clearly not a regexp" }),
+    );
   });
 
   it("validates format of with lambda", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    Topic.validatesFormatOf("content", {
+      with: (topic: Topic) =>
+        topic.title === "digit" ? new RegExp(`${A}\\d+${Z}`) : new RegExp(`${A}\\S+${Z}`),
+    });
 
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.validates("name", { format: { with: () => /^[a-z]+$/ } });
-      }
-    }
-    interface Person extends Attributes {}
+    const t = new Topic();
+    t.title = "digit";
+    t.content = "Pixies";
+    assertPredicate(await t.isInvalid(), (v) => v);
 
-    expect(await new Person({ name: "alice" }).isValid()).toBe(true);
-    expect(await new Person({ name: "Alice123" }).isValid()).toBe(false);
+    t.content = "1234";
+    assertPredicate(await t.isValid(), (v) => v);
   });
 
   it("validates format of with lambda without arguments", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    Topic.validatesFormatOf("title", { with: () => new RegExp(`${A}[A-Z]`) });
 
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.validates("name", { format: { with: () => /^\w+$/ } });
-      }
-    }
-    interface Person extends Attributes {}
+    const t = new Topic();
+    t.title = "lowercase";
+    assertPredicate(await t.isInvalid(), (v) => v);
 
-    expect(await new Person({ name: "alice" }).isValid()).toBe(true);
-    expect(await new Person({ name: "" }).isValid()).toBe(false);
+    t.title = "Titleized";
+    assertPredicate(await t.isValid(), (v) => v);
+  });
+
+  it("validates format of without lambda", async () => {
+    Topic.validatesFormatOf("content", {
+      without: (topic: Topic) =>
+        topic.title === "characters" ? new RegExp(`${A}\\d+${Z}`) : new RegExp(`${A}\\S+${Z}`),
+    });
+
+    const t = new Topic();
+    t.title = "characters";
+    t.content = "1234";
+    assertPredicate(await t.isInvalid(), (v) => v);
+
+    t.content = "Pixies";
+    assertPredicate(await t.isValid(), (v) => v);
+  });
+
+  it("validates format of without lambda without arguments", async () => {
+    Topic.validatesFormatOf("title", { without: () => /\d/ });
+
+    const t = new Topic();
+    t.title = "With number 123";
+    assertPredicate(await t.isInvalid(), (v) => v);
+
+    t.title = "Without number";
+    assertPredicate(await t.isValid(), (v) => v);
   });
 
   it("validates format of for ruby class", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    try {
+      Person.validatesFormatOf("karma", { with: new RegExp(`${A}\\d+${Z}`) });
 
-      static {
-        include(this, Attributes);
-      }
+      const p = new Person();
+      p.karma = "Pixies";
+      assertPredicate(await p.isInvalid(), (v) => v);
+
+      expect(p.errors.get("karma")).toEqual(["is invalid"]);
+
+      p.karma = "1234";
+      assertPredicate(await p.isValid(), (v) => v);
+    } finally {
+      Person.clearValidatorsBang();
     }
-    interface Person extends Attributes {}
-    Person.attribute("email", "string");
-    Person.validates("email", { format: { with: /@/ } });
-    expect(await new Person({ email: "a@b.com" }).isValid()).toBe(true);
-    expect(await new Person({ email: "invalid" }).isValid()).toBe(false);
   });
 });
 describe("format with 'without' option", () => {
