@@ -927,10 +927,10 @@ describe("ConditionalTests", () => {
 
   it("class conditional with scope", () => {
     const z: unknown[] = [];
-    const callback = class {
-      static foo(o: unknown) {
+    const callback = {
+      foo(o: unknown) {
         z.push(o);
-      }
+      },
     };
     class Klass {
       static {
@@ -951,13 +951,11 @@ describe("ConditionalTests", () => {
 
   it("class", () => {
     const z: unknown[] = [];
-    const klass = buildClass(
-      class {
-        static before(o: unknown) {
-          z.push(o);
-        }
+    const klass = buildClass({
+      before(o: unknown) {
+        z.push(o);
       },
-    );
+    });
     const object = new klass();
     object.run();
     expect(z).toEqual([object]);

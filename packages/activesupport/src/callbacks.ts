@@ -258,7 +258,7 @@ export namespace CallTemplate {
       return new ProcCall(filter);
     } else if (
       typeof filter === "function" &&
-      !/^class[\s{]/.test(Function.prototype.toString.call(filter))
+      Object.getOwnPropertyDescriptor(filter, "prototype")?.writable !== false
     ) {
       const arity = filter.length;
       if (arity === 2) {
