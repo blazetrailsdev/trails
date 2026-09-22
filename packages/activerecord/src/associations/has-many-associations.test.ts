@@ -48,6 +48,7 @@ import {
   assertNot,
   assertNotEmpty,
   assertRaise,
+  assertRaises,
   assertNoDifference,
   travel,
   travelBack,
@@ -2927,13 +2928,7 @@ describe("HasManyAssociationsTest", () => {
     it("find one message on primary key", async () => {
       const firm = firms2("first_firm") as any;
 
-      let e: any;
-      try {
-        await firm.clients.find(0);
-      } catch (err) {
-        e = err;
-      }
-      expect(e).toBeInstanceOf(RecordNotFound);
+      const e: any = await assertRaises([RecordNotFound], {}, () => firm.clients.find(0));
       expect(e.id).toBe(0);
       expect(e.primaryKey).toBe("id");
       expect(e.model).toBe("Client");
@@ -4231,8 +4226,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("collection proxy respects default scope", async () => {
     const author = await HmAuthor.find(authors("mary").id);
-    const exists = await author.firstPosts.exists();
-    expect(exists).toBe(false);
+    expect(await author.firstPosts.exists()).toBeFalsy();
   });
 });
 
