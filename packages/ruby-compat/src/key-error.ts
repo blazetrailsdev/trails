@@ -1,4 +1,4 @@
-import { StandardError } from "./standard-error.js";
+import { IndexError } from "./index-error.js";
 
 /**
  * Ruby's core `KeyError` (`vendor/ruby/error.c:3325`) — what `Hash#fetch`
@@ -10,12 +10,12 @@ import { StandardError } from "./standard-error.js";
  * renders `key not found: :expression`, a String key
  * `key not found: "expression"`.
  *
- * Ruby's chain is `KeyError < IndexError < StandardError`; ruby-compat has no
- * `IndexError` class, so this extends `StandardError` directly.
+ * Ruby's chain is `KeyError < IndexError < StandardError`
+ * (`vendor/ruby/error.c:3325`).
  *
  * @noRailsEquivalent PERMANENT — Ruby core `KeyError`, which Rails inherits
  * rather than defines.
  */
-export class KeyError extends StandardError {}
+export class KeyError extends IndexError {}
 
 KeyError.prototype.name = "KeyError";

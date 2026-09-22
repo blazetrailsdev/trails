@@ -129,6 +129,7 @@ export { kernelFloat } from "./kernel-float.js";
 export { format, sprintf } from "./kernel-format.js";
 export { kernelInteger } from "./kernel-integer.js";
 export { kernelRand } from "./kernel-rand.js";
+export { IndexError } from "./index-error.js";
 export { KeyError } from "./key-error.js";
 export { LocalJumpError } from "./local-jump-error.js";
 export { LoadError } from "./load-error.js";

@@ -24,7 +24,7 @@ export namespace Unicode {
 
   /** @internal */
   export function recodeWindows1252Chars(string: string): string {
-    const bytes = Uint8Array.from(string, (c) => c.charCodeAt(0) & 0xff);
+    const bytes = new TextEncoder().encode(string);
     return new TextDecoder("windows-1252").decode(bytes);
   }
 }
