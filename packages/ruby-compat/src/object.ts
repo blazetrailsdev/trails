@@ -46,10 +46,10 @@ const FL_SINGLETON = Symbol.for("@blazetrails/ruby-compat:FL_SINGLETON");
  * becomes the object's prototype. Its `prototype.constructor` stays the
  * attached object's class, because `rb_obj_class` skips a singleton class
  * (`vendor/ruby/object.c:296`): `obj.constructor` keeps answering Ruby's
- * `obj.class`. A JS class has no metaclass apart from its own statics, so
- * there is no distinct object to answer for a class receiver; it raises the
- * `TypeError` `singleton_class_of` raises for receivers without one
- * (`vendor/ruby/class.c:2224`).
+ * `obj.class`. Ruby gives a class receiver a metaclass
+ * (`vendor/ruby/class.c:2240`); a JS class has none apart from its own
+ * statics, so a class receiver is unsupported here and raises `TypeError`,
+ * a trails limitation rather than Ruby behavior.
  *
  * @noRailsEquivalent PERMANENT
  */
