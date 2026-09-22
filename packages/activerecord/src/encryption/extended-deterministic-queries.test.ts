@@ -107,7 +107,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest", () => {
     await books.EncryptedBook.where("1=1");
   });
 
-  fixtures([]);
+  fixtures([], { useTransactionalTests: true });
 
   afterAll(() => {
     Relation.prototype.where = savedMethods.where as typeof Relation.prototype.where;

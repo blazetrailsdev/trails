@@ -15,25 +15,9 @@ describe("MultipleDbTest", () => {
   fixtures({}, { useTransactionalTests: false });
   withSecondPool();
 
-  const seedOpts = { useTransactionalTests: false } as const;
-  const { colleges } = fixtures(["colleges"], {
-    connection: () => College.connection,
-    ...seedOpts,
+  const { colleges, courses, entrants } = fixtures(["courses", "colleges", "entrants"], {
+    useTransactionalTests: false,
   });
-  const { courses } = fixtures(["courses"], { connection: () => Course.connection, ...seedOpts });
-  const { entrants } = fixtures(
-    {
-      entrants: [
-        Entrant,
-        {
-          first: { id: 1, course_id: 1, name: "Ruby Developer" },
-          second: { id: 2, course_id: 1, name: "Ruby Guru" },
-          third: { id: 3, course_id: 2, name: "Java Lover" },
-        },
-      ],
-    },
-    { connection: () => Entrant.connection, ...seedOpts },
-  );
 
   it("connected", async () => {
     expect(await Entrant.leaseConnection()).not.toBeNull();

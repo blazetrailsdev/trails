@@ -47,9 +47,10 @@ export class AsynchronousQueriesTracker {
     return session;
   }
 
-  startSession(): void {
+  startSession(): Session[] {
     const session = new Session();
     this.#stack.push(session);
+    return this.#stack;
   }
 
   finalizeSession(wait = false): this {

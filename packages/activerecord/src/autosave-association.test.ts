@@ -680,13 +680,10 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
   function cacheAssoc(record: Base, name: string, value: unknown) {
     setAssociationTarget(record, name, value);
   }
-  const { companies, developers, cpkOrderAgreements, cpkOrders, cpkBooks } = fixtures([
-    "companies",
-    "developers",
-    "cpkOrderAgreements",
-    "cpkOrders",
-    "cpkBooks",
-  ]);
+  const { companies, developers, cpkOrderAgreements, cpkOrders, cpkBooks } = fixtures(
+    ["companies", "developers", "cpkOrderAgreements", "cpkOrders", "cpkBooks"],
+    { useTransactionalTests: true },
+  );
   beforeAll(() => {
     registerModel(CpkOrder);
     registerModel(CpkBook);
@@ -1047,7 +1044,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
   function cacheAssoc(record: Base, name: string, value: unknown) {
     setAssociationTarget(record, name, value);
   }
-  const { companies } = fixtures(["companies", "accounts"]);
+  const { companies } = fixtures(["companies", "accounts"], { useTransactionalTests: true });
   beforeAll(() => {
     registerModel(CanonicalCompany);
     registerModel(Firm);
@@ -1286,11 +1283,10 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
 });
 
 describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
-  const { chefs, cakeDesigners, drinkDesigners } = fixtures([
-    "chefs",
-    "cakeDesigners",
-    "drinkDesigners",
-  ]);
+  const { chefs, cakeDesigners, drinkDesigners } = fixtures(
+    ["chefs", "cakeDesigners", "drinkDesigners"],
+    { useTransactionalTests: true },
+  );
 
   beforeAll(() => {
     registerModel(CanonicalPirate);
@@ -1499,7 +1495,9 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
   function cacheAssoc(record: Base, name: string, value: unknown) {
     setAssociationTarget(record, name, value);
   }
-  const { tags, posts, taggings } = fixtures(["companies", "posts", "tags", "taggings"]);
+  const { tags, posts, taggings } = fixtures(["companies", "posts", "tags", "taggings"], {
+    useTransactionalTests: true,
+  });
   beforeAll(() => {
     registerModel(CanonicalCompany);
     registerModel(Firm);
@@ -1755,7 +1753,7 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
 });
 
 describe("TestAutosaveAssociationOnABelongsToAssociation", () => {
-  fixtures([]);
+  fixtures([], { useTransactionalTests: true });
 
   beforeAll(() => {
     registerModel(CanonicalPirate);
@@ -1887,7 +1885,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
   function cacheAssoc(record: Base, name: string, value: unknown) {
     setAssociationTarget(record, name, value);
   }
-  fixtures([]);
+  fixtures([], { useTransactionalTests: true });
   beforeAll(() => {
     registerModel(Molecule);
     registerModel(Electron);
@@ -2182,7 +2180,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
 });
 
 describe("TestAutosaveAssociationsInGeneral", () => {
-  fixtures([]);
+  fixtures([], { useTransactionalTests: true });
   beforeAll(() => {
     registerModel(CanonicalShip);
     registerModel(CanonicalPirate);
@@ -2355,7 +2353,7 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
   function cacheAssoc(record: Base, name: string, value: unknown) {
     setAssociationTarget(record, name, value);
   }
-  fixtures([]);
+  fixtures([], { useTransactionalTests: true });
 
   function makeModels() {
     class GcPirate extends Base {
@@ -2484,7 +2482,7 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
 });
 
 describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
-  fixtures([]);
+  fixtures([], { useTransactionalTests: true });
 
   beforeAll(() => {
     registerModel(CanonicalPirate);
@@ -2525,7 +2523,7 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
   function cacheAssoc(record: Base, name: string, value: unknown) {
     setAssociationTarget(record, name, value);
   }
-  fixtures([]);
+  fixtures([], { useTransactionalTests: true });
 
   function makeModels() {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -2619,7 +2617,7 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
 });
 
 describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
-  fixtures([]);
+  fixtures([], { useTransactionalTests: true });
   beforeAll(() => {
     registerModel(CanonicalCompany);
     registerModel(Firm);
@@ -2711,7 +2709,7 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
 });
 
 describe("TestAutosaveAssociationValidationsOnAHasManyAssociation", () => {
-  fixtures([]);
+  fixtures([], { useTransactionalTests: true });
 
   beforeAll(() => {
     registerModel(CanonicalPirate);
@@ -2804,7 +2802,7 @@ describe("TestAutosaveAssociationValidationsOnAHasManyAssociation", () => {
 });
 
 describe("TestAutosaveAssociationValidationsOnAHasOneAssociation", () => {
-  fixtures([]);
+  fixtures([], { useTransactionalTests: true });
 
   beforeAll(() => {
     registerModel(CanonicalPirate);
@@ -2835,7 +2833,7 @@ describe("TestAutosaveAssociationValidationsOnAHasOneAssociation", () => {
 });
 
 describe("TestAutosaveAssociationValidationsOnABelongsToAssociation", () => {
-  fixtures([]);
+  fixtures([], { useTransactionalTests: true });
 
   beforeAll(() => {
     registerModel(CanonicalPirate);
@@ -2877,7 +2875,7 @@ describe("TestAutosaveAssociationValidationsOnABelongsToAssociation", () => {
 });
 
 describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
-  fixtures([]);
+  fixtures([], { useTransactionalTests: true });
 
   beforeAll(() => {
     registerModel(Organization);
@@ -2932,7 +2930,7 @@ describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
 });
 
 describe("TestAutosaveAssociationValidationsOnAHABTMAssociation", () => {
-  fixtures([]);
+  fixtures([], { useTransactionalTests: true });
 
   beforeAll(() => {
     registerModel(CanonicalPirate);
@@ -2963,7 +2961,7 @@ describe("TestAutosaveAssociationValidationsOnAHABTMAssociation", () => {
 });
 
 describe("TestAutosaveAssociationOnAHasManyAssociationWithInverse", () => {
-  fixtures([]);
+  fixtures([], { useTransactionalTests: true });
 
   function makeModels() {
     class Post extends Base {
@@ -3016,7 +3014,7 @@ describe("TestAutosaveAssociationOnAHasManyAssociationWithInverse", () => {
 });
 
 describe("TestAutosaveAssociationOnABelongsToAssociationDefinedAsRecord", () => {
-  fixtures([]);
+  fixtures([], { useTransactionalTests: true });
 
   beforeAll(() => {
     registerModel(Translation);
@@ -3037,7 +3035,7 @@ describe("TestAutosaveAssociationOnABelongsToAssociationDefinedAsRecord", () => 
 });
 
 describe("TestAutosaveAssociationWithTouch", () => {
-  fixtures([]);
+  fixtures([], { useTransactionalTests: true });
   beforeAll(() => {
     registerModel(Invoice);
     registerModel(LineItem);
@@ -3049,7 +3047,7 @@ describe("TestAutosaveAssociationWithTouch", () => {
   });
 });
 describe("TestAutosaveAssociationOnAHasManyAssociationDefinedInSubclassWithAcceptsNestedAttributes", () => {
-  fixtures([]);
+  fixtures([], { useTransactionalTests: true });
 
   beforeAll(() => {
     registerModel("Company", CanonicalCompany);
@@ -3076,7 +3074,7 @@ describe("TestAutosaveAssociationOnAHasManyAssociationDefinedInSubclassWithAccep
 });
 
 describe("TestAutosaveAssociationOnAHasManyAssociation", () => {
-  fixtures([]);
+  fixtures([], { useTransactionalTests: true });
 
   beforeAll(() => {
     registerModel(CanonicalPirate);
@@ -3296,7 +3294,7 @@ describe("TestAutosaveAssociationOnAHasManyAssociation", () => {
 });
 
 describe("ChangedForAutosaveTest", () => {
-  fixtures([]);
+  fixtures([], { useTransactionalTests: true });
 
   it("parent is changed_for_autosave when nested autosave child is changed", () => {
     class Child extends Base {
@@ -3386,7 +3384,7 @@ describe("ChangedForAutosaveTest", () => {
 });
 
 describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
-  fixtures([]);
+  fixtures([], { useTransactionalTests: true });
   it("pairs queryConstraintsList PK with explicit composite FK on QC owner", async () => {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class QcOwner extends Base {

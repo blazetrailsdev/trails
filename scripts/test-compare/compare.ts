@@ -52,7 +52,8 @@
  *                 are report-only (no CI gate, no exclude.json).
  *   --dynamic     List the TS files carrying dynamically-named tests
  *                 (`` it(`${x} …`) ``) — recorded under a placeholder name,
- *                 counted as extra, never matched against a Rails test.
+ *                 matched only on its interpolation-dropped form, the
+ *                 way the Ruby extractor records an unexpandable `#{...}`.
  *   --sibling-classes
  *                 List the Rails files whose sibling test classes define
  *                 same-named tests (those are keyed by (class, name)).
@@ -67,7 +68,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import type { TestManifest, TestGate } from "./types.js";
-import { DYNAMIC_TITLE_PLACEHOLDER } from "./extract-ts-core.js";
+import { DYNAMIC_TITLE_PLACEHOLDER, collapseDynamicTitle } from "./extract-ts-core.js";
 import { classifyGateMismatch, type GateMismatchKind } from "./gates.js";
 import { buildHistogram, diffHistograms, type KindDelta } from "./assertion-kinds.js";
 import { assertionValueMismatch, type ValueDelta } from "./assertion-values.js";
@@ -499,7 +500,7 @@ export function arClosureResult(
 interface TsTestInfo {
   path: string; // normalized full path
   desc: string; // normalized description
-  dynamic: boolean; // name recovered from a template literal — never a match candidate
+  dynamic: boolean; // name recovered from a template literal — matches only on its collapsed form
   pending: boolean;
   gate?: TestGate; // adapter/feature gate emitted by the TS extractor
   assertionCount?: number; // raw assertion-call count from the TS extractor
@@ -690,8 +691,9 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
 
       for (let i = 0; i < file.testCases.length; i++) {
         const tc = file.testCases[i];
-        const np = normPath(tc.ancestors, tc.description);
-        const nd = normalize(tc.description);
+        const description = tc.dynamic ? collapseDynamicTitle(tc.description) : tc.description;
+        const np = normPath(tc.ancestors, description);
+        const nd = normalize(description);
         tests.push({
           path: np,
           desc: nd,
@@ -704,17 +706,17 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
         });
         if (tc.dynamic) {
           dynamicTests++;
-          continue;
+          if (nd.trim() === "") continue;
         }
         appendIndex(descIdx, nd, i);
-        const ndAlias = aliasKey(nd);
+        const ndAlias = tc.dynamic ? undefined : aliasKey(nd);
         if (ndAlias !== undefined) appendIndex(descAliasIdx, ndAlias, i);
         if (!descToFileCounts.has(nd)) descToFileCounts.set(nd, new Map());
         increment(descToFileCounts.get(nd)!, relPath);
 
         if (np.includes(DYNAMIC_TITLE_PLACEHOLDER)) continue;
         appendIndex(pathIdx, np, i);
-        const npAlias = aliasKey(np);
+        const npAlias = tc.dynamic ? undefined : aliasKey(np);
         if (npAlias !== undefined) appendIndex(pathAliasIdx, npAlias, i);
 
         // Cross-file reverse lookup
@@ -1177,7 +1179,7 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
   if (dynamicFiles.length > 0) {
     const total = dynamicFiles.reduce((n, f) => n + f.count, 0);
     console.log(
-      `\n  ${total} dynamically-named test(s) in ${dynamicFiles.length} file(s) — counted as extra, never matched:`,
+      `\n  ${total} dynamically-named test(s) in ${dynamicFiles.length} file(s) — matched only on the Ruby-collapsed title:`,
     );
     if (showDynamic) {
       for (const f of dynamicFiles.sort((a, b) => b.count - a.count)) {

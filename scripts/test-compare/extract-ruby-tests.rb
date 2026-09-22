@@ -157,6 +157,12 @@ ADAPTER_SYMBOL_MAP = {
   "SQLite3" => "sqlite",
 }.freeze
 
+# A loop element written as a Symbol literal (`[:passthrough, :marshal_7_0]`).
+# It still reads as its name everywhere a bound String does; only `inspect`
+# answers differently, `:passthrough` rather than `"passthrough"`
+# (activesupport/test/cache/serializer_with_fallback_test.rb:42-43).
+class LoopSymbolName < String; end
+
 class TestExtractor
   attr_reader :test_files, :unexpanded_loops
 
@@ -1021,9 +1027,13 @@ class TestExtractor
       path = const_path(node)
       path && qualified_const_name(path)
     when :symbol_literal
-      ident_name(node[1].is_a?(Array) && node[1][0] == :symbol ? node[1][1] : node[1])
-    when :dyna_symbol, :string_literal
-      extract_string_content(node[0] == :dyna_symbol ? [:string_literal, node[1]] : node)
+      name = ident_name(node[1].is_a?(Array) && node[1][0] == :symbol ? node[1][1] : node[1])
+      name && LoopSymbolName.new(name)
+    when :dyna_symbol
+      name = extract_string_content([:string_literal, node[1]])
+      name && LoopSymbolName.new(name)
+    when :string_literal
+      extract_string_content(node)
     when :@tstring_content
       # `%w(a b)` / `%i(a b)` elements, which Ripper emits bare.
       node[1]
@@ -1123,7 +1133,7 @@ class TestExtractor
   end
 
   # Evaluates the handful of expressions Rails interpolates into a generated test
-  # name: the block variable itself, `.name` / `.to_s` on it, `.gsub` with two
+  # name: the block variable itself, `.name` / `.to_s` / `.inspect` on it, `.gsub` with two
   # string literals (`klass.name.gsub('::', '_')`), `Regexp.escape` on a bound
   # string (`:"test_to_regexp_#{Regexp.escape(path)}"` at
   # journey/path/pattern_test.rb:28) and `.keys.map(&:to_s).join(<literal>)` on a
@@ -1138,7 +1148,11 @@ class TestExtractor
     when :call
       receiver = eval_loop_expr(node[1], bindings)
       return nil if receiver.nil?
-      %w[name to_s to_sym].include?(ident_name(node[3])) ? receiver : nil
+      case ident_name(node[3])
+      when "name", "to_s", "to_sym" then receiver
+      when "inspect"
+        receiver.is_a?(LoopSymbolName) ? receiver.to_sym.inspect : String.new(receiver).inspect
+      end
     when :method_add_arg
       inner = node[1]
       return nil unless inner.is_a?(Array) && inner[0] == :call

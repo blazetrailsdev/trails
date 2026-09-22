@@ -29,7 +29,7 @@ function decodeBinaryDefault(value: unknown): string {
 }
 
 describe("DefaultTest", () => {
-  fixtures(["entrants"]);
+  fixtures(["entrants"], { useTransactionalTests: true });
 
   it("nil defaults for not null columns", async () => {
     await Entrant.loadSchema();

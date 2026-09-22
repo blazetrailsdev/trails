@@ -1,6 +1,4 @@
-import { beforeEach, afterEach, type TaskContext } from "vitest";
-import { Notifications, type NotificationSubscriber } from "@blazetrails/activesupport";
-import { Base } from "../base.js";
+import { beforeEach } from "vitest";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import { NullPool } from "../connection-adapters/abstract/connection-pool.js";
@@ -13,26 +11,7 @@ import {
   templateSchemaFingerprint,
 } from "../support/schema-cache-dump.js";
 
-interface TxnHost {
-  transactionManager: {
-    beginTransaction: (opts: { joinable: boolean; _lazy: boolean }) => Promise<unknown>;
-    rollbackTransaction: () => Promise<void>;
-    openTransactions: number;
-  };
-}
-
 export type TransactionalFixturesAdapter = DatabaseAdapter;
-
-function tm(adapter: TransactionalFixturesAdapter): TxnHost["transactionManager"] {
-  const host = adapter as unknown as Partial<TxnHost>;
-  if (!host.transactionManager) {
-    throw new Error(
-      `withTransactionalFixtures: adapter ${(adapter as { adapterName?: string }).adapterName ?? "unknown"} ` +
-        `does not expose transactionManager`,
-    );
-  }
-  return host.transactionManager;
-}
 
 /** @internal */
 async function eagerWarmSchemaCache(adapter: TransactionalFixturesAdapter): Promise<void> {
@@ -89,29 +68,6 @@ export function warmSchemaCacheBeforeFirstTest(
   });
 }
 
-function pooledAdapterPool(adapter: TransactionalFixturesAdapter): ConnectionPool | null {
-  const host = adapter as { pool?: unknown };
-  const pool = host.pool;
-  if (pool == null || pool instanceof NullPool) return null;
-  return pool as ConnectionPool;
-}
-
-let fixtureConnectionPools: ConnectionPool[] | null = null;
-
-let fixtureScopeDepth = 0;
-
-let pinnedPools: ConnectionPool[] = [];
-
-let connectionSubscriber: NotificationSubscriber | null = null;
-
-let pendingPins: Promise<void>[] = [];
-
-async function pinConnectionPool(pool: ConnectionPool): Promise<void> {
-  await pool.pinConnectionBang();
-  pinnedPools.push(pool);
-  await pool.leaseConnection();
-}
-
 export interface WithTransactionalFixturesOptions {
   eagerWarmSchemaCache?: boolean;
 
@@ -120,88 +76,4 @@ export interface WithTransactionalFixturesOptions {
   useTransactionalTests?: boolean;
 }
 
-/** @noRailsEquivalent CONVERGEABLE converge-with-transactional-fixtures-onto-test-fixtures-setup */
-export function withTransactionalFixtures(
-  getAdapter: () => TransactionalFixturesAdapter | Promise<TransactionalFixturesAdapter>,
-  options: WithTransactionalFixturesOptions = {},
-): void {
-  const { eagerWarmSchemaCache: eagerWarm = true, usesTransaction: usesTransactionNames = [] } =
-    options;
-  if (eagerWarm) warmSchemaCacheBeforeFirstTest(getAdapter);
-  let _txnOpenedForTest = false;
-
-  beforeEach(async (ctx: TaskContext) => {
-    const adapter = await getAdapter();
-    if (usesTransactionNames.includes(ctx.task.name)) {
-      _txnOpenedForTest = false;
-      return;
-    }
-    _txnOpenedForTest = true;
-    const pool = pooledAdapterPool(adapter);
-    if (pool) {
-      if (fixtureConnectionPools === null) {
-        fixtureConnectionPools = Base.connectionHandler.connectionPoolList("writing");
-        if (!fixtureConnectionPools.includes(pool)) fixtureConnectionPools.push(pool);
-        for (const p of fixtureConnectionPools) {
-          await pinConnectionPool(p);
-        }
-      }
-      fixtureScopeDepth++;
-    } else {
-      await tm(adapter).beginTransaction({ joinable: false, _lazy: false });
-    }
-
-    connectionSubscriber = Notifications.subscribe("!connection.active_record", (event) => {
-      const payload = event.payload as { connection_name?: string; shard?: string };
-      const connectionName = "connection_name" in payload ? payload.connection_name : undefined;
-      const shard = "shard" in payload ? payload.shard : undefined;
-
-      if (connectionName != null) {
-        const newPool = Base.connectionHandler.retrieveConnectionPool(connectionName, { shard });
-        if (newPool) {
-          if (fixtureConnectionPools !== null && !fixtureConnectionPools.includes(newPool)) {
-            fixtureConnectionPools.push(newPool);
-            pendingPins.push(
-              newPool
-                .leaseConnection()
-                .then((connection) =>
-                  connection.lock.synchronize(() => pinConnectionPool(newPool)),
-                ),
-            );
-          }
-        }
-      }
-    });
-  });
-
-  afterEach(async () => {
-    if (connectionSubscriber) {
-      Notifications.unsubscribe(connectionSubscriber);
-      connectionSubscriber = null;
-    }
-    const pins = pendingPins;
-    pendingPins = [];
-    const pinResults = await Promise.allSettled(pins);
-    if (!_txnOpenedForTest) {
-      const failed = pinResults.find((r) => r.status === "rejected");
-      if (failed) throw failed.reason;
-      return;
-    }
-    const adapter = await getAdapter();
-    if (fixtureConnectionPools !== null && pooledAdapterPool(adapter) !== null) {
-      if (--fixtureScopeDepth === 0) {
-        const pools = pinnedPools;
-        pinnedPools = [];
-        for (const pool of pools) {
-          await pool.unpinConnectionBang();
-        }
-        fixtureConnectionPools = null;
-      }
-    } else {
-      const t = tm(adapter);
-      while (t.openTransactions > 0) await t.rollbackTransaction();
-    }
-    const failed = pinResults.find((r) => r.status === "rejected");
-    if (failed) throw failed.reason;
-  });
-}
+export { withTransactionalFixtures } from "../test-fixtures.js";

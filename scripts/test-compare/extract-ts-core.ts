@@ -382,6 +382,11 @@ export function extractTestsFromSource(content: string, relativePath: string): T
   const registrars = testRegisteringHelpers(sourceFile, helpers);
   const deferredBodies = new Map<string, ts.Node>();
   const callSiteGates = new Map<string, (TestGate | undefined)[]>();
+  // An `it()` whose title stays dynamic inside an expanded `for...of` is
+  // visited once per element, but the skeleton is the same every time, so it
+  // is recorded once — the Ruby extractor records one row per `test` call
+  // site it cannot expand (extract-ruby-tests.rb `process_test_macro_loop`).
+  const dynamicSites = new Set<ts.CallExpression>();
 
   function activeGate(): TestGate | undefined {
     let g: TestGate | undefined;
@@ -397,6 +402,10 @@ export function extractTestsFromSource(content: string, relativePath: string): T
     inlineGate?: TestGate | null,
     dynamic = false,
   ) {
+    if (dynamic) {
+      if (dynamicSites.has(node)) return;
+      dynamicSites.add(node);
+    }
     let gate = activeGate();
     if (inlineGate) gate = mergeGate(gate, inlineGate);
     const finalGate = gate ? finalizeGate(gate) : undefined;
@@ -751,8 +760,7 @@ function agreedGate(gates: (TestGate | undefined)[] | undefined): TestGate | und
  *
  * A recovered skeleton is a label for the audit, never a name to match on — a
  * dynamic suite name cannot equal a Rails describe — so `compare.ts` keeps a
- * path carrying the placeholder out of its path indexes the way it keeps a
- * `dynamic` case out of every index.
+ * path carrying the placeholder out of its path indexes.
  */
 function getSuiteTitle(
   node: ts.CallExpression,
@@ -784,6 +792,19 @@ function getArgString(node: ts.CallExpression, index: number): string | null {
  * description instead.
  */
 export const DYNAMIC_TITLE_PLACEHOLDER = "<expr>";
+
+/**
+ * A dynamic title as the Ruby extractor records the same unexpandable
+ * interpolation: every `#{...}` dropped and the literal text kept
+ * (`extract_string_content`, extract-ruby-tests.rb), so
+ * `` `${loader} serializer can load ${dumper} dump` `` and
+ * `"#{loader.inspect} serializer can load #{dumper.inspect} dump"` both read
+ * `" serializer can load  dump"`. This is the one key `compare.ts` matches a
+ * dynamic case on; the placeholder form stays the audit label.
+ */
+export function collapseDynamicTitle(title: string): string {
+  return title.split(DYNAMIC_TITLE_PLACEHOLDER).join("");
+}
 
 /**
  * The static skeleton of a template-literal title, with every `${...}`

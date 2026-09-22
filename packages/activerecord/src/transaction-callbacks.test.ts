@@ -91,17 +91,7 @@ class TopicWithCallbacks extends Base {
 }
 registerModel(TopicWithCallbacks);
 
-fixtures(["topics", "owners", "pets"], {
-  usesTransaction: [
-    "trigger once on multiple deletion within transaction",
-    "trigger once on multiple deletions",
-    "trigger once on multiple deletions in a transaction",
-    "rollback on multiple deletions",
-    "trigger on update where row was deleted",
-    "callback on action with condition",
-    "set callback with on",
-  ],
-});
+fixtures(["topics", "owners", "pets"]);
 
 function addTransactionExecutionBlocks(record: TopicWithCallbacks) {
   record.afterCommitBlock("create", (r) => r.history.push("commit_on_create"));
@@ -113,6 +103,12 @@ function addTransactionExecutionBlocks(record: TopicWithCallbacks) {
 }
 
 describe("TransactionCallbacksTest", () => {
+  fixtures([], {
+    usesTransaction: [
+      "after commit callback should not rollback state that already been succeeded",
+    ],
+  });
+
   it("before commit exception should pop transaction stack", async () => {
     const first = await TopicWithCallbacks.find(1);
     first.beforeCommitBlock(null, () => {
@@ -914,6 +910,8 @@ describe("TransactionCallbacksTest", () => {
   });
 
   describe("CallbackOrderTest", () => {
+    fixtures([], { useTransactionalTests: false });
+
     it("callbacks run in order defined in model if not using run after transaction callbacks in order defined", async () => {
       setRunAfterTransactionCallbacksInOrderDefined(false);
       const Topic = defineBehaviourTopic();
@@ -972,6 +970,8 @@ describe("TransactionCallbacksTest", () => {
   });
 
   describe("CallbacksOnMultipleActionsTest", () => {
+    fixtures([], { useTransactionalTests: false });
+
     it("after commit on multiple actions", async () => {
       class TopicWithCallbacksOnMultipleActions extends Base {
         declare approved: boolean;
@@ -1067,6 +1067,8 @@ describe("TransactionCallbacksTest", () => {
   });
 
   describe("CallbackOrderTest", () => {
+    fixtures([], { useTransactionalTests: false });
+
     it("callbacks run in order defined in model if using run after transaction callbacks in order defined", async () => {
       let Topic: ReturnType<typeof defineBehaviourTopic>;
       setRunAfterTransactionCallbacksInOrderDefined(true);
@@ -1100,6 +1102,8 @@ describe("TransactionCallbacksTest", () => {
   });
 
   describe("CallbacksOnDestroyUpdateActionRaceTest", () => {
+    fixtures([], { useTransactionalTests: false });
+
     const makeTopicWithCallbacksOnDestroy = (history: string[]) =>
       class TopicWithCallbacksOnDestroy extends Base {
         declare title: string;
@@ -1225,6 +1229,8 @@ describe("TransactionCallbacksTest", () => {
   });
 
   describe("CallbacksOnActionAndConditionTest", () => {
+    fixtures([], { useTransactionalTests: false });
+
     it("callback on action with condition", async () => {
       class TopicWithCallbacksOnActionAndCondition extends Base {
         declare title: string;
@@ -1391,6 +1397,8 @@ describe("TransactionCallbacksTest", () => {
   });
 
   describe("SetCallbackTest", () => {
+    fixtures([], { useTransactionalTests: false });
+
     it("set callback with on", async () => {
       const history: string[] = [];
       const afterCommitOnUpdate1 = () => history.push("after_commit_on_update_1");

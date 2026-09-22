@@ -80,4 +80,26 @@ describe("Ruby extractor test-macro loop expansion", () => {
     expect(cases.map((c) => c.description)).toEqual(["round trips "]);
     expect(unexpandedLoops).toEqual([]);
   });
+
+  it("interpolates inspect on a Symbol element with its leading colon", () => {
+    // activesupport/test/cache/serializer_with_fallback_test.rb:42-43
+    const { cases } = extract(`
+      LEGACY_FORMATS = [:passthrough, :marshal_7_0]
+      LEGACY_FORMATS.each do |format|
+        test "#{format.inspect} serializer can compress entries" do
+          assert_equal 1, 1
+        end
+      end
+      ["plain"].each do |name|
+        test "#{name.inspect} is quoted" do
+          assert_equal 1, 1
+        end
+      end
+    `);
+    expect(cases.map((c) => c.description)).toEqual([
+      ":passthrough serializer can compress entries",
+      ":marshal_7_0 serializer can compress entries",
+      '"plain" is quoted',
+    ]);
+  });
 });

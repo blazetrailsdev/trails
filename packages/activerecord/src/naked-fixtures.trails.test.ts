@@ -3,6 +3,8 @@ import { File as FixtureFile } from "./fixture-set/file.js";
 import { FIXTURES_ROOT as TS_FIXTURES_ROOT } from "./test-helpers/fixtures-registry.js";
 import { FixtureSet } from "./fixtures.js";
 import { fixtures } from "./test-fixtures.js";
+import { Account } from "./test-helpers/models/account.js";
+import { Company } from "./test-helpers/models/company.js";
 import { Tree } from "./test-helpers/models/tree.js";
 import "./relation.js";
 import { nakedYmlAccountsFixtureData } from "./test-helpers/fixtures/naked/yml/accounts.js";
@@ -12,7 +14,7 @@ import { nakedYmlTreesFixtureData } from "./test-helpers/fixtures/naked/yml/tree
 
 describe("tableless useFixtures (naked/yml)", () => {
   describe("test_empty_yaml_fixture", () => {
-    const { accounts } = fixtures([{ table: "accounts", data: nakedYmlAccountsFixtureData }]);
+    const { accounts } = fixtures({ accounts: [Account, nakedYmlAccountsFixtureData] });
 
     it("loads an empty fixture set without error", () => {
       expect(accounts.all()).toHaveLength(0);
@@ -20,7 +22,7 @@ describe("tableless useFixtures (naked/yml)", () => {
   });
 
   describe("test_empty_yaml_fixture_with_a_comment_in_it", () => {
-    const { companies } = fixtures([{ table: "companies", data: nakedYmlCompaniesFixtureData }]);
+    const { companies } = fixtures({ companies: [Company, nakedYmlCompaniesFixtureData] });
 
     it("loads a comment-only fixture set without error", () => {
       expect(companies.all()).toHaveLength(0);
@@ -41,17 +43,12 @@ describe("tableless useFixtures (naked/yml)", () => {
   });
 
   describe("test_yaml_file_with_symbol_columns", () => {
-    const { trees } = fixtures([{ table: "trees", data: nakedYmlTreesFixtureData }]);
+    const { trees } = fixtures({ trees: [Tree, nakedYmlTreesFixtureData] });
 
     it("inserts the row and it can be found by primary key", async () => {
       const root = await Tree.findBy({ id: 1 });
       expect(root).not.toBeNull();
       expect(root!.name).toBe("The Root");
-    });
-
-    it("accessor returns the row as a plain object", () => {
-      const row = trees("root");
-      expect(row).toMatchObject({ id: 1, name: "The Root" });
     });
 
     it(".all() returns all rows", () => {

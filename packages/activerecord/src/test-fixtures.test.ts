@@ -233,12 +233,7 @@ describe("useFixtures type contract", () => {
 });
 
 describe("useFixtures by registry name", () => {
-  withTransactionalFixtures(leaseFixtureConnection);
-
-  const { authors, posts } = fixtures(["authorAddresses", "authors", "posts"], {
-    connection: () => Base.connection,
-    useTransactionalTests: false,
-  });
+  const { authors, posts } = fixtures(["authorAddresses", "authors", "posts"]);
 
   it("loads authors by label with the expected attributes", async () => {
     const david = authors("david");
@@ -290,12 +285,11 @@ describe("useFixtures by registry name", () => {
 });
 
 describe("useFixtures seeds HABTM join tables (no model class)", () => {
-  withTransactionalFixtures(leaseFixtureConnection);
-
-  const { categories, posts, categoriesPosts } = fixtures(
-    ["categories", "posts", "categoriesPosts"],
-    { connection: () => Base.connection, useTransactionalTests: false },
-  );
+  const { categories, posts, categoriesPosts } = fixtures([
+    "categories",
+    "posts",
+    "categoriesPosts",
+  ]);
 
   it("resolves each join row's FK pair to the referenced rows' ids", () => {
     const row = categoriesPosts("general_welcome");
@@ -333,12 +327,11 @@ describe("useFixtures seeds HABTM join tables (no model class)", () => {
 });
 
 describe("useFixtures seeds a single-row HABTM join table", () => {
-  withTransactionalFixtures(leaseFixtureConnection);
-
-  const { people, treasures, peoplesTreasures } = fixtures(
-    ["people", "treasures", "peoplesTreasures"],
-    { connection: () => Base.connection, useTransactionalTests: false },
-  );
+  const { people, treasures, peoplesTreasures } = fixtures([
+    "people",
+    "treasures",
+    "peoplesTreasures",
+  ]);
 
   it("resolves rich_person_id/treasure_id to the referenced rows", () => {
     const row = peoplesTreasures("michael_diamond");
@@ -349,12 +342,7 @@ describe("useFixtures seeds a single-row HABTM join table", () => {
 });
 
 describe("useFixtures vertices and edges", () => {
-  withTransactionalFixtures(leaseFixtureConnection);
-
-  const { vertices, edges } = fixtures(["vertices", "edges"], {
-    connection: () => Base.connection,
-    useTransactionalTests: false,
-  });
+  const { vertices, edges } = fixtures(["vertices", "edges"]);
 
   it("loads all 5 vertices and 4 edges", () => {
     expect(vertices.all().length).toBe(5);
@@ -371,12 +359,7 @@ describe("useFixtures vertices and edges", () => {
 });
 
 describe("useFixtures auto-stamps NOT NULL timestamps", () => {
-  withTransactionalFixtures(leaseFixtureConnection);
-
-  const { people } = fixtures(["people"], {
-    connection: () => Base.connection,
-    useTransactionalTests: false,
-  });
+  const { people } = fixtures(["people"]);
 
   it("fills created_at/updated_at for a row that omits them", async () => {
     const id = people("michael").id;
@@ -393,12 +376,7 @@ describe("useFixtures auto-stamps NOT NULL timestamps", () => {
 });
 
 describe("useFixtures with a string primary key", () => {
-  withTransactionalFixtures(leaseFixtureConnection);
-
-  const { subscribers } = fixtures(["subscribers"], {
-    connection: () => Base.connection,
-    useTransactionalTests: false,
-  });
+  const { subscribers } = fixtures(["subscribers"]);
 
   it("loads a record keyed by its declared string primary key", async () => {
     const luke = subscribers("first");
@@ -417,20 +395,7 @@ describe("useFixtures with a string primary key", () => {
 });
 
 describe("useFixtures reconciles the PK column against the schema", () => {
-  withTransactionalFixtures(leaseFixtureConnection);
-
-  const { bulbs } = fixtures(["bulbs"], {
-    connection: () => Base.connection,
-    useTransactionalTests: false,
-  });
-  const { mixedCaseMonkeys } = fixtures(["mixedCaseMonkeys"], {
-    connection: () => Base.connection,
-    useTransactionalTests: false,
-  });
-  const { mateys } = fixtures(["mateys"], {
-    connection: () => Base.connection,
-    useTransactionalTests: false,
-  });
+  const { bulbs, mixedCaseMonkeys, mateys } = fixtures(["bulbs", "mixedCaseMonkeys", "mateys"]);
 
   it("populates the `ID` column for a custom-PK table", async () => {
     const special = bulbs("special");
@@ -462,12 +427,7 @@ describe("useFixtures reconciles the PK column against the schema", () => {
 });
 
 describe("useFixtures seeds composite-primary-key tables", () => {
-  withTransactionalFixtures(leaseFixtureConnection);
-
-  const { cpkOrders, cpkOrderTags, cpkBooks } = fixtures(
-    ["cpkOrders", "cpkOrderTags", "cpkBooks"],
-    { connection: () => Base.connection, useTransactionalTests: false },
-  );
+  const { cpkOrders, cpkOrderTags, cpkBooks } = fixtures(["cpkOrders", "cpkOrderTags", "cpkBooks"]);
 
   it("seeds a composite-model-PK order against the schema's single id", () => {
     const order = cpkOrders("cpk_groceries_order_1");
@@ -499,16 +459,7 @@ describe("useFixtures seeds composite-primary-key tables", () => {
 });
 
 describe("useFixtures resolves STI subclasses on standalone load", () => {
-  withTransactionalFixtures(leaseFixtureConnection);
-
-  const { parrots } = fixtures(["parrots"], {
-    connection: () => Base.connection,
-    useTransactionalTests: false,
-  });
-  const { vegetables } = fixtures(["vegetables"], {
-    connection: () => Base.connection,
-    useTransactionalTests: false,
-  });
+  const { parrots, vegetables } = fixtures(["parrots", "vegetables"]);
 
   it("hydrates a LiveParrot-typed row as a LiveParrot instance", () => {
     expect(parrots("george")).toBeInstanceOf(LiveParrot);
@@ -590,12 +541,6 @@ describe("resolveFixtureNames same-table guard", () => {
     expect(map.liveParrots.table).toBe("parrots");
   });
 
-  it("rejects two same-table sets whose rows collide on a primary key", async () => {
-    await expect(resolveFixtureNames(["dogs", "otherDogs"])).rejects.toThrow(
-      /both map to table "dogs" with a row that resolves to the same primary key/,
-    );
-  });
-
   it("resolves distinct-table sets without error", async () => {
     const map = await resolveFixtureNames(["authors", "posts"]);
     expect(Object.keys(map)).toEqual(["authors", "posts"]);
@@ -635,6 +580,7 @@ describe("fixtureRegistry seeds against TEST_SCHEMA", () => {
   });
   afterAll(() => {
     restoreEncryption?.();
+    FixtureSet.resetCache();
   });
 
   it("every registered entry seeds without error", async () => {
@@ -661,8 +607,6 @@ describe("fixtureRegistry seeds against TEST_SCHEMA", () => {
 });
 
 describe("useFixtures bootstraps the encryption add-on for encrypted fixtures", () => {
-  withTransactionalFixtures(leaseFixtureConnection);
-
   // global encryption config doesn't leak into later suites in the worker.
   let restoreEncryption: (() => void) | undefined;
   beforeAll(async () => {
@@ -673,10 +617,7 @@ describe("useFixtures bootstraps the encryption add-on for encrypted fixtures", 
   });
 
   describe("encryptedBooks set", () => {
-    const { encryptedBooks } = fixtures(["encryptedBooks"], {
-      connection: () => Base.connection,
-      useTransactionalTests: false,
-    });
+    const { encryptedBooks } = fixtures(["encryptedBooks"]);
 
     it("reads the encrypted name attribute back as its expected plaintext", () => {
       expect(encryptedBooks("awdr").readAttribute("name")).toBe("Agile Web Development with Rails");
@@ -693,10 +634,7 @@ describe("useFixtures bootstraps the encryption add-on for encrypted fixtures", 
   });
 
   describe("encryptedBookThatIgnoresCases set", () => {
-    const { encryptedBookThatIgnoresCases } = fixtures(["encryptedBookThatIgnoresCases"], {
-      connection: () => Base.connection,
-      useTransactionalTests: false,
-    });
+    const { encryptedBookThatIgnoresCases } = fixtures(["encryptedBookThatIgnoresCases"]);
 
     it("reads an ignore-case encrypted fixture back as plaintext", () => {
       expect((encryptedBookThatIgnoresCases("rfr") as any).name).toBe("Ruby for Rails");

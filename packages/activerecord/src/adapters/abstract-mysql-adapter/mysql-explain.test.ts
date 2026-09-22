@@ -20,7 +20,9 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
   });
 
   describe("MySQLExplainTest", () => {
-    const { authors } = fixtures(["authors", "authorAddresses", "posts"]);
+    const { authors } = fixtures(["authors", "authorAddresses", "posts"], {
+      useTransactionalTests: true,
+    });
 
     let explainOpt: string;
     let expectedClause: string;
