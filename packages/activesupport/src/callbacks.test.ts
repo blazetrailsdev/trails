@@ -531,48 +531,6 @@ class DuplicatingCallbacksInSameCall extends OneTwoThreeSave {
   }
 }
 
-class AllSaveCallbacks {
-  history: string[] = [];
-
-  static {
-    defineCallbacks(this.prototype, "save");
-    setCallback(this.prototype, "save", "before", ":beforeSave1");
-    setCallback(this.prototype, "save", "before", ":beforeSave2");
-    setCallback(this.prototype, "save", "around", ":aroundSave1");
-    setCallback(this.prototype, "save", "around", ":aroundSave2");
-    setCallback(this.prototype, "save", "after", ":afterSave1");
-    setCallback(this.prototype, "save", "after", ":afterSave2");
-  }
-
-  beforeSave1(): void {
-    this.history.push("beforeSave1");
-  }
-
-  beforeSave2(): void {
-    this.history.push("beforeSave2");
-  }
-
-  aroundSave1(block: () => unknown): void {
-    this.history.push("aroundSave1_before");
-    block();
-    this.history.push("aroundSave1_after");
-  }
-
-  aroundSave2(block: () => unknown): void {
-    this.history.push("aroundSave2_before");
-    block();
-    this.history.push("aroundSave2_after");
-  }
-
-  afterSave1(): void {
-    this.history.push("afterSave1");
-  }
-
-  afterSave2(): void {
-    this.history.push("afterSave2");
-  }
-}
-
 class WriterSkipper extends Person {
   age = 0;
 
@@ -969,10 +927,10 @@ describe("ConditionalTests", () => {
 
   it("class conditional with scope", () => {
     const z: unknown[] = [];
-    const callback = {
-      foo(o: unknown) {
+    const callback = class {
+      static foo(o: unknown) {
         z.push(o);
-      },
+      }
     };
     class Klass {
       static {
@@ -993,11 +951,13 @@ describe("ConditionalTests", () => {
 
   it("class", () => {
     const z: unknown[] = [];
-    const klass = buildClass({
-      before(o: unknown) {
-        z.push(o);
+    const klass = buildClass(
+      class {
+        static before(o: unknown) {
+          z.push(o);
+        }
       },
-    });
+    );
     const object = new klass();
     object.run();
     expect(z).toEqual([object]);
@@ -1085,31 +1045,6 @@ describe("ExcludingDuplicatesCallbackTest", () => {
     const model = new DuplicatingCallbacksInSameCall();
     model.save();
     expect(model.record).toEqual(["two", "one", "three", "yielded"]);
-  });
-});
-
-describe("RunSpecificCallbackTest", () => {
-  it("run callbacks only before", () => {
-    const klass = new AllSaveCallbacks();
-    runCallbacks(klass, "save", undefined, undefined, "before");
-    expect(klass.history).toEqual(["beforeSave1", "beforeSave2"]);
-  });
-
-  it("run callbacks only around", () => {
-    const klass = new AllSaveCallbacks();
-    runCallbacks(klass, "save", undefined, undefined, "around");
-    expect(klass.history).toEqual([
-      "aroundSave1_before",
-      "aroundSave2_before",
-      "aroundSave2_after",
-      "aroundSave1_after",
-    ]);
-  });
-
-  it("run callbacks only after", () => {
-    const klass = new AllSaveCallbacks();
-    runCallbacks(klass, "save", undefined, undefined, "after");
-    expect(klass.history).toEqual(["afterSave2", "afterSave1"]);
   });
 });
 
@@ -1261,11 +1196,11 @@ describe("CallbackTypeTest", () => {
 
   it("add class", () => {
     const calls: unknown[] = [];
-    const callback = new (class {
-      before(o: unknown) {
+    const callback = class {
+      static before(o: unknown) {
         calls.push(o);
       }
-    })();
+    };
     new (buildClass(callback))().run();
     expect(calls.length).toBe(10);
   });
@@ -1286,11 +1221,11 @@ describe("CallbackTypeTest", () => {
 
   it("skip class", () => {
     const calls: unknown[] = [];
-    const callback = new (class {
-      before(o: unknown) {
+    const callback = class {
+      static before(o: unknown) {
         calls.push(o);
       }
-    })();
+    };
     const klass = buildClass(callback);
     for (let i = 9; i >= 0; i--) {
       klass.skip(callback);
@@ -1350,5 +1285,72 @@ describe("NotSupportedStringConditionalTest", () => {
     expect(() =>
       skipCallback(Klass.prototype, "save", "after", ":tweedle", { unless: "false" }),
     ).toThrow(ArgumentError);
+  });
+});
+
+class AllSaveCallbacks {
+  history: string[] = [];
+
+  static {
+    defineCallbacks(this.prototype, "save");
+    setCallback(this.prototype, "save", "before", ":beforeSave1");
+    setCallback(this.prototype, "save", "before", ":beforeSave2");
+    setCallback(this.prototype, "save", "around", ":aroundSave1");
+    setCallback(this.prototype, "save", "around", ":aroundSave2");
+    setCallback(this.prototype, "save", "after", ":afterSave1");
+    setCallback(this.prototype, "save", "after", ":afterSave2");
+  }
+
+  beforeSave1(): void {
+    this.history.push("beforeSave1");
+  }
+
+  beforeSave2(): void {
+    this.history.push("beforeSave2");
+  }
+
+  aroundSave1(block: () => unknown): void {
+    this.history.push("aroundSave1_before");
+    block();
+    this.history.push("aroundSave1_after");
+  }
+
+  aroundSave2(block: () => unknown): void {
+    this.history.push("aroundSave2_before");
+    block();
+    this.history.push("aroundSave2_after");
+  }
+
+  afterSave1(): void {
+    this.history.push("afterSave1");
+  }
+
+  afterSave2(): void {
+    this.history.push("afterSave2");
+  }
+}
+
+describe("RunSpecificCallbackTest", () => {
+  it("run callbacks only before", () => {
+    const klass = new AllSaveCallbacks();
+    runCallbacks(klass, "save", undefined, undefined, "before");
+    expect(klass.history).toEqual(["beforeSave1", "beforeSave2"]);
+  });
+
+  it("run callbacks only around", () => {
+    const klass = new AllSaveCallbacks();
+    runCallbacks(klass, "save", undefined, undefined, "around");
+    expect(klass.history).toEqual([
+      "aroundSave1_before",
+      "aroundSave2_before",
+      "aroundSave2_after",
+      "aroundSave1_after",
+    ]);
+  });
+
+  it("run callbacks only after", () => {
+    const klass = new AllSaveCallbacks();
+    runCallbacks(klass, "save", undefined, undefined, "after");
+    expect(klass.history).toEqual(["afterSave2", "afterSave1"]);
   });
 });

@@ -256,7 +256,10 @@ export namespace CallTemplate {
       return new MethodCall(typeof filter === "string" ? filter.slice(1) : filter);
     } else if (filter instanceof Value) {
       return new ProcCall(filter);
-    } else if (typeof filter === "function") {
+    } else if (
+      typeof filter === "function" &&
+      !/^class[\s{]/.test(Function.prototype.toString.call(filter))
+    ) {
       const arity = filter.length;
       if (arity === 2) {
         return new InstanceExec2(
