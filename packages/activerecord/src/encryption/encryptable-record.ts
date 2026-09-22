@@ -3,6 +3,7 @@ import { Contexts } from "./contexts.js";
 import { Configuration } from "./errors.js";
 import { type ValueType } from "@blazetrails/activemodel";
 import { Module, include } from "@blazetrails/ruby-compat";
+import { initializeGeneratedModules } from "../attribute-methods.js";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Configurable } from "./configurable.js";
 import { registerLoadSchemaOverride } from "../load-schema-overrides-slot.js";
@@ -125,7 +126,7 @@ export function overrideAccessorsToPreserveOriginal(
   originalAttributeName: string,
 ): void {
   if (!Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")) {
-    this.initializeGeneratedModules?.();
+    initializeGeneratedModules.call(this);
   }
   const mod = new Module();
   mod.moduleEval((table) => {
