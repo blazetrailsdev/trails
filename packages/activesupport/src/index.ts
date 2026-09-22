@@ -570,6 +570,7 @@ export {
   assertRaises,
   assertRaise,
   assertNothingRaised,
+  _assertNothingRaisedOrWarn,
   assertDifference,
   assertNoDifference,
   assertChanges,
