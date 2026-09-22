@@ -73,6 +73,10 @@ export interface MethodInfo {
   /** Ruby side only (RFC 0156): declares `&blk`, or its body `yield`s or tests
    *  `block_given?`. Compared by block-params.ts. */
   takesBlock?: boolean;
+  /** TS side only (RFC 0156): a class property assigned a callable
+   *  (`static assertRaises = assertRaises`) carries no `params` of its own;
+   *  these are the target's, read by the block-parameter check alone. */
+  aliasParams?: ParamInfo[];
   /**
    * TS-side only (RFC 0084): the same call names in SOURCE ORDER, deduplicated
    * at first occurrence exactly as the Ruby extractor's `calls.uniq` is. `calls`

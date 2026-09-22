@@ -3665,6 +3665,9 @@ export function extractClass(
     } else if (ts.isPropertyDeclaration(member) && memberName) {
       // Public properties are like attr_reader/attr_accessor
       // Only record them if they're not readonly (readonly = getter only conceptually)
+      const aliasParams = member.initializer
+        ? paramsOfCallableRef(member.initializer, checker)
+        : null;
       const method: MethodInfo = {
         name: memberName,
         visibility,
@@ -3674,6 +3677,7 @@ export function extractClass(
         isStatic,
         ...(internal ? { internal: true } : {}),
         ...tagged,
+        ...(aliasParams ? { aliasParams } : {}),
       };
       if (isStatic) {
         classMethods.push(method);

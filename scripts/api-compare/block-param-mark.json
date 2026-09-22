@@ -6,18 +6,19 @@
     }
   },
   "actioncontroller": {
-    "total": 4,
+    "total": 5,
     "byFile": {
+      "base.rb": 1,
       "metal/live.rb": 1,
       "metal/strong_parameters.rb": 3
     }
   },
   "actiondispatch": {
-    "total": 25,
+    "total": 30,
     "byFile": {
       "http/headers.rb": 1,
       "http/query_parser.rb": 1,
-      "http/response.rb": 1,
+      "http/response.rb": 2,
       "http/url.rb": 1,
       "journey/formatter.rb": 1,
       "journey/router.rb": 1,
@@ -27,18 +28,21 @@
       "request/utils.rb": 1,
       "routing/mapper.rb": 9,
       "system_test_case.rb": 1,
-      "system_testing/driver.rb": 1
+      "system_testing/driver.rb": 1,
+      "testing/integration.rb": 4
     }
   },
   "actionview": {
-    "total": 8,
+    "total": 19,
     "byFile": {
       "base.rb": 1,
+      "helpers/debug_helper.rb": 5,
       "helpers/number_helper.rb": 1,
       "helpers/tag_helper.rb": 1,
+      "helpers/text_helper.rb": 5,
       "path_set.rb": 1,
       "renderer/renderer.rb": 2,
-      "renderer/streaming_template_renderer.rb": 1,
+      "renderer/streaming_template_renderer.rb": 2,
       "template.rb": 1
     }
   },
@@ -52,10 +56,12 @@
     }
   },
   "activerecord": {
-    "total": 28,
+    "total": 35,
     "byFile": {
       "association_relation.rb": 1,
       "associations/collection_proxy.rb": 1,
+      "associations/has_one_through_association.rb": 1,
+      "base.rb": 6,
       "connection_adapters/abstract/database_statements.rb": 1,
       "connection_adapters/postgresql_adapter.rb": 1,
       "core.rb": 2,
@@ -101,11 +107,12 @@
     }
   },
   "trailties": {
-    "total": 5,
+    "total": 8,
     "byFile": {
-      "generators/actions.rb": 1,
+      "application.rb": 1,
+      "generators/actions.rb": 2,
       "generators/actions/create_migration.rb": 1,
-      "generators/base.rb": 1,
+      "generators/base.rb": 2,
       "initializable.rb": 1,
       "railtie/configuration.rb": 1
     }

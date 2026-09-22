@@ -3449,6 +3449,7 @@ export function main() {
     // pooling all signatures and matching ANY (see matchArityAgainst) finds the
     // true arity and keeps those bindings/overloads from false-positiving.
     const tsParamsByName = new Map<string, ParamInfo[][]>();
+    const tsBlockSigsByFileName = new Map<string, Map<string, ParamInfo[][]>>();
     // The package-only signature populations the calls-parity ported-with-args
     // gate reads — see TsPortedWithArgsMaps for what each one is scoped to.
     const portedWithArgsMaps = newTsPortedWithArgsMaps();
@@ -3613,6 +3614,14 @@ export function main() {
       sigs.push(m.params);
       tsParamsByName.set(m.name, sigs);
       if (scope === "package") recordTsPortedWithArgs(portedWithArgsMaps, m, file, owner);
+      if (scope === "package") {
+        const byName = tsBlockSigsByFileName.get(file) ?? new Map<string, ParamInfo[][]>();
+        const blockSigs = byName.get(m.name) ?? [];
+        blockSigs.push(m.params);
+        if (m.aliasParams) blockSigs.push(m.aliasParams);
+        byName.set(m.name, blockSigs);
+        tsBlockSigsByFileName.set(file, byName);
+      }
       if (m.missingRailsCalls !== undefined) {
         recordTaggedCalls(
           tsMissingCallTagsByFileName,
@@ -4620,9 +4629,7 @@ export function main() {
         if (candidates.length === 0) return;
         if (rubyBlockNames.has(rubyName) && !rubyForwardingNames.has(rubyName) && !guessedFile) {
           blockParamsCompared++;
-          const inFile = tsParamsByFileNameInPkg.get(tsFile)?.get(tsName) ?? [];
-          const aliasOnly = inFile.every((sig) => stripThis(sig).length === 0);
-          if (dropsBlock(true, aliasOnly ? candidates : inFile)) {
+          if (dropsBlock(true, tsBlockSigsByFileName.get(tsFile)?.get(tsName) ?? [])) {
             blockParamMismatches.push({ rubyFile, tsFile, rubyName, tsName });
           }
         }
