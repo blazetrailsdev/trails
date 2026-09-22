@@ -271,7 +271,6 @@ describe("I18nValidationTest", () => {
     ).toEqual("Country cannot be blank");
   });
 
-
   const COMMON_CASES: [string, Record<string, unknown>, Record<string, unknown>][] = [
     ["given no options", {}, {}],
     ["given custom message", { message: "custom" }, { message: "custom" }],
@@ -439,7 +438,7 @@ describe("I18nValidationTest", () => {
         onlyInteger: true,
         odd: true,
       });
-      person.title = 0;
+      (person as Record<string, unknown>).title = 0;
       const call = ["title", ":odd", person, { ...generateMessageOptions, value: 0 }];
       await assertCalledWith(ModelError, "generateMessage", call, {}, validateAndReadMessages());
     });
@@ -452,7 +451,7 @@ describe("I18nValidationTest", () => {
         onlyInteger: true,
         lessThan: 0,
       });
-      person.title = 1;
+      (person as Record<string, unknown>).title = 1;
       const call = [
         "title",
         ":less_than",
@@ -583,7 +582,7 @@ describe("I18nValidationTest", () => {
           onlyInteger: true,
           odd: true,
         });
-        person.title = 0;
+        (person as Record<string, unknown>).title = 0;
       },
     ],
     [
@@ -595,7 +594,7 @@ describe("I18nValidationTest", () => {
           onlyInteger: true,
           lessThan: 0,
         });
-        person.title = 1;
+        (person as Record<string, unknown>).title = 1;
       },
     ],
   ];
