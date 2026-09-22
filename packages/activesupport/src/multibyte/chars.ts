@@ -1,6 +1,7 @@
 import {
   cmp,
   equals as cmpEquals,
+  KERNEL_METHODS,
   NoMethodError,
   PROTOCOL_PROBES,
   rbStrMatch,
@@ -22,8 +23,8 @@ export class Chars {
     return new Proxy(this, {
       get(target, prop, receiver) {
         if (typeof prop === "symbol" || prop in target) return Reflect.get(target, prop, receiver);
-        if (!target.respondToMissing(prop, false)) {
-          if (PROTOCOL_PROBES.has(prop) || prop === "respondTo" || prop === "eql") return undefined;
+        if (KERNEL_METHODS.has(prop) || !target.respondToMissing(prop, false)) {
+          if (PROTOCOL_PROBES.has(prop) || KERNEL_METHODS.has(prop)) return undefined;
           return () => {
             throw new NoMethodError(`undefined method '${prop}' for an instance of Chars`);
           };
@@ -35,7 +36,9 @@ export class Chars {
         return (...args: unknown[]) => target.methodMissing.call(receiver, prop, ...args);
       },
       has(target, prop) {
-        return prop in target || (typeof prop === "string" && target.respondToMissing(prop, false));
+        if (prop in target) return true;
+        if (typeof prop !== "string" || KERNEL_METHODS.has(prop)) return false;
+        return target.respondToMissing(prop, false);
       },
     });
   }

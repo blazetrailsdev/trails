@@ -1,87 +1,215 @@
 import { ArgumentError } from "../argument-error.js";
+import { cmp } from "../comparable.js";
+import { Encoding } from "../encoding.js";
 import { IndexError } from "../index-error.js";
+import { format } from "../kernel-format.js";
 import { NoMethodError } from "../no-method-error.js";
-import { rbBuiltinClassName } from "../object.js";
 import { Range } from "../range.js";
-import { regexpEscape } from "../regexp.js";
+import { rbEqual } from "../rb-equal.js";
+import { rbHash } from "../rb-hash.js";
 import { TypeError } from "../type-error.js";
-import { b } from "./b.js";
+import { EACH_METHODS, rbStrUpto } from "./each.js";
+import {
+  rbStrByteindexM,
+  rbStrByterindexM,
+  rbStrBytesplice,
+  rbStrByteslice,
+} from "./byte-methods.js";
+import { rbStrGetbyte, rbStrSetbyte, rbStrSum } from "./byte-methods.js";
+import { bytes } from "./bytes.js";
+import { capitalize, casecmp, downcase, isCasecmp, swapcase, upcase } from "./case-mapping.js";
 import { chomp } from "./chomp.js";
-import { stringDelete } from "./delete.js";
-import { forceEncoding } from "./force-encoding.js";
+import { rbStrDump, rbStrHex, rbStrOct, rbStrToF, rbStrToI, strUndump } from "./convert.js";
+import { stringInspect } from "./inspect.js";
+import { scrub } from "./scrub.js";
+import { sliceBang } from "./slice.js";
+import { stringSplit } from "./split.js";
+import {
+  rbStrMatchM,
+  rbStrMatchMP,
+  rbStrPartition,
+  rbStrRpartition,
+  rbStrScan,
+  rbStrStartWith,
+  rbStrEndWith,
+  rbStrSub,
+  rbStrSubBang,
+  strGsub,
+} from "./sub.js";
 import { succ } from "./succ.js";
+import {
+  bang,
+  blockArg,
+  checkArity,
+  num2long,
+  rbCheckStringType,
+  rbErrorArity,
+  rbRangeBegLen,
+  rbRegBackrefNumber,
+  rbRegSearch,
+  rbStrCmp,
+  rbStrSublen,
+  strlen,
+  strOffset,
+  stringValue,
+  type StringReceiver,
+} from "./support.js";
+import { strCount, strDelete, strSqueeze, trTrans } from "./tr.js";
 
-/**
- * A {@link STRING_METHOD_TABLE} entry's receiver. A JS string is immutable, so a
- * destructive entry writes back to `string`, as `rb_str_update`
- * (`vendor/ruby/string.c:5378`) writes the receiver's bytes.
- *
- * @noRailsEquivalent PERMANENT
- */
-export interface StringReceiver {
-  string: string;
-}
+export type { StringReceiver } from "./support.js";
 
 type StringMethod = (self: StringReceiver, ...args: never[]) => unknown;
-type GsubReplacement = string | Record<string, string> | ((match: string) => string);
+type Method = (self: StringReceiver, ...args: unknown[]) => unknown;
 
 /**
- * The methods `Init_String` (`vendor/ruby/string.c:12119`) defines on
- * `rb_cString`, keyed by the camelCased Ruby name (`[]=` is `set`, `include?`
- * is `isInclude`, `upcase!` is `upcaseBang`). Every position is a character
- * (code point) offset, as MRI's are for a UTF-8 String. A package that
- * reopens String, as ActiveSupport's `core_ext/string` does, assigns an entry.
- * Case mapping ignores `check_case_options` (`vendor/ruby/string.c:7304`), `gsub`
- * has no Enumerator arm, and the rest of `Init_String` is unported: story
- * `ruby-string-method-table-case-options-and-gsub-enumerator`.
+ * The public methods `Init_String` (`vendor/ruby/string.c:12119`) defines on
+ * `rb_cString`, keyed by the camelCased Ruby name: an operator by the
+ * spelling trails gives it elsewhere (`<=>` `compareTo`, `==` `equals`, `===`
+ * `caseEquals`, `+` `plus`, `*` `multiply`, `%` `format`, `[]` `get`, `[]=`
+ * `set`, `=~` `matchOperator`, `<<` `append`, `+@` `uplus`, `-@` `uminus`), a
+ * predicate as `isX`, a bang form as `xBang`. Every position is a character
+ * (code point) offset, as MRI's are for a UTF-8 String; a block is a trailing
+ * function argument. A package that reopens String, as ActiveSupport's
+ * `core_ext/string` does, assigns an entry.
+ *
+ * Not in the table, because a JS string cannot carry what they read or
+ * write: `force_encoding` and `b` retag the receiver's bytes, and a JS string
+ * has no encoding tag (it is always the UTF-8 `encoding` answers); `crypt`
+ * is the platform's `crypt(3)`; `length` is the JS string's own property;
+ * `initialize` and `initialize_copy` are private.
  *
  * @noRailsEquivalent PERMANENT
  */
 export const STRING_METHOD_TABLE: Record<string, StringMethod> = Object.assign(
   Object.create(null),
   {
-    size: rbDefineMethod(0, (self) => strlen(self.string)),
-    slice: rbStrArefM,
+    compareTo: rbDefineMethod(1, (self, other) => rbStrCmpM(self.string, other)),
+    equals: rbDefineMethod(1, (self, other) => rbStrEqual(self.string, other)),
+    caseEquals: rbDefineMethod(1, (self, other) => rbStrEqual(self.string, other)),
+    eql: rbDefineMethod(1, (self, other) => typeof other === "string" && self.string === other),
+    hash: rbDefineMethod(0, (self) => rbHash(self.string)),
+    casecmp: rbDefineMethod(1, (self, other) => casecmp(self.string, other)),
+    isCasecmp: rbDefineMethod(1, (self, other) => isCasecmp(self.string, other)),
+    plus: rbDefineMethod(1, (self, str2) => self.string + stringValue(str2)),
+    multiply: rbDefineMethod(1, (self, times) => rbStrTimes(self.string, times)),
+    format: rbDefineMethod(1, (self, arg) =>
+      Array.isArray(arg) ? format(self.string, ...arg) : format(self.string, arg),
+    ),
+    get: rbStrArefM,
     set: rbStrAsetM,
     insert: rbDefineMethod(2, rbStrInsert),
-    index: rbStrIndexM,
-    rindex: rbStrRindexM,
+    size: rbDefineMethod(0, (self) => strlen(self.string)),
+    bytesize: rbDefineMethod(0, (self) => bytes(self.string).length),
+    isEmpty: rbDefineMethod(0, (self) => self.string.length === 0),
+    matchOperator: rbDefineMethod(1, (self, y) => rbStrMatch(self.string, y)),
+    match: rbStrMatchM,
+    isMatch: rbStrMatchMP,
     succ: rbDefineMethod(0, (self) => succ(self.string)),
+    succBang: rbDefineMethod(0, (self) => (self.string = succ(self.string))),
     next: rbDefineMethod(0, (self) => succ(self.string)),
-    ljust: (self, ...args: unknown[]) => rbStrJustify(args, self.string, "l"),
-    rjust: (self, ...args: unknown[]) => rbStrJustify(args, self.string, "r"),
-    center: (self, ...args: unknown[]) => rbStrJustify(args, self.string, "c"),
+    nextBang: rbDefineMethod(0, (self) => (self.string = succ(self.string))),
+    upto: rbStrUpto,
+    index: rbStrIndexM,
+    byteindex: (self, ...args) => rbStrByteindexM(self.string, ...args),
+    rindex: rbStrRindexM,
+    byterindex: (self, ...args) => rbStrByterindexM(self.string, ...args),
+    replace: rbDefineMethod(1, (self, str2) => (self.string = stringValue(str2))),
+    clear: rbDefineMethod(0, (self) => (self.string = "")),
+    chr: rbDefineMethod(0, (self) => [...self.string].slice(0, 1).join("")),
+    getbyte: rbDefineMethod(1, (self, index) => rbStrGetbyte(self.string, index)),
+    setbyte: rbDefineMethod(2, rbStrSetbyte),
+    byteslice: (self, ...args) => rbStrByteslice(self.string, ...args),
+    bytesplice: rbStrBytesplice,
+    scrub: (self, ...argv) => strScrub(self.string, argv),
+    scrubBang: (self, ...argv) => (self.string = strScrub(self.string, argv)),
+    freeze: rbDefineMethod(0, (self) => self.string),
+    uplus: rbDefineMethod(0, (self) => self.string),
+    uminus: rbDefineMethod(0, (self) => self.string),
+    dup: rbDefineMethod(0, (self) => self.string),
+    toI: (self, ...args) => rbStrToI(self.string, ...args),
+    toF: rbDefineMethod(0, (self) => rbStrToF(self.string)),
+    toS: rbDefineMethod(0, (self) => self.string),
+    toStr: rbDefineMethod(0, (self) => self.string),
+    inspect: rbDefineMethod(0, (self) => stringInspect(self.string)),
+    dump: rbDefineMethod(0, (self) => rbStrDump(self.string)),
+    undump: rbDefineMethod(0, (self) => strUndump(self.string)),
+    upcase: (self, ...args) => upcase(self.string, blockArg(args)[0]),
+    downcase: (self, ...args) => downcase(self.string, blockArg(args)[0]),
+    capitalize: (self, ...args) => capitalize(self.string, blockArg(args)[0]),
+    swapcase: (self, ...args) => swapcase(self.string, blockArg(args)[0]),
+    upcaseBang: (self, ...args) => bang(self, upcase(self.string, blockArg(args)[0])),
+    downcaseBang: (self, ...args) => bang(self, downcase(self.string, blockArg(args)[0])),
+    capitalizeBang: (self, ...args) => bang(self, capitalize(self.string, blockArg(args)[0])),
+    swapcaseBang: (self, ...args) => bang(self, swapcase(self.string, blockArg(args)[0])),
+    hex: rbDefineMethod(0, (self) => rbStrHex(self.string)),
+    oct: rbDefineMethod(0, (self) => rbStrOct(self.string)),
+    split: rbStrSplitM,
+    ...EACH_METHODS,
+    reverse: rbDefineMethod(0, (self) => [...self.string].reverse().join("")),
+    reverseBang: rbDefineMethod(0, (self) => (self.string = [...self.string].reverse().join(""))),
+    concat: rbStrConcatMulti,
+    append: rbDefineMethod(1, (self, str2) => (self.string = rbStrConcat(self.string, str2))),
+    prepend: (self, ...args) => (self.string = args.map(stringValue).join("") + self.string),
+    intern: rbDefineMethod(0, (self) => `:${self.string}`),
+    toSym: rbDefineMethod(0, (self) => `:${self.string}`),
     ord: rbDefineMethod(0, rbStrOrd),
     isInclude: rbDefineMethod(1, (self, arg) => self.string.includes(stringValue(arg))),
-    matchOperator: rbDefineMethod(1, (self, y) => rbStrMatch(self.string, y)),
-    upcase: (self) => self.string.toUpperCase(),
-    downcase: (self) => self.string.toLowerCase(),
-    swapcase: (self) => swapcase(self.string),
-    capitalize: (self) => capitalize(self.string),
-    upcaseBang: (self) => bang(self, self.string.toUpperCase()),
-    downcaseBang: (self) => bang(self, self.string.toLowerCase()),
-    swapcaseBang: (self) => bang(self, swapcase(self.string)),
-    capitalizeBang: (self) => bang(self, capitalize(self.string)),
-    chomp: (self, ...args: unknown[]) => rbStrChomp(self.string, args),
+    isStartWith: (self, ...prefixes) => rbStrStartWith(self.string, ...blockArg(prefixes)[0]),
+    isEndWith: (self, ...suffixes) => rbStrEndWith(self.string, ...blockArg(suffixes)[0]),
+    scan: rbStrScan,
+    ljust: (self, ...args) => rbStrJustify(blockArg(args)[0], self.string, "l"),
+    rjust: (self, ...args) => rbStrJustify(blockArg(args)[0], self.string, "r"),
+    center: (self, ...args) => rbStrJustify(blockArg(args)[0], self.string, "c"),
+    sub: rbStrSub,
+    gsub: (self, ...argv) => strGsub(self, argv, false),
+    chop: rbDefineMethod(0, (self) => rbStrChop(self.string)),
+    chomp: (self, ...args) => rbStrChomp(self.string, blockArg(args)[0]),
+    strip: rbDefineMethod(0, (self) => self.string.replace(LSTRIP, "").replace(RSTRIP, "")),
     lstrip: rbDefineMethod(0, (self) => self.string.replace(LSTRIP, "")),
     rstrip: rbDefineMethod(0, (self) => self.string.replace(RSTRIP, "")),
-    strip: rbDefineMethod(0, (self) => self.string.replace(LSTRIP, "").replace(RSTRIP, "")),
-    lstripBang: rbDefineMethod(0, (self) => bang(self, self.string.replace(LSTRIP, ""))),
-    rstripBang: rbDefineMethod(0, (self) => bang(self, self.string.replace(RSTRIP, ""))),
+    deletePrefix: rbDefineMethod(1, (self, prefix) => deletePrefix(self.string, prefix)),
+    deleteSuffix: rbDefineMethod(1, (self, suffix) => deleteSuffix(self.string, suffix)),
+    subBang: rbStrSubBang,
+    gsubBang: (self, ...argv) => strGsub(self, argv, true),
+    chopBang: rbDefineMethod(0, (self) =>
+      self.string.length === 0 ? null : (self.string = rbStrChop(self.string)),
+    ),
+    chompBang: (self, ...args) => bang(self, rbStrChomp(self.string, blockArg(args)[0])),
     stripBang: rbDefineMethod(0, (self) =>
       bang(self, self.string.replace(LSTRIP, "").replace(RSTRIP, "")),
     ),
-    gsub: (self, ...args: unknown[]) => rbStrGsub(self.string, args),
-    delete: (self, ...args: unknown[]) => {
-      if (args.length === 0) rbErrorArity(0, 1, Infinity);
-      return stringDelete(self.string, ...(args.map(stringValue) as [string, ...string[]]));
-    },
-    forceEncoding: rbDefineMethod(1, (self, encoding) => {
-      self.string = forceEncoding(self.string, encoding as string);
-      return self.string;
-    }),
-    b: rbDefineMethod(0, (self) => b(self.string)),
-  } satisfies Record<string, StringMethod>,
+    lstripBang: rbDefineMethod(0, (self) => bang(self, self.string.replace(LSTRIP, ""))),
+    rstripBang: rbDefineMethod(0, (self) => bang(self, self.string.replace(RSTRIP, ""))),
+    deletePrefixBang: rbDefineMethod(1, (self, p) => bang(self, deletePrefix(self.string, p))),
+    deleteSuffixBang: rbDefineMethod(1, (self, s) => bang(self, deleteSuffix(self.string, s))),
+    tr: rbDefineMethod(2, (self, src, repl) => trTrans(self.string, src, repl, false)),
+    trS: rbDefineMethod(2, (self, src, repl) => trTrans(self.string, src, repl, true)),
+    delete: (self, ...args) => strDelete(self.string, blockArg(args)[0]),
+    squeeze: (self, ...args) => strSqueeze(self.string, blockArg(args)[0]),
+    count: (self, ...args) => strCount(self.string, blockArg(args)[0]),
+    trBang: rbDefineMethod(2, (self, src, repl) =>
+      bang(self, trTrans(self.string, src, repl, false)),
+    ),
+    trSBang: rbDefineMethod(2, (self, src, repl) =>
+      bang(self, trTrans(self.string, src, repl, true)),
+    ),
+    deleteBang: (self, ...args) => bang(self, strDelete(self.string, blockArg(args)[0])),
+    squeezeBang: (self, ...args) => bang(self, strSqueeze(self.string, blockArg(args)[0])),
+    sum: (self, ...args) => rbStrSum(self.string, ...blockArg(args)[0]),
+    slice: rbStrArefM,
+    sliceBang: rbStrSliceBang,
+    partition: rbDefineMethod(1, (self, sep) => rbStrPartition(self.string, sep)),
+    rpartition: rbDefineMethod(1, (self, sep) => rbStrRpartition(self.string, sep)),
+    encoding: rbDefineMethod(0, () => Encoding.UTF_8),
+    isValidEncoding: rbDefineMethod(0, (self) => !LONE_SURROGATE.test(self.string)),
+    // eslint-disable-next-line no-control-regex -- `rb_str_is_ascii_only_p` (string.c:11019)
+    isAsciiOnly: rbDefineMethod(0, (self) => /^[\x00-\x7f]*$/.test(self.string)),
+    unicodeNormalize: (self, ...args) => unicodeNormalize(self.string, blockArg(args)[0]),
+    unicodeNormalizeBang: (self, ...args) =>
+      (self.string = unicodeNormalize(self.string, blockArg(args)[0])),
+    isUnicodeNormalized: (self, ...args) =>
+      unicodeNormalize(self.string, blockArg(args)[0]) === self.string,
+  } satisfies Record<string, Method>,
 );
 
 const JS_STRING_METHODS = new Set(Object.getOwnPropertyNames(String.prototype));
@@ -89,8 +217,9 @@ JS_STRING_METHODS.delete("length");
 
 /**
  * `str.__send__(method, *args)` (`vendor/ruby/vm_eval.c:1330` `rb_f_send`): the
- * {@link STRING_METHOD_TABLE} entry, else a member String is reopened with. The
- * receiver's contents after the call come back beside the result.
+ * {@link STRING_METHOD_TABLE} entry, else a member String is reopened with, else
+ * `NoMethodError`. The receiver's contents after the call come back beside the
+ * result.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -98,7 +227,7 @@ export function rbStrSend(str: string, method: string, ...args: unknown[]): [unk
   const entry = STRING_METHOD_TABLE[method];
   if (entry) {
     const self = { string: str };
-    const result = (entry as (self: StringReceiver, ...args: unknown[]) => unknown)(self, ...args);
+    const result = (entry as Method)(self, ...args);
     return [result, self.string];
   }
   if (!rbStrRespondTo(str, method)) {
@@ -109,9 +238,9 @@ export function rbStrSend(str: string, method: string, ...args: unknown[]): [unk
 }
 
 /**
- * `str.respond_to?` (`vendor/ruby/vm_method.c:2977` `obj_respond_to`) over {@link rbStrSend}'s
- * names: JS's own `String.prototype` members are not Ruby's. See CLAUDE.md, "Method
- * visibility is not a runtime fact in JS".
+ * `str.respond_to?` (`vendor/ruby/vm_method.c:2977` `obj_respond_to`) over
+ * {@link rbStrSend}'s names: JS's own `String.prototype` members are not
+ * Ruby's. See CLAUDE.md, "Method visibility is not a runtime fact in JS".
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -124,7 +253,11 @@ export function rbStrRespondTo(str: string, method: string, includeAll: boolean 
 }
 
 /**
- * `String#=~` (`vendor/ruby/string.c:4523` `rb_str_match`): a match's character offset.
+ * `String#=~` (`vendor/ruby/string.c:4523` `rb_str_match`): a match's character
+ * offset. This is Ruby core's String method, which Rails' `Chars#=~` delegates
+ * to (`activesupport/lib/active_support/multibyte/chars.rb:53`, ported as
+ * `Chars#matchOperator`); ruby-compat's package contract receipts every export,
+ * since no Rails file defines a Ruby core method.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -137,24 +270,53 @@ export function rbStrMatch(x: string, y: unknown): unknown {
   return (y as { matchOperator(x: string): unknown }).matchOperator(x);
 }
 
-/** `rb_define_method` (`vendor/ruby/class.c:2134`) with a fixed `argc`, which MRI checks. */
+/**
+ * `rb_define_method` (`vendor/ruby/class.c:2134`) with a fixed `argc`, which MRI
+ * checks; a trailing block is not an argument.
+ */
 function rbDefineMethod<A extends unknown[]>(
   argc: number,
   func: (self: StringReceiver, ...args: A) => unknown,
-): StringMethod {
-  return (self, ...args) => {
+): Method {
+  return (self, ...argv) => {
+    const [args] = blockArg(argv);
     if (args.length !== argc) rbErrorArity(args.length, argc, argc);
-    return func(self, ...(args as unknown as A));
+    return func(self, ...(args as A));
   };
 }
 
-/** `rb_error_arity` (`vendor/ruby/vm_insnhelper.c:466` `rb_arity_error_new`). */
-function rbErrorArity(argc: number, min: number, max: number): never {
-  const expected = min === max ? `${min}` : max === Infinity ? `${min}+` : `${min}..${max}`;
-  throw new ArgumentError(`wrong number of arguments (given ${argc}, expected ${expected})`);
+const LSTRIP = /^[\0\t\n\v\f\r ]+/;
+const RSTRIP = /[\0\t\n\v\f\r ]+$/;
+const LONE_SURROGATE = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/;
+
+/** `String#<=>` (`vendor/ruby/string.c:3803` `rb_str_cmp_m`, `rb_invcmp` at `vendor/ruby/compar.c:50`). */
+function rbStrCmpM(str1: string, str2: unknown): number | null {
+  const s = rbCheckStringType(str2);
+  if (s === null) {
+    const invcmp = cmp(str2, str1);
+    return invcmp === null ? null : -Math.sign(invcmp);
+  }
+  return rbStrCmp(str1, s);
 }
 
-/** `String#chomp` (`vendor/ruby/string.c:9786` `rb_str_chomp`). */
+/** `String#==` (`vendor/ruby/string.c:3742` `rb_str_equal`). */
+function rbStrEqual(str1: string, str2: unknown): boolean {
+  if (typeof str2 !== "string") {
+    if (typeof (str2 as { toStr?: unknown } | null)?.toStr !== "function") return false;
+    return rbEqual(str2, str1);
+  }
+  return str1 === str2;
+}
+
+/** `String#*` (`vendor/ruby/string.c:2331` `rb_str_times`). */
+function rbStrTimes(str: string, times: unknown): string {
+  const len = num2long(times);
+  if (len < 0) throw new ArgumentError("negative argument");
+  if (str.length * len > 2 ** 29) throw new ArgumentError("argument too big");
+  return str.repeat(len);
+}
+
+/** `String#chomp` (`vendor/ruby/string.c:9786` `rb_str_chomp`, `chomp_rs` at `:9728`). */
 function rbStrChomp(str: string, argv: unknown[]): string {
   if (argv.length === 0) return chomp(str);
   checkArity(argv.length, 0, 1);
@@ -162,111 +324,95 @@ function rbStrChomp(str: string, argv: unknown[]): string {
   return chomp(str, stringValue(argv[0]));
 }
 
-/** `rb_reg_prepare_re` (`vendor/ruby/re.c:1587`): a pattern matched by character, not UTF-16 unit. */
-function rbRegexp(re: RegExp, flags: string): RegExp {
-  const base = re.flags.replace(/[gyd]/g, "") + flags;
-  if (/[uv]/.test(base)) return new RegExp(re.source, base);
-  try {
-    return new RegExp(re.source, base + "u");
-  } catch {
-    return new RegExp(re.source, base);
-  }
+/** `String#chop` (`vendor/ruby/string.c:9613` `rb_str_chop`): a trailing `"\r\n"` as one. */
+function rbStrChop(str: string): string {
+  if (str.endsWith("\r\n")) return str.slice(0, -2);
+  return [...str].slice(0, -1).join("");
 }
 
-const LSTRIP = /^[\0\t\n\v\f\r ]+/;
-const RSTRIP = /[\0\t\n\v\f\r ]+$/;
-
-/** `rb_str_length` (`vendor/ruby/string.c:2211`). */
-function strlen(str: string): number {
-  return [...str].length;
+/** `String#delete_prefix` (`vendor/ruby/string.c:10795` `rb_str_delete_prefix`). */
+function deletePrefix(str: string, prefix: unknown): string {
+  const p = stringValue(prefix);
+  return str.startsWith(p) ? str.slice(p.length) : str;
 }
 
-/** `rb_str_sublen` (`vendor/ruby/string.c:2841`): a UTF-16 offset as a character offset. */
-function rbStrSublen(str: string, pos: number): number {
-  return strlen(str.slice(0, pos));
+/** `String#delete_suffix` (`vendor/ruby/string.c:10878` `rb_str_delete_suffix`). */
+function deleteSuffix(str: string, suffix: unknown): string {
+  const s = stringValue(suffix);
+  return s.length && str.endsWith(s) ? str.slice(0, -s.length) : str;
 }
 
-/** `str_offset` (`vendor/ruby/string.c:2786`): a character offset as a UTF-16 offset. */
-function strOffset(str: string, pos: number): number {
-  return [...str].slice(0, pos).join("").length;
-}
-
-/** `StringValue` (`vendor/ruby/string.c:2551` `rb_string_value`): a String, or its `to_str`. */
-function stringValue(val: unknown): string {
-  if (typeof val === "string") return val;
-  const toStr = (val as { toStr?: unknown } | null)?.toStr;
-  if (typeof toStr === "function") return toStr.call(val) as string;
-  throw new TypeError(`no implicit conversion of ${rbBuiltinClassName(val)} into String`);
-}
-
-/** `NUM2LONG` (`vendor/ruby/numeric.c:3135` `rb_num2long`). */
-function num2long(val: unknown): number {
-  if (typeof val === "number") return Math.trunc(val);
-  if (val == null) throw new TypeError("no implicit conversion from nil to integer");
-  throw new TypeError(`no implicit conversion of ${rbBuiltinClassName(val)} into Integer`);
-}
-
-/** `rb_check_arity` (`vendor/ruby/include/ruby/internal/intern/error.h:280`). */
-function checkArity(argc: number, min: number, max: number): void {
-  if (argc < min || argc > max) rbErrorArity(argc, min, max);
-}
-
-/** A bang form's nil-when-unchanged return (`vendor/ruby/string.c:7535` `rb_str_upcase_bang`). */
-function bang(self: StringReceiver, string: string): string | null {
-  if (string === self.string) return null;
-  self.string = string;
-  return string;
-}
-
-/** `rb_reg_search` (`vendor/ruby/re.c:1796`) from character offset `pos`, forward or reverse. */
-function rbRegSearch(
-  re: RegExp,
-  str: string,
-  pos: number,
-  reverse: boolean,
-): RegExpExecArray | null {
-  if (!reverse) {
-    const global = rbRegexp(re, "dg");
-    global.lastIndex = strOffset(str, pos);
-    return global.exec(str);
-  }
-  const sticky = rbRegexp(re, "dy");
-  for (let start = pos; start >= 0; start--) {
-    sticky.lastIndex = strOffset(str, start);
-    const match = sticky.exec(str);
-    if (match) return match;
-  }
-  return null;
-}
-
-/** `rb_reg_backref_number` (`vendor/ruby/re.c:1235`). */
-function rbRegBackrefNumber(match: RegExpExecArray, backref: unknown): number {
-  if (typeof backref !== "string") return num2long(backref);
-  const span = match.indices?.groups?.[backref];
-  if (!match.groups || !(backref in match.groups)) {
-    throw new IndexError(`undefined group name reference: ${backref}`);
-  }
-  return match.indices!.findIndex((s) => s === span);
-}
-
-/** `rb_range_beg_len` (`vendor/ruby/range.c:1744`), `err` 0 or 2. */
-function rbRangeBegLen(range: Range, len: number, err: number): [number, number] | null {
-  let beg = range.begin == null ? 0 : num2long(range.begin);
-  let end = range.end == null ? -1 : num2long(range.end);
-  const excl = range.end == null ? false : range.excludeEnd;
-  outOfRange: {
-    if (beg < 0) {
-      beg += len;
-      if (beg < 0) break outOfRange;
+/** `String#<<` (`vendor/ruby/string.c:3511` `rb_str_concat`): an Integer is a code point. */
+function rbStrConcat(str1: string, str2: unknown): string {
+  if (typeof str2 === "number" || typeof str2 === "bigint") {
+    const code = Number(str2);
+    if (code < 0 || code > 0xffffffff) throw new RangeError(`${str2} out of char range`);
+    if (code > 0x10ffff) throw new RangeError(`${code} out of char range`);
+    if (code >= 0xd800 && code <= 0xdfff) {
+      throw new RangeError(`invalid codepoint 0x${code.toString(16).toUpperCase()} in UTF-8`);
     }
-    if (end < 0) end += len;
-    if (!excl) end++;
-    if (beg > len) break outOfRange;
-    if (end > len) end = len;
-    return [beg, Math.max(end - beg, 0)];
+    return str1 + String.fromCodePoint(code);
   }
-  if (err) throw new RangeError(`${range.toS()} out of range`);
-  return null;
+  return str1 + stringValue(str2);
+}
+
+/** `String#concat` (`vendor/ruby/string.c:3472` `rb_str_concat_multi`). */
+function rbStrConcatMulti(self: StringReceiver, ...argv: unknown[]): string {
+  const [args] = blockArg(argv);
+  self.string += args.reduce<string>((arg, value) => rbStrConcat(arg, value), "");
+  return self.string;
+}
+
+/** `String#split` (`vendor/ruby/string.c:8757` `rb_str_split_m`): with a block, each field yielded. */
+function rbStrSplitM(self: StringReceiver, ...argv: unknown[]): unknown {
+  const [args, block] = blockArg(argv);
+  checkArity(args.length, 0, 2);
+  const fields = stringSplit(self.string, ...(args as [string | RegExp | null, number]));
+  if (!block) return fields;
+  fields.forEach((field) => block(field));
+  return self.string;
+}
+
+/** `String#slice!` (`vendor/ruby/string.c:5588` `rb_str_slice_bang`). */
+function rbStrSliceBang(self: StringReceiver, ...argv: unknown[]): string | null {
+  const [args] = blockArg(argv);
+  checkArity(args.length, 1, 2);
+  const [sliced, rest] = sliceBang(
+    self.string,
+    ...(args as Parameters<typeof sliceBang> extends [string, ...infer A] ? A : never),
+  );
+  self.string = rest;
+  return sliced;
+}
+
+/** `String#scrub` (`vendor/ruby/string.c:11354` `str_scrub`). */
+function strScrub(str: string, argv: unknown[]): string {
+  const [args, block] = blockArg(argv);
+  checkArity(args.length, 0, 1);
+  const repl = args.length && args[0] != null ? stringValue(args[0]) : null;
+  return scrub(str, repl, block ? (bad) => stringValue(block(bad)) : undefined);
+}
+
+const NORMALIZATION_FORMS: Record<string, "NFC" | "NFD" | "NFKC" | "NFKD"> = {
+  ":nfc": "NFC",
+  ":nfd": "NFD",
+  ":nfkc": "NFKC",
+  ":nfkd": "NFKD",
+};
+
+/**
+ * `String#unicode_normalize` (`vendor/ruby/string.c:11432`, raising from
+ * `vendor/ruby/lib/unicode_normalize/normalize.rb:140`).
+ */
+function unicodeNormalize(str: string, argv: unknown[]): string {
+  checkArity(argv.length, 0, 1);
+  const form = argv.length ? argv[0] : ":nfc";
+  const js = NORMALIZATION_FORMS[form as string];
+  if (!js) {
+    const name = typeof form === "string" && form.startsWith(":") ? form.slice(1) : String(form);
+    throw new ArgumentError(`Invalid normalization form ${name}.`);
+  }
+  return str.normalize(js);
 }
 
 /** `str_substr` (`vendor/ruby/string.c:2994`) over `rb_str_subpos`. */
@@ -476,48 +622,4 @@ function rbStrJustify(argv: unknown[], str: string, jflag: "l" | "r" | "c"): str
 function rbStrOrd(self: StringReceiver): number {
   if (self.string.length === 0) throw new ArgumentError("empty string");
   return self.string.codePointAt(0)!;
-}
-
-/** `rb_str_swapcase` (`vendor/ruby/string.c:7838`), per character. */
-function swapcase(str: string): string {
-  return [...str].map((c) => (c === c.toUpperCase() ? c.toLowerCase() : c.toUpperCase())).join("");
-}
-
-/**
- * `rb_str_capitalize` (`vendor/ruby/string.c:7760`). MRI titlecases the first
- * character; JS has no titlecase mapping, so a digraph such as `ǆ` upcases to
- * `Ǆ` where MRI answers `ǅ` (story
- * `ruby-string-method-table-case-options-and-gsub-enumerator`).
- */
-function capitalize(str: string): string {
-  const [first = "", ...rest] = str;
-  return first.toUpperCase() + rest.join("").toLowerCase();
-}
-
-/**
- * `String#gsub` (`vendor/ruby/string.c:6057` `rb_str_gsub`) with a replacement
- * String, expanded as `rb_reg_regsub` (`vendor/ruby/re.c:4394`) does, a Hash, or a block.
- */
-function rbStrGsub(str: string, argv: unknown[]): string {
-  checkArity(argv.length, 1, 2);
-  const [pattern, replacement] = argv as [string | RegExp, GsubReplacement];
-  const re =
-    typeof pattern === "string" ? new RegExp(regexpEscape(pattern), "gu") : rbRegexp(pattern, "g");
-  return str.replace(re, (...m: unknown[]) => {
-    const hasGroups = typeof m[m.length - 1] === "object";
-    const groups = (hasGroups ? m[m.length - 1] : undefined) as Record<string, string> | undefined;
-    const offset = m[m.length - (hasGroups ? 3 : 2)] as number;
-    const captures = m.slice(0, m.length - (hasGroups ? 3 : 2)) as (string | undefined)[];
-    const matched = captures[0]!;
-    if (typeof replacement === "function") return replacement(matched);
-    if (typeof replacement !== "string") return String(replacement[matched] ?? "");
-    return replacement.replace(/\\(\d|&|`|'|\\|k<(\w+)>)/g, (_, token: string, name?: string) => {
-      if (name !== undefined) return groups?.[name] ?? "";
-      if (token === "&") return matched;
-      if (token === "`") return str.slice(0, offset);
-      if (token === "'") return str.slice(offset + matched.length);
-      if (token === "\\") return "\\";
-      return captures[Number(token)] ?? "";
-    });
-  });
 }

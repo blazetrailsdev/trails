@@ -8,6 +8,8 @@ import {
   Range,
   rbEql,
   rbEqual,
+  rbObjMethod,
+  rbStrSend,
   TypeError,
 } from "@blazetrails/ruby-compat";
 import { Multibyte } from "./multibyte.js";
@@ -408,14 +410,13 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
     assertNotRespondTo(mbChars(""), "undefinedMethod");
   });
 
-  it.skip("method works for proxyed methods", async () => {
-    // BLOCKED: ruby-object-method-reaches-respond-to-missing
-    expect(mbChars("hello").method("slice").call(new Range(2, 3))).toEqual("ll");
+  it("method works for proxyed methods", async () => {
+    expect(rbObjMethod(mbChars("hello"), "slice").call(new Range(2, 3))).toEqual("ll");
     const chars = mbChars("hello");
-    expect(chars.method("capitalizeBang").call()).toEqual("Hello");
+    expect(rbObjMethod(chars, "capitalizeBang").call()).toEqual("Hello");
     expect(chars).toEqual("Hello");
-    expect(mbChars("hello").method("gsub").call(/h/, "j")).toEqual("jello");
-    await assertRaise([NameError], {}, () => mbChars("").method("undefinedMethod"));
+    expect(rbObjMethod(mbChars("hello"), "gsub").call(/h/, "j")).toEqual("jello");
+    await assertRaise([NameError], {}, () => rbObjMethod(mbChars(""), "undefinedMethod"));
   });
 
   it("acts like string", () => {
@@ -493,35 +494,32 @@ describe("MultibyteCharsTest", () => {
     );
   });
 
-  it.skip("should concatenate", () => {
-    // PERMANENT-SKIP: Ruby `+` / `<<` on a Chars reach method_missing and `<<` mutates the wrapped String; JS has no operator overloading and its strings are immutable.
-    const mbA: any = mbChars("a");
-    const mbB: any = mbChars("b");
-    expect(mbA + "b").toEqual("ab");
-    expect("a" + mbB).toEqual("ab");
-    expect(mbA + mbB).toEqual("ab");
+  it("should concatenate", () => {
+    const mbA = mbChars("a");
+    const mbB = mbChars("b");
+    expect(mbA.plus("b")).toEqual("ab");
+    expect(rbStrSend("a", "plus", mbB)[0]).toEqual("ab");
+    expect(mbA.plus(mbB)).toEqual("ab");
 
-    expect(mbA.concat("b")).toEqual("ab");
-    expect("a".concat(mbB)).toEqual("ab");
-    expect(mbA.concat(mbB)).toEqual("abb");
+    expect(mbA.append("b")).toEqual("ab");
+    expect(rbStrSend("a", "append", mbB)[0]).toEqual("ab");
+    expect(mbA.append(mbB)).toEqual("abb");
   });
 
-  it.skip("concatenation should return a proxy class instance", () => {
-    // PERMANENT-SKIP: Ruby `+` / `<<` on a Chars reach method_missing and `<<` mutates the wrapped String; JS has no operator overloading and its strings are immutable.
-    expect((mbChars("a") as any).concat("b").constructor).toEqual(Multibyte.proxyClass());
-    expect((mbChars("a") as any).concat("b").constructor).toEqual(Multibyte.proxyClass());
+  it("concatenation should return a proxy class instance", () => {
+    expect(mbChars("a").plus("b").constructor).toEqual(Multibyte.proxyClass());
+    expect(mbChars("a").append("b").constructor).toEqual(Multibyte.proxyClass());
   });
 
   it("ascii strings are treated at utf8 strings", () => {
     expect(mbChars(ASCII_STRING).constructor).toEqual(Multibyte.proxyClass());
   });
 
-  it.skip("concatenate should return proxy instance", () => {
-    // PERMANENT-SKIP: Ruby `+` / `<<` on a Chars reach method_missing and `<<` mutates the wrapped String; JS has no operator overloading and its strings are immutable.
-    assert((mbChars("a") as any).concat("b") instanceof proxyClass);
-    assert((mbChars("a") as any).concat(mbChars("b")) instanceof proxyClass);
-    assert((mbChars("a") as any).concat("b") instanceof proxyClass);
-    assert((mbChars("a") as any).concat(mbChars("b")) instanceof proxyClass);
+  it("concatenate should return proxy instance", () => {
+    assert(mbChars("a").plus("b") instanceof proxyClass);
+    assert(mbChars("a").plus(mbChars("b")) instanceof proxyClass);
+    assert(mbChars("a").append("b") instanceof proxyClass);
+    assert(mbChars("a").append(mbChars("b")) instanceof proxyClass);
   });
 
   it("should return string as json", () => {
@@ -668,8 +666,7 @@ describe("MultibyteCharsExtrasTest", () => {
     }
   });
 
-  it.skip("tidy bytes should tidy bytes", async () => {
-    // BLOCKED: multibyte-tidy-bytes-scrub-recodes-bad-bytes
+  it("tidy bytes should tidy bytes", async () => {
     const singleByteCases: Record<string, string> = {
       "\x21": "!",
       "\x41": "A",
