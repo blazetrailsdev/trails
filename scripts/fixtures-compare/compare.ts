@@ -1168,12 +1168,24 @@ export function modelDeclarationDrift(classes: RubyClass[], tsContent: string): 
     for (const attr of ruby.attrs) {
       const camelName = camelize(attr.name, false);
       const nameAlts = attr.name === camelName ? attr.name : `(?:${attr.name}|${camelName})`;
-      const member = new RegExp(
-        `^\\s*(?:(?:declare|public|private|protected|readonly|override|static|accessor)\\s+)*(?:(?:get|set)\\s+)?${nameAlts}\\s*[?!]?\\s*[:=;(]`,
+      const modifiers = `^\\s*(?:(?:declare|public|private|protected|readonly|override|static|accessor|async)\\s+)*`;
+      const field = new RegExp(`${modifiers}${nameAlts}\\s*[?!]?\\s*[:=;]`, "m");
+      const reader = new RegExp(`${modifiers}(?:get\\s+)?${nameAlts}\\s*\\(`, "m");
+      const writer = new RegExp(
+        `${modifiers}(?:set\\s+${nameAlts}|set${camelize(attr.name)})\\s*\\(`,
         "m",
       );
-      const setter = new RegExp(`^\\s*(?:async\\s+)?set${camelize(attr.name)}\\s*\\(`, "m");
-      if (member.test(tsContent) || (attr.kind === "writer" && setter.test(tsContent))) continue;
+      const hasField = field.test(tsContent);
+      const hasReader = hasField || reader.test(tsContent);
+      const hasWriter = hasField || writer.test(tsContent);
+      if (
+        attr.kind === "reader"
+          ? hasReader
+          : attr.kind === "writer"
+            ? hasWriter
+            : hasReader && hasWriter
+      )
+        continue;
       drift.push(`attr-missing: ${ruby.qualifiedName} attr_${attr.kind} :${attr.name}`);
     }
   }

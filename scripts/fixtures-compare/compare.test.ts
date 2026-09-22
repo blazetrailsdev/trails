@@ -811,4 +811,17 @@ describe("modelDeclarationDrift", () => {
     const ts = `  password_digest: string | null = null;\n  declare countAfterCreate: number;\n  async setPrice(value: unknown) {}`;
     expect(modelDeclarationDrift([ruby], ts)).toEqual(["attr-missing: Foo attr_reader :password_confirmation"]); // prettier-ignore
   });
+
+  it("reports an attr_accessor whose TS mirror declares only one half", () => {
+    const ruby: RubyClass = {
+      ...emptyClass(),
+      attrs: [
+        { kind: "accessor", name: "title" },
+        { kind: "accessor", name: "karma" },
+        { kind: "accessor", name: "salary" },
+      ],
+    };
+    const ts = `  get title(): string { return ""; }\n  get karma(): number { return 0; }\n  set karma(value: number) {}\n  set salary(value: number) {}`;
+    expect(modelDeclarationDrift([ruby], ts)).toEqual(["attr-missing: Foo attr_accessor :title", "attr-missing: Foo attr_accessor :salary"]); // prettier-ignore
+  });
 });
