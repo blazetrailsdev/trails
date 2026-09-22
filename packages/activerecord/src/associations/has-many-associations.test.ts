@@ -1014,7 +1014,31 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  const { companies } = fixtures(["companies", "accounts"]);
+  const { companies } = fixtures([
+    "accounts",
+    "categories",
+    "companies",
+    "developers",
+    "projects",
+    "developersProjects",
+    "topics",
+    "authors",
+    "authorAddresses",
+    "comments",
+    "posts",
+    "readers",
+    "taggings",
+    "cars",
+    "tags",
+    "categorizations",
+    "zines",
+    "interests",
+    "humans",
+    "shardedBlogPosts",
+    "shardedComments",
+    "cpkBooks",
+    "cpkAuthors",
+  ]);
   setup();
 
   it("delete all with not yet loaded association collection", async () => {
