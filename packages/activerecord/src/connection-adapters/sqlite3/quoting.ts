@@ -18,6 +18,7 @@ import {
   type QuotingDispatchHost,
 } from "../abstract/quoting.js";
 import { BigDecimal } from "@blazetrails/activesupport";
+import { Database } from "../../sqlite/database.js";
 import { BinaryData } from "@blazetrails/activemodel";
 import { rbObjAsString as toS } from "@blazetrails/ruby-compat";
 
@@ -58,9 +59,8 @@ export function quoteColumnName(name: unknown): string {
   return quoted;
 }
 
-/** @missingRailsCall quote — CONVERGEABLE sqlite3-quote-string-inlines-sqlite3-database-quote */
 export function quoteString(s: string): string {
-  return s.replace(/'/g, "''");
+  return Database.quote(s);
 }
 
 export function quote(this: QuotingDispatchHost, value: unknown): string {
