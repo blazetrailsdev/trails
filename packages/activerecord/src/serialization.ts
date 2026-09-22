@@ -14,7 +14,7 @@ export function serializableHash(this: Base, options?: SerializeOptions): Record
     options.except = [...new Set([...exceptArray.map((v) => String(v)), inheritanceCol])];
   }
 
-  return amSerializableHash(this, options);
+  return amSerializableHash.call(this, options);
 }
 
 /** @internal */

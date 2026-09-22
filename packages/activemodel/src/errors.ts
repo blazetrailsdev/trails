@@ -61,6 +61,7 @@ export class Errors<TBase extends object = object> {
     });
   }
 
+  /** @missingRailsName base — PERMANENT */
   import(
     error: ActiveModelError,
     overrideOptions: { attribute?: string; type?: string } = {},
@@ -224,10 +225,12 @@ export class Errors<TBase extends object = object> {
     return this.where(attribute).map((e) => e.message);
   }
 
+  /** @missingRailsName base — PERMANENT */
   fullMessage(attribute: string, message: string): string {
     return ActiveModelError.fullMessage(attribute, message, this._base);
   }
 
+  /** @missingRailsName base — PERMANENT */
   generateMessage(
     attribute: string,
     type: string = ":invalid",

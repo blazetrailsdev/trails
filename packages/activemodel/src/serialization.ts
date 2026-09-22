@@ -1,4 +1,4 @@
-import { asJson } from "@blazetrails/activesupport";
+import { asJson, isBlank } from "@blazetrails/activesupport";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import { NoMethodError, RuntimeError } from "./attribute-assignment.js";
@@ -12,51 +12,55 @@ export interface SerializationRecord {
 export type SerializableHash = Record<string, unknown> & PromiseLike<Record<string, unknown>>;
 
 export function serializableHash(
-  record: SerializationRecord,
+  this: SerializationRecord,
   options: SerializeOptions = {},
   sync = false,
 ): Record<string, unknown> {
   if (options.include != null && (options.include as unknown) !== false && !sync) {
     return thenableHash(
-      () => serializableHash(record, options, true),
+      () => serializableHash.call(this, options, true),
       async () => {
-        await preloadIncludes(record, options);
-        return serializableHash(record, options, true);
+        await preloadIncludes(this, options);
+        return serializableHash.call(this, options, true);
       },
     );
   }
-  const instanceAttrNames = (record as { attributeNamesForSerialization?: () => string[] })
+  const instanceAttrNames = (this as { attributeNamesForSerialization?: () => string[] })
     .attributeNamesForSerialization;
-  let keys =
+  let attributeNames =
     typeof instanceAttrNames === "function"
-      ? instanceAttrNames.call(record)
-      : attributeNamesForSerialization(record);
+      ? instanceAttrNames.call(this)
+      : attributeNamesForSerialization(this);
+
+  if (isBlank(options)) return serializableAttributes(this, attributeNames);
 
   if (options.only != null) {
-    const present = new Set(keys);
+    const present = new Set(attributeNames);
     const seen = new Set<string>();
-    keys = rubyArray(options.only).filter((k) => present.has(k) && !seen.has(k) && seen.add(k));
+    attributeNames = rubyArray(options.only)
+      .map((k) => String(k))
+      .filter((k) => present.has(k) && !seen.has(k) && seen.add(k));
   } else if (options.except != null) {
-    const except = rubyArray(options.except);
-    keys = keys.filter((k) => !except.includes(k));
+    const except = rubyArray(options.except).map((k) => String(k));
+    attributeNames = attributeNames.filter((k) => !except.includes(k));
   }
 
-  const result = serializableAttributes(record, keys);
+  const result = serializableAttributes(this, attributeNames);
 
   for (const method of rubyArray(options.methods)) {
-    const value = (record as Record<string, unknown>)[method];
+    const value = (this as Record<string, unknown>)[method];
     if (typeof value === "function") {
-      safeSet(result, method, (value as () => unknown).call(record));
-    } else if (method in record) {
+      safeSet(result, method, (value as () => unknown).call(this));
+    } else if (method in this) {
       safeSet(result, method, value);
     } else {
       throw new NoMethodError(
-        `undefined method '${method}' for an instance of ${record.constructor.name}`,
+        `undefined method '${method}' for an instance of ${this.constructor.name}`,
       );
     }
   }
 
-  serializableAddIncludes(record, options, (assocName, records, opts) => {
+  serializableAddIncludes(this, options, (assocName, records, opts) => {
     if (isSerializableCollection(records)) {
       if ((records as { loaded?: unknown }).loaded === false) {
         throw new RuntimeError(
@@ -96,14 +100,14 @@ export function serializableHash(
 }
 
 export class Serialization {
-  serializableHash(options?: SerializeOptions): Record<string, unknown> {
-    return serializableHash(this as unknown as SerializationRecord, options);
-  }
+  declare serializableHash: typeof serializableHash;
 
   readAttributeForSerialization(key: string): unknown {
     return readAttributeForSerialization(this as unknown as SerializationRecord, key);
   }
 }
+
+Serialization.prototype.serializableHash = serializableHash;
 
 export interface SerializeOptions {
   only?: string | string[];

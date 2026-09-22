@@ -58,7 +58,7 @@ export class JSON {
   }
 
   serializableHash(options?: SerializeOptions): Record<string, unknown> {
-    return serializableHash(this as unknown as SerializationRecord, options);
+    return serializableHash.call(this as unknown as SerializationRecord, options);
   }
 
   /** @internal */
