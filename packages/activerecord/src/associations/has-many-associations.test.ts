@@ -609,7 +609,7 @@ describe("HasManyAssociationsTest", () => {
     const firm = companies("first_firm") as any;
     expect(await firm.clients.size()).toBe(3);
     await firm.destroy();
-    expect((await Client.where(`firm_id=${firm.id}`)).length).toBe(0);
+    assertEmpty(await Client.where(`firm_id=${firm.id}`));
   });
 
   it("clearing a dependent association collection", async () => {
@@ -677,16 +677,17 @@ describe("HasManyAssociationsTest", () => {
     const firm = (await RestrictedWithErrorFirm.create({ name: "restrict" })) as any;
     await firm.companies.create({ name: "child" });
 
-    expect(await firm.companies.exists()).toBe(true);
+    assertNotEmpty(await firm.companies.toArray());
 
     await firm.destroy();
 
-    expect(firm.errors.where("base").length).toBeGreaterThan(0);
+    assertNotEmpty(firm.errors);
+
     expect(firm.errors.messagesFor("base")[0]).toBe(
       "Cannot delete record because dependent companies exist",
     );
-    expect(await RestrictedWithErrorFirm.exists({ name: "restrict" })).toBe(true);
-    expect(await firm.companies.exists({ name: "child" })).toBe(true);
+    expect(await RestrictedWithErrorFirm.exists({ name: "restrict" })).toBeTruthy();
+    expect(await firm.companies.exists({ name: "child" })).toBeTruthy();
   });
 });
 
@@ -2984,9 +2985,9 @@ describe("HasManyAssociationsTest", () => {
 
     it("collection not empty after building", async () => {
       const company = firms2("first_firm") as any;
-      expect(await company.contracts.isEmpty()).toBe(true);
+      assertEmpty(await company.contracts.toArray());
       company.contracts.build();
-      expect(await company.contracts.isEmpty()).toBe(false);
+      assertNotEmpty(await company.contracts.toArray());
     });
 
     it("build without loading association", async () => {
@@ -5002,10 +5003,10 @@ describe("HasManyAssociationsTest", () => {
   it("restrict with exception", async () => {
     const firm = (await RestrictedWithExceptionFirm.create({ name: "restrict" })) as any;
     await firm.companies.create({ name: "child" });
-    expect(await firm.companies.isEmpty()).toBe(false);
+    assertNotEmpty(await firm.companies.toArray());
     await expect(firm.destroy()).rejects.toThrow(DeleteRestrictionError);
-    expect(await RestrictedWithExceptionFirm.exists({ name: "restrict" })).toBe(true);
-    expect(await firm.companies.exists({ name: "child" })).toBe(true);
+    expect(await RestrictedWithExceptionFirm.exists({ name: "restrict" })).toBeTruthy();
+    expect(await firm.companies.exists({ name: "child" })).toBeTruthy();
   });
 });
 
