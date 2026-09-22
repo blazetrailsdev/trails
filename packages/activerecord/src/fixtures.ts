@@ -110,20 +110,22 @@ export class FixtureSet {
     loadInstances = true,
   ): Promise<void> {
     if (!loadInstances) return;
-    const instances: Promise<void>[] = [];
+    let instances = Promise.resolve();
     fixtureSet.each((fixtureName, fixture) => {
-      instances.push(
-        fixture.find().then(
-          (record) => {
-            (object as Record<string, unknown>)[fixtureName] = record;
-          },
-          (error: unknown) => {
-            if (!(error instanceof FixtureClassNotFound)) throw error;
-          },
-        ),
-      );
+      instances = instances.then(async () => {
+        try {
+          Object.defineProperty(object, `_${fixtureName}`, {
+            value: await fixture.find(),
+            writable: true,
+            enumerable: true,
+            configurable: true,
+          });
+        } catch (error) {
+          if (!(error instanceof FixtureClassNotFound)) throw error;
+        }
+      });
     });
-    await Promise.all(instances);
+    await instances;
   }
 
   static async instantiateAllLoadedFixtures(object: object, loadInstances = true): Promise<void> {

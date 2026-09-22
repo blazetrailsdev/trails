@@ -517,11 +517,11 @@ describe("FixturesTest", () => {
   });
 
   it("complete instantiation", () => {
-    expect((self().first as Topic).title).toBe("The First Topic");
+    expect((self()._first as Topic).title).toBe("The First Topic");
   });
 
   it("fixtures from root yml with instantiation", () => {
-    expect((self().unknown as Account).credit_limit).toBe(50);
+    expect((self()._unknown as Account).credit_limit).toBe(50);
   });
 
   it("yaml file with invalid column", async () => {
@@ -541,7 +541,7 @@ describe("FixturesTest", () => {
   });
 
   it("erb in fixtures", () => {
-    expect((self().dev_5 as Developer).name).toBe("fixture_5");
+    expect((self()._dev_5 as Developer).name).toBe("fixture_5");
   });
 
   it("empty yaml fixture", () => {
@@ -560,8 +560,8 @@ describe("FixturesTest", () => {
     const data = new Uint8Array(
       await readFile(new URL("./test-helpers/assets/flowers.jpg", import.meta.url)),
     );
-    expect(new Uint8Array((self().flowers as Binary).data)).toEqual(data);
-    expect(new Uint8Array((self().binary_helper as Binary).data)).toEqual(data);
+    expect(new Uint8Array((self()._flowers as Binary).data)).toEqual(data);
+    expect(new Uint8Array((self()._binary_helper as Binary).data)).toEqual(data);
   });
 
   it("serialized fixtures", () => {
@@ -575,14 +575,14 @@ describe("FixturesWithoutInstantiationTest", () => {
   });
 
   it("without complete instantiation", () => {
-    expect("first" in self()).toBe(false);
-    expect("topics" in self()).toBe(false);
-    expect("developers" in self()).toBe(false);
-    expect("accounts" in self()).toBe(false);
+    expect("_first" in self()).toBe(false);
+    expect("_topics" in self()).toBe(false);
+    expect("_developers" in self()).toBe(false);
+    expect("_accounts" in self()).toBe(false);
   });
 
   it("fixtures from root yml without instantiation", () => {
-    expect("unknown" in self(), "@unknown is not defined").toBe(false);
+    expect("_unknown" in self(), "@unknown is not defined").toBe(false);
   });
 
   it("accessor methods", () => {
@@ -610,7 +610,7 @@ describe("FixturesWithoutInstanceInstantiationTest", () => {
   });
 
   it("without instance instantiation", () => {
-    expect("first" in self(), "@first is not defined").toBe(false);
+    expect("_first" in self(), "@first is not defined").toBe(false);
   });
 });
 
@@ -621,12 +621,12 @@ describe("TransactionalFixturesTest", () => {
   });
 
   it("destroy", async () => {
-    expect(self().first).not.toBeNull();
-    await (self().first as Topic).destroy();
+    expect(self()._first).not.toBeNull();
+    await (self()._first as Topic).destroy();
   });
 
   it("destroy just kidding", () => {
-    expect(self().first).not.toBeNull();
+    expect(self()._first).not.toBeNull();
   });
 });
 
