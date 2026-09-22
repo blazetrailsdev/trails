@@ -1,4 +1,4 @@
-import { _And, _Grouping, _Not, _Or } from "../node-slots.js";
+import { Nodes } from "../namespaces.js";
 import { SQLString } from "../collectors/sql-string.js";
 import { setRubyNamespace } from "../visitors/ruby-class.js";
 
@@ -13,19 +13,19 @@ export const _engine: { current: ArelEngine | null } = { current: null };
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Node {
   not(): Node {
-    return new _Not!(this);
+    return new Nodes.Not(this);
   }
 
   or(right: Node): Node {
-    return new _Grouping!(new _Or!([this, right]));
+    return new Nodes.Grouping(new Nodes.Or([this, right]));
   }
 
   and(right: Node): Node {
-    return new _And!([this, right]);
+    return new Nodes.And([this, right]);
   }
 
   invert(): Node {
-    return new _Not!(this);
+    return new Nodes.Not(this);
   }
 
   toSql(engine: ArelEngine | null = _engine.current): string {

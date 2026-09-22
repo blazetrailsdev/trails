@@ -30,7 +30,9 @@ function loadAsEntryModule(module: string): Promise<string | null> {
 
 describe("arel dist modules", () => {
   it("each load as an ESM entry module", async () => {
-    const modules = (await distModules(distDir)).filter((f) => !f.endsWith(".test.js"));
+    const modules = (await distModules(distDir)).filter(
+      (f) => !f.endsWith(".test.js") && !f.endsWith(".bench.js"),
+    );
     expect(modules.length).toBeGreaterThan(50);
 
     const failures: string[] = [];

@@ -2,7 +2,7 @@ import type { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import type { Temporal } from "@blazetrails/date";
 import { include, rbEqual, rbHash } from "@blazetrails/activesupport";
 import { cloneSlot, objectClone } from "../clone-support.js";
-import { _Attribute, _Cte, _Equality, _In } from "../node-slots.js";
+import { Attributes, Nodes } from "../namespaces.js";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 import { SqlLiteral } from "./sql-literal.js";
@@ -32,8 +32,8 @@ export type NodeOrValue =
 
 export const FetchAttribute = {
   fetchAttribute(this: Binary, block: (attr: Node) => boolean): boolean | undefined {
-    if (_Attribute && this.left instanceof _Attribute) return block(this.left as Node);
-    if (_Attribute && this.right instanceof _Attribute) return block(this.right as Node);
+    if (this.left instanceof Attributes.Attribute) return block(this.left as Node);
+    if (this.right instanceof Attributes.Attribute) return block(this.right as Node);
     return undefined;
   },
 };
@@ -84,7 +84,7 @@ export class Binary extends NodeExpression {
 
 export class As extends Binary {
   toCte(): Cte {
-    return new _Cte!((this.left as { name: string | SqlLiteral }).name, this.right as Node);
+    return new Nodes.Cte((this.left as { name: string | SqlLiteral }).name, this.right as Node);
   }
 }
 
@@ -128,13 +128,13 @@ export class IsNotDistinctFrom extends Binary {
 
 export class NotEqual extends Binary {
   invert(): Node {
-    return new _Equality!(this.left, this.right);
+    return new Nodes.Equality(this.left, this.right);
   }
 }
 
 export class NotIn extends Binary {
   invert(): Node {
-    return new _In!(this.left, this.right);
+    return new Nodes.In(this.left, this.right);
   }
 }
 

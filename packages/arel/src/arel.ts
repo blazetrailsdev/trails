@@ -1,4 +1,4 @@
-import { _Attribute } from "./node-slots.js";
+import { Arel } from "./namespaces.js";
 import { Node } from "./nodes/node.js";
 import { SqlLiteral } from "./nodes/sql-literal.js";
 import { BoundSqlLiteral } from "./nodes/bound-sql-literal.js";
@@ -33,11 +33,7 @@ export function star(): SqlLiteral {
 }
 
 export function arelNode(value: unknown): boolean {
-  return (
-    value instanceof Node ||
-    (_Attribute !== undefined && value instanceof _Attribute) ||
-    value instanceof SqlLiteral
-  );
+  return value instanceof Node || value instanceof Arel.Attribute || value instanceof SqlLiteral;
 }
 
 export function fetchAttribute(

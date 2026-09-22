@@ -19,7 +19,7 @@ import { And, Or } from "./nodes/nary.js";
 import { Grouping } from "./nodes/grouping.js";
 import { Case } from "./nodes/case.js";
 import { Concat, Contains, Overlaps } from "./nodes/infix-operation.js";
-import { _buildQuoted } from "./node-slots.js";
+import { Nodes } from "./namespaces.js";
 import { rbEqual } from "@blazetrails/activesupport";
 import { NoMethodError, rbObjClass } from "@blazetrails/ruby-compat";
 
@@ -451,7 +451,7 @@ export const Predications: PredicationsModule = {
   },
 
   quotedNode(this: Node, other: unknown): Node {
-    return _buildQuoted!(other, this);
+    return Nodes.buildQuoted(other, this);
   },
   isInfinity(this: PredicationHost, value: unknown): 1 | -1 | 0 {
     void this;

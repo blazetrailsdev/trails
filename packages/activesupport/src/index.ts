@@ -513,6 +513,7 @@ export {
 } from "./callbacks.js";
 export type { ClassMethods } from "./callbacks.js";
 export { Concern, MultipleIncludedBlocks, MultiplePrependBlocks } from "./concern.js";
+export * as Autoload from "./dependencies/autoload.js";
 export {
   include,
   extend,

@@ -1,5 +1,5 @@
 import { include } from "@blazetrails/activesupport";
-import { _setEquality } from "../node-slots.js";
+import { Nodes } from "../namespaces.js";
 import { Binary, NotEqual, FetchAttribute } from "./binary.js";
 import type { Node } from "./node.js";
 
@@ -18,4 +18,4 @@ include(
   FetchAttribute as unknown as Record<string, (...args: unknown[]) => unknown>,
 );
 
-_setEquality(Equality);
+Nodes.Equality = Equality;

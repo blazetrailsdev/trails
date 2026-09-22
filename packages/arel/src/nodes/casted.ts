@@ -1,7 +1,7 @@
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
-import { _Attribute, _Table, _setBuildQuoted } from "../node-slots.js";
+import { Arel, Attributes, Nodes } from "../namespaces.js";
 import { Unary } from "./unary.js";
 import type { Attribute } from "../attributes/attribute.js";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
@@ -9,17 +9,17 @@ import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 export function buildQuoted(other: unknown, attribute?: unknown): Node {
   if (other instanceof Node) return other;
   if (other && typeof other === "object") {
-    if (_Attribute && other instanceof _Attribute) return other as Node;
-    if (_Table && other instanceof _Table) return other as unknown as Node;
+    if (other instanceof Attributes.Attribute) return other as Node;
+    if (other instanceof Arel.Table) return other as unknown as Node;
     if (other instanceof ModelAttribute) return other as unknown as Node;
     const maybeAst = (other as { ast?: unknown }).ast;
     if (maybeAst instanceof Node) return other as Node;
   }
-  if (_Attribute && attribute instanceof _Attribute) return new Casted(other, attribute);
+  if (attribute instanceof Attributes.Attribute) return new Casted(other, attribute);
   return new Quoted(other);
 }
 
-_setBuildQuoted(buildQuoted);
+Nodes.buildQuoted = buildQuoted;
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Casted extends NodeExpression {

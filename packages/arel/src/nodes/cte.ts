@@ -1,5 +1,5 @@
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
-import { _setCte } from "../node-slots.js";
+import { Nodes } from "../namespaces.js";
 import { Node } from "./node.js";
 import { Binary } from "./binary.js";
 import { SqlLiteral } from "./sql-literal.js";
@@ -57,4 +57,4 @@ export class Cte extends Binary {
   }
 }
 
-_setCte(Cte);
+Nodes.Cte = Cte;
