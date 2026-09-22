@@ -723,16 +723,6 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   },
   {
     reason:
-      "`class Module; include Concerning; end` (core_ext/module/concerning.rb:136) " +
-      "credits `Module::Concerning#concern`/`#concerning` to `Module`, whose first " +
-      "file is aliasing.rb. The methods are defined in concerning.rb:114,132 and " +
-      "ported at core-ext/module/concerning.ts, where they are matched; scoped to " +
-      "aliasing.rb so only the duplicate credit is dropped.",
-    names: ["concerning", "concern"],
-    rubyFiles: ["core_ext/module/aliasing.rb"],
-  },
-  {
-    reason:
       "`attr_internal_define` (core_ext/module/attr_internal.rb:26-31) is the " +
       "shared `define_method` back end for `attr_internal_reader`/`_writer`, and " +
       "`attr_internal_naming_format` is the `attr_accessor`-generated pair for the " +

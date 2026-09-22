@@ -1,6 +1,6 @@
 import { describe, it, expect, afterAll } from "vitest";
 // prettier-ignore
-import { belongsToAssociationsByClass, stripErb, isRefLike, compareValue, compareFile, schemaCheck, canonicalizeRailsRow, ERB_SKIP_SENTINEL, tsModelPath, compareModelClass, buildIdIndexForTest, loadRailsYamlForTest, withoutIgnoredFixtures, COMPOSITE_FK_LABEL_ATTRS } from "./compare.js";
+import { belongsToAssociationsByClass, stripErb, isRefLike, compareValue, compareFile, schemaCheck, canonicalizeRailsRow, ERB_SKIP_SENTINEL, tsModelPath, compareModelClass, modelDeclarationDrift, buildIdIndexForTest, loadRailsYamlForTest, withoutIgnoredFixtures, COMPOSITE_FK_LABEL_ATTRS } from "./compare.js";
 import type { RubyClass } from "./compare.js";
 import type { Schema } from "../../packages/activerecord/src/support/schema-types.js";
 
@@ -138,14 +138,20 @@ describe("schemaCheck", () => {
     expect(notes[0]).toMatch(/^schema-extra-col: david\.bogus/);
   });
   it("keys belongs_to associations by fully qualified class and follows inheritance", () => {
-    const klass = (qualifiedName: string, parent: string, belongsTo: string[] = []) => ({ name: qualifiedName.split("::").pop()!, qualifiedName, parent, tableName: null, associations: belongsTo.map((name) => ({ kind: "belongs_to", name, options: {} })), validations: [], scopes: [], callbacks: [], attributes: [] }); // prettier-ignore
+    const klass = (qualifiedName: string, parent: string, belongsTo: string[] = []) => ({ name: qualifiedName.split("::").pop()!, qualifiedName, parent, tableName: null, associations: belongsTo.map((name) => ({ kind: "belongs_to", name, options: {}, hasScope: false })), validations: [], scopes: [], callbacks: [], attributes: [], attrs: [] }); // prettier-ignore
     const map = belongsToAssociationsByClass([
-      { file: "test/models/user.rb", classes: [klass("User", "ActiveRecord::Base")] },
       {
+        package: "activerecord",
+        file: "test/models/user.rb",
+        classes: [klass("User", "ActiveRecord::Base")],
+      },
+      {
+        package: "activerecord",
         file: "test/models/admin/user.rb",
         classes: [klass("Admin::User", "ActiveRecord::Base", ["account"])],
       },
       {
+        package: "activerecord",
         file: "test/models/parrot.rb",
         classes: [klass("Parrot", "ActiveRecord::Base"), klass("DeadParrot", "Parrot", ["killer"])],
       },
@@ -652,6 +658,7 @@ const emptyClass = (): RubyClass => ({
   scopes: [],
   callbacks: [],
   attributes: [],
+  attrs: [],
 });
 
 describe("tsModelPath", () => {
@@ -667,7 +674,7 @@ describe("compareModelClass", () => {
   it("returns MATCH when all associations are found", () => {
     const ruby: RubyClass = {
       ...emptyClass(),
-      associations: [{ kind: "has_many", name: "comments", options: {} }],
+      associations: [{ kind: "has_many", name: "comments", options: {}, hasScope: false }],
     };
     const ts = `static { this.hasMany("comments", {}); }`;
     const r = compareModelClass(ruby, ts, "test/models/foo.rb", "foo.ts");
@@ -679,7 +686,7 @@ describe("compareModelClass", () => {
   it("returns DIFF and notes when an association is absent", () => {
     const ruby: RubyClass = {
       ...emptyClass(),
-      associations: [{ kind: "belongs_to", name: "author", options: {} }],
+      associations: [{ kind: "belongs_to", name: "author", options: {}, hasScope: false }],
     };
     const r = compareModelClass(ruby, "// empty", "test/models/foo.rb", "foo.ts");
     expect(r.status).toBe("DIFF");
@@ -770,5 +777,38 @@ describe("TS-side _fixture.ignore and composite-FK labels", () => {
     expect(COMPOSITE_FK_LABEL_ATTRS.cpk_reviews.has("book")).toBe(true);
     const cols = new Set(["author_id", "number", "rating"]);
     expect(canonicalizeRailsRow({ book: "b1", rating: 5 }, { book: "b1", rating: 5 }, cols, "cpk_reviews")).toEqual({ book: "b1", rating: 5 }); // prettier-ignore
+  });
+});
+
+describe("modelDeclarationDrift", () => {
+  it("reports a Rails association scope the TS mirror declares without one", () => {
+    const ruby: RubyClass = {
+      ...emptyClass(),
+      associations: [{ kind: "has_many", name: "open_replies", options: {}, hasScope: true }],
+    };
+    expect(modelDeclarationDrift([ruby], `this.hasMany("openReplies", { className: "Reply" });`)).toEqual(["assoc-scope-missing: Foo has_many :open_replies"]); // prettier-ignore
+    expect(modelDeclarationDrift([ruby], `this.hasMany(\n  "openReplies",\n  (q: any) => q.open(),\n  { className: "Reply" },\n);`)).toEqual([]); // prettier-ignore
+  });
+
+  it("leaves an absent association to the presence check", () => {
+    const ruby: RubyClass = {
+      ...emptyClass(),
+      associations: [{ kind: "has_many", name: "open_replies", options: {}, hasScope: true }],
+    };
+    expect(modelDeclarationDrift([ruby], "// empty")).toEqual([]);
+  });
+
+  it("reports an attr declaration with no TS member", () => {
+    const ruby: RubyClass = {
+      ...emptyClass(),
+      attrs: [
+        { kind: "accessor", name: "password_digest" },
+        { kind: "reader", name: "password_confirmation" },
+        { kind: "reader", name: "count_after_create" },
+        { kind: "writer", name: "price" },
+      ],
+    };
+    const ts = `  password_digest: string | null = null;\n  declare countAfterCreate: number;\n  async setPrice(value: unknown) {}`;
+    expect(modelDeclarationDrift([ruby], ts)).toEqual(["attr-missing: Foo attr_reader :password_confirmation"]); // prettier-ignore
   });
 });

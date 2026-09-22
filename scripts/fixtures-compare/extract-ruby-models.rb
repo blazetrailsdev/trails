@@ -1,12 +1,15 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 # Emits a JSON manifest of Rails test model classes.
-# Output: [{ file, classes: [{ name, parent, tableName, associations, validations, scopes, callbacks, attributes }] }]
+# Output: [{ package, file, classes: [{ name, parent, tableName, associations, validations, scopes, callbacks, attributes, attrs }] }]
 require "json"
 
 SCRIPT_DIR = File.dirname(__FILE__)
 ROOT = File.expand_path("../..", SCRIPT_DIR)
-MODELS_DIR = File.join(ROOT, "vendor/rails/activerecord/test/models")
+MODELS_DIRS = {
+  "activerecord" => File.join(ROOT, "vendor/rails/activerecord/test/models"),
+  "activemodel" => File.join(ROOT, "vendor/rails/activemodel/test/models"),
+}.freeze
 
 ASSOC_KINDS = %w[has_and_belongs_to_many has_many has_one belongs_to].freeze
 CALLBACK_KINDS = %w[
@@ -40,11 +43,22 @@ def extract_options(line)
   opts
 end
 
+# `has_many :foo, -> { open }, ...` — a scope lambda as the second argument.
+def scope_lambda?(line)
+  line.match?(/^\w+\s*\(?\s*:\w+\s*,\s*(?:->|lambda\b|proc\b)/)
+end
+
+# `attr_reader :a, :b` → ["a", "b"]
+def attr_names(line)
+  line.sub(/^attr_\w+\s*\(?/, "").scan(/\A\s*:(\w+)|,\s*:(\w+)/).flatten.compact
+end
+
 def parse_file(path)
   lines = File.readlines(path, chomp: true)
   classes = []
   stack = []   # [{cls:, depth:}]
   modules = [] # [{name:, depth:}]
+  singletons = [] # depths of open `class << self` bodies
   depth = 0    # simple brace/do/end depth approximation
 
   lines.each do |raw|
@@ -76,7 +90,7 @@ def parse_file(path)
       depth += 1
       namespace = modules.map { |mod| mod[:name] }.join("::")
       cls = { name: m[1], qualifiedName: namespace.empty? ? m[1] : "#{namespace}::#{m[1]}", parent: m[2], tableName: nil,
-              associations: [], validations: [], scopes: [], callbacks: [], attributes: [] }
+              associations: [], validations: [], scopes: [], callbacks: [], attributes: [], attrs: [] }
       stack << { cls: cls, depth: depth }
       classes << cls
       depth += (opens - 1) - closes
@@ -84,11 +98,14 @@ def parse_file(path)
       next
     end
 
+    singleton = line.match?(/^class\s*<<\s*self\b/)
     depth += opens - closes
+    singletons << depth if singleton
 
     # Pop classes whose depth we've left.
     stack.pop while stack.last && depth < stack.last[:depth]
     modules.pop while modules.last && depth < modules.last[:depth]
+    singletons.pop while singletons.last && depth < singletons.last
 
     next if stack.empty?
     cls = stack.last[:cls]
@@ -97,7 +114,7 @@ def parse_file(path)
       cls[:tableName] = m[1]
     elsif (kind = ASSOC_KINDS.find { |k| line =~ /^#{Regexp.escape(k)}\b/ })
       name = first_symbol(line)
-      cls[:associations] << { kind: kind, name: name, options: extract_options(line) } if name
+      cls[:associations] << { kind: kind, name: name, options: extract_options(line), hasScope: scope_lambda?(line) } if name
     elsif line =~ /^scope\s+:/
       name = first_symbol(line)
       cls[:scopes] << { name: name } if name
@@ -109,20 +126,24 @@ def parse_file(path)
       cls[:validations] << { kind: kind, attributes: [name].compact, options: extract_options(line) }
     elsif (m = line.match(/^attribute\s+:(\w+),\s*:(\w+)/))
       cls[:attributes] << { name: m[1], type: m[2] }
+    elsif singletons.empty? && (m = line.match(/^attr_(reader|writer|accessor)\b/))
+      attr_names(line).each { |name| cls[:attrs] << { kind: m[1], name: name } }
     end
   end
 
   classes
 end
 
-abort "extract-ruby-models: MODELS_DIR not found: #{MODELS_DIR}\nRun `pnpm vendor:fetch` first." unless Dir.exist?(MODELS_DIR)
-
-files = Dir.glob(File.join(MODELS_DIR, "**", "*.rb")).sort
-abort "extract-ruby-models: no .rb files found under #{MODELS_DIR}" if files.empty?
 result = []
-files.each do |f|
-  rel = f.delete_prefix(File.join(ROOT, "vendor/rails/activerecord") + "/")
-  classes = parse_file(f)
-  result << { file: rel, classes: classes } unless classes.empty?
+MODELS_DIRS.each do |package, models_dir|
+  abort "extract-ruby-models: models dir not found: #{models_dir}\nRun `pnpm vendor:fetch` first." unless Dir.exist?(models_dir)
+
+  files = Dir.glob(File.join(models_dir, "**", "*.rb")).sort
+  abort "extract-ruby-models: no .rb files found under #{models_dir}" if files.empty?
+  files.each do |f|
+    rel = f.delete_prefix(File.join(ROOT, "vendor/rails", package) + "/")
+    classes = parse_file(f)
+    result << { package: package, file: rel, classes: classes } unless classes.empty?
+  end
 end
 puts JSON.generate(result)
