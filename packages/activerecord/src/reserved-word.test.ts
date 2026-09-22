@@ -71,7 +71,7 @@ beforeEach(async () => {
 });
 
 afterAll(async () => {
-  const conn = schema();
+  const conn = (await Base.leaseConnection()) as unknown as SchemaStatements;
   await conn.dropTable("values", "group", "distinct_select", "distinct", "select", "order", {
     ifExists: true,
   });

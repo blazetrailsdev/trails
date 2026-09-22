@@ -480,12 +480,11 @@ export async function _loadSingularViaStatementCache(
       if (!(e instanceof AssociationNotFoundError)) throw e;
     }
   }
-  const connection = (targetModel as unknown as { connection: unknown }).connection;
   const baseScope = (): Relation<Base> =>
     (typeof instance?.targetScope === "function"
       ? (instance.targetScope() as Relation<Base>)
       : undefined) ?? _scopeForAssociation(targetModel);
-  const sc = (
+  const sc = (await (
     reflection as unknown as {
       associationScopeCache(
         klass: typeof Base,
@@ -501,10 +500,12 @@ export async function _loadSingularViaStatementCache(
       klass: targetModel,
     }) as Relation<Base>;
     return baseScope().merge(built) as never;
-  }) as StatementCache;
+  })) as StatementCache;
   const chain = (reflection as unknown as { chain: never[] }).chain;
   const binds = AssociationScope.getBindValues(record, chain);
-  const records = await sc.execute(binds, connection, { allowRetry: true });
+  const records = await targetModel.withConnection((c) =>
+    sc.execute(binds, c, { allowRetry: true }),
+  );
   return records[0] ?? null;
 }
 

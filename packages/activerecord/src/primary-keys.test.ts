@@ -443,7 +443,7 @@ describe("PrimaryKeyAnyTypeTest", () => {
   }
 
   beforeAll(async () => {
-    await (Base.connection as any).dropTable("barcodes", { ifExists: true });
+    await ((await Base.leaseConnection()) as any).dropTable("barcodes", { ifExists: true });
     await (Base.connection as any).createTable("barcodes", {
       primaryKey: "code",
       id: { type: "string", limit: 42 },
@@ -455,7 +455,7 @@ describe("PrimaryKeyAnyTypeTest", () => {
 
   afterAll(async () => {
     void Barcode.resetColumnInformation();
-    await (Base.connection as any).dropTable("barcodes", { ifExists: true });
+    await ((await Base.leaseConnection()) as any).dropTable("barcodes", { ifExists: true });
   });
 
   it("any type primary key", async () => {

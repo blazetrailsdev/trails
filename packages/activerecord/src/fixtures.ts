@@ -104,6 +104,34 @@ export class FixtureSet {
     Object.assign(this.cacheForConnectionPool(connectionPool), fixturesMap);
   }
 
+  static async instantiateFixtures(
+    object: object,
+    fixtureSet: FixtureSet,
+    loadInstances = true,
+  ): Promise<void> {
+    if (!loadInstances) return;
+    const instances: Promise<void>[] = [];
+    fixtureSet.each((fixtureName, fixture) => {
+      instances.push(
+        fixture.find().then(
+          (record) => {
+            (object as Record<string, unknown>)[fixtureName] = record;
+          },
+          (error: unknown) => {
+            if (!(error instanceof FixtureClassNotFound)) throw error;
+          },
+        ),
+      );
+    });
+    await Promise.all(instances);
+  }
+
+  static async instantiateAllLoadedFixtures(object: object, loadInstances = true): Promise<void> {
+    for (const fixtureSet of Object.values(this.allLoadedFixtures)) {
+      await this.instantiateFixtures(object, fixtureSet, loadInstances);
+    }
+  }
+
   static identify(label: string): number;
   static identify(label: string, columnType: string): number | string;
   static identify(label: string, columnType: string = ":integer"): number | string {
