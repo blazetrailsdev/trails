@@ -6,9 +6,9 @@ import { include, isModuleIncluded, Module } from "@blazetrails/ruby-compat";
 export const Aggregations = new Module();
 
 /** @internal */
-export function clearAggregationCache(record: Base): void {
-  const self = record as any;
-  if (self._aggregationCache && record.isPersisted()) {
+function clearAggregationCache(this: Base): void {
+  const self = this as any;
+  if (self._aggregationCache && this.isPersisted()) {
     (self._aggregationCache as Map<string, unknown>).clear();
   }
 }
@@ -188,7 +188,7 @@ export function initializeDup(this: Base, other: unknown): void {
 }
 
 export function reload(this: Base, options?: ReloadOptions): Promise<Base> {
-  clearAggregationCache(this);
+  (this as any).clearAggregationCache();
   return Aggregations.superMethod(this, "reload")!(options) as Promise<Base>;
 }
 
@@ -200,4 +200,5 @@ function initInternals(this: Base): void {
 
 Aggregations.defineMethod("initializeDup", initializeDup);
 Aggregations.defineMethod("reload", reload);
+Aggregations.defineMethod("clearAggregationCache", clearAggregationCache);
 Aggregations.defineMethod("initInternals", initInternals);

@@ -32,6 +32,7 @@ import {
   attributesForUpdate,
   attributesWithValues,
 } from "./attribute-methods.js";
+import * as Inheritance from "./inheritance.js";
 import { getStiBase, isStiSubclass, stiName, defineDynamicSelectReaders } from "./inheritance.js";
 import { withTransactionReturningStatus } from "./transactions.js";
 import { registry } from "./suppressor.js";
@@ -51,7 +52,6 @@ interface PersistenceHost {
     columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
   ): any;
   /** @internal */
-  discriminateClassForRecord?(attributes: Record<string, unknown>): PersistenceHost;
   primaryKey: string | string[];
   _queryConstraintsList?: string[] | null;
   _hasQueryConstraints?: boolean;
@@ -116,9 +116,7 @@ export function instantiate(
   columnTypes: Record<string, unknown> = {},
   block?: (record: any) => void,
 ): any {
-  const klass = this.discriminateClassForRecord
-    ? this.discriminateClassForRecord(attributes)
-    : this;
+  const klass = Inheritance.discriminateClassForRecord(this as never, attributes);
   return instantiateInstanceOf(klass, attributes, columnTypes, block);
 }
 
