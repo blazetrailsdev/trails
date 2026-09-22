@@ -1437,6 +1437,10 @@ const CONTAINMENT_PREDICATE_ALIASES = new Map<string, string>([
  *     isPrefixed form first, then the has-prefixed form
  *     (`active_connections?` → ["isActiveConnections", "activeConnections",
  *     "hasActiveConnections"]), for predicates that read as possession.
+ *     It is offered for every bare predicate rather than an allowlist:
+ *     `has*` is an accepted trails spelling of `x?` in general, and being the
+ *     last candidate it only credits a member that already exists under that
+ *     name (`value?`, an alias of `has_value?`, → `Parameters#hasValue`).
  *   - Containment predicates (`include?`, `member?`, `exclude?`) append
  *     the native JS spelling as a further candidate
  *     (`include?` → ["isInclude", "include", "includes"]).
