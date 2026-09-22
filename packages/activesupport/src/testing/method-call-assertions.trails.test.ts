@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 
+import { Range } from "@blazetrails/ruby-compat";
 import { MockExpectationError, assertCalled, assertCalledWith } from "./method-call-assertions.js";
 
 describe("assertCalled with an async block", () => {
@@ -47,6 +48,18 @@ describe("assertCalledWith", () => {
     expect(() =>
       assertCalledWith(object, "foo", [/\d+/, Date], {}, () => {
         object.foo("none", {});
+      }),
+    ).toThrow(MockExpectationError);
+  });
+
+  it("matches an argument with a ported caseEquals", () => {
+    const object = { foo: (_n: number) => "original" };
+    assertCalledWith(object, "foo", [new Range(1, 5)], {}, () => {
+      object.foo(3);
+    });
+    expect(() =>
+      assertCalledWith(object, "foo", [new Range(1, 5)], {}, () => {
+        object.foo(9);
       }),
     ).toThrow(MockExpectationError);
   });

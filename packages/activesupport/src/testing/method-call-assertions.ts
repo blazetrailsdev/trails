@@ -193,6 +193,10 @@ function assertMock(mock: Mock): void {
 }
 
 function caseEqual(expected: unknown, actual: unknown): boolean {
+  const matcher = expected as { caseEquals?: unknown } | null | undefined;
+  if (typeof matcher?.caseEquals === "function") {
+    return (matcher as { caseEquals(value: unknown): boolean }).caseEquals(actual);
+  }
   if (expected instanceof RegExp) return typeof actual === "string" && expected.test(actual);
   if (typeof expected === "function") return actual instanceof expected;
   return rbEqual(expected, actual);
