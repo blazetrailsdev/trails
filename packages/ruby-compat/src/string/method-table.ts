@@ -6,10 +6,9 @@ import { regexpEscape } from "../regexp.js";
 import { TypeError } from "../type-error.js";
 
 /**
- * The receiver a {@link STRING_METHOD_TABLE} entry runs against. A JS string is
- * immutable, so the destructive entries (`insert`, `[]=`, the bang forms)
- * write the new contents back to `string`, which is what Ruby's in-place
- * `rb_str_update` (`vendor/ruby/string.c:5378`) does to the receiver's bytes.
+ * A {@link STRING_METHOD_TABLE} entry's receiver. A JS string is immutable, so a
+ * destructive entry writes back to `string`, as `rb_str_update`
+ * (`vendor/ruby/string.c:5378`) writes the receiver's bytes.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -18,6 +17,7 @@ export interface StringReceiver {
 }
 
 type StringMethod = (self: StringReceiver, ...args: never[]) => unknown;
+type GsubReplacement = string | Record<string, string> | ((match: string) => string);
 
 /**
  * The methods `Init_String` (`vendor/ruby/string.c:12119`) defines on
@@ -25,53 +25,49 @@ type StringMethod = (self: StringReceiver, ...args: never[]) => unknown;
  * is `isInclude`, `upcase!` is `upcaseBang`). Every position is a character
  * (code point) offset, as MRI's are for a UTF-8 String. A package that
  * reopens String, as ActiveSupport's `core_ext/string` does, assigns an entry.
+ * Case mapping ignores `check_case_options` (`vendor/ruby/string.c:7304`) and `gsub`
+ * has no Enumerator arm: story `ruby-string-method-table-case-options-and-gsub-enumerator`.
  *
  * @noRailsEquivalent PERMANENT
  */
 export const STRING_METHOD_TABLE: Record<string, StringMethod> = Object.assign(
-  Object.create(null) as Record<string, StringMethod>,
+  Object.create(null),
   {
-    size: (self: StringReceiver) => strlen(self.string),
+    size: (self) => strlen(self.string),
     slice: rbStrArefM,
     set: rbStrAsetM,
     insert: rbStrInsert,
     index: rbStrIndexM,
     rindex: rbStrRindexM,
-    ljust: (self: StringReceiver, ...args: unknown[]) => rbStrJustify(args, self.string, "l"),
-    rjust: (self: StringReceiver, ...args: unknown[]) => rbStrJustify(args, self.string, "r"),
-    center: (self: StringReceiver, ...args: unknown[]) => rbStrJustify(args, self.string, "c"),
-    lstrip: (self: StringReceiver) => self.string.replace(LSTRIP, ""),
-    rstrip: (self: StringReceiver) => self.string.replace(RSTRIP, ""),
-    strip: (self: StringReceiver) => self.string.replace(LSTRIP, "").replace(RSTRIP, ""),
-    lstripBang: (self: StringReceiver) => bang(self, self.string.replace(LSTRIP, "")),
-    rstripBang: (self: StringReceiver) => bang(self, self.string.replace(RSTRIP, "")),
-    stripBang: (self: StringReceiver) =>
-      bang(self, self.string.replace(LSTRIP, "").replace(RSTRIP, "")),
+    ljust: (self, ...args: unknown[]) => rbStrJustify(args, self.string, "l"),
+    rjust: (self, ...args: unknown[]) => rbStrJustify(args, self.string, "r"),
+    center: (self, ...args: unknown[]) => rbStrJustify(args, self.string, "c"),
+    lstrip: (self) => self.string.replace(LSTRIP, ""),
+    rstrip: (self) => self.string.replace(RSTRIP, ""),
+    strip: (self) => self.string.replace(LSTRIP, "").replace(RSTRIP, ""),
+    lstripBang: (self) => bang(self, self.string.replace(LSTRIP, "")),
+    rstripBang: (self) => bang(self, self.string.replace(RSTRIP, "")),
+    stripBang: (self) => bang(self, self.string.replace(LSTRIP, "").replace(RSTRIP, "")),
     ord: rbStrOrd,
-    upcase: (self: StringReceiver) => self.string.toUpperCase(),
-    downcase: (self: StringReceiver) => self.string.toLowerCase(),
-    swapcase: (self: StringReceiver) => swapcase(self.string),
-    capitalize: (self: StringReceiver) => capitalize(self.string),
-    upcaseBang: (self: StringReceiver) => bang(self, self.string.toUpperCase()),
-    downcaseBang: (self: StringReceiver) => bang(self, self.string.toLowerCase()),
-    swapcaseBang: (self: StringReceiver) => bang(self, swapcase(self.string)),
-    capitalizeBang: (self: StringReceiver) => bang(self, capitalize(self.string)),
-    isInclude: (self: StringReceiver, arg: unknown) => self.string.includes(stringValue(arg)),
-    matchOperator: (self: StringReceiver, y: unknown) => rbStrMatch(self.string, y),
-    gsub: (
-      self: StringReceiver,
-      pattern: string | RegExp,
-      replacement: string | Record<string, string> | ((match: string) => string),
-    ) => rbStrGsub(self.string, pattern, replacement),
-  },
+    upcase: (self) => self.string.toUpperCase(),
+    downcase: (self) => self.string.toLowerCase(),
+    swapcase: (self) => swapcase(self.string),
+    capitalize: (self) => capitalize(self.string),
+    upcaseBang: (self) => bang(self, self.string.toUpperCase()),
+    downcaseBang: (self) => bang(self, self.string.toLowerCase()),
+    swapcaseBang: (self) => bang(self, swapcase(self.string)),
+    capitalizeBang: (self) => bang(self, capitalize(self.string)),
+    isInclude: (self, arg: unknown) => self.string.includes(stringValue(arg)),
+    matchOperator: (self, y: unknown) => rbStrMatch(self.string, y),
+    gsub: (self, pattern: string | RegExp, replacement: GsubReplacement) =>
+      rbStrGsub(self.string, pattern, replacement),
+  } satisfies Record<string, StringMethod>,
 );
 
 /**
- * `str.__send__(method, *args)` (`vendor/ruby/vm_eval.c:1330` `rb_f_send`) for
- * a JS string: the {@link STRING_METHOD_TABLE} entry when Ruby defines
- * `method`, else the string's own JS member — a method on `String.prototype`
- * is how a JS string is reopened. The receiver's contents after the call come
- * back beside the result, as `sliceBang` returns them.
+ * `str.__send__(method, *args)` (`vendor/ruby/vm_eval.c:1330` `rb_f_send`): the
+ * {@link STRING_METHOD_TABLE} entry, else the JS string's own member. The
+ * receiver's contents after the call come back beside the result.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -87,9 +83,8 @@ export function rbStrSend(str: string, method: string, ...args: unknown[]): [unk
 }
 
 /**
- * `str.respond_to?(method, include_all)` (`vendor/ruby/vm_method.c:2977`
- * `obj_respond_to`) over the names {@link rbStrSend} dispatches. `includeAll`
- * cannot be read; see CLAUDE.md, "Method visibility is not a runtime fact in JS".
+ * `str.respond_to?` (`vendor/ruby/vm_method.c:2977` `obj_respond_to`) over {@link rbStrSend}'s
+ * names. See CLAUDE.md, "Method visibility is not a runtime fact in JS".
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -99,8 +94,7 @@ export function rbStrRespondTo(str: string, method: string, includeAll: boolean 
 }
 
 /**
- * `String#=~` (`vendor/ruby/string.c:4523` `rb_str_match`): the character
- * offset of a Regexp's first match, or nil.
+ * `String#=~` (`vendor/ruby/string.c:4523` `rb_str_match`): a match's character offset.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -116,18 +110,22 @@ export function rbStrMatch(x: string, y: unknown): unknown {
 const LSTRIP = /^[\0\t\n\v\f\r ]+/;
 const RSTRIP = /[\0\t\n\v\f\r ]+$/;
 
+/** `rb_str_length` (`vendor/ruby/string.c:2211`). */
 function strlen(str: string): number {
   return [...str].length;
 }
 
+/** `rb_str_sublen` (`vendor/ruby/string.c:2841`): a UTF-16 offset as a character offset. */
 function rbStrSublen(str: string, pos: number): number {
   return strlen(str.slice(0, pos));
 }
 
+/** `str_offset` (`vendor/ruby/string.c:2786`): a character offset as a UTF-16 offset. */
 function strOffset(str: string, pos: number): number {
   return [...str].slice(0, pos).join("").length;
 }
 
+/** `StringValue` (`vendor/ruby/string.c:2551` `rb_string_value`): a String, or its `to_str`. */
 function stringValue(val: unknown): string {
   if (typeof val === "string") return val;
   const toStr = (val as { toStr?: unknown } | null)?.toStr;
@@ -135,24 +133,28 @@ function stringValue(val: unknown): string {
   throw new TypeError(`no implicit conversion of ${rbBuiltinClassName(val)} into String`);
 }
 
+/** `NUM2LONG` (`vendor/ruby/numeric.c:3135` `rb_num2long`). */
 function num2long(val: unknown): number {
   if (typeof val === "number") return Math.trunc(val);
   if (val == null) throw new TypeError("no implicit conversion from nil to integer");
   throw new TypeError(`no implicit conversion of ${rbBuiltinClassName(val)} into Integer`);
 }
 
+/** `rb_check_arity` (`vendor/ruby/include/ruby/internal/intern/error.h:280`). */
 function checkArity(argc: number, min: number, max: number): void {
   if (argc < min || argc > max) {
     throw new ArgumentError(`wrong number of arguments (given ${argc}, expected ${min}..${max})`);
   }
 }
 
+/** A bang form's nil-when-unchanged return (`vendor/ruby/string.c:7535` `rb_str_upcase_bang`). */
 function bang(self: StringReceiver, string: string): string | null {
   if (string === self.string) return null;
   self.string = string;
   return string;
 }
 
+/** `rb_reg_search` (`vendor/ruby/re.c:1796`) from character offset `pos`, forward or reverse. */
 function rbRegSearch(
   re: RegExp,
   str: string,
@@ -174,6 +176,7 @@ function rbRegSearch(
   return null;
 }
 
+/** `rb_reg_backref_number` (`vendor/ruby/re.c:1235`). */
 function rbRegBackrefNumber(match: RegExpExecArray, backref: unknown): number {
   if (typeof backref !== "string") return num2long(backref);
   const span = match.indices?.groups?.[backref];
@@ -414,26 +417,25 @@ function rbStrOrd(self: StringReceiver): number {
 
 /** `rb_str_swapcase` (`vendor/ruby/string.c:7838`), per character. */
 function swapcase(str: string): string {
-  return Array.from(str, (c) => (c === c.toUpperCase() ? c.toLowerCase() : c.toUpperCase())).join(
-    "",
-  );
+  return [...str].map((c) => (c === c.toUpperCase() ? c.toLowerCase() : c.toUpperCase())).join("");
 }
 
 /**
  * `rb_str_capitalize` (`vendor/ruby/string.c:7760`). MRI titlecases the first
  * character; JS has no titlecase mapping, so a digraph such as `ǆ` upcases to
- * `Ǆ` where MRI answers `ǅ`.
+ * `Ǆ` where MRI answers `ǅ` (story
+ * `ruby-string-method-table-case-options-and-gsub-enumerator`).
  */
 function capitalize(str: string): string {
   const [first = "", ...rest] = str;
   return first.toUpperCase() + rest.join("").toLowerCase();
 }
 
-function rbStrGsub(
-  str: string,
-  pattern: string | RegExp,
-  replacement: string | Record<string, string> | ((match: string) => string),
-): string {
+/**
+ * `String#gsub` (`vendor/ruby/string.c:6057` `rb_str_gsub`) with a replacement
+ * String, expanded as `rb_reg_regsub` (`vendor/ruby/re.c:4394`) does, a Hash, or a block.
+ */
+function rbStrGsub(str: string, pattern: string | RegExp, replacement: GsubReplacement): string {
   const re =
     typeof pattern === "string"
       ? new RegExp(regexpEscape(pattern), "g")
