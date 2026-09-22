@@ -1761,7 +1761,7 @@ export class Relation<T extends Base> {
     this._values = { ...source._values };
     this._withIsRecursive = source._withIsRecursive;
     this._isNone = source._isNone;
-    for (const mod of source.extendingValues) {
+    for (const mod of [...source.extendingValues].reverse()) {
       for (const [name, fn] of Object.entries(mod)) {
         if (typeof fn === "function") {
           (this as unknown as Record<string, unknown>)[name] = fn.bind(this);

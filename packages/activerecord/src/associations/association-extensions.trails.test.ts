@@ -13,6 +13,7 @@ describe("Association#extensions", () => {
     expect(post.association("commentsWithExtend").extensions).toEqual([
       ...defaultExtensions,
       Post.namedExtension,
+      Post.CommentsWithExtendAssociationExtension,
     ]);
     expect(post.association("commentsWithExtend_2").extensions).toEqual([
       ...defaultExtensions,

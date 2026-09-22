@@ -197,7 +197,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
     const extensions = association.extensions;
     if (extensions.length > 0) {
-      for (const mod of extensions) {
+      for (const mod of [...extensions].reverse()) {
         if (typeof mod === "function") {
           (mod as (rel: unknown) => void)(this);
         } else {

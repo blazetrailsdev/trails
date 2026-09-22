@@ -1138,9 +1138,11 @@ function extendingBang(
       mod(this);
     } else {
       this.extendingValues = [...this.extendingValues, mod];
-      for (const [name, fn] of Object.entries(mod)) {
-        (this as any)[name] = fn.bind(this);
-      }
+    }
+  }
+  for (const mod of [...this.extendingValues].reverse()) {
+    for (const [name, fn] of Object.entries(mod)) {
+      (this as any)[name] = fn.bind(this);
     }
   }
   return this;
