@@ -1142,7 +1142,8 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
   // converged; it must be deleted rather than silently kept.
   if (!filterPkg) {
     for (const stale of unconsumedAssertionReceipts(consumedReceipts)) {
-      console.warn(`STALE assertion receipt: ${stale}`);
+      console.error(`STALE assertion receipt: ${stale}`);
+      process.exitCode = 1;
     }
   }
 
