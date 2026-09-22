@@ -11,6 +11,8 @@ import {
   registerSubclass,
   RecordNotFound,
   RecordNotSaved,
+  RecordNotDestroyed,
+  resetCallbacks,
   RecordInvalid,
   AssociationTypeMismatch,
   ReadOnlyRecord,
@@ -46,6 +48,7 @@ import {
   assertNot,
   assertNotEmpty,
   assertRaise,
+  assertNoDifference,
   travel,
   travelBack,
 } from "@blazetrails/activesupport";
@@ -75,9 +78,14 @@ import {
 } from "../test-helpers/models/comment-overlapping-counter-cache.js";
 import { Post as HmPost, FirstPost as HmFirstPost } from "../test-helpers/models/post.js";
 import { Tag as HmTag } from "../test-helpers/models/tag.js";
+import { Tyre } from "../test-helpers/models/tyre.js";
 import { Car as HmCar } from "../test-helpers/models/car.js";
 import { Engine as HmEngine } from "../test-helpers/models/engine.js";
-import { Bulb as HmBulb, FunkyBulb as HmFunkyBulb } from "../test-helpers/models/bulb.js";
+import {
+  Bulb as HmBulb,
+  FunkyBulb as HmFunkyBulb,
+  FailedBulb,
+} from "../test-helpers/models/bulb.js";
 import { Tagging as HmTagging } from "../test-helpers/models/tagging.js";
 import {
   Topic as HmTopic,
@@ -108,6 +116,8 @@ import {
   CpkBrokenOrderWithNonCpkBooks,
   CpkNonCpkBook,
 } from "../test-helpers/models/cpk.js";
+import { quoteTableName } from "../support/quote-regex.js";
+import { regexpEscape } from "@blazetrails/ruby-compat";
 import { captureSql } from "../testing/sql-capture.js";
 import { currentAdapter } from "../support/adapter-helper.js";
 import { CompositePrimaryKeyMismatchError } from "./errors.js";
@@ -564,29 +574,41 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("deleting updates counter cache with dependent delete all", async () => {
-    const post = posts("welcome");
-    const startCount = (post as any).tags_count as number;
-    await post.updateColumns({ taggings_with_delete_all_count: startCount });
+    const post = posts("welcome") as any;
+    await post.updateColumns({ taggings_with_delete_all_count: post.tags_count });
 
-    const first = (await post.taggingsWithDeleteAll.first())!;
-    await post.taggingsWithDeleteAll.delete(first);
-
-    await post.reload();
-    expect((post as any).taggings_with_delete_all_count).toBe(startCount - 1);
-    expect(await HmTagging.findBy({ id: first.id })).toBeNull();
+    await assertDifference(
+      async () => (await post.reload()).taggings_with_delete_all_count,
+      -1,
+      null,
+      async () => {
+        await post.taggingsWithDeleteAll.delete(await post.taggingsWithDeleteAll.first());
+      },
+    );
   });
 
   it("deleting updates counter cache with dependent destroy", async () => {
-    const post = posts("welcome");
-    const startCount = (post as any).tags_count as number;
-    await post.updateColumns({ taggings_with_destroy_count: startCount });
+    const post = posts("welcome") as any;
+    await post.updateColumns({ taggings_with_destroy_count: post.tags_count });
 
-    const first = (await post.taggingsWithDestroy.first())!;
-    await post.taggingsWithDestroy.delete(first);
+    await assertDifference(
+      async () => (await post.reload()).taggings_with_destroy_count,
+      -1,
+      null,
+      async () => {
+        await post.taggingsWithDestroy.delete(await post.taggingsWithDestroy.first());
+      },
+    );
+  });
+  it("delete_all, when not loaded, doesn't load the records", async () => {
+    const post = posts("welcome") as any;
 
-    await post.reload();
-    expect((post as any).taggings_with_destroy_count).toBe(startCount - 1);
-    expect(await HmTagging.findBy({ id: first.id })).toBeNull();
+    expect(Number(await post.taggingsWithDeleteAll.count()) > 0).toBeTruthy();
+    expect(post.taggingsWithDeleteAll.loaded).toBeFalsy();
+
+    await assertQueriesCount(2, false, async () => {
+      await post.taggingsWithDeleteAll.deleteAll();
+    });
   });
 });
 
@@ -1588,21 +1610,26 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("associations autosaves when object is already persisted", async () => {
-    const author = await HmAuthor.create({ name: "Alice" });
-    const post = await HmPost.create({ author_id: author.id, title: "Saved", body: "body" });
-    expect(post.isNewRecord()).toBe(false);
-    post.title = "Updated";
-    await post.save();
-    const reloaded = await HmPost.find(post.id!);
-    expect((reloaded as any).title).toBe("Updated");
+    const bulb = await HmBulb.createBang();
+    const tyre = await Tyre.createBang();
+
+    const car = (await HmCar.createBang({ name: "honda" }, (c: any) => {
+      c.bulbs.push(bulb);
+      c.tyres.push(tyre);
+    })) as any;
+
+    expect(car.savedChangeToName).toEqual([null, "honda"]);
+
+    expect(Number(await car.bulbs.count())).toBe(1);
+    expect(Number(await car.tyres.count())).toBe(1);
   });
 
   it("does not duplicate associations when used with natural primary keys", async () => {
-    const author = await HmAuthor.create({ name: "Alice" });
-    await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts1 = await author.posts;
-    const posts2 = await author.posts;
-    expect(posts1.length).toBe(posts2.length);
+    const speedometer = (await Speedometer.createBang({ id: "4" })) as any;
+    await speedometer.minivans.createBang({ minivan_id: "a-van-red", name: "a van", color: "red" });
+
+    expect((await speedometer.minivans.toArray()).length).toBe(1);
+    expect((await (await speedometer.reload()).minivans.toArray()).length).toBe(1);
   });
 
   it("sending new to association proxy should have same effect as calling new", () => {
@@ -3408,31 +3435,12 @@ describe("HasManyAssociationsTest", () => {
     expect(contract.byeCount).toBe(1);
   });
   it("association attributes are available to after initialize", async () => {
-    class InitAttrAuthor extends Base {
-      declare name: string | null;
+    const car = (await HmCar.create({ name: "honda" })) as any;
+    const bulb = car.bulbs.build();
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    class InitAttrPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(InitAttrAuthor);
-    registerModel(InitAttrPost);
-    const author = await InitAttrAuthor.create({ name: "Alice" });
-    const post = InitAttrPost.new({ author_id: author.id, title: "Init" });
-    expect((post as any).author_id).toBe(Number(author.id));
-    expect((post as any).title).toBe("Init");
+    expect(bulb.attributesAfterInitialize["car_id"]).toBe(car.id);
   });
+
   it("attributes are set when initialized from has many null relationship", async () => {
     registerModel(HmCar);
     registerModel(HmBulb);
@@ -3516,7 +3524,11 @@ describe("HasManyAssociationsTest", () => {
   it("first_or_create adds the record to the association", async () => {
     const firm = (await HmFirm.createBang({ name: "omg" })) as any;
     await firm.clientsOfFirm.loadTarget();
-    const client = await firm.clientsOfFirm.where({ name: "lol" }).firstOrCreate();
+    let clientCount: Promise<number> | undefined;
+    const client = await firm.clientsOfFirm.where({ name: "lol" }).firstOrCreate(undefined, () => {
+      clientCount = Client.count() as Promise<number>;
+    });
+    expect(Number(await clientCount)).toBe(5);
     expect(client.name).toBe("lol");
     expect((await firm.clientsOfFirm.toArray()).map(recordId)).toEqual([client].map(recordId));
     expect((await (await firm.reload()).clientsOfFirm.toArray()).map(recordId)).toEqual(
@@ -3527,7 +3539,13 @@ describe("HasManyAssociationsTest", () => {
   it("first_or_create! adds the record to the association", async () => {
     const firm = (await HmFirm.createBang({ name: "omg" })) as any;
     await firm.clientsOfFirm.loadTarget();
-    const client = await firm.clientsOfFirm.where({ name: "lol" }).firstOrCreateBang();
+    let clientCount: Promise<number> | undefined;
+    const client = await firm.clientsOfFirm
+      .where({ name: "lol" })
+      .firstOrCreateBang(undefined, () => {
+        clientCount = Client.count() as Promise<number>;
+      });
+    expect(Number(await clientCount)).toBe(5);
     expect(client.name).toBe("lol");
     expect((await firm.clientsOfFirm.toArray()).map(recordId)).toEqual([client].map(recordId));
     expect((await (await firm.reload()).clientsOfFirm.toArray()).map(recordId)).toEqual(
@@ -3554,41 +3572,6 @@ describe("HasManyAssociationsTest", () => {
   registerModel(Minivan);
   registerModel(Invoice);
   registerModel(HmLineItem);
-
-  it("delete_all, when not loaded, doesn't load the records", async () => {
-    class NoLoadDelAuthor extends Base {
-      declare name: string | null;
-      declare no_load_del_posts: AssociationProxy<NoLoadDelPost>;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("no_load_del_posts", {
-          className: "NoLoadDelPost",
-          foreignKey: "author_id",
-          dependent: "delete",
-        });
-      }
-    }
-    class NoLoadDelPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(NoLoadDelAuthor);
-    registerModel(NoLoadDelPost);
-    const author = await NoLoadDelAuthor.create({ name: "Alice" });
-    await NoLoadDelPost.create({ author_id: author.id, title: "A", body: "body" });
-    await NoLoadDelPost.create({ author_id: author.id, title: "B", body: "body" });
-    await author.destroy();
-    const remaining = await author.no_load_del_posts;
-    expect(remaining.length).toBe(0);
-  });
 
   it("has many associations on new records use null relations", async () => {
     const post = HmPost.new() as any;
@@ -3702,63 +3685,41 @@ describe("HasManyAssociationsTest", () => {
     expect(await david.postsWithSpecialCategorizations.toArray()).toEqual([]);
   });
   it("unscopes the default scope of associated model when used with include", async () => {
-    class UsInclAuthor extends Base {
-      declare us_incl_posts: AssociationProxy<UsInclPost>;
-      declare name: string | null;
+    const car = (await HmCar.createBang()) as any;
+    const bulb1 = await HmBulb.createBang({ name: "defaulty", car });
+    const bulb2 = await HmBulb.createBang({ name: "other", car });
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("us_incl_posts", {
-          className: "UsInclPost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class UsInclPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(UsInclAuthor);
-    registerModel(UsInclPost);
-    const author = await UsInclAuthor.create({ name: "Alice" });
-    await UsInclPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await author.us_incl_posts;
-    expect(posts.length).toBe(1);
+    const byId = (a: any, b: any) => a.id - b.id;
+    expect(
+      ((await HmCar.includes("allBulbs2").find(car.id)) as any).allBulbs2.target
+        .slice()
+        .sort(byId)
+        .map(recordId),
+    ).toEqual([bulb1, bulb2].map(recordId));
+    expect(
+      ((await HmCar.eagerLoad("allBulbs2").find(car.id)) as any).allBulbs2.target
+        .slice()
+        .sort(byId)
+        .map(recordId),
+    ).toEqual([bulb1, bulb2].map(recordId));
   });
+
   it("raises RecordNotDestroyed when replaced child can't be destroyed", async () => {
-    class RndAuthor extends Base {
-      declare name: string | null;
+    const car = (await HmCar.createBang()) as any;
+    const originalChild = (await FailedBulb.createBang({ car })) as any;
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    class RndPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
+    const error = (await assertRaise([RecordNotDestroyed], {}, async () => {
+      await car.failedBulbs.replace([await FailedBulb.createBang()]);
+    })) as any;
 
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(RndAuthor);
-    registerModel(RndPost);
-    const author = await RndAuthor.create({ name: "Alice" });
-    const post = await RndPost.create({ author_id: author.id, title: "A", body: "body" });
-    expect(post.isPersisted()).toBe(true);
-    await post.destroy();
-    expect(post.isDestroyed()).toBe(true);
+    expect((await (await car.reload()).failedBulbs.toArray()).map(recordId)).toEqual(
+      [originalChild].map(recordId),
+    );
+    expect(error.message).toBe(
+      `Failed to destroy FailedBulb with ${FailedBulb.primaryKey}=${originalChild.id}`,
+    );
   });
+
   it("passes custom context validation to validate children", async () => {
     registerModel(FamousPirate);
     registerModel(FamousShip);
@@ -3789,46 +3750,16 @@ describe("HasManyAssociationsTest", () => {
     ).toEqual([]);
   });
   it("associations replace in memory when records have the same id", async () => {
-    class ReplMemAuthor extends Base {
-      declare repl_mem_posts: AssociationProxy<ReplMemPost>;
-      declare name: string | null;
+    const bulb = (await HmBulb.createBang()) as any;
+    const car = (await HmCar.createBang({ name: "honda", bulbs: [bulb] })) as any;
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("repl_mem_posts", {
-          className: "ReplMemPost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class ReplMemPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
+    expect(car.savedChangeToName).toEqual([null, "honda"]);
 
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(ReplMemAuthor);
-    registerModel(ReplMemPost);
-    const author = await ReplMemAuthor.create({ name: "Alice" });
-    const post = await ReplMemPost.create({
-      author_id: author.id,
-      title: "Original",
-      body: "body",
-    });
-    const posts1 = await author.repl_mem_posts;
-    expect(posts1.length).toBe(1);
-    expect((posts1[0] as any).title).toBe("Original");
-    post.title = "Updated";
-    await post.save();
-    await author.reload();
-    const posts2 = await author.repl_mem_posts;
-    expect(posts2.length).toBe(1);
-    expect((posts2[0] as any).title).toBe("Updated");
+    const newBulb = (await HmBulb.find(bulb.id)) as any;
+    newBulb.name = "foo";
+    await car.bulbs.replace([newBulb]);
+
+    expect((await car.bulbs.first()).name).toBe("foo");
   });
 
   it("in memory replacement executes no queries", async () => {
@@ -3844,31 +3775,26 @@ describe("HasManyAssociationsTest", () => {
     });
   });
   it("in memory replacements do not execute callbacks", async () => {
-    class InMemCbAuthor extends Base {
-      declare name: string | null;
-
+    let raiseAfterAdd = false;
+    const klass = class Car extends Base {
       static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
+        this.tableName = "cars";
+        this.hasMany("bulbs", {
+          afterAdd: () => {
+            if (raiseAfterAdd) throw new Error();
+          },
+        });
       }
-    }
-    class InMemCbPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
+    };
+    const bulb = (await HmBulb.createBang()) as any;
+    const car = (await klass.createBang({ bulbs: [bulb] })) as any;
 
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(InMemCbAuthor);
-    registerModel(InMemCbPost);
-    const author1 = await InMemCbAuthor.create({ name: "Alice" });
-    const author2 = await InMemCbAuthor.create({ name: "Bob" });
-    const post = InMemCbPost.new({ author_id: author1.id, title: "A" });
-    post.author_id = author2.id as number;
-    expect((post as any).author_id).toBe(Number(author2.id));
+    const newBulb = await HmBulb.find(bulb.id);
+    raiseAfterAdd = true;
+
+    await assertNothingRaised(async () => {
+      await car.bulbs.replace([newBulb]);
+    });
   });
 
   it("in memory replacements sets inverse instance", async () => {
@@ -3883,42 +3809,12 @@ describe("HasManyAssociationsTest", () => {
     expect(await newBulb.car).toBe(car);
   });
   it("reattach to new objects replaces inverse association and foreign key", async () => {
-    class ReattachAuthor extends Base {
-      declare reattach_posts: AssociationProxy<ReattachPost>;
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("reattach_posts", {
-          className: "ReattachPost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class ReattachPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(ReattachAuthor);
-    registerModel(ReattachPost);
-    const author1 = await ReattachAuthor.create({ name: "Alice" });
-    const author2 = await ReattachAuthor.create({ name: "Bob" });
-    const post = await ReattachPost.create({ author_id: author1.id, title: "A", body: "body" });
-    post.author_id = author2.id as number;
-    await post.save();
-    const reloaded = await ReattachPost.find(post.id!);
-    expect((reloaded as any).author_id).toBe(Number(author2.id));
-    const oldPosts = await author1.reattach_posts;
-    const newPosts = await author2.reattach_posts;
-    expect(oldPosts.length).toBe(0);
-    expect(newPosts.length).toBe(1);
+    const bulb = (await HmBulb.createBang({ car: await HmCar.createBang() })) as any;
+    expect(bulb.car_id).toBeTruthy();
+    const car = HmCar.new() as any;
+    await car.bulbs.push(bulb);
+    expect(await bulb.car).toBe(car);
+    expect(bulb.car_id).toBeNull();
   });
 
   it("in memory replacement maintains order", async () => {
@@ -3936,137 +3832,65 @@ describe("HasManyAssociationsTest", () => {
     );
   });
   it("prevent double firing the before save callback of new object when the parent association saved in the callback", async () => {
-    class DblFireAuthor extends Base {
-      declare name: string | null;
+    await resetCallbacks(HmBulb, "save", async () => {
+      let count = 0;
+      HmBulb.beforeSave(async (record: any) => {
+        if (await (await record.car).save()) count += 1;
+      });
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    class DblFirePost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
+      const car = (await HmCar.createBang()) as any;
+      await car.bulbs.createBang();
 
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(DblFireAuthor);
-    registerModel(DblFirePost);
-    let saveCount = 0;
-    const author = await DblFireAuthor.create({ name: "Alice" });
-    const post = new DblFirePost({ author_id: author.id, title: "A", body: "body" });
-    const origSave = post.save.bind(post);
-    post.save = async function () {
-      saveCount++;
-      return origSave();
-    };
-    await post.save();
-    expect(saveCount).toBe(1);
-    expect(post.isPersisted()).toBe(true);
+      expect(count).toBe(1);
+    });
   });
+
   it("ids reader memoization", async () => {
-    class MemoAuthor extends Base {
-      declare memo_posts: AssociationProxy<MemoPost>;
-      declare name: string | null;
+    const car = (await HmCar.createBang({ name: "Tofaş" })) as any;
+    const bulb = (await HmBulb.createBang({ car })) as any;
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("memo_posts", {
-          className: "MemoPost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class MemoPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
+    expect(await car.bulbIds).toEqual([bulb.id]);
+    await assertNoQueries(false, async () => {
+      await car.bulbIds;
+    });
 
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(MemoAuthor);
-    registerModel(MemoPost);
-    const author = await MemoAuthor.create({ name: "Alice" });
-    await MemoPost.create({ author_id: author.id, title: "A", body: "body" });
-    await MemoPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts1 = await author.memo_posts;
-    const ids1 = posts1.map((p: any) => p.id);
-    const posts2 = await author.memo_posts;
-    const ids2 = posts2.map((p: any) => p.id);
-    expect(ids1).toEqual(ids2);
+    const bulb2 = await car.bulbs.createBang();
+
+    expect((await car.bulbIds).sort((a: number, b: number) => a - b)).toEqual([bulb.id, bulb2.id]);
+    await assertNoQueries(false, async () => {
+      await car.bulbIds;
+    });
   });
+
   it("loading association in validate callback doesnt affect persistence", async () => {
-    class LoadValAuthor extends Base {
-      declare load_val_posts: AssociationProxy<LoadValPost>;
-      declare name: string | null;
+    await resetCallbacks(HmBulb, "validation", async () => {
+      HmBulb.afterValidation(async (record: any) => {
+        await (await record.car).bulbs.load();
+      });
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("load_val_posts", {
-          className: "LoadValPost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class LoadValPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
+      const car = (await HmCar.createBang({ name: "Car" })) as any;
+      const bulb = await car.bulbs.createBang();
 
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(LoadValAuthor);
-    registerModel(LoadValPost);
-    const author = await LoadValAuthor.create({ name: "Alice" });
-    const post = await LoadValPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await author.load_val_posts;
-    expect(posts.length).toBe(1);
-    expect(post.isPersisted()).toBe(true);
+      expect((await car.bulbs.toArray()).map(recordId)).toEqual([bulb].map(recordId));
+    });
   });
-  it("create children could be rolled back by after save", async () => {
-    class RollbackAuthor extends Base {
-      declare rollback_posts: AssociationProxy<RollbackPost>;
-      declare name: string | null;
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("rollback_posts", {
-          className: "RollbackPost",
-          foreignKey: "author_id",
+  it.skip("create children could be rolled back by after save", async () => {
+    // BLOCKED: after_rollback(on: :create) never fires when after_save raises Rollback — filed as 0155-assertion-surfaced-port-bugs/after-rollback-on-create-skipped-for-rollback-raised-in-after-save
+    const firm = (await HmFirm.createBang({ name: "A New Firm, Inc" })) as any;
+    await assertNoDifference(
+      async () => Number(await Client.count()),
+      null,
+      async () => {
+        const client = await firm.clients.create({ name: "New Client" }, (cli: any) => {
+          cli.rollbackOnSave = true;
+          expect(cli.rollbackOnCreateCalled).toBeFalsy();
         });
-      }
-    }
-    class RollbackPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(RollbackAuthor);
-    registerModel(RollbackPost);
-    const author = await RollbackAuthor.create({ name: "Alice" });
-    const post = await RollbackPost.create({ author_id: author.id, title: "A", body: "body" });
-    expect(post.isPersisted()).toBe(true);
-    const posts = await author.rollback_posts;
-    expect(posts.length).toBe(1);
+        expect(client.rollbackOnCreateCalled).toBeTruthy();
+      },
+    );
   });
+
   it("has many with out of range value", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: 999999999, title: "A", body: "body" });
@@ -4612,11 +4436,9 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("abstract class with polymorphic has many", async () => {
-    const post = (await HmSubStiPost.create({ title: "fooo", body: "baa" })) as any;
-    const tagging = (await HmTagging.create({ taggable: post })) as any;
-    const taggings = await post.taggings;
-    expect(taggings).toHaveLength(1);
-    expect(Number(taggings[0].id)).toBe(Number(tagging.id));
+    const post = (await HmSubStiPost.createBang({ title: "fooo", body: "baa" })) as any;
+    const tagging = (await HmTagging.createBang({ taggable: post })) as any;
+    expect((await post.taggings.toArray()).map(recordId)).toEqual([tagging].map(recordId));
   });
 
   it("with polymorphic has many with custom columns name", async () => {
@@ -4878,8 +4700,15 @@ describe("HasManyAssociationsTest", () => {
 
   it("updates counter cache when default scope is given", async () => {
     const topic = (await HmDefaultRejectedTopic.create({ approved: true })) as any;
-    await topic.approvedReplies.create({});
-    expect(((await HmTopic.find(topic.id)) as any).replies_count).toBe(1);
+
+    await assertDifference(
+      async () => (await topic.reload()).replies_count,
+      1,
+      null,
+      async () => {
+        await topic.approvedReplies.createBang();
+      },
+    );
   });
 
   it("calling update on id changes the counter cache", async () => {
@@ -4914,20 +4743,21 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("calling update changing ids of inversed association changes the counter cache", async () => {
-    const topic1 = (await HmTopic.find(1)) as any;
-    const topic2 = (await HmTopic.find(3)) as any;
-    const originalCount1 = (await topic1.replies).length;
-    const originalCount2 = (await topic2.replies).length;
+    expect(HmPost.reflectOnAssociation("comments")!.hasInverse()).toBeTruthy();
 
-    const reply1 = await topic1.replies.first();
-    await reply1.update({ parent_id: topic2.id });
-    expect(((await HmTopic.find(1)) as any).replies_count).toBe(originalCount1 - 1);
-    expect(((await HmTopic.find(3)) as any).replies_count).toBe(originalCount2 + 1);
+    const post1 = (await HmPost.first()) as any;
+    const post2 = (await HmPost.second()) as any;
 
-    const reply2 = await topic2.replies.first();
-    await reply2.update({ parent_id: topic1.id });
-    expect(((await HmTopic.find(1)) as any).replies_count).toBe(originalCount1);
-    expect(((await HmTopic.find(3)) as any).replies_count).toBe(originalCount2);
+    const originalCount1 = Number(await post1.comments.count());
+    const originalCount2 = Number(await post2.comments.count());
+
+    await (await post1.comments.first()).update({ post_id: post2.id });
+    expect((await post1.reload()).comments_count).toBe(originalCount1 - 1);
+    expect((await post2.reload()).comments_count).toBe(originalCount2 + 1);
+
+    await (await post2.comments.first()).update({ post_id: post1.id });
+    expect((await post1.reload()).comments_count).toBe(originalCount1);
+    expect((await post2.reload()).comments_count).toBe(originalCount2);
   });
 
   it("deleting a collection", async () => {
@@ -4986,16 +4816,27 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("has many without counter cache option", async () => {
-    const ship = (await HmShip.create({ name: "Countless", treasures_count: 10 })) as any;
-    const assoc = (HmShip as any)._reflectOnAssociation("treasures");
-    expect(assoc).toBeDefined();
-    expect(assoc.options.counterCache).toBeUndefined();
+    const ship = (await HmShip.createBang({ name: "Countless", treasures_count: 10 })) as any;
+
+    expect(HmShip.reflectOnAssociation("treasures")!.hasCachedCounter()).toBeFalsy();
+
     expect(await ship.treasures.size()).toBe(0);
-    const countBefore = (await HmShip.find(ship.id)).treasures_count;
-    await ship.treasures.create({ name: "Gold" });
-    expect((await HmShip.find(ship.id)).treasures_count).toBe(countBefore);
-    await ship.treasures.destroyAll();
-    expect((await HmShip.find(ship.id)).treasures_count).toBe(countBefore);
+
+    await assertNoDifference(
+      async () => (await ship.reload()).treasures_count,
+      "treasures_count should not be changed",
+      async () => {
+        await ship.treasures.create({ name: "Gold" });
+      },
+    );
+
+    await assertNoDifference(
+      async () => (await ship.reload()).treasures_count,
+      "treasures_count should not be changed",
+      async () => {
+        await ship.treasures.destroyAll();
+      },
+    );
   });
 
   it("counter cache updates in memory after create", async () => {
@@ -5149,25 +4990,25 @@ describe("HasManyAssociationsTest", () => {
 
   it("sharded deleting models", async () => {
     const blogPost = shardedBlogPosts("great_post_blog_one") as any;
-    const comments = await blogPost.deleteComments;
+    const comments = blogPost.deleteComments;
 
-    expect(comments.length).toBe(3);
+    expect(await comments.size()).toBe(3);
 
-    const commentsToDelete = [comments[0], comments[1]];
+    const commentsToDelete = [await comments.first(), await comments.second()];
 
-    const sqls = await captureSql(async () => {
+    const sql = await captureSql(async () => {
       await blogPost.deleteComments.delete(commentsToDelete);
     });
 
-    const col = (name: string) => `["\`]?sharded_comments["\`]?\\.["\`]?${name}["\`]?`;
-    const queryConstraints = `${col("blog_id")} = .* AND ${col("id")} = .*`;
+    const blogId = regexpEscape(quoteTableName("sharded_comments.blog_id"));
+    const id = regexpEscape(quoteTableName("sharded_comments.id"));
+
+    const queryConstraints = `${blogId} = .* AND ${id} = .*`;
     const expectation = new RegExp(
       `DELETE.*WHERE.* \\(${queryConstraints} OR ${queryConstraints}\\)`,
-      "i",
     );
-    const deleteSql = sqls.find((s) => /DELETE/i.test(s));
-    expect(deleteSql).toBeDefined();
-    expect(deleteSql).toMatch(expectation);
+
+    expect(sql[1]).toMatch(expectation);
 
     await blogPost.reload();
 
@@ -5223,24 +5064,42 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("counter cache updates in memory after create with overlapping counter cache columns", async () => {
-    const user = (await UserCommentsCount.create({})) as any;
-    const post = (await PostCommentsCount.create({})) as any;
+    const user = (await UserCommentsCount.createBang()) as any;
+    const post = (await PostCommentsCount.createBang()) as any;
 
-    const before1 = user.comments_count;
-    const postBefore1 = post.comments_count;
-    await post.comments.push(
-      await CommentOverlappingCounterCache.create({ userCommentsCount: user }),
+    await assertDifference(
+      () => user.comments_count,
+      +1,
+      null,
+      async () => {
+        await assertNoDifference(
+          () => post.comments_count,
+          null,
+          async () => {
+            await post.comments.push(
+              await CommentOverlappingCounterCache.createBang({ userCommentsCount: user }),
+            );
+          },
+        );
+      },
     );
-    expect(user.comments_count).toBe(before1 + 1);
-    expect(post.comments_count).toBe(postBefore1);
 
-    const before2 = user.comments_count;
-    const postBefore2 = post.comments_count;
-    await user.comments.push(
-      await CommentOverlappingCounterCache.create({ postCommentsCount: post }),
+    await assertDifference(
+      () => user.comments_count,
+      +1,
+      null,
+      async () => {
+        await assertNoDifference(
+          () => post.comments_count,
+          null,
+          async () => {
+            await user.comments.push(
+              await CommentOverlappingCounterCache.createBang({ postCommentsCount: post }),
+            );
+          },
+        );
+      },
     );
-    expect(user.comments_count).toBe(before2 + 1);
-    expect(post.comments_count).toBe(postBefore2);
   });
 });
 
