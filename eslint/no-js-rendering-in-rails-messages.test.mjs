@@ -15,27 +15,20 @@ const INSPECT = "an `inspect` body";
 
 tester.run("no-js-rendering-in-rails-messages", rule, {
   valid: [
-    // Outside a message: a JSON encoder, a cast, a cache key.
     "function toJSON(x: unknown) { return JSON.stringify(x); }",
     "function castValue(value: unknown) { return String(value); }",
     "const key = `${x.constructor.name}:${JSON.stringify(y)}`;",
-    // The Ruby renderings themselves.
     "throw new ArgumentError(`missing values for ${rbInspect(missing)}`);",
     "throw new TypeError(`can't quote ${rbObjClass(value)}`);",
-    // The constructor expression is not a rendered argument.
     "throw new (errors[String(kind)])('m');",
-    // A message built before the throw is out of reach by design.
     "const msg = JSON.stringify(x); throw new ArgumentError(msg);",
-    // `new` without `throw` constructs, it does not raise here.
     "const e = new ArgumentError(JSON.stringify(x));",
-    // A file-level receipt means no Rails rendering to mirror.
     `/**
  * @noRailsEquivalent PERMANENT
  */
 
 import { x } from "./x.js";
 throw new Error(JSON.stringify(x));`,
-    // A member named inspect only matters as a declaration, not a call.
     "const s = obj.inspect(JSON.stringify(x));",
   ],
   invalid: [

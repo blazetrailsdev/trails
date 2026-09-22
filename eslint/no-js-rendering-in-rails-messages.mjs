@@ -39,7 +39,6 @@ function propertyName(node) {
   return undefined;
 }
 
-/** `JSON.stringify(...)`, `String(...)` or `.constructor.name`, else undefined. */
 function jsRendering(node) {
   if (node.type === "CallExpression") {
     const callee = node.callee;
@@ -92,7 +91,6 @@ function isInspectMember(node) {
   return propertyName(node.key) === "inspect";
 }
 
-/** Where `node` renders into a Rails message: `"throw"`, `"inspect"`, or undefined. */
 function messageContext(node) {
   let child = node;
   for (let n = node.parent; n; child = n, n = n.parent) {

@@ -111,6 +111,8 @@ function predicationDispatch<T extends PredicationHost>(
   if (typeof member !== "function") {
     throw new NoMethodError(
       `undefined method '${methodId}' for an instance of ${rbObjClass(host)}`,
+      methodId,
+      { receiver: host },
     );
   }
   const fn = member as (...args: unknown[]) => Node;

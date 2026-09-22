@@ -881,11 +881,6 @@ export default defineConfig(
     },
   },
 
-  // ── no-js-rendering-in-rails-messages (RFC 0156): a value rendered into a
-  //    `throw new` argument or an `inspect` body uses Ruby's rendering, not
-  //    JSON.stringify / String() / constructor.name. Per-package enrollment,
-  //    ONLY-GROW: a package joins once its sites are converged, and a package
-  //    is never removed to turn a red run green.
   {
     files: ["packages/arel/src/**/*.ts"],
     ignores: ["**/*.test.ts", "**/test-helpers/**"],
