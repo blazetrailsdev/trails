@@ -119,7 +119,8 @@ export class Module {
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
   instanceMethods(): string[] {
-    return Object.getOwnPropertyNames(carrierOf(this));
+    const carrier = carrierOf(this);
+    return Object.getOwnPropertyNames(carrier).filter((name) => !isUndefEntry(carrier, name));
   }
 
   /**
@@ -149,10 +150,23 @@ export class Module {
    *
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
-  undefMethod(...names: string[]): void {
+  undefMethod(...names: string[]): this {
     const carrier = carrierOf(this);
-    for (const name of names) delete carrier[name];
-    relinkIncluders(this);
+    try {
+      for (const name of names) {
+        if (!Object.prototype.hasOwnProperty.call(carrier, name) || isUndefEntry(carrier, name)) {
+          throw new NameError(`undefined method '${name}' for module '#<Module>'`, name);
+        }
+        Object.defineProperty(carrier, name, {
+          value: undefined,
+          writable: true,
+          configurable: true,
+        });
+      }
+    } finally {
+      relinkIncluders(this);
+    }
+    return this;
   }
 
   /**
@@ -218,7 +232,8 @@ export class Module {
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
   isMethodDefined(name: string): boolean {
-    return Object.prototype.hasOwnProperty.call(carrierOf(this), name);
+    const carrier = carrierOf(this);
+    return Object.prototype.hasOwnProperty.call(carrier, name) && !isUndefEntry(carrier, name);
   }
 }
 
@@ -231,6 +246,11 @@ function carrierOf(mod: Module): Record<string, unknown> {
     carriers.set(mod, carrier);
   }
   return carrier;
+}
+
+function isUndefEntry(carrier: Record<string, unknown>, name: string): boolean {
+  const descriptor = Object.getOwnPropertyDescriptor(carrier, name);
+  return descriptor !== undefined && "value" in descriptor && descriptor.value === undefined;
 }
 
 const includerCarriers = new WeakMap<Module, object[]>();

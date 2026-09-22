@@ -1,4 +1,4 @@
-import { kernelThrow } from "@blazetrails/ruby-compat";
+import { Range, kernelThrow } from "@blazetrails/ruby-compat";
 import { Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect } from "vitest";
 import {
@@ -76,7 +76,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     const proxy = association<Post>(author, "posts");
     expect(proxy.at(0)).toBe(proxy.target[0]);
     expect(proxy.at(-1)).toBe(proxy.target[2]);
-    expect(proxy.at(99)).toBeUndefined();
+    expect(proxy.at(99)).toBeNull();
   });
 
   it("map / filter / forEach delegate to the target", async () => {
@@ -137,9 +137,12 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
   it("slice returns a plain array shallow copy", async () => {
     const author = await authorWithPosts();
     const proxy = association<Post>(author, "posts");
-    const head = proxy.slice(0, 2);
-    expect(head).toEqual(proxy.target.slice(0, 2));
-    expect(Array.isArray(head)).toBe(true);
+    const tail = proxy.slice(1, 2);
+    expect(tail).toEqual(proxy.target.slice(1, 3));
+    expect(Array.isArray(tail)).toBe(true);
+    expect(proxy.slice(1)).toBe(proxy.target[1]);
+    expect(proxy.slice(new Range(0, 1))).toEqual(proxy.target.slice(0, 2));
+    expect(proxy.slice(4, 1)).toBeNull();
   });
 
   it("reduce composes over the target", async () => {
@@ -152,7 +155,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
   it("indexOf / flatMap work", async () => {
     const author = await authorWithPosts();
     const proxy = association<Post>(author, "posts");
-    const second = proxy.at(1)!;
+    const second = proxy.at(1);
     expect(proxy.indexOf(second)).toBe(1);
     expect(proxy.flatMap((p: Post) => [p.title, p.title.toUpperCase()])).toEqual(
       proxy.target.flatMap((p) => [p.title, p.title.toUpperCase()]),

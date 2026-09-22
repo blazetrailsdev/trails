@@ -98,7 +98,11 @@ export function rbModSingletonP(klass: unknown): boolean {
  */
 export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true): boolean {
   void pub;
-  return mid in Object(obj);
+  for (let o: object | null = Object(obj); o; o = Object.getPrototypeOf(o) as object | null) {
+    const entry = Object.getOwnPropertyDescriptor(o, mid);
+    if (entry) return !("value" in entry && entry.value === undefined);
+  }
+  return false;
 }
 
 /**

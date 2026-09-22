@@ -1009,8 +1009,10 @@ directions:
   runtime residue: it is emitted as an ordinary property, so `in` reports it at
   BOTH `pub` values, where Ruby hides it at `pub = 1`.
 
-So `mid in Object(obj)` is the whole of `method_boundp` here, and `pub` cannot
-change its answer. The parameter is still declared and still plumbed — Rails'
+So the prototype-chain lookup of `mid` is the whole of `method_boundp` here —
+the nearest own descriptor answers, and an own `undefined` value is
+`Module#undefMethod`'s `VM_METHOD_TYPE_UNDEF` entry, which answers false — and
+`pub` cannot change its answer. The parameter is still declared and still plumbed — Rails'
 `ActiveModel::AttributeMethods#respond_to?`
 (`activemodel/lib/active_model/attribute_methods.rb:528-533`) makes two `super`
 calls that differ only in it, and dropping it collapses them into one call

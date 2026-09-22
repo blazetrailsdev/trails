@@ -308,6 +308,34 @@ describe("include", () => {
     expect((new User() as { present?: unknown }).present).toBeUndefined();
   });
 
+  it("undefMethod stops lookup where removeMethod falls through to the superclass", () => {
+    class Parent {
+      greet(): string {
+        return "parent";
+      }
+    }
+    const undefd = new Module();
+    undefd.defineMethod("greet", () => "module");
+    class Undefd extends Parent {}
+    include(Undefd, undefd);
+    undefd.undefMethod("greet");
+    expect((new Undefd() as { greet?: unknown }).greet).toBeUndefined();
+    expect(undefd.isMethodDefined("greet")).toBe(false);
+    expect(undefd.instanceMethods()).toEqual([]);
+    expect(() => undefd.undefMethod("missing")).toThrow(NameError);
+    expect(() => new Module().undefMethod("toString")).toThrow(NameError);
+    const included = new Module();
+    included.include({ wave: () => "wave" });
+    expect(included.undefMethod("wave")).toBe(included);
+
+    const removed = new Module();
+    removed.defineMethod("greet", () => "module");
+    class Removed extends Parent {}
+    include(Removed, removed);
+    removed.removeMethod("greet");
+    expect(new Removed().greet()).toBe("parent");
+  });
+
   it("keeps a class-body method ahead of an included Module", () => {
     class User {
       greet() {

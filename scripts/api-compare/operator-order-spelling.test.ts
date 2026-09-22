@@ -54,9 +54,12 @@ describe("operatorSpelling", () => {
     expect(operatorSpelling("Arel::Math", "~@")).toEqual(["bitwiseNot"]);
   });
 
-  it("leaves module operators with no TS counterpart unmapped", () => {
-    expect(operatorSpelling("ActiveRecord::Delegation", "[]")).toBeUndefined();
-    expect(operatorSpelling("ActiveRecord::Delegation", "+")).toBeUndefined();
+  it("resolves Delegation's records operators to the delegation.ts spellings", () => {
+    expect(operatorSpelling("ActiveRecord::Delegation", "[]")).toEqual(["at"]);
+    expect(operatorSpelling("ActiveRecord::Delegation", "&")).toEqual(["intersection"]);
+    expect(operatorSpelling("ActiveRecord::Delegation", "|")).toEqual(["union"]);
+    expect(operatorSpelling("ActiveRecord::Delegation", "+")).toEqual(["plus"]);
+    expect(operatorSpelling("ActiveRecord::Delegation", "-")).toEqual(["difference"]);
   });
 
   it("resolves CompareWithRange's === to the compare-range.ts spelling", () => {

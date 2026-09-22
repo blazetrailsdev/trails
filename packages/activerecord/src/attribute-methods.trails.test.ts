@@ -1,3 +1,4 @@
+import { basicObjRespondTo } from "@blazetrails/ruby-compat";
 import { describe, it, expect, vi } from "vitest";
 import { Base, DangerousAttributeError, ReadonlyAttributeError, registerModel } from "./index.js";
 import { Model } from "@blazetrails/activemodel";
@@ -60,8 +61,8 @@ describe("AttributeMethodsTest (trails)", () => {
 
     Legacy.undefineAttributeMethods();
 
-    expect("title" in Legacy.prototype).toBe(false);
-    expect("heading" in Legacy.prototype).toBe(false);
+    expect(basicObjRespondTo(Legacy.prototype, "title")).toBe(false);
+    expect(basicObjRespondTo(Legacy.prototype, "heading")).toBe(false);
   });
 
   it("a class reached only through isInstanceMethodAlreadyImplemented holds a GeneratedAttributeMethods", () => {

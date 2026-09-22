@@ -49,8 +49,7 @@ export type TemporalDateLike =
   | Temporal.Instant
   | Temporal.ZonedDateTime
   | Temporal.PlainDateTime
-  | Temporal.PlainDate
-  | Temporal.PlainTime;
+  | Temporal.PlainDate;
 
 export function quoteColumnName(_columnName: unknown): string {
   // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/quoting.rb:61
@@ -280,20 +279,6 @@ function toFsDb(value: TemporalDateLike): string {
     return formatPlainDateTimeForSql(value.toPlainDateTime());
   if (value instanceof Temporal.PlainDateTime) return formatPlainDateTimeForSql(value);
   if (value instanceof Temporal.PlainDate) return formatPlainDateForSql(value);
-  if (value instanceof Temporal.PlainTime) {
-    const dt = new Temporal.PlainDateTime(
-      2000,
-      1,
-      1,
-      value.hour,
-      value.minute,
-      value.second,
-      value.millisecond,
-      value.microsecond,
-      value.nanosecond,
-    );
-    return formatPlainDateTimeForSql(dt);
-  }
   throw new TypeError(
     `quotedDate: cannot format ${(value as object).constructor?.name ?? typeof value} — use a Temporal type`,
   );

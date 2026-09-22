@@ -5,7 +5,7 @@ import { AssociationScope, type AssociationScopeable } from "./association-scope
 import { associationKeysEqual } from "./key-normalization.js";
 import { getDjasScopeBuilder, getAssociationRelationFactory } from "./_scope-slots.js";
 import { ThroughAssociation } from "./through-association.js";
-import { camelize, safeConstantize, singularize } from "@blazetrails/activesupport";
+import { camelize, kernelArray, safeConstantize, singularize } from "@blazetrails/activesupport";
 import { except, hasKey } from "@blazetrails/ruby-compat";
 import { AssociationTypeMismatch } from "../errors.js";
 import { assertAssignedSynchronously } from "@blazetrails/activemodel";
@@ -578,11 +578,9 @@ export class Association {
   }
 
   protected isForeignKeyFor(record: Base): boolean {
-    const fk = this.reflection.foreignKey();
-    const foreignKey = Array.isArray(fk) ? fk : [fk];
-    const hasAttr = (record as any)._hasAttribute as ((k: string) => boolean) | undefined;
+    const foreignKey = kernelArray(this.reflection.foreignKey());
     return foreignKey.every((key) =>
-      typeof hasAttr === "function" ? hasAttr.call(record, String(key)) : false,
+      (record as Base & { _hasAttribute(attrName: string): boolean })._hasAttribute(key),
     );
   }
 

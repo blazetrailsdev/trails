@@ -109,6 +109,18 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // relation/predicate_builder.rb:53 `def [](attr_name, value, operator = nil)`
   // → relation/predicate-builder.ts `get`, the `Arel::Table#[]` spelling.
   "ActiveRecord::PredicateBuilder": { "[]": ["get"] },
+  // relation/delegation.rb:100-101 `delegate … :[], :&, :|, :+, :-, … to: :records`
+  // → relation/delegation.ts `at` / `intersection` / `union` / `plus` /
+  // `difference`: `[]` takes `ActiveRecord::Result`'s `at`, `|` / `+` the
+  // `Relation::WhereClause` spellings, `&` / `-` Ruby `Array#intersection` /
+  // `Array#difference`.
+  "ActiveRecord::Delegation": {
+    "[]": ["at"],
+    "&": ["intersection"],
+    "|": ["union"],
+    "+": ["plus"],
+    "-": ["difference"],
+  },
   // relation/from_clause.rb:21 `def ==(other)` → relation/from-clause.ts `equals`.
   "ActiveRecord::Relation::FromClause": { "==": ["equals"] },
   // relation/where_clause.rb:14 `def +(other)` / :18 `def -(other)` / :22

@@ -16,7 +16,14 @@ import {
   toSentence,
 } from "@blazetrails/activesupport";
 import { NotImplementedError } from "../errors.js";
-import { Module, NoMethodError, include, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import {
+  Module,
+  NoMethodError,
+  Range,
+  arySlice,
+  include,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat";
 import { _Base } from "../base-slot.js";
 import { _relationFamilySlot, _relationFamilyState } from "./uncacheable-methods-slot.js";
 
@@ -203,6 +210,14 @@ const RECORD_DELEGATES: Record<string, RecordDelegate> = {
     return records;
   },
   join: (records, separator?: string) => records.join(separator),
+  at: (records, ...args: [index: number | Range<number>, length?: number]) =>
+    arySlice(records, ...args),
+  intersection: (records, other: Base[]) =>
+    uniqRecords(records).filter((record) => includesRecord(other, record)),
+  union: (records, other: Base[]) => uniqRecords([...records, ...other]),
+  plus: (records, other: Base[]) => [...records, ...other],
+  difference: (records, other: Base[]) =>
+    records.filter((record) => !includesRecord(other, record)),
   isIntersect: (records, other: Base[]) =>
     records.some((record) => other.some((o) => record.equals(o))),
   reverse: (records) => [...records].reverse(),
@@ -236,7 +251,8 @@ const RECORD_DELEGATES: Record<string, RecordDelegate> = {
     return records.slice(shift).concat(records.slice(0, shift));
   },
   shuffle: (records) => shuffleInPlace([...records]),
-  slice: (records, start?: number, end?: number) => records.slice(start, end),
+  slice: (records, ...args: [index: number | Range<number>, length?: number]) =>
+    arySlice(records, ...args),
   split: (records, valueOrFn: Base | ((record: Base) => boolean)) => split(records, valueOrFn),
   inGroups: (records, number: number, fillWith: Base | null | false = null) =>
     inGroups(records, number, fillWith),
@@ -315,6 +331,32 @@ export class Delegation {
 
   isIntersect(this: DelegationHost, other: Base[]): boolean | Promise<boolean> {
     return withRecords(this, (records) => RECORD_DELEGATES.isIntersect(records, other) as boolean);
+  }
+
+  at(
+    this: DelegationHost,
+    ...args: [index: number | Range<number>, length?: number]
+  ): Base | Base[] | null | Promise<Base | Base[] | null> {
+    return withRecords(
+      this,
+      (records) => RECORD_DELEGATES.at(records, ...args) as Base | Base[] | null,
+    );
+  }
+
+  intersection(this: DelegationHost, other: Base[]): Base[] | Promise<Base[]> {
+    return withRecords(this, (records) => RECORD_DELEGATES.intersection(records, other) as Base[]);
+  }
+
+  union(this: DelegationHost, other: Base[]): Base[] | Promise<Base[]> {
+    return withRecords(this, (records) => RECORD_DELEGATES.union(records, other) as Base[]);
+  }
+
+  plus(this: DelegationHost, other: Base[]): Base[] | Promise<Base[]> {
+    return withRecords(this, (records) => RECORD_DELEGATES.plus(records, other) as Base[]);
+  }
+
+  difference(this: DelegationHost, other: Base[]): Base[] | Promise<Base[]> {
+    return withRecords(this, (records) => RECORD_DELEGATES.difference(records, other) as Base[]);
   }
 
   reverse(this: DelegationHost): Base[] | Promise<Base[]> {
@@ -396,8 +438,14 @@ export class Delegation {
     return withRecords(this, (records) => RECORD_DELEGATES.toFormattedS(records, format) as string);
   }
 
-  slice(this: DelegationHost, start?: number, end?: number): Base[] | Promise<Base[]> {
-    return withRecords(this, (records) => RECORD_DELEGATES.slice(records, start, end) as Base[]);
+  slice(
+    this: DelegationHost,
+    ...args: [index: number | Range<number>, length?: number]
+  ): Base | Base[] | null | Promise<Base | Base[] | null> {
+    return withRecords(
+      this,
+      (records) => RECORD_DELEGATES.slice(records, ...args) as Base | Base[] | null,
+    );
   }
 
   async toXml(this: DelegationHost, options: ToXmlOptions = {}): Promise<string> {
@@ -467,6 +515,21 @@ refuseImplicitCount(Delegation.prototype.length);
 function withRecords<R>(host: DelegationHost, fn: (records: Base[]) => R): R | Promise<R> {
   if (host.isLoaded) return fn([...(host.target ?? host._records ?? [])]);
   return host.records().then((records) => fn([...records]));
+}
+
+function includesRecord(records: unknown[], record: unknown): boolean {
+  return records.some(
+    (candidate) =>
+      candidate === record ||
+      (typeof (candidate as { equals?: unknown } | null)?.equals === "function" &&
+        (candidate as { equals(o: unknown): boolean }).equals(record) === true),
+  );
+}
+
+function uniqRecords<U>(records: U[]): U[] {
+  const uniq: U[] = [];
+  for (const record of records) if (!includesRecord(uniq, record)) uniq.push(record);
+  return uniq;
 }
 
 function shuffleInPlace<T>(array: T[]): T[] {

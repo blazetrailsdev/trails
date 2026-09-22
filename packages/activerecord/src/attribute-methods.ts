@@ -233,7 +233,7 @@ export function initializeGeneratedModules(this: AttributeMethodsHost): void {
     ? this._generatedAttributeMethods
     : undefined;
   if (previous instanceof Module) {
-    previous.undefMethod(...previous.instanceMethods());
+    previous.removeMethod(...previous.instanceMethods());
   }
   this._generatedAttributeMethods = new GeneratedAttributeMethods();
   this._generatedAttributeMethods.ownerName = this.name;
