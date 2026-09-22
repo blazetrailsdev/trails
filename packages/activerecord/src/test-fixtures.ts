@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, type TaskContext } from "vitest";
 import { getCurrentSuite } from "vitest/suite";
-import { Dir, File as RubyFile, include, included, merge } from "@blazetrails/ruby-compat";
+import {
+  Dir,
+  File as RubyFile,
+  RuntimeError,
+  include,
+  included,
+  merge,
+} from "@blazetrails/ruby-compat";
 import {
   Notifications,
   classAttribute,
@@ -270,6 +277,7 @@ const alreadyLoadedFixtures = new Map<unknown, unknown>();
 interface TestFixturesInstance {
   name: string;
   useTransactionalTests: boolean;
+  preLoadedFixtures: boolean;
   lockThreads: boolean;
   constructor: TestCaseClass;
   _inEnclosingTransaction?: boolean;
@@ -289,10 +297,14 @@ async function setupFixtures<T>(
   fixtureCacheKey: unknown,
   loadFixtures: (config: typeof Base) => Promise<T>,
 ): Promise<T> {
-  let loadedFixtures: T;
+  if (this.preLoadedFixtures && !this.useTransactionalTests) {
+    throw new RuntimeError("pre_loaded_fixtures requires use_transactional_tests");
+  }
+
   this._inEnclosingTransaction =
     ((adapter as { transactionManager?: { openTransactions: number } }).transactionManager
       ?.openTransactions ?? 0) > 0;
+  let loadedFixtures: T;
   if (isRunInTransaction.call(this)) {
     loadedFixtures = alreadyLoadedFixtures.get(fixtureCacheKey) as T;
     if (loadedFixtures === undefined) {
@@ -530,6 +542,7 @@ function useTablelessFixtures(
         Object.keys(tableRowsForConnection),
       );
       await checkAllForeignKeysValidBang(adapter);
+      FixtureSet.resetCache();
       return fixtureSets.map((fixtureSet) =>
         Object.fromEntries(
           Object.entries(fixtureSet.fixtures).map(([label, fixture]) => [label, fixture.toHash()]),
@@ -652,7 +665,9 @@ function useFixtures(
   const store: Record<string, Record<string, unknown>> = {};
   const loadedFixtures: Record<string, FixtureSet> = {};
   const fixtureCacheKey = isNameArray ? JSON.stringify(keys) : {};
-  const fixturesDirectory = `use-fixtures/${++useFixturesCount}`;
+  const fixturesDirectory = isNameArray
+    ? "use-fixtures/registry"
+    : `use-fixtures/${++useFixturesCount}`;
   let testCase: TestFixturesInstance | null = null;
 
   beforeEach(async (ctx) => {
@@ -680,8 +695,16 @@ function useFixtures(
       config,
       adapter,
       fixtureCacheKey,
-      (config) =>
-        FixtureSet.createFixtures(fixturesDirectory, fixtureSetNames, fixtureClassNames, config),
+      async (config) => {
+        const created = await FixtureSet.createFixtures(
+          fixturesDirectory,
+          fixtureSetNames,
+          fixtureClassNames,
+          config,
+        );
+        if (!isNameArray) FixtureSet.resetCache();
+        return created;
+      },
     );
     const loaded = Object.keys(fixtures);
     for (let i = 0; i < loaded.length; i++) {
