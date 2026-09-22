@@ -613,6 +613,9 @@ describe("compareCallArgs", () => {
     expect(compareCallArgs(site("present?", ["id:x"]), site("present?", ["id:y"])).verdict).toBe(
       "skip",
     );
+    for (const name of ["symbolize_keys", "symbolize_keys!"]) {
+      expect(compareCallArgs(site(name, ["id:x"]), site(name, ["id:y"])).verdict).toBe("skip");
+    }
   });
 
   it("skips an Enumerable idiom", () => {

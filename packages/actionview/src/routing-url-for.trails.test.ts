@@ -68,15 +68,20 @@ describe("ActionView::RoutingUrlFor#url_for", () => {
 
   it("asks for the current page when given nil", () => {
     expect(host.urlFor(null)).toBe("/super");
-    expect(host.seen[0]).toEqual({ only_path: true });
+    expect(host.seen[0]).toEqual({ onlyPath: true });
   });
 
   it("defaults :only_path on a Hash unless :host is given", () => {
     host.urlFor({ action: "index" });
-    expect(host.seen[0]).toEqual({ action: "index", only_path: true });
+    expect(host.seen[0]).toEqual({ action: "index", onlyPath: true });
 
     host.urlFor({ action: "index", host: "example.com" });
     expect(host.seen[1]).toEqual({ action: "index", host: "example.com" });
+  });
+
+  it("treats an empty :host as given, per Ruby truthiness", () => {
+    host.urlFor({ action: "index", host: "" });
+    expect(host.seen[0]).toEqual({ action: "index", host: "" });
   });
 
   it("does not mutate the Hash the caller passed", () => {
@@ -86,8 +91,8 @@ describe("ActionView::RoutingUrlFor#url_for", () => {
   });
 
   it("honors an explicit only_path: false", () => {
-    host.urlFor({ action: "index", only_path: false });
-    expect(host.seen[0]).toEqual({ action: "index", only_path: false });
+    host.urlFor({ action: "index", onlyPath: false });
+    expect(host.seen[0]).toEqual({ action: "index", onlyPath: false });
   });
 
   it("routes ActionController::Parameters through super", () => {
@@ -128,7 +133,7 @@ describe("ActionView::RoutingUrlFor#url_for", () => {
 
   it("routes an Array through polymorphic_path when only_path", () => {
     const record = new Workshop(1);
-    expect(host.urlFor([record])).toBe(`path:${JSON.stringify([[record], { only_path: true }])}`);
+    expect(host.urlFor([record])).toBe(`path:${JSON.stringify([[record], { onlyPath: true }])}`);
   });
 
   it("routes an Array through polymorphic_url when not only_path", () => {
@@ -161,8 +166,8 @@ describe("ActionView::RoutingUrlFor private helpers", () => {
   });
 
   it("ensure_only_path_option leaves an existing key alone", () => {
-    const options: Record<string, unknown> = { only_path: false };
+    const options: Record<string, unknown> = { onlyPath: false };
     host.ensureOnlyPathOption(options);
-    expect(options).toEqual({ only_path: false });
+    expect(options).toEqual({ onlyPath: false });
   });
 });

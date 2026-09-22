@@ -329,6 +329,8 @@ export const NO_JS_CALL_FORM = new Set([
   "blank?", // truthiness (`!x`)
   "to_str", // implicit String coercion — same family as `to_s`
   "synchronize", // the block runs bare — JS has no mutex to acquire
+  "symbolize_keys", // a bare-keyed JS object is already normalized (RFC 0149)
+  "symbolize_keys!", // same, in place
 ]);
 
 // `synchronize` is the strongest member of that set rather than a marginal one.
@@ -339,6 +341,28 @@ export const NO_JS_CALL_FORM = new Set([
 // TS body that could ever satisfy the call, which is what separates a
 // NO_JS_CALL_FORM name from a baselined omission: the gate would otherwise
 // carry a row per guarded method forever, with nothing to converge onto.
+
+// `symbolize_keys` / `symbolize_keys!` (RFC 0149, `core_ext/hash/keys.rb:27-36`)
+// collapse Ruby's two key types, String and Symbol, into one before a hash is
+// read. A JS object has one key type, so an option hash Rails normalizes this
+// way is ported bare-keyed, keyed by the camelCase spelling of the Symbol's
+// name (`onlyPath` for `:only_path`), and the call is omitted:
+// `build_db_config_from_raw_config`'s `config.symbolize_keys`
+// (`database_configurations.rb:257`) and `RoutingUrlFor#url_for`'s
+// `options.symbolize_keys` (`routing_url_for.rb:89`) have no callee in their
+// ports. A port still calls `symbolizeKeys` where Symbol-ness is observable:
+// (1) the hash is rendered by `inspect` / `rbInspect`, so the key spelling is
+// in the output; (2) control flow turns on `Symbol === key`; (3) the hash is
+// merged with, or compared to, a hash that already carries `":name"` keys.
+// The entry makes the omission correct by default and still admits a present
+// call. What it gives up, a dropped call becoming invisible, can only differ
+// at those three observable sites, and each is an `inspect` or a key lookup a
+// test pins. Before this entry the omission already passed, but only by
+// accident: gate 2 of significantMissingCalls resolves `symbolizeKeys`'s
+// signature inside the compared package alone (resolvePortedWithArgsSigs),
+// and the one that takes arguments lives in activesupport's hash-utils.ts, so
+// outside activesupport the call was never significant and a
+// `@missingRailsCall` receipt for it read STALE.
 
 /**
  * The JS iteration callee an Enumerable iterator's faithful port would name if

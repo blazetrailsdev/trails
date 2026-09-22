@@ -16,7 +16,7 @@ export class RoutingUrlFor {
     if (typeof options === "string" && !isSymbol(options)) {
       return options;
     } else if (options == null) {
-      return _UrlFor!.urlFor.call(this, { only_path: this._generatePathsByDefault() });
+      return _UrlFor!.urlFor.call(this, { onlyPath: this._generatePathsByDefault() });
     } else if (isPlainObject(options)) {
       const hash = { ...(options as Record<string, unknown>) };
       this.ensureOnlyPathOption(hash);
@@ -33,7 +33,7 @@ export class RoutingUrlFor {
       const opts = extractOptionsBang(components) as Record<string, unknown>;
       this.ensureOnlyPathOption(opts);
 
-      if (opts["only_path"]) {
+      if (opts["onlyPath"] != null && opts["onlyPath"] !== false) {
         return _UrlFor!.polymorphicPath.call(this, components, opts);
       } else {
         return _UrlFor!.polymorphicUrl.call(this, components, opts);
@@ -84,12 +84,13 @@ export class RoutingUrlFor {
     if (
       !(params
         ? params.hasKey("only_path")
-        : Object.prototype.hasOwnProperty.call(hash!, "only_path"))
+        : Object.prototype.hasOwnProperty.call(hash!, "onlyPath"))
     ) {
-      if (!(params ? params.get("host") : hash!["host"])) {
+      const host = params ? params.get("host") : hash!["host"];
+      if (!(host != null && host !== false)) {
         const onlyPath = this._generatePathsByDefault();
         if (params) params.set("only_path", onlyPath);
-        else hash!["only_path"] = onlyPath;
+        else hash!["onlyPath"] = onlyPath;
       }
     }
   }
