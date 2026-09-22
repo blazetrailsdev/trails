@@ -1,4 +1,4 @@
-import { TypeError, rbClassAttachedObject, rbModSingletonP } from "@blazetrails/ruby-compat";
+import { TypeError, rbModSingletonP } from "@blazetrails/ruby-compat";
 
 export interface ClassAttributeOptions {
   instanceAccessor?: boolean;
@@ -16,11 +16,7 @@ function inspect(value: unknown): string {
 export namespace ClassAttribute {
   export function redefine(owner: any, name: string, namespacedName: string, value: unknown): void {
     if (rbModSingletonP(owner)) {
-      if (typeof rbClassAttachedObject(owner) === "function") {
-        redefineMethod(owner, namespacedName, true, () => value);
-      } else {
-        redefineMethod(owner.prototype, name, false, () => value);
-      }
+      redefineMethod(owner.prototype, name, false, () => value);
     }
 
     redefineMethod(owner, namespacedName, true, () => value);

@@ -1228,8 +1228,8 @@ JS has no per-object class. `rbObjSingletonClass(obj)`
 (`ruby-compat/src/object.ts`) is the settled shape. It creates a subclass of
 `obj.constructor` on first call and makes it `obj`'s prototype. Its
 `prototype.constructor` is set back to the real class, so `obj.constructor`
-keeps answering Ruby's `obj.class`. `rbModSingletonP` / `rbClassAttachedObject`
-are `Module#singleton_class?` / `Class#attached_object`. Rails code that
+keeps answering Ruby's `obj.class`. `rbModSingletonP` is
+`Module#singleton_class?`. Rails code that
 branches on `singleton_class?` ports the branch as it is:
 `ClassAttribute.redefine`'s instance-reader arm (`class_attribute.rb:7-13`), and
 `UniquenessValidator#initialize`'s `@klass.superclass` (`uniqueness.rb:16`).
@@ -1239,8 +1239,11 @@ guards (§ "`inherited` is deferred") treat it as an unreset subclass. Do not
 read class-level schema memos off a singleton class. Rails does not either:
 every Rails call that reaches them goes through `record.class`.
 
-A JS class's statics already are its singleton, so a class receiver answers
-itself.
+A JS class has no metaclass apart from its own statics, so
+`rbObjSingletonClass` raises `TypeError` for a class receiver. Code whose Rails
+body reaches a class's singleton class keeps working on the class itself, and
+`ClassAttribute.redefine` does not port its `attached_object.is_a?(Module)`
+arm.
 
 ## Trails has no autoloader (`Rails.autoloaders` / Zeitwerk)
 

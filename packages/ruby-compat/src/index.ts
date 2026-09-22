@@ -29,7 +29,6 @@ export {
   rbInspect,
   rbObjInspect,
   rbObjAsString,
-  rbClassAttachedObject,
   rbModSingletonP,
   rbObjClass,
   rbObjRespondTo,

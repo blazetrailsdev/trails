@@ -46,13 +46,15 @@ const FL_SINGLETON = Symbol.for("@blazetrails/ruby-compat:FL_SINGLETON");
  * becomes the object's prototype. Its `prototype.constructor` stays the
  * attached object's class, because `rb_obj_class` skips a singleton class
  * (`vendor/ruby/object.c:296`): `obj.constructor` keeps answering Ruby's
- * `obj.class`. A JS class's statics already are its singleton, so a class
- * receiver answers itself.
+ * `obj.class`. A JS class has no metaclass apart from its own statics, so
+ * there is no distinct object to answer for a class receiver; it raises the
+ * `TypeError` `singleton_class_of` raises for receivers without one
+ * (`vendor/ruby/class.c:2224`).
  *
  * @noRailsEquivalent PERMANENT
  */
 export function rbObjSingletonClass(obj: object): abstract new (...args: never) => object {
-  if (typeof obj === "function") return obj as abstract new (...args: never) => object;
+  if (typeof obj === "function") throw new TypeError("can't define singleton");
   const proto = Object.getPrototypeOf(obj);
   if (proto !== null && Object.prototype.hasOwnProperty.call(proto, FL_SINGLETON)) {
     return proto[FL_SINGLETON] as abstract new (...args: never) => object;
@@ -77,18 +79,6 @@ export function rbObjSingletonClass(obj: object): abstract new (...args: never) 
  */
 export function rbModSingletonP(klass: unknown): boolean {
   return typeof klass === "function" && Object.prototype.hasOwnProperty.call(klass, FL_SINGLETON);
-}
-
-/**
- * `rb_class_attached_object` (`vendor/ruby/class.c:1707`), `Class#attached_object`.
- *
- * @noRailsEquivalent PERMANENT
- */
-export function rbClassAttachedObject(klass: { name: string }): unknown {
-  if (!rbModSingletonP(klass)) {
-    throw new TypeError(`\`${klass.name}' is not a singleton class`);
-  }
-  return (klass as unknown as Record<symbol, unknown>)[FL_SINGLETON];
 }
 
 /**
