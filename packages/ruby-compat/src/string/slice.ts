@@ -25,7 +25,7 @@ export function sliceBang(
     return [arg, string.slice(0, index) + string.slice(index + arg.length)];
   }
   if (arg instanceof RegExp) {
-    const m = new RegExp(arg.source, arg.flags.replace(/[gy]/g, "") + "d").exec(string);
+    const m = new RegExp(arg.source, arg.flags.replace(/[gyd]/g, "") + "d").exec(string);
     const capture = arg2 ?? 0;
     const text =
       m?.[capture as number] ?? (typeof capture === "string" ? m?.groups?.[capture] : undefined);

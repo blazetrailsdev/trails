@@ -24,10 +24,12 @@ export function stringSplit(
   const re = new RegExp(source, `${flags}gu`);
   const result: string[] = [];
   let beg = 0;
+  let fields = 0;
   for (const m of string.matchAll(re)) {
-    if (limit > 0 && result.length >= limit - 1) break;
+    if (limit > 0 && fields >= limit - 1) break;
     if (m[0].length === 0 && (m.index === beg || m.index === string.length)) continue;
     result.push(string.slice(beg, m.index));
+    fields++;
     for (const capture of m.slice(1)) if (capture !== undefined) result.push(capture);
     beg = m.index + m[0].length;
   }
