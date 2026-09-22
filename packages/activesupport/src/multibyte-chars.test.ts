@@ -80,8 +80,7 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
     assertNot(rbEql(chars_, UNICODE_STRING));
   });
 
-  it.skip("string methods are chainable", () => {
-    // BLOCKED: multibyte-chars-ruby-string-method-table
+  it("string methods are chainable", () => {
     const proxyClass = Multibyte.proxyClass();
     assert(chars("").insert(0, "") instanceof proxyClass);
     assert(chars("").rjust(1) instanceof proxyClass);
@@ -117,8 +116,7 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
     expect(words).toEqual(["armor", "builder", "zebra"]);
   });
 
-  it.skip("should return character offset for regexp matches", () => {
-    // BLOCKED: multibyte-chars-ruby-string-method-table
+  it("should return character offset for regexp matches", () => {
     expect(chars_.matchOperator(/wrong/u)).toBeNull();
     expect(chars_.matchOperator(/こ/u)).toEqual(0);
     expect(chars_.matchOperator(/こに/u)).toEqual(0);
@@ -133,8 +131,7 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
     assert(chars_.isMatch(/ち/u));
   });
 
-  it.skip("should use character offsets for insert offsets", () => {
-    // BLOCKED: multibyte-chars-ruby-string-method-table
+  it("should use character offsets for insert offsets", () => {
     expect(mbChars("").insert(0, "")).toEqual("");
     expect(chars_.insert(1, "わ")).toEqual("こわにちわ");
     expect(chars_.insert(2, "わわ")).toEqual("こわわわにちわ");
@@ -142,20 +139,17 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
     expect(chars_.wrappedString).toEqual("わこわわわにちわ");
   });
 
-  it.skip("insert should be destructive", () => {
-    // BLOCKED: multibyte-chars-ruby-string-method-table
+  it("insert should be destructive", () => {
     chars_.insert(1, "わ");
     expect(chars_).toEqual("こわにちわ");
   });
 
-  it.skip("insert throws index error", async () => {
-    // BLOCKED: multibyte-chars-ruby-string-method-table
+  it("insert throws index error", async () => {
     await assertRaise([IndexError], {}, () => chars_.insert(-12, "わ"));
     await assertRaise([IndexError], {}, () => chars_.insert(12, "わ"));
   });
 
-  it.skip("should know if one includes the other", () => {
-    // BLOCKED: multibyte-chars-ruby-string-method-table
+  it("should know if one includes the other", () => {
     assertIncludes(chars_, "");
     assertIncludes(chars_, "ち");
     assertIncludes(chars_, "わ");
@@ -163,13 +157,11 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
     assertNotIncludes(chars_, "a");
   });
 
-  it.skip("include raises when nil is passed", async () => {
-    // BLOCKED: multibyte-chars-ruby-string-method-table
+  it("include raises when nil is passed", async () => {
     await assertRaises([TypeError, NoMethodError], {}, () => chars_.isInclude(null));
   });
 
-  it.skip("index should return character offset", () => {
-    // BLOCKED: multibyte-chars-ruby-string-method-table
+  it("index should return character offset", () => {
     expect(chars_.index("u")).toBeNull();
     expect(chars_.index("こに")).toEqual(0);
     expect(chars_.index("ち")).toEqual(2);
@@ -179,8 +171,7 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
     expect(mbChars("ééxééx").index("x", 4)).toEqual(5);
   });
 
-  it.skip("rindex should return character offset", () => {
-    // BLOCKED: multibyte-chars-ruby-string-method-table
+  it("rindex should return character offset", () => {
     expect(chars_.rindex("u")).toBeNull();
     expect(chars_.rindex("に")).toEqual(1);
     expect(chars_.rindex("ち", -2)).toEqual(2);
@@ -189,8 +180,7 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
     expect(mbChars("Café périferôl").rindex(/\w/u)).toEqual(13);
   });
 
-  it.skip("indexed insert should take character offsets", () => {
-    // BLOCKED: multibyte-chars-ruby-string-method-table
+  it("indexed insert should take character offsets", () => {
     chars_.set(2, "a");
     expect(chars_).toEqual("こにaわ");
     chars_.set(2, "ηη");
@@ -211,8 +201,7 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
     expect(chars_).toEqual("こλにααα¢η");
   });
 
-  it.skip("indexed insert should raise on index overflow", async () => {
-    // BLOCKED: multibyte-chars-ruby-string-method-table
+  it("indexed insert should raise on index overflow", async () => {
     const before = chars_.toS();
     await assertRaise([IndexError], {}, () => chars_.set(10, "a"));
     await assertRaise([IndexError], {}, () => chars_.set(10, 4, "a"));
@@ -221,21 +210,18 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
     expect(chars_).toEqual(before);
   });
 
-  it.skip("indexed insert should raise on range overflow", async () => {
-    // BLOCKED: multibyte-chars-ruby-string-method-table
+  it("indexed insert should raise on range overflow", async () => {
     const before = chars_.toS();
     await assertRaise([RangeError], {}, () => chars_.set(new Range(10, 12), "a"));
     expect(chars_).toEqual(before);
   });
 
-  it.skip("rjust should raise argument errors on bad arguments", async () => {
-    // BLOCKED: multibyte-chars-ruby-string-method-table
+  it("rjust should raise argument errors on bad arguments", async () => {
     await assertRaise([ArgumentError], {}, () => chars_.rjust(10, ""));
     await assertRaise([ArgumentError], {}, () => chars_.rjust());
   });
 
-  it.skip("rjust should count characters instead of bytes", () => {
-    // BLOCKED: multibyte-chars-ruby-string-method-table
+  it("rjust should count characters instead of bytes", () => {
     expect(chars_.rjust(-3)).toEqual(UNICODE_STRING);
     expect(chars_.rjust(0)).toEqual(UNICODE_STRING);
     expect(chars_.rjust(4)).toEqual(UNICODE_STRING);
@@ -248,14 +234,12 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
     expect(chars_.rjust(8, "αη")).toEqual(`αηαη${UNICODE_STRING}`);
   });
 
-  it.skip("ljust should raise argument errors on bad arguments", async () => {
-    // BLOCKED: multibyte-chars-ruby-string-method-table
+  it("ljust should raise argument errors on bad arguments", async () => {
     await assertRaise([ArgumentError], {}, () => chars_.ljust(10, ""));
     await assertRaise([ArgumentError], {}, () => chars_.ljust());
   });
 
-  it.skip("ljust should count characters instead of bytes", () => {
-    // BLOCKED: multibyte-chars-ruby-string-method-table
+  it("ljust should count characters instead of bytes", () => {
     expect(chars_.ljust(-3)).toEqual(UNICODE_STRING);
     expect(chars_.ljust(0)).toEqual(UNICODE_STRING);
     expect(chars_.ljust(4)).toEqual(UNICODE_STRING);
@@ -268,14 +252,12 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
     expect(chars_.ljust(8, "αη")).toEqual(`${UNICODE_STRING}αηαη`);
   });
 
-  it.skip("center should raise argument errors on bad arguments", async () => {
-    // BLOCKED: multibyte-chars-ruby-string-method-table
+  it("center should raise argument errors on bad arguments", async () => {
     await assertRaise([ArgumentError], {}, () => chars_.center(10, ""));
     await assertRaise([ArgumentError], {}, () => chars_.center());
   });
 
-  it.skip("center should count characters instead of bytes", () => {
-    // BLOCKED: multibyte-chars-ruby-string-method-table
+  it("center should count characters instead of bytes", () => {
     expect(chars_.center(-3)).toEqual(UNICODE_STRING);
     expect(chars_.center(0)).toEqual(UNICODE_STRING);
     expect(chars_.center(4)).toEqual(UNICODE_STRING);
@@ -293,8 +275,7 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
     expect(chars_.center(8, "αη")).toEqual(`αη${UNICODE_STRING}αη`);
   });
 
-  it.skip("lstrip strips whitespace from the left of the string", () => {
-    // BLOCKED: multibyte-chars-ruby-string-method-table
+  it("lstrip strips whitespace from the left of the string", () => {
     expect(mbChars(UNICODE_STRING).lstrip()).toEqual(UNICODE_STRING);
     expect(mbChars(whitespace + UNICODE_STRING).lstrip()).toEqual(UNICODE_STRING);
     expect(mbChars(whitespace + UNICODE_STRING + whitespace).lstrip()).toEqual(
@@ -302,8 +283,7 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
     );
   });
 
-  it.skip("rstrip strips whitespace from the right of the string", () => {
-    // BLOCKED: multibyte-chars-ruby-string-method-table
+  it("rstrip strips whitespace from the right of the string", () => {
     expect(mbChars(UNICODE_STRING).rstrip()).toEqual(UNICODE_STRING);
     expect(mbChars(UNICODE_STRING + whitespace).rstrip()).toEqual(UNICODE_STRING);
     expect(mbChars(whitespace + UNICODE_STRING + whitespace).rstrip()).toEqual(
@@ -311,24 +291,21 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
     );
   });
 
-  it.skip("strip strips whitespace", () => {
-    // BLOCKED: multibyte-chars-ruby-string-method-table
+  it("strip strips whitespace", () => {
     expect(mbChars(UNICODE_STRING).strip()).toEqual(UNICODE_STRING);
     expect(mbChars(whitespace + UNICODE_STRING).strip()).toEqual(UNICODE_STRING);
     expect(mbChars(UNICODE_STRING + whitespace).strip()).toEqual(UNICODE_STRING);
     expect(mbChars(whitespace + UNICODE_STRING + whitespace).strip()).toEqual(UNICODE_STRING);
   });
 
-  it.skip("stripping whitespace leaves whitespace within the string intact", () => {
-    // BLOCKED: multibyte-chars-ruby-string-method-table
+  it("stripping whitespace leaves whitespace within the string intact", () => {
     const stringWithWhitespace = UNICODE_STRING + whitespace + UNICODE_STRING;
     expect(mbChars(stringWithWhitespace).strip()).toEqual(stringWithWhitespace);
     expect(mbChars(stringWithWhitespace).lstrip()).toEqual(stringWithWhitespace);
     expect(mbChars(stringWithWhitespace).rstrip()).toEqual(stringWithWhitespace);
   });
 
-  it.skip("size returns characters instead of bytes", () => {
-    // BLOCKED: multibyte-chars-ruby-string-method-table
+  it("size returns characters instead of bytes", () => {
     expect(mbChars("").size()).toEqual(0);
     expect(chars_.size()).toEqual(4);
     expect(chars_.length).toEqual(4);
@@ -347,8 +324,7 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
     expect(chars(str).compose().reverse()).toEqual(chars(reversedStr).compose());
   });
 
-  it.skip("slice should take character offsets", () => {
-    // BLOCKED: multibyte-chars-ruby-string-method-table
+  it("slice should take character offsets", () => {
     expect(mbChars("").slice(0)).toBeNull();
     expect(chars_.slice(0)).toEqual("こ");
     expect(chars_.slice(3)).toEqual("わ");
@@ -372,8 +348,7 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
     expect(chars_.sliceBang(new Range(1, 2))).toEqual("にち");
   });
 
-  it.skip("slice bang returns nil on out of bound arguments", () => {
-    // BLOCKED: multibyte-chars-ruby-string-method-table
+  it("slice bang returns nil on out of bound arguments", () => {
     expect(chars_.mbChars().sliceBang(new Range(9, 10))).toBeNull();
   });
 
@@ -391,38 +366,32 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
     expect(string).toEqual("úüù");
   });
 
-  it.skip("slice should throw exceptions on invalid arguments", async () => {
-    // BLOCKED: multibyte-chars-ruby-string-method-table
+  it("slice should throw exceptions on invalid arguments", async () => {
     await assertRaise([TypeError], {}, () => chars_.slice(new Range(2, 3), 1));
     await assertRaise([TypeError], {}, () => chars_.slice(1, new Range(2, 3)));
     await assertRaise([ArgumentError], {}, () => chars_.slice(1, 1, 1));
   });
 
-  it.skip("ord should return unicode value for first character", () => {
-    // BLOCKED: multibyte-chars-ruby-string-method-table
+  it("ord should return unicode value for first character", () => {
     expect(chars_.ord()).toEqual(12371);
   });
 
-  it.skip("upcase should upcase ascii characters", () => {
-    // BLOCKED: multibyte-chars-ruby-string-method-table
+  it("upcase should upcase ascii characters", () => {
     expect(mbChars("").upcase()).toEqual("");
     expect(mbChars("aBc").upcase()).toEqual("ABC");
   });
 
-  it.skip("downcase should downcase ascii characters", () => {
-    // BLOCKED: multibyte-chars-ruby-string-method-table
+  it("downcase should downcase ascii characters", () => {
     expect(mbChars("").downcase()).toEqual("");
     expect(mbChars("aBc").downcase()).toEqual("abc");
   });
 
-  it.skip("swapcase should swap ascii characters", () => {
-    // BLOCKED: multibyte-chars-ruby-string-method-table
+  it("swapcase should swap ascii characters", () => {
     expect(mbChars("").swapcase()).toEqual("");
     expect(mbChars("aBc").swapcase()).toEqual("AbC");
   });
 
-  it.skip("capitalize should work on ascii characters", () => {
-    // BLOCKED: multibyte-chars-ruby-string-method-table
+  it("capitalize should work on ascii characters", () => {
     expect(mbChars("").capitalize()).toEqual("");
     expect(mbChars("abc").capitalize()).toEqual("Abc");
   });
@@ -432,8 +401,7 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
     expect(mbChars("abc abc").titleize()).toEqual("Abc Abc");
   });
 
-  it.skip("respond to knows which methods the proxy responds to", () => {
-    // BLOCKED: multibyte-chars-ruby-string-method-table
+  it("respond to knows which methods the proxy responds to", () => {
     assertRespondTo(mbChars(""), "slice");
     assertRespondTo(mbChars(""), "capitalizeBang");
     assertRespondTo(mbChars(""), "gsub");
@@ -441,7 +409,7 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
   });
 
   it.skip("method works for proxyed methods", async () => {
-    // BLOCKED: multibyte-chars-ruby-string-method-table
+    // BLOCKED: ruby-object-method-reaches-respond-to-missing
     expect(mbChars("hello").method("slice").call(new Range(2, 3))).toEqual("ll");
     const chars = mbChars("hello");
     expect(chars.method("capitalizeBang").call()).toEqual("Hello");
@@ -562,26 +530,22 @@ describe("MultibyteCharsTest", () => {
 });
 
 describe("MultibyteCharsExtrasTest", () => {
-  it.skip("upcase should be unicode aware", () => {
-    // BLOCKED: multibyte-chars-ruby-string-method-table
+  it("upcase should be unicode aware", () => {
     expect(chars("аБвгд\0f").upcase()).toEqual("АБВГД\0F");
     expect(chars("こにちわ").upcase()).toEqual("こにちわ");
   });
 
-  it.skip("downcase should be unicode aware", () => {
-    // BLOCKED: multibyte-chars-ruby-string-method-table
+  it("downcase should be unicode aware", () => {
     expect(chars("аБвгд\0F").downcase()).toEqual("абвгд\0f");
     expect(chars("こにちわ").downcase()).toEqual("こにちわ");
   });
 
-  it.skip("swapcase should be unicode aware", () => {
-    // BLOCKED: multibyte-chars-ruby-string-method-table
+  it("swapcase should be unicode aware", () => {
     expect(chars("АAÉü\0F").swapcase()).toEqual("аaéÜ\0f");
     expect(chars("こにちわ").swapcase()).toEqual("こにちわ");
   });
 
-  it.skip("capitalize should be unicode aware", () => {
-    // BLOCKED: multibyte-chars-ruby-string-method-table
+  it("capitalize should be unicode aware", () => {
     for (const [f, t] of Object.entries({
       "аБвг аБвг": "Абвг абвг",
       "аБвг АБВГ": "Абвг абвг",
@@ -705,7 +669,7 @@ describe("MultibyteCharsExtrasTest", () => {
   });
 
   it.skip("tidy bytes should tidy bytes", async () => {
-    // BLOCKED: multibyte-chars-ruby-string-method-table
+    // BLOCKED: multibyte-tidy-bytes-scrub-recodes-bad-bytes
     const singleByteCases: Record<string, string> = {
       "\x21": "!",
       "\x41": "A",

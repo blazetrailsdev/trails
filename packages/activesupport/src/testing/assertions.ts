@@ -1,6 +1,6 @@
 import { indexWith } from "../enumerable-utils.js";
 
-import { Dir, env, rbEqual } from "@blazetrails/ruby-compat";
+import { Dir, env, rbEqual, rbStrRespondTo } from "@blazetrails/ruby-compat";
 import { _testCaseIdentity, taggedLogger } from "./tagged-logging.js";
 
 /** @noRailsEquivalent PERMANENT */
@@ -403,6 +403,7 @@ export function assertInDelta(exp: number, act: number, delta: number = 0.001, m
 }
 
 function respondsTo(object: object, name: string): boolean {
+  if (object instanceof String) return rbStrRespondTo(object.valueOf(), name);
   const override = findDescriptor(object, "respondTo");
   if (override && typeof override.value === "function") {
     return (override.value as (name: string) => unknown).call(object, name) !== false;
@@ -470,8 +471,8 @@ function collectionIncludes(collection: unknown, obj: unknown): boolean {
     isInclude?: (obj: never) => boolean;
     has?: (obj: never) => boolean;
   };
-  if (typeof target.include === "function") return target.include(obj as never);
   if (typeof target.isInclude === "function") return target.isInclude(obj as never);
+  if (typeof target.include === "function") return target.include(obj as never);
   if (typeof target.has === "function") return target.has(obj as never);
   return false;
 }

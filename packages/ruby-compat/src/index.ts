@@ -179,6 +179,13 @@ export { b } from "./string/b.js";
 export { chomp } from "./string/chomp.js";
 export { stringDelete } from "./string/delete.js";
 export { sliceBang } from "./string/slice.js";
+export {
+  rbStrMatch,
+  rbStrRespondTo,
+  rbStrSend,
+  STRING_METHOD_TABLE,
+  type StringReceiver,
+} from "./string/method-table.js";
 export { stringSplit } from "./string/split.js";
 export { forceEncoding } from "./string/force-encoding.js";
 export { Encoding } from "./encoding.js";

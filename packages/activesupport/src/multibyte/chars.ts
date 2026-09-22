@@ -3,7 +3,11 @@ import {
   equals as cmpEquals,
   NoMethodError,
   PROTOCOL_PROBES,
+  rbStrMatch,
+  rbStrRespondTo,
+  rbStrSend,
   sliceBang,
+  STRING_METHOD_TABLE,
   stringSplit,
 } from "@blazetrails/ruby-compat";
 import { String as JsonString } from "../core-ext/object/json.js";
@@ -25,7 +29,9 @@ export class Chars {
           };
         }
         const member = (target.wrappedString as unknown as Record<string, unknown>)[prop];
-        if (typeof member !== "function") return target.methodMissing.call(receiver, prop);
+        if (!(prop in STRING_METHOD_TABLE) && typeof member !== "function") {
+          return target.methodMissing.call(receiver, prop);
+        }
         return (...args: unknown[]) => target.methodMissing.call(receiver, prop, ...args);
       },
       has(target, prop) {
@@ -48,6 +54,10 @@ export class Chars {
 
   equals = cmpEquals;
 
+  matchOperator(pattern: unknown): unknown {
+    return rbStrMatch(this.wrappedString, pattern);
+  }
+
   isMatch(pattern: RegExp | string): boolean {
     return new RegExp(pattern).test(this.wrappedString);
   }
@@ -57,8 +67,8 @@ export class Chars {
   }
 
   methodMissing(method: string, ...args: unknown[]): unknown {
-    const member = (this.wrappedString as unknown as Record<string, unknown>)[method];
-    const result = typeof member === "function" ? member.apply(this.wrappedString, args) : member;
+    let result: unknown;
+    [result, this.wrappedString] = rbStrSend(this.wrappedString, method, ...args);
     if (method.endsWith("Bang")) {
       return result != null && result !== false ? this : null;
     } else {
@@ -66,8 +76,8 @@ export class Chars {
     }
   }
 
-  respondToMissing(method: string, _includePrivate: boolean): boolean {
-    return method in Object(this.wrappedString);
+  respondToMissing(method: string, includePrivate: boolean): boolean {
+    return rbStrRespondTo(this.wrappedString, method, includePrivate);
   }
 
   split(...args: [pattern?: string | RegExp | null, limit?: number]): Chars[] {

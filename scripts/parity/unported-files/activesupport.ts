@@ -325,15 +325,6 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
       "deterministically.",
   },
   {
-    testFile: "multibyte_proxy_test.rb",
-    tests: ["custom multibyte encoder"],
-    reason:
-      "Swaps `ActiveSupport::Multibyte.proxy_class` and asserts `String#mb_chars` returns " +
-      "the replacement proxy (multibyte.rb:14-21). `core_ext/string/multibyte.rb` is " +
-      "already an unported-file row above — JS strings are Unicode and carry no Encoding, " +
-      "so there is no `mb_chars` for a proxy class to answer.",
-  },
-  {
     testFile: "json/encoding_test.rb",
     tests: [
       "process status",

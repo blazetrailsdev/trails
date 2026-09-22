@@ -20,6 +20,7 @@ import {
   assertPredicate,
   assertRaise,
   assertRaises,
+  assertRespondTo,
 } from "../testing/assertions.js";
 import { inquiry } from "../string-inquirer.js";
 import {
@@ -73,7 +74,7 @@ import {
 import { I18n } from "../i18n.js";
 import { toTimePreservesTimezone } from "../active-support.js";
 import { actsLikeString } from "./string/behavior.js";
-import { mbChars } from "./string/multibyte.js";
+import { isUtf8, mbChars } from "./string/multibyte.js";
 import { Multibyte } from "../multibyte.js";
 
 describe("StringAccessTest", () => {
@@ -539,16 +540,17 @@ describe("StringIndentTest", () => {
 
 describe("CoreExtStringMultibyteTest", () => {
   const UTF8_STRING = "こにちわ";
+  const ASCII_STRING = "ohayo";
+  const INVALID_UTF8_STRING = "\udcb8\udc9e\x08\udc88\udca5";
 
   it("core ext adds mb chars", () => {
-    const str = "hello";
-    expect([...str].length).toBe(5);
+    assertRespondTo(UTF8_STRING, "mbChars");
   });
 
   it("string should recognize utf8 strings", () => {
-    const str = "こんにちは";
-    expect(typeof str).toBe("string");
-    expect([...str].length).toBe(5);
+    assertPredicate(UTF8_STRING, isUtf8);
+    assertPredicate(ASCII_STRING, isUtf8);
+    assertNotPredicate(INVALID_UTF8_STRING, isUtf8);
   });
 
   it("mb chars returns instance of proxy class", () => {
@@ -957,7 +959,11 @@ describe("StringInflectionsTest", () => {
 
   it("truncates bytes preserves encoding", () => {
     const original = "a".repeat(30);
-    expect(typeof truncateBytes(original, 15)).toBe("string");
+
+    expect(typeof truncateBytes(original, 15)).toEqual("string");
+    expect(typeof truncateBytes(original, 15, { omission: null })).toEqual("string");
+    expect(typeof truncateBytes(original, 15, { omission: " " })).toEqual("string");
+    expect(typeof truncateBytes(original, 15, { omission: "🖖" })).toEqual("string");
   });
 
   it("truncate words", () => {

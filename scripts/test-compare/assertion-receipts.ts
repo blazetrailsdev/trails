@@ -63,6 +63,26 @@ export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
         "json/encoding_test.rb:81 `result.encoding` — a JS string carries no encoding tag (ruby-compat/src/string/force-encoding.ts)",
     },
   ],
+  "activesupport:core_ext/string_ext_test.rb › CoreExtStringMultibyteTest › string should recognize utf8 strings":
+    [
+      {
+        kind: "assert_not_predicate",
+        value: null,
+        as: null,
+        reason:
+          'core_ext/string_ext_test.rb:799 `EUC_JP_STRING` — a JS string carries no encoding tag, so `"さよなら".encode("EUC-JP")` has no JS value distinct from the UTF-8 string (ruby-compat/src/string/force-encoding.ts)',
+      },
+    ],
+  "activesupport:safe_buffer_test.rb › SafeBufferTest › Should not fail if the returned object is not a string":
+    [
+      {
+        kind: "assert_kind_of",
+        value: null,
+        as: "assert_nil",
+        reason:
+          "safe_buffer_test.rb:195 `assert_kind_of NilClass` — JS `null` is not an instance of any class, and nil is NilClass's only instance, so the check is `assert_nil`",
+      },
+    ],
 };
 
 interface ReceiptableTestCase {
