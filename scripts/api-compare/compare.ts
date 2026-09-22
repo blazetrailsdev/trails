@@ -2098,8 +2098,6 @@ interface ParamNameMismatch {
   tsParam: string;
 }
 
-// Advisory block-parameter comparison (RFC 0156): a Ruby method taking a block
-// paired with a TS signature that has no function-typed parameter.
 interface BlockParamMismatch {
   rubyFile: string;
   tsFile: string;
@@ -4029,7 +4027,6 @@ export function main() {
       // (see arity.ts). Recorded in lockstep with rubyParamsByName so the verdict
       // always describes the very params the arity check would compare.
       const rubyForwardingNames = new Set<string>();
-      // First-sighting Ruby entries that take a block (block-params.ts).
       const rubyBlockNames = new Set<string>();
       // First-sighting Ruby option keys per name (mirrors rubyParamsByName).
       const rubyOptionKeysByName = new Map<string, string[]>();
@@ -4621,9 +4618,6 @@ export function main() {
         // overlaps ANY (see tsParamsByName above for why this is global).
         const candidates = tsParamsByName.get(tsName) ?? [];
         if (candidates.length === 0) return;
-        // A dropped block arm (block-params.ts), judged against the whole
-        // package pool: a `static x = x` alias records no parameters, so the
-        // `this`-typed function it assigns has to be able to clear the pair.
         if (rubyBlockNames.has(rubyName) && !rubyForwardingNames.has(rubyName) && !guessedFile) {
           blockParamsCompared++;
           if (dropsBlock(true, candidates)) {
@@ -5373,7 +5367,6 @@ export function main() {
     ),
   );
 
-  // Block-parameter artifact (RFC 0156), measured by lint-block-params.ts.
   const blockParamsFlat = results.flatMap((r) =>
     r.blockParams.mismatches.map((m) => ({ package: r.package, ...m })),
   );
