@@ -1,9 +1,15 @@
 import { ArgumentError } from "../argument-error.js";
 import { IndexError } from "../index-error.js";
+import { NoMethodError } from "../no-method-error.js";
 import { rbBuiltinClassName } from "../object.js";
 import { Range } from "../range.js";
 import { regexpEscape } from "../regexp.js";
 import { TypeError } from "../type-error.js";
+import { b } from "./b.js";
+import { chomp } from "./chomp.js";
+import { stringDelete } from "./delete.js";
+import { forceEncoding } from "./force-encoding.js";
+import { succ } from "./succ.js";
 
 /**
  * A {@link STRING_METHOD_TABLE} entry's receiver. A JS string is immutable, so a
@@ -25,30 +31,29 @@ type GsubReplacement = string | Record<string, string> | ((match: string) => str
  * is `isInclude`, `upcase!` is `upcaseBang`). Every position is a character
  * (code point) offset, as MRI's are for a UTF-8 String. A package that
  * reopens String, as ActiveSupport's `core_ext/string` does, assigns an entry.
- * Case mapping ignores `check_case_options` (`vendor/ruby/string.c:7304`) and `gsub`
- * has no Enumerator arm: story `ruby-string-method-table-case-options-and-gsub-enumerator`.
+ * Case mapping ignores `check_case_options` (`vendor/ruby/string.c:7304`), `gsub`
+ * has no Enumerator arm, and the rest of `Init_String` is unported: story
+ * `ruby-string-method-table-case-options-and-gsub-enumerator`.
  *
  * @noRailsEquivalent PERMANENT
  */
 export const STRING_METHOD_TABLE: Record<string, StringMethod> = Object.assign(
   Object.create(null),
   {
-    size: (self) => strlen(self.string),
+    size: rbDefineMethod(0, (self) => strlen(self.string)),
     slice: rbStrArefM,
     set: rbStrAsetM,
-    insert: rbStrInsert,
+    insert: rbDefineMethod(2, rbStrInsert),
     index: rbStrIndexM,
     rindex: rbStrRindexM,
+    succ: rbDefineMethod(0, (self) => succ(self.string)),
+    next: rbDefineMethod(0, (self) => succ(self.string)),
     ljust: (self, ...args: unknown[]) => rbStrJustify(args, self.string, "l"),
     rjust: (self, ...args: unknown[]) => rbStrJustify(args, self.string, "r"),
     center: (self, ...args: unknown[]) => rbStrJustify(args, self.string, "c"),
-    lstrip: (self) => self.string.replace(LSTRIP, ""),
-    rstrip: (self) => self.string.replace(RSTRIP, ""),
-    strip: (self) => self.string.replace(LSTRIP, "").replace(RSTRIP, ""),
-    lstripBang: (self) => bang(self, self.string.replace(LSTRIP, "")),
-    rstripBang: (self) => bang(self, self.string.replace(RSTRIP, "")),
-    stripBang: (self) => bang(self, self.string.replace(LSTRIP, "").replace(RSTRIP, "")),
-    ord: rbStrOrd,
+    ord: rbDefineMethod(0, rbStrOrd),
+    isInclude: rbDefineMethod(1, (self, arg) => self.string.includes(stringValue(arg))),
+    matchOperator: rbDefineMethod(1, (self, y) => rbStrMatch(self.string, y)),
     upcase: (self) => self.string.toUpperCase(),
     downcase: (self) => self.string.toLowerCase(),
     swapcase: (self) => swapcase(self.string),
@@ -57,16 +62,34 @@ export const STRING_METHOD_TABLE: Record<string, StringMethod> = Object.assign(
     downcaseBang: (self) => bang(self, self.string.toLowerCase()),
     swapcaseBang: (self) => bang(self, swapcase(self.string)),
     capitalizeBang: (self) => bang(self, capitalize(self.string)),
-    isInclude: (self, arg: unknown) => self.string.includes(stringValue(arg)),
-    matchOperator: (self, y: unknown) => rbStrMatch(self.string, y),
-    gsub: (self, pattern: string | RegExp, replacement: GsubReplacement) =>
-      rbStrGsub(self.string, pattern, replacement),
+    chomp: (self, ...args: unknown[]) => rbStrChomp(self.string, args),
+    lstrip: rbDefineMethod(0, (self) => self.string.replace(LSTRIP, "")),
+    rstrip: rbDefineMethod(0, (self) => self.string.replace(RSTRIP, "")),
+    strip: rbDefineMethod(0, (self) => self.string.replace(LSTRIP, "").replace(RSTRIP, "")),
+    lstripBang: rbDefineMethod(0, (self) => bang(self, self.string.replace(LSTRIP, ""))),
+    rstripBang: rbDefineMethod(0, (self) => bang(self, self.string.replace(RSTRIP, ""))),
+    stripBang: rbDefineMethod(0, (self) =>
+      bang(self, self.string.replace(LSTRIP, "").replace(RSTRIP, "")),
+    ),
+    gsub: (self, ...args: unknown[]) => rbStrGsub(self.string, args),
+    delete: (self, ...args: unknown[]) => {
+      if (args.length === 0) rbErrorArity(0, 1, Infinity);
+      return stringDelete(self.string, ...(args.map(stringValue) as [string, ...string[]]));
+    },
+    forceEncoding: rbDefineMethod(1, (self, encoding) => {
+      self.string = forceEncoding(self.string, encoding as string);
+      return self.string;
+    }),
+    b: rbDefineMethod(0, (self) => b(self.string)),
   } satisfies Record<string, StringMethod>,
 );
 
+const JS_STRING_METHODS = new Set(Object.getOwnPropertyNames(String.prototype));
+JS_STRING_METHODS.delete("length");
+
 /**
  * `str.__send__(method, *args)` (`vendor/ruby/vm_eval.c:1330` `rb_f_send`): the
- * {@link STRING_METHOD_TABLE} entry, else the JS string's own member. The
+ * {@link STRING_METHOD_TABLE} entry, else a member String is reopened with. The
  * receiver's contents after the call come back beside the result.
  *
  * @noRailsEquivalent PERMANENT
@@ -78,19 +101,26 @@ export function rbStrSend(str: string, method: string, ...args: unknown[]): [unk
     const result = (entry as (self: StringReceiver, ...args: unknown[]) => unknown)(self, ...args);
     return [result, self.string];
   }
+  if (!rbStrRespondTo(str, method)) {
+    throw new NoMethodError(`undefined method '${method}' for an instance of String`);
+  }
   const member = (str as unknown as Record<string, unknown>)[method];
   return [typeof member === "function" ? member.apply(str, args) : member, str];
 }
 
 /**
  * `str.respond_to?` (`vendor/ruby/vm_method.c:2977` `obj_respond_to`) over {@link rbStrSend}'s
- * names. See CLAUDE.md, "Method visibility is not a runtime fact in JS".
+ * names: JS's own `String.prototype` members are not Ruby's. See CLAUDE.md, "Method
+ * visibility is not a runtime fact in JS".
  *
  * @noRailsEquivalent PERMANENT
  */
 export function rbStrRespondTo(str: string, method: string, includeAll: boolean = false): boolean {
   void includeAll;
-  return method in STRING_METHOD_TABLE || method in Object(str);
+  if (method in STRING_METHOD_TABLE) return true;
+  return (
+    Object.hasOwn(Object.getPrototypeOf(Object(str)), method) && !JS_STRING_METHODS.has(method)
+  );
 }
 
 /**
@@ -105,6 +135,42 @@ export function rbStrMatch(x: string, y: unknown): unknown {
     return match ? rbStrSublen(x, match.index) : null;
   }
   return (y as { matchOperator(x: string): unknown }).matchOperator(x);
+}
+
+/** `rb_define_method` (`vendor/ruby/class.c:2134`) with a fixed `argc`, which MRI checks. */
+function rbDefineMethod<A extends unknown[]>(
+  argc: number,
+  func: (self: StringReceiver, ...args: A) => unknown,
+): StringMethod {
+  return (self, ...args) => {
+    if (args.length !== argc) rbErrorArity(args.length, argc, argc);
+    return func(self, ...(args as unknown as A));
+  };
+}
+
+/** `rb_error_arity` (`vendor/ruby/vm_insnhelper.c:466` `rb_arity_error_new`). */
+function rbErrorArity(argc: number, min: number, max: number): never {
+  const expected = min === max ? `${min}` : max === Infinity ? `${min}+` : `${min}..${max}`;
+  throw new ArgumentError(`wrong number of arguments (given ${argc}, expected ${expected})`);
+}
+
+/** `String#chomp` (`vendor/ruby/string.c:9786` `rb_str_chomp`). */
+function rbStrChomp(str: string, argv: unknown[]): string {
+  if (argv.length === 0) return chomp(str);
+  checkArity(argv.length, 0, 1);
+  if (argv[0] == null) return str;
+  return chomp(str, stringValue(argv[0]));
+}
+
+/** `rb_reg_prepare_re` (`vendor/ruby/re.c:1587`): a pattern matched by character, not UTF-16 unit. */
+function rbRegexp(re: RegExp, flags: string): RegExp {
+  const base = re.flags.replace(/[gyd]/g, "") + flags;
+  if (/[uv]/.test(base)) return new RegExp(re.source, base);
+  try {
+    return new RegExp(re.source, base + "u");
+  } catch {
+    return new RegExp(re.source, base);
+  }
 }
 
 const LSTRIP = /^[\0\t\n\v\f\r ]+/;
@@ -142,9 +208,7 @@ function num2long(val: unknown): number {
 
 /** `rb_check_arity` (`vendor/ruby/include/ruby/internal/intern/error.h:280`). */
 function checkArity(argc: number, min: number, max: number): void {
-  if (argc < min || argc > max) {
-    throw new ArgumentError(`wrong number of arguments (given ${argc}, expected ${min}..${max})`);
-  }
+  if (argc < min || argc > max) rbErrorArity(argc, min, max);
 }
 
 /** A bang form's nil-when-unchanged return (`vendor/ruby/string.c:7535` `rb_str_upcase_bang`). */
@@ -161,13 +225,12 @@ function rbRegSearch(
   pos: number,
   reverse: boolean,
 ): RegExpExecArray | null {
-  const flags = re.flags.replace(/[gyd]/g, "") + "d";
   if (!reverse) {
-    const global = new RegExp(re.source, flags + "g");
+    const global = rbRegexp(re, "dg");
     global.lastIndex = strOffset(str, pos);
     return global.exec(str);
   }
-  const sticky = new RegExp(re.source, flags + "y");
+  const sticky = rbRegexp(re, "dy");
   for (let start = pos; start >= 0; start--) {
     sticky.lastIndex = strOffset(str, start);
     const match = sticky.exec(str);
@@ -435,11 +498,11 @@ function capitalize(str: string): string {
  * `String#gsub` (`vendor/ruby/string.c:6057` `rb_str_gsub`) with a replacement
  * String, expanded as `rb_reg_regsub` (`vendor/ruby/re.c:4394`) does, a Hash, or a block.
  */
-function rbStrGsub(str: string, pattern: string | RegExp, replacement: GsubReplacement): string {
+function rbStrGsub(str: string, argv: unknown[]): string {
+  checkArity(argv.length, 1, 2);
+  const [pattern, replacement] = argv as [string | RegExp, GsubReplacement];
   const re =
-    typeof pattern === "string"
-      ? new RegExp(regexpEscape(pattern), "g")
-      : new RegExp(pattern.source, pattern.flags.replace(/[gy]/g, "") + "g");
+    typeof pattern === "string" ? new RegExp(regexpEscape(pattern), "gu") : rbRegexp(pattern, "g");
   return str.replace(re, (...m: unknown[]) => {
     const hasGroups = typeof m[m.length - 1] === "object";
     const groups = (hasGroups ? m[m.length - 1] : undefined) as Record<string, string> | undefined;

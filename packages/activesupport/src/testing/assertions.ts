@@ -403,7 +403,9 @@ export function assertInDelta(exp: number, act: number, delta: number = 0.001, m
 }
 
 function respondsTo(object: object, name: string): boolean {
-  if (object instanceof String) return rbStrRespondTo(object.valueOf(), name);
+  if (Object.getPrototypeOf(object) === String.prototype) {
+    return rbStrRespondTo(object.valueOf() as string, name);
+  }
   const override = findDescriptor(object, "respondTo");
   if (override && typeof override.value === "function") {
     return (override.value as (name: string) => unknown).call(object, name) !== false;
