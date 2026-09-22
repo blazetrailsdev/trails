@@ -11,10 +11,7 @@ export class MinimumLengthError extends Error {
 
 const MINIMUM_TOKEN_LENGTH = 24;
 
-/**
- * @missingRailsCall define_method — PERMANENT
- * @missingRailsCall set_callback — PERMANENT
- */
+/** @missingRailsCall define_method — PERMANENT */
 export function hasSecureToken(
   this: typeof Base,
   attribute: string = "token",
@@ -42,18 +39,12 @@ export function hasSecureToken(
     configurable: true,
   });
 
-  const generateIfBlank = (record: any): void => {
-    if (record.isNewRecord() && !record.queryAttribute(attribute)) {
-      record[attribute] = (record.constructor as typeof Base).generateUniqueSecureToken({
-        length,
-      });
+  const on = options?.on ?? "create";
+  this.setCallback(on, on === "initialize" ? "after" : "before", function (this: any) {
+    if (this.isNewRecord() && !this.queryAttribute(attribute)) {
+      this[attribute] = (this.constructor as typeof Base).generateUniqueSecureToken({ length });
     }
-  };
-  if (options?.on === "initialize") {
-    this.afterInitialize(generateIfBlank);
-  } else {
-    this.beforeCreate(generateIfBlank);
-  }
+  });
 }
 
 export function generateUniqueSecureToken({

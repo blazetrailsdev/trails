@@ -2,6 +2,8 @@ import { Scheme, type SchemeOptions } from "./scheme.js";
 import { Contexts } from "./contexts.js";
 import { Configuration } from "./errors.js";
 import { type ValueType } from "@blazetrails/activemodel";
+import { Module, include } from "@blazetrails/ruby-compat";
+import { initializeGeneratedModules } from "../attribute-methods.js";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Configurable } from "./configurable.js";
 import { registerLoadSchemaOverride } from "../load-schema-overrides-slot.js";
@@ -117,33 +119,37 @@ export function addLengthValidationForEncryptedColumns(this: any): void {
   }
 }
 
-/**
- * @internal
- * @missingRailsCall include — PERMANENT
- */
+/** @internal */
 export function overrideAccessorsToPreserveOriginal(
   this: any,
   name: string,
   originalAttributeName: string,
 ): void {
-  Object.defineProperty(this.prototype, name, {
-    configurable: true,
-    get(this: any) {
-      const value = this.readAttribute(name);
-      if (
-        (value != null && value !== false && encryptedAttribute.call(this, name)) ||
-        !Configurable.config.supportUnencryptedData
-      ) {
-        return this[originalAttributeName];
-      } else {
-        return value;
-      }
-    },
-    set(this: any, value: unknown) {
-      this[originalAttributeName] = value;
-      this.writeAttribute(name, value);
-    },
+  if (!Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")) {
+    initializeGeneratedModules.call(this);
+  }
+  const mod = new Module();
+  mod.moduleEval((table) => {
+    Object.defineProperty(table, name, {
+      configurable: true,
+      get(this: any) {
+        const value = this.readAttribute(name);
+        if (
+          (value != null && value !== false && encryptedAttribute.call(this, name)) ||
+          !Configurable.config.supportUnencryptedData
+        ) {
+          return this[originalAttributeName];
+        } else {
+          return value;
+        }
+      },
+      set(this: any, value: unknown) {
+        this[originalAttributeName] = value;
+        this.writeAttribute(name, value);
+      },
+    });
   });
+  include(this, mod);
 }
 
 /** @internal */

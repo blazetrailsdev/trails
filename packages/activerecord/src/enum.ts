@@ -7,14 +7,13 @@ import {
   pluralize,
 } from "@blazetrails/activesupport";
 import { ArgumentError, RuntimeError, ValueType, defaultValue } from "@blazetrails/activemodel";
-import { isSymbol, rbInspect, symbolToS } from "@blazetrails/ruby-compat";
+import { Module, include, isSymbol, rbInspect, symbolToS } from "@blazetrails/ruby-compat";
 import {
   dangerousAttributeMethods,
   isDangerousAttributeMethod,
   isDangerousClassMethod,
   isMethodDefinedWithin,
 } from "./attribute-methods.js";
-import { getOrCreateModuleCarrier } from "./module-carrier.js";
 import { Relation } from "./relation.js";
 import { loadSchema as reflectSchemaSync } from "./model-schema.js";
 
@@ -128,12 +127,11 @@ function enumMethodNamesFor(valueMethodName: string): {
   };
 }
 
-const _enumCarriers = new WeakMap<typeof import("./base.js").Base, object>();
-
-export class EnumMethods {
+export class EnumMethods extends Module {
   private _klass: typeof import("./base.js").Base;
 
   constructor(klass: typeof import("./base.js").Base) {
+    super();
     this._klass = klass;
   }
 
@@ -142,18 +140,7 @@ export class EnumMethods {
     return this._klass;
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
-  carrier(): object {
-    return getOrCreateModuleCarrier(this._klass, _enumCarriers);
-  }
-
-  /**
-   * @internal
-   * @missingRailsCall define_method — PERMANENT
-   */
+  /** @internal */
   defineEnumMethods(
     name: string,
     valueMethodName: string,
@@ -164,20 +151,11 @@ export class EnumMethods {
     const klass = this.klass;
     const { predicateName, bangName, notScopeName: notName } = enumMethodNamesFor(valueMethodName);
     if (instanceMethods) {
-      const carrier = this.carrier();
-      Object.defineProperty(carrier, predicateName, {
-        value: function (this: EnumInstanceHost) {
-          return (this as unknown as Record<string, unknown>)[`${name}ForDatabase`] === value;
-        },
-        writable: true,
-        configurable: true,
+      this.defineMethod(predicateName, function (this: EnumInstanceHost) {
+        return (this as unknown as Record<string, unknown>)[`${name}ForDatabase`] === value;
       });
-      Object.defineProperty(carrier, bangName, {
-        value: function (this: EnumInstanceHost) {
-          return this.updateBang({ [name]: value });
-        },
-        writable: true,
-        configurable: true,
+      this.defineMethod(bangName, function (this: EnumInstanceHost) {
+        return this.updateBang({ [name]: value });
       });
     }
     if (scopes) {
@@ -371,20 +349,21 @@ export function _enum(
 
     const originalName = methodName(n);
     if (instanceMethods && /[^\w\x80-\uffff]/.test(originalName)) {
-      const carrier = methodsModule.carrier();
-      Object.defineProperty(carrier, `is${originalName}`, {
-        value: function (this: Base) {
-          return this.readAttribute(name) === n;
-        },
-        writable: true,
-        configurable: true,
-      });
-      Object.defineProperty(carrier, `${originalName}Bang`, {
-        value: function (this: EnumInstanceHost) {
-          return this.updateBang({ [name]: value });
-        },
-        writable: true,
-        configurable: true,
+      methodsModule.moduleEval((table) => {
+        Object.defineProperty(table, `is${originalName}`, {
+          value: function (this: Base) {
+            return this.readAttribute(name) === n;
+          },
+          writable: true,
+          configurable: true,
+        });
+        Object.defineProperty(table, `${originalName}Bang`, {
+          value: function (this: EnumInstanceHost) {
+            return this.updateBang({ [name]: value });
+          },
+          writable: true,
+          configurable: true,
+        });
       });
     }
 
@@ -421,14 +400,12 @@ export function _enum(
 /** @internal */
 const _enumMethodsModuleRegistry = new WeakMap<typeof import("./base.js").Base, EnumMethods>();
 
-/**
- * @missingRailsCall include — PERMANENT
- * @internal
- */
+/** @internal */
 export function _enumMethodsModule(this: typeof import("./base.js").Base): EnumMethods {
   let mod = _enumMethodsModuleRegistry.get(this);
   if (!mod) {
     mod = new EnumMethods(this);
+    include(this as unknown as new (...args: unknown[]) => unknown, mod);
     _enumMethodsModuleRegistry.set(this, mod);
   }
   return mod;

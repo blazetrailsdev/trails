@@ -1,4 +1,4 @@
-import { ArgumentError, DelegateClass, hasKey } from "@blazetrails/ruby-compat";
+import { ArgumentError, DelegateClass, Module, hasKey, include } from "@blazetrails/ruby-compat";
 import { getApplicationRecordClass } from "./inheritance.js";
 import {
   NameError,
@@ -302,7 +302,7 @@ interface CoreHost {
   _connectionHandler?: any;
   _destroyAssociationAsyncJob?: any;
   _findByStatementCache?: Map<boolean, Map<string, any>>;
-  _generatedAssociationMethods?: Set<string>;
+  _generatedAssociationMethods?: Module;
   _predicateBuilder?: any;
   arelTable?: any;
   prototype: any;
@@ -499,12 +499,13 @@ export function initializeGeneratedModules(this: CoreHost): void {
   generatedAssociationMethods.call(this);
 }
 
-/** @missingRailsCall include — PERMANENT */
-export function generatedAssociationMethods(this: CoreHost): Set<string> {
-  if (!this._generatedAssociationMethods) {
-    this._generatedAssociationMethods = new Set();
+export function generatedAssociationMethods(this: CoreHost): Module {
+  if (!Object.prototype.hasOwnProperty.call(this, "_generatedAssociationMethods")) {
+    const mod = new Module();
+    include(this as unknown as new (...args: unknown[]) => unknown, mod);
+    this._generatedAssociationMethods = mod;
   }
-  return this._generatedAssociationMethods;
+  return this._generatedAssociationMethods!;
 }
 
 export function filterAttributes(

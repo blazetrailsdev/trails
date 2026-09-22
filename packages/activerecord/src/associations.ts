@@ -31,7 +31,7 @@ import { HasMany as HasManyBuilder } from "./associations/builder/has-many.js";
 import { HasAndBelongsToMany as HabtmBuilder } from "./associations/builder/has-and-belongs-to-many.js";
 import * as Reflection from "./reflection.js";
 import { hasQueryConstraints, queryConstraintsList } from "./persistence.js";
-import { rbInspect } from "@blazetrails/ruby-compat";
+import { Module, include, rbInspect } from "@blazetrails/ruby-compat";
 
 export async function eagerLoadBang(): Promise<void> {}
 
@@ -293,7 +293,6 @@ export class Associations {
     Reflection.addReflection(this as any, name, reflection);
   }
 
-  /** @missingRailsCall include — PERMANENT */
   static hasAndBelongsToMany(
     name: string,
     scope: ((...args: any[]) => any) | (AssociationOptions & { joinTable?: string }) | null = {},
@@ -336,32 +335,14 @@ export class Associations {
     Reflection.addReflection(self, middleName, middleReflection);
     middleReflection.parentReflection = habtmReflection;
 
-    const HABTM_WRAPPED_NAMES = Symbol.for("blazetrails.habtm.destroyAssociations.names");
-    const ownWrappedNames: Set<string> = Object.prototype.hasOwnProperty.call(
-      self.prototype,
-      HABTM_WRAPPED_NAMES,
-    )
-      ? self.prototype[HABTM_WRAPPED_NAMES]
-      : Object.defineProperty(self.prototype, HABTM_WRAPPED_NAMES, {
-          value: new Set<string>(),
-          configurable: true,
-          writable: false,
-        })[HABTM_WRAPPED_NAMES];
-    const prevDestroyAssociations = self.prototype.destroyAssociations;
-    if (!ownWrappedNames.has(name)) {
-      ownWrappedNames.add(name);
-      self.prototype.destroyAssociations = async function (this: {
-        association(n: string): { deleteAll(dependent?: string): Promise<unknown>; reset(): void };
-        _collectionProxies?: { delete(n: string): void };
-      }): Promise<void> {
-        await this.association(middleName).deleteAll("delete_all");
-        this.association(name).reset();
-        this._collectionProxies?.delete(name);
-        if (typeof prevDestroyAssociations === "function") {
-          await prevDestroyAssociations.call(this);
-        }
-      };
-    }
+    const mod = new Module();
+    mod.defineMethod("destroyAssociations", async function (this: any): Promise<void> {
+      await this.association(middleName).deleteAll("delete_all");
+      this.association(name).reset();
+      this._collectionProxies?.delete(name);
+      await mod.superMethod(this, "destroyAssociations")!();
+    });
+    include(this, mod);
 
     const hmOptions: Record<string, unknown> = {};
     hmOptions.through = middleName;
