@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ArgumentError } from "./argument-error.js";
-import { compact, pack, uniq } from "./array.js";
+import { arySlice, compact, pack, uniq } from "./array.js";
 
 describe("Array#pack", () => {
   const long = "a".repeat(100);
@@ -94,5 +94,13 @@ describe("Array#compact and Array#uniq", () => {
         [1, 3],
       ]),
     ).toEqual([[1n, 3]]);
+  });
+});
+
+describe("arySlice", () => {
+  it("enforces Array#slice arity 1..2", () => {
+    expect(() => (arySlice as (...a: unknown[]) => unknown)([1])).toThrow(ArgumentError);
+    expect(() => (arySlice as (...a: unknown[]) => unknown)([1], 0, 1, 2)).toThrow(ArgumentError);
+    expect(arySlice([1, 2, 3], 1, 2)).toEqual([2, 3]);
   });
 });

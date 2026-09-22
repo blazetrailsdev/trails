@@ -140,6 +140,10 @@ export function arySlice<T>(
   arg: number | Range<number>,
   length?: number,
 ): T | T[] | null {
+  const argc = arguments.length - 1;
+  if (argc < 1 || argc > 2) {
+    throw new ArgumentError(`wrong number of arguments (given ${argc}, expected 1..2)`);
+  }
   const alen = ary.length;
   if (length !== undefined) {
     let beg = arg as number;

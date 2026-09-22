@@ -210,7 +210,8 @@ const RECORD_DELEGATES: Record<string, RecordDelegate> = {
     return records;
   },
   join: (records, separator?: string) => records.join(separator),
-  at: (records, index: number | Range<number>, length?: number) => arySlice(records, index, length),
+  at: (records, ...args: [index: number | Range<number>, length?: number]) =>
+    arySlice(records, ...args),
   intersection: (records, other: Base[]) =>
     uniqRecords(records).filter((record) => includesRecord(other, record)),
   union: (records, other: Base[]) => uniqRecords([...records, ...other]),
@@ -250,8 +251,8 @@ const RECORD_DELEGATES: Record<string, RecordDelegate> = {
     return records.slice(shift).concat(records.slice(0, shift));
   },
   shuffle: (records) => shuffleInPlace([...records]),
-  slice: (records, index: number | Range<number>, length?: number) =>
-    arySlice(records, index, length),
+  slice: (records, ...args: [index: number | Range<number>, length?: number]) =>
+    arySlice(records, ...args),
   split: (records, valueOrFn: Base | ((record: Base) => boolean)) => split(records, valueOrFn),
   inGroups: (records, number: number, fillWith: Base | null | false = null) =>
     inGroups(records, number, fillWith),
@@ -334,12 +335,11 @@ export class Delegation {
 
   at(
     this: DelegationHost,
-    index: number | Range<number>,
-    length?: number,
+    ...args: [index: number | Range<number>, length?: number]
   ): Base | Base[] | null | Promise<Base | Base[] | null> {
     return withRecords(
       this,
-      (records) => RECORD_DELEGATES.at(records, index, length) as Base | Base[] | null,
+      (records) => RECORD_DELEGATES.at(records, ...args) as Base | Base[] | null,
     );
   }
 
@@ -440,12 +440,11 @@ export class Delegation {
 
   slice(
     this: DelegationHost,
-    index: number | Range<number>,
-    length?: number,
+    ...args: [index: number | Range<number>, length?: number]
   ): Base | Base[] | null | Promise<Base | Base[] | null> {
     return withRecords(
       this,
-      (records) => RECORD_DELEGATES.slice(records, index, length) as Base | Base[] | null,
+      (records) => RECORD_DELEGATES.slice(records, ...args) as Base | Base[] | null,
     );
   }
 

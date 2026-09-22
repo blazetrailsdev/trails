@@ -150,7 +150,7 @@ export class Module {
    *
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
-  undefMethod(...names: string[]): void {
+  undefMethod(...names: string[]): this {
     const carrier = carrierOf(this);
     try {
       for (const name of names) {
@@ -166,6 +166,7 @@ export class Module {
     } finally {
       relinkIncluders(this);
     }
+    return this;
   }
 
   /**

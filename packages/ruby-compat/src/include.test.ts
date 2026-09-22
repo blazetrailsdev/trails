@@ -323,6 +323,10 @@ describe("include", () => {
     expect(undefd.isMethodDefined("greet")).toBe(false);
     expect(undefd.instanceMethods()).toEqual([]);
     expect(() => undefd.undefMethod("missing")).toThrow(NameError);
+    expect(() => new Module().undefMethod("toString")).toThrow(NameError);
+    const included = new Module();
+    included.include({ wave: () => "wave" });
+    expect(included.undefMethod("wave")).toBe(included);
 
     const removed = new Module();
     removed.defineMethod("greet", () => "module");
