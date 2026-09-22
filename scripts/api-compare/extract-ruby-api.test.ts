@@ -127,6 +127,34 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
     return rubyField(fixtures, "skeleton");
   }
 
+  it("marks a send to a dynamically named setter", () => {
+    const s = rubySkeletons({
+      "foo.rb": `
+        class Foo
+          def update_attribute(name, value)
+            public_send("#{name}=", value)
+          end
+
+          def assign(record, name)
+            record.send "#{name}=", 1
+          end
+
+          def dispatch(name)
+            __send__(:"#{name}=", 2)
+          end
+
+          def read(name)
+            public_send(name)
+          end
+        end
+      `,
+    });
+    expect(s["Foo#update_attribute"]).toContain("send:setter");
+    expect(s["Foo#assign"]).toContain("send:setter");
+    expect(s["Foo#dispatch"]).toContain("send:setter");
+    expect(s["Foo#read"]).not.toContain("send:setter");
+  });
+
   it("emits one arm for a when carrying several values", () => {
     const s = rubySkeletons({
       "foo.rb": `

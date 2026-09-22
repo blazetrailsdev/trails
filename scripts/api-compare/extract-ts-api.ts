@@ -4147,7 +4147,9 @@ function collectImportAliases(sourceFile: ts.SourceFile): Map<string, string> {
 // skip crediting it. Compound assignments (`+=`, `||=`) are intentionally NOT
 // matched: `self.foo += x` desugars to `self.foo = self.foo + x`, which really
 // does call the reader.
-function isAssignmentWriteTarget(access: ts.PropertyAccessExpression): boolean {
+function isAssignmentWriteTarget(
+  access: ts.PropertyAccessExpression | ts.ElementAccessExpression,
+): boolean {
   let node: ts.Node = access;
   let parent = node.parent as ts.Node | undefined;
   while (parent !== undefined) {
@@ -4439,7 +4441,11 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
       case ts.SyntaxKind.ElementAccessExpression: {
         const access = n as ts.ElementAccessExpression;
         visit(access.expression);
-        tokens.push("ref:get");
+        // A computed-member WRITE, `this[name] = value`, is the faithful port of
+        // Ruby's `public_send("#{name}=", value)` — a setter dispatch with no
+        // callee (report-setter-dispatch.ts). Ruby's `:aref_field` emits no
+        // reach either, so the write is not a `ref:get`.
+        tokens.push(isAssignmentWriteTarget(access) ? "assign:computed" : "ref:get");
         visit(access.argumentExpression);
         return;
       }
