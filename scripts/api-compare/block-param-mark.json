@@ -14,22 +14,22 @@
     }
   },
   "actiondispatch": {
-    "total": 30,
+    "total": 63,
     "byFile": {
       "http/headers.rb": 1,
       "http/query_parser.rb": 1,
-      "http/response.rb": 2,
+      "http/response.rb": 5,
       "http/url.rb": 1,
       "journey/formatter.rb": 1,
       "journey/router.rb": 1,
       "middleware/cookies.rb": 1,
       "middleware/exception_wrapper.rb": 1,
-      "middleware/stack.rb": 5,
+      "middleware/stack.rb": 6,
       "request/utils.rb": 1,
-      "routing/mapper.rb": 9,
+      "routing/mapper.rb": 20,
       "system_test_case.rb": 1,
       "system_testing/driver.rb": 1,
-      "testing/integration.rb": 4
+      "testing/integration.rb": 22
     }
   },
   "actionview": {
@@ -47,16 +47,17 @@
     }
   },
   "activemodel": {
-    "total": 5,
+    "total": 7,
     "byFile": {
       "attribute_methods.rb": 1,
-      "attribute.rb": 1,
+      "attribute.rb": 2,
       "model.rb": 1,
+      "validations.rb": 1,
       "validations/with.rb": 2
     }
   },
   "activerecord": {
-    "total": 35,
+    "total": 36,
     "byFile": {
       "association_relation.rb": 1,
       "associations/collection_proxy.rb": 1,
@@ -70,6 +71,7 @@
       "relation/batches.rb": 4,
       "relation/finder_methods.rb": 1,
       "relation/query_methods.rb": 2,
+      "schema.rb": 1,
       "statement_cache.rb": 1,
       "tasks/database_tasks.rb": 3,
       "token_for.rb": 1,
@@ -77,10 +79,11 @@
     }
   },
   "activesupport": {
-    "total": 5,
+    "total": 9,
     "byFile": {
       "configurable.rb": 1,
       "core_ext/module/attribute_accessors.rb": 3,
+      "core_ext/object/try.rb": 4,
       "rescuable.rb": 1
     }
   },

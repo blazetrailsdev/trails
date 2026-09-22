@@ -2101,6 +2101,7 @@ interface ParamNameMismatch {
 interface BlockParamMismatch {
   rubyFile: string;
   tsFile: string;
+  rubyModule: string;
   rubyName: string;
   tsName: string;
 }
@@ -3450,6 +3451,7 @@ export function main() {
     // true arity and keeps those bindings/overloads from false-positiving.
     const tsParamsByName = new Map<string, ParamInfo[][]>();
     const tsBlockSigsByFileName = new Map<string, Map<string, ParamInfo[][]>>();
+    const tsBlockSigsByFileOwnerName = new Map<string, Map<string, ParamInfo[][]>>();
     // The package-only signature populations the calls-parity ported-with-args
     // gate reads — see TsPortedWithArgsMaps for what each one is scoped to.
     const portedWithArgsMaps = newTsPortedWithArgsMaps();
@@ -3621,6 +3623,14 @@ export function main() {
         if (m.aliasParams) blockSigs.push(m.aliasParams);
         byName.set(m.name, blockSigs);
         tsBlockSigsByFileName.set(file, byName);
+        const byOwner = tsBlockSigsByFileOwnerName.get(file) ?? new Map<string, ParamInfo[][]>();
+        const ownerKey = `${owner}#${m.name}`;
+        byOwner.set(ownerKey, [
+          ...(byOwner.get(ownerKey) ?? []),
+          m.params,
+          ...(m.aliasParams ? [m.aliasParams] : []),
+        ]);
+        tsBlockSigsByFileOwnerName.set(file, byOwner);
       }
       if (m.missingRailsCalls !== undefined) {
         recordTaggedCalls(
@@ -4036,7 +4046,7 @@ export function main() {
       // (see arity.ts). Recorded in lockstep with rubyParamsByName so the verdict
       // always describes the very params the arity check would compare.
       const rubyForwardingNames = new Set<string>();
-      const rubyBlockNames = new Set<string>();
+      const rubyBlockOwners = new Map<string, string[]>();
       // First-sighting Ruby option keys per name (mirrors rubyParamsByName).
       const rubyOptionKeysByName = new Map<string, string[]>();
       // First-sighting Ruby body call-set per name (advisory calls-parity check).
@@ -4094,7 +4104,10 @@ export function main() {
           if (!rubyParamsByName.has(rm.name)) {
             rubyParamsByName.set(rm.name, rm.params);
             if (isForwardingRubyEntry(rm)) rubyForwardingNames.add(rm.name);
-            if (rm.takesBlock) rubyBlockNames.add(rm.name);
+          }
+          if (rm.takesBlock) {
+            const blockKey = `${rmLevel}|${rm.name}`;
+            rubyBlockOwners.set(blockKey, [...(rubyBlockOwners.get(blockKey) ?? []), item.fqn]);
           }
           if (rm.option_keys && !rubyOptionKeysByName.has(rm.name)) {
             rubyOptionKeysByName.set(rm.name, rm.option_keys);
@@ -4627,10 +4640,21 @@ export function main() {
         // overlaps ANY (see tsParamsByName above for why this is global).
         const candidates = tsParamsByName.get(tsName) ?? [];
         if (candidates.length === 0) return;
-        if (rubyBlockNames.has(rubyName) && !rubyForwardingNames.has(rubyName) && !guessedFile) {
-          blockParamsCompared++;
-          if (dropsBlock(true, tsBlockSigsByFileName.get(tsFile)?.get(tsName) ?? [])) {
-            blockParamMismatches.push({ rubyFile, tsFile, rubyName, tsName });
+        if (!rubyForwardingNames.has(rubyName) && !guessedFile) {
+          for (const blockOwner of rubyBlockOwners.get(`${level}|${rubyName}`) ?? []) {
+            blockParamsCompared++;
+            const short = blockOwner.split("::").at(-1) ?? blockOwner;
+            const ownerSigs = tsBlockSigsByFileOwnerName.get(tsFile)?.get(`${short}#${tsName}`);
+            const sigs = ownerSigs ?? tsBlockSigsByFileName.get(tsFile)?.get(tsName) ?? [];
+            if (dropsBlock(true, sigs)) {
+              blockParamMismatches.push({
+                rubyFile,
+                tsFile,
+                rubyModule: blockOwner,
+                rubyName,
+                tsName,
+              });
+            }
           }
         }
         // Parameter NAMES (param-names.ts) — a separate finding from arity, and
