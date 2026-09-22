@@ -4317,6 +4317,11 @@ function isInstanceOfTest(expression: ts.Expression): boolean {
  * as `rescue` IN PLACE OF the `if` its lowering spells, before that arm's own
  * reaches — where the Ruby `:rescue` clause node sits. A catch with no
  * `instanceof` chain is a bare Ruby `rescue` and emits exactly one.
+ *
+ * A computed-member WRITE, `this[name] = value`, emits `assign:computed`, not
+ * `ref:get`: it is the faithful port of `public_send("#{name}=", value)`, a
+ * setter dispatch with no callee (setter-dispatch.ts), and Ruby's
+ * `:aref_field` emits no reach either.
  */
 /**
  * Whether this `case` clause is the continuation of a preceding EMPTY one —
@@ -4441,10 +4446,6 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
       case ts.SyntaxKind.ElementAccessExpression: {
         const access = n as ts.ElementAccessExpression;
         visit(access.expression);
-        // A computed-member WRITE, `this[name] = value`, is the faithful port of
-        // Ruby's `public_send("#{name}=", value)` — a setter dispatch with no
-        // callee (report-setter-dispatch.ts). Ruby's `:aref_field` emits no
-        // reach either, so the write is not a `ref:get`.
         tokens.push(isAssignmentWriteTarget(access) ? "assign:computed" : "ref:get");
         visit(access.argumentExpression);
         return;

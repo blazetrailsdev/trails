@@ -312,6 +312,16 @@ import { isStdlibMixinGap, stdlibMixinRows } from "./stdlib-mixin-surface.js";
 // danger case this note warns about and stays flagged under every mechanism
 // above, by construction — never provably a Hash or a split/scan chain. The
 // unconverged rows still go to the reason-text route, not to a mechanism.
+/**
+ * `send` / `public_send` / `__send__` stay OUT of this set and of the call-name
+ * comparison: they map to no TS candidate, so significantMissingCalls drops
+ * them. The two differ only in visibility, which JS has no run-time fact for
+ * (CLAUDE.md § "Method visibility is not a runtime fact in JS"), and both port
+ * to a computed member access — `public_send("#{name}=", value)`
+ * (`persistence.rb:533`) is `this[name] = value`, with no callee. A call-name
+ * check would flag that correct port too; setter-dispatch.ts reads the
+ * skeleton marks instead.
+ */
 export const NO_JS_CALL_FORM = new Set([
   "to_s", // template literal / implicit String() coercion — `${x}`
   "each", // for...of loop — no .forEach callee
@@ -329,16 +339,6 @@ export const NO_JS_CALL_FORM = new Set([
 // TS body that could ever satisfy the call, which is what separates a
 // NO_JS_CALL_FORM name from a baselined omission: the gate would otherwise
 // carry a row per guarded method forever, with nothing to converge onto.
-
-// `send` / `public_send` / `__send__` stay OUT of the call-name comparison, and
-// not by listing them here: they map to no TS candidate, so
-// significantMissingCalls drops them. They must stay out. The two differ only
-// in visibility, which JS has no run-time fact for (CLAUDE.md § "Method
-// visibility is not a runtime fact in JS"), and both port to a computed member
-// access — the faithful port of `public_send("#{name}=", value)`
-// (`persistence.rb:533`) is `this[name] = value`, with no callee at all. A
-// call-name check would flag that correct port as well as the wrong one. The
-// setter case is read from the skeleton marks instead (setter-dispatch.ts).
 
 /**
  * The JS iteration callee an Enumerable iterator's faithful port would name if

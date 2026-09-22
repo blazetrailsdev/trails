@@ -37,11 +37,12 @@ function withHelpers(
 /**
  * Whether this pair's Ruby body dispatches to a dynamic setter and its TS body
  * never assigns a computed member but does write the attribute directly.
+ *
+ * The Ruby mark is read from the body's OWN stream: `toggle!` reaches
+ * `update_attribute` (`persistence.rb:690-692`) and its port reaches
+ * `updateAttribute` the same way, so a helper's dispatch is that helper's row.
  */
 export function isSetterDispatchPortedAsDirectWrite(skeleton: CallSkeleton): boolean {
-  // The Ruby body's OWN dispatch only: `toggle!` reaches `update_attribute`
-  // (`persistence.rb:690-692`) and its port reaches `updateAttribute` the same
-  // way, so a helper's dispatch is that helper's row, not this one's.
   if (!skeleton.ruby.includes(RUBY_SETTER_SEND_TOKEN)) return false;
   const ts = withHelpers(skeleton.ts, skeleton.tsHelpers);
   if (ts.includes(TS_COMPUTED_ASSIGN_TOKEN)) return false;

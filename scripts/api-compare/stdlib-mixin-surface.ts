@@ -76,6 +76,9 @@ function shortName(name: string): string {
  * ({@link isStdlibMixinGap}) when the port does not mix the module in: an
  * iterable class answers `for...of` but still has no `map` / `first` / `any?`,
  * which is exactly where `ActiveModel::Errors` stands.
+ *
+ * TS classes and modules are concatenated, never spread-merged: a class and a
+ * same-named namespace share one `file:Name` key across the two maps.
  */
 export function stdlibMixinRows(
   ruby: ApiManifest,
@@ -85,8 +88,6 @@ export function stdlibMixinRows(
   const rows: StdlibMixinRow[] = [];
   for (const [pkg, rubyPkg] of Object.entries(ruby.packages)) {
     if (filterPkg && pkg !== filterPkg) continue;
-    // Concatenated, not spread-merged: a class and a same-named namespace share
-    // one `file:Name` key across the two maps.
     const tsEntities = [
       ...Object.values(ts.packages[pkg]?.classes ?? {}),
       ...Object.values(ts.packages[pkg]?.modules ?? {}),
