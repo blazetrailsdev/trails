@@ -516,7 +516,7 @@ export abstract class CollectionAssociation extends Association {
     return true;
   }
 
-  /** @missingRailsCall reload — PERMANENT */
+  /** @missingRailsCall reload — CONVERGEABLE collection-reader-stale-arm-calls-reload */
   get reader(): AssociationProxy {
     this.ensureKlassExists();
 

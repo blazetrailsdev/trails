@@ -58,7 +58,7 @@ export function quoteColumnName(name: unknown): string {
   return quoted;
 }
 
-/** @missingRailsCall quote — PERMANENT */
+/** @missingRailsCall quote — CONVERGEABLE sqlite3-quote-string-inlines-sqlite3-database-quote */
 export function quoteString(s: string): string {
   return s.replace(/'/g, "''");
 }

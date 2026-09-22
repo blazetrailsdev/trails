@@ -918,7 +918,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     }
   }
 
-  /** @missingRailsCall with_raw_connection — PERMANENT */
+  /** @missingRailsCall with_raw_connection — CONVERGEABLE mysql-quote-string-escapes-without-with-raw-connection */
   override quoteString(string: string): string {
     if (this._escapeState.noBackslashEscapes) {
       return string.replace(/'/g, "''");

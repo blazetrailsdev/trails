@@ -32,6 +32,7 @@ import {
   attributesForUpdate,
   attributesWithValues,
 } from "./attribute-methods.js";
+import * as Inheritance from "./inheritance.js";
 import { getStiBase, isStiSubclass, stiName, defineDynamicSelectReaders } from "./inheritance.js";
 import { withTransactionReturningStatus } from "./transactions.js";
 import { registry } from "./suppressor.js";
@@ -51,7 +52,6 @@ interface PersistenceHost {
     columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
   ): any;
   /** @internal */
-  discriminateClassForRecord?(attributes: Record<string, unknown>): PersistenceHost;
   primaryKey: string | string[];
   _queryConstraintsList?: string[] | null;
   _hasQueryConstraints?: boolean;
@@ -110,21 +110,14 @@ export function build(
   return record;
 }
 
-/** @missingRailsCall instantiate_instance_of — PERMANENT */
 export function instantiate(
   this: PersistenceHost,
   attributes: Record<string, unknown>,
   columnTypes: Record<string, unknown> = {},
   block?: (record: any) => void,
 ): any {
-  const klass = this.discriminateClassForRecord
-    ? this.discriminateClassForRecord(attributes)
-    : this;
-  return klass._instantiate(
-    attributes,
-    block,
-    columnTypes as Record<string, { deserialize(value: unknown): unknown }>,
-  );
+  const klass = Inheritance.discriminateClassForRecord(this as never, attributes);
+  return instantiateInstanceOf(klass, attributes, columnTypes, block);
 }
 
 export function queryConstraints(this: PersistenceHost, ...columnsList: string[]): void {

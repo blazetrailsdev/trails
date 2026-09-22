@@ -1,24 +1,14 @@
 import type { Base } from "./base.js";
 import { addAggregateReflection, create } from "./reflection.js";
-import {
-  assertValidKeys,
-  camelize,
-  constantize,
-  prepend,
-  type PrependModule,
-} from "@blazetrails/activesupport";
-import { include, included, isModuleIncluded } from "@blazetrails/ruby-compat";
+import { assertValidKeys, camelize, constantize } from "@blazetrails/activesupport";
+import { include, isModuleIncluded, Module } from "@blazetrails/ruby-compat";
 
-export const Aggregations = {
-  [included](base: typeof Base): void {
-    prepend(base.prototype, { initializeDup, reload, initInternals } as PrependModule);
-  },
-};
+export const Aggregations = new Module();
 
 /** @internal */
-export function clearAggregationCache(record: Base): void {
-  const self = record as any;
-  if (self._aggregationCache && record.isPersisted()) {
+function clearAggregationCache(this: Base): void {
+  const self = this as any;
+  if (self._aggregationCache && this.isPersisted()) {
     (self._aggregationCache as Map<string, unknown>).clear();
   }
 }
@@ -192,22 +182,23 @@ function writerMethod(
 
 type ReloadOptions = { lock?: boolean | string; unscoped?: boolean };
 
-export function initializeDup(this: Base, super_: (other: unknown) => void, other: unknown): void {
+export function initializeDup(this: Base, other: unknown): void {
   (this as any)._aggregationCache = new Map((this as any)._aggregationCache);
-  super_(other);
+  Aggregations.superMethod(this, "initializeDup")!(other);
 }
 
-export function reload(
-  this: Base,
-  super_: (options?: ReloadOptions) => Promise<Base>,
-  options?: ReloadOptions,
-): Promise<Base> {
-  clearAggregationCache(this);
-  return super_(options);
+export function reload(this: Base, options?: ReloadOptions): Promise<Base> {
+  (this as any).clearAggregationCache();
+  return Aggregations.superMethod(this, "reload")!(options) as Promise<Base>;
 }
 
 /** @internal */
-function initInternals(this: Base, super_: () => void): void {
-  super_();
+function initInternals(this: Base): void {
+  Aggregations.superMethod(this, "initInternals")!();
   (this as any)._aggregationCache = new Map<string, unknown>();
 }
+
+Aggregations.defineMethod("initializeDup", initializeDup);
+Aggregations.defineMethod("reload", reload);
+Aggregations.defineMethod("clearAggregationCache", clearAggregationCache);
+Aggregations.defineMethod("initInternals", initInternals);

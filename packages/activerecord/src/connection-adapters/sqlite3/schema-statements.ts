@@ -244,8 +244,12 @@ export async function virtualTableExists(
   tableName: string,
 ): Promise<boolean> {
   return (
-    (await adapter.queryValues(dataSourceSql(tableName, { type: "VIRTUAL TABLE" }), "SCHEMA"))
-      .length > 0
+    (
+      await adapter.queryValues(
+        dataSourceSql.call(adapter, tableName, { type: "VIRTUAL TABLE" }),
+        "SCHEMA",
+      )
+    ).length > 0
   );
 }
 
@@ -330,8 +334,12 @@ export function isColumnTheRowid(
 }
 
 /** @internal */
-export function dataSourceSql(name?: string, { type }: { type?: string } = {}): string {
-  const scope = quotedScope(name, { type });
+export function dataSourceSql(
+  this: QuotedScopeHost,
+  name?: string,
+  { type }: { type?: string } = {},
+): string {
+  const scope = quotedScope.call(this, name, { type });
   if (!scope.type) scope.type = "'table','view'";
   let sql = "SELECT name FROM pragma_table_list WHERE schema <> 'temp'";
   sql += " AND name NOT IN ('sqlite_sequence', 'sqlite_schema')";
@@ -340,11 +348,11 @@ export function dataSourceSql(name?: string, { type }: { type?: string } = {}): 
   return sql;
 }
 
-/**
- * @internal
- * @missingRailsCall quote — PERMANENT
- */
+type QuotedScopeHost = { quote(value: unknown): string };
+
+/** @internal */
 export function quotedScope(
+  this: QuotedScopeHost,
   name?: string,
   { type }: { type?: string } = {},
 ): { name?: string; type?: string } {
@@ -357,7 +365,7 @@ export function quotedScope(
           ? "'virtual'"
           : undefined;
   const scope: { name?: string; type?: string } = {};
-  if (name != null) scope.name = `'${name.replace(/'/g, "''")}'`;
+  if (name != null) scope.name = this.quote(name);
   if (resolvedType) scope.type = resolvedType;
   return scope;
 }

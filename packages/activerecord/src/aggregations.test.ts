@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { Base, composedOf, reflectOnAggregation } from "./index.js";
 import { reload as persistenceReload } from "./persistence.js";
+import {
+  reload as aggregationsReload,
+  initializeDup as aggregationsInitializeDup,
+} from "./aggregations.js";
 
 import { fixtures } from "./test-fixtures.js";
 import {
@@ -270,8 +274,8 @@ describe("lazy composed_of inclusion", () => {
         composedOf(this, "balance", { className: Money, mapping: [["balance", "amount"]] });
       }
     }
-    expect(own(Priced, "reload")).toBe(true);
-    expect(own(Priced, "initializeDup")).toBe(true);
+    expect(Priced.prototype.reload).toBe(aggregationsReload);
+    expect(Priced.prototype.initializeDup).toBe(aggregationsInitializeDup);
     expect(Priced.prototype.reload).not.toBe(persistenceReload);
   });
 
@@ -293,5 +297,7 @@ describe("lazy composed_of inclusion", () => {
     expect(own(SubPriced, "initializeDup")).toBe(false);
     expect(SubPriced.prototype.reload).toBe(Priced.prototype.reload);
     expect(SubPriced.prototype.reload).not.toBe(persistenceReload);
+    expect(Object.getPrototypeOf(Priced.prototype)).not.toBe(Base.prototype);
+    expect(Object.getPrototypeOf(SubPriced.prototype)).toBe(Priced.prototype);
   });
 });

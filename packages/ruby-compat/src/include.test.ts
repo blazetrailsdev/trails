@@ -858,3 +858,75 @@ describe("publicInstanceMethods", () => {
     expect(publicInstanceMethods(Sub).sort()).toEqual(["inherited", "own"]);
   });
 });
+
+describe("Module#superMethod", () => {
+  it("resumes lookup above the includer's link, bound to the receiver", () => {
+    class Parent {
+      greet(this: { name: string }): string {
+        return `parent ${this.name}`;
+      }
+    }
+    class Child extends Parent {
+      name = "c";
+    }
+    const mod = new Module();
+    mod.defineMethod("greet", function (this: Child) {
+      return `mod+${mod.superMethod(this, "greet")!()}`;
+    });
+    include(Child, mod);
+    expect(new Child().greet()).toBe("mod+parent c");
+  });
+
+  it("answers undefined when no ancestor defines the method", () => {
+    class Lonely {}
+    const mod = new Module();
+    mod.defineMethod("greet", () => "mod");
+    include(Lonely, mod);
+    expect(mod.superMethod(new Lonely(), "greet")).toBeUndefined();
+  });
+
+  it("answers undefined for a receiver whose ancestry lacks the module", () => {
+    class Outside {}
+    const mod = new Module();
+    expect(mod.superMethod(new Outside(), "toString")).toBeUndefined();
+  });
+
+  it("finds each includer's own link", () => {
+    class A {
+      who(): string {
+        return "A";
+      }
+    }
+    class B {
+      who(): string {
+        return "B";
+      }
+    }
+    class SubA extends A {}
+    class SubB extends B {}
+    const mod = new Module();
+    mod.defineMethod("who", function (this: object) {
+      return `m${mod.superMethod(this, "who")!()}`;
+    });
+    include(SubA, mod);
+    include(SubB, mod);
+    expect((new SubA() as A).who()).toBe("mA");
+    expect((new SubB() as B).who()).toBe("mB");
+  });
+
+  it("reaches through a subclass of the includer", () => {
+    class Base0 {
+      who(): string {
+        return "base";
+      }
+    }
+    class Mid extends Base0 {}
+    class Leaf extends Mid {}
+    const mod = new Module();
+    mod.defineMethod("who", function (this: object) {
+      return `m${mod.superMethod(this, "who")!()}`;
+    });
+    include(Mid, mod);
+    expect(new Leaf().who()).toBe("mbase");
+  });
+});

@@ -39,7 +39,7 @@ function resolveJoinPrimaryKey(reflection: unknown, klass?: typeof Base): string
 }
 
 export class DisableJoinsAssociationScope extends AssociationScope {
-  /** @missingRailsCall add_constraints — PERMANENT */
+  /** @missingRailsCall add_constraints — CONVERGEABLE converge-djar-deferred-chain-walk-mode */
   override scope(association: AssociationScopeable): unknown {
     const sourceReflection = association.reflection;
     const owner = association.owner;
@@ -68,7 +68,7 @@ export class DisableJoinsAssociationScope extends AssociationScope {
     });
   }
 
-  /** @missingRailsCall add_constraints — PERMANENT */
+  /** @missingRailsCall add_constraints — CONVERGEABLE converge-djar-deferred-chain-walk-mode */
   private async lastScopeChain(
     reverseChain: ChainEntry[],
     owner: Base,

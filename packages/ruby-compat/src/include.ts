@@ -226,6 +226,35 @@ export class Module {
   }
 
   /**
+   * Mirrors: Ruby's `super` from one of this module's methods —
+   * vendor/ruby/vm_insnhelper.c:4648 `vm_search_super_method`, the lookup
+   * `Method#super_method` exposes (vendor/ruby/proc.c:3391): resume the method
+   * search at `RCLASS_SUPER` of the iclass this module contributed to
+   * `receiver`'s ancestry. Answers the next method bound to `receiver`, or
+   * `undefined` where Ruby's `super_method` answers nil.
+   *
+   * A JS function's `super` is fixed to its home object, which for a carrier
+   * method is the module's own table, not the includer's link, so the link is
+   * found on the receiver's prototype chain instead.
+   *
+   * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+   */
+  superMethod(receiver: object, name: string): ((...args: unknown[]) => unknown) | undefined {
+    const links = includerCarriers.get(this) ?? [];
+    for (let proto = Object.getPrototypeOf(receiver) as object | null; proto; ) {
+      if (links.includes(proto)) {
+        const next = Object.getPrototypeOf(proto) as Record<string, unknown> | null;
+        const method = next?.[name];
+        return typeof method === "function"
+          ? (method as (...args: unknown[]) => unknown).bind(receiver)
+          : undefined;
+      }
+      proto = Object.getPrototypeOf(proto) as object | null;
+    }
+    return undefined;
+  }
+
+  /**
    * Mirrors: Ruby's Module#method_defined? — vendor/ruby/vm_method.c:2055
    * `rb_mod_method_defined`.
    *

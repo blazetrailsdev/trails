@@ -237,8 +237,8 @@ export interface CastableColumn {
 
 /**
  * @internal
- * @missingRailsCall query_value — PERMANENT
- * @missingRailsCall quote — PERMANENT
+ * @missingRailsCall query_value — CONVERGEABLE pg-lookup-cast-type-resolves-only-warmed-type-names
+ * @missingRailsCall quote — CONVERGEABLE pg-lookup-cast-type-resolves-only-warmed-type-names
  */
 export function lookupCastType(this: RegtypeOidHost, sqlType: string | null): ValueType {
   return abstractLookupCastType.call(this as never, regtypeOid.call(this, sqlType));
