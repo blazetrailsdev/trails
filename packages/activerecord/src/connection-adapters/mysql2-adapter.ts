@@ -1,3 +1,4 @@
+import { prepend, type PrependMethod } from "@blazetrails/activesupport";
 import mysql from "mysql2/promise";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
@@ -29,6 +30,7 @@ import {
   lastInsertedId as mysql2LastInsertedId,
   castResult as mysql2CastResult,
   performQuery as mysql2PerformQuery,
+  selectAll as mysql2SelectAll,
   type Mysql2RawResult,
 } from "./mysql2/database-statements.js";
 import { temporalTypeCast, TEMPORAL_POOL_OPTIONS } from "./mysql/temporal-type-cast.js";
@@ -599,3 +601,5 @@ Type.register("string", null, { adapter: "mysql2" }, (_symbol, args?) => {
   });
 });
 Type.register("unsigned_integer", UnsignedInteger, { adapter: "mysql2" });
+
+prepend(Mysql2Adapter.prototype, { selectAll: mysql2SelectAll as PrependMethod });

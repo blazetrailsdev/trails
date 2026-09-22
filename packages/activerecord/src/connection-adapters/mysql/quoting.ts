@@ -22,6 +22,7 @@ import { Rational, rbObjAsString as toS } from "@blazetrails/ruby-compat";
 import { BigDecimal, TimeWithZone } from "@blazetrails/activesupport";
 import { BinaryData } from "@blazetrails/activemodel";
 import { defaultTimezone } from "../../active-record.js";
+import { Value as TimeValue } from "../../type/time.js";
 
 export function unquotedTrue(): number {
   return 1;
@@ -135,7 +136,7 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
       return value.getlocal();
     }
   }
-  if (value instanceof RubyTime) {
+  if (value instanceof RubyTime && !(value instanceof TimeValue)) {
     if (defaultTimezone() === "utc") {
       return value.isUtc() ? value : value.getutc();
     } else {

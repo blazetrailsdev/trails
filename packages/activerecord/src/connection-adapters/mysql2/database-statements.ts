@@ -7,6 +7,7 @@ import type { StatementPool } from "../statement-pool.js";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { TimeWithZone } from "@blazetrails/activesupport";
 import { defaultTimezone } from "../../active-record.js";
+import { ExplainRegistry } from "../../explain-registry.js";
 
 export interface DatabaseStatementsHost {
   execQuery(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
@@ -71,14 +72,22 @@ interface MultiStatementsHost {
 
 const MULTI_STATEMENTS_BIT = 0x10000;
 
-/** @missingRailsCall unprepared_statement — PERMANENT */
-export async function selectAll(
-  this: DatabaseStatementsHost,
-  sql: string,
-  name?: string | null,
-  binds?: unknown[],
-): Promise<Result> {
-  return this.internalExecQuery(sql, name, binds);
+/** @internal */
+interface SelectAllHost {
+  preparedStatements?: boolean;
+  unpreparedStatement<T>(fn: () => Promise<T> | T): Promise<T> | T;
+}
+
+export function selectAll(
+  this: SelectAllHost,
+  super_: (...args: unknown[]) => unknown,
+  ...args: unknown[]
+): unknown {
+  if (ExplainRegistry.isCollect() && this.preparedStatements) {
+    return this.unpreparedStatement(() => super_(...args));
+  } else {
+    return super_(...args);
+  }
 }
 
 /** @internal */
