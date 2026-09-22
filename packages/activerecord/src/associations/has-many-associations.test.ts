@@ -2784,8 +2784,8 @@ describe("HasManyAssociationsTest", () => {
   it("adding array and collection", async () => {
     await assertNothingRaised(async () => {
       void [
-        ...(await ((await HmFirm.first()) as any).clients),
-        ...(await ((await HmFirm.all().last()) as any).clients),
+        ...(await ((await HmFirm.first()) as any).clients.toArray()),
+        ...(await ((await HmFirm.all().last()) as any).clients.toArray()),
       ];
     });
   });
