@@ -1,4 +1,11 @@
-import { NoMethodError, sliceBang, stringSplit } from "@blazetrails/ruby-compat";
+import {
+  cmp,
+  equals as cmpEquals,
+  NoMethodError,
+  PROTOCOL_PROBES,
+  sliceBang,
+  stringSplit,
+} from "@blazetrails/ruby-compat";
 import { String as JsonString } from "../core-ext/object/json.js";
 import { truncateBytes } from "../string-utils.js";
 import { Unicode } from "./unicode.js";
@@ -12,7 +19,7 @@ export class Chars {
       get(target, prop, receiver) {
         if (typeof prop === "symbol" || prop in target) return Reflect.get(target, prop, receiver);
         if (!target.respondToMissing(prop, false)) {
-          if (prop === "then" || prop === "toJSON" || prop === "asymmetricMatch") return undefined;
+          if (PROTOCOL_PROBES.has(prop) || prop === "respondTo" || prop === "eql") return undefined;
           return () => {
             throw new NoMethodError(`undefined method '${prop}' for an instance of Chars`);
           };
@@ -34,6 +41,12 @@ export class Chars {
   toStr(): string {
     return this.wrappedString;
   }
+
+  compareTo(other: unknown): number | null {
+    return cmp(this.wrappedString, other);
+  }
+
+  equals = cmpEquals;
 
   isMatch(pattern: RegExp | string): boolean {
     return new RegExp(pattern).test(this.wrappedString);

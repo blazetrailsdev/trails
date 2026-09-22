@@ -17,7 +17,7 @@
  */
 
 import { ArgumentError } from "./argument-error.js";
-import { rbInspect, rbObjClass } from "./object.js";
+import { rbInspect, rbObjClass, rbObjRespondTo } from "./object.js";
 import { rbEqual } from "./rb-equal.js";
 import { temporalTag, widenPlainDate } from "./temporal-tag.js";
 
@@ -110,9 +110,20 @@ export function cmp(a: unknown, b: unknown): number | null {
     return a < b ? -1 : a > b ? 1 : 0;
   }
   if (typeof a === "string") {
-    /* `rb_str_cmp_m` (`vendor/ruby/string.c:3803`) answers nil for a non-String. */
-    if (typeof b !== "string") return null;
-    return a < b ? -1 : a > b ? 1 : 0;
+    /* `rb_str_cmp_m` (`vendor/ruby/string.c:3803`): `rb_check_string_type`
+       converts an operand answering `to_str`, and anything else goes to
+       `rb_invcmp` (`compar.c:43`), the negated reverse `<=>`. */
+    const s =
+      typeof b === "string"
+        ? b
+        : rbObjRespondTo(b, "toStr")
+          ? (b as { toStr(): string }).toStr()
+          : null;
+    if (s === null) {
+      const inv = cmp(b, a);
+      return inv === null ? null : -inv;
+    }
+    return a < s ? -1 : a > s ? 1 : 0;
   }
   /* `vendor/ruby/object.c:1665` `rb_obj_cmp` — the inherited `<=>`: `0` for an
      `==` operand and nil otherwise, rather than JS relational coercion, which

@@ -1,3 +1,4 @@
+import { rbObjRespondTo } from "./object.js";
 import { temporalTag, widenPlainDate } from "./temporal-tag.js";
 
 /**
@@ -43,6 +44,12 @@ export function rbEql(a: unknown, b: unknown): boolean {
 function equalOrEql(a: unknown, b: unknown, eql: boolean): boolean {
   if (a === b) return true;
   if (a == null || b == null) return false;
+  /* `rb_str_equal` (`vendor/ruby/string.c:3742`): a non-String answering
+     `to_str` is asked `other == self` in turn. */
+  if (typeof a === "string" && typeof b !== "string") {
+    if (!rbObjRespondTo(b, "toStr")) return false;
+    return equalOrEql(b, a, eql);
+  }
   /* `rb_int_equal` (`vendor/ruby/numeric.c:4634`) compares by value, and Ruby
      has one Integer for every magnitude. JS splits that seat across `number`
      and `bigint`, so `===` answers false for two seats of the same Ruby
