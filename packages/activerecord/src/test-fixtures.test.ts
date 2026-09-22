@@ -1,4 +1,5 @@
 import { describe, it, expect, expectTypeOf, vi, beforeAll, beforeEach, afterAll } from "vitest";
+import { File as FixtureFile } from "./fixture-set/file.js";
 import { include } from "@blazetrails/ruby-compat";
 import { onLoad } from "@blazetrails/activesupport";
 import { resolveFixtureNames } from "./test-fixtures.js";
@@ -643,11 +644,13 @@ describe("fixtureRegistry seeds against TEST_SCHEMA", () => {
         const data = (entry as { data: Record<string, Record<string, unknown>> }).data;
         FixtureSet.resetCache();
         if (isJoinTableEntry(entry)) {
-          await FixtureSet.createFixtures({ [entry.joinTable]: data }, [entry.joinTable]);
+          FixtureFile.registerModule(`fixtures-trails/${entry.joinTable}.ts`, data);
+          await FixtureSet.createFixtures("fixtures-trails", [entry.joinTable]);
         } else {
           if ("addOn" in entry) await entry.addOn?.();
           const ModelClass = await resolvePrimaryModel(entry);
-          await FixtureSet.createFixtures({ [name]: data }, [name], { [name]: ModelClass });
+          FixtureFile.registerModule(`fixtures-trails/${name}.ts`, data);
+          await FixtureSet.createFixtures("fixtures-trails", [name], { [name]: ModelClass });
         }
       } catch (e) {
         failures.push(`${name}: ${(e as Error).message.split("\n")[0]}`);
@@ -758,11 +761,13 @@ describe("FixtureSet.createFixtures", () => {
     ]);
     const Topic = makeModel(adapter, "topics", rows);
 
-    const [result] = await FixtureSet.createFixtures(
-      { topics: { first: { title: "First" }, second: { title: "Second" } } },
-      "topics",
-      { topics: Topic },
-    );
+    FixtureFile.registerModule("fixtures-trails/topics.ts", {
+      first: { title: "First" },
+      second: { title: "Second" },
+    });
+    const [result] = await FixtureSet.createFixtures("fixtures-trails", "topics", {
+      topics: Topic,
+    });
 
     expect(await result.get("first")!.find()).toMatchObject({ id: id1 });
     expect(await result.get("second")!.find()).toMatchObject({ id: id2 });
@@ -774,7 +779,8 @@ describe("FixtureSet.createFixtures", () => {
     const rows = new Map([[id, { id, title: "Rails" }]]);
     const Topic = makeModel(adapter, "topics", rows);
 
-    await FixtureSet.createFixtures({ topics: { rails: { title: "Rails" } } }, "topics", {
+    FixtureFile.registerModule("fixtures-trails/topics.ts", { rails: { title: "Rails" } });
+    await FixtureSet.createFixtures("fixtures-trails", "topics", {
       topics: Topic,
     });
 

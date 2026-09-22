@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { File as FixtureFile } from "./fixture-set/file.js";
+import { FIXTURES_ROOT as TS_FIXTURES_ROOT } from "./test-helpers/fixtures-registry.js";
 import { Base, RecordNotFound, registerModel } from "./index.js";
 import "./relation.js";
 import { Associations } from "./associations.js";
@@ -82,10 +84,13 @@ const fixturesDirectory = {
   distinct: reservedWordsDistinctFixtureData,
   distinct_select: reservedWordsDistinctSelectFixtureData,
 };
+for (const [name, rows] of Object.entries(fixturesDirectory)) {
+  FixtureFile.registerModule(`${TS_FIXTURES_ROOT}/reserved_words/${name}.ts`, rows);
+}
 const fixtureClassNames = { select: Select, group: Group, values: Values, distinct: Distinct };
 async function createTestFixtures(...names: (keyof typeof fixturesDirectory)[]): Promise<void> {
   FixtureSet.resetCache();
-  await FixtureSet.createFixtures(fixturesDirectory, names, fixtureClassNames);
+  await FixtureSet.createFixtures(`${TS_FIXTURES_ROOT}/reserved_words`, names, fixtureClassNames);
 }
 
 describe("ReservedWordTest", () => {

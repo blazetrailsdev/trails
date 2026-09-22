@@ -4,7 +4,19 @@ import { ConfigurationFile } from "@blazetrails/activesupport/configuration-file
 import { FormatError } from "../fixtures.js";
 import { RenderContext } from "./render-context.js";
 
+const fixtureModules = new Map<string, Record<string, unknown>>();
+
 export class File {
+  /** @noRailsEquivalent PERMANENT */
+  static registerModule(file: string, rows: Record<string, unknown>): void {
+    fixtureModules.set(file, rows);
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  static modules(): string[] {
+    return [...fixtureModules.keys()];
+  }
+
   #file: string;
   #rows?: [string, unknown][];
   #configRow?: Record<string, unknown>;
@@ -51,13 +63,20 @@ export class File {
   private rawRows(): [string, unknown][] {
     if (this.#rawRows === undefined) {
       let data: unknown;
-      try {
-        data = ConfigurationFile.parse(this.#file, {
-          context: new (RenderContext.createSubclass())().getBinding(),
-        });
-      } catch (error: unknown) {
-        if (!(error instanceof ConfigurationFile.FormatError)) throw error;
-        throw new FormatError(error.message);
+      const rows = fixtureModules.get(this.#file);
+      if (rows !== undefined) {
+        data = Object.fromEntries(
+          Object.entries(rows).map(([key, row]) => [key, isPlainObject(row) ? { ...row } : row]),
+        );
+      } else {
+        try {
+          data = ConfigurationFile.parse(this.#file, {
+            context: new (RenderContext.createSubclass())().getBinding(),
+          });
+        } catch (error: unknown) {
+          if (!(error instanceof ConfigurationFile.FormatError)) throw error;
+          throw new FormatError(error.message);
+        }
       }
       this.#rawRows = data != null && data !== false ? toA(this.validate(data)) : [];
     }

@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+import { File as FixtureFile } from "../../fixture-set/file.js";
+import { FIXTURES_ROOT as TS_FIXTURES_ROOT } from "../../test-helpers/fixtures-registry.js";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { itIfSupports } from "../../support/supports.js";
 import { FixtureSet } from "../../fixtures.js";
@@ -124,11 +126,13 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     itIfSupports("virtual_columns", "build fixture sql", async () => {
-      const [fixtures] = await FixtureSet.createFixtures(
-        { virtual_columns: virtualColumnFixtureData },
-        "virtual_columns",
-        { virtual_columns: VirtualColumn },
+      FixtureFile.registerModule(
+        `${TS_FIXTURES_ROOT}/virtual_columns.ts`,
+        virtualColumnFixtureData,
       );
+      const [fixtures] = await FixtureSet.createFixtures(TS_FIXTURES_ROOT, "virtual_columns", {
+        virtual_columns: VirtualColumn,
+      });
       expect(fixtures.size()).toBe(2);
     });
   });

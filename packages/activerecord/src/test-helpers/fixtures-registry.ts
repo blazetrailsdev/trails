@@ -1,6 +1,10 @@
 import type { Base } from "../base.js";
 
+import { underscore } from "@blazetrails/activesupport";
+import { File } from "../fixture-set/file.js";
 import * as FixtureData from "./fixtures/index.js";
+
+export const FIXTURES_ROOT = new URL("./fixtures", import.meta.url).pathname;
 
 type BaseClass = typeof Base;
 type FixtureAttrs = Record<string, unknown>;
@@ -615,6 +619,10 @@ type _AssertRegistryShape =
   typeof fixtureRegistry extends Record<string, FixtureRegistryEntry> ? true : never;
 const _registryConforms: _AssertRegistryShape = true;
 void _registryConforms;
+
+for (const [name, entry] of Object.entries(fixtureRegistry)) {
+  File.registerModule(`${FIXTURES_ROOT}/${underscore(name)}.ts`, entry.data);
+}
 
 export type FixtureName = keyof typeof fixtureRegistry;
 

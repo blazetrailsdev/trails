@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { include } from "@blazetrails/ruby-compat";
 import { TestFixtures } from "./test-fixtures.js";
+import { File as FixtureFile } from "./fixture-set/file.js";
 
 type Host = {
   name: string;
@@ -45,6 +46,14 @@ describe("TestFixtures::ClassMethods", () => {
       "other_posts",
       "parrots",
     ]);
+  });
+
+  it("fixtures :all enumerates registered TS fixture modules under the fixture paths", () => {
+    FixtureFile.registerModule("all-ts-root/topics.ts", {});
+    FixtureFile.registerModule("all-ts-root/admin/users.ts", {});
+    klass.fixturePaths = ["all-ts-root"];
+    klass.fixtures(":all");
+    expect(klass.fixtureTableNames).toEqual(["admin/users", "topics"]);
   });
 
   it("fixtures unions and sorts table names and sets up accessors", () => {
