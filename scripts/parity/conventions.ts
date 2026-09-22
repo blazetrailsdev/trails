@@ -1438,6 +1438,8 @@ const CONTAINMENT_PREDICATE_ALIASES = new Map<string, string>([
  *   - Containment predicates (`include?`, `member?`, `exclude?`) append
  *     the native JS spelling as a further candidate
  *     (`include?` → ["isInclude", "include", "includes"]).
+ *   - No predicate is ever offered a `Q`-suffixed spelling
+ *     (`activeConnectionsQ`); `xQ` is not a trails spelling of `x?`.
  */
 export function rubyMethodToTs(
   name: string,
@@ -1703,7 +1705,9 @@ predicate. \`is_*?\` collapses to a single camel candidate so trails can't
 land the redundant doubled \`isIsNumber\`. Already-predicate prefixes keep the
 \`is*\` fallback because the disambiguating alias is sometimes needed when the bare
 name collides with a macro (e.g. \`isHasOne()\` alongside the \`Model.hasOne\`
-declaration). Leading underscores and runs of underscores collapse like a single
+declaration). A \`Q\` suffix (\`activeConnectionsQ\`) is never a
+candidate: \`xQ\` is not a trails spelling of \`x?\`, so port a predicate whose
+bare camel name is taken as \`is*\` (or the quoted literal). Leading underscores and runs of underscores collapse like a single
 underscore (\`visit__regexp\` → \`visitRegexp\`), and underscore-before-capital
 collapses too (\`visit_Arel_Nodes_X\` → \`visitArelNodesX\`).
 

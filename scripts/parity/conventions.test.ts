@@ -336,6 +336,23 @@ describe("rubyMethodToTs predicates", () => {
     expect(bareCandidates("debug?", new Set())).toEqual(["isDebug", "debug"]);
   });
 
+  it("never offers a Q-suffixed candidate for a predicate", () => {
+    for (const name of [
+      "active_connections?",
+      "primary_class?",
+      "is_number?",
+      "has_attribute?",
+      "include?",
+      "debug?",
+    ]) {
+      const candidates = [
+        ...(rubyMethodToTs(name) ?? []),
+        ...(rubyMethodToTs(name, new Set([name.slice(0, -1)])) ?? []),
+      ];
+      expect(candidates.filter((c) => c.endsWith("Q"))).toEqual([]);
+    }
+  });
+
   it("keeps the containment spelling last so existing isInclude ports still match first", () => {
     // CollectionAssociation#isInclude and Clusivity#isInclude are live ports;
     // widening the candidate list must never displace them.
