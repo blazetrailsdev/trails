@@ -3,6 +3,7 @@ import {
   type AsyncContext,
   type AsyncContextAdapter,
 } from "./async-context-adapter.js";
+import { Fiber } from "./fiber.js";
 import { ThreadError } from "./thread-error.js";
 
 interface MutexData {
@@ -11,6 +12,7 @@ interface MutexData {
   storage: AsyncContext<symbol> | null;
   adapter: AsyncContextAdapter | null;
   release: (() => void) | null;
+  owner: Fiber | null;
 }
 
 const MUTEX_DATA = new WeakMap<object, MutexData>();
@@ -18,7 +20,7 @@ const MUTEX_DATA = new WeakMap<object, MutexData>();
 function mutexData(self: object): MutexData {
   let data = MUTEX_DATA.get(self);
   if (!data) {
-    data = { fiber: null, chain: null, storage: null, adapter: null, release: null };
+    data = { fiber: null, chain: null, storage: null, adapter: null, release: null, owner: null };
     MUTEX_DATA.set(self, data);
   }
   const adapter = getAsyncContext();
@@ -53,9 +55,11 @@ export class Mutex {
       });
       data.chain = mine;
       data.fiber = Symbol("mutex");
+      data.owner = Fiber.current();
       data.release = () => {
         data.fiber = null;
         data.release = null;
+        data.owner = null;
         if (data.chain === mine) data.chain = null;
         unlock();
       };
@@ -75,6 +79,8 @@ export class Mutex {
     const data = mutexData(this);
     if (data.release === null) {
       throw new ThreadError("Attempt to unlock a mutex which is not locked");
+    } else if (data.owner !== Fiber.current()) {
+      throw new ThreadError("Attempt to unlock a mutex which is locked by another thread/fiber");
     }
     data.release();
     return this;
@@ -110,9 +116,11 @@ export class Mutex {
 
     const fiber = Symbol("mutex");
     data.fiber = fiber;
+    data.owner = Fiber.current();
     data.release = () => {
       data.fiber = null;
       data.release = null;
+      data.owner = null;
       if (data.chain === tail) data.chain = null;
       unlock();
     };
