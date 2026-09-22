@@ -51,8 +51,10 @@ export interface AssociationOptions {
     | "destroyAsync"
     | "nullify"
     | "delete"
+    | "deleteAll"
     | "restrictWithException"
     | "restrictWithError";
+  ensuringOwnerWas?: string;
   inverseOf?: string | false;
   through?: string;
   source?: string;

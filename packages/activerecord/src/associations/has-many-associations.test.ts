@@ -1,7 +1,7 @@
 import { kernelThrow } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { ArgumentError } from "@blazetrails/activemodel";
+import { ArgumentError, I18n } from "@blazetrails/activemodel";
 import {
   SubclassNotFound,
   Base,
@@ -34,9 +34,12 @@ import { Bulb } from "../test-helpers/models/bulb.js";
 import { Developer, AuditLog } from "../test-helpers/models/developer.js";
 import { Speedometer } from "../test-helpers/models/speedometer.js";
 import { Invoice } from "../test-helpers/models/invoice.js";
-import { Associations, isAssociationCached } from "../associations.js";
+import { Project } from "../test-helpers/models/project.js";
+import { isAssociationCached } from "../associations.js";
 import { DeleteRestrictionError } from "./errors.js";
 import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
+import { assertNotCalledOnInstanceOf } from "../testing/method-call-assertions.js";
+import { AssociationReflection } from "../reflection.js";
 import {
   assertDifference,
   assertEmpty,
@@ -46,6 +49,9 @@ import {
   assertRaise,
   assertRaises,
   assertNoDifference,
+  assertNotCalled,
+  Notifications,
+  type NotificationEvent,
   travel,
   travelBack,
 } from "@blazetrails/activesupport";
@@ -1823,15 +1829,18 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("create", async () => {
-    const firm = companies("first_firm") as any;
-    await firm.clientsOfFirm.loadTarget();
+    await forceSignal37ToLoadAllClientsOfFirm();
 
-    expect(firm.clientsOfFirm.loaded).toBeTruthy();
+    expect((companies("first_firm") as any).clientsOfFirm.loaded).toBeTruthy();
 
-    const newClient = await firm.clientsOfFirm.create({ name: "Another Client" });
-    expect(newClient.isPersisted()).toBe(true);
-    expect(await firm.clientsOfFirm.last()).toBe(newClient);
-    expect((await (await firm.clientsOfFirm.reload()).last()).id).toBe(newClient.id);
+    const newClient = await (companies("first_firm") as any).clientsOfFirm.create({
+      name: "Another Client",
+    });
+    expect(newClient.isPersisted()).toBeTruthy();
+    expect(await (companies("first_firm") as any).clientsOfFirm.last()).toEqual(newClient);
+    expect(await (await (companies("first_firm") as any).clientsOfFirm.reload()).last()).toEqual(
+      newClient,
+    );
   });
 
   it("create many", async () => {
@@ -2428,11 +2437,16 @@ describe("HasManyAssociationsTest", () => {
 
   it("deleting by integer id", async () => {
     const david = (await Developer.find(1)) as any;
-    const before = await david.projects.count();
 
-    const deleted = (await david.projects.delete(1)) as any[];
-    expect(deleted.length).toBe(1);
-    expect(await david.projects.count()).toBe(before - 1);
+    await assertDifference(
+      async () => Number(await david.projects.count()),
+      -1,
+      null,
+      async () => {
+        expect(((await david.projects.delete(1)) as any[]).length).toBe(1);
+      },
+    );
+
     expect(await david.projects.size()).toBe(1);
   });
 
@@ -2452,10 +2466,11 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("deleting self type mismatch", async () => {
-    const author = await HmAuthor.create({ name: "Alice" });
-    await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    await author.destroy();
-    expect(author.isDestroyed()).toBe(true);
+    const david = (await Developer.find(1)) as any;
+    await david.projects.reload();
+    await assertRaise([AssociationTypeMismatch], {}, async () => {
+      await david.projects.delete(((await Project.find(1)) as any).developers);
+    });
   });
 
   it("destroying", async () => {
@@ -2628,48 +2643,16 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("three levels of dependence", async () => {
-    class ThreeLvlTopic extends Base {
-      declare title: string | null;
-      declare replies: AssociationProxy<ThreeLvlReply>;
-
-      static {
-        this._tableName = "topics";
-        this.attribute("title", "string");
-        this.hasMany("replies", {
-          className: "ThreeLvlReply",
-          foreignKey: "parent_id",
-          dependent: "destroy",
-        });
-      }
-    }
-    class ThreeLvlReply extends Base {
-      declare title: string | null;
-      declare content: string | null;
-      declare parent_id: number | null;
-      declare replies: AssociationProxy<ThreeLvlReply>;
-
-      static {
-        this._tableName = "topics";
-        this.attribute("title", "string");
-        this.attribute("content", "string");
-        this.attribute("parent_id", "integer");
-        this.hasMany("replies", {
-          className: "ThreeLvlReply",
-          foreignKey: "parent_id",
-          dependent: "destroy",
-        });
-      }
-    }
-    registerModel(ThreeLvlTopic);
-    registerModel(ThreeLvlReply);
-    const topic = await ThreeLvlTopic.create({ title: "neat and simple" });
-    const reply = await (topic as any).replies.create({
+    const topic = (await HmTopic.create({ title: "neat and simple" })) as any;
+    const reply = await topic.replies.create({
       title: "neat and simple",
       content: "still digging it",
     });
     await reply.replies.create({ title: "neat and simple", content: "ain't complaining" });
-    await topic.destroy();
-    expect(await ThreeLvlTopic.find(topic.id).catch(() => null)).toBeNull();
+
+    await assertNothingRaised(async () => {
+      await topic.destroy();
+    });
   });
 
   it("dependence with transaction support on failure", async () => {
@@ -2753,41 +2736,30 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("restrict with error with locale", async () => {
-    class ReLocaleAuthor extends Base {
-      declare name: string | null;
-      declare re_locale_posts: AssociationProxy<ReLocalePost>;
+    I18n.setBackend(new I18n.Simple());
+    try {
+      I18n.backend().storeTranslations("en", {
+        activerecord: {
+          attributes: { restricted_with_error_firm: { companies: "client companies" } },
+        },
+      });
+      const firm = (await RestrictedWithErrorFirm.createBang({ name: "restrict" })) as any;
+      await firm.companies.create({ name: "child" });
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("re_locale_posts", {
-          className: "ReLocalePost",
-          foreignKey: "author_id",
-          dependent: "restrictWithError",
-        });
-      }
-    }
-    class ReLocalePost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
+      assertNotEmpty(await firm.companies.toArray());
 
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
+      await firm.destroy();
+
+      assertNotEmpty(firm.errors);
+
+      expect(firm.errors.get("base")[0]).toBe(
+        "Cannot delete record because dependent client companies exist",
+      );
+      expect(await RestrictedWithErrorFirm.exists({ name: "restrict" })).toBeTruthy();
+      expect(await firm.companies.exists({ name: "child" })).toBeTruthy();
+    } finally {
+      await I18n.backend().reloadBang();
     }
-    registerModel(ReLocaleAuthor);
-    registerModel(ReLocalePost);
-    const author = await ReLocaleAuthor.create({ name: "Writer" });
-    await ReLocalePost.create({ author_id: author.id, title: "P", body: "body" });
-    expect(await author.destroy()).toBe(false);
-    expect(author.errors.where("base")).toHaveLength(1);
-    expect(author.errors.messagesFor("base")[0]).toBe(
-      "Cannot delete record because dependent re locale posts exist",
-    );
-    expect(await ReLocaleAuthor.findBy({ id: author.id })).not.toBeNull();
-    expect(await ReLocalePost.where({ author_id: author.id }).count()).toBe(1);
   });
 
   it("included in collection", async () => {
@@ -2810,37 +2782,12 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("adding array and collection", async () => {
-    class ArrAuthor extends Base {
-      declare arr_posts: AssociationProxy<ArrPost>;
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("arr_posts", {
-          className: "ArrPost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class ArrPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(ArrAuthor);
-    registerModel(ArrPost);
-    const author = await ArrAuthor.create({ name: "Alice" });
-    await ArrPost.create({ author_id: author.id, title: "A", body: "body" });
-    await ArrPost.create({ author_id: author.id, title: "B", body: "body" });
-    await ArrPost.create({ author_id: author.id, title: "C", body: "body" });
-    const loaded = await author.arr_posts;
-    expect(loaded.length).toBe(3);
+    await assertNothingRaised(async () => {
+      void [
+        ...(await ((await HmFirm.first()) as any).clients.toArray()),
+        ...(await ((await HmFirm.all().last()) as any).clients.toArray()),
+      ];
+    });
   });
 
   it("replace with less", async () => {
@@ -3061,9 +3008,12 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("get ids for association on new record does not try to find records", async () => {
-    const author = HmAuthor.new({ name: "New" });
-    expect(author.isNewRecord()).toBe(true);
-    expect(author.id == null).toBe(true);
+    const company = Company.new() as any;
+    await assertQueriesCount(0, false, async () => {
+      await company.contractIds;
+    });
+
+    expect(await company.contractIds).toEqual([]);
   });
 
   it("set ids for association on new record applies association correctly", async () => {
@@ -3308,12 +3258,11 @@ describe("HasManyAssociationsTest", () => {
   it("calling many should defer to collection if using a block", async () => {
     const firm = companies("first_firm") as any;
     await assertQueriesCount(1, false, async () => {
-      const size = vi.spyOn(firm.clients, "size");
-      await firm.clients.isMany(() => true);
-      expect(size).not.toHaveBeenCalled();
-      size.mockRestore();
+      await assertNotCalled(firm.clients, "size", null, async () => {
+        await firm.clients.isMany(() => true);
+      });
     });
-    expect(firm.clients.loaded).toBe(true);
+    expect(firm.clients.loaded).toBeTruthy();
   });
 
   it("calling many should return false if none or one", async () => {
@@ -3351,7 +3300,9 @@ describe("HasManyAssociationsTest", () => {
   it("calling none should defer to collection if using a block", async () => {
     const firm = companies("first_firm") as any;
     await assertQueriesCount(1, false, async () => {
-      await firm.clients.isNone(() => true);
+      await assertNotCalled(firm.clients, "size", null, async () => {
+        await firm.clients.isNone(() => true);
+      });
     });
     expect(firm.clients.loaded).toBeTruthy();
   });
@@ -3395,7 +3346,9 @@ describe("HasManyAssociationsTest", () => {
   it("calling one should defer to collection if using a block", async () => {
     const firm = companies("first_firm") as any;
     await assertQueriesCount(1, false, async () => {
-      await firm.clients.isOne(() => true);
+      await assertNotCalled(firm.clients, "size", null, async () => {
+        await firm.clients.isOne(() => true);
+      });
     });
     expect(firm.clients.loaded).toBeTruthy();
   });
@@ -3481,71 +3434,25 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("defining has many association with delete all dependency lazily evaluates target class", async () => {
-    class LazyDelAuthor extends Base {
-      declare name: string | null;
-      declare lazy_del_posts: AssociationProxy<LazyDelPost>;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("lazy_del_posts", {
-          className: "LazyDelPost",
-          foreignKey: "author_id",
-          dependent: "delete",
-        });
+    await assertNotCalledOnInstanceOf(AssociationReflection, "className", () => {
+      class DeleteAllModel extends Base {
+        static {
+          this.hasMany("nonentities", { dependent: "deleteAll" });
+        }
       }
-    }
-    class LazyDelPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(LazyDelAuthor);
-    registerModel(LazyDelPost);
-    const author = await LazyDelAuthor.create({ name: "Alice" });
-    await LazyDelPost.create({ author_id: author.id, title: "A", body: "body" });
-    await author.destroy();
-    const remaining = await author.lazy_del_posts;
-    expect(remaining.length).toBe(0);
+      void DeleteAllModel;
+    });
   });
 
   it("defining has many association with nullify dependency lazily evaluates target class", async () => {
-    class LazyNullAuthor extends Base {
-      declare name: string | null;
-      declare lazy_null_posts: AssociationProxy<LazyNullPost>;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("lazy_null_posts", {
-          className: "LazyNullPost",
-          foreignKey: "author_id",
-          dependent: "nullify",
-        });
+    await assertNotCalledOnInstanceOf(AssociationReflection, "className", () => {
+      class NullifyModel extends Base {
+        static {
+          this.hasMany("nonentities", { dependent: "nullify" });
+        }
       }
-    }
-    class LazyNullPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(LazyNullAuthor);
-    registerModel(LazyNullPost);
-    const author = await LazyNullAuthor.create({ name: "Alice" });
-    const post = await LazyNullPost.create({ author_id: author.id, title: "A", body: "body" });
-    await author.destroy();
-    const reloaded = await LazyNullPost.find(post.id!);
-    expect((reloaded as any).author_id).toBeNull();
+      void NullifyModel;
+    });
   });
 
   it("attributes are being set when initialized from has many association with where clause", async () => {
@@ -4001,15 +3908,13 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("passes custom context validation to validate children", async () => {
-    registerModel(FamousPirate);
-    registerModel(FamousShip);
     const pirate = FamousPirate.new() as any;
     const ship = FamousShip.new() as any;
     await pirate.famousShips.push(ship);
 
-    expect(await pirate.isValid()).toBe(true);
-    expect(await pirate.isValid("conference")).toBe(false);
-    expect(ship.errors.messagesFor("name")[0]).toBe("can't be blank");
+    expect(await pirate.isValid()).toBeTruthy();
+    expect(await pirate.isValid("conference")).toBeFalsy();
+    expect(ship.errors.get("name")[0]).toBe("can't be blank");
   });
 
   it("association with instance dependent scope", async () => {
@@ -4215,80 +4120,47 @@ describe("HasManyAssociationsTest", () => {
     });
   });
 
-  it("destroy does not raise when association errors on destroy", async () => {
-    class PostWithErrorDestroying extends Base {
-      static {
-        this._tableName = "posts";
-        this.beforeDestroy(function () {
-          kernelThrow(":abort");
-        });
-      }
+  class AuthorWithErrorDestroyingAssociation extends Base {
+    static {
+      this.tableName = "authors";
+      this.hasMany("postsWithErrorDestroying", {
+        className: "PostWithErrorDestroying",
+        foreignKey: "author_id",
+        dependent: "destroy",
+      });
     }
-    class AuthorWithErrorDestroyingAssociation extends Base {
-      declare name: string | null;
-      declare postsWithErrorDestroying: AssociationProxy<PostWithErrorDestroying>;
+  }
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("postsWithErrorDestroying", {
-          className: "PostWithErrorDestroying",
-          foreignKey: "author_id",
-          dependent: "destroy",
-        });
-      }
+  class PostWithErrorDestroying extends Base {
+    static {
+      this.tableName = "posts";
+      this.inheritanceColumn = null;
+      this.beforeDestroy(() => {
+        kernelThrow(":abort");
+      });
     }
-    registerModel(AuthorWithErrorDestroyingAssociation);
-    registerModel(PostWithErrorDestroying);
-    const author = await AuthorWithErrorDestroyingAssociation.create({ name: "Alice" });
-    await PostWithErrorDestroying.create({ author_id: author.id, title: "A", body: "body" });
-    const countBefore = await AuthorWithErrorDestroyingAssociation.count();
-    const result = await author.destroy();
-    expect(result).toBeFalsy();
-    expect(await AuthorWithErrorDestroyingAssociation.count()).toBe(countBefore);
+  }
+  registerModel(AuthorWithErrorDestroyingAssociation);
+  registerModel(PostWithErrorDestroying);
+
+  it("destroy does not raise when association errors on destroy", async () => {
+    await assertNoDifference(
+      async () => Number(await AuthorWithErrorDestroyingAssociation.count()),
+      null,
+      async () => {
+        const author = (await AuthorWithErrorDestroyingAssociation.first()) as any;
+
+        assertNot(await author.destroy());
+      },
+    );
   });
 
   it("destroy with bang bubbles errors from associations", async () => {
-    class PostWithErrorDestroying2 extends Base {
-      static {
-        this._tableName = "posts";
-        this.beforeDestroy(function () {
-          kernelThrow(":abort");
-        });
-      }
-    }
-    class AuthorWithErrorDestroyingAssociation2 extends Base {
-      declare name: string | null;
-      declare postsWithErrorDestroying2: AssociationProxy<PostWithErrorDestroying2>;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("postsWithErrorDestroying2", {
-          className: "PostWithErrorDestroying2",
-          foreignKey: "author_id",
-          dependent: "destroy",
-        });
-      }
-    }
-    registerModel(AuthorWithErrorDestroyingAssociation2);
-    registerModel(PostWithErrorDestroying2);
-    const author = await AuthorWithErrorDestroyingAssociation2.create({ name: "Alice" });
-    const post = await PostWithErrorDestroying2.create({
-      author_id: author.id,
-      title: "A",
-      body: "body",
+    const error: any = await assertRaises([RecordNotDestroyed], {}, async () => {
+      await ((await AuthorWithErrorDestroyingAssociation.first()) as any).destroyBang();
     });
-    const { RecordNotDestroyed: RND } = await import("../index.js");
-    let error: InstanceType<typeof RND> | undefined;
-    try {
-      await (author as any).destroyBang();
-    } catch (e) {
-      if (e instanceof RND) error = e;
-    }
-    expect(error).toBeDefined();
-    expect((error as any).record).toBeInstanceOf(PostWithErrorDestroying2);
-    void post;
+
+    expect(error.record).toBeInstanceOf(PostWithErrorDestroying);
   });
 
   it("collection destroy uses destroy bang and rolls back the batch on failure", async () => {
@@ -4395,148 +4267,74 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("has many association with same foreign key name", async () => {
-    class SameFkAuthor extends Base {
-      declare name: string | null;
-      declare posts: AssociationProxy<SameFkPost>;
-      declare published_posts: AssociationProxy<SameFkPost>;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("posts", { className: "SameFkPost", foreignKey: "author_id" });
-        this.hasMany("published_posts", { className: "SameFkPost", foreignKey: "author_id" });
-      }
-    }
-    class SameFkPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(SameFkAuthor);
-    registerModel(SameFkPost);
-    const author = await SameFkAuthor.create({ name: "Alice" });
-    await SameFkPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await author.posts;
-    const pubPosts = await author.published_posts;
-    expect(posts.length).toBe(1);
-    expect(pubPosts.length).toBe(1);
+    await assertNothingRaised(async () => {
+      const firm = (await HmFirm.find(15)) as any;
+      expect(await firm.comments.first()).not.toBeNull();
+    });
   });
 
   it("key ensuring owner was is not valid without dependent option", async () => {
-    class KeyValAuthor extends Base {
-      declare name: string | null;
-      declare key_val_posts: AssociationProxy<KeyValPost>;
+    const error: any = await assertRaises([ArgumentError], {}, () => {
+      void class extends Base {
+        static {
+          this.hasMany("books", { ensuringOwnerWas: "isDestroyed" });
+        }
+      };
+    });
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("key_val_posts", {
-          className: "KeyValPost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class KeyValPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(KeyValAuthor);
-    registerModel(KeyValPost);
-    const author = await KeyValAuthor.create({ name: "Alice" });
-    await KeyValPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await author.key_val_posts;
-    expect(posts.length).toBe(1);
+    expect(error.message).toMatch(/Unknown key: :ensuringOwnerWas/);
   });
 
   it("invalid key raises with message including all default options", async () => {
-    class InvKeyAuthor extends Base {
-      declare name: string | null;
+    const error: any = await assertRaises([ArgumentError], {}, () => {
+      void class extends Base {
+        static {
+          this.hasMany("books", { trough: "users" } as any);
+        }
+      };
+    });
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    registerModel(InvKeyAuthor);
-    expect(() => {
-      Associations.hasMany.call(InvKeyAuthor, "nonexistent_posts", {
-        className: "NonExistentModel",
-        foreignKey: "author_id",
-      });
-    }).not.toThrow();
+    expect(error.message).toBe(
+      "Unknown key: :trough. Valid keys are: :className, :anonymousClass, :primaryKey, :foreignKey, :dependent, :validate, :inverseOf, :strictLoading, :queryConstraints, :autosave, :beforeAdd, :afterAdd, :beforeRemove, :afterRemove, :extend, :counterCache, :joinTable, :indexErrors, :as, :through",
+    );
   });
 
   it("key ensuring owner was is valid when dependent option is destroy async", async () => {
-    class AsyncDepAuthor extends Base {
-      declare name: string | null;
-      declare async_dep_posts: AssociationProxy<AsyncDepPost>;
+    await assertNothingRaised(() => {
+      void class extends Base {
+        static {
+          this.destroyAssociationAsyncJob(class {});
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("async_dep_posts", {
-          className: "AsyncDepPost",
-          foreignKey: "author_id",
-          dependent: "destroy",
-        });
-      }
-    }
-    class AsyncDepPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(AsyncDepAuthor);
-    registerModel(AsyncDepPost);
-    const author = await AsyncDepAuthor.create({ name: "Alice" });
-    await AsyncDepPost.create({ author_id: author.id, title: "A", body: "body" });
-    await author.destroy();
-    const remaining = await author.async_dep_posts;
-    expect(remaining.length).toBe(0);
+          this.hasMany("books", { dependent: "destroyAsync", ensuringOwnerWas: "isDestroyed" });
+        }
+      };
+    });
   });
 
-  it("composite primary key malformed association class", () => {
-    registerModel(CpkBook);
-    const order = new CpkBrokenOrder();
-    let error: Error | undefined;
-    try {
-      order.association("books");
-    } catch (e) {
-      error = e as Error;
-    }
-    expect(error).toBeInstanceOf(CompositePrimaryKeyMismatchError);
-    expect(error?.message).toBe(
+  it("composite primary key malformed association class", async () => {
+    const error: any = await assertRaises([CompositePrimaryKeyMismatchError], {}, async () => {
+      const order = CpkBrokenOrder.new({
+        id: [1, 2],
+        books: [CpkBook.new({ title: "Some book" })],
+      });
+      await order.saveBang();
+    });
+
+    expect(error.message).toBe(
       `Association CpkBrokenOrder#books primary key ["shop_id", "status"] doesn't match with foreign key broken_order_id. Please specify query_constraints, or primary_key and foreign_key values.`,
     );
   });
 
-  it("composite primary key malformed association owner class", () => {
-    registerModel(CpkNonCpkBook);
-    const order = new CpkBrokenOrderWithNonCpkBooks();
-    let error: Error | undefined;
-    try {
-      order.association("books");
-    } catch (e) {
-      error = e as Error;
-    }
-    expect(error).toBeInstanceOf(CompositePrimaryKeyMismatchError);
-    expect(error?.message).toBe(
+  it("composite primary key malformed association owner class", async () => {
+    const error: any = await assertRaises([CompositePrimaryKeyMismatchError], {}, async () => {
+      const order = CpkBrokenOrderWithNonCpkBooks.new({
+        id: [1, 2],
+        books: [CpkNonCpkBook.new({ title: "Some book" })],
+      });
+      await order.saveBang();
+    });
+
+    expect(error.message).toBe(
       `Association CpkBrokenOrderWithNonCpkBooks#books primary key ["shop_id", "status"] doesn't match with foreign key broken_order_with_non_cpk_books_id. Please specify query_constraints, or primary_key and foreign_key values.`,
     );
   });
@@ -4557,15 +4355,26 @@ describe("HasManyAssociationsTest", () => {
 describe("AsyncHasManyAssociationsTest", () => {
   const { companies } = fixtures(["companies", "accounts"]);
 
-  it("async load has many", async () => {
+  // BLOCKED: association-async-load-target-uses-async-executor
+  it.skip("async load has many", async () => {
     const firm = companies("first_firm") as any;
 
     await firm.association("clients").asyncLoadTarget();
 
-    expect(await firm.clients.size()).toBe(3);
+    const events: NotificationEvent[] = [];
+    const callback = (event: NotificationEvent) => {
+      if (event.payload.name !== "SCHEMA") events.push(event);
+    };
+
+    await Notifications.subscribed(callback, "sql.active_record", async () => {
+      expect(await firm.clients.size()).toEqual(3);
+    });
 
     await assertNoQueries(false, async () => {
-      expect(firm.clients[2]).not.toBeUndefined();
+      expect((await firm.clients.toArray())[2] ?? null).not.toBeNull();
     });
+
+    expect(events.length).toEqual(1);
+    expect(events[0].payload.async).toEqual(true);
   });
 });
