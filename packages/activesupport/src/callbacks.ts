@@ -262,6 +262,7 @@ export namespace CallTemplate {
         Function.prototype.toString.call(filter),
       ) &&
       !(
+        /\{\s*\[native code\]\s*\}$/.test(Function.prototype.toString.call(filter)) &&
         Object.getOwnPropertyDescriptor(filter, "prototype")?.writable === false &&
         !Object.isFrozen(filter)
       )
