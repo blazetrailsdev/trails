@@ -179,6 +179,22 @@ describe("statically expanded loop-generated it() titles", () => {
       `),
     ).toEqual([["rejects an adapter whose <expr> a proxy intercepts on <expr>", true]]);
   });
+
+  // activesupport/src/cache/serializer-with-fallback.test.ts:39-47 — the inner
+  // loop over LEGACY_FORMATS expands, but `loader` never resolves, so each
+  // iteration re-visits the same `it()` with the same skeleton.
+  it("records a dynamic it() once per call site inside an expanded loop", () => {
+    expect(
+      titles(`
+        const LEGACY_FORMATS = ["passthrough", "marshal_7_0"];
+        for (const loader of Object.keys(SERIALIZERS)) {
+          for (const dumper of LEGACY_FORMATS) {
+            it(\`:\${loader} serializer can load :\${dumper} dump\`, () => {});
+          }
+        }
+      `),
+    ).toEqual([[":<expr> serializer can load :<expr> dump", true]]);
+  });
 });
 
 /** The extracted tests' full paths, in order. */

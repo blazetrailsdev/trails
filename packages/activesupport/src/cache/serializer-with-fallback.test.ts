@@ -8,6 +8,10 @@ const FORMATS = Object.keys(SerializerWithFallback.SERIALIZERS);
 const LEGACY_FORMATS = ["passthrough", "marshal_7_0"];
 const NON_LEGACY_FORMATS = FORMATS.filter((f) => !LEGACY_FORMATS.includes(f));
 
+function inspect(format: string) {
+  return `:${format}`;
+}
+
 function serializer(format: string) {
   return SerializerWithFallback.get(format);
 }
@@ -28,7 +32,7 @@ function assertEntry(expected: Entry, actual: unknown) {
 describe("CacheSerializerWithFallbackTest", () => {
   for (const loader of FORMATS) {
     for (const dumper of NON_LEGACY_FORMATS) {
-      it(`${JSON.stringify(loader)} serializer can load ${JSON.stringify(dumper)} dump`, () => {
+      it(`${inspect(loader)} serializer can load ${inspect(dumper)} dump`, () => {
         const entry = makeEntry();
         const dumped = serializer(dumper).dump(entry.value);
         expect(serializer(loader).load(dumped)).toEqual(entry.value);
@@ -38,7 +42,7 @@ describe("CacheSerializerWithFallbackTest", () => {
 
   for (const loader of FORMATS) {
     for (const dumper of LEGACY_FORMATS) {
-      it(`${JSON.stringify(loader)} serializer can load ${JSON.stringify(dumper)} dump`, () => {
+      it(`${inspect(loader)} serializer can load ${inspect(dumper)} dump`, () => {
         const entry = makeEntry();
         const dumped = serializer(dumper).dump(entry);
         assertEntry(entry, serializer(loader).load(dumped));
@@ -47,12 +51,12 @@ describe("CacheSerializerWithFallbackTest", () => {
   }
 
   for (const format of FORMATS) {
-    it(`${JSON.stringify(format)} serializer handles unrecognized payloads gracefully`, () => {
+    it(`${inspect(format)} serializer handles unrecognized payloads gracefully`, () => {
       expect(serializer(format).load({})).toBeNull();
       expect(serializer(format).load("")).toBeNull();
     });
 
-    it(`${JSON.stringify(format)} serializer logs unrecognized payloads`, () => {
+    it(`${inspect(format)} serializer logs unrecognized payloads`, () => {
       const messages: string[] = [];
       const logger = { warn: (msg: string) => messages.push(msg) };
 
@@ -66,7 +70,7 @@ describe("CacheSerializerWithFallbackTest", () => {
   }
 
   for (const format of LEGACY_FORMATS) {
-    it(`${JSON.stringify(format)} serializer can compress entries`, () => {
+    it(`:${format} serializer can compress entries`, () => {
       const entry = makeEntry();
       const compressed = serializer(format).dumpCompressed!(entry, 1);
       const uncompressed = serializer(format).dumpCompressed!(entry, 100_000);
