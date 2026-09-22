@@ -442,9 +442,11 @@ describe("PrimaryKeyAnyTypeTest", () => {
     static _primaryKey = "code";
   }
 
-  beforeAll(async () => {
-    await ((await Base.leaseConnection()) as any).dropTable("barcodes", { ifExists: true });
-    await (Base.connection as any).createTable("barcodes", {
+  let connection: any;
+
+  beforeEach(async () => {
+    connection = await Base.leaseConnection();
+    await connection.createTable("barcodes", {
       primaryKey: "code",
       id: { type: "string", limit: 42 },
       force: true,
@@ -453,9 +455,9 @@ describe("PrimaryKeyAnyTypeTest", () => {
     await Barcode.loadSchema();
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     void Barcode.resetColumnInformation();
-    await ((await Base.leaseConnection()) as any).dropTable("barcodes", { ifExists: true });
+    await connection.dropTable("barcodes", { ifExists: true });
   });
 
   it("any type primary key", async () => {
@@ -469,7 +471,7 @@ describe("PrimaryKeyAnyTypeTest", () => {
   });
 
   it("schema dump primary key includes type and options", async () => {
-    const schema = await dumpTableSchema(Base.connection, "barcodes");
+    const schema = await dumpTableSchema(connection, "barcodes");
     expect(schema).toMatch(
       /createTable\("barcodes", \{ primaryKey: "code", id: \{ type: "string", limit: 42 \}/,
     );
@@ -477,17 +479,17 @@ describe("PrimaryKeyAnyTypeTest", () => {
   });
 
   it.skipIf(adapterType !== "mysql")("schema typed primary key column", async () => {
-    await (Base.connection as any).dropTable("scheduled_logs", { ifExists: true });
-    await (Base.connection as any).createTable("scheduled_logs", {
+    await connection.dropTable("scheduled_logs", { ifExists: true });
+    await connection.createTable("scheduled_logs", {
       id: "timestamp",
       precision: 6,
       force: true,
     });
     try {
-      const schema = await dumpTableSchema(Base.connection, "scheduled_logs");
+      const schema = await dumpTableSchema(connection, "scheduled_logs");
       expect(schema).toMatch(/createTable\("scheduled_logs", \{ id: "timestamp"/);
     } finally {
-      await (Base.connection as any).dropTable("scheduled_logs", { ifExists: true });
+      await connection.dropTable("scheduled_logs", { ifExists: true });
     }
   });
 });
@@ -682,21 +684,21 @@ describe("PrimaryKeyIntegerTest", () => {
     static _tableName = "widgets";
   }
 
-  beforeAll(async () => {
-    if (adapterType === "sqlite") return;
-    await ((await Base.leaseConnection()) as any).dropTable("widgets", { ifExists: true });
+  let connection: any;
+
+  beforeEach(async () => {
+    connection = await Base.leaseConnection();
   });
 
-  afterAll(async () => {
-    if (adapterType === "sqlite") return;
+  afterEach(async () => {
     void Widget.resetColumnInformation();
-    await ((await Base.leaseConnection()) as any).dropTable("widgets", { ifExists: true });
+    await connection.dropTable("widgets", { ifExists: true });
   });
 
   const pkType = adapterType === "postgres" ? "serial" : "integer";
 
   it.skipIf(adapterType === "sqlite")("primary key column type with serial/integer", async () => {
-    await (Base.connection as any).createTable("widgets", { id: { type: pkType }, force: true });
+    await connection.createTable("widgets", { id: { type: pkType }, force: true });
     void Widget.resetColumnInformation();
     await Widget.loadSchema();
     const col = (Widget as any).columnsHash()["id"];
@@ -707,7 +709,7 @@ describe("PrimaryKeyIntegerTest", () => {
   it.skipIf(adapterType === "sqlite")(
     "primary key with serial/integer are automatically numbered",
     async () => {
-      await (Base.connection as any).createTable("widgets", { id: { type: pkType }, force: true });
+      await connection.createTable("widgets", { id: { type: pkType }, force: true });
       void Widget.resetColumnInformation();
       await Widget.loadSchema();
       const w = await Widget.createBang();
@@ -716,13 +718,13 @@ describe("PrimaryKeyIntegerTest", () => {
   );
 
   it.skipIf(adapterType === "sqlite")("schema dump primary key with serial/integer", async () => {
-    await (Base.connection as any).createTable("widgets", { id: { type: pkType }, force: true });
-    const schema = await dumpTableSchema(Base.connection, "widgets");
+    await connection.createTable("widgets", { id: { type: pkType }, force: true });
+    const schema = await dumpTableSchema(connection, "widgets");
     expect(schema).toMatch(new RegExp(`createTable\\("widgets", \\{ id: "${pkType}", `));
   });
 
   it.skipIf(adapterType !== "mysql")("primary key column type with options", async () => {
-    await (Base.connection as any).createTable("widgets", {
+    await connection.createTable("widgets", {
       id: { type: "primary_key", limit: 4, unsigned: true },
       force: true,
     });
@@ -734,12 +736,12 @@ describe("PrimaryKeyIntegerTest", () => {
     expect(col.isBigint()).toBeFalsy();
     expect(col.isUnsigned()).toBeTruthy();
 
-    const schema = await dumpTableSchema(Base.connection, "widgets");
+    const schema = await dumpTableSchema(connection, "widgets");
     expect(schema).toMatch(/createTable\("widgets", \{ id: \{ type: "integer", unsigned: true \}/);
   });
 
   it.skipIf(adapterType !== "mysql")("bigint primary key with unsigned", async () => {
-    await (Base.connection as any).createTable("widgets", {
+    await connection.createTable("widgets", {
       id: { type: "bigint", unsigned: true },
       force: true,
     });
@@ -751,7 +753,7 @@ describe("PrimaryKeyIntegerTest", () => {
     expect(col.isBigint()).toBeTruthy();
     expect(col.isUnsigned()).toBeTruthy();
 
-    const schema = await dumpTableSchema(Base.connection, "widgets");
+    const schema = await dumpTableSchema(connection, "widgets");
     expect(schema).toMatch(/createTable\("widgets", \{ id: \{ type: "bigint", unsigned: true \}/);
   });
 });
