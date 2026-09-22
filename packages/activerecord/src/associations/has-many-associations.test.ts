@@ -3705,7 +3705,7 @@ describe("HasManyAssociationsTest", () => {
     const originalChild = (await FailedBulb.createBang({ car })) as any;
 
     const error = (await assertRaise([RecordNotDestroyed], {}, async () => {
-      await car.failedBulbs.replace([await FailedBulb.createBang()]);
+      await car.association("failedBulbs").writer([await FailedBulb.createBang()]);
     })) as any;
 
     expect((await (await car.reload()).failedBulbs.toArray()).map(recordId)).toEqual(
@@ -3753,7 +3753,7 @@ describe("HasManyAssociationsTest", () => {
 
     const newBulb = (await HmBulb.find(bulb.id)) as any;
     newBulb.name = "foo";
-    await car.bulbs.replace([newBulb]);
+    await car.association("bulbs").writer([newBulb]);
 
     expect((await car.bulbs.first()).name).toBe("foo");
   });
@@ -3789,7 +3789,7 @@ describe("HasManyAssociationsTest", () => {
     raiseAfterAdd = true;
 
     await assertNothingRaised(async () => {
-      await car.bulbs.replace([newBulb]);
+      await car.association("bulbs").writer([newBulb]);
     });
   });
 
