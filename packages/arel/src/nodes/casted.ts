@@ -7,14 +7,14 @@ import type { Attribute } from "../attributes/attribute.js";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 
 export function buildQuoted(other: unknown, attribute?: unknown): Node {
-  if (other instanceof Node) return other;
-  if (other && typeof other === "object") {
-    if (other instanceof Attributes.Attribute) return other as Node;
-    if (other instanceof Arel.Table) return other as unknown as Node;
-    if (other instanceof ModelAttribute) return other as unknown as Node;
-    const maybeAst = (other as { ast?: unknown }).ast;
-    if (maybeAst instanceof Node) return other as Node;
-  }
+  if (
+    other instanceof Node ||
+    other instanceof Attributes.Attribute ||
+    other instanceof Arel.Table ||
+    other instanceof Arel.SelectManager ||
+    other instanceof ModelAttribute
+  )
+    return other as Node;
   if (attribute instanceof Attributes.Attribute) return new Casted(other, attribute);
   return new Quoted(other);
 }

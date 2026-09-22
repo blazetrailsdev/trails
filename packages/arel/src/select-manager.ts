@@ -17,6 +17,7 @@ import { Exists } from "./nodes/function.js";
 import { NamedWindow } from "./nodes/window.js";
 import { Table } from "./table.js";
 import { sql } from "./arel.js";
+import { Arel } from "./namespaces.js";
 import { Comment } from "./nodes/comment.js";
 import { Lateral } from "./nodes/unary.js";
 import { And } from "./nodes/nary.js";
@@ -296,3 +297,5 @@ type _FactoryMethodsModule = import("./factory-methods.js").FactoryMethodsModule
 export interface SelectManager extends _FactoryMethodsModule, Crud {}
 
 include(SelectManager, Crud);
+
+Arel.SelectManager = SelectManager;

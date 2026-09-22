@@ -7,6 +7,7 @@ import type { Grouping } from "./nodes/grouping.js";
 import type { In } from "./nodes/in.js";
 import type { And, Or } from "./nodes/nary.js";
 import type { Not } from "./nodes/unary.js";
+import type { SelectManager } from "./select-manager.js";
 import type { Table } from "./table.js";
 import type { Dot } from "./visitors/dot.js";
 
@@ -14,6 +15,7 @@ type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
 const loadPath: Record<string, () => Promise<unknown>> = {
   "arel/table": () => import("./table.js"),
+  "arel/select_manager": () => import("./select-manager.js"),
   "arel/attributes/attribute": () => import("./attributes/attribute.js"),
   "arel/nodes/unary": () => import("./nodes/unary.js"),
   "arel/nodes/grouping": () => import("./nodes/grouping.js"),
@@ -26,10 +28,12 @@ const loadPath: Record<string, () => Promise<unknown>> = {
 
 export const Arel = { name: "Arel", loadPath } as AutoloadModule & {
   Table: typeof Table;
+  SelectManager: typeof SelectManager;
   Attribute: typeof AttributeClass;
 };
 extend(Arel, Autoload);
 Arel.autoload("Table", "arel/table");
+Arel.autoload("SelectManager", "arel/select_manager");
 Arel.autoload("Attribute", "arel/attributes/attribute");
 
 export const Attributes = { name: "Arel::Attributes", loadPath } as AutoloadModule & {
