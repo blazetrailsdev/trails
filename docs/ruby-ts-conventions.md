@@ -15,20 +15,20 @@ comparison credits your implementation.
 The Example column shows the TS **symbol name(s)** parity:api looks for (it
 matches the first candidate present in the target file), not a call expression.
 
-| Ruby                                                                                                                     | TypeScript                         | Example                                                                                          |
-| ------------------------------------------------------------------------------------------------------------------------ | ---------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `predicate?` (bare)                                                                                                      | `is*` prefix, then camel           | `valid?` → `isValid` or `valid` or `_isValid` or `_valid`                                        |
-| `is_*?`                                                                                                                  | camel form (no doubled `isIs*`)    | `is_number?` → `isNumber` or `_isNumber`                                                         |
-| `has_*?` / `supports_*?` / `can_*?` / `should_*?` / `needs_*?` / `includes_*?` / `responds_*?` / `allows_*?` / `uses_*?` | camel form + `is*` fallback        | `has_attribute?` → `hasAttribute` or `isHasAttribute` or `_hasAttribute` or `_isHasAttribute`    |
-| `include?` / `member?` / `exclude?`                                                                                      | `is*` / camel / native JS spelling | `include?` → `isInclude` or `include` or `includes` or `_isInclude` or `_include` or `_includes` |
-| `name!` (bang)                                                                                                           | `*Bang` suffix                     | `save!` → `saveBang` or `_saveBang`                                                              |
-| `name=` (setter)                                                                                                         | bare camel name, `set*` fallback   | `table_name=` → `tableName` or `setTableName` or `_tableName` or `_setTableName`                 |
-| `initialize` / `new`                                                                                                     | `constructor`                      | `initialize` → `constructor`                                                                     |
-| `to_s` / `to_str`                                                                                                        | `toString`                         | `to_s` → `toString`                                                                              |
-| `to_json`                                                                                                                | `toJSON`                           | `to_json` → `toJSON`                                                                             |
-| `to_sql`                                                                                                                 | `toSql`                            | `to_sql` → `toSql`                                                                               |
-| `-@` (unary minus)                                                                                                       | `negate`                           | `-@` → `negate`                                                                                  |
-| everything else                                                                                                          | `snake_case` → `camelCase`         | `has_many` → `hasMany` or `_hasMany`                                                             |
+| Ruby                                                                                                                     | TypeScript                                   | Example                                                                                          |
+| ------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `predicate?` (bare)                                                                                                      | `is*` prefix, then camel, then `has*` prefix | `valid?` → `isValid` or `valid` or `hasValid` or `_isValid` or `_valid` or `_hasValid`           |
+| `is_*?`                                                                                                                  | camel form (no doubled `isIs*`)              | `is_number?` → `isNumber` or `_isNumber`                                                         |
+| `has_*?` / `supports_*?` / `can_*?` / `should_*?` / `needs_*?` / `includes_*?` / `responds_*?` / `allows_*?` / `uses_*?` | camel form + `is*` fallback                  | `has_attribute?` → `hasAttribute` or `isHasAttribute` or `_hasAttribute` or `_isHasAttribute`    |
+| `include?` / `member?` / `exclude?`                                                                                      | `is*` / camel / native JS spelling           | `include?` → `isInclude` or `include` or `includes` or `_isInclude` or `_include` or `_includes` |
+| `name!` (bang)                                                                                                           | `*Bang` suffix                               | `save!` → `saveBang` or `_saveBang`                                                              |
+| `name=` (setter)                                                                                                         | bare camel name, `set*` fallback             | `table_name=` → `tableName` or `setTableName` or `_tableName` or `_setTableName`                 |
+| `initialize` / `new`                                                                                                     | `constructor`                                | `initialize` → `constructor`                                                                     |
+| `to_s` / `to_str`                                                                                                        | `toString`                                   | `to_s` → `toString`                                                                              |
+| `to_json`                                                                                                                | `toJSON`                                     | `to_json` → `toJSON`                                                                             |
+| `to_sql`                                                                                                                 | `toSql`                                      | `to_sql` → `toSql`                                                                               |
+| `-@` (unary minus)                                                                                                       | `negate`                                     | `-@` → `negate`                                                                                  |
+| everything else                                                                                                          | `snake_case` → `camelCase`                   | `has_many` → `hasMany` or `_hasMany`                                                             |
 
 Constructor details: `new` maps to `constructor` only when its Ruby file does
 NOT also define `initialize`. A same-file `new` beside `initialize`
@@ -45,7 +45,11 @@ land the redundant doubled `isIsNumber`. Already-predicate prefixes keep the
 name collides with a macro (e.g. `isHasOne()` alongside the `Model.hasOne`
 declaration). A `Q` suffix (`activeConnectionsQ`) is never a
 candidate: `xQ` is not a trails spelling of `x?`, so port a predicate whose
-bare camel name is taken as `is*` (or the quoted literal). Leading underscores and runs of underscores collapse like a single
+bare camel name is taken as `is*` or `has*` (or the quoted literal). A bare
+predicate offers `has*` after `is*` and the camel form
+(`active_connections?` → `hasActiveConnections`), for predicates that read
+as possession; the `is_*?`, already-predicate-prefix and containment families
+do not, since `hasIsNumber` / `hasHasAttribute` / `hasInclude` never read right. Leading underscores and runs of underscores collapse like a single
 underscore (`visit__regexp` → `visitRegexp`), and underscore-before-capital
 collapses too (`visit_Arel_Nodes_X` → `visitArelNodesX`).
 

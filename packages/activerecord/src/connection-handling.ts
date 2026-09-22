@@ -101,7 +101,7 @@ export function connectedTo<T>(
     );
   }
 
-  if (!this.connectionClassQ() && !isPrimaryClass.call(this)) {
+  if (!this.isConnectionClass() && !isPrimaryClass.call(this)) {
     // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_handling.rb:142 cluster=connection-pool
     throw new NotImplementedError(
       "calling `connected_to` is only allowed on the abstract class that established the connection.",
@@ -316,11 +316,10 @@ export function retrieveConnection(this: typeof Base): Promise<DatabaseAdapter> 
   });
 }
 
-export function connectedQ(this: typeof Base): boolean {
-  const name = connectionSpecificationName.call(this);
-  return this.connectionHandler.isConnected(name, {
-    role: coreCurrentRole.call(this as any),
-    shard: coreCurrentShard.call(this as any),
+export function isConnected(this: typeof Base): boolean {
+  return this.connectionHandler.isConnected(connectionSpecificationName.call(this), {
+    role: this.currentRole(),
+    shard: this.currentShard(),
   });
 }
 
@@ -405,7 +404,7 @@ export function connectionSpecificationName(this: typeof Base): string {
   if (typeof (this as any).primaryClassQ === "function" && (this as any).primaryClassQ()) {
     return "ActiveRecord::Base";
   }
-  if ((this as any).connectionClassQ?.()) {
+  if ((this as any).isConnectionClass?.()) {
     return this.name;
   }
   const parent = Object.getPrototypeOf(this);
@@ -607,7 +606,7 @@ export const ConnectionHandling = {
   connectionDbConfig,
   connectionPool,
   retrieveConnection,
-  connectedQ,
+  isConnected,
   connection,
   isPrimaryClass,
   adapterClass,

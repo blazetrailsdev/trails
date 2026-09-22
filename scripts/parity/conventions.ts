@@ -1434,7 +1434,9 @@ const CONTAINMENT_PREDICATE_ALIASES = new Map<string, string>([
  *     macro — e.g. Reflection exposes `isHasOne()` alongside the
  *     `Model.hasOne` association declaration.
  *   - Bare predicates (`valid?`, `blank?`) return both forms with the
- *     isPrefixed form first (`valid?` → ["isValid", "valid"]).
+ *     isPrefixed form first, then the has-prefixed form
+ *     (`active_connections?` → ["isActiveConnections", "activeConnections",
+ *     "hasActiveConnections"]), for predicates that read as possession.
  *   - Containment predicates (`include?`, `member?`, `exclude?`) append
  *     the native JS spelling as a further candidate
  *     (`include?` → ["isInclude", "include", "includes"]).
@@ -1549,7 +1551,8 @@ function rubyMethodToTsWithoutUnderscore(
     if (containment !== undefined) {
       return [...literal, isPrefixed, camel, containment];
     }
-    return [...literal, isPrefixed, camel];
+    const hasPrefixed = "has" + camel.replace(/^./, (c) => c.toUpperCase());
+    return [...literal, isPrefixed, camel, hasPrefixed];
   }
 
   if (name.endsWith("!")) {
@@ -1679,7 +1682,7 @@ matches the first candidate present in the target file), not a call expression.
 
 | Ruby | TypeScript | Example |
 | ---- | ---------- | ------- |
-| \`predicate?\` (bare) | \`is*\` prefix, then camel | \`valid?\` → ${example("valid?")} |
+| \`predicate?\` (bare) | \`is*\` prefix, then camel, then \`has*\` prefix | \`valid?\` → ${example("valid?")} |
 | \`is_*?\` | camel form (no doubled \`isIs*\`) | \`is_number?\` → ${example("is_number?")} |
 | ${predicatePrefixes} | camel form + \`is*\` fallback | \`has_attribute?\` → ${example("has_attribute?")} |
 | ${containmentPredicates} | \`is*\` / camel / native JS spelling | \`include?\` → ${example("include?")} |
@@ -1707,7 +1710,11 @@ land the redundant doubled \`isIsNumber\`. Already-predicate prefixes keep the
 name collides with a macro (e.g. \`isHasOne()\` alongside the \`Model.hasOne\`
 declaration). A \`Q\` suffix (\`activeConnectionsQ\`) is never a
 candidate: \`xQ\` is not a trails spelling of \`x?\`, so port a predicate whose
-bare camel name is taken as \`is*\` (or the quoted literal). Leading underscores and runs of underscores collapse like a single
+bare camel name is taken as \`is*\` or \`has*\` (or the quoted literal). A bare
+predicate offers \`has*\` after \`is*\` and the camel form
+(\`active_connections?\` → \`hasActiveConnections\`), for predicates that read
+as possession; the \`is_*?\`, already-predicate-prefix and containment families
+do not, since \`hasIsNumber\` / \`hasHasAttribute\` / \`hasInclude\` never read right. Leading underscores and runs of underscores collapse like a single
 underscore (\`visit__regexp\` → \`visitRegexp\`), and underscore-before-capital
 collapses too (\`visit_Arel_Nodes_X\` → \`visitArelNodesX\`).
 

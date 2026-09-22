@@ -2,13 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-handling.ts",
-    "rubyName": "connected_to",
-    "call": "connection_class?",
-    "reason": "The TS body calls connectionClassQ, which stopped pairing with connection_class? when conventions.ts dropped the Q candidate; the rename to isConnectionClass is `rename-q-predicates-ar-class-kind`."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-handling.ts",
     "rubyName": "connected_to_all_shards",
     "call": "map",
     "reason": "Newly measured by RFC 0126: this pair was outside the call population until the gate stopped letting a bodyless declaration / a dependency package's same-path body answer for the real one. The omission is pre-existing and unconverged — burndown is tracked by the `burn-down-rfc0126-repairing-surfaced-call-rows` story, which converges each row against its Rails file:line."

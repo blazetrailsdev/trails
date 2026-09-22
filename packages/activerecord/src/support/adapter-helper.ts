@@ -19,7 +19,7 @@ export function currentAdapter(...types: AdapterClassName[]): boolean {
 }
 
 function poolConfigurationHash(): Record<string, unknown> {
-  return Base.connectedQ()
+  return Base.isConnected()
     ? (Base.connectionPool().dbConfig.configurationHash as Record<string, unknown>)
     : ambientPoolConfiguration();
 }

@@ -10,12 +10,12 @@ describe("ActiveRecordTest", () => {
 
   it.skipIf(inMemoryDb())(".disconnect_all! closes all connections", async () => {
     await (await Base.leaseConnection()).connectBang();
-    assertPredicate(Base, (b) => b.connectedQ());
+    assertPredicate(Base, (b) => b.isConnected());
 
     await disconnectAllBang();
-    assertNotPredicate(Base, (b) => b.connectedQ());
+    assertNotPredicate(Base, (b) => b.isConnected());
 
     await (await Base.leaseConnection()).connectBang();
-    assertPredicate(Base, (b) => b.connectedQ());
+    assertPredicate(Base, (b) => b.isConnected());
   });
 });
