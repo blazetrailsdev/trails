@@ -1274,19 +1274,19 @@ export class ThroughReflection extends AbstractReflection {
 
   foreignKey(kwargs?: { inferFromInverseOf?: boolean }): string | string[] {
     const _ = this.sourceReflection;
-    if (_ == null) throw DelegationError.nilTarget("foreignKey", "sourceReflection");
+    if (_ == null) throw DelegationError.nilTarget("foreign_key", "source_reflection");
     return _.foreignKey(kwargs);
   }
 
   get foreignType(): string | null {
     const _ = this.sourceReflection;
-    if (_ == null) throw DelegationError.nilTarget("foreignType", "sourceReflection");
+    if (_ == null) throw DelegationError.nilTarget("foreign_type", "source_reflection");
     return _.foreignType;
   }
 
   get type(): string | null {
     const _ = this.sourceReflection;
-    if (_ == null) throw DelegationError.nilTarget("type", "sourceReflection");
+    if (_ == null) throw DelegationError.nilTarget("type", "source_reflection");
     return _.type;
   }
 

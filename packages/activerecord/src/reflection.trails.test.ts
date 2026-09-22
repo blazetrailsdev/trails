@@ -253,11 +253,13 @@ describe("ThroughReflection delegation to a nil source_reflection", () => {
     Object.defineProperty(ref, "sourceReflection", { value: null });
 
     expect(() => ref.foreignKey()).toThrow(
-      new DelegationError("foreignKey delegated to sourceReflection, but sourceReflection is nil"),
+      new DelegationError(
+        "foreign_key delegated to source_reflection, but source_reflection is nil",
+      ),
     );
     expect(() => ref.foreignType).toThrow(DelegationError);
     expect(() => ref.type).toThrow(
-      "type delegated to sourceReflection, but sourceReflection is nil",
+      "type delegated to source_reflection, but source_reflection is nil",
     );
   });
 });
