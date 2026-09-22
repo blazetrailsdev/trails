@@ -666,6 +666,7 @@ describe("MultibyteCharsExtrasTest", () => {
       ["", 0],
       ["abc", 3],
       ["こにちわ", 4],
+      // boundary: Rails' [0x0924, 0x094D, 0x0930] row (expected 2, multibyte_chars_test.rb:576) is omitted — Intl.Segmenter implements Unicode 15.1+ GB9c and answers 1; Ruby 3.3 segments by Unicode 15.0.
       [["cr", "lf"], 1],
       [["cr", "n"], 2],
       [["lf", "n"], 2],
