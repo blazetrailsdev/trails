@@ -3,174 +3,157 @@
    Rails test model it mirrors does; the empty class/interface merge beside it is how
    `include()` surfaces those members on the type side. */
 import { describe, it, expect } from "vitest";
-import { include } from "@blazetrails/activesupport";
+import { assert, assertDifference, assertPredicate, include } from "@blazetrails/activesupport";
+import { includedModules, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Serialization } from "../serialization.js";
 import { Model } from "../index.js";
 import { Attributes, type AttributesClassHalf } from "../attributes.js";
 import { LazilyDefineAttributes } from "./acceptance.js";
+import { Topic } from "../test-helpers/models/topic.js";
+import { Person } from "../test-helpers/models/person.js";
+
+type Accepting = Topic & Record<string, unknown>;
 
 describe("AcceptanceValidationTest", () => {
-  it("eula", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("eula", "string");
-        this.validates("eula", { acceptance: true });
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({ eula: "0" });
-    expect(await p.isValid()).toBe(false);
-    const p2 = new Person({ eula: "1" });
-    expect(await p2.isValid()).toBe(true);
-  });
-
-  it("lazy attribute module included only once", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("terms", "boolean");
-        this.validates("terms", { acceptance: true });
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({ terms: true });
-    expect(await p.isValid()).toBe(true);
-  });
-
-  it("lazy attributes module included again if needed", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("terms", "boolean");
-        this.validates("terms", { acceptance: true });
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({ terms: false });
-    await p.isValid();
-    expect(p.errors.count).toBeGreaterThan(0);
-  });
-
-  it("lazy attributes respond to?", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("terms", "boolean");
-        this.validates("terms", { acceptance: true });
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({});
-    expect(p._attributes.isKey("terms")).toBe(true);
-  });
+  function defineTestClass<T extends typeof Topic | typeof Person>(parent: T): T {
+    return class TestClass extends (parent as typeof Model) {} as T;
+  }
 
   it("terms of service agreement no acceptance", async () => {
-    class Terms extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    const klass = defineTestClass(Topic);
+    klass.validatesAcceptanceOf("termsOfService");
 
-      static {
-        include(this, Attributes);
-        this.attribute("terms", "string");
-        this.validates("terms", { acceptance: true });
-      }
-    }
-    interface Terms extends Attributes {}
-
-    expect(await new Terms({ terms: "0" }).isValid()).toBe(false);
+    const t = new klass({ title: "We should not be confirmed" });
+    assertPredicate(await t.isValid(), (v) => v);
   });
 
   it("terms of service agreement", async () => {
-    class Terms extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    const klass = defineTestClass(Topic);
+    klass.validatesAcceptanceOf("termsOfService");
 
-      static {
-        include(this, Attributes);
-        this.attribute("terms", "string");
-        this.validates("terms", { acceptance: true });
-      }
-    }
-    interface Terms extends Attributes {}
+    const t = new klass({ title: "We should be confirmed", termsOfService: "" }) as Accepting;
+    assertPredicate(await t.isInvalid(), (v) => v);
+    expect(t.errors.get("termsOfService")).toEqual(["must be accepted"]);
 
-    expect(await new Terms({ terms: "1" }).isValid()).toBe(true);
+    t.termsOfService = "1";
+    assertPredicate(await t.isValid(), (v) => v);
+  });
+
+  it("eula", async () => {
+    const klass = defineTestClass(Topic);
+    klass.validatesAcceptanceOf("eula", { message: "must be abided" });
+
+    const t = new klass({ title: "We should be confirmed", eula: "" }) as Accepting;
+    assertPredicate(await t.isInvalid(), (v) => v);
+    expect(t.errors.get("eula")).toEqual(["must be abided"]);
+
+    t.eula = "1";
+    assertPredicate(await t.isValid(), (v) => v);
   });
 
   it("terms of service agreement with accept value", async () => {
-    class Terms extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    const klass = defineTestClass(Topic);
+    klass.validatesAcceptanceOf("termsOfService", { accept: "I agree." });
 
-      static {
-        include(this, Attributes);
-        this.attribute("terms", "string");
-        this.validates("terms", { acceptance: { accept: ["yes", "I agree"] } });
-      }
-    }
-    interface Terms extends Attributes {}
+    const t = new klass({ title: "We should be confirmed", termsOfService: "" }) as Accepting;
+    assertPredicate(await t.isInvalid(), (v) => v);
+    expect(t.errors.get("termsOfService")).toEqual(["must be accepted"]);
 
-    expect(await new Terms({ terms: "yes" }).isValid()).toBe(true);
-    expect(await new Terms({ terms: "no" }).isValid()).toBe(false);
+    t.termsOfService = "I agree.";
+    assertPredicate(await t.isValid(), (v) => v);
   });
 
   it("terms of service agreement with multiple accept values", async () => {
-    class Terms extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    const klass = defineTestClass(Topic);
+    klass.validatesAcceptanceOf("termsOfService", { accept: [1, "I concur."] });
 
-      static {
-        include(this, Attributes);
-        this.attribute("terms", "string");
-        this.validates("terms", { acceptance: { accept: ["1", "yes", "true"] } });
-      }
-    }
-    interface Terms extends Attributes {}
+    const t = new klass({ title: "We should be confirmed", termsOfService: "" }) as Accepting;
+    assertPredicate(await t.isInvalid(), (v) => v);
+    expect(t.errors.get("termsOfService")).toEqual(["must be accepted"]);
 
-    expect(await new Terms({ terms: "1" }).isValid()).toBe(true);
-    expect(await new Terms({ terms: "yes" }).isValid()).toBe(true);
-    expect(await new Terms({ terms: "true" }).isValid()).toBe(true);
-    expect(await new Terms({ terms: "no" }).isValid()).toBe(false);
-  });
+    t.termsOfService = 1;
+    assertPredicate(await t.isValid(), (v) => v);
 
-  it("validates acceptance of true", async () => {
-    class Terms extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("terms", "boolean");
-        this.validates("terms", { acceptance: true });
-      }
-    }
-    interface Terms extends Attributes {}
-
-    expect(await new Terms({ terms: true }).isValid()).toBe(true);
+    t.termsOfService = "I concur.";
+    assertPredicate(await t.isValid(), (v) => v);
   });
 
   it("validates acceptance of for ruby class", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    const klass = defineTestClass(Person);
+    klass.validatesAcceptanceOf("karma");
 
-      static {
-        include(this, Attributes);
-      }
+    const p = new klass();
+    p.karma = "";
+
+    assertPredicate(await p.isInvalid(), (v) => v);
+    expect(p.errors.get("karma")).toEqual(["must be accepted"]);
+
+    p.karma = "1";
+    assertPredicate(await p.isValid(), (v) => v);
+  });
+
+  it("validates acceptance of true", async () => {
+    const klass = defineTestClass(Topic);
+    klass.validatesAcceptanceOf("termsOfService");
+
+    assertPredicate(await new klass({ termsOfService: true }).isValid(), (v) => v);
+  });
+
+  it("lazy attribute module included only once", async () => {
+    const klass = defineTestClass(Topic);
+    await assertDifference(
+      () => includedModules(klass).length,
+      2,
+      null,
+      () => {
+        for (let i = 0; i < 2; i++) {
+          klass.validatesAcceptanceOf("somethingToAccept");
+          assert(rbObjRespondTo(new klass(), "somethingToAccept"));
+        }
+        for (let i = 0; i < 2; i++) {
+          klass.validatesAcceptanceOf("somethingElseToAccept");
+          assert(rbObjRespondTo(new klass(), "somethingElseToAccept"));
+        }
+      },
+    );
+  });
+
+  it("lazy attributes module included again if needed", async () => {
+    const klass = defineTestClass(Topic);
+    await assertDifference(
+      () => includedModules(klass).length,
+      1,
+      null,
+      () => {
+        klass.validatesAcceptanceOf("somethingToAccept");
+      },
+    );
+    const topic = new klass() as Accepting;
+    void topic.somethingToAccept;
+    await assertDifference(
+      () => includedModules(klass).length,
+      1,
+      null,
+      () => {
+        klass.validatesAcceptanceOf("somethingElseToAccept");
+      },
+    );
+    assert(rbObjRespondTo(topic, "somethingElseToAccept"));
+  });
+
+  it("lazy attributes respond to?", async () => {
+    const klass = defineTestClass(Topic);
+    klass.validatesAcceptanceOf("termsOfService");
+    const topic = new klass();
+    const threads: Promise<void>[] = [];
+    for (let i = 0; i < 2; i++) {
+      threads.push(
+        (async () => {
+          assert(rbObjRespondTo(topic, "termsOfService"));
+        })(),
+      );
     }
-    interface Person extends Attributes {}
-    Person.attribute("terms", "string");
-    Person.validates("terms", { acceptance: true });
-    const p = new Person({ terms: "no" });
-    expect(await p.isValid()).toBe(false);
-    const p2 = new Person({ terms: "1" });
-    expect(await p2.isValid()).toBe(true);
+    await Promise.all(threads);
   });
 
   it("validates acceptance with a scalar accept option", async () => {
