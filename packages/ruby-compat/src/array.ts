@@ -146,8 +146,10 @@ export function arySlice<T>(
     throw new ArgumentError(`wrong number of arguments (given ${argc}, expected 1..2)`);
   }
   const alen = ary.length;
+  if (arg == null || (argc === 2 && length == null)) {
+    throw new TypeError("no implicit conversion from nil to integer");
+  }
   if (argc === 2) {
-    if (length == null) throw new TypeError("no implicit conversion from nil to integer");
     let beg = arg as number;
     if (beg < 0) beg += alen;
     return subseq(ary, beg, length);

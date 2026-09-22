@@ -104,5 +104,7 @@ describe("arySlice", () => {
     expect(() => (arySlice as (...a: unknown[]) => unknown)([1], 0, 1, 2)).toThrow(ArgumentError);
     expect(arySlice([1, 2, 3], 1, 2)).toEqual([2, 3]);
     expect(() => arySlice([1, 2, 3], 0, undefined)).toThrow(TypeError);
+    expect(() => arySlice([1, 2, 3], undefined as never)).toThrow(TypeError);
+    expect(() => arySlice([1, 2, 3], undefined as never, 1)).toThrow(TypeError);
   });
 });
