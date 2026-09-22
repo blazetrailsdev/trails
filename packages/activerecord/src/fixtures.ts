@@ -134,7 +134,7 @@ export class FixtureSet {
   }
 
   static async createFixtures(
-    fixturesDirectories: Record<string, Record<string, FixtureAttrs>>,
+    fixturesDirectories: string | readonly string[],
     fixtureSetNames: string | readonly string[],
     classNames: Record<string, BaseClass | string | null> = {},
     config: typeof Base = Base,
@@ -150,7 +150,7 @@ export class FixtureSet {
 
     if (fixtureFilesToRead.length > 0) {
       const fixturesMap = await this.readAndInsert(
-        fixturesDirectories,
+        typeof fixturesDirectories === "string" ? [fixturesDirectories] : fixturesDirectories,
         fixtureFilesToRead,
         classNames,
         connectionPool,
@@ -161,19 +161,20 @@ export class FixtureSet {
   }
 
   private static async readAndInsert(
-    fixturesDirectories: Record<string, Record<string, FixtureAttrs>>,
+    fixturesDirectories: readonly string[],
     fixtureFiles: string[],
     classNames: Record<string, BaseClass | string | null>,
     connectionPool: ConnectionPool,
   ): Promise<Record<string, FixtureSet>> {
     const fixturesMap: Record<string, FixtureSet> = {};
+    const directoryGlob = `{${fixturesDirectories.join(",")}}`;
     const fixtureSets = fixtureFiles.map(
       (fixtureSetName) =>
         (fixturesMap[fixtureSetName] = new this(
           null,
           fixtureSetName,
           classNames[fixtureSetName] ?? null,
-          fixturesDirectories[fixtureSetName],
+          RubyFile.join(directoryGlob, fixtureSetName),
         )),
     );
     this.updateAllLoadedFixtures(fixturesMap);
@@ -234,13 +235,13 @@ export class FixtureSet {
   readonly config: typeof Base;
   private _modelClass: BaseClass | null = null;
   private _ignoredFixtures: string[] | null = null;
-  private _path: string | Record<string, FixtureAttrs>;
+  private _path: string;
 
   constructor(
     _: unknown,
     name: string,
     className: BaseClass | string | null,
-    path: string | Record<string, FixtureAttrs>,
+    path: string,
     config: typeof Base = Base,
   ) {
     this.name = name;
@@ -309,21 +310,17 @@ export class FixtureSet {
     if (!this._ignoredFixtures.includes("DEFAULTS")) this._ignoredFixtures.push("DEFAULTS");
   }
 
-  private readFixtureFiles(path: string | Record<string, FixtureAttrs>): Record<string, Fixture> {
-    if (typeof path !== "string") {
-      const { _fixture: configRow, ...rows } = path;
-      const config = configRow as { model_class?: string; ignore?: unknown } | undefined;
-      if (this.modelClass == null && config?.model_class) this.setModelClass(config.model_class);
-      if (this.modelClass == null) this.setModelClass(this.defaultFixtureModelClass());
-      if (this.ignoredFixtures == null) this.setIgnoredFixtures(config?.ignore);
-      const fixtures: Record<string, Fixture> = {};
-      for (const [fixtureName, row] of Object.entries(rows)) {
-        fixtures[fixtureName] = new Fixture({ ...row }, this.modelClass);
-      }
-      return fixtures;
-    }
-
-    const yamlFiles = Dir.glob(`${path}{.yml,/{**,*}/*.yml}`).filter((f) => RubyFile.isFile(f));
+  private readFixtureFiles(path: string): Record<string, Fixture> {
+    const yamlFiles = [
+      ...Dir.glob(`${path}{.yml,/{**,*}/*.yml}`).filter((f) => RubyFile.isFile(f)),
+      ...File.modules().filter((f) =>
+        RubyFile.fnmatch(
+          `${path}{.ts,/{**,*}/*.ts}`,
+          f,
+          RubyFile.FNM_EXTGLOB | RubyFile.FNM_PATHNAME,
+        ),
+      ),
+    ];
 
     if (yamlFiles.length === 0) throw new ArgumentError(`No fixture files found for ${this.name}`);
 

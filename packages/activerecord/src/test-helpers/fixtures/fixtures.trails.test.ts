@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import { File as FixtureFile } from "../../fixture-set/file.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../../connection-adapters/abstract-adapter.js";
 import { FixtureSet } from "../../fixtures.js";
 import { adminAccountsFixtureData } from "./admin/accounts.js";
@@ -56,8 +57,9 @@ async function createFixtures(
   const pool = { withConnection: async (block: (c: unknown) => unknown) => block(adapter) };
   modelClass.connectionPool = () => pool;
   FixtureSet.resetCache();
+  FixtureFile.registerModule(`fixtures-trails/${modelClass.tableName}.ts`, data);
   const [fixtureSet] = await FixtureSet.createFixtures(
-    { [modelClass.tableName]: data },
+    "fixtures-trails",
     [modelClass.tableName],
     { [modelClass.tableName]: modelClass },
     modelClass,

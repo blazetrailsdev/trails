@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { readFile } from "fs/promises";
 import { include } from "@blazetrails/ruby-compat";
 import { FixtureSet, FixtureError } from "./fixtures.js";
+import { File as FixtureFile } from "./fixture-set/file.js";
+import { FIXTURES_ROOT as TS_FIXTURES_ROOT } from "./test-helpers/fixtures-registry.js";
 import { PrimaryKeyError } from "./fixture-set/table-row.js";
 import { Time } from "@blazetrails/date";
 import {
@@ -33,24 +35,19 @@ import { TrafficLight } from "./test-helpers/models/traffic-light.js";
 import { Movie } from "./test-helpers/models/movie.js";
 import { Computer } from "./test-helpers/models/computer.js";
 import { ActiveRecordError, NotNullViolation } from "./errors.js";
-import {
-  bulbFixtureData,
-  computerFixtureData,
-  movieFixtureData,
-} from "./test-helpers/fixtures/index.js";
 import { CpkOrder } from "./test-helpers/models/cpk.js";
 import { Task } from "./test-helpers/models/task.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Tree } from "./test-helpers/models/tree.js";
 import { nakedYmlParrotsFixtureData } from "./test-helpers/fixtures/naked/yml/parrots.js";
 import { nakedYmlTreesFixtureData } from "./test-helpers/fixtures/naked/yml/trees.js";
+
+FixtureFile.registerModule(`${TS_FIXTURES_ROOT}/naked/yml/parrots.ts`, nakedYmlParrotsFixtureData);
+FixtureFile.registerModule(`${TS_FIXTURES_ROOT}/naked/yml/trees.ts`, nakedYmlTreesFixtureData);
 import { Aircraft } from "./test-helpers/models/aircraft.js";
 import { Parrot } from "./test-helpers/models/parrot.js";
 import { Reply } from "./test-helpers/models/reply.js";
 import { registerModel } from "./associations.js";
-import { topicFixtureData } from "./test-helpers/fixtures/topics.js";
-import { taskFixtureData } from "./test-helpers/fixtures/tasks.js";
-import { aircraftFixtureData } from "./test-helpers/fixtures/aircrafts.js";
 import { Post } from "./test-helpers/models/post.js";
 import { Joke } from "./test-helpers/models/joke.js";
 import { Book } from "./test-helpers/models/book.js";
@@ -111,8 +108,12 @@ describe("PrimaryKeyErrorTest", () => {
       findBy: vi.fn(async () => null),
     } as any;
 
+    FixtureFile.registerModule(
+      `${TS_FIXTURES_ROOT}/primary_key_error.ts`,
+      primaryKeyErrorFixtureData,
+    );
     const e = await FixtureSet.createFixtures(
-      { primary_key_error: primaryKeyErrorFixtureData },
+      TS_FIXTURES_ROOT,
       "primary_key_error",
       { primary_key_error: AuthorModel },
       AuthorModel,
@@ -140,12 +141,12 @@ describe("FixturesWithForeignKeyViolationsTest", () => {
   });
 
   it("raises fk violations", async () => {
+    FixtureFile.registerModule(`${TS_FIXTURES_ROOT}/fk_pointing_to_non_existent_objects.ts`, {
+      first: { fk_object_to_point_to_id: 4242 },
+    });
     await withVerifyForeignKeysForFixtures(async () => {
       const load = (): Promise<unknown> =>
-        FixtureSet.createFixtures(
-          { fk_pointing_to_non_existent_objects: { first: { fk_object_to_point_to_id: 4242 } } },
-          ["fk_pointing_to_non_existent_objects"],
-        );
+        FixtureSet.createFixtures(TS_FIXTURES_ROOT, ["fk_pointing_to_non_existent_objects"]);
       if (currentAdapter("SQLite3Adapter", "PostgreSQLAdapter")) {
         const error = await load().catch((e: Error) => e);
         expect(() => {
@@ -162,15 +163,17 @@ describe("FixturesWithForeignKeyViolationsTest", () => {
   });
 
   it("does not raise if no fk violations", async () => {
-    await FixtureSet.createFixtures({ fk_object_to_point_tos: fkObjectToPointToFixtureData }, [
-      "fk_object_to_point_tos",
-    ]);
+    FixtureFile.registerModule(
+      `${TS_FIXTURES_ROOT}/fk_object_to_point_tos.ts`,
+      fkObjectToPointToFixtureData,
+    );
+    await FixtureSet.createFixtures(TS_FIXTURES_ROOT, ["fk_object_to_point_tos"]);
+    FixtureFile.registerModule(`${TS_FIXTURES_ROOT}/fk_pointing_to_non_existent_objects.ts`, {
+      first: { fk_object_to_point_to_id: 1 },
+    });
     await withVerifyForeignKeysForFixtures(async () => {
       await expect(
-        FixtureSet.createFixtures(
-          { fk_pointing_to_non_existent_objects: { first: { fk_object_to_point_to_id: 1 } } },
-          ["fk_pointing_to_non_existent_objects"],
-        ),
+        FixtureSet.createFixtures(TS_FIXTURES_ROOT, ["fk_pointing_to_non_existent_objects"]),
       ).resolves.not.toThrow();
     });
   });
@@ -217,7 +220,7 @@ describe("FixturesTest", () => {
         subscriber.call(e as never),
       );
       try {
-        await FixtureSet.createFixtures({ bulbs: bulbFixtureData }, "bulbs", { bulbs: Bulb });
+        await FixtureSet.createFixtures(TS_FIXTURES_ROOT, "bulbs", { bulbs: Bulb });
         expect(subscriber.events.length, "It takes one INSERT query to insert two fixtures").toBe(
           1,
         );
@@ -235,11 +238,11 @@ describe("FixturesTest", () => {
         subscriber.call(e as never),
       );
       try {
-        await FixtureSet.createFixtures(
-          { bulbs: bulbFixtureData, movies: movieFixtureData, computers: computerFixtureData },
-          ["bulbs", "movies", "computers"],
-          { bulbs: Bulb, movies: Movie, computers: Computer },
-        );
+        await FixtureSet.createFixtures(TS_FIXTURES_ROOT, ["bulbs", "movies", "computers"], {
+          bulbs: Bulb,
+          movies: Movie,
+          computers: Computer,
+        });
         const conn = await Base.leaseConnection();
         const expectedSql = [
           `INSERT INTO ${conn.quoteTableName("bulbs")} .*`,
@@ -431,7 +434,7 @@ describe("FixturesTest", () => {
   });
 
   it("attributes", async () => {
-    const [topics] = await FixtureSet.createFixtures({ topics: topicFixtureData }, "topics", {
+    const [topics] = await FixtureSet.createFixtures(TS_FIXTURES_ROOT, "topics", {
       topics: Topic,
     });
     expect(topics.get("first")!.get("title")).toBe("The First Topic");
@@ -457,7 +460,7 @@ describe("FixturesTest", () => {
   });
 
   it("inserts", async () => {
-    await FixtureSet.createFixtures({ topics: topicFixtureData }, "topics", { topics: Topic });
+    await FixtureSet.createFixtures(TS_FIXTURES_ROOT, "topics", { topics: Topic });
     const firstRow = await (
       await Base.leaseConnection()
     ).selectOne("SELECT * FROM topics WHERE author_name = 'David'");
@@ -470,13 +473,13 @@ describe("FixturesTest", () => {
   });
 
   it("insert with datetime", async () => {
-    await FixtureSet.createFixtures({ tasks: taskFixtureData }, "tasks", { tasks: Task });
+    await FixtureSet.createFixtures(TS_FIXTURES_ROOT, "tasks", { tasks: Task });
     const first = await Task.find(1);
     expect(first).toBeTruthy();
   });
 
   it("insert with default function", async () => {
-    await FixtureSet.createFixtures({ aircrafts: aircraftFixtureData }, "aircrafts", {
+    await FixtureSet.createFixtures(TS_FIXTURES_ROOT, "aircrafts", {
       aircrafts: Aircraft,
     });
     const aircraft = await Aircraft.findBy({ name: "boeing-with-no-manufactured-at" });
@@ -484,7 +487,7 @@ describe("FixturesTest", () => {
   });
 
   it("insert with default value", async () => {
-    await FixtureSet.createFixtures({ aircrafts: aircraftFixtureData }, "aircrafts", {
+    await FixtureSet.createFixtures(TS_FIXTURES_ROOT, "aircrafts", {
       aircrafts: Aircraft,
     });
     const aircraft = await Aircraft.findBy({ name: "boeing-with-no-wheels" });
@@ -497,7 +500,7 @@ describe("FixturesTest", () => {
       Base.logger = new Logger(null);
 
       const level = (Base.logger as Logger).level;
-      await FixtureSet.createFixtures({ topics: topicFixtureData }, "topics", { topics: Topic });
+      await FixtureSet.createFixtures(TS_FIXTURES_ROOT, "topics", { topics: Topic });
       expect((Base.logger as Logger).level).toBe(level);
     } finally {
       Base.logger = previousLogger;
@@ -505,14 +508,14 @@ describe("FixturesTest", () => {
   });
 
   it("instantiation", async () => {
-    const [topics] = await FixtureSet.createFixtures({ topics: topicFixtureData }, "topics", {
+    const [topics] = await FixtureSet.createFixtures(TS_FIXTURES_ROOT, "topics", {
       topics: Topic,
     });
     expect(await topics.get("first")!.find()).toBeInstanceOf(Topic);
   });
 
   it("yaml file with invalid column", async () => {
-    const e = await FixtureSet.createFixtures({ parrots: nakedYmlParrotsFixtureData }, "parrots", {
+    const e = await FixtureSet.createFixtures(`${TS_FIXTURES_ROOT}/naked/yml`, "parrots", {
       parrots: Parrot,
     }).catch((err: Error) => err);
     expect(() => {
@@ -522,7 +525,7 @@ describe("FixturesTest", () => {
   });
 
   it("yaml file with symbol columns", async () => {
-    await FixtureSet.createFixtures({ trees: nakedYmlTreesFixtureData }, "trees", { trees: Tree });
+    await FixtureSet.createFixtures(`${TS_FIXTURES_ROOT}/naked/yml`, "trees", { trees: Tree });
     const root = await Tree.find(1);
     expect(root).toBeTruthy();
   });

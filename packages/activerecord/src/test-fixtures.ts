@@ -9,6 +9,7 @@ import {
   stringifyKeys,
 } from "@blazetrails/activesupport";
 import { FixtureSet, checkAllForeignKeysValidBang } from "./fixtures.js";
+import { File as FixtureFile } from "./fixture-set/file.js";
 import { insertFixturesSet } from "./connection-adapters/abstract/database-statements.js";
 import {
   fixtureRegistry,
@@ -248,6 +249,8 @@ export type UseTablelessFixturesResult<T extends readonly TablelessFixtureEntry[
   [E in T[number] as E["table"]]: JoinTableAccessor<Extract<keyof E["data"], string>>;
 };
 
+let useFixturesCount = 0;
+
 let alreadyLoadedFixtures = new Map<unknown, unknown>();
 
 /** @internal */
@@ -298,11 +301,17 @@ function useTablelessFixtures(
   const keys = entries.map((e) => e.table);
   const store: Record<string, Record<string, unknown>> = {};
   const fixtureCacheKey = {};
+  const fixturesDirectory = `use-fixtures/${++useFixturesCount}`;
+  for (const { table, data } of entries) {
+    FixtureFile.registerModule(`${fixturesDirectory}/${table}.ts`, data);
+  }
 
   beforeEach(async (ctx) => {
     const adapter = await getAdapter();
     const loadFixtures = async () => {
-      const fixtureSets = entries.map(({ table, data }) => new FixtureSet(null, table, null, data));
+      const fixtureSets = entries.map(
+        ({ table }) => new FixtureSet(null, table, null, `${fixturesDirectory}/${table}`),
+      );
       const tableRowsForConnection: Record<string, Record<string, unknown>[]> = {};
       for (const fixtureSet of fixtureSets) {
         for (const [table, rows] of Object.entries(fixtureSet.tableRows())) {
@@ -427,10 +436,10 @@ function useFixtures(
   const store: Record<string, Record<string, unknown>> = {};
   const loadedFixtures: Record<string, FixtureSet> = {};
   const fixtureCacheKey = isNameArray ? JSON.stringify(keys) : {};
+  const fixturesDirectory = `use-fixtures/${++useFixturesCount}`;
 
   beforeEach(async (ctx) => {
     if (!fixtures) fixtures = await resolveFixtureNames(keys as readonly FixtureName[]);
-    const fixturesDirectories: Record<string, Record<string, FixtureAttrs>> = {};
     const fixtureClassNames: Record<string, BaseClass | null> = {};
     const fixtureSetNames: string[] = [];
     for (const [key, { table, model, data }] of Object.entries(fixtures)) {
@@ -438,7 +447,7 @@ function useFixtures(
         registerModel(model);
       }
       const fsName = model === null ? table : key;
-      fixturesDirectories[fsName] = data;
+      FixtureFile.registerModule(`${fixturesDirectory}/${fsName}.ts`, data);
       fixtureClassNames[fsName] = model;
       fixtureSetNames.push(fsName);
     }
@@ -451,7 +460,7 @@ function useFixtures(
     const fixtureSets = await loadFixturesOnce(fixtureCacheKey, ctx, adapter, options, () => {
       FixtureSet.resetCache();
       return FixtureSet.createFixtures(
-        fixturesDirectories,
+        fixturesDirectory,
         fixtureSetNames,
         fixtureClassNames,
         config,
