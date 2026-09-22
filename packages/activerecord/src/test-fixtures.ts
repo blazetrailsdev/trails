@@ -1,12 +1,14 @@
 import { afterEach, beforeEach, type TaskContext } from "vitest";
 import { getCurrentSuite } from "vitest/suite";
-import { Dir, File as RubyFile, include, included } from "@blazetrails/ruby-compat";
+import { Dir, File as RubyFile, include, included, merge } from "@blazetrails/ruby-compat";
 import {
+  Notifications,
   classAttribute,
   extend,
   isBlank,
   runLoadHooks,
   stringifyKeys,
+  type NotificationSubscriber,
 } from "@blazetrails/activesupport";
 import { FixtureSet, checkAllForeignKeysValidBang } from "./fixtures.js";
 import { File as FixtureFile } from "./fixture-set/file.js";
@@ -25,11 +27,10 @@ import { Base } from "./base.js";
 import { registerModel } from "./associations.js";
 import {
   warmSchemaCacheBeforeFirstTest,
-  withTransactionalFixtures,
   type WithTransactionalFixturesOptions,
 } from "./test-fixtures/with-transactional-fixtures.js";
 import { leaseFixtureConnection } from "./test-fixtures/fixture-connection.js";
-import { NullPool } from "./connection-adapters/abstract/connection-pool.js";
+import { NullPool, type ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 
 function effectiveFixtureKey(
   model: typeof Base,
@@ -57,7 +58,7 @@ interface TestFixturesClassHost {
 
 export const ClassMethods = {
   setFixtureClass(this: TestFixturesClassHost, classNames: Record<string, unknown> = {}): void {
-    this.fixtureClassNames = { ...this.fixtureClassNames, ...stringifyKeys(classNames) };
+    this.fixtureClassNames = merge(this.fixtureClassNames, stringifyKeys(classNames));
   },
 
   fixtures(this: TestFixturesClassHost, ...fixtureSetNames: unknown[]): void {
@@ -264,41 +265,232 @@ export type UseTablelessFixturesResult<T extends readonly TablelessFixtureEntry[
 
 let useFixturesCount = 0;
 
-let alreadyLoadedFixtures = new Map<unknown, unknown>();
+const alreadyLoadedFixtures = new Map<unknown, unknown>();
+
+interface TestFixturesInstance {
+  name: string;
+  useTransactionalTests: boolean;
+  lockThreads: boolean;
+  constructor: TestCaseClass;
+  _inEnclosingTransaction?: boolean;
+}
+
+function newTestCase(klass: TestCaseClass, ctx: TaskContext): TestFixturesInstance {
+  const testCase = new klass() as TestFixturesInstance;
+  testCase.name = ctx.task.name;
+  return testCase;
+}
 
 /** @internal */
-async function loadFixturesOnce<T>(
-  fixtureCacheKey: unknown,
-  ctx: TaskContext,
+async function setupFixtures<T>(
+  this: TestFixturesInstance,
+  config: typeof Base,
   adapter: DatabaseAdapter,
-  options: WithTransactionalFixturesOptions,
-  loadFixtures: () => Promise<T>,
+  fixtureCacheKey: unknown,
+  loadFixtures: (config: typeof Base) => Promise<T>,
 ): Promise<T> {
-  const runInTransaction =
-    options.useTransactionalTests !== false &&
-    !(options.usesTransaction ?? []).includes(ctx.task.name);
-  const openTransactions =
-    (adapter as { transactionManager?: { openTransactions: number } }).transactionManager
-      ?.openTransactions ?? 0;
-  if (openTransactions > 0) return loadFixtures();
-  if (runInTransaction) {
-    let loaded = alreadyLoadedFixtures.get(fixtureCacheKey) as T | undefined;
-    if (loaded === undefined) {
+  let loadedFixtures: T;
+  this._inEnclosingTransaction =
+    ((adapter as { transactionManager?: { openTransactions: number } }).transactionManager
+      ?.openTransactions ?? 0) > 0;
+  if (isRunInTransaction.call(this)) {
+    loadedFixtures = alreadyLoadedFixtures.get(fixtureCacheKey) as T;
+    if (loadedFixtures === undefined) {
       alreadyLoadedFixtures.clear();
-      loaded = await loadFixtures();
-      alreadyLoadedFixtures.set(fixtureCacheKey, loaded);
+      loadedFixtures = await loadFixtures(config);
+      alreadyLoadedFixtures.set(fixtureCacheKey, loadedFixtures);
     }
-    return loaded;
+
+    await setupTransactionalFixtures.call(this, adapter);
+  } else {
+    FixtureSet.resetCache();
+    invalidateAlreadyLoadedFixtures();
+    loadedFixtures = await loadFixtures(config);
   }
-  alreadyLoadedFixtures = new Map();
-  return loadFixtures();
+  return loadedFixtures;
+}
+
+/**
+ * @internal
+ * @missingRailsCall teardown_asynchronous_queries_session — CONVERGEABLE converge-with-transactional-fixtures-onto-test-fixtures-setup
+ * @missingRailsCall clear_active_connections! — CONVERGEABLE converge-with-transactional-fixtures-onto-test-fixtures-setup
+ */
+async function teardownFixtures(
+  this: TestFixturesInstance,
+  adapter: DatabaseAdapter,
+): Promise<void> {
+  if (isRunInTransaction.call(this)) {
+    await teardownTransactionalFixtures.call(this, adapter);
+  } else {
+    FixtureSet.resetCache();
+    invalidateAlreadyLoadedFixtures();
+  }
+}
+
+/** @internal */
+function isRunInTransaction(this: TestFixturesInstance): boolean {
+  return (
+    this.useTransactionalTests &&
+    !this.constructor.isUsesTransaction(this.name) &&
+    !this._inEnclosingTransaction
+  );
+}
+
+/** @internal */
+function invalidateAlreadyLoadedFixtures(): void {
+  alreadyLoadedFixtures.clear();
+}
+
+let fixtureConnectionPools: ConnectionPool[] | null = null;
+
+let fixtureScopeDepth = 0;
+
+let pinnedPools: ConnectionPool[] = [];
+
+let connectionSubscriber: NotificationSubscriber | null = null;
+
+let pendingPins: Promise<void>[] = [];
+
+function pooledAdapterPool(adapter: DatabaseAdapter): ConnectionPool | null {
+  const pool = (adapter as { pool?: unknown }).pool;
+  if (pool == null || pool instanceof NullPool) return null;
+  return pool as ConnectionPool;
+}
+
+async function pinConnectionPool(pool: ConnectionPool, lockThreads: boolean): Promise<void> {
+  await pool.pinConnectionBang(lockThreads);
+  pinnedPools.push(pool);
+  await pool.leaseConnection();
+}
+
+function transactionManager(adapter: DatabaseAdapter) {
+  const host = adapter as unknown as {
+    transactionManager?: {
+      beginTransaction: (opts: { joinable: boolean; _lazy: boolean }) => Promise<unknown>;
+      rollbackTransaction: () => Promise<void>;
+      openTransactions: number;
+    };
+  };
+  if (!host.transactionManager) {
+    throw new Error(
+      `setupTransactionalFixtures: adapter ${(adapter as { adapterName?: string }).adapterName ?? "unknown"} ` +
+        `does not expose transactionManager`,
+    );
+  }
+  return host.transactionManager;
+}
+
+/**
+ * @internal
+ * @missingRailsCall setup_shared_connection_pool — CONVERGEABLE converge-with-transactional-fixtures-onto-test-fixtures-setup
+ */
+async function setupTransactionalFixtures(
+  this: TestFixturesInstance,
+  adapter: DatabaseAdapter,
+): Promise<void> {
+  const lockThreads = this.lockThreads;
+  const pool = pooledAdapterPool(adapter);
+  if (pool) {
+    if (fixtureConnectionPools === null) {
+      fixtureConnectionPools = Base.connectionHandler.connectionPoolList("writing");
+      if (!fixtureConnectionPools.includes(pool)) fixtureConnectionPools.push(pool);
+      for (const p of fixtureConnectionPools) {
+        await pinConnectionPool(p, lockThreads);
+      }
+    }
+    fixtureScopeDepth++;
+  } else {
+    await transactionManager(adapter).beginTransaction({ joinable: false, _lazy: false });
+  }
+
+  connectionSubscriber = Notifications.subscribe("!connection.active_record", (event) => {
+    const payload = event.payload as { connection_name?: string; shard?: string };
+    const connectionName = "connection_name" in payload ? payload.connection_name : undefined;
+    const shard = "shard" in payload ? payload.shard : undefined;
+
+    if (connectionName != null) {
+      const newPool = Base.connectionHandler.retrieveConnectionPool(connectionName, { shard });
+      if (newPool) {
+        if (fixtureConnectionPools !== null && !fixtureConnectionPools.includes(newPool)) {
+          fixtureConnectionPools.push(newPool);
+          pendingPins.push(
+            newPool
+              .leaseConnection()
+              .then((connection) =>
+                connection.lock.synchronize(() => pinConnectionPool(newPool, lockThreads)),
+              ),
+          );
+        }
+      }
+    }
+  });
+}
+
+/**
+ * @internal
+ * @missingRailsCall teardown_shared_connection_pool — CONVERGEABLE converge-with-transactional-fixtures-onto-test-fixtures-setup
+ */
+async function teardownTransactionalFixtures(
+  this: TestFixturesInstance,
+  adapter: DatabaseAdapter,
+): Promise<void> {
+  if (connectionSubscriber) {
+    Notifications.unsubscribe(connectionSubscriber);
+    connectionSubscriber = null;
+  }
+  const pins = pendingPins;
+  pendingPins = [];
+  const pinResults = await Promise.allSettled(pins);
+  if (fixtureConnectionPools !== null && pooledAdapterPool(adapter) !== null) {
+    if (--fixtureScopeDepth === 0) {
+      const pools = pinnedPools;
+      pinnedPools = [];
+      let clean = true;
+      for (const pool of pools) {
+        if (!(await pool.unpinConnectionBang())) clean = false;
+      }
+      if (!clean) alreadyLoadedFixtures.clear();
+      fixtureConnectionPools = null;
+    }
+  } else {
+    const t = transactionManager(adapter);
+    while (t.openTransactions > 0) await t.rollbackTransaction();
+  }
+  const failed = pinResults.find((r) => r.status === "rejected");
+  if (failed) throw failed.reason;
+}
+
+/** @noRailsEquivalent CONVERGEABLE converge-with-transactional-fixtures-onto-test-fixtures-setup */
+export function withTransactionalFixtures(
+  getAdapter: () => DatabaseAdapter | Promise<DatabaseAdapter>,
+  options: WithTransactionalFixturesOptions = {},
+): void {
+  const { eagerWarmSchemaCache: eagerWarm = true, usesTransaction = [] } = options;
+  if (eagerWarm) warmSchemaCacheBeforeFirstTest(getAdapter);
+  const klass = testCaseClassFor(getCurrentSuite().suite as SuiteScope | undefined);
+  klass.usesTransaction(...usesTransaction);
+  let testCase: TestFixturesInstance | null = null;
+
+  beforeEach(async (ctx: TaskContext) => {
+    testCase = newTestCase(klass, ctx);
+    testCase.useTransactionalTests = true;
+    if (!isRunInTransaction.call(testCase)) return;
+    await setupTransactionalFixtures.call(testCase, await getAdapter());
+  });
+
+  afterEach(async () => {
+    const current = testCase;
+    testCase = null;
+    if (current === null || !isRunInTransaction.call(current)) return;
+    await teardownTransactionalFixtures.call(current, await getAdapter());
+  });
 }
 
 /** @internal */
 function useTablelessFixtures(
   entries: readonly TablelessFixtureEntry[],
   getAdapter: () => DatabaseAdapter | Promise<DatabaseAdapter>,
-  options: WithTransactionalFixturesOptions,
+  newFixturesTestCase: (ctx: TaskContext) => TestFixturesInstance,
 ): Record<string, unknown> {
   const seenTables = new Set<string>();
   for (const { table } of entries) {
@@ -318,6 +510,7 @@ function useTablelessFixtures(
   for (const { table, data } of entries) {
     FixtureFile.registerModule(`${fixturesDirectory}/${table}.ts`, data);
   }
+  let testCase: TestFixturesInstance | null = null;
 
   beforeEach(async (ctx) => {
     const adapter = await getAdapter();
@@ -343,14 +536,24 @@ function useTablelessFixtures(
         ),
       );
     };
-    const results = await loadFixturesOnce(fixtureCacheKey, ctx, adapter, options, loadFixtures);
+    testCase = newFixturesTestCase(ctx);
+    const results = await (setupFixtures<Record<string, unknown>[]>).call(
+      testCase,
+      Base,
+      adapter,
+      fixtureCacheKey,
+      loadFixtures,
+    );
     results.forEach((result, i) => {
       store[keys[i]] = result;
     });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     for (const key of keys) delete store[key];
+    const current = testCase;
+    testCase = null;
+    if (current !== null) await teardownFixtures.call(current, await getAdapter());
   });
 
   const result: Record<string, unknown> = {};
@@ -378,22 +581,22 @@ function useTablelessFixtures(
 function useFixtures<M extends FixtureMap>(
   fixtures: M,
   getAdapter: () => DatabaseAdapter | Promise<DatabaseAdapter>,
-  options: WithTransactionalFixturesOptions,
+  newFixturesTestCase: (ctx: TaskContext) => TestFixturesInstance,
 ): UseFixturesResult<M>;
 function useFixtures<const N extends FixtureName>(
   names: readonly N[],
   getAdapter: () => DatabaseAdapter | Promise<DatabaseAdapter>,
-  options: WithTransactionalFixturesOptions,
+  newFixturesTestCase: (ctx: TaskContext) => TestFixturesInstance,
 ): UseFixturesByNameResult<N>;
 function useFixtures<const T extends readonly TablelessFixtureEntry[]>(
   tablelessEntries: T,
   getAdapter: () => DatabaseAdapter | Promise<DatabaseAdapter>,
-  options: WithTransactionalFixturesOptions,
+  newFixturesTestCase: (ctx: TaskContext) => TestFixturesInstance,
 ): UseTablelessFixturesResult<T>;
 function useFixtures(
   fixturesOrNames: FixtureMap | readonly FixtureName[] | readonly TablelessFixtureEntry[],
   getAdapter: () => DatabaseAdapter | Promise<DatabaseAdapter>,
-  options: WithTransactionalFixturesOptions,
+  newFixturesTestCase: (ctx: TaskContext) => TestFixturesInstance,
 ): Record<string, unknown> {
   if (
     Array.isArray(fixturesOrNames) &&
@@ -414,7 +617,7 @@ function useFixtures(
     return useTablelessFixtures(
       fixturesOrNames as readonly TablelessFixtureEntry[],
       getAdapter,
-      options,
+      newFixturesTestCase,
     );
   }
   if (
@@ -450,6 +653,7 @@ function useFixtures(
   const loadedFixtures: Record<string, FixtureSet> = {};
   const fixtureCacheKey = isNameArray ? JSON.stringify(keys) : {};
   const fixturesDirectory = `use-fixtures/${++useFixturesCount}`;
+  let testCase: TestFixturesInstance | null = null;
 
   beforeEach(async (ctx) => {
     if (!fixtures) fixtures = await resolveFixtureNames(keys as readonly FixtureName[]);
@@ -470,15 +674,15 @@ function useFixtures(
       fixturePool instanceof NullPool
         ? Base
         : ({ connectionPool: () => fixturePool } as unknown as typeof Base);
-    const fixtureSets = await loadFixturesOnce(fixtureCacheKey, ctx, adapter, options, () => {
-      FixtureSet.resetCache();
-      return FixtureSet.createFixtures(
-        fixturesDirectory,
-        fixtureSetNames,
-        fixtureClassNames,
-        config,
-      );
-    });
+    testCase = newFixturesTestCase(ctx);
+    const fixtureSets = await (setupFixtures<FixtureSet[]>).call(
+      testCase,
+      config,
+      adapter,
+      fixtureCacheKey,
+      (config) =>
+        FixtureSet.createFixtures(fixturesDirectory, fixtureSetNames, fixtureClassNames, config),
+    );
     const loaded = Object.keys(fixtures);
     for (let i = 0; i < loaded.length; i++) {
       const fixtureSet = fixtureSets[i];
@@ -492,10 +696,13 @@ function useFixtures(
     }
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     for (const key of Object.keys(store)) {
       delete store[key];
     }
+    const current = testCase;
+    testCase = null;
+    if (current !== null) await teardownFixtures.call(current, await getAdapter());
   });
 
   const result: Record<string, unknown> = {};
@@ -578,17 +785,19 @@ export function fixtures(
 
   const getConnection = connection ?? leaseFixtureConnection;
   warmSchemaCacheBeforeFirstTest(getConnection);
-  const result = useFixtures(fixturesOrNames as FixtureMap, getConnection, options ?? {});
-  if (useTransactionalTests !== false) {
-    withTransactionalFixtures(getConnection, { usesTransaction, eagerWarmSchemaCache: false });
-  }
+  const klass = testCaseClassFor(getCurrentSuite().suite as SuiteScope | undefined);
+  klass.usesTransaction(...(usesTransaction ?? []));
+  const result = useFixtures(fixturesOrNames as FixtureMap, getConnection, (ctx) => {
+    const testCase = newTestCase(klass, ctx);
+    if (useTransactionalTests !== undefined) testCase.useTransactionalTests = useTransactionalTests;
+    return testCase;
+  });
 
   const fixtureSetNames = Array.isArray(fixturesOrNames)
     ? (fixturesOrNames as readonly (string | TablelessFixtureEntry)[]).map((entry) =>
         typeof entry === "string" ? entry : entry.table,
       )
     : Object.keys(fixturesOrNames);
-  const klass = testCaseClassFor(getCurrentSuite().suite as SuiteScope | undefined);
   klass.fixtures(fixtureSetNames);
 
   Object.defineProperty(result, "fixtureTableNames", { get: () => klass.fixtureTableNames });

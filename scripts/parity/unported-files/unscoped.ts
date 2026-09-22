@@ -358,16 +358,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "fixture-set/file.test.ts.",
   },
   {
-    pattern: "test_fixtures.rb",
-    reason:
-      "The `included do` block and ClassMethods (set_fixture_class, fixtures, " +
-      "setup_fixture_accessors, uses_transaction) are ported in test-fixtures.ts. " +
-      "Still unported: before_setup/after_teardown, " +
-      "setup_fixtures/teardown_fixtures and the transactional/shared-pool helpers, " +
-      "whose trails counterpart is with-transactional-fixtures.ts under trails names. " +
-      "CONVERGEABLE port-test-fixtures-transactional-setup.",
-  },
-  {
     testFile: "test_fixtures_test.rb",
     className: "TestFixturesTest",
     tests: ["doesnt rely on active support test case specific methods"],
