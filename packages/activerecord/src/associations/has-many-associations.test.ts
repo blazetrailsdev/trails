@@ -44,7 +44,6 @@ import {
   assertNothingRaised,
   assertNot,
   assertNotEmpty,
-  assertPredicate,
   assertRaise,
 } from "@blazetrails/activesupport";
 
