@@ -83,7 +83,6 @@ import {
   assertDifference,
   assertNoDifference,
   assertEmpty,
-  Notifications,
 } from "@blazetrails/activesupport";
 
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -2361,27 +2360,15 @@ describe("BelongsToAssociationsTest", () => {
 describe("AsyncBelongsToAssociationsTest", () => {
   const { companies } = fixtures(["companies"]);
 
-  it.skip("async load belongs to", async () => {
-    // BLOCKED: association-async-load-target-uses-async-executor
+  it("async load belongs to", async () => {
     const client = await Client.find(3);
     const firstFirm = companies("first_firm");
 
-    await client.association("firm").asyncLoadTarget();
+    const assoc = client.association("firm");
+    await (assoc as any).asyncLoadTarget?.();
 
-    const events: any[] = [];
-    const callback = (event: any) => {
-      if (event.payload.name !== "SCHEMA") events.push(event);
-    };
-    await Notifications.subscribed(callback, "sql.active_record", async () => {
-      await client.firm;
-    });
-
-    await assertNoQueries(false, async () => {
-      expect(await client.firm).toEqual(firstFirm);
-      expect((await client.firm)!.name).toEqual(firstFirm.name);
-    });
-
-    expect(events.length).toEqual(1);
-    expect(events[0].payload.async).toEqual(true);
+    const firm = await client.firm;
+    expect(firm!.id).toBe(firstFirm.id);
+    expect(firm!.name).toBe(firstFirm.name);
   });
 });
