@@ -177,7 +177,6 @@ tester.run("require-table-teardown", rule, {
     'await ctx.dropTable("a", { ifExists: true });\nawait ctx.dropTable("b", { force: true });',
     // Non-adjacent drops (unrelated statement between) don't merge.
     'await ctx.dropTable("a");\ndoSomething();\nawait ctx.dropTable("b");',
-    // A run of bare one-name drops is a ported Rails helper (uuid_test.rb:11-13), never merged.
     'await dropTable("pg_uuid_comments");\nawait dropTable("pg_uuid_posts");',
     'dropTable("a");\ndropTable("b");\ndropTable("c");',
     // A dynamic-name drop can't be merged with its neighbour.
