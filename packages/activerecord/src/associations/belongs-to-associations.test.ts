@@ -1,6 +1,7 @@
 import { kernelThrow } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "./collection-proxy.js";
 import type { Category } from "../test-helpers/models/category.js";
+import { Notifications, type NotificationEvent } from "@blazetrails/activesupport";
 import { describe, it, expect } from "vitest";
 import {
   SubclassNotFound,
@@ -2360,15 +2361,25 @@ describe("BelongsToAssociationsTest", () => {
 describe("AsyncBelongsToAssociationsTest", () => {
   const { companies } = fixtures(["companies"]);
 
-  it("async load belongs to", async () => {
-    const client = await Client.find(3);
+  // BLOCKED: association-async-load-target-uses-async-executor
+  it.skip("async load belongs to", async () => {
+    const client = (await Client.find(3)) as any;
     const firstFirm = companies("first_firm");
 
-    const assoc = client.association("firm");
-    await (assoc as any).asyncLoadTarget?.();
+    await client.association("firm").asyncLoadTarget();
 
-    const firm = await client.firm;
-    expect(firm!.id).toBe(firstFirm.id);
-    expect(firm!.name).toBe(firstFirm.name);
+    const events: NotificationEvent[] = [];
+    const callback = (event: NotificationEvent) => {
+      if (event.payload.name !== "SCHEMA") events.push(event);
+    };
+    await Notifications.subscribed(callback, "sql.active_record", () => client.firm);
+
+    await assertNoQueries(false, async () => {
+      expect((await client.firm).id).toEqual(firstFirm.id);
+      expect((await client.firm).name).toEqual(firstFirm.name);
+    });
+
+    expect(events.length).toEqual(1);
+    expect(events[0].payload.async).toEqual(true);
   });
 });

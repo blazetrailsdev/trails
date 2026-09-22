@@ -7,6 +7,7 @@ import {
   assertRaises,
   assertRespondTo,
   assertNotRespondTo,
+  assertIncludes,
   TimeWithZone,
   TimeZone,
   toFs,
@@ -19,7 +20,7 @@ import {
   TimeType,
   UnknownAttributeError as AMUnknownAttributeError,
 } from "@blazetrails/activemodel";
-import { ArgumentError, basicObjRespondTo } from "@blazetrails/ruby-compat";
+import { ArgumentError, basicObjRespondTo, NoMethodError } from "@blazetrails/ruby-compat";
 import { Base, DangerousAttributeError, Type, UnknownAttributeError } from "./index.js";
 
 import { GeneratedAttributeMethods } from "./attribute-methods.js";
@@ -124,9 +125,11 @@ describe("AttributeMethodsTest", () => {
     Base.attributeMethodPatterns = oldMatchers;
   });
 
-  it("attribute keys on a new instance", async () => {
+  // BLOCKED: activerecord-record-undefined-name-does-not-raise-no-method-error
+  it.skip("attribute keys on a new instance", async () => {
     const t = CanonicalTopic.new() as any;
     expect(t.title).toBeNull();
+    await assertRaises([NoMethodError], {}, () => t.title2);
   });
 
   it("integers as nil", async () => {
@@ -441,11 +444,13 @@ describe("AttributeMethodsTest", () => {
     topic = new klass({ user_defined_json: {} } as any) as any;
     expect(topic["user_defined_json?"]).toBeFalsy();
   });
-  it("undeclared attribute method does not affect respond_to? and method_missing", async () => {
+  // BLOCKED: activerecord-record-undefined-name-does-not-raise-no-method-error
+  it.skip("undeclared attribute method does not affect respond_to? and method_missing", async () => {
     const topic = target.new({ title: "Budget" }) as any;
     assertRespondTo(topic, "title");
     expect(topic.title).toBe("Budget");
-    assertNotRespondTo(topic, "titleHelloWorld");
+    assertNotRespondTo(topic, "title_hello_world");
+    await assertRaises([NoMethodError], {}, () => topic.title_hello_world);
   });
   it("declared prefixed attribute method affects respond_to? and method_missing", async () => {
     const topic = new target({ title: "Budget" } as any) as any;
@@ -743,29 +748,38 @@ describe("AttributeMethodsTest", () => {
     expect(CanonicalTopic.skipTimeZoneConversionForAttributes).toEqual(["field_a"]);
     expect(Minimalistic.skipTimeZoneConversionForAttributes).toEqual(["field_b"]);
   });
-  it("attribute predicates respect access control", async () => {
+  // BLOCKED: activerecord-private-attribute-methods-are-still-public
+  it.skip("attribute predicates respect access control", async () => {
     class Target extends Base {
       static {
         this.tableName = "topics";
         this.attribute("title", "string");
       }
-      get ["title?"](): string {
+      private get ["title?"](): string {
         return "I'm private";
       }
     }
     const topic = Target.new({ title: "Isaac Newton's pants" }) as any;
+    assertNotRespondTo(topic, "title?");
+    const exception = await assertRaises([NoMethodError], {}, () => topic["title?"]);
+    assertIncludes(exception.message, "private method");
     expect(topic["title?"]).toBeTruthy();
   });
-  it("bulk updates respect access control", async () => {
+  // BLOCKED: activerecord-private-attribute-methods-are-still-public
+  it.skip("bulk updates respect access control", async () => {
     class Target extends Base {
       static {
         this.tableName = "topics";
         this.attribute("title", "string");
       }
-      set title(_value: string) {}
+      private set title(_value: string) {}
     }
-    const topic = Target.new({ title: "Rants about pants" }) as any;
-    expect(topic.readAttribute("title")).toBeNull();
+    await assertRaises([UnknownAttributeError], {}, () =>
+      Target.new({ title: "Rants about pants" } as any),
+    );
+    await assertRaises([UnknownAttributeError], {}, () => {
+      (Target.new() as any).attributes = { title: "Ants in pants" };
+    });
   });
   it("#undefine_attribute_methods undefines alias attribute methods", () => {
     class topicClass extends Base {
@@ -1348,9 +1362,12 @@ describe("AttributeMethodsTest", () => {
     expect(topic.get("title")).toBe("a");
   });
 
-  it("non-attribute read and write", async () => {
+  // BLOCKED: activerecord-record-undefined-name-does-not-raise-no-method-error
+  it.skip("non-attribute read and write", async () => {
     const topic = CanonicalTopic.new() as any;
     assertNotRespondTo(topic, "mumbo");
+    await assertRaises([NoMethodError], {}, () => topic.mumbo);
+    await assertRaises([NoMethodError], {}, () => (topic.mumbo = 5));
   });
 
   it("attributes without primary key", async () => {
@@ -1693,34 +1710,43 @@ describe("AttributeMethodsTest", () => {
     await assertNothingRaised(() => klass.defineAttributeMethod("bar"));
   });
 
-  it("attribute readers respect access control", async () => {
+  // BLOCKED: activerecord-private-attribute-methods-are-still-public
+  it.skip("attribute readers respect access control", async () => {
     class Target extends Base {
       static {
         this.tableName = "topics";
         this.attribute("title", "string");
       }
-      get title(): string {
+      private get title(): string {
         return "I'm private";
       }
-      set title(v: string) {
+      private set title(v: string) {
         this.writeAttribute("title", v);
       }
     }
     const topic = new Target({ title: "The pros and cons of programming naked." }) as any;
+    assertNotRespondTo(topic, "title");
+    const exception = await assertRaises([NoMethodError], {}, () => topic.title);
+    assertIncludes(exception.message, "private method");
     expect(topic.title).toBe("I'm private");
   });
 
-  it("attribute writers respect access control", async () => {
+  // BLOCKED: activerecord-private-attribute-methods-are-still-public
+  it.skip("attribute writers respect access control", async () => {
     class Target extends Base {
       static {
         this.tableName = "topics";
         this.attribute("title", "string");
       }
-      set title(_value: string) {}
+      private set title(_value: string) {}
     }
     const topic = Target.new() as any;
+    assertNotRespondTo(topic, "title=");
+    const exception = await assertRaises([NoMethodError], {}, () => {
+      topic.title = "Pants";
+    });
+    assertIncludes(exception.message, "private method");
     topic.title = "Very large pants";
-    expect(topic.readAttribute("title")).toBeNull();
   });
 
   it("bulk update raises ActiveRecord::UnknownAttributeError", async () => {

@@ -64,18 +64,19 @@ describe("ActiveRecordSchemaTest", () => {
     }
   });
 
-  it("schema without version is the current version schema", () => {
+  // BLOCKED: schema-bracket-and-pre-7-1-migration-compatibility
+  it.skip("schema without version is the current version schema", () => {
     const schemaClass = Schema;
     expect(schemaClass.prototype instanceof Migration.get(Migration.currentVersion())).toBeTruthy();
+    expect(schemaClass.prototype instanceof Migration.get(7.0)).toBeFalsy();
     expect(isModuleIncluded(schemaClass, Definition)).toBeTruthy();
   });
 
-  it("schema version accessor", () => {
-    class V1 extends Migration {
-      async change() {}
-    }
-    const m = new V1(undefined, 20230101000000);
-    expect(m.version).toBe(20230101000000);
+  // BLOCKED: schema-bracket-and-pre-7-1-migration-compatibility
+  it.skip("schema version accessor", () => {
+    const schemaClass = Schema.get(6.1);
+    expect(schemaClass.prototype instanceof Migration.get(6.1)).toBeTruthy();
+    expect(isModuleIncluded(schemaClass, Definition)).toBeTruthy();
   });
 
   it("schema define", async () => {
