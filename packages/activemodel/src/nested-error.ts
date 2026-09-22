@@ -3,7 +3,7 @@ import { Error as ActiveModelError } from "./error.js";
 interface ErrorLike {
   attribute: string;
   type: string;
-  rawType?: string;
+  rawType?: string | null;
   message: string;
   options?: Record<string, unknown>;
 }

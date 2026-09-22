@@ -1230,10 +1230,10 @@ export class AbstractAdapter implements Quoting {
     const envName = dbConfig.envName ?? "test";
     const configName = dbConfig.name;
     const nameField = configName && configName !== "primary" ? ` name=${q(configName)}` : "";
-    const shardField = this.shard !== "default" ? ` shard=${q(this.shard)}` : "";
+    const shardField = this.shard !== "default" ? ` shard=:${this.shard}` : "";
     this._inspectId ??= AbstractAdapter._inspectSeq = (AbstractAdapter._inspectSeq ?? 0) + 1;
     const hex = `0x${this._inspectId.toString(16).padStart(12, "0")}`;
-    return `#<${this.constructor.name}:${hex} env_name=${q(envName)}${nameField} role=${q(this.role)}${shardField}>`;
+    return `#<${this.constructor.name}:${hex} env_name=${q(envName)}${nameField} role=:${this.role}${shardField}>`;
   }
 
   /** @noRailsEquivalent PERMANENT */

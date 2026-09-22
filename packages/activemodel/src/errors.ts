@@ -5,7 +5,14 @@ import {
   ToJsonWithActiveSupportEncoder,
   type Included,
 } from "@blazetrails/activesupport";
-import { Hash, rbEqual, transformValues } from "@blazetrails/ruby-compat";
+import {
+  Enumerable,
+  FrozenError,
+  Hash,
+  rbEqual,
+  rbInspect,
+  transformValues,
+} from "@blazetrails/ruby-compat";
 import { Error as ActiveModelError } from "./error.js";
 import { NestedError } from "./nested-error.js";
 
@@ -13,7 +20,14 @@ export type ErrorDetail = ActiveModelError;
 
 export type ErrorDetailHash = { error: string; [k: string]: unknown };
 
-const EMPTY_ARRAY: readonly never[] = Object.freeze([]);
+const EMPTY_ARRAY: readonly never[] = new Proxy(Object.freeze([]), {
+  set(target): boolean {
+    throw new FrozenError(`can't modify frozen Array: ${rbInspect(target)}`);
+  },
+  deleteProperty(target): boolean {
+    throw new FrozenError(`can't modify frozen Array: ${rbInspect(target)}`);
+  },
+});
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (core_ext/object/json.rb:47-49); the class/interface merge is how `include()` surfaces on the type side.
 export class Errors<TBase extends object = object> {
@@ -166,6 +180,7 @@ export class Errors<TBase extends object = object> {
     attribute: string,
     type:
       | string
+      | null
       | ((record: TBase | null, options: Record<string, unknown>) => string) = ":invalid",
     options?: {
       message?: string | ((record: TBase | null, options: Record<string, unknown>) => string);
@@ -248,18 +263,35 @@ export class Errors<TBase extends object = object> {
   /** @internal */
   normalizeArguments(
     attribute: string,
+    type: string | null | ((record: TBase | null, options: Record<string, unknown>) => string),
+    options?: Record<string, unknown>,
+  ): [string, string | null, Record<string, unknown>];
+  /** @internal */
+  normalizeArguments(
+    attribute: string,
     type?: string | ((record: TBase | null, options: Record<string, unknown>) => string),
     options?: Record<string, unknown>,
   ): [string, string | undefined, Record<string, unknown>];
   /** @internal */
   normalizeArguments(
     attribute: string,
-    type?: string | ((record: TBase | null, options: Record<string, unknown>) => string),
+    type?: string | null | ((record: TBase | null, options: Record<string, unknown>) => string),
     options?: Record<string, unknown>,
-  ): [string, string | undefined, Record<string, unknown>] {
+  ): [string, string | null | undefined, Record<string, unknown>] {
     const opts = { ...(options ?? {}) };
     const resolvedType = typeof type === "function" ? type(this._base, opts) : type;
     return [attribute, resolvedType, opts];
+  }
+
+  initializeDup(other: Errors<TBase>): void {
+    this._errors = deepDup(other.errors);
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  dup(): this {
+    const duped = Object.assign(Object.create(Object.getPrototypeOf(this) as object) as this, this);
+    duped.initializeDup(this);
+    return duped;
   }
 
   /** @noRailsEquivalent PERMANENT */
@@ -269,10 +301,6 @@ export class Errors<TBase extends object = object> {
 
   get count(): number {
     return this._errors.length;
-  }
-
-  get any(): boolean {
-    return this._errors.length > 0;
   }
 
   toHash(fullMessages = false): Hash<string, string[]> {
@@ -299,9 +327,14 @@ export class Errors<TBase extends object = object> {
 }
 
 export interface Errors<TBase extends object = object> {
+  map<R>(block: (error: ActiveModelError) => R): R[];
+  first(): ActiveModelError | null;
+  first(n: number): ActiveModelError[];
+  isAny(block?: (error: ActiveModelError) => unknown): boolean;
   toJSON: Included<typeof ToJsonWithActiveSupportEncoder>["toJSON"];
 }
 
+include(Errors, Enumerable);
 include(Errors, ToJsonWithActiveSupportEncoder);
 
 export class StrictValidationFailed extends globalThis.Error {

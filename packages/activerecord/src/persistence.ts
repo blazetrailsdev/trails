@@ -432,7 +432,7 @@ interface SaveRecord {
   _attributes: { writeCastValue(key: string, val: unknown): void };
   readAttribute(name: string): unknown;
   _readAttribute(name: string): unknown;
-  errors: { any: boolean };
+  errors: { isAny(): boolean };
   isValid(context?: ValidationContextArg): Promise<boolean>;
   constructor: {
     name: string;
@@ -502,7 +502,7 @@ export async function saveBang<
 ): Promise<true | undefined> {
   const result = await this.save(options, block);
   if (result === false) {
-    if ((this as unknown as { errors: { any: boolean } }).errors.any) {
+    if ((this as unknown as { errors: { isAny(): boolean } }).errors.isAny()) {
       raiseValidationError(this);
     }
     throw new RecordNotSaved("Failed to save the record", this as unknown as object);

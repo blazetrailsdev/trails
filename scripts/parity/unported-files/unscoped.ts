@@ -94,6 +94,30 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "JS cache/session layers use JSON or structured clone.",
   },
   {
+    testFile: "attributes_test.rb",
+    className: "AttributesTest",
+    tests: ["attributes with proc defaults can be marshalled"],
+    reason:
+      "Round-trips a model through Marshal.load(Marshal.dump(data)) " +
+      "(activemodel/test/cases/attributes_test.rb:136-143). Ruby marshals any object graph by " +
+      "its ivars and resolves classes by constant name on load; JS has no such serializer to " +
+      "call, and the per-class marshal_dump/marshal_load hooks trails does port " +
+      "(LazyAttributeHash, UserProvidedDefault) have no engine driving them. A dup() round " +
+      "trip would assert something else under Rails' name.",
+  },
+  {
+    testFile: "errors_test.rb",
+    className: "ErrorsTest",
+    tests: ["errors are marshalable", "errors are compatible with YAML dumped from Rails 6.x"],
+    reason:
+      "Both deserialize an ActiveModel::Errors from a Ruby wire format: Marshal.dump/load " +
+      "(activemodel/test/cases/errors_test.rb:670-678) and a literal Rails-6 Psych dump with " +
+      "!ruby/object: tags loaded by YAML.unsafe_load (:680-703). Errors defines neither " +
+      "marshal_dump nor init_with, so both run Ruby's generic ivar-by-ivar object " +
+      "reconstruction, which JS has no counterpart for; trails has no Marshal and no Psych, " +
+      "and no Ruby-written dump can reach a trails process.",
+  },
+  {
     pattern: "message_pack.rb",
     testFile: "message_pack_test.rb",
     reason:

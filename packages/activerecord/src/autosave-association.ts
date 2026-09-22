@@ -434,7 +434,7 @@ export async function isAssociationValid(
     owner.errors.add(association.reflection.name);
   }
 
-  return owner.errors.any;
+  return owner.errors.isAny();
 }
 
 /** @internal */

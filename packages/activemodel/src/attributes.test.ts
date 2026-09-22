@@ -180,13 +180,7 @@ describe("AttributesTest", () => {
   });
 
   it.skip("attributes with proc defaults can be marshalled", () => {
-    // BLOCKED: activemodel-attributes-have-no-marshal-round-trip
-    const data = new ModelForAttributesTest();
-    const attributes = data._attributes;
-    const roundTripped = (data as unknown as { dup(): ModelForAttributesTest }).dup();
-    const newAttributes = roundTripped._attributes;
-
-    expect(attributes).toEqual(newAttributes);
+    // PERMANENT-SKIP: Ruby-only (see scripts/parity/unported-files/unscoped.ts) — marshal
   });
 
   it("attributes can be dup-ed", () => {

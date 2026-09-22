@@ -71,43 +71,33 @@ describe("ErrorsTest", () => {
     assertIncludes(errors, "foo", "errors should include 'foo' as :foo");
   });
 
-  it.skip("each when arity is negative", () => {
-    // BLOCKED: activemodel-errors-does-not-include-enumerable
+  it("each when arity is negative", () => {
     const errors = new Errors(new Person());
     errors.add("name", ":blank");
     errors.add("gender", ":blank");
 
-    expect(
-      (errors as unknown as { map(fn: (e: ModelError) => string): string[] }).map(
-        (e) => e.attribute,
-      ),
-    ).toEqual(["name", "gender"]);
+    expect(errors.map((e) => e.attribute)).toEqual(["name", "gender"]);
   });
 
-  it.skip("any?", () => {
-    // BLOCKED: activemodel-errors-does-not-include-enumerable
+  it("any?", () => {
     const errors = new Errors(new Person());
     errors.add("name");
-    assertPredicate(errors, (e) => e.any, "any? should return true");
-    expect(
-      (errors as unknown as { any(fn: (e: ModelError) => boolean): boolean }).any(() => true),
-    ).toBeTruthy();
+    assertPredicate(errors, (e) => e.isAny(), "any? should return true");
+    expect(errors.isAny(() => true)).toBeTruthy();
   });
 
-  it.skip("first", () => {
-    // BLOCKED: activemodel-errors-does-not-include-enumerable
+  it("first", () => {
     const errors = new Errors(new Person());
     errors.add("name", ":blank");
 
-    const error = (errors as unknown as { first: ModelError }).first;
+    const error = errors.first();
     expect(error).toBeInstanceOf(ModelError);
   });
 
-  it.skip("dup", () => {
-    // BLOCKED: activemodel-errors-has-no-dup
+  it("dup", () => {
     const errors = new Errors(new Person());
     errors.add("name");
-    const errorsDup = (errors as unknown as { dup(): Errors<Person> }).dup();
+    const errorsDup = errors.dup();
     assertNotSame(errorsDup.errors, errors.errors);
   });
 
@@ -496,8 +486,7 @@ describe("ErrorsTest", () => {
     expect((person.errors.asJson() as { defaultProc?: unknown }).defaultProc).toBeUndefined();
   });
 
-  it.skip("messages returns empty frozen array when accessed with non-existent attribute", async () => {
-    // BLOCKED: activemodel-errors-frozen-empty-array-raises-typeerror
+  it("messages returns empty frozen array when accessed with non-existent attribute", async () => {
     const errors = new Errors(new Person());
 
     expect(errors.messages.get("foo")).toEqual([]);
@@ -618,12 +607,11 @@ describe("ErrorsTest", () => {
     expect(Object.fromEntries(person.errors.details)).toEqual({ name: [{ error: ":invalid" }] });
   });
 
-  it.skip("details retains original type as error", () => {
-    // BLOCKED: activemodel-error-type-default-swallows-explicit-nil
+  it("details retains original type as error", () => {
     const errors = new Errors(new Person());
     errors.add("name", "cannot be nil");
     errors.add("foo", "bar");
-    errors.add("baz", null as unknown as string);
+    errors.add("baz", null);
     errors.add("age", ":invalid", { count: 3, message: "%{count} is too low" });
 
     expect(Object.fromEntries(errors.details)).toEqual({
@@ -642,11 +630,10 @@ describe("ErrorsTest", () => {
     expect(hash).toEqual({ name: [error] });
   });
 
-  it.skip("dup duplicates details", () => {
-    // BLOCKED: activemodel-errors-has-no-dup
+  it("dup duplicates details", () => {
     const errors = new Errors(new Person());
     errors.add("name", ":invalid");
-    const errorsDup = (errors as unknown as { dup(): Errors<Person> }).dup();
+    const errorsDup = errors.dup();
     errorsDup.add("name", ":taken");
     expect(Object.fromEntries(errorsDup.details)).not.toEqual(Object.fromEntries(errors.details));
   });
@@ -679,8 +666,7 @@ describe("ErrorsTest", () => {
     assertEmpty(person.errors.details);
   });
 
-  it.skip("details returns empty array when accessed with non-existent attribute", async () => {
-    // BLOCKED: activemodel-errors-frozen-empty-array-raises-typeerror
+  it("details returns empty array when accessed with non-existent attribute", async () => {
     const errors = new Errors(new Person());
 
     expect(errors.details.get("foo")).toEqual([]);
@@ -718,11 +704,10 @@ describe("ErrorsTest", () => {
     expect(person.errors.added("name", ":blank")).toBeTruthy();
   });
 
-  it.skip("merge does not import errors when merging with self", () => {
-    // BLOCKED: activemodel-errors-has-no-dup
+  it("merge does not import errors when merging with self", () => {
     const errors = new Errors(new Person());
     errors.add("name", ":invalid");
-    const errorsBeforeMerge = (errors as unknown as { dup(): Errors<Person> }).dup();
+    const errorsBeforeMerge = errors.dup();
 
     errors.mergeBang(errors);
 
@@ -730,43 +715,11 @@ describe("ErrorsTest", () => {
   });
 
   it.skip("errors are marshalable", () => {
-    // BLOCKED: activemodel-errors-has-no-marshal
-    const errors = new Errors(new Person());
-    errors.add("name", ":invalid");
-    const serialized = (
-      errors as unknown as { marshalDump(): unknown; marshalLoad(d: unknown): Errors<Person> }
-    ).marshalLoad((errors as unknown as { marshalDump(): unknown }).marshalDump());
-
-    expect((serialized as unknown as { base: Person }).base.constructor).toBe(Person);
-    expect(Object.fromEntries(serialized.messages)).toEqual(Object.fromEntries(errors.messages));
-    expect(Object.fromEntries(serialized.details)).toEqual(Object.fromEntries(errors.details));
+    // PERMANENT-SKIP: Ruby-only (see scripts/parity/unported-files/unscoped.ts) — marshal
   });
 
   it.skip("errors are compatible with YAML dumped from Rails 6.x", () => {
-    // BLOCKED: activemodel-errors-not-loadable-from-rails-6-yaml
-    const yaml = `--- !ruby/object:ActiveModel::Errors
-base: &1 !ruby/object:ErrorsTest::Person
-  errors: !ruby/object:ActiveModel::Errors
-    base: *1
-    errors: []
-errors:
-- !ruby/object:ActiveModel::Error
-  base: *1
-  attribute: :name
-  type: :invalid
-  raw_type: :invalid
-  options: {}
-`;
-
-    const YAML = undefined as unknown as { unsafeLoad(yaml: string): Errors<Person> };
-    const errors = YAML.unsafeLoad(yaml);
-
-    expect(Object.fromEntries(errors.messages)).toEqual({ name: ["is invalid"] });
-    expect(Object.fromEntries(errors.details)).toEqual({ name: [{ error: ":invalid" }] });
-
-    errors.clear();
-    expect(Object.fromEntries(errors.messages)).toEqual({});
-    expect(Object.fromEntries(errors.details)).toEqual({});
+    // PERMANENT-SKIP: Ruby-only (see scripts/parity/unported-files/unscoped.ts) — psych
   });
 
   it("inspect", () => {
