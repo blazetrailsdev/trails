@@ -1008,7 +1008,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     const kwargsOnly = nameOrOptions != null && typeof nameOrOptions === "object";
     const name = kwargsOnly ? null : nameOrOptions;
     const opts = kwargsOnly ? nameOrOptions : options;
-    return sqliteDataSourceSql(name ?? undefined, { type: opts.type });
+    return sqliteDataSourceSql.call(this, name ?? undefined, { type: opts.type });
   }
 
   /** @internal */

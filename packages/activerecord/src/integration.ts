@@ -142,7 +142,7 @@ const TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d{1,6})?$/;
 
 /**
  * @internal
- * @missingRailsCall with_connection — PERMANENT
+ * @missingRailsCall with_connection — CONVERGEABLE cache-version-fast-path-reads-global-default-timezone
  */
 export function canUseFastCacheVersion(record: Identifiable, timestamp: unknown): boolean {
   if (typeof timestamp !== "string") return false;

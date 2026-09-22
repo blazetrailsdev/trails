@@ -14,6 +14,8 @@ import { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { Column } from "./column.js";
 import { SchemaDumper } from "./schema-dumper.js";
 
+const quoter = { quote: (value: unknown) => `'${String(value).replace(/'/g, "''")}'` };
+
 describe("SQLite3::SchemaStatements", () => {
   describe("createSchemaDumper", () => {
     it("returns a SchemaDumper instance", () => {
@@ -25,6 +27,7 @@ describe("SQLite3::SchemaStatements", () => {
   describe("virtualTableExists", () => {
     it("returns true when a matching virtual table row is found", async () => {
       const fakeAdapter = {
+        ...quoter,
         queryValues: vi.fn().mockResolvedValue(["virtual_tab"]),
       } as any;
       expect(await virtualTableExists(fakeAdapter, "virtual_tab")).toBe(true);
@@ -32,16 +35,17 @@ describe("SQLite3::SchemaStatements", () => {
 
     it("returns false when no matching row is found", async () => {
       const fakeAdapter = {
+        ...quoter,
         queryValues: vi.fn().mockResolvedValue([]),
       } as any;
       expect(await virtualTableExists(fakeAdapter, "no_such_table")).toBe(false);
     });
 
     it("scopes the data_source_sql probe to VIRTUAL TABLE under the SCHEMA name", async () => {
-      const fakeAdapter = { queryValues: vi.fn().mockResolvedValue([]) } as any;
+      const fakeAdapter = { ...quoter, queryValues: vi.fn().mockResolvedValue([]) } as any;
       await virtualTableExists(fakeAdapter, "my_vtab");
       expect(fakeAdapter.queryValues).toHaveBeenCalledWith(
-        dataSourceSql("my_vtab", { type: "VIRTUAL TABLE" }),
+        dataSourceSql.call(fakeAdapter, "my_vtab", { type: "VIRTUAL TABLE" }),
         "SCHEMA",
       );
     });
@@ -108,47 +112,53 @@ describe("SQLite3::SchemaStatements", () => {
 
   describe("dataSourceSql", () => {
     it("returns default table/view query with no args", () => {
-      const sql = dataSourceSql();
+      const sql = dataSourceSql.call(quoter);
       expect(sql).toContain("pragma_table_list");
       expect(sql).toContain("'table','view'");
     });
 
     it("filters by name when provided", () => {
-      expect(dataSourceSql("users")).toContain("name = 'users'");
+      expect(dataSourceSql.call(quoter, "users")).toContain("name = 'users'");
     });
 
     it("filters by BASE TABLE type", () => {
-      expect(dataSourceSql(undefined, { type: "BASE TABLE" })).toContain("'table'");
+      expect(dataSourceSql.call(quoter, undefined, { type: "BASE TABLE" })).toContain("'table'");
     });
 
     it("filters by VIEW type", () => {
-      expect(dataSourceSql(undefined, { type: "VIEW" })).toContain("'view'");
+      expect(dataSourceSql.call(quoter, undefined, { type: "VIEW" })).toContain("'view'");
     });
 
     it("filters by VIRTUAL TABLE type", () => {
-      expect(dataSourceSql(undefined, { type: "VIRTUAL TABLE" })).toContain("'virtual'");
+      expect(dataSourceSql.call(quoter, undefined, { type: "VIRTUAL TABLE" })).toContain(
+        "'virtual'",
+      );
     });
   });
 
   describe("quotedScope", () => {
     it("returns empty scope with no args", () => {
-      expect(quotedScope()).toEqual({});
+      expect(quotedScope.call(quoter)).toEqual({});
     });
 
     it("includes quoted name", () => {
-      expect(quotedScope("users")).toMatchObject({ name: "'users'" });
+      expect(quotedScope.call(quoter, "users")).toMatchObject({ name: "'users'" });
     });
 
     it("escapes single quotes in name", () => {
-      expect(quotedScope("o'brien")).toMatchObject({ name: "'o''brien'" });
+      expect(quotedScope.call(quoter, "o'brien")).toMatchObject({ name: "'o''brien'" });
     });
 
     it("maps BASE TABLE to table", () => {
-      expect(quotedScope(undefined, { type: "BASE TABLE" })).toMatchObject({ type: "'table'" });
+      expect(quotedScope.call(quoter, undefined, { type: "BASE TABLE" })).toMatchObject({
+        type: "'table'",
+      });
     });
 
     it("maps VIEW to view", () => {
-      expect(quotedScope(undefined, { type: "VIEW" })).toMatchObject({ type: "'view'" });
+      expect(quotedScope.call(quoter, undefined, { type: "VIEW" })).toMatchObject({
+        type: "'view'",
+      });
     });
   });
 

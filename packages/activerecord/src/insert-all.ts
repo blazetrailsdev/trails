@@ -27,7 +27,7 @@ export interface InsertAllOptions {
 }
 
 /**
- * @noRailsEquivalent PERMANENT
+ * @noRailsEquivalent CONVERGEABLE insert-all-constructor-reads-the-schema-cache-at-its-rails-call-sites
  * @internal
  */
 interface ResolvedConnectionFacts {
@@ -40,7 +40,7 @@ interface ResolvedConnectionFacts {
 }
 
 /**
- * @noRailsEquivalent PERMANENT
+ * @noRailsEquivalent CONVERGEABLE insert-all-constructor-reads-the-schema-cache-at-its-rails-call-sites
  * @internal
  */
 async function resolveConnectionFacts(
@@ -189,7 +189,7 @@ export class InsertAll {
     return (this._updatableColumns ??= [...this.keys].filter((k) => !exclude.has(k)));
   }
 
-  /** @missingRailsCall table_name — PERMANENT */
+  /** @missingRailsCall table_name — CONVERGEABLE insert-all-constructor-reads-the-schema-cache-at-its-rails-call-sites */
   primaryKeys(): string[] {
     return this._facts.primaryKeys;
   }

@@ -110,7 +110,6 @@ export function build(
   return record;
 }
 
-/** @missingRailsCall instantiate_instance_of — PERMANENT */
 export function instantiate(
   this: PersistenceHost,
   attributes: Record<string, unknown>,
@@ -120,11 +119,7 @@ export function instantiate(
   const klass = this.discriminateClassForRecord
     ? this.discriminateClassForRecord(attributes)
     : this;
-  return klass._instantiate(
-    attributes,
-    block,
-    columnTypes as Record<string, { deserialize(value: unknown): unknown }>,
-  );
+  return instantiateInstanceOf(klass, attributes, columnTypes, block);
 }
 
 export function queryConstraints(this: PersistenceHost, ...columnsList: string[]): void {
