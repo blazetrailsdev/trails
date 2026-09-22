@@ -83,7 +83,7 @@ export async function assertQueriesMatch<T>(
 
   const counter = new SQLCounter();
   return await Notifications.subscribed(counter, "sql.active_record", async () => {
-    const result = (await _assertNothingRaisedOrWarn("assert_queries_count", fn)) as T;
+    const result = (await _assertNothingRaisedOrWarn("assert_queries_match", fn)) as T;
     const queries = includeSchema ? counter.logAll : counter.log;
     const matchedQueries = queries.filter((query) => {
       if (typeof match === "string") return match === query;
