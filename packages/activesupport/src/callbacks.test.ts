@@ -430,68 +430,6 @@ class CallbackFalseTerminator extends AbstractCallbackTerminator {
   }
 }
 
-class CallbackObject {
-  before(caller: { record: string[] }): void {
-    caller.record.push("before");
-  }
-
-  beforeSave(caller: { record: string[] }): void {
-    caller.record.push("before save");
-  }
-
-  around(caller: { record: string[] }, block: () => unknown): void {
-    caller.record.push("around before");
-    block();
-    caller.record.push("around after");
-  }
-}
-
-class UsingObjectBefore {
-  static {
-    defineCallbacks(this.prototype, "save");
-    setCallback(this.prototype, "save", "before", new CallbackObject());
-  }
-
-  record: string[] = [];
-
-  save(): unknown {
-    return runCallbacks(this, "save", () => {
-      this.record.push("yielded");
-    });
-  }
-}
-
-class UsingObjectAround {
-  static {
-    defineCallbacks(this.prototype, "save");
-    setCallback(this.prototype, "save", "around", new CallbackObject());
-  }
-
-  record: string[] = [];
-
-  save(): unknown {
-    return runCallbacks(this, "save", () => {
-      this.record.push("yielded");
-    });
-  }
-}
-
-class CustomScopeObject {
-  static {
-    defineCallbacks(this.prototype, "save", { scope: ["kind", "name"] });
-    setCallback(this.prototype, "save", "before", new CallbackObject());
-  }
-
-  record: string[] = [];
-
-  save(): unknown {
-    return runCallbacks(this, "save", () => {
-      this.record.push("yielded");
-      return "CallbackResult";
-    });
-  }
-}
-
 class OneTwoThreeSave {
   static {
     defineCallbacks(this.prototype, "save");
@@ -1047,27 +985,67 @@ describe("ExcludingDuplicatesCallbackTest", () => {
 });
 
 describe("UsingObjectTest", () => {
+  class CallbackObject {
+    before(caller: { record: string[] }): void {
+      caller.record.push("before");
+    }
+    beforeSave(caller: { record: string[] }): void {
+      caller.record.push("before save");
+    }
+    around(caller: { record: string[] }, next: () => unknown): void {
+      caller.record.push("around before");
+      next();
+      caller.record.push("around after");
+    }
+  }
+
+  const usingObjectBefore = () => {
+    const u = { record: [] as string[] };
+    defineCallbacks(u, "save");
+    setCallback(u, "save", "before", new CallbackObject());
+    return u;
+  };
+  const usingObjectAround = () => {
+    const u = { record: [] as string[] };
+    defineCallbacks(u, "save");
+    setCallback(u, "save", "around", new CallbackObject());
+    return u;
+  };
+  const customScopeObject = () => {
+    const u = { record: [] as string[] };
+    defineCallbacks(u, "save", { scope: ["kind", "name"] });
+    setCallback(u, "save", "before", new CallbackObject());
+    return u;
+  };
+  const save = (u: { record: string[] }) =>
+    runCallbacks(u, "save", () => {
+      u.record.push("yielded");
+    });
+
   it("before object", () => {
-    const u = new UsingObjectBefore();
-    u.save();
+    const u = usingObjectBefore();
+    save(u);
     expect(u.record).toEqual(["before", "yielded"]);
   });
-
   it("around object", () => {
-    const u = new UsingObjectAround();
-    u.save();
+    const u = usingObjectAround();
+    save(u);
     expect(u.record).toEqual(["around before", "yielded", "around after"]);
   });
+  const customScopeSave = (u: { record: string[] }) =>
+    runCallbacks(u, "save", () => {
+      u.record.push("yielded");
+      return "CallbackResult";
+    });
 
   it("customized object", () => {
-    const u = new CustomScopeObject();
-    u.save();
+    const u = customScopeObject();
+    customScopeSave(u);
     expect(u.record).toEqual(["before save", "yielded"]);
   });
-
   it("block result is returned", () => {
-    const u = new CustomScopeObject();
-    expect(u.save()).toBe("CallbackResult");
+    const u = customScopeObject();
+    expect(customScopeSave(u)).toBe("CallbackResult");
   });
 });
 

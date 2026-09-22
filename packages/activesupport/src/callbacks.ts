@@ -260,6 +260,10 @@ export namespace CallTemplate {
       typeof filter === "function" &&
       !/^class(?=[\s{/])(?:\s|\/\*[\s\S]*?\*\/|\/\/[^\n]*\n)*[^(\s/]/.test(
         Function.prototype.toString.call(filter),
+      ) &&
+      !(
+        Object.getOwnPropertyDescriptor(filter, "prototype")?.writable === false &&
+        !Object.isFrozen(filter)
       )
     ) {
       const arity = filter.length;
