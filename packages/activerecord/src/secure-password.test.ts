@@ -134,7 +134,7 @@ describe("SecurePasswordTest", () => {
     };
 
     let found: Promise<unknown> | undefined;
-    assertCalledWith(
+    await assertCalledWith(
       params,
       "toH",
       [],
@@ -146,7 +146,7 @@ describe("SecurePasswordTest", () => {
     expect(((await found) as User | null)?.id).toBe(user.id);
 
     let notFound: Promise<unknown> | undefined;
-    assertCalledWith(
+    await assertCalledWith(
       params,
       "toH",
       [],

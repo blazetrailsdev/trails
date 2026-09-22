@@ -1,3 +1,4 @@
+import { rbEqual } from "@blazetrails/ruby-compat";
 import { assert } from "./assertions.js";
 
 /** @noRailsEquivalent PERMANENT */
@@ -40,30 +41,33 @@ export function assertCalled<T extends object>(
   check();
 }
 
-/**
- * @internal
- * @missingRailsCall new — PERMANENT
- */
+/** @internal */
 export function assertCalledWith<T extends object>(
   object: T,
   methodName: keyof T & string,
   args: unknown[],
   { returns = false }: { returns?: unknown } = {},
-  block?: () => void,
-): void {
+  block?: () => void | Promise<void>,
+): void | Promise<void> {
   const mock: Mock = { expected: [], returns, calls: [] };
   expectCalledWith(mock, args, { returns });
 
-  stub(
+  const result = stub(
     object,
     methodName,
     (...called: unknown[]) => {
+      if (!mock.expected[mock.calls.length]) {
+        throw new MockExpectationError(
+          `No more expects available for :${methodName}: ${called.map(String).join(", ")}`,
+        );
+      }
       mock.calls.push(called);
       return mock.returns;
     },
     block,
   );
 
+  if (result) return result.then(() => assertMock(mock));
   assertMock(mock);
 }
 
@@ -175,7 +179,7 @@ function assertMock(mock: Mock): void {
     }
     if (
       actual.length !== expected.length ||
-      expected.some((arg, i) => !Object.is(arg, actual[i]))
+      expected.some((arg, i) => !(caseEqual(arg, actual[i]) || rbEqual(arg, actual[i])))
     ) {
       throw new MockExpectationError(
         `Expected call with ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`,
@@ -183,6 +187,22 @@ function assertMock(mock: Mock): void {
     }
   }
   assert(true);
+}
+
+function caseEqual(expected: unknown, actual: unknown): boolean {
+  const matcher = expected as { caseEquals?: unknown } | null | undefined;
+  if (typeof matcher?.caseEquals === "function") {
+    return (matcher as { caseEquals(value: unknown): boolean }).caseEquals(actual);
+  }
+  if (expected instanceof RegExp) return typeof actual === "string" && expected.test(actual);
+  if (typeof expected === "function") {
+    if (expected.prototype === undefined) {
+      const result: unknown = expected(actual);
+      return result != null && result !== false;
+    }
+    return actual instanceof expected;
+  }
+  return rbEqual(expected, actual);
 }
 
 function assertEqual(expected: unknown, actual: unknown, message: string): void {
