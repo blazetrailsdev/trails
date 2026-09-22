@@ -349,7 +349,7 @@ function select(this: QueryMethodsHost, ...fields: any[]): any {
     if (fields.length > 1) {
       throw new ArgumentError("`select' with block doesn't take arguments.");
     }
-    return (this as any).toArray().then((records: any[]) => records.filter(fields[0]));
+    return (this as any).records().then((records: any[]) => records.filter(fields[0]));
   }
   checkIfMethodHasArgumentsBang.call(
     this,

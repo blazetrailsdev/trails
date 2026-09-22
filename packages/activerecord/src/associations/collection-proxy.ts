@@ -566,7 +566,7 @@ export const MIXIN_PUBLIC_INSTANCE_METHODS = [QueryMethods, SpawnMethods].flatMa
 const ownPublicInstanceMethods = publicInstanceMethods(CollectionProxy, false);
 
 const delegateMethods = MIXIN_PUBLIC_INSTANCE_METHODS.filter(
-  (name) => !ownPublicInstanceMethods.includes(name),
+  (name) => !ownPublicInstanceMethods.includes(name) && name !== "select",
 ).concat([
   "scoping",
   "values",

@@ -147,8 +147,6 @@ export class HasManyThroughAssociation extends HasManyAssociation {
               inverseAssoc.target = built.throughRecord;
             }
             inverseAssoc.setInverseInstance?.(built.throughRecord);
-          } else if (typeof inverseAssoc.writer === "function") {
-            inverseAssoc.writer(built.throughRecord);
           }
         }
       }
@@ -291,16 +289,14 @@ export function buildThroughInverseFor(
     ? sourceRefl.polymorphicInverseOf?.(record.constructor as any)
     : sourceRefl.inverseOf?.();
   if (!inverse?.name) return null;
+  const isCollection = !!inverse.isCollection?.();
+  const isHasOne = !!inverse.isHasOne?.();
+  if (!isCollection && !isHasOne) return null;
 
   const throughRecord = assoc.buildThroughRecord(record);
   if (!throughRecord) return null;
 
-  return {
-    inverseName: inverse.name,
-    isCollection: !!inverse.isCollection?.(),
-    isHasOne: !!inverse.isHasOne?.(),
-    throughRecord,
-  };
+  return { inverseName: inverse.name, isCollection, isHasOne, throughRecord };
 }
 
 /** @internal */
@@ -308,6 +304,8 @@ function buildThroughRecord(this: HasManyThroughAssociation, record: Base): Base
   const cache = this._throughRecords;
   const cached = cache.get(record);
   if (cached) return cached;
+
+  this.ensureMutable();
 
   const ctor = this.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
   const refl = ctor._reflectOnAssociation?.(this.reflection.name);
