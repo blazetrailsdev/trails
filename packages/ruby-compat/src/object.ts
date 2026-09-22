@@ -57,8 +57,7 @@ export function rbObjSingletonClass(obj: object): abstract new (...args: never) 
   if (proto !== null && Object.prototype.hasOwnProperty.call(proto, FL_SINGLETON)) {
     return proto[FL_SINGLETON] as abstract new (...args: never) => object;
   }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TS2545: a mixin base's constructor rest parameter must be typed `any[]`.
-  const superclass = obj.constructor as new (...args: any[]) => object;
+  const superclass = obj.constructor as ObjectConstructor;
   const klass = class extends superclass {};
   Object.defineProperty(klass, FL_SINGLETON, { value: obj });
   Object.defineProperty(klass.prototype, FL_SINGLETON, { value: klass });
