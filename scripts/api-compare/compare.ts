@@ -4903,6 +4903,16 @@ export function main() {
         }
 
         if (!hasTsCounterpart) {
+          if (
+            mixinMethodCreditedToOwnFile(
+              { rubyName, rubyModule, mixinFile },
+              rubyFile,
+              pkg,
+              (f) => byFile.has(f),
+              tsMethodsByFile,
+            )
+          )
+            continue;
           fileMissing++;
           missingMethods.push({ rubyName, tsName: tsCandidates[0], rubyModule });
           continue;

@@ -915,7 +915,9 @@ async function main(): Promise<void> {
     }
   }
   const idIndex = buildIdIndex(yamlByTableName);
-  const associations = belongsToAssociationsByClass(loadRubyModelsManifest());
+  const associations = belongsToAssociationsByClass(
+    loadRubyModelsManifest().filter((e) => e.package === "activerecord"),
+  );
 
   const results: FileResult[] = [];
   for (const f of yamlFiles) {
@@ -1001,13 +1003,17 @@ const VALIDATION_KIND_TO_TS: Record<string, string> = {
   validates_associated: "validatesAssociated",
 };
 
-const MODELS_TS_DIR = path.join(ROOT, "packages/activerecord/src/test-helpers/models");
+const MODELS_TS_DIRS: Record<string, string> = {
+  activerecord: path.join(ROOT, "packages/activerecord/src/test-helpers/models"),
+  activemodel: path.join(ROOT, "packages/activemodel/src/test-helpers/models"),
+};
 const RUBY_EXTRACTOR = path.join(HERE, "extract-ruby-models.rb");
 
 export interface RubyAssoc {
   kind: string;
   name: string;
   options: Record<string, string>;
+  hasScope: boolean;
 }
 interface RubyValidation {
   kind: string;
@@ -1025,6 +1031,10 @@ interface RubyAttr {
   name: string;
   type: string;
 }
+interface RubyAttrDecl {
+  kind: "reader" | "writer" | "accessor";
+  name: string;
+}
 export interface RubyClass {
   name: string;
   qualifiedName: string;
@@ -1035,8 +1045,10 @@ export interface RubyClass {
   scopes: RubyScope[];
   callbacks: RubyCallback[];
   attributes: RubyAttr[];
+  attrs: RubyAttrDecl[];
 }
 interface RubyFileEntry {
+  package: string;
   file: string;
   classes: RubyClass[];
 }
@@ -1068,12 +1080,13 @@ const MODEL_PATH_REMAPS: Record<string, string> = {
 
 // Infer TS filename from Ruby file path. `test/models/post.rb` → `post.ts`;
 // `test/models/admin/account.rb` → `admin/account.ts` (preserving subdir).
-export function tsModelPath(rubyFile: string): string {
+export function tsModelPath(rubyFile: string, pkg = "activerecord"): string {
+  const modelsDir = MODELS_TS_DIRS[pkg];
   const rel = rubyFile.replace(/^test\/models\//, "").replace(/\.rb$/, ".ts");
   for (const [prefix, target] of Object.entries(MODEL_PATH_REMAPS)) {
-    if (rel.startsWith(prefix)) return path.join(MODELS_TS_DIR, target);
+    if (rel.startsWith(prefix)) return path.join(modelsDir, target);
   }
-  return path.join(MODELS_TS_DIR, rel.replace(/_/g, "-"));
+  return path.join(modelsDir, rel.replace(/_/g, "-"));
 }
 
 export function compareModelClass(
@@ -1129,9 +1142,61 @@ export function compareModelClass(
   return r;
 }
 
+/**
+ * Declaration drift the (kind, name) presence check cannot see: a Rails
+ * association scope lambda (`has_many :open_replies, -> { open }`) mirrored as
+ * an unscoped association, and an `attr_reader` / `attr_writer` /
+ * `attr_accessor` with no TS member of that name. Checked across every class
+ * in the Ruby file, since the TS mirror keeps them in one module.
+ */
+export function modelDeclarationDrift(classes: RubyClass[], tsContent: string): string[] {
+  const drift: string[] = [];
+  for (const ruby of classes) {
+    for (const a of ruby.associations) {
+      if (!a.hasScope) continue;
+      const tsMacro = camelize(a.kind, false);
+      const camelName = camelize(a.name, false);
+      const nameAlts = a.name === camelName ? a.name : `(?:${a.name}|${camelName})`;
+      const head = `this\\.${tsMacro}\\s*\\(\\s*["']${nameAlts}["']\\s*,\\s*`;
+      const declared = new RegExp(`this\\.${tsMacro}\\s*\\(\\s*["']${nameAlts}["']`).test(
+        tsContent,
+      );
+      const scoped = new RegExp(`${head}(?![{)])\\S`).test(tsContent);
+      if (declared && !scoped)
+        drift.push(`assoc-scope-missing: ${ruby.qualifiedName} ${a.kind} :${a.name}`);
+    }
+    for (const attr of ruby.attrs) {
+      const camelName = camelize(attr.name, false);
+      const nameAlts = attr.name === camelName ? attr.name : `(?:${attr.name}|${camelName})`;
+      const modifiers = `^\\s*(?:(?:declare|public|private|protected|readonly|override|static|accessor|async)\\s+)*`;
+      const field = new RegExp(`${modifiers}${nameAlts}\\s*[?!]?\\s*[:=;]`, "m");
+      const reader = new RegExp(`${modifiers}(?:get\\s+)?${nameAlts}\\s*\\(`, "m");
+      const writer = new RegExp(
+        `${modifiers}(?:set\\s+${nameAlts}|set${camelize(attr.name)})\\s*\\(`,
+        "m",
+      );
+      const hasField = field.test(tsContent);
+      const hasReader = hasField || reader.test(tsContent);
+      const hasWriter = hasField || writer.test(tsContent);
+      if (
+        attr.kind === "reader"
+          ? hasReader
+          : attr.kind === "writer"
+            ? hasWriter
+            : hasReader && hasWriter
+      )
+        continue;
+      drift.push(`attr-missing: ${ruby.qualifiedName} attr_${attr.kind} :${attr.name}`);
+    }
+  }
+  return drift;
+}
+
 function formatModelLine(r: ModelResult): string {
   const ruby = path.basename(r.rubyFile).padEnd(36);
-  const ts = (r.tsFile ? path.relative(MODELS_TS_DIR, r.tsFile) : "(missing)").padEnd(32);
+  const ts = (r.tsFile ? path.relative(MODELS_TS_DIRS.activerecord, r.tsFile) : "(missing)").padEnd(
+    32,
+  );
   if (r.status === "MISSING") {
     return `${ruby}${ts}${r.status}`;
   }
@@ -1165,7 +1230,7 @@ function runModelsPass(filter: string | null, incomplete = false): void {
   const entries = filter ? manifest.filter((e) => e.file.includes(filter)) : manifest;
 
   const results: ModelResult[] = [];
-  for (const entry of entries) {
+  for (const entry of entries.filter((e) => e.package === "activerecord")) {
     const tsPath = tsModelPath(entry.file);
     const tsExists = existsSync(tsPath);
     const tsContent = tsExists ? readFileSync(tsPath, "utf8") : null;
@@ -1206,6 +1271,17 @@ function runModelsPass(filter: string | null, incomplete = false): void {
   const matched = results.filter((r) => r.status === "MATCH").length;
   const diff = results.filter((r) => r.status === "DIFF").length;
   console.log(`\n${results.length} files — match=${matched} diff=${diff} missing=${missing}`);
+
+  console.log("\n=== models:compare declaration drift (report-only) ===");
+  let driftCount = 0;
+  for (const entry of entries) {
+    const tsPath = tsModelPath(entry.file, entry.package);
+    if (!existsSync(tsPath)) continue;
+    const drift = modelDeclarationDrift(entry.classes, readFileSync(tsPath, "utf8"));
+    for (const d of drift) console.log(`${entry.package}/${entry.file}  ${d}`);
+    driftCount += drift.length;
+  }
+  console.log(`\n${driftCount} declaration drift rows`);
   if (missing > 0 || diff > 0) process.exit(1);
 }
 
