@@ -19,7 +19,7 @@ import {
   TimeType,
   UnknownAttributeError as AMUnknownAttributeError,
 } from "@blazetrails/activemodel";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, basicObjRespondTo } from "@blazetrails/ruby-compat";
 import { Base, DangerousAttributeError, Type, UnknownAttributeError } from "./index.js";
 
 import { GeneratedAttributeMethods } from "./attribute-methods.js";
@@ -778,15 +778,15 @@ describe("AttributeMethodsTest", () => {
 
     const topic = new topicClass({ title: "New topic" }) as any;
     expect(topic.subject_to_be_undefined).toBe("New topic");
-    expect("subject_to_be_undefined" in topicClass.prototype).toBe(true);
+    expect(basicObjRespondTo(topicClass.prototype, "subject_to_be_undefined")).toBe(true);
     topicClass.undefineAttributeMethods();
-    expect("subject_to_be_undefined" in topicClass.prototype).toBe(false);
+    expect(basicObjRespondTo(topicClass.prototype, "subject_to_be_undefined")).toBe(false);
 
     topicClass.defineAttributeMethods();
-    expect("subject_to_be_undefined" in topicClass.prototype).toBe(true);
+    expect(basicObjRespondTo(topicClass.prototype, "subject_to_be_undefined")).toBe(true);
 
     expect(topic.respondTo("subject_to_be_undefined")).toBe(true);
-    expect("subject_to_be_undefined" in topicClass.prototype).toBe(true);
+    expect(basicObjRespondTo(topicClass.prototype, "subject_to_be_undefined")).toBe(true);
   });
   it("#define_attribute_methods brings back undefined aliases", () => {
     class topicClass extends Base {
@@ -801,11 +801,11 @@ describe("AttributeMethodsTest", () => {
     expect(topic.title_alias_to_be_undefined).toBe("New topic");
     topicClass.undefineAttributeMethods();
 
-    expect("title_alias_to_be_undefined" in topicClass.prototype).toBe(false);
+    expect(basicObjRespondTo(topicClass.prototype, "title_alias_to_be_undefined")).toBe(false);
 
     topicClass.defineAttributeMethods();
 
-    expect("title_alias_to_be_undefined" in topicClass.prototype).toBe(true);
+    expect(basicObjRespondTo(topicClass.prototype, "title_alias_to_be_undefined")).toBe(true);
     expect(topic.title_alias_to_be_undefined).toBe("New topic");
   });
   it("#method_missing define methods on the fly in a thread safe way", async () => {

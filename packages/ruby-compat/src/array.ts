@@ -1,6 +1,7 @@
 import { rbEql } from "./rb-equal.js";
 import { rbHash } from "./rb-hash.js";
 import { ArgumentError } from "./argument-error.js";
+import { Range } from "./range.js";
 
 /** `toofew` (`vendor/ruby/pack.c:120`). */
 const toofew = "too few arguments";
@@ -125,6 +126,44 @@ export function pack(ary: ReadonlyArray<string>, fmt: string): string {
   }
 
   return res.join("");
+}
+
+/**
+ * Ruby `Array#slice` / `Array#[]` (`vendor/ruby/array.c:1827` `rb_ary_aref`):
+ * `(index)` answers the element or nil, `(start, length)` a subarray
+ * (`rb_ary_aref2`, `:1837`), and a Range a subarray through
+ * `rb_range_beg_len` (`vendor/ruby/range.c:1744`); an out-of-range start is nil.
+ * @noRailsEquivalent PERMANENT
+ */
+export function arySlice<T>(
+  ary: readonly T[],
+  arg: number | Range<number>,
+  length?: number,
+): T | T[] | null {
+  const alen = ary.length;
+  if (length !== undefined) {
+    let beg = arg as number;
+    if (beg < 0) beg += alen;
+    return subseq(ary, beg, length);
+  }
+  if (arg instanceof Range) {
+    let beg = arg.begin ?? 0;
+    let end = arg.end ?? alen;
+    if (beg < 0) {
+      beg += alen;
+      if (beg < 0) return null;
+    }
+    if (end < 0) end += alen;
+    if (arg.end !== null && !arg.excludeEnd) end += 1;
+    return subseq(ary, beg, Math.max(0, end - beg));
+  }
+  const index = arg < 0 ? arg + alen : arg;
+  return index >= 0 && index < alen ? ary[index] : null;
+}
+
+function subseq<T>(ary: readonly T[], beg: number, len: number): T[] | null {
+  if (beg > ary.length || beg < 0 || len < 0) return null;
+  return ary.slice(beg, beg + len);
 }
 
 /**

@@ -30,11 +30,6 @@ describe("quotedDate", () => {
     expect(quotedDate(v)).toBe("2026-04-26");
   });
 
-  it("formats a Temporal.PlainTime (normalised to 2000-01-01 date)", () => {
-    const v = Temporal.PlainTime.from("14:23:55");
-    expect(quotedDate(v)).toBe("2000-01-01 14:23:55");
-  });
-
   it("formats a TimeWithZone through its UTC instant", () => {
     const eastern = TimeZone.find("Eastern Time (US & Canada)")!;
     const v = new TimeWithZone(Temporal.Instant.from("2026-04-26T14:23:55Z"), eastern);

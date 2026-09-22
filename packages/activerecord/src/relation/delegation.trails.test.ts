@@ -199,7 +199,7 @@ describe("name delegate — property-reader typing invariant", () => {
 describe("delegated records operators without an Array.prototype counterpart", () => {
   const loaded = (records: unknown[]) =>
     Object.assign(Comment.all(), { _records: records, _loaded: true }) as unknown as Record<
-      "intersection" | "union" | "difference" | "at" | "concat",
+      "intersection" | "union" | "difference" | "plus" | "at" | "concat",
       (...args: unknown[]) => unknown
     >;
 
@@ -208,7 +208,9 @@ describe("delegated records operators without an Array.prototype counterpart", (
     expect(dup.intersection(["b", "c", "d"])).toEqual(["b", "c"]);
     expect(dup.union(["c", "d"])).toEqual(["a", "b", "c", "d"]);
     expect(dup.difference(["c"])).toEqual(["a", "b", "b"]);
+    expect(dup.plus(["c"])).toEqual(["a", "b", "b", "c", "c"]);
     expect(loaded(["a", "b", "c"]).at(1)).toBe("b");
+    expect(loaded(["a", "b", "c"]).at(1, 2)).toEqual(["b", "c"]);
     expect(loaded(["a", "b", "c"]).concat(["d"])).toEqual(["a", "b", "c", "d"]);
   });
 

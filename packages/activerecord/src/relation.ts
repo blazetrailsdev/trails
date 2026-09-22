@@ -2136,7 +2136,12 @@ export interface Relation<T extends Base> {
   length(): Promise<number>;
   each(fn: (record: T, index: number) => void): Promise<T[]>;
   join(separator?: string): Promise<string>;
-  slice(start?: number, end?: number): T[] | Promise<T[]>;
+  at(index: number | Range<number>, length?: number): Promise<T | T[] | null>;
+  intersection(other: T[]): Promise<T[]>;
+  union(other: T[]): Promise<T[]>;
+  plus(other: T[]): Promise<T[]>;
+  difference(other: T[]): Promise<T[]>;
+  slice(index: number | Range<number>, length?: number): T | T[] | null | Promise<T | T[] | null>;
   isIntersect(other: T[]): Promise<boolean>;
   reverse(): Promise<T[]>;
   compact(): Promise<T[]>;
@@ -2174,11 +2179,6 @@ const ENUMERABLE_METHODS: Record<string, (records: any[], args: any[]) => unknow
     records.forEach((record, index) => (fn(record, index) ? matched : unmatched).push(record));
     return [matched, unmatched];
   },
-  intersection: (records, [other]) =>
-    uniqRecords(records).filter((record) => includesRecord(other ?? [], record)),
-  union: (records, [other]) => uniqRecords([...records, ...(other ?? [])]),
-  difference: (records, [other]) =>
-    records.filter((record) => !includesRecord(other ?? [], record)),
 };
 for (const name of [
   "forEach",
@@ -2195,21 +2195,6 @@ for (const name of [
   "flatMap",
 ]) {
   ENUMERABLE_METHODS[name] = (records, args) => (records as any)[name](...args);
-}
-
-function includesRecord(records: unknown[], record: unknown): boolean {
-  return records.some(
-    (candidate) =>
-      candidate === record ||
-      (typeof (candidate as { equals?: unknown } | null)?.equals === "function" &&
-        (candidate as { equals(o: unknown): boolean }).equals(record) === true),
-  );
-}
-
-function uniqRecords<U>(records: U[]): U[] {
-  const uniq: U[] = [];
-  for (const record of records) if (!includesRecord(uniq, record)) uniq.push(record);
-  return uniq;
 }
 
 include(Relation, Delegation);

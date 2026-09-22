@@ -1272,15 +1272,15 @@ export class ThroughReflection extends AbstractReflection {
   }
 
   foreignKey(kwargs?: { inferFromInverseOf?: boolean }): string | string[] {
-    return this.sourceReflection?.foreignKey(kwargs) ?? this.delegateReflection.foreignKey(kwargs);
+    return this.sourceReflection!.foreignKey(kwargs);
   }
 
   get foreignType(): string | null {
-    return this.sourceReflection?.foreignType ?? this.delegateReflection.foreignType;
+    return this.sourceReflection!.foreignType;
   }
 
   get type(): string | null {
-    return this.sourceReflection?.type ?? null;
+    return this.sourceReflection!.type;
   }
 
   get scope(): ((...args: any[]) => any) | null {

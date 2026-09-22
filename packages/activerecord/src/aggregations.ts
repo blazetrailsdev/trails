@@ -7,6 +7,13 @@ import {
   prepend,
   type PrependModule,
 } from "@blazetrails/activesupport";
+import { include, included, isModuleIncluded } from "@blazetrails/ruby-compat";
+
+export const Aggregations = {
+  [included](base: typeof Base): void {
+    prepend(base.prototype, { initializeDup, reload, initInternals } as PrependModule);
+  },
+};
 
 /** @internal */
 export function clearAggregationCache(record: Base): void {
@@ -24,7 +31,7 @@ interface ComposedOfOptions {
   allowNil?: boolean;
 }
 
-/** @missingRailsCall include — PERMANENT */
+/** @missingRailsArgs include — PERMANENT */
 export function composedOf(
   modelClass: typeof Base,
   partId: string,
@@ -38,11 +45,7 @@ export function composedOf(
     "converter",
   ]);
 
-  const proto = modelClass.prototype as Record<string | symbol, any>;
-  if (!proto[aggregationsIncluded]) {
-    Object.defineProperty(proto, aggregationsIncluded, { value: true, configurable: true });
-    prepend(proto, { initializeDup, reload, initInternals } as PrependModule);
-  }
+  if (!isModuleIncluded(modelClass, Aggregations)) include(modelClass, Aggregations);
 
   const name = partId;
   const className = options.className ?? camelize(name);
@@ -202,8 +205,6 @@ export function reload(
   clearAggregationCache(this);
   return super_(options);
 }
-
-const aggregationsIncluded = Symbol.for("@blazetrails/activerecord:aggregationsIncluded");
 
 /** @internal */
 function initInternals(this: Base, super_: () => void): void {
