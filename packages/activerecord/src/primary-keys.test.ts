@@ -684,13 +684,13 @@ describe("PrimaryKeyIntegerTest", () => {
 
   beforeAll(async () => {
     if (adapterType === "sqlite") return;
-    await (Base.connection as any).dropTable("widgets", { ifExists: true });
+    await ((await Base.leaseConnection()) as any).dropTable("widgets", { ifExists: true });
   });
 
   afterAll(async () => {
     if (adapterType === "sqlite") return;
     void Widget.resetColumnInformation();
-    await (Base.connection as any).dropTable("widgets", { ifExists: true });
+    await ((await Base.leaseConnection()) as any).dropTable("widgets", { ifExists: true });
   });
 
   const pkType = adapterType === "postgres" ? "serial" : "integer";
