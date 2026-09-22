@@ -131,13 +131,13 @@ describe("FormatValidationTest", () => {
 
   it("validates format of when with isnt a regexp should raise error", async () => {
     await assertRaise([ArgumentError], {}, () =>
-      Topic.validatesFormatOf("title", { with: "clearly not a regexp" as any }),
+      Topic.validatesFormatOf("title", { with: "clearly not a regexp" }),
     );
   });
 
   it("validates format of when not isnt a regexp should raise error", async () => {
     await assertRaise([ArgumentError], {}, () =>
-      Topic.validatesFormatOf("title", { without: "clearly not a regexp" as any }),
+      Topic.validatesFormatOf("title", { without: "clearly not a regexp" }),
     );
   });
 

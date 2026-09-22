@@ -116,14 +116,10 @@ describe("InclusionValidationTest", () => {
     assertPredicate(t.errors.get("title"), (e) => e.length > 0);
     expect(t.errors.get("title")).toEqual(["is not included in the list"]);
 
-    await assertRaise([ArgumentError], {}, () =>
-      Topic.validatesInclusionOf("title", { in: null as any }),
-    );
-    await assertRaise([ArgumentError], {}, () =>
-      Topic.validatesInclusionOf("title", { in: 0 as any }),
-    );
+    await assertRaise([ArgumentError], {}, () => Topic.validatesInclusionOf("title", { in: null }));
+    await assertRaise([ArgumentError], {}, () => Topic.validatesInclusionOf("title", { in: 0 }));
 
-    await assertNothingRaised(() => Topic.validatesInclusionOf("title", { in: "hi!" as any }));
+    await assertNothingRaised(() => Topic.validatesInclusionOf("title", { in: "hi!" }));
     await assertNothingRaised(() => Topic.validatesInclusionOf("title", { in: new Map() }));
     await assertNothingRaised(() => Topic.validatesInclusionOf("title", { in: [] }));
   });
@@ -234,13 +230,13 @@ describe("InclusionValidationTest", () => {
       Person.validatesInclusionOf("karma", { in: ["abe", "monkey"] });
 
       let p = new Person();
-      p.karma = ["Lifo", "monkey"] as any;
+      (p as { karma: unknown }).karma = ["Lifo", "monkey"];
 
       assertPredicate(await p.isInvalid(), (v) => v);
       expect(p.errors.get("karma")).toEqual(["is not included in the list"]);
 
       p = new Person();
-      p.karma = ["abe", "monkey"] as any;
+      (p as { karma: unknown }).karma = ["abe", "monkey"];
 
       assertPredicate(await p.isValid(), (v) => v);
     } finally {
