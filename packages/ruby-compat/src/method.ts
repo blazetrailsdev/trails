@@ -76,7 +76,7 @@ export function rbObjMethod(obj: unknown, vid: string): Method {
   if (found != null && found !== false) {
     return new Method(obj, vid, (...args) => target.methodMissing!(vid, ...args));
   }
-  throw new NameError(`undefined method \`${vid}' for class \`${rbObjClass(obj)}'`, vid, {
+  throw new NameError(`undefined method '${vid}' for an instance of ${rbObjClass(obj)}`, vid, {
     receiver: obj,
   });
 }
