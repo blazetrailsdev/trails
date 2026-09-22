@@ -377,16 +377,7 @@ export class TestFixtures {
     if (!unpinned.every(Boolean)) {
       alreadyLoadedFixtures.clear();
     }
-    for (const adapter of this._fixtureAdapters) {
-      if (adapter.pool == null || adapter.pool instanceof NullPool) {
-        const manager = (
-          adapter as unknown as {
-            transactionManager: { openTransactions: number; rollbackTransaction(): Promise<void> };
-          }
-        ).transactionManager;
-        while (manager.openTransactions > 0) await manager.rollbackTransaction();
-      }
-    }
+    await unpinFixtureAdapters.call(this);
     this._fixtureConnectionPools = [];
     this.teardownSharedConnectionPool();
     const failed = pinResults.find((r) => r.status === "rejected");
@@ -488,10 +479,11 @@ export class TestFixtures {
       }
     });
 
-    return returnSingleRecord ? instances[0] : forceReload ? Promise.all(instances) : instances;
+    return returnSingleRecord ? instances[0] : instances;
   }
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-with-transactional-fixtures-onto-test-fixtures-setup */
 async function pinFixtureAdapters(this: TestFixtures): Promise<void> {
   for (const adapter of this._fixtureAdapters) {
     const pool = adapter.pool;
@@ -507,6 +499,20 @@ async function pinFixtureAdapters(this: TestFixtures): Promise<void> {
       await pool.pinConnectionBang(this.lockThreads);
       await pool.leaseConnection();
       this._fixtureConnectionPools.push(pool);
+    }
+  }
+}
+
+/** @noRailsEquivalent CONVERGEABLE converge-with-transactional-fixtures-onto-test-fixtures-setup */
+async function unpinFixtureAdapters(this: TestFixtures): Promise<void> {
+  for (const adapter of this._fixtureAdapters) {
+    if (adapter.pool == null || adapter.pool instanceof NullPool) {
+      const manager = (
+        adapter as unknown as {
+          transactionManager: { openTransactions: number; rollbackTransaction(): Promise<void> };
+        }
+      ).transactionManager;
+      while (manager.openTransactions > 0) await manager.rollbackTransaction();
     }
   }
 }
