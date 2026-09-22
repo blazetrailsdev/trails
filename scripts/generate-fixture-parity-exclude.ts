@@ -3,13 +3,14 @@
  * Build the test-fixture-parity ESLint exclude baseline.
  *
  * Lints every activerecord test file with the `test-fixture-parity` rule and
- * collects the files that still produce an *active* (non-skipped) violation —
+ * collects the tests that still produce an *active* (non-skipped) violation —
  * i.e. tests whose Rails counterpart uses fixtures but which call no fixture
- * accessor in their it() body. Today these are overwhelmingly green tests that
- * port Rails fixture-tests with inline-defined models rather than `useFixtures`.
+ * accessor in their it() body. A file already excluded whole keeps its
+ * whole-file entry while it still violates; every other violation is written
+ * as a per-test `{ file, tests }` entry, so no file is newly excluded whole.
  *
  * Listing them lets the rule ship at `error` severity with zero new CI
- * failures; porters remove their file from the list once they migrate it onto
+ * failures; porters remove their entries once they migrate the tests onto
  * fixture accessors. Mirrors the `expected-fixtures` baseline builder.
  *
  * Output: eslint/test-fixture-parity-exclude.json (committed).
@@ -33,8 +34,6 @@ async function main(): Promise<void> {
   const eslint = new ESLint({ cwd: ROOT });
   const results = await eslint.lintFiles(["packages/activerecord/src/**/*.test.ts"]);
 
-  // Only-shrink: a whole-file entry survives while the file still violates,
-  // but no file is newly excluded wholesale — new violations land per test.
   const previous: unknown[] = fs.existsSync(OUT_PATH)
     ? JSON.parse(fs.readFileSync(OUT_PATH, "utf8"))
     : [];
