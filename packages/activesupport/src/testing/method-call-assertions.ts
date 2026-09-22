@@ -59,6 +59,11 @@ export function assertCalledWith<T extends object>(
     object,
     methodName,
     (...called: unknown[]) => {
+      if (!mock.expected[mock.calls.length]) {
+        throw new MockExpectationError(
+          `No more expects available for :${methodName}: ${called.map(String).join(", ")}`,
+        );
+      }
       mock.calls.push(called);
       return mock.returns;
     },
