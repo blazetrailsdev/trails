@@ -48,6 +48,7 @@ import noInternalCanonicalLoaders from "./eslint/no-internal-canonical-loaders.m
 import noLoadSchemaWithStubbedDdl from "./eslint/no-load-schema-with-stubbed-ddl.mjs";
 import noExplicitAnyDisable from "./eslint/no-explicit-any-disable.mjs";
 import noRawControlBytes from "./eslint/no-raw-control-bytes.mjs";
+import noJsRenderingInRailsMessages from "./eslint/no-js-rendering-in-rails-messages.mjs";
 import noFreeformComments from "./eslint/no-freeform-comments.mjs";
 import { sweptFilesInsideUnsweptTrees } from "./eslint/no-freeform-comments-scope.mjs";
 import { readFileSync } from "node:fs";
@@ -313,6 +314,7 @@ export default defineConfig(
           "no-load-schema-with-stubbed-ddl": noLoadSchemaWithStubbedDdl,
           "no-explicit-any-disable": noExplicitAnyDisable,
           "no-raw-control-bytes": noRawControlBytes,
+          "no-js-rendering-in-rails-messages": noJsRenderingInRailsMessages,
           "no-freeform-comments": noFreeformComments,
           // Off by default — opt in per project (see eslint/manifest-complete.mjs).
           "manifest-complete": manifestComplete,
@@ -876,6 +878,19 @@ export default defineConfig(
     files: ["packages/activerecord/src/**/*.ts", "packages/arel/src/**/*.ts"],
     rules: {
       "blazetrails/no-explicit-any-disable": "error",
+    },
+  },
+
+  // ── no-js-rendering-in-rails-messages (RFC 0156): a value rendered into a
+  //    `throw new` argument or an `inspect` body uses Ruby's rendering, not
+  //    JSON.stringify / String() / constructor.name. Per-package enrollment,
+  //    ONLY-GROW: a package joins once its sites are converged, and a package
+  //    is never removed to turn a red run green.
+  {
+    files: ["packages/arel/src/**/*.ts"],
+    ignores: ["**/*.test.ts", "**/test-helpers/**"],
+    rules: {
+      "blazetrails/no-js-rendering-in-rails-messages": "error",
     },
   },
 

@@ -1,4 +1,5 @@
 import { ArgumentError, rbEqual, rbHash } from "@blazetrails/activesupport";
+import { rbInspect } from "@blazetrails/ruby-compat";
 import { arelNode } from "../arel.js";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
@@ -33,14 +34,18 @@ export class BoundSqlLiteral extends NodeExpression {
       }
     } else if (hasNamed) {
       const tokensInString = [
-        ...new Set([...sqlWithPlaceholders.matchAll(/:(?<!::)([a-zA-Z]\w*)/g)].map((m) => m[1])),
+        ...new Set(
+          [...sqlWithPlaceholders.matchAll(/:(?<!::)([a-zA-Z]\w*)/g)].map((m) => `:${m[1]}`),
+        ),
       ];
-      const missing = tokensInString.filter((t) => !(t in namedBinds));
+      const tokensInHash = [...new Set(Object.keys(namedBinds).map((k) => `:${k}`))];
+
+      const missing = tokensInString.filter((t) => !tokensInHash.includes(t));
       if (missing.length > 0) {
         if (missing.length === 1) {
-          throw new BindError(`missing value for :${missing[0]}`, sqlWithPlaceholders);
+          throw new BindError(`missing value for ${rbInspect(missing[0])}`, sqlWithPlaceholders);
         } else {
-          throw new BindError(`missing values for ${JSON.stringify(missing)}`, sqlWithPlaceholders);
+          throw new BindError(`missing values for ${rbInspect(missing)}`, sqlWithPlaceholders);
         }
       }
     }

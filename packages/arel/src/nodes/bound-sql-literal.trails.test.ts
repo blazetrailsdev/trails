@@ -86,7 +86,7 @@ describe("BoundSqlLiteralTest", () => {
 
     it("error message matches Rails phrasing (plural missing)", () => {
       expect(() => new Nodes.BoundSqlLiteral("id IN (:foo, :bar, :baz)", null, { foo: 1 })).toThrow(
-        'missing values for ["bar","baz"] in: "id IN (:foo, :bar, :baz)"',
+        'missing values for [:bar, :baz] in: "id IN (:foo, :bar, :baz)"',
       );
     });
   });

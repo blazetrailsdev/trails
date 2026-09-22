@@ -21,6 +21,7 @@ import { Case } from "./nodes/case.js";
 import { Concat, Contains, Overlaps } from "./nodes/infix-operation.js";
 import { _buildQuoted } from "./node-slots.js";
 import { rbEqual } from "@blazetrails/activesupport";
+import { NoMethodError, rbObjClass } from "@blazetrails/ruby-compat";
 
 function isSelectManagerLike(value: unknown): value is { ast: Node } {
   return (
@@ -108,9 +109,8 @@ function predicationDispatch<T extends PredicationHost>(
   }
   const member = (host as Record<string, unknown>)[methodId];
   if (typeof member !== "function") {
-    // eslint-disable-next-line blazetrails/rails-error-parity -- Ruby raises NoMethodError/TypeError here; TypeError is its JS analogue, not a missing ported class.
-    throw new TypeError(
-      `Predications.groupingAny/All: \`${methodId}\` is not a method on the host (${(host as object).constructor.name})`,
+    throw new NoMethodError(
+      `undefined method '${methodId}' for an instance of ${rbObjClass(host)}`,
     );
   }
   const fn = member as (...args: unknown[]) => Node;
