@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
-import { ACCEPTABLE_UUID, Uuid } from "../../connection-adapters/postgresql/oid/uuid.js";
+import { Uuid } from "../../connection-adapters/postgresql/oid/uuid.js";
 import { RecordNotFound } from "../../errors.js";
 import { itIfSupports } from "../../support/supports.js";
 import { fixtures } from "../../test-fixtures.js";
@@ -40,483 +40,35 @@ describeIfPg("PostgreSQLAdapter", () => {
   beforeAll(async () => {
     adapter = Base.connection as PostgreSQLAdapter;
     await adapter.enableExtension("uuid-ossp");
-    if (await adapter.supportsPgcryptoUuid()) await adapter.enableExtension("pgcrypto");
+    supportsPgcryptoUuid = await adapter.supportsPgcryptoUuid();
+    if (supportsPgcryptoUuid) await adapter.enableExtension("pgcrypto");
   });
 
-  beforeEach(async () => {
-    await adapter.execute(`DROP TABLE IF EXISTS uuid_data_type`);
-    await adapter.execute(`
-      CREATE TABLE uuid_data_type (
-        id serial primary key,
-        guid uuid DEFAULT gen_random_uuid(),
-        other_guid uuid
-      )
-    `);
-  });
-  afterEach(async () => {
-    await adapter.execute(`DROP TABLE IF EXISTS uuid_data_type`);
-  });
+  let supportsPgcryptoUuid: boolean;
+  const uuidFunction = () => (supportsPgcryptoUuid ? "gen_random_uuid()" : "uuid_generate_v4()");
+  const uuidDefault = () => (supportsPgcryptoUuid ? {} : { default: uuidFunction() });
 
   describe("PostgreSQLUUIDTest", () => {
-    it("uuid column", async () => {
-      const rows = await adapter.execute(`
-        SELECT column_name, data_type
-        FROM information_schema.columns
-        WHERE table_name = 'uuid_data_type' AND column_name = 'guid'
-      `);
-      expect(rows).toHaveLength(1);
-      expect(rows[0].data_type).toBe("uuid");
+    beforeEach(async () => {
+      await adapter.createTable("uuid_data_type", {}, (t) => {
+        t.uuid("guid");
+      });
     });
 
-    it("uuid default", async () => {
-      const rows = await adapter.execute(`
-        SELECT column_default
-        FROM information_schema.columns
-        WHERE table_name = 'uuid_data_type' AND column_name = 'guid'
-      `);
-      expect(rows).toHaveLength(1);
-      expect(rows[0].column_default).toMatch(/gen_random_uuid/);
-    });
-
-    it("uuid type cast", async () => {
-      expect(new Uuid().cast("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11")).toBe(
-        "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
-      );
-      expect(new Uuid().cast("A0EEBC99-9C0B-4EF8-BB6D-6BB9BD380A11")).toBe(
-        "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
-      );
-    });
-
-    it("uuid write", async () => {
-      const uuid = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
-      await adapter.execQuery(`INSERT INTO uuid_data_type (guid) VALUES ($1)`, "SQL", [uuid]);
-      const rows = await adapter.execute(`SELECT guid FROM uuid_data_type`);
-      expect(rows[0].guid).toBe(uuid);
-    });
-
-    it("uuid select", async () => {
-      const uuid = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
-      await adapter.execQuery(`INSERT INTO uuid_data_type (guid) VALUES ($1)`, "SQL", [uuid]);
-      const rows = (
-        await adapter.execQuery(`SELECT guid FROM uuid_data_type WHERE guid = $1`, "SQL", [uuid])
-      ).toArray();
-      expect(rows).toHaveLength(1);
-      expect(rows[0].guid).toBe(uuid);
-    });
-
-    it("uuid where", async () => {
-      const uuid = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
-      await adapter.execQuery(`INSERT INTO uuid_data_type (guid) VALUES ($1)`, "SQL", [uuid]);
-      const rows = (
-        await adapter.execQuery(`SELECT * FROM uuid_data_type WHERE guid = $1`, "SQL", [uuid])
-      ).toArray();
-      expect(rows).toHaveLength(1);
-    });
-
-    it("uuid order", async () => {
-      const uuid1 = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
-      const uuid2 = "b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
-      await adapter.execQuery(`INSERT INTO uuid_data_type (guid) VALUES ($1)`, "SQL", [uuid2]);
-      await adapter.execQuery(`INSERT INTO uuid_data_type (guid) VALUES ($1)`, "SQL", [uuid1]);
-      const rows = await adapter.execute(`SELECT guid FROM uuid_data_type ORDER BY guid ASC`);
-      expect(rows[0].guid).toBe(uuid1);
-      expect(rows[1].guid).toBe(uuid2);
-    });
-
-    it("uuid pluck", async () => {
-      const uuid = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
-      await adapter.execQuery(`INSERT INTO uuid_data_type (guid) VALUES ($1)`, "SQL", [uuid]);
-      const rows = await adapter.execute(`SELECT guid FROM uuid_data_type`);
-      expect(rows.map((r) => r.guid)).toEqual([uuid]);
-    });
-
-    it("uuid primary key", async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS uuid_pk_test`);
-      await adapter.execute(`
-        CREATE TABLE uuid_pk_test (
-          id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-          name text
-        )
-      `);
-      try {
-        const rows = await adapter.execute(`
-          SELECT column_name, data_type
-          FROM information_schema.columns
-          WHERE table_name = 'uuid_pk_test' AND column_name = 'id'
-        `);
-        expect(rows[0].data_type).toBe("uuid");
-      } finally {
-        await adapter.execute(`DROP TABLE IF EXISTS uuid_pk_test`);
-      }
-    });
-
-    it("uuid primary key default", async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS uuid_pk_test`);
-      await adapter.execute(`
-        CREATE TABLE uuid_pk_test (
-          id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-          name text
-        )
-      `);
-      try {
-        await adapter.execQuery(`INSERT INTO uuid_pk_test (name) VALUES ($1)`, "SQL", ["test"]);
-        const rows = await adapter.execute(`SELECT id FROM uuid_pk_test`);
-        expect(rows).toHaveLength(1);
-        expect(rows[0].id).toBeTruthy();
-        expect(ACCEPTABLE_UUID.test(rows[0].id as string)).toBe(true);
-      } finally {
-        await adapter.execute(`DROP TABLE IF EXISTS uuid_pk_test`);
-      }
-    });
-
-    it("uuid primary key insert", async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS uuid_pk_test`);
-      await adapter.execute(`
-        CREATE TABLE uuid_pk_test (
-          id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-          name text
-        )
-      `);
-      try {
-        const uuid = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
-        await adapter.execQuery(`INSERT INTO uuid_pk_test (id, name) VALUES ($1, $2)`, "SQL", [
-          uuid,
-          "test",
-        ]);
-        const rows = await adapter.execute(`SELECT id FROM uuid_pk_test`);
-        expect(rows[0].id).toBe(uuid);
-      } finally {
-        await adapter.execute(`DROP TABLE IF EXISTS uuid_pk_test`);
-      }
-    });
-
-    it("uuid pk with auto populate", async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS uuid_pk_test`);
-      await adapter.execute(`
-        CREATE TABLE uuid_pk_test (
-          id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-          name text
-        )
-      `);
-      try {
-        await adapter.execQuery(`INSERT INTO uuid_pk_test (name) VALUES ($1)`, "SQL", ["auto"]);
-        const rows = await adapter.execute(`SELECT id, name FROM uuid_pk_test`);
-        expect(rows[0].name).toBe("auto");
-        expect(ACCEPTABLE_UUID.test(rows[0].id as string)).toBe(true);
-      } finally {
-        await adapter.execute(`DROP TABLE IF EXISTS uuid_pk_test`);
-      }
-    });
-
-    it("uuid pk create", async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS uuid_pk_test`);
-      await adapter.execute(`
-        CREATE TABLE uuid_pk_test (
-          id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-          name text
-        )
-      `);
-      try {
-        await adapter.execQuery(`INSERT INTO uuid_pk_test (name) VALUES ($1)`, "SQL", ["created"]);
-        const rows = await adapter.execute(`SELECT * FROM uuid_pk_test`);
-        expect(rows).toHaveLength(1);
-        expect(ACCEPTABLE_UUID.test(rows[0].id as string)).toBe(true);
-      } finally {
-        await adapter.execute(`DROP TABLE IF EXISTS uuid_pk_test`);
-      }
-    });
-
-    it("uuid pk find", async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS uuid_pk_test`);
-      await adapter.execute(`
-        CREATE TABLE uuid_pk_test (
-          id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-          name text
-        )
-      `);
-      try {
-        await adapter.execQuery(`INSERT INTO uuid_pk_test (name) VALUES ($1)`, "SQL", ["findme"]);
-        const inserted = await adapter.execute(`SELECT id FROM uuid_pk_test`);
-        const id = inserted[0].id;
-        const rows = (
-          await adapter.execQuery(`SELECT * FROM uuid_pk_test WHERE id = $1`, "SQL", [id])
-        ).toArray();
-        expect(rows).toHaveLength(1);
-        expect(rows[0].name).toBe("findme");
-      } finally {
-        await adapter.execute(`DROP TABLE IF EXISTS uuid_pk_test`);
-      }
-    });
-
-    it("uuid schema dump", async () => {
-      const output = await dumpTableSchema(adapter, "uuid_data_type");
-      expect(output).toContain("uuid_data_type");
-      expect(output).toMatch(/t\.uuid\("guid"/);
-    });
-    it("uuid gen random uuid", async () => {
-      const rows = await adapter.execute(`SELECT gen_random_uuid() AS uuid`);
-      expect(ACCEPTABLE_UUID.test(rows[0].uuid as string)).toBe(true);
-    });
-
-    it("uuid gen random uuid default", async () => {
-      await adapter.execQuery(`INSERT INTO uuid_data_type (other_guid) VALUES ($1)`, "SQL", [
-        "b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
-      ]);
-      const rows = await adapter.execute(`SELECT guid FROM uuid_data_type`);
-      expect(ACCEPTABLE_UUID.test(rows[0].guid as string)).toBe(true);
-    });
-
-    it("uuid invalid", async () => {
-      expect(ACCEPTABLE_UUID.test("not-a-uuid")).toBe(false);
-      expect(new Uuid().cast("not-a-uuid")).toBeNull();
-    });
-
-    it("uuid nil", async () => {
-      await adapter.execute(`INSERT INTO uuid_data_type (guid) VALUES (NULL)`);
-      const rows = await adapter.execute(`SELECT guid FROM uuid_data_type`);
-      expect(rows[0].guid).toBeNull();
-    });
-
-    it("uuid blank", async () => {
-      expect(new Uuid().cast("")).toBeNull();
-      expect(new Uuid().cast("   ")).toBeNull();
-    });
-
-    it("uuid uniqueness", async () => {
-      const uuid = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
-      await adapter.execute(`DROP TABLE IF EXISTS uuid_unique_test`);
-      await adapter.execute(`
-        CREATE TABLE uuid_unique_test (
-          id serial primary key,
-          guid uuid UNIQUE
-        )
-      `);
-      try {
-        await adapter.execQuery(`INSERT INTO uuid_unique_test (guid) VALUES ($1)`, "SQL", [uuid]);
-        await expect(
-          adapter
-            .execQuery(`INSERT INTO uuid_unique_test (guid) VALUES ($1)`, "SQL", [uuid])
-            .then((r) => r.toArray()),
-        ).rejects.toThrow();
-      } finally {
-        await adapter.execute(`DROP TABLE IF EXISTS uuid_unique_test`);
-      }
-    });
-
-    it("uuid array", async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS uuid_array_test`);
-      await adapter.execute(`
-        CREATE TABLE uuid_array_test (
-          id serial primary key,
-          guids uuid[]
-        )
-      `);
-      try {
-        const uuid1 = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
-        const uuid2 = "b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
-        await adapter.execQuery(`INSERT INTO uuid_array_test (guids) VALUES ($1)`, "SQL", [
-          `{${uuid1},${uuid2}}`,
-        ]);
-        const rows = await adapter.execute(`SELECT guids FROM uuid_array_test`);
-        const guids = rows[0].guids as string[];
-        expect(guids).toHaveLength(2);
-        expect(guids).toContain(uuid1);
-        expect(guids).toContain(uuid2);
-      } finally {
-        await adapter.execute(`DROP TABLE IF EXISTS uuid_array_test`);
-      }
-    });
-
-    it("uuid in relation", async () => {
-      const uuid1 = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
-      const uuid2 = "b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
-      await adapter.execQuery(`INSERT INTO uuid_data_type (guid) VALUES ($1)`, "SQL", [uuid1]);
-      await adapter.execQuery(`INSERT INTO uuid_data_type (guid) VALUES ($1)`, "SQL", [uuid2]);
-      const rows = (
-        await adapter.execQuery(
-          `SELECT guid FROM uuid_data_type WHERE guid IN ($1, $2) ORDER BY guid`,
-          "SQL",
-          [uuid1, uuid2],
-        )
-      ).toArray();
-      expect(rows).toHaveLength(2);
-    });
-
-    it("uuid association", async () => {
-      const { registerModel } = await import("../../index.js");
-      await adapter.execute(`DROP TABLE IF EXISTS uuid_assoc_comments`);
-      await adapter.execute(`DROP TABLE IF EXISTS uuid_assoc_posts`);
-      await adapter.execute(`
-        CREATE TABLE uuid_assoc_posts (
-          id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-          title text
-        )
-      `);
-      await adapter.execute(`
-        CREATE TABLE uuid_assoc_comments (
-          id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-          uuid_assoc_post_id uuid REFERENCES uuid_assoc_posts(id),
-          body text
-        )
-      `);
-      try {
-        class UuidAssocPost extends Base {
-          static tableName = "uuid_assoc_posts";
-          static {
-            this.attribute("id", "uuid");
-            this.hasMany("uuidAssocComments", {
-              className: "UuidAssocComment",
-              foreignKey: "uuid_assoc_post_id",
-            });
-          }
-        }
-        class UuidAssocComment extends Base {
-          static tableName = "uuid_assoc_comments";
-          static {
-            this.attribute("id", "uuid");
-            this.belongsTo("uuidAssocPost", {
-              className: "UuidAssocPost",
-              foreignKey: "uuid_assoc_post_id",
-            });
-          }
-        }
-        registerModel("UuidAssocPost", UuidAssocPost);
-        registerModel("UuidAssocComment", UuidAssocComment);
-        await UuidAssocPost.loadSchema();
-        await UuidAssocComment.loadSchema();
-
-        const post = await UuidAssocPost.createBang({});
-        expect(ACCEPTABLE_UUID.test(post.id as string)).toBe(true);
-
-        const comment = await (post as any).uuidAssocComments.createBang({ body: "hello" });
-        expect(ACCEPTABLE_UUID.test(comment.id as string)).toBe(true);
-        expect(comment.uuid_assoc_post_id).toBe(post.id);
-
-        const found = await (post as any).uuidAssocComments.find(comment.id);
-        expect(found.id).toBe(comment.id);
-      } finally {
-        await adapter.execute(`DROP TABLE IF EXISTS uuid_assoc_comments`);
-        await adapter.execute(`DROP TABLE IF EXISTS uuid_assoc_posts`);
-      }
-    });
-
-    it("uuid foreign key", async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS uuid_fk_child`);
-      await adapter.execute(`DROP TABLE IF EXISTS uuid_fk_parent`);
-      await adapter.execute(`
-        CREATE TABLE uuid_fk_parent (
-          id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-          name text
-        )
-      `);
-      await adapter.execute(`
-        CREATE TABLE uuid_fk_child (
-          id serial primary key,
-          parent_id uuid REFERENCES uuid_fk_parent(id)
-        )
-      `);
-      try {
-        await adapter.execQuery(`INSERT INTO uuid_fk_parent (name) VALUES ($1)`, "SQL", ["parent"]);
-        const parents = await adapter.execute(`SELECT id FROM uuid_fk_parent`);
-        const parentId = parents[0].id;
-        await adapter.execQuery(`INSERT INTO uuid_fk_child (parent_id) VALUES ($1)`, "SQL", [
-          parentId,
-        ]);
-        const children = (
-          await adapter.execQuery(`SELECT * FROM uuid_fk_child WHERE parent_id = $1`, "SQL", [
-            parentId,
-          ])
-        ).toArray();
-        expect(children).toHaveLength(1);
-      } finally {
-        await adapter.execute(`DROP TABLE IF EXISTS uuid_fk_child`);
-        await adapter.execute(`DROP TABLE IF EXISTS uuid_fk_parent`);
-      }
-    });
-
-    it("uuid index", async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS uuid_index_test`);
-      await adapter.execute(`
-        CREATE TABLE uuid_index_test (
-          id serial primary key,
-          guid uuid
-        )
-      `);
-      await adapter.execute(`CREATE INDEX idx_uuid_test ON uuid_index_test (guid)`);
-      try {
-        const rows = await adapter.execute(`
-          SELECT indexname FROM pg_indexes
-          WHERE tablename = 'uuid_index_test' AND indexname = 'idx_uuid_test'
-        `);
-        expect(rows).toHaveLength(1);
-      } finally {
-        await adapter.execute(`DROP TABLE IF EXISTS uuid_index_test`);
-      }
-    });
-
-    it("uuid change column", async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS uuid_change_test`);
-      await adapter.execute(`
-        CREATE TABLE uuid_change_test (
-          id serial primary key,
-          guid text
-        )
-      `);
-      try {
-        await adapter.execute(
-          `ALTER TABLE uuid_change_test ALTER COLUMN guid TYPE uuid USING guid::uuid`,
-        );
-        const rows = await adapter.execute(`
-          SELECT data_type FROM information_schema.columns
-          WHERE table_name = 'uuid_change_test' AND column_name = 'guid'
-        `);
-        expect(rows[0].data_type).toBe("uuid");
-      } finally {
-        await adapter.execute(`DROP TABLE IF EXISTS uuid_change_test`);
-      }
-    });
-
-    it("uuid remove column", async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS uuid_remove_test`);
-      await adapter.execute(`
-        CREATE TABLE uuid_remove_test (
-          id serial primary key,
-          guid uuid,
-          name text
-        )
-      `);
-      try {
-        await adapter.execute(`ALTER TABLE uuid_remove_test DROP COLUMN guid`);
-        const rows = await adapter.execute(`
-          SELECT column_name FROM information_schema.columns
-          WHERE table_name = 'uuid_remove_test'
-        `);
-        const columns = rows.map((r) => r.column_name);
-        expect(columns).not.toContain("guid");
-        expect(columns).toContain("name");
-      } finally {
-        await adapter.execute(`DROP TABLE IF EXISTS uuid_remove_test`);
-      }
+    afterEach(async () => {
+      void UUIDType.resetColumnInformation();
+      await adapter.dropTable("uuid_data_type", { ifExists: true });
     });
 
     itIfSupports("pgcrypto_uuid", "uuid column default", async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS uuid_column_default_test`);
-      await adapter.execute(`
-        CREATE TABLE uuid_column_default_test (
-          id serial primary key,
-          guid uuid DEFAULT gen_random_uuid()
-        )
-      `);
-      try {
-        const cols = (await adapter.columns("uuid_column_default_test")) as {
-          name: string;
-          defaultFunction?: string;
-        }[];
-        const column = cols.find((c) => c.name === "guid");
-        expect(column!.defaultFunction).toBe("gen_random_uuid()");
-      } finally {
-        await adapter.execute(`DROP TABLE IF EXISTS uuid_column_default_test`);
-      }
+      await adapter.addColumn("uuid_data_type", "thingy", "uuid", {
+        null: false,
+        default: "gen_random_uuid()",
+      });
+      void UUIDType.resetColumnInformation();
+      await UUIDType.loadSchema();
+      const column = UUIDType.columnsHash()["thingy"] as unknown as PgColumn;
+      expect(column.defaultFunction).toBe("gen_random_uuid()");
     });
 
     it("change column default", async () => {
@@ -653,6 +205,11 @@ describeIfPg("PostgreSQLAdapter", () => {
       });
     });
 
+    it("schema dump with shorthand", async () => {
+      const output = await dumpTableSchema(adapter, "uuid_data_type");
+      expect(output).toMatch(/t\.uuid\("guid"/);
+    });
+
     it("uniqueness validation ignores uuid", async () => {
       class klass extends Base {
         declare guid: string | null;
@@ -683,12 +240,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     }
 
-    let supportsPgcryptoUuid: boolean;
-    const uuidFunction = () => (supportsPgcryptoUuid ? "gen_random_uuid()" : "uuid_generate_v4()");
-    const uuidDefault = () => (supportsPgcryptoUuid ? {} : { default: uuidFunction() });
-
     beforeEach(async () => {
-      supportsPgcryptoUuid = await adapter.supportsPgcryptoUuid();
       await adapter.createTable("pg_uuids", { id: "uuid", default: "uuid_generate_v1()" }, (t) => {
         t.string("name");
         t.uuid("other_uuid", { default: "uuid_generate_v4()" });
@@ -776,256 +328,183 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
-    it("createTable round-trips uuid PK default", async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS pg_uuids_rt`);
-      try {
-        await adapter.createTable("pg_uuids_rt", {
-          id: "uuid",
-          default: () => "gen_random_uuid()",
-          force: "cascade",
-        });
-        const rows = await adapter.execute(
-          `SELECT column_default FROM information_schema.columns
-           WHERE table_name = 'pg_uuids_rt' AND column_name = 'id'`,
-        );
-        expect(rows[0].column_default).toMatch(/gen_random_uuid/);
-      } finally {
-        await adapter.dropTable("pg_uuids_rt", { ifExists: true });
-      }
-    });
-
     it.skip("schema dumper for uuid primary key default in legacy migration", () => {});
   });
 
   describe("PostgreSQLUUIDTestNilDefault", () => {
+    beforeEach(async () => {
+      await adapter.createTable("pg_uuids", { id: false }, (t) => {
+        t.primaryKey("id", "uuid", { default: null });
+        t.string("name");
+      });
+    });
+
+    afterEach(async () => {
+      await adapter.dropTable("pg_uuids", { ifExists: true });
+    });
+
     it("id allows default override via nil", async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS uuid_nil_default_test`);
-      await adapter.execute(`
-        CREATE TABLE uuid_nil_default_test (
-          id uuid PRIMARY KEY,
-          name text
-        )
-      `);
-      try {
-        const rows = await adapter.execute(`
-          SELECT column_default FROM information_schema.columns
-          WHERE table_name = 'uuid_nil_default_test' AND column_name = 'id'
-        `);
-        expect(rows[0].column_default).toBeNull();
-      } finally {
-        await adapter.execute(`DROP TABLE IF EXISTS uuid_nil_default_test`);
-      }
+      const colDesc = (
+        await adapter.execute(`SELECT pg_get_expr(d.adbin, d.adrelid) as default
+                                  FROM pg_attribute a
+                                  LEFT JOIN pg_attrdef d ON a.attrelid = d.adrelid AND a.attnum = d.adnum
+                                  WHERE a.attname='id' AND a.attrelid = 'pg_uuids'::regclass`)
+      )[0];
+      expect(colDesc["default"]).toBeNull();
     });
 
     it("schema dumper for uuid primary key with default override via nil", async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS pg_uuids_nil`);
-      await adapter.execute(`
-        CREATE TABLE pg_uuids_nil (
-          id uuid PRIMARY KEY,
-          name text
-        )
-      `);
-      try {
-        const output = await dumpTableSchema(adapter, "pg_uuids_nil");
-        expect(output).toMatch(/createTable\("pg_uuids_nil".*id: "uuid".*default: null/);
-      } finally {
-        await adapter.execute(`DROP TABLE IF EXISTS pg_uuids_nil`);
-      }
+      const schema = await dumpTableSchema(adapter, "pg_uuids");
+      expect(schema).toMatch(/\bcreateTable\("pg_uuids", \{ id: "uuid", default: null/);
     });
 
     it.skip("schema dumper for uuid primary key with default nil in legacy migration", () => {});
   });
 
   describe("PostgreSQLUUIDTestInverseOf", () => {
-    let UuidPost: any;
+    class UuidPost extends Base {
+      static {
+        this.tableName = "pg_uuid_posts";
+        this.hasMany("uuidComments", { className: "UuidCommentInverse", inverseOf: "uuidPost" });
+      }
+    }
+    class UuidComment extends Base {
+      static {
+        this.tableName = "pg_uuid_comments";
+        this.belongsTo("uuidPost", { className: "UuidPostInverse" });
+      }
+    }
+    registerModel("UuidPostInverse", UuidPost);
+    registerModel("UuidCommentInverse", UuidComment);
 
     beforeEach(async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS pg_uuid_comments`);
-      await adapter.execute(`DROP TABLE IF EXISTS pg_uuid_posts`);
-      await adapter.execute(`
-        CREATE TABLE pg_uuid_posts (
-          id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-          title text
-        )
-      `);
-      await adapter.execute(`
-        CREATE TABLE pg_uuid_comments (
-          id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-          uuid_post_id uuid REFERENCES pg_uuid_posts(id),
-          content text
-        )
-      `);
-      const { registerModel } = await import("../../index.js");
-      class UuidPostCls extends Base {
-        static tableName = "pg_uuid_posts";
-        static {
-          this.attribute("id", "uuid");
-          this.hasMany("uuidComments", {
-            className: "UuidCommentInverse",
-            foreignKey: "uuid_post_id",
-            inverseOf: "uuidPost",
-          });
-        }
-      }
-      class UuidCommentCls extends Base {
-        static tableName = "pg_uuid_comments";
-        static {
-          this.attribute("id", "uuid");
-          this.belongsTo("uuidPost", {
-            className: "UuidPostInverse",
-            foreignKey: "uuid_post_id",
-          });
-        }
-      }
-      registerModel("UuidPostInverse", UuidPostCls);
-      registerModel("UuidCommentInverse", UuidCommentCls);
-      await UuidPostCls.loadSchema();
-      await UuidCommentCls.loadSchema();
-      UuidPost = UuidPostCls;
+      await adapter.transaction(async () => {
+        await adapter.createTable("pg_uuid_posts", { id: "uuid", ...uuidDefault() }, (t) => {
+          t.string("title");
+        });
+        await adapter.createTable("pg_uuid_comments", { id: "uuid", ...uuidDefault() }, (t) => {
+          t.references("uuid_post", { type: "uuid" });
+          t.string("content");
+        });
+      });
+      void UuidPost.resetColumnInformation();
+      void UuidComment.resetColumnInformation();
+      await UuidPost.loadSchema();
+      await UuidComment.loadSchema();
     });
 
     afterEach(async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS pg_uuid_comments`);
-      await adapter.execute(`DROP TABLE IF EXISTS pg_uuid_posts`);
+      await adapter.dropTable("pg_uuid_comments", "pg_uuid_posts", { ifExists: true });
     });
 
     it("collection association with uuid", async () => {
-      const post = await UuidPost.createBang({});
-      const comment = await post.uuidComments.createBang({});
+      const post = (await UuidPost.createBang()) as any;
+      const comment = await post.uuidComments.createBang();
       assert(await post.uuidComments.find(comment.id));
     });
 
     it("find with uuid", async () => {
-      await UuidPost.createBang({});
+      await UuidPost.createBang();
       await assertRaises([RecordNotFound], {}, async () => {
         await UuidPost.find(123456);
       });
     });
 
     it("find by with uuid", async () => {
-      await UuidPost.createBang({});
-      const result = await UuidPost.findBy({ id: 789 });
-      expect(result).toBeNull();
+      await UuidPost.createBang();
+      expect(await UuidPost.findBy({ id: 789 })).toBeNull();
     });
   });
 
   describe("PostgreSQLUUIDHasManyThroughDisableJoinsTest", () => {
-    let UuidForum: any;
+    class UuidForum extends Base {
+      static {
+        this.tableName = "pg_uuid_forums";
+        this.hasMany("uuidPosts", (rel: any) => rel.order("title DESC"), {
+          className: "UuidPostDj",
+        });
+        this.hasMany("uuidComments", { className: "UuidCommentDj", through: "uuidPosts" });
+        this.hasMany("uuidCommentsWithoutJoins", {
+          className: "UuidCommentDj",
+          through: "uuidPosts",
+          source: "uuidComments",
+          disableJoins: true,
+        });
+      }
+    }
+    class UuidPost extends Base {
+      static {
+        this.tableName = "pg_uuid_posts";
+        this.belongsTo("uuidForum", { className: "UuidForumDj" });
+        this.hasMany("uuidComments", { className: "UuidCommentDj" });
+      }
+    }
+    class UuidComment extends Base {
+      static {
+        this.tableName = "pg_uuid_comments";
+        this.belongsTo("uuidPost", { className: "UuidPostDj" });
+        this.hasOne("uuidForum", { className: "UuidForumDj", through: "uuidPost" });
+        this.hasOne("uuidForumWithoutJoins", {
+          className: "UuidForumDj",
+          through: "uuidPost",
+          source: "uuidForum",
+          disableJoins: true,
+        });
+      }
+    }
+    registerModel("UuidForumDj", UuidForum);
+    registerModel("UuidPostDj", UuidPost);
+    registerModel("UuidCommentDj", UuidComment);
 
     beforeEach(async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS pg_uuid_dj_comments`);
-      await adapter.execute(`DROP TABLE IF EXISTS pg_uuid_dj_posts`);
-      await adapter.execute(`DROP TABLE IF EXISTS pg_uuid_dj_forums`);
-      await adapter.execute(`
-        CREATE TABLE pg_uuid_dj_forums (
-          id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-          name text
-        )
-      `);
-      await adapter.execute(`
-        CREATE TABLE pg_uuid_dj_posts (
-          id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-          uuid_forum_id uuid REFERENCES pg_uuid_dj_forums(id),
-          title text
-        )
-      `);
-      await adapter.execute(`
-        CREATE TABLE pg_uuid_dj_comments (
-          id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-          uuid_post_id uuid REFERENCES pg_uuid_dj_posts(id),
-          content text
-        )
-      `);
-      class UuidForumCls extends Base {
-        static tableName = "pg_uuid_dj_forums";
-        static {
-          this.attribute("id", "uuid");
-          this.hasMany("uuidPosts", (rel: any) => rel.order("title DESC"), {
-            className: "UuidPostDj",
-            foreignKey: "uuid_forum_id",
-          });
-          this.hasMany("uuidComments", {
-            className: "UuidCommentDj",
-            through: "uuidPosts",
-            source: "uuidComments",
-          });
-          this.hasMany("uuidCommentsWithoutJoins", {
-            className: "UuidCommentDj",
-            through: "uuidPosts",
-            source: "uuidComments",
-            disableJoins: true,
-          });
-        }
+      await adapter.transaction(async () => {
+        await adapter.createTable("pg_uuid_forums", { id: "uuid", ...uuidDefault() }, (t) => {
+          t.string("name");
+        });
+        await adapter.createTable("pg_uuid_posts", { id: "uuid", ...uuidDefault() }, (t) => {
+          t.references("uuid_forum", { type: "uuid" });
+          t.string("title");
+        });
+        await adapter.createTable("pg_uuid_comments", { id: "uuid", ...uuidDefault() }, (t) => {
+          t.references("uuid_post", { type: "uuid" });
+          t.string("content");
+        });
+      });
+      for (const klass of [UuidForum, UuidPost, UuidComment]) {
+        void klass.resetColumnInformation();
+        await klass.loadSchema();
       }
-      class UuidPostCls extends Base {
-        static tableName = "pg_uuid_dj_posts";
-        static {
-          this.attribute("id", "uuid");
-          this.belongsTo("uuidForum", {
-            className: "UuidForumDj",
-            foreignKey: "uuid_forum_id",
-          });
-          this.hasMany("uuidComments", {
-            className: "UuidCommentDj",
-            foreignKey: "uuid_post_id",
-          });
-        }
-      }
-      class UuidCommentCls extends Base {
-        static tableName = "pg_uuid_dj_comments";
-        static {
-          this.attribute("id", "uuid");
-          this.belongsTo("uuidPost", {
-            className: "UuidPostDj",
-            foreignKey: "uuid_post_id",
-          });
-          this.hasOne("uuidForum", {
-            className: "UuidForumDj",
-            through: "uuidPost",
-          });
-          this.hasOne("uuidForumWithoutJoins", {
-            className: "UuidForumDj",
-            through: "uuidPost",
-            source: "uuidForum",
-            disableJoins: true,
-          });
-        }
-      }
-      registerModel("UuidForumDj", UuidForumCls);
-      registerModel("UuidPostDj", UuidPostCls);
-      registerModel("UuidCommentDj", UuidCommentCls);
-      await UuidForumCls.loadSchema();
-      await UuidPostCls.loadSchema();
-      await UuidCommentCls.loadSchema();
-      UuidForum = UuidForumCls;
     });
 
     afterEach(async () => {
-      await adapter.execute(`DROP TABLE IF EXISTS pg_uuid_dj_comments`);
-      await adapter.execute(`DROP TABLE IF EXISTS pg_uuid_dj_posts`);
-      await adapter.execute(`DROP TABLE IF EXISTS pg_uuid_dj_forums`);
+      await adapter.dropTable("pg_uuid_comments", "pg_uuid_posts", "pg_uuid_forums", {
+        ifExists: true,
+      });
     });
 
     it("uuid primary key and disable joins with delegate cache", async () => {
-      const forum = await UuidForum.createBang({});
-      const post1 = await forum.uuidPosts.createBang({});
-      const comment11 = await post1.uuidComments.createBang({});
-      const comment12 = await post1.uuidComments.createBang({});
-      const post2 = await forum.uuidPosts.createBang({});
-      const comment21 = await post2.uuidComments.createBang({});
-      const comment22 = await post2.uuidComments.createBang({});
-      const comment23 = await post2.uuidComments.createBang({});
+      const uuidForum = (await UuidForum.createBang()) as any;
+      const uuidPost1 = await uuidForum.uuidPosts.createBang();
+      const uuidComment11 = await uuidPost1.uuidComments.createBang();
+      const uuidComment12 = await uuidPost1.uuidComments.createBang();
+      const uuidPost2 = await uuidForum.uuidPosts.createBang();
+      const uuidComment21 = await uuidPost2.uuidComments.createBang();
+      const uuidComment22 = await uuidPost2.uuidComments.createBang();
+      const uuidComment23 = await uuidPost2.uuidComments.createBang();
 
-      const noJoins = await forum.uuidCommentsWithoutJoins.order("id").toArray();
-      const actual = noJoins.map((c: any) => c.id).sort();
-      const expected = [
-        comment11.id,
-        comment12.id,
-        comment21.id,
-        comment22.id,
-        comment23.id,
-      ].sort();
-      expect(actual).toEqual(expected);
+      expect(
+        (await uuidForum.uuidCommentsWithoutJoins.order("id").toArray())
+          .map((c: any) => c.id)
+          .sort(),
+      ).toEqual(
+        [
+          uuidComment11.id,
+          uuidComment12.id,
+          uuidComment21.id,
+          uuidComment22.id,
+          uuidComment23.id,
+        ].sort(),
+      );
     });
   });
 });
