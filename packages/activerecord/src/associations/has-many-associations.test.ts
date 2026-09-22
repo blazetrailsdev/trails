@@ -11,6 +11,7 @@ import {
   registerSubclass,
   RecordNotFound,
   RecordNotSaved,
+  RecordInvalid,
   AssociationTypeMismatch,
   ReadOnlyRecord,
   HasManyThroughCantAssociateThroughHasOneOrManyReflection,
@@ -145,7 +146,7 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
   it("custom primary key on new record should fetch with query", async () => {
     const subscriber = new HmSubscriber({ nick: "webster132" });
     const subscriptions = association(subscriber, "subscriptions");
-    expect(subscriptions.loaded).toBe(false);
+    expect(subscriptions.loaded).toBeFalsy();
 
     await assertQueriesCount(1, false, async () => {
       expect(await subscriptions.size()).toBe(2);
@@ -159,7 +160,7 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
   it("association primary key on new record should fetch with query", async () => {
     const author = new HmAuthor({ name: "David" });
     const essays = association(author, "essays");
-    expect(essays.loaded).toBe(false);
+    expect(essays.loaded).toBeFalsy();
 
     await assertQueriesCount(1, false, async () => {
       expect(await essays.size()).toBe(1);
@@ -189,7 +190,7 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
   it("blank custom primary key on new record should not run queries", async () => {
     const author = new HmAuthor();
     const essays = association(author, "essays");
-    expect(essays.loaded).toBe(false);
+    expect(essays.loaded).toBeFalsy();
 
     await assertQueriesCount(0, false, async () => {
       expect(await essays.size()).toBe(0);
@@ -313,26 +314,20 @@ describe("HasManyAssociationsTest", () => {
 
   it("create with bang on has many when parent is new raises", async () => {
     const firm = new HmFirm();
-    let error: any;
-    try {
+    const error = (await assertRaise([RecordNotSaved], {}, async () => {
       await (firm as any).plainClients.createBang({ name: "Whoever" });
-    } catch (e) {
-      error = e;
-    }
-    expect(error).toBeInstanceOf(RecordNotSaved);
+    })) as any;
+
     expect(error.message).toBe("You cannot call create unless the parent is saved");
     expect(error.record).toBe(firm);
   });
 
   it("regular create on has many when parent is new raises", async () => {
     const firm = new HmFirm();
-    let error: any;
-    try {
+    const error = (await assertRaise([RecordNotSaved], {}, async () => {
       await (firm as any).plainClients.create({ name: "Whoever" });
-    } catch (e) {
-      error = e;
-    }
-    expect(error).toBeInstanceOf(RecordNotSaved);
+    })) as any;
+
     expect(error.message).toBe("You cannot call create unless the parent is saved");
     expect(error.record).toBe(firm);
   });
@@ -865,11 +860,11 @@ describe("HasManyAssociationsTest", () => {
     expect(client).toBeInstanceOf(Client);
 
     const clientAry = (await firm.clients.find([2])) as any[];
-    expect(Array.isArray(clientAry)).toBe(true);
+    expect(clientAry).toBeInstanceOf(Array);
     expect(clientAry[0].id).toBe(client.id);
 
     const clientAry2 = (await firm.clients.find(2, 3)) as any[];
-    expect(Array.isArray(clientAry2)).toBe(true);
+    expect(clientAry2).toBeInstanceOf(Array);
     expect(clientAry2.length).toBe(2);
     expect(clientAry2[0].id).toBe(client.id);
 
@@ -2420,20 +2415,17 @@ describe("HasManyAssociationsTest", () => {
     expect((await (posts("welcome") as any).comments.select(() => true)).length).toBe(3);
   });
   it("create with bang on has many raises when record not saved", async () => {
-    const author = HmAuthor.new({ name: "Unsaved" });
-    expect(author.isNewRecord()).toBe(true);
-    const post = HmPost.new({ author_id: author.id, title: "Test" });
-    expect((post as any).author_id).toBeNull();
+    await assertRaise([RecordInvalid], {}, async () => {
+      const firm = (await HmFirm.first()) as any;
+      await firm.plainClients.createBang();
+    });
   });
   it("create with bang on habtm when parent is new raises", async () => {
     const developer = Developer.new({ name: "Aredridel" });
-    let error: any;
-    try {
+    const error = (await assertRaise([RecordNotSaved], {}, async () => {
       await association(developer, "projects").createBang({});
-    } catch (e) {
-      error = e;
-    }
-    expect(error).toBeInstanceOf(RecordNotSaved);
+    })) as any;
+
     expect(error.message).toBe("You cannot call create unless the parent is saved");
     expect(error.record).toBe(developer);
   });
@@ -2483,104 +2475,27 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("destroy all on association clears scope", async () => {
-    class DestroyAllScopeAuthor extends Base {
-      declare name: string | null;
-      declare destroy_all_scope_posts: AssociationProxy<DestroyAllScopePost>;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("destroy_all_scope_posts", {
-          className: "DestroyAllScopePost",
-          foreignKey: "author_id",
-          dependent: "destroy",
-        });
-      }
-    }
-    class DestroyAllScopePost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(DestroyAllScopeAuthor);
-    registerModel(DestroyAllScopePost);
-    const author = await DestroyAllScopeAuthor.create({ name: "Alice" });
-    await DestroyAllScopePost.create({ author_id: author.id, title: "A", body: "body" });
-    await DestroyAllScopePost.create({ author_id: author.id, title: "B", body: "body" });
-    await author.destroy();
-    const remaining = await author.destroy_all_scope_posts;
-    expect(remaining.length).toBe(0);
+    const author = await HmAuthor.createBang({ name: "Gannon" });
+    const posts = (author as any).posts;
+    await posts.createBang({ title: "test", body: "body" });
+    await posts.destroyAll();
+    expect(await posts.first()).toBeNull();
   });
 
   it("destroy on association clears scope", async () => {
-    class DestroyScopeAuthor extends Base {
-      declare destroy_scope_posts: AssociationProxy<DestroyScopePost>;
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("destroy_scope_posts", {
-          className: "DestroyScopePost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class DestroyScopePost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(DestroyScopeAuthor);
-    registerModel(DestroyScopePost);
-    const author = await DestroyScopeAuthor.create({ name: "Alice" });
-    const post = await DestroyScopePost.create({ author_id: author.id, title: "A", body: "body" });
-    await post.destroy();
-    const remaining = await author.destroy_scope_posts;
-    expect(remaining.length).toBe(0);
+    const author = await HmAuthor.createBang({ name: "Gannon" });
+    const posts = (author as any).posts;
+    const post = await posts.createBang({ title: "test", body: "body" });
+    await posts.destroy(post);
+    expect(await posts.first()).toBeNull();
   });
 
   it("delete on association clears scope", async () => {
-    class DeleteScopeAuthor extends Base {
-      declare delete_scope_posts: AssociationProxy<DeleteScopePost>;
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("delete_scope_posts", {
-          className: "DeleteScopePost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class DeleteScopePost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(DeleteScopeAuthor);
-    registerModel(DeleteScopePost);
-    const author = await DeleteScopeAuthor.create({ name: "Alice" });
-    const post = await DeleteScopePost.create({ author_id: author.id, title: "A", body: "body" });
-    await DeleteScopePost.destroy(post.id!);
-    const remaining = await author.delete_scope_posts;
-    expect(remaining.length).toBe(0);
+    const author = await HmAuthor.createBang({ name: "Gannon" });
+    const posts = (author as any).posts;
+    const post = await posts.createBang({ title: "test", body: "body" });
+    await posts.delete(post);
+    expect(await posts.first()).toBeNull();
   });
   it("dependence for associations with hash condition", async () => {
     const david = authors("david") as any;
@@ -3048,7 +2963,7 @@ describe("HasManyAssociationsTest", () => {
       expect(client).toBeInstanceOf(Client);
 
       const clientAry = await firm.clientsOfFirm.find([3]);
-      expect(Array.isArray(clientAry)).toBe(true);
+      expect(clientAry).toBeInstanceOf(Array);
       expect(clientAry[0]).toEqual(client);
     });
 
