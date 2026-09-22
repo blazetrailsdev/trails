@@ -352,14 +352,7 @@ export class TestFixtures {
 
           if (!this._fixtureConnectionPools.includes(pool)) {
             this._fixtureConnectionPools.push(pool);
-            this._pendingPins.push(
-              pool.leaseConnection().then((connection) =>
-                connection.lock.synchronize(async () => {
-                  await pool.pinConnectionBang(this.lockThreads);
-                  await pool.leaseConnection();
-                }),
-              ),
-            );
+            deferConnectionPoolPin.call(this, pool);
           }
         }
       }
@@ -370,7 +363,7 @@ export class TestFixtures {
   async teardownTransactionalFixtures(): Promise<void> {
     if (this._connectionSubscriber) Notifications.unsubscribe(this._connectionSubscriber);
 
-    const pinResults = await Promise.allSettled(this._pendingPins);
+    const pinFailure = await settlePendingPins.call(this);
     const unpinned = await Promise.all(
       this._fixtureConnectionPools.map((pool) => pool.unpinConnectionBang()),
     );
@@ -380,8 +373,7 @@ export class TestFixtures {
     await unpinFixtureAdapters.call(this);
     this._fixtureConnectionPools = [];
     this.teardownSharedConnectionPool();
-    const failed = pinResults.find((r) => r.status === "rejected");
-    if (failed) throw failed.reason;
+    if (pinFailure) throw pinFailure.reason;
   }
 
   /** @internal */
@@ -481,6 +473,25 @@ export class TestFixtures {
 
     return returnSingleRecord ? instances[0] : instances;
   }
+}
+
+/** @noRailsEquivalent PERMANENT */
+function deferConnectionPoolPin(this: TestFixtures, pool: ConnectionPool): void {
+  this._pendingPins.push(
+    pool.leaseConnection().then((connection) =>
+      connection.lock.synchronize(async () => {
+        await pool.pinConnectionBang(this.lockThreads);
+        await pool.leaseConnection();
+      }),
+    ),
+  );
+}
+
+/** @noRailsEquivalent PERMANENT */
+async function settlePendingPins(this: TestFixtures): Promise<PromiseRejectedResult | undefined> {
+  const pinResults = await Promise.allSettled(this._pendingPins);
+  this._pendingPins = [];
+  return pinResults.find((r): r is PromiseRejectedResult => r.status === "rejected");
 }
 
 /** @noRailsEquivalent CONVERGEABLE converge-with-transactional-fixtures-onto-test-fixtures-setup */
