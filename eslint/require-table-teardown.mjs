@@ -264,6 +264,13 @@
  * different receiver, a differing options object, a differing `await`, or a
  * dynamic/computed table name breaks the run (any contiguous sub-runs on either
  * side are still flagged independently).
+ *
+ * A bare-receiver `dropTable(name)` is never merged. It is a ported Rails test
+ * helper, not the adapter method: `PostgresqlUUIDHelper#drop_table(name)`
+ * (`activerecord/test/cases/adapters/postgresql/uuid_test.rb:11-13`) takes one
+ * name, and Rails' teardowns call it once per table (`:397-400`, `:460-464`).
+ * Merging the run would hand the helper arguments its signature has no place
+ * for, so a faithful port of that decomposition must pass as written.
  */
 
 import { calledName, staticString, SQL_SINKS } from "./sql-call-shapes.mjs";
@@ -941,8 +948,8 @@ function analyzeDropCall(stmt, sourceCode) {
   const callee = expr.callee;
   if (calledName(callee) !== "dropTable") return null;
 
-  const receiverText =
-    callee.type === "Identifier" ? "<<bare>>" : sourceCode.getText(callee.object);
+  if (callee.type === "Identifier") return null;
+  const receiverText = sourceCode.getText(callee.object);
 
   const args = expr.arguments;
   let optionsNode = null;
