@@ -550,6 +550,22 @@ describe("body call capture", () => {
     expect(helper.skeleton).toBeUndefined();
   });
 
+  it("marks a computed-member assignment, not a computed-member read", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        updateAttribute(name: string, value: unknown) {
+          (this as any)[name] = value;
+        }
+        read(name: string) {
+          return (this as any)[name];
+        }
+      }`,
+    );
+    const skeletonOf = (n: string) => cls.instanceMethods.find((m) => m.name === n)!.skeleton;
+    expect(skeletonOf("updateAttribute")).toContain("assign:computed");
+    expect(skeletonOf("read")).toEqual(["ref:get"]);
+  });
+
   it("emits an ordered control + call skeleton, with duplicates, alongside calls", () => {
     const cls = extractFromSource(
       `class Foo {

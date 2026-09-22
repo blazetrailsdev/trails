@@ -3003,6 +3003,7 @@ class ApiExtractor
     return unless node.is_a?(Array)
 
     kind = node[0]
+    tokens << "send:setter" if setter_send?(node)
     if SKELETON_IF_NODES.include?(kind)
       tokens << "if"
     elsif SKELETON_LOOP_NODES.include?(kind)
@@ -3062,6 +3063,37 @@ class ApiExtractor
 
     node.each { |child| walk_for_skeleton(child, tokens) if child.is_a?(Array) }
     note_capture_locals(node)
+  end
+
+  SETTER_SEND_NAMES = %w[send public_send __send__].freeze
+
+  # Is this node a `send` / `public_send` / `__send__` whose first argument is a
+  # string or dstring (or dsym) ending in `=` — a dispatch to a dynamically
+  # named SETTER, `public_send("#{name}=", value)` (`persistence.rb:533`)? The
+  # faithful port is a computed-member assignment with no callee at all, so the
+  # mark is read against the TS body's `assign:computed` token by
+  # report-setter-dispatch.ts rather than as a call name.
+  def setter_send?(node)
+    name, args =
+      case node[0]
+      when :method_add_arg
+        callee = node[1].is_a?(Array) ? node[1] : []
+        ident = callee[0] == :fcall ? callee[1] : (callee[0] == :call ? callee[3] : nil)
+        [ident.is_a?(Array) ? ident_name(ident) : nil, node[2]]
+      when :command then [ident_name(node[1]), node[2]]
+      when :command_call then [node[3] ? ident_name(node[3]) : nil, node[4]]
+      else [nil, nil]
+      end
+    return false unless SETTER_SEND_NAMES.include?(name)
+
+    args = args[1] if args.is_a?(Array) && args[0] == :arg_paren
+    return false unless args.is_a?(Array) && args[0] == :args_add_block && args[1].is_a?(Array)
+
+    first = args[1][0]
+    return false unless first.is_a?(Array) && %i[string_literal dyna_symbol].include?(first[0])
+
+    last = first[1].is_a?(Array) ? first[1].last : nil
+    last.is_a?(Array) && last[0] == :@tstring_content && last[1].end_with?("=")
   end
 
   # Ripper wraps an op-assign operator in an `:op` node on newer parsers and

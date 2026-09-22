@@ -172,6 +172,8 @@ import {
   requiresNegatedAlias,
   skeletonIdiomLowering,
 } from "./enumerable-idioms.js";
+import { isSetterDispatchPortedAsDirectWrite } from "./setter-dispatch.js";
+import { isStdlibMixinGap, stdlibMixinRows } from "./stdlib-mixin-surface.js";
 
 // `super` is captured by both extractors (extract-ruby-api.rb records
 // super/zsuper; extract-ts-api.ts records a bare super(...) callee) and
@@ -310,6 +312,16 @@ import {
 // danger case this note warns about and stays flagged under every mechanism
 // above, by construction — never provably a Hash or a split/scan chain. The
 // unconverged rows still go to the reason-text route, not to a mechanism.
+/**
+ * `send` / `public_send` / `__send__` stay OUT of this set and of the call-name
+ * comparison: they map to no TS candidate, so significantMissingCalls drops
+ * them. The two differ only in visibility, which JS has no run-time fact for
+ * (CLAUDE.md § "Method visibility is not a runtime fact in JS"), and both port
+ * to a computed member access — `public_send("#{name}=", value)`
+ * (`persistence.rb:533`) is `this[name] = value`, with no callee. A call-name
+ * check would flag that correct port too; setter-dispatch.ts reads the
+ * skeleton marks instead.
+ */
 export const NO_JS_CALL_FORM = new Set([
   "to_s", // template literal / implicit String() coercion — `${x}`
   "each", // for...of loop — no .forEach callee
@@ -5561,6 +5573,48 @@ export function main() {
         null,
         2,
       ),
+    );
+
+    const setterDispatch = skeletonsFlat.filter(isSetterDispatchPortedAsDirectWrite);
+    fs.writeFileSync(
+      path.join(OUTPUT_DIR, `setter-dispatch${modeSuffix}.json`),
+      JSON.stringify(
+        {
+          generatedAt: new Date().toISOString(),
+          note: "Advisory, ungated (RFC 0156). Pairs whose Ruby body dispatches to a dynamically named setter (send/public_send/__send__ with a first argument ending in `=`) where the TS body assigns no computed member but calls writeAttribute/_writeAttribute.",
+          rows: setterDispatch.map(({ package: pkg, rubyFile, rubyName, tsFile, tsName }) => ({
+            package: pkg,
+            rubyFile,
+            rubyName,
+            tsFile,
+            tsName,
+          })),
+        },
+        null,
+        2,
+      ),
+    );
+    console.log(`Setter dispatch ported as a direct attribute write: ${setterDispatch.length}`);
+  }
+
+  if (mode !== "private") {
+    const stdlibMixins = stdlibMixinRows(ruby, ts, filterPkg);
+    const gaps = stdlibMixins.filter(isStdlibMixinGap);
+    fs.writeFileSync(
+      path.join(OUTPUT_DIR, "stdlib-mixin-surface.json"),
+      JSON.stringify(
+        {
+          generatedAt: new Date().toISOString(),
+          note: "Advisory, ungated (RFC 0156). One row per Ruby class including Enumerable (defining each) or Comparable (defining <=>): whether its TS class answers the contract ([Symbol.iterator] / compareTo) and whether it mixes the ruby-compat module in. `gaps` are the rows that do not mix it in.",
+          rows: stdlibMixins,
+          gaps,
+        },
+        null,
+        2,
+      ),
+    );
+    console.log(
+      `Stdlib mixin surface (Enumerable/Comparable) not mixed in: ${gaps.length} of ${stdlibMixins.length}`,
     );
   }
 
