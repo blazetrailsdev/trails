@@ -133,14 +133,14 @@ export const STRING_METHOD_TABLE: Record<string, StringMethod> = Object.assign(
     inspect: rbDefineMethod(0, (self) => stringInspect(self.string)),
     dump: rbDefineMethod(0, (self) => rbStrDump(self.string)),
     undump: rbDefineMethod(0, (self) => strUndump(self.string)),
-    upcase: (self, ...args) => upcase(self.string, blockArg(args)[0]),
-    downcase: (self, ...args) => downcase(self.string, blockArg(args)[0]),
-    capitalize: (self, ...args) => capitalize(self.string, blockArg(args)[0]),
-    swapcase: (self, ...args) => swapcase(self.string, blockArg(args)[0]),
-    upcaseBang: (self, ...args) => bang(self, upcase(self.string, blockArg(args)[0])),
-    downcaseBang: (self, ...args) => bang(self, downcase(self.string, blockArg(args)[0])),
-    capitalizeBang: (self, ...args) => bang(self, capitalize(self.string, blockArg(args)[0])),
-    swapcaseBang: (self, ...args) => bang(self, swapcase(self.string, blockArg(args)[0])),
+    upcase: (self, ...args) => upcase(self.string, args),
+    downcase: (self, ...args) => downcase(self.string, args),
+    capitalize: (self, ...args) => capitalize(self.string, args),
+    swapcase: (self, ...args) => swapcase(self.string, args),
+    upcaseBang: (self, ...args) => bang(self, upcase(self.string, args)),
+    downcaseBang: (self, ...args) => bang(self, downcase(self.string, args)),
+    capitalizeBang: (self, ...args) => bang(self, capitalize(self.string, args)),
+    swapcaseBang: (self, ...args) => bang(self, swapcase(self.string, args)),
     hex: rbDefineMethod(0, (self) => rbStrHex(self.string)),
     oct: rbDefineMethod(0, (self) => rbStrOct(self.string)),
     split: rbStrSplitM,
@@ -154,16 +154,16 @@ export const STRING_METHOD_TABLE: Record<string, StringMethod> = Object.assign(
     toSym: rbDefineMethod(0, (self) => `:${self.string}`),
     ord: rbDefineMethod(0, rbStrOrd),
     isInclude: rbDefineMethod(1, (self, arg) => self.string.includes(stringValue(arg))),
-    isStartWith: (self, ...prefixes) => rbStrStartWith(self.string, ...blockArg(prefixes)[0]),
-    isEndWith: (self, ...suffixes) => rbStrEndWith(self.string, ...blockArg(suffixes)[0]),
+    isStartWith: (self, ...prefixes) => rbStrStartWith(self.string, ...prefixes),
+    isEndWith: (self, ...suffixes) => rbStrEndWith(self.string, ...suffixes),
     scan: rbStrScan,
-    ljust: (self, ...args) => rbStrJustify(blockArg(args)[0], self.string, "l"),
-    rjust: (self, ...args) => rbStrJustify(blockArg(args)[0], self.string, "r"),
-    center: (self, ...args) => rbStrJustify(blockArg(args)[0], self.string, "c"),
+    ljust: (self, ...args) => rbStrJustify(args, self.string, "l"),
+    rjust: (self, ...args) => rbStrJustify(args, self.string, "r"),
+    center: (self, ...args) => rbStrJustify(args, self.string, "c"),
     sub: rbStrSub,
     gsub: (self, ...argv) => strGsub(self, argv, false),
     chop: rbDefineMethod(0, (self) => rbStrChop(self.string)),
-    chomp: (self, ...args) => rbStrChomp(self.string, blockArg(args)[0]),
+    chomp: (self, ...args) => rbStrChomp(self.string, args),
     strip: rbDefineMethod(0, (self) => self.string.replace(LSTRIP, "").replace(RSTRIP, "")),
     lstrip: rbDefineMethod(0, (self) => self.string.replace(LSTRIP, "")),
     rstrip: rbDefineMethod(0, (self) => self.string.replace(RSTRIP, "")),
@@ -174,7 +174,7 @@ export const STRING_METHOD_TABLE: Record<string, StringMethod> = Object.assign(
     chopBang: rbDefineMethod(0, (self) =>
       self.string.length === 0 ? null : (self.string = rbStrChop(self.string)),
     ),
-    chompBang: (self, ...args) => bang(self, rbStrChomp(self.string, blockArg(args)[0])),
+    chompBang: (self, ...args) => bang(self, rbStrChomp(self.string, args)),
     stripBang: rbDefineMethod(0, (self) =>
       bang(self, self.string.replace(LSTRIP, "").replace(RSTRIP, "")),
     ),
@@ -184,18 +184,18 @@ export const STRING_METHOD_TABLE: Record<string, StringMethod> = Object.assign(
     deleteSuffixBang: rbDefineMethod(1, (self, s) => bang(self, deleteSuffix(self.string, s))),
     tr: rbDefineMethod(2, (self, src, repl) => trTrans(self.string, src, repl, false)),
     trS: rbDefineMethod(2, (self, src, repl) => trTrans(self.string, src, repl, true)),
-    delete: (self, ...args) => strDelete(self.string, blockArg(args)[0]),
-    squeeze: (self, ...args) => strSqueeze(self.string, blockArg(args)[0]),
-    count: (self, ...args) => strCount(self.string, blockArg(args)[0]),
+    delete: (self, ...args) => strDelete(self.string, args),
+    squeeze: (self, ...args) => strSqueeze(self.string, args),
+    count: (self, ...args) => strCount(self.string, args),
     trBang: rbDefineMethod(2, (self, src, repl) =>
       bang(self, trTrans(self.string, src, repl, false)),
     ),
     trSBang: rbDefineMethod(2, (self, src, repl) =>
       bang(self, trTrans(self.string, src, repl, true)),
     ),
-    deleteBang: (self, ...args) => bang(self, strDelete(self.string, blockArg(args)[0])),
-    squeezeBang: (self, ...args) => bang(self, strSqueeze(self.string, blockArg(args)[0])),
-    sum: (self, ...args) => rbStrSum(self.string, ...blockArg(args)[0]),
+    deleteBang: (self, ...args) => bang(self, strDelete(self.string, args)),
+    squeezeBang: (self, ...args) => bang(self, strSqueeze(self.string, args)),
+    sum: (self, ...args) => rbStrSum(self.string, ...args),
     slice: rbStrArefM,
     sliceBang: rbStrSliceBang,
     partition: rbDefineMethod(1, (self, sep) => rbStrPartition(self.string, sep)),
@@ -204,11 +204,9 @@ export const STRING_METHOD_TABLE: Record<string, StringMethod> = Object.assign(
     isValidEncoding: rbDefineMethod(0, (self) => !LONE_SURROGATE.test(self.string)),
     // eslint-disable-next-line no-control-regex -- `rb_str_is_ascii_only_p` (string.c:11019)
     isAsciiOnly: rbDefineMethod(0, (self) => /^[\x00-\x7f]*$/.test(self.string)),
-    unicodeNormalize: (self, ...args) => unicodeNormalize(self.string, blockArg(args)[0]),
-    unicodeNormalizeBang: (self, ...args) =>
-      (self.string = unicodeNormalize(self.string, blockArg(args)[0])),
-    isUnicodeNormalized: (self, ...args) =>
-      unicodeNormalize(self.string, blockArg(args)[0]) === self.string,
+    unicodeNormalize: (self, ...args) => unicodeNormalize(self.string, args),
+    unicodeNormalizeBang: (self, ...args) => (self.string = unicodeNormalize(self.string, args)),
+    isUnicodeNormalized: (self, ...args) => unicodeNormalize(self.string, args) === self.string,
   } satisfies Record<string, Method>,
 );
 
@@ -272,14 +270,13 @@ export function rbStrMatch(x: string, y: unknown): unknown {
 
 /**
  * `rb_define_method` (`vendor/ruby/class.c:2134`) with a fixed `argc`, which MRI
- * checks; a trailing block is not an argument.
+ * checks.
  */
 function rbDefineMethod<A extends unknown[]>(
   argc: number,
   func: (self: StringReceiver, ...args: A) => unknown,
 ): Method {
-  return (self, ...argv) => {
-    const [args] = blockArg(argv);
+  return (self, ...args) => {
     if (args.length !== argc) rbErrorArity(args.length, argc, argc);
     return func(self, ...(args as A));
   };
@@ -357,8 +354,7 @@ function rbStrConcat(str1: string, str2: unknown): string {
 }
 
 /** `String#concat` (`vendor/ruby/string.c:3472` `rb_str_concat_multi`). */
-function rbStrConcatMulti(self: StringReceiver, ...argv: unknown[]): string {
-  const [args] = blockArg(argv);
+function rbStrConcatMulti(self: StringReceiver, ...args: unknown[]): string {
   self.string += args.reduce<string>((arg, value) => rbStrConcat(arg, value), "");
   return self.string;
 }
@@ -374,8 +370,7 @@ function rbStrSplitM(self: StringReceiver, ...argv: unknown[]): unknown {
 }
 
 /** `String#slice!` (`vendor/ruby/string.c:5588` `rb_str_slice_bang`). */
-function rbStrSliceBang(self: StringReceiver, ...argv: unknown[]): string | null {
-  const [args] = blockArg(argv);
+function rbStrSliceBang(self: StringReceiver, ...args: unknown[]): string | null {
   checkArity(args.length, 1, 2);
   const [sliced, rest] = sliceBang(
     self.string,

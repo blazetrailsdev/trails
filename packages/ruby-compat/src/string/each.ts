@@ -93,7 +93,7 @@ export function rbStrEnumerateLines(str: string, argv: unknown[]): string[] {
   return lines;
 }
 
-function* enumerate<T>(items: T[]): Generator<T> {
+function* enumerate<T>(items: Iterable<T>): Generator<T> {
   yield* items;
 }
 
@@ -108,7 +108,7 @@ function* enumerate<T>(items: T[]): Generator<T> {
 export function eachOrEnumerator<T>(
   self: StringReceiver,
   block: Callback | null,
-  items: T[],
+  items: Iterable<T>,
 ): string | Generator<T> {
   if (!block) return enumerate(items);
   for (const item of items) block(item);
@@ -196,22 +196,21 @@ function each<T>(self: StringReceiver, argv: unknown[], items: T[]): string | Ge
  *
  * @noRailsEquivalent PERMANENT
  */
-export function rbStrUptoEach(beg: string, endArg: unknown, excl: boolean): string[] {
+export function* rbStrUptoEach(beg: string, endArg: unknown, excl: boolean): Generator<string> {
   const end = stringValue(endArg);
-  const out: string[] = [];
   // eslint-disable-next-line no-control-regex -- `is_ascii_string` (string.c:5053)
   const ascii = /^[\x00-\x7f]*$/.test(beg) && /^[\x00-\x7f]*$/.test(end);
   if (beg.length === 1 && end.length === 1 && ascii) {
     let c = beg.charCodeAt(0);
     const e = end.charCodeAt(0);
-    if (c > e || (excl && c === e)) return out;
+    if (c > e || (excl && c === e)) return;
     for (;;) {
-      out.push(String.fromCharCode(c));
+      yield String.fromCharCode(c);
       if (!excl && c === e) break;
       c++;
       if (excl && c === e) break;
     }
-    return out;
+    return;
   }
   if (ascii && /^\d+$/.test(beg) && /^\d+$/.test(end)) {
     const width = beg.length;
@@ -219,25 +218,24 @@ export function rbStrUptoEach(beg: string, endArg: unknown, excl: boolean): stri
     const ei = BigInt(end);
     while (bi <= ei) {
       if (excl && bi === ei) break;
-      out.push(bi.toString().padStart(width, "0"));
+      yield bi.toString().padStart(width, "0");
       bi++;
     }
-    return out;
+    return;
   }
   const n = rbStrCmp(beg, end);
-  if (n > 0 || (excl && n === 0)) return out;
+  if (n > 0 || (excl && n === 0)) return;
   const afterEnd = succ(end);
   let current = beg;
   while (current !== afterEnd) {
     let next: string | null = null;
     if (excl || current !== end) next = succ(current);
-    out.push(current);
+    yield current;
     if (next === null) break;
     current = next;
     if (excl && current === end) break;
     if (current.length > end.length || current.length === 0) break;
   }
-  return out;
 }
 
 /**

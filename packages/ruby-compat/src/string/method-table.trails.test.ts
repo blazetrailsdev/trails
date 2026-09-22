@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Encoding } from "../encoding.js";
 import { MatchData } from "../match-data.js";
 import { Range } from "../range.js";
+import { TypeError } from "../type-error.js";
 import { bytes } from "./bytes.js";
 import { rbStrSend } from "./method-table.js";
 
@@ -1033,5 +1034,16 @@ describe("STRING_METHOD_TABLE", () => {
   it("String#each_byte answers as MRI does", () => {
     const rows: Row[] = [["ab", "eachByte", [], { res: { enum: [97, 98] }, recv: { s: "ab" } }]];
     for (const [recv, method, args, want] of rows) expect(send(recv, method, args)).toEqual(want);
+  });
+});
+
+describe("STRING_METHOD_TABLE blocks and enumerators", () => {
+  it("reads a function as an argument where String takes no block", () => {
+    expect(() => rbStrSend("abc", "isInclude", () => "a")).toThrow(TypeError);
+  });
+
+  it("answers upto's enumerator before walking the range", () => {
+    const [enumerator] = rbStrSend("a", "upto", "zzzzzzzzzz") as [Iterator<string>, string];
+    expect([enumerator.next().value, enumerator.next().value]).toEqual(["a", "b"]);
   });
 });

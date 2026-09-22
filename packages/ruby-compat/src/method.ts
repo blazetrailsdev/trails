@@ -43,12 +43,11 @@ export class Method {
   }
 
   /**
-   * `Method#name` (`vendor/ruby/proc.c:1939` `method_name`), spelled `methodName`
-   * because a JS class reserves the static `name`.
+   * `Method#name` (`vendor/ruby/proc.c:1939` `method_name`).
    *
    * @noRailsEquivalent PERMANENT
    */
-  methodName(): string {
+  name(): string {
     return this.#name;
   }
 }

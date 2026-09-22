@@ -16,7 +16,10 @@ export interface StringReceiver {
 }
 
 /**
- * Split a trailing block off `args` (`rb_block_given_p`, `vendor/ruby/eval.c:866`).
+ * Split a trailing block off `args` (`rb_block_given_p`, `vendor/ruby/eval.c:866`),
+ * for the methods whose MRI body takes one. JS has no block syntax apart from
+ * its arguments, so a trailing function IS the block there; every other table
+ * entry reads a function as an ordinary argument.
  *
  * @noRailsEquivalent PERMANENT
  */
