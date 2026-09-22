@@ -162,4 +162,4 @@ const rule = {
 };
 
 export default rule;
-export { hasReceipt };
+export { hasFileLevelReceipt, hasReceipt };
