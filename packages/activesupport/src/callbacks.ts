@@ -256,7 +256,17 @@ export namespace CallTemplate {
       return new MethodCall(typeof filter === "string" ? filter.slice(1) : filter);
     } else if (filter instanceof Value) {
       return new ProcCall(filter);
-    } else if (typeof filter === "function") {
+    } else if (
+      typeof filter === "function" &&
+      !/^class(?=[\s{/])(?:\s|\/\*[\s\S]*?\*\/|\/\/[^\n]*\n)*[^(\s/]/.test(
+        Function.prototype.toString.call(filter),
+      ) &&
+      !(
+        /\{\s*\[native code\]\s*\}$/.test(Function.prototype.toString.call(filter)) &&
+        Object.getOwnPropertyDescriptor(filter, "prototype")?.writable === false &&
+        !Object.isFrozen(filter)
+      )
+    ) {
       const arity = filter.length;
       if (arity === 2) {
         return new InstanceExec2(
