@@ -607,3 +607,7 @@ export {
   _setActionDispatchRequest,
   type ActionDispatchRequestConstructor,
 } from "./action-dispatch-request-slot.js";
+export { Multibyte } from "./multibyte.js";
+export { Chars } from "./multibyte/chars.js";
+export { Unicode } from "./multibyte/unicode.js";
+export { mbChars, isUtf8 } from "./core-ext/string/multibyte.js";

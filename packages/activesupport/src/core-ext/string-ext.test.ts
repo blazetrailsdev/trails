@@ -73,6 +73,8 @@ import {
 import { I18n } from "../i18n.js";
 import { toTimePreservesTimezone } from "../active-support.js";
 import { actsLikeString } from "./string/behavior.js";
+import { mbChars } from "./string/multibyte.js";
+import { Multibyte } from "../multibyte.js";
 
 describe("StringAccessTest", () => {
   it("#at with Integer, returns a substring of one character at that position", () => {
@@ -536,6 +538,8 @@ describe("StringIndentTest", () => {
 });
 
 describe("CoreExtStringMultibyteTest", () => {
+  const UTF8_STRING = "こにちわ";
+
   it("core ext adds mb chars", () => {
     const str = "hello";
     expect([...str].length).toBe(5);
@@ -548,8 +552,7 @@ describe("CoreExtStringMultibyteTest", () => {
   });
 
   it("mb chars returns instance of proxy class", () => {
-    const str = "hello";
-    expect(typeof str).toBe("string");
+    expect(mbChars(UTF8_STRING)).toBeInstanceOf(Multibyte.proxyClass());
   });
 });
 

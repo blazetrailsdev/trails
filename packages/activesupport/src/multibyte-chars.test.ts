@@ -1,4 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, beforeEach, describe, it, expect } from "vitest";
+import { NoMethodError } from "@blazetrails/ruby-compat";
+import { Multibyte } from "./multibyte.js";
+import { Chars } from "./multibyte/chars.js";
+import { mbChars } from "./core-ext/string/multibyte.js";
+import { assert, assertNothingRaised, assertRaise } from "./testing/assertions.js";
 
 function mbLength(str: string): number {
   return [...str].length;
@@ -394,69 +399,108 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
 });
 
 describe("MultibyteCharsTest", () => {
-  it("wraps the original string", () => {
-    const str = "hello";
-    expect(typeof str).toBe("string");
-    expect(str).toBe("hello");
+  const UNICODE_STRING = "こにちわ";
+  const ASCII_STRING = "ohayo";
+  const BYTE_STRING = "\u00b8\u009e\u0008\u0088\u00a5";
+  const proxyClass = Chars;
+  let chars: Chars & Record<string, any>;
+
+  const definedStringMethods: string[] = [];
+  const defineStringMethod = (name: string, body: () => unknown) => {
+    Object.defineProperty(String.prototype, name, { value: body, configurable: true });
+    definedStringMethods.push(name);
+  };
+
+  beforeEach(() => {
+    chars = new proxyClass(UNICODE_STRING) as Chars & Record<string, any>;
   });
 
-  it("should allow method calls to string", () => {
-    const str = "hello";
-    expect(str.toUpperCase()).toBe("HELLO");
+  afterEach(() => {
+    for (const name of definedStringMethods.splice(0)) {
+      delete (String.prototype as unknown as Record<string, unknown>)[name];
+    }
+  });
+
+  it("wraps the original string", () => {
+    expect(chars.toS()).toEqual(UNICODE_STRING);
+    expect(chars.wrappedString).toEqual(UNICODE_STRING);
+  });
+
+  it("should allow method calls to string", async () => {
+    defineStringMethod("__methodForMultibyteTesting", () => "result");
+
+    await assertNothingRaised(() => chars.__methodForMultibyteTesting());
+    await assertRaise([NoMethodError], {}, () => chars.__unknownMethod());
   });
 
   it("forwarded method calls should return new chars instance", () => {
-    const str = "hello";
-    const upper = str.toUpperCase();
-    expect(upper).toBe("HELLO");
-    expect(typeof upper).toBe("string");
+    defineStringMethod("__methodForMultibyteTesting", () => "result");
+
+    expect(chars.__methodForMultibyteTesting()).toBeInstanceOf(proxyClass);
+    expect(chars.__methodForMultibyteTesting()).not.toBe(chars);
   });
 
   it("forwarded bang method calls should return the original chars instance when result is not nil", () => {
-    const str = "hello";
-    const result = str.toUpperCase();
-    expect(result).toBe("HELLO");
+    defineStringMethod("__methodForMultibyteTestingBang", () => "result");
+
+    expect(chars.__methodForMultibyteTestingBang()).toBeInstanceOf(proxyClass);
+    expect(chars.__methodForMultibyteTestingBang()).toBe(chars);
   });
 
   it("forwarded bang method calls should return nil when result is nil", () => {
-    const str = "";
-    const result = str.match(/xyz/)?.[0];
-    expect(result).toBeUndefined();
+    defineStringMethod("__methodForMultibyteTestingThatReturnsNilBang", () => null);
+
+    expect(chars.__methodForMultibyteTestingThatReturnsNilBang()).toBeNull();
   });
 
   it("methods are forwarded to wrapped string for byte strings", () => {
-    const str = "hello";
-    expect(str.length).toBe(5);
+    expect((mbChars(BYTE_STRING) as Chars & Record<string, any>).length).toEqual(
+      BYTE_STRING.length,
+    );
   });
 
   it("forwarded method with non string result should be returned verbatim", () => {
-    const str = "hello";
-    expect(str.length).toBe(5);
+    const str: any = "";
+    defineStringMethod("__methodForMultibyteTestingWithIntegerResult", () => 1);
+
+    expect(chars.__methodForMultibyteTestingWithIntegerResult()).toEqual(
+      str.__methodForMultibyteTestingWithIntegerResult(),
+    );
   });
 
-  it("should concatenate", () => {
-    const str = "hello" + " world";
-    expect(str).toBe("hello world");
+  it.skip("should concatenate", () => {
+    // PERMANENT-SKIP: Ruby `+` / `<<` on a Chars reach method_missing and `<<` mutates the wrapped String; JS has no operator overloading and its strings are immutable.
+    const mbA: any = mbChars("a");
+    const mbB: any = mbChars("b");
+    expect(mbA + "b").toEqual("ab");
+    expect("a" + mbB).toEqual("ab");
+    expect(mbA + mbB).toEqual("ab");
+
+    expect(mbA.concat("b")).toEqual("ab");
+    expect("a".concat(mbB)).toEqual("ab");
+    expect(mbA.concat(mbB)).toEqual("abb");
   });
 
-  it("concatenation should return a proxy class instance", () => {
-    const str = "hello" + " world";
-    expect(typeof str).toBe("string");
+  it.skip("concatenation should return a proxy class instance", () => {
+    // PERMANENT-SKIP: Ruby `+` / `<<` on a Chars reach method_missing and `<<` mutates the wrapped String; JS has no operator overloading and its strings are immutable.
+    expect((mbChars("a") as any).concat("b").constructor).toEqual(Multibyte.proxyClass());
+    expect((mbChars("a") as any).concat("b").constructor).toEqual(Multibyte.proxyClass());
   });
 
   it("ascii strings are treated at utf8 strings", () => {
-    const str = "hello";
-    expect([...str].length).toBe(5);
+    expect(mbChars(ASCII_STRING).constructor).toEqual(Multibyte.proxyClass());
   });
 
-  it("concatenate should return proxy instance", () => {
-    const str = "foo" + "bar";
-    expect(str).toBe("foobar");
+  it.skip("concatenate should return proxy instance", () => {
+    // PERMANENT-SKIP: Ruby `+` / `<<` on a Chars reach method_missing and `<<` mutates the wrapped String; JS has no operator overloading and its strings are immutable.
+    assert((mbChars("a") as any).concat("b") instanceof proxyClass);
+    assert((mbChars("a") as any).concat(mbChars("b")) instanceof proxyClass);
+    assert((mbChars("a") as any).concat("b") instanceof proxyClass);
+    assert((mbChars("a") as any).concat(mbChars("b")) instanceof proxyClass);
   });
 
   it("should return string as json", () => {
-    const str = "hello";
-    expect(JSON.stringify(str)).toBe('"hello"');
+    expect(chars.asJson()).toEqual(UNICODE_STRING);
   });
 });
 

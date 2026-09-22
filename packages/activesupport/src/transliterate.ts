@@ -1,4 +1,5 @@
 import { ArgumentError } from "./hash-utils.js";
+import { Unicode } from "./multibyte/unicode.js";
 import { I18n } from "./i18n.js";
 import { rbObjClass, regexpEscape } from "@blazetrails/ruby-compat";
 
@@ -12,7 +13,10 @@ export function transliterate(
   // eslint-disable-next-line no-control-regex -- Ruby's `ascii_only?` (transliterate.rb:69)
   if (/^[\x00-\x7f]*$/.test(string)) return string;
 
-  return I18n.transliterate(string.normalize("NFC"), { replacement, locale }) as string;
+  return I18n.transliterate(Unicode.tidyBytes(string).normalize("NFC"), {
+    replacement,
+    locale,
+  }) as string;
 }
 
 export function parameterize(

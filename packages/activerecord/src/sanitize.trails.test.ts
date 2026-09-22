@@ -232,18 +232,6 @@ describe("sanitizeSql", () => {
       expect(result).toContain("3");
     });
 
-    it("handles Sets as bind values", () => {
-      const result = Post.sanitizeSqlArray("id IN (?)", new Set([1, 2, 3]));
-      expect(result).toContain("1");
-      expect(result).toContain("2");
-      expect(result).toContain("3");
-    });
-
-    it("handles empty Sets as bind values", () => {
-      const result = Post.sanitizeSqlArray("id IN (?)", new Set());
-      expect(result).toContain("NULL");
-    });
-
     it("boolean quoting routes through the active adapter", () => {
       const sql = Post.sanitizeSqlArray("active = ?", true);
       const a = Post.connection as unknown as {

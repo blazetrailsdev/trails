@@ -33,13 +33,6 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
     reason: "Method-table surgery to silence redefinition warnings; JS reassignment is silent.",
   },
   {
-    pattern: "core_ext/string/multibyte.rb",
-    package: "activesupport",
-    reason:
-      "`mb_chars` returns a Multibyte::Chars proxy and `is_utf8?` reports a Ruby Encoding; " +
-      "JS strings carry no encoding tag and are already Unicode.",
-  },
-  {
     pattern: "core_ext/kernel/singleton_class.rb",
     package: "activesupport",
     reason:

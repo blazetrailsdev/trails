@@ -18,7 +18,7 @@ import {
 } from "../testing/query-assertions.js";
 import { currentAdapter } from "../support/adapter-helper.js";
 import { Treasure } from "../test-helpers/models/treasure.js";
-import { captureSql } from "../testing/sql-capture.js";
+import { captureSql, captureSqlAndBinds } from "../testing/sql-capture.js";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import { fixtures } from "../test-fixtures.js";
 import { Author, AuthorAddress } from "../test-helpers/models/author.js";
@@ -577,13 +577,43 @@ describe("BelongsToAssociationsTest", () => {
   });
 
   it("default scope on relations is not cached", async () => {
-    const counter = 0;
-    const comment = await Comment.first();
-    const firstPost = await (comment as any).post;
-    await comment!.reload();
-    const secondPost = await (comment as any).post;
-    expect(firstPost).not.toBeNull();
-    expect(secondPost).not.toBeNull();
+    let counter = 0;
+
+    let comments: typeof Base | undefined = undefined;
+    comments = class extends Base {
+      static {
+        this.tableName = "comments";
+        this.inheritanceColumn = "not_there";
+
+        const posts = class extends Base {
+          static {
+            this.tableName = "posts";
+            this.inheritanceColumn = "not_there";
+
+            this.defaultScope((q: any) => {
+              counter += 1;
+              return q.where("id = :inc", { inc: counter });
+            });
+
+            this.hasMany("comments", { anonymousClass: comments });
+          }
+        };
+        this.belongsTo("post", { anonymousClass: posts, inverseOf: false });
+      }
+    };
+
+    expect(counter).toBe(0);
+    const comment = (await comments.first()) as any;
+    expect(counter).toBe(0);
+    const queries = await captureSqlAndBinds(async () => {
+      await comment.post;
+    });
+    await comment.reload();
+    expect(
+      await captureSqlAndBinds(async () => {
+        await comment.post;
+      }),
+    ).not.toEqual(queries);
   });
 
   it("proxy assignment", async () => {

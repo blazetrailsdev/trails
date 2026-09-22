@@ -73,6 +73,7 @@ class Project {
   ) {}
 }
 delegate.call(Project.prototype, "name", { to: "person", allowNil: true });
+delegate.call(Project.prototype, "toF", { to: "description", allowNil: true });
 
 class Developer {
   constructor(public client: any) {}
@@ -297,15 +298,12 @@ describe("ModuleTest", () => {
     await assertRaise([DelegationError], {}, () => david.street());
   });
 
-  it.skip("delegation to method that exists on nil", () => {
-    // BLOCKED: activesupport-delegate-private-and-ruby-method-semantics
+  it("delegation to method that exists on nil", () => {
     const nilPerson = new Someone(null) as Someone & Record<string, any>;
     expect(nilPerson.toF()).toEqual(0.0);
   });
 
-  it.skip("delegation to method that exists on nil when allowing nil", () => {
-    // BLOCKED: activesupport-delegate-private-and-ruby-method-semantics
-    delegate.call(Project.prototype, "toF", { to: "description", allowNil: true });
+  it("delegation to method that exists on nil when allowing nil", () => {
     const nilProject = new Project(null) as Project & Record<string, any>;
     expect(nilProject.toF()).toEqual(0.0);
   });

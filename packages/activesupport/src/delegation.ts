@@ -1,4 +1,4 @@
-import { ArgumentError, NoMethodError } from "@blazetrails/ruby-compat";
+import { ArgumentError, NilClass, NoMethodError } from "@blazetrails/ruby-compat";
 import { constantize, registeredConstantName, safeConstantize } from "./inflector.js";
 import { PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
 
@@ -106,7 +106,7 @@ export namespace Delegation {
         const _ = receiver.startsWith("::")
           ? constantize(receiver)
           : receiverValue(self, receiverName);
-        if (_ == null) {
+        if (_ == null && !Object.hasOwn(NilClass, method)) {
           if (allowNil) return undefined;
           throw DelegationError.nilTarget(methodName, receiver);
         }
@@ -128,7 +128,8 @@ export namespace Delegation {
 
       const value = function (this: Record<string, unknown>, ...args: unknown[]) {
         const _ = resolve(this);
-        if (_ == null) return undefined;
+        if (_ == null)
+          return Object.hasOwn(NilClass, method) ? NilClass[method].apply(null, args) : undefined;
         if (!(method in Object(_))) {
           throw new NoMethodError(`undefined method '${method}' for ${String(_)}`);
         }

@@ -1,4 +1,5 @@
 import { Notifications } from "@blazetrails/activesupport";
+import { SQLCounter } from "./query-assertions.js";
 
 /** @internal */
 export interface StubbableAdapter {
@@ -67,6 +68,22 @@ export async function captureSql(
     Notifications.unsubscribe(sub);
   }
   return sqls;
+}
+
+/**
+ * `ActiveRecord::TestCase#capture_sql_and_binds` (test/cases/test_case.rb:102).
+ *
+ * @internal
+ * @noRailsEquivalent CONVERGEABLE ActiveRecord::TestCase#capture_sql_and_binds (test/cases/test_case.rb:102), async because the block it wraps is.
+ */
+export async function captureSqlAndBinds(
+  fn: () => void | Promise<void>,
+): Promise<[string, unknown[]][]> {
+  const counter = new SQLCounter();
+  return Notifications.subscribed(counter, "sql.active_record", async () => {
+    await fn();
+    return counter.logFull;
+  });
 }
 
 /**

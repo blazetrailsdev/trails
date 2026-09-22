@@ -120,30 +120,30 @@ describe("SanitizeTest", () => {
     expect(Binary.sanitizeSqlLike("1_000%", "%")).toBe("1%_000%%");
   });
 
-  // BLOCKED: inheritance — Rails' Class.new(Post) has sti_name nil (inheritance.rb:187), so type_condition is `type IS NULL` and the LIKE bind is $1; trails' stiName returns "" so it binds, shifting LIKE to $2 on PostgreSQL — sti-name-of-anonymous-class-should-be-nil.
-  it.skip("sanitize sql like example use case", async () => {
-    class SearchablePost extends Post {
-      static searchAsMethod(term: string) {
-        return this.where("title LIKE ?", this.sanitizeSqlLike(term, "!"));
-      }
-      declare static searchAsScope: (term: string) => Relation<SearchablePost>;
-    }
-    SearchablePost.scope("searchAsScope", function (this: Relation<SearchablePost>, term: string) {
+  it("sanitize sql like example use case", async () => {
+    const searchablePost = (() =>
+      class extends Post {
+        static searchAsMethod(term: string) {
+          return this.where("title LIKE ?", this.sanitizeSqlLike(term, "!"));
+        }
+        declare static searchAsScope: (term: string) => Relation<Post>;
+      })();
+    searchablePost.scope("searchAsScope", function (this: Relation<Post>, term: string) {
       return this.where("title LIKE ?", this.sanitizeSqlLike(term, "!"));
     });
 
-    const query = (await SearchablePost.leaseConnection()).preparedStatements
+    const query = (await searchablePost.leaseConnection()).preparedStatements
       ? currentAdapter("PostgreSQLAdapter")
         ? /title LIKE \$1/
         : /title LIKE \?/
       : /LIKE '20!% !_reduction!_!!'/;
 
     await assertQueriesMatch(query, undefined, false, async () => {
-      await SearchablePost.searchAsMethod("20% _reduction_!");
+      await searchablePost.searchAsMethod("20% _reduction_!");
     });
 
     await assertQueriesMatch(query, undefined, false, async () => {
-      await SearchablePost.searchAsScope("20% _reduction_!");
+      await searchablePost.searchAsScope("20% _reduction_!");
     });
   });
 
@@ -184,8 +184,7 @@ describe("SanitizeTest", () => {
     await assertRaises([PreparedStatementInvalid], {}, () => bind("name = :name", { id: 1 }));
   });
 
-  // BLOCKED: sanitization — sanitization.ts:321 narrows sanitization.rb:191's `respond_to?(:map)` duck test to Array|Set, so a Ruby-Enumerable value raises `can't quote <Class>` — sanitize-quote-bound-value-enumerable-duck-test.
-  it.skip("bind enumerable", async () => {
+  it("bind enumerable", async () => {
     const connection = await Base.leaseConnection();
     const quotedAbc = `${connection.quote("a")},${connection.quote("b")},${connection.quote("c")}`;
 
@@ -225,8 +224,7 @@ describe("SanitizeTest", () => {
     expect(bind("foo in (?)", [])).toBe(`foo in (${quotedNil})`);
   });
 
-  // BLOCKED: sanitization — sanitization.ts:321 narrows sanitization.rb:191's `respond_to?(:map)` duck test to Array|Set, so a Ruby-Enumerable value raises `can't quote <Class>` — sanitize-quote-bound-value-enumerable-duck-test.
-  it.skip("bind range", async () => {
+  it("bind range", async () => {
     const connection = await Base.leaseConnection();
     const quotedAbc = `${connection.quote("a")},${connection.quote("b")},${connection.quote("c")}`;
     if (currentAdapter("Mysql2Adapter", "TrilogyAdapter")) {
@@ -239,8 +237,7 @@ describe("SanitizeTest", () => {
     expect(bind("?", new Range("a", "d", true))).toBe(quotedAbc);
   });
 
-  // BLOCKED: sanitization — sanitization.ts:321 narrows sanitization.rb:191's `respond_to?(:map)` duck test to Array|Set, so a Ruby-Enumerable value raises `can't quote <Class>` — sanitize-quote-bound-value-enumerable-duck-test.
-  it.skip("bind empty range", async () => {
+  it("bind empty range", async () => {
     const quotedNil = (await Base.leaseConnection()).quote(null);
     expect(bind("?", new Range(0, 0, true))).toBe(quotedNil);
     expect(bind("?", new Range("a", "a", true))).toBe(quotedNil);
