@@ -14,6 +14,7 @@ import { Configurable } from "./configurable.js";
 import "../encryption.js";
 import { Base } from "../base.js";
 import { Relation } from "../relation.js";
+import { deterministicEncryptedAttributes } from "./encryptable-record.js";
 
 fixtures([], { useTransactionalTests: false });
 
@@ -264,6 +265,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::EncryptedQuery
     return {
       encryptedAttributes: new Set(["email"]),
       typeForAttribute: () => type,
+      deterministicEncryptedAttributes,
     };
   }
 
@@ -322,6 +324,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::RelationQuerie
     const model = {
       encryptedAttributes: new Set(["email"]),
       typeForAttribute: () => type,
+      deterministicEncryptedAttributes,
     };
     const relation = {
       model,
@@ -337,6 +340,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::RelationQuerie
     const model = {
       encryptedAttributes: new Set(["email"]),
       typeForAttribute: () => type,
+      deterministicEncryptedAttributes,
     };
     const relation = { model, whereValuesHash: () => ({}) };
 
@@ -352,6 +356,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::RelationQuerie
     const model = {
       encryptedAttributes: new Set(["body"]),
       typeForAttribute: () => type,
+      deterministicEncryptedAttributes,
     };
     const relation = { model, whereValuesHash: () => ({ body: [av] }) };
 
@@ -364,6 +369,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::RelationQuerie
     const model = {
       encryptedAttributes: new Set(["email"]),
       typeForAttribute: () => type,
+      deterministicEncryptedAttributes,
     };
     const relation = {
       model,
@@ -476,6 +482,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries.installSupport"
       const model = {
         encryptedAttributes: new Set(["email"]),
         typeForAttribute: () => type,
+        deterministicEncryptedAttributes,
       };
       const rel = new (targets.Relation as any)(model);
       rel.where({ email: "a@x" });
@@ -498,6 +505,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries.installSupport"
       const model = {
         encryptedAttributes: new Set(["email"]),
         typeForAttribute: () => type,
+        deterministicEncryptedAttributes,
       };
       const rel = new (targets.Relation as any)(model);
       rel._wheres = { email: [av] };
@@ -521,6 +529,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries.installSupport"
       class Contact extends (targets.Base as any) {
         static encryptedAttributes = new Set(["email"]);
         static typeForAttribute = () => type;
+        static deterministicEncryptedAttributes = deterministicEncryptedAttributes;
       }
       (Contact as any).findBy({ email: "x" });
       const captured = (Contact as any)._lastFindBy.email as unknown[];

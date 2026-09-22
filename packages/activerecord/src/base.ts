@@ -83,6 +83,7 @@ import * as _Validations from "./validations.js";
 import {
   EncryptableRecord as _EncryptableRecord,
   encrypts as _encrypts,
+  deterministicEncryptedAttributes as _deterministicEncryptedAttributes,
   isEncryptedAttribute as _isEncryptedAttribute,
   ciphertextFor as _ciphertextFor,
   encrypt as _encrypt,
@@ -1194,6 +1195,7 @@ export class Base extends Model {
   declare static generatedTokenVerifier: _MessageVerifier | null;
 
   declare static encrypts: (...args: Array<string | EncryptsOptions>) => void;
+  declare static deterministicEncryptedAttributes: () => Set<string> | undefined;
 
   static async suppress<R>(fn: () => R | Promise<R>): Promise<R> {
     return _suppressBlock(this, fn);
@@ -2752,6 +2754,7 @@ Base.validate((record: any) => _EncryptableRecord.cantModifyEncryptedAttributesW
 });
 extend(Base, {
   encrypts: _encrypts,
+  deterministicEncryptedAttributes: _deterministicEncryptedAttributes,
   sourceAttributeFromPreservedAttribute: _sourceAttributeFromPreservedAttribute,
 });
 include(Base, {

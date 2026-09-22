@@ -5,6 +5,7 @@ import { Scheme } from "./scheme.js";
 import { Contexts } from "./contexts.js";
 import { NullEncryptor } from "./null-encryptor.js";
 import type { EncryptorLike } from "./encryptor.js";
+import { deterministicEncryptedAttributes } from "./encryptable-record.js";
 
 const encryptorA: EncryptorLike = {
   encrypt: (v) => `A:${v}`,
@@ -33,6 +34,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicUniquenessValidatorTest
     const klass = {
       encryptedAttributes: new Set(["email"]),
       typeForAttribute: () => type,
+      deterministicEncryptedAttributes,
     };
     const record = { constructor: klass };
 
@@ -67,6 +69,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicUniquenessValidatorTest
     const klass = {
       encryptedAttributes: new Set(["body"]),
       typeForAttribute: () => type,
+      deterministicEncryptedAttributes,
     };
     const record = { constructor: klass };
 

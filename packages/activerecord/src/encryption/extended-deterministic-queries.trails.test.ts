@@ -5,6 +5,7 @@ import { NoMethodError } from "@blazetrails/activemodel";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Scheme } from "./scheme.js";
 import { Configurable } from "./configurable.js";
+import { deterministicEncryptedAttributes } from "./encryptable-record.js";
 
 import { YAMLColumn } from "../coders/yaml-column.js";
 import "../encryption.js";
@@ -147,7 +148,11 @@ describe("EncryptedQuery.processArguments (trails extras)", () => {
         previousSchemes: [prev],
       }),
     });
-    const owner = { encryptedAttributes: new Set(["email"]), typeForAttribute: () => type };
+    const owner = {
+      encryptedAttributes: new Set(["email"]),
+      typeForAttribute: () => type,
+      deterministicEncryptedAttributes,
+    };
     const args: unknown[] = [
       new Map<unknown, unknown>([
         [["id", 1], [[1, 2]]],
