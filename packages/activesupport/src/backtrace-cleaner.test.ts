@@ -43,19 +43,17 @@ describe("BacktraceCleanerDefaultFilterAndSilencerTest", () => {
     expect(cleaner.clean(bt)).toEqual(["lib/foo.rb"]);
   });
 
-  it("should silence gems from the backtrace", () => {
-    const cleaner = makeBacktraceCleaner();
-    cleaner.addSilencer((line) => line.includes("/gems/"));
+  it.skip("should silence gems from the backtrace", () => {
+    // BLOCKED: backtrace-cleaner-has-no-default-gem-and-stdlib-silencers
     const backtrace = ["/gems/nosuchgem-1.2.3/lib/foo.rb"];
-    const result = cleaner.clean(backtrace);
+    const result = new BacktraceCleaner().clean(backtrace);
     assertEmpty(result);
   });
 
-  it("should silence stdlib", () => {
-    const cleaner = makeBacktraceCleaner();
-    cleaner.addSilencer((line) => line.startsWith("/usr/lib/ruby/"));
-    const backtrace = ["/usr/lib/ruby/lib/foo.rb"];
-    const result = cleaner.clean(backtrace);
+  it.skip("should silence stdlib", () => {
+    // BLOCKED: backtrace-cleaner-has-no-default-gem-and-stdlib-silencers
+    const backtrace = ["/lib/foo.rb"];
+    const result = new BacktraceCleaner().clean(backtrace);
     assertEmpty(result);
   });
 
