@@ -168,15 +168,15 @@ export class FixtureSet {
   ): Promise<Record<string, FixtureSet>> {
     const fixturesMap: Record<string, FixtureSet> = {};
     const directoryGlob = `{${fixturesDirectories.join(",")}}`;
-    const fixtureSets = fixtureFiles.map(
-      (fixtureSetName) =>
-        (fixturesMap[fixtureSetName] = new this(
-          null,
-          fixtureSetName,
-          classNames[fixtureSetName] ?? null,
-          RubyFile.join(directoryGlob, fixtureSetName),
-        )),
-    );
+    const fixtureSets = fixtureFiles.map((fixtureSetName) => {
+      const klass = classNames[fixtureSetName] ?? null;
+      return (fixturesMap[fixtureSetName] = new this(
+        null,
+        fixtureSetName,
+        klass,
+        RubyFile.join(directoryGlob, fixtureSetName),
+      ));
+    });
     this.updateAllLoadedFixtures(fixturesMap);
 
     await this.insert(fixtureSets, connectionPool);

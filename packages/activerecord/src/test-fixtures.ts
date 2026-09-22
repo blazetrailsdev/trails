@@ -67,10 +67,23 @@ export const ClassMethods = {
       fixtureSetNames = [
         ...new Set(
           this.fixturePaths.flatMap((path) => {
-            let names = [...new Set(Dir.glob(RubyFile.join(path, "{**,*}/*.{yml}")))];
+            let names = [
+              ...new Set([
+                ...Dir.glob(RubyFile.join(path, "{**,*}/*.{yml}")),
+                ...FixtureFile.modules().filter((f) =>
+                  RubyFile.fnmatch(
+                    RubyFile.join(path, "{**,*}/*.{ts}"),
+                    f,
+                    RubyFile.FNM_EXTGLOB | RubyFile.FNM_PATHNAME,
+                  ),
+                ),
+              ]),
+            ];
             if (this.fileFixturePath)
               names = names.filter((f) => !f.startsWith(String(this.fileFixturePath)));
-            return names.map((f) => f.slice(String(path).length, -4).replace(/^\//, ""));
+            return names.map((f) =>
+              f.slice(String(path).length, -RubyFile.extname(f).length).replace(/^\//, ""),
+            );
           }),
         ),
       ];
