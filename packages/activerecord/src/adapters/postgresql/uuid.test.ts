@@ -205,6 +205,11 @@ describeIfPg("PostgreSQLAdapter", () => {
       });
     });
 
+    it("schema dump with shorthand", async () => {
+      const output = await dumpTableSchema(adapter, "uuid_data_type");
+      expect(output).toMatch(/t\.uuid\("guid"/);
+    });
+
     it("uniqueness validation ignores uuid", async () => {
       class klass extends Base {
         declare guid: string | null;
