@@ -1,7 +1,6 @@
 import { any, isPlainObject, prepend, transformKeys } from "@blazetrails/activesupport";
 import { isEmpty } from "@blazetrails/ruby-compat";
 import { Relation } from "../relation.js";
-import { deterministicEncryptedAttributes } from "./encryptable-record.js";
 import { ADDITIONAL_VALUE_BRAND, EncryptedAttributeType } from "./encrypted-attribute-type.js";
 
 export interface SerializableType {
@@ -82,7 +81,7 @@ export class EncryptedQuery {
   ): unknown[] {
     if (owner instanceof Relation) owner = owner.model;
 
-    if (isEmpty(deterministicEncryptedAttributes.call(owner))) return args;
+    if (owner.deterministicEncryptedAttributes()?.size === 0) return args;
 
     let options: unknown;
     if (Array.isArray(args) && (isPlainObject((options = args[0])) || options instanceof Map)) {
@@ -98,7 +97,7 @@ export class EncryptedQuery {
       ) as Map<string, unknown> | Record<string, unknown>;
       args[0] = hash;
 
-      for (let attributeName of deterministicEncryptedAttributes.call(owner)) {
+      for (let attributeName of owner.deterministicEncryptedAttributes() ?? []) {
         attributeName = String(attributeName);
         const type = owner.typeForAttribute(attributeName) as EncryptedAttributeType;
         let value: unknown;
@@ -170,13 +169,13 @@ export class RelationQueries {
     this: any,
     originalScopeForCreate: (...args: any[]) => unknown,
   ): Record<string, unknown> {
-    if (!any([...deterministicEncryptedAttributes.call(this.model)]))
+    if (!any([...(this.model.deterministicEncryptedAttributes() ?? [])]))
       return originalScopeForCreate.call(this) as Record<string, unknown>;
 
     const scopeAttributes = originalScopeForCreate.call(this) as Record<string, unknown>;
     const wheres = this.whereValuesHash();
 
-    for (let attributeName of deterministicEncryptedAttributes.call(this.model)) {
+    for (let attributeName of this.model.deterministicEncryptedAttributes()) {
       attributeName = String(attributeName);
       const values = wheres[attributeName];
       if (Array.isArray(values) && values.slice(1).every((v) => v instanceof AdditionalValue)) {

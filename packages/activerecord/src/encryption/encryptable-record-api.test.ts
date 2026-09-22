@@ -108,7 +108,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
     await freshAdapter();
     const Book = makeEncryptedBook();
     const book = await Book.create({ name: "Dune" });
-    expect(book.encryptedAttribute("id")).toBeFalsy();
+    expect(book.isEncryptedAttribute("id")).toBeFalsy();
   });
 
   it("encrypted_attribute? returns true for encrypted attributes which content is encrypted", async () => {
@@ -116,14 +116,14 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
     const Book = makeEncryptedBook();
     const book = await Book.create({ name: "Dune" });
     const reloaded = await Book.find(book.id);
-    expect(reloaded.encryptedAttribute("name")).toBeTruthy();
+    expect(reloaded.isEncryptedAttribute("name")).toBeTruthy();
   });
 
   it("encrypted_attribute? returns false for encrypted attributes which content is not encrypted", async () => {
     await freshAdapter();
     const Book = makeEncryptedBook();
     const book = await withoutEncryption(() => Book.create({ name: "Dune" }));
-    expect(book.encryptedAttribute("name")).toBeFalsy();
+    expect(book.isEncryptedAttribute("name")).toBeFalsy();
   });
 
   it("ciphertext_for returns the ciphertext for a given attribute", async () => {

@@ -220,7 +220,7 @@ export function dangerousAttributeMethods(): Set<string> {
     "assignAttributes",
     "encrypt",
     "decrypt",
-    "encryptedAttribute",
+    "isEncryptedAttribute",
     "ciphertextFor",
     "attributes",
     "logger",

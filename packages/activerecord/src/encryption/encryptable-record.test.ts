@@ -35,7 +35,6 @@ import { withTransactionalFixtures } from "../test-fixtures/with-transactional-f
 import {
   EncryptableRecord,
   decryptAttributes,
-  deterministicEncryptedAttributes,
   encryptAttributes,
   encrypts,
   validateEncryptionAllowed,
@@ -212,9 +211,9 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     const Post = makeEncryptedPost();
     new Book();
     new Post();
-    expect(deterministicEncryptedAttributes.call(Book)).toEqual(new Set(["name"]));
-    expect(deterministicEncryptedAttributes.call(Post)).not.toEqual(
-      deterministicEncryptedAttributes.call(Book),
+    expect(Book.deterministicEncryptedAttributes()).toEqual(new Set(["name"]));
+    expect(Post.deterministicEncryptedAttributes()).not.toEqual(
+      Book.deterministicEncryptedAttributes(),
     );
   });
 

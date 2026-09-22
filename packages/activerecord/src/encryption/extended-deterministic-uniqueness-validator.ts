@@ -1,5 +1,4 @@
 import { prepend } from "@blazetrails/activesupport";
-import { deterministicEncryptedAttributes } from "./encryptable-record.js";
 import { Contexts } from "./contexts.js";
 
 export class ExtendedDeterministicUniquenessValidator {
@@ -39,7 +38,7 @@ export const EncryptedUniquenessValidator = {
     await super_(record, attribute, value);
 
     const klass = record.constructor;
-    if (deterministicEncryptedAttributes.call(klass)?.has(attribute)) {
+    if (klass.deterministicEncryptedAttributes()?.has(attribute)) {
       const encryptedType = klass.typeForAttribute(attribute);
       for (const type of encryptedType.previousTypes) {
         const encryptedValue = type.serialize(value);
