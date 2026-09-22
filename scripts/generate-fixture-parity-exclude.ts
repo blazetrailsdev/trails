@@ -15,6 +15,7 @@
  * Output: eslint/test-fixture-parity-exclude.json (committed).
  * Run via `pnpm fixture-parity-baseline:refresh`.
  */
+import * as fs from "fs";
 import * as path from "path";
 import { writeJsonManifest } from "@blazetrails/parity/write-json-manifest";
 
@@ -32,16 +33,32 @@ async function main(): Promise<void> {
   const eslint = new ESLint({ cwd: ROOT });
   const results = await eslint.lintFiles(["packages/activerecord/src/**/*.test.ts"]);
 
-  const files = new Set<string>();
+  // Only-shrink: a whole-file entry survives while the file still violates,
+  // but no file is newly excluded wholesale — new violations land per test.
+  const previous: unknown[] = fs.existsSync(OUT_PATH)
+    ? JSON.parse(fs.readFileSync(OUT_PATH, "utf8"))
+    : [];
+  const wholeFiles = new Set(previous.filter((e): e is string => typeof e === "string"));
+
+  const files: string[] = [];
+  const tests: { file: string; tests: string[] }[] = [];
   for (const r of results) {
-    if (!r.messages.some((m) => m.ruleId === RULE_ID)) continue;
+    const descs = r.messages
+      .filter((m) => m.ruleId === RULE_ID)
+      .map((m) => /for "(.*)" uses fixtures/.exec(m.message)?.[1])
+      .filter((d): d is string => d !== undefined);
+    if (descs.length === 0) continue;
     const rel = path.relative(ROOT, r.filePath).replace(/\\/g, "/");
-    files.add(rel);
+    if (wholeFiles.has(rel)) files.push(rel);
+    else tests.push({ file: rel, tests: [...new Set(descs)].sort() });
   }
 
-  const arr = [...files].sort();
-  writeJsonManifest(OUT_PATH, arr);
-  console.log(`Wrote ${OUT_PATH}: ${arr.length} excluded files`);
+  files.sort();
+  tests.sort((a, b) => a.file.localeCompare(b.file));
+  writeJsonManifest(OUT_PATH, [...files, ...tests]);
+  console.log(
+    `Wrote ${OUT_PATH}: ${files.length} excluded files, ${tests.reduce((n, t) => n + t.tests.length, 0)} excluded tests`,
+  );
 }
 
 void main();

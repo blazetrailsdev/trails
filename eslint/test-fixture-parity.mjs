@@ -7,19 +7,20 @@
  * `const { x } = useFixtures(...)` / `useHandlerFixtures(...)` destructuring
  * anywhere in scope.
  *
- * For a fixture surface called without destructuring a named accessor —
- * e.g. `fixtures([])` — the check falls back to the describe-scope presence
- * check: those tests load fixtures transactionally without a named accessor.
+ * A fixture surface called without destructuring a named accessor — e.g.
+ * `fixtures([])` — exposes no accessor, so it never satisfies the check: a
+ * test's result must not depend on which describe it sits in.
  *
  * Skipped tests (it.skip / it.skipIf / it.todo / test.skip, and anything nested
  * in describe.skip / describe.todo) are exempt — they are the migration backlog
  * and the mapping JSON is their canonical inventory.
  *
- * Ships at `error`. Files that port their Rails counterpart with inline models
- * rather than `useFixtures` are listed in eslint/test-fixture-parity-exclude.json.
- * Exclusion is **whole-file**: a listed file no-ops entirely, so new or
- * partially-migrated tests in it are NOT gated until the file is fully migrated
- * and dropped from the list. This per-file ratchet — and its regression blind
+ * Ships at `error`. Tests that port their Rails counterpart with inline models
+ * rather than fixture accessors are listed in
+ * eslint/test-fixture-parity-exclude.json. A string entry excludes a **whole
+ * file** (it no-ops entirely, so new tests in it are NOT gated until it is
+ * dropped from the list); a `{ file, tests }` entry excludes only the named
+ * tests and keeps the rest of the file gated. This per-file ratchet — and its regression blind
  * spot for excluded files — is the same contract as the `expected-fixtures`
  * precedent; the baseline shrinks as porters adopt useFixtures.
  *
@@ -60,10 +61,16 @@ function loadMapping() {
 let excludeCache = null;
 let excludeCacheMtime = -1;
 function loadExclude() {
-  if (!fs.existsSync(EXCLUDE_PATH)) return new Set();
+  if (!fs.existsSync(EXCLUDE_PATH)) return { files: new Set(), tests: new Map() };
   const mtime = fs.statSync(EXCLUDE_PATH).mtimeMs;
   if (excludeCache && mtime === excludeCacheMtime) return excludeCache;
-  excludeCache = new Set(JSON.parse(fs.readFileSync(EXCLUDE_PATH, "utf8")));
+  const files = new Set();
+  const tests = new Map();
+  for (const entry of JSON.parse(fs.readFileSync(EXCLUDE_PATH, "utf8"))) {
+    if (typeof entry === "string") files.add(entry);
+    else tests.set(entry.file, new Set(entry.tests.map(normalizeDesc)));
+  }
+  excludeCache = { files, tests };
   excludeCacheMtime = mtime;
   return excludeCache;
 }
@@ -162,16 +169,6 @@ function destructuredNames(callNode) {
   return [];
 }
 
-/**
- * True for a zero-fixture surface call — the first argument is an empty array
- * literal, e.g. `fixtures([])`. It wires the suite + per-test txn in scope but
- * seeds no rows and exposes no named accessor.
- */
-function isEmptyFixtureCall(callNode) {
-  const first = callNode.arguments[0];
-  return first?.type === "ArrayExpression" && first.elements.length === 0;
-}
-
 /** Collect all Identifier call names inside a subtree (for it() body scanning). */
 function collectCallNamesIn(node, out = new Set()) {
   if (!node || typeof node !== "object") return out;
@@ -210,7 +207,9 @@ const rule = {
 
     // Ratcheted backlog — excluded files no-op under the hard `error` gate.
     const rel = repoRel(filename);
-    if (rel && loadExclude().has(rel)) return {};
+    const exclude = loadExclude();
+    if (rel && exclude.files.has(rel)) return {};
+    const excludedTests = (rel && exclude.tests.get(rel)) || new Set();
 
     const mapping = loadMapping();
     const fixtureDescs = mapping[key];
@@ -218,8 +217,6 @@ const rule = {
 
     // scope (BlockStatement|null) → Set<accessorName>
     const accessorsByScope = new Map();
-    // scope (BlockStatement|null) → true when transactional helper is present
-    const transactionalScopes = new Set();
 
     const toCheck = [];
 
@@ -243,13 +240,6 @@ const rule = {
               accessorsByScope.set(scope, s);
             }
             for (const n of names) s.add(n);
-          } else if (isEmptyFixtureCall(node)) {
-            // A zero-fixture surface call (`fixtures([])`) still wires the suite
-            // in scope, so it satisfies the parity check via scope presence
-            // without a per-test accessor call. A non-empty call with no
-            // destructuring seeds rows but exposes no accessor, so it is left to
-            // fall through and warn.
-            transactionalScopes.add(scope);
           }
           return;
         }
@@ -262,7 +252,7 @@ const rule = {
           const firstArg = node.arguments[0];
           if (firstArg?.type !== "Literal" || typeof firstArg.value !== "string") return;
           const desc = normalizeDesc(firstArg.value);
-          if (!fixtureDescs.has(desc)) return;
+          if (!fixtureDescs.has(desc) || excludedTests.has(desc)) return;
           const callback = node.arguments[node.arguments.length - 1];
           const callbackBody =
             callback &&
@@ -282,9 +272,6 @@ const rule = {
         for (const { node, desc, ancestors, callbackBody } of toCheck) {
           // Build the set of accessor names available in any enclosing scope (or file scope).
           const scopes = [null, ...ancestors];
-
-          // If any scope has a transactional helper, fall back to scope-presence check.
-          if (scopes.some((s) => transactionalScopes.has(s))) continue;
 
           // Collect accessor names from all enclosing scopes.
           const accessors = new Set();
