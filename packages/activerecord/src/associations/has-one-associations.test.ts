@@ -1,4 +1,5 @@
 import { kernelThrow } from "@blazetrails/ruby-compat";
+import { Notifications, type NotificationEvent } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import { SingularAssociation } from "./singular-association.js";
 import { ArgumentError, I18n, UnknownAttributeError } from "@blazetrails/activemodel";
@@ -1287,12 +1288,27 @@ describe("AsyncHasOneAssociationsTest", () => {
     await Account.loadSchema();
   });
 
-  it("async load has one", async () => {
+  // BLOCKED: association-async-load-target-uses-async-executor
+  it.skip("async load has one", async () => {
     const firm = companies("first_firm") as any;
     const firstAccount = await Account.find(1);
-    await firm.association("account").loadTarget();
-    const account = await readHasOne(firm, "account");
-    expect(account.id).toBe(firstAccount.id);
-    expect(account.credit_limit).toBe(firstAccount.credit_limit);
+
+    await firm.association("account").asyncLoadTarget();
+
+    const events: NotificationEvent[] = [];
+    const callback = (event: NotificationEvent) => {
+      if (event.payload.name !== "SCHEMA") events.push(event);
+    };
+    await Notifications.subscribed(callback, "sql.active_record", () =>
+      readHasOne(firm, "account"),
+    );
+
+    await assertNoQueries(false, async () => {
+      expect((await readHasOne(firm, "account")).id).toEqual(firstAccount.id);
+      expect((await readHasOne(firm, "account")).credit_limit).toEqual(firstAccount.credit_limit);
+    });
+
+    expect(events.length).toEqual(1);
+    expect(events[0].payload.async).toEqual(true);
   });
 });

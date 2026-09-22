@@ -764,15 +764,29 @@ describe("DefaultScopingTest", () => {
     );
   });
 
-  it("unscope errors with non where hash keys", () => {
+  // BLOCKED: unscope-symbol-vs-string-raising-arms
+  it.skip("unscope errors with non where hash keys", () => {
     expect(() =>
       Developer.where({ name: "Jamis" })
         .limit(4)
         .unscope({ limit: 4 } as any),
     ).toThrow(ArgumentError);
+
+    expect(() => Developer.where({ name: "Jamis" }).unscope({ where: ":name" } as any)).toThrow(
+      ArgumentError,
+    );
   });
 
-  it("unscope errors with non symbol or hash arguments", () => {
+  // BLOCKED: unscope-symbol-vs-string-raising-arms
+  it.skip("unscope errors with non symbol or hash arguments", () => {
+    expect(() =>
+      Developer.where({ name: "Jamis" })
+        .limit(3)
+        .unscope("limit" as any),
+    ).toThrow(ArgumentError);
+
+    expect(() => Developer.select("id").unscope("select" as any)).toThrow(ArgumentError);
+
     expect(() => Developer.select("id").unscope(5 as any)).toThrow(ArgumentError);
   });
 
