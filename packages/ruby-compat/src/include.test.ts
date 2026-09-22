@@ -936,6 +936,14 @@ describe("Module#superMethod", () => {
     expect(bare.greeting()).toBe("receiver :)");
   });
 
+  it("exposes a method defined after extend on the already-extended object", () => {
+    const mod = new Module();
+    const obj = {} as { late?: () => string };
+    extend(obj, mod);
+    mod.defineMethod("late", () => "late");
+    expect(obj.late!()).toBe("late");
+  });
+
   it("reaches through a subclass of the includer", () => {
     class Base0 {
       who(): string {

@@ -234,8 +234,10 @@ export class Module {
    * `obj`'s ancestry is skipped, as `include_modules_at` skips one
    * (vendor/ruby/class.c:1281,1291,1296).
    *
-   * Unlike an includer's link, a singleton link is held weakly, since one is
-   * made per extended object, so it is not relinked by a later `defineMethod`.
+   * One link is made per extended object, so singleton links are held through
+   * `WeakRef`s that `relinkIncluders` still walks, keeping a later
+   * `defineMethod` visible on an already-extended object as Ruby's shared
+   * method table does, without retaining the object.
    *
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
@@ -248,8 +250,11 @@ export class Module {
     const link = Object.create(Object.getPrototypeOf(obj) as object | null) as object;
     Object.defineProperties(link, Object.getOwnPropertyDescriptors(carrierOf(this)));
     let links = singletonCarriers.get(this);
-    if (!links) singletonCarriers.set(this, (links = new WeakSet()));
-    links.add(link);
+    if (!links) singletonCarriers.set(this, (links = { members: new WeakSet(), refs: new Set() }));
+    const ref = new WeakRef(link);
+    links.members.add(link);
+    links.refs.add(ref);
+    singletonReaper.register(link, { mod: this, ref });
     Object.setPrototypeOf(obj, link);
   }
 
@@ -311,18 +316,34 @@ function isUndefEntry(carrier: Record<string, unknown>, name: string): boolean {
 
 const includerCarriers = new WeakMap<Module, object[]>();
 
-const singletonCarriers = new WeakMap<Module, WeakSet<object>>();
+const singletonCarriers = new WeakMap<
+  Module,
+  { members: WeakSet<object>; refs: Set<WeakRef<object>> }
+>();
+
+const singletonReaper = new FinalizationRegistry<{ mod: Module; ref: WeakRef<object> }>(
+  ({ mod, ref }) => singletonCarriers.get(mod)?.refs.delete(ref),
+);
 
 function isLinkOf(mod: Module, proto: object): boolean {
   return (
     (includerCarriers.get(mod)?.includes(proto) ?? false) ||
-    (singletonCarriers.get(mod)?.has(proto) ?? false)
+    (singletonCarriers.get(mod)?.members.has(proto) ?? false)
   );
+}
+
+function linksOf(mod: Module): object[] {
+  const singletons: object[] = [];
+  for (const ref of singletonCarriers.get(mod)?.refs ?? []) {
+    const link = ref.deref();
+    if (link) singletons.push(link);
+  }
+  return [...(includerCarriers.get(mod) ?? []), ...singletons];
 }
 
 function relinkIncluders(mod: Module): void {
   const table = carrierOf(mod);
-  for (const link of includerCarriers.get(mod) ?? []) {
+  for (const link of linksOf(mod)) {
     for (const name of Object.getOwnPropertyNames(link)) {
       if (!Object.prototype.hasOwnProperty.call(table, name))
         delete (link as Record<string, unknown>)[name];

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { RecordNotFound } from "../../errors.js";
+import { itIfSupports } from "../../support/supports.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Base, registerModel } from "../../index.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
@@ -60,8 +61,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await dropTable("uuid_data_type");
     });
 
-    it("uuid column default", async (ctx) => {
-      ctx.skip(!supportsPgcryptoUuid);
+    itIfSupports("pgcrypto_uuid", "uuid column default", async () => {
       await adapter.addColumn("uuid_data_type", "thingy", "uuid", {
         null: false,
         default: "gen_random_uuid()",
