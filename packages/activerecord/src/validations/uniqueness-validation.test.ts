@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import { Base, StatementInvalid, UnknownPrimaryKey, ValueTooLong } from "../index.js";
 import { registerModel } from "../associations.js";
 import { registerSubclass } from "../inheritance.js";
@@ -146,9 +147,12 @@ describe("UniquenessValidationTest", () => {
   it("validate uniqueness with singleton class", async () => {
     await Topic.createBang({ title: "abc" });
 
-    Topic.validatesUniquenessOf("title");
     const t2 = new Topic({ title: "abc" });
+    (rbObjSingletonClass(t2) as typeof Topic).validates("title", { uniqueness: true });
     expect(await t2.isValid()).toBeFalsy();
+
+    const t3 = new Topic({ title: "abc" });
+    expect(await t3.isValid()).toBeTruthy();
   });
 
   it("validate uniqueness with alias attribute", async () => {

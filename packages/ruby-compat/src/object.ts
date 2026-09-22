@@ -1,6 +1,7 @@
 import { stringInspect } from "./string/inspect.js";
 import { isSymbol } from "./symbol.js";
 import { rubyClass, type Comparable } from "./comparable.js";
+import { TypeError } from "./type-error.js";
 
 /**
  * `rb_obj_class` (`vendor/ruby/object.c:296`) over the values trails carries:
@@ -33,6 +34,62 @@ function hasEpochNanoseconds(value: unknown): value is { epochNanoseconds: bigin
     (value as { [Symbol.toStringTag]: string })[Symbol.toStringTag].startsWith("Temporal.") &&
     typeof (value as { epochNanoseconds?: unknown }).epochNanoseconds === "bigint"
   );
+}
+
+const FL_SINGLETON = Symbol.for("@blazetrails/ruby-compat:FL_SINGLETON");
+
+/**
+ * `rb_obj_singleton_class` (`vendor/ruby/object.c:288`), Ruby's
+ * `Kernel#singleton_class`, over `singleton_class_of` (`vendor/ruby/class.c:2215`):
+ * the receiver's own class, created on first call and inserted between the
+ * object and its class. The JS seat is a subclass of `obj.constructor` that
+ * becomes the object's prototype. Its `prototype.constructor` stays the
+ * attached object's class, because `rb_obj_class` skips a singleton class
+ * (`vendor/ruby/object.c:296`): `obj.constructor` keeps answering Ruby's
+ * `obj.class`. A JS class's statics already are its singleton, so a class
+ * receiver answers itself.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbObjSingletonClass(obj: object): abstract new (...args: never) => object {
+  if (typeof obj === "function") return obj as abstract new (...args: never) => object;
+  const proto = Object.getPrototypeOf(obj);
+  if (proto !== null && Object.prototype.hasOwnProperty.call(proto, FL_SINGLETON)) {
+    return proto[FL_SINGLETON] as abstract new (...args: never) => object;
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TS2545: a mixin base's constructor rest parameter must be typed `any[]`.
+  const superclass = obj.constructor as new (...args: any[]) => object;
+  const klass = class extends superclass {};
+  Object.defineProperty(klass, FL_SINGLETON, { value: obj });
+  Object.defineProperty(klass.prototype, FL_SINGLETON, { value: klass });
+  Object.defineProperty(klass.prototype, "constructor", {
+    value: superclass,
+    writable: true,
+    configurable: true,
+  });
+  Object.setPrototypeOf(obj, klass.prototype);
+  return klass;
+}
+
+/**
+ * `rb_mod_singleton_p` (`vendor/ruby/object.c:3050`), `Module#singleton_class?`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbModSingletonP(klass: unknown): boolean {
+  return typeof klass === "function" && Object.prototype.hasOwnProperty.call(klass, FL_SINGLETON);
+}
+
+/**
+ * `rb_class_attached_object` (`vendor/ruby/class.c:1707`), `Class#attached_object`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbClassAttachedObject(klass: { name: string }): unknown {
+  if (!rbModSingletonP(klass)) {
+    throw new TypeError(`\`${klass.name}' is not a singleton class`);
+  }
+  return (klass as unknown as Record<symbol, unknown>)[FL_SINGLETON];
 }
 
 /**
