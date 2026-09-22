@@ -157,7 +157,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       );
       const output = await dumpTableSchema(adapter, "postgresql_enums");
       expect(output).toContain(
-        "Note that some types may not work with other database engines. Be careful if changing database.",
+        "// Note that some types may not work with other database engines. Be careful if changing database.",
       );
       expect(output).toContain('await ctx.createEnum("mood", ["sad","ok","happy"]);');
       expect(output).toContain('t.enum("current_mood", { enumType: "mood" })');
@@ -170,14 +170,14 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.renameEnum("mood", "feeling");
       const output = await dumpTableSchema(adapter, "postgresql_enums");
       expect(output).toContain('await ctx.createEnum("feeling", ["sad","ok","happy"]);');
-      expect(output).toContain('enumType: "feeling"');
+      expect(output).toContain('t.enum("current_mood", { enumType: "feeling" })');
     });
 
     it("schema dump renamed enum with to option", async () => {
       await adapter.renameEnum("mood", { to: "feeling" });
       const output = await dumpTableSchema(adapter, "postgresql_enums");
       expect(output).toContain('await ctx.createEnum("feeling", ["sad","ok","happy"]);');
-      expect(output).toContain('enumType: "feeling"');
+      expect(output).toContain('t.enum("current_mood", { enumType: "feeling" })');
     });
 
     it.skipIf(pgServerVersion < 100000)("schema dump added enum value", async () => {
@@ -311,7 +311,7 @@ describeIfPg("PostgreSQLAdapter", () => {
             'await ctx.createEnum("mood_in_test_schema", ["sad","ok","happy"]);',
           );
           expect(output).toContain('t.enum("current_mood", { enumType: "mood_in_test_schema" })');
-          expect(output).not.toContain("other_schema.mood_in_other_schema");
+          expect(output).not.toContain('await ctx.createEnum("other_schema.mood_in_other_schema"');
         });
       } finally {
         await adapter.dropSchema("other_schema", { ifExists: true });

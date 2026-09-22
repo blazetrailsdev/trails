@@ -245,4 +245,76 @@ describe("assertionValueMismatch", () => {
       ),
     ).toBeNull();
   });
+
+  it("folds a trails schema-dump statement onto the Rails DSL line", () => {
+    expect(
+      assertionValueMismatch(
+        ["assert_includes", "assert_includes"],
+        [
+          's:create_enum "mood", ["sad", "ok", "happy"]',
+          's:t.enum "good_mood", null: false, enum_type: "mood"',
+        ],
+        ["toContain", "toContain"],
+        [
+          's:await ctx.createEnum("mood", ["sad","ok","happy"]);',
+          's:t.enum("good_mood", { null: false, enumType: "mood" })',
+        ],
+        false,
+      ),
+    ).toBeNull();
+  });
+
+  it("still flags a folded dump statement whose values differ", () => {
+    expect(
+      assertionValueMismatch(
+        ["assert_includes"],
+        ['s:create_enum "mood", ["sad", "ok"]'],
+        ["toContain"],
+        ['s:await ctx.createEnum("mood", ["sad","okay"]);'],
+        false,
+      ),
+    ).not.toBeNull();
+  });
+
+  it("folds a dumped comment and an unterminated dump-call prefix", () => {
+    expect(
+      assertionValueMismatch(
+        ["assert_includes", "assert_not_includes"],
+        [
+          "s:# Note that some types may not work with other database engines.",
+          's:create_enum "other_schema.mood"',
+        ],
+        ["toContain", "not.toContain"],
+        [
+          "s:// Note that some types may not work with other database engines.",
+          's:await ctx.createEnum("other_schema.mood"',
+        ],
+        false,
+      ),
+    ).toBeNull();
+  });
+
+  it("does not fold dump spellings on the Rails side or outside the enum dump shapes", () => {
+    expect(
+      assertionValueMismatch(
+        ["assert_includes", "assert_includes"],
+        ["s:// Note that some types may not work with other database engines.", 's:t.string("x")'],
+        ["toContain", "toContain"],
+        ["s:# Note that some types may not work with other database engines.", 's:t.string "x"'],
+        false,
+      ),
+    ).not.toBeNull();
+  });
+
+  it("does not fold a bare createEnum or a ctx-prefixed t.enum", () => {
+    expect(
+      assertionValueMismatch(
+        ["assert_includes", "assert_includes"],
+        ['s:create_enum "mood"', 's:t.enum "mood"'],
+        ["toContain", "toContain"],
+        ['s:createEnum("mood")', 's:await ctx.t.enum("mood")'],
+        false,
+      ),
+    ).not.toBeNull();
+  });
 });
