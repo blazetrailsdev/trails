@@ -11,13 +11,14 @@ export namespace Unicode {
     return codepointsOf(String.fromCodePoint(...codepoints).normalize("NFC"));
   }
 
+  /** @missingRailsCall recode_windows1252_chars — PERMANENT */
   export function tidyBytes(string: string, force: boolean = false): string {
     // eslint-disable-next-line no-control-regex -- Ruby's `ascii_only?` (unicode.rb:29)
     if (string.length === 0 || /^[\x00-\x7f]*$/.test(string)) return string;
     if (force) return recodeWindows1252Chars(string);
     return string.replace(
       /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g,
-      (bad) => recodeWindows1252Chars(bad),
+      "\ufffd",
     );
   }
 

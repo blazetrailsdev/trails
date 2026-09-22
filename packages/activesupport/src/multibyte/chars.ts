@@ -1,4 +1,4 @@
-import { NoMethodError } from "@blazetrails/ruby-compat";
+import { NoMethodError, sliceBang, stringSplit } from "@blazetrails/ruby-compat";
 import { String as JsonString } from "../core-ext/object/json.js";
 import { truncateBytes } from "../string-utils.js";
 import { Unicode } from "./unicode.js";
@@ -18,8 +18,8 @@ export class Chars {
           };
         }
         const member = (target.wrappedString as unknown as Record<string, unknown>)[prop];
-        if (typeof member !== "function") return target.methodMissing(prop);
-        return (...args: unknown[]) => target.methodMissing(prop, ...args);
+        if (typeof member !== "function") return target.methodMissing.call(receiver, prop);
+        return (...args: unknown[]) => target.methodMissing.call(receiver, prop, ...args);
       },
       has(target, prop) {
         return prop in target || (typeof prop === "string" && target.respondToMissing(prop, false));
@@ -57,17 +57,21 @@ export class Chars {
     return method in Object(this.wrappedString);
   }
 
-  split(...args: Parameters<string["split"]>): Chars[] {
-    return this.wrappedString.split(...args).map((i) => new (this.constructor as typeof Chars)(i));
+  split(...args: [pattern?: string | RegExp | null, limit?: number]): Chars[] {
+    return stringSplit(this.wrappedString, ...args).map(
+      (i) => new (this.constructor as typeof Chars)(i),
+    );
   }
 
-  sliceBang(start: number, length: number = 1): Chars | null {
-    const chars = [...this.wrappedString];
-    if (start < 0) start += chars.length;
-    if (start < 0 || start > chars.length || length < 0) return null;
-    const stringSliced = chars.splice(start, length).join("");
-    this.wrappedString = chars.join("");
-    return this.chars(stringSliced);
+  sliceBang(
+    ...args: Parameters<typeof sliceBang> extends [string, ...infer A] ? A : never
+  ): Chars | null {
+    const [stringSliced, rest] = sliceBang(this.wrappedString, ...args);
+    this.wrappedString = rest;
+    if (stringSliced != null) {
+      return this.chars(stringSliced);
+    }
+    return null;
   }
 
   /** @missingRailsArgs join — PERMANENT */
@@ -81,7 +85,9 @@ export class Chars {
 
   titleize(): Chars {
     return this.chars(
-      this.wrappedString.toLowerCase().replace(/\b('?\S)/gu, (_m, c: string) => c.toUpperCase()),
+      this.wrappedString
+        .toLowerCase()
+        .replace(WORD_BOUNDARY_TITLEIZE, (_m, c: string) => c.toUpperCase()),
     );
   }
 
@@ -126,6 +132,9 @@ export class Chars {
     return new (this.constructor as typeof Chars)(string);
   }
 }
+
+const W = "[\\p{L}\\p{M}\\p{N}\\p{Pc}]";
+const WORD_BOUNDARY_TITLEIZE = new RegExp(`(?:(?<=${W})(?!${W})|(?<!${W})(?=${W}))('?\\S)`, "gu");
 
 function graphemeClusters(string: string): string[] {
   return Array.from(new Intl.Segmenter().segment(string), (s) => s.segment);

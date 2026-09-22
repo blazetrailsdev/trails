@@ -175,6 +175,8 @@ export { StringIO } from "./string-io.js";
 export { b } from "./string/b.js";
 export { chomp } from "./string/chomp.js";
 export { stringDelete } from "./string/delete.js";
+export { sliceBang } from "./string/slice.js";
+export { stringSplit } from "./string/split.js";
 export { forceEncoding } from "./string/force-encoding.js";
 export { Encoding } from "./encoding.js";
 export { stringInspect } from "./string/inspect.js";

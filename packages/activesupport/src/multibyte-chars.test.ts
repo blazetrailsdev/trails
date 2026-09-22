@@ -1,4 +1,4 @@
-import { beforeEach, describe, it, expect } from "vitest";
+import { afterEach, beforeEach, describe, it, expect } from "vitest";
 import { NoMethodError } from "@blazetrails/ruby-compat";
 import { Multibyte } from "./multibyte.js";
 import { Chars } from "./multibyte/chars.js";
@@ -405,8 +405,20 @@ describe("MultibyteCharsTest", () => {
   const proxyClass = Chars;
   let chars: Chars & Record<string, any>;
 
+  const definedStringMethods: string[] = [];
+  const defineStringMethod = (name: string, body: () => unknown) => {
+    Object.defineProperty(String.prototype, name, { value: body, configurable: true });
+    definedStringMethods.push(name);
+  };
+
   beforeEach(() => {
     chars = new proxyClass(UNICODE_STRING) as Chars & Record<string, any>;
+  });
+
+  afterEach(() => {
+    for (const name of definedStringMethods.splice(0)) {
+      delete (String.prototype as unknown as Record<string, unknown>)[name];
+    }
   });
 
   it("wraps the original string", () => {
@@ -414,33 +426,29 @@ describe("MultibyteCharsTest", () => {
     expect(chars.wrappedString).toEqual(UNICODE_STRING);
   });
 
-  it.skip("should allow method calls to string", async () => {
-    // BLOCKED: assertions-activesupport-multibyte-chars-remainder
-    (chars.wrappedString as any).__methodForMultibyteTesting = () => "result";
+  it("should allow method calls to string", async () => {
+    defineStringMethod("__methodForMultibyteTesting", () => "result");
 
     await assertNothingRaised(() => chars.__methodForMultibyteTesting());
     await assertRaise([NoMethodError], {}, () => chars.__unknownMethod());
   });
 
-  it.skip("forwarded method calls should return new chars instance", () => {
-    // BLOCKED: assertions-activesupport-multibyte-chars-remainder
-    (chars.wrappedString as any).__methodForMultibyteTesting = () => "result";
+  it("forwarded method calls should return new chars instance", () => {
+    defineStringMethod("__methodForMultibyteTesting", () => "result");
 
     expect(chars.__methodForMultibyteTesting()).toBeInstanceOf(proxyClass);
     expect(chars.__methodForMultibyteTesting()).not.toBe(chars);
   });
 
-  it.skip("forwarded bang method calls should return the original chars instance when result is not nil", () => {
-    // BLOCKED: assertions-activesupport-multibyte-chars-remainder
-    (chars.wrappedString as any).__methodForMultibyteTestingBang = () => "result";
+  it("forwarded bang method calls should return the original chars instance when result is not nil", () => {
+    defineStringMethod("__methodForMultibyteTestingBang", () => "result");
 
     expect(chars.__methodForMultibyteTestingBang()).toBeInstanceOf(proxyClass);
     expect(chars.__methodForMultibyteTestingBang()).toBe(chars);
   });
 
-  it.skip("forwarded bang method calls should return nil when result is nil", () => {
-    // BLOCKED: assertions-activesupport-multibyte-chars-remainder
-    (chars.wrappedString as any).__methodForMultibyteTestingThatReturnsNilBang = () => null;
+  it("forwarded bang method calls should return nil when result is nil", () => {
+    defineStringMethod("__methodForMultibyteTestingThatReturnsNilBang", () => null);
 
     expect(chars.__methodForMultibyteTestingThatReturnsNilBang()).toBeNull();
   });
@@ -451,11 +459,9 @@ describe("MultibyteCharsTest", () => {
     );
   });
 
-  it.skip("forwarded method with non string result should be returned verbatim", () => {
-    // BLOCKED: assertions-activesupport-multibyte-chars-remainder
+  it("forwarded method with non string result should be returned verbatim", () => {
     const str: any = "";
-    str.__methodForMultibyteTestingWithIntegerResult = () => 1;
-    (chars.wrappedString as any).__methodForMultibyteTestingWithIntegerResult = () => 1;
+    defineStringMethod("__methodForMultibyteTestingWithIntegerResult", () => 1);
 
     expect(chars.__methodForMultibyteTestingWithIntegerResult()).toEqual(
       str.__methodForMultibyteTestingWithIntegerResult(),
@@ -463,7 +469,7 @@ describe("MultibyteCharsTest", () => {
   });
 
   it.skip("should concatenate", () => {
-    // BLOCKED: assertions-activesupport-multibyte-chars-remainder
+    // PERMANENT-SKIP: Ruby `+` / `<<` on a Chars reach method_missing and `<<` mutates the wrapped String; JS has no operator overloading and its strings are immutable.
     const mbA: any = mbChars("a");
     const mbB: any = mbChars("b");
     expect(mbA + "b").toEqual("ab");
@@ -476,7 +482,7 @@ describe("MultibyteCharsTest", () => {
   });
 
   it.skip("concatenation should return a proxy class instance", () => {
-    // BLOCKED: assertions-activesupport-multibyte-chars-remainder
+    // PERMANENT-SKIP: Ruby `+` / `<<` on a Chars reach method_missing and `<<` mutates the wrapped String; JS has no operator overloading and its strings are immutable.
     expect((mbChars("a") as any).concat("b").constructor).toEqual(Multibyte.proxyClass());
     expect((mbChars("a") as any).concat("b").constructor).toEqual(Multibyte.proxyClass());
   });
@@ -486,7 +492,7 @@ describe("MultibyteCharsTest", () => {
   });
 
   it.skip("concatenate should return proxy instance", () => {
-    // BLOCKED: assertions-activesupport-multibyte-chars-remainder
+    // PERMANENT-SKIP: Ruby `+` / `<<` on a Chars reach method_missing and `<<` mutates the wrapped String; JS has no operator overloading and its strings are immutable.
     assert((mbChars("a") as any).concat("b") instanceof proxyClass);
     assert((mbChars("a") as any).concat(mbChars("b")) instanceof proxyClass);
     assert((mbChars("a") as any).concat("b") instanceof proxyClass);
