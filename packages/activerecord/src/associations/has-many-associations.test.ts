@@ -3685,18 +3685,19 @@ describe("HasManyAssociationsTest", () => {
     const bulb1 = await HmBulb.createBang({ name: "defaulty", car });
     const bulb2 = await HmBulb.createBang({ name: "other", car });
 
-    const byId = (a: any, b: any) => a.id - b.id;
     expect(
-      ((await HmCar.includes("allBulbs2").find(car.id)) as any).allBulbs2.target
-        .slice()
-        .sort(byId)
-        .map(recordId),
+      (
+        await ((await HmCar.includes("allBulbs2").find(car.id)) as any).allBulbs2.sortBy(
+          (b: any) => b.id,
+        )
+      ).map(recordId),
     ).toEqual([bulb1, bulb2].map(recordId));
     expect(
-      ((await HmCar.eagerLoad("allBulbs2").find(car.id)) as any).allBulbs2.target
-        .slice()
-        .sort(byId)
-        .map(recordId),
+      (
+        await ((await HmCar.eagerLoad("allBulbs2").find(car.id)) as any).allBulbs2.sortBy(
+          (b: any) => b.id,
+        )
+      ).map(recordId),
     ).toEqual([bulb1, bulb2].map(recordId));
   });
 
