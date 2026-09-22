@@ -1,38 +1,45 @@
 {
   "abstractcontroller": {
-    "total": 2,
+    "total": 3,
     "byFile": {
-      "rendering.rb": 2
+      "rendering.rb": 3
     }
   },
   "actioncontroller": {
-    "total": 2,
+    "total": 4,
     "byFile": {
       "metal/live.rb": 1,
-      "metal/strong_parameters.rb": 1
+      "metal/strong_parameters.rb": 3
     }
   },
   "actiondispatch": {
-    "total": 14,
+    "total": 25,
     "byFile": {
+      "http/headers.rb": 1,
+      "http/query_parser.rb": 1,
+      "http/response.rb": 1,
       "http/url.rb": 1,
       "journey/formatter.rb": 1,
       "journey/router.rb": 1,
+      "middleware/cookies.rb": 1,
       "middleware/exception_wrapper.rb": 1,
       "middleware/stack.rb": 5,
       "request/utils.rb": 1,
-      "routing/mapper.rb": 3,
-      "system_test_case.rb": 1
+      "routing/mapper.rb": 9,
+      "system_test_case.rb": 1,
+      "system_testing/driver.rb": 1
     }
   },
   "actionview": {
-    "total": 6,
+    "total": 8,
     "byFile": {
       "base.rb": 1,
       "helpers/number_helper.rb": 1,
       "helpers/tag_helper.rb": 1,
       "path_set.rb": 1,
-      "renderer/renderer.rb": 2
+      "renderer/renderer.rb": 2,
+      "renderer/streaming_template_renderer.rb": 1,
+      "template.rb": 1
     }
   },
   "activemodel": {
@@ -45,17 +52,22 @@
     }
   },
   "activerecord": {
-    "total": 21,
+    "total": 28,
     "byFile": {
       "association_relation.rb": 1,
+      "associations/collection_proxy.rb": 1,
       "connection_adapters/abstract/database_statements.rb": 1,
       "connection_adapters/postgresql_adapter.rb": 1,
-      "core.rb": 1,
+      "core.rb": 2,
+      "log_subscriber.rb": 1,
       "relation.rb": 8,
       "relation/batches.rb": 4,
+      "relation/finder_methods.rb": 1,
+      "relation/query_methods.rb": 2,
       "statement_cache.rb": 1,
       "tasks/database_tasks.rb": 3,
-      "token_for.rb": 1
+      "token_for.rb": 1,
+      "type/hash_lookup_type_map.rb": 1
     }
   },
   "activesupport": {
@@ -79,10 +91,12 @@
     "byFile": {}
   },
   "rack": {
-    "total": 3,
+    "total": 5,
     "byFile": {
       "builder.rb": 1,
+      "headers.rb": 1,
       "query_parser.rb": 1,
+      "response.rb": 1,
       "utils.rb": 1
     }
   },

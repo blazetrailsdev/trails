@@ -4620,7 +4620,9 @@ export function main() {
         if (candidates.length === 0) return;
         if (rubyBlockNames.has(rubyName) && !rubyForwardingNames.has(rubyName) && !guessedFile) {
           blockParamsCompared++;
-          if (dropsBlock(true, candidates)) {
+          const inFile = tsParamsByFileNameInPkg.get(tsFile)?.get(tsName) ?? [];
+          const aliasOnly = inFile.every((sig) => stripThis(sig).length === 0);
+          if (dropsBlock(true, aliasOnly ? candidates : inFile)) {
             blockParamMismatches.push({ rubyFile, tsFile, rubyName, tsName });
           }
         }
