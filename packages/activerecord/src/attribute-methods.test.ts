@@ -20,7 +20,7 @@ import {
   TimeType,
   UnknownAttributeError as AMUnknownAttributeError,
 } from "@blazetrails/activemodel";
-import { ArgumentError, basicObjRespondTo, NoMethodError } from "@blazetrails/ruby-compat";
+import { ArgumentError, Module, basicObjRespondTo, NoMethodError } from "@blazetrails/ruby-compat";
 import { Base, DangerousAttributeError, Type, UnknownAttributeError } from "./index.js";
 
 import { GeneratedAttributeMethods } from "./attribute-methods.js";
@@ -1900,6 +1900,6 @@ describe("initialize_generated_modules", () => {
       }
     }
     Topic.initializeGeneratedModules();
-    expect((Topic as any)._generatedAssociationMethods).toBeInstanceOf(Set);
+    expect((Topic as any)._generatedAssociationMethods).toBeInstanceOf(Module);
   });
 });

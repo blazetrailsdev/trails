@@ -45,7 +45,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicUniquenessValidatorTest
       });
     };
 
-    await new EncryptedUniquenessValidator().validateEach(
+    await EncryptedUniquenessValidator.validateEach(
       originalValidateEach,
       record,
       "email",
@@ -73,12 +73,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicUniquenessValidatorTest
     const calls: unknown[] = [];
     const originalValidateEach = (_r: any, _a: string, value: unknown) => calls.push(value);
 
-    await new EncryptedUniquenessValidator().validateEach(
-      originalValidateEach,
-      record,
-      "body",
-      "hello",
-    );
+    await EncryptedUniquenessValidator.validateEach(originalValidateEach, record, "body", "hello");
 
     expect(calls).toHaveLength(1);
   });

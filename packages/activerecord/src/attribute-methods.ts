@@ -381,12 +381,19 @@ function isOwnedByGeneratedAttributeMethods(klass: any, name: string): boolean {
 }
 
 function instanceMethodOwner(klass: any, name: string): unknown {
-  for (let c = klass; typeof c === "function"; c = Object.getPrototypeOf(c)) {
-    if (c.prototype && Object.prototype.hasOwnProperty.call(c.prototype, name)) return c.prototype;
-    const mod = Object.prototype.hasOwnProperty.call(c, "_generatedAttributeMethods")
-      ? c._generatedAttributeMethods
-      : undefined;
-    if (mod instanceof Module && mod.isMethodDefined(name)) return mod;
+  for (let proto = klass.prototype; proto; proto = Object.getPrototypeOf(proto)) {
+    const descriptor = Object.getOwnPropertyDescriptor(proto, name);
+    if (!descriptor) continue;
+    if ("value" in descriptor && descriptor.value === undefined) return undefined;
+    if (Object.prototype.hasOwnProperty.call(proto, "constructor")) return proto;
+    for (let c = klass; typeof c === "function"; c = Object.getPrototypeOf(c)) {
+      const mod = Object.prototype.hasOwnProperty.call(c, "_generatedAttributeMethods")
+        ? c._generatedAttributeMethods
+        : undefined;
+      const entry = mod instanceof Module ? mod.instanceMethod(name) : undefined;
+      if (entry && (entry.get ?? entry.value) === (descriptor.get ?? descriptor.value)) return mod;
+    }
+    return proto;
   }
   return undefined;
 }
