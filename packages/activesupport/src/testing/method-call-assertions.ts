@@ -1,3 +1,4 @@
+import { rbEqual } from "@blazetrails/ruby-compat";
 import { assert } from "./assertions.js";
 
 /** @noRailsEquivalent PERMANENT */
@@ -49,12 +50,12 @@ export function assertCalledWith<T extends object>(
   methodName: keyof T & string,
   args: unknown[],
   { returns = false }: { returns?: unknown } = {},
-  block?: () => void,
-): void {
+  block?: () => void | Promise<void>,
+): void | Promise<void> {
   const mock: Mock = { expected: [], returns, calls: [] };
   expectCalledWith(mock, args, { returns });
 
-  stub(
+  const result = stub(
     object,
     methodName,
     (...called: unknown[]) => {
@@ -64,6 +65,7 @@ export function assertCalledWith<T extends object>(
     block,
   );
 
+  if (result) return result.then(() => assertMock(mock));
   assertMock(mock);
 }
 
@@ -175,7 +177,7 @@ function assertMock(mock: Mock): void {
     }
     if (
       actual.length !== expected.length ||
-      expected.some((arg, i) => !Object.is(arg, actual[i]))
+      expected.some((arg, i) => !rbEqual(arg, actual[i]))
     ) {
       throw new MockExpectationError(
         `Expected call with ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`,

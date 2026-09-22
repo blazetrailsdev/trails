@@ -133,7 +133,11 @@ function equalOrEql(a: unknown, b: unknown, eql: boolean): boolean {
 /** The `RHASH` of `hash_equal` (`vendor/ruby/hash.c:3746`) over both JS seats. */
 function hashEntries(value: unknown): [unknown, unknown][] | null {
   if (value instanceof Map) return [...value.entries()];
-  if (typeof value === "object" && value !== null && value.constructor === Object) {
+  if (
+    typeof value === "object" &&
+    value !== null &&
+    [Object.prototype, null].includes(Object.getPrototypeOf(value))
+  ) {
     return Object.entries(value as Record<string, unknown>);
   }
   return null;
