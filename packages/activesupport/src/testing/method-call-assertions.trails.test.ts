@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { assertCalled, assertCalledWith } from "./method-call-assertions.js";
+import { MockExpectationError, assertCalled, assertCalledWith } from "./method-call-assertions.js";
 
 describe("assertCalled with an async block", () => {
   it("restores the stub only after the block settles", async () => {
@@ -37,6 +37,18 @@ describe("assertCalledWith", () => {
     assertCalledWith(object, "foo", [{ a: 1 }], {}, () => {
       object.foo(Object.assign(Object.create(null), { a: 1 }));
     });
+  });
+
+  it("matches an argument with Ruby ===", () => {
+    const object = { foo: (_a: unknown, _b: unknown) => "original" };
+    assertCalledWith(object, "foo", [/\d+/, Date], {}, () => {
+      object.foo("id 42", new Date());
+    });
+    expect(() =>
+      assertCalledWith(object, "foo", [/\d+/, Date], {}, () => {
+        object.foo("none", {});
+      }),
+    ).toThrow(MockExpectationError);
   });
 
   it("verifies after an async block settles", async () => {

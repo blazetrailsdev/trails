@@ -182,7 +182,7 @@ function assertMock(mock: Mock): void {
     }
     if (
       actual.length !== expected.length ||
-      expected.some((arg, i) => !rbEqual(arg, actual[i]))
+      expected.some((arg, i) => !(caseEqual(arg, actual[i]) || rbEqual(arg, actual[i])))
     ) {
       throw new MockExpectationError(
         `Expected call with ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`,
@@ -190,6 +190,12 @@ function assertMock(mock: Mock): void {
     }
   }
   assert(true);
+}
+
+function caseEqual(expected: unknown, actual: unknown): boolean {
+  if (expected instanceof RegExp) return typeof actual === "string" && expected.test(actual);
+  if (typeof expected === "function") return actual instanceof expected;
+  return rbEqual(expected, actual);
 }
 
 function assertEqual(expected: unknown, actual: unknown, message: string): void {
