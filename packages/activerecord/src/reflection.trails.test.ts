@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { RuntimeError } from "@blazetrails/ruby-compat";
+import { DelegationError } from "@blazetrails/activesupport";
 import { Base, reflectOnAssociation, registerModel } from "./index.js";
 import {
   configureEncryption,
@@ -235,6 +236,28 @@ describe("Reflection.create", () => {
 
     expect(() => create("hasAndBelongsToMany" as never, "gadgets", null, {}, Widget)).toThrow(
       new RuntimeError("Unsupported Macro: hasAndBelongsToMany"),
+    );
+  });
+});
+
+describe("ThroughReflection delegation to a nil source_reflection", () => {
+  it("raises DelegationError from foreignKey, foreignType and type", () => {
+    class NsrPost extends Base {
+      static {
+        this.hasMany("nsrTaggings", {});
+        this.hasMany("nsrTags", { through: "nsrTaggings" });
+      }
+    }
+    registerModel("NsrPost", NsrPost);
+    const ref = reflectOnAssociation(NsrPost, "nsrTags") as ThroughReflection;
+    Object.defineProperty(ref, "sourceReflection", { value: null });
+
+    expect(() => ref.foreignKey()).toThrow(
+      new DelegationError("foreignKey delegated to sourceReflection, but sourceReflection is nil"),
+    );
+    expect(() => ref.foreignType).toThrow(DelegationError);
+    expect(() => ref.type).toThrow(
+      "type delegated to sourceReflection, but sourceReflection is nil",
     );
   });
 });

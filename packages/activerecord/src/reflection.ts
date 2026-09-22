@@ -14,6 +14,7 @@ import {
   safeConstantize,
   foreignKey as deriveForeignKey,
   merge,
+  DelegationError,
 } from "@blazetrails/activesupport";
 import { RuntimeError, except, mergeBang } from "@blazetrails/ruby-compat";
 import { Table, Nodes } from "@blazetrails/arel";
@@ -1272,15 +1273,21 @@ export class ThroughReflection extends AbstractReflection {
   }
 
   foreignKey(kwargs?: { inferFromInverseOf?: boolean }): string | string[] {
-    return this.sourceReflection!.foreignKey(kwargs);
+    const _ = this.sourceReflection;
+    if (_ == null) throw DelegationError.nilTarget("foreignKey", "sourceReflection");
+    return _.foreignKey(kwargs);
   }
 
   get foreignType(): string | null {
-    return this.sourceReflection!.foreignType;
+    const _ = this.sourceReflection;
+    if (_ == null) throw DelegationError.nilTarget("foreignType", "sourceReflection");
+    return _.foreignType;
   }
 
   get type(): string | null {
-    return this.sourceReflection!.type;
+    const _ = this.sourceReflection;
+    if (_ == null) throw DelegationError.nilTarget("type", "sourceReflection");
+    return _.type;
   }
 
   get scope(): ((...args: any[]) => any) | null {
