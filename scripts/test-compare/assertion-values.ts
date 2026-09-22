@@ -109,7 +109,8 @@ function collectSide(
     const value = values?.[i];
     if (value != null) {
       if (LOOSE_RAILS_KINDS.has(kinds[i])) entry.loose.add(entry.captured.length);
-      entry.captured.push(foldNameToken(foldDumpStatementToken(foldSymbolToken(value))));
+      const token = foldSymbolToken(value);
+      entry.captured.push(foldNameToken(side === "trails" ? foldDumpStatementToken(token) : token));
     }
   }
   return map;
@@ -135,20 +136,21 @@ function foldSymbolToken(token: string): string {
  * `t.enum("current_mood", { enumType: "mood" })` on the trails side and
  * `create_enum "mood", ["sad", "ok"]` / `t.enum "current_mood", enum_type: "mood"`
  * on the Rails side (activerecord/test/cases/adapters/postgresql/enum_test.rb:108-117),
- * and a dumped `// ` comment is Ruby's `# `. That is the dump file's host
- * language, not a fidelity divergence. The fold turns a `ctx.` / `t.` call's
- * parentheses into Ruby's bare call (an unterminated prefix such as
+ * and the PostgreSQL dumper's `// Note that some types …` header is Ruby's
+ * `# Note …` (enum_test.rb:106). That is the dump file's host language, not a
+ * fidelity divergence. Only those evidenced shapes fold, and only on the trails
+ * side. The fold turns a `createEnum` / `t.enum` call's parentheses into Ruby's
+ * bare call (an unterminated prefix such as
  * `await ctx.createEnum("x"` folds too, for `assert_not_includes` at
  * enum_test.rb:254), unwraps a trailing options object into kwargs and spaces
  * a string array's commas as Ruby's `inspect` does; foldNameToken then aligns
- * `create_enum` / `enum_type`. Ruby tokens never carry either prefix, so they
- * pass through untouched.
+ * `create_enum` / `enum_type`.
  */
-const DUMP_STATEMENT_RE =
-  /^s:(?:await ctx\.|(?=t\.))((?:t\.)?[A-Za-z_][A-Za-z0-9_]*)\((.*?)(?:\);?)?$/s;
+const DUMP_STATEMENT_RE = /^s:(?:await ctx\.)?(createEnum|t\.enum)\((.*?)(?:\);?)?$/s;
+const DUMP_ENUM_NOTE = "// Note that some types may not work with other database engines.";
 
 function foldDumpStatementToken(token: string): string {
-  if (token.startsWith("s:// ")) return `s:# ${token.slice(5)}`;
+  if (token.startsWith(`s:${DUMP_ENUM_NOTE}`)) return `s:# ${token.slice(5)}`;
   const match = DUMP_STATEMENT_RE.exec(token);
   if (!match) return token;
   const args = match[2].replace(/, \{ (.*) \}$/s, ", $1").replace(/",(?=")/g, '", ');

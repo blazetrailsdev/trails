@@ -280,11 +280,29 @@ describe("assertionValueMismatch", () => {
     expect(
       assertionValueMismatch(
         ["assert_includes", "assert_not_includes"],
-        ["s:# Note", 's:create_enum "other_schema.mood"'],
+        [
+          "s:# Note that some types may not work with other database engines.",
+          's:create_enum "other_schema.mood"',
+        ],
         ["toContain", "not.toContain"],
-        ["s:// Note", 's:await ctx.createEnum("other_schema.mood"'],
+        [
+          "s:// Note that some types may not work with other database engines.",
+          's:await ctx.createEnum("other_schema.mood"',
+        ],
         false,
       ),
     ).toBeNull();
+  });
+
+  it("does not fold dump spellings on the Rails side or outside the enum dump shapes", () => {
+    expect(
+      assertionValueMismatch(
+        ["assert_includes", "assert_includes"],
+        ["s:// Note that some types may not work with other database engines.", 's:t.string("x")'],
+        ["toContain", "toContain"],
+        ["s:# Note that some types may not work with other database engines.", 's:t.string "x"'],
+        false,
+      ),
+    ).not.toBeNull();
   });
 });
