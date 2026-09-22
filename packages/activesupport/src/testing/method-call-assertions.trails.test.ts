@@ -64,6 +64,18 @@ describe("assertCalledWith", () => {
     ).toThrow(MockExpectationError);
   });
 
+  it("matches an argument with a lambda, as Proc#===", () => {
+    const object = { foo: (_n: number) => "original" };
+    assertCalledWith(object, "foo", [(n: number) => n > 2], {}, () => {
+      object.foo(3);
+    });
+    expect(() =>
+      assertCalledWith(object, "foo", [(n: number) => n > 2], {}, () => {
+        object.foo(1);
+      }),
+    ).toThrow(MockExpectationError);
+  });
+
   it("verifies after an async block settles", async () => {
     const object = { foo: (_x: number) => "original" };
     await expect(

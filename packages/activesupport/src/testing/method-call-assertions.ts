@@ -198,7 +198,13 @@ function caseEqual(expected: unknown, actual: unknown): boolean {
     return (matcher as { caseEquals(value: unknown): boolean }).caseEquals(actual);
   }
   if (expected instanceof RegExp) return typeof actual === "string" && expected.test(actual);
-  if (typeof expected === "function") return actual instanceof expected;
+  if (typeof expected === "function") {
+    if (expected.prototype === undefined) {
+      const result: unknown = expected(actual);
+      return result != null && result !== false;
+    }
+    return actual instanceof expected;
+  }
   return rbEqual(expected, actual);
 }
 
