@@ -1,7 +1,8 @@
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { hexdigest, isBlank, toFs } from "@blazetrails/activesupport";
 import { except, extend, isModuleIncluded, type Module, Range } from "@blazetrails/ruby-compat";
-import { isEmpty } from "@blazetrails/ruby-compat";
+import { fetch, isEmpty } from "@blazetrails/ruby-compat";
+import type { TokenDefinition } from "./token-for.js";
 import { first } from "./ruby-first.js";
 import { Table, SelectManager, Nodes, sql, star } from "@blazetrails/arel";
 import type { Base } from "./base.js";
@@ -1617,25 +1618,31 @@ export class Relation<T extends Base> {
     return this.scoping(() => (this.model as any).findSignedBang(token, options)) as Promise<T>;
   }
 
+  /** @missingRailsArgs fetch — PERMANENT */
   async findByTokenFor(purpose: string, token: string): Promise<T | null> {
     const primaryKey = this.model.primaryKey as string | string[] | null;
     if (!primaryKey || primaryKey.length === 0) throw new UnknownPrimaryKey(this);
-    const record = await this.model.tokenDefinitions.fetch(purpose).resolveToken(token, (id) => {
-      if (Array.isArray(primaryKey)) {
-        if (!Array.isArray(id) || id.length !== primaryKey.length) return Promise.resolve(null);
-        return this.findBy(
-          Object.fromEntries(primaryKey.map((key, i) => [key, id[i]])),
-        ) as Promise<Base | null>;
-      }
-      return this.findBy({ [primaryKey]: [id] }) as Promise<Base | null>;
-    });
+    const record = await fetch<TokenDefinition>(this.model.tokenDefinitions, purpose).resolveToken(
+      token,
+      (id) => {
+        if (Array.isArray(primaryKey)) {
+          if (!Array.isArray(id) || id.length !== primaryKey.length) return Promise.resolve(null);
+          return this.findBy(
+            Object.fromEntries(primaryKey.map((key, i) => [key, id[i]])),
+          ) as Promise<Base | null>;
+        }
+        return this.findBy({ [primaryKey]: [id] }) as Promise<Base | null>;
+      },
+    );
     return record as T | null;
   }
 
+  /** @missingRailsArgs fetch — PERMANENT */
   async findByTokenForBang(purpose: string, token: string): Promise<T> {
-    const record = await this.model.tokenDefinitions
-      .fetch(purpose)
-      .resolveToken(token, (id) => this.find(id) as Promise<Base>);
+    const record = await fetch<TokenDefinition>(this.model.tokenDefinitions, purpose).resolveToken(
+      token,
+      (id) => this.find(id) as Promise<Base>,
+    );
     if (!record) throw new InvalidSignature();
     return record as T;
   }

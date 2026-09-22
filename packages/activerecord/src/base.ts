@@ -139,8 +139,6 @@ import {
   findSignedBang as _findSignedBang,
 } from "./signed-id.js";
 import {
-  registerGeneratedTokenVerifierSink as _registerGeneratedTokenVerifierSink,
-  withFetch as _withFetch,
   generatesTokenFor as _generatesTokenFor,
   generateTokenFor as _generateTokenFor,
   findByTokenFor as _findByTokenFor,
@@ -148,11 +146,8 @@ import {
 } from "./token-for.js";
 import type { TokenDefinitionsHash as _TokenDefinitionsHash } from "./token-for.js";
 import type { MessageVerifier as _MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { setBaseResolver as _setBaseResolverWithLogSubscriber } from "./log-subscriber.js";
 import { writingRole } from "./active-record.js";
 import { DescendantsTracker } from "@blazetrails/activesupport";
-import { registerMigrationArConfig } from "./migration/ar-config-source.js";
-import { registerTableNameOptions } from "./connection-adapters/abstract/table-name-options.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
 import * as LockingOptimistic from "./locking/optimistic.js";
 import * as LockingPessimistic from "./locking/pessimistic.js";
@@ -1052,6 +1047,7 @@ export class Base extends Model {
   declare static symbolColumnToString: typeof ModelSchema.symbolColumnToString;
   declare static resetColumnInformation: typeof ModelSchema.resetColumnInformation;
   declare static _returningColumnsForInsert: typeof ModelSchema._returningColumnsForInsert;
+  declare static loadSchemaBang: typeof ModelSchema.loadSchemaBang;
 
   static get inheritanceColumn(): string | null {
     return ModelSchema.inheritanceColumn.call(this);
@@ -2766,7 +2762,7 @@ include(Base, {
 classAttribute.call(Base, "tokenDefinitions", {
   instanceAccessor: false,
   instancePredicate: false,
-  default: _withFetch({}),
+  default: {},
 });
 classAttribute.call(Base, "generatedTokenVerifier", {
   instanceAccessor: false,
@@ -2775,14 +2771,6 @@ classAttribute.call(Base, "generatedTokenVerifier", {
 classAttribute.call(Base, "counterCachedAssociationNames", {
   instanceWriter: false,
   default: [],
-});
-let _bootTokenVerifier: _MessageVerifier | null = null;
-_registerGeneratedTokenVerifierSink((verifier) => {
-  if (Base.generatedTokenVerifier != null && Base.generatedTokenVerifier !== _bootTokenVerifier) {
-    return;
-  }
-  _bootTokenVerifier = verifier;
-  Base.generatedTokenVerifier = verifier;
 });
 extend(Base, {
   defaultScope: _defaultScope,
@@ -2908,6 +2896,8 @@ include(Base, Timestamp.InstanceMethods);
 include(Base, TouchLater.InstanceMethods);
 include(Base, _AttributeAssignment.AttributeAssignment);
 include(Base, AutosaveAssociation);
+prepend(Base, { loadSchemaBang: CounterCache.loadSchemaBang as PrependMethod });
+prepend(Base, { loadSchemaBang: _EncryptableRecord.loadSchemaBang as PrependMethod });
 prepend(Base.prototype, { initInternals: _Core.initInternals as PrependMethod });
 prepend(Base.prototype, { initInternals: _Persistence.initInternals as PrependMethod });
 prepend(Base.prototype, {
@@ -3130,33 +3120,6 @@ _setSuperIsValid(Model.prototype.isValid);
   });
 }
 
-registerTableNameOptions({
-  get tableNamePrefix() {
-    return Base.tableNamePrefix;
-  },
-  get tableNameSuffix() {
-    return Base.tableNameSuffix;
-  },
-  get pluralizeTableNames() {
-    return Base.pluralizeTableNames;
-  },
-  getPrimaryKey(baseName: string) {
-    return Base.getPrimaryKey(baseName) as string;
-  },
-});
-
-registerMigrationArConfig({
-  get tableNamePrefix() {
-    return Base.tableNamePrefix;
-  },
-  get tableNameSuffix() {
-    return Base.tableNameSuffix;
-  },
-  configurations: () => Base.configurations(),
-  connectionHandler: () => Base.connectionHandler,
-  databaseTasks: () => DatabaseTasks,
-});
-
 import "@blazetrails/globalid/wire";
 
 import { type LocatorModel as _LocatorModel } from "@blazetrails/globalid";
@@ -3182,4 +3145,3 @@ _registerBaseWithSchemaDumper(Base);
 _registerBaseWithConnectionHandler(Base);
 _registerBaseWithAsynchronousQueriesTracker(Base);
 _registerBaseWithDatabaseStatements(Base);
-_setBaseResolverWithLogSubscriber(() => Base);

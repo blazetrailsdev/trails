@@ -12,7 +12,7 @@ import { CheckConstraintDefinition } from "../abstract/schema-definitions.js";
 import type { TableDefinition as SQLite3TableDefinition } from "./schema-definitions.js";
 import { IndexDefinition } from "../abstract/schema-definitions.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
-import { globalPluralizeTableNames } from "../abstract/table-name-options.js";
+import { _Base } from "../../base-slot.js";
 import { SchemaStatements as AbstractSchemaStatements } from "../abstract/schema-statements.js";
 import { SchemaDumper as AbstractSchemaDumper } from "../abstract/schema-dumper.js";
 import { SchemaDumper } from "./schema-dumper.js";
@@ -94,7 +94,7 @@ export async function removeForeignKey(
       table = to;
     } else {
       table = toS(matchOptions.column).replace(/_id$/, "");
-      table = globalPluralizeTableNames() ? pluralize(table) : table;
+      table = _Base!.pluralizeTableNames ? pluralize(table) : table;
     }
     table = this.stripTableNamePrefixAndSuffix(table);
     const fkOptions = fk.options as Record<string, unknown>;

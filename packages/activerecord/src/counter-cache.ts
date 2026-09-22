@@ -2,7 +2,6 @@ import type { Base } from "./base.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { extractOptionsBang, wrap } from "@blazetrails/activesupport";
 import { pendingCounterCacheColumns } from "./counter-cache-state.js";
-import { registerLoadSchemaOverride } from "./load-schema-overrides-slot.js";
 import {
   touchAttributesWithTime,
   type CounterCacheTouchOption,
@@ -212,5 +211,3 @@ export function _foreignKeysEqual(fkey1: unknown, fkey2: unknown): boolean {
   );
   return arr1.length === arr2.length && arr1.every((k, i) => k === arr2[i]);
 }
-
-registerLoadSchemaOverride(309, loadSchemaBang as never);

@@ -22,6 +22,7 @@ import {
   type Included,
 } from "@blazetrails/activesupport";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
+import { _Base } from "../../base-slot.js";
 import type { HashConfig } from "../../database-configurations/hash-config.js";
 import type { PoolConfig } from "../pool-config.js";
 import type { ConnectionDescriptor } from "./connection-handler.js";
@@ -216,36 +217,11 @@ export class LeaseRegistry {
   }
 }
 
-type ConnectionHandlerLike = {
-  eachConnectionPool(block: (pool: ConnectionPool) => void): void;
-  eachConnectionPool(role: string | null | undefined, block: (pool: ConnectionPool) => void): void;
-};
-
 export class ExecutorHooks {
-  private static _getConnectionHandler: (() => ConnectionHandlerLike | null) | null = null;
-
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
-  static setConnectionHandlerResolver(resolver: () => ConnectionHandlerLike | null): void {
-    ExecutorHooks._getConnectionHandler = resolver;
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
-  static connectionHandler(): ConnectionHandlerLike | null {
-    return ExecutorHooks._getConnectionHandler?.() ?? null;
-  }
-
   static run(): void {}
 
   static complete(): void {
-    const handler = ExecutorHooks._getConnectionHandler?.();
-    if (!handler) return;
-    handler.eachConnectionPool((pool) => {
+    _Base!.connectionHandler.eachConnectionPool((pool) => {
       const connection = pool.activeConnection;
       if (connection) {
         const txn =

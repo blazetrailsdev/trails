@@ -6,6 +6,7 @@ import {
   type Logger,
 } from "@blazetrails/activesupport";
 import { verboseQueryLogs } from "./active-record.js";
+import { _Base } from "./base-slot.js";
 
 function byteLength(value: unknown): number {
   if (value == null) return 0;
@@ -39,24 +40,6 @@ function safeJsonStringify(value: unknown): string {
   );
   const escaped = marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return wrapped.replace(new RegExp(`"${escaped}(-?\\d+)${escaped}"`, "g"), "$1");
-}
-
-let _baseResolver: (() => any) | null = null;
-
-/**
- * @internal
- * @noRailsEquivalent PERMANENT
- */
-export function setBaseResolver(resolver: () => any): void {
-  _baseResolver = resolver;
-}
-
-/**
- * @internal
- * @noRailsEquivalent PERMANENT
- */
-export function getBase(): any {
-  return _baseResolver?.() ?? null;
 }
 
 export class LogSubscriber extends BaseLogSubscriber {
@@ -117,9 +100,7 @@ export class LogSubscriber extends BaseLogSubscriber {
 
   /** @internal */
   override get logger(): Logger | null {
-    const B = getBase();
-    if (B && "logger" in B) return B.logger as Logger | null;
-    return (this.constructor as typeof LogSubscriber).logger;
+    return _Base!.logger as Logger | null;
   }
 
   protected debugSql(message: string): boolean {
@@ -247,14 +228,7 @@ export class LogSubscriber extends BaseLogSubscriber {
   }
 
   private filter(name: string | null, value: unknown): unknown {
-    const B = getBase();
-    if (B && typeof B.inspectionFilter === "function") {
-      const filter = B.inspectionFilter();
-      if (filter && typeof filter.filterParam === "function") {
-        return filter.filterParam(name, value);
-      }
-    }
-    return value;
+    return _Base!.inspectionFilter().filterParam(name as string, value);
   }
 }
 

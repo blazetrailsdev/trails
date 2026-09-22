@@ -1,8 +1,5 @@
 import type { ConnectionPool } from "./connection-pool.js";
-import {
-  DatabaseConfig,
-  _setAdapterClassResolver,
-} from "../../database-configurations/database-config.js";
+import { DatabaseConfig } from "../../database-configurations/database-config.js";
 import type { HashConfig } from "../../database-configurations/hash-config.js";
 import {
   configurationsStore as configurations,
@@ -14,10 +11,8 @@ import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js"
 import { AdapterNotSpecified, ConnectionNotDefined } from "../../errors.js";
 import type { QueryCachePool } from "./query-cache.js";
 import { Notifications } from "@blazetrails/activesupport";
-import { resolve as resolveConnectionAdapter } from "../../connection-adapters.js";
+import "../../connection-adapters.js";
 import { isPreventingWrites } from "../../core.js";
-
-_setAdapterClassResolver((adapterName) => resolveConnectionAdapter(adapterName));
 
 export interface ConnectionOwner {
   name: string;

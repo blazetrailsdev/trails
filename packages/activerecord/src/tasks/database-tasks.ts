@@ -9,6 +9,7 @@ import { HashConfig } from "../database-configurations/hash-config.js";
 import { Migration, ProtectedEnvironmentError } from "../migration.js";
 import { DEFAULT_ENV } from "../connection-handling.js";
 import { _setRailsEnv } from "../connection-handling-slot.js";
+import { _setDatabaseTasks } from "./database-tasks-slot.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import { getEnv, isBlank, trailsRoot } from "@blazetrails/activesupport";
 import {
@@ -986,6 +987,8 @@ export class DatabaseTasks {
     );
   }
 }
+
+_setDatabaseTasks(DatabaseTasks);
 
 export interface DatabaseTaskInstance {
   create?(): Promise<void>;

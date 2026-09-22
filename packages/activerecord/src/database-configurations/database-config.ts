@@ -1,5 +1,6 @@
 import { NotImplementedError } from "../errors.js";
 import { _DEFAULT_ENV } from "../connection-handling-slot.js";
+import { _ConnectionAdapters } from "../connection-adapters-slot.js";
 export interface DatabaseConfigOptions {
   adapter?: string;
   database?: string;
@@ -29,16 +30,6 @@ export interface DatabaseConfigOptions {
   [key: string]: unknown;
 }
 
-type AdapterClassResolver = (
-  adapterName: string | undefined,
-) => (new (...args: any[]) => unknown) | Promise<new (...args: any[]) => unknown>;
-let _adapterClassResolver: AdapterClassResolver | null = null;
-
-/** @internal */
-export function _setAdapterClassResolver(fn: AdapterClassResolver): void {
-  _adapterClassResolver = fn;
-}
-
 export class DatabaseConfig {
   readonly envName: string;
   readonly name: string;
@@ -50,15 +41,9 @@ export class DatabaseConfig {
     this.#adapterClass = null;
   }
 
-  /** @missingRailsCall resolve — PERMANENT */
   adapterClass(): (new (...args: any[]) => unknown) | Promise<new (...args: any[]) => unknown> {
     if (this.#adapterClass) return this.#adapterClass;
-    if (!_adapterClassResolver) {
-      throw new Error(
-        "Adapter class resolver not registered — import ConnectionHandler (or connection-handling) first",
-      );
-    }
-    const adapterClass = _adapterClassResolver(this.adapter);
+    const adapterClass = _ConnectionAdapters!.resolve(this.adapter);
     if (!(adapterClass instanceof Promise)) return (this.#adapterClass = adapterClass);
     return adapterClass.then((klass) => (this.#adapterClass = klass));
   }

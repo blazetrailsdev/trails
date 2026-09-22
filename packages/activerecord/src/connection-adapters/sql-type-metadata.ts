@@ -1,6 +1,9 @@
 import { deduplicate } from "./deduplicable.js";
 import { rbHash } from "@blazetrails/ruby-compat";
 import type { Deduplicable } from "./deduplicable.js";
+import type { TypeMetadataJSON as MySQLTypeMetadataJSON } from "./mysql/type-metadata.js";
+import type { TypeMetadataJSON as PostgreSQLTypeMetadataJSON } from "./postgresql/type-metadata.js";
+import { _MySQLTypeMetadata, _PostgreSQLTypeMetadata } from "./type-metadata-slots.js";
 
 export class SqlTypeMetadata implements Deduplicable {
   readonly sqlType: string | null;
@@ -60,8 +63,14 @@ export class SqlTypeMetadata implements Deduplicable {
 
   /** @noRailsEquivalent CONVERGEABLE converge-adapter-schema-and-result-helper-surface */
   static fromJSON(data: SqlTypeMetadataJSON): SqlTypeMetadata {
-    const klass = TYPE_METADATA_CLASSES[data.class ?? ""];
-    if (klass) return klass.fromJSON(data);
+    if (data.class === "MySQL::TypeMetadata") {
+      const row = data as MySQLTypeMetadataJSON;
+      return new _MySQLTypeMetadata!(row, { extra: row.extra });
+    }
+    if (data.class === "PostgreSQL::TypeMetadata") {
+      const row = data as PostgreSQLTypeMetadataJSON;
+      return new _PostgreSQLTypeMetadata!(row, { oid: row.oid, fmod: row.fmod });
+    }
     return new SqlTypeMetadata({
       sqlType: data.sqlType,
       type: data.type,
@@ -88,17 +97,4 @@ export interface SqlTypeMetadataJSON {
   limit: number | null;
   precision: number | null;
   scale: number | null;
-}
-
-const TYPE_METADATA_CLASSES: Record<
-  string,
-  { fromJSON(data: SqlTypeMetadataJSON): SqlTypeMetadata }
-> = {};
-
-/** @noRailsEquivalent PERMANENT */
-export function registerTypeMetadataClass(
-  name: string,
-  klass: { fromJSON(data: SqlTypeMetadataJSON): SqlTypeMetadata },
-): void {
-  TYPE_METADATA_CLASSES[name] = klass;
 }
