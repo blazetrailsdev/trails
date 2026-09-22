@@ -17,9 +17,8 @@ export class NestedError extends ActiveModelError {
     overrideOptions?: { attribute?: string; type?: string },
   ) {
     const attribute = overrideOptions?.attribute ?? innerError.attribute;
-    const innerRawType = innerError.rawType ?? innerError.type;
     const type = overrideOptions?.type ?? innerError.type;
-    super(base, attribute, type, innerError.options ?? {}, innerRawType);
+    super(base, attribute, type, innerError.options ?? {}, innerError.rawType ?? null);
     this.innerError = innerError;
   }
 

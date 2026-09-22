@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { NestedError } from "./index.js";
+import { Error as ModelError, NestedError } from "./index.js";
 
 describe("NestedErrorTest", () => {
   it("NestedError initialize", () => {
@@ -30,5 +30,14 @@ describe("NestedErrorTest", () => {
       message: "is invalid",
     });
     expect(baseNested.fullMessage).toBe("is invalid");
+  });
+
+  it("NestedError keeps an inner nil raw_type", () => {
+    const base = {};
+    const innerError = new ModelError(base, "name", null);
+    const nested = new NestedError(base, innerError);
+    expect(nested.rawType).toBeNull();
+    expect(nested.type).toBe(":invalid");
+    expect(nested.details).toEqual({ error: null });
   });
 });
