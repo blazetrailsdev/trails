@@ -1,9 +1,15 @@
 import { afterEach, beforeEach, describe, it, expect } from "vitest";
-import { NoMethodError } from "@blazetrails/ruby-compat";
+import { NoMethodError, Range } from "@blazetrails/ruby-compat";
 import { Multibyte } from "./multibyte.js";
 import { Chars } from "./multibyte/chars.js";
 import { mbChars } from "./core-ext/string/multibyte.js";
-import { assert, assertNothingRaised, assertRaise } from "./testing/assertions.js";
+import {
+  assert,
+  assertNot,
+  assertNothingRaised,
+  assertPredicate,
+  assertRaise,
+} from "./testing/assertions.js";
 
 function mbLength(str: string): number {
   return [...str].length;
@@ -88,23 +94,35 @@ function mbCenter(str: string, width: number, pad = " "): string {
 }
 
 const UNICODE_STRING = "こにちわ";
+const ASCII_STRING = "ohayo";
+const BYTE_STRING = "\u00b8\u009e\u0008\u0088\u00a5";
+
+function chars(str: string): Chars {
+  return new Chars(str);
+}
 
 describe("MultibyteCharsUTF8BehaviorTest", () => {
+  let subject: Chars;
+
+  beforeEach(() => {
+    subject = mbChars(UNICODE_STRING);
+  });
+
   it("split should return an array of chars instances", () => {
-    const parts = [...UNICODE_STRING];
-    expect(parts.length).toBe(4);
-    parts.forEach((p) => expect(typeof p).toBe("string"));
+    for (const character of subject.split(/(?:)/)) {
+      expect(character).toBeInstanceOf(Multibyte.proxyClass());
+    }
   });
 
   it("tidy bytes bang should return self", () => {
-    const str = UNICODE_STRING;
-    expect(str).toBe(UNICODE_STRING);
+    expect(subject.tidyBytesBang()).toBe(subject);
   });
 
   it("tidy bytes bang should change wrapped string", () => {
-    const original = " Un bUen café \x92";
-    const tidied = original.replace(/[\x80-\x9F]/g, "");
-    expect(tidied).not.toBe(original);
+    const original = " Un bUen café \ud892";
+    const proxy = chars(original);
+    proxy.tidyBytesBang();
+    expect(proxy.toS()).not.toEqual(original);
   });
 
   it("unicode string should have utf8 encoding", () => {
@@ -146,9 +164,9 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
   });
 
   it("match should return boolean for regexp match", () => {
-    expect(/wrong/u.test(UNICODE_STRING)).toBe(false);
-    expect(/こに/u.test(UNICODE_STRING)).toBe(true);
-    expect(/ち/u.test(UNICODE_STRING)).toBe(true);
+    assertNot(subject.isMatch(/wrong/u));
+    assert(subject.isMatch(/こに/u));
+    assert(subject.isMatch(/ち/u));
   });
 
   it("should use character offsets for insert offsets", () => {
@@ -293,11 +311,15 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
   });
 
   it("reverse reverses characters", () => {
-    expect(mbReverse(UNICODE_STRING)).toBe("わちにこ");
+    expect(mbChars("").reverse().toS()).toEqual("");
+    expect(subject.reverse().toS()).toEqual("わちにこ");
   });
 
   it("reverse should work with normalized strings", () => {
-    expect(mbReverse("café")).toBe("éfac");
+    const str = "bös";
+    const reversedStr = "söb";
+    expect(chars(str).decompose().reverse().toS()).toEqual(chars(reversedStr).decompose().toS());
+    expect(chars(str).compose().reverse().toS()).toEqual(chars(reversedStr).compose().toS());
   });
 
   it("slice should take character offsets", () => {
@@ -307,27 +329,25 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
   });
 
   it("slice bang returns sliced out substring", () => {
-    const chars = [...UNICODE_STRING];
-    const sliced = chars.splice(1, 2);
-    expect(sliced.join("")).toBe("にち");
+    expect(subject.sliceBang(new Range(1, 2))!.toS()).toEqual("にち");
   });
 
   it("slice bang returns nil on out of bound arguments", () => {
-    const chars = [...UNICODE_STRING];
-    expect(chars[100]).toBeUndefined();
+    expect(mbChars(subject.toS()).sliceBang(new Range(9, 10))).toBeNull();
   });
 
   it("slice bang removes the slice from the receiver", () => {
-    const chars = [...UNICODE_STRING];
-    chars.splice(1, 2);
-    expect(chars.join("")).toBe("こわ");
+    const chars = mbChars("úüù");
+    chars.sliceBang(0, 2);
+    expect(chars.toS()).toEqual("ù");
   });
 
   it("slice bang returns nil and does not modify receiver if out of bounds", () => {
-    const chars = [...UNICODE_STRING];
-    const original = chars.join("");
-    expect(chars[100]).toBeUndefined();
-    expect(chars.join("")).toBe(original);
+    const string = "úüù";
+    const chars = mbChars(string);
+    expect(chars.sliceBang(4, 5)).toBeNull();
+    expect(chars.toS()).toEqual("úüù");
+    expect(string).toEqual("úüù");
   });
 
   it("slice should throw exceptions on invalid arguments", () => {
@@ -340,7 +360,7 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
   });
 
   it("ord should return unicode value for first character", () => {
-    expect(UNICODE_STRING.codePointAt(0)).toBe(0x3053);
+    expect(UNICODE_STRING.codePointAt(0)).toBe(12371);
   });
 
   it("upcase should upcase ascii characters", () => {
@@ -367,9 +387,8 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
   });
 
   it("titleize should work on ascii characters", () => {
-    const str = "hello world";
-    const titled = str.replace(/\b\w/g, (c) => c.toUpperCase());
-    expect(titled).toBe("Hello World");
+    expect(mbChars("").titleize().toS()).toEqual("");
+    expect(mbChars("abc abc").titleize().toS()).toEqual("Abc Abc");
   });
 
   it("respond to knows which methods the proxy responds to", () => {
@@ -385,8 +404,7 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
   });
 
   it("acts like string", () => {
-    const str = "hello";
-    expect(typeof str).toBe("string");
+    assertPredicate(mbChars("Bambi"), (c) => c.actsLikeString());
   });
 
   it("insert throws index error", () => {
@@ -399,9 +417,6 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
 });
 
 describe("MultibyteCharsTest", () => {
-  const UNICODE_STRING = "こにちわ";
-  const ASCII_STRING = "ohayo";
-  const BYTE_STRING = "\u00b8\u009e\u0008\u0088\u00a5";
   const proxyClass = Chars;
   let chars: Chars & Record<string, any>;
 
@@ -505,6 +520,24 @@ describe("MultibyteCharsTest", () => {
 });
 
 describe("MultibyteCharsExtrasTest", () => {
+  function stringFromClasses(classes: string[]): string {
+    const characterFromClass: Record<string, number> = {
+      l: 0x1100,
+      v: 0x1160,
+      t: 0x11a8,
+      lv: 0xac00,
+      lvt: 0xac01,
+      cr: 0x000d,
+      lf: 0x000a,
+      extend: 0x094d,
+      n: 0x64,
+      spacingmark: 0x0903,
+      r: 0x1f1e6,
+      control: 0x0001,
+    };
+    return String.fromCodePoint(...classes.map((k) => characterFromClass[k]));
+  }
+
   it("upcase should be unicode aware", () => {
     expect("café".toUpperCase()).toBe("CAFÉ");
   });
@@ -529,48 +562,98 @@ describe("MultibyteCharsExtrasTest", () => {
   });
 
   it("titleize should be unicode aware", () => {
-    const str = "hello world";
-    const titled = str.replace(/\b\w/g, (c) => c.toUpperCase());
-    expect(titled).toBe("Hello World");
+    expect(chars("ÉL QUE SE ENTERÓ").titleize().toS()).toEqual("Él Que Se Enteró");
+    expect(chars("аБвг аБвг").titleize().toS()).toEqual("Абвг Абвг");
   });
 
   it("titleize should not affect characters that do not case fold", () => {
-    const str = "hello";
-    expect(str.replace(/\b\w/g, (c) => c.toUpperCase())).toBe("Hello");
+    expect(chars("日本語").titleize().toS()).toEqual("日本語");
   });
 
   it("limit should not break on blank strings", () => {
-    const str = "";
-    const limited = [...str].slice(0, 5).join("");
-    expect(limited).toBe("");
+    const example = chars("");
+    expect(example.limit(0).toS()).toEqual(example.toS());
+    expect(example.limit(1).toS()).toEqual(example.toS());
   });
 
   it("limit should work on a multibyte string", () => {
-    const str = "日本語テスト";
-    const limited = [...str].slice(0, 3).join("");
-    expect(limited).toBe("日本語");
+    const example = chars(UNICODE_STRING);
+    const bytesize = new TextEncoder().encode(UNICODE_STRING).length;
+
+    expect(example.limit(bytesize).toS()).toEqual(UNICODE_STRING);
+    expect(example.limit(0).toS()).toEqual("");
+    expect(example.limit(1).toS()).toEqual("");
+    expect(example.limit(3).toS()).toEqual("こ");
+    expect(example.limit(6).toS()).toEqual("こに");
+    expect(example.limit(8).toS()).toEqual("こに");
+    expect(example.limit(9).toS()).toEqual("こにち");
+    expect(example.limit(50).toS()).toEqual("こにちわ");
   });
 
   it("limit should work on an ascii string", () => {
-    const str = "Hello World";
-    const limited = [...str].slice(0, 5).join("");
-    expect(limited).toBe("Hello");
+    const ascii = chars(ASCII_STRING);
+    expect(ascii.limit(ASCII_STRING.length).toS()).toEqual(ASCII_STRING);
+    expect(ascii.limit(0).toS()).toEqual("");
+    expect(ascii.limit(1).toS()).toEqual("o");
+    expect(ascii.limit(2).toS()).toEqual("oh");
+    expect(ascii.limit(4).toS()).toEqual("ohay");
+    expect(ascii.limit(50).toS()).toEqual("ohayo");
   });
 
   it("limit should keep under the specified byte limit", () => {
-    const str = "Hello";
-    const limited = str.slice(0, 3);
-    expect(limited.length).toBeLessThanOrEqual(3);
+    const example = chars(UNICODE_STRING);
+    for (let limit = 1; limit <= UNICODE_STRING.length; limit++) {
+      assert(example.limit(limit).toS().length <= limit);
+    }
   });
 
   it("normalization shouldnt strip null bytes", () => {
-    const str = "hello\x00world";
-    expect(str.includes("\x00")).toBe(true);
+    const nullByteStr = "Test\0test";
+
+    expect(chars(nullByteStr).decompose().toS()).toEqual(nullByteStr);
+    expect(chars(nullByteStr).compose().toS()).toEqual(nullByteStr);
   });
 
   it("should compute grapheme length", () => {
-    const str = "Hello";
-    expect([...str].length).toBe(5);
+    const cases: [string | string[], number][] = [
+      ["", 0],
+      ["abc", 3],
+      ["こにちわ", 4],
+      [["cr", "lf"], 1],
+      [["cr", "n"], 2],
+      [["lf", "n"], 2],
+      [["control", "n"], 2],
+      [["cr", "extend"], 2],
+      [["lf", "extend"], 2],
+      [["control", "extend"], 2],
+      [["n", "cr"], 2],
+      [["n", "lf"], 2],
+      [["n", "control"], 2],
+      [["extend", "cr"], 2],
+      [["extend", "lf"], 2],
+      [["extend", "control"], 2],
+      [["l", "l"], 1],
+      [["l", "v"], 1],
+      [["l", "lv"], 1],
+      [["l", "lvt"], 1],
+      [["lv", "v"], 1],
+      [["lv", "t"], 1],
+      [["v", "v"], 1],
+      [["v", "t"], 1],
+      [["lvt", "t"], 1],
+      [["t", "t"], 1],
+      [["r", "r"], 1],
+      [["n", "extend"], 1],
+      [["n", "spacingmark"], 1],
+      [["n", "n"], 2],
+      [["n", "cr", "lf", "n"], 3],
+      [["n", "l", "v", "t"], 2],
+      [["cr", "extend", "n"], 3],
+    ];
+    for (const [input, expectedLength] of cases) {
+      const str = Array.isArray(input) ? stringFromClasses(input) : input;
+      expect(chars(str).graphemeLength(), JSON.stringify(input)).toEqual(expectedLength);
+    }
   });
 
   it("tidy bytes should tidy bytes", () => {
@@ -584,8 +667,6 @@ describe("MultibyteCharsExtrasTest", () => {
   });
 
   it("class is not forwarded", () => {
-    const str = "hello";
-    expect(typeof str).toBe("string");
-    expect(str.constructor).toBe(String);
+    expect(mbChars(BYTE_STRING).constructor).toEqual(Chars);
   });
 });
