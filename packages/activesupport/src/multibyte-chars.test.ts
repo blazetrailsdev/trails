@@ -703,9 +703,28 @@ describe("MultibyteCharsExtrasTest", () => {
     }
   });
 
-  it.skip("tidy bytes should tidy bytes", () => {
+  it.skip("tidy bytes should tidy bytes", async () => {
     // BLOCKED: multibyte-chars-ruby-string-method-table
-    const singleByteCases: Record<string, string> = { "\udc80": "€", "\udc94": "”" };
+    const singleByteCases: Record<string, string> = {
+      "\x21": "!",
+      "\x41": "A",
+      "\x7e": "~",
+      "\udc80": "€",
+      "\udc94": "”",
+      "\udc9f": "Ÿ",
+      "\udcc0": "À",
+      "\udcc1": "Á",
+      "\udcc2": "Â",
+      "\udcc8": "È",
+      "\udcdf": "ß",
+      "\udce0": "à",
+      "\udce8": "è",
+      "\udcef": "ï",
+      "\udcf0": "ð",
+      "\udcf1": "ñ",
+      "\udcff": "ÿ",
+      "\x00": "\x00",
+    };
     for (const [bad, good] of Object.entries(singleByteCases)) {
       expect(chars(bad).tidyBytes().toS()).toEqual(good);
       expect(chars(`${bad}${bad}`).tidyBytes()).toEqual(`${good}${good}`);
@@ -717,6 +736,13 @@ describe("MultibyteCharsExtrasTest", () => {
       expect(chars(`a${bad}`).tidyBytes()).toEqual(`a${good}`);
       expect(chars(`á${bad}`).tidyBytes()).toEqual(`á${good}`);
     }
+
+    const byteString = "\udcb8\udc9e\x08\udc88\udca5";
+    const tidyString = String.fromCodePoint(0xb8, 0x17e, 0x8, 0x2c6, 0xa5);
+    expect(chars(byteString).tidyBytes().toS()).toEqual(tidyString);
+    await assertNothingRaised(() => Array.from(chars(byteString).tidyBytes().toS()));
+
+    expect(chars("\udcf0\udca5\udca4\x21").tidyBytes().toS()).toEqual("\u00f0\u00a5\u00a4\x21");
   });
 
   it("tidy bytes should forcibly tidy bytes if specified", () => {
