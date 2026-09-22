@@ -923,16 +923,19 @@ export class Relation<T extends Base> {
     });
   }
 
-  async firstOrCreate(attributes?: Record<string, unknown>): Promise<T> {
+  async firstOrCreate(attributes?: Record<string, unknown>, block?: (r: T) => void): Promise<T> {
     const first = await this.first();
     if (first) return first;
-    return this.create(attributes);
+    return this.create(attributes, block);
   }
 
-  async firstOrCreateBang(attributes?: Record<string, unknown>): Promise<T> {
+  async firstOrCreateBang(
+    attributes?: Record<string, unknown>,
+    block?: (r: T) => void,
+  ): Promise<T> {
     const first = await this.first();
     if (first) return first;
-    return this.createBang(attributes);
+    return this.createBang(attributes, block);
   }
 
   async firstOrInitialize(

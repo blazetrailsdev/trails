@@ -24,6 +24,7 @@ import {
   RestrictedWithErrorFirm,
 } from "../test-helpers/models/company.js";
 import { Account } from "../test-helpers/models/account.js";
+import { Contract } from "../test-helpers/models/contract.js";
 import { Car } from "../test-helpers/models/car.js";
 import { Bulb } from "../test-helpers/models/bulb.js";
 import { Developer, AuditLog } from "../test-helpers/models/developer.js";
@@ -35,7 +36,13 @@ import { LineItem as HmLineItem } from "../test-helpers/models/line-item.js";
 import { Associations, isAssociationCached } from "../associations.js";
 import { DeleteRestrictionError } from "./errors.js";
 import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
-import { assertDifference, assertNothingRaised } from "@blazetrails/activesupport";
+import {
+  assertDifference,
+  assertNothingRaised,
+  assertNot,
+  assertNotEmpty,
+  assertRaise,
+} from "@blazetrails/activesupport";
 
 import { fixtures } from "../test-fixtures.js";
 
@@ -1168,12 +1175,6 @@ describe("HasManyAssociationsTest", () => {
     const posts = await author.posts;
     expect(posts.some((p: any) => p.id === newPost.id)).toBe(false);
   });
-
-  it("has many associations on new records use null relations", async () => {
-    const author = HmAuthor.new({ name: "New" });
-    expect(author.isNewRecord()).toBe(true);
-    expect(author.id == null).toBe(true);
-  });
 });
 
 describe("HasManyAssociationsTest", () => {
@@ -1495,19 +1496,6 @@ describe("HasManyAssociationsTest", () => {
     });
   });
 
-  it("association with extend option", () => {
-    class Author extends Base {
-      declare name: string | null;
-
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    Associations.hasMany.call(Author, "posts", { className: "Post", foreignKey: "author_id" });
-    const assoc = (Author as any)._reflectOnAssociation("posts");
-    expect(assoc).toBeDefined();
-  });
-
   it("associations autosaves when object is already persisted", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     const post = await HmPost.create({ author_id: author.id, title: "Saved", body: "body" });
@@ -1537,14 +1525,6 @@ describe("HasManyAssociationsTest", () => {
     const posts = await author.posts;
     const unique = new Set(posts.map((p: any) => p.id));
     expect(unique.size).toBe(posts.length);
-  });
-
-  it("in memory replacement maintains order", async () => {
-    const author = await HmAuthor.create({ name: "Alice" });
-    await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    await HmPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await author.posts;
-    expect(posts.length).toBe(2);
   });
 
   it("anonymous has many", async () => {
@@ -2874,39 +2854,6 @@ describe("HasManyAssociationsTest", () => {
     const loaded = await author.arr_posts;
     expect(loaded.length).toBe(3);
   });
-  it("replace failure", async () => {
-    class ReplFailAuthor extends Base {
-      declare repl_fail_posts: AssociationProxy<ReplFailPost>;
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("repl_fail_posts", {
-          className: "ReplFailPost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class ReplFailPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(ReplFailAuthor);
-    registerModel(ReplFailPost);
-    const author = await ReplFailAuthor.create({ name: "Alice" });
-    const post = await ReplFailPost.create({ author_id: author.id, title: "A", body: "body" });
-    post.author_id = 999999;
-    await post.save();
-    const posts = await author.repl_fail_posts;
-    expect(posts.length).toBe(0);
-  });
   it("ids reader cache not used for size when association is dirty", async () => {
     class DirtyIdAuthor extends Base {
       declare dirty_id_posts: AssociationProxy<DirtyIdPost>;
@@ -2976,39 +2923,6 @@ describe("HasManyAssociationsTest", () => {
     await author.reload();
     posts = await author.clr_id_posts;
     expect(posts).toHaveLength(0);
-  });
-  it("set ids for association on new record applies association correctly", async () => {
-    class SetIdAuthor extends Base {
-      declare set_id_posts: AssociationProxy<SetIdPost>;
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("set_id_posts", {
-          className: "SetIdPost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class SetIdPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(SetIdAuthor);
-    registerModel(SetIdPost);
-    const author = new SetIdAuthor({ name: "Alice" });
-    await author.save();
-    const post = await SetIdPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await author.set_id_posts;
-    expect(posts.length).toBe(1);
-    expect(posts[0].id).toBe(post.id);
   });
   it("assign ids ignoring blanks", async () => {
     class BlankIdAuthor extends Base {
@@ -3960,80 +3874,6 @@ describe("HasManyAssociationsTest", () => {
     expect(post.isNewRecord()).toBe(true);
     expect((post as any).author_id).toBe(Number(author.id));
   });
-  it("first_or_create adds the record to the association", async () => {
-    class FocAuthor extends Base {
-      declare foc_posts: AssociationProxy<FocPost>;
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("foc_posts", {
-          className: "FocPost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class FocPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(FocAuthor);
-    registerModel(FocPost);
-    const author = await FocAuthor.create({ name: "Alice" });
-    const posts1 = await author.foc_posts;
-    expect(posts1.length).toBe(0);
-    const post = await FocPost.create({ author_id: author.id, title: "Created", body: "body" });
-    expect(post.isNewRecord()).toBe(false);
-    await author.reload();
-    const posts2 = await author.foc_posts;
-    expect(posts2.length).toBe(1);
-  });
-  it("first_or_create! adds the record to the association", async () => {
-    class FocBangAuthor extends Base {
-      declare foc_bang_posts: AssociationProxy<FocBangPost>;
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("foc_bang_posts", {
-          className: "FocBangPost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class FocBangPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(FocBangAuthor);
-    registerModel(FocBangPost);
-    const author = await FocBangAuthor.create({ name: "Alice" });
-    const posts1 = await author.foc_bang_posts;
-    expect(posts1.length).toBe(0);
-    const post = await FocBangPost.create({
-      author_id: author.id,
-      title: "Created!",
-      body: "body",
-    });
-    expect(post.isNewRecord()).toBe(false);
-    await author.reload();
-    const posts2 = await author.foc_bang_posts;
-    expect(posts2.length).toBe(1);
-  });
   it("delete_all, when not loaded, doesn't load the records", async () => {
     class NoLoadDelAuthor extends Base {
       declare name: string | null;
@@ -4067,68 +3907,6 @@ describe("HasManyAssociationsTest", () => {
     await author.destroy();
     const remaining = await author.no_load_del_posts;
     expect(remaining.length).toBe(0);
-  });
-  it("association with extend option with multiple extensions", async () => {
-    class ExtAuthor extends Base {
-      declare name: string | null;
-      declare ext_posts: AssociationProxy<ExtPost>;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("ext_posts", {
-          className: "ExtPost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class ExtPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(ExtAuthor);
-    registerModel(ExtPost);
-    const author = await ExtAuthor.create({ name: "Alice" });
-    await ExtPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await author.ext_posts;
-    expect(posts.length).toBe(1);
-  });
-  it("extend option affects per association", async () => {
-    class ExtPerAuthor extends Base {
-      declare name: string | null;
-      declare ext_per_posts: AssociationProxy<ExtPerPost>;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("ext_per_posts", {
-          className: "ExtPerPost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class ExtPerPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(ExtPerAuthor);
-    registerModel(ExtPerPost);
-    const author = await ExtPerAuthor.create({ name: "Alice" });
-    await ExtPerPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await author.ext_per_posts;
-    expect(posts.length).toBe(1);
   });
   it("delete record with complex joins", async () => {
     class CjAuthor extends Base {
@@ -4304,32 +4082,6 @@ describe("HasManyAssociationsTest", () => {
     expect(posts2.length).toBe(1);
     expect((posts2[0] as any).title).toBe("Updated");
   });
-  it("in memory replacement executes no queries", async () => {
-    class InMemAuthor extends Base {
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    class InMemPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(InMemAuthor);
-    registerModel(InMemPost);
-    const author = await InMemAuthor.create({ name: "Alice" });
-    const post = InMemPost.new({ author_id: author.id, title: "A" });
-    post.author_id = null as any;
-    expect((post as any).author_id).toBeNull();
-  });
   it("in memory replacements do not execute callbacks", async () => {
     class InMemCbAuthor extends Base {
       declare name: string | null;
@@ -4356,31 +4108,6 @@ describe("HasManyAssociationsTest", () => {
     const post = InMemCbPost.new({ author_id: author1.id, title: "A" });
     post.author_id = author2.id as number;
     expect((post as any).author_id).toBe(Number(author2.id));
-  });
-  it("in memory replacements sets inverse instance", async () => {
-    class InMemInvAuthor extends Base {
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    class InMemInvPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(InMemInvAuthor);
-    registerModel(InMemInvPost);
-    const author = await InMemInvAuthor.create({ name: "Alice" });
-    const post = InMemInvPost.new({ author_id: author.id, title: "A" });
-    expect((post as any).author_id).toBe(Number(author.id));
   });
   it("reattach to new objects replaces inverse association and foreign key", async () => {
     class ReattachAuthor extends Base {
@@ -5842,5 +5569,162 @@ describe("HasManyAssociationsTest", () => {
     expect(await (authors("mary") as any).commentIds).toEqual([
       comments("eager_other_comment1").id,
     ]);
+  });
+});
+
+describe("HasManyAssociationsTest", () => {
+  const { companies, posts } = fixtures(["companies", "accounts", "posts", "comments", "cars"]);
+  setup();
+
+  beforeAll(() => {
+    registerModel(Company);
+    registerModel(HmFirm);
+    registerModel(Client);
+    registerModel(Account);
+    registerModel(Contract);
+    registerModel(HmCar);
+    registerModel(HmBulb);
+    registerModel(HmPost);
+    registerModel(Comment);
+  });
+
+  it("replace failure", async () => {
+    const firm = companies("first_firm") as any;
+    const account = Account.new();
+    const origAccounts = await firm.accounts.toArray();
+
+    assertNot(await account.isValid());
+    assertNotEmpty(origAccounts);
+    const error = await assertRaise([RecordNotSaved], {}, async () => {
+      await firm.association("accounts").writer([account]);
+    });
+
+    expect((await firm.accounts.toArray()).map(recordId)).toEqual(origAccounts.map(recordId));
+    expect(error.message).toBe(
+      "Failed to replace accounts because one or more of the " + "new records could not be saved.",
+    );
+  });
+
+  it("set ids for association on new record applies association correctly", async () => {
+    const contractA = await Contract.createBang();
+    const contractB = await Contract.createBang();
+    await Contract.createBang();
+    const company = Company.new({ name: "Some Company" }) as any;
+
+    await company.association("contracts").idsWriter([contractA.id, contractB.id]);
+    expect(await company.contractIds).toEqual([contractA.id, contractB.id]);
+    expect((await company.contracts.toArray()).map(recordId)).toEqual(
+      [contractA, contractB].map(recordId),
+    );
+
+    await company.saveBang();
+    expect(recordId(await ((await contractA.reload()) as any).company)).toBe(recordId(company));
+    expect(recordId(await ((await contractB.reload()) as any).company)).toBe(recordId(company));
+  });
+
+  it("first_or_create adds the record to the association", async () => {
+    const firm = (await HmFirm.createBang({ name: "omg" })) as any;
+    await firm.clientsOfFirm.loadTarget();
+    let clientCount: Promise<unknown> | undefined;
+    const client = await firm.clientsOfFirm.where({ name: "lol" }).firstOrCreate(undefined, () => {
+      clientCount = Client.count();
+    });
+    expect(await clientCount).toBe(5);
+    expect(client.name).toBe("lol");
+    expect((await firm.clientsOfFirm.toArray()).map(recordId)).toEqual([client].map(recordId));
+    expect((await (await firm.reload()).clientsOfFirm.toArray()).map(recordId)).toEqual(
+      [client].map(recordId),
+    );
+  });
+
+  it("first_or_create! adds the record to the association", async () => {
+    const firm = (await HmFirm.createBang({ name: "omg" })) as any;
+    await firm.clientsOfFirm.loadTarget();
+    let clientCount: Promise<unknown> | undefined;
+    const client = await firm.clientsOfFirm
+      .where({ name: "lol" })
+      .firstOrCreateBang(undefined, () => {
+        clientCount = Client.count();
+      });
+    expect(await clientCount).toBe(5);
+    expect(client.name).toBe("lol");
+    expect((await firm.clientsOfFirm.toArray()).map(recordId)).toEqual([client].map(recordId));
+    expect((await (await firm.reload()).clientsOfFirm.toArray()).map(recordId)).toEqual(
+      [client].map(recordId),
+    );
+  });
+
+  it("has many associations on new records use null relations", async () => {
+    const post = HmPost.new() as any;
+
+    await assertNoQueries(false, async () => {
+      expect(await post.comments.toArray()).toEqual([]);
+      expect(await post.comments.where({ body: "omg" }).toArray()).toEqual([]);
+      expect(await post.comments.pluck("body")).toEqual([]);
+      expect(await post.comments.sum("id")).toBe(0);
+      expect(await post.comments.count()).toBe(0);
+    });
+  });
+
+  it("association with extend option", () => {
+    const post = posts("welcome") as any;
+    expect(post.commentsWithExtend.author()).toBe("lifo");
+    expect(post.commentsWithExtend.greeting()).toBe("hello :)");
+  });
+
+  // BLOCKED: collection-proxy-extend-super-chain
+  it.skip("association with extend option with multiple extensions", () => {
+    const post = posts("welcome") as any;
+    expect(post.commentsWithExtend_2.author()).toBe("lifo");
+    expect(post.commentsWithExtend_2.greeting()).toBe("hullo :)");
+  });
+
+  // BLOCKED: collection-proxy-extend-super-chain
+  it.skip("extend option affects per association", () => {
+    const post = posts("welcome") as any;
+    expect(post.commentsWithExtend.author()).toBe("lifo");
+    expect(post.commentsWithExtend_2.author()).toBe("lifo");
+    expect(post.commentsWithExtend.greeting()).toBe("hello :)");
+    expect(post.commentsWithExtend_2.greeting()).toBe("hullo :)");
+  });
+
+  it("in memory replacement executes no queries", async () => {
+    const bulb = await HmBulb.createBang();
+    const car = (await HmCar.createBang({ name: "honda", bulbs: [bulb] })) as any;
+
+    expect(car.savedChangeToName).toEqual([null, "honda"]);
+
+    const newBulb = await HmBulb.find(bulb.id);
+
+    await assertNoQueries(false, async () => {
+      await car.association("bulbs").writer([newBulb]);
+    });
+  });
+
+  it("in memory replacements sets inverse instance", async () => {
+    const bulb = await HmBulb.createBang();
+    const car = (await HmCar.createBang({ name: "honda", bulbs: [bulb] })) as any;
+
+    expect(car.savedChangeToName).toEqual([null, "honda"]);
+
+    const newBulb = (await HmBulb.find(bulb.id)) as any;
+    await car.association("bulbs").writer([newBulb]);
+
+    expect(await newBulb.car).toBe(car);
+  });
+
+  it("in memory replacement maintains order", async () => {
+    const firstBulb = await HmBulb.createBang();
+    const secondBulb = await HmBulb.createBang();
+    const car = (await HmCar.createBang({ name: "honda", bulbs: [firstBulb, secondBulb] })) as any;
+
+    expect(car.savedChangeToName).toEqual([null, "honda"]);
+
+    const sameBulb = await HmBulb.find(firstBulb.id);
+    await car.association("bulbs").writer([secondBulb, sameBulb]);
+
+    expect((await car.bulbs.toArray()).map(recordId)).toEqual(
+      [firstBulb, secondBulb].map(recordId),
+    );
   });
 });
