@@ -41,10 +41,7 @@ export function assertCalled<T extends object>(
   check();
 }
 
-/**
- * @internal
- * @missingRailsCall new — PERMANENT
- */
+/** @internal */
 export function assertCalledWith<T extends object>(
   object: T,
   methodName: keyof T & string,
