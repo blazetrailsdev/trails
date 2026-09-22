@@ -92,6 +92,8 @@ export const EXTRACTOR_OUTPUT_FIELDS = [
   "writer",
   "reExportedFrom",
   "bodyless",
+  "admitsFunction",
+  "aliasParams",
 ] as const;
 
 /**

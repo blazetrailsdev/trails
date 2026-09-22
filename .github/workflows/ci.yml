@@ -1738,6 +1738,13 @@ jobs:
         # every other package is measured, reported, and joins by its own
         # burndown story.
         run: pnpm exec tsx scripts/api-compare/lint-param-names.ts
+      - name: Block-parameter ratchet
+        # RFC 0156. A Ruby method taking a block (`&blk`, `yield`,
+        # `block_given?`) paired with a TS signature with no function-typed
+        # parameter, counted per package and Ruby file against
+        # scripts/api-compare/block-param-mark.json. Only-shrink; narrow with
+        # `pnpm parity:api:blocks:tighten` — there is no reseed.
+        run: pnpm exec tsx scripts/api-compare/lint-block-params.ts
       - name: Ambiguous-parent ratchet
         # RFC 0126. An inheritance edge whose parent name resolves to several
         # same-named candidates, none sharing a leading path segment with the

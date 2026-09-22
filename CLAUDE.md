@@ -1184,6 +1184,61 @@ no story to proxy records or to replace the Migration forwarders. It does not
 rule out a `Proxy` on some other non-record object whose Rails counterpart
 dispatches through `method_missing`; that is decided per class.
 
+## Ruby protocol methods with a different JS mechanism
+
+Five Ruby protocol names are neither portable by name nor meaningless: JS has
+the capability, in a different place. Each is its own `SKIP_GROUPS` entry in
+`scripts/parity/conventions.ts`, decided here:
+
+- **`is_a?` / `kind_of?` — `instanceof`.** JS customises it with
+  `static [Symbol.hasInstance]` on the class tested _against_, so
+  `TimeWithZone#is_a?(Time)` (`time_with_zone.rb:509-511`) ports as a hook on
+  `Time`, not a method on `TimeWithZone`. Skipped for name scoring. The one TS
+  member, `Duration#isA`, answers `this instanceof klass` where Rails'
+  `duration.rb:330-332` answers `value.is_a?(klass)`, and is filed for
+  convergence. `HashObject` (`attribute-methods/serialization.ts`) is the
+  existing `hasInstance` hook.
+- **`hash` / `eql?` — live, scored by their consumers.** `Map` and `Set` call no
+  hook, but ruby-compat's `rbHash` and `rbEqual` dispatch to a TS `hash()` /
+  `eql()`, and so do `Deduplicable#deduplicate` and the preloader's batch
+  grouping (`associations/preloader/batch.ts`). The members are not dead code.
+  Scoring them is a comparer change and has its own story.
+- **`method_missing` / `respond_to_missing?` / `respond_to?` — per class.**
+  `respond_to?` is `rbObjRespondTo`, a function; `in` cannot see a name a
+  `respond_to_missing?` answers. § "Records are not Proxies" decides records;
+  every other Rails definer is decided per class from this table:
+
+| Rails file (`method_missing` / `respond_to_missing?`) | trails status         |
+| ----------------------------------------------------- | --------------------- |
+| `active_model/attribute_methods.rb`                   | named method, no trap |
+| `active_record/attribute_methods.rb`                  | records: not a Proxy  |
+| `connection_adapters/abstract/connection_pool.rb`     | Proxy (`NullPool`)    |
+| `active_record/dynamic_matchers.rb`                   | `respondToMissing`    |
+| `migration/command_recorder.rb`                       | typed forwarders      |
+| `migration/default_strategy.rb`                       | typed forwarders      |
+| `active_record/migration.rb`                          | typed forwarders      |
+| `relation/delegation.rb`                              | named method, no trap |
+| `active_record/test_fixtures.rb`                      | nothing               |
+| `active_support/array_inquirer.rb`                    | Proxy                 |
+| `active_support/broadcast_logger.rb`                  | nothing               |
+| `core_ext/module/delegation.rb`                       | nothing (no file)     |
+| `active_support/current_attributes.rb`                | nothing               |
+| `active_support/delegation.rb`                        | Proxy                 |
+| `deprecation/proxy_wrappers.rb`                       | Proxy                 |
+| `active_support/duration.rb`                          | nothing               |
+| `log_subscriber/test_helper.rb`                       | nothing (no file)     |
+| `multibyte/chars.rb`                                  | nothing (no file)     |
+| `active_support/option_merger.rb`                     | Proxy                 |
+| `active_support/ordered_options.rb`                   | Proxy                 |
+| `active_support/string_inquirer.rb`                   | Proxy                 |
+| `active_support/time_with_zone.rb`                    | Proxy                 |
+
+A "named method, no trap" row answers only an explicit `methodMissing` call,
+which is where `collection-proxy-does-not-delegate-association-names-to-scope`,
+`finder-respond-to-dynamic-finders-invisible-to-in` and `relation-dynamic-finders`
+sit. These rows are decided per class, not ratified: a "nothing" row with a
+dispatch-dependent Rails test is a gap, filed against its package.
+
 ## `inherited` is deferred to own-property memo guards (`ModelSchema.inherited`)
 
 § "Module mixins" says only `inherited` has no JS equivalent and its semantics

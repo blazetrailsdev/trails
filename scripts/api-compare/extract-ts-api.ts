@@ -113,6 +113,11 @@ const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
  */
 let currentImportAliases: ReadonlyMap<string, string> | undefined;
 
+/** The program's checker, for {@link admitsFunction}. Set beside
+ *  `currentImportAliases`, since `extractParameters` is reached from call sites
+ *  that do not all thread one through. */
+let currentChecker: ts.TypeChecker | undefined;
+
 /**
  * The local names a file binds `block` from `@blazetrails/ruby-compat` to —
  * the mark a value-or-block argument position carries (`rb_block_given_p`,
@@ -636,6 +641,7 @@ export function extractFromProgram(
   };
   const pendingReExports: PendingReExport[] = [];
   const checker = program.getTypeChecker();
+  currentChecker = checker;
 
   for (const sourceFile of program.getSourceFiles()) {
     const filePath = sourceFile.fileName;
@@ -3659,6 +3665,9 @@ export function extractClass(
     } else if (ts.isPropertyDeclaration(member) && memberName) {
       // Public properties are like attr_reader/attr_accessor
       // Only record them if they're not readonly (readonly = getter only conceptually)
+      const aliasParams = member.initializer
+        ? paramsOfCallableRef(member.initializer, checker)
+        : null;
       const method: MethodInfo = {
         name: memberName,
         visibility,
@@ -3668,6 +3677,7 @@ export function extractClass(
         isStatic,
         ...(internal ? { internal: true } : {}),
         ...tagged,
+        ...(aliasParams ? { aliasParams } : {}),
       };
       if (isStatic) {
         classMethods.push(method);
@@ -5194,8 +5204,25 @@ function extractParameters(params: ts.NodeArray<ts.ParameterDeclaration>): Param
     if (p.type) {
       result.type = p.type.getText();
     }
+    if (admitsFunction(p)) result.admitsFunction = true;
     return result;
   });
+}
+
+/** Can a function be passed in this parameter's position? An untyped parameter
+ *  is judged by nothing, so it does not count. `any`/`unknown` do not either: a
+ *  port that took Ruby's block would type it. */
+function admitsFunction(p: ts.ParameterDeclaration): boolean {
+  if (!p.type) return false;
+  if (!currentChecker) return ts.isFunctionTypeNode(p.type);
+  let type = currentChecker.getTypeAtLocation(p.type);
+  if (p.dotDotDotToken) type = currentChecker.getIndexTypeOfType(type, ts.IndexKind.Number) ?? type;
+  const members = type.isUnion() ? type.types : [type];
+  return members.some(
+    (t) =>
+      t.getCallSignatures().length > 0 ||
+      (t.getSymbol()?.getName() === "Function" && !(t.flags & ts.TypeFlags.Any)),
+  );
 }
 
 /**

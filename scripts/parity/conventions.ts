@@ -461,7 +461,6 @@ export const SKIP_GROUPS: SkipGroup[] = [
       "dup",
       "clone",
       "freeze",
-      "hash",
       "inspect",
       "pretty_print",
       "object_id",
@@ -471,15 +470,9 @@ export const SKIP_GROUPS: SkipGroup[] = [
       "tap",
       "then",
       "yield_self",
-      "respond_to?",
-      "respond_to_missing?",
-      "method_missing",
-      "is_a?",
-      "kind_of?",
       "instance_of?",
       "nil?",
       "equal?",
-      "eql?",
       "instance_variable_get",
       "instance_variable_set",
       "instance_variables",
@@ -497,6 +490,31 @@ export const SKIP_GROUPS: SkipGroup[] = [
       "to_r",
       "to_c",
     ],
+  },
+  {
+    reason:
+      "PERMANENT for scoring by name — JS spells `is_a?` as `instanceof`, customised by " +
+      "`static [Symbol.hasInstance]` on the class tested AGAINST, so " +
+      "`TimeWithZone#is_a?(Time)` ports as a hook on `Time`. A same-named `isA` is " +
+      'judged against its Rails body per class (CLAUDE.md § "Ruby protocol methods ' +
+      'with a different JS mechanism").',
+    names: ["is_a?", "kind_of?"],
+  },
+  {
+    reason:
+      "Skipped until scored by their consumers: JS `Map`/`Set` call no hook, but " +
+      "`rbHash` / `rbEqual` (ruby-compat) dispatch to a TS `hash()` / `eql()`, as do " +
+      "`Deduplicable#deduplicate` and the preloader's batch grouping, so the members " +
+      'are live (CLAUDE.md § "Ruby protocol methods with a different JS mechanism").',
+    names: ["hash", "eql?"],
+  },
+  {
+    reason:
+      "Decided per class — the JS mechanism is a `Proxy` trap, or typed forwarders, and " +
+      "`respond_to?` is `rbObjRespondTo`, a function; `in` sees no name a " +
+      '`respond_to_missing?` answers (CLAUDE.md § "Ruby protocol methods with a ' +
+      'different JS mechanism", which lists every Rails definer).',
+    names: ["method_missing", "respond_to_missing?", "respond_to?"],
   },
   {
     reason: "Ruby module lifecycle hooks — no TypeScript equivalent.",
