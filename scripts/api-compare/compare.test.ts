@@ -2921,6 +2921,18 @@ describe("mixinMethodCreditedToOwnFile", () => {
     });
   });
 
+  it("credits a method a TS-less includer's first file inherits from a mixin's own file", () => {
+    expect(
+      mixinMethodCreditedToOwnFile(
+        { rubyName: "concern", rubyModule: "Module", mixinFile: "core_ext/module/concerning.rb" },
+        "core_ext/module/aliasing.rb",
+        "activesupport",
+        (f) => f === "core_ext/module/concerning.rb",
+        new Map([["core-ext/module/concerning.ts", new Set(["concerning", "concern"])]]),
+      ),
+    ).toEqual({ tsName: "concern", tsFile: "core-ext/module/concerning.ts" });
+  });
+
   it("does not credit a method the host declares itself", () => {
     expect(
       mixinMethodCreditedToOwnFile(

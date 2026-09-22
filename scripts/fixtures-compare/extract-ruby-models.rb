@@ -58,7 +58,7 @@ def parse_file(path)
   classes = []
   stack = []   # [{cls:, depth:}]
   modules = [] # [{name:, depth:}]
-  singletons = [] # depths of open `class << self` bodies
+  singletons = []
   depth = 0    # simple brace/do/end depth approximation
 
   lines.each do |raw|

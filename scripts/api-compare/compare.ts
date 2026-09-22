@@ -4903,11 +4903,6 @@ export function main() {
         }
 
         if (!hasTsCounterpart) {
-          // A host with no TS file of its own holds no `include` seam to move
-          // the credit to, so a mixin method ported in its own file is not a
-          // gap here at all: `class Module; include Concerning; end`
-          // (core_ext/module/concerning.rb:136) flattens `concern` /
-          // `concerning` onto `Module`, whose first file is aliasing.rb.
           if (
             mixinMethodCreditedToOwnFile(
               { rubyName, rubyModule, mixinFile },

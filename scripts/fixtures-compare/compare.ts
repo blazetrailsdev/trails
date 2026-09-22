@@ -1142,11 +1142,13 @@ export function compareModelClass(
   return r;
 }
 
-// Declaration drift the (kind, name) presence check above cannot see: a Rails
-// association scope lambda (`has_many :open_replies, -> { open }`) mirrored as
-// an unscoped association, and an `attr_reader` / `attr_writer` /
-// `attr_accessor` with no TS member of that name. Checked across every class
-// in the Ruby file, since the TS mirror keeps them in one module.
+/**
+ * Declaration drift the (kind, name) presence check cannot see: a Rails
+ * association scope lambda (`has_many :open_replies, -> { open }`) mirrored as
+ * an unscoped association, and an `attr_reader` / `attr_writer` /
+ * `attr_accessor` with no TS member of that name. Checked across every class
+ * in the Ruby file, since the TS mirror keeps them in one module.
+ */
 export function modelDeclarationDrift(classes: RubyClass[], tsContent: string): string[] {
   const drift: string[] = [];
   for (const ruby of classes) {
@@ -1258,7 +1260,6 @@ function runModelsPass(filter: string | null, incomplete = false): void {
   const diff = results.filter((r) => r.status === "DIFF").length;
   console.log(`\n${results.length} files — match=${matched} diff=${diff} missing=${missing}`);
 
-  // Report-only: declaration drift does not move the exit status.
   console.log("\n=== models:compare declaration drift (report-only) ===");
   let driftCount = 0;
   for (const entry of entries) {
