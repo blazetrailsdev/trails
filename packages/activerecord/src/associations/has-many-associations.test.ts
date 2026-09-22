@@ -3520,10 +3520,11 @@ describe("HasManyAssociationsTest", () => {
   it("first_or_create adds the record to the association", async () => {
     const firm = (await HmFirm.createBang({ name: "omg" })) as any;
     await firm.clientsOfFirm.loadTarget();
-    const clientCount = Number(await Client.count());
-    const client = await firm.clientsOfFirm.where({ name: "lol" }).firstOrCreate(undefined, () => {
-      expect(clientCount).toBe(5);
-    });
+    const client = await firm.clientsOfFirm
+      .where({ name: "lol" })
+      .firstOrCreate(undefined, async () => {
+        expect(Number(await Client.count())).toBe(5);
+      });
     expect(client.name).toBe("lol");
     expect((await firm.clientsOfFirm.toArray()).map(recordId)).toEqual([client].map(recordId));
     expect((await (await firm.reload()).clientsOfFirm.toArray()).map(recordId)).toEqual(
@@ -3534,11 +3535,10 @@ describe("HasManyAssociationsTest", () => {
   it("first_or_create! adds the record to the association", async () => {
     const firm = (await HmFirm.createBang({ name: "omg" })) as any;
     await firm.clientsOfFirm.loadTarget();
-    const clientCount = Number(await Client.count());
     const client = await firm.clientsOfFirm
       .where({ name: "lol" })
-      .firstOrCreateBang(undefined, () => {
-        expect(clientCount).toBe(5);
+      .firstOrCreateBang(undefined, async () => {
+        expect(Number(await Client.count())).toBe(5);
       });
     expect(client.name).toBe("lol");
     expect((await firm.clientsOfFirm.toArray()).map(recordId)).toEqual([client].map(recordId));

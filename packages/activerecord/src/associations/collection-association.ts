@@ -251,8 +251,16 @@ export abstract class CollectionAssociation extends Association {
       return records;
     }
 
-    const record = this.buildRecord(attributes, block);
+    let yielded: unknown;
+    const record = this.buildRecord(
+      attributes,
+      block &&
+        ((record: Base) => {
+          yielded = block(record);
+        }),
+    );
     if (!record) return null;
+    if (isThenable(yielded)) await yielded;
     await this.transaction(async () => {
       let result: boolean | undefined = undefined;
       await this.addToTarget(record, {}, async () => {

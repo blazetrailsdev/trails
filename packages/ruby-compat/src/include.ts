@@ -226,6 +226,34 @@ export class Module {
   }
 
   /**
+   * Mirrors: Ruby's Module#extend_object — vendor/ruby/eval.c:1746
+   * `rb_mod_extend_object`, which `rb_extend_object` (:1713) runs as
+   * `rb_include_module(rb_singleton_class(obj), module)`: the module's link is
+   * spliced between `obj` and its class, so a later `extend` sits above it and
+   * `superMethod` resumes the lookup at the next link. A module already in
+   * `obj`'s ancestry is skipped, as `include_modules_at` skips one
+   * (vendor/ruby/class.c:1281,1291,1296).
+   *
+   * Unlike an includer's link, a singleton link is held weakly, since one is
+   * made per extended object, so it is not relinked by a later `defineMethod`.
+   *
+   * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+   */
+  extendObject(obj: object): void {
+    for (let proto = Object.getPrototypeOf(obj) as object | null; proto; ) {
+      if (isLinkOf(this, proto)) return;
+      proto = Object.getPrototypeOf(proto) as object | null;
+    }
+    trackIncludedModule(obj, this);
+    const link = Object.create(Object.getPrototypeOf(obj) as object | null) as object;
+    Object.defineProperties(link, Object.getOwnPropertyDescriptors(carrierOf(this)));
+    let links = singletonCarriers.get(this);
+    if (!links) singletonCarriers.set(this, (links = new WeakSet()));
+    links.add(link);
+    Object.setPrototypeOf(obj, link);
+  }
+
+  /**
    * Mirrors: Ruby's `super` from one of this module's methods —
    * vendor/ruby/vm_insnhelper.c:4648 `vm_search_super_method`, the lookup
    * `Method#super_method` exposes (vendor/ruby/proc.c:3391): resume the method
@@ -240,9 +268,8 @@ export class Module {
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
   superMethod(receiver: object, name: string): ((...args: unknown[]) => unknown) | undefined {
-    const links = includerCarriers.get(this) ?? [];
     for (let proto = Object.getPrototypeOf(receiver) as object | null; proto; ) {
-      if (links.includes(proto)) {
+      if (isLinkOf(this, proto)) {
         const next = Object.getPrototypeOf(proto) as Record<string, unknown> | null;
         const method = next?.[name];
         return typeof method === "function"
@@ -283,6 +310,15 @@ function isUndefEntry(carrier: Record<string, unknown>, name: string): boolean {
 }
 
 const includerCarriers = new WeakMap<Module, object[]>();
+
+const singletonCarriers = new WeakMap<Module, WeakSet<object>>();
+
+function isLinkOf(mod: Module, proto: object): boolean {
+  return (
+    (includerCarriers.get(mod)?.includes(proto) ?? false) ||
+    (singletonCarriers.get(mod)?.has(proto) ?? false)
+  );
+}
 
 function relinkIncluders(mod: Module): void {
   const table = carrierOf(mod);
@@ -814,6 +850,7 @@ export function prepend(klass: AnyClass, mod: ModuleObject | AnyClass | Module):
 export function extend(klass: AnyClass | object, mod: ModuleObject | AnyClass | Module): void {
   const extendedHook = featureHook(mod, "extended");
   if (extendedHook) return extendedHook(klass);
+  if (mod instanceof Module) return mod.extendObject(klass);
   const isClassModule = typeof mod === "function" && (mod as AnyClass).prototype;
   const keys = isClassModule
     ? Object.getOwnPropertyNames(mod).filter((k) => !STATIC_CLASS_KEYS.has(k))

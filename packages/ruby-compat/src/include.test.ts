@@ -914,6 +914,28 @@ describe("Module#superMethod", () => {
     expect((new SubB() as B).who()).toBe("mB");
   });
 
+  it("resumes above an extended object's link, next module first", () => {
+    class Receiver {
+      greeting(): string {
+        return "receiver";
+      }
+    }
+    const named = new Module();
+    named.defineMethod("greeting", function (this: object) {
+      return `${named.superMethod(this, "greeting")!()} :)`;
+    });
+    const named2 = new Module();
+    named2.defineMethod("greeting", () => "hullo");
+    const obj = new Receiver();
+    extend(obj, named2);
+    extend(obj, named);
+    expect(obj.greeting()).toBe("hullo :)");
+    expect(new Receiver().greeting()).toBe("receiver");
+    const bare = new Receiver();
+    extend(bare, named);
+    expect(bare.greeting()).toBe("receiver :)");
+  });
+
   it("reaches through a subclass of the includer", () => {
     class Base0 {
       who(): string {

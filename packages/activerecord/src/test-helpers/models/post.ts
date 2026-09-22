@@ -1,4 +1,4 @@
-import { kernelThrow } from "@blazetrails/ruby-compat";
+import { kernelThrow, Module } from "@blazetrails/ruby-compat";
 import type { Relation } from "../../relation.js";
 import type { Author } from "./author.js";
 import type { AuthorAddress } from "./author.js";
@@ -147,30 +147,20 @@ export class Post extends Base {
   declare taggingsWithDeleteAll: AssociationProxy<Tagging>;
   declare taggingsWithDestroy: AssociationProxy<Tagging>;
 
-  static namedExtension = {
-    author() {
-      return "lifo";
-    },
-    greeting(this: any) {
-      const extensions = this.proxyAssociation?.extensions ?? this.extendingValues;
-      const superModule = extensions
-        .slice(extensions.indexOf(Post.namedExtension) + 1)
-        .find((mod: any) => typeof mod.greeting === "function");
-      return superModule.greeting.call(this) + " :)";
-    },
-  };
+  static namedExtension = new Module();
 
-  static CommentsWithExtendAssociationExtension = {
-    greeting() {
-      return "hello";
-    },
-  };
+  static CommentsWithExtendAssociationExtension = new Module();
 
-  static namedExtension2 = {
-    greeting() {
-      return "hullo";
-    },
-  };
+  static namedExtension2 = new Module();
+
+  static {
+    this.namedExtension.defineMethod("author", () => "lifo");
+    this.namedExtension.defineMethod("greeting", function (this: object) {
+      return `${Post.namedExtension.superMethod(this, "greeting")!()} :)`;
+    });
+
+    this.namedExtension2.defineMethod("greeting", () => "hullo");
+  }
 
   static _log: Array<[any, any, any]> = [];
 
@@ -287,6 +277,7 @@ export class Post extends Base {
         },
       },
     });
+    this.CommentsWithExtendAssociationExtension.defineMethod("greeting", () => "hello");
     this.hasMany("commentsWithExtend", {
       extend: [Post.namedExtension, Post.CommentsWithExtendAssociationExtension],
       className: "Comment",

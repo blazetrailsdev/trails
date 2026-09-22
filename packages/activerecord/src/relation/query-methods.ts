@@ -1,4 +1,4 @@
-import { hasKey, rbObjClass, RuntimeError } from "@blazetrails/ruby-compat";
+import { extend, hasKey, rbObjClass, RuntimeError } from "@blazetrails/ruby-compat";
 import * as Arel from "@blazetrails/arel";
 import { Nodes, SelectManager, Table as ArelTable } from "@blazetrails/arel";
 import {
@@ -208,7 +208,7 @@ interface QueryMethodsHost {
   joinsValues: (AssociationSpec | string | Nodes.Join)[];
   leftOuterJoinsValues: AssociationSpec[];
   referencesValues: Array<string | Nodes.SqlLiteral>;
-  extendingValues: Array<Record<string, (...args: any[]) => any>>;
+  extendingValues: object[];
   unscopeValues: Array<string | { where: string | string[] }>;
   optimizerHintsValues: string[];
   annotateValues: string[];
@@ -1121,17 +1121,14 @@ function distinctBang(this: QueryMethodsHost, value = true): any {
   return this;
 }
 
-function extending(
-  this: QueryMethodsHost,
-  modules?: Record<string, (...args: any[]) => any> | ((rel: any) => void),
-): any {
+function extending(this: QueryMethodsHost, modules?: object | ((rel: any) => void)): any {
   if (!modules) return this;
   return extendingBang.call(this.spawn(), modules);
 }
 
 function extendingBang(
   this: QueryMethodsHost,
-  ...modules: Array<Record<string, (...args: any[]) => any> | ((rel: any) => void)>
+  ...modules: Array<object | ((rel: any) => void)>
 ): any {
   for (const mod of modules) {
     if (typeof mod === "function") {
@@ -1140,11 +1137,7 @@ function extendingBang(
       this.extendingValues = [...this.extendingValues, mod];
     }
   }
-  for (const mod of [...this.extendingValues].reverse()) {
-    for (const [name, fn] of Object.entries(mod)) {
-      (this as any)[name] = fn.bind(this);
-    }
-  }
+  for (const mod of [...this.extendingValues].reverse()) extend(this, mod);
   return this;
 }
 

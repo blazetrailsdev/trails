@@ -1,4 +1,4 @@
-import { NoMethodError } from "@blazetrails/ruby-compat";
+import { NoMethodError, extend } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import { Relation } from "../relation.js";
 import { QueryMethods } from "../relation/query-methods.js";
@@ -201,11 +201,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         if (typeof mod === "function") {
           (mod as (rel: unknown) => void)(this);
         } else {
-          for (const [name, fn] of Object.entries(
-            mod as Record<string, (...args: unknown[]) => unknown>,
-          )) {
-            (this as unknown as Record<string, unknown>)[name] = fn.bind(this);
-          }
+          extend(this, mod as object);
         }
       }
     }
