@@ -42,4 +42,25 @@ describe("Mutex", () => {
 
     expect(await mutex.synchronize(async () => "ok")).toBe("ok");
   });
+
+  it("try_lock fails while held and synchronize waits for unlock", async () => {
+    const mutex = new Mutex();
+    const order: string[] = [];
+
+    expect(mutex.tryLock()).toBe(true);
+    expect(mutex.tryLock()).toBe(false);
+    const waiting = mutex.synchronize(() => order.push("sync"));
+    await Promise.resolve();
+    expect(order).toEqual([]);
+    mutex.unlock();
+    await waiting;
+
+    expect(order).toEqual(["sync"]);
+    expect(mutex.tryLock()).toBe(true);
+    mutex.unlock();
+  });
+
+  it("unlock raises ThreadError when not locked", () => {
+    expect(() => new Mutex().unlock()).toThrow("Attempt to unlock a mutex which is not locked");
+  });
 });

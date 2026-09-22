@@ -7,7 +7,7 @@ import {
   type EventPayload,
   type Instrumenter,
 } from "@blazetrails/activesupport";
-import { Process } from "@blazetrails/ruby-compat";
+import { Mutex, Process } from "@blazetrails/ruby-compat";
 import { Result } from "./result.js";
 
 /** @internal */
@@ -132,16 +132,18 @@ export class FutureResult {
   protected args: unknown[];
   protected kwargs: Record<string, unknown>;
 
+  #mutex: Mutex;
   #session: FutureResultSession | null = null;
+  #scheduled: Promise<void> | null = null;
   #pending = true;
   #error: unknown = null;
   #result: Result | null = null;
-  #executing: Promise<void> | null = null;
-  #scheduled: Promise<void> | null = null;
   #instrumenter: Instrumenter;
   #eventBuffer: EventBuffer | null = null;
 
   constructor(pool: FutureResultPool, args: unknown[], kwargs: Record<string, unknown> = {}) {
+    this.#mutex = new Mutex();
+
     this.pool = pool;
     this.args = args;
     this.kwargs = kwargs;
@@ -185,11 +187,16 @@ export class FutureResult {
       if (!this.pending()) return;
 
       await this.pool.withConnection(async (connection) => {
-        if (this.#executing) return;
-        if (this.pending()) {
-          this.#eventBuffer = new EventBuffer(this, this.#instrumenter);
-          IsolatedExecutionState.set(ACTIVE_RECORD_INSTRUMENTER, this.#eventBuffer);
-          await this.executeQuery(connection, { async: true });
+        if (!this.#mutex.tryLock()) return;
+        try {
+          if (this.pending()) {
+            this.#eventBuffer = new EventBuffer(this, this.#instrumenter);
+            IsolatedExecutionState.set(ACTIVE_RECORD_INSTRUMENTER, this.#eventBuffer);
+
+            await this.executeQuery(connection, { async: true });
+          }
+        } finally {
+          this.#mutex.unlock();
         }
       });
     }));
@@ -220,35 +227,33 @@ export class FutureResult {
     if (this.pending()) {
       const start = Process.clockGettime(Process.CLOCK_MONOTONIC, ":float_millisecond");
       if (this.#scheduled) await this.#scheduled;
-      if (this.#executing) {
-        await this.#executing;
-        this.lockWait = Process.clockGettime(Process.CLOCK_MONOTONIC, ":float_millisecond") - start;
-      } else {
-        await this.pool.withConnection((connection) => this.executeQuery(connection));
-      }
+      await this.#mutex.synchronize(async () => {
+        if (this.pending()) {
+          await this.pool.withConnection((connection) => this.executeQuery(connection));
+        } else {
+          this.lockWait =
+            Process.clockGettime(Process.CLOCK_MONOTONIC, ":float_millisecond") - start;
+        }
+      });
     } else {
       this.lockWait = 0.0;
     }
   }
 
-  protected executeQuery(
+  protected async executeQuery(
     connection: FutureResultConnection,
     kwargs: { async?: boolean } = {},
   ): Promise<void> {
-    const running = (async () => {
-      try {
-        this.#result = await this.execQuery(connection, this.args, {
-          ...this.kwargs,
-          async: kwargs.async ?? false,
-        });
-      } catch (error) {
-        this.#error = error;
-      } finally {
-        this.#pending = false;
-      }
-    })();
-    this.#executing = running;
-    return running;
+    try {
+      this.#result = await this.execQuery(connection, this.args, {
+        ...this.kwargs,
+        async: kwargs.async ?? false,
+      });
+    } catch (error) {
+      this.#error = error;
+    } finally {
+      this.#pending = false;
+    }
   }
 
   protected execQuery(
