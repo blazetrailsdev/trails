@@ -134,7 +134,7 @@ export { KeyError } from "./key-error.js";
 export { LocalJumpError } from "./local-jump-error.js";
 export { LoadError } from "./load-error.js";
 export { IPAddr } from "./ipaddr.js";
-export { PROTOCOL_PROBES, methodMissingProxy } from "./method-missing-proxy.js";
+export { KERNEL_METHODS, PROTOCOL_PROBES, methodMissingProxy } from "./method-missing-proxy.js";
 export { NameError } from "./name-error.js";
 export { NilClass } from "./nil-class.js";
 export { NoMethodError } from "./no-method-error.js";
@@ -162,6 +162,7 @@ export {
 } from "./process-adapter.js";
 export type { ProcessAdapter, ReadStream, SignalName, WriteStream } from "./process-adapter.js";
 export type { PrependMethod, PrependModule } from "./prepend.js";
+export { Method, rbObjMethod } from "./method.js";
 export { regexpEscape } from "./regexp.js";
 export { Range } from "./range.js";
 export { Rational, ZeroDivisionError, rational } from "./rational.js";
@@ -176,9 +177,19 @@ export { Digest, DigestClass, DigestInstance } from "./digest.js";
 export { Cipher, HMAC, OpenSSL } from "./openssl.js";
 export { StringIO } from "./string-io.js";
 export { b } from "./string/b.js";
+export { bytes } from "./string/bytes.js";
+export { scrub } from "./string/scrub.js";
 export { chomp } from "./string/chomp.js";
 export { stringDelete } from "./string/delete.js";
 export { sliceBang } from "./string/slice.js";
+export {
+  rbStrMatch,
+  rbStrRespondTo,
+  rbStrSend,
+  STRING_METHOD_TABLE,
+  type StringReceiver,
+} from "./string/method-table.js";
+export { MatchData } from "./match-data.js";
 export { stringSplit } from "./string/split.js";
 export { forceEncoding } from "./string/force-encoding.js";
 export { Encoding } from "./encoding.js";

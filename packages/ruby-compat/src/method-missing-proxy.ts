@@ -39,6 +39,63 @@ export const PROTOCOL_PROBES = new Set([
 ]);
 
 /**
+ * The public methods `Kernel` defines on every object (`vendor/ruby/object.c:4360`,
+ * `Init_Object` at `:4527`), camelCased as trails spells them. Ruby finds them
+ * on the receiver before `method_missing` is consulted, so a trap forwarding
+ * to a delegate must not forward these: `chars.eql?(chars)` is Kernel's
+ * identity test, never the wrapped String's.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const KERNEL_METHODS = new Set([
+  "isNil",
+  "caseEquals",
+  "eql",
+  "hash",
+  "compareTo",
+  "singletonClass",
+  "dup",
+  "itself",
+  "freeze",
+  "isFrozen",
+  "clone",
+  "toS",
+  "inspect",
+  "methods",
+  "singletonMethods",
+  "protectedMethods",
+  "privateMethods",
+  "publicMethods",
+  "instanceVariables",
+  "instanceVariableGet",
+  "instanceVariableSet",
+  "isInstanceVariableDefined",
+  "removeInstanceVariable",
+  "isInstanceOf",
+  "isKindOf",
+  "isA",
+  "tap",
+  "then",
+  "yieldSelf",
+  "send",
+  "publicSend",
+  "respondTo",
+  "method",
+  "publicMethod",
+  "singletonMethod",
+  "defineSingletonMethod",
+  "objectId",
+  "display",
+  "extend",
+  "enumFor",
+  "toEnum",
+  "isEqual",
+  "equals",
+  "instanceEval",
+  "instanceExec",
+]);
+
+/**
  * Mirrors `Kernel#respond_to?` (`vendor/ruby/vm_method.c:3017`) — public
  * members only, as its `include_all = false` default is.
  */

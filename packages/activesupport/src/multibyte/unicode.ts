@@ -1,3 +1,5 @@
+import { bytes, scrub } from "@blazetrails/ruby-compat";
+
 export namespace Unicode {
   export function decompose(type: string, codepoints: number[]): number[] {
     if (type === ":compatibility") {
@@ -11,23 +13,25 @@ export namespace Unicode {
     return codepointsOf(String.fromCodePoint(...codepoints).normalize("NFC"));
   }
 
-  /** @missingRailsCall recode_windows1252_chars — PERMANENT */
   export function tidyBytes(string: string, force: boolean = false): string {
     // eslint-disable-next-line no-control-regex -- Ruby's `ascii_only?` (unicode.rb:29)
     if (string.length === 0 || /^[\x00-\x7f]*$/.test(string)) return string;
     if (force) return recodeWindows1252Chars(string);
-    return string.replace(
-      /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/g,
-      "\ufffd",
-    );
+    return scrub(string, null, (bad) => recodeWindows1252Chars(bad));
   }
 
   /** @internal */
   export function recodeWindows1252Chars(string: string): string {
-    const bytes = new TextEncoder().encode(string);
-    return new TextDecoder("windows-1252").decode(bytes);
+    const decoder = new TextDecoder("windows-1252");
+    return bytes(string)
+      .map((byte) =>
+        WINDOWS_1252_UNDEF.has(byte) ? "\ufffd" : decoder.decode(Uint8Array.of(byte)),
+      )
+      .join("");
   }
 }
+
+const WINDOWS_1252_UNDEF = new Set([0x81, 0x8d, 0x8f, 0x90, 0x9d]);
 
 function codepointsOf(string: string): number[] {
   return Array.from(string, (c) => c.codePointAt(0)!);
