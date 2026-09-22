@@ -52,6 +52,9 @@ export interface ParamInfo {
    * functions (the arity check, in a follow-up). Absent on the Ruby side.
    */
   type?: string;
+  /** TS side only (RFC 0156): the declared type admits a function — a call
+   *  signature on it or on any union member. What a ported Ruby block needs. */
+  admitsFunction?: boolean;
 }
 
 // When you add a field here that the extractor POPULATES, also add its emitted
@@ -67,6 +70,9 @@ export interface MethodInfo {
   deps?: string[];
   depRefs?: Record<string, string[]>;
   calls?: string[];
+  /** Ruby side only (RFC 0156): declares `&blk`, or its body `yield`s or tests
+   *  `block_given?`. Compared by block-params.ts. */
+  takesBlock?: boolean;
   /**
    * TS-side only (RFC 0084): the same call names in SOURCE ORDER, deduplicated
    * at first occurrence exactly as the Ruby extractor's `calls.uniq` is. `calls`

@@ -59,9 +59,12 @@ export interface MeasuredRow {
   rubyFile: string;
 }
 
-export function measure(rows: readonly MeasuredRow[]): ParamNameMarks {
+export function measure(
+  rows: readonly MeasuredRow[],
+  gated: readonly string[] = GATED_PACKAGES,
+): ParamNameMarks {
   const marks: ParamNameMarks = {};
-  for (const name of GATED_PACKAGES) marks[name] = { total: 0, byFile: {} };
+  for (const name of gated) marks[name] = { total: 0, byFile: {} };
   for (const row of rows) {
     const mark = marks[row.package];
     if (!mark) continue;
@@ -90,9 +93,13 @@ function dimensions(mark: PackageMark, now: PackageMark): [string, number, numbe
 }
 
 /** Every dimension that grew past its mark. Empty means the gate passes. */
-export function exceedances(marks: ParamNameMarks, current: ParamNameMarks): MarkViolation[] {
+export function exceedances(
+  marks: ParamNameMarks,
+  current: ParamNameMarks,
+  gated: readonly string[] = GATED_PACKAGES,
+): MarkViolation[] {
   const violations: MarkViolation[] = [];
-  for (const name of GATED_PACKAGES) {
+  for (const name of gated) {
     const mark = marks[name];
     const now = current[name];
     if (!mark || !now) continue;
@@ -106,9 +113,13 @@ export function exceedances(marks: ParamNameMarks, current: ParamNameMarks): Mar
 /** Marks sitting ABOVE what a clean measurement would write. Not a failure —
  *  the gate only forbids growth — but reported so a converged PR narrows its
  *  mark instead of leaving slack for the next one to spend. */
-export function staleMarks(marks: ParamNameMarks, current: ParamNameMarks): MarkViolation[] {
+export function staleMarks(
+  marks: ParamNameMarks,
+  current: ParamNameMarks,
+  gated: readonly string[] = GATED_PACKAGES,
+): MarkViolation[] {
   const stale: MarkViolation[] = [];
-  for (const name of GATED_PACKAGES) {
+  for (const name of gated) {
     const mark = marks[name];
     const now = current[name];
     if (!mark || !now) continue;
@@ -121,28 +132,38 @@ export function staleMarks(marks: ParamNameMarks, current: ParamNameMarks): Mark
 
 /** A package the gate covers but the measurement never reported — silently
  *  passing would disarm the gate the first time a `--package` filter hid it. */
-export function unmeasuredPackages(measuredPackages: readonly string[]): string[] {
-  return GATED_PACKAGES.filter((name) => !measuredPackages.includes(name));
+export function unmeasuredPackages(
+  measuredPackages: readonly string[],
+  gated: readonly string[] = GATED_PACKAGES,
+): string[] {
+  return gated.filter((name) => !measuredPackages.includes(name));
 }
 
 /** A package the gate covers but the mark file never committed — every
  *  comparison skips it, so gating without seeding disarms rather than
  *  half-enables. The mark-side twin of {@link unmeasuredPackages}. */
-export function unmarkedPackages(marks: ParamNameMarks): string[] {
-  return GATED_PACKAGES.filter((name) => marks[name] === undefined);
+export function unmarkedPackages(
+  marks: ParamNameMarks,
+  gated: readonly string[] = GATED_PACKAGES,
+): string[] {
+  return gated.filter((name) => marks[name] === undefined);
 }
 
-export async function loadMarks(): Promise<ParamNameMarks> {
-  return JSON.parse(await fs.readFile(MARK_PATH, "utf-8")) as ParamNameMarks;
+export async function loadMarks(file = MARK_PATH): Promise<ParamNameMarks> {
+  return JSON.parse(await fs.readFile(file, "utf-8")) as ParamNameMarks;
 }
 
 /** Write the mark down to `current`. Only-shrink by construction: a dimension
  *  that grew keeps its committed value, so `--tighten` can never launder a
  *  regression into the mark the way a reseed would. A file that converged to
  *  zero leaves the mark rather than lingering as a `0` row. */
-export function tightened(marks: ParamNameMarks, current: ParamNameMarks): ParamNameMarks {
+export function tightened(
+  marks: ParamNameMarks,
+  current: ParamNameMarks,
+  gated: readonly string[] = GATED_PACKAGES,
+): ParamNameMarks {
   const next: ParamNameMarks = { ...marks };
-  for (const name of GATED_PACKAGES) {
+  for (const name of gated) {
     const mark = marks[name];
     const now = current[name];
     if (!mark || !now) continue;
@@ -156,8 +177,8 @@ export function tightened(marks: ParamNameMarks, current: ParamNameMarks): Param
   return next;
 }
 
-export async function writeMarks(marks: ParamNameMarks): Promise<void> {
+export async function writeMarks(marks: ParamNameMarks, file = MARK_PATH): Promise<void> {
   const sorted: ParamNameMarks = {};
   for (const name of Object.keys(marks).sort()) sorted[name] = marks[name]!;
-  await fs.writeFile(MARK_PATH, serializeBaseline(sorted));
+  await fs.writeFile(file, serializeBaseline(sorted));
 }

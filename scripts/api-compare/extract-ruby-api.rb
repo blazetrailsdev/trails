@@ -214,6 +214,18 @@ def symbol_discriminated_names(node, names = [])
   names
 end
 
+# Does the body reach the caller's block — `yield`, or a `block_given?` test?
+# Neither declares a parameter, so a `&block`-less method taking a block is
+# invisible to the params gate (RFC 0156, block-params.ts). A nested `def`
+# yields to its own caller, so it is not descended into.
+def body_takes_block?(node)
+  return false unless node.is_a?(Array)
+  return true if node[0] == :yield || node[0] == :yield0
+  return true if %i[vcall fcall].include?(node[0]) && ident_name(node[1]) == "block_given?"
+  return false if node[0] == :def || node[0] == :defs
+  node.any? { |child| body_takes_block?(child) }
+end
+
 def mark_symbol_discriminated(params, body)
   names = symbol_discriminated_names(body)
   return if names.empty?
@@ -2052,6 +2064,7 @@ class ApiExtractor
   # drift back apart.
   def record_body_facts(entry, body, params_node, fqn)
     mark_symbol_discriminated(entry[:params], body)
+    entry[:takesBlock] = true if entry[:params].any? { |p| p[:kind] == "block" } || body_takes_block?(body)
     dep_info = detect_deps(body)
     calls, weak_calls, call_receivers = collect_method_calls(body, params_node)
     entry[:deps] = dep_info[:deps] unless dep_info[:deps].empty?

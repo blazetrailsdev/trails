@@ -50,6 +50,8 @@
     "parity:api:parents": "pnpm tsx scripts/api-compare/lint-ambiguous-parents.ts",
     "parity:api:parents:tighten": "pnpm tsx scripts/api-compare/lint-ambiguous-parents.ts --tighten",
     "parity:api:params:tighten": "pnpm tsx scripts/api-compare/lint-param-names.ts --tighten",
+    "parity:api:blocks": "pnpm tsx scripts/api-compare/lint-block-params.ts",
+    "parity:api:blocks:tighten": "pnpm tsx scripts/api-compare/lint-block-params.ts --tighten",
     "parity:api:arity": "pnpm tsx scripts/api-compare/lint-arity-excludes.ts",
     "parity:api:inheritance": "pnpm tsx scripts/api-compare/lint-inheritance-excludes.ts",
     "parity:api:pins": "pnpm tsx scripts/api-compare/lint-body-pins.ts",

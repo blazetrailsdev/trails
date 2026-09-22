@@ -155,7 +155,13 @@ anything else takes the plain kebab-case rule.
 parity:api never expects a TS counterpart for these Ruby methods:
 
 - Ruby core object / value-protocol methods with no meaningful public TypeScript surface (identity, reflection, coercion).
-  - `dup`, `clone`, `freeze`, `hash`, `inspect`, `pretty_print`, `object_id`, `class`, `send`, `public_send`, `tap`, `then`, `yield_self`, `respond_to?`, `respond_to_missing?`, `method_missing`, `is_a?`, `kind_of?`, `instance_of?`, `nil?`, `equal?`, `eql?`, `instance_variable_get`, `instance_variable_set`, `instance_variables`, `initialize_copy`, `initialize_dup`, `initialize_clone`, `encode_with`, `init_with`, `to_ary`, `to_a`, `to_i`, `to_f`, `to_h`, `to_hash`, `to_r`, `to_c`
+  - `dup`, `clone`, `freeze`, `inspect`, `pretty_print`, `object_id`, `class`, `send`, `public_send`, `tap`, `then`, `yield_self`, `instance_of?`, `nil?`, `equal?`, `instance_variable_get`, `instance_variable_set`, `instance_variables`, `initialize_copy`, `initialize_dup`, `initialize_clone`, `encode_with`, `init_with`, `to_ary`, `to_a`, `to_i`, `to_f`, `to_h`, `to_hash`, `to_r`, `to_c`
+- PERMANENT for scoring by name — JS spells `is_a?` as `instanceof`, customised by `static [Symbol.hasInstance]` on the class tested AGAINST, so `TimeWithZone#is_a?(Time)` ports as a hook on `Time`. A same-named `isA` is judged against its Rails body per class (CLAUDE.md § "Ruby protocol methods with a different JS mechanism").
+  - `is_a?`, `kind_of?`
+- Skipped until scored by their consumers: JS `Map`/`Set` call no hook, but `rbHash` / `rbEqual` (ruby-compat) dispatch to a TS `hash()` / `eql()`, as do `Deduplicable#deduplicate` and the preloader's batch grouping, so the members are live (CLAUDE.md § "Ruby protocol methods with a different JS mechanism").
+  - `hash`, `eql?`
+- Decided per class — the JS mechanism is a `Proxy` trap, or typed forwarders, and `respond_to?` is `rbObjRespondTo`, a function; `in` sees no name a `respond_to_missing?` answers (CLAUDE.md § "Ruby protocol methods with a different JS mechanism", which lists every Rails definer).
+  - `method_missing`, `respond_to_missing?`, `respond_to?`
 - Ruby module lifecycle hooks — no TypeScript equivalent.
   - `extended`, `included`, `inherited`, `append_features`, `prepend_features`
 - Ruby object hooks — no TypeScript equivalent.
