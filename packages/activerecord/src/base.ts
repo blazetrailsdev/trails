@@ -770,7 +770,7 @@ export class Base extends Model {
     this._connectionClass = value;
   }
 
-  static connectionClassQ(): boolean {
+  static isConnectionClass(): boolean {
     return !!this.connectionClass;
   }
 
@@ -801,7 +801,7 @@ export class Base extends Model {
   static connectionClassForSelf(): typeof Base {
     let klass: typeof Base = this;
     while (klass !== Base) {
-      if (klass.connectionClassQ()) return klass;
+      if (klass.isConnectionClass()) return klass;
       const parent = Object.getPrototypeOf(klass);
       if (!parent || parent === Function.prototype) break;
       klass = parent;
@@ -960,7 +960,7 @@ export class Base extends Model {
   static set connectionSpecificationName(name: string | null) {
     (this as any)._connectionSpecificationName = name;
   }
-  declare static connectedQ: typeof ConnectionHandling.connectedQ;
+  declare static isConnected: typeof ConnectionHandling.isConnected;
   declare static readonly connection: DatabaseAdapter;
   declare static isPrimaryClass: typeof ConnectionHandling.isPrimaryClass;
   declare static adapterClass: typeof ConnectionHandling.adapterClass;
@@ -2528,7 +2528,7 @@ export class Base extends Model {
       return name;
     } else if (this.abstractClass) {
       return `${name}(abstract)`;
-    } else if (!ModelSchema.isSchemaLoaded.call(this as never) && !this.connectedQ()) {
+    } else if (!ModelSchema.isSchemaLoaded.call(this as never) && !this.isConnected()) {
       return `${name} (call '${name}.load_schema' to load schema informations)`;
     }
     const columns = this.columnsHash();

@@ -525,7 +525,7 @@ describe("QueryCacheTest", () => {
     const originalConnection = await Base.removeConnection();
 
     await Base.establishConnection(dbConfig);
-    assertNotPredicate(Task, (k) => k.connectedQ());
+    assertNotPredicate(Task, (k) => k.isConnected());
 
     try {
       await Task.cache(async () => {

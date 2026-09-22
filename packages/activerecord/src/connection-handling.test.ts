@@ -309,7 +309,7 @@ describe("ConnectionHandlingTest", () => {
   it("is_connected?", async () => {
     const pool = Base.connectionPool();
     await (await pool.leaseConnection()).verifyBang();
-    expect(Base.connectedQ()).toBe(true);
+    expect(Base.isConnected()).toBe(true);
     pool.releaseConnection();
   });
 

@@ -22,7 +22,7 @@ import { TableNotSpecified } from "./errors.js";
 import { loadSchemaOverrides } from "./load-schema-overrides-slot.js";
 import { EncryptableRecord } from "./encryption/encryptable-record.js";
 import { NullColumn } from "./connection-adapters/column.js";
-import { connectionPool, withConnection, connectedQ } from "./connection-handling.js";
+import { connectionPool, withConnection, isConnected } from "./connection-handling.js";
 
 function reflectionAdapter(klass: any): any {
   const pool = connectionPool.call(klass);
@@ -717,7 +717,7 @@ export function tableName(this: SchemaHost, value?: string | null): string {
     value = value == null ? null : String(value);
     if (Object.prototype.hasOwnProperty.call(this, "_tableName")) {
       if (value === this._tableName) return this._tableName ?? "";
-      if (connectedQ.call(this as unknown as typeof Base)) {
+      if (isConnected.call(this as unknown as typeof Base)) {
         void Promise.resolve(resetColumnInformation.call(this)).catch(() => {});
       }
     }

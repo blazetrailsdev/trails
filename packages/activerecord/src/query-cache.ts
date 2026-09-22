@@ -55,7 +55,7 @@ export class QueryCache {
 
 export const ClassMethods = {
   cache<T>(this: typeof Base, block: () => T | Promise<T>): T | Promise<T> {
-    if (this.connectedQ() || !this.configurations().empty) {
+    if (this.isConnected() || !this.configurations().empty) {
       const pool = this.connectionPool();
       const wasEnabled = pool.queryCacheEnabled;
       const ensure = () => {
@@ -80,7 +80,7 @@ export const ClassMethods = {
     block: () => T | Promise<T>,
     options: { dirties?: boolean } = {},
   ): T | Promise<T> {
-    if (this.connectedQ() || !this.configurations().empty) {
+    if (this.isConnected() || !this.configurations().empty) {
       return this.connectionPool().disableQueryCache(block, options);
     }
     return block();

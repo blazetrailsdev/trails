@@ -30,7 +30,7 @@ describe("handler-resolved adapter (Phase D-0)", () => {
   });
 
   it("connectedQ() is true after setupHandlerSuite()", () => {
-    expect(Base.connectedQ()).toBe(true);
+    expect(Base.isConnected()).toBe(true);
   });
 
   it("bare class extends Base loads schema via lazy reflection without deadlock", async () => {
