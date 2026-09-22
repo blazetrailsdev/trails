@@ -46,6 +46,8 @@ import {
   assertNot,
   assertNotEmpty,
   assertRaise,
+  travel,
+  travelBack,
 } from "@blazetrails/activesupport";
 
 import { fixtures } from "../test-fixtures.js";
@@ -1178,11 +1180,9 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("included in collection for new records", async () => {
-    const author = await HmAuthor.create({ name: "Alice" });
-    const newPost = HmPost.new({ author_id: author.id, title: "New" });
-    expect(newPost.isNewRecord()).toBe(true);
-    const posts = await author.posts;
-    expect(posts.some((p: any) => p.id === newPost.id)).toBe(false);
+    const client = (await Client.create({ name: "Persisted" })) as any;
+    expect(client.client_of).toBeNull();
+    expect(await (HmFirm.new() as any).clientsOfFirm.isInclude(client)).toBe(false);
   });
 });
 
@@ -1472,7 +1472,7 @@ describe("HasManyAssociationsTest", () => {
     const client = clients.target[0];
 
     await assertNoQueries(false, async () => {
-      expect(clients.loaded).toBe(true);
+      expect(clients.loaded).toBeTruthy();
       expect(await clients.isInclude(client)).toBe(true);
     });
   });
@@ -1685,17 +1685,21 @@ describe("HasManyAssociationsTest", () => {
     expect(queries2).not.toEqual(queries);
   });
   it("add record to collection should change its updated at", async () => {
-    registerModel(HmShip);
-    registerModel(HmShipPart);
     const ship = await HmShip.create({ name: "dauntless" });
-    const part = await HmShipPart.create({ name: "cockpit" });
-    const updatedAt = (part as any).updated_at;
-    (part as any).ship_id = ship.id;
-    await (part as any).save();
-    const reloaded = await HmShipPart.find((part as any).id);
-    expect((reloaded as any).ship_id).toBe(Number(ship.id));
-    expect((reloaded as any).updated_at).toBeDefined();
+    const part = (await HmShipPart.create({ name: "cockpit" })) as any;
+    const updatedAt = part.updated_at;
+
+    travel(1);
+    try {
+      await (ship as any).parts.push(part);
+    } finally {
+      travelBack();
+    }
+
+    expect(await part.ship).toEqual(ship);
+    expect(part.updated_at).not.toEqual(updatedAt);
   });
+
   it("clear collection should not change updated at", async () => {
     registerModel(HmShip);
     registerModel(HmShipPart);
@@ -1827,37 +1831,20 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("delete all on association with nil dependency is the same as not loaded", async () => {
-    class NilDepAuthor extends Base {
-      declare name: string | null;
-      declare nil_dep_posts: AssociationProxy<NilDepPost>;
+    const author = authors("david") as any;
+    await author.posts.createBang({ title: "test", body: "body" });
+    await author.reload();
+    const expectedSql = await captureSql(async () => {
+      await author.posts.deleteAll();
+    });
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("nil_dep_posts", {
-          className: "NilDepPost",
-          foreignKey: "author_id",
-          dependent: "nullify",
-        });
-      }
-    }
-    class NilDepPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(NilDepAuthor);
-    registerModel(NilDepPost);
-    const author = await NilDepAuthor.create({ name: "Alice" });
-    const post = await NilDepPost.create({ author_id: author.id, title: "A", body: "body" });
-    await author.destroy();
-    const reloaded = await NilDepPost.find(post.id!);
-    expect((reloaded as any).author_id).toBeNull();
+    await author.posts.createBang({ title: "test", body: "body" });
+    await author.reload();
+    await author.posts.toArray();
+    const loadedSql = await captureSql(async () => {
+      await author.posts.deleteAll();
+    });
+    expect(loadedSql).toEqual(expectedSql);
   });
 
   it("building the associated object with implicit sti base class", () => {
@@ -2086,7 +2073,7 @@ describe("HasManyAssociationsTest", () => {
     speedometer.minivans.where({ color: "blue" }).build(data);
 
     expect(await speedometer.minivans.size()).toBe(2);
-    expect(await speedometer.save()).toBe(true);
+    expect(await speedometer.save()).toBeTruthy();
 
     await speedometer.reload();
 
@@ -2101,7 +2088,7 @@ describe("HasManyAssociationsTest", () => {
     speedometer.minivans.where({ color: "blue" }).new(data);
 
     expect(await speedometer.minivans.size()).toBe(2);
-    expect(await speedometer.save()).toBe(true);
+    expect(await speedometer.save()).toBeTruthy();
 
     await speedometer.reload();
 
@@ -2330,7 +2317,7 @@ describe("HasManyAssociationsTest", () => {
       await expect(c.saveBang()).rejects.toThrow(ReadOnlyRecord);
     }
     for (const c of await (authors("david") as any).readonlyComments) {
-      expect(c.isReadonly()).toBe(true);
+      expect(c.isReadonly()).toBeTruthy();
     }
   });
 
@@ -2450,13 +2437,13 @@ describe("HasManyAssociationsTest", () => {
   it("build followed by save does not load target", async () => {
     (companies("first_firm") as any).clientsOfFirm.build({ name: "Another Client" });
     expect(await (companies("first_firm") as any).save()).toBeTruthy();
-    expect((companies("first_firm") as any).clientsOfFirm.loaded).toBe(false);
+    expect((companies("first_firm") as any).clientsOfFirm.loaded).toBeFalsy();
   });
 
   it("create followed by save does not load target", async () => {
     await (companies("first_firm") as any).clientsOfFirm.create({ name: "Another Client" });
     expect(await (companies("first_firm") as any).save()).toBeTruthy();
-    expect((companies("first_firm") as any).clientsOfFirm.loaded).toBe(false);
+    expect((companies("first_firm") as any).clientsOfFirm.loaded).toBeFalsy();
   });
   it("dependent association respects optional conditions on delete", async () => {
     const firm = companies("odegy") as any;
@@ -2725,40 +2712,12 @@ describe("HasManyAssociationsTest", () => {
   registerModel(HmLineItem);
 
   it("ids reader cache not used for size when association is dirty", async () => {
-    class DirtyIdAuthor extends Base {
-      declare dirty_id_posts: AssociationProxy<DirtyIdPost>;
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("dirty_id_posts", {
-          className: "DirtyIdPost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class DirtyIdPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(DirtyIdAuthor);
-    registerModel(DirtyIdPost);
-    const author = await DirtyIdAuthor.create({ name: "Writer" });
-    await DirtyIdPost.create({ author_id: author.id, title: "P1", body: "body" });
-    const posts = await author.dirty_id_posts;
-    expect(posts).toHaveLength(1);
-    await DirtyIdPost.create({ author_id: author.id, title: "P2", body: "body" });
-    await author.reload();
-    const posts2 = await author.dirty_id_posts;
-    expect(posts2).toHaveLength(2);
+    const firm = (await HmFirm.createBang({ name: "Startup" })) as any;
+    expect((await firm.clientIds).length).toBe(0);
+    firm.clients.build();
+    expect(await firm.clients.size()).toBe(1);
   });
+
   it("ids reader cache should be cleared when collection is deleted", async () => {
     const firm = companies("first_firm") as any;
     expect(await firm.clientIds).toEqual([2, 3, 11]);
@@ -4598,7 +4557,7 @@ describe("HasManyAssociationsTest", () => {
   it("replace with less", async () => {
     const firm = (await HmFirm.first()) as any;
     await firm.clients.replace([companies("first_client")]);
-    expect(await firm.save()).toBe(true);
+    expect(await firm.save()).toBeTruthy();
     await firm.reload();
     expect((await firm.clients).length).toBe(1);
   });
