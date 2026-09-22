@@ -1215,6 +1215,36 @@ This is a genuine language shortcoming, ratified repo-wide here. An own-property
 memo guard in `model-schema.ts` is the port of `inherited`, not a deviation to
 retire, and there is no story to port `inherited` as a hook.
 
+## `singleton_class` is a per-object subclass (`rbObjSingletonClass`)
+
+Ruby's `obj.singleton_class` (`vendor/ruby/object.c:288`, `class.c:2215`) is a
+class of the object's own. It sits between the object and its class, and
+`obj.class` skips it (`rb_obj_class`, `object.c:296`). So
+`t2.singleton_class.validates(:title, uniqueness: true)`
+(`activerecord/test/cases/validations/uniqueness_validation_test.rb:109`) gives
+only `t2` the validator, and `t2.class` is still `Topic`.
+
+JS has no per-object class. `rbObjSingletonClass(obj)`
+(`ruby-compat/src/object.ts`) is the settled shape. It creates a subclass of
+`obj.constructor` on first call and makes it `obj`'s prototype. Its
+`prototype.constructor` is set back to the real class, so `obj.constructor`
+keeps answering Ruby's `obj.class`. `rbModSingletonP` is
+`Module#singleton_class?`. Rails code that
+branches on `singleton_class?` ports the branch as it is:
+`ClassAttribute.redefine`'s instance-reader arm (`class_attribute.rb:7-13`), and
+`UniquenessValidator#initialize`'s `@klass.superclass` (`uniqueness.rb:16`).
+
+Because a Ruby singleton class never fires `inherited`, the own-property memo
+guards (§ "`inherited` is deferred") treat it as an unreset subclass. Do not
+read class-level schema memos off a singleton class. Rails does not either:
+every Rails call that reaches them goes through `record.class`.
+
+A JS class has no metaclass apart from its own statics, so
+`rbObjSingletonClass` raises `TypeError` for a class receiver. Code whose Rails
+body reaches a class's singleton class keeps working on the class itself, and
+`ClassAttribute.redefine` does not port its `attached_object.is_a?(Module)`
+arm.
+
 ## Trails has no autoloader (`Rails.autoloaders` / Zeitwerk)
 
 `Rails::Autoloaders` (`railties/lib/rails/autoloaders.rb:12-28`) is a pair of

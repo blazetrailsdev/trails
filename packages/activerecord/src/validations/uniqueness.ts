@@ -1,6 +1,6 @@
 import { EachValidator, ArgumentError } from "@blazetrails/activemodel";
 import { isBlank } from "@blazetrails/activesupport";
-import { except, hasKey } from "@blazetrails/ruby-compat";
+import { except, hasKey, rbModSingletonP } from "@blazetrails/ruby-compat";
 import { UnknownPrimaryKey } from "../errors.js";
 import { connectionPool } from "../connection-handling.js";
 
@@ -55,6 +55,7 @@ export class UniquenessValidator extends EachValidator {
     }
     super(options);
     this._klass = options.class ?? null;
+    if (rbModSingletonP(this._klass)) this._klass = Object.getPrototypeOf(this._klass);
   }
 
   /** @internal */

@@ -29,8 +29,10 @@ export {
   rbInspect,
   rbObjInspect,
   rbObjAsString,
+  rbModSingletonP,
   rbObjClass,
   rbObjRespondTo,
+  rbObjSingletonClass,
 } from "./object.js";
 export {
   Hash,

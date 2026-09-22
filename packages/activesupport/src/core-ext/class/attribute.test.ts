@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import { classAttribute } from "../../class-attribute.js";
 import { assertNotRespondTo, assertPredicate } from "../../testing/assertions.js";
 
@@ -107,6 +108,23 @@ describe("ClassAttributeTest", () => {
     const object = new (Cls as any)();
     expect(() => object.isSetting()).toThrow(TypeError);
     assertNotRespondTo(object, "isSetting");
+  });
+
+  it("works well with singleton classes", () => {
+    const object = new Klass();
+
+    (rbObjSingletonClass(object) as any).setting = "foo";
+    expect((rbObjSingletonClass(object) as any).setting).toBe("foo");
+    expect(object.setting).toBe("foo");
+    expect(Klass.setting).toBeUndefined();
+
+    (rbObjSingletonClass(object) as any).setting = "bar";
+    expect(object.setting).toBe("bar");
+    expect(Klass.setting).toBeUndefined();
+
+    Klass.setting = "plop";
+    expect(object.setting).toBe("bar");
+    expect(Klass.setting).toBe("plop");
   });
 
   it("setter returns set value", () => {
