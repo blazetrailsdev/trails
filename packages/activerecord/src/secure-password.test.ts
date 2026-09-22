@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { User } from "./test-helpers/models/user.js";
 import { SecurePassword } from "@blazetrails/activemodel";
-import { assertCalledWith, assertInDelta } from "@blazetrails/activesupport";
+import { Assertion, assertCalledWith, assertInDelta } from "@blazetrails/activesupport";
 import { assertNoQueries } from "./testing/query-assertions.js";
 import { fixtures } from "./test-fixtures.js";
 
@@ -11,8 +11,7 @@ async function retryFlakyTest(fn: () => Promise<void>, retryCount = 3): Promise<
       await fn();
       return;
     } catch (error) {
-      const isAssertion = error instanceof Error && error.name === "AssertionError";
-      if (!isAssertion || attempt >= retryCount) throw error;
+      if (!(error instanceof Assertion) || attempt >= retryCount) throw error;
     }
   }
 }
