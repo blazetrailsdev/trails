@@ -80,7 +80,6 @@
   "packages/activerecord/src/counter-cache.ts",
   "packages/activerecord/src/database-configurations/database-config.ts",
   "packages/activerecord/src/delegated-type.ts",
-  "packages/activerecord/src/encryption-hooks.ts",
   "packages/activerecord/src/encryption.ts",
   "packages/activerecord/src/encryption/auto-filtered-parameters.ts",
   "packages/activerecord/src/encryption/config.ts",

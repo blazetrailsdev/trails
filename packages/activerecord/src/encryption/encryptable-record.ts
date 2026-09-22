@@ -135,7 +135,7 @@ export function overrideAccessorsToPreserveOriginal(
       get(this: any) {
         const value = this.readAttribute(name);
         if (
-          (value != null && value !== false && encryptedAttribute.call(this, name)) ||
+          (value != null && value !== false && isEncryptedAttribute.call(this, name)) ||
           !Configurable.config.supportUnencryptedData
         ) {
           return this[originalAttributeName];
@@ -204,7 +204,7 @@ export function sourceAttributeFromPreservedAttribute(
 }
 
 /** @internal */
-export function encryptedAttribute(this: any, attributeName: string): boolean {
+export function isEncryptedAttribute(this: any, attributeName: string): boolean {
   const name = this.constructor.attributeAliases?.[attributeName] ?? attributeName;
   if (!(this.constructor.encryptedAttributes ?? new Set<string>()).has(name)) return false;
   const type = this.constructor.typeForAttribute(name) as EncryptedAttributeType;
@@ -214,7 +214,7 @@ export function encryptedAttribute(this: any, attributeName: string): boolean {
 /** @internal */
 export function ciphertextFor(this: any, attributeName: string): unknown {
   attributeName = this.constructor.attributeAliases?.[attributeName] ?? attributeName;
-  if (encryptedAttribute.call(this, attributeName)) {
+  if (isEncryptedAttribute.call(this, attributeName)) {
     return this.readAttributeBeforeTypeCast?.(attributeName);
   }
   return this.readAttributeForDatabase(attributeName);

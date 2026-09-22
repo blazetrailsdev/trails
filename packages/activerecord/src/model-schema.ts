@@ -20,7 +20,7 @@ import { singularize } from "@blazetrails/activesupport";
 import { modelRegistry } from "./associations.js";
 import { TableNotSpecified } from "./errors.js";
 import { loadSchemaOverrides } from "./load-schema-overrides-slot.js";
-import { encryptionHooks } from "./encryption-hooks.js";
+import { EncryptableRecord } from "./encryption/encryptable-record.js";
 import { NullColumn } from "./connection-adapters/column.js";
 import { connectionPool, withConnection, connectedQ } from "./connection-handling.js";
 
@@ -577,7 +577,7 @@ function applyColumnsHash(host: SchemaHost, hash: Record<string, unknown>): void
   methodHost._attributeMethodsGenerated = false;
 
   const reflectedColumnNames = Object.keys(hash).filter((n) => !ignored.has(n));
-  encryptionHooks.requireOriginalColumnsAfterReflection?.(host, reflectedColumnNames);
+  EncryptableRecord.requireOriginalColumnsAfterReflection(host, reflectedColumnNames);
 }
 
 /**

@@ -53,7 +53,7 @@ describe("STI subclass encrypts", () => {
 
     const reloadedPlain = await Company.find(plain.id);
     expect(reloadedPlain.description).toBe(secret);
-    expect(reloadedPlain.encryptedAttribute("description")).toBe(false);
+    expect(reloadedPlain.isEncryptedAttribute("description")).toBe(false);
   });
 
   it("keeps the subclass decoration across a schema reset and re-reflection", async () => {

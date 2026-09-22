@@ -133,7 +133,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest (trails)", () => {
 
     const reloaded = await EncryptedBookWithSerializedDeterministicName.find(book.id);
     expect(reloaded.name).toBe("Dune");
-    expect(reloaded.encryptedAttribute("name")).toBe(true);
+    expect(reloaded.isEncryptedAttribute("name")).toBe(true);
   });
 });
 

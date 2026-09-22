@@ -687,8 +687,8 @@ describe("useFixtures bootstraps the encryption add-on for encrypted fixtures", 
       const rawDbValue = book.readAttributeBeforeTypeCast?.("name");
       expect(rawDbValue).not.toBe("Agile Web Development with Rails");
       expect(typeof rawDbValue).toBe("string");
-      const { encryptedAttribute } = await import("./encryption/encryptable-record.js");
-      expect(encryptedAttribute.call(book, "name")).toBe(true);
+      const { isEncryptedAttribute } = await import("./encryption/encryptable-record.js");
+      expect(isEncryptedAttribute.call(book, "name")).toBe(true);
     });
   });
 
@@ -710,8 +710,8 @@ describe("useFixtures bootstraps the encryption add-on for encrypted fixtures", 
       const rawOriginal = book.readAttributeBeforeTypeCast?.("original_name");
       expect(rawOriginal).not.toBe("Ruby for Rails");
       expect(typeof rawOriginal).toBe("string");
-      const { encryptedAttribute } = await import("./encryption/encryptable-record.js");
-      expect(encryptedAttribute.call(book, "name")).toBe(true);
+      const { isEncryptedAttribute } = await import("./encryption/encryptable-record.js");
+      expect(isEncryptedAttribute.call(book, "name")).toBe(true);
     });
   });
 });

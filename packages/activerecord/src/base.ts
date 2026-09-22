@@ -80,7 +80,17 @@ import {
   type ValidationContextArg,
 } from "./validations.js";
 import * as _Validations from "./validations.js";
-import { encryptionHooks } from "./encryption-hooks.js";
+import {
+  EncryptableRecord as _EncryptableRecord,
+  encrypts as _encrypts,
+  isEncryptedAttribute as _isEncryptedAttribute,
+  ciphertextFor as _ciphertextFor,
+  encrypt as _encrypt,
+  decrypt as _decrypt,
+  hasEncryptedAttributes as _hasEncryptedAttributes,
+  sourceAttributeFromPreservedAttribute as _sourceAttributeFromPreservedAttribute,
+} from "./encryption/encryptable-record.js";
+import { Contexts as _Contexts } from "./encryption/contexts.js";
 import type { EncryptsOptions } from "./encryption.js";
 import * as CounterCache from "./counter-cache.js";
 import * as ReadonlyAttributes from "./readonly-attributes.js";
@@ -1183,29 +1193,7 @@ export class Base extends Model {
 
   declare static generatedTokenVerifier: _MessageVerifier | null;
 
-  static encrypts(...args: Array<string | EncryptsOptions>): void {
-    encryptionHooks.encrypts(this, ...args);
-  }
-
-  /** @internal */
-  encryptedAttribute(attributeName: string): boolean {
-    return encryptionHooks.encryptedAttribute(this, attributeName);
-  }
-
-  /** @internal */
-  ciphertextFor(attributeName: string): unknown {
-    return encryptionHooks.ciphertextFor(this, attributeName);
-  }
-
-  /** @internal */
-  async encrypt(): Promise<void> {
-    return encryptionHooks.encrypt(this);
-  }
-
-  /** @internal */
-  async decrypt(): Promise<void> {
-    return encryptionHooks.decrypt(this);
-  }
+  declare static encrypts: (...args: Array<string | EncryptsOptions>) => void;
 
   static async suppress<R>(fn: () => R | Promise<R>): Promise<R> {
     return _suppressBlock(this, fn);
@@ -2655,6 +2643,14 @@ export interface Base extends Included<typeof AutosaveAssociation>, JSONSerializ
   clone(): this;
   becomes<K extends typeof Base>(klass: K): InstanceType<K>;
   becomesBang<K extends typeof Base>(klass: K): InstanceType<K>;
+  /** @internal */
+  isEncryptedAttribute(attributeName: string): boolean;
+  /** @internal */
+  ciphertextFor(attributeName: string): unknown;
+  /** @internal */
+  encrypt(): Promise<void>;
+  /** @internal */
+  decrypt(): Promise<void>;
 }
 
 extend(Base, ConnectionHandling.ConnectionHandling);
@@ -2751,6 +2747,19 @@ classAttribute.call(Base, "defaultScopeOverride", {
 });
 classAttribute.call(Base, "nestedAttributesOptions", { instanceWriter: false, default: {} });
 classAttribute.call(Base, "encryptedAttributes");
+Base.validate((record: any) => _EncryptableRecord.cantModifyEncryptedAttributesWhenFrozen(record), {
+  if: (record: any) => _hasEncryptedAttributes.call(record) && _Contexts.context.frozenEncryption,
+});
+extend(Base, {
+  encrypts: _encrypts,
+  sourceAttributeFromPreservedAttribute: _sourceAttributeFromPreservedAttribute,
+});
+include(Base, {
+  isEncryptedAttribute: _isEncryptedAttribute,
+  ciphertextFor: _ciphertextFor,
+  encrypt: _encrypt,
+  decrypt: _decrypt,
+});
 classAttribute.call(Base, "tokenDefinitions", {
   instanceAccessor: false,
   instancePredicate: false,

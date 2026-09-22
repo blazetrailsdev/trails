@@ -31,7 +31,6 @@
   "packages/activerecord/src/database-configurations/connection-url-resolver.ts",
   "packages/activerecord/src/database-configurations/database-config.ts",
   "packages/activerecord/src/delegated-type.ts",
-  "packages/activerecord/src/encryption-hooks.ts",
   "packages/activerecord/src/encryption/extended-deterministic-queries.ts",
   "packages/activerecord/src/encryption/extended-deterministic-uniqueness-validator.ts",
   "packages/activerecord/src/encryption/message-pack-message-serializer.ts",

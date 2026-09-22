@@ -93,7 +93,7 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     });
     const reloaded = await Author.find(author.id);
     expect(reloaded.name).toBe("dhh");
-    expect(reloaded.encryptedAttribute("name")).toBeTruthy();
+    expect(reloaded.isEncryptedAttribute("name")).toBeTruthy();
   });
 
   it("when defining previous encryption schemes, you still get Decryption errors when using invalid clear values", async () => {
@@ -122,7 +122,7 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     new EncryptedAuthor1();
     const author = await EncryptedAuthor1.create({ name: "1" });
     expect(author.name).toBe("1");
-    expect(author.encryptedAttribute("name")).toBeTruthy();
+    expect(author.isEncryptedAttribute("name")).toBeTruthy();
   });
 
   it("support previous contexts", async () => {
@@ -143,7 +143,7 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     const author = await EncryptedAuthor2.create({ name: "2" });
     expect(author.name).toBe("2");
     expect(author.equals(await EncryptedAuthor2.findBy({ name: "2" }))).toBe(true);
-    expect(author.encryptedAttribute("name")).toBeTruthy();
+    expect(author.isEncryptedAttribute("name")).toBeTruthy();
     const RawModel = class extends Base {
       static {
         this._tableName = "authors";
@@ -157,7 +157,7 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     const reloaded = await EncryptedAuthor2.find(author.id);
     expect(reloaded.name).toBe("1");
     expect(reloaded.equals(await EncryptedAuthor2.findBy({ name: "1" }))).toBe(true);
-    expect(reloaded.encryptedAttribute("name")).toBeFalsy();
+    expect(reloaded.isEncryptedAttribute("name")).toBeFalsy();
   });
 
   it("use global previous schemes to decrypt data encrypted with previous schemes", () => {
