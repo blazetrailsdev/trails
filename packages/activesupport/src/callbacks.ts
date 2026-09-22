@@ -258,7 +258,9 @@ export namespace CallTemplate {
       return new ProcCall(filter);
     } else if (
       typeof filter === "function" &&
-      Object.getOwnPropertyDescriptor(filter, "prototype")?.writable !== false
+      !/^class(?=[\s{/])(?:\s|\/\*[\s\S]*?\*\/|\/\/[^\n]*\n)*[^(\s/]/.test(
+        Function.prototype.toString.call(filter),
+      )
     ) {
       const arity = filter.length;
       if (arity === 2) {
