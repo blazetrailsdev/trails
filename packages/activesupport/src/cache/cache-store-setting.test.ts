@@ -3,7 +3,6 @@ import { describe, it, expect } from "vitest";
 import { lookupStore } from "../cache.js";
 import { ArgumentError } from "../cache/store.js";
 import { MemoryStore } from "../cache/memory-store.js";
-import { NullStore } from "../cache/null-store.js";
 import { FileStore } from "../cache/file-store.js";
 
 describe("CacheStoreSettingTest", () => {
@@ -29,26 +28,20 @@ describe("CacheStoreSettingTest", () => {
     }).toThrow(ArgumentError);
   });
 
-  it("mem cache fragment cache store", () => {
-    const store = new NullStore();
-    store.write("k", "v");
-    expect(store.read("k")).toBeNull();
+  it.skip("mem cache fragment cache store", () => {
+    // BLOCKED: cache-lookup-store-has-no-mem-cache-or-redis-store
   });
 
-  it("mem cache fragment cache store with not dalli client", () => {
-    const store = new NullStore();
-    expect(store).toBeDefined();
+  it.skip("mem cache fragment cache store with not dalli client", () => {
+    // BLOCKED: cache-lookup-store-has-no-mem-cache-or-redis-store
   });
 
-  it("mem cache fragment cache store with multiple servers", () => {
-    const store = new NullStore();
-    expect(store).toBeDefined();
+  it.skip("mem cache fragment cache store with multiple servers", () => {
+    // BLOCKED: cache-lookup-store-has-no-mem-cache-or-redis-store
   });
 
-  it("mem cache fragment cache store with options", () => {
-    const store = new MemoryStore({ namespace: "foo" });
-    store.write("x", 1);
-    expect(store.read("x")).toBe(1);
+  it.skip("mem cache fragment cache store with options", () => {
+    // BLOCKED: cache-lookup-store-has-no-mem-cache-or-redis-store
   });
 
   it("object assigned fragment cache store", () => {
@@ -57,13 +50,11 @@ describe("CacheStoreSettingTest", () => {
     expect((store as FileStore).cachePath).toBe("/path/to/cache/directory");
   });
 
-  it("redis cache store with single array object", () => {
-    const store = new NullStore();
-    expect(store).toBeDefined();
+  it.skip("redis cache store with single array object", () => {
+    // BLOCKED: cache-lookup-store-has-no-mem-cache-or-redis-store
   });
 
-  it("redis cache store with ordered options", () => {
-    const store = new NullStore();
-    expect(store).toBeDefined();
+  it.skip("redis cache store with ordered options", () => {
+    // BLOCKED: cache-lookup-store-has-no-mem-cache-or-redis-store
   });
 });

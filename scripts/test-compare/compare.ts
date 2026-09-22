@@ -72,6 +72,11 @@ import { classifyGateMismatch, type GateMismatchKind } from "./gates.js";
 import { buildHistogram, diffHistograms, type KindDelta } from "./assertion-kinds.js";
 import { assertionValueMismatch, type ValueDelta } from "./assertion-values.js";
 import { isTestCaseUnported, isTestFileUnported } from "@blazetrails/parity/unported-files";
+import {
+  ASSERTION_RECEIPTS,
+  applyAssertionReceipts,
+  unconsumedAssertionReceipts,
+} from "./assertion-receipts.js";
 import { PATH_SEGMENT_ALIASES } from "@blazetrails/parity/conventions";
 import { SpellChecker } from "../../packages/did-you-mean/src/spell-checker.js";
 import { testPathsManifest } from "../../vendor/sources.js";
@@ -739,6 +744,8 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
 
   const results: ConventionPackageResult[] = [];
 
+  const consumedReceipts = new Set<string>();
+
   for (const [pkg, pkgInfo] of Object.entries(ruby.packages)) {
     if (filterPkg && pkg !== filterPkg) continue;
 
@@ -784,6 +791,9 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
 
     for (const file of pkgInfo.files) {
       if (isTestFileUnported(file.file, pkg)) continue;
+      file.testCases = file.testCases.map((tc) =>
+        applyAssertionReceipts(pkg, file.file, tc, ASSERTION_RECEIPTS, consumedReceipts),
+      );
       const conventionTs = rubyToConventionTs(file.file, pkg);
       const exists = lookup.allFiles.has(conventionTs);
 
@@ -1126,6 +1136,14 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
       ...(pkg === "activesupport" ? { arClosure: arClosureResult(fileResults) } : {}),
       files: fileResults,
     });
+  }
+
+  // A receipt that consumed nothing names a Rails assertion that moved or was
+  // converged; it must be deleted rather than silently kept.
+  if (!filterPkg) {
+    for (const stale of unconsumedAssertionReceipts(consumedReceipts)) {
+      console.warn(`STALE assertion receipt: ${stale}`);
+    }
   }
 
   // Always write JSON output

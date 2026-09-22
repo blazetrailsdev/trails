@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 import { ActiveSupportJSON } from "../json.js";
-import { DateTime, Temporal } from "@blazetrails/date";
+import { DateTime, Temporal, Time, resetLocalTimeZoneId } from "@blazetrails/date";
 import { TimeWithZone } from "../time-with-zone.js";
 import { TimeZone } from "../values/time-zone.js";
 import { Encoding, type EncodeOptions } from "./encoding.js";
@@ -61,6 +61,22 @@ function sortedJson(json: string): string {
 
 function objectKeys(jsonObject: string): string[] {
   return [...jsonObject.slice(1, -1).matchAll(/([^{}:,\s]+):/g)].map((match) => match[1]).sort();
+}
+
+function withEnvTz<T>(newTz: string, fn: () => T): T {
+  const oldTz = process.env.TZ;
+  process.env.TZ = newTz;
+  resetLocalTimeZoneId();
+  try {
+    return fn();
+  } finally {
+    if (oldTz === undefined) {
+      delete process.env.TZ;
+    } else {
+      process.env.TZ = oldTz;
+    }
+    resetLocalTimeZoneId();
+  }
 }
 
 function withStandardJsonTimeFormat(value: boolean, block: () => void): void {
@@ -179,9 +195,13 @@ describe("TestJSONEncoding", () => {
   });
 
   it("time to json includes local offset", () => {
-    const d = new Date("2023-06-15T12:00:00Z");
-    const json = JSON.stringify(d);
-    expect(json).toContain("2023");
+    withStandardJsonTimeFormat(true, () => {
+      withEnvTz("US/Eastern", () => {
+        expect(ActiveSupportJSON.encode(Time.local(2005, 2, 1, 15, 15, 10))).toBe(
+          '"2005-02-01T15:15:10.000-05:00"',
+        );
+      });
+    });
   });
 
   it("hash with time to json", () => {

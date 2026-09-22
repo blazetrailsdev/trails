@@ -1,7 +1,13 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { ArgumentError, Store as CacheStore, type Store, type StoreOptions } from "../store.js";
 import { assertErrorReported } from "../../testing/error-reporter-assertions.js";
-import { assert, assertNot, assertRaises, assertSame } from "../../testing/assertions.js";
+import {
+  assert,
+  assertIncludes,
+  assertNot,
+  assertRaises,
+  assertSame,
+} from "../../testing/assertions.js";
 
 /** @internal */
 export interface CacheStoreBehaviorHost {
@@ -235,7 +241,7 @@ export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
         cache.write(key, "bar", { expiresIn: -60 });
       });
       assertSame("Cache expiration time is invalid, cannot be negative: -60", error.message);
-      assert(cache.read(key) == null);
+      expect(cache.read(key)).toBeNull();
     });
   });
 
@@ -248,9 +254,9 @@ export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
           cache.write(key, "bar", { expiresIn: -60 });
           assertSame("bar", cache.read(key));
         });
-        assert(logs.includes(`ArgumentError: ${errorMessage}`));
+        assertIncludes(logs, `ArgumentError: ${errorMessage}`);
       });
-      assert(report!.error.message.includes(errorMessage));
+      assertIncludes(report!.error.message, errorMessage);
     });
   });
 }
