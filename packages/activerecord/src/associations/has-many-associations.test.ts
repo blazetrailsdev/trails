@@ -1527,21 +1527,6 @@ describe("HasManyAssociationsTest", () => {
     expect(unique.size).toBe(posts.length);
   });
 
-  it("in memory replacement maintains order", async () => {
-    const firstBulb = await HmBulb.createBang();
-    const secondBulb = await HmBulb.createBang();
-    const car = (await HmCar.createBang({ name: "honda", bulbs: [firstBulb, secondBulb] })) as any;
-
-    expect(car.savedChangeToName).toEqual([null, "honda"]);
-
-    const sameBulb = await HmBulb.find(firstBulb.id);
-    await car.association("bulbs").writer([secondBulb, sameBulb]);
-
-    expect((await car.bulbs.toArray()).map(recordId)).toEqual(
-      [firstBulb, secondBulb].map(recordId),
-    );
-  });
-
   it("anonymous has many", async () => {
     class AnonDeveloper extends Base {
       declare developerProjects: AssociationProxy<AnonDeveloperProject>;
@@ -2869,28 +2854,64 @@ describe("HasManyAssociationsTest", () => {
     const loaded = await author.arr_posts;
     expect(loaded.length).toBe(3);
   });
+});
 
-  describe("HasManyAssociationsTest", () => {
-    const { companies } = fixtures(["companies", "accounts"]);
+describe("HasManyAssociationsTest", () => {
+  const { companies } = fixtures(["companies", "accounts"]);
+  setup();
 
-    it("replace failure", async () => {
-      const firm = companies("first_firm") as any;
-      const account = Account.new();
-      const origAccounts = await firm.accounts.toArray();
-
-      assertNot(await account.isValid());
-      assertNotEmpty(origAccounts);
-      const error = await assertRaise([RecordNotSaved], {}, async () => {
-        await firm.association("accounts").writer([account]);
-      });
-
-      expect((await firm.accounts.toArray()).map(recordId)).toEqual(origAccounts.map(recordId));
-      expect(error.message).toBe(
-        "Failed to replace accounts because one or more of the " +
-          "new records could not be saved.",
-      );
-    });
+  beforeAll(async () => {
+    await Developer.loadSchema();
+    await Project.loadSchema();
+    await Speedometer.loadSchema();
+    await Minivan.loadSchema();
+    await Invoice.loadSchema();
+    await HmLineItem.loadSchema();
   });
+  registerModel(Developer);
+  registerModel(Project);
+  registerModel(Speedometer);
+  registerModel(Minivan);
+  registerModel(Invoice);
+  registerModel(HmLineItem);
+
+  it("replace failure", async () => {
+    const firm = companies("first_firm") as any;
+    const account = Account.new();
+    const origAccounts = await firm.accounts.toArray();
+
+    assertNot(await account.isValid());
+    assertNotEmpty(origAccounts);
+    const error = await assertRaise([RecordNotSaved], {}, async () => {
+      await firm.association("accounts").writer([account]);
+    });
+
+    expect((await firm.accounts.toArray()).map(recordId)).toEqual(origAccounts.map(recordId));
+    expect(error.message).toBe(
+      "Failed to replace accounts because one or more of the " + "new records could not be saved.",
+    );
+  });
+});
+
+describe("HasManyAssociationsTest", () => {
+  fixtures([]);
+  setup();
+
+  beforeAll(async () => {
+    await Developer.loadSchema();
+    await Project.loadSchema();
+    await Speedometer.loadSchema();
+    await Minivan.loadSchema();
+    await Invoice.loadSchema();
+    await HmLineItem.loadSchema();
+  });
+  registerModel(Developer);
+  registerModel(Project);
+  registerModel(Speedometer);
+  registerModel(Minivan);
+  registerModel(Invoice);
+  registerModel(HmLineItem);
+
   it("ids reader cache not used for size when association is dirty", async () => {
     class DirtyIdAuthor extends Base {
       declare dirty_id_posts: AssociationProxy<DirtyIdPost>;
@@ -2961,27 +2982,64 @@ describe("HasManyAssociationsTest", () => {
     posts = await author.clr_id_posts;
     expect(posts).toHaveLength(0);
   });
+});
 
-  describe("HasManyAssociationsTest", () => {
-    fixtures(["companies"]);
+describe("HasManyAssociationsTest", () => {
+  fixtures(["companies"]);
+  setup();
 
-    it("set ids for association on new record applies association correctly", async () => {
-      const contractA = await Contract.createBang();
-      const contractB = await Contract.createBang();
-      await Contract.createBang();
-      const company = Company.new({ name: "Some Company" }) as any;
-
-      await company.association("contracts").idsWriter([contractA.id, contractB.id]);
-      expect(await company.contractIds).toEqual([contractA.id, contractB.id]);
-      expect((await company.contracts.toArray()).map(recordId)).toEqual(
-        [contractA, contractB].map(recordId),
-      );
-
-      await company.saveBang();
-      expect(recordId(await ((await contractA.reload()) as any).company)).toBe(recordId(company));
-      expect(recordId(await ((await contractB.reload()) as any).company)).toBe(recordId(company));
-    });
+  beforeAll(async () => {
+    await Developer.loadSchema();
+    await Project.loadSchema();
+    await Speedometer.loadSchema();
+    await Minivan.loadSchema();
+    await Invoice.loadSchema();
+    await HmLineItem.loadSchema();
   });
+  registerModel(Developer);
+  registerModel(Project);
+  registerModel(Speedometer);
+  registerModel(Minivan);
+  registerModel(Invoice);
+  registerModel(HmLineItem);
+
+  it("set ids for association on new record applies association correctly", async () => {
+    const contractA = await Contract.createBang();
+    const contractB = await Contract.createBang();
+    await Contract.createBang();
+    const company = Company.new({ name: "Some Company" }) as any;
+
+    await company.association("contracts").idsWriter([contractA.id, contractB.id]);
+    expect(await company.contractIds).toEqual([contractA.id, contractB.id]);
+    expect((await company.contracts.toArray()).map(recordId)).toEqual(
+      [contractA, contractB].map(recordId),
+    );
+
+    await company.saveBang();
+    expect(recordId(await ((await contractA.reload()) as any).company)).toBe(recordId(company));
+    expect(recordId(await ((await contractB.reload()) as any).company)).toBe(recordId(company));
+  });
+});
+
+describe("HasManyAssociationsTest", () => {
+  fixtures([]);
+  setup();
+
+  beforeAll(async () => {
+    await Developer.loadSchema();
+    await Project.loadSchema();
+    await Speedometer.loadSchema();
+    await Minivan.loadSchema();
+    await Invoice.loadSchema();
+    await HmLineItem.loadSchema();
+  });
+  registerModel(Developer);
+  registerModel(Project);
+  registerModel(Speedometer);
+  registerModel(Minivan);
+  registerModel(Invoice);
+  registerModel(HmLineItem);
+
   it("assign ids ignoring blanks", async () => {
     class BlankIdAuthor extends Base {
       declare blank_id_posts: AssociationProxy<BlankIdPost>;
@@ -3932,48 +3990,79 @@ describe("HasManyAssociationsTest", () => {
     expect(post.isNewRecord()).toBe(true);
     expect((post as any).author_id).toBe(Number(author.id));
   });
+});
 
-  describe("HasManyAssociationsTest", () => {
-    fixtures(["companies"]);
+describe("HasManyAssociationsTest", () => {
+  fixtures(["companies"]);
+  setup();
 
-    it("first_or_create adds the record to the association", async () => {
-      const firm = (await HmFirm.createBang({ name: "omg" })) as any;
-      await firm.clientsOfFirm.loadTarget();
-      let clientCount: Promise<unknown> | undefined;
-      const client = await firm.clientsOfFirm
-        .where({ name: "lol" })
-        .firstOrCreate(undefined, () => {
-          clientCount = Client.count();
-        });
-      expect(await clientCount).toBe(5);
-      expect(client.name).toBe("lol");
-      expect((await firm.clientsOfFirm.toArray()).map(recordId)).toEqual([client].map(recordId));
-      expect((await (await firm.reload()).clientsOfFirm.toArray()).map(recordId)).toEqual(
-        [client].map(recordId),
-      );
+  beforeAll(async () => {
+    await Developer.loadSchema();
+    await Project.loadSchema();
+    await Speedometer.loadSchema();
+    await Minivan.loadSchema();
+    await Invoice.loadSchema();
+    await HmLineItem.loadSchema();
+  });
+  registerModel(Developer);
+  registerModel(Project);
+  registerModel(Speedometer);
+  registerModel(Minivan);
+  registerModel(Invoice);
+  registerModel(HmLineItem);
+
+  it("first_or_create adds the record to the association", async () => {
+    const firm = (await HmFirm.createBang({ name: "omg" })) as any;
+    await firm.clientsOfFirm.loadTarget();
+    let clientCount: Promise<unknown> | undefined;
+    const client = await firm.clientsOfFirm.where({ name: "lol" }).firstOrCreate(undefined, () => {
+      clientCount = Client.count();
     });
+    expect(await clientCount).toBe(5);
+    expect(client.name).toBe("lol");
+    expect((await firm.clientsOfFirm.toArray()).map(recordId)).toEqual([client].map(recordId));
+    expect((await (await firm.reload()).clientsOfFirm.toArray()).map(recordId)).toEqual(
+      [client].map(recordId),
+    );
   });
 
-  describe("HasManyAssociationsTest", () => {
-    fixtures(["companies"]);
-
-    it("first_or_create! adds the record to the association", async () => {
-      const firm = (await HmFirm.createBang({ name: "omg" })) as any;
-      await firm.clientsOfFirm.loadTarget();
-      let clientCount: Promise<unknown> | undefined;
-      const client = await firm.clientsOfFirm
-        .where({ name: "lol" })
-        .firstOrCreateBang(undefined, () => {
-          clientCount = Client.count();
-        });
-      expect(await clientCount).toBe(5);
-      expect(client.name).toBe("lol");
-      expect((await firm.clientsOfFirm.toArray()).map(recordId)).toEqual([client].map(recordId));
-      expect((await (await firm.reload()).clientsOfFirm.toArray()).map(recordId)).toEqual(
-        [client].map(recordId),
-      );
-    });
+  it("first_or_create! adds the record to the association", async () => {
+    const firm = (await HmFirm.createBang({ name: "omg" })) as any;
+    await firm.clientsOfFirm.loadTarget();
+    let clientCount: Promise<unknown> | undefined;
+    const client = await firm.clientsOfFirm
+      .where({ name: "lol" })
+      .firstOrCreateBang(undefined, () => {
+        clientCount = Client.count();
+      });
+    expect(await clientCount).toBe(5);
+    expect(client.name).toBe("lol");
+    expect((await firm.clientsOfFirm.toArray()).map(recordId)).toEqual([client].map(recordId));
+    expect((await (await firm.reload()).clientsOfFirm.toArray()).map(recordId)).toEqual(
+      [client].map(recordId),
+    );
   });
+});
+
+describe("HasManyAssociationsTest", () => {
+  fixtures([]);
+  setup();
+
+  beforeAll(async () => {
+    await Developer.loadSchema();
+    await Project.loadSchema();
+    await Speedometer.loadSchema();
+    await Minivan.loadSchema();
+    await Invoice.loadSchema();
+    await HmLineItem.loadSchema();
+  });
+  registerModel(Developer);
+  registerModel(Project);
+  registerModel(Speedometer);
+  registerModel(Minivan);
+  registerModel(Invoice);
+  registerModel(HmLineItem);
+
   it("delete_all, when not loaded, doesn't load the records", async () => {
     class NoLoadDelAuthor extends Base {
       declare name: string | null;
@@ -4020,32 +4109,68 @@ describe("HasManyAssociationsTest", () => {
       expect(await post.comments.count()).toBe(0);
     });
   });
+});
 
-  describe("HasManyAssociationsTest", () => {
-    const { posts } = fixtures(["posts", "comments"]);
+describe("HasManyAssociationsTest", () => {
+  const { posts } = fixtures(["posts", "comments"]);
+  setup();
 
-    it("association with extend option", () => {
-      const post = posts("welcome") as any;
-      expect(post.commentsWithExtend.author()).toBe("lifo");
-      expect(post.commentsWithExtend.greeting()).toBe("hello :)");
-    });
-
-    // BLOCKED: collection-proxy-extend-super-chain
-    it.skip("association with extend option with multiple extensions", () => {
-      const post = posts("welcome") as any;
-      expect(post.commentsWithExtend_2.author()).toBe("lifo");
-      expect(post.commentsWithExtend_2.greeting()).toBe("hullo :)");
-    });
-
-    // BLOCKED: collection-proxy-extend-super-chain
-    it.skip("extend option affects per association", () => {
-      const post = posts("welcome") as any;
-      expect(post.commentsWithExtend.author()).toBe("lifo");
-      expect(post.commentsWithExtend_2.author()).toBe("lifo");
-      expect(post.commentsWithExtend.greeting()).toBe("hello :)");
-      expect(post.commentsWithExtend_2.greeting()).toBe("hullo :)");
-    });
+  beforeAll(async () => {
+    await Developer.loadSchema();
+    await Project.loadSchema();
+    await Speedometer.loadSchema();
+    await Minivan.loadSchema();
+    await Invoice.loadSchema();
+    await HmLineItem.loadSchema();
   });
+  registerModel(Developer);
+  registerModel(Project);
+  registerModel(Speedometer);
+  registerModel(Minivan);
+  registerModel(Invoice);
+  registerModel(HmLineItem);
+
+  it("association with extend option", () => {
+    const post = posts("welcome") as any;
+    expect(post.commentsWithExtend.author()).toBe("lifo");
+    expect(post.commentsWithExtend.greeting()).toBe("hello :)");
+  });
+
+  // BLOCKED: collection-proxy-extend-super-chain
+  it.skip("association with extend option with multiple extensions", () => {
+    const post = posts("welcome") as any;
+    expect(post.commentsWithExtend_2.author()).toBe("lifo");
+    expect(post.commentsWithExtend_2.greeting()).toBe("hullo :)");
+  });
+
+  // BLOCKED: collection-proxy-extend-super-chain
+  it.skip("extend option affects per association", () => {
+    const post = posts("welcome") as any;
+    expect(post.commentsWithExtend.author()).toBe("lifo");
+    expect(post.commentsWithExtend_2.author()).toBe("lifo");
+    expect(post.commentsWithExtend.greeting()).toBe("hello :)");
+    expect(post.commentsWithExtend_2.greeting()).toBe("hullo :)");
+  });
+});
+
+describe("HasManyAssociationsTest", () => {
+  fixtures([]);
+  setup();
+
+  beforeAll(async () => {
+    await Developer.loadSchema();
+    await Project.loadSchema();
+    await Speedometer.loadSchema();
+    await Minivan.loadSchema();
+    await Invoice.loadSchema();
+    await HmLineItem.loadSchema();
+  });
+  registerModel(Developer);
+  registerModel(Project);
+  registerModel(Speedometer);
+  registerModel(Minivan);
+  registerModel(Invoice);
+  registerModel(HmLineItem);
 
   it("delete record with complex joins", async () => {
     class CjAuthor extends Base {
@@ -4310,6 +4435,21 @@ describe("HasManyAssociationsTest", () => {
     const newPosts = await author2.reattach_posts;
     expect(oldPosts.length).toBe(0);
     expect(newPosts.length).toBe(1);
+  });
+
+  it("in memory replacement maintains order", async () => {
+    const firstBulb = await HmBulb.createBang();
+    const secondBulb = await HmBulb.createBang();
+    const car = (await HmCar.createBang({ name: "honda", bulbs: [firstBulb, secondBulb] })) as any;
+
+    expect(car.savedChangeToName).toEqual([null, "honda"]);
+
+    const sameBulb = await HmBulb.find(firstBulb.id);
+    await car.association("bulbs").writer([secondBulb, sameBulb]);
+
+    expect((await car.bulbs.toArray()).map(recordId)).toEqual(
+      [firstBulb, secondBulb].map(recordId),
+    );
   });
   it("prevent double firing the before save callback of new object when the parent association saved in the callback", async () => {
     class DblFireAuthor extends Base {
