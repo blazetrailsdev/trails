@@ -146,15 +146,15 @@ function foldSymbolToken(token: string): string {
  * a string array's commas as Ruby's `inspect` does; foldNameToken then aligns
  * `create_enum` / `enum_type`.
  */
-const DUMP_STATEMENT_RE = /^s:(?:await ctx\.)?(createEnum|t\.enum)\((.*?)(?:\);?)?$/s;
+const DUMP_STATEMENT_RE = /^s:(?:await ctx\.(createEnum)|(t\.enum))\((.*?)(?:\);?)?$/s;
 const DUMP_ENUM_NOTE = "// Note that some types may not work with other database engines.";
 
 function foldDumpStatementToken(token: string): string {
   if (token.startsWith(`s:${DUMP_ENUM_NOTE}`)) return `s:# ${token.slice(5)}`;
   const match = DUMP_STATEMENT_RE.exec(token);
   if (!match) return token;
-  const args = match[2].replace(/, \{ (.*) \}$/s, ", $1").replace(/",(?=")/g, '", ');
-  return `s:${match[1]} ${args}`;
+  const args = match[3].replace(/, \{ (.*) \}$/s, ", $1").replace(/",(?=")/g, '", ');
+  return `s:${match[1] ?? match[2]} ${args}`;
 }
 
 /**

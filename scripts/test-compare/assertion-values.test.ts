@@ -305,4 +305,16 @@ describe("assertionValueMismatch", () => {
       ),
     ).not.toBeNull();
   });
+
+  it("does not fold a bare createEnum or a ctx-prefixed t.enum", () => {
+    expect(
+      assertionValueMismatch(
+        ["assert_includes", "assert_includes"],
+        ['s:create_enum "mood"', 's:t.enum "mood"'],
+        ["toContain", "toContain"],
+        ['s:createEnum("mood")', 's:await ctx.t.enum("mood")'],
+        false,
+      ),
+    ).not.toBeNull();
+  });
 });
