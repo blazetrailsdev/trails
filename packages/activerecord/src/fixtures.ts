@@ -114,12 +114,7 @@ export class FixtureSet {
     fixtureSet.each((fixtureName, fixture) => {
       instances = instances.then(async () => {
         try {
-          Object.defineProperty(object, `_${fixtureName}`, {
-            value: await fixture.find(),
-            writable: true,
-            enumerable: true,
-            configurable: true,
-          });
+          (object as Record<string, unknown>)[`@${fixtureName}`] = await fixture.find();
         } catch (error) {
           if (!(error instanceof FixtureClassNotFound)) throw error;
         }
