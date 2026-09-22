@@ -388,7 +388,7 @@ describe("Schema.verbose", () => {
 
 describe("createTable force + ifNotExists key presence", () => {
   it("raises when ifNotExists is present but false", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     // eslint-disable-next-line blazetrails/require-table-teardown
     const create = adapter.createTable("things", { force: true, ifNotExists: false });
     await expect(create).rejects.toThrow(ArgumentError);
@@ -397,7 +397,7 @@ describe("createTable force + ifNotExists key presence", () => {
 
 describe("Migration#removeColumns forwards to the connection", () => {
   it("emits the same single statement the connection path does", async () => {
-    const connection = Base.connection;
+    const connection = await Base.leaseConnection();
     try {
       await connection.createTable("my_table", { force: true }, (t) => {
         t.integer("col_one");

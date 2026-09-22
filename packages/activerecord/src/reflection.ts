@@ -924,7 +924,9 @@ export class AssociationReflection extends MacroReflection {
     if (this.isPolymorphic()) {
       key += `:${owner?._readAttribute?.(this.foreignType)}`;
     }
-    return cachedFindByStatement.call(klass as any, (klass as any).connection, key, block);
+    return klass.withConnection((connection) =>
+      cachedFindByStatement.call(klass as any, connection, key, block),
+    );
   }
 
   checkValidityBang(): void {

@@ -310,7 +310,7 @@ describe("SchemaAdapter TM delegation", () => {
   });
 
   afterAll(async () => {
-    await Base.connection.execute("DELETE FROM items");
+    await (await Base.leaseConnection()).execute("DELETE FROM items");
   });
 
   it("transaction() routes SchemaAdapter through TM (spy on inner.withinNewTransaction)", async () => {

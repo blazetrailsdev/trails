@@ -9,6 +9,7 @@ import {
   hashDelete,
   include,
   included,
+  isEmpty,
   merge,
   rbEql,
 } from "@blazetrails/ruby-compat";
@@ -20,11 +21,13 @@ import {
   isBlank,
   runLoadHooks,
   stringifyKeys,
+  underscore,
   type NotificationSubscriber,
 } from "@blazetrails/activesupport";
 import { FixtureSet } from "./fixtures.js";
 import { File as FixtureFile } from "./fixture-set/file.js";
 import {
+  FIXTURES_ROOT,
   fixtureRegistry,
   isJoinTableEntry,
   type FixtureName,
@@ -296,12 +299,13 @@ export class TestFixtures {
       this._loadedFixtures = await this.loadFixtures(config);
     }
     this.setupAsynchronousQueriesSession();
+
+    if (this.useInstantiatedFixtures != null && this.useInstantiatedFixtures !== false) {
+      await this.instantiateFixtures();
+    }
   }
 
-  /**
-   * @internal
-   * @missingRailsCall clear_active_connections! — CONVERGEABLE test-fixtures-teardown-clear-active-connections
-   */
+  /** @internal */
   async teardownFixtures(): Promise<void> {
     this.teardownAsynchronousQueriesSession();
 
@@ -311,6 +315,8 @@ export class TestFixtures {
       FixtureSet.resetCache();
       this.invalidateAlreadyLoadedFixtures();
     }
+
+    Base.connectionHandler.clearActiveConnectionsBang("all");
   }
 
   /** @internal */
@@ -433,6 +439,26 @@ export class TestFixtures {
   }
 
   /** @internal */
+  async instantiateFixtures(): Promise<void> {
+    if (this.preLoadedFixtures) {
+      if (isEmpty(FixtureSet.allLoadedFixtures))
+        throw new RuntimeError("Load fixtures before instantiating them.");
+      await FixtureSet.instantiateAllLoadedFixtures(this, this.isLoadInstances());
+    } else {
+      if (this._loadedFixtures == null)
+        throw new RuntimeError("Load fixtures before instantiating them.");
+      for (const fixtureSet of Object.values(this._loadedFixtures)) {
+        await FixtureSet.instantiateFixtures(this, fixtureSet, this.isLoadInstances());
+      }
+    }
+  }
+
+  /** @internal */
+  isLoadInstances(): boolean {
+    return this.useInstantiatedFixtures !== ":no_instances";
+  }
+
+  /** @internal */
   activeRecordFixture(fixtureSetName: string, ...fixtureNames: unknown[]): unknown {
     const fsName = this.fixtureSets[fixtureSetName];
     if (fsName) {
@@ -528,13 +554,20 @@ async function unpinFixtureAdapters(this: TestFixtures): Promise<void> {
   }
 }
 
-type FixturesOptions = WithTransactionalFixturesOptions & FixturesConnectionOpts;
+type FixturesOptions = WithTransactionalFixturesOptions &
+  FixturesConnectionOpts & { useInstantiatedFixtures?: boolean | string };
+
+type FixturesResult = {
+  readonly fixtureTableNames: string[];
+  readonly self: () => TestFixtures & Record<string, unknown>;
+};
 
 type SuiteScope = { suite?: SuiteScope };
 type TestCaseClass = (new () => TestFixtures) &
   TestFixturesClassHost &
   typeof ClassMethods & {
     useTransactionalTests: boolean;
+    useInstantiatedFixtures: boolean | string;
   };
 
 const USE_FIXTURES_ROOT = "use-fixtures";
@@ -559,7 +592,7 @@ function testCaseClassFor(suite: SuiteScope | undefined): TestCaseClass {
     if (rootTestCaseClass === undefined) {
       rootTestCaseClass = class {} as unknown as TestCaseClass;
       include(rootTestCaseClass, TestFixtures);
-      rootTestCaseClass.fixturePaths = [USE_FIXTURES_ROOT];
+      rootTestCaseClass.fixturePaths = [FIXTURES_ROOT, USE_FIXTURES_ROOT];
     }
     return rootTestCaseClass;
   }
@@ -580,14 +613,20 @@ function registrationsFor(klass: TestCaseClass) {
   return registrations;
 }
 
+const fixtureRegistryNames = new Map(
+  (Object.keys(fixtureRegistry) as FixtureName[]).map((name) => [underscore(name), name]),
+);
+
 async function resolveFixtureClassNames(klass: TestCaseClass): Promise<void> {
   const names = klass.fixtureTableNames.filter(
-    (name) => name in fixtureRegistry && !(name in klass.fixtureClassNames),
-  ) as FixtureName[];
-  const resolved = await resolveFixtureNames(names);
+    (fsName) => fixtureRegistryNames.has(fsName) && !(fsName in klass.fixtureClassNames),
+  );
+  const resolved = await resolveFixtureNames(
+    names.map((fsName) => fixtureRegistryNames.get(fsName)!),
+  );
   const classNames: Record<string, unknown> = {};
   for (const [name, { model }] of Object.entries(resolved)) {
-    if (model !== null) classNames[name] = model;
+    if (model !== null) classNames[underscore(name)] = model;
   }
   if (Object.keys(classNames).length > 0) klass.setFixtureClass(classNames);
   for (const model of Object.values(klass.fixtureClassNames)) {
@@ -684,34 +723,35 @@ export function withTransactionalFixtures(
 export function fixtures<M extends FixtureMap>(
   fixtures: M,
   options?: FixturesOptions,
-): UseFixturesResult<M> & { readonly fixtureTableNames: string[] };
+): UseFixturesResult<M> & FixturesResult;
 export function fixtures<const N extends FixtureName>(
   names: readonly N[],
   options?: FixturesOptions,
-): UseFixturesByNameResult<N> & { readonly fixtureTableNames: string[] };
+): UseFixturesByNameResult<N> & FixturesResult;
 export function fixtures(
   fixturesOrNames: FixtureMap | readonly FixtureName[],
   options: FixturesOptions | undefined = undefined,
 ): Record<string, unknown> {
-  const { usesTransaction, useTransactionalTests, connection } = options ?? {};
+  const { usesTransaction, useTransactionalTests, useInstantiatedFixtures, connection } =
+    options ?? {};
 
   warmSchemaCacheBeforeFirstTest(connection ?? leaseFixtureConnection);
   const klass = testCaseClassFor(getCurrentSuite().suite as SuiteScope | undefined);
   klass.usesTransaction(...(usesTransaction ?? []));
   if (useTransactionalTests !== undefined) klass.useTransactionalTests = useTransactionalTests;
+  if (useInstantiatedFixtures !== undefined)
+    klass.useInstantiatedFixtures = useInstantiatedFixtures;
 
   const accessors: Record<string, string> = {};
   const fixtureSetNames: string[] = [];
   if (Array.isArray(fixturesOrNames)) {
     for (const name of fixturesOrNames as readonly FixtureName[]) {
-      const entry = fixtureRegistry[name] as (typeof fixtureRegistry)[FixtureName] | undefined;
-      if (!entry) {
+      if (!(name in fixtureRegistry)) {
         throw new Error(
           `useFixtures: no fixture set named "${name}" in the registry — add it to fixtures-registry.ts`,
         );
       }
-      const fsName = isJoinTableEntry(entry) ? entry.joinTable : name;
-      FixtureFile.registerModule(`${USE_FIXTURES_ROOT}/${fsName}.ts`, entry.data);
+      const fsName = underscore(name);
       accessors[name] = fsName;
       fixtureSetNames.push(fsName);
     }
@@ -735,5 +775,6 @@ export function fixtures(
     result[key] = fixtureAccessor(fsName.replaceAll("/", "_"));
   }
   Object.defineProperty(result, "fixtureTableNames", { get: () => klass.fixtureTableNames });
+  result.self = () => currentTestCase;
   return result;
 }

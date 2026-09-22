@@ -55,6 +55,8 @@ import { Course } from "./test-helpers/models/course.js";
 import { College } from "./test-helpers/models/college.js";
 import { withSecondPool } from "./support/setup-second-pool.js";
 import { Account } from "./test-helpers/models/account.js";
+import { Binary } from "./test-helpers/models/binary.js";
+import { Developer } from "./test-helpers/models/developer.js";
 import { Company } from "./test-helpers/models/company.js";
 import { Matey } from "./test-helpers/models/matey.js";
 import { DeadParrot, LiveParrot } from "./test-helpers/models/parrot.js";
@@ -195,7 +197,7 @@ function stubMaxAllowedPacket(conn: unknown, packetSize: number) {
 }
 
 describe("FixturesTest", () => {
-  const { topics, developers, binaries, trafficLights } = fixtures(
+  const { self, topics, developers, binaries, trafficLights } = fixtures(
     [
       "topics",
       "developers",
@@ -207,7 +209,7 @@ describe("FixturesTest", () => {
       "trafficLights",
       "trees",
     ],
-    { useTransactionalTests: false },
+    { useInstantiatedFixtures: true, useTransactionalTests: false },
   );
 
   const FIXTURES_ROOT = new URL("./fixture-set/test-data", import.meta.url).pathname;
@@ -514,6 +516,14 @@ describe("FixturesTest", () => {
     expect(await topics.get("first")!.find()).toBeInstanceOf(Topic);
   });
 
+  it("complete instantiation", () => {
+    expect((self()["@first"] as Topic).title).toBe("The First Topic");
+  });
+
+  it("fixtures from root yml with instantiation", () => {
+    expect((self()["@unknown"] as Account).credit_limit).toBe(50);
+  });
+
   it("yaml file with invalid column", async () => {
     const e = await FixtureSet.createFixtures(`${TS_FIXTURES_ROOT}/naked/yml`, "parrots", {
       parrots: Parrot,
@@ -531,7 +541,7 @@ describe("FixturesTest", () => {
   });
 
   it("erb in fixtures", () => {
-    expect(developers("dev_5").name).toBe("fixture_5");
+    expect((self()["@dev_5"] as Developer).name).toBe("fixture_5");
   });
 
   it("empty yaml fixture", () => {
@@ -550,8 +560,8 @@ describe("FixturesTest", () => {
     const data = new Uint8Array(
       await readFile(new URL("./test-helpers/assets/flowers.jpg", import.meta.url)),
     );
-    expect(new Uint8Array(binaries("flowers").data)).toEqual(data);
-    expect(new Uint8Array(binaries("binary_helper").data)).toEqual(data);
+    expect(new Uint8Array((self()["@flowers"] as Binary).data)).toEqual(data);
+    expect(new Uint8Array((self()["@binary_helper"] as Binary).data)).toEqual(data);
   });
 
   it("serialized fixtures", () => {
@@ -560,7 +570,20 @@ describe("FixturesTest", () => {
 });
 
 describe("FixturesWithoutInstantiationTest", () => {
-  const { topics, developers, accounts } = fixtures(["topics", "developers", "accounts"]);
+  const { self, topics, developers, accounts } = fixtures(["topics", "developers", "accounts"], {
+    useInstantiatedFixtures: false,
+  });
+
+  it("without complete instantiation", () => {
+    expect("@first" in self()).toBe(false);
+    expect("@topics" in self()).toBe(false);
+    expect("@developers" in self()).toBe(false);
+    expect("@accounts" in self()).toBe(false);
+  });
+
+  it("fixtures from root yml without instantiation", () => {
+    expect("@unknown" in self(), "@unknown is not defined").toBe(false);
+  });
 
   it("accessor methods", () => {
     expect(topics("first").title).toBe("The First Topic");
@@ -581,16 +604,29 @@ describe("FixturesWithoutInstantiationTest", () => {
   });
 });
 
+describe("FixturesWithoutInstanceInstantiationTest", () => {
+  const { self } = fixtures(["topics", "developers", "accounts"], {
+    useInstantiatedFixtures: ":no_instances",
+  });
+
+  it("without instance instantiation", () => {
+    expect("@first" in self(), "@first is not defined").toBe(false);
+  });
+});
+
 describe("TransactionalFixturesTest", () => {
-  const { topics } = fixtures(["topics"], { useTransactionalTests: true });
+  const { self } = fixtures(["topics"], {
+    useInstantiatedFixtures: true,
+    useTransactionalTests: true,
+  });
 
   it("destroy", async () => {
-    expect(topics("first")).not.toBeNull();
-    await topics("first").destroy();
+    expect(self()["@first"]).not.toBeNull();
+    await (self()["@first"] as Topic).destroy();
   });
 
   it("destroy just kidding", () => {
-    expect(topics("first")).not.toBeNull();
+    expect(self()["@first"]).not.toBeNull();
   });
 });
 
@@ -1086,7 +1122,7 @@ describe("CustomNameForFixtureOrModelTest", () => {
   });
 
   it("table name is defined in the model", () => {
-    expect(FixtureSet.allLoadedFixtures["admin/randomlyNamedA9"].tableName).toBe(
+    expect(FixtureSet.allLoadedFixtures["admin/randomly_named_a9"].tableName).toBe(
       "randomly_named_table2",
     );
     expect(AdminClassNameThatDoesNotFollowCONVENTIONS1.tableName).toBe("randomly_named_table2");

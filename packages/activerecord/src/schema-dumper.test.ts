@@ -402,7 +402,7 @@ describe("SchemaDumperTest", () => {
     const schemaMigration = Base.connectionPool().schemaMigration;
     await schemaMigration.createTable();
     await schemaMigration.deleteAllVersions();
-    const schemaInfo = (await Base.connection.dumpSchemaInformation!()) ?? "";
+    const schemaInfo = (await (await Base.leaseConnection()).dumpSchemaInformation!()) ?? "";
     expect(schemaInfo).not.toMatch(/INSERT INTO/);
   });
 
@@ -416,7 +416,7 @@ describe("SchemaDumperTest", () => {
     }
 
     try {
-      const schemaInfo = await Base.connection.dumpSchemaInformation!();
+      const schemaInfo = await (await Base.leaseConnection()).dumpSchemaInformation!();
       const expected = [
         `INSERT INTO ${Base.connection.quoteTableName("schema_migrations")} (version) VALUES`,
         "('20100301010101'),",
@@ -432,7 +432,7 @@ describe("SchemaDumperTest", () => {
   it("schema dump include migration version", async () => {
     const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
     const { SchemaMigration } = await import("./schema-migration.js");
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     const sm = new SchemaMigration(adapter.pool);
     await sm.createTable();
     await sm.createVersion("20240601120000");
@@ -452,13 +452,11 @@ describe("SchemaDumperTest", () => {
     "schema dump keeps id false when id is false and unique not null column added",
     { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
-      await Base.connection.createTable(
-        "dump_string_key_objects",
-        { id: false, force: true },
-        (t) => {
-          t.string("key", { null: false });
-        },
-      );
+      await (
+        await Base.leaseConnection()
+      ).createTable("dump_string_key_objects", { id: false, force: true }, (t) => {
+        t.string("key", { null: false });
+      });
       await Base.connection.addIndex("dump_string_key_objects", "key", { unique: true });
       const output = await dumpTableSchema(Base.connection, "dump_string_key_objects");
       expect(output).toMatch(/createTable\("dump_string_key_objects",\s*\{[^}]*id:\s*false/);
@@ -689,7 +687,7 @@ describe("SchemaDumperTest", () => {
     "foreign_keys",
     "foreign keys are dumped at the bottom to circumvent dependency issues",
     async () => {
-      const output = await dumpAllTableSchema([], Base.connection);
+      const output = await dumpAllTableSchema([], await Base.leaseConnection());
       expect(output).toMatch(
         /^\s+await ctx\.addForeignKey\("fk_test_has_fk"[^\n]+\n\s+await ctx\.addForeignKey\("lessons_students"/m,
       );
@@ -697,7 +695,7 @@ describe("SchemaDumperTest", () => {
     FULL_DUMP_TIMEOUT_MS,
   );
   itIfSupports("foreign_keys", "do not dump foreign keys for ignored tables", async () => {
-    const output = await dumpTableSchema(Base.connection, "authors");
+    const output = await dumpTableSchema(await Base.leaseConnection(), "authors");
     expect(
       [...output.matchAll(/^\s*await ctx\.addForeignKey\("([^"]+)".+$/gm)].map((m) => m[1]),
     ).toEqual(["authors"]);

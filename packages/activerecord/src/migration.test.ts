@@ -185,7 +185,7 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
-  const adapter = Base.connection;
+  const adapter = await Base.leaseConnection();
   const o = { ifExists: true } as const;
   await adapter.dropTable("big_numbers", o);
   await adapter.dropTable("binary_testings", o);
