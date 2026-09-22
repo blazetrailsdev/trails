@@ -443,8 +443,8 @@ export abstract class CollectionAssociation extends Association {
         const targetReflection = await (source as unknown as Record<string, unknown>)[sourceName];
         if (
           Array.isArray(targetReflection)
-            ? targetReflection.includes(record)
-            : targetReflection === record
+            ? targetReflection.some((r: Base) => r.equals(record))
+            : (targetReflection as Base | null)?.equals(record)
         ) {
           return true;
         }
