@@ -44,6 +44,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     if (supportsPgcryptoUuid) await adapter.enableExtension("pgcrypto");
   });
 
+  const dropTable = (name: string) => adapter.dropTable(name, { ifExists: true });
+
   let supportsPgcryptoUuid: boolean;
   const uuidFunction = () => (supportsPgcryptoUuid ? "gen_random_uuid()" : "uuid_generate_v4()");
   const uuidDefault = () => (supportsPgcryptoUuid ? {} : { default: uuidFunction() });
@@ -57,7 +59,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     afterEach(async () => {
       void UUIDType.resetColumnInformation();
-      await adapter.dropTable("uuid_data_type", { ifExists: true });
+      await dropTable("uuid_data_type");
     });
 
     itIfSupports("pgcrypto_uuid", "uuid column default", async () => {
@@ -269,7 +271,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     afterEach(async () => {
-      await adapter.dropTable("pg_uuids", "pg_uuids_2", "pg_uuids_3", { ifExists: true });
+      await dropTable("pg_uuids");
+      await dropTable("pg_uuids_2");
+      await dropTable("pg_uuids_3");
       await adapter.execute("DROP FUNCTION IF EXISTS my_uuid_generator();");
       void UUID.resetColumnInformation();
     });
@@ -340,7 +344,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     afterEach(async () => {
-      await adapter.dropTable("pg_uuids", { ifExists: true });
+      await dropTable("pg_uuids");
     });
 
     it("id allows default override via nil", async () => {
@@ -394,7 +398,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     afterEach(async () => {
-      await adapter.dropTable("pg_uuid_comments", "pg_uuid_posts", { ifExists: true });
+      await dropTable("pg_uuid_comments");
+      await dropTable("pg_uuid_posts");
     });
 
     it("collection association with uuid", async () => {
@@ -477,9 +482,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     afterEach(async () => {
-      await adapter.dropTable("pg_uuid_comments", "pg_uuid_posts", "pg_uuid_forums", {
-        ifExists: true,
-      });
+      await dropTable("pg_uuid_comments");
+      await dropTable("pg_uuid_posts");
+      await dropTable("pg_uuid_forums");
     });
 
     it("uuid primary key and disable joins with delegate cache", async () => {

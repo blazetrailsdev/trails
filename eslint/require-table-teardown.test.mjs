@@ -177,6 +177,8 @@ tester.run("require-table-teardown", rule, {
     'await ctx.dropTable("a", { ifExists: true });\nawait ctx.dropTable("b", { force: true });',
     // Non-adjacent drops (unrelated statement between) don't merge.
     'await ctx.dropTable("a");\ndoSomething();\nawait ctx.dropTable("b");',
+    'await dropTable("pg_uuid_comments");\nawait dropTable("pg_uuid_posts");',
+    'dropTable("a");\ndropTable("b");\ndropTable("c");',
     // A dynamic-name drop can't be merged with its neighbour.
     'await ctx.dropTable(name);\nawait ctx.dropTable("b");',
     // A catalogue prefix sweep is teardown for every create under its prefix.
