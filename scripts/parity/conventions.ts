@@ -1396,6 +1396,26 @@ const ALREADY_PREDICATE_RE = new RegExp(`^(${ALREADY_PREDICATE_PREFIXES.join("|"
  * `isInclude()` (CollectionAssociation, Clusivity) keep matching exactly as
  * before; this only widens what counts, it can never take a match away.
  */
+/**
+ * Bare predicates that Rails itself aliases to a `has_*?` method, mapped to the
+ * `has*` spelling a port may use. The Rails alias is the parity basis:
+ * `value?` is `alias value? has_value?`
+ * (actionpack/lib/action_controller/metal/strong_parameters.rb:1001), and
+ * `key?` is `alias :key? :has_key?`
+ * (actionpack/lib/action_dispatch/request/session.rb:138,
+ * rack/lib/rack/headers.rb:148). A blanket `has*` for every bare predicate is
+ * NOT offered: `class_attribute :encrypted_attributes` generates a public
+ * `encrypted_attributes?` whose `hasEncryptedAttributes` would collide with the
+ * private `has_encrypted_attributes?`
+ * (activerecord/lib/active_record/encryption/encryptable_record.rb:204).
+ *
+ * Appended as a LAST candidate, so it only widens what counts.
+ */
+const HAS_PREDICATE_ALIASES = new Map<string, string>([
+  ["key?", "hasKey"],
+  ["value?", "hasValue"],
+]);
+
 const CONTAINMENT_PREDICATE_ALIASES = new Map<string, string>([
   // `member?` is a Ruby alias of `include?` in Rails (finder_methods.rb,
   // strong_parameters.rb), so it gets the same containment spelling.
@@ -1434,13 +1454,10 @@ const CONTAINMENT_PREDICATE_ALIASES = new Map<string, string>([
  *     macro — e.g. Reflection exposes `isHasOne()` alongside the
  *     `Model.hasOne` association declaration.
  *   - Bare predicates (`valid?`, `blank?`) return both forms with the
- *     isPrefixed form first, then the has-prefixed form
- *     (`active_connections?` → ["isActiveConnections", "activeConnections",
- *     "hasActiveConnections"]), for predicates that read as possession.
- *     It is offered for every bare predicate rather than an allowlist:
- *     `has*` is an accepted trails spelling of `x?` in general, and being the
- *     last candidate it only credits a member that already exists under that
- *     name (`value?`, an alias of `has_value?`, → `Parameters#hasValue`).
+ *     isPrefixed form first (`valid?` → ["isValid", "valid"]).
+ *   - Bare predicates Rails aliases to a `has_*?` method
+ *     ({@link HAS_PREDICATE_ALIASES}) append that `has*` spelling
+ *     (`value?` → ["isValue", "value", "hasValue"]).
  *   - Containment predicates (`include?`, `member?`, `exclude?`) append
  *     the native JS spelling as a further candidate
  *     (`include?` → ["isInclude", "include", "includes"]).
@@ -1555,8 +1572,8 @@ function rubyMethodToTsWithoutUnderscore(
     if (containment !== undefined) {
       return [...literal, isPrefixed, camel, containment];
     }
-    const hasPrefixed = "has" + camel.replace(/^./, (c) => c.toUpperCase());
-    return [...literal, isPrefixed, camel, hasPrefixed];
+    const hasAlias = HAS_PREDICATE_ALIASES.get(name);
+    return [...literal, isPrefixed, camel, ...(hasAlias === undefined ? [] : [hasAlias])];
   }
 
   if (name.endsWith("!")) {
@@ -1636,6 +1653,7 @@ export function explainConventions(): string {
   // subset) so the row can't name a different set than the matcher uses.
   const predicatePrefixes = ALREADY_PREDICATE_PREFIXES.map((p) => `\`${p}_*?\``).join(" / ");
 
+  const hasPredicates = [...HAS_PREDICATE_ALIASES.keys()].map((n) => `\`${n}\``).join(" / ");
   const containmentPredicates = [...CONTAINMENT_PREDICATE_ALIASES.keys()]
     .map((n) => `\`${n}\``)
     .join(" / ");
@@ -1686,7 +1704,8 @@ matches the first candidate present in the target file), not a call expression.
 
 | Ruby | TypeScript | Example |
 | ---- | ---------- | ------- |
-| \`predicate?\` (bare) | \`is*\` prefix, then camel, then \`has*\` prefix | \`valid?\` → ${example("valid?")} |
+| \`predicate?\` (bare) | \`is*\` prefix, then camel | \`valid?\` → ${example("valid?")} |
+| ${hasPredicates} | \`is*\` / camel / the \`has*\` spelling of the \`has_*?\` Rails aliases it to | \`value?\` → ${example("value?")} |
 | \`is_*?\` | camel form (no doubled \`isIs*\`) | \`is_number?\` → ${example("is_number?")} |
 | ${predicatePrefixes} | camel form + \`is*\` fallback | \`has_attribute?\` → ${example("has_attribute?")} |
 | ${containmentPredicates} | \`is*\` / camel / native JS spelling | \`include?\` → ${example("include?")} |
@@ -1714,11 +1733,10 @@ land the redundant doubled \`isIsNumber\`. Already-predicate prefixes keep the
 name collides with a macro (e.g. \`isHasOne()\` alongside the \`Model.hasOne\`
 declaration). A \`Q\` suffix (\`activeConnectionsQ\`) is never a
 candidate: \`xQ\` is not a trails spelling of \`x?\`, so port a predicate whose
-bare camel name is taken as \`is*\` or \`has*\` (or the quoted literal). A bare
-predicate offers \`has*\` after \`is*\` and the camel form
-(\`active_connections?\` → \`hasActiveConnections\`), for predicates that read
-as possession; the \`is_*?\`, already-predicate-prefix and containment families
-do not, since \`hasIsNumber\` / \`hasHasAttribute\` / \`hasInclude\` never read right. Leading underscores and runs of underscores collapse like a single
+bare camel name is taken as \`is*\` (or the quoted literal). A \`has*\` spelling is
+a candidate only for a bare predicate Rails itself aliases to a \`has_*?\` method
+(${hasPredicates}); a blanket \`has*\` would collide with a sibling \`has_*?\`, as
+\`encrypted_attributes?\` does with \`has_encrypted_attributes?\`. Leading underscores and runs of underscores collapse like a single
 underscore (\`visit__regexp\` → \`visitRegexp\`), and underscore-before-capital
 collapses too (\`visit_Arel_Nodes_X\` → \`visitArelNodesX\`).
 

@@ -260,14 +260,7 @@ describe("rubyMethodToTs private helpers", () => {
       "_convertValueToParameters",
     ]);
     expect(rubyMethodToTs("save!")).toEqual(["saveBang", "_saveBang"]);
-    expect(rubyMethodToTs("blank?")).toEqual([
-      "isBlank",
-      "blank",
-      "hasBlank",
-      "_isBlank",
-      "_blank",
-      "_hasBlank",
-    ]);
+    expect(rubyMethodToTs("blank?")).toEqual(["isBlank", "blank", "_isBlank", "_blank"]);
   });
 
   it("leaves the fixed JS spellings alone", () => {
@@ -296,9 +289,9 @@ describe("rubyMethodToTs predicates", () => {
   });
 
   it("keeps prepending is for predicates that don't already start with one of the allowlisted prefixes", () => {
-    expect(bareCandidates("number?")).toEqual(["isNumber", "number", "hasNumber"]);
-    expect(bareCandidates("blank?")).toEqual(["isBlank", "blank", "hasBlank"]);
-    expect(bareCandidates("present?")).toEqual(["isPresent", "present", "hasPresent"]);
+    expect(bareCandidates("number?")).toEqual(["isNumber", "number"]);
+    expect(bareCandidates("blank?")).toEqual(["isBlank", "blank"]);
+    expect(bareCandidates("present?")).toEqual(["isPresent", "present"]);
   });
 
   it("does NOT treat names that merely camelize to start with 'is' as the is_*? family", () => {
@@ -306,12 +299,8 @@ describe("rubyMethodToTs predicates", () => {
     // `isolation_level?` camelizes to `isolationLevel` (starts with
     // 'is'), but the Ruby base doesn't start with `is_` — keep both
     // candidates so trails methods named either way still match.
-    expect(bareCandidates("isolation_level?")).toEqual([
-      "isIsolationLevel",
-      "isolationLevel",
-      "hasIsolationLevel",
-    ]);
-    expect(bareCandidates("island?")).toEqual(["isIsland", "island", "hasIsland"]);
+    expect(bareCandidates("isolation_level?")).toEqual(["isIsolationLevel", "isolationLevel"]);
+    expect(bareCandidates("island?")).toEqual(["isIsland", "island"]);
   });
 
   it("keeps the existing has/supports/can/etc allowlist behavior intact (camel preferred, isPrefixed available as fallback)", () => {
@@ -342,26 +331,21 @@ describe("rubyMethodToTs predicates", () => {
     // so the camel candidate `debug` names the LOGGING method — the pairing
     // that reported BroadcastLogger's predicate bodies as call mismatches.
     // trails spells the predicate `get "debug?"`, which is what should win.
-    expect(bareCandidates("debug?", new Set(["debug"]))).toEqual([
-      "debug?",
-      "isDebug",
-      "debug",
-      "hasDebug",
-    ]);
+    expect(bareCandidates("debug?", new Set(["debug"]))).toEqual(["debug?", "isDebug", "debug"]);
     // No bare sibling — the candidate list is untouched.
-    expect(bareCandidates("debug?", new Set())).toEqual(["isDebug", "debug", "hasDebug"]);
+    expect(bareCandidates("debug?", new Set())).toEqual(["isDebug", "debug"]);
   });
 
-  it("offers the has-prefixed form after is* and camel for a bare predicate", () => {
-    expect(bareCandidates("active_connections?")).toEqual([
-      "isActiveConnections",
-      "activeConnections",
-      "hasActiveConnections",
-    ]);
-    expect(rubyMethodToTs("key?")?.[0]).toBe("isKey");
-    expect(bareCandidates("is_number?")).not.toContain("hasIsNumber");
-    expect(bareCandidates("has_attribute?")).not.toContain("hasHasAttribute");
-    expect(bareCandidates("include?")).not.toContain("hasInclude");
+  it("offers the has* spelling only for predicates Rails aliases to a has_*? method", () => {
+    // `alias value? has_value?` (strong_parameters.rb:1001), `alias :key? :has_key?`
+    // (request/session.rb:138).
+    expect(bareCandidates("value?")).toEqual(["isValue", "value", "hasValue"]);
+    expect(bareCandidates("key?")).toEqual(["isKey", "key", "hasKey"]);
+    // `class_attribute :encrypted_attributes` generates a public
+    // `encrypted_attributes?`; a blanket has* would name the private
+    // `has_encrypted_attributes?` (encryptable_record.rb:204).
+    expect(bareCandidates("encrypted_attributes?")).not.toContain("hasEncryptedAttributes");
+    expect(bareCandidates("blank?")).not.toContain("hasBlank");
   });
 
   it("never offers a Q-suffixed candidate for a predicate", () => {

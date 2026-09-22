@@ -676,7 +676,7 @@ describe("significantMissingCalls", () => {
         rubyMethodToTs,
         wide,
       );
-      expect(missing).toEqual(["match? → isMatch|match|hasMatch|_isMatch|_match|_hasMatch"]);
+      expect(missing).toEqual(["match? → isMatch|match|_isMatch|_match"]);
     });
 
     it("still flags an enumerable call the TS body makes in no form", () => {
@@ -688,7 +688,7 @@ describe("significantMissingCalls", () => {
         rubyMethodToTs,
         wide,
       );
-      expect(missing).toEqual(["any? → isAny|any|hasAny|_isAny|_any|_hasAny"]);
+      expect(missing).toEqual(["any? → isAny|any|_isAny|_any"]);
     });
 
     it("does not flag exclude?/none? when the TS body negates the analogue", () => {
@@ -720,7 +720,7 @@ describe("significantMissingCalls", () => {
       );
       expect(missing).toEqual([
         "exclude? → isExclude|exclude|excludes|_isExclude|_exclude|_excludes",
-        "none? → isNone|none|hasNone|_isNone|_none|_hasNone",
+        "none? → isNone|none|_isNone|_none",
       ]);
     });
 
