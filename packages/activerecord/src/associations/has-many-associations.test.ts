@@ -1014,7 +1014,31 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  fixtures([]);
+  const { companies } = fixtures([
+    "accounts",
+    "categories",
+    "companies",
+    "developers",
+    "projects",
+    "developersProjects",
+    "topics",
+    "authors",
+    "authorAddresses",
+    "comments",
+    "posts",
+    "readers",
+    "taggings",
+    "cars",
+    "tags",
+    "categorizations",
+    "zines",
+    "interests",
+    "humans",
+    "shardedBlogPosts",
+    "shardedComments",
+    "cpkBooks",
+    "cpkAuthors",
+  ]);
   setup();
 
   it("delete all with not yet loaded association collection", async () => {
@@ -1132,10 +1156,9 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("included in collection", async () => {
-    const author = await HmAuthor.create({ name: "Alice" });
-    const post = await HmPost.create({ author_id: author.id, title: "Included", body: "body" });
-    const posts = await author.posts;
-    expect(posts.some((p: any) => p.id === post.id)).toBe(true);
+    expect(await (companies("first_firm") as any).clients.isInclude(await Client.find(2))).toBe(
+      true,
+    );
   });
 
   it("included in collection for new records", async () => {
@@ -1363,7 +1386,31 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  fixtures([]);
+  const { companies, posts, authors } = fixtures([
+    "accounts",
+    "categories",
+    "companies",
+    "developers",
+    "projects",
+    "developersProjects",
+    "topics",
+    "authors",
+    "authorAddresses",
+    "comments",
+    "posts",
+    "readers",
+    "taggings",
+    "cars",
+    "tags",
+    "categorizations",
+    "zines",
+    "interests",
+    "humans",
+    "shardedBlogPosts",
+    "shardedComments",
+    "cpkBooks",
+    "cpkAuthors",
+  ]);
   setup();
 
   beforeAll(async () => {
@@ -1382,10 +1429,8 @@ describe("HasManyAssociationsTest", () => {
   registerModel(HmLineItem);
 
   it("select query method", async () => {
-    const author = await HmAuthor.create({ name: "Alice" });
-    await HmPost.create({ author_id: author.id, title: "Hello", body: "body" });
-    const sql = HmPost.where({ author_id: author.id }).toSql();
-    expect(sql).toContain("author_id");
+    const comment = await (posts("welcome") as any).comments.select("id", "body").first();
+    expect(Object.keys(comment.attributes)).toEqual(["id", "body"]);
   });
 
   it("exists respects association scope", async () => {
@@ -1481,10 +1526,9 @@ describe("HasManyAssociationsTest", () => {
     expect(posts1.length).toBe(posts2.length);
   });
 
-  it("sending new to association proxy should have same effect as calling new", async () => {
-    const author = await HmAuthor.create({ name: "Alice" });
-    const post = HmPost.new({ author_id: author.id, title: "New" });
-    expect(post.isNewRecord()).toBe(true);
+  it("sending new to association proxy should have same effect as calling new", () => {
+    const clientAssociation = (companies("first_firm") as any).clients;
+    expect(clientAssociation.new().attributes).toEqual(clientAssociation["new"]().attributes);
   });
 
   it("prevent double insertion of new object when the parent association loaded in the after save callback", async () => {
@@ -2417,10 +2461,8 @@ describe("HasManyAssociationsTest", () => {
     ).resolves.not.toThrow();
   });
   it("default select", async () => {
-    const author = await HmAuthor.create({ name: "Alice" });
-    await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await author.posts;
-    expect((posts[0] as any).title).toBe("A");
+    const comment = await (posts("welcome") as any).comments.first();
+    expect(Object.keys(comment.attributes).sort()).toEqual([...Comment.columnNames()].sort());
   });
   it("select with block and dirty target", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
@@ -2449,217 +2491,51 @@ describe("HasManyAssociationsTest", () => {
     expect(error.record).toBe(developer);
   });
   it("inverse on before validate", async () => {
-    class InvValAuthor extends Base {
-      declare name: string | null;
-      declare inv_val_posts: AssociationProxy<InvValPost>;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("inv_val_posts", {
-          className: "InvValPost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class InvValPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.belongsTo("author", {
-          className: "InvValAuthor",
-          foreignKey: "author_id",
-          inverseOf: "inv_val_posts",
-        });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface InvValPost {
-      get author(): InvValAuthor | null | Promise<InvValAuthor | null>;
-      set author(value: InvValAuthor | null);
-    }
-    registerModel(InvValAuthor);
-    registerModel(InvValPost);
-    const author = await InvValAuthor.create({ name: "Alice" });
-    const post = await InvValPost.create({ author_id: author.id, title: "A", body: "body" });
-    const loaded = await (post as any).author;
-    expect(loaded).not.toBeNull();
-    expect(loaded!.name).toBe("Alice");
+    const firm = companies("first_firm") as any;
+    await assertQueriesCount(3, false, async () => {
+      await firm.clientsOfFirm.push(new Client({ name: "Natural Company" }));
+    });
   });
   it("collection size with dirty target", async () => {
-    class SizeDirtyAuthor extends Base {
-      declare size_dirty_posts: AssociationProxy<SizeDirtyPost>;
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("size_dirty_posts", {
-          className: "SizeDirtyPost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class SizeDirtyPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(SizeDirtyAuthor);
-    registerModel(SizeDirtyPost);
-    const author = await SizeDirtyAuthor.create({ name: "Alice" });
-    await SizeDirtyPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await author.size_dirty_posts;
-    expect(posts.length).toBe(1);
+    const post = posts("thinking") as any;
+    expect(await post.readerIds).toEqual([]);
+    expect(await post.readers.size()).toBe(0);
+    post.readers.reset();
+    post.readers.build();
+    expect(await post.readerIds).toEqual([null]);
+    expect(await post.readers.size()).toBe(1);
   });
 
   it("collection empty with dirty target", async () => {
-    class EmptyDirtyAuthor extends Base {
-      declare empty_dirty_posts: AssociationProxy<EmptyDirtyPost>;
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("empty_dirty_posts", {
-          className: "EmptyDirtyPost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class EmptyDirtyPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(EmptyDirtyAuthor);
-    registerModel(EmptyDirtyPost);
-    const author = await EmptyDirtyAuthor.create({ name: "Alice" });
-    const posts = await author.empty_dirty_posts;
-    expect(posts.length === 0).toBe(true);
+    const post = posts("thinking") as any;
+    expect(await post.readerIds).toEqual([]);
+    expect(await post.readers.isEmpty()).toBe(true);
+    post.readers.reset();
+    post.readers.build();
+    expect(await post.readerIds).toEqual([null]);
+    expect(await post.readers.isEmpty()).toBe(false);
   });
 
   it("collection size twice for regressions", async () => {
-    class SizeTwiceAuthor extends Base {
-      declare size_twice_posts: AssociationProxy<SizeTwicePost>;
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("size_twice_posts", {
-          className: "SizeTwicePost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class SizeTwicePost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(SizeTwiceAuthor);
-    registerModel(SizeTwicePost);
-    const author = await SizeTwiceAuthor.create({ name: "Alice" });
-    await SizeTwicePost.create({ author_id: author.id, title: "A", body: "body" });
-    await SizeTwicePost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts1 = await author.size_twice_posts;
-    expect(posts1.length).toBe(2);
-    const posts2 = await author.size_twice_posts;
-    expect(posts2.length).toBe(2);
+    const post = posts("thinking") as any;
+    expect(await post.readers.size()).toBe(0);
+    await post.reload();
+    post.readers.build();
+    const size1 = await post.readers.size();
+    const size2 = await post.readers.size();
+    expect(size2).toBe(size1);
   });
 
   it("build followed by save does not load target", async () => {
-    class BuildSaveAuthor extends Base {
-      declare build_save_posts: AssociationProxy<BuildSavePost>;
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("build_save_posts", {
-          className: "BuildSavePost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class BuildSavePost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(BuildSaveAuthor);
-    registerModel(BuildSavePost);
-    const author = await BuildSaveAuthor.create({ name: "Alice" });
-    const post = BuildSavePost.new({ author_id: author.id, title: "Built", body: "body" });
-    await post.save();
-    expect(post.isNewRecord()).toBe(false);
-    const posts = await author.build_save_posts;
-    expect(posts.length).toBe(1);
+    (companies("first_firm") as any).clientsOfFirm.build({ name: "Another Client" });
+    expect(await (companies("first_firm") as any).save()).toBeTruthy();
+    expect((companies("first_firm") as any).clientsOfFirm.loaded).toBe(false);
   });
 
   it("create followed by save does not load target", async () => {
-    class CreateSaveAuthor extends Base {
-      declare create_save_posts: AssociationProxy<CreateSavePost>;
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("create_save_posts", {
-          className: "CreateSavePost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class CreateSavePost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(CreateSaveAuthor);
-    registerModel(CreateSavePost);
-    const author = await CreateSaveAuthor.create({ name: "Alice" });
-    const post = await CreateSavePost.create({
-      author_id: author.id,
-      title: "Created",
-      body: "body",
-    });
-    post.title = "Updated";
-    await post.save();
-    const posts = await author.create_save_posts;
-    expect(posts.length).toBe(1);
-    expect((posts[0] as any).title).toBe("Updated");
+    await (companies("first_firm") as any).clientsOfFirm.create({ name: "Another Client" });
+    expect(await (companies("first_firm") as any).save()).toBeTruthy();
+    expect((companies("first_firm") as any).clientsOfFirm.loaded).toBe(false);
   });
   it("dependent association respects optional conditions on delete", async () => {
     class DcFirm extends Base {

@@ -1,4 +1,41 @@
 [
   "packages/activerecord/src/associations/has-and-belongs-to-many-associations.test.ts",
-  "packages/activerecord/src/associations/has-many-through-disable-joins-associations.test.ts"
+  {
+    "file": "packages/activerecord/src/associations/has-many-associations.test.ts",
+    "tests": [
+      "HasManyAssociationsTest > assign ids ignoring blanks",
+      "HasManyAssociationsTest > association with extend option",
+      "HasManyAssociationsTest > association with extend option with multiple extensions",
+      "HasManyAssociationsTest > association with instance dependent scope",
+      "HasManyAssociationsTest > association with or doesnt set inverse instance key",
+      "HasManyAssociationsTest > association with rewhere doesnt set inverse instance key",
+      "HasManyAssociationsTest > associations order should be priority over throughs order",
+      "HasManyAssociationsTest > attributes are being set when initialized from has many association with multiple where clauses",
+      "HasManyAssociationsTest > attributes are being set when initialized from has many association with where clause",
+      "HasManyAssociationsTest > build",
+      "HasManyAssociationsTest > build many",
+      "HasManyAssociationsTest > calling many should defer to collection if using a block",
+      "HasManyAssociationsTest > cant save has many readonly association",
+      "HasManyAssociationsTest > collection association with private kernel method",
+      "HasManyAssociationsTest > delete all with not yet loaded association collection",
+      "HasManyAssociationsTest > delete record with complex joins",
+      "HasManyAssociationsTest > dependence for associations with hash condition",
+      "HasManyAssociationsTest > dependence with transaction support on failure",
+      "HasManyAssociationsTest > dependent association respects optional conditions on delete",
+      "HasManyAssociationsTest > dont call save callbacks twice on has many",
+      "HasManyAssociationsTest > dynamic find should respect association order for through",
+      "HasManyAssociationsTest > extend option affects per association",
+      "HasManyAssociationsTest > find should append to association order",
+      "HasManyAssociationsTest > finder method with dirty target",
+      "HasManyAssociationsTest > has many through respects hash conditions",
+      "HasManyAssociationsTest > ids reader cache should be cleared when collection is deleted",
+      "HasManyAssociationsTest > ids reader on preloaded association with composite primary key",
+      "HasManyAssociationsTest > included in collection for composite keys",
+      "HasManyAssociationsTest > modifying a through a has many should raise",
+      "HasManyAssociationsTest > new aliased to build",
+      "HasManyAssociationsTest > replace failure",
+      "HasManyAssociationsTest > select with block and dirty target",
+      "HasManyAssociationsTest > taking with inverse of"
+    ]
+  }
 ]

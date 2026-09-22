@@ -1,7 +1,8 @@
 #!/usr/bin/env -S npx tsx
 /**
- * Generates eslint/test-fixture-parity.json — trails file → fixture-using
- * test descriptions.
+ * Generates eslint/test-fixture-parity.json — trails file → the Rails test
+ * classes it declares and its fixture-using tests, each keyed `Class > desc`
+ * so a title Rails reuses across classes is marked only where it reads rows.
  *
  * Detection signal (precise, body-accessor only):
  *   Class-level `fixtures :foo` + per-test body accessor `foo(:record)` →
@@ -53,23 +54,34 @@ function parseFixtureNames(after: string): string[] {
 }
 
 interface TestEntry {
+  klass: string;
   desc: string;
   bodyLines: string[];
 }
 
-function extractTests(src: string): TestEntry[] {
+function extractTests(src: string): { classes: string[]; tests: TestEntry[] } {
   const lines = src.split("\n");
+  const classes: string[] = [];
   const entries: TestEntry[] = [];
 
+  const CLASS_RE = /^\s*class\s+(?:[\w:]+::)?(\w+)\s*<\s*[\w:]*Test(?:Case)?\b/;
   const DEF_RE = /^(\s*)def\s+(test_[a-zA-Z0-9_?!]*)/;
   const BLK_RE = /^(\s*)test\s+["']([^"']+)["']\s+do\b/;
 
+  let klass = "";
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    const cm = line.match(CLASS_RE);
+    if (cm) {
+      klass = cm[1];
+      classes.push(klass);
+      continue;
+    }
     const dm = line.match(DEF_RE);
     if (dm) {
       const end = findBodyEnd(lines, i, dm[1].length);
       entries.push({
+        klass,
         desc: normalize(dm[2].replace(/^test_/, "").replace(/_/g, " ")),
         bodyLines: lines.slice(i + 1, end),
       });
@@ -78,10 +90,10 @@ function extractTests(src: string): TestEntry[] {
     const bm = line.match(BLK_RE);
     if (bm) {
       const end = findBodyEnd(lines, i, bm[1].length);
-      entries.push({ desc: normalize(bm[2]), bodyLines: lines.slice(i + 1, end) });
+      entries.push({ klass, desc: normalize(bm[2]), bodyLines: lines.slice(i + 1, end) });
     }
   }
-  return entries;
+  return { classes: [...new Set(classes)].sort(), tests: entries };
 }
 
 function findBodyEnd(lines: string[], startIdx: number, indent: number): number {
@@ -128,7 +140,9 @@ function collectFixtureNames(src: string): string[] {
   return names;
 }
 
-function processFile(file: string): { trailsRel: string; descs: string[] } | null {
+function processFile(
+  file: string,
+): { trailsRel: string; classes: string[]; tests: string[] } | null {
   const src = fs.readFileSync(file, "utf8");
 
   const fixtureNames = collectFixtureNames(src);
@@ -137,18 +151,20 @@ function processFile(file: string): { trailsRel: string; descs: string[] } | nul
   const accessorRe = buildAccessorRe(fixtureNames);
   if (!accessorRe) return null;
 
-  const tests = extractTests(src);
+  const { classes, tests } = extractTests(src);
   if (tests.length === 0) return null;
 
   // Mark only tests that call a fixture row accessor in their body. Tests that
   // declare fixtures but never reference a row are not gated (see header).
-  const useDescs = tests.filter((t) => accessorRe.test(t.bodyLines.join("\n"))).map((t) => t.desc);
+  const useTests = tests
+    .filter((t) => accessorRe.test(t.bodyLines.join("\n")))
+    .map((t) => `${t.klass} > ${t.desc}`);
 
-  if (useDescs.length === 0) return null;
+  if (useTests.length === 0) return null;
 
   const relPath = path.relative(CASES_DIR, file).replace(/\\/g, "/");
   const trailsRel = railsToTrailsRel(relPath);
-  return { trailsRel, descs: [...new Set(useDescs)].sort() };
+  return { trailsRel, classes, tests: [...new Set(useTests)].sort() };
 }
 
 function walk(dir: string, acc: string[] = []): string[] {
@@ -169,16 +185,16 @@ async function main() {
   }
 
   const files = walk(CASES_DIR).sort();
-  const out: Record<string, string[]> = {};
+  const out: Record<string, { classes: string[]; tests: string[] }> = {};
 
   for (const file of files) {
     const result = processFile(file);
     if (!result) continue;
-    out[result.trailsRel] = result.descs;
+    out[result.trailsRel] = { classes: result.classes, tests: result.tests };
   }
 
   const entries = Object.keys(out).length;
-  const tests = Object.values(out).reduce((a, b) => a + b.length, 0);
+  const tests = Object.values(out).reduce((a, b) => a + b.tests.length, 0);
   // Emit prettier-canonical JSON so `regenerate → commit` is a single
   // reproducible step that passes CI's `prettier --check` (the file is not in
   // .prettierignore). Raw JSON.stringify leaves single-element arrays expanded.
