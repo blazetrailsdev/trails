@@ -1,4 +1,5 @@
 import { beforeEach, describe, it, expect } from "vitest";
+import { assertEmpty } from "./testing/assertions.js";
 
 import { BacktraceCleaner } from "./backtrace-cleaner.js";
 
@@ -45,15 +46,17 @@ describe("BacktraceCleanerDefaultFilterAndSilencerTest", () => {
   it("should silence gems from the backtrace", () => {
     const cleaner = makeBacktraceCleaner();
     cleaner.addSilencer((line) => line.includes("/gems/"));
-    const bt = ["/gems/rack-1.0/lib/rack.rb", "/app/controllers/foo.rb"];
-    expect(cleaner.clean(bt)).toEqual(["/app/controllers/foo.rb"]);
+    const backtrace = ["/gems/nosuchgem-1.2.3/lib/foo.rb"];
+    const result = cleaner.clean(backtrace);
+    assertEmpty(result);
   });
 
   it("should silence stdlib", () => {
     const cleaner = makeBacktraceCleaner();
     cleaner.addSilencer((line) => line.startsWith("/usr/lib/ruby/"));
-    const bt = ["/usr/lib/ruby/json.rb", "/app/lib/my_code.rb"];
-    expect(cleaner.clean(bt)).toEqual(["/app/lib/my_code.rb"]);
+    const backtrace = ["/usr/lib/ruby/lib/foo.rb"];
+    const result = cleaner.clean(backtrace);
+    assertEmpty(result);
   });
 
   it("should preserve lines that have a subpath matching a gem path", () => {

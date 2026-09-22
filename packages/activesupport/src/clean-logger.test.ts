@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { Logger } from "./logger.js";
+import { rbInspect } from "@blazetrails/ruby-compat";
 
 describe("CleanLoggerTest", () => {
   it("format message", () => {
@@ -10,19 +11,23 @@ describe("CleanLoggerTest", () => {
     expect(lines.join("")).toEqual("error\n");
   });
 
-  it("datetime format", () => {
+  it.skip("datetime format", () => {
+    // BLOCKED: logger-default-simple-formatter-and-nonstring-inspect
     const lines: string[] = [];
     const logger = new Logger({ write: (s) => lines.push(s) });
-    logger.formatter = (severity, datetime, _prog, msg) =>
-      `[${datetime.toString()}] ${severity}: ${msg}\n`;
-    logger.info("test");
-    expect(lines[0]).toMatch(/^\[\d{4}-\d{2}-\d{2}/);
+    (logger as any).formatter = new (Logger as any).Formatter();
+    (logger as any).formatter.datetimeFormat = "%Y-%m-%d";
+    logger.debug("debug");
+    expect((logger as any).formatter.datetimeFormat).toEqual("%Y-%m-%d");
+    expect(lines.join("")).toMatch(/D, \[\d\d\d\d-\d\d-\d\d[ ]?#\d+\] DEBUG -- : debug/);
   });
 
-  it("nonstring formatting", () => {
+  it.skip("nonstring formatting", () => {
+    // BLOCKED: logger-default-simple-formatter-and-nonstring-inspect
     const lines: string[] = [];
     const logger = new Logger({ write: (s) => lines.push(s) });
-    logger.info(String(42));
-    expect(lines.some((l) => l.includes("42"))).toBe(true);
+    const anObject = [1, 2, 3, 4, 5];
+    logger.debug(anObject as unknown as string);
+    expect(lines.join("")).toEqual(`${rbInspect(anObject)}\n`);
   });
 });

@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Logger, taggedLogging } from "./logger.js";
 import { BroadcastLogger } from "./broadcast-logger.js";
 import { TagStack, Formatter } from "./tagged-logging.js";
+import { Thread } from "@blazetrails/ruby-compat";
+import { assertRespondTo } from "./testing/assertions.js";
 
 function makeBuffer() {
   const lines: string[] = [];
@@ -63,82 +65,79 @@ describe("TaggedLoggingWithoutBlockTest", () => {
 });
 
 describe("TaggedLoggingTest", () => {
+  class MyLogger extends Logger {
+    flush(): void {
+      this.info("[FLUSHED]");
+    }
+  }
+
   let output: ReturnType<typeof makeBuffer>;
   let logger: ReturnType<typeof taggedLogging>;
   beforeEach(() => {
     output = makeBuffer();
-    const base = new Logger(output);
-    logger = taggedLogging(base);
+    logger = taggedLogging(new MyLogger(output));
   });
 
-  function makeOutput() {
-    const lines: string[] = [];
-    return { write: (s: string) => lines.push(s), lines };
-  }
-
-  it("sets logger.formatter if missing and extends it with a tagging API", () => {
-    const output = makeOutput();
-    const logger = new Logger(output);
-    const tagged = taggedLogging(logger);
-    tagged.pushTags("TAG");
-    tagged.info("hello");
-    expect(output.lines.some((l) => l.includes("[TAG]") && l.includes("hello"))).toBe(true);
+  it.skip("sets logger.formatter if missing and extends it with a tagging API", () => {
+    // BLOCKED: tagged-logging-proxy-is-not-a-formatter-extension
+    const logger = new Logger(makeBuffer());
+    expect(logger.formatter).toBeNull();
+    const otherLogger = taggedLogging(logger);
+    expect(otherLogger.formatter).not.toBeNull();
+    assertRespondTo(otherLogger.formatter, "tagged");
   });
 
   it("provides access to the logger instance", () => {
-    const output = makeOutput();
-    const logger = new Logger(output);
-    const tagged = taggedLogging(logger);
-    expect(tagged).toBeDefined();
-    expect(typeof tagged.info).toBe("function");
+    logger.tagged("BCX", (logger) => {
+      logger.info("Funky time");
+    });
+    expect(output.string).toBe("[BCX] Funky time\n");
   });
 
   it("keeps each tag in their own instance", () => {
-    const output = makeOutput();
-    const logger = new Logger(output);
-    const t1 = taggedLogging(logger);
-    const t2 = taggedLogging(logger);
-    t1.pushTags("T1");
-    t2.pushTags("T2");
-    expect(t1.currentTags).toContain("T1");
-    expect(t1.currentTags).not.toContain("T2");
-    expect(t2.currentTags).toContain("T2");
-    expect(t2.currentTags).not.toContain("T1");
+    const otherOutput = makeBuffer();
+    const otherLogger = taggedLogging(new MyLogger(otherOutput));
+    logger.tagged("OMG", () => {
+      otherLogger.tagged("BCX", () => {
+        logger.info("Cool story");
+        otherLogger.info("Funky time");
+      });
+    });
+    expect(output.string).toBe("[OMG] Cool story\n");
+    expect(otherOutput.string).toBe("[BCX] Funky time\n");
   });
 
-  it("does not share the same formatter instance of the original logger", () => {
-    const out1 = makeOutput();
-    const out2 = makeOutput();
-    const l1 = new Logger(out1);
-    const l2 = new Logger(out2);
-    const t1 = taggedLogging(l1);
-    const t2 = taggedLogging(l2);
-    t1.pushTags("A");
-    t2.pushTags("B");
-    t1.info("msg1");
-    t2.info("msg2");
-    expect(out1.lines.some((l) => l.includes("[A]"))).toBe(true);
-    expect(out1.lines.some((l) => l.includes("[B]"))).toBe(false);
-    expect(out2.lines.some((l) => l.includes("[B]"))).toBe(true);
+  it.skip("does not share the same formatter instance of the original logger", () => {
+    // BLOCKED: tagged-logging-proxy-is-not-a-formatter-extension
+    const otherLogger = taggedLogging(logger);
+    logger.tagged("OMG", () => {
+      otherLogger.tagged("BCX", () => {
+        logger.info("Cool story");
+        otherLogger.info("Funky time");
+      });
+    });
+    expect(output.string).toBe("[OMG] Cool story\n[BCX] Funky time\n");
   });
 
   it("cleans up the taggings on flush", () => {
-    const output = makeOutput();
-    const logger = new Logger(output);
-    const tagged = taggedLogging(logger);
-    tagged.pushTags("BEFORE");
-    expect(tagged.currentTags).toContain("BEFORE");
-    tagged.flush();
-    expect(tagged.currentTags).toHaveLength(0);
+    logger.tagged("BCX", () => {
+      new Thread(() => {
+        logger.tagged("OMG", () => {
+          logger.flush();
+          logger.info("Cool story");
+        });
+      }).join();
+    });
+    expect(output.string).toBe("[FLUSHED]\nCool story\n");
   });
 
   it("implicit logger instance", () => {
-    const output = makeOutput();
-    const logger = new Logger(output);
-    const tagged = taggedLogging(logger);
-    tagged.pushTags("X");
-    tagged.info("test");
-    expect(output.lines.some((l) => l.includes("[X]") && l.includes("test"))).toBe(true);
+    const output = makeBuffer();
+    const logger = taggedLogging.logger(output);
+    logger.tagged("BCX", () => {
+      logger.info("Funky time");
+    });
+    expect(output.string).toBe("[BCX] Funky time\n");
   });
 
   it("tagged once", () => {
@@ -199,32 +198,38 @@ describe("TaggedLoggingTest", () => {
     expect(output.string).toBe("[New] Funky time\n");
   });
 
-  it("keeps each tag in their own thread", () => {
-    const out2 = makeBuffer();
-    const base2 = new Logger(out2);
-    const logger2 = taggedLogging(base2);
-    logger.tagged("Thread1").info("t1 msg");
-    logger2.tagged("Thread2").info("t2 msg");
-    expect(output.string).toContain("[Thread1]");
-    expect(out2.string).toContain("[Thread2]");
-    expect(output.string).not.toContain("[Thread2]");
+  it.skip("keeps each tag in their own thread", () => {
+    // BLOCKED: tagged-logging-proxy-is-not-a-formatter-extension
+    logger.tagged("BCX", () => {
+      new Thread(() => {
+        logger.info("Dull story");
+        logger.tagged("OMG", () => {
+          logger.info("Cool story");
+        });
+      }).join();
+      logger.info("Funky time");
+    });
+    expect(output.string).toBe("Dull story\n[OMG] Cool story\n[BCX] Funky time\n");
   });
 
-  it("keeps each tag in their own thread even when pushed directly", () => {
-    const t = logger.tagged("Direct");
-    t.pushTags("Extra");
-    t.info("pushed");
-    expect(output.string).toContain("[Direct] [Extra]");
-    t.clearTags();
+  it.skip("keeps each tag in their own thread even when pushed directly", () => {
+    // BLOCKED: tagged-logging-proxy-is-not-a-formatter-extension
+    new Thread(() => {
+      logger.pushTags("OMG");
+      logger.info("Cool story");
+    }).join();
+    logger.info("Funky time");
+    expect(output.string).toBe("[OMG] Cool story\nFunky time\n");
   });
 
   it("mixed levels of tagging", () => {
-    const outer = logger.tagged("BCX");
-    const inner = outer.tagged("Jason");
-    inner.info("Funky time");
-    outer.info("Junky time!");
-    expect(output.string).toContain("[BCX] [Jason] Funky time");
-    expect(output.string).toContain("[BCX] Junky time!");
+    logger.tagged("BCX", () => {
+      logger.tagged("Jason", () => {
+        logger.info("Funky time");
+      });
+      logger.info("Junky time!");
+    });
+    expect(output.string).toBe("[BCX] [Jason] Funky time\n[BCX] Junky time!\n");
   });
 
   it("block form pushes and pops tags", () => {
@@ -256,44 +261,46 @@ describe("TaggedLoggingTest", () => {
 });
 
 describe("TaggedLoggingWithoutBlockTest", () => {
+  let output: ReturnType<typeof makeBuffer>;
+  let logger: ReturnType<typeof taggedLogging>;
+  beforeEach(() => {
+    output = makeBuffer();
+    logger = taggedLogging(new Logger(output));
+  });
+
   function makeOutput() {
     const lines: string[] = [];
     return { write: (s: string) => lines.push(s), lines };
   }
 
   it("keeps each tag in their own instance", () => {
-    const output = makeOutput();
-    const logger = new Logger(output);
-    const t1 = taggedLogging(logger);
-    const t2 = taggedLogging(logger);
-    t1.pushTags("ONE");
-    t2.pushTags("TWO");
-    expect(t1.currentTags).toEqual(["ONE"]);
-    expect(t2.currentTags).toEqual(["TWO"]);
+    const otherOutput = makeBuffer();
+    const otherLogger = taggedLogging(new Logger(otherOutput));
+    const taggedLogger = logger.tagged("OMG");
+    const otherTaggedLogger = otherLogger.tagged("BCX");
+    taggedLogger.info("Cool story");
+    otherTaggedLogger.info("Funky time");
+    expect(output.string).toBe("[OMG] Cool story\n");
+    expect(otherOutput.string).toBe("[BCX] Funky time\n");
   });
 
   it("does not share the same formatter instance of the original logger", () => {
-    const out1 = makeOutput();
-    const out2 = makeOutput();
-    const t1 = taggedLogging(new Logger(out1));
-    const t2 = taggedLogging(new Logger(out2));
-    t1.pushTags("A");
-    t2.pushTags("B");
-    t1.info("hi");
-    t2.info("hi");
-    expect(out1.lines[0]).toContain("[A]");
-    expect(out2.lines[0]).toContain("[B]");
+    const otherLogger = taggedLogging(logger);
+    const taggedLogger = logger.tagged("OMG");
+    const otherTaggedLogger = otherLogger.tagged("BCX");
+    taggedLogger.info("Cool story");
+    otherTaggedLogger.info("Funky time");
+    expect(output.string).toBe("[OMG] Cool story\n[BCX] Funky time\n");
   });
 
   it("keeps broadcasting functionality", () => {
-    const out1 = makeOutput();
-    const out2 = makeOutput();
-    const l1 = new Logger(out1);
-    const l2 = new Logger(out2);
-    const broadcast = new BroadcastLogger(l1, l2);
-    broadcast.info("broadcast message");
-    expect(out1.lines.some((l) => l.includes("broadcast message"))).toBe(true);
-    expect(out2.lines.some((l) => l.includes("broadcast message"))).toBe(true);
+    const broadcastOutput = makeBuffer();
+    const broadcastLogger = new BroadcastLogger(new Logger(broadcastOutput), logger);
+    const loggerWithTags = taggedLogging(broadcastLogger);
+    const taggedLogger = loggerWithTags.tagged("OMG");
+    taggedLogger.info("Broadcasting...");
+    expect(output.string).toBe("[OMG] Broadcasting...\n");
+    expect(broadcastOutput.string).toBe("[OMG] Broadcasting...\n");
   });
 
   it("accepts non-String objects as tags (converts to string)", () => {

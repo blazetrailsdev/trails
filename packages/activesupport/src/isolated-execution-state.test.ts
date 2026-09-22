@@ -31,6 +31,8 @@ describe("IsolatedExecutionStateTest", () => {
 
     IsolatedExecutionState.set("test", 42);
     expect(IsolatedExecutionState.get("test")).toBe(42);
+    const enumerator = new Fiber(() => IsolatedExecutionState.get("test"));
+    expect(enumerator.resume()).toBe(42);
 
     expect(await new Thread(() => IsolatedExecutionState.get("test")).value()).toBeUndefined();
   });

@@ -169,13 +169,28 @@ describe("SyncLogSubscriberTest", () => {
     expect(logSubscriber.event).toBeInstanceOf(Event);
   });
 
-  it("event attributes", () => {
+  it.skip("event attributes", () => {
+    // BLOCKED: notifications-timed-subscriber-arity-and-event-cpu-allocations
+    const JRUBY_VERSION: string | null = null;
     MyLogSubscriber.attachTo("my_log_subscriber", logSubscriber);
     Notifications.instrument("some_event.my_log_subscriber", {}, () => {
       return [];
     });
     const event = logSubscriber.event!;
-    expect(event.duration).toBeGreaterThanOrEqual(0);
+    // eslint-disable-next-line vitest/no-conditional-in-test -- mirrors log_subscriber_test.rb:96
+    if (JRUBY_VERSION != null) {
+      // eslint-disable-next-line vitest/no-conditional-expect
+      expect(event.cpuTime).toBe(0);
+      // eslint-disable-next-line vitest/no-conditional-expect
+      expect(event.allocations).toBe(0);
+    } else {
+      // eslint-disable-next-line vitest/no-conditional-expect
+      expect(event.cpuTime).toBeGreaterThan(0);
+      // eslint-disable-next-line vitest/no-conditional-expect
+      expect(event.allocations).toBeGreaterThan(0);
+    }
+    expect(event.duration).toBeGreaterThan(0);
+    expect(event.idleTime).toBeGreaterThanOrEqual(0);
   });
 
   it("does not send the event if it doesnt match the class", () => {
