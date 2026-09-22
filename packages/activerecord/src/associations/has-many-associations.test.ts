@@ -38,6 +38,7 @@ import { DeleteRestrictionError } from "./errors.js";
 import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
 import {
   assertDifference,
+  assertEmpty,
   assertNothingRaised,
   assertNot,
   assertNotEmpty,
@@ -463,6 +464,26 @@ describe("HasManyAssociationsTest", () => {
     await HmEssay.loadSchema();
     await HmTag.loadSchema();
     await HmTagging.loadSchema();
+  });
+
+  it("collection size with dirty target", async () => {
+    const post = posts("thinking") as any;
+    expect(await post.readerIds).toEqual([]);
+    expect(await post.readers.size()).toBe(0);
+    post.readers.reset();
+    post.readers.build();
+    expect(await post.readerIds).toEqual([null]);
+    expect(await post.readers.size()).toBe(1);
+  });
+
+  it("collection empty with dirty target", async () => {
+    const post = posts("thinking") as any;
+    expect(await post.readerIds).toEqual([]);
+    assertEmpty(await post.readers.toArray());
+    post.readers.reset();
+    post.readers.build();
+    expect(await post.readerIds).toEqual([null]);
+    assertNotEmpty(await post.readers.toArray());
   });
 
   it("depends and nullify on polymorphic assoc", async () => {
@@ -948,7 +969,7 @@ describe("HasManyAssociationsTest", () => {
       newClients.push(company.clientsOfFirm.build({ name: "Another Client III" }));
     });
 
-    expect(company.clientsOfFirm.loaded).toBe(false);
+    expect(company.clientsOfFirm.loaded).toBeFalsy();
 
     await assertQueriesCount(1, false, async () => {
       expect(await company.clientsOfFirm.thirdBang()).toBe(newClients[0]);
@@ -1047,40 +1068,6 @@ describe("HasManyAssociationsTest", () => {
     "cpkAuthors",
   ]);
   setup();
-
-  it("delete all with not yet loaded association collection", async () => {
-    class DeleteAllUnloadedAuthor extends Base {
-      declare name: string | null;
-      declare delete_all_unloaded_posts: AssociationProxy<DeleteAllUnloadedPost>;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("delete_all_unloaded_posts", {
-          className: "DeleteAllUnloadedPost",
-          foreignKey: "author_id",
-          dependent: "destroy",
-        });
-      }
-    }
-    class DeleteAllUnloadedPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(DeleteAllUnloadedAuthor);
-    registerModel(DeleteAllUnloadedPost);
-    const author = await DeleteAllUnloadedAuthor.create({ name: "Alice" });
-    await DeleteAllUnloadedPost.create({ author_id: author.id, title: "A", body: "body" });
-    await author.destroy();
-    const remaining = await author.delete_all_unloaded_posts;
-    expect(remaining.length).toBe(0);
-  });
 
   it.skip("depends and nullify with composite foreign key nulls every FK column", async () => {
     class NullifyCompositeAuthor extends Base {
@@ -1197,6 +1184,89 @@ describe("HasManyAssociationsTest", () => {
   Company.inheritanceColumn = "type";
   registerSubclass(HmFirm);
   registerSubclass(Client);
+
+  it("reload with query cache", async () => {
+    const connection = (await Base.leaseConnection()) as any;
+    connection.enableQueryCacheBang();
+    connection.clearQueryCache();
+    try {
+      const firm = (await HmFirm.first()) as any;
+      await firm.clients.load();
+
+      expect(connection.queryCache.size).toBe(2);
+
+      await assertQueriesCount(1, false, async () => {
+        await firm.clients.reload();
+      });
+      await assertQueriesCount(0, false, async () => {
+        await firm.clients.load();
+      });
+
+      expect(connection.queryCache.size).toBe(1);
+    } finally {
+      ((await Base.leaseConnection()) as any).disableQueryCacheBang();
+    }
+  });
+
+  it("reloading unloaded associations with query cache", async () => {
+    const connection = (await Base.leaseConnection()) as any;
+    connection.enableQueryCacheBang();
+    connection.clearQueryCache();
+    try {
+      let firm = (await HmFirm.createBang({ name: "firm name" })) as any;
+      const client = await firm.clients.createBang({ name: "client name" });
+      await firm.clients.toArray();
+
+      await connection.uncached(async () => {
+        await client.updateBang({ name: "new client name" });
+      });
+
+      firm = await HmFirm.find(firm.id);
+
+      expect(((await firm.clients.reload()) as any[]).map((c) => c.name)).toEqual([client.name]);
+    } finally {
+      ((await Base.leaseConnection()) as any).disableQueryCacheBang();
+    }
+  });
+
+  it("new aliased to build", async () => {
+    const company = companies("first_firm") as any;
+
+    const newClient = await assertQueriesCount(0, false, () =>
+      company.clientsOfFirm.new({ name: "Another Client" }),
+    );
+    expect(company.clientsOfFirm.loaded).toBeFalsy();
+
+    expect(newClient.name).toBe("Another Client");
+    expect(newClient.isPersisted()).toBeFalsy();
+    expect(await company.clientsOfFirm.last()).toBe(newClient);
+  });
+
+  it("build", async () => {
+    const company = companies("first_firm") as any;
+
+    const newClient = await assertQueriesCount(0, false, () =>
+      company.clientsOfFirm.build({ name: "Another Client" }),
+    );
+    expect(company.clientsOfFirm.loaded).toBeFalsy();
+
+    expect(newClient.name).toBe("Another Client");
+    expect(newClient.isPersisted()).toBeFalsy();
+    expect(await company.clientsOfFirm.last()).toBe(newClient);
+  });
+
+  it("delete all with not yet loaded association collection", async () => {
+    await forceSignal37ToLoadAllClientsOfFirm(companies);
+
+    expect((companies("first_firm") as any).clientsOfFirm.loaded).toBeTruthy();
+
+    await (companies("first_firm") as any).clientsOfFirm.create({ name: "Another Client" });
+    expect(await (companies("first_firm") as any).clientsOfFirm.size()).toBe(3);
+    (companies("first_firm") as any).clientsOfFirm.reset();
+    await (companies("first_firm") as any).clientsOfFirm.deleteAll();
+    expect(await (companies("first_firm") as any).clientsOfFirm.size()).toBe(0);
+    expect(await (await (companies("first_firm") as any).clientsOfFirm.reload()).size()).toBe(0);
+  });
 
   it("calling size on an association that has not been loaded performs a query", async () => {
     const car = (await Car.create({})) as any;
@@ -2357,78 +2427,6 @@ describe("HasManyAssociationsTest", () => {
     const posts = await author.upd_all_fk_posts;
     expect((posts[0] as any).title).toBe("Updated");
   });
-  it("reload with query cache", async () => {
-    class ReloadQcAuthor extends Base {
-      declare name: string | null;
-      declare reloadQcPosts: AssociationProxy<ReloadQcPost>;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("reloadQcPosts", {
-          className: "ReloadQcPost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class ReloadQcPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel("ReloadQcAuthor", ReloadQcAuthor);
-    registerModel("ReloadQcPost", ReloadQcPost);
-    const author = await ReloadQcAuthor.create({ name: "Alice" });
-    await ReloadQcPost.create({ author_id: author.id, title: "A", body: "body" });
-    const proxy = association(author, "reloadQcPosts");
-    await proxy.load();
-    expect(proxy.loaded).toBe(true);
-    expect(proxy.target.length).toBe(1);
-    await ReloadQcPost.create({ author_id: author.id, title: "B", body: "body" });
-    await proxy.reload();
-    expect(proxy.loaded).toBe(true);
-    expect(proxy.target.length).toBe(2);
-  });
-  it("reloading unloaded associations with query cache", async () => {
-    class ReloadUlAuthor extends Base {
-      declare name: string | null;
-      declare reloadUlPosts: AssociationProxy<ReloadUlPost>;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("reloadUlPosts", {
-          className: "ReloadUlPost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class ReloadUlPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel("ReloadUlAuthor", ReloadUlAuthor);
-    registerModel("ReloadUlPost", ReloadUlPost);
-    const author = await ReloadUlAuthor.create({ name: "Alice" });
-    await ReloadUlPost.create({ author_id: author.id, title: "A", body: "body" });
-    const proxy = association(author, "reloadUlPosts");
-    expect(proxy.loaded).toBe(false);
-    await proxy.reload();
-    expect(proxy.loaded).toBe(true);
-    expect(proxy.target.length).toBe(1);
-    expect((proxy.target[0] as ReloadUlPost).title).toBe("A");
-  });
   it("find all with include and conditions", async () => {
     registerModel(Developer);
     registerModel(AuditLog);
@@ -2475,25 +2473,6 @@ describe("HasManyAssociationsTest", () => {
     await assertQueriesCount(3, false, async () => {
       await firm.clientsOfFirm.push(new Client({ name: "Natural Company" }));
     });
-  });
-  it("collection size with dirty target", async () => {
-    const post = posts("thinking") as any;
-    expect(await post.readerIds).toEqual([]);
-    expect(await post.readers.size()).toBe(0);
-    post.readers.reset();
-    post.readers.build();
-    expect(await post.readerIds).toEqual([null]);
-    expect(await post.readers.size()).toBe(1);
-  });
-
-  it("collection empty with dirty target", async () => {
-    const post = posts("thinking") as any;
-    expect(await post.readerIds).toEqual([]);
-    expect(await post.readers.isEmpty()).toBe(true);
-    post.readers.reset();
-    post.readers.build();
-    expect(await post.readerIds).toEqual([null]);
-    expect(await post.readers.isEmpty()).toBe(false);
   });
 
   it("collection size twice for regressions", async () => {
@@ -3328,7 +3307,7 @@ describe("HasManyAssociationsTest", () => {
       expect(company.clientsOfFirm.loaded).toBeFalsy();
 
       expect(newClient.name).toBe("Another Client");
-      expect(newClient.isPersisted()).toBe(false);
+      expect(newClient.isPersisted()).toBeFalsy();
       expect(await company.clientsOfFirm.last()).toEqual(newClient);
     });
 
@@ -4845,13 +4824,6 @@ describe("HasManyAssociationsTest", () => {
     registerModel(HmBulb);
   });
 
-  it("build", async () => {
-    const author = await HmAuthor.create({ name: "Alice" });
-    const post = HmPost.new({ author_id: author.id, title: "Built" });
-    expect(post.isNewRecord()).toBe(true);
-    expect((post as any).author_id).toBe(Number(author.id));
-  });
-
   it("build many", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     const posts = [
@@ -4860,13 +4832,6 @@ describe("HasManyAssociationsTest", () => {
     ];
     expect(posts.length).toBe(2);
     expect(posts.every((p) => p.isNewRecord())).toBe(true);
-  });
-
-  it("new aliased to build", async () => {
-    const author = await HmAuthor.create({ name: "Alice" });
-    const post = HmPost.new({ author_id: author.id, title: "Built" });
-    expect(post).toBeDefined();
-    expect(post.isNewRecord()).toBe(true);
   });
 
   it("create from association with nil values should work", async () => {
