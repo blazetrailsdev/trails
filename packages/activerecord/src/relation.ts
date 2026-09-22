@@ -1,6 +1,6 @@
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { hexdigest, isBlank, toFs } from "@blazetrails/activesupport";
-import { except, isModuleIncluded, Range } from "@blazetrails/ruby-compat";
+import { except, extend, isModuleIncluded, type Module, Range } from "@blazetrails/ruby-compat";
 import { isEmpty } from "@blazetrails/ruby-compat";
 import { first } from "./ruby-first.js";
 import { Table, SelectManager, Nodes, sql, star } from "@blazetrails/arel";
@@ -1761,13 +1761,7 @@ export class Relation<T extends Base> {
     this._values = { ...source._values };
     this._withIsRecursive = source._withIsRecursive;
     this._isNone = source._isNone;
-    for (const mod of [...source.extendingValues].reverse()) {
-      for (const [name, fn] of Object.entries(mod)) {
-        if (typeof fn === "function") {
-          (this as unknown as Record<string, unknown>)[name] = fn.bind(this);
-        }
-      }
-    }
+    for (const mod of [...source.extendingValues].reverse()) extend(this, mod);
     this.skipPreloadingValue = source.skipPreloadingValue;
   }
 
@@ -1808,7 +1802,7 @@ export class Relation<T extends Base> {
     const currentScope = (modelClass as any).currentScope(true);
     return (record: T) => {
       (modelClass as any).setCurrentScope(currentScope ?? null);
-      block?.(record);
+      return block?.(record);
     };
   }
 
@@ -1927,8 +1921,8 @@ export interface Relation<T extends Base> {
   joinsValues: (AssociationSpec | string | Nodes.Join)[];
   leftOuterJoinsValues: AssociationSpec[];
   referencesValues: Array<string | Nodes.SqlLiteral>;
-  extendingValues: Array<Record<string, (...args: any[]) => any>>;
-  readonly extensions: Array<Record<string, (...args: any[]) => any>>;
+  extendingValues: object[];
+  readonly extensions: object[];
   unscopeValues: Array<string | { where: string | string[] }>;
   optimizerHintsValues: string[];
   annotateValues: string[];
@@ -2001,6 +1995,7 @@ export interface Relation<T extends Base>
   extending<M extends Record<string, (...args: any[]) => any>>(
     mod: M | undefined,
   ): Relation<T> & Partial<M>;
+  extending(mod: Module): Relation<T>;
   extending(fn: (rel: Relation<T>) => void): Relation<T>;
   extending(): Relation<T>;
   optimizerHints(...args: string[]): Relation<T>;

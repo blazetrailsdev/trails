@@ -23,6 +23,9 @@ const mysql =
         supportsRenameIndex: false,
       };
 
+const pg =
+  adapterType === "postgres" ? await import("./describe-if-pg.js") : { pgServerVersion: 0 };
+
 function withMysql(base: readonly Backend[], supported: boolean): readonly Backend[] {
   return supported ? [...base, "mysql"] : base;
 }
@@ -49,7 +52,7 @@ const SUPPORTS: Readonly<Record<string, readonly Backend[]>> = {
   nulls_not_distinct: ["postgres"],
   native_partitioning: ["postgres"],
   partitioned_indexes: ["postgres"],
-  pgcrypto_uuid: ["postgres"],
+  pgcrypto_uuid: pg.pgServerVersion >= 90400 ? ["postgres"] : [],
   insert_returning: withMysql(["postgres", "sqlite"], mysql.supportsInsertReturning),
   text_column_with_default: supportsTextColumnWithDefault() ? ALL : [],
   non_unique_constraint_name: supportsNonUniqueConstraintName() ? ALL : [],

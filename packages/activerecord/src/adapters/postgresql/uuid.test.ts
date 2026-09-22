@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
-import { Uuid } from "../../connection-adapters/postgresql/oid/uuid.js";
 import { RecordNotFound } from "../../errors.js";
 import { itIfSupports } from "../../support/supports.js";
 import { fixtures } from "../../test-fixtures.js";
@@ -133,12 +132,14 @@ describeIfPg("PostgreSQLAdapter", () => {
       assertNotPredicate(type!, (t) => t.isBinary());
     });
 
-    it("treat blank uuid as nil", () => {
-      expect(new Uuid().cast("")).toBeNull();
+    it("treat blank uuid as nil", async () => {
+      await UUIDType.createBang({ guid: "" });
+      expect((await UUIDType.last())!.guid).toBeNull();
     });
 
-    it("treat invalid uuid as nil", () => {
-      expect(new Uuid().cast("foobar")).toBeNull();
+    it("treat invalid uuid as nil", async () => {
+      const uuid = await UUIDType.createBang({ guid: "foobar" });
+      expect(uuid.guid).toBeNull();
     });
 
     it("invalid uuid dont modify before type cast", async () => {
@@ -165,8 +166,17 @@ describeIfPg("PostgreSQLAdapter", () => {
       assertNotPredicate(model, (m: UUIDType) => m.isChanged);
     });
 
-    it.skip("acceptable uuid regex", () => {
+    class DuckUUID {
+      constructor(private uuid: string) {}
+
+      toString(): string {
+        return this.uuid;
+      }
+    }
+
+    it.skip("acceptable uuid regex", async () => {
       // BLOCKED: uuid-cast-array-stringification
+      await UUIDType.loadSchema();
       [
         "A0EEBC99-9C0B-4EF8-BB6D-6BB9BD380A11",
         "{a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11}",
@@ -174,8 +184,10 @@ describeIfPg("PostgreSQLAdapter", () => {
         "a0ee-bc99-9c0b-4ef8-bb6d-6bb9-bd38-0a11",
         "{a0eebc99-9c0b4ef8-bb6d6bb9-bd380a11}",
         "{a0eebc99-9c0b-4ef8-fb6d-6bb9bd380a11}",
+        new DuckUUID("A0EEBC99-9C0B-4EF8-BB6D-6BB9BD380A11"),
       ].forEach((validUuid) => {
-        expect(Object(new Uuid().cast(validUuid))).toBeInstanceOf(String);
+        const uuid = new UUIDType({ guid: validUuid });
+        expect(Object(uuid.guid)).toBeInstanceOf(String);
       });
 
       [
@@ -191,20 +203,23 @@ describeIfPg("PostgreSQLAdapter", () => {
         "{a0eebc99-9c0b4ef8-bb6d6bb9-bd380a11",
         "a0eebc99-9c0b4ef8-bb6d6bb9-bd380a11}",
       ].forEach((invalidUuid) => {
-        expect(new Uuid().cast(invalidUuid)).toBeNull();
+        const uuid = new UUIDType({ guid: invalidUuid });
+        expect(uuid.guid).toBeNull();
       });
     });
 
-    it("uuid formats", () => {
-      [
+    it("uuid formats", async () => {
+      for (const validUuid of [
         "A0EEBC99-9C0B-4EF8-BB6D-6BB9BD380A11",
         "{a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11}",
         "a0eebc999c0b4ef8bb6d6bb9bd380a11",
         "a0ee-bc99-9c0b-4ef8-bb6d-6bb9-bd38-0a11",
         "{a0eebc99-9c0b4ef8-bb6d6bb9-bd380a11}",
-      ].forEach((validUuid) => {
-        expect(new Uuid().cast(validUuid)).toEqual("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11");
-      });
+      ]) {
+        await UUIDType.create({ guid: validUuid });
+        const uuid = (await UUIDType.last())!;
+        expect(uuid.guid).toEqual("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11");
+      }
     });
 
     it("schema dump with shorthand", async () => {

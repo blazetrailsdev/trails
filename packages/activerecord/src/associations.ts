@@ -72,7 +72,8 @@ export interface AssociationOptions {
   afterRemove?: CollectionCallback<"afterRemove"> | CollectionCallback<"afterRemove">[];
   extend?:
     | Record<string, (...args: unknown[]) => unknown>
-    | Record<string, (...args: unknown[]) => unknown>[];
+    | Module
+    | Array<Record<string, (...args: unknown[]) => unknown> | Module>;
   disableJoins?: boolean;
   associationForeignKey?: string;
   foreignType?: string;
