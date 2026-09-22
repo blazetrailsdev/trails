@@ -4135,22 +4135,6 @@ describe("HasManyAssociationsTest", () => {
     expect(post.commentsWithExtend.author()).toBe("lifo");
     expect(post.commentsWithExtend.greeting()).toBe("hello :)");
   });
-
-  // BLOCKED: collection-proxy-extend-super-chain
-  it.skip("association with extend option with multiple extensions", () => {
-    const post = posts("welcome") as any;
-    expect(post.commentsWithExtend_2.author()).toBe("lifo");
-    expect(post.commentsWithExtend_2.greeting()).toBe("hullo :)");
-  });
-
-  // BLOCKED: collection-proxy-extend-super-chain
-  it.skip("extend option affects per association", () => {
-    const post = posts("welcome") as any;
-    expect(post.commentsWithExtend.author()).toBe("lifo");
-    expect(post.commentsWithExtend_2.author()).toBe("lifo");
-    expect(post.commentsWithExtend.greeting()).toBe("hello :)");
-    expect(post.commentsWithExtend_2.greeting()).toBe("hullo :)");
-  });
 });
 
 describe("HasManyAssociationsTest", () => {
@@ -4171,6 +4155,70 @@ describe("HasManyAssociationsTest", () => {
   registerModel(Minivan);
   registerModel(Invoice);
   registerModel(HmLineItem);
+
+  it("association with extend option with multiple extensions", async () => {
+    class ExtAuthor extends Base {
+      declare name: string | null;
+      declare ext_posts: AssociationProxy<ExtPost>;
+
+      static {
+        this._tableName = "authors";
+        this.attribute("name", "string");
+        this.hasMany("ext_posts", {
+          className: "ExtPost",
+          foreignKey: "author_id",
+        });
+      }
+    }
+    class ExtPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
+      static {
+        this._tableName = "posts";
+        this.attribute("author_id", "integer");
+        this.attribute("title", "string");
+      }
+    }
+    registerModel(ExtAuthor);
+    registerModel(ExtPost);
+    const author = await ExtAuthor.create({ name: "Alice" });
+    await ExtPost.create({ author_id: author.id, title: "A", body: "body" });
+    const posts = await author.ext_posts;
+    expect(posts.length).toBe(1);
+  });
+
+  it("extend option affects per association", async () => {
+    class ExtPerAuthor extends Base {
+      declare name: string | null;
+      declare ext_per_posts: AssociationProxy<ExtPerPost>;
+
+      static {
+        this._tableName = "authors";
+        this.attribute("name", "string");
+        this.hasMany("ext_per_posts", {
+          className: "ExtPerPost",
+          foreignKey: "author_id",
+        });
+      }
+    }
+    class ExtPerPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
+      static {
+        this._tableName = "posts";
+        this.attribute("author_id", "integer");
+        this.attribute("title", "string");
+      }
+    }
+    registerModel(ExtPerAuthor);
+    registerModel(ExtPerPost);
+    const author = await ExtPerAuthor.create({ name: "Alice" });
+    await ExtPerPost.create({ author_id: author.id, title: "A", body: "body" });
+    const posts = await author.ext_per_posts;
+    expect(posts.length).toBe(1);
+  });
 
   it("delete record with complex joins", async () => {
     class CjAuthor extends Base {
