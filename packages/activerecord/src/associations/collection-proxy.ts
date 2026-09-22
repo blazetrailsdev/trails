@@ -405,10 +405,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   async reload(): Promise<Omit<this, "then">> {
-    this._targetLoaded = false;
-    this._target = [];
-    this._replacedOrAddedTargets.clear();
-    await this.load();
+    await this.proxyAssociation.reload(true);
     this.resetScope();
     return stripThenable(this);
   }

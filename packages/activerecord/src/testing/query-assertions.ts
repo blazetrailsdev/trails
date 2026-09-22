@@ -42,14 +42,14 @@ export class SQLCounter {
   }
 }
 
-export async function assertQueriesCount(
+export async function assertQueriesCount<T>(
   count: number | undefined,
   includeSchema = false,
-  fn: () => void | Promise<void>,
-): Promise<void> {
+  fn: () => T | Promise<T>,
+): Promise<T> {
   const counter = new SQLCounter();
-  await Notifications.subscribed(counter, "sql.active_record", async () => {
-    await fn();
+  return await Notifications.subscribed(counter, "sql.active_record", async () => {
+    const result = await fn();
     const queries = includeSchema ? counter.logAll : counter.log;
     if (count !== undefined) {
       assert(
@@ -59,14 +59,15 @@ export async function assertQueriesCount(
     } else {
       assert(queries.length >= 1, "1 or more queries expected, but none were executed.");
     }
+    return result;
   });
 }
 
-export async function assertNoQueries(
+export async function assertNoQueries<T>(
   includeSchema = false,
-  fn: () => void | Promise<void>,
-): Promise<void> {
-  await assertQueriesCount(0, includeSchema, fn);
+  fn: () => T | Promise<T>,
+): Promise<T> {
+  return await assertQueriesCount(0, includeSchema, fn);
 }
 
 export async function assertQueriesMatch<T>(
