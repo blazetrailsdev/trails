@@ -4275,12 +4275,11 @@ describe("HasManyAssociationsTest", () => {
 
   it("key ensuring owner was is not valid without dependent option", async () => {
     const error: any = await assertRaises([ArgumentError], {}, () => {
-      class _ extends Base {
+      void class extends Base {
         static {
-          this.hasMany("books", { ensuringOwnerWas: "destroyed?" });
+          this.hasMany("books", { ensuringOwnerWas: "isDestroyed" });
         }
-      }
-      void _;
+      };
     });
 
     expect(error.message).toMatch(/Unknown key: :ensuringOwnerWas/);
@@ -4288,12 +4287,11 @@ describe("HasManyAssociationsTest", () => {
 
   it("invalid key raises with message including all default options", async () => {
     const error: any = await assertRaises([ArgumentError], {}, () => {
-      class _ extends Base {
+      void class extends Base {
         static {
           this.hasMany("books", { trough: "users" } as any);
         }
-      }
-      void _;
+      };
     });
 
     expect(error.message).toBe(
@@ -4303,14 +4301,13 @@ describe("HasManyAssociationsTest", () => {
 
   it("key ensuring owner was is valid when dependent option is destroy async", async () => {
     await assertNothingRaised(() => {
-      class _ extends Base {
+      void class extends Base {
         static {
           this.destroyAssociationAsyncJob(class {});
 
-          this.hasMany("books", { dependent: "destroyAsync", ensuringOwnerWas: "destroyed?" });
+          this.hasMany("books", { dependent: "destroyAsync", ensuringOwnerWas: "isDestroyed" });
         }
-      }
-      void _;
+      };
     });
   });
 
@@ -4374,7 +4371,7 @@ describe("AsyncHasManyAssociationsTest", () => {
     });
 
     await assertNoQueries(false, async () => {
-      expect(firm.clients[2]).not.toBeNull();
+      expect((await firm.clients.toArray())[2] ?? null).not.toBeNull();
     });
 
     expect(events.length).toEqual(1);
