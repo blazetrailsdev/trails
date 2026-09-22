@@ -353,7 +353,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgreSQLTimestampMigrationTest", () => {
-    fixtures(["topics"]);
+    fixtures(["topics"], { useTransactionalTests: true });
 
     it("adds column as timestamp", async () => {
       await adapter.addColumn("postgresql_timestamp_with_zones", "times", "datetime");

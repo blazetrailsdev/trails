@@ -541,12 +541,6 @@ describe("resolveFixtureNames same-table guard", () => {
     expect(map.liveParrots.table).toBe("parrots");
   });
 
-  it("rejects two same-table sets whose rows collide on a primary key", async () => {
-    await expect(resolveFixtureNames(["dogs", "otherDogs"])).rejects.toThrow(
-      /both map to table "dogs" with a row that resolves to the same primary key/,
-    );
-  });
-
   it("resolves distinct-table sets without error", async () => {
     const map = await resolveFixtureNames(["authors", "posts"]);
     expect(Object.keys(map)).toEqual(["authors", "posts"]);

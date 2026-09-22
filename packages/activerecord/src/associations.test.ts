@@ -385,7 +385,7 @@ describe("PreloaderTest", () => {
     "cpkOrderAgreements",
     "dogs",
   ]);
-  const { otherDogs } = fixtures(["otherDogs"], { connection: () => OtherDog.connection });
+  const { otherDogs } = fixtures(["otherDogs"]);
 
   afterEach(() => vi.restoreAllMocks());
 

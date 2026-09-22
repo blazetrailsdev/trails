@@ -42,7 +42,6 @@ function emitTableSql(td: TableDefinition): Promise<string> {
   return new SQLite3SchemaCreation(adapter).accept(td);
 }
 import { Person } from "./test-helpers/models/person.js";
-import { personFixtureData } from "./test-helpers/fixtures/people.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
 import { itIfSupports, describeIfSupports } from "./support/supports.js";
 import { describeIfPostgresqlAdapter } from "./support/describe-if-postgresql-adapter.js";
@@ -162,7 +161,7 @@ async function personColumnNames(): Promise<string[]> {
   return Person.columnNames();
 }
 
-fixtures({ people: [Person, personFixtureData] }, { useTransactionalTests: false });
+fixtures(["people"], { useTransactionalTests: false });
 
 afterEach(async () => {
   Base.tableNamePrefix = "";
@@ -2546,7 +2545,7 @@ function mockMigration(): { migration: Migration; sql: string[] } {
 }
 
 describe("MigrationTest", () => {
-  fixtures({ people: [Person, personFixtureData] }, { useTransactionalTests: false });
+  fixtures(["people"], { useTransactionalTests: false });
 
   it("migration instance has connection", async () => {
     const migration = new (class extends Migration {})();

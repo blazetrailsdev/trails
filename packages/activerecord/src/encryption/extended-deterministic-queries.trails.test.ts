@@ -74,7 +74,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest (trails ext
     await EncryptedSerializedBook.where("1=1");
   });
 
-  fixtures([]);
+  fixtures([], { useTransactionalTests: true });
 
   afterAll(() => {
     relProto.where = savedMethods.where;

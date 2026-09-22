@@ -201,14 +201,10 @@ describe("JsonSerializationTest", () => {
 });
 
 describe("DatabaseConnectedJsonEncodingTest", () => {
-  const { authors } = fixtures([
-    "authors",
-    "authorAddresses",
-    "posts",
-    "comments",
-    "tags",
-    "taggings",
-  ]);
+  const { authors } = fixtures(
+    ["authors", "authorAddresses", "posts", "comments", "tags", "taggings"],
+    { useTransactionalTests: true },
+  );
 
   const getDavid = () => Author.find(authors("david").id);
   const getMary = () => Author.find(authors("mary").id);
