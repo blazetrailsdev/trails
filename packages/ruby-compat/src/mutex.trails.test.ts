@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { Fiber } from "./fiber.js";
 import { Mutex } from "./mutex.js";
 
 describe("Mutex", () => {
@@ -41,5 +42,36 @@ describe("Mutex", () => {
     ).rejects.toThrow("boom");
 
     expect(await mutex.synchronize(async () => "ok")).toBe("ok");
+  });
+
+  it("try_lock fails while held and synchronize waits for unlock", async () => {
+    const mutex = new Mutex();
+    const order: string[] = [];
+
+    expect(mutex.tryLock()).toBe(true);
+    expect(mutex.tryLock()).toBe(false);
+    const waiting = mutex.synchronize(() => order.push("sync"));
+    await Promise.resolve();
+    expect(order).toEqual([]);
+    mutex.unlock();
+    await waiting;
+
+    expect(order).toEqual(["sync"]);
+    expect(mutex.tryLock()).toBe(true);
+    mutex.unlock();
+  });
+
+  it("unlock raises ThreadError when not locked", () => {
+    expect(() => new Mutex().unlock()).toThrow("Attempt to unlock a mutex which is not locked");
+  });
+
+  it("unlock raises ThreadError when locked by another fiber", () => {
+    const mutex = new Mutex();
+    expect(mutex.tryLock()).toBe(true);
+
+    expect(() => new Fiber(() => mutex.unlock()).resume()).toThrow(
+      "Attempt to unlock a mutex which is locked by another thread/fiber",
+    );
+    mutex.unlock();
   });
 });

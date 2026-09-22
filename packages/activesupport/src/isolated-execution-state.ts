@@ -8,12 +8,33 @@ type IsolationLevel = "thread" | "fiber";
 
 declare module "@blazetrails/ruby-compat" {
   interface Thread {
-    activeSupportExecutionState?: Store;
+    activeSupportExecutionState(): Store | null;
+    setActiveSupportExecutionState(value: Store | null): Store | null;
   }
   interface Fiber {
-    activeSupportExecutionState?: Store;
+    activeSupportExecutionState(): Store | null;
+    setActiveSupportExecutionState(value: Store | null): Store | null;
   }
 }
+
+const _activeSupportExecutionState = new WeakMap<Thread | Fiber, Store | null>();
+
+export function activeSupportExecutionState(this: Thread | Fiber): Store | null {
+  return _activeSupportExecutionState.get(this) ?? null;
+}
+
+export function setActiveSupportExecutionState(
+  this: Thread | Fiber,
+  value: Store | null,
+): Store | null {
+  _activeSupportExecutionState.set(this, value);
+  return value;
+}
+
+Thread.prototype.activeSupportExecutionState = activeSupportExecutionState;
+Thread.prototype.setActiveSupportExecutionState = setActiveSupportExecutionState;
+Fiber.prototype.activeSupportExecutionState = activeSupportExecutionState;
+Fiber.prototype.setActiveSupportExecutionState = setActiveSupportExecutionState;
 
 let _isolationLevel: IsolationLevel | null = null;
 let _scope: typeof Thread | typeof Fiber;
@@ -21,7 +42,9 @@ let _scope: typeof Thread | typeof Fiber;
 /** @internal */
 function state(): Store {
   const context = IsolatedExecutionState.context();
-  return (context.activeSupportExecutionState ??= new Map());
+  return (
+    context.activeSupportExecutionState() ?? context.setActiveSupportExecutionState(new Map())!
+  );
 }
 
 export const IsolatedExecutionState = {
@@ -82,10 +105,10 @@ export const IsolatedExecutionState = {
     return IsolatedExecutionState.scope.current();
   },
   shareWith(other: Thread | Fiber): void {
-    const otherState = other.activeSupportExecutionState;
-    IsolatedExecutionState.context().activeSupportExecutionState = otherState
-      ? new Map(otherState)
-      : undefined;
+    const otherState = other.activeSupportExecutionState();
+    IsolatedExecutionState.context().setActiveSupportExecutionState(
+      otherState ? new Map(otherState) : null,
+    );
   },
 };
 
