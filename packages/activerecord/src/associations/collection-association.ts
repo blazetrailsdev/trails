@@ -416,7 +416,7 @@ export abstract class CollectionAssociation extends Association {
     if (record.isNewRecord()) {
       return await this.isIncludeInMemory(record);
     } else if (this.isLoaded()) {
-      return this.target.includes(record);
+      return this.target.some((r) => r.equals(record));
     } else {
       const recordId = klass.compositePrimaryKey
         ? Object.fromEntries(
@@ -427,7 +427,6 @@ export abstract class CollectionAssociation extends Association {
     }
   }
 
-  /** @missingRailsCall any? — PERMANENT */
   private async isIncludeInMemory(record: Base): Promise<boolean> {
     const reflection = this.reflection as unknown as {
       isThroughReflection?: () => boolean;
@@ -444,15 +443,15 @@ export abstract class CollectionAssociation extends Association {
         const targetReflection = await (source as unknown as Record<string, unknown>)[sourceName];
         if (
           Array.isArray(targetReflection)
-            ? targetReflection.includes(record)
-            : targetReflection === record
+            ? targetReflection.some((r: Base) => r.equals(record))
+            : (targetReflection as Base | null)?.equals(record)
         ) {
           return true;
         }
       }
-      return this.target.includes(record);
+      return this.target.some((r) => r.equals(record));
     }
-    return this.target.includes(record);
+    return this.target.some((r) => r.equals(record));
   }
 
   override loadTarget(): Promise<Base[]> | Base[] {

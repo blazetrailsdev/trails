@@ -197,7 +197,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
     const extensions = association.extensions;
     if (extensions.length > 0) {
-      for (const mod of extensions) {
+      for (const mod of [...extensions].reverse()) {
         if (typeof mod === "function") {
           (mod as (rel: unknown) => void)(this);
         } else {
@@ -566,7 +566,7 @@ export const MIXIN_PUBLIC_INSTANCE_METHODS = [QueryMethods, SpawnMethods].flatMa
 const ownPublicInstanceMethods = publicInstanceMethods(CollectionProxy, false);
 
 const delegateMethods = MIXIN_PUBLIC_INSTANCE_METHODS.filter(
-  (name) => !ownPublicInstanceMethods.includes(name),
+  (name) => !ownPublicInstanceMethods.includes(name) && name !== "select",
 ).concat([
   "scoping",
   "values",

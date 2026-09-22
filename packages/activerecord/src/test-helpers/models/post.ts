@@ -152,7 +152,17 @@ export class Post extends Base {
       return "lifo";
     },
     greeting(this: any) {
-      return "hello :)";
+      const extensions = this.proxyAssociation?.extensions ?? this.extendingValues;
+      const superModule = extensions
+        .slice(extensions.indexOf(Post.namedExtension) + 1)
+        .find((mod: any) => typeof mod.greeting === "function");
+      return superModule.greeting.call(this) + " :)";
+    },
+  };
+
+  static CommentsWithExtendAssociationExtension = {
+    greeting() {
+      return "hello";
     },
   };
 
@@ -278,7 +288,7 @@ export class Post extends Base {
       },
     });
     this.hasMany("commentsWithExtend", {
-      extend: Post.namedExtension,
+      extend: [Post.namedExtension, Post.CommentsWithExtendAssociationExtension],
       className: "Comment",
       foreignKey: "post_id",
     });

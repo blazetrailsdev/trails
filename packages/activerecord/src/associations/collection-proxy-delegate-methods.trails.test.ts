@@ -15,7 +15,14 @@ describe("CollectionProxy delegate list", () => {
 
   it("delegates every public mixin member", () => {
     expect(MIXIN_PUBLIC_INSTANCE_METHODS.length).toBeGreaterThan(80);
-    for (const name of MIXIN_PUBLIC_INSTANCE_METHODS) expect(delegatedNames).toContain(name);
+    for (const name of MIXIN_PUBLIC_INSTANCE_METHODS) {
+      if (name === "select") continue;
+      expect(delegatedNames).toContain(name);
+    }
+  });
+
+  it("does not delegate select, so a block reads the loaded target", () => {
+    expect(delegatedNames).not.toContain("select");
   });
 
   it("delegates no private mixin member", () => {
