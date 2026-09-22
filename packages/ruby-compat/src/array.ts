@@ -152,7 +152,7 @@ export function arySlice<T>(
   if (argc === 2) {
     let beg = arg as number;
     if (beg < 0) beg += alen;
-    return subseq(ary, beg, length);
+    return subseq(ary, beg, length!);
   }
   if (arg instanceof Range) {
     let beg = arg.begin ?? 0;
