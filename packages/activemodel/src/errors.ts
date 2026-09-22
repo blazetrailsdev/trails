@@ -287,7 +287,6 @@ export class Errors<TBase extends object = object> {
     this._errors = deepDup(other.errors);
   }
 
-  /** @noRailsEquivalent PERMANENT */
   dup(): this {
     const duped = Object.assign(Object.create(Object.getPrototypeOf(this) as object) as this, this);
     duped.initializeDup(this);

@@ -21,9 +21,9 @@ describe("Enumerable", () => {
 
   it("first stops each after the first element and answers nil when empty", () => {
     const bag = new Bag([1, 2, 3]);
-    expect(Enumerable.first.call(bag)).toBe(1);
+    expect(Reflect.apply(Enumerable.first, bag, [])).toBe(1);
     expect(bag.yielded).toBe(1);
-    expect(Enumerable.first.call(new Bag([]))).toBeNull();
+    expect(Reflect.apply(Enumerable.first, new Bag([]), [])).toBeNull();
   });
 
   it("first(n) takes n elements and rejects a negative size", () => {
