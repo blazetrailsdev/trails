@@ -14,7 +14,7 @@
  * (vendor/rails/activerecord/lib/active_record/test_fixtures.rb:113, :146).
  *
  * What was left is an unenforced invariant: a test file that writes rows must
- * either ride `fixtures()` / `useTransactionalTests()` / `withTransactionalFixtures`,
+ * either ride `fixtures()` / `withTransactionalFixtures`,
  * or delete its own rows. This module checks it. A new non-transactional file
  * that writes rows is otherwise silently fine until some sibling case happens to
  * read the same table, and the resulting failure can be lane-specific (#5719's
@@ -79,7 +79,6 @@ const SKIP_DIRS = new Set(["node_modules", "dist", "__snapshots__", "__fixtures_
  */
 export const TRANSACTIONAL_WIRING = [
   "fixtures(",
-  "useTransactionalTests(",
   "withTransactionalFixtures(",
   "setupAdapterSuite(",
 ];

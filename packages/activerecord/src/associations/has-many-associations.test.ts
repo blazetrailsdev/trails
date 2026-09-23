@@ -38,7 +38,7 @@ import { Project } from "../test-helpers/models/project.js";
 import { isAssociationCached } from "../associations.js";
 import { DeleteRestrictionError } from "./errors.js";
 import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
-import { assertNotCalledOnInstanceOf } from "../testing/method-call-assertions.js";
+import { assertNotCalledOnInstanceOf } from "@blazetrails/activesupport";
 import { AssociationReflection } from "../reflection.js";
 import {
   assertDifference,
@@ -3434,7 +3434,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("defining has many association with delete all dependency lazily evaluates target class", async () => {
-    await assertNotCalledOnInstanceOf(AssociationReflection, "className", () => {
+    await assertNotCalledOnInstanceOf(AssociationReflection, "className", null, () => {
       class DeleteAllModel extends Base {
         static {
           this.hasMany("nonentities", { dependent: "deleteAll" });
@@ -3445,7 +3445,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("defining has many association with nullify dependency lazily evaluates target class", async () => {
-    await assertNotCalledOnInstanceOf(AssociationReflection, "className", () => {
+    await assertNotCalledOnInstanceOf(AssociationReflection, "className", null, () => {
       class NullifyModel extends Base {
         static {
           this.hasMany("nonentities", { dependent: "nullify" });

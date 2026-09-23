@@ -6,7 +6,8 @@ import { NotImplementedError, StatementInvalid } from "../errors.js";
 import type { CheckConstraintDefinition } from "../connection-adapters/abstract/schema-definitions.js";
 import type { ValidateConstraintStatements } from "../connection-adapters/abstract/schema-statements.js";
 import { ambientConnection } from "../support/rocket-tables.js";
-import { useTransactionalTests } from "../test-fixtures/use-transactional-tests.js";
+import { leaseFixtureConnection } from "../test-fixtures/fixture-connection.js";
+import { withTransactionalFixtures } from "../test-fixtures/with-transactional-fixtures.js";
 import { adapterSupports, describeIfSupports, itIfSupports } from "../support/supports.js";
 import { adapterType } from "../test-adapter.js";
 import { isMariaDb, serverVersion } from "../support/mysql-server-version.js";
@@ -41,7 +42,7 @@ function assertEmpty(collection: CheckConstraintDefinition[]): void {
 
 describe("Migration", () => {
   describeIfSupports("check_constraints", "CheckConstraintTest", () => {
-    useTransactionalTests({
+    withTransactionalFixtures(leaseFixtureConnection, {
       usesTransaction: [
         "add check constraint with non existent table raises",
         "added check constraint ensures valid values",

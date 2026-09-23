@@ -1,4 +1,4 @@
-import { rbEqual } from "@blazetrails/ruby-compat";
+import { NameError, rbEqual } from "@blazetrails/ruby-compat";
 import { assert } from "./assertions.js";
 
 /** @noRailsEquivalent PERMANENT */
@@ -97,25 +97,58 @@ export function assertCalledOnInstanceOf<T>(
   methodName: keyof T & string,
   message: string | null,
   { times = 1, returns = null }: { times?: number; returns?: unknown } = {},
-  block?: () => void,
-): void {
+  block?: () => void | Promise<void>,
+): void | Promise<void> {
   let timesCalled = 0;
-  const originalMethod = klass.prototype[methodName];
-
-  klass.prototype[methodName] = function () {
+  const stubbed = function () {
     timesCalled += 1;
+
     return returns;
   };
 
-  try {
-    block?.();
-  } finally {
-    klass.prototype[methodName] = originalMethod;
+  const proto = klass.prototype as object;
+  const original = Object.getOwnPropertyDescriptor(proto, methodName);
+  let inherited: PropertyDescriptor | undefined;
+  for (let p = proto; !inherited && p; p = Object.getPrototypeOf(p)) {
+    inherited = Object.getOwnPropertyDescriptor(p, methodName);
   }
+  if (!inherited) {
+    throw new NameError(`undefined method '${methodName}' for class '${klass.name}'`, methodName);
+  }
+  Object.defineProperty(
+    proto,
+    methodName,
+    inherited.get
+      ? { configurable: true, get: stubbed, set: inherited.set }
+      : { configurable: true, writable: true, value: stubbed },
+  );
+  const ensure = () => {
+    if (original) Object.defineProperty(proto, methodName, original);
+    else delete (proto as Record<string, unknown>)[methodName];
+  };
 
-  let error = `Expected ${methodName} to be called ${times} times, but was called ${timesCalled} times`;
-  if (message) error = `${message}.\n${error}`;
-  assertEqual(times, timesCalled, error);
+  const check = () => {
+    let error = `Expected ${methodName} to be called ${times} times, but was called ${timesCalled} times`;
+    if (message) error = `${message}.\n${error}`;
+
+    assertEqual(times, timesCalled, error);
+  };
+
+  let result: void | Promise<void>;
+  try {
+    result = block?.();
+  } catch (e) {
+    ensure();
+    throw e;
+  }
+  if (result && typeof result.then === "function") {
+    return result.then(check).finally(ensure);
+  }
+  try {
+    check();
+  } finally {
+    ensure();
+  }
 }
 
 /** @internal */
@@ -123,9 +156,9 @@ export function assertNotCalledOnInstanceOf<T>(
   klass: new (...args: any[]) => T,
   methodName: keyof T & string,
   message: string | null,
-  block?: () => void,
-): void {
-  assertCalledOnInstanceOf(klass, methodName, message, { times: 0 }, block);
+  block?: () => void | Promise<void>,
+): void | Promise<void> {
+  return assertCalledOnInstanceOf(klass, methodName, message, { times: 0 }, block);
 }
 
 /** @internal */

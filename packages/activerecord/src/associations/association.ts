@@ -11,7 +11,7 @@ import { except, hasKey } from "@blazetrails/ruby-compat";
 import { AssociationTypeMismatch } from "../errors.js";
 import { assertAssignedSynchronously } from "@blazetrails/activemodel";
 
-export class Association {
+export class Association<Target extends Base | Base[] = Base | Base[]> {
   owner: Base;
   readonly reflection: AssociationDefinition;
   readonly disableJoins: boolean;
@@ -28,8 +28,8 @@ export class Association {
     this._loadedStore = value;
   }
 
-  get target(): Base | Base[] | null {
-    return this._targetStore;
+  get target(): Target | null {
+    return this._targetStore as Target | null;
   }
 
   set target(value: Base | Base[] | null) {

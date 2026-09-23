@@ -63,8 +63,8 @@ describe("non-transactional row writes", () => {
     expect(isOffender(POST_5719_ENCRYPTABLE_RECORD)).toBe(false);
   });
 
-  it("clears a file wired by fixtures() or useTransactionalTests()", () => {
-    for (const call of ["fixtures({ books: Book });", "useTransactionalTests(() => adapter);"]) {
+  it("clears a file wired by fixtures()", () => {
+    for (const call of ["fixtures({ books: Book });"]) {
       const src = `describe("x", () => {\n  ${call}\n  it("writes", async () => {\n    await Book.create({ name: "Dune" });\n  });\n});\n`;
       expect(isOffender(src)).toBe(false);
     }

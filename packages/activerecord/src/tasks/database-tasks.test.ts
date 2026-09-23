@@ -25,7 +25,7 @@ import { SchemaMigration } from "../schema-migration.js";
 import { Base } from "../base.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import { DEFAULT_ENV } from "../connection-handling.js";
-import { assertCalledOnInstanceOf } from "../testing/method-call-assertions.js";
+import { assertCalledOnInstanceOf } from "@blazetrails/activesupport";
 import { adapterType, ambientPoolConfiguration } from "../test-adapter.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
 import { fixtures } from "../test-fixtures.js";
@@ -106,6 +106,8 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
         await assertCalledOnInstanceOf(
           MigrationContext,
           "currentVersion",
+          null,
+          { times: 4, returns: 1 },
           async () => {
             expect(protectedEnvironments).not.toContain(currentEnv);
             await DatabaseTasks.checkProtectedEnvironmentsBang(env);
@@ -116,7 +118,6 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
               ProtectedEnvironmentError,
             );
           },
-          { times: 4, returns: 1 },
         );
       } finally {
         Base.protectedEnvironments = protectedEnvironments;

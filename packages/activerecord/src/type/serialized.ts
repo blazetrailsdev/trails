@@ -2,14 +2,10 @@ import { MutableModule, ValueType, BinaryData, type Mutable } from "@blazetrails
 import { include } from "@blazetrails/activesupport";
 import { DelegateClass, rbEqual } from "@blazetrails/ruby-compat";
 import { IndifferentHashAccessor } from "../store.js";
+import type { ColumnSerializer } from "../coders/column-serializer.js";
 
-/** @noRailsEquivalent PERMANENT */
-export interface Coder {
-  dump(value: unknown): string | null;
-  load(value: unknown): unknown;
-  objectClass?: new (...args: any[]) => any;
-  assertValidValue?(value: unknown, options: { action: string }): void;
-}
+type Coder = Pick<ColumnSerializer, "dump" | "load"> &
+  Partial<Pick<ColumnSerializer, "objectClass" | "assertValidValue">>;
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (activerecord/lib/active_record/type/serialized.rb:8); the class/interface merge is how `include()` surfaces on the type side.
 export class Serialized extends DelegateClass(ValueType) {

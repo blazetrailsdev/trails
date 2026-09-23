@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { BinaryType, StringType } from "@blazetrails/activemodel";
 import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
-import { Serialized, type Coder } from "./serialized.js";
+import { Serialized } from "./serialized.js";
 
-const jsonCoder: Coder = {
+const jsonCoder: Serialized["coder"] = {
   dump: (value) => (value == null ? null : JSON.stringify(value)),
   load: (value) => (value == null ? {} : typeof value === "string" ? JSON.parse(value) : value),
 };

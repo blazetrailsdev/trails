@@ -17,7 +17,7 @@ import {
 } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { HasManyThroughAssociation } from "./has-many-through-association.js";
-import { assertNotCalledOnInstanceOf } from "../testing/method-call-assertions.js";
+import { assertNotCalledOnInstanceOf } from "@blazetrails/activesupport";
 import { fixtures } from "../test-fixtures.js";
 import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
 import {
@@ -1038,7 +1038,7 @@ describe("EagerAssociationTest", () => {
     await expect(essays.eagerLoad(":writer").exists()).rejects.toThrow(EagerLoadPolymorphicError);
   });
   it("preloading has_many_through association avoids calling association.reader", async () => {
-    await assertNotCalledOnInstanceOf(HasManyThroughAssociation, "reader", async () => {
+    await assertNotCalledOnInstanceOf(HasManyThroughAssociation, "reader", null, async () => {
       await Author.preload(":readonlyComments").firstBang();
     });
   });

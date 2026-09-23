@@ -1090,7 +1090,7 @@ export class Base extends Model {
     return polymorphicClassFor(this, name);
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE base-subclasses-onto-descendants-tracker */
   static get subclasses(): (typeof Base)[] {
     const result: (typeof Base)[] = Object.prototype.hasOwnProperty.call(this, "_subclasses")
       ? [...((this as any)._subclasses as (typeof Base)[])]
