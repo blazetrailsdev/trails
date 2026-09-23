@@ -1503,10 +1503,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     })) {
       const setter = `set${camelize(pragma)}`;
       if (hasKey(Pragmas, setter)) {
-        await Pragmas[setter as keyof typeof Pragmas].call(
-          { execute: (sql: string) => this._rawConnection!.exec(sql) },
-          value,
-        );
+        await Pragmas[setter as keyof typeof Pragmas].call(this._rawConnection!, value);
       } else {
         console.warn(`Unknown SQLite pragma: ${pragma}`);
       }

@@ -136,6 +136,15 @@ class ExpoSqliteConnection implements SqliteConnection {
     await this.raw.execAsync(sql);
   }
 
+  async execute(sql: string, bindVars: SqliteBinds = []): Promise<readonly unknown[]> {
+    const stmt = await this.prepare(sql);
+    try {
+      return Object.freeze(await stmt.all(bindVars));
+    } finally {
+      await stmt.close();
+    }
+  }
+
   async pragma(source: string, opts?: { simple?: boolean }): Promise<unknown> {
     if (source.includes("=")) {
       await this.raw.execAsync(`PRAGMA ${source}`);

@@ -32,6 +32,13 @@ describe.skipIf(!isExpoSqliteAvailable)("SqliteDriver — expo-sqlite round-trip
     expect(row["qty"]).toBe(42);
   });
 
+  it("execute() returns the statement's rows, frozen, and [] for a non-reader", async () => {
+    const rows = await conn.execute("SELECT name FROM widgets WHERE qty = ?", [42]);
+    expect(rows).toEqual([{ name: "sprocket" }]);
+    expect(Object.isFrozen(rows)).toBe(true);
+    expect(await conn.execute("UPDATE widgets SET qty = qty WHERE 0")).toEqual([]);
+  });
+
   it("run() returns changes and lastInsertRowid", async () => {
     const insert = await conn.prepare("INSERT INTO widgets (name, qty) VALUES (?, ?)");
     const result = await insert.run(["bolt", 99]);
