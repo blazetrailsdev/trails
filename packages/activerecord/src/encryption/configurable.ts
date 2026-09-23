@@ -1,5 +1,5 @@
 import { Config } from "./config.js";
-import { _setConfigurable } from "./configurable-slot.js";
+import { Encryption } from "../namespaces.js";
 import { Context } from "./context.js";
 import { Contexts } from "./contexts.js";
 import { Cipher } from "./cipher.js";
@@ -110,7 +110,7 @@ export class Configurable {
   }
 }
 
-_setConfigurable(Configurable);
+Encryption.Configurable = Configurable;
 
 /** @internal */
 type DelegatedProperty = (typeof Context.PROPERTIES)[number];

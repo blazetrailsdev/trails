@@ -24,7 +24,7 @@ import {
   include,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
-import { _Base } from "../base-slot.js";
+import { ActiveRecord } from "../namespaces.js";
 import { _relationFamilySlot, _relationFamilyState } from "./uncacheable-methods-slot.js";
 
 type AnyCallable = (...args: any[]) => any;
@@ -146,7 +146,7 @@ export class ClassSpecificRelation {
   methodMissing(this: any, method: string, ...args: any[]): unknown {
     const model = this._model as typeof Base;
     if (rbObjRespondTo(model, method)) {
-      if (!DelegateCache.delegateBaseMethods && rbObjRespondTo(_Base, method)) {
+      if (!DelegateCache.delegateBaseMethods && rbObjRespondTo(ActiveRecord.Base, method)) {
         // @nie disposition=TODO
         throw new NotImplementedError(
           "Active Record code shouldn't rely on association delegation into ActiveRecord::Base methods",

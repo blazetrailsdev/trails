@@ -6,7 +6,7 @@ import {
 } from "./encryptor.js";
 import { Configuration } from "./errors.js";
 import { type Compressor } from "./config.js";
-import { Configurable } from "./configurable-slot.js";
+import { Encryption } from "../namespaces.js";
 import type { MessageSerializerLike } from "./message-serializer.js";
 import type { Context } from "./context.js";
 import { isPresent, wrap } from "@blazetrails/activesupport";
@@ -102,7 +102,7 @@ export class Scheme {
   }
 
   isSupportUnencryptedData(): boolean {
-    return this._supportUnencryptedData ?? Configurable.config.supportUnencryptedData;
+    return this._supportUnencryptedData ?? Encryption.Configurable.config.supportUnencryptedData;
   }
 
   isFixed(): boolean {
@@ -154,13 +154,13 @@ export class Scheme {
 
   /** @internal */
   private defaultKeyProvider(): unknown {
-    return Configurable.keyProvider;
+    return Encryption.Configurable.keyProvider;
   }
 
   /** @internal */
   private deterministicKeyProvider(): DeterministicKeyProvider | undefined {
     if (this.isDeterministic()) {
-      const deterministicKey = Configurable.config.deterministicKey;
+      const deterministicKey = Encryption.Configurable.config.deterministicKey;
       this._cachedDeterministicKeyProvider ??= new DeterministicKeyProvider(deterministicKey);
       return this._cachedDeterministicKeyProvider;
     }

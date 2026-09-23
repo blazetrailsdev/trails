@@ -1,7 +1,7 @@
 import type { Base } from "./base.js";
 import { modelRegistry, registerModelConstant } from "./associations.js";
 import { ActiveRecordError, NameError, SubclassNotFound } from "./errors.js";
-import { _Base } from "./base-slot.js";
+import { ActiveRecord } from "./namespaces.js";
 import {
   camelize,
   constantize,
@@ -69,17 +69,17 @@ export function isBaseClass(modelClass: typeof Base): boolean {
 /** @internal */
 export function setBaseClass(modelClass: typeof Base): void {
   const klass = modelClass as typeof Base & { _computedBaseClass?: typeof Base };
-  if (modelClass === _Base) {
+  if (modelClass === ActiveRecord.Base) {
     klass._computedBaseClass = modelClass;
   } else {
-    if (!(modelClass.prototype instanceof _Base!)) {
+    if (!(modelClass.prototype instanceof ActiveRecord.Base)) {
       throw new ActiveRecordError(
         `${modelClass.name} doesn't belong in a hierarchy descending from ActiveRecord`,
       );
     }
 
     const superclass = Object.getPrototypeOf(modelClass) as typeof Base;
-    if (superclass === _Base || superclass.abstractClass) {
+    if (superclass === ActiveRecord.Base || superclass.abstractClass) {
       klass._computedBaseClass = modelClass;
     } else {
       klass._computedBaseClass = baseClass.call(superclass);

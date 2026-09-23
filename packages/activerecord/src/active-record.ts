@@ -1,7 +1,7 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { ActiveSupport, any, InheritableOptions } from "@blazetrails/activesupport";
 import { AsyncExecutor } from "./ar-config.js";
-import { _Base } from "./base-slot.js";
+import { ActiveRecord } from "./namespaces.js";
 import type { SQLWarning } from "./errors.js";
 import type { Transaction } from "./connection-adapters/abstract/transaction.js";
 import type { QueryTransformer } from "./query-transformers.js";
@@ -128,7 +128,7 @@ export function setDbWarningsAction(action: DbWarningsAction): void {
       _dbWarningsAction = (warning) => {
         let warningMessage = `[${warning.name}] ${warning.message}`;
         if (warning.code) warningMessage += ` (${warning.code})`;
-        (_Base!.logger as { warn: (msg: string) => void }).warn(warningMessage);
+        (ActiveRecord.Base.logger as { warn: (msg: string) => void }).warn(warningMessage);
       };
       break;
     case "raise":
@@ -465,7 +465,7 @@ export function afterAllTransactionsCommit(
 
 export function allOpenTransactions(): Transaction[] {
   const openTransactions: Transaction[] = [];
-  _Base!.connectionHandler.eachConnectionPool((pool) => {
+  ActiveRecord.Base.connectionHandler.eachConnectionPool((pool) => {
     const activeConnection = pool.activeConnection;
     if (activeConnection != null) {
       const currentTransaction = activeConnection.currentTransaction();

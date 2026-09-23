@@ -835,29 +835,9 @@ with `Super` still in TDZ and the module throws
 imports at all (so it cannot join any cycle) exporting a mutable binding plus a
 `_setX()` setter, which the defining module calls at the bottom of its own
 body. Readers import the binding from the slot and use it at call time, exactly
-where Ruby resolves the constant. Eighteen instances exist and are the only ones, plus the one converged onto
-`Autoload`:
+where Ruby resolves the constant. Nine instances exist and are the only ones, plus the two namespace
+modules converged onto `Autoload`:
 
-- `activerecord/src/associations/association-class-slots.ts` — the six
-  concrete association ctors `AssociationReflection#association_class` returns,
-  read by `reflection.ts` (`reflection.rb:889-923`). The cycle is closed by
-  `class SingularAssociation extends Association` / `class CollectionAssociation
-extends Association`, whose modules reach `reflection.ts` back through
-  `association-scope.ts` and `through-association.ts`; `base.ts` still loads the
-  ctors through `associations/instance-methods.ts`.
-
-- `activerecord/src/encryption/configurable-slot.ts` — `Configurable`, read by
-  `encryptor.ts`, `context.ts`, `scheme.ts`, `key-provider.ts`,
-  `key-generator.ts`.
-- `activerecord/src/associations/collection-proxy-slot.ts` — the
-  `CollectionProxy` ctor, read by `associations.ts`.
-- `activerecord/src/associations/_scope-slots.ts` — the `AssociationRelation`
-  factory and the `DisableJoinsAssociationScope` builder, read by
-  `associations/association.ts` for `Association#scope`
-  (`associations/association.rb:107-115,312-314`). The cycles are closed by
-  `class AssociationRelation extends Relation` (`association-relation.ts`) and by
-  `disable-joins-association-scope.ts`, so `association.ts` cannot import either
-  back.
 - `activemodel/src/attribute/user-provided-default-slot.ts` — the
   `UserProvidedDefault` ctor, read by `attribute.ts` for
   `Attribute#with_user_default` (`activemodel/lib/active_model/attribute/user_provided_default.rb:7-9`).
@@ -884,12 +864,6 @@ extends Association`, whose modules reach `reflection.ts` back through
   `annotate_rendered_view_with_filenames` (`handlers/erb.rb:86-89`). The cycle
   is closed by `template.rb:178`'s `extend Template::Handlers`, whose port
   constructs the handler at `template.ts` class-static time.
-- `activerecord/src/fixture-error-slot.ts` — `FixtureError`, read by
-  `connection-adapters/abstract/database-statements.ts` for `build_fixture_sql`'s
-  unknown-column raise (`abstract/database_statements.rb:615`, the constant
-  declared at `fixtures.rb:809`). The cycle is closed by `fixtures.ts` needing
-  `Base` at runtime (`fixtures.ts:720,940`), so `database-statements.ts` cannot
-  import `fixtures.ts` back.
 - `actionview/src/routing-url-for-slot.ts` — the `ActionDispatch::Routing::UrlFor`
   module, read by `routing-url-for.ts` for the `super` calls in
   `ActionView::RoutingUrlFor#url_for` / `#url_options` /
@@ -898,48 +872,50 @@ extends Association`, whose modules reach `reflection.ts` back through
   names. Rails mixes the module in from an `on_load(:action_controller)` hook
   (`actionview/lib/action_view/railtie.rb:97-101`); actionview does not depend
   on actionpack, so a plain import is not available in either direction.
-- `activerecord/src/base-slot.ts` — `Base`, read by `dynamic-matchers.ts`,
-  `connection-handling.ts` and `core.ts` for Rails' `self == Base`
-  (`dynamic_matchers.rb:7`, `connection_handling.rb:318,324`, `core.rb:241`).
-  The cycle is closed by `base.ts` importing all three, so none of them can
-  import `base.ts` back. `connection-adapters/abstract-adapter.ts` also reads
-  it as `_Base?.logger ?? null` in the constructor
+- `activerecord/src/namespaces.ts` — not a slot: the `ActiveRecord`,
+  `ActiveRecord::Associations`, `ActiveRecord::Encryption` and
+  `ActiveRecord::Migration` namespace objects, extended with
+  `ActiveSupport::Autoload` exactly like arel's (RFC 0151). Autoloaded there,
+  mirroring `active_record.rb:43-112`, `associations.rb:15,29-41`,
+  `encryption.rb:14` and `migration.rb:573`: `ActiveRecord.Base`,
+  `.ConnectionHandling` (`DEFAULT_ENV`, `connection_handling.rb:7`),
+  `.ModelSchema` (`derive_join_table_name`, `migration/join_table.rb:12`),
+  `.FixtureError` (`fixtures.rb:809`, raised at
+  `abstract/database_statements.rb:615`) and `.AssociationRelation`; the six
+  concrete association ctors `AssociationReflection#association_class` returns
+  (`reflection.rb:889-923`), `Associations.CollectionProxy` and
+  `Associations.DisableJoinsAssociationScope` (`associations/association.rb:107-115`);
+  `Encryption.Configurable`; `Migration.Compatibility` (`migration.rb:629-631`,
+  `schema.rb:72`). The cycles they break are the ones the deleted slots broke:
+  `base.ts` importing every `self == Base` reader; `class SingularAssociation` /
+  `CollectionAssociation extends Association` reaching `reflection.ts`; `class
+AssociationRelation extends Relation`; `V8_0 = Current`; and
+  `schema-statements.ts -> join-table.ts -> model-schema.ts ->
+connection-handling.ts -> … -> abstract-adapter.ts`, whose module-scope
+  `include(AbstractAdapter, SchemaStatements)` reads `SchemaStatements` in TDZ.
+  `connection-adapters/abstract-adapter.ts` reads `ActiveRecord.Base?.logger ?? null` in the constructor
   (`abstract_adapter.rb:132,140`). That read on a standalone adapter's own
-  path is one of the two guarded slot reads, falling back to the value Rails'
+  path is one of the two guarded autoload reads, falling back to the value Rails'
   autoloaded `active_record.rb` would hold. The other is
   `connection-adapters/abstract/query-cache.ts`'s `dirties_query_cache` arm,
-  `_Base?.connectionHandler` (`abstract/query_cache.rb:24-25`,
+  `ActiveRecord.Base?.connectionHandler` (`abstract/query_cache.rb:24-25`,
   `connection_handling.rb:258-262`), which a standalone adapter's `execute`
   reaches. An
   adapter is a standalone public entry point, constructed and queried with no
-  model layer loaded at all (the whole `sqlite-drivers` lane), so an unset
-  slot there is not a load-order bug but a legitimate configuration. A read
-  is added to this list only when that lane is shown to reach it. A seat that
+  model layer loaded at all (the whole `sqlite-drivers` lane), so an unseated
+  `Base` there is not a load-order bug but a legitimate configuration. A read
+  is added to this exception only when that lane is shown to reach it. A seat that
   has moved onto the `ActiveRecord` module (`active-record.ts`) needs no guard:
-  the module is a plain import with no slot, and it holds the Rails default
+  the module is a plain import, and it holds the Rails default
   itself — which is how `queryTransformers()` in `preprocessQuery`,
   `disablePreparedStatements()` in the adapter constructor,
   `lazilyLoadSchemaCache()` in `ConnectionPool#new_connection`, and
   `asyncQueryExecutor()` in `abstract-adapter.ts` and
-  `ConnectionPool#build_async_executor` left this list.
+  `ConnectionPool#build_async_executor` left the slot.
   Every `ActiveRecord` singleton config seat (`active_record.rb:182-491`'s
   `singleton_class.attr_*` block) and its `def self.` methods live on the
   `ActiveRecord` module in `active-record.ts`, where `parity:api` records them
-  against `active_record.rb` itself, so no module reads a seat through this
-  slot and `Base` holds none of them.
-- `activerecord/src/model-schema-slot.ts` — `deriveJoinTableName`, read by
-  `migration/join-table.ts` for `Migration::JoinTable#join_table_name`
-  (`migration/join_table.rb:11-13` names `ModelSchema` at call time). The cycle
-  is `schema-statements.ts -> join-table.ts -> model-schema.ts ->
-connection-handling.ts -> connection-adapters.ts -> abstract-adapter.ts`,
-  whose module-scope `include(AbstractAdapter, SchemaStatements)`
-  (`abstract_adapter.rb:50-56`) would read `SchemaStatements` in TDZ.
-- `activerecord/src/migration/compatibility-slot.ts` — the `Compatibility`
-  module, read by `migration.ts` for `Migration.[]` (`migration.rb:629-631`
-  names `Compatibility.find` at call time, autoloaded at `:573`). The cycle is
-  closed by `V8_0 = Current` / `class V7_2 < V8_0`
-  (`migration/compatibility.rb:32-36`), so `migration.ts` cannot import
-  `compatibility.ts` back.
+  against `active_record.rb` itself, and `Base` holds none of them.
 - `activerecord/src/reflection-slot.ts` — the `Reflection` module, read by
   `associations/builder/association.ts` for `Builder::Association.create_reflection`
   (`associations/builder/association.rb:40-51` names `ActiveRecord::Reflection.create`
@@ -947,17 +923,12 @@ connection-handling.ts -> connection-adapters.ts -> abstract-adapter.ts`,
 builder/association.ts -> reflection.ts -> associations.ts -> builder/has-one.ts`,
   whose `class HasOne extends SingularAssociation` reads `SingularAssociation` in
   TDZ when a builder is the entry module.
-- `activerecord/src/connection-handling-slot.ts` — `DEFAULT_ENV`, read by
-  `migration.ts`, `database-configurations.ts` and
-  `database-configurations/database-config.ts` (`migration.rb:676,773,1341`
-  name `ConnectionHandling::DEFAULT_ENV`, defined at `connection_handling.rb:7`).
-  Same cycle as above, entered through `schema-statements.ts ->
-migration/command-recorder.ts -> migration.ts`.
 - `activerecord/src/tasks/database-tasks-slot.ts` — `DatabaseTasks`, read by
   `migration.ts` for `ActiveRecord::Tasks::DatabaseTasks`
   (`migration.rb:151-183,696,750,1037-1041,1361-1365`). `database-tasks.ts`
   imports `migration.ts` and `connection-handling.ts`, so a plain import back
-  re-enters the cycle above.
+  re-enters the `schema-statements.ts -> migration/command-recorder.ts ->
+migration.ts` cycle `ActiveRecord.ConnectionHandling` breaks.
 - `activerecord/src/connection-adapters-slot.ts` — `ConnectionAdapters.resolve`,
   read by `database-configurations/database-config.ts` for
   `DatabaseConfig#adapter_class` (`database_config.rb:17`). The cycle is

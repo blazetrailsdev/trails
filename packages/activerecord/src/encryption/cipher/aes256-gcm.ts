@@ -1,5 +1,5 @@
 import { Cipher, OpenSSL, type Bytes } from "@blazetrails/ruby-compat";
-import { Configurable } from "../configurable-slot.js";
+import { Encryption } from "../../namespaces.js";
 import { Configuration, Decryption, EncryptedContentIntegrity } from "../errors.js";
 import { Message } from "../message.js";
 
@@ -108,7 +108,7 @@ export class Aes256Gcm {
   private generateDeterministicIv(clearText: Bytes): Bytes {
     return OpenSSL.HMAC.digest(OpenSSL.Digest.SHA256.new(), this.secret, clearText).subarray(
       0,
-      Configurable.cipher.ivLength(),
+      Encryption.Configurable.cipher.ivLength(),
     ) as Bytes;
   }
 }

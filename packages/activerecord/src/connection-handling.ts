@@ -1,5 +1,5 @@
 import type { Base } from "./base.js";
-import { _Base } from "./base-slot.js";
+import { ActiveRecord } from "./namespaces.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import type { HashConfig } from "./database-configurations/hash-config.js";
@@ -16,7 +16,7 @@ import {
   configurations as baseConfigurations,
 } from "./core.js";
 import { IsolatedExecutionState, getEnv, presence } from "@blazetrails/activesupport";
-import { _railsEnv, _setDefaultEnv } from "./connection-handling-slot.js";
+import * as ConnectionHandlingModule from "./connection-handling.js";
 import { readingRole, setDefaultTimezone, writingRole } from "./active-record.js";
 import { permanentConnectionCheckout } from "./active-record.js";
 
@@ -343,7 +343,7 @@ export function connection(this: typeof Base): DatabaseAdapter {
 }
 
 export function isPrimaryClass(this: typeof Base): boolean {
-  return (this as unknown) === _Base || coreIsApplicationRecordClass.call(this as any);
+  return (this as unknown) === ActiveRecord.Base || coreIsApplicationRecordClass.call(this as any);
 }
 
 export function adapterClass(this: typeof Base): Promise<new (...args: any[]) => DatabaseAdapter> {
@@ -392,7 +392,7 @@ export function connectionSpecificationName(this: typeof Base): string {
   }
 
   if (ownHas) {
-    if ((this as unknown) === _Base) return "ActiveRecord::Base";
+    if ((this as unknown) === ActiveRecord.Base) return "ActiveRecord::Base";
     const parent = Object.getPrototypeOf(this);
     if (parent && typeof parent === "function" && parent !== this) {
       return connectionSpecificationName.call(parent as typeof Base);
@@ -400,7 +400,7 @@ export function connectionSpecificationName(this: typeof Base): string {
     return "ActiveRecord::Base";
   }
 
-  if ((this as unknown) === _Base) return "ActiveRecord::Base";
+  if ((this as unknown) === ActiveRecord.Base) return "ActiveRecord::Base";
   if (typeof (this as any).primaryClassQ === "function" && (this as any).primaryClassQ()) {
     return "ActiveRecord::Base";
   }
@@ -525,6 +525,13 @@ async function _loadAdapter(name: string): Promise<new (arg: unknown) => Databas
   return resolveConnectionAdapter(name) as Promise<new (arg: unknown) => DatabaseAdapter>;
 }
 
+let _railsEnv: string | null = null;
+
+/** @internal */
+export function _setRailsEnv(value: string | null): void {
+  _railsEnv = value;
+}
+
 /** @missingRailsCall Rails.env — PERMANENT */
 export const RAILS_ENV = (): string | undefined =>
   presence(getEnv("TRAILS_ENV")) ??
@@ -629,4 +636,4 @@ export function resolveConfigForConnection(this: typeof Base, configOrEnv: unkno
   return baseConfigurations().resolve(configOrEnv);
 }
 
-_setDefaultEnv(DEFAULT_ENV);
+ActiveRecord.ConnectionHandling = ConnectionHandlingModule;

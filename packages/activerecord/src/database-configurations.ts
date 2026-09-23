@@ -5,7 +5,7 @@ import {
   DatabaseConfig,
   type DatabaseConfigOptions,
 } from "./database-configurations/database-config.js";
-import { _DEFAULT_ENV } from "./connection-handling-slot.js";
+import { ActiveRecord } from "./namespaces.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { UrlConfig } from "./database-configurations/url-config.js";
 
@@ -173,7 +173,7 @@ export class DatabaseConfigurations {
    * @missingRailsCall call — PERMANENT
    */
   private defaultEnv(): string {
-    return String(_DEFAULT_ENV!());
+    return String(ActiveRecord.ConnectionHandling.DEFAULT_ENV());
   }
 
   private buildConfigs(configs: RawConfigurations | HashConfig[]): HashConfig[] {

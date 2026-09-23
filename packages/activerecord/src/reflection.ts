@@ -34,14 +34,7 @@ import type { HasManyAssociation } from "./associations/has-many-association.js"
 import type { HasManyThroughAssociation } from "./associations/has-many-through-association.js";
 import type { HasOneAssociation } from "./associations/has-one-association.js";
 import type { HasOneThroughAssociation } from "./associations/has-one-through-association.js";
-import {
-  _BelongsToAssociation,
-  _BelongsToPolymorphicAssociation,
-  _HasManyAssociation,
-  _HasManyThroughAssociation,
-  _HasOneAssociation,
-  _HasOneThroughAssociation,
-} from "./associations/association-class-slots.js";
+import { Associations } from "./namespaces.js";
 import {
   AmbiguousSourceReflectionForThroughAssociation,
   HasManyThroughAssociationNotFoundError,
@@ -1123,7 +1116,9 @@ export class HasManyReflection extends AssociationReflection {
   }
 
   associationClass(): typeof HasManyAssociation | typeof HasManyThroughAssociation {
-    return this.options.through ? _HasManyThroughAssociation! : _HasManyAssociation!;
+    return this.options.through
+      ? Associations.HasManyThroughAssociation
+      : Associations.HasManyAssociation;
   }
 }
 
@@ -1137,7 +1132,9 @@ export class HasOneReflection extends AssociationReflection {
   }
 
   associationClass(): typeof HasOneAssociation | typeof HasOneThroughAssociation {
-    return this.options.through ? _HasOneThroughAssociation! : _HasOneAssociation!;
+    return this.options.through
+      ? Associations.HasOneThroughAssociation
+      : Associations.HasOneAssociation;
   }
 }
 
@@ -1155,7 +1152,9 @@ export class BelongsToReflection extends AssociationReflection {
   }
 
   associationClass(): typeof BelongsToAssociation | typeof BelongsToPolymorphicAssociation {
-    return this.isPolymorphic() ? _BelongsToPolymorphicAssociation! : _BelongsToAssociation!;
+    return this.isPolymorphic()
+      ? Associations.BelongsToPolymorphicAssociation
+      : Associations.BelongsToAssociation;
   }
 
   protected override canFindInverseOfAutomatically(

@@ -1,6 +1,6 @@
 import type { PrependModule } from "@blazetrails/ruby-compat";
 import type { ValueType } from "@blazetrails/activemodel";
-import { Configurable } from "./configurable-slot.js";
+import { Encryption } from "../namespaces.js";
 
 type FixtureRow = Record<string, unknown>;
 
@@ -52,7 +52,7 @@ function processPreservedOriginalColumns(
 export const EncryptedFixtures: PrependModule = {
   initialize(super_: (...args: unknown[]) => unknown, ...args: never[]): unknown {
     const [fixture, modelClass] = args as unknown as [FixtureRow, FixtureModelClass];
-    if (Configurable.config.encryptFixtures) {
+    if (Encryption.Configurable.config.encryptFixtures) {
       const host = this as unknown as EncryptedFixtureHost;
       host.cleanValues = {};
       encryptFixtureData.call(host, fixture, modelClass);

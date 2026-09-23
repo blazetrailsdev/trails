@@ -10,7 +10,7 @@ import {
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { RecordNotFound, SoleRecordExceeded, UnknownPrimaryKey } from "../errors.js";
 import { queryConstraintsList as _queryConstraintsListFn } from "../persistence.js";
-import { _Base } from "../base-slot.js";
+import { ActiveRecord } from "../namespaces.js";
 
 export const ONE_AS_ONE = "1 AS one";
 
@@ -299,7 +299,7 @@ export async function exists(
   conditions?: Record<string, unknown> | unknown,
 ): Promise<boolean> {
   if (this.isNullRelation()) return false;
-  if (conditions instanceof _Base!) {
+  if (conditions instanceof ActiveRecord.Base) {
     throw new ArgumentError(
       "You are passing an instance of ActiveRecord::Base to `exists?`. " +
         "Please pass the id of the object by calling `.id`.",
@@ -541,7 +541,7 @@ export async function findWithIds(this: FinderRelation, ...ids: unknown[]): Prom
 
 /** @internal */
 export async function findOne(this: FinderRelation, id: unknown): Promise<any> {
-  if (id instanceof _Base!) {
+  if (id instanceof ActiveRecord.Base) {
     throw new ArgumentError(
       "You are passing an instance of ActiveRecord::Base to `find`. " +
         "Please pass the id of the object by calling `.id`.",

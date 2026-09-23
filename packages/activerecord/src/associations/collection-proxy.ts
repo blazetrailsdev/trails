@@ -32,7 +32,7 @@ import {
   autoloadModel,
   collectionProxyFor as associationProxy,
 } from "../associations.js";
-import { _setCollectionProxyCtor } from "./collection-proxy-slot.js";
+import { Associations } from "../namespaces.js";
 
 // @ts-expect-error declaration-merge load() divergence — permanent, see class override
 export interface CollectionProxy<T extends Base = Base> {
@@ -604,9 +604,7 @@ for (const name of delegateMethods) {
   });
 }
 
-_setCollectionProxyCtor(
-  CollectionProxy as unknown as Parameters<typeof _setCollectionProxyCtor>[0],
-);
+Associations.CollectionProxy = CollectionProxy;
 
 _registerRelationFamily(
   "collectionProxy",

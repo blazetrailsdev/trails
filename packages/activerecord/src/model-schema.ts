@@ -1,5 +1,6 @@
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
-import { _setDeriveJoinTableName } from "./model-schema-slot.js";
+import { ActiveRecord } from "./namespaces.js";
+import * as ModelSchemaModule from "./model-schema.js";
 import type { Base } from "./base.js";
 import { Nodes, sql as arelSql } from "@blazetrails/arel";
 import { pluralize, underscore } from "@blazetrails/activesupport";
@@ -854,4 +855,4 @@ export function typeForColumn(this: SchemaHost, connection: any, column: any): a
   return type;
 }
 
-_setDeriveJoinTableName(deriveJoinTableName);
+ActiveRecord.ModelSchema = ModelSchemaModule;

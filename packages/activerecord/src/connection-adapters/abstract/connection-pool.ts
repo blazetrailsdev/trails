@@ -22,7 +22,7 @@ import {
   type Included,
 } from "@blazetrails/activesupport";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
-import { _Base } from "../../base-slot.js";
+import { ActiveRecord } from "../../namespaces.js";
 import type { HashConfig } from "../../database-configurations/hash-config.js";
 import type { PoolConfig } from "../pool-config.js";
 import type { ConnectionDescriptor } from "./connection-handler.js";
@@ -221,7 +221,7 @@ export class ExecutorHooks {
   static run(): void {}
 
   static complete(): void {
-    _Base!.connectionHandler.eachConnectionPool((pool) => {
+    ActiveRecord.Base.connectionHandler.eachConnectionPool((pool) => {
       const connection = pool.activeConnection;
       if (connection) {
         const txn =

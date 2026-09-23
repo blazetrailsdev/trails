@@ -1,5 +1,5 @@
 import { kernelThrow } from "@blazetrails/ruby-compat";
-import { _setHasOneAssociation } from "./association-class-slots.js";
+import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
 import { DeleteRestrictionError, HasOnePersistedAssignmentError } from "./errors.js";
 import { RecordNotSaved } from "../errors.js";
@@ -436,4 +436,4 @@ function nullifiedOwnerAttributes(assoc: HasOneAssociation): Record<string, null
 
 Object.assign(HasOneAssociation.prototype, { foreignKeyPresent });
 
-_setHasOneAssociation(HasOneAssociation);
+Associations.HasOneAssociation = HasOneAssociation;

@@ -4,7 +4,7 @@ import { underscore, compactBlank, indexBy, valuesAt } from "@blazetrails/active
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Association } from "./association.js";
 import type { AssociationProxy } from "./collection-proxy.js";
-import { _CollectionProxyCtor } from "./collection-proxy-slot.js";
+import { Associations } from "../namespaces.js";
 import { ownerForeignKeyColumns } from "./foreign-association.js";
 import { NotImplementedError, RecordNotFound, RecordNotSaved, Rollback } from "../errors.js";
 import { CollectionIdsAssignmentError, CollectionPersistedAssignmentError } from "./errors.js";
@@ -533,7 +533,7 @@ export abstract class CollectionAssociation extends Association {
       this.resetScope();
     }
 
-    const CollectionProxy = _CollectionProxyCtor as unknown as {
+    const CollectionProxy = Associations.CollectionProxy as unknown as {
       create(klass: typeof Base, association: CollectionAssociation): AssociationProxy;
     };
     this._proxy ??= CollectionProxy.create(this.klass, this);

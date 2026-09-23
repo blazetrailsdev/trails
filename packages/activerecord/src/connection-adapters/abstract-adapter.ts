@@ -45,7 +45,7 @@ type AdapterInstrumenter = {
     block: (payload: EventPayload) => Promise<T>,
   ): Promise<T>;
 };
-import { _Base } from "../base-slot.js";
+import { ActiveRecord } from "../namespaces.js";
 import { Result, type ColumnTypes } from "../result.js";
 import { SchemaCache, SchemaReflection, BoundSchemaReflection } from "./schema-cache.js";
 import { NullPool, removeConnectionFromThreadCache } from "./abstract/connection-pool.js";
@@ -806,7 +806,7 @@ export class AbstractAdapter implements Quoting {
 
     if (isPlainConfigHash(configOrDeprecatedConnection)) {
       this._config = configOrDeprecatedConnection;
-      this.logger = _Base?.logger ?? null;
+      this.logger = ActiveRecord.Base?.logger ?? null;
 
       if (
         isRubyTruthy(deprecatedLogger) ||
@@ -820,7 +820,9 @@ export class AbstractAdapter implements Quoting {
     } else {
       this._unconfiguredConnection = (configOrDeprecatedConnection ??
         null) as AbstractAdapter | null;
-      this.logger = isRubyTruthy(deprecatedLogger) ? deprecatedLogger : (_Base?.logger ?? null);
+      this.logger = isRubyTruthy(deprecatedLogger)
+        ? deprecatedLogger
+        : (ActiveRecord.Base?.logger ?? null);
       if (isRubyTruthy(deprecatedConfig)) {
         this._config = (deprecatedConfig ?? {}) as Record<string, unknown>;
         this._connectionParameters = deprecatedConnectionOptions;

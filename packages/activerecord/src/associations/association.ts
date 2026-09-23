@@ -3,7 +3,8 @@ import type { AssociationDefinition, AssociationOptions } from "../associations.
 import { associationInstanceGet } from "../associations.js";
 import { AssociationScope, type AssociationScopeable } from "./association-scope.js";
 import { associationKeysEqual } from "./key-normalization.js";
-import { getDjasScopeBuilder, getAssociationRelationFactory } from "./_scope-slots.js";
+import { ActiveRecord, Associations } from "../namespaces.js";
+import { relationClassFor } from "../relation/delegation.js";
 import { ThroughAssociation } from "./through-association.js";
 import { camelize, kernelArray, safeConstantize, singularize } from "@blazetrails/activesupport";
 import { except, hasKey } from "@blazetrails/ruby-compat";
@@ -122,20 +123,14 @@ export class Association {
     this.target = target;
   }
 
-  /** @missingRailsCall create — PERMANENT */
   scope(): any {
+    if (this.disableJoins) {
+      return Associations.DisableJoinsAssociationScope.create().scope(
+        this as unknown as AssociationScopeable,
+      );
+    }
     const klass = this.klass as typeof Base | undefined;
     if (!klass) return undefined;
-    if (this.disableJoins) {
-      const djas = getDjasScopeBuilder();
-      if (!djas)
-        throw new Error(
-          "DisableJoinsAssociationScope not initialized — import '@blazetrails/activerecord/associations' before using disable_joins associations",
-        );
-      const ctor = this.owner.constructor as typeof Base;
-      const reflection = ctor._reflectOnAssociation?.(this.reflection.name) ?? this.reflection;
-      return djas({ owner: this.owner, reflection, klass } as never);
-    }
     const currentScope = (klass as any).currentScope();
     if (currentScope && currentScope.proxyAssociation === this) {
       return typeof currentScope.spawn === "function" ? currentScope.spawn() : currentScope;
@@ -162,12 +157,9 @@ export class Association {
     }
     if (this._cachedScope === undefined) {
       if (this.disableJoins) {
-        const djas = getDjasScopeBuilder();
-        if (!djas)
-          throw new Error(
-            "DisableJoinsAssociationScope not initialized — import '@blazetrails/activerecord/associations' before using disable_joins associations",
-          );
-        this._cachedScope = djas(this);
+        this._cachedScope = Associations.DisableJoinsAssociationScope.create().scope(
+          this as unknown as AssociationScopeable,
+        );
       } else {
         this._cachedScope = AssociationScope.scope(this as unknown as AssociationScopeable);
       }
@@ -530,10 +522,8 @@ export class Association {
     const klass = this.klass as typeof Base | undefined;
     if (!klass) return null;
     const scopeForAssociation = (klass as any).scopeForAssociation?.() ?? null;
-    const arFactory = getAssociationRelationFactory();
-    if (!arFactory) return scopeForAssociation;
-    const ar = arFactory(klass, this);
-    return scopeForAssociation ? (ar as any).mergeBang(scopeForAssociation) : ar;
+    const ar = new (relationClassFor.call(ActiveRecord.AssociationRelation, klass))(klass, this);
+    return scopeForAssociation ? ar.mergeBang(scopeForAssociation) : ar;
   }
 
   /** @internal */
