@@ -2,6 +2,7 @@ import { Temporal } from "@blazetrails/date";
 import "./i18n.js";
 import { GlobalID as _GlobalIDCtor } from "@blazetrails/globalid";
 import { Transaction as _UserTransaction } from "./transaction.js";
+import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 
 interface ToSgidOptions {
   app?: string;
@@ -931,7 +932,7 @@ export class Base extends Model {
           password?: string;
           [key: string]: unknown;
         },
-  ): Promise<void> {
+  ): Promise<ConnectionPool> {
     return ConnectionHandling.establishConnection(this, configOrEnv);
   }
 

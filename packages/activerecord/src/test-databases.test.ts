@@ -32,7 +32,7 @@ describe("TestDatabasesTest", () => {
   it("databases are created", async () => {
     vi.spyOn(DatabaseTasks, "reconstructFromSchema").mockResolvedValue(undefined);
     const connectionHandling = await import("./connection-handling.js");
-    vi.spyOn(connectionHandling, "establishConnection").mockResolvedValue(undefined);
+    vi.spyOn(connectionHandling, "establishConnection").mockResolvedValue(undefined as never);
 
     const mockConfig: any = {};
     Object.defineProperty(mockConfig, "_database", {
@@ -57,7 +57,7 @@ describe("TestDatabasesTest", () => {
   it("create databases after fork", async () => {
     vi.spyOn(DatabaseTasks, "reconstructFromSchema").mockResolvedValue(undefined);
     const connectionHandling = await import("./connection-handling.js");
-    vi.spyOn(connectionHandling, "establishConnection").mockResolvedValue(undefined);
+    vi.spyOn(connectionHandling, "establishConnection").mockResolvedValue(undefined as never);
 
     const mockConfig: any = {};
     Object.defineProperty(mockConfig, "_database", {
@@ -89,7 +89,7 @@ describe("TestDatabasesTest", () => {
       .spyOn(DatabaseTasks, "reconstructFromSchema")
       .mockResolvedValue(undefined);
     vi.spyOn(await import("./connection-handling.js"), "establishConnection").mockResolvedValue(
-      undefined,
+      undefined as never,
     );
 
     const configs = [
@@ -112,7 +112,7 @@ describe("TestDatabasesTest", () => {
   it("suffixes a URL-based config by deriving the database from configuration.url", async () => {
     vi.spyOn(DatabaseTasks, "reconstructFromSchema").mockResolvedValue(undefined);
     vi.spyOn(await import("./connection-handling.js"), "establishConnection").mockResolvedValue(
-      undefined,
+      undefined as never,
     );
 
     const { UrlConfig } = await import("./database-configurations/url-config.js");
@@ -132,7 +132,7 @@ describe("TestDatabasesTest", () => {
       .mockResolvedValue(undefined);
     const mockEstablishConnection = vi
       .spyOn(await import("./connection-handling.js"), "establishConnection")
-      .mockResolvedValue(undefined);
+      .mockResolvedValue(undefined as never);
 
     Base.configurations({});
 
@@ -148,7 +148,7 @@ describe("TestDatabasesTest", () => {
     const connectionHandling = await import("./connection-handling.js");
     const mockEstablishConnection = vi
       .spyOn(connectionHandling, "establishConnection")
-      .mockResolvedValue(undefined);
+      .mockResolvedValue(undefined as never);
 
     const mockConfig: any = {};
     Object.defineProperty(mockConfig, "_database", {

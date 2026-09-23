@@ -34,7 +34,7 @@ async function withStubbedConnectionEstablishConnection(
   block: () => Promise<void>,
 ): Promise<void> {
   await withStubbedConnection(connection, async () => {
-    const spy = vi.spyOn(Base, "establishConnection").mockResolvedValue(undefined);
+    const spy = vi.spyOn(Base, "establishConnection").mockResolvedValue(undefined as never);
     try {
       await block();
     } finally {
@@ -88,7 +88,9 @@ describeIfPostgresqlAdapter("PostgreSQLDBCreateTest", () => {
   it("establishes connection to postgresql database", async () => {
     const dbConfig = configuration();
 
-    const establishConnection = vi.spyOn(Base, "establishConnection").mockResolvedValue(undefined);
+    const establishConnection = vi
+      .spyOn(Base, "establishConnection")
+      .mockResolvedValue(undefined as never);
     await withStubbedConnection(connection, async () => {
       await DatabaseTasks.create(dbConfig);
     });
@@ -152,7 +154,9 @@ describeIfPostgresqlAdapter("PostgreSQLDBCreateTest", () => {
   it("establishes connection to new database", async () => {
     const dbConfig = configuration();
 
-    const establishConnection = vi.spyOn(Base, "establishConnection").mockResolvedValue(undefined);
+    const establishConnection = vi
+      .spyOn(Base, "establishConnection")
+      .mockResolvedValue(undefined as never);
     await withStubbedConnection(connection, async () => {
       await DatabaseTasks.create(dbConfig);
     });
@@ -208,7 +212,9 @@ describeIfPostgresqlAdapter("PostgreSQLDBDropTest", () => {
   });
 
   it("establishes connection to postgresql database", async () => {
-    const establishConnection = vi.spyOn(Base, "establishConnection").mockResolvedValue(undefined);
+    const establishConnection = vi
+      .spyOn(Base, "establishConnection")
+      .mockResolvedValue(undefined as never);
 
     await withStubbedConnection(connection, async () => {
       await DatabaseTasks.drop(configuration());
@@ -269,7 +275,9 @@ describeIfPostgresqlAdapter("PostgreSQLPurgeTest", () => {
 
   it("establishes connection to postgresql database", async () => {
     const dbConfig = configuration();
-    const establishConnection = vi.spyOn(Base, "establishConnection").mockResolvedValue(undefined);
+    const establishConnection = vi
+      .spyOn(Base, "establishConnection")
+      .mockResolvedValue(undefined as never);
 
     await withStubbedConnection(connection, async () => {
       await DatabaseTasks.purge(dbConfig);
@@ -302,7 +310,9 @@ describeIfPostgresqlAdapter("PostgreSQLPurgeTest", () => {
 
   it("establishes connection", async () => {
     const dbConfig = configuration();
-    const establishConnection = vi.spyOn(Base, "establishConnection").mockResolvedValue(undefined);
+    const establishConnection = vi
+      .spyOn(Base, "establishConnection")
+      .mockResolvedValue(undefined as never);
 
     await withStubbedConnection(connection, async () => {
       await DatabaseTasks.purge(dbConfig);

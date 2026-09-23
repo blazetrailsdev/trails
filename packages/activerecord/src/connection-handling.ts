@@ -560,12 +560,12 @@ export async function establishConnection(
         password?: string;
         [key: string]: unknown;
       },
-): Promise<void> {
+): Promise<ConnectionPool> {
   if (!modelClass.name) throw new Error("Anonymous class is not allowed.");
 
   configOrEnv ??= DEFAULT_ENV();
   const dbConfig = modelClass.resolveConfigForConnection(configOrEnv);
-  await establishWithDbConfig(modelClass, dbConfig);
+  return establishWithDbConfig(modelClass, dbConfig);
 }
 
 function validateConfigDefaultTimezone(config: { [key: string]: unknown }): "utc" | "local" | null {
@@ -577,7 +577,10 @@ function validateConfigDefaultTimezone(config: { [key: string]: unknown }): "utc
   return raw;
 }
 
-async function establishWithDbConfig(modelClass: typeof Base, dbConfig: HashConfig): Promise<void> {
+async function establishWithDbConfig(
+  modelClass: typeof Base,
+  dbConfig: HashConfig,
+): Promise<ConnectionPool> {
   const config = dbConfig.configurationHash as Record<string, unknown>;
   const tz = validateConfigDefaultTimezone(config);
 
@@ -588,12 +591,13 @@ async function establishWithDbConfig(modelClass: typeof Base, dbConfig: HashConf
   const role = coreCurrentRole.call(modelClass as any);
   const shard = coreCurrentShard.call(modelClass as any);
 
-  await modelClass.connectionHandler.establishConnection(dbConfig, {
+  const pool = await modelClass.connectionHandler.establishConnection(dbConfig, {
     ownerName: modelClass.connectionClassForSelf(),
     role,
     shard,
   });
   if (tz) setDefaultTimezone(tz);
+  return pool;
 }
 
 export const ConnectionHandling = {
