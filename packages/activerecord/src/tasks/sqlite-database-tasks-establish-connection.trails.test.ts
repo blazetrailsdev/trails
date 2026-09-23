@@ -17,6 +17,7 @@ describe("SQLiteDatabaseTasks#establish_connection", () => {
     const tasks = new SQLiteDatabaseTasks(configuration);
     vi.spyOn(Base, "establishConnection").mockImplementation(async () => {
       calls.push("establishConnection");
+      return undefined as never;
     });
     Object.assign(tasks, {
       connection: async () => ({

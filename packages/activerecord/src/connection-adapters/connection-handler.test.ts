@@ -356,9 +356,8 @@ describe("ConnectionHandlerTest", () => {
 
     expect(await Klass2.leaseConnection()).toBe(await Base.leaseConnection());
 
-    await Klass2.establishConnection(Base.connectionPool().dbConfig.configurationHash);
-    const klass2Pool = Klass2.connectionPool();
-    expect(await Klass2.leaseConnection()).toBe(await klass2Pool.leaseConnection());
+    const pool = await Klass2.establishConnection(Base.connectionPool().dbConfig.configurationHash);
+    expect(await Klass2.leaseConnection()).toBe(await pool.leaseConnection());
     expect(await Klass2.leaseConnection()).not.toBe(await Base.leaseConnection());
 
     await Klass2.removeConnection();

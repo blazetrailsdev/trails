@@ -446,7 +446,7 @@ describe("DatabaseTasksCreateAllTest", () => {
   let createSpy: MockInstance<any>;
   beforeEach(async () => {
     await Base.establishConnection(ambientPoolConfiguration());
-    vi.spyOn(Base, "establishConnection").mockResolvedValue(undefined);
+    vi.spyOn(Base, "establishConnection").mockResolvedValue(undefined as never);
     createSpy = vi.spyOn(DatabaseTasks, "create").mockResolvedValue(undefined as never);
   });
   afterEach(() => {
@@ -516,7 +516,7 @@ describe("DatabaseTasksCreateCurrentTest", () => {
 
   let establishSpy: MockInstance<any>;
   beforeEach(() => {
-    establishSpy = vi.spyOn(Base, "establishConnection").mockResolvedValue(undefined);
+    establishSpy = vi.spyOn(Base, "establishConnection").mockResolvedValue(undefined as never);
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
       development: { adapter: "abstract", database: "dev-db" },
       test: { adapter: "abstract", database: "test-db" },
@@ -589,7 +589,7 @@ describe("DatabaseTasksCreateCurrentThreeTierTest", () => {
 
   let establishSpy: MockInstance<any>;
   beforeEach(() => {
-    establishSpy = vi.spyOn(Base, "establishConnection").mockResolvedValue(undefined);
+    establishSpy = vi.spyOn(Base, "establishConnection").mockResolvedValue(undefined as never);
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
       development: {
         primary: { adapter: "abstract", database: "dev-db" },
@@ -1191,7 +1191,9 @@ describe("DatabaseTasksPurgeCurrentTest", () => {
   });
 
   it("purges current environment database", async () => {
-    const establishSpy = vi.spyOn(Base, "establishConnection").mockResolvedValue(undefined);
+    const establishSpy = vi
+      .spyOn(Base, "establishConnection")
+      .mockResolvedValue(undefined as never);
     const purgeSpy = vi.spyOn(DatabaseTasks, "purge").mockResolvedValue(undefined as never);
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
       development: { adapter: "abstract", database: "dev-db" },
