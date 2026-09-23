@@ -15,13 +15,15 @@ import {
   foreignKey as deriveForeignKey,
   merge,
   DelegationError,
+  classAttribute,
+  included,
 } from "@blazetrails/activesupport";
 import { RuntimeError, except, mergeBang } from "@blazetrails/ruby-compat";
 import { Table, Nodes } from "@blazetrails/arel";
 import { deriveJoinTableName } from "./model-schema.js";
 
 import { modelRegistry, autoloadModel } from "./associations.js";
-import * as Reflection from "./reflection.js";
+import * as ReflectionModule from "./reflection.js";
 import { _setReflection } from "./reflection-slot.js";
 import {
   hasQueryConstraints,
@@ -1950,6 +1952,25 @@ export function reflectOnAllAutosaveAssociations(
 
 export type AssociationLikeReflection = AssociationReflection | ThroughReflection;
 
+export interface Reflection {
+  readonly _reflections: Record<string, AssociationReflection>;
+  readonly aggregateReflections: Record<string, AggregateReflection>;
+  readonly automaticScopeInversing: boolean;
+  readonly automaticallyInvertPluralAssociations: boolean;
+}
+
+export const Reflection = {
+  [included](base: object): void {
+    classAttribute.call(base, "_reflections", { instanceWriter: false, default: {} });
+    classAttribute.call(base, "aggregateReflections", { instanceWriter: false, default: {} });
+    classAttribute.call(base, "automaticScopeInversing", { instanceWriter: false, default: false });
+    classAttribute.call(base, "automaticallyInvertPluralAssociations", {
+      instanceWriter: false,
+      default: false,
+    });
+  },
+};
+
 export const ClassMethods = {
   reflections(
     this: typeof Base,
@@ -1985,4 +2006,4 @@ export const ClassMethods = {
   _reflectOnAssociation: _reflectOnAssociationClassMethod,
 };
 
-_setReflection(Reflection);
+_setReflection(ReflectionModule);

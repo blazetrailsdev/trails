@@ -784,14 +784,18 @@ export async function tableExists(this: SchemaHost): Promise<boolean> {
 }
 
 export interface ModelSchema {
+  primaryKeyPrefixType: string | null | undefined;
   tableNamePrefix: string;
   tableNameSuffix: string;
+  pluralizeTableNames: boolean;
 }
 
 export const ModelSchema = {
   [included](base: object): void {
+    classAttribute.call(base, "primaryKeyPrefixType", { instanceWriter: false });
     classAttribute.call(base, "tableNamePrefix", { instanceWriter: false, default: "" });
     classAttribute.call(base, "tableNameSuffix", { instanceWriter: false, default: "" });
+    classAttribute.call(base, "pluralizeTableNames", { instanceWriter: false, default: true });
   },
 };
 
