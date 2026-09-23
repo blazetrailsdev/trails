@@ -452,17 +452,60 @@ export interface SkipGroup {
   tsMirrorIsDrift?: true;
 }
 
+/**
+ * Ruby value-protocol names that translate directly (`inspect`, the dup
+ * family, `encode_with` / `init_with`, the explicit conversions), scored per
+ * definition wherever {@link PROTOCOL_DEFINITION_ENROLLED_PACKAGES} lists the
+ * package (RFC 0156). Calls TO them stay unmapped: {@link rubyMethodToTs}
+ * without a package still answers `null`.
+ */
+export const PROTOCOL_DEFINITION_NAMES = [
+  "inspect",
+  "pretty_print",
+  "dup",
+  "initialize_copy",
+  "initialize_dup",
+  "encode_with",
+  "init_with",
+  "to_a",
+  "to_h",
+  "to_hash",
+];
+
+/**
+ * Packages whose {@link PROTOCOL_DEFINITION_NAMES} definitions are scored.
+ * Only-grow: a package joins through its own burndown story, once every gate
+ * is green with it enrolled, and is never removed to turn a red run green.
+ */
+export const PROTOCOL_DEFINITION_ENROLLED_PACKAGES: ReadonlySet<string> = new Set<string>([
+  "abstractcontroller",
+  "actioncontroller",
+  "actionview",
+  "activerecord-test-support",
+  "arel",
+  "did-you-mean",
+  "globalid",
+  "i18n",
+  "rack",
+  "rack-session",
+  "ruby-compat",
+  "sqlite3",
+  "trailties",
+]);
+
 export const SKIP_GROUPS: SkipGroup[] = [
   {
     reason:
-      "Ruby core object / value-protocol methods with no meaningful public " +
-      "TypeScript surface (identity, reflection, coercion).",
+      "Ruby core object methods outside `PROTOCOL_DEFINITION_NAMES`: identity " +
+      "(`object_id`, `equal?`, `nil?`, `class`), reflection (`instance_of?`, " +
+      "`instance_variable_get` / `instance_variable_set` / `instance_variables`), " +
+      "dispatch (`send`, `public_send`, `tap`, " +
+      "`yield_self`), numeric coercion (`to_i`, `to_f`, `to_r`, `to_c`), " +
+      "`clone` / `initialize_clone` / `freeze`, and `to_ary` / `then`, which JS " +
+      "would read as array destructuring and as a thenable `await` calls.",
     names: [
-      "dup",
       "clone",
       "freeze",
-      "inspect",
-      "pretty_print",
       "object_id",
       "class",
       "send",
@@ -476,20 +519,21 @@ export const SKIP_GROUPS: SkipGroup[] = [
       "instance_variable_get",
       "instance_variable_set",
       "instance_variables",
-      "initialize_copy",
-      "initialize_dup",
       "initialize_clone",
-      "encode_with",
-      "init_with",
       "to_ary",
-      "to_a",
       "to_i",
       "to_f",
-      "to_h",
-      "to_hash",
       "to_r",
       "to_c",
     ],
+  },
+  {
+    reason:
+      "Scored per definition in `PROTOCOL_DEFINITION_ENROLLED_PACKAGES`, and " +
+      "skipped elsewhere only until that package's burndown story enrolls it " +
+      "(RFC 0156): these translate directly, so a Ruby file defining one " +
+      "expects it in the mirroring TS file.",
+    names: PROTOCOL_DEFINITION_NAMES,
   },
   {
     reason:
@@ -1453,10 +1497,31 @@ const CONTAINMENT_PREDICATE_ALIASES = new Map<string, string>([
 export function rubyMethodToTs(
   name: string,
   siblingRubyNames?: ReadonlySet<string>,
+  pkg?: string,
 ): string[] | null {
-  if (SKIP.has(name)) return null;
+  if (SKIP.has(name) && !isScoredProtocolDefinition(name, pkg)) return null;
   return rubyMethodToTsIgnoringSkip(name, siblingRubyNames);
 }
+
+function isScoredProtocolDefinition(name: string, pkg: string | undefined): boolean {
+  return (
+    pkg !== undefined &&
+    PROTOCOL_DEFINITION_ENROLLED_PACKAGES.has(pkg) &&
+    PROTOCOL_DEFINITION_NAMES.includes(name)
+  );
+}
+
+/**
+ * Ruby's copy hooks, each mapped to the copy methods that run it. `Object#dup`
+ * calls `initialize_dup` and `Object#clone` calls `initialize_clone`, both of
+ * which default to `initialize_copy`, and JS has no `Object#dup`, so a port
+ * may land the hook's body in either hook's spelling or in an own copy method
+ * that runs it. compare.ts lets one TS member answer only one hook per file.
+ */
+export const COPY_HOOKS: ReadonlyMap<string, readonly string[]> = new Map([
+  ["initialize_copy", ["dup", "clone"]],
+  ["initialize_dup", ["dup"]],
+]);
 
 /**
  * {@link rubyMethodToTs} without the {@link SKIP} gate.
@@ -1518,6 +1583,13 @@ function rubyMethodToTsWithoutUnderscore(
   // surface (the AR Deduplicable value objects, where `-@` is just Ruby's
   // `alias :-@ :deduplicate`) suppress it via SCOPED_SKIP_GROUPS instead.
   if (name === "-@") return ["negate"];
+  if (name === "to_a") return ["toA", "toArray"];
+  if (COPY_HOOKS.has(name)) {
+    const own = snakeToCamel(name);
+    const other = [...COPY_HOOKS.keys()].filter((h) => h !== name).map(snakeToCamel);
+    const copies = COPY_HOOKS.get(name)!.filter((c) => siblingRubyNames?.has(c) !== true);
+    return [own, ...other, ...copies];
+  }
 
   if (name.endsWith("?")) {
     const base = name.slice(0, -1);

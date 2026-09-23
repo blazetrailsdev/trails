@@ -5355,3 +5355,31 @@ describe("admitsBoolean", () => {
     });
   });
 });
+
+describe("returnsVoid", () => {
+  it("records a method returning void or Promise<void>", () => {
+    const { instanceMethods } = extractFromSource(`
+      interface Promise<T> {
+        then<R>(onfulfilled: (value: T) => R): Promise<R>;
+      }
+      declare var Promise: { resolve(): Promise<void> };
+      class Pool {}
+      class Foo {
+        establishConnection(): void {}
+        async connect(): Promise<void> {}
+        async inferred() { await Promise.resolve(); }
+        pool(): Pool { return new Pool(); }
+        async lease(): Promise<Pool> { return new Pool(); }
+        loose(): unknown { return null; }
+      }
+    `);
+    expect(Object.fromEntries(instanceMethods.map((m) => [m.name, m.returnsVoid]))).toEqual({
+      establishConnection: true,
+      connect: true,
+      inferred: true,
+      pool: undefined,
+      lease: undefined,
+      loose: undefined,
+    });
+  });
+});

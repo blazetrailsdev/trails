@@ -71,8 +71,15 @@ import {
   declarationOnlyInFile,
   misplacedClusterVerdict,
   rubyMethodToTsForFqn,
+  copyHookClaimed,
 } from "./compare.js";
-import { SCOPED_SKIP_GROUPS, SKIP, rubyMethodToTs } from "@blazetrails/parity/conventions";
+import {
+  COPY_HOOKS,
+  PROTOCOL_DEFINITION_ENROLLED_PACKAGES,
+  SCOPED_SKIP_GROUPS,
+  SKIP,
+  rubyMethodToTs,
+} from "@blazetrails/parity/conventions";
 import type {
   ApiManifest,
   ClassInfo,
@@ -1818,6 +1825,16 @@ describe("dedupeRubyMethodInto", () => {
       definedInFile: "x.rb",
     });
   });
+  it("expects a copy hook only where its package is enrolled", () => {
+    const enrolled = [...PROTOCOL_DEFINITION_ENROLLED_PACKAGES][0];
+    const scored = new Map<string, SeenRubyMethod>();
+    dedupeRubyMethodInto(scored, rm("initialize_dup"), "Foo", "x.rb", false, enrolled);
+    expect([...scored.keys()]).toEqual(["initialize_dup"]);
+    const skipped = new Map<string, SeenRubyMethod>();
+    dedupeRubyMethodInto(skipped, rm("initialize_dup"), "Foo", "x.rb", false, "activemodel");
+    expect(skipped.size).toBe(0);
+  });
+
   it("keeps a class method and an instance method of one name as two rows", () => {
     const seen = new Map<string, SeenRubyMethod>();
     dedupeRubyMethodInto(seen, rm("attribute_method?"), "ActiveRecord::AttributeMethods");
@@ -3722,6 +3739,28 @@ describe("predicateKindMismatch", () => {
     ["active_connection", "activeConnection", [false], false],
   ] as const)("%s matched by %s admitting %j is %s", (rubyName, tsName, admits, expected) => {
     expect(predicateKindMismatch(rubyName, tsName, admits)).toBe(expected);
+  });
+});
+
+describe("copyHookClaimed", () => {
+  it("lets one TS dup answer only one of the file's two copy hooks", () => {
+    const enrolled = [...PROTOCOL_DEFINITION_ENROLLED_PACKAGES][0];
+    const tsMethods = new Set(["dup"]);
+    const claims = new Set<string>();
+    const matchOf = (rubyName: string) => {
+      const match = (rubyMethodToTs(rubyName, undefined, enrolled) ?? []).find(
+        (c) => tsMethods.has(c) && !copyHookClaimed(rubyName, c, claims),
+      );
+      if (match !== undefined && COPY_HOOKS.has(rubyName)) claims.add(match);
+      return match;
+    };
+    expect(matchOf("initialize_copy")).toBe("dup");
+    expect(matchOf("initialize_dup")).toBeUndefined();
+  });
+
+  it("does not hold a claim against a name that is not a copy hook", () => {
+    expect(copyHookClaimed("dup", "dup", new Set(["dup"]))).toBe(false);
+    expect(copyHookClaimed("initialize_dup", "dup", new Set(["clone"]))).toBe(false);
   });
 });
 
