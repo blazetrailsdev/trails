@@ -148,17 +148,6 @@ const ER_CLIENT_INTERACTION_TIMEOUT = 4031;
 type CreateTableArgs = Parameters<MysqlSchemaStatements["createTable"]>;
 type CreateTableOptions = Extract<CreateTableArgs[1], { options?: string }>;
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface AbstractMysqlAdapter {
-  /**
-   * drift-ok: concrete adapters only — `text_type?` is defined by
-   * `mysql2_adapter.rb:140-142`, not by `abstract_mysql_adapter.rb`.
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
-  isTextType(type: string): boolean;
-}
-
 // eslint-disable-next-line no-control-regex
 const MYSQL_ESCAPE_RE = /[\\'"\x00\n\r\x1a]/g;
 const MYSQL_ESCAPE_MAP: Record<string, string> = {
@@ -172,7 +161,13 @@ const MYSQL_ESCAPE_MAP: Record<string, string> = {
 };
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export class AbstractMysqlAdapter extends AbstractAdapter {
+export abstract class AbstractMysqlAdapter extends AbstractAdapter {
+  protected abstract isTextType(type: string): boolean;
+
+  protected abstract fullVersion(): Promise<string | null>;
+
+  protected abstract getFullVersion(): Promise<string | null>;
+
   override async removeForeignKey(
     fromTable: string,
     toTable?: string | RemoveForeignKeyOptions,
@@ -208,14 +203,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   /** @internal */
   override arelVisitor(): Visitors.ToSql {
     return new Visitors.MySQL(this);
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
-  async fullVersion(): Promise<string | null> {
-    throw new Error(`${this.constructor.name} must implement fullVersion()`);
   }
 
   async isMariadb(): Promise<boolean> {
@@ -980,10 +967,10 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   static override readonly EXTENDED_TYPE_MAPS = new Map<string, unknown>();
 
-  static override extendedTypeMap(
-    this: typeof AbstractMysqlAdapter,
-    options: { defaultTimezone?: string; emulateBooleans: boolean },
-  ): TypeMap {
+  static override extendedTypeMap(options: {
+    defaultTimezone?: string;
+    emulateBooleans: boolean;
+  }): TypeMap {
     const m = super.extendedTypeMap(options);
     if (options.emulateBooleans) {
       m.registerType(/^tinyint\(1\)/i, new BooleanType());
@@ -1305,14 +1292,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     await this.rawExecute(`SET ${encoding} ${sqlModeAssignment} ${variableAssignments}`, "SCHEMA");
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
-  async getFullVersion(): Promise<string | null> {
-    throw new Error(`${this.constructor.name} must implement getFullVersion()`);
-  }
-
   override async getDatabaseVersion(): Promise<Version> {
     const fullVersionString = await this.getFullVersion();
     const versionString = this.versionString(fullVersionString);
@@ -1335,7 +1314,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   /** @internal */
-  static override initializeTypeMap(this: typeof AbstractMysqlAdapter, m: TypeMap): void {
+  static override initializeTypeMap(m: TypeMap): void {
     super.initializeTypeMap(m);
 
     m.registerType(/tinytext/i, undefined, () => new TextType({ limit: 2 ** 8 - 1 }));
@@ -1555,7 +1534,10 @@ export interface AbstractMysqlAdapter {
 }
 /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
 
-include(AbstractMysqlAdapter, MysqlSchemaStatements);
+include(
+  AbstractMysqlAdapter as unknown as new (...args: unknown[]) => unknown,
+  MysqlSchemaStatements,
+);
 AbstractMysqlAdapter.prototype.defaultInsertValue = mysqlDefaultInsertValue;
 AbstractMysqlAdapter.prototype.foreignKeys = mysqlForeignKeys;
 AbstractMysqlAdapter.prototype.newColumnFromField = newColumnFromField;

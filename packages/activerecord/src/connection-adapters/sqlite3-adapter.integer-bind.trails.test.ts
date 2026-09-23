@@ -51,6 +51,15 @@ describe("SQLite3Adapter integer bind serialization", () => {
     expect(rows[0].l).toBe("2.0");
   });
 
+  it("binds a negative-zero Float attribute with its sign", async () => {
+    const bind = new QueryAttribute("x", -0, new FloatType());
+    const rows = (
+      await adapter.execQuery("SELECT typeof(?) AS t, ? AS v", "SQL", [bind, bind])
+    ).toArray();
+    expect(rows[0].t).toBe("real");
+    expect(Object.is(rows[0].v, -0)).toBe(true);
+  });
+
   it("binds a whole-valued Decimal attribute as SQLITE_FLOAT", async () => {
     const bind = new QueryAttribute("x", 2, new DecimalType());
     const rows = (

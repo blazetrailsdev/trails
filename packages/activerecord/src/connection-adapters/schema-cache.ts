@@ -23,6 +23,9 @@ async function withConnection<T>(
 
 function serializeColumn(col: Column): ColumnCoder {
   const coder: ColumnCoder = {};
+  coder["class"] = Object.keys(COLUMN_CLASSES)
+    .reverse()
+    .find((name) => Object.prototype.isPrototypeOf.call(COLUMN_CLASSES[name].prototype, col));
   col.encodeWith(coder);
   return coder;
 }

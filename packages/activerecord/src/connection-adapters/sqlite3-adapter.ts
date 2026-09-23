@@ -46,7 +46,7 @@ import { ArgumentError, BinaryData } from "@blazetrails/activemodel";
 import { deprecator } from "../deprecator.js";
 import { TypeMap } from "../type/type-map.js";
 import { DateTime as ARDateTimeType } from "../type/date-time.js";
-import { Attribute as ModelAttribute, IntegerType, FloatType } from "@blazetrails/activemodel";
+import { IntegerType } from "@blazetrails/activemodel";
 import { camelize, isBlank, runLoadHooks, trailsRoot } from "@blazetrails/activesupport";
 import { File, FileUtils } from "@blazetrails/ruby-compat";
 import {
@@ -83,7 +83,7 @@ import {
   quotedBinary as sqliteQuotedBinary,
   quotedTime as sqliteQuotedTime,
 } from "./sqlite3/quoting.js";
-import { isSqlLiteral, type QuotingDispatchHost } from "./abstract/quoting.js";
+import { isSqlLiteral } from "./abstract/quoting.js";
 import {
   CheckConstraintDefinition,
   ForeignKeyDefinition,
@@ -97,15 +97,6 @@ import { Column } from "./column.js";
 import { Column as Sqlite3Column } from "./sqlite3/column.js";
 import { SchemaDumper as Sqlite3SchemaDumper } from "./sqlite3/schema-dumper.js";
 import { databaseCli } from "../active-record.js";
-
-function _driverBind(this: QuotingDispatchHost, value: unknown): unknown {
-  let bindsAsFloat = false;
-  if (value instanceof ModelAttribute) {
-    bindsAsFloat = value.type instanceof FloatType;
-    value = value.valueForDatabase;
-  }
-  return sqliteTypeCast.call(this, value, bindsAsFloat);
-}
 
 function isStructuredDefault(value: unknown): boolean {
   if (Array.isArray(value)) return true;
@@ -353,14 +344,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   override typeCast(value: unknown): unknown {
     return sqliteTypeCast.call(this, value);
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
-  override typeCastedBinds(binds: unknown[] | null | undefined): unknown[] | undefined {
-    return binds?.map(_driverBind, this);
   }
 
   override quoteString(s: string): string {
@@ -1530,19 +1513,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
   }
 
   static override readonly EXTENDED_TYPE_MAPS = new Map<string, unknown>();
-
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
-  static override extendedTypeMap(options: { defaultTimezone?: string }): TypeMap {
-    const m = super.extendedTypeMap(options);
-    this.registerClassWithPrecision(m, /^[^(]*datetime/i, ARDateTimeType, {
-      timezone: options.defaultTimezone,
-    });
-    m.aliasType(/^[^(]*timestamp/i, "datetime");
-    return m;
-  }
 }
 
 export class SQLite3Integer extends IntegerType {

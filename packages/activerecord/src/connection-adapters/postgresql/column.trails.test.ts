@@ -20,7 +20,6 @@ describe("PostgreSQL::Column JSON round-trip", () => {
 
     expect(Object.keys(coder).sort()).toEqual(
       [
-        "class",
         "collation",
         "comment",
         "default",

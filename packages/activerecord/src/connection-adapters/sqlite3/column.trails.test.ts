@@ -57,7 +57,6 @@ describe("SQLite3::Column JSON round-trip", () => {
     expect(Object.keys(coder).sort()).toEqual(
       [
         "auto_increment",
-        "class",
         "collation",
         "comment",
         "default",

@@ -259,24 +259,6 @@ export class TableDefinition extends AbstractTableDefinition {
     return type;
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
-  static override defineColumnMethods(...columnTypes: string[]): void {
-    for (const type of columnTypes) {
-      if (!(type in this.prototype)) {
-        (this.prototype as any)[type] = function (
-          this: TableDefinition,
-          name: string,
-          options: ColumnOptions = {},
-        ) {
-          return this.column(name, type as ColumnType, options);
-        };
-      }
-    }
-  }
-
   private mysqlColumn(
     name: string,
     type: ColumnType,

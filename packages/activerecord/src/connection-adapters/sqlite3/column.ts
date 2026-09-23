@@ -85,6 +85,5 @@ export class Column extends BaseColumn {
   override encodeWith(coder: ColumnCoder): void {
     coder["auto_increment"] = this._autoIncrement;
     super.encodeWith(coder);
-    coder["class"] = "SQLite3::Column";
   }
 }
