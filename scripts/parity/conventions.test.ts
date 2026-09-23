@@ -348,7 +348,7 @@ describe("rubyMethodToTs predicates", () => {
     expect(bareCandidates("blank?")).not.toContain("hasBlank");
   });
 
-  it("appends has* for plural-noun predicates whose Rails body is an existence test", () => {
+  it("appends has* for plural-noun predicates", () => {
     expect(bareCandidates("active_connections?")).toEqual([
       "isActiveConnections",
       "activeConnections",
@@ -357,9 +357,9 @@ describe("rubyMethodToTs predicates", () => {
     expect(bareCandidates("prepared_statements?")).toEqual([
       "isPreparedStatements",
       "preparedStatements",
+      "hasPreparedStatements",
     ]);
-    expect(bareCandidates("record_timestamps?")).not.toContain("hasRecordTimestamps");
-    expect(bareCandidates("attachments?")).not.toContain("hasAttachments");
+    expect(bareCandidates("primary_class?")).not.toContain("hasPrimaryClass");
   });
 
   it("never offers a Q-suffixed candidate for a predicate", () => {

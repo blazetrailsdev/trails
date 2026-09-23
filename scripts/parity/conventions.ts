@@ -1403,61 +1403,41 @@ const HAS_PREDICATE_ALIASES = new Map<string, string>([
 ]);
 
 /**
- * Bare predicates on a plural noun whose Rails body asks "are there any?", mapped
- * to the `has*` spelling a port may use (`active_connections?` →
- * `hasActiveConnections`). Plurality alone is not the discriminator; the BODY
- * is. A name is admitted only when its body is a non-emptiness test over the
- * collection the noun names — `any?`, `size > 0` — or delegates to one:
- *   - `active_connections?` — `each_connection_pool(role).any?(&:active_connection?)`
- *     (activerecord/lib/active_record/connection_adapters/abstract/connection_handler.rb:157-158)
- *   - `active_workers?` — `@active_workers.size > 0`
- *     (activesupport/lib/active_support/testing/parallelization/server.rb:51-52)
- *   - `any_changes?` — `attr_names.any? { … }`
- *     (activemodel/lib/active_model/attribute_mutation_tracker.rb:40-41)
- *   - `default_scopes?` — `self.default_scopes.any?`
- *     (activerecord/lib/active_record/scoping/default.rb:62-67)
- *   - `eligible_waiters?` — `@waiting.any? { … }`
- *     (activesupport/lib/active_support/concurrency/share_lock.rb:213-214)
- *   - `nested_attributes?` — `@parameters.any? { … }`
- *     (actionpack/lib/action_controller/metal/strong_parameters.rb:1119-1120)
- *   - `saved_changes?` — `mutations_before_last_save.any_changes?`
- *     (activerecord/lib/active_record/attribute_methods/dirty.rb:113-114)
- *
- * Deliberately excluded, because the body is a flag or a state check where
- * `has*` would misread it:
- *   - configuration flags — `prepared_statements?` is `@prepared_statements && …`
- *     (connection_adapters/abstract_adapter.rb:234-235), `record_timestamps?` is
- *     `@record_timestamps` (insert_all.rb:87-88), and likewise `seeds?`
- *     (database_configurations/hash_config.rb:137-138) and `database_tasks?`
- *     (hash_config.rb:161-162); "is this enabled?", so `is*` is the reading.
- *   - equality/state checks on a plural-looking symbol — `attachments?` is
- *     `type == :attachments` (railties/lib/rails/generators/generated_attribute.rb:220-221),
- *     `resources?` is `scope_level == :resources`
- *     (actionpack/lib/action_dispatch/routing/mapper.rb:2318-2319).
- *   - a threshold, not existence — `many_workers?` is `size > 1`
- *     (activesupport/lib/active_support/testing/parallelize_executor.rb:60-61).
- *   - bodies that do not read the named collection — `scope_attributes?` is
- *     `current_scope` (activerecord/lib/active_record/scoping.rb:22-23), `routes?`
- *     is the memo `@routes` (railties/lib/rails/engine.rb:680-681),
- *     `grouped_choices?` tests the SHAPE of `@choices`
- *     (actionview/lib/action_view/helpers/tags/select.rb:39-40), and
- *     `duplicates?(other)` is a verb (activesupport/lib/active_support/callbacks.rb:272).
+ * Bare predicates whose subject is a plural noun, mapped to the `has*` spelling a
+ * port may use (`active_connections?` → `hasActiveConnections`). Every
+ * plural-noun predicate in `vendor/rails/*\/lib` that is not already verb-led
+ * (`supports_*?`, `*_exists?`, `matches?`, `has_*?`) is admitted, flag or
+ * existence test alike: `has*` is offered, never imposed, so the port picks the
+ * reading. `active_connections?`
+ * (activerecord/lib/active_record/connection_adapters/abstract/connection_handler.rb:157)
+ * is the case that motivated it.
  *
  * Kept apart from {@link HAS_PREDICATE_ALIASES}, whose admission rule — Rails
- * itself aliases the name to a `has_*?` method — these do not meet. None of the
- * admitted names has a `has_*?` sibling in `vendor/rails/*\/lib`, so the
+ * itself aliases the name to a `has_*?` method — these do not meet. None of
+ * them has a `has_*?` sibling in `vendor/rails/*\/lib`, so the
  * `encrypted_attributes?` collision that rule guards against cannot arise.
  *
  * Appended as a LAST candidate, so it only widens what counts.
  */
-const EXISTENCE_PREDICATE_ALIASES = new Map<string, string>([
+const PLURAL_PREDICATE_ALIASES = new Map<string, string>([
   ["active_connections?", "hasActiveConnections"],
   ["active_workers?", "hasActiveWorkers"],
   ["any_changes?", "hasAnyChanges"],
+  ["attachments?", "hasAttachments"],
+  ["database_tasks?", "hasDatabaseTasks"],
   ["default_scopes?", "hasDefaultScopes"],
+  ["duplicates?", "hasDuplicates"],
   ["eligible_waiters?", "hasEligibleWaiters"],
+  ["grouped_choices?", "hasGroupedChoices"],
+  ["many_workers?", "hasManyWorkers"],
   ["nested_attributes?", "hasNestedAttributes"],
+  ["prepared_statements?", "hasPreparedStatements"],
+  ["record_timestamps?", "hasRecordTimestamps"],
+  ["resources?", "hasResources"],
+  ["routes?", "hasRoutes"],
   ["saved_changes?", "hasSavedChanges"],
+  ["scope_attributes?", "hasScopeAttributes"],
+  ["seeds?", "hasSeeds"],
 ]);
 
 const CONTAINMENT_PREDICATE_ALIASES = new Map<string, string>([
@@ -1502,8 +1482,8 @@ const CONTAINMENT_PREDICATE_ALIASES = new Map<string, string>([
  *   - Bare predicates Rails aliases to a `has_*?` method
  *     ({@link HAS_PREDICATE_ALIASES}) append that `has*` spelling
  *     (`value?` → ["isValue", "value", "hasValue"]).
- *   - Bare plural-noun predicates whose Rails body is an existence test
- *     ({@link EXISTENCE_PREDICATE_ALIASES}) append the `has*` spelling
+ *   - Bare plural-noun predicates
+ *     ({@link PLURAL_PREDICATE_ALIASES}) append the `has*` spelling
  *     (`active_connections?` → ["isActiveConnections", "activeConnections",
  *     "hasActiveConnections"]).
  *   - Containment predicates (`include?`, `member?`, `exclude?`) append
@@ -1620,7 +1600,7 @@ function rubyMethodToTsWithoutUnderscore(
     if (containment !== undefined) {
       return [...literal, isPrefixed, camel, containment];
     }
-    const hasAlias = HAS_PREDICATE_ALIASES.get(name) ?? EXISTENCE_PREDICATE_ALIASES.get(name);
+    const hasAlias = HAS_PREDICATE_ALIASES.get(name) ?? PLURAL_PREDICATE_ALIASES.get(name);
     return [...literal, isPrefixed, camel, ...(hasAlias === undefined ? [] : [hasAlias])];
   }
 
@@ -1702,9 +1682,7 @@ export function explainConventions(): string {
   const predicatePrefixes = ALREADY_PREDICATE_PREFIXES.map((p) => `\`${p}_*?\``).join(" / ");
 
   const hasPredicates = [...HAS_PREDICATE_ALIASES.keys()].map((n) => `\`${n}\``).join(" / ");
-  const existencePredicates = [...EXISTENCE_PREDICATE_ALIASES.keys()]
-    .map((n) => `\`${n}\``)
-    .join(" / ");
+  const pluralPredicates = [...PLURAL_PREDICATE_ALIASES.keys()].map((n) => `\`${n}\``).join(" / ");
   const containmentPredicates = [...CONTAINMENT_PREDICATE_ALIASES.keys()]
     .map((n) => `\`${n}\``)
     .join(" / ");
@@ -1757,7 +1735,7 @@ matches the first candidate present in the target file), not a call expression.
 | ---- | ---------- | ------- |
 | \`predicate?\` (bare) | \`is*\` prefix, then camel | \`valid?\` → ${example("valid?")} |
 | ${hasPredicates} | \`is*\` / camel / the \`has*\` spelling of the \`has_*?\` Rails aliases it to | \`value?\` → ${example("value?")} |
-| ${existencePredicates} | \`is*\` / camel / \`has*\` (the body is an "are there any?" test) | \`active_connections?\` → ${example("active_connections?")} |
+| ${pluralPredicates} | \`is*\` / camel / \`has*\` (plural-noun subject) | \`active_connections?\` → ${example("active_connections?")} |
 | \`is_*?\` | camel form (no doubled \`isIs*\`) | \`is_number?\` → ${example("is_number?")} |
 | ${predicatePrefixes} | camel form + \`is*\` fallback | \`has_attribute?\` → ${example("has_attribute?")} |
 | ${containmentPredicates} | \`is*\` / camel / native JS spelling | \`include?\` → ${example("include?")} |
@@ -1788,10 +1766,8 @@ candidate: \`xQ\` is not a trails spelling of \`x?\`, so port a predicate whose
 bare camel name is taken as \`is*\` (or the quoted literal). A \`has*\` spelling is
 a candidate only for a bare predicate Rails itself aliases to a \`has_*?\` method
 (${hasPredicates}); a blanket \`has*\` would collide with a sibling \`has_*?\`, as
-\`encrypted_attributes?\` does with \`has_encrypted_attributes?\`. A plural-noun
-predicate also gets \`has*\` when its Rails body is a non-emptiness test over the
-collection it names (${existencePredicates}); a configuration flag such as
-\`prepared_statements?\` or \`record_timestamps?\` keeps \`is*\` only. Leading underscores and runs of underscores collapse like a single
+\`encrypted_attributes?\` does with \`has_encrypted_attributes?\`. A predicate whose
+subject is a plural noun also gets \`has*\` (${pluralPredicates}). Leading underscores and runs of underscores collapse like a single
 underscore (\`visit__regexp\` → \`visitRegexp\`), and underscore-before-capital
 collapses too (\`visit_Arel_Nodes_X\` → \`visitArelNodesX\`).
 
