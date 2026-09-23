@@ -3043,13 +3043,9 @@ const DENOMINATOR_BUCKETS = [
 type DenominatorBucket = (typeof DENOMINATOR_BUCKETS)[number];
 
 /**
- * Where a package's Ruby definitions (after the `ClassMethods` fold) went on
- * the way to `totalMethods`, each counted once in the first bucket that
- * applies: an unported file; a file with no expected row, or a Ruby-only
- * class; a `SKIP_GROUPS` name; a mirrorless scoped skip; an unpinned
- * operator; a second definition of a (level, name) its file already expects;
- * else a row of its own. Include-flattened host copies are not definitions,
- * which is why `totalMethods` can exceed `definitions`. Report-only (RFC 0156).
+ * Where a package's Ruby definitions went on the way to `totalMethods`, each
+ * in the first `DENOMINATOR_BUCKETS` bucket that applies. Include-flattened
+ * host copies are not definitions. Report-only (RFC 0156).
  */
 export type DenominatorBreakdown = Record<DenominatorBucket | "definitions", number>;
 

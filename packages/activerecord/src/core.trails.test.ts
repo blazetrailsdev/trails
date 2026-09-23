@@ -243,5 +243,7 @@ describe("hash agrees with ==", () => {
     expect(coreEquals.call(record([[1]]), record([[1]]))).toBe(true);
     expect(hashOf([[1]])).toEqual(hashOf([[1]]));
     expect(hashOf(Symbol.for("x"))).toEqual(hashOf(Symbol.for("x")));
+    expect(coreEquals.call(record(Array(1)), record([undefined]))).toBe(true);
+    expect(hashOf(Array(1))).toEqual(hashOf([undefined]));
   });
 });

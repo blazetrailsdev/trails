@@ -146,7 +146,7 @@ let nextIdHashToken = 0;
 
 function serializeIdForHash(id: unknown): string | undefined {
   if (Array.isArray(id)) {
-    const parts = id.map(serializeIdForHash);
+    const parts = [...id].map(serializeIdForHash);
     if (parts.includes(undefined)) return undefined;
     return `A${parts.map((part) => lengthPrefixed(part!)).join("")}`;
   }
@@ -181,7 +181,7 @@ export function hash(this: CoreRecord): unknown {
 function primaryKeyValuesEqual(a: unknown, b: unknown): boolean {
   if (Array.isArray(a) && Array.isArray(b)) {
     if (a.length !== b.length) return false;
-    return a.every((value, index) => primaryKeyValuesEqual(value, b[index]));
+    return [...a].every((value, index) => primaryKeyValuesEqual(value, b[index]));
   }
   return a === b;
 }

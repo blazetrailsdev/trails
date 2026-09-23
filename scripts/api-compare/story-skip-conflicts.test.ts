@@ -38,10 +38,18 @@ describe("rubyFileMentions", () => {
       "`globalid/lib/global_id/railtie.rb` calls `ActiveSupport.on_load` from `railtie.rb`",
       [{ pkg: "globalid", file: "railtie.rb" }],
     ],
+    [
+      "each bare mention by its own line",
+      "`globalid/lib/global_id/railtie.rb`\n`ActiveSupport::Railtie` in `railtie.rb`",
+      [
+        { pkg: "globalid", file: "railtie.rb" },
+        { pkg: "activesupport", file: "railtie.rb" },
+      ],
+    ],
     ["no gem for a bare path", "`railtie.rb` and `connection_pool_test.rb`", []],
     [
       "no gem when two are named",
-      "`ActionView::Base`, `ActiveSupport.on_load`, `railtie.rb:97`",
+      "`ActionView::Base`\n`ActiveSupport::Railtie`\n`railtie.rb:97`",
       [],
     ],
     ["no railties for a lone Rails", "Rails defines `fixtures.rb`", []],
