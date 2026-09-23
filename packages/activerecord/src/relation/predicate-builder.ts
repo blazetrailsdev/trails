@@ -181,6 +181,7 @@ export class PredicateBuilder {
   }
 
   /** @internal */
+  private groupingQueries(queries: Nodes.Node[][]): Nodes.Node[];
   private groupingQueries(queries: Nodes.Node[][] | Nodes.Node[] | Nodes.Or): Nodes.Node[] {
     queries = queries as Nodes.Node[][];
     if (queries.length === 1) return queries[0];
