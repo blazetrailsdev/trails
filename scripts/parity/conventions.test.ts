@@ -218,7 +218,6 @@ describe("PROTOCOL_DEFINITION_NAMES", () => {
       "dup",
       "clone",
     ]);
-    // A Ruby `dup` in the same file claims the TS `dup` for itself.
     expect(
       rubyMethodToTs("initialize_copy", new Set(["dup", "initialize_copy"]), enrolled)?.filter(
         (c) => !c.startsWith("_"),

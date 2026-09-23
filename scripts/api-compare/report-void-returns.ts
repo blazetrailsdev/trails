@@ -105,7 +105,6 @@ export function voidReturnRows(
   return rows;
 }
 
-/** 32-bit FNV-1a: orders the sample by content, so a rerun draws the same rows. */
 function fnv1a(text: string): number {
   let hash = 0x811c9dc5;
   for (let i = 0; i < text.length; i++) {

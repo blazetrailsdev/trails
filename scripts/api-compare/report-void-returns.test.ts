@@ -9,8 +9,6 @@ import {
   type ApiManifest,
 } from "./report-void-returns.js";
 
-// [package, rubyFile, rubyName, lastExpr, tsFile, tsName, returnsVoid] — the
-// methods of RFC 0155's four discarded-return stories, as first filed.
 // prettier-ignore
 const PAIRS = [
   ["activerecord", "connection_handling.rb", "establish_connection", "call", "connection-handling.ts", "establishConnection", true],
@@ -33,7 +31,6 @@ function manifest(side: "ruby" | "ts"): ApiManifest {
       m,
     ];
   }
-  // `FromDatabase#forgettingAssignment` beside it returns a value.
   packages.activemodel.fileFunctions!["attribute.ts"]?.push({
     name: "forgettingAssignment",
     visibility: "public",

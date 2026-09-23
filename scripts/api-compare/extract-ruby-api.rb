@@ -2085,10 +2085,6 @@ class ApiExtractor
     entry[:lastExpr] = body_last_expr(body)
   end
 
-  # The kind of a body's final expression, the value Ruby returns when nothing
-  # returned earlier (RFC 0156's void-return report): "call" (a method call,
-  # `super` or `yield`), "new" (a `.new`), "return" (`return <expr>`),
-  # "assign", or "other". A final `raise` never returns, so it is "other".
   def body_last_expr(body)
     node = body
     node = node[1] if node.is_a?(Array) && node[0] == :bodystmt

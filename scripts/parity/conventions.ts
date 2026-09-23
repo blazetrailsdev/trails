@@ -1579,12 +1579,10 @@ function rubyMethodToTsWithoutUnderscore(
   // surface (the AR Deduplicable value objects, where `-@` is just Ruby's
   // `alias :-@ :deduplicate`) suppress it via SCOPED_SKIP_GROUPS instead.
   if (name === "-@") return ["negate"];
-  // `to_a` is `toArray` wherever JS already names the protocol (`Relation#toArray`).
   if (name === "to_a") return ["toA", "toArray"];
   if (COPY_HOOKS.has(name)) {
     const own = snakeToCamel(name);
     const other = [...COPY_HOOKS].filter((h) => h !== name).map(snakeToCamel);
-    // A Ruby file that defines its own `dup` / `clone` has that method claim the spelling.
     const copies = ["dup", "clone"].filter((c) => siblingRubyNames?.has(c) !== true);
     return [own, ...other, ...copies];
   }

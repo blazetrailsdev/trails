@@ -1826,8 +1826,6 @@ describe("dedupeRubyMethodInto", () => {
     });
   });
   it("expects a copy hook only where its package is enrolled", () => {
-    // `ActiveModel::Errors#initialize_dup` (errors.rb:122-125) is a row once
-    // its package scores protocol definitions, and dropped before.
     const enrolled = [...PROTOCOL_DEFINITION_ENROLLED_PACKAGES][0];
     const scored = new Map<string, SeenRubyMethod>();
     dedupeRubyMethodInto(scored, rm("initialize_dup"), "Foo", "x.rb", false, enrolled);

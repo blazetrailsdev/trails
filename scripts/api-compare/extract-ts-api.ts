@@ -5239,7 +5239,6 @@ function admitsFunction(p: ts.ParameterDeclaration): boolean {
   );
 }
 
-/** `MethodInfo.returnsVoid`: the signature returns `void` or `Promise<void>`. */
 function signatureReturnsVoid(
   decl: ts.MethodDeclaration | ts.FunctionDeclaration,
   checker: ts.TypeChecker,
