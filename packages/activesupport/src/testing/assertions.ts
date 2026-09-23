@@ -2,12 +2,16 @@ import { indexWith } from "../enumerable-utils.js";
 
 import {
   Dir,
+  RbConfig,
   Tempfile,
   env,
   getChildProcess,
   rbAnyToS,
   rbEqual,
+  rbObjClass,
   rbStrRespondTo,
+  stderr,
+  verbose,
 } from "@blazetrails/ruby-compat";
 import { _testCaseIdentity, taggedLogger } from "./tagged-logging.js";
 
@@ -536,6 +540,16 @@ function diff(exp: unknown, act: unknown): string {
       result = getChildProcess().spawnSync(cmd, [...args, a.path()!, b.path()!]).stdout;
       result = result.replace(/^--- .+/m, "--- expected");
       result = result.replace(/^\+\+\+ .+/m, "+++ actual");
+
+      if (result === "") {
+        const klass = rbObjClass(exp);
+        result = [
+          `No visible difference in the ${klass}#inspect output.\n`,
+          "You should look at the implementation of #== on ",
+          `${klass} or its members.\n`,
+          expect,
+        ].join("");
+      }
     });
   });
 
@@ -563,7 +577,14 @@ function assertionsDiff(): string | null {
 
   const system = (cmd: string) =>
     getChildProcess().spawnSync(cmd, ["/dev/null", "/dev/null"]).status === 0;
-  _diff = system("gdiff") ? "gdiff -u" : system("diff") ? "diff -u" : null;
+  _diff =
+    /mswin|mingw/.test(RbConfig.CONFIG.host_os) && system("diff.exe")
+      ? "diff.exe -u"
+      : system("gdiff")
+        ? "gdiff -u"
+        : system("diff")
+          ? "diff -u"
+          : null;
   return _diff;
 }
 
@@ -602,7 +623,13 @@ function refute(test: unknown, msg: string | (() => string) | null = null): true
 
 function assertEqual(exp: unknown, act: unknown, msg: string | (() => string) | null = null): true {
   msg = message(msg, "", () => diff(exp, act));
-  return assert(deepEqual(exp, act), msg);
+  const result = assert(deepEqual(exp, act), msg);
+
+  if (exp == null && verbose() != null) {
+    stderr.write("DEPRECATED: Use assert_nil if expecting nil. This will fail in Minitest 6.\n");
+  }
+
+  return result;
 }
 
 function refuteEqual(exp: unknown, act: unknown, msg: string | (() => string) | null = null): true {
