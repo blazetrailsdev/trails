@@ -241,21 +241,14 @@ export async function indexes(
   return result;
 }
 
-/**
- * @missingRailsCall any? — PERMANENT
- * @missingRailsName dataSourceSql — PERMANENT
- */
+/** @missingRailsCall any? — PERMANENT */
 export async function virtualTableExists(
-  adapter: DatabaseAdapter,
+  this: SQLite3SchemaAdapter,
   tableName: string,
 ): Promise<boolean> {
   return (
-    (
-      await adapter.queryValues(
-        dataSourceSql.call(adapter, tableName, { type: "VIRTUAL TABLE" }),
-        "SCHEMA",
-      )
-    ).length > 0
+    (await this.queryValues(this.dataSourceSql(tableName, { type: "VIRTUAL TABLE" }), "SCHEMA"))
+      .length > 0
   );
 }
 

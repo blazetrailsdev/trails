@@ -176,7 +176,6 @@ export const NO_JS_EQUIVALENT: Record<string, string[]> = {
   last: ["at", "pop"],
   length: ["size"],
   object_id: ["this"],
-  pack: ["fromCodePoint"],
   read: ["readFile"],
   size: ["length"],
   strip: ["trim"],

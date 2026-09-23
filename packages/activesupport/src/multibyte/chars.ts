@@ -12,6 +12,7 @@ import {
   stringSplit,
 } from "@blazetrails/ruby-compat";
 import { String as JsonString } from "../core-ext/object/json.js";
+import type { EncodeOptions } from "../json/encoding.js";
 import { truncateBytes } from "../string-utils.js";
 import { Unicode } from "./unicode.js";
 
@@ -122,14 +123,12 @@ export class Chars {
     return this.titleize();
   }
 
-  /** @missingRailsName pack — PERMANENT */
   decompose(): Chars {
     return this.chars(
       String.fromCodePoint(...Unicode.decompose(":canonical", codepoints(this.wrappedString))),
     );
   }
 
-  /** @missingRailsName pack — PERMANENT */
   compose(): Chars {
     return this.chars(String.fromCodePoint(...Unicode.compose(codepoints(this.wrappedString))));
   }
@@ -142,9 +141,8 @@ export class Chars {
     return this.chars(Unicode.tidyBytes(this.wrappedString, force));
   }
 
-  /** @missingRailsName options — PERMANENT */
-  asJson(_options: unknown = null): unknown {
-    return JsonString.asJson(this.toS());
+  asJson(options: EncodeOptions | null = null): unknown {
+    return JsonString.asJson(this.toS(), options);
   }
 
   reverseBang(...args: []): this {

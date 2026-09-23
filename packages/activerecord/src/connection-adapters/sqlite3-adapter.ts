@@ -694,7 +694,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   async virtualTableExists(tableName: string): Promise<boolean> {
-    return sqliteVirtualTableExists(this, tableName);
+    return sqliteVirtualTableExists.call(this, tableName);
   }
 
   static readonly VIRTUAL_TABLE_REGEX = /USING\s+(\w+)\s*\((.+)\)/i;
