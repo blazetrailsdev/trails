@@ -255,6 +255,7 @@ export class ConnectionPool implements ReapablePool {
 
   private _connections: DatabaseAdapter[] | null = [];
   private _nowConnecting = 0;
+  private _threadsBlockingNewConnections = 0;
   private _available: ConnectionLeasingQueue | null;
   private _checkedOut = new Set<DatabaseAdapter>();
   private _leases: LeaseRegistry | null = new LeaseRegistry();
@@ -1029,11 +1030,11 @@ async function checkoutForExclusiveAccess(
 
 /** @internal */
 async function withNewConnectionsBlocked<R>(this: Pool, block: () => Promise<R>): Promise<R> {
-  this._threadsBlockingNewConnections = (this._threadsBlockingNewConnections ?? 0) + 1;
+  this._threadsBlockingNewConnections += 1;
   try {
     return await block();
   } finally {
-    this._threadsBlockingNewConnections! -= 1;
+    this._threadsBlockingNewConnections -= 1;
     if (this._threadsBlockingNewConnections === 0) {
       const waiters = this.numWaitingInQueue();
       let need = waiters;
@@ -1112,7 +1113,7 @@ function release(pool: Pool, conn: DatabaseAdapter, ownerThread?: object): void 
 function tryToCheckoutNewConnection(this: Pool): DatabaseAdapter | null {
   let doCheckout = false;
   if (
-    (this._threadsBlockingNewConnections ?? 0) === 0 &&
+    this._threadsBlockingNewConnections === 0 &&
     this._connections &&
     this._connections.length + this._nowConnecting < this.size
   ) {
