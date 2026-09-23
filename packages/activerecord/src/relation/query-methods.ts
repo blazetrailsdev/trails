@@ -24,7 +24,6 @@ import { Map as TypeCasterMap } from "../type-caster/map.js";
 import { WhereClause } from "./where-clause.js";
 import { JoinDependency } from "../associations/join-dependency.js";
 import type { AliasCounts, AliasTracker } from "../associations/alias-tracker.js";
-import { connectionPool } from "../connection-handling.js";
 import {
   any,
   compactBlank,
@@ -1436,9 +1435,6 @@ export function buildCastValue(name: string, value: unknown): Attribute {
  * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
  */
 export function normalizeBoundValue(this: QueryMethodsHost, value: unknown): unknown {
-  if (value instanceof Nodes.Node) {
-    return Arel.sql(connectionFor(this._model).toSql(value));
-  }
   if (isRelationLike(value)) {
     return Arel.sql((value as { toSql(): string }).toSql());
   }
@@ -1879,17 +1875,13 @@ function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function connectionFor(modelClass: any): any {
-  return modelClass && (connectionPool.call(modelClass).activeConnection ?? modelClass.connection);
-}
-
 /** @internal */
 export function isTableNameMatches(this: QueryMethodsHost, from: unknown): boolean {
   const table: any = this.table;
   if (!table) return false;
   const modelClass: any = this.model;
   const name = escapeRegex(table.name);
-  const quotedTableName = connectionFor(modelClass).quoteTableName(table.name);
+  const quotedTableName = modelClass.adapterClassSync().quoteTableName(table.name);
   const quoted = escapeRegex(quotedTableName);
   const fromStr = typeof (from as any)?.toSql === "function" ? (from as any).toSql() : String(from);
   return new RegExp(`(?:^|(?<!FROM)\\s)(?:\\b${name}\\b|${quoted})(?!\\.)`, "i").test(fromStr);
@@ -1922,7 +1914,7 @@ export function arelColumn(
   }
   if (fallback) return fallback(field);
   if (Arel.arelNode(field)) return field;
-  const quoted = isSymbol ? connectionFor(modelClass).quoteTableName(field) : field;
+  const quoted = isSymbol ? modelClass.adapterClassSync().quoteTableName(field) : field;
   return Arel.sql(quoted);
 }
 
@@ -1961,7 +1953,7 @@ export function arelColumnWithTable(
       ) ?? new ArelTable(tableName).get(columnName)
     );
   }
-  return Arel.sql(`${connectionFor(modelClass).quoteTableName(tableName)}.${columnName}`);
+  return Arel.sql(`${modelClass.adapterClassSync().quoteTableName(tableName)}.${columnName}`);
 }
 
 /** @internal */
@@ -1992,7 +1984,9 @@ export function orderColumn(this: QueryMethodsHost, field: string): unknown {
       const table: any = this.table;
       return table.get(attrName);
     }
-    return Arel.sql(connectionFor(this.model).quoteTableName(attrName), { retryable: true });
+    return Arel.sql((this.model as any).adapterClassSync().quoteTableName(attrName), {
+      retryable: true,
+    });
   });
 }
 
@@ -2020,7 +2014,7 @@ export function arelColumnAliasesFromHash(
     const tableName = isRubySymbol(key) ? symbolToName(key) : key;
     const modelClass: any = this.model;
     const quoteAlias = (a: unknown): string =>
-      connectionFor(modelClass).quoteColumnName(isRubySymbol(a) ? symbolToName(a) : String(a));
+      modelClass.adapterClassSync().quoteColumnName(isRubySymbol(a) ? symbolToName(a) : String(a));
     if (isPlainObject(columnsAliases)) {
       return Object.keys(columnsAliases as object).map((col) => {
         const alias = (columnsAliases as any)[col];

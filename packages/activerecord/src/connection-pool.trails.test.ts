@@ -217,6 +217,32 @@ it("disconnect under exclusive acquisition checks out idle connections during th
   expect(pool.stat().connections).toBe(0);
 });
 
+it("tryToCheckoutNewConnection counts an in-flight connect in _nowConnecting and releases it when the connect raises", () => {
+  const pool = makePool(2) as any;
+  const seen: number[] = [];
+  pool.checkoutNewConnection = () => {
+    seen.push(pool._nowConnecting);
+    throw new ConnectionNotEstablished("boom");
+  };
+  expect(() => pool.tryToCheckoutNewConnection()).toThrow("boom");
+  expect(seen).toEqual([1]);
+  expect(pool._nowConnecting).toBe(0);
+
+  pool._nowConnecting = 2;
+  expect(pool.tryToCheckoutNewConnection()).toBeNull();
+});
+
+it("the exclusive sweep keeps waiting while a connect is in flight", async () => {
+  const pool = makePool(2) as any;
+  pool.checkin(await pool.checkout());
+  pool._nowConnecting = 1;
+  await expect(pool.withExclusivelyAcquiredAllConnections(true, () => "done")).rejects.toThrow(
+    /could not obtain ownership of all database connections/,
+  );
+  pool._nowConnecting = 0;
+  expect(await pool.withExclusivelyAcquiredAllConnections(true, () => "done")).toBe("done");
+});
+
 it("clearReloadableConnections only disconnects reloadable adapters", async () => {
   const pool = makePool(3);
   const c1 = await pool.checkout();
