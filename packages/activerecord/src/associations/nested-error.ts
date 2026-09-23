@@ -14,7 +14,7 @@ interface AssociationLike {
 interface InnerErrorLike {
   attribute: string;
   type: string;
-  rawType?: string;
+  rawType?: string | null;
   message: string;
   options?: Record<string, unknown>;
   base?: unknown;

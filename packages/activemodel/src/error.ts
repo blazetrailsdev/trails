@@ -64,7 +64,7 @@ export class Error {
   base: ModelBase;
   attribute: string;
   type: string;
-  rawType: string;
+  rawType: string | null;
   options: Record<string, unknown>;
 
   static fullMessage(attribute: string, message: string, base: ModelBase): string {
@@ -185,19 +185,19 @@ export class Error {
   constructor(
     base: ModelBase,
     attribute: string,
-    type: string = ":invalid",
+    type: string | null = ":invalid",
     options: Record<string, unknown> = {},
-    rawType?: string,
+    rawType?: string | null,
   ) {
     this.base = base;
     this.attribute = attribute;
-    this.rawType = rawType ?? type;
-    this.type = type || ":invalid";
+    this.rawType = rawType !== undefined ? rawType : type;
+    this.type = type ?? ":invalid";
     this.options = options;
   }
 
   get message(): string {
-    if (this.rawType.startsWith(":")) {
+    if (this.rawType != null && this.rawType.startsWith(":")) {
       return Error.generateMessage(
         this.attribute,
         this.rawType,
@@ -205,7 +205,7 @@ export class Error {
         except(this.options, ...CALLBACKS_OPTIONS),
       );
     }
-    return this.rawType;
+    return this.rawType as string;
   }
 
   get details(): Record<string, unknown> {
@@ -251,7 +251,7 @@ export class Error {
   }
 
   /** @internal */
-  protected attributesForHash(): [ModelBase, string, string, Record<string, unknown>] {
+  protected attributesForHash(): [ModelBase, string, string | null, Record<string, unknown>] {
     return [this.base, this.attribute, this.rawType, except(this.options, ...CALLBACKS_OPTIONS)];
   }
 

@@ -443,7 +443,7 @@ describe("aborting before_validation halts before the validators run", () => {
   const newInvalidReply = () =>
     WrongReply.new({ title: "a reply", content: "" }) as unknown as {
       save(): Promise<boolean | undefined>;
-      errors: { any: boolean };
+      errors: { isAny(): boolean };
       beforeValidationForTransaction: () => Promise<void>;
     };
 
@@ -451,7 +451,7 @@ describe("aborting before_validation halts before the validators run", () => {
     const reply = newInvalidReply();
 
     expect(await reply.save()).toBeFalsy();
-    expect(reply.errors.any).toBe(true);
+    expect(reply.errors.isAny()).toBe(true);
   });
 
   it("leaves no errors when a record is also invalid", async () => {
@@ -462,6 +462,6 @@ describe("aborting before_validation halts before the validators run", () => {
     };
 
     expect(await reply.save()).toBeFalsy();
-    expect(reply.errors.any).toBe(false);
+    expect(reply.errors.isAny()).toBe(false);
   });
 });

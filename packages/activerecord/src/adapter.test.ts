@@ -474,7 +474,7 @@ describe("AdapterTest", () => {
 
   it("inspect does not show secrets", () => {
     const output = Base.connection.inspect();
-    expect(output).toMatch(/\w*Adapter:0x[\da-f]+ env_name="\w+" role="writing">/);
+    expect(output).toMatch(/\w*Adapter:0x[\da-f]+ env_name="\w+" role=:writing>/);
   });
 });
 
