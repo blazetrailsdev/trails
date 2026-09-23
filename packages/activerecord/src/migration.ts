@@ -56,7 +56,7 @@ export { ExecutionStrategy } from "./migration/execution-strategy.js";
 export { DefaultStrategy } from "./migration/default-strategy.js";
 export { PendingMigrationConnection } from "./migration/pending-migration-connection.js";
 
-import { ActiveRecordError, NoDatabaseError } from "./errors.js";
+import { ActiveRecordError, ConnectionNotEstablished, NoDatabaseError } from "./errors.js";
 import {
   maintainTestSchema,
   migrationStrategy,
@@ -854,7 +854,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     if (typeof this[direction] !== "function") return;
     this.announce(direction === "up" ? "migrating" : "reverting");
     let timeElapsed = 0;
-    const pool = _DatabaseTasks!.migrationConnection().pool as ConnectionPool;
+    const pool = (await _DatabaseTasks!.migrationConnection()).pool as ConnectionPool;
     await pool.withConnection(async (conn) => {
       const start = Date.now();
       await this.execMigration(conn, direction);
@@ -934,7 +934,15 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   }
 
   get connection(): A {
-    return (this._connectionOverride ?? _DatabaseTasks!.migrationConnection()) as A;
+    if (this._connectionOverride) return this._connectionOverride as A;
+    const connection = _DatabaseTasks!.migrationConnectionPool().activeConnection;
+    if (!connection) {
+      throw new ConnectionNotEstablished(
+        "No connection is leased for this execution context. " +
+          "Await `lease_connection` or use `with_connection` first.",
+      );
+    }
+    return connection as A;
   }
 
   set connection(conn: DatabaseAdapter | CommandRecorder | undefined) {
@@ -1648,7 +1656,7 @@ export class Migrator {
   /** @internal */
   async withAdvisoryLock<T>(fn: () => Promise<T>): Promise<T> {
     const lockId = await this.generateMigratorAdvisoryLockId();
-    const gotLock = await this.connection.getAdvisoryLock(lockId);
+    const gotLock = await (await this.connection).getAdvisoryLock(lockId);
     if (!gotLock) {
       throw new ConcurrentMigrationError();
     }
@@ -1664,7 +1672,7 @@ export class Migrator {
     }
     let released: boolean | undefined;
     try {
-      released = await this.connection.releaseAdvisoryLock(lockId);
+      released = await (await this.connection).releaseAdvisoryLock(lockId);
     } catch (releaseErr) {
       if (fnError !== _sentinel) throw fnError;
       throw releaseErr;
@@ -1677,13 +1685,13 @@ export class Migrator {
   }
 
   async run(): Promise<number | undefined> {
-    return this.isUseAdvisoryLock()
+    return (await this.isUseAdvisoryLock())
       ? this.withAdvisoryLock(() => this.runWithoutLock())
       : this.runWithoutLock();
   }
 
   async migrate(): Promise<MigrationProxy[]> {
-    return this.isUseAdvisoryLock()
+    return (await this.isUseAdvisoryLock())
       ? this.withAdvisoryLock(() => this.migrateWithoutLock())
       : this.migrateWithoutLock();
   }
@@ -1727,13 +1735,13 @@ export class Migrator {
     if (this._internalMetadata.enabled) {
       await this._internalMetadata.set(
         "environment",
-        this.connection.pool.dbConfig.envName as string,
+        (await this.connection).pool.dbConfig.envName as string,
       );
     }
   }
 
   /** @internal */
-  private get connection(): DatabaseAdapter {
+  private get connection(): Promise<DatabaseAdapter> {
     return _DatabaseTasks!.migrationConnection();
   }
 
@@ -1805,15 +1813,15 @@ export class Migrator {
   }
 
   /** @internal */
-  isUseAdvisoryLock(): boolean {
-    return this.connection.isAdvisoryLocksEnabled();
+  async isUseAdvisoryLock(): Promise<boolean> {
+    return (await this.connection).isAdvisoryLocksEnabled();
   }
 
   /** @internal */
   async generateMigratorAdvisoryLockId(): Promise<bigint> {
     const dbNameHash = Zlib.crc32(
       await (
-        this.connection as unknown as { currentDatabase(): Promise<string> }
+        (await this.connection) as unknown as { currentDatabase(): Promise<string> }
       ).currentDatabase(),
     );
     return BigInt(Migrator._MIGRATOR_SALT) * BigInt(dbNameHash);
@@ -1854,7 +1862,7 @@ export class Migrator {
   /** @internal */
   async ddlTransaction(migration: MigrationProxy, fn: () => Promise<void>): Promise<void> {
     if (await this.isUseTransaction(migration)) {
-      await this.connection.transaction(fn);
+      await (await this.connection).transaction(fn);
     } else {
       await fn();
     }
@@ -1863,7 +1871,7 @@ export class Migrator {
   /** @internal */
   async isUseTransaction(migration: MigrationProxy): Promise<boolean> {
     if ((await migration.migration()).disableDdlTransaction) return false;
-    return this.connection.supportsDdlTransactions?.() ?? false;
+    return (await this.connection).supportsDdlTransactions?.() ?? false;
   }
 
   async currentMigration(): Promise<MigrationProxy | null> {

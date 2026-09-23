@@ -29,7 +29,7 @@ import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
 import { migrationProxy } from "./test-helpers/migration-proxy.js";
 
 function withMigrationConnection(adapter: DatabaseAdapter): void {
-  const spy = vi.spyOn(DatabaseTasks, "migrationConnection").mockReturnValue(adapter);
+  const spy = vi.spyOn(DatabaseTasks, "migrationConnection").mockResolvedValue(adapter);
   onTestFinished(() => spy.mockRestore());
 }
 
@@ -487,7 +487,7 @@ describe("Migrator advisory lock wrapping", () => {
       new InternalMetadata(Base.connection.pool),
     );
     withMigrationConnection(adapter);
-    expect(migrator.isUseAdvisoryLock()).toBe(true);
+    expect(await migrator.isUseAdvisoryLock()).toBe(true);
   });
 
   it("isUseAdvisoryLock is false when advisory locks are disabled", async () => {
@@ -502,7 +502,7 @@ describe("Migrator advisory lock wrapping", () => {
       new InternalMetadata(Base.connection.pool),
     );
     withMigrationConnection(adapter);
-    expect(migrator.isUseAdvisoryLock()).toBe(false);
+    expect(await migrator.isUseAdvisoryLock()).toBe(false);
   });
 
   it("reloads the migrated versions after acquiring the advisory lock", async () => {
