@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { Range } from "@blazetrails/ruby-compat";
-import { NameError } from "@blazetrails/ruby-compat";
+import { NameError, Range } from "@blazetrails/ruby-compat";
 import {
   MockExpectationError,
   assertCalled,
