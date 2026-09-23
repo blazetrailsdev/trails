@@ -6,15 +6,14 @@
     }
   },
   "actioncontroller": {
-    "total": 5,
+    "total": 4,
     "byFile": {
-      "base.rb": 1,
       "metal/live.rb": 1,
       "metal/strong_parameters.rb": 3
     }
   },
   "actiondispatch": {
-    "total": 63,
+    "total": 44,
     "byFile": {
       "http/headers.rb": 1,
       "http/query_parser.rb": 1,
@@ -29,7 +28,7 @@
       "routing/mapper.rb": 20,
       "system_test_case.rb": 1,
       "system_testing/driver.rb": 1,
-      "testing/integration.rb": 22
+      "testing/integration.rb": 3
     }
   },
   "actionview": {
@@ -49,20 +48,20 @@
   "activemodel": {
     "total": 7,
     "byFile": {
-      "attribute_methods.rb": 1,
       "attribute.rb": 2,
+      "attribute_methods.rb": 1,
       "model.rb": 1,
       "validations.rb": 1,
       "validations/with.rb": 2
     }
   },
   "activerecord": {
-    "total": 36,
+    "total": 32,
     "byFile": {
       "association_relation.rb": 1,
       "associations/collection_proxy.rb": 1,
       "associations/has_one_through_association.rb": 1,
-      "base.rb": 6,
+      "base.rb": 2,
       "connection_adapters/abstract/database_statements.rb": 1,
       "connection_adapters/postgresql_adapter.rb": 1,
       "core.rb": 2,

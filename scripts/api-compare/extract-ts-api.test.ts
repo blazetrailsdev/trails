@@ -69,6 +69,19 @@ function extractFromSource(source: string, className = "Foo"): ClassInfo {
   return found;
 }
 
+describe("extractClass — a `declare` member typed `typeof fn`", () => {
+  it("records the mixin function's block parameter as aliasParams", () => {
+    const cls = extractFromSource(
+      `function addIncludes(this: object, options: object, block: () => void): void {}
+      class Foo {
+        declare addIncludes: typeof addIncludes;
+      }`,
+    );
+    const member = cls.instanceMethods.find((m) => m.name === "addIncludes")!;
+    expect(member.aliasParams?.find((p) => p.name === "block")?.admitsFunction).toBe(true);
+  });
+});
+
 function objectLiteralMethods(source: string): MethodInfo[] {
   const { sourceFile, checker } = compile(source);
   let out: MethodInfo[] = [];

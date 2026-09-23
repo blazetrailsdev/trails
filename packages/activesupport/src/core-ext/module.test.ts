@@ -398,34 +398,26 @@ describe("ModuleTest", () => {
   });
 
   it("delegate missing to with method", () => {
-    expect((delegateMissingTo.call(new DecoratedTester(david), "client") as any).name).toEqual(
-      "David",
-    );
+    expect((delegateMissingTo(new DecoratedTester(david), "client") as any).name).toEqual("David");
   });
 
   it("delegate missing to calling on self", () => {
-    expect(
-      (delegateMissingTo.call(new DecoratedTester(david), "client") as DecoratedTester).callName(),
-    ).toEqual("David");
+    expect(delegateMissingTo(new DecoratedTester(david), "client").callName()).toEqual("David");
   });
 
   it("delegate missing to with reserved methods", () => {
-    expect((delegateMissingTo.call(new DecoratedReserved(david), "case") as any).name).toEqual(
-      "David",
-    );
+    expect((delegateMissingTo(new DecoratedReserved(david), "case") as any).name).toEqual("David");
   });
 
   it("delegate missing to with keyword methods", () => {
     expect(
-      (delegateMissingTo.call(new DecoratedReserved(david), "case") as any).kwSend({
-        method: "name",
-      }),
+      (delegateMissingTo(new DecoratedReserved(david), "case") as any).kwSend({ method: "name" }),
     ).toEqual("David");
   });
 
   it("delegate missing to does not delegate to private methods", async () => {
     const e = await assertRaises([NoMethodError], {}, () =>
-      (delegateMissingTo.call(new DecoratedReserved(david), "case") as any).privateName(),
+      (delegateMissingTo(new DecoratedReserved(david), "case") as any).privateName(),
     );
 
     expect(e.message).toMatch(/undefined method [`']privateName' for/);
@@ -433,7 +425,7 @@ describe("ModuleTest", () => {
 
   it("delegate missing to does not delegate to fake methods", async () => {
     const e = await assertRaises([NoMethodError], {}, () =>
-      (delegateMissingTo.call(new DecoratedReserved(david), "case") as any).myFakeMethod(),
+      (delegateMissingTo(new DecoratedReserved(david), "case") as any).myFakeMethod(),
     );
 
     expect(e.message).toMatch(/undefined method [`']myFakeMethod' for/);
@@ -443,7 +435,7 @@ describe("ModuleTest", () => {
     const e = await assertRaises(
       [DelegationError],
       {},
-      () => (delegateMissingTo.call(new DecoratedTester(null), "client") as any).name,
+      () => (delegateMissingTo(new DecoratedTester(null), "client") as any).name,
     );
 
     expect(e.message).toEqual("name delegated to client, but client is nil");
@@ -451,7 +443,7 @@ describe("ModuleTest", () => {
 
   it("delegate missing to returns nil if allow nil and nil target", () => {
     expect(
-      (delegateMissingTo.call(new DecoratedReserved(null), "case", { allowNil: true }) as any).name,
+      (delegateMissingTo(new DecoratedReserved(null), "case", { allowNil: true }) as any).name,
     ).toBeUndefined();
   });
 
@@ -469,7 +461,7 @@ describe("ModuleTest", () => {
     }
     expect(
       (
-        delegateMissingTo.call(new DecoratedMissingAllowNil(null), "case", {
+        delegateMissingTo(new DecoratedMissingAllowNil(null), "case", {
           allowNil: true,
         }) as any
       ).callName(),
@@ -477,7 +469,7 @@ describe("ModuleTest", () => {
   });
 
   it("delegate missing to affects respond to", () => {
-    const decorated = () => delegateMissingTo.call(new DecoratedTester(david), "client");
+    const decorated = () => delegateMissingTo(new DecoratedTester(david), "client");
     assertRespondTo(decorated(), "name");
     assertNotRespondTo(decorated(), "privateName");
     assertNotRespondTo(decorated(), "myFakeMethod");
@@ -488,11 +480,11 @@ describe("ModuleTest", () => {
   });
 
   it("delegate missing to respects superclass missing", () => {
-    expect(
-      (delegateMissingTo.call(new DecoratedTester(david), "client") as any).extraMissing,
-    ).toEqual(42);
+    expect((delegateMissingTo(new DecoratedTester(david), "client") as any).extraMissing).toEqual(
+      42,
+    );
 
-    assertRespondTo(delegateMissingTo.call(new DecoratedTester(david), "client"), "extraMissing");
+    assertRespondTo(delegateMissingTo(new DecoratedTester(david), "client"), "extraMissing");
   });
 
   it("delegate missing to does not interfere with marshallization", () => {
@@ -508,7 +500,7 @@ describe("ModuleTest", () => {
       }
     }
     const maze = new Maze();
-    maze.cavern = delegateMissingTo.call(new Cavern(new Maze()), "target");
+    maze.cavern = delegateMissingTo(new Cavern(new Maze()), "target");
 
     const array = [maze, null];
     const serializedArray = JSON.stringify(array);

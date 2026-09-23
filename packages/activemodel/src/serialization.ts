@@ -12,7 +12,7 @@ export interface SerializationRecord {
   serializableAttributes(attributeNames: readonly string[]): Record<string, unknown>;
   serializableAddIncludes(
     options: SerializeOptions,
-    callback: (association: string, records: unknown, opts: SerializeOptions) => void,
+    block: (association: string, records: unknown, opts: SerializeOptions) => void,
   ): void;
 }
 
@@ -196,7 +196,7 @@ export function serializableAttributes(
 export function serializableAddIncludes(
   this: SerializationRecord,
   options: SerializeOptions = {},
-  callback: (association: string, records: unknown, opts: SerializeOptions) => void,
+  block: (association: string, records: unknown, opts: SerializeOptions) => void,
 ): void {
   const includeOpt = options.include as
     | string
@@ -224,7 +224,7 @@ export function serializableAddIncludes(
   for (const [assocName, assocOpts] of Object.entries(includes)) {
     const records = sendAssociation(this, assocName);
     if (records !== null && records !== undefined) {
-      callback(assocName, records, assocOpts);
+      block(assocName, records, assocOpts);
     }
   }
 }

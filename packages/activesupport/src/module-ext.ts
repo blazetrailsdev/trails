@@ -14,11 +14,11 @@ export function delegate(this: object, ...methods: (string | DelegateOptions)[])
 }
 
 export function delegateMissingTo<T extends object>(
-  this: T,
+  host: T,
   target: string,
   { allowNil }: { allowNil?: boolean } = {},
 ): T {
-  return Delegation.generateMethodMissing(this, target, { allowNil });
+  return Delegation.generateMethodMissing(host, target, { allowNil });
 }
 
 export interface MattrOptions {

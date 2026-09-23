@@ -3667,9 +3667,10 @@ export function extractClass(
     } else if (ts.isPropertyDeclaration(member) && memberName) {
       // Public properties are like attr_reader/attr_accessor
       // Only record them if they're not readonly (readonly = getter only conceptually)
-      const aliasParams = member.initializer
-        ? paramsOfCallableRef(member.initializer, checker)
-        : null;
+      const aliasRef =
+        member.initializer ??
+        (member.type && ts.isTypeQueryNode(member.type) ? member.type.exprName : undefined);
+      const aliasParams = aliasRef ? paramsOfCallableRef(aliasRef as ts.Expression, checker) : null;
       const valueAdmitsBoolean = aliasParams ? undefined : memberAdmitsBoolean(member, checker);
       const method: MethodInfo = {
         name: memberName,
