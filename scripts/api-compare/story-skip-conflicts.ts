@@ -1,28 +1,17 @@
 #!/usr/bin/env npx tsx
 /**
- * Open stories that ask to port something a skip register says is unportable
- * (RFC 0156). Report-only.
+ * `pnpm parity:skips:stories` (RFC 0156, report-only): open stories that ask to
+ * port what a skip register says is unportable. A story conflicts with
+ * `UNPORTED_FILES` when it names a Ruby file `isSourceUnported` excludes, and
+ * with a mirrorless `SCOPED_SKIP_GROUPS` group when it names one of the
+ * group's `rubyFiles` and, in code position, one of its `names`.
  *
- *   pnpm parity:skips:stories
+ * The registers are keyed per package, so a file counts once the body says
+ * which gem it is in: a path through a vendored lib root, or a bare path beside
+ * that gem's namespace (`test_case.rb` with `ActiveSupport::TestCase`).
  *
- * A register row says "no TS counterpart is expected"; an open story naming the
- * same Ruby surface says "port it". One of the two is wrong, and nothing else
- * notices. Two registers are read:
- *
- * - `UNPORTED_FILES` (`unported-files/`): a story whose body names a Ruby file
- *   `isSourceUnported` excludes.
- * - `SCOPED_SKIP_GROUPS` (`conventions.ts`): a story whose body names one of a
- *   group's `rubyFiles` AND, in code position (after a backtick, `.`, `#` or
- *   `::`), one of its `names` or that name's TS spelling.
- *
- * A Ruby file counts only when the body says which gem it is in — a path
- * through a vendored package's lib root, as `rubyFileMentions` reads it. A bare
- * `railtie.rb` names a file in half the packages, and the registers are keyed
- * per package.
- *
- * Stories are read from the tasks checkout this worktree links at `tasks/`;
- * "open" is any `status:` other than `done` / `closed` in the exported
- * frontmatter.
+ * Stories come from the checkout `scripts/tasks/tasks.sh` would use; "open" is
+ * any exported `status:` other than `done` / `closed`.
  */
 import * as path from "path";
 import { readdir, readFile } from "fs/promises";
@@ -47,88 +36,70 @@ export interface StorySkipConflict {
   reason: string;
 }
 
-export interface RubyFileMention {
-  pkg: string;
-  file: string;
-}
-
-const CLOSED_STATUSES = new Set(["done", "closed"]);
-
-/**
- * Lib-root namespace directory → parity package, from each vendored package's
- * `libPath` (`activesupport/lib/active_support` → `active_support`), longest
- * first so `rack/session` wins over `rack`.
- */
-export const LIB_ROOTS: ReadonlyMap<string, string> = new Map(
-  SOURCES.flatMap((source) =>
-    source.packages.flatMap((pkg): [string, string][] => {
-      const root = pkg.libPath.split(/(?:^|\/)lib\//)[1] ?? "";
-      return root === "" ? [] : [[root, pkg.name]];
-    }),
-  ).sort(([a], [b]) => b.length - a.length),
-);
+/** Lib root (`active_support`) → package, longest first so `rack/session` beats `rack`. */
+const LIB_ROOTS: [string, string][] = SOURCES.flatMap((source) =>
+  source.packages.flatMap((pkg): [string, string][] => {
+    const root = pkg.libPath.split(/(?:^|\/)lib\//)[1] ?? "";
+    return root === "" ? [] : [[root, pkg.name]];
+  }),
+).sort(([a], [b]) => b.length - a.length);
 
 function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-/**
- * Every Ruby file a body names under a known lib root, as the package and the
- * root-relative path the registers key on
- * (`vendor/rails/activesupport/lib/active_support/test_case.rb:23` →
- * `activesupport`, `test_case.rb`).
- */
-export function rubyFileMentions(body: string): RubyFileMention[] {
-  const mentions = new Map<string, RubyFileMention>();
+/** Every Ruby file a body names, as its package and lib-root-relative path. */
+export function rubyFileMentions(body: string): { pkg: string; file: string }[] {
+  const mentions = new Map<string, { pkg: string; file: string }>();
+  const constants = [...body.matchAll(/(?<![\w:])[A-Z]\w*(?:::[A-Z]\w*)+/g)].map(([c]) =>
+    c.toLowerCase(),
+  );
+  const namedPackages = LIB_ROOTS.filter(([root]) => {
+    const namespace = root.replace(/\//g, "::").replace(/_/g, "").toLowerCase();
+    return constants.some((c) => c.startsWith(`${namespace}::`));
+  }).map(([, pkg]) => pkg);
   for (const [token] of body.matchAll(/[\w./-]+\.rb(?!\w)/g)) {
-    for (const [root, pkg] of LIB_ROOTS) {
-      const match = new RegExp(`(?:^|/)${escapeRegExp(root)}/`).exec(token);
-      if (!match) continue;
-      const file = token.slice(match.index + match[0].length);
-      mentions.set(`${pkg}\u0000${file}`, { pkg, file });
-      break;
-    }
+    const rooted = LIB_ROOTS.map(
+      ([root, pkg]) => [new RegExp(`(?:^|/)${escapeRegExp(root)}/`).exec(token), pkg] as const,
+    ).find(([match]) => match !== null);
+    const pkgs = rooted
+      ? [rooted[1]]
+      : /(?:^|\/)(?:lib|test|vendor|railties|active\w*|action\w*)\//.test(token)
+        ? []
+        : namedPackages;
+    const file = rooted ? token.slice(rooted[0]!.index + rooted[0]![0].length) : token;
+    for (const pkg of pkgs) mentions.set(`${pkg}\u0000${file}`, { pkg, file });
   }
   return [...mentions.values()];
 }
 
-/** `name` (or one of its TS spellings) appears in code position. */
+/** `name` (or one of its TS spellings) appears after a backtick, `.`, `#` or `::`. */
 export function namesMember(body: string, name: string): boolean {
-  const spellings = [name, ...(rubyMethodToTsIgnoringSkip(name) ?? [])];
-  return spellings.some((spelling) =>
+  return [name, ...(rubyMethodToTsIgnoringSkip(name) ?? [])].some((spelling) =>
     new RegExp(`(?:\`|\\.|#|::)${escapeRegExp(spelling)}(?![\\w?!=])`).test(body),
   );
 }
 
 export function storySkipConflicts(stories: readonly StoryText[]): StorySkipConflict[] {
   const conflicts: StorySkipConflict[] = [];
-  for (const { id, status, body } of stories) {
-    if (CLOSED_STATUSES.has(status)) continue;
-    for (const { pkg, file } of rubyFileMentions(body)) {
-      const entry = unportedSourceEntry(file, pkg);
+  for (const { id: story, status, body } of stories) {
+    if (status === "done" || status === "closed") continue;
+    for (const { pkg, file: rubyFile } of rubyFileMentions(body)) {
+      const entry = unportedSourceEntry(rubyFile, pkg);
       if (entry) {
         conflicts.push({
-          story: id,
+          story,
           status,
           register: "unported-file",
           pkg,
-          rubyFile: file,
+          rubyFile,
           reason: entry.reason,
         });
       }
-      for (const group of SCOPED_SKIP_GROUPS) {
-        if (!group.rubyFiles.includes(file)) continue;
-        for (const name of group.names) {
-          if (!namesMember(body, name)) continue;
-          conflicts.push({
-            story: id,
-            status,
-            register: "scoped-skip",
-            pkg,
-            rubyFile: file,
-            name,
-            reason: group.reason,
-          });
+      for (const { tsMirrorName, rubyFiles, names, reason } of SCOPED_SKIP_GROUPS) {
+        if (tsMirrorName !== undefined || !rubyFiles.includes(rubyFile)) continue;
+        for (const name of names.filter((n) => namesMember(body, n))) {
+          conflicts.push({ story, status, register: "scoped-skip", pkg, rubyFile, name, reason });
         }
       }
     }
@@ -136,35 +107,49 @@ export function storySkipConflicts(stories: readonly StoryText[]): StorySkipConf
   return conflicts;
 }
 
-/** The story id, `status:` and body of one story file. */
 export function parseStory(id: string, source: string): StoryText {
   const status = /^status:\s*"?([\w-]+)"?\s*$/m.exec(source)?.[1] ?? "";
-  const body = source.replace(/^---\n[\s\S]*?\n---\n/, "");
-  return { id, status, body };
+  return { id, status, body: source.replace(/^---\n[\s\S]*?\n---\n/, "") };
 }
 
-async function readStories(rfcsDir: string): Promise<StoryText[]> {
+/** The first candidate checkout that has an `rfcs/` directory. */
+export async function resolveRfcsDir(candidates: readonly string[]): Promise<string | undefined> {
+  for (const candidate of candidates) {
+    const rfcsDir = path.join(candidate, "rfcs");
+    if (
+      await readdir(rfcsDir).then(
+        () => true,
+        () => false,
+      )
+    )
+      return rfcsDir;
+  }
+  return undefined;
+}
+
+async function main(): Promise<number> {
+  const { TASKS_DIR, RFCS_DIR, HOME } = process.env;
+  const rfcsDir = await resolveRfcsDir(
+    [
+      TASKS_DIR,
+      RFCS_DIR,
+      fileURLToPath(new URL("../../tasks", import.meta.url)),
+      HOME && path.join(HOME, "github/blazetrailsdev/tasks"),
+    ].filter((c): c is string => !!c),
+  );
+  if (rfcsDir === undefined) {
+    console.error("parity:skips:stories: no tasks checkout with rfcs/ found; set $TASKS_DIR.");
+    return 1;
+  }
   const stories: StoryText[] = [];
   for (const rfc of await readdir(rfcsDir)) {
-    const storiesDir = path.join(rfcsDir, rfc, "stories");
-    let files: string[];
-    try {
-      files = await readdir(storiesDir);
-    } catch {
-      continue;
-    }
-    for (const file of files) {
+    const dir = path.join(rfcsDir, rfc, "stories");
+    for (const file of await readdir(dir).catch(() => [] as string[])) {
       if (!file.endsWith(".md")) continue;
-      const source = await readFile(path.join(storiesDir, file), "utf8");
-      stories.push(parseStory(file.slice(0, -3), source));
+      stories.push(parseStory(file.slice(0, -3), await readFile(path.join(dir, file), "utf8")));
     }
   }
-  return stories;
-}
-
-async function main(): Promise<void> {
-  const rfcsDir = fileURLToPath(new URL("../../tasks/rfcs/", import.meta.url));
-  const conflicts = storySkipConflicts(await readStories(rfcsDir));
+  const conflicts = storySkipConflicts(stories);
   console.log(
     `story/skip-register conflicts (report-only): ${conflicts.length} row(s) over ` +
       `${new Set(conflicts.map((c) => c.story)).size} open stor(ies)`,
@@ -173,13 +158,12 @@ async function main(): Promise<void> {
     const what = c.name === undefined ? c.rubyFile : `${c.rubyFile} ${c.name}`;
     console.log(`  ${c.story} (${c.status})  ${c.register}  ${c.pkg}  ${what}`);
   }
+  return 0;
 }
 
 async function runAsScript(): Promise<void> {
-  const self = fileURLToPath(import.meta.url);
   const invoked = process.argv[1] ? path.resolve(process.argv[1]) : "";
-  if (path.resolve(self) !== invoked) return;
-  await main();
+  if (path.resolve(fileURLToPath(import.meta.url)) === invoked) process.exitCode = await main();
 }
 
 void runAsScript();

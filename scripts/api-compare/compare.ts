@@ -1909,19 +1909,13 @@ export function predicatePairedWithBareTwin(
 }
 
 /**
- * Whether a Ruby predicate `foo?` was matched only through its bare camel
- * candidate (`foo`) by a member that cannot hold a boolean — a getter or
- * property whose every declaration here has `admitsBoolean === false`.
- * `ConnectionPool#active_connection?` (`connection_pool.rb:376`) matched
- * against `get activeConnection(): DatabaseAdapter | null` is the case this
- * reports.
- *
- * A Ruby predicate may return a value, so a non-boolean type alone is not the
- * signal; the member also has to be a value rather than a method. A bare Ruby
- * twin does not excuse the match: `active_connection` is
- * `alias_method :active_connection, :active_connection?` (`:379`), so the
- * getter ports the twin and the predicate's own `isActiveConnection` is what
- * is absent. Report-only (RFC 0156): a match stays a match.
+ * Whether a Ruby predicate `foo?` was matched only through its bare candidate
+ * (`foo`) by a getter or property whose every declaration here has
+ * `admitsBoolean === false`. It reports the predicate's kind, not its value:
+ * `ConnectionPool#active_connection?` returns `connection_lease.connection`
+ * (`connection_pool.rb:376-377`), which `get activeConnection()` returns
+ * faithfully as the port of the `active_connection` alias (`:379`), but the
+ * predicate's own spelling, `isActiveConnection()`, is unported. Report-only.
  */
 export function predicateKindMismatch(
   rubyName: string,
@@ -3037,36 +3031,27 @@ export function rubyLevelKey(level: OwnerSeat, name: string): string {
   return level === "class" ? `self.${name}` : name;
 }
 
-/**
- * Where a package's Ruby definitions went on the way to `totalMethods` (RFC
- * 0156). Every `def` the extractor recorded, after the `ClassMethods` fold, is
- * counted once, in the first bucket that applies:
- *
- * - `excludedFile` — its file is declared unported (`isSourceUnported`).
- * - `rowlessFile` — its file yields no expected row at all, or its class is
- *   Ruby-only (`isRubyOnlyClass`).
- * - `globalSkip` — a `SKIP_GROUPS` name, which maps to no TS candidate.
- * - `scopedSkip` — a `SCOPED_SKIP_GROUPS` (file, name) pair with no mirror.
- * - `operator` — an `OPERATORS` name with no pinned spelling.
- * - `sameNameCollapse` — a second definition of a (level, name) its file
- *   already expects, which `dedupeRubyMethodInto` folds into the first.
- * - `ownRow` — the rest: scored on a row of its own.
- *
- * `totalMethods` can exceed `ownRow` and even `definitions`: include-flattening
- * adds a host copy of every mixin method, which this count leaves out.
- */
-export interface DenominatorBreakdown {
-  definitions: number;
-  excludedFile: number;
-  rowlessFile: number;
-  globalSkip: number;
-  scopedSkip: number;
-  operator: number;
-  sameNameCollapse: number;
-  ownRow: number;
-}
+const DENOMINATOR_BUCKETS = [
+  "excludedFile",
+  "rowlessFile",
+  "globalSkip",
+  "scopedSkip",
+  "operator",
+  "sameNameCollapse",
+  "ownRow",
+] as const;
+type DenominatorBucket = (typeof DENOMINATOR_BUCKETS)[number];
 
-type DenominatorBucket = Exclude<keyof DenominatorBreakdown, "definitions">;
+/**
+ * Where a package's Ruby definitions (after the `ClassMethods` fold) went on
+ * the way to `totalMethods`, each counted once in the first bucket that
+ * applies: an unported file; a file with no expected row, or a Ruby-only
+ * class; a `SKIP_GROUPS` name; a mirrorless scoped skip; an unpinned
+ * operator; a second definition of a (level, name) its file already expects;
+ * else a row of its own. Include-flattened host copies are not definitions,
+ * which is why `totalMethods` can exceed `definitions`. Report-only (RFC 0156).
+ */
+export type DenominatorBreakdown = Record<DenominatorBucket | "definitions", number>;
 
 export function rubyDefinitionBreakdown(
   allRuby: readonly RubyEntity[],
@@ -3075,31 +3060,23 @@ export function rubyDefinitionBreakdown(
 ): DenominatorBreakdown {
   const byFile = new Map<string, { buckets: DenominatorBucket[]; seen: Set<string> }>();
   for (const entity of allRuby) {
-    for (const item of splitOverriddenFileBuckets(entity)) {
-      const file = item.info.file || "unknown.rb";
+    for (const { fqn, info } of splitOverriddenFileBuckets(entity)) {
+      const file = info.file || "unknown.rb";
       const tally = byFile.get(file) ?? { buckets: [], seen: new Set<string>() };
       byFile.set(file, tally);
       for (const [methods, klass] of [
-        [item.info.instanceMethods, false],
-        [item.info.classMethods, true],
+        [info.instanceMethods, false],
+        [info.classMethods, true],
       ] as const) {
-        for (const rm of methods) {
-          if (!inMode(rm)) continue;
-          tally.buckets.push(rubyDefinitionBucket(rm.name, item.fqn, file, klass, tally.seen));
+        for (const rm of methods.filter(inMode)) {
+          tally.buckets.push(rubyDefinitionBucket(rm.name, fqn, file, klass, tally.seen));
         }
       }
     }
   }
-  const breakdown: DenominatorBreakdown = {
-    definitions: 0,
-    excludedFile: 0,
-    rowlessFile: 0,
-    globalSkip: 0,
-    scopedSkip: 0,
-    operator: 0,
-    sameNameCollapse: 0,
-    ownRow: 0,
-  };
+  const breakdown = Object.fromEntries(
+    ["definitions", ...DENOMINATOR_BUCKETS].map((b) => [b, 0]),
+  ) as DenominatorBreakdown;
   for (const [file, { buckets }] of byFile) {
     const excluded = isSourceUnported(file, pkg);
     const rowless = !buckets.includes("ownRow");
@@ -3684,8 +3661,6 @@ export function main() {
     const tsBodylessOwnersByFileName = new Map<string, Map<string, Set<string>>>();
     const tsBodiedOwnersByFileName = new Map<string, Map<string, Set<string>>>();
     const tsAliasNamesByFileName = new Map<string, Set<string>>();
-    // (file → name → each declaration's `MethodInfo.admitsBoolean`), for
-    // `predicateKindMismatch`.
     const tsAdmitsBooleanByFileName = new Map<string, Map<string, (boolean | undefined)[]>>();
     // Same call-sets unioned by NAME across this package and its deps (the same
     // scope tsParamsByName uses). Consulted ONLY by the delegation-transparency
@@ -4990,6 +4965,12 @@ export function main() {
             ? rubyMethodToTsForFqn(rubyModule, rubyName, siblingRubyNames)
             : scopedSkipMirrorCandidates(tsMirrorNames, tsMethods);
         if (tsCandidates === null) continue;
+        const notePredicateKind = (tsFile: string, tsName: string) => {
+          const admits = tsAdmitsBooleanByFileName.get(tsFile)?.get(tsName);
+          if (predicateKindMismatch(rubyName, tsName, admits)) {
+            predicateKindMismatches.push({ rubyFile, rubyName, rubyModule, tsFile, tsName });
+          }
+        };
 
         // Check direct match first — find which candidate matched
         const bothLevels =
@@ -5037,21 +5018,7 @@ export function main() {
         let declOnlyTsName = declOnly ? directMatch : undefined;
         if (directMatch && !declOnly) {
           fileMatched++;
-          if (
-            predicateKindMismatch(
-              rubyName,
-              directMatch,
-              tsAdmitsBooleanByFileName.get(expectedTs)?.get(directMatch),
-            )
-          ) {
-            predicateKindMismatches.push({
-              rubyFile,
-              rubyName,
-              rubyModule,
-              tsFile: expectedTs,
-              tsName: directMatch,
-            });
-          }
+          notePredicateKind(expectedTs, directMatch);
           const claimKey = `${expectedTs}#${directMatch}#${rubyName.endsWith("=") ? "w" : "r"}`;
           const self = `${rubyFile}#${rubyName}`;
           const claimant = tsMemberClaims.get(claimKey);
@@ -5136,21 +5103,7 @@ export function main() {
 
         if (foundViaInclude && !declOnly) {
           fileMatched++;
-          if (
-            predicateKindMismatch(
-              rubyName,
-              matchedCandidate!,
-              tsAdmitsBooleanByFileName.get(foundViaInclude)?.get(matchedCandidate!),
-            )
-          ) {
-            predicateKindMismatches.push({
-              rubyFile,
-              rubyName,
-              rubyModule,
-              tsFile: foundViaInclude,
-              tsName: matchedCandidate!,
-            });
-          }
+          notePredicateKind(foundViaInclude, matchedCandidate!);
           checkArity(
             rubyName,
             matchedCandidate!,
@@ -5995,13 +5948,8 @@ function printReport(
     const d = pkg.denominator;
     const ownPct = d.definitions > 0 ? Math.round((d.ownRow / d.definitions) * 1000) / 10 : 0;
     console.log(
-      `  Ruby defs: ${d.definitions}  —  own row ${d.ownRow} (${ownPct}%)  |  excluded file ${d.excludedFile}  |  rowless file ${d.rowlessFile}  |  global skip ${d.globalSkip}  |  scoped skip ${d.scopedSkip}  |  operator ${d.operator}  |  same-name collapse ${d.sameNameCollapse}`,
+      `  Ruby defs: ${d.definitions}  —  own row ${d.ownRow} (${ownPct}%)  |  excluded file ${d.excludedFile}  |  rowless file ${d.rowlessFile}  |  global skip ${d.globalSkip}  |  scoped skip ${d.scopedSkip}  |  operator ${d.operator}  |  same-name collapse ${d.sameNameCollapse}  |  predicate kind mismatches ${pkg.predicateKindMismatches.length}`,
     );
-    if (pkg.predicateKindMismatches.length > 0) {
-      console.log(
-        `  Predicate kind mismatches (advisory — matched by a non-boolean getter/property): ${pkg.predicateKindMismatches.length}`,
-      );
-    }
     console.log(`${"=".repeat(100)}`);
 
     if (showMissing && pkg.predicateKindMismatches.length > 0) {
