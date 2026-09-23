@@ -3,6 +3,7 @@ import { createRequire } from "node:module";
 import {
   type ColumnInfo,
   type RunResult,
+  type SqliteBindValue,
   type SqliteBinds,
   type SqliteConnection,
   type SqliteDriver,
@@ -136,13 +137,34 @@ class ExpoSqliteConnection implements SqliteConnection {
     await this.raw.execAsync(sql);
   }
 
-  async execute(sql: string, bindVars: SqliteBinds = []): Promise<readonly unknown[]> {
+  execute(sql: string, bindVars?: SqliteBinds): Promise<readonly unknown[]>;
+  execute(
+    sql: string,
+    bindVars: SqliteBinds | undefined,
+    block: ((row: unknown) => void) | undefined,
+  ): Promise<readonly unknown[] | null>;
+  async execute(
+    sql: string,
+    bindVars: SqliteBinds = [],
+    block?: (row: unknown) => void,
+  ): Promise<readonly unknown[] | null> {
     const stmt = await this.prepare(sql);
     try {
-      return Object.freeze(await stmt.all(bindVars));
+      if (block) {
+        for (const row of await stmt.all(bindVars)) block(row);
+        return null;
+      } else {
+        return Object.freeze(await stmt.all(bindVars));
+      }
     } finally {
       await stmt.close();
     }
+  }
+
+  async getFirstValue(sql: string, ...bindVars: SqliteBindValue[]): Promise<unknown> {
+    const row = (await this.execute(sql, bindVars))[0];
+    if (row) return Object.values(row as object)[0];
+    return null;
   }
 
   async pragma(source: string, opts?: { simple?: boolean }): Promise<unknown> {

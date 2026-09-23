@@ -31,6 +31,12 @@ export interface SqliteConnection {
   prepare(sql: string): SqliteStatement | Promise<SqliteStatement>;
   exec(sql: string): void | Promise<void>;
   execute(sql: string, bindVars?: SqliteBinds): readonly unknown[] | Promise<readonly unknown[]>;
+  execute(
+    sql: string,
+    bindVars: SqliteBinds | undefined,
+    block: ((row: unknown) => void) | undefined,
+  ): readonly unknown[] | null | Promise<readonly unknown[] | null>;
+  getFirstValue(sql: string, ...bindVars: SqliteBindValue[]): unknown | Promise<unknown>;
   pragma(source: string, opts?: { simple?: boolean }): unknown | Promise<unknown>;
   changes(): number | Promise<number>;
   lastInsertRowId(): number | bigint | Promise<number | bigint>;
@@ -55,6 +61,12 @@ export interface SyncSqliteConnection {
   prepare(sql: string): SyncSqliteStatement;
   exec(sql: string): void;
   execute(sql: string, bindVars?: SqliteBinds): readonly unknown[];
+  execute(
+    sql: string,
+    bindVars: SqliteBinds | undefined,
+    block: ((row: unknown) => void) | undefined,
+  ): readonly unknown[] | null;
+  getFirstValue(sql: string, ...bindVars: SqliteBindValue[]): unknown;
   pragma(source: string, opts?: { simple?: boolean }): unknown;
   changes(): number;
   lastInsertRowId(): number | bigint;
@@ -70,6 +82,13 @@ export const SQLite3Constants = {
     CREATE: 0x00000004,
     URI: 0x00000040,
     SHAREDCACHE: 0x00020000,
+  },
+  Optimize: {
+    DEBUG: 0x00001,
+    ANALYZE_TABLES: 0x00002,
+    LIMIT_ANALYZE: 0x00010,
+    CHECK_ALL_TABLES: 0x10000,
+    DEFAULT: 0x00002 | 0x00010,
   },
 } as const;
 

@@ -5,6 +5,7 @@ import { ConfigurationError } from "../errors.js";
 import {
   type ColumnInfo,
   type RunResult,
+  type SqliteBindValue,
   type SqliteBinds,
   type SqliteConnection,
   type SqliteDriver,
@@ -123,13 +124,34 @@ class BetterSqlite3Connection implements SqliteConnection, SyncSqliteConnection 
     this.raw.exec(sql);
   }
 
-  execute(sql: string, bindVars: SqliteBinds = []): readonly unknown[] {
+  execute(sql: string, bindVars?: SqliteBinds): readonly unknown[];
+  execute(
+    sql: string,
+    bindVars: SqliteBinds | undefined,
+    block: ((row: unknown) => void) | undefined,
+  ): readonly unknown[] | null;
+  execute(
+    sql: string,
+    bindVars: SqliteBinds = [],
+    block?: (row: unknown) => void,
+  ): readonly unknown[] | null {
     const stmt = this.prepare(sql);
     try {
-      return Object.freeze(stmt.all(bindVars));
+      if (block) {
+        for (const row of stmt.all(bindVars)) block(row);
+        return null;
+      } else {
+        return Object.freeze(stmt.all(bindVars));
+      }
     } finally {
       stmt.close();
     }
+  }
+
+  getFirstValue(sql: string, ...bindVars: SqliteBindValue[]): unknown {
+    const row = this.execute(sql, bindVars)[0];
+    if (row) return Object.values(row as object)[0];
+    return null;
   }
 
   pragma(source: string, opts?: { simple?: boolean }): unknown {
