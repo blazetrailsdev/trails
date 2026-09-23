@@ -29,3 +29,25 @@ describe("SQLite3::Pragmas readers", () => {
     }
   });
 });
+
+describe("SQLite3::Pragmas getters on an async host", () => {
+  it("resolve to the same values the sync host returns", async () => {
+    const db = betterSqlite3Driver.openSync!({ database: ":memory:" });
+    const host = {
+      execute: async (sql: string, bindVars?: never[], block?: (row: unknown) => void) =>
+        db.execute(sql, bindVars, block),
+      getFirstValue: async (sql: string) => db.getFirstValue(sql),
+    };
+    try {
+      Pragmas.setUserVersion.call(db, 3);
+      Pragmas.setJournalMode.call(db, "memory");
+
+      expect(await Pragmas.userVersion.call(host)).toBe(3);
+      expect(await Pragmas.readUncommitted.call(host)).toBe(false);
+      expect(await Pragmas.journalMode.call(host)).toBe("memory");
+      expect(await Pragmas.indexList.call(host, "sqlite_master")).toEqual([]);
+    } finally {
+      db.close();
+    }
+  });
+});
