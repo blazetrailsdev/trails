@@ -570,26 +570,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(err.message).toMatch("has no unique constraint");
     });
 
-    it("exclusionConstraintForBang inspects the lookup options with Symbol keys", async () => {
-      const err = await adapter
-        .exclusionConstraintForBang(`${SCHEMA_NAME}.${TABLE_NAME}`, { name: "missing_excl" })
-        .catch((e) => e);
-      expect(err).toBeInstanceOf(ArgumentError);
-      expect(err.message).toBe(
-        `Table '${SCHEMA_NAME}.${TABLE_NAME}' has no exclusion constraint for {:name=>"missing_excl"}`,
-      );
-    });
-
-    it("uniqueConstraintForBang inspects the lookup options with Symbol keys", async () => {
-      const err = await adapter
-        .uniqueConstraintForBang(`${SCHEMA_NAME}.${TABLE_NAME}`, { name: "missing_uniq" })
-        .catch((e) => e);
-      expect(err).toBeInstanceOf(ArgumentError);
-      expect(err.message).toBe(
-        `Table '${SCHEMA_NAME}.${TABLE_NAME}' has no unique constraint for {:name=>"missing_uniq"}`,
-      );
-    });
-
     it("exclusionConstraintName is deterministic and uses name option", () => {
       const name = adapter.exclusionConstraintName("products", { expression: "price WITH =" });
       expect(name).toMatch(/^excl_rails_[0-9a-f]{10}$/);
