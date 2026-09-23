@@ -349,22 +349,16 @@ describe("rubyMethodToTs predicates", () => {
   });
 
   it("appends has* for plural-noun predicates whose Rails body is an existence test", () => {
-    // `active_connections?` is `each_connection_pool(role).any?(&:active_connection?)`
-    // (connection_handler.rb:157-158); `isActiveConnections` keeps pairing first.
     expect(bareCandidates("active_connections?")).toEqual([
       "isActiveConnections",
       "activeConnections",
       "hasActiveConnections",
     ]);
-    // Configuration flags stay is*-only: `prepared_statements?` is
-    // `@prepared_statements && …` (abstract_adapter.rb:234-235) and
-    // `record_timestamps?` is `@record_timestamps` (insert_all.rb:87-88).
     expect(bareCandidates("prepared_statements?")).toEqual([
       "isPreparedStatements",
       "preparedStatements",
     ]);
     expect(bareCandidates("record_timestamps?")).not.toContain("hasRecordTimestamps");
-    // `attachments?` is `type == :attachments` (generated_attribute.rb:220-221).
     expect(bareCandidates("attachments?")).not.toContain("hasAttachments");
   });
 
