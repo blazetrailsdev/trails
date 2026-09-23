@@ -1078,9 +1078,7 @@ export class Base extends Model {
     primaryAbstractClass(this);
   }
 
-  static isApplicationRecordClass(): boolean {
-    return _Core.isApplicationRecordClass.call(this);
-  }
+  declare static isApplicationRecordClass: typeof _Core.isApplicationRecordClass;
 
   static stiClassFor(typeName: string): typeof Base {
     return stiClassFor(this, typeName);
@@ -2655,6 +2653,7 @@ Object.defineProperty(Base, "connection", {
 extend(Base, { collectionCacheKey: _collectionCacheKey });
 extend(Base, { find: _Core.find, findBy: _Core.findBy, findByBang: _Core.findByBang });
 extend(Base, { configurations: _Core.configurations });
+extend(Base, { isApplicationRecordClass: _Core.isApplicationRecordClass });
 Base.configurations({});
 extend(Base, {
   initializeFindByCache: _Core.initializeFindByCache,
