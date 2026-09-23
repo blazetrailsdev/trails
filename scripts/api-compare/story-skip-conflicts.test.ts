@@ -27,6 +27,16 @@ describe("rubyFileMentions", () => {
     );
   });
 
+  it("resolves a bare path beside a bare namespace", () => {
+    expect(rubyFileMentions("ActiveSupport needs file_update_checker.rb ported")).toEqual([
+      { pkg: "activesupport", file: "file_update_checker.rb" },
+    ]);
+  });
+
+  it("does not read a lone Rails as railties", () => {
+    expect(rubyFileMentions("Rails defines `fixtures.rb`")).toEqual([]);
+  });
+
   it("does not resolve a bare path under another gem's directory", () => {
     expect(rubyFileMentions("`actionmailer/railtie.rb` beside `ActiveSupport::Railtie`")).toEqual(
       [],

@@ -8,7 +8,9 @@
  *
  * The registers are keyed per package, so a file counts once the body says
  * which gem it is in: a path through a vendored lib root, or a bare path beside
- * that gem's namespace (`test_case.rb` with `ActiveSupport::TestCase`).
+ * that gem's namespace (`test_case.rb` with `ActiveSupport` or
+ * `ActiveSupport::TestCase`). A lone `Rails` names the framework in prose, so
+ * railties needs `Rails::`.
  *
  * Stories come from the checkout `scripts/tasks/tasks.sh` would use; "open" is
  * any exported `status:` other than `done` / `closed`.
@@ -51,12 +53,13 @@ function escapeRegExp(text: string): string {
 /** Every Ruby file a body names, as its package and lib-root-relative path. */
 export function rubyFileMentions(body: string): { pkg: string; file: string }[] {
   const mentions = new Map<string, { pkg: string; file: string }>();
-  const constants = [...body.matchAll(/(?<![\w:])[A-Z]\w*(?:::[A-Z]\w*)+/g)].map(([c]) =>
+  const constants = [...body.matchAll(/(?<![\w:])[A-Z]\w*(?:::[A-Z]\w*)*/g)].map(([c]) =>
     c.toLowerCase(),
   );
   const namedPackages = LIB_ROOTS.filter(([root]) => {
     const namespace = root.replace(/\//g, "::").replace(/_/g, "").toLowerCase();
-    return constants.some((c) => c.startsWith(`${namespace}::`));
+    const bare = namespace !== "rails" && constants.includes(namespace);
+    return bare || constants.some((c) => c.startsWith(`${namespace}::`));
   }).map(([, pkg]) => pkg);
   for (const [token] of body.matchAll(/[\w./-]+\.rb(?!\w)/g)) {
     const rooted = LIB_ROOTS.map(

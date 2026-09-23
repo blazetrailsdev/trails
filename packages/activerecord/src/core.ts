@@ -141,11 +141,36 @@ function constructorToken(ctor: object): number {
   return token;
 }
 
-function serializeIdForHash(id: unknown): string {
-  if (Array.isArray(id)) {
-    return `A${id.map((el) => lengthPrefixed(serializeIdForHash(el))).join("")}`;
+const objectIdHashTokens = new WeakMap<object, number>();
+const symbolIdHashTokens = new Map<symbol, number>();
+let nextIdHashToken = 0;
+
+function serializeIdForHash(id: unknown): string | undefined {
+  if (!Array.isArray(id)) return serializeIdComponentForHash(id);
+  const parts = id.map(serializeIdComponentForHash);
+  if (parts.includes(undefined)) return undefined;
+  return `A${parts.map((part) => lengthPrefixed(part!)).join("")}`;
+}
+
+function serializeIdComponentForHash(id: unknown): string | undefined {
+  if (typeof id === "number" && Number.isNaN(id)) return undefined;
+  if (typeof id === "symbol") return `Y${idHashToken(symbolIdHashTokens, id)}`;
+  if ((typeof id === "object" && id !== null) || typeof id === "function") {
+    return `O${idHashToken(objectIdHashTokens, id)}`;
   }
   return `S${typeof id}:${String(id)}`;
+}
+
+function idHashToken<K>(
+  tokens: { get(id: K): number | undefined; set(id: K, token: number): unknown },
+  id: K,
+): number {
+  let token = tokens.get(id);
+  if (token === undefined) {
+    token = nextIdHashToken++;
+    tokens.set(id, token);
+  }
+  return token;
 }
 
 function lengthPrefixed(value: string): string {
@@ -153,9 +178,12 @@ function lengthPrefixed(value: string): string {
 }
 
 export function hash(this: CoreRecord): unknown {
-  if ((this as unknown as { isPrimaryKeyValuesPresent(): boolean }).isPrimaryKeyValuesPresent()) {
-    return `${constructorToken(this.constructor)}#${serializeIdForHash(this.id)}`;
-  }
+  const serialized = (
+    this as unknown as { isPrimaryKeyValuesPresent(): boolean }
+  ).isPrimaryKeyValuesPresent()
+    ? serializeIdForHash(this.id)
+    : undefined;
+  if (serialized !== undefined) return `${constructorToken(this.constructor)}#${serialized}`;
   let key = identityHashKeys.get(this);
   if (key === undefined) {
     key = Symbol("record-hash");
