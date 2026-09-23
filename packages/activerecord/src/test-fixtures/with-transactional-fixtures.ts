@@ -48,8 +48,8 @@ async function replaySchemaCacheDump(
  * It cannot run in a `beforeAll`: callers register their schema-setup
  * `beforeAll` *after* calling the helper, so the schema does not yet exist when
  * ours would fire. Shared with the non-transactional path (`fixtures(...,
- * { useTransactionalTests: false })`), which skips the transactional setup
- * entirely and would otherwise leave the cache cold — a model whose only declaration is `tableName` then reflects no
+ * { useTransactionalTests: false })`), which would otherwise leave the cache
+ * cold — a model whose only declaration is `tableName` then reflects no
  * columns at all, because the sync `load_schema` can only answer from the cache
  * (`model-schema.ts` `loadSchemaFromCacheSync`), where Ruby loads lazily on
  * first attribute access.
