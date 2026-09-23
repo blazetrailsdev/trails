@@ -1,7 +1,7 @@
 import { Thread } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Base } from "./base.js";
-import { ActiveRecordError } from "./errors.js";
+import { ActiveRecordError, ConnectionNotEstablished } from "./errors.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
 import { fixtures } from "./test-fixtures.js";
@@ -136,7 +136,9 @@ describe("ConnectionHandlingTest", () => {
     try {
       Base.releaseConnection();
 
-      void Base.connection;
+      await Base.withConnection(async () => {
+        void Base.connection;
+      });
       expect(warnSpy).toHaveBeenCalledTimes(1);
       warnSpy.mockClear();
 
@@ -145,7 +147,7 @@ describe("ConnectionHandlingTest", () => {
 
       Base.releaseConnection();
 
-      void Base.connection;
+      expect(() => Base.connection).toThrow(ConnectionNotEstablished);
       expect(warnSpy).toHaveBeenCalledTimes(1);
       warnSpy.mockClear();
       Base.releaseConnection();
@@ -459,17 +461,6 @@ describe("ConnectionHandlingTest", () => {
     expect(results).toContain("task2: writing");
     expect(currentRole.call(Base)).toBe("writing");
     expect(connectedToStack()).toHaveLength(0);
-  });
-
-  it("#connection leases a connection when none is active", async () => {
-    setPermanentConnectionCheckout(true);
-    const pool = Base.connectionPool();
-    Base.releaseConnection();
-    expect(pool.activeConnection).toBeNull();
-    const conn = Base.connection;
-    expect(conn).toBeTruthy();
-    expect(pool.activeConnection).toBeTruthy();
-    Base.releaseConnection();
   });
 
   it("#connection returns the active connection inside withConnection", async () => {

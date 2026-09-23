@@ -3,6 +3,8 @@ import { Nodes } from "@blazetrails/arel";
 import { Base } from "./base.js";
 import { leaseConnection, withConnection, connection } from "./connection-handling.js";
 import { adapterDouble, establishConnectionTo } from "./test-helpers/adapter-double.js";
+import { permanentConnectionCheckout, setPermanentConnectionCheckout } from "./active-record.js";
+import { ConnectionNotEstablished } from "./errors.js";
 
 describe("directly bound adapter", () => {
   it("connection, leaseConnection and withConnection resolve to the same session", async () => {
@@ -17,6 +19,36 @@ describe("directly bound adapter", () => {
     expect(direct).toBe(bound);
     expect(leased).toBe(bound);
     expect(scoped).toBe(bound);
+  });
+});
+
+describe("connection without a threaded lease", () => {
+  it("raises ConnectionNotEstablished instead of checking one out synchronously", () => {
+    const was = permanentConnectionCheckout();
+    setPermanentConnectionCheckout(true);
+    try {
+      Base.releaseConnection();
+      expect(() => Base.connection).toThrow(ConnectionNotEstablished);
+      expect(Base.connectionPool().activeConnection).toBeNull();
+    } finally {
+      setPermanentConnectionCheckout(was);
+    }
+  });
+
+  it("makes a connection threaded by withConnection permanent, as lease_connection does", async () => {
+    const was = permanentConnectionCheckout();
+    setPermanentConnectionCheckout(true);
+    try {
+      Base.releaseConnection();
+      const conn = await Base.withConnection(async (connection) => {
+        expect(Base.connection).toBe(connection);
+        return connection;
+      });
+      expect(Base.connectionPool().activeConnection).toBe(conn);
+    } finally {
+      Base.releaseConnection();
+      setPermanentConnectionCheckout(was);
+    }
   });
 });
 
@@ -39,7 +71,10 @@ describe("Arel toSql through Table.engine", () => {
   it("keeps a lease the block made sticky, as connection_pool.rb:421 checks after yielding", () => {
     Base.releaseConnection();
     const pool = Base.connectionPool();
-    const leased = pool.withConnectionSync(() => pool.leaseConnectionSync());
+    const leased = pool.withConnectionSync((conn) => {
+      void pool.leaseConnection();
+      return conn;
+    });
     try {
       expect(pool.activeConnection).toBe(leased);
     } finally {

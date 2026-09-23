@@ -16,6 +16,7 @@ import { fixtures } from "./test-fixtures.js";
 import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
 import { migrationProxy } from "./test-helpers/migration-proxy.js";
 import { migrationStrategy, setMigrationStrategy } from "./active-record.js";
+import { ConnectionNotEstablished } from "./errors.js";
 
 describe("MigrationTest", () => {
   fixtures({}, { useTransactionalTests: false });
@@ -32,6 +33,39 @@ describe("MigrationTest", () => {
     await m.migrate("up");
     await m.migrate("down");
     expect(m.directions).toEqual(["up", "down"]);
+  });
+
+  it("migration.connection raises ConnectionNotEstablished when no connection is leased", async () => {
+    class M extends Migration {
+      async up() {}
+      async down() {}
+    }
+    const m = new M();
+    Base.releaseConnection();
+    try {
+      expect(() => m.connection).toThrow(ConnectionNotEstablished);
+      expect(Base.connectionPool().activeConnection).toBeNull();
+    } finally {
+      await Base.leaseConnection();
+    }
+  });
+
+  it("migration.connection makes the threaded lease permanent, as migration_connection does", async () => {
+    class M extends Migration {
+      async up() {}
+      async down() {}
+    }
+    const m = new M();
+    Base.releaseConnection();
+    try {
+      const conn = await Base.withConnection(async (connection) => {
+        expect(m.connection).toBe(connection);
+        return connection;
+      });
+      expect(Base.connectionPool().activeConnection).toBe(conn);
+    } finally {
+      await Base.leaseConnection();
+    }
   });
 
   it("migration.connection returns _connectionOverride when set", async () => {

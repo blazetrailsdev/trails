@@ -86,7 +86,7 @@ async function main(): Promise<void> {
     // A bare path is treated as a configuration name, not a URL, so pass an
     // explicit hash config.
     await Base.establishConnection({ adapter: "sqlite3", database: dbPath });
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
 
     // 3. Introspect tables, columns, indexes
     const tables = (await adapter.tables()).filter((t) => !FILTERED_TABLES.has(t)).sort();

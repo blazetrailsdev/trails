@@ -149,7 +149,7 @@ async function main(): Promise<void> {
     //    RFC 0007 deleted the connection-less quoters, so a visitor built with
     //    no connection dies on `quoteTableName` (to-sql.ts:1665-1667).
     await Base.establishConnection({ adapter: "sqlite3", database: dbPath });
-    void Base.connection; // checkout wires the dialect visitor (IS DISTINCT FROM → IS NOT)
+    await Base.leaseConnection(); // checkout wires the dialect visitor (IS DISTINCT FROM → IS NOT)
 
     // 4. Import query.ts. Fixtures end with `export default <expr>` — see
     //    scripts/parity/pipeline/translate/arel.ts (generateTs).

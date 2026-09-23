@@ -2538,7 +2538,7 @@ async function main() {
     console.log("Running full refresh sync.\n");
   }
 
-  const adapter = Base.connection as SQLite3Adapter;
+  const adapter = (await Base.leaseConnection()) as SQLite3Adapter;
 
   try {
     await migrateDb(adapter);
