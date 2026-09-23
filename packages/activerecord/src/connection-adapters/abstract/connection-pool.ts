@@ -254,6 +254,7 @@ export class ConnectionPool implements ReapablePool {
   adapterReady: Promise<unknown> = Promise.resolve();
 
   private _connections: DatabaseAdapter[] | null = [];
+  private _nowConnecting = 0;
   private _available: ConnectionLeasingQueue | null;
   private _checkedOut = new Set<DatabaseAdapter>();
   private _leases: LeaseRegistry | null = new LeaseRegistry();
@@ -968,7 +969,9 @@ async function attemptToCheckoutAllExistingConnections(
     await this._available.withABiasFor(IsolatedExecutionState.context(), async () => {
       for (;;) {
         const done = await (synchronize<boolean>).call(this, async () => {
-          if (collectedConns.length === this._connections.length) return true;
+          if (collectedConns.length === this._connections.length && this._nowConnecting === 0) {
+            return true;
+          }
 
           let remainingTimeout = timeoutTime - performance.now() / 1000;
           if (remainingTimeout < 0) remainingTimeout = 0;
@@ -1107,19 +1110,28 @@ function release(pool: Pool, conn: DatabaseAdapter, ownerThread?: object): void 
 
 /** @internal */
 function tryToCheckoutNewConnection(this: Pool): DatabaseAdapter | null {
-  if ((this._threadsBlockingNewConnections ?? 0) > 0) return null;
-  if (!this._connections || this._connections.length >= this.size) return null;
-  if (!this.automaticReconnect) {
-    throw new ConnectionNotEstablished(
-      "No connection available from pool and automatic_reconnect is disabled",
-      { connectionPool: this },
-    );
+  let doCheckout = false;
+  if (
+    (this._threadsBlockingNewConnections ?? 0) === 0 &&
+    this._connections &&
+    this._connections.length + this._nowConnecting < this.size
+  ) {
+    this._nowConnecting += 1;
+    doCheckout = true;
   }
-  const conn = this.checkoutNewConnection();
-  this.adoptConnection(conn);
-  this._checkedOut.add(conn);
-  (conn as unknown as PoolManagedConnection).lease?.();
-  return conn;
+  if (!doCheckout) return null;
+  let conn: DatabaseAdapter | undefined;
+  try {
+    conn = this.checkoutNewConnection();
+  } finally {
+    if (conn) {
+      this.adoptConnection(conn);
+      this._checkedOut.add(conn);
+      (conn as unknown as PoolManagedConnection).lease?.();
+    }
+    this._nowConnecting -= 1;
+  }
+  return conn!;
 }
 
 /** @internal */
