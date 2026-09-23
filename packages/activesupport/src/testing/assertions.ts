@@ -71,9 +71,11 @@ export class BacktraceFilter {
 
 /** @noRailsEquivalent PERMANENT */
 export const Minitest: {
+  VERSION: string;
   backtraceFilter: { filter(bt: string[] | null): string[] };
   filterBacktrace(bt: string[] | null): string[];
 } = {
+  VERSION: "5.27.0",
   backtraceFilter: new BacktraceFilter(),
 
   filterBacktrace(bt: string[] | null): string[] {
@@ -576,7 +578,7 @@ function assertionsDiff(): string | null {
   if (_diff !== undefined) return _diff;
 
   const system = (cmd: string) =>
-    getChildProcess().spawnSync(cmd, ["/dev/null", "/dev/null"]).status === 0;
+    getChildProcess().spawnSync(cmd, [Dir.pwd(), Dir.pwd()]).status === 0;
   _diff =
     /mswin|mingw/.test(RbConfig.CONFIG.host_os) && system("diff.exe")
       ? "diff.exe -u"
@@ -621,12 +623,18 @@ function refute(test: unknown, msg: string | (() => string) | null = null): true
   return assert(test == null || test === false, msg);
 }
 
+const E = "";
+
 function assertEqual(exp: unknown, act: unknown, msg: string | (() => string) | null = null): true {
-  msg = message(msg, "", () => diff(exp, act));
+  msg = message(msg, E, () => diff(exp, act));
   const result = assert(deepEqual(exp, act), msg);
 
-  if (exp == null && verbose() != null) {
-    stderr.write("DEPRECATED: Use assert_nil if expecting nil. This will fail in Minitest 6.\n");
+  if (exp == null) {
+    if (Minitest.VERSION >= "6") {
+      refuteNil(exp, "Use assert_nil if expecting nil.");
+    } else if (verbose() != null) {
+      stderr.write("DEPRECATED: Use assert_nil if expecting nil. This will fail in Minitest 6.\n");
+    }
   }
 
   return result;
@@ -642,7 +650,16 @@ function assertNil(obj: unknown, msg: string | (() => string) | null = null): tr
   return assert(obj == null, msg);
 }
 
-function assertMatch(matcher: RegExp | string, obj: string, msg: string | null = null): void {
+function refuteNil(obj: unknown, msg: string | (() => string) | null = null): true {
+  msg = message(msg, null, () => `Expected ${inspect(obj)} to not be nil`);
+  return refute(obj == null, msg);
+}
+
+function assertMatch(
+  matcher: RegExp | string,
+  obj: string,
+  msg: string | (() => string) | null = null,
+): void {
   const m = message(msg, null, () => `Expected ${inspect(matcher)} to match ${inspect(obj)}`);
   const matched = typeof matcher === "string" ? obj.includes(matcher) : matcher.test(obj);
   assert(matched, m);
