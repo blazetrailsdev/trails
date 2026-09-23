@@ -367,23 +367,6 @@ export function getApplicationRecordClass(): typeof Base | null {
   return applicationRecordClass() as typeof Base | null;
 }
 
-/**
- * Returns true if this class is the designated application-record base class.
- * When a primary abstract class has been explicitly set via `primaryAbstractClass`,
- * this compares against that class. Otherwise it falls back to checking whether
- * the class is registered on `globalThis` as `"ApplicationRecord"`.
- *
- * @internal
- * Mirrors: ActiveRecord::Core::ClassMethods#application_record_class?
- * @noRailsEquivalent CONVERGEABLE Core::ClassMethods#application_record_class? (core.rb:121) as a free function; it also exists on Base, and one of the two should go.
- */
-export function applicationRecordClassQ(modelClass: typeof Base): boolean {
-  if (applicationRecordClass()) {
-    return modelClass === applicationRecordClass();
-  }
-  return modelClass === (globalThis as Record<string, unknown>)["ApplicationRecord"];
-}
-
 export function primaryAbstractClass(modelClass: typeof Base): void {
   if (applicationRecordClass() && applicationRecordClass()!.name !== modelClass.name) {
     throw new ArgumentError(

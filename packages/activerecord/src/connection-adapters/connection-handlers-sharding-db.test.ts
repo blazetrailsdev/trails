@@ -237,37 +237,37 @@ describe("ConnectionHandlersShardingDbTest", () => {
 
         await Base.connectedTo({ role: "reading", shard: "default" }, async () => {
           expect(currentRole.call(Base as any)).toBe("reading");
-          expect(Base.connectedToQ({ role: "reading", shard: "default" })).toBeTruthy();
-          expect(Base.connectedToQ({ role: "writing", shard: "default" })).toBeFalsy();
-          expect(Base.connectedToQ({ role: "writing", shard: "shard_one" })).toBeFalsy();
-          expect(Base.connectedToQ({ role: "reading", shard: "shard_one" })).toBeFalsy();
+          expect(Base.isConnectedTo({ role: "reading", shard: "default" })).toBeTruthy();
+          expect(Base.isConnectedTo({ role: "writing", shard: "default" })).toBeFalsy();
+          expect(Base.isConnectedTo({ role: "writing", shard: "shard_one" })).toBeFalsy();
+          expect(Base.isConnectedTo({ role: "reading", shard: "shard_one" })).toBeFalsy();
           expect((await Base.leaseConnection()).isPreventingWrites()).toBeTruthy();
         });
 
         await Base.connectedTo({ role: "writing", shard: "default" }, async () => {
           expect(currentRole.call(Base as any)).toBe("writing");
-          expect(Base.connectedToQ({ role: "writing", shard: "default" })).toBeTruthy();
-          expect(Base.connectedToQ({ role: "reading", shard: "default" })).toBeFalsy();
-          expect(Base.connectedToQ({ role: "reading", shard: "shard_one" })).toBeFalsy();
-          expect(Base.connectedToQ({ role: "writing", shard: "shard_one" })).toBeFalsy();
+          expect(Base.isConnectedTo({ role: "writing", shard: "default" })).toBeTruthy();
+          expect(Base.isConnectedTo({ role: "reading", shard: "default" })).toBeFalsy();
+          expect(Base.isConnectedTo({ role: "reading", shard: "shard_one" })).toBeFalsy();
+          expect(Base.isConnectedTo({ role: "writing", shard: "shard_one" })).toBeFalsy();
           expect((await Base.leaseConnection()).isPreventingWrites()).toBeFalsy();
         });
 
         await Base.connectedTo({ role: "reading", shard: "shard_one" }, async () => {
           expect(currentRole.call(Base as any)).toBe("reading");
-          expect(Base.connectedToQ({ role: "reading", shard: "shard_one" })).toBeTruthy();
-          expect(Base.connectedToQ({ role: "writing", shard: "shard_one" })).toBeFalsy();
-          expect(Base.connectedToQ({ role: "writing", shard: "default" })).toBeFalsy();
-          expect(Base.connectedToQ({ role: "reading", shard: "default" })).toBeFalsy();
+          expect(Base.isConnectedTo({ role: "reading", shard: "shard_one" })).toBeTruthy();
+          expect(Base.isConnectedTo({ role: "writing", shard: "shard_one" })).toBeFalsy();
+          expect(Base.isConnectedTo({ role: "writing", shard: "default" })).toBeFalsy();
+          expect(Base.isConnectedTo({ role: "reading", shard: "default" })).toBeFalsy();
           expect((await Base.leaseConnection()).isPreventingWrites()).toBeTruthy();
         });
 
         await Base.connectedTo({ role: "writing", shard: "shard_one" }, async () => {
           expect(currentRole.call(Base as any)).toBe("writing");
-          expect(Base.connectedToQ({ role: "writing", shard: "shard_one" })).toBeTruthy();
-          expect(Base.connectedToQ({ role: "reading", shard: "shard_one" })).toBeFalsy();
-          expect(Base.connectedToQ({ role: "reading", shard: "default" })).toBeFalsy();
-          expect(Base.connectedToQ({ role: "writing", shard: "default" })).toBeFalsy();
+          expect(Base.isConnectedTo({ role: "writing", shard: "shard_one" })).toBeTruthy();
+          expect(Base.isConnectedTo({ role: "reading", shard: "shard_one" })).toBeFalsy();
+          expect(Base.isConnectedTo({ role: "reading", shard: "default" })).toBeFalsy();
+          expect(Base.isConnectedTo({ role: "writing", shard: "default" })).toBeFalsy();
           expect((await Base.leaseConnection()).isPreventingWrites()).toBeFalsy();
         });
       },
@@ -515,7 +515,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
 
     ShardedAbstractBase.connectingTo({ role: "writing" });
     try {
-      expect(ShardedAbstractBase.connectedToQ({ role: "writing", shard: "not_default" })).toBe(
+      expect(ShardedAbstractBase.isConnectedTo({ role: "writing", shard: "not_default" })).toBe(
         true,
       );
     } finally {

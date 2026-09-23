@@ -510,7 +510,7 @@ export function attributesForUpdate(this: InstanceMethodHost, attributeNames: st
   const colNames = new Set<string>(mc.columnNames?.() ?? []);
   return attributeNames.filter((name) => {
     if (!colNames.has(name)) return false;
-    if (mc.readonlyAttributeQ?.(name)) return false;
+    if (mc.isReadonlyAttribute?.(name)) return false;
     if (mc.isCounterCacheColumn?.(name)) return false;
     const col = mc.columnForAttribute?.(name);
     if (col?.virtual || col?.isVirtual?.()) return false;

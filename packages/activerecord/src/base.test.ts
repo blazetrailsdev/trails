@@ -1879,7 +1879,7 @@ describe("BasicsTest", () => {
 
   it("can call connected_to with role and shard on abstract classes", () => {
     SecondAbstractClass.connectedTo({ role: "reading", shard: "default" }, () => {
-      assert(SecondAbstractClass.connectedToQ({ role: "reading", shard: "default" }));
+      assert(SecondAbstractClass.isConnectedTo({ role: "reading", shard: "default" }));
     });
   });
 
@@ -1897,7 +1897,7 @@ describe("BasicsTest", () => {
     try {
       SecondAbstractClass.connectingTo({ role: "reading" });
 
-      assert(SecondAbstractClass.connectedToQ({ role: "reading" }));
+      assert(SecondAbstractClass.isConnectedTo({ role: "reading" }));
       assert(SecondAbstractClass.currentPreventingWrites());
     } finally {
       connectedToStack().pop();
@@ -1908,7 +1908,7 @@ describe("BasicsTest", () => {
     try {
       SecondAbstractClass.connectingTo({ role: "reading", shard: "default" });
 
-      assert(SecondAbstractClass.connectedToQ({ role: "reading", shard: "default" }));
+      assert(SecondAbstractClass.isConnectedTo({ role: "reading", shard: "default" }));
     } finally {
       connectedToStack().pop();
     }
@@ -1918,7 +1918,7 @@ describe("BasicsTest", () => {
     try {
       SecondAbstractClass.connectingTo({ role: "writing", preventWrites: true });
 
-      assert(SecondAbstractClass.connectedToQ({ role: "writing" }));
+      assert(SecondAbstractClass.isConnectedTo({ role: "writing" }));
       assert(SecondAbstractClass.currentPreventingWrites());
     } finally {
       connectedToStack().pop();

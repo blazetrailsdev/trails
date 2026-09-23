@@ -4,12 +4,12 @@ import { Nodes, SelectManager, Table as ArelTable } from "@blazetrails/arel";
 import {
   ArgumentError,
   Attribute,
-  ValueType,
   sanitizeForMassAssignment as sanitizeForbiddenAttributes,
 } from "@blazetrails/activemodel";
 import { PredicateBuilder } from "./predicate-builder.js";
 import { DeferredIdsNotIn } from "./predicate-builder/deferred-distinct-pk-in.js";
 import { ActiveRecord } from "../namespaces.js";
+import { defaultValue } from "../type.js";
 import { Relation } from "../relation.js";
 import {
   ActiveRecordError,
@@ -1428,7 +1428,7 @@ export function toI(value: unknown): number {
 
 /** @internal */
 export function buildCastValue(name: string, value: unknown): Attribute {
-  return Attribute.withCastValue(name, value, new ValueType());
+  return Attribute.withCastValue(name, value, defaultValue());
 }
 
 /**
@@ -1641,10 +1641,7 @@ function orderedNode(node: unknown, dir: unknown): unknown {
 
 /** @internal */
 export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]): void {
-  const flattened = flattenedArgs(orderArgs).map((k) =>
-    typeof k === "string" && isRubySymbol(k) ? symbolToName(k) : k,
-  );
-  this.model.disallowRawSqlBang(flattened as (string | symbol | Nodes.Node)[], {
+  this.model.disallowRawSqlBang(flattenedArgs(orderArgs) as (string | symbol | Nodes.Node)[], {
     permit: (
       this.model.adapterClassSync() as unknown as { columnNameWithOrderMatcher(): RegExp }
     ).columnNameWithOrderMatcher(),
@@ -2281,6 +2278,7 @@ export function selectAssociationList(
 /**
  * @internal
  * @missingRailsCall empty? — PERMANENT
+ * @missingRailsName strip — PERMANENT
  */
 export function buildJoinBuckets(
   this: QueryMethodsHost,

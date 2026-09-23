@@ -4542,7 +4542,7 @@ export function main() {
           rubyCalls,
           tsCalls,
           // A `this:` receiver is not an argument — counting it would
-          // promote zero-arg readers (`spawn`, `readonlyAttributeQ`) past the
+          // promote zero-arg readers (`spawn`, `isReadonlyAttribute`) past the
           // gate the moment alias bindings started carrying real params.
           (c) => portedWithArgsSigs(tsFile, c).some((sig) => stripThis(sig).length > 0),
           rubyMethodToTs,

@@ -227,9 +227,9 @@ export function asyncCount(
 
 export async function average(
   this: CalculationRelation,
-  column: string | Nodes.Node,
+  columnName: string | Nodes.Node,
 ): Promise<unknown | null | Map<unknown, unknown>> {
-  return this.calculate("average", column as string);
+  return this.calculate("average", columnName as string);
 }
 
 export function asyncAverage(
@@ -241,9 +241,9 @@ export function asyncAverage(
 
 export async function minimum(
   this: CalculationRelation,
-  column: string | Nodes.Node,
+  columnName: string | Nodes.Node,
 ): Promise<unknown | null | Map<unknown, unknown>> {
-  return this.calculate("minimum", column as string);
+  return this.calculate("minimum", columnName as string);
 }
 
 export function asyncMinimum(
@@ -255,9 +255,9 @@ export function asyncMinimum(
 
 export async function maximum(
   this: CalculationRelation,
-  column: string | Nodes.Node,
+  columnName: string | Nodes.Node,
 ): Promise<unknown | null | Map<unknown, unknown>> {
-  return this.calculate("maximum", column as string);
+  return this.calculate("maximum", columnName as string);
 }
 
 export function asyncMaximum(
@@ -373,6 +373,7 @@ export async function calculate(
   }
 }
 
+/** @missingRailsName first — PERMANENT */
 export async function pluck(
   this: CalculationRelation,
   ...columnNames: Array<
@@ -394,13 +395,7 @@ export async function pluck(
     );
   }
 
-  const firstColumnName =
-    columnNames.length === 0
-      ? null
-      : typeof columnNames[0] === "string"
-        ? columnNames[0]
-        : "\0arel";
-  if (hasInclude(this as any, firstColumnName)) {
+  if (hasInclude(this as any, columnNames.at(0))) {
     return this.applyJoinDependency({}, (relation) => relation.pluck(...columnNames));
   }
 
@@ -651,10 +646,7 @@ export function isAllAttributes(rel: CalculationRelation, columnNames: string[])
 }
 
 /** @internal */
-export function hasInclude(
-  rel: CalculationRelation,
-  columnName: string | Nodes.Node | number | null,
-): boolean {
+export function hasInclude(rel: CalculationRelation, columnName: unknown): boolean {
   return (
     rel.isEagerLoading ||
     (isPresent(rel.includesValues) && columnName != null && columnName !== ":all")
@@ -772,7 +764,7 @@ export async function executeSimpleCalculation(
   } else {
     relation = rel.unscope("order").distinctBang(false) as CalculationRelation;
 
-    column = aggregateColumn(relation, aggregateTarget(columnName));
+    column = aggregateColumn(relation, columnName as string | Nodes.Node | number | null);
     const selectValue = operationOverAggregateColumn(
       column,
       operation,

@@ -2378,7 +2378,7 @@ function extractDefinePropertyAccessorDirect(
  * Params of the function an identifier / property-access reference points at,
  * or null when the expression isn't callable. Mirrors the alias resolution the
  * named-export path does for `export { foo }` so that a binding like
- * `isReadonlyAttribute: readonlyAttributeQ` reports the target's real arity
+ * `readonlyAttribute: isReadonlyAttribute` reports the target's real arity
  * instead of an empty list. Returns `[]` for a callable with no reachable
  * declaration (a synthesized/ambient signature), which is what the pre-alias
  * behavior recorded.

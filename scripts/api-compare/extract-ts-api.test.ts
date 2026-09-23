@@ -217,10 +217,10 @@ describe("harvestObjectLiteralMethods", () => {
 
   it("resolves alias bindings to the target function's params", () => {
     const methods = objectLiteralMethods(
-      `function readonlyAttributeQ(this: unknown, attribute: string): boolean { return true; }
+      `function isReadonlyAttribute(this: unknown, attribute: string): boolean { return true; }
       export const ClassMethods = {
-        readonlyAttributeQ,
-        isReadonlyAttribute: readonlyAttributeQ,
+        isReadonlyAttribute,
+        readonlyAttribute: isReadonlyAttribute,
       };`,
     );
     const byName = Object.fromEntries(methods.map((m) => [m.name, m.params]));
@@ -230,8 +230,8 @@ describe("harvestObjectLiteralMethods", () => {
     ];
     // Both the shorthand and the renamed alias must carry the real 1-1 arity
     // (post `this`-strip) into the candidate pool, not an empty list.
-    expect(byName["readonlyAttributeQ"]).toEqual(expected);
     expect(byName["isReadonlyAttribute"]).toEqual(expected);
+    expect(byName["readonlyAttribute"]).toEqual(expected);
   });
 });
 

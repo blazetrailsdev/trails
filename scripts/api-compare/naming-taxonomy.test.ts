@@ -43,7 +43,7 @@ describe("classifyPair", () => {
   });
 
   it("names what the conventions table itself produces", () => {
-    expect(classifyPair("primary_class?", "primaryClassQ")).toBe("conventions-rename");
+    expect(classifyPair("primary_class?", "isPrimaryClass")).toBe("conventions-rename");
     expect(classifyPair("@callbacks", "_callbacks")).toBe("conventions-rename");
   });
 

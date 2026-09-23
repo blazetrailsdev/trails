@@ -17,7 +17,7 @@ export class PendingMigrationConnection {
     }
   }
 
-  static primaryClassQ(): boolean {
+  static isPrimaryClass(): boolean {
     return false;
   }
 

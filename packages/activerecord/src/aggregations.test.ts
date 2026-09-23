@@ -37,7 +37,7 @@ describe("AggregationsTest", () => {
     const david = customers("david") as CustomerModel & { address: Address };
     expect(david.address.street).toEqual(david.readAttribute("address_street"));
     expect(
-      david.address.closeToQ(
+      david.address.isCloseTo(
         new Address(
           "Different Street",
           david.readAttribute("address_city") as string,

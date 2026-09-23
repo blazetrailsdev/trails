@@ -51,7 +51,6 @@ import {
   isFinderNeedsTypeCondition,
   typeCondition,
   primaryAbstractClass,
-  applicationRecordClassQ as _applicationRecordClassQ,
   stiClassFor,
   polymorphicClassFor,
   initializeInternalsCallback as inheritanceInitializeInternalsCallback,
@@ -774,10 +773,6 @@ export class Base extends Model {
     return !!this.connectionClass;
   }
 
-  static primaryClassQ(): boolean {
-    return this === Base || this.applicationRecordClassQ();
-  }
-
   static asynchronousQueriesSession(): Session {
     return _Core.asynchronousQueriesSession();
   }
@@ -941,7 +936,7 @@ export class Base extends Model {
   declare static connectedToMany: typeof ConnectionHandling.connectedToMany;
   declare static connectedToAllShards: typeof ConnectionHandling.connectedToAllShards;
   declare static connectingTo: typeof ConnectionHandling.connectingTo;
-  declare static connectedToQ: typeof ConnectionHandling.connectedToQ;
+  declare static isConnectedTo: typeof ConnectionHandling.isConnectedTo;
   declare static whilePreventingWrites: typeof ConnectionHandling.whilePreventingWrites;
   declare static prohibitShardSwapping: typeof ConnectionHandling.prohibitShardSwapping;
   declare static isShardSwappingProhibited: typeof ConnectionHandling.isShardSwappingProhibited;
@@ -1083,8 +1078,8 @@ export class Base extends Model {
     primaryAbstractClass(this);
   }
 
-  static applicationRecordClassQ(): boolean {
-    return _applicationRecordClassQ(this);
+  static isApplicationRecordClass(): boolean {
+    return _Core.isApplicationRecordClass.call(this);
   }
 
   static stiClassFor(typeName: string): typeof Base {
@@ -1120,6 +1115,8 @@ export class Base extends Model {
   declare static logger: BenchmarkLogger | null | undefined;
 
   static benchmark = benchmarkable;
+
+  declare static touchAttributesWithTime: typeof Timestamp.touchAttributesWithTime;
 
   static _recordTimestamps = true;
 
@@ -1165,7 +1162,7 @@ export class Base extends Model {
   static _suppressAbstractCheck = false;
 
   declare static attrReadonly: typeof ReadonlyAttributes.attrReadonly;
-  declare static readonlyAttributeQ: typeof ReadonlyAttributes.readonlyAttributeQ;
+  declare static isReadonlyAttribute: typeof ReadonlyAttributes.isReadonlyAttribute;
 
   static get readonlyAttributes(): string[] {
     return ReadonlyAttributes.readonlyAttributes.call(this);
@@ -2782,6 +2779,7 @@ extend(Base, {
   resetDefaultAttributes: _resetDefaultAttributes,
   reloadSchemaFromCache: Timestamp.reloadSchemaFromCache,
 });
+extend(Base, { touchAttributesWithTime: Timestamp.touchAttributesWithTime });
 extend(Base, { isDangerousAttributeMethod: _pkIsDangerousAttributeMethod });
 extend(Base, { isInstanceMethodAlreadyImplemented: _pkIsInstanceMethodAlreadyImplemented });
 extend(Base, {

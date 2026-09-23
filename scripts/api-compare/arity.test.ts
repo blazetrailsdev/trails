@@ -266,7 +266,7 @@ describe("matchArityAgainst", () => {
   });
 
   it("reports the closest candidate, not a 0-arg alias binding recorded first", () => {
-    // `isReadonlyAttribute: readonlyAttributeQ` style alias: the empty record
+    // `readonlyAttribute: isReadonlyAttribute` style alias: the empty record
     // comes first, but the 3-arg real signature is what the report must show.
     const real: ParamInfo[] = [req("a"), req("b"), req("c")];
     const v = matchArityAgainst([req("a"), req("b"), req("c"), req("d"), req("e")], [[], real]);

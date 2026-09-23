@@ -237,7 +237,7 @@ function instantOf(value: TimeLike): Temporal.Instant {
 }
 
 /** Ruby's `Time#utc?` (`vendor/ruby/time.c:4340`). */
-function utcQ(value: TimeLike): boolean {
+function isUtc(value: TimeLike): boolean {
   if (value instanceof TimeWithZone || value instanceof RubyTime) return value.isUtc();
   if (value instanceof Temporal.ZonedDateTime) return value.timeZoneId === "UTC";
   return true;
@@ -274,7 +274,7 @@ function toFsDb(value: TemporalDateLike): string {
 export function quotedDate(value: TemporalDateLike): string {
   if (actsLikeTime(value)) {
     if (defaultTimezone() === "utc") {
-      if (!utcQ(value)) value = getutc(value);
+      if (!isUtc(value)) value = getutc(value);
     } else {
       value = getlocal(value);
     }

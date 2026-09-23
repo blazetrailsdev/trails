@@ -46,6 +46,7 @@ export class RangeHandler {
     this._predicateBuilder = predicateBuilder;
   }
 
+  /** @missingRailsName name — PERMANENT */
   call(attribute: Nodes.Attribute, value: Range<unknown>): Nodes.Node {
     const beginBind = this.predicateBuilder.buildBindAttribute(toS(attribute.name), value.begin);
     const endBind = this.predicateBuilder.buildBindAttribute(toS(attribute.name), value.end);

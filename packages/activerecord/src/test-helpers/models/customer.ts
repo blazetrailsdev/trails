@@ -12,7 +12,7 @@ export class Address {
     this.country = country;
   }
 
-  closeToQ(otherAddress: Address): boolean {
+  isCloseTo(otherAddress: Address): boolean {
     return this.city === otherAddress.city && this.country === otherAddress.country;
   }
 

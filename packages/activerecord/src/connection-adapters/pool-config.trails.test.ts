@@ -36,7 +36,7 @@ describe("PoolConfig", () => {
     });
 
     it("accepts a ConnectionOwner as first arg", () => {
-      const owner = { name: "MyModel", primaryClassQ: () => false };
+      const owner = { name: "MyModel", isPrimaryClass: () => false };
       const pc = new PoolConfig(owner, makeDbConfig());
       expect(pc.connectionDescriptor).toBeInstanceOf(ConnectionDescriptor);
       expect(pc.connectionDescriptor.name).toBe("MyModel");
@@ -51,14 +51,14 @@ describe("PoolConfig", () => {
     });
 
     it("wraps ConnectionOwner objects into ConnectionDescriptor", () => {
-      config.connectionDescriptor = { name: "MyModel", primaryClassQ: () => false };
+      config.connectionDescriptor = { name: "MyModel", isPrimaryClass: () => false };
       expect(config.connectionDescriptor).toBeInstanceOf(ConnectionDescriptor);
       expect(config.connectionDescriptor.name).toBe("MyModel");
     });
 
     it("wraps primary class owners correctly", () => {
-      config.connectionDescriptor = { name: "Base", primaryClassQ: () => true };
-      expect(config.connectionDescriptor.primaryClassQ()).toBe(true);
+      config.connectionDescriptor = { name: "Base", isPrimaryClass: () => true };
+      expect(config.connectionDescriptor.isPrimaryClass()).toBe(true);
       expect(config.connectionDescriptor.name).toBe("ActiveRecord::Base");
     });
   });

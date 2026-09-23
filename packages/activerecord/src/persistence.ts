@@ -859,7 +859,7 @@ interface PersistencePrivateHost {
     primaryKey: string | string[];
     currentScope?: unknown | (() => unknown);
     defaultScoped(): { whereClause: { isEmpty(): boolean; ast: unknown } };
-    readonlyAttributeQ?(name: string): boolean;
+    isReadonlyAttribute?(name: string): boolean;
     withConnection?(fn: (conn: unknown) => Promise<void>): Promise<void>;
     connection: { delete(arel: unknown, name?: string | null, binds?: unknown[]): Promise<number> };
   };
@@ -1128,7 +1128,7 @@ export async function _createRecord(
 
 /** @internal */
 export function verifyReadonlyAttribute(this: PersistencePrivateHost, name: string): void {
-  if ((this.constructor as any).readonlyAttributeQ(name)) {
+  if ((this.constructor as any).isReadonlyAttribute(name)) {
     throw new ActiveRecordError(`${name} is marked as readonly`);
   }
 }

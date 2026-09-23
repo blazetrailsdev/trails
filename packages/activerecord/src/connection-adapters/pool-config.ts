@@ -167,7 +167,7 @@ export class PoolConfig {
     if (value instanceof ConnectionDescriptor) {
       this._connectionDescriptor = value;
     } else {
-      this._connectionDescriptor = new ConnectionDescriptor(value.name, value.primaryClassQ());
+      this._connectionDescriptor = new ConnectionDescriptor(value.name, value.isPrimaryClass());
     }
   }
 }
