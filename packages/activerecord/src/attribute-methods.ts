@@ -1,5 +1,5 @@
 import { CodeGenerator, include, Module, TimeWithZone, toFs } from "@blazetrails/activesupport";
-import { AttributeMethods as AMAttributeMethods } from "@blazetrails/activemodel";
+import { AttributeMethods as AMAttributeMethods, Model } from "@blazetrails/activemodel";
 import { isEmpty, rbInspect as inspect } from "@blazetrails/ruby-compat";
 import {
   ArgumentError,
@@ -629,6 +629,14 @@ function classHasAttribute(
 }
 
 export const ClassMethods = {
+  /** @missingRailsCall table_exists? — PERMANENT */
+  isAttributeMethod(this: { columnNames(): string[] } & object, attribute: string): boolean {
+    return (
+      Model.isAttributeMethod.call(this as never, attribute) ||
+      (cachedTableExists.call(this as never) !== false &&
+        this.columnNames().includes(String(attribute).replace(/=$/, "")))
+    );
+  },
   /** @missingRailsCall table_exists? — PERMANENT */
   attributeNames: classAttributeNames,
   _hasAttribute: classHasAttribute,

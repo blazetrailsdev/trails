@@ -30,6 +30,7 @@ export {
   rbBuiltinClassName,
   rbInspect,
   rbObjInspect,
+  rbAnyToS,
   rbObjAsString,
   rbModSingletonP,
   rbObjClass,

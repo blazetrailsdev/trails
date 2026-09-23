@@ -168,15 +168,9 @@ export function rbInspect(value: unknown): string {
  * @noRailsEquivalent PERMANENT
  */
 export function rbObjInspect(obj: object): string {
-  const c = obj.constructor.name;
-  let address = objAddresses.get(obj);
-  if (address === undefined) {
-    address = nextObjAddress += 8;
-    objAddresses.set(obj, address);
-  }
-  const str = `#<${c}:0x${address.toString(16).padStart(16, "0")}`;
   const ivars = Object.keys(obj);
-  if (ivars.length === 0) return `${str}>`;
+  if (ivars.length === 0) return rbAnyToS(obj);
+  const str = rbAnyToS(obj).slice(0, -1);
   if (objInspectRecursing.has(obj)) return `${str} ...>`;
   objInspectRecursing.add(obj);
   try {
@@ -192,6 +186,24 @@ export function rbObjInspect(obj: object): string {
   } finally {
     objInspectRecursing.delete(obj);
   }
+}
+
+/**
+ * `rb_any_to_s` (`vendor/ruby/object.c:693-701`), `Kernel#to_s`:
+ * `#<Class:0x…>`. JS exposes no object address, so each object is assigned a
+ * stable one on first use. A JS function is Ruby's `Proc`, whose `to_s`
+ * (`proc_to_s`, `vendor/ruby/proc.c:1595`) opens the same way.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbAnyToS(obj: object): string {
+  const cname = typeof obj === "function" ? "Proc" : obj.constructor.name;
+  let address = objAddresses.get(obj);
+  if (address === undefined) {
+    address = nextObjAddress += 8;
+    objAddresses.set(obj, address);
+  }
+  return `#<${cname}:0x${address.toString(16).padStart(16, "0")}>`;
 }
 
 const objInspectRecursing = new Set<object>();

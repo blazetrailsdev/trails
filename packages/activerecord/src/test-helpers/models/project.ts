@@ -58,8 +58,8 @@ export class Project extends Base {
       className: "Developer",
       beforeAdd: (o: any, r: any) => o.developersLog.push(`before_adding${r.id ?? "<new>"}`),
       afterAdd: (o: any, r: any) => o.developersLog.push(`after_adding${r.id ?? "<new>"}`),
-      beforeRemove: (o: any, r: any) => o.developersLog.push(`before_removing${r.id}`),
-      afterRemove: (o: any, r: any) => o.developersLog.push(`after_removing${r.id}`),
+      beforeRemove: (o: any, r: any) => o.developersLog.push(`before_removing${r.id ?? ""}`),
+      afterRemove: (o: any, r: any) => o.developersLog.push(`after_removing${r.id ?? ""}`),
     });
     {
       const prev = (Base as unknown as { belongsToRequiredByDefault?: boolean })

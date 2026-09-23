@@ -379,9 +379,9 @@ export class Author extends Base {
     this.hasMany("postsWithCallbacks", {
       className: "Post",
       beforeAdd: (owner: any, r: any) => owner.postLog.push(`before_adding${r.id ?? "<new>"}`),
-      afterAdd: (owner: any, r: any) => owner.postLog.push(`after_adding${r.id}`),
-      beforeRemove: (owner: any, r: any) => owner.postLog.push(`before_removing${r.id}`),
-      afterRemove: (owner: any, r: any) => owner.postLog.push(`after_removing${r.id}`),
+      afterAdd: (owner: any, r: any) => owner.postLog.push(`after_adding${r.id ?? ""}`),
+      beforeRemove: (owner: any, r: any) => owner.postLog.push(`before_removing${r.id ?? ""}`),
+      afterRemove: (owner: any, r: any) => owner.postLog.push(`after_removing${r.id ?? ""}`),
     });
     this.hasMany("postsWithThrownCallbacks", {
       className: "Post",
@@ -402,8 +402,8 @@ export class Author extends Base {
       className: "Post",
       beforeAdd: (o: any, r: any) => o.postLog.push(`before_adding${r.id ?? "<new>"}`),
       afterAdd: (o: any, r: any) => o.postLog.push(`after_adding${r.id ?? "<new>"}`),
-      beforeRemove: (o: any, r: any) => o.postLog.push(`before_removing${r.id}`),
-      afterRemove: (o: any, r: any) => o.postLog.push(`after_removing${r.id}`),
+      beforeRemove: (o: any, r: any) => o.postLog.push(`before_removing${r.id ?? ""}`),
+      afterRemove: (o: any, r: any) => o.postLog.push(`after_removing${r.id ?? ""}`),
     });
     this.hasMany("postsWithMultipleCallbacks", {
       className: "Post",
@@ -412,7 +412,7 @@ export class Author extends Base {
         (o: any, r: any) => o.postLog.push(`before_adding_proc${r.id ?? "<new>"}`),
       ],
       afterAdd: [
-        (owner: any, r: any) => owner.postLog.push(`after_adding${r.id}`),
+        (owner: any, r: any) => owner.postLog.push(`after_adding${r.id ?? ""}`),
         (o: any, r: any) => o.postLog.push(`after_adding_proc${r.id ?? "<new>"}`),
       ],
     });
@@ -421,7 +421,7 @@ export class Author extends Base {
       beforeAdd: (_owner: any, _object: any) => {
         throw new Error("You can't add a post");
       },
-      afterAdd: (owner: any, r: any) => owner.postLog.push(`after_adding${r.id}`),
+      afterAdd: (owner: any, r: any) => owner.postLog.push(`after_adding${r.id ?? ""}`),
     });
 
     this.hasMany("categorizations");
