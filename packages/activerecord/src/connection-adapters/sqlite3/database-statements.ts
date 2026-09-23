@@ -216,7 +216,7 @@ export async function performQuery(
       return typeof value === "bigint" &&
         bind instanceof ModelAttribute &&
         bind.type instanceof FloatType
-        ? Number(value)
+        ? bind.valueForDatabase
         : value;
     });
   }
