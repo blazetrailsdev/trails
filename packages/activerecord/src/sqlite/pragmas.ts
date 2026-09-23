@@ -1,5 +1,6 @@
 import { FloatDomainError, NoMethodError } from "@blazetrails/ruby-compat";
 
+import type { SqliteBinds } from "../sqlite-adapter.js";
 import { Exception } from "./errors.js";
 
 export const SYNCHRONOUS_MODES: (string | number)[][] = [
@@ -41,7 +42,7 @@ export const WAL_CHECKPOINTS: (string | number)[][] = [
 ];
 
 export interface PragmasHost {
-  execute(sql: string): unknown;
+  execute(sql: string, bindVars?: SqliteBinds, block?: (row: unknown) => void): unknown;
   getFirstValue(sql: string): unknown;
 }
 
@@ -96,11 +97,16 @@ export function setBooleanPragma(this: PragmasHost, name: string, mode: unknown)
 }
 
 export function getQueryPragma(this: PragmasHost, name: string, ...params: unknown[]): unknown {
+  const block =
+    params.length > 0 &&
+    (params[params.length - 1] === undefined || typeof params[params.length - 1] === "function")
+      ? (params.pop() as ((row: unknown) => void) | undefined)
+      : undefined;
   if (params.length === 0) {
-    return this.execute(`PRAGMA ${name}`);
+    return this.execute(`PRAGMA ${name}`, [], block);
   } else {
     const args = "'" + params.join("','") + "'";
-    return this.execute(`PRAGMA ${name}( ${args} )`);
+    return this.execute(`PRAGMA ${name}( ${args} )`, [], block);
   }
 }
 
@@ -197,12 +203,12 @@ export function setCheckpointFullfsync(this: PragmasHost, mode: unknown): unknow
   return setBooleanPragma.call(this, "checkpoint_fullfsync", mode);
 }
 
-export function collationList(this: PragmasHost): unknown {
-  return getQueryPragma.call(this, "collation_list");
+export function collationList(this: PragmasHost, block?: (row: unknown) => void): unknown {
+  return getQueryPragma.call(this, "collation_list", block);
 }
 
-export function compileOptions(this: PragmasHost): unknown {
-  return getQueryPragma.call(this, "compile_options");
+export function compileOptions(this: PragmasHost, block?: (row: unknown) => void): unknown {
+  return getQueryPragma.call(this, "compile_options", block);
 }
 
 export function countChanges(this: PragmasHost): Promise<boolean> {
@@ -217,8 +223,8 @@ export function dataVersion(this: PragmasHost): Promise<number> {
   return getIntPragma.call(this, "data_version");
 }
 
-export function databaseList(this: PragmasHost): unknown {
-  return getQueryPragma.call(this, "database_list");
+export function databaseList(this: PragmasHost, block?: (row: unknown) => void): unknown {
+  return getQueryPragma.call(this, "database_list", block);
 }
 
 export function defaultCacheSize(this: PragmasHost): Promise<number> {
@@ -265,8 +271,12 @@ export function foreignKeyCheck(this: PragmasHost, ...table: unknown[]): unknown
   return getQueryPragma.call(this, "foreign_key_check", ...table);
 }
 
-export function foreignKeyList(this: PragmasHost, table: unknown): unknown {
-  return getQueryPragma.call(this, "foreign_key_list", table);
+export function foreignKeyList(
+  this: PragmasHost,
+  table: unknown,
+  block?: (row: unknown) => void,
+): unknown {
+  return getQueryPragma.call(this, "foreign_key_list", table, block);
 }
 
 export function foreignKeys(this: PragmasHost): Promise<boolean> {
@@ -301,20 +311,36 @@ export function setIgnoreCheckConstraints(this: PragmasHost, mode: unknown): unk
   return setBooleanPragma.call(this, "ignore_check_constraints", mode);
 }
 
-export function incrementalVacuum(this: PragmasHost, pages: unknown): unknown {
-  return getQueryPragma.call(this, "incremental_vacuum", pages);
+export function incrementalVacuum(
+  this: PragmasHost,
+  pages: unknown,
+  block?: (row: unknown) => void,
+): unknown {
+  return getQueryPragma.call(this, "incremental_vacuum", pages, block);
 }
 
-export function indexInfo(this: PragmasHost, index: unknown): unknown {
-  return getQueryPragma.call(this, "index_info", index);
+export function indexInfo(
+  this: PragmasHost,
+  index: unknown,
+  block?: (row: unknown) => void,
+): unknown {
+  return getQueryPragma.call(this, "index_info", index, block);
 }
 
-export function indexList(this: PragmasHost, table: unknown): unknown {
-  return getQueryPragma.call(this, "index_list", table);
+export function indexList(
+  this: PragmasHost,
+  table: unknown,
+  block?: (row: unknown) => void,
+): unknown {
+  return getQueryPragma.call(this, "index_list", table, block);
 }
 
-export function indexXinfo(this: PragmasHost, index: unknown): unknown {
-  return getQueryPragma.call(this, "index_xinfo", index);
+export function indexXinfo(
+  this: PragmasHost,
+  index: unknown,
+  block?: (row: unknown) => void,
+): unknown {
+  return getQueryPragma.call(this, "index_xinfo", index, block);
 }
 
 export function integrityCheck(this: PragmasHost, ...numErrors: unknown[]): unknown {
@@ -473,8 +499,8 @@ export function setSoftHeapLimit(this: PragmasHost, mode: unknown): unknown {
   return setIntPragma.call(this, "soft_heap_limit", mode);
 }
 
-export function stats(this: PragmasHost): unknown {
-  return getQueryPragma.call(this, "stats");
+export function stats(this: PragmasHost, block?: (row: unknown) => void): unknown {
+  return getQueryPragma.call(this, "stats", block);
 }
 
 export function synchronous(this: PragmasHost): unknown {

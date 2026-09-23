@@ -15,6 +15,15 @@ describe("SQLite3::Pragmas readers", () => {
       expect(await Pragmas.foreignKeys.call(db)).toBe(true);
       expect(Pragmas.journalMode.call(db)).toBe("memory");
       expect(Pragmas.indexList.call(db, "sqlite_master")).toEqual([]);
+
+      const names: unknown[] = [];
+      expect(
+        Pragmas.collationList.call(db, (row) => names.push((row as { name: string }).name)),
+      ).toBeNull();
+      expect(names).toContain("BINARY");
+      const checked: unknown[] = [];
+      expect(Pragmas.integrityCheck.call(db, (row: unknown) => checked.push(row))).toBeNull();
+      expect(checked).toEqual([{ integrity_check: "ok" }]);
     } finally {
       db.close();
     }

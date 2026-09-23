@@ -31,6 +31,11 @@ export interface SqliteConnection {
   prepare(sql: string): SqliteStatement | Promise<SqliteStatement>;
   exec(sql: string): void | Promise<void>;
   execute(sql: string, bindVars?: SqliteBinds): readonly unknown[] | Promise<readonly unknown[]>;
+  execute(
+    sql: string,
+    bindVars: SqliteBinds | undefined,
+    block: ((row: unknown) => void) | undefined,
+  ): readonly unknown[] | null | Promise<readonly unknown[] | null>;
   getFirstValue(sql: string, ...bindVars: SqliteBindValue[]): unknown | Promise<unknown>;
   pragma(source: string, opts?: { simple?: boolean }): unknown | Promise<unknown>;
   changes(): number | Promise<number>;
@@ -56,6 +61,11 @@ export interface SyncSqliteConnection {
   prepare(sql: string): SyncSqliteStatement;
   exec(sql: string): void;
   execute(sql: string, bindVars?: SqliteBinds): readonly unknown[];
+  execute(
+    sql: string,
+    bindVars: SqliteBinds | undefined,
+    block: ((row: unknown) => void) | undefined,
+  ): readonly unknown[] | null;
   getFirstValue(sql: string, ...bindVars: SqliteBindValue[]): unknown;
   pragma(source: string, opts?: { simple?: boolean }): unknown;
   changes(): number;

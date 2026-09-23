@@ -110,10 +110,25 @@ class NodeSqliteConnection implements SqliteConnection, SyncSqliteConnection {
     this.raw.exec(sql);
   }
 
-  execute(sql: string, bindVars: SqliteBinds = []): readonly unknown[] {
+  execute(sql: string, bindVars?: SqliteBinds): readonly unknown[];
+  execute(
+    sql: string,
+    bindVars: SqliteBinds | undefined,
+    block: ((row: unknown) => void) | undefined,
+  ): readonly unknown[] | null;
+  execute(
+    sql: string,
+    bindVars: SqliteBinds = [],
+    block?: (row: unknown) => void,
+  ): readonly unknown[] | null {
     const stmt = this.prepare(sql);
     try {
-      return Object.freeze(stmt.all(bindVars));
+      if (block) {
+        for (const row of stmt.all(bindVars)) block(row);
+        return null;
+      } else {
+        return Object.freeze(stmt.all(bindVars));
+      }
     } finally {
       stmt.close();
     }
