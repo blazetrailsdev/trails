@@ -1019,6 +1019,10 @@ jobs:
       contains(github.event.pull_request.labels.*.name, 'run-sqlite-mem'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-pnpm
@@ -1028,7 +1032,7 @@ jobs:
       # Trailing slash for the reason given on `sqlite-tests`. The CLI package
       # is excluded: it owns no `inMemoryDb()` guards, so it has nothing this
       # lane can check.
-      - run: pnpm vitest run packages/activerecord/
+      - run: pnpm vitest run packages/activerecord/ --shard=${{ matrix.shard }}/2
         env:
           ARCONN: sqlite3_mem
 
