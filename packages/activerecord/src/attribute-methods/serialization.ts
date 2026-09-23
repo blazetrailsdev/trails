@@ -3,7 +3,7 @@ import { classAttribute, extend, included } from "@blazetrails/activesupport";
 import type { Base } from "../base.js";
 import { type AttributeOptions, type ValueType, ArgumentError } from "@blazetrails/activemodel";
 import { Json } from "../type/json.js";
-import { Serialized, type Coder } from "../type/serialized.js";
+import { Serialized } from "../type/serialized.js";
 import { JSON as CodersJSON } from "../coders/json.js";
 import { ColumnSerializer as CodersColumnSerializer } from "../coders/column-serializer.js";
 import { YAMLColumn, type YamlColumnOptions } from "../coders/yaml-column.js";
@@ -117,7 +117,12 @@ export function serialize(
     );
   }
 
-  const columnSerializer = buildColumnSerializer(attrName, coder, type, yaml) as Coder;
+  const columnSerializer = buildColumnSerializer(
+    attrName,
+    coder,
+    type,
+    yaml,
+  ) as Serialized["coder"];
 
   const attributeOptions: AttributeOptions = { ...options };
   delete (attributeOptions as SerializeOptions).coder;

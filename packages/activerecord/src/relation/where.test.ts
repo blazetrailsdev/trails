@@ -13,7 +13,7 @@ import {
 } from "@blazetrails/activesupport";
 import { ArgumentError, ValueType } from "@blazetrails/activemodel";
 import { assertQueriesCount } from "../testing/query-assertions.js";
-import { assertNotCalledOnInstanceOf } from "../testing/method-call-assertions.js";
+import { assertNotCalledOnInstanceOf } from "@blazetrails/activesupport";
 import { fixtures } from "../test-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
@@ -100,12 +100,12 @@ describe("WhereTest", () => {
     const welcome = posts("welcome");
     let relation: any = null;
 
-    await assertNotCalledOnInstanceOf(ValueType, "cast", () => {
+    await assertNotCalledOnInstanceOf(ValueType, "cast", null, () => {
       relation = Post.where({ id: "1-foo" });
     });
     expect(ids(await relation)).toStrictEqual([(welcome as any).id]);
 
-    await assertNotCalledOnInstanceOf(ValueType, "cast", () => {
+    await assertNotCalledOnInstanceOf(ValueType, "cast", null, () => {
       relation = Post.where({ id: ["1-foo", "bar"] });
     });
     expect(ids(await relation)).toStrictEqual([(welcome as any).id]);

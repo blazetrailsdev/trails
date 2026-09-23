@@ -15,16 +15,7 @@ import { NotImplementedError } from "@blazetrails/ruby-compat";
 import { strictLoadingViolationBang } from "../core.js";
 import { RecordInvalid } from "../validations.js";
 
-export class SingularAssociation extends Association {
-  /** @noRailsEquivalent PERMANENT */
-  override get target(): Base | null {
-    return super.target as Base | null;
-  }
-
-  override set target(value: Base | Base[] | null) {
-    super.target = value;
-  }
-
+export class SingularAssociation extends Association<Base> {
   override reset(): void {
     super.reset();
     this._writeTargetStore(null);
