@@ -75,7 +75,7 @@ export interface ColumnMethods {
   uuid(...args: [...names: string[], options: ColumnOptions]): unknown;
   xml(...names: string[]): unknown;
   xml(...args: [...names: string[], options: ColumnOptions]): unknown;
-  /** @noRailsEquivalent CONVERGEABLE converge-adapter-schema-and-result-helper-surface */
+  /** @noRailsEquivalent CONVERGEABLE converge-adapter-schema-and-result-helper-surface-remainder */
   enumType(name: string, enumName: string, options?: ColumnOptions): unknown;
   enum(...names: string[]): unknown;
   enum(...args: [...names: string[], options: ColumnOptions]): unknown;

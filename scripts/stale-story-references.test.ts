@@ -75,6 +75,26 @@ describe("stale story references", () => {
     }
   });
 
+  it("flags a CONVERGEABLE receipt whose story has landed", () => {
+    for (const comment of [
+      "/** @noRailsEquivalent CONVERGEABLE cache-entry-remaining-methods */\n",
+      "/** @missingRailsCall new — CONVERGEABLE activesupport-json-encoding-time-precision */\n",
+    ]) {
+      expect(staleStoryReferences(extractStoryReferences(comment, "x.ts"), STORIES)).toHaveLength(
+        1,
+      );
+    }
+    expect(
+      staleStoryReferences(
+        extractStoryReferences(
+          "/** @noRailsEquivalent CONVERGEABLE converge-connection-pool-lifecycle-async */\n",
+          "x.ts",
+        ),
+        STORIES,
+      ),
+    ).toEqual([]);
+  });
+
   it("ignores a landed-story citation in a block that promises a different story", () => {
     const refs = extractStoryReferences(
       "// TODO(converge-connection-pool-lifecycle-async): remove it.fails when\n" +

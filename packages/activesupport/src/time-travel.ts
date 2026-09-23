@@ -18,19 +18,7 @@ import { Temporal } from "@blazetrails/date";
 let _frozenInstant: Temporal.Instant | null = null;
 let _timeOffsetNs: bigint = 0n;
 
-/**
- * The named clock method trails production code reads the current time through.
- * `travel_to` stubs the receivers Rails stubs — `Time.now`, `Date.today` and
- * `DateTime.now` — and this holder's `now` alongside them, because reading
- * `Time.now` here instead would cost ~70x a bare `performance.now()` read on
- * every `TimeWithZone` construction.
- *
- * @noRailsEquivalent CONVERGEABLE — Ruby's only clock is `Time.now`, so this
- * holder exists purely for that cost. Retiring it means making
- * `@blazetrails/date`'s `Time.now` cheap enough to sit on the hot path;
- * `0098-activesupport-ar-closure-port/time-helpers-stub-date-and-datetime-clock`
- * carries that decision.
- */
+/** @noRailsEquivalent CONVERGEABLE retire-time-travel-clock-holder */
 export const clock = {
   now(): Temporal.Instant {
     if (_frozenInstant) return _frozenInstant;

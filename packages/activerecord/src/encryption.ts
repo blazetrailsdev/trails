@@ -6,16 +6,7 @@ import { Contexts } from "./encryption/contexts.js";
 import type { Context } from "./encryption/context.js";
 import type { Config } from "./encryption/config.js";
 
-/**
- * The simple encryptor surface `Base.encrypts({ encryptor })` accepts — the
- * same shape `Scheme`'s `encryptor:` option takes, adapted to the full contract
- * by `LegacyEncryptorShim` where that option is read.
- *
- * @noRailsEquivalent CONVERGEABLE (story:
- * converge-encryption-simple-encryptor-onto-encryptor-like). Rails has one
- * encryptor contract, `Encryption::Encryptor`, which trails ports as a class
- * plus the `EncryptorLike` shape; this alias exists only for older call sites.
- */
+/** @noRailsEquivalent CONVERGEABLE retire-legacy-encryptor-shim-option-surface */
 export type Encryptor = EncryptorOptionLike;
 
 export interface EncryptsOptions extends Omit<SchemeOptions, "encryptor"> {

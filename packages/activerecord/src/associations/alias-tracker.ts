@@ -7,7 +7,7 @@ const DEFAULT_TABLE_ALIAS_LENGTH = maxIdentifierLength();
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
+ * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy-remainder
  */
 export function aliasedArelTableFor(
   klass: { arelTable?: Table; tableName?: string } | null | undefined,
@@ -22,7 +22,7 @@ export function aliasedArelTableFor(
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
+ * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy-remainder
  */
 export function aliasedArelTableForReflection(
   reflection: { klass?: unknown; isPolymorphic?: () => boolean } | null | undefined,

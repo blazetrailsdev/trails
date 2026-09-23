@@ -161,7 +161,7 @@ export type AdapterName = "sqlite3" | "postgresql" | "mysql2";
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
+ * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers-remainder
  */
 export function adapterNameFromConfig(configAdapter: string | undefined): AdapterName {
   switch (configAdapter) {

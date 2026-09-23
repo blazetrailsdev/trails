@@ -740,7 +740,7 @@ function buildCountSubquery(
 /**
  * @internal
  * @missingRailsCall first — PERMANENT
- * @missingRailsCall wrap — CONVERGEABLE port-load-async-future-result-for-select-async-arm
+ * @missingRailsCall wrap — CONVERGEABLE execute-simple-calculation-async-arm
  */
 export async function executeSimpleCalculation(
   rel: CalculationRelation,

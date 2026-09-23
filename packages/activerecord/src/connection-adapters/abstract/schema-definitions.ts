@@ -10,7 +10,7 @@ import { wrap } from "@blazetrails/activesupport";
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
+ * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers-remainder
  */
 export function splitColumnNames(
   args: unknown[],
@@ -1223,7 +1223,7 @@ export class Table {
   async numeric(...args: unknown[]): Promise<void> {
     await this.definedColumn("decimal", args);
   }
-  /** @noRailsEquivalent CONVERGEABLE converge-adapter-schema-and-result-helper-surface */
+  /** @noRailsEquivalent CONVERGEABLE converge-adapter-schema-and-result-helper-surface-remainder */
   async char(...names: string[]): Promise<void>;
   async char(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
   async char(...args: unknown[]): Promise<void> {

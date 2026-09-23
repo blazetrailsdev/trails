@@ -328,12 +328,12 @@ function resolve(): FsRegistration {
   );
 }
 
-/** @noRailsEquivalent CONVERGEABLE unexempt-file-and-dir-from-core-class-receivers */
+/** @noRailsEquivalent CONVERGEABLE retire-getfs-and-getpath-public-exports */
 export function getFs(): FsAdapter {
   return resolve().fs;
 }
 
-/** @noRailsEquivalent CONVERGEABLE unexempt-file-and-dir-from-core-class-receivers */
+/** @noRailsEquivalent CONVERGEABLE retire-getfs-and-getpath-public-exports */
 export function getPath(): PathAdapter {
   return resolve().path;
 }

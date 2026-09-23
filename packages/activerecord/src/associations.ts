@@ -210,7 +210,7 @@ export function autoloadModel(name: string): void {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
+ * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers-remainder
  */
 export function resolveAssocClass(
   recordOrClass: Base | typeof Base,

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { Base, registerModel } from "./index.js";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import {
@@ -494,17 +494,15 @@ describe("PrimaryKeyAnyTypeTest", () => {
   });
 });
 
-async function primaryKeysOf(tableName: string): Promise<string[]> {
-  return (Base.connection as any).primaryKeys(tableName);
-}
-
 describe("CompositePrimaryKeyTest", () => {
-  const { cpkBooks } = fixtures(["cpkAuthors", "cpkOrders", "cpkBooks"]);
+  const { cpkBooks } = fixtures(["cpkBooks", "cpkOrders"], { useTransactionalTests: false });
 
-  beforeAll(async () => {
-    const conn = (await Base.leaseConnection()) as any;
-    await conn.dropTable("uber_barcodes", "barcodes_reverse", "travels", { ifExists: true });
-    await conn.createTable(
+  let connection: any;
+
+  beforeEach(async () => {
+    Base.schemaCache().clearBang();
+    connection = await Base.leaseConnection();
+    await connection.createTable(
       "uber_barcodes",
       { primaryKey: ["region", "code"], force: true },
       (t: any) => {
@@ -512,7 +510,7 @@ describe("CompositePrimaryKeyTest", () => {
         t.integer("code");
       },
     );
-    await conn.createTable(
+    await connection.createTable(
       "barcodes_reverse",
       { primaryKey: ["code", "region"], force: true },
       (t: any) => {
@@ -520,35 +518,42 @@ describe("CompositePrimaryKeyTest", () => {
         t.integer("code");
       },
     );
-    await conn.createTable("travels", { primaryKey: ["from", "to"], force: true }, (t: any) => {
-      t.string("from");
-      t.string("to");
-    });
+    await connection.createTable(
+      "travels",
+      { primaryKey: ["from", "to"], force: true },
+      (t: any) => {
+        t.string("from");
+        t.string("to");
+      },
+    );
   });
 
-  afterAll(async () => {
-    const conn = (await Base.leaseConnection()) as any;
-    await conn.dropTable("uber_barcodes", "barcodes_reverse", "travels", { ifExists: true });
+  afterEach(async () => {
+    await connection.dropTable("uber_barcodes", "barcodes_reverse", "travels", { ifExists: true });
   });
 
   it("composite primary key", async () => {
-    expect(await primaryKeysOf("uber_barcodes")).toEqual(["region", "code"]);
+    expect(await connection.primaryKeys("uber_barcodes")).toEqual(["region", "code"]);
   });
 
   it("composite primary key with reserved words", async () => {
-    expect(await primaryKeysOf("travels")).toEqual(["from", "to"]);
+    expect(await connection.primaryKeys("travels")).toEqual(["from", "to"]);
   });
 
   it("composite primary key out of order", async () => {
-    expect(await primaryKeysOf("barcodes_reverse")).toEqual(["code", "region"]);
+    expect(await connection.primaryKeys("barcodes_reverse")).toEqual(["code", "region"]);
   });
 
   it("assigning a composite primary key", async () => {
-    const book = new CpkBook();
-    book.id = [1, 2];
-    await book.saveBang();
-    expect(book.id).toEqual([1, 2]);
-    await CpkBook.deleteAll();
+    try {
+      const book = new CpkBook();
+      book.id = [1, 2];
+      await book.saveBang();
+
+      expect(book.id).toEqual([1, 2]);
+    } finally {
+      await CpkBook.deleteAll();
+    }
   });
 
   it("assigning a non array value to model with composite primary key raises", async () => {
@@ -606,12 +611,12 @@ describe("CompositePrimaryKeyTest", () => {
   });
 
   it("collectly dump composite primary key", async () => {
-    const schema = await dumpTableSchema(Base.connection, "uber_barcodes");
+    const schema = await dumpTableSchema(connection, "uber_barcodes");
     expect(schema).toMatch(/createTable\("uber_barcodes", \{ primaryKey: \["region","code"\]/);
   });
 
   it("dumping composite primary key out of order", async () => {
-    const schema = await dumpTableSchema(Base.connection, "barcodes_reverse");
+    const schema = await dumpTableSchema(connection, "barcodes_reverse");
     expect(schema).toMatch(/createTable\("barcodes_reverse", \{ primaryKey: \["code","region"\]/);
   });
 

@@ -354,7 +354,7 @@ function deriveAsTypeCol(assoc: { reflection: { options: { as?: string } } }): s
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
+ * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy-remainder
  */
 export function setDifference(a: Base[], b: Base[]): Base[] {
   return a.filter((record) => !b.some((r) => rbEqual(r, record)));
@@ -362,7 +362,7 @@ export function setDifference(a: Base[], b: Base[]): Base[] {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
+ * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy-remainder
  */
 export function setIntersection(a: Base[], b: Base[]): Base[] {
   const result: Base[] = [];
@@ -420,7 +420,7 @@ async function findTarget(
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
+ * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy-remainder
  */
 export function scope(
   record: Base,

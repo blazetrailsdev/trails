@@ -18,6 +18,11 @@ const STORY_SLUG = /[a-z0-9]+(?:-[a-z0-9]+){2,}/g;
 const PENDING_PHRASE =
   /converged by|converges (when|in|once)|will (be )?converge|deferred to|pending convergence|once .{0,40}lands|until .{0,60}lands|un-?skip once|when that story|fixed by|tracked (by|to|in|here|separately)|known gap|TODO\(/i;
 
+// A `CONVERGEABLE <story-id>` receipt names the story that owns its debt, so
+// it is a promise too. Case-sensitive: the receipt token is upper-case, and
+// "convergeable" in prose promises nothing.
+const RECEIPT_PHRASE = /\bCONVERGEABLE\b/;
+
 const PROVENANCE_PHRASE = /regression for|\blanded\b|added by|introduced by|ported in/i;
 
 // Frontmatter `status:` of a story file, matched before any body prose.
@@ -114,7 +119,7 @@ function blockReferences(blocks: readonly Block[], file: string): StoryReference
   const refs: StoryReference[] = [];
   for (const block of blocks) {
     const text = block.text.join(" ");
-    if (!PENDING_PHRASE.test(text)) continue;
+    if (!PENDING_PHRASE.test(text) && !RECEIPT_PHRASE.test(text)) continue;
     for (const sentence of text.split(SENTENCE)) {
       if (PROVENANCE_PHRASE.test(sentence)) continue;
       for (const slug of new Set(sentence.match(STORY_SLUG) ?? [])) {

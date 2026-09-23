@@ -27,7 +27,7 @@ import type { Result } from "../../result.js";
 type CreateTableArgs = Parameters<BaseSchemaStatements["createTable"]>;
 type CreateTableOptions = Extract<CreateTableArgs[1], { options?: string }>;
 
-/** @noRailsEquivalent CONVERGEABLE converge-adapter-schema-and-result-helper-surface */
+/** @noRailsEquivalent CONVERGEABLE converge-adapter-schema-and-result-helper-surface-remainder */
 export class MysqlSchemaStatements extends BaseSchemaStatements {
   override createSchemaDumper(options: Record<string, unknown>): MysqlSchemaDumper {
     return MysqlSchemaDumper.create(
@@ -461,61 +461,6 @@ export function integerToSql(limit: number | null | undefined): string {
   }
 }
 
-/** @noRailsEquivalent CONVERGEABLE converge-adapter-schema-and-result-helper-surface */
-export function parseMysqlName(name: string): { schema?: string; table: string } {
-  const input = name.trim();
-  const invalid = (): never => {
-    throw new Error(`Invalid MySQL identifier "${name}": expected "table" or "schema.table".`);
-  };
-  const unquote = (s: string): string =>
-    s.startsWith("`") && s.endsWith("`") ? s.slice(1, -1).replace(/``/g, "`") : s;
-
-  const parsePart = (start: number): { part: string; nextIndex: number } => {
-    if (start >= input.length) invalid();
-    if (input[start] === "`") {
-      let part = "`";
-      let i = start + 1;
-      while (i < input.length) {
-        if (input[i] === "`") {
-          if (input[i + 1] === "`") {
-            part += "``";
-            i += 2;
-            continue;
-          }
-          part += "`";
-          return { part, nextIndex: i + 1 };
-        }
-        part += input[i];
-        i += 1;
-      }
-      invalid();
-    }
-    let i = start;
-    while (i < input.length && input[i] !== "." && input[i] !== "`" && !/\s/.test(input[i])) {
-      i += 1;
-    }
-    if (i === start) invalid();
-    return { part: input.slice(start, i), nextIndex: i };
-  };
-
-  if (input.length === 0) invalid();
-
-  const checkNonEmpty = (part: string): string => {
-    const s = unquote(part);
-    if (s.length === 0) invalid();
-    return s;
-  };
-
-  const first = parsePart(0);
-  if (first.nextIndex === input.length) {
-    return { table: checkNonEmpty(first.part) };
-  }
-  if (input[first.nextIndex] !== ".") invalid();
-  const second = parsePart(first.nextIndex + 1);
-  if (second.nextIndex !== input.length) invalid();
-  return { schema: checkNonEmpty(first.part), table: checkNonEmpty(second.part) };
-}
-
 /** @internal */
 interface ForeignKeysHost {
   internalExecQuery(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
@@ -526,7 +471,7 @@ interface ForeignKeysHost {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
+ * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers-remainder
  */
 export async function foreignKeys(
   this: ForeignKeysHost,

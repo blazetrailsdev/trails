@@ -10,7 +10,7 @@ export const VERSION = {
   },
 };
 
-/** @missingRailsCall new — CONVERGEABLE gem-version-returns-string-not-gem-version */
+/** @missingRailsCall new — PERMANENT */
 export function gemVersion(): string {
   return VERSION.STRING;
 }
