@@ -1,6 +1,5 @@
 /** @noRailsEquivalent PERMANENT */
 import * as ts from "typescript/unstable/ast";
-import { getPath } from "@blazetrails/ruby-compat";
 import { walk, type ClassInfo } from "./walker.js";
 import { resolveAssociationTarget } from "./resolve-target.js";
 import { tsApi } from "./ts-api.js";
@@ -91,10 +90,13 @@ function collectNamesInScope(sf: ts.SourceFile): Set<string> {
 }
 
 function computeRelativeImport(fromFile: string, toFile: string): string {
-  const path = getPath();
-  const fromDir = path.dirname(fromFile);
-  let rel = path.relative!(fromDir, toFile);
-  rel = rel.replace(/\\/g, "/");
+  const fromDir = fromFile.replace(/\\/g, "/").split("/").slice(0, -1);
+  const to = toFile.replace(/\\/g, "/").split("/");
+  let common = 0;
+  while (common < fromDir.length && common < to.length - 1 && fromDir[common] === to[common]) {
+    common++;
+  }
+  let rel = [...fromDir.slice(common).map(() => ".."), ...to.slice(common)].join("/");
   if (!rel.startsWith(".")) rel = "./" + rel;
   rel = rel.replace(/\.tsx?$/, ".js");
   return rel;
