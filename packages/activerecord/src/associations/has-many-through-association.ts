@@ -29,9 +29,9 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   /** @internal */
   declare saveThroughRecord: (record: Base) => Promise<boolean>;
   /** @internal */
-  declare throughRecordsFor: (record: Base) => Base[];
+  declare throughRecordsFor: (record: Base) => Base[] | Promise<Base[]>;
   /** @internal */
-  declare deleteThroughRecords: (records: Base[]) => void;
+  declare deleteThroughRecords: (records: Base[]) => void | Promise<void>;
   /** @internal */
   declare throughReflection: () => unknown;
   /** @internal */
@@ -174,13 +174,13 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   ): Promise<boolean> | boolean {
     const removed = super.removeRecords(existingRecords, records, method);
     if (isThenable(removed)) {
-      return removed.then(() => {
-        this.deleteThroughRecords(records);
+      return removed.then(async () => {
+        await this.deleteThroughRecords(records);
         return true;
       });
     }
-    this.deleteThroughRecords(records);
-    return true;
+    const deleted = this.deleteThroughRecords(records);
+    return isThenable(deleted) ? deleted.then(() => true) : true;
   }
 
   /**
@@ -226,7 +226,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
       count = await scope.deleteAll();
     }
 
-    this.deleteThroughRecords(records);
+    await this.deleteThroughRecords(records);
 
     if (method !== "destroy" && sourceRefl?.options?.counterCache) {
       const counter = sourceRefl.counterCacheColumn?.();
@@ -404,7 +404,10 @@ function updateThroughCounter(this: HasManyThroughAssociation, method: string): 
 }
 
 /** @internal */
-function throughRecordsFor(this: HasManyThroughAssociation, record: Base): Base[] {
+function throughRecordsFor(
+  this: HasManyThroughAssociation,
+  record: Base,
+): Base[] | Promise<Base[]> {
   const throughName = this.reflection.options.through;
   if (!throughName) return [];
   const proxy = throughProxy(this);
@@ -416,36 +419,46 @@ function throughRecordsFor(this: HasManyThroughAssociation, record: Base): Base[
     : proxy.target
       ? [proxy.target]
       : [];
-  return candidates.filter((c) =>
-    Object.entries(joinAttrs).every(([key, val]) => {
-      const joinRefl = (c.constructor as any)._reflectOnAssociation?.(key);
-      if (joinRefl) {
-        return rbEqual((c as any).association?.(key)?.target, val);
+  const attributes = Object.entries(joinAttrs);
+  const sent = candidates.map((c) =>
+    attributes.map(([key]) => {
+      if ((c.constructor as any)._reflectOnAssociation?.(key)) {
+        return (c as any).association(key).reader as unknown;
       }
-      const actual =
-        typeof (c as any).readAttribute === "function"
-          ? (c as any).readAttribute(key)
-          : (c as any)[key];
-      return rbEqual(actual, val);
+      return typeof (c as any).readAttribute === "function"
+        ? (c as any).readAttribute(key)
+        : (c as any)[key];
     }),
   );
+  const findAll = (values: unknown[][]): Base[] =>
+    candidates.filter((_c, i) => attributes.every(([, value], j) => rbEqual(values[i][j], value)));
+  return sent.some((values) => values.some(isThenable))
+    ? Promise.all(sent.map((values) => Promise.all(values))).then(findAll)
+    : findAll(sent);
 }
 
 /** @internal */
-function deleteThroughRecords(this: HasManyThroughAssociation, records: Base[]): void {
+function deleteThroughRecords(
+  this: HasManyThroughAssociation,
+  records: Base[],
+): void | Promise<void> {
   const throughName = this.reflection.options.through;
   if (!throughName) return;
   const proxy = throughProxy(this);
   const cache = this._throughRecords;
   if (!proxy) return;
-  for (const record of records) {
-    const toDelete = this.throughRecordsFor(record);
+  for (let i = 0; i < records.length; i++) {
+    const record = records[i];
+    const throughRecords = this.throughRecordsFor(record);
+    if (isThenable(throughRecords)) {
+      return throughRecords.then(() => this.deleteThroughRecords(records.slice(i)));
+    }
     if (Array.isArray(proxy.target)) {
-      for (const r of toDelete) {
+      for (const r of throughRecords) {
         const idx = proxy.target.indexOf(r);
         if (idx !== -1) proxy.target.splice(idx, 1);
       }
-    } else if (toDelete.length > 0 && proxy.target === toDelete[0]) {
+    } else if (throughRecords.length > 0 && proxy.target === throughRecords[0]) {
       (proxy as { target?: Base | null }).target = null;
     }
     cache.delete(record);
