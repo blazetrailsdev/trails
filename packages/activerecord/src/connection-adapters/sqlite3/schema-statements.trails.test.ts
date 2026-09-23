@@ -14,12 +14,10 @@ import { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { Column } from "./column.js";
 import { SchemaDumper } from "./schema-dumper.js";
 
-const quoter = { quote: (value: unknown) => `'${String(value).replace(/'/g, "''")}'` };
-const sqliteHost = {
-  ...quoter,
-  dataSourceSql(this: object, name?: string | null, options?: { type?: string }) {
-    return dataSourceSql.call(this as never, name ?? undefined, options ?? {});
-  },
+const quoter = {
+  quote: (value: unknown) => `'${String(value).replace(/'/g, "''")}'`,
+  dataSourceSql: (name?: string, options?: { type?: string }) =>
+    dataSourceSql.call(quoter as never, name, options),
 };
 
 describe("SQLite3::SchemaStatements", () => {
@@ -33,7 +31,7 @@ describe("SQLite3::SchemaStatements", () => {
   describe("virtualTableExists", () => {
     it("returns true when a matching virtual table row is found", async () => {
       const fakeAdapter = {
-        ...sqliteHost,
+        ...quoter,
         queryValues: vi.fn().mockResolvedValue(["virtual_tab"]),
       } as any;
       expect(await virtualTableExists.call(fakeAdapter, "virtual_tab")).toBe(true);
@@ -41,14 +39,14 @@ describe("SQLite3::SchemaStatements", () => {
 
     it("returns false when no matching row is found", async () => {
       const fakeAdapter = {
-        ...sqliteHost,
+        ...quoter,
         queryValues: vi.fn().mockResolvedValue([]),
       } as any;
       expect(await virtualTableExists.call(fakeAdapter, "no_such_table")).toBe(false);
     });
 
     it("scopes the data_source_sql probe to VIRTUAL TABLE under the SCHEMA name", async () => {
-      const fakeAdapter = { ...sqliteHost, queryValues: vi.fn().mockResolvedValue([]) } as any;
+      const fakeAdapter = { ...quoter, queryValues: vi.fn().mockResolvedValue([]) } as any;
       await virtualTableExists.call(fakeAdapter, "my_vtab");
       expect(fakeAdapter.queryValues).toHaveBeenCalledWith(
         dataSourceSql.call(fakeAdapter, "my_vtab", { type: "VIRTUAL TABLE" }),

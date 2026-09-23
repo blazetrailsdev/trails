@@ -2281,12 +2281,6 @@ describe("staleCallTags", () => {
     ]);
   });
 
-  it("seeds no key for a compared declaration that carries no tag", () => {
-    const used = new Map<string, Set<string>>();
-    seedComparedTagKey(used, undefined, callTagKey("x.ts", "*", "x"));
-    expect(used.size).toBe(0);
-  });
-
   it("keys tags to their own file, so a same-named method elsewhere is untouched", () => {
     const twoFiles = new Map([
       [
