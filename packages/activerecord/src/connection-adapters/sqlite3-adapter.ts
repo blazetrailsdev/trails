@@ -8,13 +8,13 @@ import type {
 } from "../sqlite-adapter.js";
 import { SQLite3Constants } from "../sqlite-adapter.js";
 import { Pragmas } from "../sqlite/pragmas.js";
-import { Visitors } from "@blazetrails/arel";
+import { Nodes, Visitors } from "@blazetrails/arel";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
 import type { AddReferenceOptions } from "./abstract/schema-definitions.js";
 import type { InsertBuilder } from "../insert-all.js";
 import type { SQLite3Config } from "./pool-config.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
-import { isRubyTruthy } from "../ruby-truthy.js";
+import { rtest } from "@blazetrails/ruby-compat";
 import { SchemaCreation as SQLite3SchemaCreation } from "./sqlite3/schema-creation.js";
 import { type NativeDatabaseTypes } from "./abstract/native-database-types.js";
 import { TableDefinition as SQLite3TableDefinition } from "./sqlite3/schema-definitions.js";
@@ -83,7 +83,6 @@ import {
   quotedBinary as sqliteQuotedBinary,
   quotedTime as sqliteQuotedTime,
 } from "./sqlite3/quoting.js";
-import { isSqlLiteral } from "./abstract/quoting.js";
 import {
   CheckConstraintDefinition,
   ForeignKeyDefinition,
@@ -100,7 +99,8 @@ import { databaseCli } from "../active-record.js";
 
 function isStructuredDefault(value: unknown): boolean {
   if (Array.isArray(value)) return true;
-  if (value === null || typeof value !== "object" || isSqlLiteral(value)) return false;
+  if (value === null || typeof value !== "object" || value instanceof Nodes.SqlLiteral)
+    return false;
   const proto = Object.getPrototypeOf(value);
   return proto === Object.prototype || proto === null;
 }
@@ -399,7 +399,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     );
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE adapter-driver-open-close-and-transaction-status-shims */
   whenClosed(): Promise<void> {
     return this._closingDriver ?? Promise.resolve();
   }
@@ -658,7 +658,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     options: { mode?: string; header?: boolean } = {},
   ): string[] {
     const args: string[] = [];
-    if (isRubyTruthy(options.mode)) args.push(`-${options.mode}`);
+    if (rtest(options.mode)) args.push(`-${options.mode}`);
     if (options.header) args.push("-header");
     args.push(File.expandPath(config.database!, trailsRoot() ?? undefined));
     return this.findCmdAndExec(databaseCli()["sqlite"], ...args);
@@ -1415,7 +1415,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
 
   /**
    * @internal
-   * @noRailsEquivalent PERMANENT
+   * @noRailsEquivalent CONVERGEABLE adapter-driver-open-close-and-transaction-status-shims
    */
   async completeAsyncConnect(): Promise<void> {
     if (!this._asyncConnectPending) return;
@@ -1440,7 +1440,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     this._asyncConnectPending = false;
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE adapter-driver-open-close-and-transaction-status-shims */
   static async openAsync(
     this: new (config: SQLite3Config) => SQLite3Adapter,
     config: SQLite3Config,
@@ -1460,14 +1460,14 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
   /** @internal */
   override async configureConnection(): Promise<void> {
     const cfg = this._config as SQLite3Config;
-    if (isRubyTruthy(cfg.timeout) && isRubyTruthy(cfg.retries)) {
+    if (rtest(cfg.timeout) && rtest(cfg.retries)) {
       throw new ArgumentError("Cannot specify both timeout and retries arguments");
-    } else if (isRubyTruthy(cfg.timeout)) {
+    } else if (rtest(cfg.timeout)) {
       const timeout = SQLite3Adapter.typeCastConfigToInteger(cfg.timeout);
       if (typeof timeout !== "number" || !Number.isInteger(timeout)) {
         throw new TypeError(`timeout must be integer, not ${String(timeout)}`);
       }
-    } else if (isRubyTruthy(cfg.retries)) {
+    } else if (rtest(cfg.retries)) {
       deprecator().warn(
         "The retries option is deprecated and will be removed in Rails 8.1. Use timeout instead.\n",
       );

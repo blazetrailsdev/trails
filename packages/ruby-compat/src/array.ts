@@ -175,6 +175,30 @@ function subseq<T>(ary: readonly T[], beg: number, len: number): T[] | null {
 }
 
 /**
+ * Ruby `Array#first` with no argument (`vendor/ruby/array.c:1901` `ary_first`):
+ * the first element, or `nil` for an empty array.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function first<T>(ary: readonly T[]): T | undefined {
+  return ary[0];
+}
+
+/**
+ * Ruby `Array#drop` (`vendor/ruby/array.c:7594` `rb_ary_drop`): every element
+ * after the first `n`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function drop<T>(ary: readonly T[], n: number): T[] {
+  const pos = n;
+  if (pos < 0) {
+    throw new ArgumentError("attempt to drop negative size");
+  }
+  return ary.slice(pos);
+}
+
+/**
  * Ruby `Array#compact` (`vendor/ruby/array.c:6240` `rb_ary_compact`): a new
  * array with every `nil` element removed.
  * @noRailsEquivalent PERMANENT — Ruby core `Array#compact`

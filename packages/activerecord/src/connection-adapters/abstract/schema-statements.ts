@@ -50,8 +50,6 @@ import {
 import { SchemaDumper } from "./schema-dumper.js";
 import { ActiveRecord } from "../../namespaces.js";
 
-export { assertSchemaAdapter } from "./assert-schema-adapter.js";
-
 /** @internal */
 export function canRemoveIndexByName(
   columnName: string | string[] | undefined | null,

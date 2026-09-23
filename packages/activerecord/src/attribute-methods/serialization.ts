@@ -83,20 +83,6 @@ export function buildColumnSerializer(
   return coder;
 }
 
-/**
- * @internal
- * @noRailsEquivalent PERMANENT
- */
-export class HashObject {
-  constructor() {
-    return {};
-  }
-  /** @noRailsEquivalent PERMANENT */
-  static [Symbol.hasInstance](value: unknown): boolean {
-    return value != null && typeof value === "object" && !Array.isArray(value);
-  }
-}
-
 export interface SerializeOptions extends AttributeOptions {
   coder?: unknown;
   type?: unknown;

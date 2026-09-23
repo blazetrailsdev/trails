@@ -6,7 +6,7 @@ import {
   HasOneThroughNestedAssociationsAreReadonly,
 } from "./errors.js";
 import { compositeQueryConstraintsList } from "../persistence.js";
-import { drop } from "../ruby-drop.js";
+import { drop } from "@blazetrails/ruby-compat";
 
 /** @internal */
 export interface ThroughAssociationHost {

@@ -278,6 +278,17 @@ function isPlainHash(value: unknown): value is Record<string, unknown> {
 }
 
 /**
+ * `RTEST` (`vendor/ruby/include/ruby/internal/special_consts.h:138` `RB_TEST`):
+ * false only for `nil` and `false`, where a JS truthiness test is also false
+ * for `0`, `""` and `NaN`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rtest(obj: unknown): boolean {
+  return obj !== null && obj !== undefined && obj !== false;
+}
+
+/**
  * `rb_obj_as_string` (`vendor/ruby/string.c:1653`) — the `to_s` of any value.
  * `Array#to_s` and `Hash#to_s` are aliases of `inspect`
  * (`vendor/ruby/array.c:8616`, `vendor/ruby/hash.c:7197`), so those two classes

@@ -164,9 +164,9 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   /**
    * @internal
-   * @missingRailsCall first — PERMANENT
-   * @missingRailsCall internal_exec_query — PERMANENT
-   * @missingRailsCall quote — PERMANENT
+   * @missingRailsCall first — CONVERGEABLE mysql-schema-dumper-queries-collation-and-virtual-expression-in-line
+   * @missingRailsCall internal_exec_query — CONVERGEABLE mysql-schema-dumper-queries-collation-and-virtual-expression-in-line
+   * @missingRailsCall quote — CONVERGEABLE mysql-schema-dumper-queries-collation-and-virtual-expression-in-line
    */
   protected override schemaCollation(column: MysqlColumn): string | undefined {
     if (!column.collation) return undefined;
@@ -180,9 +180,9 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   /**
    * @internal
-   * @missingRailsCall query_value — PERMANENT
-   * @missingRailsCall quote — PERMANENT
-   * @missingRailsCall quote_column_name — PERMANENT
+   * @missingRailsCall query_value — CONVERGEABLE mysql-schema-dumper-queries-collation-and-virtual-expression-in-line
+   * @missingRailsCall quote — CONVERGEABLE mysql-schema-dumper-queries-collation-and-virtual-expression-in-line
+   * @missingRailsCall quote_column_name — CONVERGEABLE mysql-schema-dumper-queries-collation-and-virtual-expression-in-line
    */
   protected extractExpressionForVirtualColumn(column: MysqlColumn): string | undefined {
     const tableName = this.tableName;

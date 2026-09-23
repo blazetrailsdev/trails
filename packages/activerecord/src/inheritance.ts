@@ -119,7 +119,7 @@ export function namespaceSegments(modelClass: typeof Base): string[] {
 
 /**
  * @internal
- * @noRailsEquivalent PERMANENT
+ * @noRailsEquivalent CONVERGEABLE module-table-name-prefix-reads-module-parents
  */
 export function moduleParentChain(moduleName: string | undefined): string[] {
   if (!moduleName) return [];
@@ -134,12 +134,12 @@ export function moduleParentChain(moduleName: string | undefined): string[] {
 const moduleTableNamePrefixes = new Map<string, string>();
 const moduleTableNameSuffixes = new Map<string, string>();
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE module-table-name-prefix-reads-module-parents */
 export function registerModuleTableNamePrefix(moduleName: string, prefix: string): void {
   moduleTableNamePrefixes.set(moduleName, prefix);
 }
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE module-table-name-prefix-reads-module-parents */
 export function registerModuleTableNameSuffix(moduleName: string, suffix: string): void {
   moduleTableNameSuffixes.set(moduleName, suffix);
 }
@@ -160,7 +160,7 @@ function lookupModuleDecoration(
 
 /**
  * @internal
- * @noRailsEquivalent PERMANENT
+ * @noRailsEquivalent CONVERGEABLE module-table-name-prefix-reads-module-parents
  */
 export function lookupModuleTableNamePrefix(moduleName: string | undefined): string | undefined {
   return lookupModuleDecoration(
@@ -172,7 +172,7 @@ export function lookupModuleTableNamePrefix(moduleName: string | undefined): str
 
 /**
  * @internal
- * @noRailsEquivalent PERMANENT
+ * @noRailsEquivalent CONVERGEABLE module-table-name-prefix-reads-module-parents
  */
 export function lookupModuleTableNameSuffix(moduleName: string | undefined): string | undefined {
   return lookupModuleDecoration(
@@ -198,7 +198,7 @@ export function polymorphicName(modelClass: typeof Base): string {
   return klass.storeFullClassName ? name : demodulize(name);
 }
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE base-subclasses-onto-descendants-tracker */
 export function registerSubclass(klass: typeof Base): void {
   const parent = Object.getPrototypeOf(klass) as typeof Base;
   if (!parent || parent === Function.prototype) return;
@@ -302,7 +302,7 @@ const SELECT_ALIAS_READERS = Symbol.for("activerecord.selectAliasReaders");
 
 /**
  * @internal
- * @noRailsEquivalent PERMANENT
+ * @noRailsEquivalent CONVERGEABLE select-alias-readers-onto-attribute-method-dispatch
  */
 export function defineDynamicSelectReaders(record: Base): void {
   const attrs = (record as any)._attributes as { keys(): Iterable<string> };

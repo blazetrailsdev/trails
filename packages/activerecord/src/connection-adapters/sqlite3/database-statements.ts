@@ -173,7 +173,7 @@ export async function internalBeginTransaction(
 
 /**
  * @internal
- * @noRailsEquivalent PERMANENT
+ * @noRailsEquivalent CONVERGEABLE retire-sqlite-statement-lock-onto-with-raw-connection
  */
 export function acquireStatementLock(host: {
   _statementLock: Promise<void> | null;

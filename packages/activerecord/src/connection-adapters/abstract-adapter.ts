@@ -1,6 +1,6 @@
 import type { SqlTypeMetadata } from "./sql-type-metadata.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
-import { isRubyTruthy } from "../ruby-truthy.js";
+import { rtest } from "@blazetrails/ruby-compat";
 import type { ExplainOption } from "./abstract/database-statements.js";
 import type { InsertBuilder } from "../insert-all.js";
 import { type Nodes, Visitors, Collectors } from "@blazetrails/arel";
@@ -810,9 +810,9 @@ export class AbstractAdapter implements Quoting {
       this.logger = ActiveRecord.Base?.logger ?? null;
 
       if (
-        isRubyTruthy(deprecatedLogger) ||
-        isRubyTruthy(deprecatedConnectionOptions) ||
-        isRubyTruthy(deprecatedConfig)
+        rtest(deprecatedLogger) ||
+        rtest(deprecatedConnectionOptions) ||
+        rtest(deprecatedConfig)
       ) {
         throw new ArgumentError(
           "when initializing an Active Record adapter with a config hash, that should be the only argument",
@@ -821,10 +821,10 @@ export class AbstractAdapter implements Quoting {
     } else {
       this._unconfiguredConnection = (configOrDeprecatedConnection ??
         null) as AbstractAdapter | null;
-      this.logger = isRubyTruthy(deprecatedLogger)
+      this.logger = rtest(deprecatedLogger)
         ? deprecatedLogger
         : (ActiveRecord.Base?.logger ?? null);
-      if (isRubyTruthy(deprecatedConfig)) {
+      if (rtest(deprecatedConfig)) {
         this._config = (deprecatedConfig ?? {}) as Record<string, unknown>;
         this._connectionParameters = deprecatedConnectionOptions;
       } else {

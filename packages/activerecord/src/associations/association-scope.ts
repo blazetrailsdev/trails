@@ -7,7 +7,7 @@ import { AliasTracker, aliasedArelTableForReflection } from "./alias-tracker.js"
 import { CompositePrimaryKeyMismatchError } from "./errors.js";
 import { WhereClause } from "../relation/where-clause.js";
 import { constructJoinDependency } from "../relation/query-methods.js";
-import { drop } from "../ruby-drop.js";
+import { drop } from "@blazetrails/ruby-compat";
 import { methodMissingProxy } from "@blazetrails/ruby-compat";
 
 export type ValueTransformation<T = unknown> = (v: T) => unknown;

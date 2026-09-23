@@ -13,7 +13,7 @@ import {
 import type { ExplainOption } from "./abstract/database-statements.js";
 import { fetch, rbInspect, RuntimeError } from "@blazetrails/ruby-compat";
 import { Result } from "../result.js";
-import { isRubyTruthy } from "../ruby-truthy.js";
+import { rtest } from "@blazetrails/ruby-compat";
 import { transactionIsolationLevels } from "./abstract/database-statements.js";
 import type { InsertBuilder } from "../insert-all.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
@@ -941,12 +941,12 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
       sslkey: "--ssl-key",
       ssl_mode: "--ssl-mode",
     }).flatMap(([opt, arg]) =>
-      isRubyTruthy(mysqlConfig[opt]) ? [`${arg}=${String(mysqlConfig[opt])}`] : [],
+      rtest(mysqlConfig[opt]) ? [`${arg}=${String(mysqlConfig[opt])}`] : [],
     );
 
-    if (isRubyTruthy(mysqlConfig.password) && options.includePassword) {
+    if (rtest(mysqlConfig.password) && options.includePassword) {
       args.push(`--password=${String(mysqlConfig.password)}`);
-    } else if (isRubyTruthy(mysqlConfig.password) && String(mysqlConfig.password) !== "") {
+    } else if (rtest(mysqlConfig.password) && String(mysqlConfig.password) !== "") {
       args.push("-p");
     }
 
@@ -1257,7 +1257,7 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
     if (sqlMode != null && sqlMode !== false) {
       sqlMode = this.quote(sqlMode);
     } else if (!defaults.has(this.isStrictMode())) {
-      if (isRubyTruthy(this.isStrictMode())) {
+      if (rtest(this.isStrictMode())) {
         sqlMode = "CONCAT(@@sql_mode, ',STRICT_ALL_TABLES')";
       } else {
         sqlMode = "REPLACE(@@sql_mode, 'STRICT_TRANS_TABLES', '')";
@@ -1270,9 +1270,9 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
       sqlMode != null && sqlMode !== false ? `@@SESSION.sql_mode = ${sqlMode}, ` : "";
 
     let encoding = "";
-    if (isRubyTruthy(this._config.encoding)) {
+    if (rtest(this._config.encoding)) {
       encoding = `NAMES ${this._config.encoding}`;
-      if (isRubyTruthy(this._config.collation)) encoding += ` COLLATE ${this._config.collation}`;
+      if (rtest(this._config.collation)) encoding += ` COLLATE ${this._config.collation}`;
       encoding += ", ";
     }
 

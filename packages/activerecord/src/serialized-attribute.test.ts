@@ -2,13 +2,21 @@ import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
 import { assertNoQueries } from "./testing/query-assertions.js";
 import { ValueType, MissingAttributeError } from "@blazetrails/activemodel";
 import { Base, SerializationTypeMismatch } from "./index.js";
-import { HashObject } from "./attribute-methods/serialization.js";
 
 import { fixtures } from "./test-fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { SerializedPerson } from "./test-helpers/models/person.js";
 import { TrafficLight } from "./test-helpers/models/traffic-light.js";
 import { setUseYamlUnsafeLoad } from "./active-record.js";
+
+class HashObject {
+  constructor() {
+    return {};
+  }
+  static [Symbol.hasInstance](value: unknown): boolean {
+    return value != null && typeof value === "object" && !Array.isArray(value);
+  }
+}
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 

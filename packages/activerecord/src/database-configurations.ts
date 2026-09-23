@@ -30,7 +30,7 @@ type DbConfigHandler = (
 
 /**
  * @internal
- * @noRailsEquivalent PERMANENT
+ * @noRailsEquivalent CONVERGEABLE determine-owner-name-symbol-config-as-colon-string
  */
 export function symbolConnectionName(config: unknown): string | undefined {
   if (typeof config !== "string" || config === "") return undefined;

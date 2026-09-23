@@ -2,7 +2,7 @@ import { ArgumentError, kernelFloat, rbEqual } from "@blazetrails/ruby-compat";
 import { ValueType } from "@blazetrails/activemodel";
 import { isBlank, isPlainObject } from "@blazetrails/activesupport";
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE point-value-converges-onto-active-record-point */
 export class PointValue {
   x: number;
   y: number;
@@ -12,7 +12,7 @@ export class PointValue {
     this.y = y;
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE point-value-converges-onto-active-record-point */
   equals(other: unknown): boolean {
     return other instanceof PointValue && rbEqual(this.x, other.x) && rbEqual(this.y, other.y);
   }

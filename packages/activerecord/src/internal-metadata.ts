@@ -6,7 +6,7 @@ import { NoMethodError } from "@blazetrails/activemodel";
 import type { Base } from "./base.js";
 import { EnvironmentStorageError } from "./migration.js";
 import { ActiveRecordError } from "./errors.js";
-import { first } from "./ruby-first.js";
+import { first } from "@blazetrails/ruby-compat";
 import {
   Table,
   SelectManager,

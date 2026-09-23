@@ -352,7 +352,7 @@ export function adapterClass(this: typeof Base): Promise<new (...args: any[]) =>
   >;
 }
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE adapter-class-sync-retires-with-eager-adapter-resolution */
 export function adapterClassSync(
   this: typeof Base,
 ): (new (...args: any[]) => DatabaseAdapter) | null {

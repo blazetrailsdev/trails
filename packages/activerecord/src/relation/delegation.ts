@@ -284,21 +284,6 @@ RECORD_DELEGATES.toFormattedS = RECORD_DELEGATES.toFs;
 
 class ImplicitCountError extends globalThis.TypeError {}
 
-/** @noRailsEquivalent PERMANENT */
-function refuseImplicitCount<F extends (...args: any[]) => unknown>(fn: F): F {
-  Object.defineProperty(fn, Symbol.toPrimitive, {
-    value: (): never => {
-      throw new ImplicitCountError(
-        "`length` is a method on a collection, not a property: it reads as a function, " +
-          "not a count. Call `await collection.length()`, or `await collection.size()` " +
-          "for the count Rails' `size` gives.",
-      );
-    },
-    configurable: true,
-  });
-  return fn;
-}
-
 export class Delegation {
   respondToMissing(this: any, method: string, _: boolean): boolean {
     const model = this._model as typeof Base;
@@ -510,7 +495,16 @@ export class Delegation {
   }
 }
 
-refuseImplicitCount(Delegation.prototype.length);
+Object.defineProperty(Delegation.prototype.length, Symbol.toPrimitive, {
+  value: (): never => {
+    throw new ImplicitCountError(
+      "`length` is a method on a collection, not a property: it reads as a function, " +
+        "not a count. Call `await collection.length()`, or `await collection.size()` " +
+        "for the count Rails' `size` gives.",
+    );
+  },
+  configurable: true,
+});
 
 function withRecords<R>(host: DelegationHost, fn: (records: Base[]) => R): R | Promise<R> {
   if (host.isLoaded) return fn([...(host.target ?? host._records ?? [])]);
