@@ -492,6 +492,7 @@ export class Transaction {
     }
   }
 
+  /** @missingRailsName callbacks — PERMANENT */
   async commitRecords(): Promise<void> {
     const recs = this.records;
     if (recs) {
@@ -1029,10 +1030,10 @@ export class TransactionManager {
         let result: T;
         try {
           result = await fn(transaction.userTransaction);
-        } catch (e) {
+        } catch (error) {
           await this.rollbackTransaction();
-          await this.afterFailureActions(transaction, e);
-          throw e;
+          await this.afterFailureActions(transaction, error);
+          throw error;
         }
 
         try {

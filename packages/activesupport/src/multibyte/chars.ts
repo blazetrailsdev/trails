@@ -109,6 +109,7 @@ export class Chars {
     return this.chars(truncateBytes(this.wrappedString, limit, { omission: null }));
   }
 
+  /** @missingRailsName gsub — PERMANENT */
   titleize(): Chars {
     return this.chars(
       this.wrappedString
@@ -121,12 +122,14 @@ export class Chars {
     return this.titleize();
   }
 
+  /** @missingRailsName pack — PERMANENT */
   decompose(): Chars {
     return this.chars(
       String.fromCodePoint(...Unicode.decompose(":canonical", codepoints(this.wrappedString))),
     );
   }
 
+  /** @missingRailsName pack — PERMANENT */
   compose(): Chars {
     return this.chars(String.fromCodePoint(...Unicode.compose(codepoints(this.wrappedString))));
   }
@@ -139,6 +142,7 @@ export class Chars {
     return this.chars(Unicode.tidyBytes(this.wrappedString, force));
   }
 
+  /** @missingRailsName options — PERMANENT */
   asJson(_options: unknown = null): unknown {
     return JsonString.asJson(this.toS());
   }

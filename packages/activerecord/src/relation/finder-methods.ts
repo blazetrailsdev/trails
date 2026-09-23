@@ -354,10 +354,7 @@ function whereCompositePrimaryKeyIn(relation: any, pk: string[], ids: unknown[])
   return rel;
 }
 
-/**
- * @missingRailsCall size — PERMANENT
- * @missingRailsArgs where_sql — CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073
- */
+/** @missingRailsCall size — PERMANENT */
 export function raiseRecordNotFoundExceptionBang(
   this: FinderRelation,
   ids?: unknown,

@@ -756,10 +756,7 @@ export class AssociationReflection extends MacroReflection {
   private _inverseNameCache: string | false | null | undefined = undefined;
   private _inverseOfCache: AssociationReflection | ThroughReflection | null | undefined = undefined;
 
-  /**
-   * @internal
-   * @missingRailsArgs fetch — PERMANENT
-   */
+  /** @internal */
   override inverseName(): string | false | null {
     if (this._inverseNameCache !== undefined) return this._inverseNameCache;
     this._inverseNameCache = fetch<string | false | null>(
@@ -1823,7 +1820,6 @@ export function create(
     : (reflection as AssociationReflection | AggregateReflection);
 }
 
-/** @missingRailsArgs merge! — PERMANENT */
 export function addReflection(
   ar: typeof Base,
   name: string,

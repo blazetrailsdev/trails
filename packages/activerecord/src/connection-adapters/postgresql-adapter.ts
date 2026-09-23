@@ -1715,12 +1715,9 @@ export class PostgreSQLAdapter
       ifExists?: boolean;
     } = {},
   ): Promise<void> {
-    let column: string | string[] | undefined;
-    if (typeof columnName === "string" || Array.isArray(columnName)) {
-      column = columnName;
-    } else {
-      column = undefined;
+    if (!(typeof columnName === "string" || Array.isArray(columnName))) {
       options = { ...columnName, ...options };
+      columnName = undefined;
     }
 
     let table = Utils.extractSchemaQualifiedName(tableName);
@@ -1736,13 +1733,13 @@ export class PostgreSQLAdapter
       }
     }
 
-    if (options.ifExists && !(await this.indexExists(tableName, column, options))) {
+    if (options.ifExists && !(await this.indexExists(tableName, columnName, options))) {
       return;
     }
 
     const indexToRemove = new Name(
       table.schema,
-      await this.indexNameForRemove(table.toString(), column, options),
+      await this.indexNameForRemove(table.toString(), columnName, options),
     ).toString();
 
     await this.execute(

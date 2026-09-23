@@ -13,7 +13,7 @@ import { TimeWithZone } from "../time-with-zone.js";
 import { Duration } from "../duration.js";
 import { ArgumentError } from "../hash-utils.js";
 import { Temporal, Date as RubyDate, Time, tzdataIsdst } from "@blazetrails/date";
-import { Rational, sprintf } from "@blazetrails/ruby-compat";
+import { fetch, Rational, sprintf } from "@blazetrails/ruby-compat";
 import type { DateParts } from "@blazetrails/date";
 import { instantFrom } from "../temporal.js";
 import { currentTime } from "../time-travel.js";
@@ -849,7 +849,10 @@ export class TimeZone {
     if (parts.yday != null) {
       let ordinalDate: Temporal.PlainDate;
       try {
-        ordinalDate = RubyDate.ordinal(year, parts.yday);
+        ordinalDate = RubyDate.ordinal(
+          year,
+          fetch<number>(parts as Record<string, unknown>, "yday"),
+        );
       } catch (error) {
         if (error instanceof RubyDate.Error) throw new ArgumentError("invalid date");
         throw error;

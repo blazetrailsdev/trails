@@ -13,6 +13,7 @@ export class PoolManager {
     });
   }
 
+  /** @missingRailsName roleToShardMapping — PERMANENT */
   get shardNames(): string[] {
     return [
       ...new Set(
@@ -21,6 +22,7 @@ export class PoolManager {
     ];
   }
 
+  /** @missingRailsName roleToShardMapping — PERMANENT */
   get roleNames(): string[] {
     return Object.keys(this._roleToShardMapping);
   }

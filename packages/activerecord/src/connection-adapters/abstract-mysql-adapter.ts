@@ -392,7 +392,6 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
     });
   }
 
-  /** @missingRailsArgs fetch — PERMANENT */
   async beginIsolatedDbTransaction(isolation: string): Promise<unknown> {
     const level = fetch<string>(transactionIsolationLevels(), isolation);
     return this.executeBatch([`SET TRANSACTION ISOLATION LEVEL ${level}`, "BEGIN"], "TRANSACTION", {
@@ -829,6 +828,7 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
     return [...orderColumns, columns].join(", ");
   }
 
+  /** @missingRailsName config — PERMANENT */
   isStrictMode(): boolean | unknown {
     return (this.constructor as typeof AbstractMysqlAdapter).typeCastConfigToBoolean(
       fetch(this._config, "strict", true),
@@ -1033,15 +1033,13 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
     const fkFromMsg = /Referencing column '(\w+)' and referenced/i.exec(message)?.[1];
     const fkPat = fkFromMsg ?? "\\w+";
 
-    const match = sql.match(
-      new RegExp(
-        String.raw`(?:CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?|ALTER\s+TABLE\s+)(?:\`?\w+\`?\.)?` +
-          String.raw`\`?(?<table>\w+)\`?.+?` +
-          String.raw`FOREIGN\s+KEY\s*\(\`?(?<foreign_key>${fkPat})\`?\)\s*` +
-          String.raw`REFERENCES\s*\`?(?<target_table>\w+)\`?\s*\(\`?(?<primary_key>\w+)\`?\)`,
-        "ims",
-      ),
-    );
+    const match = new RegExp(
+      String.raw`(?:CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?|ALTER\s+TABLE\s+)(?:\`?\w+\`?\.)?` +
+        String.raw`\`?(?<table>\w+)\`?.+?` +
+        String.raw`FOREIGN\s+KEY\s*\(\`?(?<foreign_key>${fkPat})\`?\)\s*` +
+        String.raw`REFERENCES\s*\`?(?<target_table>\w+)\`?\s*\(\`?(?<primary_key>\w+)\`?\)`,
+      "ims",
+    ).exec(sql);
 
     if (!match?.groups) return {};
 

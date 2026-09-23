@@ -182,7 +182,6 @@ export class ForeignKeyDefinition {
     return this.options["primaryKey"] !== this.defaultPrimaryKey;
   }
 
-  /** @missingRailsArgs fetch — PERMANENT */
   get isValidate(): boolean | null {
     return fetch<boolean | null>(this.options, "validate", true);
   }
@@ -1361,6 +1360,10 @@ export class Table {
     return this._schema.changeColumnDefault(this.name, columnName, defaultOrChanges);
   }
 
+  /**
+   * @missingRailsName null — PERMANENT
+   * @missingRailsName default — PERMANENT
+   */
   async changeNull(columnName: string, isNull: boolean, defaultValue?: unknown): Promise<void> {
     return this._schema.changeColumnNull(this.name, columnName, isNull, defaultValue);
   }

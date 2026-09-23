@@ -4,6 +4,7 @@ import type { DeprecationBehaviorCallable } from "../deprecation.js";
 import { ArgumentError } from "../hash-utils.js";
 import { assert } from "./assertions.js";
 
+/** @missingRailsName escape — PERMANENT */
 export async function assertDeprecated<T>(
   match: RegExp | string | Deprecation | null | undefined,
   deprecator?: Deprecation | null,

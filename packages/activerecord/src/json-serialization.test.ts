@@ -125,7 +125,7 @@ describe("JsonSerializationTest", () => {
     const contact = newContact();
     (
       contact as unknown as { serializableHash: (o?: unknown) => Record<string, unknown> }
-    ).serializableHash = function () {
+    ).serializableHash = function (this: Base) {
       return Base.prototype.serializableHash.call(this, Object.freeze({ only: ["name"] }));
     };
 
@@ -139,7 +139,7 @@ describe("JsonSerializationTest", () => {
     const contact = newContact();
     (
       contact as unknown as { serializableHash: (o?: unknown) => Record<string, unknown> }
-    ).serializableHash = function () {
+    ).serializableHash = function (this: Base) {
       return Base.prototype.serializableHash.call(this, { only: ["name"] });
     };
 
@@ -153,7 +153,7 @@ describe("JsonSerializationTest", () => {
     const contact = newContact();
     (
       contact as unknown as { serializableHash: (o?: unknown) => Record<string, unknown> }
-    ).serializableHash = function () {
+    ).serializableHash = function (this: Base) {
       return Base.prototype.serializableHash.call(this, { except: ["age"] });
     };
 
@@ -179,7 +179,7 @@ describe("JsonSerializationTest", () => {
 
     (
       contact as unknown as { serializableHash: (o?: unknown) => Record<string, unknown> }
-    ).serializableHash = function (options?: unknown) {
+    ).serializableHash = function (this: Base, options?: unknown) {
       return Base.prototype.serializableHash.call(this, {
         except: ["age"],
         ...((options as Record<string, unknown>) ?? {}),

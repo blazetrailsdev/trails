@@ -206,7 +206,6 @@ export const ClassMethods = {
     });
   },
 
-  /** @missingRailsArgs define_call — PERMANENT */
   aliasAttributeMethodDefinition(
     this: ClassMethodsHost,
     codeGenerator: CodeGenerator,

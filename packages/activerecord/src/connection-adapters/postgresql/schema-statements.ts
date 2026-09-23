@@ -106,14 +106,17 @@ export class SchemaStatements extends AbstractSchemaStatements {
     const options = (hasOptions ? last : {}) as { ifExists?: boolean; force?: boolean | "cascade" };
     const ifExists = options.ifExists ? " IF EXISTS" : "";
     const cascade = options.force === "cascade" ? " CASCADE" : "";
-    for (const name of tableNames) {
-      await this.schemaCache.clearDataSourceCacheBang(name);
+    for (const tableName of tableNames) {
+      await this.schemaCache.clearDataSourceCacheBang(tableName);
     }
-    const quoted = tableNames.map((n) => this.quoteTableName(n)).join(", ");
+    const quoted = tableNames.map((tableName) => this.quoteTableName(tableName)).join(", ");
     await this.execute(`DROP TABLE${ifExists} ${quoted}${cascade}`);
   }
 
-  /** @missingRailsCall order:split,map — PERMANENT */
+  /**
+   * @missingRailsCall order:split,map — PERMANENT
+   * @missingRailsName gsub — PERMANENT
+   */
   async indexes(tableName: string): Promise<IndexDefinition[]> {
     const scope = this.quotedScope(tableName);
 
@@ -580,6 +583,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return new ChangeColumnDefinition(cd, columnName);
   }
 
+  /** @missingRailsName default — PERMANENT */
   override async buildChangeColumnDefaultDefinition(
     tableName: string,
     columnName: string,
@@ -813,9 +817,9 @@ export class SchemaStatements extends AbstractSchemaStatements {
     expression: string,
     options: ExclusionConstraintOptions = {},
   ): Promise<void> {
-    const opts = this.exclusionConstraintOptions(tableName, expression, options);
+    options = this.exclusionConstraintOptions(tableName, expression, options);
     const at = this.createAlterTable(tableName) as PgAlterTable;
-    at.addExclusionConstraint(expression, opts);
+    at.addExclusionConstraint(expression, options);
     await this.execute(await this.schemaCreation.accept(at));
   }
 
@@ -922,9 +926,9 @@ export class SchemaStatements extends AbstractSchemaStatements {
     columnName?: string | string[] | null,
     options: UniqueConstraintOptions = {},
   ): Promise<void> {
-    const opts = this.uniqueConstraintOptions(tableName, columnName, options);
+    options = this.uniqueConstraintOptions(tableName, columnName, options);
     const at = this.createAlterTable(tableName) as PgAlterTable;
-    at.addUniqueConstraint(columnName as string | string[], opts);
+    at.addUniqueConstraint(columnName as string | string[], options);
     await this.execute(await this.schemaCreation.accept(at));
   }
 
@@ -1220,15 +1224,16 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
   async setPkSequenceBang(table: string, value: number): Promise<void> {
     const result = await this.pkAndSequenceFor(table);
-    const [pk, seq] = result ?? [null, null];
-    if (!pk) return;
-    if (seq) {
-      const quotedSequence = this.quoteTableName(seq);
-      await this.queryValue(`SELECT setval(${this.quote(quotedSequence)}, ${value})`, "SCHEMA");
-    } else {
-      (this.logger as { warn?(message: string): void } | null)?.warn?.(
-        `${table} has primary key ${pk} with no default sequence.`,
-      );
+    const [pk, sequence] = result ?? [null, null];
+    if (pk) {
+      if (sequence) {
+        const quotedSequence = this.quoteTableName(sequence);
+        await this.queryValue(`SELECT setval(${this.quote(quotedSequence)}, ${value})`, "SCHEMA");
+      } else {
+        (this.logger as { warn?(message: string): void } | null)?.warn?.(
+          `${table} has primary key ${pk} with no default sequence.`,
+        );
+      }
     }
   }
 

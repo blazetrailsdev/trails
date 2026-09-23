@@ -134,6 +134,7 @@ export class MemoryStore extends Store implements CacheStore {
     );
   }
 
+  /** @missingRailsName integer — PERMANENT */
   private modifyValue(name: string, amount: number, options?: CacheOptions): number {
     options = this.mergedOptions(options);
     const key = this.normalizeKey(name, options);

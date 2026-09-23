@@ -36,6 +36,7 @@ export class ConnectionDescriptor {
     return this._primary;
   }
 
+  /** @missingRailsName name — PERMANENT */
   currentPreventingWrites(): boolean {
     return isPreventingWrites(this._name);
   }

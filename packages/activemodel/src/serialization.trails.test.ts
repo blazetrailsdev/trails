@@ -62,7 +62,7 @@ describe("Serialization — trails-only coverage", () => {
       },
       constructor: { name: "Host" },
     } as unknown as SerializationRecord;
-    expect(readAttributeForSerialization(host, "name")).toBe("FRESH");
+    expect(readAttributeForSerialization.call(host, "name")).toBe("FRESH");
   });
 
   it("read_attribute_for_serialization honors an overridden attribute reader (send)", () => {
@@ -92,7 +92,7 @@ describe("Serialization — trails-only coverage", () => {
       },
       constructor: { name: "Host" },
     } as unknown as SerializationRecord;
-    expect(readAttributeForSerialization(host, "name")).toBe("i_am_name");
+    expect(readAttributeForSerialization.call(host, "name")).toBe("i_am_name");
   });
 
   it("read_attribute_for_serialization returns undefined for a present reader that returns undefined", () => {
@@ -102,7 +102,7 @@ describe("Serialization — trails-only coverage", () => {
       },
       constructor: { name: "Host" },
     } as unknown as SerializationRecord;
-    expect(readAttributeForSerialization(host, "name")).toBeUndefined();
+    expect(readAttributeForSerialization.call(host, "name")).toBeUndefined();
   });
 
   it("read_attribute_for_serialization raises NoMethodError-style for a missing reader", () => {
@@ -110,8 +110,10 @@ describe("Serialization — trails-only coverage", () => {
       attributes: { name: "x" },
       constructor: { name: "Host" },
     } as unknown as SerializationRecord;
-    expect(() => readAttributeForSerialization(host, "nope")).toThrow(NoMethodError);
-    expect(() => readAttributeForSerialization(host, "nope")).toThrow(/undefined method 'nope'/);
+    expect(() => readAttributeForSerialization.call(host, "nope")).toThrow(NoMethodError);
+    expect(() => readAttributeForSerialization.call(host, "nope")).toThrow(
+      /undefined method 'nope'/,
+    );
   });
 
   it("read_attribute_for_serialization raises NoMethodError-style for a reader-less attributes key", () => {
@@ -119,8 +121,10 @@ describe("Serialization — trails-only coverage", () => {
       attributes: { name: "x" },
       constructor: { name: "Host" },
     } as unknown as SerializationRecord;
-    expect(() => readAttributeForSerialization(host, "name")).toThrow(NoMethodError);
-    expect(() => readAttributeForSerialization(host, "name")).toThrow(/undefined method 'name'/);
+    expect(() => readAttributeForSerialization.call(host, "name")).toThrow(NoMethodError);
+    expect(() => readAttributeForSerialization.call(host, "name")).toThrow(
+      /undefined method 'name'/,
+    );
   });
 
   it("read_attribute_for_serialization invokes a method reader on an _attributes-backed record", () => {
@@ -139,9 +143,9 @@ describe("Serialization — trails-only coverage", () => {
     interface Person extends Attributes, SerializersJSON {}
 
     const p = new Person({ name: "Bob" });
-    expect(readAttributeForSerialization(p as unknown as SerializationRecord, "greeting")).toBe(
-      "Hi Bob",
-    );
+    expect(
+      readAttributeForSerialization.call(p as unknown as SerializationRecord, "greeting"),
+    ).toBe("Hi Bob");
   });
 
   it("a caller option named __sync does not hijack the internal sync re-entry", () => {

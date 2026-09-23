@@ -59,7 +59,10 @@ export class XMLConverter {
     }
   }
 
-  /** @missingRailsCall try — PERMANENT */
+  /**
+   * @missingRailsCall try — PERMANENT
+   * @missingRailsName detect — PERMANENT
+   */
   private processHash(value: Record<string, unknown>): unknown {
     if (
       Object.hasOwn(value, "type") &&

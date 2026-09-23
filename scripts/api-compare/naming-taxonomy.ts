@@ -16,6 +16,7 @@
  * Hard rules: no node:* imports, no process.*, async fs.
  */
 import { rubyMethodToTsIgnoringSkip, snakeToCamel } from "@blazetrails/parity/conventions";
+import { RUBY_COMPAT_EXPORTS } from "../parity/ruby-compat.js";
 
 export type NamingClass =
   | "js-reserved-word"
@@ -48,7 +49,9 @@ export const NAMING_CLASSES: NamingClassInfo[] = [
     permanent: true,
     reason:
       "Ruby construct spelled as the JS builtin doing the same work (`inject`/`reduce`, " +
-      "`last`/`at(-1)`). Same call; only the language's name for it differs.",
+      "`last`/`at(-1)`), or as the ruby-compat export RUBY_COMPAT_EXPORTS names its port " +
+      "(`Float(x)`/`kernelFloat(x)`, `Regexp.escape`/`regexpEscape`). Same call; only the " +
+      "language's name for it differs.",
   },
   {
     name: "conventions-rename",
@@ -162,6 +165,7 @@ export const JS_RESERVED_WORDS = new Set(
  */
 export const NO_JS_EQUIVALENT: Record<string, string[]> = {
   class: ["constructor"],
+  collect: ["map"],
   compact: ["filter"],
   detect: ["find"],
   first: ["at"],
@@ -172,6 +176,7 @@ export const NO_JS_EQUIVALENT: Record<string, string[]> = {
   last: ["at", "pop"],
   length: ["size"],
   object_id: ["this"],
+  pack: ["fromCodePoint"],
   read: ["readFile"],
   size: ["length"],
   strip: ["trim"],
@@ -191,6 +196,20 @@ export const NO_JS_EQUIVALENT: Record<string, string[]> = {
  */
 const NO_JS_EQUIVALENT_BY_CAMEL = new Map(
   Object.entries(NO_JS_EQUIVALENT).map(([rubyRef, tsRefs]) => [snakeToCamel(rubyRef), tsRefs]),
+);
+
+/**
+ * {@link RUBY_COMPAT_EXPORTS} keyed by the bare method name as the recorder
+ * spells a Ruby `ref:` — `Kernel#Float` reaches the artifact as `float`,
+ * `Regexp.escape` as `escape`. The table's own admission rule (a TS name
+ * implausible as the port of any other method of that bare name) is what makes
+ * dropping the receiver safe here.
+ */
+const RUBY_COMPAT_EXPORT_BY_REF = new Map(
+  [...RUBY_COMPAT_EXPORTS].map(([mri, tsExport]) => {
+    const name = snakeToCamel(mri.split(/[#.]/)[1]);
+    return [name.charAt(0).toLowerCase() + name.slice(1), tsExport];
+  }),
 );
 
 /** The bare identifier behind a recorded `ref:` argument, or undefined. */
@@ -258,6 +277,7 @@ export function classifyPair(
     ? NO_JS_EQUIVALENT[rubyRef]
     : NO_JS_EQUIVALENT_BY_CAMEL.get(rubyRef);
   if (noJsEquivalent?.includes(tsRef)) return "no-js-equivalent";
+  if (RUBY_COMPAT_EXPORT_BY_REF.get(rubyRef) === tsRef) return "no-js-equivalent";
   if (tsRef === "toS" || tsRef === "toString" || rubyRef === "toS" || rubyRef === "to_s") {
     return "implicit-to-s";
   }

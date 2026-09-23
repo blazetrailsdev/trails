@@ -28,13 +28,13 @@ export class TypeMapInitializer {
   }
 
   run(records: PgTypeRow[]): void {
-    const nodes = records.filter((row) => !this.store.isKey(toInt(row.oid)));
+    const nodes = records.filter((row) => !this.store.isKey(toI(row.oid)));
     const mapped = extract(nodes, (row) => this.store.isKey(row.typname));
     const ranges = extract(nodes, (row) => row.typtype === "r");
     const enums = extract(nodes, (row) => row.typtype === "e");
     const domains = extract(nodes, (row) => row.typtype === "d");
     const arrays = extract(nodes, (row) => row.typinput === "array_in");
-    const composites = extract(nodes, (row) => toInt(row.typelem) !== 0);
+    const composites = extract(nodes, (row) => toI(row.typelem) !== 0);
 
     mapped.forEach((row) => this.registerMappedType(row));
     enums.forEach((row) => this.registerEnumType(row));
@@ -61,7 +61,7 @@ export class TypeMapInitializer {
   }
 
   private registerSqlTypeName(row: PgTypeRow): void {
-    const oid = toInt(row.oid);
+    const oid = toI(row.oid);
     if (!this.store.isKey(oid)) return;
     for (const name of [row.formatType, row.aliasName]) {
       if (name == null || this.store.isKey(name)) continue;
@@ -76,7 +76,7 @@ export class TypeMapInitializer {
   private registerRangeType(row: PgTypeRow): void {
     this.registerWithSubtype(
       row.oid,
-      toInt(row.rngsubtype ?? 0),
+      toI(row.rngsubtype ?? 0),
       (subtype) => new RangeType(subtype as unknown as RangeSubtype, row.typname),
     );
   }
@@ -86,7 +86,7 @@ export class TypeMapInitializer {
   }
 
   private registerDomainType(row: PgTypeRow): void {
-    const baseType = this.store.lookup(toInt(row.typbasetype));
+    const baseType = this.store.lookup(toI(row.typbasetype));
     if (baseType) {
       this.register(row.oid, baseType);
     } else {
@@ -95,14 +95,14 @@ export class TypeMapInitializer {
   }
 
   private registerCompositeType(row: PgTypeRow): void {
-    const subtype = this.store.lookup(toInt(row.typelem));
+    const subtype = this.store.lookup(toI(row.typelem));
     if (subtype) this.register(row.oid, new Vector(row.typdelim, subtype));
   }
 
   private registerArrayType(row: PgTypeRow): void {
     this.registerWithSubtype(
       row.oid,
-      toInt(row.typelem),
+      toI(row.typelem),
       (subtype) => new OidArray(subtype, row.typdelim),
     );
   }
@@ -138,7 +138,7 @@ export class TypeMapInitializer {
 
   private assertValidRegistration(oid: number | string, oidType: unknown): number {
     if (oidType == null) throw new ArgumentError(`can't register nil type for OID ${oid}`);
-    return toInt(oid);
+    return toI(oid);
   }
 }
 
@@ -159,7 +159,7 @@ interface OidSubtype {
   deserialize?(value: unknown): unknown;
 }
 
-function toInt(value: number | string): number {
+function toI(value: number | string): number {
   if (typeof value === "number") return Number.isFinite(value) ? Math.trunc(value) : 0;
   const parsed = Number.parseInt(value, 10);
   return Number.isNaN(parsed) ? 0 : parsed;

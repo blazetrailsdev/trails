@@ -87,6 +87,7 @@ export class EncryptedFile {
     return (await this.readKeyFile()) !== null;
   }
 
+  /** @missingRailsName strip — PERMANENT */
   async read(): Promise<string> {
     const key = await this.key();
     const fs = getFs();

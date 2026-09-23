@@ -435,7 +435,7 @@ export class Duration {
       throw new ArgumentError(`expected a time or date, got ${inspect(time)}`);
     }
 
-    if (isEmpty(this._partKeys)) {
+    if (isEmpty(this._parts())) {
       if (time instanceof Temporal.PlainDate) return dateSince(time, sign * this.inSeconds());
       if (time instanceof RubyTime) return timeSince.call(time, sign * this.inSeconds());
       if (isDateTime(time)) return datetimeSince(time, sign * this.inSeconds());

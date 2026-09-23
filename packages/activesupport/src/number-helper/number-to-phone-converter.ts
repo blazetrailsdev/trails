@@ -4,6 +4,7 @@ import type { NumberToPhoneOptions } from "../number-helper.js";
 import { isBlank, isPresent } from "../core-ext/object/blank.js";
 
 export class NumberToPhoneConverter extends NumberConverter<NumberToPhoneOptions> {
+  /** @missingRailsName strip — PERMANENT */
   protected convert(): string {
     let str = this.countryCode(this.opts.countryCode);
     str += this.convertToPhoneNumber(String(this.number).trim());

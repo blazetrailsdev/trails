@@ -233,14 +233,15 @@ export class SchemaStatements {
       definer = fn;
     }
 
-    const { id, primaryKey, force, ...restOptions } = kwargs;
-    this.validateCreateTableOptionsBang(restOptions);
+    const { id, primaryKey, force, ...rest } = kwargs;
+    options = rest;
+    this.validateCreateTableOptionsBang(options);
 
-    if ((restOptions as { _usesLegacyTableName?: boolean })._usesLegacyTableName !== true) {
+    if ((options as { _usesLegacyTableName?: boolean })._usesLegacyTableName !== true) {
       this.validateTableLengthBang(tableName);
     }
 
-    if (force && "ifNotExists" in restOptions) {
+    if (force && "ifNotExists" in options) {
       throw new ArgumentError(
         "Options `:force` and `:if_not_exists` cannot be used simultaneously.",
       );
@@ -248,7 +249,7 @@ export class SchemaStatements {
 
     const td = await this.buildCreateTableDefinition(
       tableName,
-      { id, primaryKey, force, ...restOptions },
+      { id, primaryKey, force, ...options },
       definer,
     );
 
@@ -376,20 +377,18 @@ export class SchemaStatements {
     columnName:
       | string
       | string[]
-      | { column?: string | string[]; name?: string; ifExists?: boolean } = {},
+      | { column?: string | string[]; name?: string; ifExists?: boolean }
+      | null = null,
     options: { column?: string | string[]; name?: string; ifExists?: boolean } = {},
   ): Promise<void> {
-    let column: string | string[] | undefined;
-    if (typeof columnName === "string" || Array.isArray(columnName)) {
-      column = columnName;
-    } else {
-      column = undefined;
+    if (!(typeof columnName === "string" || Array.isArray(columnName))) {
       options = { ...columnName, ...options };
+      columnName = null;
     }
 
-    if (options.ifExists && !(await this.indexExists(tableName, column, options))) return;
+    if (options.ifExists && !(await this.indexExists(tableName, columnName, options))) return;
 
-    const indexName = await this.indexNameForRemove(tableName, column, options);
+    const indexName = await this.indexNameForRemove(tableName, columnName, options);
 
     await this.execute(
       `DROP INDEX ${this.quoteColumnName(indexName)} ON ${this.quoteTableName(tableName)}`,
@@ -552,19 +551,16 @@ export class SchemaStatements {
     options: RemoveForeignKeyOptions = {},
   ): Promise<void> {
     if (!this.useForeignKeys()) return;
-    let toTableName: string | undefined;
-    let opts: RemoveForeignKeyOptions;
     if (typeof toTable === "object" && toTable !== null) {
-      opts = { ...toTable };
-      toTableName = opts.toTable;
+      options = { ...toTable };
+      toTable = options.toTable;
     } else {
-      toTableName = toTable;
-      opts = { ...options };
+      options = { ...options };
     }
-    if (opts.ifExists === true && !(await this.foreignKeyExists(fromTable, toTableName))) {
+    if (options.ifExists === true && !(await this.foreignKeyExists(fromTable, toTable))) {
       return;
     }
-    const lookup: ForeignKeyLookupOptions = { ...opts, toTable: toTableName };
+    const lookup: ForeignKeyLookupOptions = { ...options, toTable };
     delete (lookup as RemoveForeignKeyOptions).ifExists;
     const fk = await this.foreignKeyForBang(fromTable, lookup);
     const at = this.createAlterTable(fromTable);
@@ -645,22 +641,21 @@ export class SchemaStatements {
     options?: JoinTableOptions | ((t: TableDefinitionOf<this>) => void),
     fn?: (t: TableDefinitionOf<this>) => void,
   ): Promise<void> {
-    let kwargs: JoinTableOptions = {};
     let definer: ((t: TableDefinitionOf<this>) => void) | undefined;
     if (typeof options === "function") {
       definer = options;
+      options = {};
     } else {
-      kwargs = options ?? {};
+      options = { ...options };
       definer = fn;
     }
-    const joinOptions: JoinTableOptions = { ...kwargs };
-    let columnOptions = joinOptions.columnOptions ?? {};
-    delete joinOptions.columnOptions;
-    const joinTableName = this.findJoinTableName(table1, table2, joinOptions);
+    let columnOptions = options.columnOptions ?? {};
+    delete options.columnOptions;
+    const joinTableName = this.findJoinTableName(table1, table2, options);
     columnOptions = { null: false, index: false, ...columnOptions };
     const [t1Ref, t2Ref] = [table1, table2].map((t) => this.referenceNameForTable(t));
 
-    await this.createTable(joinTableName, { ...joinOptions, id: false }, (t) => {
+    await this.createTable(joinTableName, { ...options, id: false }, (t) => {
       t.references(t1Ref, columnOptions);
       t.references(t2Ref, columnOptions);
       if (definer) definer(t);
@@ -1270,7 +1265,6 @@ export class SchemaStatements {
     return [idx, this.indexAlgorithm(options.algorithm), !!options.ifNotExists];
   }
 
-  /** @missingRailsArgs fetch — PERMANENT */
   indexAlgorithm(algorithm?: string): string | undefined {
     if (algorithm == null) return undefined;
     const indexAlgorithms = this.indexAlgorithms();

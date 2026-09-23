@@ -63,6 +63,7 @@ import {
   rubyDefinitionBreakdown,
   writerPairedWithReader,
   staleCallTags,
+  seedComparedTagKey,
   applyCallTags,
   suppressTaggedCalls,
   tagsForOwner,
@@ -2257,6 +2258,33 @@ describe("staleCallTags", () => {
 
   it("stays silent about a method no matched pair compared", () => {
     expect(staleCallTags(tags, new Map())).toEqual([]);
+  });
+
+  it("reports a @missingRailsArgs tag stale once its declaration's only tagged call stops mismatching", () => {
+    const argTags = new Map([
+      [
+        "join-table.ts",
+        new Map([["joinTableName", new Map([["", new Map([["derive_join_table_name", ""]])]])]]),
+      ],
+    ]);
+    const used = new Map<string, Set<string>>();
+    const key = callTagKey("join-table.ts", "*", "joinTableName");
+    seedComparedTagKey(used, argTags.get("join-table.ts")!.get("joinTableName")!.get(""), key);
+    expect(staleCallTags(argTags, used)).toEqual([
+      {
+        tsFile: "join-table.ts",
+        tsClass: "",
+        tsDeclFile: undefined,
+        tsName: "joinTableName",
+        call: "derive_join_table_name",
+      },
+    ]);
+  });
+
+  it("seeds no key for a compared declaration that carries no tag", () => {
+    const used = new Map<string, Set<string>>();
+    seedComparedTagKey(used, undefined, callTagKey("x.ts", "*", "x"));
+    expect(used.size).toBe(0);
   });
 
   it("keys tags to their own file, so a same-named method elsewhere is untouched", () => {

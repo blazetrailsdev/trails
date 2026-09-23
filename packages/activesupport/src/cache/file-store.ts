@@ -60,6 +60,7 @@ export class FileStore extends Store implements CacheStore {
     this._cachePath = String(cachePath);
   }
 
+  /** @missingRailsName collect — PERMANENT */
   override clear(): void {
     try {
       const rootDirs = Dir.children(this.cachePath).filter((f) => !GITKEEP_FILES.includes(f));

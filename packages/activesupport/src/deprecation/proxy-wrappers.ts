@@ -66,6 +66,7 @@ export class DeprecatedObjectProxy extends DeprecationProxy {
     return this._object;
   }
 
+  /** @missingRailsName message — PERMANENT */
   protected override warn(callstack: CallerLocation[], _called: string, _args: unknown[]): void {
     this._deprecator.warn(this._message, callstack);
   }
