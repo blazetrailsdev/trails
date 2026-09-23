@@ -1,5 +1,5 @@
 import { sql as arelSql } from "@blazetrails/arel";
-import { ArgumentError } from "@blazetrails/activemodel";
+import { ArgumentError, Attribute as ModelAttribute, FloatType } from "@blazetrails/activemodel";
 import { b, StandardError } from "@blazetrails/ruby-compat";
 import type { SqliteBinds, SqliteConnection, SqliteStatement } from "../../sqlite-adapter.js";
 import { TransactionIsolationError } from "../../errors.js";
@@ -210,6 +210,16 @@ export async function performQuery(
     batch?: boolean;
   },
 ): Promise<Result> {
+  if (Array.isArray(typeCastedBinds)) {
+    typeCastedBinds = typeCastedBinds.map((value, i) => {
+      const bind = binds[i];
+      return typeof value === "bigint" &&
+        bind instanceof ModelAttribute &&
+        bind.type instanceof FloatType
+        ? Number(value)
+        : value;
+    });
+  }
   const acquired = acquireStatementLock(this);
   const release = typeof acquired === "function" ? acquired : await acquired;
   let stmt: SqliteStatement | null = null;

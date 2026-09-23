@@ -111,13 +111,10 @@ export function quoteDefaultExpression(
   return abstractQuoteDefaultExpression.call(this, value, column);
 }
 
-export function typeCast(this: QuotingDispatchHost, value: unknown, bindsAsFloat = false): unknown {
+export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   if (value === null || value === undefined) return null;
   if (typeof value === "boolean") return BigInt(value ? this.unquotedTrue() : this.unquotedFalse());
-  if (typeof value === "number") {
-    if (bindsAsFloat) return value;
-    return Number.isInteger(value) ? BigInt(value) : value;
-  }
+  if (typeof value === "number") return Number.isInteger(value) ? BigInt(value) : value;
   if (value instanceof BigDecimal) return Number(value.toString("F"));
   return abstractTypeCast.call(this, value);
 }
