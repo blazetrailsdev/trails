@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import ts from "typescript";
+import ts from "typescript-5";
 import { virtualizeTse } from "./tse.js";
 import { diagnose } from "./tse-diagnose.js";
 

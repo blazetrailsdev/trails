@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import ts from "typescript";
+import ts from "typescript-5";
 import { init } from "./lsp-plugin.js";
 
 function makeHost(files: Record<string, string>): ts.LanguageServiceHost {
