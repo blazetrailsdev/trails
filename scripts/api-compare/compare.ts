@@ -1290,6 +1290,7 @@ interface CallResult {
   mismatched: number;
   mismatches: CallMismatch[];
   staleTags: StaleCallTag[];
+  uncomparedTags: StaleCallTag[];
   suppressed: SuppressedCall[];
   skeletons: CallSkeleton[];
 }
@@ -2128,6 +2129,58 @@ export function staleCallTags(
   );
 }
 
+/** Every tagged call on a declaration NO pair compared — the half
+ *  {@link staleCallTags} skips, since "no longer flagged" is unknowable there.
+ *  Reported by `receipt-audit.ts`, not gated. One declaration is recorded under
+ *  every file reaching it (a barrel, maybe under an alias), and only one pair
+ *  compares it: a view whose `tsDeclFile` has its own record defers to it, a
+ *  pair compared through a view covers that record, and each uncompared
+ *  declaration is reported once. */
+export function uncomparedCallTags(
+  tagsByFileName: Map<string, Map<string, Map<string, Map<string, string>>>>,
+  used: Map<string, Set<string>>,
+  declFileByFileNameOwner: ReadonlyMap<
+    string,
+    ReadonlyMap<string, ReadonlyMap<string, string>>
+  > = new Map(),
+): StaleCallTag[] {
+  const compared = new Set<string>();
+  const candidates = new Map<string, StaleCallTag[]>();
+  for (const [tsFile, byName] of tagsByFileName) {
+    for (const [tsName, byClass] of byName) {
+      for (const [tsClass, calls] of byClass) {
+        const tsDeclFile = declFileFor(declFileByFileNameOwner, tsFile, tsName, tsClass);
+        const anyOwner = tsClass === "" ? usedForAnyOwner(used, tsFile, tsName) : undefined;
+        const hit =
+          anyOwner ??
+          used.get(callTagKey(tsFile, tsClass, tsName)) ??
+          used.get(callTagKey(tsFile, "*", tsName));
+        const view = tsDeclFile === undefined ? undefined : callTagKey(tsDeclFile, "", tsName);
+        if (hit !== undefined) {
+          compared.add(view ?? callTagKey(tsFile, tsClass, tsName));
+          continue;
+        }
+        if (tsDeclFile !== undefined && tagsByFileName.get(tsDeclFile)?.has(tsName)) continue;
+        const key = view ?? callTagKey(tsFile, tsClass, tsName);
+        if (candidates.has(key)) continue;
+        candidates.set(
+          key,
+          [...calls.keys()].map((call) => ({ tsFile, tsClass, tsDeclFile, tsName, call })),
+        );
+      }
+    }
+  }
+  const out = [...candidates]
+    .filter(([key, [t]]) => !compared.has(key) && !compared.has(callTagKey(t.tsFile, "", t.tsName)))
+    .flatMap(([, tags]) => tags);
+  return out.sort((a, b) =>
+    `${a.tsFile} ${a.tsClass} ${a.tsName} ${a.call}` <
+    `${b.tsFile} ${b.tsClass} ${b.tsName} ${b.call}`
+      ? -1
+      : 1,
+  );
+}
+
 /** A `@missingRailsCall` tag (RFC 0083) on a COMPARED method whose call is no
  *  longer flagged — the tag's only-shrink half, mirroring the baseline dir's
  *  STALE entries: once the TS body makes the call, the justification must go.
@@ -2287,6 +2340,8 @@ interface CallArgsResult {
   /** `@missingRailsArgs` tags on a COMPARED pair that suppressed nothing —
    *  the tag's only-shrink half, read by lint-call-args.ts. */
   staleTags: StaleCallTag[];
+  /** `@missingRailsArgs` tags on a declaration no pair compared. */
+  uncomparedTags: StaleCallTag[];
   /** The mismatches those tags DID suppress, each with its reason — the
    *  permanence report's population (RFC 0099). */
   suppressed: SuppressedCall[];
@@ -5494,6 +5549,11 @@ export function main() {
           callTagsUsed,
           tsDeclFileByFileNameOwner,
         ),
+        uncomparedTags: uncomparedCallTags(
+          tsMissingCallTagsByFileName,
+          callTagsUsed,
+          tsDeclFileByFileNameOwner,
+        ),
         suppressed: suppressedCalls,
         skeletons: callSkeletons,
       },
@@ -5503,6 +5563,11 @@ export function main() {
         skipped: callArgsSkipped,
         mismatches: callArgMismatches,
         staleTags: staleCallTags(
+          tsMissingArgTagsByFileName,
+          argTagsUsed,
+          tsDeclFileByFileNameOwner,
+        ),
+        uncomparedTags: uncomparedCallTags(
           tsMissingArgTagsByFileName,
           argTagsUsed,
           tsDeclFileByFileNameOwner,
@@ -5697,6 +5762,9 @@ export function main() {
           mismatched: callsFlat.length,
           mismatches: callsFlat,
           staleTags: staleTagsFlat,
+          uncomparedTags: results.flatMap((r) =>
+            r.calls.uncomparedTags.map((t) => ({ package: r.package, ...t })),
+          ),
           suppressed: suppressedFlat,
         },
         null,
@@ -5739,6 +5807,9 @@ export function main() {
           ),
           mismatches: callArgsFlat,
           staleTags: staleArgTagsFlat,
+          uncomparedTags: results.flatMap((r) =>
+            r.callArgs.uncomparedTags.map((t) => ({ package: r.package, ...t })),
+          ),
           suppressed: suppressedArgsFlat,
           staleNameTags: staleNameTagsFlat,
         },
