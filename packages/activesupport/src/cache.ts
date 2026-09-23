@@ -6,17 +6,12 @@ import "./cache/null-store.js";
 import "./cache/file-store.js";
 import { lookupStoreClass } from "./cache/store-registry.js";
 import type { CacheStore } from "./cache/index.js";
-import { getFormatVersion } from "./cache/format-version-slot.js";
 
 export { Store, ArgumentError, NotImplementedError, WriteOptions } from "./cache/store.js";
 export type { CacheLogger, StoreOptions } from "./cache/store.js";
 export { DeserializationError } from "./cache/deserialization-error.js";
 
-export function formatVersion(): number {
-  return getFormatVersion();
-}
-
-export { setFormatVersion } from "./cache/format-version-slot.js";
+export { formatVersion, setFormatVersion } from "./cache/store.js";
 
 export function lookupStore(store?: unknown, ...parameters: unknown[]): CacheStore {
   if (typeof store === "string" && store.startsWith(":")) {

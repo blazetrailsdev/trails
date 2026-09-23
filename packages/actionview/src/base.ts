@@ -12,7 +12,7 @@ import {
 } from "@blazetrails/activesupport";
 
 import "./log-subscriber.js";
-import { _setBase } from "./base-slot.js";
+import { ActionView } from "./namespaces.js";
 import { OutputBuffer } from "./buffers.js";
 import { Context } from "./context.js";
 import * as Helpers from "./helpers/index.js";
@@ -392,4 +392,4 @@ include(Base, Context);
 
 runLoadHooks("action_view", Base);
 
-_setBase(Base);
+ActionView.Base = Base;

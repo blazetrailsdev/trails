@@ -1,7 +1,7 @@
 import { ArgumentError, rbInspect } from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { FEATURE_POLICY } from "../constants.js";
-import { _RequestCtor } from "./request-slot.js";
+import { ActionDispatch } from "../../namespaces.js";
 
 /** @internal */
 const MAPPINGS: Record<string, string> = {
@@ -24,7 +24,7 @@ export class Middleware {
 
     if (this.policyPresent(headers)) return response;
 
-    const request = new _RequestCtor!(env) as {
+    const request = new ActionDispatch.Request(env) as {
       permissionsPolicy?: PermissionsPolicy | null;
       controllerInstance?: unknown;
     };

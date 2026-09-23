@@ -1,5 +1,5 @@
 import { Logger, type LogLevel } from "./logger.js";
-import { _setBroadcastLoggerClass } from "./broadcast-logger-slot.js";
+import { ActiveSupport } from "./namespaces.js";
 
 export class BroadcastLogger extends Logger {
   public broadcasts: Logger[] = [];
@@ -153,4 +153,4 @@ export class BroadcastLogger extends Logger {
   }
 }
 
-_setBroadcastLoggerClass(BroadcastLogger);
+ActiveSupport.BroadcastLogger = BroadcastLogger;

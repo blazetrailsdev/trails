@@ -1,6 +1,6 @@
 import { chomp } from "@blazetrails/activesupport";
 import { compileJs, type EmitJsOptions, type EmitResult } from "@blazetrails/tse-compiler";
-import { _Base } from "../../base-slot.js";
+import { ActionView } from "../../namespaces.js";
 import type { TemplateHandler } from "../handlers.js";
 import {
   translateLocation as translateLocationImpl,
@@ -56,7 +56,11 @@ export class Tse implements TemplateHandler {
     const escapeIgnore = mime != null && ctor.escapeIgnoreList.includes(mime);
     const options: EmitJsOptions = { escapeIgnore, raiseOnStrictLocalsMismatch: false };
     const format = template.format ?? (mime === "text/html" ? "html" : null);
-    if (_Base!.annotateRenderedViewWithFilenames && format === "html" && template.shortIdentifier) {
+    if (
+      ActionView.Base.annotateRenderedViewWithFilenames &&
+      format === "html" &&
+      template.shortIdentifier
+    ) {
       const id = template.shortIdentifier;
       options.preamble = `_ob.safeAppend(${JSON.stringify(`<!-- BEGIN ${id} -->`)});`;
       options.postamble = `_ob.safeAppend(${JSON.stringify(`<!-- END ${id} -->`)});`;

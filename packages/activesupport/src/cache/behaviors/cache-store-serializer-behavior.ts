@@ -1,5 +1,5 @@
 import { afterEach, expect, it } from "vitest";
-import { getFormatVersion, setFormatVersion } from "../format-version-slot.js";
+import * as Cache from "../../cache.js";
 import { UnserializableObjectError } from "../../message-pack/extensions.js";
 import type { Store, StoreOptions } from "../store.js";
 
@@ -12,16 +12,16 @@ export interface CacheStoreSerializerBehaviorHost {
 
 export function cacheStoreSerializerBehavior(host: CacheStoreSerializerBehaviorHost): void {
   afterEach(() => {
-    setFormatVersion(7.0);
+    Cache.setFormatVersion(7.0);
   });
 
   function withFormat<T>(formatVersion: number, block: () => T): T {
-    const previous = getFormatVersion();
-    setFormatVersion(formatVersion);
+    const previous = Cache.formatVersion();
+    Cache.setFormatVersion(formatVersion);
     try {
       return block();
     } finally {
-      setFormatVersion(previous);
+      Cache.setFormatVersion(previous);
     }
   }
 

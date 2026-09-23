@@ -26,7 +26,7 @@ import {
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Response } from "@blazetrails/rack";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
-import { _RequestCtor } from "../http/request-slot.js";
+import { ActionDispatch } from "../../namespaces.js";
 
 export type CookieExpires = Date | Temporal.Instant | { toF(): number; httpdate(): string };
 
@@ -575,7 +575,7 @@ export class Cookies {
   }
 
   async call(env: RackEnv): Promise<RackResponse> {
-    const request = new _RequestCtor!(env) as CookiesRequest;
+    const request = new ActionDispatch.Request(env) as CookiesRequest;
     let response: RackResponse | Response = await this.app(env);
 
     if (request.isHaveCookieJar()) {

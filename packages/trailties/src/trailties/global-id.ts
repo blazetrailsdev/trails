@@ -17,7 +17,6 @@ import {
   Verifier,
 } from "@blazetrails/globalid";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
-import { setRubyClassPath } from "../ruby-class-path-slot.js";
 
 export interface GlobalIdConfig {
   app?: string;
@@ -79,4 +78,4 @@ export class Trailtie extends BaseTrailtie {
   }
 }
 
-setRubyClassPath(Trailtie, "GlobalID::Railtie");
+Object.defineProperty(Trailtie, "name", { value: "GlobalID::Railtie" });

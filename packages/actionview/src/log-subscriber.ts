@@ -7,7 +7,7 @@ import {
 import type { Logger, Subscriber } from "@blazetrails/activesupport";
 import { round } from "@blazetrails/ruby-compat";
 
-import { _Base } from "./base-slot.js";
+import { ActionView } from "./namespaces.js";
 
 const VIEWS_PATTERN = /^app\/views\//;
 
@@ -18,7 +18,7 @@ export interface UtilsHost {
 
 /** @internal */
 export function logger(): Logger | null {
-  return (_Base?.logger ?? null) as Logger | null;
+  return ActionView.Base.logger as Logger | null;
 }
 
 /** @internal */

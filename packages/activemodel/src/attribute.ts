@@ -3,7 +3,7 @@ import { defaultValue } from "./type.js";
 import { MissingAttributeError } from "./attribute-methods.js";
 import { rbEqual } from "@blazetrails/ruby-compat";
 import { isDuplicable } from "@blazetrails/activesupport";
-import { _UserProvidedDefaultCtor } from "./attribute/user-provided-default-slot.js";
+import type { UserProvidedDefault } from "./attribute/user-provided-default.js";
 
 function dupValue(value: unknown): unknown {
   if (Array.isArray(value)) return value.slice();
@@ -25,6 +25,8 @@ const rubyNamespace: unique symbol = Symbol.for("@blazetrails:rubyNamespace");
 export abstract class Attribute {
   /** @noRailsEquivalent PERMANENT */
   static readonly [rubyNamespace]: string = "ActiveModel";
+
+  declare static UserProvidedDefault: typeof UserProvidedDefault;
 
   readonly name: string;
   protected _valueBeforeTypeCast: unknown;
@@ -228,7 +230,7 @@ export abstract class Attribute {
   }
 
   withUserDefault(value: unknown): Attribute {
-    return new _UserProvidedDefaultCtor!(
+    return new Attribute.UserProvidedDefault(
       this.name,
       value,
       this.type,

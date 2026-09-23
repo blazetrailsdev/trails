@@ -16,7 +16,6 @@ import { deprecator } from "./deprecator.js";
 import { Engine } from "./engine.js";
 import type { MiddlewareStackProxy } from "./configuration.js";
 import { Trailtie } from "./trailtie.js";
-import { setRubyClassPath } from "./ruby-class-path-slot.js";
 import { Bootstrap } from "./application/bootstrap.js";
 import { DefaultMiddlewareStack } from "./application/default-middleware-stack.js";
 import { Finisher } from "./application/finisher.js";
@@ -268,4 +267,4 @@ async function defaultCredentialPaths(
   };
 }
 
-setRubyClassPath(Application, "Rails::Application");
+Object.defineProperty(Application, "name", { value: "Rails::Application" });

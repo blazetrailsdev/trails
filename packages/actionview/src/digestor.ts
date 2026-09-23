@@ -1,6 +1,6 @@
 import { Digest } from "@blazetrails/activesupport/digest";
 
-import { _Base } from "./base-slot.js";
+import { ActionView } from "./namespaces.js";
 import { DependencyTracker } from "./dependency-tracker.js";
 import type { LookupContext } from "./lookup-context.js";
 import type { Template } from "./template.js";
@@ -49,7 +49,7 @@ export class Digestor {
   }
 
   static logger(): Logger {
-    return (_Base!.logger as Logger | null) ?? NullLogger;
+    return (ActionView.Base.logger as Logger | null) ?? NullLogger;
   }
 
   static tree(

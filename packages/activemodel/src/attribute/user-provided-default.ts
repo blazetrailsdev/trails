@@ -1,5 +1,4 @@
 import { Attribute, FromUser } from "../attribute.js";
-import { _setUserProvidedDefaultCtor } from "./user-provided-default-slot.js";
 import { ValueType } from "../type/value.js";
 
 export class UserProvidedDefault extends FromUser {
@@ -44,4 +43,4 @@ export class UserProvidedDefault extends FromUser {
   }
 }
 
-_setUserProvidedDefaultCtor(UserProvidedDefault);
+Attribute.UserProvidedDefault = UserProvidedDefault;

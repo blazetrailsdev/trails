@@ -13,7 +13,7 @@ import {
   cookieJar,
   type RequestCookieMethodsHost,
 } from "../../action-dispatch/middleware/cookies.js";
-import { SessionHash, setRubyClassPath } from "@blazetrails/rack-session";
+import { SessionHash } from "@blazetrails/rack-session";
 import type { Persisted, PersistedRequest } from "@blazetrails/rack-session";
 import type { Req } from "../../action-dispatch/request/session.js";
 import { ActionControllerError } from "./exceptions.js";
@@ -562,7 +562,7 @@ export function normalizeActionPath(this: CsrfController, actionPath: string): s
   }
 }
 
-setRubyClassPath(
-  NullSessionHash,
-  "ActionController::RequestForgeryProtection::ProtectionMethods::NullSession::NullSessionHash",
-);
+Object.defineProperty(NullSessionHash, "name", {
+  value:
+    "ActionController::RequestForgeryProtection::ProtectionMethods::NullSession::NullSessionHash",
+});

@@ -1,7 +1,7 @@
 import { stdout } from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/date";
 import { File } from "@blazetrails/ruby-compat";
-import { BroadcastLoggerClass } from "./broadcast-logger-slot.js";
+import { ActiveSupport } from "./namespaces.js";
 import { include } from "@blazetrails/ruby-compat/include";
 import { LoggerThreadSafeLevel } from "./logger-thread-safe-level.js";
 
@@ -74,9 +74,7 @@ export class Logger {
 
   static isLoggerOutputsTo(logger: Logger, ...sources: unknown[]): boolean {
     const loggers: Logger[] =
-      BroadcastLoggerClass !== null && logger instanceof BroadcastLoggerClass
-        ? logger.broadcasts
-        : [logger];
+      logger instanceof ActiveSupport.BroadcastLogger ? logger.broadcasts : [logger];
 
     const logdevs = loggers.map((logger) => logger.output);
     const loggerSources = logdevs

@@ -1,7 +1,7 @@
 import { ArgumentError, rbInspect } from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_REPORT_ONLY } from "../constants.js";
-import { _RequestCtor } from "./request-slot.js";
+import { ActionDispatch } from "../../namespaces.js";
 
 export const MAPPINGS = {
   self: "'self'",
@@ -52,7 +52,7 @@ export class Middleware {
     if (status === 304) return response;
     if (this.policyPresent(headers)) return response;
 
-    const request = new _RequestCtor!(env) as Request & {
+    const request = new ActionDispatch.Request(env) as Request & {
       controllerInstance?: unknown;
     };
 

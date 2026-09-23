@@ -5,7 +5,6 @@ import {
   Persisted,
   SecureSessionHash,
   SessionId,
-  setRubyClassPath,
   type PersistedRequest,
 } from "@blazetrails/rack-session";
 import { buildNestedQuery } from "@blazetrails/rack";
@@ -641,7 +640,7 @@ export class TestSession extends SecureSessionHash {
   }
 }
 
-setRubyClassPath(TestSession, "ActionController::TestSession");
+Object.defineProperty(TestSession, "name", { value: "ActionController::TestSession" });
 
 function formatToMime(format: string): string {
   const MIMES: Record<string, string> = {

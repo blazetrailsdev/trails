@@ -1,4 +1,3 @@
-import { getRubyClassPath } from "@blazetrails/rack-session";
 import { describe, it, expect } from "vitest";
 import { TestRequest, TestSession } from "./test-case.js";
 
@@ -23,7 +22,7 @@ describe("TestRequest#assignParameters Content-Type case", () => {
 
 describe("ActionController::TestSession", () => {
   it("registers its Ruby constant path for Session#inspect's not-yet-loaded arm", () => {
-    expect(getRubyClassPath(TestSession)).toBe("ActionController::TestSession");
+    expect(TestSession.name).toBe("ActionController::TestSession");
   });
 });
 

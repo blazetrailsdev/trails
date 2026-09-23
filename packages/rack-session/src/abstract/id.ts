@@ -18,8 +18,6 @@ import {
   ResponseRaw,
 } from "@blazetrails/rack";
 
-import { getRubyClassPath } from "../ruby-class-path-slot.js";
-
 export class SessionId {
   static ID_VERSION = 2;
 
@@ -69,23 +67,6 @@ function objectIdHex(object: object): string {
     objectIds.set(object, id);
   }
   return id.toString(16);
-}
-
-function rubyClassPath(klass: unknown): string {
-  switch (klass) {
-    case SessionHash:
-      return "Rack::Session::Abstract::SessionHash";
-    case SecureSessionHash:
-      return "Rack::Session::Abstract::PersistedSecure::SecureSessionHash";
-    case Persisted:
-      return "Rack::Session::Abstract::Persisted";
-    case PersistedSecure:
-      return "Rack::Session::Abstract::PersistedSecure";
-    case ID:
-      return "Rack::Session::Abstract::ID";
-    default:
-      return getRubyClassPath(klass) ?? (klass as { name: string }).name;
-  }
 }
 
 export class SessionHash implements PersistedSession {
@@ -247,7 +228,7 @@ export class SessionHash implements PersistedSession {
     if (this.isLoaded()) {
       return inspect(this.data);
     } else {
-      return `#<${rubyClassPath(this.constructor)}:0x${objectIdHex(this)} not yet loaded>`;
+      return `#<${this.constructor.name}:0x${objectIdHex(this)} not yet loaded>`;
     }
   }
 
@@ -526,7 +507,7 @@ export class Persisted {
     const data = this.writeSession(req, sessionId, sessionData, options);
     if (!isTruthy(data)) {
       (req.getHeader(RACK_ERRORS) as unknown as RackErrors).puts(
-        `Warning! ${rubyClassPath(this.constructor)} failed to save session. Content dropped.`,
+        `Warning! ${this.constructor.name} failed to save session. Content dropped.`,
       );
     } else if (isTruthy(options["defer"]) && !isTruthy(options["renew"])) {
       if (isTruthy(verbose())) {
@@ -678,3 +659,13 @@ export class ID extends Persisted {
     return (this as unknown as IdSubclass).destroySession(req.env, sid, options);
   }
 }
+
+Object.defineProperty(SessionHash, "name", { value: "Rack::Session::Abstract::SessionHash" });
+Object.defineProperty(Persisted, "name", { value: "Rack::Session::Abstract::Persisted" });
+Object.defineProperty(SecureSessionHash, "name", {
+  value: "Rack::Session::Abstract::PersistedSecure::SecureSessionHash",
+});
+Object.defineProperty(PersistedSecure, "name", {
+  value: "Rack::Session::Abstract::PersistedSecure",
+});
+Object.defineProperty(ID, "name", { value: "Rack::Session::Abstract::ID" });

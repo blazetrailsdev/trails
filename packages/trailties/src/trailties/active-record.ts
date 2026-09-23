@@ -25,7 +25,6 @@ import {
   ExtendedDeterministicUniquenessValidator,
 } from "@blazetrails/activerecord/encryption";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
-import { setRubyClassPath } from "../ruby-class-path-slot.js";
 import {
   setBelongsToRequiredValidatesForeignKey,
   setGenerateSecureTokenOn,
@@ -189,4 +188,4 @@ export class Trailtie extends BaseTrailtie {
   }
 }
 
-setRubyClassPath(Trailtie, "ActiveRecord::Railtie");
+Object.defineProperty(Trailtie, "name", { value: "ActiveRecord::Railtie" });
