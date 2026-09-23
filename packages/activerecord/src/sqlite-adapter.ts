@@ -83,6 +83,13 @@ export const SQLite3Constants = {
     URI: 0x00000040,
     SHAREDCACHE: 0x00020000,
   },
+  Optimize: {
+    DEBUG: 0x00001,
+    ANALYZE_TABLES: 0x00002,
+    LIMIT_ANALYZE: 0x00010,
+    CHECK_ALL_TABLES: 0x10000,
+    DEFAULT: 0x00002 | 0x00010,
+  },
 } as const;
 
 export interface SqliteOpenConfig {

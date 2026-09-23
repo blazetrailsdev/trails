@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import type { SyncSqliteConnection } from "../sqlite-adapter.js";
+import { SQLite3Constants, type SyncSqliteConnection } from "../sqlite-adapter.js";
 import { betterSqlite3Driver } from "./better-sqlite3.js";
 import { Exception } from "./errors.js";
 import { Pragmas } from "./pragmas.js";
@@ -48,5 +48,20 @@ describe("SQLite3::TestPragmas", () => {
     Pragmas.optimize.call(db);
 
     expect(db.testStatements).toEqual(["PRAGMA optimize"]);
+  });
+
+  it("optimize with args", () => {
+    const Optimize = SQLite3Constants.Optimize;
+    Pragmas.optimize.call(db, Optimize.DEFAULT);
+    Pragmas.optimize.call(db, Optimize.ANALYZE_TABLES | Optimize.LIMIT_ANALYZE);
+    Pragmas.optimize.call(db, Optimize.ANALYZE_TABLES | Optimize.DEBUG);
+    Pragmas.optimize.call(db, Optimize.DEFAULT | Optimize.CHECK_ALL_TABLES);
+
+    expect(db.testStatements).toEqual([
+      "PRAGMA optimize=18",
+      "PRAGMA optimize=18",
+      "PRAGMA optimize=3",
+      "PRAGMA optimize=65554",
+    ]);
   });
 });
