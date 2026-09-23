@@ -19,7 +19,6 @@ import {
 import { singularize } from "@blazetrails/activesupport";
 import { modelRegistry } from "./associations.js";
 import { TableNotSpecified } from "./errors.js";
-import { loadSchemaOverrides } from "./load-schema-overrides-slot.js";
 import { EncryptableRecord } from "./encryption/encryptable-record.js";
 import { NullColumn } from "./connection-adapters/column.js";
 import { connectionPool, withConnection, isConnected } from "./connection-handling.js";
@@ -289,6 +288,7 @@ export interface SchemaHost {
   _yamlEncoder?: YAMLEncoder;
   attributeTypes(): Record<string, any>;
   _schemaLoaded?: boolean;
+  loadSchemaBang(): void;
   /** @internal */
   _columnNamesMemo?: { names: readonly string[] };
   connection: any;
@@ -498,7 +498,7 @@ export function reloadSchemaFromCache(this: SchemaHost, recursive = true): void 
 export function loadSchema(this: SchemaHost): void {
   if (ownSchemaMemo(this, "_schemaLoaded")) return;
   try {
-    loadSchemaBang.call(this);
+    this.loadSchemaBang();
   } catch (error) {
     this.reloadSchemaFromCache();
     throw error;
@@ -509,19 +509,6 @@ export function loadSchema(this: SchemaHost): void {
 }
 
 export function loadSchemaBang(this: SchemaHost): void {
-  runLoadSchemaChain(this, () => loadSchemaBangAnchor.call(this));
-}
-
-function runLoadSchemaChain(host: SchemaHost, anchor: () => void): void {
-  let next = anchor;
-  for (const { override } of loadSchemaOverrides) {
-    const superFn = next;
-    next = () => override.call(host, superFn);
-  }
-  next();
-}
-
-function loadSchemaBangAnchor(this: SchemaHost): void {
   const klass = this as unknown as typeof Base;
   if (!klass.tableName) {
     throw new TableNotSpecified(
@@ -649,7 +636,7 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   }
   if (currentAdapter !== startingAdapter) return;
 
-  loadSchemaBang.call(this);
+  this.loadSchemaBang();
 }
 
 function loadSchemaFromCacheSync(host: SchemaHost): boolean {
@@ -825,6 +812,7 @@ export const ClassMethods = {
   symbolColumnToString,
   resetColumnInformation,
   _returningColumnsForInsert,
+  loadSchemaBang,
   loadSchemaFromAdapter,
 };
 

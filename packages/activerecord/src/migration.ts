@@ -41,7 +41,8 @@ import { SchemaMigration, NullSchemaMigration } from "./schema-migration.js";
 import { InternalMetadata, NullInternalMetadata } from "./internal-metadata.js";
 import { _DEFAULT_ENV } from "./connection-handling-slot.js";
 import type { DatabaseConfig } from "./database-configurations/database-config.js";
-import { migrationArConfig } from "./migration/ar-config-source.js";
+import { _Base } from "./base-slot.js";
+import { _DatabaseTasks } from "./tasks/database-tasks-slot.js";
 import type { SchemaFormat } from "./tasks/database-tasks.js";
 import type { ExecutionStrategy } from "./migration/execution-strategy.js";
 import { PendingMigrationConnection } from "./migration/pending-migration-connection.js";
@@ -58,7 +59,6 @@ export { DefaultStrategy } from "./migration/default-strategy.js";
 export { PendingMigrationConnection } from "./migration/pending-migration-connection.js";
 
 import { ActiveRecordError, NoDatabaseError } from "./errors.js";
-import type { Base } from "./base.js";
 import {
   maintainTestSchema,
   migrationStrategy,
@@ -66,15 +66,6 @@ import {
   timestampedMigrations,
   validateMigrationTimestamps,
 } from "./active-record.js";
-
-type BaseWithLogger = Pick<typeof Base, "logger">;
-
-let _base: BaseWithLogger | undefined;
-
-/** @internal */
-export function _registerBase(base: BaseWithLogger): void {
-  _base = base;
-}
 
 /** @internal */
 export interface ColumnExistsOptions {
@@ -865,7 +856,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     if (typeof this[direction] !== "function") return;
     this.announce(direction === "up" ? "migrating" : "reverting");
     let timeElapsed = 0;
-    const pool = migrationArConfig()!.databaseTasks().migrationConnection().pool as ConnectionPool;
+    const pool = _DatabaseTasks!.migrationConnection().pool as ConnectionPool;
     await pool.withConnection(async (conn) => {
       const start = Date.now();
       await this.execMigration(conn, direction);
@@ -945,8 +936,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   }
 
   get connection(): A {
-    return (this._connectionOverride ??
-      migrationArConfig()!.databaseTasks().migrationConnection()) as A;
+    return (this._connectionOverride ?? _DatabaseTasks!.migrationConnection()) as A;
   }
 
   set connection(conn: DatabaseAdapter | CommandRecorder | undefined) {
@@ -954,7 +944,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   }
 
   get connectionPool(): ConnectionPool {
-    return this._poolOverride ?? migrationArConfig()!.databaseTasks().migrationConnectionPool();
+    return this._poolOverride ?? _DatabaseTasks!.migrationConnectionPool();
   }
 
   async execMigration(conn: DatabaseAdapter, direction: "up" | "down"): Promise<void> {
@@ -1034,8 +1024,8 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   static tableNameOptions(): { tableNamePrefix: string; tableNameSuffix: string } {
     return {
-      tableNamePrefix: migrationArConfig()!.tableNamePrefix,
-      tableNameSuffix: migrationArConfig()!.tableNameSuffix,
+      tableNamePrefix: _Base!.tableNamePrefix,
+      tableNameSuffix: _Base!.tableNameSuffix,
     };
   }
 
@@ -1117,12 +1107,10 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   static async checkAllPendingBang(): Promise<void> {
     const pendingMigrations: MigrationProxy[][] = [];
 
-    await migrationArConfig()!
-      .databaseTasks()
-      .withTemporaryPoolForEach({ env: this.env() }, async (pool) => {
-        const pending = await pool.migrationContext.open().pendingMigrations();
-        if (pending != null) pendingMigrations.push(pending);
-      });
+    await _DatabaseTasks!.withTemporaryPoolForEach({ env: this.env() }, async (pool) => {
+      const pending = await pool.migrationContext.open().pendingMigrations();
+      if (pending != null) pendingMigrations.push(pending);
+    });
 
     const migrations = pendingMigrations.flat();
 
@@ -1227,7 +1215,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   /** @internal */
   private static async anySchemaNeedsUpdate(): Promise<boolean> {
-    const databaseTasks = migrationArConfig()!.databaseTasks();
+    const databaseTasks = _DatabaseTasks!;
 
     for (const dbConfig of this.dbConfigsInCurrentEnv()) {
       if (!(await databaseTasks.schemaUpToDate(dbConfig, _schemaFormat()))) return true;
@@ -1251,7 +1239,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   /** @internal */
   private static dbConfigsInCurrentEnv(): DatabaseConfig[] {
-    return migrationArConfig()!.configurations().configsFor({ envName: this.env() });
+    return _Base!.configurations().configsFor({ envName: this.env() });
   }
 
   /**
@@ -1264,11 +1252,11 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   /** @internal */
   private static async loadSchemaBang(): Promise<void> {
-    const databaseTasks = migrationArConfig()!.databaseTasks();
+    const databaseTasks = _DatabaseTasks!;
 
-    await migrationArConfig()!.connectionHandler().clearAllConnectionsBang("all");
+    await _Base!.connectionHandler.clearAllConnectionsBang("all");
 
-    const testConfigs = migrationArConfig()!.configurations().configsFor({ envName: "test" });
+    const testConfigs = _Base!.configurations().configsFor({ envName: "test" });
     for (const dbConfig of testConfigs) {
       await databaseTasks.purge(dbConfig);
     }
@@ -1382,7 +1370,7 @@ export class MigrationContext<
   }
 
   private connectionPool(): ConnectionPool {
-    return migrationArConfig()!.databaseTasks().migrationConnectionPool();
+    return _DatabaseTasks!.migrationConnectionPool();
   }
 
   async migrate(
@@ -1748,7 +1736,7 @@ export class Migrator {
 
   /** @internal */
   private get connection(): DatabaseAdapter {
-    return migrationArConfig()!.databaseTasks().migrationConnection();
+    return _DatabaseTasks!.migrationConnection();
   }
 
   /** @internal */
@@ -1769,8 +1757,8 @@ export class Migrator {
       if (this.isDown() && !applied.has(migration.version)) return undefined;
       if (this.isUp() && applied.has(migration.version)) return undefined;
 
-      if (_base?.logger)
-        _base.logger.info?.(`Migrating to ${migration.name} (${migration.version})`);
+      if (_Base!.logger)
+        _Base!.logger.info(`Migrating to ${migration.name} (${migration.version})`);
 
       await this.ddlTransaction(migration, async () => {
         await (await migration.migration()).migrate(this._direction);
@@ -2047,7 +2035,7 @@ export class CheckPending {
   /** @missingRailsCall call — PERMANENT */
   private buildWatcher(block: () => Promise<void> | void): FileUpdateChecker {
     const currentEnvironment = _DEFAULT_ENV!();
-    const allConfigs = migrationArConfig()!.configurations().configsFor({
+    const allConfigs = _Base!.configurations().configsFor({
       envName: currentEnvironment,
     });
     const paths = [

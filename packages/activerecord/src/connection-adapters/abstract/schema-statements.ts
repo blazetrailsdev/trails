@@ -48,11 +48,7 @@ import {
   wrap,
 } from "@blazetrails/activesupport";
 import { SchemaDumper } from "./schema-dumper.js";
-import {
-  globalPluralizeTableNames,
-  globalTableNamePrefix,
-  globalTableNameSuffix,
-} from "./table-name-options.js";
+import { _Base } from "../../base-slot.js";
 
 export { assertSchemaAdapter } from "./assert-schema-adapter.js";
 
@@ -502,7 +498,7 @@ export class SchemaStatements {
         typeof options.foreignKey === "object"
           ? { ...options.foreignKey, ...conditionalOptions }
           : {
-              toTable: globalPluralizeTableNames() ? pluralize(refName) : refName,
+              toTable: _Base!.pluralizeTableNames ? pluralize(refName) : refName,
               ...conditionalOptions,
             };
       if ((fkOptions as { column?: string }).column == null) {
@@ -1625,8 +1621,8 @@ export class SchemaStatements {
   /** @internal */
   stripTableNamePrefixAndSuffix(tableName: string): string {
     const adapter = this as any;
-    const prefix: string = adapter.tableNamePrefix ?? globalTableNamePrefix();
-    const suffix: string = adapter.tableNameSuffix ?? globalTableNameSuffix();
+    const prefix: string = adapter.tableNamePrefix ?? _Base!.tableNamePrefix;
+    const suffix: string = adapter.tableNameSuffix ?? _Base!.tableNameSuffix;
     const str = String(tableName);
     const m = str.match(new RegExp(`${prefix}(.+)${suffix}`));
     return m ? m[1] : str;

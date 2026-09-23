@@ -1,8 +1,5 @@
-import {
-  SqlTypeMetadata,
-  registerTypeMetadataClass,
-  type SqlTypeMetadataJSON,
-} from "../sql-type-metadata.js";
+import { SqlTypeMetadata, type SqlTypeMetadataJSON } from "../sql-type-metadata.js";
+import { _setMySQLTypeMetadata } from "../type-metadata-slots.js";
 
 export interface TypeMetadataJSON extends SqlTypeMetadataJSON {
   extra: string | null;
@@ -35,9 +32,4 @@ export class TypeMetadata extends SqlTypeMetadata {
   }
 }
 
-registerTypeMetadataClass("MySQL::TypeMetadata", {
-  fromJSON(data: SqlTypeMetadataJSON): TypeMetadata {
-    const row = data as TypeMetadataJSON;
-    return new TypeMetadata(row, { extra: row.extra });
-  },
-});
+_setMySQLTypeMetadata(TypeMetadata);

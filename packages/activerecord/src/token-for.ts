@@ -1,22 +1,9 @@
 import { InvalidSignature, MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { KeyError } from "@blazetrails/ruby-compat";
-import { asJson, getEnv } from "@blazetrails/activesupport";
+import { fetch, merge } from "@blazetrails/ruby-compat";
+import { asJson, getEnv, onLoad } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 
 export { InvalidSignature };
-
-let _assignBootVerifier: ((verifier: MessageVerifier | null) => void) | null = null;
-
-/**
- * @internal
- * @noRailsEquivalent PERMANENT
- */
-export function registerGeneratedTokenVerifierSink(
-  sink: (verifier: MessageVerifier | null) => void,
-): void {
-  _assignBootVerifier = sink;
-  buildDefaultVerifier();
-}
 
 function resolveSecret(): string | null {
   const envSecret = getEnv("BLAZETRAILS_SECRET_KEY_BASE") ?? getEnv("BLAZETRAILS_SIGNED_ID_SECRET");
@@ -24,10 +11,10 @@ function resolveSecret(): string | null {
   return null;
 }
 
-function buildDefaultVerifier(): void {
+onLoad("active_record", function (this: typeof Base) {
   const secret = resolveSecret();
-  _assignBootVerifier?.(secret === null ? null : new MessageVerifier(secret));
-}
+  this.generatedTokenVerifier ??= secret === null ? null : new MessageVerifier(secret);
+});
 
 export class TokenDefinition {
   readonly definingClass: typeof Base;
@@ -81,32 +68,7 @@ export class TokenDefinition {
   }
 }
 
-export type TokenDefinitionsHash = Readonly<Record<string, TokenDefinition>> & {
-  fetch(purpose: string): TokenDefinition;
-  merge(other: Record<string, TokenDefinition>): TokenDefinitionsHash;
-};
-
-/**
- * @internal
- * @noRailsEquivalent PERMANENT
- */
-export function withFetch(entries: Record<string, TokenDefinition>): TokenDefinitionsHash {
-  Object.defineProperty(entries, "fetch", {
-    value(purpose: string): TokenDefinition {
-      const definition = entries[purpose];
-      if (definition === undefined) {
-        throw new KeyError(`key not found: ${JSON.stringify(purpose)}`);
-      }
-      return definition;
-    },
-  });
-  Object.defineProperty(entries, "merge", {
-    value(other: Record<string, TokenDefinition>): TokenDefinitionsHash {
-      return withFetch({ ...entries, ...other });
-    },
-  });
-  return entries as TokenDefinitionsHash;
-}
+export type TokenDefinitionsHash = Readonly<Record<string, TokenDefinition>>;
 
 export function generatesTokenFor(
   this: typeof Base,
@@ -116,13 +78,17 @@ export function generatesTokenFor(
     block?: (record: any) => unknown;
   } = {},
 ): void {
-  this.tokenDefinitions = this.tokenDefinitions.merge({
+  this.tokenDefinitions = merge(this.tokenDefinitions, {
     [purpose]: new TokenDefinition(this, purpose, options.expiresIn, options.block),
   });
 }
 
+/** @missingRailsArgs fetch — PERMANENT */
 export function generateTokenFor(this: Base, purpose: string): string {
-  return (this.constructor as typeof Base).tokenDefinitions.fetch(purpose).generateToken(this);
+  return fetch<TokenDefinition>(
+    (this.constructor as typeof Base).tokenDefinitions,
+    purpose,
+  ).generateToken(this);
 }
 
 export async function findByTokenFor(

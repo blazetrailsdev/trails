@@ -18,9 +18,6 @@ export {
 export type { ColumnType as ResultColumnType, ColumnTypes as ResultColumnTypes } from "./result.js";
 export * as Type from "./type.js";
 
-import { ExecutorHooks } from "./connection-adapters/abstract/connection-pool.js";
-import { Base as _Base } from "./base.js";
-ExecutorHooks.setConnectionHandlerResolver(() => _Base.connectionHandler);
 export { Relation, Range } from "./relation.js";
 export { RangeType } from "./connection-adapters/postgresql/oid/range.js";
 export { IPAddr } from "@blazetrails/ruby-compat";
@@ -66,17 +63,11 @@ export type { AssociationProxy } from "./associations/collection-proxy.js";
 export { AssociationRelation } from "./association-relation.js";
 export type { AssociationOptions } from "./associations.js";
 export { Transaction } from "./transaction.js";
-export {
-  LogSubscriber,
-  /** @noRailsEquivalent PERMANENT */
-  setBaseResolver as setLogSubscriberBaseResolver,
-} from "./log-subscriber.js";
+export { LogSubscriber } from "./log-subscriber.js";
 export { ExplainSubscriber } from "./explain-subscriber.js";
 export { ExplainRegistry } from "./explain-registry.js";
 export { collectingQueriesForExplain, execExplain } from "./explain.js";
 
-import { _registerBase as _registerBaseWithMigration } from "./migration.js";
-_registerBaseWithMigration(_Base);
 import "./migration/compatibility.js";
 
 import { LogSubscriber as _LogSubscriber } from "./log-subscriber.js";

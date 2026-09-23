@@ -1,4 +1,5 @@
 import { AdapterNotFound } from "./errors.js";
+import { _setConnectionAdapters } from "./connection-adapters-slot.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 
 export interface ConnectionAdapters {
@@ -84,6 +85,8 @@ export function resolve(adapterName: string | undefined): AdapterClass | Promise
   resolved.set(adapterName ?? "", promise);
   return promise;
 }
+
+_setConnectionAdapters({ resolve });
 
 const sqlite3Loader: AdapterLoader = async () =>
   (await import("./connection-adapters/better-sqlite3-adapter.js")).BetterSQLite3Adapter as any;

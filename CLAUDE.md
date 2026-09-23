@@ -835,7 +835,7 @@ with `Super` still in TDZ and the module throws
 imports at all (so it cannot join any cycle) exporting a mutable binding plus a
 `_setX()` setter, which the defining module calls at the bottom of its own
 body. Readers import the binding from the slot and use it at call time, exactly
-where Ruby resolves the constant. Fifteen instances exist and are the only ones, plus the one converged onto
+where Ruby resolves the constant. Eighteen instances exist and are the only ones, plus the one converged onto
 `Autoload`:
 
 - `activerecord/src/associations/association-class-slots.ts` — the six
@@ -905,8 +905,12 @@ extends Association`, whose modules reach `reflection.ts` back through
   import `base.ts` back. `connection-adapters/abstract-adapter.ts` also reads
   it as `_Base?.logger ?? null` in the constructor
   (`abstract_adapter.rb:132,140`). That read on a standalone adapter's own
-  path is the only guarded slot read, falling back to the value Rails'
-  autoloaded `active_record.rb` would hold. An
+  path is one of the two guarded slot reads, falling back to the value Rails'
+  autoloaded `active_record.rb` would hold. The other is
+  `connection-adapters/abstract/query-cache.ts`'s `dirties_query_cache` arm,
+  `_Base?.connectionHandler` (`abstract/query_cache.rb:24-25`,
+  `connection_handling.rb:258-262`), which a standalone adapter's `execute`
+  reaches. An
   adapter is a standalone public entry point, constructed and queried with no
   model layer loaded at all (the whole `sqlite-drivers` lane), so an unset
   slot there is not a load-order bug but a legitimate configuration. A read
@@ -949,6 +953,23 @@ builder/association.ts -> reflection.ts -> associations.ts -> builder/has-one.ts
   name `ConnectionHandling::DEFAULT_ENV`, defined at `connection_handling.rb:7`).
   Same cycle as above, entered through `schema-statements.ts ->
 migration/command-recorder.ts -> migration.ts`.
+- `activerecord/src/tasks/database-tasks-slot.ts` — `DatabaseTasks`, read by
+  `migration.ts` for `ActiveRecord::Tasks::DatabaseTasks`
+  (`migration.rb:151-183,696,750,1037-1041,1361-1365`). `database-tasks.ts`
+  imports `migration.ts` and `connection-handling.ts`, so a plain import back
+  re-enters the cycle above.
+- `activerecord/src/connection-adapters-slot.ts` — `ConnectionAdapters.resolve`,
+  read by `database-configurations/database-config.ts` for
+  `DatabaseConfig#adapter_class` (`database_config.rb:17`). The cycle is
+  `connection-adapters.ts -> abstract/connection-handler.ts ->
+database-configurations.ts -> hash-config.ts`, whose `class HashConfig extends
+  DatabaseConfig` reads `DatabaseConfig` in TDZ.
+- `activerecord/src/connection-adapters/type-metadata-slots.ts` — the MySQL and
+  PostgreSQL `TypeMetadata` ctors, read by `sql-type-metadata.ts` to revive a
+  serialized column's metadata by its class name (Psych's constant lookup of the
+  `!ruby/object:` tag). The cycle is closed by each `class TypeMetadata extends
+SqlTypeMetadata` (Rails: `DelegateClass(SqlTypeMetadata)`, `mysql/type_metadata.rb:6`,
+  `postgresql/type_metadata.rb:7`).
 
 This is a genuine language shortcoming, not a preference, and it is the one
 sanctioned shape for it — do not re-derive a per-cluster justification, and do

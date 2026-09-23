@@ -6,7 +6,6 @@ import { Module, include } from "@blazetrails/ruby-compat";
 import { initializeGeneratedModules } from "../attribute-methods.js";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Configurable } from "./configurable.js";
-import { registerLoadSchemaOverride } from "../load-schema-overrides-slot.js";
 
 /**
  * Mirrors Rails' EncryptableRecord#global_previous_schemes_for.
@@ -333,5 +332,3 @@ export function preserveOriginalEncrypted(this: any, name: string): void {
   encrypts.call(this, originalAttributeName);
   overrideAccessorsToPreserveOriginal.call(this, name, originalAttributeName);
 }
-
-registerLoadSchemaOverride(313, EncryptableRecord.loadSchemaBang as never);
