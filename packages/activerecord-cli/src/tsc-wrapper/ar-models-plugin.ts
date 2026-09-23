@@ -1,6 +1,6 @@
 import type { TscPlugin, VirtualizeOutput } from "@blazetrails/trails-tsc";
 import { virtualize } from "@blazetrails/activerecord/type-virtualization/virtualize.js";
-import { resolveAutoImports } from "./auto-import.js";
+import { resolveAutoImports } from "@blazetrails/activerecord/type-virtualization/auto-import.js";
 import type { SchemaColumnValue } from "@blazetrails/activerecord/type-virtualization/synthesize.js";
 
 const STATIC_BLOCK_PATTERN = /\bstatic\s*\{/;

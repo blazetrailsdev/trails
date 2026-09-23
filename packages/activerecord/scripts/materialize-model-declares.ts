@@ -1,9 +1,10 @@
-import ts from "typescript";
+import * as ts from "typescript/unstable/ast";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { classify, camelize } from "@blazetrails/activesupport";
 import { virtualize } from "../src/type-virtualization/virtualize.js";
+import { tsApi } from "../src/type-virtualization/ts-api.js";
 import { walk, type ClassInfo, type AssociationCall } from "../src/type-virtualization/walker.js";
 import {
   resolveAssociationTarget,
@@ -49,12 +50,7 @@ function buildModelRegistry(): Map<string, string> {
   for (const entry of fs.readdirSync(MODELS_DIR)) {
     if (!entry.endsWith(".ts") || entry.endsWith(".test.ts")) continue;
     const file = path.join(MODELS_DIR, entry);
-    const sf = ts.createSourceFile(
-      file,
-      fs.readFileSync(file, "utf8"),
-      ts.ScriptTarget.ES2022,
-      true,
-    );
+    const sf = tsApi().createSourceFile(file, fs.readFileSync(file, "utf8"));
     for (const stmt of sf.statements) {
       if (ts.isClassDeclaration(stmt) && stmt.name && !registry.has(stmt.name.text)) {
         registry.set(stmt.name.text, file);
@@ -70,12 +66,7 @@ function buildNamespacedClassRegistry(registry: ReadonlyMap<string, string>): Ma
   for (const [, file] of registry) {
     if (seen.has(file)) continue;
     seen.add(file);
-    const sf = ts.createSourceFile(
-      file,
-      fs.readFileSync(file, "utf8"),
-      ts.ScriptTarget.ES2022,
-      true,
-    );
+    const sf = tsApi().createSourceFile(file, fs.readFileSync(file, "utf8"));
     for (const stmt of sf.statements) {
       if (!ts.isClassDeclaration(stmt) || !stmt.name) continue;
       const tsName = stmt.name.text;
@@ -83,9 +74,9 @@ function buildNamespacedClassRegistry(registry: ReadonlyMap<string, string>): Ma
       let demodulizedName: string | undefined;
       for (const m of stmt.members) {
         if (!ts.isPropertyDeclaration(m) || !m.initializer) continue;
-        if (!ts.isIdentifier(m.name) && !ts.isStringLiteralLike(m.name)) continue;
+        if (!ts.isIdentifier(m.name) && !ts.isStringLiteralLikeNode(m.name)) continue;
         const prop = ts.isIdentifier(m.name) ? m.name.text : m.name.text;
-        if (!ts.isStringLiteralLike(m.initializer)) continue;
+        if (!ts.isStringLiteralLikeNode(m.initializer)) continue;
         if (prop === "moduleName") moduleName = m.initializer.text;
         else if (prop === "_demodulizedName") demodulizedName = m.initializer.text;
       }
@@ -170,7 +161,7 @@ function extractComposedOfColumns(sf: ts.SourceFile): Map<string, Set<string>> {
           for (const pair of mapping.elements) {
             if (!ts.isArrayLiteralExpression(pair) || pair.elements.length < 1) continue;
             const colArg = pair.elements[0];
-            if (!colArg || !ts.isStringLiteralLike(colArg)) continue;
+            if (!colArg || !ts.isStringLiteralLikeNode(colArg)) continue;
             const cols = out.get(className) ?? new Set<string>();
             cols.add(colArg.text);
             out.set(className, cols);
@@ -181,7 +172,7 @@ function extractComposedOfColumns(sf: ts.SourceFile): Map<string, Set<string>> {
   };
   const visit = (node: ts.Node): void => {
     if (ts.isClassDeclaration(node)) visitClass(node);
-    ts.forEachChild(node, visit);
+    node.forEachChild(visit);
   };
   visit(sf);
   return out;
@@ -208,12 +199,7 @@ function buildGlobalSuperNameOf(registry: ReadonlyMap<string, string>): Map<stri
   for (const [, file] of registry) {
     if (walkedFiles.has(file)) continue;
     walkedFiles.add(file);
-    const sf = ts.createSourceFile(
-      file,
-      fs.readFileSync(file, "utf8"),
-      ts.ScriptTarget.ES2022,
-      true,
-    );
+    const sf = tsApi().createSourceFile(file, fs.readFileSync(file, "utf8"));
     for (const stmt of sf.statements) {
       if (!ts.isClassDeclaration(stmt) || !stmt.name) continue;
       const superName = superClassNameOf(stmt);
@@ -240,12 +226,7 @@ function buildModelAssociationLookup(
     }
     if (walkedFiles.has(file)) return;
     walkedFiles.add(file);
-    const sf = ts.createSourceFile(
-      file,
-      fs.readFileSync(file, "utf8"),
-      ts.ScriptTarget.ES2022,
-      true,
-    );
+    const sf = tsApi().createSourceFile(file, fs.readFileSync(file, "utf8"));
     for (const info of walk(sf, { isModelClass: () => true })) {
       if (!ownByClassName.has(info.name)) {
         ownByClassName.set(info.name, associationCalls(info));
@@ -318,7 +299,7 @@ function collectModelClassNodes(sf: ts.SourceFile): Set<ts.ClassDeclaration> {
   const all: ts.ClassDeclaration[] = [];
   const collect = (node: ts.Node): void => {
     if (ts.isClassDeclaration(node) && node.name) all.push(node);
-    ts.forEachChild(node, collect);
+    node.forEachChild(collect);
   };
   collect(sf);
 
@@ -445,7 +426,7 @@ function buildClassNameAliases(sf: ts.SourceFile): Map<string, string> {
       const [nameArg, classArg] = node.arguments;
       if (
         nameArg &&
-        ts.isStringLiteralLike(nameArg) &&
+        ts.isStringLiteralLikeNode(nameArg) &&
         classArg &&
         ts.isIdentifier(classArg) &&
         nameArg.text !== classArg.text
@@ -453,7 +434,7 @@ function buildClassNameAliases(sf: ts.SourceFile): Map<string, string> {
         aliases.set(nameArg.text, classArg.text);
       }
     }
-    ts.forEachChild(node, visit);
+    node.forEachChild(visit);
   };
   visit(sf);
   return aliases;
@@ -553,7 +534,7 @@ async function main(): Promise<void> {
   const namespacedClassRegistry = buildNamespacedClassRegistry(registry);
   for (const file of targets) {
     const source = fs.readFileSync(file, "utf8");
-    const sf = ts.createSourceFile(file, source, ts.ScriptTarget.ES2022, true);
+    const sf = tsApi().createSourceFile(file, source);
     const modelSpans = new Set<string>();
     for (const cls of collectModelClassNodes(sf)) modelSpans.add(`${cls.pos}:${cls.end}`);
     const isModelClass = (cls: ts.ClassDeclaration): boolean =>

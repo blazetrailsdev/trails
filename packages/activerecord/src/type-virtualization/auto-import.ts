@@ -1,7 +1,9 @@
-import ts from "typescript";
-import * as path from "node:path";
-import { walk, type ClassInfo } from "@blazetrails/activerecord/type-virtualization/walker.js";
-import { resolveAssociationTarget } from "@blazetrails/activerecord/type-virtualization/resolve-target.js";
+/** @noRailsEquivalent PERMANENT */
+import * as ts from "typescript/unstable/ast";
+import { getPath } from "@blazetrails/ruby-compat";
+import { walk, type ClassInfo } from "./walker.js";
+import { resolveAssociationTarget } from "./resolve-target.js";
+import { tsApi } from "./ts-api.js";
 
 export function resolveAutoImports(
   originalText: string,
@@ -9,7 +11,7 @@ export function resolveAutoImports(
   modelRegistry: ReadonlyMap<string, string>,
   baseNames?: readonly string[],
 ): string[] {
-  const sf = ts.createSourceFile(fileName, originalText, ts.ScriptTarget.ES2022, true);
+  const sf = tsApi().createSourceFile(fileName, originalText);
   const classes = walk(sf, { baseNames });
 
   const neededNames = new Set<string>();
@@ -89,9 +91,36 @@ function collectNamesInScope(sf: ts.SourceFile): Set<string> {
 }
 
 function computeRelativeImport(fromFile: string, toFile: string): string {
-  const fromDir = path.dirname(fromFile);
-  let rel = path.relative(fromDir, toFile);
-  rel = rel.replace(/\\/g, "/");
+  const absolute = (file: string): string =>
+    /^([A-Za-z]:)?[\\/]/.test(file) ? file : getPath().resolve(file);
+  const fromPath = absolute(fromFile);
+  const toPath = absolute(toFile);
+  const windows = /^[A-Za-z]:|\\/.test(fromPath) || /^[A-Za-z]:|\\/.test(toPath);
+  const key = (segment: string): string => (windows ? segment.toLowerCase() : segment);
+  const split = (file: string): [string, string[]] => {
+    const slashed = file.replace(/\\/g, "/");
+    const root = windows ? (/^(\/\/[^/]+\/[^/]+|[A-Za-z]:)/.exec(slashed)?.[0] ?? "") : "";
+    const segments: string[] = [];
+    for (const segment of slashed.slice(root.length).split("/")) {
+      if (segment === "" || segment === ".") continue;
+      if (segment === "..") segments.pop();
+      else segments.push(segment);
+    }
+    return [root, segments];
+  };
+  const [fromRoot, fromSegments] = split(fromPath);
+  const [toRoot, to] = split(toPath);
+  if (key(fromRoot) !== key(toRoot)) return `./${toRoot}/${to.join("/")}`.replace(/\.tsx?$/, ".js");
+  const fromDir = fromSegments.slice(0, -1);
+  let common = 0;
+  while (
+    common < fromDir.length &&
+    common < to.length - 1 &&
+    key(fromDir[common]) === key(to[common])
+  ) {
+    common++;
+  }
+  let rel = [...fromDir.slice(common).map(() => ".."), ...to.slice(common)].join("/");
   if (!rel.startsWith(".")) rel = "./" + rel;
   rel = rel.replace(/\.tsx?$/, ".js");
   return rel;

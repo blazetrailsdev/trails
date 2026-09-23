@@ -1,7 +1,8 @@
 /** @noRailsEquivalent PERMANENT */
-import ts from "typescript";
+import * as ts from "typescript/unstable/ast";
 import { walk, findIncludeCalls, type WalkOptions, type ClassInfo } from "./walker.js";
 import { synthesizeDeclares } from "./synthesize.js";
+import { tsApi } from "./ts-api.js";
 
 const INCLUDED_ALIAS = "__TrailsIncluded";
 const INCLUDED_IMPORT_LINE = `import type { Included as ${INCLUDED_ALIAS} } from "@blazetrails/activesupport";`;
@@ -34,7 +35,7 @@ export function virtualize(
   fileName: string,
   options: VirtualizeOptions = {},
 ): VirtualizeResult {
-  const sf = ts.createSourceFile(fileName, originalText, ts.ScriptTarget.ES2022, true);
+  const sf = tsApi().createSourceFile(fileName, originalText);
   const classes = walk(sf, options);
   const { superNameOf: inFileSuperNameOf, ancestorsOf } = buildInheritance(classes);
   const superNameOf: ReadonlyMap<string, string> = (() => {
@@ -164,11 +165,11 @@ export function virtualize(
 }
 
 function canMergeInterface(cls: ts.ClassDeclaration): boolean {
-  return !(ts.getModifiers(cls) ?? []).some((m) => m.kind === ts.SyntaxKind.DefaultKeyword);
+  return !(cls.modifiers ?? []).some((m) => m.kind === ts.SyntaxKind.DefaultKeyword);
 }
 
 function isExported(cls: ts.ClassDeclaration): boolean {
-  return (ts.getModifiers(cls) ?? []).some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
+  return (cls.modifiers ?? []).some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
 }
 
 function typeParamsText(sf: ts.SourceFile, cls: ts.ClassDeclaration): string {
@@ -207,8 +208,9 @@ function buildInheritance(classes: readonly ClassInfo[]): {
 function directSuperName(cls: ts.ClassDeclaration): string | undefined {
   for (const hc of cls.heritageClauses ?? []) {
     if (hc.token !== ts.SyntaxKind.ExtendsKeyword) continue;
-    const expr = hc.types[0]?.expression;
-    if (expr && ts.isIdentifier(expr)) return expr.text;
+    const t = hc.types[0];
+    if (!t || !ts.isExpressionWithTypeArguments(t)) continue;
+    if (ts.isIdentifier(t.expression)) return t.expression.text;
   }
   return undefined;
 }
@@ -240,7 +242,7 @@ function checkIncludedAliasBinding(sf: ts.SourceFile, alias: string): AliasBindi
         if (el.name.text !== alias) continue;
         const importedName = el.propertyName?.text ?? el.name.text;
         const fromActivesupport =
-          ts.isStringLiteralLike(stmt.moduleSpecifier) &&
+          ts.isStringLiteralLikeNode(stmt.moduleSpecifier) &&
           stmt.moduleSpecifier.text === "@blazetrails/activesupport";
         if (fromActivesupport && importedName === "Included") escalate("matches");
         else escalate("different");
