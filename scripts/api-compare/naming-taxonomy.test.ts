@@ -35,9 +35,6 @@ describe("classifyPair", () => {
     expect(classifyPair("toS", "fetchValue")).toBe("implicit-to-s");
   });
 
-  // `Float(x)` is `kernelFloat(x)` (point.rb:64), `Regexp.escape` is
-  // `regexpEscape`: RUBY_COMPAT_EXPORTS names the port, so the pair is the same
-  // call under the ruby-compat spelling — and nothing else it might be renamed to.
   it("names a Ruby core call spelled as the ruby-compat export that ports it", () => {
     expect(classifyPair("float", "kernelFloat")).toBe("no-js-equivalent");
     expect(classifyPair("integer", "kernelInteger")).toBe("no-js-equivalent");

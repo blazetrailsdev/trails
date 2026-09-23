@@ -75,8 +75,6 @@ export const JS_ENUMERABLE_ALIASES = new Map<string, string[]>([
   // spells `RegExp#test` — the WHOLE call's analogue, not a building block, so
   // it cannot silence a dropped call the way a loose pair would.
   ["match?", ["test"]],
-  // `Regexp#match(str)` is `RegExp#exec(str)` — same receiver, same argument,
-  // `nil`/`null` on a miss (mysql's mismatched_foreign_key_details).
   ["match", ["exec"]],
 ]);
 
