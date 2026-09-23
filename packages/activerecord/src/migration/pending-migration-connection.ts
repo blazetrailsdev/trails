@@ -7,7 +7,9 @@ export class PendingMigrationConnection {
     dbConfig: DatabaseConfig,
     block: (pool: ConnectionPool) => Promise<T> | T,
   ): Promise<T> {
-    const pool = await ActiveRecord.Base.connectionHandler.establishConnection(dbConfig, { ownerName: this });
+    const pool = await ActiveRecord.Base.connectionHandler.establishConnection(dbConfig, {
+      ownerName: this,
+    });
     try {
       return await block(pool);
     } finally {
