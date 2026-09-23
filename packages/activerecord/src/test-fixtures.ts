@@ -754,7 +754,7 @@ export function fixtures(
     klass.setFixtureClass(classNames);
   }
   klass.fixtures(fixtureSetNames);
-  registerFixtureHooks(klass, connection);
+  registerFixtureHooks(klass, connection ?? (() => Base.leaseConnection()));
 
   const result: Record<string, unknown> = {};
   for (const [key, fsName] of Object.entries(accessors)) {
