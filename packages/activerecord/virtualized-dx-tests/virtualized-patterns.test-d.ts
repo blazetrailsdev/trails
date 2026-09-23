@@ -4,9 +4,9 @@ import {
   CollectionProxy,
   AssociationProxy,
   Relation,
-  association,
-  defineEnum,
+  collectionProxyFor,
 } from "@blazetrails/activerecord";
+import { defineEnum } from "../src/enum.js";
 
 class User extends Base {
   static {
@@ -107,7 +107,7 @@ describe("virtualized patterns — trails-tsc injects declares + auto-imports", 
 
   it("association() helper keeps the full CollectionProxy API", async () => {
     const author = new Author({ name: "dean" });
-    const proxy = association<Comment>(author, "comments");
+    const proxy = collectionProxyFor<Comment>(author, "comments");
     expectTypeOf(proxy).toMatchTypeOf<CollectionProxy<Comment>>();
     expectTypeOf(await proxy.first()).toEqualTypeOf<Comment | null>();
     expectTypeOf(await proxy.toArray()).toEqualTypeOf<Comment[]>();
