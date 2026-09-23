@@ -1512,13 +1512,16 @@ function isScoredProtocolDefinition(name: string, pkg: string | undefined): bool
 }
 
 /**
- * Ruby's copy hooks. `Object#dup` / `#clone` call `initialize_copy` (and
- * `initialize_dup` / `initialize_clone`, which default to it), and JS has no
- * `Object#dup`, so a port may land the hook's body in either hook's spelling
- * or in an own `dup` / `clone`. compare.ts lets one TS member answer only one
- * of them per file.
+ * Ruby's copy hooks, each mapped to the copy methods that run it. `Object#dup`
+ * calls `initialize_dup` and `Object#clone` calls `initialize_clone`, both of
+ * which default to `initialize_copy`, and JS has no `Object#dup`, so a port
+ * may land the hook's body in either hook's spelling or in an own copy method
+ * that runs it. compare.ts lets one TS member answer only one hook per file.
  */
-export const COPY_HOOKS = new Set(["initialize_copy", "initialize_dup"]);
+export const COPY_HOOKS: ReadonlyMap<string, readonly string[]> = new Map([
+  ["initialize_copy", ["dup", "clone"]],
+  ["initialize_dup", ["dup"]],
+]);
 
 /**
  * {@link rubyMethodToTs} without the {@link SKIP} gate.
@@ -1583,8 +1586,8 @@ function rubyMethodToTsWithoutUnderscore(
   if (name === "to_a") return ["toA", "toArray"];
   if (COPY_HOOKS.has(name)) {
     const own = snakeToCamel(name);
-    const other = [...COPY_HOOKS].filter((h) => h !== name).map(snakeToCamel);
-    const copies = ["dup", "clone"].filter((c) => siblingRubyNames?.has(c) !== true);
+    const other = [...COPY_HOOKS.keys()].filter((h) => h !== name).map(snakeToCamel);
+    const copies = COPY_HOOKS.get(name)!.filter((c) => siblingRubyNames?.has(c) !== true);
     return [own, ...other, ...copies];
   }
 

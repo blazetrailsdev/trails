@@ -216,7 +216,6 @@ describe("PROTOCOL_DEFINITION_NAMES", () => {
       "initializeDup",
       "initializeCopy",
       "dup",
-      "clone",
     ]);
     expect(
       rubyMethodToTs("initialize_copy", new Set(["dup", "initialize_copy"]), enrolled)?.filter(

@@ -3040,8 +3040,8 @@ export function dedupeRubyMethodInto(
 /**
  * Whether `tsName` already answers another of the file's copy hooks
  * (`COPY_HOOKS`). `initialize_copy` and `initialize_dup` may each be ported
- * as either spelling or as an own `dup` / `clone`, so without the claim one
- * TS `dup` would credit both Ruby hooks.
+ * as either spelling or as an own `dup`, so without the claim one TS `dup`
+ * would credit both Ruby hooks.
  */
 export function copyHookClaimed(
   rubyName: string,
