@@ -8,7 +8,6 @@ import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { KeyGenerator } from "./key-generator.js";
 import { Scheme, type SchemeOptions } from "./scheme.js";
 
-/** @noRailsEquivalent PERMANENT */
 export interface Compressor {
   deflate(data: string): Buffer | Uint8Array;
   inflate(data: Buffer | Uint8Array): string;

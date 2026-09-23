@@ -7,7 +7,7 @@ import {
   makeEncryptedBook,
 } from "./test-helpers.js";
 import type { TestDatabaseAdapter } from "../test-adapter.js";
-import { withTransactionalFixtures } from "../test-fixtures/with-transactional-fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 
 describe("ActiveRecord::Encryption::ConcurrencyTest", () => {
   let adapter: TestDatabaseAdapter;
@@ -17,7 +17,7 @@ describe("ActiveRecord::Encryption::ConcurrencyTest", () => {
     adapter = await freshAdapter();
   });
 
-  withTransactionalFixtures(() => adapter);
+  fixtures([], { connection: () => adapter });
 
   beforeEach(() => {
     configSnapshot = snapshotEncryptionConfig();

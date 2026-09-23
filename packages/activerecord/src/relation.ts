@@ -1899,7 +1899,6 @@ export class Relation<T extends Base> {
 _registerRelationFamily("relation", Relation);
 
 /* eslint-disable @typescript-eslint/no-empty-object-type */
-/** @noRailsEquivalent PERMANENT */
 export interface RelationScopes<T extends Base> {}
 /* eslint-enable @typescript-eslint/no-empty-object-type */
 

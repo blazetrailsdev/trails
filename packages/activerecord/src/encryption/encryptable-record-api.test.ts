@@ -19,7 +19,7 @@ import {
 } from "./test-helpers.js";
 import { Scheme } from "./scheme.js";
 import { Configurable } from "./configurable.js";
-import { withTransactionalFixtures } from "../test-fixtures/with-transactional-fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 
 describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
   let configSnapshot: ReturnType<typeof snapshotEncryptionConfig>;
@@ -28,7 +28,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
   beforeAll(async () => {
     txnAdapter = await freshAdapter();
   });
-  withTransactionalFixtures(() => txnAdapter);
+  fixtures([], { connection: () => txnAdapter });
 
   beforeEach(() => {
     configSnapshot = snapshotEncryptionConfig();

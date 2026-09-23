@@ -43,7 +43,6 @@ import {
   warmSchemaCacheBeforeFirstTest,
   type WithTransactionalFixturesOptions,
 } from "./test-fixtures/with-transactional-fixtures.js";
-import { leaseFixtureConnection } from "./test-fixtures/fixture-connection.js";
 import { NullPool, type ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import type { PoolConfig } from "./connection-adapters/pool-config.js";
 import { writingRole } from "./active-record.js";
@@ -168,7 +167,7 @@ export type UseFixturesByNameResult<N extends FixtureName> = {
 };
 
 export interface FixturesConnectionOpts {
-  connection?: () => DatabaseAdapter;
+  connection?: () => DatabaseAdapter | Promise<DatabaseAdapter>;
 }
 
 /**
@@ -520,7 +519,7 @@ async function settlePendingPins(this: TestFixtures): Promise<PromiseRejectedRes
   return pinResults.find((r): r is PromiseRejectedResult => r.status === "rejected");
 }
 
-/** @noRailsEquivalent CONVERGEABLE converge-with-transactional-fixtures-onto-test-fixtures-setup */
+/** @noRailsEquivalent CONVERGEABLE converge-fixture-raw-adapter-arm-onto-pool-walk */
 async function pinFixtureAdapters(this: TestFixtures): Promise<void> {
   for (const adapter of this._fixtureAdapters) {
     const pool = adapter.pool;
@@ -540,7 +539,7 @@ async function pinFixtureAdapters(this: TestFixtures): Promise<void> {
   }
 }
 
-/** @noRailsEquivalent CONVERGEABLE converge-with-transactional-fixtures-onto-test-fixtures-setup */
+/** @noRailsEquivalent CONVERGEABLE converge-fixture-raw-adapter-arm-onto-pool-walk */
 async function unpinFixtureAdapters(this: TestFixtures): Promise<void> {
   for (const adapter of this._fixtureAdapters) {
     if (adapter.pool == null || adapter.pool instanceof NullPool) {
@@ -706,19 +705,6 @@ function fixtureAccessor(fixtureSetName: string) {
   return accessor;
 }
 
-/** @noRailsEquivalent CONVERGEABLE converge-with-transactional-fixtures-onto-test-fixtures-setup */
-export function withTransactionalFixtures(
-  getAdapter: () => DatabaseAdapter | Promise<DatabaseAdapter>,
-  options: WithTransactionalFixturesOptions = {},
-): void {
-  const { eagerWarmSchemaCache: eagerWarm = true, usesTransaction = [] } = options;
-  if (eagerWarm) warmSchemaCacheBeforeFirstTest(getAdapter);
-  const klass = testCaseClassFor(getCurrentSuite().suite as SuiteScope | undefined);
-  klass.usesTransaction(...usesTransaction);
-  klass.useTransactionalTests = true;
-  registerFixtureHooks(klass, getAdapter);
-}
-
 /** @internal */
 export function fixtures<M extends FixtureMap>(
   fixtures: M,
@@ -735,7 +721,7 @@ export function fixtures(
   const { usesTransaction, useTransactionalTests, useInstantiatedFixtures, connection } =
     options ?? {};
 
-  warmSchemaCacheBeforeFirstTest(connection ?? leaseFixtureConnection);
+  warmSchemaCacheBeforeFirstTest(connection);
   const klass = testCaseClassFor(getCurrentSuite().suite as SuiteScope | undefined);
   klass.usesTransaction(...(usesTransaction ?? []));
   if (useTransactionalTests !== undefined) klass.useTransactionalTests = useTransactionalTests;
@@ -768,7 +754,7 @@ export function fixtures(
     klass.setFixtureClass(classNames);
   }
   klass.fixtures(fixtureSetNames);
-  registerFixtureHooks(klass, connection ?? leaseFixtureConnection);
+  registerFixtureHooks(klass, connection ?? (() => Base.leaseConnection()));
 
   const result: Record<string, unknown> = {};
   for (const [key, fsName] of Object.entries(accessors)) {

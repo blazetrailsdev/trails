@@ -2785,6 +2785,7 @@ describe("buildReport — @noRailsEquivalent tags", () => {
       inheritedMatched: 0,
       stale: [],
       redundant: [],
+      scored: expect.any(Array),
       classification: {
         permanent: 0,
         convergeable: 0,
@@ -2886,6 +2887,7 @@ describe("buildReport — @noRailsEquivalent tags", () => {
       inheritedMatched: 1,
       stale: [],
       redundant: [],
+      scored: expect.any(Array),
       // Inherited entries repeat one declaration's reason, so they are not
       // classified — the claim is counted once, where it is written (on the
       // declaration name).
@@ -3730,6 +3732,7 @@ describe("printClassificationBlock", () => {
       inheritedMatched: 0,
       stale: [],
       redundant: [],
+      scored: [],
       classification: {
         permanent: 2,
         convergeable: 1,
@@ -3780,6 +3783,7 @@ describe("gateUnclassified", () => {
     inheritedMatched: 0,
     stale,
     redundant: [],
+    scored: [],
     classification: {
       permanent: 2,
       convergeable: 1,
@@ -3827,6 +3831,7 @@ describe("gateStale", () => {
     inheritedMatched: 0,
     stale,
     redundant: [],
+    scored: [],
     classification: {
       permanent: 3,
       convergeable: 0,

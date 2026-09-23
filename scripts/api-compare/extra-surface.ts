@@ -869,6 +869,12 @@ export interface TaggedSummary {
    */
   redundant: TaggedEntry[];
   /**
+   * Every entry, written or inherited, whose name the scorer reached — matched
+   * or redundant. The population `receipt-audit.ts` re-scores with the
+   * receipts stripped, so it never reports a name absent from its file.
+   */
+  scored: TaggedEntry[];
+  /**
    * Permanence claims across the WRITTEN tags (`total`). An inherited entry
    * repeats its interface declaration's reason, so counting it would multiply
    * one claim by the interface's member count. A non-zero `unclassified` fails
@@ -2668,6 +2674,11 @@ export function buildReport(
     inheritedMatched,
     stale: staleTagged,
     redundant: redundantTagged,
+    scored: tagged.filter(
+      (e) =>
+        scannedPkgs.has(e.package) &&
+        (matchedTagKeys.has(allowKeyOf(e)) || redundantTagKeys.has(allowKeyOf(e))),
+    ),
     classification: {
       permanent: claims.permanent,
       convergeable: claims.convergeable,

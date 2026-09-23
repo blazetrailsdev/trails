@@ -5,7 +5,6 @@ import type {
   ColumnType,
 } from "./schema-definitions.js";
 
-/** @noRailsEquivalent PERMANENT */
 export interface SchemaStatementsLike {
   addColumn(
     tableName: string,

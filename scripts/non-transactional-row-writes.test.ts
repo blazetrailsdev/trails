@@ -46,7 +46,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
 /** The same file after #5719. */
 const POST_5719_ENCRYPTABLE_RECORD = PRE_5719_ENCRYPTABLE_RECORD.replace(
   "  beforeEach(() => {",
-  "  withTransactionalFixtures(() => txnAdapter);\n\n  beforeEach(() => {",
+  "  fixtures([], { connection: () => txnAdapter });\n\n  beforeEach(() => {",
 );
 
 describe("non-transactional row writes", () => {

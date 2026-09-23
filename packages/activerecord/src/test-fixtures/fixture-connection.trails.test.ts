@@ -1,32 +1,12 @@
-import { describe, it, expect, afterEach, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base } from "../base.js";
-import { leaseFixtureConnection } from "./fixture-connection.js";
-import { setPermanentConnectionCheckout } from "../active-record.js";
-import { withTransactionalFixtures } from "./with-transactional-fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { adapterType } from "../test-adapter.js";
 
 const conn = () => Base.leaseConnection();
 
-describe("fixture connection source", () => {
-  afterEach(() => {
-    setPermanentConnectionCheckout(true);
-  });
-
-  it("leases without tripping permanentConnectionCheckout = disallowed", async () => {
-    setPermanentConnectionCheckout("disallowed");
-
-    await expect(leaseFixtureConnection()).resolves.toBeDefined();
-  });
-
-  it("resolves the same connection the pool holds", async () => {
-    const leased = await leaseFixtureConnection();
-
-    expect(leased).toBe(Base.connectionPool().activeConnection);
-  });
-});
-
 describe("useTransactionalTests — DML isolation", () => {
-  withTransactionalFixtures(leaseFixtureConnection);
+  fixtures([]);
 
   beforeAll(async () => {
     await (
@@ -55,7 +35,7 @@ describe("useTransactionalTests — DML isolation", () => {
 describe.skipIf(adapterType === "mysql")(
   "useTransactionalTests — DDL isolation (PG + SQLite)",
   () => {
-    withTransactionalFixtures(leaseFixtureConnection);
+    fixtures([]);
 
     it("creates a DDL table that is visible within the same test", async () => {
       await (
