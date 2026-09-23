@@ -68,7 +68,7 @@ export class Module {
     return result;
   }
 
-  include(mod: ModuleObject): void {
+  include(mod: ModuleObject): this {
     const carrier = carrierOf(this);
     const members = mod as Record<string, unknown>;
     for (const key of Object.keys(members)) {
@@ -80,6 +80,10 @@ export class Module {
       });
     }
     relinkIncluders(this);
+    if (typeof (mod as ModuleHooks)[included] === "function") {
+      (mod as ModuleHooks)[included]!(this);
+    }
+    return this;
   }
 
   /**

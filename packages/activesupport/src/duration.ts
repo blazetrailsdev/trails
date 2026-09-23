@@ -410,8 +410,9 @@ export class Duration {
   }
 
   isA(klass: unknown): boolean {
-    return klass === Duration || this instanceof (klass as any);
+    return Duration === klass || Object(this.value) instanceof (klass as any);
   }
+  declare isKindOf: (klass: unknown) => boolean;
 
   isVariable(): boolean {
     return this._variable;
@@ -517,6 +518,8 @@ export class Duration {
     return new Duration(value, parts, variable);
   }
 }
+
+Duration.prototype.isKindOf = Duration.prototype.isA;
 
 export function seconds(n: number): Duration {
   return Duration.seconds(n);

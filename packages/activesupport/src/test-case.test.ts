@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { SecureRandom } from "@blazetrails/ruby-compat";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { SecureRandom, kernelRand } from "@blazetrails/ruby-compat";
 import { NameError } from "./core-ext/name-error.js";
 import { ArgumentError } from "./hash-utils.js";
 import { Logger } from "./logger.js";
@@ -698,8 +698,18 @@ describe("AssertionsTest", () => {
   });
 });
 
+declare const rand: number;
+
 describe("ExceptionsInsideAssertionsTest", () => {
   let out: string[];
+
+  beforeAll(() => {
+    Object.defineProperty(globalThis, "rand", { get: kernelRand, configurable: true });
+  });
+
+  afterAll(() => {
+    delete (globalThis as { rand?: number }).rand;
+  });
 
   beforeEach(() => {
     out = [];
@@ -747,7 +757,7 @@ describe("ExceptionsInsideAssertionsTest", () => {
 
   async function runTestThatShouldFailButNotLogAWarning(): Promise<void> {
     await assertNoChanges(
-      () => Math.random(),
+      () => rand,
       null,
       {},
       async () => {
@@ -772,8 +782,7 @@ describe("ExceptionsInsideAssertionsTest", () => {
     assertNot(out.join("").includes("assert_nothing_raised"));
   });
 
-  it.skip("warning is not logged if assertions are nested correctly", async () => {
-    // BLOCKED: activesupport-exceptions-inside-assertions-warning-is-not-emitted
+  it("warning is not logged if assertions are nested correctly", async () => {
     const error = await assertRaises([Assertion], {}, async () => {
       await runTestThatShouldFailButNotLogAWarning();
     });
@@ -781,8 +790,7 @@ describe("ExceptionsInsideAssertionsTest", () => {
     assert(error.message.includes("`rand` changed"));
   });
 
-  it.skip("fails and warning is logged if wrong error caught", async () => {
-    // BLOCKED: activesupport-exceptions-inside-assertions-warning-is-not-emitted
+  it("fails and warning is logged if wrong error caught", async () => {
     const error = await assertRaises([Assertion], {}, async () => {
       await runTestThatShouldFailConfusingly();
     });
@@ -862,10 +870,15 @@ describe("SubclassSetupAndTeardownTest", () => {
 });
 
 describe("TestCaseTaggedLoggingTest", () => {
-  it.skip("logs tagged with current test case", () => {
-    // BLOCKED: activesupport-test-case-does-not-tag-the-logger-with-the-running-test
-    const out: string[] = [];
+  let out: string[];
+
+  beforeEach(() => {
+    out = [];
     TestCase.setTaggedLogger(new Logger({ write: (s: string) => out.push(s) }) as never);
+    TestCase.beforeSetup();
+  });
+
+  it("logs tagged with current test case", () => {
     expect(out.join("")).toMatch("TestCaseTaggedLoggingTest: logs tagged with current test case\n");
   });
 });
@@ -889,8 +902,7 @@ describe("TestOrderTest", () => {
     TestOrder.setTestOrder(originalTestOrder);
   });
 
-  it.skip("defaults to random", () => {
-    // BLOCKED: activesupport-test-case-has-no-test-order
+  it("defaults to random", () => {
     TestOrder.setTestOrder(null);
 
     expect(TestOrder.testOrder).toEqual(":random");
@@ -898,8 +910,7 @@ describe("TestOrderTest", () => {
     expect(ActiveSupportTestOrder.testOrder).toEqual(":random");
   });
 
-  it.skip("test order is global", () => {
-    // BLOCKED: activesupport-test-case-has-no-test-order
+  it("test order is global", () => {
     TestOrder.setTestOrder(":sorted");
 
     expect(ActiveSupportTestOrder.testOrder).toEqual(":sorted");

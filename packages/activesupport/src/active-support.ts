@@ -20,3 +20,13 @@ export function setToTimePreservesTimezone(value: boolean | string | null): void
 
   setPreserveTimezone(value);
 }
+
+let _testOrder: string | null = null;
+
+export function testOrder(): string | null {
+  return _testOrder;
+}
+
+export function setTestOrder(value: string | null): void {
+  _testOrder = value;
+}
