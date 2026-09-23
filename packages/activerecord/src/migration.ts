@@ -942,6 +942,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
           "Await `lease_connection` or use `with_connection` first.",
       );
     }
+    void _DatabaseTasks!.migrationConnection();
     return connection as A;
   }
 
