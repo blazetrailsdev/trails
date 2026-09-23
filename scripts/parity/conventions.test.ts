@@ -24,6 +24,8 @@ import {
   ALREADY_PREDICATE_PREFIXES,
   TOKEN_RENAMES,
   explainConventions,
+  PROTOCOL_DEFINITION_NAMES,
+  PROTOCOL_DEFINITION_ENROLLED_PACKAGES,
 } from "./conventions.js";
 
 describe("snakeToCamel", () => {
@@ -175,6 +177,53 @@ describe("rubyMethodToTsIgnoringSkip", () => {
 
   it("still refuses operators", () => {
     expect(rubyMethodToTsIgnoringSkip("==")).toBeNull();
+  });
+});
+
+describe("PROTOCOL_DEFINITION_NAMES", () => {
+  const enrolled = [...PROTOCOL_DEFINITION_ENROLLED_PACKAGES][0];
+
+  it("is scored per definition in an enrolled package only", () => {
+    expect(PROTOCOL_DEFINITION_ENROLLED_PACKAGES.has("activemodel")).toBe(false);
+    for (const name of PROTOCOL_DEFINITION_NAMES) {
+      expect(rubyMethodToTs(name)).toBeNull();
+      expect(rubyMethodToTs(name, undefined, "activemodel")).toBeNull();
+      expect(rubyMethodToTs(name, undefined, enrolled)).toEqual(rubyMethodToTsIgnoringSkip(name));
+    }
+    expect(rubyMethodToTs("clone", undefined, enrolled)).toBeNull();
+    expect(rubyMethodToTs("object_id", undefined, enrolled)).toBeNull();
+  });
+
+  it("left SKIP_GROUPS[0] and sits in a group of its own", () => {
+    for (const name of PROTOCOL_DEFINITION_NAMES) {
+      expect(SKIP_GROUPS[0].names).not.toContain(name);
+      expect(SKIP.has(name)).toBe(true);
+    }
+  });
+
+  it("spells to_a as toArray too", () => {
+    expect(bareCandidatesIgnoringSkip("to_a")).toEqual(["toA", "toArray"]);
+  });
+
+  it("satisfies a copy hook with either hook spelling or an own dup / clone", () => {
+    expect(bareCandidatesIgnoringSkip("initialize_copy")).toEqual([
+      "initializeCopy",
+      "initializeDup",
+      "dup",
+      "clone",
+    ]);
+    expect(bareCandidatesIgnoringSkip("initialize_dup")).toEqual([
+      "initializeDup",
+      "initializeCopy",
+      "dup",
+      "clone",
+    ]);
+    // A Ruby `dup` in the same file claims the TS `dup` for itself.
+    expect(
+      rubyMethodToTs("initialize_copy", new Set(["dup", "initialize_copy"]), enrolled)?.filter(
+        (c) => !c.startsWith("_"),
+      ),
+    ).toEqual(["initializeCopy", "initializeDup", "clone"]);
   });
 });
 

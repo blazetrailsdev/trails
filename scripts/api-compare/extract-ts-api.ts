@@ -857,6 +857,7 @@ export function extractFromProgram(
           file: relPath,
           ...(internal ? { internal: true } : {}),
           ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
+          ...(signatureReturnsVoid(node, checker) ? { returnsVoid: true } : {}),
           ...(fnOptionKeys !== undefined ? { optionKeys: fnOptionKeys } : {}),
           ...(fnCalls !== undefined ? { calls: fnCalls } : {}),
           ...(fnCallSeq !== undefined ? { callSeq: fnCallSeq } : {}),
@@ -3552,6 +3553,7 @@ export function extractClass(
         isStatic,
         ...(internal ? { internal: true } : {}),
         ...tagged,
+        ...(signatureReturnsVoid(member, checker) ? { returnsVoid: true } : {}),
         ...(optionKeys !== undefined ? { optionKeys } : {}),
         ...(calls !== undefined ? { calls } : {}),
         ...(callSeq !== undefined ? { callSeq } : {}),
@@ -5235,6 +5237,18 @@ function admitsFunction(p: ts.ParameterDeclaration): boolean {
       t.getCallSignatures().length > 0 ||
       (t.getSymbol()?.getName() === "Function" && !(t.flags & ts.TypeFlags.Any)),
   );
+}
+
+/** `MethodInfo.returnsVoid`: the signature returns `void` or `Promise<void>`. */
+function signatureReturnsVoid(
+  decl: ts.MethodDeclaration | ts.FunctionDeclaration,
+  checker: ts.TypeChecker,
+): boolean {
+  const signature = checker.getSignatureFromDeclaration(decl);
+  if (signature === undefined) return false;
+  const type = checker.getReturnTypeOfSignature(signature);
+  const awaited = checker.getAwaitedType(type) ?? type;
+  return (awaited.flags & ts.TypeFlags.Void) !== 0;
 }
 
 /** `MethodInfo.admitsBoolean`; `undefined` for a callable member. */

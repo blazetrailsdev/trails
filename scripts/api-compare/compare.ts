@@ -105,6 +105,7 @@ import { SpellChecker } from "../../packages/did-you-mean/src/spell-checker.js";
 import { operatorSpelling } from "./operator-order-spelling.js";
 import { DATA_LAYER_PACKAGES, filterFilesToClosure, writeArClosure } from "./ar-closure.js";
 import {
+  COPY_HOOKS,
   OPERATORS,
   TS_CLASS_RENAMES,
   isArityOverridden,
@@ -2798,7 +2799,7 @@ export function mixinMethodCreditedToOwnFile(
   const mixinFile = rm.mixinFile;
   if (mixinFile === undefined || mixinFile === hostRubyFile) return null;
   if (!rubyFileHasBucket(mixinFile)) return null;
-  const candidates = rubyMethodToTsForFqn(rm.rubyModule, rm.rubyName);
+  const candidates = rubyMethodToTsForFqn(rm.rubyModule, rm.rubyName, undefined, pkg);
   if (candidates === null) return null;
   const tsFile = rubyFileToTs(mixinFile, pkg);
   const mixinTsMethods = tsMethodsByFile.get(tsFile);
@@ -2836,7 +2837,7 @@ export function reopeningMethodCreditedToOwnFile(
 ): { tsName: string; tsFile: string } | null {
   const definedInFile = rm.definedInFile;
   if (definedInFile === undefined || definedInFile === hostRubyFile) return null;
-  const candidates = rubyMethodToTsForFqn(rm.rubyModule, rm.rubyName);
+  const candidates = rubyMethodToTsForFqn(rm.rubyModule, rm.rubyName, undefined, pkg);
   if (candidates === null) return null;
   const tsFile = rubyFileToTs(definedInFile, pkg);
   const reopeningTsMethods = tsMethodsByFile.get(tsFile);
@@ -2991,8 +2992,9 @@ export function rubyMethodToTsForFqn(
   fqn: string,
   name: string,
   siblingRubyNames?: ReadonlySet<string>,
+  pkg?: string,
 ): string[] | null {
-  return operatorSpelling(fqn, name) ?? rubyMethodToTs(name, siblingRubyNames);
+  return operatorSpelling(fqn, name) ?? rubyMethodToTs(name, siblingRubyNames, pkg);
 }
 
 /**
@@ -3014,8 +3016,9 @@ export function dedupeRubyMethodInto(
   itemFqn: string,
   rubyFile?: string,
   klass = false,
+  pkg?: string,
 ): void {
-  if (rubyMethodToTsForFqn(itemFqn, rm.name) === null) return;
+  if (rubyMethodToTsForFqn(itemFqn, rm.name, undefined, pkg) === null) return;
   if (isRubyOnlyClass(itemFqn)) return;
   const tsMirrorNames = rubyFile === undefined ? null : scopedSkipMirrorName(rm.name, rubyFile);
   if (rubyFile !== undefined && tsMirrorNames === null && isScopedSkip(rm.name, rubyFile)) return;
@@ -3032,6 +3035,20 @@ export function dedupeRubyMethodInto(
       definedInFile: rm.file,
     });
   }
+}
+
+/**
+ * Whether `tsName` already answers another of the file's copy hooks
+ * (`COPY_HOOKS`). `initialize_copy` and `initialize_dup` may each be ported
+ * as either spelling or as an own `dup` / `clone`, so without the claim one
+ * TS `dup` would credit both Ruby hooks.
+ */
+export function copyHookClaimed(
+  rubyName: string,
+  tsName: string,
+  claims: ReadonlySet<string>,
+): boolean {
+  return COPY_HOOKS.has(rubyName) && claims.has(tsName);
 }
 
 /**
@@ -3077,7 +3094,7 @@ export function rubyDefinitionBreakdown(
         [info.classMethods, true],
       ] as const) {
         for (const rm of methods.filter(inMode)) {
-          tally.buckets.push(rubyDefinitionBucket(rm.name, fqn, file, klass, tally.seen));
+          tally.buckets.push(rubyDefinitionBucket(rm.name, fqn, file, klass, tally.seen, pkg));
         }
       }
     }
@@ -3102,8 +3119,9 @@ function rubyDefinitionBucket(
   file: string,
   klass: boolean,
   seen: Set<string>,
+  pkg: string,
 ): DenominatorBucket {
-  if (rubyMethodToTsForFqn(fqn, name) === null) {
+  if (rubyMethodToTsForFqn(fqn, name, undefined, pkg) === null) {
     return OPERATORS.has(name) ? "operator" : "globalSkip";
   }
   if (isRubyOnlyClass(fqn)) return "rowlessFile";
@@ -4262,7 +4280,7 @@ export function main() {
           // public-mode run would otherwise never see the declaration.
           if (rm.reader) rubyReaderNames.add(ownerKey(item.fqn, rm.name));
           if (!methodMatchesMode(rm)) continue;
-          dedupeRubyMethodInto(seen, rm, item.fqn, rubyFile, klassMethods.has(rm));
+          dedupeRubyMethodInto(seen, rm, item.fqn, rubyFile, klassMethods.has(rm), pkg);
           const rmLevel = rubyOwnerSeat(item.fqn, klassMethods.has(rm));
           if (!rubyParamsByName.has(rm.name)) {
             rubyParamsByName.set(rm.name, rm.params);
@@ -4928,7 +4946,7 @@ export function main() {
       if (!tsFileExists && seen.size > 0) {
         const fileHits = new Map<string, number>();
         for (const [, { rubyName, rubyModule }] of seen) {
-          const candidates = rubyMethodToTsForFqn(rubyModule, rubyName);
+          const candidates = rubyMethodToTsForFqn(rubyModule, rubyName, undefined, pkg);
           if (!candidates) continue;
           const containingFiles = new Set<string>();
           for (const c of candidates) {
@@ -4960,6 +4978,7 @@ export function main() {
       ]);
 
       const neutralClaims = new Set<string>();
+      const copyHookClaims = new Set<string>();
       for (const [
         _dedupeKey,
         { level, rubyName, rubyModule, notes, mixinFile, definedInFile, tsMirrorNames },
@@ -4968,7 +4987,7 @@ export function main() {
         // is dropped the way `seen`'s own no-candidate gate drops one.
         const tsCandidates =
           tsMirrorNames === undefined
-            ? rubyMethodToTsForFqn(rubyModule, rubyName, siblingRubyNames)
+            ? rubyMethodToTsForFqn(rubyModule, rubyName, siblingRubyNames, pkg)
             : scopedSkipMirrorCandidates(tsMirrorNames, tsMethods);
         if (tsCandidates === null) continue;
         const notePredicateKind = (tsFile: string, tsName: string) => {
@@ -4984,6 +5003,7 @@ export function main() {
         let neutralTaken = false;
         const directMatch = tsCandidates.find((c) => {
           if (!tsMethods.has(c)) return false;
+          if (copyHookClaimed(rubyName, c, copyHookClaims)) return false;
           if (!bothLevels || level === undefined) return true;
           const declared = tsDeclaresOnLevel(
             level,
@@ -5022,6 +5042,7 @@ export function main() {
         // below is not `directMatch` (that arm runs because the expected file
         // does not exist at all).
         let declOnlyTsName = declOnly ? directMatch : undefined;
+        if (directMatch !== undefined && COPY_HOOKS.has(rubyName)) copyHookClaims.add(directMatch);
         if (directMatch && !declOnly) {
           fileMatched++;
           notePredicateKind(expectedTs, directMatch);

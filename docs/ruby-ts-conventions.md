@@ -153,8 +153,10 @@ anything else takes the plain kebab-case rule.
 
 parity:api never expects a TS counterpart for these Ruby methods:
 
-- Ruby core object / value-protocol methods with no meaningful public TypeScript surface (identity, reflection, coercion).
-  - `dup`, `clone`, `freeze`, `inspect`, `pretty_print`, `object_id`, `class`, `send`, `public_send`, `tap`, `then`, `yield_self`, `instance_of?`, `nil?`, `equal?`, `instance_variable_get`, `instance_variable_set`, `instance_variables`, `initialize_copy`, `initialize_dup`, `initialize_clone`, `encode_with`, `init_with`, `to_ary`, `to_a`, `to_i`, `to_f`, `to_h`, `to_hash`, `to_r`, `to_c`
+- Ruby core object methods outside PROTOCOL*DEFINITION_NAMES: identity (`object_id`, `equal?`, `nil?`, `class`), reflection (`instance_of?`, `instance_variable*\*`), dispatch (`send`, `public_send`, `tap`, `yield_self`), numeric coercion (`to_i`, `to_f`, `to_r`, `to_c`), `clone`/`initialize_clone`/`freeze`, and `to_ary`/`then`, which JS would read as array destructuring and as a thenable `await` calls.
+  - `clone`, `freeze`, `object_id`, `class`, `send`, `public_send`, `tap`, `then`, `yield_self`, `instance_of?`, `nil?`, `equal?`, `instance_variable_get`, `instance_variable_set`, `instance_variables`, `initialize_clone`, `to_ary`, `to_i`, `to_f`, `to_r`, `to_c`
+- Scored per definition in PROTOCOL_DEFINITION_ENROLLED_PACKAGES, and skipped elsewhere only until that package's burndown story enrolls it (RFC 0156): these translate directly, so a Ruby file defining one expects it in the mirroring TS file.
+  - `inspect`, `pretty_print`, `dup`, `initialize_copy`, `initialize_dup`, `encode_with`, `init_with`, `to_a`, `to_h`, `to_hash`
 - PERMANENT for scoring by name — JS spells `is_a?` as `instanceof`, customised by `static [Symbol.hasInstance]` on the class tested AGAINST, so `TimeWithZone#is_a?(Time)` ports as a hook on `Time`. A same-named `isA` is judged against its Rails body per class (CLAUDE.md § "Ruby protocol methods with a different JS mechanism").
   - `is_a?`, `kind_of?`
 - Skipped until scored by their consumers: JS `Map`/`Set` call no hook, but `rbHash` / `rbEqual` (ruby-compat) dispatch to a TS `hash()` / `eql()`, as do `Deduplicable#deduplicate` and the preloader's batch grouping, so the members are live (CLAUDE.md § "Ruby protocol methods with a different JS mechanism").

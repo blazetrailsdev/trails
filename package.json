@@ -43,6 +43,7 @@
     "parity:api:calls:unreviewed": "pnpm tsx scripts/api-compare/lint-call-mismatches.ts --unreviewed",
     "parity:api:arms:report": "pnpm tsx scripts/api-compare/report-arms.ts --report",
     "parity:api:duck-types": "pnpm tsx scripts/api-compare/report-duck-type-instanceof.ts",
+    "parity:api:returns": "pnpm tsx scripts/api-compare/report-void-returns.ts",
     "parity:api:arms:throws": "pnpm tsx scripts/api-compare/lint-arm-throws.ts",
     "parity:api:arms:throws:tighten": "pnpm tsx scripts/api-compare/lint-arm-throws.ts --tighten",
     "parity:api:calls:reseed": "API_COMPARE_FORCE=1 pnpm parity:api --calls && pnpm tsx scripts/api-compare/lint-call-mismatches.ts --write --no-regen",

@@ -58,6 +58,58 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
     }
   }
 
+  it("records the kind of each body's final expression as lastExpr", () => {
+    const last = rubyField(
+      {
+        "foo.rb": `
+        class Foo
+          def delegate
+            config = resolve
+            handler.establish_connection(config)
+          end
+          def build = Bar.new(1)
+          def early
+            return pool if pool
+            nil
+          end
+          def explicit
+            return compute
+          end
+          def assigns
+            @value = 1
+          end
+          def with_block
+            subscribed(counter) do
+              run
+            end
+          end
+          def reads
+            @value
+          end
+          def up
+            super
+          end
+          def abstract
+            raise NotImplementedError, "abstract is not implemented"
+          end
+        end
+      `,
+      },
+      "lastExpr",
+    );
+    expect(last).toMatchObject({
+      "Foo#delegate": "call",
+      "Foo#build": "new",
+      "Foo#early": "other",
+      "Foo#explicit": "return",
+      "Foo#assigns": "assign",
+      "Foo#with_block": "call",
+      "Foo#reads": "other",
+      "Foo#up": "call",
+      "Foo#abstract": "other",
+    });
+  });
+
   function rubyCalls(fixtures: Record<string, string>): Record<string, string[] | undefined> {
     return rubyField(fixtures, "calls");
   }
