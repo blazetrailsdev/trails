@@ -188,7 +188,7 @@ export class ConnectionHandler {
     return poolConfig.pool;
   }
 
-  isActiveConnections(role?: string | null): boolean {
+  hasActiveConnections(role?: string | null): boolean {
     const pools: ConnectionPool[] = [];
     this.eachConnectionPool(role, (pool) => {
       pools.push(pool);

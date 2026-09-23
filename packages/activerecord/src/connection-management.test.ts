@@ -53,7 +53,7 @@ describe("ConnectionManagementTest", () => {
     management = middleware(app);
 
     expect(await Base.leaseConnection()).toBeTruthy();
-    expect(Base.connectionHandler.isActiveConnections("all")).toBeTruthy();
+    expect(Base.connectionHandler.hasActiveConnections("all")).toBeTruthy();
   });
 
   afterEach(async () => {
@@ -77,7 +77,7 @@ describe("ConnectionManagementTest", () => {
   it("connections are cleared after body close", () => {
     const [, , body] = management(env);
     (body as BodyProxy).close();
-    expect(Base.connectionHandler.isActiveConnections("all")).toBeFalsy();
+    expect(Base.connectionHandler.hasActiveConnections("all")).toBeFalsy();
   });
 
   it.skip("connections are cleared even if inside a non-joinable transaction", () => {
@@ -88,7 +88,7 @@ describe("ConnectionManagementTest", () => {
     await Base.transaction(async () => {
       const [, , body] = management(env);
       (body as BodyProxy).close();
-      expect(Base.connectionHandler.isActiveConnections("all")).toBeTruthy();
+      expect(Base.connectionHandler.hasActiveConnections("all")).toBeTruthy();
     });
   });
 
@@ -100,7 +100,7 @@ describe("ConnectionManagementTest", () => {
     }
     const explosive = middleware(new Explosive());
     expect(() => explosive(env)).toThrow("NotImplementedError");
-    expect(Base.connectionHandler.isActiveConnections("all")).toBeFalsy();
+    expect(Base.connectionHandler.hasActiveConnections("all")).toBeFalsy();
   });
 
   it("connections not closed if exception inside transaction", async () => {
@@ -112,7 +112,7 @@ describe("ConnectionManagementTest", () => {
       }
       const explosive = middleware(new Explosive());
       expect(() => explosive(env)).toThrow("RuntimeError");
-      expect(Base.connectionHandler.isActiveConnections("all")).toBeTruthy();
+      expect(Base.connectionHandler.hasActiveConnections("all")).toBeTruthy();
     });
   });
 
@@ -123,7 +123,7 @@ describe("ConnectionManagementTest", () => {
   it("doesn't clear active connections when running in a test case", () => {
     executor().wrap(() => {
       management(env);
-      expect(Base.connectionHandler.isActiveConnections("all")).toBeTruthy();
+      expect(Base.connectionHandler.hasActiveConnections("all")).toBeTruthy();
     });
   });
 

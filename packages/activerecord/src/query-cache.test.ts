@@ -610,24 +610,24 @@ describe("QueryCacheTest", () => {
 
   it("query cache does not establish connection if unconnected", async () => {
     Base.connectionHandler.clearActiveConnectionsBang("all");
-    assertNot(Base.connectionHandler.isActiveConnections("all"));
+    assertNot(Base.connectionHandler.hasActiveConnections("all"));
 
     await middleware(() => {
       assertNot(
-        Base.connectionHandler.isActiveConnections("all"),
+        Base.connectionHandler.hasActiveConnections("all"),
         "QueryCache forced ActiveRecord::Base to establish a connection in setup",
       );
     })();
 
     assertNot(
-      Base.connectionHandler.isActiveConnections("all"),
+      Base.connectionHandler.hasActiveConnections("all"),
       "QueryCache forced ActiveRecord::Base to establish a connection in cleanup",
     );
   });
 
   it("query cache is enabled on connections established after middleware runs", async () => {
     Base.connectionHandler.clearActiveConnectionsBang("all");
-    assertNot(Base.connectionHandler.isActiveConnections("all"));
+    assertNot(Base.connectionHandler.hasActiveConnections("all"));
 
     await middleware(async () => {
       assertPredicate(await Base.leaseConnection(), (c) => c.queryCacheEnabled);

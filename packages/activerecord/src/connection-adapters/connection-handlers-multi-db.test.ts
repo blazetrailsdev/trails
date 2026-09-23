@@ -374,20 +374,20 @@ describe("ConnectionHandlersMultiDbTest", () => {
   });
 
   it("active connections?", async () => {
-    expect(handler.isActiveConnections()).toBeFalsy();
+    expect(handler.hasActiveConnections()).toBeFalsy();
 
     expect(await handler.retrieveConnection(connectionName)).toBeTruthy();
     expect(await handler.retrieveConnection(connectionName, { role: "reading" })).toBeTruthy();
 
-    expect(handler.isActiveConnections()).toBeTruthy();
+    expect(handler.hasActiveConnections()).toBeTruthy();
 
     handler.clearActiveConnectionsBang("writing");
 
-    expect(handler.isActiveConnections()).toBeTruthy();
+    expect(handler.hasActiveConnections()).toBeTruthy();
 
     handler.clearActiveConnectionsBang("all");
 
-    expect(handler.isActiveConnections()).toBeFalsy();
+    expect(handler.hasActiveConnections()).toBeFalsy();
   });
 
   it("retrieve connection pool", () => {
