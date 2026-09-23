@@ -10,7 +10,6 @@ import {
 import { ActionController, AbstractController } from "@blazetrails/actionpack";
 import { Dir, File, getPath } from "@blazetrails/ruby-compat";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
-import { setRubyClassPath } from "../ruby-class-path-slot.js";
 
 export interface ActionControllerConfig {
   raiseOnOpenRedirects: boolean;
@@ -114,4 +113,4 @@ async function helperConstants(
   return constants;
 }
 
-setRubyClassPath(Trailtie, "ActionController::Railtie");
+Object.defineProperty(Trailtie, "name", { value: "ActionController::Railtie" });

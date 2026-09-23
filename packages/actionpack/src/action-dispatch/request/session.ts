@@ -1,4 +1,3 @@
-import { getRubyClassPath } from "@blazetrails/rack-session";
 import { hasKey, KeyError } from "@blazetrails/ruby-compat";
 import { stringifyKeys } from "@blazetrails/activesupport";
 
@@ -83,15 +82,6 @@ const Unspecified: unknown = {};
 function classNameOf(value: unknown): string {
   if (value === null || value === undefined) return "NilClass";
   return (value as { constructor?: { name?: string } }).constructor?.name ?? typeof value;
-}
-
-function rubyClassPath(klass: unknown): string {
-  switch (klass) {
-    case Session:
-      return "ActionDispatch::Request::Session";
-    default:
-      return getRubyClassPath(klass) ?? (klass as { name: string }).name;
-  }
 }
 
 const objectIds = new WeakMap<object, number>();
@@ -304,7 +294,7 @@ export class Session {
     if (this.isLoaded()) {
       return `#<ActionDispatch::Request::Session:0x${objectIdHex(this)}>`;
     } else {
-      return `#<${rubyClassPath(this.constructor)}:0x${objectIdHex(this)} not yet loaded>`;
+      return `#<${this.constructor.name}:0x${objectIdHex(this)} not yet loaded>`;
     }
   }
 
@@ -366,3 +356,5 @@ export class Session {
     this.loaded = true;
   }
 }
+
+Object.defineProperty(Session, "name", { value: "ActionDispatch::Request::Session" });

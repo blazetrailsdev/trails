@@ -10,7 +10,6 @@ import {
 } from "@blazetrails/ruby-compat";
 import { Coder, type CoderCompressor, type CoderSerializer } from "./coder.js";
 import { SerializerWithFallback, type Serializer } from "./serializer-with-fallback.js";
-import { getFormatVersion } from "./format-version-slot.js";
 import { deflate, inflate } from "../gzip.js";
 import { DeserializationError } from "./deserialization-error.js";
 import { Notifications } from "../notifications.js";
@@ -18,6 +17,16 @@ import { toParam } from "../hash-utils.js";
 import { currentErrorReporter } from "../error-reporter.js";
 import type { EventPayload } from "../notifications/instrumenter.js";
 import { isEmpty } from "@blazetrails/ruby-compat";
+
+let _formatVersion = 7.0;
+
+export function formatVersion(): number {
+  return _formatVersion;
+}
+
+export function setFormatVersion(value: number): void {
+  _formatVersion = value;
+}
 
 const DEFAULT_COMPRESS_LIMIT = 1024;
 
@@ -139,7 +148,7 @@ export abstract class Store {
     let coder = this.options.coder as CacheCoder | null | undefined;
     delete this.options.coder;
     if (!hadCoder) {
-      const legacySerializer = getFormatVersion() < 7.1 && !this.options.serializer;
+      const legacySerializer = formatVersion() < 7.1 && !this.options.serializer;
       let serializer = this.options.serializer as Serializer | string | undefined;
       delete this.options.serializer;
       serializer ||= this.defaultSerializer();
@@ -454,14 +463,14 @@ export abstract class Store {
   }
 
   private defaultSerializer(): Serializer {
-    switch (getFormatVersion()) {
+    switch (formatVersion()) {
       case 7.0:
         return SerializerWithFallback.get("marshal_7_0");
       case 7.1:
         return SerializerWithFallback.get("marshal_7_1");
       default:
         throw new ArgumentError(
-          `Unrecognized ActiveSupport::Cache.format_version: ${getFormatVersion()}`,
+          `Unrecognized ActiveSupport::Cache.format_version: ${formatVersion()}`,
         );
     }
   }
@@ -578,7 +587,7 @@ export abstract class Store {
       throw new ArgumentError("Cannot specify :compressor and :coder options together");
     }
 
-    if (getFormatVersion() < 7.1 && !options.serializer && options.compressor) {
+    if (formatVersion() < 7.1 && !options.serializer && options.compressor) {
       throw new ArgumentError(
         "Cannot specify :compressor option when using" +
           " default serializer and cache format version is < 7.1",

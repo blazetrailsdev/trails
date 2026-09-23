@@ -835,35 +835,32 @@ with `Super` still in TDZ and the module throws
 imports at all (so it cannot join any cycle) exporting a mutable binding plus a
 `_setX()` setter, which the defining module calls at the bottom of its own
 body. Readers import the binding from the slot and use it at call time, exactly
-where Ruby resolves the constant. Nine instances exist and are the only ones, plus the two namespace
+where Ruby resolves the constant. Six instances exist and are the only ones, plus the namespace
 modules converged onto `Autoload`:
 
-- `activemodel/src/attribute/user-provided-default-slot.ts` — the
-  `UserProvidedDefault` ctor, read by `attribute.ts` for
-  `Attribute#with_user_default` (`activemodel/lib/active_model/attribute/user_provided_default.rb:7-9`).
-  The cycle is closed by `class UserProvidedDefault < FromUser`
-  (`attribute/user-provided-default.ts`), so `attribute.ts` cannot import it
-  back.
 - `arel/src/namespaces.ts` — not a slot: the `Arel` / `Arel::Attributes` /
   `Arel::Nodes` / `Arel::Visitors` namespace objects, extended with
   `ActiveSupport::Autoload` (RFC 0151). Each constant is `autoload`ed there,
   seated by its defining module (`Nodes.Not = Not`) and read as a property at
   call time (`new Nodes.Not(this)`). This is the shape the remaining slots
   converge onto.
-- `rack-session/src/ruby-class-path-slot.ts` — the Ruby constant path a store
-  registers for itself, read by `abstract/id.ts`'s `rubyClassPath` (Ruby's
-  `self.class`, `rack-session/lib/rack/session/abstract/id.rb:155,396`). The
-  cycle is closed by `class Pool extends PersistedSecure` (`pool.ts`), so
-  `id.ts` cannot import `pool.ts` back.
+- `activesupport/src/namespaces.ts`, `actionview/src/namespaces.ts`,
+  `actionpack/src/namespaces.ts` — not slots: the `ActiveSupport`, `ActionView`
+  and `ActionDispatch` namespace objects, shaped like arel's.
+  `ActiveSupport.BroadcastLogger` (`logger.rb:21`) and `ActiveSupport.Cache`
+  (`format_version`, `cache.rb:55-58`, read by `cache/store.rb:302,765,921`);
+  `ActionView.Base` (`action_view.rb:37`, read by `handlers/erb.rb:86`,
+  `log_subscriber.rb:59`, `digestor.rb:39`); `ActionDispatch.Request`
+  (`action_dispatch.rb:63`, read by `http/headers.rb:55`,
+  `content_security_policy.rb:46`, `permissions_policy.rb:42`,
+  `middleware/cookies.rb:705`). A nested class constant whose Ruby `require`s
+  it rather than autoloading it is seated on the class itself:
+  `Attribute.UserProvidedDefault` (`attribute_registration.rb:5`).
 - `trailties/src/trails-slot.ts` — the `Trails` constant, read by
   `engine/lazy-route-set.ts` for `Rails.application&.reload_routes_unless_loaded`
   (`engine/lazy_route_set.rb:12-104`). The cycle is closed by
   `class Application extends Engine` (`application.ts`), so `lazy-route-set.ts`
   cannot import `rails.ts` back.
-- `actionview/src/base-slot.ts` — `Base`, read by `template/handlers/tse.ts` for
-  `annotate_rendered_view_with_filenames` (`handlers/erb.rb:86-89`). The cycle
-  is closed by `template.rb:178`'s `extend Template::Handlers`, whose port
-  constructs the handler at `template.ts` class-static time.
 - `actionview/src/routing-url-for-slot.ts` — the `ActionDispatch::Routing::UrlFor`
   module, read by `routing-url-for.ts` for the `super` calls in
   `ActionView::RoutingUrlFor#url_for` / `#url_options` /

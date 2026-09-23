@@ -7,7 +7,6 @@ import {
   type PersistedRequest,
   SessionId,
 } from "./abstract/id.js";
-import { setRubyClassPath } from "./ruby-class-path-slot.js";
 
 export class Pool extends PersistedSecure {
   pool!: Record<string, Record<string, unknown> | undefined>;
@@ -89,4 +88,4 @@ export class Pool extends PersistedSecure {
   }
 }
 
-setRubyClassPath(Pool, "Rack::Session::Pool");
+Object.defineProperty(Pool, "name", { value: "Rack::Session::Pool" });

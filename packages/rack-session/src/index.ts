@@ -11,4 +11,3 @@ export {
 } from "./abstract/id.js";
 export { ID } from "./abstract/id.js";
 export { Pool } from "./pool.js";
-export { getRubyClassPath, setRubyClassPath } from "./ruby-class-path-slot.js";

@@ -97,7 +97,7 @@ import {
   type ParametersHost,
 } from "./parameters.js";
 import { Headers as HttpHeaders } from "./headers.js";
-import { _setRequestCtor } from "./request-slot.js";
+import { ActionDispatch } from "../../namespaces.js";
 
 const ACTION_DISPATCH_REQUEST_ID = "action_dispatch.request_id";
 const FORM_DATA_MEDIA_TYPES = ["application/x-www-form-urlencoded", "multipart/form-data"] as const;
@@ -1060,4 +1060,4 @@ Request.prototype.isParamsReadable = function (this: Request) {
 
 _setActionDispatchRequest(Request as unknown as ActionDispatchRequestConstructor);
 
-_setRequestCtor(Request);
+ActionDispatch.Request = Request;

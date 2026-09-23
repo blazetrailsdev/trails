@@ -4,7 +4,6 @@ import { Initializable } from "./initializable.js";
 import { Configuration } from "./trailtie/configuration.js";
 import { ownState, readOwnState, writeOwnState } from "./trailtie/per-class-state.js";
 import { assertNotSealed } from "./trailtie/configurable.js";
-import { rubyClassPath, setRubyClassPath } from "./ruby-class-path-slot.js";
 
 const ABSTRACT_RAILTIES = ["Rails::Railtie", "Rails::Engine", "Rails::Application"];
 
@@ -28,9 +27,7 @@ export class Trailtie extends Initializable {
     super();
     const klass = this.constructor as typeof Trailtie;
     if (klass.isAbstractRailtie()) {
-      throw new RuntimeError(
-        `${rubyClassPath(klass)} is abstract, you cannot instantiate it directly.`,
-      );
+      throw new RuntimeError(`${klass.name} is abstract, you cannot instantiate it directly.`);
     }
   }
 
@@ -54,14 +51,14 @@ export class Trailtie extends Initializable {
   }
 
   static isAbstractRailtie(): boolean {
-    return ABSTRACT_RAILTIES.includes(rubyClassPath(this));
+    return ABSTRACT_RAILTIES.includes(this.name);
   }
 
   static railtieName(name?: string): string {
     if (name !== undefined) writeOwnState(this, "_railtieName", name);
     let existing = readOwnState<string>(this, "_railtieName");
     if (!existing) {
-      existing = generateRailtieName(rubyClassPath(this));
+      existing = generateRailtieName(this.name);
       writeOwnState(this, "_railtieName", existing);
     }
     return existing;
@@ -179,4 +176,4 @@ export function resetTrailtieRegistry(): () => void {
   };
 }
 
-setRubyClassPath(Trailtie, "Rails::Railtie");
+Object.defineProperty(Trailtie, "name", { value: "Rails::Railtie" });

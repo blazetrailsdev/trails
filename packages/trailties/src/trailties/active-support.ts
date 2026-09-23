@@ -1,5 +1,4 @@
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
-import { setRubyClassPath } from "../ruby-class-path-slot.js";
 import {
   deprecator,
   type Deprecation,
@@ -73,4 +72,4 @@ export class Trailtie extends BaseTrailtie {
   }
 }
 
-setRubyClassPath(Trailtie, "ActiveSupport::Railtie");
+Object.defineProperty(Trailtie, "name", { value: "ActiveSupport::Railtie" });

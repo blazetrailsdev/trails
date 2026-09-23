@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { Entry } from "../entry.js";
 import { coder } from "../coder.js";
-import { getFormatVersion, setFormatVersion } from "../format-version-slot.js";
+import * as Cache from "../../cache.js";
 import { deflate, inflate } from "../../gzip.js";
 import type { Store, StoreOptions } from "../store.js";
 
@@ -31,16 +31,16 @@ export function cacheStoreCompressionBehavior(host: CompressionBehaviorHost): vo
   });
 
   afterEach(() => {
-    setFormatVersion(7.0);
+    Cache.setFormatVersion(7.0);
   });
 
   function withFormat<T>(formatVersion: number, block: () => T): T {
-    const previous = getFormatVersion();
-    setFormatVersion(formatVersion);
+    const previous = Cache.formatVersion();
+    Cache.setFormatVersion(formatVersion);
     try {
       return block();
     } finally {
-      setFormatVersion(previous);
+      Cache.setFormatVersion(previous);
     }
   }
 

@@ -13,7 +13,6 @@ import type { DrawCallback, RackApp, RackAppObject, RouteSet } from "@blazetrail
 import { Root } from "./paths.js";
 import type { RouteSetLike } from "./application/routes-reloader.js";
 import { Trailtie } from "./trailtie.js";
-import { setRubyClassPath } from "./ruby-class-path-slot.js";
 import { Trailties } from "./engine/trailties.js";
 import { EngineConfiguration } from "./engine/configuration.js";
 import type { MiddlewareStackProxy } from "./configuration.js";
@@ -283,7 +282,7 @@ async function realpathOr(fs: Fs, p: string): Promise<string> {
   }
 }
 
-setRubyClassPath(Engine, "Rails::Engine");
+Object.defineProperty(Engine, "name", { value: "Rails::Engine" });
 
 include(Engine, ASCallbacks.InstanceMethods);
 extend(Engine, ASCallbacks.ClassMethods);
