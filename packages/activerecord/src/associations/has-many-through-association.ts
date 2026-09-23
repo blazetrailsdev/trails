@@ -74,12 +74,18 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   }
 
   protected markOccurrence(distribution: Distribution, record: Base): false | Distribution {
-    return markOccurrence(distribution, record);
+    return (
+      distribution.get(record.hash())! > 0 &&
+      distribution.set(record.hash(), distribution.get(record.hash())! - 1)
+    );
   }
 
-  /** @missingRailsCall new — PERMANENT */
   protected distribution(array: Base[]): Distribution {
-    return distribution(array);
+    const distribution: Distribution = new Hash(0);
+    for (const record of array) {
+      distribution.set(record.hash(), distribution.get(record.hash())! + 1);
+    }
+    return distribution;
   }
 
   sourceReflection(): unknown {
@@ -450,41 +456,6 @@ function deleteThroughRecords(this: HasManyThroughAssociation, records: Base[]):
 
 /** @internal */
 type Distribution = Hash<unknown, number>;
-
-/** @internal */
-function distribution(array: Base[]): Distribution {
-  const distribution: Distribution = new Hash(0);
-  for (const record of array) {
-    distribution.set(record.hash(), distribution.get(record.hash())! + 1);
-  }
-  return distribution;
-}
-
-/** @internal */
-function markOccurrence(distribution: Distribution, record: Base): false | Distribution {
-  return (
-    distribution.get(record.hash())! > 0 &&
-    distribution.set(record.hash(), distribution.get(record.hash())! - 1)
-  );
-}
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
- */
-export function multisetDifference(a: Base[], b: Base[]): Base[] {
-  const buckets = distribution(b);
-  return a.filter((record) => !markOccurrence(buckets, record));
-}
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
- */
-export function multisetIntersection(a: Base[], b: Base[]): Base[] {
-  const buckets = distribution(b);
-  return a.filter((record) => markOccurrence(buckets, record));
-}
 
 /** @internal */
 interface ThroughTargetStore {
