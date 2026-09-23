@@ -1196,7 +1196,7 @@ the capability, in a different place. Each is its own `SKIP_GROUPS` entry in
   `Time`, not a method on `TimeWithZone`. Skipped for name scoring. The one TS
   member, `Duration#isA`, answers `this instanceof klass` where Rails'
   `duration.rb:330-332` answers `value.is_a?(klass)`, and is filed for
-  convergence. `HashObject` (`attribute-methods/serialization.ts`) is the
+  convergence. `HashObject` (`serialized-attribute.test.ts`) is the
   existing `hasInstance` hook.
 - **`hash` / `eql?` — live, scored by their consumers.** `Map` and `Set` call no
   hook, but ruby-compat's `rbHash` and `rbEqual` dispatch to a TS `hash()` /

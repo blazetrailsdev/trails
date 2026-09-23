@@ -1,6 +1,6 @@
 import { Thread } from "@blazetrails/ruby-compat";
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE async-executor-onto-a-thread-pool-executor-port */
 export class AsyncExecutor {
   private readonly minThreads: number;
   private readonly maxThreads: number;
@@ -9,7 +9,7 @@ export class AsyncExecutor {
   private _running = 0;
   private readonly _queue: (() => unknown)[] = [];
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE async-executor-onto-a-thread-pool-executor-port */
   constructor({
     minThreads,
     maxThreads,
@@ -27,7 +27,7 @@ export class AsyncExecutor {
     this.fallbackPolicy = fallbackPolicy;
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE async-executor-onto-a-thread-pool-executor-port */
   post(task: () => unknown): void {
     if (this._running < this.maxThreads) {
       this._running += 1;

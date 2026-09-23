@@ -5,7 +5,7 @@ import type { EncryptorLike } from "./encryptor.js";
 import { Contexts } from "./contexts.js";
 import { Configurable } from "./configurable.js";
 import { Encoding, Decryption, Base } from "./errors.js";
-import { isRubyTruthy } from "../ruby-truthy.js";
+import { rtest } from "@blazetrails/ruby-compat";
 import { NullEncryptor } from "./null-encryptor.js";
 import {
   normalizeEncoding as _normalizeEncoding,
@@ -143,7 +143,7 @@ export class EncryptedAttributeType extends ValueType {
     try {
       return this.scheme.withContext(() => {
         if (value === null || value === undefined) return value;
-        if (isRubyTruthy(this._default) && this._default === value) return value;
+        if (rtest(this._default) && this._default === value) return value;
 
         let ciphertext: string;
         if (typeof value === "string") {

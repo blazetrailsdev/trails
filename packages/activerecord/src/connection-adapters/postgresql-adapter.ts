@@ -7,7 +7,7 @@ import { block, fetch, setEnv } from "@blazetrails/ruby-compat";
 import { ValueType, ArgumentError, BinaryData, TimeType } from "@blazetrails/activemodel";
 import { singularize, runLoadHooks, include } from "@blazetrails/activesupport";
 import { Nodes, Visitors } from "@blazetrails/arel";
-import { isRubyTruthy } from "../ruby-truthy.js";
+import { rtest } from "@blazetrails/ruby-compat";
 import { Result } from "../result.js";
 import * as Type from "../type.js";
 import { HashLookupTypeMap } from "../type/hash-lookup-type-map.js";
@@ -253,17 +253,17 @@ export class PostgreSQLAdapter
     const pgConfig = (config as unknown as { configurationHash: DatabaseConfigOptions })
       .configurationHash;
 
-    if (isRubyTruthy(pgConfig.username)) setEnv("PGUSER", String(pgConfig.username));
-    if (isRubyTruthy(pgConfig.host)) setEnv("PGHOST", String(pgConfig.host));
-    if (isRubyTruthy(pgConfig.port)) setEnv("PGPORT", String(pgConfig.port));
-    if (isRubyTruthy(pgConfig.password) && isRubyTruthy(options.includePassword)) {
+    if (rtest(pgConfig.username)) setEnv("PGUSER", String(pgConfig.username));
+    if (rtest(pgConfig.host)) setEnv("PGHOST", String(pgConfig.host));
+    if (rtest(pgConfig.port)) setEnv("PGPORT", String(pgConfig.port));
+    if (rtest(pgConfig.password) && rtest(options.includePassword)) {
       setEnv("PGPASSWORD", String(pgConfig.password));
     }
-    if (isRubyTruthy(pgConfig.sslmode)) setEnv("PGSSLMODE", String(pgConfig.sslmode));
-    if (isRubyTruthy(pgConfig.sslcert)) setEnv("PGSSLCERT", String(pgConfig.sslcert));
-    if (isRubyTruthy(pgConfig.sslkey)) setEnv("PGSSLKEY", String(pgConfig.sslkey));
-    if (isRubyTruthy(pgConfig.sslrootcert)) setEnv("PGSSLROOTCERT", String(pgConfig.sslrootcert));
-    if (isRubyTruthy(pgConfig.variables)) {
+    if (rtest(pgConfig.sslmode)) setEnv("PGSSLMODE", String(pgConfig.sslmode));
+    if (rtest(pgConfig.sslcert)) setEnv("PGSSLCERT", String(pgConfig.sslcert));
+    if (rtest(pgConfig.sslkey)) setEnv("PGSSLKEY", String(pgConfig.sslkey));
+    if (rtest(pgConfig.sslrootcert)) setEnv("PGSSLROOTCERT", String(pgConfig.sslrootcert));
+    if (rtest(pgConfig.variables)) {
       setEnv(
         "PGOPTIONS",
         Object.entries(pgConfig.variables as Record<string, unknown>)
@@ -506,7 +506,7 @@ export class PostgreSQLAdapter
     this._pgClientOptions = {
       ...PostgreSQLAdapter._sliceValidConnParams({
         ...pgDriverConfig,
-        ...(isRubyTruthy(railsUsername) ? { user: railsUsername } : {}),
+        ...(rtest(railsUsername) ? { user: railsUsername } : {}),
       }),
       types: {
         getTypeParser(oid: number, format?: string): unknown {
@@ -872,7 +872,7 @@ export class PostgreSQLAdapter
 
   /**
    * @internal
-   * @noRailsEquivalent PERMANENT
+   * @noRailsEquivalent CONVERGEABLE adapter-driver-open-close-and-transaction-status-shims
    */
   get transactionStatus(): number {
     const client = this._rawConnection as (pg.Client & { _activeQuery?: unknown }) | null;
@@ -1017,12 +1017,12 @@ export class PostgreSQLAdapter
     await this.internalExecute("SET standard_conforming_strings = on", "SCHEMA");
   }
 
-  /** @missingRailsCall query_value — PERMANENT */
+  /** @missingRailsCall query_value — CONVERGEABLE pg-max-identifier-length-sync-async-split */
   maxIdentifierLength(): number {
     return this._maxIdentifierLength ?? 63;
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE pg-max-identifier-length-sync-async-split */
   async warmMaxIdentifierLength(): Promise<number> {
     if (this._maxIdentifierLength == null) {
       const value = await this.queryValue("SHOW max_identifier_length", "SCHEMA");
@@ -1123,7 +1123,7 @@ export class PostgreSQLAdapter
     await super.configureConnection();
     this._mappedDefaultTimezone = null;
 
-    if (isRubyTruthy(this._config.encoding)) {
+    if (rtest(this._config.encoding)) {
       await this._rawConnection!.query(
         `SET client_encoding TO ${this._rawConnection!.escapeLiteral(String(this._config.encoding))}`,
       );
@@ -1181,7 +1181,7 @@ export class PostgreSQLAdapter
     });
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE adapter-driver-open-close-and-transaction-status-shims */
   whenClosed(): Promise<void> {
     return this._closingDriver ?? Promise.resolve();
   }
@@ -2031,7 +2031,7 @@ export class PostgreSQLAdapter
   async reconfigureConnectionTimezone(): Promise<void> {
     const variables = fetch<SessionVariables>(this._config, "variables", {});
 
-    if (isRubyTruthy(variables["timezone"])) return;
+    if (rtest(variables["timezone"])) return;
 
     if (this.defaultTimezone === "utc") {
       await this.rawExecute("SET SESSION timezone TO 'UTC'", "SCHEMA");

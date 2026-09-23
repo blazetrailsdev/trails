@@ -9,7 +9,7 @@ import {
 } from "./abstract-mysql-adapter.js";
 import { StringType, ImmutableStringType } from "@blazetrails/activemodel";
 import { Text as TextType } from "../type/text.js";
-import { isRubyTruthy } from "../ruby-truthy.js";
+import { rtest } from "@blazetrails/ruby-compat";
 import { TypeMap } from "../type/type-map.js";
 import * as Type from "../type.js";
 import { UnsignedInteger } from "../type/unsigned-integer.js";
@@ -245,8 +245,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     };
     this._poolConfig = {
       ...mysqlDriverConfig,
-      ...(isRubyTruthy(railsUsername) ? { user: railsUsername } : {}),
-      ...(isRubyTruthy(railsSocket) ? { socketPath: railsSocket } : {}),
+      ...(rtest(railsUsername) ? { user: railsUsername } : {}),
+      ...(rtest(railsSocket) ? { socketPath: railsSocket } : {}),
       flags: resolvedFlags,
       strict,
       waitTimeout,

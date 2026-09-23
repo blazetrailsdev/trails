@@ -117,11 +117,11 @@ export const RECEIVER_AS_FIRST_ARG = new Set([
   "to_fs",
   // Ruby core `Array#first` — a language built-in on the same receivers as
   // `empty?` above, and the same shape: `values[0]` is an index read, not a
-  // call, so activerecord's `ruby-first.ts` exports it as `first(collection)`
+  // call, so @blazetrails/ruby-compat exports it as `first(collection)`
   // and the Ruby receiver is TS argument 1.
   "first",
   // Ruby core `Array#drop` — the same shape as `first` above: `chain.slice(1)`
-  // names a JS method Ruby never calls, so activerecord's `ruby-drop.ts`
+  // names a JS method Ruby never calls, so @blazetrails/ruby-compat
   // exports it as `drop(collection, n)` and the Ruby receiver is TS argument 1.
   "drop",
   // Ruby core `Enumerable#min` in its no-argument receiver form —

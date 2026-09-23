@@ -3,7 +3,7 @@ import { hexdigest, isBlank, toFs } from "@blazetrails/activesupport";
 import { except, extend, isModuleIncluded, type Module, Range } from "@blazetrails/ruby-compat";
 import { fetch, isEmpty } from "@blazetrails/ruby-compat";
 import type { TokenDefinition } from "./token-for.js";
-import { first } from "./ruby-first.js";
+import { first } from "@blazetrails/ruby-compat";
 import { Table, SelectManager, Nodes, sql, star } from "@blazetrails/arel";
 import type { Base } from "./base.js";
 import { ActiveRecordError, RecordNotSaved, RecordNotUnique, UnknownPrimaryKey } from "./errors.js";

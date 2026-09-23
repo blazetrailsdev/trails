@@ -178,8 +178,7 @@ export interface EnumMacroOptions {
   default?: unknown;
 }
 
-/** @noRailsEquivalent PERMANENT */
-export function enumMethod(
+function enumMethod(
   this: typeof Base,
   name: string,
   values: string[] | Record<string, EnumValue>,
@@ -540,7 +539,7 @@ let _enumWarn: (msg: string) => void = (msg) => console.warn(msg);
 
 /**
  * @internal
- * @noRailsEquivalent PERMANENT
+ * @noRailsEquivalent CONVERGEABLE converge-negative-enum-condition-warning-to-rails
  */
 export function setEnumWarn(fn: (msg: string) => void): void {
   _enumWarn = fn;

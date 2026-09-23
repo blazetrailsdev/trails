@@ -252,11 +252,6 @@ export type MigrationClass = new () => Migration;
 
 type MigrationRunOptions = { direction?: "up" | "down"; revert?: boolean };
 
-/** @noRailsEquivalent PERMANENT */
-function isMigrationClass(fn: unknown): fn is MigrationClass {
-  return typeof fn === "function" && (fn === Migration || fn.prototype instanceof Migration);
-}
-
 function isCommandRecorder(connection: unknown): connection is CommandRecorder {
   return connection instanceof CommandRecorder;
 }
@@ -800,7 +795,10 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   async revert(...migrationClasses: Array<MigrationClass | (() => Promise<void>)>): Promise<void> {
     const last = migrationClasses[migrationClasses.length - 1];
-    const fn = typeof last === "function" && !isMigrationClass(last) ? last : undefined;
+    const fn =
+      typeof last === "function" && last !== Migration && !(last.prototype instanceof Migration)
+        ? (last as () => Promise<void>)
+        : undefined;
     const klasses = (fn ? migrationClasses.slice(0, -1) : migrationClasses) as MigrationClass[];
     if (klasses.length > 0) {
       await this.run(...[...klasses].reverse(), { revert: true });

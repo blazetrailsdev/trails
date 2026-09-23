@@ -1,7 +1,6 @@
 import { defineModule, slice } from "@blazetrails/activesupport";
 import { ArgumentError, except as exceptValues } from "@blazetrails/ruby-compat";
 import { Merger, HashMerger } from "./merger.js";
-import { setValues } from "./query-methods.js";
 import type { ExceptSkip } from "./query-methods.js";
 
 interface SpawnRelation<T = unknown> {
@@ -87,6 +86,6 @@ export function relationWith<T extends SpawnRelation<T>>(
   values: Record<string, unknown>,
 ): T {
   const result = (this as any).spawn();
-  setValues(result, values);
+  result._values = values;
   return result;
 }

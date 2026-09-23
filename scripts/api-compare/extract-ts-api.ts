@@ -2754,7 +2754,7 @@ export function noRailsEquivalentReason(node: ts.Node): string | undefined {
  * already reads it there), and reading it as file-level too would silently
  * widen every such tag into a blanket. The blank line is what separates the two
  * cases, which is why an import-less file could not carry the tag at all before
- * RFC 0121 — `temporal-tag.ts` and `ruby-truthy.ts` have no runtime imports by
+ * RFC 0121 — `temporal-tag.ts` and the former `ruby-truthy.ts` had no runtime imports by
  * design and nothing to hang it on.
  *
  * Both placements reach the SAME parse as the declaration-level tag, and so

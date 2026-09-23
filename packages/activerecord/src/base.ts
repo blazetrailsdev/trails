@@ -964,7 +964,7 @@ export class Base extends Model {
   declare static readonly connection: DatabaseAdapter;
   declare static isPrimaryClass: typeof ConnectionHandling.isPrimaryClass;
   declare static adapterClass: typeof ConnectionHandling.adapterClass;
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE adapter-class-sync-retires-with-eager-adapter-resolution */
   declare static adapterClassSync: typeof ConnectionHandling.adapterClassSync;
   declare static removeConnection: typeof ConnectionHandling.removeConnection;
   declare static schemaCache: typeof ConnectionHandling.schemaCache;
@@ -1215,7 +1215,7 @@ export class Base extends Model {
 
   static _enums: Map<string, Record<string, number | string | boolean | null>> = new Map();
 
-  declare static enum: typeof _EnumModule.enumMethod;
+  declare static enum: typeof _EnumModule.enum;
 
   /** @internal */
   declare static _enum: typeof _EnumModule._enum;
@@ -2703,7 +2703,7 @@ extend(Base, Normalization.ClassMethods);
 include(Base, Normalization.InstanceMethods);
 include(Base, Marshalling.Methods);
 extend(Base, {
-  enum: _EnumModule.enumMethod,
+  enum: _EnumModule.enum,
   _enum: _EnumModule._enum,
   _enumMethodsModule: _EnumModule._enumMethodsModule,
   detectEnumConflictBang: _EnumModule.detectEnumConflictBang,

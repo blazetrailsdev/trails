@@ -12,7 +12,7 @@ import { Result } from "./result.js";
 import { isEmpty, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
 import { isPresent, many, reverseMerge } from "@blazetrails/activesupport";
 import { except } from "@blazetrails/ruby-compat";
-import { first } from "./ruby-first.js";
+import { first } from "@blazetrails/ruby-compat";
 import { withConnection } from "./connection-handling.js";
 import { allTimestampAttributesInModel, timestampAttributesForUpdateInModel } from "./timestamp.js";
 

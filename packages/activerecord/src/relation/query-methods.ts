@@ -139,7 +139,7 @@ export const FROZEN_EMPTY_ARRAY: readonly never[] = Object.freeze([]);
 
 export const FROZEN_EMPTY_HASH: Readonly<Record<string, never>> = Object.freeze({});
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE query-methods-value-methods-and-to-i */
 export function defineValueMethods(relationClass: {
   prototype: object;
   MULTI_VALUE_METHODS: readonly string[];
@@ -631,14 +631,6 @@ export const EXCEPT_ONLY_KEYS: readonly ExceptKey[] = [
 
 export type ExceptSkip = ExceptKey | (string & {});
 
-/**
- * @internal
- * @noRailsEquivalent PERMANENT
- */
-export function setValues(host: QueryMethodsHost, values: Record<string, unknown>): void {
-  host._values = values;
-}
-
 function unscope(
   this: QueryMethodsHost,
   ...args: Array<UnscopeType | { where: string | string[] }>
@@ -743,9 +735,14 @@ export function buildWhereClause(
     for (const [rawKey, value] of toA(opts) as [unknown, unknown][]) {
       let key: string | string[];
       if (Array.isArray(rawKey)) {
-        key = rawKey.map((k) => aliases[toS(k)] ?? toS(k));
+        key = rawKey.map((k) => {
+          const s = String(k);
+          const name = isRubySymbol(s) ? symbolToName(s) : s;
+          return aliases[name] ?? name;
+        });
       } else {
-        const name = toS(rawKey);
+        const s = String(rawKey);
+        const name = isRubySymbol(s) ? symbolToName(s) : s;
         key = aliases[name] ?? name;
       }
       if (transformed instanceof Map) transformed.set(key, value);
@@ -834,7 +831,7 @@ function uniqArray(arr: unknown[]): unknown[] {
 
 /**
  * @internal
- * @noRailsEquivalent PERMANENT
+ * @noRailsEquivalent CONVERGEABLE union-order-clauses-is-a-second-spelling-of-ruby-array-union
  */
 export function structuralUnionEq(a: unknown, b: unknown): boolean {
   if (a instanceof JoinDependency || b instanceof JoinDependency) return a === b;
@@ -1419,7 +1416,7 @@ export function processWithArgs(
 
 /**
  * @internal
- * @noRailsEquivalent PERMANENT
+ * @noRailsEquivalent CONVERGEABLE query-methods-value-methods-and-to-i
  */
 export function toI(value: unknown): number {
   if (value == null) return 0;
@@ -1578,12 +1575,6 @@ export function extractTableNameFrom(string: string): string | null {
 
 function isRubySymbol(value: unknown): value is string {
   return typeof value === "string" && value.startsWith(":");
-}
-
-/** @noRailsEquivalent PERMANENT */
-function toS(key: unknown): string {
-  const s = String(key);
-  return isRubySymbol(s) ? symbolToName(s) : s;
 }
 
 function symbolToName(s: string): string {
@@ -2289,20 +2280,6 @@ export function selectAssociationList(
 
 /**
  * @internal
- * @noRailsEquivalent PERMANENT
- */
-export function assertValidLeftOuterJoinsBang(values: unknown[]): void {
-  for (const v of values) {
-    if (typeof v === "string") {
-      if (/\s/.test(v)) throw new ArgumentError("only Hash, Symbol and Array are allowed");
-    } else if (!Array.isArray(v) && !isPlainObject(v) && !(v instanceof JoinDependency)) {
-      throw new ArgumentError("only Hash, Symbol and Array are allowed");
-    }
-  }
-}
-
-/**
- * @internal
  * @missingRailsCall empty? — PERMANENT
  */
 export function buildJoinBuckets(
@@ -2320,7 +2297,6 @@ export function buildJoinBuckets(
   const leftOuterJoinsValues = this.leftOuterJoinsValues;
   const stashedLeft: JoinDependency[] = [];
   if (leftOuterJoinsValues.length > 0) {
-    assertValidLeftOuterJoinsBang(leftOuterJoinsValues);
     const namedLeft = selectNamedJoins.call(this, leftOuterJoinsValues, stashedLeft, (left) => {
       if (left instanceof CTEJoin) {
         buckets.join_node.push(buildWithJoinNode.call(this, left.name, Nodes.OuterJoin));

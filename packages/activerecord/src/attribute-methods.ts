@@ -123,11 +123,11 @@ export function accessedFields(this: AttributeRecord): string[] {
 export class GeneratedAttributeMethods extends Module {
   /**
    * @internal
-   * @noRailsEquivalent PERMANENT
+   * @noRailsEquivalent CONVERGEABLE generated-attribute-methods-name-comes-from-const-set
    */
   ownerName?: string;
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE generated-attribute-methods-name-comes-from-const-set */
   inspect(): string {
     return `${this.ownerName}::GeneratedAttributeMethods`;
   }

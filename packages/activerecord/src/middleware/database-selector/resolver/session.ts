@@ -1,6 +1,6 @@
 import { Temporal } from "@blazetrails/date";
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE database-selector-session-typed-against-the-rack-session */
 export interface SessionStore {
   get(key: string): unknown;
   set(key: string, value: unknown): void;

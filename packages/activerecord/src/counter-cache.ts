@@ -138,7 +138,7 @@ export function loadSchemaBang(this: typeof Base, superFn: () => void): void {
   this.counterCachedAssociationNames = names;
 }
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE eliminate-pending-counter-cache-deferral-via-lazy-target-resolution */
 export function flushPendingCounterCacheColumns(modelClass: typeof Base, key: string): void {
   for (const cacheColumn of pendingCounterCacheColumns.get(key) ?? []) {
     const column = cacheColumn();

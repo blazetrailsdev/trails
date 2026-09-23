@@ -64,7 +64,7 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
     }
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-model-mixin-plumbing-surface */
+  /** @noRailsEquivalent CONVERGEABLE converge-djar-deferred-chain-walk-mode */
   static deferred<T extends Base>(
     klass: typeof Base,
     chainWalker: () => Promise<{ relation: Relation<T> }>,
@@ -116,7 +116,7 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
     return (this._storedIds as unknown[]).slice();
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE converge-djar-deferred-chain-walk-mode */
   async count(column?: string): Promise<number | Map<unknown, number>> {
     if (this._chainWalker) {
       const { relation } = await this._walkOnce();
@@ -135,7 +135,7 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
     return baseCount.call(this, column);
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE converge-djar-deferred-chain-walk-mode */
   override async calculate(
     operation: "count",
     column?: string,
@@ -172,7 +172,7 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
     ).calculate.call(this, operation, columnName);
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE converge-djar-deferred-chain-walk-mode */
   override async pluck(
     ...columnNames: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
   ): Promise<unknown[]> {

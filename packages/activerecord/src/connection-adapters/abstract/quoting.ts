@@ -218,19 +218,6 @@ export function columnNameWithOrderMatcher(): RegExp {
   return /^((?:(?:\w+\.)?\w+|\w+\((?:|(?:(?:\w+\.)?\w+|\w+\((?:|(?:\w+\.)?\w+)\)))\))(?:\s+ASC|\s+DESC)?(?:\s+NULLS\s+(?:FIRST|LAST))?)(?:\s*,\s*(?:(?:\w+\.)?\w+|\w+\((?:|(?:(?:\w+\.)?\w+|\w+\((?:|(?:\w+\.)?\w+)\)))\))(?:\s+ASC|\s+DESC)?(?:\s+NULLS\s+(?:FIRST|LAST))?)*$/i;
 }
 
-/**
- * @internal
- * @noRailsEquivalent PERMANENT
- */
-export function isSqlLiteral(value: unknown): value is { value: string } {
-  return (
-    value !== null &&
-    typeof value === "object" &&
-    value.constructor?.name === "SqlLiteral" &&
-    typeof (value as any).value === "string"
-  );
-}
-
 function actsLikeTime(value: unknown): value is TimeLike {
   return (
     value instanceof TimeWithZone ||

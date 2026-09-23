@@ -347,10 +347,8 @@ class BasicObject {}
 
 class Relation {}
 
-/** @noRailsEquivalent PERMANENT */
 type Attributes = Record<string, unknown> | Map<unknown, unknown>;
 
-/** @noRailsEquivalent PERMANENT */
 function entriesOf(attributes: Attributes): [string | string[], unknown][] {
   return attributes instanceof Map
     ? ([...attributes] as [string | string[], unknown][])

@@ -39,7 +39,7 @@ export class TypeMetadata extends SqlTypeMetadata {
     return rbHash(TypeMetadata) ^ rbHash(super.hash()) ^ rbHash(this.oid) ^ rbHash(this.fmod);
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE type-metadata-serializes-without-to-json */
   override toJSON(): TypeMetadataJSON {
     return { ...super.toJSON(), class: "PostgreSQL::TypeMetadata", oid: this.oid, fmod: this.fmod };
   }
