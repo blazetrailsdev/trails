@@ -1,5 +1,6 @@
 /** @noRailsEquivalent PERMANENT */
 import * as ts from "typescript/unstable/ast";
+import { getPath } from "@blazetrails/ruby-compat";
 import { walk, type ClassInfo } from "./walker.js";
 import { resolveAssociationTarget } from "./resolve-target.js";
 import { tsApi } from "./ts-api.js";
@@ -90,7 +91,11 @@ function collectNamesInScope(sf: ts.SourceFile): Set<string> {
 }
 
 function computeRelativeImport(fromFile: string, toFile: string): string {
-  const windows = /^[A-Za-z]:|\\/.test(fromFile) || /^[A-Za-z]:|\\/.test(toFile);
+  const absolute = (file: string): string =>
+    /^([A-Za-z]:)?[\\/]/.test(file) ? file : getPath().resolve(file);
+  const fromPath = absolute(fromFile);
+  const toPath = absolute(toFile);
+  const windows = /^[A-Za-z]:|\\/.test(fromPath) || /^[A-Za-z]:|\\/.test(toPath);
   const key = (segment: string): string => (windows ? segment.toLowerCase() : segment);
   const split = (file: string): [string, string[]] => {
     const slashed = file.replace(/\\/g, "/");
@@ -103,8 +108,8 @@ function computeRelativeImport(fromFile: string, toFile: string): string {
     }
     return [root, segments];
   };
-  const [fromRoot, fromSegments] = split(fromFile);
-  const [toRoot, to] = split(toFile);
+  const [fromRoot, fromSegments] = split(fromPath);
+  const [toRoot, to] = split(toPath);
   if (key(fromRoot) !== key(toRoot)) return `./${toRoot}/${to.join("/")}`.replace(/\.tsx?$/, ".js");
   const fromDir = fromSegments.slice(0, -1);
   let common = 0;
