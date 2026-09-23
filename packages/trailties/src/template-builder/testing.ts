@@ -1,13 +1,17 @@
-import ts from "typescript";
+import { API, ModuleKind, type Diagnostic } from "typescript/unstable/sync";
+import { ScriptTarget } from "typescript/unstable/ast";
 
 export { assertNoRubySource } from "./no-ruby-source.js";
 
-export function parseTs(source: string): { diagnostics: readonly ts.Diagnostic[] } {
-  const result = ts.transpileModule(source, {
+let api: API | undefined;
+
+export function parseTs(source: string): { diagnostics: readonly Diagnostic[] } {
+  api ??= new API();
+  const result = api.transpileModule(source, {
     reportDiagnostics: true,
     compilerOptions: {
-      target: ts.ScriptTarget.Latest,
-      module: ts.ModuleKind.ESNext,
+      target: ScriptTarget.Latest,
+      module: ModuleKind.ESNext,
       isolatedModules: true,
       noEmit: true,
     },
