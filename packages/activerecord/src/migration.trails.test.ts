@@ -480,3 +480,13 @@ describe("Migration#removeColumns forwards to the connection", () => {
     }
   });
 });
+
+describe("Migration#formatArguments", () => {
+  it("inspects the trailing options hash with Symbol keys and drops internal options", () => {
+    const m = new Migration();
+    expect(m.formatArguments(["posts", { force: true, _skipValidateOptions: true }])).toBe(
+      '"posts", {:force=>true}',
+    );
+    expect(m.formatArguments(["posts", { _skipValidateOptions: true }])).toBe('"posts"');
+  });
+});

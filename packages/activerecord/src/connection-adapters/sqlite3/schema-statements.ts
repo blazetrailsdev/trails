@@ -1,5 +1,5 @@
 import { ArgumentError } from "@blazetrails/activemodel";
-import { pluralize } from "@blazetrails/activesupport";
+import { pluralize, symbolizeKeys } from "@blazetrails/activesupport";
 import { rbObjAsString as toS } from "@blazetrails/ruby-compat";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import type {
@@ -110,7 +110,7 @@ export async function removeForeignKey(
 
   if (!fkey) {
     throw new ArgumentError(
-      `Table '${fromTable}' has no foreign key for ${to ?? toS(matchOptions)}`,
+      `Table '${fromTable}' has no foreign key for ${to ?? toS(symbolizeKeys(matchOptions as Record<string, unknown>))}`,
     );
   }
 
