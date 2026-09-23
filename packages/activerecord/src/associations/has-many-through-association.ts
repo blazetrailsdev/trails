@@ -2,11 +2,10 @@ import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
 import { HasManyAssociation } from "./has-many-association.js";
-import { Hash, NotImplementedError } from "@blazetrails/ruby-compat";
+import { Hash, NotImplementedError, rbEqual } from "@blazetrails/ruby-compat";
 import { underscore, singularize, isBlank } from "@blazetrails/activesupport";
 import { collectionProxyFor as collectionProxyFor } from "../associations.js";
 import { ThroughAssociation, sourceReflection, throughBuildRecord } from "./through-association.js";
-import { associationKeysEqual } from "./key-normalization.js";
 import { isThenable } from "./collection-association.js";
 import { runCallbacks } from "@blazetrails/activesupport";
 
@@ -428,7 +427,7 @@ function throughRecordsFor(this: HasManyThroughAssociation, record: Base): Base[
         typeof (c as any).readAttribute === "function"
           ? (c as any).readAttribute(key)
           : (c as any)[key];
-      return associationKeysEqual(actual, val);
+      return rbEqual(actual, val);
     }),
   );
 }

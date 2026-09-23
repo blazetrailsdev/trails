@@ -344,16 +344,6 @@ export async function include(this: FinderRelation, record: any): Promise<boolea
 
 export const member = include;
 
-/** @noRailsEquivalent PERMANENT */
-function whereCompositePrimaryKeyIn(relation: any, pk: string[], ids: unknown[]): any {
-  const tuples = ids as unknown[][];
-  let rel = relation.where(buildPkWhere(pk, tuples[0]));
-  for (let i = 1; i < tuples.length; i++) {
-    rel = rel.or(relation.where(buildPkWhere(pk, tuples[i])));
-  }
-  return rel;
-}
-
 /** @missingRailsCall size — PERMANENT */
 export function raiseRecordNotFoundExceptionBang(
   this: FinderRelation,
@@ -561,9 +551,7 @@ export async function findSome(this: FinderRelation, ids: unknown[]): Promise<an
   if (this.orderValues.length === 0) return (this as any).findSomeOrdered(ids);
 
   const pk = this.primaryKey;
-  let relation = Array.isArray(pk)
-    ? whereCompositePrimaryKeyIn(this, pk, ids)
-    : (this as any).where({ [pk]: ids });
+  let relation = (this as any).where(new Map([[pk, ids]]));
   if ((this as any).selectValues.length > 0) {
     relation = relation.select(this.table.get(pk as string));
   }
@@ -599,9 +587,7 @@ export async function findSomeOrdered(this: FinderRelation, ids: unknown[]): Pro
 
   let relation = (this as any).except("limit", "offset");
   const pk = this.model.primaryKey;
-  relation = Array.isArray(pk)
-    ? whereCompositePrimaryKeyIn(relation, pk, ids)
-    : relation.where({ [this.model.primaryKey as string]: ids });
+  relation = relation.where(new Map([[pk, ids]]));
   if ((this as any).selectValues.length > 0) {
     relation = relation.select(this.table.get(this.model.primaryKey as string));
   }

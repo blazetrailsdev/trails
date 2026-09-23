@@ -389,7 +389,7 @@ export function _scopeForAssociation(model: typeof Base): Relation<Base> {
 
 /**
  * @internal
- * @noRailsEquivalent PERMANENT
+ * @noRailsEquivalent CONVERGEABLE converge-invented-association-scope-and-key-helpers
  */
 export function applyAssociationScope<R>(
   rel: R,

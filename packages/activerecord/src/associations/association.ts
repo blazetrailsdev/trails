@@ -2,12 +2,11 @@ import type { Base } from "../base.js";
 import type { AssociationDefinition, AssociationOptions } from "../associations.js";
 import { associationInstanceGet } from "../associations.js";
 import { AssociationScope, type AssociationScopeable } from "./association-scope.js";
-import { associationKeysEqual } from "./key-normalization.js";
 import { ActiveRecord, Associations } from "../namespaces.js";
 import { relationClassFor } from "../relation/delegation.js";
 import { ThroughAssociation } from "./through-association.js";
 import { camelize, kernelArray, safeConstantize, singularize } from "@blazetrails/activesupport";
-import { except, hasKey } from "@blazetrails/ruby-compat";
+import { except, hasKey, rbEqual } from "@blazetrails/ruby-compat";
 import { AssociationTypeMismatch } from "../errors.js";
 import { assertAssignedSynchronously } from "@blazetrails/activemodel";
 
@@ -454,21 +453,12 @@ export class Association<Target extends Base | Base[] = Base | Base[]> {
   matchesForeignKey(record: Base): boolean {
     if (this.isForeignKeyFor(record)) {
       return (
-        associationKeysEqual(
-          record.readAttribute(String(this.reflection.foreignKey())),
-          this.owner.id,
-        ) ||
+        rbEqual(record.readAttribute(String(this.reflection.foreignKey())), this.owner.id) ||
         (this.isForeignKeyFor(this.owner) &&
-          associationKeysEqual(
-            this.owner.readAttribute(String(this.reflection.foreignKey())),
-            record.id,
-          ))
+          rbEqual(this.owner.readAttribute(String(this.reflection.foreignKey())), record.id))
       );
     }
-    return associationKeysEqual(
-      this.owner.readAttribute(String(this.reflection.foreignKey())),
-      record.id,
-    );
+    return rbEqual(this.owner.readAttribute(String(this.reflection.foreignKey())), record.id);
   }
 
   /** @internal */

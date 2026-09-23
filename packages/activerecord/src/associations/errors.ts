@@ -381,7 +381,7 @@ export class DeleteRestrictionError extends ActiveRecordError {
   }
 }
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE has-one-mass-assignment-refuses-rails-replace */
 export class HasOnePersistedAssignmentError extends ActiveRecordError {
   constructor(association: string) {
     const cap = association.charAt(0).toUpperCase() + association.slice(1);
@@ -395,7 +395,7 @@ export class HasOnePersistedAssignmentError extends ActiveRecordError {
   }
 }
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE sync-collection-mass-assignment-refuses-rails-replace */
 export class CollectionPersistedAssignmentError extends ActiveRecordError {
   constructor(association: string) {
     super(
@@ -408,7 +408,7 @@ export class CollectionPersistedAssignmentError extends ActiveRecordError {
   }
 }
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE sync-collection-mass-assignment-refuses-rails-replace */
 export class CollectionIdsAssignmentError extends ActiveRecordError {
   constructor(association: string) {
     const idsName = `${singularize(association)}Ids`;

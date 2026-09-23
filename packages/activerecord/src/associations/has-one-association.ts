@@ -1,4 +1,4 @@
-import { kernelThrow } from "@blazetrails/ruby-compat";
+import { kernelThrow, rbEqual } from "@blazetrails/ruby-compat";
 import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
 import { DeleteRestrictionError, HasOnePersistedAssignmentError } from "./errors.js";
@@ -127,7 +127,7 @@ export class HasOneAssociation extends SingularAssociation {
   /** @internal */
   protected override detachDisplacedOnBuild(record: Base | null): Promise<void> | null {
     const displaced = this.loaded ? this.target : null;
-    if (!displaced || sameRecord(displaced, record)) return null;
+    if (!displaced || rbEqual(displaced, record)) return null;
     const dependent = (this.reflection.options.dependent as string) ?? "";
     if (
       dependent !== "delete" &&
@@ -151,7 +151,7 @@ export class HasOneAssociation extends SingularAssociation {
         if (record) (this as any).raiseOnTypeMismatchBang(record);
         if (!this.loaded) await this.loadTarget();
         if (!this.target && !record) return;
-        const assigningAnotherRecord = !sameRecord(this.target, record);
+        const assigningAnotherRecord = !rbEqual(this.target, record);
         if (assigningAnotherRecord || record?.hasChangesToSave === true) {
           save = (this.owner as { isPersisted?: () => boolean }).isPersisted?.() === true;
           await transactionIf(this, save, async () => {
@@ -177,7 +177,7 @@ export class HasOneAssociation extends SingularAssociation {
     }
     {
       if (record) (this as any).raiseOnTypeMismatchBang(record);
-      const assigningAnotherRecord = !sameRecord(this.target, record);
+      const assigningAnotherRecord = !rbEqual(this.target, record);
       if (assigningAnotherRecord || record?.hasChangesToSave === true) {
         if (
           this.target &&
@@ -345,16 +345,6 @@ export class HasOneAssociation extends SingularAssociation {
       if (!primaryKeys.includes(foreignKeyColumn)) record.writeAttribute(foreignKeyColumn, null);
     }
   }
-}
-
-/**
- * @internal
- * @noRailsEquivalent PERMANENT
- */
-export function sameRecord(a: Base | null, b: Base | null): boolean {
-  if (a === b) return true;
-  if (a == null || b == null) return false;
-  return (a as { equals?: (other: unknown) => boolean }).equals?.(b) === true;
 }
 
 /** @internal */

@@ -1,4 +1,4 @@
-import { kernelCatch } from "@blazetrails/ruby-compat";
+import { kernelCatch, rbEqual } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import { underscore, compactBlank, indexBy, valuesAt } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -49,7 +49,7 @@ export abstract class CollectionAssociation extends Association {
     return this.replace(records);
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE sync-collection-mass-assignment-refuses-rails-replace */
   syncWrite(records: Base[]): void {
     for (const val of records) (this as any).raiseOnTypeMismatchBang(val);
     if (
@@ -62,7 +62,7 @@ export abstract class CollectionAssociation extends Association {
     this.replace(records) as Base[];
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE sync-collection-mass-assignment-refuses-rails-replace */
   syncIdsWrite(_ids: unknown[]): never {
     throw new CollectionIdsAssignmentError(this.reflection.name);
   }
@@ -661,7 +661,7 @@ export abstract class CollectionAssociation extends Association {
     }
     this._lastRemoveAborted = false;
     const pruned = (): boolean => {
-      this._targetStore = this.target.filter((r) => !includesRecord(records, r));
+      this._targetStore = this.target.filter((r) => !records.some((record) => rbEqual(record, r)));
       this._associationIds = null;
       for (const record of records) this.callback("afterRemove", record);
       return true;
@@ -855,11 +855,7 @@ export abstract class CollectionAssociation extends Association {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
- */
-/**
- * @internal
- * @noRailsEquivalent PERMANENT
+ * @noRailsEquivalent CONVERGEABLE converge-invented-association-scope-and-key-helpers
  */
 export function isThenable<T>(value: Promise<T> | T): value is Promise<T> {
   return typeof (value as { then?: unknown } | null | undefined)?.then === "function";
@@ -874,14 +870,6 @@ function diffHooks(assoc: CollectionAssociation): {
     difference(a: Base[], b: Base[]): Base[];
     intersection(a: Base[], b: Base[]): Base[];
   };
-}
-
-/**
- * @internal
- * @noRailsEquivalent PERMANENT
- */
-export function includesRecord(records: Base[], record: Base): boolean {
-  return records.some((r) => (r as unknown as { equals(o: unknown): boolean }).equals(record));
 }
 
 /** @internal */
