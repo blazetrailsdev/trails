@@ -92,8 +92,21 @@ function collectNamesInScope(sf: ts.SourceFile): Set<string> {
 function computeRelativeImport(fromFile: string, toFile: string): string {
   const windows = /^[A-Za-z]:|\\/.test(fromFile) || /^[A-Za-z]:|\\/.test(toFile);
   const key = (segment: string): string => (windows ? segment.toLowerCase() : segment);
-  const fromDir = fromFile.replace(/\\/g, "/").split("/").slice(0, -1);
-  const to = toFile.replace(/\\/g, "/").split("/");
+  const split = (file: string): [string, string[]] => {
+    const slashed = file.replace(/\\/g, "/");
+    const root = windows ? (/^(\/\/[^/]+\/[^/]+|[A-Za-z]:)/.exec(slashed)?.[0] ?? "") : "";
+    const segments: string[] = [];
+    for (const segment of slashed.slice(root.length).split("/")) {
+      if (segment === "" || segment === ".") continue;
+      if (segment === "..") segments.pop();
+      else segments.push(segment);
+    }
+    return [root, segments];
+  };
+  const [fromRoot, fromSegments] = split(fromFile);
+  const [toRoot, to] = split(toFile);
+  if (key(fromRoot) !== key(toRoot)) return `./${toRoot}/${to.join("/")}`.replace(/\.tsx?$/, ".js");
+  const fromDir = fromSegments.slice(0, -1);
   let common = 0;
   while (
     common < fromDir.length &&
@@ -102,10 +115,7 @@ function computeRelativeImport(fromFile: string, toFile: string): string {
   ) {
     common++;
   }
-  let rel =
-    windows && common === 0
-      ? to.join("/")
-      : [...fromDir.slice(common).map(() => ".."), ...to.slice(common)].join("/");
+  let rel = [...fromDir.slice(common).map(() => ".."), ...to.slice(common)].join("/");
   if (!rel.startsWith(".")) rel = "./" + rel;
   rel = rel.replace(/\.tsx?$/, ".js");
   return rel;
