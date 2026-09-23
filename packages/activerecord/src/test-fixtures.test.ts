@@ -9,7 +9,6 @@ import { FixtureSet } from "./fixtures.js";
 import { Base } from "./base.js";
 import "./relation.js";
 import { fixtures, TestFixtures } from "./test-fixtures.js";
-import { withTransactionalFixtures } from "./test-fixtures/with-transactional-fixtures.js";
 import { withSecondPool } from "./support/setup-second-pool.js";
 import { College } from "./test-helpers/models/college.js";
 import { Author } from "./test-helpers/models/author.js";
@@ -19,7 +18,6 @@ import { Cucumber, Cabbage, RedCabbage } from "./test-helpers/models/vegetables.
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { doubleColumnsHash } from "./test-helpers/double-columns.js";
 import { NullPool } from "./connection-adapters/abstract/connection-pool.js";
-import { leaseFixtureConnection } from "./test-fixtures/fixture-connection.js";
 
 async function resolvePrimaryModel(entry: {
   model: () => Promise<typeof Base | readonly (typeof Base)[]>;
@@ -573,7 +571,7 @@ describe("fixtures() loads multiple same-table fixture sets in one call", () => 
 });
 
 describe("fixtureRegistry seeds against TEST_SCHEMA", () => {
-  withTransactionalFixtures(leaseFixtureConnection);
+  fixtures([]);
   let restoreEncryption: (() => void) | undefined;
   beforeAll(async () => {
     restoreEncryption = await setupScopedEncryption();

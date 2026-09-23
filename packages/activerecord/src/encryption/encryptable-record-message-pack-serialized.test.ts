@@ -9,7 +9,7 @@ import {
   assertEncryptedAttribute,
 } from "./test-helpers.js";
 import { type TestDatabaseAdapter } from "../test-adapter.js";
-import { withTransactionalFixtures } from "../test-fixtures/with-transactional-fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { Encoding } from "./errors.js";
 
 describe("ActiveRecord::Encryption::EncryptableRecordMessagePackSerializedTest", () => {
@@ -20,7 +20,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordMessagePackSerializedTest",
     adapter = await freshAdapter();
   });
 
-  withTransactionalFixtures(() => adapter);
+  fixtures([], { connection: () => adapter });
 
   beforeEach(() => {
     configSnapshot = snapshotEncryptionConfig();

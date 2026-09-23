@@ -3,7 +3,7 @@ import { describeIfPg, leasePgAdapter, PostgreSQLAdapter } from "./test-helper.j
 import { BigDecimal } from "@blazetrails/ruby-compat";
 import { Range } from "../../index.js";
 import { setZone } from "@blazetrails/activesupport";
-import { withTransactionalFixtures } from "../../test-fixtures/with-transactional-fixtures.js";
+import { fixtures } from "../../test-fixtures.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -30,7 +30,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   afterAll(async () => {
     await adapter.execute(`DROP TABLE IF EXISTS postgresql_infinities`);
   });
-  withTransactionalFixtures(() => adapter);
+  fixtures([], { connection: () => adapter });
 
   async function modelClass() {
     const { Base } = await import("../../index.js");

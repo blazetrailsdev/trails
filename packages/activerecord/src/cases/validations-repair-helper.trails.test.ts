@@ -1,10 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "../index.js";
-import { withTransactionalFixtures } from "../test-fixtures/with-transactional-fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 import { repairValidations } from "./validations-repair-helper.js";
-import { leaseFixtureConnection } from "../test-fixtures/fixture-connection.js";
 
-withTransactionalFixtures(leaseFixtureConnection);
+fixtures([]);
 
 describe("repairValidations", () => {
   it("removes a validator added inside the block after it returns", async () => {

@@ -31,7 +31,6 @@ import { AttributeRegistration, Model as ActiveModel } from "@blazetrails/active
 import { assertNoChanges, include } from "@blazetrails/activesupport";
 import { itIfSupports } from "../support/supports.js";
 import { fixtures } from "../test-fixtures.js";
-import { withTransactionalFixtures } from "../test-fixtures/with-transactional-fixtures.js";
 import {
   EncryptableRecord,
   decryptAttributes,
@@ -61,7 +60,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   beforeAll(async () => {
     txnAdapter = await freshAdapter();
   });
-  withTransactionalFixtures(() => txnAdapter);
+  fixtures([], { connection: () => txnAdapter });
 
   beforeEach(() => {
     configSnapshot = snapshotEncryptionConfig();

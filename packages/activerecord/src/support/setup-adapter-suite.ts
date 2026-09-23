@@ -1,10 +1,8 @@
 import { beforeAll, afterAll } from "vitest";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { loadSchema } from "./load-schema-helper.js";
-import {
-  withTransactionalFixtures,
-  type TransactionalFixturesAdapter,
-} from "../test-fixtures/with-transactional-fixtures.js";
+import { type TransactionalFixturesAdapter } from "../test-fixtures/with-transactional-fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 
 export interface AdapterSuiteOptions<A extends TransactionalFixturesAdapter> {
   factory: () => A | Promise<A>;
@@ -28,14 +26,16 @@ export function setupAdapterSuite<A extends TransactionalFixturesAdapter>(
     if (opts.setup) await opts.setup(adapter);
   });
 
-  withTransactionalFixtures(() => {
-    if (!adapter) {
-      throw new Error(
-        "setupAdapterSuite: adapter accessed before beforeAll completed — " +
-          "check that `factory` did not throw",
-      );
-    }
-    return adapter;
+  fixtures([], {
+    connection: () => {
+      if (!adapter) {
+        throw new Error(
+          "setupAdapterSuite: adapter accessed before beforeAll completed — " +
+            "check that `factory` did not throw",
+        );
+      }
+      return adapter;
+    },
   });
 
   afterAll(async () => {

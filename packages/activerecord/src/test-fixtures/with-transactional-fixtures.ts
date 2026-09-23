@@ -1,4 +1,5 @@
 import { beforeEach } from "vitest";
+import { Base } from "../base.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import { NullPool } from "../connection-adapters/abstract/connection-pool.js";
@@ -47,9 +48,8 @@ async function replaySchemaCacheDump(
  * It cannot run in a `beforeAll`: callers register their schema-setup
  * `beforeAll` *after* calling the helper, so the schema does not yet exist when
  * ours would fire. Shared with the non-transactional path (`fixtures(...,
- * { useTransactionalTests: false })`), which skips
- * {@link withTransactionalFixtures} entirely and would otherwise leave the
- * cache cold — a model whose only declaration is `tableName` then reflects no
+ * { useTransactionalTests: false })`), which skips the transactional setup
+ * entirely and would otherwise leave the cache cold — a model whose only declaration is `tableName` then reflects no
  * columns at all, because the sync `load_schema` can only answer from the cache
  * (`model-schema.ts` `loadSchemaFromCacheSync`), where Ruby loads lazily on
  * first attribute access.
@@ -58,22 +58,19 @@ async function replaySchemaCacheDump(
  * @noRailsEquivalent CONVERGEABLE the eager schema warm Ruby gets free from lazy synchronous load_schema (model_schema.rb:587).
  */
 export function warmSchemaCacheBeforeFirstTest(
-  getAdapter: () => TransactionalFixturesAdapter | Promise<TransactionalFixturesAdapter>,
+  getAdapter?: () => TransactionalFixturesAdapter | Promise<TransactionalFixturesAdapter>,
 ): void {
   let warmed = false;
   beforeEach(async () => {
     if (warmed) return;
     warmed = true;
-    await eagerWarmSchemaCache(await getAdapter());
+    if (getAdapter) await eagerWarmSchemaCache(await getAdapter());
+    else await Base.withConnection(eagerWarmSchemaCache);
   });
 }
 
 export interface WithTransactionalFixturesOptions {
-  eagerWarmSchemaCache?: boolean;
-
   usesTransaction?: string[];
 
   useTransactionalTests?: boolean;
 }
-
-export { withTransactionalFixtures } from "../test-fixtures.js";

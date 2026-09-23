@@ -1,7 +1,6 @@
 import { describe, it, afterAll, beforeAll, expect } from "vitest";
 import { Base } from "../base.js";
-import { leaseFixtureConnection } from "../test-fixtures/fixture-connection.js";
-import { withTransactionalFixtures } from "../test-fixtures/with-transactional-fixtures.js";
+import { fixtures } from "../test-fixtures.js";
 
 class HandlerResolvedPost extends Base {
   static {
@@ -16,7 +15,7 @@ class HandlerResolvedComment extends Base {
 }
 
 describe("handler-resolved adapter (Phase D-0)", () => {
-  withTransactionalFixtures(leaseFixtureConnection);
+  fixtures([]);
 
   beforeAll(async () => {
     const adapter = Base.connection;

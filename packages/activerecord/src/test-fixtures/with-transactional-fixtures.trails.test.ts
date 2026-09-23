@@ -9,7 +9,6 @@ import { Base } from "../base.js";
 import { SQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adapter.js";
 import { NullTransaction } from "../connection-adapters/abstract/transaction.js";
-import { withTransactionalFixtures } from "./with-transactional-fixtures.js";
 import { fixtures } from "../test-fixtures.js";
 
 async function primaryAdapter(): Promise<TestDatabaseAdapter> {
@@ -40,7 +39,7 @@ describe("withTransactionalFixtures", () => {
     await a().execute(`CREATE TABLE fixture_users (id INTEGER PRIMARY KEY, name TEXT)`);
   });
 
-  withTransactionalFixtures(() => adapter);
+  fixtures([], { connection: () => adapter });
 
   it("inserts a row (first run)", async () => {
     await a().execute(`INSERT INTO fixture_users (id, name) VALUES (1, 'alice')`);
@@ -97,7 +96,7 @@ describe("withTransactionalFixtures (raw adapter)", () => {
     await adapter.disconnectBang();
   });
 
-  withTransactionalFixtures(() => adapter);
+  fixtures([], { connection: () => adapter });
 
   it("rolls back inserts between tests (first run)", async () => {
     await exec(`INSERT INTO raw_fixture_users (id, name) VALUES (1, 'alice')`);
@@ -131,7 +130,7 @@ describe("withTransactionalFixtures (pooled adapter)", () => {
     }
   });
 
-  withTransactionalFixtures(() => adapter);
+  fixtures([], { connection: () => adapter });
 
   it("inserts a row inside the pinned transaction (first run)", async () => {
     await exec(`INSERT INTO pooled_fixture_users (id, name) VALUES (1, 'alice')`);
