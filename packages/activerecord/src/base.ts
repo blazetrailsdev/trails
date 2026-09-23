@@ -744,7 +744,11 @@ export class Base extends Model {
 
   declare static signedIdVerifier: _MessageVerifier;
 
-  declare static signedIdVerifierSecret: string | (() => string | null | undefined) | null;
+  declare static signedIdVerifierSecret:
+    | string
+    | (() => string | null | undefined)
+    | null
+    | undefined;
 
   static _requireConcreteClass(): void {
     if ((this.abstractClass || this === Base) && !this._suppressAbstractCheck) {

@@ -101,7 +101,7 @@ export function cacheKeyWithVersion(this: Identifiable): string {
 }
 
 export interface Integration {
-  readonly cacheTimestampFormat: string;
+  readonly cacheTimestampFormat: "usec" | "number";
   readonly cacheVersioning: boolean;
   readonly collectionCacheVersioning: boolean;
 }
