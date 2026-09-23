@@ -191,7 +191,7 @@ describe("findSomeOrdered — slices ids by offset and limit before querying", (
     const rel = {
       ...makeFindSomeOrderedRel(dbRows, { limit: 10 }),
       where(cond: any) {
-        queriedIds = cond["id"];
+        queriedIds = cond.get("id");
         const r: any = {
           toArray: async () => dbRows,
           records: async () => dbRows,
@@ -213,7 +213,7 @@ describe("findSomeOrdered — slices ids by offset and limit before querying", (
     const rel = {
       ...makeFindSomeOrderedRel(dbRows, { limit: 3, offset: 9 }),
       where(cond: any) {
-        queriedIds = cond["id"];
+        queriedIds = cond.get("id");
         const r: any = {
           toArray: async () => dbRows,
           records: async () => dbRows,

@@ -17,7 +17,7 @@ export type ScopeLambda<R> = (this: R, rel: R, owner: Base) => R | false | null 
 
 /**
  * @internal
- * @noRailsEquivalent PERMANENT
+ * @noRailsEquivalent CONVERGEABLE converge-invented-association-scope-and-key-helpers
  */
 export function invokeScopeLambda<R>(
   fn: ScopeLambda<R>,
@@ -442,7 +442,7 @@ function arelTableEql(a: ArelTable | Nodes.TableAlias, b: ArelTable | Nodes.Tabl
 
 /**
  * @internal
- * @noRailsEquivalent PERMANENT
+ * @noRailsEquivalent CONVERGEABLE union-order-clauses-is-a-second-spelling-of-ruby-array-union
  */
 export function unionOrderClauses(first: unknown[], second: unknown[]): unknown[] {
   const result: unknown[] = [];

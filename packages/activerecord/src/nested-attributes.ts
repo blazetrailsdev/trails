@@ -377,7 +377,6 @@ export function assignNestedAttributesForCollectionAssociation(
   const collectionTargetModel = resolveCollectionTargetModel(record, associationName);
   const association = record.association(associationName) as CollectionAssociation;
 
-  /** @noRailsEquivalent PERMANENT */
   const assignRecords = (existingRecords: Base[]): Promise<void> | void => {
     const nestedTarget: (Base | null)[] = [];
     let pending: Promise<void> | undefined;

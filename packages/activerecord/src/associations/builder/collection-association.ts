@@ -2,7 +2,7 @@ import { singularize } from "@blazetrails/activesupport";
 import { Association, type AssociationInstanceHost } from "./association.js";
 import { addAutosaveAssociationCallbacks } from "../../autosave-association.js";
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE retire-ids-name-helper-constructor-dispatch */
 export function idsName(name: string): string {
   return `${singularize(name)}Ids`;
 }

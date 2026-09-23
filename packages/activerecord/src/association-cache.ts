@@ -1,4 +1,4 @@
-/** @noRailsEquivalent PERMANENT MOVED-BY-SHORT-NAME: clear, constructor, delete, entries, forEach, get, keys, proxies, set, size, store, values. */
+/** @noRailsEquivalent CONVERGEABLE retire-association-cache-facet-class MOVED-BY-SHORT-NAME: clear, constructor, delete, entries, forEach, get, keys, proxies, set, size, store, values. */
 
 export type AssociationFacetKey = "instance" | "proxy";
 
@@ -102,7 +102,7 @@ export class AssociationCacheFacet<V> implements Map<string, V> {
     }
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE retire-association-cache-facet-class */
   [Symbol.iterator](): MapIterator<[string, V]> {
     return this.entries();
   }
@@ -111,7 +111,7 @@ export class AssociationCacheFacet<V> implements Map<string, V> {
     for (const [name, value] of this.entries()) cb.call(thisArg, value, name, this);
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE retire-association-cache-facet-class */
   get [Symbol.toStringTag](): string {
     return "Map";
   }

@@ -1,4 +1,4 @@
-import { kernelThrow } from "@blazetrails/ruby-compat";
+import { kernelThrow, rbEqual } from "@blazetrails/ruby-compat";
 import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
@@ -18,7 +18,7 @@ import {
   CompositePrimaryKeyMismatchError,
   DeleteRestrictionError,
 } from "./errors.js";
-import { CollectionAssociation, includesRecord, isThenable } from "./collection-association.js";
+import { CollectionAssociation, isThenable } from "./collection-association.js";
 import type { Association } from "./association.js";
 import {
   ForeignAssociation,
@@ -357,7 +357,7 @@ function deriveAsTypeCol(assoc: { reflection: { options: { as?: string } } }): s
  * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
  */
 export function setDifference(a: Base[], b: Base[]): Base[] {
-  return a.filter((record) => !includesRecord(b, record));
+  return a.filter((record) => !b.some((r) => rbEqual(r, record)));
 }
 
 /**
@@ -365,7 +365,13 @@ export function setDifference(a: Base[], b: Base[]): Base[] {
  * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
  */
 export function setIntersection(a: Base[], b: Base[]): Base[] {
-  return a.filter((record) => includesRecord(b, record));
+  const result: Base[] = [];
+  for (const record of a) {
+    if (b.some((r) => rbEqual(r, record)) && !result.some((r) => rbEqual(r, record))) {
+      result.push(record);
+    }
+  }
+  return result;
 }
 
 /** @internal */
