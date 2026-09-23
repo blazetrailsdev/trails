@@ -1009,13 +1009,6 @@ jobs:
   # on the Monday sweep (where `changes` forces every gate true), on
   # `workflow_dispatch`, and on a PR labelled `run-sqlite-mem`. It is in the `ci`
   # aggregator's `needs:`, so whenever it does run a failure blocks the merge.
-  #
-  # 2-way file-level shard (RFC 0157 shard-ar-sqlite-mem-lane), mirroring
-  # `sqlite-tests`: once the other AR lanes were sharded this unsharded one
-  # became `main`'s critical path. Nothing is pinned to shard 1 — the lane has
-  # no CLI or scripts/ step — and the `needs` graph keys on the job id, so the
-  # `ci` aggregator still sees one merged result for both legs. The
-  # `run-sqlite-mem` label opts both legs in through the job-level `if:`.
   sqlite-mem-tests:
     name: "Active Record SQLite :memory: Tests"
     needs: changes
@@ -2230,8 +2223,6 @@ jobs:
                   fi
                   ;;
                 sqlite-mem-tests)
-                  # 2-way `--shard` matrix; one result under the job id, as
-                  # for postgres-tests/maria-tests above.
                   if [ "$AR_AFFECTED" = "false" ] || \
                      [ "$SQLITE_MEM_UNLABELLED" = "true" ]; then
                     continue
