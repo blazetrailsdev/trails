@@ -501,7 +501,7 @@ describe("AdapterForeignKeyTest", () => {
   });
 
   const insertIntoFkTestHasFk = (fkId = 0): Promise<unknown> =>
-    connection.insert(`INSERT INTO fk_test_has_fk (fk_id) VALUES (${fkId})`);
+    connection.execute(`INSERT INTO fk_test_has_fk (fk_id) VALUES (${fkId})`);
 
   it("foreign key violations are translated to specific exception with validate false", async () => {
     class KlassHasFk extends Base {
@@ -528,7 +528,7 @@ describe("AdapterForeignKeyTest", () => {
     await connection.execute("INSERT INTO fk_test_has_pk (pk_id) VALUES (1)");
     await insertIntoFkTestHasFk(1);
     const error = await assertRaises([InvalidForeignKey], {}, async () => {
-      await connection.delete("DELETE FROM fk_test_has_pk WHERE pk_id = 1");
+      await connection.execute("DELETE FROM fk_test_has_pk WHERE pk_id = 1");
     });
     expect(error.cause).toBeDefined();
   });
