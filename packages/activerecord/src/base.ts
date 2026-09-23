@@ -2165,6 +2165,10 @@ export class Base extends Model {
     return _attributeNames.call(this as any);
   }
 
+  static override isAttributeMethod(attribute: string): boolean {
+    return AttributeMethodsClassMethods.isAttributeMethod.call(this, attribute);
+  }
+
   static attributeNames(): string[] {
     return AttributeMethodsClassMethods.attributeNames.call(this);
   }

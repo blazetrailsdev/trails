@@ -12,11 +12,15 @@ import { getOs } from "./os-adapter.js";
 export const RbConfig = {
   /**
    * `vendor/ruby/tool/mkconfig.rb:394` — the config hash itself, read as
-   * `RbConfig::CONFIG["EXEEXT"]`.
+   * `RbConfig::CONFIG["EXEEXT"]` and `RbConfig::CONFIG["host_os"]`.
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `RbConfig::CONFIG`.
    */
   get CONFIG(): Readonly<Record<string, string>> {
-    return { EXEEXT: getOs().platform() === "win32" ? ".exe" : "" };
+    const platform = getOs().platform();
+    return {
+      EXEEXT: platform === "win32" ? ".exe" : "",
+      host_os: platform === "win32" ? "mingw32" : platform,
+    };
   },
 };

@@ -1537,8 +1537,7 @@ describe("AttributeMethodsTest", () => {
     expect(t.get("title")).toBe("STOP CHANGING THE TOPIC");
   });
 
-  // BLOCKED: activerecord-class-level-attribute-method-predicate-strips-equals-suffix
-  it.skip("attribute_method?", async () => {
+  it("attribute_method?", async () => {
     expect(target.isAttributeMethod("title")).toBeTruthy();
     expect(target.isAttributeMethod("title=")).toBeTruthy();
     expect(target.isAttributeMethod("wibble")).toBeFalsy();

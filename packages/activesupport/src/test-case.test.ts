@@ -40,8 +40,7 @@ describe("AssertionsTest", () => {
     object.num = 0;
   });
 
-  it.skip("assert not", async () => {
-    // BLOCKED: activesupport-assert-not-returns-void-where-rails-returns-true
+  it("assert not", async () => {
     expect(assertNot(null)).toEqual(true);
     expect(assertNot(false)).toEqual(true);
 
@@ -62,8 +61,7 @@ describe("AssertionsTest", () => {
     });
   });
 
-  it.skip("assert raises with match fail", async () => {
-    // BLOCKED: activesupport-assertion-failure-messages-diverge-from-minitest
+  it("assert raises with match fail", async () => {
     await assertRaises(
       [Assertion],
       { match: 'Expected /incorrect/i to match "Wrong argument".' },
@@ -83,8 +81,7 @@ describe("AssertionsTest", () => {
     );
   });
 
-  it.skip("assert no difference fail", async () => {
-    // BLOCKED: activesupport-assertion-failure-messages-diverge-from-minitest
+  it("assert no difference fail", async () => {
     const error = await assertRaises([Assertion], {}, async () => {
       await assertNoDifference(
         () => object.num,
@@ -99,8 +96,7 @@ describe("AssertionsTest", () => {
     );
   });
 
-  it.skip("assert no difference with message fail", async () => {
-    // BLOCKED: activesupport-assertion-failure-messages-diverge-from-minitest
+  it("assert no difference with message fail", async () => {
     const error = await assertRaises([Assertion], {}, async () => {
       await assertNoDifference(
         () => object.num,
@@ -240,8 +236,7 @@ describe("AssertionsTest", () => {
     );
   });
 
-  it.skip("hash of expressions with message", async () => {
-    // BLOCKED: activesupport-assertion-failure-messages-diverge-from-minitest
+  it("hash of expressions with message", async () => {
     const error = await assertRaises([Assertion], {}, async () => {
       await assertDifference(new Map([[() => object.num, 0]]), "Object Changed", () => {
         object.increment();
@@ -252,8 +247,7 @@ describe("AssertionsTest", () => {
     );
   });
 
-  it.skip("assert difference message includes change", async () => {
-    // BLOCKED: activesupport-assertion-failure-messages-diverge-from-minitest
+  it("assert difference message includes change", async () => {
     const error = await assertRaises([Assertion], {}, async () => {
       await assertDifference(
         () => object.num,
@@ -270,8 +264,7 @@ describe("AssertionsTest", () => {
     );
   });
 
-  it.skip("assert difference message with lambda", async () => {
-    // BLOCKED: activesupport-assertion-failure-messages-diverge-from-minitest
+  it("assert difference message with lambda", async () => {
     const error = await assertRaises([Assertion], {}, async () => {
       await assertDifference(
         () => object.num,
@@ -385,8 +378,7 @@ describe("AssertionsTest", () => {
     );
   });
 
-  it.skip("assert changes with to option but no change has special message", async () => {
-    // BLOCKED: activesupport-assertion-failure-messages-diverge-from-minitest
+  it("assert changes with to option but no change has special message", async () => {
     const error = await assertRaises([Assertion], {}, async () => {
       await assertChanges(
         () => object.num,
@@ -401,8 +393,7 @@ describe("AssertionsTest", () => {
     );
   });
 
-  it.skip("assert changes message with lambda", async () => {
-    // BLOCKED: activesupport-assertion-failure-messages-diverge-from-minitest
+  it("assert changes message with lambda", async () => {
     const error = await assertRaises([Assertion], {}, async () => {
       await assertChanges(
         () => object.num,
@@ -512,8 +503,7 @@ describe("AssertionsTest", () => {
     );
   });
 
-  it.skip("assert changes with message", async () => {
-    // BLOCKED: activesupport-assertion-failure-messages-diverge-from-minitest
+  it("assert changes with message", async () => {
     const error = await assertRaises([Assertion], {}, async () => {
       await assertChanges(
         () => object.num,
@@ -582,8 +572,7 @@ describe("AssertionsTest", () => {
     );
   });
 
-  it.skip("assert no changes with message", async () => {
-    // BLOCKED: activesupport-assertion-failure-messages-diverge-from-minitest
+  it("assert no changes with message", async () => {
     const error = await assertRaises([Assertion], {}, async () => {
       await assertNoChanges(
         () => object.num,
@@ -600,8 +589,7 @@ describe("AssertionsTest", () => {
     );
   });
 
-  it.skip("assert no changes message with lambda", async () => {
-    // BLOCKED: activesupport-assertion-failure-messages-diverge-from-minitest
+  it("assert no changes message with lambda", async () => {
     let error = await assertRaises([Assertion], {}, async () => {
       await assertNoChanges(
         () => object.num,
@@ -655,8 +643,7 @@ describe("AssertionsTest", () => {
     expect(error.message).toMatch(/#<Proc:0x.*changed/);
   });
 
-  it.skip("assert no changes message with multi line lambda", async () => {
-    // BLOCKED: activesupport-assertion-failure-messages-diverge-from-minitest
+  it("assert no changes message with multi line lambda", async () => {
     let check = () => {
       "title".toUpperCase();
       return object.num;
@@ -680,8 +667,7 @@ describe("AssertionsTest", () => {
     expect(error.message).toMatch(/#<Proc:0x.*changed/);
   });
 
-  it.skip("assert no changes message with not real callable", async () => {
-    // BLOCKED: activesupport-assertion-failure-messages-diverge-from-minitest
+  it("assert no changes message with not real callable", async () => {
     const check = { call: () => object.num };
 
     const error = await assertRaises([Assertion], {}, async () => {
@@ -692,8 +678,7 @@ describe("AssertionsTest", () => {
     expect(error.message).toMatch(/#<Object:0x.*changed/);
   });
 
-  it.skip("assert no changes with long string wont output everything", async () => {
-    // BLOCKED: activesupport-assertion-failure-messages-diverge-from-minitest
+  it("assert no changes with long string wont output everything", async () => {
     let lines = "HEY\n".repeat(12);
 
     const error = await assertRaises([Assertion], {}, async () => {

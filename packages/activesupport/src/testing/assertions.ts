@@ -1,6 +1,18 @@
 import { indexWith } from "../enumerable-utils.js";
 
-import { Dir, env, rbEqual, rbStrRespondTo } from "@blazetrails/ruby-compat";
+import {
+  Dir,
+  RbConfig,
+  Tempfile,
+  env,
+  getChildProcess,
+  rbAnyToS,
+  rbEqual,
+  rbObjClass,
+  rbStrRespondTo,
+  stderr,
+  verbose,
+} from "@blazetrails/ruby-compat";
 import { _testCaseIdentity, taggedLogger } from "./tagged-logging.js";
 
 /** @noRailsEquivalent PERMANENT */
@@ -59,9 +71,11 @@ export class BacktraceFilter {
 
 /** @noRailsEquivalent PERMANENT */
 export const Minitest: {
+  VERSION: string;
   backtraceFilter: { filter(bt: string[] | null): string[] };
   filterBacktrace(bt: string[] | null): string[];
 } = {
+  VERSION: "5.27.0",
   backtraceFilter: new BacktraceFilter(),
 
   filterBacktrace(bt: string[] | null): string[] {
@@ -111,9 +125,9 @@ export const UNTRACKED: unique symbol = Symbol("UNTRACKED");
 
 type Expression<T> = () => T | Promise<T>;
 
-export function assertNot(object: unknown, message?: string | null): void {
-  message ||= `Expected ${inspect(object)} to be nil or false`;
-  assert(!(object != null && object !== false), message);
+export function assertNot(object: unknown, message?: string | (() => string) | null): true {
+  message ||= () => `Expected ${inspect(object)} to be nil or false`;
+  return assert(!(object != null && object !== false), message);
 }
 
 export async function assertRaises(
@@ -222,9 +236,9 @@ export async function assertChanges<T>(
   { from = UNTRACKED, to = UNTRACKED }: { from?: unknown; to?: unknown } = {},
   block?: () => T | Promise<T>,
 ): Promise<T | undefined> {
-  const exp = expression;
+  const exp = expression as unknown as { call(): unknown };
 
-  const before = await exp();
+  const before = await exp.call();
   const retval = await _assertNothingRaisedOrWarn("assert_changes", block);
 
   if (from !== UNTRACKED) {
@@ -236,7 +250,7 @@ export async function assertChanges<T>(
     assert(caseEqual(from, before), richMessage);
   }
 
-  const after = await exp();
+  const after = await exp.call();
 
   const richMessage = () => {
     let error = `\`${_callableToSourceString(expression)}\` didn't change`;
@@ -264,9 +278,9 @@ export async function assertNoChanges<T>(
   { from = UNTRACKED }: { from?: unknown } = {},
   block?: () => T | Promise<T>,
 ): Promise<T | undefined> {
-  const exp = expression;
+  const exp = expression as unknown as { call(): unknown };
 
-  const before = await exp();
+  const before = await exp.call();
   const retval = await _assertNothingRaisedOrWarn("assert_no_changes", block);
 
   if (from !== UNTRACKED) {
@@ -278,7 +292,7 @@ export async function assertNoChanges<T>(
     assert(caseEqual(from, before), richMessage);
   }
 
-  const after = await exp();
+  const after = await exp.call();
 
   const richMessage = () => {
     let error = `\`${_callableToSourceString(expression)}\` changed`;
@@ -323,7 +337,7 @@ export async function _assertNothingRaisedOrWarn<T>(
 function _callableToSourceString(callable: unknown): string {
   const source = String(callable);
   const match = /^(?:async\s+)?\(\s*\)\s*=>\s*([\s\S]+)$/.exec(source.trim());
-  if (!match) return source;
+  if (typeof callable !== "function" || !match) return rbAnyToS(callable as object);
 
   let body = match[1].trim();
   if (body.startsWith("{")) {
@@ -335,7 +349,7 @@ function _callableToSourceString(callable: unknown): string {
   }
   if (!body.includes("\n")) return body;
 
-  return source;
+  return rbAnyToS(callable as object);
 }
 
 let _assertions = 0;
@@ -348,11 +362,14 @@ export function _takeAssertions(): number {
 }
 
 /** @noRailsEquivalent PERMANENT */
-export function assert(value: unknown, message: string | (() => string) = ""): void {
+export function assert(value: unknown, message: string | (() => string) | null = null): true {
   _assertions += 1;
   if (value == null || value === false) {
-    throw new Assertion(typeof message === "function" ? message() : message);
+    message ||= `Expected ${inspect(value)} to be truthy.`;
+    if (typeof message === "function") message = message();
+    throw new Assertion(message);
   }
+  return true;
 }
 
 /** @noRailsEquivalent PERMANENT */
@@ -508,21 +525,144 @@ export function assertNotSame(expected: unknown, actual: unknown, message?: stri
   );
 }
 
-function assertEqual(expected: unknown, actual: unknown, message: () => string): void {
-  assert(deepEqual(expected, actual), message);
+function diff(exp: unknown, act: unknown): string {
+  let result = "";
+
+  const [expect, butwas] = thingsToDiff(exp, act);
+
+  if (expect == null) return `Expected: ${inspect(exp)}\n  Actual: ${inspect(act)}`;
+
+  Tempfile.create("expect", undefined, (a) => {
+    a.puts(expect);
+
+    Tempfile.create("butwas", undefined, (b) => {
+      b.puts(butwas);
+
+      const [cmd, ...args] = assertionsDiff()!.split(" ");
+      result = getChildProcess().spawnSync(cmd, [...args, a.path()!, b.path()!]).stdout;
+      result = result.replace(/^--- .+/m, "--- expected");
+      result = result.replace(/^\+\+\+ .+/m, "+++ actual");
+
+      if (result === "") {
+        const klass = rbObjClass(exp);
+        result = [
+          `No visible difference in the ${klass}#inspect output.\n`,
+          "You should look at the implementation of #== on ",
+          `${klass} or its members.\n`,
+          expect,
+        ].join("");
+      }
+    });
+  });
+
+  return result;
 }
 
-function refuteEqual(expected: unknown, actual: unknown, message: () => string): void {
-  assert(!deepEqual(expected, actual), message);
+function thingsToDiff(exp: unknown, act: unknown): [string, string] | [null, null] {
+  const expect = muPpForDiff(exp);
+  const butwas = muPpForDiff(act);
+
+  const [e1, e2] = [expect.includes("\n"), expect.includes("\\n")];
+  const [b1, b2] = [butwas.includes("\n"), butwas.includes("\\n")];
+
+  const needToDiff =
+    (e1 !== e2 || b1 !== b2 || expect.length > 30 || butwas.length > 30 || expect === butwas) &&
+    assertionsDiff();
+
+  return needToDiff ? [expect, butwas] : [null, null];
 }
 
-function assertNil(actual: unknown, message: () => string): void {
-  assert(actual === null || actual === undefined, message);
+let _diff: string | null | undefined;
+
+function assertionsDiff(): string | null {
+  if (_diff !== undefined) return _diff;
+
+  const system = (cmd: string) =>
+    getChildProcess().spawnSync(cmd, [Dir.pwd(), Dir.pwd()]).status === 0;
+  _diff =
+    /mswin|mingw/.test(RbConfig.CONFIG.host_os) && system("diff.exe")
+      ? "diff.exe -u"
+      : system("gdiff")
+        ? "gdiff -u"
+        : system("diff")
+          ? "diff -u"
+          : null;
+  return _diff;
 }
 
-function assertMatch(match: RegExp | string, actual: string): void {
-  const matched = typeof match === "string" ? actual.includes(match) : match.test(actual);
-  assert(matched, `Expected ${inspect(actual)} to match ${String(match)}`);
+function muPpForDiff(obj: unknown): string {
+  const str = inspect(obj);
+
+  const single = /(?<!\\|^)\\n/m.test(str);
+  const double = /(?<=\\|^)\\n/m.test(str);
+
+  const process =
+    single !== double
+      ? single
+        ? (s: string) => (s === "\\n" ? "\n" : s)
+        : (s: string) => (s === "\\\\n" ? "\\n\n" : s)
+      : (s: string) => s;
+
+  return str.replace(/\\?\\n/g, process).replace(/:0x[a-fA-F0-9]{4,}/gm, ":0xXXXXXX");
+}
+
+function message(
+  msg: string | (() => string) | null,
+  ending: string | null,
+  defaultMessage: () => string,
+): () => string {
+  return () => {
+    if (typeof msg === "function") msg = msg().replace(/\.$/, "");
+    const customMessage = msg == null || msg === "" ? "" : `${msg}.\n`;
+    return `${customMessage}${defaultMessage()}${ending ?? "."}`;
+  };
+}
+
+function refute(test: unknown, msg: string | (() => string) | null = null): true {
+  msg ||= message(null, null, () => `Expected ${inspect(test)} to not be truthy`);
+  return assert(test == null || test === false, msg);
+}
+
+const E = "";
+
+function assertEqual(exp: unknown, act: unknown, msg: string | (() => string) | null = null): true {
+  msg = message(msg, E, () => diff(exp, act));
+  const result = assert(deepEqual(exp, act), msg);
+
+  if (exp == null) {
+    if (Minitest.VERSION >= "6") {
+      refuteNil(exp, "Use assert_nil if expecting nil.");
+    } else if (verbose() != null) {
+      stderr.write("DEPRECATED: Use assert_nil if expecting nil. This will fail in Minitest 6.\n");
+    }
+  }
+
+  return result;
+}
+
+function refuteEqual(exp: unknown, act: unknown, msg: string | (() => string) | null = null): true {
+  msg = message(msg, null, () => `Expected ${inspect(act)} to not be equal to ${inspect(exp)}`);
+  return refute(deepEqual(exp, act), msg);
+}
+
+function assertNil(obj: unknown, msg: string | (() => string) | null = null): true {
+  msg = message(msg, null, () => `Expected ${inspect(obj)} to be nil`);
+  return assert(obj == null, msg);
+}
+
+function refuteNil(obj: unknown, msg: string | (() => string) | null = null): true {
+  msg = message(msg, null, () => `Expected ${inspect(obj)} to not be nil`);
+  return refute(obj == null, msg);
+}
+
+function assertMatch(
+  matcher: RegExp | string,
+  obj: string,
+  msg: string | (() => string) | null = null,
+): void {
+  const m = message(msg, null, () => `Expected ${inspect(matcher)} to match ${inspect(obj)}`);
+  const matched = typeof matcher === "string" ? obj.includes(matcher) : matcher.test(obj);
+  assert(matched, m);
 }
 
 function caseEqual(expected: unknown, actual: unknown): boolean {
@@ -539,6 +679,7 @@ function deepEqual(a: unknown, b: unknown): boolean {
 
 function inspect(value: unknown): string {
   if (typeof value === "string") return JSON.stringify(value);
+  if (value instanceof RegExp) return String(value);
   if (value === null || value === undefined) return "nil";
   try {
     return String(value);

@@ -170,7 +170,7 @@ describe("AssociationCallbacksTest", () => {
 
     const callbackLog = [
       "before_adding<new>",
-      `after_adding${(await (jack as any).postsWithCallbacks.first()).id}`,
+      `after_adding${(await (jack as any).postsWithCallbacks.first()).id ?? ""}`,
     ];
     expect((jack as any).postLog).toEqual(callbackLog);
     expect(await jack.save()).toBeTruthy();
