@@ -31,7 +31,7 @@ import { columnsHash } from "./model-schema.js";
 import { StatementCache } from "./statement-cache.js";
 import { withConnection } from "./connection-handling.js";
 import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
-import { runCallbacks } from "@blazetrails/activesupport";
+import { classAttribute, included, runCallbacks } from "@blazetrails/activesupport";
 
 export interface Core {
   inspect(): string;
@@ -50,8 +50,22 @@ export interface Core {
   isStrictLoadingNPlusOneOnly(): boolean;
 }
 
+export const Core = {
+  [included](base: object): void {
+    classAttribute.call(base, "logger", { instanceWriter: false });
+    classAttribute.call(base, "destroyAssociationAsyncBatchSize", {
+      instanceWriter: false,
+      instancePredicate: false,
+      default: null,
+    });
+    classAttribute.call(base, "defaultRole", { instanceWriter: false });
+
+    (base as { defaultRole: string }).defaultRole = writingRole();
+  },
+};
+
 import { ActiveRecord } from "./namespaces.js";
-import { actionOnStrictLoadingViolation } from "./active-record.js";
+import { actionOnStrictLoadingViolation, writingRole } from "./active-record.js";
 
 interface CoreRecord {
   id: unknown;

@@ -1,7 +1,15 @@
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import { NoMethodError } from "@blazetrails/ruby-compat";
-import { isPresent, squish, parameterize, toFs, truncate } from "@blazetrails/activesupport";
+import {
+  classAttribute,
+  included,
+  isPresent,
+  squish,
+  parameterize,
+  toFs,
+  truncate,
+} from "@blazetrails/activesupport";
 import { defaultTimezone } from "./active-record.js";
 
 interface Identifiable {
@@ -91,6 +99,23 @@ export function cacheKeyWithVersion(this: Identifiable): string {
   const version = cacheVersion.call(this);
   return version ? `${base}-${version}` : base;
 }
+
+export interface Integration {
+  readonly cacheTimestampFormat: string;
+  readonly cacheVersioning: boolean;
+  readonly collectionCacheVersioning: boolean;
+}
+
+export const Integration = {
+  [included](base: object): void {
+    classAttribute.call(base, "cacheTimestampFormat", { instanceWriter: false, default: "usec" });
+    classAttribute.call(base, "cacheVersioning", { instanceWriter: false, default: false });
+    classAttribute.call(base, "collectionCacheVersioning", {
+      instanceWriter: false,
+      default: false,
+    });
+  },
+};
 
 export const ClassMethods = {
   /** @missingRailsCall define_method — PERMANENT */

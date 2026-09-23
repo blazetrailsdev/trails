@@ -4,7 +4,9 @@ import { ActiveRecordError, NameError, SubclassNotFound } from "./errors.js";
 import { ActiveRecord } from "./namespaces.js";
 import {
   camelize,
+  classAttribute,
   constantize,
+  included,
   isPresent,
   safeConstantize,
   underscore,
@@ -12,6 +14,18 @@ import {
 import { ArgumentError } from "@blazetrails/activemodel";
 import { demodulize } from "@blazetrails/activesupport";
 import { applicationRecordClass, setApplicationRecordClass } from "./active-record.js";
+
+export interface Inheritance {
+  readonly storeFullClassName: boolean;
+  readonly storeFullStiClass: boolean;
+}
+
+export const Inheritance = {
+  [included](base: object): void {
+    classAttribute.call(base, "storeFullClassName", { instanceWriter: false, default: true });
+    classAttribute.call(base, "storeFullStiClass", { instanceWriter: false, default: true });
+  },
+};
 
 function castInheritanceColumnValue(
   modelClass: typeof Base,

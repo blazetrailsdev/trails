@@ -1,21 +1,21 @@
 import type { Base } from "./base.js";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { JSON, underscore } from "@blazetrails/activesupport";
+import { JSON, classAttribute, included, underscore } from "@blazetrails/activesupport";
 import type { Temporal } from "@blazetrails/date";
 import { UnknownPrimaryKey } from "./errors.js";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 
-let _signedIdVerifierSecret: string | (() => string | null | undefined) | null = null;
+export interface SignedId {
+  readonly signedIdVerifierSecret: string | (() => string | null | undefined) | null | undefined;
+}
+
+export const SignedId = {
+  [included](base: object): void {
+    classAttribute.call(base, "signedIdVerifierSecret", { instanceWriter: false });
+  },
+};
 
 export class ClassMethods {
-  static get signedIdVerifierSecret(): string | (() => string | null | undefined) | null {
-    return _signedIdVerifierSecret;
-  }
-
-  static set signedIdVerifierSecret(value: string | (() => string | null | undefined) | null) {
-    _signedIdVerifierSecret = value;
-  }
-
   static get signedIdVerifier(): MessageVerifier {
     if ((this as any)._signedIdVerifier) {
       return (this as any)._signedIdVerifier;

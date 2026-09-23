@@ -146,7 +146,6 @@ import {
 } from "./token-for.js";
 import type { TokenDefinitionsHash as _TokenDefinitionsHash } from "./token-for.js";
 import type { MessageVerifier as _MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { writingRole } from "./active-record.js";
 import { DescendantsTracker } from "@blazetrails/activesupport";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
 import * as LockingOptimistic from "./locking/optimistic.js";
@@ -250,6 +249,7 @@ import { Query as _Query } from "./attribute-methods/query.js";
 import { Serialization as _AttrSerialization } from "./attribute-methods/serialization.js";
 import {
   toParam as _toParam,
+  Integration as _Integration,
   ClassMethods as _IntegrationClassMethods,
   cacheKey as _cacheKey,
   cacheKeyWithVersion as _cacheKeyWithVersion,
@@ -716,13 +716,13 @@ export class Base extends Model {
   static _connectionHandler: ConnectionHandler = new ConnectionHandler();
   static _abstractClass = false;
   static _connectionClass = false;
-  static automaticScopeInversing = false;
-  static automaticallyInvertPluralAssociations = false;
+  declare static automaticScopeInversing: boolean;
+  declare static automaticallyInvertPluralAssociations: boolean;
   static hasManyInversing = false;
   static paramDelimiter = "_";
-  static cacheVersioning = false;
-  static cacheTimestampFormat: "usec" | "number" = "usec";
-  static collectionCacheVersioning = false;
+  declare static cacheVersioning: boolean;
+  declare static cacheTimestampFormat: "usec" | "number";
+  declare static collectionCacheVersioning: boolean;
   static _protectedEnvironments: string[] = ["production"];
   static _lockingColumn: string = "lock_version";
 
@@ -1112,15 +1112,7 @@ export class Base extends Model {
     return result;
   }
 
-  static _logger: BenchmarkLogger | null = null;
-
-  static get logger(): BenchmarkLogger | null {
-    return this._logger;
-  }
-
-  static set logger(log: BenchmarkLogger | null) {
-    this._logger = log;
-  }
+  declare static logger: BenchmarkLogger | null;
 
   static benchmark = benchmarkable;
 
@@ -2198,25 +2190,9 @@ export class Base extends Model {
     this._strictLoadingMode = value;
   }
 
-  static _storeFullStiClass = true;
+  declare static storeFullStiClass: boolean;
 
-  static get storeFullStiClass(): boolean {
-    return this._storeFullStiClass;
-  }
-
-  static set storeFullStiClass(value: boolean) {
-    this._storeFullStiClass = value;
-  }
-
-  static _storeFullClassName = true;
-
-  static get storeFullClassName(): boolean {
-    return this._storeFullClassName;
-  }
-
-  static set storeFullClassName(value: boolean) {
-    this._storeFullClassName = value;
-  }
+  declare static storeFullClassName: boolean;
 
   static _runCommitCallbacksOnFirstSavedInstancesInTransaction = true;
 
@@ -2236,7 +2212,7 @@ export class Base extends Model {
     this._connectionHandler = value;
   }
 
-  static defaultRole: string = writingRole();
+  declare static defaultRole: string;
 
   static belongsToRequiredByDefault = false;
 
@@ -2248,9 +2224,9 @@ export class Base extends Model {
 
   static destroyAssociationAsyncJob = _Core.destroyAssociationAsyncJob;
 
-  static destroyAssociationAsyncBatchSize: number | null = null;
+  declare static destroyAssociationAsyncBatchSize: number | null;
 
-  static primaryKeyPrefixType: string | null = null;
+  declare static primaryKeyPrefixType: string | null | undefined;
 
   static getPrimaryKey = _getPrimaryKey;
 
@@ -2260,7 +2236,7 @@ export class Base extends Model {
 
   static implicitOrderColumn: string | null = null;
 
-  static pluralizeTableNames = true;
+  declare static pluralizeTableNames: boolean;
 
   static schemaMigrationsTableName = "schema_migrations";
 
@@ -2655,6 +2631,11 @@ extend(Base, ConnectionHandling.ConnectionHandling);
 extend(Base, Inheritance.ClassMethods);
 extend(Base, LockingOptimistic.ClassMethods);
 extend(Base, SignedId.ClassMethods);
+include(Base, _Core.Core);
+include(Base, Inheritance.Inheritance);
+include(Base, _Integration);
+include(Base, LockingOptimistic.Optimistic);
+include(Base, SignedId.SignedId);
 extend(Base, QueryCacheClassMethods.ClassMethods);
 
 Object.defineProperty(Base, "connection", {
@@ -2731,6 +2712,11 @@ extend(Base, {
 extend(Base, _Reflection.ClassMethods);
 classAttribute.call(Base, "_reflections", { instanceWriter: false, default: {} });
 classAttribute.call(Base, "aggregateReflections", { instanceWriter: false, default: {} });
+classAttribute.call(Base, "automaticScopeInversing", { instanceWriter: false, default: false });
+classAttribute.call(Base, "automaticallyInvertPluralAssociations", {
+  instanceWriter: false,
+  default: false,
+});
 classAttribute.call(Base, "_counterCacheColumns", { instanceAccessor: false, default: [] });
 classAttribute.call(Base, "_attrReadonly", { instanceAccessor: false, default: [] });
 classAttribute.call(Base, "defaultScopes", {

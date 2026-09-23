@@ -1,4 +1,5 @@
 import { DelegateClass, merge } from "@blazetrails/ruby-compat";
+import { classAttribute, included } from "@blazetrails/activesupport";
 import type { Base } from "../base.js";
 import { StaleObjectError } from "../errors.js";
 import { ValueType } from "@blazetrails/activemodel";
@@ -59,6 +60,16 @@ function buildBaseConstraints(
 
 const DEFAULT_LOCKING_COLUMN = "lock_version";
 
+export interface Optimistic {
+  readonly lockOptimistically: boolean;
+}
+
+export const Optimistic = {
+  [included](base: object): void {
+    classAttribute.call(base, "lockOptimistically", { instanceWriter: false, default: true });
+  },
+};
+
 interface LockingRecord {
   constructor: { lockingEnabled: boolean; lockingColumn: string };
   readAttribute(name: string): unknown;
@@ -112,14 +123,6 @@ export class ClassMethods {
   static get lockingEnabled(): boolean {
     const self = this as unknown as typeof Base;
     return self.lockOptimistically && self.columnsHash()[self.lockingColumn] != null;
-  }
-
-  static get lockOptimistically(): boolean {
-    return (this as any)._lockOptimistically !== false;
-  }
-
-  static set lockOptimistically(value: boolean) {
-    (this as any)._lockOptimistically = value;
   }
 }
 
