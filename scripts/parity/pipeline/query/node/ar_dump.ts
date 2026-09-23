@@ -146,7 +146,7 @@ async function main(): Promise<void> {
     //    (`resolve_config_for_connection`), failing with "the `<path>` database
     //    is not configured for the `development` environment".
     await Base.establishConnection({ adapter: "sqlite3", database: dbPath });
-    void Base.connection; // trigger _wireArelVisitor so the correct Arel visitor is active
+    await Base.leaseConnection(); // trigger _wireArelVisitor so the correct Arel visitor is active
     // Regression coverage: fixtures ar-09/ar-11/ar-19/ar-29 each produce a
     // distinct wrong literal under the generic visitor (TRUE/FALSE, FOR UPDATE)
     // vs the correct SQLite literal (1/0, empty lock). Their PASS status in CI
