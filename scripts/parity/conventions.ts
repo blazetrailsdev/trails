@@ -1446,6 +1446,44 @@ const HAS_PREDICATE_ALIASES = new Map<string, string>([
   ["value?", "hasValue"],
 ]);
 
+/**
+ * Bare predicates whose subject is a plural noun, mapped to the `has*` spelling a
+ * port may use (`active_connections?` → `hasActiveConnections`). Every
+ * plural-noun predicate in `vendor/rails/*\/lib` that is not already verb-led
+ * (`supports_*?`, `*_exists?`, `matches?`, `has_*?`) is admitted, flag or
+ * existence test alike: `has*` is offered, never imposed, so the port picks the
+ * reading. `active_connections?`
+ * (activerecord/lib/active_record/connection_adapters/abstract/connection_handler.rb:157)
+ * is the case that motivated it.
+ *
+ * Kept apart from {@link HAS_PREDICATE_ALIASES}, whose admission rule — Rails
+ * itself aliases the name to a `has_*?` method — these do not meet. None of
+ * them has a `has_*?` sibling in `vendor/rails/*\/lib`, so the
+ * `encrypted_attributes?` collision that rule guards against cannot arise.
+ *
+ * Appended as a LAST candidate, so it only widens what counts.
+ */
+const PLURAL_PREDICATE_ALIASES = new Map<string, string>([
+  ["active_connections?", "hasActiveConnections"],
+  ["active_workers?", "hasActiveWorkers"],
+  ["any_changes?", "hasAnyChanges"],
+  ["attachments?", "hasAttachments"],
+  ["database_tasks?", "hasDatabaseTasks"],
+  ["default_scopes?", "hasDefaultScopes"],
+  ["duplicates?", "hasDuplicates"],
+  ["eligible_waiters?", "hasEligibleWaiters"],
+  ["grouped_choices?", "hasGroupedChoices"],
+  ["many_workers?", "hasManyWorkers"],
+  ["nested_attributes?", "hasNestedAttributes"],
+  ["prepared_statements?", "hasPreparedStatements"],
+  ["record_timestamps?", "hasRecordTimestamps"],
+  ["resources?", "hasResources"],
+  ["routes?", "hasRoutes"],
+  ["saved_changes?", "hasSavedChanges"],
+  ["scope_attributes?", "hasScopeAttributes"],
+  ["seeds?", "hasSeeds"],
+]);
+
 const CONTAINMENT_PREDICATE_ALIASES = new Map<string, string>([
   // `member?` is a Ruby alias of `include?` in Rails (finder_methods.rb,
   // strong_parameters.rb), so it gets the same containment spelling.
@@ -1488,6 +1526,10 @@ const CONTAINMENT_PREDICATE_ALIASES = new Map<string, string>([
  *   - Bare predicates Rails aliases to a `has_*?` method
  *     ({@link HAS_PREDICATE_ALIASES}) append that `has*` spelling
  *     (`value?` → ["isValue", "value", "hasValue"]).
+ *   - Bare plural-noun predicates
+ *     ({@link PLURAL_PREDICATE_ALIASES}) append the `has*` spelling
+ *     (`active_connections?` → ["isActiveConnections", "activeConnections",
+ *     "hasActiveConnections"]).
  *   - Containment predicates (`include?`, `member?`, `exclude?`) append
  *     the native JS spelling as a further candidate
  *     (`include?` → ["isInclude", "include", "includes"]).
@@ -1630,7 +1672,7 @@ function rubyMethodToTsWithoutUnderscore(
     if (containment !== undefined) {
       return [...literal, isPrefixed, camel, containment];
     }
-    const hasAlias = HAS_PREDICATE_ALIASES.get(name);
+    const hasAlias = HAS_PREDICATE_ALIASES.get(name) ?? PLURAL_PREDICATE_ALIASES.get(name);
     return [...literal, isPrefixed, camel, ...(hasAlias === undefined ? [] : [hasAlias])];
   }
 
@@ -1712,6 +1754,7 @@ export function explainConventions(): string {
   const predicatePrefixes = ALREADY_PREDICATE_PREFIXES.map((p) => `\`${p}_*?\``).join(" / ");
 
   const hasPredicates = [...HAS_PREDICATE_ALIASES.keys()].map((n) => `\`${n}\``).join(" / ");
+  const pluralPredicates = [...PLURAL_PREDICATE_ALIASES.keys()].map((n) => `\`${n}\``).join(" / ");
   const containmentPredicates = [...CONTAINMENT_PREDICATE_ALIASES.keys()]
     .map((n) => `\`${n}\``)
     .join(" / ");
@@ -1764,6 +1807,7 @@ matches the first candidate present in the target file), not a call expression.
 | ---- | ---------- | ------- |
 | \`predicate?\` (bare) | \`is*\` prefix, then camel | \`valid?\` → ${example("valid?")} |
 | ${hasPredicates} | \`is*\` / camel / the \`has*\` spelling of the \`has_*?\` Rails aliases it to | \`value?\` → ${example("value?")} |
+| ${pluralPredicates} | \`is*\` / camel / \`has*\` (plural-noun subject) | \`active_connections?\` → ${example("active_connections?")} |
 | \`is_*?\` | camel form (no doubled \`isIs*\`) | \`is_number?\` → ${example("is_number?")} |
 | ${predicatePrefixes} | camel form + \`is*\` fallback | \`has_attribute?\` → ${example("has_attribute?")} |
 | ${containmentPredicates} | \`is*\` / camel / native JS spelling | \`include?\` → ${example("include?")} |
@@ -1794,7 +1838,8 @@ candidate: \`xQ\` is not a trails spelling of \`x?\`, so port a predicate whose
 bare camel name is taken as \`is*\` (or the quoted literal). A \`has*\` spelling is
 a candidate only for a bare predicate Rails itself aliases to a \`has_*?\` method
 (${hasPredicates}); a blanket \`has*\` would collide with a sibling \`has_*?\`, as
-\`encrypted_attributes?\` does with \`has_encrypted_attributes?\`. Leading underscores and runs of underscores collapse like a single
+\`encrypted_attributes?\` does with \`has_encrypted_attributes?\`. A predicate whose
+subject is a plural noun also gets \`has*\` (${pluralPredicates}). Leading underscores and runs of underscores collapse like a single
 underscore (\`visit__regexp\` → \`visitRegexp\`), and underscore-before-capital
 collapses too (\`visit_Arel_Nodes_X\` → \`visitArelNodesX\`).
 
