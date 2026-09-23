@@ -1116,7 +1116,7 @@ export class Base extends Model {
     return result;
   }
 
-  declare static logger: BenchmarkLogger | null;
+  declare static logger: BenchmarkLogger | null | undefined;
 
   static benchmark = benchmarkable;
 
@@ -2714,13 +2714,7 @@ extend(Base, {
   buildExplainClause: _buildExplainClause,
 });
 extend(Base, _Reflection.ClassMethods);
-classAttribute.call(Base, "_reflections", { instanceWriter: false, default: {} });
-classAttribute.call(Base, "aggregateReflections", { instanceWriter: false, default: {} });
-classAttribute.call(Base, "automaticScopeInversing", { instanceWriter: false, default: false });
-classAttribute.call(Base, "automaticallyInvertPluralAssociations", {
-  instanceWriter: false,
-  default: false,
-});
+include(Base, _Reflection.Reflection);
 classAttribute.call(Base, "_counterCacheColumns", { instanceAccessor: false, default: [] });
 classAttribute.call(Base, "_attrReadonly", { instanceAccessor: false, default: [] });
 classAttribute.call(Base, "defaultScopes", {
