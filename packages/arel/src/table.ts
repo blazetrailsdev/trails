@@ -2,7 +2,7 @@ import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Attribute } from "./attributes/attribute.js";
 import { EmptyJoinError } from "./errors.js";
 import { _engine, ArelEngine, Node } from "./nodes/node.js";
-import { _setTable } from "./node-slots.js";
+import { Arel } from "./namespaces.js";
 import { SelectManager } from "./select-manager.js";
 import { InnerJoin } from "./nodes/inner-join.js";
 import { OuterJoin } from "./nodes/outer-join.js";
@@ -144,5 +144,5 @@ type _AliasPredication = import("./alias-predication.js").AliasPredicationModule
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging */
 export interface Table extends _FactoryMethodsModule, _AliasPredication {}
 
-_setTable(Table);
+Arel.Table = Table;
 setRubyNamespace(Table, "Arel");

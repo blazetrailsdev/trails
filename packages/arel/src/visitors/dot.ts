@@ -1,7 +1,7 @@
 import * as Nodes from "../nodes/index.js";
 import { Table } from "../table.js";
 import { Visitor } from "./visitor.js";
-import { _setDot } from "../node-slots.js";
+import { Visitors } from "../namespaces.js";
 import { PlainString } from "../collectors/plain-string.js";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import { temporalClassName } from "../temporal-tag.js";
@@ -446,4 +446,4 @@ export class Edge {
   }
 }
 
-_setDot(Dot);
+Visitors.Dot = Dot;

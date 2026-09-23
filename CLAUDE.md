@@ -827,7 +827,8 @@ with `Super` still in TDZ and the module throws
 imports at all (so it cannot join any cycle) exporting a mutable binding plus a
 `_setX()` setter, which the defining module calls at the bottom of its own
 body. Readers import the binding from the slot and use it at call time, exactly
-where Ruby resolves the constant. Sixteen instances exist and are the only ones:
+where Ruby resolves the constant. Fifteen instances exist and are the only ones, plus the one converged onto
+`Autoload`:
 
 - `activerecord/src/associations/association-class-slots.ts` — the six
   concrete association ctors `AssociationReflection#association_class` returns,
@@ -855,10 +856,12 @@ extends Association`, whose modules reach `reflection.ts` back through
   The cycle is closed by `class UserProvidedDefault < FromUser`
   (`attribute/user-provided-default.ts`), so `attribute.ts` cannot import it
   back.
-- `arel/src/node-slots.ts` — the `Not` / `Grouping` / `Or` / `And` / `Equality`
-  / `In` / `Attribute` / `Dot` / `Table` ctors and `buildQuoted`, read by
-  `nodes/node.ts`, `nodes/node-expression.ts`, `nodes/binary.ts`,
-  `nodes/casted.ts`, `arel.ts`, `tree-manager.ts`.
+- `arel/src/namespaces.ts` — not a slot: the `Arel` / `Arel::Attributes` /
+  `Arel::Nodes` / `Arel::Visitors` namespace objects, extended with
+  `ActiveSupport::Autoload` (RFC 0151). Each constant is `autoload`ed there,
+  seated by its defining module (`Nodes.Not = Not`) and read as a property at
+  call time (`new Nodes.Not(this)`). This is the shape the remaining slots
+  converge onto.
 - `rack-session/src/ruby-class-path-slot.ts` — the Ruby constant path a store
   registers for itself, read by `abstract/id.ts`'s `rubyClassPath` (Ruby's
   `self.class`, `rack-session/lib/rack/session/abstract/id.rb:155,396`). The

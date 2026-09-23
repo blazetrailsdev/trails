@@ -38,22 +38,25 @@ whose members all `extend Node` / `extend Binary`, which throws
 `Cannot access 'Binary' before initialization` depending on which module you
 enter the graph through.
 
-Where that happens, the constructor is read through a **zero-import slot
-module**, `packages/arel/src/node-slots.ts`: it imports nothing, so it cannot
-join a cycle, and it exports a mutable binding plus a setter that the defining
-module calls at the bottom of its own body. Readers import the binding and use
-it at call time — exactly where Ruby resolves the constant.
+Where that happens, the constant is read off a namespace object in
+`packages/arel/src/namespaces.ts` — `Arel`, `Arel::Attributes`, `Arel::Nodes`,
+`Arel::Visitors` — each extended with trails' port of `ActiveSupport::Autoload`
+(`activesupport/lib/active_support/dependencies/autoload.rb`). That module
+imports none of the classes it names, so it cannot join a cycle. It
+`autoload`s each constant, the defining module seats it at the bottom of its own
+body (`Nodes.Not = Not`), and readers use it at call time — exactly where Ruby
+resolves the constant.
 
 <!-- typecheck:skip -->
 
 ```ts
 // nodes/binary.ts — Rails: left.is_a?(Arel::Attributes::Attribute)
-if (_Attribute && this.left instanceof _Attribute) return block(this.left);
+if (this.left instanceof Attributes.Attribute) return block(this.left);
 ```
 
 The narrowing itself is plain `instanceof`, the direct equivalent of Ruby's
-`is_a?`; the slot only defers _which module the class arrives from_. This is a
-pure-TS concern; Rails never needs it.
+`is_a?`; the namespace only defers _which module the class arrives from_. This
+is a pure-TS concern; Rails never needs it.
 
 ## No `method_missing`, no Proxy
 

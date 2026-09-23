@@ -1,4 +1,4 @@
-import { _setGrouping } from "../node-slots.js";
+import { Nodes } from "../namespaces.js";
 import { Node } from "./node.js";
 import { Unary } from "./unary.js";
 
@@ -14,4 +14,4 @@ export class Grouping extends Unary {
   }
 }
 
-_setGrouping(Grouping);
+Nodes.Grouping = Grouping;

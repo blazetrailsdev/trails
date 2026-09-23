@@ -1,5 +1,5 @@
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
-import { _setNot } from "../node-slots.js";
+import { Nodes } from "../namespaces.js";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 
@@ -60,7 +60,7 @@ export class OptimizerHints extends Unary {
 }
 export class RollUp extends Unary {}
 
-_setNot(Not);
+Nodes.Not = Not;
 
 type _AliasPredication = import("../alias-predication.js").AliasPredicationModule;
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type

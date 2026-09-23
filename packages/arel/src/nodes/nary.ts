@@ -1,5 +1,5 @@
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
-import { _setAnd, _setOr } from "../node-slots.js";
+import { Nodes } from "../namespaces.js";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 
@@ -44,8 +44,8 @@ export class And extends Nary {}
 
 export class Or extends Nary {}
 
-_setAnd(And);
-_setOr(Or);
+Nodes.And = And;
+Nodes.Or = Or;
 
 type _AliasPredication = import("../alias-predication.js").AliasPredicationModule;
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type

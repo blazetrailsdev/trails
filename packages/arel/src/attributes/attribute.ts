@@ -1,5 +1,5 @@
 import { include, rbEqual, rbHash } from "@blazetrails/activesupport";
-import { _setAttribute } from "../node-slots.js";
+import { Arel, Attributes } from "../namespaces.js";
 import { Node } from "../nodes/node.js";
 import { SqlLiteral } from "../nodes/sql-literal.js";
 import { NamedFunction } from "../nodes/named-function.js";
@@ -88,5 +88,6 @@ include(Attribute, AliasPredication);
 include(Attribute, OrderPredications);
 include(Attribute, MathMixin);
 
-_setAttribute(Attribute);
+Attributes.Attribute = Attribute;
+Arel.Attribute = Attributes.Attribute;
 setRubyNamespace(Attribute, "Arel::Attributes");

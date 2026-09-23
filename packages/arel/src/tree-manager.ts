@@ -1,5 +1,5 @@
 import { ArelEngine, Node, _engine } from "./nodes/node.js";
-import { _Dot } from "./node-slots.js";
+import { Visitors } from "./namespaces.js";
 import { cloneSlot, objectClone } from "./clone-support.js";
 import { PlainString } from "./collectors/plain-string.js";
 import { Limit, Offset } from "./nodes/unary.js";
@@ -61,7 +61,7 @@ export abstract class TreeManager {
 
   toDot(): string {
     const collector = new PlainString();
-    const dot = new _Dot!();
+    const dot = new Visitors.Dot();
     dot.accept(this.ast, collector);
     return collector.value;
   }
