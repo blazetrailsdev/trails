@@ -19,7 +19,9 @@ export function createArTrailsProgram(
 ): TrailsProgram {
   const pass1 = createPlainProgram(configPath);
   if (pass1.configDiagnostics.length > 0) return pass1;
-  const { baseNames, modelRegistry } = collectBaseDescendants(pass1.program);
+  const { baseNames, modelRegistry } = collectBaseDescendants(
+    pass1.program.getCompilerOptions().configFilePath as string,
+  );
   const plugin = createArModelsPlugin({
     baseNames: [...baseNames],
     modelRegistry,
@@ -38,8 +40,8 @@ export function createArSolutionBuilder(
 ): TrailsSolutionBuilder {
   return createTrailsSolutionBuilder(rootConfigs, {
     ...opts,
-    pluginFactory: (plainProgram) => {
-      const { baseNames, modelRegistry } = collectBaseDescendants(plainProgram);
+    pluginFactory: (_plainProgram, options) => {
+      const { baseNames, modelRegistry } = collectBaseDescendants(options.configFilePath as string);
       return [
         createArModelsPlugin({
           baseNames: [...baseNames],

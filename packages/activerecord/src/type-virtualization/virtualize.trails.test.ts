@@ -1,9 +1,10 @@
 import { describe, expect, test } from "vitest";
-import ts from "typescript";
+import * as ts from "typescript/unstable/ast";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { virtualize, remapLine } from "./virtualize.js";
+import { tsApi } from "./ts-api.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURES_DIR = path.join(HERE, "fixtures");
@@ -543,13 +544,13 @@ describe("virtualize — multiple classes", () => {
       "    }\n" +
       "  });\n" +
       "});\n";
-    const sf = ts.createSourceFile("file.ts", src, ts.ScriptTarget.ES2022, true);
+    const sf = tsApi().createSourceFile("file.ts", src);
     const baseRooted = new Set<string>();
     const visit = (node: ts.Node): void => {
       if (ts.isClassDeclaration(node) && node.name?.text === "Client" && baseRooted.size === 0) {
         baseRooted.add(`${node.pos}:${node.end}`);
       }
-      ts.forEachChild(node, visit);
+      node.forEachChild(visit);
     };
     visit(sf);
     const { text } = virtualize(src, "file.ts", {

@@ -1,7 +1,9 @@
-import ts from "typescript";
-import * as path from "node:path";
-import { walk, type ClassInfo } from "@blazetrails/activerecord/type-virtualization/walker.js";
-import { resolveAssociationTarget } from "@blazetrails/activerecord/type-virtualization/resolve-target.js";
+/** @noRailsEquivalent PERMANENT */
+import * as ts from "typescript/unstable/ast";
+import { getPath } from "@blazetrails/ruby-compat";
+import { walk, type ClassInfo } from "./walker.js";
+import { resolveAssociationTarget } from "./resolve-target.js";
+import { tsApi } from "./ts-api.js";
 
 export function resolveAutoImports(
   originalText: string,
@@ -9,7 +11,7 @@ export function resolveAutoImports(
   modelRegistry: ReadonlyMap<string, string>,
   baseNames?: readonly string[],
 ): string[] {
-  const sf = ts.createSourceFile(fileName, originalText, ts.ScriptTarget.ES2022, true);
+  const sf = tsApi().createSourceFile(fileName, originalText);
   const classes = walk(sf, { baseNames });
 
   const neededNames = new Set<string>();
@@ -89,8 +91,9 @@ function collectNamesInScope(sf: ts.SourceFile): Set<string> {
 }
 
 function computeRelativeImport(fromFile: string, toFile: string): string {
+  const path = getPath();
   const fromDir = path.dirname(fromFile);
-  let rel = path.relative(fromDir, toFile);
+  let rel = path.relative!(fromDir, toFile);
   rel = rel.replace(/\\/g, "/");
   if (!rel.startsWith(".")) rel = "./" + rel;
   rel = rel.replace(/\.tsx?$/, ".js");

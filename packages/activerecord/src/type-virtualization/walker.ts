@@ -1,5 +1,5 @@
 /** @noRailsEquivalent PERMANENT MOVED-BY-SHORT-NAME: walk. */
-import ts from "typescript";
+import * as ts from "typescript/unstable/ast";
 
 export type AssociationKind = "hasMany" | "hasAndBelongsToMany" | "belongsTo" | "hasOne";
 
@@ -74,7 +74,7 @@ export function walk(sourceFile: ts.SourceFile, opts: WalkOptions = {}): ClassIn
     if (ts.isClassDeclaration(node) && node.name && isModel(node)) {
       out.push(buildClassInfo(node, sourceFile));
     }
-    ts.forEachChild(node, visit);
+    node.forEachChild(visit);
   };
   visit(sourceFile);
 
@@ -89,7 +89,7 @@ export function walk(sourceFile: ts.SourceFile, opts: WalkOptions = {}): ClassIn
         const [targetArg, attrArg, mapArg, optsArg] = call.arguments;
         const targetName = targetArg && ts.isIdentifier(targetArg) ? targetArg.text : null;
         const values = mapArg ? readEnumValues(mapArg) : null;
-        if (targetName && attrArg && ts.isStringLiteralLike(attrArg) && values) {
+        if (targetName && attrArg && ts.isStringLiteralLikeNode(attrArg) && values) {
           const info = resolveLexicalClassInfo(out, node, targetName);
           if (info) {
             info.calls.push({
@@ -102,7 +102,7 @@ export function walk(sourceFile: ts.SourceFile, opts: WalkOptions = {}): ClassIn
         }
       }
     }
-    ts.forEachChild(node, visitDefineEnum);
+    node.forEachChild(visitDefineEnum);
   };
   visitDefineEnum(sourceFile);
 
@@ -117,15 +117,15 @@ function recordMergedInterfaceMembers(sourceFile: ts.SourceFile, out: readonly C
       for (const info of out) {
         if (info.name !== node.name.text) continue;
         for (const m of node.members) {
-          const name = m.name;
+          const name = (m as Partial<ts.NamedMemberBase>).name;
           if (!name) continue;
-          if (ts.isIdentifier(name) || ts.isStringLiteralLike(name)) {
+          if (ts.isIdentifier(name) || ts.isStringLiteralLikeNode(name)) {
             info.existingMembers.add(name.text);
           }
         }
       }
     }
-    ts.forEachChild(node, visit);
+    node.forEachChild(visit);
   };
   visit(sourceFile);
 }
@@ -188,6 +188,7 @@ function extendsOneOf(cls: ts.ClassDeclaration, names: Set<string>): boolean {
   for (const hc of cls.heritageClauses ?? []) {
     if (hc.token !== ts.SyntaxKind.ExtendsKeyword) continue;
     for (const t of hc.types) {
+      if (!ts.isExpressionWithTypeArguments(t)) continue;
       const expr = t.expression;
       if (ts.isIdentifier(expr) && names.has(expr.text)) return true;
     }
@@ -227,13 +228,14 @@ function parseSkipColumns(cls: ts.ClassDeclaration, sf: ts.SourceFile): Set<stri
 }
 
 function recordExistingMember(m: ts.ClassElement, info: ClassInfo): void {
+  const member = m as Partial<ts.NamedMemberBase>;
   let name: string | undefined;
-  if (m.name) {
-    if (ts.isIdentifier(m.name)) name = m.name.text;
-    else if (ts.isStringLiteralLike(m.name)) name = m.name.text;
+  if (member.name) {
+    if (ts.isIdentifier(member.name)) name = member.name.text;
+    else if (ts.isStringLiteralLikeNode(member.name)) name = member.name.text;
   }
   if (!name) return;
-  const modifiers = ts.canHaveModifiers(m) ? ts.getModifiers(m) : undefined;
+  const modifiers = member.modifiers;
   const isStatic = modifiers?.some((mod) => mod.kind === ts.SyntaxKind.StaticKeyword) ?? false;
   if (isStatic) info.existingStaticMembers.add(name);
   else info.existingMembers.add(name);
@@ -243,7 +245,7 @@ function recordExistingMember(m: ts.ClassElement, info: ClassInfo): void {
     name === "tableName" &&
     ts.isPropertyDeclaration(m) &&
     m.initializer &&
-    ts.isStringLiteralLike(m.initializer)
+    ts.isStringLiteralLikeNode(m.initializer)
   ) {
     info.tableName = m.initializer.text;
   }
@@ -256,7 +258,7 @@ function readDefineEnumThisCall(stmt: ts.Statement): DefineEnumCall | null {
   if (!ts.isIdentifier(call.expression) || call.expression.text !== "defineEnum") return null;
   const [targetArg, attrArg, mapArg, optsArg] = call.arguments;
   if (!targetArg || targetArg.kind !== ts.SyntaxKind.ThisKeyword) return null;
-  if (!attrArg || !ts.isStringLiteralLike(attrArg)) return null;
+  if (!attrArg || !ts.isStringLiteralLikeNode(attrArg)) return null;
   if (!mapArg) return null;
   const values = readEnumValues(mapArg);
   if (!values) return null;
@@ -296,8 +298,8 @@ function readThisCall(stmt: ts.Statement): RuntimeCall | null {
 
 function readAttributeCall(call: ts.CallExpression): AttributeCall | null {
   const [nameArg, typeArg, optsArg] = call.arguments;
-  if (!nameArg || !ts.isStringLiteralLike(nameArg)) return null;
-  if (!typeArg || !ts.isStringLiteralLike(typeArg)) return null;
+  if (!nameArg || !ts.isStringLiteralLikeNode(nameArg)) return null;
+  if (!typeArg || !ts.isStringLiteralLikeNode(typeArg)) return null;
   return {
     kind: "attribute",
     name: nameArg.text,
@@ -311,7 +313,7 @@ function readAssociationCall(
   call: ts.CallExpression,
 ): AssociationCall | null {
   const [nameArg, optsArg] = call.arguments;
-  if (!nameArg || !ts.isStringLiteralLike(nameArg)) return null;
+  if (!nameArg || !ts.isStringLiteralLikeNode(nameArg)) return null;
   return {
     kind,
     name: nameArg.text,
@@ -321,7 +323,7 @@ function readAssociationCall(
 
 function readScopeCall(call: ts.CallExpression): ScopeCall | null {
   const [nameArg, fnArg] = call.arguments;
-  if (!nameArg || !ts.isStringLiteralLike(nameArg)) return null;
+  if (!nameArg || !ts.isStringLiteralLikeNode(nameArg)) return null;
   if (!fnArg) return { kind: "scope", name: nameArg.text, paramsAfterThis: [] };
   if (!ts.isArrowFunction(fnArg) && !ts.isFunctionExpression(fnArg)) {
     return { kind: "scope", name: nameArg.text, paramsAfterThis: [] };
@@ -361,7 +363,7 @@ function inferLiteralType(expr: ts.Expression): string {
 
 function readEnumCall(call: ts.CallExpression): EnumCall | null {
   const [attrArg, mapArg, optsArg] = call.arguments;
-  if (!attrArg || !ts.isStringLiteralLike(attrArg)) return null;
+  if (!attrArg || !ts.isStringLiteralLikeNode(attrArg)) return null;
   if (!mapArg) return null;
   const values = readEnumValues(mapArg);
   if (!values) return null;
@@ -378,7 +380,7 @@ function readEnumValues(node: ts.Expression): string[] | null {
   if (ts.isArrayLiteralExpression(node)) {
     const out: string[] = [];
     for (const el of node.elements) {
-      if (!ts.isStringLiteralLike(el)) return null;
+      if (!ts.isStringLiteralLikeNode(el)) return null;
       out.push(el.text);
     }
     return out;
@@ -392,7 +394,7 @@ function readRecordLiteral(node: ts.Expression | undefined): RecordLiteral {
   for (const prop of node.properties) {
     if (!ts.isPropertyAssignment(prop)) continue;
     const key =
-      prop.name && (ts.isIdentifier(prop.name) || ts.isStringLiteralLike(prop.name))
+      prop.name && (ts.isIdentifier(prop.name) || ts.isStringLiteralLikeNode(prop.name))
         ? prop.name.text
         : null;
     if (!key) continue;
@@ -409,7 +411,7 @@ export function findIncludeCalls(sourceFile: ts.SourceFile): IncludeCall[] {
   let includeImported = false;
   for (const stmt of sourceFile.statements) {
     if (!ts.isImportDeclaration(stmt)) continue;
-    if (!ts.isStringLiteralLike(stmt.moduleSpecifier)) continue;
+    if (!ts.isStringLiteralLikeNode(stmt.moduleSpecifier)) continue;
     if (stmt.moduleSpecifier.text !== "@blazetrails/activesupport") continue;
     const named = stmt.importClause?.namedBindings;
     if (named && ts.isNamedImports(named)) {
@@ -428,9 +430,7 @@ export function findIncludeCalls(sourceFile: ts.SourceFile): IncludeCall[] {
   const declaredClasses = new Map<string, DeclaredClass>();
   for (const stmt of sourceFile.statements) {
     if (!ts.isClassDeclaration(stmt) || !stmt.name) continue;
-    const exported = (ts.getModifiers(stmt) ?? []).some(
-      (m) => m.kind === ts.SyntaxKind.ExportKeyword,
-    );
+    const exported = (stmt.modifiers ?? []).some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
     let typeParams = "";
     if (stmt.typeParameters && stmt.typeParameters.length > 0) {
       const first = stmt.typeParameters[0].pos;
@@ -472,7 +472,7 @@ function objectKeys(obj: ts.ObjectLiteralExpression): string[] {
   const keys: string[] = [];
   for (const p of obj.properties) {
     if (!ts.isPropertyAssignment(p)) continue;
-    if (p.name && (ts.isIdentifier(p.name) || ts.isStringLiteralLike(p.name))) {
+    if (p.name && (ts.isIdentifier(p.name) || ts.isStringLiteralLikeNode(p.name))) {
       keys.push(p.name.text);
     }
   }

@@ -1,5 +1,5 @@
 /** @noRailsEquivalent PERMANENT */
-import ts from "typescript";
+import * as ts from "typescript/unstable/ast";
 import { camelize, pluralize, underscore } from "@blazetrails/activesupport";
 import { resolveAssociationTarget, stripQuotes } from "./resolve-target.js";
 import type {
@@ -155,12 +155,12 @@ function renderDeclaredMemberName(name: string): string {
   return isValidIdentifier(name) ? name : JSON.stringify(name);
 }
 
-const identifierScanner = ts.createScanner(ts.ScriptTarget.ES2022, true);
+const identifierScanner = ts.createScanner(true);
 function isValidIdentifier(name: string): boolean {
   if (name.length === 0) return false;
   identifierScanner.setText(name);
   const token = identifierScanner.scan();
-  return token === ts.SyntaxKind.Identifier && identifierScanner.getTextPos() === name.length;
+  return token === ts.SyntaxKind.Identifier && identifierScanner.getTokenEnd() === name.length;
 }
 
 function collectConflictingCollections(info: ClassInfo, opts: SynthesizeOptions): Set<string> {
