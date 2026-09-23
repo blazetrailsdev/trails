@@ -2093,13 +2093,12 @@ class ApiExtractor
     case node[0]
     when :return then "return"
     when :assign, :opassign, :massign then "assign"
-    when :method_add_arg, :method_add_block
-      body_last_expr(node[1]) == "new" ? "new" : "call"
+    when :method_add_arg, :method_add_block then body_last_expr(node[1])
     when :call, :command_call
       node[3].is_a?(Array) && node[3][1] == "new" ? "new" : "call"
-    when :command
+    when :command, :fcall, :vcall
       %w[raise fail].include?(node[1].is_a?(Array) && node[1][1]) ? "other" : "call"
-    when :fcall, :vcall, :super, :zsuper, :yield, :yield0 then "call"
+    when :super, :zsuper, :yield, :yield0 then "call"
     else "other"
     end
   end

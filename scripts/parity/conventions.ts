@@ -496,9 +496,10 @@ export const PROTOCOL_DEFINITION_ENROLLED_PACKAGES: ReadonlySet<string> = new Se
 export const SKIP_GROUPS: SkipGroup[] = [
   {
     reason:
-      "Ruby core object methods outside PROTOCOL_DEFINITION_NAMES: identity " +
+      "Ruby core object methods outside `PROTOCOL_DEFINITION_NAMES`: identity " +
       "(`object_id`, `equal?`, `nil?`, `class`), reflection (`instance_of?`, " +
-      "`instance_variable_*`), dispatch (`send`, `public_send`, `tap`, " +
+      "`instance_variable_get` / `instance_variable_set` / `instance_variables`), " +
+      "dispatch (`send`, `public_send`, `tap`, " +
       "`yield_self`), numeric coercion (`to_i`, `to_f`, `to_r`, `to_c`), " +
       "`clone` / `initialize_clone` / `freeze`, and `to_ary` / `then`, which JS " +
       "would read as array destructuring and as a thenable `await` calls.",
@@ -528,7 +529,7 @@ export const SKIP_GROUPS: SkipGroup[] = [
   },
   {
     reason:
-      "Scored per definition in PROTOCOL_DEFINITION_ENROLLED_PACKAGES, and " +
+      "Scored per definition in `PROTOCOL_DEFINITION_ENROLLED_PACKAGES`, and " +
       "skipped elsewhere only until that package's burndown story enrolls it " +
       "(RFC 0156): these translate directly, so a Ruby file defining one " +
       "expects it in the mirroring TS file.",

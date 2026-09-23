@@ -92,6 +92,15 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
           def abstract
             raise NotImplementedError, "abstract is not implemented"
           end
+          def reraise
+            raise
+          end
+          def fails
+            fail
+          end
+          def parenthesized
+            raise(NotImplementedError)
+          end
         end
       `,
       },
@@ -107,6 +116,9 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
       "Foo#reads": "other",
       "Foo#up": "call",
       "Foo#abstract": "other",
+      "Foo#reraise": "other",
+      "Foo#fails": "other",
+      "Foo#parenthesized": "other",
     });
   });
 
