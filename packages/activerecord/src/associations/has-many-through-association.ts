@@ -455,10 +455,11 @@ function deleteThroughRecords(
     }
     if (Array.isArray(proxy.target)) {
       for (const r of throughRecords) {
-        const idx = proxy.target.indexOf(r);
-        if (idx !== -1) proxy.target.splice(idx, 1);
+        for (let idx = proxy.target.length - 1; idx >= 0; idx--) {
+          if (rbEqual(proxy.target[idx], r)) proxy.target.splice(idx, 1);
+        }
       }
-    } else if (throughRecords.length > 0 && proxy.target === throughRecords[0]) {
+    } else if (throughRecords.some((r) => rbEqual(r, proxy.target))) {
       (proxy as { target?: Base | null }).target = null;
     }
     cache.delete(record);
