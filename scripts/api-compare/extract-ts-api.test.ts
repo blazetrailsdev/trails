@@ -5320,32 +5320,25 @@ describe("creditMixinObjectLiteralKeys", () => {
 });
 
 describe("admitsBoolean", () => {
-  const members = () =>
-    extractFromSource(`
+  it("records whether a getter's or value property's type can hold a boolean", () => {
+    const { instanceMethods } = extractFromSource(`
       type Adapter = { id: number };
       class Foo {
         get activeConnection(): Adapter | null { return null; }
+        pending: string | null = null;
         get inUse(): boolean | null { return null; }
         get loose(): unknown { return null; }
-        pending: string | null = null;
         callback: () => void = () => {};
         isActive(): Adapter | null { return null; }
       }
-    `).instanceMethods;
-  const admits = (name: string) => members().find((m) => m.name === name)?.admitsBoolean;
-
-  it("is false on a getter or property whose type cannot hold a boolean", () => {
-    expect(admits("activeConnection")).toBe(false);
-    expect(admits("pending")).toBe(false);
-  });
-
-  it("is true when the type has a boolean member or is unknown", () => {
-    expect(admits("inUse")).toBe(true);
-    expect(admits("loose")).toBe(true);
-  });
-
-  it("is not recorded on a method or a callable property", () => {
-    expect(admits("isActive")).toBeUndefined();
-    expect(admits("callback")).toBeUndefined();
+    `);
+    expect(Object.fromEntries(instanceMethods.map((m) => [m.name, m.admitsBoolean]))).toEqual({
+      activeConnection: false,
+      pending: false,
+      inUse: true,
+      loose: true,
+      callback: undefined,
+      isActive: undefined,
+    });
   });
 });

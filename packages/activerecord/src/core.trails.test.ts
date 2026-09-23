@@ -233,7 +233,6 @@ describe("hash agrees with ==", () => {
     expect(hashOf(NaN)).not.toEqual(hashOf(NaN));
     expect(hashOf(Symbol("x"))).not.toEqual(hashOf(Symbol("x")));
     expect(hashOf([1, NaN])).not.toEqual(hashOf([1, NaN]));
-    expect(hashOf([[1]])).not.toEqual(hashOf([[1]]));
   });
 
   it("gives == ids one hash", () => {
@@ -241,5 +240,8 @@ describe("hash agrees with ==", () => {
     expect(coreEquals.call(record(id), record(id))).toBe(true);
     expect(hashOf(id)).toEqual(hashOf(id));
     expect(hashOf([1, "a"])).toEqual(hashOf([1, "a"]));
+    expect(coreEquals.call(record([[1]]), record([[1]]))).toBe(true);
+    expect(hashOf([[1]])).toEqual(hashOf([[1]]));
+    expect(hashOf(Symbol.for("x"))).toEqual(hashOf(Symbol.for("x")));
   });
 });

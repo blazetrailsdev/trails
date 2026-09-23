@@ -50,9 +50,16 @@ function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-/** Every Ruby file a body names, as its package and lib-root-relative path. */
+/**
+ * Every Ruby file a body names, as its package and lib-root-relative path. A
+ * path through a lib root is bound to that root's package; a bare path the
+ * body also names through a root is bound the same way, and an otherwise
+ * unbound bare path resolves only when the body names exactly one gem's
+ * namespace — with two, `railtie.rb:97` could be either gem's.
+ */
 export function rubyFileMentions(body: string): { pkg: string; file: string }[] {
   const mentions = new Map<string, { pkg: string; file: string }>();
+  const add = (pkg: string, file: string) => mentions.set(`${pkg}\u0000${file}`, { pkg, file });
   const constants = [...body.matchAll(/(?<![\w:])[A-Z]\w*(?:::[A-Z]\w*)*/g)].map(([c]) =>
     c.toLowerCase(),
   );
@@ -61,17 +68,20 @@ export function rubyFileMentions(body: string): { pkg: string; file: string }[] 
     const bare = namespace !== "rails" && constants.includes(namespace);
     return bare || constants.some((c) => c.startsWith(`${namespace}::`));
   }).map(([, pkg]) => pkg);
+  const bare: string[] = [];
   for (const [token] of body.matchAll(/[\w./-]+\.rb(?!\w)/g)) {
     const rooted = LIB_ROOTS.map(
       ([root, pkg]) => [new RegExp(`(?:^|/)${escapeRegExp(root)}/`).exec(token), pkg] as const,
     ).find(([match]) => match !== null);
-    const pkgs = rooted
-      ? [rooted[1]]
-      : /(?:^|\/)(?:lib|test|vendor|railties|active\w*|action\w*)\//.test(token)
-        ? []
-        : namedPackages;
-    const file = rooted ? token.slice(rooted[0]!.index + rooted[0]![0].length) : token;
-    for (const pkg of pkgs) mentions.set(`${pkg}\u0000${file}`, { pkg, file });
+    if (rooted) add(rooted[1], token.slice(rooted[0]!.index + rooted[0]![0].length));
+    else if (!/(?:^|\/)(?:lib|test|vendor|railties|active\w*|action\w*)\//.test(token)) {
+      bare.push(token);
+    }
+  }
+  const bound = [...mentions.values()].map(({ file }) => file);
+  for (const token of bare) {
+    if (bound.some((file) => file === token || file.endsWith(`/${token}`))) continue;
+    if (namedPackages.length === 1) add(namedPackages[0], token);
   }
   return [...mentions.values()];
 }

@@ -3691,25 +3691,15 @@ describe("ported-with-args population", () => {
 });
 
 describe("predicateKindMismatch", () => {
-  it("reports a predicate matched through its bare spelling by a non-boolean getter", () => {
-    expect(predicateKindMismatch("active_connection?", "activeConnection", [false])).toBe(true);
-  });
-
-  it("leaves the predicate's own is-spelling alone", () => {
-    expect(predicateKindMismatch("active_connection?", "isActiveConnection", [false])).toBe(false);
-  });
-
-  it("leaves a member that can hold a boolean alone", () => {
-    expect(predicateKindMismatch("in_use?", "inUse", [true])).toBe(false);
-  });
-
-  it("leaves a method alone, since a method records no admitsBoolean", () => {
-    expect(predicateKindMismatch("in_use?", "inUse", [undefined])).toBe(false);
-    expect(predicateKindMismatch("in_use?", "inUse", [false, undefined])).toBe(false);
-  });
-
-  it("ignores a non-predicate", () => {
-    expect(predicateKindMismatch("active_connection", "activeConnection", [false])).toBe(false);
+  it.each([
+    ["active_connection?", "activeConnection", [false], true],
+    ["active_connection?", "isActiveConnection", [false], false],
+    ["in_use?", "inUse", [true], false],
+    ["in_use?", "inUse", [undefined], false],
+    ["in_use?", "inUse", [false, undefined], false],
+    ["active_connection", "activeConnection", [false], false],
+  ] as const)("%s matched by %s admitting %j is %s", (rubyName, tsName, admits, expected) => {
+    expect(predicateKindMismatch(rubyName, tsName, admits)).toBe(expected);
   });
 });
 

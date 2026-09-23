@@ -5236,39 +5236,25 @@ function admitsFunction(p: ts.ParameterDeclaration): boolean {
   );
 }
 
-/**
- * Whether a `get` accessor's or a property's type can hold a `boolean` — see
- * `MethodInfo.admitsBoolean`. `undefined` when the member is callable (a
- * method spelled as a property) or its type cannot be resolved.
- */
+/** `MethodInfo.admitsBoolean`; `undefined` for a callable member. */
 function memberAdmitsBoolean(
   member: ts.GetAccessorDeclaration | ts.PropertyDeclaration,
   checker: ts.TypeChecker,
 ): boolean | undefined {
-  let type: ts.Type;
-  try {
-    if (ts.isGetAccessorDeclaration(member)) {
-      const signature = checker.getSignatureFromDeclaration(member);
-      if (!signature) return undefined;
-      type = checker.getReturnTypeOfSignature(signature);
-    } else {
-      type = member.type
-        ? checker.getTypeFromTypeNode(member.type)
-        : checker.getTypeAtLocation(member);
-    }
-  } catch {
-    return undefined;
-  }
-  if (type.getCallSignatures().length > 0) return undefined;
-  return typeAdmitsBoolean(type);
+  const signature = ts.isGetAccessorDeclaration(member)
+    ? checker.getSignatureFromDeclaration(member)
+    : undefined;
+  const type = signature
+    ? checker.getReturnTypeOfSignature(signature)
+    : checker.getTypeAtLocation(member.type ?? member);
+  return type.getCallSignatures().length > 0 ? undefined : typeAdmitsBoolean(type);
 }
 
 function typeAdmitsBoolean(type: ts.Type): boolean {
   const open =
     ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.BooleanLike | ts.TypeFlags.TypeParameter;
   if (type.flags & open) return true;
-  if (type.isUnionOrIntersection()) return type.types.some(typeAdmitsBoolean);
-  return false;
+  return type.isUnionOrIntersection() && type.types.some(typeAdmitsBoolean);
 }
 
 /**
