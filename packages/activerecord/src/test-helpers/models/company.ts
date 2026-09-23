@@ -463,7 +463,7 @@ export class Client extends Company {
   static RaisedOnSave = class extends Error {};
   static RaisedOnDestroy = class extends Error {};
 
-  ratingQ(): boolean {
+  isRating(): boolean {
     return (this as any).queryAttribute("rating");
   }
 

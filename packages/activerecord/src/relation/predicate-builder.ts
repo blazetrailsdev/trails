@@ -181,16 +181,20 @@ export class PredicateBuilder {
   }
 
   /** @internal */
-  private groupingQueries(queries: Nodes.Node[][]): Nodes.Node[] {
+  private groupingQueries(queries: Nodes.Node[][]): Nodes.Node[];
+  private groupingQueries(queries: Nodes.Node[][] | Nodes.Node[] | Nodes.Or): Nodes.Node[] {
+    queries = queries as Nodes.Node[][];
     if (queries.length === 1) return queries[0];
-    const reduced = queries.map((query) => query.reduce((left, right) => left.and(right)));
-    return [new Nodes.Grouping(new Nodes.Or(reduced))];
+    queries = queries.map((query) => query.reduce((left, right) => left.and(right)));
+    queries = new Nodes.Or(queries);
+    return [new Nodes.Grouping(queries)];
   }
 
   get(attrName: string, value: unknown, operator: string | null = null): Nodes.Node {
     return this.build(this.table.arelTable.get(attrName), value, operator);
   }
 
+  /** @missingRailsName name — PERMANENT */
   build(attribute: Nodes.Attribute, value: unknown, operator: string | null = null): Nodes.Node {
     if (respondsToId(value)) {
       value = (value as { id: unknown }).id;

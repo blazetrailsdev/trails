@@ -25,13 +25,13 @@ export function readonlyAttributes(this: typeof Base): string[] {
   return (this as any)._attrReadonly;
 }
 
-export function readonlyAttributeQ(this: typeof Base, name: string): boolean {
+export function isReadonlyAttribute(this: typeof Base, name: string): boolean {
   return ((this as any)._attrReadonly as string[]).includes(name);
 }
 
 export function writeAttribute(this: Base, attrName: string, value: unknown): void {
   const ctor = this.constructor as typeof Base;
-  if (this._newRecord === false && ctor.readonlyAttributeQ(String(attrName))) {
+  if (this._newRecord === false && ctor.isReadonlyAttribute(String(attrName))) {
     throw new ReadonlyAttributeError(String(attrName));
   }
 
@@ -40,7 +40,7 @@ export function writeAttribute(this: Base, attrName: string, value: unknown): vo
 
 export function _writeAttribute(this: Base, attrName: string, value: unknown): void {
   const ctor = this.constructor as typeof Base;
-  if (this._newRecord === false && ctor.readonlyAttributeQ(String(attrName))) {
+  if (this._newRecord === false && ctor.isReadonlyAttribute(String(attrName))) {
     throw new ReadonlyAttributeError(String(attrName));
   }
   this._attributes.writeFromUser(attrName, value);
@@ -53,5 +53,5 @@ export const HasReadonlyAttributes = {
 
 export const ClassMethods = {
   attrReadonly,
-  readonlyAttributeQ,
+  isReadonlyAttribute,
 };

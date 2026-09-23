@@ -661,7 +661,7 @@ function categorize(relPath: string, describeName: string, testName: string): An
     return {
       blocked: "migration — multi-DB migrator / primary-class gap",
       rootCause:
-        "migration.ts#MigrationContext or connection-adapters/abstract/connection-handler.ts#primaryClassQ not fully implemented",
+        "migration.ts#MigrationContext or connection-adapters/abstract/connection-handler.ts#isPrimaryClass not fully implemented",
       scope: `~50 LOC fix in migration.ts; affects ~7 tests in ${file}.test.ts`,
     };
   }

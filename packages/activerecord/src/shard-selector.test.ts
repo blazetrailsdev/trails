@@ -57,7 +57,7 @@ describe("ShardSelectorTest", () => {
     await setupShards();
     const middleware = new ShardSelector(
       async () => {
-        expect(Base.connectedToQ({ role: "writing", shard: "shard_one" })).toBeTruthy();
+        expect(Base.isConnectedTo({ role: "writing", shard: "shard_one" })).toBeTruthy();
         return [200, {}, ["body"]];
       },
       () => "shard_one",
@@ -69,7 +69,7 @@ describe("ShardSelectorTest", () => {
     await setupShards();
     const middleware = new ShardSelector(
       async () => {
-        expect(Base.connectedToQ({ role: "writing", shard: "shard_one" })).toBeTruthy();
+        expect(Base.isConnectedTo({ role: "writing", shard: "shard_one" })).toBeTruthy();
         return [200, {}, ["body"]];
       },
       () => "shard_one",

@@ -30,10 +30,10 @@ class TestRequest {
 _setActionDispatchRequest(TestRequest);
 
 function isWriting() {
-  return Base.connectedToQ({ role: "writing" });
+  return Base.isConnectedTo({ role: "writing" });
 }
 function isReading() {
-  return Base.connectedToQ({ role: "reading" });
+  return Base.isConnectedTo({ role: "reading" });
 }
 function isPreventingWrites() {
   return currentPreventingWrites.call(Base as any);

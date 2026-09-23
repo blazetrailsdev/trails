@@ -95,7 +95,7 @@ export function disallowRawSqlBang(
     abstractColumnNameMatcher();
   const unexpected: string[] = [];
   for (const arg of args) {
-    if (typeof arg === "symbol") continue;
+    if (typeof arg === "symbol" || (typeof arg === "string" && arg.startsWith(":"))) continue;
     if (arg instanceof Nodes.Node) continue;
     const str = arg == null ? "" : arg.toString();
     if (!columnMatcher.test(str.trim())) {

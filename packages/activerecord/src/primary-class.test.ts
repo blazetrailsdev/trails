@@ -40,24 +40,24 @@ describe("PrimaryClassTest", () => {
   it("application record is used if no primary class is set", () => {
     (globalThis as Record<string, unknown>)["ApplicationRecord"] = ApplicationRecord;
 
-    expect(ApplicationRecord.primaryClassQ()).toBeTruthy();
-    expect(ApplicationRecord.applicationRecordClassQ()).toBeTruthy();
+    expect(ApplicationRecord.isPrimaryClass()).toBeTruthy();
+    expect(ApplicationRecord.isApplicationRecordClass()).toBeTruthy();
     expect(ApplicationRecord.abstractClass).toBeTruthy();
   });
 
   it("primary class and primary abstract class behavior", () => {
     PrimaryAppRecord.primaryAbstractClass();
 
-    expect(PrimaryAppRecord.primaryClassQ()).toBeTruthy();
-    expect(PrimaryAppRecord.applicationRecordClassQ()).toBeTruthy();
+    expect(PrimaryAppRecord.isPrimaryClass()).toBeTruthy();
+    expect(PrimaryAppRecord.isApplicationRecordClass()).toBeTruthy();
     expect(PrimaryAppRecord.abstractClass).toBeTruthy();
 
-    expect(AnotherAppRecord.primaryClassQ()).toBeFalsy();
-    expect(AnotherAppRecord.applicationRecordClassQ()).toBeFalsy();
+    expect(AnotherAppRecord.isPrimaryClass()).toBeFalsy();
+    expect(AnotherAppRecord.isApplicationRecordClass()).toBeFalsy();
     expect(AnotherAppRecord.abstractClass).toBeTruthy();
 
-    expect(Base.primaryClassQ()).toBeTruthy();
-    expect(Base.applicationRecordClassQ()).toBeFalsy();
+    expect(Base.isPrimaryClass()).toBeTruthy();
+    expect(Base.isApplicationRecordClass()).toBeFalsy();
     expect(Base.abstractClass).toBeFalsy();
   });
 
@@ -71,34 +71,34 @@ describe("PrimaryClassTest", () => {
     PrimaryAppRecord.primaryAbstractClass();
     (globalThis as Record<string, unknown>)["ApplicationRecord"] = ApplicationRecord;
 
-    expect(PrimaryAppRecord.primaryClassQ()).toBeTruthy();
-    expect(PrimaryAppRecord.applicationRecordClassQ()).toBeTruthy();
+    expect(PrimaryAppRecord.isPrimaryClass()).toBeTruthy();
+    expect(PrimaryAppRecord.isApplicationRecordClass()).toBeTruthy();
     expect(PrimaryAppRecord.abstractClass).toBeTruthy();
 
-    expect(ApplicationRecord.primaryClassQ()).toBeFalsy();
-    expect(ApplicationRecord.applicationRecordClassQ()).toBeFalsy();
+    expect(ApplicationRecord.isPrimaryClass()).toBeFalsy();
+    expect(ApplicationRecord.isApplicationRecordClass()).toBeFalsy();
     expect(ApplicationRecord.abstractClass).toBeTruthy();
 
-    expect(Base.primaryClassQ()).toBeTruthy();
-    expect(Base.applicationRecordClassQ()).toBeFalsy();
+    expect(Base.isPrimaryClass()).toBeTruthy();
+    expect(Base.isApplicationRecordClass()).toBeFalsy();
     expect(Base.abstractClass).toBeFalsy();
   });
 
   it("setting primary abstract class explicitly wins over application record set implicitly", () => {
     (globalThis as Record<string, unknown>)["ApplicationRecord"] = ApplicationRecord;
 
-    expect(ApplicationRecord.primaryClassQ()).toBeTruthy();
-    expect(ApplicationRecord.applicationRecordClassQ()).toBeTruthy();
+    expect(ApplicationRecord.isPrimaryClass()).toBeTruthy();
+    expect(ApplicationRecord.isApplicationRecordClass()).toBeTruthy();
     expect(ApplicationRecord.abstractClass).toBeTruthy();
 
     PrimaryAppRecord.primaryAbstractClass();
 
-    expect(PrimaryAppRecord.primaryClassQ()).toBeTruthy();
-    expect(PrimaryAppRecord.applicationRecordClassQ()).toBeTruthy();
+    expect(PrimaryAppRecord.isPrimaryClass()).toBeTruthy();
+    expect(PrimaryAppRecord.isApplicationRecordClass()).toBeTruthy();
     expect(PrimaryAppRecord.abstractClass).toBeTruthy();
 
-    expect(ApplicationRecord.primaryClassQ()).toBeFalsy();
-    expect(ApplicationRecord.applicationRecordClassQ()).toBeFalsy();
+    expect(ApplicationRecord.isPrimaryClass()).toBeFalsy();
+    expect(ApplicationRecord.isApplicationRecordClass()).toBeFalsy();
     expect(ApplicationRecord.abstractClass).toBeTruthy();
   });
 
@@ -112,8 +112,8 @@ describe("PrimaryClassTest", () => {
         });
         await Promise.all(pools.map((p) => p.adapterReady));
 
-        expect(ApplicationRecord.primaryClassQ()).toBeTruthy();
-        expect(ApplicationRecord.applicationRecordClassQ()).toBeTruthy();
+        expect(ApplicationRecord.isPrimaryClass()).toBeTruthy();
+        expect(ApplicationRecord.isApplicationRecordClass()).toBeTruthy();
         expect(await ApplicationRecord.leaseConnection()).toBe(await Base.leaseConnection());
       } finally {
         await ApplicationRecord.removeConnection();
@@ -132,8 +132,8 @@ describe("PrimaryClassTest", () => {
         });
         await Promise.all(pools.map((p) => p.adapterReady));
 
-        expect(PrimaryAppRecord.primaryClassQ()).toBeTruthy();
-        expect(PrimaryAppRecord.applicationRecordClassQ()).toBeTruthy();
+        expect(PrimaryAppRecord.isPrimaryClass()).toBeTruthy();
+        expect(PrimaryAppRecord.isApplicationRecordClass()).toBeTruthy();
         expect(PrimaryAppRecord.abstractClass).toBeTruthy();
         expect(await PrimaryAppRecord.leaseConnection()).toBe(await Base.leaseConnection());
       } finally {

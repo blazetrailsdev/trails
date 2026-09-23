@@ -16,7 +16,7 @@ import { isPreventingWrites } from "../../core.js";
 
 export interface ConnectionOwner {
   name: string;
-  primaryClassQ(): boolean;
+  isPrimaryClass(): boolean;
 }
 
 export class ConnectionDescriptor {
@@ -29,10 +29,10 @@ export class ConnectionDescriptor {
   }
 
   get name(): string {
-    return this.primaryClassQ() ? "ActiveRecord::Base" : this._name;
+    return this.isPrimaryClass() ? "ActiveRecord::Base" : this._name;
   }
 
-  primaryClassQ(): boolean {
+  isPrimaryClass(): boolean {
     return this._primary;
   }
 
@@ -155,7 +155,7 @@ export class ConnectionHandler {
       if (!(ownerName instanceof ConnectionDescriptor)) {
         const owner = ownerName;
         if (
-          owner.primaryClassQ?.() &&
+          owner.isPrimaryClass?.() &&
           existingPoolConfig.connectionDescriptor.name !== owner.name
         ) {
           existingPoolConfig.connectionDescriptor = owner;
@@ -188,7 +188,7 @@ export class ConnectionHandler {
     return poolConfig.pool;
   }
 
-  activeConnectionsQ(role?: string | null): boolean {
+  hasActiveConnections(role?: string | null): boolean {
     const pools: ConnectionPool[] = [];
     this.eachConnectionPool(role, (pool) => {
       pools.push(pool);

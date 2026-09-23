@@ -109,14 +109,11 @@ export class HasOne extends SingularAssociation {
       await HasOne.touchRecord(record, name, touch);
     };
 
-    const savedChangesQ = (record: any) =>
-      typeof record.isSavedChanges === "function" && record.isSavedChanges();
-
-    model.afterCreate(callback, { if: savedChangesQ });
+    model.afterCreate(callback, { if: ":isSavedChanges" });
     model.afterCreateCommit(async (record: any) => {
       record.association(name).resetNegativeCache();
     });
-    model.afterUpdate(callback, { if: savedChangesQ });
+    model.afterUpdate(callback, { if: ":isSavedChanges" });
     model.afterDestroy(async (record: any) => {
       if (typeof record.isNewRecord !== "function" || !record.isNewRecord()) {
         await HasOne.touchRecord(record, name, touch);

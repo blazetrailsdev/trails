@@ -1,6 +1,13 @@
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { hexdigest, isBlank, toFs } from "@blazetrails/activesupport";
-import { except, extend, isModuleIncluded, type Module, Range } from "@blazetrails/ruby-compat";
+import {
+  except,
+  extend,
+  isModuleIncluded,
+  type Module,
+  Range,
+  uniq,
+} from "@blazetrails/ruby-compat";
 import { fetch, isEmpty } from "@blazetrails/ruby-compat";
 import type { TokenDefinition } from "./token-for.js";
 import { first } from "@blazetrails/ruby-compat";
@@ -62,7 +69,6 @@ import { TableMetadata } from "./table-metadata.js";
 import { WhereClause } from "./relation/where-clause.js";
 import type { BatchEnumerator } from "./relation/batches/batch-enumerator.js";
 import {
-  touchAttributesWithTime,
   type TouchAllArgs,
   type TouchAllOptions,
   type CounterCacheTouchOption,
@@ -771,9 +777,7 @@ export class Relation<T extends Base> {
         ? await this.applyJoinDependency({}, (relation) => relation.arel())
         : this.buildArel(c);
       arel.source.left = this.table;
-      const groupValuesArelColumns = this.arelColumns(
-        Array.from(new Set(this.groupValues)),
-      ) as Nodes.Node[];
+      const groupValuesArelColumns = this.arelColumns(uniq(this.groupValues)) as Nodes.Node[];
       const havingClauseAst = this.havingClause.isEmpty() ? null : this.havingClause.ast;
       const primaryKey = this.primaryKey;
       const key = this.model.compositePrimaryKey
@@ -811,9 +815,7 @@ export class Relation<T extends Base> {
         ? await this.applyJoinDependency({}, (relation) => relation.arel())
         : this.buildArel(c);
       arel.source.left = this.table;
-      const groupValuesArelColumns = this.arelColumns(
-        Array.from(new Set(this.groupValues)),
-      ) as Nodes.Node[];
+      const groupValuesArelColumns = this.arelColumns(uniq(this.groupValues)) as Nodes.Node[];
       const havingClauseAst = this.havingClause.isEmpty() ? null : this.havingClause.ast;
       const primaryKey = this.model.primaryKey;
       const key = this.model.compositePrimaryKey
@@ -830,7 +832,7 @@ export class Relation<T extends Base> {
   async touchAll(...names: TouchAllArgs): Promise<number> {
     const { time } = extractOptionsBang(names as unknown[]) as TouchAllOptions;
 
-    return this.updateAll(touchAttributesWithTime.call(this.model, ...(names as string[]), time));
+    return this.updateAll(this.model.touchAttributesWithTime(...(names as string[]), time));
   }
 
   async findOrCreateBy(
@@ -1112,9 +1114,9 @@ export class Relation<T extends Base> {
         conn.unpreparedStatement(() => {
           if (this.isEagerLoading) {
             const manager = this._buildEagerOperandManager();
-            if (manager !== null) return conn.toSql(manager.ast);
+            if (manager !== null) return conn.toSql(manager);
           }
-          return conn.toSql(this.arel().ast);
+          return conn.toSql(this.arel());
         }) as string,
     );
   }
@@ -1395,11 +1397,7 @@ export class Relation<T extends Base> {
     if (touch) {
       const names = wrap(touch !== true ? touch : undefined) as Array<string | { time?: RubyTime }>;
       const options = extractOptionsBang(names) as TouchAllOptions;
-      const touchUpdates = touchAttributesWithTime.call(
-        this.model,
-        ...(names as string[]),
-        options.time,
-      );
+      const touchUpdates = this.model.touchAttributesWithTime(...(names as string[]), options.time);
       for (const [col, t] of Object.entries(touchUpdates)) {
         updates[col] = new Nodes.Quoted(t);
       }
@@ -1544,6 +1542,7 @@ export class Relation<T extends Base> {
     return { ...this._values };
   }
 
+  /** @missingRailsName values — PERMANENT */
   valuesForQueries(): Record<string, unknown> {
     return except(this._values, "extending", "skipQueryCache", "strictLoading");
   }

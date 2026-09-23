@@ -226,7 +226,7 @@ export function connectingTo(
   });
 }
 
-export function connectedToQ(
+export function isConnectedTo(
   this: typeof Base,
   options: { role: string; shard?: string },
 ): boolean {
@@ -409,7 +409,7 @@ export function connectionSpecificationName(this: typeof Base): string {
   }
 
   if ((this as unknown) === ActiveRecord.Base) return "ActiveRecord::Base";
-  if (typeof (this as any).primaryClassQ === "function" && (this as any).primaryClassQ()) {
+  if (typeof (this as any).isPrimaryClass === "function" && (this as any).isPrimaryClass()) {
     return "ActiveRecord::Base";
   }
   if ((this as any).isConnectionClass?.()) {
@@ -614,7 +614,7 @@ export const ConnectionHandling = {
   connectedToMany,
   connectedToAllShards,
   connectingTo,
-  connectedToQ,
+  isConnectedTo,
   whilePreventingWrites,
   prohibitShardSwapping,
   isShardSwappingProhibited,

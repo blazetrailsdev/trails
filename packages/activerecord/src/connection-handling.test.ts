@@ -230,10 +230,10 @@ describe("ConnectionHandlingTest", () => {
   });
 
   it("connected_to? checks role and shard", async () => {
-    expect(Base.connectedToQ({ role: "writing" })).toBe(true);
-    expect(Base.connectedToQ({ role: "reading" })).toBe(false);
+    expect(Base.isConnectedTo({ role: "writing" })).toBe(true);
+    expect(Base.isConnectedTo({ role: "reading" })).toBe(false);
     Base.connectedTo({ role: "reading" }, () => {
-      expect(Base.connectedToQ({ role: "reading" })).toBe(true);
+      expect(Base.isConnectedTo({ role: "reading" })).toBe(true);
     });
   });
 
@@ -695,7 +695,7 @@ describe("AbstractAdapter#isPreventingWrites stack matching", () => {
         this.abstractClass = true;
         this.connectionClass = true;
       }
-      static override primaryClassQ(): boolean {
+      static override isPrimaryClass(): boolean {
         return true;
       }
     }

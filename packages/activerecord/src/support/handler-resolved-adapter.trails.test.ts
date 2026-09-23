@@ -30,7 +30,7 @@ describe("handler-resolved adapter (Phase D-0)", () => {
     await (await Base.leaseConnection()).dropTable("handler_resolved_comments", { ifExists: true });
   });
 
-  it("connectedQ() is true after setupHandlerSuite()", () => {
+  it("isConnected() is true after setupHandlerSuite()", () => {
     expect(Base.isConnected()).toBe(true);
   });
 

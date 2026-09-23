@@ -12,6 +12,7 @@ export class BasicObjectHandler {
     this._predicateBuilder = predicateBuilder;
   }
 
+  /** @missingRailsName name — PERMANENT */
   call(attribute: Nodes.Attribute, value: unknown): Nodes.Node {
     const bind = this._predicateBuilder.buildBindAttribute(toS(attribute.name), value);
     return attribute.eq(bind);

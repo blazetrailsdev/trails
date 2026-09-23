@@ -546,7 +546,10 @@ export async function findOne(this: FinderRelation, id: unknown): Promise<any> {
   return record;
 }
 
-/** @internal */
+/**
+ * @internal
+ * @missingRailsName size — PERMANENT
+ */
 export async function findSome(this: FinderRelation, ids: unknown[]): Promise<any[]> {
   if (this.orderValues.length === 0) return (this as any).findSomeOrdered(ids);
 
@@ -576,7 +579,10 @@ export async function findSome(this: FinderRelation, ids: unknown[]): Promise<an
   return records;
 }
 
-/** @internal */
+/**
+ * @internal
+ * @missingRailsName size — PERMANENT
+ */
 export async function findSomeOrdered(this: FinderRelation, ids: unknown[]): Promise<any[]> {
   const offsetValue: number | string = (this as any).offsetValue ?? 0;
   const limitValue: number | string | null = (this as any).limitValue ?? null;

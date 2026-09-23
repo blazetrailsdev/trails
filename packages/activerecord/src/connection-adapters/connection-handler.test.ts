@@ -329,11 +329,11 @@ describe("ConnectionHandlerTest", () => {
 
   it("active connections?", async () => {
     await setupPool();
-    expect(handler.activeConnectionsQ("all")).toBeFalsy();
+    expect(handler.hasActiveConnections("all")).toBeFalsy();
     expect(await handler.retrieveConnection(connectionName)).toBeTruthy();
-    expect(handler.activeConnectionsQ("all")).toBeTruthy();
+    expect(handler.hasActiveConnections("all")).toBeTruthy();
     handler.clearActiveConnectionsBang("all");
-    expect(handler.activeConnectionsQ("all")).toBeFalsy();
+    expect(handler.hasActiveConnections("all")).toBeFalsy();
   });
 
   it("retrieve connection pool", async () => {
@@ -622,8 +622,8 @@ describe("ConnectionHandlerTest", () => {
     });
     const pool = handler.retrieveConnectionPool("primary", { role: "writing" })!;
     await pool.leaseConnection();
-    expect(handler.activeConnectionsQ("writing")).toBe(true);
-    expect(handler.activeConnectionsQ("reading")).toBe(false);
+    expect(handler.hasActiveConnections("writing")).toBe(true);
+    expect(handler.hasActiveConnections("reading")).toBe(false);
     pool.releaseConnection();
   });
 
