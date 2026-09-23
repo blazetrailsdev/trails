@@ -4,6 +4,8 @@ import { MissingTemplate } from "./error.js";
 describe("MissingTemplate", () => {
   it("inspects details with Ruby Symbol keys", () => {
     const e = new MissingTemplate([], "foo", ["parent"], false, { locale: [], handlers: [] });
-    expect(e.message).toContain("Missing template parent/foo with {:locale=>[], :handlers=>[]}.");
+    expect(e.message).toBe(
+      "Missing template parent/foo with {:locale=>[], :handlers=>[]}.\n\nSearched in:\n",
+    );
   });
 });

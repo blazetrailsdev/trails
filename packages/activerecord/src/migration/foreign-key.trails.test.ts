@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { ArgumentError } from "@blazetrails/activemodel";
 import { StatementInvalid } from "../errors.js";
 import { fixtures } from "../test-fixtures.js";
 import {
@@ -46,6 +47,19 @@ describe("removeForeignKey option narrowing", () => {
       const remaining = await conn.foreignKeys("astronauts");
       expect(remaining.map((fk) => fk.column)).toEqual(["favorite_rocket_id"]);
       expect(remaining[0].onDelete).toBe("nullify");
+    });
+  });
+});
+
+describe("removeForeignKey without a matching foreign key", () => {
+  fixtures([], { useTransactionalTests: false });
+
+  it("inspects the lookup options with Symbol keys", async () => {
+    const conn = await ambientConnection();
+    await withRocketTables(conn, async () => {
+      const e = await conn.removeForeignKey("astronauts", { column: "rocket_id" }).catch((e) => e);
+      expect(e).toBeInstanceOf(ArgumentError);
+      expect(e.message).toBe(`Table 'astronauts' has no foreign key for {:column=>"rocket_id"}`);
     });
   });
 });
