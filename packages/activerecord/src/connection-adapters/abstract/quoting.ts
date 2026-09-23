@@ -161,8 +161,8 @@ export function quoteDefaultExpression(
   if (typeof value === "function") {
     return (value as () => unknown)() as string;
   }
-  const castType = this.lookupCastType(column.sqlType ?? null);
-  return this.quote(castType.serialize(value));
+  value = this.lookupCastType(column.sqlType ?? null).serialize(value);
+  return this.quote(value);
 }
 
 export function quotedTrue(): string {

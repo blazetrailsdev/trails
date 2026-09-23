@@ -975,7 +975,6 @@ export function lookupCastTypeFromJoinDependencies(
 /**
  * @internal
  * @missingRailsCall size — PERMANENT
- * @missingRailsArgs fetch — PERMANENT
  */
 export async function typeCastPluckValues(
   this: CalculationRelation,

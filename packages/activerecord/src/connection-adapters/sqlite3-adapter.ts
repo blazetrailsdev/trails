@@ -232,6 +232,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     cache_size: 2000,
   };
 
+  /** @missingRailsName config — PERMANENT */
   constructor(config: SQLite3Config) {
     const { database, ...options } = config;
     let filename = database ?? "";
@@ -595,6 +596,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return rows?.[0]?.encoding ?? "UTF-8";
   }
 
+  /** @missingRailsName config — PERMANENT */
   isSharedCache(): boolean {
     return anybits(fetch(this._config, "flags", 0), SQLite3Constants.Open.SHAREDCACHE);
   }
@@ -675,17 +677,14 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       | { name?: string; column?: string | string[]; ifExists?: boolean },
     options: { name?: string; column?: string | string[]; ifExists?: boolean } = {},
   ): Promise<void> {
-    let column: string | string[] | undefined;
-    if (typeof columnName === "string" || Array.isArray(columnName)) {
-      column = columnName;
-    } else {
-      column = undefined;
+    if (!(typeof columnName === "string" || Array.isArray(columnName))) {
       options = { ...columnName, ...options };
+      columnName = undefined;
     }
 
-    if (options.ifExists && !(await this.indexExists(tableName, column, options))) return;
+    if (options.ifExists && !(await this.indexExists(tableName, columnName, options))) return;
 
-    const indexName = await this.indexNameForRemove(tableName, column, options);
+    const indexName = await this.indexNameForRemove(tableName, columnName, options);
 
     await this.execQuery(`DROP INDEX ${quoteColumnName(indexName)}`);
   }
@@ -695,7 +694,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   async virtualTableExists(tableName: string): Promise<boolean> {
-    return sqliteVirtualTableExists(this, tableName);
+    return sqliteVirtualTableExists.call(this, tableName);
   }
 
   static readonly VIRTUAL_TABLE_REGEX = /USING\s+(\w+)\s*\((.+)\)/i;
@@ -1383,7 +1382,10 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     return def;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsName connectionParameters — PERMANENT
+   */
   private connect(): void {
     if (this.driverIsAsync()) {
       this._asyncConnectPending = true;
@@ -1455,10 +1457,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     ).openSync;
   }
 
-  /**
-   * @missingRailsArgs fetch — PERMANENT
-   * @internal
-   */
+  /** @internal */
   override async configureConnection(): Promise<void> {
     const cfg = this._config as SQLite3Config;
     if (isRubyTruthy(cfg.timeout) && isRubyTruthy(cfg.retries)) {

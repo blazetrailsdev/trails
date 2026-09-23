@@ -354,7 +354,8 @@ export interface AbstractAdapter {
     columnName?:
       | string
       | string[]
-      | { column?: string | string[]; name?: string; ifExists?: boolean },
+      | { column?: string | string[]; name?: string; ifExists?: boolean }
+      | null,
     options?: { column?: string | string[]; name?: string; ifExists?: boolean },
   ): Promise<void>;
   renameIndex(tableName: string, oldName: string, newName: string): Promise<void>;
@@ -1287,6 +1288,7 @@ export class AbstractAdapter implements Quoting {
     }
   }
 
+  /** @missingRailsName objectId — PERMANENT */
   unpreparedStatement<T>(fn: () => Promise<T> | T): Promise<T> | T {
     let cache: Set<unknown> | undefined;
     if (
@@ -1880,7 +1882,10 @@ export class AbstractAdapter implements Quoting {
     });
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsName last — PERMANENT
+   */
   static registerClassWithLimit(
     this: Pick<typeof AbstractAdapter, "extractLimit">,
     mapping: TypeMap | HashLookupTypeMap,
@@ -1893,6 +1898,7 @@ export class AbstractAdapter implements Quoting {
     });
   }
 
+  /** @missingRailsName last — PERMANENT */
   static registerClassWithPrecision(
     this: Pick<typeof AbstractAdapter, "extractPrecision">,
     mapping: TypeMap | HashLookupTypeMap,

@@ -178,6 +178,7 @@ export class TimeWithZone {
     return time.plus(offset);
   }
 
+  /** @missingRailsName time — PERMANENT */
   private _getPeriodAndEnsureValidLocalTime(period: TimezonePeriod | null): TimezonePeriod {
     if (!(this._time instanceof Time) || !this._time.isUtc()) {
       this._time = this._transferTimeValuesToUtcConstructor(this._time!);
@@ -238,6 +239,7 @@ export class TimeWithZone {
     }
   }
 
+  /** @missingRailsName utc — PERMANENT */
   get period(): TimezonePeriod {
     return (this._period ??= this._timeZone.periodForUtc(this._utc!));
   }

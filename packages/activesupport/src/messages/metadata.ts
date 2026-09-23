@@ -183,6 +183,7 @@ export abstract class Metadata {
     return this.encode(this.serialize(data) as string, { urlSafe: false });
   }
 
+  /** @missingRailsName decode — PERMANENT */
   protected deserializeFromJsonSafeString(string: string): unknown {
     return this.deserialize(this.decode(string, { urlSafe: false }).toString("latin1"));
   }

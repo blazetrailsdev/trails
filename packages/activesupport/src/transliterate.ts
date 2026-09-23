@@ -3,6 +3,7 @@ import { Unicode } from "./multibyte/unicode.js";
 import { I18n } from "./i18n.js";
 import { rbObjClass, regexpEscape } from "@blazetrails/ruby-compat";
 
+/** @missingRailsName unicodeNormalize — PERMANENT */
 export function transliterate(
   string: string,
   replacement = "?",

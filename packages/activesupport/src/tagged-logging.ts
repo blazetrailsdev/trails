@@ -34,6 +34,7 @@ export class TagStack {
     this._tags.length = 0;
   }
 
+  /** @missingRailsName tags — PERMANENT */
   formatMessage(message: string): string {
     if (isEmpty(this._tags)) {
       return message;

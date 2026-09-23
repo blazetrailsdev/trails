@@ -305,6 +305,7 @@ export const Extensions = {
     throw new MessagePackError("Invalid format");
   },
 
+  /** @missingRailsName class — PERMANENT */
   writeObject(object: object, packer: Packer): void {
     const klass = classOf(object);
     const o = object as { toMsgpackExt?: () => unknown; asJson?: () => unknown };

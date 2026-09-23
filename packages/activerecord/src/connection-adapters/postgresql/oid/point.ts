@@ -85,6 +85,7 @@ export class Point extends ValueType {
     return s.endsWith(".0") ? s.slice(0, -2) : s;
   }
 
+  /** @missingRailsName float — PERMANENT */
   private buildPoint(x: unknown, y: unknown): PointValue {
     return new PointValue(kernelFloat(x), kernelFloat(y));
   }

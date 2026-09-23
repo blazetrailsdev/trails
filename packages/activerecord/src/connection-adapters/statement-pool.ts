@@ -19,15 +19,18 @@ export class StatementPool<T = unknown> {
     return this.cache.get(key);
   }
 
-  /** @missingRailsCall last — PERMANENT */
+  /**
+   * @missingRailsCall last — PERMANENT
+   * @missingRailsName last — PERMANENT
+   */
   set(key: string, stmt: T): void | Promise<void> {
     let deallocating: Promise<void> | undefined;
     while (this._statementLimit <= this.cache.size) {
-      const [firstKey, evicted] = this.cache.entries().next().value!;
-      this.cache.delete(firstKey);
+      const shifted = this.cache.entries().next().value!;
+      this.cache.delete(shifted[0]);
       deallocating = deallocating
-        ? deallocating.then(() => this.dealloc(evicted))
-        : (this.dealloc(evicted) ?? undefined);
+        ? deallocating.then(() => this.dealloc(shifted.at(-1) as T))
+        : (this.dealloc(shifted.at(-1) as T) ?? undefined);
     }
     this.cache.set(key, stmt);
     return deallocating;

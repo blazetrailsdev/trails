@@ -1,5 +1,5 @@
 import { Date, DateTime, Temporal, Time } from "@blazetrails/date";
-import { Rational, RuntimeError } from "@blazetrails/ruby-compat";
+import { Rational, rational, RuntimeError } from "@blazetrails/ruby-compat";
 
 import { Duration } from "../duration.js";
 import { clock, currentTimeInstant } from "../time-travel.js";
@@ -172,7 +172,7 @@ export function travelTo(
       now.hour,
       now.min,
       now.sec,
-      new Rational(now.utcOffset, 86400),
+      rational(now.utcOffset, 86400),
     );
   });
 

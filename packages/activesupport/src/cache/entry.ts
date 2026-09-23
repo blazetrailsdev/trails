@@ -40,6 +40,7 @@ export class Entry {
     this._compressed = options.compressed === true;
   }
 
+  /** @missingRailsName value — PERMANENT */
   get value(): unknown {
     return this.isCompressed() ? this.uncompress(this._value as string) : this._value;
   }

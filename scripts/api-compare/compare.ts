@@ -2068,6 +2068,18 @@ export function usedForAnyOwner(
   return seen ? union : undefined;
 }
 
+/** Mark a tagged declaration COMPARED the moment any of its call-site pairs
+ *  is compared, not only when a tag suppresses a mismatch. `staleCallTags`
+ *  skips an unseeded key as "not compared", so seeding only on suppression
+ *  hides a tag whose call site has since converged. */
+export function seedComparedTagKey(
+  used: Map<string, Set<string>>,
+  tags: ReadonlyMap<string, string> | undefined,
+  key: string,
+): void {
+  if (tags && !used.has(key)) used.set(key, new Set());
+}
+
 /** Every tagged call on a COMPARED (tsFile, tsClass, tsName) that never
  *  suppressed a flag — the tag's stale half. Sorted for a deterministic
  *  artifact. A pair whose owning class stayed unresolved recorded its
@@ -4682,7 +4694,7 @@ export function main() {
           tsMissingNameTagsByFileName.get(tsFile)?.get(tsName),
           tsClass,
         );
-        const nameTagKey = callTagKey(tsFile, tsClass ?? "*", tsName);
+        const tagKey = callTagKey(tsFile, tsClass ?? "*", tsName);
         for (const { ruby, ts } of pairCallSites(rubySites, tsSites)) {
           const result = compareCallArgs(
             ruby,
@@ -4696,17 +4708,15 @@ export function main() {
             continue;
           }
           callArgsCompared++;
-          if (nameTags && !nameTagsUsed.has(nameTagKey)) nameTagsUsed.set(nameTagKey, new Set());
+          seedComparedTagKey(argTagsUsed, argTags, tagKey);
+          seedComparedTagKey(nameTagsUsed, nameTags, tagKey);
           if (result.verdict !== "mismatch") continue;
           // A call-site receipt (`@missingRailsArgs <call> — <reason>`) takes
           // this deviation off the baseline: the reason is reviewed in the diff
           // where the code is, exactly as `@missingRailsCall` does for the
           // call-SET gate.
           if (argTags?.has(ruby.name)) {
-            const tagKey = callTagKey(tsFile, tsClass ?? "*", tsName);
-            (argTagsUsed.get(tagKey) ?? argTagsUsed.set(tagKey, new Set()).get(tagKey)!).add(
-              ruby.name,
-            );
+            argTagsUsed.get(tagKey)!.add(ruby.name);
             suppressedArgCalls.push({
               tsFile,
               rubyName,
@@ -4727,7 +4737,7 @@ export function main() {
                     : [];
                 })
               : [];
-          for (const r of receipts) nameTagsUsed.get(nameTagKey)!.add(r);
+          for (const r of receipts) nameTagsUsed.get(tagKey)!.add(r);
           callArgMismatches.push({
             rubyFile,
             tsFile,

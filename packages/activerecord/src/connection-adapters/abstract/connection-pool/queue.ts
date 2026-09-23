@@ -106,6 +106,10 @@ interface BiasableQueueHost {
   _cond: Cond;
 }
 
+/**
+ * @missingRailsName lock — PERMANENT
+ * @missingRailsName cond — PERMANENT
+ */
 export function withABiasFor<T>(this: BiasableQueueHost, thread: unknown, fn: () => T): T {
   let previousCond: Cond | null = null;
   let newCond: BiasedConditionVariable | null = null;

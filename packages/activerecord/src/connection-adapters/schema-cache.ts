@@ -97,7 +97,7 @@ export class SchemaCache {
   private _columns = new Map<string, Column[]>();
   private _columnsHash = new Map<string, Record<string, Column>>();
   private _primaryKeys = new Map<string, string | string[] | null>();
-  private _dataSourceExists = new Map<string, boolean>();
+  private _dataSources = new Map<string, boolean>();
   private _indexes = new Map<string, IndexDefinition[]>();
   private _version: string | number | null = null;
 
@@ -127,7 +127,7 @@ export class SchemaCache {
     dup._columns = new Map(this._columns);
     dup._columnsHash = new Map(this._columnsHash);
     dup._primaryKeys = new Map(this._primaryKeys);
-    dup._dataSourceExists = new Map(this._dataSourceExists);
+    dup._dataSources = new Map(this._dataSources);
     dup._indexes = new Map(this._indexes);
     dup._version = this._version;
     return dup;
@@ -144,7 +144,7 @@ export class SchemaCache {
         ]),
     );
     coder["primary_keys"] = Object.fromEntries([...this._primaryKeys].sort(byKey));
-    coder["data_sources"] = Object.fromEntries([...this._dataSourceExists].sort(byKey));
+    coder["data_sources"] = Object.fromEntries([...this._dataSources].sort(byKey));
     coder["indexes"] = Object.fromEntries([...this._indexes].sort(byKey));
     coder["version"] = this._version;
   }
@@ -170,7 +170,7 @@ export class SchemaCache {
 
     this._primaryKeys = new Map(coderEntries<string | string[] | null>(coder["primary_keys"]));
 
-    this._dataSourceExists = new Map(coderEntries<boolean>(coder["data_sources"]));
+    this._dataSources = new Map(coderEntries<boolean>(coder["data_sources"]));
 
     this._indexes = new Map(
       coderEntries<unknown[]>(coder["indexes"]).map(([table, idx]) => [
@@ -215,21 +215,21 @@ export class SchemaCache {
 
   async dataSourceExists(pool: unknown, name: string): Promise<boolean | undefined> {
     if (this.isIgnoredTable(name)) return undefined;
-    if (this._dataSourceExists.size === 0) {
+    if (this._dataSources.size === 0) {
       const tables = await this.tablesToCache(pool);
       for (const source of tables) {
-        this._dataSourceExists.set(source, true);
+        this._dataSources.set(source, true);
       }
     }
 
-    if (this._dataSourceExists.has(name)) {
-      return this._dataSourceExists.get(name);
+    if (this._dataSources.has(name)) {
+      return this._dataSources.get(name);
     }
 
     return withConnection(pool, async (connection) => {
       if (typeof connection.dataSourceExists === "function") {
         const exists = await connection.dataSourceExists(name);
-        this._dataSourceExists.set(name, exists);
+        this._dataSources.set(name, exists);
         return exists;
       }
       return undefined;
@@ -301,7 +301,7 @@ export class SchemaCache {
    * @noRailsEquivalent PERMANENT
    */
   getCachedDataSourceExists(name: string): boolean | undefined {
-    return this._dataSourceExists.get(name);
+    return this._dataSources.get(name);
   }
 
   /**
@@ -348,10 +348,7 @@ export class SchemaCache {
 
   get size(): number {
     return (
-      this._columns.size +
-      this._columnsHash.size +
-      this._primaryKeys.size +
-      this._dataSourceExists.size
+      this._columns.size + this._columnsHash.size + this._primaryKeys.size + this._dataSources.size
     );
   }
 
@@ -359,7 +356,7 @@ export class SchemaCache {
     this._columns.delete(name);
     this._columnsHash.delete(name);
     this._primaryKeys.delete(name);
-    this._dataSourceExists.delete(name);
+    this._dataSources.delete(name);
     this._indexes.delete(name);
   }
 
@@ -374,7 +371,7 @@ export class SchemaCache {
       hash[col.name] = col;
     }
     this._columnsHash.set(tableName, hash);
-    this._dataSourceExists.set(tableName, true);
+    this._dataSources.set(tableName, true);
   }
 
   async addAll(pool: unknown): Promise<void> {
@@ -404,7 +401,7 @@ export class SchemaCache {
       columnsData,
       {},
       Object.fromEntries(this._primaryKeys),
-      Object.fromEntries(this._dataSourceExists),
+      Object.fromEntries(this._dataSources),
       Object.fromEntries(this._indexes),
     ];
   }
@@ -420,9 +417,7 @@ export class SchemaCache {
     this._primaryKeys = new Map(
       Object.entries((primaryKeys as Record<string, string | string[] | null>) ?? {}),
     );
-    this._dataSourceExists = new Map(
-      Object.entries((dataSources as Record<string, boolean>) ?? {}),
-    );
+    this._dataSources = new Map(Object.entries((dataSources as Record<string, boolean>) ?? {}));
     this._indexes = new Map(
       Object.entries((indexes as Record<string, unknown[]>) ?? {}).map(([table, idx]) => [
         table,
@@ -433,6 +428,12 @@ export class SchemaCache {
     this.deriveColumnsHashAndDeduplicateValues();
   }
 
+  /**
+   * @missingRailsName columns — PERMANENT
+   * @missingRailsName primaryKeys — PERMANENT
+   * @missingRailsName dataSources — PERMANENT
+   * @missingRailsName indexes — PERMANENT
+   */
   private deriveColumnsHashAndDeduplicateValues(): void {
     this._columns = deepDeduplicate(this._columns);
     this._columnsHash.clear();
@@ -444,7 +445,7 @@ export class SchemaCache {
       this._columnsHash.set(table, hash);
     }
     this._primaryKeys = deepDeduplicate(this._primaryKeys);
-    this._dataSourceExists = deepDeduplicate(this._dataSourceExists);
+    this._dataSources = deepDeduplicate(this._dataSources);
     this._indexes = deepDeduplicate(this._indexes);
   }
 
@@ -626,6 +627,7 @@ export class SchemaReflection {
     return this._cachePromise;
   }
 
+  /** @missingRailsName cachePath — PERMANENT */
   private possibleCacheAvailable(): boolean {
     if (!SchemaReflection.useSchemaCacheDump) return false;
     if (!this._cachePath) return false;

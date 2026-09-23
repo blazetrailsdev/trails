@@ -54,7 +54,7 @@ export class NilClass {
 }
 
 export class String {
-  static asJson(value: string): string {
+  static asJson(value: string, options: EncodeOptions | null = null): string {
     return value;
   }
 }

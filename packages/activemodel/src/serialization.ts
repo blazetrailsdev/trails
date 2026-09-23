@@ -7,6 +7,13 @@ export interface SerializationRecord {
   _attributes?: unknown;
   attributes?: Record<string, unknown>;
   constructor: { name: string };
+  readAttributeForSerialization(key: string): unknown;
+  attributeNamesForSerialization(): string[];
+  serializableAttributes(attributeNames: readonly string[]): Record<string, unknown>;
+  serializableAddIncludes(
+    options: SerializeOptions,
+    block: (association: string, records: unknown, opts: SerializeOptions) => void,
+  ): void;
 }
 
 export type SerializableHash = Record<string, unknown> & PromiseLike<Record<string, unknown>>;
@@ -25,14 +32,9 @@ export function serializableHash(
       },
     );
   }
-  const instanceAttrNames = (this as { attributeNamesForSerialization?: () => string[] })
-    .attributeNamesForSerialization;
-  let attributeNames =
-    typeof instanceAttrNames === "function"
-      ? instanceAttrNames.call(this)
-      : attributeNamesForSerialization(this);
+  let attributeNames = this.attributeNamesForSerialization();
 
-  if (isBlank(options)) return serializableAttributes(this, attributeNames);
+  if (isBlank(options)) return this.serializableAttributes(attributeNames);
 
   if (options.only != null) {
     const present = new Set(attributeNames);
@@ -45,10 +47,10 @@ export function serializableHash(
     attributeNames = attributeNames.filter((k) => !except.includes(k));
   }
 
-  const result = serializableAttributes(this, attributeNames);
+  const result = this.serializableAttributes(attributeNames);
 
   for (const method of rubyArray(options.methods)) {
-    const value = (this as Record<string, unknown>)[method];
+    const value = (this as unknown as Record<string, unknown>)[method];
     if (typeof value === "function") {
       safeSet(result, method, (value as () => unknown).call(this));
     } else if (method in this) {
@@ -60,7 +62,7 @@ export function serializableHash(
     }
   }
 
-  serializableAddIncludes(this, options, (assocName, records, opts) => {
+  this.serializableAddIncludes(options, (assocName, records, opts) => {
     if (isSerializableCollection(records)) {
       if ((records as { loaded?: unknown }).loaded === false) {
         throw new RuntimeError(
@@ -102,12 +104,17 @@ export function serializableHash(
 export class Serialization {
   declare serializableHash: typeof serializableHash;
 
-  readAttributeForSerialization(key: string): unknown {
-    return readAttributeForSerialization(this as unknown as SerializationRecord, key);
-  }
-}
+  declare readAttributeForSerialization: typeof readAttributeForSerialization;
 
-Serialization.prototype.serializableHash = serializableHash;
+  /** @internal */
+  declare attributeNamesForSerialization: typeof attributeNamesForSerialization;
+
+  /** @internal */
+  declare serializableAttributes: typeof serializableAttributes;
+
+  /** @internal */
+  declare serializableAddIncludes: typeof serializableAddIncludes;
+}
 
 export interface SerializeOptions {
   only?: string | string[];
@@ -119,14 +126,14 @@ export interface SerializeOptions {
     | string;
 }
 
-export function readAttributeForSerialization(record: SerializationRecord, key: string): unknown {
-  const attrStore = record._attributes as AttributeStore;
+export function readAttributeForSerialization(this: SerializationRecord, key: string): unknown {
+  const attrStore = this._attributes as AttributeStore;
   const hasStore =
     (attrStore && typeof (attrStore as { fetchValue?: unknown }).fetchValue === "function") ||
     attrStore instanceof Map;
 
-  const inRecord = key in (record as object);
-  const reader = inRecord ? (record as Record<string, unknown>)[key] : undefined;
+  const inRecord = key in (this as object);
+  const reader = inRecord ? (this as unknown as Record<string, unknown>)[key] : undefined;
 
   if (inRecord && typeof reader !== "function") return reader;
 
@@ -142,15 +149,13 @@ export function readAttributeForSerialization(record: SerializationRecord, key: 
       : (attrStore as { fetchValue(k: string): unknown }).fetchValue(key);
   }
 
-  if (inRecord) return (reader as () => unknown).call(record);
-  throw new NoMethodError(
-    `undefined method '${key}' for an instance of ${record.constructor.name}`,
-  );
+  if (inRecord) return (reader as () => unknown).call(this);
+  throw new NoMethodError(`undefined method '${key}' for an instance of ${this.constructor.name}`);
 }
 
 /** @internal */
-export function attributeNamesForSerialization(record: SerializationRecord): string[] {
-  const attrStore = record._attributes as AttributeStore;
+export function attributeNamesForSerialization(this: SerializationRecord): string[] {
+  const attrStore = this._attributes as AttributeStore;
   let keys: string[];
   if (
     attrStore &&
@@ -160,8 +165,8 @@ export function attributeNamesForSerialization(record: SerializationRecord): str
     keys = (attrStore as { keys(): string[] }).keys();
   } else if (attrStore instanceof Map) {
     keys = Array.from(attrStore.keys());
-  } else if (record.attributes) {
-    keys = Object.keys(record.attributes);
+  } else if (this.attributes) {
+    keys = Object.keys(this.attributes);
   } else {
     keys = [];
   }
@@ -177,27 +182,21 @@ type AttributeStore =
 
 /** @internal */
 export function serializableAttributes(
-  record: SerializationRecord,
+  this: SerializationRecord,
   attributeNames: readonly string[],
 ): Record<string, unknown> {
-  const instanceRead = (record as { readAttributeForSerialization?: (key: string) => unknown })
-    .readAttributeForSerialization;
-  const read =
-    typeof instanceRead === "function"
-      ? (n: string) => instanceRead.call(record, n)
-      : (n: string) => readAttributeForSerialization(record, n);
   const result: Record<string, unknown> = {};
   for (const n of attributeNames) {
-    safeSet(result, n, read(n));
+    safeSet(result, n, this.readAttributeForSerialization(n));
   }
   return result;
 }
 
 /** @internal */
 export function serializableAddIncludes(
-  record: SerializationRecord,
+  this: SerializationRecord,
   options: SerializeOptions = {},
-  callback: (association: string, records: unknown, opts: SerializeOptions) => void,
+  block: (association: string, records: unknown, opts: SerializeOptions) => void,
 ): void {
   const includeOpt = options.include as
     | string
@@ -223,12 +222,18 @@ export function serializableAddIncludes(
   }
 
   for (const [assocName, assocOpts] of Object.entries(includes)) {
-    const records = sendAssociation(record, assocName);
+    const records = sendAssociation(this, assocName);
     if (records !== null && records !== undefined) {
-      callback(assocName, records, assocOpts);
+      block(assocName, records, assocOpts);
     }
   }
 }
+
+Serialization.prototype.serializableHash = serializableHash;
+Serialization.prototype.readAttributeForSerialization = readAttributeForSerialization;
+Serialization.prototype.attributeNamesForSerialization = attributeNamesForSerialization;
+Serialization.prototype.serializableAttributes = serializableAttributes;
+Serialization.prototype.serializableAddIncludes = serializableAddIncludes;
 
 function isIncludeHash(value: unknown): value is Record<string, SerializeOptions> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -351,7 +356,7 @@ function sendAssociation(record: SerializationRecord, name: string): unknown {
       `undefined method '${name}' for an instance of ${record.constructor.name}`,
     );
   }
-  const reader = (record as Record<string, unknown>)[name];
+  const reader = (record as unknown as Record<string, unknown>)[name];
   return typeof reader === "function" ? (reader as () => unknown).call(record) : reader;
 }
 

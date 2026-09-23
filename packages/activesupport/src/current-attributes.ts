@@ -48,6 +48,7 @@ export abstract class CurrentAttributes {
   /**
    * @missingRailsCall generate — PERMANENT
    * @missingRailsCall merge — PERMANENT
+   * @missingRailsName generatedAttributeMethods — PERMANENT
    */
   static attribute(...args: unknown[]): void {
     const ctor = this as unknown as CurrentAttributesClass;

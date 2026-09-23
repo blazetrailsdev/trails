@@ -289,14 +289,14 @@ export function cacheableQuery(
   return [query, binds];
 }
 
-export function queryValue(
+export async function queryValue(
   this: DatabaseStatementsHost,
   sql: string,
   name?: string | null,
   binds?: unknown[],
   options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
 ): Promise<unknown> {
-  return query.call(this, sql, name, binds, options).then((rows) => singleValueFromRows(rows));
+  return singleValueFromRows(await query.call(this, sql, name, binds, options));
 }
 
 export function queryValues(
@@ -349,6 +349,7 @@ export function explain(
   throw new NotImplementedError();
 }
 
+/** @missingRailsName buildTruncateStatement — PERMANENT */
 export async function truncate(
   this: DatabaseStatementsHost &
     Required<Pick<DatabaseStatementsHost, "execute">> &
@@ -356,8 +357,10 @@ export async function truncate(
   tableName: string,
   name: string | null = null,
 ): Promise<unknown> {
-  const sql = (this.buildTruncateStatement ?? buildTruncateStatement).call(this, tableName);
-  return this.execute(sql, name);
+  return this.execute(
+    (this.buildTruncateStatement ?? buildTruncateStatement).call(this, tableName),
+    name,
+  );
 }
 
 export async function truncateTables(
@@ -537,6 +540,7 @@ export function isTransactionOpen(this: DatabaseStatementsHost): boolean {
   return this.currentTransaction().open;
 }
 
+/** @missingRailsName ensureFinalize — PERMANENT */
 export function addTransactionRecord(
   this: DatabaseStatementsHost,
   record: unknown,
@@ -1303,7 +1307,7 @@ export function select(
       allowRetry: options?.allowRetry,
     });
     if (async != null && async !== false) {
-      return result.then((r) => FutureResult.wrap(r));
+      return result.then((result) => FutureResult.wrap(result));
     } else {
       return result;
     }

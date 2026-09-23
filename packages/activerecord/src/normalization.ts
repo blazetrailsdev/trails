@@ -29,7 +29,6 @@ export function normalizeAttribute(this: NormalizationRecord, name: string): voi
 }
 
 export const ClassMethods = {
-  /** @missingRailsArgs new — PERMANENT */
   normalizes(this: NormalizationClass, ...args: NormalizesArgs): void {
     const options = args[args.length - 1] as {
       with: (value: unknown) => unknown;

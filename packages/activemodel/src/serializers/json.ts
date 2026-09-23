@@ -6,7 +6,6 @@ import {
   serializableAddIncludes,
   asJsonThenable,
   type SerializeOptions,
-  type SerializationRecord,
 } from "../serialization.js";
 import { ModelName, Naming } from "../naming.js";
 import {
@@ -57,32 +56,25 @@ export class JSON {
     return this;
   }
 
-  serializableHash(options?: SerializeOptions): Record<string, unknown> {
-    return serializableHash.call(this as unknown as SerializationRecord, options);
-  }
+  declare serializableHash: typeof serializableHash;
 
   /** @internal */
-  protected attributeNamesForSerialization(): string[] {
-    return attributeNamesForSerialization(this as unknown as SerializationRecord);
-  }
+  declare attributeNamesForSerialization: typeof attributeNamesForSerialization;
 
   /** @internal */
-  protected serializableAttributes(attributeNames: readonly string[]): Record<string, unknown> {
-    return serializableAttributes(this as unknown as SerializationRecord, attributeNames);
-  }
+  declare serializableAttributes: typeof serializableAttributes;
 
-  readAttributeForSerialization(key: string): unknown {
-    return readAttributeForSerialization(this as unknown as SerializationRecord, key);
-  }
+  declare readAttributeForSerialization: typeof readAttributeForSerialization;
 
   /** @internal */
-  protected serializableAddIncludes(
-    options: SerializeOptions = {},
-    callback: (association: string, records: unknown, opts: SerializeOptions) => void = () => {},
-  ): void {
-    serializableAddIncludes(this as unknown as SerializationRecord, options, callback);
-  }
+  declare serializableAddIncludes: typeof serializableAddIncludes;
 }
+
+JSON.prototype.serializableHash = serializableHash;
+JSON.prototype.attributeNamesForSerialization = attributeNamesForSerialization;
+JSON.prototype.serializableAttributes = serializableAttributes;
+JSON.prototype.readAttributeForSerialization = readAttributeForSerialization;
+JSON.prototype.serializableAddIncludes = serializableAddIncludes;
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (core_ext/object/json.rb:47-49); the class/interface merge is how `include()` surfaces on the type side.
 export interface JSON {

@@ -174,7 +174,8 @@ export class SafeBuffer {
   }
 
   bytesplice(...args: [...(number | Range<number>)[], unknown]): this {
-    const value = toStr(this.implicitHtmlEscapeInterpolatedArgument(args.pop()));
+    let value = args.pop();
+    value = toStr(this.implicitHtmlEscapeInterpolatedArgument(value));
     const bytes = new TextEncoder().encode(this._value);
     const [start, length] =
       args[0] instanceof Range

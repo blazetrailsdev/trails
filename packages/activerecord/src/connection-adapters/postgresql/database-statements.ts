@@ -47,10 +47,9 @@ export async function explain(
   binds: unknown[] = [],
   options: ExplainOption[] = [],
 ): Promise<string> {
-  const explainSql = (await this.buildExplainClause(options)) + " " + this.toSql(arel, binds);
-  const result = await this.internalExecQuery(explainSql, "EXPLAIN", binds);
-  const printer = new ExplainPrettyPrinter();
-  return printer.pp(result);
+  const sql = (await this.buildExplainClause(options)) + " " + this.toSql(arel, binds);
+  const result = await this.internalExecQuery(sql, "EXPLAIN", binds);
+  return new ExplainPrettyPrinter().pp(result);
 }
 
 export function isWriteQuery(sql: string | null): boolean {
@@ -176,7 +175,6 @@ export async function beginDbTransaction(this: TransactionHost): Promise<void> {
   }
 }
 
-/** @missingRailsArgs fetch — PERMANENT */
 export async function beginIsolatedDbTransaction(
   this: TransactionHost,
   isolation: string,
@@ -370,7 +368,11 @@ export async function castResult(this: CastResultHost, result: PGResult): Promis
     const fmod = result.fmod(i);
     types[fname] = types[i] = await this.getOidType(ftype, fmod, fname);
   }
-  const arResult = new Result(fields, result.values(), types as Record<string, ValueType>);
+  const arResult = new Result(
+    fields,
+    result.values(),
+    Object.freeze(types) as Record<string, ValueType>,
+  );
   result.clear();
   return arResult;
 }

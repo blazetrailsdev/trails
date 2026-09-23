@@ -12,6 +12,7 @@ import {
   stringSplit,
 } from "@blazetrails/ruby-compat";
 import { String as JsonString } from "../core-ext/object/json.js";
+import type { EncodeOptions } from "../json/encoding.js";
 import { truncateBytes } from "../string-utils.js";
 import { Unicode } from "./unicode.js";
 
@@ -109,6 +110,7 @@ export class Chars {
     return this.chars(truncateBytes(this.wrappedString, limit, { omission: null }));
   }
 
+  /** @missingRailsName gsub — PERMANENT */
   titleize(): Chars {
     return this.chars(
       this.wrappedString
@@ -139,8 +141,8 @@ export class Chars {
     return this.chars(Unicode.tidyBytes(this.wrappedString, force));
   }
 
-  asJson(_options: unknown = null): unknown {
-    return JsonString.asJson(this.toS());
+  asJson(options: EncodeOptions | null = null): unknown {
+    return JsonString.asJson(this.toS(), options);
   }
 
   reverseBang(...args: []): this {

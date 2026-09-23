@@ -73,16 +73,19 @@ export async function removeForeignKey(
   toTable?: string | RemoveForeignKeyOptions,
   options: RemoveForeignKeyOptions = {},
 ): Promise<void> {
-  let to = typeof toTable === "string" ? toTable : undefined;
-  const opts: RemoveForeignKeyOptions =
-    typeof toTable === "object" && toTable !== null ? { ...toTable, ...options } : { ...options };
-  const ifExists = opts.ifExists === true;
-  delete opts.ifExists;
+  if (typeof toTable === "object" && toTable !== null) {
+    options = { ...toTable, ...options };
+    toTable = undefined;
+  } else {
+    options = { ...options };
+  }
+  const ifExists = options.ifExists === true;
+  delete options.ifExists;
 
-  if (ifExists && !(await this.foreignKeyExists(fromTable, to))) return;
+  if (ifExists && !(await this.foreignKeyExists(fromTable, toTable))) return;
 
-  to ??= opts.toTable;
-  let matchOptions: ForeignKeyLookupOptions = { ...opts };
+  toTable ??= options.toTable;
+  let matchOptions: ForeignKeyLookupOptions = { ...options };
   delete matchOptions.name;
   delete matchOptions.toTable;
   delete matchOptions.validate;
@@ -90,8 +93,8 @@ export async function removeForeignKey(
   const foreignKeys = await this.foreignKeys(fromTable);
   const fkey = foreignKeys.find((fk) => {
     let table: string;
-    if (to != null) {
-      table = to;
+    if (toTable != null) {
+      table = toTable;
     } else {
       table = toS(matchOptions.column).replace(/_id$/, "");
       table = ActiveRecord.Base.pluralizeTableNames ? pluralize(table) : table;
@@ -110,7 +113,7 @@ export async function removeForeignKey(
 
   if (!fkey) {
     throw new ArgumentError(
-      `Table '${fromTable}' has no foreign key for ${to ?? toS(symbolizeKeys(matchOptions as Record<string, unknown>))}`,
+      `Table '${fromTable}' has no foreign key for ${toTable ?? toS(symbolizeKeys(matchOptions as Record<string, unknown>))}`,
     );
   }
 
@@ -240,16 +243,12 @@ export async function indexes(
 
 /** @missingRailsCall any? — PERMANENT */
 export async function virtualTableExists(
-  adapter: DatabaseAdapter,
+  this: SQLite3SchemaAdapter,
   tableName: string,
 ): Promise<boolean> {
   return (
-    (
-      await adapter.queryValues(
-        dataSourceSql.call(adapter, tableName, { type: "VIRTUAL TABLE" }),
-        "SCHEMA",
-      )
-    ).length > 0
+    (await this.queryValues(this.dataSourceSql(tableName, { type: "VIRTUAL TABLE" }), "SCHEMA"))
+      .length > 0
   );
 }
 

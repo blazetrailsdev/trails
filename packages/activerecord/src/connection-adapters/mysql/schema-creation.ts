@@ -3,7 +3,6 @@ import {
   type SchemaCreationConn,
 } from "../abstract/schema-creation.js";
 import type {
-  ColumnOptions,
   AddColumnDefinition,
   AddIndexOptions,
   TableDefinitionConn,
@@ -140,26 +139,25 @@ export class SchemaCreation extends AbstractSchemaCreation {
   /** @internal */
   protected override async addColumnOptionsBang(
     sql: string,
-    options: ColumnOptions,
+    options: MysqlColumnOptions,
   ): Promise<string> {
-    const mo = options as MysqlColumnOptions;
-    const col = mo.column;
-    if (col && /^\btimestamp\b/.test(col.sqlType ?? col.type ?? "") && !mo.primaryKey) {
-      if (mo.null !== false && !this.optionsIncludeDefault(mo)) {
+    const col = options.column;
+    if (col && /^\btimestamp\b/.test(col.sqlType ?? col.type ?? "") && !options.primaryKey) {
+      if (options.null !== false && !this.optionsIncludeDefault(options)) {
         sql += " NULL";
       }
     }
-    if (mo.charset) {
-      sql += ` CHARACTER SET ${mo.charset}`;
+    if (options.charset) {
+      sql += ` CHARACTER SET ${options.charset}`;
     }
-    if (mo.collation) {
-      sql += ` COLLATE ${mo.collation}`;
+    if (options.collation) {
+      sql += ` COLLATE ${options.collation}`;
     }
-    if (mo.as) {
-      sql += ` AS (${mo.as})`;
-      if (mo.stored) sql += (await this.isMariadb()) ? " PERSISTENT" : " STORED";
+    if (options.as) {
+      sql += ` AS (${options.as})`;
+      if (options.stored) sql += (await this.isMariadb()) ? " PERSISTENT" : " STORED";
     }
-    return this.addSqlCommentBang(await super.addColumnOptionsBang(sql, options), mo.comment);
+    return this.addSqlCommentBang(await super.addColumnOptionsBang(sql, options), options.comment);
   }
 
   /** @internal */
