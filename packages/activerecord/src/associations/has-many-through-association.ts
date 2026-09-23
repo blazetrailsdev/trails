@@ -420,8 +420,7 @@ function throughRecordsFor(this: HasManyThroughAssociation, record: Base): Base[
     Object.entries(joinAttrs).every(([key, val]) => {
       const joinRefl = (c.constructor as any)._reflectOnAssociation?.(key);
       if (joinRefl) {
-        const target = (c as any).association?.(key)?.target;
-        return Array.isArray(target) ? target.includes(val as Base) : target === val;
+        return rbEqual((c as any).association?.(key)?.target, val);
       }
       const actual =
         typeof (c as any).readAttribute === "function"
