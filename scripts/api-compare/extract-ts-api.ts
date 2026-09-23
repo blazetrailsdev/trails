@@ -3617,6 +3617,7 @@ export function extractClass(
       const callSeq = extractCallSeq(member.body);
       const callArgs = extractCallArgs(member.body);
       const skeleton = extractSkeleton(member.body);
+      const valueAdmitsBoolean = memberAdmitsBoolean(member, checker);
       const method: MethodInfo = {
         name: memberName,
         visibility,
@@ -3626,6 +3627,7 @@ export function extractClass(
         isStatic,
         ...(internal ? { internal: true } : {}),
         ...tagged,
+        ...(valueAdmitsBoolean !== undefined ? { admitsBoolean: valueAdmitsBoolean } : {}),
         ...(calls !== undefined ? { calls } : {}),
         ...(callSeq !== undefined ? { callSeq } : {}),
         ...(callArgs !== undefined ? { callArgs } : {}),
@@ -3668,6 +3670,7 @@ export function extractClass(
       const aliasParams = member.initializer
         ? paramsOfCallableRef(member.initializer, checker)
         : null;
+      const valueAdmitsBoolean = aliasParams ? undefined : memberAdmitsBoolean(member, checker);
       const method: MethodInfo = {
         name: memberName,
         visibility,
@@ -3678,6 +3681,7 @@ export function extractClass(
         ...(internal ? { internal: true } : {}),
         ...tagged,
         ...(aliasParams ? { aliasParams } : {}),
+        ...(valueAdmitsBoolean !== undefined ? { admitsBoolean: valueAdmitsBoolean } : {}),
       };
       if (isStatic) {
         classMethods.push(method);
@@ -5230,6 +5234,27 @@ function admitsFunction(p: ts.ParameterDeclaration): boolean {
       t.getCallSignatures().length > 0 ||
       (t.getSymbol()?.getName() === "Function" && !(t.flags & ts.TypeFlags.Any)),
   );
+}
+
+/** `MethodInfo.admitsBoolean`; `undefined` for a callable member. */
+function memberAdmitsBoolean(
+  member: ts.GetAccessorDeclaration | ts.PropertyDeclaration,
+  checker: ts.TypeChecker,
+): boolean | undefined {
+  const signature = ts.isGetAccessorDeclaration(member)
+    ? checker.getSignatureFromDeclaration(member)
+    : undefined;
+  const type = signature
+    ? checker.getReturnTypeOfSignature(signature)
+    : checker.getTypeAtLocation(member.type ?? member);
+  return type.getCallSignatures().length > 0 ? undefined : typeAdmitsBoolean(type);
+}
+
+function typeAdmitsBoolean(type: ts.Type): boolean {
+  const open =
+    ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.BooleanLike | ts.TypeFlags.TypeParameter;
+  if (type.flags & open) return true;
+  return type.isUnionOrIntersection() && type.types.some(typeAdmitsBoolean);
 }
 
 /**

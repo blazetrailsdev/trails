@@ -5318,3 +5318,27 @@ describe("creditMixinObjectLiteralKeys", () => {
     expect(methods).toEqual([]);
   });
 });
+
+describe("admitsBoolean", () => {
+  it("records whether a getter's or value property's type can hold a boolean", () => {
+    const { instanceMethods } = extractFromSource(`
+      type Adapter = { id: number };
+      class Foo {
+        get activeConnection(): Adapter | null { return null; }
+        pending: string | null = null;
+        get inUse(): boolean | null { return null; }
+        get loose(): unknown { return null; }
+        callback: () => void = () => {};
+        isActive(): Adapter | null { return null; }
+      }
+    `);
+    expect(Object.fromEntries(instanceMethods.map((m) => [m.name, m.admitsBoolean]))).toEqual({
+      activeConnection: false,
+      pending: false,
+      inUse: true,
+      loose: true,
+      callback: undefined,
+      isActive: undefined,
+    });
+  });
+});

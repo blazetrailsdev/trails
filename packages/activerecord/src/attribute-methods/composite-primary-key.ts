@@ -30,7 +30,7 @@ export class CompositePrimaryKey extends PrimaryKey {
   override isPrimaryKeyValuesPresent(): boolean {
     const record = this as unknown as PrimaryKeyRecord;
     if ((record.constructor as any).compositePrimaryKey)
-      return (record.id as unknown[]).every((v) => v != null);
+      return [...(record.id as unknown[])].every((v) => v != null && v !== false);
     return super.isPrimaryKeyValuesPresent();
   }
 

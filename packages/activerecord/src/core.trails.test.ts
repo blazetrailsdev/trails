@@ -8,6 +8,7 @@ import { DatabaseConfigurations } from "./database-configurations.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
 import { BooleanType, IntegerType, StringType } from "@blazetrails/activemodel";
 import { establishConnectionTo } from "./test-helpers/adapter-double.js";
+import { equals as coreEquals, hash as coreHash } from "./core.js";
 
 describe("frozen / isFrozen", () => {
   fixtures(["topics"]);
@@ -219,5 +220,30 @@ describe("init_internals / initialize_dup super chain", () => {
 
     expect(duped.isNewRecord()).toBe(true);
     expect(duped.id).toBe(null);
+  });
+});
+
+describe("hash agrees with ==", () => {
+  class Keyed {}
+  const record = (id: unknown) =>
+    Object.assign(new Keyed(), { id, isPrimaryKeyValuesPresent: () => true }) as never;
+  const hashOf = (id: unknown) => coreHash.call(record(id));
+
+  it("gives ids that are never == distinct hashes", () => {
+    expect(hashOf(NaN)).not.toEqual(hashOf(NaN));
+    expect(hashOf(Symbol("x"))).not.toEqual(hashOf(Symbol("x")));
+    expect(hashOf([1, NaN])).not.toEqual(hashOf([1, NaN]));
+  });
+
+  it("gives == ids one hash", () => {
+    const id = Symbol("x");
+    expect(coreEquals.call(record(id), record(id))).toBe(true);
+    expect(hashOf(id)).toEqual(hashOf(id));
+    expect(hashOf([1, "a"])).toEqual(hashOf([1, "a"]));
+    expect(coreEquals.call(record([[1]]), record([[1]]))).toBe(true);
+    expect(hashOf([[1]])).toEqual(hashOf([[1]]));
+    expect(hashOf(Symbol.for("x"))).toEqual(hashOf(Symbol.for("x")));
+    expect(coreEquals.call(record(Array(1)), record([undefined]))).toBe(true);
+    expect(hashOf(Array(1))).toEqual(hashOf([undefined]));
   });
 });

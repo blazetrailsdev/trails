@@ -141,11 +141,22 @@ function constructorToken(ctor: object): number {
   return token;
 }
 
-function serializeIdForHash(id: unknown): string {
+const idHashTokens = new WeakMap<WeakKey, number>();
+let nextIdHashToken = 0;
+
+function serializeIdForHash(id: unknown): string | undefined {
   if (Array.isArray(id)) {
-    return `A${id.map((el) => lengthPrefixed(serializeIdForHash(el))).join("")}`;
+    const parts = [...id].map(serializeIdForHash);
+    if (parts.includes(undefined)) return undefined;
+    return `A${parts.map((part) => lengthPrefixed(part!)).join("")}`;
   }
-  return `S${typeof id}:${String(id)}`;
+  if (typeof id === "number" && Number.isNaN(id)) return undefined;
+  if (typeof id !== "symbol" && typeof id !== "function" && (typeof id !== "object" || !id)) {
+    return `S${typeof id}:${String(id)}`;
+  }
+  if (typeof id === "symbol" && Symbol.keyFor(id) !== undefined) return `R${Symbol.keyFor(id)}`;
+  if (!idHashTokens.has(id as WeakKey)) idHashTokens.set(id as WeakKey, nextIdHashToken++);
+  return `O${idHashTokens.get(id as WeakKey)}`;
 }
 
 function lengthPrefixed(value: string): string {
@@ -153,9 +164,12 @@ function lengthPrefixed(value: string): string {
 }
 
 export function hash(this: CoreRecord): unknown {
-  if ((this as unknown as { isPrimaryKeyValuesPresent(): boolean }).isPrimaryKeyValuesPresent()) {
-    return `${constructorToken(this.constructor)}#${serializeIdForHash(this.id)}`;
-  }
+  const serialized = (
+    this as unknown as { isPrimaryKeyValuesPresent(): boolean }
+  ).isPrimaryKeyValuesPresent()
+    ? serializeIdForHash(this.id)
+    : undefined;
+  if (serialized !== undefined) return `${constructorToken(this.constructor)}#${serialized}`;
   let key = identityHashKeys.get(this);
   if (key === undefined) {
     key = Symbol("record-hash");
@@ -167,7 +181,7 @@ export function hash(this: CoreRecord): unknown {
 function primaryKeyValuesEqual(a: unknown, b: unknown): boolean {
   if (Array.isArray(a) && Array.isArray(b)) {
     if (a.length !== b.length) return false;
-    return a.every((value, index) => value === b[index]);
+    return [...a].every((value, index) => primaryKeyValuesEqual(value, b[index]));
   }
   return a === b;
 }

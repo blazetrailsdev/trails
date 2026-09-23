@@ -1027,26 +1027,22 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   {
     reason:
       "The minitest runner plumbing on ActiveSupport::TestCase " +
-      "(test_case.rb): `test_order` selects minitest's shuffle seed policy, " +
-      "`parallelize` / `parallelize_setup` / `parallelize_teardown` configure " +
+      "(test_case.rb): `parallelize` / `parallelize_setup` / `parallelize_teardown` configure " +
       "the fork-based parallel runner (see the parallelization.rb group), " +
       "and `method_name` is the `alias_method :method_name, :name` onto " +
-      "Minitest::Test#name. vitest is the runner in trails: it owns ordering " +
-      "and worker parallelism, so none of these has a port to point at. (The " +
+      "Minitest::Test#name. vitest is the runner in trails: it owns worker " +
+      "parallelism, so none of these has a port to point at. `test_order` / " +
+      "`test_order=` are NOT skipped: they read and write the " +
+      "`ActiveSupport.test_order` global (test_case.rb:34-46, " +
+      "active_support.rb:100), a value seat that is portable whoever runs " +
+      "the tests. (The " +
       '`test "..." do` macro test_case.rb:153 extends in is skipped against ' +
       "its own file, testing/declarative.rb.) Scoped to test_case.rb — the assertion helpers this " +
       "file picks up by `include` (assert_not*, assert_raises, " +
       "assert_difference, assert_changes, assert_deprecated, stub_const, the " +
       "TimeHelpers travel/freeze family) are NOT skipped: they are portable and " +
       "still counted against testing/assertions.rb and its siblings.",
-    names: [
-      "method_name",
-      "test_order",
-      "test_order=",
-      "parallelize",
-      "parallelize_setup",
-      "parallelize_teardown",
-    ],
+    names: ["method_name", "parallelize", "parallelize_setup", "parallelize_teardown"],
     rubyFiles: ["test_case.rb"],
   },
   {

@@ -59,6 +59,8 @@ import {
   tsOwnerSeat,
   crossPackageIncludedMethodNames,
   predicatePairedWithBareTwin,
+  predicateKindMismatch,
+  rubyDefinitionBreakdown,
   writerPairedWithReader,
   staleCallTags,
   applyCallTags,
@@ -69,7 +71,7 @@ import {
   misplacedClusterVerdict,
   rubyMethodToTsForFqn,
 } from "./compare.js";
-import { rubyMethodToTs } from "@blazetrails/parity/conventions";
+import { SCOPED_SKIP_GROUPS, SKIP, rubyMethodToTs } from "@blazetrails/parity/conventions";
 import type {
   ApiManifest,
   ClassInfo,
@@ -3685,5 +3687,72 @@ describe("ported-with-args population", () => {
 
     expect(sigs("relation.ts", "buildFrom")).toHaveLength(1);
     expect(sigs("test-helpers/fixtures.ts", "fixtures")).toEqual([]);
+  });
+});
+
+describe("predicateKindMismatch", () => {
+  it.each([
+    ["active_connection?", "activeConnection", [false], true],
+    ["active_connection?", "isActiveConnection", [false], false],
+    ["in_use?", "inUse", [true], false],
+    ["in_use?", "inUse", [undefined], false],
+    ["in_use?", "inUse", [false, undefined], false],
+    ["active_connection", "activeConnection", [false], false],
+  ] as const)("%s matched by %s admitting %j is %s", (rubyName, tsName, admits, expected) => {
+    expect(predicateKindMismatch(rubyName, tsName, admits)).toBe(expected);
+  });
+});
+
+describe("rubyDefinitionBreakdown", () => {
+  function m(name: string, file: string): MethodInfo {
+    return { name, visibility: "public", params: [], file };
+  }
+  function entity(fqn: string, file: string, names: string[], klass: string[] = []) {
+    return {
+      fqn,
+      info: {
+        ...cls(file, fqn),
+        instanceMethods: names.map((n) => m(n, file)),
+        classMethods: klass.map((n) => m(n, file)),
+      },
+    };
+  }
+  const skipName = [...SKIP][0];
+  const scoped = SCOPED_SKIP_GROUPS.filter((g) => g.tsMirrorName === undefined)
+    .flatMap((g) => g.names.map((name) => ({ name, rubyFile: g.rubyFiles[0] })))
+    .find(({ name }) => rubyMethodToTs(name) !== null)!;
+
+  it("puts every definition in exactly one bucket", () => {
+    const breakdown = rubyDefinitionBreakdown(
+      [
+        entity("Foo", "foo.rb", ["bar", "baz", skipName, "=="], ["bar"]),
+        entity("Qux", "foo.rb", ["bar"]),
+        entity("Skipped", scoped.rubyFile, [scoped.name, "real_method"]),
+        entity("Railtie", "i18n_railtie.rb", ["bar"]),
+        entity("OnlySkipped", "only_skipped.rb", [skipName]),
+      ],
+      "activesupport",
+      () => true,
+    );
+    expect(breakdown).toEqual({
+      definitions: 10,
+      excludedFile: 1,
+      rowlessFile: 1,
+      globalSkip: 1,
+      scopedSkip: 1,
+      operator: 1,
+      sameNameCollapse: 1,
+      ownRow: 4,
+    });
+  });
+
+  it("counts only the definitions the mode admits", () => {
+    const breakdown = rubyDefinitionBreakdown(
+      [entity("Foo", "foo.rb", ["bar", "baz"])],
+      "activesupport",
+      (rm) => rm.name === "bar",
+    );
+    expect(breakdown.definitions).toBe(1);
+    expect(breakdown.ownRow).toBe(1);
   });
 });

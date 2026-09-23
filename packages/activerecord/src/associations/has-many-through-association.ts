@@ -2,7 +2,7 @@ import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
 import { HasManyAssociation } from "./has-many-association.js";
-import { NotImplementedError } from "@blazetrails/ruby-compat";
+import { Hash, NotImplementedError } from "@blazetrails/ruby-compat";
 import { underscore, singularize, isBlank } from "@blazetrails/activesupport";
 import { collectionProxyFor as collectionProxyFor } from "../associations.js";
 import { ThroughAssociation, sourceReflection, throughBuildRecord } from "./through-association.js";
@@ -73,13 +73,19 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     return a.filter((record) => this.markOccurrence(distribution, record));
   }
 
-  protected markOccurrence(distribution: Occurrences, record: Base): boolean {
-    return markOccurrence(distribution, record);
+  protected markOccurrence(distribution: Distribution, record: Base): false | Distribution {
+    return (
+      distribution.get(record.hash())! > 0 &&
+      distribution.set(record.hash(), distribution.get(record.hash())! - 1)
+    );
   }
 
-  /** @missingRailsCall new — PERMANENT */
-  protected distribution(array: Base[]): Occurrences {
-    return distribution(array);
+  protected distribution(array: Base[]): Distribution {
+    const distribution: Distribution = new Hash(0);
+    for (const record of array) {
+      distribution.set(record.hash(), distribution.get(record.hash())! + 1);
+    }
+    return distribution;
   }
 
   sourceReflection(): unknown {
@@ -449,44 +455,7 @@ function deleteThroughRecords(this: HasManyThroughAssociation, records: Base[]):
 }
 
 /** @internal */
-type Occurrences = Array<{ record: Base; count: number }>;
-
-/** @internal */
-function distribution(array: Base[]): Occurrences {
-  const distribution: Occurrences = [];
-  for (const record of array) {
-    const bucket = distribution.find((b) => b.record.equals(record));
-    if (bucket) bucket.count += 1;
-    else distribution.push({ record, count: 1 });
-  }
-  return distribution;
-}
-
-/** @internal */
-function markOccurrence(distribution: Occurrences, record: Base): boolean {
-  const bucket = distribution.find((b) => b.record.equals(record));
-  if (!bucket || bucket.count <= 0) return false;
-  bucket.count -= 1;
-  return true;
-}
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
- */
-export function multisetDifference(a: Base[], b: Base[]): Base[] {
-  const buckets = distribution(b);
-  return a.filter((record) => !markOccurrence(buckets, record));
-}
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
- */
-export function multisetIntersection(a: Base[], b: Base[]): Base[] {
-  const buckets = distribution(b);
-  return a.filter((record) => markOccurrence(buckets, record));
-}
+type Distribution = Hash<unknown, number>;
 
 /** @internal */
 interface ThroughTargetStore {
