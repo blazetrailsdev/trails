@@ -39,14 +39,12 @@ import type { UniqueConstraintOptions } from "./connection-adapters/postgresql/s
 import { CommandRecorder } from "./migration/command-recorder.js";
 import { SchemaMigration, NullSchemaMigration } from "./schema-migration.js";
 import { InternalMetadata, NullInternalMetadata } from "./internal-metadata.js";
-import { _DEFAULT_ENV } from "./connection-handling-slot.js";
+import { ActiveRecord, Migration as MigrationNamespace } from "./namespaces.js";
 import type { DatabaseConfig } from "./database-configurations/database-config.js";
-import { _Base } from "./base-slot.js";
 import { _DatabaseTasks } from "./tasks/database-tasks-slot.js";
 import type { SchemaFormat } from "./tasks/database-tasks.js";
 import type { ExecutionStrategy } from "./migration/execution-strategy.js";
 import { PendingMigrationConnection } from "./migration/pending-migration-connection.js";
-import { _Compatibility } from "./migration/compatibility-slot.js";
 import { VERSION } from "./gem-version.js";
 
 export type {
@@ -888,7 +886,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   }
 
   static get(version: string | number): typeof Migration {
-    return _Compatibility!.find(version) as typeof Migration;
+    return MigrationNamespace.Compatibility.find(version) as typeof Migration;
   }
 
   static currentVersion(): number {
@@ -1024,8 +1022,8 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   static tableNameOptions(): { tableNamePrefix: string; tableNameSuffix: string } {
     return {
-      tableNamePrefix: _Base!.tableNamePrefix,
-      tableNameSuffix: _Base!.tableNameSuffix,
+      tableNamePrefix: ActiveRecord.Base.tableNamePrefix,
+      tableNameSuffix: ActiveRecord.Base.tableNameSuffix,
     };
   }
 
@@ -1239,7 +1237,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   /** @internal */
   private static dbConfigsInCurrentEnv(): DatabaseConfig[] {
-    return _Base!.configurations().configsFor({ envName: this.env() });
+    return ActiveRecord.Base.configurations().configsFor({ envName: this.env() });
   }
 
   /**
@@ -1247,16 +1245,16 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
    * @missingRailsCall call — PERMANENT
    */
   static env(): string {
-    return _DEFAULT_ENV!();
+    return ActiveRecord.ConnectionHandling.DEFAULT_ENV();
   }
 
   /** @internal */
   private static async loadSchemaBang(): Promise<void> {
     const databaseTasks = _DatabaseTasks!;
 
-    await _Base!.connectionHandler.clearAllConnectionsBang("all");
+    await ActiveRecord.Base.connectionHandler.clearAllConnectionsBang("all");
 
-    const testConfigs = _Base!.configurations().configsFor({ envName: "test" });
+    const testConfigs = ActiveRecord.Base.configurations().configsFor({ envName: "test" });
     for (const dbConfig of testConfigs) {
       await databaseTasks.purge(dbConfig);
     }
@@ -1476,7 +1474,7 @@ export class MigrationContext<
 
   /** @missingRailsCall call — PERMANENT */
   get currentEnvironment(): string {
-    return _DEFAULT_ENV!();
+    return ActiveRecord.ConnectionHandling.DEFAULT_ENV();
   }
 
   async protectedEnvironment(this: MigrationContext): Promise<boolean> {
@@ -1757,8 +1755,8 @@ export class Migrator {
       if (this.isDown() && !applied.has(migration.version)) return undefined;
       if (this.isUp() && applied.has(migration.version)) return undefined;
 
-      if (_Base!.logger)
-        _Base!.logger.info(`Migrating to ${migration.name} (${migration.version})`);
+      if (ActiveRecord.Base.logger)
+        ActiveRecord.Base.logger.info(`Migrating to ${migration.name} (${migration.version})`);
 
       await this.ddlTransaction(migration, async () => {
         await (await migration.migration()).migrate(this._direction);
@@ -2034,8 +2032,8 @@ export class CheckPending {
 
   /** @missingRailsCall call — PERMANENT */
   private buildWatcher(block: () => Promise<void> | void): FileUpdateChecker {
-    const currentEnvironment = _DEFAULT_ENV!();
-    const allConfigs = _Base!.configurations().configsFor({
+    const currentEnvironment = ActiveRecord.ConnectionHandling.DEFAULT_ENV();
+    const allConfigs = ActiveRecord.Base.configurations().configsFor({
       envName: currentEnvironment,
     });
     const paths = [

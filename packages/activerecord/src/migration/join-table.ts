@@ -1,4 +1,4 @@
-import { _deriveJoinTableName } from "../model-schema-slot.js";
+import { ActiveRecord } from "../namespaces.js";
 
 export interface JoinTableHost {
   joinTableName(table1: string, table2: string): string;
@@ -18,5 +18,5 @@ export function findJoinTableName(
 
 /** @internal */
 export function joinTableName(table1: string, table2: string): string {
-  return _deriveJoinTableName!(table1, table2);
+  return ActiveRecord.ModelSchema.deriveJoinTableName(table1, table2);
 }

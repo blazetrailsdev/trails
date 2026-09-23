@@ -1,4 +1,4 @@
-import { _setBelongsToAssociation } from "./association-class-slots.js";
+import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
 import { underscore } from "@blazetrails/activesupport";
 import { belongsToCounterCacheColumn } from "../reflection.js";
@@ -346,4 +346,4 @@ export function inferCompositePrimaryKey(pk: string | string[]): string[] {
   return [pk];
 }
 
-_setBelongsToAssociation(BelongsToAssociation);
+Associations.BelongsToAssociation = BelongsToAssociation;

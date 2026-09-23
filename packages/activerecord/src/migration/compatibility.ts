@@ -2,7 +2,7 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { rbInspect } from "@blazetrails/ruby-compat";
 import { Current } from "../migration.js";
 import * as Compatibility from "./compatibility.js";
-import { _setCompatibility } from "./compatibility-slot.js";
+import { Migration } from "../namespaces.js";
 
 export function find(version: string | number): unknown {
   version =
@@ -25,4 +25,4 @@ export class V7_2 extends V8_0 {}
 
 export class V7_1 extends V7_2 {}
 
-_setCompatibility(Compatibility);
+Migration.Compatibility = Compatibility;

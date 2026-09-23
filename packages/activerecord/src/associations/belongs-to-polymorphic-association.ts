@@ -1,4 +1,4 @@
-import { _setBelongsToPolymorphicAssociation } from "./association-class-slots.js";
+import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
 import { modelRegistry } from "../associations.js";
 import { demodulize } from "@blazetrails/activesupport";
@@ -120,4 +120,4 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
   }
 }
 
-_setBelongsToPolymorphicAssociation(BelongsToPolymorphicAssociation);
+Associations.BelongsToPolymorphicAssociation = BelongsToPolymorphicAssociation;

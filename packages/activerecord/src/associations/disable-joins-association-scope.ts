@@ -13,7 +13,7 @@ import { WhereClause } from "../relation/where-clause.js";
 import type { ExceptKey } from "../relation/query-methods.js";
 import type { Base } from "../base.js";
 import type { AbstractReflection } from "../reflection.js";
-import { setDjasScopeBuilder } from "./_scope-slots.js";
+import { Associations } from "../namespaces.js";
 
 type ChainEntry = AbstractReflection;
 
@@ -188,6 +188,4 @@ export class DisableJoinsAssociationScope extends AssociationScope {
   }
 }
 
-setDjasScopeBuilder((assoc) =>
-  DisableJoinsAssociationScope.create().scope(assoc as AssociationScopeable),
-);
+Associations.DisableJoinsAssociationScope = DisableJoinsAssociationScope;

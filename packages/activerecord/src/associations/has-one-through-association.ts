@@ -1,4 +1,4 @@
-import { _setHasOneThroughAssociation } from "./association-class-slots.js";
+import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
 import { HasOneAssociation } from "./has-one-association.js";
 import { ThroughAssociation, sourceReflection } from "./through-association.js";
@@ -114,4 +114,4 @@ Object.assign(HasOneThroughAssociation.prototype, {
   ...ThroughAssociation,
 });
 
-_setHasOneThroughAssociation(HasOneThroughAssociation);
+Associations.HasOneThroughAssociation = HasOneThroughAssociation;

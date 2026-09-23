@@ -11,7 +11,7 @@ import {
   typeRegistry,
 } from "@blazetrails/activemodel";
 export { ValueType } from "@blazetrails/activemodel";
-import { _Base as Base } from "./base-slot.js";
+import { ActiveRecord } from "./namespaces.js";
 import { AdapterSpecificRegistry } from "./type/adapter-specific-registry.js";
 import type { AdapterName } from "./connection-adapters/abstract-adapter.js";
 import { adapterNameFromConfig } from "./connection-adapters/abstract-adapter.js";
@@ -118,7 +118,7 @@ export function adapterNameFrom(model: AdapterNameSource): AdapterName {
 
 /** @internal */
 export function currentAdapterName(): AdapterName {
-  return adapterNameFrom(Base!);
+  return adapterNameFrom(ActiveRecord.Base);
 }
 
 typeRegistry.register("date", Date); // boundary: AR Type::Date class, not JS Date

@@ -1,5 +1,5 @@
 import { camelize } from "@blazetrails/activesupport";
-import { _Base } from "./base-slot.js";
+import { ActiveRecord } from "./namespaces.js";
 
 interface DynamicMatchersHost {
   name: string;
@@ -27,7 +27,7 @@ function valid(model: DynamicMatchersHost, attributeNames: string[]): boolean {
 }
 
 export function respondToMissing(this: DynamicMatchersHost, name: string): boolean {
-  if ((this as unknown) === _Base) {
+  if ((this as unknown) === ActiveRecord.Base) {
     return false;
   } else {
     const matched = match(this, name);

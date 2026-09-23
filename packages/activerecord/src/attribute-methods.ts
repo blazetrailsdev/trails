@@ -9,7 +9,7 @@ import {
   type DirtyOptions,
 } from "@blazetrails/activemodel";
 import { DangerousAttributeError } from "./errors.js";
-import { _Base } from "./base-slot.js";
+import { ActiveRecord } from "./namespaces.js";
 import { toFs as dateToFs } from "@blazetrails/activesupport/core-ext/date/conversions";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import {
@@ -466,7 +466,7 @@ export function isDangerousClassMethod(this: AttributeMethodsHost, methodName: s
   if (RESTRICTED_CLASS_METHODS.has(methodName)) return true;
   if (INTRINSIC_FUNCTION_PROPS.has(methodName)) return false;
 
-  let klass: any = _Base;
+  let klass: any = ActiveRecord.Base;
   while (klass && klass !== Function.prototype && klass !== Object.prototype) {
     if (Object.prototype.hasOwnProperty.call(klass, methodName)) return true;
     klass = Object.getPrototypeOf(klass);

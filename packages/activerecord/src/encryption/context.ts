@@ -1,6 +1,6 @@
 import { MessageSerializer, type MessageSerializerLike } from "./message-serializer.js";
 import { Cipher } from "./cipher.js";
-import { Configurable } from "./configurable-slot.js";
+import { Encryption } from "../namespaces.js";
 import { Encryptor } from "./encryptor.js";
 import { KeyGenerator } from "./key-generator.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
@@ -45,6 +45,6 @@ export class Context {
 
   /** @internal */
   private buildDefaultKeyProvider(): unknown {
-    return new DerivedSecretKeyProvider(Configurable.config.primaryKey);
+    return new DerivedSecretKeyProvider(Encryption.Configurable.config.primaryKey);
   }
 }

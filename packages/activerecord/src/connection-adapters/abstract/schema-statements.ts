@@ -48,7 +48,7 @@ import {
   wrap,
 } from "@blazetrails/activesupport";
 import { SchemaDumper } from "./schema-dumper.js";
-import { _Base } from "../../base-slot.js";
+import { ActiveRecord } from "../../namespaces.js";
 
 export { assertSchemaAdapter } from "./assert-schema-adapter.js";
 
@@ -498,7 +498,7 @@ export class SchemaStatements {
         typeof options.foreignKey === "object"
           ? { ...options.foreignKey, ...conditionalOptions }
           : {
-              toTable: _Base!.pluralizeTableNames ? pluralize(refName) : refName,
+              toTable: ActiveRecord.Base.pluralizeTableNames ? pluralize(refName) : refName,
               ...conditionalOptions,
             };
       if ((fkOptions as { column?: string }).column == null) {
@@ -1621,8 +1621,8 @@ export class SchemaStatements {
   /** @internal */
   stripTableNamePrefixAndSuffix(tableName: string): string {
     const adapter = this as any;
-    const prefix: string = adapter.tableNamePrefix ?? _Base!.tableNamePrefix;
-    const suffix: string = adapter.tableNameSuffix ?? _Base!.tableNameSuffix;
+    const prefix: string = adapter.tableNamePrefix ?? ActiveRecord.Base.tableNamePrefix;
+    const suffix: string = adapter.tableNameSuffix ?? ActiveRecord.Base.tableNameSuffix;
     const str = String(tableName);
     const m = str.match(new RegExp(`${prefix}(.+)${suffix}`));
     return m ? m[1] : str;

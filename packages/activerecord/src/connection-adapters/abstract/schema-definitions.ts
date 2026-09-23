@@ -5,7 +5,7 @@ import type { Column } from "../column.js";
 import { singularize, pluralize, assertValidKeys, isBlank } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { SchemaDumper } from "../../schema-dumper.js";
-import { _Base } from "../../base-slot.js";
+import { ActiveRecord } from "../../namespaces.js";
 import { wrap } from "@blazetrails/activesupport";
 
 /**
@@ -687,7 +687,7 @@ export class ReferenceDefinition {
     return fetch<string>(
       fkOpts as unknown as Record<string, unknown>,
       "toTable",
-      block(() => (_Base!.pluralizeTableNames ? pluralize(this.name) : this.name)),
+      block(() => (ActiveRecord.Base.pluralizeTableNames ? pluralize(this.name) : this.name)),
     );
   }
 
@@ -807,7 +807,7 @@ export class TableDefinition {
   ): void {
     if (!id || this.as) return;
 
-    const pk = primaryKey || (_Base!.getPrimaryKey(singularize(tableName)) as string);
+    const pk = primaryKey || (ActiveRecord.Base.getPrimaryKey(singularize(tableName)) as string);
 
     let pkOptions: ColumnOptions = { ...(options as Partial<ColumnOptions>) };
     let pkType: ColumnType = typeof id === "string" ? id : "primary_key";
@@ -945,8 +945,8 @@ export class TableDefinition {
     toTable: string,
     options: Partial<AddForeignKeyOptions> = {},
   ): ForeignKeyDefinition {
-    const prefix = this.conn.tableNamePrefix ?? _Base!.tableNamePrefix;
-    const suffix = this.conn.tableNameSuffix ?? _Base!.tableNameSuffix;
+    const prefix = this.conn.tableNamePrefix ?? ActiveRecord.Base.tableNamePrefix;
+    const suffix = this.conn.tableNameSuffix ?? ActiveRecord.Base.tableNameSuffix;
     toTable = `${prefix}${toTable}${suffix}`;
     options = this.conn.foreignKeyOptions(this.name, toTable, {
       ...options,

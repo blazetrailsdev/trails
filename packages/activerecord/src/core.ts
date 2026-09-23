@@ -50,7 +50,7 @@ export interface Core {
   isStrictLoadingNPlusOneOnly(): boolean;
 }
 
-import { _Base } from "./base-slot.js";
+import { ActiveRecord } from "./namespaces.js";
 import { actionOnStrictLoadingViolation } from "./active-record.js";
 
 interface CoreRecord {
@@ -451,7 +451,7 @@ export function connectionClassForSelf(this: CoreHost): CoreHost {
   while (klass) {
     if (Object.prototype.hasOwnProperty.call(klass, "_connectionClass") && klass._connectionClass)
       return klass;
-    if ((klass as unknown) === _Base) return klass;
+    if ((klass as unknown) === ActiveRecord.Base) return klass;
     klass = parentClass(klass);
   }
   return this;

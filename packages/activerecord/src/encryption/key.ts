@@ -1,5 +1,5 @@
 import { Digest } from "@blazetrails/ruby-compat";
-import { Configurable } from "./configurable-slot.js";
+import { Encryption } from "../namespaces.js";
 import type { KeyGenerator } from "./key-generator.js";
 import { Properties } from "./properties.js";
 
@@ -18,7 +18,7 @@ export class Key {
   }
 
   static deriveFrom(password: string): Key {
-    const secret = (Configurable.keyGenerator as KeyGenerator).deriveKeyFrom(password);
+    const secret = (Encryption.Configurable.keyGenerator as KeyGenerator).deriveKeyFrom(password);
     return new Key(secret);
   }
 }

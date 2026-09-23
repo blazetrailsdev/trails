@@ -7,8 +7,7 @@ import {
 import type { RawConfigurations } from "../database-configurations.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { Migration, ProtectedEnvironmentError } from "../migration.js";
-import { DEFAULT_ENV } from "../connection-handling.js";
-import { _setRailsEnv } from "../connection-handling-slot.js";
+import { DEFAULT_ENV, _setRailsEnv } from "../connection-handling.js";
 import { _setDatabaseTasks } from "./database-tasks-slot.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import { getEnv, isBlank, trailsRoot } from "@blazetrails/activesupport";

@@ -9,7 +9,7 @@ import {
 } from "@blazetrails/activemodel";
 import { PredicateBuilder } from "./predicate-builder.js";
 import { DeferredIdsNotIn } from "./predicate-builder/deferred-distinct-pk-in.js";
-import { _Base } from "../base-slot.js";
+import { ActiveRecord } from "../namespaces.js";
 import { Relation } from "../relation.js";
 import {
   ActiveRecordError,
@@ -1276,7 +1276,9 @@ function excludingBang(this: QueryMethodsHost, records: any[]): any {
   }
 
   const attribute = this.predicateBuilder.table.arelTable.get(pk as string);
-  const literalIds = literalRecords.map((r) => (r instanceof _Base! ? (r as any).id : r));
+  const literalIds = literalRecords.map((r) =>
+    r instanceof ActiveRecord.Base ? (r as any).id : r,
+  );
   const inlineSubquery = (this.predicateBuilder.build(attribute, deferredRelations[0]) as Nodes.In)
     .right as Nodes.Node;
   this.whereClause = this.whereClause.plus(

@@ -13,7 +13,6 @@
   "packages/activerecord/src/associations/builder/has-one.ts",
   "packages/activerecord/src/associations/builder/singular-association.ts",
   "packages/activerecord/src/associations/collection-association.ts",
-  "packages/activerecord/src/associations/collection-proxy-slot.ts",
   "packages/activerecord/src/associations/collection-proxy.ts",
   "packages/activerecord/src/associations/disable-joins-association-scope.ts",
   "packages/activerecord/src/associations/errors.ts",

@@ -8,7 +8,7 @@ import {
 import { Result } from "../../result.js";
 import { FutureResult, Complete as FutureResultComplete } from "../../future-result.js";
 import { WeakThreadKeyMap } from "./connection-pool.js";
-import { _Base } from "../../base-slot.js";
+import { ActiveRecord } from "../../namespaces.js";
 import { Fiber, Thread } from "@blazetrails/ruby-compat";
 
 const LOCKED_QUERY = /\bFOR\s+(UPDATE|SHARE|NO\s+KEY\s+UPDATE|KEY\s+SHARE)\b/i;
@@ -350,7 +350,7 @@ export function selectAll(
 /** @internal */
 function clearCurrentThreadQueryCaches(host: QueryCacheHost): void {
   const cleared = new Set<Store>();
-  _Base?.connectionHandler.eachConnectionPool((pool) => {
+  ActiveRecord.Base?.connectionHandler.eachConnectionPool((pool) => {
     const p = pool as unknown as QueryCachePool & { queryCache?: Store };
     p.clearQueryCache();
     if (p.queryCache) cleared.add(p.queryCache);

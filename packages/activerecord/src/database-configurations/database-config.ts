@@ -1,5 +1,5 @@
 import { NotImplementedError } from "../errors.js";
-import { _DEFAULT_ENV } from "../connection-handling-slot.js";
+import { ActiveRecord } from "../namespaces.js";
 import { _ConnectionAdapters } from "../connection-adapters-slot.js";
 export interface DatabaseConfigOptions {
   adapter?: string;
@@ -154,7 +154,7 @@ export class DatabaseConfig {
 
   /** @missingRailsCall call — PERMANENT */
   get forCurrentEnv(): boolean {
-    return this.envName === _DEFAULT_ENV!();
+    return this.envName === ActiveRecord.ConnectionHandling.DEFAULT_ENV();
   }
 
   get schemaCachePath(): string | undefined {

@@ -6,7 +6,7 @@ import {
   type Logger,
 } from "@blazetrails/activesupport";
 import { verboseQueryLogs } from "./active-record.js";
-import { _Base } from "./base-slot.js";
+import { ActiveRecord } from "./namespaces.js";
 
 function byteLength(value: unknown): number {
   if (value == null) return 0;
@@ -100,7 +100,7 @@ export class LogSubscriber extends BaseLogSubscriber {
 
   /** @internal */
   override get logger(): Logger | null {
-    return _Base!.logger as Logger | null;
+    return ActiveRecord.Base.logger as Logger | null;
   }
 
   protected debugSql(message: string): boolean {
@@ -228,7 +228,7 @@ export class LogSubscriber extends BaseLogSubscriber {
   }
 
   private filter(name: string | null, value: unknown): unknown {
-    return _Base!.inspectionFilter().filterParam(name as string, value);
+    return ActiveRecord.Base.inspectionFilter().filterParam(name as string, value);
   }
 }
 

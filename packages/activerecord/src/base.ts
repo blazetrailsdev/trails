@@ -35,7 +35,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import { Relation } from "./relation.js";
 import "./relation.js";
 import { DelegateCache } from "./relation/delegation.js";
-import { _setBase } from "./base-slot.js";
+import { ActiveRecord } from "./namespaces.js";
 import { _registerBase as _registerBaseWithQueryCache } from "./query-cache.js";
 import { _registerBase as _registerBaseWithSchemaMigration } from "./schema-migration.js";
 import { _registerBase as _registerBaseWithInternalMetadata } from "./internal-metadata.js";
@@ -2548,7 +2548,7 @@ export class Base extends Model {
   }
 }
 
-_setBase(Base);
+ActiveRecord.Base = Base;
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Base extends Included<typeof AutosaveAssociation>, JSONSerializer, AMDirty {

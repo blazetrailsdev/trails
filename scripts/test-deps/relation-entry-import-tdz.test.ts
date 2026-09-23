@@ -7,10 +7,10 @@
 // model-schema -> associations), entering the graph at `relation.ts` re-entered
 // it while `Relation` was still in its temporal dead zone, crashing with
 // `ReferenceError: Cannot access 'Relation' before initialization`. Those three
-// now load through the zero-import slots (`associations/collection-proxy-slot.ts`,
-// `associations/_scope-slots.ts`) the way Zeitwerk autoloads them in Ruby — see
-// CLAUDE.md, "Call-time constant resolution (Ruby autoload → the zero-import
-// slot)".
+// now resolve at call time through the `ActiveSupport::Autoload` namespaces in
+// `packages/activerecord/src/namespaces.ts` (`Associations.CollectionProxy`,
+// `ActiveRecord.AssociationRelation`, `Associations.DisableJoinsAssociationScope`)
+// — see CLAUDE.md, "Call-time constant resolution".
 //
 // Like the adapter-graph guard next door, this lives in the `other` vitest
 // project, which does NOT preload the ActiveRecord graph via setupFiles, so the

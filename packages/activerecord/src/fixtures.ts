@@ -20,7 +20,7 @@ import {
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
 import { EncryptedFixtures } from "./encryption/encrypted-fixtures.js";
-import { _setFixtureError } from "./fixture-error-slot.js";
+import { ActiveRecord } from "./namespaces.js";
 import { TableRows } from "./fixture-set/table-rows.js";
 import { File } from "./fixture-set/file.js";
 import { verifyForeignKeysForFixtures } from "./active-record.js";
@@ -435,7 +435,7 @@ export class FormatError extends FixtureError {
   }
 }
 
-_setFixtureError(FixtureError);
+ActiveRecord.FixtureError = FixtureError;
 
 prepend(Fixture.prototype, EncryptedFixtures);
 

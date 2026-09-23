@@ -3,24 +3,15 @@ import type { AssociationReflection, ThroughReflection } from "./reflection.js";
 import "./relation.js";
 import type { Relation } from "./relation.js";
 import type { CollectionProxy, AssociationProxy } from "./associations/collection-proxy.js";
-import { _CollectionProxyCtor } from "./associations/collection-proxy-slot.js";
+import { Associations as AssociationsNamespace } from "./namespaces.js";
 import { hasDefaultScopeOverride } from "./scoping/default.js";
 import { qualifiedName } from "./inheritance.js";
-export { _setCollectionProxyCtor } from "./associations/collection-proxy-slot.js";
 
 import { ArgumentError } from "@blazetrails/activemodel";
 import { StatementCache } from "./statement-cache.js";
 import { AssociationNotFoundError } from "./associations/errors.js";
 import { AssociationScope, invokeScopeLambda } from "./associations/association-scope.js";
 import type { Association as AssociationInstance } from "./associations/association.js";
-import {
-  _BelongsToAssociation,
-  _BelongsToPolymorphicAssociation,
-  _HasManyAssociation,
-  _HasManyThroughAssociation,
-  _HasOneAssociation,
-  _HasOneThroughAssociation,
-} from "./associations/association-class-slots.js";
 export { joinTableName as joinHabtmTableNames } from "./migration/join-table.js";
 import { constantize, registerConstant, unregisterConstant } from "@blazetrails/activesupport";
 import { registerSubclass } from "./inheritance.js";
@@ -623,18 +614,8 @@ export function collectionProxyFor<T extends Base = Base>(
         `Use record.association("${assocName}") for the singular association object.`,
     );
   }
-  if (!_CollectionProxyCtor) {
-    throw new Error(
-      "CollectionProxy not registered. Either import '@blazetrails/activerecord' " +
-        "once (the package entry loads CollectionProxy eagerly), or, if you are " +
-        "using subpath imports such as '@blazetrails/activerecord/associations' or " +
-        "'@blazetrails/activerecord/base', import " +
-        "'@blazetrails/activerecord/associations' before the first " +
-        "`association()` call.",
-    );
-  }
   const proxy = (
-    _CollectionProxyCtor as unknown as {
+    AssociationsNamespace.CollectionProxy as unknown as {
       _create: (r: Base, n: string, d: AssociationDefinition) => CollectionProxy<T>;
     }
   )._create(record, assocName, assocDef);
@@ -651,16 +632,19 @@ export function _buildAssociationInstance(
   const opts = (assocDef.options ?? {}) as Record<string, unknown>;
   switch (assocDef.macro) {
     case "belongsTo":
-      if (opts.polymorphic) return new _BelongsToPolymorphicAssociation!(this, assocDef as any);
-      return new _BelongsToAssociation!(this, assocDef as any);
+      if (opts.polymorphic)
+        return new AssociationsNamespace.BelongsToPolymorphicAssociation(this, assocDef as any);
+      return new AssociationsNamespace.BelongsToAssociation(this, assocDef as any);
     case "hasOne":
-      if (opts.through) return new _HasOneThroughAssociation!(this, assocDef as any);
-      return new _HasOneAssociation!(this, assocDef as any);
+      if (opts.through)
+        return new AssociationsNamespace.HasOneThroughAssociation(this, assocDef as any);
+      return new AssociationsNamespace.HasOneAssociation(this, assocDef as any);
     case "hasMany":
-      if (opts.through) return new _HasManyThroughAssociation!(this, assocDef as any);
-      return new _HasManyAssociation!(this, assocDef as any);
+      if (opts.through)
+        return new AssociationsNamespace.HasManyThroughAssociation(this, assocDef as any);
+      return new AssociationsNamespace.HasManyAssociation(this, assocDef as any);
     default:
-      return new _HasManyThroughAssociation!(this, assocDef as any);
+      return new AssociationsNamespace.HasManyThroughAssociation(this, assocDef as any);
   }
 }
 
