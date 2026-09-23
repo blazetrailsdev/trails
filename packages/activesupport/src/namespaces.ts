@@ -4,12 +4,9 @@ import type { BroadcastLogger } from "./broadcast-logger.js";
 
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
-const loadPath: Record<string, () => Promise<unknown>> = {
-  "active_support/broadcast_logger": () => import("./broadcast-logger.js"),
-};
+const loadPath: Record<string, () => Promise<unknown>> = {};
 
 export const ActiveSupport = { name: "ActiveSupport", loadPath } as AutoloadModule & {
   BroadcastLogger: typeof BroadcastLogger;
 };
 extend(ActiveSupport, Autoload);
-ActiveSupport.autoload("BroadcastLogger");

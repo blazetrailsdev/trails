@@ -847,15 +847,15 @@ modules converged onto `Autoload`:
 - `activesupport/src/namespaces.ts`, `actionview/src/namespaces.ts`,
   `actionpack/src/namespaces.ts` — not slots: the `ActiveSupport`, `ActionView`
   and `ActionDispatch` namespace objects, shaped like arel's.
-  `ActiveSupport.BroadcastLogger` (`logger.rb:21`) and `ActiveSupport.Cache`
-  (`format_version`, `cache.rb:55-58`, read by `cache/store.rb:302,765,921`);
   `ActionView.Base` (`action_view.rb:37`, read by `handlers/erb.rb:86`,
   `log_subscriber.rb:59`, `digestor.rb:39`); `ActionDispatch.Request`
   (`action_dispatch.rb:63`, read by `http/headers.rb:55`,
   `content_security_policy.rb:46`, `permissions_policy.rb:42`,
-  `middleware/cookies.rb:705`). A nested class constant whose Ruby `require`s
-  it rather than autoloading it is seated on the class itself:
-  `Attribute.UserProvidedDefault` (`attribute_registration.rb:5`).
+  `middleware/cookies.rb:705`). A constant Rails `require`s rather than
+  autoloads is seated on its namespace with no `autoload` call:
+  `ActiveSupport.BroadcastLogger` (`active_support.rb:30`, read at
+  `logger.rb:21`), and `Attribute.UserProvidedDefault` on the class Rails nests
+  it in (`attribute_registration.rb:5`).
 - `trailties/src/trails-slot.ts` — the `Trails` constant, read by
   `engine/lazy-route-set.ts` for `Rails.application&.reload_routes_unless_loaded`
   (`engine/lazy_route_set.rb:12-104`). The cycle is closed by
