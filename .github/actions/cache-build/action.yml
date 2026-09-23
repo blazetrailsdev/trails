@@ -1,10 +1,11 @@
 name: Cache workspace build
 description: Restores the per-package dist/ + tsc --build incremental state so pnpm build no-ops on a warm cache.
 
-# `pnpm build` (the full `tsc --build` workspace compile, ~30-45s cold) runs in
-# six jobs on every full run, each recompiling from scratch. This step restores
-# the per-package `dist/` outputs and the `tsconfig.tsbuildinfo` incremental
-# state so `tsc --build` short-circuits to a ~1.5s no-op on a cache hit.
+# `pnpm build` (the full `tsc --build` workspace compile, ~40-70s cold) runs in
+# up to eleven jobs on every full run, each recompiling from scratch. This step
+# restores the per-package `dist/` outputs and the `tsconfig.tsbuildinfo`
+# incremental state so `tsc --build` short-circuits to a ~9-17s up-to-date
+# check on a cache hit.
 # NOTE: with `rootDir: "src"` set per package, tsc writes the buildinfo to the
 # package ROOT (`packages/*/tsconfig.tsbuildinfo`), NOT inside `outDir`/dist —
 # verified empirically — so that path is load-bearing, not redundant with dist.
@@ -13,6 +14,10 @@ description: Restores the per-package dist/ + tsc --build incremental state so p
 # and the lockfile.
 # Exact-match only (no restore-keys): any source change misses and rebuilds, so
 # a stale dist can never be restored onto changed source and mask a failure.
+# The miss on a source-changing PR is therefore expected and structural, not a
+# bug: do NOT "fix" it with restore-keys. Only a sibling job that starts after
+# the first save, or a re-run of an unchanged commit, hits. The remedy is a
+# cheaper compile (the TypeScript 7 flip, RFC 0125), not a staler cache.
 # tsc treats the restored tsconfig.tsbuildinfo as authoritative — if dist and
 # the buildinfo agree with the source hashes it records, it skips compilation;
 # otherwise it rebuilds the affected references.
