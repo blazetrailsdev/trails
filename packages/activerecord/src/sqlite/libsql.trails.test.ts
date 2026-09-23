@@ -38,6 +38,13 @@ describe("SqliteDriver — libsql round-trip", () => {
     expect(row["qty"]).toBe(42);
   });
 
+  it("execute() returns the statement's rows, frozen, and [] for a non-reader", async () => {
+    const rows = await driver.execute("SELECT name FROM widgets WHERE qty = ?", [42]);
+    expect(rows).toEqual([{ name: "sprocket" }]);
+    expect(Object.isFrozen(rows)).toBe(true);
+    expect(await driver.execute("UPDATE widgets SET qty = qty WHERE 0")).toEqual([]);
+  });
+
   it("run() returns changes and lastInsertRowid", async () => {
     const insert = await driver.prepare("INSERT INTO widgets (name, qty) VALUES (?, ?)");
     const result = await insert.run(["bolt", 99]);
@@ -418,7 +425,8 @@ describe.skipIf(!hasCredentials)("libsqlRemoteDriver — network round-trip (TUR
 
   beforeAll(async () => {
     conn = await libsqlRemoteDriver.open({
-      database: tursoUrl!,
+      database: ":memory:",
+      remoteUrl: tursoUrl!,
       driverOptions: { authToken: tursoToken },
     });
   });

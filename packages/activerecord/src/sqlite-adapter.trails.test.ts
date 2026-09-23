@@ -541,6 +541,32 @@ describe("SQLite adapter driver binding", () => {
     }) as unknown as SqliteConnection;
   });
 
+  it("configureConnection sends each pragma setter to the raw connection's execute", async () => {
+    const executed: string[] = [];
+    const executeSpyDriver = asyncDriver(async (config) => {
+      const conn = await openVia(config);
+      return new Proxy(conn, {
+        get(target, prop) {
+          if (prop === "execute") {
+            return (sql: string) => {
+              executed.push(sql);
+              return target.execute(sql);
+            };
+          }
+          const value = Reflect.get(target, prop, target);
+          return typeof value === "function" ? value.bind(target) : value;
+        },
+      }) as unknown as SqliteConnection;
+    });
+    const adapter = await SQLite3Adapter.openAsync({
+      database: ":memory:",
+      driver: executeSpyDriver,
+    });
+    expect(executed).toContain("PRAGMA foreign_keys=ON");
+    expect(executed).toContain("PRAGMA cache_size=2000");
+    await adapter.disconnectBang();
+  });
+
   it("encoding is memoized at connect for an async-only driver", async () => {
     const adapter = await SQLite3Adapter.openAsync({
       database: ":memory:",
@@ -606,7 +632,8 @@ describe("SQLite3Adapter connection parameters", () => {
 
   it("does not expand or mkdir a libsql remote URL as a local path", () => {
     const adapter = new LibSQLRemoteAdapter({ database: "libsql://trails-remote-probe.invalid" });
-    expect(adapter._connectionParameters.database).toBe("libsql://trails-remote-probe.invalid");
+    expect(adapter._connectionParameters.remoteUrl).toBe("libsql://trails-remote-probe.invalid");
+    expect(adapter._connectionParameters.database).toBe(":memory:");
     expect(File.isDirectory("libsql:")).toBe(false);
   });
 });

@@ -28,6 +28,19 @@ describe("SqliteDriver — better-sqlite3 round-trip", () => {
     expect(row["qty"]).toBe(42);
   });
 
+  it("execute() returns the statement's rows, frozen, and [] for a non-reader", async () => {
+    const rows = await driver.execute("SELECT name FROM widgets WHERE qty = ?", [42]);
+    expect(rows).toEqual([{ name: "sprocket" }]);
+    expect(Object.isFrozen(rows)).toBe(true);
+    expect(await driver.execute("UPDATE widgets SET qty = qty WHERE 0")).toEqual([]);
+  });
+
+  it("all() on a non-reader statement runs it and returns [], as the gem's Statement#to_a does", async () => {
+    const update = await driver.prepare("UPDATE widgets SET qty = qty + 0 WHERE name = ?");
+    expect(await update.all(["gear"])).toEqual([]);
+    expect(await driver.changes()).toBe(1);
+  });
+
   it("run() returns changes and lastInsertRowid", async () => {
     const insert = await driver.prepare("INSERT INTO widgets (name, qty) VALUES (?, ?)");
     const result = await insert.run(["bolt", 99]);

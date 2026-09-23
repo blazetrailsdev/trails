@@ -63,6 +63,10 @@ class BetterSqlite3Statement implements SqliteStatement, SyncSqliteStatement {
   }
 
   all(binds?: SqliteBinds): unknown[] {
+    if (!this.stmt.reader) {
+      this.run(binds);
+      return [];
+    }
     return this.bind(binds, (args) => this.stmt.all(...args));
   }
 
@@ -117,6 +121,15 @@ class BetterSqlite3Connection implements SqliteConnection, SyncSqliteConnection 
 
   exec(sql: string): void {
     this.raw.exec(sql);
+  }
+
+  execute(sql: string, bindVars: SqliteBinds = []): readonly unknown[] {
+    const stmt = this.prepare(sql);
+    try {
+      return Object.freeze(stmt.all(bindVars));
+    } finally {
+      stmt.close();
+    }
   }
 
   pragma(source: string, opts?: { simple?: boolean }): unknown {
