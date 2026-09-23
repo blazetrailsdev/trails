@@ -284,22 +284,6 @@ export class TableDefinition extends AbstractTableDefinition {
     ];
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
-  static override defineColumnMethods(...columnTypes: string[]): void {
-    for (const type of columnTypes) {
-      if (!(type in this.prototype)) {
-        (this.prototype as any)[type] = function (this: TableDefinition, ...args: unknown[]) {
-          const { names, options } = splitColumnNames(args, type);
-          for (const name of names) this.column(name, type as ColumnType, options);
-          return this;
-        };
-      }
-    }
-  }
-
   bigserial(...names: string[]): this;
   bigserial(...args: [...names: string[], options: ColumnOptions]): this;
   bigserial(...args: unknown[]): this {

@@ -105,6 +105,5 @@ export class Column extends BaseColumn {
     coder["identity"] = this._identity;
     coder["generated"] = this._generated;
     super.encodeWith(coder);
-    coder["class"] = "PostgreSQL::Column";
   }
 }

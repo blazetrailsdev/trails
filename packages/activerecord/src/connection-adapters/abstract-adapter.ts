@@ -1210,14 +1210,6 @@ export class AbstractAdapter implements Quoting {
     }
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
-  sqlKey(sql: string): string {
-    return sql;
-  }
-
   get role(): string {
     return this.pool.role;
   }

@@ -118,7 +118,6 @@ export class Column implements Deduplicable {
   }
 
   encodeWith(coder: ColumnCoder): void {
-    coder["class"] = "Column";
     coder["name"] = this.name;
     coder["sql_type_metadata"] = this.sqlTypeMetadata?.toJSON() ?? null;
     coder["null"] = this.null;

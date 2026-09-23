@@ -3,6 +3,8 @@ import { SchemaCache, FakePool } from "./schema-cache.js";
 import { IndexDefinition } from "./abstract/schema-definitions.js";
 import { Column } from "./column.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
+import { Column as MysqlColumn } from "./mysql/column.js";
+import { TypeMetadata as MysqlTypeMetadata } from "./mysql/type-metadata.js";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
@@ -248,5 +250,34 @@ describe("SchemaCacheGzipDumpTest", () => {
     await cache.dumpTo(filename);
 
     expect(fs.existsSync(filename)).toBe(true);
+  });
+});
+
+describe("SchemaCacheColumnClassRoundTripTest", () => {
+  it("dumped and loaded adapter columns keep their subclass", async () => {
+    const live = [
+      new MysqlColumn(
+        "id",
+        null,
+        new MysqlTypeMetadata(
+          { sqlType: "bigint(20)", type: "integer" },
+          { extra: "auto_increment" },
+        ),
+      ),
+    ];
+    const cache = new SchemaCache();
+    await cache.columns(
+      new FakePool({ columns: async () => live, dataSourceExists: async () => true }),
+      "people",
+    );
+
+    const coder: Record<string, unknown> = {};
+    cache.encodeWith(coder);
+    const loaded = new SchemaCache();
+    loaded.initWith(JSON.parse(JSON.stringify(coder)));
+    const [column] = (await loaded.columns(new FakePool({}), "people"))!;
+
+    expect(column).toBeInstanceOf(MysqlColumn);
+    expect((column as MysqlColumn).isAutoIncrement()).toBe(true);
   });
 });

@@ -1530,19 +1530,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
   }
 
   static override readonly EXTENDED_TYPE_MAPS = new Map<string, unknown>();
-
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
-  static override extendedTypeMap(options: { defaultTimezone?: string }): TypeMap {
-    const m = super.extendedTypeMap(options);
-    this.registerClassWithPrecision(m, /^[^(]*datetime/i, ARDateTimeType, {
-      timezone: options.defaultTimezone,
-    });
-    m.aliasType(/^[^(]*timestamp/i, "datetime");
-    return m;
-  }
 }
 
 export class SQLite3Integer extends IntegerType {

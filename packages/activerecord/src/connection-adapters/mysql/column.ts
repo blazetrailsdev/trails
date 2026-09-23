@@ -1,5 +1,4 @@
 import { Column as BaseColumn } from "../column.js";
-import type { ColumnCoder } from "../column.js";
 import { TypeMetadata } from "./type-metadata.js";
 
 export class Column extends BaseColumn {
@@ -25,11 +24,5 @@ export class Column extends BaseColumn {
 
   isVirtual(): boolean {
     return /\b(?:VIRTUAL|STORED|PERSISTENT)\b/.test(this.extra ?? "");
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  override encodeWith(coder: ColumnCoder): void {
-    super.encodeWith(coder);
-    coder["class"] = "MySQL::Column";
   }
 }
