@@ -113,6 +113,14 @@ port a body:
   a value-returning predicate ported as a `boolean` breaks every call site that
   used the value.
 - **Bang methods** raise; the non-bang form returns falsy. Port both arms.
+- **`symbolize_keys` on an option hash.** A JS object has one key type, so an
+  option hash Rails normalizes with `symbolize_keys` stays bare-keyed, keyed by
+  the camelCase spelling of the Symbol's name (`:only_path` is `onlyPath`), and
+  the call is omitted (RFC 0149). Call `symbolizeKeys` only where Symbol-ness
+  is observable: the hash is rendered by `inspect` / `rbInspect`, control flow
+  turns on `Symbol === key`, or it meets a hash already carrying `":name"`
+  keys. `symbolize_keys` is in `NO_JS_CALL_FORM`, so the call gate will not
+  catch a wrong omission. Check these three cases yourself.
 - **Symbols vs strings.** Where Rails accepts a Symbol _or_ a String, port both
   arms — dropping the string arm is a common silent gap.
 - **A Ruby Symbol is a JS string, never a JS `Symbol`.** `:short` is `"short"`.

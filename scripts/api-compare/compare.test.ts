@@ -306,6 +306,9 @@ describe("significantMissingCalls", () => {
     // faithful port runs the guarded body with no callee, so no TS body could
     // ever satisfy the call.
     expect(SIGNIFICANT_CALLS.has("synchronize")).toBe(false);
+    // RFC 0149: an option hash is bare-keyed, so `symbolize_keys` is omitted.
+    expect(SIGNIFICANT_CALLS.has("symbolize_keys")).toBe(false);
+    expect(SIGNIFICANT_CALLS.has("symbolize_keys!")).toBe(false);
     // Names with a real JS call form must stay significant — suppressing them
     // would hide a genuinely dropped call. `size`/`empty?`/`first`/`last` look
     // like plain Array/property idioms but on a Relation receiver are real
@@ -348,6 +351,25 @@ describe("significantMissingCalls", () => {
     // into the call-alias names RECEIVER_KEYED_RUBY_COMPAT_EXPORTS already owns.
     const sig = significantCallsForReceivers({ fetch: ["array"] });
     expect(sig.has("fetch")).toBe(true);
+  });
+
+  it("does not flag an omitted symbolize_keys even where symbolizeKeys is ported with args", () => {
+    expect(
+      significantMissingCalls(
+        "build_db_config_from_raw_config",
+        ["symbolize_keys", "symbolize_keys!", "build_db_config_from_hash"],
+        new Set(["buildDbConfigFromHash"]),
+        () => true,
+      ),
+    ).toEqual([]);
+    expect(
+      significantMissingCalls(
+        "build_db_config_from_raw_config",
+        ["build_db_config_from_hash"],
+        new Set(),
+        () => true,
+      ),
+    ).toEqual(["build_db_config_from_hash → buildDbConfigFromHash|_buildDbConfigFromHash"]);
   });
 
   it("significantCallsForReceivers still respects the base predicate (super, NO_JS_CALL_FORM)", () => {

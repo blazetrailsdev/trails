@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { Deprecators, runLoadHooks, resetLoadHooks } from "@blazetrails/activesupport";
-import { ActionController } from "@blazetrails/actionpack";
-import { RoutingUrlFor } from "@blazetrails/actionview";
+import { ActionController, RouteSet } from "@blazetrails/actionpack";
+import { RoutingUrlFor, type RoutingUrlForHost } from "@blazetrails/actionview";
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
 import {
   applyStylesheetMediaDefault,
@@ -66,6 +66,28 @@ describe("action_view.setup_action_pack", () => {
     const view = Object.create(RoutingUrlFor.prototype) as RoutingUrlFor;
     expect(RoutingUrlFor.prototype.urlFor.call(view as never, "http://www.example.com")).toBe(
       "http://www.example.com",
+    );
+  });
+
+  it("url_for with a Hash from a view generates a path, not a full URL, by default", async () => {
+    await runTrailtieInitializers(Trailtie, {
+      config: Trailtie.config,
+      deprecators: new Deprecators(),
+    });
+    runLoadHooks("action_controller", ActionController.Base);
+
+    const routes = new RouteSet();
+    routes.draw((r) => {
+      r.get("/:controller/:action");
+    });
+    const view = Object.assign(Object.create(RoutingUrlFor.prototype) as RoutingUrlFor, {
+      _routes: routes,
+      controller: { urlOptions: () => ({ host: "example.com" }) },
+    }) as unknown as RoutingUrlFor & RoutingUrlForHost;
+
+    expect(view.urlFor({ controller: "foo", action: "other" })).toBe("/foo/other");
+    expect(view.urlFor({ controller: "foo", action: "other", onlyPath: false })).toBe(
+      "http://example.com/foo/other",
     );
   });
 });
