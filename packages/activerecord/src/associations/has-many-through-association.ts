@@ -2,7 +2,7 @@ import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
 import { HasManyAssociation } from "./has-many-association.js";
-import { NotImplementedError } from "@blazetrails/ruby-compat";
+import { Hash, NotImplementedError } from "@blazetrails/ruby-compat";
 import { underscore, singularize, isBlank } from "@blazetrails/activesupport";
 import { collectionProxyFor as collectionProxyFor } from "../associations.js";
 import { ThroughAssociation, sourceReflection, throughBuildRecord } from "./through-association.js";
@@ -73,12 +73,12 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     return a.filter((record) => this.markOccurrence(distribution, record));
   }
 
-  protected markOccurrence(distribution: Occurrences, record: Base): boolean {
+  protected markOccurrence(distribution: Distribution, record: Base): false | Distribution {
     return markOccurrence(distribution, record);
   }
 
   /** @missingRailsCall new — PERMANENT */
-  protected distribution(array: Base[]): Occurrences {
+  protected distribution(array: Base[]): Distribution {
     return distribution(array);
   }
 
@@ -449,25 +449,23 @@ function deleteThroughRecords(this: HasManyThroughAssociation, records: Base[]):
 }
 
 /** @internal */
-type Occurrences = Array<{ record: Base; count: number }>;
+type Distribution = Hash<unknown, number>;
 
 /** @internal */
-function distribution(array: Base[]): Occurrences {
-  const distribution: Occurrences = [];
+function distribution(array: Base[]): Distribution {
+  const distribution: Distribution = new Hash(0);
   for (const record of array) {
-    const bucket = distribution.find((b) => b.record.equals(record));
-    if (bucket) bucket.count += 1;
-    else distribution.push({ record, count: 1 });
+    distribution.set(record.hash(), distribution.get(record.hash())! + 1);
   }
   return distribution;
 }
 
 /** @internal */
-function markOccurrence(distribution: Occurrences, record: Base): boolean {
-  const bucket = distribution.find((b) => b.record.equals(record));
-  if (!bucket || bucket.count <= 0) return false;
-  bucket.count -= 1;
-  return true;
+function markOccurrence(distribution: Distribution, record: Base): false | Distribution {
+  return (
+    distribution.get(record.hash())! > 0 &&
+    distribution.set(record.hash(), distribution.get(record.hash())! - 1)
+  );
 }
 
 /**

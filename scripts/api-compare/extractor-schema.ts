@@ -94,6 +94,7 @@ export const EXTRACTOR_OUTPUT_FIELDS = [
   "bodyless",
   "admitsFunction",
   "aliasParams",
+  "admitsBoolean",
 ] as const;
 
 /**

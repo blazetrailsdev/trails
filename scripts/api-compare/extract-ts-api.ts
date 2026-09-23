@@ -3617,6 +3617,7 @@ export function extractClass(
       const callSeq = extractCallSeq(member.body);
       const callArgs = extractCallArgs(member.body);
       const skeleton = extractSkeleton(member.body);
+      const valueAdmitsBoolean = memberAdmitsBoolean(member, checker);
       const method: MethodInfo = {
         name: memberName,
         visibility,
@@ -3626,6 +3627,7 @@ export function extractClass(
         isStatic,
         ...(internal ? { internal: true } : {}),
         ...tagged,
+        ...(valueAdmitsBoolean !== undefined ? { admitsBoolean: valueAdmitsBoolean } : {}),
         ...(calls !== undefined ? { calls } : {}),
         ...(callSeq !== undefined ? { callSeq } : {}),
         ...(callArgs !== undefined ? { callArgs } : {}),
@@ -3668,6 +3670,7 @@ export function extractClass(
       const aliasParams = member.initializer
         ? paramsOfCallableRef(member.initializer, checker)
         : null;
+      const valueAdmitsBoolean = aliasParams ? undefined : memberAdmitsBoolean(member, checker);
       const method: MethodInfo = {
         name: memberName,
         visibility,
@@ -3678,6 +3681,7 @@ export function extractClass(
         ...(internal ? { internal: true } : {}),
         ...tagged,
         ...(aliasParams ? { aliasParams } : {}),
+        ...(valueAdmitsBoolean !== undefined ? { admitsBoolean: valueAdmitsBoolean } : {}),
       };
       if (isStatic) {
         classMethods.push(method);
@@ -5230,6 +5234,41 @@ function admitsFunction(p: ts.ParameterDeclaration): boolean {
       t.getCallSignatures().length > 0 ||
       (t.getSymbol()?.getName() === "Function" && !(t.flags & ts.TypeFlags.Any)),
   );
+}
+
+/**
+ * Whether a `get` accessor's or a property's type can hold a `boolean` — see
+ * `MethodInfo.admitsBoolean`. `undefined` when the member is callable (a
+ * method spelled as a property) or its type cannot be resolved.
+ */
+function memberAdmitsBoolean(
+  member: ts.GetAccessorDeclaration | ts.PropertyDeclaration,
+  checker: ts.TypeChecker,
+): boolean | undefined {
+  let type: ts.Type;
+  try {
+    if (ts.isGetAccessorDeclaration(member)) {
+      const signature = checker.getSignatureFromDeclaration(member);
+      if (!signature) return undefined;
+      type = checker.getReturnTypeOfSignature(signature);
+    } else {
+      type = member.type
+        ? checker.getTypeFromTypeNode(member.type)
+        : checker.getTypeAtLocation(member);
+    }
+  } catch {
+    return undefined;
+  }
+  if (type.getCallSignatures().length > 0) return undefined;
+  return typeAdmitsBoolean(type);
+}
+
+function typeAdmitsBoolean(type: ts.Type): boolean {
+  const open =
+    ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.BooleanLike | ts.TypeFlags.TypeParameter;
+  if (type.flags & open) return true;
+  if (type.isUnionOrIntersection()) return type.types.some(typeAdmitsBoolean);
+  return false;
 }
 
 /**

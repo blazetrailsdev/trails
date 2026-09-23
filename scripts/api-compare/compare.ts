@@ -105,6 +105,7 @@ import { SpellChecker } from "../../packages/did-you-mean/src/spell-checker.js";
 import { operatorSpelling } from "./operator-order-spelling.js";
 import { DATA_LAYER_PACKAGES, filterFilesToClosure, writeArClosure } from "./ar-closure.js";
 import {
+  OPERATORS,
   TS_CLASS_RENAMES,
   isArityOverridden,
   isRubyOnlyClass,
@@ -1260,6 +1261,10 @@ interface PackageResult {
   paramNames: ParamNameResult;
   blockParams: { compared: number; mismatches: BlockParamMismatch[] };
   optionKeys: OptionKeyResult;
+  /** Report-only (RFC 0156): predicates matched by a non-boolean getter or property. */
+  predicateKindMismatches: PredicateKindMismatch[];
+  /** Report-only (RFC 0156): where Rails' definitions went — see `rubyDefinitionBreakdown`. */
+  denominator: DenominatorBreakdown;
   literals: LiteralResult;
   calls: CallResult;
   callArgs: CallArgsResult;
@@ -1904,6 +1909,35 @@ export function predicatePairedWithBareTwin(
 }
 
 /**
+ * Whether a Ruby predicate `foo?` was matched only through its bare camel
+ * candidate (`foo`) by a member that cannot hold a boolean — a getter or
+ * property whose every declaration here has `admitsBoolean === false`.
+ * `ConnectionPool#active_connection?` (`connection_pool.rb:376`) matched
+ * against `get activeConnection(): DatabaseAdapter | null` is the case this
+ * reports.
+ *
+ * A Ruby predicate may return a value, so a non-boolean type alone is not the
+ * signal; the member also has to be a value rather than a method. A bare Ruby
+ * twin does not excuse the match: `active_connection` is
+ * `alias_method :active_connection, :active_connection?` (`:379`), so the
+ * getter ports the twin and the predicate's own `isActiveConnection` is what
+ * is absent. Report-only (RFC 0156): a match stays a match.
+ */
+export function predicateKindMismatch(
+  rubyName: string,
+  tsName: string,
+  admitsBoolean: readonly (boolean | undefined)[] | undefined,
+): boolean {
+  if (!rubyName.endsWith("?")) return false;
+  if (!(rubyMethodToTs(rubyName.slice(0, -1)) ?? []).includes(tsName)) return false;
+  return (
+    admitsBoolean !== undefined &&
+    admitsBoolean.length > 0 &&
+    admitsBoolean.every((a) => a === false)
+  );
+}
+
+/**
  * Method names a Ruby file's entities inherit from `include`d modules that live
  * in ANOTHER gem.
  *
@@ -2110,6 +2144,15 @@ export interface StaleCallTag {
 
 // Advisory signature comparison: for a name-matched (ruby, ts) pair whose
 // positional-arg ranges don't overlap. Never affects the parity %.
+/** A predicate matched by a non-boolean value member — see `predicateKindMismatch`. */
+interface PredicateKindMismatch {
+  rubyFile: string;
+  rubyName: string;
+  rubyModule: string;
+  tsFile: string;
+  tsName: string;
+}
+
 interface ArityMismatch {
   rubyFile: string;
   tsFile: string;
@@ -2995,6 +3038,98 @@ export function rubyLevelKey(level: OwnerSeat, name: string): string {
 }
 
 /**
+ * Where a package's Ruby definitions went on the way to `totalMethods` (RFC
+ * 0156). Every `def` the extractor recorded, after the `ClassMethods` fold, is
+ * counted once, in the first bucket that applies:
+ *
+ * - `excludedFile` — its file is declared unported (`isSourceUnported`).
+ * - `rowlessFile` — its file yields no expected row at all, or its class is
+ *   Ruby-only (`isRubyOnlyClass`).
+ * - `globalSkip` — a `SKIP_GROUPS` name, which maps to no TS candidate.
+ * - `scopedSkip` — a `SCOPED_SKIP_GROUPS` (file, name) pair with no mirror.
+ * - `operator` — an `OPERATORS` name with no pinned spelling.
+ * - `sameNameCollapse` — a second definition of a (level, name) its file
+ *   already expects, which `dedupeRubyMethodInto` folds into the first.
+ * - `ownRow` — the rest: scored on a row of its own.
+ *
+ * `totalMethods` can exceed `ownRow` and even `definitions`: include-flattening
+ * adds a host copy of every mixin method, which this count leaves out.
+ */
+export interface DenominatorBreakdown {
+  definitions: number;
+  excludedFile: number;
+  rowlessFile: number;
+  globalSkip: number;
+  scopedSkip: number;
+  operator: number;
+  sameNameCollapse: number;
+  ownRow: number;
+}
+
+type DenominatorBucket = Exclude<keyof DenominatorBreakdown, "definitions">;
+
+export function rubyDefinitionBreakdown(
+  allRuby: readonly RubyEntity[],
+  pkg: string,
+  inMode: (m: MethodInfo) => boolean,
+): DenominatorBreakdown {
+  const byFile = new Map<string, { buckets: DenominatorBucket[]; seen: Set<string> }>();
+  for (const entity of allRuby) {
+    for (const item of splitOverriddenFileBuckets(entity)) {
+      const file = item.info.file || "unknown.rb";
+      const tally = byFile.get(file) ?? { buckets: [], seen: new Set<string>() };
+      byFile.set(file, tally);
+      for (const [methods, klass] of [
+        [item.info.instanceMethods, false],
+        [item.info.classMethods, true],
+      ] as const) {
+        for (const rm of methods) {
+          if (!inMode(rm)) continue;
+          tally.buckets.push(rubyDefinitionBucket(rm.name, item.fqn, file, klass, tally.seen));
+        }
+      }
+    }
+  }
+  const breakdown: DenominatorBreakdown = {
+    definitions: 0,
+    excludedFile: 0,
+    rowlessFile: 0,
+    globalSkip: 0,
+    scopedSkip: 0,
+    operator: 0,
+    sameNameCollapse: 0,
+    ownRow: 0,
+  };
+  for (const [file, { buckets }] of byFile) {
+    const excluded = isSourceUnported(file, pkg);
+    const rowless = !buckets.includes("ownRow");
+    for (const bucket of buckets) {
+      breakdown.definitions++;
+      breakdown[excluded ? "excludedFile" : rowless ? "rowlessFile" : bucket]++;
+    }
+  }
+  return breakdown;
+}
+
+function rubyDefinitionBucket(
+  name: string,
+  fqn: string,
+  file: string,
+  klass: boolean,
+  seen: Set<string>,
+): DenominatorBucket {
+  if (rubyMethodToTsForFqn(fqn, name) === null) {
+    return OPERATORS.has(name) ? "operator" : "globalSkip";
+  }
+  if (isRubyOnlyClass(fqn)) return "rowlessFile";
+  if (scopedSkipMirrorName(name, file) === null && isScopedSkip(name, file)) return "scopedSkip";
+  const key = rubyLevelKey(rubyOwnerSeat(fqn, klass), name);
+  if (seen.has(key)) return "sameNameCollapse";
+  seen.add(key);
+  return "ownRow";
+}
+
+/**
  * How `tsFile` declares `tsName` for a Ruby method at `level`: `"seat"` when
  * some owner states that seat (a static is the class seat, an instance member
  * the instance seat — see `tsOwnerSeat`), `"neutral"` when the only fitting
@@ -3549,6 +3684,9 @@ export function main() {
     const tsBodylessOwnersByFileName = new Map<string, Map<string, Set<string>>>();
     const tsBodiedOwnersByFileName = new Map<string, Map<string, Set<string>>>();
     const tsAliasNamesByFileName = new Map<string, Set<string>>();
+    // (file → name → each declaration's `MethodInfo.admitsBoolean`), for
+    // `predicateKindMismatch`.
+    const tsAdmitsBooleanByFileName = new Map<string, Map<string, (boolean | undefined)[]>>();
     // Same call-sets unioned by NAME across this package and its deps (the same
     // scope tsParamsByName uses). Consulted ONLY by the delegation-transparency
     // gate (see effectiveTsCalls), never as the primary population — the
@@ -3630,6 +3768,10 @@ export function main() {
           aliasNames.add(m.name);
           tsAliasNamesByFileName.set(file, aliasNames);
         }
+        const admits =
+          tsAdmitsBooleanByFileName.get(file) ?? new Map<string, (boolean | undefined)[]>();
+        admits.set(m.name, [...(admits.get(m.name) ?? []), m.admitsBoolean]);
+        tsAdmitsBooleanByFileName.set(file, admits);
         const byShape = m.bodyless === true ? tsBodylessOwnersByFileName : tsBodiedOwnersByFileName;
         const shapeOwners = byShape.get(file) ?? new Map<string, Set<string>>();
         shapeOwners.set(m.name, (shapeOwners.get(m.name) ?? new Set<string>()).add(owner));
@@ -3881,6 +4023,7 @@ export function main() {
 
     // Collect all Ruby classes and modules with their methods
     const allRuby = collectRubyEntities(rubyPkg);
+    const denominator = rubyDefinitionBreakdown(allRuby, pkg, methodMatchesMode);
 
     const inheritanceClassPerFile = primaryClassesPerFile(
       rubyPkg.classes as unknown as Record<string, ClassInfo>,
@@ -4000,6 +4143,7 @@ export function main() {
     const arityMismatches: ArityMismatch[] = [];
     let optionKeysCompared = 0;
     const optionKeyMismatches: OptionKeyMismatch[] = [];
+    const predicateKindMismatches: PredicateKindMismatch[] = [];
     let literalsCompared = 0;
     let literalsSkipped = 0;
     const literalMismatches: LiteralMismatch[] = [];
@@ -4893,6 +5037,21 @@ export function main() {
         let declOnlyTsName = declOnly ? directMatch : undefined;
         if (directMatch && !declOnly) {
           fileMatched++;
+          if (
+            predicateKindMismatch(
+              rubyName,
+              directMatch,
+              tsAdmitsBooleanByFileName.get(expectedTs)?.get(directMatch),
+            )
+          ) {
+            predicateKindMismatches.push({
+              rubyFile,
+              rubyName,
+              rubyModule,
+              tsFile: expectedTs,
+              tsName: directMatch,
+            });
+          }
           const claimKey = `${expectedTs}#${directMatch}#${rubyName.endsWith("=") ? "w" : "r"}`;
           const self = `${rubyFile}#${rubyName}`;
           const claimant = tsMemberClaims.get(claimKey);
@@ -4977,6 +5136,21 @@ export function main() {
 
         if (foundViaInclude && !declOnly) {
           fileMatched++;
+          if (
+            predicateKindMismatch(
+              rubyName,
+              matchedCandidate!,
+              tsAdmitsBooleanByFileName.get(foundViaInclude)?.get(matchedCandidate!),
+            )
+          ) {
+            predicateKindMismatches.push({
+              rubyFile,
+              rubyName,
+              rubyModule,
+              tsFile: foundViaInclude,
+              tsName: matchedCandidate!,
+            });
+          }
           checkArity(
             rubyName,
             matchedCandidate!,
@@ -5318,6 +5492,8 @@ export function main() {
         mismatches: paramNameMismatches,
       },
       blockParams: { compared: blockParamsCompared, mismatches: blockParamMismatches },
+      predicateKindMismatches,
+      denominator,
       optionKeys: {
         compared: optionKeysCompared,
         mismatched: optionKeyMismatches.length,
@@ -5816,7 +5992,24 @@ function printReport(
     console.log(
       `  ${pkg.package}  —  ${pkg.matched}/${pkg.totalMethods} methods (${pkg.percent}%)  |  files: ${pkg.filesExist}/${pkg.totalFiles}${misplacedNote}${inhNote}${arityNote}${paramsNote}${pinsNote}${excludedNote}`,
     );
+    const d = pkg.denominator;
+    const ownPct = d.definitions > 0 ? Math.round((d.ownRow / d.definitions) * 1000) / 10 : 0;
+    console.log(
+      `  Ruby defs: ${d.definitions}  —  own row ${d.ownRow} (${ownPct}%)  |  excluded file ${d.excludedFile}  |  rowless file ${d.rowlessFile}  |  global skip ${d.globalSkip}  |  scoped skip ${d.scopedSkip}  |  operator ${d.operator}  |  same-name collapse ${d.sameNameCollapse}`,
+    );
+    if (pkg.predicateKindMismatches.length > 0) {
+      console.log(
+        `  Predicate kind mismatches (advisory — matched by a non-boolean getter/property): ${pkg.predicateKindMismatches.length}`,
+      );
+    }
     console.log(`${"=".repeat(100)}`);
+
+    if (showMissing && pkg.predicateKindMismatches.length > 0) {
+      console.log(`\n  Predicate kind mismatches (advisory — still counted as matched):`);
+      for (const m of pkg.predicateKindMismatches) {
+        console.log(`    ${m.rubyFile}  ${m.rubyModule}#${m.rubyName}  →  ${m.tsFile}:${m.tsName}`);
+      }
+    }
 
     if (showArity && ar.mismatches.length > 0) {
       console.log(`\n  Arity mismatches (advisory — does not affect parity):`);

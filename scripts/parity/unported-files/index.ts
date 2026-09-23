@@ -33,7 +33,12 @@ export const UNPORTED_FILES: UnportedFile[] = [
 ];
 
 export function isSourceUnported(file: string, pkg?: string): boolean {
-  return UNPORTED_FILES.some((e) => {
+  return unportedSourceEntry(file, pkg) !== undefined;
+}
+
+/** The entry that makes {@link isSourceUnported} true, for its `reason`. */
+export function unportedSourceEntry(file: string, pkg?: string): UnportedFile | undefined {
+  return UNPORTED_FILES.find((e) => {
     if (!e.pattern) return false;
     // A leading "/" anchors the pattern to a path boundary — same rule as
     // `isTestFileUnported` below — so a basename entry cannot swallow a longer
