@@ -31,6 +31,7 @@ export interface SqliteConnection {
   prepare(sql: string): SqliteStatement | Promise<SqliteStatement>;
   exec(sql: string): void | Promise<void>;
   execute(sql: string, bindVars?: SqliteBinds): readonly unknown[] | Promise<readonly unknown[]>;
+  getFirstValue(sql: string, ...bindVars: SqliteBindValue[]): unknown | Promise<unknown>;
   pragma(source: string, opts?: { simple?: boolean }): unknown | Promise<unknown>;
   changes(): number | Promise<number>;
   lastInsertRowId(): number | bigint | Promise<number | bigint>;
@@ -55,6 +56,7 @@ export interface SyncSqliteConnection {
   prepare(sql: string): SyncSqliteStatement;
   exec(sql: string): void;
   execute(sql: string, bindVars?: SqliteBinds): readonly unknown[];
+  getFirstValue(sql: string, ...bindVars: SqliteBindValue[]): unknown;
   pragma(source: string, opts?: { simple?: boolean }): unknown;
   changes(): number;
   lastInsertRowId(): number | bigint;

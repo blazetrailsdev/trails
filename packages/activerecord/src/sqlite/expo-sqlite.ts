@@ -3,6 +3,7 @@ import { createRequire } from "node:module";
 import {
   type ColumnInfo,
   type RunResult,
+  type SqliteBindValue,
   type SqliteBinds,
   type SqliteConnection,
   type SqliteDriver,
@@ -143,6 +144,12 @@ class ExpoSqliteConnection implements SqliteConnection {
     } finally {
       await stmt.close();
     }
+  }
+
+  async getFirstValue(sql: string, ...bindVars: SqliteBindValue[]): Promise<unknown> {
+    const row = (await this.execute(sql, bindVars))[0];
+    if (row) return Object.values(row as object)[0];
+    return null;
   }
 
   async pragma(source: string, opts?: { simple?: boolean }): Promise<unknown> {

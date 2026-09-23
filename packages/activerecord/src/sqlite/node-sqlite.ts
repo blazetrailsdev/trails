@@ -4,6 +4,7 @@ import { File } from "@blazetrails/ruby-compat";
 import {
   type ColumnInfo,
   type RunResult,
+  type SqliteBindValue,
   type SqliteBinds,
   type SqliteConnection,
   type SqliteDriver,
@@ -116,6 +117,12 @@ class NodeSqliteConnection implements SqliteConnection, SyncSqliteConnection {
     } finally {
       stmt.close();
     }
+  }
+
+  getFirstValue(sql: string, ...bindVars: SqliteBindValue[]): unknown {
+    const row = this.execute(sql, bindVars)[0];
+    if (row) return Object.values(row as object)[0];
+    return null;
   }
 
   pragma(source: string, opts?: { simple?: boolean }): unknown {
