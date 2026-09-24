@@ -206,6 +206,28 @@ export function rbAnyToS(obj: object): string {
   return `#<${cname}:0x${address.toString(16).padStart(16, "0")}>`;
 }
 
+/**
+ * `rb_obj_id` (`vendor/ruby/gc.c:4975`), `Kernel#object_id`: a stable integer
+ * handed out on first use by `rb_find_object_id` (`gc.c:4883`), starting at
+ * `OBJ_ID_INITIAL` and `OBJ_ID_INCREMENT` apart (`gc.c:3826-3827`, a 40-byte
+ * `RVALUE` on 64-bit).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbObjId(obj: object): number {
+  let id = objIds.get(obj);
+  if (id === undefined) {
+    id = nextObjectId;
+    nextObjectId += OBJ_ID_INCREMENT;
+    objIds.set(obj, id);
+  }
+  return id;
+}
+
+const OBJ_ID_INCREMENT = 20;
+const OBJ_ID_INITIAL = OBJ_ID_INCREMENT * 2;
+const objIds = new WeakMap<object, number>();
+let nextObjectId = OBJ_ID_INITIAL;
 const objInspectRecursing = new Set<object>();
 const objAddresses = new WeakMap<object, number>();
 let nextObjAddress = 0x7f0000000000;

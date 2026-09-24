@@ -31,6 +31,7 @@ export {
   rbInspect,
   rbObjInspect,
   rbAnyToS,
+  rbObjId,
   rbObjAsString,
   rbModSingletonP,
   rbObjClass,

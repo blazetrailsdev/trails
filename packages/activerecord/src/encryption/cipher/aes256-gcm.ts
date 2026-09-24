@@ -1,4 +1,4 @@
-import { Cipher, OpenSSL, rbAnyToS, type Bytes } from "@blazetrails/ruby-compat";
+import { Cipher, OpenSSL, rbObjId, sprintf, type Bytes } from "@blazetrails/ruby-compat";
 import { Encryption } from "../../namespaces.js";
 import { Configuration, Decryption, EncryptedContentIntegrity } from "../errors.js";
 import { Message } from "../message.js";
@@ -89,7 +89,7 @@ export class Aes256Gcm {
   }
 
   inspect(): string {
-    return `#<${(this.constructor as typeof Aes256Gcm)._railsClassName}:${rbAnyToS(this).split(":")[1]}`;
+    return `#<${(this.constructor as typeof Aes256Gcm)._railsClassName}:${sprintf("%#016x", rbObjId(this) << 1)}>`;
   }
 
   private _validateKeyLength(key: Bytes): void {
