@@ -14,11 +14,29 @@ import {
   minimum,
   maximum,
 } from "../enumerable-utils.js";
-import { compactBlank as hashCompactBlank, compactBlankBang } from "../hash-utils.js";
+import {
+  compactBlank as hashCompactBlank,
+  compactBlankBang,
+  excluding as hashExcluding,
+} from "../hash-utils.js";
+import { TypeError, toI } from "@blazetrails/ruby-compat";
+import { assertRaise, assertRaises } from "../testing/assertions.js";
 import { Array as ArrayExt } from "./array/access.js";
 
 class Payment {
   constructor(readonly price: number | null) {}
+}
+
+class GenericEnumerable<T> implements Iterable<T> {
+  constructor(private values: T[] = [1, 2, 3] as T[]) {}
+
+  *[Symbol.iterator](): Iterator<T> {
+    yield* this.values;
+  }
+}
+
+function range(first: number, last: number): number[] {
+  return Array.from({ length: last - first + 1 }, (_, i) => first + i);
 }
 
 class ExpandedPayment {
@@ -38,37 +56,43 @@ describe("EnumerableTests", () => {
   });
 
   it.skip("sums", () => {
-    // BLOCKED: enumerable-sum-index-with-and-excluding-port-gaps
+    // BLOCKED: activesupport-sum-has-no-float-or-complex-seat
     expect(sum([1, 2, 3])).toBe(6);
     expect(sum([1, 2, 3], (x) => x * 2)).toBe(12);
   });
 
-  it.skip("nil sums", () => {
-    // BLOCKED: enumerable-sum-index-with-and-excluding-port-gaps
+  it("nil sums", async () => {
     const expectedRaise = TypeError;
 
-    expect(() => sum([5, 15, null] as never[])).toThrow(expectedRaise);
-    expect(() => sum([null] as never[])).toThrow(expectedRaise);
+    await assertRaise([expectedRaise], {}, () => sum(new GenericEnumerable([5, 15, null])));
+    await assertRaises([expectedRaise], {}, () => {
+      sum([null]);
+    });
 
-    const payments = [new Payment(5), new Payment(15), new Payment(10), new Payment(null)];
-    expect(() => sum(payments, (p) => p.price as number)).toThrow(expectedRaise);
+    const payments = new GenericEnumerable([
+      new Payment(5),
+      new Payment(15),
+      new Payment(10),
+      new Payment(null),
+    ]);
+    await assertRaise([expectedRaise], {}, () => sum(payments, (p) => p.price));
 
-    expect(sum(payments, (p) => (p.price ?? 0) * 2)).toBe(60);
+    expect(sum(payments, (p) => (toI(p.price) as number) * 2)).toEqual(60);
   });
 
   it.skip("empty sums", () => {
-    // BLOCKED: enumerable-sum-index-with-and-excluding-port-gaps
+    // BLOCKED: activesupport-sum-has-no-float-or-complex-seat
     expect(sum([])).toBe(0);
   });
 
   it.skip("range sums", () => {
-    // BLOCKED: enumerable-sum-index-with-and-excluding-port-gaps
+    // BLOCKED: activesupport-sum-has-no-float-or-complex-seat
     const range = Array.from({ length: 5 }, (_, i) => i + 1);
     expect(sum(range)).toBe(15);
   });
 
   it.skip("array sums", () => {
-    // BLOCKED: enumerable-sum-index-with-and-excluding-port-gaps
+    // BLOCKED: activesupport-sum-has-no-float-or-complex-seat
     expect(sum([5, 10, 15])).toBe(30);
   });
 
@@ -109,20 +133,21 @@ describe("EnumerableTests", () => {
     expect(exclude([1, 2, 3] as any, 2 as any)).toBe(false);
   });
 
-  it.skip("excluding", () => {
-    // BLOCKED: enumerable-sum-index-with-and-excluding-port-gaps
-    expect(excluding([1, 2, 3, 4, 5], 3, 5)).toEqual([1, 2, 4]);
-    expect(excluding([1, 2, 3, 4, 5], [1, 2] as never)).toEqual([3, 4, 5]);
+  it("excluding", () => {
+    expect(excluding(new GenericEnumerable(range(1, 5)), 3, 5)).toEqual([1, 2, 4]);
+    expect(excluding(new GenericEnumerable(range(1, 5)), [1, 2])).toEqual([3, 4, 5]);
     expect(
       excluding(
-        [
+        new GenericEnumerable([
           [0, 1],
           [1, 0],
-        ],
-        [[1, 0]] as never,
+        ]),
+        [[1, 0]],
       ),
     ).toEqual([[0, 1]]);
-    expect(excluding([1, 2, 3, 4, 5], 3, 5)).toEqual([1, 2, 4]);
+    expect(excluding(range(1, 5), 3, 5)).toEqual([1, 2, 4]);
+    expect(excluding(new Set(range(1, 5)), 3, 5)).toEqual([1, 2, 4]);
+    expect(hashExcluding({ foo: 1, bar: 2, baz: 3 }, "bar")).toEqual({ foo: 1, baz: 3 });
   });
 
   it("without", () => {
@@ -237,7 +262,7 @@ describe("EnumerableTests", () => {
   });
 
   it.skip("index with", () => {
-    // BLOCKED: enumerable-sum-index-with-and-excluding-port-gaps
+    // BLOCKED: port-a-minimal-enumerator-for-to-enum-arms
     const payments = [new Payment(5), new Payment(15), new Payment(10)];
 
     expect(indexWith(payments, (p) => p.price)).toEqual(
@@ -269,10 +294,6 @@ describe("EnumerableTests", () => {
   });
 
   it.skip("doesnt bust constant cache", () => {
-    // BLOCKED: enumerable-sum-index-with-and-excluding-port-gaps
-    const items = [1, 2, 3];
-    expect(sum(items)).toBe(6);
-    expect(sum(items)).toBe(6);
-    expect(many(items)).toBe(true);
+    // PERMANENT-SKIP: MRI-only — `skip "Only applies to MRI" unless defined?(RubyVM.stat)` (enumerable_test.rb:404)
   });
 });

@@ -11,6 +11,8 @@ import {
   rbObjClass,
   rbObjRespondTo,
   symbolToS,
+  toEnum,
+  type Enumerator,
 } from "@blazetrails/ruby-compat";
 
 type AnyObject = Record<string, unknown>;
@@ -301,8 +303,13 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
     return this.except(...keys);
   }
 
-  select(...args: [(key: string, value: V) => boolean]): HashWithIndifferentAccess<V> {
+  select(): Enumerator;
+  select(...args: [(key: string, value: V) => boolean]): HashWithIndifferentAccess<V>;
+  select(
+    ...args: [] | [(key: string, value: V) => boolean]
+  ): HashWithIndifferentAccess<V> | Enumerator {
     const block = args[args.length - 1];
+    if (!block) return toEnum(this, "select");
     const hash = this.dup();
     hash.selectBang(block);
     return hash;
@@ -319,8 +326,13 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
     return changed ? this : null;
   }
 
-  reject(...args: [(key: string, value: V) => boolean]): HashWithIndifferentAccess<V> {
+  reject(): Enumerator;
+  reject(...args: [(key: string, value: V) => boolean]): HashWithIndifferentAccess<V>;
+  reject(
+    ...args: [] | [(key: string, value: V) => boolean]
+  ): HashWithIndifferentAccess<V> | Enumerator {
     const block = args[args.length - 1];
+    if (!block) return toEnum(this, "reject");
     const hash = this.dup();
     hash.rejectBang(block);
     return hash;

@@ -346,6 +346,13 @@ export const reverseUpdate = reverseMergeBang;
 
 export const withDefaultsBang = reverseMergeBang;
 
+export function excluding<T extends AnyObject>(hash: T, ...elements: unknown[]): Partial<T> {
+  elements = elements.flat(1);
+  return Object.fromEntries(
+    Object.entries(hash).filter(([element]) => !elements.includes(element)),
+  ) as Partial<T>;
+}
+
 export function exceptBang<T extends AnyObject>(hash: T, ...keys: string[]): T {
   keys.forEach((key) => hashDelete(hash, key));
   return hash;
