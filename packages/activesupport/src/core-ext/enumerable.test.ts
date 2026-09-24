@@ -14,11 +14,7 @@ import {
   minimum,
   maximum,
 } from "../enumerable-utils.js";
-import {
-  compactBlank as hashCompactBlank,
-  compactBlankBang,
-  excluding as hashExcluding,
-} from "../hash-utils.js";
+import { compactBlank as hashCompactBlank, compactBlankBang } from "../hash-utils.js";
 import { TypeError, toI } from "@blazetrails/ruby-compat";
 import { assertRaise, assertRaises } from "../testing/assertions.js";
 import { Array as ArrayExt } from "./array/access.js";
@@ -147,7 +143,7 @@ describe("EnumerableTests", () => {
     ).toEqual([[0, 1]]);
     expect(excluding(range(1, 5), 3, 5)).toEqual([1, 2, 4]);
     expect(excluding(new Set(range(1, 5)), 3, 5)).toEqual([1, 2, 4]);
-    expect(hashExcluding({ foo: 1, bar: 2, baz: 3 }, "bar")).toEqual({ foo: 1, baz: 3 });
+    expect(excluding({ foo: 1, bar: 2, baz: 3 }, "bar")).toEqual({ foo: 1, baz: 3 });
   });
 
   it("without", () => {

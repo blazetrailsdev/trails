@@ -6,7 +6,7 @@ import {
   rbEqual,
   rbObjClass,
 } from "@blazetrails/ruby-compat";
-import { valuesAt } from "./hash-utils.js";
+import { isPlainObject, valuesAt } from "./hash-utils.js";
 import { isBlank } from "./string-utils.js";
 
 /**
@@ -183,9 +183,21 @@ export function filterMap<T, U>(collection: T[], fn: (item: T) => U | null | und
   return result;
 }
 
-export function excluding<T>(collection: Iterable<T>, ...elements: unknown[]): T[] {
+export function excluding<T extends Record<string, unknown>>(
+  collection: T,
+  ...elements: unknown[]
+): Partial<T>;
+export function excluding<T>(collection: Iterable<T>, ...elements: unknown[]): T[];
+export function excluding(collection: unknown, ...elements: unknown[]): unknown {
   elements = elements.flat(1);
-  return [...collection].filter((element) => !elements.some((e) => rbEqual(e, element)));
+  if (isPlainObject(collection)) {
+    return Object.fromEntries(
+      Object.entries(collection).filter(([element]) => !elements.some((e) => rbEqual(e, element))),
+    );
+  }
+  return [...(collection as Iterable<unknown>)].filter(
+    (element) => !elements.some((e) => rbEqual(e, element)),
+  );
 }
 
 export function including<T>(collection: T[], ...elements: T[]): T[] {
