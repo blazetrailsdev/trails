@@ -173,6 +173,7 @@ export { Rational, ZeroDivisionError, rational } from "./rational.js";
 export { RUBY_PLATFORM } from "./ruby-platform.js";
 export { rbEql, rbEqual } from "./rb-equal.js";
 export { rbHash } from "./rb-hash.js";
+export { rbConstMissing, rbModConstMissing } from "./variable.js";
 export { isEmpty } from "./ruby-empty.js";
 export { RuntimeError } from "./runtime-error.js";
 export { StandardError } from "./standard-error.js";

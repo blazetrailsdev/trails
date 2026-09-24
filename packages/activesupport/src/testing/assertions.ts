@@ -47,7 +47,7 @@ function classNameOf(e: Error): string {
 /** @noRailsEquivalent PERMANENT */
 export class BacktraceFilter {
   /** @noRailsEquivalent PERMANENT */
-  static MT_RE = /node_modules[/\\]@?vitest|node:internal/;
+  static MT_RE = /node_modules[/\\]@?vitest|node:internal(?!\/process\/task_queues)/;
 
   regexp: RegExp;
 
@@ -108,7 +108,10 @@ Object.defineProperties(UnexpectedError.prototype, {
       const bt = Minitest.filterBacktrace(backtrace(this.error))
         .join("\n    ")
         .replace(baseRe(), "");
-      return `${classNameOf(this.error)}: ${this.error.message}\n    ${bt}`;
+      const message = Object.hasOwn(this.error, "message")
+        ? this.error.message
+        : classNameOf(this.error);
+      return `${classNameOf(this.error)}: ${message}\n    ${bt}`;
     },
   },
 });
@@ -139,6 +142,7 @@ export async function assertRaises(
   try {
     await block?.();
   } catch (e) {
+    if (!exp.some((klass) => e instanceof klass) && e instanceof Assertion) throw e;
     error = e as Error;
   }
   if (!error)

@@ -2,6 +2,10 @@ import { afterEach, beforeEach, expect } from "vitest";
 import type { TestContext } from "vitest";
 import { Time } from "@blazetrails/date";
 import {
+  testOrder as activeSupportTestOrder,
+  setTestOrder as activeSupportSetTestOrder,
+} from "./active-support.js";
+import {
   setTaggedLogger,
   beforeSetup as taggedLoggingBeforeSetup,
   taggedLogger,
@@ -46,6 +50,15 @@ import {
 } from "./testing/time-helpers.js";
 
 export class TestCase {
+  static setTestOrder(newOrder: string | null): void {
+    activeSupportSetTestOrder(newOrder);
+  }
+
+  static get testOrder(): string {
+    if (activeSupportTestOrder() == null) activeSupportSetTestOrder(":random");
+    return activeSupportTestOrder()!;
+  }
+
   static setTaggedLogger = setTaggedLogger;
   /** @internal */
   static taggedLogger = taggedLogger;

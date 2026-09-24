@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Thread, stderr } from "@blazetrails/ruby-compat";
+import { StandardError, Thread, stderr } from "@blazetrails/ruby-compat";
+import { Module } from "@blazetrails/ruby-compat/include";
 import {
   Deprecation,
   DeprecationException,
@@ -7,11 +8,13 @@ import {
   type CallerLocation,
   type DeprecationBehaviorCallable,
 } from "./deprecation.js";
+import { DeprecatedConstantAccessor } from "./deprecation/constant-accessor.js";
 import {
   DeprecatedConstantProxy,
   DeprecatedInstanceVariableProxy,
   DeprecatedObjectProxy,
 } from "./deprecation/proxy-wrappers.js";
+import { deprecate } from "./core-ext/module/deprecation.js";
 import { sole } from "./enumerable-utils.js";
 import { VERSION } from "./gem-version.js";
 import { ArgumentError } from "./hash-utils.js";
@@ -39,6 +42,8 @@ import {
 } from "./testing/deprecation.js";
 
 class Deprecatee {
+  static deprecate = deprecate;
+
   private _fubar: unknown;
   private _fooBar: unknown;
 
@@ -69,6 +74,8 @@ class Deprecatee {
 const UndeprecatedFoo: Record<string, unknown> = { BAR: "foo bar" };
 registerConstant("Undeprecated::Foo", UndeprecatedFoo);
 registerConstant("Undeprecated::Foo::BAR", UndeprecatedFoo.BAR);
+class UndeprecatedError extends StandardError {}
+registerConstant("Undeprecated::Error", UndeprecatedError);
 
 class CallerLocationFixture implements CallerLocation {
   path = "packages/activesupport/src/deprecation.test.ts";
@@ -281,13 +288,7 @@ describe("DeprecationTest", () => {
 
   it("Module::deprecate", async () => {
     const klass = class extends Deprecatee {};
-    deprecator.deprecateMethods(
-      klass.prototype as unknown as Record<string, unknown>,
-      "zero",
-      "one",
-      "multi",
-      { deprecator },
-    );
+    klass.deprecate("zero", "one", "multi", { deprecator });
 
     await assertDeprecated(/zero is deprecated/, deprecator, () => {
       expect(new klass().zero()).toEqual(0);
@@ -308,12 +309,7 @@ describe("DeprecationTest", () => {
         return Deprecatee.prototype.one.call(this, a);
       }
     };
-    deprecator.deprecateMethods(
-      klass.prototype as unknown as Record<string, unknown>,
-      "one",
-      "one!",
-      { deprecator },
-    );
+    klass.deprecate("one", "one!", { deprecator });
 
     const hash = { k: 1 };
 
@@ -326,8 +322,7 @@ describe("DeprecationTest", () => {
     });
   });
 
-  it.skip("Module::deprecate requires a deprecator", async () => {
-    // BLOCKED: activesupport-has-no-module-deprecate
+  it("Module::deprecate requires a deprecator", async () => {
     const klass = class extends Deprecatee {};
     await assertRaises([ArgumentError], {}, () => {
       (klass as unknown as { deprecate(name: string): void }).deprecate("zero");
@@ -591,12 +586,16 @@ describe("DeprecationTest", () => {
     });
   });
 
-  it.skip("deprecate_constant", async () => {
-    // BLOCKED: activesupport-has-no-deprecated-constant-accessor
-    const legacy = {} as {
-      FUBAR: unknown;
-      deprecateConstant(a: string, b: string, o: object): void;
-    };
+  type Legacy = Module & {
+    FUBAR: unknown;
+    Error: new () => Error;
+    deprecateConstant(a: string, b: string, o?: object): void;
+  };
+
+  it("deprecate_constant", async () => {
+    const legacy = new Module() as Legacy;
+    Object.defineProperty(legacy, "name", { value: "Legacy" });
+    legacy.include(DeprecatedConstantAccessor);
     legacy.deprecateConstant("FUBAR", "Undeprecated::Foo::BAR", { deprecator });
 
     await assertDeprecated("Legacy::FUBAR", deprecator, () => {
@@ -604,18 +603,16 @@ describe("DeprecationTest", () => {
     });
   });
 
-  it.skip("deprecate_constant when rescuing a deprecated error", async () => {
-    // BLOCKED: activesupport-has-no-deprecated-constant-accessor
-    const legacy = {} as {
-      Error: new () => Error;
-      deprecateConstant(a: string, b: string, o: object): void;
-    };
+  it("deprecate_constant when rescuing a deprecated error", async () => {
+    const legacy = new Module() as Legacy;
+    Object.defineProperty(legacy, "name", { value: "Legacy" });
+    legacy.include(DeprecatedConstantAccessor);
     legacy.deprecateConstant("Error", "Undeprecated::Error", { deprecator });
 
     await assertDeprecated("Legacy::Error", deprecator, async () => {
       await assertNothingRaised(() => {
         try {
-          throw new Error("Undeprecated::Error");
+          throw new UndeprecatedError();
         } catch (e) {
           if (!(e instanceof legacy.Error)) throw e;
         }
@@ -623,9 +620,8 @@ describe("DeprecationTest", () => {
     });
   });
 
-  it.skip("deprecate_constant requires a deprecator", async () => {
-    // BLOCKED: activesupport-has-no-deprecated-constant-accessor
-    const legacy = {} as { deprecateConstant(a: string, b: string): void };
+  it("deprecate_constant requires a deprecator", async () => {
+    const legacy = new Module().include(DeprecatedConstantAccessor) as Legacy;
     await assertRaises([ArgumentError], {}, () => {
       legacy.deprecateConstant("OLD", "NEW");
     });
@@ -738,12 +734,7 @@ describe("DeprecationTest", () => {
 
   it("Module::deprecate with method name only", async () => {
     const klass = class extends Deprecatee {};
-    deprecator.deprecateMethods(
-      klass.prototype as unknown as Record<string, unknown>,
-      "fubar",
-      "setFubar",
-      { deprecator },
-    );
+    klass.deprecate("fubar", "setFubar", { deprecator });
 
     await assertDeprecated(deprecator, null, () => new klass().fubar());
     await assertDeprecated(deprecator, null, () => {
@@ -854,9 +845,7 @@ describe("DeprecationTest", () => {
   it("Module::deprecate can be called before the target method is defined", async () => {
     const base = class extends Deprecatee {};
     const klass = class extends base {};
-    deprecator.deprecateMethods(klass.prototype as unknown as Record<string, unknown>, "multi!", {
-      deprecator,
-    });
+    klass.deprecate("multi!", { deprecator });
     (base.prototype as unknown as Record<string, unknown>)["multi!"] = Deprecatee.prototype.multi;
 
     await assertDeprecated(/multi! is deprecated/, deprecator, () => {

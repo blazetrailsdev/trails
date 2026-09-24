@@ -27,6 +27,7 @@ import {
   zlibAdapterConfig,
 } from "@blazetrails/ruby-compat";
 import { ErrorReporter, currentErrorReporter, _setErrorReporter } from "./error-reporter.js";
+import { testOrder, setTestOrder } from "./active-support.js";
 
 export const ActiveSupport = {
   get errorReporter(): ErrorReporter {
@@ -87,6 +88,13 @@ export const ActiveSupport = {
 
   get processAdapter(): string | null {
     return processAdapterConfig.adapter;
+  },
+
+  get testOrder(): string | null {
+    return testOrder();
+  },
+  set testOrder(value: string | null) {
+    setTestOrder(value);
   },
 };
 
