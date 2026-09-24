@@ -399,7 +399,7 @@ export function extractGeneratedType(
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
+ * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers-remainder
  */
 export function extractValueFromDefault(dfltValue: string | null): unknown {
   if (dfltValue === null) return null;

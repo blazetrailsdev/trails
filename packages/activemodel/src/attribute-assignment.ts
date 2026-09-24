@@ -117,7 +117,7 @@ export interface AttributeAssignment {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
+ * @noRailsEquivalent CONVERGEABLE inline-is-mass-assignment-empty-into-assign-attributes
  */
 export function isMassAssignmentEmpty(attrs: object): boolean {
   if (isParamsLikeWrapper(attrs)) {

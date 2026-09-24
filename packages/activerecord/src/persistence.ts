@@ -373,7 +373,7 @@ interface UpdateRecord extends AttributeIO {
   saveBang(options?: { validate?: boolean }): Promise<true | undefined>;
 }
 
-/** @missingRailsCall assign_attributes — CONVERGEABLE update-must-call-assign-attributes-not-set-attributes */
+/** @missingRailsCall assign_attributes — CONVERGEABLE update-must-call-assign-attributes-carried-from-0087 */
 export async function update<T extends UpdateRecord>(
   this: T,
   attributes: Record<string, unknown>,
@@ -385,7 +385,7 @@ export async function update<T extends UpdateRecord>(
   }) as Promise<boolean | undefined>;
 }
 
-/** @missingRailsCall assign_attributes — CONVERGEABLE update-must-call-assign-attributes-not-set-attributes */
+/** @missingRailsCall assign_attributes — CONVERGEABLE update-must-call-assign-attributes-carried-from-0087 */
 export async function updateBang<T extends UpdateRecord>(
   this: T,
   attributes: Record<string, unknown>,

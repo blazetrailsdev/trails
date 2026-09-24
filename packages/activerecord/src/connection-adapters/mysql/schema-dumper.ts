@@ -14,7 +14,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   protected _tableCollationCache: Record<string, string | undefined> = Object.create(null);
 
-  /** @noRailsEquivalent CONVERGEABLE converge-adapter-schema-and-result-helper-surface */
+  /** @noRailsEquivalent CONVERGEABLE converge-adapter-schema-and-result-helper-surface-remainder */
   virtualExpressionCache: Record<string, Record<string, string> | undefined> = Object.create(null);
 
   /** @internal */
@@ -126,7 +126,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
+   * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers-remainder
    */
   override async table(tableName: string, stream: IO | StringIO): Promise<void> {
     await this.populateVirtualExpressionCache(tableName);

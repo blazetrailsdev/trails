@@ -211,6 +211,13 @@ describe("AdapterTest", () => {
     ],
   });
 
+  let connection: DatabaseAdapter;
+
+  beforeEach(async () => {
+    connection = await Base.leaseConnection();
+    await connection.materializeTransactions();
+  });
+
   it.skipIf(adapterType === "postgres")("update prepared statement", async () => {
     const b = await Book.create({ name: "my \x00 book" });
     await b.reload();
@@ -230,18 +237,17 @@ describe("AdapterTest", () => {
   });
 
   it("valid column", () => {
-    const conn = Base.connection;
-    for (const type of Object.keys(conn.nativeDatabaseTypes())) {
-      expect(conn.isValidType(type)).toBeTruthy();
+    for (const type of Object.keys(connection.nativeDatabaseTypes())) {
+      expect(connection.isValidType(type)).toBeTruthy();
     }
   });
 
   it("invalid column", () => {
-    expect(Base.connection.isValidType("foobar")).toBeFalsy();
+    expect(connection.isValidType("foobar")).toBeFalsy();
   });
 
   it("tables", async () => {
-    const tables = await Base.connection.tables();
+    const tables = await connection.tables();
     expect(tables).toContain("accounts");
     expect(tables).toContain("authors");
     expect(tables).toContain("tasks");
@@ -249,16 +255,15 @@ describe("AdapterTest", () => {
   });
 
   it("table exists?", async () => {
-    const conn = Base.connection;
-    expect(await conn.tableExists("accounts")).toBeTruthy();
-    expect(await conn.tableExists("accounts")).toBeTruthy();
-    expect(await conn.tableExists("nonexistingtable")).toBeFalsy();
-    expect(await conn.tableExists("'")).toBeFalsy();
-    expect(await conn.tableExists(null as unknown as string)).toBeFalsy();
+    expect(await connection.tableExists("accounts")).toBeTruthy();
+    expect(await connection.tableExists("accounts")).toBeTruthy();
+    expect(await connection.tableExists("nonexistingtable")).toBeFalsy();
+    expect(await connection.tableExists("'")).toBeFalsy();
+    expect(await connection.tableExists(null as unknown as string)).toBeFalsy();
   });
 
   it("data sources", async () => {
-    const dataSources = await Base.connection.dataSources();
+    const dataSources = await connection.dataSources();
     expect(dataSources).toContain("accounts");
     expect(dataSources).toContain("authors");
     expect(dataSources).toContain("tasks");
@@ -266,22 +271,20 @@ describe("AdapterTest", () => {
   });
 
   it("data source exists?", async () => {
-    const conn = Base.connection;
-    expect(await conn.dataSourceExists("accounts")).toBeTruthy();
-    expect(await conn.dataSourceExists("accounts")).toBeTruthy();
-    expect(await conn.dataSourceExists("nonexistingtable")).toBeFalsy();
-    expect(await conn.dataSourceExists("'")).toBeFalsy();
-    expect(await conn.dataSourceExists(null as unknown as string)).toBeFalsy();
+    expect(await connection.dataSourceExists("accounts")).toBeTruthy();
+    expect(await connection.dataSourceExists("accounts")).toBeTruthy();
+    expect(await connection.dataSourceExists("nonexistingtable")).toBeFalsy();
+    expect(await connection.dataSourceExists("'")).toBeFalsy();
+    expect(await connection.dataSourceExists(null as unknown as string)).toBeFalsy();
   });
 
   it("indexes", async () => {
     const idxName = "accounts_idx";
-    const conn = Base.connection;
     try {
-      assertEmpty(await conn.indexes("accounts"));
+      assertEmpty(await connection.indexes("accounts"));
 
-      await conn.addIndex("accounts", "firm_id", { name: idxName });
-      const indexes = (await conn.indexes("accounts")) as Array<{
+      await connection.addIndex("accounts", "firm_id", { name: idxName });
+      const indexes = (await connection.indexes("accounts")) as Array<{
         table: string;
         name: string;
         unique: boolean;
@@ -292,49 +295,47 @@ describe("AdapterTest", () => {
       expect(indexes[0].unique).toBeFalsy();
       expect(indexes[0].columns).toEqual(["firm_id"]);
     } finally {
-      await conn.removeIndex("accounts", { name: idxName }).catch(() => {});
+      await connection.removeIndex("accounts", { name: idxName }).catch(() => {});
     }
   });
 
   it("returns empty indexes for non existing table", async () => {
-    expect(await Base.connection.indexes("nonexistingtable")).toEqual([]);
+    expect(await connection.indexes("nonexistingtable")).toEqual([]);
   });
 
   it("remove index when name and wrong column name specified", async () => {
-    const conn = Base.connection;
     const indexName = "accounts_idx";
     try {
-      await conn.addIndex("accounts", "firm_id", { name: indexName });
+      await connection.addIndex("accounts", "firm_id", { name: indexName });
       await assertRaises([ArgumentError], {}, async () => {
-        await conn.removeIndex("accounts", { name: indexName, column: "wrong_column_name" });
+        await connection.removeIndex("accounts", { name: indexName, column: "wrong_column_name" });
       });
     } finally {
-      await conn.removeIndex("accounts", { name: indexName });
+      await connection.removeIndex("accounts", { name: indexName });
     }
   });
 
   it("remove index when name and wrong column name specified positional argument", async () => {
-    const conn = Base.connection;
     const indexName = "accounts_idx";
     try {
-      await conn.addIndex("accounts", "firm_id", { name: indexName });
+      await connection.addIndex("accounts", "firm_id", { name: indexName });
       await assertRaises([ArgumentError], {}, async () => {
-        await conn.removeIndex("accounts", "wrong_column_name", { name: indexName });
+        await connection.removeIndex("accounts", "wrong_column_name", { name: indexName });
       });
     } finally {
-      await conn.removeIndex("accounts", { name: indexName });
+      await connection.removeIndex("accounts", { name: indexName });
     }
   });
 
   it("#exec_query queries with no result set return an empty ActiveRecord::Result", async () => {
-    const result = await Base.connection.execQuery("INSERT INTO subscribers(nick) VALUES('me')");
+    const result = await connection.execQuery("INSERT INTO subscribers(nick) VALUES('me')");
     expect(result).toBeInstanceOf(Result);
     assertEmpty(result.rows);
     assertEmpty(result.columns);
   });
 
   it("#exec_query queries with an empty result set still return the columns", async () => {
-    const result = await Base.connection.execQuery("SELECT * FROM subscribers WHERE 1=0");
+    const result = await connection.execQuery("SELECT * FROM subscribers WHERE 1=0");
     expect(result).toBeInstanceOf(Result);
     assertEmpty(result.rows);
     assertNotEmpty(result.columns);
@@ -369,10 +370,9 @@ describe("AdapterTest", () => {
   });
 
   it("uniqueness violations are translated to specific exception", async () => {
-    const conn = Base.connection;
-    await conn.execute("INSERT INTO subscribers(nick) VALUES('me')");
+    await connection.execute("INSERT INTO subscribers(nick) VALUES('me')");
     const error = await assertRaises([RecordNotUnique], {}, async () => {
-      await conn.execute("INSERT INTO subscribers(nick) VALUES('me')");
+      await connection.execute("INSERT INTO subscribers(nick) VALUES('me')");
     });
     expect(error.cause).toBeDefined();
   });
@@ -398,7 +398,9 @@ describe("AdapterTest", () => {
     "numeric value out of ranges are translated to specific exception",
     async () => {
       const error = await assertRaises([RangeError], {}, async () => {
-        await Base.connection.insert("INSERT INTO books(author_id) VALUES (9223372036854775808)");
+        await (
+          await Book.leaseConnection()
+        ).create("INSERT INTO books(author_id) VALUES (9223372036854775808)");
       });
       expect(error.cause).toBeDefined();
     },
@@ -411,7 +413,7 @@ describe("AdapterTest", () => {
     });
     try {
       const actualError = await assertRaises([StandardError], {}, async () => {
-        await Base.connection.execute("SELECT * FROM posts");
+        await connection.execute("SELECT * FROM posts");
       });
       expect(actualError).toBe(originalError);
     } finally {
@@ -421,59 +423,56 @@ describe("AdapterTest", () => {
 
   it("database related exceptions are translated to statement invalid", async () => {
     const error = await assertRaises([StatementInvalid], {}, async () => {
-      await Base.connection.execute("This is a syntax error");
+      await connection.execute("This is a syntax error");
     });
     expect(error).toBeInstanceOf(StatementInvalid);
     expect(error.cause).toBeInstanceOf(Error);
   });
 
   it("select all always return activerecord result", async () => {
-    const result = await Base.connection.selectAll("SELECT * FROM posts");
+    const result = await connection.selectAll("SELECT * FROM posts");
     expect(result instanceof Result).toBeTruthy();
   });
 
   it("select all insert update delete with casted binds", async () => {
     const binds = [Event.typeForAttribute("id")!.serialize(1)];
-    await roundTripBinds(Base.connection, binds);
+    await roundTripBinds(connection, binds);
   });
 
   it("select all insert update delete with binds", async () => {
     const binds = [new QueryAttribute("id", 1, Event.typeForAttribute("id"))];
-    await roundTripBinds(Base.connection, binds);
+    await roundTripBinds(connection, binds);
   });
 
   it("select methods passing a association relation", async () => {
-    const conn = Base.connection;
     const author = await Author.create({ name: "john" });
     await Post.create({ author, title: "foo", body: "bar" });
     const query = (author as any).posts.where({ title: "foo" }).select("title");
     const sql = query.toSql();
-    expect(await conn.selectOne(sql)).toEqual({ title: "foo" });
-    expect((await conn.selectAll(sql)) instanceof Result).toBeTruthy();
-    expect(await conn.selectValue(sql)).toBe("foo");
-    expect(await conn.selectValues(sql)).toEqual(["foo"]);
+    expect(await connection.selectOne(sql)).toEqual({ title: "foo" });
+    expect((await connection.selectAll(sql)) instanceof Result).toBeTruthy();
+    expect(await connection.selectValue(sql)).toBe("foo");
+    expect(await connection.selectValues(sql)).toEqual(["foo"]);
   });
 
   it("select methods passing a relation", async () => {
-    const conn = Base.connection;
     await Post.create({ title: "foo", body: "bar" });
     const query = Post.where({ title: "foo" }).select("title");
     const sql = query.toSql();
-    expect(await conn.selectOne(sql)).toEqual({ title: "foo" });
-    expect((await conn.selectAll(sql)) instanceof Result).toBeTruthy();
-    expect(await conn.selectValue(sql)).toBe("foo");
-    expect(await conn.selectValues(sql)).toEqual(["foo"]);
+    expect(await connection.selectOne(sql)).toEqual({ title: "foo" });
+    expect((await connection.selectAll(sql)) instanceof Result).toBeTruthy();
+    expect(await connection.selectValue(sql)).toBe("foo");
+    expect(await connection.selectValues(sql)).toEqual(["foo"]);
   });
 
   it("type_to_sql returns a String for unmapped types", async () => {
-    const conn = await Base.leaseConnection();
-    expect((conn as never as { typeToSql(t: string): string }).typeToSql("special_db_type")).toBe(
-      "special_db_type",
-    );
+    expect(
+      (connection as never as { typeToSql(t: string): string }).typeToSql("special_db_type"),
+    ).toBe("special_db_type");
   });
 
   it("inspect does not show secrets", () => {
-    const output = Base.connection.inspect();
+    const output = connection.inspect();
     expect(output).toMatch(/\w*Adapter:0x[\da-f]+ env_name="\w+" role=:writing>/);
   });
 });
@@ -481,9 +480,15 @@ describe("AdapterTest", () => {
 describe("AdapterForeignKeyTest", () => {
   fixtures({}, { useTransactionalTests: false });
 
+  let connection: DatabaseAdapter;
+
+  beforeEach(async () => {
+    connection = await Base.leaseConnection();
+  });
+
   const cleanup = async (): Promise<void> => {
-    await Base.connection.execute("DELETE FROM fk_test_has_fk");
-    await Base.connection.execute("DELETE FROM fk_test_has_pk");
+    await connection.execute("DELETE FROM fk_test_has_fk");
+    await connection.execute("DELETE FROM fk_test_has_pk");
   };
 
   beforeEach(cleanup);
@@ -491,12 +496,12 @@ describe("AdapterForeignKeyTest", () => {
 
   beforeEach(async () => {
     if (adapterType === "sqlite") {
-      await Base.connection.execute("PRAGMA foreign_keys = ON");
+      await connection.execute("PRAGMA foreign_keys = ON");
     }
   });
 
   const insertIntoFkTestHasFk = (fkId = 0): Promise<unknown> =>
-    Base.connection.insert(`INSERT INTO fk_test_has_fk (fk_id) VALUES (${fkId})`);
+    connection.execute(`INSERT INTO fk_test_has_fk (fk_id) VALUES (${fkId})`);
 
   it("foreign key violations are translated to specific exception with validate false", async () => {
     class KlassHasFk extends Base {
@@ -520,20 +525,19 @@ describe("AdapterForeignKeyTest", () => {
   });
 
   it("foreign key violations on delete are translated to specific exception", async () => {
-    await Base.connection.execute("INSERT INTO fk_test_has_pk (pk_id) VALUES (1)");
+    await connection.execute("INSERT INTO fk_test_has_pk (pk_id) VALUES (1)");
     await insertIntoFkTestHasFk(1);
     const error = await assertRaises([InvalidForeignKey], {}, async () => {
-      await Base.connection.delete("DELETE FROM fk_test_has_pk WHERE pk_id = 1");
+      await connection.execute("DELETE FROM fk_test_has_pk WHERE pk_id = 1");
     });
     expect(error.cause).toBeDefined();
   });
 
   it("disable referential integrity", async () => {
-    const conn = Base.connection;
     await assertNothingRaised(async () => {
-      await conn.disableReferentialIntegrity(async () => {
+      await connection.disableReferentialIntegrity(async () => {
         await insertIntoFkTestHasFk();
-        await conn.execute("DELETE FROM fk_test_has_fk");
+        await connection.execute("DELETE FROM fk_test_has_fk");
       });
     });
   });
@@ -553,51 +557,53 @@ describe("AdapterTestWithoutTransaction", () => {
     usesTransaction: withoutTransaction,
   });
 
+  let connection: DatabaseAdapter;
+
+  beforeEach(async () => {
+    connection = await Base.leaseConnection();
+  });
+
   it("create with query cache", async () => {
-    const conn = Base.connection;
-    conn.enableQueryCacheBang();
+    connection.enableQueryCacheBang();
     try {
       posts("welcome");
       const count = (await Post.count()) as number;
 
-      await conn.create("INSERT INTO posts(title, body) VALUES ('', '')");
+      await connection.create("INSERT INTO posts(title, body) VALUES ('', '')");
 
       expect(await Post.count()).toBe(count + 1);
     } finally {
-      conn.disableQueryCacheBang();
+      connection.disableQueryCacheBang();
     }
   });
 
   it("truncate", async () => {
-    const conn = Base.connection;
     expect(await Post.count()).toBeGreaterThan(0);
 
-    await conn.truncate("posts");
+    await connection.truncate("posts");
 
     expect(await Post.count()).toBe(0);
   });
 
   it("truncate with query cache", async () => {
-    const conn = Base.connection;
-    conn.enableQueryCacheBang();
+    connection.enableQueryCacheBang();
     try {
       expect(await Post.count()).toBeGreaterThan(0);
 
-      await conn.truncate("posts");
+      await connection.truncate("posts");
 
       expect(await Post.count()).toBe(0);
     } finally {
-      conn.disableQueryCacheBang();
+      connection.disableQueryCacheBang();
     }
   });
 
   it("truncate tables", async () => {
-    const conn = Base.connection;
     expect(await Post.count()).toBeGreaterThan(0);
     expect(await Author.count()).toBeGreaterThan(0);
     expect(await AuthorAddress.count()).toBeGreaterThan(0);
 
-    await conn.truncateTables("author_addresses", "authors", "posts");
+    await connection.truncateTables("author_addresses", "authors", "posts");
 
     expect(await Post.count()).toBe(0);
     expect(await Author.count()).toBe(0);
@@ -605,40 +611,41 @@ describe("AdapterTestWithoutTransaction", () => {
   });
 
   it("truncate tables with query cache", async () => {
-    const conn = Base.connection;
-    conn.enableQueryCacheBang();
+    connection.enableQueryCacheBang();
     try {
       expect(await Post.count()).toBeGreaterThan(0);
       expect(await Author.count()).toBeGreaterThan(0);
       expect(await AuthorAddress.count()).toBeGreaterThan(0);
 
-      await conn.truncateTables("author_addresses", "authors", "posts");
+      await connection.truncateTables("author_addresses", "authors", "posts");
 
       expect(await Post.count()).toBe(0);
       expect(await Author.count()).toBe(0);
       expect(await AuthorAddress.count()).toBe(0);
     } finally {
-      conn.disableQueryCacheBang();
+      connection.disableQueryCacheBang();
     }
   });
 
   const respondsToResetPkSequence = adapterType === "postgres";
   it.skipIf(!respondsToResetPkSequence)("reset empty table with custom pk", async () => {
-    const conn = Base.connection as DatabaseAdapter & {
-      resetPkSequenceBang(table: string): Promise<void>;
-    };
     await Movie.deleteAll();
-    await conn.resetPkSequenceBang("movies");
+    await (
+      (await Movie.leaseConnection()) as DatabaseAdapter & {
+        resetPkSequenceBang(table: string): Promise<void>;
+      }
+    ).resetPkSequenceBang("movies");
     const movie = await Movie.create({ name: "fight club" });
     expect(Number(movie.id)).toBe(1);
   });
 
   it.skipIf(!respondsToResetPkSequence)("reset table with non integer pk", async () => {
-    const conn = Base.connection as DatabaseAdapter & {
-      resetPkSequenceBang(table: string): Promise<void>;
-    };
     await Subscriber.deleteAll();
-    await conn.resetPkSequenceBang("subscribers");
+    await (
+      (await Subscriber.leaseConnection()) as DatabaseAdapter & {
+        resetPkSequenceBang(table: string): Promise<void>;
+      }
+    ).resetPkSequenceBang("subscribers");
     const sub = new Subscriber({ name: "robert drake" });
     sub.id = "bob drake";
     await assertNothingRaised(async () => {
@@ -687,7 +694,7 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
   let connection: DatabaseAdapter;
 
   beforeEach(async () => {
-    connection = Base.connection;
+    connection = await Base.leaseConnection();
     expect(await connection.active()).toBeTruthy();
   });
 
@@ -1073,7 +1080,7 @@ describe("InvalidateTransactionTest", () => {
     "invalidates transaction on rollback error",
     async () => {
       let invalidated = false;
-      const connection = Base.connection;
+      const connection = await Base.leaseConnection();
 
       await connection.transaction(async () => {
         try {

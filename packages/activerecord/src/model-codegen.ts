@@ -32,7 +32,7 @@ interface PlannedClass {
   leadingComments: string[];
 }
 
-/** @noRailsEquivalent CONVERGEABLE converge-model-mixin-plumbing-surface */
+/** @noRailsEquivalent CONVERGEABLE converge-model-mixin-plumbing-surface-remainder */
 export function unqualify(tableName: string): string {
   const parts: string[] = [];
   let current = "";
@@ -67,7 +67,7 @@ function unquoteIdentifier(id: string): string {
   return id;
 }
 
-/** @noRailsEquivalent CONVERGEABLE converge-model-mixin-plumbing-surface */
+/** @noRailsEquivalent CONVERGEABLE converge-model-mixin-plumbing-surface-remainder */
 export function generateModels(
   tables: IntrospectedTable[],
   opts: GenerateModelsOptions = {},

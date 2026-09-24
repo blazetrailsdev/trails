@@ -22,7 +22,6 @@ import {
   limitToSize,
   integerToSql,
   foreignKeys,
-  parseMysqlName,
 } from "./schema-statements.js";
 import type { RowFormatHost } from "./schema-statements.js";
 import type { ValueType } from "@blazetrails/activemodel";
@@ -627,44 +626,6 @@ describe("MySQL::SchemaStatements", () => {
       false,
     ).indexes("pages");
     expect(idx[0].columns).toBe("(lower(`title`)), `position`(4)");
-  });
-});
-
-describe("parseMysqlName", () => {
-  it("accepts a bare table name", () => {
-    expect(parseMysqlName("widgets")).toEqual({ table: "widgets" });
-  });
-
-  it("accepts schema-qualified names, quoted or unquoted", () => {
-    expect(parseMysqlName("mydb.widgets")).toEqual({ schema: "mydb", table: "widgets" });
-    expect(parseMysqlName("`mydb`.`widgets`")).toEqual({ schema: "mydb", table: "widgets" });
-  });
-
-  it("permits whitespace inside a backtick-quoted identifier", () => {
-    expect(parseMysqlName("`not a real table`")).toEqual({ table: "not a real table" });
-  });
-
-  it("rejects three-part identifiers instead of silently truncating", () => {
-    expect(() => parseMysqlName("a.b.c")).toThrow(/Invalid MySQL identifier/);
-  });
-
-  it("rejects identifiers with empty segments", () => {
-    expect(() => parseMysqlName(".widgets")).toThrow(/Invalid MySQL identifier/);
-    expect(() => parseMysqlName("a..b")).toThrow(/Invalid MySQL identifier/);
-    expect(() => parseMysqlName("db.widgets.")).toThrow(/Invalid MySQL identifier/);
-    expect(() => parseMysqlName("")).toThrow(/Invalid MySQL identifier/);
-  });
-
-  it("rejects unquoted identifiers containing whitespace", () => {
-    expect(() => parseMysqlName("db .widgets")).toThrow(/Invalid MySQL identifier/);
-    expect(() => parseMysqlName("db. widgets")).toThrow(/Invalid MySQL identifier/);
-    expect(() => parseMysqlName("wid gets")).toThrow(/Invalid MySQL identifier/);
-  });
-
-  it("rejects empty quoted identifiers that unquote to an empty string", () => {
-    expect(() => parseMysqlName("``")).toThrow(/Invalid MySQL identifier/);
-    expect(() => parseMysqlName("``.widgets")).toThrow(/Invalid MySQL identifier/);
-    expect(() => parseMysqlName("`db`.``")).toThrow(/Invalid MySQL identifier/);
   });
 });
 

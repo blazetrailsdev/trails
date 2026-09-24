@@ -543,7 +543,7 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
+   * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers-remainder
    */
   async changeColumnDefaultForAlter(
     tableName: string,

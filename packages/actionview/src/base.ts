@@ -205,7 +205,7 @@ export class Base {
     return (this.constructor as typeof Base).compiledMethodContainer();
   }
 
-  /** @missingRailsArgs _run — CONVERGEABLE template-render-hands-the-view-to-run */
+  /** @missingRailsArgs _run — PERMANENT */
   _run(
     method: string,
     template: Template | null,

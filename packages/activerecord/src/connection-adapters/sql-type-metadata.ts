@@ -61,7 +61,7 @@ export class SqlTypeMetadata implements Deduplicable {
     };
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-adapter-schema-and-result-helper-surface */
+  /** @noRailsEquivalent CONVERGEABLE converge-adapter-schema-and-result-helper-surface-remainder */
   static fromJSON(data: SqlTypeMetadataJSON): SqlTypeMetadata {
     if (data.class === "MySQL::TypeMetadata") {
       const row = data as MySQLTypeMetadataJSON;
