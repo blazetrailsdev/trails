@@ -54,10 +54,8 @@ function timeWithZone(dateOrTime: DateOrTime, time: TimeLike | null, zone: TimeZ
   return zone.local(date.year, date.month, date.day);
 }
 
-function asInstant(time: TimeLike): Temporal.Instant {
-  if (time instanceof RubyTime) {
-    return (time.isUtc() ? time : time.getutc()).toTime().toInstant();
-  }
+function asInstant(time: TimeLike): RubyTime | Temporal.Instant {
+  if (time instanceof RubyTime) return time.isUtc() ? time : time.getutc();
   if (time instanceof Temporal.ZonedDateTime) return time.toInstant();
   if (time instanceof Temporal.PlainDateTime) return time.toZonedDateTime("UTC").toInstant();
   return time instanceof Temporal.Instant ? time : instantFrom(time);

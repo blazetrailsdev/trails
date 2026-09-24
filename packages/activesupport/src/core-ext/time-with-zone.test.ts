@@ -287,8 +287,7 @@ describe("TimeWithZoneTest", () => {
     expect(twz.xmlschema()).toBe("1999-12-31T19:00:00-05:00");
   });
 
-  it.skip("xmlschema with fractional seconds", () => {
-    // BLOCKED: activesupport-time-with-zone-subnanosecond-fractions
+  it("xmlschema with fractional seconds", () => {
     twz = twz.plus(0.1234560001);
     expect(twz.xmlschema(3)).toEqual("1999-12-31T19:00:00.123-05:00");
     expect(twz.xmlschema(6)).toEqual("1999-12-31T19:00:00.123456-05:00");
@@ -1136,8 +1135,7 @@ describe("TimeWithZoneTest", () => {
     });
   });
 
-  it.skip("to time without preserve timezone configured", async () => {
-    // BLOCKED: activesupport-time-with-zone-to-time-preserve-timezone-deprecation
+  it("to time without preserve timezone configured", async () => {
     setPreserveTimezone(null);
     await withEnvTz("US/Eastern", async () => {
       const time: any = await assertDeprecated(null, deprecator(), () => twz.toTime());
