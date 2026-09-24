@@ -3,6 +3,7 @@ import {
   fetch,
   hasKey,
   rbObjClass,
+  rbObjRespondTo,
   RuntimeError,
   toI,
   transformValues,
@@ -1384,16 +1385,6 @@ export function buildCastValue(name: string, value: unknown): Attribute {
   return Attribute.withCastValue(name, value, defaultValue());
 }
 
-function hasIdForDatabase(value: unknown): value is { idForDatabase: unknown } {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    !Array.isArray(value) &&
-    !(value instanceof Set) &&
-    "idForDatabase" in value
-  );
-}
-
 /** @internal */
 export function buildNamedBoundSqlLiteral(
   this: QueryMethodsHost,
@@ -1404,10 +1395,14 @@ export function buildNamedBoundSqlLiteral(
     if (isRelationLike(value)) {
       return Arel.sql((value as { toSql(): string }).toSql());
     } else if (Array.isArray(value) || value instanceof Set) {
-      const values = Array.from(value).map((v) => (hasIdForDatabase(v) ? v.idForDatabase : v));
+      const values = Array.from(value).map((v) =>
+        rbObjRespondTo(v, "idForDatabase") ? (v as { idForDatabase: unknown }).idForDatabase : v,
+      );
       return values.length === 0 ? null : values;
     } else {
-      if (hasIdForDatabase(value)) value = value.idForDatabase;
+      if (rbObjRespondTo(value, "idForDatabase")) {
+        value = (value as { idForDatabase: unknown }).idForDatabase;
+      }
       return value;
     }
   });
@@ -1429,10 +1424,14 @@ export function buildBoundSqlLiteral(
     if (isRelationLike(value)) {
       return Arel.sql((value as { toSql(): string }).toSql());
     } else if (Array.isArray(value) || value instanceof Set) {
-      const values = Array.from(value).map((v) => (hasIdForDatabase(v) ? v.idForDatabase : v));
+      const values = Array.from(value).map((v) =>
+        rbObjRespondTo(v, "idForDatabase") ? (v as { idForDatabase: unknown }).idForDatabase : v,
+      );
       return values.length === 0 ? null : values;
     } else {
-      if (hasIdForDatabase(value)) value = value.idForDatabase;
+      if (rbObjRespondTo(value, "idForDatabase")) {
+        value = (value as { idForDatabase: unknown }).idForDatabase;
+      }
       return value;
     }
   });
