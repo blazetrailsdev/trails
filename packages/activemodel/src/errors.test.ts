@@ -13,6 +13,7 @@ import {
   assertRaises,
   assertSame,
   isBlank,
+  assertNil,
 } from "@blazetrails/activesupport";
 import { FrozenError } from "@blazetrails/ruby-compat";
 import { Errors } from "./errors.js";
@@ -641,7 +642,7 @@ describe("ErrorsTest", () => {
   it("delete returns nil when no errors were deleted", () => {
     const errors = new Errors(new Person());
 
-    expect(errors.delete("name")).toBeNull();
+    assertNil(errors.delete("name"));
   });
 
   it("delete removes details on given attribute", () => {

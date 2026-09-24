@@ -3,7 +3,7 @@ import { Logger, taggedLogging } from "./logger.js";
 import { BroadcastLogger } from "./broadcast-logger.js";
 import { TagStack, Formatter } from "./tagged-logging.js";
 import { Thread } from "@blazetrails/ruby-compat";
-import { assertRespondTo } from "./testing/assertions.js";
+import { assertRespondTo, assertNotNil } from "./testing/assertions.js";
 
 function makeBuffer() {
   const lines: string[] = [];
@@ -83,7 +83,7 @@ describe("TaggedLoggingTest", () => {
     const logger = new Logger(makeBuffer());
     expect(logger.formatter).toBeNull();
     const otherLogger = taggedLogging(logger);
-    expect(otherLogger.formatter).not.toBeNull();
+    assertNotNil(otherLogger.formatter);
     assertRespondTo(otherLogger.formatter, "tagged");
   });
 

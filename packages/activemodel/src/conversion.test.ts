@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Contact } from "./test-helpers/models/contact.js";
 import { Apache, Comanche, Helicopter } from "./test-helpers/models/helicopter.js";
+import { assertNil } from "@blazetrails/activesupport";
 
 describe("ConversionTest", () => {
   it("to_model default implementation returns self", () => {
@@ -9,7 +10,7 @@ describe("ConversionTest", () => {
   });
 
   it("to_key default implementation returns nil for new records", () => {
-    expect(new Contact({}).toKey()).toBeNull();
+    assertNil(new Contact({}).toKey());
   });
 
   it("to_key default implementation returns the id in an array for persisted records", () => {
@@ -21,7 +22,7 @@ describe("ConversionTest", () => {
   });
 
   it("to_param default implementation returns nil for new records", () => {
-    expect(new Contact({}).toParam()).toBeNull();
+    assertNil(new Contact({}).toParam());
   });
 
   it("to_param default implementation returns a string of ids for persisted records", () => {
@@ -33,7 +34,7 @@ describe("ConversionTest", () => {
   });
 
   it("to_param returns nil if composite id is incomplete", () => {
-    expect(new Contact({ id: [1, null] }).toParam()).toBeNull();
+    assertNil(new Contact({ id: [1, null] }).toParam());
   });
 
   it("to_param returns nil if to_key is nil", () => {
@@ -43,7 +44,7 @@ describe("ConversionTest", () => {
       }
     }
 
-    expect(new Klass({}).toParam()).toBeNull();
+    assertNil(new Klass({}).toParam());
   });
 
   it("to_partial_path default implementation returns a string giving a relative path", () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { BigDecimal } from "@blazetrails/activesupport";
+import { BigDecimal, assertNil } from "@blazetrails/activesupport";
 import { Types } from "../index.js";
 
 describe("FloatTest", () => {
@@ -10,7 +10,7 @@ describe("FloatTest", () => {
 
   it("type cast float from invalid string", () => {
     const type = new Types.FloatType();
-    expect(type.cast("")).toBeNull();
+    assertNil(type.cast(""));
     expect(type.cast("1ignore")).toBe(1.0);
     expect(type.cast("bad1")).toBe(0.0);
     expect(type.cast("bad")).toBe(0.0);

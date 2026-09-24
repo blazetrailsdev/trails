@@ -3,6 +3,7 @@ import { SerializerWithFallback } from "./serializer-with-fallback.js";
 import { KeyError } from "@blazetrails/ruby-compat";
 import { Entry } from "./entry.js";
 import { Store } from "./index.js";
+import { assertNotNil } from "../testing/assertions.js";
 
 const FORMATS = Object.keys(SerializerWithFallback.SERIALIZERS);
 const LEGACY_FORMATS = ["passthrough", "marshal_7_0"];
@@ -94,7 +95,7 @@ describe("CacheSerializerWithFallbackTest", () => {
     }
 
     const dumped = serializer("message_pack").dump(new FakeClass());
-    expect(dumped).not.toBeNull();
+    assertNotNil(dumped);
     expect(serializer("message_pack").load(dumped)).toBeNull();
   });
 

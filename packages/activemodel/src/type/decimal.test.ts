@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { BigDecimal } from "@blazetrails/activesupport";
+import { BigDecimal, assertNil } from "@blazetrails/activesupport";
 import { Rational } from "@blazetrails/ruby-compat";
 import { DecimalType as Decimal } from "./decimal.js";
 
@@ -15,7 +15,7 @@ describe("DecimalTest", () => {
 
   it("type cast decimal from invalid string", () => {
     const type = new Decimal();
-    expect(type.cast("")).toBeNull();
+    assertNil(type.cast(""));
     expect(type.cast("1ignore")).toEqual(bd("1"));
     expect(type.cast("bad1")).toEqual(bd("0"));
     expect(type.cast("bad")).toEqual(bd("0"));

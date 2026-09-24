@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Types } from "../index.js";
-import { TimeWithZone, useZone, zone } from "@blazetrails/activesupport";
+import { TimeWithZone, useZone, zone, assertNil } from "@blazetrails/activesupport";
 
 function timeUtc(year: number, mon: number, mday: number, hour = 0, min = 0, sec = 0): RubyTime {
   return RubyTime.utc(year, mon, mday, hour, min, sec);
@@ -11,10 +11,10 @@ describe("TimeTest", () => {
   const type = new Types.TimeType();
 
   it("type cast time", () => {
-    expect(type.cast(null)).toBeNull();
-    expect(type.cast("")).toBeNull();
-    expect(type.cast("ABC")).toBeNull();
-    expect(type.cast(" ".repeat(129))).toBeNull();
+    assertNil(type.cast(null));
+    assertNil(type.cast(""));
+    assertNil(type.cast("ABC"));
+    assertNil(type.cast(" ".repeat(129)));
 
     const timeString = Temporal.Now.instant()
       .toZonedDateTimeISO("UTC")
@@ -32,10 +32,10 @@ describe("TimeTest", () => {
   it("user input in time zone", () => {
     useZone("Pacific Time (US & Canada)", () => {
       const type = new Types.TimeType();
-      expect(type.userInputInTimeZone(null)).toBeNull();
-      expect(type.userInputInTimeZone("")).toBeNull();
-      expect(type.userInputInTimeZone("ABC")).toBeNull();
-      expect(type.userInputInTimeZone(" ".repeat(129))).toBeNull();
+      assertNil(type.userInputInTimeZone(null));
+      assertNil(type.userInputInTimeZone(""));
+      assertNil(type.userInputInTimeZone("ABC"));
+      assertNil(type.userInputInTimeZone(" ".repeat(129)));
 
       const offset = zone()!.formattedOffset();
       const timeString = `2015-02-09T19:45:54${offset}`;

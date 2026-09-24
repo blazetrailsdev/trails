@@ -6,6 +6,7 @@ import { ValueType } from "./type/value.js";
 import { FloatType } from "./type/float.js";
 import { IntegerType } from "./type/integer.js";
 import { StringType } from "./type/string.js";
+import { assertNil } from "@blazetrails/activesupport";
 
 describe("AttributeSetTest", () => {
   it("building a new set from raw attributes", () => {
@@ -34,7 +35,7 @@ describe("AttributeSetTest", () => {
     const attributes = builder.buildFromDatabase({ foo: "3.3" });
 
     expect(attributes.getAttribute("foo").valueBeforeTypeCast).toEqual("3.3");
-    expect(attributes.getAttribute("bar").valueBeforeTypeCast).toBeNull();
+    assertNil(attributes.getAttribute("bar").valueBeforeTypeCast);
     expect(attributes.getAttribute("bar").name).toEqual("bar");
   });
 
@@ -151,14 +152,14 @@ describe("AttributeSetTest", () => {
 
   it("fetch_value returns nil for unknown attributes", () => {
     const attributes = attributesWithUninitializedKey();
-    expect(attributes.fetchValue("wibble", () => "hello")).toBeNull();
+    assertNil(attributes.fetchValue("wibble", () => "hello"));
   });
 
   it("fetch_value returns nil for unknown attributes when types has a default", () => {
     const builder = new Builder({});
     const attributes = builder.buildFromDatabase();
 
-    expect(attributes.fetchValue("wibble", () => "hello")).toBeNull();
+    assertNil(attributes.fetchValue("wibble", () => "hello"));
   });
 
   it("fetch_value uses the given block for uninitialized attributes", () => {

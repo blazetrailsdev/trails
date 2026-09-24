@@ -1,11 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { Types } from "../index.js";
+import { assertNil } from "@blazetrails/activesupport";
 
 describe("BinaryTest", () => {
   it("type cast binary", () => {
     const type = new Types.BinaryType();
 
-    expect(type.cast(null)).toBeNull();
+    assertNil(type.cast(null));
     expect(type.cast(1)).toBe(1);
 
     expect(type.cast("1")).toEqual(new TextEncoder().encode("1"));

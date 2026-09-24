@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { minutes, hours } from "@blazetrails/activesupport";
+import { minutes, hours, assertNil } from "@blazetrails/activesupport";
 import { Types } from "../index.js";
 import { IntegerType as Integer } from "./integer.js";
 import { RangeError } from "../errors.js";
@@ -8,7 +8,7 @@ import { Range } from "@blazetrails/ruby-compat";
 describe("IntegerTest", () => {
   it("simple values", () => {
     const type = new Types.IntegerType();
-    expect(type.cast("")).toBeNull();
+    assertNil(type.cast(""));
     expect(type.cast(1)).toBe(1);
     expect(type.cast("1")).toBe(1);
     expect(type.cast("1ignore")).toBe(1);
@@ -17,25 +17,25 @@ describe("IntegerTest", () => {
     expect(type.cast(1.7)).toBe(1);
     expect(type.cast(false)).toBe(0);
     expect(type.cast(true)).toBe(1);
-    expect(type.cast(null)).toBeNull();
+    assertNil(type.cast(null));
   });
 
   it("random objects cast to nil", () => {
     const type = new Types.IntegerType();
-    expect(type.cast([1, 2])).toBeNull();
-    expect(type.cast({ 1: 2 })).toBeNull();
-    expect(type.cast(new Range(1, 2))).toBeNull();
+    assertNil(type.cast([1, 2]));
+    assertNil(type.cast({ 1: 2 }));
+    assertNil(type.cast(new Range(1, 2)));
   });
 
   it("casting objects without to_i", () => {
     const type = new Types.IntegerType();
-    expect(type.cast(new Object())).toBeNull();
+    assertNil(type.cast(new Object()));
   });
 
   it("casting nan and infinity", () => {
     const type = new Types.IntegerType();
-    expect(type.cast(Number.NaN)).toBeNull();
-    expect(type.cast(1.0 / 0.0)).toBeNull();
+    assertNil(type.cast(Number.NaN));
+    assertNil(type.cast(1.0 / 0.0));
   });
 
   it("casting booleans for database", () => {
@@ -52,7 +52,7 @@ describe("IntegerTest", () => {
 
   it("casting string for database", () => {
     const type = new Types.IntegerType();
-    expect(type.serialize("wibble")).toBeNull();
+    assertNil(type.serialize("wibble"));
     expect(type.serialize("5wibble")).toBe(5);
     expect(type.serialize(" +5")).toBe(5);
     expect(type.serialize(" -5")).toBe(-5);
@@ -60,9 +60,9 @@ describe("IntegerTest", () => {
 
   it("casting empty string", () => {
     const type = new Types.IntegerType();
-    expect(type.cast("")).toBeNull();
-    expect(type.serialize("")).toBeNull();
-    expect(type.deserialize("")).toBeNull();
+    assertNil(type.cast(""));
+    assertNil(type.serialize(""));
+    assertNil(type.deserialize(""));
   });
 
   it("changed?", () => {

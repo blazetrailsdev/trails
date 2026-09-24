@@ -8,6 +8,7 @@ import {
   assertNoDifference,
   assertRaises,
   assertSame,
+  assertNotNil,
 } from "./testing/assertions.js";
 
 class FailingErrorSubscriber {
@@ -238,7 +239,7 @@ describe("ErrorReporterTest", () => {
       reporter.unexpected(error);
     });
     expect(raisedError.message).toContain("RuntimeError: Oops");
-    expect(raisedError.cause).not.toBeNull();
+    assertNotNil(raisedError.cause);
     assertSame(error, raisedError.cause);
     expect(raisedError.stack!.split("\n")[1]).toContain(`${import.meta.url.split("/").pop()}`);
   });
