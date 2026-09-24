@@ -953,6 +953,35 @@ describe(
       expect(c["Quux#e"]).not.toContain("new");
       expect(c["Quux#e"]).toContain("greet");
     });
+
+    it("drops the new site a raise builds its error with, keeping an unrelated new", () => {
+      // extract-ts-api.ts#isThrownConstruction drops `throw new Foo(file)`, so a
+      // recorded Ruby `raise Foo.new(file)` would pair with `Set.new(list)`
+      // (migration.rb:1324 against migration.ts#migrationsStatus). The raised
+      // construction's own arguments are still walked.
+      const c = rubyCallSiteNames({
+        "raiser.rb": `
+        class Raiser
+          def f(file)
+            list = Set.new(versions)
+            raise IllegalError.new(name_of(file)) unless ok?
+            raise(OtherError.new(file))
+            raise Wrapper.new(Inner.new(file))
+          end
+        end
+      `,
+      });
+      expect(c["Raiser#f"]).toEqual([
+        "new",
+        "versions",
+        "ok?",
+        "raise",
+        "name_of",
+        "raise",
+        "raise",
+        "new",
+      ]);
+    });
   },
 );
 
