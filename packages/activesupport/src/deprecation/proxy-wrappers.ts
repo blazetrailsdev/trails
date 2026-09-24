@@ -141,7 +141,7 @@ export class DeprecatedConstantProxy extends Module {
     { message }: { message?: string } = {},
   ) {
     super();
-    if (arguments.length < 3) {
+    if (arguments.length < 3 || arguments.length > 4) {
       throw new ArgumentError(`wrong number of arguments (given ${arguments.length}, expected 3)`);
     }
     this._oldConst = oldConst;
