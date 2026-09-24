@@ -33,6 +33,7 @@ import { itIfSupports } from "../support/supports.js";
 import { fixtures } from "../test-fixtures.js";
 import {
   EncryptableRecord,
+  cantModifyEncryptedAttributesWhenFrozen,
   decryptAttributes,
   encryptAttributes,
   encrypts,
@@ -770,7 +771,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     const proxy = Object.assign(Object.create(Object.getPrototypeOf(post)), post, {
       _errors: { add: (attr: string, msg: string) => errored.push([attr, msg]) },
     });
-    EncryptableRecord.cantModifyEncryptedAttributesWhenFrozen(proxy);
+    cantModifyEncryptedAttributesWhenFrozen.call(proxy);
     expect(errored).toEqual([["title", "can't be modified because it is encrypted"]]);
   });
 
@@ -783,7 +784,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     const proxy = Object.assign(Object.create(Object.getPrototypeOf(post)), post, {
       _errors: { add: (attr: string, msg: string) => errored.push([attr, msg]) },
     });
-    EncryptableRecord.cantModifyEncryptedAttributesWhenFrozen(proxy);
+    cantModifyEncryptedAttributesWhenFrozen.call(proxy);
     expect(errored).toEqual([]);
   });
 

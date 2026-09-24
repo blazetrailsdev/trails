@@ -89,6 +89,7 @@ import {
   encrypt as _encrypt,
   decrypt as _decrypt,
   hasEncryptedAttributes as _hasEncryptedAttributes,
+  cantModifyEncryptedAttributesWhenFrozen as _cantModifyEncryptedAttributesWhenFrozen,
   sourceAttributeFromPreservedAttribute as _sourceAttributeFromPreservedAttribute,
 } from "./encryption/encryptable-record.js";
 import { Contexts as _Contexts } from "./encryption/contexts.js";
@@ -2629,6 +2630,8 @@ export interface Base extends Included<typeof AutosaveAssociation>, JSONSerializ
   encrypt(): Promise<void>;
   /** @internal */
   decrypt(): Promise<void>;
+  /** @internal */
+  cantModifyEncryptedAttributesWhenFrozen(): void;
 }
 
 extend(Base, ConnectionHandling.ConnectionHandling);
@@ -2730,7 +2733,7 @@ classAttribute.call(Base, "defaultScopeOverride", {
 });
 classAttribute.call(Base, "nestedAttributesOptions", { instanceWriter: false, default: {} });
 classAttribute.call(Base, "encryptedAttributes");
-Base.validate((record: any) => _EncryptableRecord.cantModifyEncryptedAttributesWhenFrozen(record), {
+Base.validate(":cantModifyEncryptedAttributesWhenFrozen", {
   if: (record: any) => _hasEncryptedAttributes.call(record) && _Contexts.context.frozenEncryption,
 });
 extend(Base, {
@@ -2743,6 +2746,7 @@ include(Base, {
   ciphertextFor: _ciphertextFor,
   encrypt: _encrypt,
   decrypt: _decrypt,
+  cantModifyEncryptedAttributesWhenFrozen: _cantModifyEncryptedAttributesWhenFrozen,
 });
 classAttribute.call(Base, "tokenDefinitions", {
   instanceAccessor: false,

@@ -14,7 +14,7 @@ import {
   EncryptedBook,
   UnencryptedBook,
 } from "../test-helpers/models/book-encrypted.js";
-import { deterministicEncryptedAttributes } from "./encryptable-record.js";
+import { _createRecord, deterministicEncryptedAttributes } from "./encryptable-record.js";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Serialized } from "../type/serialized.js";
 import { Base } from "../base.js";
@@ -134,6 +134,20 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest (trails)", () => {
     const reloaded = await EncryptedBookWithSerializedDeterministicName.find(book.id);
     expect(reloaded.name).toBe("Dune");
     expect(reloaded.isEncryptedAttribute("name")).toBe(true);
+  });
+});
+
+describe("ActiveRecord::Encryption::EncryptableRecord#_create_record (trails)", () => {
+  it("adds every encrypted attribute to the names handed to super", async () => {
+    const book = new EncryptedBook();
+    const names = await _createRecord.call(book, ["format"], async (n: string[]) => n);
+    expect(names).toEqual(["format", ...[...EncryptedBook.encryptedAttributes].map(String)]);
+  });
+
+  it("leaves the names alone for a model without encrypted attributes", async () => {
+    const book = new UnencryptedBook();
+    const names = await _createRecord.call(book, ["format"], async (n: string[]) => n);
+    expect(names).toEqual(["format"]);
   });
 });
 

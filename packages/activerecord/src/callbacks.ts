@@ -3,6 +3,7 @@ import { include, included, type Callback } from "@blazetrails/activesupport";
 import { ValidationsCallbacks } from "@blazetrails/activemodel";
 import { getCallbackChains, peekCallbackChain, runCallbacks } from "@blazetrails/activesupport";
 import { _createRecord as counterCacheCreateRecord } from "./counter-cache.js";
+import { _createRecord as encryptableRecordCreateRecord } from "./encryption/encryptable-record.js";
 import { recordUpdateTimestamps } from "./timestamp.js";
 import {
   _createRecord as persistenceCreateRecord,
@@ -73,8 +74,10 @@ export async function _createRecord(
   const ctor = this.constructor;
   return await runCallbacks(this, "create", () =>
     dirtyCreateRecord.call(this, attributeNames, (names: string[]) =>
-      counterCacheCreateRecord.call(this, names, (names2: string[]) =>
-        persistenceCreateRecord.call(this, names2, block),
+      encryptableRecordCreateRecord.call(this, names, (encryptedNames: string[]) =>
+        counterCacheCreateRecord.call(this, encryptedNames, (names2: string[]) =>
+          persistenceCreateRecord.call(this, names2, block),
+        ),
       ),
     ),
   );

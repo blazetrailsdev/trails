@@ -5,10 +5,10 @@ import {
   RuntimeError,
   synchronize,
   Thread,
+  ThreadPoolExecutor,
 } from "@blazetrails/ruby-compat";
 import { IsolatedExecutionState } from "@blazetrails/activesupport";
 import { NoMethodError } from "@blazetrails/activemodel";
-import { AsyncExecutor } from "../../ar-config.js";
 import {
   asyncQueryExecutor,
   globalThreadPoolAsyncQueryExecutor,
@@ -243,7 +243,7 @@ export class ConnectionPool implements ReapablePool {
   readonly shard: string;
   readonly size: number;
   readonly reaper: Reaper;
-  readonly asyncExecutor: AsyncExecutor | null;
+  readonly asyncExecutor: ThreadPoolExecutor | null;
 
   automaticReconnect = true;
   checkoutTimeout: number;
@@ -847,11 +847,11 @@ export class ConnectionPool implements ReapablePool {
     this.asyncExecutor!.post(() => futureResult.executeOrSkip());
   }
 
-  private buildAsyncExecutor(): AsyncExecutor | null {
+  private buildAsyncExecutor(): ThreadPoolExecutor | null {
     switch (asyncQueryExecutor()) {
       case "multi_thread_pool":
         return this.dbConfig.maxThreads > 0
-          ? new AsyncExecutor({
+          ? new ThreadPoolExecutor({
               minThreads: this.dbConfig.minThreads,
               maxThreads: this.dbConfig.maxThreads,
               maxQueue: this.dbConfig.maxQueue,
