@@ -17,6 +17,8 @@ import {
   create,
 } from "./reflection.js";
 import { fixtures } from "./test-fixtures.js";
+import { Post } from "./test-helpers/models/post.js";
+import { Tagging } from "./test-helpers/models/tagging.js";
 
 fixtures({});
 
@@ -285,6 +287,39 @@ describe("ThroughReflection delegation to a nil source_reflection", () => {
     );
     expect(() => ref.joinForeignKey).toThrow(
       "join_foreign_key delegated to source_reflection, but source_reflection is nil",
+    );
+  });
+});
+
+describe("AssociationReflection#associationScopeCache", () => {
+  function redefineOwner(): typeof Base {
+    return class Owner extends Base {
+      static {
+        this.tableName = "authors";
+        this.hasMany("posts");
+      }
+    };
+  }
+
+  it("keys the statement cache on the reflection, not its owner and association names", async () => {
+    const first = reflectOnAssociation(redefineOwner(), "posts")!;
+    const second = reflectOnAssociation(redefineOwner(), "posts")!;
+    const block = () => Post.all();
+
+    const firstCache = await first.associationScopeCache(Post, null, block);
+    expect(await first.associationScopeCache(Post, null, block)).toBe(firstCache);
+    expect(await second.associationScopeCache(Post, null, block)).not.toBe(firstCache);
+  });
+
+  it("suffixes a polymorphic key with the owner's foreign type, compared by eql?", async () => {
+    const reflection = reflectOnAssociation(Tagging, "taggable")!;
+    const owner = (type: string) => ({ _readAttribute: () => type });
+    const block = () => Post.all();
+
+    const postCache = await reflection.associationScopeCache(Post, owner("Post"), block);
+    expect(await reflection.associationScopeCache(Post, owner("Post"), block)).toBe(postCache);
+    expect(await reflection.associationScopeCache(Post, owner("Author"), block)).not.toBe(
+      postCache,
     );
   });
 });

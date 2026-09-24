@@ -1344,7 +1344,7 @@ export class Base extends Model {
 
   declare static initializeFindByCache: typeof _Core.initializeFindByCache;
   declare static cachedFindByStatement: typeof _Core.cachedFindByStatement;
-  declare static _findByStatementCache?: Map<boolean, Map<string, unknown>>;
+  declare static _findByStatementCache?: Map<boolean, Map<unknown, unknown>>;
 
   declare static configurations: typeof _Core.configurations;
 

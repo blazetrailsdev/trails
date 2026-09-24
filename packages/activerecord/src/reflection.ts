@@ -912,9 +912,9 @@ export class AssociationReflection extends MacroReflection {
   }
 
   associationScopeCache(klass: typeof Base, owner: any, block: (params: any) => any): any {
-    let key = `assocScope:${this.activeRecord.name}#${this.nameString}`;
+    let key: unknown = this;
     if (this.isPolymorphic()) {
-      key += `:${owner?._readAttribute?.(this.foreignType)}`;
+      key = [key, owner._readAttribute(this.foreignType)];
     }
     return klass.withConnection((connection) =>
       cachedFindByStatement.call(klass as any, connection, key, block),
