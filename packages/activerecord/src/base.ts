@@ -89,6 +89,7 @@ import {
   encrypt as _encrypt,
   decrypt as _decrypt,
   hasEncryptedAttributes as _hasEncryptedAttributes,
+  cantModifyEncryptedAttributesWhenFrozen as _cantModifyEncryptedAttributesWhenFrozen,
   sourceAttributeFromPreservedAttribute as _sourceAttributeFromPreservedAttribute,
 } from "./encryption/encryptable-record.js";
 import { Contexts as _Contexts } from "./encryption/contexts.js";
@@ -147,7 +148,6 @@ import {
 import type { TokenDefinitionsHash as _TokenDefinitionsHash } from "./token-for.js";
 import type { MessageVerifier as _MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { DescendantsTracker } from "@blazetrails/activesupport";
-import { DatabaseTasks } from "./tasks/database-tasks.js";
 import * as LockingOptimistic from "./locking/optimistic.js";
 import * as LockingPessimistic from "./locking/pessimistic.js";
 import {
@@ -2630,6 +2630,8 @@ export interface Base extends Included<typeof AutosaveAssociation>, JSONSerializ
   encrypt(): Promise<void>;
   /** @internal */
   decrypt(): Promise<void>;
+  /** @internal */
+  cantModifyEncryptedAttributesWhenFrozen(): void;
 }
 
 extend(Base, ConnectionHandling.ConnectionHandling);
@@ -2731,7 +2733,7 @@ classAttribute.call(Base, "defaultScopeOverride", {
 });
 classAttribute.call(Base, "nestedAttributesOptions", { instanceWriter: false, default: {} });
 classAttribute.call(Base, "encryptedAttributes");
-Base.validate((record: any) => _EncryptableRecord.cantModifyEncryptedAttributesWhenFrozen(record), {
+Base.validate(":cantModifyEncryptedAttributesWhenFrozen", {
   if: (record: any) => _hasEncryptedAttributes.call(record) && _Contexts.context.frozenEncryption,
 });
 extend(Base, {
@@ -2744,6 +2746,7 @@ include(Base, {
   ciphertextFor: _ciphertextFor,
   encrypt: _encrypt,
   decrypt: _decrypt,
+  cantModifyEncryptedAttributesWhenFrozen: _cantModifyEncryptedAttributesWhenFrozen,
 });
 classAttribute.call(Base, "tokenDefinitions", {
   instanceAccessor: false,
@@ -3115,8 +3118,6 @@ type _ARBaseUnscopedWire =
   typeof Base extends Pick<Required<_LocatorModel>, "unscoped"> ? true : never;
 const _arBaseUnscopedWire: _ARBaseUnscopedWire = true;
 void _arBaseUnscopedWire;
-
-DatabaseTasks._registerBase(Base);
 
 runLoadHooks("active_record", Base);
 

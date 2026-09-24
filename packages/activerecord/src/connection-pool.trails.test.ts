@@ -1,5 +1,5 @@
 import { mkdtemp, writeFile, readFile, rm } from "fs/promises";
-import { Thread } from "@blazetrails/ruby-compat";
+import { Thread, ThreadPoolExecutor } from "@blazetrails/ruby-compat";
 import { tmpdir } from "os";
 import { join } from "path";
 import { describe, it, expect, vi } from "vitest";
@@ -16,7 +16,6 @@ import { rawTestAdapterConfiguration } from "./test-adapter.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
 import type { LeasedTestAdapter } from "./test-adapter.js";
 import { fixtures } from "./test-fixtures.js";
-import { AsyncExecutor } from "./ar-config.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { adapterNameFromConfig } from "./connection-adapters/abstract-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
@@ -291,12 +290,14 @@ it("pin connection reuses leased connection and checks in on unpin", async () =>
 
 it("scheduleQuery runs each task on its own lease", async () => {
   const pool = makeAmbientPool({ pool: 5 });
-  (pool as unknown as { asyncExecutor: AsyncExecutor }).asyncExecutor = new AsyncExecutor({
-    minThreads: 0,
-    maxThreads: 5,
-    maxQueue: 20,
-    fallbackPolicy: "caller_runs",
-  });
+  (pool as unknown as { asyncExecutor: ThreadPoolExecutor }).asyncExecutor = new ThreadPoolExecutor(
+    {
+      minThreads: 0,
+      maxThreads: 5,
+      maxQueue: 20,
+      fallbackPolicy: "caller_runs",
+    },
+  );
   const leases: unknown[] = [];
   const task = {
     executeOrSkip: () => {

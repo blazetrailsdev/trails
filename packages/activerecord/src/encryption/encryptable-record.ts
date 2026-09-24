@@ -84,30 +84,6 @@ export class EncryptableRecord {
       addLengthValidationForEncryptedColumns.call(this);
     }
   }
-
-  /** @internal */
-  static _createRecord(record: any, attributeNames?: string[]): unknown {
-    const names =
-      attributeNames ??
-      (typeof record.attributeNames === "function" ? record.attributeNames() : []);
-    const encryptedAttrs: Set<string> = record.constructor.encryptedAttributes ?? new Set<string>();
-    const merged = [...new Set<string>([...names, ...[...encryptedAttrs].map(String)])];
-    return record._createRecord?.(merged);
-  }
-
-  /** @internal */
-  static cantModifyEncryptedAttributesWhenFrozen(record: any): void {
-    const klass = record.constructor;
-    const encryptedAttrs: Set<string> = klass.encryptedAttributes ?? new Set();
-    const changed: string[] = Array.isArray(record.changedAttributeNamesToSave)
-      ? record.changedAttributeNamesToSave
-      : [];
-    for (const attr of changed) {
-      if (encryptedAttrs.has(attr)) {
-        record.errors?.add?.(attr, "can't be modified because it is encrypted");
-      }
-    }
-  }
 }
 
 /** @internal */
@@ -264,6 +240,21 @@ export function hasEncryptedAttributes(this: any): boolean {
 }
 
 /** @internal */
+export async function _createRecord(
+  this: any,
+  attributeNames: string[] | undefined,
+  superFn: (attributeNames: string[]) => Promise<unknown>,
+): Promise<unknown> {
+  attributeNames ??= this.attributeNames();
+  if (hasEncryptedAttributes.call(this)) {
+    attributeNames = [
+      ...new Set([...attributeNames!, ...[...this.constructor.encryptedAttributes].map(String)]),
+    ];
+  }
+  return superFn(attributeNames!);
+}
+
+/** @internal */
 export function buildEncryptAttributeAssignments(this: any): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const attributeName of this.constructor.encryptedAttributes ?? new Set<string>()) {
@@ -334,4 +325,13 @@ export function preserveOriginalEncrypted(this: any, name: string): void {
 
   encrypts.call(this, originalAttributeName);
   overrideAccessorsToPreserveOriginal.call(this, name, originalAttributeName);
+}
+
+/** @internal */
+export function cantModifyEncryptedAttributesWhenFrozen(this: any): void {
+  for (const attribute of this.constructor.encryptedAttributes) {
+    if (Object.keys(this.changedAttributes).includes(attribute)) {
+      this.errors.add(attribute, "can't be modified because it is encrypted");
+    }
+  }
 }

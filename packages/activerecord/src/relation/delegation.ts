@@ -22,6 +22,7 @@ import {
   Range,
   arySlice,
   include,
+  rbEqual,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
 import { ActiveRecord } from "../namespaces.js";
@@ -213,13 +214,13 @@ const RECORD_DELEGATES: Record<string, RecordDelegate> = {
   at: (records, ...args: [index: number | Range<number>, length?: number]) =>
     arySlice(records, ...args),
   intersection: (records, other: Base[]) =>
-    uniqRecords(records).filter((record) => includesRecord(other, record)),
+    uniqRecords(records).filter((record) => other.some((o) => rbEqual(o, record))),
   union: (records, other: Base[]) => uniqRecords([...records, ...other]),
   plus: (records, other: Base[]) => [...records, ...other],
   difference: (records, other: Base[]) =>
-    records.filter((record) => !includesRecord(other, record)),
+    records.filter((record) => !other.some((o) => rbEqual(o, record))),
   isIntersect: (records, other: Base[]) =>
-    records.some((record) => other.some((o) => record.equals(o))),
+    records.some((record) => other.some((o) => rbEqual(record, o))),
   reverse: (records) => [...records].reverse(),
   compact: (records) => records.filter((record) => record != null),
   index: (records, valueOrFn: Base | ((record: Base) => unknown)) => {
@@ -511,18 +512,9 @@ function withRecords<R>(host: DelegationHost, fn: (records: Base[]) => R): R | P
   return host.records().then((records) => fn([...records]));
 }
 
-function includesRecord(records: unknown[], record: unknown): boolean {
-  return records.some(
-    (candidate) =>
-      candidate === record ||
-      (typeof (candidate as { equals?: unknown } | null)?.equals === "function" &&
-        (candidate as { equals(o: unknown): boolean }).equals(record) === true),
-  );
-}
-
 function uniqRecords<U>(records: U[]): U[] {
   const uniq: U[] = [];
-  for (const record of records) if (!includesRecord(uniq, record)) uniq.push(record);
+  for (const record of records) if (!uniq.some((seen) => rbEqual(seen, record))) uniq.push(record);
   return uniq;
 }
 

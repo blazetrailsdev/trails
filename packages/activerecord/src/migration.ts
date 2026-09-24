@@ -1487,8 +1487,7 @@ export class MigrationContext<
   async protectedEnvironment(this: MigrationContext): Promise<boolean> {
     const stored = await this.lastStoredEnvironment();
     if (!stored) return false;
-    const { Base } = await import("./base.js");
-    return (Base.protectedEnvironments ?? ["production"]).includes(stored);
+    return ActiveRecord.Base.protectedEnvironments.includes(stored);
   }
 
   async lastStoredEnvironment(this: MigrationContext): Promise<string | null> {

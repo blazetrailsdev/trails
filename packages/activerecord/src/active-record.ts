@@ -1,6 +1,6 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { ActiveSupport, any, InheritableOptions } from "@blazetrails/activesupport";
-import { AsyncExecutor } from "./ar-config.js";
+import { ThreadPoolExecutor } from "@blazetrails/ruby-compat";
 import { ActiveRecord } from "./namespaces.js";
 import type { SQLWarning } from "./errors.js";
 import type { Transaction } from "./connection-adapters/abstract/transaction.js";
@@ -27,7 +27,7 @@ let _dbWarningsIgnore: (string | RegExp)[] = [];
 let _writingRole = "writing";
 let _readingRole = "reading";
 let _asyncQueryExecutor: "global_thread_pool" | "multi_thread_pool" | null = null;
-let _globalThreadPoolAsyncQueryExecutor: AsyncExecutor | undefined;
+let _globalThreadPoolAsyncQueryExecutor: ThreadPoolExecutor | undefined;
 let _globalExecutorConcurrency: number | null | undefined;
 let _permanentConnectionCheckout: true | "deprecated" | "disallowed" = true;
 let _indexNestedAttributeErrors = false;
@@ -186,9 +186,9 @@ export function setAsyncQueryExecutor(
   _asyncQueryExecutor = asyncQueryExecutor;
 }
 
-export function globalThreadPoolAsyncQueryExecutor(): AsyncExecutor {
+export function globalThreadPoolAsyncQueryExecutor(): ThreadPoolExecutor {
   const concurrency = globalExecutorConcurrency() ?? 4;
-  return (_globalThreadPoolAsyncQueryExecutor ??= new AsyncExecutor({
+  return (_globalThreadPoolAsyncQueryExecutor ??= new ThreadPoolExecutor({
     minThreads: 0,
     maxThreads: concurrency,
     maxQueue: concurrency * 4,

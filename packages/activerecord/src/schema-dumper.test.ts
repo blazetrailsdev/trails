@@ -1066,23 +1066,23 @@ describe("SchemaDumperTest", () => {
 });
 
 describe("SchemaDumperDefaultsTest", () => {
-  let adapter: TestDatabaseAdapter;
+  let connection: TestDatabaseAdapter;
   beforeEach(async () => {
-    adapter = await Base.leaseConnection();
+    connection = await Base.leaseConnection();
   });
 
   it(
     "schema dump defaults with universally supported types",
     { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
-      await adapter.createTable("dump_defaults", { force: true }, (t) => {
+      await connection.createTable("dump_defaults", { force: true }, (t) => {
         t.string("string_with_default", { default: "Hello!" });
         t.date("date_with_default", { default: "2014-06-05" });
         t.datetime("datetime_with_default", { default: "2014-06-05 07:17:04" });
         t.time("time_with_default", { default: "07:17:04" });
         t.decimal("decimal_with_default", { precision: 3, scale: 2, default: 2.78 });
       });
-      const output = await dumpTableSchema(await Base.leaseConnection(), "dump_defaults");
+      const output = await dumpTableSchema(connection, "dump_defaults");
       expect(output).toMatch(/string.*"string_with_default".*default: "Hello!"/);
       expect(output).toMatch(/date.*"date_with_default".*default: "2014-06-05"/);
       expect(output).toMatch(/datetime.*"datetime_with_default".*default:/);
@@ -1092,13 +1092,13 @@ describe("SchemaDumperDefaultsTest", () => {
   );
 
   itIfSupports("text_column_with_default", "schema dump with text column", async () => {
-    await adapter.createTable("dump_defaults", { force: true }, (t) => {
+    await connection.createTable("dump_defaults", { force: true }, (t) => {
       t.text("text_with_default", { default: "John' Doe" });
       t.text("uuid", {
         default: () => (adapterType === "postgres" ? "gen_random_uuid()" : "uuid()"),
       });
     });
-    const output = await dumpTableSchema(await Base.leaseConnection(), "dump_defaults");
+    const output = await dumpTableSchema(connection, "dump_defaults");
 
     expect(output).toMatch(/text.*"text_with_default".*default: "John' Doe"/);
 
@@ -1113,7 +1113,7 @@ describe("SchemaDumperDefaultsTest", () => {
     "schema dump with column infinity default",
     { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
-      await adapter.createTable("infinity_defaults", {}, (t) => {
+      await connection.createTable("infinity_defaults", {}, (t) => {
         t.float("float_with_inf_default", { default: Infinity });
         t.float("float_with_nan_default", { default: NaN });
         t.datetime("beginning_of_time", { default: "-infinity" });
@@ -1121,7 +1121,7 @@ describe("SchemaDumperDefaultsTest", () => {
         t.date("date_with_neg_inf_default", { default: -Infinity });
         t.date("date_with_pos_inf_default", { default: Infinity });
       });
-      const output = await dumpTableSchema(adapter, "infinity_defaults");
+      const output = await dumpTableSchema(connection, "infinity_defaults");
       expect(output).toMatch(/t\.float\("float_with_inf_default",.*default: ::Float::INFINITY/);
       expect(output).toMatch(/t\.float\("float_with_nan_default",.*default: ::Float::NAN/);
       expect(output).toMatch(/t\.datetime\("beginning_of_time",.*default: -::Float::INFINITY/);

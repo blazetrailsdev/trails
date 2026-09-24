@@ -390,14 +390,17 @@ describe("PrimaryKeyWithAutoIncrementTest", () => {
     static _tableName = "auto_increments";
   }
 
+  let connection: any;
+
   beforeEach(async () => {
-    await ((await Base.leaseConnection()) as any).dropTable("auto_increments", { ifExists: true });
+    connection = await Base.leaseConnection();
+    await connection.dropTable("auto_increments", { ifExists: true });
     void AutoIncrement.resetColumnInformation();
   });
 
   afterEach(async () => {
     void AutoIncrement.resetColumnInformation();
-    await ((await Base.leaseConnection()) as any).dropTable("auto_increments", { ifExists: true });
+    await connection.dropTable("auto_increments", { ifExists: true });
   });
 
   async function assertAutoIncremented() {
@@ -417,7 +420,7 @@ describe("PrimaryKeyWithAutoIncrementTest", () => {
 
   it("primary key with integer", async () => {
     const type = "integer";
-    await ((await Base.leaseConnection()) as any).createTable("auto_increments", {
+    await connection.createTable("auto_increments", {
       id: { type },
       force: true,
     });
@@ -426,7 +429,7 @@ describe("PrimaryKeyWithAutoIncrementTest", () => {
 
   it("primary key with bigint", async () => {
     const type = "bigint";
-    await ((await Base.leaseConnection()) as any).createTable("auto_increments", {
+    await connection.createTable("auto_increments", {
       id: { type },
       force: true,
     });
@@ -650,34 +653,37 @@ describe("CompositePrimaryKeyTest", () => {
 describe("PrimaryKeyIntegerNilDefaultTest", () => {
   fixtures({}, { useTransactionalTests: false });
 
+  let connection: any;
+
   beforeEach(async () => {
-    await ((await Base.leaseConnection()) as any).dropTable("int_defaults", { ifExists: true });
+    connection = await Base.leaseConnection();
+    await connection.dropTable("int_defaults", { ifExists: true });
   });
 
   afterEach(async () => {
-    await ((await Base.leaseConnection()) as any).dropTable("int_defaults", { ifExists: true });
+    await connection.dropTable("int_defaults", { ifExists: true });
   });
 
   it.skipIf(adapterType === "sqlite")(
     "schema dump primary key integer with default nil",
     async () => {
-      await ((await Base.leaseConnection()) as any).createTable("int_defaults", {
+      await connection.createTable("int_defaults", {
         id: "integer",
         default: null,
         force: true,
       });
-      const schema = await dumpTableSchema(await Base.leaseConnection(), "int_defaults");
+      const schema = await dumpTableSchema(connection, "int_defaults");
       expect(schema).toMatch(/createTable\("int_defaults", \{ id: "integer", default: null/);
     },
   );
 
   it("schema dump primary key bigint with default nil", async () => {
-    await ((await Base.leaseConnection()) as any).createTable("int_defaults", {
+    await connection.createTable("int_defaults", {
       id: "bigint",
       default: null,
       force: true,
     });
-    const schema = await dumpTableSchema(await Base.leaseConnection(), "int_defaults");
+    const schema = await dumpTableSchema(connection, "int_defaults");
     expect(schema).toMatch(/createTable\("int_defaults", \{ id: "bigint", default: null/);
   });
 });

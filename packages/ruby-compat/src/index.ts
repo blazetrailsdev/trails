@@ -207,6 +207,7 @@ export { Fiber } from "./fiber.js";
 export { FiberError } from "./fiber-error.js";
 export { Thread } from "./thread.js";
 export { ThreadError } from "./thread-error.js";
+export { ThreadPoolExecutor } from "./thread-pool-executor.js";
 export type { MonitorMixin } from "./monitor.js";
 
 export { Tempfile } from "./tempfile.js";

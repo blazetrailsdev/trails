@@ -7,7 +7,7 @@ import {
 } from "@blazetrails/activesupport";
 import { buildColumnSerializer } from "./attribute-methods/serialization.js";
 import { YAMLColumn, type YamlColumnOptions } from "./coders/yaml-column.js";
-import { getOrCreateModuleCarrier } from "./module-carrier.js";
+import { Module, include } from "@blazetrails/ruby-compat";
 
 interface CoderLike {
   dump(v: unknown): unknown;
@@ -44,20 +44,16 @@ export class IndifferentCoder {
 
 const _storedAttributes = new WeakMap<typeof Base, Record<string, string[]>>();
 
-const _storeAccessorsModules = new WeakMap<typeof Base, Set<string>>();
+const _storeAccessorsModules = new WeakMap<typeof Base, Module>();
 
-const _storeModuleProtos = new WeakMap<typeof Base, object>();
-
-/** @internal */
-function getOrCreateStoreModuleProto(modelClass: typeof Base): object {
-  return getOrCreateModuleCarrier(modelClass, _storeModuleProtos);
-}
-
-function _storeAccessorsModule(this: typeof Base): Set<string> {
-  if (!_storeAccessorsModules.has(this)) {
-    _storeAccessorsModules.set(this, new Set());
+function _storeAccessorsModule(this: typeof Base): Module {
+  let mod = _storeAccessorsModules.get(this);
+  if (!mod) {
+    mod = new Module();
+    include(this, mod);
+    _storeAccessorsModules.set(this, mod);
   }
-  return _storeAccessorsModules.get(this)!;
+  return mod;
 }
 
 export function localStoredAttributes(this: typeof Base): Record<string, string[]> | undefined {
@@ -165,62 +161,55 @@ function storeAccessor(
   const accessorSuffix =
     typeof suffix === "string" ? `_${suffix}` : suffix === true ? `_${storeAttribute}` : "";
 
-  const storeModuleProto = getOrCreateStoreModuleProto(this);
-  for (const key of keys) {
-    const accessorKey = `${accessorPrefix}${key}${accessorSuffix}`;
-    this._storeAccessorsModule().add(accessorKey);
+  const mod = this._storeAccessorsModule();
+  mod.moduleEval((methods) => {
+    for (const key of keys) {
+      const accessorKey = `${accessorPrefix}${key}${accessorSuffix}`;
 
-    Object.defineProperty(storeModuleProto, accessorKey, {
-      set: function (this: Base, value: unknown) {
-        this.writeStoreAttribute(storeAttribute, key, value);
-      },
-      get: function (this: Base) {
-        return this.readStoreAttribute(storeAttribute, key);
-      },
-      configurable: true,
-    });
-
-    const cap = accessorKey.charAt(0).toUpperCase() + accessorKey.slice(1);
-    const define = (name: string, fn: (this: StoreDirtyHost) => unknown): void => {
-      if (Object.prototype.hasOwnProperty.call(storeModuleProto, name)) return;
-      Object.defineProperty(storeModuleProto, name, {
-        value: fn,
-        writable: true,
+      Object.defineProperty(methods, accessorKey, {
+        set: function (this: Base, value: unknown) {
+          this.writeStoreAttribute(storeAttribute, key, value);
+        },
+        get: function (this: Base) {
+          return this.readStoreAttribute(storeAttribute, key);
+        },
         configurable: true,
       });
-    };
 
-    define(`${accessorKey}Changed`, function (this) {
-      if (!this.attributeChanged(storeAttribute)) return false;
-      const [prevStore, newStore] = this.changes[storeAttribute] ?? [undefined, undefined];
-      return dig(prevStore, key) !== dig(newStore, key);
-    });
-    define(`${accessorKey}Change`, function (this) {
-      if (!this.attributeChanged(storeAttribute)) return null;
-      const [prevStore, newStore] = this.changes[storeAttribute] ?? [undefined, undefined];
-      return [dig(prevStore, key) ?? null, dig(newStore, key) ?? null];
-    });
-    define(`${accessorKey}Was`, function (this) {
-      if (!this.attributeChanged(storeAttribute)) return null;
-      const [prevStore] = this.changes[storeAttribute] ?? [undefined];
-      return dig(prevStore, key) ?? null;
-    });
-    define(`isSavedChangeTo${cap}`, function (this) {
-      if (!this.isSavedChangeToAttribute?.(storeAttribute)) return false;
-      const [prevStore, newStore] = this.savedChanges?.[storeAttribute] ?? [undefined, undefined];
-      return dig(prevStore, key) !== dig(newStore, key);
-    });
-    define(`savedChangeTo${cap}`, function (this) {
-      if (!this.isSavedChangeToAttribute?.(storeAttribute)) return null;
-      const [prevStore, newStore] = this.savedChanges?.[storeAttribute] ?? [undefined, undefined];
-      return [dig(prevStore, key) ?? null, dig(newStore, key) ?? null];
-    });
-    define(`${accessorKey}BeforeLastSave`, function (this) {
-      if (!this.isSavedChangeToAttribute?.(storeAttribute)) return null;
-      const [prevStore] = this.savedChanges?.[storeAttribute] ?? [undefined];
-      return dig(prevStore, key) ?? null;
-    });
-  }
+      const cap = accessorKey.charAt(0).toUpperCase() + accessorKey.slice(1);
+
+      mod.defineMethod(`${accessorKey}Changed`, function (this: StoreDirtyHost) {
+        if (!this.attributeChanged(storeAttribute)) return false;
+        const [prevStore, newStore] = this.changes[storeAttribute] ?? [undefined, undefined];
+        return dig(prevStore, key) !== dig(newStore, key);
+      });
+      mod.defineMethod(`${accessorKey}Change`, function (this: StoreDirtyHost) {
+        if (!this.attributeChanged(storeAttribute)) return null;
+        const [prevStore, newStore] = this.changes[storeAttribute] ?? [undefined, undefined];
+        return [dig(prevStore, key) ?? null, dig(newStore, key) ?? null];
+      });
+      mod.defineMethod(`${accessorKey}Was`, function (this: StoreDirtyHost) {
+        if (!this.attributeChanged(storeAttribute)) return null;
+        const [prevStore] = this.changes[storeAttribute] ?? [undefined];
+        return dig(prevStore, key) ?? null;
+      });
+      mod.defineMethod(`isSavedChangeTo${cap}`, function (this: StoreDirtyHost) {
+        if (!this.isSavedChangeToAttribute?.(storeAttribute)) return false;
+        const [prevStore, newStore] = this.savedChanges?.[storeAttribute] ?? [undefined, undefined];
+        return dig(prevStore, key) !== dig(newStore, key);
+      });
+      mod.defineMethod(`savedChangeTo${cap}`, function (this: StoreDirtyHost) {
+        if (!this.isSavedChangeToAttribute?.(storeAttribute)) return null;
+        const [prevStore, newStore] = this.savedChanges?.[storeAttribute] ?? [undefined, undefined];
+        return [dig(prevStore, key) ?? null, dig(newStore, key) ?? null];
+      });
+      mod.defineMethod(`${accessorKey}BeforeLastSave`, function (this: StoreDirtyHost) {
+        if (!this.isSavedChangeToAttribute?.(storeAttribute)) return null;
+        const [prevStore] = this.savedChanges?.[storeAttribute] ?? [undefined];
+        return dig(prevStore, key) ?? null;
+      });
+    }
+  });
 
   let localStored = this.localStoredAttributes();
   if (!localStored) {
