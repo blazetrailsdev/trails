@@ -2,7 +2,13 @@ import { block, fetch, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import type { SchemaStatementsLike } from "./schema-statements-like.js";
 import type { Column } from "../column.js";
-import { singularize, pluralize, assertValidKeys, isBlank } from "@blazetrails/activesupport";
+import {
+  camelize,
+  singularize,
+  pluralize,
+  assertValidKeys,
+  isBlank,
+} from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { ActiveRecord } from "../../namespaces.js";
@@ -499,6 +505,8 @@ export interface ColumnMethods {
   boolean(...args: [...names: string[], options: ColumnOptions]): unknown;
   date(...names: string[]): unknown;
   date(...args: [...names: string[], options: ColumnOptions]): unknown;
+  time(...names: string[]): unknown;
+  time(...args: [...names: string[], options: ColumnOptions]): unknown;
   datetime(...names: string[]): unknown;
   datetime(...args: [...names: string[], options: ColumnOptions]): unknown;
   timestamp(...names: string[]): unknown;
@@ -761,6 +769,7 @@ export type TableOf<A> = A extends {
   ? T
   : Table;
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface below.
 export class TableDefinition {
   readonly name: string;
   protected readonly columnsHash = new Map<string, ColumnDefinition | null>();
@@ -966,132 +975,20 @@ export class TableDefinition {
 
   /** @internal */
   static defineColumnMethods(...columnTypes: string[]): void {
-    for (const type of columnTypes) {
-      if (!(type in TableDefinition.prototype)) {
-        (TableDefinition.prototype as any)[type] = function (
-          this: TableDefinition,
-          ...args: unknown[]
-        ) {
-          return this.definedColumn(type as ColumnType, args);
+    for (const columnType of columnTypes) {
+      (this.prototype as unknown as Record<string, unknown>)[camelize(columnType, false)] =
+        function (this: TableDefinition, ...names: unknown[]): unknown[] {
+          const last = names[names.length - 1];
+          const options = (
+            typeof last === "object" && last !== null ? names.pop() : {}
+          ) as ColumnOptions;
+          if (names.length === 0) {
+            throw new ArgumentError(`Missing column name(s) for ${columnType}`);
+          }
+          names.forEach((name) => this.column(name as string, columnType as ColumnType, options));
+          return names;
         };
-      }
     }
-  }
-
-  /** @internal */
-  protected definedColumn(type: ColumnType, args: unknown[]): this {
-    const rest = [...args];
-    const last = rest[rest.length - 1];
-    const options = (typeof last === "object" && last !== null ? rest.pop() : {}) as ColumnOptions;
-    const names = rest as string[];
-    if (names.length === 0) {
-      throw new ArgumentError(`Missing column name(s) for ${type}`);
-    }
-    for (const name of names) {
-      this.column(name, type, options);
-    }
-    return this;
-  }
-
-  string(...names: string[]): this;
-  string(...args: [...names: string[], options: ColumnOptions]): this;
-  string(...args: unknown[]): this {
-    return this.definedColumn("string", args);
-  }
-
-  text(...names: string[]): this;
-  text(...args: [...names: string[], options: ColumnOptions]): this;
-  text(...args: unknown[]): this {
-    return this.definedColumn("text", args);
-  }
-
-  integer(...names: string[]): this;
-  integer(...args: [...names: string[], options: ColumnOptions]): this;
-  integer(...args: unknown[]): this {
-    return this.definedColumn("integer", args);
-  }
-
-  bigint(...names: string[]): this;
-  bigint(...args: [...names: string[], options: ColumnOptions]): this;
-  bigint(...args: unknown[]): this {
-    return this.definedColumn("bigint", args);
-  }
-
-  float(...names: string[]): this;
-  float(...args: [...names: string[], options: ColumnOptions]): this;
-  float(...args: unknown[]): this {
-    return this.definedColumn("float", args);
-  }
-
-  decimal(...names: string[]): this;
-  decimal(...args: [...names: string[], options: ColumnOptions]): this;
-  decimal(...args: unknown[]): this {
-    return this.definedColumn("decimal", args);
-  }
-
-  boolean(...names: string[]): this;
-  boolean(...args: [...names: string[], options: ColumnOptions]): this;
-  boolean(...args: unknown[]): this {
-    return this.definedColumn("boolean", args);
-  }
-
-  date(...names: string[]): this;
-  date(...args: [...names: string[], options: ColumnOptions]): this;
-  date(...args: unknown[]): this {
-    return this.definedColumn("date", args);
-  }
-
-  time(...names: string[]): this;
-  time(...args: [...names: string[], options: ColumnOptions]): this;
-  time(...args: unknown[]): this {
-    return this.definedColumn("time", args);
-  }
-
-  datetime(...names: string[]): this;
-  datetime(...args: [...names: string[], options: ColumnOptions]): this;
-  datetime(...args: unknown[]): this {
-    return this.definedColumn("datetime", args);
-  }
-
-  timestamp(...names: string[]): this;
-  timestamp(...args: [...names: string[], options: ColumnOptions]): this;
-  timestamp(...args: unknown[]): this {
-    return this.definedColumn("timestamp", args);
-  }
-
-  binary(...names: string[]): this;
-  binary(...args: [...names: string[], options: ColumnOptions]): this;
-  binary(...args: unknown[]): this {
-    return this.definedColumn("binary", args);
-  }
-
-  blob(...names: string[]): this;
-  blob(...args: [...names: string[], options: ColumnOptions]): this;
-  blob(...args: unknown[]): this {
-    return this.definedColumn("binary", args);
-  }
-
-  numeric(...names: string[]): this;
-  numeric(...args: [...names: string[], options: ColumnOptions]): this;
-  numeric(...args: unknown[]): this {
-    return this.definedColumn("decimal", args);
-  }
-
-  json(...names: string[]): this;
-  json(...args: [...names: string[], options: ColumnOptions]): this;
-  json(...args: unknown[]): this {
-    return this.definedColumn("json", args);
-  }
-
-  virtual(...names: string[]): this;
-  virtual(
-    ...args: [
-      ...names: string[],
-      options: ColumnOptions & { type?: ColumnType; as?: string; stored?: boolean },
-    ]
-  ): this;
-  virtual(...args: unknown[]): this {
-    return this.definedColumn("virtual" as ColumnType, args);
   }
 
   timestamps(
@@ -1129,6 +1026,28 @@ export class TableDefinition {
     return this;
   }
 }
+
+/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ColumnMethods` (`abstract/schema_definitions.rb:367`); the class/interface merge is how a mixin surfaces on the type side. */
+export interface TableDefinition extends ColumnMethods {}
+
+TableDefinition.defineColumnMethods(
+  "bigint",
+  "binary",
+  "boolean",
+  "date",
+  "datetime",
+  "decimal",
+  "float",
+  "integer",
+  "json",
+  "string",
+  "text",
+  "time",
+  "timestamp",
+  "virtual",
+);
+TableDefinition.prototype.blob = TableDefinition.prototype.binary;
+TableDefinition.prototype.numeric = TableDefinition.prototype.decimal;
 
 export class Table {
   constructor(

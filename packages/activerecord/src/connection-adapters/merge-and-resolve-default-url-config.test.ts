@@ -72,7 +72,7 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
   it("resolver with database uri and current env symbol key", () => {
     process.env["DATABASE_URL"] = "postgres://localhost/foo";
     const config = { not_production: { adapter: "abstract", database: "not_foo" } };
-    const actual = resolveDbConfig(DEFAULT_ENV, config);
+    const actual = resolveDbConfig(":default_env", config);
     expect(actual.configurationHash).toEqual({
       adapter: "postgresql",
       database: "foo",
@@ -84,7 +84,7 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
     process.env["DATABASE_URL"] = "postgres://localhost/foo";
     DatabaseTasks.env = "foo";
     const config = { not_production: { adapter: "abstract", database: "not_foo" } };
-    const actual = resolveDbConfig("foo", config);
+    const actual = resolveDbConfig(":foo", config);
     expect(actual.configurationHash).toEqual({
       adapter: "postgresql",
       database: "foo",
@@ -95,7 +95,7 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
   it("resolver with nil database url and current env", () => {
     DatabaseTasks.env = "foo";
     const config = { foo: { adapter: "postgresql", url: undefined } };
-    const actual = resolveDbConfig("foo", config);
+    const actual = resolveDbConfig(":foo", config);
     expect(actual.configurationHash).toEqual({ adapter: "postgresql" });
   });
 
@@ -103,7 +103,7 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
     process.env["DATABASE_URL"] = "postgres://localhost/foo";
     DatabaseTasks.env = "foo";
     const config = { not_production: { adapter: "abstract", database: "not_foo" } };
-    const actual = resolveDbConfig("foo", config);
+    const actual = resolveDbConfig(":foo", config);
     expect(actual.configurationHash).toEqual({
       adapter: "postgresql",
       database: "foo",
@@ -114,7 +114,7 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
   it("resolver with database uri and known key", () => {
     process.env["DATABASE_URL"] = "postgres://localhost/foo";
     const config = { production: { adapter: "abstract", database: "not_foo", host: "localhost" } };
-    const actual = resolveDbConfig("production", config);
+    const actual = resolveDbConfig(":production", config);
     expect(actual.configurationHash).toEqual({
       adapter: "abstract",
       database: "not_foo",
@@ -129,7 +129,7 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
       production: { adapter: "postgresql", database: "foo_prod" },
       test: { adapter: "postgresql", database: "foo_test" },
     };
-    const actual = resolveDbConfig("test", config);
+    const actual = resolveDbConfig(":test", config);
     expect(actual.configurationHash).toEqual({
       adapter: "postgresql",
       database: "foo_test",
@@ -140,7 +140,7 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
   it("resolver with database uri and unknown symbol key", () => {
     process.env["DATABASE_URL"] = "postgres://localhost/foo";
     const config = { not_production: { adapter: "abstract", database: "not_foo" } };
-    expect(() => resolveDbConfig("production", config)).toThrow();
+    expect(() => resolveDbConfig(":production", config)).toThrow();
   });
 
   it("resolver with database uri and supplied url", () => {
@@ -160,7 +160,7 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
     DatabaseTasks.env = "test";
 
     const config = { test: { adapter: "postgres", database: "not_foo", host: "localhost" } };
-    const actual = resolveDbConfig("test", config);
+    const actual = resolveDbConfig(":test", config);
     expect(actual.configurationHash).toEqual({
       adapter: "postgres",
       database: "foo",
@@ -198,7 +198,7 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
     const config = {
       default_env: { adapter: "abstract", database: "not_foo", host: "localhost" },
     };
-    const actual = resolveDbConfig(DEFAULT_ENV, config);
+    const actual = resolveDbConfig(":default_env", config);
     expect(actual.configurationHash).toEqual({
       adapter: "ibm_db",
       database: "foo",
@@ -220,7 +220,7 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
 
   it("url removed from hash", () => {
     const config = { default_env: { url: "postgres://localhost/foo" } };
-    const actual = resolveDbConfig(DEFAULT_ENV, config);
+    const actual = resolveDbConfig(":default_env", config);
     expect(Object.keys(actual.configurationHash)).not.toContain("url");
   });
 
@@ -386,14 +386,14 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
       production: { adapter: "abstract", database: "not_foo", host: "localhost" },
       default_env: {},
     };
-    const actual1 = resolveDbConfig("production", config);
+    const actual1 = resolveDbConfig(":production", config);
     expect(actual1.configurationHash).toEqual({
       adapter: "abstract",
       database: "not_foo",
       host: "localhost",
     });
 
-    const actual2 = resolveDbConfig(DEFAULT_ENV, config);
+    const actual2 = resolveDbConfig(":default_env", config);
     expect(actual2.configurationHash).toEqual({
       host: "localhost",
       database: "foo",
@@ -404,7 +404,7 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
   it("protocol adapter mapping is used", () => {
     process.env["DATABASE_URL"] = "mysql://localhost/exampledb";
     DatabaseTasks.env = "production";
-    const actual = resolveDbConfig("production", {});
+    const actual = resolveDbConfig(":production", {});
     expect(actual.configurationHash).toEqual({
       adapter: "mysql2",
       database: "exampledb",
@@ -415,7 +415,7 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
   it("protocol adapter mapping falls through if non found", () => {
     process.env["DATABASE_URL"] = "unknown://localhost/exampledb";
     DatabaseTasks.env = "production";
-    const actual = resolveDbConfig("production", {});
+    const actual = resolveDbConfig(":production", {});
     expect(actual.configurationHash).toEqual({
       adapter: "unknown",
       database: "exampledb",
@@ -427,7 +427,7 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
     protocolAdapters().set("potato", "postgresql");
     process.env["DATABASE_URL"] = "potato://localhost/exampledb";
     DatabaseTasks.env = "production";
-    const actual = resolveDbConfig("production", {});
+    const actual = resolveDbConfig(":production", {});
     expect(actual.configurationHash).toEqual({
       adapter: "postgresql",
       database: "exampledb",
@@ -439,7 +439,7 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
     protocolAdapters().set("custom_protocol", "postgresql");
     process.env["DATABASE_URL"] = "custom-protocol://localhost/exampledb";
     DatabaseTasks.env = "production";
-    const actual = resolveDbConfig("production", {});
+    const actual = resolveDbConfig(":production", {});
     expect(actual.configurationHash).toEqual({
       adapter: "postgresql",
       database: "exampledb",
@@ -451,7 +451,7 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
     protocolAdapters().set("custom_protocol", "sqlite3");
     process.env["DATABASE_URL"] = "custom-protocol:/path/to/db.sqlite3";
     DatabaseTasks.env = "production";
-    const actual = resolveDbConfig("production", {});
+    const actual = resolveDbConfig(":production", {});
     expect(actual.configurationHash).toEqual({
       adapter: "sqlite3",
       database: "/path/to/db.sqlite3",

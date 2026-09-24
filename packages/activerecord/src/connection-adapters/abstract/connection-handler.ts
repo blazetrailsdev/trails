@@ -1,10 +1,8 @@
 import type { ConnectionPool } from "./connection-pool.js";
 import { DatabaseConfig } from "../../database-configurations/database-config.js";
 import type { HashConfig } from "../../database-configurations/hash-config.js";
-import {
-  configurationsStore as configurations,
-  symbolConnectionName,
-} from "../../database-configurations.js";
+import { configurationsStore as configurations } from "../../database-configurations.js";
+import { isSymbol, symbolToS } from "@blazetrails/ruby-compat";
 import { PoolConfig } from "../pool-config.js";
 import { PoolManager } from "../pool-manager.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
@@ -78,13 +76,12 @@ export class ConnectionHandler {
     config?: DatabaseConfig | string | Record<string, unknown>,
   ): ConnectionDescriptor | ConnectionOwner | undefined {
     if (typeof ownerName === "string") {
-      return new ConnectionDescriptor(ownerName);
+      return new ConnectionDescriptor(isSymbol(ownerName) ? symbolToS(ownerName) : ownerName);
+    } else if (isSymbol(config)) {
+      return new ConnectionDescriptor(symbolToS(config));
+    } else {
+      return ownerName;
     }
-    const symbolName = symbolConnectionName(config);
-    if (symbolName != null) {
-      return new ConnectionDescriptor(symbolName);
-    }
-    return ownerName;
   }
 
   connectionPoolNames(): string[] {

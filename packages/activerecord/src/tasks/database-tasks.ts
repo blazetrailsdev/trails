@@ -180,7 +180,7 @@ export class DatabaseTasks {
     for (const dbConfig of this.eachCurrentConfiguration(environment, name)) {
       await this.create(dbConfig);
     }
-    await this.migrationClass().establishConnection(environment);
+    await this.migrationClass().establishConnection(`:${environment}`);
   }
 
   static async drop(configuration: HashConfig | string | Record<string, unknown>): Promise<void> {
@@ -282,7 +282,7 @@ export class DatabaseTasks {
     for (const dbConfig of this.eachCurrentConfiguration(environment)) {
       await this.purge(dbConfig);
     }
-    await this.migrationClass().establishConnection(environment);
+    await this.migrationClass().establishConnection(`:${environment}`);
   }
 
   static async purgeAll(): Promise<void> {

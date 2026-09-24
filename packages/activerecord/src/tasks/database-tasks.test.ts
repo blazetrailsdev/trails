@@ -580,7 +580,7 @@ describe("DatabaseTasksCreateCurrentTest", () => {
   it("establishes connection for the given environments", async () => {
     vi.spyOn(DatabaseTasks, "create").mockResolvedValue(undefined as never);
     await DatabaseTasks.createCurrent("development");
-    assertCalledWith(establishSpy, ["development"]);
+    assertCalledWith(establishSpy, [":development"]);
   });
 });
 
@@ -669,7 +669,7 @@ describe("DatabaseTasksCreateCurrentThreeTierTest", () => {
   it("establishes connection for the given environments config", async () => {
     vi.spyOn(DatabaseTasks, "create").mockResolvedValue(undefined as never);
     await DatabaseTasks.createCurrent("development");
-    assertCalledWith(establishSpy, ["development"]);
+    assertCalledWith(establishSpy, [":development"]);
   });
 });
 
@@ -955,7 +955,7 @@ function databaseTasksMigrationTestCase(folderName = "valid"): MigrationTestCase
     try {
       await Base.removeConnection();
     } catch {}
-    if (!skipMigrationTestCase) await Base.establishConnection("arunit");
+    if (!skipMigrationTestCase) await Base.establishConnection(":arunit");
   });
 
   const captureStdout = async (fn: () => Promise<void>): Promise<string> => {
@@ -1205,7 +1205,7 @@ describe("DatabaseTasksPurgeCurrentTest", () => {
     await DatabaseTasks.purgeCurrent("production");
 
     assertCalledWith(purgeSpy, [configFor("production", "primary")]);
-    assertCalledWith(establishSpy, ["production"]);
+    assertCalledWith(establishSpy, [":production"]);
   });
 });
 

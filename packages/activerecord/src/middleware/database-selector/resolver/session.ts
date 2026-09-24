@@ -1,20 +1,14 @@
 import { Temporal } from "@blazetrails/date";
-
-/** @noRailsEquivalent CONVERGEABLE database-selector-session-typed-against-the-rack-session */
-export interface SessionStore {
-  get(key: string): unknown;
-  set(key: string, value: unknown): void;
-  delete(key: string): void;
-}
+import type { Hash } from "@blazetrails/ruby-compat";
 
 export class Session {
-  readonly session: SessionStore;
+  readonly session: Pick<Hash<string, unknown>, "get" | "set">;
 
-  constructor(session: SessionStore) {
+  constructor(session: Pick<Hash<string, unknown>, "get" | "set">) {
     this.session = session;
   }
 
-  static call(request: { session: SessionStore }): Session {
+  static call(request: { session: Pick<Hash<string, unknown>, "get" | "set"> }): Session {
     return new Session(request.session);
   }
 
@@ -28,8 +22,7 @@ export class Session {
   }
 
   lastWriteTimestamp(): Temporal.Instant {
-    const raw = this.session.get("lastWrite");
-    return Session.convertTimestampToTime(Number.isFinite(raw) ? (raw as number) : undefined);
+    return Session.convertTimestampToTime(this.session.get("lastWrite") as number | undefined);
   }
 
   /** @missingRailsName now — PERMANENT */

@@ -35,7 +35,7 @@ describe("PoolConfig", () => {
     });
 
     it("url from environment", () => {
-      const poolConfig = resolveDbConfig("production", {
+      const poolConfig = resolveDbConfig(":production", {
         production: "abstract://foo?encoding=utf8",
       });
       expect(poolConfig.configurationHash).toEqual({
@@ -46,7 +46,7 @@ describe("PoolConfig", () => {
     });
 
     it("url sub key", () => {
-      const poolConfig = resolveDbConfig("production", {
+      const poolConfig = resolveDbConfig(":production", {
         production: { url: "abstract://foo?encoding=utf8" },
       });
       expect(poolConfig.configurationHash).toEqual({
@@ -63,7 +63,7 @@ describe("PoolConfig", () => {
         host: "bar",
         pool: "3",
       };
-      const poolConfig = resolveDbConfig("production", { production: hash });
+      const poolConfig = resolveDbConfig(":production", { production: hash });
       expect(poolConfig.configurationHash).toEqual({
         adapter: "abstract",
         host: "foo",
@@ -74,7 +74,7 @@ describe("PoolConfig", () => {
 
     it("url sub key merges correctly when query param", () => {
       const hash = { url: "abstract:///?user=user&password=passwd&dbname=app" };
-      const poolConfig = resolveDbConfig("production", { production: hash });
+      const poolConfig = resolveDbConfig(":production", { production: hash });
       expect(poolConfig.configurationHash).toEqual({
         adapter: "abstract",
         user: "user",
@@ -142,7 +142,7 @@ describe("PoolConfig", () => {
     });
 
     it("url sub key for sqlite3", () => {
-      const poolConfig = resolveDbConfig("production", {
+      const poolConfig = resolveDbConfig(":production", {
         production: { url: "sqlite3:foo?encoding=utf8" },
       });
       expect(poolConfig.configurationHash).toEqual({

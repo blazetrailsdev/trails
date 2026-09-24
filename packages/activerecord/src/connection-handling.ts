@@ -567,7 +567,7 @@ export async function establishConnection(
 ): Promise<ConnectionPool> {
   if (!modelClass.name) throw new Error("Anonymous class is not allowed.");
 
-  configOrEnv ??= DEFAULT_ENV();
+  configOrEnv ??= `:${DEFAULT_ENV()}`;
   const dbConfig = modelClass.resolveConfigForConnection(configOrEnv);
   return establishWithDbConfig(modelClass, dbConfig);
 }

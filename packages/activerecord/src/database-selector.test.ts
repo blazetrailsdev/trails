@@ -4,27 +4,16 @@ import { currentPreventingWrites } from "./core.js";
 import { DatabaseSelector } from "./middleware/database-selector.js";
 import { _setActionDispatchRequest } from "@blazetrails/activesupport";
 import { Resolver, type ResolverContext } from "./middleware/database-selector/resolver.js";
-import { Session, type SessionStore } from "./middleware/database-selector/resolver/session.js";
+import { Session } from "./middleware/database-selector/resolver/session.js";
+import { Hash } from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/date";
-
-function makeStore(data: Record<string, unknown> = {}): SessionStore {
-  return {
-    get: (k) => data[k],
-    set: (k, v) => {
-      data[k] = v;
-    },
-    delete: (k) => {
-      delete data[k];
-    },
-  };
-}
 
 class TestRequest {
   readonly method: string;
-  readonly session: SessionStore;
+  readonly session: Hash<string, unknown>;
   constructor(env: Record<string, unknown>) {
     this.method = env["REQUEST_METHOD"] as string;
-    this.session = env["rack.session"] as SessionStore;
+    this.session = env["rack.session"] as Hash<string, unknown>;
   }
 }
 _setActionDispatchRequest(TestRequest);
@@ -43,12 +32,12 @@ function fiveSecondsAgo() {
 }
 
 describe("DatabaseSelectorTest", () => {
-  let data: Record<string, unknown>;
+  let sessionStore: Hash<string, unknown>;
   let session: Session;
 
   beforeEach(() => {
-    data = {};
-    session = new Session(makeStore(data));
+    sessionStore = new Hash();
+    session = new Session(sessionStore);
   });
 
   it("empty session", () => {
@@ -57,7 +46,7 @@ describe("DatabaseSelectorTest", () => {
 
   it("writing the session timestamps", () => {
     expect(session.updateLastWriteTimestamp()).toBeTruthy();
-    const session2 = new Session(makeStore(data));
+    const session2 = new Session(sessionStore);
     expect(session.lastWriteTimestamp().epochMilliseconds).toBe(
       session2.lastWriteTimestamp().epochMilliseconds,
     );
@@ -72,7 +61,7 @@ describe("DatabaseSelectorTest", () => {
   });
 
   it("read from replicas", async () => {
-    data["lastWrite"] = fiveSecondsAgo();
+    sessionStore.set("lastWrite", fiveSecondsAgo());
     const resolver = new Resolver(session);
     let called = false;
     await resolver.read(async () => {
@@ -83,7 +72,7 @@ describe("DatabaseSelectorTest", () => {
   });
 
   it("can write while reading from replicas if explicit", async () => {
-    data["lastWrite"] = fiveSecondsAgo();
+    sessionStore.set("lastWrite", fiveSecondsAgo());
     const resolver = new Resolver(session);
     let called = false;
     await resolver.read(async () => {
@@ -101,7 +90,7 @@ describe("DatabaseSelectorTest", () => {
   });
 
   it("read from primary", async () => {
-    data["lastWrite"] = Session.convertTimeToTimestamp(Temporal.Now.instant());
+    sessionStore.set("lastWrite", Session.convertTimeToTimestamp(Temporal.Now.instant()));
     const resolver = new Resolver(session);
     let called = false;
     await resolver.read(async () => {
@@ -113,14 +102,14 @@ describe("DatabaseSelectorTest", () => {
 
   it("write to primary", async () => {
     const resolver = new Resolver(session);
-    expect(data["lastWrite"]).toBeUndefined();
+    expect(sessionStore.get("lastWrite")).toBeUndefined();
     let called = false;
     await resolver.write(async () => {
       expect(isWriting()).toBeTruthy();
       called = true;
     });
     expect(called).toBeTruthy();
-    expect(data["lastWrite"]).toBeTruthy();
+    expect(sessionStore.get("lastWrite")).toBeTruthy();
   });
 
   it("write to primary and update custom context", async () => {
@@ -135,8 +124,8 @@ describe("DatabaseSelectorTest", () => {
         r["wroteToPrimary"] = this.wrote;
       }
     }
-    const resolver = new Resolver(new CustomContext(makeStore(data)));
-    expect(data["lastWrite"]).toBeUndefined();
+    const resolver = new Resolver(new CustomContext(sessionStore));
+    expect(sessionStore.get("lastWrite")).toBeUndefined();
     let called = false;
     await resolver.write(async () => {
       expect(isWriting()).toBeTruthy();
@@ -145,13 +134,13 @@ describe("DatabaseSelectorTest", () => {
     expect(called).toBeTruthy();
     const response: Record<string, unknown> = {};
     resolver.updateContext(response);
-    expect(data["lastWrite"]).toBeTruthy();
+    expect(sessionStore.get("lastWrite")).toBeTruthy();
     expect(response["wroteToPrimary"]).toBeTruthy();
   });
 
   it("write to primary with exception", async () => {
     const resolver = new Resolver(session);
-    expect(data["lastWrite"]).toBeUndefined();
+    expect(sessionStore.get("lastWrite")).toBeUndefined();
     let called = false;
     await expect(
       resolver.write(async () => {
@@ -161,19 +150,19 @@ describe("DatabaseSelectorTest", () => {
       }),
     ).rejects.toThrow("RecordNotFound");
     expect(called).toBeTruthy();
-    expect(data["lastWrite"]).toBeTruthy();
+    expect(sessionStore.get("lastWrite")).toBeTruthy();
   });
 
   it("read from primary with options", async () => {
     const resolver = new Resolver(session, { delay: 5000 });
-    expect(data["lastWrite"]).toBeUndefined();
+    expect(sessionStore.get("lastWrite")).toBeUndefined();
     let called = false;
     await resolver.write(async () => {
       expect(isWriting()).toBeTruthy();
       called = true;
     });
     expect(called).toBeTruthy();
-    expect(data["lastWrite"]).toBeTruthy();
+    expect(sessionStore.get("lastWrite")).toBeTruthy();
     let read = false;
     await resolver.read(async () => {
       expect(isWriting()).toBeTruthy();
@@ -184,14 +173,14 @@ describe("DatabaseSelectorTest", () => {
 
   it("preventing writes turns off for primary write", async () => {
     const resolver = new Resolver(session, { delay: 5000 });
-    expect(data["lastWrite"]).toBeUndefined();
+    expect(sessionStore.get("lastWrite")).toBeUndefined();
     let called = false;
     await resolver.write(async () => {
       expect(isWriting()).toBeTruthy();
       called = true;
     });
     expect(called).toBeTruthy();
-    expect(data["lastWrite"]).toBeTruthy();
+    expect(sessionStore.get("lastWrite")).toBeTruthy();
     let read = false;
     let write = false;
     await resolver.read(async () => {
@@ -214,14 +203,14 @@ describe("DatabaseSelectorTest", () => {
 
   it("read from replica with no delay", async () => {
     const resolver = new Resolver(session, { delay: 0 });
-    expect(data["lastWrite"]).toBeUndefined();
+    expect(sessionStore.get("lastWrite")).toBeUndefined();
     let called = false;
     await resolver.write(async () => {
       expect(isWriting()).toBeTruthy();
       called = true;
     });
     expect(called).toBeTruthy();
-    expect(data["lastWrite"]).toBeTruthy();
+    expect(sessionStore.get("lastWrite")).toBeTruthy();
     let read = false;
     await resolver.read(async () => {
       expect(isReading()).toBeTruthy();
@@ -235,7 +224,7 @@ describe("DatabaseSelectorTest", () => {
       expect(isWriting()).toBeTruthy();
       return [200, {}, ["body"]];
     });
-    expect(await mw.call({ REQUEST_METHOD: "POST", "rack.session": makeStore() })).toEqual([
+    expect(await mw.call({ REQUEST_METHOD: "POST", "rack.session": new Hash() })).toEqual([
       200,
       {},
       ["body"],
@@ -247,7 +236,7 @@ describe("DatabaseSelectorTest", () => {
       expect(isReading()).toBeTruthy();
       return [200, {}, ["body"]];
     });
-    expect(await mw.call({ REQUEST_METHOD: "GET", "rack.session": makeStore() })).toEqual([
+    expect(await mw.call({ REQUEST_METHOD: "GET", "rack.session": new Hash() })).toEqual([
       200,
       {},
       ["body"],
@@ -267,7 +256,7 @@ describe("DatabaseSelectorTest", () => {
       expect(isReading()).toBeTruthy();
       return [200, {}, ["body"]];
     }, ReadonlyResolver);
-    expect(await mw.call({ REQUEST_METHOD: "POST", "rack.session": makeStore() })).toEqual([
+    expect(await mw.call({ REQUEST_METHOD: "POST", "rack.session": new Hash() })).toEqual([
       200,
       {},
       ["body"],

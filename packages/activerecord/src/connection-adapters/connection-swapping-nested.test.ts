@@ -116,9 +116,11 @@ describe("ConnectionSwappingNestedTest", () => {
       },
     });
 
-    await PrimaryBase.connectsTo({ database: { writing: "primary", reading: "primary_replica" } });
+    await PrimaryBase.connectsTo({
+      database: { writing: ":primary", reading: ":primary_replica" },
+    });
     await SecondaryBase.connectsTo({
-      database: { writing: "secondary", reading: "secondary_replica" },
+      database: { writing: ":secondary", reading: ":secondary_replica" },
     });
 
     Base.connectedTo({ role: "writing" }, () => {
@@ -187,16 +189,16 @@ describe("ConnectionSwappingNestedTest", () => {
 
     await PrimaryBase.connectsTo({
       shards: {
-        default: { writing: "primary", reading: "primary_replica" },
-        shard_one: { writing: "primary_shard_one", reading: "primary_shard_one_replica" },
+        default: { writing: ":primary", reading: ":primary_replica" },
+        shard_one: { writing: ":primary_shard_one", reading: ":primary_shard_one_replica" },
       },
     });
 
     await SecondaryBase.connectsTo({
       shards: {
-        default: { writing: "secondary", reading: "secondary_replica" },
-        shard_one: { writing: "secondary_shard_one", reading: "secondary_shard_one_replica" },
-        shard_two: { writing: "secondary_shard_two", reading: "secondary_shard_two_replica" },
+        default: { writing: ":secondary", reading: ":secondary_replica" },
+        shard_one: { writing: ":secondary_shard_one", reading: ":secondary_shard_one_replica" },
+        shard_two: { writing: ":secondary_shard_two", reading: ":secondary_shard_two_replica" },
       },
     });
 
@@ -262,16 +264,16 @@ describe("ConnectionSwappingNestedTest", () => {
 
     await PrimaryBase.connectsTo({
       shards: {
-        default: { writing: "primary", reading: "primary_replica" },
-        shard_one: { writing: "primary_shard_one", reading: "primary_shard_one_replica" },
+        default: { writing: ":primary", reading: ":primary_replica" },
+        shard_one: { writing: ":primary_shard_one", reading: ":primary_shard_one_replica" },
       },
     });
 
     await SecondaryBase.connectsTo({
       shards: {
-        default: { writing: "secondary", reading: "secondary_replica" },
-        shard_one: { writing: "secondary_shard_one", reading: "secondary_shard_one_replica" },
-        shard_two: { writing: "secondary_shard_two", reading: "secondary_shard_two_replica" },
+        default: { writing: ":secondary", reading: ":secondary_replica" },
+        shard_one: { writing: ":secondary_shard_one", reading: ":secondary_shard_one_replica" },
+        shard_two: { writing: ":secondary_shard_two", reading: ":secondary_shard_two_replica" },
       },
     });
 
@@ -341,24 +343,24 @@ describe("ConnectionSwappingNestedTest", () => {
 
     await PrimaryBase.connectsTo({
       shards: {
-        default: { writing: "primary", reading: "primary_replica" },
-        shard_one: { writing: "primary_shard_one", reading: "primary_shard_one_replica" },
+        default: { writing: ":primary", reading: ":primary_replica" },
+        shard_one: { writing: ":primary_shard_one", reading: ":primary_shard_one_replica" },
       },
     });
 
     await SecondaryBase.connectsTo({
       shards: {
-        default: { writing: "secondary", reading: "secondary_replica" },
-        shard_one: { writing: "secondary_shard_one", reading: "secondary_shard_one_replica" },
-        shard_two: { writing: "secondary_shard_two", reading: "secondary_shard_two_replica" },
+        default: { writing: ":secondary", reading: ":secondary_replica" },
+        shard_one: { writing: ":secondary_shard_one", reading: ":secondary_shard_one_replica" },
+        shard_two: { writing: ":secondary_shard_two", reading: ":secondary_shard_two_replica" },
       },
     });
 
     await TertiaryBase.connectsTo({
       shards: {
-        default: { writing: "tertiary", reading: "tertiary_replica" },
-        shard_one: { writing: "tertiary_shard_one", reading: "tertiary_shard_one_replica" },
-        shard_two: { writing: "tertiary_shard_two", reading: "tertiary_shard_two_replica" },
+        default: { writing: ":tertiary", reading: ":tertiary_replica" },
+        shard_one: { writing: ":tertiary_shard_one", reading: ":tertiary_shard_one_replica" },
+        shard_two: { writing: ":tertiary_shard_two", reading: ":tertiary_shard_two_replica" },
       },
     });
 
@@ -395,9 +397,11 @@ describe("ConnectionSwappingNestedTest", () => {
       },
     });
 
-    await PrimaryBase.connectsTo({ database: { writing: "primary", reading: "primary_replica" } });
+    await PrimaryBase.connectsTo({
+      database: { writing: ":primary", reading: ":primary_replica" },
+    });
     await SecondaryBase.connectsTo({
-      database: { writing: "secondary", reading: "secondary_replica" },
+      database: { writing: ":secondary", reading: ":secondary_replica" },
     });
 
     Base.connectedTo({ role: "writing" }, () => {
@@ -451,7 +455,7 @@ describe("ConnectionSwappingNestedTest", () => {
     });
 
     try {
-      await AppRecord.connectsTo({ database: { writing: "arunit", reading: "arunit" } });
+      await AppRecord.connectsTo({ database: { writing: ":arunit", reading: ":arunit" } });
 
       Base.connectedTo({ role: "writing" }, () => {
         expect(currentPreventingWrites.call(Base as any)).toBeFalsy();
@@ -482,7 +486,7 @@ describe("ConnectionSwappingNestedTest", () => {
     }
     Object.defineProperty(ReloadedRecordV1, "name", { value: "ReloadedRecord" });
 
-    await ReloadedRecordV1.connectsTo({ database: { writing: "arunit", reading: "arunit" } });
+    await ReloadedRecordV1.connectsTo({ database: { writing: ":arunit", reading: ":arunit" } });
 
     Base.connectedTo({ role: "reading", preventWrites: true }, () => {
       ReloadedRecordV1.connectedTo({ role: "writing", preventWrites: false }, () => {
@@ -498,7 +502,7 @@ describe("ConnectionSwappingNestedTest", () => {
     }
     Object.defineProperty(ReloadedRecordV2, "name", { value: "ReloadedRecord" });
 
-    await ReloadedRecordV2.connectsTo({ database: { writing: "arunit", reading: "arunit" } });
+    await ReloadedRecordV2.connectsTo({ database: { writing: ":arunit", reading: ":arunit" } });
 
     Base.connectedTo({ role: "reading", preventWrites: true }, () => {
       ReloadedRecordV2.connectedTo({ role: "writing", preventWrites: false }, () => {

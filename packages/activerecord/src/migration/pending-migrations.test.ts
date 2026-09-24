@@ -109,12 +109,12 @@ describe.skipIf(skip)("Migration", () => {
       tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pending_migrations_test-"));
       originalConfigurations = Base.configurations();
       Base.configurations(baseConfig());
-      await Base.establishConnection("primary");
+      await Base.establishConnection(":primary");
     });
 
     afterEach(async () => {
       Base.configurations(originalConfigurations);
-      await Base.establishConnection("arunit");
+      await Base.establishConnection(":arunit");
       fs.rmSync(tmpDir, { recursive: true, force: true });
     });
 
@@ -156,10 +156,10 @@ describe.skipIf(skip)("Migration", () => {
       createMigration("02", "create_foo", "secondary");
       await assertPendingMigrations("01_create_bar.ts", "02_create_foo.ts");
 
-      await Base.establishConnection("secondary");
+      await Base.establishConnection(":secondary");
       await runMigrations();
 
-      await Base.establishConnection("primary");
+      await Base.establishConnection(":primary");
       await runMigrations();
 
       await assertNoPendingMigrations();

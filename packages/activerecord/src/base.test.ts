@@ -1854,7 +1854,7 @@ describe("BasicsTest", async () => {
 
   it("cannot call connects_to on non-abstract or non-ActiveRecord::Base classes", async () => {
     const error = await assertRaises([NotImplementedError], {}, () =>
-      Bird.connectsTo({ database: { writing: "arunit" } }),
+      Bird.connectsTo({ database: { writing: ":arunit" } }),
     );
 
     expect(error.message).toEqual(
@@ -1969,7 +1969,7 @@ describe("BasicsTest", () => {
       };
       await Base.establishConnection(newConfig as Parameters<typeof Base.establishConnection>[0]);
       cleanupConnections.push(async () => {
-        await Base.establishConnection("arunit");
+        await Base.establishConnection(":arunit");
         await Default.resetColumnInformation();
       });
       await Default.resetColumnInformation();
@@ -1996,7 +1996,7 @@ describe("BasicsTest", () => {
       };
       await Base.establishConnection(newConfig as Parameters<typeof Base.establishConnection>[0]);
       cleanupConnections.push(async () => {
-        await Base.establishConnection("arunit");
+        await Base.establishConnection(":arunit");
         await Default.resetColumnInformation();
       });
       await Default.resetColumnInformation();

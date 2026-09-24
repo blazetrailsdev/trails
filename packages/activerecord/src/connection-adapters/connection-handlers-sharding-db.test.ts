@@ -74,7 +74,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
       },
       async () => {
         const pools = await Base.connectsTo({
-          shards: { default: { writing: "primary" } },
+          shards: { default: { writing: ":primary" } },
         });
         await Promise.all(pools.map((p) => p.adapterReady));
 
@@ -107,8 +107,8 @@ describe("ConnectionHandlersShardingDbTest", () => {
       async () => {
         await Base.connectsTo({
           shards: {
-            default: { writing: "primary", reading: "primary" },
-            shard_one: { writing: "primary_shard_one", reading: "primary_shard_one" },
+            default: { writing: ":primary", reading: ":primary" },
+            shard_one: { writing: ":primary_shard_one", reading: ":primary_shard_one" },
           },
         });
 
@@ -153,8 +153,8 @@ describe("ConnectionHandlersShardingDbTest", () => {
       async () => {
         await Base.connectsTo({
           shards: {
-            default: { writing: "primary", reading: "primary_replica" },
-            shard_one: { writing: "primary_shard_one", reading: "primary_shard_one_replica" },
+            default: { writing: ":primary", reading: ":primary_replica" },
+            shard_one: { writing: ":primary_shard_one", reading: ":primary_shard_one_replica" },
           },
         });
 
@@ -230,8 +230,8 @@ describe("ConnectionHandlersShardingDbTest", () => {
       async () => {
         await Base.connectsTo({
           shards: {
-            default: { writing: "primary", reading: "primary_replica" },
-            shard_one: { writing: "primary_shard_one", reading: "primary_shard_one_replica" },
+            default: { writing: ":primary", reading: ":primary_replica" },
+            shard_one: { writing: ":primary_shard_one", reading: ":primary_shard_one_replica" },
           },
         });
 
@@ -294,8 +294,8 @@ describe("ConnectionHandlersShardingDbTest", () => {
       async () => {
         await Base.connectsTo({
           shards: {
-            default: { writing: "primary", reading: "primary_replica" },
-            shard_one: { writing: "primary_shard_one", reading: "primary_shard_one_replica" },
+            default: { writing: ":primary", reading: ":primary_replica" },
+            shard_one: { writing: ":primary_shard_one", reading: ":primary_shard_one_replica" },
           },
         });
 
@@ -334,8 +334,8 @@ describe("ConnectionHandlersShardingDbTest", () => {
     let error: any;
     await expect(
       Base.connectsTo({
-        database: { writing: "arunit" },
-        shards: { shard_one: { writing: "arunit" } },
+        database: { writing: ":arunit" },
+        shards: { shard_one: { writing: ":arunit" } },
       } as any).catch((e) => {
         error = e;
         throw e;
@@ -357,7 +357,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
     await withBaseConfigs(
       { default_env: { arunit: { adapter: "sqlite3", database: dbPath("arunit.sqlite3") } } },
       async () => {
-        await Base.connectsTo({ shards: { default: { writing: "arunit", reading: "arunit" } } });
+        await Base.connectsTo({ shards: { default: { writing: ":arunit", reading: ":arunit" } } });
         let error: any;
         await expect(
           Base.connectedTo({ role: "reading", shard: "foo" }, async () => {
@@ -383,8 +383,8 @@ describe("ConnectionHandlersShardingDbTest", () => {
       async () => {
         await Base.connectsTo({
           shards: {
-            default: { writing: "arunit", reading: "arunit" },
-            shard_one: { writing: "arunit", reading: "arunit" },
+            default: { writing: ":arunit", reading: ":arunit" },
+            shard_one: { writing: ":arunit", reading: ":arunit" },
           },
         });
         let error: any;
@@ -410,7 +410,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
     await withBaseConfigs(
       { default_env: { arunit: { adapter: "sqlite3", database: dbPath("arunit.sqlite3") } } },
       async () => {
-        await Base.connectsTo({ shards: { default: { writing: "arunit", reading: "arunit" } } });
+        await Base.connectsTo({ shards: { default: { writing: ":arunit", reading: ":arunit" } } });
         let error: any;
         await expect(
           Base.connectedTo({ shard: "foo" }, async () => {
@@ -440,8 +440,8 @@ describe("ConnectionHandlersShardingDbTest", () => {
       async () => {
         await Base.connectsTo({
           shards: {
-            default: { writing: "primary" },
-            shard_one: { writing: "primary_shard_one" },
+            default: { writing: ":primary" },
+            shard_one: { writing: ":primary_shard_one" },
           },
         });
 
@@ -466,7 +466,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
       },
       async () => {
         await Base.connectsTo({
-          shards: { default: { writing: "primary", reading: "primary_replica" } },
+          shards: { default: { writing: ":primary", reading: ":primary_replica" } },
         });
 
         expect(() => {

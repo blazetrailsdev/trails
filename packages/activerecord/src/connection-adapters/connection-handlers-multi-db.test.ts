@@ -145,7 +145,7 @@ describe("ConnectionHandlersMultiDbTest", () => {
         },
       },
       async () => {
-        await Base.connectsTo({ database: { writing: "default", reading: "readonly" } });
+        await Base.connectsTo({ database: { writing: ":default", reading: ":readonly" } });
 
         const writingPool = Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base");
         expect(writingPool).not.toBeNull();
@@ -172,7 +172,7 @@ describe("ConnectionHandlersMultiDbTest", () => {
         },
       },
       async () => {
-        await Base.connectsTo({ database: { writing: "primary", reading: "readonly" } });
+        await Base.connectsTo({ database: { writing: ":primary", reading: ":readonly" } });
 
         await Base.connectedTo({ role: "reading" }, async () => {
           expect(currentRole.call(Base as any)).toEqual("reading");
@@ -201,7 +201,7 @@ describe("ConnectionHandlersMultiDbTest", () => {
         },
       },
       async () => {
-        await Base.connectsTo({ database: { default: "primary", readonly: "readonly" } });
+        await Base.connectsTo({ database: { default: ":primary", readonly: ":readonly" } });
 
         const defaultPool = Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base", {
           role: "default",
@@ -276,7 +276,7 @@ describe("ConnectionHandlersMultiDbTest", () => {
         },
       },
       async () => {
-        await Base.connectsTo({ database: { writing: "animals" } });
+        await Base.connectsTo({ database: { writing: ":animals" } });
         expect(currentRole.call(Base as any)).toEqual("writing");
         expect(Base.isConnectedTo({ role: "writing" })).toBeTruthy();
 
@@ -301,7 +301,7 @@ describe("ConnectionHandlersMultiDbTest", () => {
     await withBaseConfigs(
       config,
       async () => {
-        await Base.connectsTo({ database: { writing: "primary" } });
+        await Base.connectsTo({ database: { writing: ":primary" } });
         expect(currentRole.call(Base as any)).toEqual("writing");
         expect(Base.isConnectedTo({ role: "writing" })).toBeTruthy();
 
@@ -318,7 +318,7 @@ describe("ConnectionHandlersMultiDbTest", () => {
 
   it("connects to with single configuration", async () => {
     await withBaseConfigs({ development: sqliteDb("primary") }, async () => {
-      await Base.connectsTo({ database: { writing: "development" } });
+      await Base.connectsTo({ database: { writing: ":development" } });
       expect(Base.connectionHandler).toEqual(Base.connectionHandler);
       expect(currentRole.call(Base as any)).toEqual("writing");
       expect(Base.isConnectedTo({ role: "writing" })).toBeTruthy();
@@ -333,7 +333,7 @@ describe("ConnectionHandlersMultiDbTest", () => {
       },
       async () => {
         await Base.connectsTo({
-          database: { writing: "development", reading: "development_readonly" },
+          database: { writing: ":development", reading: ":development_readonly" },
         });
         const pool = Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base", {
           role: "reading",
@@ -352,7 +352,7 @@ describe("ConnectionHandlersMultiDbTest", () => {
       },
       async () => {
         const result = await Base.connectsTo({
-          database: { writing: "development", reading: "development_readonly" },
+          database: { writing: ":development", reading: ":development_readonly" },
         });
         expect(result).toEqual([
           Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base"),

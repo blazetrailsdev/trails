@@ -3,12 +3,24 @@ import type { Developer } from "./developer.js";
 import type { Firm } from "./company.js";
 import type { Project } from "./project.js";
 import { registerModel } from "../../associations.js";
-import { registerModuleTableNamePrefix, registerModuleTableNameSuffix } from "../../inheritance.js";
 import { Base } from "../../base.js";
-import { Range } from "@blazetrails/ruby-compat";
+import { Module, Range } from "@blazetrails/ruby-compat";
+import { registerConstant } from "@blazetrails/activesupport";
 
-registerModuleTableNamePrefix("MyApplication::Business::Prefixed", "prefixed_");
-registerModuleTableNameSuffix("MyApplication::Business::Suffixed", "_suffixed");
+registerConstant("MyApplication", new Module());
+registerConstant("MyApplication::Business", new Module());
+registerConstant(
+  "MyApplication::Business::Prefixed",
+  Object.assign(new Module(), { tableNamePrefix: "prefixed_" }),
+);
+registerConstant("MyApplication::Business::Prefixed::Nested", new Module());
+registerConstant(
+  "MyApplication::Business::Suffixed",
+  Object.assign(new Module(), { tableNameSuffix: "_suffixed" }),
+);
+registerConstant("MyApplication::Business::Suffixed::Nested", new Module());
+registerConstant("MyApplication::Billing", new Module());
+registerConstant("MyApplication::Billing::Nested", new Module());
 
 export class MyAppBusinessCompany extends Base {
   static moduleName = "MyApplication::Business";
