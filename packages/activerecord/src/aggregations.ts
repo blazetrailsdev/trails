@@ -2,7 +2,7 @@ import type { Base } from "./base.js";
 import { addAggregateReflection, create } from "./reflection.js";
 import { assertValidKeys, camelize, constantize, isPlainObject } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { include, isModuleIncluded, Module } from "@blazetrails/ruby-compat";
+import { include, isModuleIncluded, Module, NoMethodError } from "@blazetrails/ruby-compat";
 
 export const Aggregations = new Module();
 
@@ -102,29 +102,6 @@ function readerMethod(
   });
 }
 
-function _decompose(
-  record: Base,
-  cache: Map<string, unknown>,
-  name: string,
-  mapping: [string, string][],
-  value: unknown,
-): void {
-  const result: Record<string, unknown> = {};
-  for (const [modelAttr, valueAttr] of mapping) {
-    const prop = (value as any)[valueAttr];
-    const resolved = typeof prop === "function" ? (prop as () => unknown).call(value) : prop;
-    if (resolved === undefined) {
-      throw new TypeError(
-        `Cannot decompose value: '${valueAttr}' is not a property of the assigned object`,
-      );
-    }
-    result[modelAttr] = resolved;
-  }
-  for (const [modelAttr] of mapping) record.writeAttribute(modelAttr, result[modelAttr]);
-  const proto = Object.getPrototypeOf(value as object) ?? Object.prototype;
-  cache.set(name, Object.freeze(Object.assign(Object.create(proto), value)));
-}
-
 /** @internal */
 function writerMethod(
   this: typeof Base,
@@ -159,14 +136,20 @@ function writerMethod(
       if (part == null && allowNil) {
         for (const [key] of mapping) this.writeAttribute(key, null);
         cache.set(name, null);
-      } else if (part instanceof klass) {
-        for (const [key, value] of mapping) this.writeAttribute(key, part[value]);
+      } else {
+        for (const [key, value] of mapping) {
+          if (!(value in Object(part))) {
+            throw new NoMethodError(
+              `undefined method '${value}' for ${part == null ? "nil" : `an instance of ${(part as object).constructor.name}`}`,
+            );
+          }
+          const method = (part as Record<string, unknown>)[value];
+          this.writeAttribute(key, typeof method === "function" ? method.call(part) : method);
+        }
         cache.set(
           name,
           Object.freeze(Object.assign(Object.create(Object.getPrototypeOf(part)), part)),
         );
-      } else {
-        _decompose(this, cache, name, mapping, part);
       }
     },
     configurable: true,
