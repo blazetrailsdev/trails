@@ -329,6 +329,7 @@ let seatedTime: {
   timeZoneId: string | null;
   tzmodeUtc: boolean;
   localZone: boolean;
+  subnano: Rational;
 } | null = null;
 
 /** @noRailsEquivalent PERMANENT */
@@ -375,6 +376,8 @@ export class Time {
   #localZone: boolean;
   /** @internal */
   #utcOffsetMemo: number | null;
+  /** @internal */
+  #subnano: Rational;
 
   /** @internal */
   get #plain(): Temporal.PlainDateTime {
@@ -441,6 +444,7 @@ export class Time {
     instant: Temporal.Instant,
     zone: string | number | null = null,
     tzmodeUtc?: boolean,
+    subnano: Rational = new Rational(0, 1),
   ): Time {
     const timeZoneId =
       zone == null ? nowTimeZoneId() : typeof zone === "number" ? of2str(zone) : zone;
@@ -451,6 +455,7 @@ export class Time {
       timeZoneId: typeof zone === "number" ? null : timeZoneId,
       tzmodeUtc: tzmodeUtc ?? (zone != null && zoned.timeZoneId === "UTC"),
       localZone: zone == null,
+      subnano,
     };
     return new Time(0);
   }
@@ -458,7 +463,12 @@ export class Time {
   static #timeNewTimew(timew: Rational): Time {
     const nanoseconds =
       timew.numerator / timew.denominator - (timew.numerator % timew.denominator < 0n ? 1n : 0n);
-    return Time.#atInstant(Temporal.Instant.fromEpochNanoseconds(nanoseconds));
+    return Time.#atInstant(
+      Temporal.Instant.fromEpochNanoseconds(nanoseconds),
+      null,
+      undefined,
+      timew.add(-nanoseconds),
+    );
   }
 
   static at(
@@ -484,7 +494,7 @@ export class Time {
         .add(numExact(subsec).mul(1_000_000_000).quo(scale));
       t = Time.#timeNewTimew(timew);
     } else if (time instanceof Time) {
-      t = Time.#atInstant(time.#instant, time.#zoneArgument(), time.#tzmodeUtc);
+      t = Time.#atInstant(time.#instant, time.#zoneArgument(), time.#tzmodeUtc, time.#subnano);
     } else {
       const timew = numExact(time).mul(1_000_000_000);
       t = Time.#timeNewTimew(timew);
@@ -1162,6 +1172,7 @@ export class Time {
       this.#timeZoneId = seat.timeZoneId;
       this.#tzmodeUtc = seat.tzmodeUtc;
       this.#localZone = seat.localZone;
+      this.#subnano = seat.subnano;
       return;
     }
     year = obj2vint(year);
@@ -1172,6 +1183,7 @@ export class Time {
     if (sec == null) sec = 0;
     else if (typeof sec === "string") sec = obj2vint(sec);
     const nsec = subsecNanoseconds(sec);
+    this.#subnano = numExact(sec).mod(1).mul(1_000_000_000).add(-nsec);
     const wholeSec = sec instanceof Rational ? sec.div(1) : Math.floor(sec);
     obj2ubits(month, 4);
     obj2ubits(day, 5);
@@ -1331,7 +1343,9 @@ export class Time {
   }
 
   toR(): Rational {
-    return new Rational(this.#instant.epochNanoseconds, 1_000_000_000n);
+    return new Rational(this.#instant.epochNanoseconds, 1_000_000_000n).add(
+      this.#subnano.quo(1_000_000_000),
+    );
   }
 
   toTime(): Temporal.ZonedDateTime {
@@ -1395,7 +1409,7 @@ export class Time {
         hour: this.hour,
         min: this.min,
         sec: this.sec,
-        nsec: new Rational(this.nsec, 1),
+        nsec: new Rational(this.nsec, 1).add(this.#subnano),
         get zone(): string {
           return self.zone ?? "";
         },
@@ -1408,13 +1422,16 @@ export class Time {
   compare(other: unknown): number | null {
     if (!(other instanceof Time)) return null;
     const n = this.#instant.epochNanoseconds - other.#instant.epochNanoseconds;
-    if (n === 0n) return 0;
+    if (n === 0n) return this.#subnano.cmp(other.#subnano);
     return n > 0n ? 1 : -1;
   }
 
   eql(other: unknown): boolean {
     if (!(other instanceof Time)) return false;
-    return this.#instant.epochNanoseconds === other.#instant.epochNanoseconds;
+    return (
+      this.#instant.epochNanoseconds === other.#instant.epochNanoseconds &&
+      this.#subnano.cmp(other.#subnano) === 0
+    );
   }
 
   isUtc(): boolean {
@@ -1430,20 +1447,26 @@ export class Time {
 
   minus(offset: number | bigint | Rational | Time): Time | number {
     if (offset instanceof Time) {
-      return (
-        Number(this.#instant.epochNanoseconds - offset.#instant.epochNanoseconds) / 1_000_000_000
-      );
+      return new Rational(this.#instant.epochNanoseconds - offset.#instant.epochNanoseconds, 1)
+        .add(this.#subnano)
+        .add(offset.#subnano.mul(-1))
+        .quo(1_000_000_000)
+        .toF();
     }
     return this.#timeAdd(offset, -1);
   }
 
   #timeAdd(offset: number | bigint | Rational, sign: 1 | -1): Time {
-    const timew = numExact(offset).mul(1_000_000_000 * sign);
+    const timew = numExact(offset)
+      .mul(1_000_000_000 * sign)
+      .add(this.#subnano);
     const nanoseconds =
       timew.numerator / timew.denominator - (timew.numerator % timew.denominator < 0n ? 1n : 0n);
     return Time.#atInstant(
       Temporal.Instant.fromEpochNanoseconds(this.#instant.epochNanoseconds + nanoseconds),
       this.#zoneArgument(),
+      undefined,
+      timew.add(-nanoseconds),
     );
   }
 
@@ -1471,16 +1494,18 @@ export class Time {
       plain.day,
       plain.hour,
       plain.minute,
-      new Rational(plain.second, 1).add(new Rational(this.nsec, 1_000_000_000)),
+      new Rational(plain.second, 1).add(
+        new Rational(this.nsec, 1).add(this.#subnano).quo(1_000_000_000),
+      ),
       "UTC",
     );
   }
 
   getlocal(utcOffset: number | string | null = null): Time {
     if (typeof utcOffset === "string" && !isZoneIdentifier(utcOffset)) {
-      return Time.#atInstant(this.#instant, utcOffsetArgument(utcOffset));
+      return Time.#atInstant(this.#instant, utcOffsetArgument(utcOffset), undefined, this.#subnano);
     }
-    return Time.#atInstant(this.#instant, utcOffset);
+    return Time.#atInstant(this.#instant, utcOffset, undefined, this.#subnano);
   }
 
   toS(): string {

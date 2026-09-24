@@ -51,16 +51,24 @@ function withEnvTz<T>(newTz: string, fn: () => T): T {
   const oldTz = process.env.TZ;
   process.env.TZ = newTz;
   resetLocalTimeZoneId();
-  try {
-    return fn();
-  } finally {
+  const restore = () => {
     if (oldTz === undefined) {
       delete process.env.TZ;
     } else {
       process.env.TZ = oldTz;
     }
     resetLocalTimeZoneId();
+  };
+  let result: T;
+  try {
+    result = fn();
+  } catch (e) {
+    restore();
+    throw e;
   }
+  if (result instanceof Promise) return result.finally(restore) as T;
+  restore();
+  return result;
 }
 
 function withTzDefault<T>(tz: TimeZone | string | null, fn: () => T): T {
@@ -287,8 +295,7 @@ describe("TimeWithZoneTest", () => {
     expect(twz.xmlschema()).toBe("1999-12-31T19:00:00-05:00");
   });
 
-  it.skip("xmlschema with fractional seconds", () => {
-    // BLOCKED: activesupport-time-with-zone-subnanosecond-fractions
+  it("xmlschema with fractional seconds", () => {
     twz = twz.plus(0.1234560001);
     expect(twz.xmlschema(3)).toEqual("1999-12-31T19:00:00.123-05:00");
     expect(twz.xmlschema(6)).toEqual("1999-12-31T19:00:00.123456-05:00");
@@ -1136,8 +1143,7 @@ describe("TimeWithZoneTest", () => {
     });
   });
 
-  it.skip("to time without preserve timezone configured", async () => {
-    // BLOCKED: activesupport-time-with-zone-to-time-preserve-timezone-deprecation
+  it("to time without preserve timezone configured", async () => {
     setPreserveTimezone(null);
     await withEnvTz("US/Eastern", async () => {
       const time: any = await assertDeprecated(null, deprecator(), () => twz.toTime());

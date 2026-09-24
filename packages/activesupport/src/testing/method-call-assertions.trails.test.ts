@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 import { NameError, Range } from "@blazetrails/ruby-compat";
+import { Assertion } from "./assertions.js";
 import {
   MockExpectationError,
   assertCalled,
@@ -35,7 +36,7 @@ describe("assertCalledWith", () => {
         object.foo(1);
         object.foo(1);
       }),
-    ).toThrow("No more expects available for :foo: 1");
+    ).toThrow("No more expects available for :call: [1] {}");
     expect(object.foo(1)).toBe("original");
   });
 
@@ -89,7 +90,35 @@ describe("assertCalledWith", () => {
         await Promise.resolve();
         object.foo(2);
       }),
-    ).rejects.toThrow("Expected call with [1], got [2]");
+    ).rejects.toThrow("mocked method :call called with unexpected arguments [2]");
+  });
+
+  it("formats a mismatched argument with inspect", () => {
+    class Person {
+      toJSON(): unknown {
+        throw new TypeError("this.asJson is not a function");
+      }
+      inspect(): string {
+        return '#<Person name: "david">';
+      }
+    }
+    const object = { foo: (_p: unknown) => "original" };
+    expect(() =>
+      assertCalledWith(object, "foo", [new Person()], {}, () => {
+        object.foo(new Person());
+      }),
+    ).toThrow(
+      new MockExpectationError(
+        'mocked method :call called with unexpected arguments [#<Person name: "david">]',
+      ),
+    );
+  });
+
+  it("fails verification with minitest's message when never called", () => {
+    const object = { foo: (_x: number) => "original" };
+    expect(() => assertCalledWith(object, "foo", [1, "a"], {}, () => {})).toThrow(
+      new Assertion('Expected call(1, "a") => false'),
+    );
   });
 });
 

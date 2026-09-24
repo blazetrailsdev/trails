@@ -104,6 +104,7 @@ export function setBaseClass(modelClass: typeof Base): void {
 /** @noRailsEquivalent PERMANENT */
 export function qualifiedName(modelClass: typeof Base): string {
   const klass = modelClass as typeof Base & { moduleName?: string; _demodulizedName?: string };
+  if (modelClass === ActiveRecord.Base) return "ActiveRecord::Base";
   if (!klass.moduleName) return modelClass.name;
   return `${klass.moduleName}::${klass._demodulizedName ?? modelClass.name}`;
 }

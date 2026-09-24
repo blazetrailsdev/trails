@@ -48,16 +48,16 @@ export function inTimeZone(dateOrTime: DateOrTime, zone: unknown = currentZone()
 /** @internal */
 function timeWithZone(dateOrTime: DateOrTime, time: TimeLike | null, zone: TimeZone): TimeWithZone {
   if (time !== null) {
-    return new TimeWithZone(asInstant(time), zone);
+    return new TimeWithZone(
+      time instanceof RubyTime ? (time.isUtc() ? time : time.getutc()) : asInstant(time),
+      zone,
+    );
   }
   const date = dateOrTime as Temporal.PlainDate;
   return zone.local(date.year, date.month, date.day);
 }
 
-function asInstant(time: TimeLike): Temporal.Instant {
-  if (time instanceof RubyTime) {
-    return (time.isUtc() ? time : time.getutc()).toTime().toInstant();
-  }
+function asInstant(time: Exclude<TimeLike, RubyTime>): Temporal.Instant {
   if (time instanceof Temporal.ZonedDateTime) return time.toInstant();
   if (time instanceof Temporal.PlainDateTime) return time.toZonedDateTime("UTC").toInstant();
   return time instanceof Temporal.Instant ? time : instantFrom(time);

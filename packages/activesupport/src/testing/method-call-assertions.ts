@@ -1,4 +1,4 @@
-import { NameError, rbEqual } from "@blazetrails/ruby-compat";
+import { ArgumentError, NameError, rbEqual, rbInspect } from "@blazetrails/ruby-compat";
 import { assert } from "./assertions.js";
 
 /** @noRailsEquivalent PERMANENT */
@@ -6,10 +6,80 @@ export class MockExpectationError extends Error {
   override name = "MockExpectationError";
 }
 
-interface Mock {
-  expected: unknown[][];
-  returns: unknown;
-  calls: unknown[][];
+interface MockCall {
+  retval: unknown;
+  args: unknown[];
+}
+
+class Mock {
+  #expectedCalls = new Map<string, MockCall[]>();
+  #actualCalls = new Map<string, MockCall[]>();
+
+  expect(name: string, retval: unknown, args: unknown[] = []): this {
+    if (!Array.isArray(args)) throw new ArgumentError("args must be an array");
+    const expected = this.#expectedCalls.get(name) ?? [];
+    expected.push({ retval, args });
+    this.#expectedCalls.set(name, expected);
+    return this;
+  }
+
+  __call(name: string, data: MockCall | MockCall[]): string {
+    if (Array.isArray(data)) return data.map((d) => this.__call(name, d)).join(", ");
+    const args = rbInspect(data.args).slice(1, -1);
+    return `${name}(${args}) => ${rbInspect(data.retval)}`;
+  }
+
+  verify(): true {
+    for (const [name, expected] of this.#expectedCalls) {
+      const actual = this.#actualCalls.get(name) ?? null;
+      if (!actual) throw new MockExpectationError(`Expected ${this.__call(name, expected[0])}`);
+      if (actual.length < expected.length) {
+        throw new MockExpectationError(
+          `Expected ${this.__call(name, expected[actual.length])}, got [${this.__call(name, actual)}]`,
+        );
+      }
+    }
+    return true;
+  }
+
+  call(...args: unknown[]): unknown {
+    const sym = ":call";
+    const actualCalls = this.#actualCalls.get("call") ?? [];
+    const index = actualCalls.length;
+    const expectedCall = this.#expectedCalls.get("call")?.[index];
+
+    if (!expectedCall) {
+      throw new MockExpectationError(
+        `No more expects available for ${rbInspect(sym)}: ${rbInspect(args)} ${rbInspect({})}`,
+      );
+    }
+
+    const { args: expectedArgs, retval } = expectedCall;
+
+    if (expectedArgs.length !== args.length) {
+      throw new ArgumentError(
+        `mocked method ${rbInspect(sym)} expects ${expectedArgs.length} arguments, got ${rbInspect(args)}`,
+      );
+    }
+
+    const fullyMatched = expectedArgs.every(
+      (mod, i) => caseEqual(mod, args[i]) || rbEqual(mod, args[i]),
+    );
+
+    if (!fullyMatched) {
+      throw new MockExpectationError(
+        `mocked method ${rbInspect(sym)} called with unexpected arguments ${rbInspect(args)}`,
+      );
+    }
+
+    actualCalls.push({
+      retval,
+      args: expectedArgs.map((e, i) => (caseEqual(e, args[i]) ? e : args[i])),
+    });
+    this.#actualCalls.set("call", actualCalls);
+
+    return retval;
+  }
 }
 
 /** @internal */
@@ -49,23 +119,10 @@ export function assertCalledWith<T extends object>(
   { returns = false }: { returns?: unknown } = {},
   block?: () => void | Promise<void>,
 ): void | Promise<void> {
-  const mock: Mock = { expected: [], returns, calls: [] };
+  const mock = new Mock();
   expectCalledWith(mock, args, { returns });
 
-  const result = stub(
-    object,
-    methodName,
-    (...called: unknown[]) => {
-      if (!mock.expected[mock.calls.length]) {
-        throw new MockExpectationError(
-          `No more expects available for :${methodName}: ${called.map(String).join(", ")}`,
-        );
-      }
-      mock.calls.push(called);
-      return mock.returns;
-    },
-    block,
-  );
+  const result = stub(object, methodName, (...called: unknown[]) => mock.call(...called), block);
 
   if (result) return result.then(() => assertMock(mock));
   assertMock(mock);
@@ -87,8 +144,7 @@ export function expectCalledWith(
   args: unknown[],
   { returns = false }: { returns?: unknown } = {},
 ): void {
-  mock.expected.push(args);
-  mock.returns = returns;
+  mock.expect("call", returns, args);
 }
 
 /** @internal */
@@ -203,23 +259,12 @@ function stub<T extends object>(
 }
 
 function assertMock(mock: Mock): void {
-  for (const [index, expected] of mock.expected.entries()) {
-    const actual = mock.calls[index];
-    if (!actual) {
-      throw new MockExpectationError(
-        `Expected call with ${JSON.stringify(expected)}, but it was never called`,
-      );
-    }
-    if (
-      actual.length !== expected.length ||
-      expected.some((arg, i) => !(caseEqual(arg, actual[i]) || rbEqual(arg, actual[i])))
-    ) {
-      throw new MockExpectationError(
-        `Expected call with ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`,
-      );
-    }
+  try {
+    assert(mock.verify());
+  } catch (e) {
+    if (!(e instanceof MockExpectationError)) throw e;
+    assert(false, e.message);
   }
-  assert(true);
 }
 
 function caseEqual(expected: unknown, actual: unknown): boolean {

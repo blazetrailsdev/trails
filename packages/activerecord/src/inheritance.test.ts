@@ -329,7 +329,7 @@ describe("InheritanceTest", () => {
     const e = await assertRaises([NotImplementedError], {}, () => {
       Base.new();
     });
-    expect(e.message).toBe("Base is an abstract class and cannot be instantiated.");
+    expect(e.message).toBe("ActiveRecord::Base is an abstract class and cannot be instantiated.");
   });
 
   it("new with invalid type", () => {

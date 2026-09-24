@@ -2,7 +2,9 @@ import { indexWith } from "../enumerable-utils.js";
 
 import {
   Dir,
+  Exception,
   RbConfig,
+  StandardError,
   Tempfile,
   env,
   getChildProcess,
@@ -169,6 +171,7 @@ export async function assertNothingRaised<T>(block: () => T | Promise<T>): Promi
     assert(true);
     return retval;
   } catch (error) {
+    if (error instanceof Exception && !(error instanceof StandardError)) throw error;
     throw new UnexpectedError(error as Error);
   }
 }
