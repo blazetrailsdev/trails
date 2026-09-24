@@ -19,6 +19,8 @@ export interface TimestampHost {
   _timestampAttributesForCreateInModel?: string[];
   _timestampAttributesForUpdateInModel?: string[];
   _allTimestampAttributesInModel?: string[];
+  timestampAttributesForCreate(): string[];
+  timestampAttributesForUpdate(): string[];
 }
 
 interface TimestampInstanceHost {
@@ -64,9 +66,9 @@ export function timestampAttributesForCreateInModel(this: TimestampHost): string
   const names =
     typeof this.columnNames === "function" ? this.columnNames() : (this.columnNames ?? []);
   const cols = new Set(names);
-  this._timestampAttributesForCreateInModel = timestampAttributesForCreate
-    .call(this)
-    .filter((a) => cols.has(a));
+  this._timestampAttributesForCreateInModel = this.timestampAttributesForCreate().filter((a) =>
+    cols.has(a),
+  );
   return this._timestampAttributesForCreateInModel;
 }
 
@@ -75,9 +77,9 @@ export function timestampAttributesForUpdateInModel(this: TimestampHost): string
   const names =
     typeof this.columnNames === "function" ? this.columnNames() : (this.columnNames ?? []);
   const cols = new Set(names);
-  this._timestampAttributesForUpdateInModel = timestampAttributesForUpdate
-    .call(this)
-    .filter((a) => cols.has(a));
+  this._timestampAttributesForUpdateInModel = this.timestampAttributesForUpdate().filter((a) =>
+    cols.has(a),
+  );
   return this._timestampAttributesForUpdateInModel;
 }
 
