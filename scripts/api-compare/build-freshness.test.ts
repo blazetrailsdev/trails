@@ -9,7 +9,7 @@
  * verify nothing — the previous mtime-based implementation passed a full suite
  * of fixture tests and still failed every CI run.
  */
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -298,6 +298,27 @@ describe("staleBuilds", () => {
       ...rootsOf(packagesDir, "trailties", "actionview", "activesupport"),
     ]);
     expect(stale.map((entry) => entry.dir)).toEqual(["actionview", "activesupport", "trailties"]);
+  });
+
+  it("throws rather than reporting fresh when the dry run gives a built project no verdict", async () => {
+    const root = mkTmp();
+    const packagesDir = path.join(root, "packages");
+    buildPackage(packagesDir, "activesupport");
+    vi.resetModules();
+    vi.doMock("child_process", async (importOriginal) => ({
+      ...(await importOriginal<typeof import("child_process")>()),
+      execFile: (_file: string, _args: string[], callback: (error: null, out: object) => void) =>
+        callback(null, { stdout: "", stderr: "" }),
+    }));
+    try {
+      const { staleBuilds: stubbed } = await import("./build-freshness.js");
+      await expect(stubbed(rootsOf(packagesDir, "activesupport"))).rejects.toThrow(
+        /no verdict for packages\/activesupport/,
+      );
+    } finally {
+      vi.doUnmock("child_process");
+      vi.resetModules();
+    }
   });
 });
 

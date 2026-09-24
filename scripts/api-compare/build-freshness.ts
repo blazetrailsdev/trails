@@ -40,6 +40,11 @@
  * "update timestamps" for is up to date: its sources hash to what was built,
  * which is exactly the restored-cache case above.
  *
+ * Reading CLI prose fails OPEN by default: a reworded message or another locale
+ * matches nothing, and nothing matched reads as "every package is fresh". So the
+ * run is pinned to `--locale en`, and every built project must get one of the
+ * three verdicts or `staleBuilds` throws rather than guessing.
+ *
  * Constraints: async fs only, no `node:` specifiers, no `process` references.
  * The `typescript-5` import is the one unavoidable exception — its `ts.sys` I/O
  * is synchronous and internal to the compiler — and it only parses tsconfigs.
@@ -80,6 +85,14 @@ const TSC = path.join(
 );
 
 const WOULD_BUILD = /A non-dry build would build project '(.+)'/g;
+
+/**
+ * The dry run's two verdicts for a project it would NOT build. Matched only so
+ * every built project is accounted for: the verdicts are English CLI prose, and
+ * a reworded message would otherwise silently read as "nothing is stale".
+ */
+const UP_TO_DATE =
+  /(?:Project '(.+)' is up to date|would update timestamps for output of project '(.+)')/g;
 
 /** A project in the reference closure: where it builds to, and what to call it. */
 interface Project {
@@ -205,11 +218,27 @@ export async function staleBuilds(roots: readonly PackageRoots[]): Promise<Stale
       TSC,
       "--build",
       "--dry",
+      "--locale",
+      "en",
       ...built.map((project) => project.configPath),
     ]);
     const wouldBuild = new Set(
       [...stdout.matchAll(WOULD_BUILD)].map((match) => path.resolve(match[1])),
     );
+    const upToDate = new Set(
+      [...stdout.matchAll(UP_TO_DATE)].map((match) => path.resolve(match[1] ?? match[2])),
+    );
+    const unaccounted = built.filter((project) => {
+      const configPath = path.resolve(project.configPath);
+      return !wouldBuild.has(configPath) && !upToDate.has(configPath);
+    });
+    if (unaccounted.length > 0) {
+      throw new Error(
+        `tsc --build --dry gave no verdict for ${unaccounted
+          .map((project) => `packages/${project.dir}`)
+          .join(", ")}; refusing to report them fresh.\n${stdout}`,
+      );
+    }
     for (const project of built) {
       if (wouldBuild.has(path.resolve(project.configPath))) {
         stale.push({ dir: project.dir, status: OUT_OF_DATE });
