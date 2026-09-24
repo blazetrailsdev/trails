@@ -189,6 +189,12 @@ describe("SQLite3::SchemaStatements", () => {
       expect(() => assertValidDeferrable(0)).toThrow();
     });
 
+    it("renders the rejected value with inspect", () => {
+      expect(() => assertValidDeferrable({ foo: "immediate" })).toThrow(
+        'deferrable must be `:immediate` or `:deferred`, got: `{"foo"=>"immediate"}`',
+      );
+    });
+
     it("throws for invalid string", () => {
       expect(() => assertValidDeferrable("exclusive")).toThrow();
     });

@@ -1,6 +1,6 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { pluralize, symbolizeKeys } from "@blazetrails/activesupport";
-import { rbObjAsString as toS } from "@blazetrails/ruby-compat";
+import { rbInspect, rbObjAsString as toS } from "@blazetrails/ruby-compat";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import type {
   AddForeignKeyOptions,
@@ -381,7 +381,7 @@ export function assertValidDeferrable(deferrable: unknown): void {
   )
     return;
   throw new ArgumentError(
-    `deferrable must be \`:immediate\` or \`:deferred\`, got: \`${JSON.stringify(deferrable)}\``,
+    `deferrable must be \`:immediate\` or \`:deferred\`, got: \`${rbInspect(deferrable)}\``,
   );
 }
 
