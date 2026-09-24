@@ -13,7 +13,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { COMPARED_TS_FILES, walkTsFilesSync } from "./ts-file-walk.js";
-import * as ts from "typescript";
+import * as ts from "typescript-5";
 import type { ApiManifest, ClassInfo, MethodInfo } from "@blazetrails/parity/types";
 import { OUTPUT_DIR, packageSrcDir } from "./config.js";
 import { rubyFileToTs, rubyMethodToTs } from "@blazetrails/parity/conventions";

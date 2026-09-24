@@ -1,6 +1,5 @@
-import * as ts from "typescript/unstable/ast";
-import { ScriptKind } from "typescript/unstable/sync";
-import { tsApi } from "@blazetrails/activerecord/type-virtualization/ts-api.js";
+import { API } from "typescript/unstable/sync";
+import { createVirtualFileSystem } from "typescript/unstable/fs";
 
 const AR_REQUIRED_OPTIONS: ReadonlyArray<readonly [string, unknown]> = [
   ["target", "ES2022"],
@@ -52,41 +51,16 @@ export interface TsconfigMergeResult {
 }
 
 function parseJsonc(text: string): unknown {
-  const sf = tsApi().createSourceFile("/tsconfig.json", text, { scriptKind: ScriptKind.JSON });
-  const [stmt, ...rest] = sf.statements;
-  if (!stmt || rest.length > 0 || !ts.isExpressionStatement(stmt)) {
-    throw new SyntaxError("tsconfig.json parse error: expected a single JSON value");
-  }
-  return convertToObject(stmt.expression);
-}
-
-function convertToObject(node: ts.Expression): unknown {
-  if (node.kind === ts.SyntaxKind.TrueKeyword) return true;
-  if (node.kind === ts.SyntaxKind.FalseKeyword) return false;
-  if (node.kind === ts.SyntaxKind.NullKeyword) return null;
-  if (ts.isStringLiteral(node)) return node.text;
-  if (ts.isNumericLiteral(node)) return Number(node.text);
-  if (
-    ts.isPrefixUnaryExpression(node) &&
-    node.operator === ts.SyntaxKind.MinusToken &&
-    ts.isNumericLiteral(node.operand)
-  ) {
-    return -Number(node.operand.text);
-  }
-  if (ts.isArrayLiteralExpression(node)) return node.elements.map(convertToObject);
-  if (ts.isObjectLiteralExpression(node)) {
-    const result: Record<string, unknown> = {};
-    for (const prop of node.properties) {
-      if (!ts.isPropertyAssignment(prop) || !ts.isStringLiteral(prop.name)) {
-        throw new SyntaxError("tsconfig.json parse error: property name must be a string");
-      }
-      result[prop.name.text] = convertToObject(prop.initializer);
+  const api = new API({ fs: createVirtualFileSystem({ "/tsconfig.json": text }) });
+  try {
+    const { config, error } = api.readConfigFile("/tsconfig.json");
+    if (error) {
+      throw new SyntaxError(`tsconfig.json parse error: ${error.text}`);
     }
-    return result;
+    return config;
+  } finally {
+    api.close();
   }
-  throw new SyntaxError(
-    `tsconfig.json parse error: unexpected ${ts.SyntaxKind[node.kind]} at position ${node.pos}`,
-  );
 }
 
 export function mergeTsconfig(existingText: string): TsconfigMergeResult {

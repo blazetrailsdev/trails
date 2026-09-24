@@ -189,6 +189,10 @@ export default defineConfig(
     },
   },
   {
+    files: [".pnpmfile.cjs"],
+    languageOptions: { sourceType: "commonjs", globals: { module: "writable" } },
+  },
+  {
     plugins: {
       "unused-imports": unusedImports,
     },

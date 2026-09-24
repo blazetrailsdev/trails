@@ -200,6 +200,13 @@ as convergence classes.
   (it just wastes turns). The webhook reports failures only: if the run fails
   a notification lands here, so no notification means CI passed. Move on after
   linking — don't wait around watching for a result.
+- **The compiler is TypeScript 7.1** (an exact `7.1.0-dev` nightly, root
+  `package.json`). `pnpm build` / `pnpm typecheck` compile the workspace cold
+  in ~10s, and the bare `typescript` import is only a version string: package
+  code reaches the compiler through `typescript/unstable/*`. The classic 5.x
+  API survives only as the `typescript-5` alias (5.9.3), for `scripts/`
+  (import it by that name, never as bare `typescript`), `trails-tsc`, and the
+  lint/typedoc toolchain, whose peers `.pnpmfile.cjs` moves (RFC 0125).
 - **Do NOT run the whole test suite locally** (`pnpm test`, `pnpm -r test`,
   `pnpm --filter activerecord test`, etc.). CI runs the full suite on every
   push. Locally, run only the individual test files or small groups you

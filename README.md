@@ -8,25 +8,27 @@ The goal is **100% API compatible with Rails**, with behavior matched **test for
 
 ## Requirements
 
-**TypeScript 5.x** (`^5.0.0`; 5.9.3 is the version CI runs). Three packages
-declare a `typescript` peer dependency and all three are pinned to the 5.x line
-today:
+**TypeScript 7.1** — pinned to the exact nightly `7.1.0-dev.20260920.1`, which
+is what CI builds with; the pin moves to 7.1 stable when it ships (scheduled
+2026-11-24). The packages that touch the compiler API use
+`typescript/unstable/*`, which carries no semver guarantee, so their ranges are
+the exact build they were verified against:
 
-| package                     | peer range | why                                                                                                                                                  |
-| --------------------------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@blazetrails/activerecord` | `^5.0.0`   | the `./type-virtualization/*` subpath builds a `ts.SourceFile` from source text (`ts.createSourceFile`), which the TypeScript 7 API does not expose. |
-| `@blazetrails/trails-tsc`   | `^5.0.0`   | it is a `tsc` replacement: it drives a programmatic `--build` and hosts a language-service plugin, neither of which TypeScript 7 offers.             |
-| `@blazetrails/trailties`    | `^5.0.0`   | `./template-builder/testing`'s `parseTs()` uses `ts.transpileModule`.                                                                                |
+| package                         | `typescript`                                    | why                                                                                                               |
+| ------------------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `@blazetrails/activerecord`     | optional peer, `7.1.0-dev.20260920.1`           | the `./type-virtualization/*` subpath parses and walks model source through the 7.1 API.                          |
+| `@blazetrails/trailties`        | optional peer, `7.1.0-dev.20260920.1`           | `./template-builder/testing`'s `parseTs()` uses `API#transpileModule`.                                            |
+| `@blazetrails/activerecord-cli` | dependency, `7.1.0-dev.20260920.1`              | the `trails-tsc` typecheck bin runs on the 7.1 API.                                                               |
+| `@blazetrails/trails-tsc`       | dependency, `typescript-5@npm:typescript@5.9.3` | it drives a programmatic `--build` and hosts a language-service plugin, neither of which TypeScript 7 offers yet. |
 
 For `activerecord` and `trailties` the peer is **optional** — neither runtime
 needs the compiler, only the two subpaths named above do — so a project that
-imports neither never has to install TypeScript at all. `trails-tsc` requires it
-outright, because compiling is the whole package.
+imports neither never has to install TypeScript at all.
 
-TypeScript 7 support is tracked by RFC
-`0125-typescript-7-ground-floor` in the tasks repo; the ranges above will widen
-package by package as each port lands, and are deliberately narrow until then
-rather than admitting a version the code cannot run on.
+`trails-tsc`'s 5.9.3 is an alias, so it never collides with a project's own
+`typescript`; `activerecord-cli`'s `--build` mode reaches it through
+`trails-tsc`. Both retire when TypeScript 7 ships a programmatic build API
+(RFC `0125-typescript-7-ground-floor` in the tasks repo).
 
 ## Zero-declare models — `trails-tsc`
 

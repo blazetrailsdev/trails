@@ -38,7 +38,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { builtinModules } from "node:module";
 import path from "node:path";
-import ts from "typescript";
+import ts from "typescript-5";
 
 const NODE_BUILTINS = new Set(builtinModules.filter((m) => !m.startsWith("_")));
 

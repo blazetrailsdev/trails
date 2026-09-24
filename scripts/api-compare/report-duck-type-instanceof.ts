@@ -28,7 +28,7 @@
 import * as path from "path";
 import { readFile } from "fs/promises";
 import { fileURLToPath } from "url";
-import ts from "typescript";
+import ts from "typescript-5";
 import { OUTPUT_DIR, ROOT_DIR, packageSrcDir } from "./config.js";
 import { section, tally } from "./lint-call-mismatches.js";
 import { spliceHelperSkeletons, type SkeletonArtifact, type SkeletonRow } from "./report-arms.js";

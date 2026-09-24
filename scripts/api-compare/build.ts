@@ -63,7 +63,7 @@
 
 import * as fs from "fs/promises";
 import * as path from "path";
-import * as ts from "typescript";
+import * as ts from "typescript-5";
 import { fileURLToPath } from "url";
 import { OUTPUT_DIR, ROOT_DIR, packageSrcDir } from "./config.js";
 import {

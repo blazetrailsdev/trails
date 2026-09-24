@@ -26,7 +26,7 @@
  * extract-ts-api.test.ts; extend that fixture when you add a field.
  */
 
-import * as ts from "typescript";
+import * as ts from "typescript-5";
 import * as path from "path";
 import * as fs from "fs";
 import { COMPARED_TS_FILES, walkTsFilesSync } from "./ts-file-walk.js";
