@@ -717,7 +717,9 @@ jobs:
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       - uses: ./.github/actions/cache-build
-      - run: pnpm build
+        with:
+          compiler: ts7
+      - run: pnpm build:ts7
       - run: pnpm guides:typecheck
 
   virtualized-dx-type-tests:
@@ -756,10 +758,12 @@ jobs:
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       - uses: ./.github/actions/cache-build
+        with:
+          compiler: ts7
       # scripts/parity/pipeline/query/node spawns the dump runners as real subprocesses;
       # they resolve @blazetrails/* through package `main` entries, so the
       # dist/ trees have to exist before vitest starts.
-      - run: pnpm build
+      - run: pnpm build:ts7
       # The scripts/* suites added here are the compare tooling's own unit
       # tests; none needs Ruby or the `pnpm build` above (that step exists for
       # parity/query/node, which #5264 already wired in — the whole
@@ -972,7 +976,9 @@ jobs:
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       - uses: ./.github/actions/cache-build
-      - run: pnpm build
+        with:
+          compiler: ts7
+      - run: pnpm build:ts7
       # Trailing slash is load-bearing: the bare `packages/activerecord` filter
       # is a substring match that also sweeps in packages/activerecord-cli/**.
       # Those already run in the dedicated step below, so the slash avoids a
@@ -1028,7 +1034,9 @@ jobs:
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       - uses: ./.github/actions/cache-build
-      - run: pnpm build
+        with:
+          compiler: ts7
+      - run: pnpm build:ts7
       # Trailing slash for the reason given on `sqlite-tests`. The CLI package
       # is excluded: it owns no `inMemoryDb()` guards, so it has nothing this
       # lane can check.
@@ -1059,7 +1067,9 @@ jobs:
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       - uses: ./.github/actions/cache-build
-      - run: pnpm build
+        with:
+          compiler: ts7
+      - run: pnpm build:ts7
       # AR_COVERAGE=1 scopes the vitest coverage include to activerecord source
       # (see vitest.config.ts). Only the main AR suite is covered; the cli run
       # is intentionally omitted so it can't clobber the report.
@@ -1107,7 +1117,9 @@ jobs:
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       - uses: ./.github/actions/cache-build
-      - run: pnpm build
+        with:
+          compiler: ts7
+      - run: pnpm build:ts7
       # The cli suite's trails-tsc E2E tests spawn tsc subprocesses that, under
       # v8 instrumentation, trip vitest's `onTaskUpdate` worker-RPC timeout and
       # abort the run. Mirror the trails-tsc job: TRAILS_TEST_FORKS=1 cuts fork
@@ -1277,7 +1289,9 @@ jobs:
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       - uses: ./.github/actions/cache-build
-      - run: pnpm build
+        with:
+          compiler: ts7
+      - run: pnpm build:ts7
       # Service containers can't mount /docker-entrypoint-initdb.d, so feed the
       # compose init script by hand — same file, so CI and local provisioning
       # can't drift.
@@ -1374,7 +1388,9 @@ jobs:
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       - uses: ./.github/actions/cache-build
-      - run: pnpm build
+        with:
+          compiler: ts7
+      - run: pnpm build:ts7
       # Service containers can't mount /docker-entrypoint-initdb.d, so feed the
       # compose init script by hand — same file, so CI and local provisioning
       # can't drift.
@@ -1452,7 +1468,9 @@ jobs:
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       - uses: ./.github/actions/cache-build
-      - run: pnpm build
+        with:
+          compiler: ts7
+      - run: pnpm build:ts7
       # Service containers can't mount /docker-entrypoint-initdb.d, so feed the
       # compose init script by hand — same file, so CI and local provisioning
       # can't drift.
@@ -1515,7 +1533,9 @@ jobs:
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       - uses: ./.github/actions/cache-build
-      - run: pnpm build
+        with:
+          compiler: ts7
+      - run: pnpm build:ts7
       - name: Provision Rails' test user
         run: |
           mysql -h 127.0.0.1 -uroot -e "
