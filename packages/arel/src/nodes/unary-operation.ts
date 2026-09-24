@@ -1,3 +1,4 @@
+import { Nodes } from "../namespaces.js";
 import { Node } from "./node.js";
 import { Unary } from "./unary.js";
 
@@ -16,3 +17,6 @@ export class BitwiseNot extends UnaryOperation {
     super("~", operand);
   }
 }
+
+Nodes.UnaryOperation = UnaryOperation;
+Nodes.BitwiseNot = BitwiseNot;

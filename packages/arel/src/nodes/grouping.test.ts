@@ -3,7 +3,6 @@ import { fakeRecordConnection } from "../test-helpers/connection.js";
 import { Nodes, Visitors } from "../index.js";
 import type { Node } from "./node.js";
 import { uniq } from "../test-helpers/uniq.js";
-import { buildQuoted } from "./casted.js";
 
 describe("GroupingTest", () => {
   describe("equality", () => {
@@ -25,7 +24,7 @@ describe("GroupingTest", () => {
   });
 
   it("should create Equality nodes", () => {
-    const grouping = new Nodes.Grouping(buildQuoted("foo"));
+    const grouping = new Nodes.Grouping(Nodes.buildQuoted("foo"));
     const sql = new Visitors.ToSql(fakeRecordConnection).compile(grouping.eq("foo"));
     expect(sql).toBe("('foo') = 'foo'");
   });

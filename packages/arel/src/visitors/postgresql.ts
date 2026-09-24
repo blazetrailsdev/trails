@@ -1,3 +1,4 @@
+import { Visitors } from "../namespaces.js";
 import * as Nodes from "../nodes/index.js";
 import { SQLString } from "../collectors/sql-string.js";
 import { ToSql } from "./to-sql.js";
@@ -115,3 +116,5 @@ export class PostgreSQL extends ToSql {
     return collector;
   }
 }
+
+Visitors.PostgreSQL = PostgreSQL;

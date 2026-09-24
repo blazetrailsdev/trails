@@ -1,3 +1,4 @@
+import { Nodes } from "../namespaces.js";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
 import { buildQuoted } from "./casted.js";
@@ -88,3 +89,5 @@ export class HomogeneousIn extends Node {
     return [this.attribute, this.values, this.type];
   }
 }
+
+Nodes.HomogeneousIn = HomogeneousIn;

@@ -1,3 +1,4 @@
+import { Nodes } from "../namespaces.js";
 import { Binary, type NodeOrValue } from "./binary.js";
 
 export class Over extends Binary {
@@ -9,3 +10,5 @@ export class Over extends Binary {
     return "OVER";
   }
 }
+
+Nodes.Over = Over;

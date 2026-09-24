@@ -66,3 +66,5 @@ type _FactoryMethodsModule = import("../factory-methods.js").FactoryMethodsModul
    @typescript-eslint/no-unsafe-declaration-merging */
 export interface Node extends _FactoryMethodsModule {}
 setRubyNamespace(Node, "Arel::Nodes");
+
+Nodes.Node = Node;

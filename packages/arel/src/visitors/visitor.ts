@@ -1,3 +1,4 @@
+import { Visitors } from "../namespaces.js";
 import { isHashAnalogue, rubyClassName, rubyConstantName } from "./ruby-class.js";
 
 function describeClass(object: unknown): string {
@@ -103,3 +104,5 @@ export abstract class Visitor {
     return `visit${klassName.replaceAll("::", "")}`;
   }
 }
+
+Visitors.Visitor = Visitor;

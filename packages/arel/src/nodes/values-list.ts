@@ -1,3 +1,4 @@
+import { Nodes } from "../namespaces.js";
 import { Unary } from "./unary.js";
 
 export class ValuesList extends Unary {
@@ -9,3 +10,5 @@ export class ValuesList extends Unary {
     return this.expr as unknown[][];
   }
 }
+
+Nodes.ValuesList = ValuesList;

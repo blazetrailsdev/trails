@@ -517,18 +517,9 @@ async function _loadAdapter(name: string): Promise<new (arg: unknown) => Databas
   return resolveConnectionAdapter(name) as Promise<new (arg: unknown) => DatabaseAdapter>;
 }
 
-let _railsEnv: string | null = null;
-
-/** @internal */
-export function _setRailsEnv(value: string | null): void {
-  _railsEnv = value;
-}
-
 /** @missingRailsCall Rails.env — PERMANENT */
 export const RAILS_ENV = (): string | undefined =>
-  presence(getEnv("TRAILS_ENV")) ??
-  (_railsEnv !== null ? _railsEnv : undefined) ??
-  presence(getEnv("NODE_ENV"));
+  presence(getEnv("TRAILS_ENV")) ?? presence(getEnv("NODE_ENV"));
 
 /** @missingRailsCall call — PERMANENT */
 export const DEFAULT_ENV = (): string => RAILS_ENV() || "default_env";

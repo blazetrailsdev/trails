@@ -1,3 +1,4 @@
+import { Nodes } from "../namespaces.js";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { objectClone } from "../clone-support.js";
 import { Node } from "./node.js";
@@ -62,3 +63,5 @@ export class UpdateStatement extends Node {
     return copy;
   }
 }
+
+Nodes.UpdateStatement = UpdateStatement;

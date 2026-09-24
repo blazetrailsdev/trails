@@ -1,3 +1,4 @@
+import { Visitors } from "../namespaces.js";
 import { NotImplementedError } from "@blazetrails/ruby-compat";
 import { arelNode } from "../arel.js";
 import { Node } from "../nodes/node.js";
@@ -1307,3 +1308,6 @@ export class ToSql extends Visitor {
     return typeof maybe?.isNil === "function" && maybe.isNil();
   }
 }
+
+Visitors.UnsupportedVisitError = UnsupportedVisitError;
+Visitors.ToSql = ToSql;

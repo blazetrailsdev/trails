@@ -858,7 +858,10 @@ modules converged onto `Autoload`:
   `Arel::Nodes` / `Arel::Visitors` namespace objects, extended with
   `ActiveSupport::Autoload` (RFC 0151). Each constant is `autoload`ed there,
   seated by its defining module (`Nodes.Not = Not`) and read as a property at
-  call time (`new Nodes.Not(this)`). This is the shape the remaining slots
+  call time (`new Nodes.Not(this)`). `Nodes` and `Visitors` are also the
+  public `Arel.Nodes` / `Arel.Visitors` exports: every class seats itself on
+  them in its defining module, and a type-only `declare namespace` of the same
+  name carries the type side. This is the shape the remaining slots
   converge onto.
 - `activesupport/src/namespaces.ts`, `actionview/src/namespaces.ts`,
   `actionpack/src/namespaces.ts` — not slots: the `ActiveSupport`, `ActionView`

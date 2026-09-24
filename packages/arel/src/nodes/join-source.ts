@@ -1,3 +1,4 @@
+import { Nodes } from "../namespaces.js";
 import { Node } from "./node.js";
 import type { Table } from "../table.js";
 import { Binary } from "./binary.js";
@@ -16,3 +17,5 @@ export class JoinSource extends Binary {
     return !this.left && this.right.length === 0;
   }
 }
+
+Nodes.JoinSource = JoinSource;

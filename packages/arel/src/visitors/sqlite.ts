@@ -1,3 +1,4 @@
+import { Visitors } from "../namespaces.js";
 import * as Nodes from "../nodes/index.js";
 import { Node } from "../nodes/node.js";
 import { SQLString } from "../collectors/sql-string.js";
@@ -85,3 +86,5 @@ export class SQLite extends ToSql {
     return node;
   }
 }
+
+Visitors.SQLite = SQLite;

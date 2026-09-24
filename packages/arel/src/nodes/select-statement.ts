@@ -1,3 +1,4 @@
+import { Nodes } from "../namespaces.js";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { cloneSlot, objectClone } from "../clone-support.js";
 import { Node } from "./node.js";
@@ -52,3 +53,5 @@ export class SelectStatement extends NodeExpression {
 type _AliasPredication = import("../alias-predication.js").AliasPredicationModule;
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
 export interface SelectStatement extends _AliasPredication {}
+
+Nodes.SelectStatement = SelectStatement;

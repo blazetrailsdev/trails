@@ -1,3 +1,4 @@
+import { Nodes } from "../namespaces.js";
 import { Binary, NodeOrValue } from "./binary.js";
 
 export class Regexp extends Binary {
@@ -15,3 +16,6 @@ export class NotRegexp extends Binary {
     this.caseSensitive = caseSensitive;
   }
 }
+
+Nodes.Regexp = Regexp;
+Nodes.NotRegexp = NotRegexp;

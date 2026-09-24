@@ -1,3 +1,4 @@
+import { Nodes } from "../namespaces.js";
 import { Node } from "./node.js";
 import { Binary } from "./binary.js";
 import { Cte } from "./cte.js";
@@ -69,3 +70,5 @@ export class TableAlias extends Binary {
       : new Attribute(this, name);
   }
 }
+
+Nodes.TableAlias = TableAlias;

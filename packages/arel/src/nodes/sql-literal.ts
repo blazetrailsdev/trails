@@ -1,3 +1,4 @@
+import { Nodes } from "../namespaces.js";
 import { ArgumentError, isBlank, rbHash } from "@blazetrails/activesupport";
 import { arelNode } from "../arel.js";
 import { Node } from "./node.js";
@@ -57,3 +58,5 @@ type _Expressions = import("../expressions.js").ExpressionsModule;
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface SqlLiteral
   extends _Predications, _Expressions, _AliasPredication, _OrderPredications {}
+
+Nodes.SqlLiteral = SqlLiteral;

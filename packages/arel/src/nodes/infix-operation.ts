@@ -1,3 +1,4 @@
+import { Nodes } from "../namespaces.js";
 import { Binary, type NodeOrValue } from "./binary.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -106,3 +107,17 @@ type _Expressions = import("../expressions.js").ExpressionsModule;
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface InfixOperation
   extends _Predications, _Math, _Expressions, _AliasPredication, _OrderPredications {}
+
+Nodes.InfixOperation = InfixOperation;
+Nodes.BitwiseAnd = BitwiseAnd;
+Nodes.BitwiseOr = BitwiseOr;
+Nodes.BitwiseXor = BitwiseXor;
+Nodes.BitwiseShiftLeft = BitwiseShiftLeft;
+Nodes.BitwiseShiftRight = BitwiseShiftRight;
+Nodes.Addition = Addition;
+Nodes.Subtraction = Subtraction;
+Nodes.Multiplication = Multiplication;
+Nodes.Division = Division;
+Nodes.Concat = Concat;
+Nodes.Contains = Contains;
+Nodes.Overlaps = Overlaps;

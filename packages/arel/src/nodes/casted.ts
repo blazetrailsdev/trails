@@ -93,3 +93,6 @@ export class Quoted extends Unary {
 type _AliasPredication = import("../alias-predication.js").AliasPredicationModule;
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
 export interface Casted extends _AliasPredication {}
+
+Nodes.Quoted = Quoted;
+Nodes.Casted = Casted;

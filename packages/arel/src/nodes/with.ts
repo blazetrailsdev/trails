@@ -1,3 +1,4 @@
+import { Nodes } from "../namespaces.js";
 import { Node } from "./node.js";
 import { Unary } from "./unary.js";
 
@@ -12,3 +13,6 @@ export class With extends Unary {
 }
 
 export class WithRecursive extends With {}
+
+Nodes.With = With;
+Nodes.WithRecursive = WithRecursive;

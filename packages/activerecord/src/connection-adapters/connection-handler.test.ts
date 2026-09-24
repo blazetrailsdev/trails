@@ -4,11 +4,11 @@ import { HashConfig } from "../database-configurations/hash-config.js";
 import { Base } from "../base.js";
 import { AdapterNotFound } from "../errors.js";
 import { ambientPoolConfiguration } from "../test-adapter.js";
-import { assertNotDeprecated } from "@blazetrails/activesupport";
+import { assertNotDeprecated, getEnv } from "@blazetrails/activesupport";
+import { setEnv } from "@blazetrails/ruby-compat";
 import { deprecator } from "../deprecator.js";
 import { restoreWorkerConnection } from "../support/connection.js";
 import { DEFAULT_ENV } from "../connection-handling.js";
-import { DatabaseTasks } from "../tasks/database-tasks.js";
 import { readingRole, setWritingRole, writingRole } from "../active-record.js";
 
 function setupSharedConnectionPool(handlerArg: ConnectionHandler): void {
@@ -33,7 +33,6 @@ describe("ConnectionHandlerTest", () => {
   beforeEach(async () => {
     await restoreWorkerConnection();
     handler = new ConnectionHandler();
-    DatabaseTasks.env = "development";
   });
 
   afterEach(async () => {
@@ -49,7 +48,6 @@ describe("ConnectionHandlerTest", () => {
   it("default env fall back to default env when rails env or rack env is empty string", async () => {
     vi.stubEnv("TRAILS_ENV", "");
     vi.stubEnv("NODE_ENV", "");
-    DatabaseTasks.env = "";
     try {
       expect(DEFAULT_ENV()).toEqual("default_env");
     } finally {
@@ -69,8 +67,8 @@ describe("ConnectionHandlerTest", () => {
       },
       common: { adapter: "sqlite3", database: "test/db/common.sqlite3" },
     };
-    const prevEnv = DatabaseTasks.env;
-    DatabaseTasks.env = "default_env";
+    const previousEnv = getEnv("TRAILS_ENV");
+    setEnv("TRAILS_ENV", "default_env");
     const prevConfigs = Base.configurations();
     Base.configurations(config);
 
@@ -92,7 +90,7 @@ describe("ConnectionHandlerTest", () => {
       expect(commonPool!.dbConfig.database).toBe("test/db/common.sqlite3");
     } finally {
       Base.configurations(prevConfigs);
-      DatabaseTasks.env = prevEnv;
+      setEnv("TRAILS_ENV", previousEnv);
     }
   });
 
@@ -191,8 +189,8 @@ describe("ConnectionHandlerTest", () => {
   });
 
   it("establish connection using 3 level config defaults to default env primary db", async () => {
-    const previousEnv = DatabaseTasks.env;
-    DatabaseTasks.env = "default_env";
+    const previousEnv = getEnv("TRAILS_ENV");
+    setEnv("TRAILS_ENV", "default_env");
     const config = {
       default_env: {
         primary: { adapter: "sqlite3", database: "test/db/primary.sqlite3" },
@@ -213,14 +211,14 @@ describe("ConnectionHandlerTest", () => {
       );
     } finally {
       Base.configurations(prevConfigs);
-      DatabaseTasks.env = previousEnv;
+      setEnv("TRAILS_ENV", previousEnv);
       await restoreWorkerConnection();
     }
   });
 
   it("establish connection using 2 level config defaults to default env primary db", async () => {
-    const previousEnv = DatabaseTasks.env;
-    DatabaseTasks.env = "default_env";
+    const previousEnv = getEnv("TRAILS_ENV");
+    setEnv("TRAILS_ENV", "default_env");
     const config = {
       default_env: { adapter: "sqlite3", database: "test/db/primary.sqlite3" },
       another_env: { adapter: "sqlite3", database: "test/db/bad-primary.sqlite3" },
@@ -235,7 +233,7 @@ describe("ConnectionHandlerTest", () => {
       );
     } finally {
       Base.configurations(prevConfigs);
-      DatabaseTasks.env = previousEnv;
+      setEnv("TRAILS_ENV", previousEnv);
       await restoreWorkerConnection();
     }
   });

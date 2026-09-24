@@ -1,3 +1,4 @@
+import { Nodes } from "../namespaces.js";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
 import type { NodeOrValue } from "./binary.js";
@@ -57,3 +58,10 @@ type _WindowPredications = import("../window-predications.js").WindowPredication
 type _FilterPredications = import("../filter-predications.js").FilterPredicationsModule;
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Function extends _WindowPredications, _FilterPredications {}
+
+Nodes.Function = Function;
+Nodes.Exists = Exists;
+Nodes.Sum = Sum;
+Nodes.Max = Max;
+Nodes.Min = Min;
+Nodes.Avg = Avg;

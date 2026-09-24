@@ -1,3 +1,4 @@
+import { Nodes } from "../namespaces.js";
 import { Ordering } from "./ordering.js";
 
 export class Ascending extends Ordering {
@@ -28,3 +29,5 @@ export class Ascending extends Ordering {
 
 import { Descending } from "./descending.js";
 import { NullsFirst, NullsLast } from "./ordering.js";
+
+Nodes.Ascending = Ascending;

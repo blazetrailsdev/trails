@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Base } from "./base.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
-import { DatabaseTasks } from "./tasks/database-tasks.js";
 import { assertEmpty } from "@blazetrails/activesupport";
 
 describe("ShardsKeysTest", () => {
@@ -16,15 +15,12 @@ describe("ShardsKeysTest", () => {
   class ShardedModel extends ShardedBase {}
 
   let prevConfigs: DatabaseConfigurations;
-  let prevDefaultEnv: string;
 
   let baselinePools: Set<unknown>;
 
   beforeEach(async () => {
     baselinePools = new Set(Base.connectionHandler.connectionPoolList("all"));
     prevConfigs = Base.configurations();
-    prevDefaultEnv = DatabaseTasks.env;
-    DatabaseTasks.env = "default_env";
     vi.stubEnv("TRAILS_ENV", "default_env");
     Base.configurations({
       default_env: {
@@ -56,7 +52,6 @@ describe("ShardsKeysTest", () => {
       });
     }
     Base.configurations(prevConfigs);
-    DatabaseTasks.env = prevDefaultEnv;
     (Base as any)._shardKeys = undefined;
     vi.unstubAllEnvs();
   });

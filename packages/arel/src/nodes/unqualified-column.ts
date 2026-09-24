@@ -1,3 +1,4 @@
+import { Nodes } from "../namespaces.js";
 import { Unary } from "./unary.js";
 
 export class UnqualifiedColumn extends Unary {
@@ -17,3 +18,5 @@ export class UnqualifiedColumn extends Unary {
     return (this.expr as { name: unknown })?.name;
   }
 }
+
+Nodes.UnqualifiedColumn = UnqualifiedColumn;

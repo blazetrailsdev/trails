@@ -1,3 +1,4 @@
+import { Nodes } from "../namespaces.js";
 import { Binary, NodeOrValue } from "./binary.js";
 import type { Node } from "./node.js";
 import { buildQuoted } from "./casted.js";
@@ -18,3 +19,6 @@ export class Matches extends Binary {
 }
 
 export class DoesNotMatch extends Matches {}
+
+Nodes.Matches = Matches;
+Nodes.DoesNotMatch = DoesNotMatch;

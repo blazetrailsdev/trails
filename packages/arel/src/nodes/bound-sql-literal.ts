@@ -1,3 +1,4 @@
+import { Nodes } from "../namespaces.js";
 import { ArgumentError, rbEqual, rbHash } from "@blazetrails/activesupport";
 import { rbInspect } from "@blazetrails/ruby-compat";
 import { arelNode } from "../arel.js";
@@ -90,3 +91,5 @@ export class BoundSqlLiteral extends NodeExpression {
 type _AliasPredication = import("../alias-predication.js").AliasPredicationModule;
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
 export interface BoundSqlLiteral extends _AliasPredication {}
+
+Nodes.BoundSqlLiteral = BoundSqlLiteral;
