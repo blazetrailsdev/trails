@@ -118,7 +118,6 @@ export { SchemaStatements } from "./connection-adapters/abstract/schema-statemen
 export { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
 export type { SchemaSource, IndexInfo } from "./schema-dumper.js";
 export type { Column } from "./connection-adapters/column.js";
-export type { IntrospectedTable, GenerateModelsOptions } from "./model-codegen.js";
 export {
   ActiveRecordError,
   SubclassNotFound,

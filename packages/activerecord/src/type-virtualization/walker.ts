@@ -29,14 +29,7 @@ export interface EnumCall {
   options: RecordLiteral;
 }
 
-export interface DefineEnumCall {
-  kind: "defineEnum";
-  attr: string;
-  values: string[];
-  options: RecordLiteral;
-}
-
-export type RuntimeCall = AttributeCall | AssociationCall | ScopeCall | EnumCall | DefineEnumCall;
+export type RuntimeCall = AttributeCall | AssociationCall | ScopeCall | EnumCall;
 
 /** @internal */
 export interface IncludeCall {
@@ -78,33 +71,25 @@ export function walk(sourceFile: ts.SourceFile, opts: WalkOptions = {}): ClassIn
   };
   visit(sourceFile);
 
-  const visitDefineEnum = (node: ts.Node): void => {
+  const visitModelEnum = (node: ts.Node): void => {
     if (ts.isExpressionStatement(node)) {
       const call = node.expression;
       if (
         ts.isCallExpression(call) &&
-        ts.isIdentifier(call.expression) &&
-        call.expression.text === "defineEnum"
+        ts.isPropertyAccessExpression(call.expression) &&
+        ts.isIdentifier(call.expression.expression) &&
+        call.expression.name.text === "enum"
       ) {
-        const [targetArg, attrArg, mapArg, optsArg] = call.arguments;
-        const targetName = targetArg && ts.isIdentifier(targetArg) ? targetArg.text : null;
-        const values = mapArg ? readEnumValues(mapArg) : null;
-        if (targetName && attrArg && ts.isStringLiteralLikeNode(attrArg) && values) {
-          const info = resolveLexicalClassInfo(out, node, targetName);
-          if (info) {
-            info.calls.push({
-              kind: "defineEnum",
-              attr: attrArg.text,
-              values,
-              options: readRecordLiteral(optsArg),
-            });
-          }
+        const enumCall = readEnumCall(call);
+        if (enumCall) {
+          const info = resolveLexicalClassInfo(out, node, call.expression.expression.text);
+          if (info) info.calls.push(enumCall);
         }
       }
     }
-    node.forEachChild(visitDefineEnum);
+    node.forEachChild(visitModelEnum);
   };
-  visitDefineEnum(sourceFile);
+  visitModelEnum(sourceFile);
 
   recordMergedInterfaceMembers(sourceFile, out);
 
@@ -171,12 +156,7 @@ function buildClassInfo(cls: ts.ClassDeclaration, sourceFile: ts.SourceFile): Cl
     if (ts.isClassStaticBlockDeclaration(member)) {
       for (const s of member.body.statements) {
         const call = readThisCall(s);
-        if (call) {
-          info.calls.push(call);
-          continue;
-        }
-        const defineEnumCall = readDefineEnumThisCall(s);
-        if (defineEnumCall) info.calls.push(defineEnumCall);
+        if (call) info.calls.push(call);
       }
     }
   }
@@ -249,25 +229,6 @@ function recordExistingMember(m: ts.ClassElement, info: ClassInfo): void {
   ) {
     info.tableName = m.initializer.text;
   }
-}
-
-function readDefineEnumThisCall(stmt: ts.Statement): DefineEnumCall | null {
-  if (!ts.isExpressionStatement(stmt)) return null;
-  const call = stmt.expression;
-  if (!ts.isCallExpression(call)) return null;
-  if (!ts.isIdentifier(call.expression) || call.expression.text !== "defineEnum") return null;
-  const [targetArg, attrArg, mapArg, optsArg] = call.arguments;
-  if (!targetArg || targetArg.kind !== ts.SyntaxKind.ThisKeyword) return null;
-  if (!attrArg || !ts.isStringLiteralLikeNode(attrArg)) return null;
-  if (!mapArg) return null;
-  const values = readEnumValues(mapArg);
-  if (!values) return null;
-  return {
-    kind: "defineEnum",
-    attr: attrArg.text,
-    values,
-    options: readRecordLiteral(optsArg),
-  };
 }
 
 function readThisCall(stmt: ts.Statement): RuntimeCall | null {

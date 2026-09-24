@@ -6,8 +6,6 @@ import {
   Relation,
   collectionProxyFor as association,
 } from "@blazetrails/activerecord";
-import { defineEnum } from "@blazetrails/activerecord/enum";
-
 class User extends Base {
   declare name: string;
   declare email: string;
@@ -128,13 +126,12 @@ class Article extends Base {
 
   static {
     this.attribute("status", "integer");
-    defineEnum(this, "status", { draft: 0, published: 1 });
+    this.enum("status", { draft: 0, published: 1 });
   }
 }
 
 export function _defineEnumOptionsTypecheck(): void {
-  defineEnum(
-    Article,
+  Article.enum(
     "status",
     { draft: 0, published: 1 },
     {

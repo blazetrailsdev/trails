@@ -494,14 +494,14 @@ describe("virtualize — multiple classes", () => {
     expect(text).toContain("declare gadgets:");
   });
 
-  test("materializes standalone defineEnum(Model, ...) nested in a function body", () => {
+  test("materializes standalone Model.enum(...) nested in a function body", () => {
     const src =
       'describe("nested enum", () => {\n' +
       '  it("works", () => {\n' +
       "    class Post extends Base {\n" +
       '      static { this.attribute("status", "integer"); }\n' +
       "    }\n" +
-      '    defineEnum(Post, "status", { draft: 0, published: 1 });\n' +
+      '    Post.enum("status", { draft: 0, published: 1 });\n' +
       "  });\n" +
       "});\n";
     const { text } = virtualize(src, "file.ts");
@@ -516,7 +516,7 @@ describe("virtualize — multiple classes", () => {
       "    class Post extends Base {\n" +
       '      static { this.attribute("status", "integer"); }\n' +
       "    }\n" +
-      '    defineEnum(Post, "status", { draft: 0 });\n' +
+      '    Post.enum("status", { draft: 0 });\n' +
       "  });\n" +
       '  it("b", () => {\n' +
       "    class Post extends Base {\n" +

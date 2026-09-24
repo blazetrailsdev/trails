@@ -26,16 +26,6 @@ interface EnumInstanceHost {
   writeAttribute(name: string, value: unknown): void;
 }
 
-/** @noRailsEquivalent CONVERGEABLE converge-model-mixin-plumbing-surface-remainder */
-export function defineEnum(
-  modelClass: typeof Base,
-  attribute: string,
-  valuesInput: string[] | Record<string, string | number | boolean | null>,
-  options?: EnumMacroOptions,
-): void {
-  _enum.call(modelClass, attribute, valuesInput, options);
-}
-
 export class EnumType extends ValueType<string> {
   /** @internal */
   readonly name: string;

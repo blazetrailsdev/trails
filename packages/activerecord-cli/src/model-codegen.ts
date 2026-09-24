@@ -1,7 +1,6 @@
-import type { ForeignKeyDefinition } from "./connection-adapters/abstract/schema-definitions.js";
+import { Base, type ForeignKeyDefinition } from "@blazetrails/activerecord";
 import { classify, pluralize, singularize, tableize, underscore } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/date";
-import { ActiveRecord } from "./namespaces.js";
 
 export interface IntrospectedTable {
   name: string;
@@ -32,7 +31,6 @@ interface PlannedClass {
   leadingComments: string[];
 }
 
-/** @noRailsEquivalent CONVERGEABLE converge-model-mixin-plumbing-surface-remainder */
 export function unqualify(tableName: string): string {
   const parts: string[] = [];
   let current = "";
@@ -67,7 +65,6 @@ function unquoteIdentifier(id: string): string {
   return id;
 }
 
-/** @noRailsEquivalent CONVERGEABLE converge-model-mixin-plumbing-surface-remainder */
 export function generateModels(
   tables: IntrospectedTable[],
   opts: GenerateModelsOptions = {},
@@ -75,10 +72,9 @@ export function generateModels(
   const { stripPrefix, stripSuffix, noHeader, sourceHint } = opts;
   const now = opts.now ?? Temporal.Now.instant();
 
-  const base = ActiveRecord.Base;
   const builtinIgnore = new Set([
-    `${base.tableNamePrefix}${base.schemaMigrationsTableName}${base.tableNameSuffix}`,
-    `${base.tableNamePrefix}${base.internalMetadataTableName}${base.tableNameSuffix}`,
+    `${Base.tableNamePrefix}${Base.schemaMigrationsTableName}${Base.tableNameSuffix}`,
+    `${Base.tableNamePrefix}${Base.internalMetadataTableName}${Base.tableNameSuffix}`,
   ]);
   const hasNoPk = (pk: string | string[] | null): boolean =>
     pk === null || (Array.isArray(pk) && pk.length === 0);

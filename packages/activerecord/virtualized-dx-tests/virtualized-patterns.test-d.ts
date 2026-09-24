@@ -6,8 +6,6 @@ import {
   Relation,
   collectionProxyFor,
 } from "@blazetrails/activerecord";
-import { defineEnum } from "../src/enum.js";
-
 class User extends Base {
   static {
     this.attribute("name", "string");
@@ -63,7 +61,7 @@ class Task extends Base {
 class Article extends Base {
   static {
     this.attribute("status", "integer");
-    defineEnum(this, "status", { draft: 0, published: 1 });
+    this.enum("status", { draft: 0, published: 1 });
   }
 }
 

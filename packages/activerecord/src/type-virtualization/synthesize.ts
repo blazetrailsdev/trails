@@ -9,7 +9,6 @@ import type {
   AttributeCall,
   ScopeCall,
   EnumCall,
-  DefineEnumCall,
 } from "./walker.js";
 import { tsTypeFor } from "./type-registry.js";
 
@@ -263,8 +262,6 @@ function renderCall(
       return renderScope(info, call);
     case "enum":
       return renderEnum(info, call);
-    case "defineEnum":
-      return renderEnum(info, call);
   }
 }
 
@@ -329,7 +326,7 @@ function renderScope(info: ClassInfo, call: ScopeCall): RenderedLine[] {
   ];
 }
 
-function renderEnum(info: ClassInfo, call: EnumCall | DefineEnumCall): RenderedLine[] {
+function renderEnum(info: ClassInfo, call: EnumCall): RenderedLine[] {
   const out: RenderedLine[] = [];
   const { prefix, suffix } = readPrefixSuffix(call.options, call.attr);
   for (const value of call.values) {

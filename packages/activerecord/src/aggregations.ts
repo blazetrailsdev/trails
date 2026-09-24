@@ -1,6 +1,7 @@
 import type { Base } from "./base.js";
 import { addAggregateReflection, create } from "./reflection.js";
-import { assertValidKeys, camelize, constantize } from "@blazetrails/activesupport";
+import { assertValidKeys, camelize, constantize, isPlainObject } from "@blazetrails/activesupport";
+import { ArgumentError } from "@blazetrails/activemodel";
 import { include, isModuleIncluded, Module } from "@blazetrails/ruby-compat";
 
 export const Aggregations = new Module();
@@ -137,43 +138,36 @@ function writerMethod(
   Object.defineProperty(this.prototype, name, {
     enumerable: existing?.enumerable ?? false,
     get: existing?.get,
-    set(this: Base, value: unknown): void {
+    set(this: Base, part: unknown): void {
       const klass = resolveClass(className);
       const cache: Map<string, unknown> = (this as any)._aggregationCache;
-      if ((value === null || value === undefined) && allowNil === true) {
-        for (const [modelAttr] of mapping) this.writeAttribute(modelAttr, null);
-        cache.set(name, null);
-        return;
+
+      if (!(part instanceof klass || converter == null || part == null)) {
+        part = converter(part);
       }
-      if (value instanceof klass) {
-        for (const [modelAttr, valueAttr] of mapping)
-          this.writeAttribute(modelAttr, value[valueAttr]);
+
+      const hashFromMultiparameterAssignment =
+        isPlainObject(part) && Object.keys(part).every((key) => /^\d+$/.test(key));
+      if (hashFromMultiparameterAssignment) {
+        const keys = Object.keys(part as object).map(Number);
+        if (keys.length !== Math.max(...keys)) throw new ArgumentError();
+        part = new klass(
+          ...keys.sort((a, b) => a - b).map((key) => (part as Record<number, unknown>)[key]),
+        );
+      }
+
+      if (part == null && allowNil) {
+        for (const [key] of mapping) this.writeAttribute(key, null);
+        cache.set(name, null);
+      } else if (part instanceof klass) {
+        for (const [key, value] of mapping) this.writeAttribute(key, part[value]);
         cache.set(
           name,
-          Object.freeze(Object.assign(Object.create(Object.getPrototypeOf(value)), value)),
+          Object.freeze(Object.assign(Object.create(Object.getPrototypeOf(part)), part)),
         );
-        return;
+      } else {
+        _decompose(this, cache, name, mapping, part);
       }
-      if (converter && value != null) {
-        const converted = converter(value);
-        if (converted == null) {
-          for (const [modelAttr] of mapping) this.writeAttribute(modelAttr, null);
-          cache.set(name, null);
-        } else if (converted instanceof klass) {
-          for (const [modelAttr, valueAttr] of mapping)
-            this.writeAttribute(modelAttr, (converted as any)[valueAttr]);
-          cache.set(
-            name,
-            Object.freeze(
-              Object.assign(Object.create(Object.getPrototypeOf(converted)), converted),
-            ),
-          );
-        } else {
-          _decompose(this, cache, name, mapping, converted);
-        }
-        return;
-      }
-      _decompose(this, cache, name, mapping, value);
     },
     configurable: true,
   });

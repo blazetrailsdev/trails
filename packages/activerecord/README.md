@@ -204,7 +204,7 @@ post.update!(status: :published)
 
 ```ts
 // TypeScript / trails
-import { Base, defineEnum } from "@blazetrails/activerecord";
+import { Base } from "@blazetrails/activerecord";
 
 class Post extends Base {
   static {
@@ -212,7 +212,7 @@ class Post extends Base {
     this.hasMany("comments", { dependent: "destroy" });
     this.validates("title", { presence: true });
     this.scope("published", (rel) => rel.where({ published: true }));
-    defineEnum(this, "status", { draft: 0, published: 1, archived: 2 });
+    this.enum("status", { draft: 0, published: 1, archived: 2 });
   }
 }
 
@@ -271,7 +271,7 @@ await Post.createBang({ title: "x" });
 
 Related families that follow the same suffix: `toggleBang`, `incrementBang`,
 `decrementBang`, the `validatesUniqueness`/`validatesPresenceOf` declarations,
-and the enum bang setters from `defineEnum`/`Base.enum`.
+and the enum bang setters from `Base.enum`.
 
 ### 2. Async singular-association loading (`belongsTo` / `hasOne`)
 
