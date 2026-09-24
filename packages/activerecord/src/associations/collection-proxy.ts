@@ -168,14 +168,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   static create<T extends Base = Base>(
-    _model: typeof Base,
-    association: { owner: Base; reflection: AssociationDefinition },
+    model: typeof Base,
+    association: CollectionAssociation,
   ): AssociationProxy<T> {
-    return this._create<T>(
-      association.owner,
-      association.reflection.name,
-      association.reflection,
-    ) as unknown as AssociationProxy<T>;
+    const Ctor = relationClassFor.call(CollectionProxy, model);
+    return new Ctor(model, association) as unknown as AssociationProxy<T>;
   }
 
   /** @internal */
