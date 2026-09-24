@@ -20,6 +20,8 @@ import { Column } from "./column.js";
 import { quoteTableName } from "./quoting.js";
 
 interface SQLite3SchemaAdapter extends DatabaseAdapter {
+  /** @internal */
+  extractValueFromDefault(default_: string | null): unknown;
   addForeignKey(
     fromTable: string,
     toTable: string,
@@ -294,7 +296,7 @@ export function newColumnFromField(
   const dfltValue = (field["dflt_value"] as string | null) ?? null;
   const sqlType = String(field["type"] ?? "");
   const typeMetadata = adapter.fetchTypeMetadata(sqlType) as SqlTypeMetadata;
-  const defaultValue = extractValueFromDefault(dfltValue);
+  const defaultValue = adapter.extractValueFromDefault(dfltValue);
   const generatedType = extractGeneratedType(field);
 
   let defaultFunction: string | null = null;
@@ -396,25 +398,6 @@ export function extractGeneratedType(
       return undefined;
   }
 }
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers-remainder
- */
-export function extractValueFromDefault(dfltValue: string | null): unknown {
-  if (dfltValue === null) return null;
-  if (/^null$/i.test(dfltValue)) return null;
-  const single = /^'([^|]*)'$/m.exec(dfltValue);
-  if (single) return single[1].replace(/''/g, "'");
-  const double = /^"([^|]*)"$/m.exec(dfltValue);
-  if (double) return double[1].replace(/""/g, '"');
-  if (/^-?\d+(\.\d*)?$/.test(dfltValue)) return dfltValue;
-  const hex = /x'(.*)'/.exec(dfltValue);
-  if (hex) return Buffer.from(hex[1], "hex");
-  return null;
-}
-
-export { extractValueFromDefault as _extractValueFromDefault };
 
 function extractDefaultFunction(defaultValue: unknown, dflt: string | null): string | null {
   if (

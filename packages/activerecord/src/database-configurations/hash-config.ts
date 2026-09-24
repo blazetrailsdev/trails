@@ -114,7 +114,7 @@ export class HashConfig extends DatabaseConfig {
     );
   }
 
-  schemaDump(format: "ruby" | "sql" | "ts" = "ts"): string | null {
+  schemaDump(format: "ruby" | "sql" | "ts" | "js" = "ts"): string | null {
     if (
       hasKey(this.configurationHash, "schemaDump") &&
       this.configurationHash.schemaDump !== undefined
@@ -151,6 +151,8 @@ export class HashConfig extends DatabaseConfig {
         return "structure.sql";
       case "ts":
         return "schema.ts";
+      case "js":
+        return "schema.js";
       default:
         return null;
     }

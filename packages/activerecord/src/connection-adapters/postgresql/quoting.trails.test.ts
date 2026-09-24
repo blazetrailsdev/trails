@@ -203,18 +203,7 @@ describe("PostgreSQL quoting", () => {
   });
 
   it("quotedBinary wraps escape_bytea output in SQL quotes", () => {
-    expect(quotedBinary(Buffer.from("ab"))).toBe("'\\x6162'");
-    expect(quotedBinary("ab")).toBe("'\\x6162'");
-  });
-
-  it("quotedBinary hexes an ArrayBuffer view like MySQL/SQLite do", () => {
-    const buffer = new Uint8Array([0x1f, 0x8b]).buffer;
-    expect(quotedBinary(new DataView(buffer))).toBe("'\\x1f8b'");
-  });
-
-  it("quotedBinary hexes a bare ArrayBuffer like MySQL/SQLite do", () => {
-    const buffer = new Uint8Array([0x1f, 0x8b]).buffer;
-    expect(quotedBinary(buffer)).toBe("'\\x1f8b'");
+    expect(quotedBinary(new BinaryData("ab"))).toBe("'\\x6162'");
   });
 
   it("quote(Uint8Array) emits a bytea hex literal via quotedBinary", () => {

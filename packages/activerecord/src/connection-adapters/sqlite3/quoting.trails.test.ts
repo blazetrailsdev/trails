@@ -212,12 +212,13 @@ describe("SQLite3::Quoting", () => {
 
   describe("quotedBinary", () => {
     it("formats as hex literal", () => {
-      expect(quotedBinary(new Uint8Array([0xde, 0xad, 0xbe, 0xef]))).toBe("x'deadbeef'");
+      expect(quotedBinary(new BinaryData(new Uint8Array([0xde, 0xad, 0xbe, 0xef])))).toBe(
+        "x'deadbeef'",
+      );
     });
 
     it("accepts the Type::Binary::Data Rails' quoted_binary is given", () => {
       expect(quotedBinary(new BinaryData(new Uint8Array([0xde, 0xad])))).toBe("x'dead'");
-      expect(quotedBinary(new Uint8Array([0xde, 0xad]).buffer)).toBe("x'dead'");
     });
 
     it("quote(BinaryData) unwraps to bytes via quotedBinary", () => {

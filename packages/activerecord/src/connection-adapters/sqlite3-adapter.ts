@@ -20,7 +20,6 @@ import { type NativeDatabaseTypes } from "./abstract/native-database-types.js";
 import { TableDefinition as SQLite3TableDefinition } from "./sqlite3/schema-definitions.js";
 import {
   dataSourceSql as sqliteDataSourceSql,
-  extractValueFromDefault as sqliteExtractValueFromDefault,
   indexes as sqliteIndexes,
   newColumnFromField,
   validTableDefinitionOptions as sqliteValidTableDefinitionOptions,
@@ -376,18 +375,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return sqliteUnquotedFalse();
   }
 
-  override quotedBinary(value: unknown): string {
-    if (value instanceof BinaryData || value instanceof Uint8Array) {
-      return sqliteQuotedBinary(value);
-    }
-    if (value instanceof ArrayBuffer) {
-      return sqliteQuotedBinary(new Uint8Array(value));
-    }
-    throw new TypeError(
-      `quotedBinary expects a Uint8Array, ArrayBuffer, Buffer, or BinaryData; got ${
-        value === null ? "null" : typeof value
-      }`,
-    );
+  override quotedBinary(value: BinaryData): string {
+    return sqliteQuotedBinary(value);
   }
 
   override supportsDdlTransactions(): boolean {
@@ -974,6 +963,25 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   /** @internal */
+  extractValueFromDefault(default_: string | null): unknown {
+    if (default_ === null) return null;
+    let m: RegExpExecArray | null;
+    if (/^null$/im.test(default_)) {
+      return null;
+    } else if ((m = /^'([^|]*)'$/m.exec(default_))) {
+      return m[1].replace(/''/g, "'");
+    } else if ((m = /^"([^|]*)"$/m.exec(default_))) {
+      return m[1].replace(/""/g, '"');
+    } else if ((m = /^-?\d+(\.\d*)?$/.exec(default_))) {
+      return m[0];
+    } else if ((m = /x'(.*)'/.exec(default_))) {
+      return Buffer.from(m[1], "hex");
+    } else {
+      return null;
+    }
+  }
+
+  /** @internal */
   private newColumnFromField(
     tableName: string,
     field: Record<string, unknown>,
@@ -1468,11 +1476,6 @@ export class StatementPool extends GenericStatementPool<SqliteStatement> {
   protected override dealloc(stmt: SqliteStatement): void | Promise<void> {
     if (!stmt.closed) return stmt.close();
   }
-}
-
-/** @internal */
-function extractValueFromDefault(default_: string | null): unknown {
-  return sqliteExtractValueFromDefault(default_);
 }
 
 /** @internal */

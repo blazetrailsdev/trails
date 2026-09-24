@@ -1,9 +1,4 @@
-import { SqlTypeMetadata, type SqlTypeMetadataJSON } from "../sql-type-metadata.js";
-import { _setMySQLTypeMetadata } from "../type-metadata-slots.js";
-
-export interface TypeMetadataJSON extends SqlTypeMetadataJSON {
-  extra: string | null;
-}
+import { SqlTypeMetadata } from "../sql-type-metadata.js";
 
 export class TypeMetadata extends SqlTypeMetadata {
   readonly extra: string | null;
@@ -26,5 +21,3 @@ export class TypeMetadata extends SqlTypeMetadata {
     return other instanceof TypeMetadata && super.equals(other) && this.extra === other.extra;
   }
 }
-
-_setMySQLTypeMetadata(TypeMetadata);

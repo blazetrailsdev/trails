@@ -12,11 +12,7 @@
  *   typed-error path that mirrors the abstract dispatcher.
  */
 
-import {
-  typeCast as abstractTypeCast,
-  toBytes,
-  type QuotingDispatchHost,
-} from "../abstract/quoting.js";
+import { typeCast as abstractTypeCast, type QuotingDispatchHost } from "../abstract/quoting.js";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Rational, rbObjAsString as toS } from "@blazetrails/ruby-compat";
 import { BigDecimal, TimeWithZone } from "@blazetrails/activesupport";
@@ -57,19 +53,8 @@ export interface EscapeState {
   noBackslashEscapes: boolean;
 }
 
-export function quotedBinary(
-  value: Buffer | Uint8Array | ArrayBuffer | string | BinaryData,
-): string {
-  const bytes = toBytes(value);
-  if (bytes) {
-    return `x'${Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString("hex")}'`;
-  }
-  if (typeof value === "string") return `x'${Buffer.from(value, "binary").toString("hex")}'`;
-  throw new TypeError(
-    `quotedBinary expects a Uint8Array, ArrayBuffer, Buffer, string, or BinaryData; got ${
-      value === null ? "null" : typeof value
-    }`,
-  );
+export function quotedBinary(value: BinaryData): string {
+  return `x'${value.hex()}'`;
 }
 
 export function unquoteIdentifier(identifier: string | null | undefined): string | null {

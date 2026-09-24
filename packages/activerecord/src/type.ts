@@ -14,7 +14,6 @@ export { ValueType } from "@blazetrails/activemodel";
 import { ActiveRecord } from "./namespaces.js";
 import { AdapterSpecificRegistry } from "./type/adapter-specific-registry.js";
 import type { AdapterName } from "./connection-adapters/abstract-adapter.js";
-import { adapterNameFromConfig } from "./connection-adapters/abstract-adapter.js";
 
 import { Date } from "./type/date.js";
 import { DateTime } from "./type/date-time.js";
@@ -113,7 +112,7 @@ export function defaultValue(): ValueType {
 }
 
 export function adapterNameFrom(model: AdapterNameSource): AdapterName {
-  return adapterNameFromConfig(model.connectionDbConfig()!.adapter);
+  return model.connectionDbConfig()!.adapter as AdapterName;
 }
 
 /** @internal */

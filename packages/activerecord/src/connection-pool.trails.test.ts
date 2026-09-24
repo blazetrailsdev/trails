@@ -6,7 +6,7 @@ import { describe, it, expect, vi } from "vitest";
 import { NoMethodError } from "@blazetrails/activemodel";
 import { Reaper } from "./connection-adapters/abstract/connection-pool/reaper.js";
 import { ConnectionPool, NullPool } from "./connection-adapters/abstract/connection-pool.js";
-import { AdapterNotFound, ConnectionNotEstablished } from "./errors.js";
+import { ConnectionNotEstablished } from "./errors.js";
 import { Store } from "./connection-adapters/abstract/query-cache.js";
 import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-handler.js";
 import { PoolConfig } from "./connection-adapters/pool-config.js";
@@ -17,7 +17,6 @@ import { inMemoryDb } from "./support/adapter-helper.js";
 import type { LeasedTestAdapter } from "./test-adapter.js";
 import { fixtures } from "./test-fixtures.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
-import { adapterNameFromConfig } from "./connection-adapters/abstract-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { lazilyLoadSchemaCache, setLazilyLoadSchemaCache } from "./active-record.js";
 
@@ -722,30 +721,6 @@ describe("ConnectionPool schema cache", () => {
     expect(reflection).toBeInstanceOf(SchemaReflection);
     expect((reflection as unknown as { _cachePath: string | null })._cachePath).toBe(
       "db/custom_cache.json",
-    );
-  });
-});
-
-describe("adapterNameFromConfig", () => {
-  it("answers the registered Rails adapter names verbatim", async () => {
-    expect(adapterNameFromConfig("postgresql")).toBe("postgresql");
-    expect(adapterNameFromConfig("mysql2")).toBe("mysql2");
-    expect(adapterNameFromConfig("sqlite3")).toBe("sqlite3");
-  });
-
-  it("answers sqlite3 for the trails-only SQLite drivers", async () => {
-    expect(adapterNameFromConfig("libsql")).toBe("sqlite3");
-    expect(adapterNameFromConfig("node-sqlite")).toBe("sqlite3");
-    expect(adapterNameFromConfig("expo-sqlite")).toBe("sqlite3");
-  });
-
-  it("raises AdapterNotFound for an unregistered adapter", async () => {
-    expect(() => adapterNameFromConfig(undefined)).toThrow(AdapterNotFound);
-    expect(() => adapterNameFromConfig("postgres")).toThrow(
-      "Database configuration specifies nonexistent 'postgres' adapter.",
-    );
-    expect(() => adapterNameFromConfig("unknown")).toThrow(
-      "Database configuration specifies nonexistent 'unknown' adapter.",
     );
   });
 });

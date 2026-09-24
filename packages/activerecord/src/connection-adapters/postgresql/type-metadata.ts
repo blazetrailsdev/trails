@@ -1,11 +1,5 @@
 import { rbHash } from "@blazetrails/ruby-compat";
-import { SqlTypeMetadata, type SqlTypeMetadataJSON } from "../sql-type-metadata.js";
-import { _setPostgreSQLTypeMetadata } from "../type-metadata-slots.js";
-
-export interface TypeMetadataJSON extends SqlTypeMetadataJSON {
-  oid: number | null;
-  fmod: number | null;
-}
+import { SqlTypeMetadata } from "../sql-type-metadata.js";
 
 export class TypeMetadata extends SqlTypeMetadata {
   readonly oid: number | null;
@@ -39,5 +33,3 @@ export class TypeMetadata extends SqlTypeMetadata {
     return rbHash(TypeMetadata) ^ rbHash(super.hash()) ^ rbHash(this.oid) ^ rbHash(this.fmod);
   }
 }
-
-_setPostgreSQLTypeMetadata(TypeMetadata);

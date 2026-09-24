@@ -81,7 +81,7 @@ import {
   newColumnFromField,
   quotedScope,
   tableAliasLength as mysqlTableAliasLength,
-  MysqlSchemaStatements,
+  SchemaStatements,
 } from "./mysql/schema-statements.js";
 import {
   compactBlank,
@@ -145,7 +145,7 @@ const CR_SERVER_GONE_ERROR = 2006;
 const CR_SERVER_LOST = 2013;
 const ER_CLIENT_INTERACTION_TIMEOUT = 4031;
 
-type CreateTableArgs = Parameters<MysqlSchemaStatements["createTable"]>;
+type CreateTableArgs = Parameters<SchemaStatements["createTable"]>;
 type CreateTableOptions = Extract<CreateTableArgs[1], { options?: string }>;
 
 // eslint-disable-next-line no-control-regex
@@ -541,23 +541,6 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
     await this.execute(`ALTER TABLE ${quotedTableName} ${fragment}`);
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers-remainder
-   */
-  async changeColumnDefaultForAlter(
-    tableName: string,
-    columnName: string,
-    defaultOrChanges: unknown,
-  ): Promise<string> {
-    const cd = await this.buildChangeColumnDefaultDefinition(
-      tableName,
-      columnName,
-      defaultOrChanges,
-    );
-    return this.schemaCreation.accept(cd);
-  }
-
   async buildChangeColumnDefaultDefinition(
     tableName: string,
     columnName: string,
@@ -688,8 +671,8 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
     return mysqlCastBoundValue(value);
   }
 
-  quotedBinary(value: unknown): string {
-    return mysqlQuotedBinary(value as Buffer | Uint8Array | ArrayBuffer | string | BinaryData);
+  quotedBinary(value: BinaryData): string {
+    return mysqlQuotedBinary(value);
   }
 
   unquoteIdentifier(identifier: string | null | undefined): string | null {
@@ -1532,10 +1515,7 @@ export interface AbstractMysqlAdapter {
 }
 /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
 
-include(
-  AbstractMysqlAdapter as unknown as new (...args: unknown[]) => unknown,
-  MysqlSchemaStatements,
-);
+include(AbstractMysqlAdapter as unknown as new (...args: unknown[]) => unknown, SchemaStatements);
 AbstractMysqlAdapter.prototype.defaultInsertValue = mysqlDefaultInsertValue;
 AbstractMysqlAdapter.prototype.foreignKeys = mysqlForeignKeys;
 AbstractMysqlAdapter.prototype.newColumnFromField = newColumnFromField;

@@ -137,32 +137,14 @@ describe("MySQL quoting — typeCast", () => {
 });
 
 describe("MySQL quoting — quotedBinary", () => {
-  it("formats a Buffer as hex literal", () => {
-    expect(quotedBinary(Buffer.from([0xde, 0xad, 0xbe, 0xef]))).toBe("x'deadbeef'");
-  });
-
-  it("formats a binary string as hex literal", () => {
-    expect(quotedBinary(Buffer.from("hello").toString("binary"))).toBe("x'68656c6c6f'");
-  });
-
-  it("formats a Uint8Array as hex literal", () => {
-    expect(quotedBinary(new Uint8Array([0xde, 0xad, 0xbe, 0xef]))).toBe("x'deadbeef'");
-  });
-
-  it("formats an ArrayBuffer as hex literal", () => {
-    expect(quotedBinary(new Uint8Array([0xde, 0xad, 0xbe, 0xef]).buffer)).toBe("x'deadbeef'");
-  });
-
   it("formats a byte-offset view over a larger buffer", () => {
-    expect(quotedBinary(new Uint8Array([0x00, 0xde, 0xad, 0x00]).subarray(1, 3))).toBe("x'dead'");
+    expect(
+      quotedBinary(new BinaryData(new Uint8Array([0x00, 0xde, 0xad, 0x00]).subarray(1, 3))),
+    ).toBe("x'dead'");
   });
 
   it("accepts the Type::Binary::Data Rails' quoted_binary is given", () => {
     expect(quotedBinary(new BinaryData(new Uint8Array([0xde, 0xad])))).toBe("x'dead'");
-  });
-
-  it("raises on a non-byte source rather than hexing garbage", () => {
-    expect(() => quotedBinary(42 as unknown as Uint8Array)).toThrow(TypeError);
   });
 });
 

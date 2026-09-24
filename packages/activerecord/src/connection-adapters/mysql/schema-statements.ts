@@ -27,8 +27,7 @@ import type { Result } from "../../result.js";
 type CreateTableArgs = Parameters<BaseSchemaStatements["createTable"]>;
 type CreateTableOptions = Extract<CreateTableArgs[1], { options?: string }>;
 
-/** @noRailsEquivalent CONVERGEABLE converge-adapter-schema-and-result-helper-surface-remainder */
-export class MysqlSchemaStatements extends BaseSchemaStatements {
+export class SchemaStatements extends BaseSchemaStatements {
   override createSchemaDumper(options: Record<string, unknown>): MysqlSchemaDumper {
     return MysqlSchemaDumper.create(
       this as unknown as Parameters<typeof MysqlSchemaDumper.create>[0],
@@ -471,7 +470,7 @@ interface ForeignKeysHost {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers-remainder
+ * @noRailsEquivalent CONVERGEABLE move-mysql-foreign-keys-onto-abstract-mysql-adapter
  */
 export async function foreignKeys(
   this: ForeignKeysHost,

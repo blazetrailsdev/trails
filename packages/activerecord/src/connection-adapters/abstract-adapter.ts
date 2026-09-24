@@ -16,7 +16,6 @@ import {
   Deadlocked,
   LockWaitTimeout,
   NotImplementedError,
-  AdapterNotFound,
 } from "../errors.js";
 import {
   IsolatedExecutionState,
@@ -143,6 +142,7 @@ import {
   DecimalType,
   ArgumentError,
   type ValueType,
+  type BinaryData,
 } from "@blazetrails/activemodel";
 import { Text as TextType } from "../type/text.js";
 import { Date as DateType } from "../type/date.js";
@@ -158,30 +158,6 @@ import {
 import { dbWarningsIgnore } from "../active-record.js";
 
 export type AdapterName = "sqlite3" | "postgresql" | "mysql2";
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers-remainder
- */
-export function adapterNameFromConfig(configAdapter: string | undefined): AdapterName {
-  switch (configAdapter) {
-    case "postgresql":
-      return "postgresql";
-    case "mysql2":
-      return "mysql2";
-    case "sqlite3":
-    case "node-sqlite":
-    case "expo-sqlite":
-    case "libsql":
-    case "libsql-remote":
-    case "libsql-replica":
-      return "sqlite3";
-    default:
-      throw new AdapterNotFound(
-        `Database configuration specifies nonexistent '${configAdapter}' adapter.`,
-      );
-  }
-}
 
 export class Version {
   private _version: number[];
@@ -312,6 +288,12 @@ export interface AbstractAdapter {
     type: ColumnType,
     options?: ColumnOptions,
   ): Promise<string | [string, () => Promise<void>]>;
+  /** @internal */
+  changeColumnDefaultForAlter(
+    tableName: string,
+    columnName: string,
+    defaultOrChanges: unknown,
+  ): Promise<string>;
   /**
    * drift-ok: concrete adapters may return `undefined` (MySQL short-circuits
    * `ifNotExists` when the index already exists), so the declared return type
@@ -952,7 +934,7 @@ export class AbstractAdapter implements Quoting {
     return abstractQuotedTime.call(this, value);
   }
 
-  quotedBinary(value: unknown): string {
+  quotedBinary(value: BinaryData): string {
     return abstractQuotedBinary(value);
   }
 

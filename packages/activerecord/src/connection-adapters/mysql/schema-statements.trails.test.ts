@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "../../base.js";
-import { MysqlSchemaStatements } from "./schema-statements.js";
+import { SchemaStatements } from "./schema-statements.js";
 import {
   Table as MysqlTable,
   TableDefinition as MysqlTableDefinition,
@@ -95,8 +95,8 @@ describe("MySQL::SchemaStatements", () => {
   });
 
   it("validPrimaryKeyOptions includes unsigned and autoIncrement", () => {
-    const opts = MysqlSchemaStatements.prototype.validPrimaryKeyOptions.call(
-      Object.create(MysqlSchemaStatements.prototype) as MysqlSchemaStatements,
+    const opts = SchemaStatements.prototype.validPrimaryKeyOptions.call(
+      Object.create(SchemaStatements.prototype) as SchemaStatements,
     );
     expect(opts).toContain("unsigned");
     expect(opts).toContain("autoIncrement");
@@ -105,7 +105,7 @@ describe("MySQL::SchemaStatements", () => {
 
   it("createTableDefinition returns MySQL TableDefinition", async () => {
     const conn = await Base.leaseConnection();
-    const td = MysqlSchemaStatements.prototype.createTableDefinition.call(conn as never, "users");
+    const td = SchemaStatements.prototype.createTableDefinition.call(conn as never, "users");
     expect(td.name).toBe("users");
     expect(td).toBeInstanceOf(MysqlTableDefinition);
   });
@@ -329,7 +329,7 @@ describe("MySQL::SchemaStatements", () => {
   });
 
   const schemaStatements = (sortOrderSupported = true) =>
-    Object.assign(Object.create(MysqlSchemaStatements.prototype) as MysqlSchemaStatements, {
+    Object.assign(Object.create(SchemaStatements.prototype) as SchemaStatements, {
       supportsIndexSortOrder: async () => sortOrderSupported,
     });
 
@@ -514,7 +514,7 @@ describe("MySQL::SchemaStatements", () => {
   });
 
   const indexHost = (rows: Record<string, unknown>[], sortOrderSupported = true) =>
-    Object.assign(Object.create(MysqlSchemaStatements.prototype) as MysqlSchemaStatements, {
+    Object.assign(Object.create(SchemaStatements.prototype) as SchemaStatements, {
       internalExecQuery: async () => Result.fromRowHashes(rows),
       quoteTableName: (n: string) => `\`${n}\``,
       supportsIndexSortOrder: async () => sortOrderSupported,
@@ -637,7 +637,7 @@ describe("MySQL::SchemaStatements#tableAliasLength", () => {
 
 describe("MysqlSchemaStatements#changeTable", () => {
   it("yields the MySQL Table subclass", async () => {
-    const ss = Object.setPrototypeOf({}, MysqlSchemaStatements.prototype) as MysqlSchemaStatements;
+    const ss = Object.setPrototypeOf({}, SchemaStatements.prototype) as SchemaStatements;
     let yielded: unknown;
     await ss.changeTable("things", (t) => {
       yielded = t;

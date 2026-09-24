@@ -13,7 +13,6 @@ import {
   quoteDefaultExpression as abstractQuoteDefaultExpression,
   type QuotingHost,
   typeCast as abstractTypeCast,
-  toBytes,
   type QuotedTimeValue,
   type QuotingDispatchHost,
 } from "../abstract/quoting.js";
@@ -84,19 +83,8 @@ export function quotedTime(this: QuotingDispatchHost, value: QuotedTimeValue): s
   return this.quotedDate(value).replace(/^\d{4}-\d{2}-\d{2} /, "2000-01-01 ");
 }
 
-export function quotedBinary(value: Uint8Array | ArrayBuffer | BinaryData): string {
-  const bytes = toBytes(value);
-  if (!bytes) {
-    throw new TypeError(
-      `quotedBinary expects a Uint8Array, ArrayBuffer, Buffer, or BinaryData; got ${
-        value === null ? "null" : typeof value
-      }`,
-    );
-  }
-  const hex = Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-  return `x'${hex}'`;
+export function quotedBinary(value: BinaryData): string {
+  return `x'${value.hex()}'`;
 }
 
 export function quoteDefaultExpression(

@@ -45,7 +45,7 @@ const PAIRS = [
   {
     label: "AbstractMysqlAdapter / MySQL::SchemaStatements",
     mixinFile: `${ADAPTERS}mysql/schema-statements.ts`,
-    mixinClass: "MysqlSchemaStatements",
+    mixinClass: "SchemaStatements",
     adapterFile: `${ADAPTERS}abstract-mysql-adapter.ts`,
     adapterInterface: "AbstractMysqlAdapter",
     witness: AbstractMysqlAdapter,

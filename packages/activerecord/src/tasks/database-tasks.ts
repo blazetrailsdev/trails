@@ -140,11 +140,6 @@ export class DatabaseTasks {
     return new ctor(config, ...args);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-adapter-schema-and-result-helper-surface-remainder */
-  static clearRegisteredTasks(): void {
-    this._registeredTasks = [];
-  }
-
   static async create(configuration: HashConfig | string | Record<string, unknown>): Promise<void> {
     const dbConfig = this.resolveConfiguration(configuration);
     const { DatabaseAlreadyExists } = await import("../errors.js");
@@ -358,19 +353,6 @@ export class DatabaseTasks {
     }
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-adapter-schema-and-result-helper-surface-remainder */
-  static dumpSchemaFilename(dbConfig?: HashConfig, format?: SchemaFormat): string {
-    const envSchema = getEnv("SCHEMA");
-    if (envSchema !== undefined) return envSchema;
-    const fmt = format ?? schemaFormat();
-    const ext = fmt === "sql" ? "sql" : fmt;
-    const base = fmt === "sql" ? "structure" : "schema";
-    if (dbConfig && dbConfig.name !== "primary") {
-      return `${this.dbDir}/${dbConfig.name}_${base}.${ext}`;
-    }
-    return `${this.dbDir}/${base}.${ext}`;
-  }
-
   static checkSchemaFile(filename: string): void {
     if (!File.isExist(filename)) {
       let message = `${filename} doesn't exist yet. Run \`bin/rails db:migrate\` to create it, then try again.`;
@@ -563,25 +545,14 @@ export class DatabaseTasks {
     return structureLoadFlags;
   }
 
-  static schemaDumpPath(dbConfig?: HashConfig, format?: SchemaFormat): string | null {
+  static schemaDumpPath(
+    dbConfig: HashConfig,
+    format: SchemaFormat = schemaFormat(),
+  ): string | null {
     const envSchema = getEnv("SCHEMA");
     if (envSchema !== undefined) return envSchema;
 
-    const rawCfg = (dbConfig as unknown as { configurationHash?: Record<string, unknown> })
-      ?.configurationHash;
-    const hasExplicitSchemaDump =
-      rawCfg != null && Object.hasOwn(rawCfg, "schemaDump") && rawCfg["schemaDump"] !== undefined;
-
-    if (!hasExplicitSchemaDump) {
-      return this.dumpSchemaFilename(dbConfig, format);
-    }
-
-    const cfgWithDump = dbConfig as unknown as { schemaDump?: (format?: string) => string | null };
-    if (typeof cfgWithDump?.schemaDump !== "function") {
-      return this.dumpSchemaFilename(dbConfig, format);
-    }
-    const fmt = (format ?? schemaFormat()) === "js" ? "ts" : (format ?? schemaFormat());
-    const filename = cfgWithDump.schemaDump(fmt);
+    const filename = dbConfig.schemaDump(format);
     if (filename == null) return null;
 
     if (File.dirname(filename) === this.dbDir) return filename;
@@ -997,17 +968,6 @@ function _errorToS(error: unknown): string {
 export function isVerbose(): boolean {
   const v = getEnv("VERBOSE");
   return v !== undefined ? v !== "false" : true;
-}
-
-/** @noRailsEquivalent CONVERGEABLE converge-adapter-schema-and-result-helper-surface-remainder */
-export function metadataTableNames(): Set<string> {
-  const base = ActiveRecord.Base;
-  const prefix = base.tableNamePrefix;
-  const suffix = base.tableNameSuffix;
-  return new Set([
-    `${prefix}${base.schemaMigrationsTableName}${suffix}`,
-    `${prefix}${base.internalMetadataTableName}${suffix}`,
-  ]);
 }
 
 /** @internal */

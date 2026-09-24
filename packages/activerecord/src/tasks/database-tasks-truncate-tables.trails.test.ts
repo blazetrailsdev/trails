@@ -7,6 +7,7 @@ import { DatabaseTasks } from "./database-tasks.js";
 import "./sqlite-database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { Base } from "../base.js";
+import { clearRegisteredTasks } from "../test-helpers/registered-tasks.js";
 
 describe("DatabaseTasksTruncateTablesTest", () => {
   const created: string[] = [];
@@ -38,7 +39,7 @@ describe("DatabaseTasksTruncateTablesTest", () => {
     await seed.execute("INSERT INTO schema_migrations (version) VALUES ('1')");
     await seed.disconnectBang();
 
-    DatabaseTasks.clearRegisteredTasks();
+    clearRegisteredTasks();
     DatabaseTasks.registerTask(/sqlite/, class {});
     await DatabaseTasks.truncateTables(config);
 

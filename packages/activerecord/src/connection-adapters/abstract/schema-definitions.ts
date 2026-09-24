@@ -12,27 +12,7 @@ import {
 import { ArgumentError } from "@blazetrails/activemodel";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { ActiveRecord } from "../../namespaces.js";
-import { wrap } from "@blazetrails/activesupport";
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers-remainder
- */
-export function splitColumnNames(
-  args: unknown[],
-  columnType: string,
-): { names: string[]; options: ColumnOptions } {
-  const rest = [...args];
-  const last = rest[rest.length - 1];
-  const options =
-    typeof last === "object" && last !== null
-      ? (rest.pop() as ColumnOptions)
-      : ({} as ColumnOptions);
-  if (rest.length === 0) {
-    throw new ArgumentError(`Missing column name(s) for ${columnType}`);
-  }
-  return { names: rest as string[], options };
-}
+import { extractOptionsBang, wrap } from "@blazetrails/activesupport";
 
 export type ColumnType =
   | "string"
@@ -1061,7 +1041,9 @@ export class Table {
 
   /** @internal */
   protected async definedColumn(type: ColumnType, args: unknown[]): Promise<void> {
-    const { names, options } = splitColumnNames(args, type);
+    const names = [...args] as string[];
+    const options = extractOptionsBang(names) as ColumnOptions;
+    if (names.length === 0) throw new ArgumentError(`Missing column name(s) for ${type}`);
     for (const name of names) {
       await this.column(name, type, options);
     }
@@ -1141,12 +1123,6 @@ export class Table {
   async numeric(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
   async numeric(...args: unknown[]): Promise<void> {
     await this.definedColumn("decimal", args);
-  }
-  /** @noRailsEquivalent CONVERGEABLE converge-adapter-schema-and-result-helper-surface-remainder */
-  async char(...names: string[]): Promise<void>;
-  async char(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
-  async char(...args: unknown[]): Promise<void> {
-    await this.definedColumn("char", args);
   }
   async virtual(...names: string[]): Promise<void>;
   async virtual(
