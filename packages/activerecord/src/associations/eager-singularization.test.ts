@@ -8,41 +8,63 @@ describe("EagerSingularizationTest", () => {
   fixtures([]);
 
   beforeAll(async () => {
-    await Base.connection.createTable("viri", { force: true }, (t) => {
+    await (
+      await Base.leaseConnection()
+    ).createTable("viri", { force: true }, (t) => {
       t.integer("octopus_id");
       t.string("species");
     });
-    await Base.connection.createTable("octopi", { force: true }, (t) => {
+    await (
+      await Base.leaseConnection()
+    ).createTable("octopi", { force: true }, (t) => {
       t.string("species");
     });
-    await Base.connection.createTable("passes", { force: true }, (t) => {
+    await (
+      await Base.leaseConnection()
+    ).createTable("passes", { force: true }, (t) => {
       t.integer("bus_id");
       t.integer("rides");
     });
-    await Base.connection.createTable("buses", { force: true }, (t) => {
+    await (
+      await Base.leaseConnection()
+    ).createTable("buses", { force: true }, (t) => {
       t.string("name");
     });
-    await Base.connection.createTable("crises_messes", { id: false, force: true }, (t) => {
+    await (
+      await Base.leaseConnection()
+    ).createTable("crises_messes", { id: false, force: true }, (t) => {
       t.integer("crisis_id");
       t.integer("mess_id");
     });
-    await Base.connection.createTable("messes", { force: true }, (t) => {
+    await (
+      await Base.leaseConnection()
+    ).createTable("messes", { force: true }, (t) => {
       t.string("name");
     });
-    await Base.connection.createTable("crises", { force: true }, (t) => {
+    await (
+      await Base.leaseConnection()
+    ).createTable("crises", { force: true }, (t) => {
       t.string("name");
     });
-    await Base.connection.createTable("successes", { force: true }, (t) => {
+    await (
+      await Base.leaseConnection()
+    ).createTable("successes", { force: true }, (t) => {
       t.string("name");
     });
-    await Base.connection.createTable("analyses", { force: true }, (t) => {
+    await (
+      await Base.leaseConnection()
+    ).createTable("analyses", { force: true }, (t) => {
       t.integer("crisis_id");
       t.integer("success_id");
     });
-    await Base.connection.createTable("dresses", { force: true }, (t) => {
+    await (
+      await Base.leaseConnection()
+    ).createTable("dresses", { force: true }, (t) => {
       t.integer("crisis_id");
     });
-    await Base.connection.createTable("compresses", { force: true }, (t) => {
+    await (
+      await Base.leaseConnection()
+    ).createTable("compresses", { force: true }, (t) => {
       t.integer("dress_id");
     });
   });

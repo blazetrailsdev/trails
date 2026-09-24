@@ -36,18 +36,26 @@ describe("DJAS routing widening — nested-through", () => {
   }
 
   beforeAll(async () => {
-    await Base.connection.createTable("nt_authors", { force: true }, (t: any) => {
+    await (
+      await Base.leaseConnection()
+    ).createTable("nt_authors", { force: true }, (t: any) => {
       t.string("name");
     });
-    await Base.connection.createTable("nt_posts", { force: true }, (t: any) => {
+    await (
+      await Base.leaseConnection()
+    ).createTable("nt_posts", { force: true }, (t: any) => {
       t.integer("nt_author_id");
       t.string("title");
     });
-    await Base.connection.createTable("nt_comments", { force: true }, (t: any) => {
+    await (
+      await Base.leaseConnection()
+    ).createTable("nt_comments", { force: true }, (t: any) => {
       t.integer("nt_post_id");
       t.string("body");
     });
-    await Base.connection.createTable("nt_ratings", { force: true }, (t: any) => {
+    await (
+      await Base.leaseConnection()
+    ).createTable("nt_ratings", { force: true }, (t: any) => {
       t.integer("nt_comment_id");
       t.integer("value");
     });

@@ -17,7 +17,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   let connection: PostgreSQLAdapter;
 
   beforeEach(async () => {
-    connection = Base.connection as PostgreSQLAdapter;
+    connection = (await Base.leaseConnection()) as PostgreSQLAdapter;
     await connection.execute("DROP TABLE IF EXISTS xml_data_type");
     await connection.execute(`CREATE TABLE xml_data_type (id SERIAL PRIMARY KEY, payload xml)`);
     void XmlDataType.resetColumnInformation();

@@ -33,10 +33,14 @@ describe("DJAS — composite key support", () => {
   }
 
   beforeAll(async () => {
-    await Base.connection.createTable("ck_shops", { force: true }, (t: any) => {
+    await (
+      await Base.leaseConnection()
+    ).createTable("ck_shops", { force: true }, (t: any) => {
       t.string("name");
     });
-    await Base.connection.createTable(
+    await (
+      await Base.leaseConnection()
+    ).createTable(
       "ck_orders",
       { primaryKey: ["shop_id", "order_number"], force: true },
       (t: any) => {
@@ -45,7 +49,9 @@ describe("DJAS — composite key support", () => {
         t.string("name");
       },
     );
-    await Base.connection.createTable("ck_line_items", { force: true }, (t: any) => {
+    await (
+      await Base.leaseConnection()
+    ).createTable("ck_line_items", { force: true }, (t: any) => {
       t.integer("ck_order_shop_id");
       t.integer("ck_order_number");
       t.string("sku");

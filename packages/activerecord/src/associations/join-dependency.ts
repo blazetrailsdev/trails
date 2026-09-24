@@ -126,9 +126,7 @@ export class JoinDependency {
   private _baseTableAliasLength(): number | undefined {
     let connection;
     try {
-      connection =
-        (this._baseModel as any).connectionPool().activeConnection ??
-        (this._baseModel as any).connection;
+      connection = (this._baseModel as any).connectionPool().withConnectionSync((c: unknown) => c);
     } catch (error) {
       if (error instanceof ConnectionNotDefined) return undefined;
       throw error;

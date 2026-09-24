@@ -1857,7 +1857,7 @@ describe("EagerAssociationTest", () => {
   });
 
   it("eager association loading with belongs to and conditions string with quoted table name", async () => {
-    const quotedPostsId = Comment.connection.quoteTableName("posts.id");
+    const quotedPostsId = (await Comment.leaseConnection()).quoteTableName("posts.id");
     expect(() =>
       Comment.all()
         .includes(":post")
@@ -1873,7 +1873,7 @@ describe("EagerAssociationTest", () => {
   });
 
   it("eager association loading with belongs to and order string with quoted table name", async () => {
-    const quotedPostsId = Comment.connection.quoteTableName("posts.id");
+    const quotedPostsId = (await Comment.leaseConnection()).quoteTableName("posts.id");
     await assertNothingRaised(() =>
       Comment.all().includes(":post").references("posts").order(quotedPostsId).toArray(),
     );
@@ -2681,7 +2681,7 @@ describe("EagerAssociationTest", () => {
     });
     const sql = sqls[sqls.length - 1];
 
-    const conn = Base.connection;
+    const conn = await Base.leaseConnection();
     const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const quotedBlogId = escape(conn.quoteTableName("sharded_comments.blog_id"));
     const quotedBlogPostId = escape(conn.quoteTableName("sharded_comments.blog_post_id"));

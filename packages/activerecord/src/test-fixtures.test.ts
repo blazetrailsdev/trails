@@ -237,8 +237,10 @@ describe("useFixtures by registry name", () => {
     const david = authors("david");
     expect(Number(david.id)).toBe(1);
     const [row] = (
-      await Base.connection.selectAll(
-        `SELECT name FROM ${Base.connection.quoteTableName(Author.tableName)} WHERE id = 1`,
+      await (
+        await Base.leaseConnection()
+      ).selectAll(
+        `SELECT name FROM ${(await Base.leaseConnection()).quoteTableName(Author.tableName)} WHERE id = 1`,
       )
     ).toArray();
     expect((row as { name: string }).name).toBe("David");
@@ -250,14 +252,18 @@ describe("useFixtures by registry name", () => {
 
   it("resolves cross-fixture ref() to the target fixture's declared id", async () => {
     const [a] = (
-      await Base.connection.selectAll(
-        `SELECT author_address_id FROM ${Base.connection.quoteTableName(Author.tableName)} WHERE id = 1`,
+      await (
+        await Base.leaseConnection()
+      ).selectAll(
+        `SELECT author_address_id FROM ${(await Base.leaseConnection()).quoteTableName(Author.tableName)} WHERE id = 1`,
       )
     ).toArray();
     expect(Number((a as { author_address_id: unknown }).author_address_id)).toBe(1);
     const [p] = (
-      await Base.connection.selectAll(
-        `SELECT author_id FROM ${Base.connection.quoteTableName(Post.tableName)} WHERE id = 1`,
+      await (
+        await Base.leaseConnection()
+      ).selectAll(
+        `SELECT author_id FROM ${(await Base.leaseConnection()).quoteTableName(Post.tableName)} WHERE id = 1`,
       )
     ).toArray();
     expect(Number((p as { author_id: unknown }).author_id)).toBe(1);
@@ -265,9 +271,9 @@ describe("useFixtures by registry name", () => {
 
   it("isolation part 1 — a delete lands within the test", async () => {
     expect(await Author.count()).toBe(3);
-    await Base.connection.execute(
-      `DELETE FROM ${Base.connection.quoteTableName(Author.tableName)}`,
-    );
+    await (
+      await Base.leaseConnection()
+    ).execute(`DELETE FROM ${(await Base.leaseConnection()).quoteTableName(Author.tableName)}`);
     expect(await Author.count()).toBe(0);
   });
 
@@ -298,8 +304,10 @@ describe("useFixtures seeds HABTM join tables (no model class)", () => {
   it("seeds every label-less join row (HABTM rows carry no id/label column)", async () => {
     expect(categoriesPosts.all().length).toBe(8);
     const [{ n }] = (
-      await Base.connection.selectAll(
-        `SELECT COUNT(*) AS n FROM ${Base.connection.quoteTableName("categories_posts")}`,
+      await (
+        await Base.leaseConnection()
+      ).selectAll(
+        `SELECT COUNT(*) AS n FROM ${(await Base.leaseConnection()).quoteTableName("categories_posts")}`,
       )
     ).toArray() as [{ n: number }];
     expect(Number(n)).toBe(8);
@@ -309,13 +317,17 @@ describe("useFixtures seeds HABTM join tables (no model class)", () => {
     for (const row of categoriesPosts.all()) {
       const r = row as { category_id: number; post_id: number };
       const [cat] = (
-        await Base.connection.selectAll(
-          `SELECT id FROM ${Base.connection.quoteTableName("categories")} WHERE id = ${r.category_id}`,
+        await (
+          await Base.leaseConnection()
+        ).selectAll(
+          `SELECT id FROM ${(await Base.leaseConnection()).quoteTableName("categories")} WHERE id = ${r.category_id}`,
         )
       ).toArray();
       const [post] = (
-        await Base.connection.selectAll(
-          `SELECT id FROM ${Base.connection.quoteTableName("posts")} WHERE id = ${r.post_id}`,
+        await (
+          await Base.leaseConnection()
+        ).selectAll(
+          `SELECT id FROM ${(await Base.leaseConnection()).quoteTableName("posts")} WHERE id = ${r.post_id}`,
         )
       ).toArray();
       expect(cat, `category_id ${r.category_id} must reference a real Category`).toBeDefined();
@@ -362,8 +374,10 @@ describe("useFixtures auto-stamps NOT NULL timestamps", () => {
   it("fills created_at/updated_at for a row that omits them", async () => {
     const id = people("michael").id;
     const [row] = (
-      await Base.connection.selectAll(
-        `SELECT created_at, updated_at FROM ${Base.connection.quoteTableName("people")} WHERE id = ${id}`,
+      await (
+        await Base.leaseConnection()
+      ).selectAll(
+        `SELECT created_at, updated_at FROM ${(await Base.leaseConnection()).quoteTableName("people")} WHERE id = ${id}`,
       )
     ).toArray();
     const r = row as { created_at: unknown; updated_at: unknown };
@@ -380,8 +394,10 @@ describe("useFixtures with a string primary key", () => {
     const luke = subscribers("first");
     expect(luke.readAttribute("nick")).toBe("alterself");
     const [row] = (
-      await Base.connection.selectAll(
-        `SELECT name FROM ${Base.connection.quoteTableName("subscribers")} WHERE nick = 'alterself'`,
+      await (
+        await Base.leaseConnection()
+      ).selectAll(
+        `SELECT name FROM ${(await Base.leaseConnection()).quoteTableName("subscribers")} WHERE nick = 'alterself'`,
       )
     ).toArray();
     expect((row as { name: string }).name).toBe("Luke Holden");
@@ -400,8 +416,10 @@ describe("useFixtures reconciles the PK column against the schema", () => {
     expect(special.readAttribute("ID")).not.toBeNull();
     expect(special.readAttribute("ID")).not.toBeUndefined();
     const [row] = (
-      await Base.connection.selectAll(
-        `SELECT name FROM ${Base.connection.quoteTableName("bulbs")} WHERE ${Base.connection.quoteColumnName("ID")} = ${special.readAttribute("ID")}`,
+      await (
+        await Base.leaseConnection()
+      ).selectAll(
+        `SELECT name FROM ${(await Base.leaseConnection()).quoteTableName("bulbs")} WHERE ${(await Base.leaseConnection()).quoteColumnName("ID")} = ${special.readAttribute("ID")}`,
       )
     ).toArray();
     expect((row as { name: string }).name).toBe("special");
@@ -416,9 +434,9 @@ describe("useFixtures reconciles the PK column against the schema", () => {
     const m = mateys("blackbeard_to_redbeard");
     expect(m.readAttribute("weight")).toBe(10);
     const rows = (
-      await Base.connection.selectAll(
-        `SELECT weight FROM ${Base.connection.quoteTableName("mateys")}`,
-      )
+      await (
+        await Base.leaseConnection()
+      ).selectAll(`SELECT weight FROM ${(await Base.leaseConnection()).quoteTableName("mateys")}`)
     ).toArray();
     expect(rows.length).toBe(1);
   });
@@ -471,8 +489,10 @@ describe("useFixtures resolves STI subclasses on standalone load", () => {
 
   it("resolves the subclass-only `breed` enum via the row's STI class", async () => {
     const [row] = (
-      await Base.connection.selectAll(
-        `SELECT breed FROM ${Base.connection.quoteTableName("parrots")} WHERE name = 'Curious George'`,
+      await (
+        await Base.leaseConnection()
+      ).selectAll(
+        `SELECT breed FROM ${(await Base.leaseConnection()).quoteTableName("parrots")} WHERE name = 'Curious George'`,
       )
     ).toArray() as { breed: number }[];
     expect(row.breed).toBe(1);
@@ -560,8 +580,10 @@ describe("fixtures() loads multiple same-table fixture sets in one call", () => 
 
   it("inserts both sets' rows into the shared table", async () => {
     const rows = (
-      await Base.connection.selectAll(
-        `SELECT name FROM ${Base.connection.quoteTableName("parrots")} ORDER BY name`,
+      await (
+        await Base.leaseConnection()
+      ).selectAll(
+        `SELECT name FROM ${(await Base.leaseConnection()).quoteTableName("parrots")} ORDER BY name`,
       )
     ).toArray() as { name: string }[];
     const names = rows.map((r) => r.name);

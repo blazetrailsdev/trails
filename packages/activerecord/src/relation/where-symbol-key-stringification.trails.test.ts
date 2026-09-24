@@ -18,8 +18,8 @@ describe("a leading-colon where key", () => {
     );
   });
 
-  it("keys where.associated off a class_name association whose name is not its table", () => {
-    const conn = Post.connection;
+  it("keys where.associated off a class_name association whose name is not its table", async () => {
+    const conn = await Post.leaseConnection();
     const sql = Post.where().associated("firstComment").toSql();
     const qualified = `${conn.quoteTableName("firstComment")}.${conn.quoteColumnName("id")}`;
     expect(sql).toContain(`${qualified} IS NOT NULL`);

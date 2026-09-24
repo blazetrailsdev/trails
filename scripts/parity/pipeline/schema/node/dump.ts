@@ -166,7 +166,7 @@ async function main(): Promise<void> {
     // Base.removeConnection() only drops the pool reference; the adapter (and
     // its better-sqlite3 handle) may still be open, causing EBUSY on Windows.
     try {
-      const a = Base.connection as { close?: () => void };
+      const a = (await Base.leaseConnection()) as { close?: () => void };
       if (typeof a.close === "function") a.close();
     } catch {
       /* adapter unavailable or already closed */

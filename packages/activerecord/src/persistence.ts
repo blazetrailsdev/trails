@@ -686,9 +686,8 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
   applyDefaultAndGlobalConstraints(um as never, ctor as never);
 
   const adapter =
-    (connectionPool.call(ctor as unknown as typeof import("./base.js").Base).activeConnection as
-      | typeof ctor.connection
-      | null) ?? ctor.connection;
+    (connectionPool.call(ctor as unknown as typeof import("./base.js").Base)
+      .activeConnection as Awaited<typeof ctor.connection> | null) ?? (await ctor.connection);
   const affectedRows = await adapter.update(um, "Update Columns");
 
   const clearer = this as unknown as { clearAttributeChange?(name: string): void };

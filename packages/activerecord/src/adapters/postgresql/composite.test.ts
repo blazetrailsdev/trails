@@ -66,7 +66,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     }
 
     beforeEach(async () => {
-      connection = Base.connection as PostgreSQLAdapter;
+      connection = (await Base.leaseConnection()) as PostgreSQLAdapter;
       await setupCompositeType();
       void PostgresqlComposite.resetColumnInformation();
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -113,7 +113,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("PostgresqlCompositeWithCustomOidTest", () => {
     beforeEach(async () => {
-      connection = Base.connection as PostgreSQLAdapter;
+      connection = (await Base.leaseConnection()) as PostgreSQLAdapter;
       await setupCompositeType();
       connection.typeMap.registerType("full_address", new FullAddressType());
       void PostgresqlComposite.resetColumnInformation();

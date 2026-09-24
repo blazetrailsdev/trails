@@ -24,7 +24,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   let VirtualColumn: any;
 
   beforeAll(async () => {
-    adapter = Base.connection as PostgreSQLAdapter;
+    adapter = (await Base.leaseConnection()) as PostgreSQLAdapter;
     await adapter.execute(`DROP TABLE IF EXISTS virtual_columns`);
     await adapter.createTable("virtual_columns", (t) => {
       t.string("name");

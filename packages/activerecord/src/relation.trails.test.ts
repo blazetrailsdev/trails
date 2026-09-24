@@ -518,8 +518,8 @@ describe("Relation#arel build_arel convergence", () => {
     }
   }
 
-  const arelSql = (rel: any) => {
-    const conn = Widget.connection as any;
+  const arelSql = async (rel: any) => {
+    const conn = (await Widget.leaseConnection()) as any;
     const wasPreparedStatements = conn.preparedStatements;
     conn.preparedStatements = false;
     try {
@@ -530,42 +530,42 @@ describe("Relation#arel build_arel convergence", () => {
   };
   const placeholderSql = (rel: any) => rel.toSql();
 
-  it("arel carries joins, group, and having", () => {
+  it("arel carries joins, group, and having", async () => {
     const rel = Widget.joins(
       `INNER JOIN "widgets" AS "w2" ON "w2"."category" = "widgets"."category"`,
     )
       .group("category")
       .having("COUNT(*) > 1");
-    const sql = arelSql(rel);
+    const sql = await arelSql(rel);
     expect(sql).toContain('INNER JOIN "widgets" AS "w2"');
     expect(sql).toContain("GROUP BY");
     expect(sql).toContain("HAVING");
     expect(sql).toBe(placeholderSql(rel));
   });
 
-  it("arel carries a from-subquery", () => {
+  it("arel carries a from-subquery", async () => {
     const rel = Widget.from(Widget.where({ category: "fruit" }), "widgets");
-    const sql = arelSql(rel);
+    const sql = await arelSql(rel);
     expect(sql).toContain("FROM (SELECT");
     expect(sql).toBe(placeholderSql(rel));
   });
 
-  it("arel carries a CTE", () => {
+  it("arel carries a CTE", async () => {
     const rel = Widget.with({ cheap: Widget.where({ category: "fruit" }) }).where("1 = 1");
-    const sql = arelSql(rel);
+    const sql = await arelSql(rel);
     expect(sql).toContain("WITH");
     expect(sql).toMatch(/["`]cheap["`]/);
     expect(sql).toBe(placeholderSql(rel));
   });
 
-  it("arel carries lock", () => {
+  it("arel carries lock", async () => {
     const rel = Widget.all().lock("FOR UPDATE");
-    expect(arelSql(rel)).toBe(placeholderSql(rel));
+    expect(await arelSql(rel)).toBe(placeholderSql(rel));
   });
 
-  it("arel of an eager relation projects normal columns, not join-dependency aliases", () => {
+  it("arel of an eager relation projects normal columns, not join-dependency aliases", async () => {
     const rel = Gadget.eagerLoad(":widget").select(Gadget.arelTable.get("id"));
-    const sql = Gadget.connection.toSql(rel.arel().ast);
+    const sql = (await Gadget.leaseConnection()).toSql(rel.arel().ast);
     expect(sql).not.toMatch(/t\d+_r\d+/);
     expect(sql).toMatch(/SELECT\s+["`]gadgets["`]\.["`]id["`]/);
   });

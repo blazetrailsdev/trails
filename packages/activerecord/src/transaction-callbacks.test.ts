@@ -460,7 +460,7 @@ describe("TransactionCallbacksTest", () => {
       afterHistory.push("after_rollback");
     });
 
-    const adapter = Topic.connection as any;
+    const adapter = (await Topic.leaseConnection()) as any;
     const spy = vi.spyOn(adapter, "releaseSavepoint").mockImplementationOnce(async () => {
       throw new Error("commit failed");
     });

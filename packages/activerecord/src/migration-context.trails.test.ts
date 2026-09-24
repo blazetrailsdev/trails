@@ -147,7 +147,7 @@ describe("MigrationContext connected surface", () => {
   let context: MigrationContext;
 
   beforeEach(async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     const schemaMigration = new SchemaMigration(adapter.pool);
     await schemaMigration.createTable();
     await schemaMigration.deleteAllVersions();
@@ -159,7 +159,7 @@ describe("MigrationContext connected surface", () => {
   });
 
   afterEach(async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     for (const table of ["people_reminders", "reminders"]) {
       await adapter.dropTable(table, { ifExists: true });
     }
@@ -213,7 +213,7 @@ describe("MigrationContext connected surface", () => {
   });
 
   it("migrate with no target runs every migration, and a lower target runs down", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
 
     await context.migrate();
     expect(await context.getAllVersions()).toEqual([1, 2, 3]);

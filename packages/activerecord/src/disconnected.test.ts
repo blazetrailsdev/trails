@@ -12,8 +12,8 @@ describe.skipIf(inMemoryDb())("TestDisconnectedAdapter", () => {
 
   let connection: AbstractAdapter;
 
-  beforeEach(() => {
-    connection = Base.connection;
+  beforeEach(async () => {
+    connection = await Base.leaseConnection();
   });
 
   function rawConnection(conn: AbstractAdapter): unknown {

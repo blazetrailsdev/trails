@@ -734,7 +734,7 @@ describe("UniquenessValidationWithIndexTest", () => {
   });
 
   beforeEach(async () => {
-    const connection = Base.connection;
+    const connection = await Base.leaseConnection();
     connection.internalSchemaCache.clearDataSourceCacheBang(
       connection.pool ?? connection,
       "topics",
@@ -745,12 +745,16 @@ describe("UniquenessValidationWithIndexTest", () => {
 
   afterEach(async () => {
     Topic.clearValidatorsBang();
-    await Base.connection.removeIndex("topics", { name: "topics_index", ifExists: true });
+    await (
+      await Base.leaseConnection()
+    ).removeIndex("topics", { name: "topics_index", ifExists: true });
   });
 
   it("new record", async () => {
     Topic.validatesUniquenessOf("title");
-    await Base.connection.addIndex("topics", "title", { unique: true, name: "topics_index" });
+    await (
+      await Base.leaseConnection()
+    ).addIndex("topics", "title", { unique: true, name: "topics_index" });
 
     const t = new Topic({ title: "abc" });
     await assertQueriesCount(1, false, async () => {
@@ -760,7 +764,9 @@ describe("UniquenessValidationWithIndexTest", () => {
 
   it("changing non unique attribute", async () => {
     Topic.validatesUniquenessOf("title");
-    await Base.connection.addIndex("topics", "title", { unique: true, name: "topics_index" });
+    await (
+      await Base.leaseConnection()
+    ).addIndex("topics", "title", { unique: true, name: "topics_index" });
 
     const t = await Topic.createBang({ title: "abc" });
     t.writeAttribute("author_name", "John");
@@ -771,7 +777,9 @@ describe("UniquenessValidationWithIndexTest", () => {
 
   it("changing unique attribute", async () => {
     Topic.validatesUniquenessOf("title");
-    await Base.connection.addIndex("topics", "title", { unique: true, name: "topics_index" });
+    await (
+      await Base.leaseConnection()
+    ).addIndex("topics", "title", { unique: true, name: "topics_index" });
 
     const t = await Topic.createBang({ title: "abc" });
     t.writeAttribute("title", "abc v2");
@@ -782,7 +790,9 @@ describe("UniquenessValidationWithIndexTest", () => {
 
   it("changing non unique attribute and unique attribute is nil", async () => {
     Topic.validatesUniquenessOf("title");
-    await Base.connection.addIndex("topics", "title", { unique: true, name: "topics_index" });
+    await (
+      await Base.leaseConnection()
+    ).addIndex("topics", "title", { unique: true, name: "topics_index" });
 
     const t = await Topic.createBang({});
     expect(t.readAttribute("title")).toBeNull();
@@ -798,7 +808,9 @@ describe("UniquenessValidationWithIndexTest", () => {
         return this.where().not({ author_name: null });
       },
     });
-    await Base.connection.addIndex("topics", "title", { unique: true, name: "topics_index" });
+    await (
+      await Base.leaseConnection()
+    ).addIndex("topics", "title", { unique: true, name: "topics_index" });
 
     const t = await Topic.createBang({ title: "abc" });
     t.writeAttribute("title", "abc v2");
@@ -809,7 +821,9 @@ describe("UniquenessValidationWithIndexTest", () => {
 
   it("case sensitive", async () => {
     Topic.validatesUniquenessOf("title", { caseSensitive: true });
-    await Base.connection.addIndex("topics", "title", { unique: true, name: "topics_index" });
+    await (
+      await Base.leaseConnection()
+    ).addIndex("topics", "title", { unique: true, name: "topics_index" });
 
     const t = await Topic.createBang({ title: "abc" });
     t.writeAttribute("title", "abc v2");
@@ -820,7 +834,9 @@ describe("UniquenessValidationWithIndexTest", () => {
 
   itIfSupports("partial_index", "partial index", async () => {
     Topic.validatesUniquenessOf("title");
-    await Base.connection.addIndex("topics", "title", {
+    await (
+      await Base.leaseConnection()
+    ).addIndex("topics", "title", {
       unique: true,
       where: "approved",
       name: "topics_index",
@@ -835,7 +851,7 @@ describe("UniquenessValidationWithIndexTest", () => {
 
   it("non unique index", async () => {
     Topic.validatesUniquenessOf("title");
-    await Base.connection.addIndex("topics", "title", { name: "topics_index" });
+    await (await Base.leaseConnection()).addIndex("topics", "title", { name: "topics_index" });
 
     const t = await Topic.createBang({ title: "abc" });
     t.writeAttribute("author_name", "John");
@@ -846,7 +862,9 @@ describe("UniquenessValidationWithIndexTest", () => {
 
   it("scope", async () => {
     Topic.validatesUniquenessOf("title", { scope: "author_name" });
-    await Base.connection.addIndex("topics", ["author_name", "title"], {
+    await (
+      await Base.leaseConnection()
+    ).addIndex("topics", ["author_name", "title"], {
       unique: true,
       name: "topics_index",
     });
@@ -864,7 +882,9 @@ describe("UniquenessValidationWithIndexTest", () => {
   });
 
   it("uniqueness on relation", async () => {
-    await Base.connection.addIndex("topics", "parent_id", {
+    await (
+      await Base.leaseConnection()
+    ).addIndex("topics", "parent_id", {
       unique: true,
       name: "topics_index",
     });
@@ -898,7 +918,9 @@ describe("UniquenessValidationWithIndexTest", () => {
 
   it("index of sublist of columns", async () => {
     Topic.validatesUniquenessOf("title", { scope: "author_name" });
-    await Base.connection.addIndex("topics", "author_name", {
+    await (
+      await Base.leaseConnection()
+    ).addIndex("topics", "author_name", {
       unique: true,
       name: "topics_index",
     });
@@ -917,7 +939,9 @@ describe("UniquenessValidationWithIndexTest", () => {
 
   it("index of columns list and extra columns", async () => {
     Topic.validatesUniquenessOf("title");
-    await Base.connection.addIndex("topics", ["title", "author_name"], {
+    await (
+      await Base.leaseConnection()
+    ).addIndex("topics", ["title", "author_name"], {
       unique: true,
       name: "topics_index",
     });
@@ -931,7 +955,9 @@ describe("UniquenessValidationWithIndexTest", () => {
 
   it.skipIf(adapterType !== "postgres")("expression index", async () => {
     Topic.validatesUniquenessOf("title");
-    await Base.connection.addIndex("topics", "LOWER(title)", {
+    await (
+      await Base.leaseConnection()
+    ).addIndex("topics", "LOWER(title)", {
       unique: true,
       name: "topics_index",
     });

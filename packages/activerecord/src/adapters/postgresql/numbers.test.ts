@@ -16,7 +16,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   let connection: PostgreSQLAdapter;
 
   beforeEach(async () => {
-    connection = Base.connection as PostgreSQLAdapter;
+    connection = (await Base.leaseConnection()) as PostgreSQLAdapter;
     await connection.execute("DROP TABLE IF EXISTS postgresql_numbers");
     await connection.execute(
       `CREATE TABLE postgresql_numbers (id SERIAL PRIMARY KEY, single REAL, double DOUBLE PRECISION)`,

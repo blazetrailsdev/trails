@@ -212,10 +212,12 @@ describeIfPg("PostgreSQLAdapter", () => {
     }
   };
   beforeAll(async () => {
-    defaultSearchPath = await (Base.connection as PostgreSQLAdapter).schemaSearchPath();
+    defaultSearchPath = await (
+      (await Base.leaseConnection()) as PostgreSQLAdapter
+    ).schemaSearchPath();
   });
   beforeEach(async () => {
-    adapter = Base.connection as PostgreSQLAdapter;
+    adapter = (await Base.leaseConnection()) as PostgreSQLAdapter;
   });
   afterEach(async () => {
     await adapter.setSchemaSearchPath(defaultSearchPath);

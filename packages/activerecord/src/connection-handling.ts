@@ -5,7 +5,7 @@ import type { ConnectionPool } from "./connection-adapters/abstract/connection-p
 import type { HashConfig } from "./database-configurations/hash-config.js";
 import { DatabaseConfig } from "./database-configurations/database-config.js";
 import { resolve as resolveConnectionAdapter } from "./connection-adapters.js";
-import { NotImplementedError, ActiveRecordError, ConnectionNotEstablished } from "./errors.js";
+import { NotImplementedError, ActiveRecordError } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
   connectedToStack,
@@ -328,7 +328,7 @@ const CONNECTION_DEPRECATION_MSG =
   "Either use `with_connection` or `lease_connection`.";
 
 /** @deprecated */
-export function connection(this: typeof Base): DatabaseAdapter {
+export async function connection(this: typeof Base): Promise<DatabaseAdapter> {
   const pool = connectionPool.call(this);
   if (pool.isPermanentLease()) {
     const setting = permanentConnectionCheckout();
@@ -337,17 +337,10 @@ export function connection(this: typeof Base): DatabaseAdapter {
     } else if (setting === "disallowed") {
       throw new ActiveRecordError(CONNECTION_DEPRECATION_MSG);
     }
-    const connection = pool.activeConnection;
-    if (!connection) {
-      throw new ConnectionNotEstablished(
-        "No connection is leased for this execution context. " +
-          "Await `lease_connection` or use `with_connection` first.",
-      );
-    }
-    void pool.leaseConnection();
-    return connection;
+    return pool.leaseConnection();
+  } else {
+    return pool.activeConnection!;
   }
-  return pool.activeConnection!;
 }
 
 export function isPrimaryClass(this: typeof Base): boolean {

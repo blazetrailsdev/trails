@@ -701,13 +701,15 @@ describe("DirtyTest", () => {
       static tableName = "testings";
     };
     try {
-      await Base.connection.createTable("testings", { force: true }, (t) => {
+      await (
+        await Base.leaseConnection()
+      ).createTable("testings", { force: true }, (t) => {
         t.string("field");
       });
       await Testings.loadSchema();
       expect(() => new Testings().attributes).not.toThrow();
     } finally {
-      await Base.connection.dropTable("testings", { ifExists: true });
+      await (await Base.leaseConnection()).dropTable("testings", { ifExists: true });
     }
   });
 

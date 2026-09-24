@@ -22,7 +22,7 @@ describe("DateTimePrecisionTest", () => {
   let adapter: DatabaseAdapter;
 
   beforeEach(async () => {
-    adapter = Base.connection;
+    adapter = await Base.leaseConnection();
   });
   afterEach(async () => {
     await adapter.dropTable("foos", { ifExists: true });

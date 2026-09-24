@@ -41,7 +41,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   let PostgresqlRangesTz: any;
 
   beforeEach(async () => {
-    adapter = Base.connection as PostgreSQLAdapter;
+    adapter = (await Base.leaseConnection()) as PostgreSQLAdapter;
     await adapter.execute(`DROP TABLE IF EXISTS postgresql_ranges`);
     await adapter.execute(`DROP TYPE IF EXISTS floatrange`);
     await adapter.execute(`DROP TYPE IF EXISTS stringrange`);

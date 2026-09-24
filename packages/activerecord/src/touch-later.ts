@@ -38,7 +38,7 @@ export async function touchLater(this: Base, ...names: string[]): Promise<void> 
   self._touchTime = currentTimeFromProperTimezone();
   surreptitiouslyTouch.call(this, self._deferTouchAttrs as string[]);
 
-  const adapter = ctor.connection as any;
+  const adapter = (await ctor.connection) as any;
   const hasAddRecord = typeof adapter?.addTransactionRecord === "function";
   const currentTx =
     typeof adapter?.currentTransaction === "function" ? adapter.currentTransaction() : null;

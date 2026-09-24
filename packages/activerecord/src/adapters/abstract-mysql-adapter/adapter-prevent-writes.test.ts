@@ -11,7 +11,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
   let conn: Mysql2Adapter;
   beforeAll(async () => {
-    conn = Base.connection as Mysql2Adapter;
+    conn = (await Base.leaseConnection()) as Mysql2Adapter;
     await conn.getDatabaseVersion();
   });
 

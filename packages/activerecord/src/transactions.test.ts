@@ -1606,7 +1606,7 @@ describe("TransactionTest", () => {
   });
 
   it("transaction rollback with primarykeyless tables", async () => {
-    const connection = Base.connection as any;
+    const connection = (await Base.leaseConnection()) as any;
     await connection.createTable(
       "transaction_without_primary_keys",
       { force: true, id: false },

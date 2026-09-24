@@ -29,7 +29,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
 
   beforeEach(async (ctx) => {
-    adapter = Base.connection as PostgreSQLAdapter;
+    adapter = (await Base.leaseConnection()) as PostgreSQLAdapter;
 
     await adapter.execute("DROP FOREIGN TABLE IF EXISTS foreign_professors");
     await adapter.execute("DROP SERVER IF EXISTS foreign_server CASCADE");

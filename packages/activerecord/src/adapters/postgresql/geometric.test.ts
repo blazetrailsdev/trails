@@ -13,7 +13,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
-    adapter = Base.connection as PostgreSQLAdapter;
+    adapter = (await Base.leaseConnection()) as PostgreSQLAdapter;
   });
 
   describe("PostgreSQLPointTest", () => {

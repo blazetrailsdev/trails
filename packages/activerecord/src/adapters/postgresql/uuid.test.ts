@@ -37,7 +37,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
 
   beforeAll(async () => {
-    adapter = Base.connection as PostgreSQLAdapter;
+    adapter = (await Base.leaseConnection()) as PostgreSQLAdapter;
     await adapter.enableExtension("uuid-ossp");
     supportsPgcryptoUuid = await adapter.supportsPgcryptoUuid();
     if (supportsPgcryptoUuid) await adapter.enableExtension("pgcrypto");

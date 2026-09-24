@@ -178,7 +178,7 @@ function timeToA(time: any): unknown[] {
   ];
 }
 
-describe("BasicsTest", () => {
+describe("BasicsTest", async () => {
   const { topics, posts, authors, developers, cpkBooks } = fixtures([
     "topics",
     "companies",
@@ -213,7 +213,7 @@ describe("BasicsTest", () => {
 
     await Topic.resetColumnInformation();
 
-    const adapter = Topic.connection as any;
+    const adapter = (await Topic.leaseConnection()) as any;
     vi.spyOn(adapter, "internalSchemaCache", "get").mockImplementation(() => {
       throw new RuntimeError("Some Error");
     });
@@ -223,8 +223,8 @@ describe("BasicsTest", () => {
     expect(((await Topic.first()) as any).content).toEqual(payload);
   });
 
-  it("column names are escaped", () => {
-    const conn = Base.connection as any;
+  it("column names are escaped", async () => {
+    const conn = (await Base.leaseConnection()) as any;
     const badchar = adapterType === "mysql" ? "`" : '"';
 
     const quoted = conn.quoteColumnName(`foo${badchar}bar`);
@@ -798,7 +798,7 @@ describe("BasicsTest", () => {
   });
 
   it("create without prepared statement", async () => {
-    const topic = await (Topic.connection as any).unpreparedStatement(() =>
+    const topic = await ((await Topic.leaseConnection()) as any).unpreparedStatement(() =>
       Topic.create({ title: "foo" }),
     );
 
@@ -807,7 +807,7 @@ describe("BasicsTest", () => {
 
   it("destroy without prepared statement", async () => {
     const topic = (await Topic.create({ title: "foo" })) as any;
-    await (Topic.connection as any).unpreparedStatement(async () => {
+    await ((await Topic.leaseConnection()) as any).unpreparedStatement(async () => {
       await ((await Topic.find(topic.id)) as any).destroy();
     });
 
@@ -1441,30 +1441,30 @@ describe("BasicsTest", () => {
     expect(CpkModel.sequenceName).toBeNull();
   });
 
-  const QUOTED_TYPE = () => (Base.connection as any).quoteColumnName("type");
+  const QUOTED_TYPE = async () => ((await Base.leaseConnection()) as any).quoteColumnName("type");
 
   it("count with join", async () => {
     const res = await Post.countBySql(
-      `SELECT COUNT(*) FROM posts LEFT JOIN comments ON posts.id=comments.post_id WHERE posts.${QUOTED_TYPE()} = 'Post'`,
+      `SELECT COUNT(*) FROM posts LEFT JOIN comments ON posts.id=comments.post_id WHERE posts.${await QUOTED_TYPE()} = 'Post'`,
     );
-    const res2 = await Post.where(`posts.${QUOTED_TYPE()} = 'Post'`)
+    const res2 = await Post.where(`posts.${await QUOTED_TYPE()} = 'Post'`)
       .joins("LEFT JOIN comments ON posts.id=comments.post_id")
       .count();
     expect(res2).toEqual(res);
 
     const res4 = await Post.countBySql(
-      `SELECT COUNT(p.id) FROM posts p, comments co WHERE p.${QUOTED_TYPE()} = 'Post' AND p.id=co.post_id`,
+      `SELECT COUNT(p.id) FROM posts p, comments co WHERE p.${await QUOTED_TYPE()} = 'Post' AND p.id=co.post_id`,
     );
-    const res5 = await Post.where(`p.${QUOTED_TYPE()} = 'Post' AND p.id=co.post_id`)
+    const res5 = await Post.where(`p.${await QUOTED_TYPE()} = 'Post' AND p.id=co.post_id`)
       .joins("p, comments co")
       .select("p.id")
       .count();
     expect(res5).toEqual(res4);
 
     const res6 = await Post.countBySql(
-      `SELECT COUNT(DISTINCT p.id) FROM posts p, comments co WHERE p.${QUOTED_TYPE()} = 'Post' AND p.id=co.post_id`,
+      `SELECT COUNT(DISTINCT p.id) FROM posts p, comments co WHERE p.${await QUOTED_TYPE()} = 'Post' AND p.id=co.post_id`,
     );
-    const res7 = await Post.where(`p.${QUOTED_TYPE()} = 'Post' AND p.id=co.post_id`)
+    const res7 = await Post.where(`p.${await QUOTED_TYPE()} = 'Post' AND p.id=co.post_id`)
       .joins("p, comments co")
       .select("p.id")
       .distinct()
@@ -1552,7 +1552,8 @@ describe("BasicsTest", () => {
   });
 
   it("assert queries count", async () => {
-    const query = () => (Base.connection as any).execute("select count(*) from developers");
+    const query = async () =>
+      ((await Base.leaseConnection()) as any).execute("select count(*) from developers");
     await assertQueriesCount(2, false, async () => {
       for (let i = 0; i < 2; i++) await query();
     });
@@ -1595,7 +1596,7 @@ describe("BasicsTest", () => {
   });
 
   it("clear cache!", async () => {
-    const conn = Base.connection;
+    const conn = await Base.leaseConnection();
     let cache = conn.internalSchemaCache;
     const c1 = await cache.columns(conn.pool, "posts");
     expect(cache.size).not.toBe(0);
@@ -1693,7 +1694,7 @@ describe("BasicsTest", () => {
   });
 
   it.skipIf(adapterType !== "postgres")("column types on queries on postgresql", async () => {
-    const result = await (Base.connection as any).execQuery("SELECT 1 AS test");
+    const result = await ((await Base.leaseConnection()) as any).execQuery("SELECT 1 AS test");
     expect(result.columnTypes["test"].constructor).toEqual(IntegerType);
   });
 
@@ -1733,7 +1734,7 @@ describe("BasicsTest", () => {
   });
 
   it("ignored columns are not present in columns_hash", async () => {
-    const conn = Base.connection;
+    const conn = await Base.leaseConnection();
     const cacheColumns = await conn.internalSchemaCache.columnsHash(conn.pool, Developer.tableName);
     expect(Object.keys(cacheColumns ?? {})).toContain("first_name");
     expect(Object.keys(Developer.columnsHash())).not.toContain("first_name");

@@ -420,8 +420,8 @@ describe("TransactionInstrumentationTest", () => {
         },
       );
       await Topic.transaction(async () => {
-        await Base.connection.materializeTransactions();
-        await Base.connection.reconnectBang({ restoreTransactions: true });
+        await (await Base.leaseConnection()).materializeTransactions();
+        await (await Base.leaseConnection()).reconnectBang({ restoreTransactions: true });
       });
 
       expect(events.length).toBe(2);
@@ -517,7 +517,9 @@ describe("TransactionInstrumentationTest", () => {
 
       const error = class extends Error {};
       vi.spyOn(
-        Base.connection as unknown as Required<Pick<DatabaseStatementsHost, "commitDbTransaction">>,
+        (await Base.leaseConnection()) as unknown as Required<
+          Pick<DatabaseStatementsHost, "commitDbTransaction">
+        >,
         "commitDbTransaction",
       ).mockImplementationOnce(async () => {
         throw new error();
@@ -549,9 +551,11 @@ describe("TransactionInstrumentationTest", () => {
       );
 
       const error = class extends Error {};
-      vi.spyOn(Base.connection, "rollbackDbTransaction").mockImplementationOnce(async () => {
-        throw new error();
-      });
+      vi.spyOn(await Base.leaseConnection(), "rollbackDbTransaction").mockImplementationOnce(
+        async () => {
+          throw new error();
+        },
+      );
       await expect(
         Base.transaction(async () => {
           await topic.update({ title: "Ruby on Rails" });
@@ -576,11 +580,12 @@ describe("TransactionInstrumentationTest", () => {
         });
 
         const error = class extends Error {};
-        vi.spyOn(Base.connection.transactionManager, "rollbackTransaction").mockImplementationOnce(
-          async () => {
-            throw new error();
-          },
-        );
+        vi.spyOn(
+          (await Base.leaseConnection()).transactionManager,
+          "rollbackTransaction",
+        ).mockImplementationOnce(async () => {
+          throw new error();
+        });
         await expect(
           Topic.transaction(async () => {
             throw new Rollback();

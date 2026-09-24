@@ -318,7 +318,9 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("touch existing lock without default should work with null in the database", async () => {
-    await Base.connection.execute("INSERT INTO lock_without_defaults(title) VALUES('title1')");
+    await (
+      await Base.leaseConnection()
+    ).execute("INSERT INTO lock_without_defaults(title) VALUES('title1')");
     const t1 = (await LockWithoutDefault.last())!;
     expect(t1.lock_version).toBe(0);
     expect(t1.readAttributeBeforeTypeCast("lock_version")).toBeNull();
@@ -340,7 +342,9 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("lock without default should work with null in the database", async () => {
-    await Base.connection.execute("INSERT INTO lock_without_defaults(title) VALUES('title1')");
+    await (
+      await Base.leaseConnection()
+    ).execute("INSERT INTO lock_without_defaults(title) VALUES('title1')");
     const t1 = (await LockWithoutDefault.last())!;
     const t2 = await LockWithoutDefault.find(t1.id);
     expect(t1.lock_version).toBe(0);
@@ -358,7 +362,9 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("update with lock version without default should work on dirty value before type cast", async () => {
-    await Base.connection.execute("INSERT INTO lock_without_defaults(title) VALUES('title1')");
+    await (
+      await Base.leaseConnection()
+    ).execute("INSERT INTO lock_without_defaults(title) VALUES('title1')");
     const t1 = (await LockWithoutDefault.last())!;
     expect(t1.lock_version).toBe(0);
     expect(t1.readAttributeBeforeTypeCast("lock_version")).toBeNull();
@@ -372,7 +378,9 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("destroy with lock version without default should work on dirty value before type cast", async () => {
-    await Base.connection.execute("INSERT INTO lock_without_defaults(title) VALUES('title1')");
+    await (
+      await Base.leaseConnection()
+    ).execute("INSERT INTO lock_without_defaults(title) VALUES('title1')");
     const t1 = (await LockWithoutDefault.last())!;
     expect(t1.lock_version).toBe(0);
     expect(t1.readAttributeBeforeTypeCast("lock_version")).toBeNull();
@@ -421,7 +429,9 @@ describe("OptimisticLockingTest", () => {
   });
 
   it("lock with custom column without default should work with null in the database", async () => {
-    await Base.connection.execute("INSERT INTO lock_without_defaults_cust(title) VALUES('title1')");
+    await (
+      await Base.leaseConnection()
+    ).execute("INSERT INTO lock_without_defaults_cust(title) VALUES('title1')");
     const t1 = (await LockWithCustomColumnWithoutDefault.last())!;
     const t2 = await LockWithCustomColumnWithoutDefault.find(t1.id);
     expect(t1.custom_lock_version).toBe(0);
@@ -583,9 +593,9 @@ describe("OptimisticLockingTest", () => {
     await p.destroy();
     assertEmpty(await proxy);
     assertEmpty(
-      await Base.connection.selectAll(
-        `SELECT * FROM peoples_treasures WHERE rich_person_id = ${p.id}`,
-      ),
+      await (
+        await Base.leaseConnection()
+      ).selectAll(`SELECT * FROM peoples_treasures WHERE rich_person_id = ${p.id}`),
     );
   });
 
@@ -614,14 +624,14 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
   });
 
   async function addCounterColumnTo(model: typeof Base, col = "test_count"): Promise<void> {
-    await (Base.connection as any).addColumn(model.tableName, col, "integer", {
+    await ((await Base.leaseConnection()) as any).addColumn(model.tableName, col, "integer", {
       null: false,
       default: 0,
     });
     void model.resetColumnInformation();
   }
   async function removeCounterColumnFrom(model: typeof Base, col = "test_count"): Promise<void> {
-    await (Base.connection as any).removeColumn(model.tableName, col);
+    await ((await Base.leaseConnection()) as any).removeColumn(model.tableName, col);
     void model.resetColumnInformation();
   }
 
@@ -690,7 +700,9 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
   });
 
   it("destroy existing object with locking column value null in the database", async () => {
-    await Base.connection.execute("INSERT INTO lock_without_defaults(title) VALUES('title1')");
+    await (
+      await Base.leaseConnection()
+    ).execute("INSERT INTO lock_without_defaults(title) VALUES('title1')");
     const t1 = (await LockWithoutDefault.last())!;
     expect(t1.lock_version).toBe(0);
     expect(t1.readAttributeBeforeTypeCast("lock_version")).toBeNull();
@@ -780,7 +792,7 @@ describe("PessimisticLockingTest", () => {
   });
 
   it("with lock configures transaction", async () => {
-    const adapter = Base.connection as any;
+    const adapter = (await Base.leaseConnection()) as any;
     const p = await Person.find(people("michael").id);
     await Person.transaction(async () => {
       const outerTx = adapter.transactionManager.currentTransaction;
@@ -803,7 +815,7 @@ describe("PessimisticLockingTest", () => {
   });
 
   it.skipIf(adapterType !== "postgres")("with lock sets isolation", async () => {
-    const adapter = Base.connection as any;
+    const adapter = (await Base.leaseConnection()) as any;
     const person = await Person.find(people("michael").id);
     await person.withLock({ isolation: ":read_uncommitted" }, async () => {
       const currentTransaction = adapter.transactionManager.currentTransaction;

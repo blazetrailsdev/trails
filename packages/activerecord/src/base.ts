@@ -956,7 +956,7 @@ export class Base extends Model {
     (this as any)._connectionSpecificationName = name;
   }
   declare static isConnected: typeof ConnectionHandling.isConnected;
-  declare static readonly connection: DatabaseAdapter;
+  declare static readonly connection: Promise<DatabaseAdapter>;
   declare static isPrimaryClass: typeof ConnectionHandling.isPrimaryClass;
   declare static adapterClass: typeof ConnectionHandling.adapterClass;
   /** @noRailsEquivalent CONVERGEABLE adapter-class-sync-retires-with-eager-adapter-resolution */
@@ -2035,7 +2035,7 @@ export class Base extends Model {
         _Persistence.applyDefaultAndGlobalConstraints(dm as any, ctor);
 
         const adapter =
-          ConnectionHandling.connectionPool.call(ctor).activeConnection ?? ctor.connection;
+          ConnectionHandling.connectionPool.call(ctor).activeConnection ?? (await ctor.connection);
         const affected = await adapter.delete(dm, `${ctor.name} Destroy`);
         if (ctor.lockingEnabled && affected !== 1) {
           throw new StaleObjectError(this, "destroy");

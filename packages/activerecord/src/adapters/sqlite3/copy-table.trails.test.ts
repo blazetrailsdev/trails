@@ -37,7 +37,7 @@ describeIfSqlite("SQLite3Adapter table-rebuild cluster", () => {
   };
 
   beforeEach(async () => {
-    db = leased = Base.connection as SQLite3Adapter;
+    db = leased = (await Base.leaseConnection()) as SQLite3Adapter;
     await dropCopyTargets();
   });
 

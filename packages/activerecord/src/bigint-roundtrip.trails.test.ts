@@ -6,7 +6,9 @@ const BIG = 2n ** 62n;
 fixtures([]);
 
 beforeAll(async () => {
-  await Base.connection.createTable("metrics", { force: true }, (t) => {
+  await (
+    await Base.leaseConnection()
+  ).createTable("metrics", { force: true }, (t) => {
     t.bigint("score");
     t.string("label");
   });

@@ -314,7 +314,7 @@ describe("SchemaAdapter TM delegation", () => {
   });
 
   it("transaction() routes SchemaAdapter through TM (spy on inner.withinNewTransaction)", async () => {
-    const testAdapter = Base.connection;
+    const testAdapter = await Base.leaseConnection();
     const spy = vi.spyOn(testAdapter, "withinNewTransaction");
     class Item extends Base {
       static {
@@ -332,7 +332,7 @@ describe("SchemaAdapter TM delegation", () => {
     const { Transaction: TxBase } = await import("./connection-adapters/abstract/transaction.js");
     const { SavepointTransaction, RealTransaction } =
       await import("./connection-adapters/abstract/transaction.js");
-    const testAdapter = Base.connection;
+    const testAdapter = await Base.leaseConnection();
     class Item extends Base {
       static {
         this.attribute("id", "integer");
@@ -364,7 +364,7 @@ describe("SchemaAdapter TM delegation", () => {
   });
 
   it.skip("concurrent Promise.all top-level transactions are serialized (no shared TM frame)", async () => {
-    const testAdapter = Base.connection;
+    const testAdapter = await Base.leaseConnection();
     class Item extends Base {
       static {
         this.attribute("id", "integer");
@@ -407,7 +407,7 @@ describe("SchemaAdapter TM delegation", () => {
   });
 
   it("manual beginTransaction/commit pair delegates inner state unconditionally", async () => {
-    const testAdapter = Base.connection;
+    const testAdapter = await Base.leaseConnection();
     class Item extends Base {
       static {
         this.attribute("id", "integer");

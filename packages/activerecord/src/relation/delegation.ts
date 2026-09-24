@@ -462,7 +462,7 @@ export class Delegation {
     return instruct + builder.target();
   }
 
-  get connection(): DatabaseAdapter {
+  get connection(): Promise<DatabaseAdapter> {
     return (this as unknown as DelegationHost).model.connection;
   }
 

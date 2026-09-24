@@ -270,8 +270,8 @@ describe("PrimaryKeysTest", () => {
         this._tableName = "developers_projects";
       }
     }
-    await (Base.connection as any).internalSchemaCache.primaryKeys(
-      Base.connection,
+    await ((await Base.leaseConnection()) as any).internalSchemaCache.primaryKeys(
+      await Base.leaseConnection(),
       "developers_projects",
     );
     expect(AnonDevelopersProjects.primaryKey).toBeNull();
@@ -361,7 +361,7 @@ describe("PrimaryKeysTest", () => {
   });
 
   it.skipIf(adapterType !== "postgres")("serial with quoted sequence name", async () => {
-    const cols = (await (Base.connection as any).columns("mixed_case_monkeys")) as {
+    const cols = (await ((await Base.leaseConnection()) as any).columns("mixed_case_monkeys")) as {
       name: string;
       defaultFunction?: string;
       isSerial?: () => boolean;
@@ -372,7 +372,7 @@ describe("PrimaryKeysTest", () => {
   });
 
   it.skipIf(adapterType !== "postgres")("serial with unquoted sequence name", async () => {
-    const cols = (await (Base.connection as any).columns("topics")) as {
+    const cols = (await ((await Base.leaseConnection()) as any).columns("topics")) as {
       name: string;
       defaultFunction?: string;
       isSerial?: () => boolean;
@@ -391,13 +391,13 @@ describe("PrimaryKeyWithAutoIncrementTest", () => {
   }
 
   beforeEach(async () => {
-    await (Base.connection as any).dropTable("auto_increments", { ifExists: true });
+    await ((await Base.leaseConnection()) as any).dropTable("auto_increments", { ifExists: true });
     void AutoIncrement.resetColumnInformation();
   });
 
   afterEach(async () => {
     void AutoIncrement.resetColumnInformation();
-    await (Base.connection as any).dropTable("auto_increments", { ifExists: true });
+    await ((await Base.leaseConnection()) as any).dropTable("auto_increments", { ifExists: true });
   });
 
   async function assertAutoIncremented() {
@@ -417,7 +417,7 @@ describe("PrimaryKeyWithAutoIncrementTest", () => {
 
   it("primary key with integer", async () => {
     const type = "integer";
-    await (Base.connection as any).createTable("auto_increments", {
+    await ((await Base.leaseConnection()) as any).createTable("auto_increments", {
       id: { type },
       force: true,
     });
@@ -426,7 +426,7 @@ describe("PrimaryKeyWithAutoIncrementTest", () => {
 
   it("primary key with bigint", async () => {
     const type = "bigint";
-    await (Base.connection as any).createTable("auto_increments", {
+    await ((await Base.leaseConnection()) as any).createTable("auto_increments", {
       id: { type },
       force: true,
     });
@@ -651,33 +651,33 @@ describe("PrimaryKeyIntegerNilDefaultTest", () => {
   fixtures({}, { useTransactionalTests: false });
 
   beforeEach(async () => {
-    await (Base.connection as any).dropTable("int_defaults", { ifExists: true });
+    await ((await Base.leaseConnection()) as any).dropTable("int_defaults", { ifExists: true });
   });
 
   afterEach(async () => {
-    await (Base.connection as any).dropTable("int_defaults", { ifExists: true });
+    await ((await Base.leaseConnection()) as any).dropTable("int_defaults", { ifExists: true });
   });
 
   it.skipIf(adapterType === "sqlite")(
     "schema dump primary key integer with default nil",
     async () => {
-      await (Base.connection as any).createTable("int_defaults", {
+      await ((await Base.leaseConnection()) as any).createTable("int_defaults", {
         id: "integer",
         default: null,
         force: true,
       });
-      const schema = await dumpTableSchema(Base.connection, "int_defaults");
+      const schema = await dumpTableSchema(await Base.leaseConnection(), "int_defaults");
       expect(schema).toMatch(/createTable\("int_defaults", \{ id: "integer", default: null/);
     },
   );
 
   it("schema dump primary key bigint with default nil", async () => {
-    await (Base.connection as any).createTable("int_defaults", {
+    await ((await Base.leaseConnection()) as any).createTable("int_defaults", {
       id: "bigint",
       default: null,
       force: true,
     });
-    const schema = await dumpTableSchema(Base.connection, "int_defaults");
+    const schema = await dumpTableSchema(await Base.leaseConnection(), "int_defaults");
     expect(schema).toMatch(/createTable\("int_defaults", \{ id: "bigint", default: null/);
   });
 });

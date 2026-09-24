@@ -9,7 +9,7 @@ describe("sql.active_record type_casted_binds", () => {
   fixtures({});
 
   it("carries equal values on the cached and uncached paths", async () => {
-    const conn = await Base.connection;
+    const conn = await Base.leaseConnection();
     const task = await Task.create({ starting: null, ending: null });
     const events: Record<string, unknown>[] = [];
     const sub = Notifications.subscribe("sql.active_record", (e: Event) =>
@@ -41,7 +41,7 @@ describe("sql.active_record type_casted_binds", () => {
   });
 
   it("routes Temporal binds through the adapter's quoted_date", async () => {
-    const conn = (await Base.connection) as unknown as {
+    const conn = (await Base.leaseConnection()) as unknown as {
       typeCastedBinds(binds: unknown[]): unknown[];
       quotedDate(value: unknown): string;
     };

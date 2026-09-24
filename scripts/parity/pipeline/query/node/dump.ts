@@ -202,7 +202,7 @@ async function main(): Promise<void> {
     // try/catches, matching ar_dump.ts and scripts/parity/pipeline/schema/node/dump.ts:
     // a throwing close() must not skip removeConnection().
     try {
-      const a = Base.connection as { close?: () => void };
+      const a = (await Base.leaseConnection()) as { close?: () => void };
       if (typeof a.close === "function") a.close();
     } catch {
       /* adapter unavailable or already closed */

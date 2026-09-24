@@ -169,7 +169,7 @@ describe("StoreTest", () => {
   });
 
   it("saved changes tracking for accessors with json column", async (ctx) => {
-    ctx.skip((await (Base.connection as any).isMariadb?.()) ?? false);
+    ctx.skip((await ((await Base.leaseConnection()) as any).isMariadb?.()) ?? false);
     (john as any).enableFriendRequests = true;
     expect((john as any).enableFriendRequestsChanged()).toBeTruthy();
 

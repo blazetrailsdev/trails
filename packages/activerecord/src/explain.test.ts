@@ -154,7 +154,7 @@ describe("ExplainTest", () => {
       [sqls[0], []],
       [sqls[1], []],
     ];
-    const adapter = Base.connection as unknown as {
+    const adapter = (await Base.leaseConnection()) as unknown as {
       explain: (...args: unknown[]) => Promise<string>;
     };
     const original = adapter.explain;
@@ -175,7 +175,7 @@ describe("ExplainTest", () => {
       [sqls[0], [bindParam("wadus", 1)]],
       [sqls[1], [bindParam("chaflan", 2)]],
     ];
-    const adapter = Base.connection as unknown as {
+    const adapter = (await Base.leaseConnection()) as unknown as {
       explain: (...args: unknown[]) => Promise<string>;
     };
     const original = adapter.explain;
@@ -236,8 +236,9 @@ describe("ExplainTest", () => {
   });
 
   it("renders binds via adapter.typeCast + Ruby-inspect form", async () => {
+    const connection = await Base.leaseConnection();
     const rendered = rbInspect(
-      [BigInt(42), "str", 7, null, true, false].map((b) => renderBind(Base.connection, b)),
+      [BigInt(42), "str", 7, null, true, false].map((b) => renderBind(connection, b)),
     );
     expect(rendered.startsWith('[[nil, 42], [nil, "str"], [nil, 7], [nil, nil], ')).toBe(true);
     expect(rendered).toMatch(/\[nil, (1\], \[nil, 0|true\], \[nil, false)\]\]$/);

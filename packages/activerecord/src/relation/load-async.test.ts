@@ -59,7 +59,7 @@ describe("LoadAsyncTest", () => {
       const records = await deferredPosts;
 
       expect(records.map((post) => post.id)).toEqual(expectedRecords.map((post) => post.id));
-      const connection = Base.connection as unknown as {
+      const connection = (await Base.connection) as unknown as {
         supportsConcurrentConnections(): boolean;
       };
       expect(status.async).toBe(connection.supportsConcurrentConnections());

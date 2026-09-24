@@ -21,7 +21,7 @@ describe("binary type_casted_binds payload", () => {
 
   it("unwraps Type::Binary::Data for subscribers", async () => {
     const bytes = new Uint8Array([0xde, 0xad]);
-    const conn = await Base.connection;
+    const conn = await Base.leaseConnection();
     const bind = Attribute.withCastValue("data", bytes, new BinaryType());
     expect(bind.valueForDatabase).toBeInstanceOf(BinaryData);
     const out = conn.typeCastedBinds([bind])!;
@@ -32,7 +32,7 @@ describe("binary type_casted_binds payload", () => {
   it("casts both byte forms Rails reaches type_cast with", async () => {
     const bytes = new Uint8Array([0xde, 0xad]);
     expect(new BinaryType().serialize(bytes)).toBeInstanceOf(BinaryData);
-    const conn = await Base.connection;
+    const conn = await Base.leaseConnection();
     expect(new Uint8Array(conn.typeCast(new BinaryData(bytes)) as Uint8Array)).toEqual(bytes);
     expect(() => conn.typeCast(bytes)).toThrow(TypeError);
   });

@@ -1369,7 +1369,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("find first sanitized", async () => {
-    const QUOTED_TYPE = (Base.connection as any).quoteColumnName("type");
+    const QUOTED_TYPE = ((await Base.leaseConnection()) as any).quoteColumnName("type");
     const firm = (await HmFirm.first()) as any;
     const client2 = await Client.find(2);
     expect(await firm.clients.where(`${QUOTED_TYPE} = ?`, "Client").first()).toEqual(client2);

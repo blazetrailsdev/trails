@@ -22,7 +22,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   let type: any;
 
   beforeEach(async () => {
-    connection = Base.connection as PostgreSQLAdapter;
+    connection = (await Base.leaseConnection()) as PostgreSQLAdapter;
     await connection.transaction(async () => {
       await connection.createTable("bytea_data_type", (t) => {
         t.binary("payload");

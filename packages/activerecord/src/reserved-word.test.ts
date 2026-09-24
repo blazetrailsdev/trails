@@ -40,14 +40,14 @@ Associations.hasMany.call(Distinct, "values", { through: "groups" });
 
 fixtures({}, { useTransactionalTests: false });
 
-function schema(): SchemaStatements {
-  return Base.connection as unknown as SchemaStatements;
+async function schema(): Promise<SchemaStatements> {
+  return (await Base.leaseConnection()) as unknown as SchemaStatements;
 }
 
 const RESERVED_TABLES = ["values", "group", "distinct_select", "distinct", "select", "order"];
 
 beforeEach(async () => {
-  const conn = schema();
+  const conn = await schema();
   for (const t of RESERVED_TABLES) await conn.dropTable(t, { ifExists: true });
   await conn.createTable("select", { force: true }, () => {});
   await conn.createTable("distinct", { force: true }, () => {});
@@ -95,7 +95,7 @@ async function createTestFixtures(...names: (keyof typeof fixturesDirectory)[]):
 
 describe("ReservedWordTest", () => {
   it("create tables", async () => {
-    const conn = schema();
+    const conn = await schema();
     expect(await conn.tableExists("order")).toBeFalsy();
     await conn.createTable("order", { force: true }, (t) => {
       t.string("group");
@@ -104,11 +104,11 @@ describe("ReservedWordTest", () => {
   });
 
   it("rename tables", async () => {
-    await assertNothingRaised(() => schema().renameTable("group", "order"));
+    await assertNothingRaised(async () => (await schema()).renameTable("group", "order"));
   });
 
   it("change columns", async () => {
-    const conn = Base.connection as unknown as {
+    const conn = (await Base.leaseConnection()) as unknown as {
       changeColumnDefault(t: string, c: string, d: unknown): Promise<void>;
       changeColumn(t: string, c: string, ty: string, o?: Record<string, unknown>): Promise<void>;
       renameColumn(t: string, c: string, n: string): Promise<void>;
@@ -119,7 +119,7 @@ describe("ReservedWordTest", () => {
   });
 
   it("introspect", async () => {
-    const conn = schema();
+    const conn = await schema();
     const cols = (await conn.columns("group")).map((c) => c.name).sort();
     expect(cols).toEqual(["id", "order", "select_id"]);
     const idx = (await conn.indexes("group")).map((i) => i.name).sort();

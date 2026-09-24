@@ -53,15 +53,21 @@ describe("disable_joins shapes the deleted routing gate rejected", () => {
   }
 
   beforeAll(async () => {
-    await Base.connection.createTable("rj_authors", { force: true }, (t: TableDefinition) => {
+    await (
+      await Base.leaseConnection()
+    ).createTable("rj_authors", { force: true }, (t: TableDefinition) => {
       t.string("name");
     });
-    await Base.connection.createTable("rj_comments", { force: true }, (t: TableDefinition) => {
+    await (
+      await Base.leaseConnection()
+    ).createTable("rj_comments", { force: true }, (t: TableDefinition) => {
       t.integer("rj_author_id");
       t.integer("origin_id");
       t.string("origin_type");
     });
-    await Base.connection.createTable("rj_members", { force: true }, (t: TableDefinition) => {
+    await (
+      await Base.leaseConnection()
+    ).createTable("rj_members", { force: true }, (t: TableDefinition) => {
       t.string("name");
     });
     registerModel("RjAuthor", RjAuthor);

@@ -64,8 +64,8 @@ let schemaMigration: SchemaMigration;
 let internalMetadata: InternalMetadata;
 
 beforeEach(async () => {
-  schemaMigration = new SchemaMigration(Base.connection.pool);
-  internalMetadata = new InternalMetadata(Base.connection.pool);
+  schemaMigration = new SchemaMigration((await Base.leaseConnection()).pool);
+  internalMetadata = new InternalMetadata((await Base.leaseConnection()).pool);
   await schemaMigration.dropTable();
   await internalMetadata.dropTable();
 });
@@ -73,8 +73,8 @@ beforeEach(async () => {
 describe("Migrator trails extensions", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
-    adapter = Base.connection;
+  beforeEach(async () => {
+    adapter = await Base.leaseConnection();
   });
 
   it("stores environment after up migration", async () => {
@@ -274,7 +274,7 @@ describe("Migrator trails extensions", () => {
 
 describe("Migrator advisory lock wrapping", () => {
   it("acquires and releases advisory lock when adapter supports it", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     const lockLog: string[] = [];
     addAdvisoryLockSupport(adapter);
     adapter.getAdvisoryLock = async () => {
@@ -297,7 +297,7 @@ describe("Migrator advisory lock wrapping", () => {
   });
 
   it("throws ConcurrentMigrationError when lock cannot be acquired", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     addAdvisoryLockSupport(adapter);
     adapter.getAdvisoryLock = async () => false;
     adapter.releaseAdvisoryLock = async () => true;
@@ -312,7 +312,7 @@ describe("Migrator advisory lock wrapping", () => {
   });
 
   it("releases lock even when migration throws", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     const lockLog: string[] = [];
     addAdvisoryLockSupport(adapter);
     adapter.getAdvisoryLock = async () => {
@@ -339,7 +339,7 @@ describe("Migrator advisory lock wrapping", () => {
   });
 
   it("skips locking when adapter does not support advisory locks", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     const migrator = new Migrator(
       "up",
       [makeMigration(1, "M1")],
@@ -351,7 +351,7 @@ describe("Migrator advisory lock wrapping", () => {
   });
 
   it("wraps run in advisory lock", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     const lockLog: string[] = [];
     addAdvisoryLockSupport(adapter);
     adapter.getAdvisoryLock = async () => {
@@ -381,7 +381,7 @@ describe("Migrator advisory lock wrapping", () => {
   }
 
   async function lockableAdapter() {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     const lockLog: string[] = [];
     addAdvisoryLockSupport(adapter);
     adapter.getAdvisoryLock = async () => {
@@ -428,7 +428,7 @@ describe("Migrator advisory lock wrapping", () => {
   });
 
   it("raises ConcurrentMigrationError with RELEASE_LOCK_FAILED_MESSAGE when releaseAdvisoryLock returns false", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     addAdvisoryLockSupport(adapter);
     adapter.getAdvisoryLock = async () => true;
     adapter.releaseAdvisoryLock = async () => false;
@@ -444,7 +444,7 @@ describe("Migrator advisory lock wrapping", () => {
   });
 
   it("uses db-scoped lock ID matching Rails MIGRATOR_SALT * Zlib.crc32(dbName)", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     const lockIds: unknown[] = [];
     adapter.supportsAdvisoryLocks = () => true;
     adapter.getAdvisoryLock = async (id) => {
@@ -460,7 +460,7 @@ describe("Migrator advisory lock wrapping", () => {
   });
 
   it("lock ID is deterministic for the same db name", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     const lockIds: bigint[] = [];
     adapter.supportsAdvisoryLocks = () => true;
     adapter.getAdvisoryLock = async (id) => {
@@ -483,8 +483,8 @@ describe("Migrator advisory lock wrapping", () => {
     const migrator = new Migrator(
       "up",
       [],
-      new SchemaMigration(Base.connection.pool),
-      new InternalMetadata(Base.connection.pool),
+      new SchemaMigration((await Base.leaseConnection()).pool),
+      new InternalMetadata((await Base.leaseConnection()).pool),
     );
     withMigrationConnection(adapter);
     expect(await migrator.isUseAdvisoryLock()).toBe(true);
@@ -498,15 +498,15 @@ describe("Migrator advisory lock wrapping", () => {
     const migrator = new Migrator(
       "up",
       [],
-      new SchemaMigration(Base.connection.pool),
-      new InternalMetadata(Base.connection.pool),
+      new SchemaMigration((await Base.leaseConnection()).pool),
+      new InternalMetadata((await Base.leaseConnection()).pool),
     );
     withMigrationConnection(adapter);
     expect(await migrator.isUseAdvisoryLock()).toBe(false);
   });
 
   it("reloads the migrated versions after acquiring the advisory lock", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     addAdvisoryLockSupport(adapter);
     adapter.getAdvisoryLock = async () => true;
     adapter.releaseAdvisoryLock = async () => true;
@@ -531,7 +531,7 @@ describe("Migrator advisory lock wrapping", () => {
   });
 
   it("record_version_state_after_migrating updates the migrated memo in place", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     const up = new Migrator("up", [makeMigration(1, "M1")], schemaMigration, internalMetadata);
     const down = new Migrator("down", [makeMigration(1, "M1")], schemaMigration, internalMetadata);
     await new SchemaMigration(adapter.pool).createTable();
@@ -544,7 +544,7 @@ describe("Migrator advisory lock wrapping", () => {
   });
 
   it("loadMigrated re-reads schema_migrations so repeated pending checks are not memoized", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     await schemaMigration.createTable();
     const migrator = new Migrator(
       "up",
@@ -565,8 +565,8 @@ describe("Migrator drives migrations through Migration#migrate", () => {
   let chunks: string[];
   let spy: MockInstance;
 
-  beforeEach(() => {
-    adapter = Base.connection;
+  beforeEach(async () => {
+    adapter = await Base.leaseConnection();
     chunks = [];
     spy = vi.spyOn(stdout, "write").mockImplementation((chunk) => {
       chunks.push(chunk);
@@ -674,8 +674,8 @@ describe("Migrator runnable direction awareness", () => {
     makeMigration(3, "M3"),
   ];
 
-  beforeEach(() => {
-    adapter = Base.connection;
+  beforeEach(async () => {
+    adapter = await Base.leaseConnection();
   });
 
   it("migrations is ascending going up and reversed going down", () => {

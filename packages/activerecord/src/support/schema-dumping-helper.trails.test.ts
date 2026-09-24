@@ -11,8 +11,8 @@ import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/
 
 let adapter: DatabaseAdapter;
 
-beforeAll(() => {
-  adapter = Base.connection;
+beforeAll(async () => {
+  adapter = await Base.leaseConnection();
 });
 
 const createdTables = new Set<string>();

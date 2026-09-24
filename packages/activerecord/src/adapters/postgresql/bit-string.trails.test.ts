@@ -21,7 +21,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     let connection: PostgreSQLAdapter;
     beforeEach(async () => {
-      connection = Base.connection as PostgreSQLAdapter;
+      connection = (await Base.leaseConnection()) as PostgreSQLAdapter;
       await connection.createTable("postgresql_bit_strings", { force: true }, (t) => {
         t.bit("a_bit", { default: "00000011", limit: 8 });
         t.bitVarying("a_bit_varying", { default: "0011", limit: 4 });

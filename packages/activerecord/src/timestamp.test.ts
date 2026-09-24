@@ -507,11 +507,15 @@ describe("TimestampsWithoutTransactionTest", () => {
   fixtures({}, { useTransactionalTests: false });
 
   afterEach(async () => {
-    await Base.connection.dropTable("timestamp_attribute_posts", "foos", { ifExists: true });
+    await (
+      await Base.leaseConnection()
+    ).dropTable("timestamp_attribute_posts", "foos", { ifExists: true });
   });
 
   it("do not write timestamps on save if they are not attributes", async () => {
-    await Base.connection.createTable("timestamp_attribute_posts", { force: true }, (t) => {});
+    await (
+      await Base.leaseConnection()
+    ).createTable("timestamp_attribute_posts", { force: true }, (t) => {});
 
     class TimestampAttributePost extends Base {
       static {
@@ -531,14 +535,18 @@ describe("TimestampsWithoutTransactionTest", () => {
   });
 
   it("index is created for both timestamps", async () => {
-    await Base.connection.createTable("foos", { force: true }, (t) => {
+    await (
+      await Base.leaseConnection()
+    ).createTable("foos", { force: true }, (t) => {
       t.timestamps({ null: true, index: true });
     });
 
-    const indexes = (await Base.connection.indexes("foos")) as { columns: string[] }[];
+    const indexes = (await (await Base.leaseConnection()).indexes("foos")) as {
+      columns: string[];
+    }[];
     const columns = indexes.flatMap((i) => i.columns).sort();
     expect(columns).toEqual(["created_at", "updated_at"]);
 
-    await Base.connection.dropTable("foos");
+    await (await Base.leaseConnection()).dropTable("foos");
   });
 });

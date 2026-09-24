@@ -22,8 +22,12 @@ const mysqlQuoter: Quoter = {
   castBoundValue: (v) => v,
 };
 
+const poolFor = (q: Quoter) => () => ({
+  withConnectionSync: <T>(block: (connection: Quoter) => T): T => block(q),
+});
+
 describe("sanitization quoter threading (module-level)", () => {
-  const hostFor = (q: Quoter) => ({ connection: q, ...ClassMethods });
+  const hostFor = (q: Quoter) => ({ connectionPool: poolFor(q), ...ClassMethods });
 
   it("MySQL emits backtick-qualified `table`.`column` for hash assignment", () => {
     expect(hostFor(mysqlQuoter).sanitizeSqlHashForAssignment({ name: "x" }, "users")).toBe(
@@ -55,8 +59,8 @@ describe("sanitization quoter threading (module-level)", () => {
 });
 
 describe("sanitization class-method dispatch threads `this.connection`", () => {
-  const mysqlHost = { connection: mysqlQuoter };
-  const pgHost = { connection: pgQuoter };
+  const mysqlHost = { connectionPool: poolFor(mysqlQuoter) };
+  const pgHost = { connectionPool: poolFor(pgQuoter) };
 
   it("sanitizeSqlHashForAssignment uses MySQL adapter from this.connection", () => {
     expect(ClassMethods.sanitizeSqlHashForAssignment.call(mysqlHost, { name: "x" }, "users")).toBe(
@@ -76,7 +80,7 @@ describe("sanitization class-method dispatch threads `this.connection`", () => {
 
   it("raises ConnectionNotDefined when host.connection has no adapter", () => {
     const host = {
-      get connection(): never {
+      connectionPool(): never {
         throw new ConnectionNotDefined("No database connection defined.");
       },
     };
@@ -95,7 +99,7 @@ describe("sanitization class-method dispatch threads `this.connection`", () => {
   it("surfaces the adapter_class lookup error for sanitizeSqlForOrder", () => {
     const host = {
       ...ClassMethods,
-      connection: mysqlQuoter,
+      connectionPool: poolFor(mysqlQuoter),
       adapterClassSync: (): never => {
         throw new ConnectionNotDefined("No database connection defined.");
       },
@@ -105,9 +109,11 @@ describe("sanitization class-method dispatch threads `this.connection`", () => {
 
   it("propagates non-ConnectionNotDefined errors from host.connection", () => {
     const host = {
-      get connection(): never {
-        throw new ConnectionTimeoutError("connection timed out");
-      },
+      connectionPool: () => ({
+        withConnectionSync(): never {
+          throw new ConnectionTimeoutError("connection timed out");
+        },
+      }),
     };
     expect(() =>
       ClassMethods.sanitizeSqlHashForAssignment.call(host, { name: "x" }, "users"),

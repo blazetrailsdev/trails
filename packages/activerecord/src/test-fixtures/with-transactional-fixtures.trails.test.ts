@@ -12,7 +12,7 @@ import { NullTransaction } from "../connection-adapters/abstract/transaction.js"
 import { fixtures } from "../test-fixtures.js";
 
 async function primaryAdapter(): Promise<TestDatabaseAdapter> {
-  return Base.connection;
+  return await Base.leaseConnection();
 }
 
 interface AdapterWithExec {
@@ -198,7 +198,7 @@ describe("the DDL recording window arms around a test's DDL", () => {
   fixtures([]);
 
   it("runs DDL through the wrapped method", async () => {
-    const conn = Base.connection;
+    const conn = await Base.leaseConnection();
     await conn.addIndex("computers", "system", { name: "idx_own_property_restore" });
     await conn.removeIndex("computers", { name: "idx_own_property_restore" });
   });

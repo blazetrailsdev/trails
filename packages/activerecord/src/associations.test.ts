@@ -61,7 +61,9 @@ import { NoMethodError, regexpEscape, StandardError } from "@blazetrails/ruby-co
 import { Preloader } from "./associations/preloader.js";
 
 function quoteTableName(name: string): string {
-  return (Base.connection as { quoteTableName(n: string): string }).quoteTableName(name);
+  return (
+    Base.adapterClassSync() as unknown as { quoteTableName(n: string): string }
+  ).quoteTableName(name);
 }
 
 describe("AssociationsTest", () => {

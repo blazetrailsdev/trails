@@ -29,7 +29,7 @@ describe("StatementInvalidTest", () => {
   });
 
   it("message contains no sql", async () => {
-    const conn = Base.connection as any;
+    const conn = (await Base.leaseConnection()) as any;
     const sql = Book.where({ author_id: 96, cover: "hard" }).toSql();
     const error = (await assertRaises([StatementInvalid], {}, () =>
       conn.log(sql, "Book", [], [], false, () =>
@@ -42,7 +42,7 @@ describe("StatementInvalidTest", () => {
   });
 
   it("statement and binds are set on select", async () => {
-    const conn = Base.connection as any;
+    const conn = (await Base.leaseConnection()) as any;
     const sql = Book.where({ author_id: 96, cover: "hard" }).toSql();
     const binds = [{}, {}];
     const error = (await assertRaises([StatementInvalid], {}, () =>

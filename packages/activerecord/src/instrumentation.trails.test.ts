@@ -20,7 +20,9 @@ describe("Instrumentation exception payload (trails)", () => {
       payloads.push(event.payload);
     });
 
-    await expect(Base.connection.execute("SELECT * FROM definitely_not_a_table")).rejects.toThrow();
+    await expect(
+      (await Base.leaseConnection()).execute("SELECT * FROM definitely_not_a_table"),
+    ).rejects.toThrow();
 
     const failed = payloads.filter((p) => p.exception_object !== undefined);
     expect(failed).toHaveLength(1);
@@ -37,7 +39,7 @@ describe("Instrumentation exception payload (trails)", () => {
       payloads.push(event.payload);
     });
 
-    await Base.connection.execute("SELECT 1");
+    await (await Base.leaseConnection()).execute("SELECT 1");
 
     expect(payloads.length).toBeGreaterThan(0);
     for (const p of payloads) {

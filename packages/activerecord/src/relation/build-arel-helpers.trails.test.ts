@@ -77,8 +77,8 @@ describe("Relation private build-arel helpers", () => {
       expect(relation().isTableNameMatches("posts")).toBe(true);
     });
 
-    it("matches the adapter-quoted table name", () => {
-      const quoted = (Post.connection as any).quoteTableName("posts");
+    it("matches the adapter-quoted table name", async () => {
+      const quoted = ((await Post.leaseConnection()) as any).quoteTableName("posts");
       expect(relation().isTableNameMatches(quoted)).toBe(true);
     });
 

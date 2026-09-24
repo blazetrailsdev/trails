@@ -18,7 +18,7 @@ describe("the async schema load warms the shared cache and replaces a synthesize
         this.attribute("declared_field", "string", { default: "v" });
       }
     }
-    const conn = Post.connection;
+    const conn = await Post.leaseConnection();
     await conn.internalSchemaCache.clearDataSourceCacheBang(conn.pool ?? conn, "posts");
     expect(conn.internalSchemaCache.getCachedColumnsHash("posts")).toBeUndefined();
 
@@ -37,7 +37,7 @@ describe("the async schema load warms the shared cache and replaces a synthesize
         this.attribute("declared_field", "string", { default: "v" });
       }
     }
-    const conn = Post.connection;
+    const conn = await Post.leaseConnection();
     await conn.internalSchemaCache.clearDataSourceCacheBang(conn.pool ?? conn, "posts");
 
     const cold = Post.columnNames();
@@ -57,7 +57,7 @@ describe("the async schema load warms the shared cache and replaces a synthesize
         this.attribute("declared_field", "string", { default: "v" });
       }
     }
-    const conn = Post.connection;
+    const conn = await Post.leaseConnection();
     await conn.internalSchemaCache.clearDataSourceCacheBang(conn.pool ?? conn, "posts");
 
     const post = await Post.create({ title: "first", body: "b" });

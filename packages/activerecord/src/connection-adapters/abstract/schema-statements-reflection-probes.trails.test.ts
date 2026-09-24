@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { Base } from "../../index.js";
 import type { AbstractAdapter } from "../abstract-adapter.js";
 import { fixtures } from "../../test-fixtures.js";
@@ -8,12 +8,14 @@ import { SchemaStatements } from "./schema-statements.js";
 describe("SchemaStatements reflection probes", () => {
   fixtures({});
 
-  function conn(): AbstractAdapter {
-    return Base.connection as unknown as AbstractAdapter;
-  }
+  let connection: AbstractAdapter;
+
+  beforeEach(async () => {
+    connection = (await Base.leaseConnection()) as unknown as AbstractAdapter;
+  });
 
   function statements(): SchemaStatements {
-    const host = Object.create(conn()) as SchemaStatements;
+    const host = Object.create(connection) as SchemaStatements;
     const proto = Object.getOwnPropertyDescriptors(SchemaStatements.prototype);
     for (const name of ["tables", "views", "dataSources", "dataSourceExists"] as const) {
       Object.defineProperty(host, name, proto[name]);

@@ -21,7 +21,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   let connection: PostgreSQLAdapter;
 
   beforeEach(async () => {
-    connection = Base.connection as PostgreSQLAdapter;
+    connection = (await Base.leaseConnection()) as PostgreSQLAdapter;
     await connection.execute("set lc_monetary = 'C'");
     await connection.createTable("postgresql_moneys", { force: true }, (t) => {
       t.money("wealth");

@@ -13,8 +13,8 @@ describeIfSqlite("SQLite3Adapter queryTransformers wiring", () => {
   let adapter: SQLite3Adapter;
   let savedTransformers: QueryTransformer[];
 
-  beforeEach(() => {
-    adapter = Base.connection as SQLite3Adapter;
+  beforeEach(async () => {
+    adapter = (await Base.leaseConnection()) as SQLite3Adapter;
     savedTransformers = queryTransformers().slice();
     queryTransformers().length = 0;
   });
