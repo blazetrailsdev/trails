@@ -54,7 +54,7 @@
 import * as fs from "fs/promises";
 import * as path from "path";
 import { fileURLToPath } from "url";
-import * as ts from "typescript";
+import * as ts from "typescript-5";
 import { ROOT_DIR } from "./config.js";
 import { isLineLeadingJsDocTag } from "./extract-ts-api.js";
 import { listSourceFiles } from "./lint-missing-rails-call-reasons.js";

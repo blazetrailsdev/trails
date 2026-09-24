@@ -3,7 +3,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { Linter } from "eslint";
-import ts from "typescript";
+import ts from "typescript-5";
 import { parser } from "typescript-eslint";
 import rule from "../../eslint/ruby-compat-needs-mri-citation.mjs";
 import { keptLineLeadingTag } from "../../eslint/no-freeform-comments.mjs";

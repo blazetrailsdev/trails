@@ -5,7 +5,6 @@
   "packageManager": "pnpm@12.3.4",
   "scripts": {
     "build": "tsc --build",
-    "build:ts7": "node packages/activerecord/node_modules/typescript/bin/tsc --build",
     "tasks": "scripts/tasks/tasks.sh",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -144,7 +143,8 @@
     "tinyglobby": "0.2.16",
     "ts-morph": "^28.0.0",
     "tsx": "^4.19.0",
-    "typescript": "^5.9.3",
+    "typescript": "7.1.0-dev.20260920.1",
+    "typescript-5": "npm:typescript@5.9.3",
     "typescript-eslint": "^8.57.0",
     "vitest": "^3.0.0"
   },

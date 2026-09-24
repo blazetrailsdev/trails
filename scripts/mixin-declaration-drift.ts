@@ -22,7 +22,7 @@
  * Constraints: no `node:` specifiers, no `process` references.
  */
 
-import ts from "typescript";
+import ts from "typescript-5";
 
 export interface SignatureEntry {
   name: string;

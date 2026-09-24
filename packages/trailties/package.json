@@ -42,7 +42,7 @@
     "typescript": "7.1.0-dev.20260920.1"
   },
   "peerDependencies": {
-    "typescript": "^7.1.0-dev.20260920.1"
+    "typescript": "7.1.0-dev.20260920.1"
   },
   "peerDependenciesMeta": {
     "typescript": {

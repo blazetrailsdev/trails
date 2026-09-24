@@ -4,7 +4,7 @@
 // the comparison; the file-walking CLI entrypoint lives in extract-ts-tests.ts.
 
 import * as path from "path";
-import * as ts from "typescript";
+import * as ts from "typescript-5";
 import { NON_ASSERTION_TRAILS_HELPERS, normalizeTrailsKind } from "./assertion-kinds.js";
 import { VALUE_BEARING_KINDS } from "./assertion-values.js";
 import {

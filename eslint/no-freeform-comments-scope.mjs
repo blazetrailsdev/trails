@@ -73,7 +73,6 @@ export const sweptFilesInsideUnsweptTrees = [
   "scripts/api-compare/privates-entities.test.ts",
   "scripts/api-compare/require-rails-api.test.ts",
   "scripts/api-compare/ts-file-walk.test.ts",
-  "scripts/api-compare/typescript-internal.d.ts",
   "scripts/deprecated-manifest-diff.test.ts",
   "scripts/sync-stats/expired-job-log.test.ts",
   "scripts/sync-stats/gh-transient-error.test.ts",

@@ -13,8 +13,15 @@ import { describe, it, expect, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import ts from "typescript";
-import { NOT_BUILT, staleBuilds, staleBuildMessage, manifestIsStale } from "./build-freshness.js";
+import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
+import {
+  NOT_BUILT,
+  OUT_OF_DATE,
+  staleBuilds,
+  staleBuildMessage,
+  manifestIsStale,
+} from "./build-freshness.js";
 import type { PackageRoots } from "./config.js";
 
 const tmpDirs: string[] = [];
@@ -73,8 +80,14 @@ function buildPackage(
   return pkg;
 }
 
+const TSC = path.join(
+  path.dirname(createRequire(import.meta.url).resolve("typescript/package.json")),
+  "bin",
+  "tsc",
+);
+
 function build(configPath: string): void {
-  ts.createSolutionBuilder(ts.createSolutionBuilderHost(ts.sys), [configPath], {}).build();
+  execFileSync("node", [TSC, "--build", configPath]);
 }
 
 /**
@@ -111,7 +124,7 @@ describe("staleBuilds", () => {
     checkoutRewrite(pkg, "index.ts", "export const a = 2;\n");
 
     expect(await staleBuilds([...rootsOf(packagesDir, "activesupport", "trailties")])).toEqual([
-      { dir: "activesupport", status: "OutOfDateWithSelf" },
+      { dir: "activesupport", status: OUT_OF_DATE },
     ]);
   });
 
@@ -126,7 +139,7 @@ describe("staleBuilds", () => {
     fs.rmSync(path.join(pkg, "src", "nodes", "casted.ts"));
 
     expect(await staleBuilds([rootFor(packagesDir, "arel")])).toEqual([
-      { dir: "arel", status: "OutOfDateRoots" },
+      { dir: "arel", status: OUT_OF_DATE },
     ]);
   });
 
@@ -222,8 +235,8 @@ describe("staleBuilds", () => {
     const root = mkTmp();
     const packagesDir = path.join(root, "packages");
     // actionview references @blazetrails/tse-compiler, which is not in
-    // PACKAGES. tsc calls the importer UpToDateWithUpstreamTypes when such a
-    // reference goes stale — not an out-of-date status — so asking only about
+    // PACKAGES. A dry build only updates the importer's timestamps when such a
+    // reference goes stale, so asking only about
     // the api-compared package would let the stale dist/*.d.ts through.
     buildPackage(packagesDir, "tse-compiler", { "index.ts": "export const compileJs = 1;\n" });
     buildPackage(packagesDir, "actionview", { "index.ts": "export const a = 1;\n" }, [
@@ -236,7 +249,7 @@ describe("staleBuilds", () => {
     );
 
     expect(await staleBuilds([rootFor(packagesDir, "actionview")])).toEqual([
-      { dir: "tse-compiler", status: "OutOfDateWithSelf" },
+      { dir: "tse-compiler", status: OUT_OF_DATE },
     ]);
   });
 
@@ -272,7 +285,7 @@ describe("staleBuilds", () => {
         rootFor(packagesDir, "actionpack", "action-dispatch"),
         rootFor(packagesDir, "actionpack", "action-controller"),
       ]),
-    ).toEqual([{ dir: "actionpack", status: "OutOfDateWithSelf" }]);
+    ).toEqual([{ dir: "actionpack", status: OUT_OF_DATE }]);
   });
 
   it("sorts by package directory so the message is stable across runs", async () => {
@@ -373,25 +386,25 @@ describe("manifestIsStale", () => {
 describe("staleBuildMessage", () => {
   it("names every stale package and how to fix it", () => {
     const message = staleBuildMessage([
-      { dir: "trailties", status: "OutOfDateWithSelf" },
-      { dir: "actionview", status: "OutOfDateRoots" },
+      { dir: "trailties", status: OUT_OF_DATE },
+      { dir: "actionview", status: OUT_OF_DATE },
     ]);
     expect(message).toContain("2 package(s)");
-    expect(message).toContain("packages/trailties — OutOfDateWithSelf");
-    expect(message).toContain("packages/actionview — OutOfDateRoots");
+    expect(message).toContain("packages/trailties — OutOfDate");
+    expect(message).toContain("packages/actionview — OutOfDate");
     expect(message).toContain("pnpm build");
     expect(message).toContain("API_COMPARE_ALLOW_STALE_BUILD=1");
   });
 
   it("explains that FORCE does not cover build state", () => {
-    const message = staleBuildMessage([{ dir: "arel", status: "OutOfDateWithSelf" }]);
+    const message = staleBuildMessage([{ dir: "arel", status: OUT_OF_DATE }]);
     expect(message).toContain("API_COMPARE_FORCE=1 does NOT fix this");
   });
 
   it("calls out unbuilt packages separately from stale ones", () => {
     const message = staleBuildMessage([
       { dir: "activemodel", status: NOT_BUILT },
-      { dir: "arel", status: "OutOfDateWithSelf" },
+      { dir: "arel", status: OUT_OF_DATE },
     ]);
     expect(message).toContain("packages/activemodel — NotBuilt");
     expect(message).toContain("1 of those have no dist at all");
@@ -406,28 +419,7 @@ describe("staleBuildMessage", () => {
   });
 
   it("omits the unbuilt paragraph when every package merely went stale", () => {
-    const message = staleBuildMessage([{ dir: "arel", status: "OutOfDateWithSelf" }]);
+    const message = staleBuildMessage([{ dir: "arel", status: OUT_OF_DATE }]);
     expect(message).not.toContain("no dist at all");
-  });
-});
-
-describe("typescript-internal.d.ts", () => {
-  const declaredStatusNames = (): string[] => {
-    const source = fs.readFileSync(path.join(__dirname, "typescript-internal.d.ts"), "utf8");
-    const body = /export enum UpToDateStatusType \{([^}]*)\}/.exec(source);
-    expect(body).not.toBeNull();
-    return [...body![1].matchAll(/(\w+),/g)].map((m) => m[1]);
-  };
-
-  it("declares every status the installed TypeScript reports", () => {
-    const runtimeNames = Object.values(ts.UpToDateStatusType).filter(
-      (v): v is string => typeof v === "string",
-    );
-    expect(declaredStatusNames()).toEqual(runtimeNames);
-  });
-
-  it("declares a getUpToDateStatusOfProject the installed TypeScript still implements", () => {
-    const builder = ts.createSolutionBuilder(ts.createSolutionBuilderHost(ts.sys), [], {});
-    expect(builder.getUpToDateStatusOfProject).toBeTypeOf("function");
   });
 });

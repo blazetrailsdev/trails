@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect, afterEach } from "vitest";
-import * as ts from "typescript";
+import * as ts from "typescript-5";
 import * as path from "path";
 import * as fs from "node:fs";
 import * as os from "node:os";

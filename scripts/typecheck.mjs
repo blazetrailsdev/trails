@@ -12,8 +12,9 @@ const tscPath = path.join(
 // `packages/*` uses `composite: true` with `references` to upstream
 // packages). Per-project `tsc -p ... --noEmit` cannot resolve those
 // references, so it fails on a fresh clone where `dist/` is empty.
-// `--build` populates dist/ on the first run (~60s cold) and is
-// incremental thereafter (<1s warm via .tsbuildinfo), matching what
+// `--build` populates dist/ on the first run (~9s cold on TS 7.1; it was
+// ~120s on TS 5.9.3 on the same host, load avg ~70) and is
+// incremental thereafter (~1.5s warm no-op via .tsbuildinfo), matching what
 // CI's `pnpm build` does before its typecheck step.
 const result = spawnSync(tscPath, ["--build"], { stdio: "inherit" });
 

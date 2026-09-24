@@ -26,21 +26,30 @@
  * every package is stale. An mtime guard fails all 13 packages on every CI run
  * while contradicting the build that just succeeded.
  *
- * So we ask the authority instead. `ts.createSolutionBuilder` exposes the same
- * up-to-date computation `tsc --build` uses, which is what wrote the outputs in
- * the first place. By construction the guard can never disagree with a build
- * that just succeeded, and it still reports `OutOfDateWithSelf` the moment a
+ * So we ask the authority instead. `tsc --build --dry` runs the same up-to-date
+ * computation a real `tsc --build` does, which is what wrote the outputs in the
+ * first place. By construction the guard can never disagree with a build that
+ * just succeeded, and it still names a project it "would build" the moment a
  * checkout rewrites a source — including a delete-only checkout, which moves the
  * project's root file set rather than any surviving file's mtime.
  *
+ * It has to be the CLI, and the CLI of the compiler `pnpm build` runs. TS 7 has
+ * no programmatic solution builder (RFC 0125), and the TS 5.9.3 builder the
+ * `typescript-5` alias still offers reads TS 7's `.tsbuildinfo` as
+ * `TsVersionOutputOfDate` for every project. A project the dry run would only
+ * "update timestamps" for is up to date: its sources hash to what was built,
+ * which is exactly the restored-cache case above.
+ *
  * Constraints: async fs only, no `node:` specifiers, no `process` references.
- * The `typescript` import is the one unavoidable exception — its `ts.sys` I/O is
- * synchronous and internal to the compiler. That is the point: reusing tsc's
- * own reader is what makes this agree with tsc.
+ * The `typescript-5` import is the one unavoidable exception — its `ts.sys` I/O
+ * is synchronous and internal to the compiler — and it only parses tsconfigs.
  */
 import * as fs from "fs/promises";
 import * as path from "path";
-import ts from "typescript";
+import { execFile } from "child_process";
+import { createRequire } from "module";
+import { promisify } from "util";
+import ts from "typescript-5";
 import type { PackageRoots } from "./config.js";
 
 /**
@@ -54,30 +63,23 @@ export const NOT_BUILT = "NotBuilt";
 export interface StaleBuild {
   /** Directory name under `packages/` (not the api-compare package key). */
   dir: string;
-  /** `tsc`'s own verdict, e.g. `OutOfDateWithSelf`, or `NotBuilt`. */
+  /** `OutOfDate` (tsc would rebuild it) or `NotBuilt`. */
   status: string;
 }
 
 /**
- * The `UpToDateStatusType`s that mean "the emitted output does not correspond
- * to these sources". Enumerated positively rather than as "anything that isn't
- * up to date" so a status we did not anticipate (`ContainerOnly`, `ForceBuild`,
- * `ComputingUpstream`) cannot start failing runs after a TypeScript upgrade.
- * `Unbuildable` / `ErrorReadingFile` are likewise excluded: a project that
- * cannot build is a compile error to surface on its own, not a stale baseline.
+ * Reported for a project a non-dry `tsc --build` would rebuild. The dry run
+ * names the project without a status type, so the guard mints this one.
  */
-const STALE_STATUSES: ReadonlySet<ts.UpToDateStatusType> = new Set([
-  ts.UpToDateStatusType.OutputMissing,
-  ts.UpToDateStatusType.OutOfDateWithSelf,
-  ts.UpToDateStatusType.OutOfDateWithUpstream,
-  ts.UpToDateStatusType.OutOfDateBuildInfoWithPendingEmit,
-  ts.UpToDateStatusType.OutOfDateBuildInfoWithErrors,
-  ts.UpToDateStatusType.OutOfDateOptions,
-  ts.UpToDateStatusType.OutOfDateRoots,
-  ts.UpToDateStatusType.UpstreamOutOfDate,
-  ts.UpToDateStatusType.UpstreamBlocked,
-  ts.UpToDateStatusType.TsVersionOutputOfDate,
-]);
+export const OUT_OF_DATE = "OutOfDate";
+
+const TSC = path.join(
+  path.dirname(createRequire(import.meta.url).resolve("typescript/package.json")),
+  "bin",
+  "tsc",
+);
+
+const WOULD_BUILD = /A non-dry build would build project '(.+)'/g;
 
 /** A project in the reference closure: where it builds to, and what to call it. */
 interface Project {
@@ -97,9 +99,8 @@ const PARSE_HOST: ts.ParseConfigFileHost = {
  *
  * Checking only the api-compared packages is not enough: a package can import
  * declaration output from a workspace that is NOT api-compared — `actionview`
- * references `@blazetrails/tse-compiler` — and tsc reports the IMPORTER as
- * `UpToDateWithUpstreamTypes` when such a reference goes stale, which is not an
- * out-of-date status. The stale `dist/*.d.ts` would still be what the extractor
+ * references `@blazetrails/tse-compiler` — and a dry build would only update
+ * the IMPORTER's timestamps when such a reference goes stale. The stale `dist/*.d.ts` would still be what the extractor
  * reads, so the referenced project has to be asked about directly.
  *
  * This does not undo the scoping: the closure is reachability from packages
@@ -200,15 +201,18 @@ export async function staleBuilds(roots: readonly PackageRoots[]): Promise<Stale
     .map((project) => ({ dir: project.dir, status: NOT_BUILT }));
 
   if (built.length > 0) {
-    const builder = ts.createSolutionBuilder(
-      ts.createSolutionBuilderHost(ts.sys),
-      built.map((project) => project.configPath),
-      {},
+    const { stdout } = await promisify(execFile)("node", [
+      TSC,
+      "--build",
+      "--dry",
+      ...built.map((project) => project.configPath),
+    ]);
+    const wouldBuild = new Set(
+      [...stdout.matchAll(WOULD_BUILD)].map((match) => path.resolve(match[1])),
     );
     for (const project of built) {
-      const status = builder.getUpToDateStatusOfProject(project.configPath);
-      if (STALE_STATUSES.has(status.type)) {
-        stale.push({ dir: project.dir, status: ts.UpToDateStatusType[status.type] });
+      if (wouldBuild.has(path.resolve(project.configPath))) {
+        stale.push({ dir: project.dir, status: OUT_OF_DATE });
       }
     }
   }

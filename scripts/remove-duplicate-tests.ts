@@ -11,7 +11,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import * as typescript from "typescript";
+import * as typescript from "typescript-5";
 
 const ts_api = typescript;
 
