@@ -167,8 +167,8 @@ export class DeprecatedConstantProxy extends Module {
     return typeof target.hash === "function" ? target.hash() : undefined;
   }
 
-  respondTo(method: string): boolean {
-    return rbObjRespondTo(this.target, method);
+  respondTo(method: string, includeAll: boolean = false): boolean {
+    return rbObjRespondTo(this.target, method, includeAll);
   }
 
   class(): unknown {
