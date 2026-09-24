@@ -1,12 +1,16 @@
 import { PeriodNotFound, TimeZone, TimezonePeriod } from "./values/time-zone.js";
 import {
   Range,
+  basicObjRespondTo,
   equals as cmpEquals,
   greaterThan,
   greaterThanOrEqual,
   isBetween,
   lessThan,
   lessThanOrEqual,
+  NoMethodError,
+  PROTOCOL_PROBES,
+  rbObjClass,
   rubyClass,
 } from "@blazetrails/ruby-compat";
 import { Object as ObjectExt } from "./core-ext/object/acts-like.js";
@@ -100,7 +104,7 @@ type TimeLike =
 const METHOD_MISSING_HANDLER: ProxyHandler<TimeWithZone> = {
   get(target, prop) {
     if (Reflect.has(target, prop)) return Reflect.get(target, prop, target);
-    if (typeof prop !== "string" || !target.respondToMissing(prop, false)) return undefined;
+    if (typeof prop === "symbol" || PROTOCOL_PROBES.has(prop)) return undefined;
     return (...args: unknown[]) => target.methodMissing(prop, ...args);
   },
   has(target, prop) {
@@ -148,6 +152,11 @@ export class TimeWithZone {
     return this.utc().toTime().toPlainDateTime();
   }
 
+  respondTo(sym: string, includePriv: boolean = false): boolean {
+    if (sym === "toStr") return false;
+    return basicObjRespondTo(this, sym, !includePriv);
+  }
+
   respondToMissing(sym: string, includePriv: boolean): boolean {
     if (!includePriv && sym.startsWith("_")) return false;
     return typeof (this.time as unknown as Record<string, unknown>)[sym] === "function";
@@ -156,6 +165,11 @@ export class TimeWithZone {
   methodMissing(method: string, ...args: unknown[]): unknown {
     const time = this.time as unknown as Record<string, unknown>;
     try {
+      if (typeof time[method] !== "function") {
+        throw new NoMethodError(
+          `undefined method '${method}' for an instance of ${rbObjClass(time)}`,
+        );
+      }
       return this._wrapWithTimeZone(
         (time[method] as (...a: unknown[]) => unknown).apply(time, args),
       );
@@ -865,6 +879,21 @@ export class TimeWithZone {
     this.toDatetime();
     this.toTime();
     return Object.freeze(this);
+  }
+
+  marshalDump(): [Time, string, Time] {
+    return [this.utc(), this.timeZone.name, this.time];
+  }
+
+  marshalLoad(variables: [Time, string, Time]): void {
+    Object.assign(
+      this,
+      new TimeWithZone(
+        variables[0].getutc(),
+        findZone(variables[1]) as TimeZone,
+        variables[2].getutc(),
+      ),
+    );
   }
 
   toDatetime(): Temporal.ZonedDateTime {
