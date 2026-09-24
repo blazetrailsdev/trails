@@ -92,6 +92,12 @@ export class DeprecatedInstanceVariableProxy extends DeprecationProxy {
     super();
     const varName = typeof varOrOptions === "string" ? varOrOptions : `@${method}`;
     const kwargs = typeof varOrOptions === "string" ? options : varOrOptions;
+    const given = arguments.length - (kwargs === undefined ? 0 : 1);
+    if (given < 2 || given > 3) {
+      throw new ArgumentError(
+        `wrong number of arguments (given ${given}, expected 2..3; required keyword: deprecator)`,
+      );
+    }
     if (kwargs === undefined || !("deprecator" in kwargs)) {
       throw new ArgumentError("missing keyword: :deprecator");
     }
