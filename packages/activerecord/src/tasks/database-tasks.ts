@@ -43,7 +43,7 @@ export class DatabaseTasks {
   private static _env: string | null = null;
 
   static get env(): string {
-    return this._env ?? DEFAULT_ENV();
+    return (this._env ??= DEFAULT_ENV());
   }
 
   static set env(value: string | null) {

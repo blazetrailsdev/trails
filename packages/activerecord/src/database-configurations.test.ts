@@ -235,6 +235,7 @@ describe("DatabaseConfigurationsTest", () => {
       expect(DatabaseTasks.env).toBe("staging");
 
       vi.stubEnv("NODE_ENV", undefined as unknown as string);
+      DatabaseTasks.env = null;
       expect(DatabaseTasks.env).toBe("default_env");
     });
 
