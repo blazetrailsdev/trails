@@ -3,6 +3,7 @@ import { ActsLikeObject, isBlank } from "@blazetrails/activesupport";
 import { format, rbObjAsString, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import type { Quoting } from "./connection-adapters/abstract/quoting.js";
 import { PreparedStatementInvalid, UnknownAttributeReference } from "./errors.js";
+import { ActiveRecord } from "./namespaces.js";
 
 /** @internal */
 export type Quoter = Pick<
@@ -43,26 +44,6 @@ export function sanitizeSqlLike(string: string, escapeCharacter: string = "\\"):
   return string.replace(/[%_]/g, (c) => escapeCharacter + c);
 }
 
-export function sanitizeSql(
-  this: { sanitizeSqlArray(ary: [string, ...unknown[]]): string },
-  condition: string | [string, ...unknown[]] | null | undefined,
-): string | null {
-  if (isBlankCondition(condition)) return null;
-  if (Array.isArray(condition)) {
-    return this.sanitizeSqlArray(condition);
-  } else {
-    return condition as string;
-  }
-}
-
-/** @internal */
-function isBlankCondition(value: unknown): boolean {
-  if (value == null) return true;
-  if (typeof value === "string") return value.trim() === "";
-  if (Array.isArray(value)) return value.length === 0;
-  return false;
-}
-
 /** @internal */
 interface QuoterHost {
   connectionPool(): { withConnectionSync<T>(block: (connection: Quoter) => T): T };
@@ -88,14 +69,19 @@ export function sanitizeSqlArray(this: QuoterHost, ary: [string, ...unknown[]]):
 }
 
 export function sanitizeSqlForConditions(
-  this: QuoterHost & {
-    sanitizeSql(condition: string | [string, ...unknown[]] | null | undefined): string | null;
-  },
+  this: { sanitizeSqlArray(ary: [string, ...unknown[]]): string },
   condition: string | [string, ...unknown[]] | null | undefined,
 ): string | null {
-  if (isBlankCondition(condition)) return null;
-  return this.sanitizeSql(condition);
+  if (isBlank(condition)) return null;
+
+  if (Array.isArray(condition)) {
+    return this.sanitizeSqlArray(condition);
+  } else {
+    return condition as string;
+  }
 }
+
+export const sanitizeSql = sanitizeSqlForConditions;
 
 export function sanitizeSqlForAssignment(
   this: QuoterHost & {
@@ -187,18 +173,11 @@ export function replaceBindVariables(
 
 /** @internal */
 function replaceBindVariable(connection: Quoter, value: unknown): string {
-  if (isRelationLike(value)) {
-    return (value as { toSql(): string }).toSql();
+  if (value instanceof ActiveRecord.Relation) {
+    return value.toSql();
+  } else {
+    return quoteBoundValue(connection, value);
   }
-  return quoteBoundValue(connection, value);
-}
-
-function isRelationLike(value: unknown): value is { toSql(): string } {
-  return (
-    value != null &&
-    typeof (value as { toSql?: unknown }).toSql === "function" &&
-    typeof (value as { toArray?: unknown }).toArray === "function"
-  );
 }
 
 /** @internal */

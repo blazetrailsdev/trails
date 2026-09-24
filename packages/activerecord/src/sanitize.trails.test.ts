@@ -69,15 +69,17 @@ describe("sanitizeSql", () => {
     expect(SubPost.sanitizeSql(["title = ?", "x"])).toBe("OVERRIDDEN");
   });
 
-  it("sanitizeSqlForConditions dispatches through this.sanitizeSql", () => {
+  it("sanitizeSql is sanitizeSqlForConditions (Rails alias)", () => {
+    expect(Post.sanitizeSql).toBe(Post.sanitizeSqlForConditions);
+  });
+
+  it("sanitizeSqlForConditions dispatches through this.sanitizeSqlArray", () => {
     class SubPost extends Post {
-      static override sanitizeSql(
-        _input: string | [string, ...unknown[]] | null | undefined,
-      ): string | null {
-        return "VIA_SANITIZE_SQL";
+      static override sanitizeSqlArray(_ary: [string, ...unknown[]]): string {
+        return "OVERRIDDEN";
       }
     }
-    expect(SubPost.sanitizeSqlForConditions(["a = ?", 1])).toBe("VIA_SANITIZE_SQL");
+    expect(SubPost.sanitizeSqlForConditions(["a = ?", 1])).toBe("OVERRIDDEN");
     expect(SubPost.sanitizeSqlForConditions(null)).toBeNull();
     expect(SubPost.sanitizeSqlForConditions("")).toBeNull();
   });
