@@ -11,9 +11,9 @@ interface MockCall {
   args: unknown[];
 }
 
-interface Mock {
-  expected: MockCall[];
-  calls: MockCall[];
+class Mock {
+  expected: MockCall[] = [];
+  calls: MockCall[] = [];
 }
 
 /** @internal */
@@ -53,7 +53,7 @@ export function assertCalledWith<T extends object>(
   { returns = false }: { returns?: unknown } = {},
   block?: () => void | Promise<void>,
 ): void | Promise<void> {
-  const mock: Mock = { expected: [], calls: [] };
+  const mock = new Mock();
   expectCalledWith(mock, args, { returns });
 
   const result = stub(object, methodName, (...called: unknown[]) => mockCall(mock, called), block);
