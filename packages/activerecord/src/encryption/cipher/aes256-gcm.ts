@@ -16,6 +16,9 @@ function toBytes(value: string | Bytes): Bytes {
 }
 
 export class Aes256Gcm {
+  /** @internal */
+  static _railsClassName = "ActiveRecord::Encryption::Cipher::Aes256Gcm";
+
   static readonly CIPHER_TYPE = "aes-256-gcm";
   static keyLength = KEY_LENGTH;
   static ivLength = IV_LENGTH;
@@ -86,11 +89,7 @@ export class Aes256Gcm {
   }
 
   inspect(): string {
-    const name =
-      this.constructor === Aes256Gcm
-        ? "ActiveRecord::Encryption::Cipher::Aes256Gcm"
-        : this.constructor.name;
-    return `#<${name}:${rbAnyToS(this).split(":")[1]}`;
+    return `#<${(this.constructor as typeof Aes256Gcm)._railsClassName}:${rbAnyToS(this).split(":")[1]}`;
   }
 
   private _validateKeyLength(key: Bytes): void {
