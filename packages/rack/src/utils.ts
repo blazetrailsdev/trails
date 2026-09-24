@@ -8,7 +8,7 @@ import {
   ParamsTooDeepError,
   Params,
 } from "./query-parser.js";
-import { ArgumentError, Process, RFC2396_PARSER, URI } from "@blazetrails/ruby-compat";
+import { ArgumentError, Process, RFC2396_PARSER, URI, rbInspect } from "@blazetrails/ruby-compat";
 
 export { ArgumentError };
 
@@ -266,14 +266,21 @@ export function parseCookies(env: Record<string, any>): Record<string, string> {
 
 const VALID_COOKIE_KEY = /^[!#$%&'*+\-.^_`|~0-9a-zA-Z]+$/;
 
+function escapeCookieKey(key: string): string {
+  if (VALID_COOKIE_KEY.test(key)) {
+    return key;
+  } else {
+    console.warn(
+      `Cookie key ${rbInspect(key)} is not valid according to RFC2616; it will be escaped. This behaviour is deprecated and will be removed in a future version of Rack.`,
+    );
+    return escape(key);
+  }
+}
+
 export function setCookieHeader(
   key: string,
   value: string | string[] | Record<string, any>,
 ): string {
-  if (!VALID_COOKIE_KEY.test(key)) {
-    throw new ArgumentError(`invalid cookie key: ${JSON.stringify(key)}`);
-  }
-
   let domain = "",
     path = "",
     maxAge = "",
@@ -286,6 +293,7 @@ export function setCookieHeader(
 
   if (typeof value === "object" && !Array.isArray(value)) {
     const opts = value;
+    if (opts.escapeKey !== false) key = escapeCookieKey(key);
     if (opts.domain) domain = `; domain=${opts.domain}`;
     if (opts.path) path = `; path=${opts.path}`;
     if (opts.maxAge !== undefined) maxAge = `; max-age=${opts.maxAge}`;
@@ -297,14 +305,16 @@ export function setCookieHeader(
       if (ss === "none" || ss === "None") sameSite = "; samesite=none";
       else if (ss === "lax" || ss === "Lax") sameSite = "; samesite=lax";
       else if (ss === true || ss === "strict" || ss === "Strict") sameSite = "; samesite=strict";
-      else throw new ArgumentError(`Invalid :same_site value: ${JSON.stringify(ss)}`);
+      else throw new ArgumentError(`Invalid :same_site value: ${rbInspect(ss)}`);
     }
     if (opts.partitioned) partitioned = "; partitioned";
     const v = opts.value;
     values = Array.isArray(v) ? v : [v ?? ""];
   } else if (Array.isArray(value)) {
+    key = escapeCookieKey(key);
     values = value;
   } else {
+    key = escapeCookieKey(key);
     values = [value];
   }
 

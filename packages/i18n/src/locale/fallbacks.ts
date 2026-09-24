@@ -1,3 +1,4 @@
+import { rbObjClass } from "@blazetrails/ruby-compat";
 import { InvalidLocale, Disabled } from "../exceptions.js";
 import type { Locale } from "../i18n.js";
 import { tag as tagFor } from "./tag.js";
@@ -71,7 +72,7 @@ export class Fallbacks extends Map<Locale, Locale[]> {
     const map = Object.entries(this.mapStore)
       .map(([key, value]) => `${inspectSymbol(key)}=>${inspectLocales(value)}`)
       .join(", ");
-    return `#<${this.constructor.name} @map={${map}} @defaults=${inspectLocales(this.defaultsStore)}>`;
+    return `#<${rbObjClass(this)} @map={${map}} @defaults=${inspectLocales(this.defaultsStore)}>`;
   }
 
   protected compute(
