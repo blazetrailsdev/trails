@@ -5,7 +5,10 @@ import type { TouchArgs, TouchOptions } from "./timestamp.js";
 import { extractOptionsBang } from "@blazetrails/activesupport";
 import { BelongsTo as BelongsToBuilder } from "./associations/builder/belongs-to.js";
 import { HasOne as HasOneBuilder } from "./associations/builder/has-one.js";
-import { beforeCommittedBang as transactionsBeforeCommittedBang } from "./transactions.js";
+import {
+  addToTransaction,
+  beforeCommittedBang as transactionsBeforeCommittedBang,
+} from "./transactions.js";
 import { isAppliedTo as isNoTouchingApplied } from "./no-touching.js";
 
 function raiseRecordNotTouchedError(): never {
@@ -38,21 +41,8 @@ export async function touchLater(this: Base, ...names: string[]): Promise<void> 
   self._touchTime = currentTimeFromProperTimezone();
   surreptitiouslyTouch.call(this, self._deferTouchAttrs as string[]);
 
-  const adapter = (await ctor.connection) as any;
-  const hasAddRecord = typeof adapter?.addTransactionRecord === "function";
-  const currentTx =
-    typeof adapter?.currentTransaction === "function" ? adapter.currentTransaction() : null;
-  const hasOpenRealTransaction =
-    hasAddRecord &&
-    currentTx != null &&
-    currentTx.open === true &&
-    typeof currentTx.addRecord === "function";
-  if (hasOpenRealTransaction) {
-    adapter.addTransactionRecord(this);
-  } else {
-    await touchDeferredAttributes.call(this);
-    return;
-  }
+  await addToTransaction.call(this);
+  self._newRecordBeforeLastCommit ||= false;
 
   for (const r of ctor.reflectOnAllAssociations()) {
     const touch = r.options?.touch;
@@ -92,8 +82,7 @@ export async function touch(
 }
 
 export async function beforeCommittedBang(this: Base): Promise<void> {
-  const self = this as any;
-  if (self._deferTouchAttrs?.length && this.isPersisted()) {
+  if (hasDeferTouchAttrs(this) && this.isPersisted()) {
     await touchDeferredAttributes.call(this);
   }
   await transactionsBeforeCommittedBang(this);

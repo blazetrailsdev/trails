@@ -1370,12 +1370,12 @@ export class CreatePosts extends Migration {
       createWidgets.migration = async () =>
         new (class extends Migration {
           override async up(): Promise<void> {
-            await this.connection.execute(
-              `CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT)`,
-            );
+            await (
+              await this.connection
+            ).execute(`CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT)`);
           }
           override async down(): Promise<void> {
-            await this.connection.execute(`DROP TABLE widgets`);
+            await (await this.connection).execute(`DROP TABLE widgets`);
           }
         })("CreateWidgets", 20260101000000);
       const migrations = [createWidgets];

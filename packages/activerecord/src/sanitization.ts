@@ -1,88 +1,15 @@
 import { Nodes, sql as arelSql } from "@blazetrails/arel";
-import { ActsLikeObject } from "@blazetrails/activesupport";
+import { ActsLikeObject, isBlank } from "@blazetrails/activesupport";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import type { Quoting } from "./connection-adapters/abstract/quoting.js";
 import { columnNameMatcher as abstractColumnNameMatcher } from "./connection-adapters/abstract/quoting.js";
-import {
-  ConnectionNotDefined,
-  PreparedStatementInvalid,
-  UnknownAttributeReference,
-} from "./errors.js";
+import { PreparedStatementInvalid, UnknownAttributeReference } from "./errors.js";
 
 /** @internal */
 export type Quoter = Pick<
   Quoting,
   "quote" | "quoteColumnName" | "quoteTableNameForAssignment" | "quoteString" | "castBoundValue"
 >;
-
-function _sanitizeSqlArray(
-  withConnection: () => Quoter,
-  template: string,
-  binds: unknown[],
-): string {
-  const statement = template;
-  const [first] = binds;
-
-  if (isPlainHash(first) && /:\w+/.test(statement)) {
-    return replaceNamedBindVariables(withConnection(), statement, first as Record<string, unknown>);
-  }
-
-  if (statement.includes("?")) {
-    return replaceBindVariables(withConnection(), statement, binds);
-  }
-
-  if (statement === "") {
-    raiseIfBindArityMismatch(statement, 0, binds.length);
-    return statement;
-  }
-
-  const quoter = withConnection();
-  const specifiers = statement.match(/%[sdi]/g) ?? [];
-  if (specifiers.length > 0) {
-    raiseIfBindArityMismatch(statement, specifiers.length, binds.length);
-    const values = [...binds];
-    return statement.replace(/%[sdi]/g, (spec) => {
-      const value = values.shift();
-      if (spec === "%s") return quoter.quoteString(String(value ?? ""));
-      const text = String(value ?? "").trim();
-      if (!/^[+-]?\d+$/.test(text)) {
-        throw new PreparedStatementInvalid(
-          `invalid value for %d bind variable (${String(value)}) in: ${statement}`,
-        );
-      }
-      return String(parseInt(text, 10));
-    });
-  }
-
-  raiseIfBindArityMismatch(statement, 0, binds.length);
-  return statement;
-}
-
-/** @internal */
-function _sanitizeSqlHashForAssignment(
-  quoter: Quoter,
-  attrs: Record<string, unknown>,
-  table: string,
-  typeForAttribute?: (
-    name: string,
-  ) => { cast?(v: unknown): unknown; serialize?(v: unknown): unknown } | undefined,
-): string {
-  return Object.entries(attrs)
-    .map(([attr, value]) => {
-      if (typeForAttribute) {
-        const type = typeForAttribute(attr);
-        if (type) {
-          if (type.cast) value = type.cast(value);
-          if (type.serialize) value = type.serialize(value);
-        }
-      }
-      const col = table
-        ? quoter.quoteTableNameForAssignment(table, attr)
-        : quoter.quoteColumnName(attr);
-      return `${col} = ${quoter.quote(value)}`;
-    })
-    .join(", ");
-}
 
 export function disallowRawSqlBang(
   this: { adapterClassSync(): unknown },
@@ -142,18 +69,42 @@ function isBlankCondition(value: unknown): boolean {
 
 /** @internal */
 interface QuoterHost {
-  connectionPool?(): { withConnectionSync<T>(block: (connection: Quoter) => T): T };
+  connectionPool(): { withConnectionSync<T>(block: (connection: Quoter) => T): T };
 }
 
-/** @internal */
-function quoterFor(host: QuoterHost): Quoter {
-  const conn = host.connectionPool?.().withConnectionSync((c) => c);
-  if (!conn || typeof conn.quote !== "function") throw new ConnectionNotDefined();
-  return conn;
-}
-
-export function sanitizeSqlArray(this: QuoterHost, template: string, ...binds: unknown[]): string {
-  return _sanitizeSqlArray(() => quoterFor(this), template, binds);
+export function sanitizeSqlArray(
+  this: QuoterHost,
+  statement: string,
+  ...values: unknown[]
+): string {
+  if (isPlainHash(values[0]) && statement.match(/:\w+/) != null) {
+    return this.connectionPool().withConnectionSync((c) =>
+      replaceNamedBindVariables(c, statement, values[0] as Record<string, unknown>),
+    );
+  } else if (statement.includes("?")) {
+    return this.connectionPool().withConnectionSync((c) =>
+      replaceBindVariables(c, statement, values),
+    );
+  } else if (isBlank(statement)) {
+    return statement;
+  } else {
+    return this.connectionPool().withConnectionSync((c) => {
+      const specifiers = statement.match(/%[sdi]/g) ?? [];
+      raiseIfBindArityMismatch(statement, specifiers.length, values.length);
+      const quoted = values.map((value) => c.quoteString(String(value ?? "")));
+      return statement.replace(/%[sdi]/g, (spec) => {
+        const value = quoted.shift()!;
+        if (spec === "%s") return value;
+        const text = value.trim();
+        if (!/^[+-]?\d+$/.test(text)) {
+          throw new PreparedStatementInvalid(
+            `invalid value for %d bind variable (${value}) in: ${statement}`,
+          );
+        }
+        return String(parseInt(text, 10));
+      });
+    });
+  }
 }
 
 export function sanitizeSqlForConditions(
@@ -220,7 +171,18 @@ export function sanitizeSqlHashForAssignment(
     name: string,
   ) => { cast?(v: unknown): unknown; serialize?(v: unknown): unknown } | undefined,
 ): string {
-  return _sanitizeSqlHashForAssignment(quoterFor(this), attrs, table, typeForAttribute);
+  return this.connectionPool().withConnectionSync((c) =>
+    Object.entries(attrs)
+      .map(([attr, value]) => {
+        const type = typeForAttribute?.(attr);
+        if (type) {
+          if (type.cast) value = type.cast(value);
+          if (type.serialize) value = type.serialize(value);
+        }
+        return `${table ? c.quoteTableNameForAssignment(table, attr) : c.quoteColumnName(attr)} = ${c.quote(value)}`;
+      })
+      .join(", "),
+  );
 }
 
 export const ClassMethods = {
@@ -235,7 +197,11 @@ export const ClassMethods = {
 };
 
 /** @internal */
-function replaceBindVariables(connection: Quoter, statement: string, values: unknown[]): string {
+export function replaceBindVariables(
+  connection: Quoter,
+  statement: string,
+  values: unknown[],
+): string {
   raiseIfBindArityMismatch(statement, statement.match(/\?/g)?.length ?? 0, values.length);
   const bound = [...values];
   let result = statement;
@@ -260,7 +226,7 @@ function isRelationLike(value: unknown): value is { toSql(): string } {
 }
 
 /** @internal */
-function replaceNamedBindVariables(
+export function replaceNamedBindVariables(
   connection: Quoter,
   statement: string,
   bindVars: Record<string, unknown>,

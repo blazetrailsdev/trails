@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { sql as arelSql } from "@blazetrails/arel";
-import { assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
+import { assertNothingRaised, assertRaises, isPlainObject } from "@blazetrails/activesupport";
 import { Base, Range, PreparedStatementInvalid, UnknownAttributeReference } from "./index.js";
 import type { Relation } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
@@ -9,12 +9,21 @@ import { Author } from "./test-helpers/models/author.js";
 import { Binary } from "./test-helpers/models/binary.js";
 import { Post } from "./test-helpers/models/post.js";
 import { currentAdapter } from "./support/adapter-helper.js";
+import { replaceBindVariables, replaceNamedBindVariables } from "./sanitization.js";
 import { assertQueriesMatch } from "./testing/query-assertions.js";
 
 fixtures({});
 
 function bind(statement: string, ...vars: unknown[]): string {
-  return Base.sanitizeSqlArray(statement, ...vars);
+  if (isPlainObject(vars[0])) {
+    return Base.connectionPool().withConnectionSync((c) =>
+      replaceNamedBindVariables(c, statement, vars[0] as Record<string, unknown>),
+    );
+  } else {
+    return Base.connectionPool().withConnectionSync((c) =>
+      replaceBindVariables(c, statement, vars),
+    );
+  }
 }
 
 class SimpleEnumerable {

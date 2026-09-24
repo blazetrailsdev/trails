@@ -2553,6 +2553,6 @@ describe("MigrationTest", () => {
 
   it("migration instance has connection", async () => {
     const migration = new (class extends Migration {})();
-    expect(migration.connection).toBe(await Base.leaseConnection());
+    expect(await migration.connection).toBe(await Base.leaseConnection());
   });
 });

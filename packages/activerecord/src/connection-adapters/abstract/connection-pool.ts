@@ -1074,6 +1074,7 @@ async function acquireConnection(this: Pool, checkoutTimeout: number): Promise<D
     conn = this.tryToCheckoutNewConnection() ?? undefined;
     if (conn) return conn;
     await this.reap();
+    ensureLive();
     conn = this._available?.poll() as DatabaseAdapter | undefined;
     if (conn) return accept(conn);
     conn = this.tryToCheckoutNewConnection() ?? undefined;
@@ -1114,8 +1115,7 @@ function tryToCheckoutNewConnection(this: Pool): DatabaseAdapter | null {
   let doCheckout = false;
   if (
     this._threadsBlockingNewConnections === 0 &&
-    this._connections &&
-    this._connections.length + this._nowConnecting < this.size
+    this._connections!.length + this._nowConnecting < this.size
   ) {
     this._nowConnecting += 1;
     doCheckout = true;
