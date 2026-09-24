@@ -1,6 +1,6 @@
 import { ValueType } from "@blazetrails/activemodel";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { ArgumentError, Range, rbEqual } from "@blazetrails/ruby-compat";
+import { ArgumentError, Range, rbEqual, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 export interface RangeSubtype {
   cast(value: unknown): unknown;
@@ -133,12 +133,9 @@ export class RangeType extends ValueType<Range<unknown>> {
 
   /** @internal */
   private isInfinity(value: unknown): boolean {
-    const fn = (value as { isInfinite?: unknown })?.isInfinite;
-    if (typeof fn === "function") {
-      const result = (fn as () => unknown).call(value);
-      return result != null && result !== false;
-    }
-    return value === Infinity || value === -Infinity;
+    if (!rbObjRespondTo(value, "isInfinite")) return value === Infinity || value === -Infinity;
+    const result = (value as { isInfinite(): unknown }).isInfinite();
+    return result != null && result !== false;
   }
 }
 

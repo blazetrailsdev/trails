@@ -14,11 +14,7 @@ import {
   advance as datetimeAdvance,
   since as datetimeSince,
 } from "./core-ext/date-time/calculations.js";
-import {
-  advance as timeAdvance,
-  current as timeCurrent,
-  since as timeSince,
-} from "./core-ext/time/calculations.js";
+import { current as timeCurrent } from "./core-ext/time/calculations.js";
 import { rbInspect as inspect } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "./hash-utils.js";
 import { toSentence } from "./array-utils.js";
@@ -438,7 +434,6 @@ export class Duration {
 
     if (isEmpty(this._parts())) {
       if (time instanceof Temporal.PlainDate) return dateSince(time, sign * this.inSeconds());
-      if (time instanceof RubyTime) return timeSince.call(time, sign * this.inSeconds());
       if (isDateTime(time)) return datetimeSince(time, sign * this.inSeconds());
       if (!(time instanceof Date || time instanceof Temporal.Instant))
         return time.since(sign * this.inSeconds());
@@ -598,7 +593,6 @@ function dateOrTimeSince(
   seconds: number,
 ): DateTime | TimeWithZone | RubyTime {
   if (t instanceof Temporal.PlainDate) return dateSince(t, seconds);
-  if (t instanceof RubyTime) return timeSince.call(t, seconds);
   if (isDateTime(t)) return datetimeSince(t, seconds);
   return t.since(seconds);
 }
@@ -608,7 +602,6 @@ function dateOrTimeAdvance(
   options: Partial<DurationParts>,
 ): Temporal.PlainDate | DateTime | TimeWithZone | RubyTime {
   if (t instanceof Temporal.PlainDate) return dateAdvance(t, options);
-  if (t instanceof RubyTime) return timeAdvance.call(t, options);
   if (isDateTime(t)) return datetimeAdvance(t, options);
   return t.advance(options);
 }

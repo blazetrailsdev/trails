@@ -16,6 +16,11 @@ export const packageEntries: Array<[string, string]> = [
   ["@blazetrails/activerecord/migration", "../activerecord/src/migration.ts"],
   ["@blazetrails/activerecord/base", "../activerecord/src/base.ts"],
   ["@blazetrails/activerecord/schema", "../activerecord/src/schema.ts"],
+  [
+    "@blazetrails/activerecord/connection-adapters/sqlite3-adapter",
+    "../activerecord/src/connection-adapters/sqlite3-adapter.ts",
+  ],
+  ["@blazetrails/activerecord/connection-adapters", "../activerecord/src/connection-adapters.ts"],
   ["@blazetrails/activerecord", "../activerecord/src/index.ts"],
   ["@blazetrails/rack", "../rack/src/index.ts"],
   ["@blazetrails/actionview", "../actionview/src/index.ts"],

@@ -622,8 +622,7 @@ describe("TimeWithZoneTest", () => {
     assertNotPredicate(twz, (t) => t.isBlank());
   });
 
-  it.skip("is a", () => {
-    // BLOCKED: activesupport-time-with-zone-is-a-time
+  it("is a", () => {
     expect(twz).toBeInstanceOf(RubyTime);
     expect(twz).toBeInstanceOf(RubyTime);
     expect(twz).toBeInstanceOf(TimeWithZone);
@@ -1157,11 +1156,36 @@ describe("TimeWithZoneTest", () => {
     expect((twz as MethodMissing).monthsSince(1).time).toEqual(RubyTime.utc(2000, 1, 31, 19, 0, 0));
   });
 
-  // BLOCKED: activesupport-time-with-zone-marshal-dump-and-load
-  it.todo("marshal dump and load");
+  function marshalRoundTrip(value: TimeWithZone): TimeWithZone {
+    const marshalStr = value.marshalDump();
+    const mtime = Object.create(TimeWithZone.prototype) as TimeWithZone;
+    mtime.marshalLoad(marshalStr);
+    return mtime;
+  }
 
-  // BLOCKED: activesupport-time-with-zone-marshal-dump-and-load
-  it.todo("marshal dump and load with tzinfo identifier");
+  it("marshal dump and load", () => {
+    const mtime = marshalRoundTrip(twz);
+    expect(mtime.utc()).toEqual(RubyTime.utc(2000, 1, 1, 0));
+    assertPredicate(mtime.utc(), (t) => t.isUtc());
+    expect(mtime.timeZone).toEqual(TimeZone.find("Eastern Time (US & Canada)"));
+    expect(mtime.time).toEqual(RubyTime.utc(1999, 12, 31, 19));
+    assertPredicate(mtime.time, (t) => t.isUtc());
+    expect(mtime.inspect()).toEqual(twz.inspect());
+  });
+
+  it("marshal dump and load with tzinfo identifier", () => {
+    const tzinfoTwz = new TimeWithZone(
+      utc,
+      Timezone.get("America/New_York") as unknown as TimeZone,
+    );
+    const mtime = marshalRoundTrip(tzinfoTwz);
+    expect(mtime.utc()).toEqual(RubyTime.utc(2000, 1, 1, 0));
+    assertPredicate(mtime.utc(), (t) => t.isUtc());
+    expect(mtime.timeZone.name).toEqual("America/New_York");
+    expect(mtime.time).toEqual(RubyTime.utc(1999, 12, 31, 19));
+    assertPredicate(mtime.time, (t) => t.isUtc());
+    expect(mtime.inspect()).toEqual(twz.inspect());
+  });
 
   it("freeze", () => {
     twz.freeze();
@@ -1494,13 +1518,12 @@ describe("TimeWithZoneTest", () => {
     );
   });
 
-  it.skip("no method error has proper context", async () => {
-    // BLOCKED: activesupport-time-with-zone-method-missing-no-method-error
+  it("no method error has proper context", async () => {
     const e = await assertRaises([NoMethodError], {}, () => {
       (twz as any).thisMethodDoesNotExist();
     });
     expect(e.message).toMatch(
-      /undefined method [`']this_method_does_not_exist' for.*ActiveSupport::TimeWithZone/,
+      /undefined method [`']thisMethodDoesNotExist' for.*ActiveSupport::TimeWithZone/,
     );
     expect(e.stack!.split("\n")[1]).not.toMatch("rescue");
   });

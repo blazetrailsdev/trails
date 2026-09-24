@@ -1,12 +1,13 @@
 import { Date as RubyDate, Temporal, Time as RubyTime } from "@blazetrails/date";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Rational, rbObjClass } from "@blazetrails/ruby-compat";
+import { deprecator } from "../../deprecator.js";
 import { Duration } from "../../duration.js";
 import { ArgumentError } from "../../hash-utils.js";
 import { currentTimeInstant } from "../../time-travel.js";
 import { TimeWithZone } from "../../time-with-zone.js";
 import { zone as timeZone } from "../../time-zone-config.js";
 import { advance as dateAdvance } from "../date/calculations.js";
-import { compare as dateTimeCompare } from "../date-time/calculations.js";
+import { compare as dateTimeCompare, since as dateTimeSince } from "../date-time/calculations.js";
 import { toF } from "../date-time/conversions.js";
 import { toTime } from "./compatibility.js";
 
@@ -97,7 +98,7 @@ export function secondsUntilEndOfDay(this: RubyTime): number {
   return endOfDay.call(this).toI() - this.toI();
 }
 
-export function secFraction(this: RubyTime): number {
+export function secFraction(this: RubyTime): number | Rational {
   return this.subsec;
 }
 
@@ -210,8 +211,18 @@ export function ago(this: RubyTime, seconds: number | Duration): RubyTime {
   return since.call(this, seconds instanceof Duration ? seconds.negate() : -seconds);
 }
 
-export function since(this: RubyTime, seconds: number | Duration): RubyTime {
-  return plusWithDuration.call(this, seconds);
+export function since(this: RubyTime, seconds: number | Duration | RubyTime): RubyTime {
+  try {
+    return this.plus(seconds as number);
+  } catch (e) {
+    if (!(e instanceof TypeError)) throw e;
+    const result = dateTimeSince(this.toDatetime(), seconds as RubyTime);
+    deprecator().warn(
+      `Passing an instance of ${rbObjClass(seconds)} to ${rbObjClass(this)}#since is deprecated. This behavior will raise ` +
+        "a `TypeError` in Rails 8.1.",
+    );
+    return result as unknown as RubyTime;
+  }
 }
 
 export function beginningOfDay(this: RubyTime): RubyTime {
@@ -353,11 +364,11 @@ declare module "@blazetrails/date" {
   interface Time {
     secondsSinceMidnight(): number;
     secondsUntilEndOfDay(): number;
-    secFraction(): number;
+    secFraction(): number | Rational;
     change(options: ChangeOptions): Time;
     advance(options: AdvanceOptions): Time;
     ago(seconds: number | Duration): Time;
-    since(seconds: number | Duration): Time;
+    since(seconds: number | Duration | Time): Time;
     in(seconds: number): Time;
     beginningOfDay(): Time;
     midnight(): Time;
@@ -452,3 +463,12 @@ Object.assign(RubyTime.prototype, {
 Object.assign(RubyTime, { current, daysInMonth, daysInYear, rfc3339, atWithCoercion });
 
 RubyTime.at = atWithCoercion;
+
+Object.defineProperty(RubyTime, Symbol.hasInstance, {
+  value(this: typeof RubyTime, other: unknown): boolean {
+    return (
+      Function.prototype[Symbol.hasInstance].call(this, other) ||
+      (this === RubyTime && other instanceof TimeWithZone)
+    );
+  },
+});

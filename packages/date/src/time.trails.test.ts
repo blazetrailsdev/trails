@@ -157,7 +157,7 @@ describe("Time", () => {
     expect(time.sec).toBe(0);
     expect(time.nsec).toBe(500000000);
     expect(time.usec).toBe(500000);
-    expect(time.subsec).toBe(0.5);
+    expect(time.subsec).toEqual(new Rational(1, 2));
     expect(time.strftime("%S")).toBe("00");
     expect(time.strftime("%N")).toBe("500000000");
     expect(time.strftime("%L")).toBe("500");

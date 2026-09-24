@@ -1,12 +1,16 @@
 import { PeriodNotFound, TimeZone, TimezonePeriod } from "./values/time-zone.js";
 import {
   Range,
+  basicObjRespondTo,
   equals as cmpEquals,
   greaterThan,
   greaterThanOrEqual,
   isBetween,
   lessThan,
   lessThanOrEqual,
+  NoMethodError,
+  PROTOCOL_PROBES,
+  rbObjClass,
   rubyClass,
 } from "@blazetrails/ruby-compat";
 import { Object as ObjectExt } from "./core-ext/object/acts-like.js";
@@ -100,7 +104,7 @@ type TimeLike =
 const METHOD_MISSING_HANDLER: ProxyHandler<TimeWithZone> = {
   get(target, prop) {
     if (Reflect.has(target, prop)) return Reflect.get(target, prop, target);
-    if (typeof prop !== "string" || !target.respondToMissing(prop, false)) return undefined;
+    if (typeof prop === "symbol" || PROTOCOL_PROBES.has(prop)) return undefined;
     return (...args: unknown[]) => target.methodMissing(prop, ...args);
   },
   has(target, prop) {
@@ -112,9 +116,9 @@ const METHOD_MISSING_HANDLER: ProxyHandler<TimeWithZone> = {
 };
 
 export class TimeWithZone {
-  private _utc: Time | null;
-  private _time: TimeLike | null;
-  private readonly _timeZone: TimeZone;
+  private _utc!: Time | null;
+  private _time!: TimeLike | null;
+  private _timeZone!: TimeZone;
   private _period?: TimezonePeriod;
   private _toTimeWithTimezone?: Time;
   private _toTimeWithInstanceOffset?: Time;
@@ -126,14 +130,22 @@ export class TimeWithZone {
     localTime: TimeLike | null = null,
     period: TimezonePeriod | null = null,
   ) {
+    this.initialize(utcTime, timeZone, localTime, period);
+    return new Proxy(this, METHOD_MISSING_HANDLER);
+  }
+
+  initialize(
+    utcTime: TimeLike | null,
+    timeZone: TimeZone,
+    localTime: TimeLike | null = null,
+    period: TimezonePeriod | null = null,
+  ): void {
     this._utc = utcTime ? this._transferTimeValuesToUtcConstructor(utcTime) : null;
     this._timeZone = timeZone;
     this._time = localTime;
     this._period = this._utc
       ? (period ?? undefined)
       : this._getPeriodAndEnsureValidLocalTime(period);
-
-    return new Proxy(this, METHOD_MISSING_HANDLER);
   }
 
   private get _zoned(): Temporal.ZonedDateTime {
@@ -148,6 +160,11 @@ export class TimeWithZone {
     return this.utc().toTime().toPlainDateTime();
   }
 
+  respondTo(sym: string, includePriv: boolean = false): boolean {
+    if (sym === "toStr") return false;
+    return basicObjRespondTo(this, sym, !includePriv) || this.respondToMissing(sym, includePriv);
+  }
+
   respondToMissing(sym: string, includePriv: boolean): boolean {
     if (!includePriv && sym.startsWith("_")) return false;
     return typeof (this.time as unknown as Record<string, unknown>)[sym] === "function";
@@ -156,6 +173,11 @@ export class TimeWithZone {
   methodMissing(method: string, ...args: unknown[]): unknown {
     const time = this.time as unknown as Record<string, unknown>;
     try {
+      if (typeof time[method] !== "function") {
+        throw new NoMethodError(
+          `undefined method '${method}' for an instance of ${rbObjClass(time)}`,
+        );
+      }
       return this._wrapWithTimeZone(
         (time[method] as (...a: unknown[]) => unknown).apply(time, args),
       );
@@ -865,6 +887,18 @@ export class TimeWithZone {
     this.toDatetime();
     this.toTime();
     return Object.freeze(this);
+  }
+
+  marshalDump(): [Time, string, Time] {
+    return [this.utc(), this.timeZone.name, this.time];
+  }
+
+  marshalLoad(variables: [Time, string, Time]): void {
+    this.initialize(
+      variables[0].getutc(),
+      findZone(variables[1]) as TimeZone,
+      variables[2].getutc(),
+    );
   }
 
   toDatetime(): Temporal.ZonedDateTime {
