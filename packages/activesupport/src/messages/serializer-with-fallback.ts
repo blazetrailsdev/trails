@@ -155,7 +155,7 @@ const messagePackWithFallback: Serializer = {
   },
 
   _load(dumped: string): unknown {
-    return MessagePack.load(Buffer.from(dumped, "latin1"));
+    return MessagePack.load(dumped);
   },
 
   dumped(dumped: string): boolean {

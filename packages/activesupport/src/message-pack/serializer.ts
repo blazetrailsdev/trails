@@ -26,7 +26,7 @@ export class Serializer {
     return packer.toBuffer();
   }
 
-  load(dumped: Buffer): unknown {
+  load(dumped: Buffer | string): unknown {
     const unpacker = this.messagePackPool().unpacker(dumped);
     if (unpacker.read() !== SIGNATURE_INT)
       throw new MessagePackError("Invalid serialization format");

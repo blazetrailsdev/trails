@@ -117,38 +117,21 @@ export class BelongsToAssociation extends SingularAssociation {
       modelWas = this.klass;
     }
 
-    const fkNames = this.foreignKeyNames();
-    const foreignKeyWas = fkNames.map((foreignKey) =>
-      typeof this.owner.attributeBeforeLastSave === "function"
-        ? this.owner.attributeBeforeLastSave(foreignKey)
-        : undefined,
+    const foreignKeyWas = this.owner.attributeBeforeLastSave(
+      this.reflection.foreignKey() as string,
     );
 
-    if (foreignKeyWas.some((v) => v != null) && modelWas) {
-      const counterCol = this.counterCacheColumn();
-      if (!counterCol) return;
+    if (foreignKeyWas != null && foreignKeyWas !== false && modelWas) {
       await this.updateCountersViaScope(modelWas, foreignKeyWas, -1);
     }
   }
 
-  private async updateCountersViaScope(klass: any, foreignKey: any[], by: number): Promise<void> {
-    const counterCol = this.counterCacheColumn();
-    if (!counterCol) return;
-    if (typeof klass.unscoped !== "function") return;
-
-    const pks = this.associationPrimaryKeys(klass);
-    if (pks.length !== foreignKey.length) return;
-    const conditions: Record<string, unknown> = {};
-    for (let i = 0; i < pks.length; i++) {
-      if (foreignKey[i] == null) return;
-      conditions[pks[i]] = foreignKey[i];
-    }
-
-    const scope = klass.unscoped().whereBang(conditions);
-    if (typeof scope.updateCounters === "function") {
-      const touch = (this.reflection.options as any).touch;
-      await scope.updateCounters({ [counterCol]: by, touch });
-    }
+  private async updateCountersViaScope(klass: any, foreignKey: unknown, by: number): Promise<void> {
+    const scope = klass.unscoped().whereBang(new Map([[this.primaryKey(klass), foreignKey]]));
+    await scope.updateCounters({
+      [this.counterCacheColumn()!]: by,
+      touch: (this.reflection.options as any).touch,
+    });
   }
 
   isTargetChanged(): boolean {
@@ -330,7 +313,7 @@ export class BelongsToAssociation extends SingularAssociation {
       } else {
         await this.updateCountersViaScope(
           this.klass,
-          this.foreignKeyNames().map((fk) => (this.owner as any)._readAttribute?.(fk)),
+          this.owner._readAttribute(this.reflection.foreignKey() as string),
           by,
         );
       }

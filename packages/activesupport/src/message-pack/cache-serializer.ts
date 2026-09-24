@@ -2,7 +2,7 @@ import { Serializer } from "./serializer.js";
 import { Extensions, MissingClassError } from "./extensions.js";
 
 export class CacheSerializer extends Serializer {
-  override load(dumped: Buffer): unknown {
+  override load(dumped: Buffer | string): unknown {
     try {
       return super.load(dumped);
     } catch (e) {

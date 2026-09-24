@@ -1110,15 +1110,10 @@ describe("EagerAssociationTest", () => {
   });
 
   it("preloading has_one with cpk", async () => {
-    const order = await CpkOrder.create({ id: [2, 2] });
-    const orderId = (order as any).id[1];
-    const book = await CpkBook.create({
-      id: [1, 3],
-      shop_id: order.shop_id,
-      order_id: orderId,
-    });
+    const order = await CpkOrder.create({ shop_id: 2 });
+    const book = await CpkBook.create({ order, id: [1, 3] });
 
-    const found = (await CpkOrder.all().eagerLoad(":book").findBy({ id: orderId })) as any;
+    const found = (await CpkOrder.all().eagerLoad(":book").findBy({ id: order.id })) as any;
     expect(found.association("book").target.id).toEqual(book.id);
   });
 

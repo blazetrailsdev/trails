@@ -608,10 +608,10 @@ export class DatabaseTasks {
     dbConfig: HashConfig,
     format: SchemaFormat = schemaFormat(),
   ): Promise<void> {
-    const rawFilename = this.schemaDumpPath(dbConfig, format);
-    if (rawFilename == null) return;
-    const filename = this._resolveSchemaPath(rawFilename);
-    FileUtils.mkdirP(File.dirname(filename));
+    const filename = this.schemaDumpPath(dbConfig, format);
+    if (filename == null) return;
+
+    FileUtils.mkdirP(this.dbDir);
     if (format !== "sql") {
       const { SchemaDumper } = await import("../connection-adapters/abstract/schema-dumper.js");
       const languageWas = SchemaDumper.language;
@@ -1083,12 +1083,9 @@ export async function initializeDatabase(dbConfig: HashConfig): Promise<boolean>
       }
     }
     if (!alreadyInitialized) {
-      const rawPath = DatabaseTasks.schemaDumpPath(dbConfig);
-      if (rawPath) {
-        const resolved = DatabaseTasks._resolveSchemaPath(rawPath);
-        if (File.isExist(resolved)) {
-          await DatabaseTasks.loadSchema(dbConfig, schemaFormat(), undefined);
-        }
+      const schemaDumpPath = DatabaseTasks.schemaDumpPath(dbConfig);
+      if (schemaDumpPath != null && File.isExist(schemaDumpPath)) {
+        await DatabaseTasks.loadSchema(dbConfig, schemaFormat(), undefined);
       }
     }
     return !alreadyInitialized;

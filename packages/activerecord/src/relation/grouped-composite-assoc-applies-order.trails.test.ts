@@ -14,8 +14,9 @@ describe("CpkBook grouped calculation over a composite-key belongs_to applies or
 
   async function seedOrders(): Promise<void> {
     await CpkAuthor.create({ id: 1, name: "Author One" });
+    const orders = new Map<number, CpkOrder>();
     for (const id of [1, 2, 3]) {
-      await CpkOrder.create({ id: [1, id], status: `s-${id}` });
+      orders.set(id, await CpkOrder.create({ id: [1, id], status: `s-${id}` }));
     }
     const books: Array<[number, number]> = [
       [1, 1],
@@ -30,8 +31,7 @@ describe("CpkBook grouped calculation over a composite-key belongs_to applies or
         id: [1, bookId],
         title: `book-${bookId}`,
         revision: 1,
-        shop_id: 1,
-        order_id: orderId,
+        order: orders.get(orderId),
       });
     }
   }

@@ -97,11 +97,11 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
 
   async function seedBooksWithOrders(): Promise<void> {
     await CpkAuthor.create({ id: 1, name: "Author One" });
-    await CpkOrder.create({ id: [1, 100], status: "open" });
-    await CpkOrder.create({ id: [1, 200], status: "open" });
-    await CpkBook.create({ id: [1, 1], shop_id: 1, order_id: 100, title: "Alpha" });
-    await CpkBook.create({ id: [1, 2], shop_id: 1, order_id: 100, title: "Beta" });
-    await CpkBook.create({ id: [1, 3], shop_id: 1, order_id: 200, title: "Gamma" });
+    const order100 = await CpkOrder.create({ id: [1, 100], status: "open" });
+    const order200 = await CpkOrder.create({ id: [1, 200], status: "open" });
+    await CpkBook.create({ id: [1, 1], order: order100, title: "Alpha" });
+    await CpkBook.create({ id: [1, 2], order: order100, title: "Beta" });
+    await CpkBook.create({ id: [1, 3], order: order200, title: "Gamma" });
   }
 
   function byOrderId(result: Map<unknown, unknown>): Map<number | null, number> {

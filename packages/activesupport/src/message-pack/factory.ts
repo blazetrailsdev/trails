@@ -45,8 +45,8 @@ export class Factory {
     return new Packer(this);
   }
 
-  unpacker(buf: Buffer): Unpacker {
-    return new Unpacker(buf, this);
+  unpacker(buf: Buffer | string): Unpacker {
+    return new Unpacker(typeof buf === "string" ? Buffer.from(buf, "latin1") : buf, this);
   }
 }
 

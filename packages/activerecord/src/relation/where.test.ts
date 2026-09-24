@@ -270,16 +270,12 @@ describe("WhereTest", () => {
 
   it("where with nil cpk association", async () => {
     const order = await CpkOrder.create({ id: [1, 2] });
-    const book = await CpkBook.create({
-      id: [3, 4],
-      shop_id: (order as any).readAttribute("shop_id"),
-      order_id: (order as any).readAttribute("id"),
-    });
+    const book = await (order as any).books.create({ id: [3, 4] });
     const keys = (recs: unknown[]): string[] => recs.map((r) => JSON.stringify((r as any).id));
 
     expect(keys(await CpkBook.where({ order }))).toContain(JSON.stringify(book.id));
 
-    await book.update({ shop_id: null, order_id: null });
+    await book.update({ order: null });
     expect(keys(await CpkBook.where({ order: null }))).toContain(JSON.stringify(book.id));
   });
 

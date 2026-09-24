@@ -18,7 +18,7 @@ export class MessagePackMessageSerializer implements MessageSerializerLike {
     }
     let data: unknown;
     try {
-      data = MessagePack.load(Buffer.from(serializedContent, "latin1"));
+      data = MessagePack.load(serializedContent);
     } catch (e) {
       if (e instanceof MessagePackError) throw new Decryption("Failed to load MessagePack message");
       throw e;
