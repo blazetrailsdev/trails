@@ -66,6 +66,16 @@ it("verifyBang on a checked-out adapter establishes the raw connection on every 
   }
 });
 
+it("a checkout racing discardBang across the awaited reap raises ConnectionNotEstablished", async () => {
+  const pool = makePool(1);
+  const held = await pool.checkout();
+  const checkout = new Thread(() => pool.checkout()).value();
+  await pool.discardBang();
+  await expect(checkout).rejects.toThrow(ConnectionNotEstablished);
+  await expect(checkout).rejects.toThrow("Connection pool has been discarded");
+  expect(held).toBeTruthy();
+});
+
 it("leaseConnection routes its verify through checkout and establishes on verifyBang", async () => {
   const pool = makePool();
   const checkoutSpy = vi.spyOn(pool, "checkout");

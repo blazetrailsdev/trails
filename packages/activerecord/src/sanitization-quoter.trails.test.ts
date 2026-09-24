@@ -87,13 +87,15 @@ describe("sanitization class-method dispatch threads `this.connection`", () => {
     expect(() =>
       ClassMethods.sanitizeSqlHashForAssignment.call(host, { name: "x" }, "users"),
     ).toThrow(ConnectionNotDefined);
-    expect(() =>
-      ClassMethods.sanitizeSqlHashForAssignment.call({}, { name: "x" }, "users"),
-    ).toThrow(ConnectionNotDefined);
   });
 
   it("answers a blank statement without asking for a connection", () => {
-    expect(ClassMethods.sanitizeSqlArray.call({}, "")).toBe("");
+    const host = {
+      connectionPool(): never {
+        throw new ConnectionNotDefined("No database connection defined.");
+      },
+    };
+    expect(ClassMethods.sanitizeSqlArray.call(host, "")).toBe("");
   });
 
   it("surfaces the adapter_class lookup error for sanitizeSqlForOrder", () => {

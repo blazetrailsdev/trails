@@ -56,7 +56,7 @@ export { ExecutionStrategy } from "./migration/execution-strategy.js";
 export { DefaultStrategy } from "./migration/default-strategy.js";
 export { PendingMigrationConnection } from "./migration/pending-migration-connection.js";
 
-import { ActiveRecordError, ConnectionNotEstablished, NoDatabaseError } from "./errors.js";
+import { ActiveRecordError, NoDatabaseError } from "./errors.js";
 import {
   maintainTestSchema,
   migrationStrategy,
@@ -732,11 +732,11 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     await this.methodMissing("renameIndex", tableName, oldName, newName);
   }
 
-  indexName(
+  async indexName(
     tableName: string,
     options: { column?: string | string[]; name?: string; _usesLegacyIndexName?: boolean },
-  ): string {
-    return this.connection.indexName(this._pt(tableName), options);
+  ): Promise<string> {
+    return (await this.connection).indexName(this._pt(tableName), options);
   }
 
   async removeColumns(tableName: string, ...columns: string[]): Promise<void>;
@@ -808,7 +808,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
       await this.connection.revert(fn);
       return;
     }
-    const recorder = this.commandRecorder();
+    const recorder = await this.commandRecorder();
     this._connectionOverride = recorder;
     await this.suppressMessages(async () => {
       await recorder.revert(fn);
@@ -828,7 +828,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
       });
     } else {
       for (const migrationClass of klasses) {
-        await new migrationClass().execMigration(this.connection, dir);
+        await new migrationClass().execMigration(await this.connection, dir);
       }
     }
   }
@@ -931,17 +931,11 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
   }
 
-  get connection(): A {
-    if (this._connectionOverride) return this._connectionOverride as A;
-    const connection = _DatabaseTasks!.migrationConnectionPool().activeConnection;
-    if (!connection) {
-      throw new ConnectionNotEstablished(
-        "No connection is leased for this execution context. " +
-          "Await `lease_connection` or use `with_connection` first.",
-      );
-    }
-    void _DatabaseTasks!.migrationConnection();
-    return connection as A;
+  get connection(): A | Promise<A> {
+    return (
+      (this._connectionOverride as A | undefined) ??
+      (_DatabaseTasks!.migrationConnection() as Promise<A>)
+    );
   }
 
   set connection(conn: DatabaseAdapter | CommandRecorder | undefined) {
@@ -1158,7 +1152,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     const block = typeof args[args.length - 1] === "function" ? args.pop() : undefined;
     const announced = args.filter((a) => a !== undefined);
     return await this.sayWithTime(`${name}(${this.formatArguments(announced)})`, async () => {
-      const conn = this.connection as unknown as Record<string, unknown>;
+      const conn = (await this.connection) as unknown as Record<string, unknown>;
       if (typeof conn["revert"] !== "function") {
         if (args.length > 0 && !["execute", "enableExtension", "disableExtension"].includes(name)) {
           const options = Migration.tableNameOptions();
@@ -1172,11 +1166,11 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
         }
       }
       const strategy = this.executionStrategy as {
-        respondToMissing?: (name: string) => boolean;
+        respondToMissing?: (name: string) => boolean | Promise<boolean>;
         methodMissing?: (name: string, ...args: unknown[]) => unknown;
       };
-      if (strategy.respondToMissing?.(name) !== true) {
-        throw new TypeError(`undefined method '${name}' for ${this.connection.constructor.name}`);
+      if ((await strategy.respondToMissing?.(name)) !== true) {
+        throw new TypeError(`undefined method '${name}' for ${conn.constructor.name}`);
       }
       if (block !== undefined) args.push(block);
       return await strategy.methodMissing?.(name, ...args);
@@ -1185,7 +1179,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   /** @internal */
   async executeBlock(fn: () => Promise<void>): Promise<void> {
-    const connection = this.connection as unknown as Record<string, unknown>;
+    const connection = (await this.connection) as unknown as Record<string, unknown>;
     if (typeof connection["executeBlock"] === "function") {
       await this.methodMissing("executeBlock", fn);
       return;
@@ -1214,8 +1208,8 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   }
 
   /** @internal */
-  commandRecorder(): CommandRecorder {
-    return new CommandRecorder(this.connection);
+  async commandRecorder(): Promise<CommandRecorder> {
+    return new CommandRecorder(await this.connection);
   }
 
   /** @internal */

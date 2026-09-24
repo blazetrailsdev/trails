@@ -10,13 +10,13 @@ import { SchemaMigration } from "./schema-migration.js";
 import { InternalMetadata } from "./internal-metadata.js";
 import { adapterType, checkoutRawTestAdapter } from "./test-adapter.js";
 import { assertQueriesCount } from "./testing/query-assertions.js";
+import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Table } from "./connection-adapters/abstract/schema-definitions.js";
 import { fixtures } from "./test-fixtures.js";
 import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
 import { migrationProxy } from "./test-helpers/migration-proxy.js";
 import { migrationStrategy, setMigrationStrategy } from "./active-record.js";
-import { ConnectionNotEstablished } from "./errors.js";
 
 describe("MigrationTest", () => {
   fixtures({}, { useTransactionalTests: false });
@@ -35,7 +35,7 @@ describe("MigrationTest", () => {
     expect(m.directions).toEqual(["up", "down"]);
   });
 
-  it("migration.connection raises ConnectionNotEstablished when no connection is leased", async () => {
+  it("migration.connection checks a connection out when none is leased, as migration_connection does", async () => {
     class M extends Migration {
       async up() {}
       async down() {}
@@ -43,8 +43,10 @@ describe("MigrationTest", () => {
     const m = new M();
     Base.releaseConnection();
     try {
-      expect(() => m.connection).toThrow(ConnectionNotEstablished);
       expect(Base.connectionPool().activeConnection).toBeNull();
+      const conn = await m.connection;
+      expect(conn).toBeInstanceOf(AbstractAdapter);
+      expect(Base.connectionPool().activeConnection).toBe(conn);
     } finally {
       await Base.leaseConnection();
     }
@@ -59,7 +61,7 @@ describe("MigrationTest", () => {
     Base.releaseConnection();
     try {
       const conn = await Base.withConnection(async (connection) => {
-        expect(m.connection).toBe(connection);
+        expect(await m.connection).toBe(connection);
         return connection;
       });
       expect(Base.connectionPool().activeConnection).toBe(conn);
@@ -83,15 +85,15 @@ describe("MigrationTest", () => {
     const { adapter: override, pool: overridePool } = await checkoutRawTestAdapter();
     const { adapter: poolOverride, pool: poolOverridePool } = await checkoutRawTestAdapter();
     try {
-      expect(m.connection).toBe(baseAdapter);
+      expect(await m.connection).toBe(baseAdapter);
       internals._connectionOverride = override;
       expect(m.connection).toBe(override);
       expect(m.connectionPool).toBe(basePool);
       delete internals._connectionOverride;
-      expect(m.connection).toBe(baseAdapter);
+      expect(await m.connection).toBe(baseAdapter);
       internals._poolOverride = poolOverride;
       expect(m.connectionPool).toBe(poolOverride);
-      expect(m.connection).toBe(baseAdapter);
+      expect(await m.connection).toBe(baseAdapter);
       delete internals._poolOverride;
       expect(m.connectionPool).toBe(basePool);
     } finally {
@@ -222,7 +224,7 @@ describe("Migration#createTable id option type", () => {
       expect(migration.executionStrategy).toBe(migration.executionStrategy);
     });
 
-    it("uses the class configured on Base.migrationStrategy", () => {
+    it("uses the class configured on Base.migrationStrategy", async () => {
       class CustomStrategy extends DefaultStrategy {}
       const previous = migrationStrategy();
       setMigrationStrategy(CustomStrategy);
@@ -230,7 +232,7 @@ describe("Migration#createTable id option type", () => {
         const migration = new StrategyMigration();
         const strategy = migration.executionStrategy as CustomStrategy;
         expect(strategy).toBeInstanceOf(CustomStrategy);
-        expect(strategy.methodMissing("createTable")).toBe("hi mom!");
+        expect(await strategy.methodMissing("createTable")).toBe("hi mom!");
       } finally {
         setMigrationStrategy(previous);
       }
@@ -239,9 +241,9 @@ describe("Migration#createTable id option type", () => {
     it("forwards unknown calls through the strategy to the connection", async () => {
       const migration = new StrategyMigration();
       const strategy = migration.executionStrategy as DefaultStrategy;
-      expect(strategy.respondToMissing("createTable")).toBe(true);
-      expect(strategy.respondToMissing("nopeNotHere")).toBe(false);
-      expect(strategy.methodMissing("createTable")).toBe("hi mom!");
+      expect(await strategy.respondToMissing("createTable")).toBe(true);
+      expect(await strategy.respondToMissing("nopeNotHere")).toBe(false);
+      expect(await strategy.methodMissing("createTable")).toBe("hi mom!");
       await expect(migration.methodMissing("nopeNotHere")).rejects.toThrow(TypeError);
     });
 
