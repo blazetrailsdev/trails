@@ -21,37 +21,6 @@ export interface EncryptorLike {
   isBinary(): boolean;
 }
 
-/** @noRailsEquivalent CONVERGEABLE retire-legacy-encryptor-shim-option-surface */
-export type EncryptorOptionLike = Omit<EncryptorLike, "isEncrypted" | "isBinary"> &
-  Partial<Pick<EncryptorLike, "isEncrypted" | "isBinary">>;
-
-/** @noRailsEquivalent CONVERGEABLE retire-legacy-encryptor-shim-option-surface */
-export class LegacyEncryptorShim implements EncryptorLike {
-  constructor(private readonly inner: EncryptorOptionLike) {}
-
-  encrypt(clearText: string, options?: Record<string, unknown>): string {
-    return this.inner.encrypt(clearText, options);
-  }
-
-  decrypt(encryptedText: string, options?: Record<string, unknown>): string {
-    return this.inner.decrypt(encryptedText, options);
-  }
-
-  isEncrypted(text: string): boolean {
-    if (this.inner.isEncrypted) return this.inner.isEncrypted(text);
-    try {
-      this.inner.decrypt(text);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  isBinary(): boolean {
-    return this.inner.isBinary?.() ?? false;
-  }
-}
-
 export interface KeyProviderLike {
   encryptionKey(): { secret: string; publicTags?: Record<string, unknown> | Properties };
   decryptionKeys(
@@ -75,8 +44,8 @@ export class Encryptor {
     if (options?.keyProvider && options.key !== undefined) {
       throw new Configuration("key and keyProvider can't be used simultaneously");
     }
-    this.validatePayloadType(clearText);
     if (options?.deterministic) clearText = this.forceEncodingIfNeeded(clearText);
+    this.validatePayloadType(clearText);
     const keyProvider: KeyProviderLike | undefined =
       options?.keyProvider ??
       (options?.key !== undefined

@@ -263,6 +263,7 @@ import { suppress as _suppressBlock } from "./suppressor.js";
 import {
   inspect as _inspect,
   equals as _equals,
+  eql as _eql,
   compare as _compare,
   hash as _hash,
   isPresent as _isPresent,
@@ -2232,6 +2233,8 @@ export class Base extends Model {
 
   declare equals: (other: unknown) => boolean;
 
+  declare eql: (other: unknown) => boolean;
+
   declare compare: (other: unknown) => number | undefined;
 
   declare hash: () => unknown;
@@ -2769,6 +2772,7 @@ include(Base, {
   prettyPrint: _Core.prettyPrint,
   attributeForInspect: _attributeForInspect,
   equals: _equals,
+  eql: _eql,
   compare: _compare,
   hash: _hash,
   isPresent: _isPresent,

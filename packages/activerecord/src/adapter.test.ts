@@ -98,16 +98,16 @@ async function rawTransactionOpen(conn: DatabaseAdapter): Promise<boolean> {
       return false;
     }
   }
-  const sqlite = conn as unknown as {
-    sqliteConnection(): Promise<{ exec(sql: string): Promise<void> }>;
-  };
+  const raw = (conn as unknown as { _rawConnection: { exec(sql: string): Promise<void> } | null })
+    ._rawConnection;
+  if (!raw) return false;
   try {
-    await (await sqlite.sqliteConnection()).exec("BEGIN");
+    await raw.exec("BEGIN");
   } catch {
     return true;
   }
   try {
-    await (await sqlite.sqliteConnection()).exec("ROLLBACK");
+    await raw.exec("ROLLBACK");
   } catch {}
   return false;
 }
@@ -478,26 +478,12 @@ describe("AdapterTest", () => {
 });
 
 describe("AdapterForeignKeyTest", () => {
-  fixtures({}, { useTransactionalTests: false });
+  fixtures(["fkTestHasPk"], { useTransactionalTests: false });
 
   let connection: DatabaseAdapter;
 
   beforeEach(async () => {
     connection = await Base.leaseConnection();
-  });
-
-  const cleanup = async (): Promise<void> => {
-    await connection.execute("DELETE FROM fk_test_has_fk");
-    await connection.execute("DELETE FROM fk_test_has_pk");
-  };
-
-  beforeEach(cleanup);
-  afterEach(cleanup);
-
-  beforeEach(async () => {
-    if (adapterType === "sqlite") {
-      await connection.execute("PRAGMA foreign_keys = ON");
-    }
   });
 
   const insertIntoFkTestHasFk = (fkId = 0): Promise<unknown> =>
@@ -525,7 +511,6 @@ describe("AdapterForeignKeyTest", () => {
   });
 
   it("foreign key violations on delete are translated to specific exception", async () => {
-    await connection.execute("INSERT INTO fk_test_has_pk (pk_id) VALUES (1)");
     await insertIntoFkTestHasFk(1);
     const error = await assertRaises([InvalidForeignKey], {}, async () => {
       await connection.execute("DELETE FROM fk_test_has_pk WHERE pk_id = 1");

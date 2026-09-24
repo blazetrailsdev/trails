@@ -22,8 +22,9 @@ import {
   Range,
   arySlice,
   include,
-  rbEqual,
+  rbEql,
   rbObjRespondTo,
+  uniq,
 } from "@blazetrails/ruby-compat";
 import { ActiveRecord, Associations } from "../namespaces.js";
 
@@ -200,13 +201,13 @@ const RECORD_DELEGATES: Record<string, RecordDelegate> = {
   at: (records, ...args: [index: number | Range<number>, length?: number]) =>
     arySlice(records, ...args),
   intersection: (records, other: Base[]) =>
-    uniqRecords(records).filter((record) => other.some((o) => rbEqual(o, record))),
-  union: (records, other: Base[]) => uniqRecords([...records, ...other]),
+    uniq(records.filter((record) => other.some((o) => rbEql(o, record)))),
+  union: (records, other: Base[]) => uniq([...records, ...other]),
   plus: (records, other: Base[]) => [...records, ...other],
   difference: (records, other: Base[]) =>
-    records.filter((record) => !other.some((o) => rbEqual(o, record))),
+    records.filter((record) => !other.some((o) => rbEql(o, record))),
   isIntersect: (records, other: Base[]) =>
-    records.some((record) => other.some((o) => rbEqual(record, o))),
+    records.some((record) => other.some((o) => rbEql(record, o))),
   reverse: (records) => [...records].reverse(),
   compact: (records) => records.filter((record) => record != null),
   index: (records, valueOrFn: Base | ((record: Base) => unknown)) => {
@@ -496,12 +497,6 @@ Object.defineProperty(Delegation.prototype.length, Symbol.toPrimitive, {
 function withRecords<R>(host: DelegationHost, fn: (records: Base[]) => R): R | Promise<R> {
   if (host.isLoaded) return fn([...(host.target ?? host._records ?? [])]);
   return host.records().then((records) => fn([...records]));
-}
-
-function uniqRecords<U>(records: U[]): U[] {
-  const uniq: U[] = [];
-  for (const record of records) if (!uniq.some((seen) => rbEqual(seen, record))) uniq.push(record);
-  return uniq;
 }
 
 function shuffleInPlace<T>(array: T[]): T[] {

@@ -1,9 +1,4 @@
-import {
-  Encryptor,
-  LegacyEncryptorShim,
-  type EncryptorLike,
-  type EncryptorOptionLike,
-} from "./encryptor.js";
+import { Encryptor, type EncryptorLike } from "./encryptor.js";
 import { Configuration } from "./errors.js";
 import { type Compressor } from "./config.js";
 import { Encryption } from "../namespaces.js";
@@ -25,15 +20,8 @@ export interface SchemeOptions {
   previousSchemes?: Scheme[];
   compress?: boolean;
   compressor?: Compressor;
-  encryptor?: EncryptorOptionLike;
+  encryptor?: EncryptorLike;
   messageSerializer?: MessageSerializerLike;
-}
-
-/** @noRailsEquivalent CONVERGEABLE retire-legacy-encryptor-shim-option-surface */
-function shimUnlessFullEncryptor(encryptor: EncryptorOptionLike): EncryptorLike {
-  return typeof encryptor.isEncrypted === "function" && typeof encryptor.isBinary === "function"
-    ? (encryptor as EncryptorLike)
-    : new LegacyEncryptorShim(encryptor);
 }
 
 export class Scheme {
@@ -64,7 +52,7 @@ export class Scheme {
 
     this._contextProperties = {};
     if (options.encryptor !== undefined) {
-      this._contextProperties.encryptor = shimUnlessFullEncryptor(options.encryptor);
+      this._contextProperties.encryptor = options.encryptor;
     }
     if (options.messageSerializer !== undefined) {
       this._contextProperties.messageSerializer = options.messageSerializer;

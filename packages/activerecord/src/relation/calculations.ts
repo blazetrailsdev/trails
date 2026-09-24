@@ -6,6 +6,7 @@ import { block, fetch, isEmpty } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import type { JoinDependency } from "../associations/join-dependency.js";
 import { Result, type ColumnType, type ColumnTypes } from "../result.js";
+import { FutureResult } from "../future-result.js";
 import { EnumType } from "../enum.js";
 import { defaultValue } from "../type.js";
 import {
@@ -75,6 +76,7 @@ interface CalculationConnection {
     arel: unknown,
     name?: string | null,
     binds?: unknown[],
+    opts?: { async?: boolean },
   ): Promise<import("../result.js").Result>;
 }
 
@@ -98,6 +100,8 @@ interface CalculationRelation {
   offsetValue: number | string | null;
   optimizerHintsValues: string[];
   _isNone: boolean;
+  _async?: boolean;
+  async(): CalculationRelation;
   /** @internal */
   isNullRelation(): boolean;
   distinctValue: boolean;
@@ -222,7 +226,7 @@ export function asyncCount(
   this: CalculationRelation,
   columnName?: string,
 ): Promise<number | Map<unknown, number>> {
-  return this.count(columnName);
+  return this.async().count(columnName);
 }
 
 export async function average(
@@ -236,7 +240,7 @@ export function asyncAverage(
   this: CalculationRelation,
   columnName: string | Nodes.Node,
 ): Promise<unknown | null | Map<unknown, unknown>> {
-  return this.average(columnName);
+  return this.async().average(columnName);
 }
 
 export async function minimum(
@@ -250,7 +254,7 @@ export function asyncMinimum(
   this: CalculationRelation,
   columnName: string | Nodes.Node,
 ): Promise<unknown | null | Map<unknown, unknown>> {
-  return this.minimum(columnName);
+  return this.async().minimum(columnName);
 }
 
 export async function maximum(
@@ -264,7 +268,7 @@ export function asyncMaximum(
   this: CalculationRelation,
   columnName: string | Nodes.Node,
 ): Promise<unknown | null | Map<unknown, unknown>> {
-  return this.maximum(columnName);
+  return this.async().maximum(columnName);
 }
 
 function sumAdd(
@@ -325,7 +329,7 @@ export function asyncSum(
   this: CalculationRelation,
   identityOrColumn: string | Nodes.Node | number | null = null,
 ): Promise<number | bigint | Map<unknown, number | bigint>> {
-  return this.sum(identityOrColumn);
+  return this.async().sum(identityOrColumn);
 }
 
 export async function calculate(
@@ -740,7 +744,6 @@ function buildCountSubquery(
 /**
  * @internal
  * @missingRailsCall first — PERMANENT
- * @missingRailsCall wrap — CONVERGEABLE execute-simple-calculation-async-arm
  */
 export async function executeSimpleCalculation(
   rel: CalculationRelation,
@@ -778,17 +781,23 @@ export async function executeSimpleCalculation(
   }
 
   const queryResult = relation.whereClause.isContradiction()
-    ? Result.empty()
-    : await (
+    ? rel._async
+      ? FutureResult.wrap(Result.empty())
+      : Result.empty()
+    : (
         rel as unknown as { skipQueryCacheIfNecessary<R>(block: () => R): R }
       ).skipQueryCacheIfNecessary(() =>
         rel.model.withConnection((c) =>
           c.selectAll(
             queryBuilder,
             `${rel.model.name} ${operation.charAt(0).toUpperCase() + operation.slice(1)}`,
+            [],
+            { async: rel._async },
           ),
         ),
       );
+
+  const result = await queryResult;
 
   let type: unknown;
   if (operation !== "count") {
@@ -799,7 +808,7 @@ export async function executeSimpleCalculation(
     if (type instanceof EnumType) type = type.subtype;
   }
 
-  return typeCastCalculatedValue(queryResult.castValues()[0], operation, type);
+  return typeCastCalculatedValue(result.castValues()[0], operation, type);
 }
 
 /**

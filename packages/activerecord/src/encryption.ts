@@ -1,17 +1,11 @@
 import { type SchemeOptions } from "./encryption/scheme.js";
-import type { EncryptorOptionLike } from "./encryption/encryptor.js";
 export { Cipher } from "./encryption/cipher.js";
 import { Configurable } from "./encryption/configurable.js";
 import { Contexts } from "./encryption/contexts.js";
 import type { Context } from "./encryption/context.js";
 import type { Config } from "./encryption/config.js";
 
-/** @noRailsEquivalent CONVERGEABLE retire-legacy-encryptor-shim-option-surface */
-export type Encryptor = EncryptorOptionLike;
-
-export interface EncryptsOptions extends Omit<SchemeOptions, "encryptor"> {
-  encryptor?: Encryptor;
-}
+export type EncryptsOptions = SchemeOptions;
 
 export function eagerLoadBang(): void {}
 

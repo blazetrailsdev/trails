@@ -1,4 +1,5 @@
 import { ArgumentError, type ValueType } from "@blazetrails/activemodel";
+import { toI } from "@blazetrails/ruby-compat";
 
 import { HashLookupTypeMap } from "../../../type/hash-lookup-type-map.js";
 import { Array as OidArray } from "./array.js";
@@ -28,7 +29,7 @@ export class TypeMapInitializer {
   }
 
   run(records: PgTypeRow[]): void {
-    const nodes = records.filter((row) => !this.store.isKey(toI(row.oid)));
+    const nodes = records.filter((row) => !this.store.isKey(toI(row.oid) as number));
     const mapped = extract(nodes, (row) => this.store.isKey(row.typname));
     const ranges = extract(nodes, (row) => row.typtype === "r");
     const enums = extract(nodes, (row) => row.typtype === "e");
@@ -61,7 +62,7 @@ export class TypeMapInitializer {
   }
 
   private registerSqlTypeName(row: PgTypeRow): void {
-    const oid = toI(row.oid);
+    const oid = toI(row.oid) as number;
     if (!this.store.isKey(oid)) return;
     for (const name of [row.formatType, row.aliasName]) {
       if (name == null || this.store.isKey(name)) continue;
@@ -76,7 +77,7 @@ export class TypeMapInitializer {
   private registerRangeType(row: PgTypeRow): void {
     this.registerWithSubtype(
       row.oid,
-      toI(row.rngsubtype ?? 0),
+      toI(row.rngsubtype) as number,
       (subtype) => new RangeType(subtype as unknown as RangeSubtype, row.typname),
     );
   }
@@ -86,7 +87,7 @@ export class TypeMapInitializer {
   }
 
   private registerDomainType(row: PgTypeRow): void {
-    const baseType = this.store.lookup(toI(row.typbasetype));
+    const baseType = this.store.lookup(toI(row.typbasetype) as number);
     if (baseType) {
       this.register(row.oid, baseType);
     } else {
@@ -95,14 +96,14 @@ export class TypeMapInitializer {
   }
 
   private registerCompositeType(row: PgTypeRow): void {
-    const subtype = this.store.lookup(toI(row.typelem));
+    const subtype = this.store.lookup(toI(row.typelem) as number);
     if (subtype) this.register(row.oid, new Vector(row.typdelim, subtype));
   }
 
   private registerArrayType(row: PgTypeRow): void {
     this.registerWithSubtype(
       row.oid,
-      toI(row.typelem),
+      toI(row.typelem) as number,
       (subtype) => new OidArray(subtype, row.typdelim),
     );
   }
@@ -138,7 +139,7 @@ export class TypeMapInitializer {
 
   private assertValidRegistration(oid: number | string, oidType: unknown): number {
     if (oidType == null) throw new ArgumentError(`can't register nil type for OID ${oid}`);
-    return toI(oid);
+    return toI(oid) as number;
   }
 }
 
@@ -157,10 +158,4 @@ interface OidSubtype {
   cast(value: unknown): unknown;
   serialize(value: unknown): unknown;
   deserialize?(value: unknown): unknown;
-}
-
-function toI(value: number | string): number {
-  if (typeof value === "number") return Number.isFinite(value) ? Math.trunc(value) : 0;
-  const parsed = Number.parseInt(value, 10);
-  return Number.isNaN(parsed) ? 0 : parsed;
 }

@@ -10,13 +10,15 @@ export class LibSQLReplicaAdapter extends SQLite3Adapter {
   }
 
   async syncReplica(): Promise<void> {
-    const conn = (await this.sqliteConnection()) as Partial<SyncableSqliteConnection>;
-    if (typeof conn.sync !== "function") {
-      throw new ConfigurationError(
-        "syncReplica() requires a libsql embedded-replica connection (opened " +
-          "with a syncUrl); the active connection does not expose sync().",
-      );
-    }
-    await conn.sync();
+    await this.withRawConnection({ materializeTransactions: false }, async (raw) => {
+      const conn = raw as unknown as Partial<SyncableSqliteConnection>;
+      if (typeof conn.sync !== "function") {
+        throw new ConfigurationError(
+          "syncReplica() requires a libsql embedded-replica connection (opened " +
+            "with a syncUrl); the active connection does not expose sync().",
+        );
+      }
+      await conn.sync();
+    });
   }
 }

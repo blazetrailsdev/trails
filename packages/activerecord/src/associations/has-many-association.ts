@@ -1,4 +1,4 @@
-import { kernelThrow, rbEqual } from "@blazetrails/ruby-compat";
+import { kernelThrow, rbEqual, toI } from "@blazetrails/ruby-compat";
 import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
@@ -229,7 +229,9 @@ export class HasManyAssociation extends CollectionAssociation {
     if (reflection.hasActiveCachedCounter()) {
       const counterCacheColumn = reflection.counterCacheColumn();
       count =
-        counterCacheColumn == null ? 0 : toI((this.owner as any).readAttribute(counterCacheColumn));
+        counterCacheColumn == null
+          ? 0
+          : (toI((this.owner as any).readAttribute(counterCacheColumn)) as number);
     } else {
       count = await (this as unknown as CollectionAssociation).scope().count(":all");
     }
@@ -248,14 +250,6 @@ export class HasManyAssociation extends CollectionAssociation {
     )?.limitValue;
     return min([limitValue, count].filter((value) => value != null))!;
   }
-}
-
-function toI(value: unknown): number {
-  if (value == null) return 0;
-  if (typeof value === "number") return Math.trunc(value);
-  if (typeof value === "bigint") return Number(value);
-  const n = Number.parseInt(String(value), 10);
-  return Number.isNaN(n) ? 0 : n;
 }
 
 /** @internal */

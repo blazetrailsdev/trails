@@ -55,4 +55,4 @@ export {
   context,
   currentCustomContext,
 } from "../encryption.js";
-export type { Encryptor as LegacyEncryptor, EncryptsOptions } from "../encryption.js";
+export type { EncryptsOptions } from "../encryption.js";

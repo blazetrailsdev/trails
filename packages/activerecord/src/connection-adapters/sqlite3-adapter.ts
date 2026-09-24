@@ -177,19 +177,11 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   set _rawConnection(value: SqliteConnection | null) {
     this._connection = value as unknown as AbstractAdapter | null;
   }
-  private _asyncConnectPending = false;
-  private _connectingPromise: Promise<void> | null = null;
   private _closingDriver: Promise<void> | null = null;
   override async active(): Promise<boolean> {
     await this._closingDriver;
     return this._rawConnection?.isOpen() ?? false;
   }
-  /** @internal */
-  protected async sqliteConnection(): Promise<SqliteConnection> {
-    await this.ensureConnected();
-    return this._rawConnection!;
-  }
-
   /** @internal */
   _connectionParameters: SQLite3ConnectionParameters;
   private _strict: boolean;
@@ -262,7 +254,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     }
     this._filename = filename;
     this._strict = strict;
-    this._asyncConnectPending = this.driverIsAsync();
+    this.driverIsAsync();
     this._connectionParameters = merge(this._config as SQLite3Config, {
       database: filename,
       resultsAsHash: true,
@@ -560,11 +552,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
         await this._rawConnection!.exec("ROLLBACK");
       } catch {}
     } else {
-      this.connect();
-      if (this._asyncConnectPending) {
-        this._asyncConnectPending = false;
-        await this.connectAsync();
-      }
+      await this.connect();
     }
   }
 
@@ -934,7 +922,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   override async disableReferentialIntegrity(fn: () => Promise<void>): Promise<void> {
-    await this.ensureConnected();
     const oldForeignKeys = await this.queryValue("PRAGMA foreign_keys");
     const oldDeferForeignKeys = await this.queryValue("PRAGMA defer_foreign_keys");
     try {
@@ -948,7 +935,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   override async checkAllForeignKeysValidBang(): Promise<void> {
-    await this.ensureConnected();
     const sql = "PRAGMA foreign_key_check";
     const result = (await this.execute(sql))!;
 
@@ -1062,7 +1048,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     options: { rename?: Record<string, string> } = {},
     block?: (definition: SQLite3TableDefinition) => void,
   ): Promise<void> {
-    await this.ensureConnected();
     const rename = options.rename ?? {};
 
     const alteredTableName = `a${tableName}`;
@@ -1381,11 +1366,8 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
    * @internal
    * @missingRailsName connectionParameters — PERMANENT
    */
-  private connect(): void {
-    if (this.driverIsAsync()) {
-      this._asyncConnectPending = true;
-      return;
-    }
+  private connect(): void | Promise<void> {
+    if (this.driverIsAsync()) return this.connectAsync();
     try {
       this._rawConnection = (this.constructor as typeof SQLite3Adapter).newClient(
         this._connectionParameters,
@@ -1406,18 +1388,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
       if (ex instanceof ConnectionNotEstablished) throw ex.setPool(this.pool);
       throw ex;
     }
-  }
-
-  /** @internal */
-  private async ensureConnected(): Promise<void> {
-    if (this._asyncConnectPending) {
-      this._connectingPromise ??= this.connectBang()
-        .then(() => {})
-        .finally(() => {
-          this._connectingPromise = null;
-        });
-      await this._connectingPromise;
-    } else if (!this.isActive() && this.isReconnectCanRestoreState()) await this.verifyBang();
   }
 
   /** @internal */
