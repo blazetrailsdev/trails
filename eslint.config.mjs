@@ -391,10 +391,6 @@ export default defineConfig(
     },
   },
 
-  // ── no-q-suffix-predicate ──
-  // A Ruby `?` predicate ports as `isX`; the retired trailing-`Q` encoding
-  // (`connectedToQ`) is no longer credited by `parity:api:extra` or the naming
-  // taxonomy (RFC 0153), so a new one would surface as invented surface.
   {
     files: ["packages/*/src/**/*.ts"],
     ignores: ["**/*.test.ts", "**/*.test-d.ts"],
