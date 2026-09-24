@@ -12,6 +12,6 @@ export function isTransientGhError(message: string): boolean {
 export const TRANSIENT_GH_FAILURE_MARKER = "[sync-stats] transient gh failure";
 
 export function transientGhFailureLine(message: string): string | null {
-  if (!isTransientGhError(message)) return null;
-  return `${TRANSIENT_GH_FAILURE_MARKER}: ${message.split("\n").find((l) => isTransientGhError(l)) ?? message.split("\n")[0]}`;
+  const line = message.split("\n").find((l) => isTransientGhError(l));
+  return line == null ? null : `${TRANSIENT_GH_FAILURE_MARKER}: ${line}`;
 }
