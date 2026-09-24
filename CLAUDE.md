@@ -893,7 +893,9 @@ modules converged onto `Autoload`:
   `encryption.rb:14` and `migration.rb:573`: `ActiveRecord.Base`,
   `.ConnectionHandling` (`DEFAULT_ENV`, `connection_handling.rb:7`),
   `.ModelSchema` (`derive_join_table_name`, `migration/join_table.rb:12`),
-  `.Fixture` (`active_record.rb:54`, whose `Fixture::FixtureError` (`fixtures.rb:809`) is raised at
+  `.Fixture` (Rails has no `autoload :Fixture`: it is defined in `active_record/fixtures.rb`,
+  which `active_record.rb:54`'s `autoload :FixtureSet` loads; its `Fixture::FixtureError`
+  (`fixtures.rb:809`) is raised at
   `abstract/database_statements.rb:615`), and `.Relation`, `.AssociationRelation` and
   `.DisableJoinsAssociationRelation`, which `Delegation.delegated_classes` reads
   (`relation/delegation.rb:7-15`); the six
