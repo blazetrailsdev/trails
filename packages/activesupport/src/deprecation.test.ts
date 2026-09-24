@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { StandardError, Thread, stderr } from "@blazetrails/ruby-compat";
+import { StandardError, Thread, rbEqual, stderr } from "@blazetrails/ruby-compat";
 import { Module } from "@blazetrails/ruby-compat/include";
 import {
   Deprecation,
@@ -71,6 +71,15 @@ class Deprecatee {
     return [a, b, c];
   }
 }
+
+expect.addEqualityTesters([
+  function deprecatedConstantProxyEquals(a: unknown, b: unknown): boolean | undefined {
+    if (!(a instanceof DeprecatedConstantProxy) && !(b instanceof DeprecatedConstantProxy)) {
+      return undefined;
+    }
+    return rbEqual(b, a);
+  },
+]);
 
 const UndeprecatedFoo: Record<string, unknown> = { BAR: "foo bar" };
 registerConstant("Undeprecated::Foo", UndeprecatedFoo);
@@ -332,8 +341,7 @@ describe("DeprecationTest", () => {
     );
   });
 
-  it.skip("DeprecatedObjectProxy requires a deprecator", async () => {
-    // BLOCKED: deprecation-proxies-do-not-require-a-deprecator
+  it("DeprecatedObjectProxy requires a deprecator", async () => {
     await assertRaises([ArgumentError], {}, () => {
       DeprecatedObjectProxy.new({}, ":bomb:");
     });
@@ -353,8 +361,7 @@ describe("DeprecationTest", () => {
     });
   });
 
-  it.skip("behavior callbacks with callable objects", () => {
-    // BLOCKED: deprecation-behavior-does-not-accept-callable-objects
+  it("behavior callbacks with callable objects", () => {
     assertCallbacksCalledWith({ deprecator, message: /fubar/ }, (callbacks) => {
       assertNotEmpty(callbacks);
 
@@ -535,15 +542,13 @@ describe("DeprecationTest", () => {
     expect(fubarInspected).toEqual(JSON.stringify(instance.fooBar()));
   });
 
-  it.skip("DeprecatedInstanceVariableProxy requires a deprecator", async () => {
-    // BLOCKED: deprecation-proxies-do-not-require-a-deprecator
+  it("DeprecatedInstanceVariableProxy requires a deprecator", async () => {
     await assertRaises([ArgumentError], {}, () => {
       DeprecatedInstanceVariableProxy.new(new Deprecatee(), "foobar", "@fubar");
     });
   });
 
-  it.skip("DeprecatedConstantProxy", async () => {
-    // BLOCKED: deprecated-constant-proxy-is-not-transparent-to-equality
+  it("DeprecatedConstantProxy", async () => {
     const proxy = DeprecatedConstantProxy.new("FUBAR", "Undeprecated::Foo::BAR", deprecator);
 
     await assertDeprecated("FUBAR", deprecator, () => {
@@ -575,8 +580,7 @@ describe("DeprecationTest", () => {
     });
   });
 
-  it.skip("DeprecatedConstantProxy requires a deprecator", async () => {
-    // BLOCKED: deprecation-proxies-do-not-require-a-deprecator
+  it("DeprecatedConstantProxy requires a deprecator", async () => {
     await assertRaise([ArgumentError], {}, () => {
       DeprecatedConstantProxy.new("Fuu", "Undeprecated::Foo");
     });

@@ -51,6 +51,12 @@ describe("Object#respond_to?", () => {
     expect(rbObjRespondTo(overriding, "respondTo")).toBe(false);
     expect(rbObjRespondTo({ id: 1 }, "id")).toBe(true);
   });
+
+  it("answers to_str for a String, which String.prototype does not define", () => {
+    // vendor/ruby/string.c:12177 rb_define_method(rb_cString, "to_str", rb_str_to_s, 0).
+    expect(basicObjRespondTo("foo bar", "toStr")).toBe(true);
+    expect(basicObjRespondTo({}, "toStr")).toBe(false);
+  });
 });
 
 describe("rbObjInspect", () => {

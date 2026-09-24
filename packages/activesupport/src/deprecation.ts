@@ -5,7 +5,7 @@ import { ArgumentError } from "./hash-utils.js";
 import { underscore } from "./inflector.js";
 import { Logger } from "./logger.js";
 import { Notifications } from "./notifications.js";
-import { stderr } from "@blazetrails/ruby-compat";
+import { rbObjRespondTo, stderr } from "@blazetrails/ruby-compat";
 import { TopLevel } from "./namespaces.js";
 import { ThreadLocalVar } from "./thread-local-var.js";
 
@@ -69,30 +69,36 @@ type DeprecationBehaviorItem = DeprecationBehavior | ((...args: never[]) => void
 export type DeprecationBehaviorInput = DeprecationBehaviorItem | DeprecationBehaviorItem[] | null;
 
 function arityCoerce(behavior: unknown): DeprecationBehaviorCallable {
-  if (typeof behavior !== "function") {
+  if (!rbObjRespondTo(behavior, "call")) {
     const inspected = typeof behavior === "string" ? `:${behavior}` : String(behavior);
     throw new ArgumentError(`${inspected} is not a valid deprecation behavior.`);
   }
 
+  const call = (...args: unknown[]): void => {
+    if (typeof behavior === "function") behavior(...args);
+    else (behavior as { call(...a: unknown[]): void }).call(...args);
+  };
+
   switch (arityOfCallable(behavior)) {
     case 2:
       return (message, callstack) => {
-        behavior(message, callstack);
+        call(message, callstack);
       };
     case 0:
     case 1:
     case 3:
-      return behavior as DeprecationBehaviorCallable;
+      return typeof behavior === "function" ? (behavior as DeprecationBehaviorCallable) : call;
     default:
       return (message, callstack, deprecator) => {
-        behavior(message, callstack, deprecator.deprecationHorizon, deprecator.gemName);
+        call(message, callstack, deprecator.deprecationHorizon, deprecator.gemName);
       };
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-function arityOfCallable(callable: Function): number {
-  return callable.length;
+function arityOfCallable(callable: unknown): number {
+  return typeof callable === "function"
+    ? callable.length
+    : (callable as { call: (...args: unknown[]) => unknown }).call.length;
 }
 
 type AllowMatcher = string | RegExp;
