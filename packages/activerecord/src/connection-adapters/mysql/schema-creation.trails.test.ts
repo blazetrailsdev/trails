@@ -327,11 +327,11 @@ describeIfMysqlAdapter("MySQL::TableDefinition column methods", () => {
     td.unsignedInteger("hits", "misses");
 
     expect(td.columns.map((c) => c.name)).toEqual(["body", "summary", "hits", "misses"]);
-    expect(td.columns.map((c) => c.sqlType)).toEqual([
-      "LONGTEXT",
-      "LONGTEXT",
-      "INT UNSIGNED",
-      "INT UNSIGNED",
+    expect(td.columns.map((c) => [c.type, c.options.unsigned])).toEqual([
+      ["longtext", undefined],
+      ["longtext", undefined],
+      ["integer", true],
+      ["integer", true],
     ]);
   });
 
@@ -340,7 +340,10 @@ describeIfMysqlAdapter("MySQL::TableDefinition column methods", () => {
     td.blob("thumb", "preview", { limit: 300 });
 
     expect(td.columns.map((c) => c.name)).toEqual(["thumb", "preview"]);
-    expect(td.columns.map((c) => c.sqlType)).toEqual(["BLOB", "BLOB"]);
+    expect(td.columns.map((c) => [c.type, c.options.limit])).toEqual([
+      ["blob", 300],
+      ["blob", 300],
+    ]);
   });
 
   it("raises when called with no column name", () => {

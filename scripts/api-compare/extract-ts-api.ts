@@ -1045,6 +1045,24 @@ export function extractFromProgram(
       }
     });
 
+    for (const generated of collectDefineColumnMethodsMembers(sourceFile)) {
+      const entity = info.classes[`${relPath}:${generated.receiver}`];
+      if (entity === undefined) continue;
+      const at = entity.instanceMethods.findIndex((m) => m.name === generated.name);
+      if (at !== -1 && entity.instanceMethods[at].bodyless !== true) continue;
+      const method: MethodInfo = {
+        name: generated.name,
+        visibility: "public",
+        params: [{ name: "names", kind: "rest" }],
+        isStatic: false,
+        line: generated.line,
+        file: relPath,
+        ...(generated.aliasOf !== undefined ? { aliasOf: generated.aliasOf } : {}),
+      };
+      if (at === -1) entity.instanceMethods.push(method);
+      else entity.instanceMethods[at] = method;
+    }
+
     for (const attr of collectClassAttributeCalls(sourceFile)) {
       const target =
         [attr.enclosing, attr.receiver]
@@ -2981,6 +2999,70 @@ export function factoryClassMembers(
  */
 export function isConstantCaseName(name: string): boolean {
   return /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$/.test(name);
+}
+
+/**
+ * Members a top-level `Klass.defineColumnMethods("a", "b_c", …)` call installs on
+ * `Klass.prototype`, the TS twin of extract-ruby-api.rb#process_define_column_methods
+ * (`abstract/schema_definitions.rb:332-341`). The class types them through a
+ * merged `interface Klass extends ColumnMethods`, which alone reads as
+ * declaration-only; the generator call is the body. `Klass.prototype.a =
+ * Klass.prototype.b` beside it is Ruby's `alias :a :b` (`:328`) and is credited
+ * with `aliasOf`, so the compare's alias arm pairs it.
+ *
+ * Only literal column types on an identifier receiver are credited.
+ */
+interface DefineColumnMethodsMember {
+  receiver: string;
+  name: string;
+  aliasOf?: string;
+  line: number;
+}
+
+function collectDefineColumnMethodsMembers(sourceFile: ts.SourceFile): DefineColumnMethodsMember[] {
+  const out: DefineColumnMethodsMember[] = [];
+  const lineOf = (node: ts.Node): number =>
+    sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
+  const prototypeMember = (expr: ts.Expression): { receiver: string; name: string } | null =>
+    ts.isPropertyAccessExpression(expr) &&
+    ts.isPropertyAccessExpression(expr.expression) &&
+    expr.expression.name.text === "prototype" &&
+    ts.isIdentifier(expr.expression.expression)
+      ? { receiver: expr.expression.expression.text, name: expr.name.text }
+      : null;
+  for (const statement of sourceFile.statements) {
+    if (!ts.isExpressionStatement(statement)) continue;
+    const expr = statement.expression;
+    if (
+      ts.isCallExpression(expr) &&
+      ts.isPropertyAccessExpression(expr.expression) &&
+      expr.expression.name.text === "defineColumnMethods" &&
+      ts.isIdentifier(expr.expression.expression)
+    ) {
+      for (const arg of expr.arguments) {
+        if (!ts.isStringLiteralLike(arg)) continue;
+        out.push({
+          receiver: expr.expression.expression.text,
+          name: arg.text.replace(/_([a-z0-9])/g, (_, c: string) => c.toUpperCase()),
+          line: lineOf(arg),
+        });
+      }
+    } else if (
+      ts.isBinaryExpression(expr) &&
+      expr.operatorToken.kind === ts.SyntaxKind.EqualsToken
+    ) {
+      const left = prototypeMember(expr.left);
+      const right = prototypeMember(expr.right);
+      if (left === null || right === null || left.receiver !== right.receiver) continue;
+      out.push({
+        receiver: left.receiver,
+        name: left.name,
+        aliasOf: right.name,
+        line: lineOf(expr),
+      });
+    }
+  }
+  return out;
 }
 
 /**

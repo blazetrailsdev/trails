@@ -5181,6 +5181,38 @@ describe("extractFromProgram — alias bindings", () => {
   });
 });
 
+describe("extractFromProgram — defineColumnMethods() generated column methods", () => {
+  const SRC = `
+    export interface ColumnMethods {
+      bitVarying(...names: string[]): unknown;
+      binary(...names: string[]): unknown;
+      blob(...names: string[]): unknown;
+    }
+    export class TableDefinition {
+      static defineColumnMethods(...columnTypes: string[]): void {}
+    }
+    export interface TableDefinition extends ColumnMethods {}
+    TableDefinition.defineColumnMethods("bit_varying", "binary");
+    TableDefinition.prototype.blob = TableDefinition.prototype.binary;
+  `;
+
+  it("credits each literal column type as a bodied member of the receiver", () => {
+    const info = extractFromFiles("/p", { "schema-definitions.ts": SRC });
+    const klass = info.classes["schema-definitions.ts:TableDefinition"];
+    const bitVarying = klass.instanceMethods.find((m) => m.name === "bitVarying")!;
+    expect(bitVarying.bodyless).toBeUndefined();
+    expect(klass.instanceMethods.find((m) => m.name === "binary")!.bodyless).toBeUndefined();
+  });
+
+  it("credits a prototype alias assignment with aliasOf", () => {
+    const info = extractFromFiles("/p", { "schema-definitions.ts": SRC });
+    const klass = info.classes["schema-definitions.ts:TableDefinition"];
+    const blob = klass.instanceMethods.find((m) => m.name === "blob")!;
+    expect(blob.bodyless).toBeUndefined();
+    expect(blob.aliasOf).toBe("binary");
+  });
+});
+
 describe("extractFromProgram — classAttribute() generated accessors", () => {
   const TZ = `
     import { classAttribute } from "@blazetrails/activesupport";
