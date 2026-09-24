@@ -114,6 +114,7 @@ import {
   scopedSkipMirrorCandidates,
   scopedSkipMirrorName,
   rubyFileToTs,
+  rubyCallToTs,
   rubyMethodToTs,
 } from "@blazetrails/parity/conventions";
 import {
@@ -4608,7 +4609,7 @@ export function main() {
           // promote zero-arg readers (`spawn`, `isReadonlyAttribute`) past the
           // gate the moment alias bindings started carrying real params.
           (c) => portedWithArgsSigs(tsFile, c).some((sig) => stripThis(sig).length > 0),
-          rubyMethodToTs,
+          (rc) => rubyCallToTs(rc, pkg),
           significantCallsForReceivers(rubyOwned?.receivers, callsSignificant),
           (rc) => jsEnumerableAliases(rc, rubyOwned?.receivers?.[rc]),
           negatedTsCalls,
@@ -4659,7 +4660,7 @@ export function main() {
               rubyCalls,
               [...partitionNegatedCalls(seqSets[0]).calls],
               (c) => portedWithArgsSigs(tsFile, c).some((sig) => stripThis(sig).length > 0),
-              rubyMethodToTs,
+              (rc) => rubyCallToTs(rc, pkg),
               callsSignificant,
               rubyOwned?.calls ?? rubyCalls,
             ),

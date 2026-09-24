@@ -493,6 +493,31 @@ export const PROTOCOL_DEFINITION_ENROLLED_PACKAGES: ReadonlySet<string> = new Se
   "trailties",
 ]);
 
+/**
+ * Packages whose Ruby bodies' CALLS to a {@link PROTOCOL_DEFINITION_NAMES} name
+ * are mapped in the call gate ({@link rubyCallToTs}), so a port that drops a
+ * `.dup` or an `inspect` is flagged like any other dropped call. The sibling of
+ * {@link PROTOCOL_DEFINITION_ENROLLED_PACKAGES}, and only-grow on the same
+ * terms: a package joins through its own burndown story once its rows are
+ * converged, and is never removed to turn a red run green.
+ */
+export const PROTOCOL_CALL_ENROLLED_PACKAGES: ReadonlySet<string> = new Set<string>([
+  "abstractcontroller",
+  "actionview",
+  "activemodel",
+  "activerecord-test-support",
+  "arel",
+  "did-you-mean",
+  "globalid",
+  "i18n",
+  "rack",
+  "rack-session",
+  "rack-test",
+  "ruby-compat",
+  "sqlite3",
+  "trailties",
+]);
+
 export const SKIP_GROUPS: SkipGroup[] = [
   {
     reason:
@@ -1543,6 +1568,22 @@ export function rubyMethodToTs(
 ): string[] | null {
   if (SKIP.has(name) && !isScoredProtocolDefinition(name, pkg)) return null;
   return rubyMethodToTsIgnoringSkip(name, siblingRubyNames);
+}
+
+/**
+ * {@link rubyMethodToTs} for a CALL made in a body of package `pkg`: a
+ * {@link PROTOCOL_DEFINITION_NAMES} name is mapped where `pkg` is in
+ * {@link PROTOCOL_CALL_ENROLLED_PACKAGES}, and skipped elsewhere as before.
+ */
+export function rubyCallToTs(name: string, pkg: string | undefined): string[] | null {
+  if (
+    pkg !== undefined &&
+    PROTOCOL_CALL_ENROLLED_PACKAGES.has(pkg) &&
+    PROTOCOL_DEFINITION_NAMES.includes(name)
+  ) {
+    return rubyMethodToTsIgnoringSkip(name);
+  }
+  return rubyMethodToTs(name);
 }
 
 function isScoredProtocolDefinition(name: string, pkg: string | undefined): boolean {

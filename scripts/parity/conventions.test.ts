@@ -26,6 +26,8 @@ import {
   explainConventions,
   PROTOCOL_DEFINITION_NAMES,
   PROTOCOL_DEFINITION_ENROLLED_PACKAGES,
+  PROTOCOL_CALL_ENROLLED_PACKAGES,
+  rubyCallToTs,
 } from "./conventions.js";
 
 describe("snakeToCamel", () => {
@@ -222,6 +224,19 @@ describe("PROTOCOL_DEFINITION_NAMES", () => {
         (c) => !c.startsWith("_"),
       ),
     ).toEqual(["initializeCopy", "initializeDup", "clone"]);
+  });
+});
+
+describe("rubyCallToTs", () => {
+  it("maps a call to a protocol name in an enrolled package only", () => {
+    expect(PROTOCOL_CALL_ENROLLED_PACKAGES.has("activerecord")).toBe(false);
+    for (const name of PROTOCOL_DEFINITION_NAMES) {
+      expect(rubyCallToTs(name, undefined)).toBeNull();
+      expect(rubyCallToTs(name, "activerecord")).toBeNull();
+      expect(rubyCallToTs(name, "arel")).toEqual(rubyMethodToTsIgnoringSkip(name));
+    }
+    expect(rubyCallToTs("clone", "arel")).toBeNull();
+    expect(rubyCallToTs("to_s", "activerecord")).toEqual(rubyMethodToTs("to_s"));
   });
 });
 
