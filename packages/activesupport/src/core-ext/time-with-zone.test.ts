@@ -51,16 +51,24 @@ function withEnvTz<T>(newTz: string, fn: () => T): T {
   const oldTz = process.env.TZ;
   process.env.TZ = newTz;
   resetLocalTimeZoneId();
-  try {
-    return fn();
-  } finally {
+  const restore = () => {
     if (oldTz === undefined) {
       delete process.env.TZ;
     } else {
       process.env.TZ = oldTz;
     }
     resetLocalTimeZoneId();
+  };
+  let result: T;
+  try {
+    result = fn();
+  } catch (e) {
+    restore();
+    throw e;
   }
+  if (result instanceof Promise) return result.finally(restore) as T;
+  restore();
+  return result;
 }
 
 function withTzDefault<T>(tz: TimeZone | string | null, fn: () => T): T {
