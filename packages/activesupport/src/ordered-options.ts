@@ -112,7 +112,7 @@ export class OrderedOptions {
   }
 
   isKey(key: string): boolean {
-    return this.data.has(key);
+    return key.startsWith(":") && this.data.has(key.slice(1));
   }
 
   key(value: unknown): string | undefined {
@@ -202,7 +202,11 @@ export class InheritableOptions extends OrderedOptions {
   }
 
   isOverridden(key: string): boolean {
-    return !!(this.parent && this.parentIsKey(key) && this.ownKey(String(key)));
+    return !!(
+      this.parent &&
+      this.parentIsKey(key) &&
+      this.ownKey(key.startsWith(":") ? key : `:${key}`)
+    );
   }
 
   inheritableCopy(): InheritableOptions {
@@ -225,6 +229,6 @@ export class InheritableOptions extends OrderedOptions {
   private parentIsKey(key: string): boolean {
     return this.parent instanceof OrderedOptions
       ? this.parent.isKey(key)
-      : Object.prototype.hasOwnProperty.call(this.parent, key);
+      : key.startsWith(":") && Object.prototype.hasOwnProperty.call(this.parent, key.slice(1));
   }
 }

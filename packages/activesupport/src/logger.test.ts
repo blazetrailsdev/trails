@@ -245,8 +245,7 @@ describe("LoggerTest", () => {
     }
   });
 
-  it.skip("defaults to simple formatter", () => {
-    // BLOCKED: logger-default-simple-formatter-and-nonstring-inspect
+  it("defaults to simple formatter", () => {
     const logger = new Logger(output);
     expect(logger.formatter).toBeInstanceOf(SimpleFormatter);
   });

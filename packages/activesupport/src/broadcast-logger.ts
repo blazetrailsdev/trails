@@ -13,6 +13,7 @@ export class BroadcastLogger extends Logger {
 
   constructor(...loggers: Logger[]) {
     super(null);
+    this._formatter = null;
     this.broadcasts = [];
     this.progname = "Broadcast";
 

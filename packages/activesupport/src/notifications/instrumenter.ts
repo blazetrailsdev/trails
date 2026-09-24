@@ -104,7 +104,7 @@ export class Event {
   }
 
   private nowCpu(): number {
-    return 0.0;
+    return Process.clockGettime(Process.CLOCK_THREAD_CPUTIME_ID, ":float_millisecond");
   }
 
   private nowGc(): number {

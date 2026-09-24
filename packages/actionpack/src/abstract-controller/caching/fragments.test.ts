@@ -196,7 +196,7 @@ describe("instrumentFragmentCache", () => {
     const h1 = Notifications.subscribe("write_fragment.abstract_controller", sub);
     try {
       expect(instrumentFragmentCache(host, "write_fragment", "k", () => "ok")).toBe("ok");
-      expect(sub.mock.calls[0][0]?.payload).toEqual({ key: "k" });
+      expect(sub.mock.calls[0][4]).toEqual({ key: "k" });
     } finally {
       Notifications.unsubscribe(h1);
     }
@@ -207,7 +207,7 @@ describe("instrumentFragmentCache", () => {
     const h2 = Notifications.subscribe("read_fragment.action_controller", sub2);
     try {
       instrumentFragmentCache(host, "read_fragment", "k", () => null);
-      expect(sub2.mock.calls[0][0]?.payload).toEqual({ key: "k", controller: "Pages" });
+      expect(sub2.mock.calls[0][4]).toEqual({ key: "k", controller: "Pages" });
     } finally {
       Notifications.unsubscribe(h2);
     }

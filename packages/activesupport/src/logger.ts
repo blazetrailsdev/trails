@@ -1,5 +1,5 @@
-import { stdout } from "@blazetrails/ruby-compat";
-import { Temporal } from "@blazetrails/date";
+import { Process, rbInspect, sprintf, stdout } from "@blazetrails/ruby-compat";
+import { Temporal, strftime } from "@blazetrails/date";
 import { File } from "@blazetrails/ruby-compat";
 import { ActiveSupport } from "./namespaces.js";
 import { include } from "@blazetrails/ruby-compat/include";
@@ -36,22 +36,61 @@ const defaultOutput: LoggerOutput = {
   },
 };
 
+export type LoggerFormatter =
+  | ((severity: string, datetime: Temporal.Instant, progname: string | null, msg: any) => string)
+  | {
+      call(severity: string, datetime: Temporal.Instant, progname: string | null, msg: any): string;
+    };
+
+/** @noRailsEquivalent PERMANENT */
+export class Formatter {
+  static readonly Format = "%.1s, [%s #%d] %5s -- %s: %s\n";
+  static readonly DatetimeFormat = "%Y-%m-%dT%H:%M:%S.%6N";
+
+  datetimeFormat: string | null;
+
+  constructor() {
+    this.datetimeFormat = null;
+  }
+
+  call(severity: string, time: Temporal.Instant, progname: string | null, msg: unknown): string {
+    return sprintf(
+      Formatter.Format,
+      severity,
+      this.formatDatetime(time),
+      Process.pid,
+      severity,
+      progname,
+      this.msg2str(msg),
+    );
+  }
+
+  private formatDatetime(time: Temporal.Instant): string {
+    return strftime(time, this.datetimeFormat ?? Formatter.DatetimeFormat);
+  }
+
+  private msg2str(msg: unknown): string {
+    if (typeof msg === "string") {
+      return msg;
+    } else if (msg instanceof Error) {
+      return `${msg.message} (${msg.constructor.name})\n${msg.stack ?? ""}`;
+    } else {
+      return rbInspect(msg);
+    }
+  }
+}
+
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include LoggerThreadSafeLevel` (`logger_silence.rb:9`); the class/interface merge is how `include()` surfaces on the type side.
 export class Logger {
-  progname: string = "trails";
-  protected _formatter:
-    | ((severity: string, datetime: Temporal.Instant, progname: string, msg: string) => string)
-    | null = null;
-  get formatter():
-    | ((severity: string, datetime: Temporal.Instant, progname: string, msg: string) => string)
-    | null {
+  progname: string | null = null;
+  /** @noRailsEquivalent PERMANENT */
+  static Formatter = Formatter;
+
+  protected _formatter: LoggerFormatter | null = null;
+  get formatter(): LoggerFormatter | null {
     return this._formatter;
   }
-  set formatter(
-    value:
-      | ((severity: string, datetime: Temporal.Instant, progname: string, msg: string) => string)
-      | null,
-  ) {
+  set formatter(value: LoggerFormatter | null) {
     this._formatter = value;
   }
 
@@ -96,24 +135,24 @@ export class Logger {
 
   constructor(output: LoggerOutput | null = defaultOutput) {
     this.output = output;
+    this._formatter ??= new SimpleFormatter();
   }
 
   add(severity: number, message?: string | null, progname?: string): boolean {
     if (severity < this.level) return true;
-    let msg: string;
-    let formatterProgname: string;
+    let msg: unknown;
+    let formatterProgname: string | null;
     if (message != null) {
-      msg = String(message);
+      msg = message;
       formatterProgname = progname ?? this.progname;
     } else {
       msg = progname ?? this.progname;
       formatterProgname = this.progname;
     }
     const severityName = (LEVEL_NAMES[severity] ?? "unknown").toUpperCase();
-    const line = this.formatter
-      ? this.formatter(severityName, Temporal.Now.instant(), formatterProgname, msg)
-      : `${msg}\n`;
-    this.output?.write(line);
+    this.output?.write(
+      this.formatMessage(severityName, Temporal.Now.instant(), formatterProgname, msg),
+    );
     return true;
   }
 
@@ -192,6 +231,18 @@ export class Logger {
   }
 
   close(): void {}
+
+  private formatMessage(
+    severity: string,
+    datetime: Temporal.Instant,
+    progname: string | null,
+    msg: unknown,
+  ): string {
+    const formatter = this.formatter ?? new Formatter();
+    return typeof formatter === "function"
+      ? formatter(severity, datetime, progname, msg)
+      : formatter.call(severity, datetime, progname, msg);
+  }
 
   append(s: string): void {
     this.output?.write(s);
@@ -398,14 +449,14 @@ taggedLogging.logger = function (output: LoggerOutput): TaggedLogger {
   return taggedLogging(logger);
 };
 
-export class SimpleFormatter {
-  call(
-    _severity: string,
-    _timestamp: Temporal.Instant,
-    _progname: string | null,
-    msg: string,
+export class SimpleFormatter extends Formatter {
+  override call(
+    severity: string,
+    timestamp: Temporal.Instant,
+    progname: string | null,
+    msg: unknown,
   ): string {
-    return `${msg}\n`;
+    return `${typeof msg === "string" ? msg : rbInspect(msg)}\n`;
   }
 }
 
@@ -413,7 +464,7 @@ export function simpleFormatter(): (
   severity: string,
   timestamp: Temporal.Instant,
   progname: string | null,
-  msg: string,
+  msg: unknown,
 ) => string {
   const fmt = new SimpleFormatter();
   return fmt.call.bind(fmt);

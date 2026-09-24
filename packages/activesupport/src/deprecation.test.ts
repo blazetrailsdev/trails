@@ -702,8 +702,7 @@ describe("DeprecationTest", () => {
     });
   });
 
-  it.skip("silence only affects the current thread", async () => {
-    // BLOCKED: deprecation-silence-and-allow-restore-before-an-async-block-settles
+  it("silence only affects the current thread", async () => {
     await deprecator.silence(async () => {
       await assertNotDeprecated(deprecator, () => {
         deprecator.warn();

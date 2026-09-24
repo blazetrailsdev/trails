@@ -285,13 +285,20 @@ export class Deprecation {
     );
   }
 
-  silence<T>(fn: () => T): T {
+  silence<T>(block: () => T): T {
     this.beginSilence();
+    let result: T;
     try {
-      return fn();
-    } finally {
+      result = block();
+    } catch (error) {
       this.endSilence();
+      throw error;
     }
+    if (result != null && typeof (result as unknown as PromiseLike<unknown>).then === "function") {
+      return Promise.resolve(result as unknown).finally(() => this.endSilence()) as T;
+    }
+    this.endSilence();
+    return result;
   }
 
   beginSilence(): void {

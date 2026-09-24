@@ -1,5 +1,5 @@
 import { ArgumentError, Process } from "@blazetrails/ruby-compat";
-import { Temporal } from "@blazetrails/date";
+import { Time } from "@blazetrails/date";
 import { Event } from "./instrumenter.js";
 import { IsolatedExecutionState } from "../isolated-execution-state.js";
 
@@ -49,8 +49,8 @@ export type EventedListener = {
 
 type TimedCallback = (
   name: string,
-  start: Temporal.Instant | number | null,
-  finish: Temporal.Instant | number | null,
+  start: Time | number | null,
+  finish: Time | number | null,
   id: unknown,
   payload: Record<string, unknown>,
 ) => void;
@@ -137,8 +137,8 @@ export abstract class BaseGroup<L = Delegate> {
   abstract finish(name: string, id: unknown, payload: Record<string, unknown>): void;
 }
 
-export class BaseTimeGroup extends BaseGroup<TimedCallback> {
-  private startTime: Temporal.Instant | number = 0;
+export abstract class BaseTimeGroup extends BaseGroup<TimedCallback> {
+  private startTime: Time | number = 0;
 
   override start(_name: string, _id: unknown, _payload: Record<string, unknown>): void {
     this.startTime = this.now();
@@ -151,9 +151,7 @@ export class BaseTimeGroup extends BaseGroup<TimedCallback> {
     });
   }
 
-  protected now(): Temporal.Instant | number {
-    return Temporal.Now.instant();
-  }
+  protected abstract now(): Time | number;
 }
 
 export class MonotonicTimedGroup extends BaseTimeGroup {
@@ -163,8 +161,8 @@ export class MonotonicTimedGroup extends BaseTimeGroup {
 }
 
 export class TimedGroup extends BaseTimeGroup {
-  protected override now(): Temporal.Instant {
-    return Temporal.Now.instant();
+  protected override now(): Time {
+    return Time.now();
   }
 }
 

@@ -11,8 +11,7 @@ describe("CleanLoggerTest", () => {
     expect(lines.join("")).toEqual("error\n");
   });
 
-  it.skip("datetime format", () => {
-    // BLOCKED: logger-default-simple-formatter-and-nonstring-inspect
+  it("datetime format", () => {
     const lines: string[] = [];
     const logger = new Logger({ write: (s) => lines.push(s) });
     (logger as any).formatter = new (Logger as any).Formatter();
@@ -22,8 +21,7 @@ describe("CleanLoggerTest", () => {
     expect(lines.join("")).toMatch(/D, \[\d\d\d\d-\d\d-\d\d[ ]?#\d+\] DEBUG -- : debug/);
   });
 
-  it.skip("nonstring formatting", () => {
-    // BLOCKED: logger-default-simple-formatter-and-nonstring-inspect
+  it("nonstring formatting", () => {
     const lines: string[] = [];
     const logger = new Logger({ write: (s) => lines.push(s) });
     const anObject = [1, 2, 3, 4, 5];

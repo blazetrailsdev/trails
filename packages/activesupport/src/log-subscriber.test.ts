@@ -170,7 +170,7 @@ describe("SyncLogSubscriberTest", () => {
   });
 
   it.skip("event attributes", () => {
-    // BLOCKED: notifications-timed-subscriber-arity-and-event-cpu-allocations
+    // BLOCKED: notifications-event-allocations-has-no-js-allocation-counter
     const JRUBY_VERSION: string | null = null;
     MyLogSubscriber.attachTo("my_log_subscriber", logSubscriber);
     Notifications.instrument("some_event.my_log_subscriber", {}, () => {

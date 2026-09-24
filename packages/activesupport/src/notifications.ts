@@ -1,4 +1,4 @@
-import { Temporal } from "@blazetrails/date";
+import { Time } from "@blazetrails/date";
 import { Event, Instrumenter } from "./notifications/instrumenter.js";
 import type { EventPayload, NotificationHandle } from "./notifications/instrumenter.js";
 import { Fanout } from "./notifications/fanout.js";
@@ -19,8 +19,8 @@ export type NotificationCallback =
   | ((event: Event) => void)
   | ((
       name: string,
-      start: Temporal.Instant | number,
-      finish: Temporal.Instant | number,
+      start: Time | number,
+      finish: Time | number,
       id: string,
       payload: EventPayload,
     ) => void);
@@ -48,12 +48,17 @@ export class Notifications {
 
   static subscribe(
     pattern: string | RegExp | null | undefined,
-    callback: ((event: Event) => void) | CallableListener | EventedListener,
+    callback: (event: Event) => void,
+  ): NotificationSubscriber;
+  static subscribe(
+    pattern: string | RegExp | null | undefined,
+    callback: NotificationCallback | EventedListener,
+  ): NotificationSubscriber;
+  static subscribe(
+    pattern: string | RegExp | null | undefined,
+    callback: NotificationCallback | EventedListener,
   ): NotificationSubscriber {
-    const sub =
-      typeof callback === "function"
-        ? this.notifier.subscribe(pattern ?? null, (event: Event) => callback(event))
-        : this.notifier.subscribe(pattern ?? null, callback);
+    const sub = this.notifier.subscribe(pattern ?? null, callback as FanoutListener, false);
     return sub as unknown as NotificationSubscriber;
   }
 
