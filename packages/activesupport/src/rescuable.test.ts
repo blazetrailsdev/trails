@@ -12,7 +12,7 @@ class CoolError extends Error {}
 
 class WeirdError {
   static [Symbol.hasInstance](other: unknown): boolean {
-    return other instanceof Error && "weird" in other;
+    return other instanceof Error && "isWeird" in other;
   }
 }
 
@@ -54,7 +54,9 @@ class Stargate {
     });
   }
 
-  dispatch(method: "attack" | "nuke" | "ronanize" | "crash"): void {
+  dispatch(
+    method: "attack" | "nuke" | "ronanize" | "crash" | "loopedCrash" | "fallBackToCause" | "weird",
+  ): void {
     try {
       this[method]();
     } catch (e) {
@@ -78,6 +80,25 @@ class Stargate {
 
   crash(): never {
     throw new RangeError("unhandled RuntimeError");
+  }
+
+  loopedCrash(): never {
+    const ex1 = new Error("error 1");
+    const ex2 = new Error("error 2", { cause: ex1 });
+    Object.defineProperty(ex1, "cause", { value: ex2 });
+    throw ex1;
+  }
+
+  fallBackToCause(): never {
+    try {
+      this.ronanize();
+    } catch (e) {
+      throw new RangeError("unhandled RuntimeError with a handleable cause", { cause: e });
+    }
+  }
+
+  weird(): never {
+    throw Object.assign(new Error(), { isWeird: () => true });
   }
 
   sos(): void {
@@ -123,6 +144,11 @@ describe("RescuableTest", () => {
     expect(stargate.result).toBe("dex");
   });
 
+  it("rescue from error dispatchers with case operator", () => {
+    stargate.dispatch("weird");
+    expect(stargate.result).toBe("weird");
+  });
+
   it("rescues defined later are added at end of the rescue handlers array", () => {
     const expected = ["WraithAttack", "WraithAttack", "NuclearExplosion", "MadRonon", "WeirdError"];
     const result = stargate.rescueHandlers.map((handler) => handler[0]);
@@ -142,8 +168,20 @@ describe("RescuableTest", () => {
     expect(result).toEqual(expected);
   });
 
+  it.skip("rescue falls back to exception cause", () => {
+    // BLOCKED: port-rescuable-tagged-logging-and-isolated-execution-cases
+    stargate.dispatch("fallBackToCause");
+    expect(stargate.result).toBe("dex");
+  });
+
   it("unhandled exceptions", () => {
     stargate.dispatch("crash");
+    expect(stargate.result).toBe("unhandled");
+  });
+
+  it.skip("rescue handles loops in exception cause chain", () => {
+    // BLOCKED: port-rescuable-tagged-logging-and-isolated-execution-cases
+    stargate.dispatch("loopedCrash");
     expect(stargate.result).toBe("unhandled");
   });
 });
