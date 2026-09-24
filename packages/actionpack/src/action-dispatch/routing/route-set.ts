@@ -296,7 +296,7 @@ export class NamedRouteCollection {
     return this._routes;
   }
 
-  routeDefinedQ(name: string): boolean {
+  isRouteDefined(name: string): boolean {
     return this.pathHelpers.has(name) || this.urlHelpers.has(name);
   }
 
@@ -335,7 +335,7 @@ export class NamedRouteCollection {
     return this._routes.get(name);
   }
 
-  keyQ(name: string | null | undefined): boolean {
+  isKey(name: string | null | undefined): boolean {
     if (name == null) return false;
     return this._routes.has(name);
   }

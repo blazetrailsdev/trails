@@ -20,7 +20,7 @@ export {
 
 export { escapeJavascript, j, javascriptCdataSection, javascriptTag } from "./javascript-helper.js";
 
-export { capture, contentFor, contentForQ, provide, withOutputBuffer } from "./capture-helper.js";
+export { capture, contentFor, isContentFor, provide, withOutputBuffer } from "./capture-helper.js";
 export type { CaptureHelperHost } from "./capture-helper.js";
 
 export {

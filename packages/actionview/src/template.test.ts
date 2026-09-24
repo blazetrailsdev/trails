@@ -42,7 +42,7 @@ describe("ActionView::Template (smoke)", () => {
     });
     expect(t.strictLocalsBang()).toBe("headline:, alerts: []");
     expect(t.source).not.toMatch(/locals:/);
-    expect(t.strictLocalsQ()).toBe(true);
+    expect(t.isStrictLocals()).toBe(true);
     expect(t.locals).toBeNull();
 
     const afterFirst = t.source;

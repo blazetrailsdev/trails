@@ -357,6 +357,7 @@ import {
   generateUniqueSecureToken as _generateUniqueSecureToken,
 } from "./secure-token.js";
 import { authenticateBy as _authenticateBy } from "./secure-password.js";
+import { ClassMethods as _AggregationsClassMethods } from "./aggregations.js";
 import {
   ClassMethods as _StoreClassMethods,
   localStoredAttributes as _localStoredAttributes,
@@ -1290,6 +1291,8 @@ export class Base extends Model {
   ) => void;
 
   declare static localStoredAttributes: typeof _localStoredAttributes;
+
+  declare static composedOf: typeof _AggregationsClassMethods.composedOf;
 
   static storedAttributes = _storedAttributes;
 
@@ -2791,6 +2794,7 @@ extend(Base, {
 });
 
 extend(Base, _StoreClassMethods);
+extend(Base, _AggregationsClassMethods);
 
 include(Base, JSONSerializer);
 Base.includeRootInJson = false;

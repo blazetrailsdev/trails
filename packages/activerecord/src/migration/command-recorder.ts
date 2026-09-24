@@ -93,6 +93,7 @@ export class CommandRecorder {
     ).call(this, args, block);
   }
 
+  /** @missingRailsName delegate — PERMANENT */
   async changeTable(
     tableName: string,
     options: ((t: Table) => Promise<void> | void) | Record<string, unknown>,
@@ -442,7 +443,10 @@ export class CommandRecorder {
     );
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsName delegate — PERMANENT
+   */
   async invertTransaction(args: unknown[], block?: MigrationBlock): Promise<MigrationCommand> {
     const subRecorder = new CommandRecorder(this._delegate);
     await subRecorder.revert(block as () => Promise<void>);

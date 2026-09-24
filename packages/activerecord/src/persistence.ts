@@ -648,15 +648,15 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
   const setPairs: Array<[unknown, unknown]> = [];
   const updatedKeys: string[] = [];
   const attributeTypes = ctor.attributeTypes();
-  for (const [key, value] of resolvedEntries) {
-    updatedKeys.push(key);
-    const known = Object.hasOwn(attributeTypes, key);
-    if (!known && !pkCols.includes(key)) {
-      throw new UnknownAttributeError(this, key);
+  for (const [k, v] of resolvedEntries) {
+    updatedKeys.push(k);
+    const known = Object.hasOwn(attributeTypes, k);
+    if (!known && !pkCols.includes(k)) {
+      throw new UnknownAttributeError(this, k);
     }
-    const attrType = known ? ctor.typeForAttribute(key) : undefined;
-    const cast = attrType ? attrType.cast(value) : value;
-    this._attributes.writeCastValue(key, value);
+    const attrType = known ? ctor.typeForAttribute(k) : undefined;
+    const cast = attrType ? attrType.cast(v) : v;
+    this._attributes.writeCastValue(k, v);
     const type = attrType as
       | {
           serializeCastValue(v: unknown): unknown;
@@ -668,7 +668,7 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
       type && typeof type.serialize === "function"
         ? SerializeCastValue.serialize(type, cast)
         : cast;
-    setPairs.push([table.get(key), dbValue]);
+    setPairs.push([table.get(k), dbValue]);
   }
 
   const um = new UpdateManager();
@@ -782,6 +782,7 @@ interface BecomesRecord {
   errors: unknown;
 }
 
+/** @missingRailsName instanceVariableGet — PERMANENT */
 export function becomes<
   T extends BecomesRecord,
   K extends new (
@@ -905,7 +906,10 @@ export function strictLoadedAssociations(this: PersistencePrivateHost): string[]
     .map(([name]) => name);
 }
 
-/** @internal */
+/**
+ * @internal
+ * @missingRailsName _inMemoryQueryConstraintsHash — PERMANENT
+ */
 export function _findRecord(
   this: PersistencePrivateHost & { constructor: any },
   options?: { lock?: boolean | string; allQueries?: boolean | null },

@@ -292,7 +292,7 @@ export class File extends IO {
    * @noRailsEquivalent PERMANENT — Ruby core `File.size?`
    * (`vendor/ruby/file.c:2047`).
    */
-  static sizeQ(fileName: string): number | null {
+  static isSize(fileName: string): number | null {
     let size: number;
     try {
       size = File.stat(fileName).size;

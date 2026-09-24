@@ -70,7 +70,7 @@ export class Base {
 
   static _compiledMethods: Map<string, CompiledMethod> = new Map();
 
-  static xssSafeQ(): boolean {
+  static isXssSafe(): boolean {
     return true;
   }
 
@@ -101,7 +101,7 @@ export class Base {
     );
   }
 
-  static changedQ(other: typeof Base): boolean {
+  static isChanged(other: typeof Base): boolean {
     return this.compiledMethodContainer() !== other.compiledMethodContainer();
   }
 

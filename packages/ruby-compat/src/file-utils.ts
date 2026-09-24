@@ -243,49 +243,49 @@ class Entry_ {
 
   /** `Entry_#file?` (`vendor/ruby/lib/fileutils.rb:2118-2121`). */
   get isFile(): boolean {
-    const s = this.lstatQ();
+    const s = this.lstatBang();
     return s != null && s.isFile();
   }
 
   /** `Entry_#directory?` (`vendor/ruby/lib/fileutils.rb:2123-2126`). */
   get isDirectory(): boolean {
-    const s = this.lstatQ();
+    const s = this.lstatBang();
     return s != null && s.isDirectory();
   }
 
   /** `Entry_#symlink?` (`vendor/ruby/lib/fileutils.rb:2128-2131`). */
   get isSymlink(): boolean {
-    const s = this.lstatQ();
+    const s = this.lstatBang();
     return s != null && s.isSymbolicLink?.() === true;
   }
 
   /** `Entry_#chardev?` (`vendor/ruby/lib/fileutils.rb:2133-2136`). */
   get isChardev(): boolean {
-    const s = this.lstatQ();
+    const s = this.lstatBang();
     return s != null && s.isCharacterDevice?.() === true;
   }
 
   /** `Entry_#blockdev?` (`vendor/ruby/lib/fileutils.rb:2138-2141`). */
   get isBlockdev(): boolean {
-    const s = this.lstatQ();
+    const s = this.lstatBang();
     return s != null && s.isBlockDevice?.() === true;
   }
 
   /** `Entry_#socket?` (`vendor/ruby/lib/fileutils.rb:2143-2146`). */
   get isSocket(): boolean {
-    const s = this.lstatQ();
+    const s = this.lstatBang();
     return s != null && s.isSocket?.() === true;
   }
 
   /** `Entry_#pipe?` (`vendor/ruby/lib/fileutils.rb:2148-2151`). */
   get isPipe(): boolean {
-    const s = this.lstatQ();
+    const s = this.lstatBang();
     return s != null && s.isFIFO?.() === true;
   }
 
   /** `Entry_#door?` (`vendor/ruby/lib/fileutils.rb:2155-2158`). */
   get isDoor(): boolean {
-    const s = this.lstatQ();
+    const s = this.lstatBang();
     return s != null && (s.mode & 0xf000) === Entry_.S_IF_DOOR;
   }
 
@@ -306,7 +306,7 @@ class Entry_ {
   }
 
   /** `Entry_#lstat!` (`vendor/ruby/lib/fileutils.rb:2200-2204`). */
-  lstatQ(): FsStatResult | null {
+  lstatBang(): FsStatResult | null {
     try {
       return this.lstat();
     } catch (error) {

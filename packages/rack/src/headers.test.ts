@@ -377,7 +377,7 @@ describe("RackHeadersTest", () => {
   });
 
   it("compare by identity?", () => {
-    expect(fh.compareByIdentityQ).toBe(false);
+    expect(fh.isCompareByIdentity).toBe(false);
   });
 
   it("to h", () => {

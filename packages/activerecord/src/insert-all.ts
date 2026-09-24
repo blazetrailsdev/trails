@@ -531,13 +531,13 @@ export class Builder implements InsertBuilder {
       ...this._insertAll.keysIncludingTimestamps(),
     ]);
 
-    const rows = this._insertAll.mapKeyWithValue<unknown>((key, value) => {
+    const valuesList = this._insertAll.mapKeyWithValue<unknown>((key, value) => {
       if (value instanceof Nodes.SqlLiteral) return value;
       const type = types[key];
       value = SerializeCastValue.serialize(type!, type!.cast(value));
       return value;
     });
-    return this._connection.visitor.compile(new Nodes.ValuesList(rows));
+    return this._connection.visitor.compile(new Nodes.ValuesList(valuesList));
   }
 
   conflictTarget(): string {

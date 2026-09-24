@@ -191,6 +191,7 @@ export function freeze<T extends FrozenRecord>(this: T): T {
   return this;
 }
 
+/** @missingRailsName attributes — PERMANENT */
 export function isFrozen(this: FrozenRecord): boolean {
   return Object.isFrozen(this._attributes);
 }

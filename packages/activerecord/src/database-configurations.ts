@@ -176,6 +176,7 @@ export class DatabaseConfigurations {
     return String(ActiveRecord.ConnectionHandling.DEFAULT_ENV());
   }
 
+  /** @missingRailsName compact — PERMANENT */
   private buildConfigs(configs: RawConfigurations | HashConfig[]): HashConfig[] {
     if (Array.isArray(configs)) return configs;
 

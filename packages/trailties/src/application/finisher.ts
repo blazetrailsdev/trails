@@ -28,7 +28,7 @@ export interface FinisherConfig {
   toPrepareBlocks: ConfigurationBlock[];
   eagerLoad: boolean | null;
   eagerLoadNamespaces: unknown[];
-  sessionStoreQ(): unknown;
+  isSessionStore(): unknown;
   sessionStore(newSessionStore?: unknown, options?: Record<string, unknown>): unknown;
 }
 
@@ -68,7 +68,7 @@ Finisher.initializer(
   "setup_default_session_store",
   { before: "build_middleware_stack" },
   function (this: FinisherHost) {
-    if (this.config.sessionStoreQ() == null) {
+    if (this.config.isSessionStore() == null) {
       const appName = this.constructor.name ? this.railtieName.replace(/_application$/, "") : "";
       this.config.sessionStore(":cookie_store", { key: `_${appName}_session` });
     }

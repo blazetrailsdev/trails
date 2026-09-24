@@ -32,6 +32,7 @@ export class Session {
     return Session.convertTimestampToTime(Number.isFinite(raw) ? (raw as number) : undefined);
   }
 
+  /** @missingRailsName now — PERMANENT */
   updateLastWriteTimestamp(): number {
     const lastWrite = Session.convertTimeToTimestamp(Temporal.Now.instant());
     this.session.set("lastWrite", lastWrite);

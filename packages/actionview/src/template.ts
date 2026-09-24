@@ -135,7 +135,7 @@ export class Template {
   }
 
   get locals(): readonly string[] | null {
-    return this.strictLocalsQ() ? null : this._locals;
+    return this.isStrictLocals() ? null : this._locals;
   }
 
   get type(): string | null {
@@ -195,7 +195,7 @@ export class Template {
     return this._strictLocals;
   }
 
-  strictLocalsQ(): boolean {
+  isStrictLocals(): boolean {
     return this.strictLocalsBang() != null;
   }
 
@@ -212,7 +212,7 @@ export class Template {
       return this.instrumentRenderTemplate<string>(() => {
         this.compileBang(view);
 
-        if (this.strictLocalsQ() && this._strictLocalKeys && implicitLocals.length > 0) {
+        if (this.isStrictLocals() && this._strictLocalKeys && implicitLocals.length > 0) {
           const localsToIgnore = implicitLocals.filter((l) => !this._strictLocalKeys!.includes(l));
           for (const key of localsToIgnore) delete locals[key];
         }
@@ -220,13 +220,13 @@ export class Template {
         if (buffer) {
           view._run(this.methodName(), this, locals, buffer, {
             addToStack,
-            hasStrictLocals: this.strictLocalsQ(),
+            hasStrictLocals: this.isStrictLocals(),
           });
           return "";
         } else {
           const result = view._run(this.methodName(), this, locals, new OutputBuffer(), {
             addToStack,
-            hasStrictLocals: this.strictLocalsQ(),
+            hasStrictLocals: this.isStrictLocals(),
           });
           return result instanceof OutputBuffer ? result.toStr() : String(result ?? "");
         }
@@ -339,7 +339,7 @@ export class Template {
     const method = factory(ArgumentError, htmlSafe, OutputBuffer);
     mod._compiledMethods.set(this.methodName(), method);
 
-    if (!this.strictLocalsQ()) return;
+    if (!this.isStrictLocals()) return;
 
     const parameters = method.parameters!.filter(
       ([type, name]) => !(type === "req" && (name === "local_assigns" || name === "output_buffer")),
@@ -381,7 +381,7 @@ export class Template {
 
   /** @internal */
   private localsCode(): string {
-    if (this.strictLocalsQ()) return "";
+    if (this.isStrictLocals()) return "";
 
     let locals = this._locals.filter((l) => !JS_RESERVED_KEYWORDS.includes(l));
 

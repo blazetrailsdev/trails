@@ -127,28 +127,31 @@ export function overrideAccessorsToPreserveOriginal(
   if (!Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")) {
     initializeGeneratedModules.call(this);
   }
-  const mod = new Module();
-  mod.moduleEval((table) => {
-    Object.defineProperty(table, name, {
-      configurable: true,
-      get(this: any) {
-        const value = this.readAttribute(name);
-        if (
-          (value != null && value !== false && isEncryptedAttribute.call(this, name)) ||
-          !Configurable.config.supportUnencryptedData
-        ) {
-          return this[originalAttributeName];
-        } else {
-          return value;
-        }
-      },
-      set(this: any, value: unknown) {
-        this[originalAttributeName] = value;
-        this.writeAttribute(name, value);
-      },
-    });
-  });
-  include(this, mod);
+  include(
+    this,
+    new Module((mod) => {
+      mod.moduleEval((table) => {
+        Object.defineProperty(table, name, {
+          configurable: true,
+          get(this: any) {
+            const value = this.readAttribute(name);
+            if (
+              (value != null && value !== false && isEncryptedAttribute.call(this, name)) ||
+              !Configurable.config.supportUnencryptedData
+            ) {
+              return this[originalAttributeName];
+            } else {
+              return value;
+            }
+          },
+          set(this: any, value: unknown) {
+            this[originalAttributeName] = value;
+            this.writeAttribute(name, value);
+          },
+        });
+      });
+    }),
+  );
 }
 
 /** @internal */

@@ -390,7 +390,7 @@ export class Headers extends Hash<string, string> {
     throw new TypeError("Headers cannot compare by identity");
   }
 
-  get compareByIdentityQ(): boolean {
+  get isCompareByIdentity(): boolean {
     return false;
   }
 

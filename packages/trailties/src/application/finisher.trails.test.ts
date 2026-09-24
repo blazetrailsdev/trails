@@ -19,7 +19,7 @@ class TestApp extends Finisher {
     toPrepareBlocks: [],
     eagerLoad: null,
     eagerLoadNamespaces: [],
-    sessionStoreQ: () => (this.sessionStoreArgs === null ? null : this.sessionStoreArgs[0]),
+    isSessionStore: () => (this.sessionStoreArgs === null ? null : this.sessionStoreArgs[0]),
     sessionStore: (newSessionStore?: unknown, options?: Record<string, unknown>) =>
       (this.sessionStoreArgs = [newSessionStore, options]),
   };

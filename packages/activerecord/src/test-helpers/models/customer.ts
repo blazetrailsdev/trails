@@ -1,4 +1,3 @@
-import { composedOf } from "../../aggregations.js";
 import { Base } from "../../base.js";
 
 export class Address {
@@ -96,7 +95,7 @@ export class Customer extends Base {
   static gpsConversionWasRun: boolean | null = null;
 
   static {
-    composedOf(this, "address", {
+    this.composedOf("address", {
       className: Address,
       mapping: [
         ["address_street", "street"],
@@ -105,7 +104,7 @@ export class Customer extends Base {
       ],
       allowNil: true,
     });
-    composedOf(this, "addressHashMapping", {
+    this.composedOf("addressHashMapping", {
       className: Address,
       mapping: [
         ["address_street", "street"],
@@ -114,17 +113,17 @@ export class Customer extends Base {
       ],
       allowNil: true,
     });
-    composedOf(this, "balance", {
+    this.composedOf("balance", {
       className: Money,
       mapping: [["balance", "amount"]],
       allowNil: false,
     });
-    composedOf(this, "gpsLocation", {
+    this.composedOf("gpsLocation", {
       className: GpsLocation,
       mapping: [["gps_location", "gpsLocation"]],
       allowNil: true,
     });
-    composedOf(this, "nonBlankGpsLocation", {
+    this.composedOf("nonBlankGpsLocation", {
       className: GpsLocation,
       mapping: [["gps_location", "gpsLocation"]],
       allowNil: true,
@@ -134,13 +133,13 @@ export class Customer extends Base {
         return new GpsLocation(String(gps));
       },
     });
-    composedOf(this, "fullname", {
+    this.composedOf("fullname", {
       className: Fullname,
       mapping: [["name", "toS"]],
       constructorFn: (name: unknown) => Fullname.parse(name),
       converter: (v: unknown) => Fullname.parse(v),
     });
-    composedOf(this, "fullnameNoConverter", {
+    this.composedOf("fullnameNoConverter", {
       className: Fullname,
       mapping: [["name", "toString"]],
     });

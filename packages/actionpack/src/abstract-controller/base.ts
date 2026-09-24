@@ -83,10 +83,6 @@ export class AbstractController {
     this._actionName = value;
   }
 
-  static supportsPathQ(): boolean {
-    return true;
-  }
-
   static raiseOnMissingCallbackActions: boolean = false;
 
   protected _responseBody: string | Buffer | null = null;

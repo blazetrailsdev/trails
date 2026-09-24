@@ -21,12 +21,7 @@ interface ComposedOfOptions {
   allowNil?: boolean;
 }
 
-/** @missingRailsArgs include — PERMANENT */
-export function composedOf(
-  modelClass: typeof Base,
-  partId: string,
-  options: ComposedOfOptions,
-): void {
+export function composedOf(this: typeof Base, partId: string, options: ComposedOfOptions): void {
   assertValidKeys(options as unknown as Record<string, unknown>, [
     "className",
     "mapping",
@@ -35,7 +30,7 @@ export function composedOf(
     "converter",
   ]);
 
-  if (!isModuleIncluded(modelClass, Aggregations)) include(modelClass, Aggregations);
+  if (!isModuleIncluded(this, Aggregations)) include(this, Aggregations);
 
   const name = partId;
   const className = options.className ?? camelize(name);
@@ -45,8 +40,8 @@ export function composedOf(
   const constructor = options.constructorFn ?? "new";
   const converter = options.converter;
 
-  readerMethod(modelClass, name, className, mapping as [string, string][], allowNil, constructor);
-  writerMethod(modelClass, name, className, mapping as [string, string][], allowNil, converter);
+  readerMethod(this, name, className, mapping as [string, string][], allowNil, constructor);
+  writerMethod(this, name, className, mapping as [string, string][], allowNil, converter);
 
   const reflection = create(
     "composedOf",
@@ -55,10 +50,14 @@ export function composedOf(
     typeof options.className === "function"
       ? { ...options, className: options.className.name, anonymousClass: options.className }
       : { ...options },
-    modelClass,
+    this,
   );
-  addAggregateReflection(modelClass, partId, reflection);
+  addAggregateReflection(this, partId, reflection);
 }
+
+export const ClassMethods = {
+  composedOf,
+};
 
 /** @internal */
 function resolveClass(

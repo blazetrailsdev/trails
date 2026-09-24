@@ -57,6 +57,17 @@ type ModuleHooks = {
  */
 export class Module {
   /**
+   * Mirrors: Ruby's Module.new — vendor/ruby/object.c:1950
+   * `rb_mod_initialize`, which hands a given block the new module
+   * (`rb_mod_module_exec(1, &module, module)`, object.c:1959).
+   *
+   * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+   */
+  constructor(block?: (mod: Module) => void) {
+    if (block !== undefined) block(this);
+  }
+
+  /**
    * Mirrors: Ruby's Module#module_eval — vendor/ruby/vm_eval.c:2128
    * `rb_mod_module_eval` — yields the module's method table.
    *
