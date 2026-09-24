@@ -254,7 +254,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     }
     this._filename = filename;
     this._strict = strict;
-    this.driverIsAsync();
     this._connectionParameters = merge(this._config as SQLite3Config, {
       database: filename,
       resultsAsHash: true,

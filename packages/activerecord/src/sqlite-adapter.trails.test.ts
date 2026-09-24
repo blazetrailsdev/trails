@@ -56,8 +56,8 @@ describe("SQLite adapter driver binding", () => {
     await adapter.disconnectBang();
   });
 
-  it("the abstract base has no bundled driver and cannot open directly", () => {
-    expect(() => new SQLite3Adapter({ database: ":memory:" })).toThrow(
+  it("the abstract base has no bundled driver and cannot open directly", async () => {
+    await expect(new SQLite3Adapter({ database: ":memory:" }).connectBang()).rejects.toThrow(
       /No SQLite driver configured/,
     );
   });
@@ -68,10 +68,10 @@ describe("SQLite adapter driver binding", () => {
     await adapter.disconnectBang();
   });
 
-  it("rejects an invalid driver object", () => {
-    expect(
-      () => new SQLite3Adapter({ database: ":memory:", driver: { name: "x" } as never }),
-    ).toThrow(/config.driver must be a SqliteDriver/);
+  it("rejects an invalid driver object", async () => {
+    await expect(
+      new SQLite3Adapter({ database: ":memory:", driver: { name: "x" } as never }).connectBang(),
+    ).rejects.toThrow(/config.driver must be a SqliteDriver/);
   });
 
   it("NodeSQLiteAdapter and ExpoSQLiteAdapter are thin SQLite3Adapter subclasses", () => {
