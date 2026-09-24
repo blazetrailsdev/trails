@@ -15,7 +15,7 @@ import {
   merge,
   mergeBang,
 } from "@blazetrails/ruby-compat";
-import { BigDecimal, Notifications, isBlank } from "@blazetrails/activesupport";
+import { BigDecimal, Notifications, isBlank, toQuery } from "@blazetrails/activesupport";
 
 import { UploadedFile } from "../../action-dispatch/http/upload.js";
 import { ActionController } from "../../namespaces.js";
@@ -576,12 +576,7 @@ export class Parameters {
   }
 
   toQuery(args?: string): string {
-    const parts: string[] = [];
-    for (const [k, v] of Object.entries(this._data)) {
-      const key = args ? `${args}[${k}]` : k;
-      parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(String(v))}`);
-    }
-    return parts.join("&");
+    return toQuery(this.toH(), args);
   }
 
   toParam(): string {

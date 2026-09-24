@@ -1,6 +1,10 @@
 import { EMPTY_HASH, normalizeKeys } from "./i18n.js";
 import type { Locale, TranslationKey } from "./i18n.js";
-import { ArgumentError as RubyArgumentError, NoMethodError } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError as RubyArgumentError,
+  NoMethodError,
+  rbInspect,
+} from "@blazetrails/ruby-compat";
 
 export { NoMethodError };
 
@@ -19,7 +23,7 @@ export function inspect(value: unknown): string {
     );
     return `{${pairs.join(", ")}}`;
   }
-  return String(value);
+  return rbInspect(value);
 }
 
 const RUBY_ESCAPES: Record<string, string> = {

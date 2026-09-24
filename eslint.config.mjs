@@ -896,7 +896,13 @@ export default defineConfig(
   },
 
   {
-    files: ["packages/arel/src/**/*.ts"],
+    files: [
+      "packages/arel/src/**/*.ts",
+      "packages/globalid/src/**/*.ts",
+      "packages/i18n/src/**/*.ts",
+      "packages/rack/src/**/*.ts",
+      "packages/rack-session/src/**/*.ts",
+    ],
     ignores: ["**/*.test.ts", "**/test-helpers/**"],
     rules: {
       "blazetrails/no-js-rendering-in-rails-messages": "error",

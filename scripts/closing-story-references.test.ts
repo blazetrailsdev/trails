@@ -4,6 +4,7 @@ import {
   closesStoryIds,
   closingStoryReferences,
   formatFindings,
+  scanClosingStoryReferences,
 } from "./closing-story-references.js";
 import { extractStoryReferences, type StoryReference } from "./stale-story-references.js";
 
@@ -30,6 +31,12 @@ describe("closesStoryIds", () => {
   it("ignores prose that merely mentions the phrase mid-line", () => {
     expect(closesStoryIds("This PR closes-story: nothing at all really")).toEqual([]);
     expect(closesStoryIds("no trailer here")).toEqual([]);
+  });
+
+  it("closes nothing for a trailer-less body, whatever its branch is named", async () => {
+    const body = "Partial work on some-landed-story; branch some-landed-story-ab12.";
+    expect(closesStoryIds(body)).toEqual([]);
+    await expect(scanClosingStoryReferences("/nonexistent", body)).resolves.toEqual([]);
   });
 });
 

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { Parameters, ParameterMissing } from "../metal/strong-parameters.js";
+import { toParam, toQuery } from "@blazetrails/activesupport";
+import { Parameters, ParameterMissing, UnfilteredParameters } from "../metal/strong-parameters.js";
 
 describe("ActionControllerRequiredParamsTest", () => {
   it("missing required parameters will raise exception", () => {
@@ -51,14 +52,20 @@ describe("ParametersRequireTest", () => {
   });
 
   it("to_param works like in a Hash", () => {
-    const params = new Parameters({ foo: "bar", baz: "qux" });
-    const query = params.toParam();
-    expect(query).toContain("foo=bar");
-    expect(query).toContain("baz=qux");
+    const params = new Parameters({ nested: { key: "value" } }).permitBang();
+    expect(params.toParam()).toBe(toParam({ nested: { key: "value" } }));
+
+    expect(() => new Parameters({ nested: { key: "value" } }).toParam()).toThrow(
+      UnfilteredParameters,
+    );
   });
 
   it("to_query works like in a Hash", () => {
-    const params = new Parameters({ foo: "bar" });
-    expect(params.toQuery()).toBe("foo=bar");
+    const params = new Parameters({ nested: { key: "value" } }).permitBang();
+    expect(params.toQuery()).toBe(toQuery({ nested: { key: "value" } }));
+
+    expect(() => new Parameters({ nested: { key: "value" } }).toQuery()).toThrow(
+      UnfilteredParameters,
+    );
   });
 });

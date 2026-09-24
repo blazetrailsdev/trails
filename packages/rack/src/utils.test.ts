@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import * as Utils from "./utils.js";
 import { MockRequest } from "./mock-request.js";
 
@@ -438,16 +438,18 @@ describe("cookies", () => {
     expect(headers["set-cookie"]).toEqual(["name=value", "name2=value2", "name2=value3"]);
   });
 
-  it("raises an error if the cookie key is invalid", () => {
-    expect(() => Utils.setCookieHeader("na e", "value")).toThrow(Utils.ArgumentError);
-  });
-
   it("encodes cookie key values by default", () => {
-    expect(() => Utils.setCookieHeader("na e", "value")).toThrow();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      expect(Utils.setCookieHeader("na e", "value")).toBe("na+e=value");
+      expect(warn.mock.calls.pop()![0]).toMatch(/Cookie key "na e" is not valid/);
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it("does not encode cookie key values if :escape_key is false", () => {
-    expect(Utils.setCookieHeader("name", "value")).toBe("name=value");
+    expect(Utils.setCookieHeader("na e", { value: "value", escapeKey: false })).toBe("na e=value");
   });
 
   it("sets partitioned cookie attribute", () => {
