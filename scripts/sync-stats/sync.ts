@@ -7,7 +7,7 @@ import type { SQLite3Adapter } from "@blazetrails/activerecord/connection-adapte
 import { parseTestCompareFromLogs } from "./parse-test-compare.js";
 import { parseCallSummariesFromLogs } from "./parse-call-summaries.js";
 import { classifyCompareStep } from "./classify-compare-step.js";
-import { isTransientGhError } from "./gh-transient-error.js";
+import { isTransientGhError, transientGhFailureLine } from "./gh-transient-error.js";
 import { isExpiredJobLogError } from "./expired-job-log.js";
 
 const REPO = "blazetrailsdev/trails";
@@ -2680,5 +2680,7 @@ async function main() {
 
 main().catch((err) => {
   console.error(err);
+  const transient = transientGhFailureLine(err instanceof Error ? err.message : String(err));
+  if (transient) console.error(transient);
   process.exit(1);
 });

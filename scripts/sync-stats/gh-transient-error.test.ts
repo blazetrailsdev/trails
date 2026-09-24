@@ -1,6 +1,14 @@
+import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { isTransientGhError } from "./gh-transient-error.js";
+import {
+  isTransientGhError,
+  TRANSIENT_GH_FAILURE_MARKER,
+  transientGhFailureLine,
+} from "./gh-transient-error.js";
+
+const dir = fileURLToPath(new URL(".", import.meta.url));
 
 describe("isTransientGhError", () => {
   it("matches the HTTP/2 stream cancel that broke the 2026-08-13 sync", () => {
@@ -39,5 +47,27 @@ describe("isTransientGhError", () => {
     "HTTP 422: Validation Failed",
   ])("does not treat %j as transient", (msg) => {
     expect(isTransientGhError(msg)).toBe(false);
+  });
+});
+
+describe("transientGhFailureLine", () => {
+  it("names the transient line of a gh failure, behind the marker", () => {
+    const msg = [
+      "Command failed: gh pr list --repo blazetrailsdev/trails --state all --limit 1000",
+      "unexpected end of JSON input",
+    ].join("\n");
+    expect(transientGhFailureLine(msg)).toBe(
+      `${TRANSIENT_GH_FAILURE_MARKER}: unexpected end of JSON input`,
+    );
+  });
+
+  it("is null for a failure outside the transient set", () => {
+    expect(transientGhFailureLine("gh: Not Found (HTTP 404)")).toBeNull();
+  });
+
+  it("is the marker cron-wrapper.sh matches for its outer retry", async () => {
+    const wrapper = await readFile(`${dir}cron-wrapper.sh`, "utf8");
+    expect(wrapper).toContain(`TRANSIENT_GH_FAILURE_MARKER="${TRANSIENT_GH_FAILURE_MARKER}"`);
+    expect(wrapper).toContain('grep -qF "$TRANSIENT_GH_FAILURE_MARKER" "$tmplog"');
   });
 });

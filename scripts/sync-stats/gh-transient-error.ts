@@ -8,3 +8,14 @@ const TRANSIENT_GH_ERROR_RE =
 export function isTransientGhError(message: string): boolean {
   return TRANSIENT_GH_ERROR_RE.test(message);
 }
+
+// The line sync.ts prints when it dies on a transient gh failure its own
+// in-process retries (~60 s in total) could not outlast. cron-wrapper.sh greps
+// for it to decide whether an outage-length outer retry is worth waiting for,
+// so the transient set lives here once instead of being re-spelled in bash.
+export const TRANSIENT_GH_FAILURE_MARKER = "[sync-stats] transient gh failure";
+
+export function transientGhFailureLine(message: string): string | null {
+  if (!isTransientGhError(message)) return null;
+  return `${TRANSIENT_GH_FAILURE_MARKER}: ${message.split("\n").find((l) => isTransientGhError(l)) ?? message.split("\n")[0]}`;
+}

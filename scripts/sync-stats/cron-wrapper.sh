@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Wrapper for cron-triggered stats sync.
-# Runs --latest, retries once on rate-limit failure, alerts on failure.
+# Runs --latest, retries once on rate-limit failure and up to TRANSIENT_RETRIES
+# times on a transient gh failure, alerts on failure.
 #
 # A failed run used to be indistinguishable from a successful one in the log:
 # the counts block below is appended either way, so both outages of August 2026
@@ -17,6 +18,15 @@
 #   LOG         — path for the sync log file (default: ~/github/blazetrailsdev/stats-sync.log)
 #   EMAIL       — alert recipient (REQUIRED; no default — fail fast)
 #   STALE_HOURS — flag a gap since the previous run wider than this (default 26)
+#   TRANSIENT_RETRIES          — outer retries after a transient gh failure (default 2)
+#   TRANSIENT_COOLDOWN_SECONDS — wait before each of those retries (default 1800)
+#
+# The transient arm exists because sync.ts's in-process gh() retry gives up
+# after ~60 s, and the 2026-09-15 outage (`unexpected end of JSON input` on
+# `gh pr list`) lasted about three hours. sync.ts prints
+# TRANSIENT_GH_FAILURE_MARKER (gh-transient-error.ts) when it dies on one, so
+# the transient set is defined once, in TypeScript, and only the marker is
+# matched here.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -24,6 +34,9 @@ PROJ_DIR="${PROJ_DIR:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 LOG="${LOG:-$HOME/github/blazetrailsdev/stats-sync.log}"
 EMAIL="${EMAIL:-}"
 STALE_HOURS="${STALE_HOURS:-26}"
+TRANSIENT_RETRIES="${TRANSIENT_RETRIES:-2}"
+TRANSIENT_COOLDOWN_SECONDS="${TRANSIENT_COOLDOWN_SECONDS:-1800}"
+TRANSIENT_GH_FAILURE_MARKER="[sync-stats] transient gh failure"
 
 if [ -z "$EMAIL" ]; then
   echo "[cron-wrapper] EMAIL env var must be set" >&2
@@ -132,22 +145,35 @@ exit_code=$?
 set -e
 cat "$tmplog" >> "$LOG"
 
+retry_sync() {
+  set +e
+  run_sync > "$tmplog" 2>&1
+  exit_code=$?
+  set -e
+  cat "$tmplog" >> "$LOG"
+}
+
 if [ "$exit_code" -ne 0 ] && grep -qi "rate limit\|secondary rate\|abuse detection" "$tmplog"; then
   echo "[cron-wrapper] First run failed with rate-limit signals, waiting 120s and retrying..." >> "$LOG"
   sleep 120
-  set +e
-  run_sync > "$tmplog" 2>&1
-  retry_exit=$?
-  set -e
-  cat "$tmplog" >> "$LOG"
-  if [ "$retry_exit" -ne 0 ]; then
-    report_failure "$retry_exit" "Retry exited $retry_exit after rate-limit cooldown."
-    exit_code=$retry_exit
-  else
-    exit_code=0
+  retry_sync
+  if [ "$exit_code" -ne 0 ]; then
+    report_failure "$exit_code" "Retry exited $exit_code after rate-limit cooldown."
+  fi
+elif [ "$exit_code" -ne 0 ] && grep -qF "$TRANSIENT_GH_FAILURE_MARKER" "$tmplog"; then
+  attempt=0
+  while [ "$exit_code" -ne 0 ] && [ "$attempt" -lt "$TRANSIENT_RETRIES" ] \
+    && grep -qF "$TRANSIENT_GH_FAILURE_MARKER" "$tmplog"; do
+    attempt=$((attempt + 1))
+    echo "[cron-wrapper] Run hit a transient gh error, waiting ${TRANSIENT_COOLDOWN_SECONDS}s before retry $attempt/$TRANSIENT_RETRIES..." >> "$LOG"
+    sleep "$TRANSIENT_COOLDOWN_SECONDS"
+    retry_sync
+  done
+  if [ "$exit_code" -ne 0 ]; then
+    report_failure "$exit_code" "Retry $attempt/$TRANSIENT_RETRIES exited $exit_code after transient-gh cooldown."
   fi
 elif [ "$exit_code" -ne 0 ]; then
-  report_failure "$exit_code" "First run exited $exit_code; no rate-limit signals detected."
+  report_failure "$exit_code" "First run exited $exit_code; no rate-limit or transient gh signals detected."
 fi
 
 # DB path matches sync.ts's DB_PATH: ~/github/blazetrailsdev/stats.db
