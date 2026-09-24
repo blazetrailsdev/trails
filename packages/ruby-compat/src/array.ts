@@ -1,6 +1,7 @@
 import { rbEql, rbEqual } from "./rb-equal.js";
 import { rbHash } from "./rb-hash.js";
 import { ArgumentError } from "./argument-error.js";
+import { rbBuiltinClassName } from "./object.js";
 import { Range } from "./range.js";
 import { TypeError } from "./type-error.js";
 
@@ -113,7 +114,11 @@ export function pack(ary: ReadonlyArray<string | number>, fmt: string): string {
 
     if (type === "U") {
       while (len-- > 0) {
-        const l = nextfrom() as number;
+        const from = nextfrom();
+        if (typeof from !== "number") {
+          throw new TypeError(`no implicit conversion of ${rbBuiltinClassName(from)} into Integer`);
+        }
+        const l = Math.trunc(from);
         if (l < 0) {
           throw new RangeError("pack(U): value out of range");
         }

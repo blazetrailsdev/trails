@@ -72,6 +72,13 @@ describe("Array#pack", () => {
   it("U raises on a negative codepoint", () => {
     expect(() => pack([-1], "U")).toThrow(new RangeError("pack(U): value out of range"));
   });
+
+  it("U converts its argument with to_int", () => {
+    expect(pack([233.7], "U")).toBe("\u00e9");
+    expect(() => pack(["a"], "U")).toThrow(
+      new TypeError("no implicit conversion of String into Integer"),
+    );
+  });
 });
 
 describe("Array#to_a", () => {
