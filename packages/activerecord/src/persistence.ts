@@ -6,7 +6,7 @@ import {
   type TouchArgs,
   type TouchOptions,
 } from "./timestamp.js";
-import { Rational, rbObjSingletonClass } from "@blazetrails/ruby-compat";
+import { Rational, basicObjRespondTo, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import type { CounterCacheCounters } from "./counter-cache.js";
 import { ArgumentError, AttributeMethods, SerializeCastValue } from "@blazetrails/activemodel";
@@ -752,6 +752,11 @@ export async function reload<T extends ReloadRecord>(
   this._attributes = fresh._attributes;
   if (Object.getPrototypeOf(this) !== (ctor as { prototype?: object }).prototype) {
     AttributeMethods.ClassMethods.undefineAttributeMethods.call(rbObjSingletonClass(this) as never);
+  }
+  for (const name of (this._attributes as { keys(): Iterable<string> }).keys()) {
+    if (!basicObjRespondTo(this, name, false)) {
+      (rbObjSingletonClass(this) as unknown as typeof Base).defineAttributeMethod(name);
+    }
   }
   this._newRecord = false;
   this._previouslyNewRecord = false;

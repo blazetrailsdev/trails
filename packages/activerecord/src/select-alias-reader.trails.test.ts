@@ -23,4 +23,14 @@ describe("select alias dynamic reader (trails)", () => {
     expect(record.bumped_id).toBeUndefined();
     expect(record.id).toEqual(record.readAttribute("id"));
   });
+
+  it("keeps the alias reader on reload when the fresh row still carries it", async () => {
+    const aliased = Comment.select("comments.*, (id + 1000) AS bumped_id").order("id");
+    const record = (await aliased)[0] as Comment & { bumped_id: unknown };
+    await aliased.scoping({ allQueries: true }, async () => {
+      await record.reload();
+    });
+    expect(record.bumped_id).toEqual(record.readAttribute("bumped_id"));
+    expect(record.bumped_id).not.toBeUndefined();
+  });
 });
