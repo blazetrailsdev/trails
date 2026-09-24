@@ -16,6 +16,7 @@ import {
   dedupeRubyMethodInto,
   rubyLevelKey,
   tsDeclaresOnLevel,
+  tsOwnerOnBothSeats,
   includerAdmitsOnLevel,
   rubyBodyKey,
   type SeenRubyMethod,
@@ -191,6 +192,36 @@ describe("significantMissingCalls", () => {
       sig,
     );
     expect(missing).toEqual(["save → save"]);
+  });
+
+  it("credits a Ruby call ported as the ruby-compat export it maps to", () => {
+    const receivers: Record<string, string[]> = { delete: ["expr"], "include?": ["expr"] };
+    const alias = (rc: string) => jsEnumerableAliases(rc, receivers[rc]);
+    const withDelete = new Set(["delete", "include?", "key?"]);
+    const run = (tsCalls: string[]) =>
+      significantMissingCalls(
+        "access_fixture",
+        ["delete"],
+        new Set(tsCalls),
+        () => true,
+        map,
+        withDelete,
+        alias,
+      );
+    expect(run(["hashDelete"])).toEqual([]);
+    expect(run(["stringDelete"])).toEqual([]);
+    expect(run(["hasKey"])).toEqual(["delete → delete"]);
+    expect(
+      significantMissingCalls(
+        "x",
+        ["include?", "key?"],
+        new Set(["hasKey"]),
+        () => true,
+        map,
+        withDelete,
+        alias,
+      ),
+    ).toEqual(["include? → include?"]);
   });
 
   it("ignores idiom calls outside the allowlist (the noise the gate exists for)", () => {
@@ -1899,6 +1930,25 @@ describe("tsDeclaresOnLevel", () => {
 
   it("prefers a seat declaration over a neutral one", () => {
     expect(tsDeclaresOnLevel("class", owners("", "Base"), owners("Base"), undefined)).toBe("seat");
+  });
+
+  it("lets one owner declaring both seats satisfy both rows", () => {
+    const both = owners("Migration");
+    expect(tsDeclaresOnLevel("class", both, both, both)).toBe("seat");
+    expect(tsDeclaresOnLevel("instance", both, both, both)).toBe("seat");
+    expect(tsDeclaresOnLevel("class", owners("Other"), both, both)).toBe("neutral");
+  });
+
+  it("keeps a ClassMethods / InstanceMethods grouping on its named seat", () => {
+    const grouping = owners("ClassMethods", "InstanceMethods");
+    expect(tsOwnerOnBothSeats("ClassMethods", grouping, grouping)).toBe(false);
+    expect(tsOwnerOnBothSeats("InstanceMethods", grouping, grouping)).toBe(false);
+    expect(tsDeclaresOnLevel("instance", owners("ClassMethods"), grouping, grouping)).toBe(
+      undefined,
+    );
+    expect(tsDeclaresOnLevel("class", owners("InstanceMethods"), grouping, grouping)).toBe(
+      undefined,
+    );
   });
 });
 

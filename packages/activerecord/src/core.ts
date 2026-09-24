@@ -1,4 +1,11 @@
-import { ArgumentError, DelegateClass, Module, hasKey, include } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  DelegateClass,
+  Module,
+  hasKey,
+  include,
+  rbEql,
+} from "@blazetrails/ruby-compat";
 import { getApplicationRecordClass } from "./inheritance.js";
 import {
   NameError,
@@ -330,7 +337,7 @@ interface CoreHost {
   _connectionClass?: boolean;
   _connectionHandler?: any;
   _destroyAssociationAsyncJob?: any;
-  _findByStatementCache?: Map<boolean, Map<string, any>>;
+  _findByStatementCache?: Map<boolean, Map<unknown, any>>;
   _generatedAssociationMethods?: Module;
   _predicateBuilder?: any;
   arelTable?: any;
@@ -566,7 +573,7 @@ export function typeCaster(this: CoreHost): TypeCasterMap {
 export function cachedFindByStatement(
   this: CoreHost,
   connection: any,
-  key: string,
+  key: unknown,
   block: (params: any) => any,
 ): any {
   if (
@@ -577,6 +584,7 @@ export function cachedFindByStatement(
   }
   const prepared = connection?.preparedStatements ?? true;
   const cache = this._findByStatementCache!.get(prepared)!;
+  if (Array.isArray(key)) key = [...cache.keys()].find((stored) => rbEql(stored, key)) ?? key;
   if (!cache.has(key)) {
     cache.set(key, StatementCache.create(connection, block));
   }

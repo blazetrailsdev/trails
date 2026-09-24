@@ -3219,11 +3219,35 @@ export function tsDeclaresOnLevel(
   if (tsOwners === undefined || tsOwners.size === 0) return "neutral";
   let neutral = false;
   for (const owner of tsOwners) {
+    if (tsOwnerOnBothSeats(owner, staticOwners, instanceOwners)) return "seat";
     const seat = owner === "" ? undefined : tsOwnerSeat(owner, staticOwners, instanceOwners);
     if (seat === level) return "seat";
     if (seat === undefined) neutral = true;
   }
   return neutral ? "neutral" : undefined;
+}
+
+/**
+ * Whether one TS owner declares `tsName` as a static AND as an instance member:
+ * the faithful `class_attribute` / `cattr_accessor` port, `static x` beside the
+ * prototype reader `classAttribute()` installs (`class-attribute.ts`), which is
+ * the pair Ruby defines (`core_ext/class/attribute.rb:80-84`). `tsOwnerSeat`
+ * answers `undefined` for it, since no ONE seat is stated, but it states both,
+ * so each level's row is on its seat. A top-level function (`""`) and an owner
+ * recorded on neither seat stay neutral.
+ */
+export function tsOwnerOnBothSeats(
+  tsOwner: string,
+  staticOwners: ReadonlySet<string> | undefined,
+  instanceOwners: ReadonlySet<string> | undefined,
+): boolean {
+  return (
+    tsOwner !== "" &&
+    tsOwner !== "ClassMethods" &&
+    tsOwner !== "InstanceMethods" &&
+    (staticOwners?.has(tsOwner) ?? false) &&
+    (instanceOwners?.has(tsOwner) ?? false)
+  );
 }
 
 /**
@@ -4485,7 +4509,15 @@ export function main() {
         const rubySeats = new Set([...(rubyOwners ?? [])].map(rubySeatOf));
         const bothLevels =
           seen.has(rubyLevelKey("class", rubyName)) && seen.has(rubyLevelKey("instance", rubyName));
-        const exactSeat = [...(tsOwners ?? [])].filter((o) => seatOf(o) === level);
+        const exactSeat = [...(tsOwners ?? [])].filter(
+          (o) =>
+            seatOf(o) === level ||
+            tsOwnerOnBothSeats(
+              o,
+              tsStaticOwnersByFileName.get(tsFile)?.get(tsName),
+              tsInstanceOwnersByFileName.get(tsFile)?.get(tsName),
+            ),
+        );
         const onSeat = !bothLevels
           ? tsOwners
           : new Set(

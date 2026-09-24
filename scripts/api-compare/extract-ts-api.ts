@@ -1050,8 +1050,19 @@ export function extractFromProgram(
         [attr.enclosing, attr.receiver]
           .filter((n): n is string => n !== undefined)
           .map((n) => `${relPath}:${n}`)
-          .find((key) => info.classes[key] || info.modules[key]) ?? undefined;
+          .find((key) => info.classes[key] || info.modules[key]) ??
+        (attr.enclosingObjectLiteral === true ? `${relPath}:${attr.enclosing}` : undefined);
       if (target === undefined) continue;
+      if (!info.classes[target] && !info.modules[target]) {
+        info.modules[target] = {
+          name: attr.enclosing!,
+          file: relPath,
+          includes: [],
+          extends: [],
+          instanceMethods: [],
+          classMethods: [],
+        };
+      }
       const entity = info.classes[target] ?? info.modules[target];
       for (const name of attr.names) {
         const seats: boolean[] = [true];
@@ -1061,23 +1072,28 @@ export function extractFromProgram(
           : undefined;
         for (const isStatic of seats) {
           const members = isStatic ? entity.classMethods : entity.instanceMethods;
-          const generatedNames = [name];
+          const generated: { name: string; writer: boolean }[] = [];
+          if (isStatic || attr.instanceReader) generated.push({ name, writer: false });
+          if (isStatic || attr.instanceWriter) generated.push({ name, writer: true });
           if (predicate !== undefined && (isStatic || attr.instanceReader)) {
-            generatedNames.push(predicate);
+            generated.push({ name: predicate, writer: false });
           }
-          for (const generatedName of generatedNames) {
-            const at = members.findIndex((m) => m.name === generatedName);
+          for (const { name: generatedName, writer } of generated) {
+            const at = members.findIndex(
+              (m) => m.name === generatedName && (m.writer === true) === writer,
+            );
             if (at !== -1 && members[at].bodyless !== true) continue;
-            const generated: MethodInfo = {
+            const method: MethodInfo = {
               name: generatedName,
               visibility: "public",
-              params: [],
+              params: writer ? [{ name: "value", kind: "required" }] : [],
               isStatic,
               line: attr.line,
               file: relPath,
+              ...(writer ? { writer: true } : {}),
             };
-            if (at === -1) members.push(generated);
-            else members[at] = generated;
+            if (at === -1) members.push(method);
+            else members[at] = method;
           }
         }
       }
@@ -2993,6 +3009,7 @@ export function isConstantCaseName(name: string): boolean {
  */
 interface ClassAttributeCall {
   enclosing?: string;
+  enclosingObjectLiteral?: boolean;
   receiver?: string;
   names: string[];
   instanceReader: boolean;
@@ -3037,8 +3054,10 @@ function readClassAttributeCall(
   const opts = rest.at(-1);
   const options = opts !== undefined && ts.isObjectLiteralExpression(opts) ? opts : undefined;
   const instanceAccessor = optionBool(options, "instanceAccessor") ?? true;
+  const enclosing = enclosingEntity(node);
   return {
-    ...(enclosingEntityName(node) !== undefined ? { enclosing: enclosingEntityName(node) } : {}),
+    ...(enclosing !== undefined ? { enclosing: enclosing.name } : {}),
+    ...(enclosing?.objectLiteral === true ? { enclosingObjectLiteral: true } : {}),
     ...(ts.isIdentifier(recv) ? { receiver: recv.text } : {}),
     names,
     instanceReader: optionBool(options, "instanceReader") ?? instanceAccessor,
@@ -3061,10 +3080,26 @@ function optionBool(
   return undefined;
 }
 
-function enclosingEntityName(node: ts.Node): string | undefined {
+function enclosingEntity(node: ts.Node): { name: string; objectLiteral: boolean } | undefined {
   for (let cur: ts.Node | undefined = node.parent; cur; cur = cur.parent) {
-    if (ts.isClassDeclaration(cur) && cur.name) return cur.name.text;
-    if (ts.isVariableDeclaration(cur) && ts.isIdentifier(cur.name)) return cur.name.text;
+    if (ts.isClassDeclaration(cur) && cur.name)
+      return { name: cur.name.text, objectLiteral: false };
+    if (ts.isVariableDeclaration(cur) && ts.isIdentifier(cur.name)) {
+      const objectLiteral =
+        cur.initializer !== undefined &&
+        ts.isObjectLiteralExpression(cur.initializer) &&
+        ts.isVariableStatement(cur.parent.parent) &&
+        isExported(cur.parent.parent) &&
+        !isConstantCaseName(cur.name.text) &&
+        cur.initializer.properties.some(
+          (prop) =>
+            prop.name !== undefined &&
+            ts.isComputedPropertyName(prop.name) &&
+            ts.isIdentifier(prop.name.expression) &&
+            (prop.name.expression.text === "included" || prop.name.expression.text === "extended"),
+        );
+      return { name: cur.name.text, objectLiteral };
+    }
   }
   return undefined;
 }

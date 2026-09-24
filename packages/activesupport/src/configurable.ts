@@ -7,6 +7,7 @@ export class Configuration extends InheritableOptions {
     klass.compileMethodsBang(this.keys());
   }
 
+  /** @missingRailsCall class_eval — PERMANENT */
   static compileMethodsBang(keys: string[]): void {
     for (const key of keys.filter((m) => !(m in this.prototype))) {
       Object.defineProperty(this.prototype, key, {

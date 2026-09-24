@@ -176,8 +176,39 @@ export function rubyCompatExport(
   return admitted.length === 1 ? admitted[0].tsExport : undefined;
 }
 
-/** Forward: JS call names counting as Ruby `rubyCall`, as `jsEnumerableAliases` consults. */
+const UNPROVEN_RECEIVER_KINDS = new Set<string>(["self", "local", "ivar", "const", "expr"]);
+
+const PORTED_NAMES_BY_EXPORT = (() => {
+  const byExport = new Map<string, Set<string>>();
+  for (const [name, claims] of BY_BARE_NAME)
+    for (const { tsExport } of claims)
+      byExport.set(tsExport, (byExport.get(tsExport) ?? new Set()).add(name));
+  return byExport;
+})();
+
+/** Forward: JS call names counting as Ruby `rubyCall`, as `jsEnumerableAliases` consults.
+ *
+ *  Wider than {@link rubyCompatExport}, which the REVERSE report reads and
+ *  which must name one export: here an unproven receiver kind disproves no
+ *  receiver-keyed row, so every row a proven kind does not rule out is named,
+ *  and the TS body calling that export is the proof of its receiver — but only
+ *  an export porting this one Ruby name proves anything: `hasKey` also ports
+ *  `key?`, so an `include?` on an unproven receiver must not claim it.
+ *  `@fixture_cache[fs_name].delete(f_name)` (`test_fixtures.rb:307`) records
+ *  `expr`, and its port `hashDelete(...)` credits `delete`; a `stringDelete`
+ *  would too, and a proven `hash` receiver still admits only `hashDelete`. The
+ *  contract stays silence-only: a credit never manufactures a flag. */
 export function rubyCompatAliases(rubyCall: string, receiverKinds?: readonly string[]): string[] {
   const tsExport = rubyCompatExport(rubyCall, receiverKinds);
-  return tsExport === undefined ? [] : [tsExport];
+  if (tsExport !== undefined) return [tsExport];
+  const claims = BY_BARE_NAME.get(rubyCall);
+  if (claims === undefined || receiverKinds === undefined || receiverKinds.length === 0) return [];
+  return [...claims]
+    .filter(
+      (claim) =>
+        claim.receiver !== undefined &&
+        PORTED_NAMES_BY_EXPORT.get(claim.tsExport)!.size === 1 &&
+        receiverKinds.every((kind) => kind === claim.receiver || UNPROVEN_RECEIVER_KINDS.has(kind)),
+    )
+    .map((claim) => claim.tsExport);
 }

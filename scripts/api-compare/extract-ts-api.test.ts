@@ -5202,7 +5202,10 @@ describe("extractFromProgram — classAttribute() generated accessors", () => {
     const info = extractFromFiles("/p", { "time-zone-conversion.ts": TZ });
     const mod = info.modules["time-zone-conversion.ts:TimeZoneConversion"];
     const generated = mod.classMethods.filter((m) => m.name.startsWith("timeZone"));
-    expect(generated.map((m) => m.name)).toEqual(["timeZoneAwareTypes"]);
+    expect(generated.map((m) => [m.name, m.writer === true])).toEqual([
+      ["timeZoneAwareTypes", false],
+      ["timeZoneAwareTypes", true],
+    ]);
     expect(generated[0].bodyless).toBeUndefined();
     expect(mod.instanceMethods.map((m) => m.name)).toContain("timeZoneAwareTypes");
   });
@@ -5214,6 +5217,70 @@ describe("extractFromProgram — classAttribute() generated accessors", () => {
     expect(mod.instanceMethods.map((m) => m.name)).not.toContain(
       "skipTimeZoneConversionForAttributes",
     );
+  });
+
+  it("credits the writer on the class seat, and on the instance seat unless instanceWriter is false", () => {
+    const info = extractFromFiles("/p", { "time-zone-conversion.ts": TZ });
+    const mod = info.modules["time-zone-conversion.ts:TimeZoneConversion"];
+    const writers = (members: MethodInfo[]) =>
+      members.filter((m) => m.writer === true).map((m) => m.name);
+    expect(writers(mod.classMethods)).toEqual([
+      "timeZoneAwareTypes",
+      "skipTimeZoneConversionForAttributes",
+    ]);
+    expect(writers(mod.instanceMethods)).not.toContain("timeZoneAwareTypes");
+    expect(mod.classMethods.map((m) => m.name)).toContain("isTimeZoneAwareTypes");
+  });
+
+  it("resolves a class static block and an object-literal [included] module", () => {
+    const info = extractFromFiles("/p", {
+      "error.ts": `
+        import { classAttribute } from "@blazetrails/activesupport";
+        export class Error {
+          static {
+            classAttribute.call(this, "i18nCustomizeFullMessage", { default: false });
+          }
+        }
+      `,
+      "optimistic.ts": `
+        import { classAttribute, included } from "@blazetrails/activesupport";
+        export const Optimistic = {
+          [included](base: any): void {
+            classAttribute.call(base, "lockOptimistically", { instanceWriter: false });
+          },
+        };
+      `,
+    });
+    const seats = (c: ClassInfo, name: string) =>
+      [...c.classMethods, ...c.instanceMethods]
+        .filter((m) => m.name === name)
+        .map((m) => `${m.isStatic ? "static" : "instance"}${m.writer ? " writer" : ""}`);
+    expect(seats(info.classes["error.ts:Error"], "i18nCustomizeFullMessage")).toEqual([
+      "static",
+      "static writer",
+      "instance",
+      "instance writer",
+    ]);
+    expect(seats(info.modules["optimistic.ts:Optimistic"], "lockOptimistically")).toEqual([
+      "static",
+      "static writer",
+      "instance",
+    ]);
+  });
+
+  it("does not seat an object literal with no [included] or [extended] hook", () => {
+    const info = extractFromFiles("/p", {
+      "helpers.ts": `
+        import { classAttribute } from "@blazetrails/activesupport";
+        const install = Symbol("install");
+        export const Helpers = {
+          [install](base: any): void {
+            classAttribute.call(base, "lockOptimistically");
+          },
+        };
+      `,
+    });
+    expect(info.modules["helpers.ts:Helpers"]).toBeUndefined();
   });
 
   it("credits nothing for a non-literal attribute name", () => {

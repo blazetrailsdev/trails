@@ -88,6 +88,16 @@ describe("rubyCompatExport", () => {
     expect(rubyCompatExport("escape", ["const"])).toBe("regexpEscape");
   });
 
+  it("credits a receiver-keyed export forward when the receiver is unproven", () => {
+    expect(rubyCompatAliases("delete", ["expr"])).toEqual(["hashDelete", "stringDelete"]);
+    expect(rubyCompatAliases("delete", ["hash", "expr"])).toEqual(["hashDelete"]);
+    expect(rubyCompatAliases("delete", ["array"])).toEqual([]);
+    expect(rubyCompatAliases("delete")).toEqual([]);
+    expect(jsEnumerableAliases("delete", ["expr"])).toContain("hashDelete");
+    expect(rubyCompatExport("delete", ["expr"])).toBeUndefined();
+    expect(rubyCompatAliases("include?", ["expr"])).toEqual([]);
+  });
+
   it("forwards the receiver through jsEnumerableAliases", () => {
     expect(jsEnumerableAliases("merge", ["hash"])).toEqual(["merge"]);
     expect(jsEnumerableAliases("merge")).toEqual([]);
