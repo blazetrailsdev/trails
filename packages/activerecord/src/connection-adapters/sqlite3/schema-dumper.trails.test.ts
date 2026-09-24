@@ -32,9 +32,9 @@ describe("SQLite3::SchemaDumper", () => {
     expect((dumper as any).isExplicitPrimaryKeyDefault(col("id", "bigint"))).toBe(true);
   });
 
-  it("prepareColumnOptions adds as/stored for virtual columns", () => {
+  it("prepareColumnOptions adds as/stored for virtual columns", async () => {
     const column = col("x", "string", { defaultFunction: "a + b", generatedType: "virtual" });
-    const spec = (dumper as any).prepareColumnOptions(column);
+    const spec = await (dumper as any).prepareColumnOptions(column);
     expect(spec["as"]).toBe('"a + b"');
     expect(spec["stored"]).toBe(false);
   });
