@@ -35,7 +35,7 @@ describe("DurationTest", () => {
     expect(d.isA(Duration)).toBeTruthy();
     expect(d).toBeInstanceOf(Duration);
     expect(d.isKindOf(Number)).toBeTruthy();
-    expect(d.isKindOf(Number)).toBeTruthy();
+    expect(Number.isInteger(d.toI())).toBeTruthy();
     expect(d.isA(Map)).toBeFalsy();
 
     const k = class {};

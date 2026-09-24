@@ -888,10 +888,6 @@ describe("TestOrderTest", () => {
     testOrder: string;
     setTestOrder(order: string | null): void;
   };
-  const ActiveSupportTestOrder = ActiveSupport as unknown as {
-    testOrder: string;
-    setTestOrder(order: string | null): void;
-  };
   let originalTestOrder: string;
 
   beforeEach(() => {
@@ -907,20 +903,20 @@ describe("TestOrderTest", () => {
 
     expect(TestOrder.testOrder).toEqual(":random");
 
-    expect(ActiveSupportTestOrder.testOrder).toEqual(":random");
+    expect(ActiveSupport.testOrder).toEqual(":random");
   });
 
   it("test order is global", () => {
     TestOrder.setTestOrder(":sorted");
 
-    expect(ActiveSupportTestOrder.testOrder).toEqual(":sorted");
+    expect(ActiveSupport.testOrder).toEqual(":sorted");
     expect(TestOrder.testOrder).toEqual(":sorted");
     expect(TestOrder.testOrder).toEqual(":sorted");
     expect((class extends TestCase {} as unknown as typeof TestOrder).testOrder).toEqual(":sorted");
 
-    ActiveSupportTestOrder.setTestOrder(":random");
+    ActiveSupport.testOrder = ":random";
 
-    expect(ActiveSupportTestOrder.testOrder).toEqual(":random");
+    expect(ActiveSupport.testOrder).toEqual(":random");
     expect(TestOrder.testOrder).toEqual(":random");
     expect(TestOrder.testOrder).toEqual(":random");
     expect((class extends TestCase {} as unknown as typeof TestOrder).testOrder).toEqual(":random");

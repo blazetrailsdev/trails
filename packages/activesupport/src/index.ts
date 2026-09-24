@@ -93,7 +93,9 @@ export const ActiveSupport = {
   get testOrder(): string | null {
     return testOrder();
   },
-  setTestOrder,
+  set testOrder(value: string | null) {
+    setTestOrder(value);
+  },
 };
 
 export {
