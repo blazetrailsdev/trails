@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { anybits, round } from "./numeric.js";
+import { FloatDomainError } from "./float-domain-error.js";
+import { NoMethodError } from "./no-method-error.js";
+import { anybits, round, toI } from "./numeric.js";
 
 describe("Float#round", () => {
   it("rounds to the given number of digits", () => {
@@ -36,5 +38,22 @@ describe("anybits", () => {
     expect(anybits(~42, 42)).toBe(false);
     expect(anybits(-42, -42)).toBe(true);
     expect(anybits(~0b100, ~0b1)).toBe(true);
+  });
+});
+
+describe("#to_i", () => {
+  it("dispatches on the receiver the way a Ruby send does", () => {
+    expect(toI(null)).toBe(0);
+    expect(toI(3.9)).toBe(3);
+    expect(toI(-3.9)).toBe(-3);
+    expect(toI("12abc")).toBe(12);
+    expect(toI("abc")).toBe(0);
+    expect(toI(2n ** 70n)).toBe(2n ** 70n);
+    expect(toI({ toI: () => 7 })).toBe(7);
+  });
+
+  it("raises where Ruby raises", () => {
+    expect(() => toI(NaN)).toThrow(FloatDomainError);
+    expect(() => toI({})).toThrow(NoMethodError);
   });
 });

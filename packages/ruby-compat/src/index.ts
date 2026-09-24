@@ -142,7 +142,7 @@ export { KERNEL_METHODS, PROTOCOL_PROBES, methodMissingProxy } from "./method-mi
 export { NameError } from "./name-error.js";
 export { NilClass } from "./nil-class.js";
 export { NoMethodError } from "./no-method-error.js";
-export { anybits, round } from "./numeric.js";
+export { anybits, round, toI } from "./numeric.js";
 export { NotImplementedError } from "./not-implemented-error.js";
 export { prepend } from "./prepend.js";
 export { Process } from "./process.js";

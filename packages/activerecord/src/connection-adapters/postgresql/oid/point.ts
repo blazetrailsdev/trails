@@ -1,9 +1,9 @@
 import { ArgumentError, kernelFloat, rbEqual } from "@blazetrails/ruby-compat";
 import { ValueType } from "@blazetrails/activemodel";
 import { isBlank, isPlainObject } from "@blazetrails/activesupport";
+import { ActiveRecord } from "../../../namespaces.js";
 
-/** @noRailsEquivalent CONVERGEABLE point-value-converges-onto-active-record-point */
-export class PointValue {
+ActiveRecord.Point = class Point {
   x: number;
   y: number;
 
@@ -12,11 +12,12 @@ export class PointValue {
     this.y = y;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE point-value-converges-onto-active-record-point */
   equals(other: unknown): boolean {
-    return other instanceof PointValue && rbEqual(this.x, other.x) && rbEqual(this.y, other.y);
+    return (
+      other instanceof ActiveRecord.Point && rbEqual(this.x, other.x) && rbEqual(this.y, other.y)
+    );
   }
-}
+};
 
 export class Point extends ValueType {
   override type(): string {
@@ -57,7 +58,7 @@ export class Point extends ValueType {
   }
 
   override serialize(value: unknown): unknown {
-    if (value instanceof PointValue) {
+    if (value instanceof ActiveRecord.Point) {
       return `(${this.numberForPoint(value.x)},${this.numberForPoint(value.y)})`;
     }
     if (globalThis.Array.isArray(value)) {
@@ -74,7 +75,7 @@ export class Point extends ValueType {
   }
 
   override typeCastForSchema(value: unknown): string {
-    if (value instanceof PointValue) {
+    if (value instanceof ActiveRecord.Point) {
       return `[${value.x}, ${value.y}]`;
     }
     return super.typeCastForSchema(value);
@@ -86,8 +87,8 @@ export class Point extends ValueType {
   }
 
   /** @missingRailsName float — PERMANENT */
-  private buildPoint(x: unknown, y: unknown): PointValue {
-    return new PointValue(kernelFloat(x), kernelFloat(y));
+  private buildPoint(x: unknown, y: unknown): InstanceType<typeof ActiveRecord.Point> {
+    return new ActiveRecord.Point(kernelFloat(x), kernelFloat(y));
   }
 }
 

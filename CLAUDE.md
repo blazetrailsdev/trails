@@ -877,8 +877,8 @@ modules converged onto `Autoload`:
   (`actionview/lib/action_view/railtie.rb:97-101`); actionview does not depend
   on actionpack, so a plain import is not available in either direction.
 - `activerecord/src/namespaces.ts` — not a slot: the `ActiveRecord`,
-  `ActiveRecord::Associations`, `ActiveRecord::Encryption` and
-  `ActiveRecord::Migration` namespace objects, extended with
+  `ActiveRecord::Associations`, `ActiveRecord::ConnectionAdapters`,
+  `ActiveRecord::Encryption` and `ActiveRecord::Migration` namespace objects, extended with
   `ActiveSupport::Autoload` exactly like arel's (RFC 0151). Autoloaded there,
   mirroring `active_record.rb:43-112`, `associations.rb:15,29-41`,
   `encryption.rb:14` and `migration.rb:573`: `ActiveRecord.Base`,
@@ -890,13 +890,19 @@ modules converged onto `Autoload`:
   (`reflection.rb:889-923`), `Associations.CollectionProxy` and
   `Associations.DisableJoinsAssociationScope` (`associations/association.rb:107-115`);
   `Encryption.Configurable`; `Migration.Compatibility` (`migration.rb:629-631`,
-  `schema.rb:72`). The cycles they break are the ones the deleted slots broke:
+  `schema.rb:72`); `ConnectionAdapters.ConnectionPool`
+  (`connection_adapters.rb:107-110`, read by `abstract/query_cache.rb:100` for
+  `ConnectionPool::WeakThreadKeyMap`). `ActiveRecord.Point`
+  (`postgresql/oid/point.rb:4`) is required, not autoloaded, and is seated with
+  no `autoload` call. The cycles they break are the ones the deleted slots broke:
   `base.ts` importing every `self == Base` reader; `class SingularAssociation` /
   `CollectionAssociation extends Association` reaching `reflection.ts`; `class
 AssociationRelation extends Relation`; `V8_0 = Current`; and
   `schema-statements.ts -> join-table.ts -> model-schema.ts ->
 connection-handling.ts -> … -> abstract-adapter.ts`, whose module-scope
-  `include(AbstractAdapter, SchemaStatements)` reads `SchemaStatements` in TDZ.
+  `include(AbstractAdapter, SchemaStatements)` reads `SchemaStatements` in TDZ,
+  and `query-cache.ts -> connection-pool.ts -> abstract-adapter.ts`, whose
+  `include(AbstractAdapter, QueryCacheMixin)` reads `QueryCacheMixin` in TDZ.
   `connection-adapters/abstract-adapter.ts` reads `ActiveRecord.Base?.logger ?? null` in the constructor
   (`abstract_adapter.rb:132,140`). That read on a standalone adapter's own
   path is one of the two guarded autoload reads, falling back to the value Rails'

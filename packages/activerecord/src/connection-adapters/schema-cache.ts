@@ -7,6 +7,9 @@ import type { ColumnCoder } from "./column.js";
 import { Column as MysqlColumn } from "./mysql/column.js";
 import { Column as PostgresqlColumn } from "./postgresql/column.js";
 import { Column as Sqlite3Column } from "./sqlite3/column.js";
+import { SqlTypeMetadata, type SqlTypeMetadataJSON } from "./sql-type-metadata.js";
+import { TypeMetadata as MysqlTypeMetadata } from "./mysql/type-metadata.js";
+import { TypeMetadata as PostgresqlTypeMetadata } from "./postgresql/type-metadata.js";
 import { isSchemaCacheIgnoredTable } from "../active-record.js";
 import { StatementInvalid } from "../errors.js";
 import { IndexDefinition } from "./abstract/schema-definitions.js";
@@ -27,6 +30,17 @@ function serializeColumn(col: Column): ColumnCoder {
     .reverse()
     .find((name) => Object.prototype.isPrototypeOf.call(COLUMN_CLASSES[name].prototype, col));
   col.encodeWith(coder);
+  const metadata = coder["sql_type_metadata"];
+  if (metadata instanceof SqlTypeMetadata) {
+    coder["sql_type_metadata"] = {
+      class: Object.keys(TYPE_METADATA_CLASSES)
+        .reverse()
+        .find((name) =>
+          Object.prototype.isPrototypeOf.call(TYPE_METADATA_CLASSES[name].prototype, metadata),
+        ),
+      ...metadata,
+    };
+  }
   return coder;
 }
 
@@ -37,12 +51,25 @@ const COLUMN_CLASSES: Record<string, { prototype: Column }> = {
   "SQLite3::Column": Sqlite3Column,
 };
 
+const TYPE_METADATA_CLASSES: Record<string, { prototype: SqlTypeMetadata }> = {
+  SqlTypeMetadata,
+  "MySQL::TypeMetadata": MysqlTypeMetadata,
+  "PostgreSQL::TypeMetadata": PostgresqlTypeMetadata,
+};
+
 function rehydrateColumn(data: unknown): Column {
   if (data instanceof Column) return data;
   if (data == null || typeof data !== "object") return data as Column;
-  const coder = data as ColumnCoder;
+  let coder = data as ColumnCoder;
   const klass = COLUMN_CLASSES[coder["class"] as string] ?? Column;
   const column = Object.create(klass.prototype) as Column;
+  const metadata = coder["sql_type_metadata"];
+  if (metadata != null && !(metadata instanceof SqlTypeMetadata)) {
+    coder = {
+      ...coder,
+      sql_type_metadata: SqlTypeMetadata.fromJSON(metadata as SqlTypeMetadataJSON),
+    };
+  }
   column.initWith(coder);
   return column;
 }

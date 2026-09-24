@@ -262,4 +262,29 @@ describe("ThroughReflection delegation to a nil source_reflection", () => {
       "type delegated to source_reflection, but source_reflection is nil",
     );
   });
+
+  it("raises DelegationError from the remaining source_reflection delegators", () => {
+    class NsrAuthor extends Base {
+      static {
+        this.hasMany("nsrPosts", {});
+        this.hasMany("nsrComments", { through: "nsrPosts" });
+      }
+    }
+    registerModel("NsrAuthor", NsrAuthor);
+    const ref = reflectOnAssociation(NsrAuthor, "nsrComments") as ThroughReflection;
+    Object.defineProperty(ref, "sourceReflection", { value: null });
+
+    expect(() => ref.associationForeignKey).toThrow(
+      "association_foreign_key delegated to source_reflection, but source_reflection is nil",
+    );
+    expect(() => ref.joinIdFor(new NsrAuthor())).toThrow(
+      "join_id_for delegated to source_reflection, but source_reflection is nil",
+    );
+    expect(() => ref.activeRecordPrimaryKey).toThrow(
+      "active_record_primary_key delegated to source_reflection, but source_reflection is nil",
+    );
+    expect(() => ref.joinForeignKey).toThrow(
+      "join_foreign_key delegated to source_reflection, but source_reflection is nil",
+    );
+  });
 });

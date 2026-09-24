@@ -9,6 +9,7 @@ import type { HasManyThroughAssociation } from "./associations/has-many-through-
 import type { HasOneAssociation } from "./associations/has-one-association.js";
 import type { HasOneThroughAssociation } from "./associations/has-one-through-association.js";
 import type { Base } from "./base.js";
+import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import type * as ConnectionHandling from "./connection-handling.js";
 import type { Configurable } from "./encryption/configurable.js";
 import type { FixtureError } from "./fixtures.js";
@@ -40,6 +41,8 @@ const loadPath: Record<string, () => Promise<unknown>> = {
     import("./associations/disable-joins-association-scope.js"),
   "active_record/encryption/configurable": () => import("./encryption/configurable.js"),
   "active_record/migration/compatibility": () => import("./migration/compatibility.js"),
+  "active_record/connection_adapters/abstract/connection_pool": () =>
+    import("./connection-adapters/abstract/connection-pool.js"),
 };
 
 export const ActiveRecord = { name: "ActiveRecord", loadPath } as AutoloadModule & {
@@ -48,6 +51,7 @@ export const ActiveRecord = { name: "ActiveRecord", loadPath } as AutoloadModule
   FixtureError: typeof FixtureError;
   ModelSchema: typeof ModelSchema;
   AssociationRelation: typeof AssociationRelationClass;
+  Point: new (x: number, y: number) => { x: number; y: number; equals(other: unknown): boolean };
 };
 extend(ActiveRecord, Autoload);
 ActiveRecord.autoload("Base");
@@ -78,6 +82,17 @@ Associations.eagerAutoload(() => {
   Associations.autoload("HasOneAssociation");
   Associations.autoload("HasOneThroughAssociation");
   Associations.autoload("DisableJoinsAssociationScope");
+});
+
+export const ConnectionAdapters = {
+  name: "ActiveRecord::ConnectionAdapters",
+  loadPath,
+} as AutoloadModule & {
+  ConnectionPool: typeof ConnectionPool;
+};
+extend(ConnectionAdapters, Autoload);
+ConnectionAdapters.autoloadAt("active_record/connection_adapters/abstract/connection_pool", () => {
+  ConnectionAdapters.autoload("ConnectionPool");
 });
 
 export const Encryption = { name: "ActiveRecord::Encryption", loadPath } as AutoloadModule & {

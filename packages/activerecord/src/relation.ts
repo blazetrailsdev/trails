@@ -34,7 +34,6 @@ export { Range };
 import {
   WhereChain,
   QueryMethods,
-  defineValueMethods,
   type UnscopeType,
   type ExceptSkip,
   type AssociationSpec,
@@ -2216,8 +2215,6 @@ for (const name of ["updateAll", "deleteAll"] as const) {
     configurable: true,
   });
 }
-
-defineValueMethods(Relation);
 
 applyThenable(Relation.prototype);
 
