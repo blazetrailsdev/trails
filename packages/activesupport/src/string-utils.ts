@@ -172,5 +172,6 @@ export function indent(
   indentString: string | null = null,
   indentEmptyLines: boolean = false,
 ): string {
-  return indentBang(str, amount, indentString, indentEmptyLines) ?? str;
+  const _ = str;
+  return indentBang(_, amount, indentString, indentEmptyLines) ?? _;
 }

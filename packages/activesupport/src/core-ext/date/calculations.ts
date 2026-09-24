@@ -95,13 +95,13 @@ export function endOfDay(date: Temporal.PlainDate): TimeWithZone {
 export const atEndOfDay = endOfDay;
 
 export function plusWithDuration(
-  date: Temporal.PlainDate,
+  this: Temporal.PlainDate,
   other: Duration | number,
 ): Temporal.PlainDate | TimeWithZone {
   if (other instanceof Duration) {
-    return other.since(date);
+    return other.since(this);
   } else {
-    return plusWithoutDuration(date, other);
+    return plusWithoutDuration(this, other);
   }
 }
 
@@ -114,7 +114,7 @@ export function minusWithDuration(
   other: Duration | number | Temporal.PlainDate,
 ): Temporal.PlainDate | TimeWithZone | number {
   if (other instanceof Duration) {
-    return plusWithDuration(date, other.negate());
+    return plusWithDuration.call(date, other.negate());
   } else {
     return minusWithoutDuration(date, other);
   }

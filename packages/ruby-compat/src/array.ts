@@ -1,6 +1,7 @@
 import { rbEql, rbEqual } from "./rb-equal.js";
 import { rbHash } from "./rb-hash.js";
 import { ArgumentError } from "./argument-error.js";
+import { rbBuiltinClassName } from "./object.js";
 import { Range } from "./range.js";
 import { TypeError } from "./type-error.js";
 
@@ -56,27 +57,34 @@ function encodes(str: string[], s0: Uint8Array, len: number, tailLf: number): vo
  * (`pack.c:663-690`) — Base64, wrapped at `len` input bytes per line, or
  * strict with no line breaks at all when the count is an explicit `0`. `m0` is
  * what `Rack::Test::Session#basic_authorize` packs with
- * (`vendor/rack-test/lib/rack/test.rb:199`). Every other directive is a
- * separate port, so each reaches `unknown_directive` (`pack.c:761`) here.
+ * (`vendor/rack-test/lib/rack/test.rb:199`) — and to `U` (`pack.c:645-660`),
+ * one UTF-8 character per Integer, which `ActiveSupport::Multibyte::Chars`
+ * packs codepoints with (`multibyte/chars.rb:136,144`). Every other directive
+ * is a separate port, so each reaches `unknown_directive` (`pack.c:761`) here.
+ *
+ * A `U` result is a UTF-8 String (`pack.c:299-302`), so it is a JS string of
+ * those characters rather than of bytes; `String.fromCodePoint` is
+ * `rb_uv_to_utf8`, and raises past U+10FFFF, which JS strings cannot hold.
  *
  * The argument is read as bytes, one code unit per byte — ruby-compat's
  * ASCII-8BIT convention — as `pack.c:663-690` reads `RSTRING_PTR` with no
  * re-encoding. A caller holding a UTF-8 String passes its `String#b`.
  *
- * `*` is `1` for the `PMm` types rather than the array remainder
- * (`pack.c:281-284`), so `m*` is `m`. The `u`-only `len > 63` clamp
- * (`pack.c:676`) is not reachable without that directive.
+ * `*` is `1` for the `PMm` types and the array remainder otherwise
+ * (`pack.c:281-284`), so `m*` is `m` and `U*` takes every element. The
+ * `u`-only `len > 63` clamp (`pack.c:676`) is not reachable without that
+ * directive.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Array#pack`
  * (`vendor/ruby/pack.c:197`).
  */
-export function pack(ary: ReadonlyArray<string>, fmt: string): string {
+export function pack(ary: ReadonlyArray<string | number>, fmt: string): string {
   const res: string[] = [];
   let p = 0;
   const pend = fmt.length;
   let idx = 0;
 
-  const nextfrom = (): string => {
+  const nextfrom = (): string | number => {
     if (idx >= ary.length) throw new ArgumentError(toofew);
     return ary[idx++];
   };
@@ -94,7 +102,7 @@ export function pack(ary: ReadonlyArray<string>, fmt: string): string {
 
     let len: number;
     if (fmt[p] === "*") {
-      len = 1;
+      len = "PMm".includes(type) ? 1 : ary.length - idx;
       p++;
     } else if (fmt[p] >= "0" && fmt[p] <= "9") {
       let digits = "";
@@ -104,9 +112,23 @@ export function pack(ary: ReadonlyArray<string>, fmt: string): string {
       len = 1;
     }
 
+    if (type === "U") {
+      while (len-- > 0) {
+        const from = nextfrom();
+        if (typeof from !== "number") {
+          throw new TypeError(`no implicit conversion of ${rbBuiltinClassName(from)} into Integer`);
+        }
+        const l = Math.trunc(from);
+        if (l < 0) {
+          throw new RangeError("pack(U): value out of range");
+        }
+        res.push(String.fromCodePoint(l));
+      }
+      continue;
+    }
     if (type !== "m") unknownDirective("pack", type, fmt);
 
-    const from = nextfrom();
+    const from = nextfrom() as string;
     const s = new Uint8Array(from.length);
     for (let i = 0; i < from.length; i++) s[i] = from.charCodeAt(i) & 0xff;
     let ptr = 0;
@@ -217,6 +239,21 @@ export function aryDelete<T, U = undefined>(ary: T[], item: T, block?: (item: T)
  */
 export function first<T>(ary: readonly T[]): T | undefined {
   return ary[0];
+}
+
+/**
+ * Ruby `Array#to_a` (`vendor/ruby/array.c:2952` `rb_ary_to_a`): the receiver
+ * itself, or a plain-Array copy of an instance of an Array subclass.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function toA<T>(ary: T[]): T[] {
+  if (ary.constructor !== Array) {
+    const dup: T[] = [];
+    dup.push(...ary);
+    return dup;
+  }
+  return ary;
 }
 
 /**

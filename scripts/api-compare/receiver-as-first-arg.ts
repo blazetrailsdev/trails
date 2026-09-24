@@ -124,6 +124,11 @@ export const RECEIVER_AS_FIRST_ARG = new Set([
   // names a JS method Ruby never calls, so @blazetrails/ruby-compat
   // exports it as `drop(collection, n)` and the Ruby receiver is TS argument 1.
   "drop",
+  // Ruby core `Array#pack` (`vendor/ruby/pack.c:197`) — `codepoints.pack("U*")`
+  // (multibyte/chars.rb:136,144). The same shape as `drop` above:
+  // @blazetrails/ruby-compat exports it as `pack(ary, fmt)` and the Ruby
+  // receiver is TS argument 1.
+  "pack",
   // Ruby core `Enumerable#min` in its no-argument receiver form —
   // `[limit_value, count].compact.min`. JS's `Math.min(...values)` takes the
   // values as ARGUMENTS and is numbers-only, so @blazetrails/activesupport

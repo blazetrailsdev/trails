@@ -52,36 +52,44 @@ describe("date calculations coercion arms", () => {
   });
 
   it("plus_with_duration widens for a zero sub-day part and not for a zero day part", () => {
-    expect(DateExt.plusWithDuration(pd(2017, 1, 1), Duration.seconds(0))).toBeInstanceOf(RubyTime);
-    expect(DateExt.plusWithDuration(pd(2017, 1, 1), Duration.minutes(0))).toBeInstanceOf(RubyTime);
-    expect(DateExt.plusWithDuration(pd(2017, 1, 1), Duration.hours(0))).toBeInstanceOf(RubyTime);
-    expect(DateExt.plusWithDuration(pd(2017, 1, 1), Duration.days(0))).toEqual(pd(2017, 1, 1));
-    expect(DateExt.plusWithDuration(pd(2017, 1, 1), Duration.months(0))).toEqual(pd(2017, 1, 1));
+    expect(DateExt.plusWithDuration.call(pd(2017, 1, 1), Duration.seconds(0))).toBeInstanceOf(
+      RubyTime,
+    );
+    expect(DateExt.plusWithDuration.call(pd(2017, 1, 1), Duration.minutes(0))).toBeInstanceOf(
+      RubyTime,
+    );
+    expect(DateExt.plusWithDuration.call(pd(2017, 1, 1), Duration.hours(0))).toBeInstanceOf(
+      RubyTime,
+    );
+    expect(DateExt.plusWithDuration.call(pd(2017, 1, 1), Duration.days(0))).toEqual(pd(2017, 1, 1));
+    expect(DateExt.plusWithDuration.call(pd(2017, 1, 1), Duration.months(0))).toEqual(
+      pd(2017, 1, 1),
+    );
   });
 
   it("plus_with_duration drops the zeroes of a non-zero duration", () => {
     expect(
-      DateExt.plusWithDuration(pd(2017, 1, 1), Duration.days(1).plus(Duration.seconds(0))),
+      DateExt.plusWithDuration.call(pd(2017, 1, 1), Duration.days(1).plus(Duration.seconds(0))),
     ).toEqual(pd(2017, 1, 2));
   });
 
   it("plus_with_duration applies the parts in merge order", () => {
     expect(
-      DateExt.plusWithDuration(pd(2017, 1, 30), Duration.months(1).plus(Duration.days(1))),
+      DateExt.plusWithDuration.call(pd(2017, 1, 30), Duration.months(1).plus(Duration.days(1))),
     ).toEqual(pd(2017, 3, 1));
     expect(
-      DateExt.plusWithDuration(pd(2017, 1, 30), Duration.days(1).plus(Duration.months(1))),
+      DateExt.plusWithDuration.call(pd(2017, 1, 30), Duration.days(1).plus(Duration.months(1))),
     ).toEqual(pd(2017, 2, 28));
   });
 
   it("plus_with_duration appends new keys in the other duration's own order", () => {
     const dayThenMonth = Duration.days(1).plus(Duration.months(1));
     const monthThenDay = Duration.months(1).plus(Duration.days(1));
-    expect(DateExt.plusWithDuration(pd(2017, 1, 30), dayThenMonth)).toEqual(pd(2017, 2, 28));
-    expect(DateExt.plusWithDuration(pd(2017, 1, 30), monthThenDay)).toEqual(pd(2017, 3, 1));
+    expect(DateExt.plusWithDuration.call(pd(2017, 1, 30), dayThenMonth)).toEqual(pd(2017, 2, 28));
+    expect(DateExt.plusWithDuration.call(pd(2017, 1, 30), monthThenDay)).toEqual(pd(2017, 3, 1));
     expect(
       (
-        DateExt.plusWithDuration(
+        DateExt.plusWithDuration.call(
           pd(2017, 1, 30),
           Duration.seconds(1).plus(dayThenMonth),
         ) as TimeWithZone
@@ -89,7 +97,7 @@ describe("date calculations coercion arms", () => {
     ).toEqual(pd(2017, 2, 28));
     expect(
       (
-        DateExt.plusWithDuration(
+        DateExt.plusWithDuration.call(
           pd(2017, 1, 30),
           Duration.seconds(1).plus(monthThenDay),
         ) as TimeWithZone
