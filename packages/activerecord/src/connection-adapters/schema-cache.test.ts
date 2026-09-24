@@ -424,7 +424,7 @@ describe("SchemaCacheTest", () => {
       expect(Base.connectionPool().schemaReflection.loadedCache).not.toBeNull();
     } finally {
       setLazilyLoadSchemaCache(oldConfig);
-      await Base.establishConnection("arunit");
+      await Base.establishConnection(":arunit");
     }
   });
   it("#init_with skips deduplication if told to", () => {

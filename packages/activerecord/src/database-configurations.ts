@@ -1,4 +1,4 @@
-import { hasKey } from "@blazetrails/ruby-compat";
+import { hasKey, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
 import { getEnv } from "@blazetrails/activesupport";
 import { AdapterNotSpecified } from "./errors.js";
 import {
@@ -27,15 +27,6 @@ type DbConfigHandler = (
   url: string | undefined,
   config: DatabaseConfigOptions,
 ) => HashConfig | null | undefined;
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE determine-owner-name-symbol-config-as-colon-string
- */
-export function symbolConnectionName(config: unknown): string | undefined {
-  if (typeof config !== "string" || config === "") return undefined;
-  return /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(config) ? undefined : config;
-}
 
 let _configurations: DatabaseConfigurations | undefined;
 
@@ -134,7 +125,7 @@ export class DatabaseConfigurations {
   }
 
   findDbConfig(env: string): HashConfig | undefined {
-    env = String(env);
+    env = isSymbol(env) ? symbolToS(env) : String(env);
     const matching = this._configurations.find(
       (c) => c.forCurrentEnv && (c.envName === env || c.name === env),
     );
@@ -150,10 +141,10 @@ export class DatabaseConfigurations {
 
   resolve(config: unknown): HashConfig {
     if (config instanceof DatabaseConfig) return config as HashConfig;
+    if (isSymbol(config)) {
+      return this.resolveSymbolConnection(config);
+    }
     if (typeof config === "string") {
-      if (symbolConnectionName(config) != null) {
-        return this.resolveSymbolConnection(config);
-      }
       return this.buildDbConfigFromRawConfig(this.defaultEnv(), "primary", config);
     }
     if (typeof config === "object" && config !== null) {
@@ -222,7 +213,7 @@ export class DatabaseConfigurations {
     if (dbConfig) return dbConfig;
     const defaultEnv = this.defaultEnv();
     throw new AdapterNotSpecified(
-      `The \`${name}\` database is not configured for the \`${defaultEnv}\` environment.\n\n  Available database configurations are:\n\n  ${this.buildConfigurationSentence()}`,
+      `The \`${symbolToS(name)}\` database is not configured for the \`${defaultEnv}\` environment.\n\n  Available database configurations are:\n\n  ${this.buildConfigurationSentence()}`,
     );
   }
 

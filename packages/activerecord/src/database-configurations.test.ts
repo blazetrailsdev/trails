@@ -207,7 +207,7 @@ describe("DatabaseConfigurationsTest", () => {
         primary: { adapter: "sqlite3", database: "test.db" },
       },
     });
-    const resolved = configs.resolve("primary");
+    const resolved = configs.resolve(":primary");
     expect(resolved.database).toBe("test.db");
   });
 

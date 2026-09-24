@@ -317,8 +317,8 @@ describe("ConnectionHandlingTest", () => {
   it("connectsTo rejects both database and shards", async () => {
     await expect(
       Base.connectsTo({
-        database: { writing: "primary" },
-        shards: { default: { writing: "primary" } },
+        database: { writing: ":primary" },
+        shards: { default: { writing: ":primary" } },
       }),
     ).rejects.toThrow(
       "`connects_to` can only accept a `database` or `shards` argument, but not both arguments.",
@@ -745,13 +745,13 @@ describe("resolveConfigForConnection / connectsTo with unset configurations", ()
         this.abstractClass = true;
       }
     }
-    expect(() => resolveConfigForConnection.call(Untouched, "missing_env")).toThrow(
+    expect(() => resolveConfigForConnection.call(Untouched, ":missing_env")).toThrow(
       AdapterNotSpecified,
     );
-    expect(() => resolveConfigForConnection.call(Untouched, "missing_env")).toThrow(
+    expect(() => resolveConfigForConnection.call(Untouched, ":missing_env")).toThrow(
       /`missing_env` database is not configured/,
     );
-    expect(() => resolveConfigForConnection.call(Untouched, "missing_env")).toThrow(
+    expect(() => resolveConfigForConnection.call(Untouched, ":missing_env")).toThrow(
       /Available database configurations are:/,
     );
   });
@@ -774,10 +774,10 @@ describe("resolveConfigForConnection / connectsTo with unset configurations", ()
         [env]: { primary: { adapter: "sqlite3", database: "db/primary.sqlite3" } },
       });
 
-      await AppRecord.connectsTo({ database: { writing: "primary" } });
+      await AppRecord.connectsTo({ database: { writing: ":primary" } });
       expect((AppRecord as any)._connectionSpecificationName).toBe("ActiveRecord::Base");
 
-      await SecondaryAbstract.connectsTo({ database: { writing: "primary" } });
+      await SecondaryAbstract.connectsTo({ database: { writing: ":primary" } });
       expect((SecondaryAbstract as any)._connectionSpecificationName).toBe("SecondaryAbstract");
     } finally {
       await SecondaryAbstract.removeConnection();

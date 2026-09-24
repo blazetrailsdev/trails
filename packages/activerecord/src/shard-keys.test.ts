@@ -37,11 +37,11 @@ describe("ShardsKeysTest", () => {
     });
     (Base as any)._shardKeys = undefined;
 
-    await UnshardedBase.connectsTo({ database: { writing: "primary" } });
+    await UnshardedBase.connectsTo({ database: { writing: ":primary" } });
     await ShardedBase.connectsTo({
       shards: {
-        shard_one: { writing: "shard_one", reading: "shard_one_reading" },
-        shard_two: { writing: "shard_two", reading: "shard_two_reading" },
+        shard_one: { writing: ":shard_one", reading: ":shard_one_reading" },
+        shard_two: { writing: ":shard_two", reading: ":shard_two_reading" },
       },
     });
   });

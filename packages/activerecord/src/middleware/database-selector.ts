@@ -1,15 +1,12 @@
 import { Notifications, _ActionDispatchRequest } from "@blazetrails/activesupport";
+import type { Hash } from "@blazetrails/ruby-compat";
 import { Resolver } from "./database-selector/resolver.js";
 import type { ResolverContext } from "./database-selector/resolver.js";
 import { Session } from "./database-selector/resolver/session.js";
 
 export interface MiddlewareRequest {
   method: string;
-  session: {
-    get(key: string): unknown;
-    set(key: string, value: unknown): void;
-    delete(key: string): void;
-  };
+  session: Pick<Hash<string, unknown>, "get" | "set">;
 }
 
 type ResolverClass = {

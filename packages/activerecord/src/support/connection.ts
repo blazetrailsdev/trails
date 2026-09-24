@@ -192,8 +192,8 @@ export async function connect(): Promise<TestDatabaseConfig> {
     }
   }
 
-  await Base.establishConnection("arunit");
-  await ARUnit2Model.establishConnection("arunit2");
+  await Base.establishConnection(":arunit");
+  await ARUnit2Model.establishConnection(":arunit2");
 
   const arunitAdapter = (await Base.leaseConnection()).pool.dbConfig.adapter as string;
 
@@ -211,7 +211,7 @@ const CANONICAL_PROBE_TABLE = "posts";
 const ADAPTER_SPECIFIC_PROBE_TABLE = "defaults";
 
 export async function restoreWorkerConnection(): Promise<void> {
-  await Base.establishConnection("arunit");
+  await Base.establishConnection(":arunit");
   const connection = (await Base.leaseConnection()) as unknown as {
     tableExists(name: string): Promise<boolean>;
   };
@@ -226,7 +226,7 @@ export async function restoreWorkerConnection(): Promise<void> {
 }
 
 async function restoreSecondWorkerConnection(): Promise<void> {
-  await ARUnit2Model.establishConnection("arunit2");
+  await ARUnit2Model.establishConnection(":arunit2");
   const { ARUNIT2_TABLES, provisionSecondDatabase } = await import("./setup-second-pool.js");
   const arunit2 = await ARUnit2Model.leaseConnection();
   const present = new Set(await arunit2.tables());

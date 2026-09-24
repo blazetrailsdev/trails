@@ -10,13 +10,8 @@ import {
   type AttributeSet,
   type ValueType,
 } from "@blazetrails/activemodel";
-import { classAttribute, included } from "@blazetrails/activesupport";
-import {
-  isBaseClass,
-  baseClass,
-  lookupModuleTableNamePrefix,
-  lookupModuleTableNameSuffix,
-} from "./inheritance.js";
+import { classAttribute, included, moduleParents } from "@blazetrails/activesupport";
+import { isBaseClass, baseClass, qualifiedName } from "./inheritance.js";
 import { singularize } from "@blazetrails/activesupport";
 import { modelRegistry } from "./associations.js";
 import { TableNotSpecified } from "./errors.js";
@@ -326,14 +321,22 @@ export function resetTableName(this: SchemaHost): string {
   return this._tableName ?? "";
 }
 
+/** @missingRailsArgs module_parents — PERMANENT */
 export function fullTableNamePrefix(this: SchemaHost): string {
-  const moduleName = (this as any).moduleName as string | undefined;
-  return lookupModuleTableNamePrefix(moduleName) ?? this.tableNamePrefix ?? "";
+  return (
+    (moduleParents({ name: qualifiedName(this as typeof Base) }).find((p) =>
+      rbObjRespondTo(p, "tableNamePrefix"),
+    ) as SchemaHost | undefined) ?? this
+  ).tableNamePrefix;
 }
 
+/** @missingRailsArgs module_parents — PERMANENT */
 export function fullTableNameSuffix(this: SchemaHost): string {
-  const moduleName = (this as any).moduleName as string | undefined;
-  return lookupModuleTableNameSuffix(moduleName) ?? this.tableNameSuffix ?? "";
+  return (
+    (moduleParents({ name: qualifiedName(this as typeof Base) }).find((p) =>
+      rbObjRespondTo(p, "tableNameSuffix"),
+    ) as SchemaHost | undefined) ?? this
+  ).tableNameSuffix;
 }
 
 export function realInheritanceColumn(this: SchemaHost, value: string | null): void {

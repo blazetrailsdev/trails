@@ -75,9 +75,9 @@ describe("ConnectionHandlerTest", () => {
     Base.configurations(config);
 
     try {
-      await handler.establishConnection("common");
-      await handler.establishConnection("primary");
-      await handler.establishConnection("readonly");
+      await handler.establishConnection(":common");
+      await handler.establishConnection(":primary");
+      await handler.establishConnection(":readonly");
 
       const readonlyPool = handler.retrieveConnectionPool("readonly");
       expect(readonlyPool).not.toBeNull();
@@ -104,7 +104,7 @@ describe("ConnectionHandlerTest", () => {
     Base.configurations(config);
 
     try {
-      await expect(Base.establishConnection("development")).rejects.toThrow(AdapterNotFound);
+      await expect(Base.establishConnection(":development")).rejects.toThrow(AdapterNotFound);
     } finally {
       Base.configurations(prevConfigs);
     }
@@ -179,7 +179,7 @@ describe("ConnectionHandlerTest", () => {
     const config = { primary: { adapter: "sqlite3", database: "test/db/primary.sqlite3" } };
     Base.configurations(config);
     try {
-      await handler.establishConnection("primary");
+      await handler.establishConnection(":primary");
 
       await assertNotDeprecated(deprecator(), async () => {
         await handler.retrieveConnection("primary");
@@ -247,7 +247,7 @@ describe("ConnectionHandlerTest", () => {
     const prevConfigs = Base.configurations();
     Base.configurations(config);
     try {
-      await handler.establishConnection("development");
+      await handler.establishConnection(":development");
 
       const pool = handler.retrieveConnectionPool("development");
       expect(pool).not.toBeNull();
@@ -266,7 +266,7 @@ describe("ConnectionHandlerTest", () => {
     const prevConfigs = Base.configurations();
     Base.configurations(config);
     try {
-      await handler.establishConnection("development_readonly");
+      await handler.establishConnection(":development_readonly");
 
       const pool = handler.retrieveConnectionPool("development_readonly");
       expect(pool).not.toBeNull();
@@ -285,7 +285,9 @@ describe("ConnectionHandlerTest", () => {
     const prevConfigs = Base.configurations();
     Base.configurations(config);
     try {
-      await handler.establishConnection("development_readonly", { ownerName: "custom_connection" });
+      await handler.establishConnection(":development_readonly", {
+        ownerName: "custom_connection",
+      });
 
       const pool = handler.retrieveConnectionPool("custom_connection");
       expect(pool).not.toBeNull();
