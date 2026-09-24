@@ -1,4 +1,4 @@
-import { hasKey, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
+import { hasKey, isSymbol, rbInspect, symbolToS } from "@blazetrails/ruby-compat";
 import { getEnv } from "@blazetrails/activesupport";
 import { AdapterNotSpecified } from "./errors.js";
 import {
@@ -144,18 +144,15 @@ export class DatabaseConfigurations {
     if (isSymbol(config)) {
       return this.resolveSymbolConnection(config);
     }
-    if (typeof config === "string") {
-      return this.buildDbConfigFromRawConfig(this.defaultEnv(), "primary", config);
-    }
-    if (typeof config === "object" && config !== null) {
+    if (isHash(config) || typeof config === "string") {
       return this.buildDbConfigFromRawConfig(
         this.defaultEnv(),
         "primary",
-        config as DatabaseConfigOptions,
+        config as DatabaseConfigOptions | string,
       );
     }
     throw new TypeError(
-      `Invalid type for configuration. Expected string, hash, or DatabaseConfig. Got ${typeof config}`,
+      `Invalid type for configuration. Expected Symbol, String, or Hash. Got ${rbInspect(config)}`,
     );
   }
 
