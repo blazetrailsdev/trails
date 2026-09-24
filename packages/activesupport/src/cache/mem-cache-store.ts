@@ -70,7 +70,7 @@ export class MemCacheStore extends Store {
   }
 
   inspect(): string {
-    const instance = this.data || this.memCacheOptions;
+    const instance = rtest(this.data) ? this.data : this.memCacheOptions;
     return `#<${this.constructor.name} options=${inspectOptions(this.options)} mem_cache=${rbInspect(instance)}>`;
   }
 
@@ -121,9 +121,9 @@ export class MemCacheStore extends Store {
 
   /** @internal */
   private writeSerializedEntry(key: string, payload: unknown, options: StoreOptions): boolean {
-    const method = options.unlessExist ? "add" : "set";
+    const method = rtest(options.unlessExist) ? "add" : "set";
     let expiresIn = Math.trunc(Number(options.expiresIn ?? 0));
-    if (options.raceConditionTtl && expiresIn > 0 && !options.raw) {
+    if (rtest(options.raceConditionTtl) && expiresIn > 0 && !rtest(options.raw)) {
       expiresIn += 5 * 60;
     }
     return this.rescueErrorWith(null, () => {
@@ -179,7 +179,7 @@ export class MemCacheStore extends Store {
   /** @internal */
   protected override serializeEntry(entry: Entry, options: StoreOptions = {}): unknown {
     const { raw = false } = options;
-    if (raw) {
+    if (rtest(raw)) {
       return String(entry.value);
     } else {
       return super.serializeEntry(entry, { ...options, raw });
@@ -208,7 +208,7 @@ export class MemCacheStore extends Store {
 
   /** @internal */
   protected override deserializeEntry(payload: unknown, options: StoreOptions = {}): Entry | null {
-    if (payload && options.raw) {
+    if (rtest(payload) && rtest(options.raw)) {
       return new Entry(payload);
     } else {
       return super.deserializeEntry(payload);

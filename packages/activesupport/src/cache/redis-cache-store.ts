@@ -1,4 +1,4 @@
-import { rbInspect } from "@blazetrails/ruby-compat";
+import { rbInspect, rtest } from "@blazetrails/ruby-compat";
 
 import { Entry } from "./entry.js";
 import { Store, UNIVERSAL_OPTIONS, inspectOptions, type StoreOptions } from "./store.js";
@@ -45,7 +45,7 @@ export class RedisCacheStore extends Store {
 
     if (typeof redis === "function") {
       return (redis as () => Redis)();
-    } else if (redis) {
+    } else if (rtest(redis)) {
       return redis as Redis;
     } else if (urls.length > 1) {
       return this.buildRedisDistributedClient({ urls, ...redisOptions });
@@ -148,14 +148,14 @@ export class RedisCacheStore extends Store {
       pipeline?: { set(key: string, value: unknown, modifiers: StoreOptions): unknown } | null;
     },
   ): boolean {
-    if (raceConditionTtl && expiresIn && expiresIn > 0 && !raw) {
-      expiresIn += 5 * 60;
+    if (rtest(raceConditionTtl) && rtest(expiresIn) && expiresIn! > 0 && !rtest(raw)) {
+      expiresIn = expiresIn! + 5 * 60;
     }
 
     const modifiers: StoreOptions = {};
-    if (unlessExist || expiresIn) {
+    if (rtest(unlessExist) || rtest(expiresIn)) {
       modifiers.nx = unlessExist;
-      if (expiresIn) modifiers.px = Math.ceil(1000 * expiresIn);
+      if (rtest(expiresIn)) modifiers.px = Math.ceil(1000 * expiresIn!);
     }
 
     if (pipeline) {
@@ -176,7 +176,7 @@ export class RedisCacheStore extends Store {
 
   /** @internal */
   protected override deserializeEntry(payload: unknown, options: StoreOptions = {}): Entry | null {
-    if (options.raw && payload != null) {
+    if (rtest(options.raw) && payload != null) {
       return new Entry(payload);
     } else {
       return super.deserializeEntry(payload);
@@ -186,7 +186,7 @@ export class RedisCacheStore extends Store {
   /** @internal */
   protected override serializeEntry(entry: Entry, options: StoreOptions = {}): unknown {
     const { raw = false } = options;
-    if (raw) {
+    if (rtest(raw)) {
       return String(entry.value);
     } else {
       return super.serializeEntry(entry, { ...options, raw });
