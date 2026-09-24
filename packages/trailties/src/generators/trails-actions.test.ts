@@ -177,10 +177,13 @@ describe("TrailsActions", () => {
     });
 
     it("with env option targets the env-specific config file", async () => {
-      files.set("/app/config/environments/production.ts", `export default {\n  // config\n};\n`);
-      await makeGen().environment(`logLevel: "warn",`, { env: "production" });
+      files.set(
+        "/app/config/environments/production.ts",
+        `Trails.application!.configure(function () {\n  // config\n});\n`,
+      );
+      await makeGen().environment(`this.config.logLevel = "warn";`, { env: "production" });
       expect(files.get("/app/config/environments/production.ts")).toBe(
-        `export default {\n  logLevel: "warn",\n  // config\n};\n`,
+        `Trails.application!.configure(function () {\n  this.config.logLevel = "warn";\n  // config\n});\n`,
       );
     });
   });

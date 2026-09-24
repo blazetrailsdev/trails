@@ -109,7 +109,7 @@ export class Trailtie extends Initializable {
     return (this.constructor as typeof Trailtie).railtieName();
   }
 
-  configure(block: (this: Trailtie) => void): void {
+  configure(block: (this: this) => void): void {
     block.call(this);
   }
 
