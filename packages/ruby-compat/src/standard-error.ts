@@ -1,3 +1,5 @@
+import { Exception } from "./exception.js";
+
 /**
  * Ruby's core `StandardError` (`vendor/ruby/error.c:3319` `rb_eStandardError`)
  * — the root of the ordinary rescuable hierarchy, and what a bare
@@ -6,6 +8,6 @@
  * @noRailsEquivalent PERMANENT — Ruby core `StandardError`, which Rails
  * inherits rather than defines.
  */
-export class StandardError extends Error {}
+export class StandardError extends Exception {}
 
 StandardError.prototype.name = "StandardError";

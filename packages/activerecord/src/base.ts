@@ -61,6 +61,7 @@ import {
   subclassFromAttributesForNew,
   isDescendsFromActiveRecord as _isDescendsFromActiveRecord,
   usingSingleTableInheritance as _usingSingleTableInheritance,
+  qualifiedName,
 } from "./inheritance.js";
 import { NotImplementedError } from "./errors.js";
 import {
@@ -658,7 +659,7 @@ export class Base extends Model {
     if ((this.abstractClass || this === Base) && !this._suppressAbstractCheck) {
       // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/inheritance.rb:58
       throw new NotImplementedError(
-        `${this.name} is an abstract class and cannot be instantiated.`,
+        `${qualifiedName(this)} is an abstract class and cannot be instantiated.`,
       );
     }
   }

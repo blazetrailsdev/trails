@@ -383,11 +383,11 @@ acceptsNestedAttributesFor(Agency, "projects");
 export class Client extends Company {
   declare accounts: AssociationProxy<Account>;
 
-  raiseOnSave = false;
-  throwOnSave = false;
-  rollbackOnSave = false;
-  rollbackOnCreateCalled = false;
-  raiseOnDestroy = false;
+  declare raiseOnSave: boolean | undefined;
+  declare throwOnSave: boolean | undefined;
+  declare rollbackOnSave: boolean | undefined;
+  declare rollbackOnCreateCalled: boolean | undefined;
+  declare raiseOnDestroy: boolean | undefined;
 
   static destroyedClientIds: Map<number, number[]> = new Map();
 

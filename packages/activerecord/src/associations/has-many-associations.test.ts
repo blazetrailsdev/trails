@@ -4228,8 +4228,7 @@ describe("HasManyAssociationsTest", () => {
     });
   });
 
-  it.skip("create children could be rolled back by after save", async () => {
-    // BLOCKED: after_rollback(on: :create) never fires when after_save raises Rollback — filed as 0155-assertion-surfaced-port-bugs/after-rollback-on-create-skipped-for-rollback-raised-in-after-save
+  it("create children could be rolled back by after save", async () => {
     const firm = (await HmFirm.createBang({ name: "A New Firm, Inc" })) as any;
     await assertNoDifference(
       async () => Number(await Client.count()),

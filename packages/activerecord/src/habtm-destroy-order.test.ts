@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   assertNoDifference,
   assertNotEmpty,
+  assertRaises,
   assertNothingRaised,
 } from "@blazetrails/activesupport";
 import {
@@ -25,15 +26,15 @@ describe("HabtmDestroyOrderTest", () => {
     const ben = await Student.create({ name: "Ben Bitdiddle" });
     await association(sicp, "students").push(ben);
 
-    await expect(
-      assertNoDifference(
+    await assertRaises([LessonError], {}, async () => {
+      await assertNoDifference(
         async () => Number(await Lesson.count()),
         null,
         async () => {
           await sicp.destroy();
         },
-      ),
-    ).rejects.toThrow(/LessonError/);
+      );
+    });
     expect(sicp.isDestroyed()).toBeFalsy();
   });
 

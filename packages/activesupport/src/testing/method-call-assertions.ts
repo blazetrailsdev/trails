@@ -1,4 +1,4 @@
-import { NameError, rbEqual } from "@blazetrails/ruby-compat";
+import { ArgumentError, NameError, rbEqual, rbInspect } from "@blazetrails/ruby-compat";
 import { assert } from "./assertions.js";
 
 /** @noRailsEquivalent PERMANENT */
@@ -6,10 +6,14 @@ export class MockExpectationError extends Error {
   override name = "MockExpectationError";
 }
 
+interface MockCall {
+  retval: unknown;
+  args: unknown[];
+}
+
 interface Mock {
-  expected: unknown[][];
-  returns: unknown;
-  calls: unknown[][];
+  expected: MockCall[];
+  calls: MockCall[];
 }
 
 /** @internal */
@@ -49,23 +53,10 @@ export function assertCalledWith<T extends object>(
   { returns = false }: { returns?: unknown } = {},
   block?: () => void | Promise<void>,
 ): void | Promise<void> {
-  const mock: Mock = { expected: [], returns, calls: [] };
+  const mock: Mock = { expected: [], calls: [] };
   expectCalledWith(mock, args, { returns });
 
-  const result = stub(
-    object,
-    methodName,
-    (...called: unknown[]) => {
-      if (!mock.expected[mock.calls.length]) {
-        throw new MockExpectationError(
-          `No more expects available for :${methodName}: ${called.map(String).join(", ")}`,
-        );
-      }
-      mock.calls.push(called);
-      return mock.returns;
-    },
-    block,
-  );
+  const result = stub(object, methodName, (...called: unknown[]) => mockCall(mock, called), block);
 
   if (result) return result.then(() => assertMock(mock));
   assertMock(mock);
@@ -87,8 +78,7 @@ export function expectCalledWith(
   args: unknown[],
   { returns = false }: { returns?: unknown } = {},
 ): void {
-  mock.expected.push(args);
-  mock.returns = returns;
+  mock.expected.push({ retval: returns, args });
 }
 
 /** @internal */
@@ -202,24 +192,69 @@ function stub<T extends object>(
   return undefined;
 }
 
-function assertMock(mock: Mock): void {
-  for (const [index, expected] of mock.expected.entries()) {
-    const actual = mock.calls[index];
-    if (!actual) {
-      throw new MockExpectationError(
-        `Expected call with ${JSON.stringify(expected)}, but it was never called`,
-      );
-    }
-    if (
-      actual.length !== expected.length ||
-      expected.some((arg, i) => !(caseEqual(arg, actual[i]) || rbEqual(arg, actual[i])))
-    ) {
-      throw new MockExpectationError(
-        `Expected call with ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`,
-      );
-    }
+function mockCall(mock: Mock, args: unknown[]): unknown {
+  const sym = ":call";
+  const index = mock.calls.length;
+  const expectedCall = mock.expected[index];
+
+  if (!expectedCall) {
+    throw new MockExpectationError(
+      `No more expects available for ${rbInspect(sym)}: ${rbInspect(args)} ${rbInspect({})}`,
+    );
   }
-  assert(true);
+
+  const { args: expectedArgs, retval } = expectedCall;
+
+  if (expectedArgs.length !== args.length) {
+    throw new ArgumentError(
+      `mocked method ${rbInspect(sym)} expects ${expectedArgs.length} arguments, got ${rbInspect(args)}`,
+    );
+  }
+
+  const fullyMatched = expectedArgs.every(
+    (mod, i) => caseEqual(mod, args[i]) || rbEqual(mod, args[i]),
+  );
+
+  if (!fullyMatched) {
+    throw new MockExpectationError(
+      `mocked method ${rbInspect(sym)} called with unexpected arguments ${rbInspect(args)}`,
+    );
+  }
+
+  mock.calls.push({
+    retval,
+    args: expectedArgs.map((e, i) => (caseEqual(e, args[i]) ? e : args[i])),
+  });
+
+  return retval;
+}
+
+function mockCallToS(name: string, data: MockCall | MockCall[]): string {
+  if (Array.isArray(data)) return data.map((d) => mockCallToS(name, d)).join(", ");
+  const args = rbInspect(data.args).slice(1, -1);
+  return `${name}(${args}) => ${rbInspect(data.retval)}`;
+}
+
+function verify(mock: Mock): true {
+  const name = "call";
+  const expected = mock.expected;
+  const actual = mock.calls.length > 0 ? mock.calls : null;
+  if (!actual) throw new MockExpectationError(`Expected ${mockCallToS(name, expected[0])}`);
+  if (actual.length < expected.length) {
+    throw new MockExpectationError(
+      `Expected ${mockCallToS(name, expected[actual.length])}, got [${mockCallToS(name, actual)}]`,
+    );
+  }
+  return true;
+}
+
+function assertMock(mock: Mock): void {
+  try {
+    assert(verify(mock));
+  } catch (e) {
+    if (!(e instanceof MockExpectationError)) throw e;
+    assert(false, e.message);
+  }
 }
 
 function caseEqual(expected: unknown, actual: unknown): boolean {

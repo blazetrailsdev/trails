@@ -1,3 +1,5 @@
+import { Exception } from "./exception.js";
+
 /**
  * Ruby's core `NotImplementedError` (`vendor/ruby/error.c:3346`) — a
  * `ScriptError`, not a `StandardError`, raised by an abstract method's
@@ -7,7 +9,7 @@
  * @noRailsEquivalent PERMANENT — Ruby core `NotImplementedError`, which Rails
  * inherits rather than defines.
  */
-export class NotImplementedError extends Error {}
+export class NotImplementedError extends Exception {}
 
 NotImplementedError.prototype.name = "NotImplementedError";
 NotImplementedError.prototype.message = "NotImplementedError";
