@@ -7,6 +7,7 @@ const TS5_PEER_CONSUMERS = [
   /^@vitest\/eslint-plugin$/,
   /^typedoc$/,
   /^@sveltejs\/kit$/,
+  /^@expo\/require-utils$/,
 ];
 
 function readPackage(pkg) {

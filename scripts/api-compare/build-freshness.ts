@@ -81,6 +81,9 @@ const TSC = path.join(
 
 const WOULD_BUILD = /A non-dry build would build project '(.+)'/g;
 
+const UP_TO_DATE =
+  /(?:Project '(.+)' is up to date|would update timestamps for output of project '(.+)')/g;
+
 /** A project in the reference closure: where it builds to, and what to call it. */
 interface Project {
   dir: string;
@@ -183,6 +186,12 @@ async function hasDeclarations(dir: string): Promise<boolean> {
  * `NotBuilt` is ours rather than tsc's on purpose — tsc reports a project whose
  * `dist` was deleted but whose `tsconfig.tsbuildinfo` survives as up to date,
  * so deferring to it would let a removed build through.
+ *
+ * The dry run's verdicts are English CLI prose, and prose fails OPEN: a reworded
+ * message or another locale matches nothing, which would read as "every package
+ * is fresh". So the run is pinned to `--locale en`, and a built project that
+ * gets none of the three verdicts (would build, would update timestamps, is up
+ * to date) makes this throw rather than report it fresh.
  */
 export async function staleBuilds(roots: readonly PackageRoots[]): Promise<StaleBuild[]> {
   const seeds = new Map<string, Project>();
@@ -205,11 +214,27 @@ export async function staleBuilds(roots: readonly PackageRoots[]): Promise<Stale
       TSC,
       "--build",
       "--dry",
+      "--locale",
+      "en",
       ...built.map((project) => project.configPath),
     ]);
     const wouldBuild = new Set(
       [...stdout.matchAll(WOULD_BUILD)].map((match) => path.resolve(match[1])),
     );
+    const upToDate = new Set(
+      [...stdout.matchAll(UP_TO_DATE)].map((match) => path.resolve(match[1] ?? match[2])),
+    );
+    const unaccounted = built.filter((project) => {
+      const configPath = path.resolve(project.configPath);
+      return !wouldBuild.has(configPath) && !upToDate.has(configPath);
+    });
+    if (unaccounted.length > 0) {
+      throw new Error(
+        `tsc --build --dry gave no verdict for ${unaccounted
+          .map((project) => `packages/${project.dir}`)
+          .join(", ")}; refusing to report them fresh.\n${stdout}`,
+      );
+    }
     for (const project of built) {
       if (wouldBuild.has(path.resolve(project.configPath))) {
         stale.push({ dir: project.dir, status: OUT_OF_DATE });
