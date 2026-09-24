@@ -27,13 +27,13 @@ function toJSON(
 export const ToJsonWithActiveSupportEncoder = { toJSON };
 
 export class Module {
-  static asJson(value: { name: string }): string {
+  static asJson(value: { name: string }, options: EncodeOptions | null = null): string {
     return value.name;
   }
 }
 
 export class Object {
-  static asJson(value: object, options?: EncodeOptions | null): unknown {
+  static asJson(value: object, options: EncodeOptions | null = null): unknown {
     if (typeof (value as { toHash?: unknown }).toHash === "function") {
       return Hash.asJson((value as { toHash(): unknown }).toHash(), options);
     }
@@ -42,13 +42,13 @@ export class Object {
 }
 
 export class TrueClass {
-  static asJson(value: boolean): boolean {
+  static asJson(value: boolean, options: EncodeOptions | null = null): boolean {
     return value;
   }
 }
 
 export class NilClass {
-  static asJson(_value: null | undefined): null {
+  static asJson(_value: null | undefined, options: EncodeOptions | null = null): null {
     return null;
   }
 }
@@ -60,37 +60,37 @@ export class String {
 }
 
 export class Numeric {
-  static asJson(value: number | bigint): number | string {
+  static asJson(value: number | bigint, options: EncodeOptions | null = null): number | string {
     return typeof value === "bigint" ? value.toString() : value;
   }
 }
 
 export class Float {
-  static asJson(value: number): number | null {
+  static asJson(value: number, options: EncodeOptions | null = null): number | null {
     return globalThis.Number.isFinite(value) ? value : null;
   }
 }
 
 export class BigDecimal {
-  static asJson(value: BigDecimalValue): string {
+  static asJson(value: BigDecimalValue, options: EncodeOptions | null = null): string {
     return value.toString();
   }
 }
 
 export class Regexp {
-  static asJson(value: RegExp): string {
+  static asJson(value: RegExp, options: EncodeOptions | null = null): string {
     return globalThis.String(value);
   }
 }
 
 export class Enumerable {
-  static asJson(value: Iterable<unknown>, options?: EncodeOptions | null): unknown[] | null {
+  static asJson(value: Iterable<unknown>, options: EncodeOptions | null = null): unknown[] | null {
     return Array.asJson([...value], options);
   }
 }
 
 export class Range {
-  static asJson(value: RangeValue<unknown>): string {
+  static asJson(value: RangeValue<unknown>, options: EncodeOptions | null = null): string {
     return value.toS();
   }
 }
@@ -124,7 +124,7 @@ const inProgress = new WeakSet<object>();
 let memo = new WeakMap<object, unknown>();
 
 export class Array {
-  static asJson(value: unknown[], options?: EncodeOptions | null): unknown[] | null {
+  static asJson(value: unknown[], options: EncodeOptions | null = null): unknown[] | null {
     const frame = enterCycle(value);
     if (frame === null) return null;
     const result = frame.claim<unknown[]>([]);
@@ -138,7 +138,10 @@ export class Array {
 }
 
 export class Hash {
-  static asJson(value: unknown, options?: EncodeOptions | null): Record<string, unknown> | null {
+  static asJson(
+    value: unknown,
+    options: EncodeOptions | null = null,
+  ): Record<string, unknown> | null {
     const entries =
       value instanceof Map
         ? [...value.entries()]
@@ -180,7 +183,10 @@ export class Hash {
 }
 
 export class Time {
-  static asJson(value: RubyTime | Temporal.Instant | Temporal.ZonedDateTime): string {
+  static asJson(
+    value: RubyTime | Temporal.Instant | Temporal.ZonedDateTime,
+    options: EncodeOptions | null = null,
+  ): string {
     const digits =
       Encoding.timePrecision as Temporal.ToStringPrecisionOptions["fractionalSecondDigits"];
 
@@ -205,7 +211,7 @@ export class Time {
 }
 
 export class Date {
-  static asJson(value: Temporal.PlainDate): string {
+  static asJson(value: Temporal.PlainDate, options: EncodeOptions | null = null): string {
     if (Encoding.useStandardJsonTimeFormat) {
       return value.toString();
     } else {
@@ -215,7 +221,7 @@ export class Date {
 }
 
 export class DateTime {
-  static asJson(value: Temporal.PlainDateTime): string {
+  static asJson(value: Temporal.PlainDateTime, options: EncodeOptions | null = null): string {
     const digits =
       Encoding.timePrecision as Temporal.ToStringPrecisionOptions["fractionalSecondDigits"];
 
@@ -228,13 +234,13 @@ export class DateTime {
 }
 
 export class Generic {
-  static asJson(value: URL): string {
+  static asJson(value: URL, options: EncodeOptions | null = null): string {
     return value.toString();
   }
 }
 
 export class Exception {
-  static asJson(value: Error): string {
+  static asJson(value: Error, options: EncodeOptions | null = null): string {
     return value.message;
   }
 }
@@ -259,33 +265,33 @@ export function isPlainObject(value: object): boolean {
   return proto === globalThis.Object.prototype || proto === null;
 }
 
-export function asJson(value: unknown, options?: EncodeOptions | null): unknown {
-  if (value == null) return NilClass.asJson(value);
-  if (typeof value === "boolean") return TrueClass.asJson(value);
-  if (typeof value === "string") return String.asJson(value);
-  if (typeof value === "number") return Float.asJson(value);
-  if (typeof value === "bigint") return Numeric.asJson(value);
+export function asJson(value: unknown, options: EncodeOptions | null = null): unknown {
+  if (value == null) return NilClass.asJson(value, options);
+  if (typeof value === "boolean") return TrueClass.asJson(value, options);
+  if (typeof value === "string") return String.asJson(value, options);
+  if (typeof value === "number") return Float.asJson(value, options);
+  if (typeof value === "bigint") return Numeric.asJson(value, options);
 
   const own = (value as { asJson?: (o?: unknown) => unknown }).asJson;
   if (typeof own === "function") return own.call(value, options ?? undefined);
 
-  if (typeof value === "function") return Module.asJson(value as { name: string });
+  if (typeof value === "function") return Module.asJson(value as { name: string }, options);
 
   if (
     value instanceof RubyTime ||
     value instanceof Temporal.Instant ||
     value instanceof Temporal.ZonedDateTime
   ) {
-    return Time.asJson(value);
+    return Time.asJson(value, options);
   }
-  if (value instanceof Temporal.PlainDate) return Date.asJson(value);
-  if (value instanceof Temporal.PlainDateTime) return DateTime.asJson(value);
-  if (value instanceof BigDecimalValue) return BigDecimal.asJson(value);
-  if (value instanceof RegExp) return Regexp.asJson(value);
-  if (value instanceof Error) return Exception.asJson(value);
-  if (value instanceof URL) return Generic.asJson(value);
+  if (value instanceof Temporal.PlainDate) return Date.asJson(value, options);
+  if (value instanceof Temporal.PlainDateTime) return DateTime.asJson(value, options);
+  if (value instanceof BigDecimalValue) return BigDecimal.asJson(value, options);
+  if (value instanceof RegExp) return Regexp.asJson(value, options);
+  if (value instanceof Error) return Exception.asJson(value, options);
+  if (value instanceof URL) return Generic.asJson(value, options);
   if (globalThis.Array.isArray(value)) return Array.asJson(value, options);
-  if (value instanceof RangeValue) return Range.asJson(value);
+  if (value instanceof RangeValue) return Range.asJson(value, options);
   if (value instanceof Map || isPlainObject(value as object)) return Hash.asJson(value, options);
   if (
     typeof (value as { [globalThis.Symbol.iterator]?: unknown })[globalThis.Symbol.iterator] ===
