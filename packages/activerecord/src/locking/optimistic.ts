@@ -4,10 +4,7 @@ import type { Base } from "../base.js";
 import { StaleObjectError } from "../errors.js";
 import { ValueType } from "@blazetrails/activemodel";
 import { isWillSaveChangeToAttribute } from "../attribute-methods/dirty.js";
-import {
-  incrementBang as persistenceIncrementBang,
-  _updateRecord as persistenceUpdateRecord,
-} from "../persistence.js";
+import { incrementBang as persistenceIncrementBang } from "../persistence.js";
 import { attributesWithValues } from "../attribute-methods.js";
 import type { CounterCacheCounters } from "../counter-cache.js";
 
@@ -186,8 +183,7 @@ export async function _updateRow(
   this.writeAttribute(col, (Number(this.readAttribute(col)) || 0) + 1);
 
   try {
-    const affectedRows = await persistenceUpdateRecord.call(
-      ctor as any,
+    const affectedRows = await (ctor as any)._updateRecord(
       attributesWithValues.call(this as any, attributeNames),
       updateConstraints,
     );
