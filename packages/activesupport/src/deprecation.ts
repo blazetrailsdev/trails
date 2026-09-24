@@ -6,7 +6,7 @@ import { underscore } from "./inflector.js";
 import { Logger } from "./logger.js";
 import { Notifications } from "./notifications.js";
 import { stderr } from "@blazetrails/ruby-compat";
-import { trailsLogger } from "./trails-logger-slot.js";
+import { TopLevel } from "./namespaces.js";
 import { ThreadLocalVar } from "./thread-local-var.js";
 
 export type DeprecationBehavior = "raise" | "stderr" | "log" | "silence" | "notify" | "report";
@@ -38,7 +38,7 @@ export const DEFAULT_BEHAVIORS: Readonly<Record<DeprecationBehavior, Deprecation
     },
 
     log: (message, callstack, deprecator) => {
-      const logger = trailsLogger ?? new Logger(stderr);
+      const logger = TopLevel.Trails?.logger ?? new Logger(stderr);
       logger.warn(message);
       if (deprecator.debug) logger.debug(callstack.join("\n  "));
     },

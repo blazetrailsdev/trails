@@ -94,7 +94,7 @@ export class Scheme {
   }
 
   isSupportUnencryptedData(): boolean {
-    return this._supportUnencryptedData ?? Encryption.Configurable.config.supportUnencryptedData;
+    return this._supportUnencryptedData ?? Encryption.config.supportUnencryptedData;
   }
 
   isFixed(): boolean {
@@ -146,13 +146,13 @@ export class Scheme {
 
   /** @internal */
   private defaultKeyProvider(): unknown {
-    return Encryption.Configurable.keyProvider;
+    return Encryption.keyProvider;
   }
 
   /** @internal */
   private deterministicKeyProvider(): DeterministicKeyProvider | undefined {
     if (this.isDeterministic()) {
-      const deterministicKey = Encryption.Configurable.config.deterministicKey;
+      const deterministicKey = Encryption.config.deterministicKey;
       this._cachedDeterministicKeyProvider ??= new DeterministicKeyProvider(deterministicKey);
       return this._cachedDeterministicKeyProvider;
     }

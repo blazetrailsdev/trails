@@ -1,6 +1,5 @@
-import { extractOptionsBang, isPlainObject } from "@blazetrails/activesupport";
+import { TopLevel, extractOptionsBang, isPlainObject } from "@blazetrails/activesupport";
 import { isSymbol, symbolToS } from "@blazetrails/ruby-compat";
-import { _UrlFor, type ParametersLike } from "./routing-url-for-slot.js";
 
 export interface RoutingUrlForHost {
   controller: unknown;
@@ -11,21 +10,31 @@ export type UrlForOptions = string | null | undefined | object | ReadonlyArray<u
 
 type Host = RoutingUrlFor & RoutingUrlForHost;
 
-export class RoutingUrlFor {
+type Parameters = InstanceType<NonNullable<typeof TopLevel.ActionController>["Parameters"]>;
+
+interface UrlFor {
+  urlFor(options?: unknown): string;
+  urlOptions(): Record<string, unknown>;
+  optimizeRoutesGeneration(): boolean;
+  polymorphicPath(record: unknown, options: Record<string, unknown>): string;
+  polymorphicUrl(record: unknown, options: Record<string, unknown>): string;
+}
+
+export class RoutingUrlFor extends (Object as unknown as new () => UrlFor) {
   urlFor(this: Host, options: UrlForOptions = null): string {
     if (typeof options === "string" && !isSymbol(options)) {
       return options;
     } else if (options == null) {
-      return _UrlFor!.urlFor.call(this, { onlyPath: this._generatePathsByDefault() });
+      return super.urlFor({ onlyPath: this._generatePathsByDefault() });
     } else if (isPlainObject(options)) {
       const hash = { ...(options as Record<string, unknown>) };
       this.ensureOnlyPathOption(hash);
 
-      return _UrlFor!.urlFor.call(this, hash);
-    } else if (_UrlFor!.isParameters(options)) {
+      return super.urlFor(hash);
+    } else if (options instanceof TopLevel.ActionController!.Parameters) {
       this.ensureOnlyPathOption(options);
 
-      return _UrlFor!.urlFor.call(this, options);
+      return super.urlFor(options);
     } else if (options === ":back") {
       return this._backUrl();
     } else if (Array.isArray(options)) {
@@ -34,13 +43,14 @@ export class RoutingUrlFor {
       this.ensureOnlyPathOption(opts);
 
       if (opts["onlyPath"] != null && opts["onlyPath"] !== false) {
-        return _UrlFor!.polymorphicPath.call(this, components, opts);
+        return this.polymorphicPath(components, opts);
       } else {
-        return _UrlFor!.polymorphicUrl.call(this, components, opts);
+        return this.polymorphicUrl(components, opts);
       }
     } else {
       const method = this._generatePathsByDefault() ? "path" : "url";
-      const builder = _UrlFor!.helperMethodBuilder[method]();
+      const builder =
+        TopLevel.ActionDispatch!.Routing.PolymorphicRoutes.HelperMethodBuilder[method]();
 
       if (isSymbol(options)) {
         return builder.handleStringCall(this, symbolToS(options));
@@ -55,7 +65,7 @@ export class RoutingUrlFor {
   /** @internal */
   urlOptions(this: Host): Record<string, unknown> {
     const controller = this.controller as { urlOptions?: () => Record<string, unknown> } | null;
-    if (typeof controller?.urlOptions !== "function") return _UrlFor!.urlOptions.call(this);
+    if (typeof controller?.urlOptions !== "function") return super.urlOptions();
     return controller.urlOptions();
   }
 
@@ -69,7 +79,7 @@ export class RoutingUrlFor {
     const controller = this.controller as { optimizeRoutesGeneration?: () => boolean } | null;
     return typeof controller?.optimizeRoutesGeneration === "function"
       ? controller.optimizeRoutesGeneration()
-      : _UrlFor!.optimizeRoutesGeneration.call(this);
+      : super.optimizeRoutesGeneration();
   }
 
   /** @internal */
@@ -78,8 +88,8 @@ export class RoutingUrlFor {
   }
 
   /** @internal */
-  ensureOnlyPathOption(this: Host, options: Record<string, unknown> | ParametersLike): void {
-    const params = _UrlFor!.isParameters(options) ? options : null;
+  ensureOnlyPathOption(this: Host, options: Record<string, unknown> | Parameters): void {
+    const params = options instanceof TopLevel.ActionController!.Parameters ? options : null;
     const hash = params ? null : (options as Record<string, unknown>);
     if (
       !(params

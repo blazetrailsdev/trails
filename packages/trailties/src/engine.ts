@@ -5,6 +5,7 @@ import {
   include,
   Notifications,
   onLoad,
+  TopLevel,
   type Extended,
   type Included,
 } from "@blazetrails/activesupport";
@@ -17,7 +18,6 @@ import { Trailties } from "./engine/trailties.js";
 import { EngineConfiguration } from "./engine/configuration.js";
 import type { MiddlewareStackProxy } from "./configuration.js";
 import { LazyRouteSet } from "./engine/lazy-route-set.js";
-import { _Trails } from "./trails-slot.js";
 import { readOwnState, writeOwnState } from "./trailtie/per-class-state.js";
 
 export class Engine extends Trailtie {
@@ -211,7 +211,7 @@ Engine.initializer(
 );
 
 Engine.initializer("make_routes_lazy", { before: "bootstrap_hook" }, function (this: Engine) {
-  if (_Trails!.env["local?"]()) this.config.routeSetClass = LazyRouteSet;
+  if (TopLevel.Trails!.env["local?"]()) this.config.routeSetClass = LazyRouteSet;
 });
 
 Engine.initializer("add_routing_paths", async function (this: Engine, ...args: unknown[]) {

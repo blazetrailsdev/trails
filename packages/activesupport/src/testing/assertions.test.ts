@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { _setTrailsLogger } from "../trails-logger-slot.js";
+import { TopLevel } from "../namespaces.js";
 import {
   assertChanges,
   assertDifference,
@@ -61,11 +61,9 @@ describe("AssertionsTest", () => {
 
   it("assert difference warns through the tagged logger and re-raises", async () => {
     const warnings: unknown[] = [];
-    _setTrailsLogger({
-      warn: (msg: unknown) => warnings.push(msg),
-      debug: () => {},
-      "warn?": true,
-    } as never);
+    TopLevel.Trails = {
+      logger: { warn: (msg: unknown) => warnings.push(msg), debug: () => {}, "warn?": true },
+    } as never;
     try {
       let counter = 0;
       const error = await assertDifference(
@@ -86,7 +84,7 @@ describe("AssertionsTest", () => {
           "Other block based assertions (e.g. `assert_difference`) can be used, as long as `assert_raises` is inside their block.\n",
       );
     } finally {
-      _setTrailsLogger(null);
+      delete TopLevel.Trails;
     }
   });
 

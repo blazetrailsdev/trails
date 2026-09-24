@@ -3,7 +3,7 @@ import { Base } from "./base.js";
 import { ShardSelector } from "./middleware/shard-selector.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { ambientPoolConfiguration } from "./test-adapter.js";
-import { _setActionDispatchRequest } from "@blazetrails/activesupport";
+import { TopLevel } from "@blazetrails/activesupport";
 
 class TestRequest {
   readonly method: string;
@@ -11,7 +11,7 @@ class TestRequest {
     this.method = env["REQUEST_METHOD"] as string;
   }
 }
-_setActionDispatchRequest(TestRequest);
+TopLevel.ActionDispatch = { Request: TestRequest } as never;
 
 describe("ShardSelectorTest", () => {
   afterEach(async () => {

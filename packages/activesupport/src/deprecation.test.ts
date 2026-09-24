@@ -21,7 +21,8 @@ import { ArgumentError } from "./hash-utils.js";
 import { registerConstant } from "./inflector.js";
 import { Logger } from "./logger.js";
 import { Notifications } from "./notifications.js";
-import { _setTrailsLogger } from "./trails-logger-slot.js";
+import { TopLevel } from "./namespaces.js";
+import { stubConst } from "./testing/constant-stubbing.js";
 import {
   Assertion,
   assert,
@@ -111,12 +112,7 @@ function capture(_stream: ":stderr", block: () => void): string {
 }
 
 function withTrailsLogger<T>(logger: Logger | null, block: (logger: Logger | null) => T): T {
-  _setTrailsLogger(logger);
-  try {
-    return block(logger);
-  } finally {
-    _setTrailsLogger(null);
-  }
+  return stubConst(TopLevel, "Trails", { logger }, () => block(logger), { exists: false });
 }
 
 function callDeprecatedMethodWarning(

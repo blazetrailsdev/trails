@@ -7,10 +7,6 @@ import {
   Request as RackRequest,
   RequestHelpers,
 } from "@blazetrails/rack";
-import {
-  _setActionDispatchRequest,
-  type ActionDispatchRequestConstructor,
-} from "@blazetrails/activesupport";
 import { BadRequest, UnknownHttpMethod } from "../../action-controller/metal/exceptions.js";
 import { ParamBuilder } from "./param-builder.js";
 import { ParamError } from "./param-error.js";
@@ -1057,7 +1053,5 @@ Request.prototype.formatFromPathExtension = function (this: Request) {
 Request.prototype.isParamsReadable = function (this: Request) {
   return _paramsReadable.call(mimeHost(this));
 };
-
-_setActionDispatchRequest(Request as unknown as ActionDispatchRequestConstructor);
 
 ActionDispatch.Request = Request;

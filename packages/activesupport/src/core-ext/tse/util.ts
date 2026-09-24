@@ -1,6 +1,5 @@
 import { SafeBuffer, htmlSafe } from "../string/output-safety.js";
-import { NotImplementedError } from "../../cache/store.js";
-import { isEmpty } from "@blazetrails/ruby-compat";
+import { NotImplementedError, isEmpty } from "@blazetrails/ruby-compat";
 import { Unicode } from "../../multibyte/unicode.js";
 
 const HTML_ESCAPE: Record<string, string> = {

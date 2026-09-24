@@ -1,3 +1,4 @@
+import { extend } from "@blazetrails/activesupport";
 import { Config } from "./config.js";
 import { Encryption } from "../namespaces.js";
 import { Context } from "./context.js";
@@ -111,6 +112,7 @@ export class Configurable {
 }
 
 Encryption.Configurable = Configurable;
+extend(Encryption, Configurable);
 
 /** @internal */
 type DelegatedProperty = (typeof Context.PROPERTIES)[number];

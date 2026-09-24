@@ -1,11 +1,10 @@
 import { include, onLoad, type Deprecators } from "@blazetrails/activesupport";
-import { HelperMethodBuilder, Parameters, UrlFor } from "@blazetrails/actionpack";
+import { UrlFor } from "@blazetrails/actionpack";
+import { Module } from "@blazetrails/ruby-compat";
 import {
   Base,
   deprecator,
   RoutingUrlFor,
-  _setUrlFor,
-  type UrlForImplementation,
   setApplyStylesheetMediaDefault,
   setPreloadLinksHeader,
 } from "@blazetrails/actionview";
@@ -60,12 +59,10 @@ export class Trailtie extends BaseTrailtie {
 
     this.initializer("action_view.setup_action_pack", () => {
       onLoad("action_controller", () => {
-        include(RoutingUrlFor as unknown as new (...args: never[]) => unknown, UrlFor);
-        _setUrlFor({
-          ...UrlFor,
-          isParameters: (value: unknown) => value instanceof Parameters,
-          helperMethodBuilder: HelperMethodBuilder,
-        } as unknown as UrlForImplementation);
+        include(
+          RoutingUrlFor as unknown as new (...args: never[]) => unknown,
+          new Module((mod) => mod.include(UrlFor)),
+        );
       });
     });
 

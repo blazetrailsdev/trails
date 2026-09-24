@@ -1,6 +1,8 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { ModelName } from "@blazetrails/activemodel";
 
+import { Routing } from "../../namespaces.js";
+import * as PolymorphicRoutes from "./polymorphic-routes.js";
 import { RoutesProxy } from "./routes-proxy.js";
 
 export interface ToModel {
@@ -367,3 +369,5 @@ export class HelperMethodBuilder {
     return `${this.prefix}${str}_${this.suffix}`;
   }
 }
+
+Routing.PolymorphicRoutes = PolymorphicRoutes;

@@ -2,11 +2,7 @@ import "./trailties/active-support.js";
 import "./trailties/action-dispatch.js";
 import { EnvironmentInquirer } from "@blazetrails/activesupport";
 import { getEnv } from "@blazetrails/activesupport";
-import {
-  trailsLogger,
-  _setTrailsLogger,
-  _setTrails as _setTrailsConst,
-} from "@blazetrails/activesupport";
+import { TopLevel } from "@blazetrails/activesupport";
 import type { CacheStore, Logger } from "@blazetrails/activesupport";
 import { Application } from "./application.js";
 import { BacktraceCleaner } from "./backtrace-cleaner.js";
@@ -14,7 +10,6 @@ import type { Configuration } from "./application/configuration.js";
 import { resolveEnv } from "./database.js";
 import type { InitializerGroup } from "./initializable.js";
 import { VERSION } from "./version.js";
-import { _setTrails } from "./trails-slot.js";
 
 let _application: Application | null = null;
 let _cache: CacheStore | null = null;
@@ -44,12 +39,7 @@ export class Trails {
     _cache = value;
   }
 
-  static get logger(): Logger | null {
-    return trailsLogger as Logger | null;
-  }
-  static set logger(value: Logger | null) {
-    _setTrailsLogger(value);
-  }
+  static logger: Logger | null = null;
 
   static get version(): string {
     return VERSION;
@@ -127,5 +117,4 @@ export function _resetTrailsEnv(): void {
   _backtraceCleaner = undefined;
 }
 
-_setTrails(Trails);
-_setTrailsConst(Trails as unknown as { env: { "development?"(): boolean } });
+TopLevel.Trails = Trails;

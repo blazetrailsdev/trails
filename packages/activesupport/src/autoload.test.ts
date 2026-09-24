@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Autoload } from "./dependencies/autoload.js";
+import { assertNothingRaised } from "./testing/assertions.js";
 import type {
   Fixtures as FixturesType,
   LOADED_FEATURES as LoadedFeaturesType,
@@ -26,7 +27,7 @@ describe("TestAutoloadModule", () => {
   it("the autoload module works like normal autoload", async () => {
     Fixtures.Autoload.autoload("SomeClass", "fixtures/autoload/some_class");
 
-    await expect(constGet(Fixtures.Autoload, "SomeClass")).resolves.not.toThrow();
+    await assertNothingRaised(() => constGet(Fixtures.Autoload, "SomeClass"));
   });
 
   it("when specifying an :eager constant it still works like normal autoload by default", async () => {
@@ -35,14 +36,14 @@ describe("TestAutoloadModule", () => {
     });
 
     expect(LOADED_FEATURES).not.toContain(someClassPath);
-    await expect(constGet(Fixtures.Autoload, "SomeClass")).resolves.not.toThrow();
+    await assertNothingRaised(() => constGet(Fixtures.Autoload, "SomeClass"));
   });
 
   it("the location of autoloaded constants defaults to :name.underscore", async () => {
     Fixtures.Autoload.autoload("SomeClass");
 
     expect(LOADED_FEATURES).not.toContain(someClassPath);
-    await expect(constGet(Fixtures.Autoload, "SomeClass")).resolves.not.toThrow();
+    await assertNothingRaised(() => constGet(Fixtures.Autoload, "SomeClass"));
   });
 
   it("the location of :eager autoloaded constants defaults to :name.underscore", async () => {
@@ -53,7 +54,7 @@ describe("TestAutoloadModule", () => {
     expect(LOADED_FEATURES).not.toContain(someClassPath);
     await Fixtures.Autoload.eagerLoadBang();
     expect(LOADED_FEATURES).toContain(someClassPath);
-    await expect(constGet(Fixtures.Autoload, "SomeClass")).resolves.not.toThrow();
+    await assertNothingRaised(() => constGet(Fixtures.Autoload, "SomeClass"));
   });
 
   it("a directory for a block of autoloads can be specified", async () => {
@@ -62,7 +63,7 @@ describe("TestAutoloadModule", () => {
     });
 
     expect(LOADED_FEATURES).not.toContain(anotherClassPath);
-    await expect(constGet(Fixtures, "AnotherClass")).resolves.not.toThrow();
+    await assertNothingRaised(() => constGet(Fixtures, "AnotherClass"));
   });
 
   it("a path for a block of autoloads can be specified", async () => {
@@ -71,6 +72,6 @@ describe("TestAutoloadModule", () => {
     });
 
     expect(LOADED_FEATURES).not.toContain(anotherClassPath);
-    await expect(constGet(Fixtures, "AnotherClass")).resolves.not.toThrow();
+    await assertNothingRaised(() => constGet(Fixtures, "AnotherClass"));
   });
 });

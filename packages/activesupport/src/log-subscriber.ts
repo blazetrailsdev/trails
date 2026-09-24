@@ -1,8 +1,9 @@
 import { Subscriber, getClassState } from "./subscriber.js";
 import type { Event } from "./notifications/instrumenter.js";
 import type { Logger } from "./logger.js";
-import { trailsLogger } from "./trails-logger-slot.js";
+import { TopLevel } from "./namespaces.js";
 import { transformKeys } from "./hash-utils.js";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { publicInstanceMethods } from "@blazetrails/ruby-compat/include";
 
 export class LogSubscriber extends Subscriber {
@@ -49,7 +50,10 @@ export class LogSubscriber extends Subscriber {
   private static _logger: Logger | null = null;
 
   static get logger(): Logger | null {
-    return (this._logger ??= trailsLogger as Logger | null);
+    return (this._logger ??=
+      TopLevel.Trails !== undefined && rbObjRespondTo(TopLevel.Trails, "logger")
+        ? TopLevel.Trails.logger
+        : null);
   }
 
   static set logger(value: Logger | null) {

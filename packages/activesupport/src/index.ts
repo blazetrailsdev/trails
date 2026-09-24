@@ -436,8 +436,7 @@ export { HtmlSafeTranslation } from "./html-safe-translation.js";
 export { BacktraceCleaner } from "./backtrace-cleaner.js";
 export { OrderedHash } from "./ordered-hash.js";
 export { ErrorReporter } from "./error-reporter.js";
-export { trailsLogger, _setTrailsLogger } from "./trails-logger-slot.js";
-export { trails, _setTrails } from "./trails-slot.js";
+export { TopLevel } from "./namespaces.js";
 export type {
   ErrorSeverity,
   ErrorContext,
@@ -611,11 +610,6 @@ export { NumberToPercentageConverter } from "./number-helper/number-to-percentag
 export { NumberToHumanConverter } from "./number-helper/number-to-human-converter.js";
 export { NumberToHumanSizeConverter } from "./number-helper/number-to-human-size-converter.js";
 export { RoundingHelper } from "./number-helper/rounding-helper.js";
-export {
-  _ActionDispatchRequest,
-  _setActionDispatchRequest,
-  type ActionDispatchRequestConstructor,
-} from "./action-dispatch-request-slot.js";
 export { Multibyte } from "./multibyte.js";
 export { Chars } from "./multibyte/chars.js";
 export { Unicode } from "./multibyte/unicode.js";

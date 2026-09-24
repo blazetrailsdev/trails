@@ -61,6 +61,7 @@ export {
 export { CollectionProxy } from "./associations/collection-proxy.js";
 export type { AssociationProxy } from "./associations/collection-proxy.js";
 export { AssociationRelation } from "./association-relation.js";
+export { DisableJoinsAssociationRelation } from "./disable-joins-association-relation.js";
 export type { AssociationOptions } from "./associations.js";
 export { Transaction } from "./transaction.js";
 export { LogSubscriber } from "./log-subscriber.js";

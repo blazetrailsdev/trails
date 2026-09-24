@@ -1,4 +1,4 @@
-import { trailsLogger } from "../trails-logger-slot.js";
+import { TopLevel } from "../namespaces.js";
 
 type TaggedLogger = {
   warn(msg: unknown): void;
@@ -26,7 +26,7 @@ export function beforeSetup(): void {
 
 /** @internal */
 export function taggedLogger(): TaggedLogger | null {
-  return taggedLoggerValue ?? trailsLogger;
+  return taggedLoggerValue ?? TopLevel.Trails?.logger ?? null;
 }
 
 /** @internal */

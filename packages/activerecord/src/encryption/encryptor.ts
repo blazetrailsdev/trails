@@ -65,7 +65,7 @@ export class Encryptor {
 
   constructor(options?: { compress?: boolean; compressor?: Compressor }) {
     this._compress = options?.compress ?? true;
-    this._compressor = options?.compressor ?? Encryption.Configurable.config.compressor;
+    this._compressor = options?.compressor ?? Encryption.config.compressor;
   }
 
   encrypt(
@@ -151,7 +151,7 @@ export class Encryptor {
 
   /** @internal */
   private cipher() {
-    return Encryption.Configurable.cipher;
+    return Encryption.cipher;
   }
 
   get compressor(): Compressor {
@@ -164,7 +164,7 @@ export class Encryptor {
 
   /** @internal */
   private defaultKeyProvider(): KeyProviderLike | undefined {
-    return Encryption.Configurable.keyProvider as KeyProviderLike | undefined;
+    return Encryption.keyProvider as KeyProviderLike | undefined;
   }
 
   /** @internal */
@@ -195,7 +195,7 @@ export class Encryptor {
 
   /** @internal */
   private serializer(): MessageSerializerLike {
-    return Encryption.Configurable.messageSerializer as MessageSerializerLike;
+    return Encryption.messageSerializer as MessageSerializerLike;
   }
 
   /** @internal */
@@ -260,6 +260,6 @@ export class Encryptor {
 
   /** @internal */
   private forcedEncodingForDeterministicEncryption(): string {
-    return Encryption.Configurable.config.forcedEncodingForDeterministicEncryption;
+    return Encryption.config.forcedEncodingForDeterministicEncryption;
   }
 }

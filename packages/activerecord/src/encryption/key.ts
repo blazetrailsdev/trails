@@ -18,7 +18,7 @@ export class Key {
   }
 
   static deriveFrom(password: string): Key {
-    const secret = (Encryption.Configurable.keyGenerator as KeyGenerator).deriveKeyFrom(password);
+    const secret = (Encryption.keyGenerator as KeyGenerator).deriveKeyFrom(password);
     return new Key(secret);
   }
 }
