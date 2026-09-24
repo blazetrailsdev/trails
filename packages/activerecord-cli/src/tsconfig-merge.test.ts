@@ -51,6 +51,18 @@ describe("mergeTsconfig", () => {
     expect(cfg.compilerOptions["target"]).toBe("ES2022");
   });
 
+  it("rejects a tsconfig with a recoverable syntax error (missing comma)", () => {
+    const broken = `{
+  "compilerOptions": {
+    "outDir": "dist"
+    "strict": true
+  }
+}`;
+    expect(() => mergeTsconfig(broken)).toThrow(
+      new SyntaxError("tsconfig.json parse error: ',' expected."),
+    );
+  });
+
   it("appends missing include globs and leaves existing ones alone", () => {
     const existing =
       JSON.stringify({ compilerOptions: {}, include: ["./**/*.ts"] }, null, 2) + "\n";
