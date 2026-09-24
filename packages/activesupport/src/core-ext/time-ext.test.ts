@@ -1258,8 +1258,7 @@ describe("TimeExtCalculationsTest", () => {
     expect(result.epochMilliseconds).toBe(t.getTime());
   });
 
-  it.skip("advance gregorian proleptic", () => {
-    // BLOCKED: activesupport-time-advance-gregorian-proleptic
+  it("advance gregorian proleptic", () => {
     expect(RubyTime.local(1582, 10, 15, 15, 15, 10).advance({ days: -1 })).toEqual(
       RubyTime.local(1582, 10, 14, 15, 15, 10),
     );
@@ -1827,8 +1826,7 @@ describe("TimeExtCalculationsTest", () => {
     );
   });
 
-  it.skip("at with in option", () => {
-    // BLOCKED: activesupport-time-at-in-option-and-case-equality
+  it("at with in option", () => {
     expect((RubyTime.at as any)(31337, { in: -28800 })).toEqual(
       RubyTime.new(1970, 1, 1, 0, 42, 17, "-08:00"),
     );
@@ -1911,8 +1909,7 @@ describe("TimeExtCalculationsTest", () => {
     });
   });
 
-  it.skip("case equality", () => {
-    // BLOCKED: activesupport-time-at-in-option-and-case-equality
+  it("case equality", () => {
     class Sub extends RubyTime {}
     const utcZone = TimeZone.find("UTC")!;
     expect(RubyTime.utc(2000) instanceof RubyTime).toBeTruthy();

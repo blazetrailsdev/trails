@@ -173,6 +173,9 @@ function changeNsec<T extends NsecBearing>(value: T, newNsec: bigint): T {
   if (value instanceof Time || value instanceof TimeWithZone) {
     return value.change({ nsec: Number(newNsec) }) as T;
   }
+  if (value instanceof Time) {
+    return timeChange(value, { nsec: Number(newNsec) }) as T;
+  }
   if (value instanceof Temporal.Instant) {
     return Temporal.Instant.fromEpochNanoseconds(
       value.epochNanoseconds - nsec(value) + newNsec,

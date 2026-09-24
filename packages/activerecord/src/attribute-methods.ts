@@ -560,10 +560,10 @@ export function formatForInspect(this: InstanceMethodHost, name: string, value: 
       inspectedValue = inspect(`${value.substring(0, 50)}...`);
     } else if (value instanceof Temporal.PlainDate) {
       inspectedValue = `"${dateToFs(value, "inspect")}"`;
-    } else if (value instanceof Temporal.Instant || value instanceof RubyTime) {
-      inspectedValue = `"${toFs(value, "inspect")}"`;
     } else if (value instanceof TimeWithZone) {
       inspectedValue = `"${value.toFs("inspect")}"`;
+    } else if (value instanceof Temporal.Instant || value instanceof RubyTime) {
+      inspectedValue = `"${toFs(value, "inspect")}"`;
       // boundary: legacy custom-typed attributes may still be JS Date.
     } else if (value instanceof Date) {
       inspectedValue = Number.isNaN(value.getTime())

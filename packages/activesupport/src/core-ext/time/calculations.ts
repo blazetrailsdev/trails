@@ -195,8 +195,15 @@ export function advance(this: RubyTime, options: AdvanceOptions): RubyTime {
     options.hours = (options.hours ?? 0) + 24 * partialDays;
   }
 
-  const d = dateAdvance(this.toDate(), options);
-  const timeAdvancedByDate = change.call(this, { year: d.year, month: d.month, day: d.day });
+  const d = dateAdvance(
+    new RubyDate(this.year, this.mon, this.day, RubyDate.GREGORIAN).gregorian(),
+    options,
+  );
+  const timeAdvancedByDate = change.call(this, {
+    year: Number(d.year),
+    month: d.month,
+    day: d.day,
+  });
   const secondsToAdvance =
     (options.seconds ?? 0) + (options.minutes ?? 0) * 60 + (options.hours ?? 0) * 3600;
 
@@ -461,6 +468,16 @@ Object.assign(RubyTime.prototype, {
 });
 
 Object.assign(RubyTime, { current, daysInMonth, daysInYear, rfc3339, atWithCoercion });
+
+Object.defineProperty(RubyTime, Symbol.hasInstance, {
+  value: function (this: typeof RubyTime, other: unknown): boolean {
+    return (
+      Function.prototype[Symbol.hasInstance].call(this, other) ||
+      (this === RubyTime && other instanceof TimeWithZone)
+    );
+  },
+  configurable: true,
+});
 
 RubyTime.at = atWithCoercion;
 

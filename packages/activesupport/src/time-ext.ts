@@ -11,7 +11,7 @@
 
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Rational } from "@blazetrails/ruby-compat";
-import { advance as timeAdvance, change as timeChange } from "./core-ext/time/calculations.js";
+import "./core-ext/time/calculations.js";
 import { instantFrom } from "./temporal.js";
 import { ArgumentError } from "./hash-utils.js";
 import { zone as timeZone } from "./time-zone-config.js";
@@ -200,7 +200,7 @@ export function advance(
   date: Date | RubyTime | Temporal.ZonedDateTime,
   options: AdvanceOptions,
 ): Temporal.Instant | RubyTime | Temporal.ZonedDateTime {
-  if (date instanceof RubyTime) return timeAdvance.call(date, options);
+  if (date instanceof RubyTime) return date.advance(options);
 
   options = { ...options };
 
@@ -297,7 +297,7 @@ export function change(
   date: Date | RubyTime | Temporal.ZonedDateTime,
   options: ChangeOptions,
 ): Temporal.Instant | RubyTime | Temporal.ZonedDateTime {
-  if (date instanceof RubyTime) return timeChange.call(date, options);
+  if (date instanceof RubyTime) return date.change(options);
 
   const self =
     date instanceof Date ? instantFrom(date).toZonedDateTimeISO(Temporal.Now.timeZoneId()) : date;
