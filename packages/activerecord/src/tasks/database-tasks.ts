@@ -23,20 +23,9 @@ import {
   RuntimeError,
 } from "@blazetrails/ruby-compat";
 import { NoMethodError } from "@blazetrails/activemodel";
-import { ActiveRecordError } from "../errors.js";
 import type { Base } from "../base.js";
 import { dumpSchemaAfterMigration, schemaFormat } from "../active-record.js";
-
-let _base: typeof Base | undefined;
-
-function setModuleBase(base: typeof Base): void {
-  _base = base;
-}
-
-function baseClass(): typeof Base {
-  if (!_base) throw new ActiveRecordError("ActiveRecord::Base has not finished loading");
-  return _base;
-}
+import { ActiveRecord } from "../namespaces.js";
 
 export class DatabaseNotSupported extends Error {
   /** @noRailsEquivalent PERMANENT */
@@ -417,14 +406,12 @@ export class DatabaseTasks {
   static configsFor(
     options: { envName?: string; name?: string; includeHidden?: boolean } = {},
   ): HashConfig[] | HashConfig | undefined {
-    return baseClass()
-      .configurations()
-      .configsFor(options as { name: string });
+    return ActiveRecord.Base.configurations().configsFor(options as { name: string });
   }
 
   /** @internal */
   private static resolveConfiguration(configuration: unknown): HashConfig {
-    return baseClass().configurations().resolve(configuration);
+    return ActiveRecord.Base.configurations().resolve(configuration);
   }
 
   /** @internal */
@@ -741,7 +728,9 @@ export class DatabaseTasks {
   }
 
   static async migrateAll(): Promise<void> {
-    const configs = baseClass().configurations().configsFor({ envName: this._normalizeEnv() });
+    const configs = ActiveRecord.Base.configurations().configsFor({
+      envName: this._normalizeEnv(),
+    });
 
     for (const dbConfig of configs) {
       await initializeDatabase(dbConfig);
@@ -873,12 +862,7 @@ export class DatabaseTasks {
   }
 
   static migrationClass(): typeof Base {
-    return baseClass();
-  }
-
-  /** @internal */
-  static _registerBase(base: typeof import("../base.js").Base): void {
-    setModuleBase(base);
+    return ActiveRecord.Base;
   }
 
   static migrationConnection(): Promise<
@@ -1018,7 +1002,7 @@ export function isVerbose(): boolean {
 
 /** @noRailsEquivalent CONVERGEABLE converge-adapter-schema-and-result-helper-surface-remainder */
 export function metadataTableNames(): Set<string> {
-  const base = baseClass();
+  const base = ActiveRecord.Base;
   const prefix = base.tableNamePrefix;
   const suffix = base.tableNameSuffix;
   return new Set([

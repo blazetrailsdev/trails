@@ -147,7 +147,6 @@ import {
 import type { TokenDefinitionsHash as _TokenDefinitionsHash } from "./token-for.js";
 import type { MessageVerifier as _MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { DescendantsTracker } from "@blazetrails/activesupport";
-import { DatabaseTasks } from "./tasks/database-tasks.js";
 import * as LockingOptimistic from "./locking/optimistic.js";
 import * as LockingPessimistic from "./locking/pessimistic.js";
 import {
@@ -3115,8 +3114,6 @@ type _ARBaseUnscopedWire =
   typeof Base extends Pick<Required<_LocatorModel>, "unscoped"> ? true : never;
 const _arBaseUnscopedWire: _ARBaseUnscopedWire = true;
 void _arBaseUnscopedWire;
-
-DatabaseTasks._registerBase(Base);
 
 runLoadHooks("active_record", Base);
 
