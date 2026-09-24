@@ -1885,16 +1885,19 @@ AND query LIKE '%${lockId}%'`;
   });
 
   describeIfSupports("bulk_alter", "RevertBulkAlterTableMigrationsTest", () => {
+    let connection: DatabaseAdapter;
+
+    beforeEach(async () => {
+      connection = await Person.leaseConnection();
+      Person.resetColumnInformation();
+      Person.resetSequenceName();
+    });
+
     afterEach(async () => {
-      await (await Base.leaseConnection())
-        .removeColumns("people", "column1", "column2")
-        .catch(() => {});
+      await connection.removeColumns("people", "column1", "column2").catch(() => {});
     });
 
     it("bulk revert", async () => {
-      const connection = await Base.leaseConnection();
-      Person.resetColumnInformation();
-      Person.resetSequenceName();
       await connection.addColumn("people", "column1", "string");
       await connection.addColumn("people", "column2", "string");
       await assertColumn(Person, "column1");

@@ -40,26 +40,24 @@ Associations.hasMany.call(Distinct, "values", { through: "groups" });
 
 fixtures({}, { useTransactionalTests: false });
 
-async function schema(): Promise<SchemaStatements> {
-  return (await Base.leaseConnection()) as unknown as SchemaStatements;
-}
+let connection: SchemaStatements;
 
 const RESERVED_TABLES = ["values", "group", "distinct_select", "distinct", "select", "order"];
 
 beforeEach(async () => {
-  const conn = await schema();
-  for (const t of RESERVED_TABLES) await conn.dropTable(t, { ifExists: true });
-  await conn.createTable("select", { force: true }, () => {});
-  await conn.createTable("distinct", { force: true }, () => {});
-  await conn.createTable("distinct_select", { id: false, force: true }, (t) => {
+  connection = (await Base.leaseConnection()) as unknown as SchemaStatements;
+  for (const t of RESERVED_TABLES) await connection.dropTable(t, { ifExists: true });
+  await connection.createTable("select", { force: true }, () => {});
+  await connection.createTable("distinct", { force: true }, () => {});
+  await connection.createTable("distinct_select", { id: false, force: true }, (t) => {
     t.references("distinct");
     t.references("select");
   });
-  await conn.createTable("group", { force: true }, (t) => {
+  await connection.createTable("group", { force: true }, (t) => {
     t.string("order");
     t.references("select");
   });
-  await conn.createTable("values", { primaryKey: "as", force: true }, (t) => {
+  await connection.createTable("values", { primaryKey: "as", force: true }, (t) => {
     t.references("group");
   });
   await Promise.all([
@@ -95,20 +93,19 @@ async function createTestFixtures(...names: (keyof typeof fixturesDirectory)[]):
 
 describe("ReservedWordTest", () => {
   it("create tables", async () => {
-    const conn = await schema();
-    expect(await conn.tableExists("order")).toBeFalsy();
-    await conn.createTable("order", { force: true }, (t) => {
+    expect(await connection.tableExists("order")).toBeFalsy();
+    await connection.createTable("order", { force: true }, (t) => {
       t.string("group");
     });
-    expect(await conn.tableExists("order")).toBeTruthy();
+    expect(await connection.tableExists("order")).toBeTruthy();
   });
 
   it("rename tables", async () => {
-    await assertNothingRaised(async () => (await schema()).renameTable("group", "order"));
+    await assertNothingRaised(async () => connection.renameTable("group", "order"));
   });
 
   it("change columns", async () => {
-    const conn = (await Base.leaseConnection()) as unknown as {
+    const conn = connection as unknown as {
       changeColumnDefault(t: string, c: string, d: unknown): Promise<void>;
       changeColumn(t: string, c: string, ty: string, o?: Record<string, unknown>): Promise<void>;
       renameColumn(t: string, c: string, n: string): Promise<void>;
@@ -119,10 +116,9 @@ describe("ReservedWordTest", () => {
   });
 
   it("introspect", async () => {
-    const conn = await schema();
-    const cols = (await conn.columns("group")).map((c) => c.name).sort();
+    const cols = (await connection.columns("group")).map((c) => c.name).sort();
     expect(cols).toEqual(["id", "order", "select_id"]);
-    const idx = (await conn.indexes("group")).map((i) => i.name).sort();
+    const idx = (await connection.indexes("group")).map((i) => i.name).sort();
     expect(idx).toEqual(["index_group_on_select_id"]);
   });
 

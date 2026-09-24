@@ -141,7 +141,7 @@ describe("ActiveRecord::Encryption::EncryptableRecord#_create_record (trails)", 
   it("adds every encrypted attribute to the names handed to super", async () => {
     const book = new EncryptedBook();
     const names = await _createRecord.call(book, ["format"], async (n: string[]) => n);
-    expect(names).toEqual(["format", ...[...EncryptedBook.encryptedAttributes].map(String)]);
+    expect(names).toEqual(["format", ...[...EncryptedBook.encryptedAttributes!].map(String)]);
   });
 
   it("leaves the names alone for a model without encrypted attributes", async () => {
