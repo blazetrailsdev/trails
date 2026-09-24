@@ -1933,6 +1933,15 @@ describe("tsDeclaresOnLevel", () => {
   it("prefers a seat declaration over a neutral one", () => {
     expect(tsDeclaresOnLevel("class", owners("", "Base"), owners("Base"), undefined)).toBe("seat");
   });
+
+  it("lets one owner declaring both seats satisfy both rows", () => {
+    // `class_attribute :verbose`-shaped: `static verbose` beside the prototype
+    // reader, as migration.ts declares it.
+    const both = owners("Migration");
+    expect(tsDeclaresOnLevel("class", both, both, both)).toBe("seat");
+    expect(tsDeclaresOnLevel("instance", both, both, both)).toBe("seat");
+    expect(tsDeclaresOnLevel("class", owners("Other"), both, both)).toBe("neutral");
+  });
 });
 
 describe("includerAdmitsOnLevel", () => {

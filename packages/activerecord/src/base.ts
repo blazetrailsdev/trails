@@ -1438,6 +1438,7 @@ export class Base extends Model {
     id: unknown,
     attrs: Record<string, unknown>,
   ): Promise<InstanceType<T>>;
+  /** @missingRailsCall all — CONVERGEABLE class-update-converges-onto-persistence-classmethods */
   static async update<T extends typeof Base>(
     this: T,
     idOrAttrs: unknown,
@@ -1467,6 +1468,7 @@ export class Base extends Model {
     id: unknown,
     attrs: Record<string, unknown>,
   ): Promise<InstanceType<T>>;
+  /** @missingRailsCall all — CONVERGEABLE class-update-converges-onto-persistence-classmethods */
   static async updateBang<T extends typeof Base>(
     this: T,
     idOrAttrs: unknown,

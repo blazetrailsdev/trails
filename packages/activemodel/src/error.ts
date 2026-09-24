@@ -1,4 +1,4 @@
-import { humanize, deepDup, isPlainObject } from "@blazetrails/activesupport";
+import { classAttribute, humanize, deepDup, isPlainObject } from "@blazetrails/activesupport";
 import { except, kernelCatch } from "@blazetrails/ruby-compat";
 import { MissingTranslation, type TranslateKey } from "@blazetrails/i18n";
 import { I18n } from "./i18n.js";
@@ -59,7 +59,11 @@ function optionsEqual(a: unknown, b: unknown): boolean {
 }
 
 export class Error {
-  static i18nCustomizeFullMessage: boolean = false;
+  declare static i18nCustomizeFullMessage: boolean;
+
+  static {
+    classAttribute.call(this, "i18nCustomizeFullMessage", { default: false });
+  }
 
   base: ModelBase;
   attribute: string;
@@ -81,16 +85,18 @@ export class Error {
       const attributesScope = `${baseClass.i18nScope}.errors.models`;
 
       if (namespace) {
-        defaults = baseClass.lookupAncestors!().flatMap((klass) => [
+        defaults = baseClass.lookupAncestors!().map((klass) => [
           `:${attributesScope}.${klass.modelName!.i18nKey}/${namespace}.attributes.${attributeName}.format`,
           `:${attributesScope}.${klass.modelName!.i18nKey}/${namespace}.format`,
         ]);
       } else {
-        defaults = baseClass.lookupAncestors!().flatMap((klass) => [
+        defaults = baseClass.lookupAncestors!().map((klass) => [
           `:${attributesScope}.${klass.modelName!.i18nKey}.attributes.${attributeName}.format`,
           `:${attributesScope}.${klass.modelName!.i18nKey}.format`,
         ]);
       }
+
+      defaults = defaults.flat();
     } else {
       defaults = [];
     }
