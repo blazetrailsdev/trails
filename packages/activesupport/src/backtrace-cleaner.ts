@@ -66,7 +66,6 @@ export class BacktraceCleaner {
     }
   }
 
-  /** @internal */
   static readonly FORMATTED_GEMS_PATTERN = /^[^/]+ \([\w.]+\) /;
 
   /** @internal */
