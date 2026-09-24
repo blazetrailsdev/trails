@@ -470,10 +470,7 @@ export class TestFixtures {
     }
   }
 
-  /**
-   * @internal
-   * @missingRailsCall delete — PERMANENT
-   */
+  /** @internal */
   accessFixture(fsName: string, ...fixtureNames: unknown[]): unknown {
     const forceReload =
       fixtureNames.at(-1) === true || fixtureNames.at(-1) === ":reload"

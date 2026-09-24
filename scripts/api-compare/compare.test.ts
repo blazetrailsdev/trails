@@ -193,6 +193,39 @@ describe("significantMissingCalls", () => {
     expect(missing).toEqual(["save → save"]);
   });
 
+  it("credits a Ruby call ported as the ruby-compat export it maps to", () => {
+    // test_fixtures.rb:307 `@fixture_cache[fs_name].delete(f_name)`: an aref
+    // receiver, recorded `expr`, ported as `hashDelete(...)`.
+    const receivers: Record<string, string[]> = { delete: ["expr"], "include?": ["expr"] };
+    const alias = (rc: string) => jsEnumerableAliases(rc, receivers[rc]);
+    const withDelete = new Set(["delete", "include?", "key?"]);
+    const run = (tsCalls: string[]) =>
+      significantMissingCalls(
+        "access_fixture",
+        ["delete"],
+        new Set(tsCalls),
+        () => true,
+        map,
+        withDelete,
+        alias,
+      );
+    expect(run(["hashDelete"])).toEqual([]);
+    expect(run(["stringDelete"])).toEqual([]);
+    expect(run(["hasKey"])).toEqual(["delete → delete"]);
+    // `hasKey` ports `key?` too, so an unproven `include?` must not claim it.
+    expect(
+      significantMissingCalls(
+        "x",
+        ["include?", "key?"],
+        new Set(["hasKey"]),
+        () => true,
+        map,
+        withDelete,
+        alias,
+      ),
+    ).toEqual(["include? → include?"]);
+  });
+
   it("ignores idiom calls outside the allowlist (the noise the gate exists for)", () => {
     const missing = significantMissingCalls(
       "build",
