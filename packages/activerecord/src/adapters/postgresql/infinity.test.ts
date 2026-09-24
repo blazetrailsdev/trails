@@ -30,7 +30,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   afterAll(async () => {
     await adapter.execute(`DROP TABLE IF EXISTS postgresql_infinities`);
   });
-  fixtures([], { connection: () => adapter });
+  fixtures([]);
 
   async function modelClass() {
     const { Base } = await import("../../index.js");

@@ -51,4 +51,12 @@ describe("Kernel#Rational()", () => {
     expect(rational(r)).toBe(r);
     expect(rational(r, 1)).toBe(r);
   });
+
+  it("mod takes a Rational divisor, exactly past 2**53, flooring toward the divisor's sign", () => {
+    expect(new Rational(1461369600123456789n, 1_000_000_000n).mod(new Rational(1, 1000))).toEqual(
+      new Rational(456789, 1_000_000_000),
+    );
+    expect(new Rational(-7, 2).mod(new Rational(1, 3))).toEqual(new Rational(1, 6));
+    expect(new Rational(7, 2).mod(2)).toEqual(new Rational(3, 2));
+  });
 });

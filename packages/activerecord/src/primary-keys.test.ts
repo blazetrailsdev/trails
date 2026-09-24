@@ -55,8 +55,7 @@ describe("PrimaryKeysTest", () => {
     expect(keyboard.toKey()).toEqual([keyboard.id]);
   });
 
-  it.skip("to key with composite primary key", () => {
-    // BLOCKED: composite-primary-key-id-reader-collapses-all-nil-to-nil
+  it("to key with composite primary key", () => {
     const order = new CpkOrder();
     expect(order.toKey()).toEqual([null, null]);
     order.id = [1, 2];

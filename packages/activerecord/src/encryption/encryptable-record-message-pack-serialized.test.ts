@@ -20,7 +20,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordMessagePackSerializedTest",
     adapter = await freshAdapter();
   });
 
-  fixtures([], { connection: () => adapter });
+  fixtures([]);
 
   beforeEach(() => {
     configSnapshot = snapshotEncryptionConfig();

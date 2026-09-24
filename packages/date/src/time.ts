@@ -159,6 +159,18 @@ function numExact(v: unknown): Rational {
   return fToR(v);
 }
 
+/** `ndigits_denominator` (`vendor/ruby/time.c:4504`). */
+function ndigitsDenominator(ndigits: number): number | Rational {
+  const nd = Math.trunc(ndigits);
+  if (nd < 0) {
+    throw new ArgumentError("negative ndigits given");
+  }
+  if (nd === 0) {
+    return 1;
+  }
+  return new Rational(1, 10n ** BigInt(nd));
+}
+
 const months = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
 
 function obj2vint(obj: number | string): number {
@@ -1468,6 +1480,25 @@ export class Time {
       undefined,
       timew.add(-nanoseconds),
     );
+  }
+
+  /** `time_floor` (`vendor/ruby/time.c:4595`). */
+  floor(ndigits: number | null = null): Time {
+    const den = ndigits == null ? 1 : ndigitsDenominator(ndigits);
+    let v = this.toR();
+    v = v.mod(den);
+    return this.#timeAdd(v, -1);
+  }
+
+  /** `time_ceil` (`vendor/ruby/time.c:4640`). */
+  ceil(ndigits: number | null = null): Time {
+    const den = ndigits == null ? 1 : ndigitsDenominator(ndigits);
+    let v = this.toR();
+    v = v.mod(den);
+    if (!v.isZero()) {
+      v = (den instanceof Rational ? den : new Rational(den, 1)).add(v.mul(-1));
+    }
+    return this.#timeAdd(v, 1);
   }
 
   /** `time_gmtime` (`vendor/ruby/time.c:4169`): converts the receiver to UTC in place. */

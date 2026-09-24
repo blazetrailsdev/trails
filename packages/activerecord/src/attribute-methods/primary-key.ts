@@ -20,11 +20,9 @@ export interface PrimaryKeyRecord {
 }
 
 export function toKey(this: PrimaryKeyRecord): unknown[] | null {
-  const pk = this.id;
-  if (pk == null) return null;
-  const arr = Array.isArray(pk) ? pk : [pk];
-  if (arr.some((v) => v == null)) return null;
-  return arr;
+  const key = this.id;
+  if (key == null || key === false) return null;
+  return Array.isArray(key) ? key : [key];
 }
 
 function columnForDatabase(record: PrimaryKeyRecord, key: string): unknown {

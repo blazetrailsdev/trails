@@ -36,14 +36,13 @@ import {
   type IsJoinTableName,
 } from "./test-helpers/fixtures-registry.js";
 export type { FixtureName } from "./test-helpers/fixtures-registry.js";
-import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Base } from "./base.js";
 import { registerModel } from "./associations.js";
 import {
   warmSchemaCacheBeforeFirstTest,
   type WithTransactionalFixturesOptions,
 } from "./test-fixtures/with-transactional-fixtures.js";
-import { NullPool, type ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
+import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import type { PoolConfig } from "./connection-adapters/pool-config.js";
 import { writingRole } from "./active-record.js";
 
@@ -166,10 +165,6 @@ export type UseFixturesByNameResult<N extends FixtureName> = {
     : FixtureAccessor<RegistryModel<K>, Extract<keyof RegistryData<K>, string>>;
 };
 
-export interface FixturesConnectionOpts {
-  connection?: () => DatabaseAdapter | Promise<DatabaseAdapter>;
-}
-
 /**
  * Resolves fixture-set names through the registry into their table and model.
  * Model classes are dynamic-imported (see {@link FixtureRegistryEntry}), so this is async.
@@ -237,7 +232,6 @@ export class TestFixtures {
   declare _savedPoolConfigs: Hash<string, Record<string, Record<string, PoolConfig>>>;
   declare _loadedFixtures: Record<string, FixtureSet>;
   declare _asyncQueriesSession: unknown;
-  declare _fixtureAdapters: DatabaseAdapter[];
   declare _pendingPins: Promise<void>[];
 
   async beforeSetup(): Promise<void> {
@@ -342,7 +336,6 @@ export class TestFixtures {
       await pool.pinConnectionBang(this.lockThreads);
       await pool.leaseConnection();
     }
-    await pinFixtureAdapters.call(this);
 
     this._pendingPins = [];
     this._connectionSubscriber = Notifications.subscribe("!connection.active_record", (event) => {
@@ -378,7 +371,6 @@ export class TestFixtures {
     if (!unpinned.every(Boolean)) {
       alreadyLoadedFixtures.clear();
     }
-    await unpinFixtureAdapters.call(this);
     this._fixtureConnectionPools = [];
     this.teardownSharedConnectionPool();
     if (pinFailure) throw pinFailure.reason;
@@ -519,42 +511,9 @@ async function settlePendingPins(this: TestFixtures): Promise<PromiseRejectedRes
   return pinResults.find((r): r is PromiseRejectedResult => r.status === "rejected");
 }
 
-/** @noRailsEquivalent CONVERGEABLE converge-fixture-raw-adapter-arm-onto-pool-walk */
-async function pinFixtureAdapters(this: TestFixtures): Promise<void> {
-  for (const adapter of this._fixtureAdapters) {
-    const pool = adapter.pool;
-    if (pool == null || pool instanceof NullPool) {
-      await (
-        adapter as unknown as {
-          transactionManager: {
-            beginTransaction(opts: { joinable: boolean; _lazy: boolean }): Promise<unknown>;
-          };
-        }
-      ).transactionManager.beginTransaction({ joinable: false, _lazy: false });
-    } else if (!this._fixtureConnectionPools.includes(pool)) {
-      await pool.pinConnectionBang(this.lockThreads);
-      await pool.leaseConnection();
-      this._fixtureConnectionPools.push(pool);
-    }
-  }
-}
-
-/** @noRailsEquivalent CONVERGEABLE converge-fixture-raw-adapter-arm-onto-pool-walk */
-async function unpinFixtureAdapters(this: TestFixtures): Promise<void> {
-  for (const adapter of this._fixtureAdapters) {
-    if (adapter.pool == null || adapter.pool instanceof NullPool) {
-      const manager = (
-        adapter as unknown as {
-          transactionManager: { openTransactions: number; rollbackTransaction(): Promise<void> };
-        }
-      ).transactionManager;
-      while (manager.openTransactions > 0) await manager.rollbackTransaction();
-    }
-  }
-}
-
-type FixturesOptions = WithTransactionalFixturesOptions &
-  FixturesConnectionOpts & { useInstantiatedFixtures?: boolean | string };
+type FixturesOptions = WithTransactionalFixturesOptions & {
+  useInstantiatedFixtures?: boolean | string;
+};
 
 type FixturesResult = {
   readonly fixtureTableNames: string[];
@@ -577,10 +536,7 @@ let rootTestCaseClass: TestCaseClass | undefined;
 
 const testCaseClasses = new WeakMap<SuiteScope, TestCaseClass>();
 
-const fixtureRegistrations = new WeakMap<
-  TestCaseClass,
-  { count: number; adapters: (() => DatabaseAdapter | Promise<DatabaseAdapter>)[] }
->();
+const fixtureRegistrations = new WeakMap<TestCaseClass, { count: number }>();
 
 const testCases = new WeakMap<object, { testCase: TestFixtures; pending: number }>();
 
@@ -606,7 +562,7 @@ function testCaseClassFor(suite: SuiteScope | undefined): TestCaseClass {
 function registrationsFor(klass: TestCaseClass) {
   let registrations = fixtureRegistrations.get(klass);
   if (registrations === undefined) {
-    registrations = { count: 0, adapters: [] };
+    registrations = { count: 0 };
     fixtureRegistrations.set(klass, registrations);
   }
   return registrations;
@@ -635,13 +591,9 @@ async function resolveFixtureClassNames(klass: TestCaseClass): Promise<void> {
   }
 }
 
-function registerFixtureHooks(
-  klass: TestCaseClass,
-  getAdapter?: () => DatabaseAdapter | Promise<DatabaseAdapter>,
-): void {
+function registerFixtureHooks(klass: TestCaseClass): void {
   const registrations = registrationsFor(klass);
   registrations.count++;
-  if (getAdapter) registrations.adapters.push(getAdapter);
 
   beforeEach(async (ctx: TaskContext) => {
     if (testCases.has(ctx.task)) return;
@@ -651,28 +603,19 @@ function registerFixtureHooks(
     testCase._fixtureConnectionPools = [];
     testCase._pendingPins = [];
     testCase._savedPoolConfigs = new Hash();
-    testCase._fixtureAdapters = [];
     let pending = 0;
-    const getters: (() => DatabaseAdapter | Promise<DatabaseAdapter>)[] = [];
     for (
       let k: TestCaseClass | null = testKlass;
       k !== null && k !== (Object.getPrototypeOf(Function) as unknown);
       k = Object.getPrototypeOf(k) as TestCaseClass | null
     ) {
       const own = fixtureRegistrations.get(k);
-      if (own) {
-        pending += own.count;
-        getters.push(...own.adapters);
-      }
+      if (own) pending += own.count;
     }
     testCases.set(ctx.task, { testCase, pending });
     currentTestCase = testCase;
 
     await resolveFixtureClassNames(testKlass);
-    for (const getter of getters) {
-      const adapter = await getter();
-      if (!testCase._fixtureAdapters.includes(adapter)) testCase._fixtureAdapters.push(adapter);
-    }
     await testCase.beforeSetup();
 
     for (const [fsName, fixtureSet] of Object.entries(testCase._loadedFixtures)) {
@@ -718,10 +661,9 @@ export function fixtures(
   fixturesOrNames: FixtureMap | readonly FixtureName[],
   options: FixturesOptions | undefined = undefined,
 ): Record<string, unknown> {
-  const { usesTransaction, useTransactionalTests, useInstantiatedFixtures, connection } =
-    options ?? {};
+  const { usesTransaction, useTransactionalTests, useInstantiatedFixtures } = options ?? {};
 
-  warmSchemaCacheBeforeFirstTest(connection);
+  warmSchemaCacheBeforeFirstTest();
   const klass = testCaseClassFor(getCurrentSuite().suite as SuiteScope | undefined);
   klass.usesTransaction(...(usesTransaction ?? []));
   if (useTransactionalTests !== undefined) klass.useTransactionalTests = useTransactionalTests;
@@ -754,7 +696,7 @@ export function fixtures(
     klass.setFixtureClass(classNames);
   }
   klass.fixtures(fixtureSetNames);
-  registerFixtureHooks(klass, connection ?? (() => Base.leaseConnection()));
+  registerFixtureHooks(klass);
 
   const result: Record<string, unknown> = {};
   for (const [key, fsName] of Object.entries(accessors)) {

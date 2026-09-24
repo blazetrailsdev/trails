@@ -1,4 +1,4 @@
-import { kernelThrow } from "@blazetrails/ruby-compat";
+import { Hash, kernelThrow } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
 import type { Account } from "./account.js";
@@ -389,7 +389,15 @@ export class Client extends Company {
   declare rollbackOnCreateCalled: boolean | undefined;
   declare raiseOnDestroy: boolean | undefined;
 
-  static destroyedClientIds: Map<number, number[]> = new Map();
+  static _destroyedClientIds: Hash<number, number[]> | undefined;
+
+  static get destroyedClientIds(): Hash<number, number[]> {
+    return (this._destroyedClientIds ??= new Hash((h, k) => {
+      const value: number[] = [];
+      h.set(k, value);
+      return value;
+    }));
+  }
 
   static {
     this.belongsTo("firm", { foreignKey: "client_of", inverseOf: "client" });
@@ -450,9 +458,7 @@ export class Client extends Company {
     this.beforeDestroy(async function (this: Client) {
       const firm = await (this as any).firm;
       if (firm) {
-        const firmId = firm.id as number;
-        if (!Client.destroyedClientIds.has(firmId)) Client.destroyedClientIds.set(firmId, []);
-        Client.destroyedClientIds.get(firmId)!.push(this.id as number);
+        Client.destroyedClientIds.get(firm.id as number)!.push(this.id as number);
       }
     });
     this.beforeDestroy(function (this: Client) {

@@ -1,13 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, onTestFinished } from "vitest";
-import {
-  createPooledTestAdapter,
-  _resetPooledTestAdapterForTests,
-  type LeasedTestAdapter,
-  type TestDatabaseAdapter,
-} from "../test-adapter.js";
+import { type LeasedTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { Base } from "../base.js";
 import { SQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
-import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adapter.js";
 import { NullTransaction } from "../connection-adapters/abstract/transaction.js";
 import { fixtures } from "../test-fixtures.js";
 
@@ -39,7 +33,7 @@ describe("withTransactionalFixtures", () => {
     await a().execute(`CREATE TABLE fixture_users (id INTEGER PRIMARY KEY, name TEXT)`);
   });
 
-  fixtures([], { connection: () => adapter });
+  fixtures([]);
 
   it("inserts a row (first run)", async () => {
     await a().execute(`INSERT INTO fixture_users (id, name) VALUES (1, 'alice')`);
@@ -80,23 +74,27 @@ describe("withTransactionalFixtures", () => {
   });
 });
 
-describe("withTransactionalFixtures (raw adapter)", () => {
+describe("withTransactionalFixtures (pool established on the handler)", () => {
   let adapter: SQLite3Adapter;
   const exec = (sql: string) => adapter.execute(sql);
   const query = async (sql: string) => (await adapter.selectAll(sql)).toArray();
 
   beforeAll(async () => {
-    adapter = new BetterSQLite3Adapter({ database: ":memory:" });
+    const pool = await Base.connectionHandler.establishConnection(
+      { adapter: "sqlite3", database: ":memory:" },
+      { ownerName: "RawFixtureUsers" },
+    );
+    adapter = (await pool.leaseConnection()) as unknown as SQLite3Adapter;
     await adapter.createTable("raw_fixture_users", (t) => {
       t.string("name");
     });
   });
 
   afterAll(async () => {
-    await adapter.disconnectBang();
+    await Base.connectionHandler.removeConnectionPool("RawFixtureUsers");
   });
 
-  fixtures([], { connection: () => adapter });
+  fixtures([]);
 
   it("rolls back inserts between tests (first run)", async () => {
     await exec(`INSERT INTO raw_fixture_users (id, name) VALUES (1, 'alice')`);
@@ -106,40 +104,6 @@ describe("withTransactionalFixtures (raw adapter)", () => {
 
   it("sees zero rows because the previous insert rolled back", async () => {
     const rows = await query(`SELECT * FROM raw_fixture_users`);
-    expect(rows).toHaveLength(0);
-  });
-});
-
-describe("withTransactionalFixtures (pooled adapter)", () => {
-  let adapter: LeasedTestAdapter;
-  const exec = (sql: string) => adapter.execute(sql);
-  const query = async (sql: string) => (await adapter.selectAll(sql)).toArray();
-
-  beforeAll(async () => {
-    const handle = await createPooledTestAdapter();
-    adapter = handle.adapter;
-    await exec(`DROP TABLE IF EXISTS pooled_fixture_users`);
-    await exec(`CREATE TABLE pooled_fixture_users (id INTEGER PRIMARY KEY, name TEXT)`);
-  });
-
-  afterAll(async () => {
-    try {
-      await exec(`DROP TABLE IF EXISTS pooled_fixture_users`);
-    } finally {
-      _resetPooledTestAdapterForTests();
-    }
-  });
-
-  fixtures([], { connection: () => adapter });
-
-  it("inserts a row inside the pinned transaction (first run)", async () => {
-    await exec(`INSERT INTO pooled_fixture_users (id, name) VALUES (1, 'alice')`);
-    const rows = await query(`SELECT * FROM pooled_fixture_users`);
-    expect(rows).toHaveLength(1);
-  });
-
-  it("sees zero rows because unpinConnectionBang rolled back the previous insert", async () => {
-    const rows = await query(`SELECT * FROM pooled_fixture_users`);
     expect(rows).toHaveLength(0);
   });
 });
