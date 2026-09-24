@@ -150,22 +150,22 @@ function remapOneDiagnostic(
     lineStartsCache.set(d.fileName, lineStarts);
   }
 
-  const shift = originalLine - virtualLine;
-  const shiftLine = (line: number) => Math.min(line + shift, lineStarts.length - 1);
   const pos = lineStarts[originalLine] + d.startPosition.character;
+  const endPosition = d.endPosition && {
+    line: remapLine(d.endPosition.line, deltas) ?? originalLine,
+    character: d.endPosition.character,
+  };
   return {
     ...unmoved,
     pos,
-    end: pos + (d.end - d.pos),
+    end: endPosition ? lineStarts[endPosition.line] + endPosition.character : pos + (d.end - d.pos),
     startPosition: { line: originalLine, character: d.startPosition.character },
-    endPosition: d.endPosition && {
-      line: shiftLine(d.endPosition.line),
-      character: d.endPosition.character,
-    },
-    sourceLines: d.sourceLines?.map(({ line }) => ({
-      line: shiftLine(line),
-      text: originalText.slice(lineStarts[shiftLine(line)], lineStarts[shiftLine(line) + 1]),
-    })),
+    endPosition,
+    sourceLines: d.sourceLines?.flatMap(({ line: virtual }) => {
+      const line = remapLine(virtual, deltas);
+      if (line === null) return [];
+      return [{ line, text: originalText.slice(lineStarts[line], lineStarts[line + 1]) }];
+    }),
   };
 }
 
@@ -173,6 +173,8 @@ export enum ExitStatus {
   Success = 0,
   DiagnosticsPresent_OutputsSkipped = 1,
   DiagnosticsPresent_OutputsGenerated = 2,
+  InvalidProject_OutputsSkipped = 3,
+  ProjectReferenceCycle_OutputsSkipped = 4,
 }
 
 export interface ArSolutionBuilder {
