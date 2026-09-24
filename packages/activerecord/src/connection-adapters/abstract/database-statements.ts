@@ -349,10 +349,7 @@ export function explain(
   throw new NotImplementedError();
 }
 
-/**
- * @missingRailsName buildTruncateStatement — PERMANENT
- * @missingRailsName buildTruncateStatement — PERMANENT
- */
+/** @missingRailsName buildTruncateStatement — PERMANENT */
 export async function truncate(
   this: DatabaseStatementsHost &
     Required<Pick<DatabaseStatementsHost, "execute">> &
@@ -543,10 +540,7 @@ export function isTransactionOpen(this: DatabaseStatementsHost): boolean {
   return this.currentTransaction().open;
 }
 
-/**
- * @missingRailsName ensureFinalize — PERMANENT
- * @missingRailsName ensureFinalize — PERMANENT
- */
+/** @missingRailsName ensureFinalize — PERMANENT */
 export function addTransactionRecord(
   this: DatabaseStatementsHost,
   record: unknown,
