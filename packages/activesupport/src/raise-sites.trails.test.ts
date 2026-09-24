@@ -1,18 +1,18 @@
 import { describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/ruby-compat";
-import { rescueFrom } from "./module-ext.js";
+import { rescueFrom } from "./rescuable.js";
 import { Fanout } from "./notifications/fanout.js";
 import { numberToHuman } from "./number-helper.js";
 
 describe("raise sites Rails has and the port had dropped", () => {
   it("rescue_from raises without a handler", () => {
-    expect(() => rescueFrom.call({}, Error)).toThrow(
+    expect(() => rescueFrom.call({ rescueHandlers: [] }, Error)).toThrow(
       new ArgumentError("Need a handler. Pass the with: keyword argument or provide a block."),
     );
   });
 
   it("rescue_from raises on a key that is neither a class nor a String", () => {
-    expect(() => rescueFrom.call({}, 42 as never, { with: () => {} })).toThrow(
+    expect(() => rescueFrom.call({ rescueHandlers: [] }, 42 as never, { with: () => {} })).toThrow(
       new ArgumentError("42 must be an Exception class or a String referencing an Exception class"),
     );
   });

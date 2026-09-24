@@ -296,9 +296,8 @@ export {
   registerSubclass,
   subclasses,
   descendants,
-  rescueFrom,
-  handleRescue,
 } from "./module-ext.js";
+export { Rescuable, rescueFrom, handleRescue } from "./rescuable.js";
 export type { MattrOptions } from "./module-ext.js";
 
 export {

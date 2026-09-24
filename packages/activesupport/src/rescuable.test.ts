@@ -1,27 +1,55 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { include } from "@blazetrails/ruby-compat";
 
-import { rescueFrom, handleRescue } from "./module-ext.js";
+import { registerConstant } from "./inflector.js";
+import { Rescuable, rescueFrom, handleRescue } from "./rescuable.js";
 
 class WraithAttack extends Error {}
 
 class MadRonon extends Error {}
 
+class CoolError extends Error {}
+
+class WeirdError {
+  static [Symbol.hasInstance](other: unknown): boolean {
+    return other instanceof Error && "weird" in other;
+  }
+}
+
 class NuclearExplosion extends Error {}
 
+for (const klass of [WraithAttack, MadRonon, CoolError, WeirdError, NuclearExplosion]) {
+  registerConstant(klass.name, klass);
+}
+
 class Stargate {
+  declare static rescueHandlers: [string, unknown][];
+  declare rescueHandlers: [string, unknown][];
+
   result: string | null = null;
 
-  constructor() {
+  static {
+    include(this, Rescuable);
+
     rescueFrom.call(this, WraithAttack, { with: "sosFirst" });
+
     rescueFrom.call(this, WraithAttack, { with: "sos" });
-    rescueFrom.call(this, NuclearExplosion, {
-      with: () => {
+
+    rescueFrom.call(this, "NuclearExplosion", {
+      with: function (this: Stargate) {
         this.result = "alldead";
       },
     });
+
     rescueFrom.call(this, MadRonon, {
-      with: (e: Error) => {
+      with: function (this: Stargate, e: Error) {
         this.result = e.message;
+      },
+    });
+
+    rescueFrom.call(this, WeirdError as never, {
+      with: function (this: Stargate) {
+        this.result = "weird";
       },
     });
   }
@@ -61,11 +89,23 @@ class Stargate {
   }
 }
 
+class CoolStargate extends Stargate {
+  static {
+    rescueFrom.call(this, CoolError, { with: "sosCoolError" });
+  }
+
+  sosCoolError(): void {
+    this.result = "sos_cool_error";
+  }
+}
+
 describe("RescuableTest", () => {
   let stargate: Stargate;
+  let coolStargate: CoolStargate;
 
   beforeEach(() => {
     stargate = new Stargate();
+    coolStargate = new CoolStargate();
   });
 
   it("rescue from with method", () => {
@@ -83,10 +123,22 @@ describe("RescuableTest", () => {
     expect(stargate.result).toBe("dex");
   });
 
-  it.skip("rescues defined later are added at end of the rescue handlers array", () => {
-    // BLOCKED: rescuable-has-no-rescue-handlers-reader
+  it("rescues defined later are added at end of the rescue handlers array", () => {
     const expected = ["WraithAttack", "WraithAttack", "NuclearExplosion", "MadRonon", "WeirdError"];
-    const result = (stargate as any).rescueHandlers.map((h: [string]) => h[0]);
+    const result = stargate.rescueHandlers.map((handler) => handler[0]);
+    expect(result).toEqual(expected);
+  });
+
+  it("children should inherit rescue definitions from parents and child rescue should be appended", () => {
+    const expected = [
+      "WraithAttack",
+      "WraithAttack",
+      "NuclearExplosion",
+      "MadRonon",
+      "WeirdError",
+      "CoolError",
+    ];
+    const result = coolStargate.rescueHandlers.map((handler) => handler[0]);
     expect(result).toEqual(expected);
   });
 
