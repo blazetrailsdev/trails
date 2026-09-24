@@ -1,4 +1,5 @@
 import type { Base } from "../base.js";
+import type { Relation } from "../relation.js";
 import type { AssociationDefinition, AssociationOptions } from "../associations.js";
 import { associationInstanceGet } from "../associations.js";
 import { AssociationScope, type AssociationScopeable } from "./association-scope.js";
@@ -564,14 +565,15 @@ export class Association<Target extends Base | Base[] = Base | Base[]> {
     );
   }
 
-  /** @missingRailsCall any? — PERMANENT */
-  private isSkipStatementCache(scope: any): boolean {
-    const refl = this.reflection as any;
-    const hasReflScope = !!(refl.hasScope?.() ?? refl.scope);
-    const eagerLoading = !!scope?.isEagerLoading;
-    const scopeAttrs = !!(this.klass as any)?.hasScopeAttributes?.();
-    const sourceDefaultScopes = !!refl.sourceReflection?.()?.activeRecord?.defaultScopes?.length;
-    return hasReflScope || eagerLoading || scopeAttrs || sourceDefaultScopes;
+  private isSkipStatementCache(scope: Relation<Base>): boolean {
+    return (
+      this.reflection.hasScope() ||
+      scope.isEagerLoading ||
+      this.klass.isScopeAttributes() ||
+      this.reflection.sourceReflection!.activeRecord.defaultScopes.some(
+        (defaultScope) => defaultScope != null,
+      )
+    );
   }
 
   protected enqueueDestroyAssociation(options: Record<string, unknown>): void {

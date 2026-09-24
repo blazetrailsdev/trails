@@ -2,11 +2,7 @@ import type { Base } from "./base.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { extractOptionsBang, wrap } from "@blazetrails/activesupport";
 import { pendingCounterCacheColumns } from "./counter-cache-state.js";
-import {
-  touchAttributesWithTime,
-  type CounterCacheTouchOption,
-  type TouchAllOptions,
-} from "./timestamp.js";
+import { type CounterCacheTouchOption, type TouchAllOptions } from "./timestamp.js";
 
 export async function incrementCounter(
   this: typeof Base,
@@ -104,11 +100,7 @@ export async function resetCounters(
       string | TouchAllOptions
     >;
     const touchOptions = extractOptionsBang(names) as TouchAllOptions;
-    const touchUpdates = touchAttributesWithTime.call(
-      this,
-      ...(names as string[]),
-      touchOptions.time,
-    );
+    const touchUpdates = this.touchAttributesWithTime(...(names as string[]), touchOptions.time);
     Object.assign(updates, touchUpdates);
   }
 
