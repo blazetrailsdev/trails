@@ -1,4 +1,4 @@
-import { Cipher, OpenSSL, type Bytes } from "@blazetrails/ruby-compat";
+import { Cipher, OpenSSL, rbObjId, sprintf, type Bytes } from "@blazetrails/ruby-compat";
 import { Encryption } from "../../namespaces.js";
 import { Configuration, Decryption, EncryptedContentIntegrity } from "../errors.js";
 import { Message } from "../message.js";
@@ -16,6 +16,9 @@ function toBytes(value: string | Bytes): Bytes {
 }
 
 export class Aes256Gcm {
+  /** @internal */
+  static _railsClassName = "ActiveRecord::Encryption::Cipher::Aes256Gcm";
+
   static readonly CIPHER_TYPE = "aes-256-gcm";
   static keyLength = KEY_LENGTH;
   static ivLength = IV_LENGTH;
@@ -35,7 +38,7 @@ export class Aes256Gcm {
 
   /** @noRailsEquivalent PERMANENT */
   [Symbol.for("nodejs.util.inspect.custom")](): string {
-    return `Cipher {}`;
+    return this.inspect();
   }
 
   encrypt(clearText: string | Bytes): Message {
@@ -83,6 +86,10 @@ export class Aes256Gcm {
     } catch {
       throw new Decryption("The provided key could not decrypt the data");
     }
+  }
+
+  inspect(): string {
+    return `#<${(this.constructor as typeof Aes256Gcm)._railsClassName}:${sprintf("%#016x", rbObjId(this) << 1)}>`;
   }
 
   private _validateKeyLength(key: Bytes): void {

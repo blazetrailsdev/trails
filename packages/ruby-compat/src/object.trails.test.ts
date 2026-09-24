@@ -3,6 +3,7 @@ import {
   basicObjRespondTo,
   rbInspect as inspect,
   rbObjInspect,
+  rbObjId,
   rbObjAsString as toS,
   rbObjRespondTo,
 } from "./object.js";
@@ -63,5 +64,16 @@ describe("rbObjInspect", () => {
     const node = new Node();
     node.self = node;
     expect(node.inspect()).toMatch(/^#<Node:0x[0-9a-f]{16} @self=#<Node:0x[0-9a-f]{16} \.\.\.>>$/);
+  });
+});
+
+describe("rbObjId", () => {
+  it("is stable per object and OBJ_ID_INCREMENT apart", () => {
+    const a = {};
+    const b = {};
+    const id = rbObjId(a);
+
+    expect(rbObjId(a)).toBe(id);
+    expect(rbObjId(b)).toBe(id + 20);
   });
 });

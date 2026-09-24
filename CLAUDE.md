@@ -1257,7 +1257,7 @@ the capability, in a different place. Each is its own `SKIP_GROUPS` entry in
 | `relation/delegation.rb`                              | named method, no trap |
 | `active_record/test_fixtures.rb`                      | nothing               |
 | `active_support/array_inquirer.rb`                    | Proxy                 |
-| `active_support/broadcast_logger.rb`                  | nothing               |
+| `active_support/broadcast_logger.rb`                  | Proxy                 |
 | `core_ext/module/delegation.rb`                       | nothing (no file)     |
 | `active_support/current_attributes.rb`                | nothing               |
 | `active_support/delegation.rb`                        | Proxy                 |
@@ -1269,6 +1269,15 @@ the capability, in a different place. Each is its own `SKIP_GROUPS` entry in
 | `active_support/ordered_options.rb`                   | Proxy                 |
 | `active_support/string_inquirer.rb`                   | Proxy                 |
 | `active_support/time_with_zone.rb`                    | Proxy                 |
+
+A Proxy row whose Ruby class also defines `respond_to_missing?` forwards a
+name only when that predicate answers it (`broadcast_logger.rb:235-251`): a
+`typeof x.m === "function"` probe is JS's `respond_to?`, and TaggedLogging's
+`flush` and rack's `CommonLogger` probe a wrapped logger exactly that way, so
+handing every name a raising function would turn Ruby's skipped arm into a
+raise. The `method_missing` `super` arm stays in the port; an unanswered name
+reads `undefined`, and calling it is a `TypeError` where Ruby raises
+`NoMethodError`.
 
 A "named method, no trap" row answers only an explicit `methodMissing` call,
 which is where `collection-proxy-does-not-delegate-association-names-to-scope`,

@@ -106,8 +106,7 @@ describe("ActiveRecord::Encryption::Aes256GcmTest", () => {
     expect(() => new Cipher(generateKey()).decrypt(message)).toThrow(Decryption);
   });
 
-  it.skip("inspect_does not show secrets", () => {
-    // BLOCKED: aes256-gcm-inspect-not-rails-format
+  it("inspect_does not show secrets", () => {
     const secret = generateKey();
     const cipher = new Cipher(secret);
     expect(inspect(cipher)).toMatch(/^#<ActiveRecord::Encryption::Cipher::Aes256Gcm:0x[0-9a-f]+>$/);

@@ -1,3 +1,4 @@
+import { NoMethodError, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Logger, type LogLevel } from "./logger.js";
 import { ActiveSupport } from "./namespaces.js";
 
@@ -16,6 +17,22 @@ export class BroadcastLogger extends Logger {
     this.progname = "Broadcast";
 
     this.broadcastTo(...loggers);
+
+    return new Proxy(this, {
+      get(target, name, receiver) {
+        if (typeof name === "symbol" || Reflect.has(target, name)) {
+          return Reflect.get(target, name, receiver);
+        }
+        if (!target.respondToMissing(name, false)) return undefined;
+        return (...args: unknown[]) => target.methodMissing(name, ...args);
+      },
+      has(target, name) {
+        return (
+          Reflect.has(target, name) ||
+          (typeof name === "string" && target.respondToMissing(name, false))
+        );
+      },
+    });
   }
 
   broadcastTo(...loggers: Logger[]): this {
@@ -67,36 +84,36 @@ export class BroadcastLogger extends Logger {
     return this._formatter;
   }
 
-  add(severity: number, message?: string | null, progname?: string): boolean {
-    return this.dispatch((logger) => logger.add(severity, message, progname));
+  add(...args: unknown[]): boolean {
+    return this.dispatch((logger) => logger.add(...(args as Parameters<Logger["add"]>)));
   }
 
-  log(severity: number, message?: string | (() => string), progname?: string): boolean {
-    return this.dispatch((logger) => logger.log(severity, message, progname));
+  log(...args: unknown[]): boolean {
+    return this.dispatch((logger) => logger.log(...(args as Parameters<Logger["log"]>)));
   }
 
-  debug(message?: string | (() => string)): boolean {
-    return this.dispatch((logger) => logger.debug(message));
+  debug(...args: unknown[]): boolean {
+    return this.dispatch((logger) => logger.debug(...(args as Parameters<Logger["debug"]>)));
   }
 
-  info(message?: string | (() => string)): boolean {
-    return this.dispatch((logger) => logger.info(message));
+  info(...args: unknown[]): boolean {
+    return this.dispatch((logger) => logger.info(...(args as Parameters<Logger["info"]>)));
   }
 
-  warn(message?: string | (() => string)): boolean {
-    return this.dispatch((logger) => logger.warn(message));
+  warn(...args: unknown[]): boolean {
+    return this.dispatch((logger) => logger.warn(...(args as Parameters<Logger["warn"]>)));
   }
 
-  error(message?: string | (() => string)): boolean {
-    return this.dispatch((logger) => logger.error(message));
+  error(...args: unknown[]): boolean {
+    return this.dispatch((logger) => logger.error(...(args as Parameters<Logger["error"]>)));
   }
 
-  fatal(message?: string | (() => string)): boolean {
-    return this.dispatch((logger) => logger.fatal(message));
+  fatal(...args: unknown[]): boolean {
+    return this.dispatch((logger) => logger.fatal(...(args as Parameters<Logger["fatal"]>)));
   }
 
-  unknown(message?: string | (() => string)): boolean {
-    return this.dispatch((logger) => logger.unknown(message));
+  unknown(...args: unknown[]): boolean {
+    return this.dispatch((logger) => logger.unknown(...(args as Parameters<Logger["unknown"]>)));
   }
 
   get "debug?"(): boolean {
@@ -147,9 +164,45 @@ export class BroadcastLogger extends Logger {
     this.dispatch((logger) => logger.append(s));
   }
 
+  dup(): this {
+    const copy = new (this.constructor as new () => this)();
+    copy.broadcasts = [];
+    copy.progname = this.progname;
+    copy._formatter = this.formatter;
+
+    copy.broadcastTo(
+      ...this.broadcasts.map(
+        (logger) =>
+          (logger as { dup?: () => Logger }).dup?.() ??
+          (Object.assign(Object.create(Object.getPrototypeOf(logger) as object), logger) as Logger),
+      ),
+    );
+    return copy;
+  }
+
   private dispatch(block: (logger: Logger) => void): boolean {
     this.broadcasts.forEach((logger) => block(logger));
     return true;
+  }
+
+  private methodMissing(name: string, ...args: unknown[]): unknown {
+    const loggers = this.broadcasts.filter((logger) => rbObjRespondTo(logger, name));
+
+    if (loggers.length === 0) {
+      throw new NoMethodError(
+        `undefined method '${name}' for an instance of ActiveSupport::BroadcastLogger`,
+      );
+    } else if (loggers.length === 1) {
+      return (loggers[0] as unknown as Record<string, (...a: unknown[]) => unknown>)[name](...args);
+    } else {
+      return loggers.map((logger) =>
+        (logger as unknown as Record<string, (...a: unknown[]) => unknown>)[name](...args),
+      );
+    }
+  }
+
+  private respondToMissing(method: string, includeAll: boolean): boolean {
+    return this.broadcasts.some((logger) => rbObjRespondTo(logger, method, includeAll));
   }
 }
 

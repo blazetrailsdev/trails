@@ -288,8 +288,7 @@ describe("AttributeTest", () => {
     expect(forgotten.isChanged()).toBeFalsy();
   });
 
-  // BLOCKED: attribute-from-database-forgetting-assignment-returns-self
-  it.skip("#forgetting_assignment on an unchanged .from_database attribute re-deserializes its value", () => {
+  it("#forgetting_assignment on an unchanged .from_database attribute re-deserializes its value", () => {
     class deserializedValueClass {
       id: unknown;
       constructor(id: unknown) {

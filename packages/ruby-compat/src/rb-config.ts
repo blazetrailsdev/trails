@@ -6,6 +6,8 @@ import { getOs } from "./os-adapter.js";
  * executable suffix a DOSISH build appends and the empty string everywhere
  * else, which is what `ActiveRecord::ConnectionAdapters::AbstractAdapter
  * .find_cmd_and_exec` (`abstract_adapter.rb:95`) tests for emptiness.
+ * `rubylibdir` is where the standard library's frames come from, which in
+ * Node is the `node:` scheme.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib `RbConfig`.
  */
@@ -21,6 +23,7 @@ export const RbConfig = {
     return {
       EXEEXT: platform === "win32" ? ".exe" : "",
       host_os: platform === "win32" ? "mingw32" : platform,
+      rubylibdir: "node:",
     };
   },
 };
