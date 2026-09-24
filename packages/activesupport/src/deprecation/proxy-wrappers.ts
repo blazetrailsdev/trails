@@ -221,10 +221,12 @@ export class DeprecatedConstantProxy extends Module {
 
   private methodMissing(called: string, args: unknown[]): unknown {
     this._deprecator.warn(this._message, callerLocations());
-    if (called === "equals") return rbEqual(this.target, args[0]);
-    const value = (this.target as Record<string, unknown>)[called];
+    const target = this.target;
+    if (called === "equals") return rbEqual(target, args[0]);
+    if (typeof target === "string") return rbStrSend(target, called, ...args)[0];
+    const value = (target as Record<string, unknown>)[called];
     return typeof value === "function"
-      ? (value as (...a: unknown[]) => unknown).apply(this.target, args)
+      ? (value as (...a: unknown[]) => unknown).apply(target, args)
       : value;
   }
 }

@@ -55,9 +55,9 @@ function sumIterSomeValue(v: unknown, i: unknown): unknown {
 }
 
 /**
- * `Integer#+` / `Float#+` / `Rational#+` (`vendor/ruby/numeric.c` `rb_int_plus`,
- * `rb_float_plus`, `vendor/ruby/rational.c:724` `rb_rational_plus`); a
- * non-numeric addend goes through `rb_num_coerce_bin`.
+ * `Integer#+` / `Float#+` / `Rational#+` (`vendor/ruby/numeric.c:3983` `rb_int_plus`,
+ * `numeric.c:1176` `rb_float_plus`, `vendor/ruby/rational.c:724` `rb_rational_plus`); a
+ * non-numeric addend goes through `rb_num_coerce_bin` (`numeric.c:477`).
  */
 function numericPlus(v: number | bigint | Rational, i: unknown): unknown {
   if (i instanceof Rational || v instanceof Rational) {
@@ -71,7 +71,7 @@ function numericPlus(v: number | bigint | Rational, i: unknown): unknown {
     const [n, b] = typeof v === "bigint" ? [i as number, v] : [v, i as bigint];
     return Number.isInteger(n) ? BigInt(n) + b : n + Number(b);
   }
-  // `do_coerce` (`vendor/ruby/numeric.c:448`).
+  // `do_coerce` (`vendor/ruby/numeric.c:455`).
   const coerce = (i as { coerce?: unknown } | null)?.coerce;
   if (typeof coerce !== "function") {
     throw new TypeError(`${rbBuiltinClassName(i)} can't be coerced into ${rbObjClass(v)}`);
