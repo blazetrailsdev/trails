@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Nodes, Table as ArelTable } from "@blazetrails/arel";
+import { isPresent } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
 import { registerModel, modelRegistry } from "./associations.js";
 import { merge, SpawnMethods } from "./relation/spawn-methods.js";
@@ -40,11 +41,11 @@ describe("isBlank / isPresent", () => {
     }
 
     expect(await SampleRecord.all().isBlank()).toBe(true);
-    expect(await SampleRecord.all().isPresent()).toBe(false);
+    expect(await isPresent(SampleRecord.all())).toBe(false);
 
     await SampleRecord.create({ name: "Alice" });
     expect(await SampleRecord.all().isBlank()).toBe(false);
-    expect(await SampleRecord.all().isPresent()).toBe(true);
+    expect(await isPresent(SampleRecord.all())).toBe(true);
   });
 });
 

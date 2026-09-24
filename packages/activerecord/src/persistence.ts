@@ -6,10 +6,10 @@ import {
   type TouchArgs,
   type TouchOptions,
 } from "./timestamp.js";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Rational, basicObjRespondTo, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import type { CounterCacheCounters } from "./counter-cache.js";
-import { ArgumentError, SerializeCastValue } from "@blazetrails/activemodel";
+import { ArgumentError, AttributeMethods, SerializeCastValue } from "@blazetrails/activemodel";
 import { extractOptionsBang, runCallbacks } from "@blazetrails/activesupport";
 import {
   InsertManager,
@@ -33,7 +33,7 @@ import {
   attributesWithValues,
 } from "./attribute-methods.js";
 import * as Inheritance from "./inheritance.js";
-import { getStiBase, isStiSubclass, stiName, defineDynamicSelectReaders } from "./inheritance.js";
+import { getStiBase, isStiSubclass, stiName } from "./inheritance.js";
 import { withTransactionReturningStatus } from "./transactions.js";
 import { registry } from "./suppressor.js";
 import {
@@ -705,8 +705,6 @@ interface ReloadRecord {
   _mutationsBeforeLastSave: unknown;
   _mutationsFromDatabase: unknown;
   _associationInstances: Map<string, { owner: unknown }>;
-  _collectionProxies: Map<string, unknown>;
-  _resetAssociationCaches(): void;
   id: unknown;
   constructor: {
     name: string;
@@ -749,23 +747,23 @@ export async function reload<T extends ReloadRecord>(
   ) as {
     _attributes: unknown;
     _associationInstances: Map<string, { owner: unknown }>;
-    _collectionProxies: Map<string, unknown>;
   };
 
   this._attributes = fresh._attributes;
-  defineDynamicSelectReaders(this as unknown as import("./base.js").Base);
+  if (Object.getPrototypeOf(this) !== (ctor as { prototype?: object }).prototype) {
+    AttributeMethods.ClassMethods.undefineAttributeMethods.call(rbObjSingletonClass(this) as never);
+  }
+  for (const name of (this._attributes as { keys(): Iterable<string> }).keys()) {
+    if (!basicObjRespondTo(this, name, false)) {
+      (rbObjSingletonClass(this) as unknown as typeof Base).defineAttributeMethod(name);
+    }
+  }
   this._newRecord = false;
   this._previouslyNewRecord = false;
   this._mutationsBeforeLastSave = null;
   this._mutationsFromDatabase = null;
 
-  this._resetAssociationCaches();
-  for (const [name, value] of fresh._associationInstances) {
-    this._associationInstances.set(name, value);
-  }
-  for (const [name, value] of fresh._collectionProxies) {
-    this._collectionProxies.set(name, value);
-  }
+  this._associationInstances = fresh._associationInstances;
   for (const association of this._associationInstances.values()) {
     association.owner = this;
   }

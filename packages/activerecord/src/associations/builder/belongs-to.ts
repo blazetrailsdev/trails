@@ -1,4 +1,4 @@
-import { hasKey } from "@blazetrails/ruby-compat";
+import { hasKey, type Module } from "@blazetrails/ruby-compat";
 import { underscore, pluralize, isBlank, safeConstantize } from "@blazetrails/activesupport";
 import type { AssociationInstanceHost } from "./association.js";
 import { SingularAssociation } from "./singular-association.js";
@@ -326,31 +326,14 @@ export class BelongsTo extends SingularAssociation {
   }
 
   static override defineChangeTrackingMethods(model: any, reflection: any): void {
-    const mixin = model.prototype ?? model;
-    if (!mixin || typeof mixin !== "object") return;
-    const name = reflection.name ?? reflection;
+    const mixin: Module = model.generatedAssociationMethods();
+    const name = reflection.name;
 
-    for (const [methodName, impl] of [
-      [
-        `${name}Changed`,
-        function (this: AssociationInstanceHost) {
-          return this.association(name).isTargetChanged();
-        },
-      ],
-      [
-        `${name}PreviouslyChanged`,
-        function (this: AssociationInstanceHost) {
-          return this.association(name).isTargetPreviouslyChanged();
-        },
-      ],
-    ] as [string, () => any][]) {
-      const existing = Object.getOwnPropertyDescriptor(mixin, methodName);
-      if (existing && !existing.configurable) continue;
-      Object.defineProperty(mixin, methodName, {
-        value: impl,
-        writable: true,
-        configurable: true,
-      });
-    }
+    mixin.defineMethod(`${name}Changed`, function (this: AssociationInstanceHost) {
+      return this.association(name).isTargetChanged();
+    });
+    mixin.defineMethod(`${name}PreviouslyChanged`, function (this: AssociationInstanceHost) {
+      return this.association(name).isTargetPreviouslyChanged();
+    });
   }
 }

@@ -184,27 +184,22 @@ export function generateAssociationWriter(
   associationName: string,
   type: "collection" | "one_to_one",
 ): void {
-  const modelClass = this;
   const attrName = `${associationName}Attributes`;
   const assign: (record: Base, name: string, value: any) => Promise<void> | void =
     type === "collection"
       ? assignNestedAttributesForCollectionAssociation
       : assignNestedAttributesForOneToOneAssociation;
 
-  Object.defineProperty(modelClass.prototype, `set${camelize(attrName, true)}`, {
-    value(this: Base, value: any): Promise<void> | void {
-      return assign(this, associationName, value);
-    },
-    writable: true,
-    configurable: true,
-  });
-
-  Object.defineProperty(modelClass.prototype, `${attrName}=`, {
-    value(this: Base, value: any): Promise<void> | void {
-      return assign(this, associationName, value);
-    },
-    writable: true,
-    configurable: true,
+  this.generatedAssociationMethods().moduleEval((m) => {
+    for (const methodName of [`set${camelize(attrName, true)}`, `${attrName}=`]) {
+      Object.defineProperty(m, methodName, {
+        value(this: Base, value: any): Promise<void> | void {
+          return assign(this, associationName, value);
+        },
+        writable: true,
+        configurable: true,
+      });
+    }
   });
 }
 

@@ -66,7 +66,6 @@ interface ValidationsHost {
   errors: { isAny(): boolean };
   isValid(context?: ValidationContextArg): Promise<boolean>;
   _associationCache?(name: string): { target?: unknown } | undefined;
-  _collectionProxies?: { get?(name: string): unknown };
   association?(name: string): { loaded?: boolean; target?: unknown } | undefined;
   readAttribute(name: string): unknown;
 }
@@ -124,15 +123,6 @@ export function performValidations(
 
 /** @noRailsEquivalent PERMANENT */
 export function readAttributeForValidation(this: ValidationsHost, attribute: string): unknown {
-  const proxy = this._collectionProxies?.get?.(attribute) as
-    | { loaded?: boolean; target?: unknown[] }
-    | undefined;
-  if (
-    proxy &&
-    (proxy.loaded === true || (Array.isArray(proxy.target) && proxy.target.length > 0))
-  ) {
-    return proxy.target;
-  }
   if (typeof this.association === "function") {
     try {
       const assoc = this.association(attribute);

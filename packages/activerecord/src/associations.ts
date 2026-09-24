@@ -10,7 +10,7 @@ import { qualifiedName } from "./inheritance.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { StatementCache } from "./statement-cache.js";
 import { AssociationNotFoundError } from "./associations/errors.js";
-import { AssociationScope, invokeScopeLambda } from "./associations/association-scope.js";
+import { AssociationScope } from "./associations/association-scope.js";
 import type { Association as AssociationInstance } from "./associations/association.js";
 export { joinTableName as joinHabtmTableNames } from "./migration/join-table.js";
 import { constantize, registerConstant, unregisterConstant } from "@blazetrails/activesupport";
@@ -241,7 +241,9 @@ export function _cacheSingularTarget(record: Base, assocName: string, target: Ba
     assoc.inversedFrom(target);
     return;
   }
-  record._associationInstances.get(assocName)?.inversedFrom(target);
+  (associationInstanceGet.call(record, assocName) as AssociationInstance | null)?.inversedFrom(
+    target,
+  );
 }
 
 export class Associations {
@@ -331,7 +333,6 @@ export class Associations {
         mod.defineMethod("destroyAssociations", async function (this: any): Promise<void> {
           await this.association(middleReflection.name).deleteAll("delete_all");
           this.association(name).reset();
-          this._collectionProxies?.delete(name);
           await mod.superMethod(this, "destroyAssociations")!();
         });
       }),
@@ -363,8 +364,7 @@ export class Associations {
 }
 
 export function isAssociationCached(record: Base, name: string): boolean {
-  if (record._associationInstances.has(name)) return true;
-  return record._collectionProxies.has(name);
+  return record._associationInstances.has(name);
 }
 
 /** @internal */
@@ -384,21 +384,6 @@ export function _scopeForAssociation(model: typeof Base): Relation<Base> {
     (model as unknown as { scopeForAssociation?(): Relation<Base> }).scopeForAssociation?.() ??
     model.all()
   );
-}
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE converge-invented-association-scope-and-key-helpers
- */
-export function applyAssociationScope<R>(
-  rel: R,
-  scope: ((this: R, rel: R, owner: Base) => R | false | null | undefined) | null | undefined,
-  owner: Base,
-  reflectionScope?: unknown,
-): R {
-  if (!scope) return rel;
-  if (reflectionScope !== undefined && scope === reflectionScope) return rel;
-  return invokeScopeLambda(scope, rel, owner) || rel;
 }
 
 /** @internal */
@@ -597,15 +582,14 @@ export function collectionProxyFor<T extends Base = Base>(
   record: Base,
   assocName: string,
 ): AssociationProxy<T> {
-  const existing = record._collectionProxies.get(assocName) as AssociationProxy<T> | undefined;
-  if (existing) return existing;
+  const instance = record.association(assocName) as unknown as {
+    isCollection(): boolean;
+    reflection: AssociationDefinition;
+    _proxy?: AssociationProxy<T>;
+  };
+  if (instance._proxy) return instance._proxy;
 
   const ctor = record.constructor as typeof Base;
-  const assocDef = ctor._reflectOnAssociation(assocName) as unknown as AssociationDefinition | null;
-  if (!assocDef) {
-    throw new AssociationNotFoundError(record, assocName);
-  }
-  const instance = record.association(assocName) as unknown as { isCollection(): boolean };
   if (!instance.isCollection()) {
     throw new TypeError(
       `association() builds a CollectionProxy, which Rails has only for a collection ` +
@@ -617,10 +601,10 @@ export function collectionProxyFor<T extends Base = Base>(
     AssociationsNamespace.CollectionProxy as unknown as {
       _create: (r: Base, n: string, d: AssociationDefinition) => CollectionProxy<T>;
     }
-  )._create(record, assocName, assocDef);
+  )._create(record, assocName, instance.reflection);
 
-  record._collectionProxies.set(assocName, proxy);
-  return proxy as AssociationProxy<T>;
+  instance._proxy = proxy as AssociationProxy<T>;
+  return instance._proxy;
 }
 
 /** @internal */
@@ -666,7 +650,7 @@ function syncAssociationInstance(this: Base, name: string, instance: Association
 }
 
 export function association(this: Base, name: string): AssociationInstance {
-  const existing = this._associationInstances.get(name);
+  const existing = associationInstanceGet.call(this, name) as AssociationInstance | null;
   if (existing) {
     syncAssociationInstance.call(this, name, existing);
     return existing;
@@ -681,7 +665,7 @@ export function association(this: Base, name: string): AssociationInstance {
   }
 
   const instance = _buildAssociationInstance.call(this, assocDef);
-  this._associationInstances.set(name, instance);
+  associationInstanceSet.call(this, name, instance);
   syncAssociationInstance.call(this, name, instance);
   return instance;
 }
@@ -689,11 +673,11 @@ export function association(this: Base, name: string): AssociationInstance {
 /** @internal */
 export function initInternals(this: Base, super_: () => void): void {
   super_();
-  this._resetAssociationCaches();
+  this._associationInstances = new Map();
 }
 
 export function initializeDup(this: Base, super_: (other: unknown) => void, other: unknown): void {
-  this._resetAssociationCaches();
+  this._associationInstances = new Map();
   super_(other);
 }
 

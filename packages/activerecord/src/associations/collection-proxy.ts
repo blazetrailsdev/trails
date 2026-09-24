@@ -26,11 +26,7 @@ import {
   publicInstanceMethods,
 } from "@blazetrails/activesupport";
 import type { AssociationDefinition } from "../associations.js";
-import {
-  _buildAssociationInstance,
-  autoloadModel,
-  collectionProxyFor as associationProxy,
-} from "../associations.js";
+import { _buildAssociationInstance, autoloadModel } from "../associations.js";
 import { Associations } from "../namespaces.js";
 
 // @ts-expect-error declaration-merge load() divergence — permanent, see class override
@@ -171,10 +167,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   static create<T extends Base = Base>(
-    _model: typeof Base,
-    association: { owner: Base; reflection: { name: string } },
+    model: typeof Base,
+    association: CollectionAssociation,
   ): AssociationProxy<T> {
-    return associationProxy<T>(association.owner, association.reflection.name);
+    const Ctor = relationClassFor.call(CollectionProxy, model);
+    return new Ctor(model, association) as unknown as AssociationProxy<T>;
   }
 
   /** @internal */

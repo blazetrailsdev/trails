@@ -1,5 +1,5 @@
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { hexdigest, isBlank, toFs } from "@blazetrails/activesupport";
+import { hexdigest, isBlank, isPresent, toFs } from "@blazetrails/activesupport";
 import {
   except,
   extend,
@@ -583,14 +583,9 @@ export class Relation<T extends Base> {
     return this.isEmpty();
   }
 
-  /** @noRailsEquivalent CONVERGEABLE relation-present-presence-via-object-blank */
-  async isPresent(): Promise<boolean> {
-    return this.isAny();
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE relation-present-presence-via-object-blank */
+  /** @noRailsEquivalent PERMANENT */
   async presence(): Promise<LoadedRelation<Relation<T>> | null> {
-    return (await this.isPresent()) ? stripThenable(this as Relation<T>) : null;
+    return (await isPresent(this)) ? stripThenable(this as Relation<T>) : null;
   }
 
   async detect(fn: (record: T, index: number, all: T[]) => unknown): Promise<T | undefined> {

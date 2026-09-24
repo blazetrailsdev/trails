@@ -228,56 +228,6 @@ export function findStiClass(baseClass: typeof Base, typeName: string): typeof B
   return subclass;
 }
 
-const SELECT_ALIAS_READERS = Symbol.for("activerecord.selectAliasReaders");
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE select-alias-readers-onto-attribute-method-dispatch
- */
-export function defineDynamicSelectReaders(record: Base): void {
-  const attrs = (record as any)._attributes as { keys(): Iterable<string> };
-  const rec = record as unknown as Record<string | symbol, unknown>;
-  const installed = (rec[SELECT_ALIAS_READERS] as Set<string> | undefined) ?? new Set<string>();
-  if (installed.size > 0) {
-    const live = new Set(attrs.keys());
-    for (const name of installed) {
-      if (!live.has(name)) {
-        delete rec[name];
-        installed.delete(name);
-      }
-    }
-  }
-  const proto = Object.getPrototypeOf(record) as object;
-  for (const name of attrs.keys()) {
-    if (installed.has(name)) continue;
-    if (Object.prototype.hasOwnProperty.call(record, name)) continue;
-    let hasProtoMember = false;
-    for (let p: object | null = proto; p != null; p = Object.getPrototypeOf(p)) {
-      if (Object.getOwnPropertyDescriptor(p, name)) {
-        hasProtoMember = true;
-        break;
-      }
-    }
-    if (hasProtoMember) continue;
-    Object.defineProperty(record, name, {
-      get(this: Base) {
-        return (this as any).readAttribute(name);
-      },
-      configurable: true,
-      enumerable: false,
-    });
-    installed.add(name);
-  }
-  if (installed.size > 0 && rec[SELECT_ALIAS_READERS] === undefined) {
-    Object.defineProperty(record, SELECT_ALIAS_READERS, {
-      value: installed,
-      configurable: true,
-      enumerable: false,
-      writable: false,
-    });
-  }
-}
-
 export function isFinderNeedsTypeCondition(modelClass: typeof Base): boolean {
   if (!Object.prototype.hasOwnProperty.call(modelClass, "_finderNeedsTypeCondition")) {
     (modelClass as any)._finderNeedsTypeCondition = !modelClass.isDescendsFromActiveRecord();

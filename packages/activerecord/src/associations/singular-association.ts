@@ -5,7 +5,6 @@ import {
   _loadSingularViaStatementCache,
   _scopeForAssociation,
   _skipSingularStatementCache,
-  applyAssociationScope,
   resolveAssocClass,
 } from "../associations.js";
 import { Association } from "./association.js";
@@ -120,9 +119,7 @@ export class SingularAssociation extends Association<Base> {
       } else {
         const built = _builtAssociationScope(owner, assocName, reflection, targetModel);
         const baseRelation = _scopeForAssociation(targetModel);
-        let rel = baseRelation.merge(built);
-        rel = applyAssociationScope(rel, this.reflection.scope, owner, reflection.scope);
-        result = await rel.take();
+        result = await baseRelation.merge(built).take();
       }
 
       if (result) this.setInverseInstance(result);

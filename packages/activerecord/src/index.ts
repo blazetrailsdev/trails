@@ -203,7 +203,6 @@ export {
   HasOneThroughNestedAssociationsAreReadonly,
   EagerLoadPolymorphicError,
   DeleteRestrictionError,
-  HasOnePersistedAssignmentError,
   CollectionPersistedAssignmentError,
   CollectionIdsAssignmentError,
 } from "./associations/errors.js";

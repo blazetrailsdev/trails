@@ -24,6 +24,7 @@ import {
   assertPredicate,
   assertRespondTo,
   isBlank,
+  isPresent,
 } from "@blazetrails/activesupport";
 import { pp } from "./pretty-print.js";
 import { fixtures } from "./test-fixtures.js";
@@ -2434,11 +2435,11 @@ describe("RelationTest", () => {
     const topicsRel = Topic.all();
 
     await assertQueriesCount(1, false, async () => {
-      expect(await topicsRel.isPresent()).toBeTruthy();
+      expect(await isPresent(topicsRel)).toBeTruthy();
     });
 
     await assertNoQueries(false, async () => {
-      expect(await topicsRel.isPresent()).toBeTruthy();
+      expect(await isPresent(topicsRel)).toBeTruthy();
     });
     await assertNoQueries(false, async () => {
       expect(await topicsRel.isBlank()).toBeFalsy();

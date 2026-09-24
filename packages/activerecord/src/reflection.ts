@@ -532,9 +532,6 @@ export class MacroReflection extends AbstractReflection {
 
   scopeFor(relation: any, owner?: any): any {
     if (this._scope) {
-      if (this._scope.length === 0) {
-        return this._scope.call(relation) || relation;
-      }
       return this._scope.call(relation, relation, owner) || relation;
     }
     return relation;

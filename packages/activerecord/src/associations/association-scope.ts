@@ -12,23 +12,6 @@ import { methodMissingProxy } from "@blazetrails/ruby-compat";
 
 export type ValueTransformation<T = unknown> = (v: T) => unknown;
 
-/** @internal */
-export type ScopeLambda<R> = (this: R, rel: R, owner: Base) => R | false | null | undefined;
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE converge-invented-association-scope-and-key-helpers
- */
-export function invokeScopeLambda<R>(
-  fn: ScopeLambda<R>,
-  rel: R,
-  owner: Base,
-): R | false | null | undefined {
-  return fn.length === 0
-    ? (fn as (this: R) => ReturnType<ScopeLambda<R>>).call(rel)
-    : fn.call(rel, rel, owner);
-}
-
 export interface AssociationScopeable {
   readonly owner: Base;
   readonly reflection: AssociationReflection;
@@ -422,7 +405,7 @@ export class AssociationScope {
     const relation = (reflection as unknown as ScopeBuilder).buildScope(
       (reflection as Partial<ReflectionProxy>).aliasedTable,
     );
-    const evaluated = invokeScopeLambda(scope as ScopeLambda<unknown>, relation, owner);
+    const evaluated = scope.call(relation, relation, owner);
     return evaluated != null && evaluated !== false ? evaluated : relation;
   }
 

@@ -1,15 +1,5 @@
+import type { Module } from "@blazetrails/ruby-compat";
 import { Association, type AssociationInstanceHost } from "./association.js";
-
-function defineMethod(mixin: any, methodName: string, fn: (...args: any[]) => any): void {
-  if (!mixin || typeof mixin !== "object") return;
-  const existing = Object.getOwnPropertyDescriptor(mixin, methodName);
-  if (existing && !existing.configurable) return;
-  Object.defineProperty(mixin, methodName, {
-    value: fn,
-    writable: true,
-    configurable: true,
-  });
-}
 
 export class SingularAssociation extends Association {
   static override validOptions(options: Record<string, unknown>): string[] {
@@ -18,40 +8,34 @@ export class SingularAssociation extends Association {
 
   static override defineAccessors(model: any, reflection: any): void {
     super.defineAccessors(model, reflection);
-    const mixin = model.prototype ?? model;
-    const name = reflection.name ?? reflection;
+    const mixin: Module = model.generatedAssociationMethods();
+    const name = reflection.name;
     const cap = name.charAt(0).toUpperCase() + name.slice(1);
 
     if (!reflection.options?.polymorphic) {
       this.defineConstructors(mixin, name);
     }
 
-    defineMethod(mixin, `reload${cap}`, function (this: AssociationInstanceHost) {
+    mixin.defineMethod(`reload${cap}`, function (this: AssociationInstanceHost) {
       return this.association(name).forceReloadReader();
     });
-    defineMethod(mixin, `reset${cap}`, function (this: AssociationInstanceHost) {
+    mixin.defineMethod(`reset${cap}`, function (this: AssociationInstanceHost) {
       return this.association(name).reset();
     });
   }
 
-  static defineConstructors(mixin: any, name: string): void {
+  static defineConstructors(mixin: Module, name: string): void {
     const cap = name.charAt(0).toUpperCase() + name.slice(1);
-    defineMethod(
-      mixin,
-      `build${cap}`,
-      function (this: AssociationInstanceHost, ...args: unknown[]) {
-        return this.association(name).build(...args);
-      },
-    );
-    defineMethod(
-      mixin,
+    mixin.defineMethod(`build${cap}`, function (this: AssociationInstanceHost, ...args: unknown[]) {
+      return this.association(name).build(...args);
+    });
+    mixin.defineMethod(
       `create${cap}`,
       function (this: AssociationInstanceHost, ...args: unknown[]) {
         return this.association(name).create(...args);
       },
     );
-    defineMethod(
-      mixin,
+    mixin.defineMethod(
       `create${cap}Bang`,
       function (this: AssociationInstanceHost, ...args: unknown[]) {
         return this.association(name).createBang(...args);

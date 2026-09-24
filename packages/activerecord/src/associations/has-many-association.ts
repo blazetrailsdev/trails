@@ -9,7 +9,6 @@ import {
   _ownerChainReflection,
   associationInstanceGet,
   _scopeForAssociation,
-  applyAssociationScope,
   resolveAssocClass,
 } from "../associations.js";
 import { strictLoadingViolationBang } from "../core.js";
@@ -382,16 +381,6 @@ async function findTarget(
   violatesStrictLoading = false,
 ): Promise<Base[]> {
   const options = assocDef.options;
-  const cache = record._associationCache(assocName);
-  if (
-    cache &&
-    cache !== record._collectionProxies.get(assocName) &&
-    (cache as unknown) !== (record._associationInstances.get(assocName) as unknown) &&
-    Array.isArray(cache.target) &&
-    !(typeof (cache as any).isStaleTarget === "function" && (cache as any).isStaleTarget())
-  ) {
-    return cache.target;
-  }
   const holder = associationInstanceGet.call(record, assocName) as Association | null;
   if (holder?.isLoaded() && !(holder._staleStateIsSnapshotted && holder.isStaleTarget())) {
     return (holder.target ?? []) as Base[];
@@ -459,7 +448,6 @@ export function scope(
     const built = _builtAssociationScope(record, assocName, reflection, targetModel);
     const baseRelation = _scopeForAssociation(targetModel);
     rel = baseRelation.merge(built);
-    rel = applyAssociationScope(rel, assocDef.scope, record, reflection.scope);
   } else {
     if (options.as) {
       const typeCol = `${underscore(options.as)}_type`;
@@ -499,7 +487,7 @@ export function scope(
         [foreignKey]: record._readAttribute(ownerKey as string),
       });
     }
-    rel = applyAssociationScope(rel, assocDef.scope, record);
+    if (assocDef.scope) rel = assocDef.scope.call(rel, rel, record) || rel;
   }
   return rel;
 }
