@@ -100,14 +100,6 @@ export class Result {
     }
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-result-from-row-hashes-onto-result-new */
-  static fromRowHashes(rows: Record<string, unknown>[]): Result {
-    if (rows.length === 0) return new Result([], []);
-    const columns = Object.keys(rows[0]);
-    const rowArrays = rows.map((row) => columns.map((col) => row[col]));
-    return new Result(columns, rowArrays);
-  }
-
   /** @noRailsEquivalent PERMANENT */
   [Symbol.iterator](): IterableIterator<Record<string, unknown>> {
     return this.hashRows()[Symbol.iterator]();
@@ -208,6 +200,10 @@ export class Result {
       : this.columns.map((name, i) => this.#columnType(name, i, typeOverrides as ColumnTypes));
 
     return this.rows.map((row) => row.map((value, i) => types[i].deserialize(value)));
+  }
+
+  dup(): Result {
+    return new Result(this.columns, this.rows.slice(), { ...this.columnTypes });
   }
 
   get columnIndexes(): Record<string, number> {

@@ -15,7 +15,7 @@ const LOCKED_QUERY = /\bFOR\s+(UPDATE|SHARE|NO\s+KEY\s+UPDATE|KEY\s+SHARE)\b/i;
 const DEFAULT_MAX_SIZE = 100;
 
 export class Store {
-  private _map = new Map<string, Record<string, unknown>[]>();
+  private _map = new Map<string, Result>();
   private _maxSize: number | null;
   private _version: { value: number } | null;
   private _currentVersion: number;
@@ -50,7 +50,7 @@ export class Store {
     return this.dirties;
   }
 
-  get(key: string): Record<string, unknown>[] | undefined {
+  get(key: string): Result | undefined {
     this.checkVersion();
     if (!this.enabled) return undefined;
     const entry = this._map.get(key);
@@ -61,10 +61,7 @@ export class Store {
     return entry;
   }
 
-  computeIfAbsent(
-    key: string,
-    compute: () => Promise<Record<string, unknown>[]>,
-  ): Promise<Record<string, unknown>[]> {
+  computeIfAbsent(key: string, compute: () => Promise<Result>): Promise<Result> {
     this.checkVersion();
 
     if (!this.enabled) return compute();
@@ -135,21 +132,21 @@ export interface QueryCacheHost extends DatabaseStatementsHost {
     sql: string,
     name: string | null | undefined,
     binds: unknown[],
-    result: Record<string, unknown>[],
+    result: Result,
   ): Record<string, unknown>;
   /** @internal */
   lookupSqlCache(
     sql: string,
     name: string | null | undefined,
     binds: unknown[],
-  ): Record<string, unknown>[] | undefined;
+  ): Result | undefined;
   /** @internal */
   cacheSql(
     sql: string,
     name: string | null | undefined,
     binds: unknown[],
-    block: () => Promise<Record<string, unknown>[]>,
-  ): Promise<Record<string, unknown>[]>;
+    block: () => Promise<Result>,
+  ): Promise<Result>;
 }
 
 export class ConnectionPoolConfiguration {
@@ -329,19 +326,19 @@ export function selectAll(
   const qc = this._queryCache;
   if (qc?.enabled && !LOCKED_QUERY.test(sql)) {
     if (opts?.async) {
-      const cached = this.lookupSqlCache(sql, name, binds ?? []);
       const result =
-        cached !== undefined
-          ? Result.fromRowHashes(cached)
-          : super_.call(this, sql, name, binds, forwardOpts);
+        this.lookupSqlCache(sql, name, binds ?? []) ??
+        super_.call(this, sql, name, binds, forwardOpts);
       return result instanceof Promise
         ? result.then((r) => FutureResult.wrap(r))
         : FutureResult.wrap(result);
     }
-    return this.cacheSql(sql, name, binds ?? [], async () => {
-      const result = await super_.call(this, sql, name, binds, forwardOpts);
-      return result.toArray();
-    }).then((rows) => Result.fromRowHashes(rows));
+    return this.cacheSql(
+      sql,
+      name,
+      binds ?? [],
+      async () => await super_.call(this, sql, name, binds, forwardOpts),
+    );
   }
   return super_.call(this, sql, name, binds, forwardOpts);
 }
@@ -407,7 +404,7 @@ function cacheNotificationInfoResult(
   sql: string,
   name: string | null | undefined,
   binds: unknown[],
-  result: Record<string, unknown>[],
+  result: Result,
 ): Record<string, unknown> {
   const payload = this.cacheNotificationInfo(sql, name, binds);
   payload["row_count"] = result.length;
@@ -431,7 +428,7 @@ function lookupSqlCache(
   sql: string,
   name: string | null | undefined,
   binds: unknown[],
-): Record<string, unknown>[] | undefined {
+): Result | undefined {
   const qc = this._queryCache;
   if (!qc) return undefined;
   const key = sqlCacheKey(sql, binds);
@@ -451,8 +448,8 @@ function cacheSql(
   sql: string,
   name: string | null | undefined,
   binds: unknown[],
-  block: () => Promise<Record<string, unknown>[]>,
-): Promise<Record<string, unknown>[]> {
+  block: () => Promise<Result>,
+): Promise<Result> {
   const qc = this._queryCache;
   if (!qc) return block();
   const key = sqlCacheKey(sql, binds);
@@ -470,7 +467,7 @@ function cacheSql(
           this.cacheNotificationInfoResult(sql, name, binds, result),
         );
       }
-      return [...result];
+      return result.dup();
     });
 }
 

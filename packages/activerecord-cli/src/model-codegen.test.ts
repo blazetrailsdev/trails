@@ -2,8 +2,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { generateModels, unqualify } from "./model-codegen.js";
 import type { IntrospectedTable } from "./model-codegen.js";
-import { ForeignKeyDefinition } from "./connection-adapters/abstract/schema-definitions.js";
-import { Base } from "./base.js";
+import { Base, ForeignKeyDefinition } from "@blazetrails/activerecord";
 
 const NOW = Temporal.Instant.from("2026-04-24T14:23:05.000Z");
 

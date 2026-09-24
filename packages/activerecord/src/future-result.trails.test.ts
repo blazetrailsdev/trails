@@ -336,7 +336,7 @@ describe("QueryCache#select_all", () => {
         _sql: string,
         _name: string | null | undefined,
         _binds: unknown[],
-        block: () => Promise<Record<string, unknown>[]>,
+        block: () => Promise<Result>,
       ) => block(),
     };
   }
@@ -370,7 +370,7 @@ describe("QueryCache#select_all", () => {
   it("wraps a cache hit in a Complete on the async arm", async () => {
     const store = new Store();
     store.enabled = true;
-    await store.computeIfAbsent("SELECT 1", async () => [{ id: 1 }]);
+    await store.computeIfAbsent("SELECT 1", async () => new Result(["id"], [[1]]));
     const superSelectAll = () => {
       throw new Error("must not reach super on a cache hit");
     };

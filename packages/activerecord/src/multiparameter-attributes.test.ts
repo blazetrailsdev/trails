@@ -511,8 +511,7 @@ describe("MultiParameterAttributeTest", () => {
     expect(customer.address).toEqual(address);
   });
 
-  it.skip("multiparameter assignment of aggregation with missing values", async () => {
-    // BLOCKED: composed-of-multiparameter-assignment-does-not-raise-on-bad-arity
+  it("multiparameter assignment of aggregation with missing values", async () => {
     const ex = (await assertRaise([MultiparameterAssignmentErrors], {}, async () => {
       const customer = new Customer();
       const address = new Address("The Street", "The City", "The Country");
@@ -536,8 +535,7 @@ describe("MultiParameterAttributeTest", () => {
     );
   });
 
-  it.skip("multiparameter assignment of aggregation with large index", async () => {
-    // BLOCKED: composed-of-multiparameter-assignment-does-not-raise-on-bad-arity
+  it("multiparameter assignment of aggregation with large index", async () => {
     const ex = (await assertRaise([MultiparameterAssignmentErrors], {}, async () => {
       const customer = new Customer();
       const address = new Address("The Street", "The City", "The Country");

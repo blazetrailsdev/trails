@@ -12,7 +12,6 @@ export type {
   AssociationKind,
   ScopeCall,
   EnumCall,
-  DefineEnumCall,
 } from "./walker.js";
 export { synthesizeDeclares } from "./synthesize.js";
 export { ATTRIBUTE_TYPE_MAP, tsTypeFor } from "./type-registry.js";

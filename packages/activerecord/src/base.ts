@@ -367,8 +367,6 @@ import {
 } from "./store.js";
 import { respondToMissing } from "./dynamic-matchers.js";
 
-import { extractMultiparameterCallstack } from "./multiparameter-attribute-assignment.js";
-
 export type PrimaryKeyScalar = string | number | bigint | null | undefined;
 
 export type PrimaryKeyValue = PrimaryKeyScalar | PrimaryKeyScalar[];
@@ -1792,11 +1790,10 @@ export class Base extends Model {
     if (!wasSuppressed) {
       inheritanceInitializeInternalsCallback.call(this as any);
       if (_shouldApplyScopeAttributes(ctor)) {
-        const { multiparams, regular } = extractMultiparameterCallstack(attrs);
         _applyScopeAttributes(
           ctor,
           this as any,
-          new Set([...Object.keys(multiparams), ...Object.keys(regular)]),
+          new Set(Object.keys(attrs).map((key) => key.split("(")[0])),
         );
       }
       if (assocPending) {

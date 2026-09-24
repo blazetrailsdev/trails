@@ -42,7 +42,6 @@
   "packages/activerecord/src/locking/pessimistic.ts",
   "packages/activerecord/src/migration.ts",
   "packages/activerecord/src/migration/command-recorder.ts",
-  "packages/activerecord/src/model-codegen.ts",
   "packages/activerecord/src/nested-attributes.ts",
   "packages/activerecord/src/persistence.ts",
   "packages/activerecord/src/querying.ts",

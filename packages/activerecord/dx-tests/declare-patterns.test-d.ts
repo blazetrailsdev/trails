@@ -6,8 +6,6 @@ import {
   Relation,
   collectionProxyFor as association,
 } from "@blazetrails/activerecord";
-import { defineEnum } from "@blazetrails/activerecord/enum";
-
 class User extends Base {
   declare name: string;
   declare email: string;
@@ -112,38 +110,17 @@ class Task extends Base {
   }
 }
 
-class Article extends Base {
-  declare status: string;
-
-  declare isDraft: () => boolean;
-  declare isPublished: () => boolean;
-  declare draft: () => void;
-  declare published: () => void;
-  declare draftBang: () => Promise<void>;
-  declare publishedBang: () => Promise<void>;
-  declare static draft: () => Relation<Article>;
-  declare static published: () => Relation<Article>;
-  declare static notDraft: () => Relation<Article>;
-  declare static notPublished: () => Relation<Article>;
-
-  static {
-    this.attribute("status", "integer");
-    defineEnum(this, "status", { draft: 0, published: 1 });
-  }
-}
-
-export function _defineEnumOptionsTypecheck(): void {
-  defineEnum(
-    Article,
+export function _enumOptionsTypecheck(): void {
+  Task.enum(
     "status",
-    { draft: 0, published: 1 },
+    { low: 0, high: 1 },
     {
       prefix: true,
       suffix: "state",
       scopes: false,
       instanceMethods: false,
       validate: true,
-      default: "draft",
+      default: "low",
     },
   );
 }
@@ -249,14 +226,6 @@ describe("declare patterns — typing runtime-attached members", () => {
   it("Base.enum class scopes: `declare static low: () => Relation<Task>`", () => {
     expectTypeOf(Task.low).toEqualTypeOf<() => Relation<Task>>();
     expectTypeOf(Task.low()).toMatchTypeOf<Relation<Task>>();
-  });
-
-  it("defineEnum adds plain setters + async bangs + not* scopes", async () => {
-    const a = new Article({ status: 0 });
-    expectTypeOf(a.draft).toEqualTypeOf<() => void>();
-    expectTypeOf(a.draftBang).toEqualTypeOf<() => Promise<void>>();
-    expectTypeOf(await a.draftBang()).toBeVoid();
-    expectTypeOf(Article.notDraft()).toMatchTypeOf<Relation<Article>>();
   });
 
   it("without a declare, an instance member read is a compile error; static members don't exist at all", () => {

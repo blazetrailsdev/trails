@@ -43,10 +43,6 @@ const files = allTs.filter((f) => {
   // they exist to be parsed/emitted, not executed against an adapter.
   if (/\/__fixtures__\//.test(f)) return false;
   if (/\/type-virtualization\/fixtures\//.test(f)) return false;
-  // model-codegen.ts emits class strings; its matches are inside templates
-  // that the comment/string stripper handles, but excluding it explicitly
-  // is cheaper and clearer.
-  if (f.endsWith("/model-codegen.ts")) return false;
   return true;
 });
 

@@ -3,9 +3,9 @@ import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 import { aliasedRow } from "../support/join-dependency-aliased-row.js";
 import { fixtures } from "../test-fixtures.js";
-import { Result } from "../result.js";
 import { JoinDependency } from "./join-dependency.js";
 import { Nodes } from "@blazetrails/arel";
+import { resultFromRowHashes } from "../test-helpers/result-from-row-hashes.js";
 
 describe("JoinDependency extra columns in instantiate", () => {
   fixtures({});
@@ -61,7 +61,7 @@ describe("JoinDependency extra columns in instantiate", () => {
       },
     ];
 
-    const parents = jd.instantiate(Result.fromRowHashes(rows));
+    const parents = jd.instantiate(resultFromRowHashes(rows));
 
     expect(parents).toHaveLength(2);
     expect(parents[0]._readAttribute("comment_count")).toBe(5);
@@ -81,7 +81,7 @@ describe("JoinDependency extra columns in instantiate", () => {
       },
     ];
 
-    const parents = jd.instantiate(Result.fromRowHashes(rows));
+    const parents = jd.instantiate(resultFromRowHashes(rows));
     const children = parents[0].association("comments").target;
 
     expect(children).toHaveLength(1);
@@ -98,7 +98,7 @@ describe("JoinDependency extra columns in instantiate", () => {
       }),
     ];
 
-    const parents = jd.instantiate(Result.fromRowHashes(rows));
+    const parents = jd.instantiate(resultFromRowHashes(rows));
 
     expect(parents).toHaveLength(1);
     expect(parents[0]._readAttribute("title")).toBe("Post");

@@ -22,10 +22,10 @@ import { ambientPoolConfiguration, rawTestAdapterConfiguration } from "./test-ad
 import { inMemoryDb } from "./support/adapter-helper.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
-import { Result } from "./result.js";
 import { Base } from "./base.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
 import { register, resolve } from "./connection-adapters.js";
+import { resultFromRowHashes } from "./test-helpers/result-from-row-hashes.js";
 
 interface AmbientPoolOptions {
   role?: string;
@@ -92,7 +92,7 @@ class TransactionAwareTestAdapter extends AbstractAdapter implements DatabaseAda
   async releaseSavepoint(_name: string): Promise<void> {}
   async rollbackToSavepoint(_name: string): Promise<void> {}
   async selectAll(sql: string, _n?: string | null, _b?: unknown[]) {
-    return Result.fromRowHashes(await this.execute(sql));
+    return resultFromRowHashes(await this.execute(sql));
   }
   async selectOne(sql: string, _n?: string | null, _b?: unknown[]) {
     return (await this.execute(sql))[0];
@@ -107,10 +107,10 @@ class TransactionAwareTestAdapter extends AbstractAdapter implements DatabaseAda
     return [];
   }
   async execQuery(sql: string, _n?: string | null, _b?: unknown[]) {
-    return Result.fromRowHashes(await this.execute(sql));
+    return resultFromRowHashes(await this.execute(sql));
   }
   async execInsert(sql: string, _n?: string | null, _b?: unknown[]) {
-    return Result.fromRowHashes(await this.execute(sql));
+    return resultFromRowHashes(await this.execute(sql));
   }
   async execDelete(_sql: string, _n?: string | null, _b?: unknown[]) {
     return 0;

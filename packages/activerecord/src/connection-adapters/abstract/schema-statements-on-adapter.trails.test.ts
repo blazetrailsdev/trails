@@ -2,13 +2,13 @@ import { describe, it, expect, afterEach } from "vitest";
 import { SQLite3Adapter } from "../sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../better-sqlite3-adapter.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
-import { Result } from "../../result.js";
 import { indexes as sqliteIndexes } from "../sqlite3/schema-statements.js";
 import { ForeignKeyDefinition } from "./schema-definitions.js";
 import { fixtures } from "../../test-fixtures.js";
 import { NotImplementedError } from "../../errors.js";
 import { ambientConnection, withRocketTables } from "../../support/rocket-tables.js";
 import { adapterType } from "../../test-adapter.js";
+import { resultFromRowHashes } from "../../test-helpers/result-from-row-hashes.js";
 
 const guardsIfNotExists = adapterType !== "sqlite";
 
@@ -47,7 +47,7 @@ class SqliteCapturingAdapter extends AbstractAdapter {
   }
   override async internalExecQuery(sql: string) {
     const rows = await this.execute(sql);
-    return Result.fromRowHashes(rows);
+    return resultFromRowHashes(rows);
   }
 }
 

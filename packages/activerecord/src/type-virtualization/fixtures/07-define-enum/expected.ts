@@ -1,5 +1,3 @@
-import { defineEnum } from "@blazetrails/activerecord/enum";
-
 export class Article extends Base {
   declare isDraft: () => boolean;
   declare draftBang: () => Promise<true | undefined>;
@@ -20,4 +18,4 @@ export interface Article {
 }
 
 
-defineEnum(Article, "status", { draft: 0, published: 1 });
+Article.enum("status", { draft: 0, published: 1 });

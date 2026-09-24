@@ -1,9 +1,5 @@
-import {
-  extractMultiparameterCallstack,
-  assignMultiparameterValues,
-} from "./multiparameter-attribute-assignment.js";
 import { AttributeAssignmentError, MultiparameterAssignmentErrors } from "./errors.js";
-import { rbInspect } from "@blazetrails/ruby-compat";
+import { isEmpty, rbInspect } from "@blazetrails/ruby-compat";
 
 interface AttributeAssignmentHost {
   writeAttribute(key: string, value: unknown): void;
@@ -97,11 +93,7 @@ export function executeCallstackForMultiparameterAttributes(
       } else {
         values = valuesWithEmptyParameters;
       }
-      assignMultiparameterValues(
-        this as unknown as Parameters<typeof assignMultiparameterValues>[0],
-        name,
-        values,
-      );
+      (this as unknown as Record<string, unknown>)[name] = values;
     } catch (ex) {
       errors.push(
         new AttributeAssignmentError(
@@ -125,7 +117,19 @@ export function extractCallstackForMultiparameterAttributes(
   this: AttributeAssignmentHost,
   pairs: Record<string, unknown>,
 ): Record<string, Record<number, unknown>> {
-  return extractMultiparameterCallstack(pairs).multiparams;
+  const attributes: Record<string, Record<number, unknown>> = {};
+
+  for (const [multiparameterName, value] of Object.entries(pairs)) {
+    const attributeName = multiparameterName.split("(")[0];
+    attributes[attributeName] ??= {};
+
+    const parameterValue = isEmpty(value as string)
+      ? null
+      : typeCastAttributeValue(multiparameterName, value as string);
+    attributes[attributeName][findParameterPosition(multiparameterName)] ??= parameterValue;
+  }
+
+  return attributes;
 }
 
 /** @internal */

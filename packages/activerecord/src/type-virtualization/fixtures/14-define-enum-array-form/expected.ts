@@ -1,5 +1,3 @@
-import { defineEnum } from "@blazetrails/activerecord/enum";
-
 export class Conversation extends Base {
   declare isActive: () => boolean;
   declare activeBang: () => Promise<true | undefined>;
@@ -20,4 +18,4 @@ export interface Conversation {
 }
 
 
-defineEnum(Conversation, "status", ["active", "archived"]);
+Conversation.enum("status", ["active", "archived"]);

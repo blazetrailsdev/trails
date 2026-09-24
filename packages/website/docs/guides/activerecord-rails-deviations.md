@@ -229,7 +229,7 @@ Rails' `enum status: [:draft, :published]` generates `draft?`,
 `published?`, `draft!`, `published!`, and scopes. Trails does the same
 but:
 
-- Generation happens in `defineEnum`
+- Generation happens in `Base.enum`
   (`packages/activerecord/src/enum.ts`) via `Object.defineProperty`,
   not `define_method`.
 - The **bang methods are async** because persisting the change hits
@@ -401,7 +401,6 @@ import {
   Relation,
   collectionProxyFor,
 } from "@blazetrails/activerecord";
-import { defineEnum } from "@blazetrails/activerecord/enum";
 
 class Author extends Base {}
 class Comment extends Base {}
@@ -409,8 +408,7 @@ class Comment extends Base {}
 class Post extends Base {
   declare title: string; // attribute
   declare featured: boolean; // attribute (backs the named scope below)
-  declare status: number; // enum is stored as an integer; defineEnum
-  //                        does not override the accessor (unlike Base.enum)
+  declare status: number; // enum is stored as an integer
   declare author: Author | null | Promise<Author | null>; // belongsTo reader — the loaded record,
   //                                or a Promise that loads it
   declare comments: AssociationProxy<Comment>;
@@ -420,28 +418,19 @@ class Post extends Base {
   // as what `collectionProxyFor(post, "comments")` returns. Collections have
   // no explicit loader — `await post.comments` IS the load.
   declare isDraft: () => boolean; // enum predicate
-  declare draft: () => void; // enum in-memory setter (defineEnum only)
-  declare draftBang: () => Promise<void>; // async (defineEnum only): sets
-  //                                         in-memory; if persisted, calls
-  //                                         updateColumn — bypasses
-  //                                         validations/callbacks
+  declare draftBang: () => Promise<true | undefined>; // async: update!(status: "draft")
   declare static draft: () => Relation<Post>; // enum class scope
   declare static published: () => Relation<Post>; // enum class scope
-  declare static notDraft: () => Relation<Post>; // enum `not*` scope (defineEnum only)
+  declare static notDraft: () => Relation<Post>; // enum `not*` scope
   declare static featured: () => Relation<Post>; // named scope (distinct from the enum above)
 
   static {
     this.attribute("title", "string");
     this.attribute("featured", "boolean", { default: false });
-    this.attribute("status", "integer"); // defineEnum only attaches methods;
-    //                                       the underlying column still needs an attribute
+    this.attribute("status", "integer");
     this.belongsTo("author");
     this.hasMany("comments");
-    // defineEnum (above, section 7) gives the full surface: plain setter,
-    // async bang, and not* scope. Use `this.enum(...)` instead for the
-    // simpler Base.enum surface (no plain setter, sync bang returning
-    // `this`, no not* scopes).
-    defineEnum(this, "status", { draft: 0, published: 1 });
+    this.enum("status", { draft: 0, published: 1 });
     // Named scope — use a name that doesn't collide with an enum value above.
     this.scope("featured", function () {
       return this.where({ featured: true });
@@ -457,8 +446,8 @@ Without a matching `declare`:
   `unknown`.
 - **Static access** (`Post.published`, enum class scopes like
   `Post.draft`) is a `Property 'published' does not exist on type 'typeof Post'`
-  error — the class has no index signature. Always pair `this.scope(...)`,
-  `this.enum(...)`, or `defineEnum(...)` with a matching `declare static`.
+  error — the class has no index signature. Always pair `this.scope(...)`
+  or `this.enum(...)` with a matching `declare static`.
 
 The compiled reference for every supported pattern lives in
 `packages/activerecord/dx-tests/declare-patterns.test-d.ts`.

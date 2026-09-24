@@ -2,10 +2,10 @@ import { describe, it, expect } from "vitest";
 import { ValueType } from "@blazetrails/activemodel";
 import { SchemaDumper } from "./schema-dumper.js";
 import type { SchemaSource } from "../../schema-dumper.js";
-import { Result } from "../../result.js";
 import { Column } from "./column.js";
 import { TypeMetadata } from "./type-metadata.js";
 import { Version } from "../abstract-adapter.js";
+import { resultFromRowHashes } from "../../test-helpers/result-from-row-hashes.js";
 
 const stubSource: SchemaSource = {
   tables: async () => [],
@@ -29,7 +29,7 @@ const stubConnection = (
   tableOptions: async () => ({}),
   internalExecQuery: async (sql: string) => {
     o.onQuery?.(sql);
-    return Result.fromRowHashes([{ Collation: o.collation ?? null }]);
+    return resultFromRowHashes([{ Collation: o.collation ?? null }]);
   },
   queryValue: async (sql: string) => {
     o.onQuery?.(sql);

@@ -55,6 +55,7 @@ import type { Quoting } from "./quoting.js";
 import { fixtures } from "../../test-fixtures.js";
 import { newSqlitePool } from "../../support/pooled-sqlite-adapter.js";
 import { queryTransformers } from "../../active-record.js";
+import { resultFromRowHashes } from "../../test-helpers/result-from-row-hashes.js";
 
 const pool = newSqlitePool();
 
@@ -712,7 +713,7 @@ describe("select", () => {
       async internalExecute(_sql, _name, _binds) {
         return [{ id: 1 }];
       },
-      castResult: (raw) => Result.fromRowHashes(raw as Record<string, unknown>[]),
+      castResult: (raw) => resultFromRowHashes(raw as Record<string, unknown>[]),
     };
     const result = await select.call(host, "SELECT 1");
     expect(result).toBeInstanceOf(Result);

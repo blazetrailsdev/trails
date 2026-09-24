@@ -3,6 +3,7 @@ import { Thread, ThreadPoolExecutor } from "@blazetrails/ruby-compat";
 import { tmpdir } from "os";
 import { join } from "path";
 import { describe, it, expect, vi } from "vitest";
+import { Result } from "./result.js";
 import { NoMethodError } from "@blazetrails/activemodel";
 import { Reaper } from "./connection-adapters/abstract/connection-pool/reaper.js";
 import { ConnectionPool, NullPool } from "./connection-adapters/abstract/connection-pool.js";
@@ -762,7 +763,7 @@ describe("ConnectionPoolConfiguration query cache", () => {
         const conn = await pool.checkout();
         cacheA = (conn as unknown as { _queryCache: Store | null })._queryCache;
         cacheA!.enabled = true;
-        await cacheA!.computeIfAbsent(KEY, async () => [{ x: 1 }]);
+        await cacheA!.computeIfAbsent(KEY, async () => new Result(["x"], [[1]]));
         pool.checkin(conn);
       }).value();
 
@@ -917,7 +918,7 @@ describe("ConnectionPoolConfiguration query cache", () => {
         const conn = await pool.checkout();
         observed = (conn as unknown as { _queryCache: Store | null })._queryCache;
         expect(observed!.enabled).toBe(true);
-        await observed!.computeIfAbsent("SELECT 1", async () => [{ x: 1 }]);
+        await observed!.computeIfAbsent("SELECT 1", async () => new Result(["x"], [[1]]));
         expect(observed!.size).toBe(1);
         pool.checkin(conn);
       });

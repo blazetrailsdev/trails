@@ -6,8 +6,6 @@ import {
   Relation,
   collectionProxyFor,
 } from "@blazetrails/activerecord";
-import { defineEnum } from "../src/enum.js";
-
 class User extends Base {
   static {
     this.attribute("name", "string");
@@ -57,13 +55,6 @@ class Task extends Base {
   static {
     this.attribute("status", "integer");
     this.enum("status", { low: 0, high: 1 });
-  }
-}
-
-class Article extends Base {
-  static {
-    this.attribute("status", "integer");
-    defineEnum(this, "status", { draft: 0, published: 1 });
   }
 }
 
@@ -151,14 +142,6 @@ describe("virtualized patterns — trails-tsc injects declares + auto-imports", 
     expectTypeOf(t.lowBang).toEqualTypeOf<() => Promise<true | undefined>>();
     expectTypeOf(Task.low()).toMatchTypeOf<Relation<Task>>();
     expectTypeOf(Task.notLow()).toMatchTypeOf<Relation<Task>>();
-  });
-
-  it("defineEnum (alias of _enum) produces predicates, persisting bangs, and not* scopes", () => {
-    const a = new Article({ status: 0 });
-    expectTypeOf(a.isDraft()).toBeBoolean();
-    expectTypeOf(a.draftBang).toEqualTypeOf<() => Promise<true | undefined>>();
-    expectTypeOf(Article.draft()).toMatchTypeOf<Relation<Article>>();
-    expectTypeOf(Article.notDraft()).toMatchTypeOf<Relation<Article>>();
   });
 
   it("Temporal attribute types: datetime → Instant | PlainDateTime, date → PlainDate, time → Instant | TimeWithZone", () => {
