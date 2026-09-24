@@ -450,22 +450,20 @@ describe("TimeExtCalculationsTest", () => {
     expect(time.secFraction().toF()).toEqual(0.001 / 1000000);
   });
 
-  it.skip("floor", () => {
-    // BLOCKED: activesupport-time-floor-ceil-ndigits
+  it("floor", () => {
     const time = RubyTime.utc(2016, 4, 23, 0, 0, new Rational(123456789, 1_000_000_000)) as any;
 
-    expect(time.floor().subsec).toEqual(new Rational(0, 1));
+    expect(time.floor().subsec).toEqual(0);
     expect(time.floor(1).subsec).toEqual(new Rational(1, 10));
     expect(time.floor(2).subsec).toEqual(new Rational(12, 100));
     expect(time.floor(9).subsec).toEqual(new Rational(123456789, 1_000_000_000));
     expect(time.floor(10).subsec).toEqual(new Rational(123456789, 1_000_000_000));
   });
 
-  it.skip("ceil", () => {
-    // BLOCKED: activesupport-time-floor-ceil-ndigits
+  it("ceil", () => {
     const time = RubyTime.utc(2016, 4, 30, 23, 59, new Rational(59123456789, 1_000_000_000)) as any;
 
-    expect(time.ceil().subsec).toEqual(new Rational(0, 1));
+    expect(time.ceil().subsec).toEqual(0);
     expect(time.ceil()).toEqual(RubyTime.utc(2016, 5, 1, 0, 0));
 
     expect(time.ceil(3).subsec).toEqual(new Rational(124, 1000));

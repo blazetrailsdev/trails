@@ -26,7 +26,7 @@ import {
   publicInstanceMethods,
 } from "@blazetrails/activesupport";
 import type { AssociationDefinition } from "../associations.js";
-import { _buildAssociationInstance, autoloadModel } from "../associations.js";
+import { autoloadModel } from "../associations.js";
 import { Associations } from "../namespaces.js";
 
 // @ts-expect-error declaration-merge load() divergence — permanent, see class override
@@ -201,32 +201,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         }
       }
     }
-  }
-
-  private async _execLoad(): Promise<T[]> {
-    const results = (await this._findTargetViaAssociation()) as T[];
-    const association = this._association.owner.association(this._assocName) as unknown as {
-      setStrictLoading?: (record: Base) => Base;
-    };
-    if (typeof association.setStrictLoading === "function") {
-      for (const r of results) association.setStrictLoading(r);
-    }
-    const sv = (this as any).strictLoadingValue as boolean | null;
-    if (sv != null) {
-      for (const r of results) (r as any)._strictLoading = sv;
-    }
-    return results;
-  }
-
-  private async _findTargetViaAssociation(): Promise<Base[]> {
-    if (!(this._association as unknown as { findTargetNeeded(): boolean }).findTargetNeeded()) {
-      return [];
-    }
-    const assoc = _buildAssociationInstance.call(
-      this._association.owner,
-      this.reflection,
-    ) as unknown as { findTarget(): Promise<Base[]> };
-    return assoc.findTarget();
   }
 
   protected override async execQueries(): Promise<T[]> {
@@ -418,16 +392,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return (this._scope ??= assoc.scope() as any);
   }
   async loadTarget(): Promise<T[]> {
-    if (this._targetLoaded) {
-      if (!this._association.isStaleTarget()) return this._target;
-      this._target = [];
-      this._targetLoaded = false;
-      this._association.resetScope();
-    }
-    const results = await this._execLoad();
-    this._target = this._association.mergeTargetLists(results, this._target) as T[];
-    this._association.loadedBang();
-    return this._target;
+    return (await this._association.loadTarget()) as T[];
   }
 
   /** @internal */

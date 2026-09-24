@@ -57,15 +57,12 @@ async function replaySchemaCacheDump(
  * @internal
  * @noRailsEquivalent CONVERGEABLE the eager schema warm Ruby gets free from lazy synchronous load_schema (model_schema.rb:587).
  */
-export function warmSchemaCacheBeforeFirstTest(
-  getAdapter?: () => TransactionalFixturesAdapter | Promise<TransactionalFixturesAdapter>,
-): void {
+export function warmSchemaCacheBeforeFirstTest(): void {
   let warmed = false;
   beforeEach(async () => {
     if (warmed) return;
     warmed = true;
-    if (getAdapter) await eagerWarmSchemaCache(await getAdapter());
-    else await Base.withConnection(eagerWarmSchemaCache);
+    await Base.withConnection(eagerWarmSchemaCache);
   });
 }
 

@@ -58,7 +58,6 @@
   "packages/activerecord/src/sqlite/expo-sqlite.ts",
   "packages/activerecord/src/sqlite/node-sqlite.ts",
   "packages/activerecord/src/support/quote-regex.ts",
-  "packages/activerecord/src/support/setup-adapter-suite.ts",
   "packages/activerecord/src/support/supports.ts",
   "packages/activerecord/src/support/template-global-setup.ts",
   "packages/activerecord/src/tasks/database-tasks.ts",

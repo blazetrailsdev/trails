@@ -28,7 +28,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
   beforeAll(async () => {
     txnAdapter = await freshAdapter();
   });
-  fixtures([], { connection: () => txnAdapter });
+  fixtures([]);
 
   beforeEach(() => {
     configSnapshot = snapshotEncryptionConfig();

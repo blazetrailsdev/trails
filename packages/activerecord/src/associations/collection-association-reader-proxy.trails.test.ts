@@ -25,15 +25,35 @@ describe("CollectionAssociation#reader", () => {
     await association.reader;
 
     vi.spyOn(association, "isStaleTarget").mockReturnValue(true);
-    const reset = vi.spyOn(association, "reset");
-    const resetScope = vi.spyOn(association, "resetScope");
+    const reload = vi.spyOn(association, "reload");
 
     const proxy = association.reader as { toArray(): Promise<Post[]> };
     vi.mocked(association.isStaleTarget).mockRestore();
 
-    expect(reset).toHaveBeenCalledTimes(1);
-    expect(resetScope).toHaveBeenCalledTimes(1);
+    expect(reload).toHaveBeenCalledTimes(1);
     expect((await proxy.toArray()).length).toBeGreaterThan(0);
+  });
+
+  it("shares the stale reload's in-flight load with the proxy, keeping a record built meanwhile", async () => {
+    const author = await authors("david");
+    const association = postsAssociation(author);
+    await association.reader;
+    const count = (await author.posts).length;
+
+    vi.spyOn(association, "isStaleTarget").mockReturnValue(true);
+    const findTarget = vi.spyOn(association as unknown as { findTarget(): unknown }, "findTarget");
+
+    const proxy = association.reader as {
+      build(attrs: Record<string, unknown>): Post;
+      toArray(): Promise<Post[]>;
+    };
+    vi.mocked(association.isStaleTarget).mockRestore();
+    const built = proxy.build({ title: "Built", body: "meanwhile" });
+
+    const records = await proxy.toArray();
+    expect(findTarget).toHaveBeenCalledTimes(1);
+    expect(records).toHaveLength(count + 1);
+    expect(records).toContain(built);
   });
 
   it("does not reload a fresh target", async () => {

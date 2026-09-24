@@ -103,7 +103,7 @@ describe("useFixtures", () => {
 
   const { topics } = fixtures(
     { topics: [Topic, { rails: { title: "Rails" } }] },
-    { connection: () => adapter, useTransactionalTests: false },
+    { useTransactionalTests: false },
   );
 
   it("accessor returns the instance by label after beforeEach runs", () => {
@@ -132,7 +132,7 @@ describe("useFixtures multi-set", () => {
       topics: [Topic, { rails: { title: "Rails" } }],
       posts: [Post, { hello: { title: "Hello" } }],
     },
-    { connection: () => adapter, useTransactionalTests: false },
+    { useTransactionalTests: false },
   );
 
   it("both sets are accessible", () => {
@@ -149,7 +149,7 @@ describe("useFixtures slash-keyed fixture sets", () => {
 
   const result = fixtures(
     { "admin/accounts": [AccountModel, { david: { name: "David" } }] },
-    { connection: () => adapter, useTransactionalTests: false },
+    { useTransactionalTests: false },
   );
 
   it("result property is accessible via bracket notation", () => {
@@ -178,7 +178,7 @@ describe("all/ fixture sets — explicit enumeration", () => {
       "all/tasks": [TaskModel, {}],
       "all/namespaced/accounts": [AccountModel, { signals37: { name: "37signals" } }],
     },
-    { connection: () => adapter, useTransactionalTests: false },
+    { useTransactionalTests: false },
   );
 
   it("all four fixture sets are accessible via bracket notation", () => {
@@ -217,7 +217,7 @@ describe("useFixtures type contract", () => {
       topics: [Topic, { first: { title: "First" }, second: { title: "Second" } }],
       posts: [Post, { welcome: { body: "Hi" } }],
     },
-    { connection: () => makeAdapter() as any, useTransactionalTests: false },
+    { useTransactionalTests: false },
   );
 
   it("accessor return type is narrowed to the model instance type", () => {

@@ -145,6 +145,7 @@ export abstract class CollectionAssociation extends Association {
 
   override reset(): void {
     super.reset();
+    this.#loadingTarget = null;
     this._targetStore = [];
     this._replacedOrAddedTargets = new Set<Base>();
     this._associationIds = null;
@@ -469,17 +470,25 @@ export abstract class CollectionAssociation extends Association {
       this.loadedBang();
       return this.target;
     };
+    if (this.#loadingTarget) return this.#loadingTarget;
     if (this.findTargetNeeded()) {
-      return Promise.resolve(this.findTarget()).then((findTarget) => {
-        if (!this.isLoaded()) {
-          this._targetStore = this.mergeTargetLists(findTarget as Base[], this.target);
-        }
-        return loaded();
-      });
+      const loading = Promise.resolve(this.findTarget())
+        .then((findTarget) => {
+          if (!this.isLoaded()) {
+            this._targetStore = this.mergeTargetLists(findTarget as Base[], this.target);
+          }
+          return loaded();
+        })
+        .finally(() => {
+          if (this.#loadingTarget === loading) this.#loadingTarget = null;
+        });
+      return (this.#loadingTarget = loading);
     }
 
     return loaded();
   }
+
+  #loadingTarget: Promise<Base[]> | null = null;
 
   addToTarget(record: Base, options?: { skipCallbacks?: boolean; replace?: boolean }): Base | null;
   addToTarget(
@@ -526,13 +535,12 @@ export abstract class CollectionAssociation extends Association {
     return true;
   }
 
-  /** @missingRailsCall reload — CONVERGEABLE collection-reader-stale-arm-calls-reload */
   get reader(): AssociationProxy {
     this.ensureKlassExists();
 
     if (this.isStaleTarget()) {
-      this.reset();
-      this.resetScope();
+      const reloaded = this.reload();
+      if (reloaded instanceof Promise) reloaded.catch(() => {});
     }
 
     const CollectionProxy = Associations.CollectionProxy as unknown as {

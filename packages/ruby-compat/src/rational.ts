@@ -191,10 +191,14 @@ export class Rational {
   /** `vendor/ruby/numeric.c:700` `num_modulo` (`Rational#%`, inherited from
    * Numeric), which is `self - other * (self.div other)` there too — what
    * `date_core.c`'s `f_mod` dispatches to for a Rational — for the Integer
-   * divisor this port needs.
+   * and Rational divisors this port needs (`time.c`'s `modv`).
    * @noRailsEquivalent PERMANENT — Ruby core, part of the Rational above. */
-  mod(other: number | bigint): Rational {
-    return this.add(-BigInt(other) * BigInt(this.div(other)));
+  mod(other: number | bigint | Rational): Rational {
+    const b = other instanceof Rational ? other : new Rational(other, 1);
+    const num = this.numerator * b.denominator;
+    const den = this.denominator * b.numerator;
+    const q = num / den - (num % den !== 0n && num < 0n !== den < 0n ? 1n : 0n);
+    return this.add(new Rational(-b.numerator * q, b.denominator));
   }
 
   /** `vendor/ruby/rational.c:1278` `nurat_truncate` (`Rational#to_i`), which

@@ -2261,7 +2261,7 @@ describe("HasManyAssociationsTest", () => {
     expect(await firm.clientsOfFirm.size()).toBe(0);
     await firm.clientsOfFirm.reload();
     expect(await firm.clientsOfFirm.size()).toBe(0);
-    expect(Client.destroyedClientIds.get(firm.id as number) ?? []).toEqual([]);
+    expect(Client.destroyedClientIds.get(firm.id as number)).toEqual([]);
 
     await assertNothingRaised(async () => {
       expect(await (await Client.find(clientId)).firm).toBeNull();
@@ -2306,7 +2306,7 @@ describe("HasManyAssociationsTest", () => {
     expect(await firm.dependentClientsOfFirm.size()).toBe(0);
     await firm.dependentClientsOfFirm.reload();
     expect(await firm.dependentClientsOfFirm.size()).toBe(0);
-    expect(Client.destroyedClientIds.get(firm.id as number) ?? []).toEqual([]);
+    expect(Client.destroyedClientIds.get(firm.id as number)).toEqual([]);
 
     expect(await Client.findBy({ id: clientId })).toBeNull();
   });
@@ -2338,14 +2338,14 @@ describe("HasManyAssociationsTest", () => {
     const clientId = (await firm.exclusivelyDependentClientsOfFirm.first()).id;
     expect(await firm.exclusivelyDependentClientsOfFirm.size()).toBe(2);
 
-    expect(Client.destroyedClientIds.get(firm.id as number) ?? []).toEqual([]);
+    expect(Client.destroyedClientIds.get(firm.id as number)).toEqual([]);
 
     await firm.exclusivelyDependentClientsOfFirm.clear();
 
     expect(await firm.exclusivelyDependentClientsOfFirm.size()).toBe(0);
     await firm.exclusivelyDependentClientsOfFirm.reload();
     expect(await firm.exclusivelyDependentClientsOfFirm.size()).toBe(0);
-    expect(Client.destroyedClientIds.get(firm.id as number) ?? []).toEqual([]);
+    expect(Client.destroyedClientIds.get(firm.id as number)).toEqual([]);
 
     expect(await Client.findBy({ id: clientId })).toBeNull();
   });

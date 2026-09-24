@@ -77,7 +77,7 @@ const SKIP_DIRS = new Set(["node_modules", "dist", "__snapshots__", "__fixtures_
  * that rolls back per test. `fixtures()` is the endgame surface — it wires the
  * handler, the transactional fixtures, and the canonical schema in one call.
  */
-export const TRANSACTIONAL_WIRING = ["fixtures(", "setupAdapterSuite("];
+export const TRANSACTIONAL_WIRING = ["fixtures("];
 
 const NON_BANG_WRITE_PATTERNS = [
   ".create(",

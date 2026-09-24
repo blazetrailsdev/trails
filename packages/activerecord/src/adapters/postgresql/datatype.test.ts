@@ -18,7 +18,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   afterAll(async () => {
     await adapter.execute(`DROP TABLE IF EXISTS ex CASCADE`);
   });
-  fixtures([], { connection: () => adapter });
+  fixtures([]);
 
   async function setupTimesTable() {
     await adapter.execute(`DROP TABLE IF EXISTS postgresql_times`);

@@ -226,19 +226,6 @@ describe("non-transactional row writes", () => {
     expect(isOffender(src)).toBe(false);
   });
 
-  it("clears a file wired by setupAdapterSuite", () => {
-    const src = `describe("x", () => {
-  const suite = setupAdapterSuite({ factory: () => new BetterSQLite3Adapter({ database: ":memory:" }) });
-
-  it("inserts", async () => {
-    await (await Base.leaseConnection()).execute(\`INSERT INTO widgets (id) VALUES (1)\`);
-  });
-});
-`;
-    expect(hasTransactionalWiring(src)).toBe(true);
-    expect(isOffender(src)).toBe(false);
-  });
-
   it("catches a write in an it.each tagged-template table body", () => {
     const src = [
       'describe("x", () => {',
