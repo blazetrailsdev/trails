@@ -40,11 +40,6 @@
  * "update timestamps" for is up to date: its sources hash to what was built,
  * which is exactly the restored-cache case above.
  *
- * Reading CLI prose fails OPEN by default: a reworded message or another locale
- * matches nothing, and nothing matched reads as "every package is fresh". So the
- * run is pinned to `--locale en`, and every built project must get one of the
- * three verdicts or `staleBuilds` throws rather than guessing.
- *
  * Constraints: async fs only, no `node:` specifiers, no `process` references.
  * The `typescript-5` import is the one unavoidable exception — its `ts.sys` I/O
  * is synchronous and internal to the compiler — and it only parses tsconfigs.
@@ -86,11 +81,6 @@ const TSC = path.join(
 
 const WOULD_BUILD = /A non-dry build would build project '(.+)'/g;
 
-/**
- * The dry run's two verdicts for a project it would NOT build. Matched only so
- * every built project is accounted for: the verdicts are English CLI prose, and
- * a reworded message would otherwise silently read as "nothing is stale".
- */
 const UP_TO_DATE =
   /(?:Project '(.+)' is up to date|would update timestamps for output of project '(.+)')/g;
 
@@ -196,6 +186,12 @@ async function hasDeclarations(dir: string): Promise<boolean> {
  * `NotBuilt` is ours rather than tsc's on purpose — tsc reports a project whose
  * `dist` was deleted but whose `tsconfig.tsbuildinfo` survives as up to date,
  * so deferring to it would let a removed build through.
+ *
+ * The dry run's verdicts are English CLI prose, and prose fails OPEN: a reworded
+ * message or another locale matches nothing, which would read as "every package
+ * is fresh". So the run is pinned to `--locale en`, and a built project that
+ * gets none of the three verdicts (would build, would update timestamps, is up
+ * to date) makes this throw rather than report it fresh.
  */
 export async function staleBuilds(roots: readonly PackageRoots[]): Promise<StaleBuild[]> {
   const seeds = new Map<string, Project>();
