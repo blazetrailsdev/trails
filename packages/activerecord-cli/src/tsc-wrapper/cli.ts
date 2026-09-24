@@ -4,6 +4,7 @@ import {
   formatDiagnostics,
   formatDiagnosticsWithColorAndContext,
   type CompilerOptions,
+  type Diagnostic,
   type FormatDiagnosticsHost,
 } from "typescript/unstable/sync";
 import * as path from "node:path";
@@ -239,6 +240,15 @@ function findConfigFile(
   }
 }
 
+function flattenDiagnosticMessageText(d: Diagnostic, newLine: string, indent = 0): string {
+  let result = indent ? newLine + "  ".repeat(indent) : "";
+  result += d.text;
+  for (const chain of d.messageChain ?? []) {
+    result += flattenDiagnosticMessageText(chain, newLine, indent + 1);
+  }
+  return result;
+}
+
 function handleBuildMode(args: string[]): void {
   const buildIdx = args.findIndex((a) => a === "--build" || a === "-b");
   if (buildIdx === -1) return;
@@ -277,7 +287,8 @@ function handleBuildMode(args: string[]): void {
       process.stderr.write(out);
     },
     onStatus: (d) => {
-      process.stdout.write(`${d.text}${fh.getNewLine()}`);
+      const msg = flattenDiagnosticMessageText(d, fh.getNewLine());
+      process.stdout.write(`${msg}${fh.getNewLine()}`);
     },
   });
 
