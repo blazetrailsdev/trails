@@ -77,7 +77,7 @@ export class Error {
     const baseClass = base?.constructor as ModelClass | undefined;
 
     let defaults: unknown[];
-    if (Error.i18nCustomizeFullMessage && baseClass?.i18nScope != null) {
+    if (this.i18nCustomizeFullMessage && baseClass?.i18nScope != null) {
       attribute = attribute.replace(/\[\d+\]/g, "");
       const parts = attribute.split(".");
       const attributeName = parts.pop() as string;
@@ -96,7 +96,7 @@ export class Error {
         ]);
       }
 
-      defaults = defaults.flat();
+      defaults = defaults.flat(Infinity);
     } else {
       defaults = [];
     }
@@ -226,7 +226,7 @@ export class Error {
   }
 
   get fullMessage(): string {
-    return Error.fullMessage(this.attribute, this.message, this.base);
+    return (this.constructor as typeof Error).fullMessage(this.attribute, this.message, this.base);
   }
 
   match(attribute: string, type?: string, options?: Record<string, unknown>): boolean {

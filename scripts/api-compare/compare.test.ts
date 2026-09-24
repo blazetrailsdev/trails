@@ -194,8 +194,6 @@ describe("significantMissingCalls", () => {
   });
 
   it("credits a Ruby call ported as the ruby-compat export it maps to", () => {
-    // test_fixtures.rb:307 `@fixture_cache[fs_name].delete(f_name)`: an aref
-    // receiver, recorded `expr`, ported as `hashDelete(...)`.
     const receivers: Record<string, string[]> = { delete: ["expr"], "include?": ["expr"] };
     const alias = (rc: string) => jsEnumerableAliases(rc, receivers[rc]);
     const withDelete = new Set(["delete", "include?", "key?"]);
@@ -212,7 +210,6 @@ describe("significantMissingCalls", () => {
     expect(run(["hashDelete"])).toEqual([]);
     expect(run(["stringDelete"])).toEqual([]);
     expect(run(["hasKey"])).toEqual(["delete → delete"]);
-    // `hasKey` ports `key?` too, so an unproven `include?` must not claim it.
     expect(
       significantMissingCalls(
         "x",
@@ -1935,8 +1932,6 @@ describe("tsDeclaresOnLevel", () => {
   });
 
   it("lets one owner declaring both seats satisfy both rows", () => {
-    // `class_attribute :verbose`-shaped: `static verbose` beside the prototype
-    // reader, as migration.ts declares it.
     const both = owners("Migration");
     expect(tsDeclaresOnLevel("class", both, both, both)).toBe("seat");
     expect(tsDeclaresOnLevel("instance", both, both, both)).toBe("seat");

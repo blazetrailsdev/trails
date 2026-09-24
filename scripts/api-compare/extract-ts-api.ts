@@ -1070,10 +1070,6 @@ export function extractFromProgram(
         const predicate = attr.instancePredicate
           ? `is${name.charAt(0).toUpperCase()}${name.slice(1)}`
           : undefined;
-        // attribute.rb:99-127: the class seat takes the reader and the writer
-        // delegators; the instance seat the reader, the `attr_writer` and the
-        // predicate each under its own option. The writer is the accessor's
-        // `set` half (class-attribute.ts), recorded as a `set` accessor is.
         for (const isStatic of seats) {
           const members = isStatic ? entity.classMethods : entity.instanceMethods;
           const generated: { name: string; writer: boolean }[] = [];
@@ -3013,9 +3009,6 @@ export function isConstantCaseName(name: string): boolean {
  */
 interface ClassAttributeCall {
   enclosing?: string;
-  /** `enclosing` is an exported `const X = { … }` mixin, which the literal
-   *  harvest does not seat when its only member is the computed
-   *  `[included]` hook. */
   enclosingObjectLiteral?: boolean;
   receiver?: string;
   names: string[];

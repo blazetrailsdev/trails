@@ -176,11 +176,8 @@ export function rubyCompatExport(
   return admitted.length === 1 ? admitted[0].tsExport : undefined;
 }
 
-/** The {@link ReceiverKind}s naming a shape rather than a class: they prove no
- *  receiver, and so disprove none either. */
 const UNPROVEN_RECEIVER_KINDS = new Set<string>(["self", "local", "ivar", "const", "expr"]);
 
-/** ruby-compat export → the bare Ruby call names the tables port to it. */
 const PORTED_NAMES_BY_EXPORT = (() => {
   const byExport = new Map<string, Set<string>>();
   for (const [name, claims] of BY_BARE_NAME)
