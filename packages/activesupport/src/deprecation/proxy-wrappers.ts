@@ -2,6 +2,8 @@ import { callerLocations, type CallerLocation, type Deprecation } from "../depre
 import { extend, include, Module, prepend } from "@blazetrails/ruby-compat/include";
 import { constantize } from "../inflector.js";
 import { PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
+import { rbEqual, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "../hash-utils.js";
 
 function inspect(value: unknown): string {
   if (typeof value === "string") return JSON.stringify(value);
@@ -57,6 +59,9 @@ export class DeprecatedObjectProxy extends DeprecationProxy {
 
   constructor(object: unknown, message: string, deprecator: Deprecation) {
     super();
+    if (arguments.length !== 3) {
+      throw new ArgumentError(`wrong number of arguments (given ${arguments.length}, expected 3)`);
+    }
     this._object = object;
     this._message = message;
     this._deprecator = deprecator;
@@ -86,11 +91,15 @@ export class DeprecatedInstanceVariableProxy extends DeprecationProxy {
   ) {
     super();
     const varName = typeof varOrOptions === "string" ? varOrOptions : `@${method}`;
-    const deprecator = (typeof varOrOptions === "string" ? options : varOrOptions)?.deprecator;
+    const kwargs = typeof varOrOptions === "string" ? options : varOrOptions;
+    if (kwargs === undefined || !("deprecator" in kwargs)) {
+      throw new ArgumentError("missing keyword: :deprecator");
+    }
+    const deprecator = kwargs.deprecator;
     this._instance = instance as Record<string, unknown>;
     this._method = method;
     this._var = varName;
-    this._deprecator = deprecator as Deprecation;
+    this._deprecator = deprecator;
   }
 
   protected override get target(): unknown {
@@ -132,6 +141,9 @@ export class DeprecatedConstantProxy extends Module {
     { message }: { message?: string } = {},
   ) {
     super();
+    if (arguments.length < 3) {
+      throw new ArgumentError(`wrong number of arguments (given ${arguments.length}, expected 3)`);
+    }
     this._oldConst = oldConst;
     this._newConst = newConst;
     this._deprecator = deprecator;
@@ -156,10 +168,7 @@ export class DeprecatedConstantProxy extends Module {
   }
 
   respondTo(method: string): boolean {
-    const target = this.target as { respondTo?: (m: string) => boolean };
-    return typeof target.respondTo === "function"
-      ? target.respondTo(method)
-      : method in (target as object);
+    return rbObjRespondTo(this.target, method);
   }
 
   class(): unknown {
@@ -187,6 +196,7 @@ export class DeprecatedConstantProxy extends Module {
 
   private methodMissing(called: string, args: unknown[]): unknown {
     this._deprecator.warn(this._message, callerLocations());
+    if (called === "equals") return rbEqual(this.target, args[0]);
     const value = (this.target as Record<string, unknown>)[called];
     return typeof value === "function"
       ? (value as (...a: unknown[]) => unknown).apply(this.target, args)
