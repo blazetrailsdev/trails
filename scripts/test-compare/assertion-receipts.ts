@@ -47,6 +47,22 @@ export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
         "attributes_test.rb:44 `assert_kind_of Float` on `2.0` — `2.0 === 2` in JS, so no value distinguishes a Float from an Integer",
     },
   ],
+  "activesupport:core_ext/duration_test.rb › DurationTest › is a": [
+    {
+      kind: "assert_kind_of",
+      value: null,
+      as: "assert",
+      reason:
+        "core_ext/duration_test.rb:17 `assert_kind_of Numeric` — a Duration is an object and cannot be `instanceof` the JS `Number` builtin; the port asserts `d.isKindOf(Number)`, which is Rails' `value.is_a?(klass)` (duration.rb:330-332)",
+    },
+    {
+      kind: "assert_kind_of",
+      value: null,
+      as: "assert",
+      reason:
+        "core_ext/duration_test.rb:18 `assert_kind_of Integer` — a JS number has no Integer class; the port asserts `Number.isInteger(d.toI())`",
+    },
+  ],
   "activesupport:json/encoding_test.rb › TestJSONEncoding › utf8 string encoded properly": [
     {
       kind: "assert_equal",

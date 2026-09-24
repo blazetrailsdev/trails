@@ -9,6 +9,7 @@ import {
   assertEmpty,
   assertNotEmpty,
   assertNoDifference,
+  assertNotCalled,
   assertNothingRaised,
   assertRaises,
 } from "@blazetrails/activesupport";
@@ -87,16 +88,6 @@ import {
   CpkChapter,
 } from "../test-helpers/models/cpk.js";
 import { PersonalLegacyThing } from "../test-helpers/models/personal-legacy-thing.js";
-
-async function assertNotCalled(block: () => Promise<void>): Promise<void> {
-  const spy = vi.spyOn(Preloader.prototype, "call");
-  try {
-    await block();
-    expect(spy).not.toHaveBeenCalled();
-  } finally {
-    spy.mockRestore();
-  }
-}
 
 describe("HasManyThroughAssociationsTest", () => {
   const {
@@ -1635,7 +1626,7 @@ describe("HasManyThroughAssociationsTest", () => {
       taggable_id: post.id,
       tag_id: tags("misc").id,
     });
-    await assertNotCalled(async () => {
+    await assertNotCalled(Preloader, "new", null, async () => {
       await (post as any).miscTagIds;
     });
   });

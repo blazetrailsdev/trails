@@ -12,6 +12,7 @@ import { TimeWithZone } from "../time-with-zone.js";
 import { TimeZone } from "../values/time-zone.js";
 import { setZone, zone } from "../time-zone-config.js";
 import { clock } from "../time-travel.js";
+import { withEnvTz } from "../time-zone-test-helpers.js";
 import {
   minusWithDuration as minusWithTimeDuration,
   plusWithDuration as timePlusWithDuration,
@@ -362,16 +363,23 @@ describe("DurationTest", () => {
   it("since and ago anchored to time now when time zone is not set", () => {
     const oldZone = zone();
     setZone(null);
-    const now = vi
-      .spyOn(clock, "now")
-      .mockReturnValue(Temporal.Instant.fromEpochMilliseconds(new Date(2000, 0, 1).getTime()));
     try {
-      assertNotInstanceOf(TimeWithZone, Duration.seconds(5).since());
-      expect(Duration.seconds(5).since()).toEqual(RubyTime.local(2000, 1, 1, 0, 0, 5));
-      assertNotInstanceOf(TimeWithZone, Duration.seconds(5).ago());
-      expect(Duration.seconds(5).ago()).toEqual(RubyTime.local(1999, 12, 31, 23, 59, 55));
+      withEnvTz("US/Eastern", () => {
+        const now = vi
+          .spyOn(clock, "now")
+          .mockReturnValue(
+            Temporal.Instant.fromEpochMilliseconds(RubyTime.local(2000).toI() * 1000),
+          );
+        try {
+          assertNotInstanceOf(TimeWithZone, Duration.seconds(5).since());
+          expect(Duration.seconds(5).since()).toEqual(RubyTime.local(2000, 1, 1, 0, 0, 5));
+          assertNotInstanceOf(TimeWithZone, Duration.seconds(5).ago());
+          expect(Duration.seconds(5).ago()).toEqual(RubyTime.local(1999, 12, 31, 23, 59, 55));
+        } finally {
+          now.mockRestore();
+        }
+      });
     } finally {
-      now.mockRestore();
       setZone(oldZone);
     }
   });

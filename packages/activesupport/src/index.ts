@@ -330,10 +330,10 @@ export type { ClassAttributeOptions } from "./class-attribute.js";
 export { benchmark } from "./benchmarkable.js";
 export type { Benchmarkable, BenchmarkLogger, BenchmarkOptions } from "./benchmarkable.js";
 
-export { Logger, taggedLogging, SimpleFormatter } from "./logger.js";
+export { Logger, SimpleFormatter } from "./logger.js";
 export { NullLogger, nullLogger } from "./null-logger.js";
 export { BroadcastLogger } from "./broadcast-logger.js";
-export type { LogLevel, LoggerOutput, TaggedLogger } from "./logger.js";
+export type { LogLevel, LoggerOutput } from "./logger.js";
 export { Subscriber } from "./subscriber.js";
 export { LogSubscriber } from "./log-subscriber.js";
 
@@ -448,6 +448,7 @@ export type { ParameterFilterOptions } from "./parameter-filter.js";
 export { transliterate, parameterize } from "./transliterate.js";
 export { TagStack, Formatter, LocalTagStorage } from "./tagged-logging.js";
 export { TaggedLogging } from "./tagged-logging.js";
+export type { TaggedLogger, TaggedFormatter } from "./tagged-logging.js";
 export { DeepMergeable } from "./deep-mergeable.js";
 export { DelegationError, Delegation } from "./delegation.js";
 export { ActiveSupportJSON, parseJsonTimes, setParseJsonTimes } from "./json.js";

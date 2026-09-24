@@ -28,8 +28,10 @@ function systemEpochNs(): bigint {
 }
 
 /** @noRailsEquivalent PERMANENT */
-export function resetLocalTimeZoneId(): void {
-  localTimeZoneId = null;
+export function resetLocalTimeZoneId(timeZoneId: string | null = null): string | null {
+  const oldTimeZoneId = localTimeZoneId;
+  localTimeZoneId = timeZoneId;
+  return oldTimeZoneId;
 }
 
 function divmod(a: number, b: number): [number, number] {
