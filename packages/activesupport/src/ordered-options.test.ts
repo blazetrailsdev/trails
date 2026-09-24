@@ -212,8 +212,7 @@ describe("OrderedOptionsTest", () => {
     expect(duplicate).not.toBe(object);
   });
 
-  it.skip("ordered options key", () => {
-    // BLOCKED: ordered-options-key-does-not-tell-symbol-from-string
+  it("ordered options key", () => {
     const object = new OrderedOptions() as unknown as Options;
     object.one = "first value";
     object.set("two", "second value");
@@ -228,8 +227,7 @@ describe("OrderedOptionsTest", () => {
     expect(object.isKey(":four")).toBeFalsy();
   });
 
-  it.skip("inheritable options key", () => {
-    // BLOCKED: ordered-options-key-does-not-tell-symbol-from-string
+  it("inheritable options key", () => {
     const object = new InheritableOptions({ one: "first value" });
     object.set("two", "second value");
     object.set("three", "third value");
@@ -252,11 +250,11 @@ describe("OrderedOptionsTest", () => {
     object.set("one", "first value override");
     object.set("two", "second value override");
 
-    expect(object.isOverridden("one")).toBeTruthy();
+    expect(object.isOverridden(":one")).toBeTruthy();
     expect(object.one).toBe("first value override");
-    expect(object.isOverridden("two")).toBeTruthy();
+    expect(object.isOverridden(":two")).toBeTruthy();
     expect(object.two).toBe("second value override");
-    expect(object.isOverridden("three")).toBeFalsy();
+    expect(object.isOverridden(":three")).toBeFalsy();
     expect(object.three).toBe("third value");
   });
 
@@ -265,9 +263,9 @@ describe("OrderedOptionsTest", () => {
     object.set("one", "first value override");
     object.set("two", "second value override");
 
-    expect(object.isOverridden("one")).toBeFalsy();
+    expect(object.isOverridden(":one")).toBeFalsy();
     expect(object.one).toBe("first value override");
-    expect(object.isOverridden("two")).toBeFalsy();
+    expect(object.isOverridden(":two")).toBeFalsy();
     expect(object.two).toBe("second value override");
   });
 

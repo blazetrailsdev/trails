@@ -50,11 +50,19 @@ export class Deprecators {
 
   silence<T>(block: () => T): T {
     this.each((deprecator) => deprecator.beginSilence());
+    const endSilence = () => this.each((deprecator) => deprecator.endSilence());
+    let result: T;
     try {
-      return block();
-    } finally {
-      this.each((deprecator) => deprecator.endSilence());
+      result = block();
+    } catch (error) {
+      endSilence();
+      throw error;
     }
+    if (result != null && typeof (result as unknown as PromiseLike<unknown>).then === "function") {
+      return Promise.resolve(result as unknown).finally(endSilence) as T;
+    }
+    endSilence();
+    return result;
   }
 
   private setOption(name: OptionName, value: unknown): void {

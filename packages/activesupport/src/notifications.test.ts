@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { Time } from "@blazetrails/date";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import { Notifications } from "./notifications.js";
-import { Fanout, type Evented, type EventedListener } from "./notifications/fanout.js";
+import { Fanout, type Evented } from "./notifications/fanout.js";
 import { travelTo, travelBack } from "./testing/time-helpers.js";
 import { assertEmpty } from "./testing/assertions.js";
 import { Event, Instrumenter, LegacyHandle, Wrapper } from "./notifications/instrumenter.js";
@@ -23,11 +24,11 @@ describe("SubscribeEventObjectsTest", () => {
   afterEach(teardownTestCase);
 
   it.skip("subscribe events", () => {
-    // BLOCKED: notifications-timed-subscriber-arity-and-event-cpu-allocations
+    // BLOCKED: notifications-event-allocations-has-no-js-allocation-counter
     const evs: Event[] = [];
-    notifier.subscribe(null, ((event: Event) => {
+    notifier.subscribe(null, (event: Event) => {
       evs.push(event);
-    }) as unknown as EventedListener);
+    });
 
     Notifications.instrument("foo");
     const event = evs[0];
@@ -39,9 +40,9 @@ describe("SubscribeEventObjectsTest", () => {
   });
 
   it("subscribe to events where payload is changed during instrumentation", () => {
-    notifier.subscribe(null, ((event: Event) => {
+    notifier.subscribe(null, (event: Event) => {
       expect(event.payload.my_key).toBe("success!");
-    }) as unknown as EventedListener);
+    });
 
     Notifications.instrument("foo", {}, (payload) => {
       payload.my_key = "success!";
@@ -49,11 +50,11 @@ describe("SubscribeEventObjectsTest", () => {
   });
 
   it("subscribe to events can handle nested hashes in the paylaod", () => {
-    notifier.subscribe(null, ((event: Event) => {
+    notifier.subscribe(null, (event: Event) => {
       const someKey = event.payload.some_key as Record<string, unknown>;
       expect(someKey.key_one).toBe("success!");
       expect(someKey.key_two).toBe("great_success!");
-    }) as unknown as EventedListener);
+    });
 
     Notifications.instrument("foo", { some_key: { key_one: "success!" } }, (payload) => {
       (payload.some_key as Record<string, unknown>).key_two = "great_success!";
@@ -61,7 +62,7 @@ describe("SubscribeEventObjectsTest", () => {
   });
 
   it.skip("subscribe via top level api", () => {
-    // BLOCKED: notifications-timed-subscriber-arity-and-event-cpu-allocations
+    // BLOCKED: notifications-event-allocations-has-no-js-allocation-counter
     const oldNotifier = Notifications.notifier;
     Notifications.notifier = new Fanout();
     try {
@@ -87,7 +88,7 @@ describe("SubscribeEventObjectsTest", () => {
       eventName = event.name;
     };
 
-    notifier.subscribe(null, listener as unknown as EventedListener);
+    notifier.subscribe(null, listener);
     Notifications.instrument("event_name");
 
     expect(eventName).toBe("event_name");
@@ -101,7 +102,7 @@ describe("SubscribeEventObjectsTest", () => {
       }
     };
 
-    notifier.subscribe(null, new listener() as unknown as EventedListener);
+    notifier.subscribe(null, new listener());
     Notifications.instrument("event_name");
 
     expect(eventName).toBe("event_name");
@@ -112,20 +113,19 @@ describe("TimedAndMonotonicTimedSubscriberTest", () => {
   beforeEach(setupTestCase);
   afterEach(teardownTestCase);
 
-  it.skip("subscribe", () => {
-    // BLOCKED: notifications-timed-subscriber-arity-and-event-cpu-allocations
+  it("subscribe", () => {
     const eventName = "foo";
-    let classOfStarted: string | undefined;
-    let classOfFinished: string | undefined;
+    let classOfStarted: unknown;
+    let classOfFinished: unknown;
 
-    Notifications.subscribe(eventName, ((_name: string, started: unknown, finished: unknown) => {
-      classOfStarted = (started as object).constructor.name;
-      classOfFinished = (finished as object).constructor.name;
-    }) as never);
+    Notifications.subscribe(eventName, (_name: string, started: unknown, finished: unknown) => {
+      classOfStarted = (started as object).constructor;
+      classOfFinished = (finished as object).constructor;
+    });
 
     Notifications.instrument(eventName);
 
-    expect([classOfStarted, classOfFinished]).toEqual(["Instant", "Instant"]);
+    expect([classOfStarted, classOfFinished]).toEqual([Time, Time]);
   });
 
   it("monotonic subscribe", () => {
@@ -133,14 +133,13 @@ describe("TimedAndMonotonicTimedSubscriberTest", () => {
     let classOfStarted: string | undefined;
     let classOfFinished: string | undefined;
 
-    Notifications.monotonicSubscribe(eventName, ((
-      _name: string,
-      started: unknown,
-      finished: unknown,
-    ) => {
-      classOfStarted = typeof started;
-      classOfFinished = typeof finished;
-    }) as never);
+    Notifications.monotonicSubscribe(
+      eventName,
+      (_name: string, started: unknown, finished: unknown) => {
+        classOfStarted = typeof started;
+        classOfFinished = typeof finished;
+      },
+    );
 
     Notifications.instrument(eventName);
 
@@ -152,16 +151,15 @@ describe("BuildHandleTest", () => {
   beforeEach(setupTestCase);
   afterEach(teardownTestCase);
 
-  it.skip("interleaved event", () => {
-    // BLOCKED: notifications-timed-subscriber-arity-and-event-cpu-allocations
+  it("interleaved event", () => {
     const eventName = "foo";
     const actualTimes: unknown[][] = [];
 
-    Notifications.subscribe(eventName, ((_name: string, started: unknown, finished: unknown) => {
+    Notifications.subscribe(eventName, (_name: string, started: unknown, finished: unknown) => {
       actualTimes.push([started, finished]);
-    }) as never);
+    });
 
-    const times = [1, 2, 3, 4].map((s) => new Date(2020, 0, 1, 0, 0, s));
+    const times = [1, 2, 3, 4].map((s) => Time.new(2020, 1, 1).plus(s));
 
     const instrumenter = Notifications.instrumenter;
     travelTo(times[0]);
@@ -256,7 +254,7 @@ describe("SubscribedTest", () => {
     Notifications.notifier = new Fanout();
 
     try {
-      Notifications.subscribe("foo", new TestSubscriber() as never);
+      Notifications.subscribe("foo", new TestSubscriber());
 
       expect(() =>
         Notifications.instrument("foo", {}, () => {
@@ -277,13 +275,13 @@ describe("SubscribedTest", () => {
       classOfFinished = (finished as object).constructor.name;
     };
 
-    await Notifications.subscribed(callback as never, eventName, () => {
+    await Notifications.subscribed(callback, eventName, () => {
       Notifications.instrument(eventName);
     });
 
     Notifications.instrument(eventName);
 
-    expect([classOfStarted, classOfFinished]).toEqual(["Instant", "Instant"]);
+    expect([classOfStarted, classOfFinished]).toEqual([Time.name, Time.name]);
   });
 
   it("monotonic timed subscribed", async () => {
@@ -296,7 +294,7 @@ describe("SubscribedTest", () => {
     };
 
     await Notifications.subscribed(
-      callback as never,
+      callback,
       eventName,
       () => {
         Notifications.instrument(eventName);
@@ -322,10 +320,8 @@ function setupTestCase() {
   Notifications.notifier = notifier;
   events = [];
   namedEvents = [];
-  subscription = notifier.subscribe(null, ((...args: unknown[]) =>
-    events.push(args)) as unknown as EventedListener);
-  notifier.subscribe("named.subscription", ((...args: unknown[]) =>
-    namedEvents.push(args)) as unknown as EventedListener);
+  subscription = notifier.subscribe(null, (...args: unknown[]) => events.push(args));
+  notifier.subscribe("named.subscription", (...args: unknown[]) => namedEvents.push(args));
 }
 
 function teardownTestCase() {
@@ -397,8 +393,7 @@ describe("UnsubscribeTest", () => {
 
   it("unsubscribing by name leaves regexp matched subscriptions", () => {
     const matchedEvents: unknown[][] = [];
-    notifier.subscribe(/subscription/, ((...args: unknown[]) =>
-      matchedEvents.push(args)) as unknown as EventedListener);
+    notifier.subscribe(/subscription/, (...args: unknown[]) => matchedEvents.push(args));
     notifier.publish("named.subscription", ":before");
     notifier.wait();
     for (const collector of [events, namedEvents, matchedEvents]) {
@@ -437,8 +432,7 @@ describe("SyncPubSubTest", () => {
     notifier.publish(":foo");
     notifier.publish(":foo");
 
-    notifier.subscribe("not_existent", ((event: unknown) =>
-      events.push(event as unknown[])) as unknown as EventedListener);
+    notifier.subscribe("not_existent", (event: unknown) => events.push(event as unknown[]));
 
     notifier.publish(":foo");
     notifier.publish(":foo");
@@ -449,8 +443,7 @@ describe("SyncPubSubTest", () => {
 
   it("log subscriber with string", () => {
     const logged: unknown[][] = [];
-    notifier.subscribe("1", ((...args: unknown[]) =>
-      logged.push(args)) as unknown as EventedListener);
+    notifier.subscribe("1", (...args: unknown[]) => logged.push(args));
 
     notifier.publish("1");
     notifier.publish("1.a");
@@ -462,8 +455,7 @@ describe("SyncPubSubTest", () => {
 
   it("log subscriber with pattern", () => {
     const logged: unknown[][] = [];
-    notifier.subscribe(/\d/, ((...args: unknown[]) =>
-      logged.push(args)) as unknown as EventedListener);
+    notifier.subscribe(/\d/, (...args: unknown[]) => logged.push(args));
 
     notifier.publish("1");
     notifier.publish("a.1");
@@ -475,8 +467,7 @@ describe("SyncPubSubTest", () => {
 
   it("multiple log subscribers", () => {
     const another: unknown[][] = [];
-    notifier.subscribe(null, ((...args: unknown[]) =>
-      another.push(args)) as unknown as EventedListener);
+    notifier.subscribe(null, (...args: unknown[]) => another.push(args));
     notifier.publish(":foo");
     notifier.wait();
 
@@ -486,7 +477,7 @@ describe("SyncPubSubTest", () => {
 
   it("publish with subscriber", () => {
     const subscriber = new TestSubscriber();
-    notifier.subscribe(null, subscriber as unknown as EventedListener);
+    notifier.subscribe(null, subscriber);
     notifier.publish(":foo");
 
     expect(subscriber.publishes).toEqual([[":foo"]]);
@@ -503,7 +494,7 @@ describe("InstrumentationTest", () => {
 
   it("instrument yields the payload for further modification", () => {
     const evs: Event[] = [];
-    notifier.subscribe(null, ((e: Event) => evs.push(e)) as unknown as EventedListener);
+    notifier.subscribe(null, (e: Event) => evs.push(e));
     expect(
       Notifications.instrument("awesome", {}, (p) => {
         p.result = 1 + 1;
@@ -546,8 +537,8 @@ describe("EventTest", () => {
   it("subscribe raises error on non supported arguments", () => {
     const notifier = new Fanout();
 
-    expect(() => notifier.subscribe(1 as never, (() => {}) as never)).toThrow(ArgumentError);
-    expect(() => notifier.subscribe({} as never, (() => {}) as never)).toThrow(ArgumentError);
+    expect(() => notifier.subscribe(1 as never, () => {})).toThrow(ArgumentError);
+    expect(() => notifier.subscribe({} as never, () => {})).toThrow(ArgumentError);
   });
 });
 
