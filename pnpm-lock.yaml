@@ -510,9 +510,9 @@ importers:
       '@blazetrails/tse-compiler':
         specifier: workspace:*
         version: link:../tse-compiler
-      typescript:
-        specifier: ^5.0.0
-        version: 5.9.3
+      typescript-5:
+        specifier: npm:typescript@5.9.3
+        version: typescript@5.9.3
 
   packages/trailties:
     dependencies:

@@ -22,11 +22,11 @@
     "build": "tsc"
   },
   "dependencies": {
-    "@blazetrails/tse-compiler": "workspace:*"
+    "@blazetrails/tse-compiler": "workspace:*",
+    "typescript-5": "npm:typescript@5.9.3"
   },
   "peerDependencies": {
-    "@blazetrails/actionview": "workspace:*",
-    "typescript": "^5.0.0"
+    "@blazetrails/actionview": "workspace:*"
   },
   "files": [
     "dist",

@@ -1,4 +1,4 @@
-import type ts from "typescript";
+import type ts from "typescript-5";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { virtualizeTse } from "./plugins/tse.js";

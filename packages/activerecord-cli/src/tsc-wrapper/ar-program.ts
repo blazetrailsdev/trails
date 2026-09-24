@@ -34,6 +34,7 @@ export interface CreateArSolutionBuilderOptions extends Omit<TrailsBuildOptions,
   schemaColumnsByTable?: ArModelsPluginOptions["schemaColumnsByTable"];
 }
 
+/** @noRailsEquivalent CONVERGEABLE port-trails-tsc-to-ts7-api */
 export function createArSolutionBuilder(
   rootConfigs: readonly string[],
   opts: CreateArSolutionBuilderOptions = {},

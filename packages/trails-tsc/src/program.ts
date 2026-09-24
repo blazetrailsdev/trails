@@ -1,4 +1,4 @@
-import ts from "typescript";
+import ts from "typescript-5";
 import * as path from "node:path";
 import { buildCompilerHost, type TrailsCompilerHost } from "./host.js";
 import type { TscPlugin } from "./plugin.js";

@@ -1,4 +1,4 @@
-import ts from "typescript";
+import ts from "typescript-5";
 
 const DEFAULT_STUB = [
   "export interface TemplateRegistry {}",
