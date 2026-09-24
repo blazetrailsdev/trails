@@ -3090,7 +3090,14 @@ function enclosingEntity(node: ts.Node): { name: string; objectLiteral: boolean 
         ts.isObjectLiteralExpression(cur.initializer) &&
         ts.isVariableStatement(cur.parent.parent) &&
         isExported(cur.parent.parent) &&
-        !isConstantCaseName(cur.name.text);
+        !isConstantCaseName(cur.name.text) &&
+        cur.initializer.properties.some(
+          (prop) =>
+            prop.name !== undefined &&
+            ts.isComputedPropertyName(prop.name) &&
+            ts.isIdentifier(prop.name.expression) &&
+            (prop.name.expression.text === "included" || prop.name.expression.text === "extended"),
+        );
       return { name: cur.name.text, objectLiteral };
     }
   }

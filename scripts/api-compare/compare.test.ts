@@ -16,6 +16,7 @@ import {
   dedupeRubyMethodInto,
   rubyLevelKey,
   tsDeclaresOnLevel,
+  tsOwnerOnBothSeats,
   includerAdmitsOnLevel,
   rubyBodyKey,
   type SeenRubyMethod,
@@ -1936,6 +1937,18 @@ describe("tsDeclaresOnLevel", () => {
     expect(tsDeclaresOnLevel("class", both, both, both)).toBe("seat");
     expect(tsDeclaresOnLevel("instance", both, both, both)).toBe("seat");
     expect(tsDeclaresOnLevel("class", owners("Other"), both, both)).toBe("neutral");
+  });
+
+  it("keeps a ClassMethods / InstanceMethods grouping on its named seat", () => {
+    const grouping = owners("ClassMethods", "InstanceMethods");
+    expect(tsOwnerOnBothSeats("ClassMethods", grouping, grouping)).toBe(false);
+    expect(tsOwnerOnBothSeats("InstanceMethods", grouping, grouping)).toBe(false);
+    expect(tsDeclaresOnLevel("instance", owners("ClassMethods"), grouping, grouping)).toBe(
+      undefined,
+    );
+    expect(tsDeclaresOnLevel("class", owners("InstanceMethods"), grouping, grouping)).toBe(
+      undefined,
+    );
   });
 });
 

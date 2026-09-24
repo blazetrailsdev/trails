@@ -5248,6 +5248,21 @@ describe("extractFromProgram — classAttribute() generated accessors", () => {
     ]);
   });
 
+  it("does not seat an object literal with no [included] or [extended] hook", () => {
+    const info = extractFromFiles("/p", {
+      "helpers.ts": `
+        import { classAttribute } from "@blazetrails/activesupport";
+        const install = Symbol("install");
+        export const Helpers = {
+          [install](base: any): void {
+            classAttribute.call(base, "lockOptimistically");
+          },
+        };
+      `,
+    });
+    expect(info.modules["helpers.ts:Helpers"]).toBeUndefined();
+  });
+
   it("credits nothing for a non-literal attribute name", () => {
     const info = extractFromFiles("/p", {
       "dynamic.ts": `
