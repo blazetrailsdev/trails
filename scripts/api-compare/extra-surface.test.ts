@@ -1217,9 +1217,6 @@ describe("buildReport — novel vs moved classification", () => {
   });
 
   it("allows a folded ::ClassMethods submodule a host extends directly", () => {
-    // activerecord/base.rb:297 `extend Aggregations::ClassMethods` — the fold
-    // drops the submodule from the short-name map, so the host resolves it
-    // through its parent `Aggregations`.
     const ruby: ApiManifest = {
       source: "ruby",
       generatedAt: "",

@@ -40,8 +40,8 @@ export function composedOf(this: typeof Base, partId: string, options: ComposedO
   const constructor = options.constructorFn ?? "new";
   const converter = options.converter;
 
-  readerMethod(this, name, className, mapping as [string, string][], allowNil, constructor);
-  writerMethod(this, name, className, mapping as [string, string][], allowNil, converter);
+  readerMethod.call(this, name, className, mapping as [string, string][], allowNil, constructor);
+  writerMethod.call(this, name, className, mapping as [string, string][], allowNil, converter);
 
   const reflection = create(
     "composedOf",
@@ -70,15 +70,15 @@ function resolveClass(
 
 /** @internal */
 function readerMethod(
-  modelClass: typeof Base,
+  this: typeof Base,
   name: string,
   className: (new (...args: any[]) => any) | string,
   mapping: [string, string][],
   allowNil: boolean,
   constructor: ((...args: any[]) => any) | string,
 ): void {
-  const existing = Object.getOwnPropertyDescriptor(modelClass.prototype, name);
-  Object.defineProperty(modelClass.prototype, name, {
+  const existing = Object.getOwnPropertyDescriptor(this.prototype, name);
+  Object.defineProperty(this.prototype, name, {
     enumerable: existing?.enumerable ?? false,
     get(this: Base): unknown {
       const cache: Map<string, unknown> = (this as any)._aggregationCache;
@@ -126,15 +126,15 @@ function _decompose(
 
 /** @internal */
 function writerMethod(
-  modelClass: typeof Base,
+  this: typeof Base,
   name: string,
   className: (new (...args: any[]) => any) | string,
   mapping: [string, string][],
   allowNil: boolean,
   converter?: (value: unknown) => unknown,
 ): void {
-  const existing = Object.getOwnPropertyDescriptor(modelClass.prototype, name);
-  Object.defineProperty(modelClass.prototype, name, {
+  const existing = Object.getOwnPropertyDescriptor(this.prototype, name);
+  Object.defineProperty(this.prototype, name, {
     enumerable: existing?.enumerable ?? false,
     get: existing?.get,
     set(this: Base, value: unknown): void {

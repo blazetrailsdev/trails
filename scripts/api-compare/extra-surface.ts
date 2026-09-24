@@ -1544,11 +1544,6 @@ function collectAllowedNames(
     target: Set<string> = allowed,
     methodFile?: string,
   ): void => {
-    // A folded `X::ClassMethods` is absent from `moduleFqnByShort`, so a direct
-    // `extend Aggregations::ClassMethods` (activerecord/base.rb:297) misses it;
-    // it resolves through its parent `X` — Ruby's own lookup order — and
-    // re-appends the segment, the folded module itself still being in
-    // `rubyModules`.
     let fqn = resolveModuleName(incName, contextFqn, moduleFqnByShort);
     if (!rubyModules[fqn] && !crossPackageModules[fqn] && incName.endsWith("::ClassMethods")) {
       const parent = incName.slice(0, -"::ClassMethods".length);

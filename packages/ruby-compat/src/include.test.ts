@@ -960,3 +960,17 @@ describe("Module#superMethod", () => {
     expect(new Leaf().who()).toBe("mbase");
   });
 });
+
+describe("Module.new", () => {
+  it("hands its block the new module, whose methods an includer answers", () => {
+    let yielded: Module | undefined;
+    const mod = new Module((m) => {
+      yielded = m;
+      m.defineMethod("greet", () => "hello");
+    });
+    class Host {}
+    include(Host, mod);
+    expect(yielded).toBe(mod);
+    expect((new Host() as unknown as { greet(): string }).greet()).toBe("hello");
+  });
+});
