@@ -9,8 +9,7 @@ import {
 import type { ColumnOptions, ColumnType } from "../abstract/schema-definitions.js";
 import type { SchemaStatementsLike } from "../abstract/schema-statements-like.js";
 import type { TableDefinitionConn } from "../abstract/schema-definitions.js";
-import { extractOptionsBang, wrap } from "@blazetrails/activesupport";
-import { ArgumentError } from "@blazetrails/activemodel";
+import { wrap } from "@blazetrails/activesupport";
 
 export interface ColumnMethods {
   bigserial(...names: string[]): unknown;
@@ -185,6 +184,7 @@ type PgConstraintOptionsConn = {
   ): Record<string, unknown>;
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface below.
 export class TableDefinition extends AbstractTableDefinition {
   readonly exclusionConstraints: ExclusionConstraintDefinition[] = [];
   readonly uniqueConstraints: UniqueConstraintDefinition[] = [];
@@ -281,208 +281,45 @@ export class TableDefinition extends AbstractTableDefinition {
       "stored",
     ];
   }
-
-  bigserial(...names: string[]): this;
-  bigserial(...args: [...names: string[], options: ColumnOptions]): this;
-  bigserial(...args: unknown[]): this {
-    return this.definedPgColumn("bigserial", args);
-  }
-
-  serial(...names: string[]): this;
-  serial(...args: [...names: string[], options: ColumnOptions]): this;
-  serial(...args: unknown[]): this {
-    return this.definedPgColumn("serial", args);
-  }
-
-  bit(...names: string[]): this;
-  bit(...args: [...names: string[], options: ColumnOptions & { limit?: number }]): this;
-  bit(...args: unknown[]): this {
-    return this.definedPgColumn("bit", args);
-  }
-
-  bitVarying(...names: string[]): this;
-  bitVarying(...args: [...names: string[], options: ColumnOptions & { limit?: number }]): this;
-  bitVarying(...args: unknown[]): this {
-    return this.definedPgColumn("bit_varying", args);
-  }
-
-  uuid(...names: string[]): this;
-  uuid(...args: [...names: string[], options: ColumnOptions]): this;
-  uuid(...args: unknown[]): this {
-    return this.definedPgColumn("uuid", args);
-  }
-
-  jsonb(...names: string[]): this;
-  jsonb(...args: [...names: string[], options: ColumnOptions]): this;
-  jsonb(...args: unknown[]): this {
-    return this.definedPgColumn("jsonb", args);
-  }
-
-  daterange(...names: string[]): this;
-  daterange(...args: [...names: string[], options: ColumnOptions]): this;
-  daterange(...args: unknown[]): this {
-    return this.definedPgColumn("daterange", args);
-  }
-
-  int4range(...names: string[]): this;
-  int4range(...args: [...names: string[], options: ColumnOptions]): this;
-  int4range(...args: unknown[]): this {
-    return this.definedPgColumn("int4range", args);
-  }
-
-  int8range(...names: string[]): this;
-  int8range(...args: [...names: string[], options: ColumnOptions]): this;
-  int8range(...args: unknown[]): this {
-    return this.definedPgColumn("int8range", args);
-  }
-
-  numrange(...names: string[]): this;
-  numrange(...args: [...names: string[], options: ColumnOptions]): this;
-  numrange(...args: unknown[]): this {
-    return this.definedPgColumn("numrange", args);
-  }
-
-  timestamptz(...names: string[]): this;
-  timestamptz(...args: [...names: string[], options: ColumnOptions]): this;
-  timestamptz(...args: unknown[]): this {
-    return this.definedPgColumn("timestamptz", args);
-  }
-
-  tsrange(...names: string[]): this;
-  tsrange(...args: [...names: string[], options: ColumnOptions]): this;
-  tsrange(...args: unknown[]): this {
-    return this.definedPgColumn("tsrange", args);
-  }
-
-  tstzrange(...names: string[]): this;
-  tstzrange(...args: [...names: string[], options: ColumnOptions]): this;
-  tstzrange(...args: unknown[]): this {
-    return this.definedPgColumn("tstzrange", args);
-  }
-
-  oid(...names: string[]): this;
-  oid(...args: [...names: string[], options: ColumnOptions]): this;
-  oid(...args: unknown[]): this {
-    return this.definedPgColumn("oid", args);
-  }
-
-  cidr(...names: string[]): this;
-  cidr(...args: [...names: string[], options: ColumnOptions]): this;
-  cidr(...args: unknown[]): this {
-    return this.definedPgColumn("cidr", args);
-  }
-
-  citext(...names: string[]): this;
-  citext(...args: [...names: string[], options: ColumnOptions]): this;
-  citext(...args: unknown[]): this {
-    return this.definedPgColumn("citext", args);
-  }
-
-  hstore(...names: string[]): this;
-  hstore(...args: [...names: string[], options: ColumnOptions]): this;
-  hstore(...args: unknown[]): this {
-    return this.definedPgColumn("hstore", args);
-  }
-
-  inet(...names: string[]): this;
-  inet(...args: [...names: string[], options: ColumnOptions]): this;
-  inet(...args: unknown[]): this {
-    return this.definedPgColumn("inet", args);
-  }
-
-  interval(...names: string[]): this;
-  interval(...args: [...names: string[], options: ColumnOptions]): this;
-  interval(...args: unknown[]): this {
-    return this.definedPgColumn("interval", args);
-  }
-
-  ltree(...names: string[]): this;
-  ltree(...args: [...names: string[], options: ColumnOptions]): this;
-  ltree(...args: unknown[]): this {
-    return this.definedPgColumn("ltree", args);
-  }
-
-  macaddr(...names: string[]): this;
-  macaddr(...args: [...names: string[], options: ColumnOptions]): this;
-  macaddr(...args: unknown[]): this {
-    return this.definedPgColumn("macaddr", args);
-  }
-
-  money(...names: string[]): this;
-  money(...args: [...names: string[], options: ColumnOptions]): this;
-  money(...args: unknown[]): this {
-    return this.definedPgColumn("money", args);
-  }
-
-  point(...names: string[]): this;
-  point(...args: [...names: string[], options: ColumnOptions]): this;
-  point(...args: unknown[]): this {
-    return this.definedPgColumn("point", args);
-  }
-
-  line(...names: string[]): this;
-  line(...args: [...names: string[], options: ColumnOptions]): this;
-  line(...args: unknown[]): this {
-    return this.definedPgColumn("line", args);
-  }
-
-  lseg(...names: string[]): this;
-  lseg(...args: [...names: string[], options: ColumnOptions]): this;
-  lseg(...args: unknown[]): this {
-    return this.definedPgColumn("lseg", args);
-  }
-
-  box(...names: string[]): this;
-  box(...args: [...names: string[], options: ColumnOptions]): this;
-  box(...args: unknown[]): this {
-    return this.definedPgColumn("box", args);
-  }
-
-  path(...names: string[]): this;
-  path(...args: [...names: string[], options: ColumnOptions]): this;
-  path(...args: unknown[]): this {
-    return this.definedPgColumn("path", args);
-  }
-
-  polygon(...names: string[]): this;
-  polygon(...args: [...names: string[], options: ColumnOptions]): this;
-  polygon(...args: unknown[]): this {
-    return this.definedPgColumn("polygon", args);
-  }
-
-  circle(...names: string[]): this;
-  circle(...args: [...names: string[], options: ColumnOptions]): this;
-  circle(...args: unknown[]): this {
-    return this.definedPgColumn("circle", args);
-  }
-
-  tsvector(...names: string[]): this;
-  tsvector(...args: [...names: string[], options: ColumnOptions]): this;
-  tsvector(...args: unknown[]): this {
-    return this.definedPgColumn("tsvector", args);
-  }
-
-  xml(...names: string[]): this;
-  xml(...args: [...names: string[], options: ColumnOptions]): this;
-  xml(...args: unknown[]): this {
-    return this.definedPgColumn("xml", args);
-  }
-
-  enum(...names: string[]): this;
-  enum(...args: [...names: string[], options: ColumnOptions]): this;
-  enum(...args: unknown[]): this {
-    return this.definedPgColumn("enum", args);
-  }
-
-  /** @internal */
-  private definedPgColumn(type: string, args: unknown[]): this {
-    const names = [...args] as string[];
-    const options = extractOptionsBang(names) as ColumnOptions;
-    if (names.length === 0) throw new ArgumentError(`Missing column name(s) for ${type}`);
-    for (const name of names) this.column(name, type as ColumnType, options);
-    return this;
-  }
 }
+
+/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ColumnMethods` (`postgresql/schema_definitions.rb:246`); the class/interface merge is how a mixin surfaces on the type side. */
+export interface TableDefinition extends ColumnMethods {}
+
+TableDefinition.defineColumnMethods(
+  "bigserial",
+  "bit",
+  "bit_varying",
+  "cidr",
+  "citext",
+  "daterange",
+  "hstore",
+  "inet",
+  "interval",
+  "int4range",
+  "int8range",
+  "jsonb",
+  "ltree",
+  "macaddr",
+  "money",
+  "numrange",
+  "oid",
+  "point",
+  "line",
+  "lseg",
+  "box",
+  "path",
+  "polygon",
+  "circle",
+  "serial",
+  "tsrange",
+  "tstzrange",
+  "tsvector",
+  "uuid",
+  "xml",
+  "timestamptz",
+  "enum",
+);
 
 export interface SchemaStatementsConstraintLike extends SchemaStatementsLike {
   addExclusionConstraint(
@@ -538,13 +375,13 @@ export class Table extends AbstractTable {
   bigserial(...names: string[]): Promise<void>;
   bigserial(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
   bigserial(...args: unknown[]): Promise<void> {
-    return this.definedPgColumn("bigserial", args);
+    return this.definedColumn("bigserial" as ColumnType, args);
   }
 
   bit(...names: string[]): Promise<void>;
   bit(...args: [...names: string[], options: ColumnOptions & { limit?: number }]): Promise<void>;
   bit(...args: unknown[]): Promise<void> {
-    return this.definedPgColumn("bit", args);
+    return this.definedColumn("bit" as ColumnType, args);
   }
 
   bitVarying(...names: string[]): Promise<void>;
@@ -552,188 +389,180 @@ export class Table extends AbstractTable {
     ...args: [...names: string[], options: ColumnOptions & { limit?: number }]
   ): Promise<void>;
   bitVarying(...args: unknown[]): Promise<void> {
-    return this.definedPgColumn("bit_varying", args);
+    return this.definedColumn("bit_varying" as ColumnType, args);
   }
 
   cidr(...names: string[]): Promise<void>;
   cidr(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
   cidr(...args: unknown[]): Promise<void> {
-    return this.definedPgColumn("cidr", args);
+    return this.definedColumn("cidr" as ColumnType, args);
   }
 
   citext(...names: string[]): Promise<void>;
   citext(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
   citext(...args: unknown[]): Promise<void> {
-    return this.definedPgColumn("citext", args);
+    return this.definedColumn("citext" as ColumnType, args);
   }
 
   daterange(...names: string[]): Promise<void>;
   daterange(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
   daterange(...args: unknown[]): Promise<void> {
-    return this.definedPgColumn("daterange", args);
+    return this.definedColumn("daterange" as ColumnType, args);
   }
 
   hstore(...names: string[]): Promise<void>;
   hstore(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
   hstore(...args: unknown[]): Promise<void> {
-    return this.definedPgColumn("hstore", args);
+    return this.definedColumn("hstore" as ColumnType, args);
   }
 
   inet(...names: string[]): Promise<void>;
   inet(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
   inet(...args: unknown[]): Promise<void> {
-    return this.definedPgColumn("inet", args);
+    return this.definedColumn("inet" as ColumnType, args);
   }
 
   interval(...names: string[]): Promise<void>;
   interval(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
   interval(...args: unknown[]): Promise<void> {
-    return this.definedPgColumn("interval", args);
+    return this.definedColumn("interval" as ColumnType, args);
   }
 
   int4range(...names: string[]): Promise<void>;
   int4range(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
   int4range(...args: unknown[]): Promise<void> {
-    return this.definedPgColumn("int4range", args);
+    return this.definedColumn("int4range" as ColumnType, args);
   }
 
   int8range(...names: string[]): Promise<void>;
   int8range(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
   int8range(...args: unknown[]): Promise<void> {
-    return this.definedPgColumn("int8range", args);
+    return this.definedColumn("int8range" as ColumnType, args);
   }
 
   jsonb(...names: string[]): Promise<void>;
   jsonb(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
   jsonb(...args: unknown[]): Promise<void> {
-    return this.definedPgColumn("jsonb", args);
+    return this.definedColumn("jsonb" as ColumnType, args);
   }
 
   ltree(...names: string[]): Promise<void>;
   ltree(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
   ltree(...args: unknown[]): Promise<void> {
-    return this.definedPgColumn("ltree", args);
+    return this.definedColumn("ltree" as ColumnType, args);
   }
 
   macaddr(...names: string[]): Promise<void>;
   macaddr(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
   macaddr(...args: unknown[]): Promise<void> {
-    return this.definedPgColumn("macaddr", args);
+    return this.definedColumn("macaddr" as ColumnType, args);
   }
 
   money(...names: string[]): Promise<void>;
   money(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
   money(...args: unknown[]): Promise<void> {
-    return this.definedPgColumn("money", args);
+    return this.definedColumn("money" as ColumnType, args);
   }
 
   numrange(...names: string[]): Promise<void>;
   numrange(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
   numrange(...args: unknown[]): Promise<void> {
-    return this.definedPgColumn("numrange", args);
+    return this.definedColumn("numrange" as ColumnType, args);
   }
 
   oid(...names: string[]): Promise<void>;
   oid(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
   oid(...args: unknown[]): Promise<void> {
-    return this.definedPgColumn("oid", args);
+    return this.definedColumn("oid" as ColumnType, args);
   }
 
   point(...names: string[]): Promise<void>;
   point(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
   point(...args: unknown[]): Promise<void> {
-    return this.definedPgColumn("point", args);
+    return this.definedColumn("point" as ColumnType, args);
   }
 
   line(...names: string[]): Promise<void>;
   line(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
   line(...args: unknown[]): Promise<void> {
-    return this.definedPgColumn("line", args);
+    return this.definedColumn("line" as ColumnType, args);
   }
 
   lseg(...names: string[]): Promise<void>;
   lseg(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
   lseg(...args: unknown[]): Promise<void> {
-    return this.definedPgColumn("lseg", args);
+    return this.definedColumn("lseg" as ColumnType, args);
   }
 
   box(...names: string[]): Promise<void>;
   box(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
   box(...args: unknown[]): Promise<void> {
-    return this.definedPgColumn("box", args);
+    return this.definedColumn("box" as ColumnType, args);
   }
 
   path(...names: string[]): Promise<void>;
   path(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
   path(...args: unknown[]): Promise<void> {
-    return this.definedPgColumn("path", args);
+    return this.definedColumn("path" as ColumnType, args);
   }
 
   polygon(...names: string[]): Promise<void>;
   polygon(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
   polygon(...args: unknown[]): Promise<void> {
-    return this.definedPgColumn("polygon", args);
+    return this.definedColumn("polygon" as ColumnType, args);
   }
 
   circle(...names: string[]): Promise<void>;
   circle(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
   circle(...args: unknown[]): Promise<void> {
-    return this.definedPgColumn("circle", args);
+    return this.definedColumn("circle" as ColumnType, args);
   }
 
   serial(...names: string[]): Promise<void>;
   serial(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
   serial(...args: unknown[]): Promise<void> {
-    return this.definedPgColumn("serial", args);
+    return this.definedColumn("serial" as ColumnType, args);
   }
 
   tsrange(...names: string[]): Promise<void>;
   tsrange(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
   tsrange(...args: unknown[]): Promise<void> {
-    return this.definedPgColumn("tsrange", args);
+    return this.definedColumn("tsrange" as ColumnType, args);
   }
 
   tstzrange(...names: string[]): Promise<void>;
   tstzrange(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
   tstzrange(...args: unknown[]): Promise<void> {
-    return this.definedPgColumn("tstzrange", args);
+    return this.definedColumn("tstzrange" as ColumnType, args);
   }
 
   tsvector(...names: string[]): Promise<void>;
   tsvector(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
   tsvector(...args: unknown[]): Promise<void> {
-    return this.definedPgColumn("tsvector", args);
+    return this.definedColumn("tsvector" as ColumnType, args);
   }
 
   uuid(...names: string[]): Promise<void>;
   uuid(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
   uuid(...args: unknown[]): Promise<void> {
-    return this.definedPgColumn("uuid", args);
+    return this.definedColumn("uuid" as ColumnType, args);
   }
 
   xml(...names: string[]): Promise<void>;
   xml(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
   xml(...args: unknown[]): Promise<void> {
-    return this.definedPgColumn("xml", args);
+    return this.definedColumn("xml" as ColumnType, args);
   }
 
   timestamptz(...names: string[]): Promise<void>;
   timestamptz(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
   timestamptz(...args: unknown[]): Promise<void> {
-    return this.definedPgColumn("timestamptz", args);
+    return this.definedColumn("timestamptz" as ColumnType, args);
   }
 
   enum(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
   async enum(...args: unknown[]): Promise<void> {
-    await this.definedPgColumn("enum", args);
-  }
-
-  /** @internal */
-  private async definedPgColumn(type: string, args: unknown[]): Promise<void> {
-    const names = [...args] as string[];
-    const options = extractOptionsBang(names) as ColumnOptions;
-    if (names.length === 0) throw new ArgumentError(`Missing column name(s) for ${type}`);
-    for (const name of names) await this.column(name, type as ColumnType, options);
+    await this.definedColumn("enum" as ColumnType, args);
   }
 }
 

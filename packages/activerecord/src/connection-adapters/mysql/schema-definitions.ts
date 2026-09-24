@@ -12,16 +12,11 @@ import type {
 import type { SchemaStatementsLike } from "../abstract/schema-statements-like.js";
 import { type VisitorHostAdapter } from "./schema-creation.js";
 import { deprecator } from "../../deprecator.js";
-import { ArgumentError } from "@blazetrails/activemodel";
-
-const UNSIGNED_FLOAT_DEPRECATION =
-  "unsigned_float is deprecated and will be removed from Active Record";
-const UNSIGNED_DECIMAL_DEPRECATION =
-  "unsigned_decimal is deprecated and will be removed from Active Record";
+import { deprecate } from "@blazetrails/activesupport";
 
 export interface ColumnMethods {
   blob(...names: string[]): unknown;
-  blob(...args: [...names: string[], options: ColumnOptions & { limit?: number }]): unknown;
+  blob(...args: [...names: string[], options: ColumnOptions]): unknown;
   tinyblob(...names: string[]): unknown;
   tinyblob(...args: [...names: string[], options: ColumnOptions]): unknown;
   mediumblob(...names: string[]): unknown;
@@ -48,6 +43,7 @@ export interface ColumnMethods {
   unsignedDecimal(...args: [...names: string[], options: ColumnOptions]): unknown;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface below.
 export class TableDefinition extends AbstractTableDefinition {
   readonly charset?: string;
   readonly collation?: string;
@@ -71,137 +67,6 @@ export class TableDefinition extends AbstractTableDefinition {
     super(conn, name, rest);
     this.charset = charset ?? undefined;
     this.collation = collation ?? undefined;
-  }
-
-  /** @internal */
-  protected definedMysqlColumn(
-    columnType: string,
-    type: ColumnType,
-    sqlType: string | ((options: ColumnOptions) => string),
-    args: unknown[],
-  ): this {
-    const rest = [...args];
-    const last = rest[rest.length - 1];
-    const options = (typeof last === "object" && last !== null ? rest.pop() : {}) as ColumnOptions;
-    const names = rest as string[];
-    if (names.length === 0) {
-      throw new ArgumentError(`Missing column name(s) for ${columnType}`);
-    }
-    const resolved = typeof sqlType === "function" ? sqlType(options) : sqlType;
-    for (const name of names) {
-      this.mysqlColumn(name, type, resolved, options);
-    }
-    return this;
-  }
-
-  blob(...names: string[]): this;
-  blob(...args: [...names: string[], options: ColumnOptions & { limit?: number }]): this;
-  blob(...args: unknown[]): this {
-    return this.definedMysqlColumn(
-      "blob",
-      "binary" as ColumnType,
-      (options) => {
-        const limit = (options as ColumnOptions & { limit?: number }).limit;
-        if (limit == null) return "BLOB";
-        if (limit <= 255) return "TINYBLOB";
-        if (limit <= 65535) return "BLOB";
-        if (limit <= 16777215) return "MEDIUMBLOB";
-        return "LONGBLOB";
-      },
-      args,
-    );
-  }
-
-  tinyblob(...names: string[]): this;
-  tinyblob(...args: [...names: string[], options: ColumnOptions]): this;
-  tinyblob(...args: unknown[]): this {
-    return this.definedMysqlColumn("tinyblob", "binary" as ColumnType, "TINYBLOB", args);
-  }
-
-  mediumblob(...names: string[]): this;
-  mediumblob(...args: [...names: string[], options: ColumnOptions]): this;
-  mediumblob(...args: unknown[]): this {
-    return this.definedMysqlColumn("mediumblob", "binary" as ColumnType, "MEDIUMBLOB", args);
-  }
-
-  longblob(...names: string[]): this;
-  longblob(...args: [...names: string[], options: ColumnOptions]): this;
-  longblob(...args: unknown[]): this {
-    return this.definedMysqlColumn("longblob", "binary" as ColumnType, "LONGBLOB", args);
-  }
-
-  tinytext(...names: string[]): this;
-  tinytext(...args: [...names: string[], options: ColumnOptions]): this;
-  tinytext(...args: unknown[]): this {
-    return this.definedMysqlColumn("tinytext", "text" as ColumnType, "TINYTEXT", args);
-  }
-
-  mediumtext(...names: string[]): this;
-  mediumtext(...args: [...names: string[], options: ColumnOptions]): this;
-  mediumtext(...args: unknown[]): this {
-    return this.definedMysqlColumn("mediumtext", "text" as ColumnType, "MEDIUMTEXT", args);
-  }
-
-  longtext(...names: string[]): this;
-  longtext(...args: [...names: string[], options: ColumnOptions]): this;
-  longtext(...args: unknown[]): this {
-    return this.definedMysqlColumn("longtext", "text" as ColumnType, "LONGTEXT", args);
-  }
-
-  unsignedInteger(...names: string[]): this;
-  unsignedInteger(...args: [...names: string[], options: ColumnOptions]): this;
-  unsignedInteger(...args: unknown[]): this {
-    return this.definedMysqlColumn(
-      "unsigned_integer",
-      "integer" as ColumnType,
-      "INT UNSIGNED",
-      args,
-    );
-  }
-
-  unsignedBigint(...names: string[]): this;
-  unsignedBigint(...args: [...names: string[], options: ColumnOptions]): this;
-  unsignedBigint(...args: unknown[]): this {
-    return this.definedMysqlColumn(
-      "unsigned_bigint",
-      "bigint" as ColumnType,
-      "BIGINT UNSIGNED",
-      args,
-    );
-  }
-
-  /** @deprecated */
-  unsignedFloat(...names: string[]): this;
-  /** @deprecated */
-  unsignedFloat(...args: [...names: string[], options: ColumnOptions]): this;
-  /** @deprecated */
-  unsignedFloat(...args: unknown[]): this {
-    deprecator().warn(UNSIGNED_FLOAT_DEPRECATION);
-    return this.definedMysqlColumn("unsigned_float", "float" as ColumnType, "FLOAT UNSIGNED", args);
-  }
-
-  /** @deprecated */
-  unsignedDecimal(...names: string[]): this;
-  /** @deprecated */
-  unsignedDecimal(...args: [...names: string[], options: ColumnOptions]): this;
-  /** @deprecated */
-  unsignedDecimal(...args: unknown[]): this {
-    deprecator().warn(UNSIGNED_DECIMAL_DEPRECATION);
-    return this.definedMysqlColumn(
-      "unsigned_decimal",
-      "decimal" as ColumnType,
-      (options) => {
-        if (options.scale != null && options.precision == null) {
-          throw new ArgumentError(
-            "Error adding decimal column: precision cannot be empty if scale is specified",
-          );
-        }
-        const precision = options.precision ?? 10;
-        const scale = options.scale ?? 0;
-        return `DECIMAL(${precision}, ${scale}) UNSIGNED`;
-      },
-      args,
-    );
   }
 
   override newColumnDefinition(
@@ -258,19 +123,26 @@ export class TableDefinition extends AbstractTableDefinition {
     }
     return type;
   }
-
-  private mysqlColumn(
-    name: string,
-    type: ColumnType,
-    sqlType: string,
-    options: ColumnOptions,
-  ): this {
-    const col = new ColumnDefinition(name, type, options);
-    col.sqlType = sqlType;
-    this.columnsHash.set(name, col);
-    return this;
-  }
 }
+
+/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ColumnMethods` (`mysql/schema_definitions.rb:56`); the class/interface merge is how a mixin surfaces on the type side. */
+export interface TableDefinition extends ColumnMethods {}
+
+TableDefinition.defineColumnMethods(
+  "blob",
+  "tinyblob",
+  "mediumblob",
+  "longblob",
+  "tinytext",
+  "mediumtext",
+  "longtext",
+  "unsigned_integer",
+  "unsigned_bigint",
+  "unsigned_float",
+  "unsigned_decimal",
+);
+
+deprecate.call(TableDefinition, "unsignedFloat", "unsignedDecimal", { deprecator: deprecator() });
 
 export class Table extends AbstractTable {
   constructor(tableName: string, schema: SchemaStatementsLike) {
@@ -315,13 +187,13 @@ export class Table extends AbstractTable {
 
   /** @deprecated */
   async unsignedFloat(...args: unknown[]): Promise<void> {
-    deprecator().warn(UNSIGNED_FLOAT_DEPRECATION);
     await this.definedColumn("unsigned_float" as ColumnType, args);
   }
 
   /** @deprecated */
   async unsignedDecimal(...args: unknown[]): Promise<void> {
-    deprecator().warn(UNSIGNED_DECIMAL_DEPRECATION);
     await this.definedColumn("unsigned_decimal" as ColumnType, args);
   }
 }
+
+deprecate.call(Table, "unsignedFloat", "unsignedDecimal", { deprecator: deprecator() });

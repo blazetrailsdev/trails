@@ -345,6 +345,7 @@ export type { CacheOptions, CacheStore } from "./cache/index.js";
 
 export { Deprecation, DeprecationException, DEFAULT_BEHAVIORS } from "./deprecation.js";
 export { deprecator } from "./deprecator.js";
+export { deprecate } from "./core-ext/module/deprecation.js";
 export { VERSION, gemVersion } from "./gem-version.js";
 export type {
   DeprecationBehavior,
