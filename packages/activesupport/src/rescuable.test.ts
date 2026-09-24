@@ -16,13 +16,13 @@ class WeirdError {
   }
 }
 
-class NuclearExplosion extends Error {}
-
-for (const klass of [WraithAttack, MadRonon, CoolError, WeirdError, NuclearExplosion]) {
+for (const klass of [WraithAttack, MadRonon, CoolError, WeirdError]) {
   registerConstant(klass.name, klass);
 }
 
 class Stargate {
+  static NuclearExplosion = class NuclearExplosion extends Error {};
+
   declare static rescueHandlers: [string, unknown][];
   declare rescueHandlers: [string, unknown][];
 
@@ -69,7 +69,7 @@ class Stargate {
   }
 
   nuke(): never {
-    throw new NuclearExplosion();
+    throw new Stargate.NuclearExplosion();
   }
 
   ronanize(): never {

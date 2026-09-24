@@ -45,13 +45,20 @@ export function rescueFrom(
 export function handleRescue(target: any, error: Error): boolean {
   const handlers = (target as RescuableHost).rescueHandlers;
   for (const [key, handler] of [...handlers].reverse()) {
-    const klass = safeConstantize(key) as (new (...args: any[]) => Error) | undefined;
+    const klass = (target.constructor[key] ?? safeConstantize(key)) as
+      | (new (...args: any[]) => Error)
+      | undefined;
     if (klass !== undefined && error instanceof klass) {
       if (typeof handler === "function") {
-        (handler as Exclude<ErrorHandler, string>).call(target, error);
+        const rescuer = handler as Exclude<ErrorHandler, string>;
+        if (rescuer.length === 0) (rescuer as (this: any) => void).call(target);
+        else rescuer.call(target, error);
       } else if (typeof handler === "string") {
         const method = target[handler];
-        if (typeof method === "function") method.call(target, error);
+        if (typeof method === "function") {
+          if (method.length === 0) method.call(target);
+          else method.call(target, error);
+        }
       }
       return true;
     }
