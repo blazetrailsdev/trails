@@ -111,7 +111,7 @@ export function defaultValue(): ValueType {
 }
 
 export function adapterNameFrom(model: AdapterNameSource): string {
-  return model.connectionDbConfig()!.adapter!;
+  return model.connectionDbConfig()!.adapter!.toString();
 }
 
 /** @internal */

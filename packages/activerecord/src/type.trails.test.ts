@@ -55,6 +55,7 @@ describe("Type.currentAdapterName", () => {
         },
       }),
     ).toThrow(ConnectionNotDefined);
+    expect(() => adapterNameFrom(modelWith(undefined))).toThrow(TypeError);
   });
 
   it("propagates errors other than a missing connection", () => {
