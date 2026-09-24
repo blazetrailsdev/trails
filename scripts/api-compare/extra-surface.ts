@@ -1544,7 +1544,11 @@ function collectAllowedNames(
     target: Set<string> = allowed,
     methodFile?: string,
   ): void => {
-    const fqn = resolveModuleName(incName, contextFqn, moduleFqnByShort);
+    let fqn = resolveModuleName(incName, contextFqn, moduleFqnByShort);
+    if (!rubyModules[fqn] && !crossPackageModules[fqn] && incName.endsWith("::ClassMethods")) {
+      const parent = incName.slice(0, -"::ClassMethods".length);
+      fqn = `${resolveModuleName(parent, contextFqn, moduleFqnByShort)}::ClassMethods`;
+    }
     let visited = visitedByTarget.get(target);
     if (visited === undefined) {
       visited = new Set<string>();

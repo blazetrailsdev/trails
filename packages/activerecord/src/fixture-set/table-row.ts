@@ -148,6 +148,7 @@ export class TableRow {
     }
   }
 
+  /** @missingRailsName label — PERMANENT */
   private generatePrimaryKey(): void {
     const pk = this.modelMetadata.primaryKeyName as string;
 
@@ -156,6 +157,7 @@ export class TableRow {
     }
   }
 
+  /** @missingRailsName label — PERMANENT */
   private generateCompositePrimaryKey(): void {
     const compositeKey = FixtureSet.compositeIdentify(
       this._label,

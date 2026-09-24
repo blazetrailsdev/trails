@@ -406,7 +406,7 @@ export class Configuration extends EngineConfiguration {
     return this._sessionStore;
   }
 
-  sessionStoreQ(): unknown {
+  isSessionStore(): unknown {
     return this._sessionStore;
   }
 

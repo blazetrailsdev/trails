@@ -175,6 +175,7 @@ export const NO_JS_EQUIVALENT: Record<string, string[]> = {
   inspect: ["toString", "inspectError"],
   last: ["at", "pop"],
   length: ["size"],
+  now: ["instant"],
   object_id: ["this"],
   read: ["readFile"],
   size: ["length"],

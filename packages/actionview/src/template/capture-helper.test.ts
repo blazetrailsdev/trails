@@ -5,7 +5,7 @@ import { OutputFlow } from "../flows.js";
 import {
   capture,
   contentFor,
-  contentForQ,
+  isContentFor,
   provide,
   withOutputBuffer,
   type CaptureHelperHost,
@@ -16,7 +16,7 @@ import { raw } from "../helpers/output-safety-helper.js";
 interface Host extends CaptureHelperHost {
   capture: typeof capture;
   contentFor: typeof contentFor;
-  contentForQ: typeof contentForQ;
+  isContentFor: typeof isContentFor;
   provide: typeof provide;
   withOutputBuffer: typeof withOutputBuffer;
 }
@@ -27,7 +27,7 @@ function makeHost(): Host {
     viewFlow: new OutputFlow(),
     capture,
     contentFor,
-    contentForQ,
+    isContentFor,
     provide,
     withOutputBuffer,
   };
@@ -85,21 +85,21 @@ describe("CaptureHelperTest", () => {
   });
 
   it("content for with multiple calls", () => {
-    expect(av.contentForQ("title")).toBe(false);
+    expect(av.isContentFor("title")).toBe(false);
     av.contentFor("title", "foo");
     av.contentFor("title", "bar");
     expect(av.contentFor("title")?.toString()).toBe("foobar");
   });
 
   it("content for with multiple calls and flush", () => {
-    expect(av.contentForQ("title")).toBe(false);
+    expect(av.isContentFor("title")).toBe(false);
     av.contentFor("title", "foo");
     av.contentFor("title", "bar", { flush: true });
     expect(av.contentFor("title")?.toString()).toBe("bar");
   });
 
   it("content for with block", () => {
-    expect(av.contentForQ("title")).toBe(false);
+    expect(av.isContentFor("title")).toBe(false);
     av.contentFor("title", undefined, undefined, () => {
       av.outputBuffer!.concat("foo");
       av.outputBuffer!.concat("bar");
@@ -109,28 +109,28 @@ describe("CaptureHelperTest", () => {
   });
 
   it("content for with block and multiple calls with flush", () => {
-    expect(av.contentForQ("title")).toBe(false);
+    expect(av.isContentFor("title")).toBe(false);
     av.contentFor("title", undefined, undefined, () => "foo");
     av.contentFor("title", undefined, { flush: true }, () => "bar");
     expect(av.contentFor("title")?.toString()).toBe("bar");
   });
 
   it("content for with block and multiple calls with flush nil content", () => {
-    expect(av.contentForQ("title")).toBe(false);
+    expect(av.isContentFor("title")).toBe(false);
     av.contentFor("title", undefined, undefined, () => "foo");
     av.contentFor("title", null, { flush: true }, () => "bar");
     expect(av.contentFor("title")?.toString()).toBe("bar");
   });
 
   it("content for with block and multiple calls without flush", () => {
-    expect(av.contentForQ("title")).toBe(false);
+    expect(av.isContentFor("title")).toBe(false);
     av.contentFor("title", undefined, undefined, () => "foo");
     av.contentFor("title", undefined, { flush: false }, () => "bar");
     expect(av.contentFor("title")?.toString()).toBe("foobar");
   });
 
   it("content for with whitespace block", () => {
-    expect(av.contentForQ("title")).toBe(false);
+    expect(av.isContentFor("title")).toBe(false);
     av.contentFor("title", "foo");
     av.contentFor("title", undefined, undefined, () => {
       av.outputBuffer!.concat("  \n  ");
@@ -141,7 +141,7 @@ describe("CaptureHelperTest", () => {
   });
 
   it("content for with whitespace block and flush", () => {
-    expect(av.contentForQ("title")).toBe(false);
+    expect(av.isContentFor("title")).toBe(false);
     av.contentFor("title", "foo");
     av.contentFor("title", undefined, { flush: true }, () => {
       av.outputBuffer!.concat("  \n  ");
@@ -152,7 +152,7 @@ describe("CaptureHelperTest", () => {
   });
 
   it("content for returns nil when writing", () => {
-    expect(av.contentForQ("title")).toBe(false);
+    expect(av.isContentFor("title")).toBe(false);
     expect(av.contentFor("title", "foo")).toBeNull();
     expect(
       av.contentFor("title", undefined, undefined, () => {
@@ -188,14 +188,14 @@ describe("CaptureHelperTest", () => {
   });
 
   it("content for question mark", () => {
-    expect(av.contentForQ("title")).toBe(false);
+    expect(av.isContentFor("title")).toBe(false);
     av.contentFor("title", "title");
-    expect(av.contentForQ("title")).toBe(true);
-    expect(av.contentForQ("something_else")).toBe(false);
+    expect(av.isContentFor("title")).toBe(true);
+    expect(av.isContentFor("something_else")).toBe(false);
   });
 
   it("content for should be html safe after flush empty", () => {
-    expect(av.contentForQ("title")).toBe(false);
+    expect(av.isContentFor("title")).toBe(false);
     av.contentFor("title", undefined, undefined, () => contentTag("p", "title"));
     expect(av.contentFor("title")!.htmlSafe).toBe(true);
     av.contentFor("title", "", { flush: true });
@@ -204,9 +204,9 @@ describe("CaptureHelperTest", () => {
   });
 
   it("provide", () => {
-    expect(av.contentForQ("title")).toBe(false);
+    expect(av.isContentFor("title")).toBe(false);
     av.provide("title", "hi");
-    expect(av.contentForQ("title")).toBe(true);
+    expect(av.isContentFor("title")).toBe(true);
     expect(av.contentFor("title")?.toString()).toBe("hi");
     av.provide("title", "<p>title</p>");
     expect(av.contentFor("title")?.toString()).toBe("hi&lt;p&gt;title&lt;/p&gt;");

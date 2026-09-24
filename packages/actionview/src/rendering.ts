@@ -58,7 +58,7 @@ export interface LayoutsClass {
 export interface ViewContextClassMethods {
   _routes?: ViewContextRoutes | null;
   _helpers?: object | null;
-  supportsPathQ(): boolean;
+  supportsPath(): boolean;
   viewContextClass(): typeof Base;
   buildViewContextClass(
     klass: typeof Base,
@@ -66,7 +66,7 @@ export interface ViewContextClassMethods {
     routes: ViewContextRoutes | null | undefined,
     helpers: object | null | undefined,
   ): typeof Base;
-  inheritViewContextClassQ(): boolean;
+  isInheritViewContextClass(): boolean;
   /** @internal */
   _viewContextClass?: typeof Base;
 }
@@ -82,11 +82,11 @@ function superclassOf(klass: ViewContextClassMethods): ViewContextClassMethods |
   return typeof parent === "function" ? parent : null;
 }
 
-export function inheritViewContextClassQ(this: ViewContextClassMethods): boolean {
+export function isInheritViewContextClass(this: ViewContextClassMethods): boolean {
   const superclass = superclassOf(this);
   return (
     typeof superclass?.viewContextClass === "function" &&
-    this.supportsPathQ() === superclass.supportsPathQ() &&
+    this.supportsPath() === superclass.supportsPath() &&
     this._routes === superclass._routes &&
     this._helpers === superclass._helpers
   );
@@ -100,7 +100,7 @@ export function buildViewContextClass(
   routes: ViewContextRoutes | null | undefined,
   helpers: object | null | undefined,
 ): typeof Base {
-  if (this.inheritViewContextClassQ()) {
+  if (this.isInheritViewContextClass()) {
     return superclassOf(this)!.viewContextClass();
   }
 
@@ -122,16 +122,16 @@ export function viewContextClass(this: ViewContextClassMethods): typeof Base {
   if (this._viewContextClass === undefined || !Object.hasOwn(this, "_viewContextClass")) {
     this._viewContextClass = this.buildViewContextClass(
       klass,
-      this.supportsPathQ(),
+      this.supportsPath(),
       this._routes,
       this._helpers,
     );
   }
 
-  if (klass.changedQ(this._viewContextClass)) {
+  if (klass.isChanged(this._viewContextClass)) {
     this._viewContextClass = this.buildViewContextClass(
       klass,
-      this.supportsPathQ(),
+      this.supportsPath(),
       this._routes,
       this._helpers,
     );

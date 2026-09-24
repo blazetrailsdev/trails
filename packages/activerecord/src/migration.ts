@@ -1755,7 +1755,10 @@ export class Migrator {
     return this._targetVersion !== null && this._targetVersion !== 0 && !this.target();
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsName direction — PERMANENT
+   */
   async executeMigrationInTransaction(migration: MigrationProxy): Promise<number | undefined> {
     try {
       const applied = await this.migrated();

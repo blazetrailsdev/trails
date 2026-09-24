@@ -189,7 +189,7 @@ export async function saveHasOneAssociation(
     return true;
   }
   if (autosave === false) return true;
-  const pkSpec = computePrimaryKey(reflection, owner);
+  const pkSpec = computePrimaryKey(reflection, this);
   const primaryKey: string[] = Array.isArray(pkSpec) ? pkSpec : [pkSpec];
   const primaryKeyValue = primaryKey.map((key) => owner._readAttribute(key));
   const recordChanged = is_recordChanged(reflection, record, primaryKeyValue);

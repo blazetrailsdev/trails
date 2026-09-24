@@ -469,11 +469,11 @@ describe("Trails.application integration (boot-app fixture)", () => {
 describe("Application::Configuration", () => {
   it("config.session_store writes the store and reads it back resolved", () => {
     const c = new Configuration();
-    expect(c.sessionStoreQ()).toBeNull();
+    expect(c.isSessionStore()).toBeNull();
     expect(c.sessionStore()).toBeNull();
 
     c.sessionStore(":cookie_store", { key: "_myapp_session" });
-    expect(c.sessionStoreQ()).toBe(":cookie_store");
+    expect(c.isSessionStore()).toBe(":cookie_store");
     expect(c.sessionStore()).toBe(Session.CookieStore);
     expect(c.sessionOptions).toEqual({ key: "_myapp_session" });
   });
@@ -481,7 +481,7 @@ describe("Application::Configuration", () => {
   it("config.session_store :disabled reads back as nil", () => {
     const c = new Configuration();
     c.sessionStore(":disabled");
-    expect(c.sessionStoreQ()).toBe(":disabled");
+    expect(c.isSessionStore()).toBe(":disabled");
     expect(c.sessionStore()).toBeNull();
   });
 

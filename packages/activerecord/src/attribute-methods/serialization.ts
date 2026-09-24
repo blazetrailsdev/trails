@@ -121,8 +121,8 @@ export function serialize(
     if (isTypeIncompatibleWithSerialize(castType, coder, type, castType instanceof Json)) {
       throw new ColumnNotSerializableError(name, castType);
     }
-    const subtype = castType instanceof Serialized ? castType.subtype : castType;
-    return new Serialized(subtype, columnSerializer);
+    if (castType instanceof Serialized) castType = castType.subtype;
+    return new Serialized(castType, columnSerializer);
   };
 
   this.decorateAttributes([attrName], decorator);

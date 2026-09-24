@@ -21,12 +21,7 @@ interface ComposedOfOptions {
   allowNil?: boolean;
 }
 
-/** @missingRailsArgs include — PERMANENT */
-export function composedOf(
-  modelClass: typeof Base,
-  partId: string,
-  options: ComposedOfOptions,
-): void {
+export function composedOf(this: typeof Base, partId: string, options: ComposedOfOptions): void {
   assertValidKeys(options as unknown as Record<string, unknown>, [
     "className",
     "mapping",
@@ -35,7 +30,7 @@ export function composedOf(
     "converter",
   ]);
 
-  if (!isModuleIncluded(modelClass, Aggregations)) include(modelClass, Aggregations);
+  if (!isModuleIncluded(this, Aggregations)) include(this, Aggregations);
 
   const name = partId;
   const className = options.className ?? camelize(name);
@@ -45,8 +40,8 @@ export function composedOf(
   const constructor = options.constructorFn ?? "new";
   const converter = options.converter;
 
-  readerMethod(modelClass, name, className, mapping as [string, string][], allowNil, constructor);
-  writerMethod(modelClass, name, className, mapping as [string, string][], allowNil, converter);
+  readerMethod.call(this, name, className, mapping as [string, string][], allowNil, constructor);
+  writerMethod.call(this, name, className, mapping as [string, string][], allowNil, converter);
 
   const reflection = create(
     "composedOf",
@@ -55,10 +50,14 @@ export function composedOf(
     typeof options.className === "function"
       ? { ...options, className: options.className.name, anonymousClass: options.className }
       : { ...options },
-    modelClass,
+    this,
   );
-  addAggregateReflection(modelClass, partId, reflection);
+  addAggregateReflection(this, partId, reflection);
 }
+
+export const ClassMethods = {
+  composedOf,
+};
 
 /** @internal */
 function resolveClass(
@@ -71,15 +70,15 @@ function resolveClass(
 
 /** @internal */
 function readerMethod(
-  modelClass: typeof Base,
+  this: typeof Base,
   name: string,
   className: (new (...args: any[]) => any) | string,
   mapping: [string, string][],
   allowNil: boolean,
   constructor: ((...args: any[]) => any) | string,
 ): void {
-  const existing = Object.getOwnPropertyDescriptor(modelClass.prototype, name);
-  Object.defineProperty(modelClass.prototype, name, {
+  const existing = Object.getOwnPropertyDescriptor(this.prototype, name);
+  Object.defineProperty(this.prototype, name, {
     enumerable: existing?.enumerable ?? false,
     get(this: Base): unknown {
       const cache: Map<string, unknown> = (this as any)._aggregationCache;
@@ -127,15 +126,15 @@ function _decompose(
 
 /** @internal */
 function writerMethod(
-  modelClass: typeof Base,
+  this: typeof Base,
   name: string,
   className: (new (...args: any[]) => any) | string,
   mapping: [string, string][],
   allowNil: boolean,
   converter?: (value: unknown) => unknown,
 ): void {
-  const existing = Object.getOwnPropertyDescriptor(modelClass.prototype, name);
-  Object.defineProperty(modelClass.prototype, name, {
+  const existing = Object.getOwnPropertyDescriptor(this.prototype, name);
+  Object.defineProperty(this.prototype, name, {
     enumerable: existing?.enumerable ?? false,
     get: existing?.get,
     set(this: Base, value: unknown): void {

@@ -71,6 +71,7 @@ export class BelongsToAssociation extends SingularAssociation {
     super.inversedFrom(record);
   }
 
+  /** @missingRailsName instanceExec — PERMANENT */
   async default(block: (owner: Base) => Base | null | Promise<Base | null>): Promise<void> {
     if ((await this.reader) == null) await this.writer(await block(this.owner));
   }

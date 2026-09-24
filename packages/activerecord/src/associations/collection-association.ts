@@ -99,6 +99,7 @@ export abstract class CollectionAssociation extends Association {
     return this.reflection.associationPrimaryKey?.() ?? (this.klass as any).primaryKey ?? "id";
   }
 
+  /** @missingRailsName size — PERMANENT */
   async idsWriter(ids: unknown[]): Promise<void> {
     const klass = this.klass as any;
     const primaryKey = this.associationPrimaryKey();
@@ -149,6 +150,7 @@ export abstract class CollectionAssociation extends Association {
     this._associationIds = null;
   }
 
+  /** @missingRailsName size — PERMANENT */
   async find(...args: unknown[]): Promise<Base | Base[] | null> {
     const scope = this.scope();
 

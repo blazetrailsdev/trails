@@ -393,6 +393,7 @@ export function attributesBuilder(this: SchemaHost): AttributeSetBuilder {
   return builder;
 }
 
+/** @missingRailsName columnsHash — PERMANENT */
 export function columns(this: SchemaHost): any[] {
   const ownColumns = ownSchemaMemo(this, "_columns");
   if (ownColumns != null) return ownColumns;

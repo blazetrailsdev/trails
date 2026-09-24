@@ -208,6 +208,6 @@ export class Files {
 
   /** @internal */
   filesize(path: string): number {
-    return File.sizeQ(path) ?? Buffer.byteLength(File.read(path));
+    return File.isSize(path) ?? Buffer.byteLength(File.read(path));
   }
 }

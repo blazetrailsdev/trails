@@ -112,9 +112,9 @@ describe("File", () => {
     // vendor/ruby/file.c:2047 answers nil in BOTH cases, not 0.
     const root = fixture();
     writeFileSync(join(root, "empty.rb"), "");
-    expect(File.sizeQ(join(root, "a.rb"))).toBe(7);
-    expect(File.sizeQ(join(root, "empty.rb"))).toBe(null);
-    expect(File.sizeQ(join(root, "nonexistent"))).toBe(null);
+    expect(File.isSize(join(root, "a.rb"))).toBe(7);
+    expect(File.isSize(join(root, "empty.rb"))).toBe(null);
+    expect(File.isSize(join(root, "nonexistent"))).toBe(null);
   });
 
   it("stat raises where the predicates swallow, and mtime reads through it", () => {

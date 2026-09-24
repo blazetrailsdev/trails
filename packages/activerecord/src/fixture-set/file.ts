@@ -17,7 +17,7 @@ export class File {
     return [...fixtureModules.keys()];
   }
 
-  #file: string;
+  private file: string;
   #rows?: [string, unknown][];
   #configRow?: Record<string, unknown>;
   #rawRows?: [string, unknown][];
@@ -30,7 +30,7 @@ export class File {
   }
 
   constructor(file: string) {
-    this.#file = file;
+    this.file = file;
   }
 
   each(): IterableIterator<[string, unknown]>;
@@ -63,14 +63,14 @@ export class File {
   private rawRows(): [string, unknown][] {
     if (this.#rawRows === undefined) {
       let data: unknown;
-      const rows = fixtureModules.get(this.#file);
+      const rows = fixtureModules.get(this.file);
       if (rows !== undefined) {
         data = Object.fromEntries(
           Object.entries(rows).map(([key, row]) => [key, isPlainObject(row) ? { ...row } : row]),
         );
       } else {
         try {
-          data = ConfigurationFile.parse(this.#file, {
+          data = ConfigurationFile.parse(this.file, {
             context: new (RenderContext.createSubclass())().getBinding(),
           });
         } catch (error: unknown) {
@@ -86,7 +86,7 @@ export class File {
   private validateConfigRow(data: unknown): Record<string, unknown> {
     if (!isPlainObject(data)) {
       throw new FormatError(
-        `Invalid \`_fixture\` section: \`_fixture\` must be a hash: ${this.#file}`,
+        `Invalid \`_fixture\` section: \`_fixture\` must be a hash: ${this.file}`,
       );
     }
 
@@ -94,7 +94,7 @@ export class File {
       assertValidKeys(data, ["model_class", "ignore"]);
     } catch (error: unknown) {
       throw new FormatError(
-        `Invalid \`_fixture\` section: ${(error as Error).message}: ${this.#file}`,
+        `Invalid \`_fixture\` section: ${(error as Error).message}: ${this.file}`,
       );
     }
 
@@ -103,13 +103,13 @@ export class File {
 
   private validate(data: unknown): Record<string, unknown> | Map<unknown, unknown> {
     if (!isPlainObject(data) && !(data instanceof Map)) {
-      throw new FormatError(`fixture is not a hash: ${this.#file}`);
+      throw new FormatError(`fixture is not a hash: ${this.file}`);
     }
 
     const invalid = toA(data).filter(([, row]) => !isPlainObject(row));
     if (invalid.length > 0) {
       throw new FormatError(
-        `fixture key is not a hash: ${this.#file}, keys: ` +
+        `fixture key is not a hash: ${this.file}, keys: ` +
           `[${invalid.map(([key]) => JSON.stringify(key)).join(", ")}]`,
       );
     }

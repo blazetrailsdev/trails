@@ -18,10 +18,10 @@ describe("NamedRouteCollection", () => {
     expect(named.helperNames()).toEqual(["postsPath", "postPath", "postsUrl", "postUrl"]);
     expect(named.names()).toEqual(["posts", "post"]);
     expect(named.length()).toBe(2);
-    expect(named.keyQ("posts")).toBe(true);
-    expect(named.keyQ("nope")).toBe(false);
-    expect(named.routeDefinedQ("postsPath")).toBe(true);
-    expect(named.routeDefinedQ("posts")).toBe(false);
+    expect(named.isKey("posts")).toBe(true);
+    expect(named.isKey("nope")).toBe(false);
+    expect(named.isRouteDefined("postsPath")).toBe(true);
+    expect(named.isRouteDefined("posts")).toBe(false);
   });
 
   it("generates a path from a positional argument", () => {

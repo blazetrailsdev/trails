@@ -6,7 +6,7 @@ import { TemplateHandlers } from "./template/handlers.js";
 import { Tse } from "./template/handlers/tse.js";
 import {
   buildViewContextClass,
-  inheritViewContextClassQ,
+  isInheritViewContextClass,
   viewContextClass,
   type ViewContextRoutes,
 } from "./rendering.js";
@@ -14,10 +14,10 @@ import {
 class Controller {
   static _routes: ViewContextRoutes | null = null;
   static _helpers: object | null = null;
-  static supportsPathQ(): boolean {
+  static supportsPath(): boolean {
     return true;
   }
-  static inheritViewContextClassQ = inheritViewContextClassQ;
+  static isInheritViewContextClass = isInheritViewContextClass;
   static buildViewContextClass = buildViewContextClass;
   static viewContextClass = viewContextClass;
   static _viewContextClass?: typeof Base;

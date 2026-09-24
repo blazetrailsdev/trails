@@ -21,10 +21,10 @@ export class Time extends ActiveModelTime {
   }
 
   override serialize(value: unknown): Value | null {
-    const serialized: unknown = super.serialize(value);
-    return serialized instanceof RubyTime || serialized instanceof TimeWithZone
-      ? new Value(serialized)
-      : (serialized as Value | null);
+    value = super.serialize(value);
+    return value instanceof RubyTime || value instanceof TimeWithZone
+      ? new Value(value)
+      : (value as Value | null);
   }
 
   override serializeCastValue(value: TimeWithZone | RubyTime | null): Value | null {

@@ -3,7 +3,6 @@ import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { registerConstant, unregisterConstant } from "@blazetrails/activesupport";
 
 import { Base } from "./index.js";
-import { composedOf } from "./aggregations.js";
 import { fixtures } from "./test-fixtures.js";
 import { Customer as CustomerModel, Money as MoneyClass } from "./test-helpers/models/customer.js";
 
@@ -37,7 +36,7 @@ describe("AggregationsTest (trails)", () => {
       class Customer extends Base {
         static {
           this.attribute("gpsLocation", "string");
-          composedOf(this, "gpsLocation", { mapping: ["gpsLocation", "gpsLocation"] });
+          this.composedOf("gpsLocation", { mapping: ["gpsLocation", "gpsLocation"] });
         }
       }
       const customer = new Customer();

@@ -21,6 +21,7 @@ export function isAppliedTo(klass: typeof Base): boolean {
   });
 }
 
+/** @missingRailsName class — PERMANENT */
 export function isNoTouching(this: Base): boolean {
   return isAppliedTo(this.constructor as typeof Base);
 }

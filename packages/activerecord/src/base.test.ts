@@ -1,11 +1,5 @@
 import { describe, it, expect, afterAll, afterEach, vi } from "vitest";
-import {
-  Base,
-  NotImplementedError,
-  ReadonlyAttributeError,
-  Relation,
-  composedOf,
-} from "./index.js";
+import { Base, NotImplementedError, ReadonlyAttributeError, Relation } from "./index.js";
 import {
   TableNotSpecified,
   ActiveRecordError,
@@ -1128,7 +1122,7 @@ describe("BasicsTest", async () => {
     const developerWithAggregate = class extends Base {
       static {
         this.tableName = "developers";
-        composedOf(this, "salary", {
+        this.composedOf("salary", {
           className: DeveloperSalary,
           mapping: [["salary", "amount"]],
         });

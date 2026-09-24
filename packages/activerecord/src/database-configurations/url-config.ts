@@ -5,7 +5,10 @@ import { ConnectionUrlResolver } from "./connection-url-resolver.js";
 export class UrlConfig extends HashConfig {
   readonly url: string;
 
-  /** @missingRailsCall merge — PERMANENT */
+  /**
+   * @missingRailsCall merge — PERMANENT
+   * @missingRailsName configurationHash — PERMANENT
+   */
   constructor(
     envName: string,
     name: string,
@@ -15,24 +18,21 @@ export class UrlConfig extends HashConfig {
     super(envName, name, configurationHash);
 
     this.url = url;
-    const hash: Record<string, unknown> = {
-      ...this.configurationHash,
-      ...this.buildUrlHash(),
-    };
-    camelizeUrlKeys(hash);
+    this._configurationHash = { ...this._configurationHash, ...this.buildUrlHash() };
+    camelizeUrlKeys(this._configurationHash as Record<string, unknown>);
 
-    if (hash.schemaDump === "false") {
-      hash.schemaDump = false;
+    if (this._configurationHash.schemaDump === "false") {
+      this._configurationHash.schemaDump = false;
     }
 
-    if (hash.queryCache === "false") {
-      hash.queryCache = false;
+    if ((this._configurationHash.queryCache as unknown) === "false") {
+      this._configurationHash.queryCache = false;
     }
 
-    toBooleanBang(hash, "replica");
-    toBooleanBang(hash, "databaseTasks");
+    toBooleanBang(this._configurationHash, "replica");
+    toBooleanBang(this._configurationHash, "databaseTasks");
 
-    this._configurationHash = Object.freeze(hash as DatabaseConfigOptions);
+    Object.freeze(this._configurationHash);
   }
 
   /** @internal */

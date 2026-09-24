@@ -36,7 +36,7 @@ export type {
 
 export {
   buildViewContextClass,
-  inheritViewContextClassQ,
+  isInheritViewContextClass,
   viewContext,
   viewContextClass,
 } from "./rendering.js";

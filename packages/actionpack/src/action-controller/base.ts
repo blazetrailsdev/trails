@@ -32,7 +32,7 @@ import {
 import {
   Base as ActionViewBase,
   buildViewContextClass,
-  inheritViewContextClassQ,
+  isInheritViewContextClass,
   viewContext,
   viewContextClass,
 } from "@blazetrails/actionview";
@@ -224,7 +224,7 @@ export class Base extends Metal {
     );
   }
 
-  static inheritViewContextClassQ = inheritViewContextClassQ;
+  static isInheritViewContextClass = isInheritViewContextClass;
   static buildViewContextClass = buildViewContextClass;
   static viewContextClass = viewContextClass;
   /** @internal */

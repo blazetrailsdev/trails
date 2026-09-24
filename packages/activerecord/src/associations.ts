@@ -306,12 +306,9 @@ export class Associations {
       options = { ...options, className: rawClassName.description ?? "" };
     }
     const self = this as any;
-    const positionalScope = (typeof scope === "function" ? scope : null) as
-      | ((...args: any[]) => any)
-      | null;
     const habtmReflection = new Reflection.HasAndBelongsToManyReflection(
       name,
-      positionalScope,
+      scope as ((...args: any[]) => any) | null,
       options as Record<string, unknown>,
       self,
     );
@@ -324,22 +321,24 @@ export class Associations {
     modelRegistry.set(registryKey, joinModel);
 
     const middleReflection = builder.middleReflection(joinModel);
-    const middleName = middleReflection.name;
     HasManyBuilder.defineCallbacks(self, middleReflection);
-    Reflection.addReflection(self, middleName, middleReflection);
+    Reflection.addReflection(self, middleReflection.name, middleReflection);
     middleReflection.parentReflection = habtmReflection;
 
-    const mod = new Module();
-    mod.defineMethod("destroyAssociations", async function (this: any): Promise<void> {
-      await this.association(middleName).deleteAll("delete_all");
-      this.association(name).reset();
-      this._collectionProxies?.delete(name);
-      await mod.superMethod(this, "destroyAssociations")!();
-    });
-    include(this, mod);
+    include(
+      this,
+      new Module((mod) => {
+        mod.defineMethod("destroyAssociations", async function (this: any): Promise<void> {
+          await this.association(middleReflection.name).deleteAll("delete_all");
+          this.association(name).reset();
+          this._collectionProxies?.delete(name);
+          await mod.superMethod(this, "destroyAssociations")!();
+        });
+      }),
+    );
 
     const hmOptions: Record<string, unknown> = {};
-    hmOptions.through = middleName;
+    hmOptions.through = middleReflection.name;
     hmOptions.source = joinModel.rightReflection.name;
 
     for (const k of [
@@ -357,7 +356,7 @@ export class Associations {
       if (Object.prototype.hasOwnProperty.call(options, k)) hmOptions[k] = options[k];
     }
 
-    this.hasMany(name, positionalScope, hmOptions);
+    this.hasMany(name, scope as ((...args: any[]) => any) | null, hmOptions);
     (self._reflections as Record<string, { parentReflection?: unknown }>)[name].parentReflection =
       habtmReflection;
   }

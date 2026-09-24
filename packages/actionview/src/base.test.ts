@@ -72,8 +72,8 @@ describe("ActionView::Base", () => {
   it("changed? compares the two classes' compiled method containers", () => {
     const a = Base.withEmptyTemplateCache();
     const b = Base.withEmptyTemplateCache();
-    expect(a.changedQ(b)).toBe(true);
-    expect(a.changedQ(a)).toBe(false);
+    expect(a.isChanged(b)).toBe(true);
+    expect(a.isChanged(a)).toBe(false);
   });
 
   it("withViewPaths builds a LookupContext for the view", () => {

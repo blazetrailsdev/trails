@@ -364,7 +364,10 @@ export class TestFixtures {
     });
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsName connectionSubscriber — PERMANENT
+   */
   async teardownTransactionalFixtures(): Promise<void> {
     if (this._connectionSubscriber) Notifications.unsubscribe(this._connectionSubscriber);
 

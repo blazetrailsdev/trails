@@ -70,12 +70,12 @@ export class Complete {
 /** @internal */
 export class EventBuffer {
   #futureResult: FutureResult;
-  #instrumenter: Instrumenter;
+  private instrumenter: Instrumenter;
   #events: NotificationEvent[];
 
   constructor(futureResult: FutureResult, instrumenter: Instrumenter) {
     this.#futureResult = futureResult;
-    this.#instrumenter = instrumenter;
+    this.instrumenter = instrumenter;
     this.#events = [];
   }
 
@@ -84,7 +84,7 @@ export class EventBuffer {
     payload: EventPayload = {},
     block?: (payload: EventPayload) => Promise<T>,
   ): Promise<T> {
-    const event = this.#instrumenter.newEvent(name, payload);
+    const event = this.instrumenter.newEvent(name, payload);
     try {
       return await event.record(block);
     } finally {
@@ -138,7 +138,7 @@ export class FutureResult {
   #pending = true;
   #error: unknown = null;
   #result: Result | null = null;
-  #instrumenter: Instrumenter;
+  private instrumenter: Instrumenter;
   #eventBuffer: EventBuffer | null = null;
 
   constructor(pool: FutureResultPool, args: unknown[], kwargs: Record<string, unknown> = {}) {
@@ -147,7 +147,7 @@ export class FutureResult {
     this.pool = pool;
     this.args = args;
     this.kwargs = kwargs;
-    this.#instrumenter = Notifications.instrumenter;
+    this.instrumenter = Notifications.instrumenter;
   }
 
   async isEmpty(): Promise<boolean> {
@@ -190,7 +190,7 @@ export class FutureResult {
         if (!this.#mutex.tryLock()) return;
         try {
           if (this.pending()) {
-            this.#eventBuffer = new EventBuffer(this, this.#instrumenter);
+            this.#eventBuffer = new EventBuffer(this, this.instrumenter);
             IsolatedExecutionState.set(ACTIVE_RECORD_INSTRUMENTER, this.#eventBuffer);
 
             await this.executeQuery(connection, { async: true });

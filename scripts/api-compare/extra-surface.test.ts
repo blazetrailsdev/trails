@@ -1216,6 +1216,57 @@ describe("buildReport — novel vs moved classification", () => {
     expect(fooDrift).toBeUndefined();
   });
 
+  it("allows a folded ::ClassMethods submodule a host extends directly", () => {
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        ar: {
+          classes: {
+            "P::Host": {
+              ...rubyClass({ name: "Host", file: "host.rb" }),
+              extends: ["Foo::ClassMethods"],
+            },
+          },
+          modules: {
+            "P::Foo": rubyClass({ name: "Foo", file: "foo.rb" }),
+            "P::Foo::ClassMethods": rubyClass({
+              name: "ClassMethods",
+              file: "foo.rb",
+              instance: [method("composed_of")],
+            }),
+          },
+        },
+      },
+    };
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        ar: {
+          classes: {
+            Host: {
+              name: "Host",
+              file: "host.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [],
+              classMethods: [method("composedOf")],
+            },
+          },
+          modules: {},
+        },
+      },
+    };
+    const report = buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    expect(report.packages[0].extraFiles.find((x) => x.tsFile === "host.ts")).toBeUndefined();
+  });
+
   it("does NOT propagate module classMethods through include (Ruby semantics)", () => {
     // Module Bar defines a class method `bareClassMethod` directly (not via
     // ASC's ClassMethods submodule). Host `include Bar` must NOT give Host

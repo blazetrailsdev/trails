@@ -75,6 +75,7 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
     return ["id"];
   }
 
+  /** @missingRailsName class — PERMANENT */
   protected override inverseReflectionFor(record: Base): unknown {
     const refl = this.reflection as unknown as {
       polymorphicInverseOf?: (klass: typeof Base) => unknown;

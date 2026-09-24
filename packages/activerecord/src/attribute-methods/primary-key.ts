@@ -10,6 +10,7 @@ import type { Base } from "../base.js";
 /** @internal */
 export interface PrimaryKeyRecord {
   id: unknown;
+  _primaryKey: string | string[];
   readAttribute(name: string): unknown;
   _readAttribute(name: string): unknown;
   _queryAttribute(name: string): boolean;
@@ -38,6 +39,7 @@ function columnForDatabase(record: PrimaryKeyRecord, key: string): unknown {
 /** @internal */
 export interface PrimaryKeyInstance {
   constructor: unknown;
+  _primaryKey: string | string[] | null;
   _queryAttribute(name: string): boolean;
   _readAttribute(name: string): unknown;
   _writeAttribute(name: string, value: unknown): void;
@@ -45,12 +47,12 @@ export interface PrimaryKeyInstance {
 }
 
 function readId(this: PrimaryKeyInstance): unknown {
-  const pk = primaryKeyOf(this) as string | string[] | null;
+  const pk = this._primaryKey;
   return this._readAttribute(pk as string);
 }
 
 function writeId(this: PrimaryKeyInstance, value: unknown): void {
-  const pk = primaryKeyOf(this) as string | string[] | null;
+  const pk = this._primaryKey;
   if (pk == null) {
     this.writeAttribute("id", value);
   } else {
@@ -73,32 +75,31 @@ export class PrimaryKey {
 
   get isId(): boolean {
     const record = this as unknown as PrimaryKeyRecord;
-    return record._queryAttribute(primaryKeyOf(record) as string);
+    return record._queryAttribute(record._primaryKey as string);
   }
 
+  /** @missingRailsName primaryKey — PERMANENT */
   get idBeforeTypeCast(): unknown {
     const record = this as unknown as PrimaryKeyRecord;
-    return record.attributeBeforeTypeCast(primaryKeyOf(record) as string);
+    return record.attributeBeforeTypeCast(record._primaryKey as string);
   }
 
+  /** @missingRailsName primaryKey — PERMANENT */
   get idWas(): unknown {
     const record = this as unknown as PrimaryKeyRecord;
-    return record.attributeWas(primaryKeyOf(record) as string);
+    return record.attributeWas(record._primaryKey as string);
   }
 
+  /** @missingRailsName primaryKey — PERMANENT */
   get idInDatabase(): unknown {
     const record = this as unknown as PrimaryKeyRecord;
-    return record.attributeInDatabase(primaryKeyOf(record) as string);
+    return record.attributeInDatabase(record._primaryKey as string);
   }
 
   get idForDatabase(): unknown {
     const record = this as unknown as PrimaryKeyRecord;
-    return columnForDatabase(record, primaryKeyOf(record) as string);
+    return columnForDatabase(record, record._primaryKey as string);
   }
-}
-
-function primaryKeyOf(record: object): string | string[] {
-  return (record as { _primaryKey: string | string[] })._primaryKey;
 }
 
 interface CachedSchemaSource {
