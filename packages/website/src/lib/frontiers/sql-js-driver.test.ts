@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import initSqlJs from "sql.js";
 import { Base } from "@blazetrails/activerecord/base";
-import { register } from "../../../../activerecord/src/connection-adapters.js";
-import { SQLite3Adapter } from "../../../../activerecord/src/connection-adapters/sqlite3-adapter.js";
+import { register } from "@blazetrails/activerecord/connection-adapters";
+import { SQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/sqlite3-adapter";
 import { sqlJsDriver } from "./sql-js-driver.js";
 
 describe("sqlJsDriver", () => {

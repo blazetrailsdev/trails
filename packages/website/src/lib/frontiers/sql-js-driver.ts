@@ -1,3 +1,4 @@
+/** @noRailsEquivalent PERMANENT */
 import type { Database, Statement, BindParams, SqlValue } from "sql.js";
 import type {
   ColumnInfo,
@@ -149,6 +150,12 @@ class SqlJsConnection implements SyncSqliteConnection {
   }
 }
 
+/**
+ * A `SqliteDriver` over the sandbox's one sql.js handle. The sandbox owns the
+ * handle's lifetime (`replaceDatabase` closes it), so a connection's `close()`
+ * only marks itself closed: a pool disconnect or reap must not close the
+ * database the VFS and CLI still read.
+ */
 export function sqlJsDriver(db: Database): SqliteDriver {
   return {
     name: "sql.js",
