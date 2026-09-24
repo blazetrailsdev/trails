@@ -287,9 +287,7 @@ export async function connectAdapter(config: DatabaseConfig): Promise<DatabaseAd
     case "sqlite":
     case "node-sqlite":
     case "expo-sqlite": {
-      type SqliteCtor = {
-        openAsync(config: Record<string, unknown>): Promise<DatabaseAdapter>;
-      };
+      type SqliteCtor = new (config: Record<string, unknown>) => DatabaseAdapter;
       const load = async (): Promise<SqliteCtor> => {
         if (adapter === "node-sqlite") {
           return (
@@ -323,7 +321,7 @@ export async function connectAdapter(config: DatabaseConfig): Promise<DatabaseAd
       void _a;
       void _d;
       void _u;
-      return SQLiteAdapter.openAsync({ ...rest, database: config.database ?? ":memory:" });
+      return new SQLiteAdapter({ ...rest, database: config.database ?? ":memory:" }).connectBang();
     }
     case "postgresql":
     case "postgres": {

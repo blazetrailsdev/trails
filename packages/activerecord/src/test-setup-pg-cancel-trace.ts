@@ -14,8 +14,7 @@ interface CancelRecord {
 
 interface TracedAdapter {
   _client: { processID?: number | null } | null;
-  _rawConnection: unknown;
-  transactionStatus: unknown;
+  _rawConnection: { transactionStatus(): number } | null;
   _cancelAnyRunningQuery(...args: unknown[]): Promise<void>;
 }
 
@@ -86,7 +85,8 @@ if (!proto[WRAPPED_KEY]) {
     state.records.push({
       at: now(),
       pid: this._client?.processID,
-      transactionStatus: this._rawConnection == null ? "no raw connection" : this.transactionStatus,
+      transactionStatus:
+        this._rawConnection == null ? "no raw connection" : this._rawConnection.transactionStatus(),
       ...currentTest(),
       stack: new Error("cancel issued").stack,
     });

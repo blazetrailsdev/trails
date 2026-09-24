@@ -5,7 +5,6 @@ import { PostgreSQLAdapter } from "./postgresql-adapter.js";
 interface PrivatePgAdapter {
   _rawConnection: unknown;
   _client: unknown;
-  _readyForQueryStatus: string;
   _acquireFreshClient: () => Promise<unknown>;
   reconnect: () => void;
   resetBang: () => void;
@@ -91,10 +90,10 @@ describe("PostgreSQLAdapter#getClient (single persistent connection)", () => {
       }),
       end: async () => {},
       on: () => fakeClient,
+      transactionStatus: () => 2,
     };
     adapter._rawConnection = fakeClient;
     adapter._client = fakeClient;
-    adapter._readyForQueryStatus = "T";
 
     vi.spyOn(
       adapter as unknown as { configureConnection: () => Promise<void> },

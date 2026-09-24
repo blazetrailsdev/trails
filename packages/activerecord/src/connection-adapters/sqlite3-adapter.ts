@@ -181,7 +181,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   private _connectingPromise: Promise<void> | null = null;
   private _closingDriver: Promise<void> | null = null;
   override async active(): Promise<boolean> {
-    await this.whenClosed();
+    await this._closingDriver;
     return this._rawConnection?.isOpen() ?? false;
   }
   /** @internal */
@@ -397,11 +397,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
         value === null ? "null" : typeof value
       }`,
     );
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE adapter-driver-open-close-and-transaction-status-shims */
-  whenClosed(): Promise<void> {
-    return this._closingDriver ?? Promise.resolve();
   }
 
   override supportsDdlTransactions(): boolean {
@@ -1413,41 +1408,16 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     }
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE adapter-driver-open-close-and-transaction-status-shims
-   */
-  async completeAsyncConnect(): Promise<void> {
-    if (!this._asyncConnectPending) return;
-    if (!this._connectingPromise) {
-      this._connectingPromise = this._doAsyncConnect().finally(() => {
-        this._connectingPromise = null;
-      });
-    }
-    return this._connectingPromise;
-  }
-
   /** @internal */
   private async ensureConnected(): Promise<void> {
-    if (this._asyncConnectPending) await this.completeAsyncConnect();
-    else if (!this.isActive() && this.isReconnectCanRestoreState()) await this.verifyBang();
-  }
-
-  /** @internal */
-  private async _doAsyncConnect(): Promise<void> {
-    await this.connectAsync();
-    await this.configureConnection();
-    this._asyncConnectPending = false;
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE adapter-driver-open-close-and-transaction-status-shims */
-  static async openAsync(
-    this: new (config: SQLite3Config) => SQLite3Adapter,
-    config: SQLite3Config,
-  ): Promise<SQLite3Adapter> {
-    const adapter = new this(config);
-    await adapter.connectBang();
-    return adapter;
+    if (this._asyncConnectPending) {
+      this._connectingPromise ??= this.connectBang()
+        .then(() => {})
+        .finally(() => {
+          this._connectingPromise = null;
+        });
+      await this._connectingPromise;
+    } else if (!this.isActive() && this.isReconnectCanRestoreState()) await this.verifyBang();
   }
 
   /** @internal */
