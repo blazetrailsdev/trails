@@ -550,17 +550,23 @@ function alignBuiltinReceiver(
  *  the order is immaterial. */
 function alignReceiverArgs(
   ruby: CallSite,
+  ts: CallSite,
   tsArgs: string[],
   calleeSigs: ParamInfo[][] | undefined,
 ): { rubyArgs: string[]; tsArgs: string[] } {
-  return alignPortedReceiver(
+  const stripped = stripCalleeReceiverArg(
     ruby,
-    alignBuiltinReceiver(
-      ruby,
-      ruby.args,
-      stripCalleeReceiverArg(ruby, ruby.args, stripMixinReceiver(ruby.args, tsArgs), calleeSigs),
-    ),
+    ruby.args,
+    stripMixinReceiver(ruby.args, tsArgs),
+    calleeSigs,
   );
+  const aligned = alignPortedReceiver(ruby, alignBuiltinReceiver(ruby, ruby.args, stripped));
+  if (ts.recv === undefined || aligned.rubyArgs.length === ruby.args.length) return aligned;
+  const [rubyRecv] = normalizeArgs(aligned.rubyArgs.slice(0, 1)) ?? [];
+  const [tsFirst] = normalizeArgs(aligned.tsArgs.slice(0, 1)) ?? [];
+  return rubyRecv !== undefined && tsFirst !== undefined && argKeysEqual(rubyRecv, tsFirst)
+    ? aligned
+    : { rubyArgs: ruby.args, tsArgs: stripped };
 }
 
 /** A bare local/ivar argument, whose identifier is what decides whether it is
@@ -686,6 +692,23 @@ function stripBlockTailPadding(
   if (!tsArgs.slice(rubyArgs.length).every((arg) => arg === "nil")) return tsArgs;
   if (!padsDefaultedParams(calleeSigs, rubyArgs.length, tsArgs.length)) return tsArgs;
   return tsArgs.slice(0, rubyArgs.length);
+}
+
+function stripForwardedLiteralBlock(
+  ruby: CallSite,
+  ts: CallSite,
+  rubyArgs: string[],
+  tsArgs: string[],
+  calleeSigs: ParamInfo[][] | undefined,
+): string[] {
+  if (!ruby.flags.includes("block") || rubyBlockArg(ruby) !== undefined) return tsArgs;
+  if (ts.flags.includes("block") || tsArgs.length !== rubyArgs.length + 1) return tsArgs;
+  const at = rubyArgs.length;
+  const callable = (calleeSigs ?? []).some((raw) => {
+    const param = stripThis(raw)[at];
+    return param !== undefined && (param.kind === "block" || param.admitsFunction === true);
+  });
+  return callable ? tsArgs.slice(0, at) : tsArgs;
 }
 
 /** Whether some TS signature of the callee declares every parameter in
@@ -923,8 +946,16 @@ function blockAffinity(ruby: CallSite, ts: CallSite): number {
  * assignment takes it whenever the key matches tie.
  */
 function argSimilarity(ruby: CallSite, ts: CallSite): number {
-  const aligned = alignReceiverArgs(ruby, stripForwardedBlockArg(ruby, ts), undefined);
-  const sameArity = aligned.rubyArgs.length === aligned.tsArgs.length ? 1 : 0;
+  const forwarded = stripForwardedBlockArg(ruby, ts);
+  const aligned = alignReceiverArgs(ruby, ts, forwarded, undefined);
+  const sameArity =
+    aligned.rubyArgs.length === aligned.tsArgs.length &&
+    (!RECEIVER_AS_FIRST_ARG.has(ruby.name) ||
+      ruby.recv === undefined ||
+      ts.recv !== undefined ||
+      forwarded.length === ruby.args.length + 1)
+      ? 1
+      : 0;
   const rubyArgs = normalizeArgs(aligned.rubyArgs);
   const tsArgs = normalizeArgs(aligned.tsArgs);
   if (rubyArgs === null || tsArgs === null) {
@@ -1202,7 +1233,7 @@ export function compareCallArgs(
   if (isSkippedCallName(ruby.name)) return skipped("excludedCallName");
   if (hasUncomparableFlag(ruby) || hasUncomparableFlag(ts)) return skipped("uncomparableFlag");
 
-  const aligned = alignReceiverArgs(ruby, ts.args, calleeSigs);
+  const aligned = alignReceiverArgs(ruby, ts, ts.args, calleeSigs);
   const rubyArgs = normalizeArgsOrFailure(aligned.rubyArgs);
   if (!Array.isArray(rubyArgs)) {
     return skipped(rubyArgs.failure === "opaque" ? "opaqueRubyArg" : "unparseableLiteral");
@@ -1211,7 +1242,13 @@ export function compareCallArgs(
   if (!Array.isArray(normalizedTs)) {
     return skipped(normalizedTs.failure === "opaque" ? "opaqueTsArg" : "unparseableLiteral");
   }
-  const tsArgs = stripBlockTailPadding(ruby, ts, rubyArgs, normalizedTs, calleeSigs);
+  const tsArgs = stripForwardedLiteralBlock(
+    ruby,
+    ts,
+    rubyArgs,
+    stripBlockTailPadding(ruby, ts, rubyArgs, normalizedTs, calleeSigs),
+    calleeSigs,
+  );
 
   const compared = withRegexpFlagKeys(ruby, resolveCalleeRefs(rubyArgs, enclosingRubyName));
   const comparedTs = withRegexpFlagKeys(ruby, tsArgs);

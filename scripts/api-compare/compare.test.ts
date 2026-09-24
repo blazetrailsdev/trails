@@ -2858,6 +2858,14 @@ describe("tagsForOwner", () => {
   it("carries each tag's reason, so the report can read its permanence claim", () => {
     expect(tagsForOwner(byClass, "NullPool")!.get("reload")).toBe("CONVERGEABLE — see story.");
   });
+
+  it("reads the top-level function's tags for a bodyless mixin-object owner", () => {
+    const receipted = new Map([["", new Map([["lock", "PERMANENT"]])]]);
+    expect(tagsForOwner(receipted, "BiasableQueue", new Set(["BiasableQueue"]))!.get("lock")).toBe(
+      "PERMANENT",
+    );
+    expect(tagsForOwner(receipted, "BiasableQueue")).toBe(undefined);
+  });
 });
 
 describe("splitOverriddenFileBuckets", () => {

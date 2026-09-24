@@ -4353,6 +4353,26 @@ describe("callArgs", () => {
   const site = (source: string, method = "create"): CallSite[] =>
     extractFromSource(source).instanceMethods.find((m) => m.name === method)!.callArgs!;
 
+  it("records a call's own receiver, but not a namespace qualifier", () => {
+    expect(
+      site(
+        `class Foo {
+          create() {
+            this.instrumenter.instrument(name, payload);
+            conn.toSql(manager);
+            Inflector.camelize(name);
+            pluralize(name, 2);
+          }
+        }`,
+      ),
+    ).toEqual([
+      { name: "instrument", args: ["id:name", "id:payload"], flags: [], recv: "id:instrumenter" },
+      { name: "toSql", args: ["id:manager"], flags: [], recv: "id:conn" },
+      { name: "camelize", args: ["id:name"], flags: [] },
+      { name: "pluralize", args: ["id:name", "num:2"], flags: [] },
+    ]);
+  });
+
   it("drops a thrown construction so the real construction pairs", () => {
     expect(
       site(
@@ -4651,11 +4671,11 @@ describe("callArgs", () => {
       ),
     ).toEqual([
       { name: "batch", args: ["call:generatedAttributeMethods", "num:1"], flags: [] },
-      { name: "call", args: ["id:this"], flags: [] },
+      { name: "call", args: ["id:this"], flags: [], recv: "id:generatedAttributeMethods" },
       { name: "batch", args: ["call:helper"], flags: [] },
-      { name: "apply", args: ["id:this", "array"], flags: [] },
+      { name: "apply", args: ["id:this", "array"], flags: [], recv: "id:helper" },
       { name: "batch", args: ["call:call"], flags: [] },
-      { name: "call", args: ["id:other"], flags: [] },
+      { name: "call", args: ["id:other"], flags: [], recv: "id:fn" },
     ]);
   });
 
@@ -4685,7 +4705,7 @@ describe("callArgs", () => {
       ),
     ).toEqual([
       { name: "klass", args: [], flags: [] },
-      { name: "unscoped", args: ["num:1"], flags: [] },
+      { name: "unscoped", args: ["num:1"], flags: [], recv: "call:klass" },
     ]);
   });
 

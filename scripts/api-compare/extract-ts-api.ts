@@ -4548,7 +4548,18 @@ function recordCallSite(
   if (name !== undefined && !(ts.isNewExpression(call) && isThrownConstruction(call))) {
     const flags: string[] = [];
     const args = describeArgs(call.arguments, flags);
-    sites.push({ name, args, flags: [...new Set(flags)] });
+    const recv =
+      ts.isPropertyAccessExpression(callee) || ts.isElementAccessExpression(callee)
+        ? describeArg(callee.expression, [])
+        : undefined;
+    sites.push({
+      name,
+      args,
+      flags: [...new Set(flags)],
+      ...(recv !== undefined && recv !== "?" && recv !== "id:this" && !recv.startsWith("const:")
+        ? { recv }
+        : {}),
+    });
   }
 
   call.arguments?.forEach(visit);

@@ -42,6 +42,7 @@ export class Logger {
     return this.callApp(request, env);
   }
 
+  /** @missingRailsArgs info — CONVERGEABLE rack-logger-call-app-info-block */
   private async callApp(request: Request, env: RackEnv): Promise<RackResponse> {
     const loggerTagPopCount = env["rails.rackLoggerTagCount"] as number;
 

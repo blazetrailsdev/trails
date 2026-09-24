@@ -1970,13 +1970,21 @@ export function crossPackageIncludedMethodNames(
 /** The tags that justify deviations for `owner`'s copy of a method. A resolved
  *  owner reads ONLY its own class's tags, so a tag on a sibling class cannot
  *  silence a flag raised against this one. With no owner resolved the tags of
- *  the file's single tagged class — or, ambiguously, their union — apply. */
+ *  the file's single tagged class — or, ambiguously, their union — apply.
+ *
+ *  A BODYLESS owner — a mixin object literal listing the file's top-level
+ *  `export function` (`BiasableQueue = { withABiasFor }`, queue.ts) — is held
+ *  to that function's body (see ownerRecordsNothing), so it reads the tags on
+ *  that body too: the top-level (`""`) entry. */
 export function tagsForOwner(
   byClass: ReadonlyMap<string, ReadonlyMap<string, string>> | undefined,
   owner: string | undefined,
+  bodylessOwners: ReadonlySet<string> | undefined = undefined,
 ): ReadonlyMap<string, string> | undefined {
   if (!byClass || byClass.size === 0) return undefined;
-  if (owner !== undefined) return byClass.get(owner);
+  if (owner !== undefined) {
+    return byClass.get(owner) ?? (bodylessOwners?.has(owner) ? byClass.get("") : undefined);
+  }
   if (byClass.size === 1) return [...byClass.values()][0];
   const union = new Map<string, string>();
   for (const calls of byClass.values()) for (const [c, reason] of calls) union.set(c, reason);
@@ -4657,7 +4665,11 @@ export function main() {
             ),
           );
         }
-        const tags = tagsForOwner(tsMissingCallTagsByFileName.get(tsFile)?.get(tsName), tsClass);
+        const tags = tagsForOwner(
+          tsMissingCallTagsByFileName.get(tsFile)?.get(tsName),
+          tsClass,
+          tsBodylessOwnersByFileName.get(tsFile)?.get(tsName),
+        );
         const tsDeclFile = declFileFor(tsDeclFileByFileNameOwner, tsFile, tsName, tsClass);
         let flagged = [...missing, ...ordered];
         if (tags !== undefined && tags.size > 0) {
@@ -4762,10 +4774,16 @@ export function main() {
           rubyOwnersByName.has(name),
         );
         if (rubySites.length === 0) return;
-        const argTags = tagsForOwner(tsMissingArgTagsByFileName.get(tsFile)?.get(tsName), tsClass);
+        const bodylessOwners = tsBodylessOwnersByFileName.get(tsFile)?.get(tsName);
+        const argTags = tagsForOwner(
+          tsMissingArgTagsByFileName.get(tsFile)?.get(tsName),
+          tsClass,
+          bodylessOwners,
+        );
         const nameTags = tagsForOwner(
           tsMissingNameTagsByFileName.get(tsFile)?.get(tsName),
           tsClass,
+          bodylessOwners,
         );
         const tagKey = callTagKey(tsFile, tsClass ?? "*", tsName);
         for (const { ruby, ts } of pairCallSites(rubySites, tsSites)) {
