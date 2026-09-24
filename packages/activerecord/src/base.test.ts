@@ -25,9 +25,9 @@ import {
   assertNotRespondTo,
   assertDifference,
 } from "@blazetrails/activesupport";
-import { Temporal, Time as RubyTime, resetLocalTimeZoneId } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { fixtures } from "./test-fixtures.js";
-import { withTimezoneConfig } from "./test-helper.js";
+import { withEnvTz, withTimezoneConfig } from "./test-helper.js";
 import { IntegerType, ValueType, ArgumentError } from "@blazetrails/activemodel";
 import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
 import { Company, Client, AbstractCompany } from "./test-helpers/models/company.js";
@@ -147,15 +147,6 @@ class ReadonlyAuthorPost extends Post {
 }
 
 class Weird extends Base {}
-
-function withEnvTz<T>(newTz: string, fn: () => Promise<T>): Promise<T> {
-  vi.stubEnv("TZ", newTz);
-  resetLocalTimeZoneId();
-  return fn().finally(() => {
-    vi.stubEnv("TZ", undefined as unknown as string);
-    resetLocalTimeZoneId();
-  });
-}
 
 function timeToA(time: any): unknown[] {
   return [
