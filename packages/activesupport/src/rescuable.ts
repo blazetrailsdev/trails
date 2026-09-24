@@ -21,7 +21,7 @@ export function rescueFrom(
   ...klasses: Array<(new (...args: any[]) => Error) | string | { with?: ErrorHandler }>
 ): void {
   const { with: handler } = extractOptionsBang(klasses) as { with?: ErrorHandler };
-  if (!handler) {
+  if (handler == null) {
     throw new ArgumentError("Need a handler. Pass the with: keyword argument or provide a block.");
   }
 
@@ -41,6 +41,7 @@ export function rescueFrom(
   }
 }
 
+/** @noRailsEquivalent CONVERGEABLE port-rescuable-tagged-logging-and-isolated-execution-cases */
 export function handleRescue(target: any, error: Error): boolean {
   const handlers = (target as RescuableHost).rescueHandlers;
   for (const [key, handler] of [...handlers].reverse()) {
