@@ -54,6 +54,11 @@ runs:
     # `package-manager-cache: true`, which reads the `packageManager` field
     # from package.json and would silently re-enable that hosted pnpm-store
     # cache (the 1 TB WAN-egress incident above) — so pin it off explicitly.
+    # pnpm-workspace.yaml sets `pmOnFail: ignore` (pnpm 12's successor to
+    # `managePackageManagerVersions: false`), so a runner image no longer
+    # self-installs the `packageManager` pin. If `vars.RUNNER` is ever set back
+    # to `self-hosted`, infra/runner/Dockerfile must ship the pinned pnpm in the
+    # image itself or the version assertion below fails.
     - if: runner.environment != 'github-hosted'
       uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
       with:

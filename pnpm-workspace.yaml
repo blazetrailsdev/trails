@@ -11,3 +11,10 @@ allowBuilds:
   better-sqlite3: true
   esbuild: true
   libsql: true
+
+# pnpm 12 replaced `managePackageManagerVersions` with this. `ignore` makes pnpm
+# neither self-installs the `packageManager` pin nor records it as
+# a `packageManagerDependencies` document at the head of pnpm-lock.yaml — that
+# document differed between a cold store and a warm one, so a frozen install
+# rewrote it in place. Use `corepack enable` to honour the pin locally.
+pmOnFail: ignore
