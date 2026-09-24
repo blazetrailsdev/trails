@@ -76,7 +76,6 @@ function rehydrateColumn(data: unknown): Column {
   return column;
 }
 
-/** @noRailsEquivalent PERMANENT */
 function coderEntries<T>(value: unknown): [string, T][] {
   if (Array.isArray(value)) return value as [string, T][];
   return Object.entries((value ?? {}) as Record<string, T>);

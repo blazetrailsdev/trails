@@ -375,17 +375,6 @@ function _shouldApplyScopeAttributes(ctor: typeof Base): boolean {
   return ctor.isScopeAttributes();
 }
 
-/**
- * Source-text of every `before`/`around` callback registered for `event` whose
- * filter is a plain function (so it can be introspected via
- * `Function.prototype.toString`). `opaque` is true when any before/around entry
- * is an object/method-name filter whose body cannot be read from here.
- *
- * @noRailsEquivalent CONVERGEABLE: Rails loads a `belongs_to` target lazily, at
- *   the moment a callback body dereferences it; trails has to decide up front
- *   which targets to await, and reads the registered filter bodies to narrow
- *   that set. See `_preloadBelongsToForDestroyCallbacks`. Not exported.
- */
 function beforeOrAroundCallbackSources(
   proto: object,
   event: string,

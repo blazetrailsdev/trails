@@ -6,10 +6,8 @@ import { Relation } from "../relation.js";
 import { isDangerousClassMethod, isMethodDefinedWithin } from "../attribute-methods.js";
 import { Default } from "./default.js";
 
-/** @noRailsEquivalent PERMANENT */
 export type ScopeMethod<T extends Base, A extends unknown[] = []> = (...args: A) => Relation<T>;
 
-/** @noRailsEquivalent PERMANENT */
 export type ScopeOn<T extends Base, M extends Base, A extends unknown[] = []> = [T] extends [M]
   ? ScopeMethod<T, A>
   : never;

@@ -72,6 +72,16 @@ describe("receiptsCoveringNothing", () => {
     ts.packages.activemodel.fileNoRailsEquivalent = { "foo.ts": "PERMANENT" };
     expect(receiptsCoveringNothing(ruby, ts, null).map((e) => e.name)).toEqual([]);
   });
+
+  it("skips a receipt a `foo: NS.bar` property copies from its target", () => {
+    const { ruby, ts } = manifests();
+    ts.packages.activemodel.modules = {};
+    ts.packages.activemodel.classes.Foo.instanceMethods[0] = {
+      ...method("bar", "PERMANENT"),
+      noRailsEquivalentInherited: true,
+    };
+    expect(receiptsCoveringNothing(ruby, ts, null).map((e) => e.name)).toEqual([]);
+  });
 });
 
 describe("unverifiableReceipts", () => {

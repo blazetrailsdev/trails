@@ -735,14 +735,12 @@ export class AlterTable {
   }
 }
 
-/** @noRailsEquivalent PERMANENT */
 export type TableDefinitionOf<A> = A extends {
   createTableDefinition(name: string, options?: Record<string, unknown>): infer T;
 }
   ? T
   : TableDefinition;
 
-/** @noRailsEquivalent PERMANENT */
 export type TableOf<A> = A extends {
   updateTableDefinition(tableName: string, base?: unknown): infer T;
 }

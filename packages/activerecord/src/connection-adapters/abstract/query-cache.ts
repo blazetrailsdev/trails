@@ -94,7 +94,6 @@ export class Store {
 export class QueryCacheRegistry {
   private _map = new ConnectionAdapters.ConnectionPool.WeakThreadKeyMap<Store>();
 
-  /** @missingRailsCall synchronize — PERMANENT */
   computeIfAbsent(context: Thread | Fiber, create: () => Store): Store {
     let cache = this._map.get(context);
     if (!cache) {
