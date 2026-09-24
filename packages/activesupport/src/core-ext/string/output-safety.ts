@@ -1,4 +1,4 @@
-import { NoMethodError, Range, rbObjClass } from "@blazetrails/ruby-compat";
+import { IndexError, NoMethodError, Range, rbObjClass } from "@blazetrails/ruby-compat";
 
 const HTML_ESCAPE: Record<string, string> = {
   "&": "&amp;",
@@ -72,7 +72,10 @@ function strRange(str: string, args: ArefArgs): [number, number] {
   const [first, second] = args;
   if (first instanceof RegExp) {
     const match = new RegExp(first.source, first.flags.replace(/[gyd]/g, "") + "d").exec(str)!;
-    const [start, end] = match.indices![second ?? 0];
+    const nth = second ?? 0;
+    const range = match.indices![nth];
+    if (range === undefined) throw new IndexError(`regexp group ${nth} not matched`);
+    const [start, end] = range;
     return [start, end - start];
   }
   if (typeof first === "string") return [str.indexOf(first), first.length];

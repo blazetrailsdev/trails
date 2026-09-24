@@ -5,6 +5,7 @@
   "packageManager": "pnpm@12.3.4",
   "scripts": {
     "build": "tsc --build",
+    "build:ts7": "node packages/activerecord/node_modules/typescript/bin/tsc --build",
     "tasks": "scripts/tasks/tasks.sh",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

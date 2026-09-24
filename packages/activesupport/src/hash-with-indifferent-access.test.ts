@@ -10,7 +10,7 @@ import {
 import { assertRaises } from "./testing/assertions.js";
 import { deepDup } from "./hash-utils.js";
 
-const plainly = (hash: Hash<string, unknown>): Record<string, unknown> =>
+const plainly = <V>(hash: Hash<string, V>): Record<string, unknown> =>
   Object.fromEntries(
     [...hash].map(([key, value]) => [key, value instanceof Hash ? plainly(value) : value]),
   );
