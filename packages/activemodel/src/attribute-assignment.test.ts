@@ -152,8 +152,7 @@ describe("AttributeAssignmentTest", () => {
     });
   });
 
-  // BLOCKED: attribute-assignment-argument-error-names-js-number-not-integer
-  it.skip("an ArgumentError is raised if a non-hash-like object is passed", async () => {
+  it("an ArgumentError is raised if a non-hash-like object is passed", async () => {
     const err = (await assertRaises([ArgumentError], {}, () => {
       new Model(1);
     })) as ArgumentError;

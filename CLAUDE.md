@@ -1271,9 +1271,8 @@ the capability, in a different place. Each is its own `SKIP_GROUPS` entry in
 | `active_support/time_with_zone.rb`                    | Proxy                 |
 
 A "named method, no trap" row answers only an explicit `methodMissing` call,
-which is where `collection-proxy-does-not-delegate-association-names-to-scope`,
-`finder-respond-to-dynamic-finders-invisible-to-in` and `relation-dynamic-finders`
-sit. These rows are decided per class, not ratified: a "nothing" row with a
+which is where `finder-respond-to-dynamic-finders-invisible-to-in` and
+`relation-dynamic-finders` sit. These rows are decided per class, not ratified: a "nothing" row with a
 dispatch-dependent Rails test is a gap, filed against its package.
 
 ## `inherited` is deferred to own-property memo guards (`ModelSchema.inherited`)

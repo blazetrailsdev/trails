@@ -38,8 +38,7 @@ describe("CoreTest", () => {
     );
   }
 
-  it.skip("inspect class", () => {
-    // BLOCKED: base-inspect-returns-unqualified-name
+  it("inspect class", () => {
     expect(Base.inspect()).toBe("ActiveRecord::Base");
     expect(LoosePerson.inspect()).toBe("LoosePerson(abstract)");
     expect(Topic.inspect()).toMatch(/^Topic\(id: integer, title: string/);

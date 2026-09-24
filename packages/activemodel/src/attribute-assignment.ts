@@ -5,13 +5,14 @@ import {
   NotImplementedError,
   RuntimeError,
   TypeError,
+  rbObjClass,
 } from "@blazetrails/ruby-compat";
 import { UnknownAttributeError } from "./errors.js";
 
 export function assignAttributes(this: AttributeAssignment, newAttributes: unknown): void {
   if (!respondToEachPair(newAttributes)) {
     throw new ArgumentError(
-      `When assigning attributes, you must pass a hash as an argument, ${classOf(newAttributes)} passed.`,
+      `When assigning attributes, you must pass a hash as an argument, ${rbObjClass(newAttributes)} passed.`,
     );
   }
   if (isMassAssignmentEmpty(newAttributes)) return;
@@ -38,7 +39,7 @@ export function setAttributes(
 ): Promise<void> | void {
   if (!respondToEachPair(newAttributes)) {
     throw new ArgumentError(
-      `When assigning attributes, you must pass a hash as an argument, ${classOf(newAttributes)} passed.`,
+      `When assigning attributes, you must pass a hash as an argument, ${rbObjClass(newAttributes)} passed.`,
     );
   }
   if (isMassAssignmentEmpty(newAttributes)) return;
@@ -140,15 +141,6 @@ function isParamsLikeWrapper(attrs: object): boolean {
   if (proto === Object.prototype || proto === null) return false;
   const wrapper = attrs as { permitted?: unknown; toH?: unknown };
   return "permitted" in wrapper || typeof wrapper.toH === "function";
-}
-
-function classOf(value: unknown): string {
-  if (value === null) return "NilClass";
-  if (Array.isArray(value)) return "Array";
-  const ctorName = (value as { constructor?: { name?: string } } | undefined)?.constructor?.name;
-  if (ctorName) return ctorName;
-  const t = typeof value;
-  return t.charAt(0).toUpperCase() + t.slice(1);
 }
 
 export { ArgumentError, TypeError, NameError, NoMethodError, NotImplementedError, RuntimeError };

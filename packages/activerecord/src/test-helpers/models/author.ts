@@ -14,7 +14,7 @@ import type { Post } from "./post.js";
 import type { PostWithDefaultInclude } from "./post.js";
 import type { PostWithSpecialCategorization } from "./post.js";
 import type { PublishedBook } from "./book.js";
-import type { Rating } from "./rating.js";
+import { Rating } from "./rating.js";
 import type { SerializedPost } from "./post.js";
 import type { SpecialCategorization } from "./categorization.js";
 import type { SpecialPost } from "./post.js";
@@ -209,7 +209,14 @@ export class Author extends Base {
       { className: "Post" },
     );
 
-    this.hasMany("comments", { through: "posts" });
+    this.hasMany("comments", {
+      through: "posts",
+      extend: {
+        ratings(this: any) {
+          return Rating.joins("comment").merge(this);
+        },
+      },
+    });
     this.hasMany("commentsWithOrder", (q: any) => q.orderedByPostId(), {
       through: "posts",
       source: "comments",

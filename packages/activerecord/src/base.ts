@@ -32,6 +32,7 @@ import {
   ValidationsCallbacks,
 } from "@blazetrails/activemodel";
 import { Table, DeleteManager, Nodes } from "@blazetrails/arel";
+import { rbModSingletonP } from "@blazetrails/ruby-compat";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Relation } from "./relation.js";
 import "./relation.js";
@@ -2446,8 +2447,8 @@ export class Base extends Model {
   }
 
   static inspect(): string {
-    const name = this.name;
-    if (this === Base) {
+    const name = this === Base ? "ActiveRecord::Base" : this.name;
+    if (this === Base || rbModSingletonP(this)) {
       return name;
     } else if (this.abstractClass) {
       return `${name}(abstract)`;
