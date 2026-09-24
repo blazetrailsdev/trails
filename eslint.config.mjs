@@ -18,6 +18,7 @@ import noNativeDate from "./eslint/no-native-date.mjs";
 import noConditionalInTest from "./eslint/no-conditional-in-test.mjs";
 import noGetterCalledAsMethod from "./eslint/no-getter-called-as-method.mjs";
 import asyncQueryingEmpty from "./eslint/async-querying-empty.mjs";
+import noQSuffixPredicate from "./eslint/no-q-suffix-predicate.mjs";
 import sqliteDriverAwait from "./eslint/sqlite-driver-await.mjs";
 import preferAwaitRelation from "./eslint/prefer-await-relation.mjs";
 import railsFileStructureMethodOrder, {
@@ -297,6 +298,7 @@ export default defineConfig(
           "no-conditional-in-test": noConditionalInTest,
           "no-getter-called-as-method": noGetterCalledAsMethod,
           "async-querying-empty": asyncQueryingEmpty,
+          "no-q-suffix-predicate": noQSuffixPredicate,
           "sqlite-driver-await": sqliteDriverAwait,
           "prefer-await-relation": preferAwaitRelation,
           "nie-requires-annotation": nieRequiresAnnotation,
@@ -386,6 +388,14 @@ export default defineConfig(
     files: ["packages/*/src/**/*.ts"],
     rules: {
       "blazetrails/no-getter-called-as-method": "error",
+    },
+  },
+
+  {
+    files: ["packages/*/src/**/*.ts"],
+    ignores: ["**/*.test.ts", "**/*.test-d.ts"],
+    rules: {
+      "blazetrails/no-q-suffix-predicate": "error",
     },
   },
 

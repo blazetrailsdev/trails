@@ -3854,6 +3854,7 @@ class ApiExtractor
     walk_for_call_args(callee[1], sites) if callee[0] == :call || callee[0] == :command_call
 
     name = call_site_name(callee)
+    name = nil if node.equal?(@raised_new)
     name = nil if callee[0] == :vcall && capture_local?(name)
     # The argument half of walk_for_calls' `Proc.new` verdict: the call-set gate
     # has already agreed the site can never be satisfied, so recording it here
@@ -3884,7 +3885,25 @@ class ApiExtractor
       sites << site
     end
 
+    outer = @raised_new
+    @raised_new = name == "raise" ? raised_construction(args) : nil
     walk_for_call_args(args, sites)
+    @raised_new = outer
+  end
+
+  def raised_construction(args)
+    args = args[1] if args.is_a?(Array) && args[0] == :arg_paren
+    return nil unless args.is_a?(Array)
+
+    list = args[0] == :args_add_block ? args[1] : args
+    first = list.is_a?(Array) ? list[0] : nil
+    return nil unless first.is_a?(Array)
+
+    call = first[0] == :method_add_arg ? first[1] : first
+    return nil unless call.is_a?(Array) && %i[call command_call].include?(call[0]) &&
+                      call[3].is_a?(Array)
+
+    ident_name(call[3]) == "new" ? first : nil
   end
 
   # The same name filter walk_for_calls applies, so the two streams pair up.

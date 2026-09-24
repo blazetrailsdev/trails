@@ -867,7 +867,7 @@ describe("buildReport — novel vs moved classification", () => {
     expect(pkg.totalMoved).toBe(1);
   });
 
-  it("doesn't flag predicate-Q, column-DSL, value-method, or SKIP-mirror names as novel", () => {
+  it("doesn't flag predicate, column-DSL, value-method, or SKIP-mirror names as novel", () => {
     // Rails foo.rb defines a `?` predicate; the column-type DSL
     // (`define_column_methods`) and Relation value-method accessors
     // (`VALUE_METHODS.each`) are now modeled by the Ruby extractor, so they
@@ -913,7 +913,7 @@ describe("buildReport — novel vs moved classification", () => {
               extends: [],
               instanceMethods: [
                 method("bar"),
-                method("connectedToQ"), // predicate `?` → Q suffix
+                method("isConnectedTo"), // predicate `?` → is-prefix
                 method("integer"), // define_column_methods macro (matched in-file)
                 method("limitValue"), // Relation::VALUE_METHODS accessor (matched in-file)
                 method("freeze"), // SKIP mirror — foo.rb defines `freeze`

@@ -262,8 +262,8 @@ function isThisTypedFunction(rubyRef: string, thisTypedFunctions?: ReadonlySet<s
  *   manifest. Without that set the arm never fires and the row stays burndown,
  *   which is the safe direction for a permanent class.
  * - `rubyMethodToTsIgnoringSkip` answers every spelling the conventions table
- *   sanctions (`primary_class?` → `isPrimaryClass` / `primaryClass`); the `Q`
- *   suffix and the leading-underscore ivar form are what it adds on top.
+ *   sanctions (`primary_class?` → `isPrimaryClass` / `primaryClass`); the
+ *   leading-underscore ivar form is what it adds on top.
  */
 export function classifyPair(
   rubyRef: string,
@@ -293,7 +293,6 @@ export function classifyPair(
   const allowed = new Set([
     ...(Array.isArray(converted) ? converted : [converted]),
     camel,
-    ...(bare.endsWith("?") ? [`${camel}Q`] : []),
     ...(ivar ? [`_${camel}`] : []),
   ]);
   return allowed.has(tsRef) ? "conventions-rename" : "burndown";

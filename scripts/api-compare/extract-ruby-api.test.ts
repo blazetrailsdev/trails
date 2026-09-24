@@ -953,6 +953,33 @@ describe(
       expect(c["Quux#e"]).not.toContain("new");
       expect(c["Quux#e"]).toContain("greet");
     });
+
+    it("drops the new site a raise builds its error with, keeping an unrelated new", () => {
+      const c = rubyCallSiteNames({
+        "raiser.rb": `
+        class Raiser
+          def f(file)
+            list = Set.new(versions)
+            raise IllegalError.new(name_of(file)) unless ok?
+            raise(OtherError.new(file))
+            raise Wrapper.new(Inner.new(file))
+            raise Bare.new file
+          end
+        end
+      `,
+      });
+      expect(c["Raiser#f"]).toEqual([
+        "new",
+        "versions",
+        "ok?",
+        "raise",
+        "name_of",
+        "raise",
+        "raise",
+        "new",
+        "raise",
+      ]);
+    });
   },
 );
 

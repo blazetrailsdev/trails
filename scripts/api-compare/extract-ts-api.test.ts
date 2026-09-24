@@ -4967,18 +4967,18 @@ describe("bodyless declarations (RFC 0126)", () => {
 
   it("flags an object-literal member that is a bare reference, not an inline body", () => {
     const methods = objectLiteralMethods(
-      `function attributeMethodQ(name: string): boolean { return true; }
-       const NS = { aliased: attributeMethodQ };
+      `function isAttributeMethod(name: string): boolean { return true; }
+       const NS = { aliased: isAttributeMethod };
        export const ClassMethods = {
-         attributeMethodQ,
-         viaProperty: attributeMethodQ,
+         isAttributeMethod,
+         viaProperty: isAttributeMethod,
          viaNamespace: NS.aliased,
          inline(name: string): boolean { return true; },
          arrow: (name: string): boolean => true,
        };`,
     );
     expect(methods.map((m) => [m.name, m.bodyless === true])).toEqual([
-      ["attributeMethodQ", true],
+      ["isAttributeMethod", true],
       ["viaProperty", true],
       ["viaNamespace", true],
       ["inline", false],
