@@ -2,7 +2,6 @@ import { EachValidator, ArgumentError } from "@blazetrails/activemodel";
 import { isBlank } from "@blazetrails/activesupport";
 import { except, hasKey, rbModSingletonP } from "@blazetrails/ruby-compat";
 import { UnknownPrimaryKey } from "../errors.js";
-import { connectionPool } from "../connection-handling.js";
 
 export function validatesUniquenessOf(
   this: {
@@ -309,7 +308,7 @@ async function tableIndexes(
 
   type Index = { unique?: boolean; where?: string | null; columns?: unknown };
 
-  const cache = connectionPool.call(klass).schemaCache as any;
+  const cache = klass.connectionPool().schemaCache;
   if (!cache || typeof cache.indexes !== "function") return [];
   return (await cache.indexes(tableName)) as Index[];
 }

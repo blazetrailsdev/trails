@@ -97,11 +97,6 @@ export class HasAndBelongsToMany {
     if (lhsModel.moduleName) {
       joinModel.moduleName = lhsModel.moduleName;
     }
-    Object.defineProperty(joinModel, "_connectionSpecificationName", {
-      get: () => lhsModel.connectionSpecificationName,
-      set: () => {},
-      configurable: true,
-    });
 
     joinModel.addLeftAssociation("leftSide", {
       anonymousClass: lhsModel,

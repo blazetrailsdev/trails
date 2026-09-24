@@ -1,5 +1,5 @@
 import type { Base } from "./base.js";
-import { ActiveRecordError, ReadOnlyRecord } from "./errors.js";
+import { ActiveRecordError } from "./errors.js";
 import { timestampAttributesForUpdateInModel, currentTimeFromProperTimezone } from "./timestamp.js";
 import type { TouchArgs, TouchOptions } from "./timestamp.js";
 import { extractOptionsBang } from "@blazetrails/activesupport";
@@ -9,7 +9,6 @@ import {
   addToTransaction,
   beforeCommittedBang as transactionsBeforeCommittedBang,
 } from "./transactions.js";
-import { isAppliedTo as isNoTouchingApplied } from "./no-touching.js";
 
 function raiseRecordNotTouchedError(): never {
   throw new ActiveRecordError(
@@ -20,8 +19,6 @@ function raiseRecordNotTouchedError(): never {
 
 export async function touchLater(this: Base, ...names: string[]): Promise<void> {
   if (!this.isPersisted()) raiseRecordNotTouchedError();
-  if (this.isReadonly()) throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
-  if (isNoTouchingApplied(this.constructor as typeof Base)) return;
 
   const ctor = this.constructor as typeof Base;
   const self = this as any;

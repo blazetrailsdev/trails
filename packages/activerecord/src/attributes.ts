@@ -13,7 +13,6 @@ import {
   reloadSchemaFromCache as modelSchemaReloadSchemaFromCache,
   typeForColumn as modelSchemaTypeForColumn,
 } from "./model-schema.js";
-import { connectionPool } from "./connection-handling.js";
 
 type AnyClass = any;
 
@@ -82,7 +81,7 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
       }
       return attributesHash;
     };
-    const attributesHash = connectionPool.call(cacheHost).withConnectionSync(buildAttributesHash);
+    const attributesHash = cacheHost.connectionPool().withConnectionSync(buildAttributesHash);
 
     const attributeSet = new AttributeSet(attributesHash);
     AttributeRegistration.ClassMethods.applyPendingAttributeModifications.call(

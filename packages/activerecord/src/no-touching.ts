@@ -26,6 +26,14 @@ export function isNoTouching(this: Base): boolean {
   return isAppliedTo(this.constructor as typeof Base);
 }
 
+export function touchLater(
+  this: Base,
+  names: string[],
+  superFn: () => Promise<void>,
+): Promise<void> | undefined {
+  return isNoTouching.call(this) ? undefined : superFn();
+}
+
 export function touch(
   this: Base,
   args: unknown[],

@@ -271,11 +271,11 @@ export function clearQueryCachesForCurrentThread(this: typeof Base): void {
 }
 
 export function leaseConnection(this: typeof Base): Promise<DatabaseAdapter> {
-  return connectionPool.call(this).leaseConnection();
+  return this.connectionPool().leaseConnection();
 }
 
 export function releaseConnection(this: typeof Base): boolean {
-  return connectionPool.call(this).releaseConnection();
+  return this.connectionPool().releaseConnection();
 }
 
 export function withConnection<T>(
@@ -285,7 +285,7 @@ export function withConnection<T>(
 ): Promise<T> {
   try {
     return Promise.resolve(
-      connectionPool.call(this).withConnection((conn) => {
+      this.connectionPool().withConnection((conn) => {
         const prevValue = IsolatedExecutionState.get<DatabaseAdapter>(QUERY_CONNECTION_KEY);
         IsolatedExecutionState.set(QUERY_CONNECTION_KEY, conn);
         return Promise.resolve(fn(conn)).finally(() => {
@@ -299,7 +299,7 @@ export function withConnection<T>(
 }
 
 export function connectionDbConfig(this: typeof Base) {
-  return connectionPool.call(this).dbConfig;
+  return this.connectionPool().dbConfig;
 }
 
 export function connectionPool(this: typeof Base): ConnectionPool {
@@ -325,8 +325,8 @@ export function isConnected(this: typeof Base): boolean {
 }
 
 /** @deprecated */
-export async function connection(this: typeof Base): Promise<DatabaseAdapter> {
-  const pool = connectionPool.call(this);
+export async function connection(this: typeof Base): Promise<DatabaseAdapter | null> {
+  const pool = this.connectionPool();
   if (pool.isPermanentLease()) {
     const setting = permanentConnectionCheckout();
     if (setting === "deprecated") {
@@ -342,7 +342,7 @@ Either use \`with_connection\` or \`lease_connection\`.
     }
     return pool.leaseConnection();
   } else {
-    return pool.activeConnection!;
+    return pool.activeConnection;
   }
 }
 
@@ -351,9 +351,7 @@ export function isPrimaryClass(this: typeof Base): boolean {
 }
 
 export function adapterClass(this: typeof Base): new (...args: any[]) => DatabaseAdapter {
-  return connectionPool.call(this).dbConfig.adapterClass() as new (
-    ...args: any[]
-  ) => DatabaseAdapter;
+  return this.connectionPool().dbConfig.adapterClass() as new (...args: any[]) => DatabaseAdapter;
 }
 
 export async function removeConnection(this: typeof Base): Promise<HashConfig | undefined> {
@@ -407,7 +405,7 @@ export function connectionSpecificationName(this: typeof Base): string {
 }
 
 export function schemaCache(this: typeof Base) {
-  return connectionPool.call(this).schemaCache;
+  return this.connectionPool().schemaCache;
 }
 
 export function clearCacheBang(this: typeof Base): void {

@@ -32,7 +32,7 @@ import {
   type CallbackObject,
   ValidationsCallbacks,
 } from "@blazetrails/activemodel";
-import { Table, DeleteManager, Nodes } from "@blazetrails/arel";
+import { Table, Nodes } from "@blazetrails/arel";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Relation } from "./relation.js";
 import "./relation.js";
@@ -62,7 +62,7 @@ import {
   isDescendsFromActiveRecord as _isDescendsFromActiveRecord,
   usingSingleTableInheritance as _usingSingleTableInheritance,
 } from "./inheritance.js";
-import { NotImplementedError, StaleObjectError } from "./errors.js";
+import { NotImplementedError } from "./errors.js";
 import {
   AutosaveAssociation,
   reload as _autosaveReload,
@@ -859,7 +859,7 @@ export class Base extends Model {
     (this as any)._connectionSpecificationName = name;
   }
   declare static isConnected: typeof ConnectionHandling.isConnected;
-  declare static readonly connection: Promise<DatabaseAdapter>;
+  declare static readonly connection: Promise<DatabaseAdapter | null>;
   declare static isPrimaryClass: typeof ConnectionHandling.isPrimaryClass;
   declare static adapterClass: typeof ConnectionHandling.adapterClass;
   declare static removeConnection: typeof ConnectionHandling.removeConnection;
@@ -1930,43 +1930,13 @@ export class Base extends Model {
   }
 
   private async _destroyRow(): Promise<boolean> {
-    const ctor = this.constructor as typeof Base;
-
     await this._preloadBelongsToForDestroyCallbacks();
 
     let didDelete = false;
     const destroyResult = await runCallbacks(this, "destroy", async () => {
       await (this as any).destroyAssociations();
 
-      const table = ctor.arelTable;
-      if (this.isPersisted()) {
-        const dm = new DeleteManager()
-          .from(table)
-          .where(
-            ctor._buildQueryConstraintsWhereNode(
-              _Persistence._queryConstraintsHash.call(this as any),
-            ),
-          );
-        const lockCol = ctor.lockingColumn;
-        if (ctor.lockingEnabled) {
-          const lockAttr = this._attributes.getAttribute(lockCol);
-          const lockWhereValue = this.isWillSaveChangeToAttribute(lockCol)
-            ? lockAttr.valueForDatabase
-            : lockAttr.originalValueForDatabase();
-          if (lockWhereValue == null) {
-            dm.where(table.get(lockCol).eq(null));
-          } else {
-            dm.where(table.get(lockCol).eq(Number(lockWhereValue) || 0));
-          }
-        }
-        _Persistence.applyDefaultAndGlobalConstraints(dm as any, ctor);
-
-        const affected = await ctor.withConnection((c) => c.delete(dm, `${ctor.name} Destroy`));
-        if (ctor.lockingEnabled && affected !== 1) {
-          throw new StaleObjectError(this, "destroy");
-        }
-        didDelete = (await CounterCache.destroyRow.call(this as any, async () => affected)) > 0;
-      }
+      if (this.isPersisted()) didDelete = (await (this as any).destroyRow()) > 0;
 
       this._destroyed = true;
       this._previouslyNewRecord = false;
@@ -2592,6 +2562,10 @@ extend(Base, {
 });
 extend(Base, Querying);
 extend(Base, {
+  _updateRecord: _Persistence._updateRecord,
+  _deleteRecord: _Persistence._deleteRecord,
+});
+extend(Base, {
   belongsTo: _Associations.belongsTo,
   hasOne: _Associations.hasOne,
   hasMany: _Associations.hasMany,
@@ -2753,7 +2727,6 @@ include(Base, {
   update: _Persistence.update,
   updateBang: _Persistence.updateBang,
   delete: _Persistence.delete,
-  destroyRow: _Persistence.destroyRow,
   _updateRow: _Persistence._updateRow,
   reload: _Persistence.reload,
   slice: Access.prototype.slice,
@@ -2965,6 +2938,14 @@ for (const [name, fn] of [
     },
   ],
   [
+    "touchLater",
+    function (this: Base, ...names: string[]): Promise<void> | undefined {
+      return _NoTouching.touchLater.call(this, names, () =>
+        TouchLater.touchLater.call(this, ...names),
+      );
+    },
+  ],
+  [
     "touch",
     function (this: Base, ...args: unknown[]): Promise<boolean> | undefined {
       return _NoTouching.touch.call(this, args, () =>
@@ -2993,6 +2974,26 @@ for (const [name, fn] of [
             (lockNames: string[], lockTime: unknown) =>
               _Persistence._touchRow.call(this as any, lockNames, lockTime as any),
           ) as Promise<number>,
+      );
+    },
+  ],
+  [
+    "destroyRow",
+    function (this: Base): Promise<number> {
+      return Promise.resolve(
+        LockingOptimistic.destroyRow.call(this as any, () =>
+          CounterCache.destroyRow.call(this as any, () =>
+            _Persistence.destroyRow.call(this as any),
+          ),
+        ),
+      );
+    },
+  ],
+  [
+    "_queryConstraintsHash",
+    function (this: Base): Record<string, unknown> {
+      return LockingOptimistic._queryConstraintsHash.call(this as any, () =>
+        _Persistence._queryConstraintsHash.call(this as any),
       );
     },
   ],
