@@ -375,7 +375,24 @@ export class FixtureSet {
   }
 }
 
+export class FixtureError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ActiveRecord::Fixture::FixtureError";
+  }
+}
+
+export class FormatError extends FixtureError {
+  constructor(message: string) {
+    super(message);
+    this.name = "ActiveRecord::Fixture::FormatError";
+  }
+}
+
 export class Fixture {
+  static FixtureError = FixtureError;
+  static FormatError = FormatError;
+
   modelClass!: BaseClass | null;
   fixture!: FixtureAttrs;
 
@@ -421,21 +438,7 @@ export class Fixture {
   }
 }
 
-export class FixtureError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ActiveRecord::Fixture::FixtureError";
-  }
-}
-
-export class FormatError extends FixtureError {
-  constructor(message: string) {
-    super(message);
-    this.name = "ActiveRecord::Fixture::FormatError";
-  }
-}
-
-ActiveRecord.FixtureError = FixtureError;
+ActiveRecord.Fixture = Fixture;
 
 prepend(Fixture.prototype, EncryptedFixtures);
 

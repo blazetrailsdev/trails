@@ -25,46 +25,32 @@ import {
   rbEqual,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
-import { ActiveRecord } from "../namespaces.js";
-import { _relationFamilySlot, _relationFamilyState } from "./uncacheable-methods-slot.js";
+import { ActiveRecord, Associations } from "../namespaces.js";
 
 type AnyCallable = (...args: any[]) => any;
 
 type FamilyCtor = new (...args: any[]) => any;
 
 export function delegatedClasses(): FamilyCtor[] {
-  const { relation, collectionProxy, associationRelation, disableJoinsAssociationRelation } =
-    _relationFamilySlot;
-  return [relation, collectionProxy, associationRelation, disableJoinsAssociationRelation].filter(
-    (klass): klass is FamilyCtor => klass !== undefined,
-  );
+  return [
+    ActiveRecord.Relation,
+    Associations.CollectionProxy,
+    ActiveRecord.AssociationRelation,
+    ActiveRecord.DisableJoinsAssociationRelation,
+  ];
 }
 
-function computeUncacheableMethods(): Set<string> {
-  const result = new Set<string>();
-  for (const klass of delegatedClasses()) {
-    for (const n of publicInstanceMethods(klass)) result.add(n);
-  }
-  const relation = _relationFamilySlot.relation;
-  if (relation) {
-    for (const n of publicInstanceMethods(relation)) result.delete(n);
-  }
-  return result;
-}
+let _uncacheableMethods: Set<string> | undefined;
 
-let _uncacheableMethodsCache: Set<string> | undefined;
-let _uncacheableMethodsCacheVersion = -1;
-
+/** @missingRailsArgs public_instance_methods — PERMANENT */
 export function uncacheableMethods(): Set<string> {
-  if (
-    _uncacheableMethodsCache &&
-    _uncacheableMethodsCacheVersion === _relationFamilyState.version
-  ) {
-    return _uncacheableMethodsCache;
-  }
-  _uncacheableMethodsCache = computeUncacheableMethods();
-  _uncacheableMethodsCacheVersion = _relationFamilyState.version;
-  return _uncacheableMethodsCache;
+  if (_uncacheableMethods) return _uncacheableMethods;
+  const relationMethods = new Set(publicInstanceMethods(ActiveRecord.Relation));
+  return (_uncacheableMethods = new Set(
+    delegatedClasses()
+      .flatMap((klass) => publicInstanceMethods(klass))
+      .filter((n) => !relationMethods.has(n)),
+  ));
 }
 
 const _relationDelegateCache = new WeakMap<typeof Base, Map<FamilyCtor, FamilyCtor>>();

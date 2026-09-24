@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Base } from "./base.js";
 import { currentPreventingWrites } from "./core.js";
 import { DatabaseSelector } from "./middleware/database-selector.js";
-import { _setActionDispatchRequest } from "@blazetrails/activesupport";
+import { TopLevel } from "@blazetrails/activesupport";
 import { Resolver, type ResolverContext } from "./middleware/database-selector/resolver.js";
 import { Session } from "./middleware/database-selector/resolver/session.js";
 import { Hash } from "@blazetrails/ruby-compat";
@@ -16,7 +16,7 @@ class TestRequest {
     this.session = env["rack.session"] as Hash<string, unknown>;
   }
 }
-_setActionDispatchRequest(TestRequest);
+TopLevel.ActionDispatch = { Request: TestRequest } as never;
 
 function isWriting() {
   return Base.isConnectedTo({ role: "writing" });

@@ -52,7 +52,7 @@ function processPreservedOriginalColumns(
 export const EncryptedFixtures: PrependModule = {
   initialize(super_: (...args: unknown[]) => unknown, ...args: never[]): unknown {
     const [fixture, modelClass] = args as unknown as [FixtureRow, FixtureModelClass];
-    if (Encryption.Configurable.config.encryptFixtures) {
+    if (Encryption.config.encryptFixtures) {
       const host = this as unknown as EncryptedFixtureHost;
       host.cleanValues = {};
       encryptFixtureData.call(host, fixture, modelClass);

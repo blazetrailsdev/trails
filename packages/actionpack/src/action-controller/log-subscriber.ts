@@ -1,7 +1,7 @@
 import {
   LogSubscriber as BaseLogSubscriber,
   NotificationEvent as Event,
-  trails,
+  TopLevel,
 } from "@blazetrails/activesupport";
 import { expandCacheKey } from "@blazetrails/activesupport/cache";
 import { HTTP_STATUS_CODES } from "@blazetrails/rack";
@@ -69,7 +69,11 @@ export class LogSubscriber extends BaseLogSubscriber {
       let message =
         `Completed ${rbObjAsString(status)} ${rbObjAsString(HTTP_STATUS_CODES[status!])} in ${round(event.duration)}ms` +
         ` (${additions.join(" | ")})`;
-      if (trails != null && trails.env["development?"]()) message += "\n\n";
+      if (
+        TopLevel.Trails !== undefined &&
+        (TopLevel.Trails.env as unknown as Record<string, () => boolean>)["development?"]()
+      )
+        message += "\n\n";
 
       return message;
     });

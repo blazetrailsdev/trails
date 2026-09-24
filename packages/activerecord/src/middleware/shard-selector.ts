@@ -1,6 +1,6 @@
 import { fetch } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
-import { Notifications, _ActionDispatchRequest } from "@blazetrails/activesupport";
+import { Notifications, TopLevel } from "@blazetrails/activesupport";
 
 export interface ShardRequest {
   method: string;
@@ -26,7 +26,7 @@ export class ShardSelector {
   }
 
   async call(env: Record<string, unknown>): Promise<unknown> {
-    const request = new _ActionDispatchRequest!(env) as ShardRequest;
+    const request = new TopLevel.ActionDispatch!.Request(env) as ShardRequest;
 
     const shard = this.selectedShard(request);
 

@@ -108,7 +108,7 @@ export class Aes256Gcm {
   private generateDeterministicIv(clearText: Bytes): Bytes {
     return OpenSSL.HMAC.digest(OpenSSL.Digest.SHA256.new(), this.secret, clearText).subarray(
       0,
-      Encryption.Configurable.cipher.ivLength(),
+      Encryption.cipher.ivLength(),
     ) as Bytes;
   }
 }

@@ -1195,7 +1195,7 @@ export async function buildFixtureSql(
   const valuesList = fixtures.map((fixture) => {
     const unknownColumns = Object.keys(fixture).filter((name) => !columnNames.includes(name));
     if (unknownColumns.length > 0) {
-      throw new ActiveRecord.FixtureError(
+      throw new ActiveRecord.Fixture.FixtureError(
         `table "${tableName}" has no columns named ${unknownColumns.map((name) => rbInspect(name)).join(", ")}.`,
       );
     }

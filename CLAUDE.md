@@ -842,7 +842,7 @@ with `Super` still in TDZ and the module throws
 imports at all (so it cannot join any cycle) exporting a mutable binding plus a
 `_setX()` setter, which the defining module calls at the bottom of its own
 body. Readers import the binding from the slot and use it at call time, exactly
-where Ruby resolves the constant. Six instances exist and are the only ones, plus the namespace
+where Ruby resolves the constant. Four instances exist and are the only ones, plus the namespace
 modules converged onto `Autoload`:
 
 - `arel/src/namespaces.ts` — not a slot: the `Arel` / `Arel::Attributes` /
@@ -863,19 +863,28 @@ modules converged onto `Autoload`:
   `ActiveSupport.BroadcastLogger` (`active_support.rb:30`, read at
   `logger.rb:21`), and `Attribute.UserProvidedDefault` on the class Rails nests
   it in (`attribute_registration.rb:5`).
-- `trailties/src/trails-slot.ts` — the `Trails` constant, read by
-  `engine/lazy-route-set.ts` for `Rails.application&.reload_routes_unless_loaded`
-  (`engine/lazy_route_set.rb:12-104`). The cycle is closed by
-  `class Application extends Engine` (`application.ts`), so `lazy-route-set.ts`
-  cannot import `rails.ts` back.
-- `actionview/src/routing-url-for-slot.ts` — the `ActionDispatch::Routing::UrlFor`
-  module, read by `routing-url-for.ts` for the `super` calls in
-  `ActionView::RoutingUrlFor#url_for` / `#url_options` /
-  `#optimize_routes_generation?` (`actionview/lib/action_view/routing_url_for.rb:80-136`),
-  plus the `HelperMethodBuilder` and `ActionController::Parameters` its body
-  names. Rails mixes the module in from an `on_load(:action_controller)` hook
-  (`actionview/lib/action_view/railtie.rb:97-101`); actionview does not depend
-  on actionpack, so a plain import is not available in either direction.
+- `activesupport/src/namespaces.ts`'s `TopLevel` — not a slot: Ruby's
+  top-level `Object`, where a top-level constant lives when the gem reading it
+  does not depend on the gem defining it, or when it is `::Rails` itself. The
+  defining gem seats it (`TopLevel.Trails = Trails` in `trailties/src/rails.ts`,
+  `TopLevel.ActionDispatch` / `TopLevel.ActionController` in
+  `actionpack/src/namespaces.ts`, which are actionpack's own namespace objects),
+  and a reader names it at call time: `TopLevel.Trails!.env` for `Rails.env.local?`
+  (`engine.rb:592`), `new TopLevel.ActionDispatch!.Request(env)`
+  (`shard_selector.rb:41`, `database_selector.rb:64`),
+  `TopLevel.ActionController!.Parameters` and
+  `TopLevel.ActionDispatch!.Routing.PolymorphicRoutes.HelperMethodBuilder`
+  (`routing_url_for.rb:92,109`). A read carries a guard only where Rails has a
+  `defined?`: `TopLevel.Trails?.logger` (`deprecation/behaviors.rb:27`,
+  `testing/tagged_logging.rb:23`, `log_subscriber.rb:94`) and
+  `TopLevel.Trails !== undefined` (`action_controller/log_subscriber.rb:40`).
+  A `globalThis` seat was the alternative; it was rejected because a
+  `declare global` in a published `.d.ts` puts `Trails` and `ActionDispatch` in
+  every consumer's global scope. `ActionView::RoutingUrlFor#url_for`'s `super`
+  (`routing_url_for.rb:80-136`) is a real `super`: the
+  `on_load(:action_controller)` hook (`railtie.rb:97-101`) includes UrlFor as a
+  live `Module`, whose link is spliced into `RoutingUrlFor`'s ancestry, because
+  `include()` flattens a plain-object module beneath the class's own methods.
 - `activerecord/src/namespaces.ts` — not a slot: the `ActiveRecord`,
   `ActiveRecord::Associations`, `ActiveRecord::ConnectionAdapters`,
   `ActiveRecord::Encryption` and `ActiveRecord::Migration` namespace objects, extended with
@@ -884,12 +893,16 @@ modules converged onto `Autoload`:
   `encryption.rb:14` and `migration.rb:573`: `ActiveRecord.Base`,
   `.ConnectionHandling` (`DEFAULT_ENV`, `connection_handling.rb:7`),
   `.ModelSchema` (`derive_join_table_name`, `migration/join_table.rb:12`),
-  `.FixtureError` (`fixtures.rb:809`, raised at
-  `abstract/database_statements.rb:615`) and `.AssociationRelation`; the six
+  `.Fixture` (`active_record.rb:54`, whose `Fixture::FixtureError` (`fixtures.rb:809`) is raised at
+  `abstract/database_statements.rb:615`), and `.Relation`, `.AssociationRelation` and
+  `.DisableJoinsAssociationRelation`, which `Delegation.delegated_classes` reads
+  (`relation/delegation.rb:7-15`); the six
   concrete association ctors `AssociationReflection#association_class` returns
   (`reflection.rb:889-923`), `Associations.CollectionProxy` and
   `Associations.DisableJoinsAssociationScope` (`associations/association.rb:107-115`);
-  `Encryption.Configurable`; `Migration.Compatibility` (`migration.rb:629-631`,
+  `Encryption.Configurable`, which configurable.ts also `extend`s onto `Encryption`
+  itself, as `encryption.rb:47` does `include Configurable`, so readers spell
+  `Encryption.config.x`; `Migration.Compatibility` (`migration.rb:629-631`,
   `schema.rb:72`); `ConnectionAdapters.ConnectionPool`
   (`connection_adapters.rb:107-110`, read by `abstract/query_cache.rb:100` for
   `ConnectionPool::WeakThreadKeyMap`). `ActiveRecord.Point`

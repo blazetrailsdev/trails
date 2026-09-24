@@ -88,4 +88,3 @@ export {
 } from "./render-context.js";
 export type NoExtraKeys<T> = T & { [K in Exclude<string, keyof T>]?: never };
 export { RoutingUrlFor, type RoutingUrlForHost } from "./routing-url-for.js";
-export { _setUrlFor, type UrlForImplementation } from "./routing-url-for-slot.js";

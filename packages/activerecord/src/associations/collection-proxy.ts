@@ -11,7 +11,6 @@ import {
 } from "./collection-association.js";
 import type { PrettyPrinter } from "../pretty-print.js";
 import { relationClassFor } from "../relation/delegation.js";
-import { _registerRelationFamily } from "../relation/uncacheable-methods-slot.js";
 
 import { stripThenable } from "../relation/thenable.js";
 import {
@@ -605,8 +604,3 @@ for (const name of delegateMethods) {
 }
 
 Associations.CollectionProxy = CollectionProxy;
-
-_registerRelationFamily(
-  "collectionProxy",
-  CollectionProxy as unknown as new (...a: never[]) => unknown,
-);

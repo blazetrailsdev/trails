@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { RoutingUrlFor, type RoutingUrlForHost } from "./routing-url-for.js";
-import { _setUrlFor, type UrlForImplementation } from "./routing-url-for-slot.js";
+import { TopLevel, include } from "@blazetrails/activesupport";
+import { Module } from "@blazetrails/ruby-compat";
 
 class Parameters {
   constructor(private readonly data: Record<string, unknown>) {}
@@ -31,25 +32,31 @@ interface Host extends RoutingUrlFor, RoutingUrlForHost {
 
 let host: Host;
 
-function stubUrlFor(): void {
-  _setUrlFor({
-    urlFor(this: Host, options?: unknown) {
-      this.seen.push(options);
-      return "/super";
-    },
-    urlOptions: () => ({ host: "example.com" }),
-    optimizeRoutesGeneration: () => true,
-    polymorphicPath: (record: unknown, options: unknown) =>
-      `path:${JSON.stringify([record, options])}`,
-    polymorphicUrl: (record: unknown, options: unknown) =>
-      `url:${JSON.stringify([record, options])}`,
-    isParameters: (value: unknown) => value instanceof Parameters,
-    helperMethodBuilder: { path: () => builder, url: () => builder },
-  } as unknown as UrlForImplementation);
-}
+include(
+  RoutingUrlFor as unknown as new (...args: never[]) => unknown,
+  new Module((mod) =>
+    mod.include({
+      urlFor(this: Host, options?: unknown) {
+        this.seen.push(options);
+        return "/super";
+      },
+      urlOptions: () => ({ host: "example.com" }),
+      optimizeRoutesGeneration: () => true,
+      polymorphicPath: (record: unknown, options: unknown) =>
+        `path:${JSON.stringify([record, options])}`,
+      polymorphicUrl: (record: unknown, options: unknown) =>
+        `url:${JSON.stringify([record, options])}`,
+    }),
+  ),
+);
 
 beforeEach(() => {
-  stubUrlFor();
+  TopLevel.ActionController = { Parameters } as never;
+  TopLevel.ActionDispatch = {
+    Routing: {
+      PolymorphicRoutes: { HelperMethodBuilder: { path: () => builder, url: () => builder } },
+    },
+  } as never;
   host = Object.assign(Object.create(RoutingUrlFor.prototype) as RoutingUrlFor, {
     controller: null as unknown,
     seen: [] as unknown[],

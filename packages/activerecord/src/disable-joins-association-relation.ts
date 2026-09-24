@@ -1,5 +1,5 @@
 import { Relation, type LoadedRelation } from "./relation.js";
-import { _registerRelationFamily } from "./relation/uncacheable-methods-slot.js";
+import { ActiveRecord } from "./namespaces.js";
 import { relationClassFor } from "./relation/delegation.js";
 import { normalizeAssociationKey } from "./associations/key-normalization.js";
 import { stripThenable } from "./relation/thenable.js";
@@ -302,7 +302,4 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
   }
 }
 
-_registerRelationFamily(
-  "disableJoinsAssociationRelation",
-  DisableJoinsAssociationRelation as unknown as new (...a: never[]) => unknown,
-);
+ActiveRecord.DisableJoinsAssociationRelation = DisableJoinsAssociationRelation;

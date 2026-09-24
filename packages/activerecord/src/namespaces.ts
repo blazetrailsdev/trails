@@ -11,10 +11,12 @@ import type { HasOneThroughAssociation } from "./associations/has-one-through-as
 import type { Base } from "./base.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import type * as ConnectionHandling from "./connection-handling.js";
+import type { DisableJoinsAssociationRelation } from "./disable-joins-association-relation.js";
 import type { Configurable } from "./encryption/configurable.js";
-import type { FixtureError } from "./fixtures.js";
+import type { Fixture } from "./fixtures.js";
 import type * as Compatibility from "./migration/compatibility.js";
 import type * as ModelSchema from "./model-schema.js";
+import type { Relation } from "./relation.js";
 
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
@@ -24,6 +26,9 @@ const loadPath: Record<string, () => Promise<unknown>> = {
   "active_record/fixtures": () => import("./fixtures.js"),
   "active_record/model_schema": () => import("./model-schema.js"),
   "active_record/association_relation": () => import("./association-relation.js"),
+  "active_record/disable_joins_association_relation": () =>
+    import("./disable-joins-association-relation.js"),
+  "active_record/relation": () => import("./relation.js"),
   "active_record/associations/collection_proxy": () => import("./associations/collection-proxy.js"),
   "active_record/associations/belongs_to_association": () =>
     import("./associations/belongs-to-association.js"),
@@ -48,18 +53,22 @@ const loadPath: Record<string, () => Promise<unknown>> = {
 export const ActiveRecord = { name: "ActiveRecord", loadPath } as AutoloadModule & {
   Base: typeof Base;
   ConnectionHandling: typeof ConnectionHandling;
-  FixtureError: typeof FixtureError;
+  Fixture: typeof Fixture;
   ModelSchema: typeof ModelSchema;
   AssociationRelation: typeof AssociationRelationClass;
+  DisableJoinsAssociationRelation: typeof DisableJoinsAssociationRelation;
+  Relation: typeof Relation;
   Point: new (x: number, y: number) => { x: number; y: number; equals(other: unknown): boolean };
 };
 extend(ActiveRecord, Autoload);
 ActiveRecord.autoload("Base");
 ActiveRecord.autoload("ConnectionHandling");
-ActiveRecord.autoload("FixtureError", "active_record/fixtures");
+ActiveRecord.autoload("Fixture", "active_record/fixtures");
 ActiveRecord.autoload("ModelSchema");
 ActiveRecord.eagerAutoload(() => {
   ActiveRecord.autoload("AssociationRelation");
+  ActiveRecord.autoload("DisableJoinsAssociationRelation");
+  ActiveRecord.autoload("Relation");
 });
 
 export const Associations = { name: "ActiveRecord::Associations", loadPath } as AutoloadModule & {
@@ -97,7 +106,7 @@ ConnectionAdapters.autoloadAt("active_record/connection_adapters/abstract/connec
 
 export const Encryption = { name: "ActiveRecord::Encryption", loadPath } as AutoloadModule & {
   Configurable: typeof Configurable;
-};
+} & Omit<typeof Configurable, "prototype">;
 extend(Encryption, Autoload);
 Encryption.eagerAutoload(() => {
   Encryption.autoload("Configurable");

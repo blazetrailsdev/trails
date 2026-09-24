@@ -3,7 +3,6 @@ import { Relation } from "./relation.js";
 import type { CollectionProxy } from "./associations/collection-proxy.js";
 import type { Association } from "./associations/association.js";
 import { ActiveRecord } from "./namespaces.js";
-import { _registerRelationFamily } from "./relation/uncacheable-methods-slot.js";
 import { relationClassFor } from "./relation/delegation.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 
@@ -134,8 +133,4 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
   }
 }
 
-_registerRelationFamily(
-  "associationRelation",
-  AssociationRelation as unknown as new (...a: never[]) => unknown,
-);
 ActiveRecord.AssociationRelation = AssociationRelation;

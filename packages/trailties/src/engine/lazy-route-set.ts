@@ -1,9 +1,9 @@
 import { RouteSet, type DrawCallback, type Request } from "@blazetrails/actionpack";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
-import { _Trails } from "../trails-slot.js";
+import { TopLevel } from "@blazetrails/activesupport";
 
 function reloadRoutesUnlessLoaded(): Promise<boolean> | undefined {
-  return _Trails!.application?.reloadRoutesUnlessLoaded();
+  return TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
 }
 
 type AnyFn = (...args: unknown[]) => unknown;

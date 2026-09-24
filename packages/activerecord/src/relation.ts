@@ -50,10 +50,7 @@ import {
   type ToSentenceOptions,
   type ToXmlOptions,
 } from "./relation/delegation.js";
-import {
-  _registerRelationFamily,
-  _relationFamilySlot,
-} from "./relation/uncacheable-methods-slot.js";
+import { ActiveRecord, Associations } from "./namespaces.js";
 import { InsertAll, type InsertAllOptions } from "./insert-all.js";
 import { Result } from "./result.js";
 import { FutureResult, Complete } from "./future-result.js";
@@ -1450,13 +1447,11 @@ export class Relation<T extends Base> {
   }
 
   async equals(other: unknown): Promise<boolean | undefined> {
-    const CollectionProxyCtor = _relationFamilySlot.collectionProxy;
-    const AssociationRelationCtor = _relationFamilySlot.associationRelation;
     if (
-      (CollectionProxyCtor && other instanceof CollectionProxyCtor) ||
-      (AssociationRelationCtor && other instanceof AssociationRelationCtor)
+      other instanceof Associations.CollectionProxy ||
+      other instanceof ActiveRecord.AssociationRelation
     ) {
-      return this.equals(await (other as Relation<T>).records());
+      return this.equals(await other.records());
     }
     if (other instanceof Relation) {
       return other.toSql() === this.toSql();
@@ -1895,7 +1890,7 @@ export class Relation<T extends Base> {
   }
 }
 
-_registerRelationFamily("relation", Relation);
+ActiveRecord.Relation = Relation;
 
 /* eslint-disable @typescript-eslint/no-empty-object-type */
 export interface RelationScopes<T extends Base> {}

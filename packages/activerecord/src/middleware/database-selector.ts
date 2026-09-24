@@ -1,4 +1,4 @@
-import { Notifications, _ActionDispatchRequest } from "@blazetrails/activesupport";
+import { Notifications, TopLevel } from "@blazetrails/activesupport";
 import type { Hash } from "@blazetrails/ruby-compat";
 import { Resolver } from "./database-selector/resolver.js";
 import type { ResolverContext } from "./database-selector/resolver.js";
@@ -37,7 +37,7 @@ export class DatabaseSelector {
   }
 
   async call(env: Record<string, unknown>): Promise<unknown> {
-    const request = new _ActionDispatchRequest!(env) as MiddlewareRequest;
+    const request = new TopLevel.ActionDispatch!.Request(env) as MiddlewareRequest;
 
     return this.selectDatabase(request, () => this.app(env));
   }

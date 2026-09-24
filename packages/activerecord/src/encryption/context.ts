@@ -45,6 +45,6 @@ export class Context {
 
   /** @internal */
   private buildDefaultKeyProvider(): unknown {
-    return new DerivedSecretKeyProvider(Encryption.Configurable.config.primaryKey);
+    return new DerivedSecretKeyProvider(Encryption.config.primaryKey);
   }
 }

@@ -18,6 +18,7 @@ import {
 import { BigDecimal, Notifications, isBlank } from "@blazetrails/activesupport";
 
 import { UploadedFile } from "../../action-dispatch/http/upload.js";
+import { ActionController } from "../../namespaces.js";
 
 export class ParameterMissing extends Error {
   readonly param: string;
@@ -1089,3 +1090,5 @@ function deepEqualValue(a: unknown, b: unknown): boolean {
 
   return false;
 }
+
+ActionController.Parameters = Parameters;

@@ -7,7 +7,7 @@ export class KeyGenerator {
   private _hashDigestClass: DigestClass;
 
   constructor({
-    hashDigestClass = Encryption.Configurable.config.hashDigestClass,
+    hashDigestClass = Encryption.config.hashDigestClass,
   }: { hashDigestClass?: DigestClass } = {}) {
     this._hashDigestClass = hashDigestClass;
   }
@@ -31,7 +31,7 @@ export class KeyGenerator {
 
   /** @internal */
   private keyDerivationSalt(): string {
-    return Encryption.Configurable.config.keyDerivationSalt;
+    return Encryption.config.keyDerivationSalt;
   }
 
   /** @internal */

@@ -17,7 +17,7 @@ export class KeyProvider {
   encryptionKey(): Key {
     if (!this._encryptionKey) {
       const key = this._keys[this._keys.length - 1];
-      if (Encryption.Configurable.config.storeKeyReferences) {
+      if (Encryption.config.storeKeyReferences) {
         key.publicTags.encryptedDataKeyId = key.id;
       }
       this._encryptionKey = key;
