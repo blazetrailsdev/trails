@@ -108,7 +108,7 @@ export function sanitizeSqlForAssignment(
 ): string {
   if (Array.isArray(assignments)) {
     return this.sanitizeSqlArray(assignments);
-  } else if (typeof assignments !== "string") {
+  } else if (isPlainHash(assignments)) {
     return this.sanitizeSqlHashForAssignment(assignments, defaultTableName);
   } else {
     return assignments;
@@ -245,7 +245,7 @@ function quoteBoundValue(connection: Quoter, value: unknown): string {
   }
 }
 
-function isPlainHash(value: unknown): boolean {
+function isPlainHash(value: unknown): value is Record<string, unknown> {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
   const proto = Object.getPrototypeOf(value);
   return proto === Object.prototype || proto === null;
