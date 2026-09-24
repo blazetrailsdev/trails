@@ -10,6 +10,7 @@ export interface SerializableType {
 export class ExtendedDeterministicQueries {
   private static _installed = false;
 
+  /** @missingRailsArgs include — PERMANENT */
   static installSupport(targets: {
     Relation: {
       prototype: {

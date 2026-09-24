@@ -1088,6 +1088,7 @@ export class Base extends Model {
     return polymorphicClassFor(this, name);
   }
 
+  /** @noRailsEquivalent PERMANENT */
   declare static readonly subclasses: (typeof Base)[];
 
   static get descendants(): (typeof Base)[] {
