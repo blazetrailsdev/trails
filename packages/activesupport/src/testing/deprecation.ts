@@ -32,6 +32,9 @@ export async function assertNotDeprecated<T>(
   deprecator: Deprecation,
   block: () => T | Promise<T>,
 ): Promise<T> {
+  if (deprecator == null) {
+    throw new ArgumentError("wrong number of arguments (given 0, expected 1)");
+  }
   const [result, deprecations] = await collectDeprecations(deprecator, block);
   assert(
     deprecations.length === 0,
@@ -44,6 +47,9 @@ export async function collectDeprecations<T>(
   deprecator: Deprecation,
   block: () => T | Promise<T>,
 ): Promise<[T, string[]]> {
+  if (deprecator == null) {
+    throw new ArgumentError("wrong number of arguments (given 0, expected 1)");
+  }
   const oldBehavior = deprecator.behavior;
   const deprecations: string[] = [];
   deprecator.behavior = ((message: string) => {

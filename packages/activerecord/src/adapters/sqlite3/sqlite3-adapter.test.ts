@@ -19,7 +19,12 @@ import { QueryAttribute } from "../../relation/query-attribute.js";
 import { ValueType, IntegerType } from "@blazetrails/activemodel";
 import { assertLogged } from "./test-helper.js";
 import type { Column as SQLite3Column } from "../../connection-adapters/sqlite3/column.js";
-import { assertCalled, assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
+import {
+  assertCalled,
+  assertNothingRaised,
+  assertRaises,
+  capture,
+} from "@blazetrails/activesupport";
 import { newSqlitePool } from "../../support/pooled-sqlite-adapter.js";
 import { NullPool } from "../../connection-adapters/abstract/connection-pool.js";
 import { StatementInvalid, StatementTimeout } from "../../errors.js";
@@ -60,19 +65,6 @@ async function withFileConnection(
   } finally {
     await conn.disconnectBang();
   }
-}
-
-async function capture(fn: () => Promise<void>): Promise<string> {
-  let captured = "";
-  const warn = vi.spyOn(console, "warn").mockImplementation((...args: unknown[]) => {
-    captured += `${args.join(" ")}\n`;
-  });
-  try {
-    await fn();
-  } finally {
-    warn.mockRestore();
-  }
-  return captured;
 }
 
 async function rawConnectionOf(conn: BetterSQLite3Adapter): Promise<Database> {
@@ -561,14 +553,14 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   it("setting invalid pragma", async () => {
     // eslint-disable-next-line blazetrails/no-conditional-in-test -- mirrors Rails' `if in_memory_db?` (sqlite3_adapter_test.rb:404)
     if (inMemoryDb()) {
-      const warning = await capture(async () => {
+      const warning = await capture(":stderr", async () => {
         await withMemoryConnection({ pragmas: { invalid: true } }, async (conn) => {
           await conn.execute("PRAGMA foreign_keys");
         });
       });
       expect(warning).toMatch(/Unknown SQLite pragma: invalid/);
     } else {
-      const warning = await capture(async () => {
+      const warning = await capture(":stderr", async () => {
         await withFileConnection({ pragmas: { invalid: true } }, async (conn) => {
           await conn.execute("PRAGMA foreign_keys");
         });

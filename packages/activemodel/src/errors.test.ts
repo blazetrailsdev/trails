@@ -727,6 +727,6 @@ describe("ErrorsTest", () => {
     const errors = new Errors(new Person());
     errors.add("base");
 
-    expect(errors.inspect()).toBe(`#<ActiveModel::Errors [${errors.objects[0].inspect()}]>`);
+    expect(errors.inspect()).toBe(`#<ActiveModel::Errors [${errors.first()!.inspect()}]>`);
   });
 });
