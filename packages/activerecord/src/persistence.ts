@@ -9,8 +9,8 @@ import {
 import { Rational, basicObjRespondTo, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import type { CounterCacheCounters } from "./counter-cache.js";
-import { ArgumentError, AttributeMethods, SerializeCastValue } from "@blazetrails/activemodel";
-import { extractOptionsBang, runCallbacks } from "@blazetrails/activesupport";
+import { ArgumentError, AttributeMethods } from "@blazetrails/activemodel";
+import { extractOptionsBang, runCallbacks, transformKeys } from "@blazetrails/activesupport";
 import {
   InsertManager,
   UpdateManager,
@@ -18,13 +18,7 @@ import {
   Table as ArelTable,
   Nodes,
 } from "@blazetrails/arel";
-import {
-  ActiveRecordError,
-  ReadOnlyRecord,
-  RecordNotDestroyed,
-  RecordNotSaved,
-  UnknownAttributeError,
-} from "./errors.js";
+import { ActiveRecordError, ReadOnlyRecord, RecordNotDestroyed, RecordNotSaved } from "./errors.js";
 import { withConnection } from "./connection-handling.js";
 import * as LockingOptimistic from "./locking/optimistic.js";
 import {
@@ -42,7 +36,6 @@ import {
   RecordInvalid,
   type ValidationContextArg,
 } from "./validations.js";
-import { ScopeRegistry } from "./scoping.js";
 
 interface PersistenceHost {
   new (attrs?: Record<string, unknown>, block?: (record: any) => void): any;
@@ -568,36 +561,22 @@ export async function updateAttributeBang<T extends AttributeSingleSave>(
 }
 
 interface UpdateColumnsRecord {
+  isNewRecord(): boolean;
+  isDestroyed(): boolean;
   isReadonly(): boolean;
+  _raiseReadonlyRecordError(): never;
+  verifyReadonlyAttribute(name: string): void;
+  _queryConstraintsHash(): Record<string, unknown>;
+  clearAttributeChange(name: string): void;
   _attributes: {
-    fetchValue(name: string): unknown;
-    writeCastValue(name: string, value: unknown): void;
+    writeCastValue(name: string, value: unknown): unknown;
   };
-  id: unknown;
-  isPersisted(): boolean;
-  changesApplied(): void;
   constructor: {
-    name: string;
-    primaryKey: string | string[];
-    arelTable: InstanceType<typeof ArelTable>;
-    attributeTypes(): Record<string, unknown>;
-    _defaultAttributes(): {
-      isKey(name: string): boolean;
-      getAttribute(name: string): { value: unknown };
-    };
-    typeForAttribute(name: string): {
-      cast(v: unknown): unknown;
-      serialize?(v: unknown): unknown;
-      type?(): string;
-    };
-    _buildPkWhereNode(id: unknown): Parameters<UpdateManager["where"]>[0];
-    connection: {
-      update(arel: unknown, name?: string | null, binds?: unknown[]): Promise<number>;
-      quote?(value: unknown): string;
-      quoteColumnName?(name: string): string;
-      quoteTableName?(name: string): string;
-      toSql(arel: unknown): string;
-    };
+    attributeAliases: Record<string, string>;
+    _updateRecord(
+      values: Record<string, unknown>,
+      constraints: Record<string, unknown>,
+    ): Promise<number>;
   };
 }
 
@@ -613,88 +592,26 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
   this: T,
   attributes: Record<string, unknown>,
 ): Promise<boolean> {
-  if (this.isReadonly()) {
-    throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
-  }
-  if (!this.isPersisted()) {
-    throw new Error("Cannot update columns on a new or destroyed record");
-  }
+  if (this.isNewRecord()) throw new ActiveRecordError("cannot update a new record");
+  if (this.isDestroyed()) throw new ActiveRecordError("cannot update a destroyed record");
+  if (this.isReadonly()) this._raiseReadonlyRecordError();
 
-  if (Object.keys(attributes).length === 0) {
-    return true;
-  }
+  attributes = transformKeys(attributes, (key) => {
+    let name = String(key);
+    name = this.constructor.attributeAliases[name] || name;
+    this.verifyReadonlyAttribute(name);
+    return name;
+  });
 
-  const ctor = this.constructor;
-  const table = ctor.arelTable as unknown as InstanceType<typeof ArelTable> & {
-    get(name: string): unknown;
-  };
+  const updateConstraints = this._queryConstraintsHash();
+  attributes = Object.entries(attributes).reduce<Record<string, unknown>>((h, [k, v]) => {
+    h[k] = this._attributes.writeCastValue(k, v);
+    this.clearAttributeChange(k);
+    return h;
+  }, {});
 
-  const updateConstraints = _queryConstraintsHash.call(this as unknown as PersistencePrivateHost);
+  const affectedRows = await this.constructor._updateRecord(attributes, updateConstraints);
 
-  const pkCols = Array.isArray(ctor.primaryKey) ? ctor.primaryKey : [ctor.primaryKey];
-  const aliases: Record<string, string> =
-    (
-      ctor as unknown as {
-        attributeAliases?: Record<string, string>;
-      }
-    ).attributeAliases ?? {};
-  const resolvedEntries = Object.entries(attributes).map(
-    ([rawKey, value]) => [aliases[rawKey] ?? rawKey, value] as const,
-  );
-  for (const [key] of resolvedEntries) {
-    verifyReadonlyAttribute.call(this as unknown as PersistencePrivateHost, key);
-  }
-
-  const setPairs: Array<[unknown, unknown]> = [];
-  const updatedKeys: string[] = [];
-  const attributeTypes = ctor.attributeTypes();
-  for (const [k, v] of resolvedEntries) {
-    updatedKeys.push(k);
-    const known = Object.hasOwn(attributeTypes, k);
-    if (!known && !pkCols.includes(k)) {
-      throw new UnknownAttributeError(this, k);
-    }
-    const attrType = known ? ctor.typeForAttribute(k) : undefined;
-    const cast = attrType ? attrType.cast(v) : v;
-    this._attributes.writeCastValue(k, v);
-    const type = attrType as
-      | {
-          serializeCastValue(v: unknown): unknown;
-          serialize(v: unknown): unknown;
-          itselfIfSerializeCastValueCompatible?(): unknown;
-        }
-      | undefined;
-    const dbValue =
-      type && typeof type.serialize === "function"
-        ? SerializeCastValue.serialize(type, cast)
-        : cast;
-    setPairs.push([table.get(k), dbValue]);
-  }
-
-  const um = new UpdateManager();
-  um.table(table);
-  um.set(setPairs as Parameters<UpdateManager["set"]>[0]);
-  um.where(
-    (
-      ctor as unknown as {
-        _buildQueryConstraintsWhereNode(
-          c: Record<string, unknown>,
-        ): Parameters<UpdateManager["where"]>[0];
-      }
-    )._buildQueryConstraintsWhereNode(updateConstraints),
-  );
-  applyDefaultAndGlobalConstraints(um as never, ctor as never);
-
-  const affectedRows = await (ctor as unknown as typeof import("./base.js").Base).withConnection(
-    (c) => c.update(um, "Update Columns"),
-  );
-
-  const clearer = this as unknown as { clearAttributeChange?(name: string): void };
-  if (typeof clearer.clearAttributeChange === "function") {
-    for (const k of updatedKeys) clearer.clearAttributeChange(k);
-  } else {
-    this.changesApplied();
-  }
   return affectedRows === 1;
 }
 
@@ -971,7 +888,7 @@ export function destroyRow(this: PersistencePrivateHost): Promise<number> {
 
 /** @internal */
 export function _deleteRow(this: PersistencePrivateHost): Promise<number> {
-  return _deleteRecord.call(this.constructor as any, _queryConstraintsHash.call(this));
+  return (this.constructor as any)._deleteRecord((this as any)._queryConstraintsHash());
 }
 
 export async function touch(this: Base, ...names: TouchArgs): Promise<boolean> {
@@ -1028,10 +945,9 @@ export function _updateRow(
   attributeNames: string[],
   _attemptedAction = "update",
 ): Promise<number> {
-  return _updateRecord.call(
-    this.constructor as any,
+  return (this.constructor as any)._updateRecord(
     attributesWithValues.call(this as any, attributeNames),
-    _queryConstraintsHash.call(this),
+    (this as any)._queryConstraintsHash(),
   );
 }
 
@@ -1186,26 +1102,6 @@ function instantiateInstanceOf(
 /** @internal */
 function discriminateClassForRecord<T>(klass: T, _record: Record<string, unknown>): T {
   return klass;
-}
-
-/**
- * Append the default constraint and the global-current-scope WHERE clause
- * (if any) to an Arel UpdateManager or DeleteManager. Mirrors the constraint
- * stacking in Rails `persistence.rb` `_update_record` / `_delete_record`.
- * @internal
- * @noRailsEquivalent CONVERGEABLE the constraint stacking Ruby writes inline in _update_record / _delete_record (persistence.rb:263).
- */
-export function applyDefaultAndGlobalConstraints(
-  manager: { where(node: unknown): unknown },
-  ctor: object,
-): void {
-  const defaultConstraint = buildDefaultConstraint.call(ctor as any);
-  if (defaultConstraint != null) manager.where(defaultConstraint);
-  const globalScope = ScopeRegistry.globalCurrentScope(ctor);
-  if (globalScope) {
-    const ast = globalScope.whereClause?.ast;
-    if (ast != null) manager.where(ast);
-  }
 }
 
 /** @internal */

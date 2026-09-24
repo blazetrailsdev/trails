@@ -1496,9 +1496,7 @@ describe("PersistenceTest", () => {
 
   it("update column should raise exception if new record", async () => {
     const topic = new Topic();
-    await expect(topic.updateColumn("approved", false)).rejects.toThrow(
-      "Cannot update columns on a new or destroyed record",
-    );
+    await expect(topic.updateColumn("approved", false)).rejects.toThrow(ActiveRecordError);
   });
 
   it("update column should not leave the object dirty", async () => {
@@ -1526,9 +1524,7 @@ describe("PersistenceTest", () => {
 
   it("update columns should raise exception if new record", async () => {
     const topic = new Topic();
-    await expect(topic.updateColumns({ approved: false })).rejects.toThrow(
-      "Cannot update columns on a new or destroyed record",
-    );
+    await expect(topic.updateColumns({ approved: false })).rejects.toThrow(ActiveRecordError);
   });
 });
 describe("PersistenceTest", () => {

@@ -318,6 +318,10 @@ export class Null extends Attribute {
   withValueFromUser(_value: unknown): Attribute {
     throw new MissingAttributeError(`can't write unknown attribute \`${this.name ?? ""}\``);
   }
+
+  withCastValue(_value: unknown): Attribute {
+    throw new MissingAttributeError(`can't write unknown attribute \`${this.name ?? ""}\``);
+  }
 }
 
 export class Uninitialized extends Attribute {

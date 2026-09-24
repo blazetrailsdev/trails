@@ -5,7 +5,6 @@ import { StaleObjectError } from "../errors.js";
 import { ValueType } from "@blazetrails/activemodel";
 import { isWillSaveChangeToAttribute } from "../attribute-methods/dirty.js";
 import {
-  queryConstraintsList,
   incrementBang as persistenceIncrementBang,
   _updateRecord as persistenceUpdateRecord,
 } from "../persistence.js";
@@ -39,23 +38,6 @@ function toInt(value: unknown): number {
   if (value === null || value === undefined) return 0;
   const n = Number(value);
   return Number.isFinite(n) ? Math.trunc(n) : 0;
-}
-
-function buildBaseConstraints(
-  instance: InstanceLockingHost,
-  ctor: typeof Base,
-): Record<string, unknown> {
-  const constraintsList = queryConstraintsList.call(ctor as any);
-  if (!constraintsList) {
-    const pk = ctor.primaryKey as string;
-    return { [pk]: (instance as any).idInDatabase ?? (instance as any).id };
-  }
-  return Object.fromEntries(
-    constraintsList.map((col: string) => [
-      col,
-      (instance as any).attributeInDatabase?.(col) ?? instance.readAttribute(col),
-    ]),
-  );
 }
 
 const DEFAULT_LOCKING_COLUMN = "lock_version";
@@ -197,7 +179,7 @@ export async function _updateRow(
   const col = ctor.lockingColumn;
   const lockAttributeWas = this._attributes.getAttribute(col);
 
-  const updateConstraints = _queryConstraintsHash.call(this, buildBaseConstraints(this, ctor));
+  const updateConstraints = (this as any)._queryConstraintsHash();
 
   attributeNames = [...attributeNames, col];
 
@@ -263,12 +245,12 @@ export function initializeDup(
  */
 export function _queryConstraintsHash(
   this: InstanceLockingHost,
-  base: Record<string, unknown>,
+  superFn: () => Record<string, unknown>,
 ): Record<string, unknown> {
-  const ctor = this.constructor;
-  if (!ctor.lockingEnabled) return base;
-  const lockingColumn = ctor.lockingColumn;
-  return merge(base, { [lockingColumn]: _lockValueForDatabase.call(this, lockingColumn) });
+  if (!this.constructor.lockingEnabled) return superFn();
+
+  const lockingColumn = this.constructor.lockingColumn;
+  return merge(superFn(), { [lockingColumn]: _lockValueForDatabase.call(this, lockingColumn) });
 }
 
 /** @internal */
@@ -285,5 +267,4 @@ export const InstanceMethods = {
   incrementBang,
   _lockValueForDatabase,
   _clearLockingColumn,
-  _queryConstraintsHash,
 };

@@ -1833,7 +1833,7 @@ describe("AttributeMethodsTest", () => {
   it("write_attribute raises ActiveModel::MissingAttributeError when the attribute does not exist", async () => {
     const topic = (await CanonicalTopic.first()) as any;
     await expect(topic.updateColumns({ no_column_exists: "Hello!" })).rejects.toThrow(
-      UnknownAttributeError,
+      MissingAttributeError,
     );
     await expect(topic.update({ no_column_exists: "Hello!" })).rejects.toThrow(
       AMUnknownAttributeError,

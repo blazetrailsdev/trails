@@ -17,10 +17,10 @@ import { modelRegistry } from "./associations.js";
 import { TableNotSpecified } from "./errors.js";
 import { EncryptableRecord } from "./encryption/encryptable-record.js";
 import { NullColumn } from "./connection-adapters/column.js";
-import { connectionPool, withConnection, isConnected } from "./connection-handling.js";
+import { withConnection, isConnected } from "./connection-handling.js";
 
 function reflectionAdapter(klass: any): any {
-  const pool = connectionPool.call(klass);
+  const pool = klass.connectionPool();
   return pool.withConnectionSync((connection: any) => connection);
 }
 
@@ -246,7 +246,7 @@ export function cachedColumnsHash(klass: typeof Base): Record<string, ColumnLike
   };
   try {
     const hash = cachedFrom(
-      connectionPool.call(klass).activeConnection as { internalSchemaCache?: unknown } | null,
+      klass.connectionPool().activeConnection as { internalSchemaCache?: unknown } | null,
     );
     if (hash) return hash;
   } catch {}
@@ -450,7 +450,7 @@ function clearAdapterDataSourceCache(host: SchemaHost): void {
 function rewarmDataSourceCache(host: SchemaHost): PromiseLike<void> | void {
   let cache: { columns?: (t: string) => Promise<unknown> } | null | undefined;
   try {
-    cache = connectionPool.call(host as unknown as typeof Base).schemaCache as typeof cache;
+    cache = (host as unknown as typeof Base).connectionPool().schemaCache as typeof cache;
   } catch {
     return;
   }
@@ -471,7 +471,7 @@ function rewarmDataSourceCache(host: SchemaHost): PromiseLike<void> | void {
 export function resetColumnInformation(this: SchemaHost): PromiseLike<void> | void {
   try {
     void (
-      connectionPool.call(this as unknown as typeof Base).activeConnection as {
+      (this as unknown as typeof Base).connectionPool().activeConnection as {
         clearCacheBang?: () => unknown;
       } | null
     )?.clearCacheBang?.();
@@ -606,7 +606,7 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   let startingAdapter: SchemaHost["connection"] | undefined;
   try {
     startingAdapter =
-      connectionPool.call(this as unknown as typeof Base).activeConnection ?? undefined;
+      (this as unknown as typeof Base).connectionPool().activeConnection ?? undefined;
   } catch {
     startingAdapter = undefined;
   }
@@ -781,8 +781,8 @@ export function cachedTableExists(this: SchemaHost): boolean | undefined {
 
 export async function tableExists(this: SchemaHost): Promise<boolean> {
   return (
-    (await connectionPool
-      .call(this as unknown as typeof Base)
+    (await (this as unknown as typeof Base)
+      .connectionPool()
       .schemaCache.dataSourceExists(this.tableName)) ?? false
   );
 }

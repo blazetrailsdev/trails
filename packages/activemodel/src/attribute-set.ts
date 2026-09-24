@@ -111,8 +111,8 @@ export class AttributeSet {
     return value;
   }
 
-  writeCastValue(name: string, value: unknown): void {
-    this._attributes[name] = this.getAttribute(name).withCastValue(value);
+  writeCastValue(name: string, value: unknown): Attribute {
+    return (this._attributes[name] = this.getAttribute(name).withCastValue(value));
   }
 
   deepDup(): AttributeSet {
