@@ -9,7 +9,7 @@ import {
 } from "@blazetrails/activemodel";
 import { Array as OidArray } from "./connection-adapters/postgresql/oid/array.js";
 import { RangeType } from "./connection-adapters/postgresql/oid/range.js";
-import { BigDecimal, assertNotCalled } from "@blazetrails/activesupport";
+import { BigDecimal, TimeWithZone, assertNotCalled } from "@blazetrails/activesupport";
 import { DateTimeType } from "@blazetrails/activemodel";
 import { Temporal, Time } from "@blazetrails/date";
 import { TimeZoneConverter } from "./attribute-methods/time-zone-conversion.js";
@@ -17,7 +17,7 @@ import { TimeZoneConverter } from "./attribute-methods/time-zone-conversion.js";
 import { registerModel } from "./associations.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
 import { fixtures } from "./test-fixtures.js";
-import { inTimeZone } from "./cases/helper.js";
+import { withTimezoneConfig } from "./test-helper.js";
 import { adapterType } from "./test-adapter.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -180,24 +180,30 @@ describe("CustomPropertiesTest", () => {
   });
 
   it("time zone aware attribute", async () => {
-    await inTimeZone("Pacific Time (US & Canada)", async () => {
-      class WithTimes extends OverloadedType {
-        static {
-          this.attribute("starts_at", "datetime", { default: () => new Date() });
-          this.attribute("ends_at", "datetime", { default: () => new Date() });
+    await withTimezoneConfig(
+      { awareAttributes: true, zone: "Pacific Time (US & Canada)" },
+      async () => {
+        class WithTimes extends OverloadedType {
+          static {
+            this.attribute("starts_at", "datetime", {
+              precision: 3,
+              default: () => Temporal.Now.instant(),
+            });
+            this.attribute("ends_at", { default: () => Temporal.Now.instant() });
+          }
         }
-      }
 
-      const startsAtType = WithTimes.typeForAttribute("starts_at")!;
-      const endsAtType = WithTimes.typeForAttribute("ends_at")!;
+        const startsAtType = WithTimes.typeForAttribute("starts_at")!;
+        const endsAtType = WithTimes.typeForAttribute("ends_at")!;
 
-      expect(startsAtType).toBeInstanceOf(TimeZoneConverter);
-      expect(endsAtType).toBeInstanceOf(TimeZoneConverter);
-      expect((startsAtType as TimeZoneConverter).__getobj__()).toBeInstanceOf(DateTimeType);
-      expect((endsAtType as TimeZoneConverter).__getobj__()).toBeInstanceOf(DateTimeType);
-      expect((new WithTimes() as any).starts_at).toBeInstanceOf(Time);
-      expect((new WithTimes() as any).ends_at).toBeInstanceOf(Time);
-    });
+        expect(startsAtType).toBeInstanceOf(TimeZoneConverter);
+        expect(endsAtType).toBeInstanceOf(TimeZoneConverter);
+        expect((startsAtType as TimeZoneConverter).__getobj__()).toBeInstanceOf(DateTimeType);
+        expect((endsAtType as TimeZoneConverter).__getobj__()).toBeInstanceOf(DateTimeType);
+        expect((new WithTimes() as any).starts_at).toBeInstanceOf(TimeWithZone);
+        expect((new WithTimes() as any).ends_at).toBeInstanceOf(TimeWithZone);
+      },
+    );
   });
 
   it("nonexistent attribute", () => {

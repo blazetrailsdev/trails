@@ -122,6 +122,30 @@ class FakeLogger extends CustomLogger {
 }
 
 class KwargsAcceptingLogger extends CustomLogger {
+  override debug(message: unknown, kwargs: unknown = {}): void {
+    this.add(Logger.DEBUG, `${inspect(kwargs)} ${message}`);
+  }
+
+  override info(message: unknown, kwargs: unknown = {}): void {
+    this.add(Logger.INFO, `${inspect(kwargs)} ${message}`);
+  }
+
+  override warn(message: unknown, kwargs: unknown = {}): void {
+    this.add(Logger.WARN, `${inspect(kwargs)} ${message}`);
+  }
+
+  override error(message: unknown, kwargs: unknown = {}): void {
+    this.add(Logger.ERROR, `${inspect(kwargs)} ${message}`);
+  }
+
+  override fatal(message: unknown, kwargs: unknown = {}): void {
+    this.add(Logger.FATAL, `${inspect(kwargs)} ${message}`);
+  }
+
+  override unknown(message: unknown, kwargs: unknown = {}): void {
+    this.add(Logger.UNKNOWN, `${inspect(kwargs)} ${message}`);
+  }
+
   override add(severity: number, message: unknown = null, kwargs: unknown = null): void {
     if (kwargs != null && typeof kwargs === "object") {
       return super.add(severity, `${inspect(kwargs)} ${message}`);
@@ -399,29 +423,25 @@ describe("BroadcastLoggerTest", () => {
     expect(() => (logger as any).nonExisting()).toThrow();
   });
 
-  it.skip("calling a method when *one* logger in the broadcast has implemented it", () => {
-    // BLOCKED: broadcast-logger-method-missing-dup-and-kwargs
+  it("calling a method when *one* logger in the broadcast has implemented it", () => {
     const logger = new BroadcastLogger(asLogger(new CustomLogger()));
 
     expect((logger as any).foo()).toBeTruthy();
   });
 
-  it.skip("calling a method when *multiple* loggers in the broadcast have implemented it", () => {
-    // BLOCKED: broadcast-logger-method-missing-dup-and-kwargs
+  it("calling a method when *multiple* loggers in the broadcast have implemented it", () => {
     const logger = new BroadcastLogger(asLogger(new CustomLogger()), asLogger(new CustomLogger()));
 
     expect((logger as any).foo()).toEqual([true, true]);
   });
 
-  it.skip("calling a method when a subset of loggers in the broadcast have implemented", () => {
-    // BLOCKED: broadcast-logger-method-missing-dup-and-kwargs
+  it("calling a method when a subset of loggers in the broadcast have implemented", () => {
     const logger = new BroadcastLogger(asLogger(new CustomLogger()), asLogger(new FakeLogger()));
 
     expect((logger as any).foo()).toBeTruthy();
   });
 
-  it.skip("calling a method that accepts a block", () => {
-    // BLOCKED: broadcast-logger-method-missing-dup-and-kwargs
+  it("calling a method that accepts a block", () => {
     const logger = new BroadcastLogger(asLogger(new CustomLogger()));
 
     let called = false;
@@ -431,22 +451,19 @@ describe("BroadcastLoggerTest", () => {
     expect(called).toBeTruthy();
   });
 
-  it.skip("calling a method that accepts args", () => {
-    // BLOCKED: broadcast-logger-method-missing-dup-and-kwargs
+  it("calling a method that accepts args", () => {
     const logger = new BroadcastLogger(asLogger(new CustomLogger()));
 
     expect((logger as any).baz("foo")).toBeTruthy();
   });
 
-  it.skip("calling a method that accepts kwargs", () => {
-    // BLOCKED: broadcast-logger-method-missing-dup-and-kwargs
+  it("calling a method that accepts kwargs", () => {
     const logger = new BroadcastLogger(asLogger(new CustomLogger()));
 
     expect((logger as any).qux({ param: "foo" })).toBeTruthy();
   });
 
-  it.skip("#dup duplicates the broadcasts", () => {
-    // BLOCKED: broadcast-logger-method-missing-dup-and-kwargs
+  it("#dup duplicates the broadcasts", () => {
     const logger = new CustomLogger();
     logger.level = Logger.WARN;
     const broadcastLogger = new BroadcastLogger(asLogger(logger));
@@ -463,8 +480,7 @@ describe("BroadcastLoggerTest", () => {
     expect(logger.error("Hello")).toBe(true);
   });
 
-  it.skip("# delegates keyword arguments to loggers", () => {
-    // BLOCKED: broadcast-logger-method-missing-dup-and-kwargs
+  it("# delegates keyword arguments to loggers", () => {
     for (const [method, level] of SEVERITIES) {
       const logger = new BroadcastLogger(asLogger(new KwargsAcceptingLogger()));
 

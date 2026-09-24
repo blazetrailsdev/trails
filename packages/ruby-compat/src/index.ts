@@ -98,6 +98,7 @@ export { BigDecimal, toD } from "./big-decimal.js";
 export { registerHttpAdapter, getHttpAsync, httpAdapterConfig } from "./http-adapter.js";
 export type { HttpAdapter, HttpRequest, HttpResponse, HttpServer } from "./http-adapter.js";
 export { registerOsAdapter, getOs, getOsAsync, osAdapterConfig } from "./os-adapter.js";
+export { Gem } from "./gem.js";
 export { RbConfig } from "./rb-config.js";
 export {
   registerZlibAdapter,

@@ -1,67 +1,57 @@
 import { beforeEach, describe, it, expect } from "vitest";
+import { Gem, RbConfig } from "@blazetrails/ruby-compat";
 import { assertEmpty } from "./testing/assertions.js";
 
 import { BacktraceCleaner } from "./backtrace-cleaner.js";
 
 describe("BacktraceCleanerDefaultFilterAndSilencerTest", () => {
-  function makeBacktraceCleaner() {
-    const filters: Array<(line: string) => string> = [];
-    const silencers: Array<(line: string) => boolean> = [];
-    return {
-      addFilter(fn: (line: string) => string) {
-        filters.push(fn);
-      },
-      addSilencer(fn: (line: string) => boolean) {
-        silencers.push(fn);
-      },
-      clean(lines: string[]): string[] {
-        return lines
-          .map((line) => filters.reduce((l, f) => f(l), line))
-          .filter((line) => !silencers.some((s) => s(line)));
-      },
-    };
-  }
+  let bc: BacktraceCleaner;
+
+  beforeEach(() => {
+    bc = new BacktraceCleaner();
+  });
 
   it("should format installed gems correctly", () => {
-    const cleaner = makeBacktraceCleaner();
-    cleaner.addFilter((line) => line.replace("/gems/some-gem-1.0/lib/", "[gem] "));
-    const bt = ["/gems/some-gem-1.0/lib/foo.rb:10"];
-    expect(cleaner.clean(bt)).toEqual(["[gem] foo.rb:10"]);
+    const backtrace = [`${Gem.defaultDir}/gems/nosuchgem-1.2.3/lib/foo.rb`];
+    const result = bc.clean(backtrace, "all");
+    expect(result[0]).toEqual("nosuchgem (1.2.3) lib/foo.rb");
   });
 
   it("should format installed gems not in Gem.default_dir correctly", () => {
-    const cleaner = makeBacktraceCleaner();
-    cleaner.addFilter((line) => line.replace(/\/path\/to\/gems\/[^/]+\//, ""));
-    const bt = ["/path/to/gems/mygem-2.0/lib/mygem.rb"];
-    expect(cleaner.clean(bt)).toEqual(["lib/mygem.rb"]);
+    const targetDir = Gem.path.find((p) => p !== Gem.defaultDir);
+    // eslint-disable-next-line vitest/no-conditional-in-test -- mirrors Rails' `if target_dir` (backtrace_cleaner_test.rb:106)
+    if (targetDir) {
+      const backtrace = [`${targetDir}/gems/nosuchgem-1.2.3/lib/foo.rb`];
+      const result = bc.clean(backtrace, "all");
+      // eslint-disable-next-line vitest/no-conditional-expect
+      expect(result[0]).toEqual("nosuchgem (1.2.3) lib/foo.rb");
+    }
   });
 
   it("should format gems installed by bundler", () => {
-    const cleaner = makeBacktraceCleaner();
-    cleaner.addFilter((line) => line.replace(/\/bundler\/gems\/[^/]+\//, ""));
-    const bt = ["/bundler/gems/foo-abc123/lib/foo.rb"];
-    expect(cleaner.clean(bt)).toEqual(["lib/foo.rb"]);
+    const backtrace = [`${Gem.defaultDir}/bundler/gems/nosuchgem-1.2.3/lib/foo.rb`];
+    const result = bc.clean(backtrace, "all");
+    expect(result[0]).toEqual("nosuchgem (1.2.3) lib/foo.rb");
   });
 
-  it.skip("should silence gems from the backtrace", () => {
-    // BLOCKED: backtrace-cleaner-has-no-default-gem-and-stdlib-silencers
-    const backtrace = ["/gems/nosuchgem-1.2.3/lib/foo.rb"];
-    const result = new BacktraceCleaner().clean(backtrace);
+  it("should silence gems from the backtrace", () => {
+    const backtrace = [`${Gem.path[0]}/gems/nosuchgem-1.2.3/lib/foo.rb`];
+    const result = bc.clean(backtrace);
     assertEmpty(result);
   });
 
-  it.skip("should silence stdlib", () => {
-    // BLOCKED: backtrace-cleaner-has-no-default-gem-and-stdlib-silencers
-    const backtrace = ["/lib/foo.rb"];
-    const result = new BacktraceCleaner().clean(backtrace);
+  it("should silence stdlib", () => {
+    const backtrace = [`${RbConfig.CONFIG["rubylibdir"]}/lib/foo.rb`];
+    const result = bc.clean(backtrace);
     assertEmpty(result);
   });
 
   it("should preserve lines that have a subpath matching a gem path", () => {
-    const cleaner = makeBacktraceCleaner();
-    cleaner.addSilencer((line) => /\/gems\/[^/]+\//.test(line) && !line.startsWith("/app/"));
-    const bt = ["/gems/rack-1.0/lib/rack.rb", "/app/lib/uses_gems/code.rb"];
-    expect(cleaner.clean(bt)).toEqual(["/app/lib/uses_gems/code.rb"]);
+    const backtrace = [Gem.defaultDir, ...Gem.path].map(
+      (path) => `/parent${path}/gems/nosuchgem-1.2.3/lib/foo.rb`,
+    );
+
+    expect(bc.clean(backtrace)).toEqual(backtrace);
   });
 });
 

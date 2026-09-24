@@ -1,3 +1,5 @@
+import { Gem, RbConfig, regexpEscape } from "@blazetrails/ruby-compat";
+
 type LineFilter = (line: string) => string;
 type LineSilencer = (line: string) => boolean;
 
@@ -6,6 +8,13 @@ export type CleanKind = "silent" | "noise" | "all";
 export class BacktraceCleaner {
   protected _filters: LineFilter[] = [];
   protected _silencers: LineSilencer[] = [];
+
+  constructor() {
+    this.addCoreSilencer();
+    this.addGemFilter();
+    this.addGemSilencer();
+    this.addStdlibSilencer();
+  }
 
   addFilter(filter: LineFilter): this {
     this._filters.push(filter);
@@ -55,6 +64,36 @@ export class BacktraceCleaner {
       default:
         return frame;
     }
+  }
+
+  /** @internal */
+  static readonly FORMATTED_GEMS_PATTERN = /^[^/]+ \([\w.]+\) /;
+
+  /** @internal */
+  private addGemFilter(): void {
+    const gemsPaths = [...new Set([...Gem.path, Gem.defaultDir])].map((p) => regexpEscape(p));
+    if (gemsPaths.length === 0) return;
+
+    const gemsRegexp = new RegExp(
+      `^(${gemsPaths.join("|")})/(bundler/)?gems/([^/]+)-([\\w.]+)/(.*)`,
+    );
+    const gemsResult = "$3 ($4) $5";
+    this.addFilter((line) => line.replace(gemsRegexp, gemsResult));
+  }
+
+  /** @internal */
+  private addCoreSilencer(): void {
+    this.addSilencer((line) => line.includes("<internal:"));
+  }
+
+  /** @internal */
+  private addGemSilencer(): void {
+    this.addSilencer((line) => BacktraceCleaner.FORMATTED_GEMS_PATTERN.test(line));
+  }
+
+  /** @internal */
+  private addStdlibSilencer(): void {
+    this.addSilencer((line) => line.startsWith(RbConfig.CONFIG["rubylibdir"]));
   }
 
   protected filterBacktrace(backtrace: string[]): string[] {

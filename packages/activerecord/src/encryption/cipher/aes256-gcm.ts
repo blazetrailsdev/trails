@@ -1,4 +1,4 @@
-import { Cipher, OpenSSL, type Bytes } from "@blazetrails/ruby-compat";
+import { Cipher, OpenSSL, rbAnyToS, type Bytes } from "@blazetrails/ruby-compat";
 import { Encryption } from "../../namespaces.js";
 import { Configuration, Decryption, EncryptedContentIntegrity } from "../errors.js";
 import { Message } from "../message.js";
@@ -35,7 +35,7 @@ export class Aes256Gcm {
 
   /** @noRailsEquivalent PERMANENT */
   [Symbol.for("nodejs.util.inspect.custom")](): string {
-    return `Cipher {}`;
+    return this.inspect();
   }
 
   encrypt(clearText: string | Bytes): Message {
@@ -83,6 +83,10 @@ export class Aes256Gcm {
     } catch {
       throw new Decryption("The provided key could not decrypt the data");
     }
+  }
+
+  inspect(): string {
+    return `#<ActiveRecord::Encryption::Cipher::Aes256Gcm:${rbAnyToS(this).split(":")[1]}`;
   }
 
   private _validateKeyLength(key: Bytes): void {

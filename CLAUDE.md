@@ -1257,7 +1257,7 @@ the capability, in a different place. Each is its own `SKIP_GROUPS` entry in
 | `relation/delegation.rb`                              | named method, no trap |
 | `active_record/test_fixtures.rb`                      | nothing               |
 | `active_support/array_inquirer.rb`                    | Proxy                 |
-| `active_support/broadcast_logger.rb`                  | nothing               |
+| `active_support/broadcast_logger.rb`                  | Proxy                 |
 | `core_ext/module/delegation.rb`                       | nothing (no file)     |
 | `active_support/current_attributes.rb`                | nothing               |
 | `active_support/delegation.rb`                        | Proxy                 |

@@ -64,3 +64,26 @@ describe("initialize_dup ensure_proper_type", () => {
     expect(duped.readAttribute("type")).toBe("Client");
   });
 });
+
+describe("becomes! inheritance column writer", () => {
+  fixtures([]);
+
+  it("assigns the sti type through the inheritance column writer", () => {
+    const written: unknown[] = [];
+    class WriterClient extends Client {}
+    Object.defineProperty(WriterClient.prototype, "type", {
+      get(this: Client) {
+        return this.readAttribute("type");
+      },
+      set(this: Client, value: unknown) {
+        written.push(value);
+        this.writeAttribute("type", value);
+      },
+    });
+
+    const became = new Client({}).becomesBang(WriterClient);
+
+    expect(written).toEqual(["WriterClient"]);
+    expect(became.type).toBe("WriterClient");
+  });
+});

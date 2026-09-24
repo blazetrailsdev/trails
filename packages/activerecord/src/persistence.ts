@@ -33,7 +33,7 @@ import {
   attributesWithValues,
 } from "./attribute-methods.js";
 import * as Inheritance from "./inheritance.js";
-import { getStiBase, isStiSubclass, stiName } from "./inheritance.js";
+import { getStiBase, isStiSubclass } from "./inheritance.js";
 import { withTransactionReturningStatus } from "./transactions.js";
 import { registry } from "./suppressor.js";
 import {
@@ -822,17 +822,13 @@ export function becomesBang<
   T extends BecomesRecord & { becomes: typeof becomes },
   K extends typeof import("./base.js").Base,
 >(this: T, klass: K): InstanceType<K> {
-  const instance = this.becomes(klass);
-  const base = getStiBase(klass);
-  const inheritanceCol = base.inheritanceColumn;
-  if (inheritanceCol) {
-    const value = klass.isDescendsFromActiveRecord() ? null : stiName(klass);
-    (instance as unknown as { writeAttribute(name: string, value: unknown): void }).writeAttribute(
-      inheritanceCol,
-      value,
-    );
+  const became = this.becomes(klass);
+  let stiType: string | null = null;
+  if (!klass.isDescendsFromActiveRecord()) {
+    stiType = klass.stiName();
   }
-  return instance;
+  (became as unknown as Record<string, unknown>)[klass.inheritanceColumn!] = stiType;
+  return became;
 }
 
 interface PersistencePrivateHost {

@@ -36,7 +36,7 @@ export abstract class Attribute {
   private _value: unknown;
   private _hasValue: boolean;
   private _cachedValueForDatabase: unknown;
-  private _hasValueForDatabase: boolean;
+  protected _hasValueForDatabase: boolean;
 
   static fromDatabase(
     name: string,
@@ -253,8 +253,11 @@ export class FromDatabase extends Attribute {
   }
 
   override forgettingAssignment(): Attribute {
-    if (!this.changedInPlace()) return this;
-    return super.forgettingAssignment();
+    if (!this._hasValueForDatabase && !this.changedInPlace()) {
+      return this.withValueFromDatabase(this.valueBeforeTypeCast);
+    } else {
+      return super.forgettingAssignment();
+    }
   }
 
   /** @internal */
