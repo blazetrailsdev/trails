@@ -189,7 +189,6 @@ export default defineConfig(
     },
   },
   {
-    // pnpm loads the pnpmfile as CommonJS.
     files: [".pnpmfile.cjs"],
     languageOptions: { sourceType: "commonjs", globals: { module: "writable" } },
   },

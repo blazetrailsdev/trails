@@ -105,7 +105,7 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-pnpmfileChecksum: sha256-Ibe2XXSBdqaJq7CVZR8BDi0sB908hxdKiivG2lBeG9w=
+pnpmfileChecksum: sha256-EACzOAZ8KIvlbDoAaXwCp4CnVEeQObMBvHdBIfMnaqI=
 
 importers:
 
@@ -10039,8 +10039,7 @@ snapshots:
 
   fs.realpath@1.0.0: {}
 
-  fsevents@2.3.2:
-    optional: true
+  fsevents@2.3.2: {}
 
   fsevents@2.3.3:
     optional: true
