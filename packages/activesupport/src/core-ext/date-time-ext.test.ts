@@ -290,13 +290,13 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("end of month", () => {
-    expect(endOfMonth(DateTime.civil(2005, 3, 20, 10, 10, 10)).toString()).toBe(
+    expect(endOfMonth.call(DateTime.civil(2005, 3, 20, 10, 10, 10)).toString()).toBe(
       DateTime.civil(2005, 3, 31, 23, 59, END_OF_PERIOD_SEC).toString(),
     );
-    expect(endOfMonth(DateTime.civil(2005, 2, 20, 10, 10, 10)).toString()).toBe(
+    expect(endOfMonth.call(DateTime.civil(2005, 2, 20, 10, 10, 10)).toString()).toBe(
       DateTime.civil(2005, 2, 28, 23, 59, END_OF_PERIOD_SEC).toString(),
     );
-    expect(endOfMonth(DateTime.civil(2005, 4, 20, 10, 10, 10)).toString()).toBe(
+    expect(endOfMonth.call(DateTime.civil(2005, 4, 20, 10, 10, 10)).toString()).toBe(
       DateTime.civil(2005, 4, 30, 23, 59, END_OF_PERIOD_SEC).toString(),
     );
   });
@@ -369,31 +369,31 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("last week", () => {
-    expect(lastWeek(DateTime.civil(2005, 3, 1, 15, 15, 10)).toString()).toBe(
+    expect(lastWeek.call(DateTime.civil(2005, 3, 1, 15, 15, 10)).toString()).toBe(
       DateTime.civil(2005, 2, 21).toString(),
     );
-    expect(lastWeek(DateTime.civil(2005, 3, 1, 15, 15, 10), ":tuesday").toString()).toBe(
+    expect(lastWeek.call(DateTime.civil(2005, 3, 1, 15, 15, 10), ":tuesday").toString()).toBe(
       DateTime.civil(2005, 2, 22).toString(),
     );
-    expect(lastWeek(DateTime.civil(2005, 3, 1, 15, 15, 10), ":friday").toString()).toBe(
+    expect(lastWeek.call(DateTime.civil(2005, 3, 1, 15, 15, 10), ":friday").toString()).toBe(
       DateTime.civil(2005, 2, 25).toString(),
     );
-    expect(lastWeek(DateTime.civil(2006, 11, 6, 0, 0, 0)).toString()).toBe(
+    expect(lastWeek.call(DateTime.civil(2006, 11, 6, 0, 0, 0)).toString()).toBe(
       DateTime.civil(2006, 10, 30).toString(),
     );
-    expect(lastWeek(DateTime.civil(2006, 11, 23, 0, 0, 0), ":wednesday").toString()).toBe(
+    expect(lastWeek.call(DateTime.civil(2006, 11, 23, 0, 0, 0), ":wednesday").toString()).toBe(
       DateTime.civil(2006, 11, 15).toString(),
     );
   });
 
   it("date time should have correct last week for leap year", () => {
-    expect(lastWeek(DateTime.civil(2016, 3, 7)).toString()).toBe(
+    expect(lastWeek.call(DateTime.civil(2016, 3, 7)).toString()).toBe(
       DateTime.civil(2016, 2, 29).toString(),
     );
   });
 
   it("last quarter on 31st", () => {
-    expect(lastQuarter(DateTime.civil(2004, 5, 31)).toString()).toBe(
+    expect(lastQuarter.call(DateTime.civil(2004, 5, 31)).toString()).toBe(
       DateTime.civil(2004, 2, 29).toString(),
     );
   });
@@ -421,137 +421,141 @@ describe("DateTimeExtCalculationsTest", () => {
 
   it("today with offset", () => {
     withDateCurrent(new Temporal.PlainDate(2000, 1, 1), () => {
-      expect(isToday(DateTime.civil(1999, 12, 31, 23, 59, 59, new Rational(-18000, 86400)))).toBe(
-        false,
-      );
-      expect(isToday(DateTime.civil(2000, 1, 1, 0, 0, 0, new Rational(-18000, 86400)))).toBe(true);
-      expect(isToday(DateTime.civil(2000, 1, 1, 23, 59, 59, new Rational(-18000, 86400)))).toBe(
+      expect(
+        isToday.call(DateTime.civil(1999, 12, 31, 23, 59, 59, new Rational(-18000, 86400))),
+      ).toBe(false);
+      expect(isToday.call(DateTime.civil(2000, 1, 1, 0, 0, 0, new Rational(-18000, 86400)))).toBe(
         true,
       );
-      expect(isToday(DateTime.civil(2000, 1, 2, 0, 0, 0, new Rational(-18000, 86400)))).toBe(false);
+      expect(
+        isToday.call(DateTime.civil(2000, 1, 1, 23, 59, 59, new Rational(-18000, 86400))),
+      ).toBe(true);
+      expect(isToday.call(DateTime.civil(2000, 1, 2, 0, 0, 0, new Rational(-18000, 86400)))).toBe(
+        false,
+      );
     });
   });
 
   it("today without offset", () => {
     withDateCurrent(new Temporal.PlainDate(2000, 1, 1), () => {
-      expect(isToday(DateTime.civil(1999, 12, 31, 23, 59, 59))).toBe(false);
-      expect(isToday(DateTime.civil(2000, 1, 1, 0))).toBe(true);
-      expect(isToday(DateTime.civil(2000, 1, 1, 23, 59, 59))).toBe(true);
-      expect(isToday(DateTime.civil(2000, 1, 2, 0))).toBe(false);
+      expect(isToday.call(DateTime.civil(1999, 12, 31, 23, 59, 59))).toBe(false);
+      expect(isToday.call(DateTime.civil(2000, 1, 1, 0))).toBe(true);
+      expect(isToday.call(DateTime.civil(2000, 1, 1, 23, 59, 59))).toBe(true);
+      expect(isToday.call(DateTime.civil(2000, 1, 2, 0))).toBe(false);
     });
   });
 
   it("yesterday with offset", () => {
     withDateCurrent(new Temporal.PlainDate(2000, 1, 1), () => {
       expect(
-        isYesterday(DateTime.civil(1999, 12, 31, 23, 59, 59, new Rational(-18000, 86400))),
+        isYesterday.call(DateTime.civil(1999, 12, 31, 23, 59, 59, new Rational(-18000, 86400))),
       ).toBe(true);
-      expect(isYesterday(DateTime.civil(2000, 1, 1, 0, 0, 0, new Rational(-18000, 86400)))).toBe(
-        false,
-      );
-      expect(isYesterday(DateTime.civil(2000, 1, 1, 23, 59, 59, new Rational(-18000, 86400)))).toBe(
-        false,
-      );
-      expect(isYesterday(DateTime.civil(1999, 12, 31, 0, 0, 0, new Rational(-18000, 86400)))).toBe(
-        true,
-      );
+      expect(
+        isYesterday.call(DateTime.civil(2000, 1, 1, 0, 0, 0, new Rational(-18000, 86400))),
+      ).toBe(false);
+      expect(
+        isYesterday.call(DateTime.civil(2000, 1, 1, 23, 59, 59, new Rational(-18000, 86400))),
+      ).toBe(false);
+      expect(
+        isYesterday.call(DateTime.civil(1999, 12, 31, 0, 0, 0, new Rational(-18000, 86400))),
+      ).toBe(true);
     });
   });
 
   it("yesterday without offset", () => {
     withDateCurrent(new Temporal.PlainDate(2000, 1, 1), () => {
-      expect(isYesterday(DateTime.civil(1999, 12, 31, 23, 59, 59))).toBe(true);
-      expect(isYesterday(DateTime.civil(2000, 1, 1, 0))).toBe(false);
-      expect(isYesterday(DateTime.civil(2000, 1, 1, 23, 59, 59))).toBe(false);
-      expect(isYesterday(DateTime.civil(2000, 1, 2, 0))).toBe(false);
+      expect(isYesterday.call(DateTime.civil(1999, 12, 31, 23, 59, 59))).toBe(true);
+      expect(isYesterday.call(DateTime.civil(2000, 1, 1, 0))).toBe(false);
+      expect(isYesterday.call(DateTime.civil(2000, 1, 1, 23, 59, 59))).toBe(false);
+      expect(isYesterday.call(DateTime.civil(2000, 1, 2, 0))).toBe(false);
     });
   });
 
   it("prev day without offset", () => {
     withDateCurrent(new Temporal.PlainDate(2000, 1, 1), () => {
-      expect(isPrevDay(DateTime.civil(1999, 12, 31, 23, 59, 59))).toBe(true);
-      expect(isPrevDay(DateTime.civil(2000, 1, 1, 0))).toBe(false);
-      expect(isPrevDay(DateTime.civil(2000, 1, 1, 23, 59, 59))).toBe(false);
-      expect(isPrevDay(DateTime.civil(2000, 1, 2, 0))).toBe(false);
+      expect(isPrevDay.call(DateTime.civil(1999, 12, 31, 23, 59, 59))).toBe(true);
+      expect(isPrevDay.call(DateTime.civil(2000, 1, 1, 0))).toBe(false);
+      expect(isPrevDay.call(DateTime.civil(2000, 1, 1, 23, 59, 59))).toBe(false);
+      expect(isPrevDay.call(DateTime.civil(2000, 1, 2, 0))).toBe(false);
     });
   });
 
   it("tomorrow with offset", () => {
     withDateCurrent(new Temporal.PlainDate(2000, 1, 1), () => {
       expect(
-        isTomorrow(DateTime.civil(1999, 12, 31, 23, 59, 59, new Rational(-18000, 86400))),
+        isTomorrow.call(DateTime.civil(1999, 12, 31, 23, 59, 59, new Rational(-18000, 86400))),
       ).toBe(false);
-      expect(isTomorrow(DateTime.civil(2000, 1, 2, 0, 0, 0, new Rational(-18000, 86400)))).toBe(
-        true,
-      );
-      expect(isTomorrow(DateTime.civil(2000, 1, 1, 23, 59, 59, new Rational(-18000, 86400)))).toBe(
-        false,
-      );
-      expect(isTomorrow(DateTime.civil(2000, 1, 2, 23, 59, 59, new Rational(-18000, 86400)))).toBe(
-        true,
-      );
+      expect(
+        isTomorrow.call(DateTime.civil(2000, 1, 2, 0, 0, 0, new Rational(-18000, 86400))),
+      ).toBe(true);
+      expect(
+        isTomorrow.call(DateTime.civil(2000, 1, 1, 23, 59, 59, new Rational(-18000, 86400))),
+      ).toBe(false);
+      expect(
+        isTomorrow.call(DateTime.civil(2000, 1, 2, 23, 59, 59, new Rational(-18000, 86400))),
+      ).toBe(true);
     });
   });
 
   it("tomorrow without offset", () => {
     withDateCurrent(new Temporal.PlainDate(2000, 1, 1), () => {
-      expect(isTomorrow(DateTime.civil(1999, 12, 31, 23, 59, 59))).toBe(false);
-      expect(isTomorrow(DateTime.civil(2000, 1, 2, 0))).toBe(true);
-      expect(isTomorrow(DateTime.civil(2000, 1, 1, 23, 59, 59))).toBe(false);
-      expect(isTomorrow(DateTime.civil(2000, 1, 3, 0))).toBe(false);
+      expect(isTomorrow.call(DateTime.civil(1999, 12, 31, 23, 59, 59))).toBe(false);
+      expect(isTomorrow.call(DateTime.civil(2000, 1, 2, 0))).toBe(true);
+      expect(isTomorrow.call(DateTime.civil(2000, 1, 1, 23, 59, 59))).toBe(false);
+      expect(isTomorrow.call(DateTime.civil(2000, 1, 3, 0))).toBe(false);
     });
   });
 
   it("next day without offset", () => {
     withDateCurrent(new Temporal.PlainDate(2000, 1, 1), () => {
-      expect(isNextDay(DateTime.civil(1999, 12, 31, 23, 59, 59))).toBe(false);
-      expect(isNextDay(DateTime.civil(2000, 1, 2, 0))).toBe(true);
-      expect(isNextDay(DateTime.civil(2000, 1, 1, 23, 59, 59))).toBe(false);
-      expect(isNextDay(DateTime.civil(2000, 1, 3, 0))).toBe(false);
+      expect(isNextDay.call(DateTime.civil(1999, 12, 31, 23, 59, 59))).toBe(false);
+      expect(isNextDay.call(DateTime.civil(2000, 1, 2, 0))).toBe(true);
+      expect(isNextDay.call(DateTime.civil(2000, 1, 1, 23, 59, 59))).toBe(false);
+      expect(isNextDay.call(DateTime.civil(2000, 1, 3, 0))).toBe(false);
     });
   });
 
   it("past with offset", () => {
     withFrozen(DateTime.civil(2005, 2, 10, 15, 30, 45, new Rational(-18000, 86400)), () => {
-      expect(isPast(DateTime.civil(2005, 2, 10, 15, 30, 44, new Rational(-18000, 86400)))).toBe(
-        true,
-      );
-      expect(isPast(DateTime.civil(2005, 2, 10, 15, 30, 45, new Rational(-18000, 86400)))).toBe(
-        false,
-      );
-      expect(isPast(DateTime.civil(2005, 2, 10, 15, 30, 46, new Rational(-18000, 86400)))).toBe(
-        false,
-      );
+      expect(
+        isPast.call(DateTime.civil(2005, 2, 10, 15, 30, 44, new Rational(-18000, 86400))),
+      ).toBe(true);
+      expect(
+        isPast.call(DateTime.civil(2005, 2, 10, 15, 30, 45, new Rational(-18000, 86400))),
+      ).toBe(false);
+      expect(
+        isPast.call(DateTime.civil(2005, 2, 10, 15, 30, 46, new Rational(-18000, 86400))),
+      ).toBe(false);
     });
   });
 
   it("past without offset", () => {
     withFrozen(DateTime.civil(2005, 2, 10, 15, 30, 45, new Rational(-18000, 86400)), () => {
-      expect(isPast(DateTime.civil(2005, 2, 10, 20, 30, 44))).toBe(true);
-      expect(isPast(DateTime.civil(2005, 2, 10, 20, 30, 45))).toBe(false);
-      expect(isPast(DateTime.civil(2005, 2, 10, 20, 30, 46))).toBe(false);
+      expect(isPast.call(DateTime.civil(2005, 2, 10, 20, 30, 44))).toBe(true);
+      expect(isPast.call(DateTime.civil(2005, 2, 10, 20, 30, 45))).toBe(false);
+      expect(isPast.call(DateTime.civil(2005, 2, 10, 20, 30, 46))).toBe(false);
     });
   });
 
   it("future with offset", () => {
     withFrozen(DateTime.civil(2005, 2, 10, 15, 30, 45, new Rational(-18000, 86400)), () => {
-      expect(isFuture(DateTime.civil(2005, 2, 10, 15, 30, 44, new Rational(-18000, 86400)))).toBe(
-        false,
-      );
-      expect(isFuture(DateTime.civil(2005, 2, 10, 15, 30, 45, new Rational(-18000, 86400)))).toBe(
-        false,
-      );
-      expect(isFuture(DateTime.civil(2005, 2, 10, 15, 30, 46, new Rational(-18000, 86400)))).toBe(
-        true,
-      );
+      expect(
+        isFuture.call(DateTime.civil(2005, 2, 10, 15, 30, 44, new Rational(-18000, 86400))),
+      ).toBe(false);
+      expect(
+        isFuture.call(DateTime.civil(2005, 2, 10, 15, 30, 45, new Rational(-18000, 86400))),
+      ).toBe(false);
+      expect(
+        isFuture.call(DateTime.civil(2005, 2, 10, 15, 30, 46, new Rational(-18000, 86400))),
+      ).toBe(true);
     });
   });
 
   it("future without offset", () => {
     withFrozen(DateTime.civil(2005, 2, 10, 15, 30, 45, new Rational(-18000, 86400)), () => {
-      expect(isFuture(DateTime.civil(2005, 2, 10, 20, 30, 44))).toBe(false);
-      expect(isFuture(DateTime.civil(2005, 2, 10, 20, 30, 45))).toBe(false);
-      expect(isFuture(DateTime.civil(2005, 2, 10, 20, 30, 46))).toBe(true);
+      expect(isFuture.call(DateTime.civil(2005, 2, 10, 20, 30, 44))).toBe(false);
+      expect(isFuture.call(DateTime.civil(2005, 2, 10, 20, 30, 45))).toBe(false);
+      expect(isFuture.call(DateTime.civil(2005, 2, 10, 20, 30, 46))).toBe(true);
     });
   });
 
@@ -752,35 +756,35 @@ describe("DateTimeExtCalculationsTest", () => {
 
   it("prev day with offset", () => {
     withDateCurrent(new Temporal.PlainDate(2000, 1, 1), () => {
-      expect(isPrevDay(DateTime.civil(1999, 12, 31, 23, 59, 59, new Rational(-18000, 86400)))).toBe(
-        true,
-      );
-      expect(isPrevDay(DateTime.civil(2000, 1, 1, 0, 0, 0, new Rational(-18000, 86400)))).toBe(
+      expect(
+        isPrevDay.call(DateTime.civil(1999, 12, 31, 23, 59, 59, new Rational(-18000, 86400))),
+      ).toBe(true);
+      expect(isPrevDay.call(DateTime.civil(2000, 1, 1, 0, 0, 0, new Rational(-18000, 86400)))).toBe(
         false,
       );
-      expect(isPrevDay(DateTime.civil(2000, 1, 1, 23, 59, 59, new Rational(-18000, 86400)))).toBe(
-        false,
-      );
-      expect(isPrevDay(DateTime.civil(1999, 12, 31, 0, 0, 0, new Rational(-18000, 86400)))).toBe(
-        true,
-      );
+      expect(
+        isPrevDay.call(DateTime.civil(2000, 1, 1, 23, 59, 59, new Rational(-18000, 86400))),
+      ).toBe(false);
+      expect(
+        isPrevDay.call(DateTime.civil(1999, 12, 31, 0, 0, 0, new Rational(-18000, 86400))),
+      ).toBe(true);
     });
   });
 
   it("next day with offset", () => {
     withDateCurrent(new Temporal.PlainDate(2000, 1, 1), () => {
-      expect(isNextDay(DateTime.civil(1999, 12, 31, 23, 59, 59, new Rational(-18000, 86400)))).toBe(
-        false,
-      );
-      expect(isNextDay(DateTime.civil(2000, 1, 2, 0, 0, 0, new Rational(-18000, 86400)))).toBe(
+      expect(
+        isNextDay.call(DateTime.civil(1999, 12, 31, 23, 59, 59, new Rational(-18000, 86400))),
+      ).toBe(false);
+      expect(isNextDay.call(DateTime.civil(2000, 1, 2, 0, 0, 0, new Rational(-18000, 86400)))).toBe(
         true,
       );
-      expect(isNextDay(DateTime.civil(2000, 1, 1, 23, 59, 59, new Rational(-18000, 86400)))).toBe(
-        false,
-      );
-      expect(isNextDay(DateTime.civil(2000, 1, 2, 23, 59, 59, new Rational(-18000, 86400)))).toBe(
-        true,
-      );
+      expect(
+        isNextDay.call(DateTime.civil(2000, 1, 1, 23, 59, 59, new Rational(-18000, 86400))),
+      ).toBe(false);
+      expect(
+        isNextDay.call(DateTime.civil(2000, 1, 2, 23, 59, 59, new Rational(-18000, 86400))),
+      ).toBe(true);
     });
   });
 

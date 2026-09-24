@@ -84,8 +84,8 @@ function rd(year: number, month: number, day: number): RubyDate {
   return new RubyDate(year, month, day);
 }
 
-function asDate(instant: Temporal.Instant): Date {
-  return new Date(instant.epochMilliseconds);
+function asDate(instant: unknown): Date {
+  return new Date((instant as Temporal.Instant).epochMilliseconds);
 }
 
 function instant(date: Date): Temporal.Instant {
@@ -128,11 +128,11 @@ describe("DateExtBehaviorTest", () => {
 
 describe("DateExtCalculationsTest", () => {
   it("yesterday in calendar reform", () => {
-    expect(yesterday(rd(1582, 10, 15)).toS()).toBe(rd(1582, 10, 4).toS());
+    expect((yesterday.call(rd(1582, 10, 15)) as RubyDate).toS()).toBe(rd(1582, 10, 4).toS());
   });
 
   it("tomorrow in calendar reform", () => {
-    expect(tomorrow(rd(1582, 10, 4)).toS()).toBe(rd(1582, 10, 15).toS());
+    expect((tomorrow.call(rd(1582, 10, 4)) as RubyDate).toS()).toBe(rd(1582, 10, 15).toS());
   });
 
   it("to fs", () => {
@@ -208,25 +208,27 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("sunday", () => {
-    expect(toDate(asDate(endOfWeek(d(2008, 3, 2))))).toEqual(pd(2008, 3, 2));
-    expect(toDate(asDate(endOfWeek(d(2008, 2, 29))))).toEqual(pd(2008, 3, 2));
+    expect(toDate(asDate(endOfWeek.call(d(2008, 3, 2))))).toEqual(pd(2008, 3, 2));
+    expect(toDate(asDate(endOfWeek.call(d(2008, 2, 29))))).toEqual(pd(2008, 3, 2));
   });
 
   it("beginning of week in calendar reform", () => {
-    expect(beginningOfWeek(rd(1582, 10, 15)).toS()).toBe(rd(1582, 10, 1).toS());
+    expect((beginningOfWeek.call(rd(1582, 10, 15)) as RubyDate).toS()).toBe(rd(1582, 10, 1).toS());
   });
 
   it("end of week in calendar reform", () => {
-    expect(endOfWeek(rd(1582, 10, 4)).toS()).toBe(rd(1582, 10, 17).toS());
+    expect((endOfWeek.call(rd(1582, 10, 4)) as RubyDate).toS()).toBe(rd(1582, 10, 17).toS());
   });
 
   it("next week in calendar reform", () => {
-    expect(nextWeek(rd(1582, 9, 30), ":friday").toS()).toBe(rd(1582, 10, 15).toS());
-    expect(nextWeek(rd(1582, 10, 4)).toS()).toBe(rd(1582, 10, 18).toS());
+    expect((nextWeek.call(rd(1582, 9, 30), ":friday") as RubyDate).toS()).toBe(
+      rd(1582, 10, 15).toS(),
+    );
+    expect((nextWeek.call(rd(1582, 10, 4)) as RubyDate).toS()).toBe(rd(1582, 10, 18).toS());
   });
 
   it("last year in calendar reform", () => {
-    expect(lastYear(rd(1583, 10, 14)).toS()).toBe(rd(1582, 10, 4).toS());
+    expect((lastYear.call(rd(1583, 10, 14)) as RubyDate).toS()).toBe(rd(1582, 10, 4).toS());
   });
 
   it("advance does first years and then days", () => {
@@ -249,11 +251,11 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("last week", () => {
-    expect(toDate(asDate(lastWeek(d(2005, 5, 17))))).toEqual(pd(2005, 5, 9));
-    expect(toDate(asDate(lastWeek(d(2007, 1, 7))))).toEqual(pd(2006, 12, 25));
-    expect(toDate(asDate(lastWeek(d(2010, 2, 19), ":friday")))).toEqual(pd(2010, 2, 12));
-    expect(toDate(asDate(lastWeek(d(2010, 2, 19), ":saturday")))).toEqual(pd(2010, 2, 13));
-    expect(toDate(asDate(lastWeek(d(2010, 3, 4), ":saturday")))).toEqual(pd(2010, 2, 27));
+    expect(toDate(asDate(lastWeek.call(d(2005, 5, 17))))).toEqual(pd(2005, 5, 9));
+    expect(toDate(asDate(lastWeek.call(d(2007, 1, 7))))).toEqual(pd(2006, 12, 25));
+    expect(toDate(asDate(lastWeek.call(d(2010, 2, 19), ":friday")))).toEqual(pd(2010, 2, 12));
+    expect(toDate(asDate(lastWeek.call(d(2010, 2, 19), ":saturday")))).toEqual(pd(2010, 2, 13));
+    expect(toDate(asDate(lastWeek.call(d(2010, 3, 4), ":saturday")))).toEqual(pd(2010, 2, 27));
   });
 
   it("last quarter on 31st", () => {
@@ -376,7 +378,7 @@ describe("DateExtCalculationsTest", () => {
   it("all day", () => {
     const beginningOfDay = d(2011, 6, 7, 0, 0, 0);
     const endOfDay = d(2011, 6, 7, 23, 59, 59, 999);
-    const { begin, end } = allDay(d(2011, 6, 7));
+    const { begin, end } = allDay.call(d(2011, 6, 7));
     expect([begin, end]).toEqual([instant(beginningOfDay), instant(endOfDay)]);
   });
 
@@ -386,7 +388,7 @@ describe("DateExtCalculationsTest", () => {
       withTzDefault(zone, () => {
         const beginningOfDay = zone.local(2011, 6, 7, 0, 0, 0);
         const endOfDay = zone.local(2011, 6, 7, 23, 59, 59, 999.999999);
-        const allDayRange = dateAllDay(pd(2011, 6, 7));
+        const allDayRange = dateAllDay.call(pd(2011, 6, 7));
         expect([String(allDayRange.begin), String(allDayRange.end)]).toEqual([
           String(beginningOfDay),
           String(endOfDay),
@@ -396,20 +398,23 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("all week", () => {
-    expect(rubyRange(allWeek(d(2011, 6, 7)))).toEqual([pd(2011, 6, 6), pd(2011, 6, 12)]);
-    expect(rubyRange(allWeek(d(2011, 6, 7), ":sunday"))).toEqual([pd(2011, 6, 5), pd(2011, 6, 11)]);
+    expect(rubyRange(allWeek.call(d(2011, 6, 7)))).toEqual([pd(2011, 6, 6), pd(2011, 6, 12)]);
+    expect(rubyRange(allWeek.call(d(2011, 6, 7), ":sunday"))).toEqual([
+      pd(2011, 6, 5),
+      pd(2011, 6, 11),
+    ]);
   });
 
   it("all month", () => {
-    expect(rubyRange(allMonth(d(2011, 6, 7)))).toEqual([pd(2011, 6, 1), pd(2011, 6, 30)]);
+    expect(rubyRange(allMonth.call(d(2011, 6, 7)))).toEqual([pd(2011, 6, 1), pd(2011, 6, 30)]);
   });
 
   it("all quarter", () => {
-    expect(rubyRange(allQuarter(d(2011, 6, 7)))).toEqual([pd(2011, 4, 1), pd(2011, 6, 30)]);
+    expect(rubyRange(allQuarter.call(d(2011, 6, 7)))).toEqual([pd(2011, 4, 1), pd(2011, 6, 30)]);
   });
 
   it("all year", () => {
-    expect(rubyRange(allYear(d(2011, 6, 7)))).toEqual([pd(2011, 1, 1), pd(2011, 12, 31)]);
+    expect(rubyRange(allYear.call(d(2011, 6, 7)))).toEqual([pd(2011, 1, 1), pd(2011, 12, 31)]);
   });
 
   it("xmlschema", () => {
@@ -436,15 +441,15 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("past", () => {
-    expect(isPast(DateExt.current().subtract({ days: 1 }))).toBe(true);
-    expect(isPast(DateExt.current())).toBe(false);
-    expect(isPast(DateExt.current().add({ days: 1 }))).toBe(false);
+    expect(isPast.call(DateExt.current().subtract({ days: 1 }))).toBe(true);
+    expect(isPast.call(DateExt.current())).toBe(false);
+    expect(isPast.call(DateExt.current().add({ days: 1 }))).toBe(false);
   });
 
   it("future", () => {
-    expect(isFuture(DateExt.current().subtract({ days: 1 }))).toBe(false);
-    expect(isFuture(DateExt.current())).toBe(false);
-    expect(isFuture(DateExt.current().add({ days: 1 }))).toBe(true);
+    expect(isFuture.call(DateExt.current().subtract({ days: 1 }))).toBe(false);
+    expect(isFuture.call(DateExt.current())).toBe(false);
+    expect(isFuture.call(DateExt.current().add({ days: 1 }))).toBe(true);
   });
 
   it("current returns date today when zone not set", () => {
