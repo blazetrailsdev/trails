@@ -1,4 +1,5 @@
-import ts from "typescript";
+import * as ts from "typescript/unstable/ast";
+import { tsApi } from "@blazetrails/activerecord/type-virtualization/ts-api.js";
 import { singularize } from "@blazetrails/activesupport";
 import { getCrypto } from "@blazetrails/ruby-compat";
 import {
@@ -121,7 +122,7 @@ function visitForeignKeys(node: ts.Node, byTable: Map<string, ForeignKeyDefiniti
       else byTable.set(fk.fromTable, [fk]);
     }
   }
-  ts.forEachChild(node, (child) => visitForeignKeys(child, byTable));
+  node.forEachChild((child) => visitForeignKeys(child, byTable));
 }
 
 /** @internal */
@@ -147,11 +148,11 @@ function visitTables(
       });
     }
   }
-  ts.forEachChild(node, (child) => visitTables(child, tables, byTable));
+  node.forEachChild((child) => visitTables(child, tables, byTable));
 }
 
 export function parseSchemaForModels(source: string, filePath: string): IntrospectedTable[] {
-  const sourceFile = ts.createSourceFile(filePath, source, ts.ScriptTarget.Latest, true);
+  const sourceFile = tsApi().createSourceFile(filePath, source);
   const byTable = new Map<string, ForeignKeyDefinition[]>();
   visitForeignKeys(sourceFile, byTable);
   const tables: IntrospectedTable[] = [];

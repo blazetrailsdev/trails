@@ -374,8 +374,8 @@ importers:
         specifier: workspace:*
         version: link:../trails-tsc
       typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
+        specifier: 7.1.0-dev.20260920.1
+        version: 7.1.0-dev.20260920.1
 
   packages/activesupport:
     dependencies:

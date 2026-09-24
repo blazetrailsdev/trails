@@ -1,6 +1,7 @@
 import { Dir, File } from "@blazetrails/ruby-compat";
 
-import ts from "typescript";
+import * as ts from "typescript/unstable/ast";
+import { tsApi } from "@blazetrails/activerecord/type-virtualization/ts-api.js";
 
 const AR_PACKAGE = "@blazetrails/activerecord";
 const MANIFEST_NAME = "index.ts";
@@ -46,7 +47,7 @@ function isModelFile(file: string): boolean {
 }
 
 function hasModifier(node: ts.ClassDeclaration, kind: ts.SyntaxKind): boolean {
-  return (ts.getModifiers(node) ?? []).some((m) => m.kind === kind);
+  return (node.modifiers ?? []).some((m) => m.kind === kind);
 }
 
 const ABSTRACT_FLAGS = new Set(["abstractClass", "_abstractClass"]);
@@ -121,8 +122,9 @@ function defaultExportName(info: FileInfo): string | undefined {
 function extendsName(node: ts.ClassDeclaration): string | undefined {
   for (const clause of node.heritageClauses ?? []) {
     if (clause.token !== ts.SyntaxKind.ExtendsKeyword) continue;
-    const expr = clause.types[0]?.expression;
-    if (expr && ts.isIdentifier(expr)) return expr.text;
+    const type = clause.types[0];
+    if (!type || !ts.isExpressionWithTypeArguments(type)) continue;
+    if (ts.isIdentifier(type.expression)) return type.expression.text;
   }
   return undefined;
 }
@@ -142,7 +144,7 @@ export async function scanModels(modelsDir: string): Promise<ModelEntry[]> {
   const byFile = new Map<string, FileInfo>();
   for (const file of files) {
     const text = File.read(File.join(modelsDir, file));
-    const sf = ts.createSourceFile(file, text, ts.ScriptTarget.ES2022, true);
+    const sf = tsApi().createSourceFile(file, text);
     const classes = new Map<string, ClassNode>();
     for (const stmt of sf.statements) {
       if (!ts.isClassDeclaration(stmt) || !stmt.name) continue;
