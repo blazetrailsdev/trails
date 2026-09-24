@@ -1,7 +1,16 @@
 import { Logger, SimpleFormatter, type LoggerFormatter } from "./logger.js";
 import type { Temporal } from "@blazetrails/date";
-import { extend, extended, isEmpty, rbObjAsString, rbObjId } from "@blazetrails/ruby-compat";
+import {
+  extend,
+  extended,
+  isEmpty,
+  rbObjAsString,
+  rbObjClone,
+  rbObjId,
+} from "@blazetrails/ruby-compat";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
+
+type Tag = string | number | boolean | null | undefined | readonly Tag[];
 
 export interface TaggedFormatter {
   call(
@@ -10,7 +19,7 @@ export interface TaggedFormatter {
     progname: string | null,
     msg: unknown,
   ): string;
-  tagged<T>(...tags: [...unknown[], (formatter: TaggedFormatter) => T]): T;
+  tagged<T>(...tags: (Tag | ((formatter: TaggedFormatter) => T))[]): T;
   pushTags(...tags: unknown[]): string[];
   popTags(count?: number): string[];
   clearTagsBang(): string[];
@@ -23,13 +32,70 @@ export interface TaggedFormatter {
 export interface TaggedLogger extends Logger {
   get formatter(): TaggedFormatter;
   set formatter(value: LoggerFormatter | null);
-  tagged<T>(...tags: [...unknown[], (logger: TaggedLogger) => T]): T;
-  tagged(...tags: unknown[]): TaggedLogger;
+  tagged<T>(...tags: [...Tag[], (logger: TaggedLogger) => T]): T;
+  tagged(...tags: Tag[]): TaggedLogger;
   pushTags(...tags: unknown[]): string[];
   popTags(count?: number): string[];
   clearTagsBang(): string[];
   flush(): void;
 }
+
+export const Formatter = {
+  call(
+    this: TaggedFormatter,
+    severity: string,
+    timestamp: Temporal.Instant,
+    progname: string | null,
+    msg: unknown,
+  ): string {
+    return (Object.getPrototypeOf(this) as TaggedFormatter).call.call(
+      this,
+      severity,
+      timestamp,
+      progname,
+      this.tagStack.formatMessage(msg),
+    );
+  },
+
+  tagged<T>(this: TaggedFormatter, ...tags: (Tag | ((formatter: TaggedFormatter) => T))[]): T {
+    const block = tags.pop() as (formatter: TaggedFormatter) => T;
+    const pushedCount = this.tagStack.pushTags(tags).length;
+    try {
+      return block(this);
+    } finally {
+      this.popTags(pushedCount);
+    }
+  },
+
+  pushTags(this: TaggedFormatter, ...tags: unknown[]): string[] {
+    return this.tagStack.pushTags(tags);
+  },
+
+  popTags(this: TaggedFormatter, count: number = 1): string[] {
+    return this.tagStack.popTags(count);
+  },
+
+  clearTagsBang(this: TaggedFormatter): string[] {
+    return this.tagStack.clear();
+  },
+
+  get tagStack(): TagStack {
+    const self = this as unknown as TaggedFormatter;
+    self._threadKey ??= `activesupport_tagged_logging_tags:${rbObjId(self)}`;
+    return (
+      IsolatedExecutionState.get<TagStack>(self._threadKey) ??
+      IsolatedExecutionState.set(self._threadKey, new TagStack())
+    );
+  },
+
+  get currentTags(): string[] {
+    return (this as unknown as TaggedFormatter).tagStack.tags;
+  },
+
+  get tagsText(): string {
+    return (this as unknown as TaggedFormatter).tagStack.formatMessage("") as string;
+  },
+};
 
 export class TagStack {
   private _tags: string[] = [];
@@ -78,63 +144,6 @@ export class TagStack {
   }
 }
 
-export const Formatter = {
-  call(
-    this: TaggedFormatter,
-    severity: string,
-    timestamp: Temporal.Instant,
-    progname: string | null,
-    msg: unknown,
-  ): string {
-    return (Object.getPrototypeOf(this) as TaggedFormatter).call.call(
-      this,
-      severity,
-      timestamp,
-      progname,
-      this.tagStack.formatMessage(msg),
-    );
-  },
-
-  tagged<T>(this: TaggedFormatter, ...tags: unknown[]): T {
-    const block = tags.pop() as (formatter: TaggedFormatter) => T;
-    const pushedCount = this.tagStack.pushTags(tags).length;
-    try {
-      return block(this);
-    } finally {
-      this.popTags(pushedCount);
-    }
-  },
-
-  pushTags(this: TaggedFormatter, ...tags: unknown[]): string[] {
-    return this.tagStack.pushTags(tags);
-  },
-
-  popTags(this: TaggedFormatter, count: number = 1): string[] {
-    return this.tagStack.popTags(count);
-  },
-
-  clearTagsBang(this: TaggedFormatter): string[] {
-    return this.tagStack.clear();
-  },
-
-  get tagStack(): TagStack {
-    const self = this as unknown as TaggedFormatter;
-    self._threadKey ??= `activesupport_tagged_logging_tags:${rbObjId(self)}`;
-    return (
-      IsolatedExecutionState.get<TagStack>(self._threadKey) ??
-      IsolatedExecutionState.set(self._threadKey, new TagStack())
-    );
-  },
-
-  get currentTags(): string[] {
-    return (this as unknown as TaggedFormatter).tagStack.tags;
-  },
-
-  get tagsText(): string {
-    return (this as unknown as TaggedFormatter).tagStack.formatMessage("") as string;
-  },
-};
-
 export const LocalTagStorage = {
   get tagStack(): TagStack {
     return (this as unknown as { _tagStack: TagStack })._tagStack;
@@ -154,19 +163,14 @@ export const TaggedLogging = {
   },
 
   new(logger: Logger): TaggedLogger {
-    logger =
-      (logger as { dup?: () => Logger }).dup?.() ??
-      (Object.assign(Object.create(Object.getPrototypeOf(logger) as object), logger) as Logger);
+    logger = (logger as { dup?: () => Logger }).dup?.() ?? rbObjClone(logger);
 
     if (logger.formatter) {
       const formatter = logger.formatter;
       logger.formatter =
         typeof formatter === "function"
           ? (Object.create({ call: formatter }) as TaggedFormatter)
-          : (Object.create(
-              Object.getPrototypeOf(formatter) as object,
-              Object.getOwnPropertyDescriptors(formatter),
-            ) as TaggedFormatter);
+          : (rbObjClone(formatter) as TaggedFormatter);
     } else {
       logger.formatter = new SimpleFormatter();
     }
@@ -189,15 +193,15 @@ export const TaggedLogging = {
   },
 
   /** @missingRailsArgs extend — PERMANENT */
-  tagged(this: TaggedLogger, ...tags: unknown[]): unknown {
+  tagged(this: TaggedLogger, ...tags: (Tag | ((logger: TaggedLogger) => unknown))[]): unknown {
     const block =
       typeof tags.at(-1) === "function" ? (tags.pop() as (logger: TaggedLogger) => unknown) : null;
     if (block) {
-      return this.formatter.tagged(...tags, () => block(this));
+      return this.formatter.tagged(...(tags as Tag[]), () => block(this));
     } else {
       const logger = TaggedLogging.new(this);
       extend(logger.formatter, LocalTagStorage);
-      logger.pushTags(...this.formatter.currentTags, ...tags);
+      logger.pushTags(...this.formatter.currentTags, ...(tags as Tag[]));
       return logger;
     }
   },

@@ -188,13 +188,13 @@ describe("TaggedLoggingTest", () => {
   });
 
   it("tagged with an array", () => {
-    const t = logger.tagged(["BCX", "Jason", "New"] as any);
+    const t = logger.tagged(["BCX", "Jason", "New"]);
     t.info("Funky time");
     expect(output.string).toBe("[BCX] [Jason] [New] Funky time\n");
   });
 
   it("tagged are flattened", () => {
-    const t = logger.tagged("BCX", ["Jason", "New"] as any);
+    const t = logger.tagged("BCX", ["Jason", "New"]);
     t.info("Funky time");
     expect(output.string).toBe("[BCX] [Jason] [New] Funky time\n");
   });
@@ -221,7 +221,7 @@ describe("TaggedLoggingTest", () => {
   });
 
   it("tagged once with blank and nil", () => {
-    const t = logger.tagged(null as any, "", "New");
+    const t = logger.tagged(null, "", "New");
     t.info("Funky time");
     expect(output.string).toBe("[New] Funky time\n");
   });

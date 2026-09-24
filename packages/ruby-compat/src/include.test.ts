@@ -6,6 +6,7 @@ import {
   extend,
   included,
   extended,
+  rbObjClone,
   Module,
   initialize,
   initializeIncludedModules,
@@ -1028,5 +1029,34 @@ describe("Module.new", () => {
     include(Host, mod);
     expect(yielded).toBe(mod);
     expect((new Host() as unknown as { greet(): string }).greet()).toBe("hello");
+  });
+});
+
+describe("rbObjClone", () => {
+  it("keeps singleton methods and gives the clone its own extend registry", () => {
+    class Host {
+      ivar = 1;
+    }
+    const obj = new Host();
+    extend(obj, {
+      a(): string {
+        return "a";
+      },
+    });
+    const clone = rbObjClone(obj);
+    extend(clone, {
+      b(): string {
+        return "b";
+      },
+    });
+
+    expect(clone).toBeInstanceOf(Host);
+    expect(clone.ivar).toBe(1);
+    expect((clone as unknown as { a(): string }).a()).toBe("a");
+    expect("b" in obj).toBe(false);
+  });
+
+  it("is frozen when the receiver is", () => {
+    expect(Object.isFrozen(rbObjClone(Object.freeze({ x: 1 })))).toBe(true);
   });
 });
