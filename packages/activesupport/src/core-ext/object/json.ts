@@ -129,7 +129,13 @@ export class Array {
     if (frame === null) return null;
     const result = frame.claim<unknown[]>([]);
     try {
-      for (const v of value) result.push(options ? asJson(v, options) : asJson(v));
+      if (options) {
+        if (!globalThis.Object.isFrozen(options))
+          options = globalThis.Object.freeze({ ...options });
+        for (const v of value) result.push(asJson(v, options));
+      } else {
+        for (const v of value) result.push(asJson(v));
+      }
     } finally {
       frame.leave();
     }
@@ -167,13 +173,26 @@ export class Hash {
     if (frame === null) return null;
     const result = frame.claim<globalThis.Record<string, unknown>>({});
     try {
-      for (const [k, v] of subset) {
-        globalThis.Object.defineProperty(result, globalThis.String(k), {
-          value: options ? asJson(v, options) : asJson(v),
-          writable: true,
-          enumerable: true,
-          configurable: true,
-        });
+      if (options) {
+        if (!globalThis.Object.isFrozen(options))
+          options = globalThis.Object.freeze({ ...options });
+        for (const [k, v] of subset) {
+          globalThis.Object.defineProperty(result, globalThis.String(k), {
+            value: asJson(v, options),
+            writable: true,
+            enumerable: true,
+            configurable: true,
+          });
+        }
+      } else {
+        for (const [k, v] of subset) {
+          globalThis.Object.defineProperty(result, globalThis.String(k), {
+            value: asJson(v),
+            writable: true,
+            enumerable: true,
+            configurable: true,
+          });
+        }
       }
     } finally {
       frame.leave();

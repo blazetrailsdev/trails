@@ -289,7 +289,6 @@ export function setCookieHeader(
     httponly = "",
     sameSite = "",
     partitioned = "";
-  let values: string[];
 
   if (typeof value === "object" && !Array.isArray(value)) {
     const opts = value;
@@ -308,17 +307,14 @@ export function setCookieHeader(
       else throw new ArgumentError(`Invalid :same_site value: ${rbInspect(ss)}`);
     }
     if (opts.partitioned) partitioned = "; partitioned";
-    const v = opts.value;
-    values = Array.isArray(v) ? v : [v ?? ""];
-  } else if (Array.isArray(value)) {
-    key = escapeCookieKey(key);
-    values = value;
+    value = opts.value;
   } else {
     key = escapeCookieKey(key);
-    values = [value];
   }
 
-  return `${key}=${values.map((v) => escape(v)).join("&")}${domain}${path}${maxAge}${expires}${secure}${httponly}${sameSite}${partitioned}`;
+  if (!Array.isArray(value)) value = [value as string];
+
+  return `${key}=${value.map((v: string | null) => escape(v)).join("&")}${domain}${path}${maxAge}${expires}${secure}${httponly}${sameSite}${partitioned}`;
 }
 
 export function setCookieHeaderBang(headers: Record<string, any>, key: string, value: any): void {
