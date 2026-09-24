@@ -156,9 +156,6 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   // by triaging the buckets #6414 un-hid (RFC 0072). Without these the members
   // read as missing while the TS file next door defines them.
   //
-  // `Rescuable`'s class methods are mixed onto a class by `rescueFrom` and
-  // friends in `module-ext.ts`, alongside the other `include`-shaped helpers.
-  "activesupport:rescuable.rb": "module-ext.ts",
   // `LoggerSilence` and `LoggerThreadSafeLevel` are both mixed into
   // `ActiveSupport::Logger`; trails carries `silence` and `localLevel` on the
   // Logger class itself rather than in two mixin files.

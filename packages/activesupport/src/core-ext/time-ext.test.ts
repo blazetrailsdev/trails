@@ -71,8 +71,8 @@ function stubDateCurrent(): void {
   vi.setSystemTime(new Date(2000, 0, 1, 12));
 }
 
-function asDate(instant: Temporal.Instant): Date {
-  return new Date(instant.epochMilliseconds);
+function asDate(instant: unknown): Date {
+  return new Date((instant as Temporal.Instant).epochMilliseconds);
 }
 
 function d(year: number, month: number, day: number, hour = 0, min = 0, sec = 0, ms = 0): Date {
@@ -1423,7 +1423,7 @@ describe("TimeExtCalculationsTest", () => {
 
   it("next week near daylight start", () => {
     withEnvTz("America/New_York", () => {
-      const result = asDate(nextWeek(new Date(2006, 3, 2, 23, 1, 0), ":monday"));
+      const result = asDate(nextWeek.call(new Date(2006, 3, 2, 23, 1, 0), ":monday"));
       expect(result.getDate()).toBe(3);
       expect(result.getMonth()).toBe(3);
     });
@@ -1431,7 +1431,7 @@ describe("TimeExtCalculationsTest", () => {
 
   it("next week near daylight end", () => {
     withEnvTz("America/New_York", () => {
-      const result = asDate(nextWeek(new Date(2006, 9, 29, 23, 1, 0), ":monday"));
+      const result = asDate(nextWeek.call(new Date(2006, 9, 29, 23, 1, 0), ":monday"));
       expect(result.getDate()).toBe(30);
       expect(result.getMonth()).toBe(9);
     });
@@ -1604,77 +1604,77 @@ describe("TimeExtCalculationsTest", () => {
 
   it("today with time local", () => {
     stubDateCurrent();
-    expect(isToday(RubyTime.local(1999, 12, 31, 23, 59, 59))).toBe(false);
-    expect(isToday(RubyTime.local(2000, 1, 1, 0))).toBe(true);
-    expect(isToday(RubyTime.local(2000, 1, 1, 23, 59, 59))).toBe(true);
-    expect(isToday(RubyTime.local(2000, 1, 2, 0))).toBe(false);
+    expect(isToday.call(RubyTime.local(1999, 12, 31, 23, 59, 59))).toBe(false);
+    expect(isToday.call(RubyTime.local(2000, 1, 1, 0))).toBe(true);
+    expect(isToday.call(RubyTime.local(2000, 1, 1, 23, 59, 59))).toBe(true);
+    expect(isToday.call(RubyTime.local(2000, 1, 2, 0))).toBe(false);
   });
 
   it("today with time utc", () => {
     stubDateCurrent();
-    expect(isToday(RubyTime.utc(1999, 12, 31, 23, 59, 59))).toBe(false);
-    expect(isToday(RubyTime.utc(2000, 1, 1, 0))).toBe(true);
-    expect(isToday(RubyTime.utc(2000, 1, 1, 23, 59, 59))).toBe(true);
-    expect(isToday(RubyTime.utc(2000, 1, 2, 0))).toBe(false);
+    expect(isToday.call(RubyTime.utc(1999, 12, 31, 23, 59, 59))).toBe(false);
+    expect(isToday.call(RubyTime.utc(2000, 1, 1, 0))).toBe(true);
+    expect(isToday.call(RubyTime.utc(2000, 1, 1, 23, 59, 59))).toBe(true);
+    expect(isToday.call(RubyTime.utc(2000, 1, 2, 0))).toBe(false);
   });
 
   it("yesterday with time local", () => {
     stubDateCurrent();
-    expect(isYesterday(RubyTime.local(1999, 12, 31, 23, 59, 59))).toBe(true);
-    expect(isYesterday(RubyTime.local(2000, 1, 1, 0))).toBe(false);
-    expect(isYesterday(RubyTime.local(1999, 12, 31))).toBe(true);
-    expect(isYesterday(RubyTime.local(2000, 1, 2, 0))).toBe(false);
+    expect(isYesterday.call(RubyTime.local(1999, 12, 31, 23, 59, 59))).toBe(true);
+    expect(isYesterday.call(RubyTime.local(2000, 1, 1, 0))).toBe(false);
+    expect(isYesterday.call(RubyTime.local(1999, 12, 31))).toBe(true);
+    expect(isYesterday.call(RubyTime.local(2000, 1, 2, 0))).toBe(false);
   });
 
   it("yesterday with time utc", () => {
     stubDateCurrent();
-    expect(isYesterday(RubyTime.utc(1999, 12, 31, 23, 59, 59))).toBe(true);
-    expect(isYesterday(RubyTime.utc(2000, 1, 1, 0))).toBe(false);
-    expect(isYesterday(RubyTime.utc(1999, 12, 31))).toBe(true);
-    expect(isYesterday(RubyTime.utc(2000, 1, 2, 0))).toBe(false);
+    expect(isYesterday.call(RubyTime.utc(1999, 12, 31, 23, 59, 59))).toBe(true);
+    expect(isYesterday.call(RubyTime.utc(2000, 1, 1, 0))).toBe(false);
+    expect(isYesterday.call(RubyTime.utc(1999, 12, 31))).toBe(true);
+    expect(isYesterday.call(RubyTime.utc(2000, 1, 2, 0))).toBe(false);
   });
 
   it("prev day with time utc", () => {
     stubDateCurrent();
-    expect(isPrevDay(RubyTime.utc(1999, 12, 31, 23, 59, 59))).toBe(true);
-    expect(isPrevDay(RubyTime.utc(2000, 1, 1, 0))).toBe(false);
-    expect(isPrevDay(RubyTime.utc(1999, 12, 31))).toBe(true);
-    expect(isPrevDay(RubyTime.utc(2000, 1, 2, 0))).toBe(false);
+    expect(isPrevDay.call(RubyTime.utc(1999, 12, 31, 23, 59, 59))).toBe(true);
+    expect(isPrevDay.call(RubyTime.utc(2000, 1, 1, 0))).toBe(false);
+    expect(isPrevDay.call(RubyTime.utc(1999, 12, 31))).toBe(true);
+    expect(isPrevDay.call(RubyTime.utc(2000, 1, 2, 0))).toBe(false);
   });
 
   it("tomorrow with time local", () => {
     stubDateCurrent();
-    expect(isTomorrow(RubyTime.local(1999, 12, 31, 23, 59, 59))).toBe(false);
-    expect(isTomorrow(RubyTime.local(2000, 1, 2, 0))).toBe(true);
-    expect(isTomorrow(RubyTime.local(2000, 1, 2, 23, 59, 59))).toBe(true);
-    expect(isTomorrow(RubyTime.local(2000, 1, 1, 0))).toBe(false);
+    expect(isTomorrow.call(RubyTime.local(1999, 12, 31, 23, 59, 59))).toBe(false);
+    expect(isTomorrow.call(RubyTime.local(2000, 1, 2, 0))).toBe(true);
+    expect(isTomorrow.call(RubyTime.local(2000, 1, 2, 23, 59, 59))).toBe(true);
+    expect(isTomorrow.call(RubyTime.local(2000, 1, 1, 0))).toBe(false);
   });
 
   it("tomorrow with time utc", () => {
     stubDateCurrent();
-    expect(isTomorrow(RubyTime.utc(1999, 12, 31, 23, 59, 59))).toBe(false);
-    expect(isTomorrow(RubyTime.utc(2000, 1, 2, 0))).toBe(true);
-    expect(isTomorrow(RubyTime.utc(2000, 1, 2, 23, 59, 59))).toBe(true);
-    expect(isTomorrow(RubyTime.utc(2000, 1, 1, 0))).toBe(false);
+    expect(isTomorrow.call(RubyTime.utc(1999, 12, 31, 23, 59, 59))).toBe(false);
+    expect(isTomorrow.call(RubyTime.utc(2000, 1, 2, 0))).toBe(true);
+    expect(isTomorrow.call(RubyTime.utc(2000, 1, 2, 23, 59, 59))).toBe(true);
+    expect(isTomorrow.call(RubyTime.utc(2000, 1, 1, 0))).toBe(false);
   });
 
   it("next day with time utc", () => {
     stubDateCurrent();
-    expect(isNextDay(RubyTime.utc(1999, 12, 31, 23, 59, 59))).toBe(false);
-    expect(isNextDay(RubyTime.utc(2000, 1, 2, 0))).toBe(true);
-    expect(isNextDay(RubyTime.utc(2000, 1, 2, 23, 59, 59))).toBe(true);
-    expect(isNextDay(RubyTime.utc(2000, 1, 1, 0))).toBe(false);
+    expect(isNextDay.call(RubyTime.utc(1999, 12, 31, 23, 59, 59))).toBe(false);
+    expect(isNextDay.call(RubyTime.utc(2000, 1, 2, 0))).toBe(true);
+    expect(isNextDay.call(RubyTime.utc(2000, 1, 2, 23, 59, 59))).toBe(true);
+    expect(isNextDay.call(RubyTime.utc(2000, 1, 1, 0))).toBe(false);
   });
 
   it("past with time current as time local", () => {
     withEnvTz("US/Eastern", () => {
       withTimeCurrent(d(2005, 2, 10, 15, 30, 45), () => {
-        expect(isPast(d(2005, 2, 10, 15, 30, 44))).toBe(true);
-        expect(isPast(d(2005, 2, 10, 15, 30, 45))).toBe(false);
-        expect(isPast(d(2005, 2, 10, 15, 30, 46))).toBe(false);
-        expect(isPast(utc(2005, 2, 10, 20, 30, 44))).toBe(true);
-        expect(isPast(utc(2005, 2, 10, 20, 30, 45))).toBe(false);
-        expect(isPast(utc(2005, 2, 10, 20, 30, 46))).toBe(false);
+        expect(isPast.call(d(2005, 2, 10, 15, 30, 44))).toBe(true);
+        expect(isPast.call(d(2005, 2, 10, 15, 30, 45))).toBe(false);
+        expect(isPast.call(d(2005, 2, 10, 15, 30, 46))).toBe(false);
+        expect(isPast.call(utc(2005, 2, 10, 20, 30, 44))).toBe(true);
+        expect(isPast.call(utc(2005, 2, 10, 20, 30, 45))).toBe(false);
+        expect(isPast.call(utc(2005, 2, 10, 20, 30, 46))).toBe(false);
       });
     });
   });
@@ -1686,12 +1686,12 @@ describe("TimeExtCalculationsTest", () => {
         "Central Time (US & Canada)",
       ) as TimeWithZone;
       withTimeCurrent(twz, () => {
-        expect(isPast(d(2005, 2, 10, 10, 30, 44))).toBe(true);
-        expect(isPast(d(2005, 2, 10, 10, 30, 45))).toBe(false);
-        expect(isPast(d(2005, 2, 10, 10, 30, 46))).toBe(false);
-        expect(isPast(utc(2005, 2, 10, 15, 30, 44))).toBe(true);
-        expect(isPast(utc(2005, 2, 10, 15, 30, 45))).toBe(false);
-        expect(isPast(utc(2005, 2, 10, 15, 30, 46))).toBe(false);
+        expect(isPast.call(d(2005, 2, 10, 10, 30, 44))).toBe(true);
+        expect(isPast.call(d(2005, 2, 10, 10, 30, 45))).toBe(false);
+        expect(isPast.call(d(2005, 2, 10, 10, 30, 46))).toBe(false);
+        expect(isPast.call(utc(2005, 2, 10, 15, 30, 44))).toBe(true);
+        expect(isPast.call(utc(2005, 2, 10, 15, 30, 45))).toBe(false);
+        expect(isPast.call(utc(2005, 2, 10, 15, 30, 46))).toBe(false);
       });
     });
   });
@@ -1699,12 +1699,12 @@ describe("TimeExtCalculationsTest", () => {
   it("future with time current as time local", () => {
     withEnvTz("US/Eastern", () => {
       withTimeCurrent(d(2005, 2, 10, 15, 30, 45), () => {
-        expect(isFuture(d(2005, 2, 10, 15, 30, 44))).toBe(false);
-        expect(isFuture(d(2005, 2, 10, 15, 30, 45))).toBe(false);
-        expect(isFuture(d(2005, 2, 10, 15, 30, 46))).toBe(true);
-        expect(isFuture(utc(2005, 2, 10, 20, 30, 44))).toBe(false);
-        expect(isFuture(utc(2005, 2, 10, 20, 30, 45))).toBe(false);
-        expect(isFuture(utc(2005, 2, 10, 20, 30, 46))).toBe(true);
+        expect(isFuture.call(d(2005, 2, 10, 15, 30, 44))).toBe(false);
+        expect(isFuture.call(d(2005, 2, 10, 15, 30, 45))).toBe(false);
+        expect(isFuture.call(d(2005, 2, 10, 15, 30, 46))).toBe(true);
+        expect(isFuture.call(utc(2005, 2, 10, 20, 30, 44))).toBe(false);
+        expect(isFuture.call(utc(2005, 2, 10, 20, 30, 45))).toBe(false);
+        expect(isFuture.call(utc(2005, 2, 10, 20, 30, 46))).toBe(true);
       });
     });
   });
@@ -1716,12 +1716,12 @@ describe("TimeExtCalculationsTest", () => {
         "Central Time (US & Canada)",
       ) as TimeWithZone;
       withTimeCurrent(twz, () => {
-        expect(isFuture(d(2005, 2, 10, 10, 30, 44))).toBe(false);
-        expect(isFuture(d(2005, 2, 10, 10, 30, 45))).toBe(false);
-        expect(isFuture(d(2005, 2, 10, 10, 30, 46))).toBe(true);
-        expect(isFuture(utc(2005, 2, 10, 15, 30, 44))).toBe(false);
-        expect(isFuture(utc(2005, 2, 10, 15, 30, 45))).toBe(false);
-        expect(isFuture(utc(2005, 2, 10, 15, 30, 46))).toBe(true);
+        expect(isFuture.call(d(2005, 2, 10, 10, 30, 44))).toBe(false);
+        expect(isFuture.call(d(2005, 2, 10, 10, 30, 45))).toBe(false);
+        expect(isFuture.call(d(2005, 2, 10, 10, 30, 46))).toBe(true);
+        expect(isFuture.call(utc(2005, 2, 10, 15, 30, 44))).toBe(false);
+        expect(isFuture.call(utc(2005, 2, 10, 15, 30, 45))).toBe(false);
+        expect(isFuture.call(utc(2005, 2, 10, 15, 30, 46))).toBe(true);
       });
     });
   });
@@ -2091,18 +2091,18 @@ describe("TimeExtCalculationsTest", () => {
 
   it("prev day with time local", () => {
     stubDateCurrent();
-    expect(isPrevDay(RubyTime.local(1999, 12, 31, 23, 59, 59))).toBe(true);
-    expect(isPrevDay(RubyTime.local(2000, 1, 1, 0))).toBe(false);
-    expect(isPrevDay(RubyTime.local(1999, 12, 31))).toBe(true);
-    expect(isPrevDay(RubyTime.local(2000, 1, 2, 0))).toBe(false);
+    expect(isPrevDay.call(RubyTime.local(1999, 12, 31, 23, 59, 59))).toBe(true);
+    expect(isPrevDay.call(RubyTime.local(2000, 1, 1, 0))).toBe(false);
+    expect(isPrevDay.call(RubyTime.local(1999, 12, 31))).toBe(true);
+    expect(isPrevDay.call(RubyTime.local(2000, 1, 2, 0))).toBe(false);
   });
 
   it("next day with time local", () => {
     stubDateCurrent();
-    expect(isNextDay(RubyTime.local(1999, 12, 31, 23, 59, 59))).toBe(false);
-    expect(isNextDay(RubyTime.local(2000, 1, 2, 0))).toBe(true);
-    expect(isNextDay(RubyTime.local(2000, 1, 2, 23, 59, 59))).toBe(true);
-    expect(isNextDay(RubyTime.local(2000, 1, 1, 0))).toBe(false);
+    expect(isNextDay.call(RubyTime.local(1999, 12, 31, 23, 59, 59))).toBe(false);
+    expect(isNextDay.call(RubyTime.local(2000, 1, 2, 0))).toBe(true);
+    expect(isNextDay.call(RubyTime.local(2000, 1, 2, 23, 59, 59))).toBe(true);
+    expect(isNextDay.call(RubyTime.local(2000, 1, 1, 0))).toBe(false);
   });
 
   it("prev day", () => {
@@ -2308,6 +2308,8 @@ describe("TimeExtMarshalingTest", () => {
   });
 
   it("last quarter on 31st", () => {
-    expect(lastQuarter(d(2004, 5, 31)).epochMilliseconds).toBe(d(2004, 2, 29).getTime());
+    expect((lastQuarter.call(d(2004, 5, 31)) as Temporal.Instant).epochMilliseconds).toBe(
+      d(2004, 2, 29).getTime(),
+    );
   });
 });

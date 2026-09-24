@@ -1,4 +1,4 @@
-import { ArgumentError, NameError, rbInspect } from "@blazetrails/ruby-compat";
+import { NameError } from "@blazetrails/ruby-compat";
 import { DescendantsTracker, type AnyClass } from "./descendants-tracker.js";
 import { constantize } from "./inflector.js";
 import { Delegation, type DelegateOptions } from "./delegation.js";
@@ -256,63 +256,4 @@ export function subclasses(klass: AnyClass): AnyClass[] {
 
 export function descendants(klass: AnyClass): AnyClass[] {
   return DescendantsTracker.descendants(klass);
-}
-
-type ErrorHandler = ((error: Error) => void) | string;
-
-interface RescueEntry {
-  key: (new (...args: any[]) => Error) | string;
-  handler: ErrorHandler;
-}
-
-const _rescueHandlers = new WeakMap<object, RescueEntry[]>();
-
-function getRescueHandlers(target: object): RescueEntry[] {
-  if (!_rescueHandlers.has(target)) _rescueHandlers.set(target, []);
-  return _rescueHandlers.get(target)!;
-}
-
-export function rescueFrom(
-  this: any,
-  ...klasses: Array<(new (...args: any[]) => Error) | string | { with?: ErrorHandler }>
-): void {
-  const options = extractOptionsBang(klasses) as { with?: ErrorHandler };
-  const keys = klasses as unknown[];
-  const handler = options.with;
-  if (!handler) {
-    throw new ArgumentError("Need a handler. Pass the with: keyword argument or provide a block.");
-  }
-
-  for (const klass of keys) {
-    let key: RescueEntry["key"];
-    if (typeof klass === "function") {
-      key = klass as new (...args: any[]) => Error;
-    } else if (typeof klass === "string") {
-      key = klass;
-    } else {
-      throw new ArgumentError(
-        `${rbInspect(klass)} must be an Exception class or a String referencing an Exception class`,
-      );
-    }
-
-    getRescueHandlers(this).push({ key, handler });
-  }
-}
-
-export function handleRescue(target: any, error: Error): boolean {
-  const handlers = getRescueHandlers(target);
-  for (const { key, handler } of [...handlers].reverse()) {
-    const klass =
-      typeof key === "string" ? (constantize(key) as new (...args: any[]) => Error) : key;
-    if (error instanceof klass) {
-      if (typeof handler === "function") {
-        handler(error);
-      } else if (typeof handler === "string") {
-        const method = target[handler] ?? target.prototype?.[handler];
-        if (typeof method === "function") method.call(target, error);
-      }
-      return true;
-    }
-  }
-  return false;
 }
