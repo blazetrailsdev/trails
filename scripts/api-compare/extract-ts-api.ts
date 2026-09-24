@@ -35,6 +35,7 @@ import { Worker, isMainThread, parentPort, workerData } from "node:worker_thread
 import { fileURLToPath } from "node:url";
 import { cpus } from "node:os";
 import { EXTERNAL_DECL_FILE, PKG_DECL_PREFIX } from "@blazetrails/parity/types";
+import { snakeToCamel } from "@blazetrails/parity/conventions";
 import type {
   ApiManifest,
   PackageInfo,
@@ -3043,7 +3044,7 @@ function collectDefineColumnMethodsMembers(sourceFile: ts.SourceFile): DefineCol
         if (!ts.isStringLiteralLike(arg)) continue;
         out.push({
           receiver: expr.expression.expression.text,
-          name: arg.text.replace(/_([a-z0-9])/g, (_, c: string) => c.toUpperCase()),
+          name: snakeToCamel(arg.text),
           line: lineOf(arg),
         });
       }
