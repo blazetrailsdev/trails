@@ -10,8 +10,10 @@ function stubBaseModel(tableAliasLength: number): BaseModelArg {
   return {
     tableName: "posts",
     arelTable: new Table("posts"),
-    connectionPool: () => ({ activeConnection: null }),
-    connection: { tableAliasLength: () => tableAliasLength },
+    connectionPool: () => ({
+      withConnectionSync: <T>(block: (connection: unknown) => T): T =>
+        block({ tableAliasLength: () => tableAliasLength }),
+    }),
   } as unknown as BaseModelArg;
 }
 
@@ -58,10 +60,11 @@ describe("JoinDependency AliasTracker seeding", () => {
     const noConnModel = {
       tableName: "posts",
       arelTable: new Table("posts"),
-      connectionPool: () => ({ activeConnection: null }),
-      get connection(): never {
-        throw new ConnectionNotDefined("No connection pool for posts");
-      },
+      connectionPool: () => ({
+        withConnectionSync(): never {
+          throw new ConnectionNotDefined("No connection pool for posts");
+        },
+      }),
     } as unknown as BaseModelArg;
     const jd = new JoinDependency(noConnModel, null, null, Nodes.OuterJoin);
     const tracker = trackerOf(jd);
@@ -76,10 +79,11 @@ describe("JoinDependency AliasTracker seeding", () => {
     const brokenModel = {
       tableName: "posts",
       arelTable: new Table("posts"),
-      connectionPool: () => ({ activeConnection: null }),
-      get connection(): never {
-        throw new Error("adapter blew up");
-      },
+      connectionPool: () => ({
+        withConnectionSync(): never {
+          throw new Error("adapter blew up");
+        },
+      }),
     } as unknown as BaseModelArg;
     expect(() => new JoinDependency(brokenModel, null, null, Nodes.OuterJoin)).toThrow(
       "adapter blew up",
@@ -90,10 +94,11 @@ describe("JoinDependency AliasTracker seeding", () => {
     const timingOutModel = {
       tableName: "posts",
       arelTable: new Table("posts"),
-      connectionPool: () => ({ activeConnection: null }),
-      get connection(): never {
-        throw new ConnectionTimeoutError("could not obtain a connection");
-      },
+      connectionPool: () => ({
+        withConnectionSync(): never {
+          throw new ConnectionTimeoutError("could not obtain a connection");
+        },
+      }),
     } as unknown as BaseModelArg;
     expect(() => new JoinDependency(timingOutModel, null, null, Nodes.OuterJoin)).toThrow(
       ConnectionTimeoutError,

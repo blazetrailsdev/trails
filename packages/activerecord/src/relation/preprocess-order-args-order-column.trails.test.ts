@@ -12,35 +12,35 @@ describe("preprocessOrderArgs routes through orderColumn", () => {
     return args;
   };
 
-  const sqlOf = (node: unknown): string =>
-    (Topic as unknown as { connection: { toSql(n: Nodes.Node): string } }).connection.toSql(
+  const sqlOf = async (node: unknown): Promise<string> =>
+    ((await Topic.leaseConnection()) as unknown as { toSql(n: Nodes.Node): string }).toSql(
       node as Nodes.Node,
     );
 
-  it("falls back to a bare quoted literal for an unknown column in the Symbol arm", () => {
+  it("falls back to a bare quoted literal for an unknown column in the Symbol arm", async () => {
     const [node] = preprocess(Topic.all(), [":nonexistent"]);
     expect(node).toBeInstanceOf(Nodes.Ascending);
-    expect(sqlOf(node)).not.toMatch(/topics/i);
-    expect(sqlOf(node)).toMatch(/nonexistent.*ASC/i);
+    expect(await sqlOf(node)).not.toMatch(/topics/i);
+    expect(await sqlOf(node)).toMatch(/nonexistent.*ASC/i);
   });
 
-  it("falls back to a bare quoted literal for an unknown column in the flat Hash arm", () => {
+  it("falls back to a bare quoted literal for an unknown column in the flat Hash arm", async () => {
     const [node] = preprocess(Topic.all(), [{ nonexistent: "desc" }]);
     expect(node).toBeInstanceOf(Nodes.Descending);
-    expect(sqlOf(node)).not.toMatch(/topics/i);
-    expect(sqlOf(node)).toMatch(/nonexistent.*DESC/i);
+    expect(await sqlOf(node)).not.toMatch(/topics/i);
+    expect(await sqlOf(node)).toMatch(/nonexistent.*DESC/i);
   });
 
-  it("keeps a known column qualified against the relation's table", () => {
+  it("keeps a known column qualified against the relation's table", async () => {
     const [node] = preprocess(Topic.all(), [":title"]);
-    expect(sqlOf(node)).toMatch(/"topics"\."title" ASC|`topics`\.`title` ASC/);
+    expect(await sqlOf(node)).toMatch(/"topics"\."title" ASC|`topics`\.`title` ASC/);
   });
 
-  it("resolves the nested Hash arm through Rails' dotted form, recording the reference", () => {
+  it("resolves the nested Hash arm through Rails' dotted form, recording the reference", async () => {
     const rel = Topic.all() as unknown as { referencesValues?: string[] };
     const [node] = preprocess(rel, [{ topics: { title: "desc" } }]);
     expect(node).toBeInstanceOf(Nodes.Descending);
-    expect(sqlOf(node)).toMatch(/"topics"\."title" DESC|`topics`\.`title` DESC/);
+    expect(await sqlOf(node)).toMatch(/"topics"\."title" DESC|`topics`\.`title` DESC/);
     expect(rel.referencesValues?.map(String)).toContain("topics");
   });
 

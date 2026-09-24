@@ -2034,9 +2034,7 @@ export class Base extends Model {
         }
         _Persistence.applyDefaultAndGlobalConstraints(dm as any, ctor);
 
-        const adapter =
-          ConnectionHandling.connectionPool.call(ctor).activeConnection ?? (await ctor.connection);
-        const affected = await adapter.delete(dm, `${ctor.name} Destroy`);
+        const affected = await ctor.withConnection((c) => c.delete(dm, `${ctor.name} Destroy`));
         if (ctor.lockingEnabled && affected !== 1) {
           throw new StaleObjectError(this, "destroy");
         }

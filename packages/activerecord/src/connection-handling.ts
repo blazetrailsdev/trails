@@ -19,6 +19,7 @@ import { IsolatedExecutionState, getEnv, presence } from "@blazetrails/activesup
 import * as ConnectionHandlingModule from "./connection-handling.js";
 import { readingRole, setDefaultTimezone, writingRole } from "./active-record.js";
 import { permanentConnectionCheckout } from "./active-record.js";
+import { deprecator } from "./deprecator.js";
 
 const PROHIBIT_SHARD_SWAPPING_KEY = Symbol.for("ar_prohibit_shard_swapping");
 
@@ -323,19 +324,21 @@ export function isConnected(this: typeof Base): boolean {
   });
 }
 
-const CONNECTION_DEPRECATION_MSG =
-  "Called deprecated `ActiveRecord::Base.connection` method. " +
-  "Either use `with_connection` or `lease_connection`.";
-
 /** @deprecated */
 export async function connection(this: typeof Base): Promise<DatabaseAdapter> {
   const pool = connectionPool.call(this);
   if (pool.isPermanentLease()) {
     const setting = permanentConnectionCheckout();
     if (setting === "deprecated") {
-      console.warn("DEPRECATION WARNING: " + CONNECTION_DEPRECATION_MSG);
+      deprecator().warn(`Called deprecated \`ActiveRecord::Base.connection\` method.
+
+Either use \`with_connection\` or \`lease_connection\`.
+`);
     } else if (setting === "disallowed") {
-      throw new ActiveRecordError(CONNECTION_DEPRECATION_MSG);
+      throw new ActiveRecordError(`Called deprecated \`ActiveRecord::Base.connection\` method.
+
+Either use \`with_connection\` or \`lease_connection\`.
+`);
     }
     return pool.leaseConnection();
   } else {

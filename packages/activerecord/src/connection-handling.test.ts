@@ -1,7 +1,9 @@
 import { Thread } from "@blazetrails/ruby-compat";
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "./base.js";
 import { ActiveRecordError } from "./errors.js";
+import { deprecator } from "./deprecator.js";
+import { assertDeprecated, assertNotDeprecated } from "@blazetrails/activesupport";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
 import { fixtures } from "./test-fixtures.js";
@@ -132,32 +134,30 @@ describe("ConnectionHandlingTest", () => {
 
   it("#connection emits a deprecation warning if ActiveRecord.permanent_connection_checkout == :deprecated", async () => {
     setPermanentConnectionCheckout("deprecated");
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    try {
-      Base.releaseConnection();
 
+    Base.releaseConnection();
+
+    await assertDeprecated(null, deprecator(), async () => {
       await Base.connection;
-      expect(warnSpy).toHaveBeenCalledTimes(1);
-      warnSpy.mockClear();
+    });
 
+    await assertNotDeprecated(deprecator(), async () => {
       await Base.connection;
-      expect(warnSpy).not.toHaveBeenCalled();
+    });
 
-      Base.releaseConnection();
+    Base.releaseConnection();
 
+    await assertDeprecated(null, deprecator(), async () => {
       await Base.connection;
-      expect(warnSpy).toHaveBeenCalledTimes(1);
-      warnSpy.mockClear();
+    });
 
-      Base.releaseConnection();
+    Base.releaseConnection();
 
-      await Base.withConnection(async () => {
+    await Base.withConnection(async () => {
+      await assertDeprecated(null, deprecator(), async () => {
         await Base.connection;
-        expect(warnSpy).toHaveBeenCalledTimes(1);
       });
-    } finally {
-      warnSpy.mockRestore();
-    }
+    });
   });
 
   it("#connection raises an error if ActiveRecord.permanent_connection_checkout == :disallowed", async () => {
