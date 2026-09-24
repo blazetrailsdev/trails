@@ -12,8 +12,74 @@ interface MockCall {
 }
 
 class Mock {
-  expected: MockCall[] = [];
-  calls: MockCall[] = [];
+  #expectedCalls = new Map<string, MockCall[]>();
+  #actualCalls = new Map<string, MockCall[]>();
+
+  expect(name: string, retval: unknown, args: unknown[] = []): this {
+    if (!Array.isArray(args)) throw new ArgumentError("args must be an array");
+    const expected = this.#expectedCalls.get(name) ?? [];
+    expected.push({ retval, args });
+    this.#expectedCalls.set(name, expected);
+    return this;
+  }
+
+  __call(name: string, data: MockCall | MockCall[]): string {
+    if (Array.isArray(data)) return data.map((d) => this.__call(name, d)).join(", ");
+    const args = rbInspect(data.args).slice(1, -1);
+    return `${name}(${args}) => ${rbInspect(data.retval)}`;
+  }
+
+  verify(): true {
+    for (const [name, expected] of this.#expectedCalls) {
+      const actual = this.#actualCalls.get(name) ?? null;
+      if (!actual) throw new MockExpectationError(`Expected ${this.__call(name, expected[0])}`);
+      if (actual.length < expected.length) {
+        throw new MockExpectationError(
+          `Expected ${this.__call(name, expected[actual.length])}, got [${this.__call(name, actual)}]`,
+        );
+      }
+    }
+    return true;
+  }
+
+  call(...args: unknown[]): unknown {
+    const sym = ":call";
+    const actualCalls = this.#actualCalls.get("call") ?? [];
+    const index = actualCalls.length;
+    const expectedCall = this.#expectedCalls.get("call")?.[index];
+
+    if (!expectedCall) {
+      throw new MockExpectationError(
+        `No more expects available for ${rbInspect(sym)}: ${rbInspect(args)} ${rbInspect({})}`,
+      );
+    }
+
+    const { args: expectedArgs, retval } = expectedCall;
+
+    if (expectedArgs.length !== args.length) {
+      throw new ArgumentError(
+        `mocked method ${rbInspect(sym)} expects ${expectedArgs.length} arguments, got ${rbInspect(args)}`,
+      );
+    }
+
+    const fullyMatched = expectedArgs.every(
+      (mod, i) => caseEqual(mod, args[i]) || rbEqual(mod, args[i]),
+    );
+
+    if (!fullyMatched) {
+      throw new MockExpectationError(
+        `mocked method ${rbInspect(sym)} called with unexpected arguments ${rbInspect(args)}`,
+      );
+    }
+
+    actualCalls.push({
+      retval,
+      args: expectedArgs.map((e, i) => (caseEqual(e, args[i]) ? e : args[i])),
+    });
+    this.#actualCalls.set("call", actualCalls);
+
+    return retval;
+  }
 }
 
 /** @internal */
@@ -56,7 +122,7 @@ export function assertCalledWith<T extends object>(
   const mock = new Mock();
   expectCalledWith(mock, args, { returns });
 
-  const result = stub(object, methodName, (...called: unknown[]) => mockCall(mock, called), block);
+  const result = stub(object, methodName, (...called: unknown[]) => mock.call(...called), block);
 
   if (result) return result.then(() => assertMock(mock));
   assertMock(mock);
@@ -78,7 +144,7 @@ export function expectCalledWith(
   args: unknown[],
   { returns = false }: { returns?: unknown } = {},
 ): void {
-  mock.expected.push({ retval: returns, args });
+  mock.expect("call", returns, args);
 }
 
 /** @internal */
@@ -192,65 +258,9 @@ function stub<T extends object>(
   return undefined;
 }
 
-function mockCall(mock: Mock, args: unknown[]): unknown {
-  const sym = ":call";
-  const index = mock.calls.length;
-  const expectedCall = mock.expected[index];
-
-  if (!expectedCall) {
-    throw new MockExpectationError(
-      `No more expects available for ${rbInspect(sym)}: ${rbInspect(args)} ${rbInspect({})}`,
-    );
-  }
-
-  const { args: expectedArgs, retval } = expectedCall;
-
-  if (expectedArgs.length !== args.length) {
-    throw new ArgumentError(
-      `mocked method ${rbInspect(sym)} expects ${expectedArgs.length} arguments, got ${rbInspect(args)}`,
-    );
-  }
-
-  const fullyMatched = expectedArgs.every(
-    (mod, i) => caseEqual(mod, args[i]) || rbEqual(mod, args[i]),
-  );
-
-  if (!fullyMatched) {
-    throw new MockExpectationError(
-      `mocked method ${rbInspect(sym)} called with unexpected arguments ${rbInspect(args)}`,
-    );
-  }
-
-  mock.calls.push({
-    retval,
-    args: expectedArgs.map((e, i) => (caseEqual(e, args[i]) ? e : args[i])),
-  });
-
-  return retval;
-}
-
-function mockCallToS(name: string, data: MockCall | MockCall[]): string {
-  if (Array.isArray(data)) return data.map((d) => mockCallToS(name, d)).join(", ");
-  const args = rbInspect(data.args).slice(1, -1);
-  return `${name}(${args}) => ${rbInspect(data.retval)}`;
-}
-
-function verify(mock: Mock): true {
-  const name = "call";
-  const expected = mock.expected;
-  const actual = mock.calls.length > 0 ? mock.calls : null;
-  if (!actual) throw new MockExpectationError(`Expected ${mockCallToS(name, expected[0])}`);
-  if (actual.length < expected.length) {
-    throw new MockExpectationError(
-      `Expected ${mockCallToS(name, expected[actual.length])}, got [${mockCallToS(name, actual)}]`,
-    );
-  }
-  return true;
-}
-
 function assertMock(mock: Mock): void {
   try {
-    assert(verify(mock));
+    assert(mock.verify());
   } catch (e) {
     if (!(e instanceof MockExpectationError)) throw e;
     assert(false, e.message);
