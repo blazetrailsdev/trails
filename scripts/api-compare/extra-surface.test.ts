@@ -334,9 +334,6 @@ describe("a TS-only package", () => {
     expect(pkg?.extraFiles[0]?.extras.map((e) => e.name)).toEqual(["squeeze", "succ"]);
   });
 
-  // The growth path the package's rule 2 prescribes: a member arriving with
-  // its receipt moves neither dimension, even when its name collides with a
-  // Rails method elsewhere and would otherwise score moved.
   it("subtracts a receipted member from both dimensions, moved or novel", () => {
     const ruby: ApiManifest = {
       source: "ruby",
