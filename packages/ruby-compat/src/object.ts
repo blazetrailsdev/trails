@@ -98,8 +98,6 @@ export function rbModSingletonP(klass: unknown): boolean {
  */
 export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true): boolean {
   void pub;
-  /* `rb_cString` defines `to_str` (`vendor/ruby/string.c:12177`); a JS string
-     is trails' Ruby String, and `String.prototype` carries no such member. */
   if (typeof obj === "string" && mid === "toStr") return true;
   for (let o: object | null = Object(obj); o; o = Object.getPrototypeOf(o) as object | null) {
     const entry = Object.getOwnPropertyDescriptor(o, mid);
