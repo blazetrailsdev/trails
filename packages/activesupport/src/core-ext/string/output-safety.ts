@@ -73,7 +73,7 @@ function strRange(str: string, args: ArefArgs): [number, number] {
   if (first instanceof RegExp) {
     const match = new RegExp(first.source, first.flags.replace(/[gyd]/g, "") + "d").exec(str)!;
     const nth = second ?? 0;
-    const range: [number, number] | undefined = match.indices![nth];
+    const range = match.indices![nth];
     if (range === undefined) throw new IndexError(`regexp group ${nth} not matched`);
     const [start, end] = range;
     return [start, end - start];

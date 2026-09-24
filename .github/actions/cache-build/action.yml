@@ -34,13 +34,6 @@ description: Restores the per-package dist/ + tsc --build incremental state so p
 # poison it for every full-build consumer until the source hash changes —
 # so the partial-build parity jobs intentionally do NOT use this action.
 
-# The key carries the compiler: `tsc --build` treats a buildinfo written by the
-# other TypeScript version as out of date and rebuilds every project, so an
-# entry shared between the TS 7 `build:ts7` jobs and the TS 5 `pnpm build` ones
-# (Build & Type Check, Rails API/Test Comparison) would restore as a miss.
-# `build:ts7` runs the `typescript@7.1` nightly `@blazetrails/activerecord`
-# pins as a devDependency, by path: a root alias would link its `tsc` over TS 5's
-# in `node_modules/.bin`, moving `pnpm typecheck` and `pnpm build` with it.
 inputs:
   compiler:
     description: "`ts5` for `pnpm build`, `ts7` for `pnpm build:ts7`."
