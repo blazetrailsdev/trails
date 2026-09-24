@@ -267,8 +267,7 @@ describe("DeprecationTest", () => {
     await assertNotDeprecated(deprecator, () => 1 + 1);
   });
 
-  it.skip("assert_not_deprecated requires a deprecator", async () => {
-    // BLOCKED: testing-deprecation-helpers-do-not-require-a-deprecator
+  it("assert_not_deprecated requires a deprecator", async () => {
     await assertRaises([ArgumentError], {}, async () => {
       await assertNotDeprecated(null as unknown as Deprecation, () => {});
     });
@@ -284,8 +283,7 @@ describe("DeprecationTest", () => {
     expect(sole(result[1])).toMatch("DEPRECATION WARNING:");
   });
 
-  it.skip("collect_deprecations requires a deprecator", async () => {
-    // BLOCKED: testing-deprecation-helpers-do-not-require-a-deprecator
+  it("collect_deprecations requires a deprecator", async () => {
     await assertRaises([ArgumentError], {}, async () => {
       await collectDeprecations(null as unknown as Deprecation, () => {});
     });
