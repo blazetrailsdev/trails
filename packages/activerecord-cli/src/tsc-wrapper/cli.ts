@@ -1,11 +1,22 @@
 #!/usr/bin/env node
 
-import ts from "typescript";
+import {
+  formatDiagnostics,
+  formatDiagnosticsWithColorAndContext,
+  type CompilerOptions,
+  type Diagnostic,
+  type FormatDiagnosticsHost,
+} from "typescript/unstable/sync";
 import * as path from "node:path";
 import * as fs from "node:fs";
-import { remapDiagnostics } from "@blazetrails/trails-tsc";
+import { tsApi } from "@blazetrails/activerecord/type-virtualization/ts-api.js";
 import { virtualize } from "@blazetrails/activerecord/type-virtualization/virtualize.js";
-import { createArTrailsProgram, createArSolutionBuilder } from "./ar-program.js";
+import {
+  createArTrailsProgram,
+  createArSolutionBuilder,
+  getPreEmitDiagnostics,
+  remapDiagnostics,
+} from "./ar-program.js";
 import type { SchemaColumnValue } from "@blazetrails/activerecord/type-virtualization/synthesize.js";
 import { parseSchemaTs } from "./schema-ts-parser.js";
 
@@ -183,7 +194,7 @@ function handlePrintVirtualized(args: string[]): void {
   process.exit(0);
 }
 
-function parsePretty(args: string[], options: ts.CompilerOptions): boolean {
+function parsePretty(args: string[], options: CompilerOptions & { pretty?: unknown }): boolean {
   const parseValue = (value: string | undefined): boolean | undefined => {
     if (value === undefined) return true;
     if (value === "true") return true;
@@ -206,15 +217,41 @@ function parsePretty(args: string[], options: ts.CompilerOptions): boolean {
     }
   }
   const prettyFromOpts = typeof options.pretty === "boolean" ? options.pretty : undefined;
-  return prettyFromArgs ?? prettyFromOpts ?? ts.sys.writeOutputIsTTY?.() ?? false;
+  return prettyFromArgs ?? prettyFromOpts ?? process.stdout.isTTY ?? false;
 }
 
-function formatHost(): ts.FormatDiagnosticsHost {
+function formatHost(): FormatDiagnosticsHost {
   return {
     getCurrentDirectory: () => process.cwd(),
-    getCanonicalFileName: (f) => (ts.sys.useCaseSensitiveFileNames ? f : f.toLowerCase()),
-    getNewLine: () => ts.sys.newLine,
+    getCanonicalFileName: (f) => tsApi().getCanonicalFileName(f),
+    getNewLine: () => tsApi().getNewLine(),
   };
+}
+
+function findConfigFile(
+  searchPath: string,
+  fileExists: (fileName: string) => boolean,
+): string | undefined {
+  for (let dir = searchPath; ; dir = path.dirname(dir)) {
+    const fileName = path.join(dir, "tsconfig.json");
+    if (fileExists(fileName)) return fileName;
+    if (path.dirname(dir) === dir) return undefined;
+  }
+}
+
+function compareDiagnostics(a: Diagnostic, b: Diagnostic): number {
+  return (
+    (a.fileName ?? "").localeCompare(b.fileName ?? "") ||
+    a.pos - b.pos ||
+    a.end - b.end ||
+    a.code - b.code ||
+    a.text.localeCompare(b.text)
+  );
+}
+
+function sortAndDeduplicateDiagnostics(diagnostics: readonly Diagnostic[]): Diagnostic[] {
+  const sorted = [...diagnostics].sort(compareDiagnostics);
+  return sorted.filter((d, i) => i === 0 || compareDiagnostics(sorted[i - 1], d) !== 0);
 }
 
 function handleBuildMode(args: string[]): void {
@@ -240,7 +277,7 @@ function handleBuildMode(args: string[]): void {
   const rootConfigs =
     rest.length > 0
       ? rest.map((p) => path.resolve(p))
-      : [ts.findConfigFile(process.cwd(), ts.sys.fileExists) ?? path.resolve("tsconfig.json")];
+      : [findConfigFile(process.cwd(), fs.existsSync) ?? path.resolve("tsconfig.json")];
 
   const fh = formatHost();
   const pretty = parsePretty(args, {});
@@ -250,13 +287,12 @@ function handleBuildMode(args: string[]): void {
     schemaColumnsByTable,
     onDiagnostic: (d) => {
       const out = pretty
-        ? ts.formatDiagnosticsWithColorAndContext([d], fh)
-        : ts.formatDiagnostics([d], fh);
+        ? formatDiagnosticsWithColorAndContext([d], fh)
+        : formatDiagnostics([d], fh);
       process.stderr.write(out);
     },
     onStatus: (d) => {
-      const msg = ts.flattenDiagnosticMessageText(d.messageText, ts.sys.newLine);
-      process.stdout.write(`${msg}${ts.sys.newLine}`);
+      process.stdout.write(`${d.text}${fh.getNewLine()}`);
     },
   });
 
@@ -282,10 +318,12 @@ export function main(): void {
     }
   }
   if (!configPath) {
-    configPath =
-      ts.findConfigFile(process.cwd(), ts.sys.fileExists) ?? path.resolve("tsconfig.json");
+    configPath = findConfigFile(process.cwd(), fs.existsSync) ?? path.resolve("tsconfig.json");
   } else {
     configPath = path.resolve(configPath);
+    if (fs.existsSync(configPath) && fs.statSync(configPath).isDirectory()) {
+      configPath = path.join(configPath, "tsconfig.json");
+    }
   }
 
   const schemaColumnsByTable = loadSchemaColumns(args);
@@ -296,11 +334,11 @@ export function main(): void {
   const fh = formatHost();
 
   if (configDiagnostics.length > 0) {
-    process.stderr.write(ts.formatDiagnostics(configDiagnostics, fh));
+    process.stderr.write(formatDiagnostics(configDiagnostics, fh));
     process.exit(1);
   }
 
-  const diagnostics = [...ts.getPreEmitDiagnostics(program)];
+  const diagnostics = getPreEmitDiagnostics(program);
 
   const noEmit = args.includes("--noEmit") || program.getCompilerOptions().noEmit;
 
@@ -310,13 +348,13 @@ export function main(): void {
   }
 
   const remapped = remapDiagnostics(diagnostics, host);
-  const sorted = ts.sortAndDeduplicateDiagnostics(remapped);
+  const sorted = sortAndDeduplicateDiagnostics(remapped);
 
   if (sorted.length > 0) {
     const pretty = parsePretty(args, program.getCompilerOptions());
     const output = pretty
-      ? ts.formatDiagnosticsWithColorAndContext(sorted, fh)
-      : ts.formatDiagnostics(sorted, fh);
+      ? formatDiagnosticsWithColorAndContext(sorted, fh)
+      : formatDiagnostics(sorted, fh);
     process.stderr.write(output);
     process.exit(1);
   }

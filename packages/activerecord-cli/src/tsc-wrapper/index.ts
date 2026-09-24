@@ -1,6 +1,12 @@
 export {
   createArTrailsProgram,
   createArSolutionBuilder,
+  getPreEmitDiagnostics,
+  remapDiagnostics,
+  ExitStatus,
+  type ArRemapHost,
+  type ArSolutionBuilder,
+  type ArTrailsProgram,
   type CreateArTrailsProgramOptions,
   type CreateArSolutionBuilderOptions,
 } from "./ar-program.js";
@@ -11,14 +17,5 @@ export {
   type SchemaColumnsByTable,
 } from "./schema-ts-parser.js";
 
-export type {
-  LineDelta,
-  PluginFactory,
-  TrailsBuildOptions,
-  TrailsCompilerHost,
-  TrailsProgram,
-  TrailsSolutionBuilder,
-  TscPlugin,
-  VirtualizeOutput,
-} from "@blazetrails/trails-tsc";
-export { remapDiagnostics, remapLine } from "@blazetrails/trails-tsc";
+export type { LineDelta, TscPlugin, VirtualizeOutput } from "@blazetrails/trails-tsc";
+export { remapLine } from "@blazetrails/trails-tsc";

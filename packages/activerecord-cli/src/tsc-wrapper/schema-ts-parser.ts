@@ -1,4 +1,5 @@
-import ts from "typescript";
+import * as ts from "typescript/unstable/ast";
+import { tsApi } from "@blazetrails/activerecord/type-virtualization/ts-api.js";
 
 export interface DumpColumnSchema {
   type: string;
@@ -168,11 +169,11 @@ function visitNode(node: ts.Node, result: SchemaColumnsByTable): void {
       result[name] = table;
     }
   }
-  ts.forEachChild(node, (child) => visitNode(child, result));
+  node.forEachChild((child) => visitNode(child, result));
 }
 
 export function parseSchemaTs(source: string, filePath: string): SchemaColumnsByTable {
-  const sourceFile = ts.createSourceFile(filePath, source, ts.ScriptTarget.Latest, true);
+  const sourceFile = tsApi().createSourceFile(filePath, source);
   const result: SchemaColumnsByTable = Object.create(null);
   visitNode(sourceFile, result);
   return result;

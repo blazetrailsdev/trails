@@ -1,11 +1,17 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import ts from "typescript";
+import * as ts from "typescript/unstable/ast";
+import type { Diagnostic } from "typescript/unstable/sync";
 import * as path from "node:path";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import { fileURLToPath } from "node:url";
-import { remapDiagnostics } from "@blazetrails/trails-tsc";
-import { createArSolutionBuilder, createArTrailsProgram } from "./ar-program.js";
+import {
+  createArSolutionBuilder,
+  createArTrailsProgram,
+  ExitStatus,
+  getPreEmitDiagnostics,
+  remapDiagnostics,
+} from "./ar-program.js";
 
 const createProgramWithArPlugin = createArTrailsProgram;
 const createBuilderWithArPlugin = createArSolutionBuilder;
@@ -29,7 +35,7 @@ describe("trails-tsc CLI — Phase 1b.1", () => {
   it("consumer.ts types `post.title` as string, `post.published` as boolean", () => {
     const configPath = path.join(FIXTURES_DIR, "tsconfig.json");
     const { program } = createProgramWithArPlugin(configPath);
-    const checker = program.getTypeChecker();
+    const checker = program.getProject().checker;
 
     const consumerFile = program.getSourceFile(path.join(FIXTURES_DIR, "consumer.ts"));
     expect(consumerFile).toBeDefined();
@@ -60,7 +66,7 @@ describe("trails-tsc CLI — Phase 1b.1", () => {
   it("zero diagnostics across all diagnostic categories", () => {
     const configPath = path.join(FIXTURES_DIR, "tsconfig.json");
     const { program } = createProgramWithArPlugin(configPath);
-    const allDiags = [...ts.getPreEmitDiagnostics(program)];
+    const allDiags = getPreEmitDiagnostics(program);
     expect(allDiags).toHaveLength(0);
   });
 
@@ -110,15 +116,15 @@ describe("trails-tsc diagnostic remap — Phase 1b.2", () => {
   it("remaps error line from virtualized coordinates to original source line", () => {
     const configPath = path.join(FIXTURES_DIR, "tsconfig-with-error.json");
     const { program, host } = createProgramWithArPlugin(configPath);
-    const diagnostics = [...ts.getPreEmitDiagnostics(program)];
+    const diagnostics = getPreEmitDiagnostics(program);
 
     expect(diagnostics.length).toBeGreaterThan(0);
 
     const errorDiag = diagnostics.find((d) => d.code === 2322);
     expect(errorDiag).toBeDefined();
-    expect(errorDiag!.file).toBeDefined();
+    expect(errorDiag!.fileName).toBeDefined();
 
-    const virtualLine = errorDiag!.file!.getLineAndCharacterOfPosition(errorDiag!.start!).line;
+    const virtualLine = errorDiag!.startPosition!.line;
 
     const originalText = fs.readFileSync(path.join(FIXTURES_DIR, "post-with-error.ts"), "utf8");
     const originalLines = originalText.split("\n");
@@ -130,24 +136,22 @@ describe("trails-tsc diagnostic remap — Phase 1b.2", () => {
     const remapped = remapDiagnostics(diagnostics, host);
     const remappedDiag = remapped.find((d) => d.code === 2322);
     expect(remappedDiag).toBeDefined();
-    const remappedLine = remappedDiag!.file!.getLineAndCharacterOfPosition(
-      remappedDiag!.start!,
-    ).line;
+    const remappedLine = remappedDiag!.startPosition!.line;
     expect(remappedLine).toBe(errorLineIdx);
   });
 
   it("non-virtualized file diagnostics pass through unchanged", () => {
     const configPath = path.join(FIXTURES_DIR, "tsconfig-with-error.json");
     const { program, host } = createProgramWithArPlugin(configPath);
-    const diagnostics = [...ts.getPreEmitDiagnostics(program)];
+    const diagnostics = getPreEmitDiagnostics(program);
     const remapped = remapDiagnostics(diagnostics, host);
     for (let i = 0; i < diagnostics.length; i++) {
       const d = diagnostics[i];
-      if (!d.file) continue;
-      const deltas = host.getDeltasForFile(path.resolve(d.file.fileName));
+      if (!d.fileName) continue;
+      const deltas = host.getDeltasForFile(path.resolve(d.fileName));
       if (!deltas || deltas.length === 0) {
         // eslint-disable-next-line vitest/no-conditional-expect
-        expect(remapped[i].start).toBe(d.start);
+        expect(remapped[i].pos).toBe(d.pos);
       }
     }
   });
@@ -159,14 +163,14 @@ describe("trails-tsc transitive extends — Phase 1b.3", () => {
   it("virtualizes `class Admin extends User` where User extends Base", () => {
     const configPath = path.join(TRANSITIVE_DIR, "tsconfig.json");
     const { program } = createProgramWithArPlugin(configPath);
-    const diagnostics = [...ts.getPreEmitDiagnostics(program)];
+    const diagnostics = getPreEmitDiagnostics(program);
     expect(diagnostics).toHaveLength(0);
   });
 
   it("admin.role types as string, admin.name inherited from User types as string", () => {
     const configPath = path.join(TRANSITIVE_DIR, "tsconfig.json");
     const { program } = createProgramWithArPlugin(configPath);
-    const checker = program.getTypeChecker();
+    const checker = program.getProject().checker;
 
     const consumerFile = program.getSourceFile(path.join(TRANSITIVE_DIR, "consumer.ts"));
     expect(consumerFile).toBeDefined();
@@ -218,12 +222,12 @@ describe("trails-tsc auto-import — Phase 1b.4", () => {
   it("zero diagnostics — auto-imported Author resolves for the belongsTo declare", () => {
     const configPath = path.join(AUTO_IMPORT_DIR, "tsconfig.json");
     const { program } = createProgramWithArPlugin(configPath);
-    const diagnostics = [...ts.getPreEmitDiagnostics(program)];
+    const diagnostics = getPreEmitDiagnostics(program);
 
     for (const d of diagnostics) {
-      const msg = typeof d.messageText === "string" ? d.messageText : JSON.stringify(d.messageText);
-      const loc = d.file
-        ? `${path.basename(d.file.fileName)}:${d.file.getLineAndCharacterOfPosition(d.start ?? 0).line + 1}`
+      const msg = d.text;
+      const loc = d.fileName
+        ? `${path.basename(d.fileName)}:${(d.startPosition?.line ?? 0) + 1}`
         : "?";
       console.error(`DIAG [${d.code}] ${loc}: ${msg}`);
     }
@@ -274,23 +278,20 @@ describe("trails-tsc --build composite projects — Phase 1b.5", () => {
 
   it("builds a composite solution with a virtualizing host on every project", () => {
     withTempComposite((dir) => {
-      const diagnostics: ts.Diagnostic[] = [];
+      const diagnostics: Diagnostic[] = [];
       const builder = createBuilderWithArPlugin([path.join(dir, "tsconfig.json")], {
         onDiagnostic: (d) => {
           diagnostics.push(d);
-          const msg =
-            typeof d.messageText === "string"
-              ? d.messageText
-              : ts.flattenDiagnosticMessageText(d.messageText, "\n");
-          const loc = d.file
-            ? `${path.basename(d.file.fileName)}:${d.file.getLineAndCharacterOfPosition(d.start ?? 0).line + 1}`
+          const msg = d.text;
+          const loc = d.fileName
+            ? `${path.basename(d.fileName)}:${(d.startPosition?.line ?? 0) + 1}`
             : "?";
           console.error(`DIAG [${d.code}] ${loc}: ${msg}`);
         },
       });
       const status = builder.build();
       expect(diagnostics).toHaveLength(0);
-      expect(status).toBe(ts.ExitStatus.Success);
+      expect(status).toBe(ExitStatus.Success);
 
       expect(fs.existsSync(path.join(dir, "models", "dist", "author.d.ts"))).toBe(true);
       expect(fs.existsSync(path.join(dir, "app", "dist", "post.d.ts"))).toBe(true);
@@ -322,11 +323,11 @@ describe("trails-tsc --build composite projects — Phase 1b.5", () => {
 
   it("re-build after editing a model reflects the new declares in dependents", () => {
     withTempComposite((dir) => {
-      const firstDiags: ts.Diagnostic[] = [];
+      const firstDiags: Diagnostic[] = [];
       const first = createBuilderWithArPlugin([path.join(dir, "tsconfig.json")], {
         onDiagnostic: (d) => firstDiags.push(d),
       });
-      expect(first.build()).toBe(ts.ExitStatus.Success);
+      expect(first.build()).toBe(ExitStatus.Success);
       expect(firstDiags).toHaveLength(0);
 
       const authorPath = path.join(dir, "models", "author.ts");
@@ -339,11 +340,11 @@ describe("trails-tsc --build composite projects — Phase 1b.5", () => {
         ),
       );
 
-      const secondDiags: ts.Diagnostic[] = [];
+      const secondDiags: Diagnostic[] = [];
       const second = createBuilderWithArPlugin([path.join(dir, "tsconfig.json")], {
         onDiagnostic: (d) => secondDiags.push(d),
       });
-      expect(second.build()).toBe(ts.ExitStatus.Success);
+      expect(second.build()).toBe(ExitStatus.Success);
       expect(secondDiags).toHaveLength(0);
 
       const authorDts = fs.readFileSync(path.join(dir, "models", "dist", "author.d.ts"), "utf8");
@@ -384,7 +385,7 @@ describe("trails-tsc — schemaColumnsByTable (Phase R.3)", () => {
         users: { name: "string", age: "integer", is_admin: "boolean" },
       },
     });
-    const checker = program.getTypeChecker();
+    const checker = program.getProject().checker;
 
     const consumer = program.getSourceFile(path.join(SCHEMA_DIR, "consumer.ts"));
     expect(consumer).toBeDefined();
@@ -530,7 +531,7 @@ describe("trails-tsc — schemaColumnsByTable (Phase R.3)", () => {
     expect(fromTs).toEqual(fromJson);
     const configPath = path.join(SCHEMA_DIR, "tsconfig.json");
     const { program } = createProgramWithArPlugin(configPath, { schemaColumnsByTable: fromTs });
-    const checker = program.getTypeChecker();
+    const checker = program.getProject().checker;
     const consumer = program.getSourceFile(path.join(SCHEMA_DIR, "consumer.ts"));
     expect(consumer).toBeDefined();
     const probed: Record<string, string> = {};
@@ -549,7 +550,7 @@ describe("trails-tsc — schemaColumnsByTable (Phase R.3)", () => {
   it("without schema, those accesses fall back to unknown (declares weren't injected)", () => {
     const configPath = path.join(SCHEMA_DIR, "tsconfig.json");
     const { program } = createProgramWithArPlugin(configPath);
-    const checker = program.getTypeChecker();
+    const checker = program.getProject().checker;
 
     const consumer = program.getSourceFile(path.join(SCHEMA_DIR, "consumer.ts"));
     const probed: Record<string, string> = {};
@@ -562,8 +563,8 @@ describe("trails-tsc — schemaColumnsByTable (Phase R.3)", () => {
     consumer!.forEachChild(visit);
 
     const diags = [
-      ...program.getSemanticDiagnostics(consumer),
-      ...program.getSyntacticDiagnostics(consumer),
+      ...program.getSemanticDiagnostics(consumer!.fileName),
+      ...program.getSyntacticDiagnostics(consumer!.fileName),
     ];
     expect(diags.length).toBeGreaterThan(0);
   });
