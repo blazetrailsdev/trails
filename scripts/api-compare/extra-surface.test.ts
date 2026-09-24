@@ -333,6 +333,52 @@ describe("a TS-only package", () => {
     expect(pkg?.extraFiles[0]?.rubyFile).toBeNull();
     expect(pkg?.extraFiles[0]?.extras.map((e) => e.name)).toEqual(["squeeze", "succ"]);
   });
+
+  it("subtracts a receipted member from both dimensions, moved or novel", () => {
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activerecord: {
+          classes: {
+            "ActiveRecord::Relation": rubyClass({
+              name: "ActiveRecord::Relation",
+              file: "relation.rb",
+              instance: [method("each"), method("first")],
+            }),
+          },
+          modules: {},
+        },
+      },
+    };
+    const each = method("each");
+    each.noRailsEquivalent = "PERMANENT";
+    const squeeze = method("squeeze");
+    squeeze.noRailsEquivalent = "PERMANENT";
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        "ruby-compat": {
+          classes: {},
+          modules: {},
+          fileFunctions: { "range.ts": [each, method("first"), squeeze] },
+        },
+      },
+    };
+    const pkg = buildReport(ruby, ts, {
+      filterPkg: "ruby-compat",
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    }).packages[0];
+    expect(pkg?.totalAllowlisted).toBe(2);
+    expect(pkg?.totalNovel).toBe(0);
+    expect(pkg?.totalExtras).toBe(1);
+    expect(pkg?.extraFiles[0]?.extras).toEqual([
+      expect.objectContaining({ name: "first", kind: "moved" }),
+    ]);
+  });
 });
 
 describe("concernHookNames", () => {
