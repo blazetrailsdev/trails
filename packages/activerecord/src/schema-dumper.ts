@@ -386,7 +386,7 @@ export abstract class SchemaDumper {
       if (typeof pk === "string") {
         if (pk !== "id") opts.push(`primaryKey: ${JSON.stringify(pk)}`);
         const pkcol = columns.find((c) => c.name === pk);
-        let pkcolspec = this.columnSpecForPrimaryKey(pkcol);
+        let pkcolspec = await this.columnSpecForPrimaryKey(pkcol);
         if (Object.keys(pkcolspec).length > 0) {
           if (!Object.keys(pkcolspec).every((k) => k === "id" || k === "default")) {
             const { id: type, ...rest } = pkcolspec;
@@ -415,7 +415,7 @@ export abstract class SchemaDumper {
           throw new Error(`Unknown type '${column.sqlType ?? ""}' for column '${column.name}'`);
         if (column.name === pk) continue;
 
-        const [type, colspec] = this.columnSpec(column);
+        const [type, colspec] = await this.columnSpec(column);
         const optStr =
           Object.keys(colspec).length > 0 ? `, { ${this.formatColspec(colspec)} }` : "";
         if (type.startsWith(":")) {
@@ -516,13 +516,15 @@ export abstract class SchemaDumper {
   protected uniqueConstraintsInCreate?(table: string, stream: IO | StringIO): Promise<void>;
 
   /** @internal */
-  protected abstract columnSpec(column: Column): [string, Record<string, unknown>];
+  protected abstract columnSpec(column: Column): Promise<[string, Record<string, unknown>]>;
 
   /** @internal */
-  protected abstract columnSpecForPrimaryKey(column: Column | undefined): Record<string, unknown>;
+  protected abstract columnSpecForPrimaryKey(
+    column: Column | undefined,
+  ): Promise<Record<string, unknown>>;
 
   /** @internal */
-  protected abstract prepareColumnOptions(column: Column): Record<string, unknown>;
+  protected abstract prepareColumnOptions(column: Column): Promise<Record<string, unknown>>;
 
   /** @internal */
   protected abstract isDefaultPrimaryKey(column: Column): boolean;
@@ -558,7 +560,7 @@ export abstract class SchemaDumper {
   protected abstract schemaExpression(column: Column): string | undefined;
 
   /** @internal */
-  protected abstract schemaCollation(column: Column): string | undefined;
+  protected abstract schemaCollation(column: Column): Promise<string | undefined>;
 
   /** @internal */
   indexParts(index: IndexInfo): string[] {

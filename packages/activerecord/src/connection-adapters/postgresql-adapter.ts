@@ -125,8 +125,9 @@ const PQTRANS_IDLE = 0;
 const PQTRANS_ACTIVE = 1;
 const PQTRANS_INTRANS = 2;
 const PQTRANS_INERROR = 3;
-const PQTRANS_UNKNOWN = 4;
 const IDLE_TRANSACTION_STATUSES = [PQTRANS_IDLE, PQTRANS_INTRANS, PQTRANS_INERROR];
+
+type RawConnection = pg.Client & { transactionStatus(): number };
 const FEATURE_NOT_SUPPORTED = "0A000";
 import {
   buildTruncateStatements as pgBuildTruncateStatements,
@@ -359,11 +360,11 @@ export class PostgreSQLAdapter
   static decodeDates = true;
 
   /** @internal */
-  get _rawConnection(): pg.Client | null {
-    return this._connection as unknown as pg.Client | null;
+  get _rawConnection(): RawConnection | null {
+    return this._connection as unknown as RawConnection | null;
   }
   /** @internal */
-  set _rawConnection(value: pg.Client | null) {
+  set _rawConnection(value: RawConnection | null) {
     this._connection = value as unknown as AbstractAdapter | null;
   }
   /** @internal */
@@ -408,7 +409,6 @@ export class PostgreSQLAdapter
 
   private _pgClientOptions: pg.ClientConfig | null = null;
   private _client: pg.Client | null = null;
-  private _readyForQueryStatus = "I";
   private _typeMap: HashLookupTypeMap | null = null;
 
   /** @internal */
@@ -452,6 +452,7 @@ export class PostgreSQLAdapter
     if (deprecatedRawConnection) {
       deprecator().warn(RAW_CONNECTION_DEPRECATION_MESSAGE);
       this._acceptDeprecatedRawConnection(config);
+      this._attachReadyForQueryListener(config as pg.Client);
       return;
     }
     if (typeof config === "string") {
@@ -788,7 +789,7 @@ export class PostgreSQLAdapter
   }
 
   private async _doAcquire(acquireGen: number): Promise<pg.Client> {
-    let client = this._rawConnection;
+    let client: pg.Client | null = this._rawConnection;
     if (client == null) {
       let newClient: pg.Client;
       try {
@@ -816,7 +817,7 @@ export class PostgreSQLAdapter
       } else {
         newClient.on("error", () => {});
         this._attachReadyForQueryListener(newClient);
-        this._rawConnection = newClient;
+        this._rawConnection = newClient as RawConnection;
         client = newClient;
       }
     }
@@ -870,34 +871,28 @@ export class PostgreSQLAdapter
     );
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE adapter-driver-open-close-and-transaction-status-shims
-   */
-  get transactionStatus(): number {
-    const client = this._rawConnection as (pg.Client & { _activeQuery?: unknown }) | null;
-    if (client == null) return PQTRANS_UNKNOWN;
-    if (client._activeQuery != null) return PQTRANS_ACTIVE;
-    switch (this._readyForQueryStatus) {
-      case "T":
-        return PQTRANS_INTRANS;
-      case "E":
-        return PQTRANS_INERROR;
-      default:
-        return PQTRANS_IDLE;
-    }
-  }
-
   /** @internal */
   private _attachReadyForQueryListener(client: pg.Client): void {
-    this._readyForQueryStatus = "I";
+    let readyForQueryStatus = "I";
+    (client as RawConnection).transactionStatus = (): number => {
+      if ((client as pg.Client & { _activeQuery?: unknown })._activeQuery != null)
+        return PQTRANS_ACTIVE;
+      switch (readyForQueryStatus) {
+        case "T":
+          return PQTRANS_INTRANS;
+        case "E":
+          return PQTRANS_INERROR;
+        default:
+          return PQTRANS_IDLE;
+      }
+    };
     const connection = (client as pg.Client & { connection?: pg.Connection }).connection;
     if (connection == null) return;
     connection.on("readyForQuery", (message: { status?: string }) => {
-      if (typeof message?.status === "string") this._readyForQueryStatus = message.status;
+      if (typeof message?.status === "string") readyForQueryStatus = message.status;
     });
     connection.on("errorMessage", () => {
-      if (this._readyForQueryStatus === "T") this._readyForQueryStatus = "E";
+      if (readyForQueryStatus === "T") readyForQueryStatus = "E";
     });
   }
 
@@ -911,7 +906,10 @@ export class PostgreSQLAdapter
       cancel(processID: number, secretKey: number): void;
     };
     const txClient = this._client as PgClientWithPid | null;
-    if (this._rawConnection == null || IDLE_TRANSACTION_STATUSES.includes(this.transactionStatus)) {
+    if (
+      this._rawConnection == null ||
+      IDLE_TRANSACTION_STATUSES.includes(this._rawConnection.transactionStatus())
+    ) {
       return;
     }
     if (txClient?.processID == null) return;
@@ -1107,7 +1105,7 @@ export class PostgreSQLAdapter
         return;
       }
 
-      if (this.transactionStatus !== PQTRANS_IDLE) {
+      if (live.transactionStatus() !== PQTRANS_IDLE) {
         await live.query("ROLLBACK");
       }
       await live.query("DISCARD ALL");
@@ -1179,11 +1177,6 @@ export class PostgreSQLAdapter
       await this._closingDriver;
       this._rawConnection = null;
     });
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE adapter-driver-open-close-and-transaction-status-shims */
-  whenClosed(): Promise<void> {
-    return this._closingDriver ?? Promise.resolve();
   }
 
   override discardBang(): void {
@@ -1996,7 +1989,10 @@ export class PostgreSQLAdapter
 
   /** @internal */
   isRetryableQueryError(exception: unknown): boolean {
-    return this.transactionStatus !== PQTRANS_INERROR && super.isRetryableQueryError(exception);
+    return (
+      this._rawConnection?.transactionStatus() !== PQTRANS_INERROR &&
+      super.isRetryableQueryError(exception)
+    );
   }
 
   /** @internal */

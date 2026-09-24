@@ -5,6 +5,7 @@ import type { SchemaSource } from "../../schema-dumper.js";
 import { Result } from "../../result.js";
 import { Column } from "./column.js";
 import { TypeMetadata } from "./type-metadata.js";
+import { Version } from "../abstract-adapter.js";
 
 const stubSource: SchemaSource = {
   tables: async () => [],
@@ -18,6 +19,28 @@ class TestSchemaDumper extends SchemaDumper {
   }
 }
 const make = () => TestSchemaDumper.create(stubSource);
+const stubConnection = (
+  o: {
+    collation?: string;
+    expression?: string;
+    onQuery?: (sql: string) => void;
+  } = {},
+): NonNullable<TestSchemaDumper["connection"]> => ({
+  tableOptions: async () => ({}),
+  internalExecQuery: async (sql: string) => {
+    o.onQuery?.(sql);
+    return Result.fromRowHashes([{ Collation: o.collation ?? null }]);
+  },
+  queryValue: async (sql: string) => {
+    o.onQuery?.(sql);
+    return o.expression ?? null;
+  },
+  quote: (v: unknown) => `'${String(v)}'`,
+  quoteColumnName: (v: unknown) => `\`${String(v)}\``,
+  isMariadb: async () => false,
+  databaseVersion: new Version("8.0.0"),
+  createTableInfo: async () => null,
+});
 const col = (
   o: {
     name?: string;
@@ -107,25 +130,34 @@ describe("MySQL::SchemaDumper", () => {
   });
 
   describe("schemaCollation", () => {
-    it("returns undefined when no collation", () =>
-      expect((make() as any).schemaCollation(col({ collation: null }))).toBeUndefined());
-    it("returns JSON collation when cache not populated", () =>
-      expect((make() as any).schemaCollation(col({ collation: "utf8mb4_unicode_ci" }))).toBe(
-        '"utf8mb4_unicode_ci"',
-      ));
-    it("omits when matching table default", () => {
+    it("returns undefined when no collation", async () =>
+      expect(await (make() as any).schemaCollation(col({ collation: null }))).toBeUndefined());
+    it("omits when matching table default", async () => {
       const d = make();
-      (d as any)._tableCollationCache["users"] = "utf8mb4_unicode_ci";
+      d.setConnection(stubConnection({ collation: "utf8mb4_unicode_ci" }));
       d.tableName = "users";
-      expect((d as any).schemaCollation(col({ collation: "utf8mb4_unicode_ci" }))).toBeUndefined();
+      expect(
+        await (d as any).schemaCollation(col({ collation: "utf8mb4_unicode_ci" })),
+      ).toBeUndefined();
     });
-    it("emits when differing from table default", () => {
+    it("emits when differing from table default", async () => {
       const d = make();
-      (d as any)._tableCollationCache["users"] = "utf8mb4_general_ci";
+      d.setConnection(stubConnection({ collation: "utf8mb4_general_ci" }));
       d.tableName = "users";
-      expect((d as any).schemaCollation(col({ collation: "utf8mb4_unicode_ci" }))).toBe(
+      expect(await (d as any).schemaCollation(col({ collation: "utf8mb4_unicode_ci" }))).toBe(
         '"utf8mb4_unicode_ci"',
       );
+    });
+    it("queries SHOW TABLE STATUS once per table", async () => {
+      const d = make();
+      const queries: string[] = [];
+      d.setConnection(
+        stubConnection({ collation: "utf8mb4_general_ci", onQuery: (q) => queries.push(q) }),
+      );
+      d.tableName = "users";
+      await (d as any).schemaCollation(col({ collation: "utf8mb4_unicode_ci" }));
+      await (d as any).schemaCollation(col({ collation: "utf8mb4_unicode_ci" }));
+      expect(queries).toEqual(["SHOW TABLE STATUS LIKE 'users'"]);
     });
   });
 
@@ -158,24 +190,24 @@ describe("MySQL::SchemaDumper", () => {
   });
 
   describe("prepareColumnOptions", () => {
-    it("adds unsigned", () =>
-      expect((make() as any).prepareColumnOptions(col({ unsigned: true }))["unsigned"]).toBe(
-        "true",
-      ));
-    it("adds autoIncrement", () =>
+    it("adds unsigned", async () =>
       expect(
-        (make() as any).prepareColumnOptions(col({ autoIncrement: true }))["autoIncrement"],
+        (await (make() as any).prepareColumnOptions(col({ unsigned: true })))["unsigned"],
       ).toBe("true"));
-    it("prepends size key for tinytext", () => {
-      const opts = (make() as any).prepareColumnOptions(col({ sqlType: "tinytext" }));
+    it("adds autoIncrement", async () =>
+      expect(
+        (await (make() as any).prepareColumnOptions(col({ autoIncrement: true })))["autoIncrement"],
+      ).toBe("true"));
+    it("prepends size key for tinytext", async () => {
+      const opts = await (make() as any).prepareColumnOptions(col({ sqlType: "tinytext" }));
       expect(Object.keys(opts)[0]).toBe("size");
       expect(opts["size"]).toBe('"tiny"');
     });
-    it("virtual column: emits type prefix, as, and stored", () => {
+    it("virtual column: emits type prefix, as, and stored", async () => {
       const d = make();
       d.tableName = "t";
-      d.virtualExpressionCache["t"] = { full_name: '"CONCAT(a, b)"' };
-      const opts = (d as any).prepareColumnOptions(
+      d.setConnection(stubConnection({ expression: "CONCAT(a, b)" }));
+      const opts = await (d as any).prepareColumnOptions(
         col({
           name: "full_name",
           type: "string",
@@ -193,114 +225,66 @@ describe("MySQL::SchemaDumper", () => {
   });
 
   describe("columnSpecForPrimaryKey", () => {
-    it("removes autoIncrement for integer pk", () => {
+    it("removes autoIncrement for integer pk", async () => {
       expect(
-        (make() as any).columnSpecForPrimaryKey(col({ type: "integer", autoIncrement: true }))[
-          "autoIncrement"
-        ],
+        (
+          await (make() as any).columnSpecForPrimaryKey(
+            col({ type: "integer", autoIncrement: true }),
+          )
+        )["autoIncrement"],
       ).toBeUndefined();
     });
   });
 
-  it("extractExpressionForVirtualColumn returns cached expression", () => {
-    const d = make();
-    d.tableName = "t";
-    d.virtualExpressionCache["t"] = { col: '"e"' };
-    expect((d as any).extractExpressionForVirtualColumn(col({ name: "col", virtual: true }))).toBe(
-      '"e"',
-    );
+  describe("extractExpressionForVirtualColumn", () => {
+    it("queries information_schema for the column's generation expression", async () => {
+      const d = make();
+      const queries: string[] = [];
+      d.setConnection(
+        stubConnection({ expression: "upper(`name`)", onQuery: (q) => queries.push(q) }),
+      );
+      d.tableName = "t";
+      expect(
+        await (d as any).extractExpressionForVirtualColumn(
+          col({ name: "upper_name", virtual: true }),
+        ),
+      ).toBe('"upper(`name`)"');
+      expect(queries).toEqual([
+        "SELECT generation_expression FROM information_schema.columns" +
+          " WHERE table_schema = database()   AND table_name = 't'   AND column_name = 'upper_name'",
+      ]);
+    });
+
+    it('strips escaped single quotes (mirrors Rails gsub("\\\\\'", "\'"))', async () => {
+      const d = make();
+      d.setConnection(
+        stubConnection({ expression: "json_extract(`profile`,_utf8mb4\\'$.email\\')" }),
+      );
+      d.tableName = "t";
+      expect(
+        await (d as any).extractExpressionForVirtualColumn(col({ name: "c", virtual: true })),
+      ).toBe(JSON.stringify("json_extract(`profile`,_utf8mb4'$.email')"));
+    });
   });
 
   describe("tableOptions", () => {
     it("returns the adapter's options and writes no collation cache", async () => {
       const d = make();
       d.setConnection({
+        ...stubConnection(),
         tableOptions: async () => ({ charset: "utf8mb4", collation: "utf8mb4_bin" }),
       });
       expect(await (d as any).tableOptions("users")).toEqual({
         charset: "utf8mb4",
         collation: "utf8mb4_bin",
       });
-      expect(Object.hasOwn((d as any)._tableCollationCache, "users")).toBe(false);
+      expect((d as any)._tableCollationCache).toBeUndefined();
     });
 
     it("returns empty object when connection is absent", async () => {
       const d = make();
       d.setConnection(undefined);
       expect(await (d as any).tableOptions("users")).toEqual({});
-    });
-  });
-
-  describe("populateTableCollationFromStatus", () => {
-    it("reads the collation from SHOW TABLE STATUS", async () => {
-      const d = make();
-      d.setConnection({
-        tableOptions: async () => ({ charset: "utf8mb4" }),
-        internalExecQuery: async () => Result.fromRowHashes([{ Collation: "utf8mb4_general_ci" }]),
-        quote: (v: unknown) => `'${String(v)}'`,
-      });
-      await (d as any).populateTableCollationFromStatus("users");
-      expect((d as any)._tableCollationCache["users"]).toBe("utf8mb4_general_ci");
-    });
-  });
-
-  describe("populateVirtualExpressionCache", () => {
-    it("caches the inspect-ready generation expression per column", async () => {
-      const d = make();
-      d.setConnection({
-        tableOptions: async () => ({}),
-        internalExecQuery: async () =>
-          Result.fromRowHashes([
-            { name: "upper_name", expr: "upper(`name`)" },
-            { name: "name_length", expr: "length(`name`)" },
-          ]),
-        quote: (v: unknown) => `'${String(v)}'`,
-      });
-      await (d as any).populateVirtualExpressionCache("t");
-      expect(d.virtualExpressionCache["t"]).toEqual({
-        upper_name: '"upper(`name`)"',
-        name_length: '"length(`name`)"',
-      });
-    });
-
-    it('strips escaped single quotes (mirrors Rails gsub("\\\\\'", "\'"))', async () => {
-      const d = make();
-      d.setConnection({
-        tableOptions: async () => ({}),
-        internalExecQuery: async () =>
-          Result.fromRowHashes([
-            { name: "c", expr: "json_extract(`profile`,_utf8mb4\\'$.email\\')" },
-          ]),
-        quote: (v: unknown) => `'${String(v)}'`,
-      });
-      await (d as any).populateVirtualExpressionCache("t");
-      expect(d.virtualExpressionCache["t"]!["c"]).toBe(
-        JSON.stringify("json_extract(`profile`,_utf8mb4'$.email')"),
-      );
-    });
-
-    it("does not re-query when the table is already cached", async () => {
-      const d = make();
-      let calls = 0;
-      d.setConnection({
-        tableOptions: async () => ({}),
-        internalExecQuery: async () => {
-          calls++;
-          return Result.fromRowHashes([]);
-        },
-        quote: (v: unknown) => `'${String(v)}'`,
-      });
-      d.virtualExpressionCache["t"] = { existing: '"e"' };
-      await (d as any).populateVirtualExpressionCache("t");
-      expect(calls).toBe(0);
-      expect(d.virtualExpressionCache["t"]).toEqual({ existing: '"e"' });
-    });
-
-    it("no-ops when the connection cannot run schema queries", async () => {
-      const d = make();
-      d.setConnection({ tableOptions: async () => ({}) });
-      await (d as any).populateVirtualExpressionCache("t");
-      expect(Object.hasOwn(d.virtualExpressionCache, "t")).toBe(false);
     });
   });
 });

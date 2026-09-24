@@ -6,17 +6,18 @@ import { PostgreSQLAdapter } from "./postgresql-adapter.js";
 const PQTRANS_IDLE = 0;
 const PQTRANS_INTRANS = 2;
 const PQTRANS_INERROR = 3;
-const PQTRANS_UNKNOWN = 4;
 
 function transactionStatus(adapter: PostgreSQLAdapter): number {
-  return (adapter as unknown as { transactionStatus: number }).transactionStatus;
+  return (
+    adapter as unknown as { _rawConnection: { transactionStatus(): number } }
+  )._rawConnection.transactionStatus();
 }
 
 describeIfPg("PostgreSQLAdapter transaction_status", () => {
   it("is unknown before a connection is opened", async () => {
     const adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
     try {
-      expect(transactionStatus(adapter)).toBe(PQTRANS_UNKNOWN);
+      expect(adapter._rawConnection).toBeNull();
     } finally {
       await adapter.disconnectBang();
     }

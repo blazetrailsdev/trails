@@ -443,13 +443,13 @@ describe.skipIf(!hasCredentials)("libsqlRemoteDriver — network round-trip (TUR
 });
 
 describe.skipIf(!hasCredentials)("LibSQLRemoteAdapter — network adapter smoke (TURSO_*)", () => {
-  let adapter: Awaited<ReturnType<typeof LibSQLRemoteAdapter.openAsync>>;
+  let adapter: LibSQLRemoteAdapter;
 
   beforeAll(async () => {
-    adapter = await LibSQLRemoteAdapter.openAsync({
+    adapter = await new LibSQLRemoteAdapter({
       database: tursoUrl,
       driverOptions: { authToken: tursoToken },
-    });
+    }).connectBang();
   });
 
   afterAll(async () => {
@@ -480,24 +480,24 @@ describe.skipIf(!hasCredentials)(
       }
     };
 
-    let primary: Awaited<ReturnType<typeof LibSQLRemoteAdapter.openAsync>>;
+    let primary: LibSQLRemoteAdapter;
     let replica: LibSQLReplicaAdapter;
     const table = `replica_smoke_${Date.now()}`;
 
     beforeAll(async () => {
       removeFiles();
-      primary = await LibSQLRemoteAdapter.openAsync({
+      primary = await new LibSQLRemoteAdapter({
         database: tursoUrl,
         driverOptions: { authToken: tursoToken },
-      });
+      }).connectBang();
       await primary.execute(`DROP TABLE IF EXISTS ${table}`);
       await primary.execute(`CREATE TABLE ${table} (id INTEGER PRIMARY KEY, label TEXT)`);
       await primary.execute(`INSERT INTO ${table} (id, label) VALUES (1, 'remote')`);
 
-      replica = (await LibSQLReplicaAdapter.openAsync({
+      replica = await new LibSQLReplicaAdapter({
         database: replicaPath,
         driverOptions: { syncUrl: tursoUrl, authToken: tursoToken },
-      })) as LibSQLReplicaAdapter;
+      }).connectBang();
     });
 
     afterAll(async () => {
@@ -539,23 +539,23 @@ describe.skipIf(!hasCredentials)(
     };
     const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
-    let primary: Awaited<ReturnType<typeof LibSQLRemoteAdapter.openAsync>>;
+    let primary: LibSQLRemoteAdapter;
     let replica: LibSQLReplicaAdapter;
     const table = `autosync_${Date.now()}`;
 
     beforeAll(async () => {
       removeFiles();
-      primary = await LibSQLRemoteAdapter.openAsync({
+      primary = await new LibSQLRemoteAdapter({
         database: tursoUrl,
         driverOptions: { authToken: tursoToken },
-      });
+      }).connectBang();
       await primary.execute(`DROP TABLE IF EXISTS ${table}`);
       await primary.execute(`CREATE TABLE ${table} (id INTEGER PRIMARY KEY, label TEXT)`);
 
-      replica = (await LibSQLReplicaAdapter.openAsync({
+      replica = await new LibSQLReplicaAdapter({
         database: replicaPath,
         driverOptions: { syncUrl: tursoUrl, authToken: tursoToken, syncPeriod: 1 },
-      })) as LibSQLReplicaAdapter;
+      }).connectBang();
     });
 
     afterAll(async () => {

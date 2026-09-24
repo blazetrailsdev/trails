@@ -18,17 +18,19 @@ export class SchemaDumper extends BaseSchemaDumper {
   }
 
   /** @internal */
-  protected columnSpec(column: Column): [string, Record<string, unknown>] {
-    return [this.schemaTypeWithVirtual(column), this.prepareColumnOptions(column)];
+  protected async columnSpec(column: Column): Promise<[string, Record<string, unknown>]> {
+    return [this.schemaTypeWithVirtual(column), await this.prepareColumnOptions(column)];
   }
 
   /** @internal */
-  protected columnSpecForPrimaryKey(column: Column | undefined): Record<string, unknown> {
+  protected async columnSpecForPrimaryKey(
+    column: Column | undefined,
+  ): Promise<Record<string, unknown>> {
     const spec: Record<string, unknown> = {};
     if (!this.isDefaultPrimaryKey(column!)) {
       spec["id"] = JSON.stringify(this.schemaType(column!).replace(/^:/, ""));
     }
-    const colOpts = this.prepareColumnOptions(column!);
+    const colOpts = await this.prepareColumnOptions(column!);
     delete colOpts["null"];
     Object.assign(spec, colOpts);
     if (this.isExplicitPrimaryKeyDefault(column!)) {
@@ -38,7 +40,7 @@ export class SchemaDumper extends BaseSchemaDumper {
   }
 
   /** @internal */
-  protected prepareColumnOptions(column: Column): Record<string, unknown> {
+  protected async prepareColumnOptions(column: Column): Promise<Record<string, unknown>> {
     const spec: Record<string, unknown> = {};
     const limit = this.schemaLimit(column);
     if (limit !== undefined) spec["limit"] = limit;
@@ -49,7 +51,7 @@ export class SchemaDumper extends BaseSchemaDumper {
     const def = this.schemaDefault(column);
     if (def !== undefined) spec["default"] = def;
     if (column.null === false) spec["null"] = "false";
-    const collation = this.schemaCollation(column);
+    const collation = await this.schemaCollation(column);
     if (collation !== undefined) spec["collation"] = collation;
     if (column.comment) spec["comment"] = JSON.stringify(column.comment);
     return spec;
@@ -132,7 +134,7 @@ export class SchemaDumper extends BaseSchemaDumper {
   }
 
   /** @internal */
-  protected schemaCollation(column: Column): string | undefined {
+  protected async schemaCollation(column: Column): Promise<string | undefined> {
     if (column.collation) return JSON.stringify(column.collation);
     return undefined;
   }

@@ -111,21 +111,21 @@ describe("PostgreSQL::SchemaDumper", () => {
   });
 
   describe("prepareColumnOptions", () => {
-    it("adds array: true for array columns", () => {
+    it("adds array: true for array columns", async () => {
       const dumper = SchemaDumper.create(emptySource) as any;
       const col = makeColumn({ type: "string", sqlType: "character varying[]", array: true });
-      const spec = dumper.prepareColumnOptions(col);
+      const spec = await dumper.prepareColumnOptions(col);
       expect(spec["array"]).toBe(true);
     });
 
-    it("does not add array for non-array columns", () => {
+    it("does not add array for non-array columns", async () => {
       const dumper = SchemaDumper.create(emptySource) as any;
       const col = makeColumn({ type: "string", sqlType: "character varying" });
-      const spec = dumper.prepareColumnOptions(col);
+      const spec = await dumper.prepareColumnOptions(col);
       expect(spec["array"]).toBeUndefined();
     });
 
-    it("adds virtual column options when adapter supports virtual columns", () => {
+    it("adds virtual column options when adapter supports virtual columns", async () => {
       const mockAdapter = {
         tables: async () => [],
         columns: async () => [],
@@ -144,13 +144,13 @@ describe("PostgreSQL::SchemaDumper", () => {
           generated: "s",
         },
       );
-      const spec = dumper.prepareColumnOptions(col);
+      const spec = await dumper.prepareColumnOptions(col);
       expect(spec["as"]).toBe(JSON.stringify("(a + b)"));
       expect(spec["stored"]).toBe(true);
       expect(spec["type"]).toBe('"integer"');
     });
 
-    it("adds enum_type even for virtual enum columns (Rails continues after virtual block)", () => {
+    it("adds enum_type even for virtual enum columns (Rails continues after virtual block)", async () => {
       const mockAdapter = {
         tables: async () => [],
         columns: async () => [],
@@ -169,12 +169,12 @@ describe("PostgreSQL::SchemaDumper", () => {
           generated: "s",
         },
       );
-      const spec = dumper.prepareColumnOptions(col);
+      const spec = await dumper.prepareColumnOptions(col);
       expect(spec["stored"]).toBe(true);
       expect(spec["enumType"]).toBe(JSON.stringify("mood"));
     });
 
-    it("skips virtual options when adapter does not support virtual columns", () => {
+    it("skips virtual options when adapter does not support virtual columns", async () => {
       const mockAdapter = {
         tables: async () => [],
         columns: async () => [],
@@ -193,11 +193,11 @@ describe("PostgreSQL::SchemaDumper", () => {
           generated: "s",
         },
       );
-      const spec = dumper.prepareColumnOptions(col);
+      const spec = await dumper.prepareColumnOptions(col);
       expect(spec["as"]).toBeUndefined();
     });
 
-    it("adds enum_type for enum columns", () => {
+    it("adds enum_type for enum columns", async () => {
       const dumper = SchemaDumper.create(emptySource) as any;
       const col = new Column(
         "status",
@@ -206,7 +206,7 @@ describe("PostgreSQL::SchemaDumper", () => {
         true,
         {},
       );
-      const spec = dumper.prepareColumnOptions(col);
+      const spec = await dumper.prepareColumnOptions(col);
       expect(spec["enumType"]).toBe(JSON.stringify("mood"));
     });
   });

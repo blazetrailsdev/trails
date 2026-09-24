@@ -1,21 +1,25 @@
-import type { IO, StringIO } from "@blazetrails/ruby-compat";
+import { regexpEscape } from "@blazetrails/ruby-compat";
+import type { Version } from "../abstract-adapter.js";
 import type { Column as MysqlColumn } from "./column.js";
 import type { Result } from "../../result.js";
 import { SchemaDumper as AbstractSchemaDumper } from "../abstract/schema-dumper.js";
+import { quotedScope } from "./schema-statements.js";
 
 interface MysqlAdapterLike {
   tableOptions(tableName: string): Promise<Record<string, string>>;
-  internalExecQuery?(sql: string, name?: string | null): Promise<Result>;
-  quote?(value: unknown): string;
+  internalExecQuery(sql: string, name?: string | null): Promise<Result>;
+  quote(value: unknown): string;
+  quoteColumnName(name: unknown): string;
+  queryValue(sql: string, name?: string | null): Promise<unknown>;
+  isMariadb(): Promise<boolean>;
+  readonly databaseVersion: Version | Promise<Version>;
+  createTableInfo(tableName: string): Promise<string | null>;
 }
 
 export class SchemaDumper extends AbstractSchemaDumper {
   declare protected connection?: MysqlAdapterLike;
 
-  protected _tableCollationCache: Record<string, string | undefined> = Object.create(null);
-
-  /** @noRailsEquivalent CONVERGEABLE converge-adapter-schema-and-result-helper-surface-remainder */
-  virtualExpressionCache: Record<string, Record<string, string> | undefined> = Object.create(null);
+  protected _tableCollationCache?: Record<string, string | undefined>;
 
   /** @internal */
   protected override async tableOptions(tableName: string): Promise<Record<string, unknown>> {
@@ -24,22 +28,10 @@ export class SchemaDumper extends AbstractSchemaDumper {
   }
 
   /** @internal */
-  protected async populateTableCollationFromStatus(tableName: string): Promise<void> {
-    if (Object.hasOwn(this._tableCollationCache, tableName)) return;
-    const conn = this.connection;
-    if (!conn?.internalExecQuery || !conn.quote) return;
-    const rows = (
-      await conn.internalExecQuery(`SHOW TABLE STATUS LIKE ${conn.quote(tableName)}`, "SCHEMA")
-    ).toArray();
-    const collation = rows[0]?.["Collation"] as string | null | undefined;
-    if (typeof collation === "string" && collation.length > 0) {
-      this._tableCollationCache[tableName] = collation;
-    }
-  }
-
-  /** @internal */
-  protected override prepareColumnOptions(column: MysqlColumn): Record<string, unknown> {
-    const spec = super.prepareColumnOptions(column);
+  protected override async prepareColumnOptions(
+    column: MysqlColumn,
+  ): Promise<Record<string, unknown>> {
+    const spec = await super.prepareColumnOptions(column);
     if (column.isUnsigned()) spec["unsigned"] = "true";
     if (column.isAutoIncrement()) spec["autoIncrement"] = "true";
 
@@ -52,7 +44,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
     }
 
     if (column.isVirtual()) {
-      const as = this.extractExpressionForVirtualColumn(column);
+      const as = await this.extractExpressionForVirtualColumn(column);
       if (as !== undefined) spec["as"] = as;
       if (/\b(?:STORED|PERSISTENT)\b/i.test(column.extra ?? "")) spec["stored"] = "true";
       const rest = { ...spec };
@@ -68,10 +60,10 @@ export class SchemaDumper extends AbstractSchemaDumper {
   }
 
   /** @internal */
-  protected override columnSpecForPrimaryKey(
+  protected override async columnSpecForPrimaryKey(
     column: MysqlColumn | undefined,
-  ): Record<string, unknown> {
-    const spec = super.columnSpecForPrimaryKey(column);
+  ): Promise<Record<string, unknown>> {
+    const spec = await super.columnSpecForPrimaryKey(column);
     if (column!.type === "integer" && column!.isAutoIncrement()) delete spec["autoIncrement"];
     return spec;
   }
@@ -124,69 +116,48 @@ export class SchemaDumper extends AbstractSchemaDumper {
     return super.schemaScale(column);
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers-remainder
-   */
-  override async table(tableName: string, stream: IO | StringIO): Promise<void> {
-    await this.populateVirtualExpressionCache(tableName);
-    await this.populateTableCollationFromStatus(tableName);
-    await super.table(tableName, stream);
+  /** @internal */
+  protected override async schemaCollation(column: MysqlColumn): Promise<string | undefined> {
+    if (column.collation != null) {
+      this._tableCollationCache ??= {};
+      this._tableCollationCache[this.tableName!] ??= (
+        await this.connection!.internalExecQuery(
+          `SHOW TABLE STATUS LIKE ${this.connection!.quote(this.tableName)}`,
+          "SCHEMA",
+        )
+      ).first()!["Collation"] as string;
+      if (column.collation !== this._tableCollationCache[this.tableName!])
+        return JSON.stringify(column.collation);
+    }
+    return undefined;
   }
 
   /** @internal */
-  protected async populateVirtualExpressionCache(tableName: string): Promise<void> {
-    if (Object.hasOwn(this.virtualExpressionCache, tableName)) return;
-    const conn = this.connection;
-    if (!conn?.internalExecQuery || !conn.quote) return;
-    const rows = (
-      await conn.internalExecQuery(
-        `SELECT column_name AS name, generation_expression AS expr
-         FROM information_schema.columns
-        WHERE table_schema = database()
-          AND table_name = ${conn.quote(tableName)}
-          AND generation_expression <> ''`,
-        "SCHEMA",
-      )
-    ).toArray();
-    const byColumn: Record<string, string> = Object.create(null);
-    for (const row of rows) {
-      const name = (row["name"] ?? row["NAME"] ?? row["COLUMN_NAME"]) as string | undefined;
-      const expr = (row["expr"] ?? row["EXPR"] ?? row["GENERATION_EXPRESSION"]) as
-        | string
-        | undefined;
-      if (typeof name === "string" && typeof expr === "string") {
-        byColumn[name] = JSON.stringify(expr.replace(/\\'/g, "'"));
-      }
+  protected async extractExpressionForVirtualColumn(
+    column: MysqlColumn,
+  ): Promise<string | undefined> {
+    if (
+      (await this.connection!.isMariadb()) &&
+      (await this.connection!.databaseVersion).compare("10.2.5") < 0
+    ) {
+      const createTableInfo = await this.connection!.createTableInfo(this.tableName!);
+      const columnName = this.connection!.quoteColumnName(column.name);
+      const m = new RegExp(
+        `${columnName} ${regexpEscape(column.sqlType ?? "")}(?: COLLATE \\w+)? AS \\((?<expression>.+?)\\) ${column.extra ?? ""}`,
+      ).exec(createTableInfo ?? "");
+      if (m) return JSON.stringify(m.groups!["expression"]);
+      return undefined;
+    } else {
+      const scope = quotedScope.call(this.connection!, this.tableName);
+      const columnName = this.connection!.quote(column.name);
+      const sql =
+        "SELECT generation_expression FROM information_schema.columns" +
+        ` WHERE table_schema = ${scope.schema}` +
+        `   AND table_name = ${scope.name}` +
+        `   AND column_name = ${columnName}`;
+      return JSON.stringify(
+        ((await this.connection!.queryValue(sql, "SCHEMA")) as string).replace(/\\'/g, "'"),
+      );
     }
-    this.virtualExpressionCache[tableName] = byColumn;
-  }
-
-  /**
-   * @internal
-   * @missingRailsCall first — CONVERGEABLE mysql-schema-dumper-queries-collation-and-virtual-expression-in-line
-   * @missingRailsCall internal_exec_query — CONVERGEABLE mysql-schema-dumper-queries-collation-and-virtual-expression-in-line
-   * @missingRailsCall quote — CONVERGEABLE mysql-schema-dumper-queries-collation-and-virtual-expression-in-line
-   */
-  protected override schemaCollation(column: MysqlColumn): string | undefined {
-    if (!column.collation) return undefined;
-    const tableName = this.tableName;
-    if (!tableName) return JSON.stringify(column.collation);
-    if (!Object.hasOwn(this._tableCollationCache, tableName))
-      return JSON.stringify(column.collation);
-    const cached = this._tableCollationCache[tableName];
-    return column.collation !== cached ? JSON.stringify(column.collation) : undefined;
-  }
-
-  /**
-   * @internal
-   * @missingRailsCall query_value — CONVERGEABLE mysql-schema-dumper-queries-collation-and-virtual-expression-in-line
-   * @missingRailsCall quote — CONVERGEABLE mysql-schema-dumper-queries-collation-and-virtual-expression-in-line
-   * @missingRailsCall quote_column_name — CONVERGEABLE mysql-schema-dumper-queries-collation-and-virtual-expression-in-line
-   */
-  protected extractExpressionForVirtualColumn(column: MysqlColumn): string | undefined {
-    const tableName = this.tableName;
-    if (!tableName) return undefined;
-    return this.virtualExpressionCache[tableName]?.[column.name];
   }
 }

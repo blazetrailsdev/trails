@@ -8,8 +8,8 @@ import type { Column } from "./column.js";
 
 export class SchemaDumper extends AbstractSchemaDumper {
   /** @internal */
-  protected override prepareColumnOptions(column: Column): Record<string, unknown> {
-    const spec = super.prepareColumnOptions(column);
+  protected override async prepareColumnOptions(column: Column): Promise<Record<string, unknown>> {
+    const spec = await super.prepareColumnOptions(column);
     if (column.isArray()) spec["array"] = true;
 
     if (this.supportsVirtualColumns && column.isVirtual()) {

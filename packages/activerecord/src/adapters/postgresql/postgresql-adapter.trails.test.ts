@@ -340,15 +340,15 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect("_commandSettled" in other).toBe(false);
 
         expect(client._activeQuery ?? null).toBeNull();
-        expect(other.transactionStatus).toBe(2);
+        expect(other._rawConnection!.transactionStatus()).toBe(2);
 
         const inFlight = (other._rawConnection as pg.Client).query("SELECT pg_sleep(0.2)");
         expect(client._activeQuery ?? null).not.toBeNull();
-        expect(other.transactionStatus).toBe(1);
+        expect(other._rawConnection!.transactionStatus()).toBe(1);
 
         await inFlight;
         expect(client._activeQuery ?? null).toBeNull();
-        expect(other.transactionStatus).toBe(2);
+        expect(other._rawConnection!.transactionStatus()).toBe(2);
       } finally {
         await other.disconnectBang();
       }
@@ -377,13 +377,13 @@ describeIfPg("PostgreSQLAdapter", () => {
       try {
         await other.execute("BEGIN");
         expect((other as unknown as { _client: unknown })._client).toBeNull();
-        expect(other.transactionStatus).not.toBe(0);
+        expect(other._rawConnection!.transactionStatus()).not.toBe(0);
 
         const resetting = other.resetBang();
         await other.lock.synchronize(async () => {});
         await resetting;
 
-        expect(other.transactionStatus).toBe(0);
+        expect(other._rawConnection!.transactionStatus()).toBe(0);
       } finally {
         await other.disconnectBang();
       }
@@ -450,7 +450,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await other.beginDbTransaction();
         const sleep = other.execute("SELECT pg_sleep(2)").catch(() => {});
         await new Promise<void>((r) => setTimeout(r, 200));
-        expect(other.transactionStatus).toBe(PQTRANS_ACTIVE);
+        expect(other._rawConnection!.transactionStatus()).toBe(PQTRANS_ACTIVE);
 
         const internals = other as unknown as {
           _cancelAnyRunningQuery(): Promise<void>;
@@ -472,7 +472,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect(cancelReturned).toBe(false);
         releaseBlock();
         await cancel;
-        expect(other.transactionStatus).not.toBe(PQTRANS_ACTIVE);
+        expect(other._rawConnection!.transactionStatus()).not.toBe(PQTRANS_ACTIVE);
 
         await sleep;
         await other.rollbackDbTransaction();
@@ -490,7 +490,9 @@ describeIfPg("PostgreSQLAdapter", () => {
         await other.beginDbTransaction();
         void other.clearCacheBang();
         await new Promise<void>((r) => setTimeout(r, 0));
-        const status = await other.lock.synchronize(() => other.transactionStatus);
+        const status = await other.lock.synchronize(() =>
+          other._rawConnection!.transactionStatus(),
+        );
         expect(status).toBe(PQTRANS_INTRANS);
         await other.rollbackDbTransaction();
       } finally {

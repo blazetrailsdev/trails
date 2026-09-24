@@ -20,7 +20,6 @@ describe("SQLiteDatabaseTasks#purge", () => {
       },
       connection: async () => ({
         disconnectBang: () => {},
-        whenClosed: async () => {},
         reconnectBang: async () => {},
       }),
     });

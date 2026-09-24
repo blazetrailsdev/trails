@@ -170,7 +170,6 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
     await expect(queued).resolves.toBe(1);
     await disconnecting;
 
-    await closing.whenClosed();
     expect(closing.isActive()).toBe(false);
   });
 

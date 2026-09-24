@@ -107,8 +107,8 @@ describe("SchemaDumper columnSpec emits TS-DSL-emittable text", () => {
     expect(dumper.schemaExpression({ defaultFunction: "now()" })).toBe('() => "now()"');
   });
 
-  it("columnSpec output round-trips through formatColspec as valid TS-DSL", () => {
-    const [type, spec] = dumper.columnSpec(
+  it("columnSpec output round-trips through formatColspec as valid TS-DSL", async () => {
+    const [type, spec] = await dumper.columnSpec(
       col(
         "created_at",
         { type: "datetime", sqlType: "datetime" },
