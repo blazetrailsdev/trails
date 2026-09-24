@@ -110,7 +110,7 @@ export function overrideAccessorsToPreserveOriginal(
         Object.defineProperty(table, name, {
           configurable: true,
           get(this: any) {
-            const value = this.readAttribute(name);
+            const value = mod.superMethod(this, name)!();
             if (
               (value != null && value !== false && isEncryptedAttribute.call(this, name)) ||
               !Configurable.config.supportUnencryptedData
@@ -122,7 +122,7 @@ export function overrideAccessorsToPreserveOriginal(
           },
           set(this: any, value: unknown) {
             this[originalAttributeName] = value;
-            this.writeAttribute(name, value);
+            mod.superMethod(this, `${name}=`)!(value);
           },
         });
       });

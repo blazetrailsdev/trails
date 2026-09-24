@@ -142,7 +142,7 @@ export class ConnectionHandler {
     const shard = options.shard ?? _base?.currentShard() ?? "default";
     const clobber = options.clobber ?? false;
 
-    const poolConfig = this.resolvePoolConfig(config, ownerName, role, shard);
+    const poolConfig = await this.resolvePoolConfig(config, ownerName, role, shard);
 
     const poolManager = this.setPoolManager(poolConfig.connectionDescriptor);
 
@@ -175,12 +175,6 @@ export class ConnectionHandler {
     };
 
     Notifications.instrument("!connection.active_record", payload);
-
-    if (poolConfig.dbConfig.adapter) {
-      const adapterReady = Promise.resolve(poolConfig.dbConfig.adapterClass());
-      adapterReady.catch(() => {});
-      poolConfig.pool.adapterReady = adapterReady;
-    }
 
     return poolConfig.pool;
   }
@@ -330,14 +324,14 @@ export class ConnectionHandler {
   }
 
   /** @internal */
-  private resolvePoolConfig(
+  private async resolvePoolConfig(
     config: DatabaseConfig | string | Record<string, unknown>,
     connectionName: ConnectionDescriptor | ConnectionOwner,
     role: string,
     shard: string,
-  ): PoolConfig {
+  ): Promise<PoolConfig> {
     const dbConfig = configurations().resolve(config);
-    dbConfig.validateBang();
+    await dbConfig.validateBang();
     if (!dbConfig.adapter) {
       throw new AdapterNotSpecified("database configuration does not specify adapter");
     }

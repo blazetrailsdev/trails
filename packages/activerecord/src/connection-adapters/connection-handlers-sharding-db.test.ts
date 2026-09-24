@@ -73,10 +73,9 @@ describe("ConnectionHandlersShardingDbTest", () => {
         default_env: { primary: { adapter: "sqlite3", database: primary } },
       },
       async () => {
-        const pools = await Base.connectsTo({
+        await Base.connectsTo({
           shards: { default: { writing: ":primary" } },
         });
-        await Promise.all(pools.map((p) => p.adapterReady));
 
         await Base.connectedTo({ role: "writing", shard: "shard_one" }, async () => {
           await Base.establishConnection({ adapter: "sqlite3", database: primary });

@@ -1395,15 +1395,11 @@ describe("BasicsTest", async () => {
 
     klass.tableName = "foo";
     expect(klass.tableName).toEqual("foo");
-    expect(klass.quotedTableName()).toEqual(
-      (klass.adapterClassSync() as any).quoteTableName("foo"),
-    );
+    expect(klass.quotedTableName()).toEqual((klass.adapterClass() as any).quoteTableName("foo"));
 
     klass.tableName = "bar";
     expect(klass.tableName).toEqual("bar");
-    expect(klass.quotedTableName()).toEqual(
-      (klass.adapterClassSync() as any).quoteTableName("bar"),
-    );
+    expect(klass.quotedTableName()).toEqual((klass.adapterClass() as any).quoteTableName("bar"));
   });
 
   it("set table name with inheritance", () => {

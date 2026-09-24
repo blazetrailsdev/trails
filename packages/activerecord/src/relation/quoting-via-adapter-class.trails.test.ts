@@ -16,7 +16,7 @@ describe("relation quoting through the adapter class", () => {
     try {
       Base.releaseConnection();
       expect(Post.connectionPool().activeConnection).toBeNull();
-      const adapterClass = Post.adapterClassSync() as unknown as {
+      const adapterClass = Post.adapterClass() as unknown as {
         quoteTableName(n: string): string;
       };
 

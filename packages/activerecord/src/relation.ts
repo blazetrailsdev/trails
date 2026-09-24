@@ -1713,7 +1713,7 @@ export class Relation<T extends Base> {
       await this.withConnection(async (c) => {
         const column = c.visitor.compile(this.table.get(timestampColumn));
         const selectValues = `COUNT(*) AS ${(
-          this.model.adapterClassSync() as unknown as { quoteColumnName(name: string): string }
+          this.model.adapterClass() as unknown as { quoteColumnName(name: string): string }
         ).quoteColumnName("size")}, MAX(%s) AS timestamp`;
 
         let arel: unknown;

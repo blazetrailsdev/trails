@@ -821,14 +821,11 @@ export class DatabaseTasks {
       const pool = await migrationClass.connectionHandler.establishConnection(dbConfig, {
         clobber,
       });
-      await pool.adapterReady;
       return await fn(pool);
     } finally {
-      await (
-        await migrationClass.connectionHandler.establishConnection(originalDbConfig, {
-          clobber,
-        })
-      ).adapterReady;
+      await migrationClass.connectionHandler.establishConnection(originalDbConfig, {
+        clobber,
+      });
     }
   }
 

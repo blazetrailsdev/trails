@@ -102,7 +102,7 @@ describe("sanitization class-method dispatch threads `this.connection`", () => {
     const host = {
       ...ClassMethods,
       connectionPool: poolFor(mysqlQuoter),
-      adapterClassSync: (): never => {
+      adapterClass: (): never => {
         throw new ConnectionNotDefined("No database connection defined.");
       },
     };

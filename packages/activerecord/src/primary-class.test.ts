@@ -107,10 +107,9 @@ describe("PrimaryClassTest", () => {
     async () => {
       (globalThis as Record<string, unknown>)["ApplicationRecord"] = ApplicationRecord;
       try {
-        const pools = await ApplicationRecord.connectsTo({
+        await ApplicationRecord.connectsTo({
           database: { writing: ":arunit", reading: ":arunit" },
         });
-        await Promise.all(pools.map((p) => p.adapterReady));
 
         expect(ApplicationRecord.isPrimaryClass()).toBeTruthy();
         expect(ApplicationRecord.isApplicationRecordClass()).toBeTruthy();
@@ -127,10 +126,9 @@ describe("PrimaryClassTest", () => {
     async () => {
       PrimaryAppRecord.primaryAbstractClass();
       try {
-        const pools = await PrimaryAppRecord.connectsTo({
+        await PrimaryAppRecord.connectsTo({
           database: { writing: ":arunit", reading: ":arunit" },
         });
-        await Promise.all(pools.map((p) => p.adapterReady));
 
         expect(PrimaryAppRecord.isPrimaryClass()).toBeTruthy();
         expect(PrimaryAppRecord.isApplicationRecordClass()).toBeTruthy();

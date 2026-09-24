@@ -48,7 +48,7 @@ describe("preprocessOrderArgs routes through orderColumn", () => {
     expect(preprocess(Topic.all(), ["title ASC"])).toEqual(["title ASC"]);
   });
   it("quotes the fallback through quote_table_name, as Rails' order_column does", () => {
-    const adapterClass = Topic.adapterClassSync();
+    const adapterClass = Topic.adapterClass();
     const quoteTableName = vi.spyOn(adapterClass as never, "quoteTableName");
     const quoteColumnName = vi.spyOn(adapterClass as never, "quoteColumnName");
     try {

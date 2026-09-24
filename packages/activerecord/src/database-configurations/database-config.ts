@@ -73,11 +73,8 @@ export class DatabaseConfig {
     return new (adapterClass as new (config: DatabaseConfigOptions) => unknown)(configurationHash);
   }
 
-  validateBang(): true {
-    if (this.adapter != null) {
-      const adapterClass = this.adapterClass();
-      if (adapterClass instanceof Promise) adapterClass.catch(() => {});
-    }
+  async validateBang(): Promise<true> {
+    if (this.adapter != null) await this.adapterClass();
 
     return true;
   }

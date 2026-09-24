@@ -18,22 +18,22 @@ describe("registerModel array form", () => {
   it("auto-routes STI subclasses into the parent's _subclasses", () => {
     registerModel([Comment, SpecialComment, SubSpecialComment]);
 
-    expect((Comment as any)._subclasses).toContain(SpecialComment);
-    expect((SpecialComment as any)._subclasses).toContain(SubSpecialComment);
+    expect(Comment.subclasses).toContain(SpecialComment);
+    expect(SpecialComment.subclasses).toContain(SubSpecialComment);
   });
 
   it("registers each subclass at most once (idempotent, like Rails)", () => {
     registerModel([Comment, SpecialComment, SubSpecialComment]);
     registerModel([Comment, SpecialComment, SubSpecialComment]);
 
-    const commentSubs = ((Comment as any)._subclasses ?? []) as unknown[];
+    const commentSubs = Comment.subclasses as unknown[];
     expect(commentSubs.filter((s) => s === SpecialComment)).toHaveLength(1);
   });
 
   it("does not treat a base model as a subclass", () => {
     registerModel([Author]);
 
-    expect((Author as any)._subclasses ?? []).not.toContain(Author);
+    expect(Author.subclasses).not.toContain(Author);
   });
 
   it("routes a freshly-defined subclass via the array form only", () => {
@@ -43,9 +43,9 @@ describe("registerModel array form", () => {
 
     registerModel([BatchBase, BatchChild, BatchGrandchild]);
 
-    expect((BatchBase as any)._subclasses ?? []).not.toContain(BatchBase);
-    expect((BatchBase as any)._subclasses).toContain(BatchChild);
-    expect((BatchChild as any)._subclasses).toContain(BatchGrandchild);
+    expect(BatchBase.subclasses).not.toContain(BatchBase);
+    expect(BatchBase.subclasses).toContain(BatchChild);
+    expect(BatchChild.subclasses).toContain(BatchGrandchild);
     expect(constantize("BatchGrandchild")).toBe(BatchGrandchild);
   });
 

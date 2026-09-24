@@ -441,7 +441,7 @@ function inOrderOf(
 ): any {
   (this.model as any).disallowRawSqlBang([column], {
     permit: (
-      this.model.adapterClassSync() as unknown as { columnNameWithOrderMatcher(): RegExp }
+      this.model.adapterClass() as unknown as { columnNameWithOrderMatcher(): RegExp }
     ).columnNameWithOrderMatcher(),
   });
   if (values.length === 0) return noneBang.call(this.spawn());
@@ -1585,7 +1585,7 @@ function orderedNode(node: unknown, dir: unknown): unknown {
 export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]): void {
   this.model.disallowRawSqlBang(flattenedArgs(orderArgs) as (string | symbol | Nodes.Node)[], {
     permit: (
-      this.model.adapterClassSync() as unknown as { columnNameWithOrderMatcher(): RegExp }
+      this.model.adapterClass() as unknown as { columnNameWithOrderMatcher(): RegExp }
     ).columnNameWithOrderMatcher(),
   });
   validateOrderArgs.call(this, orderArgs);
@@ -1864,7 +1864,7 @@ export function isTableNameMatches(this: QueryMethodsHost, from: unknown): boole
   if (!table) return false;
   const modelClass: any = this.model;
   const name = escapeRegex(table.name);
-  const quotedTableName = modelClass.adapterClassSync().quoteTableName(table.name);
+  const quotedTableName = modelClass.adapterClass().quoteTableName(table.name);
   const quoted = escapeRegex(quotedTableName);
   const fromStr = typeof (from as any)?.toSql === "function" ? (from as any).toSql() : String(from);
   return new RegExp(`(?:^|(?<!FROM)\\s)(?:\\b${name}\\b|${quoted})(?!\\.)`, "i").test(fromStr);
@@ -1897,7 +1897,7 @@ export function arelColumn(
   }
   if (fallback) return fallback(field);
   if (Arel.arelNode(field)) return field;
-  const quoted = isSymbol ? modelClass.adapterClassSync().quoteTableName(field) : field;
+  const quoted = isSymbol ? modelClass.adapterClass().quoteTableName(field) : field;
   return Arel.sql(quoted);
 }
 
@@ -1936,7 +1936,7 @@ export function arelColumnWithTable(
       ) ?? new ArelTable(tableName).get(columnName)
     );
   }
-  return Arel.sql(`${modelClass.adapterClassSync().quoteTableName(tableName)}.${columnName}`);
+  return Arel.sql(`${modelClass.adapterClass().quoteTableName(tableName)}.${columnName}`);
 }
 
 /** @internal */
@@ -1967,7 +1967,7 @@ export function orderColumn(this: QueryMethodsHost, field: string): unknown {
       const table: any = this.table;
       return table.get(attrName);
     }
-    return Arel.sql((this.model as any).adapterClassSync().quoteTableName(attrName), {
+    return Arel.sql((this.model as any).adapterClass().quoteTableName(attrName), {
       retryable: true,
     });
   });
@@ -1997,7 +1997,7 @@ export function arelColumnAliasesFromHash(
     const tableName = isRubySymbol(key) ? symbolToName(key) : key;
     const modelClass: any = this.model;
     const quoteAlias = (a: unknown): string =>
-      modelClass.adapterClassSync().quoteColumnName(isRubySymbol(a) ? symbolToName(a) : String(a));
+      modelClass.adapterClass().quoteColumnName(isRubySymbol(a) ? symbolToName(a) : String(a));
     if (isPlainObject(columnsAliases)) {
       return Object.keys(columnsAliases as object).map((col) => {
         const alias = (columnsAliases as any)[col];

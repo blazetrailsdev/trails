@@ -147,7 +147,7 @@ import {
 } from "./token-for.js";
 import type { TokenDefinitionsHash as _TokenDefinitionsHash } from "./token-for.js";
 import type { MessageVerifier as _MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { DescendantsTracker } from "@blazetrails/activesupport";
+import { DescendantsTracker, ReloadedClassesFiltering } from "@blazetrails/activesupport";
 import * as LockingOptimistic from "./locking/optimistic.js";
 import * as LockingPessimistic from "./locking/pessimistic.js";
 import {
@@ -163,6 +163,7 @@ import {
   include,
   prepend,
   extend,
+  Module,
   classAttribute,
   benchmark as benchmarkable,
   type BenchmarkLogger,
@@ -960,8 +961,6 @@ export class Base extends Model {
   declare static readonly connection: Promise<DatabaseAdapter>;
   declare static isPrimaryClass: typeof ConnectionHandling.isPrimaryClass;
   declare static adapterClass: typeof ConnectionHandling.adapterClass;
-  /** @noRailsEquivalent CONVERGEABLE adapter-class-sync-retires-with-eager-adapter-resolution */
-  declare static adapterClassSync: typeof ConnectionHandling.adapterClassSync;
   declare static removeConnection: typeof ConnectionHandling.removeConnection;
   declare static schemaCache: typeof ConnectionHandling.schemaCache;
   declare static clearCacheBang: typeof ConnectionHandling.clearCacheBang;
@@ -1089,26 +1088,11 @@ export class Base extends Model {
     return polymorphicClassFor(this, name);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE base-subclasses-onto-descendants-tracker */
-  static get subclasses(): (typeof Base)[] {
-    const result: (typeof Base)[] = Object.prototype.hasOwnProperty.call(this, "_subclasses")
-      ? [...((this as any)._subclasses as (typeof Base)[])]
-      : [];
-    for (const klass of DescendantsTracker.subclasses(
-      this as never,
-    ) as unknown as (typeof Base)[]) {
-      if (klass !== this && !result.includes(klass)) result.push(klass);
-    }
-    return result;
-  }
+  declare static readonly subclasses: (typeof Base)[];
 
   static get descendants(): (typeof Base)[] {
-    const result: (typeof Base)[] = [];
-    for (const sub of this.subclasses) {
-      result.push(sub);
-      result.push(...sub.descendants);
-    }
-    return result;
+    const subclasses = DescendantsTracker.rejectBang(this.subclasses as never) as (typeof Base)[];
+    return subclasses.concat(subclasses.flatMap((klass) => klass.descendants));
   }
 
   declare static logger: BenchmarkLogger | null | undefined;
@@ -2657,8 +2641,16 @@ Object.defineProperty(Base, "connection", {
   enumerable: false,
 });
 
+extend(Base, ReloadedClassesFiltering);
 extend(Base, { collectionCacheKey: _collectionCacheKey });
-extend(Base, { find: _Core.find, findBy: _Core.findBy, findByBang: _Core.findByBang });
+extend(
+  Base,
+  new Module((mod) => {
+    mod.defineMethod("find", _Core.find);
+    mod.defineMethod("findBy", _Core.findBy);
+    mod.defineMethod("findByBang", _Core.findByBang);
+  }),
+);
 extend(Base, { configurations: _Core.configurations });
 extend(Base, { isApplicationRecordClass: _Core.isApplicationRecordClass });
 Base.configurations({});
