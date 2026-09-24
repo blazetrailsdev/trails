@@ -13,8 +13,6 @@ import {
 export { ValueType } from "@blazetrails/activemodel";
 import { ActiveRecord } from "./namespaces.js";
 import { AdapterSpecificRegistry } from "./type/adapter-specific-registry.js";
-import type { AdapterName } from "./connection-adapters/abstract-adapter.js";
-import { adapterNameFromConfig } from "./connection-adapters/abstract-adapter.js";
 
 import { Date } from "./type/date.js";
 import { DateTime } from "./type/date-time.js";
@@ -81,7 +79,7 @@ export function registry(r?: AdapterSpecificRegistry): AdapterSpecificRegistry {
 export function register(
   typeName: string,
   klass?: (new (...args: any[]) => ValueType) | null,
-  options?: { adapter?: AdapterName; override?: boolean },
+  options?: { adapter?: string; override?: boolean },
   block?: (...args: unknown[]) => ValueType,
 ): void {
   registry().register(typeName, klass, options, block);
@@ -90,7 +88,7 @@ export function register(
 export function addModifier(
   options: Record<string, unknown>,
   klass: new (subtype: ValueType) => ValueType,
-  registrationOptions?: { adapter?: AdapterName },
+  registrationOptions?: { adapter?: string },
 ): void {
   registry().addModifier(options, klass, registrationOptions);
 }
@@ -112,12 +110,12 @@ export function defaultValue(): ValueType {
   return (_defaultValue ??= new ValueType());
 }
 
-export function adapterNameFrom(model: AdapterNameSource): AdapterName {
-  return adapterNameFromConfig(model.connectionDbConfig()!.adapter);
+export function adapterNameFrom(model: AdapterNameSource): string {
+  return model.connectionDbConfig()!.adapter!.toString();
 }
 
 /** @internal */
-export function currentAdapterName(): AdapterName {
+export function currentAdapterName(): string {
   return adapterNameFrom(ActiveRecord.Base);
 }
 

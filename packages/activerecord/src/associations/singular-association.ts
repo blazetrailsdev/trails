@@ -5,11 +5,10 @@ import {
   _loadSingularViaStatementCache,
   _scopeForAssociation,
   _skipSingularStatementCache,
-  resolveAssocClass,
 } from "../associations.js";
 import { Association } from "./association.js";
 import { AssociationNotFoundError } from "./errors.js";
-import { camelize, underscore } from "@blazetrails/activesupport";
+import { underscore } from "@blazetrails/activesupport";
 import { NotImplementedError } from "@blazetrails/ruby-compat";
 import { strictLoadingViolationBang } from "../core.js";
 import { RecordInvalid } from "../validations.js";
@@ -101,7 +100,7 @@ export class SingularAssociation extends Association<Base> {
         if (!typeName) return null;
         targetModel = ctor.polymorphicClassFor(typeName);
       } else {
-        targetModel = resolveAssocClass(owner, assocName, options.className ?? camelize(assocName));
+        targetModel = this.klass;
       }
 
       const ownerSideReflection = _ownerChainReflection(reflection) ?? reflection;

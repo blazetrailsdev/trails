@@ -31,7 +31,7 @@ export interface QuotingDispatchHost {
   quote(value: unknown): string;
   quotedDate(value: TemporalDateLike): string;
   quotedTime(value: QuotedTimeValue): string;
-  quotedBinary(value: unknown): string;
+  quotedBinary(value: BinaryData): string;
   quoteString(s: string): string;
   quoteColumnName(columnName: unknown): string;
   quoteTableName(tableName: unknown): string;
@@ -76,7 +76,7 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
   if (value instanceof BinaryData) return this.quotedBinary(value);
   if (ArrayBuffer.isView(value)) {
     const bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
-    return this.quotedBinary(bytes);
+    return this.quotedBinary(new BinaryData(bytes));
   }
   if (value instanceof TimeValue) return `'${this.quotedTime(value)}'`;
   if (
@@ -181,25 +181,8 @@ export function unquotedFalse(): boolean {
   return false;
 }
 
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers-remainder
- */
-export function toBytes(value: unknown): Uint8Array | null {
-  if (value instanceof BinaryData) return value.bytes;
-  if (ArrayBuffer.isView(value)) {
-    return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
-  }
-  if (value instanceof ArrayBuffer) return new Uint8Array(value);
-  return null;
-}
-
-export function quotedBinary(value: unknown): string {
-  const bytes = toBytes(value);
-  if (bytes) {
-    return `'${quoteString(Buffer.from(bytes).toString("latin1"))}'`;
-  }
-  return `'${quoteString(String(value))}'`;
+export function quotedBinary(value: BinaryData): string {
+  return `'${quoteString(Buffer.from(value.bytes).toString("latin1"))}'`;
 }
 
 export function sanitizeAsSqlComment(value: unknown): string {
@@ -331,7 +314,7 @@ export interface Quoting {
 
   unquotedFalse(): boolean | number;
 
-  quotedBinary(value: unknown): string;
+  quotedBinary(value: BinaryData): string;
 
   typeCast(value: unknown): unknown;
 

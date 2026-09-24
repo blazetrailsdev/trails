@@ -29,6 +29,7 @@ import { assertCalledOnInstanceOf } from "@blazetrails/activesupport";
 import { adapterType, ambientPoolConfiguration } from "../test-adapter.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
 import { fixtures } from "../test-fixtures.js";
+import { clearRegisteredTasks } from "../test-helpers/registered-tasks.js";
 
 let originalConfigurations: DatabaseConfigurations | null = null;
 const originalTrailsEnv = getEnv("TRAILS_ENV");
@@ -132,7 +133,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
         await cleanup.execute("DROP TABLE IF EXISTS ar_internal_metadata");
         await cleanup.disconnectBang();
         DatabaseTasks.databaseConfiguration = originalConfigurations;
-        DatabaseTasks.clearRegisteredTasks();
+        clearRegisteredTasks();
         fs.rmSync(tmp, { recursive: true, force: true });
       }
     },
@@ -181,7 +182,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
       await cleanup.execute("DROP TABLE IF EXISTS schema_migrations");
       await cleanup.disconnectBang();
       DatabaseTasks.databaseConfiguration = originalConfigurations;
-      DatabaseTasks.clearRegisteredTasks();
+      clearRegisteredTasks();
       fs.rmSync(tmp, { recursive: true, force: true });
     }
   });
@@ -246,7 +247,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsMultiDatabaseTest", () => {
     } finally {
       Base.protectedEnvironments = protectedEnvironments;
       DatabaseTasks.databaseConfiguration = originalConfigurations;
-      DatabaseTasks.clearRegisteredTasks();
+      clearRegisteredTasks();
       fs.rmSync(tmp, { recursive: true, force: true });
     }
   });
@@ -254,7 +255,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsMultiDatabaseTest", () => {
 
 describe("DatabaseTasksRegisterTask", () => {
   afterEach(() => {
-    DatabaseTasks.clearRegisteredTasks();
+    clearRegisteredTasks();
   });
 
   it("register task", async () => {
@@ -454,7 +455,7 @@ describe("DatabaseTasksCreateAllTest", () => {
     createSpy = vi.spyOn(DatabaseTasks, "create").mockResolvedValue(undefined as never);
   });
   afterEach(() => {
-    DatabaseTasks.clearRegisteredTasks();
+    clearRegisteredTasks();
     DatabaseTasks.databaseConfiguration = originalConfigurations;
     vi.restoreAllMocks();
   });
@@ -528,7 +529,7 @@ describe("DatabaseTasksCreateCurrentTest", () => {
     });
   });
   afterEach(() => {
-    DatabaseTasks.clearRegisteredTasks();
+    clearRegisteredTasks();
     DatabaseTasks.databaseConfiguration = originalConfigurations;
     DatabaseTasks.env = "development";
     vi.restoreAllMocks();
@@ -610,7 +611,7 @@ describe("DatabaseTasksCreateCurrentThreeTierTest", () => {
     });
   });
   afterEach(() => {
-    DatabaseTasks.clearRegisteredTasks();
+    clearRegisteredTasks();
     DatabaseTasks.databaseConfiguration = originalConfigurations;
     DatabaseTasks.env = "development";
     vi.restoreAllMocks();
@@ -685,7 +686,7 @@ describe("DatabaseTasksDropAllTest", () => {
     dropSpy = vi.spyOn(DatabaseTasks, "drop").mockResolvedValue(undefined as never);
   });
   afterEach(() => {
-    DatabaseTasks.clearRegisteredTasks();
+    clearRegisteredTasks();
     DatabaseTasks.databaseConfiguration = originalConfigurations;
     vi.restoreAllMocks();
   });
@@ -757,7 +758,7 @@ describe("DatabaseTasksDropCurrentTest", () => {
     });
   });
   afterEach(() => {
-    DatabaseTasks.clearRegisteredTasks();
+    clearRegisteredTasks();
     DatabaseTasks.databaseConfiguration = originalConfigurations;
     DatabaseTasks.env = "development";
     vi.restoreAllMocks();
@@ -820,7 +821,7 @@ describe("DatabaseTasksDropCurrentThreeTierTest", () => {
     });
   });
   afterEach(() => {
-    DatabaseTasks.clearRegisteredTasks();
+    clearRegisteredTasks();
     DatabaseTasks.databaseConfiguration = originalConfigurations;
     DatabaseTasks.env = "development";
     vi.restoreAllMocks();
@@ -955,7 +956,7 @@ function databaseTasksMigrationTestCase(folderName = "valid"): MigrationTestCase
     stdoutSpy?.mockRestore();
     stdoutSpy = undefined;
     DatabaseTasks.databaseConfiguration = originalConfigurations;
-    DatabaseTasks.clearRegisteredTasks();
+    clearRegisteredTasks();
     try {
       await Base.removeConnection();
     } catch {}
@@ -1180,7 +1181,7 @@ describe("DatabaseTasksMigrateErrorTest", () => {
         await Base.removeConnection();
       } catch {}
       DatabaseTasks.databaseConfiguration = originalConfigurations;
-      DatabaseTasks.clearRegisteredTasks();
+      clearRegisteredTasks();
       fs.rmSync(tmp, { recursive: true, force: true });
     }
   });
@@ -1188,7 +1189,7 @@ describe("DatabaseTasksMigrateErrorTest", () => {
 
 describe("DatabaseTasksPurgeCurrentTest", () => {
   afterEach(() => {
-    DatabaseTasks.clearRegisteredTasks();
+    clearRegisteredTasks();
     DatabaseTasks.databaseConfiguration = originalConfigurations;
     DatabaseTasks.env = "development";
     vi.restoreAllMocks();
@@ -1215,7 +1216,7 @@ describe("DatabaseTasksPurgeCurrentTest", () => {
 
 describe("DatabaseTasksPurgeAllTest", () => {
   afterEach(() => {
-    DatabaseTasks.clearRegisteredTasks();
+    clearRegisteredTasks();
     DatabaseTasks.databaseConfiguration = originalConfigurations;
     vi.restoreAllMocks();
   });
@@ -1234,7 +1235,7 @@ describe("DatabaseTasksPurgeAllTest", () => {
 
 describe("DatabaseTasksTruncateAllTest", () => {
   afterEach(() => {
-    DatabaseTasks.clearRegisteredTasks();
+    clearRegisteredTasks();
     DatabaseTasks.databaseConfiguration = originalConfigurations;
     DatabaseTasks.env = "development";
   });
@@ -1259,7 +1260,7 @@ describe("DatabaseTasksTruncateAllTest", () => {
     expect((await seed.execute("SELECT * FROM colleges"))!.length).toBeGreaterThan(0);
     await seed.disconnectBang();
 
-    DatabaseTasks.clearRegisteredTasks();
+    clearRegisteredTasks();
     DatabaseTasks.registerTask(/sqlite/, class {});
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
       development: { adapter: "sqlite3", database: dbPath },
@@ -1307,7 +1308,7 @@ describe("DatabaseTasksTruncateAllWithMultipleDatabasesTest", () => {
     });
   });
   afterEach(() => {
-    DatabaseTasks.clearRegisteredTasks();
+    clearRegisteredTasks();
     DatabaseTasks.databaseConfiguration = originalConfigurations;
     DatabaseTasks.env = "development";
     vi.restoreAllMocks();
@@ -1357,7 +1358,7 @@ describe("DatabaseTasksTruncateAllWithMultipleDatabasesTest", () => {
 
 describe("DatabaseTasksCharsetTest", () => {
   afterEach(() => {
-    DatabaseTasks.clearRegisteredTasks();
+    clearRegisteredTasks();
     DatabaseTasks.databaseConfiguration = originalConfigurations;
     DatabaseTasks.env = "development";
     vi.restoreAllMocks();
@@ -1377,7 +1378,7 @@ describe("DatabaseTasksCharsetTest", () => {
 
 describe("DatabaseTasksCollationTest", () => {
   afterEach(() => {
-    DatabaseTasks.clearRegisteredTasks();
+    clearRegisteredTasks();
     DatabaseTasks.databaseConfiguration = originalConfigurations;
     DatabaseTasks.env = "development";
     vi.restoreAllMocks();
@@ -1541,12 +1542,12 @@ describe("DatabaseTasksCheckSchemaFileMethods", () => {
 
   it("check dump filename defaults", () => {
     const expected = "/tmp/schema.ts";
-    expect(DatabaseTasks.schemaDumpPath(configFor("development", "primary"))).toBe(expected);
+    expect(DatabaseTasks.schemaDumpPath(configFor("development", "primary")!)).toBe(expected);
   });
 
   it("check dump filename with schema env", () => {
     process.env.SCHEMA = "schema_path";
-    expect(DatabaseTasks.schemaDumpPath(configFor("development", "primary"))).toBe("schema_path");
+    expect(DatabaseTasks.schemaDumpPath(configFor("development", "primary")!)).toBe("schema_path");
   });
 
   it("check dump filename defaults for non primary databases", () => {
@@ -1557,7 +1558,7 @@ describe("DatabaseTasksCheckSchemaFileMethods", () => {
       },
     });
     const expected = "/tmp/secondary_schema.ts";
-    expect(DatabaseTasks.schemaDumpPath(configFor("development", "secondary"))).toBe(expected);
+    expect(DatabaseTasks.schemaDumpPath(configFor("development", "secondary")!)).toBe(expected);
   });
 
   it("setting schema dump to nil", () => {
@@ -1566,7 +1567,7 @@ describe("DatabaseTasksCheckSchemaFileMethods", () => {
         primary: { adapter: "abstract", database: "dev-db", schemaDump: false },
       },
     });
-    expect(DatabaseTasks.schemaDumpPath(configFor("development", "primary"))).toBeNull();
+    expect(DatabaseTasks.schemaDumpPath(configFor("development", "primary")!)).toBeNull();
   });
 
   it("check dump filename with schema env with non primary databases", () => {
@@ -1577,7 +1578,9 @@ describe("DatabaseTasksCheckSchemaFileMethods", () => {
         secondary: { adapter: "abstract", database: "secondary-dev-db" },
       },
     });
-    expect(DatabaseTasks.schemaDumpPath(configFor("development", "secondary"))).toBe("schema_path");
+    expect(DatabaseTasks.schemaDumpPath(configFor("development", "secondary")!)).toBe(
+      "schema_path",
+    );
   });
 });
 

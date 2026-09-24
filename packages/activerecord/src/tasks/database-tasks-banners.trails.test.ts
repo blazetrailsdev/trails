@@ -3,6 +3,7 @@ import { stdout, stderr } from "@blazetrails/ruby-compat";
 import { DatabaseTasks } from "./database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseAlreadyExists, NoDatabaseError } from "../errors.js";
+import { clearRegisteredTasks } from "../test-helpers/registered-tasks.js";
 
 function config(): HashConfig {
   return new HashConfig("development", "primary", { adapter: "sqlite3", database: "my-db" });
@@ -26,7 +27,7 @@ describe("DatabaseTasksBannersTest", () => {
   });
 
   afterEach(() => {
-    DatabaseTasks.clearRegisteredTasks();
+    clearRegisteredTasks();
     vi.restoreAllMocks();
   });
 

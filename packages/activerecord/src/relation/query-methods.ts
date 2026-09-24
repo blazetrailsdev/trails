@@ -1378,7 +1378,7 @@ export function buildCastValue(name: string, value: unknown): Attribute {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers-remainder
+ * @noRailsEquivalent CONVERGEABLE inline-bound-value-and-join-plan-helpers
  */
 export function normalizeBoundValue(this: QueryMethodsHost, value: unknown): unknown {
   if (isRelationLike(value)) {
@@ -2350,7 +2350,7 @@ export interface JoinEmissionPlan {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers-remainder
+ * @noRailsEquivalent CONVERGEABLE inline-bound-value-and-join-plan-helpers
  */
 export function emitJoinPlan(
   this: QueryMethodsHost,

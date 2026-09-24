@@ -13,7 +13,7 @@ import { AssociationNotFoundError } from "./associations/errors.js";
 import { AssociationScope } from "./associations/association-scope.js";
 import type { Association as AssociationInstance } from "./associations/association.js";
 export { joinTableName as joinHabtmTableNames } from "./migration/join-table.js";
-import { constantize, registerConstant, unregisterConstant } from "@blazetrails/activesupport";
+import { registerConstant, unregisterConstant } from "@blazetrails/activesupport";
 import { registerSubclass } from "./inheritance.js";
 import { flushPendingCounterCacheColumns } from "./counter-cache.js";
 import { BelongsTo as BelongsToBuilder } from "./associations/builder/belongs-to.js";
@@ -208,31 +208,6 @@ export function autoloadModel(name: string): void {
   if (!autoloaded) return;
   if (frameworkBase(autoloaded)) registerModel(autoloaded);
   else modelRegistry.set(bare, autoloaded);
-}
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers-remainder
- */
-export function resolveAssocClass(
-  recordOrClass: Base | typeof Base,
-  assocName: string,
-  className: string,
-): typeof Base {
-  const ctor = (
-    typeof recordOrClass === "function" ? recordOrClass : recordOrClass.constructor
-  ) as typeof Base & {
-    _reflectOnAssociation?: (
-      name: string,
-    ) => { klass?: typeof Base; isPolymorphic?: () => boolean } | null;
-  };
-  const refl = ctor._reflectOnAssociation?.(assocName);
-  if (refl && !refl.isPolymorphic?.()) {
-    const richKlass = refl.klass;
-    if (richKlass) return richKlass;
-  }
-  autoloadModel(className);
-  return constantize(className) as typeof Base;
 }
 
 /** @internal */

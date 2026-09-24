@@ -4,13 +4,13 @@ import {
   TableDefinition as AbstractTableDefinition,
   ColumnDefinition,
   Table as AbstractTable,
-  splitColumnNames,
   AlterTable as AbstractAlterTable,
 } from "../abstract/schema-definitions.js";
 import type { ColumnOptions, ColumnType } from "../abstract/schema-definitions.js";
 import type { SchemaStatementsLike } from "../abstract/schema-statements-like.js";
 import type { TableDefinitionConn } from "../abstract/schema-definitions.js";
-import { wrap } from "@blazetrails/activesupport";
+import { extractOptionsBang, wrap } from "@blazetrails/activesupport";
+import { ArgumentError } from "@blazetrails/activemodel";
 
 export interface ColumnMethods {
   bigserial(...names: string[]): unknown;
@@ -75,8 +75,6 @@ export interface ColumnMethods {
   uuid(...args: [...names: string[], options: ColumnOptions]): unknown;
   xml(...names: string[]): unknown;
   xml(...args: [...names: string[], options: ColumnOptions]): unknown;
-  /** @noRailsEquivalent CONVERGEABLE converge-adapter-schema-and-result-helper-surface-remainder */
-  enumType(name: string, enumName: string, options?: ColumnOptions): unknown;
   enum(...names: string[]): unknown;
   enum(...args: [...names: string[], options: ColumnOptions]): unknown;
 }
@@ -470,27 +468,17 @@ export class TableDefinition extends AbstractTableDefinition {
     return this.definedPgColumn("xml", args);
   }
 
-  enumType(name: string, enumName: string, options: ColumnOptions = {}): this {
-    return this.column(
-      name,
-      "enum" as ColumnType,
-      { ...options, enumType: enumName } as ColumnOptions,
-    );
-  }
-
   enum(...names: string[]): this;
   enum(...args: [...names: string[], options: ColumnOptions]): this;
   enum(...args: unknown[]): this {
-    const { names, options } = splitColumnNames(args, "enum");
-    for (const name of names) {
-      this.column(name, "enum" as ColumnType, options);
-    }
-    return this;
+    return this.definedPgColumn("enum", args);
   }
 
   /** @internal */
   private definedPgColumn(type: string, args: unknown[]): this {
-    const { names, options } = splitColumnNames(args, type);
+    const names = [...args] as string[];
+    const options = extractOptionsBang(names) as ColumnOptions;
+    if (names.length === 0) throw new ArgumentError(`Missing column name(s) for ${type}`);
     for (const name of names) this.column(name, type as ColumnType, options);
     return this;
   }
@@ -737,15 +725,14 @@ export class Table extends AbstractTable {
 
   enum(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
   async enum(...args: unknown[]): Promise<void> {
-    const { names, options } = splitColumnNames(args, "enum");
-    for (const name of names) {
-      await this.column(name, "enum" as ColumnType, options);
-    }
+    await this.definedPgColumn("enum", args);
   }
 
   /** @internal */
   private async definedPgColumn(type: string, args: unknown[]): Promise<void> {
-    const { names, options } = splitColumnNames(args, type);
+    const names = [...args] as string[];
+    const options = extractOptionsBang(names) as ColumnOptions;
+    if (names.length === 0) throw new ArgumentError(`Missing column name(s) for ${type}`);
     for (const name of names) await this.column(name, type as ColumnType, options);
   }
 }

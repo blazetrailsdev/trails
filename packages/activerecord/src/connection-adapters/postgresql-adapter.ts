@@ -1759,20 +1759,8 @@ export class PostgreSQLAdapter
     return pgQuoteTableNameForAssignment(_table, attr);
   }
 
-  override quotedBinary(value: unknown): string {
-    if (
-      value instanceof BinaryData ||
-      ArrayBuffer.isView(value) ||
-      value instanceof ArrayBuffer ||
-      typeof value === "string"
-    ) {
-      return pgQuotedBinary(value);
-    }
-    throw new TypeError(
-      `quotedBinary expects Uint8Array, ArrayBuffer, Buffer, string, or BinaryData; got ${
-        value === null ? "null" : typeof value
-      }`,
-    );
+  override quotedBinary(value: BinaryData): string {
+    return pgQuotedBinary(value);
   }
 
   private nativeType(type: string): string {

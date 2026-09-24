@@ -9,7 +9,7 @@ import {
   AdapterSpecificRegistry,
 } from "./type.js";
 import { Base } from "./base.js";
-import { AdapterNotFound, ConnectionNotDefined } from "./errors.js";
+import { ConnectionNotDefined } from "./errors.js";
 import { ValueType, StringType } from "@blazetrails/activemodel";
 import "./connection-adapters/mysql2-adapter.js";
 import "./connection-adapters/postgresql-adapter.js";
@@ -55,7 +55,7 @@ describe("Type.currentAdapterName", () => {
         },
       }),
     ).toThrow(ConnectionNotDefined);
-    expect(() => adapterNameFrom(modelWith(undefined))).toThrow(AdapterNotFound);
+    expect(() => adapterNameFrom(modelWith(undefined))).toThrow(TypeError);
   });
 
   it("propagates errors other than a missing connection", () => {

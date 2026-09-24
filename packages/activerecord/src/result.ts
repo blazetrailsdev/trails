@@ -100,7 +100,7 @@ export class Result {
     }
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-adapter-schema-and-result-helper-surface-remainder */
+  /** @noRailsEquivalent CONVERGEABLE converge-result-from-row-hashes-onto-result-new */
   static fromRowHashes(rows: Record<string, unknown>[]): Result {
     if (rows.length === 0) return new Result([], []);
     const columns = Object.keys(rows[0]);

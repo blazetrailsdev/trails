@@ -2,7 +2,6 @@ import { describe, it, expect, vi } from "vitest";
 import {
   createSchemaDumper,
   virtualTableExists,
-  _extractValueFromDefault,
   isColumnTheRowid,
   dataSourceSql,
   quotedScope,
@@ -13,6 +12,10 @@ import {
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { Column } from "./column.js";
 import { SchemaDumper } from "./schema-dumper.js";
+import { SQLite3Adapter } from "../sqlite3-adapter.js";
+
+const _extractValueFromDefault = (default_: string | null) =>
+  SQLite3Adapter.prototype.extractValueFromDefault.call(null, default_);
 
 const quoter = {
   quote: (value: unknown) => `'${String(value).replace(/'/g, "''")}'`,
@@ -210,6 +213,7 @@ describe("SQLite3::SchemaStatements", () => {
       return {
         fetchTypeMetadata: (t: string) =>
           new SqlTypeMetadata({ sqlType: t, type: t.toLowerCase() }),
+        extractValueFromDefault: _extractValueFromDefault,
       } as any;
     }
 

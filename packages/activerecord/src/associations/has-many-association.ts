@@ -9,7 +9,6 @@ import {
   _ownerChainReflection,
   associationInstanceGet,
   _scopeForAssociation,
-  resolveAssocClass,
 } from "../associations.js";
 import { strictLoadingViolationBang } from "../core.js";
 import {
@@ -25,14 +24,7 @@ import {
   ownerForeignKeyColumns,
 } from "./foreign-association.js";
 import { compositeQueryConstraintsList, queryConstraintsList } from "../persistence.js";
-import {
-  camelize,
-  eachSlice,
-  min,
-  selectBang,
-  singularize,
-  underscore,
-} from "@blazetrails/activesupport";
+import { eachSlice, min, selectBang, underscore } from "@blazetrails/activesupport";
 
 export class HasManyAssociation extends CollectionAssociation {
   /** @internal */
@@ -412,10 +404,9 @@ export function scope(
 ): any | null {
   const options = assocDef.options;
   const ctor = record.constructor as typeof Base;
-  const className = options.className ?? camelize(singularize(assocName));
   const primaryKey = options.primaryKey ?? ctor.primaryKey;
 
-  const targetModel = resolveAssocClass(record, assocName, className);
+  const targetModel = record.association(assocName).klass;
 
   const foreignKeyColumns = ownerForeignKeyColumns(ctor, assocName, options);
   const foreignKey: string | string[] =

@@ -1,4 +1,5 @@
 import { quotingHost } from "./support/quoting-host.js";
+import { BinaryData } from "@blazetrails/activemodel";
 import { describe, it, expect, afterEach } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { assertRaises, minutes, BigDecimal, toFs } from "@blazetrails/activesupport";
@@ -237,11 +238,11 @@ describe("QuoteBooleanTest", () => {
   });
 
   it("quoted binary", () => {
-    expect(quotedBinary("binary data")).toBe("'binary data'");
+    expect(quotedBinary(new BinaryData("binary data"))).toBe("'binary data'");
   });
 
   it("quoted binary decodes bytes rather than String()-joining them", () => {
-    const quoted = quotedBinary(new Uint8Array([0x1f, 0x8b]));
+    const quoted = quotedBinary(new BinaryData(new Uint8Array([0x1f, 0x8b])));
     expect(quoted).not.toContain("31,139");
     expect([...Buffer.from(quoted.slice(1, -1), "latin1")]).toEqual([0x1f, 0x8b]);
   });

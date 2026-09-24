@@ -13,6 +13,7 @@ import {
 import type { HashConfig } from "../database-configurations/hash-config.js";
 import { adapterType } from "../test-adapter.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
+import { clearRegisteredTasks } from "../test-helpers/registered-tasks.js";
 
 describe("DatabaseTasksCheckProtectedEnvironmentsCurrentEnvironmentTest", () => {
   const dirs: string[] = [];
@@ -20,7 +21,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsCurrentEnvironmentTest", () => 
 
   afterEach(async () => {
     DatabaseTasks.databaseConfiguration = null;
-    DatabaseTasks.clearRegisteredTasks();
+    clearRegisteredTasks();
     for (const dir of dirs.splice(0)) await rm(dir, { recursive: true, force: true });
   });
 
@@ -106,7 +107,7 @@ describe("DatabaseTasksCheckCurrentProtectedEnvironmentTest", () => {
 
   afterEach(async () => {
     DatabaseTasks.databaseConfiguration = null;
-    DatabaseTasks.clearRegisteredTasks();
+    clearRegisteredTasks();
     for (const dir of dirs.splice(0)) await rm(dir, { recursive: true, force: true });
   });
 

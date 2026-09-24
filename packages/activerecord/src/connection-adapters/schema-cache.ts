@@ -7,7 +7,7 @@ import type { ColumnCoder } from "./column.js";
 import { Column as MysqlColumn } from "./mysql/column.js";
 import { Column as PostgresqlColumn } from "./postgresql/column.js";
 import { Column as Sqlite3Column } from "./sqlite3/column.js";
-import { SqlTypeMetadata, type SqlTypeMetadataJSON } from "./sql-type-metadata.js";
+import { SqlTypeMetadata } from "./sql-type-metadata.js";
 import { TypeMetadata as MysqlTypeMetadata } from "./mysql/type-metadata.js";
 import { TypeMetadata as PostgresqlTypeMetadata } from "./postgresql/type-metadata.js";
 import { isSchemaCacheIgnoredTable } from "../active-record.js";
@@ -65,9 +65,11 @@ function rehydrateColumn(data: unknown): Column {
   const column = Object.create(klass.prototype) as Column;
   const metadata = coder["sql_type_metadata"];
   if (metadata != null && !(metadata instanceof SqlTypeMetadata)) {
+    const { class: metadataClass, ...ivars } = metadata as { class?: string };
+    const metadataKlass = TYPE_METADATA_CLASSES[metadataClass as string] ?? SqlTypeMetadata;
     coder = {
       ...coder,
-      sql_type_metadata: SqlTypeMetadata.fromJSON(metadata as SqlTypeMetadataJSON),
+      sql_type_metadata: Object.assign(Object.create(metadataKlass.prototype), ivars),
     };
   }
   column.initWith(coder);

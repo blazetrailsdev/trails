@@ -11,7 +11,6 @@ import {
   quoteDefaultExpression as abstractQuoteDefaultExpression,
   quotedDate as abstractQuotedDate,
   type TemporalDateLike,
-  toBytes,
   typeCast as abstractTypeCast,
   type QuotingDispatchHost,
 } from "../abstract/quoting.js";
@@ -86,11 +85,8 @@ export function quoteSchemaName(schemaName: string): string {
   return quoteColumnName(schemaName);
 }
 
-export function quotedBinary(
-  value: Buffer | ArrayBufferView | ArrayBuffer | string | BinaryData,
-): string {
-  const bytes = toBytes(value);
-  return bytes ? `'${escapeBytea(bytes)}'` : `'${escapeBytea(value as string)}'`;
+export function quotedBinary(value: BinaryData): string {
+  return `'${escapeBytea(value.bytes)}'`;
 }
 
 export function quote(this: QuotingDispatchHost, value: unknown): string | null {

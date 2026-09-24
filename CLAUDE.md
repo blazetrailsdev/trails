@@ -851,7 +851,7 @@ with `Super` still in TDZ and the module throws
 imports at all (so it cannot join any cycle) exporting a mutable binding plus a
 `_setX()` setter, which the defining module calls at the bottom of its own
 body. Readers import the binding from the slot and use it at call time, exactly
-where Ruby resolves the constant. Four instances exist and are the only ones, plus the namespace
+where Ruby resolves the constant. Three instances exist and are the only ones, plus the namespace
 modules converged onto `Autoload`:
 
 - `arel/src/namespaces.ts` — not a slot: the `Arel` / `Arel::Attributes` /
@@ -972,12 +972,6 @@ migration.ts` cycle `ActiveRecord.ConnectionHandling` breaks.
   `connection-adapters.ts -> abstract/connection-handler.ts ->
 database-configurations.ts -> hash-config.ts`, whose `class HashConfig extends
   DatabaseConfig` reads `DatabaseConfig` in TDZ.
-- `activerecord/src/connection-adapters/type-metadata-slots.ts` — the MySQL and
-  PostgreSQL `TypeMetadata` ctors, read by `sql-type-metadata.ts` to revive a
-  serialized column's metadata by its class name (Psych's constant lookup of the
-  `!ruby/object:` tag). The cycle is closed by each `class TypeMetadata extends
-SqlTypeMetadata` (Rails: `DelegateClass(SqlTypeMetadata)`, `mysql/type_metadata.rb:6`,
-  `postgresql/type_metadata.rb:7`).
 
 This is a genuine language shortcoming, not a preference, and it is the one
 sanctioned shape for it — do not re-derive a per-cluster justification, and do
