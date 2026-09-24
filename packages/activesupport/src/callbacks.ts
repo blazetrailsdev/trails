@@ -667,21 +667,6 @@ export class CallbackSequence {
     return this.callTemplate!.expand(arg.target, arg.value, block);
   }
 
-  invokeAround(env: FilterEnvironment, next: () => unknown): unknown {
-    const expanded = this.expandCallTemplate(env, next);
-    const method = expanded[2];
-    if (method === "instanceExec") {
-      const fn = expanded[1] as (...args: unknown[]) => unknown;
-      return fn.apply(expanded[0], expanded.slice(3));
-    }
-    if (method === "call") {
-      const fn = expanded[0] as (...args: unknown[]) => unknown;
-      return fn(...expanded.slice(3), expanded[1]);
-    }
-    const receiver = expanded[0] as Record<PropertyKey, (...args: unknown[]) => unknown>;
-    return receiver[method as PropertyKey](...expanded.slice(3), expanded[1]);
-  }
-
   invokeBefore(
     env: FilterEnvironment,
     opts?: RunCallbacksOptions,
@@ -712,184 +697,6 @@ export class CallbackSequence {
         return Promise.resolve(r).then(() => this._runFilters(list, i + 1, env, opts, chainName));
       }
     }
-  }
-
-  invoke(target: object, block?: () => unknown, opts?: RunCallbacksOptions): unknown {
-    const chainName = this._callbackChain?.name ?? "";
-    const env: FilterEnvironment = { target, halted: false, value: undefined };
-
-    if (this.isFinal()) {
-      const beforeDone = this.invokeBefore(env, opts, chainName);
-      if (isThenable(beforeDone)) {
-        return Promise.resolve(beforeDone).then(() =>
-          this._finishFinal(env, block, opts, chainName),
-        );
-      }
-      return this._finishFinal(env, block, opts, chainName);
-    }
-
-    return this._invokeAround(env, block, opts, chainName);
-  }
-
-  private _invokeAround(
-    env: FilterEnvironment,
-    block: (() => unknown) | undefined,
-    opts: RunCallbacksOptions | undefined,
-    chainName: string,
-  ): unknown {
-    const runFinal = (current: CallbackSequence): void | Promise<void> => {
-      if (env.halted) {
-        env.value = false;
-        return current.invokeAfter(env, opts, chainName);
-      }
-      const y = block ? block() : true;
-      if (isThenable(y)) {
-        if (opts?.strict === "sync") {
-          swallowRejection(y);
-          throw new RuntimeError(
-            `Async callback on sync chain "${chainName}" — block returned a Promise`,
-          );
-        }
-        return Promise.resolve(y).then((v) => {
-          env.value = v;
-          return current.invokeAfter(env, opts, chainName);
-        });
-      }
-      env.value = y;
-      return current.invokeAfter(env, opts, chainName);
-    };
-
-    const runSeq = (current: CallbackSequence): void | Promise<void> => {
-      const beforeDone = current.invokeBefore(env, opts, chainName);
-      if (isThenable(beforeDone)) {
-        return Promise.resolve(beforeDone).then(() => afterBefore(current));
-      }
-      return afterBefore(current);
-    };
-
-    const afterBefore = (current: CallbackSequence): void | Promise<void> => {
-      if (current.isFinal()) return runFinal(current);
-      if (current.isSkip(env)) {
-        const inner = runSeq(current.nested!);
-        if (isThenable(inner)) {
-          return Promise.resolve(inner).then(() => current.invokeAfter(env, opts, chainName));
-        }
-        return current.invokeAfter(env, opts, chainName);
-      }
-      return runAround(current);
-    };
-
-    const runAround = (current: CallbackSequence): void | Promise<void> => {
-      let pendingProceed: Promise<void> | undefined;
-      let proceedObserved = false;
-      const next = (): unknown => {
-        const r = runSeq(current.nested!);
-        if (!isThenable(r)) return env.value;
-        pendingProceed = Promise.resolve(r);
-        const observed = pendingProceed.then(() => env.value);
-        observed.catch(() => {});
-        return {
-          then(onFulfilled?: any, onRejected?: any) {
-            if (typeof onRejected === "function") {
-              proceedObserved = true;
-              return observed.then(onFulfilled, onRejected);
-            }
-            const p = observed.then(onFulfilled);
-            p.catch(() => {});
-            return p;
-          },
-          catch(onRejected?: any) {
-            if (typeof onRejected === "function") {
-              proceedObserved = true;
-              return observed.catch(onRejected);
-            }
-            const p = observed.catch(onRejected);
-            p.catch(() => {});
-            return p;
-          },
-          finally(onFinally?: any) {
-            const p = observed.finally(onFinally);
-            p.catch(() => {});
-            return p;
-          },
-        } as unknown as Promise<void>;
-      };
-
-      const afterAround = (): void | Promise<void> => current.invokeAfter(env, opts, chainName);
-
-      let cbResult: void | Promise<void>;
-      try {
-        cbResult = current.invokeAround(env, next) as void | Promise<void>;
-      } catch (err) {
-        if (pendingProceed) {
-          return (async () => {
-            await pendingProceed.catch(() => {});
-            throw err;
-          })();
-        }
-        throw err;
-      }
-      if (isThenable(cbResult) || pendingProceed) {
-        if (opts?.strict === "sync") {
-          swallowRejection(cbResult);
-          swallowRejection(pendingProceed);
-          throw new RuntimeError(
-            `Async callback on sync chain "${chainName}" — around callback or block returned a Promise`,
-          );
-        }
-        return (async () => {
-          try {
-            await cbResult;
-          } catch (err) {
-            if (pendingProceed) await pendingProceed.catch(() => {});
-            throw err;
-          }
-          if (pendingProceed) {
-            if (proceedObserved) await pendingProceed.catch(() => {});
-            else await pendingProceed;
-          }
-          return afterAround();
-        })();
-      }
-      return afterAround();
-    };
-
-    const result = runSeq(this);
-    if (isThenable(result)) return Promise.resolve(result).then(() => env.value);
-    return env.value;
-  }
-
-  private _finishFinal(
-    env: FilterEnvironment,
-    block: (() => unknown) | undefined,
-    opts: RunCallbacksOptions | undefined,
-    chainName: string,
-  ): unknown {
-    if (env.halted) {
-      env.value = false;
-      const afterDone = this.invokeAfter(env, opts, chainName);
-      if (isThenable(afterDone)) return Promise.resolve(afterDone).then(() => false);
-      return false;
-    }
-    const y = block ? block() : true;
-    if (isThenable(y)) {
-      if (opts?.strict === "sync") {
-        swallowRejection(y);
-        throw new RuntimeError(
-          `Async callback on sync chain "${chainName}" — block returned a Promise`,
-        );
-      }
-      return Promise.resolve(y).then((v) => {
-        env.value = v;
-        const afterDone = this.invokeAfter(env, opts, chainName);
-        if (isThenable(afterDone)) return Promise.resolve(afterDone).then(() => env.value);
-        return env.value;
-      });
-    }
-    env.value = y;
-    const afterDone = this.invokeAfter(env, opts, chainName);
-    if (isThenable(afterDone)) return Promise.resolve(afterDone).then(() => env.value);
-    return env.value;
   }
 
   _callbackChain: CallbackChain | null = null;
@@ -1153,6 +960,73 @@ export type FilterListEntry<T extends object = object> =
   | string
   | CallbackOptions<T>;
 
+interface InvokeSequenceState {
+  current: CallbackSequence;
+  skipped: CallbackSequence[] | null;
+  step: "before" | "yield" | "after" | "skipped";
+}
+
+interface ProceedTracker {
+  pending: Promise<unknown> | undefined;
+  observed: boolean;
+}
+
+function assignYield(
+  env: FilterEnvironment,
+  y: unknown,
+  opts: RunCallbacksOptions | undefined,
+  chainName: string,
+): void | Promise<void> {
+  if (!isThenable(y)) {
+    env.value = y;
+    return;
+  }
+  if (opts?.strict === "sync") {
+    swallowRejection(y);
+    throw new RuntimeError(
+      `Async callback on sync chain "${chainName}" — block returned a Promise`,
+    );
+  }
+  return Promise.resolve(y).then((v) => {
+    env.value = v;
+  });
+}
+
+function observeProceed(
+  tracker: ProceedTracker,
+  r: PromiseLike<unknown>,
+  env: FilterEnvironment,
+): unknown {
+  tracker.pending = Promise.resolve(r);
+  const observed = tracker.pending.then(() => env.value);
+  observed.catch(() => {});
+  return {
+    then(onFulfilled?: any, onRejected?: any) {
+      if (typeof onRejected === "function") {
+        tracker.observed = true;
+        return observed.then(onFulfilled, onRejected);
+      }
+      const p = observed.then(onFulfilled);
+      p.catch(() => {});
+      return p;
+    },
+    catch(onRejected?: any) {
+      if (typeof onRejected === "function") {
+        tracker.observed = true;
+        return observed.catch(onRejected);
+      }
+      const p = observed.catch(onRejected);
+      p.catch(() => {});
+      return p;
+    },
+    finally(onFinally?: any) {
+      const p = observed.finally(onFinally);
+      p.catch(() => {});
+      return p;
+    },
+  };
+}
+
 export namespace Callbacks {
   export function defineCallbacks<T extends object>(
     target: T,
@@ -1243,27 +1117,6 @@ export namespace Callbacks {
     if (chain) chain.clear();
   }
 
-  export function runCallbacks(
-    target: object,
-    name: string,
-    block?: () => unknown,
-    opts?: RunCallbacksOptions,
-    type?: CallbackKind,
-  ): unknown {
-    const chain = peekCallbackChain(target, name);
-    if (!chain) {
-      const r = block?.();
-      if (!isThenable(r)) return r;
-      if (opts?.strict === "sync") {
-        swallowRejection(r);
-        throw new RuntimeError("Async block on chain with no callbacks");
-      }
-      return r;
-    }
-    const sequence = chain.compile(type);
-    return sequence.invoke(target, block, opts);
-  }
-
   export const ClassMethods = {
     setCallback(
       this: { prototype: object },
@@ -1294,7 +1147,7 @@ export namespace Callbacks {
       opts?: RunCallbacksOptions,
       type?: CallbackKind,
     ): unknown {
-      return Callbacks.runCallbacks(this, name, block, opts, type);
+      return runCallbacks(this, name, block, opts, type);
     },
 
     haltedCallbackHook(_filter: unknown, _name: string): void {},
@@ -1336,7 +1189,155 @@ export function runCallbacks(
   opts?: RunCallbacksOptions,
   type?: CallbackKind,
 ): unknown {
-  return Callbacks.runCallbacks(target, name, block, opts, type);
+  const callbacks = peekCallbackChain(target, name);
+
+  if (!callbacks || callbacks.isEmpty) {
+    const r = block?.();
+    if (!isThenable(r)) return r;
+    if (opts?.strict === "sync") {
+      swallowRejection(r);
+      throw new RuntimeError("Async block on chain with no callbacks");
+    }
+    return r;
+  }
+  const chainName = callbacks.name;
+  const env: FilterEnvironment = { target, halted: false, value: undefined };
+
+  const nextSequence = callbacks.compile(type);
+
+  const invokeSequence = (
+    start: CallbackSequence,
+    resume: InvokeSequenceState | null,
+    proceed: ProceedTracker | null,
+  ): unknown => {
+    let current = resume?.current ?? start;
+    let skipped = resume?.skipped ?? null;
+    let step = resume?.step ?? "before";
+    const suspend = (r: PromiseLike<unknown>, at: InvokeSequenceState["step"]) =>
+      Promise.resolve(r).then(() => invokeSequence(start, { current, skipped, step: at }, null));
+
+    let result: unknown;
+    sequence: while (true) {
+      if (step === "before") {
+        const beforeDone = current.invokeBefore(env, opts, chainName);
+        step = "yield";
+        if (isThenable(beforeDone)) {
+          result = suspend(beforeDone, "yield");
+          break sequence;
+        }
+      }
+      if (step === "yield") {
+        step = "after";
+        if (current.isFinal()) {
+          const yielded = assignYield(
+            env,
+            env.halted ? false : block ? block() : true,
+            opts,
+            chainName,
+          );
+          if (isThenable(yielded)) {
+            result = suspend(yielded, "after");
+            break sequence;
+          }
+        } else if (current.isSkip(env)) {
+          (skipped ??= []).push(current);
+          current = current.nested!;
+          step = "before";
+          continue;
+        } else {
+          const tracker: ProceedTracker = { pending: undefined, observed: false };
+          const [receiver, blk, method, ...args] = current.expandCallTemplate(
+            env,
+            invokeSequence.bind(null, current.nested!, null, tracker),
+          ) as [unknown, unknown, string, ...unknown[]];
+          let cbResult: unknown;
+          try {
+            if (method === "instanceExec") {
+              cbResult = (blk as (...a: unknown[]) => unknown).apply(receiver, args);
+            } else if (method === "call") {
+              cbResult = (receiver as (...a: unknown[]) => unknown)(...args, blk);
+            } else {
+              cbResult = (receiver as Record<string, (...a: unknown[]) => unknown>)[method](
+                ...args,
+                blk,
+              );
+            }
+          } catch (err) {
+            if (tracker.pending) {
+              const pending = tracker.pending;
+              result = (async () => {
+                await pending.catch(() => {});
+                throw err;
+              })();
+              break sequence;
+            }
+            throw err;
+          }
+          if (isThenable(cbResult) || tracker.pending) {
+            if (opts?.strict === "sync") {
+              swallowRejection(cbResult);
+              swallowRejection(tracker.pending);
+              throw new RuntimeError(
+                `Async callback on sync chain "${chainName}" — around callback or block returned a Promise`,
+              );
+            }
+            const around = cbResult;
+            result = (async () => {
+              try {
+                await around;
+              } catch (err) {
+                if (tracker.pending) await tracker.pending.catch(() => {});
+                throw err;
+              }
+              if (tracker.pending) {
+                if (tracker.observed) await tracker.pending.catch(() => {});
+                else await tracker.pending;
+              }
+              return invokeSequence(start, { current, skipped, step: "after" }, null);
+            })();
+            break sequence;
+          }
+        }
+      }
+      if (step === "after") {
+        const afterDone = current.invokeAfter(env, opts, chainName);
+        if (isThenable(afterDone)) {
+          result = suspend(afterDone, "skipped");
+          break sequence;
+        }
+      }
+      while (skipped && skipped.length > 0) {
+        const afterDone = skipped.pop()!.invokeAfter(env, opts, chainName);
+        if (isThenable(afterDone)) {
+          result = suspend(afterDone, "skipped");
+          break sequence;
+        }
+      }
+      result = env.value;
+      break sequence;
+    }
+    return proceed && isThenable(result) ? observeProceed(proceed, result, env) : result;
+  };
+
+  if (nextSequence.isFinal()) {
+    const beforeDone = nextSequence.invokeBefore(env, opts, chainName);
+    if (isThenable(beforeDone)) {
+      return Promise.resolve(beforeDone).then(() =>
+        invokeSequence(nextSequence, { current: nextSequence, skipped: null, step: "yield" }, null),
+      );
+    }
+    const yielded = assignYield(env, env.halted ? false : block ? block() : true, opts, chainName);
+    if (isThenable(yielded)) {
+      return yielded.then(() =>
+        invokeSequence(nextSequence, { current: nextSequence, skipped: null, step: "after" }, null),
+      );
+    }
+    const afterDone = nextSequence.invokeAfter(env, opts, chainName);
+    if (isThenable(afterDone)) return Promise.resolve(afterDone).then(() => env.value);
+    return env.value;
+  } else {
+    return invokeSequence(nextSequence, null, null);
+  }
 }
 
 export function CallbacksMixin<TBase extends new (...args: any[]) => object>(Base?: TBase) {

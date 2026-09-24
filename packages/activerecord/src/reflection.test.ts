@@ -1,6 +1,6 @@
 import "./support/canonical-model-index.js";
 import type { AssociationProxy } from "./associations/collection-proxy.js";
-import { describe, it, expect, onTestFinished } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   Base,
   reflectOnAssociation,
@@ -8,7 +8,6 @@ import {
   AssociationReflection,
   AggregateReflection,
   registerModel,
-  modelRegistry,
 } from "./index.js";
 import { Associations } from "./associations.js";
 import {
@@ -25,11 +24,7 @@ import { Subscriber } from "./test-helpers/models/subscriber.js";
 import { NullColumn } from "./connection-adapters/column.js";
 import { create as createReflection } from "./reflection.js";
 import { Customer } from "./test-helpers/models/customer.js";
-import {
-  UserWithInvalidRelation,
-  AccountInvalid,
-  InfoInvalid,
-} from "./test-helpers/models/user-with-invalid-relation.js";
+import { UserWithInvalidRelation } from "./test-helpers/models/user-with-invalid-relation.js";
 import { Organization } from "./test-helpers/models/organization.js";
 import { Author } from "./test-helpers/models/author.js";
 import { Hotel as CanonicalHotel } from "./test-helpers/models/hotel.js";
@@ -853,12 +848,6 @@ describe("ReflectionTest", () => {
   });
 
   it("reflection klass requires ar subclass", async () => {
-    modelRegistry.set("AccountInvalid", AccountInvalid as unknown as typeof Base);
-    modelRegistry.set("InfoInvalid", InfoInvalid as unknown as typeof Base);
-    onTestFinished(() => {
-      modelRegistry.delete("AccountInvalid");
-      modelRegistry.delete("InfoInvalid");
-    });
     for (const rel of [
       "accountInvalid",
       "accountClassName",

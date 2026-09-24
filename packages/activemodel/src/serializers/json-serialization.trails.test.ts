@@ -46,7 +46,7 @@ describe("JsonSerializationTest", () => {
     }
     interface P extends Attributes, SerializersJSON {}
 
-    expect(() => new P({}).fromJson("42")).toThrow(/Number passed/);
+    expect(() => new P({}).fromJson("42")).toThrow(/Integer passed/);
     expect(() => new P({}).fromJson("[1,2]")).toThrow(/Array passed/);
     expect(() => new P({}).fromJson("null")).toThrow(/NilClass passed/);
   });
@@ -67,7 +67,7 @@ describe("JsonSerializationTest", () => {
     interface P extends Attributes, SerializersJSON {}
 
     try {
-      expect(() => new P({}).fromJson('{"p":42}')).toThrow(/Number passed/);
+      expect(() => new P({}).fromJson('{"p":42}')).toThrow(/Integer passed/);
     } finally {
       P.includeRootInJson = false;
     }

@@ -1688,10 +1688,9 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(await (post as any).authorFavorites.toArray()).toEqual([]);
   });
 
-  it.skip("merge join association with has many through association proxy", async () => {
-    // BLOCKED: collection proxy has no ratings scoped relation — author.comments.ratings is undefined — filed as 0155-assertion-surfaced-port-bugs/collection-proxy-does-not-delegate-association-names-to-scope
+  it("merge join association with has many through association proxy", async () => {
     const author = await Author.find(authors("mary").id);
-    await assertNothingRaised(() => (author as any).comments.ratings.toSql());
+    await assertNothingRaised(() => (author as any).comments.ratings().toSql());
   });
 
   it("has many association through a has many association with nonstandard primary keys", async () => {

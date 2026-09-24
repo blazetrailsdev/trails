@@ -205,7 +205,9 @@ export function autoloadModel(name: string): void {
   const bare = name.replace(/^::/, "");
   if (modelRegistry.has(bare)) return;
   const autoloaded = canonicalModelAutoloadIndex?.get(bare);
-  if (autoloaded) registerModel(autoloaded);
+  if (!autoloaded) return;
+  if (frameworkBase(autoloaded)) registerModel(autoloaded);
+  else modelRegistry.set(bare, autoloaded);
 }
 
 /**

@@ -2424,7 +2424,7 @@ export class Base extends Model {
   }
 
   static inspect(): string {
-    const name = this.name;
+    const name = this === Base ? "ActiveRecord::Base" : this.name;
     if (this === Base) {
       return name;
     } else if (this.abstractClass) {

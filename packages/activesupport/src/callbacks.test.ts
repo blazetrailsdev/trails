@@ -1,5 +1,5 @@
 import { kernelThrow } from "@blazetrails/ruby-compat";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
   defineCallbacks,
   setCallback,
@@ -591,8 +591,16 @@ describe("DoubleYieldTest", () => {
 });
 
 describe("CallStackTest", () => {
-  it.skip("tidy call stack", () => {
-    // BLOCKED: callbacks-runner-exceeds-rails-call-stack-budget
+  let stackTraceLimit: number;
+  beforeEach(() => {
+    stackTraceLimit = Error.stackTraceLimit;
+    Error.stackTraceLimit = Infinity;
+  });
+  afterEach(() => {
+    Error.stackTraceLimit = stackTraceLimit;
+  });
+
+  it("tidy call stack", () => {
     const around = new AroundPerson();
     around.saveFails = true;
 
@@ -617,13 +625,13 @@ describe("CallStackTest", () => {
       expect(callStack.join("\n")).toBe(
         [
           "<anonymous>",
-          "next",
+          "invokeSequence",
           "AroundPerson.tweedleDeedle",
-          "next",
+          "invokeSequence",
           "AroundPerson.w0tyes",
-          "next",
+          "invokeSequence",
           "AroundPerson.tweedleDum",
-          "next",
+          "invokeSequence",
           "runCallbacks",
           "AroundPerson.save",
         ].join("\n"),
@@ -633,13 +641,13 @@ describe("CallStackTest", () => {
       expect(callStack.join("\n")).toBe(
         [
           "<anonymous>",
-          "next",
+          "invokeSequence",
           "tweedleDeedle",
-          "next",
+          "invokeSequence",
           "w0tyes",
-          "next",
+          "invokeSequence",
           "tweedleDum",
-          "next",
+          "invokeSequence",
           "runCallbacks",
           "save",
         ].join("\n"),
@@ -647,8 +655,7 @@ describe("CallStackTest", () => {
     }
   });
 
-  it.skip("short call stack", () => {
-    // BLOCKED: callbacks-runner-exceeds-rails-call-stack-budget
+  it("short call stack", () => {
     const person = new Person();
     person.saveFails = true;
 

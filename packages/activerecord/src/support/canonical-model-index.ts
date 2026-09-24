@@ -7,7 +7,7 @@ import * as canonicalModels from "../test-helpers/models/index.js";
 function buildCanonicalModelIndex(): ReadonlyMap<string, typeof Base> {
   const index = new Map<string, typeof Base>();
   for (const exported of Object.values(canonicalModels)) {
-    if (typeof exported === "function" && exported !== Base && exported.prototype instanceof Base) {
+    if (typeof exported === "function" && exported !== Base) {
       const cls = exported as typeof Base;
       for (const key of new Set([cls.name, qualifiedName(cls)])) {
         if (key && !index.has(key)) index.set(key, cls);
