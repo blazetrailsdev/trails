@@ -86,7 +86,11 @@ export class Aes256Gcm {
   }
 
   inspect(): string {
-    return `#<ActiveRecord::Encryption::Cipher::Aes256Gcm:${rbAnyToS(this).split(":")[1]}`;
+    const name =
+      this.constructor === Aes256Gcm
+        ? "ActiveRecord::Encryption::Cipher::Aes256Gcm"
+        : this.constructor.name;
+    return `#<${name}:${rbAnyToS(this).split(":")[1]}`;
   }
 
   private _validateKeyLength(key: Bytes): void {

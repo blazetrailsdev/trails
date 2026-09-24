@@ -19,7 +19,7 @@ describe("BacktraceCleanerDefaultFilterAndSilencerTest", () => {
 
   it("should format installed gems not in Gem.default_dir correctly", () => {
     const targetDir = Gem.path.find((p) => p !== Gem.defaultDir);
-    // eslint-disable-next-line vitest/no-conditional-in-test -- mirrors Rails' `if target_dir` (backtrace_cleaner_test.rb:106)
+    // eslint-disable-next-line vitest/no-conditional-in-test
     if (targetDir) {
       const backtrace = [`${targetDir}/gems/nosuchgem-1.2.3/lib/foo.rb`];
       const result = bc.clean(backtrace, "all");

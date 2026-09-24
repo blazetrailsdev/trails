@@ -68,6 +68,14 @@ export class BacktraceCleaner {
 
   static readonly FORMATTED_GEMS_PATTERN = /^[^/]+ \([\w.]+\) /;
 
+  dup(): this {
+    const Ctor = this.constructor as new () => this;
+    const copy = new Ctor();
+    copy._filters = [...this._filters];
+    copy._silencers = [...this._silencers];
+    return copy;
+  }
+
   /** @internal */
   private addGemFilter(): void {
     const gemsPaths = [...new Set([...Gem.path, Gem.defaultDir])].map((p) => regexpEscape(p));
@@ -109,13 +117,5 @@ export class BacktraceCleaner {
 
   protected noise(backtrace: string[]): string[] {
     return backtrace.filter((line) => this._silencers.some((s) => s(line)));
-  }
-
-  dup(): this {
-    const Ctor = this.constructor as new () => this;
-    const copy = new Ctor();
-    copy._filters = [...this._filters];
-    copy._silencers = [...this._silencers];
-    return copy;
   }
 }

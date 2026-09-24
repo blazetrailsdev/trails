@@ -88,8 +88,8 @@ export class BroadcastLogger extends Logger {
     return this.dispatch((logger) => logger.add(...(args as Parameters<Logger["add"]>)));
   }
 
-  log(severity: number, message?: string | (() => string), progname?: string): boolean {
-    return this.dispatch((logger) => logger.log(severity, message, progname));
+  log(...args: unknown[]): boolean {
+    return this.dispatch((logger) => logger.log(...(args as Parameters<Logger["log"]>)));
   }
 
   debug(...args: unknown[]): boolean {
