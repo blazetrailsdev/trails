@@ -45,7 +45,7 @@ describe("DateTimeTest", () => {
         const now = RubyTime.new(...timeValues, localOffset);
 
         const task = new Task();
-        (task as any).starting = now;
+        task.starting = now;
         await task.saveBang();
 
         expect((await Task.find(task.id)).starting).toEqual(RubyTime.local(...timeValues));

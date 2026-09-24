@@ -1111,10 +1111,8 @@ describe("DeprecationTest", () => {
       callstack = frames as CallerLocation[];
     };
     methodThatEmitsDeprecation(deprecator);
-    expect(callstack[0].absolutePath ?? callstack[0].path).toEqual(
-      new URL(import.meta.url).pathname,
-    );
-    expect(callstack[0].lineno).toEqual(callerLocations(0)[0].lineno - 4);
+    expect(callstack[0].absolutePath ?? callstack[0].path).toEqual(expandedFile);
+    expect(callstack[0].lineno).toEqual(callerLocations(0)[0].lineno - 2);
   });
 
   it("warn deprecation can blame code generated with eval", () => {
@@ -1152,6 +1150,8 @@ const methodThatEmitsDeprecationWithInternalMethod = (0, eval)(
 }
 //# sourceURL=/path/to/user/code.ts`,
 )() as (deprecator: Deprecation) => void;
+
+const expandedFile = new URL(import.meta.url).pathname;
 
 function methodThatEmitsDeprecation(deprecator: Deprecation): void {
   deprecator.warn();
