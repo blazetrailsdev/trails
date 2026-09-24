@@ -7,7 +7,7 @@ import {
   rbInspect as inspect,
   symbolToS,
 } from "@blazetrails/ruby-compat";
-import { assertRaises } from "./testing/assertions.js";
+import { assertRaises, assertNil } from "./testing/assertions.js";
 import { deepDup } from "./hash-utils.js";
 
 const plainly = <V>(hash: Hash<string, V>): Record<string, unknown> =>
@@ -566,7 +566,7 @@ describe("HashWithIndifferentAccessTest", () => {
     expect(hash.get(":a")).toEqual(1);
     expect(hash.get(":b")).toEqual(true);
     expect(hash.get(":c")).toEqual(false);
-    expect(hash.get(":d")).toBeNull();
+    assertNil(hash.get(":d"));
     expect(hash.get(":e")).toBeUndefined();
   });
 
@@ -580,7 +580,7 @@ describe("HashWithIndifferentAccessTest", () => {
     expect(hash.get(":a")).toEqual(1);
     expect(hash.get(":b")).toEqual(true);
     expect(hash.get(":c")).toEqual(false);
-    expect(hash.get(":d")).toBeNull();
+    assertNil(hash.get(":d"));
     expect(hash.get(":e")).toEqual(1);
   });
 
@@ -1073,7 +1073,7 @@ describe("HashWithIndifferentAccessTest", () => {
 
   it("double conversion with nil key", () => {
     const h = new HashWithIndifferentAccess<unknown>({ a: null });
-    expect(h.get("a")).toBeNull();
+    assertNil(h.get("a"));
   });
 
   it("assorted keys not stringified", () => {

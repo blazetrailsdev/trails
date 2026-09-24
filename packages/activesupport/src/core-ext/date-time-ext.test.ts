@@ -63,7 +63,7 @@ import {
 } from "./date-and-time/calculations.js";
 import { preserveTimezone } from "./date-and-time/compatibility.js";
 import { isBlank } from "./object/blank.js";
-import { assertNotPredicate, assertPredicate } from "../testing/assertions.js";
+import { assertNotPredicate, assertPredicate, assertNil } from "../testing/assertions.js";
 import { DATE_FORMATS } from "./time/conversions.js";
 import { toTime } from "./time/compatibility.js";
 
@@ -672,7 +672,7 @@ describe("DateTimeExtCalculationsTest", () => {
     expect(compare(dt(2000), Time.utc(1999, 12, 31, 23, 59, 59).toS())).toBe(1);
     expect(compare(dt(2000), Time.utc(2000, 1, 1, 0, 0, 0).toS())).toBe(0);
     expect(compare(dt(2000), Time.utc(2000, 1, 1, 0, 0, 1).toS())).toBe(-1);
-    expect(compare(dt(2000), "Invalid as Time")).toBeNull();
+    assertNil(compare(dt(2000), "Invalid as Time"));
   });
 
   it("compare with integer", () => {

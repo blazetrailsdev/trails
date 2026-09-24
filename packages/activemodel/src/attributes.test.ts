@@ -4,7 +4,13 @@
    how `include()` surfaces those members on the type side, and a generated attribute member is an
    accessor pair (CLAUDE.md § "Generated attribute readers are properties"). */
 import { describe, it, expect } from "vitest";
-import { BigDecimal, assertNothingRaised, assertRaise, include } from "@blazetrails/activesupport";
+import {
+  BigDecimal,
+  assertNothingRaised,
+  assertRaise,
+  include,
+  assertNil,
+} from "@blazetrails/activesupport";
 import { Date as RubyDate, type Temporal } from "@blazetrails/date";
 import { ArgumentError, FrozenError } from "@blazetrails/ruby-compat";
 import { Model } from "./index.js";
@@ -117,7 +123,7 @@ describe("AttributesTest", () => {
     data.boolean_field = "1";
 
     expect(data.integer_field).toEqual(10);
-    expect(data.string_with_default).toBeNull();
+    assertNil(data.string_with_default);
     expect(data.boolean_field).toEqual(true);
   });
 

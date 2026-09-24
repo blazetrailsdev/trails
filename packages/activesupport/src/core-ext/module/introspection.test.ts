@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerConstant, unregisterConstant } from "../../inflector.js";
 import { moduleParent, moduleParentName, moduleParents } from "../../module-ext.js";
+import { assertNil } from "../../testing/assertions.js";
 
 function namedModule(name: string): { name: string } {
   const mod = {};
@@ -27,7 +28,7 @@ describe("IntrospectionTest", () => {
   it("module parent name", () => {
     expect(moduleParentName(ParentAB)).toEqual("ParentA");
     expect(moduleParentName(ParentABC)).toEqual("ParentA::B");
-    expect(moduleParentName(ParentA)).toBeNull();
+    assertNil(moduleParentName(ParentA));
   });
 
   it("module parent name when frozen", () => {
@@ -37,7 +38,7 @@ describe("IntrospectionTest", () => {
 
   it("module parent name notice changes", () => {
     const klass = class {};
-    expect(moduleParentName(klass)).toBeNull();
+    assertNil(moduleParentName(klass));
     const newClass = namedModule("ParentA::NewClass");
     try {
       expect(moduleParentName(newClass)).toEqual("ParentA");

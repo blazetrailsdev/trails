@@ -3,7 +3,7 @@ import { Logger, taggedLogging } from "./logger.js";
 import { BroadcastLogger } from "./broadcast-logger.js";
 import { TagStack, Formatter } from "./tagged-logging.js";
 import { Thread } from "@blazetrails/ruby-compat";
-import { assertRespondTo } from "./testing/assertions.js";
+import { assertRespondTo, assertNotNil, assertNil } from "./testing/assertions.js";
 
 function makeBuffer() {
   const lines: string[] = [];
@@ -81,9 +81,9 @@ describe("TaggedLoggingTest", () => {
   it.skip("sets logger.formatter if missing and extends it with a tagging API", () => {
     // BLOCKED: tagged-logging-proxy-is-not-a-formatter-extension
     const logger = new Logger(makeBuffer());
-    expect(logger.formatter).toBeNull();
+    assertNil(logger.formatter);
     const otherLogger = taggedLogging(logger);
-    expect(otherLogger.formatter).not.toBeNull();
+    assertNotNil(otherLogger.formatter);
     assertRespondTo(otherLogger.formatter, "tagged");
   });
 

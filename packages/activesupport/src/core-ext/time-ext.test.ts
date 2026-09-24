@@ -12,6 +12,7 @@ import {
   assertPredicate,
   assertRaise,
   assertRaises,
+  assertNil,
 } from "../testing/assertions.js";
 import { assertDeprecated } from "../testing/deprecation.js";
 import { deprecator } from "../deprecator.js";
@@ -1258,8 +1259,7 @@ describe("TimeExtCalculationsTest", () => {
     expect(result.epochMilliseconds).toBe(t.getTime());
   });
 
-  it.skip("advance gregorian proleptic", () => {
-    // BLOCKED: activesupport-time-advance-gregorian-proleptic
+  it("advance gregorian proleptic", () => {
     expect(RubyTime.local(1582, 10, 15, 15, 15, 10).advance({ days: -1 })).toEqual(
       RubyTime.local(1582, 10, 14, 15, 15, 10),
     );
@@ -1781,7 +1781,7 @@ describe("TimeExtCalculationsTest", () => {
     expect(RubyTime.utc(2000).compare(RubyTime.utc(1999, 12, 31, 23, 59, 59, 999).toS())).toBe(1);
     expect(RubyTime.utc(2000).compare(RubyTime.utc(2000, 1, 1, 0, 0, 0).toS())).toBe(0);
     expect(RubyTime.utc(2000).compare(RubyTime.utc(2000, 1, 1, 0, 0, 1, 0).toS())).toBe(-1);
-    expect(RubyTime.utc(2000).compare("Invalid as Time")).toBeNull();
+    assertNil(RubyTime.utc(2000).compare("Invalid as Time"));
   });
 
   it("at with datetime", () => {
@@ -1827,9 +1827,8 @@ describe("TimeExtCalculationsTest", () => {
     );
   });
 
-  it.skip("at with in option", () => {
-    // BLOCKED: activesupport-time-at-in-option-and-case-equality
-    expect((RubyTime.at as any)(31337, { in: -28800 })).toEqual(
+  it("at with in option", () => {
+    expect(RubyTime.at(31337, { in: -28800 })).toEqual(
       RubyTime.new(1970, 1, 1, 0, 42, 17, "-08:00"),
     );
   });
@@ -1911,8 +1910,7 @@ describe("TimeExtCalculationsTest", () => {
     });
   });
 
-  it.skip("case equality", () => {
-    // BLOCKED: activesupport-time-at-in-option-and-case-equality
+  it("case equality", () => {
     class Sub extends RubyTime {}
     const utcZone = TimeZone.find("UTC")!;
     expect(RubyTime.utc(2000) instanceof RubyTime).toBeTruthy();

@@ -11,3 +11,5 @@ allowBuilds:
   better-sqlite3: true
   esbuild: true
   libsql: true
+
+pmOnFail: ignore

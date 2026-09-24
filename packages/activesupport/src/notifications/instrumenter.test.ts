@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { RuntimeError } from "@blazetrails/ruby-compat";
 import { Instrumenter } from "./instrumenter.js";
-import { assert, assertEmpty, assertRaises } from "../testing/assertions.js";
+import { assert, assertEmpty, assertRaises, assertNotNil } from "../testing/assertions.js";
 
 class TestNotifier {
   readonly starts: unknown[][] = [];
@@ -80,8 +80,8 @@ describe("InstrumenterTest", () => {
     expect(event.name).toEqual("awesome");
     expect(event.payload).toEqual({ result: 2 });
     expect(event.transactionId).toEqual(instrumenter.id);
-    expect(event.time).not.toBeNull();
-    expect(event.end).not.toBeNull();
+    assertNotNil(event.time);
+    assertNotNil(event.end);
   });
 
   it("record works without a block", () => {
@@ -91,8 +91,8 @@ describe("InstrumenterTest", () => {
     expect(event.name).toEqual("no.block");
     expect(event.payload).toEqual(payload);
     expect(event.transactionId).toEqual(instrumenter.id);
-    expect(event.time).not.toBeNull();
-    expect(event.end).not.toBeNull();
+    assertNotNil(event.time);
+    assertNotNil(event.end);
   });
 
   it("record with exception", async () => {

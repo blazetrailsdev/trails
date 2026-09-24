@@ -8,6 +8,8 @@ import {
   assertNoDifference,
   assertRaises,
   assertSame,
+  assertNotNil,
+  assertNil,
 } from "./testing/assertions.js";
 
 class FailingErrorSubscriber {
@@ -124,7 +126,7 @@ describe("ErrorReporterTest", () => {
       throw new Error();
       return 2 + 2;
     });
-    expect(result).toBeNull();
+    assertNil(result);
   });
 
   it("#handle returns the value of the fallback as a proc on handled raise", () => {
@@ -201,7 +203,7 @@ describe("ErrorReporterTest", () => {
     expect(error.stack).toBeUndefined();
     expect(error.stack?.split("\n").slice(1)).toBeUndefined();
 
-    expect(reporter.report(error)).toBeNull();
+    assertNil(reporter.report(error));
     expect(error.stack!.length === 0).toBeFalsy();
     expect(error.stack!.split("\n").slice(1).length === 0).toBeFalsy();
   });
@@ -213,14 +215,14 @@ describe("ErrorReporterTest", () => {
 
   it("#unexpected swallows errors by default", () => {
     const error = new Error("Oops");
-    expect(reporter.unexpected(error)).toBeNull();
+    assertNil(reporter.unexpected(error));
     expect(subscriber.events).toEqual([[error, true, "warning", "application", {}]]);
     expect(error.stack!.length === 0).toBeFalsy();
     expect(error.stack!.split("\n").slice(1).length === 0).toBeFalsy();
   });
 
   it("#unexpected accepts an error message", () => {
-    expect(reporter.unexpected("Oops")).toBeNull();
+    assertNil(reporter.unexpected("Oops"));
     expect(subscriber.events.length).toBe(1);
 
     const [error, ...eventDetails] = subscriber.events[0];
@@ -238,7 +240,7 @@ describe("ErrorReporterTest", () => {
       reporter.unexpected(error);
     });
     expect(raisedError.message).toContain("RuntimeError: Oops");
-    expect(raisedError.cause).not.toBeNull();
+    assertNotNil(raisedError.cause);
     assertSame(error, raisedError.cause);
     expect(raisedError.stack!.split("\n")[1]).toContain(`${import.meta.url.split("/").pop()}`);
   });

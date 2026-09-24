@@ -8,6 +8,7 @@ import { Encoding, type EncodeOptions } from "./encoding.js";
 import { asJson, ToJsonWithActiveSupportEncoder } from "../core-ext/object/json.js";
 import { BigDecimal } from "../core-ext/big-decimal/conversions.js";
 import { Range } from "@blazetrails/ruby-compat/range";
+import { assertNil } from "../testing/assertions.js";
 
 class Hashlike {
   toHash(): Record<string, unknown> {
@@ -308,7 +309,7 @@ describe("TestJSONEncoding", () => {
   });
 
   it("nil true and false represented as themselves", () => {
-    expect(asJson(null)).toBeNull();
+    assertNil(asJson(null));
     expect(asJson(true)).toBe(true);
     expect(asJson(false)).toBe(false);
   });

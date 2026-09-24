@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
    `ValidatableVisitor` merges with an empty interface so the `Validations` members its `Visitor`
    parent includes surface on the type side. */
-import { assertRespondTo, assertNotRespondTo } from "@blazetrails/activesupport";
+import { assertRespondTo, assertNotRespondTo, assertNil } from "@blazetrails/activesupport";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import bcrypt from "bcryptjs";
@@ -116,7 +116,7 @@ describe("SecurePasswordTest", () => {
   it("resetting password to nil clears the password cache", () => {
     user.password = "password";
     user.password = null;
-    expect(user.password).toBeNull();
+    assertNil(user.password);
   });
 
   it("update an existing user with validation and no change in password", async () => {
@@ -262,11 +262,11 @@ describe("SecurePasswordTest", () => {
 
   it("setting a nil password should clear an existing password", () => {
     existingUser.password = null;
-    expect(existingUser.password_digest).toBeNull();
+    assertNil(existingUser.password_digest);
   });
 
   it("override secure password attribute", () => {
-    expect(user.passwordCalled).toBeNull();
+    assertNil(user.passwordCalled);
 
     user.password = "secret";
 
@@ -305,12 +305,12 @@ describe("SecurePasswordTest", () => {
 
   it("password_salt should return nil when password is nil", () => {
     user.password = null;
-    expect(user.passwordSalt).toBeNull();
+    assertNil(user.passwordSalt);
   });
 
   it("password_salt should return nil when password digest is nil", () => {
     user.password_digest = null;
-    expect(user.passwordSalt).toBeNull();
+    assertNil(user.passwordSalt);
   });
 
   it("Password digest cost defaults to bcrypt default cost when min_cost is false", () => {

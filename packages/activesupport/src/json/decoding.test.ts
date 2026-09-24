@@ -3,6 +3,7 @@ import { Date as RubyDate, Time } from "@blazetrails/date";
 import { TimeZone } from "../values/time-zone.js";
 import { setZone, zone as timeZone } from "../time-zone-config.js";
 import { ActiveSupportJSON, parseJsonTimes, setParseJsonTimes } from "../json.js";
+import { assertNil } from "../testing/assertions.js";
 
 function withParseJsonTimes<T>(value: boolean, fn: () => T): T {
   const oldValue = parseJsonTimes;
@@ -110,8 +111,7 @@ describe("TestJSONDecoding", () => {
       withTzDefault("Eastern Time (US & Canada)", () => {
         withParseJsonTimes(true, () => {
           if (expected == null) {
-            // eslint-disable-next-line vitest/no-conditional-expect
-            expect(ActiveSupportJSON.decode(json), failMessage).toBeNull();
+            assertNil(ActiveSupportJSON.decode(json), failMessage);
           } else {
             // eslint-disable-next-line vitest/no-conditional-expect
             expect(ActiveSupportJSON.decode(json), failMessage).toEqual(expected);

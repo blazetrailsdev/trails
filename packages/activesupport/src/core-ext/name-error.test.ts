@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { NameError } from "./name-error.js";
 import { constantize, registerConstant, unregisterConstant } from "../inflector.js";
-import { assert, assertNot, assertRaise } from "../testing/assertions.js";
+import { assert, assertNot, assertRaise, assertNil } from "../testing/assertions.js";
 
 describe("NameErrorTest", () => {
   it("name error should set missing name", async () => {
@@ -32,7 +32,7 @@ describe("NameErrorTest", () => {
       );
     })) as NameError;
     assertNot(exc.isMissingName(":Foo"));
-    expect(exc.missingName()).toBeNull();
+    assertNil(exc.missingName());
     expect(exc.receiver()).toEqual(self);
   });
 });

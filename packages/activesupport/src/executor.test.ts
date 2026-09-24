@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Executor } from "./executor.js";
 import { ActiveSupport } from "./index.js";
 import { ErrorReporter } from "./error-reporter.js";
+import { assertNil } from "./testing/assertions.js";
 
 class DummyError extends Error {}
 
@@ -164,7 +165,7 @@ describe("ExecutorTest", () => {
 
     executor.wrap(() => {});
 
-    expect(suppliedState).toBeNull();
+    assertNil(suppliedState);
   });
 
   it("exception skips uninvoked hook", () => {

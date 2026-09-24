@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Temporal, Time as RubyTime, strftime } from "@blazetrails/date";
-import { TimeZone, setZoneDefault } from "@blazetrails/activesupport";
+import { TimeZone, setZoneDefault, assertNil } from "@blazetrails/activesupport";
 import { rbObjAsString as toS } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import { Types } from "../index.js";
@@ -10,11 +10,11 @@ describe("DateTimeTest", () => {
 
   it("type cast datetime and timestamp", () => {
     const type = new Types.DateTimeType();
-    expect(type.cast(null)).toBeNull();
-    expect(type.cast("")).toBeNull();
-    expect(type.cast("  ")).toBeNull();
-    expect(type.cast("ABC")).toBeNull();
-    expect(type.cast(" ".repeat(129))).toBeNull();
+    assertNil(type.cast(null));
+    assertNil(type.cast(""));
+    assertNil(type.cast("  "));
+    assertNil(type.cast("ABC"));
+    assertNil(type.cast(" ".repeat(129)));
 
     const datetimeString = strftime(Temporal.Now.instant(), "%FT%T");
     expect((type.cast(datetimeString) as RubyTime).strftime("%FT%T")).toBe(datetimeString);

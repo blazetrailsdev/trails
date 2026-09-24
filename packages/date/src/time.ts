@@ -188,6 +188,23 @@ function isTimeNewOptions(arg: unknown): arg is TimeNewOptions {
   return typeof arg === "object" && arg !== null && !(arg instanceof Rational);
 }
 
+/** @noRailsEquivalent PERMANENT */
+export interface TimeAtOptions {
+  in?: string | number | null;
+}
+
+function getScale(unit: string): number {
+  if (unit === "nanosecond" || unit === "nsec") {
+    return 1_000_000_000;
+  } else if (unit === "microsecond" || unit === "usec") {
+    return 1_000_000;
+  } else if (unit === "millisecond") {
+    return 1_000;
+  } else {
+    throw new ArgumentError(`unexpected unit: ${unit}`);
+  }
+}
+
 const TIME_NEW_DEFAULTS = [undefined, undefined, 1, 0, 0, 0, null];
 
 function rest(str: string, ptr: number): string {
@@ -438,19 +455,45 @@ export class Time {
     return new Time(0);
   }
 
-  static at(seconds: unknown, microsecondsWithFrac?: unknown): Time {
-    if (seconds instanceof Time) {
-      if (microsecondsWithFrac !== undefined) {
-        throw new TypeError("can't convert Time into an exact number");
-      }
-      return Time.#atInstant(seconds.#instant, seconds.#zoneArgument(), seconds.#tzmodeUtc);
-    }
-    const timew = numExact(seconds)
-      .mul(1_000_000_000)
-      .add(numExact(microsecondsWithFrac ?? 0).mul(1_000));
+  static #timeNewTimew(timew: Rational): Time {
     const nanoseconds =
       timew.numerator / timew.denominator - (timew.numerator % timew.denominator < 0n ? 1n : 0n);
     return Time.#atInstant(Temporal.Instant.fromEpochNanoseconds(nanoseconds));
+  }
+
+  static at(
+    time: unknown,
+    subsec: unknown = false,
+    unit: string | TimeAtOptions = "microsecond",
+    options: TimeAtOptions = {},
+  ): Time {
+    if (isTimeNewOptions(subsec)) {
+      options = subsec;
+      subsec = false;
+    } else if (isTimeNewOptions(unit)) {
+      options = unit;
+      unit = "microsecond";
+    }
+    const { in: zone = null } = options;
+    let t: Time;
+
+    if (subsec != null && subsec !== false) {
+      const scale = getScale(unit as string);
+      const timew = numExact(time)
+        .mul(1_000_000_000)
+        .add(numExact(subsec).mul(1_000_000_000).quo(scale));
+      t = Time.#timeNewTimew(timew);
+    } else if (time instanceof Time) {
+      t = Time.#atInstant(time.#instant, time.#zoneArgument(), time.#tzmodeUtc);
+    } else {
+      const timew = numExact(time).mul(1_000_000_000);
+      t = Time.#timeNewTimew(timew);
+    }
+    if (zone != null) {
+      t = t.getlocal(zone);
+    }
+
+    return t;
   }
 
   static utc(

@@ -2,7 +2,12 @@ import { beforeEach, describe, it, expect } from "vitest";
 import { Module, extend, include } from "@blazetrails/ruby-compat";
 import { includedModules, prepend } from "@blazetrails/ruby-compat/include";
 import { Concern, MultipleIncludedBlocks, MultiplePrependBlocks } from "./concern.js";
-import { assertNotRespondTo, assertNothingRaised, assertRaises } from "./testing/assertions.js";
+import {
+  assertNotRespondTo,
+  assertNothingRaised,
+  assertRaises,
+  assertNil,
+} from "./testing/assertions.js";
 
 function newConcern(): any {
   const mod = new Module();
@@ -118,7 +123,7 @@ describe("ConcernTest", () => {
 
   it("included block is not ran when prepended", () => {
     prepend(klass, Baz);
-    expect(klass.includedRan).toBeNull();
+    assertNil(klass.includedRan);
   });
 
   it("prepended block is ran", () => {
@@ -128,7 +133,7 @@ describe("ConcernTest", () => {
 
   it("prepended block is not ran when included", () => {
     include(klass, Baz);
-    expect(klass.prependedRan).toBeNull();
+    assertNil(klass.prependedRan);
   });
 
   it("modules dependencies are met", () => {

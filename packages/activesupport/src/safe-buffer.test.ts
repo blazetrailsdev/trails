@@ -9,6 +9,7 @@ import {
   assertNotPredicate,
   assertPredicate,
   assertRaise,
+  assertNotNil,
 } from "./testing/assertions.js";
 
 describe("SafeBufferTest", () => {
@@ -148,7 +149,7 @@ describe("SafeBufferTest", () => {
 
   it("Should be safe when sliced if original value was safe", () => {
     const newBuffer = buffer.get(0, 0);
-    expect(newBuffer).not.toBeNull();
+    assertNotNil(newBuffer);
     assertPredicate(newBuffer, isHtmlSafe, "should be safe");
   });
 

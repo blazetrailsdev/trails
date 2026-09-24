@@ -247,6 +247,7 @@ from Rails on purpose (and why): [ActiveRecord](packages/website/docs/guides/act
 
 ```bash
 # Install dependencies
+corepack enable
 pnpm install
 
 # Run tests (uses SQLite adapter by default)

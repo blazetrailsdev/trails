@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   assert,
+  assertNil,
   assertNot,
+  assertNotNil,
   assertPredicate,
   assertNotPredicate,
   asJson as objectAsJson,
@@ -184,8 +186,8 @@ describe("DirtyTest", () => {
 
   it("changes accessible through both strings and symbols", () => {
     model.name = "David";
-    expect(model.changes["name"]).not.toBeUndefined();
-    expect(model.changes["name"]).not.toBeUndefined();
+    assertNotNil(model.changes["name"]);
+    assertNotNil(model.changes["name"]);
   });
 
   it("be consistent with symbols arguments after the changes are applied", () => {
@@ -209,7 +211,7 @@ describe("DirtyTest", () => {
   it("resetting attribute", () => {
     model.name = "Bob";
     model.restoreName();
-    expect(model.name).toBeNull();
+    assertNil(model.name);
     assertNotPredicate(model, (m) => m.nameChanged());
   });
 

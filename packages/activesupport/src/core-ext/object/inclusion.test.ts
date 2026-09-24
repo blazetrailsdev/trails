@@ -4,6 +4,7 @@ import { ArgumentError } from "../../hash-utils.js";
 import { Temporal } from "@blazetrails/date";
 import { Range } from "@blazetrails/ruby-compat/range";
 import { tomorrow } from "../date/calculations.js";
+import { assertNil } from "../../testing/assertions.js";
 
 describe("InTest", () => {
   it("in array", () => {
@@ -45,7 +46,7 @@ describe("InTest", () => {
 
   it("presence in", () => {
     expect(presenceIn("stuff", ["lots", "of", "stuff"])).toEqual("stuff");
-    expect(presenceIn("stuff", ["lots", "of", "crap"])).toBeNull();
+    assertNil(presenceIn("stuff", ["lots", "of", "crap"]));
     expect(() => presenceIn(1, 1 as never)).toThrow(ArgumentError);
   });
 });

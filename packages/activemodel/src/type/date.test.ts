@@ -1,16 +1,17 @@
 import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { Types } from "../index.js";
+import { assertNil } from "@blazetrails/activesupport";
 
 describe("DateTest", () => {
   const type = new Types.DateType();
 
   it("type cast date", () => {
-    expect(type.cast(null)).toBeNull();
-    expect(type.cast("")).toBeNull();
-    expect(type.cast(" ")).toBeNull();
-    expect(type.cast("ABC")).toBeNull();
-    expect(type.cast(" ".repeat(129))).toBeNull();
+    assertNil(type.cast(null));
+    assertNil(type.cast(""));
+    assertNil(type.cast(" "));
+    assertNil(type.cast("ABC"));
+    assertNil(type.cast(" ".repeat(129)));
 
     const now = Temporal.Now.instant().toZonedDateTimeISO("UTC");
     const valuesHash = { 1: now.year, 2: now.month, 3: now.day };

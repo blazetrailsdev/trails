@@ -16,6 +16,7 @@ import {
   assertNoDifference,
   assertNot,
   assertRaises,
+  assertNil,
 } from "./testing/assertions.js";
 import { peekCallbackChain } from "./callbacks.js";
 import { stubConst } from "./testing/constant-stubbing.js";
@@ -474,7 +475,7 @@ describe("AssertionsTest", () => {
       },
     );
 
-    expect(retval).toBeNull();
+    assertNil(retval);
   });
 
   it("assert changes with to and case operator", async () => {
@@ -835,8 +836,7 @@ SubclassSetupAndTeardownTestCase.setup(":bar");
 SubclassSetupAndTeardownTestCase.teardown(":bar");
 
 describe("SetupAndTeardownTest", () => {
-  it.skip("inherited setup callbacks", () => {
-    // BLOCKED: activesupport-test-case-setup-callback-chain-is-not-introspectable
+  it("inherited setup callbacks", () => {
     const instance = new SetupAndTeardownTestCase();
     instance.resetCallbackRecord();
     instance.foo();
@@ -852,8 +852,7 @@ describe("SetupAndTeardownTest", () => {
 });
 
 describe("SubclassSetupAndTeardownTest", () => {
-  it.skip("inherited setup callbacks", () => {
-    // BLOCKED: activesupport-test-case-setup-callback-chain-is-not-introspectable
+  it("inherited setup callbacks", () => {
     const instance = new SubclassSetupAndTeardownTestCase();
     instance.resetCallbackRecord();
     instance.foo();

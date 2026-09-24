@@ -3,6 +3,7 @@ import type { MessageVerifier } from "./message-verifier.js";
 import { MessageVerifiers } from "./message-verifiers.js";
 import { rotationCoordinatorTests } from "./messages/rotation-coordinator-tests.js";
 import type { SecretGenerator } from "./messages/rotation-coordinator.js";
+import { assertNil } from "./testing/assertions.js";
 
 describe("MessageVerifiersTest", () => {
   const makeCoordinator = (): MessageVerifiers => new MessageVerifiers((salt) => salt.repeat(10));
@@ -32,7 +33,7 @@ describe("MessageVerifiersTest", () => {
     const other = makeCoordinator().rotate({ secretGenerator });
 
     expect(roundtrip("message", other.get("salt"))).toEqual("message");
-    expect(roundtrip("message", coordinator.get("salt"), other.get("salt"))).toBeNull();
+    assertNil(roundtrip("message", coordinator.get("salt"), other.get("salt")));
   });
 
   it("supports arbitrary secret generator kwargs", () => {

@@ -8,3 +8,10 @@ const TRANSIENT_GH_ERROR_RE =
 export function isTransientGhError(message: string): boolean {
   return TRANSIENT_GH_ERROR_RE.test(message);
 }
+
+export const TRANSIENT_GH_FAILURE_MARKER = "[sync-stats] transient gh failure";
+
+export function transientGhFailureLine(message: string): string | null {
+  const line = message.split("\n").find((l) => isTransientGhError(l));
+  return line == null ? null : `${TRANSIENT_GH_FAILURE_MARKER}: ${line}`;
+}

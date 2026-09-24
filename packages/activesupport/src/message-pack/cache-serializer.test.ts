@@ -4,6 +4,7 @@ import {
   UnserializableObjectError,
   registerObjectClass,
 } from "./index.js";
+import { assertNotNil } from "../testing/assertions.js";
 
 class HasValue {
   constructor(readonly value: string) {}
@@ -77,7 +78,7 @@ describe("MessagePackCacheSerializerTest", () => {
     Object.defineProperty(Klass, "name", { value: "DoesNotActuallyExist" });
 
     const dumped = dump(new Klass("foo"));
-    expect(dumped).not.toBeNull();
+    assertNotNil(dumped);
     expect(load(dumped)).toBeUndefined();
   });
 });

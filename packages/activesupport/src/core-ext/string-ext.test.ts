@@ -21,6 +21,7 @@ import {
   assertRaise,
   assertRaises,
   assertRespondTo,
+  assertNil,
 } from "../testing/assertions.js";
 import { inquiry } from "../string-inquirer.js";
 import {
@@ -495,7 +496,7 @@ describe("StringIndentTest", () => {
   it("does not indent strings that only contain newlines (edge cases)", () => {
     for (const string of ["", "\n", "\n".repeat(7)]) {
       const str = string;
-      expect(indentBang(str, 8)).toBeNull();
+      assertNil(indentBang(str, 8));
       expect(indent(str, 8)).toEqual(str);
       expect(indent(str, 1, "\t")).toEqual(str);
     }

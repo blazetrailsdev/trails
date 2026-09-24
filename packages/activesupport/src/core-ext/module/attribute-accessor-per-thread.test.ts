@@ -14,6 +14,7 @@ import {
   assertRaises,
   assertRespondTo,
   assertSame,
+  assertNil,
 } from "../../testing/assertions.js";
 
 describe("ModuleAttributeAccessorPerThreadTest", () => {
@@ -71,8 +72,8 @@ describe("ModuleAttributeAccessorPerThreadTest", () => {
 
   it("should use mattr default", () => {
     new Thread(() => {
-      expect(klass.foo).toBeNull();
-      expect(object.foo).toBeNull();
+      assertNil(klass.foo);
+      assertNil(object.foo);
     }).join();
   });
 
@@ -141,7 +142,7 @@ describe("ModuleAttributeAccessorPerThreadTest", () => {
   it("should not affect superclass if subclass set value", () => {
     klass.foo = "super";
     expect(klass.foo).toEqual("super");
-    expect(subclass.foo).toBeNull();
+    assertNil(subclass.foo);
 
     subclass.foo = "sub";
     expect(klass.foo).toEqual("super");

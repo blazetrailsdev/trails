@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertNot, assertRaises } from "./testing/assertions.js";
+import { assertNot, assertRaises, assertNil } from "./testing/assertions.js";
 
 import { getCrypto } from "@blazetrails/ruby-compat";
 import { ActiveSupportJSON } from "./json.js";
@@ -44,8 +44,8 @@ describe("MessageVerifierTest", () => {
 
   it("round tripping nil", () => {
     const message = verifier.generate(null);
-    expect(verifier.verified(message)).toBeNull();
-    expect(verifier.verify(message)).toBeNull();
+    assertNil(verifier.verified(message));
+    assertNil(verifier.verify(message));
   });
 
   it("verified returns false on invalid message", () => {

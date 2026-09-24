@@ -3,6 +3,7 @@ import { SerializerWithFallback } from "./serializer-with-fallback.js";
 import { KeyError } from "@blazetrails/ruby-compat";
 import { Entry } from "./entry.js";
 import { Store } from "./index.js";
+import { assertNotNil, assertNil } from "../testing/assertions.js";
 
 const FORMATS = Object.keys(SerializerWithFallback.SERIALIZERS);
 const LEGACY_FORMATS = ["passthrough", "marshal_7_0"];
@@ -52,8 +53,8 @@ describe("CacheSerializerWithFallbackTest", () => {
 
   for (const format of FORMATS) {
     it(`${inspect(format)} serializer handles unrecognized payloads gracefully`, () => {
-      expect(serializer(format).load({})).toBeNull();
-      expect(serializer(format).load("")).toBeNull();
+      assertNil(serializer(format).load({}));
+      assertNil(serializer(format).load(""));
     });
 
     it(`${inspect(format)} serializer logs unrecognized payloads`, () => {
@@ -94,8 +95,8 @@ describe("CacheSerializerWithFallbackTest", () => {
     }
 
     const dumped = serializer("message_pack").dump(new FakeClass());
-    expect(dumped).not.toBeNull();
-    expect(serializer("message_pack").load(dumped)).toBeNull();
+    assertNotNil(dumped);
+    assertNil(serializer("message_pack").load(dumped));
   });
 
   it("raises on invalid format name", () => {

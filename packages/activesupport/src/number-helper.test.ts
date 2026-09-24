@@ -11,6 +11,7 @@ import {
 import { Rational } from "@blazetrails/ruby-compat";
 import { BigDecimal } from "./core-ext/big-decimal/conversions.js";
 import { SafeBuffer } from "./core-ext/string/output-safety.js";
+import { assertNil } from "./testing/assertions.js";
 
 class NumberWithToD {
   readonly #number: number;
@@ -421,13 +422,13 @@ describe("NumberHelperTest", () => {
   });
 
   it("number helpers should return nil when given nil", () => {
-    expect(numberToPhone(null)).toBeNull();
-    expect(numberToCurrency(null)).toBeNull();
-    expect(numberToPercentage(null)).toBeNull();
-    expect(numberToDelimited(null)).toBeNull();
-    expect(numberToRounded(null)).toBeNull();
-    expect(numberToHumanSize(null)).toBeNull();
-    expect(numberToHuman(null)).toBeNull();
+    assertNil(numberToPhone(null));
+    assertNil(numberToCurrency(null));
+    assertNil(numberToPercentage(null));
+    assertNil(numberToDelimited(null));
+    assertNil(numberToRounded(null));
+    assertNil(numberToHumanSize(null));
+    assertNil(numberToHuman(null));
   });
 
   it("number helpers do not mutate options hash", () => {

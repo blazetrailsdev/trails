@@ -23,6 +23,7 @@ import {
   assertRaise,
   assertRaises,
   assertSame,
+  assertNil,
 } from "./testing/assertions.js";
 import { ArgumentError } from "./hash-utils.js";
 import { resetLocalTimeZoneId } from "@blazetrails/date";
@@ -827,7 +828,7 @@ describe("TimeZoneTest", () => {
   it("utc offset lazy loaded from tzinfo when not passed in to initialize", () => {
     const tzinfo = Timezone.get("America/New_York");
     const zone = TimeZone.create(tzinfo.name, null, tzinfo);
-    expect(zone["_utcOffset"]).toBeNull();
+    assertNil(zone["_utcOffset"]);
     expect(zone.utcOffset).toEqual(-18_000);
   });
 
@@ -938,8 +939,8 @@ describe("TimeZoneTest", () => {
     };
 
     await withTzMappings(mappings, async () => {
-      expect(TimeZone.find("Puerto Rico")).toBeNull();
-      expect(TimeZone.find(-9)).toBeNull();
+      assertNil(TimeZone.find("Puerto Rico"));
+      assertNil(TimeZone.find(-9));
       await assertNothingRaised(() => {
         TimeZone.all();
       });
@@ -947,7 +948,7 @@ describe("TimeZoneTest", () => {
   });
 
   it("index", async () => {
-    expect(TimeZone.find("bogus")).toBeNull();
+    assertNil(TimeZone.find("bogus"));
     expect(TimeZone.find("Central Time (US & Canada)")).toBeInstanceOf(TimeZone);
     expect(TimeZone.find(8)).toBeInstanceOf(TimeZone);
     await assertRaise([ArgumentError], {}, () => TimeZone.find(false));
@@ -958,7 +959,7 @@ describe("TimeZoneTest", () => {
   });
 
   it("unknown zones dont store mapping keys", () => {
-    expect(TimeZone.find("bogus")).toBeNull();
+    assertNil(TimeZone.find("bogus"));
   });
 
   it("new", () => {

@@ -3,7 +3,7 @@ import { ValueType } from "./index.js";
 import type { AttributeSet } from "./attribute-set.js";
 import { AttributeRegistration } from "./attribute-registration.js";
 import { typeRegistry } from "./type/registry.js";
-import { include } from "@blazetrails/activesupport";
+import { include, assertNil } from "@blazetrails/activesupport";
 
 class MyType extends ValueType<unknown> {}
 typeRegistry.register(MyType.name, MyType);
@@ -212,7 +212,7 @@ describe("AttributeRegistrationTest", () => {
     expect(child._defaultAttributes().getAttribute("foo").value).toEqual(456);
     expect(child._defaultAttributes().getAttribute("bar").value).toEqual(789);
     expect(parent._defaultAttributes().getAttribute("foo").value).toEqual(123);
-    expect(parent._defaultAttributes().getAttribute("bar").value).toBeNull();
+    assertNil(parent._defaultAttributes().getAttribute("bar").value);
   });
 
   it(".decorate_attributes decorates specified attributes", () => {

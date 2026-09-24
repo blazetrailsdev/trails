@@ -12,6 +12,7 @@ import {
   assertRaises,
   assertRespondTo,
   assertNotRespondTo,
+  assertNil,
 } from "../testing/assertions.js";
 
 class Somewhere {
@@ -514,7 +515,7 @@ describe("ModuleTest", () => {
     const serializedArray = JSON.stringify(array);
     const deserializedArray = JSON.parse(serializedArray);
 
-    expect(deserializedArray[1]).toBeNull();
+    assertNil(deserializedArray[1]);
   });
 
   it("delegate with case", () => {

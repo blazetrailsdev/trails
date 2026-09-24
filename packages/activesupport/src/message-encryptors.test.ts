@@ -3,6 +3,7 @@ import { InvalidMessage, MessageEncryptor } from "./message-encryptor.js";
 import { MessageEncryptors } from "./message-encryptors.js";
 import { rotationCoordinatorTests } from "./messages/rotation-coordinator-tests.js";
 import type { SecretGenerator } from "./messages/rotation-coordinator.js";
+import { assertNil } from "./testing/assertions.js";
 
 const SECRET_GENERATOR: SecretGenerator = (salt, { secretLength }) =>
   salt.repeat(secretLength as number).slice(0, secretLength as number);
@@ -44,7 +45,7 @@ describe("MessageEncryptorsTest", () => {
     const other = makeCoordinator().rotate({ secretGenerator });
 
     expect(roundtrip("message", other.get("salt"))).toEqual("message");
-    expect(roundtrip("message", coordinator.get("salt"), other.get("salt"))).toBeNull();
+    assertNil(roundtrip("message", coordinator.get("salt"), other.get("salt")));
   });
 
   it("supports arbitrary secret generator kwargs", () => {
@@ -70,6 +71,6 @@ describe("MessageEncryptorsTest", () => {
     other.rotateDefaults();
 
     expect(roundtrip("message", other.get("salt"))).toEqual("message");
-    expect(roundtrip("message", coordinator.get("salt"), other.get("salt"))).toBeNull();
+    assertNil(roundtrip("message", coordinator.get("salt"), other.get("salt")));
   });
 });
