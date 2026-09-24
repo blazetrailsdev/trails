@@ -5,7 +5,8 @@ import { fixtures } from "../../test-fixtures.js";
 import { Base } from "../../index.js";
 import { TableDefinition } from "../../connection-adapters/postgresql/schema-definitions.js";
 import { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
-import { PointValue } from "../../connection-adapters/postgresql/oid/point.js";
+import "../../connection-adapters/postgresql/oid/point.js";
+import { ActiveRecord } from "../../namespaces.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
@@ -18,10 +19,10 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("PostgreSQLPointTest", () => {
     class PostgresqlPoint extends Base {
-      declare x: PointValue;
-      declare y: PointValue;
-      declare z: PointValue;
-      declare array_of_points: PointValue[];
+      declare x: InstanceType<typeof ActiveRecord.Point>;
+      declare y: InstanceType<typeof ActiveRecord.Point>;
+      declare z: InstanceType<typeof ActiveRecord.Point>;
+      declare array_of_points: InstanceType<typeof ActiveRecord.Point>[];
       declare legacy_x: number[];
       declare legacy_y: number[];
       declare legacy_z: number[];
@@ -66,11 +67,11 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("default", async () => {
-      expect(PostgresqlPoint.columnDefaults["y"]).toEqual(new PointValue(12.2, 13.3));
-      expect(new PostgresqlPoint().y).toEqual(new PointValue(12.2, 13.3));
+      expect(PostgresqlPoint.columnDefaults["y"]).toEqual(new ActiveRecord.Point(12.2, 13.3));
+      expect(new PostgresqlPoint().y).toEqual(new ActiveRecord.Point(12.2, 13.3));
 
-      expect(PostgresqlPoint.columnDefaults["z"]).toEqual(new PointValue(14.4, 15.5));
-      expect(new PostgresqlPoint().z).toEqual(new PointValue(14.4, 15.5));
+      expect(PostgresqlPoint.columnDefaults["z"]).toEqual(new ActiveRecord.Point(14.4, 15.5));
+      expect(new PostgresqlPoint().z).toEqual(new ActiveRecord.Point(14.4, 15.5));
     });
 
     it("schema dumping", async () => {
@@ -83,43 +84,43 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("roundtrip", async () => {
       await PostgresqlPoint.createBang({ x: [10, 25.2] });
       const record = (await PostgresqlPoint.first())!;
-      expect(record.x).toEqual(new PointValue(10, 25.2));
+      expect(record.x).toEqual(new ActiveRecord.Point(10, 25.2));
 
-      record.x = new PointValue(1.1, 2.2);
+      record.x = new ActiveRecord.Point(1.1, 2.2);
       await record.saveBang();
       expect(await record.reload()).toBeTruthy();
-      expect(record.x).toEqual(new PointValue(1.1, 2.2));
+      expect(record.x).toEqual(new ActiveRecord.Point(1.1, 2.2));
     });
 
     it.skip("mutation", async () => {
       // BLOCKED: in-place mutation of a point attribute stays dirty after save! + reload (filed as 0155-assertion-surfaced-port-bugs/pg-point-mutation-dirty-after-reload)
-      const p = await PostgresqlPoint.createBang({ x: new PointValue(10, 20) });
+      const p = await PostgresqlPoint.createBang({ x: new ActiveRecord.Point(10, 20) });
 
       p.x.y = 25;
       await p.saveBang();
       await p.reload();
 
-      expect(p.x).toEqual(new PointValue(10.0, 25.0));
+      expect(p.x).toEqual(new ActiveRecord.Point(10.0, 25.0));
       assertNotPredicate(p, (r) => r.isChanged);
     });
 
     it("array assignment", () => {
       const p = new PostgresqlPoint({ x: [1, 2] });
 
-      expect(p.x).toEqual(new PointValue(1, 2));
+      expect(p.x).toEqual(new ActiveRecord.Point(1, 2));
     });
 
     it("hash assignment", () => {
       const p = new PostgresqlPoint({ x: { x: 1, y: 2 }, y: { x: 3, y: 4 } });
 
-      expect(p.x).toEqual(new PointValue(1, 2));
-      expect(p.y).toEqual(new PointValue(3, 4));
+      expect(p.x).toEqual(new ActiveRecord.Point(1, 2));
+      expect(p.y).toEqual(new ActiveRecord.Point(3, 4));
     });
 
     it("string assignment", () => {
       const p = new PostgresqlPoint({ x: "(1, 2)" });
 
-      expect(p.x).toEqual(new PointValue(1, 2));
+      expect(p.x).toEqual(new ActiveRecord.Point(1, 2));
     });
 
     it("empty string assignment", () => {
@@ -128,7 +129,11 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("array of points round trip", async () => {
-      const expectedValue = [new PointValue(1, 2), new PointValue(2, 3), new PointValue(3, 4)];
+      const expectedValue = [
+        new ActiveRecord.Point(1, 2),
+        new ActiveRecord.Point(2, 3),
+        new ActiveRecord.Point(3, 4),
+      ];
       const p = new PostgresqlPoint({ array_of_points: expectedValue });
 
       expect(p.array_of_points).toEqual(expectedValue);
@@ -163,7 +168,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("legacy roundtrip", async () => {
-      // BLOCKED: a :legacy_point attribute reads back a PointValue where Rails returns [x, y] (filed as 0155-assertion-surfaced-port-bugs/pg-legacy-point-attribute-type-resolution)
+      // BLOCKED: a :legacy_point attribute reads back an ActiveRecord::Point where Rails returns [x, y] (filed as 0155-assertion-surfaced-port-bugs/pg-legacy-point-attribute-type-resolution)
       await PostgresqlPoint.createBang({ legacy_x: [10, 25.2] });
       const record = (await PostgresqlPoint.first())!;
       expect(record.legacy_x).toEqual([10, 25.2]);
@@ -175,7 +180,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it.skip("legacy mutation", async () => {
-      // BLOCKED: a :legacy_point attribute reads back a PointValue where Rails returns [x, y] (filed as 0155-assertion-surfaced-port-bugs/pg-legacy-point-attribute-type-resolution)
+      // BLOCKED: a :legacy_point attribute reads back an ActiveRecord::Point where Rails returns [x, y] (filed as 0155-assertion-surfaced-port-bugs/pg-legacy-point-attribute-type-resolution)
       const p = await PostgresqlPoint.createBang({ legacy_x: [10, 20] });
 
       p.legacy_x[1] = 25;

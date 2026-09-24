@@ -1,3 +1,9 @@
+import { FloatDomainError } from "./float-domain-error.js";
+import { NilClass } from "./nil-class.js";
+import { NoMethodError } from "./no-method-error.js";
+import { rbObjClass } from "./object.js";
+import { rbStrToI } from "./string/convert.js";
+
 /**
  * Ruby `Float#round` (`vendor/ruby/numeric.c:2505` `flo_round`): rounds to
  * `ndigits` decimal places, half away from zero — which is where JS
@@ -26,4 +32,28 @@ export function round(x: number, ndigits = 0): number {
  */
 export function anybits(x: number | bigint, mask: number | bigint): boolean {
   return (BigInt(x) & BigInt(mask)) !== 0n;
+}
+
+/**
+ * Ruby's `obj.to_i` send, dispatched on the receiver's class: `NilClass#to_i`
+ * (`vendor/ruby/object.c:4414`), `Integer#to_i` (`vendor/ruby/numeric.c`
+ * `int_to_i`), `Float#to_i` (`flo_to_i`, `FloatDomainError` off the finite
+ * range), `String#to_i` (`rb_str_to_i`, {@link rbStrToI}), else the
+ * receiver's own `toI`.
+ *
+ * @noRailsEquivalent PERMANENT — a Ruby method send, which JS has no receiver
+ * for on a primitive.
+ */
+export function toI(obj: unknown): number | bigint {
+  if (obj == null) return NilClass.toI() as number;
+  if (typeof obj === "bigint") return obj;
+  if (typeof obj === "number") {
+    if (!Number.isFinite(obj)) throw new FloatDomainError(String(obj));
+    return Math.trunc(obj);
+  }
+  if (typeof obj === "string") return rbStrToI(obj);
+  if (typeof (obj as { toI?: unknown }).toI === "function") {
+    return (obj as { toI(): number | bigint }).toI();
+  }
+  throw new NoMethodError(`undefined method 'to_i' for an instance of ${rbObjClass(obj)}`);
 }

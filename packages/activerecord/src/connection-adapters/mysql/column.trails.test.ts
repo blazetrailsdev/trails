@@ -1,7 +1,17 @@
 import { describe, it, expect } from "vitest";
-import { SqlTypeMetadata } from "../sql-type-metadata.js";
+import { SchemaCache } from "../schema-cache.js";
 import { Column as MysqlColumn } from "./column.js";
 import { TypeMetadata } from "./type-metadata.js";
+
+function dumpAndLoad(col: MysqlColumn): MysqlColumn {
+  const cache = new SchemaCache();
+  cache.initWith({ columns: { t: [col] } });
+  const coder: Record<string, unknown> = {};
+  cache.encodeWith(coder);
+  const back = new SchemaCache();
+  back.initWith(JSON.parse(JSON.stringify(coder)));
+  return (back as unknown as { _columns: Map<string, MysqlColumn[]> })._columns.get("t")![0];
+}
 
 describe("MysqlColumn", () => {
   it("round-trips autoIncrement / unsigned / virtual through encodeWith/initWith", () => {
@@ -20,8 +30,7 @@ describe("MysqlColumn", () => {
     expect(Object.keys(coder)).not.toContain("auto_increment");
     expect(Object.keys(coder)).not.toContain("virtual");
 
-    const restored = Object.create(MysqlColumn.prototype) as MysqlColumn;
-    restored.initWith(JSON.parse(JSON.stringify(coder)));
+    const restored = dumpAndLoad(original);
     expect(restored.isAutoIncrement()).toBe(true);
     expect(restored.isUnsigned()).toBe(true);
     expect(restored.isVirtual()).toBe(false);
@@ -35,7 +44,7 @@ describe("MySQL::TypeMetadata JSON round-trip", () => {
       { sqlType: "bigint(20)", type: "integer", limit: 8 },
       { extra: "auto_increment" },
     );
-    const back = SqlTypeMetadata.fromJSON(JSON.parse(JSON.stringify(meta.toJSON())));
+    const back = dumpAndLoad(new MysqlColumn("id", null, meta)).sqlTypeMetadata!;
 
     expect(back).toBeInstanceOf(TypeMetadata);
     expect((back as TypeMetadata).extra).toBe("auto_increment");
@@ -52,10 +61,7 @@ describe("MySQL::TypeMetadata JSON round-trip", () => {
     expect(col.sqlTypeMetadata).toBeInstanceOf(TypeMetadata);
     expect(col.extra).toBe("auto_increment");
 
-    const coder: Record<string, unknown> = {};
-    col.encodeWith(coder);
-    const restored = Object.create(MysqlColumn.prototype) as MysqlColumn;
-    restored.initWith(JSON.parse(JSON.stringify(coder)));
+    const restored = dumpAndLoad(col);
     expect(restored.extra).toBe("auto_increment");
   });
 

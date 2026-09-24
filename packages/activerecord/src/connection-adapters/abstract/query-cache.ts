@@ -7,8 +7,7 @@ import {
 } from "./database-statements.js";
 import { Result } from "../../result.js";
 import { FutureResult, Complete as FutureResultComplete } from "../../future-result.js";
-import { WeakThreadKeyMap } from "./connection-pool.js";
-import { ActiveRecord } from "../../namespaces.js";
+import { ActiveRecord, ConnectionAdapters } from "../../namespaces.js";
 import { Fiber, Thread } from "@blazetrails/ruby-compat";
 
 const LOCKED_QUERY = /\bFOR\s+(UPDATE|SHARE|NO\s+KEY\s+UPDATE|KEY\s+SHARE)\b/i;
@@ -96,7 +95,7 @@ export class Store {
 }
 
 export class QueryCacheRegistry {
-  private _map = new WeakThreadKeyMap<Store>();
+  private _map = new ConnectionAdapters.ConnectionPool.WeakThreadKeyMap<Store>();
 
   /** @missingRailsCall synchronize — PERMANENT */
   computeIfAbsent(context: Thread | Fiber, create: () => Store): Store {

@@ -1,4 +1,4 @@
-import { hasKey, type Module } from "@blazetrails/ruby-compat";
+import { hasKey, toI, type Module } from "@blazetrails/ruby-compat";
 import type { TouchAllArgs } from "./timestamp.js";
 import { Notifications, isPlainObject as _isPlainObject } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
@@ -6,7 +6,6 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import type { FutureResult, Complete } from "./future-result.js";
 import type { Relation } from "./relation.js";
 import type { Result } from "./result.js";
-import { toI } from "./relation/query-methods.js";
 import type { AssociationSpec, JoinSpec } from "./relation/query-methods.js";
 import type { SumBlock } from "./relation/calculations.js";
 
@@ -183,7 +182,7 @@ export async function asyncFindBySql<T extends typeof Base>(
 export async function countBySql(
   this: typeof Base,
   sql: string | [string, ...unknown[]],
-): Promise<number> {
+): Promise<number | bigint> {
   const sanitized = typeof sql === "string" ? sql : (this.sanitizeSql(sql) ?? "");
   return this.withConnection(async (c) => {
     return toI(await c.selectValue(sanitized, `${this.name} Count`));
@@ -193,7 +192,7 @@ export async function countBySql(
 export function asyncCountBySql(
   this: typeof Base,
   sql: string | [string, ...unknown[]],
-): Promise<number> {
+): Promise<number | bigint> {
   return countBySql.call(this, sql);
 }
 

@@ -1,4 +1,4 @@
-import { extend, hasKey, rbObjClass, RuntimeError } from "@blazetrails/ruby-compat";
+import { extend, fetch, hasKey, rbObjClass, RuntimeError, toI } from "@blazetrails/ruby-compat";
 import * as Arel from "@blazetrails/arel";
 import { Nodes, SelectManager, Table as ArelTable } from "@blazetrails/arel";
 import {
@@ -29,6 +29,7 @@ import {
   compactBlank,
   defineModule,
   foreignKey,
+  included,
   isBlank,
   rbEqual,
   rbHash,
@@ -137,49 +138,6 @@ export type JoinSpec = AssociationSpec | Nodes.Join | JoinSpec[];
 export const FROZEN_EMPTY_ARRAY: readonly never[] = Object.freeze([]);
 
 export const FROZEN_EMPTY_HASH: Readonly<Record<string, never>> = Object.freeze({});
-
-/** @noRailsEquivalent CONVERGEABLE query-methods-value-methods-and-to-i */
-export function defineValueMethods(relationClass: {
-  prototype: object;
-  MULTI_VALUE_METHODS: readonly string[];
-  SINGLE_VALUE_METHODS: readonly string[];
-  CLAUSE_METHODS: readonly string[];
-  VALUE_METHODS: readonly string[];
-}): void {
-  for (const name of relationClass.VALUE_METHODS) {
-    let methodName: string;
-    let defaultValue: () => unknown;
-    if (relationClass.MULTI_VALUE_METHODS.includes(name)) {
-      methodName = `${name}Values`;
-      defaultValue = () => FROZEN_EMPTY_ARRAY;
-    } else if (relationClass.SINGLE_VALUE_METHODS.includes(name)) {
-      methodName = `${name}Value`;
-      defaultValue = name === "createWith" ? () => FROZEN_EMPTY_HASH : () => null;
-    } else {
-      methodName = `${name}Clause`;
-      defaultValue = name === "from" ? () => FromClause.empty() : () => WhereClause.empty();
-    }
-
-    Object.defineProperty(relationClass.prototype, methodName, {
-      configurable: true,
-      get(this: QueryMethodsHost): unknown {
-        const values = this._values;
-        return name in values ? values[name] : defaultValue();
-      },
-      set(this: QueryMethodsHost, value: unknown) {
-        assertModifiableBang.call(this);
-        this._values[name] = value;
-      },
-    });
-  }
-
-  Object.defineProperty(relationClass.prototype, "extensions", {
-    configurable: true,
-    get(this: QueryMethodsHost) {
-      return this.extendingValues;
-    },
-  });
-}
 
 type OrderDirection = "asc" | "desc" | "ASC" | "DESC";
 
@@ -1413,18 +1371,6 @@ export function processWithArgs(
   });
 }
 
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE query-methods-value-methods-and-to-i
- */
-export function toI(value: unknown): number {
-  if (value == null) return 0;
-  if (typeof value === "number") return Math.trunc(value);
-  if (typeof value === "bigint") return Number(value);
-  const n = Number.parseInt(String(value), 10);
-  return Number.isNaN(n) ? 0 : n;
-}
-
 /** @internal */
 export function buildCastValue(name: string, value: unknown): Attribute {
   return Attribute.withCastValue(name, value, defaultValue());
@@ -1870,6 +1816,43 @@ export const QueryMethods = defineModule(
   QueryMethodsProtectedInstanceMethods,
   QueryMethodsPrivateInstanceMethods,
 );
+
+Object.defineProperty(QueryMethods, included, {
+  value(): void {
+    for (const name of Relation.VALUE_METHODS) {
+      let methodName: string;
+      let defaultValue: () => unknown;
+      if ((Relation.MULTI_VALUE_METHODS as readonly string[]).includes(name)) {
+        methodName = `${name}Values`;
+        defaultValue = () => FROZEN_EMPTY_ARRAY;
+      } else if ((Relation.SINGLE_VALUE_METHODS as readonly string[]).includes(name)) {
+        methodName = `${name}Value`;
+        defaultValue = name === "createWith" ? () => FROZEN_EMPTY_HASH : () => null;
+      } else {
+        methodName = `${name}Clause`;
+        defaultValue = name === "from" ? () => FromClause.empty() : () => WhereClause.empty();
+      }
+
+      Object.defineProperty(Relation.prototype, methodName, {
+        configurable: true,
+        get(this: QueryMethodsHost): unknown {
+          return fetch(this._values, name, defaultValue());
+        },
+        set(this: QueryMethodsHost, value: unknown) {
+          assertModifiableBang.call(this);
+          this._values[name] = value;
+        },
+      });
+    }
+
+    Object.defineProperty(Relation.prototype, "extensions", {
+      configurable: true,
+      get(this: QueryMethodsHost) {
+        return this.extendingValues;
+      },
+    });
+  },
+});
 
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

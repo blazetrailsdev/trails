@@ -22,7 +22,7 @@ import {
   type Included,
 } from "@blazetrails/activesupport";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
-import { ActiveRecord } from "../../namespaces.js";
+import { ActiveRecord, ConnectionAdapters } from "../../namespaces.js";
 import type { HashConfig } from "../../database-configurations/hash-config.js";
 import type { PoolConfig } from "../pool-config.js";
 import type { ConnectionDescriptor } from "./connection-handler.js";
@@ -237,6 +237,8 @@ export class ExecutorHooks {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `prepend QueryCache::ConnectionPoolConfiguration` (connection_pool.rb:218); the class/interface merge is how `include()` surfaces on the type side.
 export class ConnectionPool implements ReapablePool {
+  static readonly WeakThreadKeyMap = WeakThreadKeyMap;
+
   readonly poolConfig: PoolConfig;
   readonly dbConfig: HashConfig;
   readonly role: string;
@@ -909,6 +911,7 @@ include(ConnectionPool, ConnectionPoolConfiguration);
 prepend(ConnectionPool.prototype, {
   checkoutAndVerify: ConnectionPoolConfiguration.prototype.checkoutAndVerify,
 });
+ConnectionAdapters.ConnectionPool = ConnectionPool;
 
 function isTransactionAware(conn: DatabaseAdapter): conn is TransactionAwareConnection {
   const c = conn as Partial<TransactionAwareConnection>;

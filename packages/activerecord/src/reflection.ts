@@ -1284,6 +1284,12 @@ export class ThroughReflection extends AbstractReflection {
     return _.foreignType;
   }
 
+  joinIdFor(owner: any): any[] {
+    const _ = this.sourceReflection;
+    if (_ == null) throw DelegationError.nilTarget("join_id_for", "source_reflection");
+    return _.joinIdFor(owner);
+  }
+
   get type(): string | null {
     const _ = this.sourceReflection;
     if (_ == null) throw DelegationError.nilTarget("type", "source_reflection");
@@ -1364,9 +1370,9 @@ export class ThroughReflection extends AbstractReflection {
   }
 
   get joinForeignKey(): string | string[] {
-    const src = this.sourceReflection;
-    if (!src) this.checkValidityBang();
-    return src!.joinForeignKey;
+    const _ = this.sourceReflection;
+    if (_ == null) throw DelegationError.nilTarget("join_foreign_key", "source_reflection");
+    return _.joinForeignKey;
   }
 
   scopeFor(relation: any, owner?: any): any {
@@ -1428,11 +1434,17 @@ export class ThroughReflection extends AbstractReflection {
   }
 
   get activeRecordPrimaryKey(): string | string[] {
-    return this.sourceReflection?.activeRecordPrimaryKey ?? this._delegate.activeRecordPrimaryKey;
+    const _ = this.sourceReflection;
+    if (_ == null) {
+      throw DelegationError.nilTarget("active_record_primary_key", "source_reflection");
+    }
+    return _.activeRecordPrimaryKey;
   }
 
   get associationForeignKey(): string {
-    return this.sourceReflection?.associationForeignKey ?? this._delegate.associationForeignKey;
+    const _ = this.sourceReflection;
+    if (_ == null) throw DelegationError.nilTarget("association_foreign_key", "source_reflection");
+    return _.associationForeignKey;
   }
 
   hasInverse(): string | false | null {

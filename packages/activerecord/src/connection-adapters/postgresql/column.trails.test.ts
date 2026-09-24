@@ -1,7 +1,17 @@
 import { describe, it, expect } from "vitest";
-import { SqlTypeMetadata } from "../sql-type-metadata.js";
+import { SchemaCache } from "../schema-cache.js";
 import { Column } from "./column.js";
 import { TypeMetadata } from "./type-metadata.js";
+
+function dumpAndLoad(col: Column): Column {
+  const cache = new SchemaCache();
+  cache.initWith({ columns: { t: [col] } });
+  const coder: Record<string, unknown> = {};
+  cache.encodeWith(coder);
+  const back = new SchemaCache();
+  back.initWith(JSON.parse(JSON.stringify(coder)));
+  return (back as unknown as { _columns: Map<string, Column[]> })._columns.get("t")![0];
+}
 
 describe("PostgreSQL::Column JSON round-trip", () => {
   it("preserves the subclass and its state through the schema-cache dump", () => {
@@ -15,8 +25,7 @@ describe("PostgreSQL::Column JSON round-trip", () => {
 
     const coder: Record<string, unknown> = {};
     col.encodeWith(coder);
-    const back = Object.create(Column.prototype) as Column;
-    back.initWith(JSON.parse(JSON.stringify(coder)));
+    const back = dumpAndLoad(col);
 
     expect(Object.keys(coder).sort()).toEqual(
       [
@@ -48,7 +57,7 @@ describe("PostgreSQL::TypeMetadata JSON round-trip", () => {
       { sqlType: "numeric(10,2)", type: "decimal", precision: 10, scale: 2 },
       { oid: 1700, fmod: 655366 },
     );
-    const back = SqlTypeMetadata.fromJSON(JSON.parse(JSON.stringify(meta.toJSON())));
+    const back = dumpAndLoad(new Column("n", null, meta)).sqlTypeMetadata!;
 
     expect(back).toBeInstanceOf(TypeMetadata);
     expect((back as TypeMetadata).oid).toBe(1700);

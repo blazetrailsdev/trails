@@ -1,7 +1,6 @@
 import { deduplicate } from "./deduplicable.js";
 import type { Deduplicable } from "./deduplicable.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
-import type { SqlTypeMetadataJSON } from "./sql-type-metadata.js";
 import { humanize } from "@blazetrails/activesupport";
 import { Encoding, rbHash } from "@blazetrails/ruby-compat";
 
@@ -107,9 +106,7 @@ export class Column implements Deduplicable {
 
   initWith(coder: ColumnCoder): void {
     this.name = coder["name"] as string;
-    this.sqlTypeMetadata = coder["sql_type_metadata"]
-      ? SqlTypeMetadata.fromJSON(coder["sql_type_metadata"] as SqlTypeMetadataJSON)
-      : null;
+    this.sqlTypeMetadata = (coder["sql_type_metadata"] as SqlTypeMetadata | null) ?? null;
     this.null = coder["null"] as boolean;
     this.default = coder["default"];
     this.defaultFunction = (coder["default_function"] as string | null) ?? null;
@@ -119,7 +116,7 @@ export class Column implements Deduplicable {
 
   encodeWith(coder: ColumnCoder): void {
     coder["name"] = this.name;
-    coder["sql_type_metadata"] = this.sqlTypeMetadata?.toJSON() ?? null;
+    coder["sql_type_metadata"] = this.sqlTypeMetadata;
     coder["null"] = this.null;
     coder["default"] = this.default;
     coder["default_function"] = this.defaultFunction;
