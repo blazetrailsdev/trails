@@ -3,7 +3,6 @@ import { ArgumentError, Rational } from "@blazetrails/ruby-compat";
 import {
   ActsLikeObject,
   TimeWithZone,
-  change as timeChange,
   inTimeZone as stringInTimeZone,
   toFs,
   zone,
@@ -171,11 +170,8 @@ function nsec(value: NsecBearing): bigint {
 }
 
 function changeNsec<T extends NsecBearing>(value: T, newNsec: bigint): T {
-  if (value instanceof TimeWithZone) {
+  if (value instanceof Time || value instanceof TimeWithZone) {
     return value.change({ nsec: Number(newNsec) }) as T;
-  }
-  if (value instanceof Time) {
-    return timeChange(value, { nsec: Number(newNsec) }) as T;
   }
   if (value instanceof Temporal.Instant) {
     return Temporal.Instant.fromEpochNanoseconds(

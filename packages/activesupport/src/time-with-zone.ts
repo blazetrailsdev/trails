@@ -116,9 +116,9 @@ const METHOD_MISSING_HANDLER: ProxyHandler<TimeWithZone> = {
 };
 
 export class TimeWithZone {
-  private _utc: Time | null;
-  private _time: TimeLike | null;
-  private readonly _timeZone: TimeZone;
+  private _utc!: Time | null;
+  private _time!: TimeLike | null;
+  private _timeZone!: TimeZone;
   private _period?: TimezonePeriod;
   private _toTimeWithTimezone?: Time;
   private _toTimeWithInstanceOffset?: Time;
@@ -130,14 +130,22 @@ export class TimeWithZone {
     localTime: TimeLike | null = null,
     period: TimezonePeriod | null = null,
   ) {
+    this.initialize(utcTime, timeZone, localTime, period);
+    return new Proxy(this, METHOD_MISSING_HANDLER);
+  }
+
+  initialize(
+    utcTime: TimeLike | null,
+    timeZone: TimeZone,
+    localTime: TimeLike | null = null,
+    period: TimezonePeriod | null = null,
+  ): void {
     this._utc = utcTime ? this._transferTimeValuesToUtcConstructor(utcTime) : null;
     this._timeZone = timeZone;
     this._time = localTime;
     this._period = this._utc
       ? (period ?? undefined)
       : this._getPeriodAndEnsureValidLocalTime(period);
-
-    return new Proxy(this, METHOD_MISSING_HANDLER);
   }
 
   private get _zoned(): Temporal.ZonedDateTime {
@@ -886,13 +894,10 @@ export class TimeWithZone {
   }
 
   marshalLoad(variables: [Time, string, Time]): void {
-    Object.assign(
-      this,
-      new TimeWithZone(
-        variables[0].getutc(),
-        findZone(variables[1]) as TimeZone,
-        variables[2].getutc(),
-      ),
+    this.initialize(
+      variables[0].getutc(),
+      findZone(variables[1]) as TimeZone,
+      variables[2].getutc(),
     );
   }
 

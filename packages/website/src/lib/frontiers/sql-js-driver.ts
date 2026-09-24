@@ -9,10 +9,6 @@ import type {
   SyncSqliteStatement,
 } from "@blazetrails/activerecord/sqlite-adapter";
 
-// A `SqliteDriver` over the sandbox's single in-memory sql.js handle, so the
-// sandbox reaches ActiveRecord through `establish_connection` and the pool
-// (connection_handling.rb:50-60) like any other SQLite3 adapter config.
-
 function bindParams(binds: SqliteBinds | undefined): BindParams {
   if (binds === undefined) return [];
   const cast = (v: SqliteBindValue): SqlValue => (typeof v === "boolean" ? (v ? 1 : 0) : v);
@@ -148,8 +144,6 @@ class SqlJsConnection implements SyncSqliteConnection {
     return this._open;
   }
 
-  // The sandbox owns the sql.js handle (`replaceDatabase` closes it); a pool
-  // disconnect or reap must not close the database the VFS still reads.
   close(): void {
     this._open = false;
   }
