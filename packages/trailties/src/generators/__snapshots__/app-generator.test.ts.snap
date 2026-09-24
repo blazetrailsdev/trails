@@ -193,7 +193,7 @@ Trails.application!.configure(function () {
   this.config.logTags = [":request_id"];
 
   // Change to "debug" to log everything (including potentially personally-identifiable information!)
-  this.config.logLevel = (process.env.TRAILS_LOG_LEVEL ?? "info") as typeof this.config.logLevel;
+  this.config.logLevel = (process.env.RAILS_LOG_LEVEL ?? "info") as typeof this.config.logLevel;
 
   // Prevent health checks from clogging up the logs.
   this.config.silenceHealthcheckPath = "/up";
