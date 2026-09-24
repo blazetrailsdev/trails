@@ -47,7 +47,9 @@ function makeAdapter(): DatabaseAdapter {
     },
     executeBatch: vi.fn(async () => {}),
     schemaCache: {
+      dataSourceExists: async () => true,
       columnsHash: async (table: string) => doubleColumnsHash(table, DOUBLE_ONLY_COLUMNS),
+      primaryKeys: async () => "id",
     },
     lookupCastTypeFromColumn: () => ({ serialize: (v: unknown) => v }),
     quoteString: (v: string) => v.replace(/'/g, "''"),
@@ -60,7 +62,11 @@ function makeAdapter(): DatabaseAdapter {
 }
 
 function mockPool(adapter: DatabaseAdapter) {
-  return { withConnection: <T>(fn: (conn: DatabaseAdapter) => T) => fn(adapter) };
+  return {
+    activeConnection: adapter,
+    withConnection: <T>(fn: (conn: DatabaseAdapter) => T) => fn(adapter),
+    withConnectionSync: <T>(fn: (conn: DatabaseAdapter) => T) => fn(adapter),
+  };
 }
 
 function makeModel(
