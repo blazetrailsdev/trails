@@ -2057,3 +2057,4 @@ export class CheckPending {
 }
 
 Migration.delegate = new Migration();
+ActiveRecord.Migration = Migration;

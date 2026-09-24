@@ -1,40 +1,19 @@
+import { extend } from "@blazetrails/activesupport";
+import { Encryption } from "./namespaces.js";
 import { type SchemeOptions } from "./encryption/scheme.js";
 export { Cipher } from "./encryption/cipher.js";
 import { Configurable } from "./encryption/configurable.js";
 import { Contexts } from "./encryption/contexts.js";
 import type { Context } from "./encryption/context.js";
-import type { Config } from "./encryption/config.js";
 
 export type EncryptsOptions = SchemeOptions;
 
+extend(Encryption, Configurable);
+extend(Encryption, Contexts);
+
+export { Encryption };
+
 export function eagerLoadBang(): void {}
-
-export function config(): Config {
-  return Configurable.config;
-}
-
-export function encryptedAttributeDeclarationListeners(
-  ...value: [] | [Array<(klass: any, name: string) => void> | undefined]
-): Array<(klass: any, name: string) => void> | undefined {
-  if (value.length > 0) {
-    Configurable.encryptedAttributeDeclarationListeners = value[0];
-  }
-  return Configurable.encryptedAttributeDeclarationListeners;
-}
-
-export function configure(options: Parameters<typeof Configurable.configure>[0]): void {
-  Configurable.configure(options);
-}
-
-export function onEncryptedAttributeDeclared(
-  callback: (klass: any, name: string) => void,
-): () => void {
-  return Configurable.onEncryptedAttributeDeclared(callback);
-}
-
-export function encryptedAttributeWasDeclared(klass: any, name: string): void {
-  Configurable.encryptedAttributeWasDeclared(klass, name);
-}
 
 export function withEncryptionContext<T>(properties: Partial<Context>, fn: () => T): T {
   return Contexts.withEncryptionContext(properties, fn);

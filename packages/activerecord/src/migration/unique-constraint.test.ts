@@ -7,16 +7,12 @@ import {
   registerConstant,
 } from "@blazetrails/activesupport";
 import { Module } from "@blazetrails/ruby-compat";
-import { ActiveRecord } from "../namespaces.js";
-import { Migration } from "../migration.js";
 import { Base } from "../base.js";
 import { Rollback, StatementInvalid } from "../errors.js";
 import { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
 import { describeIfSupports } from "../support/supports.js";
 import { fixtures } from "../test-fixtures.js";
 
-registerConstant("ActiveRecord", ActiveRecord);
-registerConstant("ActiveRecord::Migration", Migration);
 registerConstant("ActiveRecord::Migration::UniqueConstraintTest", new Module());
 
 class Section extends Base {

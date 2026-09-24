@@ -1,3 +1,5 @@
+import * as Inflector from "../inflector.js";
+
 export type Autoload = {
   name: string;
   loadPath: Record<string, () => Promise<unknown>>;
@@ -16,10 +18,7 @@ export function autoload(
   let resolvePath = async () => path!;
   if (path == null) {
     const full = [this.name, this._underPath, constName].filter((x) => x != null).join("::");
-    resolvePath = async () => {
-      const Inflector = await import("../inflector.js");
-      return Inflector.underscore(full);
-    };
+    resolvePath = async () => Inflector.underscore(full);
   }
 
   if (this._eagerAutoload) {
@@ -40,6 +39,7 @@ export function autoload(
     get: () => value,
     set: (seated: unknown) => {
       value = seated;
+      Inflector.registerConstant(`${this.name}::${constName}`, seated);
     },
     configurable: true,
     enumerable: true,

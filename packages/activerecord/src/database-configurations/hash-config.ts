@@ -1,5 +1,5 @@
 import { fetch, File, hasKey } from "@blazetrails/ruby-compat";
-import { configurationsStore as configurations } from "../database-configurations.js";
+import { ActiveRecord } from "../namespaces.js";
 import { DatabaseConfig, type DatabaseConfigOptions } from "./database-config.js";
 
 export class HashConfig extends DatabaseConfig {
@@ -103,7 +103,7 @@ export class HashConfig extends DatabaseConfig {
   }
 
   isPrimary(): boolean {
-    return configurations().isPrimary(this.name);
+    return ActiveRecord.Base.configurations().isPrimary(this.name);
   }
 
   override get seeds(): boolean | null {

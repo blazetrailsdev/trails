@@ -851,7 +851,7 @@ with `Super` still in TDZ and the module throws
 imports at all (so it cannot join any cycle) exporting a mutable binding plus a
 `_setX()` setter, which the defining module calls at the bottom of its own
 body. Readers import the binding from the slot and use it at call time, exactly
-where Ruby resolves the constant. Three instances exist and are the only ones, plus the namespace
+where Ruby resolves the constant. Two instances exist and are the only ones, plus the namespace
 modules converged onto `Autoload`:
 
 - `arel/src/namespaces.ts` — not a slot: the `Arel` / `Arel::Attributes` /
@@ -914,12 +914,17 @@ modules converged onto `Autoload`:
   concrete association ctors `AssociationReflection#association_class` returns
   (`reflection.rb:889-923`), `Associations.CollectionProxy` and
   `Associations.DisableJoinsAssociationScope` (`associations/association.rb:107-115`);
-  `Encryption.Configurable`, which configurable.ts also `extend`s onto `Encryption`
-  itself, as `encryption.rb:47` does `include Configurable`, so readers spell
-  `Encryption.config.x`; `Migration.Compatibility` (`migration.rb:629-631`,
+  `Encryption.Configurable`, which encryption.ts `extend`s onto `Encryption`
+  itself with `Contexts`, as `encryption.rb:47-48` does `include Configurable` /
+  `include Contexts`, so readers spell `Encryption.config.x`; `Migration.Compatibility` (`migration.rb:629-631`,
   `schema.rb:72`); `ConnectionAdapters.ConnectionPool`
   (`connection_adapters.rb:107-110`, read by `abstract/query_cache.rb:100` for
-  `ConnectionPool::WeakThreadKeyMap`). `ActiveRecord.Point`
+  `ConnectionPool::WeakThreadKeyMap`), and `ConnectionAdapters.register` /
+  `.resolve`, the module's singleton methods (`connection_adapters.rb:22-50`,
+  read by `database_config.rb:17`), seated by connection-adapters.ts;
+  `ActiveRecord.Migration` (`active_record.rb:60`). Every `autoload` seat
+  registers its `Namespace::Const` path with `constantize` as it is seated, as
+  Ruby's `Module#autoload` defines the constant. `ActiveRecord.Point`
   (`postgresql/oid/point.rb:4`) is required, not autoloaded, and is seated with
   no `autoload` call. The cycles they break are the ones the deleted slots broke:
   `base.ts` importing every `self == Base` reader; `class SingularAssociation` /
@@ -966,12 +971,6 @@ builder/association.ts -> reflection.ts -> associations.ts -> builder/has-one.ts
   imports `migration.ts` and `connection-handling.ts`, so a plain import back
   re-enters the `schema-statements.ts -> migration/command-recorder.ts ->
 migration.ts` cycle `ActiveRecord.ConnectionHandling` breaks.
-- `activerecord/src/connection-adapters-slot.ts` — `ConnectionAdapters.resolve`,
-  read by `database-configurations/database-config.ts` for
-  `DatabaseConfig#adapter_class` (`database_config.rb:17`). The cycle is
-  `connection-adapters.ts -> abstract/connection-handler.ts ->
-database-configurations.ts -> hash-config.ts`, whose `class HashConfig extends
-  DatabaseConfig` reads `DatabaseConfig` in TDZ.
 
 This is a genuine language shortcoming, not a preference, and it is the one
 sanctioned shape for it — do not re-derive a per-cluster justification, and do

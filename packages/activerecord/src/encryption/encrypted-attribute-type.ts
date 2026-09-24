@@ -3,7 +3,7 @@ import { Serialized } from "../type/serialized.js";
 import { Scheme } from "./scheme.js";
 import type { EncryptorLike } from "./encryptor.js";
 import { Contexts } from "./contexts.js";
-import { Configurable } from "./configurable.js";
+import { Encryption } from "../encryption.js";
 import { Encoding, Decryption, Base } from "./errors.js";
 import { rtest } from "@blazetrails/ruby-compat";
 import { NullEncryptor } from "./null-encryptor.js";
@@ -108,7 +108,7 @@ export class EncryptedAttributeType extends ValueType {
 
   get supportUnencryptedData(): boolean {
     return (
-      Configurable.config.supportUnencryptedData &&
+      Encryption.config.supportUnencryptedData &&
       this.scheme.isSupportUnencryptedData() &&
       !this._previousType
     );
@@ -290,7 +290,7 @@ export class EncryptedAttributeType extends ValueType {
   }
 
   private _applyForcedEncoding(value: string): string {
-    const forced = Configurable.config.forcedEncodingForDeterministicEncryption;
+    const forced = Encryption.config.forcedEncodingForDeterministicEncryption;
     if (!forced) return value;
     const enc = _normalizeEncoding(forced);
     if (enc === null || enc === "utf8") return value;

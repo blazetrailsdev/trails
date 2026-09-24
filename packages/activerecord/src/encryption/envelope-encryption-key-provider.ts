@@ -3,7 +3,7 @@ import { Encryptor } from "./encryptor.js";
 import { KeyProvider } from "./key-provider.js";
 import type { KeyGenerator } from "./key-generator.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
-import { Configurable } from "./configurable.js";
+import { Encryption } from "../encryption.js";
 import { Decryption } from "./errors.js";
 import { headerString } from "./encoding-helpers.js";
 import type { Message } from "./message.js";
@@ -16,7 +16,7 @@ export class EnvelopeEncryptionKeyProvider {
     const randomSecret = this.generateRandomSecret();
     const key = new Key(randomSecret);
     key.publicTags.encryptedDataKey = this.encryptDataKey(randomSecret);
-    if (Configurable.config.storeKeyReferences) {
+    if (Encryption.config.storeKeyReferences) {
       key.publicTags.encryptedDataKeyId = this.activePrimaryKey.id;
     }
     return key;
@@ -58,13 +58,13 @@ export class EnvelopeEncryptionKeyProvider {
   /** @internal */
   private primaryKeyProvider(): KeyProvider {
     this._primaryKeyProvider ??= new DerivedSecretKeyProvider(
-      Configurable.config.primaryKey as string,
+      Encryption.config.primaryKey as string,
     );
     return this._primaryKeyProvider;
   }
 
   /** @internal */
   private generateRandomSecret(): string {
-    return (Configurable.keyGenerator as KeyGenerator).generateRandomKey();
+    return (Encryption.keyGenerator as KeyGenerator).generateRandomKey();
   }
 }
