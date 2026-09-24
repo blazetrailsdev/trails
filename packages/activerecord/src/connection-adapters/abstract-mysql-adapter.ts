@@ -59,8 +59,10 @@ import {
   ChangeColumnDefaultDefinition,
   CheckConstraintDefinition,
   CreateIndexDefinition,
+  ForeignKeyDefinition,
 } from "./abstract/schema-definitions.js";
 import type {
+  AddForeignKeyOptions,
   AddIndexOptions,
   ColumnOptions,
   ColumnType,
@@ -76,7 +78,6 @@ import {
 import {
   dataSourceSql as mysqlDataSourceSql,
   extractForeignKeyAction as mysqlExtractForeignKeyAction,
-  foreignKeys as mysqlForeignKeys,
   isRowFormatDynamicByDefault,
   newColumnFromField,
   quotedScope,
@@ -85,6 +86,7 @@ import {
 } from "./mysql/schema-statements.js";
 import {
   compactBlank,
+  groupBy,
   include,
   isPresent,
   parameterize,
@@ -695,8 +697,6 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
     return mysqlQuoteTableName(name);
   }
 
-  declare foreignKeys: typeof mysqlForeignKeys;
-
   /** @internal */
   declare newColumnFromField: typeof newColumnFromField;
 
@@ -704,6 +704,61 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
 
   /** @internal */
   declare extractForeignKeyAction: typeof mysqlExtractForeignKeyAction;
+
+  async foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]> {
+    if (!isPresent(tableName)) throw new ArgumentError("ArgumentError");
+
+    const scope = quotedScope.call(this, tableName);
+
+    const fkInfo = await this.internalExecQuery(
+      `SELECT fk.referenced_table_name AS 'to_table',
+       fk.referenced_column_name AS 'primary_key',
+       fk.column_name AS 'column',
+       fk.constraint_name AS 'name',
+       fk.ordinal_position AS 'position',
+       rc.update_rule AS 'on_update',
+       rc.delete_rule AS 'on_delete'
+FROM information_schema.referential_constraints rc
+JOIN information_schema.key_column_usage fk
+USING (constraint_schema, constraint_name)
+WHERE fk.referenced_column_name IS NOT NULL
+  AND fk.table_schema = ${scope.schema}
+  AND fk.table_name = ${scope.name}
+  AND rc.constraint_schema = ${scope.schema}
+  AND rc.table_name = ${scope.name}
+`,
+      "SCHEMA",
+    );
+
+    const groupedFk = [...groupBy(fkInfo.toArray(), (row) => row["name"]).values()];
+    for (const group of groupedFk) {
+      group.sort((a, b) => (a["position"] as number) - (b["position"] as number));
+    }
+    return groupedFk.map((group) => {
+      const row = group[0];
+      const options: Partial<AddForeignKeyOptions> = {
+        name: row["name"] as string,
+        onUpdate: this.extractForeignKeyAction(row["on_update"] as string),
+        onDelete: this.extractForeignKeyAction(row["on_delete"] as string),
+      };
+
+      if (group.length === 1) {
+        options.column = this.unquoteIdentifier(row["column"] as string) as string;
+        options.primaryKey = row["primary_key"] as string;
+      } else {
+        options.column = group.map(
+          (row) => this.unquoteIdentifier(row["column"] as string) as string,
+        );
+        options.primaryKey = group.map((row) => row["primary_key"] as string);
+      }
+
+      return new ForeignKeyDefinition(
+        tableName,
+        this.unquoteIdentifier(row["to_table"] as string) as string,
+        options,
+      );
+    });
+  }
 
   async checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]> {
     if (!(await this.supportsCheckConstraints())) {
@@ -1517,7 +1572,6 @@ export interface AbstractMysqlAdapter {
 
 include(AbstractMysqlAdapter as unknown as new (...args: unknown[]) => unknown, SchemaStatements);
 AbstractMysqlAdapter.prototype.defaultInsertValue = mysqlDefaultInsertValue;
-AbstractMysqlAdapter.prototype.foreignKeys = mysqlForeignKeys;
 AbstractMysqlAdapter.prototype.newColumnFromField = newColumnFromField;
 AbstractMysqlAdapter.prototype.explain = mysqlExplain;
 AbstractMysqlAdapter.prototype.extractForeignKeyAction = mysqlExtractForeignKeyAction;
