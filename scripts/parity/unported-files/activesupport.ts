@@ -77,25 +77,24 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
   // walks out of vendor/rails and prints as the "AR closure" rollup. Every file
   // below sits OUTSIDE that closure and has no trails counterpart, so it is
   // denominator-only. Files that are out of closure but partially ported
-  // (`cache.rb`, `cache/file_store.rb`, `cache/memory_store.rb`,
-  // `cache/null_store.rb`, `xml_mini.rb`, `xml_mini/nokogiri*.rb`) stay counted,
+  // (`cache.rb`, `cache/file_store.rb`, `cache/mem_cache_store.rb`,
+  // `cache/memory_store.rb`, `cache/null_store.rb`, `cache/redis_cache_store.rb`,
+  // `xml_mini.rb`, `xml_mini/nokogiri*.rb`) stay counted,
   // as do in-closure files the walk reaches (`concurrency/share_lock.rb`,
   // `dependencies/interlock.rb`, `testing/parallelization*.rb`) and
   // `log_subscriber/test_helper.rb`, which AR's own log_subscriber and enum
   // tests include.
   {
-    pattern: "cache/redis_cache_store.rb",
     testFile: "redis_cache_store_test.rb",
     package: "activesupport",
     reason:
-      "outside the AR/AM require closure; deferred until an actionpack/railties port needs it.",
+      "needs a live Redis and the unported local-cache strategy; redis-cache-store-remaining-operations.",
   },
   {
-    pattern: "cache/mem_cache_store.rb",
     testFile: "mem_cache_store_test.rb",
     package: "activesupport",
     reason:
-      "outside the AR/AM require closure; deferred until an actionpack/railties port needs it.",
+      "needs a live memcached and the unported local-cache strategy; redis-cache-store-remaining-operations.",
   },
   {
     pattern: "cache/strategy/local_cache.rb",

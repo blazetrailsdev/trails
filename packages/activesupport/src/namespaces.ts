@@ -25,6 +25,33 @@ interface ParametersInstance {
   set(key: string, value: unknown): void;
 }
 
+interface DalliClient {
+  with<T>(block: (c: DalliClient) => T): T;
+  get(key: string, options?: Record<string, unknown>): unknown;
+  getMulti(keys: string[]): Record<string, unknown>;
+  set(key: string, value: unknown, ttl: number, options?: Record<string, unknown>): unknown;
+  add(key: string, value: unknown, ttl: number, options?: Record<string, unknown>): unknown;
+  delete(key: string): boolean;
+  incr(key: string, amt: number, ttl: unknown, def: number): number | null;
+  decr(key: string, amt: number, ttl: unknown, def: number): number | null;
+  flushAll(): unknown;
+  stats(): unknown;
+}
+
+interface RedisClient {
+  then<T>(block: (c: RedisClient) => T): T;
+  get(key: string): unknown;
+  set(key: string, value: unknown, modifiers?: Record<string, unknown>): unknown;
+  del(...keys: string[]): number;
+}
+
+interface Pool<T> {
+  with<R>(block: (c: T) => R): R;
+  then<R>(block: (c: T) => R): R;
+}
+
+type ErrorClass = abstract new (...args: never[]) => Error;
+
 export const TopLevel: {
   Trails?: {
     env: EnvironmentInquirer;
@@ -40,4 +67,24 @@ export const TopLevel: {
     };
   };
   ActionController?: { Parameters: new (...args: never[]) => ParametersInstance };
+  Dalli?: {
+    Client: { new: (servers: string[] | null, options: Record<string, unknown>) => DalliClient };
+    DalliError: ErrorClass;
+    UnmarshalError: ErrorClass;
+  };
+  Redis?: {
+    new: (options: Record<string, unknown>) => RedisClient;
+    Distributed: {
+      new: (
+        nodeConfigs: unknown[],
+        options: Record<string, unknown>,
+      ) => RedisClient & { addNode(options: Record<string, unknown>): void };
+    };
+    BaseError: ErrorClass;
+  };
+  ConnectionPool?: {
+    new: <T>(options: Record<string, unknown>, block: () => T) => Pool<T>;
+    Error: ErrorClass;
+    TimeoutError: ErrorClass;
+  };
 } = {};

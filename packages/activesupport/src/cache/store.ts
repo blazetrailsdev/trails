@@ -28,6 +28,20 @@ export function setFormatVersion(value: number): void {
   _formatVersion = value;
 }
 
+export const UNIVERSAL_OPTIONS = [
+  "coder",
+  "compress",
+  "compressThreshold",
+  "compressor",
+  "expireIn",
+  "expiredIn",
+  "expiresIn",
+  "namespace",
+  "raceConditionTtl",
+  "serializer",
+  "skipNil",
+];
+
 const DEFAULT_COMPRESS_LIMIT = 1024;
 
 const DEFAULT_POOL_OPTIONS: StoreOptions = { size: 5, timeout: 5 };

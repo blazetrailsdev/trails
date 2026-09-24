@@ -4,6 +4,9 @@ import { env } from "@blazetrails/ruby-compat";
 import { MemoryStore } from "./cache/memory-store.js";
 import "./cache/null-store.js";
 import "./cache/file-store.js";
+import "./cache/mem-cache-store.js";
+import "./cache/redis-cache-store.js";
+import { OrderedOptions } from "./ordered-options.js";
 import { lookupStoreClass } from "./cache/store-registry.js";
 import type { CacheStore } from "./cache/index.js";
 
@@ -15,7 +18,8 @@ export { formatVersion, setFormatVersion } from "./cache/store.js";
 
 export function lookupStore(store?: unknown, ...parameters: unknown[]): CacheStore {
   if (typeof store === "string" && store.startsWith(":")) {
-    const options = extractOptionsBang(parameters);
+    let options = extractOptionsBang(parameters);
+    if (options instanceof OrderedOptions) options = options.toH();
     const rest = parameters;
     return new (retrieveStoreClass(store))(
       ...rest,
