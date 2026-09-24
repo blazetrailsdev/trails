@@ -8,6 +8,7 @@ import { DatabaseConfigurations } from "./database-configurations.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
 import { BooleanType, IntegerType, StringType } from "@blazetrails/activemodel";
 import { establishConnectionTo } from "./test-helpers/adapter-double.js";
+import { uniq } from "@blazetrails/ruby-compat";
 import { equals as coreEquals, hash as coreHash } from "./core.js";
 
 describe("frozen / isFrozen", () => {
@@ -29,6 +30,19 @@ describe("frozen / isFrozen", () => {
     expect(attrsOf(topic)).not.toBe(preFreezeAttrs);
     expect(Object.isFrozen(preFreezeAttrs)).toBe(false);
     expect(Object.isFrozen(attrsOf(topic))).toBe(true);
+  });
+});
+
+describe("eql (core.rb:637 alias :eql? :==)", () => {
+  fixtures(["topics"]);
+
+  it("eql answers what equals answers, so ruby-compat uniq deduplicates loaded copies", async () => {
+    const a = await Topic.find(1);
+    const b = await Topic.find(1);
+    expect(a.eql(b)).toBe(a.equals(b));
+    expect(a.eql(b)).toBe(true);
+    expect(new Topic().eql(new Topic())).toBe(false);
+    expect(uniq([a, b])).toEqual([a]);
   });
 });
 

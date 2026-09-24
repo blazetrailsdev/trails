@@ -134,6 +134,8 @@ export function equals(this: CoreRecord, other: unknown): boolean {
   return primaryKeyValuesEqual(this.id, (other as CoreRecord).id);
 }
 
+export const eql = equals;
+
 const identityHashKeys = new WeakMap<object, symbol>();
 
 const constructorHashTokens = new WeakMap<object, number>();

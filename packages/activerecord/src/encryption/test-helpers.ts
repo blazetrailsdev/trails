@@ -17,7 +17,6 @@ import { type Scheme } from "./scheme.js";
 import { Decryption, Encryption } from "./errors.js";
 import { BinaryData } from "@blazetrails/activemodel";
 import "../encryption.js";
-import type { Encryptor } from "../encryption.js";
 import { MessagePackMessageSerializer } from "./message-pack-message-serializer.js";
 
 import { withEncryptionContext } from "../encryption.js";
@@ -244,17 +243,13 @@ export function makeEncryptedBookWithCustomCompressor() {
   } as any;
 }
 
-const _failingEncryptor: Encryptor = {
-  encrypt(_value: string): string {
-    throw new Encryption("deliberate encryption failure");
-  },
-  decrypt(ciphertext: string): string {
-    return ciphertext;
-  },
-  isEncrypted(_text: string): boolean {
-    return false;
-  },
-};
+class FailingKeyProvider {
+  decryptionKey(_message: unknown): void {}
+
+  encryptionKey(): never {
+    throw new Encryption();
+  }
+}
 
 export function makeBookThatWillFailToEncryptName() {
   return class BookThatWillFailToEncryptName extends Base {
@@ -264,7 +259,7 @@ export function makeBookThatWillFailToEncryptName() {
       this.attribute("updated_at", "datetime");
       this.attribute("id", "integer");
       this.attribute("name", "string");
-      this.encrypts("name", { encryptor: _failingEncryptor });
+      this.encrypts("name", { keyProvider: new FailingKeyProvider() });
     }
   } as any;
 }

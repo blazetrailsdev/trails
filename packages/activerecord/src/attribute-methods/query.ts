@@ -1,4 +1,5 @@
 import { included, isBlank } from "@blazetrails/activesupport";
+import { toI } from "@blazetrails/ruby-compat";
 import { BooleanType, type ValueType } from "@blazetrails/activemodel";
 
 interface QueryIncludeHost {
@@ -58,7 +59,7 @@ export function queryCastAttribute(this: QueryHost, attrName: string, value: unk
   if (value === false || value == null) return false;
   if (!this.typeForAttribute(attrName, () => false as unknown as ValueType)) {
     if (typeof value === "number" || typeof value === "bigint" || !/[^0-9]/.test(String(value))) {
-      return toI(value) !== 0;
+      return toI(value) != 0;
     }
     if (BooleanType.FALSE_VALUES.has(value)) return false;
     return !isBlank(value);
@@ -67,11 +68,4 @@ export function queryCastAttribute(this: QueryHost, attrName: string, value: unk
   } else {
     return !isBlank(value);
   }
-}
-
-function toI(value: unknown): number {
-  if (typeof value === "number") return Math.trunc(value);
-  if (typeof value === "bigint") return Number(value);
-  const m = /^\s*[+-]?\d+/.exec(String(value));
-  return m ? parseInt(m[0], 10) : 0;
 }
