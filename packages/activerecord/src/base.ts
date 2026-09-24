@@ -1116,6 +1116,10 @@ export class Base extends Model {
   static benchmark = benchmarkable;
 
   declare static touchAttributesWithTime: typeof Timestamp.touchAttributesWithTime;
+  /** @internal */
+  declare static timestampAttributesForCreate: typeof Timestamp.timestampAttributesForCreate;
+  /** @internal */
+  declare static timestampAttributesForUpdate: typeof Timestamp.timestampAttributesForUpdate;
 
   static _recordTimestamps = true;
 
@@ -2782,7 +2786,11 @@ extend(Base, {
   resetDefaultAttributes: _resetDefaultAttributes,
   reloadSchemaFromCache: Timestamp.reloadSchemaFromCache,
 });
-extend(Base, { touchAttributesWithTime: Timestamp.touchAttributesWithTime });
+extend(Base, {
+  touchAttributesWithTime: Timestamp.touchAttributesWithTime,
+  timestampAttributesForCreate: Timestamp.timestampAttributesForCreate,
+  timestampAttributesForUpdate: Timestamp.timestampAttributesForUpdate,
+});
 extend(Base, { isDangerousAttributeMethod: _pkIsDangerousAttributeMethod });
 extend(Base, { isInstanceMethodAlreadyImplemented: _pkIsInstanceMethodAlreadyImplemented });
 extend(Base, {
