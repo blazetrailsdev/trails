@@ -573,6 +573,8 @@ export {
   assertInDelta,
   assertEmpty,
   assertNotEmpty,
+  assertNil,
+  assertNotNil,
   assertSame,
   assertNotSame,
   assertRaises,

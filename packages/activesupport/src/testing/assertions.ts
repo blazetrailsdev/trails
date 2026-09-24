@@ -649,7 +649,8 @@ function refuteEqual(exp: unknown, act: unknown, msg: string | (() => string) | 
   return refute(deepEqual(exp, act), msg);
 }
 
-function assertNil(obj: unknown, msg: string | (() => string) | null = null): true {
+/** @noRailsEquivalent PERMANENT */
+export function assertNil(obj: unknown, msg: string | (() => string) | null = null): true {
   msg = message(msg, null, () => `Expected ${inspect(obj)} to be nil`);
   return assert(obj == null, msg);
 }
@@ -657,6 +658,10 @@ function assertNil(obj: unknown, msg: string | (() => string) | null = null): tr
 function refuteNil(obj: unknown, msg: string | (() => string) | null = null): true {
   msg = message(msg, null, () => `Expected ${inspect(obj)} to not be nil`);
   return refute(obj == null, msg);
+}
+
+export function assertNotNil(obj: unknown, msg: string | (() => string) | null = null): true {
+  return refuteNil(obj, msg);
 }
 
 function assertMatch(
