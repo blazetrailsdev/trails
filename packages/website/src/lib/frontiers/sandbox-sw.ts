@@ -10,6 +10,7 @@ declare const self: ServiceWorkerGlobalScope;
 
 import type { SwRequest, SwResponse, SwBroadcast } from "./sw-protocol.js";
 import { SqlJsAdapter } from "./sql-js-adapter.js";
+import { sqlJsDriver } from "./sql-js-driver.js";
 import { VirtualFS } from "./virtual-fs.js";
 import { CompiledCache } from "./compiled-cache.js";
 import { stripTypes } from "./transpiler.js";
@@ -18,6 +19,8 @@ import { createAppServer, type AppServer } from "./app-server.js";
 import { requestToRackEnvWithBody, rackResponseToFetchResponse } from "./rack-bridge.js";
 import { resolveVfsPath } from "./vfs-resolve.js";
 import { Base } from "@blazetrails/activerecord/base";
+import { register } from "@blazetrails/activerecord/connection-adapters";
+import { SQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/sqlite3-adapter";
 import { Migration, Migrator } from "@blazetrails/activerecord/migration";
 import type { MigrationProxy } from "@blazetrails/activerecord/migration";
 import { Schema } from "@blazetrails/activerecord/schema";
@@ -28,6 +31,13 @@ import { ActionController } from "@blazetrails/actionpack";
 import initSqlJs from "sql.js";
 
 const DEV_PREFIX = "/~dev/";
+
+register(
+  "sqljs",
+  "SQLite3Adapter",
+  "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js",
+  async () => SQLite3Adapter,
+);
 
 // ── Runtime state ──────────────────────────────────────────────────────
 
@@ -79,7 +89,11 @@ async function init(): Promise<void> {
 
   db = new SQL.Database();
   adapter = new SqlJsAdapter(db);
-  Base.adapter = adapter;
+  await Base.establishConnection({
+    adapter: "sqljs",
+    database: ":memory:",
+    driver: sqlJsDriver(db),
+  });
   vfs = new VirtualFS(adapter);
   compiled = new CompiledCache(adapter);
 
@@ -102,11 +116,15 @@ async function init(): Promise<void> {
 
 // ── Database replacement (used by db:import) ───────────────────────────
 
-function replaceDatabase(data: Uint8Array): void {
+async function replaceDatabase(data: Uint8Array): Promise<void> {
   db.close();
   db = new SQL.Database(data);
   adapter = new SqlJsAdapter(db);
-  Base.adapter = adapter;
+  await Base.establishConnection({
+    adapter: "sqljs",
+    database: ":memory:",
+    driver: sqlJsDriver(db),
+  });
   vfs = new VirtualFS(adapter);
   compiled = new CompiledCache(adapter);
   migrations = [];
@@ -204,7 +222,7 @@ export async function handleSwMessage(request: SwRequest): Promise<SwResponse> {
       return { type: "db:export", data: db.export() };
 
     case "db:import": {
-      replaceDatabase(request.data);
+      await replaceDatabase(request.data);
       await broadcast({ type: "vfs:changed" });
       await broadcast({ type: "db:changed" });
       return { type: "db:import", ok: true };
