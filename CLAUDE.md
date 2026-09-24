@@ -481,6 +481,15 @@ write.
    never up. There is **no reseed**, for the same reason the call baselines
    forbid one.
 
+   `ruby-compat` is no exception, although its surface is inventory rather
+   than debt: every move story adds MRI surface. A member carrying its
+   `@noRailsEquivalent PERMANENT` receipt (the package's rule 2) is subtracted
+   from both `novel` and `total`, so a receipted addition moves neither and
+   growth is mark-neutral. An unreceipted one reds the gate and wants the
+   receipt, not a bigger mark. The receipt does not prove a call site: the
+   package's rule 1 is not enforced by this gate (see
+   [its README](packages/ruby-compat/README.md#1-only-what-trails-actually-calls)).
+
    A package that has burnt its untagged novel surface to zero (`arel` today)
    is additionally **pinned**: its `novel` is the constant 0 regardless of what
    its row says, so widening the row cannot clear a red run. The only two

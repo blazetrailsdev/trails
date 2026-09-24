@@ -28,15 +28,25 @@
  * burn down. The mark is seeded at the measured 399 novel / 1424 total: a
  * high-water mark to shrink, NOT a budget to spend.
  *
- * ruby-compat joined under RFC 0129, at the moment its mark was still 0/0. Its
- * defining rule — no member exists without a real call site in this repo — has
- * no `SKIP_GROUPS` discipline behind it, because there is no Ruby-Rails file to
- * be measured against: every public name in the package lands in the
- * `rubyFile === null` slice and scores novel, so this counter IS the rule. A
- * speculative member — an MRI method ported because its siblings are here —
- * raises `novel` and turns the gate red, and there is no reseed. A later need
- * is a later story against RFC 0129 carrying its motivating call site, and the
- * mark moves up only as a reviewed line of that story's diff.
+ * ruby-compat joined under RFC 0129. For a Rails package extra surface is debt;
+ * for ruby-compat it is inventory — the package grows each time trails needs
+ * another piece of Ruby — so it would look as if the mark had to rise with it.
+ * It does not, and the only-shrink contract holds for ruby-compat unchanged.
+ * Every public name there lands in the `rubyFile === null` slice, and a
+ * declaration carrying a `@noRailsEquivalent` receipt is subtracted from BOTH
+ * dimensions before it is classified (`uncoveredTsFiles` in
+ * `extra-surface.ts`), whether its name would score novel or collide with a
+ * Rails method elsewhere and score moved. The package's rule 2 requires that
+ * receipt on every export, so a member that arrives with its receipt moves
+ * neither dimension: growth is mark-neutral. What `total` counts is the
+ * residue that has NOT got its receipt, which is a rule 2 violation to burn
+ * down (`receipt-ruby-compat-moved-residue`), not headroom to grow into. There
+ * is deliberately no raise path, for ruby-compat or any other package.
+ *
+ * Because a receipted member never reaches the counter, the counter does NOT
+ * enforce the package's rule 1 — no member without a real call site — and an
+ * earlier revision of this comment was wrong to call it that rule. Rule 1 is
+ * `ruby-compat-rule-1-call-site-gate`.
  *
  * activemodel remains ungated. The same reasoning would apply, but it has no
  * burndown behind it yet, and widening GATED_PACKAGES without one is exactly

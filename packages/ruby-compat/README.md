@@ -32,8 +32,9 @@ Every export, with the call site that justifies it (rule 1).
 
 ## The contract
 
-Four rules govern this package. They are not review preferences; three of the
-four are mechanically enforced, and the fourth is structural.
+Four rules govern this package. Rules 2 and 3 are mechanically enforced, rule 4
+is structural, and rule 1 is enforced by review until its gate lands (see
+below).
 
 ### 1. Only what trails actually calls
 
@@ -42,23 +43,37 @@ not a general-purpose Ruby runtime, and it is not a place to port a method
 because its siblings are already here — `String#succ` earns its keep because
 `arel` calls it; `String#squeeze` does not, until something calls it.
 
-This is enforced by `pnpm parity:api:extra`, not by review. Every public name in
-this package is extra surface by construction (see rule 2), so the extra-surface
-report lists the entire package; the question a reviewer asks of a new row is
-"where is the call site", and the answer must be a file and a line.
+Today this rule is enforced by review, not by a gate: the question a reviewer
+asks of a new export is "where is the call site", the answer must be a file and
+a line, and it goes in the table above. Mechanical enforcement is
+`ruby-compat-rule-1-call-site-gate`.
 
-The counter behind that report is a gate. `ruby-compat` is in `GATED_PACKAGES`
+The extra-surface counter does NOT enforce it, although earlier revisions of
+this README said it did. `ruby-compat` is in `GATED_PACKAGES`
 (`scripts/api-compare/extra-surface-mark.ts`) with its mark committed in
-`extra-surface-mark.json`, and `pnpm parity:api:extra:gate` fails on **any**
-increase in either dimension. So a speculative member — an MRI method ported
-because its siblings are here, or "we'll need it soon" — does not reach review
-as a judgement call: it raises `novel`, and CI turns red. The mark is only-shrink
-(`parity:api:extra:tighten` writes it DOWN) and **there is no reseed**.
+`extra-surface-mark.json`, and `pnpm parity:api:extra:gate` fails on any
+increase in either dimension. But the counter subtracts every member carrying a
+`@noRailsEquivalent` receipt, and rule 2 requires that receipt on every export,
+so a correctly receipted member — speculative or not — never reaches it.
 
-The way past the gate is therefore never a bigger mark in a PR that is about
-something else. A later need is a **later story filed against RFC 0129**, naming
-the call site that motivates it, and the mark moves in that story's reviewed
-diff — never as a drive-by addition to a move PR.
+### Growing the package: the receipt is the protocol
+
+For a Rails package extra surface is debt and only-shrink is the whole point.
+Here it is inventory: every move story adds MRI surface. The two do not
+conflict, because growth here is **mark-neutral**:
+
+- A member that arrives with its rule 2 receipt is subtracted from `novel` AND
+  `total`, whether its name is novel or collides with a Rails method in some
+  other `.rb` and would score moved. Adding it moves neither number.
+- A member that arrives WITHOUT its receipt raises `total` (and, if novel,
+  trips the `novel === 0` pin), and the gate turns red. The fix is the
+  receipt, never a bigger mark.
+
+So there is no raise path, and none is needed: the mark stays only-shrink
+(`parity:api:extra:tighten` writes it DOWN) with **no reseed**, exactly as for
+every other gated package. The `total` it holds today is the residue of members
+that never got their receipt, a rule 2 violation burnt down by
+`receipt-ruby-compat-moved-residue`.
 
 ### 2. Every export carries BOTH a `vendor/ruby` citation and a receipt
 
