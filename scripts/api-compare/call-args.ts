@@ -547,20 +547,37 @@ function alignBuiltinReceiver(
  *  the mixin `this` the port adds to a ported module function, and the Ruby
  *  receiver of a built-in TS cannot define on a receiver. Neither can apply to
  *  the same site — a name on the built-in table is never a ported mixin — so
- *  the order is immaterial. */
+ *  the order is immaterial.
+ *
+ *  Both assume the port moved the Ruby receiver INTO the argument list. A TS
+ *  site with a receiver of its own (`CallSite.recv`) usually kept Rails'
+ *  receiver where Rails wrote it: `instrumenter.instrument(name, payload)`
+ *  (notifications.rb:210) is `this.instrumenter.instrument(name, payload,
+ *  block)`, and prepending `instrumenter` shifts every pair by one position.
+ *  So for such a site the prepend stands only when TS argument 1 names the
+ *  Ruby receiver: `@raw_connection.warning_count`
+ *  (abstract_mysql_adapter.rb:771) is `this.warningCount(rawConnection)`, and
+ *  `content_path.basename` (encrypted_file.rb:90) is
+ *  `path.basename(contentPath)` on the path adapter. */
 function alignReceiverArgs(
   ruby: CallSite,
+  ts: CallSite,
   tsArgs: string[],
   calleeSigs: ParamInfo[][] | undefined,
 ): { rubyArgs: string[]; tsArgs: string[] } {
-  return alignPortedReceiver(
+  const stripped = stripCalleeReceiverArg(
     ruby,
-    alignBuiltinReceiver(
-      ruby,
-      ruby.args,
-      stripCalleeReceiverArg(ruby, ruby.args, stripMixinReceiver(ruby.args, tsArgs), calleeSigs),
-    ),
+    ruby.args,
+    stripMixinReceiver(ruby.args, tsArgs),
+    calleeSigs,
   );
+  const aligned = alignPortedReceiver(ruby, alignBuiltinReceiver(ruby, ruby.args, stripped));
+  if (ts.recv === undefined || aligned.rubyArgs.length === ruby.args.length) return aligned;
+  const [rubyRecv] = normalizeArgs(aligned.rubyArgs.slice(0, 1)) ?? [];
+  const [tsFirst] = normalizeArgs(aligned.tsArgs.slice(0, 1)) ?? [];
+  return rubyRecv !== undefined && tsFirst !== undefined && argKeysEqual(rubyRecv, tsFirst)
+    ? aligned
+    : { rubyArgs: ruby.args, tsArgs: stripped };
 }
 
 /** A bare local/ivar argument, whose identifier is what decides whether it is
@@ -686,6 +703,42 @@ function stripBlockTailPadding(
   if (!tsArgs.slice(rubyArgs.length).every((arg) => arg === "nil")) return tsArgs;
   if (!padsDefaultedParams(calleeSigs, rubyArgs.length, tsArgs.length)) return tsArgs;
   return tsArgs.slice(0, rubyArgs.length);
+}
+
+/**
+ * Drop the trailing argument through which the port forwards a block that Ruby
+ * wrote as a literal block.
+ *
+ * `notifications.rb:210` writes
+ * `instrumenter.instrument(name, payload) { yield payload if block_given? }`,
+ * and the port writes `this.instrumenter.instrument(name, payload, block)`. TS
+ * has no block syntax, so the callback is a trailing PARAMETER, and forwarding
+ * the enclosing method's own block is the whole of that Ruby block. An inline
+ * arrow already drops as a `block` flag (extract-ts-api.ts#describeArgs). A
+ * forwarded identifier cannot, because the extractor cannot tell it from a
+ * value.
+ *
+ * Narrow on purpose. The Ruby site must carry a literal block and no
+ * block-pass. The TS site must carry no block of its own and exactly one extra
+ * trailing argument. Some TS signature of the callee must declare a callable
+ * parameter in that position (`admitsFunction`, RFC 0156, or a `block` kind).
+ * An unresolved callee answers no.
+ */
+function stripForwardedLiteralBlock(
+  ruby: CallSite,
+  ts: CallSite,
+  rubyArgs: string[],
+  tsArgs: string[],
+  calleeSigs: ParamInfo[][] | undefined,
+): string[] {
+  if (!ruby.flags.includes("block") || rubyBlockArg(ruby) !== undefined) return tsArgs;
+  if (ts.flags.includes("block") || tsArgs.length !== rubyArgs.length + 1) return tsArgs;
+  const at = rubyArgs.length;
+  const callable = (calleeSigs ?? []).some((raw) => {
+    const param = stripThis(raw)[at];
+    return param !== undefined && (param.kind === "block" || param.admitsFunction === true);
+  });
+  return callable ? tsArgs.slice(0, at) : tsArgs;
 }
 
 /** Whether some TS signature of the callee declares every parameter in
@@ -921,10 +974,25 @@ function blockAffinity(ruby: CallSite, ts: CallSite): number {
  * Rails' (the receiver), so a raw comparison hands the arity bonus to the site
  * that happens to have the same raw count — the wrong one — and the greedy
  * assignment takes it whenever the key matches tie.
+ *
+ * The same holds when the Ruby receiver is a CHAIN, which the strip drops
+ * rather than compares. `key.to_s.pluralize(not_found_ids.size)`
+ * (finder_methods.rb:432) must not take the arity credit from the port's
+ * `pluralize(name)`: that site carries no receiver, so it is the port of a
+ * different Ruby call. Only a receiverless TS site that carries the moved
+ * receiver, one argument more than Rails, earns the credit.
  */
 function argSimilarity(ruby: CallSite, ts: CallSite): number {
-  const aligned = alignReceiverArgs(ruby, stripForwardedBlockArg(ruby, ts), undefined);
-  const sameArity = aligned.rubyArgs.length === aligned.tsArgs.length ? 1 : 0;
+  const forwarded = stripForwardedBlockArg(ruby, ts);
+  const aligned = alignReceiverArgs(ruby, ts, forwarded, undefined);
+  const sameArity =
+    aligned.rubyArgs.length === aligned.tsArgs.length &&
+    (!RECEIVER_AS_FIRST_ARG.has(ruby.name) ||
+      ruby.recv === undefined ||
+      ts.recv !== undefined ||
+      forwarded.length === ruby.args.length + 1)
+      ? 1
+      : 0;
   const rubyArgs = normalizeArgs(aligned.rubyArgs);
   const tsArgs = normalizeArgs(aligned.tsArgs);
   if (rubyArgs === null || tsArgs === null) {
@@ -1202,7 +1270,7 @@ export function compareCallArgs(
   if (isSkippedCallName(ruby.name)) return skipped("excludedCallName");
   if (hasUncomparableFlag(ruby) || hasUncomparableFlag(ts)) return skipped("uncomparableFlag");
 
-  const aligned = alignReceiverArgs(ruby, ts.args, calleeSigs);
+  const aligned = alignReceiverArgs(ruby, ts, ts.args, calleeSigs);
   const rubyArgs = normalizeArgsOrFailure(aligned.rubyArgs);
   if (!Array.isArray(rubyArgs)) {
     return skipped(rubyArgs.failure === "opaque" ? "opaqueRubyArg" : "unparseableLiteral");
@@ -1211,7 +1279,13 @@ export function compareCallArgs(
   if (!Array.isArray(normalizedTs)) {
     return skipped(normalizedTs.failure === "opaque" ? "opaqueTsArg" : "unparseableLiteral");
   }
-  const tsArgs = stripBlockTailPadding(ruby, ts, rubyArgs, normalizedTs, calleeSigs);
+  const tsArgs = stripForwardedLiteralBlock(
+    ruby,
+    ts,
+    rubyArgs,
+    stripBlockTailPadding(ruby, ts, rubyArgs, normalizedTs, calleeSigs),
+    calleeSigs,
+  );
 
   const compared = withRegexpFlagKeys(ruby, resolveCalleeRefs(rubyArgs, enclosingRubyName));
   const comparedTs = withRegexpFlagKeys(ruby, tsArgs);

@@ -27,12 +27,15 @@ export interface CallSite {
   args: string[];
   flags: string[];
   /**
-   * Ruby side only: the receiver expression, in the same descriptor spelling as
-   * `args`, when the site has one and it is describable. Absent for a
-   * receiver-less call (`:fcall` / `:vcall`) and for an opaque receiver.
-   * `alignBuiltinReceiver` (call-args.ts) compares it against TS argument 1 for
-   * a `RECEIVER_AS_FIRST_ARG` name whose receiver is a simple `id:`/`const:`
-   * ref.
+   * The receiver expression, in the same descriptor spelling as `args`, when
+   * the site has one and it is describable. Absent for a receiver-less call
+   * (`:fcall` / `:vcall`, a bare TS `foo()`) and for an opaque receiver.
+   * `alignBuiltinReceiver` (call-args.ts) compares the Ruby one against TS
+   * argument 1 for a `RECEIVER_AS_FIRST_ARG` name whose receiver is a simple
+   * `id:`/`const:` ref. On the TS side a constant-shaped receiver
+   * (`Inflector.camelize(x)`) is a namespace, not a receiver, and is not
+   * recorded; any other one tells `alignReceiverArgs` the port did not move the
+   * Ruby receiver into the argument list.
    */
   recv?: string;
 }

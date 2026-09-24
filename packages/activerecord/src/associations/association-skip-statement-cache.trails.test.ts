@@ -5,10 +5,9 @@ import { Post } from "../test-helpers/models/post.js";
 import { registerModel } from "../associations.js";
 import { fixtures } from "../test-fixtures.js";
 import type { Relation } from "../relation.js";
-import type { Base } from "../base.js";
 
 interface AssociationLike {
-  isSkipStatementCache(scope: Relation<Base>): boolean;
+  isSkipStatementCache(scope: Relation<Author>): boolean;
 }
 
 describe("Association#skip_statement_cache?", () => {

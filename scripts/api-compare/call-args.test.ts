@@ -1089,3 +1089,79 @@ describe("normalizeArg (value-equivalent constant spellings)", () => {
     expect(normalizeArg("const:MAX_VALUE")).not.toBe(normalizeArg("const:MAX"));
   });
 });
+
+describe("compareCallArgs receiver the TS site kept", () => {
+  it("does not prepend a Ruby self-call receiver the TS site also calls on", () => {
+    // notifications.rb:210 `instrumenter.instrument(name, payload) { … }` vs
+    // notifications.ts `this.instrumenter.instrument(name, payload, block)`.
+    const ruby = {
+      ...site("instrument", ["id:name", "id:payload"], ["block"]),
+      recv: "id:instrumenter",
+    };
+    const ts = {
+      ...site("instrument", ["id:name", "id:payload", "id:block"]),
+      recv: "id:instrumenter",
+    };
+    const sig: ParamInfo[] = [
+      { name: "name", kind: "required" },
+      { name: "payload", kind: "optional", default: "{}" },
+      { name: "block", kind: "optional", admitsFunction: true },
+    ];
+    expect(compareCallArgs(ruby, ts, undefined, [sig]).verdict).toBe("match");
+    const unresolved = compareCallArgs(ruby, ts);
+    expect(unresolved.rubyArgs).toEqual(["ref:name", "ref:payload"]);
+    expect(unresolved.class).toBe("shape");
+  });
+
+  it("does not prepend a block-local receiver the TS site also calls on", () => {
+    // relation.rb:1213 `relation.to_sql` vs relation.ts `conn.toSql(manager)`.
+    const result = compareCallArgs(
+      { ...site("to_sql", []), recv: "id:relation" },
+      { ...site("toSql", ["id:manager"]), recv: "id:conn" },
+    );
+    expect(result.rubyArgs).toEqual([]);
+    expect(result.class).toBe("shape");
+  });
+
+  it("still prepends when TS argument 1 is the Ruby receiver", () => {
+    // abstract_mysql_adapter.rb:771 `@raw_connection.warning_count` vs
+    // abstract-mysql-adapter.ts `this.warningCount(rawConnection)`.
+    expect(
+      compareCallArgs(
+        { ...site("warning_count", []), recv: "id:@raw_connection" },
+        { ...site("warningCount", ["id:rawConnection"]), recv: "id:this" },
+      ).verdict,
+    ).toBe("match");
+  });
+
+  it("keeps prepending for a receiverless TS port", () => {
+    // inheritance.ts `stiName(other)` where Rails wrote `klass.sti_name`.
+    const result = compareCallArgs(
+      { ...site("sti_name", []), recv: "id:klass" },
+      site("stiName", ["id:other"]),
+    );
+    expect(result.rubyArgs).toEqual(["ref:klass"]);
+    expect(result.class).toBe("naming");
+  });
+});
+
+describe("pairCallSites core_ext receiver as argument 1", () => {
+  it("pairs a chained-receiver site with a port that carries the receiver", () => {
+    // finder_methods.rb:432: `name.pluralize` and `name.pluralize(size)` are
+    // weak and dropped, leaving `key.to_s.pluralize(not_found_ids.size)`
+    // against the port's three `pluralize` sites.
+    const pairs = pairCallSites(
+      [{ ...site("pluralize", ["call:size"]), recv: "call:to_s" }],
+      [
+        site("pluralize", ["id:name"]),
+        site("pluralize", ["id:name", "call:length"]),
+        site("pluralize", ["id:keyToS", "call:length"]),
+      ],
+    );
+    expect(pairs).toHaveLength(1);
+    expect(pairs[0].ts.args).not.toEqual(["id:name"]);
+    const result = compareCallArgs(pairs[0].ruby, pairs[0].ts);
+    expect(result.rubyArgs).toEqual(["ref:size"]);
+    expect(result.tsArgs).toEqual(["ref:length"]);
+  });
+});

@@ -123,10 +123,7 @@ export class UnscopedLocator extends BaseLocator {
     return this.unscoped(modelClass, () => super.findRecords(modelClass, ids, options));
   }
 
-  /**
-   * @internal
-   * @missingRailsName modelClass — PERMANENT
-   */
+  /** @internal */
   protected unscoped<R>(
     modelClass: LocatorModel | undefined,
     block: () => R | Promise<R>,

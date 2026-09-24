@@ -2479,6 +2479,25 @@ describe("Ruby extractor call-argument capture", { timeout: RUBY_SUBPROCESS_TIME
     return sites?.find((s) => s.name === name)?.args;
   }
 
+  it("keeps a bare self-call receiver out of the argument list", () => {
+    // notifications.rb:210 — the receiver is `recv`, never argument 1, so the
+    // TS `this.instrumenter.instrument(name, payload, block)` pairs position
+    // by position.
+    const c = rubyCallArgs({
+      "foo.rb": `
+        class Foo
+          def instrument(name, payload = {})
+            instrumenter.instrument(name, payload) { yield payload if block_given? }
+          end
+        end
+      `,
+    });
+    const instrument = c["Foo#instrument"]?.find((s) => s.name === "instrument");
+    expect(instrument?.args).toEqual(["id:name", "id:payload"]);
+    expect(instrument?.flags).toContain("block");
+    expect((instrument as { recv?: string } | undefined)?.recv).toBe("id:instrumenter");
+  });
+
   it("emits a descriptor for every extractable argument form", () => {
     const c = rubyCallArgs({
       "foo.rb": `

@@ -1106,6 +1106,7 @@ export class Relation<T extends Base> {
   /**
    * @missingRailsCall apply_join_dependency — PERMANENT
    * @missingRailsCall with_connection — PERMANENT
+   * @missingRailsArgs to_sql — PERMANENT
    */
   toSql(): string {
     return this._model.connectionPool().withConnectionSync(

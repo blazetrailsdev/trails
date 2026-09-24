@@ -15,7 +15,10 @@ export class DefaultScope {
 }
 
 export class Default {
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsArgs scope — CONVERGEABLE build-default-scope-instance-exec-scope-body
+   */
   static buildDefaultScope(
     this: any,
     relation: any,
