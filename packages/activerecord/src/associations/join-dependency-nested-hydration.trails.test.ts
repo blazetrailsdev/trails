@@ -3,9 +3,9 @@ import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 import { aliasedRow } from "../support/join-dependency-aliased-row.js";
 import { fixtures } from "../test-fixtures.js";
-import { Result } from "../result.js";
 import { JoinDependency } from "./join-dependency.js";
 import { Nodes } from "@blazetrails/arel";
+import { resultFromRowHashes } from "../test-helpers/result-from-row-hashes.js";
 
 describe("JoinDependency nested hydration", () => {
   fixtures({});
@@ -51,7 +51,7 @@ describe("JoinDependency nested hydration", () => {
       }),
     ];
 
-    const parents = jd.instantiate(Result.fromRowHashes(rows));
+    const parents = jd.instantiate(resultFromRowHashes(rows));
 
     expect(parents).toHaveLength(1);
     const post = parents[0];
@@ -89,7 +89,7 @@ describe("JoinDependency nested hydration", () => {
       }),
     ];
 
-    const parents = jd.instantiate(Result.fromRowHashes(rows));
+    const parents = jd.instantiate(resultFromRowHashes(rows));
     expect(parents).toHaveLength(2);
     const a1 = parents[0].association("comments").target[0].association("author")?.target;
     const a2 = parents[1].association("comments").target[0].association("author")?.target;
@@ -105,7 +105,7 @@ describe("JoinDependency nested hydration", () => {
         comments: { id: 10, post_id: 1, body: "C1", author_id: null },
       }),
     ];
-    const parents = jd.instantiate(Result.fromRowHashes(rows));
+    const parents = jd.instantiate(resultFromRowHashes(rows));
     const comment = parents[0].association("comments").target[0];
     expect(comment._readonly).toBeFalsy();
   });

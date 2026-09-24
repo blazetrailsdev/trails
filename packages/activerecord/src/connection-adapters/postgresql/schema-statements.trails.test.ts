@@ -7,8 +7,8 @@ import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js"
 import { ForeignKeyDefinition } from "../abstract/schema-definitions.js";
 import { Table as PgTable } from "./schema-definitions.js";
 import { Name } from "./utils.js";
-import { Result } from "../../result.js";
 import { describeIfPg, PG_TEST_URL } from "../../support/describe-if-pg.js";
+import { resultFromRowHashes } from "../../test-helpers/result-from-row-hashes.js";
 
 const SCHEMA_NAME = "test_schema_stmts";
 const TABLE_NAME = "things";
@@ -643,7 +643,7 @@ function makeAdapter(options: FakeOptions = {}) {
     },
     internalExecQuery: vi.fn(async (text: string) => {
       sql.push(text);
-      return Result.fromRowHashes(
+      return resultFromRowHashes(
         options.internalExecQuery ? await options.internalExecQuery(text) : [],
       );
     }),

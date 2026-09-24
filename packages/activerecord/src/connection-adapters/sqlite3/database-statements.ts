@@ -238,13 +238,11 @@ export async function performQuery(
     } else if (stmt.reader) {
       const rows = (await stmt.all(typeCastedBinds)) as Record<string, unknown>[];
       this._narrowSpilledBigInts(stmt, rows);
-      result =
-        rows.length > 0
-          ? Result.fromRowHashes(rows)
-          : new Result(
-              stmt.columns().map((c) => c.name),
-              [],
-            );
+      const columns = stmt.columns().map((c) => c.name);
+      result = new Result(
+        columns,
+        rows.map((row) => columns.map((column) => row[column])),
+      );
     } else {
       await stmt.run(typeCastedBinds);
       result = Result.empty();

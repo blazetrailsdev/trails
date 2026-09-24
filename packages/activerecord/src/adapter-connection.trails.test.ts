@@ -6,6 +6,7 @@ import { Base } from "./index.js";
 import { Result } from "./result.js";
 import { adapterType } from "./test-adapter.js";
 import { establishConnectionTo } from "./test-helpers/adapter-double.js";
+import { resultFromRowHashes } from "./test-helpers/result-from-row-hashes.js";
 
 class LifecycleTestAdapter extends AbstractAdapter {
   private _connected = false;
@@ -65,7 +66,7 @@ class QueryTestAdapter extends LifecycleTestAdapter {
         this.failOnce = false;
         throw new ConnectionFailed("remote disconnect");
       }
-      return Result.fromRowHashes([]);
+      return resultFromRowHashes([]);
     });
   }
 }

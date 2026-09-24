@@ -3,9 +3,9 @@ import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 import { aliasedRow } from "../support/join-dependency-aliased-row.js";
 import { fixtures } from "../test-fixtures.js";
-import { Result } from "../result.js";
 import { JoinDependency } from "./join-dependency.js";
 import { Nodes } from "@blazetrails/arel";
+import { resultFromRowHashes } from "../test-helpers/result-from-row-hashes.js";
 
 describe("JoinDependency cross-parent belongsTo dedup", () => {
   fixtures({});
@@ -52,7 +52,7 @@ describe("JoinDependency cross-parent belongsTo dedup", () => {
       }),
     ];
 
-    const parents = jd.instantiate(Result.fromRowHashes(rows));
+    const parents = jd.instantiate(resultFromRowHashes(rows));
 
     expect(parents).toHaveLength(3);
 
@@ -80,7 +80,7 @@ describe("JoinDependency cross-parent belongsTo dedup", () => {
       }),
     ];
 
-    const parents = jd.instantiate(Result.fromRowHashes(rows));
+    const parents = jd.instantiate(resultFromRowHashes(rows));
 
     const author1 = parents[0].association("author")?.target;
     const author2 = parents[1].association("author")?.target;

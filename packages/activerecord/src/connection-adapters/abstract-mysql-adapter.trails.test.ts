@@ -12,6 +12,7 @@ import { AbstractMysqlAdapter, parseTableOptions } from "./abstract-mysql-adapte
 import { SchemaCreation as MysqlSchemaCreation } from "./mysql/schema-creation.js";
 import { NullPool } from "./abstract/connection-pool.js";
 import { Result } from "../result.js";
+import { resultFromRowHashes } from "../test-helpers/result-from-row-hashes.js";
 
 function makeColumn(opts: { autoIncrement?: boolean; defaultFunction?: string | null } = {}) {
   return new Column(
@@ -677,7 +678,7 @@ describe("AbstractMysqlAdapter#foreignKeys", () => {
       _escapeState: { noBackslashEscapes: false },
     }) as InstanceType<typeof AbstractMysqlAdapter>;
     Object.assign(adapter, {
-      internalExecQuery: async () => Result.fromRowHashes(rows),
+      internalExecQuery: async () => resultFromRowHashes(rows),
     });
     return adapter;
   }

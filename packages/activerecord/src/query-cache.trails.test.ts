@@ -3,6 +3,7 @@ import { registerModel } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
 import { Base } from "./base.js";
 import { Task } from "./test-helpers/models/task.js";
+import { Result } from "./result.js";
 import { Notifications, type NotificationEvent } from "@blazetrails/activesupport";
 import { Attribute, Types } from "@blazetrails/activemodel";
 import { Store } from "./connection-adapters/abstract/query-cache.js";
@@ -114,7 +115,7 @@ describe("cacheNotificationInfo payload (trails)", () => {
 describe("Store max size eviction gate (trails)", () => {
   const fill = async (store: Store, keys: string[]): Promise<void> => {
     for (const key of keys) {
-      await store.computeIfAbsent(key, () => Promise.resolve([{ key }]));
+      await store.computeIfAbsent(key, () => Promise.resolve(new Result(["key"], [[key]])));
     }
   };
 
@@ -134,8 +135,8 @@ describe("Store max size eviction gate (trails)", () => {
     await fill(store, ["a", "b", "c"]);
     expect(store.size).toBe(2);
     expect(store.get("a")).toBeUndefined();
-    expect(store.get("b")).toEqual([{ key: "b" }]);
-    expect(store.get("c")).toEqual([{ key: "c" }]);
+    expect(store.get("b")?.toArray()).toEqual([{ key: "b" }]);
+    expect(store.get("c")?.toArray()).toEqual([{ key: "c" }]);
   });
 
   it("a hit refreshes the entry so the shift evicts a colder key", async () => {
@@ -144,23 +145,25 @@ describe("Store max size eviction gate (trails)", () => {
     await fill(store, ["a", "b"]);
     await store.computeIfAbsent("a", () => Promise.reject(new Error("miss")));
     await fill(store, ["c"]);
-    expect(store.get("a")).toEqual([{ key: "a" }]);
+    expect(store.get("a")?.toArray()).toEqual([{ key: "a" }]);
     expect(store.get("b")).toBeUndefined();
   });
 
   it("a concurrent miss on the same key does not overwrite the stored value", async () => {
     const store = new Store(null, null);
     store.enabled = true;
-    let resolveSecond: (rows: Record<string, unknown>[]) => void = () => {};
-    const second = new Promise<Record<string, unknown>[]>((resolve) => {
+    let resolveSecond: (result: Result) => void = () => {};
+    const second = new Promise<Result>((resolve) => {
       resolveSecond = resolve;
     });
-    const first = store.computeIfAbsent("a", () => Promise.resolve([{ key: "first" }]));
+    const first = store.computeIfAbsent("a", () =>
+      Promise.resolve(new Result(["key"], [["first"]])),
+    );
     const later = store.computeIfAbsent("a", () => second);
     await first;
-    resolveSecond([{ key: "second" }]);
-    expect(await later).toEqual([{ key: "first" }]);
-    expect(store.get("a")).toEqual([{ key: "first" }]);
+    resolveSecond(new Result(["key"], [["second"]]));
+    expect((await later).toArray()).toEqual([{ key: "first" }]);
+    expect(store.get("a")?.toArray()).toEqual([{ key: "first" }]);
   });
 });
 

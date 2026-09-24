@@ -376,7 +376,7 @@ describe("PostgreSQLAdapter#execInsert query cache", () => {
 
   it("clears the query cache on a multi-column RETURNING insert", async () => {
     const qc = adapterWithPrimedCache(true);
-    await qc.computeIfAbsent("SELECT * FROM posts", async () => [{ id: 1 }]);
+    await qc.computeIfAbsent("SELECT * FROM posts", async () => new Result(["id"], [[1]]));
     expect(qc.empty).toBe(false);
 
     await adapter
@@ -390,7 +390,7 @@ describe("PostgreSQLAdapter#execInsert query cache", () => {
 
   it("clears the query cache on a non-returning insert", async () => {
     const qc = adapterWithPrimedCache(false);
-    await qc.computeIfAbsent("SELECT * FROM posts", async () => [{ id: 1 }]);
+    await qc.computeIfAbsent("SELECT * FROM posts", async () => new Result(["id"], [[1]]));
     expect(qc.empty).toBe(false);
 
     await adapter

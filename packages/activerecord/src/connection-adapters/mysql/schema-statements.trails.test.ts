@@ -27,7 +27,7 @@ import type { RowFormatHost } from "./schema-statements.js";
 import type { ValueType } from "@blazetrails/activemodel";
 import { Version } from "../abstract-adapter.js";
 import { AbstractMysqlAdapter } from "../abstract-mysql-adapter.js";
-import { Result } from "../../result.js";
+import { resultFromRowHashes } from "../../test-helpers/result-from-row-hashes.js";
 
 const mysqlAdapterHost = <T extends object>(overrides?: T): AbstractMysqlAdapter & T =>
   Object.assign(
@@ -39,7 +39,7 @@ const mysqlAdapterHost = <T extends object>(overrides?: T): AbstractMysqlAdapter
 
 function fkHost(rows: Record<string, unknown>[]) {
   return mysqlAdapterHost({
-    internalExecQuery: async () => Result.fromRowHashes(rows),
+    internalExecQuery: async () => resultFromRowHashes(rows),
     extractForeignKeyAction,
   });
 }
@@ -515,7 +515,7 @@ describe("MySQL::SchemaStatements", () => {
 
   const indexHost = (rows: Record<string, unknown>[], sortOrderSupported = true) =>
     Object.assign(Object.create(SchemaStatements.prototype) as SchemaStatements, {
-      internalExecQuery: async () => Result.fromRowHashes(rows),
+      internalExecQuery: async () => resultFromRowHashes(rows),
       quoteTableName: (n: string) => `\`${n}\``,
       supportsIndexSortOrder: async () => sortOrderSupported,
     });

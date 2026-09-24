@@ -12,9 +12,9 @@ import { TableDefinition as MysqlTableDefinition } from "../mysql/schema-definit
 import { AbstractAdapter } from "../abstract-adapter.js";
 import { SQLite3Adapter } from "../sqlite3-adapter.js";
 import { NotImplementedError } from "../../errors.js";
-import { Result } from "../../result.js";
 import { Table, Visitors } from "@blazetrails/arel";
 import { KeyError } from "@blazetrails/ruby-compat";
+import { resultFromRowHashes } from "../../test-helpers/result-from-row-hashes.js";
 
 function makeStatements(
   adapterOverrides: Record<string, unknown> = {},
@@ -36,7 +36,7 @@ function makeStatements(
     _name?: string | null,
     binds: unknown[] = [],
   ) =>
-    Result.fromRowHashes(
+    resultFromRowHashes(
       (await (adapter["execute"] as (s: string, b?: unknown[], n?: string) => Promise<unknown>)(
         sql,
         binds,

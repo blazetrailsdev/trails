@@ -5,6 +5,7 @@ import { Result } from "./result.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Reply } from "./test-helpers/models/reply.js";
 import { fixtures } from "./test-fixtures.js";
+import { resultFromRowHashes } from "./test-helpers/result-from-row-hashes.js";
 
 fixtures({ topics: [Topic, {}] });
 
@@ -204,7 +205,7 @@ describe("_queryBySql — kwargs pass-through (Story J gap 1)", () => {
 
   it("accepts preparable/async/allowRetry opts without error", async () => {
     const result = await Topic.withConnection((c) => {
-      vi.spyOn(c, "internalExecQuery").mockResolvedValueOnce(Result.fromRowHashes([]));
+      vi.spyOn(c, "internalExecQuery").mockResolvedValueOnce(resultFromRowHashes([]));
       return _queryBySql.call(Topic, c, "SELECT 1", [], {
         preparable: true,
         async: false,
@@ -216,7 +217,7 @@ describe("_queryBySql — kwargs pass-through (Story J gap 1)", () => {
 
   it("opts default to empty object — omitting opts still works", async () => {
     const result = await Topic.withConnection((c) => {
-      vi.spyOn(c, "internalExecQuery").mockResolvedValueOnce(Result.fromRowHashes([{ id: 1 }]));
+      vi.spyOn(c, "internalExecQuery").mockResolvedValueOnce(resultFromRowHashes([{ id: 1 }]));
       return _queryBySql.call(Topic, c, "SELECT 1") as Promise<Result>;
     });
     expect(result.toArray()).toEqual([{ id: 1 }]);
@@ -226,17 +227,17 @@ describe("_queryBySql — kwargs pass-through (Story J gap 1)", () => {
 describe("_loadFromSql — STI detection (Story J gap 2)", () => {
   it("dispatches to the correct STI subclass when inheritance column is present", () => {
     const rows = [{ id: 1, type: Reply.name, title: "Rex" }];
-    const records = _loadFromSql.call(Topic as typeof Base, Result.fromRowHashes(rows));
+    const records = _loadFromSql.call(Topic as typeof Base, resultFromRowHashes(rows));
     expect(records[0]).toBeInstanceOf(Reply);
   });
 
   it("instantiates as the base class when inheritance column is absent from result set", () => {
     const rows = [{ id: 1, title: "Rex" }];
-    const records = _loadFromSql.call(Topic as typeof Base, Result.fromRowHashes(rows));
+    const records = _loadFromSql.call(Topic as typeof Base, resultFromRowHashes(rows));
     expect(records[0]).toBeInstanceOf(Topic);
   });
 
   it("returns empty array for empty result set", () => {
-    expect(_loadFromSql.call(Topic as typeof Base, Result.fromRowHashes([]))).toEqual([]);
+    expect(_loadFromSql.call(Topic as typeof Base, resultFromRowHashes([]))).toEqual([]);
   });
 });
