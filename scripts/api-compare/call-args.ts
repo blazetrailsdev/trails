@@ -547,18 +547,7 @@ function alignBuiltinReceiver(
  *  the mixin `this` the port adds to a ported module function, and the Ruby
  *  receiver of a built-in TS cannot define on a receiver. Neither can apply to
  *  the same site — a name on the built-in table is never a ported mixin — so
- *  the order is immaterial.
- *
- *  Both assume the port moved the Ruby receiver INTO the argument list. A TS
- *  site with a receiver of its own (`CallSite.recv`) usually kept Rails'
- *  receiver where Rails wrote it: `instrumenter.instrument(name, payload)`
- *  (notifications.rb:210) is `this.instrumenter.instrument(name, payload,
- *  block)`, and prepending `instrumenter` shifts every pair by one position.
- *  So for such a site the prepend stands only when TS argument 1 names the
- *  Ruby receiver: `@raw_connection.warning_count`
- *  (abstract_mysql_adapter.rb:771) is `this.warningCount(rawConnection)`, and
- *  `content_path.basename` (encrypted_file.rb:90) is
- *  `path.basename(contentPath)` on the path adapter. */
+ *  the order is immaterial. */
 function alignReceiverArgs(
   ruby: CallSite,
   ts: CallSite,
@@ -705,25 +694,6 @@ function stripBlockTailPadding(
   return tsArgs.slice(0, rubyArgs.length);
 }
 
-/**
- * Drop the trailing argument through which the port forwards a block that Ruby
- * wrote as a literal block.
- *
- * `notifications.rb:210` writes
- * `instrumenter.instrument(name, payload) { yield payload if block_given? }`,
- * and the port writes `this.instrumenter.instrument(name, payload, block)`. TS
- * has no block syntax, so the callback is a trailing PARAMETER, and forwarding
- * the enclosing method's own block is the whole of that Ruby block. An inline
- * arrow already drops as a `block` flag (extract-ts-api.ts#describeArgs). A
- * forwarded identifier cannot, because the extractor cannot tell it from a
- * value.
- *
- * Narrow on purpose. The Ruby site must carry a literal block and no
- * block-pass. The TS site must carry no block of its own and exactly one extra
- * trailing argument. Some TS signature of the callee must declare a callable
- * parameter in that position (`admitsFunction`, RFC 0156, or a `block` kind).
- * An unresolved callee answers no.
- */
 function stripForwardedLiteralBlock(
   ruby: CallSite,
   ts: CallSite,
@@ -974,13 +944,6 @@ function blockAffinity(ruby: CallSite, ts: CallSite): number {
  * Rails' (the receiver), so a raw comparison hands the arity bonus to the site
  * that happens to have the same raw count — the wrong one — and the greedy
  * assignment takes it whenever the key matches tie.
- *
- * The same holds when the Ruby receiver is a CHAIN, which the strip drops
- * rather than compares. `key.to_s.pluralize(not_found_ids.size)`
- * (finder_methods.rb:432) must not take the arity credit from the port's
- * `pluralize(name)`: that site carries no receiver, so it is the port of a
- * different Ruby call. Only a receiverless TS site that carries the moved
- * receiver, one argument more than Rails, earns the credit.
  */
 function argSimilarity(ruby: CallSite, ts: CallSite): number {
   const forwarded = stripForwardedBlockArg(ruby, ts);

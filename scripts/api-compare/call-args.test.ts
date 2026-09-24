@@ -1092,8 +1092,6 @@ describe("normalizeArg (value-equivalent constant spellings)", () => {
 
 describe("compareCallArgs receiver the TS site kept", () => {
   it("does not prepend a Ruby self-call receiver the TS site also calls on", () => {
-    // notifications.rb:210 `instrumenter.instrument(name, payload) { … }` vs
-    // notifications.ts `this.instrumenter.instrument(name, payload, block)`.
     const ruby = {
       ...site("instrument", ["id:name", "id:payload"], ["block"]),
       recv: "id:instrumenter",
@@ -1114,7 +1112,6 @@ describe("compareCallArgs receiver the TS site kept", () => {
   });
 
   it("does not prepend a block-local receiver the TS site also calls on", () => {
-    // relation.rb:1213 `relation.to_sql` vs relation.ts `conn.toSql(manager)`.
     const result = compareCallArgs(
       { ...site("to_sql", []), recv: "id:relation" },
       { ...site("toSql", ["id:manager"]), recv: "id:conn" },
@@ -1124,8 +1121,6 @@ describe("compareCallArgs receiver the TS site kept", () => {
   });
 
   it("still prepends when TS argument 1 is the Ruby receiver", () => {
-    // abstract_mysql_adapter.rb:771 `@raw_connection.warning_count` vs
-    // abstract-mysql-adapter.ts `this.warningCount(rawConnection)`.
     expect(
       compareCallArgs(
         { ...site("warning_count", []), recv: "id:@raw_connection" },
@@ -1135,7 +1130,6 @@ describe("compareCallArgs receiver the TS site kept", () => {
   });
 
   it("keeps prepending for a receiverless TS port", () => {
-    // inheritance.ts `stiName(other)` where Rails wrote `klass.sti_name`.
     const result = compareCallArgs(
       { ...site("sti_name", []), recv: "id:klass" },
       site("stiName", ["id:other"]),
@@ -1147,9 +1141,6 @@ describe("compareCallArgs receiver the TS site kept", () => {
 
 describe("pairCallSites core_ext receiver as argument 1", () => {
   it("pairs a chained-receiver site with a port that carries the receiver", () => {
-    // finder_methods.rb:432: `name.pluralize` and `name.pluralize(size)` are
-    // weak and dropped, leaving `key.to_s.pluralize(not_found_ids.size)`
-    // against the port's three `pluralize` sites.
     const pairs = pairCallSites(
       [{ ...site("pluralize", ["call:size"]), recv: "call:to_s" }],
       [

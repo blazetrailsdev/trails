@@ -2480,9 +2480,6 @@ describe("Ruby extractor call-argument capture", { timeout: RUBY_SUBPROCESS_TIME
   }
 
   it("keeps a bare self-call receiver out of the argument list", () => {
-    // notifications.rb:210 — the receiver is `recv`, never argument 1, so the
-    // TS `this.instrumenter.instrument(name, payload, block)` pairs position
-    // by position.
     const c = rubyCallArgs({
       "foo.rb": `
         class Foo

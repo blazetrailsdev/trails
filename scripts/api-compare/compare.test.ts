@@ -2860,8 +2860,6 @@ describe("tagsForOwner", () => {
   });
 
   it("reads the top-level function's tags for a bodyless mixin-object owner", () => {
-    // queue.ts: `export function withABiasFor` carries `@missingRailsName lock`,
-    // and `BiasableQueue = { withABiasFor }` is the owner the pair resolves to.
     const receipted = new Map([["", new Map([["lock", "PERMANENT"]])]]);
     expect(tagsForOwner(receipted, "BiasableQueue", new Set(["BiasableQueue"]))!.get("lock")).toBe(
       "PERMANENT",
