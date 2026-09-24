@@ -123,7 +123,8 @@ export function travelTo(
 
   let now: typeof dateOrTime;
   if (dateOrTime instanceof Temporal.PlainDate) {
-    now = midnight(dateOrTime).toTime();
+    const dateMidnight = midnight(dateOrTime);
+    now = dateMidnight instanceof Time ? toTime(dateMidnight) : dateMidnight.toTime();
   } else if (typeof dateOrTime === "string") {
     const zone = timeZone();
     now = zone

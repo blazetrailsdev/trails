@@ -4494,6 +4494,11 @@ export class Date {
       this.#of = of;
       return;
     }
+    if (arguments.length > 4) {
+      throw new ArgumentError(
+        `wrong number of arguments (given ${arguments.length}, expected 0..4)`,
+      );
+    }
     month ??= 1;
     checkNumeric(day, "day");
     checkNumeric(month, "month");
@@ -4653,6 +4658,11 @@ export class Date {
     mday: number | Rational = 1,
     start = DEFAULT_SG,
   ): Temporal.PlainDate {
+    if (arguments.length > 4) {
+      throw new ArgumentError(
+        `wrong number of arguments (given ${arguments.length}, expected 0..4)`,
+      );
+    }
     const ret = new Date(year, month, mday, start);
     return addFracTo(ret, ret.#fr2).toDate();
   }

@@ -1,4 +1,4 @@
-import { Temporal, Date as RubyDate } from "@blazetrails/date";
+import { Temporal, Date as RubyDate, Time as RubyTime } from "@blazetrails/date";
 import { Duration } from "../../duration.js";
 import { IsolatedExecutionState } from "../../isolated-execution-state.js";
 import { TimeWithZone } from "../../time-with-zone.js";
@@ -54,17 +54,17 @@ export function current(): Temporal.PlainDate {
   return Temporal.Now.plainDateISO();
 }
 
-export function ago(date: Temporal.PlainDate, seconds: number): TimeWithZone {
+export function ago(date: Temporal.PlainDate, seconds: number): TimeWithZone | RubyTime {
   return inTimeZone(date).since(-seconds);
 }
 
-export function since(date: Temporal.PlainDate, seconds: number): TimeWithZone {
+export function since(date: Temporal.PlainDate, seconds: number): TimeWithZone | RubyTime {
   return inTimeZone(date).since(seconds);
 }
 
 export { since as in };
 
-export function beginningOfDay(date: Temporal.PlainDate): TimeWithZone {
+export function beginningOfDay(date: Temporal.PlainDate): TimeWithZone | RubyTime {
   return inTimeZone(date);
 }
 
@@ -74,7 +74,7 @@ export const atMidnight = beginningOfDay;
 
 export const atBeginningOfDay = beginningOfDay;
 
-export function middleOfDay(date: Temporal.PlainDate): TimeWithZone {
+export function middleOfDay(date: Temporal.PlainDate): TimeWithZone | RubyTime {
   return inTimeZone(date).middleOfDay();
 }
 
@@ -88,7 +88,7 @@ export const atNoon = middleOfDay;
 
 export const atMiddleOfDay = middleOfDay;
 
-export function endOfDay(date: Temporal.PlainDate): TimeWithZone {
+export function endOfDay(date: Temporal.PlainDate): TimeWithZone | RubyTime {
   return inTimeZone(date).endOfDay();
 }
 
@@ -97,7 +97,7 @@ export const atEndOfDay = endOfDay;
 export function plusWithDuration(
   this: Temporal.PlainDate,
   other: Duration | number,
-): Temporal.PlainDate | TimeWithZone {
+): Temporal.PlainDate | TimeWithZone | RubyTime {
   if (other instanceof Duration) {
     return other.since(this);
   } else {
@@ -112,7 +112,7 @@ export function plusWithoutDuration(date: Temporal.PlainDate, other: number): Te
 export function minusWithDuration(
   date: Temporal.PlainDate,
   other: Duration | number | Temporal.PlainDate,
-): Temporal.PlainDate | TimeWithZone | number {
+): Temporal.PlainDate | TimeWithZone | RubyTime | number {
   if (other instanceof Duration) {
     return plusWithDuration.call(date, other.negate());
   } else {

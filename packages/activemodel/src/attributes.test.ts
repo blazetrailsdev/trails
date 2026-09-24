@@ -11,7 +11,7 @@ import {
   include,
   assertNil,
 } from "@blazetrails/activesupport";
-import { Date as RubyDate, type Temporal } from "@blazetrails/date";
+import { Date as RubyDate, Temporal } from "@blazetrails/date";
 import { ArgumentError, FrozenError } from "@blazetrails/ruby-compat";
 import { Model } from "./index.js";
 import { UnknownAttributeError } from "./errors.js";
@@ -115,7 +115,7 @@ describe("AttributesTest", () => {
     expect(data.string_field).toEqual("Rails FTW");
     expect(data.decimal_field).toEqual(new BigDecimal("12.3"));
     expect(data.string_with_default).toEqual("default string");
-    expect(data.date_field).toEqual(new RubyDate(2016, 1, 1));
+    expect(data.date_field).toEqual(new Temporal.PlainDate(2016, 1, 1));
     expect(data.boolean_field).toEqual(false);
 
     data.integer_field = 10;
@@ -140,7 +140,7 @@ describe("AttributesTest", () => {
       string_field: "1.1",
       decimal_field: new BigDecimal("1.1"),
       string_with_default: "default string",
-      date_field: new RubyDate(2016, 1, 1),
+      date_field: new Temporal.PlainDate(2016, 1, 1),
       boolean_field: true,
     };
 

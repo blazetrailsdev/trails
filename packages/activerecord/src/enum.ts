@@ -275,13 +275,15 @@ export function _enum(
   for (const [n, value] of Object.entries(mapping)) {
     const valueMethodName = toCamel(methodName(n));
     const { predicateName, bangName, notScopeName } = enumMethodNamesFor(valueMethodName);
-    const valueMethodAlias = toCamel(methodName(n).replace(/[^\w\x80-\uffff]+/g, "_"));
+    const methodFriendlyLabel = n.replace(/[^\w\x80-\uffff]+/g, "_");
+    const valueMethodAlias = toCamel(methodName(methodFriendlyLabel));
 
-    valueMethodNames.push(valueMethodName);
+    valueMethodNames.push(methodName(n));
     const aliasIsNew =
-      valueMethodAlias !== valueMethodName && !valueMethodNames.includes(valueMethodAlias);
+      methodName(methodFriendlyLabel) !== methodName(n) &&
+      !valueMethodNames.includes(methodName(methodFriendlyLabel));
     if (aliasIsNew) {
-      valueMethodNames.push(valueMethodAlias);
+      valueMethodNames.push(methodName(methodFriendlyLabel));
     }
 
     if (instanceMethods) {
@@ -369,7 +371,7 @@ export function _enum(
   }
 
   if (scopes) {
-    detectNegativeEnumConditionsBang(valueMethodNames);
+    detectNegativeEnumConditionsBang.call(this, valueMethodNames);
   }
 
   if (validate) {
@@ -525,45 +527,21 @@ export function assertValidEnumOptions(options: unknown): void {
   }
 }
 
-let _enumWarn: (msg: string) => void = (msg) => console.warn(msg);
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE converge-negative-enum-condition-warning-to-rails
- */
-export function setEnumWarn(fn: (msg: string) => void): void {
-  _enumWarn = fn;
-}
-
 /** @internal */
-export function detectNegativeEnumConditionsBang(methodNames: string[]): void {
-  const methodNameSet = new Set(methodNames);
-  for (const notMethod of methodNames) {
-    const normalized = normalizeNegativeEnumPositiveForm(notMethod);
-    if (!normalized) continue;
-    const { prefix, positiveForm } = normalized;
-    if (methodNameSet.has(positiveForm)) {
-      _enumWarn(
-        `Enum uses prefix '${prefix}' which conflicts with auto-generated negative scope '${notMethod}' ` +
-          `while positive form '${positiveForm}' also exists.`,
+export function detectNegativeEnumConditionsBang(
+  this: typeof import("./base.js").Base,
+  methodNames: string[],
+): void {
+  if (this.logger == null) return;
+
+  for (const potentialNot of methodNames.filter((m) => m.startsWith("not_"))) {
+    const invertedForm = potentialNot.replace("not_", "");
+    if (methodNames.includes(invertedForm)) {
+      this.logger.warn(
+        `Enum element '${potentialNot}' in ${this.name} uses the prefix 'not_'.` +
+          " This has caused a conflict with auto generated negative scopes." +
+          " Avoid using enum elements starting with 'not' where the positive form is also an element.",
       );
     }
   }
-}
-
-function normalizeNegativeEnumPositiveForm(
-  methodName: string,
-): { prefix: "not" | "not_"; positiveForm: string } | null {
-  if (methodName.startsWith("not_")) {
-    const rest = methodName.substring(4);
-    if (rest.length === 0) return null;
-    return { prefix: "not_", positiveForm: rest.charAt(0).toLowerCase() + rest.slice(1) };
-  }
-  if (methodName.startsWith("not") && methodName.length > 3) {
-    const next = methodName.charAt(3);
-    if (next !== next.toUpperCase() || next === next.toLowerCase()) return null;
-    const rest = methodName.substring(3);
-    return { prefix: "not", positiveForm: rest.charAt(0).toLowerCase() + rest.slice(1) };
-  }
-  return null;
 }

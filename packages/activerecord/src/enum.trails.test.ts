@@ -6,7 +6,6 @@ import {
   detectNegativeEnumConditionsBang,
   enumTypeOf,
   EnumType,
-  setEnumWarn,
 } from "./enum.js";
 import { ArgumentError, DecimalType } from "@blazetrails/activemodel";
 import { Base } from "./index.js";
@@ -248,39 +247,42 @@ describe("Enum private validators", () => {
   });
 
   describe("detectNegativeEnumConditionsBang", () => {
-    it("warns when notDraft conflicts with draft (camelCase prefix)", () => {
-      const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      detectNegativeEnumConditionsBang(["draft", "notDraft"]);
-      expect(spy).toHaveBeenCalledWith(
-        expect.stringMatching(/conflicts with auto-generated negative scope 'notDraft'/),
-      );
+    const warnings: string[] = [];
+    class Model extends Base {}
+    beforeAll(() => {
+      Model.logger = { warn: (msg: string) => void warnings.push(msg) } as typeof Base.logger;
     });
-    it("warns when not_draft conflicts with draft (snake_case prefix)", () => {
-      const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      detectNegativeEnumConditionsBang(["draft", "not_draft"]);
-      expect(spy).toHaveBeenCalledWith(expect.stringMatching(/'not_draft'/));
+    afterEach(() => {
+      warnings.length = 0;
     });
-    it("routes warnings through setEnumWarn instead of console.warn", () => {
-      const calls: string[] = [];
-      setEnumWarn((msg) => calls.push(msg));
-      try {
-        const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-        detectNegativeEnumConditionsBang(["draft", "notDraft"]);
-        expect(calls.length).toBe(1);
-        expect(consoleSpy).not.toHaveBeenCalled();
-      } finally {
-        setEnumWarn((msg) => console.warn(msg));
-      }
+
+    it("warns when not_draft conflicts with draft", () => {
+      detectNegativeEnumConditionsBang.call(Model, ["draft", "not_draft"]);
+      expect(warnings).toEqual([expect.stringMatching(/^Enum element 'not_draft' in Model /)]);
+    });
+    it("does not detect the camelCase notDraft spelling", () => {
+      detectNegativeEnumConditionsBang.call(Model, ["draft", "notDraft"]);
+      expect(warnings).toEqual([]);
     });
     it("does not warn for unrelated identifiers starting with 'not' (notebook, notify)", () => {
-      const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      detectNegativeEnumConditionsBang(["ebook", "notebook", "ify", "notify"]);
-      expect(spy).not.toHaveBeenCalled();
+      detectNegativeEnumConditionsBang.call(Model, ["ebook", "notebook", "ify", "notify"]);
+      expect(warnings).toEqual([]);
     });
     it("does not warn when there is no positive-form clash", () => {
+      detectNegativeEnumConditionsBang.call(Model, ["not_draft", "published"]);
+      expect(warnings).toEqual([]);
+    });
+    it("does not warn when the model has no logger", () => {
+      class Loggerless extends Base {
+        static {
+          this.logger = null;
+        }
+      }
       const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      detectNegativeEnumConditionsBang(["notDraft", "published"]);
+      detectNegativeEnumConditionsBang.call(Loggerless, ["draft", "not_draft"]);
       expect(spy).not.toHaveBeenCalled();
+      expect(warnings).toEqual([]);
+      spy.mockRestore();
     });
   });
 });

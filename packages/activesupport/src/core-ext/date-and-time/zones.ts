@@ -16,7 +16,7 @@ export type DateOrTime =
   | TimeWithZone;
 
 /** @missingRailsArgs acts_like? — PERMANENT */
-export function inTimeZone(dateOrTime: Temporal.PlainDate, zone?: unknown): TimeWithZone;
+export function inTimeZone(dateOrTime: Temporal.PlainDate, zone?: unknown): TimeWithZone | RubyTime;
 export function inTimeZone(dateOrTime: Date, zone?: unknown): TimeWithZone | Date;
 export function inTimeZone(
   dateOrTime: Temporal.Instant,

@@ -393,42 +393,39 @@ describe("HasManyAssociationsTest", () => {
     expect(bulb.name).toBe("defaulty");
   });
 
-  it.fails(
-    "build and create from association should respect passed attributes over default scope",
-    async () => {
-      const car = (await Car.create({ name: "honda" })) as any;
+  it("build and create from association should respect passed attributes over default scope", async () => {
+    const car = (await Car.create({ name: "honda" })) as any;
 
-      let bulb = car.bulbs.where({ name: "exotic" }).build();
-      expect(bulb.name).toBe("exotic");
-      expect(bulb.countAfterCreate).toBeUndefined();
+    let bulb = car.bulbs.where({ name: "exotic" }).build();
+    expect(bulb.name).toBe("exotic");
+    expect(bulb.countAfterCreate).toBeUndefined();
 
-      bulb = await car.bulbs.where({ name: "exotic" }).create();
-      expect(bulb.name).toBe("exotic");
-      expect(bulb.countAfterCreate).toBe(1);
+    bulb = await car.bulbs.where({ name: "exotic" }).create();
+    expect(bulb.name).toBe("exotic");
+    expect(bulb.countAfterCreate).toBe(1);
 
-      bulb = await car.bulbs.where({ name: "exotic" }).createBang();
-      expect(bulb.name).toBe("exotic");
-      expect(bulb.countAfterCreate).toBe(2);
+    bulb = await car.bulbs.where({ name: "exotic" }).createBang();
+    expect(bulb.name).toBe("exotic");
+    expect(bulb.countAfterCreate).toBe(2);
 
-      bulb = car.bulbs.build({ name: "exotic" });
-      expect(bulb.name).toBe("exotic");
+    bulb = car.bulbs.build({ name: "exotic" });
+    expect(bulb.name).toBe("exotic");
 
-      bulb = await car.bulbs.create({ name: "exotic" });
-      expect(bulb.name).toBe("exotic");
+    bulb = await car.bulbs.create({ name: "exotic" });
+    expect(bulb.name).toBe("exotic");
 
-      bulb = await car.bulbs.createBang({ name: "exotic" });
-      expect(bulb.name).toBe("exotic");
+    bulb = await car.bulbs.createBang({ name: "exotic" });
+    expect(bulb.name).toBe("exotic");
 
-      bulb = car.awesomeBulbs.build({ frickinawesome: false });
-      expect(bulb.frickinawesome).toBe(false);
+    bulb = car.awesomeBulbs.build({ frickinawesome: false });
+    expect(bulb.frickinawesome).toBe(false);
 
-      bulb = await car.awesomeBulbs.create({ frickinawesome: false });
-      expect(bulb.frickinawesome).toBe(false);
+    bulb = await car.awesomeBulbs.create({ frickinawesome: false });
+    expect(bulb.frickinawesome).toBe(false);
 
-      bulb = await car.awesomeBulbs.createBang({ frickinawesome: false });
-      expect(bulb.frickinawesome).toBe(false);
-    },
-  );
+    bulb = await car.awesomeBulbs.createBang({ frickinawesome: false });
+    expect(bulb.frickinawesome).toBe(false);
+  });
 
   it("build and create from association should respect unscope over default scope", async () => {
     const car = (await Car.create({ name: "honda" })) as any;

@@ -2,10 +2,7 @@ import { kernelThrow } from "@blazetrails/ruby-compat";
 import type { Relation } from "../../relation.js";
 import type { Car } from "./car.js";
 import { Base } from "../../base.js";
-import {
-  association as associationInstance,
-  collectionProxyFor as association,
-} from "../../associations.js";
+import { association as associationInstance } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Bulb extends Base {
@@ -35,7 +32,7 @@ export class Bulb extends Base {
     this.afterCreate(async (record: Bulb) => {
       record.countAfterCreate = await Bulb.unscoped(async () => {
         const car = (await associationInstance.call(record, "car").loadTarget()) as Car | null;
-        return car ? ((await association(car, "bulbs").count()) as number) : undefined;
+        return car ? ((await car.bulbs.count()) as number) : undefined;
       });
     });
   }
