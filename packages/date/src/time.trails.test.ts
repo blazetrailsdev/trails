@@ -668,4 +668,20 @@ describe("Time", () => {
       );
     });
   });
+
+  describe("#utc", () => {
+    it("converts the receiver to UTC in place and answers it", () => {
+      const t = Time.new(2000, 1, 1, 12, 0, 0, "+09:00");
+      const u = t.utc();
+      expect(u).toBe(t);
+      expect(t.isUtc()).toBe(true);
+      expect(t.hour).toBe(3);
+      expect(t.utcOffset).toBe(0);
+      expect(t.utc()).toBe(t);
+    });
+  });
+
+  it("new takes a Rational utc_offset", () => {
+    expect(Time.new(2000, 1, 1, 12, 0, 0, new Rational(19800, 1)).utcOffset).toBe(19800);
+  });
 });

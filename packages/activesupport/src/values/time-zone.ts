@@ -13,7 +13,7 @@ import { TimeWithZone } from "../time-with-zone.js";
 import { Duration } from "../duration.js";
 import { ArgumentError } from "../hash-utils.js";
 import { Temporal, Date as RubyDate, Time, tzdataIsdst } from "@blazetrails/date";
-import { fetch, Rational, sprintf } from "@blazetrails/ruby-compat";
+import { fetch, hasKey, KeyError, Rational, sprintf } from "@blazetrails/ruby-compat";
 import type { DateParts } from "@blazetrails/date";
 import { instantFrom } from "../temporal.js";
 import { currentTime } from "../time-travel.js";
@@ -573,40 +573,6 @@ export class Timezone {
   }
 }
 
-/**
- * Ruby `Time.new`'s fractional-seconds argument (`parts.fetch(:sec, 0) +
- * parts.fetch(:sec_fraction, 0)`), which Temporal cannot take as a Rational —
- * it wants the sub-second remainder split across its millisecond / microsecond
- * / nanosecond components.
- *
- * @noRailsEquivalent Ruby's Time carries a Rational sub-second seat; Temporal
- * carries three integer components. This is the conversion between them.
- */
-function secFractionToNanosecond(secFraction: DateParts["secFraction"]): number {
-  if (secFraction == null) return 0;
-  return secFraction instanceof Rational
-    ? secFraction.mul(1_000_000_000).toI()
-    : Math.trunc(Number(secFraction) * 1_000_000_000);
-}
-
-/**
- * Ruby `Time#utc` on a Time built with an explicit `offset` — the instant that
- * local wall clock names at that offset.
- *
- * @noRailsEquivalent Ruby's Time holds its own UTC offset; a
- * `Temporal.PlainDateTime` does not, so the offset has to be applied here.
- */
-function utcInstantOf(
-  time: Temporal.PlainDateTime,
-  offset: NonNullable<DateParts["offset"]>,
-): Temporal.Instant {
-  const seconds = offset instanceof Rational ? offset.toF() : Number(offset);
-  return time
-    .toZonedDateTime("UTC")
-    .toInstant()
-    .subtract({ nanoseconds: Math.round(seconds * 1e9) });
-}
-
 export class TimeZone {
   readonly name: string;
   readonly tzinfo: Timezone;
@@ -839,80 +805,61 @@ export class TimeZone {
   iso8601(str: string | null | undefined): TimeWithZone {
     if (str == null) throw new ArgumentError("invalid date");
 
-    const parts = RubyDate._iso8601(str);
-
-    if (parts.year == null) throw new ArgumentError("invalid date");
-    const year = Number(parts.year);
-
-    let mon: number;
-    let mday: number;
-    if (parts.yday != null) {
-      let ordinalDate: Temporal.PlainDate;
-      try {
-        ordinalDate = RubyDate.ordinal(
-          year,
-          fetch<number>(parts as Record<string, unknown>, "yday"),
-        );
-      } catch (error) {
-        if (error instanceof RubyDate.Error) throw new ArgumentError("invalid date");
-        throw error;
-      }
-      mon = ordinalDate.month;
-      mday = ordinalDate.day;
-    } else {
-      if (parts.mon == null || parts.mday == null) throw new ArgumentError("invalid date");
-      mon = parts.mon;
-      mday = parts.mday;
-    }
-
-    const nanosecond = secFractionToNanosecond(parts.secFraction);
-    let time: Temporal.PlainDateTime;
     try {
-      time = Temporal.PlainDateTime.from({
-        year,
-        month: mon,
-        day: mday,
-        hour: parts.hour ?? 0,
-        minute: parts.min ?? 0,
-        second: parts.sec ?? 0,
-        millisecond: Math.trunc(nanosecond / 1_000_000),
-        microsecond: Math.trunc(nanosecond / 1000) % 1000,
-        nanosecond: nanosecond % 1000,
-      });
-    } catch {
-      throw new ArgumentError("argument out of range");
-    }
+      const parts = RubyDate._iso8601(str) as Record<string, unknown>;
 
-    if (parts.offset != null) {
-      return new TimeWithZone(utcInstantOf(time, parts.offset), this);
+      const year = Number(fetch<number | bigint>(parts, "year"));
+
+      let month: number;
+      let day: number;
+      if (hasKey(parts, "yday")) {
+        const ordinalDate = RubyDate.ordinal(year, fetch<number>(parts, "yday"));
+        month = ordinalDate.month;
+        day = ordinalDate.day;
+      } else {
+        month = fetch<number>(parts, "mon");
+        day = fetch<number>(parts, "mday");
+      }
+
+      const time = Time.new(
+        year,
+        month,
+        day,
+        fetch(parts, "hour", 0),
+        fetch(parts, "min", 0),
+        new Rational(fetch<number>(parts, "sec", 0), 1).add(fetch(parts, "secFraction", 0)),
+        fetch(parts, "offset", 0),
+      );
+
+      if (parts.offset != null) {
+        return new TimeWithZone(time.utc(), this);
+      } else {
+        return new TimeWithZone(null, this, time);
+      }
+    } catch (error) {
+      if (error instanceof RubyDate.Error || error instanceof KeyError) {
+        throw new ArgumentError("invalid date");
+      }
+      throw error;
     }
-    return new TimeWithZone(null, this, time);
   }
 
   rfc3339(str: string): TimeWithZone {
-    const parts = RubyDate._rfc3339(str);
+    const parts = RubyDate._rfc3339(str) as Record<string, unknown>;
 
     if (Object.keys(parts).length === 0) throw new ArgumentError("invalid date");
 
-    const nanosecond = secFractionToNanosecond(parts.secFraction);
-    let time: Temporal.PlainDateTime;
-    try {
-      time = Temporal.PlainDateTime.from({
-        year: Number(parts.year),
-        month: parts.mon!,
-        day: parts.mday!,
-        hour: parts.hour!,
-        minute: parts.min!,
-        second: parts.sec!,
-        millisecond: Math.trunc(nanosecond / 1_000_000),
-        microsecond: Math.trunc(nanosecond / 1000) % 1000,
-        nanosecond: nanosecond % 1000,
-      });
-    } catch {
-      throw new ArgumentError("argument out of range");
-    }
+    const time = Time.new(
+      Number(fetch<number | bigint>(parts, "year")),
+      fetch(parts, "mon"),
+      fetch(parts, "mday"),
+      fetch(parts, "hour"),
+      fetch(parts, "min"),
+      new Rational(fetch<number>(parts, "sec"), 1).add(fetch(parts, "secFraction", 0)),
+      fetch(parts, "offset"),
+    );
 
-    return new TimeWithZone(utcInstantOf(time, parts.offset!), this);
+    return new TimeWithZone(time.utc(), this);
   }
 
   isMatch(re: string | RegExp): boolean {
@@ -987,32 +934,27 @@ export class TimeZone {
     if (parts == null) throw new ArgumentError("invalid date");
     if (Object.keys(parts).length === 0) return undefined;
 
+    let time: Time;
     if (parts.seconds != null) {
-      return this.at(parts.seconds);
+      time = Time.at(parts.seconds);
+    } else {
+      const hash = parts as Record<string, unknown>;
+      time = Time.new(
+        Number(fetch<number | bigint>(hash, "year", now.year)),
+        fetch(hash, "mon", now.month),
+        fetch(hash, "mday", parts.year != null || parts.mon != null ? 1 : now.day),
+        fetch(hash, "hour", 0),
+        fetch(hash, "min", 0),
+        new Rational(fetch<number>(hash, "sec", 0), 1).add(fetch(hash, "secFraction", 0)),
+        fetch(hash, "offset", 0),
+      );
     }
 
-    const nanosecond = secFractionToNanosecond(parts.secFraction);
-    let time: Temporal.PlainDateTime;
-    try {
-      time = Temporal.PlainDateTime.from({
-        year: Number("year" in parts ? parts.year : now.year),
-        month: "mon" in parts ? parts.mon! : now.month,
-        day: "mday" in parts ? parts.mday! : parts.year != null || parts.mon != null ? 1 : now.day,
-        hour: "hour" in parts ? parts.hour! : 0,
-        minute: "min" in parts ? parts.min! : 0,
-        second: "sec" in parts ? parts.sec! : 0,
-        millisecond: Math.trunc(nanosecond / 1_000_000),
-        microsecond: Math.trunc(nanosecond / 1000) % 1000,
-        nanosecond: nanosecond % 1000,
-      });
-    } catch {
-      throw new ArgumentError("argument out of range");
+    if (parts.offset != null || parts.seconds != null) {
+      return new TimeWithZone(time.utc(), this);
+    } else {
+      return new TimeWithZone(null, this, time);
     }
-
-    if (parts.offset != null) {
-      return new TimeWithZone(utcInstantOf(time, parts.offset), this);
-    }
-    return new TimeWithZone(null, this, time);
   }
 
   private timeNow(): Date {

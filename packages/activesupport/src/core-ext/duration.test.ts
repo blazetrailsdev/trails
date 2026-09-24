@@ -220,34 +220,38 @@ describe("DurationTest", () => {
   });
 
   it("date added with zero days", () => {
-    expect(plusWithDuration(civil(2017, 1, 1), days(0))).toEqual(civil(2017, 1, 1));
-    expect(plusWithDuration(civil(2017, 1, 1), days(0))).toBeInstanceOf(Temporal.PlainDate);
+    expect(plusWithDuration.call(civil(2017, 1, 1), days(0))).toEqual(civil(2017, 1, 1));
+    expect(plusWithDuration.call(civil(2017, 1, 1), days(0))).toBeInstanceOf(Temporal.PlainDate);
   });
 
   it("date added with multiplied duration", () => {
-    expect(plusWithDuration(civil(2017, 1, 1), days(1).times(2))).toEqual(civil(2017, 1, 3));
-    expect(plusWithDuration(civil(2017, 1, 1), days(1).times(2))).toBeInstanceOf(
+    expect(plusWithDuration.call(civil(2017, 1, 1), days(1).times(2))).toEqual(civil(2017, 1, 3));
+    expect(plusWithDuration.call(civil(2017, 1, 1), days(1).times(2))).toBeInstanceOf(
       Temporal.PlainDate,
     );
   });
 
   it("date added with multiplied duration larger than one month", () => {
-    expect(plusWithDuration(civil(2017, 1, 1), days(1).times(45))).toEqual(civil(2017, 2, 15));
-    expect(plusWithDuration(civil(2017, 1, 1), days(1).times(45))).toBeInstanceOf(
+    expect(plusWithDuration.call(civil(2017, 1, 1), days(1).times(45))).toEqual(civil(2017, 2, 15));
+    expect(plusWithDuration.call(civil(2017, 1, 1), days(1).times(45))).toBeInstanceOf(
       Temporal.PlainDate,
     );
   });
 
   it("date added with divided duration", () => {
-    expect(plusWithDuration(civil(2017, 1, 1), days(4).dividedBy(2))).toEqual(civil(2017, 1, 3));
-    expect(plusWithDuration(civil(2017, 1, 1), days(4).dividedBy(2))).toBeInstanceOf(
+    expect(plusWithDuration.call(civil(2017, 1, 1), days(4).dividedBy(2))).toEqual(
+      civil(2017, 1, 3),
+    );
+    expect(plusWithDuration.call(civil(2017, 1, 1), days(4).dividedBy(2))).toBeInstanceOf(
       Temporal.PlainDate,
     );
   });
 
   it("date added with divided duration larger than one month", () => {
-    expect(plusWithDuration(civil(2017, 1, 1), days(90).dividedBy(2))).toEqual(civil(2017, 2, 15));
-    expect(plusWithDuration(civil(2017, 1, 1), days(90).dividedBy(2))).toBeInstanceOf(
+    expect(plusWithDuration.call(civil(2017, 1, 1), days(90).dividedBy(2))).toEqual(
+      civil(2017, 2, 15),
+    );
+    expect(plusWithDuration.call(civil(2017, 1, 1), days(90).dividedBy(2))).toBeInstanceOf(
       Temporal.PlainDate,
     );
   });
@@ -483,7 +487,7 @@ describe("DurationTest", () => {
     expect(
       timePlusWithDuration.call(RubyTime.utc(2017, 1, 1), new Scalar(2).times(Duration.day(1))),
     ).toEqual(RubyTime.utc(2017, 1, 3));
-    expect(plusWithDuration(civil(2017, 1, 1), new Scalar(2).times(Duration.day(1)))).toEqual(
+    expect(plusWithDuration.call(civil(2017, 1, 1), new Scalar(2).times(Duration.day(1)))).toEqual(
       civil(2017, 1, 3),
     );
   });
@@ -654,18 +658,26 @@ describe("DurationTest", () => {
   it("adding one month maintains day of month", () => {
     for (let month = 1; month <= 11; month++) {
       for (const day of [1, 14, 28]) {
-        expect(plusWithDuration(civil(2016, month, day), Duration.month(1))).toEqual(
+        expect(plusWithDuration.call(civil(2016, month, day), Duration.month(1))).toEqual(
           civil(2016, month + 1, day),
         );
       }
     }
 
-    expect(plusWithDuration(civil(2016, 12, 1), Duration.month(1))).toEqual(civil(2017, 1, 1));
-    expect(plusWithDuration(civil(2016, 12, 14), Duration.month(1))).toEqual(civil(2017, 1, 14));
-    expect(plusWithDuration(civil(2016, 12, 28), Duration.month(1))).toEqual(civil(2017, 1, 28));
+    expect(plusWithDuration.call(civil(2016, 12, 1), Duration.month(1))).toEqual(civil(2017, 1, 1));
+    expect(plusWithDuration.call(civil(2016, 12, 14), Duration.month(1))).toEqual(
+      civil(2017, 1, 14),
+    );
+    expect(plusWithDuration.call(civil(2016, 12, 28), Duration.month(1))).toEqual(
+      civil(2017, 1, 28),
+    );
 
-    expect(plusWithDuration(civil(2015, 1, 31), Duration.month(1))).toEqual(civil(2015, 2, 28));
-    expect(plusWithDuration(civil(2016, 1, 31), Duration.month(1))).toEqual(civil(2016, 2, 29));
+    expect(plusWithDuration.call(civil(2015, 1, 31), Duration.month(1))).toEqual(
+      civil(2015, 2, 28),
+    );
+    expect(plusWithDuration.call(civil(2016, 1, 31), Duration.month(1))).toEqual(
+      civil(2016, 2, 29),
+    );
   });
 
   it("iso8601 parsing wrong patterns with raise", () => {

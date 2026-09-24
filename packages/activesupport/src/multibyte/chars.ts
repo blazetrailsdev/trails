@@ -3,6 +3,7 @@ import {
   equals as cmpEquals,
   KERNEL_METHODS,
   NoMethodError,
+  pack,
   PROTOCOL_PROBES,
   rbStrMatch,
   rbStrRespondTo,
@@ -10,6 +11,7 @@ import {
   sliceBang,
   STRING_METHOD_TABLE,
   stringSplit,
+  toA,
 } from "@blazetrails/ruby-compat";
 import { String as JsonString } from "../core-ext/object/json.js";
 import type { EncodeOptions } from "../json/encoding.js";
@@ -125,12 +127,12 @@ export class Chars {
 
   decompose(): Chars {
     return this.chars(
-      String.fromCodePoint(...Unicode.decompose(":canonical", codepoints(this.wrappedString))),
+      pack(Unicode.decompose(":canonical", toA(codepoints(this.wrappedString))), "U*"),
     );
   }
 
   compose(): Chars {
-    return this.chars(String.fromCodePoint(...Unicode.compose(codepoints(this.wrappedString))));
+    return this.chars(pack(Unicode.compose(toA(codepoints(this.wrappedString))), "U*"));
   }
 
   graphemeLength(): number {

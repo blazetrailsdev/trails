@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ArgumentError } from "./argument-error.js";
 import { TypeError } from "./type-error.js";
-import { aryDelete, arySlice, compact, pack, uniq } from "./array.js";
+import { aryDelete, arySlice, compact, pack, toA, uniq } from "./array.js";
 
 describe("Array#pack", () => {
   const long = "a".repeat(100);
@@ -60,6 +60,33 @@ describe("Array#pack", () => {
   it("skips whitespace and # comments in the format", () => {
     expect(pack(["ab"], " m0")).toBe("YWI=");
     expect(pack(["ab"], "#skip\nm0")).toBe("YWI=");
+  });
+
+  it("U packs one character per codepoint, and U* takes the rest of the array", () => {
+    expect(pack([101, 769], "U*")).toBe("e\u0301");
+    expect(pack([97, 98], "U")).toBe("a");
+    expect(pack([97, 98], "U2")).toBe("ab");
+    expect(pack([0x1f600], "U")).toBe("\u{1f600}");
+  });
+
+  it("U raises on a negative codepoint", () => {
+    expect(() => pack([-1], "U")).toThrow(new RangeError("pack(U): value out of range"));
+  });
+});
+
+describe("Array#to_a", () => {
+  it("answers the receiver itself for an Array", () => {
+    const ary = [1, 2];
+    expect(toA(ary)).toBe(ary);
+  });
+
+  it("answers a plain Array copy for a subclass instance", () => {
+    class Sub<T> extends Array<T> {}
+    const ary = Sub.from([1, 2]);
+    const result = toA(ary);
+    expect(result).not.toBe(ary);
+    expect(result.constructor).toBe(Array);
+    expect(result).toEqual([1, 2]);
   });
 });
 

@@ -130,34 +130,42 @@ describe("NumericExtDateTest", () => {
   const today = DateExt.current();
 
   it("date plus duration", () => {
-    expect(DateExt.plusWithDuration(today, Duration.day(1))).toEqual(
+    expect(DateExt.plusWithDuration.call(today, Duration.day(1))).toEqual(
       DateExt.plusWithoutDuration(today, 1),
     );
-    expect(DateExt.plusWithDuration(today, Duration.month(1))).toEqual(
+    expect(DateExt.plusWithDuration.call(today, Duration.month(1))).toEqual(
       DateExt.advance(today, { months: 1 }),
     );
-    expect(DateExt.plusWithDuration(today, Duration.second(1))).toEqual(toTime(today).since(1));
-    expect(DateExt.plusWithDuration(today, Duration.minute(1))).toEqual(toTime(today).since(60));
-    expect(DateExt.plusWithDuration(today, Duration.hour(1))).toEqual(toTime(today).since(60 * 60));
+    expect(DateExt.plusWithDuration.call(today, Duration.second(1))).toEqual(
+      toTime(today).since(1),
+    );
+    expect(DateExt.plusWithDuration.call(today, Duration.minute(1))).toEqual(
+      toTime(today).since(60),
+    );
+    expect(DateExt.plusWithDuration.call(today, Duration.hour(1))).toEqual(
+      toTime(today).since(60 * 60),
+    );
   });
 
   it("chaining duration operations", () => {
     expect(
       DateExt.minusWithDuration(
-        DateExt.plusWithDuration(today, Duration.days(2)) as Temporal.PlainDate,
+        DateExt.plusWithDuration.call(today, Duration.days(2)) as Temporal.PlainDate,
         Duration.months(3),
       ),
     ).toEqual(DateExt.advance(DateExt.advance(today, { days: 2 }), { months: -3 }));
     expect(
-      DateExt.plusWithDuration(
-        DateExt.plusWithDuration(today, Duration.days(1)) as Temporal.PlainDate,
+      DateExt.plusWithDuration.call(
+        DateExt.plusWithDuration.call(today, Duration.days(1)) as Temporal.PlainDate,
         Duration.months(2),
       ),
     ).toEqual(DateExt.advance(DateExt.advance(today, { days: 1 }), { months: 2 }));
   });
 
   it("add one year to leap day", () => {
-    expect(DateExt.plusWithDuration(pd(2004, 2, 29), Duration.years(1))).toEqual(pd(2005, 2, 28));
+    expect(DateExt.plusWithDuration.call(pd(2004, 2, 29), Duration.years(1))).toEqual(
+      pd(2005, 2, 28),
+    );
   });
 });
 

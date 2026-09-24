@@ -41,7 +41,8 @@ function isZoneIdentifier(zone: string): boolean {
   return !/^([+-]|[A-IK-Z]$)/.test(zone);
 }
 
-function utcOffsetArgument(zone: string | number): "UTC" | number {
+function utcOffsetArgument(zone: string | number | Rational): "UTC" | number {
+  if (zone instanceof Rational) zone = zone.toF();
   if (typeof zone === "number") {
     if (!Number.isFinite(zone) || Math.abs(zone) >= 86400) {
       throw new ArgumentError("utc_offset out of range");
@@ -379,7 +380,7 @@ export class Time {
     hour: number | string | TimeNewOptions | null = 0,
     min: number | string | TimeNewOptions | null = 0,
     sec: number | string | Rational | TimeNewOptions | null = 0,
-    zone: string | number | TimeNewOptions | null = null,
+    zone: string | number | Rational | TimeNewOptions | null = null,
     options: TimeNewOptions = {},
   ): Time {
     const given = [year, month, day, hour, min, sec, zone];
@@ -414,7 +415,7 @@ export class Time {
       hour as number | string | null,
       min as number | string | null,
       sec as number | string | Rational | null,
-      zone as string | number | null,
+      zone as string | number | Rational | null,
       options,
     );
   }
@@ -1105,7 +1106,7 @@ export class Time {
     hour: number | string | null = 0,
     min: number | string | null = 0,
     sec: number | string | Rational | null = 0,
-    zone: string | number | null = null,
+    zone: string | number | Rational | null = null,
     options: TimeNewOptions = {},
   ) {
     if (seatedTime !== null) {
@@ -1401,6 +1402,22 @@ export class Time {
       Temporal.Instant.fromEpochNanoseconds(this.#instant.epochNanoseconds + nanoseconds),
       this.#zoneArgument(),
     );
+  }
+
+  /** `time_gmtime` (`vendor/ruby/time.c:4169`): converts the receiver to UTC in place. */
+  utc(): Time {
+    if (this.#tzmodeUtc) {
+      return this;
+    }
+
+    this.#zoned = this.#instant.toZonedDateTimeISO("UTC");
+    this.#plainMemo = null;
+    this.#utcOffsetMemo = null;
+    this.#timeZoneId = "UTC";
+    this.#localZone = false;
+
+    this.#tzmodeUtc = true;
+    return this;
   }
 
   getutc(): Time {
