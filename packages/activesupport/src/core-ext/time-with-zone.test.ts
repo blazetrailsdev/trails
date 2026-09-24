@@ -622,8 +622,7 @@ describe("TimeWithZoneTest", () => {
     assertNotPredicate(twz, (t) => t.isBlank());
   });
 
-  it.skip("is a", () => {
-    // BLOCKED: activesupport-time-with-zone-is-a-time
+  it("is a", () => {
     expect(twz).toBeInstanceOf(RubyTime);
     expect(twz).toBeInstanceOf(RubyTime);
     expect(twz).toBeInstanceOf(TimeWithZone);

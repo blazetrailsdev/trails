@@ -433,8 +433,7 @@ describe("TimeExtCalculationsTest", () => {
     });
   });
 
-  it.skip("sec fraction", () => {
-    // BLOCKED: activesupport-time-sec-fraction-rational
+  it("sec fraction", () => {
     let time = RubyTime.utc(2016, 4, 23, 0, 0, new Rational(1, 1_000_000_000)) as any;
     expect(time.secFraction()).toEqual(new Rational(1, 1_000_000_000));
 
@@ -615,10 +614,9 @@ describe("TimeExtCalculationsTest", () => {
     });
   });
 
-  it.skip("since with instance of time deprecated", async () => {
-    // BLOCKED: activesupport-time-since-time-instance-deprecation
+  it("since with instance of time deprecated", async () => {
     await assertDeprecated(null, deprecator(), () => {
-      (RubyTime.now() as any).since(RubyTime.now());
+      RubyTime.now().since(RubyTime.now());
     });
   });
 

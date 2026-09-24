@@ -1227,8 +1227,10 @@ export class Time {
     return this.#plain.millisecond * 1_000 + this.#plain.microsecond;
   }
 
-  get subsec(): number {
-    return this.nsec / 1_000_000_000;
+  get subsec(): number | Rational {
+    const ret = new Rational(this.nsec, 1_000_000_000);
+    if (ret.denominator === 1n) return Number(ret.numerator);
+    return ret;
   }
 
   get yday(): number {
