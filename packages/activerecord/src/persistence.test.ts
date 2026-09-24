@@ -1899,7 +1899,7 @@ describe("PersistenceTest", () => {
   fixtures([], { useTransactionalTests: false });
 
   async function buildDefaultsTable() {
-    const connection = Base.connection;
+    const connection = await Base.leaseConnection();
     if (adapterType === "postgres") {
       const pg = connection as PostgreSQLAdapter;
       const supportsVirtualColumns = await pg.supportsVirtualColumns();
@@ -1982,14 +1982,14 @@ describe("PersistenceTest", () => {
       expect(record.id).not.toBeNull();
       await assertions(record);
     } finally {
-      await Base.connection.dropTable("defaults", { ifExists: true });
+      await (await Base.leaseConnection()).dropTable("defaults", { ifExists: true });
     }
   }
 
   it.skipIf(adapterType !== "postgres")("fills auto populated columns on creation", async () => {
     await withDefaultsTable(async (record) => {
       expect(record.ruby_on_rails).toBe("Ruby on Rails");
-      if (await (Base.connection as PostgreSQLAdapter).supportsVirtualColumns()) {
+      if (await ((await Base.leaseConnection()) as PostgreSQLAdapter).supportsVirtualColumns()) {
         expect(record.virtual_stored_number).not.toBeNull();
       }
       expect(record.random_number).not.toBeNull();
@@ -2000,7 +2000,7 @@ describe("PersistenceTest", () => {
       expect(record.modified_time_function).not.toBeNull();
       expect(Buffer.from(record.binary_default_function).toString()).toBe("A");
 
-      if (await (Base.connection as PostgreSQLAdapter).supportsIdentityColumns()) {
+      if (await ((await Base.leaseConnection()) as PostgreSQLAdapter).supportsIdentityColumns()) {
         class IdentityTable extends Base {
           static _tableName = "postgresql_identity_table";
         }
@@ -2029,9 +2029,12 @@ describe("PersistenceTest", () => {
       expect(record.char1).not.toBeNull();
       const supportsDefaultExpression =
         (
-          Base.connection as { supportsDefaultExpression?: () => boolean }
+          (await Base.leaseConnection()) as { supportsDefaultExpression?: () => boolean }
         ).supportsDefaultExpression?.() ?? false;
-      if (supportsDefaultExpression && (await Base.connection.supportsInsertReturning?.())) {
+      if (
+        supportsDefaultExpression &&
+        (await (await Base.leaseConnection()).supportsInsertReturning?.())
+      ) {
         expect(record.uuid).not.toBeNull();
       }
     });

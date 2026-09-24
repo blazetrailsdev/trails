@@ -5,7 +5,7 @@ import type { ConnectionPool } from "./connection-adapters/abstract/connection-p
 import type { HashConfig } from "./database-configurations/hash-config.js";
 import { DatabaseConfig } from "./database-configurations/database-config.js";
 import { resolve as resolveConnectionAdapter } from "./connection-adapters.js";
-import { NotImplementedError, ActiveRecordError, ConnectionNotEstablished } from "./errors.js";
+import { NotImplementedError, ActiveRecordError } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
   connectedToStack,
@@ -19,6 +19,7 @@ import { IsolatedExecutionState, getEnv, presence } from "@blazetrails/activesup
 import * as ConnectionHandlingModule from "./connection-handling.js";
 import { readingRole, setDefaultTimezone, writingRole } from "./active-record.js";
 import { permanentConnectionCheckout } from "./active-record.js";
+import { deprecator } from "./deprecator.js";
 
 const PROHIBIT_SHARD_SWAPPING_KEY = Symbol.for("ar_prohibit_shard_swapping");
 
@@ -323,31 +324,26 @@ export function isConnected(this: typeof Base): boolean {
   });
 }
 
-const CONNECTION_DEPRECATION_MSG =
-  "Called deprecated `ActiveRecord::Base.connection` method. " +
-  "Either use `with_connection` or `lease_connection`.";
-
 /** @deprecated */
-export function connection(this: typeof Base): DatabaseAdapter {
+export async function connection(this: typeof Base): Promise<DatabaseAdapter> {
   const pool = connectionPool.call(this);
   if (pool.isPermanentLease()) {
     const setting = permanentConnectionCheckout();
     if (setting === "deprecated") {
-      console.warn("DEPRECATION WARNING: " + CONNECTION_DEPRECATION_MSG);
+      deprecator().warn(`Called deprecated \`ActiveRecord::Base.connection\` method.
+
+Either use \`with_connection\` or \`lease_connection\`.
+`);
     } else if (setting === "disallowed") {
-      throw new ActiveRecordError(CONNECTION_DEPRECATION_MSG);
+      throw new ActiveRecordError(`Called deprecated \`ActiveRecord::Base.connection\` method.
+
+Either use \`with_connection\` or \`lease_connection\`.
+`);
     }
-    const connection = pool.activeConnection;
-    if (!connection) {
-      throw new ConnectionNotEstablished(
-        "No connection is leased for this execution context. " +
-          "Await `lease_connection` or use `with_connection` first.",
-      );
-    }
-    void pool.leaseConnection();
-    return connection;
+    return pool.leaseConnection();
+  } else {
+    return pool.activeConnection!;
   }
-  return pool.activeConnection!;
 }
 
 export function isPrimaryClass(this: typeof Base): boolean {

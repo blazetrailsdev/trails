@@ -27,7 +27,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("SchemaAuthorizationTest", () => {
     beforeEach(async () => {
-      adapter = Base.connection as PostgreSQLAdapter;
+      adapter = (await Base.leaseConnection()) as PostgreSQLAdapter;
       await adapter.execute(`SET search_path TO '$user',public`);
       await adapter.sessionAuth("default");
       for (const u of USERS) {

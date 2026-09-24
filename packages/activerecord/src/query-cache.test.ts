@@ -814,8 +814,11 @@ describe("QueryCacheMutableParamTest", () => {
   registerModel(JsonObj);
 
   beforeEach(async () => {
-    const columnType = typeRegistryKeyFor(Base.connection) === "postgresql" ? "jsonb" : "json";
-    await Base.connection.createTable("json_objs", { force: true }, (t) => {
+    const columnType =
+      typeRegistryKeyFor(await Base.leaseConnection()) === "postgresql" ? "jsonb" : "json";
+    await (
+      await Base.leaseConnection()
+    ).createTable("json_objs", { force: true }, (t) => {
       (t as unknown as { column(name: string, type: string): void }).column("payload", columnType);
     });
     (await Base.leaseConnection()).enableQueryCacheBang();
@@ -823,7 +826,7 @@ describe("QueryCacheMutableParamTest", () => {
 
   afterEach(async () => {
     (await Base.leaseConnection()).disableQueryCacheBang();
-    await Base.connection.dropTable("json_objs", { ifExists: true });
+    await (await Base.leaseConnection()).dropTable("json_objs", { ifExists: true });
   });
 
   it("query cache handles mutated binds", async () => {

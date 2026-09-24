@@ -17,8 +17,8 @@ describe("sanitizeSql", () => {
     expect(User.sanitizeSqlArray("deleted_at = ?", null)).toBe("deleted_at = NULL");
   });
 
-  it("sanitizeSqlArray escapes single quotes", () => {
-    const a = User.connection;
+  it("sanitizeSqlArray escapes single quotes", async () => {
+    const a = await User.leaseConnection();
     expect(User.sanitizeSqlArray("name = ?", "O'Brien")).toBe(`name = ${a.quote("O'Brien")}`);
   });
 
@@ -32,8 +32,8 @@ describe("sanitizeSql", () => {
     expect(User.sanitizeSql([] as unknown as [string, ...unknown[]])).toBeNull();
   });
 
-  it("sanitizeSql handles array format", () => {
-    const a = User.connection as unknown as {
+  it("sanitizeSql handles array format", async () => {
+    const a = (await User.leaseConnection()) as unknown as {
       castBoundValue(v: unknown): unknown;
       quote(v: unknown): string;
     };
@@ -137,8 +137,9 @@ describe("sanitizeSql", () => {
   });
 
   describe("private helpers (replace_bind_variables, quote_bound_value, etc)", () => {
-    it("sanitize sql array handles %s format string", () => {
-      const qs = (v: unknown) => Post.connection.quoteString(String(v));
+    it("sanitize sql array handles %s format string", async () => {
+      const connection = await Post.leaseConnection();
+      const qs = (v: unknown) => connection.quoteString(String(v));
       const result = Post.sanitizeSqlArray("name='%s' and group_id='%s'", "foo'bar", 4);
       expect(result).toBe(`name='${qs("foo'bar")}' and group_id='${qs(4)}'`);
     });
@@ -161,8 +162,8 @@ describe("sanitizeSql", () => {
       expect(result).toBe("title = 'Hello' AND author = 'World'");
     });
 
-    it("handles named bind variables with numbers", () => {
-      const a = Post.connection as unknown as {
+    it("handles named bind variables with numbers", async () => {
+      const a = (await Post.leaseConnection()) as unknown as {
         castBoundValue(v: unknown): unknown;
         quote(v: unknown): string;
       };
@@ -189,9 +190,9 @@ describe("sanitizeSql", () => {
       expect(result).toContain("active = TRUE");
     });
 
-    it("escapes single quotes in named bind variables", () => {
+    it("escapes single quotes in named bind variables", async () => {
       const result = Post.sanitizeSqlArray("title = :title", { title: "It's a title" });
-      expect(result).toBe(`title = ${Post.connection.quote("It's a title")}`);
+      expect(result).toBe(`title = ${(await Post.leaseConnection()).quote("It's a title")}`);
     });
 
     it("handles PostgreSQL type casts in named bind variable patterns", () => {
@@ -232,9 +233,9 @@ describe("sanitizeSql", () => {
       expect(result).toContain("3");
     });
 
-    it("boolean quoting routes through the active adapter", () => {
+    it("boolean quoting routes through the active adapter", async () => {
       const sql = Post.sanitizeSqlArray("active = ?", true);
-      const a = Post.connection as unknown as {
+      const a = (await Post.leaseConnection()) as unknown as {
         castBoundValue(v: unknown): unknown;
         quote(v: unknown): string;
       };

@@ -13,7 +13,7 @@ fixtures(["authors", "authorAddresses"]);
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeAll(async () => {
-    adapter = Base.connection as PostgreSQLAdapter;
+    adapter = (await Base.leaseConnection()) as PostgreSQLAdapter;
   });
   afterAll(async () => {
     await adapter.execute(

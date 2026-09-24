@@ -73,7 +73,7 @@ import {
 const MIGRATIONS_ROOT = new URL("./test-helpers/migrations", import.meta.url).pathname;
 
 async function freshAdapterWithPeople(): Promise<DatabaseAdapter> {
-  return Base.connection;
+  return await Base.leaseConnection();
 }
 
 function envName(adapter: DatabaseAdapter): string {
@@ -144,7 +144,7 @@ async function migrateRemovingMissingColumn(migrator: Migrator): Promise<void> {
     const error = await assertRaises([StandardError], {}, () => migrator.migrate());
 
     if (adapterType === "mysql") {
-      if (await (Base.connection as any).isMariadb()) {
+      if (await ((await Base.leaseConnection()) as any).isMariadb()) {
         expect(error.message).toMatch(/Can't DROP COLUMN `last_name`; check that it exists/);
       } else {
         expect(error.message).toMatch(/check that column\/key exists/);
@@ -166,7 +166,7 @@ fixtures(["people"], { useTransactionalTests: false });
 afterEach(async () => {
   Base.tableNamePrefix = "";
   Base.tableNameSuffix = "";
-  const adapter = Base.connection;
+  const adapter = await Base.leaseConnection();
   try {
     if (await (adapter as any).columnExists("people", "last_name")) {
       await adapter.removeColumn("people", "last_name");
@@ -252,7 +252,7 @@ describe("MigrationTest", () => {
 
   it("rename table with prefix and suffix", async () => {
     class Thing extends Base {}
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     try {
       expect(await Thing.tableExists()).toBeFalsy();
       Base.tableNamePrefix = "p_";
@@ -280,7 +280,7 @@ describe("MigrationTest", () => {
   });
 
   it("decimal scale without precision should raise", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     try {
       const e = await assertRaises([ArgumentError], {}, () =>
         adapter.createTable("test_decimal_scales", { force: true }, (t) => {
@@ -323,7 +323,7 @@ describe("MigrationTest", () => {
 });
 
 async function freshAdapter(): Promise<DatabaseAdapter> {
-  return Base.connection;
+  return await Base.leaseConnection();
 }
 
 describe("MigrationTest", () => {
@@ -338,7 +338,7 @@ describe("MigrationTest", () => {
   });
 
   it("create table raises if already exists", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     try {
       await adapter.createTable("testings", { force: true }, (t) => {
         t.string("foo");
@@ -380,7 +380,7 @@ describe("MigrationTest", () => {
   });
 
   it("add table with decimals", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     await adapter.dropTable("big_numbers", { ifExists: true });
 
     const typeRegistryKey = typeRegistryKeyFor(adapter);
@@ -470,7 +470,7 @@ describe("MigrationTest", () => {
   });
 
   it("schema migrations table name", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     const schemaMigration = new SchemaMigration(adapter.pool);
     const originalTableName = Base.schemaMigrationsTableName;
     const savedPrefix = Base.tableNamePrefix;
@@ -493,7 +493,7 @@ describe("MigrationTest", () => {
   });
 
   it("internal metadata stores environment", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     const currentEnv = envName(adapter);
     const migrator = new MigrationContext(
       [`${MIGRATIONS_ROOT}/valid`],
@@ -506,7 +506,7 @@ describe("MigrationTest", () => {
   });
 
   it.skipIf(adapterType === "sqlite")("out of range integer limit should raise", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     try {
       const e = await assertRaises([ArgumentError], {}, () =>
         adapter.createTable("test_integer_limits", { force: true }, (t) => {
@@ -521,7 +521,7 @@ describe("MigrationTest", () => {
   });
 
   it("create table with binary column", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     try {
       await assertNothingRaised(() =>
         adapter.createTable("binary_testings", {}, (t) => {
@@ -607,7 +607,7 @@ describe("MigrationTest", () => {
 
   it("migration context with default schema migration", async () => {
     const migrationsPath = `${MIGRATIONS_ROOT}/valid`;
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     const schemaMigration = adapter.pool.schemaMigration;
     const migrator = new MigrationContext([migrationsPath]);
     await migrator.migrate();
@@ -625,7 +625,7 @@ describe("MigrationTest", () => {
 
   it("migrator versions", async () => {
     const migrationsPath = `${MIGRATIONS_ROOT}/valid`;
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     const schemaMigration = new SchemaMigration(adapter.pool);
     const migrator = new MigrationContext(
       [migrationsPath],
@@ -659,7 +659,7 @@ describe("MigrationTest", () => {
   });
 
   it("migration detection without schema migration table", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     const { fileURLToPath } = await import("node:url");
     const { dirname, join } = await import("node:path");
     const migrationsPath = join(
@@ -679,7 +679,7 @@ describe("MigrationTest", () => {
   });
 
   it("any migrations", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     const withMigrations = new Migrator(
       "up",
       [
@@ -704,7 +704,7 @@ describe("MigrationTest", () => {
   });
 
   it("migration version", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     const migrations: MigrationProxy[] = [
       migrationProxy({
         version: 20131219224947,
@@ -725,7 +725,7 @@ describe("MigrationTest", () => {
   });
 
   it("create table with if not exists true", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     await adapter.dropTable("things", { ifExists: true });
     try {
       await adapter.createTable("things", {}, (t) => {
@@ -742,7 +742,7 @@ describe("MigrationTest", () => {
   });
 
   it("create table raises for long table names", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     const nameLimit = adapter.tableNameLength();
     const longName = "a".repeat(nameLimit + 1);
     const shortName = "a".repeat(nameLimit);
@@ -760,7 +760,7 @@ describe("MigrationTest", () => {
   });
 
   it("create table with force and if not exists", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     await assertRaises(
       [ArgumentError],
       { match: /Options `:force` and `:if_not_exists` cannot be used simultaneously/ },
@@ -769,7 +769,7 @@ describe("MigrationTest", () => {
   });
 
   it("create table with indexes and if not exists true", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     await adapter.dropTable("things", { ifExists: true });
     try {
       await adapter.createTable("things", {}, (t) => {
@@ -787,10 +787,10 @@ describe("MigrationTest", () => {
   });
 
   it("create table with force true does not drop nonexisting table", async () => {
-    const pool = Base.connection.pool;
+    const pool = (await Base.leaseConnection()).pool;
     const tempConn = await pool.checkout();
     try {
-      expect(tempConn).not.toBe(Base.connection);
+      expect(tempConn).not.toBe(await Base.leaseConnection());
 
       await tempConn.createTable("testings2", { force: true }, (t) => {
         t.column("foo", "string");
@@ -894,7 +894,7 @@ describe("MigrationTest", () => {
 
   it("filtering migrations", async () => {
     class Reminder extends Base {}
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     await assertNoColumn(Person, "last_name");
     expect(await Reminder.tableExists()).toBeFalsy();
 
@@ -917,7 +917,7 @@ describe("MigrationTest", () => {
   });
 
   itIfSupports("ddl_transactions", "migrator one up with exception and rollback", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     await assertNoColumn(Person, "last_name");
 
     const migrator = new Migrator(
@@ -950,7 +950,7 @@ describe("MigrationTest", () => {
     "ddl_transactions",
     "migrator one up with exception and rollback using run",
     async () => {
-      const adapter = Base.connection;
+      const adapter = await Base.leaseConnection();
       await assertNoColumn(Person, "last_name");
 
       const migrator = new Migrator(
@@ -1040,7 +1040,7 @@ describe("MigrationTest", () => {
   });
 
   it("internal metadata table name", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     const { InternalMetadata } = await import("./internal-metadata.js");
     const internalMetadata = new InternalMetadata(adapter.pool);
     const originalTableName = Base.internalMetadataTableName;
@@ -1064,7 +1064,7 @@ describe("MigrationTest", () => {
   });
 
   it("internal metadata stores environment when migration fails", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     const im = new InternalMetadata(adapter.pool);
     await im.createTable();
     await im.deleteAllEntries();
@@ -1086,7 +1086,7 @@ describe("MigrationTest", () => {
   });
 
   it("internal metadata stores environment when other data exists", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     const { InternalMetadata } = await import("./internal-metadata.js");
     const im = new InternalMetadata(adapter.pool);
     await im.createTable();
@@ -1109,7 +1109,7 @@ describe("MigrationTest", () => {
   });
 
   it("internal metadata not used when not enabled", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     const { InternalMetadata } = await import("./internal-metadata.js");
 
     const im = new InternalMetadata(adapter.pool);
@@ -1150,7 +1150,7 @@ describe("MigrationTest", () => {
   });
 
   it("inserting a new entry into internal metadata", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     const { InternalMetadata } = await import("./internal-metadata.js");
     const im = new InternalMetadata(adapter.pool);
     await im.createTable();
@@ -1163,7 +1163,7 @@ describe("MigrationTest", () => {
   });
 
   it("updating an existing entry into internal metadata", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     const im = new InternalMetadata(adapter.pool);
     await im.createTable();
     const selectUpdatedAt = async () =>
@@ -1186,7 +1186,7 @@ describe("MigrationTest", () => {
   });
 
   it("internal metadata create table wont be affected by schema cache", async () => {
-    const pool = Base.connection.pool;
+    const pool = (await Base.leaseConnection()).pool;
     const im = new InternalMetadata(pool);
     await im.dropTable();
     expect(await im.tableExists()).toBeFalsy();
@@ -1217,7 +1217,7 @@ describe("MigrationTest", () => {
   });
 
   it("schema migration create table wont be affected by schema cache", async () => {
-    const pool = Base.connection.pool;
+    const pool = (await Base.leaseConnection()).pool;
     const sm = new SchemaMigration(pool);
     await sm.dropTable();
     expect(await sm.tableExists()).toBeFalsy();
@@ -1267,7 +1267,7 @@ describe("MigrationTest", () => {
   });
 
   it("create table with query", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     try {
       await adapter.createTable("table_from_query_testings", {
         as: "SELECT id FROM people WHERE id = 1",
@@ -1283,7 +1283,7 @@ describe("MigrationTest", () => {
   });
 
   it("create table with query from relation", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     try {
       await adapter.createTable("table_from_query_testings", {
         as: Person.select("id").where({ id: 1 }),
@@ -1301,7 +1301,7 @@ describe("MigrationTest", () => {
   it.skipIf(adapterType !== "sqlite")(
     "allows sqlite3 rollback on invalid column type",
     async () => {
-      const adapter = Base.connection;
+      const adapter = await Base.leaseConnection();
       try {
         await adapter.createTable("something", { force: true }, (t) => {
           t.column("number", "integer");
@@ -1320,7 +1320,7 @@ describe("MigrationTest", () => {
   );
 
   itIfSupports("advisory_locks", "migrator generates valid lock id", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     const migrator = new Migrator(
       "up",
       [anonymousMigrationProxy()],
@@ -1342,7 +1342,7 @@ describe("MigrationTest", () => {
   });
 
   itIfSupports("advisory_locks", "generate migrator advisory lock id", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     const migrator = new Migrator(
       "up",
       [anonymousMigrationProxy()],
@@ -1372,7 +1372,7 @@ describe("MigrationTest", () => {
   itIfSupports("advisory_locks", "migrator one up with unavailable lock", async () => {
     await assertNoColumn(Person, "last_name");
 
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     const migrator = new Migrator(
       "up",
       [migrateProxy(100, (m) => m.addColumn("people", "last_name", "string"))],
@@ -1397,7 +1397,7 @@ describe("MigrationTest", () => {
   itIfSupports("advisory_locks", "migrator one up with unavailable lock using run", async () => {
     await assertNoColumn(Person, "last_name");
 
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     const migrator = new Migrator(
       "up",
       [migrateProxy(100, (m) => m.addColumn("people", "last_name", "string"))],
@@ -1423,7 +1423,7 @@ describe("MigrationTest", () => {
     "advisory_locks",
     "with advisory lock closes connection",
     async () => {
-      const adapter = Base.connection;
+      const adapter = await Base.leaseConnection();
       const migrator = new Migrator(
         "up",
         [migrateProxy(100, async () => {})],
@@ -1452,7 +1452,7 @@ AND query LIKE '%${lockId}%'`;
     "advisory_locks",
     "with advisory lock raises the right error when it fails to release lock",
     async () => {
-      const adapter = Base.connection;
+      const adapter = await Base.leaseConnection();
       const migrator = new Migrator(
         "up",
         [anonymousMigrationProxy()],
@@ -1473,7 +1473,7 @@ AND query LIKE '%${lockId}%'`;
   );
 
   it.skipIf(adapterType === "sqlite")("out of range text limit should raise", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     try {
       const e = await assertRaises([ArgumentError], {}, () =>
         adapter.createTable("test_text_limits", { force: true }, (t) => {
@@ -1488,7 +1488,7 @@ AND query LIKE '%${lockId}%'`;
   });
 
   it.skipIf(adapterType === "sqlite")("out of range binary limit should raise", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     try {
       const e = await assertRaises([ArgumentError], {}, () =>
         adapter.createTable("test_binary_limits", { force: true }, (t) => {
@@ -1503,7 +1503,7 @@ AND query LIKE '%${lockId}%'`;
   });
 
   it.skipIf(adapterType !== "mysql")("invalid text size should raise", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     try {
       const e = await assertRaises([ArgumentError], {}, () =>
         adapter.createTable("test_text_sizes", { force: true }, (t) => {
@@ -1521,7 +1521,7 @@ AND query LIKE '%${lockId}%'`;
 
   describe("ReservedWordsMigrationTest", () => {
     it("drop index from table named values", async () => {
-      const connection = Base.connection;
+      const connection = await Base.leaseConnection();
       await connection.createTable("values", { force: true }, (t) => {
         t.integer("value");
       });
@@ -1538,7 +1538,7 @@ AND query LIKE '%${lockId}%'`;
 
   describe("ExplicitlyNamedIndexMigrationTest", () => {
     it("drop index by name", async () => {
-      const connection = Base.connection;
+      const connection = await Base.leaseConnection();
       await connection.createTable("values", { force: true }, (t) => {
         t.integer("value");
       });
@@ -1555,14 +1555,16 @@ AND query LIKE '%${lockId}%'`;
 
   describe("IndexTest", () => {
     async function withTestings(body: () => Promise<void>): Promise<void> {
-      await Base.connection.createTable("testings", { force: true }, (t) => {
+      await (
+        await Base.leaseConnection()
+      ).createTable("testings", { force: true }, (t) => {
         t.string("foo", { limit: 100 });
         t.string("bar", { limit: 100 });
       });
       try {
         await body();
       } finally {
-        await Base.connection.dropTable("testings", { ifExists: true });
+        await (await Base.leaseConnection()).dropTable("testings", { ifExists: true });
       }
     }
 
@@ -1608,7 +1610,7 @@ AND query LIKE '%${lockId}%'`;
 
   describeIfPostgresqlAdapter("PostgresqlIndexTest", () => {
     it("test_invalid_index", async () => {
-      const conn = Base.connection;
+      const conn = await Base.leaseConnection();
       await conn.dropTable("ex", { ifExists: true });
       await conn.createTable("ex", { force: true }, (t) => {
         t.integer("number");
@@ -1648,7 +1650,7 @@ AND query LIKE '%${lockId}%'`;
     let _indexes: IndexDefinition[] | null = null;
 
     beforeEach(async () => {
-      connection = Base.connection;
+      connection = await Base.leaseConnection();
       await connection.createTable("delete_me", { force: true }, () => {});
       Person.resetColumnInformation();
       Person.resetSequenceName();
@@ -1681,7 +1683,7 @@ AND query LIKE '%${lockId}%'`;
     }
 
     it("adding multiple columns", async () => {
-      const classname = Base.connection.constructor.name;
+      const classname = (await Base.leaseConnection()).constructor.name;
       const expectedQueryCount = fetch(
         { Mysql2Adapter: 1, TrilogyAdapter: 1, PostgreSQLAdapter: 2 },
         classname,
@@ -1796,7 +1798,7 @@ AND query LIKE '%${lockId}%'`;
         t.integer("age");
       });
 
-      const classname = Base.connection.constructor.name;
+      const classname = (await Base.leaseConnection()).constructor.name;
       const expectedQueryCount = fetch(
         { Mysql2Adapter: 1, TrilogyAdapter: 1, PostgreSQLAdapter: 3 },
         classname,
@@ -1830,7 +1832,7 @@ AND query LIKE '%${lockId}%'`;
 
       expect(await index("index_delete_me_on_name")).toBeTruthy();
 
-      const classname = Base.connection.constructor.name;
+      const classname = (await Base.leaseConnection()).constructor.name;
       const expectedQueryCount = fetch(
         { Mysql2Adapter: 1, TrilogyAdapter: 1, PostgreSQLAdapter: 2 },
         classname,
@@ -1861,7 +1863,7 @@ AND query LIKE '%${lockId}%'`;
       expect(await index("username_index")).toBeTruthy();
       expect((await index("username_index"))!.unique).toBeFalsy();
 
-      const classname = Base.connection.constructor.name;
+      const classname = (await Base.leaseConnection()).constructor.name;
       const expectedQueryCount = fetch(
         { Mysql2Adapter: 1, TrilogyAdapter: 1, PostgreSQLAdapter: 2 },
         classname,
@@ -1884,11 +1886,13 @@ AND query LIKE '%${lockId}%'`;
 
   describeIfSupports("bulk_alter", "RevertBulkAlterTableMigrationsTest", () => {
     afterEach(async () => {
-      await Base.connection.removeColumns("people", "column1", "column2").catch(() => {});
+      await (await Base.leaseConnection())
+        .removeColumns("people", "column1", "column2")
+        .catch(() => {});
     });
 
     it("bulk revert", async () => {
-      const connection = Base.connection;
+      const connection = await Base.leaseConnection();
       Person.resetColumnInformation();
       Person.resetSequenceName();
       await connection.addColumn("people", "column1", "string");
@@ -2210,8 +2214,8 @@ AND query LIKE '%${lockId}%'`;
       let validateTimestampsWas: boolean;
       let migrator: MigrationContext;
 
-      beforeEach(() => {
-        const pool = Base.connection.pool;
+      beforeEach(async () => {
+        const pool = (await Base.leaseConnection()).pool;
         schemaMigration = new SchemaMigration(pool);
         internalMetadata = new InternalMetadata(pool);
         validateTimestampsWas = validateMigrationTimestamps();
@@ -2410,7 +2414,7 @@ describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
     expect(cols.find((c) => c.name === "name")!.default).toBeFalsy();
     expect(cols.find((c) => c.name === "birthdate")!.type).toBe("date");
 
-    const classname = Base.connection.constructor.name;
+    const classname = (await Base.leaseConnection()).constructor.name;
     const expectedQueryCount = fetch(
       { Mysql2Adapter: 3, TrilogyAdapter: 3, PostgreSQLAdapter: 3 },
       classname,
@@ -2443,7 +2447,7 @@ describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
     expect(preCols.find((c) => c.name === "name")!.default).toBeFalsy();
     expect(preCols.find((c) => c.name === "birthdate")!.type).toBe("date");
 
-    const classname = Base.connection.constructor.name;
+    const classname = (await Base.leaseConnection()).constructor.name;
     const expectedQueryCount = fetch(
       { Mysql2Adapter: 7, TrilogyAdapter: 7, PostgreSQLAdapter: 5 },
       classname,

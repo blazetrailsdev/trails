@@ -18,16 +18,16 @@ describeIfPg("PostgreSQLAdapter", () => {
     const ps = (a: unknown) => a as { preparedStatements: boolean };
 
     let originalPreparedStatements: boolean;
-    beforeEach(() => {
-      originalPreparedStatements = ps(Base.connection).preparedStatements;
-      ps(Base.connection).preparedStatements = false;
+    beforeEach(async () => {
+      originalPreparedStatements = ps(await Base.leaseConnection()).preparedStatements;
+      ps(await Base.leaseConnection()).preparedStatements = false;
     });
-    afterEach(() => {
-      ps(Base.connection).preparedStatements = originalPreparedStatements;
+    afterEach(async () => {
+      ps(await Base.leaseConnection()).preparedStatements = originalPreparedStatements;
     });
 
     it("select query works even when prepared statements are disabled", async () => {
-      assertNot(ps(Developer.connection).preparedStatements);
+      assertNot(ps(await Developer.leaseConnection()).preparedStatements);
 
       const david = developers("david");
 

@@ -14,7 +14,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
     let adapter: Mysql2Adapter;
     beforeAll(async () => {
-      adapter = Base.connection as Mysql2Adapter;
+      adapter = (await Base.leaseConnection()) as Mysql2Adapter;
       await adapter.addIndex("posts", ["author_id"], {
         name: "index_posts_on_author_id",
         ifNotExists: true,

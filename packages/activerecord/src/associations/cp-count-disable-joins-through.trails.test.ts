@@ -29,18 +29,26 @@ describe("CollectionProxy#count — disable_joins through", () => {
   }
 
   beforeAll(async () => {
-    await Base.connection.createTable("cd_authors", { force: true }, (t: any) => {
+    await (
+      await Base.leaseConnection()
+    ).createTable("cd_authors", { force: true }, (t: any) => {
       t.string("name");
     });
-    await Base.connection.createTable("cd_posts", { force: true }, (t: any) => {
+    await (
+      await Base.leaseConnection()
+    ).createTable("cd_posts", { force: true }, (t: any) => {
       t.integer("cd_author_id");
       t.string("title");
     });
-    await Base.connection.createTable("cd_comments", { force: true }, (t: any) => {
+    await (
+      await Base.leaseConnection()
+    ).createTable("cd_comments", { force: true }, (t: any) => {
       t.integer("cd_post_id");
       t.string("body");
     });
-    await Base.connection.createTable("cd_ratings", { force: true }, (t: any) => {
+    await (
+      await Base.leaseConnection()
+    ).createTable("cd_ratings", { force: true }, (t: any) => {
       t.integer("cd_comment_id");
       t.integer("value");
     });

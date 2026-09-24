@@ -97,17 +97,8 @@ export class HasAndBelongsToMany {
     if (lhsModel.moduleName) {
       joinModel.moduleName = lhsModel.moduleName;
     }
-    Object.defineProperty(joinModel, "connection", {
-      get: () => lhsModel.connection,
-      configurable: true,
-    });
     Object.defineProperty(joinModel, "_connectionSpecificationName", {
       get: () => lhsModel.connectionSpecificationName,
-      set: () => {},
-      configurable: true,
-    });
-    Object.defineProperty(joinModel, "adapter", {
-      get: () => lhsModel.connection,
       set: () => {},
       configurable: true,
     });

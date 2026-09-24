@@ -6,8 +6,10 @@ import { fixtures } from "../test-fixtures.js";
 describe("RequiredAssociationsTest", () => {
   fixtures([]);
   beforeAll(async () => {
-    await Base.connection.createTable("parents", { force: true }, () => {});
-    await Base.connection.createTable("children", { force: true }, (t) => {
+    await (await Base.leaseConnection()).createTable("parents", { force: true }, () => {});
+    await (
+      await Base.leaseConnection()
+    ).createTable("children", { force: true }, (t) => {
       t.integer("parent_id");
     });
   });

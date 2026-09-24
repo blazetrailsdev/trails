@@ -1240,21 +1240,25 @@ async function syncPullRequests(mode: "latest" | "refresh"): Promise<number> {
 
   if (mode === "refresh") {
     const staleCount = (
-      await Base.connection.selectAll(
-        `SELECT COUNT(*) as cnt FROM pull_requests WHERE state IS NULL`,
-      )
+      await (
+        await Base.leaseConnection()
+      ).selectAll(`SELECT COUNT(*) as cnt FROM pull_requests WHERE state IS NULL`)
     ).toArray();
     const cnt = (staleCount[0] as { cnt: number }).cnt;
     if (cnt > 0) {
       console.log(`Backfilling state for ${cnt} existing PRs from merged_at/closed_at...`);
-      await Base.connection.execute(
+      await (
+        await Base.leaseConnection()
+      ).execute(
         `UPDATE pull_requests SET state = CASE
           WHEN merged_at IS NOT NULL THEN 'merged'
           WHEN closed_at IS NOT NULL THEN 'closed'
           ELSE 'open'
         END WHERE state IS NULL`,
       );
-      await Base.connection.execute(`UPDATE pull_requests SET is_draft = 0 WHERE is_draft IS NULL`);
+      await (
+        await Base.leaseConnection()
+      ).execute(`UPDATE pull_requests SET is_draft = 0 WHERE is_draft IS NULL`);
     }
   }
 
@@ -1294,9 +1298,9 @@ async function syncPrFiles() {
     const number = pr.readAttribute("number") as number;
     try {
       const files = ghJson<GhPrFile[]>(`api repos/${REPO}/pulls/${number}/files --paginate`);
-      await PrFile.connection.execDelete(`DELETE FROM pr_files WHERE pr_number = ?`, null, [
-        number,
-      ]);
+      await (
+        await PrFile.leaseConnection()
+      ).execDelete(`DELETE FROM pr_files WHERE pr_number = ?`, null, [number]);
       if (files.length > 0) {
         await PrFile.insertAll(
           files.map((f) => ({
@@ -1331,9 +1335,9 @@ async function syncPrCommits() {
     const number = pr.readAttribute("number") as number;
     try {
       const commits = ghJson<GhPrCommit[]>(`api repos/${REPO}/pulls/${number}/commits --paginate`);
-      await PrCommit.connection.execDelete(`DELETE FROM pr_commits WHERE pr_number = ?`, null, [
-        number,
-      ]);
+      await (
+        await PrCommit.leaseConnection()
+      ).execDelete(`DELETE FROM pr_commits WHERE pr_number = ?`, null, [number]);
       if (commits.length > 0) {
         await PrCommit.insertAll(
           commits.map((c) => ({
@@ -1642,11 +1646,9 @@ async function syncPrTimelineEvents() {
       const events = ghJson<GhTimelineEvent[]>(
         `api repos/${REPO}/issues/${number}/timeline --paginate`,
       );
-      await PrTimelineEvent.connection.execDelete(
-        `DELETE FROM pr_timeline_events WHERE pr_number = ?`,
-        null,
-        [number],
-      );
+      await (
+        await PrTimelineEvent.leaseConnection()
+      ).execDelete(`DELETE FROM pr_timeline_events WHERE pr_number = ?`, null, [number]);
       if (events.length > 0) {
         await PrTimelineEvent.insertAll(
           events.map((e) => ({
@@ -1921,7 +1923,9 @@ function parseApiCompareFromLogs(logs: string) {
 async function syncCheckAnnotations(mode: "latest" | "refresh" | "backfill") {
   const limitClause = mode === "latest" ? "LIMIT 50" : "";
   const jobsToSync = (
-    await Base.connection.selectAll(`
+    await (
+      await Base.leaseConnection()
+    ).selectAll(`
     SELECT wj.id as job_id, wr.id as run_id
     FROM workflow_jobs wj
     JOIN workflow_runs wr ON wr.id = wj.run_id
@@ -1944,11 +1948,9 @@ async function syncCheckAnnotations(mode: "latest" | "refresh" | "backfill") {
       const annotations = ghJson<GhCheckAnnotation[]>(
         `api repos/${REPO}/check-runs/${jobId}/annotations --paginate`,
       );
-      await CheckAnnotation.connection.execDelete(
-        `DELETE FROM check_annotations WHERE job_id = ?`,
-        null,
-        [jobId],
-      );
+      await (
+        await CheckAnnotation.leaseConnection()
+      ).execDelete(`DELETE FROM check_annotations WHERE job_id = ?`, null, [jobId]);
       if (annotations.length > 0) {
         await CheckAnnotation.insertAll(
           annotations.map((a) => ({
@@ -1975,7 +1977,9 @@ async function syncCheckAnnotations(mode: "latest" | "refresh" | "backfill") {
 async function syncJobLogs(mode: "latest" | "refresh" | "backfill"): Promise<number> {
   const limitClause = mode === "latest" ? "LIMIT 50" : "";
   const jobsToFetch = (
-    await Base.connection.selectAll(`
+    await (
+      await Base.leaseConnection()
+    ).selectAll(`
     SELECT wj.id as job_id, wj.run_id, wj.name as job_name,
            wr.head_sha, wr.pr_number
     FROM workflow_jobs wj
@@ -2117,7 +2121,9 @@ async function syncCompareStats(
   const limitClause = mode === "latest" ? "LIMIT 50" : "";
   const missingStatsClause = mode === "reparse" ? "" : `AND (${MISSING_STATS_PREDICATE})`;
   const runsToProcess = (
-    await Base.connection.selectAll(`
+    await (
+      await Base.leaseConnection()
+    ).selectAll(`
     SELECT rjl.job_id, rjl.merge_commit_sha, rjl.pr_number
     FROM raw_job_logs rjl
     JOIN workflow_jobs wj ON wj.id = rjl.job_id
@@ -2153,11 +2159,9 @@ async function syncCompareStats(
     const prNumber = row.pr_number as number;
 
     const logRows = (
-      await Base.connection.execQuery(
-        `SELECT log_output FROM raw_job_logs WHERE job_id = ?`,
-        "SQL",
-        [jobId],
-      )
+      await (
+        await Base.leaseConnection()
+      ).execQuery(`SELECT log_output FROM raw_job_logs WHERE job_id = ?`, "SQL", [jobId])
     ).toArray();
     if (logRows.length === 0) continue;
     const logs = logRows[0].log_output as string;
@@ -2314,13 +2318,15 @@ async function syncCompareStats(
 async function printSummary() {
   const count = async (table: string) => {
     const rows = (
-      await Base.connection.selectAll(`SELECT COUNT(*) as cnt FROM ${table}`)
+      await (await Base.leaseConnection()).selectAll(`SELECT COUNT(*) as cnt FROM ${table}`)
     ).toArray();
     return (rows[0] as { cnt: number }).cnt;
   };
   const countDistinct = async (table: string, col: string) => {
     const rows = (
-      await Base.connection.selectAll(`SELECT COUNT(DISTINCT ${col}) as cnt FROM ${table}`)
+      await (
+        await Base.leaseConnection()
+      ).selectAll(`SELECT COUNT(DISTINCT ${col}) as cnt FROM ${table}`)
     ).toArray();
     return (rows[0] as { cnt: number }).cnt;
   };
@@ -2348,9 +2354,9 @@ async function printSummary() {
   ]);
 
   const stateRows = (
-    await Base.connection.selectAll(
-      `SELECT state, COUNT(*) as cnt FROM pull_requests GROUP BY state ORDER BY state`,
-    )
+    await (
+      await Base.leaseConnection()
+    ).selectAll(`SELECT state, COUNT(*) as cnt FROM pull_requests GROUP BY state ORDER BY state`)
   ).toArray() as { cnt: number; state: string }[];
   const stateParts = stateRows.map((r) => `${r.cnt} ${r.state}`).join(", ");
 

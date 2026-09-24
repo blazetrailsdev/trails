@@ -124,18 +124,18 @@ export class JoinDependency {
 
   /** @internal */
   private _baseTableAliasLength(): number | undefined {
-    let connection;
     try {
-      connection =
-        (this._baseModel as any).connectionPool().activeConnection ??
-        (this._baseModel as any).connection;
+      return (this._baseModel as any)
+        .connectionPool()
+        .withConnectionSync((connection: any) =>
+          typeof connection?.tableAliasLength === "function"
+            ? connection.tableAliasLength()
+            : undefined,
+        );
     } catch (error) {
       if (error instanceof ConnectionNotDefined) return undefined;
       throw error;
     }
-    return typeof connection?.tableAliasLength === "function"
-      ? connection.tableAliasLength()
-      : undefined;
   }
 
   /** @internal */

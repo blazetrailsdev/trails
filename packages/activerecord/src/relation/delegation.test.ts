@@ -453,7 +453,7 @@ describe("DelegationTest", () => {
       const relation = Comment.all();
       expect(relation.tableName).toBe(Comment.tableName);
       expect(relation.primaryKey).toBe(Comment.primaryKey);
-      expect(relation.connection).toBe(Comment.connection);
+      expect(await relation.connection).toBe(await Comment.leaseConnection());
       expect(await Comment.all().transaction(async () => 42)).toBe(42);
     });
 

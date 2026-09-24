@@ -126,7 +126,9 @@ describe("InstrumentationTest", () => {
         expect(event.payload.row_count).toBe(10);
       }
     });
-    await Base.connection.execute("SELECT * FROM books WHERE name='row count book 3';");
+    await (
+      await Base.leaseConnection()
+    ).execute("SELECT * FROM books WHERE name='row count book 3';");
   });
 
   it("payload row count on cache", async () => {
@@ -138,7 +140,7 @@ describe("InstrumentationTest", () => {
 
     await Book.create({ name: "row count book" });
     Notifications.subscribe("sql.active_record", callback);
-    await (Base.connection as any).cache(async () => {
+    await ((await Base.leaseConnection()) as any).cache(async () => {
       await Book.first();
       await Book.first();
     });
@@ -152,7 +154,7 @@ describe("InstrumentationTest", () => {
   });
 
   it("payload connection with query cache disabled", async () => {
-    const connection = ClothingItem.connection;
+    const connection = await ClothingItem.leaseConnection();
     Notifications.subscribe("sql.active_record", (event: any) => {
       expect(event.payload.connection).toBe(connection);
     });
@@ -160,11 +162,11 @@ describe("InstrumentationTest", () => {
   });
 
   it("payload connection with query cache enabled", async () => {
-    const connection = ClothingItem.connection;
+    const connection = await ClothingItem.leaseConnection();
     Notifications.subscribe("sql.active_record", (event: any) => {
       expect(event.payload.connection).toBe(connection);
     });
-    await (Book.connection as any).cache(async () => {
+    await ((await Book.leaseConnection()) as any).cache(async () => {
       await Book.first();
       await Book.first();
     });

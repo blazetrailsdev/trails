@@ -78,7 +78,7 @@ describe("MigrationTest", () => {
       _connectionOverride?: DatabaseAdapter;
       _poolOverride?: unknown;
     };
-    const baseAdapter = Base.connection;
+    const baseAdapter = await Base.leaseConnection();
     const basePool = Base.connectionPool();
     const { adapter: override, pool: overridePool } = await checkoutRawTestAdapter();
     const { adapter: poolOverride, pool: poolOverridePool } = await checkoutRawTestAdapter();
@@ -103,7 +103,7 @@ describe("MigrationTest", () => {
   });
 
   it("migration context with async migration() proxy", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     await new SchemaMigration(adapter.pool).dropTable();
     const migrations: MigrationProxy[] = [
       migrationProxy({
@@ -123,7 +123,7 @@ describe("MigrationTest", () => {
   });
 
   it("columnExists forwards type and columnOptionsKeys to the adapter", async () => {
-    const conn = Base.connection;
+    const conn = await Base.leaseConnection();
     expect(await conn.columnExists("people", "first_name")).toBe(true);
     expect(await conn.columnExists("people", "first_name", "string")).toBe(true);
     expect(await conn.columnExists("people", "first_name", "integer")).toBe(false);
@@ -490,7 +490,7 @@ describe("Migration#removeColumns forwards to the connection", () => {
         return wrapped as T;
       }
     }
-    const connection = Base.connection;
+    const connection = await Base.leaseConnection();
     const migration = new Compat();
     migration.connection = connection;
     try {

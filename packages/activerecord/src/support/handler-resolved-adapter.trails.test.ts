@@ -18,7 +18,7 @@ describe("handler-resolved adapter (Phase D-0)", () => {
   fixtures([]);
 
   beforeAll(async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     await adapter.createTable("handler_resolved_comments", (t) => {
       t.string("body");
     });
@@ -41,6 +41,6 @@ describe("handler-resolved adapter (Phase D-0)", () => {
 
   it("model resolves adapter via handler — no static { this.adapter = X } needed", async () => {
     expect(Object.prototype.hasOwnProperty.call(HandlerResolvedPost, "_adapter")).toBe(false);
-    expect(() => HandlerResolvedPost.connection).not.toThrow();
+    await expect(HandlerResolvedPost.leaseConnection()).resolves.toBeDefined();
   });
 });

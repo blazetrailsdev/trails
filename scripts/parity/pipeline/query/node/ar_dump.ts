@@ -211,8 +211,9 @@ async function main(): Promise<void> {
           // execution dialect. Not `arelVisitor` — that is the *factory* method
           // (abstract-adapter.ts:1715, Rails' `arel_visitor`); `visitor` is the
           // instance it built at connect time.
-          const visitor = (Base.connection as { visitor?: InstanceType<typeof Visitors.ToSql> })
-            .visitor;
+          const visitor = (
+            (await Base.leaseConnection()) as { visitor?: InstanceType<typeof Visitors.ToSql> }
+          ).visitor;
           if (visitor == null) throw new Error("connection has no Arel visitor");
           const collector = new Collectors.Composite(
             new Collectors.SQLString(),
@@ -329,7 +330,7 @@ async function main(): Promise<void> {
     // EPERM on Windows when rmSync tries to delete the .db file. Pattern
     // mirrors scripts/parity/pipeline/schema/node/dump.ts:152-153.
     try {
-      const a = Base.connection as { close?: () => void };
+      const a = (await Base.leaseConnection()) as { close?: () => void };
       if (typeof a.close === "function") a.close();
     } catch {
       /* adapter unavailable or already closed */

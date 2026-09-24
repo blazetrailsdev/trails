@@ -21,7 +21,11 @@ export class Connection {
     const columnsHash = schemaCache?.getCachedColumnsHash?.(tableName(this));
     const column = columnsHash?.[toS(attrName)];
     const type = column
-      ? (this._klass?.connection?.lookupCastTypeFromColumn(column) as ValueType | undefined)
+      ? (this._klass
+          .connectionPool()
+          .withConnectionSync((connection: any) => connection.lookupCastTypeFromColumn(column)) as
+          | ValueType
+          | undefined)
       : undefined;
     return type ?? defaultValue();
   }

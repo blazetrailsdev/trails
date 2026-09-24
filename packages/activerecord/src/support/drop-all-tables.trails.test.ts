@@ -40,8 +40,8 @@ async function tableCount(a: DatabaseAdapter): Promise<number> {
   return (await listTables(a)).length;
 }
 
-beforeAll(() => {
-  adapter = Base.connection;
+beforeAll(async () => {
+  adapter = await Base.leaseConnection();
 });
 
 describe("dropAllTables (PG connection-error retry, fake adapter)", () => {

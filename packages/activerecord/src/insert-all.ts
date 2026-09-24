@@ -82,7 +82,7 @@ async function resolveConnectionFacts(
 
 export class InsertAll {
   readonly model: ModelClass;
-  readonly connection: ModelClass["connection"];
+  readonly connection: Awaited<ModelClass["connection"]>;
   inserts: Record<string, unknown>[];
   readonly keys: Set<string>;
   uniqueBy: string | string[] | IndexDefinition | undefined;
@@ -118,7 +118,7 @@ export class InsertAll {
   /** @missingRailsArgs except — PERMANENT */
   constructor(
     relation: Relation<any>,
-    connection: ModelClass["connection"],
+    connection: Awaited<ModelClass["connection"]>,
     inserts: Record<string, unknown>[],
     options: InsertAllOptions = {},
     facts: ResolvedConnectionFacts,
@@ -447,7 +447,7 @@ export interface InsertBuilder {
 export class Builder implements InsertBuilder {
   readonly model: ModelClass;
   private _insertAll: InsertAll;
-  private _connection: ModelClass["connection"];
+  private _connection: Awaited<ModelClass["connection"]>;
 
   constructor(insertAll: InsertAll) {
     this._insertAll = insertAll;

@@ -260,7 +260,9 @@ describe("SQLite3 write-path float binds", () => {
   it("binds a whole-valued float column as SQLITE_FLOAT", async () => {
     const { NumericData } = await import("../../test-helpers/models/numeric-data.js");
     const record = await NumericData.create({ temperature: 2.0 });
-    const rows = (await NumericData.connection.execute(
+    const rows = (await (
+      await NumericData.leaseConnection()
+    ).execute(
       `SELECT typeof("temperature") AS t FROM "numeric_data" WHERE "id" = ${record.id}`,
     )) as Array<{ t: string }>;
     expect(rows[0].t).toBe("real");

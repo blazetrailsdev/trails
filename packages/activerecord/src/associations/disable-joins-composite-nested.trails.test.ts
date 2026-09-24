@@ -39,10 +39,14 @@ describe("DJAS composite-key + nested-through", () => {
   }
 
   beforeAll(async () => {
-    await Base.connection.createTable("ckn_shops", { force: true }, (t: any) => {
+    await (
+      await Base.leaseConnection()
+    ).createTable("ckn_shops", { force: true }, (t: any) => {
       t.string("name");
     });
-    await Base.connection.createTable(
+    await (
+      await Base.leaseConnection()
+    ).createTable(
       "ckn_orders",
       { primaryKey: ["shop_id", "order_number"], force: true },
       (t: any) => {
@@ -51,12 +55,16 @@ describe("DJAS composite-key + nested-through", () => {
         t.string("label");
       },
     );
-    await Base.connection.createTable("ckn_line_items", { force: true }, (t: any) => {
+    await (
+      await Base.leaseConnection()
+    ).createTable("ckn_line_items", { force: true }, (t: any) => {
       t.integer("ckn_order_shop_id");
       t.integer("ckn_order_number");
       t.string("sku");
     });
-    await Base.connection.createTable("ckn_tags", { force: true }, (t: any) => {
+    await (
+      await Base.leaseConnection()
+    ).createTable("ckn_tags", { force: true }, (t: any) => {
       t.integer("ckn_line_item_id");
       t.string("value");
     });

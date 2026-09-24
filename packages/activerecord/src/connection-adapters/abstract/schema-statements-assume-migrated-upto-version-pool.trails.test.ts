@@ -10,9 +10,9 @@ const migrationsDir = (name: string) =>
 const VALID = migrationsDir("valid");
 const OLD_AND_NEW_VERSIONS = migrationsDir("old_and_new_versions");
 
-const assumeMigratedUptoVersion = (version: number) =>
+const assumeMigratedUptoVersion = async (version: number) =>
   (
-    Base.connection as unknown as {
+    (await Base.leaseConnection()) as unknown as {
       assumeMigratedUptoVersion(v: number): Promise<void>;
     }
   ).assumeMigratedUptoVersion(version);
@@ -42,8 +42,8 @@ describe("SchemaStatements#assumeMigratedUptoVersion", () => {
     restore = pointPoolAt([VALID]);
     previousGlobalPaths = Migrator.migrationsPaths;
     Migrator.migrationsPaths = [OLD_AND_NEW_VERSIONS];
-    await new SchemaMigration(Base.connection.pool).dropTable();
-    await new SchemaMigration(Base.connection.pool).createTable();
+    await new SchemaMigration((await Base.leaseConnection()).pool).dropTable();
+    await new SchemaMigration((await Base.leaseConnection()).pool).createTable();
   });
 
   afterEach(() => {
@@ -53,7 +53,9 @@ describe("SchemaStatements#assumeMigratedUptoVersion", () => {
 
   it("backfills every known version up to the target through the pool's migration context", async () => {
     await assumeMigratedUptoVersion(3);
-    expect(await new SchemaMigration(Base.connection.pool).integerVersions()).toEqual([1, 2, 3]);
+    expect(
+      await new SchemaMigration((await Base.leaseConnection()).pool).integerVersions(),
+    ).toEqual([1, 2, 3]);
   });
 
   it("does not re-insert a version the schema_migrations table already holds", async () => {
@@ -76,7 +78,7 @@ describe("SchemaStatements#assumeMigratedUptoVersion", () => {
   });
 
   it("reports no applied versions when schema_migrations does not exist", async () => {
-    await new SchemaMigration(Base.connection.pool).dropTable();
+    await new SchemaMigration((await Base.leaseConnection()).pool).dropTable();
     expect(await Base.connectionPool().migrationContext.getAllVersions()).toEqual([]);
     expect(await Base.connectionPool().migrationContext.currentVersion()).toBe(0);
   });

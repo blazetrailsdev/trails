@@ -31,7 +31,7 @@ class VirtualColumn extends Base {
 }
 
 beforeEach(async () => {
-  adapter = Base.connection as SQLite3Adapter;
+  adapter = (await Base.leaseConnection()) as SQLite3Adapter;
   await adapter.createTable("virtual_columns", { force: true }, (t) => {
     t.string("name");
     t.virtual("upper_name", { type: "string", as: "UPPER(name)", stored: true });

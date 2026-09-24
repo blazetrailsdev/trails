@@ -17,7 +17,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   let previousCreateUnlogged: boolean;
 
   beforeEach(async () => {
-    connection = Base.connection as PostgreSQLAdapter;
+    connection = (await Base.leaseConnection()) as PostgreSQLAdapter;
     previousCreateUnlogged = PostgreSQLAdapter.createUnloggedTables;
     PostgreSQLAdapter.createUnloggedTables = false;
   });

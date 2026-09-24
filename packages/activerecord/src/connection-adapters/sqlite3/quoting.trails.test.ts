@@ -347,7 +347,7 @@ describe("SQLite3::Quoting", () => {
     let adapter: SQLite3Adapter;
 
     beforeEach(async () => {
-      adapter = Base.connection as SQLite3Adapter;
+      adapter = (await Base.leaseConnection()) as SQLite3Adapter;
       await adapter.execute(`DROP TABLE IF EXISTS "quoting_events"`);
       await adapter.execute(`CREATE TABLE "quoting_events" (
         "id" INTEGER PRIMARY KEY AUTOINCREMENT,

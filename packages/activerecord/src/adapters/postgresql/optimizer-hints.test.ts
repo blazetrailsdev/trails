@@ -12,7 +12,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     fixtures(["authors", "posts"]);
 
     beforeAll(async () => {
-      await (Base.connection as PostgreSQLAdapter).enableExtension("pg_hint_plan");
+      await ((await Base.leaseConnection()) as PostgreSQLAdapter).enableExtension("pg_hint_plan");
     });
 
     it("optimizer hints", async () => {

@@ -28,7 +28,7 @@ fixtures(["topics"], { useTransactionalTests: false });
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
-    adapter = Base.connection as PostgreSQLAdapter;
+    adapter = (await Base.leaseConnection()) as PostgreSQLAdapter;
     await adapter.execute(`DROP TABLE IF EXISTS "postgresql_timestamps"`);
     await adapter.execute(`
       CREATE TABLE "postgresql_timestamps" (

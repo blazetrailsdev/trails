@@ -166,7 +166,7 @@ describe("SerializedAttributeTest", () => {
     const t = (await JsonTopic.create({ title: "test" } as any)) as unknown as InstanceType<
       typeof JsonTopic
     >;
-    await (Base.connection as any).execute(
+    await ((await Base.leaseConnection()) as any).execute(
       `UPDATE topics SET content = 'null' WHERE id = ${(t as any).id}`,
     );
     const reloaded = await JsonTopic.find((t as any).id as number);
@@ -181,7 +181,7 @@ describe("SerializedAttributeTest", () => {
       }
     }
     const t = await JsonTopic.create({ title: "test", content: "placeholder" as any });
-    await (Base.connection as any).execute(
+    await ((await Base.leaseConnection()) as any).execute(
       `UPDATE topics SET content = NULL WHERE id = ${(t as any).id}`,
     );
     const reloaded = await JsonTopic.find((t as any).id as number);

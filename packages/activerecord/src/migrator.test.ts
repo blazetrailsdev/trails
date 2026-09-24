@@ -82,7 +82,7 @@ describe("MigratorTest", () => {
   let verboseWas: boolean;
 
   beforeEach(async () => {
-    adapter = Base.connection;
+    adapter = await Base.leaseConnection();
     schemaMigration = new SchemaMigration(adapter.pool);
     await schemaMigration.createTable();
     await schemaMigration.deleteAllVersions();

@@ -269,14 +269,17 @@ describe("AbstractAdapter reconnect/verify lifecycle", () => {
 });
 
 describe("AbstractAdapter#isValidType spelling (trails-only)", () => {
-  it.runIf(adapterType === "postgres")("rejects a camelCase spelling of a native type", () => {
-    const conn = Base.connection;
-    expect(conn.isValidType("bit_varying")).toBe(true);
-    expect(conn.isValidType("bitVarying")).toBe(false);
-  });
+  it.runIf(adapterType === "postgres")(
+    "rejects a camelCase spelling of a native type",
+    async () => {
+      const conn = await Base.leaseConnection();
+      expect(conn.isValidType("bit_varying")).toBe(true);
+      expect(conn.isValidType("bitVarying")).toBe(false);
+    },
+  );
 
-  it("rejects a camelCase spelling of primary_key", () => {
-    const conn = Base.connection;
+  it("rejects a camelCase spelling of primary_key", async () => {
+    const conn = await Base.leaseConnection();
     expect(conn.isValidType("primary_key")).toBe(true);
     expect(conn.isValidType("primaryKey")).toBe(false);
   });

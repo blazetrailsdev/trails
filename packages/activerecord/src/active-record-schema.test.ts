@@ -31,7 +31,7 @@ describe("ActiveRecordSchemaTest", () => {
   beforeEach(async () => {
     originalVerbose = Migration.verbose;
     Migration.verbose = false;
-    adapter = Base.connection;
+    adapter = await Base.leaseConnection();
     schemaMigration = Base.connectionPool().schemaMigration;
     await schemaMigration.createTable();
     await schemaMigration.deleteAllVersions();

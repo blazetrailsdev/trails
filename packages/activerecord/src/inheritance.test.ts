@@ -502,7 +502,7 @@ describe("InheritanceTest", () => {
     const bindParam = new Nodes.BindParam(null);
     await assertQueriesMatch(
       new RegExp(
-        `${regexpEscape(Base.connection.quoteTableName("companies.id"))} = (?:${regexpEscape(bindParam.toSql())}|1)`,
+        `${regexpEscape((await Base.leaseConnection()).quoteTableName("companies.id"))} = (?:${regexpEscape(bindParam.toSql())}|1)`,
         "i",
       ),
       undefined,
@@ -557,7 +557,7 @@ describe("InheritanceComputeTypeTest", () => {
     await Company.loadSchema();
     const originalType = (Company as any).columnsHash()["type"].default;
     try {
-      await Base.connection.changeColumnDefault("companies", "type", "Firm");
+      await (await Base.leaseConnection()).changeColumnDefault("companies", "type", "Firm");
       void (Company as any).resetColumnInformation();
       await Company.loadSchema();
 
@@ -577,7 +577,7 @@ describe("InheritanceComputeTypeTest", () => {
       expect((firm as any).type).toBe("Client");
       expect(firm).toBeInstanceOf(Client);
     } finally {
-      await Base.connection.changeColumnDefault("companies", "type", originalType);
+      await (await Base.leaseConnection()).changeColumnDefault("companies", "type", originalType);
       void (Company as any).resetColumnInformation();
       await Company.loadSchema();
     }
@@ -685,7 +685,9 @@ describe("InheritanceAttributeMappingTest", () => {
     await IamtStartup.create({ name: "a Startup" });
     await IamtEmpire.create({ name: "an Empire" });
 
-    expect((await Base.connection.selectRows("SELECT name, type FROM companies")).sort()).toEqual([
+    expect(
+      (await (await Base.leaseConnection()).selectRows("SELECT name, type FROM companies")).sort(),
+    ).toEqual([
       ["a Startup", "omg_inheritance_attribute_mapping_test/startup"],
       ["an Empire", "omg_inheritance_attribute_mapping_test/empire"],
     ]);
@@ -698,7 +700,9 @@ describe("InheritanceAttributeMappingTest", () => {
     startup!.becomesBang(IamtEmpire);
     await startup!.save();
 
-    expect((await Base.connection.selectRows("SELECT name, type FROM companies")).sort()).toEqual([
+    expect(
+      (await (await Base.leaseConnection()).selectRows("SELECT name, type FROM companies")).sort(),
+    ).toEqual([
       ["a Startup", "omg_inheritance_attribute_mapping_test/empire"],
       ["an Empire", "omg_inheritance_attribute_mapping_test/empire"],
     ]);
@@ -713,9 +717,9 @@ describe("InheritanceAttributeMappingTest", () => {
     const startup = await IamtStartup.create({ name: "a Startup" });
     const sponsor = await IamtSponsor.create({ sponsorable: startup });
 
-    expect(await Base.connection.selectValues("SELECT sponsorable_type FROM sponsors")).toEqual([
-      "omg_inheritance_attribute_mapping_test/company",
-    ]);
+    expect(
+      await (await Base.leaseConnection()).selectValues("SELECT sponsorable_type FROM sponsors"),
+    ).toEqual(["omg_inheritance_attribute_mapping_test/company"]);
 
     const reloaded = await IamtSponsor.includes(":sponsorable").find(sponsor.id);
     expect((reloaded as any).sponsorable?.id).toBe(startup.id);

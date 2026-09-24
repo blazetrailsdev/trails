@@ -25,7 +25,7 @@ import {
   RecordNotSaved,
   UnknownAttributeError,
 } from "./errors.js";
-import { connectionPool, withConnection } from "./connection-handling.js";
+import { withConnection } from "./connection-handling.js";
 import * as LockingOptimistic from "./locking/optimistic.js";
 import {
   attributesForCreate,
@@ -685,11 +685,9 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
   );
   applyDefaultAndGlobalConstraints(um as never, ctor as never);
 
-  const adapter =
-    (connectionPool.call(ctor as unknown as typeof import("./base.js").Base).activeConnection as
-      | typeof ctor.connection
-      | null) ?? ctor.connection;
-  const affectedRows = await adapter.update(um, "Update Columns");
+  const affectedRows = await (ctor as unknown as typeof import("./base.js").Base).withConnection(
+    (c) => c.update(um, "Update Columns"),
+  );
 
   const clearer = this as unknown as { clearAttributeChange?(name: string): void };
   if (typeof clearer.clearAttributeChange === "function") {

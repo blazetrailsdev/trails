@@ -44,7 +44,7 @@ describe("DefaultTest", () => {
 
 describe.skipIf(adapterType === "mysql")("DefaultTest", () => {
   it("multiline default text", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     class Default extends Base {
       static override tableName = "defaults";
     }
@@ -59,7 +59,7 @@ describe("DefaultNumbersTest", () => {
   let DefaultNumber: typeof Base;
 
   beforeEach(async () => {
-    adapter = Base.connection;
+    adapter = await Base.leaseConnection();
     await adapter.createTable("default_numbers", { force: true }, (t: any) => {
       t.integer("positive_integer", { default: 7 });
       t.integer("negative_integer", { default: -5 });
@@ -100,7 +100,7 @@ describe("DefaultStringsTest", () => {
   let DefaultString: typeof Base;
 
   beforeEach(async () => {
-    adapter = Base.connection;
+    adapter = await Base.leaseConnection();
     await adapter.createTable("default_strings", { force: true }, (t: any) => {
       t.string("string_col", { default: "Smith" });
       t.string("string_col_with_quotes", { default: "O'Connor" });
@@ -130,7 +130,7 @@ describe.skipIf(adapterType === "mysql")("DefaultBinaryTest", () => {
   let DefaultBinary: typeof Base;
 
   beforeEach(async () => {
-    adapter = Base.connection;
+    adapter = await Base.leaseConnection();
     await adapter.createTable("default_binaries", { force: true }, (t: any) => {
       t.binary("varbinary_col", { null: false, limit: 64, default: "varbinary_default" });
       t.binary("varbinary_col_hex_looking", { null: false, limit: 64, default: "0xDEADBEEF" });
@@ -168,7 +168,7 @@ describeIfSupports("text_column_with_default", "DefaultTextTest", () => {
   let DefaultText: typeof Base;
 
   beforeEach(async () => {
-    adapter = Base.connection;
+    adapter = await Base.leaseConnection();
     await adapter.createTable("default_texts", { force: true }, (t: any) => {
       t.text("text_col", { default: "Smith" });
       t.text("text_col_with_quotes", { default: "O'Connor" });
@@ -196,8 +196,8 @@ describeIfSupports("text_column_with_default", "DefaultTextTest", () => {
 describeIfPostgresqlAdapter("PostgresqlDefaultExpressionTest", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
-    adapter = Base.connection;
+  beforeEach(async () => {
+    adapter = await Base.leaseConnection();
   });
 
   it("schema dump includes default expression", async () => {
@@ -237,8 +237,8 @@ describeIfPostgresqlAdapter("PostgresqlDefaultExpressionTest", () => {
 describeIfMysqlAdapter("MysqlDefaultExpressionTest", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
-    adapter = Base.connection;
+  beforeEach(async () => {
+    adapter = await Base.leaseConnection();
   });
 
   itIfSupports("default_expression", "schema dump includes default expression", async () => {
@@ -369,8 +369,8 @@ describeIfMysqlAdapter("DefaultsTestWithoutTransactionalFixtures", () => {
 describeIfSqlite("Sqlite3DefaultExpressionTest", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
-    adapter = Base.connection;
+  beforeEach(async () => {
+    adapter = await Base.leaseConnection();
   });
 
   it("schema dump includes default expression", async () => {

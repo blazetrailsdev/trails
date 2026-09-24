@@ -11,8 +11,8 @@ describeIfPg("PostgreSQLAdapter#lookupCastTypeFromColumn", () => {
 
   let connection: PostgreSQLAdapter;
 
-  beforeEach(() => {
-    connection = Base.connection as PostgreSQLAdapter;
+  beforeEach(async () => {
+    connection = (await Base.leaseConnection()) as PostgreSQLAdapter;
   });
 
   describe("on a dropped connection", () => {

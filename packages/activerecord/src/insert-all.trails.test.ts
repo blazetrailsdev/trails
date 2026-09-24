@@ -54,7 +54,7 @@ describe("InsertAll build_insert_sql raw alias syntax", () => {
   fixtures([]);
 
   it.skipIf(adapterType !== "mysql")("selects the alias arm on MySQL >= 8.0.19", async () => {
-    const connection = Ship.connection as unknown as {
+    const connection = (await Ship.leaseConnection()) as unknown as {
       supportsInsertRawAliasSyntax(): Promise<boolean>;
     };
     const rawAlias = await connection.supportsInsertRawAliasSyntax();

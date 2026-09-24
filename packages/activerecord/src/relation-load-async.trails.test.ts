@@ -39,7 +39,7 @@ describe("Relation#load_async", () => {
   });
 
   it("issues the query through select_all with async on", async () => {
-    const connection = Base.connection as unknown as {
+    const connection = (await Base.leaseConnection()) as unknown as {
       selectAll: (...args: unknown[]) => unknown;
       supportsConcurrentConnections(): boolean;
     };
@@ -139,7 +139,7 @@ describe("Relation#load_async", () => {
   );
 
   it("issues an eager-loaded relation's join query with async on", async () => {
-    const connection = Base.connection as unknown as {
+    const connection = (await Base.leaseConnection()) as unknown as {
       selectAll: (...args: unknown[]) => unknown;
       supportsConcurrentConnections(): boolean;
     };
@@ -167,7 +167,7 @@ describe("Relation#load_async", () => {
   it("drains the scheduled query from the loaded? readers", async () => {
     await Topic.create({ title: "sole async topic", author_name: "David" });
 
-    const connection = Base.connection as unknown as {
+    const connection = (await Base.leaseConnection()) as unknown as {
       selectAll: (...args: unknown[]) => unknown;
     };
     const spy = vi.spyOn(connection, "selectAll");
@@ -189,7 +189,7 @@ describe("Relation#load_async", () => {
     const excluded = await Topic.create({ title: "excluded async topic", author_name: "David" });
     await Topic.create({ title: "kept async topic", author_name: "David" });
 
-    const connection = Base.connection as unknown as {
+    const connection = (await Base.leaseConnection()) as unknown as {
       selectAll: (...args: unknown[]) => unknown;
     };
     const spy = vi.spyOn(connection, "selectAll");
@@ -206,7 +206,7 @@ describe("Relation#load_async", () => {
     await Topic.create({ title: "batched async topic", author_name: "David" });
     await Topic.create({ title: "other batched async topic", author_name: "David" });
 
-    const connection = Base.connection as unknown as {
+    const connection = (await Base.leaseConnection()) as unknown as {
       selectAll: (...args: unknown[]) => unknown;
     };
     const spy = vi.spyOn(connection, "selectAll");
@@ -226,7 +226,7 @@ describe("Relation#load_async", () => {
     restoreExecutor = undefined;
     setAsyncQueryExecutor(null);
 
-    const connection = Base.connection as unknown as {
+    const connection = (await Base.leaseConnection()) as unknown as {
       selectAll: (...args: unknown[]) => unknown;
     };
     const spy = vi.spyOn(connection, "selectAll");

@@ -24,7 +24,7 @@ describe("CacheKeyTest", () => {
   fixtures({}, { useTransactionalTests: false });
 
   beforeEach(async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     await adapter.createTable("cache_mes", { force: true }, (t: any) => t.timestamps());
     await adapter.createTable("cache_me_with_versions", { force: true }, (t: any) =>
       t.timestamps(),
@@ -32,7 +32,9 @@ describe("CacheKeyTest", () => {
   });
 
   afterEach(async () => {
-    await Base.connection.dropTable("cache_mes", "cache_me_with_versions", { ifExists: true });
+    await (
+      await Base.leaseConnection()
+    ).dropTable("cache_mes", "cache_me_with_versions", { ifExists: true });
   });
 
   function cacheMe() {

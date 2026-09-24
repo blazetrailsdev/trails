@@ -39,7 +39,7 @@ describe("DJAS — polymorphic belongsTo-through with non-id target PK", () => {
   }
 
   beforeAll(async () => {
-    const conn = Base.connection;
+    const conn = await Base.leaseConnection();
     await conn.createTable("dp_authors", { force: true }, (t: TableDefinition) => {
       t.string("name");
     });

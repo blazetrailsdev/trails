@@ -11,7 +11,7 @@ describeIfPg("PostgreSQLAdapter#lookupCastType", () => {
   let connection: PostgreSQLAdapter;
 
   beforeEach(async () => {
-    connection = Base.connection as PostgreSQLAdapter;
+    connection = (await Base.leaseConnection()) as PostgreSQLAdapter;
     await connection.execute("SELECT 1");
   });
 

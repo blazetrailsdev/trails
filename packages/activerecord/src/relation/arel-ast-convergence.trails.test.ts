@@ -12,20 +12,20 @@ class Post extends Base {
 Post.attribute("id", "integer");
 Post.attribute("author", "string");
 
-function compile(rel: unknown): [string, unknown[]] {
-  const conn = Base.connection as unknown as {
+async function compile(rel: unknown): Promise<[string, unknown[]]> {
+  const conn = (await Base.leaseConnection()) as unknown as {
     toSqlAndBinds(arel: unknown): [string, unknown[], boolean | null, boolean];
   };
   const [sql, binds] = conn.toSqlAndBinds((rel as { arel(): unknown }).arel());
   return [sql, binds];
 }
 
-function rawSql(rel: unknown): string {
-  return compile(rel)[0];
+async function rawSql(rel: unknown): Promise<string> {
+  return (await compile(rel))[0];
 }
 
-function bindValues(rel: unknown): unknown[] {
-  return compile(rel)[1].map((b) => (b as { _value?: unknown })?._value ?? b);
+async function bindValues(rel: unknown): Promise<unknown[]> {
+  return (await compile(rel))[1].map((b) => (b as { _value?: unknown })?._value ?? b);
 }
 
 const openQuote = adapterType === "mysql" ? "`" : '"';
@@ -40,19 +40,19 @@ describe("RFC 0022 arel-AST convergence (relation layer)", () => {
       }).from("posts_cte AS posts");
     }
 
-    it("compiles the array body as a UNION ALL CTE", () => {
-      const sql = rawSql(cteRelation());
+    it("compiles the array body as a UNION ALL CTE", async () => {
+      const sql = await rawSql(cteRelation());
       expect(sql).toContain(`WITH ${openQuote}posts_cte${openQuote} AS`);
       expect(sql).toContain("UNION ALL");
     });
 
     it("threads both operand binds through one collector in order", async (ctx) => {
-      ctx.skip(!(await Base.connection).preparedStatements);
+      ctx.skip(!(await Base.leaseConnection()).preparedStatements);
       const rel = cteRelation();
-      const sql = rawSql(rel);
+      const sql = await rawSql(rel);
       expect(sql).toContain(placeholder1);
       expect(sql).toContain(placeholder2);
-      expect(bindValues(rel)).toEqual(["alice", "bob"]);
+      expect(await bindValues(rel)).toEqual(["alice", "bob"]);
     });
   });
 

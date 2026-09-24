@@ -8,7 +8,7 @@ import { loadAdapterSpecificSchema, loadSchema } from "./load-schema-helper.js";
 
 describe("boot-laid table snapshot", () => {
   it("survives the reset for every table the adapter-specific arm lays", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
 
     await loadAdapterSpecificSchema(adapter);
     const bookkeeping = new Set(["schema_migrations", "ar_internal_metadata"]);
@@ -22,7 +22,7 @@ describe("boot-laid table snapshot", () => {
   });
 
   it("excludes a table left in the database before the schema load", async () => {
-    const adapter = Base.connection;
+    const adapter = await Base.leaseConnection();
     await adapter.execute(`CREATE TABLE leftover_boot_t (id INTEGER PRIMARY KEY)`);
 
     await resetTestTables(adapter);

@@ -99,8 +99,8 @@ describe("Base.adapter without establishConnection", () => {
   beforeEach(() => resetConnection());
   afterEach(() => resetConnection());
 
-  it("throws when no connection is established", () => {
+  it("throws when no connection is established", async () => {
     delete process.env.DATABASE_URL;
-    expect(() => Base.connection).toThrow(/No database connection defined/);
+    await expect(Base.connection).rejects.toThrow(/No database connection defined/);
   });
 });

@@ -1,7 +1,9 @@
 import { Thread } from "@blazetrails/ruby-compat";
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "./base.js";
-import { ActiveRecordError, ConnectionNotEstablished } from "./errors.js";
+import { ActiveRecordError } from "./errors.js";
+import { deprecator } from "./deprecator.js";
+import { assertDeprecated, assertNotDeprecated } from "@blazetrails/activesupport";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
 import { fixtures } from "./test-fixtures.js";
@@ -120,59 +122,56 @@ describe("ConnectionHandlingTest", () => {
       conn = connection;
       expect(Base.connectionPool().activeConnection).toBeTruthy();
       for (let i = 0; i < 2; i++) {
-        expect(Base.connection).toBe(connection);
+        expect(await Base.connection).toBe(connection);
       }
     });
 
     expect(Base.connectionPool().activeConnection).toBeTruthy();
-    expect(Base.connection).toBe(conn);
+    expect(await Base.connection).toBe(conn);
 
     Base.releaseConnection();
   });
 
   it("#connection emits a deprecation warning if ActiveRecord.permanent_connection_checkout == :deprecated", async () => {
     setPermanentConnectionCheckout("deprecated");
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    try {
-      Base.releaseConnection();
 
-      await Base.withConnection(async () => {
-        void Base.connection;
+    Base.releaseConnection();
+
+    await assertDeprecated(null, deprecator(), async () => {
+      await Base.connection;
+    });
+
+    await assertNotDeprecated(deprecator(), async () => {
+      await Base.connection;
+    });
+
+    Base.releaseConnection();
+
+    await assertDeprecated(null, deprecator(), async () => {
+      await Base.connection;
+    });
+
+    Base.releaseConnection();
+
+    await Base.withConnection(async () => {
+      await assertDeprecated(null, deprecator(), async () => {
+        await Base.connection;
       });
-      expect(warnSpy).toHaveBeenCalledTimes(1);
-      warnSpy.mockClear();
-
-      void Base.connection;
-      expect(warnSpy).not.toHaveBeenCalled();
-
-      Base.releaseConnection();
-
-      expect(() => Base.connection).toThrow(ConnectionNotEstablished);
-      expect(warnSpy).toHaveBeenCalledTimes(1);
-      warnSpy.mockClear();
-      Base.releaseConnection();
-
-      await Base.withConnection(async () => {
-        void Base.connection;
-        expect(warnSpy).toHaveBeenCalledTimes(1);
-      });
-    } finally {
-      warnSpy.mockRestore();
-    }
+    });
   });
 
   it("#connection raises an error if ActiveRecord.permanent_connection_checkout == :disallowed", async () => {
     setPermanentConnectionCheckout("disallowed");
     Base.releaseConnection();
 
-    expect(() => Base.connection).toThrow(ActiveRecordError);
+    await expect(Base.connection).rejects.toThrow(ActiveRecordError);
 
     await Base.withConnection(async () => {
-      expect(() => Base.connection).toThrow(ActiveRecordError);
+      await expect(Base.connection).rejects.toThrow(ActiveRecordError);
     });
 
     await Base.leaseConnection();
-    expect(() => Base.connection).not.toThrow();
+    await expect(Base.connection).resolves.not.toThrow();
     Base.releaseConnection();
   });
 
@@ -182,7 +181,7 @@ describe("ConnectionHandlingTest", () => {
 
     await Base.withConnection(
       async (connection) => {
-        expect(Base.connection).toBe(connection);
+        expect(await Base.connection).toBe(connection);
       },
       { preventPermanentCheckout: true },
     );
@@ -464,8 +463,8 @@ describe("ConnectionHandlingTest", () => {
   });
 
   it("#connection returns the active connection inside withConnection", async () => {
-    await Base.withConnection((leased) => {
-      const conn = Base.connection;
+    await Base.withConnection(async (leased) => {
+      const conn = await Base.connection;
       expect(conn).toBe(leased);
     });
   });

@@ -31,14 +31,20 @@ describe("DisableJoinsAssociationScope", () => {
   }
 
   beforeAll(async () => {
-    await Base.connection.createTable("djs_authors", { force: true }, (t: any) => {
+    await (
+      await Base.leaseConnection()
+    ).createTable("djs_authors", { force: true }, (t: any) => {
       t.string("name");
     });
-    await Base.connection.createTable("djs_posts", { force: true }, (t: any) => {
+    await (
+      await Base.leaseConnection()
+    ).createTable("djs_posts", { force: true }, (t: any) => {
       t.integer("djs_author_id");
       t.string("title");
     });
-    await Base.connection.createTable("djs_comments", { force: true }, (t: any) => {
+    await (
+      await Base.leaseConnection()
+    ).createTable("djs_comments", { force: true }, (t: any) => {
       t.integer("djs_post_id");
       t.string("body");
     });

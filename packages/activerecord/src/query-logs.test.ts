@@ -12,11 +12,6 @@ import { Dashboard } from "./test-helpers/models/dashboard.js";
 import { adapterType } from "./test-adapter.js";
 import { queryTransformers } from "./active-record.js";
 
-type RawAdapter = { execute(sql: string, binds?: unknown[], name?: string): Promise<unknown> };
-function leaseConnection(): RawAdapter {
-  return Base.connection as unknown as RawAdapter;
-}
-
 describe("QueryLogsTest", () => {
   fixtures(["dashboards"]);
 
@@ -87,7 +82,7 @@ describe("QueryLogsTest", () => {
       undefined,
       false,
       async () => {
-        await leaseConnection().execute("select dashboard_id from dashboards");
+        await (await Base.leaseConnection()).execute("select dashboard_id from dashboards");
       },
     );
   });
@@ -100,7 +95,7 @@ describe("QueryLogsTest", () => {
       undefined,
       false,
       async () => {
-        await leaseConnection().execute("select dashboard_id from dashboards");
+        await (await Base.leaseConnection()).execute("select dashboard_id from dashboards");
       },
     );
   });
@@ -149,10 +144,10 @@ describe("QueryLogsTest", () => {
     queryLogs.tags = [{ query_counter: () => ++i }];
 
     await assertQueriesMatch(/SELECT 1 \/\*query_counter:1\*\//, undefined, false, async () => {
-      await leaseConnection().execute("SELECT 1");
+      await (await Base.leaseConnection()).execute("SELECT 1");
     });
     await assertQueriesMatch(/SELECT 1 \/\*query_counter:1\*\//, undefined, false, async () => {
-      await leaseConnection().execute("SELECT 1");
+      await (await Base.leaseConnection()).execute("SELECT 1");
     });
   });
 
@@ -164,7 +159,7 @@ describe("QueryLogsTest", () => {
     ];
 
     await assertQueriesMatch(/SELECT 1 \/\*temporary_tag:value\*\//, undefined, false, async () => {
-      await leaseConnection().execute("SELECT 1");
+      await (await Base.leaseConnection()).execute("SELECT 1");
     });
 
     ExecutionContext.setKey("temporary", "new_value");
@@ -174,7 +169,7 @@ describe("QueryLogsTest", () => {
       undefined,
       false,
       async () => {
-        await leaseConnection().execute("SELECT 1");
+        await (await Base.leaseConnection()).execute("SELECT 1");
       },
     );
   });
@@ -199,7 +194,7 @@ describe("QueryLogsTest", () => {
   });
 
   it("connection is passed to tagging proc", async () => {
-    const connection = leaseConnection();
+    const connection = await Base.leaseConnection();
     queryLogs.tags = [
       {
         same_connection: (ctx) =>
@@ -230,7 +225,7 @@ describe("QueryLogsTest", () => {
       undefined,
       false,
       async () => {
-        await leaseConnection().execute("SELECT 1");
+        await (await Base.leaseConnection()).execute("SELECT 1");
       },
     );
   });
@@ -238,7 +233,7 @@ describe("QueryLogsTest", () => {
   it("empty comments are not added", async () => {
     queryLogs.tags = [{ empty: () => null }];
     await assertQueriesMatch(/SELECT 1$/, undefined, false, async () => {
-      await leaseConnection().execute("SELECT 1");
+      await (await Base.leaseConnection()).execute("SELECT 1");
     });
   });
 
@@ -335,7 +330,9 @@ describe("QueryLogsTest", () => {
 
   it.skipIf(adapterType === "postgres")("invalid encoding query", async () => {
     queryLogs.tags = ["application"];
-    await expect(leaseConnection().execute("select 1 as '\uD800'")).resolves.not.toThrow();
+    await expect(
+      (await Base.leaseConnection()).execute("select 1 as '\uD800'"),
+    ).resolves.not.toThrow();
   });
 
   it("custom proc context tags", async () => {

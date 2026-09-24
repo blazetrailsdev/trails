@@ -98,7 +98,7 @@ describe("non-transactional row writes", () => {
 
   it("catches a write in a brace-less arrow body", () => {
     const src = `describe("x", () => {
-  const adapter = Base.connection;
+  const adapter = await Base.leaseConnection();
 
   it("writes", async () => Book.create({ name: "Dune" }));
 });
@@ -169,7 +169,7 @@ describe("non-transactional row writes", () => {
 
   it("catches a write in an it.each table body", () => {
     const src = `describe("x", () => {
-  const adapter = Base.connection;
+  const adapter = await Base.leaseConnection();
 
   it.each([{ name: "Dune" }, { name: "Emma" }])("writes %s", async (row) => {
     await Book.create({ name: row.name });
@@ -231,7 +231,7 @@ describe("non-transactional row writes", () => {
   const suite = setupAdapterSuite({ factory: () => new BetterSQLite3Adapter({ database: ":memory:" }) });
 
   it("inserts", async () => {
-    await Base.connection.execute(\`INSERT INTO widgets (id) VALUES (1)\`);
+    await (await Base.leaseConnection()).execute(\`INSERT INTO widgets (id) VALUES (1)\`);
   });
 });
 `;

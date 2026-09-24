@@ -255,7 +255,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     const treaty = Treaty.new({ treaty_id: "t1", name: "peace" });
     await country.treaties.push(treaty);
 
-    const con = Base.connection;
+    const con = await Base.leaseConnection();
     const rows = await con.selectRows("select * from countries_treaties");
     const record = rows[rows.length - 1] as string[];
     expect(record[0]).toBe("c1");
@@ -566,7 +566,9 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     await david.destroy();
     assertEmpty(await david.projects);
     const joins = (
-      await Base.connection.selectAll("SELECT * FROM developers_projects WHERE developer_id = 1")
+      await (
+        await Base.leaseConnection()
+      ).selectAll("SELECT * FROM developers_projects WHERE developer_id = 1")
     ).toArray();
     assertEmpty(joins);
   });
@@ -587,7 +589,9 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     );
 
     const joins = (
-      await Base.connection.selectAll(
+      await (
+        await Base.leaseConnection()
+      ).selectAll(
         `SELECT * FROM developers_projects WHERE developer_id = ${david.id} AND project_id = ${project.id}`,
       )
     ).toArray();
@@ -611,9 +615,9 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     );
 
     const joins = (
-      await Base.connection.selectAll(
-        `SELECT * FROM developers_projects WHERE developer_id = ${david.id}`,
-      )
+      await (
+        await Base.leaseConnection()
+      ).selectAll(`SELECT * FROM developers_projects WHERE developer_id = ${david.id}`)
     ).toArray();
     assertEmpty(joins);
     await david.reload();
@@ -635,9 +639,9 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     );
 
     const joins = (
-      await Base.connection.selectAll(
-        `SELECT * FROM developers_projects WHERE developer_id = ${david.id}`,
-      )
+      await (
+        await Base.leaseConnection()
+      ).selectAll(`SELECT * FROM developers_projects WHERE developer_id = ${david.id}`)
     ).toArray();
     assertEmpty(joins);
 
@@ -666,18 +670,18 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
 
     assertEmpty(
       (
-        await Base.connection.selectAll(
-          `SELECT * FROM parrots_pirates WHERE parrot_id = ${george.id}`,
-        )
+        await (
+          await Base.leaseConnection()
+        ).selectAll(`SELECT * FROM parrots_pirates WHERE parrot_id = ${george.id}`)
       ).toArray(),
     );
     assertEmpty(await (await george.pirates.reload()).toArray());
 
     assertEmpty(
       (
-        await Base.connection.selectAll(
-          `SELECT * FROM parrots_treasures WHERE parrot_id = ${george.id}`,
-        )
+        await (
+          await Base.leaseConnection()
+        ).selectAll(`SELECT * FROM parrots_treasures WHERE parrot_id = ${george.id}`)
       ).toArray(),
     );
     assertEmpty(await (await george.treasures.reload()).toArray());
@@ -875,7 +879,9 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     await developer.projects.push(project);
     await (developer as any).updateColumns({ name: "Bruza" });
     const rows = (
-      await Base.connection.selectAll(
+      await (
+        await Base.leaseConnection()
+      ).selectAll(
         `SELECT count(*) as c FROM developers_projects WHERE project_id = ${project.id} AND developer_id = ${developer.id}`,
       )
     ).toArray();

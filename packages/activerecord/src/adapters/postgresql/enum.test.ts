@@ -53,10 +53,12 @@ describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   let defaultSearchPath: string;
   beforeAll(async () => {
-    defaultSearchPath = await (Base.connection as PostgreSQLAdapter).schemaSearchPath();
+    defaultSearchPath = await (
+      (await Base.leaseConnection()) as PostgreSQLAdapter
+    ).schemaSearchPath();
   });
   beforeEach(async () => {
-    adapter = Base.connection as PostgreSQLAdapter;
+    adapter = (await Base.leaseConnection()) as PostgreSQLAdapter;
     await adapter.execute(`DROP TABLE IF EXISTS "postgresql_enums" CASCADE`);
     await adapter.execute(`DROP TYPE IF EXISTS "mood" CASCADE`);
     await adapter.createEnum("mood", ["sad", "ok", "happy"]);

@@ -186,8 +186,9 @@ describe("CoreTest", () => {
 
   it("find by cache does not duplicate entries", async () => {
     Topic.initializeFindByCache();
-    const usingPreparedStatements = (Topic.connection as { preparedStatements: boolean })
-      .preparedStatements;
+    const usingPreparedStatements = (
+      (await Topic.leaseConnection()) as { preparedStatements: boolean }
+    ).preparedStatements;
     const topicFindByCache = Topic._findByStatementCache!.get(usingPreparedStatements)!;
 
     await assertDifference(

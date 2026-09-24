@@ -286,7 +286,9 @@ describe("ignored columns follow Rails' value-keyed attribute set (trails)", () 
         this.ignoredColumns = ["author_name"];
       }
     }
-    await Base.connection.execute("INSERT INTO topics (title, author_name) VALUES ('hi', 'bob')");
+    await (
+      await Base.leaseConnection()
+    ).execute("INSERT INTO topics (title, author_name) VALUES ('hi', 'bob')");
     const [topic] = await Topic.findBySql("SELECT * FROM topics");
     expect(
       (topic as unknown as { readAttribute(n: string): unknown }).readAttribute("author_name"),
@@ -302,7 +304,9 @@ describe("ignored columns follow Rails' value-keyed attribute set (trails)", () 
         this.ignoredColumns = ["author_name"];
       }
     }
-    await Base.connection.execute("INSERT INTO topics (title, author_name) VALUES ('hi', 'bob')");
+    await (
+      await Base.leaseConnection()
+    ).execute("INSERT INTO topics (title, author_name) VALUES ('hi', 'bob')");
     const topic = (await Topic.first())!;
     expect("author_name" in topic).toBe(false);
     expect([

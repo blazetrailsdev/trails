@@ -260,8 +260,8 @@ describe("SchemaDumperAdapterTest", () => {
 
   let adapter: DatabaseAdapter;
 
-  beforeEach(() => {
-    adapter = Base.connection;
+  beforeEach(async () => {
+    adapter = await Base.leaseConnection();
   });
 
   it("dumps schema from adapter introspection", async () => {
@@ -381,11 +381,11 @@ describe("SchemaDumperAdapterTest", () => {
 
   afterEach(async () => {
     const o = { ifExists: true } as const;
-    await Base.connection.dropTable("barcodes", o);
-    await Base.connection.dropTable("horses", o);
-    await Base.connection.dropTable("octopi", o);
-    await Base.connection.dropTable("reminders", o);
-    await Base.connection.dropTable("testings", o);
+    await (await Base.leaseConnection()).dropTable("barcodes", o);
+    await (await Base.leaseConnection()).dropTable("horses", o);
+    await (await Base.leaseConnection()).dropTable("octopi", o);
+    await (await Base.leaseConnection()).dropTable("reminders", o);
+    await (await Base.leaseConnection()).dropTable("testings", o);
   });
 });
 

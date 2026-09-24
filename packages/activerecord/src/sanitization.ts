@@ -142,12 +142,12 @@ function isBlankCondition(value: unknown): boolean {
 
 /** @internal */
 interface QuoterHost {
-  connection?: unknown;
+  connectionPool?(): { withConnectionSync<T>(block: (connection: Quoter) => T): T };
 }
 
 /** @internal */
 function quoterFor(host: QuoterHost): Quoter {
-  const conn = host.connection as Quoter | null | undefined;
+  const conn = host.connectionPool?.().withConnectionSync((c) => c);
   if (!conn || typeof conn.quote !== "function") throw new ConnectionNotDefined();
   return conn;
 }

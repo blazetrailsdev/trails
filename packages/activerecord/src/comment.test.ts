@@ -11,7 +11,7 @@ describe("CommentTest", () => {
   let adapter: DatabaseAdapter;
 
   beforeEach(async () => {
-    adapter = Base.connection;
+    adapter = await Base.leaseConnection();
     await adapter.createTable(
       "commenteds",
       { comment: "A table with comment", force: true },

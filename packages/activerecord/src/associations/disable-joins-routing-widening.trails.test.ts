@@ -35,18 +35,26 @@ describe("DJAS routing widening — sourceType + polymorphic source", () => {
   }
 
   beforeAll(async () => {
-    await Base.connection.createTable("rw_authors", { force: true }, (t: any) => {
+    await (
+      await Base.leaseConnection()
+    ).createTable("rw_authors", { force: true }, (t: any) => {
       t.string("name");
     });
-    await Base.connection.createTable("rw_comments", { force: true }, (t: any) => {
+    await (
+      await Base.leaseConnection()
+    ).createTable("rw_comments", { force: true }, (t: any) => {
       t.integer("rw_author_id");
       t.integer("origin_id");
       t.string("origin_type");
     });
-    await Base.connection.createTable("rw_members", { force: true }, (t: any) => {
+    await (
+      await Base.leaseConnection()
+    ).createTable("rw_members", { force: true }, (t: any) => {
       t.string("name");
     });
-    await Base.connection.createTable("rw_other_origins", { force: true }, (t: any) => {
+    await (
+      await Base.leaseConnection()
+    ).createTable("rw_other_origins", { force: true }, (t: any) => {
       t.string("label");
     });
     registerModel("RwAuthor", RwAuthor);

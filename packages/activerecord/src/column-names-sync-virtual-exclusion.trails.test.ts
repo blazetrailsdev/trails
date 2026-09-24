@@ -8,7 +8,7 @@ vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 describe("column_names sync virtual exclusion", () => {
   fixtures([], { useTransactionalTests: false });
   beforeAll(async () => {
-    const conn = Base.connection as unknown as {
+    const conn = (await Base.leaseConnection()) as unknown as {
       internalSchemaCache: { columnsHash(pool: unknown, table: string): Promise<unknown> };
       pool: unknown;
     };

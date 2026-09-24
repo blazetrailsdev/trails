@@ -19,7 +19,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   let connection: PostgreSQLAdapter;
 
   beforeEach(async () => {
-    connection = Base.connection as PostgreSQLAdapter;
+    connection = (await Base.leaseConnection()) as PostgreSQLAdapter;
     await connection.createTable("postgresql_network_addresses", { force: true }, (t) => {
       t.inet("inet_address", { default: "192.168.1.1" });
       t.cidr("cidr_address", { default: "192.168.1.0/24" });

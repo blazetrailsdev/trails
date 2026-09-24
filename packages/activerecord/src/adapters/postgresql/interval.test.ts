@@ -36,7 +36,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   let columnMin: PostgreSQLColumn;
 
   beforeEach(async () => {
-    adapter = Base.connection as PostgreSQLAdapter;
+    adapter = (await Base.leaseConnection()) as PostgreSQLAdapter;
     await adapter.execute(`DROP TABLE IF EXISTS interval_data_types`);
     await adapter.execute(`
       CREATE TABLE interval_data_types (

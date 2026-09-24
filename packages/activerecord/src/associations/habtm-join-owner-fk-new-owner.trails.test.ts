@@ -19,9 +19,9 @@ describe("HABTM join row built against a new owner", () => {
 
     expect(await developer.save()).toBe(true);
 
-    const joinFks = await Base.connection.selectValues(
-      "SELECT developer_id FROM developers_projects WHERE project_id = 1",
-    );
+    const joinFks = await (
+      await Base.leaseConnection()
+    ).selectValues("SELECT developer_id FROM developers_projects WHERE project_id = 1");
     expect(joinFks).toContain(developer.id);
     expect(joinFks).not.toContain(null);
   });

@@ -4,7 +4,6 @@ import { Base } from "./base.js";
 import { leaseConnection, withConnection, connection } from "./connection-handling.js";
 import { adapterDouble, establishConnectionTo } from "./test-helpers/adapter-double.js";
 import { permanentConnectionCheckout, setPermanentConnectionCheckout } from "./active-record.js";
-import { ConnectionNotEstablished } from "./errors.js";
 
 describe("directly bound adapter", () => {
   it("connection, leaseConnection and withConnection resolve to the same session", async () => {
@@ -13,7 +12,7 @@ describe("directly bound adapter", () => {
     await establishConnectionTo(Boundish, bound);
 
     const leased = await leaseConnection.call(Boundish as unknown as typeof Base);
-    const direct = connection.call(Boundish as unknown as typeof Base);
+    const direct = await connection.call(Boundish as unknown as typeof Base);
     const scoped = await withConnection.call(Boundish as unknown as typeof Base, (conn) => conn);
 
     expect(direct).toBe(bound);
@@ -23,14 +22,17 @@ describe("directly bound adapter", () => {
 });
 
 describe("connection without a threaded lease", () => {
-  it("raises ConnectionNotEstablished instead of checking one out synchronously", () => {
+  it("checks one out, as lease_connection does", async () => {
     const was = permanentConnectionCheckout();
     setPermanentConnectionCheckout(true);
     try {
       Base.releaseConnection();
-      expect(() => Base.connection).toThrow(ConnectionNotEstablished);
-      expect(Base.connectionPool().activeConnection).toBeNull();
+      const conn = await Base.connection;
+      expect(conn).toBeTruthy();
+      expect(Base.connectionPool().activeConnection).toBe(conn);
+      expect(Base.connectionPool().isPermanentLease()).toBe(false);
     } finally {
+      Base.releaseConnection();
       setPermanentConnectionCheckout(was);
     }
   });
@@ -41,7 +43,7 @@ describe("connection without a threaded lease", () => {
     try {
       Base.releaseConnection();
       const conn = await Base.withConnection(async (connection) => {
-        expect(Base.connection).toBe(connection);
+        expect(await Base.connection).toBe(connection);
         return connection;
       });
       expect(Base.connectionPool().activeConnection).toBe(conn);
