@@ -22,8 +22,9 @@ description: Restores the per-package dist/ + tsc --build incremental state so p
 # the buildinfo agree with the source hashes it records, it skips compilation;
 # otherwise it rebuilds the affected references.
 #
-# Place AFTER `pnpm install` and BEFORE `pnpm build`. The build step stays in
-# the job unchanged; it simply becomes near-instant on a hit. The first of the
+# Place AFTER `pnpm install` and BEFORE the build step: `pnpm build`, or
+# `pnpm build:ts7` with `compiler: ts7`. The build step becomes near-instant
+# on a hit. The first of the
 # parallel jobs to finish populates the cache; the rest restore it. No
 # `needs:` edge is introduced, so job parallelism is preserved.
 #
