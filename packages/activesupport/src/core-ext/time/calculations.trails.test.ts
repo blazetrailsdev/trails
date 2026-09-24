@@ -19,6 +19,11 @@ function withEnvTz<T>(tz: string, fn: () => T): T {
 }
 
 describe("TimeExtCalculationsTest (trails)", () => {
+  it("advance crosses a date whose to_date is a Julian leap day", () => {
+    const advanced = RubyTime.utc(1500, 3, 10, 15, 15, 10).advance({ days: 1 });
+    expect(advanced.strftime("%Y-%m-%d %H:%M:%S")).toBe("1500-03-11 15:15:10");
+  });
+
   it("advance floors a negative fractional weeks like Ruby's divmod", () => {
     withEnvTz("US/Eastern", () => {
       const advanced = RubyTime.local(2005, 2, 28, 15, 15, 10).advance({ weeks: -1.5 });

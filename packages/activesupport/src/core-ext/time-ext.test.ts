@@ -1828,7 +1828,7 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("at with in option", () => {
-    expect((RubyTime.at as any)(31337, { in: -28800 })).toEqual(
+    expect(RubyTime.at(31337, { in: -28800 })).toEqual(
       RubyTime.new(1970, 1, 1, 0, 42, 17, "-08:00"),
     );
   });
