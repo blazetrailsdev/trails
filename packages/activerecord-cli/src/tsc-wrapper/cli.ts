@@ -4,7 +4,6 @@ import {
   formatDiagnostics,
   formatDiagnosticsWithColorAndContext,
   type CompilerOptions,
-  type Diagnostic,
   type FormatDiagnosticsHost,
 } from "typescript/unstable/sync";
 import * as path from "node:path";
@@ -16,6 +15,7 @@ import {
   createArSolutionBuilder,
   getPreEmitDiagnostics,
   remapDiagnostics,
+  sortAndDeduplicateDiagnostics,
 } from "./ar-program.js";
 import type { SchemaColumnValue } from "@blazetrails/activerecord/type-virtualization/synthesize.js";
 import { parseSchemaTs } from "./schema-ts-parser.js";
@@ -237,21 +237,6 @@ function findConfigFile(
     if (fileExists(fileName)) return fileName;
     if (path.dirname(dir) === dir) return undefined;
   }
-}
-
-function compareDiagnostics(a: Diagnostic, b: Diagnostic): number {
-  return (
-    (a.fileName ?? "").localeCompare(b.fileName ?? "") ||
-    a.pos - b.pos ||
-    a.end - b.end ||
-    a.code - b.code ||
-    a.text.localeCompare(b.text)
-  );
-}
-
-function sortAndDeduplicateDiagnostics(diagnostics: readonly Diagnostic[]): Diagnostic[] {
-  const sorted = [...diagnostics].sort(compareDiagnostics);
-  return sorted.filter((d, i) => i === 0 || compareDiagnostics(sorted[i - 1], d) !== 0);
 }
 
 function handleBuildMode(args: string[]): void {

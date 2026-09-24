@@ -24,7 +24,6 @@ export interface ArTrailsProgram {
   program: Program;
   host: ArRemapHost;
   configDiagnostics: readonly Diagnostic[];
-  dispose(): void;
 }
 
 export function createArTrailsProgram(
@@ -37,7 +36,7 @@ export function createArTrailsProgram(
     ? [configFile.error]
     : api.parseJsonConfigFileContent(configFile.config, { configFileName: configPath }).errors;
   if (configDiagnostics.length > 0) {
-    return { program: undefined!, host: undefined!, configDiagnostics, dispose: () => {} };
+    return { program: undefined!, host: undefined!, configDiagnostics };
   }
   const { baseNames, modelRegistry } = collectBaseDescendants(configPath);
   const plugin = createArModelsPlugin({
@@ -77,7 +76,6 @@ export function createArTrailsProgram(
       getOriginalText: (fileName) => originalTextMap.get(fileName),
     },
     configDiagnostics: [],
-    dispose: () => snapshot.dispose(),
   };
 }
 
@@ -87,15 +85,35 @@ export function getPreEmitDiagnostics(program: Program): Diagnostic[] {
     ...program.getProgramDiagnostics(),
     ...program.getSyntacticDiagnostics(),
     ...program.getGlobalDiagnostics(),
+    ...program.getSemanticDiagnostics(),
   ];
-  if (diagnostics.length === 0) {
-    diagnostics.push(...program.getSemanticDiagnostics());
-    const options = program.getCompilerOptions();
-    if (options.declaration || options.composite) {
-      diagnostics.push(...program.getDeclarationDiagnostics());
-    }
+  const options = program.getCompilerOptions();
+  if (options.declaration || options.composite) {
+    diagnostics.push(...program.getDeclarationDiagnostics());
   }
-  return diagnostics;
+  return sortAndDeduplicateDiagnostics(diagnostics);
+}
+
+function compareStringsCaseSensitive(a: string | undefined, b: string | undefined): number {
+  if (a === b) return 0;
+  if (a === undefined) return -1;
+  if (b === undefined) return 1;
+  return a < b ? -1 : 1;
+}
+
+function compareDiagnostics(a: Diagnostic, b: Diagnostic): number {
+  return (
+    compareStringsCaseSensitive(a.fileName, b.fileName) ||
+    a.pos - b.pos ||
+    a.end - b.end ||
+    a.code - b.code ||
+    compareStringsCaseSensitive(a.text, b.text)
+  );
+}
+
+export function sortAndDeduplicateDiagnostics(diagnostics: readonly Diagnostic[]): Diagnostic[] {
+  const sorted = [...diagnostics].sort(compareDiagnostics);
+  return sorted.filter((d, i) => i === 0 || compareDiagnostics(sorted[i - 1], d) !== 0);
 }
 
 export function remapDiagnostics(
