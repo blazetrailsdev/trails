@@ -12,7 +12,7 @@ import {
   underscore,
 } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { demodulize } from "@blazetrails/activesupport";
+import { DescendantsTracker, demodulize } from "@blazetrails/activesupport";
 import { applicationRecordClass, setApplicationRecordClass } from "./active-record.js";
 
 export interface Inheritance {
@@ -133,17 +133,12 @@ export function polymorphicName(modelClass: typeof Base): string {
   return klass.storeFullClassName ? name : demodulize(name);
 }
 
-/** @noRailsEquivalent CONVERGEABLE base-subclasses-onto-descendants-tracker */
+/** @noRailsEquivalent PERMANENT */
 export function registerSubclass(klass: typeof Base): void {
   const parent = Object.getPrototypeOf(klass) as typeof Base;
   if (!parent || parent === Function.prototype) return;
   if (klass.name) registerModelConstant(klass.name, klass);
-  if (!Object.prototype.hasOwnProperty.call(parent, "_subclasses")) {
-    (parent as any)._subclasses = [];
-  }
-  if (!(parent as any)._subclasses.includes(klass)) {
-    (parent as any)._subclasses.push(klass);
-  }
+  DescendantsTracker.registerSubclass(parent as never, klass as never);
 }
 
 /**

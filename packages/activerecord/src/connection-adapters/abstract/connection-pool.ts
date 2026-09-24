@@ -249,11 +249,6 @@ export class ConnectionPool implements ReapablePool {
 
   automaticReconnect = true;
   checkoutTimeout: number;
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073
-   */
-  adapterReady: Promise<unknown> = Promise.resolve();
 
   private _connections: DatabaseAdapter[] | null = [];
   private _nowConnecting = 0;

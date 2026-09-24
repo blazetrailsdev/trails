@@ -481,7 +481,7 @@ describe("ConnectionHandlingTest", () => {
   it.skipIf(adapterType !== "sqlite")(
     "#adapterClass resolves to the SQLite3Adapter constructor",
     async () => {
-      expect(await Base.adapterClass()).toBe(BetterSQLite3Adapter);
+      expect(Base.adapterClass()).toBe(BetterSQLite3Adapter);
     },
   );
 
@@ -504,7 +504,7 @@ describe("ConnectionHandlingTest", () => {
 
       await InMemoryModel.establishConnection();
       expect(InMemoryModel.connectionPool().dbConfig.database).toBe("db/common.sqlite3");
-      expect(await InMemoryModel.adapterClass()).toBe(await Base.adapterClass());
+      expect(InMemoryModel.adapterClass()).toBe(Base.adapterClass());
     } finally {
       await InMemoryModel.removeConnection();
       Base.configurations(priorConfigs);
@@ -528,7 +528,7 @@ describe("ConnectionHandlingTest", () => {
       await WorkerModel.establishConnection();
       const pool = WorkerModel.connectionPool();
       expect(pool.dbConfig.database).toBe("db/foo-2.sqlite3");
-      const Klass = await WorkerModel.adapterClass();
+      const Klass = WorkerModel.adapterClass();
       const { BetterSQLite3Adapter } =
         await import("./connection-adapters/better-sqlite3-adapter.js");
       expect(Klass).toBe(BetterSQLite3Adapter);
@@ -645,11 +645,10 @@ describe("AbstractAdapter#isPreventingWrites stack matching", () => {
         this.connectionClass = true;
       }
     }
-    const pool = await Base.connectionHandler.establishConnection(
+    await Base.connectionHandler.establishConnection(
       new HashConfig("test", "UnrelatedAbstract", { adapter: "sqlite3", database: ":memory:" }),
       { ownerName: "UnrelatedAbstract", role: "writing" },
     );
-    await pool.adapterReady;
     const conn = await UnrelatedAbstract.leaseConnection();
     expect(conn.isPreventingWrites()).toBe(false);
     Base.connectedTo({ role: "writing", preventWrites: true }, () => {
@@ -671,15 +670,14 @@ describe("AbstractAdapter#isPreventingWrites stack matching", () => {
         this.connectionClass = true;
       }
     }
-    const animalsPool = await Base.connectionHandler.establishConnection(
+    await Base.connectionHandler.establishConnection(
       new HashConfig("test", "AnimalsRecord", { adapter: "sqlite3", database: ":memory:" }),
       { ownerName: "AnimalsRecord", role: "writing" },
     );
-    const mealsPool = await Base.connectionHandler.establishConnection(
+    await Base.connectionHandler.establishConnection(
       new HashConfig("test", "MealsRecord", { adapter: "sqlite3", database: ":memory:" }),
       { ownerName: "MealsRecord", role: "writing" },
     );
-    await Promise.all([animalsPool.adapterReady, mealsPool.adapterReady]);
     const animals = await AnimalsRecord.leaseConnection();
     const meals = await MealsRecord.leaseConnection();
     AnimalsRecord.connectedTo({ role: "writing", preventWrites: true }, () => {
@@ -708,7 +706,6 @@ describe("AbstractAdapter#isPreventingWrites stack matching", () => {
       { ownerName: "OtherAbstract", role: "writing" },
     );
     try {
-      await Promise.all([appPool.adapterReady, otherPool.adapterReady]);
       const appConn = await appPool.leaseConnection();
       const otherConn = await otherPool.leaseConnection();
       ApplicationRecord.connectedTo({ role: "writing", preventWrites: true }, () => {

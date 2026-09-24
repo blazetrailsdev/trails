@@ -238,11 +238,9 @@ describe("DatabaseConfigurations", () => {
 
     it("validate checks the adapter exists", async () => {
       let config = new HashConfig("default_env", "primary", { adapter: "abstract" });
-      expect(config.validateBang()).toBeTruthy();
+      expect(await config.validateBang()).toBeTruthy();
       config = new HashConfig("default_env", "primary", { adapter: "potato" });
-      await assertRaises([AdapterNotFound], {}, () => {
-        config.validateBang();
-      });
+      await assertRaises([AdapterNotFound], {}, () => config.validateBang());
     });
 
     it.skip("inspect does not show secrets", () => {

@@ -4,10 +4,13 @@ const _subclassMap = new globalThis.WeakMap<AnyClass, DescendantsTracker.WeakSet
 let _excludedDescendants: globalThis.WeakSet<AnyClass> | null = new globalThis.WeakSet<AnyClass>();
 let _clearDisabled = false;
 
-export interface ReloadedClassesFiltering {
-  subclasses(): AnyClass[];
-  descendants(): AnyClass[];
-}
+export const ReloadedClassesFiltering = {
+  get subclasses(): AnyClass[] {
+    return DescendantsTracker.rejectBang(
+      _subclassMap.get(this as unknown as AnyClass)?.toArray() ?? [],
+    );
+  },
+};
 
 export namespace DescendantsTracker {
   export class WeakSet<T extends object> {

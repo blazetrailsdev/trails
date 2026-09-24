@@ -235,8 +235,8 @@ export function isDangerousAttributeMethod(this: PrimaryKeyHost, methodName: str
   return dangerousAttributeMethods().has(methodName) && !ID_ATTRIBUTE_METHODS.has(methodName);
 }
 
-export function quotedPrimaryKey(this: PrimaryKeyHost & { adapterClassSync(): unknown }): string {
-  return (this.adapterClassSync() as typeof AbstractAdapter).quoteColumnName(this.primaryKey);
+export function quotedPrimaryKey(this: PrimaryKeyHost & { adapterClass(): unknown }): string {
+  return (this.adapterClass() as typeof AbstractAdapter).quoteColumnName(this.primaryKey);
 }
 
 export function resetPrimaryKey(this: PrimaryKeyHost): void {

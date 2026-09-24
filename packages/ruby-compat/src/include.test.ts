@@ -877,6 +877,62 @@ describe("Module#superMethod", () => {
     expect(new Child().greet()).toBe("mod+parent c");
   });
 
+  it("answers the next reader for `name` and the next writer for `name=`", () => {
+    class Record {
+      stored: unknown = "raw";
+      get title(): unknown {
+        return this.stored;
+      }
+      set title(value: unknown) {
+        this.stored = value;
+      }
+    }
+    class Sub extends Record {}
+    const mod = new Module((m) => {
+      m.moduleEval((table) => {
+        Object.defineProperty(table, "title", {
+          configurable: true,
+          get(this: Sub) {
+            return `<${m.superMethod(this, "title")!()}>`;
+          },
+          set(this: Sub, value: unknown) {
+            m.superMethod(this, "title=")!(`${value}!`);
+          },
+        });
+      });
+    });
+    include(Sub, mod);
+    const record = new Sub();
+    record.title = "x";
+    expect(record.stored).toBe("x!");
+    expect(record.title).toBe("<x!>");
+  });
+
+  it("resumes above a class's singleton link, and the class still constructs", () => {
+    class Parent {
+      value: string;
+      constructor(value: string) {
+        this.value = value;
+      }
+    }
+    class Child extends Parent {
+      constructor(value: string) {
+        super(`child ${value}`);
+      }
+    }
+    const core = new Module((m) => m.defineMethod("findBy", () => "core"));
+    const queries = new Module((m) => {
+      m.defineMethod("findBy", function (this: object) {
+        return `queries+${m.superMethod(this, "findBy")!()}`;
+      });
+    });
+    extend(Child, core);
+    extend(Child, queries);
+    class Grandchild extends Child {}
+    expect((Grandchild as unknown as { findBy(): string }).findBy()).toBe("queries+core");
+    expect(new Grandchild("x").value).toBe("child x");
+  });
+
   it("answers undefined when no ancestor defines the method", () => {
     class Lonely {}
     const mod = new Module();

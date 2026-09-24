@@ -1,5 +1,5 @@
-import { any, isPlainObject, prepend, transformKeys } from "@blazetrails/activesupport";
-import { isEmpty } from "@blazetrails/ruby-compat";
+import { Concern, any, isPlainObject, prepend, transformKeys } from "@blazetrails/activesupport";
+import { Module, extend, include, isEmpty } from "@blazetrails/ruby-compat";
 import { Relation } from "../relation.js";
 import { ADDITIONAL_VALUE_BRAND, EncryptedAttributeType } from "./encrypted-attribute-type.js";
 
@@ -10,7 +10,7 @@ export interface SerializableType {
 export class ExtendedDeterministicQueries {
   private static _installed = false;
 
-  /** @missingRailsCall include — PERMANENT */
+  /** @missingRailsArgs include — PERMANENT */
   static installSupport(targets: {
     Relation: {
       prototype: {
@@ -19,7 +19,7 @@ export class ExtendedDeterministicQueries {
         scopeForCreate: (...args: any[]) => unknown;
       };
     };
-    Base: { findBy: (...args: any[]) => unknown };
+    Base: new (...args: any[]) => unknown;
     EncryptedAttributeType: { prototype: { serialize: (...args: any[]) => unknown } };
   }): void {
     if (this._installed) return;
@@ -28,7 +28,6 @@ export class ExtendedDeterministicQueries {
       string,
       (...args: any[]) => unknown
     >;
-    const baseTarget = targets.Base as unknown as Record<string, (...args: any[]) => unknown>;
     const eatProto = targets.EncryptedAttributeType.prototype as unknown as Record<
       string,
       (...args: any[]) => unknown
@@ -38,7 +37,6 @@ export class ExtendedDeterministicQueries {
     if (typeof relProto.exists !== "function") missing.push("Relation.prototype.exists");
     if (typeof relProto.scopeForCreate !== "function")
       missing.push("Relation.prototype.scopeForCreate");
-    if (typeof baseTarget.findBy !== "function") missing.push("Base.findBy");
     if (typeof eatProto.serialize !== "function")
       missing.push("EncryptedAttributeType.prototype.serialize");
     if (missing.length > 0) {
@@ -58,11 +56,7 @@ export class ExtendedDeterministicQueries {
         return RelationQueries.scopeForCreate.call(this, super_ as (...args: any[]) => unknown);
       },
     });
-    prepend(baseTarget, {
-      findBy(super_, ...args) {
-        return CoreQueries.findBy.call(this, super_ as (...args: any[]) => unknown, args);
-      },
-    });
+    include(targets.Base, CoreQueries);
     prepend(eatProto, {
       serialize(super_, data) {
         return ExtendedEncryptableType.serialize((v: unknown) => super_.call(this, v), data);
@@ -187,11 +181,13 @@ export class RelationQueries {
   }
 }
 
-export class CoreQueries {
-  static findBy(this: any, originalFindBy: (...args: any[]) => unknown, args: unknown[]): unknown {
-    return originalFindBy.call(this, ...EncryptedQuery.processArguments(this, args, false));
-  }
-}
+export const CoreQueries = new Module() as Module & { ClassMethods: Module };
+extend(CoreQueries, Concern);
+CoreQueries.ClassMethods = new Module((mod) => {
+  mod.defineMethod("findBy", function (this: any, ...args: unknown[]) {
+    return mod.superMethod(this, "findBy")!(...EncryptedQuery.processArguments(this, args, false));
+  });
+});
 
 export class AdditionalValue {
   readonly value: unknown;

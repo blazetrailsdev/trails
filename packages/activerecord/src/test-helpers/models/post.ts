@@ -828,8 +828,8 @@ export class FakeKlass {
     return ScopeRegistry.instance();
   }
 
-  static adapterClassSync(): unknown {
-    return Post.adapterClassSync();
+  static adapterClass(): unknown {
+    return Post.adapterClass();
   }
 
   static leaseConnection(): unknown {

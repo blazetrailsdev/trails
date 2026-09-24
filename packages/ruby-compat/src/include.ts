@@ -254,6 +254,10 @@ export class Module {
    * `defineMethod` visible on an already-extended object as Ruby's shared
    * method table does, without retaining the object.
    *
+   * A class's constructor reaches its superclass through the same prototype
+   * link (`super()` reads `Object.getPrototypeOf(klass)`), so the link spliced
+   * above a class is itself a subclass of the class's parent.
+   *
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
   extendObject(obj: object): void {
@@ -262,7 +266,11 @@ export class Module {
       proto = Object.getPrototypeOf(proto) as object | null;
     }
     trackIncludedModule(obj, this);
-    const link = Object.create(Object.getPrototypeOf(obj) as object | null) as object;
+    const parent = Object.getPrototypeOf(obj) as object | null;
+    const link: object =
+      typeof obj === "function" && typeof parent === "function" && parent !== Function.prototype
+        ? class extends (parent as new (...args: never[]) => object) {}
+        : (Object.create(parent) as object);
     Object.defineProperties(link, Object.getOwnPropertyDescriptors(carrierOf(this)));
     let links = singletonCarriers.get(this);
     if (!links) singletonCarriers.set(this, (links = { members: new WeakSet(), refs: new Set() }));
@@ -285,16 +293,31 @@ export class Module {
    * method is the module's own table, not the includer's link, so the link is
    * found on the receiver's prototype chain instead.
    *
+   * A reader and writer generated as one accessor pair are two Ruby methods,
+   * `name` and `name=`, so `name` answers the next getter and `name=` the next
+   * setter, each looked up independently the way Ruby looks each method up.
+   *
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
   superMethod(receiver: object, name: string): ((...args: unknown[]) => unknown) | undefined {
     for (let proto = Object.getPrototypeOf(receiver) as object | null; proto; ) {
       if (isLinkOf(this, proto)) {
-        const next = Object.getPrototypeOf(proto) as Record<string, unknown> | null;
-        const method = next?.[name];
-        return typeof method === "function"
-          ? (method as (...args: unknown[]) => unknown).bind(receiver)
-          : undefined;
+        const writer = name.endsWith("=");
+        const key = writer ? name.slice(0, -1) : name;
+        for (let next = Object.getPrototypeOf(proto) as object | null; next; ) {
+          const descriptor = Object.getOwnPropertyDescriptor(next, key);
+          next = Object.getPrototypeOf(next) as object | null;
+          if (descriptor === undefined) continue;
+          if (!("value" in descriptor)) {
+            const half = writer ? descriptor.set : descriptor.get;
+            if (half === undefined) continue;
+            return half.bind(receiver) as (...args: unknown[]) => unknown;
+          }
+          return !writer && typeof descriptor.value === "function"
+            ? (descriptor.value as (...args: unknown[]) => unknown).bind(receiver)
+            : undefined;
+        }
+        return undefined;
       }
       proto = Object.getPrototypeOf(proto) as object | null;
     }
@@ -360,7 +383,10 @@ function relinkIncluders(mod: Module): void {
   const table = carrierOf(mod);
   for (const link of linksOf(mod)) {
     for (const name of Object.getOwnPropertyNames(link)) {
-      if (!Object.prototype.hasOwnProperty.call(table, name))
+      if (
+        !Object.prototype.hasOwnProperty.call(table, name) &&
+        Object.getOwnPropertyDescriptor(link, name)!.configurable
+      )
         delete (link as Record<string, unknown>)[name];
     }
     Object.defineProperties(link, Object.getOwnPropertyDescriptors(table));

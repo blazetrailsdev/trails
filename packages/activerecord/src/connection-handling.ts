@@ -350,22 +350,10 @@ export function isPrimaryClass(this: typeof Base): boolean {
   return (this as unknown) === ActiveRecord.Base || coreIsApplicationRecordClass.call(this as any);
 }
 
-export function adapterClass(this: typeof Base): Promise<new (...args: any[]) => DatabaseAdapter> {
-  return Promise.resolve(connectionPool.call(this).dbConfig.adapterClass()) as Promise<
-    new (...args: any[]) => DatabaseAdapter
-  >;
-}
-
-/** @noRailsEquivalent CONVERGEABLE adapter-class-sync-retires-with-eager-adapter-resolution */
-export function adapterClassSync(
-  this: typeof Base,
-): (new (...args: any[]) => DatabaseAdapter) | null {
-  const adapterClass = connectionPool.call(this).dbConfig.adapterClass();
-  if (adapterClass instanceof Promise) {
-    adapterClass.catch(() => {});
-    return null;
-  }
-  return adapterClass as new (...args: any[]) => DatabaseAdapter;
+export function adapterClass(this: typeof Base): new (...args: any[]) => DatabaseAdapter {
+  return connectionPool.call(this).dbConfig.adapterClass() as new (
+    ...args: any[]
+  ) => DatabaseAdapter;
 }
 
 export async function removeConnection(this: typeof Base): Promise<HashConfig | undefined> {
@@ -625,7 +613,6 @@ export const ConnectionHandling = {
   connection,
   isPrimaryClass,
   adapterClass,
-  adapterClassSync,
   removeConnection,
   schemaCache,
   clearCacheBang,

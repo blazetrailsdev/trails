@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { fixtures } from "../test-fixtures.js";
+import { Module, extend } from "@blazetrails/ruby-compat";
 import {
   AdditionalValue,
   EncryptedQuery,
@@ -447,12 +448,16 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries.installSupport"
       }
     }
     Object.setPrototypeOf(FakeRelation.prototype, Relation.prototype);
-    class FakeBase {
-      static findBy(conditions: Record<string, unknown>) {
-        (this as any)._lastFindBy = conditions;
-        return "hit";
-      }
-    }
+    class FakeBase {}
+    extend(
+      FakeBase,
+      new Module((mod) => {
+        mod.defineMethod("findBy", function (this: any, conditions: Record<string, unknown>) {
+          this._lastFindBy = conditions;
+          return "hit";
+        });
+      }),
+    );
     class FakeEat extends EncryptedAttributeType {}
     return { Relation: FakeRelation, Base: FakeBase, EncryptedAttributeType: FakeEat };
   }

@@ -2,7 +2,6 @@ import { Nodes, sql as arelSql } from "@blazetrails/arel";
 import { ActsLikeObject, isBlank } from "@blazetrails/activesupport";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import type { Quoting } from "./connection-adapters/abstract/quoting.js";
-import { columnNameMatcher as abstractColumnNameMatcher } from "./connection-adapters/abstract/quoting.js";
 import { PreparedStatementInvalid, UnknownAttributeReference } from "./errors.js";
 
 /** @internal */
@@ -12,14 +11,12 @@ export type Quoter = Pick<
 >;
 
 export function disallowRawSqlBang(
-  this: { adapterClassSync(): unknown },
+  this: { adapterClass(): unknown },
   args: (string | symbol | Nodes.Node)[],
   { permit }: { permit?: RegExp } = {},
 ): void {
   const columnMatcher =
-    permit ??
-    (this.adapterClassSync() as { columnNameMatcher(): RegExp } | null)?.columnNameMatcher() ??
-    abstractColumnNameMatcher();
+    permit ?? (this.adapterClass() as { columnNameMatcher(): RegExp }).columnNameMatcher();
   const unexpected: string[] = [];
   for (const arg of args) {
     if (typeof arg === "symbol" || (typeof arg === "string" && arg.startsWith(":"))) continue;
@@ -139,7 +136,7 @@ export function sanitizeSqlForAssignment(
 
 export function sanitizeSqlForOrder(
   this: QuoterHost & {
-    adapterClassSync(): unknown;
+    adapterClass(): unknown;
     disallowRawSqlBang(args: (string | symbol | Nodes.Node)[], options?: { permit?: RegExp }): void;
     sanitizeSqlArray(template: string, ...binds: unknown[]): string;
   },
@@ -150,7 +147,7 @@ export function sanitizeSqlForOrder(
     const first: unknown = condition[0];
     const firstText = first instanceof Nodes.SqlLiteral ? first.value : String(first);
     if (firstText.includes("?")) {
-      const adapterClass = this.adapterClassSync() as {
+      const adapterClass = this.adapterClass() as {
         columnNameWithOrderMatcher(): RegExp;
       };
       this.disallowRawSqlBang([first as string | symbol | Nodes.Node], {

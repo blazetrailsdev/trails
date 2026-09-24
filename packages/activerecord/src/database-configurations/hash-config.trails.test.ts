@@ -19,9 +19,9 @@ describe("DatabaseConfigurations", () => {
       expect(() => config.newConnection()).toThrow(AdapterNotFound);
     });
 
-    it("validate rejects an empty adapter string", () => {
+    it("validate rejects an empty adapter string", async () => {
       const config = new HashConfig("default_env", "primary", { adapter: "" });
-      expect(() => config.validateBang()).toThrow(AdapterNotFound);
+      await expect(config.validateBang()).rejects.toThrow(AdapterNotFound);
     });
 
     it("validate reports a registered adapter whose loader failed", async () => {
@@ -31,12 +31,14 @@ describe("DatabaseConfigurations", () => {
       const config = new HashConfig("default_env", "primary", {
         adapter: "trails_broken_adapter",
       });
-      expect(config.validateBang()).toBe(true);
-
-      await expect(resolve("trails_broken_adapter")).rejects.toThrow(
+      await expect(config.validateBang()).rejects.toThrow(
         "Error loading the 'trails_broken_adapter' Active Record adapter. Missing a package it depends on? Cannot find module 'pg'",
       );
-      expect(() => config.validateBang()).toThrow(
+
+      expect(() => resolve("trails_broken_adapter")).toThrow(
+        "Error loading the 'trails_broken_adapter' Active Record adapter. Missing a package it depends on? Cannot find module 'pg'",
+      );
+      await expect(config.validateBang()).rejects.toThrow(
         "Error loading the 'trails_broken_adapter' Active Record adapter.",
       );
     });
@@ -155,7 +157,7 @@ describe("DatabaseConfigurations", () => {
         adapter: "trails_refixed_adapter",
       });
       await expect(resolve("trails_refixed_adapter")).rejects.toThrow();
-      expect(() => config.validateBang()).toThrow();
+      await expect(config.validateBang()).rejects.toThrow();
 
       register(
         "trails_refixed_adapter",
@@ -163,7 +165,7 @@ describe("DatabaseConfigurations", () => {
         "./trails-refixed-adapter.js",
         () => Promise.resolve(class {}) as never,
       );
-      expect(config.validateBang()).toBe(true);
+      expect(await config.validateBang()).toBe(true);
     });
   });
 });
