@@ -12,6 +12,7 @@ import {
   assertPredicate,
   assertRaise,
   assertRaises,
+  assertNil,
 } from "../testing/assertions.js";
 import { assertDeprecated } from "../testing/deprecation.js";
 import { deprecator } from "../deprecator.js";
@@ -1780,7 +1781,7 @@ describe("TimeExtCalculationsTest", () => {
     expect(RubyTime.utc(2000).compare(RubyTime.utc(1999, 12, 31, 23, 59, 59, 999).toS())).toBe(1);
     expect(RubyTime.utc(2000).compare(RubyTime.utc(2000, 1, 1, 0, 0, 0).toS())).toBe(0);
     expect(RubyTime.utc(2000).compare(RubyTime.utc(2000, 1, 1, 0, 0, 1, 0).toS())).toBe(-1);
-    expect(RubyTime.utc(2000).compare("Invalid as Time")).toBeNull();
+    assertNil(RubyTime.utc(2000).compare("Invalid as Time"));
   });
 
   it("at with datetime", () => {

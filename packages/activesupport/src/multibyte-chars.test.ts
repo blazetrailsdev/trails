@@ -26,6 +26,7 @@ import {
   assertRaises,
   assertRespondTo,
   assertNotRespondTo,
+  assertNil,
 } from "./testing/assertions.js";
 
 type AnyChars = Chars & Record<string, any>;
@@ -119,7 +120,7 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
   });
 
   it("should return character offset for regexp matches", () => {
-    expect(chars_.matchOperator(/wrong/u)).toBeNull();
+    assertNil(chars_.matchOperator(/wrong/u));
     expect(chars_.matchOperator(/こ/u)).toEqual(0);
     expect(chars_.matchOperator(/こに/u)).toEqual(0);
     expect(chars_.matchOperator(/に/u)).toEqual(1);
@@ -164,20 +165,20 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
   });
 
   it("index should return character offset", () => {
-    expect(chars_.index("u")).toBeNull();
+    assertNil(chars_.index("u"));
     expect(chars_.index("こに")).toEqual(0);
     expect(chars_.index("ち")).toEqual(2);
     expect(chars_.index("ち", -2)).toEqual(2);
-    expect(chars_.index("ち", -1)).toBeNull();
+    assertNil(chars_.index("ち", -1));
     expect(chars_.index("わ")).toEqual(3);
     expect(mbChars("ééxééx").index("x", 4)).toEqual(5);
   });
 
   it("rindex should return character offset", () => {
-    expect(chars_.rindex("u")).toBeNull();
+    assertNil(chars_.rindex("u"));
     expect(chars_.rindex("に")).toEqual(1);
     expect(chars_.rindex("ち", -2)).toEqual(2);
-    expect(chars_.rindex("ち", -3)).toBeNull();
+    assertNil(chars_.rindex("ち", -3));
     expect(mbChars("Café périferôl").rindex("é")).toEqual(6);
     expect(mbChars("Café périferôl").rindex(/\w/u)).toEqual(13);
   });
@@ -327,11 +328,11 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
   });
 
   it("slice should take character offsets", () => {
-    expect(mbChars("").slice(0)).toBeNull();
+    assertNil(mbChars("").slice(0));
     expect(chars_.slice(0)).toEqual("こ");
     expect(chars_.slice(3)).toEqual("わ");
-    expect(mbChars("").slice(new Range(-1, 1))).toBeNull();
-    expect(mbChars("").slice(-1, 1)).toBeNull();
+    assertNil(mbChars("").slice(new Range(-1, 1)));
+    assertNil(mbChars("").slice(-1, 1));
     expect(mbChars("").slice(new Range(0, 10))).toEqual("");
     expect(chars_.slice(new Range(1, 3))).toEqual("にちわ");
     expect(chars_.slice(1, 3)).toEqual("にちわ");
@@ -340,10 +341,10 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
     expect(chars_.slice(new Range(4, 10))).toEqual("");
     expect(chars_.slice(/に/u)).toEqual("に");
     expect(chars_.slice(/に./u)).toEqual("にち");
-    expect(chars_.slice(/unknown/u)).toBeNull();
+    assertNil(chars_.slice(/unknown/u));
     expect(chars_.slice(/(にち)/u, 1)).toEqual("にち");
-    expect(chars_.slice(/(にち)/u, 2)).toBeNull();
-    expect(chars_.slice(new Range(7, 6))).toBeNull();
+    assertNil(chars_.slice(/(にち)/u, 2));
+    assertNil(chars_.slice(new Range(7, 6)));
   });
 
   it("slice bang returns sliced out substring", () => {
@@ -351,7 +352,7 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
   });
 
   it("slice bang returns nil on out of bound arguments", () => {
-    expect(chars_.mbChars().sliceBang(new Range(9, 10))).toBeNull();
+    assertNil(chars_.mbChars().sliceBang(new Range(9, 10)));
   });
 
   it("slice bang removes the slice from the receiver", () => {
@@ -363,7 +364,7 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
   it("slice bang returns nil and does not modify receiver if out of bounds", () => {
     const string = "úüù";
     const chars = mbChars(string);
-    expect(chars.sliceBang(4, 5)).toBeNull();
+    assertNil(chars.sliceBang(4, 5));
     expect(chars).toEqual("úüù");
     expect(string).toEqual("úüù");
   });
@@ -476,7 +477,7 @@ describe("MultibyteCharsTest", () => {
   it("forwarded bang method calls should return nil when result is nil", () => {
     defineStringMethod("__methodForMultibyteTestingThatReturnsNilBang", () => null);
 
-    expect(chars.__methodForMultibyteTestingThatReturnsNilBang()).toBeNull();
+    assertNil(chars.__methodForMultibyteTestingThatReturnsNilBang());
   });
 
   it("methods are forwarded to wrapped string for byte strings", () => {

@@ -36,6 +36,7 @@ import {
   assertRaise,
   assertRaises,
   assertRespondTo,
+  assertNil,
 } from "../testing/assertions.js";
 import { Object as ObjectExt } from "./object/acts-like.js";
 import { deprecator } from "../deprecator.js";
@@ -1105,7 +1106,7 @@ describe("TimeWithZoneTest", () => {
       expect(twz.toTime()).toBe(time);
       expect(time.eql(RubyTime.local(1999, 12, 31, 19))).toEqual(true);
       expect(time.utcOffset).toEqual(RubyTime.local(1999, 12, 31, 19).utcOffset);
-      expect(time.zone).toBeNull();
+      assertNil(time.zone);
     });
   });
 
@@ -1118,7 +1119,7 @@ describe("TimeWithZoneTest", () => {
       expect(twz.toTime()).toBe(time);
       expect(time.eql(RubyTime.local(1999, 12, 31, 19))).toEqual(true);
       expect(time.utcOffset).toEqual(RubyTime.local(1999, 12, 31, 19).utcOffset);
-      expect(time.zone).toBeNull();
+      assertNil(time.zone);
     });
   });
 
@@ -1663,7 +1664,7 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
     setZone(Duration.hours(-9));
     expect(timeZone()!.name).toBe("Alaska");
     setZone(null);
-    expect(timeZone()).toBeNull();
+    assertNil(timeZone());
   });
 
   it("time zone getter and setter with zone default set", () => {
@@ -1714,9 +1715,9 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
   });
 
   it("find zone without bang returns nil if time zone can not be found", () => {
-    expect(findZone("No such timezone exists")).toBeNull();
-    expect(findZone(Duration.hours(-15))).toBeNull();
-    expect(findZone({})).toBeNull();
+    assertNil(findZone("No such timezone exists"));
+    assertNil(findZone(Duration.hours(-15)));
+    assertNil(findZone({}));
   });
 
   it("find zone with bang raises if time zone can not be found", async () => {
@@ -1733,17 +1734,17 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
   });
 
   it("find zone with bang doesnt raises with nil and false", () => {
-    expect(findZoneBang(null)).toBeNull();
+    assertNil(findZoneBang(null));
     expect(findZoneBang(false)).toBe(false);
   });
 
   it("time zone setter with find zone without bang", () => {
     setZone(findZone("No such timezone exists"));
-    expect(timeZone()).toBeNull();
+    assertNil(timeZone());
     setZone(findZone(Duration.hours(-15)));
-    expect(timeZone()).toBeNull();
+    assertNil(timeZone());
     setZone(findZone({}));
-    expect(timeZone()).toBeNull();
+    assertNil(timeZone());
   });
 
   it("current returns time now when zone not set", () => {

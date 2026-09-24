@@ -1,12 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { NullStore } from "../null-store.js";
+import { assertNil } from "../../testing/assertions.js";
 
 describe("NullStoreTest", () => {
   it("cleanup", () => {
     const store = new NullStore();
     store.write("name", "value");
     store.cleanup();
-    expect(store.read("name")).toBeNull();
+    assertNil(store.read("name"));
   });
 
   it("write", () => {
@@ -16,7 +17,7 @@ describe("NullStoreTest", () => {
 
   it("read", () => {
     const store = new NullStore();
-    expect(store.read("anything")).toBeNull();
+    assertNil(store.read("anything"));
   });
 
   it("delete", () => {
@@ -27,29 +28,29 @@ describe("NullStoreTest", () => {
 
   it("increment", () => {
     const store = new NullStore();
-    expect(store.increment("counter")).toBeNull();
+    assertNil(store.increment("counter"));
   });
 
   it("increment with options", () => {
     const store = new NullStore();
-    expect(store.increment("counter", 5)).toBeNull();
+    assertNil(store.increment("counter", 5));
   });
 
   it("decrement", () => {
     const store = new NullStore();
-    expect(store.decrement("counter")).toBeNull();
+    assertNil(store.decrement("counter"));
   });
 
   it("decrement with options", () => {
     const store = new NullStore();
-    expect(store.decrement("counter", 5)).toBeNull();
+    assertNil(store.decrement("counter", 5));
   });
 
   it("delete matched", () => {
     const store = new NullStore();
     store.write("name", "value");
     store.deleteMatched(/name/);
-    expect(store.read("name")).toBeNull();
+    assertNil(store.read("name"));
   });
 
   it.skip("local store strategy", () => {
@@ -64,6 +65,6 @@ describe("NullStoreTest", () => {
     const store = new NullStore();
     store.write("name", "value");
     store.clear();
-    expect(store.read("name")).toBeNull();
+    assertNil(store.read("name"));
   });
 });

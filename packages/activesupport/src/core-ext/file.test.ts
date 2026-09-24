@@ -11,7 +11,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { atomicWrite, probeStatIn } from "./file/atomic.js";
-import { assert, assertNot } from "../testing/assertions.js";
+import { assert, assertNot, assertNil } from "../testing/assertions.js";
 
 describe("AtomicWriteTest", () => {
   let dir: string;
@@ -101,6 +101,6 @@ describe("AtomicWriteTest", () => {
   });
 
   it("probe stat in when no dir", () => {
-    expect(probeStatIn("/dir/does/not/exist")).toBeNull();
+    assertNil(probeStatIn("/dir/does/not/exist"));
   });
 });

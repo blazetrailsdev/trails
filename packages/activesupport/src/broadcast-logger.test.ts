@@ -9,6 +9,7 @@ import {
   assertNotSame,
   assertRespondTo,
   assertSame,
+  assertNil,
 } from "./testing/assertions.js";
 
 type Add = [number, unknown, unknown];
@@ -192,14 +193,14 @@ describe("BroadcastLoggerTest", () => {
   });
 
   it("#progname= sets the progname on the Broadcast logger but doesn't modify the inner loggers", () => {
-    expect(log1.progname).toBeNull();
-    expect(log2.progname).toBeNull();
+    assertNil(log1.progname);
+    assertNil(log2.progname);
 
     logger.progname = "Foo";
 
     expect(logger.progname).toBe("Foo");
-    expect(log1.progname).toBeNull();
-    expect(log2.progname).toBeNull();
+    assertNil(log1.progname);
+    assertNil(log2.progname);
   });
 
   it("#formatter= assigns to all the loggers", () => {

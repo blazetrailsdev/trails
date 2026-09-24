@@ -246,7 +246,7 @@ from Rails on purpose (and why): [ActiveRecord](packages/website/docs/guides/act
 ## Development
 
 ```bash
-# Install dependencies (corepack runs the pnpm version pinned in package.json)
+# Install dependencies
 corepack enable
 pnpm install
 

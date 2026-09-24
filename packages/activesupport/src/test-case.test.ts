@@ -16,6 +16,7 @@ import {
   assertNoDifference,
   assertNot,
   assertRaises,
+  assertNil,
 } from "./testing/assertions.js";
 import { peekCallbackChain } from "./callbacks.js";
 import { stubConst } from "./testing/constant-stubbing.js";
@@ -474,7 +475,7 @@ describe("AssertionsTest", () => {
       },
     );
 
-    expect(retval).toBeNull();
+    assertNil(retval);
   });
 
   it("assert changes with to and case operator", async () => {

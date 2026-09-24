@@ -469,16 +469,6 @@ Object.assign(RubyTime.prototype, {
 
 Object.assign(RubyTime, { current, daysInMonth, daysInYear, rfc3339, atWithCoercion });
 
-Object.defineProperty(RubyTime, Symbol.hasInstance, {
-  value: function (this: typeof RubyTime, other: unknown): boolean {
-    return (
-      Function.prototype[Symbol.hasInstance].call(this, other) ||
-      (this === RubyTime && other instanceof TimeWithZone)
-    );
-  },
-  configurable: true,
-});
-
 RubyTime.at = atWithCoercion;
 
 Object.defineProperty(RubyTime, Symbol.hasInstance, {

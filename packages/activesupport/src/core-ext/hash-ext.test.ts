@@ -11,6 +11,7 @@ import {
   assertRaises,
   assertPredicate,
   assertRespondTo,
+  assertNil,
 } from "../testing/assertions.js";
 import { Date as RubyDate, Time as RubyTime } from "@blazetrails/date";
 import { BigDecimal } from "./big-decimal/conversions.js";
@@ -460,7 +461,7 @@ describe("HashExtTest", () => {
     const extracted: Record<string, unknown> = extractBang(original, "a", "x");
 
     expect(extracted).toEqual(expected);
-    expect(extracted["a"]).toBeNull();
+    assertNil(extracted["a"]);
     expect(extracted["x"]).toBeUndefined();
     expect(original).toEqual(remaining);
   });

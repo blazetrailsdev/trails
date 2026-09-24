@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 import { CurrentAttributes } from "./current-attributes.js";
 import { methodMissingProxy } from "@blazetrails/ruby-compat/method-missing-proxy";
-import { assertSame } from "./testing/assertions.js";
+import { assertSame, assertNil } from "./testing/assertions.js";
 import { zone, setZone } from "./time-zone-config.js";
 
 describe("CurrentAttributesTest", () => {
@@ -165,7 +165,7 @@ describe("CurrentAttributesTest", () => {
     Current.reset();
     expect(zone()!.name).toBe("UTC");
     expect(Session.previous).toBe(42);
-    expect(Session.current).toBeNull();
+    assertNil(Session.current);
   });
 
   it("set auxiliary class based on current attributes via before callback", () => {
@@ -175,7 +175,7 @@ describe("CurrentAttributesTest", () => {
 
     Current.reset();
     expect(Session.previous).toBe(42);
-    expect(Session.current).toBeNull();
+    assertNil(Session.current);
   });
 
   it("set attribute only via scope", () => {

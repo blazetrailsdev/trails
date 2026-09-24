@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { toParam } from "../../index.js";
+import { assertNil } from "../../testing/assertions.js";
 
 class CustomString extends String {
   toParam() {
@@ -14,7 +15,7 @@ describe("ToParamTest", () => {
   });
 
   it("nil", () => {
-    expect(toParam(null)).toBeNull();
+    assertNil(toParam(null));
   });
 
   it("boolean", () => {

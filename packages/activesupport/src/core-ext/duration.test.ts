@@ -2,7 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Duration, Scalar, days } from "../duration.js";
 import { cmp, rbEqual, rbInspect as inspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
-import { assertNothingRaised, assertRaise, assertRaises } from "../testing/assertions.js";
+import {
+  assertNothingRaised,
+  assertRaise,
+  assertRaises,
+  assertNil,
+} from "../testing/assertions.js";
 import { TimeWithZone } from "../time-with-zone.js";
 import { TimeZone } from "../values/time-zone.js";
 import { setZone, zone } from "../time-zone-config.js";
@@ -514,7 +519,7 @@ describe("DurationTest", () => {
     expect(scalar.compareTo(5)).toEqual(1);
     expect(scalar.compareTo(10)).toEqual(0);
     expect(scalar.compareTo(15)).toEqual(-1);
-    expect(scalar.compareTo("foo")).toBeNull();
+    assertNil(scalar.compareTo("foo"));
   });
 
   it("scalar plus", async () => {

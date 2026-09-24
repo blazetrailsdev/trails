@@ -20,13 +20,6 @@
 #   STALE_HOURS — flag a gap since the previous run wider than this (default 26)
 #   TRANSIENT_RETRIES          — outer retries after a transient gh failure (default 2)
 #   TRANSIENT_COOLDOWN_SECONDS — wait before each of those retries (default 1800)
-#
-# The transient arm exists because sync.ts's in-process gh() retry gives up
-# after ~60 s, and the 2026-09-15 outage (`unexpected end of JSON input` on
-# `gh pr list`) lasted about three hours. sync.ts prints
-# TRANSIENT_GH_FAILURE_MARKER (gh-transient-error.ts) when it dies on one, so
-# the transient set is defined once, in TypeScript, and only the marker is
-# matched here.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
