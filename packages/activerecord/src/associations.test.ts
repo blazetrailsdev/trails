@@ -2391,8 +2391,7 @@ describe("AssociationsTest", () => {
 
   it("has one loads through a declared reflection with a composite foreign key", async () => {
     const order = (await CpkOrder.create({ shop_id: 1 })) as CpkOrder;
-    const [shopId, orderId] = order.id as [number, number];
-    await CpkBook.create({ id: [1, 90001], shop_id: shopId, order_id: orderId, title: "Only" });
+    await CpkBook.create({ id: [1, 90001], order, title: "Only" });
     expect((await (order as any).book)?.title).toBe("Only");
   });
 

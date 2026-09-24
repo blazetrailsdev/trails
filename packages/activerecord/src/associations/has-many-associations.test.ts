@@ -1892,15 +1892,9 @@ describe("HasManyAssociationsTest", () => {
   it("deleting composite-key records scopes by tuple, not cartesian product", async () => {
     registerModel([CpkOrder, CpkBook]);
     const order = await CpkOrder.create({ shop_id: 1, status: "open" });
-    const shopId = (order as any).shop_id;
     const orderId = (order as any).id_value;
     const mk = (authorId: number, id: number) =>
-      CpkBook.create({
-        id: [authorId, id],
-        shop_id: shopId,
-        order_id: orderId,
-        title: `b${authorId}-${id}`,
-      });
+      CpkBook.create({ id: [authorId, id], order, title: `b${authorId}-${id}` });
     const b1 = await mk(1, 10);
     const b2 = await mk(2, 20);
     await mk(1, 20);

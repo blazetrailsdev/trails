@@ -1,4 +1,4 @@
-import { kernelCatch, rbEqual } from "@blazetrails/ruby-compat";
+import { aryDelete, kernelCatch, rbEqual } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import { underscore, compactBlank, indexBy, valuesAt } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -718,19 +718,6 @@ export abstract class CollectionAssociation extends Association {
     return this.target.length;
   }
 
-  private recordIdentity(record: Base): string | Base {
-    const pk = (this.klass as any).primaryKey ?? "id";
-    const keys = Array.isArray(pk) ? pk : [pk];
-    const values = keys.map((key: string) =>
-      typeof (record as any)._readAttribute === "function"
-        ? (record as any)._readAttribute(key)
-        : (record as any)[key],
-    );
-    if (values.some((v) => v == null)) return record;
-    const ids = values.map((v) => (typeof v === "bigint" ? v.toString() : v));
-    return JSON.stringify(ids.length === 1 ? ids[0] : ids);
-  }
-
   private async deleteAllRecords(): Promise<number> {
     const rel = this.scope();
     if (rel && typeof rel.deleteAll === "function") {
@@ -744,15 +731,9 @@ export abstract class CollectionAssociation extends Association {
   mergeTargetLists(persisted: Base[], memory: Base[]): Base[] {
     if (memory.length === 0) return persisted;
 
-    const memoryByIdentity = new Map<string | Base, Base>();
-    for (const record of memory) memoryByIdentity.set(this.recordIdentity(record), record);
-
     const merged = persisted.map((record) => {
-      const identity = this.recordIdentity(record);
-      const memRecord = memoryByIdentity.get(identity);
-      if (memRecord) {
-        memoryByIdentity.delete(identity);
-
+      const memRecord = aryDelete(memory, record);
+      if (memRecord != null) {
         const memAttributeNames = new Set(memRecord.attributeNames());
         const changedAttributeNamesToSave = new Set(memRecord.changedAttributeNamesToSave);
         const attrReadonly = (memRecord.constructor as unknown as { _attrReadonly: string[] })
@@ -771,7 +752,7 @@ export abstract class CollectionAssociation extends Association {
       }
     });
 
-    return [...merged, ...[...memoryByIdentity.values()].filter((record) => !record.isPersisted())];
+    return [...merged, ...memory.filter((record) => !record.isPersisted())];
   }
 
   private findByScan(args: unknown[]): Base | Array<Base | undefined> | undefined {

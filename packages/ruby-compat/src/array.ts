@@ -1,4 +1,4 @@
-import { rbEql } from "./rb-equal.js";
+import { rbEql, rbEqual } from "./rb-equal.js";
 import { rbHash } from "./rb-hash.js";
 import { ArgumentError } from "./argument-error.js";
 import { Range } from "./range.js";
@@ -172,6 +172,41 @@ export function arySlice<T>(
 function subseq<T>(ary: readonly T[], beg: number, len: number): T[] | null {
   if (beg > ary.length || beg < 0 || len < 0) return null;
   return ary.slice(beg, beg + len);
+}
+
+/**
+ * Ruby `Array#delete` (`vendor/ruby/array.c:3973` `rb_ary_delete`): removes, in
+ * place, every element `==` to `item` (`rb_equal`, so a record matches by
+ * `ActiveRecord::Core#==`, not identity) and answers the last one removed.
+ * When nothing matched it answers the block's value for `item`, or nil.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function aryDelete<T, U = undefined>(ary: T[], item: T, block?: (item: T) => U): T | U {
+  let v = item;
+  let i2 = 0;
+  for (let i1 = 0; i1 < ary.length; i1++) {
+    const e = ary[i1];
+
+    if (rbEqual(e, item)) {
+      v = e;
+      continue;
+    }
+    if (i1 !== i2) {
+      ary[i2] = e;
+    }
+    i2++;
+  }
+  if (ary.length === i2) {
+    if (block) {
+      return block(item);
+    }
+    return undefined as U;
+  }
+
+  ary.length = i2;
+
+  return v;
 }
 
 /**

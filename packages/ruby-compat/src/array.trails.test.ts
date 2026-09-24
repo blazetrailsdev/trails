@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ArgumentError } from "./argument-error.js";
 import { TypeError } from "./type-error.js";
-import { arySlice, compact, pack, uniq } from "./array.js";
+import { aryDelete, arySlice, compact, pack, uniq } from "./array.js";
 
 describe("Array#pack", () => {
   const long = "a".repeat(100);
@@ -106,5 +106,28 @@ describe("arySlice", () => {
     expect(() => arySlice([1, 2, 3], 0, undefined)).toThrow(TypeError);
     expect(() => arySlice([1, 2, 3], undefined as never)).toThrow(TypeError);
     expect(() => arySlice([1, 2, 3], undefined as never, 1)).toThrow(TypeError);
+  });
+});
+
+describe("aryDelete", () => {
+  it("removes every == element in place and returns the last one removed", () => {
+    const a = { equals: (o: unknown) => o === a || o === b };
+    const b = { equals: (o: unknown) => o === a || o === b };
+    const ary: unknown[] = [a, 1, b, 2];
+    expect(aryDelete(ary, a)).toBe(b);
+    expect(ary).toEqual([1, 2]);
+  });
+
+  it("compares with ==, not identity", () => {
+    const ary: unknown[] = [[1, 2], 3];
+    expect(aryDelete(ary, [1, 2])).toEqual([1, 2]);
+    expect(ary).toEqual([3]);
+  });
+
+  it("returns nil, or the block's value, when nothing matched", () => {
+    const ary = [1, 2];
+    expect(aryDelete(ary, 3)).toBeUndefined();
+    expect(aryDelete(ary, 3, (item) => `not found: ${item}`)).toBe("not found: 3");
+    expect(ary).toEqual([1, 2]);
   });
 });

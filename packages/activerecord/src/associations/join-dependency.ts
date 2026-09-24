@@ -326,12 +326,7 @@ export class JoinDependency {
     strictLoadingValue?: boolean | null,
     block?: (record: any) => void,
   ): any[] {
-    const joinRootPk = this.joinRoot.baseKlass.primaryKey as string | string[] | null;
-    const primaryKey = joinRootPk
-      ? (Array.isArray(joinRootPk) ? joinRootPk : [joinRootPk]).map(
-          (column) => this.aliases().columnAlias(this.joinRoot, column)!,
-        )
-      : null;
+    const primaryKey = this.aliases().columnAlias(this.joinRoot, this.joinRoot.primaryKey);
 
     const seen = new Map<any, Map<JoinPart, Map<unknown, any>>>();
 
@@ -379,7 +374,7 @@ export class JoinDependency {
       for (const rowHash of rows) {
         let parentKey: unknown;
         if (primaryKey) {
-          parentKey = this._keyFor(primaryKey.map((k) => rowHash[k]));
+          parentKey = rowHash[primaryKey];
         } else {
           parentKey = rowHashKeys.find((key) => rbEqual(key, rowHash));
           if (parentKey === undefined) {
