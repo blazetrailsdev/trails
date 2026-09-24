@@ -510,8 +510,7 @@ describe("DeprecationTest", () => {
     expect(e.message).toEqual(":invalid is not a valid deprecation behavior.");
   });
 
-  it.skip("DeprecatedInstanceVariableProxy", async () => {
-    // BLOCKED: deprecation-proxy-cannot-intercept-object-prototype-methods
+  it("DeprecatedInstanceVariableProxy", async () => {
     const instance = new Deprecatee();
     instance.setFubar(
       DeprecatedInstanceVariableProxy.new(instance, "fooBar", "@fubar", { deprecator }),

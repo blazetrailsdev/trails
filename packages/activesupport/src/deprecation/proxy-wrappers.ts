@@ -1,8 +1,8 @@
 import { callerLocations, type CallerLocation, type Deprecation } from "../deprecation.js";
 import { extend, include, Module, prepend } from "@blazetrails/ruby-compat/include";
-import { constantize } from "../inflector.js";
+import { constantize, underscore } from "../inflector.js";
 import { PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
-import { rbEqual, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbEqual, rbObjRespondTo, rbStrSend } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "../hash-utils.js";
 
 function inspect(value: unknown): string {
@@ -12,16 +12,28 @@ function inspect(value: unknown): string {
   return String(value);
 }
 
-function undefMethodProxy<T extends object>(instance: T, methodMissing: MethodMissing): T {
+function undefMethodProxy<T extends object>(
+  instance: T,
+  methodMissing: MethodMissing,
+  superclass: object,
+): T {
   return new Proxy(instance, {
     get(target, prop, receiver) {
       if (typeof prop === "symbol" || PROTOCOL_PROBES.has(prop)) return undefined;
-      if (prop.startsWith("__") || Reflect.has(target, prop)) {
+      if (prop.startsWith("__") || !isUndefined(target, prop, superclass)) {
         return Reflect.get(target, prop, receiver);
       }
       return (...args: unknown[]) => methodMissing.call(target, prop, args);
     },
   });
+}
+
+function isUndefined(target: object, prop: string, superclass: object): boolean {
+  for (let owner: object | null = target; owner && owner !== superclass; ) {
+    if (Object.hasOwn(owner, prop)) return false;
+    owner = Object.getPrototypeOf(owner);
+  }
+  return true;
 }
 
 type MethodMissing = (this: unknown, called: string, args: unknown[]) => unknown;
@@ -32,7 +44,11 @@ export abstract class DeprecationProxy {
 
     if (object == null || object === false) return object;
     const instance = new (this as unknown as new (...a: unknown[]) => DeprecationProxy)(...args);
-    return undefMethodProxy(instance, DeprecationProxy.prototype.methodMissing);
+    return undefMethodProxy(
+      instance,
+      DeprecationProxy.prototype.methodMissing,
+      Object.getPrototypeOf(DeprecationProxy.prototype),
+    );
   }
 
   inspect(): string {
@@ -45,9 +61,11 @@ export abstract class DeprecationProxy {
 
   private methodMissing(called: string, args: unknown[]): unknown {
     this.warn(callerLocations(), called, args);
-    const value = (this.target as Record<string, unknown>)[called];
+    const target = this.target;
+    if (typeof target === "string") return rbStrSend(target, called, ...args)[0];
+    const value = (target as Record<string, unknown>)[called];
     return typeof value === "function"
-      ? (value as (...a: unknown[]) => unknown).apply(this.target, args)
+      ? (value as (...a: unknown[]) => unknown).apply(target, args)
       : value;
   }
 }
@@ -115,7 +133,7 @@ export class DeprecatedInstanceVariableProxy extends DeprecationProxy {
 
   protected override warn(callstack: CallerLocation[], called: string, args: unknown[]): void {
     this._deprecator.warn(
-      `${this._var} is deprecated! Call ${this._method}.${called} instead of ${this._var}.${called}. Args: ${inspect(args)}`,
+      `${this._var} is deprecated! Call ${this._method}.${underscore(called)} instead of ${this._var}.${underscore(called)}. Args: ${inspect(args)}`,
       callstack,
     );
   }
@@ -132,6 +150,7 @@ export class DeprecatedConstantProxy extends Module {
     return undefMethodProxy(
       instance,
       DeprecatedConstantProxy.prototype.methodMissing as MethodMissing,
+      Module.prototype,
     );
   }
 
@@ -202,10 +221,12 @@ export class DeprecatedConstantProxy extends Module {
 
   private methodMissing(called: string, args: unknown[]): unknown {
     this._deprecator.warn(this._message, callerLocations());
-    if (called === "equals") return rbEqual(this.target, args[0]);
-    const value = (this.target as Record<string, unknown>)[called];
+    const target = this.target;
+    if (called === "equals") return rbEqual(target, args[0]);
+    if (typeof target === "string") return rbStrSend(target, called, ...args)[0];
+    const value = (target as Record<string, unknown>)[called];
     return typeof value === "function"
-      ? (value as (...a: unknown[]) => unknown).apply(this.target, args)
+      ? (value as (...a: unknown[]) => unknown).apply(target, args)
       : value;
   }
 }

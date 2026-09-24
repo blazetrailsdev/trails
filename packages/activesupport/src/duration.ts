@@ -20,6 +20,7 @@ import { ArgumentError } from "./hash-utils.js";
 import { toSentence } from "./array-utils.js";
 import { isEmpty } from "@blazetrails/ruby-compat";
 import type { TimeWithZone } from "./time-with-zone.js";
+import { Object as ObjectExt } from "./core-ext/object/acts-like.js";
 import { ISO8601Parser } from "./duration/iso8601-parser.js";
 import { ISO8601Serializer } from "./duration/iso8601-serializer.js";
 
@@ -419,16 +420,7 @@ export class Duration {
   }
 
   private sum(sign: 1 | -1, time: DurationReceiver = timeCurrent()): DurationResult {
-    if (
-      !(
-        time instanceof Date ||
-        time instanceof Temporal.Instant ||
-        time instanceof Temporal.PlainDate ||
-        time instanceof RubyTime ||
-        isDateTime(time) ||
-        (time != null && time.actsLikeTime?.() === true)
-      )
-    ) {
+    if (!(ObjectExt.actsLike(time, "time") || ObjectExt.actsLike(time, "date"))) {
       throw new ArgumentError(`expected a time or date, got ${inspect(time)}`);
     }
 

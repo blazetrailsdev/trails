@@ -1,19 +1,83 @@
-import { valuesAt } from "./hash-utils.js";
+import {
+  NoMethodError,
+  Rational,
+  TypeError,
+  rbBuiltinClassName,
+  rbEqual,
+  rbObjClass,
+} from "@blazetrails/ruby-compat";
+import { isPlainObject, valuesAt } from "./hash-utils.js";
 import { isBlank } from "./string-utils.js";
 
-export function sum<T>(collection: T[], fn?: (item: T) => number): number;
-export function sum<T>(collection: T[], initialValue: number, fn?: (item: T) => number): number;
-export function sum<T>(
-  collection: T[],
-  initialValueOrFn?: number | ((item: T) => number),
-  fn?: (item: T) => number,
-): number {
-  const initialValue = typeof initialValueOrFn === "number" ? initialValueOrFn : 0;
-  const block = typeof initialValueOrFn === "function" ? initialValueOrFn : fn;
-  if (block) {
-    return collection.reduce((acc, item) => acc + block(item), initialValue);
+/**
+ * Ruby core `Enumerable#sum` (`vendor/ruby/enum.c:4760` `enum_sum`), which
+ * Rails' `core_ext/enumerable.rb` inherits rather than defines: `init` (default
+ * `0`) is added to each element (or each block value) by the element's own `+`.
+ */
+export function sum(collection: Iterable<number>): number;
+export function sum<T>(collection: Iterable<T>, block: (element: T) => number): number;
+export function sum<T>(collection: Iterable<T>, ...args: unknown[]): unknown;
+export function sum<T>(collection: Iterable<T>, ...args: unknown[]): unknown {
+  const block =
+    typeof args[args.length - 1] === "function"
+      ? (args.pop() as (element: T) => unknown)
+      : undefined;
+  let v: unknown = args.length === 0 ? 0 : args[0];
+  for (const element of collection) {
+    const i = block ? block(element) : element;
+    v = sumIterSomeValue(v, i);
   }
-  return collection.reduce((acc, item) => acc + (item as unknown as number), initialValue);
+  return v;
+}
+
+/** `sum_iter_some_value` (`vendor/ruby/enum.c:4581`): `memo->v + i`. */
+function sumIterSomeValue(v: unknown, i: unknown): unknown {
+  if (typeof v === "number" || typeof v === "bigint" || v instanceof Rational) {
+    return numericPlus(v, i);
+  }
+  if (typeof v === "string") {
+    if (typeof i !== "string") {
+      throw new TypeError(`no implicit conversion of ${rbBuiltinClassName(i)} into String`);
+    }
+    return v + i;
+  }
+  if (Array.isArray(v)) {
+    if (!Array.isArray(i)) {
+      throw new TypeError(`no implicit conversion of ${rbBuiltinClassName(i)} into Array`);
+    }
+    return [...v, ...i];
+  }
+  const plus = (v as { plus?: unknown } | null)?.plus;
+  if (typeof plus === "function") return plus.call(v, i);
+  throw new NoMethodError(
+    `undefined method '+' for ${v == null ? "nil" : `an instance of ${rbObjClass(v)}`}`,
+  );
+}
+
+/**
+ * `Integer#+` / `Float#+` / `Rational#+` (`vendor/ruby/numeric.c:3983` `rb_int_plus`,
+ * `numeric.c:1176` `rb_float_plus`, `vendor/ruby/rational.c:724` `rb_rational_plus`); a
+ * non-numeric addend goes through `rb_num_coerce_bin` (`numeric.c:477`).
+ */
+function numericPlus(v: number | bigint | Rational, i: unknown): unknown {
+  if (i instanceof Rational || v instanceof Rational) {
+    const [r, other] = v instanceof Rational ? [v, i] : [i as Rational, v];
+    if (typeof other === "number" && !Number.isInteger(other)) return r.toF() + other;
+    if (typeof other === "number" || typeof other === "bigint" || other instanceof Rational) {
+      return r.add(other);
+    }
+  } else if (typeof i === "number" || typeof i === "bigint") {
+    if (typeof v === typeof i) return (v as number) + (i as number);
+    const [n, b] = typeof v === "bigint" ? [i as number, v] : [v, i as bigint];
+    return Number.isInteger(n) ? BigInt(n) + b : n + Number(b);
+  }
+  // `do_coerce` (`vendor/ruby/numeric.c:455`).
+  const coerce = (i as { coerce?: unknown } | null)?.coerce;
+  if (typeof coerce !== "function") {
+    throw new TypeError(`${rbBuiltinClassName(i)} can't be coerced into ${rbObjClass(v)}`);
+  }
+  const [x, y] = coerce.call(i, v) as [unknown, unknown];
+  return sumIterSomeValue(x, y);
 }
 
 export function indexBy<T, K extends string | number>(
@@ -119,9 +183,21 @@ export function filterMap<T, U>(collection: T[], fn: (item: T) => U | null | und
   return result;
 }
 
-export function excluding<T>(collection: T[], ...elements: T[]): T[] {
-  const set = new Set(elements);
-  return collection.filter((item) => !set.has(item));
+export function excluding<T extends Record<string, unknown>>(
+  collection: T,
+  ...elements: unknown[]
+): Partial<T>;
+export function excluding<T>(collection: Iterable<T>, ...elements: unknown[]): T[];
+export function excluding(collection: unknown, ...elements: unknown[]): unknown {
+  elements = elements.flat(1);
+  if (isPlainObject(collection)) {
+    return Object.fromEntries(
+      Object.entries(collection).filter(([element]) => !elements.some((e) => rbEqual(e, element))),
+    );
+  }
+  return [...(collection as Iterable<unknown>)].filter(
+    (element) => !elements.some((e) => rbEqual(e, element)),
+  );
 }
 
 export function including<T>(collection: T[], ...elements: T[]): T[] {
