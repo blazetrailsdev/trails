@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { sql as arelSql } from "@blazetrails/arel";
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import { fixtures } from "./test-fixtures.js";
 import { Post } from "./test-helpers/models/post.js";
 import { User } from "./test-helpers/models/user.js";
@@ -8,18 +9,18 @@ fixtures({});
 
 describe("sanitizeSql", () => {
   it.skip("sanitizeSqlArray replaces ? placeholders with quoted values", () => {
-    expect(User.sanitizeSqlArray("name = ?", "Alice")).toBe("name = 'Alice'");
-    expect(User.sanitizeSqlArray("age > ?", 18)).toBe("age > 18");
-    expect(User.sanitizeSqlArray("name = ? AND age > ?", "Bob", 25)).toBe(
+    expect(User.sanitizeSqlArray(["name = ?", "Alice"])).toBe("name = 'Alice'");
+    expect(User.sanitizeSqlArray(["age > ?", 18])).toBe("age > 18");
+    expect(User.sanitizeSqlArray(["name = ? AND age > ?", "Bob", 25])).toBe(
       "name = 'Bob' AND age > 25",
     );
-    expect(User.sanitizeSqlArray("active = ?", true)).toBe("active = TRUE");
-    expect(User.sanitizeSqlArray("deleted_at = ?", null)).toBe("deleted_at = NULL");
+    expect(User.sanitizeSqlArray(["active = ?", true])).toBe("active = TRUE");
+    expect(User.sanitizeSqlArray(["deleted_at = ?", null])).toBe("deleted_at = NULL");
   });
 
   it("sanitizeSqlArray escapes single quotes", async () => {
     const a = await User.leaseConnection();
-    expect(User.sanitizeSqlArray("name = ?", "O'Brien")).toBe(`name = ${a.quote("O'Brien")}`);
+    expect(User.sanitizeSqlArray(["name = ?", "O'Brien"])).toBe(`name = ${a.quote("O'Brien")}`);
   });
 
   it("sanitizeSql handles string passthrough", () => {
@@ -43,28 +44,25 @@ describe("sanitizeSql", () => {
   });
 
   it("sanitize sql array raises on placeholder bind mismatch", () => {
-    expect(() => Post.sanitizeSqlArray("title = ? AND body = ?", "hello")).toThrow(
+    expect(() => Post.sanitizeSqlArray(["title = ? AND body = ?", "hello"])).toThrow(
       /wrong number of bind variables \(1 for 2\)/,
     );
   });
 
-  it("sanitizeSqlArray raises on extra binds with no placeholders", () => {
-    expect(() => Post.sanitizeSqlArray("SELECT 1", "extra")).toThrow(
-      /wrong number of bind variables \(1 for 0\)/,
-    );
-    expect(() => Post.sanitizeSqlArray("SELECT 1")).not.toThrow();
-  });
-
   it("sanitizeSqlArray interpolates %d as an integer and rejects non-integer values", () => {
-    expect(Post.sanitizeSqlArray("id = %d", 1)).toBe("id = 1");
-    expect(Post.sanitizeSqlArray("id = %d", "12")).toBe("id = 12");
-    expect(() => Post.sanitizeSqlArray("id = %d", "12abc")).toThrow(/invalid value for %d/);
-    expect(() => Post.sanitizeSqlArray("id = %d", "3.5")).toThrow(/invalid value for %d/);
+    expect(Post.sanitizeSqlArray(["id = %d", 1])).toBe("id = 1");
+    expect(Post.sanitizeSqlArray(["id = %d", "12"])).toBe("id = 12");
+    expect(() => Post.sanitizeSqlArray(["id = %d", "12abc"])).toThrow(
+      new ArgumentError('invalid value for Integer(): "12abc"'),
+    );
+    expect(() => Post.sanitizeSqlArray(["id = %d", "3.5"])).toThrow(
+      new ArgumentError('invalid value for Integer(): "3.5"'),
+    );
   });
 
   it("sanitizeSql dispatches through this.sanitizeSqlArray (subclass override)", () => {
     class SubPost extends Post {
-      static override sanitizeSqlArray(_template: string, ..._binds: unknown[]): string {
+      static override sanitizeSqlArray(_ary: [string, ...unknown[]]): string {
         return "OVERRIDDEN";
       }
     }
@@ -84,21 +82,10 @@ describe("sanitizeSql", () => {
     expect(SubPost.sanitizeSqlForConditions("")).toBeNull();
   });
 
-  it("sanitizeSqlForAssignment dispatches array-form through this.sanitizeSql", () => {
-    class SubPost extends Post {
-      static override sanitizeSql(
-        _input: string | [string, ...unknown[]] | null | undefined,
-      ): string | null {
-        return "VIA_SANITIZE_SQL";
-      }
-    }
-    expect(SubPost.sanitizeSqlForAssignment(["a = ?", 1])).toBe("VIA_SANITIZE_SQL");
-  });
-
   it("sanitizeSqlForOrder dispatches through this.sanitizeSqlArray and this.disallowRawSqlBang", () => {
     let disallowCalled = false;
     class SubPost extends Post {
-      static override sanitizeSqlArray(_template: string, ..._binds: unknown[]): string {
+      static override sanitizeSqlArray(_ary: [string, ...unknown[]]): string {
         return "id, 1, 2";
       }
       static override disallowRawSqlBang(_args: unknown[]): void {
@@ -113,7 +100,7 @@ describe("sanitizeSql", () => {
   it("sanitizeSqlForOrder substitutes binds when the first element is an Arel.sql literal", () => {
     let sanitizeCalled = false;
     class SubPost extends Post {
-      static override sanitizeSqlArray(_template: string, ..._binds: unknown[]): string {
+      static override sanitizeSqlArray(_ary: [string, ...unknown[]]): string {
         sanitizeCalled = true;
         return "field(id, 1,3,2)";
       }
@@ -140,25 +127,28 @@ describe("sanitizeSql", () => {
     it("sanitize sql array handles %s format string", async () => {
       const connection = await Post.leaseConnection();
       const qs = (v: unknown) => connection.quoteString(String(v));
-      const result = Post.sanitizeSqlArray("name='%s' and group_id='%s'", "foo'bar", 4);
+      const result = Post.sanitizeSqlArray(["name='%s' and group_id='%s'", "foo'bar", 4]);
       expect(result).toBe(`name='${qs("foo'bar")}' and group_id='${qs(4)}'`);
     });
 
     it("sanitize sql array %s format raises on arity mismatch", () => {
-      expect(() => Post.sanitizeSqlArray("name='%s' and id='%s'", "foo")).toThrow(
-        /wrong number of bind variables/,
+      expect(() => Post.sanitizeSqlArray(["name='%s' and id='%s'", "foo"])).toThrow(
+        new ArgumentError("too few arguments"),
       );
     });
 
     it("sanitize sql array %s format coerces nullish to empty string", () => {
-      expect(Post.sanitizeSqlArray("name='%s'", null)).toBe("name=''");
+      expect(Post.sanitizeSqlArray(["name='%s'", null])).toBe("name=''");
     });
 
     it("handles named bind variables with simple strings", () => {
-      const result = Post.sanitizeSqlArray("title = :title AND author = :author", {
-        title: "Hello",
-        author: "World",
-      });
+      const result = Post.sanitizeSqlArray([
+        "title = :title AND author = :author",
+        {
+          title: "Hello",
+          author: "World",
+        },
+      ]);
       expect(result).toBe("title = 'Hello' AND author = 'World'");
     });
 
@@ -167,74 +157,80 @@ describe("sanitizeSql", () => {
         castBoundValue(v: unknown): unknown;
         quote(v: unknown): string;
       };
-      const result = Post.sanitizeSqlArray("id = :id AND status = :status", {
-        id: 42,
-        status: "active",
-      });
+      const result = Post.sanitizeSqlArray([
+        "id = :id AND status = :status",
+        {
+          id: 42,
+          status: "active",
+        },
+      ]);
       expect(result).toBe(
         `id = ${a.quote(a.castBoundValue(42))} AND status = ${a.quote(a.castBoundValue("active"))}`,
       );
     });
 
     it.skip("handles mixed types in named bind variables", () => {
-      const result = Post.sanitizeSqlArray(
+      const result = Post.sanitizeSqlArray([
         "deleted_at IS :deleted AND age > :age AND active = :active",
         {
           deleted: null,
           age: 18,
           active: true,
         },
-      );
+      ]);
       expect(result).toContain("IS NULL");
       expect(result).toContain("age > 18");
       expect(result).toContain("active = TRUE");
     });
 
     it("escapes single quotes in named bind variables", async () => {
-      const result = Post.sanitizeSqlArray("title = :title", { title: "It's a title" });
+      const result = Post.sanitizeSqlArray(["title = :title", { title: "It's a title" }]);
       expect(result).toBe(`title = ${(await Post.leaseConnection()).quote("It's a title")}`);
     });
 
     it("handles PostgreSQL type casts in named bind variable patterns", () => {
-      const result = Post.sanitizeSqlArray("created_at::date = :date", { date: "2024-01-01" });
+      const result = Post.sanitizeSqlArray(["created_at::date = :date", { date: "2024-01-01" }]);
       expect(result).toContain("::");
       expect(result).toContain("'2024-01-01'");
     });
 
     it("handles escaped colons in named bind variable patterns", () => {
-      const result = Post.sanitizeSqlArray("TO_TIMESTAMP(:date, 'YYYY/MM/DD HH12\\:MI\\:SS')", {
-        date: "2024-01-01",
-      });
+      const result = Post.sanitizeSqlArray([
+        "TO_TIMESTAMP(:date, 'YYYY/MM/DD HH12\\:MI\\:SS')",
+        {
+          date: "2024-01-01",
+        },
+      ]);
       expect(result).toContain("'2024-01-01'");
       expect(result).toContain("HH12:MI:SS");
     });
 
     it("raises on missing named bind variable", () => {
       expect(() =>
-        Post.sanitizeSqlArray("title = :title AND author = :author", { title: "Hello" }),
+        Post.sanitizeSqlArray(["title = :title AND author = :author", { title: "Hello" }]),
       ).toThrow(/missing value for :author/);
     });
 
     it("raises on mismatched positional bind variable count", () => {
-      expect(() => Post.sanitizeSqlArray("title = ? AND author = ?", "hello")).toThrow(
+      expect(() => Post.sanitizeSqlArray(["title = ? AND author = ?", "hello"])).toThrow(
         /wrong number of bind variables \(1 for 2\)/,
       );
     });
 
     it("handles empty arrays as bind values", () => {
-      const result = Post.sanitizeSqlArray("id IN (?)", []);
+      const result = Post.sanitizeSqlArray(["id IN (?)", []]);
       expect(result).toContain("NULL");
     });
 
     it("handles arrays as bind values", () => {
-      const result = Post.sanitizeSqlArray("id IN (?)", [1, 2, 3]);
+      const result = Post.sanitizeSqlArray(["id IN (?)", [1, 2, 3]]);
       expect(result).toContain("1");
       expect(result).toContain("2");
       expect(result).toContain("3");
     });
 
     it("boolean quoting routes through the active adapter", async () => {
-      const sql = Post.sanitizeSqlArray("active = ?", true);
+      const sql = Post.sanitizeSqlArray(["active = ?", true]);
       const a = (await Post.leaseConnection()) as unknown as {
         castBoundValue(v: unknown): unknown;
         quote(v: unknown): string;

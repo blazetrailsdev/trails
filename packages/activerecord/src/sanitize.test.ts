@@ -45,49 +45,49 @@ class SimpleEnumerable {
 describe("SanitizeTest", () => {
   it("sanitize sql array handles string interpolation", async () => {
     const quotedBambi = (await Base.leaseConnection()).quoteString("Bambi");
-    expect(Binary.sanitizeSqlArray("name='%s'", "Bambi")).toBe(`name='${quotedBambi}'`);
-    expect(Binary.sanitizeSqlArray("name='%s'", "Bambi")).toBe(`name='${quotedBambi}'`);
+    expect(Binary.sanitizeSqlArray(["name='%s'", "Bambi"])).toBe(`name='${quotedBambi}'`);
+    expect(Binary.sanitizeSqlArray(["name='%s'", "Bambi"])).toBe(`name='${quotedBambi}'`);
     const quotedBambiAndThumper = (await Base.leaseConnection()).quoteString("Bambi\nand\nThumper");
-    expect(Binary.sanitizeSqlArray("name='%s'", "Bambi\nand\nThumper")).toBe(
+    expect(Binary.sanitizeSqlArray(["name='%s'", "Bambi\nand\nThumper"])).toBe(
       `name='${quotedBambiAndThumper}'`,
     );
-    expect(Binary.sanitizeSqlArray("name='%s'", "Bambi\nand\nThumper")).toBe(
+    expect(Binary.sanitizeSqlArray(["name='%s'", "Bambi\nand\nThumper"])).toBe(
       `name='${quotedBambiAndThumper}'`,
     );
   });
 
   it("sanitize sql array handles bind variables", async () => {
     const quotedBambi = (await Base.leaseConnection()).quote("Bambi");
-    expect(Binary.sanitizeSqlArray("name=?", "Bambi")).toBe(`name=${quotedBambi}`);
-    expect(Binary.sanitizeSqlArray("name=?", "Bambi")).toBe(`name=${quotedBambi}`);
+    expect(Binary.sanitizeSqlArray(["name=?", "Bambi"])).toBe(`name=${quotedBambi}`);
+    expect(Binary.sanitizeSqlArray(["name=?", "Bambi"])).toBe(`name=${quotedBambi}`);
     const quotedBambiAndThumper = (await Base.leaseConnection()).quote("Bambi\nand\nThumper");
-    expect(Binary.sanitizeSqlArray("name=?", "Bambi\nand\nThumper")).toBe(
+    expect(Binary.sanitizeSqlArray(["name=?", "Bambi\nand\nThumper"])).toBe(
       `name=${quotedBambiAndThumper}`,
     );
-    expect(Binary.sanitizeSqlArray("name=?", "Bambi\nand\nThumper")).toBe(
+    expect(Binary.sanitizeSqlArray(["name=?", "Bambi\nand\nThumper"])).toBe(
       `name=${quotedBambiAndThumper}`,
     );
   });
 
   it("sanitize sql array handles named bind variables", async () => {
     const quotedBambi = (await Base.leaseConnection()).quote("Bambi");
-    expect(Binary.sanitizeSqlArray("name=:name", { name: "Bambi" })).toBe(`name=${quotedBambi}`);
+    expect(Binary.sanitizeSqlArray(["name=:name", { name: "Bambi" }])).toBe(`name=${quotedBambi}`);
     if (currentAdapter("Mysql2Adapter", "TrilogyAdapter")) {
-      expect(Binary.sanitizeSqlArray("name=:name AND id=:id", { name: "Bambi", id: 1 })).toBe(
+      expect(Binary.sanitizeSqlArray(["name=:name AND id=:id", { name: "Bambi", id: 1 }])).toBe(
         `name=${quotedBambi} AND id='1'`,
       );
     } else {
-      expect(Binary.sanitizeSqlArray("name=:name AND id=:id", { name: "Bambi", id: 1 })).toBe(
+      expect(Binary.sanitizeSqlArray(["name=:name AND id=:id", { name: "Bambi", id: 1 }])).toBe(
         `name=${quotedBambi} AND id=1`,
       );
     }
 
     const quotedBambiAndThumper = (await Base.leaseConnection()).quote("Bambi\nand\nThumper");
-    expect(Binary.sanitizeSqlArray("name=:name", { name: "Bambi\nand\nThumper" })).toBe(
+    expect(Binary.sanitizeSqlArray(["name=:name", { name: "Bambi\nand\nThumper" }])).toBe(
       `name=${quotedBambiAndThumper}`,
     );
     expect(
-      Binary.sanitizeSqlArray("name=:name AND name2=:name", { name: "Bambi\nand\nThumper" }),
+      Binary.sanitizeSqlArray(["name=:name AND name2=:name", { name: "Bambi\nand\nThumper" }]),
     ).toBe(`name=${quotedBambiAndThumper} AND name2=${quotedBambiAndThumper}`);
   });
 
@@ -97,15 +97,15 @@ describe("SanitizeTest", () => {
 
     const subQueryPattern = /\(\bselect\b.*?\bwhere\b.*?\)/i;
 
-    let selectAuthorSql = Post.sanitizeSqlArray("id in (?)", davidPosts);
+    let selectAuthorSql = Post.sanitizeSqlArray(["id in (?)", davidPosts]);
     expect(selectAuthorSql).toMatch(subQueryPattern);
 
-    selectAuthorSql = Post.sanitizeSqlArray("id in (:post_ids)", { post_ids: davidPosts });
+    selectAuthorSql = Post.sanitizeSqlArray(["id in (:post_ids)", { post_ids: davidPosts }]);
     expect(selectAuthorSql).toMatch(subQueryPattern);
   });
 
   it("sanitize sql array handles empty statement", () => {
-    const selectAuthorSql = Post.sanitizeSqlArray("");
+    const selectAuthorSql = Post.sanitizeSqlArray([""]);
     expect(selectAuthorSql).toBe("");
   });
 

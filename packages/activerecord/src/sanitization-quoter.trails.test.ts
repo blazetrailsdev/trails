@@ -26,8 +26,14 @@ const poolFor = (q: Quoter) => () => ({
   withConnectionSync: <T>(block: (connection: Quoter) => T): T => block(q),
 });
 
+const typeForAttribute = () => ({ cast: (v: unknown) => v, serialize: (v: unknown) => v });
+
 describe("sanitization quoter threading (module-level)", () => {
-  const hostFor = (q: Quoter) => ({ connectionPool: poolFor(q), ...ClassMethods });
+  const hostFor = (q: Quoter) => ({
+    connectionPool: poolFor(q),
+    typeForAttribute,
+    ...ClassMethods,
+  });
 
   it("MySQL emits backtick-qualified `table`.`column` for hash assignment", () => {
     expect(hostFor(mysqlQuoter).sanitizeSqlHashForAssignment({ name: "x" }, "users")).toBe(
@@ -59,8 +65,8 @@ describe("sanitization quoter threading (module-level)", () => {
 });
 
 describe("sanitization class-method dispatch threads `this.connection`", () => {
-  const mysqlHost = { connectionPool: poolFor(mysqlQuoter) };
-  const pgHost = { connectionPool: poolFor(pgQuoter) };
+  const mysqlHost = { connectionPool: poolFor(mysqlQuoter), typeForAttribute };
+  const pgHost = { connectionPool: poolFor(pgQuoter), typeForAttribute };
 
   it("sanitizeSqlHashForAssignment uses MySQL adapter from this.connection", () => {
     expect(ClassMethods.sanitizeSqlHashForAssignment.call(mysqlHost, { name: "x" }, "users")).toBe(
@@ -75,7 +81,7 @@ describe("sanitization class-method dispatch threads `this.connection`", () => {
   });
 
   it("sanitizeSqlArray uses dialect quoter for `?` binds", () => {
-    expect(ClassMethods.sanitizeSqlArray.call(mysqlHost, "name = ?", "x")).toBe("name = 'x'");
+    expect(ClassMethods.sanitizeSqlArray.call(mysqlHost, ["name = ?", "x"])).toBe("name = 'x'");
   });
 
   it("raises ConnectionNotDefined when host.connection has no adapter", () => {
@@ -83,6 +89,7 @@ describe("sanitization class-method dispatch threads `this.connection`", () => {
       connectionPool(): never {
         throw new ConnectionNotDefined("No database connection defined.");
       },
+      typeForAttribute,
     };
     expect(() =>
       ClassMethods.sanitizeSqlHashForAssignment.call(host, { name: "x" }, "users"),
@@ -95,7 +102,7 @@ describe("sanitization class-method dispatch threads `this.connection`", () => {
         throw new ConnectionNotDefined("No database connection defined.");
       },
     };
-    expect(ClassMethods.sanitizeSqlArray.call(host, "")).toBe("");
+    expect(ClassMethods.sanitizeSqlArray.call(host, [""])).toBe("");
   });
 
   it("surfaces the adapter_class lookup error for sanitizeSqlForOrder", () => {
@@ -116,6 +123,7 @@ describe("sanitization class-method dispatch threads `this.connection`", () => {
           throw new ConnectionTimeoutError("connection timed out");
         },
       }),
+      typeForAttribute,
     };
     expect(() =>
       ClassMethods.sanitizeSqlHashForAssignment.call(host, { name: "x" }, "users"),

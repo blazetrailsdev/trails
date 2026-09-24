@@ -1,6 +1,6 @@
 import { Nodes, sql as arelSql } from "@blazetrails/arel";
 import { ActsLikeObject, isBlank } from "@blazetrails/activesupport";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { format, rbObjAsString, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import type { Quoting } from "./connection-adapters/abstract/quoting.js";
 import { PreparedStatementInvalid, UnknownAttributeReference } from "./errors.js";
 
@@ -44,13 +44,12 @@ export function sanitizeSqlLike(string: string, escapeCharacter: string = "\\"):
 }
 
 export function sanitizeSql(
-  this: { sanitizeSqlArray(template: string, ...binds: unknown[]): string },
+  this: { sanitizeSqlArray(ary: [string, ...unknown[]]): string },
   condition: string | [string, ...unknown[]] | null | undefined,
 ): string | null {
   if (isBlankCondition(condition)) return null;
   if (Array.isArray(condition)) {
-    const [template, ...binds] = condition;
-    return this.sanitizeSqlArray(template, ...binds);
+    return this.sanitizeSqlArray(condition);
   } else {
     return condition as string;
   }
@@ -69,11 +68,8 @@ interface QuoterHost {
   connectionPool(): { withConnectionSync<T>(block: (connection: Quoter) => T): T };
 }
 
-export function sanitizeSqlArray(
-  this: QuoterHost,
-  statement: string,
-  ...values: unknown[]
-): string {
+export function sanitizeSqlArray(this: QuoterHost, ary: [string, ...unknown[]]): string {
+  const [statement, ...values] = ary;
   if (isPlainHash(values[0]) && statement.match(/:\w+/) != null) {
     return this.connectionPool().withConnectionSync((c) =>
       replaceNamedBindVariables(c, statement, values[0] as Record<string, unknown>),
@@ -85,22 +81,9 @@ export function sanitizeSqlArray(
   } else if (isBlank(statement)) {
     return statement;
   } else {
-    return this.connectionPool().withConnectionSync((c) => {
-      const specifiers = statement.match(/%[sdi]/g) ?? [];
-      raiseIfBindArityMismatch(statement, specifiers.length, values.length);
-      const quoted = values.map((value) => c.quoteString(String(value ?? "")));
-      return statement.replace(/%[sdi]/g, (spec) => {
-        const value = quoted.shift()!;
-        if (spec === "%s") return value;
-        const text = value.trim();
-        if (!/^[+-]?\d+$/.test(text)) {
-          throw new PreparedStatementInvalid(
-            `invalid value for %d bind variable (${value}) in: ${statement}`,
-          );
-        }
-        return String(parseInt(text, 10));
-      });
-    });
+    return this.connectionPool().withConnectionSync((c) =>
+      format(statement, ...values.map((value) => c.quoteString(rbObjAsString(value)))),
+    );
   }
 }
 
@@ -117,28 +100,26 @@ export function sanitizeSqlForConditions(
 export function sanitizeSqlForAssignment(
   this: QuoterHost & {
     tableName?: string;
-    sanitizeSql(condition: string | [string, ...unknown[]] | null | undefined): string | null;
-    sanitizeSqlHashForAssignment(
-      attrs: Record<string, unknown>,
-      table: string,
-      typeForAttribute?: (
-        name: string,
-      ) => { cast?(v: unknown): unknown; serialize?(v: unknown): unknown } | undefined,
-    ): string;
+    sanitizeSqlArray(ary: [string, ...unknown[]]): string;
+    sanitizeSqlHashForAssignment(attrs: Record<string, unknown>, table: string): string;
   },
   assignments: string | [string, ...unknown[]] | Record<string, unknown>,
   defaultTableName: string = this.tableName ?? "",
 ): string {
-  if (typeof assignments === "string") return assignments;
-  if (Array.isArray(assignments)) return this.sanitizeSql(assignments) ?? "";
-  return this.sanitizeSqlHashForAssignment(assignments, defaultTableName);
+  if (Array.isArray(assignments)) {
+    return this.sanitizeSqlArray(assignments);
+  } else if (typeof assignments !== "string") {
+    return this.sanitizeSqlHashForAssignment(assignments, defaultTableName);
+  } else {
+    return assignments;
+  }
 }
 
 export function sanitizeSqlForOrder(
   this: QuoterHost & {
     adapterClass(): unknown;
     disallowRawSqlBang(args: (string | symbol | Nodes.Node)[], options?: { permit?: RegExp }): void;
-    sanitizeSqlArray(template: string, ...binds: unknown[]): string;
+    sanitizeSqlArray(ary: [string, ...unknown[]]): string;
   },
   condition: string | [string | Nodes.Node, ...unknown[]] | Nodes.Node,
 ): string | Nodes.Node | [string | Nodes.Node, ...unknown[]] {
@@ -153,7 +134,7 @@ export function sanitizeSqlForOrder(
       this.disallowRawSqlBang([first as string | symbol | Nodes.Node], {
         permit: adapterClass.columnNameWithOrderMatcher(),
       });
-      const sanitized = this.sanitizeSqlArray(firstText, ...condition.slice(1));
+      const sanitized = this.sanitizeSqlArray([firstText, ...condition.slice(1)]);
       return arelSql(sanitized);
     }
   }
@@ -161,22 +142,20 @@ export function sanitizeSqlForOrder(
 }
 
 export function sanitizeSqlHashForAssignment(
-  this: QuoterHost,
+  this: QuoterHost & {
+    typeForAttribute(
+      name: string,
+    ): { cast(v: unknown): unknown; serialize(v: unknown): unknown } | null;
+  },
   attrs: Record<string, unknown>,
   table: string,
-  typeForAttribute?: (
-    name: string,
-  ) => { cast?(v: unknown): unknown; serialize?(v: unknown): unknown } | undefined,
 ): string {
   return this.connectionPool().withConnectionSync((c) =>
     Object.entries(attrs)
       .map(([attr, value]) => {
-        const type = typeForAttribute?.(attr);
-        if (type) {
-          if (type.cast) value = type.cast(value);
-          if (type.serialize) value = type.serialize(value);
-        }
-        return `${table ? c.quoteTableNameForAssignment(table, attr) : c.quoteColumnName(attr)} = ${c.quote(value)}`;
+        const type = this.typeForAttribute(attr)!;
+        value = type.serialize(type.cast(value));
+        return `${c.quoteTableNameForAssignment(table, attr)} = ${c.quote(value)}`;
       })
       .join(", "),
   );
