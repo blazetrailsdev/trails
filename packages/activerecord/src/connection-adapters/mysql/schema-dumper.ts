@@ -118,9 +118,9 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   /** @internal */
   protected override async schemaCollation(column: MysqlColumn): Promise<string | undefined> {
-    if (column.collation) {
+    if (column.collation != null) {
       this._tableCollationCache ??= {};
-      this._tableCollationCache[this.tableName!] ||= (
+      this._tableCollationCache[this.tableName!] ??= (
         await this.connection!.internalExecQuery(
           `SHOW TABLE STATUS LIKE ${this.connection!.quote(this.tableName)}`,
           "SCHEMA",
