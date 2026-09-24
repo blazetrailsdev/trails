@@ -316,7 +316,8 @@ describe("DateExtCalculationsTest", () => {
       expect(DateExt.since(pd(2005, 2, 21), 45).toI()).toBe(
         zone.local(2005, 2, 21, 0, 0, 45).toI(),
       );
-      expect(DateExt.since(pd(2005, 2, 21), 45).timeZone).toBe(zone);
+      const t = DateExt.since(pd(2005, 2, 21), 45);
+      expect("timeZone" in t ? t.timeZone : undefined).toBe(zone);
     } finally {
       setZone(null);
     }
@@ -333,7 +334,8 @@ describe("DateExtCalculationsTest", () => {
       expect(DateExt.ago(pd(2005, 2, 21), 45).toI()).toBe(
         zone.local(2005, 2, 20, 23, 59, 15).toI(),
       );
-      expect(DateExt.ago(pd(2005, 2, 21), 45).timeZone).toBe(zone);
+      const t = DateExt.ago(pd(2005, 2, 21), 45);
+      expect("timeZone" in t ? t.timeZone : undefined).toBe(zone);
     } finally {
       setZone(null);
     }
@@ -350,7 +352,8 @@ describe("DateExtCalculationsTest", () => {
       expect(DateExt.beginningOfDay(pd(2005, 2, 21)).toI()).toBe(
         zone.local(2005, 2, 21, 0, 0, 0).toI(),
       );
-      expect(DateExt.beginningOfDay(pd(2005, 2, 21)).timeZone).toBe(zone);
+      const t = DateExt.beginningOfDay(pd(2005, 2, 21));
+      expect("timeZone" in t ? t.timeZone : undefined).toBe(zone);
     } finally {
       setZone(null);
     }
@@ -363,7 +366,8 @@ describe("DateExtCalculationsTest", () => {
       expect(DateExt.endOfDay(pd(2005, 2, 21)).toI()).toEqual(
         zone.local(2005, 2, 21, 23, 59, 59).toI(),
       );
-      expect(DateExt.endOfDay(pd(2005, 2, 21)).timeZone).toBe(zone);
+      const t = DateExt.endOfDay(pd(2005, 2, 21));
+      expect("timeZone" in t ? t.timeZone : undefined).toBe(zone);
     } finally {
       setZone(null);
     }

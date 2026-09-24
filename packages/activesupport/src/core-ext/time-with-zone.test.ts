@@ -22,7 +22,7 @@ import { toTime as dateToTime } from "./date/conversions.js";
 import { current } from "../time-ext.js";
 import "./time/calculations.js";
 import { setPreserveTimezone } from "./date-and-time/compatibility.js";
-import { Rational, rational } from "@blazetrails/ruby-compat";
+import { Rational, rational, rbInspect } from "@blazetrails/ruby-compat";
 import { assertDeprecated, assertNotDeprecated } from "../testing/deprecation.js";
 import { assertNotCalled } from "../testing/method-call-assertions.js";
 import { toTimePreservesTimezone } from "../active-support.js";
@@ -1792,10 +1792,10 @@ describe("TimeWithZoneMethodsForDate", () => {
 
   it("in time zone", () => {
     withTzDefault("Alaska", () => {
-      expect(inTimeZone(d).inspect()).toEqual("2000-01-01 00:00:00.000000000 AKST -09:00");
+      expect(rbInspect(inTimeZone(d))).toEqual("2000-01-01 00:00:00.000000000 AKST -09:00");
     });
     withTzDefault("Hawaii", () => {
-      expect(inTimeZone(d).inspect()).toEqual("2000-01-01 00:00:00.000000000 HST -10:00");
+      expect(rbInspect(inTimeZone(d))).toEqual("2000-01-01 00:00:00.000000000 HST -10:00");
     });
     withTzDefault(null, () => {
       expect(inTimeZone(d)).toEqual(dateToTime(d));
@@ -1810,12 +1810,14 @@ describe("TimeWithZoneMethodsForDate", () => {
 
   it("in time zone with argument", () => {
     withTzDefault("Eastern Time (US & Canada)", () => {
-      expect(inTimeZone(d, "Alaska").inspect()).toEqual(
+      expect(rbInspect(inTimeZone(d, "Alaska"))).toEqual(
         "2000-01-01 00:00:00.000000000 AKST -09:00",
       );
-      expect(inTimeZone(d, "Hawaii").inspect()).toEqual("2000-01-01 00:00:00.000000000 HST -10:00");
-      expect(inTimeZone(d, "UTC").inspect()).toEqual("2000-01-01 00:00:00.000000000 UTC +00:00");
-      expect(inTimeZone(d, Duration.hours(-9)).inspect()).toEqual(
+      expect(rbInspect(inTimeZone(d, "Hawaii"))).toEqual(
+        "2000-01-01 00:00:00.000000000 HST -10:00",
+      );
+      expect(rbInspect(inTimeZone(d, "UTC"))).toEqual("2000-01-01 00:00:00.000000000 UTC +00:00");
+      expect(rbInspect(inTimeZone(d, Duration.hours(-9)))).toEqual(
         "2000-01-01 00:00:00.000000000 AKST -09:00",
       );
     });

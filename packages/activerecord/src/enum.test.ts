@@ -1,10 +1,27 @@
-import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { Base, registerModel, Range } from "./index.js";
 import { ArgumentError, RuntimeError } from "@blazetrails/activemodel";
-import { assertRespondTo, assertRaises, assertEmpty } from "@blazetrails/activesupport";
+import { assertRespondTo, assertRaises, assertEmpty, Logger } from "@blazetrails/activesupport";
 import { Book, PublishedBook } from "./test-helpers/models/book.js";
 import { Author } from "./test-helpers/models/author.js";
 import { fixtures } from "./test-fixtures.js";
+
+class MockLogger extends Logger {
+  private _logged: Record<string, string[]> = { warn: [] };
+
+  constructor() {
+    super(null);
+  }
+
+  logged(level: string): string[] {
+    return this._logged[level] ?? [];
+  }
+
+  override warn(message?: string | (() => string)): boolean {
+    this._logged.warn.push(typeof message === "function" ? message() : (message ?? ""));
+    return true;
+  }
+}
 
 describe("EnumTest", () => {
   const { books, authors } = fixtures(["books", "authors", "authorAddresses"]);
@@ -1107,76 +1124,108 @@ describe("EnumTest", () => {
   });
 
   it("enum logs a warning if auto-generated negative scopes would clash with other enum names", () => {
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const oldLogger = Base.logger;
+    const logger = new MockLogger();
+
+    Base.logger = logger;
+
     const expectedMessage1 =
-      "Enum uses prefix 'not' which conflicts with auto-generated negative scope 'notSent' " +
-      "while positive form 'sent' also exists.";
+      "Enum element 'not_sent' in Book uses the prefix 'not_'." +
+      " This has caused a conflict with auto generated negative scopes." +
+      " Avoid using enum elements starting with 'not' where the positive form is also an element.";
+
     try {
-      class K extends Base {
-        static _tableName = "books";
+      class Klass extends Base {
+        static get name() {
+          return "Book";
+        }
         static {
           this.attribute("status", "integer");
-          this.enum("status", { sent: 0, notSent: 1 });
+          this.enum("status", ["sent", "not_sent"]);
         }
       }
-      void K;
-      expect(spy.mock.calls.flat()).toContain(expectedMessage1);
+      void Klass;
+
+      expect(logger.logged("warn")).toContain(expectedMessage1);
     } finally {
-      spy.mockRestore();
+      Base.logger = oldLogger;
     }
   });
 
   it("enum logs a warning if auto-generated negative scopes would clash with other enum names regardless of order", () => {
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const oldLogger = Base.logger;
+    const logger = new MockLogger();
+
+    Base.logger = logger;
+
     const expectedMessage1 =
-      "Enum uses prefix 'not' which conflicts with auto-generated negative scope 'notSent' " +
-      "while positive form 'sent' also exists.";
+      "Enum element 'not_sent' in Book uses the prefix 'not_'." +
+      " This has caused a conflict with auto generated negative scopes." +
+      " Avoid using enum elements starting with 'not' where the positive form is also an element.";
+
     try {
-      class K extends Base {
-        static _tableName = "books";
+      class Klass extends Base {
+        static get name() {
+          return "Book";
+        }
         static {
           this.attribute("status", "integer");
-          this.enum("status", { notSent: 0, sent: 1 });
+          this.enum("status", ["not_sent", "sent"]);
         }
       }
-      void K;
-      expect(spy.mock.calls.flat()).toContain(expectedMessage1);
+      void Klass;
+
+      expect(logger.logged("warn")).toContain(expectedMessage1);
     } finally {
-      spy.mockRestore();
+      Base.logger = oldLogger;
     }
   });
 
   it("enum doesn't log a warning if no clashes detected", () => {
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const oldLogger = Base.logger;
+    const logger = new MockLogger();
+
+    Base.logger = logger;
+
     try {
       class Klass extends Base {
-        static _tableName = "books";
+        static get name() {
+          return "Book";
+        }
         static {
           this.attribute("status", "integer");
-          this.enum("status", ["notSent"]);
+          this.enum("status", ["not_sent"]);
         }
       }
       void Klass;
-      assertEmpty(spy.mock.calls);
+
+      assertEmpty(logger.logged("warn"));
     } finally {
-      spy.mockRestore();
+      Base.logger = oldLogger;
     }
   });
 
   it("enum doesn't log a warning if opting out of scopes", () => {
-    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const oldLogger = Base.logger;
+    const logger = new MockLogger();
+
+    Base.logger = logger;
+
     try {
-      class K extends Base {
-        static _tableName = "books";
+      class Klass extends Base {
+        static get name() {
+          return "Book";
+        }
         static {
           this.attribute("status", "integer");
-          this.enum("status", { sent: 0, notSent: 1 }, { scopes: false });
+          this.enum("status", ["not_sent", "sent"], { scopes: false });
         }
       }
-      void K;
-      assertEmpty(spy.mock.calls);
+      void Klass;
+
+      assertEmpty(logger.logged("warn"));
     } finally {
-      spy.mockRestore();
+      Base.logger = oldLogger;
     }
   });
 

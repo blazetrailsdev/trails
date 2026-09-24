@@ -21,8 +21,7 @@ import { ArgumentError } from "./hash-utils.js";
 describe("ParsingTest", () => {
   const parsing = PARSING;
 
-  it.skip("symbol", () => {
-    // BLOCKED: date-civil-does-not-reject-extra-arguments
+  it("symbol", () => {
     const parser = parsing["symbol"];
     expect(parser("symbol")).toBe(":symbol");
     expect(parser(":symbol")).toBe(":symbol");
@@ -55,8 +54,7 @@ describe("ParsingTest", () => {
     expect(() => parser("not really a duration")).toThrow();
   });
 
-  it.skip("integer", () => {
-    // BLOCKED: date-civil-does-not-reject-extra-arguments
+  it("integer", () => {
     const parser = parsing["integer"];
     expect(parser(123)).toBe(123);
     expect(parser(123.003)).toBe(123);
@@ -66,8 +64,7 @@ describe("ParsingTest", () => {
     expect(() => parser(RubyDate.civil(2013, 11, 12, 2, 11))).toThrow(ArgumentError);
   });
 
-  it.skip("float", () => {
-    // BLOCKED: date-civil-does-not-reject-extra-arguments
+  it("float", () => {
     const parser = parsing["float"];
     expect(parser("123")).toBe(123);
     expect(parser("123.003")).toBe(123.003);
@@ -79,8 +76,7 @@ describe("ParsingTest", () => {
     expect(() => parser(RubyDate.civil(2013, 11, 12, 2, 11))).toThrow(ArgumentError);
   });
 
-  it.skip("decimal", () => {
-    // BLOCKED: date-civil-does-not-reject-extra-arguments
+  it("decimal", () => {
     const parser = parsing["decimal"];
     expect(String(parser("123"))).toBe(new BigDecimal("123").toString());
     expect(String(parser("123.003"))).toBe(new BigDecimal("123.003").toString());
@@ -103,8 +99,7 @@ describe("ParsingTest", () => {
     }
   });
 
-  it.skip("string", () => {
-    // BLOCKED: date-civil-does-not-reject-extra-arguments
+  it("string", () => {
     const parser = parsing["string"];
     expect(parser(123)).toBe("123");
     expect(parser("123")).toBe("123");

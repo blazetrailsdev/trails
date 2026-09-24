@@ -6,6 +6,7 @@ import {
   type DateParts,
 } from "@blazetrails/date";
 import { include } from "@blazetrails/activesupport";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { toFs } from "@blazetrails/activesupport/core-ext/date/conversions";
 import {
   AcceptsMultiparameterTime,
@@ -57,6 +58,8 @@ export class DateType extends ValueType<DateCastResult> {
         month: value.getUTCMonth() + 1,
         day: value.getUTCDate(),
       });
+    } else if (rbObjRespondTo(value, "toDate")) {
+      return (value as { toDate(): DateCastResult }).toDate();
     } else {
       return value as DateCastResult;
     }

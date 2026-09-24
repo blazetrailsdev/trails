@@ -167,14 +167,14 @@ function prevDay(dateOrTime: DateOrTime): DateOrInstant {
   return advance(dateOrTime, { days: -1 });
 }
 
-function beginningOfDay(dateOrTime: DateOrTime): TimeWithZone | Temporal.Instant {
+function beginningOfDay(dateOrTime: DateOrTime): TimeWithZone | Temporal.Instant | RubyTime {
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   return dateOrTime instanceof Date
     ? time.beginningOfDay(dateOrTime)
     : date.beginningOfDay(toDate(dateOrTime));
 }
 
-function endOfDay(dateOrTime: DateOrTime): TimeWithZone | Temporal.Instant {
+function endOfDay(dateOrTime: DateOrTime): TimeWithZone | Temporal.Instant | RubyTime {
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   return dateOrTime instanceof Date ? time.endOfDay(dateOrTime) : date.endOfDay(toDate(dateOrTime));
 }
@@ -529,7 +529,7 @@ export function endOfYear(dateOrTime: DateOrTime): DateOrInstant {
 
 export const atEndOfYear = endOfYear;
 
-export function allDay(dateOrTime: DateOrTime): Range<TimeWithZone | Temporal.Instant> {
+export function allDay(dateOrTime: DateOrTime): Range<TimeWithZone | Temporal.Instant | RubyTime> {
   return new Range(beginningOfDay(dateOrTime), endOfDay(dateOrTime));
 }
 

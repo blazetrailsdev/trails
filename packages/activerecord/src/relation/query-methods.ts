@@ -1,4 +1,12 @@
-import { extend, fetch, hasKey, rbObjClass, RuntimeError, toI } from "@blazetrails/ruby-compat";
+import {
+  extend,
+  fetch,
+  hasKey,
+  rbObjClass,
+  RuntimeError,
+  toI,
+  transformValues,
+} from "@blazetrails/ruby-compat";
 import * as Arel from "@blazetrails/arel";
 import { Nodes, SelectManager, Table as ArelTable } from "@blazetrails/arel";
 import {
@@ -1376,22 +1384,6 @@ export function buildCastValue(name: string, value: unknown): Attribute {
   return Attribute.withCastValue(name, value, defaultValue());
 }
 
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE inline-bound-value-and-join-plan-helpers
- */
-export function normalizeBoundValue(this: QueryMethodsHost, value: unknown): unknown {
-  if (isRelationLike(value)) {
-    return Arel.sql((value as { toSql(): string }).toSql());
-  }
-  if (Array.isArray(value) || value instanceof Set) {
-    const mapped = Array.from(value).map((v) => (hasIdForDatabase(v) ? v.idForDatabase : v));
-    return mapped.length === 0 ? null : mapped;
-  }
-  if (hasIdForDatabase(value)) return value.idForDatabase;
-  return value;
-}
-
 function hasIdForDatabase(value: unknown): value is { idForDatabase: unknown } {
   return (
     typeof value === "object" &&
@@ -1408,12 +1400,20 @@ export function buildNamedBoundSqlLiteral(
   statement: string,
   values: Record<string, unknown>,
 ): Nodes.BoundSqlLiteral {
-  const namedBinds: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(values)) {
-    namedBinds[key] = normalizeBoundValue.call(this, value);
-  }
+  const boundValues = transformValues(values, (value) => {
+    if (isRelationLike(value)) {
+      return Arel.sql((value as { toSql(): string }).toSql());
+    } else if (Array.isArray(value) || value instanceof Set) {
+      const values = Array.from(value).map((v) => (hasIdForDatabase(v) ? v.idForDatabase : v));
+      return values.length === 0 ? null : values;
+    } else {
+      if (hasIdForDatabase(value)) value = value.idForDatabase;
+      return value;
+    }
+  });
+
   try {
-    return new Nodes.BoundSqlLiteral(`(${statement})`, null, namedBinds);
+    return new Nodes.BoundSqlLiteral(`(${statement})`, null, boundValues);
   } catch (e: any) {
     throw new PreparedStatementInvalid(e?.message ?? String(e), { cause: e });
   }
@@ -1425,9 +1425,20 @@ export function buildBoundSqlLiteral(
   statement: string,
   values: unknown[],
 ): Nodes.BoundSqlLiteral {
-  const positionalBinds = values.map((value) => normalizeBoundValue.call(this, value));
+  const boundValues = values.map((value) => {
+    if (isRelationLike(value)) {
+      return Arel.sql((value as { toSql(): string }).toSql());
+    } else if (Array.isArray(value) || value instanceof Set) {
+      const values = Array.from(value).map((v) => (hasIdForDatabase(v) ? v.idForDatabase : v));
+      return values.length === 0 ? null : values;
+    } else {
+      if (hasIdForDatabase(value)) value = value.idForDatabase;
+      return value;
+    }
+  });
+
   try {
-    return new Nodes.BoundSqlLiteral(`(${statement})`, positionalBinds, null);
+    return new Nodes.BoundSqlLiteral(`(${statement})`, boundValues, null);
   } catch (e: any) {
     throw new PreparedStatementInvalid(e?.message ?? String(e), { cause: e });
   }
@@ -2337,51 +2348,6 @@ export function buildJoinBuckets(
   return [buckets, Nodes.InnerJoin];
 }
 
-/** @internal */
-export interface JoinEmissionPlan {
-  leadingJoins: Nodes.Join[];
-  joinNodes: Nodes.Join[];
-  stashedJoins: JoinDependency[];
-  namedJoins: AssociationSpec[];
-  joinType: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin;
-  aliases?: AliasTracker;
-  tracker: () => AliasTracker;
-}
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE inline-bound-value-and-join-plan-helpers
- */
-export function emitJoinPlan(
-  this: QueryMethodsHost,
-  joinSources: any[],
-  plan: JoinEmissionPlan,
-): void {
-  if (plan.leadingJoins.length > 0) joinSources.push(...plan.leadingJoins);
-
-  let trackerWasBuilt = false;
-  const sharedTracker = (): AliasTracker => {
-    trackerWasBuilt = true;
-    return plan.tracker();
-  };
-  const references = (this as any).referencesValues;
-
-  const namedJoins = plan.namedJoins;
-  const joinType = plan.joinType;
-  if (namedJoins.length > 0 || plan.stashedJoins.length > 0) {
-    const jd = constructJoinDependency.call(this, namedJoins, joinType);
-    joinSources.push(...jd.joinConstraints(plan.stashedJoins, sharedTracker(), references));
-  }
-
-  if (plan.joinNodes.length > 0) joinSources.push(...plan.joinNodes);
-
-  if (plan.aliases && trackerWasBuilt) {
-    for (const [name, count] of sharedTracker().aliases) {
-      if (count > (plan.aliases.aliases.get(name) ?? 0)) plan.aliases.aliases.set(name, count);
-    }
-  }
-}
-
 /**
  * @internal
  * @missingRailsCall empty? — PERMANENT
@@ -2394,22 +2360,23 @@ export function buildJoins(
   if (this.joinsValues.length === 0 && this.leftOuterJoinsValues.length === 0) return joinSources;
 
   const [buckets, joinType] = buildJoinBuckets.call(this);
+
+  const namedJoins = buckets.named_join as AssociationSpec[];
+  const stashedJoins = buckets.stashed_join as JoinDependency[];
   const leadingJoins = buckets.leading_join as Nodes.Join[];
   const joinNodes = buckets.join_node as Nodes.Join[];
-  let memoTracker: AliasTracker | undefined;
-  const tracker = (): AliasTracker => {
-    memoTracker ??= this.aliasTracker([...leadingJoins, ...joinNodes], aliases?.aliases);
-    return memoTracker;
-  };
-  emitJoinPlan.call(this, joinSources, {
-    leadingJoins,
-    joinNodes,
-    stashedJoins: buckets.stashed_join as JoinDependency[],
-    namedJoins: buckets.named_join as AssociationSpec[],
-    joinType,
-    aliases,
-    tracker,
-  });
+
+  if (leadingJoins.length > 0) joinSources.push(...leadingJoins);
+
+  if (!(namedJoins.length === 0 && stashedJoins.length === 0)) {
+    const aliasTracker = this.aliasTracker([...leadingJoins, ...joinNodes], aliases?.aliases);
+    const joinDependency = constructJoinDependency.call(this, namedJoins, joinType);
+    joinSources.push(
+      ...joinDependency.joinConstraints(stashedJoins, aliasTracker, this.referencesValues),
+    );
+  }
+
+  if (joinNodes.length > 0) joinSources.push(...joinNodes);
   return joinSources;
 }
 

@@ -1236,8 +1236,7 @@ describe("AttributeMethodsTest", () => {
     await inTimeZone("Pacific Time (US & Canada)", () => {
       const record = target.new() as any;
       record.last_read = RubyTime.utc(2010, 1, 1, 10);
-      const lastRead = record.last_read;
-      expect([lastRead.year, lastRead.mon, lastRead.mday]).toEqual([2010, 1, 1]);
+      expect(record.last_read).toEqual(new Temporal.PlainDate(2010, 1, 1));
     });
   });
   it("setting a time zone-aware attribute to UTC", async () => {
