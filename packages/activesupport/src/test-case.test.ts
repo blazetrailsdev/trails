@@ -835,8 +835,7 @@ SubclassSetupAndTeardownTestCase.setup(":bar");
 SubclassSetupAndTeardownTestCase.teardown(":bar");
 
 describe("SetupAndTeardownTest", () => {
-  it.skip("inherited setup callbacks", () => {
-    // BLOCKED: activesupport-test-case-setup-callback-chain-is-not-introspectable
+  it("inherited setup callbacks", () => {
     const instance = new SetupAndTeardownTestCase();
     instance.resetCallbackRecord();
     instance.foo();
@@ -852,8 +851,7 @@ describe("SetupAndTeardownTest", () => {
 });
 
 describe("SubclassSetupAndTeardownTest", () => {
-  it.skip("inherited setup callbacks", () => {
-    // BLOCKED: activesupport-test-case-setup-callback-chain-is-not-introspectable
+  it("inherited setup callbacks", () => {
     const instance = new SubclassSetupAndTeardownTestCase();
     instance.resetCallbackRecord();
     instance.foo();
