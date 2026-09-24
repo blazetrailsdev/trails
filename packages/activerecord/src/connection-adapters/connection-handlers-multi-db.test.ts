@@ -8,7 +8,6 @@ import { type RawConfigurations } from "../database-configurations.js";
 import { Base } from "../base.js";
 import { currentRole } from "../core.js";
 import { restoreWorkerConnection } from "../support/connection.js";
-import { DatabaseTasks } from "../tasks/database-tasks.js";
 import { readingRole, setReadingRole, setWritingRole, writingRole } from "../active-record.js";
 
 describe("ConnectionHandlersMultiDbTest", () => {
@@ -80,9 +79,7 @@ describe("ConnectionHandlersMultiDbTest", () => {
     opts: { defaultEnv?: string } = {},
   ): Promise<void> {
     const prevConfigs = Base.configurations();
-    const prevDefaultEnv = DatabaseTasks.env;
     if (opts.defaultEnv) {
-      DatabaseTasks.env = opts.defaultEnv;
       vi.stubEnv("TRAILS_ENV", opts.defaultEnv);
     }
     Base.configurations(raw);
@@ -90,7 +87,6 @@ describe("ConnectionHandlersMultiDbTest", () => {
       await fn();
     } finally {
       Base.configurations(prevConfigs);
-      DatabaseTasks.env = prevDefaultEnv;
       if (opts.defaultEnv) vi.unstubAllEnvs();
       void Base.connectionHandler.clearAllConnectionsBang().catch(() => {});
     }

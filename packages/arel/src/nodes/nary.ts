@@ -50,3 +50,5 @@ Nodes.Or = Or;
 type _AliasPredication = import("../alias-predication.js").AliasPredicationModule;
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
 export interface Nary extends _AliasPredication {}
+
+Nodes.Nary = Nary;

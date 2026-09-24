@@ -31,8 +31,12 @@ import { inMemoryDb } from "../support/adapter-helper.js";
 import { fixtures } from "../test-fixtures.js";
 
 let originalConfigurations: DatabaseConfigurations | null = null;
+const originalTrailsEnv = getEnv("TRAILS_ENV");
 beforeAll(() => {
   originalConfigurations = DatabaseTasks.databaseConfiguration;
+});
+afterEach(() => {
+  setEnv("TRAILS_ENV", originalTrailsEnv);
 });
 
 function configFor(envName: string, name: string): HashConfig | undefined {
@@ -556,7 +560,7 @@ describe("DatabaseTasksCreateCurrentTest", () => {
   });
 
   it("creates test and development databases when rails env is development", async () => {
-    DatabaseTasks.env = "development";
+    setEnv("TRAILS_ENV", "development");
     await assertCalledForConfigs(
       "create",
       [[configFor("development", "primary")], [configFor("test", "primary")]],
@@ -569,7 +573,7 @@ describe("DatabaseTasksCreateCurrentTest", () => {
   it("creates development database without test database when skip test database", async () => {
     setEnv("SKIP_TEST_DATABASE", "true");
     try {
-      DatabaseTasks.env = "development";
+      setEnv("TRAILS_ENV", "development");
       await assertCalledForConfigs("create", [[configFor("development", "primary")]], async () => {
         await DatabaseTasks.createCurrent("development");
       });
@@ -651,7 +655,7 @@ describe("DatabaseTasksCreateCurrentThreeTierTest", () => {
   });
 
   it("creates test and development databases when rails env is development", async () => {
-    DatabaseTasks.env = "development";
+    setEnv("TRAILS_ENV", "development");
     await assertCalledForConfigs(
       "create",
       [
@@ -785,7 +789,7 @@ describe("DatabaseTasksDropCurrentTest", () => {
   });
 
   it("drops testand development databases when rails env is development", async () => {
-    DatabaseTasks.env = "development";
+    setEnv("TRAILS_ENV", "development");
     await assertCalledForConfigs(
       "drop",
       [[configFor("development", "primary")], [configFor("test", "primary")]],
@@ -861,7 +865,7 @@ describe("DatabaseTasksDropCurrentThreeTierTest", () => {
   });
 
   it("drops testand development databases when rails env is development", async () => {
-    DatabaseTasks.env = "development";
+    setEnv("TRAILS_ENV", "development");
     await assertCalledForConfigs(
       "drop",
       [
@@ -1340,7 +1344,7 @@ describe("DatabaseTasksTruncateAllWithMultipleDatabasesTest", () => {
   });
 
   it("truncate all development databases when env is development", async () => {
-    DatabaseTasks.env = "development";
+    setEnv("TRAILS_ENV", "development");
     await assertCalledForConfigs(
       "truncateTables",
       [[configFor("development", "primary")], [configFor("development", "secondary")]],

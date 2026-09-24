@@ -1,3 +1,4 @@
+import { Nodes } from "../namespaces.js";
 import { Node } from "./node.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -21,3 +22,5 @@ type _OrderPredications = import("../order-predications.js").OrderPredicationsMo
 type _Expressions = import("../expressions.js").ExpressionsModule;
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface NodeExpression extends _Predications, _Math, _Expressions, _OrderPredications {}
+
+Nodes.NodeExpression = NodeExpression;

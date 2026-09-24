@@ -1,3 +1,4 @@
+import { Nodes } from "../namespaces.js";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { cloneSlot, objectClone } from "../clone-support.js";
 import { Node } from "./node.js";
@@ -59,3 +60,5 @@ export class DeleteStatement extends Node {
     return copy;
   }
 }
+
+Nodes.DeleteStatement = DeleteStatement;

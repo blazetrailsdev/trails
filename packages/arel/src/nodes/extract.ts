@@ -1,3 +1,4 @@
+import { Nodes } from "../namespaces.js";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
 import { Unary } from "./unary.js";
@@ -18,3 +19,5 @@ export class Extract extends Unary {
     return super.eql(other) && rbEqual(this.field, (other as Extract).field);
   }
 }
+
+Nodes.Extract = Extract;

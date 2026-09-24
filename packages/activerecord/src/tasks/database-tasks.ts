@@ -7,7 +7,7 @@ import {
 import type { RawConfigurations } from "../database-configurations.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { Migration, ProtectedEnvironmentError } from "../migration.js";
-import { DEFAULT_ENV, _setRailsEnv } from "../connection-handling.js";
+import { DEFAULT_ENV } from "../connection-handling.js";
 import { _setDatabaseTasks } from "./database-tasks-slot.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import { getEnv, isBlank, trailsRoot } from "@blazetrails/activesupport";
@@ -40,12 +40,14 @@ export type SchemaFormat = "ts" | "js" | "sql";
 export class DatabaseTasks {
   static readonly LOCAL_HOSTS: readonly string[] = ["127.0.0.1", "localhost"];
 
+  private static _env: string | null = null;
+
   static get env(): string {
-    return DEFAULT_ENV();
+    return (this._env ??= DEFAULT_ENV());
   }
 
   static set env(value: string | null) {
-    _setRailsEnv(value);
+    this._env = value;
   }
 
   static get name(): string {

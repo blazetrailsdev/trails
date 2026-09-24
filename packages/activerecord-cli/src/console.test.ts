@@ -34,6 +34,7 @@ describe("ArConsoleTest", () => {
     vi.restoreAllMocks();
     delete process.env["TRAILS_ENV"];
     DatabaseTasks.databaseConfiguration = null;
+    DatabaseTasks.env = null;
   });
 
   it("launches REPL, puts Base in context, resolves 0 on exit", async () => {

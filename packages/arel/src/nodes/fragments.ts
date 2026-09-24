@@ -1,3 +1,4 @@
+import { Nodes } from "../namespaces.js";
 import { ArgumentError, rbEqual, rbHash } from "@blazetrails/activesupport";
 import { arelNode } from "../arel.js";
 import { objectClone } from "../clone-support.js";
@@ -36,3 +37,5 @@ export class Fragments extends Node {
     return new Fragments([...this.values, other as Node]);
   }
 }
+
+Nodes.Fragments = Fragments;

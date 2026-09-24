@@ -1,3 +1,4 @@
+import { Nodes } from "../namespaces.js";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
 
@@ -40,3 +41,5 @@ export class BindParam extends Node {
     return typeof v?.isUnboundable === "function" ? v.isUnboundable() : false;
   }
 }
+
+Nodes.BindParam = BindParam;

@@ -1,11 +1,10 @@
 import { assertRaises } from "@blazetrails/activesupport";
-import { afterEach, beforeEach, describe, it, expect } from "vitest";
+import { describe, it, expect } from "vitest";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import type { RawConfigurations } from "../database-configurations.js";
 import { AdapterNotFound } from "../errors.js";
 import "../connection-handling.js";
 import { ConnectionHandler } from "../connection-adapters/abstract/connection-handler.js";
-import { DatabaseTasks } from "../tasks/database-tasks.js";
 
 function resolveDbConfig(poolConfig: string, config: RawConfigurations = {}) {
   const configs = new DatabaseConfigurations(config);
@@ -14,14 +13,6 @@ function resolveDbConfig(poolConfig: string, config: RawConfigurations = {}) {
 
 describe("PoolConfig", () => {
   describe("ResolverTest", () => {
-    beforeEach(() => {
-      DatabaseTasks.env = "development";
-    });
-
-    afterEach(() => {
-      DatabaseTasks.env = "development";
-    });
-
     it("url invalid adapter", async () => {
       const dbConfig = resolveDbConfig("ridiculous://foo?encoding=utf8");
       const handler = new ConnectionHandler();

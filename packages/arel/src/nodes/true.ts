@@ -1,3 +1,4 @@
+import { Nodes } from "../namespaces.js";
 import { rbHash } from "@blazetrails/activesupport";
 import { NodeExpression } from "./node-expression.js";
 
@@ -15,3 +16,5 @@ export class True extends NodeExpression {
 type _AliasPredication = import("../alias-predication.js").AliasPredicationModule;
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
 export interface True extends _AliasPredication {}
+
+Nodes.True = True;

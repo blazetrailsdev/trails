@@ -1,3 +1,4 @@
+import { Nodes } from "../namespaces.js";
 import { Function } from "./function.js";
 import type { NodeOrValue } from "./binary.js";
 
@@ -11,3 +12,5 @@ export class Count extends Function {
     this.distinct = distinct;
   }
 }
+
+Nodes.Count = Count;

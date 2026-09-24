@@ -1,3 +1,4 @@
+import { Nodes } from "../namespaces.js";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
 
@@ -21,3 +22,5 @@ export class Comment extends Node {
     );
   }
 }
+
+Nodes.Comment = Comment;

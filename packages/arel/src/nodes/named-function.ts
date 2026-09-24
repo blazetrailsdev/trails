@@ -1,3 +1,4 @@
+import { Nodes } from "../namespaces.js";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import type { NodeOrValue } from "./binary.js";
 import { Function } from "./function.js";
@@ -18,3 +19,5 @@ export class NamedFunction extends Function {
     return super.eql(other) && rbEqual(this.name, (other as NamedFunction).name);
   }
 }
+
+Nodes.NamedFunction = NamedFunction;

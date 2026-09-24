@@ -65,3 +65,18 @@ Nodes.Not = Not;
 type _AliasPredication = import("../alias-predication.js").AliasPredicationModule;
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
 export interface Unary extends _AliasPredication {}
+
+Nodes.Unary = Unary;
+Nodes.Offset = Offset;
+Nodes.Limit = Limit;
+Nodes.Lock = Lock;
+Nodes.DistinctOn = DistinctOn;
+Nodes.Bin = Bin;
+Nodes.On = On;
+Nodes.Lateral = Lateral;
+Nodes.GroupingElement = GroupingElement;
+Nodes.Cube = Cube;
+Nodes.GroupingSet = GroupingSet;
+Nodes.Group = Group;
+Nodes.OptimizerHints = OptimizerHints;
+Nodes.RollUp = RollUp;

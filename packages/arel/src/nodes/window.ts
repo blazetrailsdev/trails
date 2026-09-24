@@ -1,3 +1,4 @@
+import { Nodes } from "../namespaces.js";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
 import { Unary } from "./unary.js";
@@ -113,3 +114,11 @@ export class Following extends Unary {
     super(expr);
   }
 }
+
+Nodes.Window = Window;
+Nodes.NamedWindow = NamedWindow;
+Nodes.Preceding = Preceding;
+Nodes.Following = Following;
+Nodes.CurrentRow = CurrentRow;
+Nodes.Rows = Rows;
+Nodes.Range = Range;

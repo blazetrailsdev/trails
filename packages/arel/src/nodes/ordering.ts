@@ -1,3 +1,4 @@
+import { Nodes } from "../namespaces.js";
 import { Unary } from "./unary.js";
 import type { Ascending } from "./ascending.js";
 import type { Descending } from "./descending.js";
@@ -25,3 +26,7 @@ export class NullsLast extends Unary {
     return new NullsFirst(inner.reverse());
   }
 }
+
+Nodes.Ordering = Ordering;
+Nodes.NullsFirst = NullsFirst;
+Nodes.NullsLast = NullsLast;

@@ -1,3 +1,4 @@
+import { Visitors } from "../namespaces.js";
 import type { Table } from "../table.js";
 import { Node } from "../nodes/node.js";
 import * as Nodes from "../nodes/index.js";
@@ -149,3 +150,5 @@ export class MySQL extends ToSql {
     return stmt;
   }
 }
+
+Visitors.MySQL = MySQL;

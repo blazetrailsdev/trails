@@ -203,3 +203,21 @@ include(NotIn as unknown as Includable, fetchAttributeModule);
 type _AliasPredication = import("../alias-predication.js").AliasPredicationModule;
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
 export interface Binary extends _AliasPredication {}
+
+Nodes.Binary = Binary;
+Nodes.Assignment = Assignment;
+Nodes.As = As;
+Nodes.Between = Between;
+Nodes.NotEqual = NotEqual;
+Nodes.GreaterThan = GreaterThan;
+Nodes.GreaterThanOrEqual = GreaterThanOrEqual;
+Nodes.LessThan = LessThan;
+Nodes.LessThanOrEqual = LessThanOrEqual;
+Nodes.IsDistinctFrom = IsDistinctFrom;
+Nodes.IsNotDistinctFrom = IsNotDistinctFrom;
+Nodes.NotIn = NotIn;
+Nodes.Join = Join;
+Nodes.Union = Union;
+Nodes.UnionAll = UnionAll;
+Nodes.Intersect = Intersect;
+Nodes.Except = Except;

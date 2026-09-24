@@ -1,5 +1,5 @@
 import { include, rbEqual, rbHash } from "@blazetrails/activesupport";
-import { Arel, Attributes } from "../namespaces.js";
+import { Arel, Attributes, Nodes } from "../namespaces.js";
 import { Node } from "../nodes/node.js";
 import { SqlLiteral } from "../nodes/sql-literal.js";
 import { NamedFunction } from "../nodes/named-function.js";
@@ -91,3 +91,5 @@ include(Attribute, MathMixin);
 Attributes.Attribute = Attribute;
 Arel.Attribute = Attributes.Attribute;
 setRubyNamespace(Attribute, "Arel::Attributes");
+
+Nodes.Attribute = Attribute;

@@ -1,3 +1,4 @@
+import { Nodes } from "../namespaces.js";
 import { Binary } from "./binary.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -8,3 +9,5 @@ type _WindowPredications = import("../window-predications.js").WindowPredication
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type,
    @typescript-eslint/no-unsafe-declaration-merging */
 export interface Filter extends _WindowPredications {}
+
+Nodes.Filter = Filter;
