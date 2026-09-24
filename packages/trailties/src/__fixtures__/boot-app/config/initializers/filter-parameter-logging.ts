@@ -1,6 +1,6 @@
 import { Trails } from "../../../../rails.js";
 
-Trails.application!.config.filterParameters.push(
+Trails.application!.config.filterParameters = Trails.application!.config.filterParameters.concat([
   "passw",
   "email",
   "secret",
@@ -13,4 +13,4 @@ Trails.application!.config.filterParameters.push(
   "ssn",
   "cvv",
   "cvc",
-);
+]);
