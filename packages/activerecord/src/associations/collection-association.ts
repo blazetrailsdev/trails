@@ -838,7 +838,7 @@ export abstract class CollectionAssociation extends Association {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE converge-invented-association-scope-and-key-helpers
+ * @noRailsEquivalent CONVERGEABLE converge-collection-writer-isthenable-dual-returns
  */
 export function isThenable<T>(value: Promise<T> | T): value is Promise<T> {
   return typeof (value as { then?: unknown } | null | undefined)?.then === "function";

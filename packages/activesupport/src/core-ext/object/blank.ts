@@ -113,10 +113,22 @@ export function isBlank(value: unknown): boolean {
   return false;
 }
 
-export function isPresent(value: unknown): boolean {
+export function isPresent(value: { isBlank(): Promise<boolean> }): Promise<boolean>;
+export function isPresent(value: unknown): boolean;
+export function isPresent(value: unknown): boolean | Promise<boolean> {
+  const blank = (value as { isBlank?: unknown } | null | undefined)?.isBlank;
+  if (typeof blank === "function" && isAsyncFunction(blank)) {
+    return (blank.call(value) as Promise<boolean>).then((result) => !result);
+  }
   return !isBlank(value);
 }
 
-export function presence<T>(value: T): T | undefined {
-  return isPresent(value) ? value : undefined;
+export function presence<T extends { isBlank(): Promise<boolean> }>(
+  value: T,
+): Promise<T | undefined>;
+export function presence<T>(value: T): T | undefined;
+export function presence<T>(value: T): T | undefined | Promise<T | undefined> {
+  const present = isPresent(value as unknown) as boolean | Promise<boolean>;
+  if (typeof present !== "boolean") return present.then((p) => (p ? value : undefined));
+  return present ? value : undefined;
 }

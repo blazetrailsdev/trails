@@ -1,7 +1,7 @@
 import { kernelThrow, rbEqual } from "@blazetrails/ruby-compat";
 import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
-import { DeleteRestrictionError, HasOnePersistedAssignmentError } from "./errors.js";
+import { DeleteRestrictionError } from "./errors.js";
 import { RecordNotSaved } from "../errors.js";
 import { underscore, wrap as arrayWrap } from "@blazetrails/activesupport";
 import { _reflectOnAssociation, reflectOnAllAssociations } from "../reflection.js";
@@ -17,13 +17,6 @@ import { assertAssignedSynchronously } from "@blazetrails/activemodel";
 export class HasOneAssociation extends SingularAssociation {
   /** @internal */
   protected syncWrite(record: Base | null): void {
-    if (record)
-      (this as unknown as { raiseOnTypeMismatchBang(r: Base): void }).raiseOnTypeMismatchBang(
-        record,
-      );
-    if ((this.owner as { isPersisted?: () => boolean }).isPersisted?.()) {
-      throw new HasOnePersistedAssignmentError(this.reflection.name);
-    }
     assertAssignedSynchronously(this.replace(record, false), `${this.reflection.name}=`);
   }
 

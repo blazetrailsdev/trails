@@ -69,7 +69,11 @@ export class Post extends Base {
   declare static taggedWith: (id: number) => Relation<Post>;
   declare static taggedWithComment: (comment: string) => Relation<Post>;
   declare static typographicallyInteresting: () => Relation<Post>;
-  declare firstComment: Promise<string | null>;
+  get firstComment(): Promise<string | null> {
+    return Promise.resolve(
+      Reflect.get(Object.getPrototypeOf(Post.prototype), "firstComment", this),
+    ).then((c: any) => c?.body ?? null);
+  }
   declare commentsWithExtend: AssociationProxy<Comment>;
   declare commentsWithExtending: AssociationProxy<Comment>;
   declare commentsWithExtend_2: AssociationProxy<Comment>;
@@ -247,15 +251,6 @@ export class Post extends Base {
       foreignKey: "author_id",
     });
 
-    Object.defineProperty(this.prototype, "firstComment", {
-      get(this: any): Promise<string | null> {
-        return Promise.resolve(this.association("firstComment").reader).then(
-          (c: any) => c?.body ?? null,
-        );
-      },
-      configurable: false,
-      enumerable: false,
-    });
     this.hasOne("firstComment", (q: any) => q.order("id ASC"), { className: "Comment" });
     this.hasOne("lastComment", (q: any) => q.order("id desc"), { className: "Comment" });
 

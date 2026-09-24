@@ -1,5 +1,5 @@
 import { ArgumentError } from "@blazetrails/activemodel";
-import { NotImplementedError, kernelThrow } from "@blazetrails/ruby-compat";
+import { NotImplementedError, kernelThrow, type Module } from "@blazetrails/ruby-compat";
 import { assertValidKeys } from "@blazetrails/activesupport";
 import { ConfigurationError, RecordNotDestroyed } from "../../errors.js";
 import { _Reflection } from "../../reflection-slot.js";
@@ -174,35 +174,33 @@ export class Association {
   }
 
   static defineAccessors(model: any, reflection: any): void {
-    const mixin = model.prototype ?? model;
-    const name = reflection.name ?? reflection;
+    const mixin: Module = model.generatedAssociationMethods();
+    const name = reflection.name;
     this.defineReaders(mixin, name);
     this.defineWriters(mixin, name);
   }
 
-  static defineReaders(mixin: object, name: string): void {
-    if (!mixin || typeof mixin !== "object") return;
-    const existing = Object.getOwnPropertyDescriptor(mixin, name);
-    if (existing && !existing.configurable) return;
-    Object.defineProperty(mixin, name, {
-      get(this: AssociationInstanceHost) {
-        return this.association(name).reader;
-      },
-      set: existing?.set,
-      configurable: true,
+  static defineReaders(mixin: Module, name: string): void {
+    mixin.moduleEval((m) => {
+      Object.defineProperty(m, name, {
+        get(this: AssociationInstanceHost) {
+          return this.association(name).reader;
+        },
+        set: Object.getOwnPropertyDescriptor(m, name)?.set,
+        configurable: true,
+      });
     });
   }
 
-  static defineWriters(mixin: object, name: string): void {
-    if (!mixin || typeof mixin !== "object") return;
-    const existing = Object.getOwnPropertyDescriptor(mixin, name);
-    if (existing && !existing.configurable) return;
-    Object.defineProperty(mixin, name, {
-      get: existing?.get,
-      set(this: AssociationInstanceHost, value: unknown) {
-        this.association(name).writer(value);
-      },
-      configurable: true,
+  static defineWriters(mixin: Module, name: string): void {
+    mixin.moduleEval((m) => {
+      Object.defineProperty(m, name, {
+        get: Object.getOwnPropertyDescriptor(m, name)?.get,
+        set(this: AssociationInstanceHost, value: unknown) {
+          this.association(name).writer(value);
+        },
+        configurable: true,
+      });
     });
   }
 

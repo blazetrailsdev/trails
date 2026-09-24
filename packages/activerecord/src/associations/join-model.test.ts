@@ -9,7 +9,12 @@ import {
   HasManyThroughAssociationPolymorphicThroughError,
   EagerLoadPolymorphicError,
 } from "./errors.js";
-import { assertDifference, assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
+import {
+  assertDifference,
+  assertNothingRaised,
+  assertRaises,
+  isPresent,
+} from "@blazetrails/activesupport";
 import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
 import { fixtures } from "../test-fixtures.js";
 import { Author, AuthorAddress, AuthorFavorite } from "../test-helpers/models/author.js";
@@ -668,7 +673,7 @@ describe("AssociationsJoinModelTest", () => {
 
   it("has many through uses conditions specified on the has many association", async () => {
     const author = (await Author.first()) as Author;
-    expect(await (author as any).comments.isPresent()).toBeTruthy();
+    expect(await isPresent((author as any).comments)).toBeTruthy();
     expect(await (author as any).nonexistentComments.isBlank()).toBeTruthy();
   });
 

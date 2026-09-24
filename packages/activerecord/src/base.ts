@@ -1,3 +1,4 @@
+import { basicObjRespondTo, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/date";
 import "./i18n.js";
 import { GlobalID as _GlobalIDCtor } from "@blazetrails/globalid";
@@ -57,7 +58,6 @@ import {
   baseClass as _inheritanceBaseClass,
   isBaseClass as _isBaseClass,
   ensureProperType as _ensureProperType,
-  defineDynamicSelectReaders,
   subclassFromAttributesForNew,
   isDescendsFromActiveRecord as _isDescendsFromActiveRecord,
   usingSingleTableInheritance as _usingSingleTableInheritance,
@@ -105,10 +105,6 @@ import {
 import * as Timestamp from "./timestamp.js";
 import * as TouchLater from "./touch-later.js";
 import { Association as AssociationInstance } from "./associations/association.js";
-import {
-  AssociationCache,
-  type AssociationCache as _AssociationCache,
-} from "./association-cache.js";
 import {
   ConnectionHandler,
   _registerBase as _registerBaseWithConnectionHandler,
@@ -1016,6 +1012,7 @@ export class Base extends Model {
 
   declare static defineAttribute: typeof _defineAttribute;
   declare static initializeGeneratedModules: typeof _initializeGeneratedModules;
+  declare static generatedAssociationMethods: typeof _Core.generatedAssociationMethods;
   /** @internal */
   declare static _generatedAttributeMethods?: GeneratedAttributeMethods;
   declare static defineAttributeMethods: typeof _defineAttributeMethods;
@@ -1758,7 +1755,11 @@ export class Base extends Model {
     (record as any).initWithAttributes(
       (this as any).attributesBuilder().buildFromDatabase(row, columnTypes ?? {}),
     );
-    defineDynamicSelectReaders(record as unknown as Base);
+    for (const name of (record as any)._attributes.keys() as Iterable<string>) {
+      if (!basicObjRespondTo(record, name, false)) {
+        (rbObjSingletonClass(record) as unknown as typeof Base).defineAttributeMethod(name);
+      }
+    }
     record._newRecord = false;
     record.changesApplied();
     if (this._strictLoadingByDefault) {
@@ -1786,15 +1787,6 @@ export class Base extends Model {
         })
       | undefined;
     if (instance?.isLoaded() && !instance.isCollection()) return instance;
-    const proxy = this._collectionProxies.get(name) as
-      | { loaded?: boolean; target?: Base[] }
-      | undefined;
-    if (
-      proxy &&
-      (proxy.loaded === true || (Array.isArray(proxy.target) && proxy.target.length > 0))
-    ) {
-      return proxy;
-    }
     if (
       instance?.isCollection() === true &&
       (instance.isLoaded() === true ||
@@ -1803,20 +1795,6 @@ export class Base extends Model {
       return instance;
     }
     return undefined;
-  }
-
-  /** @internal */
-  _resetAssociationCaches(): void {
-    if (this._associationCacheStore === undefined) {
-      this._associationCacheStore = new AssociationCache();
-      this._collectionProxies = this._associationCacheStore.proxies;
-      this._associationInstances = this._associationCacheStore.instances as Map<
-        string,
-        AssociationInstance
-      >;
-      return;
-    }
-    this._associationCacheStore.clear();
   }
 
   /** @missingRailsCall init_internals — CONVERGEABLE base-constructor-calls-init-internals-not-activemodel */
@@ -2531,10 +2509,6 @@ export interface Base extends Included<typeof AutosaveAssociation>, JSONSerializ
   /** @internal */
   _strictLoadingMode?: _Core.StrictLoadingMode;
   /** @internal */
-  _associationCacheStore: _AssociationCache;
-  /** @internal */
-  _collectionProxies: Map<string, unknown>;
-  /** @internal */
   _associationInstances: Map<string, AssociationInstance>;
   association(name: string): AssociationInstance;
   readonly savedChanges: Record<string, [unknown, unknown]>;
@@ -2772,6 +2746,7 @@ extend(Base, {
   undefineAttributeMethods: _undefineAttributeMethods,
   aliasAttribute: _aliasAttribute,
   initializeGeneratedModules: _initializeGeneratedModules,
+  generatedAssociationMethods: _Core.generatedAssociationMethods,
   generateAliasAttributes: _generateAliasAttributes,
   eagerlyGenerateAliasAttributeMethods: _eagerlyGenerateAliasAttributeMethods,
   _defaultAttributes: _arDefaultAttributes,

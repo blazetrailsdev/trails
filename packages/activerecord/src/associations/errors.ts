@@ -381,20 +381,6 @@ export class DeleteRestrictionError extends ActiveRecordError {
   }
 }
 
-/** @noRailsEquivalent CONVERGEABLE has-one-mass-assignment-refuses-rails-replace */
-export class HasOnePersistedAssignmentError extends ActiveRecordError {
-  constructor(association: string) {
-    const cap = association.charAt(0).toUpperCase() + association.slice(1);
-    super(
-      `Cannot assign has_one association \`${association}\` by mass assignment on a ` +
-        `persisted record: Rails persists the replacement at assignment time, ` +
-        `which requires \`await\` in JS. Use \`await owner.set${cap}(x)\` (or ` +
-        `\`await owner.association("${association}").writer(x)\`).`,
-    );
-    this.name = "HasOnePersistedAssignmentError";
-  }
-}
-
 /** @noRailsEquivalent CONVERGEABLE sync-collection-mass-assignment-refuses-rails-replace */
 export class CollectionPersistedAssignmentError extends ActiveRecordError {
   constructor(association: string) {

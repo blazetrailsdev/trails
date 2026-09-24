@@ -1,7 +1,7 @@
 import { Relation, type LoadedRelation } from "./relation.js";
 import { _registerRelationFamily } from "./relation/uncacheable-methods-slot.js";
 import { relationClassFor } from "./relation/delegation.js";
-import { normalizeAssociationKey } from "./associations/key-normalization.js";
+import { rbEql, rbHash, uniq } from "@blazetrails/ruby-compat";
 import { stripThenable } from "./relation/thenable.js";
 import type { Base } from "./base.js";
 import type { Nodes } from "@blazetrails/arel";
@@ -9,25 +9,12 @@ import type { Nodes } from "@blazetrails/arel";
 export type DjarKey = string | string[];
 export type DjarIds = unknown[] | unknown[][];
 
-function serializeKey(v: unknown, composite: boolean): unknown {
-  if (!composite) return normalizeAssociationKey(v);
-  return (
-    "\u0000T" +
-    JSON.stringify(v, (_k, value) => {
-      if (typeof value !== "bigint") return value;
-      const normalized = normalizeAssociationKey(value);
-      return typeof normalized === "bigint" ? `\u0000B${normalized.toString()}` : normalized;
-    })
-  );
-}
-
 export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T> {
   /** @internal */
   static override _railsClassName = "ActiveRecord::DisableJoinsAssociationRelation";
 
   readonly key: DjarKey;
   private _storedIds: DjarIds;
-  private _storedKeyStrings: string[] | null;
   private _composite: boolean;
   private _chainWalker?: () => Promise<{ relation: Relation<T> }>;
   private _walkPromise?: Promise<{ relation: Relation<T> }>;
@@ -44,24 +31,7 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
     }
     this.key = normalizedKey;
     this._composite = Array.isArray(normalizedKey);
-    if (this._composite) {
-      const seen = new Set<string>();
-      const out: unknown[][] = [];
-      const keyStrings: string[] = [];
-      for (const tuple of normalizedIds as unknown[][]) {
-        const k = serializeKey(tuple, true) as string;
-        if (!seen.has(k)) {
-          seen.add(k);
-          out.push(Array.from(tuple));
-          keyStrings.push(k);
-        }
-      }
-      this._storedIds = out;
-      this._storedKeyStrings = keyStrings;
-    } else {
-      this._storedIds = Array.from(new Set(normalizedIds as unknown[]));
-      this._storedKeyStrings = null;
-    }
+    this._storedIds = uniq(normalizedIds as unknown[]) as DjarIds;
   }
 
   /** @noRailsEquivalent CONVERGEABLE converge-djar-deferred-chain-walk-mode */
@@ -214,7 +184,6 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
   private _adoptNormalizedState(source: DisableJoinsAssociationRelation<T>): void {
     this._composite = source._composite;
     this._storedIds = source._storedIds;
-    this._storedKeyStrings = source._storedKeyStrings;
     this._chainWalker = source._chainWalker;
   }
 
@@ -247,31 +216,22 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
     if (this._chainWalker) return stripThenable(this);
     const records = this._records;
 
-    const recordsById = new Map<unknown, T[]>();
     const keyCols = Array.isArray(this.key) ? this.key : [this.key];
     const composite = this._composite;
+    const recordKey = (record: T): unknown =>
+      composite ? keyCols.map((c) => record._readAttribute(c)) : record._readAttribute(keyCols[0]);
+
+    const recordsById = new Map<number, T[]>();
     for (const record of records) {
-      const raw = composite
-        ? keyCols.map((c) => record._readAttribute(c))
-        : record._readAttribute(keyCols[0]);
-      const k = serializeKey(raw, composite);
+      const k = rbHash(recordKey(record));
       const bucket = recordsById.get(k);
       if (bucket) bucket.push(record);
       else recordsById.set(k, [record]);
     }
 
-    const ordered: T[] = [];
-    if (composite) {
-      for (const k of this._storedKeyStrings!) {
-        const bucket = recordsById.get(k);
-        if (bucket) ordered.push(...bucket);
-      }
-    } else {
-      for (const id of this._storedIds) {
-        const bucket = recordsById.get(normalizeAssociationKey(id));
-        if (bucket) ordered.push(...bucket);
-      }
-    }
+    const ordered = (this._storedIds as unknown[]).flatMap((id) =>
+      (recordsById.get(rbHash(id)) ?? []).filter((record) => rbEql(recordKey(record), id)),
+    );
 
     this._records = ordered;
     return stripThenable(this);

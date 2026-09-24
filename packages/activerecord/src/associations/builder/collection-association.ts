@@ -1,3 +1,4 @@
+import type { Module } from "@blazetrails/ruby-compat";
 import { singularize } from "@blazetrails/activesupport";
 import { Association, type AssociationInstanceHost } from "./association.js";
 import { addAutosaveAssociationCallbacks } from "../../autosave-association.js";
@@ -87,37 +88,28 @@ export class CollectionAssociation extends Association {
     }
   }
 
-  static override defineReaders(mixin: object, name: string): void {
-    if (!mixin || typeof mixin !== "object") return;
-
+  static override defineReaders(mixin: Module, name: string): void {
     super.defineReaders(mixin, name);
 
-    const ids = idsName(name);
-    if (!(ids in mixin)) {
-      Object.defineProperty(mixin, ids, {
+    mixin.moduleEval((m) => {
+      Object.defineProperty(m, idsName(name), {
         get(this: AssociationInstanceHost) {
           return this.association(name).idsReader();
         },
         configurable: true,
       });
-    }
+    });
   }
 
-  static override defineWriters(mixin: object, name: string): void {
-    if (!mixin || typeof mixin !== "object") return;
-    Object.defineProperty(mixin, `${name}=`, {
-      value(this: AssociationInstanceHost, value: unknown): unknown {
-        return this.association(name).writer(value);
-      },
-      writable: true,
-      configurable: true,
+  static override defineWriters(mixin: Module, name: string): void {
+    mixin.defineMethod(`${name}=`, function (this: AssociationInstanceHost, value: unknown) {
+      return this.association(name).writer(value);
     });
-    Object.defineProperty(mixin, `${idsName(name)}=`, {
-      value(this: AssociationInstanceHost, value: unknown): unknown {
+    mixin.defineMethod(
+      `${idsName(name)}=`,
+      function (this: AssociationInstanceHost, value: unknown) {
         return this.association(name).idsWriter(value);
       },
-      writable: true,
-      configurable: true,
-    });
+    );
   }
 }

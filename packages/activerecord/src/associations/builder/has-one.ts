@@ -1,3 +1,4 @@
+import type { Module } from "@blazetrails/ruby-compat";
 import { SingularAssociation } from "./singular-association.js";
 import { addAutosaveAssociationCallbacks } from "../../autosave-association.js";
 
@@ -15,35 +16,18 @@ export class HasOne extends SingularAssociation {
   }
 
   /** @noRailsEquivalent CONVERGEABLE converge-has-one-builder-define-writers */
-  static override defineWriters(mixin: object, name: string): void {
-    if (!mixin || typeof mixin !== "object") return;
+  static override defineWriters(mixin: Module, name: string): void {
     const cap = name.charAt(0).toUpperCase() + name.slice(1);
-    const setter = Object.getOwnPropertyDescriptor(mixin, `set${cap}`);
-    if (!setter || setter.configurable) {
-      Object.defineProperty(mixin, `set${cap}`, {
-        value: function (
+    for (const methodName of [`set${cap}`, `${name}=`]) {
+      mixin.defineMethod(
+        methodName,
+        function (
           this: { association(n: string): { writer(v: unknown): unknown } },
           value: unknown,
         ) {
           return this.association(name).writer(value);
         },
-        writable: true,
-        configurable: true,
-      });
-    }
-
-    const rubyWriter = Object.getOwnPropertyDescriptor(mixin, `${name}=`);
-    if (!rubyWriter || rubyWriter.configurable) {
-      Object.defineProperty(mixin, `${name}=`, {
-        value: function (
-          this: { association(n: string): { writer(v: unknown): unknown } },
-          value: unknown,
-        ) {
-          return this.association(name).writer(value);
-        },
-        writable: true,
-        configurable: true,
-      });
+      );
     }
   }
 

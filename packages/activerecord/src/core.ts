@@ -530,6 +530,10 @@ export function initializeGeneratedModules(this: CoreHost): void {
 
 export function generatedAssociationMethods(this: CoreHost): Module {
   if (!Object.prototype.hasOwnProperty.call(this, "_generatedAssociationMethods")) {
+    if (!Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")) {
+      (this as unknown as { initializeGeneratedModules(): void }).initializeGeneratedModules();
+      return this._generatedAssociationMethods!;
+    }
     const mod = new Module();
     include(this as unknown as new (...args: unknown[]) => unknown, mod);
     this._generatedAssociationMethods = mod;
