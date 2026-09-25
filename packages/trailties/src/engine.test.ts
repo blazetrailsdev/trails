@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
 import {
   fsAdapterConfig,
@@ -14,6 +14,7 @@ import { EngineConfiguration } from "./engine/configuration.js";
 import { MiddlewareStackProxy } from "./configuration.js";
 import { Trailtie } from "./trailtie.js";
 import { Trailties } from "./engine/trailties.js";
+import { Trails } from "./rails.js";
 
 const posixPath: PathAdapter = {
   join: (...p) => p.join("/").replace(/\/+/g, "/"),
@@ -364,6 +365,26 @@ describe("Engine", () => {
     });
     expect(prepended).toHaveLength(1);
     expect(prepended[0][0]).toMatch(/app\/views$/);
+    resetLoadHooks();
+  });
+
+  it("adds its fixtures path to fixture_paths", async () => {
+    resetLoadHooks();
+    class Bukkits extends Engine {}
+    Trailtie.register(Bukkits);
+    const engine = Bukkits.instance();
+    engine.config.setRoot(new URL("./__fixtures__/boot-app", import.meta.url).pathname);
+    const root = vi
+      .spyOn(Trails, "root")
+      .mockResolvedValue(new URL("./__fixtures__", import.meta.url).pathname);
+
+    await engine.initializers.find((i) => i.name === "add_fixture_paths")!.run();
+
+    const testClass = { fixturePaths: [] as string[] };
+    runLoadHooks("active_record_fixtures", testClass);
+
+    expect(testClass.fixturePaths).toEqual([`${await engine.root()}/test/fixtures/`]);
+    root.mockRestore();
     resetLoadHooks();
   });
 

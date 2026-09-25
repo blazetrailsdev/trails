@@ -5,6 +5,7 @@ import {
   Notifications,
   extend,
   include,
+  type Extended,
 } from "@blazetrails/activesupport";
 import { ConfigMethods } from "../caching.js";
 
@@ -21,10 +22,6 @@ import {
 } from "./fragments.js";
 
 class HostClass {
-  static config = Configurable.ClassMethods.config;
-  static configAccessor = Configurable.ClassMethods.configAccessor;
-  config = Configurable.config;
-
   static fragmentCacheKeys: Array<(this: FragmentsHost) => unknown> | undefined;
 
   account = { id: 7 };
@@ -33,9 +30,11 @@ class HostClass {
   }
 }
 
+include(HostClass, Configurable);
+const HostConfigurable = HostClass as typeof HostClass & Extended<typeof Configurable.ClassMethods>;
 include(HostClass, ConfigMethods);
 extend(HostClass, ConfigMethods);
-HostClass.configAccessor("performCaching");
+HostConfigurable.configAccessor("performCaching");
 
 const HostConfig = HostClass as unknown as typeof HostClass & {
   cacheStore: unknown;
@@ -43,7 +42,7 @@ const HostConfig = HostClass as unknown as typeof HostClass & {
 };
 
 function makeHost(store?: MemoryStore): HostClass & FragmentsHost {
-  HostClass.config().clear();
+  HostConfigurable.config().clear();
   if (store) HostConfig.cacheStore = store;
   HostConfig.performCaching = true;
   HostClass.fragmentCacheKeys = [];

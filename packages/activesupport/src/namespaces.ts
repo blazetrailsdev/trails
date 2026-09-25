@@ -30,6 +30,8 @@ export const TopLevel: {
     env: EnvironmentInquirer;
     logger: Logger | null;
     application: { reloadRoutesUnlessLoaded(): Promise<boolean> | undefined } | null;
+    Application: abstract new (...args: never[]) => unknown;
+    root(): Promise<string | undefined>;
   };
   ActionDispatch?: {
     Request: new (env: Record<string, unknown>) => unknown;

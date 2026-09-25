@@ -44,7 +44,6 @@ export {
 } from "./url-for.js";
 export {
   cache,
-  cacheConfigured,
   ConfigMethods,
   viewCacheDependencies,
   viewCacheDependency,

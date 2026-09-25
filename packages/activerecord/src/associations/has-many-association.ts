@@ -37,11 +37,17 @@ export class HasManyAssociation extends CollectionAssociation {
   declare deleteCount: (method: string, scope: any) => Promise<number>;
 
   protected override difference(a: Base[], b: Base[]): Base[] {
-    return setDifference(a, b);
+    return a.filter((record) => !b.some((r) => rbEqual(r, record)));
   }
 
   protected override intersection(a: Base[], b: Base[]): Base[] {
-    return setIntersection(a, b);
+    const result: Base[] = [];
+    for (const record of a) {
+      if (b.some((r) => rbEqual(r, record)) && !result.some((r) => rbEqual(r, record))) {
+        result.push(record);
+      }
+    }
+    return result;
   }
 
   /**
@@ -337,28 +343,6 @@ function deriveAsTypeCol(assoc: { reflection: { options: { as?: string } } }): s
   return asName ? `${underscore(asName)}_type` : null;
 }
 
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy-remainder
- */
-export function setDifference(a: Base[], b: Base[]): Base[] {
-  return a.filter((record) => !b.some((r) => rbEqual(r, record)));
-}
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy-remainder
- */
-export function setIntersection(a: Base[], b: Base[]): Base[] {
-  const result: Base[] = [];
-  for (const record of a) {
-    if (b.some((r) => rbEqual(r, record)) && !result.some((r) => rbEqual(r, record))) {
-      result.push(record);
-    }
-  }
-  return result;
-}
-
 /** @internal */
 async function findTarget(
   record: Base,
@@ -395,7 +379,7 @@ async function findTarget(
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy-remainder
+ * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy-remainder-2
  */
 export function scope(
   record: Base,

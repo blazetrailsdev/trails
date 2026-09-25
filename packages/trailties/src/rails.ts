@@ -21,6 +21,8 @@ export class Trails {
     throw new Error("Trails is a static-only namespace; do not instantiate.");
   }
 
+  static Application = Application;
+
   static get application(): Application | null {
     if (_application) return _application;
     const klass = Application.appClass;

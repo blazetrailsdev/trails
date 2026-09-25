@@ -1,13 +1,15 @@
 import { describe, it, expect, beforeEach } from "vitest";
 
+import { include } from "@blazetrails/ruby-compat/include";
 import { Configurable } from "./configurable.js";
 import { NameError } from "./core-ext/name-error.js";
 
 class Parent {
-  static config = Configurable.ClassMethods.config;
-  static configAccessor = Configurable.ClassMethods.configAccessor;
-  config = Configurable.config;
+  declare static config: typeof Configurable.ClassMethods.config;
+  declare static configAccessor: typeof Configurable.ClassMethods.configAccessor;
+  declare config: typeof Configurable.config;
 }
+include(Parent, Configurable);
 Parent.configAccessor("foo");
 Parent.configAccessor("bar", { instanceReader: false, instanceWriter: false });
 Parent.configAccessor("baz", { instanceAccessor: false });

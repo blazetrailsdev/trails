@@ -4,10 +4,6 @@ import { NoMethodError } from "@blazetrails/ruby-compat";
 import { Notifications } from "@blazetrails/activesupport";
 import type { CacheOptions, CacheStore } from "@blazetrails/activesupport";
 
-function cacheConfigured(host: FragmentsHost): boolean {
-  return Boolean(host.performCaching && host.cacheStore);
-}
-
 export type FragmentCacheKeyBlock = (this: FragmentsHost) => unknown;
 
 export interface FragmentsClassMethods {
@@ -20,6 +16,7 @@ export interface FragmentsHost {
   constructor: FragmentsClassMethods;
   cacheStore?: CacheStore | null;
   performCaching?: boolean;
+  isCacheConfigured(): unknown;
   urlFor?(options: unknown): string;
   instrumentName?(): string;
   instrumentPayload?(key: unknown): Record<string, unknown>;
@@ -88,7 +85,7 @@ export function writeFragment(
   content: unknown,
   options?: CacheOptions,
 ): unknown {
-  if (!cacheConfigured(this)) return content;
+  if (!this.isCacheConfigured()) return content;
   key = stringifyKey(combinedFragmentCacheKey.call(this, key));
   instrumentFragmentCache(this, "write_fragment", key, () => {
     content = toStr(content);
@@ -98,7 +95,7 @@ export function writeFragment(
 }
 
 export function readFragment(this: FragmentsHost, key: unknown, options?: CacheOptions): unknown {
-  if (!cacheConfigured(this)) return undefined;
+  if (!this.isCacheConfigured()) return undefined;
   key = stringifyKey(combinedFragmentCacheKey.call(this, key));
   return instrumentFragmentCache(this, "read_fragment", key, () =>
     this.cacheStore!.read(key as string, options),
@@ -110,7 +107,7 @@ export function fragmentExist(
   key: unknown,
   options?: CacheOptions,
 ): boolean | undefined {
-  if (!cacheConfigured(this)) return undefined;
+  if (!this.isCacheConfigured()) return undefined;
   key = stringifyKey(combinedFragmentCacheKey.call(this, key));
   return instrumentFragmentCache(this, "exist_fragment?", key, () =>
     this.cacheStore!.exist(key as string, options),
@@ -118,7 +115,7 @@ export function fragmentExist(
 }
 
 export function expireFragment(this: FragmentsHost, key: unknown, options?: CacheOptions): unknown {
-  if (!cacheConfigured(this)) return undefined;
+  if (!this.isCacheConfigured()) return undefined;
   if (!(key instanceof RegExp)) key = stringifyKey(combinedFragmentCacheKey.call(this, key));
 
   return instrumentFragmentCache(this, "expire_fragment", key, () => {
