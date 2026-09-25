@@ -922,9 +922,10 @@ modules converged onto `Autoload`:
   `ConnectionPool::WeakThreadKeyMap`), and `ConnectionAdapters.register` /
   `.resolve`, the module's singleton methods (`connection_adapters.rb:22-50`,
   read by `database_config.rb:17`), seated by connection-adapters.ts;
-  `ActiveRecord.Migration` (`active_record.rb:60`). Every `autoload` seat
-  registers its `Namespace::Const` path with `constantize` as it is seated, as
-  Ruby's `Module#autoload` defines the constant. `ActiveRecord.Point`
+  `ActiveRecord.Migration` (`active_record.rb:60`). `ActiveRecord` registers
+  itself with `constantize`, which walks each further segment through the
+  constant seated on its namespace, as `Object.const_get` does
+  (`inflector/methods.rb:289-291`). `ActiveRecord.Point`
   (`postgresql/oid/point.rb:4`) is required, not autoloaded, and is seated with
   no `autoload` call. The cycles they break are the ones the deleted slots broke:
   `base.ts` importing every `self == Base` reader; `class SingularAssociation` /

@@ -1,3 +1,4 @@
+import { mattrAccessor, mattrReader } from "@blazetrails/activesupport";
 import { Config } from "./config.js";
 import { Encryption } from "../namespaces.js";
 import { Context } from "./context.js";
@@ -9,33 +10,15 @@ import type { SchemeOptions } from "./scheme.js";
 
 type DeclarationListener = (klass: any, name: string) => void;
 
-let _listeners: DeclarationListener[] | undefined;
-
-let _config: Config | undefined;
-
 export class Configurable {
-  static get config(): Config {
-    return (_config ??= new Config());
-  }
+  declare static config: Config;
+  declare static encryptedAttributeDeclarationListeners: DeclarationListener[] | undefined;
+  declare config: Config;
+  declare encryptedAttributeDeclarationListeners: DeclarationListener[] | undefined;
 
-  static get encryptedAttributeDeclarationListeners(): DeclarationListener[] | undefined {
-    return _listeners;
-  }
-
-  static set encryptedAttributeDeclarationListeners(value: DeclarationListener[] | undefined) {
-    _listeners = value;
-  }
-
-  get config(): Config {
-    return (_config ??= new Config());
-  }
-
-  get encryptedAttributeDeclarationListeners(): DeclarationListener[] | undefined {
-    return _listeners;
-  }
-
-  set encryptedAttributeDeclarationListeners(value: DeclarationListener[] | undefined) {
-    _listeners = value;
+  static {
+    mattrReader.call(this, "config", { default: new Config() });
+    mattrAccessor.call(this, "encryptedAttributeDeclarationListeners");
   }
 
   static get keyProvider(): unknown {
@@ -106,7 +89,7 @@ export class Configurable {
 
   /** @missingRailsCall new — PERMANENT */
   static onEncryptedAttributeDeclared(callback: (klass: any, name: string) => void): () => void {
-    const listeners = (_listeners ??= []);
+    const listeners = (this.encryptedAttributeDeclarationListeners ??= []);
     listeners.push(callback);
     return () => {
       const idx = listeners.indexOf(callback);
@@ -115,8 +98,9 @@ export class Configurable {
   }
 
   static encryptedAttributeWasDeclared(klass: any, name: string): void {
-    if (!_listeners) return;
-    for (const listener of [..._listeners]) {
+    const listeners = this.encryptedAttributeDeclarationListeners;
+    if (!listeners) return;
+    for (const listener of [...listeners]) {
       listener(klass, name);
     }
   }

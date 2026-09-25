@@ -1092,9 +1092,9 @@ export function extractFromProgram(
         for (const isStatic of seats) {
           const members = isStatic ? entity.classMethods : entity.instanceMethods;
           const generated: { name: string; writer: boolean }[] = [];
-          if (isStatic || attr.instanceReader) generated.push({ name, writer: false });
-          if (isStatic || attr.instanceWriter) generated.push({ name, writer: true });
-          if (predicate !== undefined && (isStatic || attr.instanceReader)) {
+          if (isStatic ? attr.reader : attr.instanceReader) generated.push({ name, writer: false });
+          if (isStatic ? attr.writer : attr.instanceWriter) generated.push({ name, writer: true });
+          if (predicate !== undefined && (isStatic ? attr.reader : attr.instanceReader)) {
             generated.push({ name: predicate, writer: false });
           }
           for (const { name: generatedName, writer } of generated) {
@@ -3095,6 +3095,8 @@ interface ClassAttributeCall {
   enclosingObjectLiteral?: boolean;
   receiver?: string;
   names: string[];
+  reader: boolean;
+  writer: boolean;
   instanceReader: boolean;
   instanceWriter: boolean;
   instancePredicate: boolean;
@@ -3114,12 +3116,38 @@ function collectClassAttributeCalls(sourceFile: ts.SourceFile): ClassAttributeCa
   return out;
 }
 
+/**
+ * The `.call` receivers credited like `classAttribute`, keyed to the halves each
+ * installs — `extract-ruby-api.rb#process_mattr`'s `reader:` / `writer:` /
+ * `predicate:` arguments for `class_attribute` and the `mattr_*` / `cattr_*`
+ * macros (module-ext.ts is their port).
+ */
+function attributeMacro(
+  name: string,
+): { reader: boolean; writer: boolean; predicate: boolean } | undefined {
+  switch (name) {
+    case "classAttribute":
+      return { reader: true, writer: true, predicate: true };
+    case "mattrAccessor":
+    case "cattrAccessor":
+      return { reader: true, writer: true, predicate: false };
+    case "mattrReader":
+    case "cattrReader":
+      return { reader: true, writer: false, predicate: false };
+    case "mattrWriter":
+    case "cattrWriter":
+      return { reader: false, writer: true, predicate: false };
+    default:
+      return undefined;
+  }
+}
+
 function isClassAttributeCallee(expr: ts.Expression): boolean {
   return (
     ts.isPropertyAccessExpression(expr) &&
     expr.name.text === "call" &&
     ts.isIdentifier(expr.expression) &&
-    expr.expression.text === "classAttribute"
+    attributeMacro(expr.expression.text) !== undefined
   );
 }
 
@@ -3137,15 +3165,20 @@ function readClassAttributeCall(
   const opts = rest.at(-1);
   const options = opts !== undefined && ts.isObjectLiteralExpression(opts) ? opts : undefined;
   const instanceAccessor = optionBool(options, "instanceAccessor") ?? true;
+  const macro = attributeMacro(
+    ((node.expression as ts.PropertyAccessExpression).expression as ts.Identifier).text,
+  )!;
   const enclosing = enclosingEntity(node);
   return {
     ...(enclosing !== undefined ? { enclosing: enclosing.name } : {}),
     ...(enclosing?.objectLiteral === true ? { enclosingObjectLiteral: true } : {}),
     ...(ts.isIdentifier(recv) ? { receiver: recv.text } : {}),
     names,
-    instanceReader: optionBool(options, "instanceReader") ?? instanceAccessor,
-    instanceWriter: optionBool(options, "instanceWriter") ?? instanceAccessor,
-    instancePredicate: optionBool(options, "instancePredicate") ?? true,
+    reader: macro.reader,
+    writer: macro.writer,
+    instanceReader: macro.reader && (optionBool(options, "instanceReader") ?? instanceAccessor),
+    instanceWriter: macro.writer && (optionBool(options, "instanceWriter") ?? instanceAccessor),
+    instancePredicate: macro.predicate && (optionBool(options, "instancePredicate") ?? true),
     line: sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1,
   };
 }
