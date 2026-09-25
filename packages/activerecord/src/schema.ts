@@ -1,8 +1,7 @@
 import { isPresent } from "@blazetrails/activesupport";
 import { extend, include, included } from "@blazetrails/ruby-compat";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
-import { Current, type Migration } from "./migration.js";
-import { Migration as MigrationNamespace } from "./namespaces.js";
+import { Current, Migration } from "./migration.js";
 
 export interface SchemaDefineInfo {
   version?: string | number;
@@ -65,9 +64,7 @@ export class Schema<A extends DatabaseAdapter = DatabaseAdapter> extends Current
   static get(version: string | number): typeof Migration {
     if (!Object.hasOwn(this, "_classForVersion")) this._classForVersion = new Map();
     if (!this._classForVersion!.has(version)) {
-      const klass = class extends (MigrationNamespace.Compatibility.find(
-        version,
-      ) as new () => object) {};
+      const klass = class extends (Migration.Compatibility.find(version) as new () => object) {};
       include(klass, Definition);
       this._classForVersion!.set(version, klass as unknown as typeof Migration);
     }

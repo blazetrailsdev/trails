@@ -1,3 +1,4 @@
+import type * as Arel from "@blazetrails/arel";
 import { Nodes } from "@blazetrails/arel";
 
 import type { PredicateBuilder } from "../predicate-builder.js";
@@ -47,7 +48,7 @@ export class RangeHandler {
   }
 
   /** @missingRailsName name — PERMANENT */
-  call(attribute: Nodes.Attribute, value: Range<unknown>): Nodes.Node {
+  call(attribute: Arel.Attribute, value: Range<unknown>): Nodes.Node {
     const beginBind = this.predicateBuilder.buildBindAttribute(toS(attribute.name), value.begin);
     const endBind = this.predicateBuilder.buildBindAttribute(toS(attribute.name), value.end);
     return attribute.between(new RangeWithBinds(beginBind, endBind, value.excludeEnd));

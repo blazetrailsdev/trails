@@ -898,11 +898,13 @@ modules converged onto `Autoload`:
   live `Module`, whose link is spliced into `RoutingUrlFor`'s ancestry, because
   `include()` flattens a plain-object module beneath the class's own methods.
 - `activerecord/src/namespaces.ts` — not a slot: the `ActiveRecord`,
-  `ActiveRecord::Associations`, `ActiveRecord::ConnectionAdapters`,
-  `ActiveRecord::Encryption` and `ActiveRecord::Migration` namespace objects, extended with
+  `ActiveRecord::Associations`, `ActiveRecord::ConnectionAdapters` and
+  `ActiveRecord::Encryption` namespace objects, extended with
   `ActiveSupport::Autoload` exactly like arel's (RFC 0151). Autoloaded there,
-  mirroring `active_record.rb:43-112`, `associations.rb:15,29-41`,
-  `encryption.rb:14` and `migration.rb:573`: `ActiveRecord.Base`,
+  mirroring `active_record.rb:43-112`, `associations.rb:15,29-41` and
+  `encryption.rb:14`: `ActiveRecord.Base`, `.Encryption`, `.Associations` and
+  `.ConnectionAdapters` (each seated by the module defining it — encryption.ts,
+  associations.ts, connection-adapters.ts),
   `.ConnectionHandling` (`DEFAULT_ENV`, `connection_handling.rb:7`),
   `.ModelSchema` (`derive_join_table_name`, `migration/join_table.rb:12`),
   `.Fixture` (Rails has no `autoload :Fixture`: it is defined in `active_record/fixtures.rb`,
@@ -916,13 +918,19 @@ modules converged onto `Autoload`:
   `Associations.DisableJoinsAssociationScope` (`associations/association.rb:107-115`);
   `Encryption.Configurable`, which encryption.ts `extend`s onto `Encryption`
   itself with `Contexts`, as `encryption.rb:47-48` does `include Configurable` /
-  `include Contexts`, so readers spell `Encryption.config.x`; `Migration.Compatibility` (`migration.rb:629-631`,
-  `schema.rb:72`); `ConnectionAdapters.ConnectionPool`
+  `include Contexts`, so readers spell `Encryption.config.x` and
+  `Encryption.withoutEncryption(...)`; `Encryption.Cipher`, itself `extend`ed
+  with `Autoload` for `Cipher.Aes256Gcm` (`encryption.rb:39-45`), which
+  `Encryption.eagerLoadBang` loads after `super` (`encryption.rb:50-54`);
+  `ConnectionAdapters.ConnectionPool`
   (`connection_adapters.rb:107-110`, read by `abstract/query_cache.rb:100` for
   `ConnectionPool::WeakThreadKeyMap`), and `ConnectionAdapters.register` /
   `.resolve`, the module's singleton methods (`connection_adapters.rb:22-50`,
   read by `database_config.rb:17`), seated by connection-adapters.ts;
-  `ActiveRecord.Migration` (`active_record.rb:60`). `ActiveRecord` registers
+  `ActiveRecord.Migration` (`active_record.rb:60`). `Migration.Compatibility`
+  (`migration.rb:573`, read at `:629-631` and `schema.rb:72`) is autoloaded on
+  the `Migration` class itself, which migration.ts `extend`s with `Autoload`,
+  and seated by compatibility.ts. `ActiveRecord` registers
   itself with `constantize`, which walks each further segment through the
   constant seated on its namespace, as `Object.const_get` does
   (`inflector/methods.rb:289-291`). `ActiveRecord.Point`

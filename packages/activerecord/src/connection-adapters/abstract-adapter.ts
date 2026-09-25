@@ -3,6 +3,7 @@ import type { DatabaseConfig } from "../database-configurations/database-config.
 import { rtest } from "@blazetrails/ruby-compat";
 import type { ExplainOption } from "./abstract/database-statements.js";
 import type { InsertBuilder } from "../insert-all.js";
+import type * as Arel from "@blazetrails/arel";
 import { type Nodes, Visitors, Collectors } from "@blazetrails/arel";
 import {
   ReadOnlyError,
@@ -1686,18 +1687,18 @@ export class AbstractAdapter implements Quoting {
     this._verified = false;
   }
 
-  defaultUniquenessComparison(attribute: Nodes.Attribute, value: unknown): Nodes.Node {
+  defaultUniquenessComparison(attribute: Arel.Attribute, value: unknown): Nodes.Node {
     return attribute.eq(value);
   }
 
   caseSensitiveComparison(
-    attribute: Nodes.Attribute,
+    attribute: Arel.Attribute,
     value: unknown,
   ): Nodes.Node | Promise<Nodes.Node> {
     return attribute.eq(value);
   }
 
-  async caseInsensitiveComparison(attribute: Nodes.Attribute, value: unknown): Promise<Nodes.Node> {
+  async caseInsensitiveComparison(attribute: Arel.Attribute, value: unknown): Promise<Nodes.Node> {
     const column = await this.columnForAttribute(attribute);
 
     if (await this.canPerformCaseInsensitiveComparisonFor(column)) {

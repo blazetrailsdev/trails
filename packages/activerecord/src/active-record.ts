@@ -431,9 +431,9 @@ export function setProtocolAdapters(protocolAdapters: InheritableOptions): void 
 
 export async function eagerLoadBang(): Promise<void> {
   const Associations = await import("./associations.js");
-  const Encryption = await import("./encryption.js");
+  const { Encryption } = await import("./encryption.js");
   await Associations.eagerLoadBang();
-  Encryption.eagerLoadBang();
+  await Encryption.eagerLoadBang();
 }
 
 export async function disconnectAllBang(): Promise<void> {

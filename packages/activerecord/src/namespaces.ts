@@ -13,11 +13,11 @@ import type { ConnectionPool } from "./connection-adapters/abstract/connection-p
 import type { register, resolve } from "./connection-adapters.js";
 import type * as ConnectionHandling from "./connection-handling.js";
 import type { DisableJoinsAssociationRelation } from "./disable-joins-association-relation.js";
+import type { Cipher } from "./encryption/cipher.js";
 import type { Configurable } from "./encryption/configurable.js";
 import type { Contexts } from "./encryption/contexts.js";
 import type { Fixture } from "./fixtures.js";
-import type { Migration as MigrationClass } from "./migration.js";
-import type * as Compatibility from "./migration/compatibility.js";
+import type { Migration } from "./migration.js";
 import type * as ModelSchema from "./model-schema.js";
 import type { Relation } from "./relation.js";
 
@@ -25,6 +25,9 @@ type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
 const loadPath: Record<string, () => Promise<unknown>> = {
   "active_record/base": () => import("./base.js"),
+  "active_record/associations": () => import("./associations.js"),
+  "active_record/connection_adapters": () => import("./connection-adapters.js"),
+  "active_record/encryption": () => import("./encryption.js"),
   "active_record/connection_handling": () => import("./connection-handling.js"),
   "active_record/fixtures": () => import("./fixtures.js"),
   "active_record/model_schema": () => import("./model-schema.js"),
@@ -47,9 +50,9 @@ const loadPath: Record<string, () => Promise<unknown>> = {
     import("./associations/has-one-through-association.js"),
   "active_record/associations/disable_joins_association_scope": () =>
     import("./associations/disable-joins-association-scope.js"),
+  "active_record/encryption/cipher": () => import("./encryption/cipher.js"),
   "active_record/encryption/configurable": () => import("./encryption/configurable.js"),
   "active_record/migration": () => import("./migration.js"),
-  "active_record/migration/compatibility": () => import("./migration/compatibility.js"),
   "active_record/connection_adapters/abstract/connection_pool": () =>
     import("./connection-adapters/abstract/connection-pool.js"),
 };
@@ -57,10 +60,13 @@ const loadPath: Record<string, () => Promise<unknown>> = {
 export const ActiveRecord = { name: "ActiveRecord", loadPath } as AutoloadModule & {
   Base: typeof Base;
   ConnectionHandling: typeof ConnectionHandling;
+  Encryption: typeof Encryption;
   Fixture: typeof Fixture;
-  Migration: typeof MigrationClass;
+  Migration: typeof Migration;
   ModelSchema: typeof ModelSchema;
   AssociationRelation: typeof AssociationRelationClass;
+  Associations: typeof Associations;
+  ConnectionAdapters: typeof ConnectionAdapters;
   DisableJoinsAssociationRelation: typeof DisableJoinsAssociationRelation;
   Relation: typeof Relation;
   Point: new (x: number, y: number) => { x: number; y: number; equals(other: unknown): boolean };
@@ -69,11 +75,14 @@ registerConstant("ActiveRecord", ActiveRecord);
 extend(ActiveRecord, Autoload);
 ActiveRecord.autoload("Base");
 ActiveRecord.autoload("ConnectionHandling");
+ActiveRecord.autoload("Encryption");
 ActiveRecord.autoload("Fixture", "active_record/fixtures");
 ActiveRecord.autoload("Migration");
 ActiveRecord.autoload("ModelSchema");
 ActiveRecord.eagerAutoload(() => {
   ActiveRecord.autoload("AssociationRelation");
+  ActiveRecord.autoload("Associations");
+  ActiveRecord.autoload("ConnectionAdapters");
   ActiveRecord.autoload("DisableJoinsAssociationRelation");
   ActiveRecord.autoload("Relation");
 });
@@ -114,16 +123,12 @@ ConnectionAdapters.autoloadAt("active_record/connection_adapters/abstract/connec
 });
 
 export const Encryption = { name: "ActiveRecord::Encryption", loadPath } as AutoloadModule & {
+  Cipher: typeof Cipher;
   Configurable: typeof Configurable;
 } & Omit<typeof Configurable, "prototype"> &
   Omit<typeof Contexts, "prototype">;
 extend(Encryption, Autoload);
 Encryption.eagerAutoload(() => {
+  Encryption.autoload("Cipher");
   Encryption.autoload("Configurable");
 });
-
-export const Migration = { name: "ActiveRecord::Migration", loadPath } as AutoloadModule & {
-  Compatibility: typeof Compatibility;
-};
-extend(Migration, Autoload);
-Migration.autoload("Compatibility", "active_record/migration/compatibility");

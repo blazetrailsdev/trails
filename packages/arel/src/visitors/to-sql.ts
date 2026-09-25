@@ -1,9 +1,10 @@
-import { Visitors } from "../namespaces.js";
+import { Attributes, Nodes, Visitors } from "../namespaces.js";
 import { NotImplementedError } from "@blazetrails/ruby-compat";
 import { arelNode } from "../arel.js";
 import { Node } from "../nodes/node.js";
 import { SQLString } from "../collectors/sql-string.js";
-import * as Nodes from "../nodes/index.js";
+import "../nodes/index.js";
+import type { Attribute } from "../attributes/attribute.js";
 import { Table } from "../table.js";
 import { Visitor } from "./visitor.js";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
@@ -95,7 +96,7 @@ export class ToSql extends Visitor {
       const colNames = o.columns.map((c) => {
         if (c instanceof Nodes.SqlLiteral) return c.value;
         const name =
-          c instanceof Nodes.Attribute ? c.name : String((c as { name?: string }).name ?? c);
+          c instanceof Attributes.Attribute ? c.name : String((c as { name?: string }).name ?? c);
         return this.quoteColumnName(name);
       });
       collector.append(colNames.join(", "));
@@ -869,7 +870,7 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  private visitArelAttributesAttribute(o: Nodes.Attribute, collector: SQLString): SQLString {
+  private visitArelAttributesAttribute(o: Attribute, collector: SQLString): SQLString {
     const joinName = o.relation.tableAlias || o.relation.name;
     collector.append(this.quoteTableName(joinName));
     collector.append(".");

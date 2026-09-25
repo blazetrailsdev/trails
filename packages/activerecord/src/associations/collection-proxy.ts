@@ -18,6 +18,7 @@ import {
   findNthWithLimit as baseFindNthWithLimit,
   FinderMethods,
 } from "../relation/finder-methods.js";
+import type * as Arel from "@blazetrails/arel";
 import type { Nodes } from "@blazetrails/arel";
 import {
   singularize,
@@ -361,7 +362,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   override async pluck(
-    ...columnNames: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
+    ...columnNames: Array<string | Arel.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
   ): Promise<unknown[]> {
     if (this.isNullScope()) return this.scope().pluck(...columnNames);
     if (this.reflection.options.disableJoins) {

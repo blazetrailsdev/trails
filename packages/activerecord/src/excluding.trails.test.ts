@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import "./index.js";
+import type * as Arel from "@blazetrails/arel";
 import { Nodes } from "@blazetrails/arel";
 import { fixtures } from "./test-fixtures.js";
 import { registerModel } from "./associations.js";
@@ -17,7 +18,7 @@ describe("excluding deferred arm (trails)", () => {
     const relation = aliased.excluding(Post.where({ title: "Welcome to the weblog" }));
 
     const predicate = relation.whereClause.predicates.at(-1) as Nodes.NotIn;
-    const attribute = predicate.left as Nodes.Attribute;
+    const attribute = predicate.left as Arel.Attribute;
     expect(attribute.relation).toBeInstanceOf(Nodes.TableAlias);
     expect((attribute.relation as Nodes.TableAlias).name).toBe("p");
   });
@@ -63,6 +64,6 @@ describe("excluding a model with a composite primary key (trails)", () => {
 
     const relation = CpkBook.excluding(book);
     const predicate = relation.whereClause.predicates.at(-1) as Nodes.NotIn;
-    expect((predicate.left as Nodes.Attribute).name).toEqual(["author_id", "id"]);
+    expect((predicate.left as Arel.Attribute).name).toEqual(["author_id", "id"]);
   });
 });

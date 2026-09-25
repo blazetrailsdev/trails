@@ -3,7 +3,7 @@ import type { AssociationReflection, ThroughReflection } from "./reflection.js";
 import "./relation.js";
 import type { Relation } from "./relation.js";
 import type { CollectionProxy, AssociationProxy } from "./associations/collection-proxy.js";
-import { Associations as AssociationsNamespace } from "./namespaces.js";
+import { ActiveRecord, Associations as AssociationsNamespace } from "./namespaces.js";
 import { hasDefaultScopeOverride } from "./scoping/default.js";
 import { qualifiedName } from "./inheritance.js";
 
@@ -648,3 +648,5 @@ export function associationInstanceGet(this: Base, name: string): unknown {
 export function associationInstanceSet(this: Base, name: string, association: unknown): void {
   this._associationCache.set(name, association as AssociationInstance);
 }
+
+ActiveRecord.Associations = AssociationsNamespace;

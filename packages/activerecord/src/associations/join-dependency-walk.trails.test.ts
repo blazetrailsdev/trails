@@ -3,6 +3,7 @@ import { Base, registerModel } from "../index.js";
 import { clearReflectionsCache } from "../reflection.js";
 import { fixtures } from "../test-fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
+import * as Arel from "@blazetrails/arel";
 import { Nodes, Table } from "@blazetrails/arel";
 
 describe("JoinDependency walk() deduplication", () => {
@@ -138,7 +139,7 @@ describe("JoinDependency walk() deduplication", () => {
     const onNode = likesJoin!.right as Nodes.On;
     const referencedTables = new Set<string>();
     function collectTableRefs(node: unknown): void {
-      if (node instanceof Nodes.Attribute) {
+      if (node instanceof Arel.Attribute) {
         const rel = (node as any).relation;
         if (rel) referencedTables.add(rel.tableAlias ?? rel.name);
         return;

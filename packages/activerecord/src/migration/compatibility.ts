@@ -1,8 +1,7 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { include, prepend, rbInspect, type PrependModule } from "@blazetrails/ruby-compat";
-import { Current } from "../migration.js";
+import { Current, Migration } from "../migration.js";
 import * as Compatibility from "./compatibility.js";
-import { Migration } from "../namespaces.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import { ReferenceDefinition as ConnectionAdaptersReferenceDefinition } from "../connection-adapters/abstract/schema-definitions.js";
 import type { CommentStatements } from "../connection-adapters/abstract/schema-statements.js";

@@ -14,18 +14,16 @@ import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { Encryptor as EncryptorImpl } from "./encryptor.js";
 import type { KeyProviderLike } from "./encryptor.js";
 import { type Scheme } from "./scheme.js";
-import { Decryption, Encryption } from "./errors.js";
+import * as Errors from "./errors.js";
 import { BinaryData } from "@blazetrails/activemodel";
-import "../encryption.js";
+import { Encryption } from "../encryption.js";
 import { MessagePackMessageSerializer } from "./message-pack-message-serializer.js";
 
-import { withEncryptionContext } from "../encryption.js";
 import { Key } from "./key.js";
 import { prepend, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Fixture } from "../fixtures.js";
 import { EncryptedFixtures } from "./encrypted-fixtures.js";
-export { withEncryptionContext, withoutEncryption } from "../encryption.js";
-export { Decryption, Encryption };
+export { Encryption, Errors };
 
 prepend(Fixture.prototype, EncryptedFixtures);
 
@@ -251,7 +249,7 @@ class FailingKeyProvider {
   decryptionKey(_message: unknown): void {}
 
   encryptionKey(): never {
-    throw new Encryption();
+    throw new Errors.Encryption();
   }
 }
 
@@ -520,10 +518,10 @@ async function assertInvalidKeyCantReadAttributeWithDefaultKeyProvider(
 ): Promise<void> {
   await model.reload();
 
-  await withEncryptionContext(
+  await Encryption.withEncryptionContext(
     { keyProvider: new DerivedSecretKeyProvider("a different 256 bits key for now") },
     () => {
-      expect(() => model[attributeName]).toThrow(Decryption);
+      expect(() => model[attributeName]).toThrow(Errors.Decryption);
     },
   );
 }
@@ -540,7 +538,7 @@ async function assertInvalidKeyCantReadAttributeWithCustomKeyProvider(
   try {
     attributeType.keyProvider.keys = [Key.deriveFrom("other custom attribute secret")];
 
-    expect(() => model[attributeName]).toThrow(Decryption);
+    expect(() => model[attributeName]).toThrow(Errors.Decryption);
   } finally {
     attributeType.keyProvider.keys = originalKeys;
   }

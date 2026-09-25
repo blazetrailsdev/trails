@@ -4,6 +4,7 @@ import { relationClassFor } from "./relation/delegation.js";
 import { rbEql, rbHash, uniq } from "@blazetrails/ruby-compat";
 import { stripThenable } from "./relation/thenable.js";
 import type { Base } from "./base.js";
+import type * as Arel from "@blazetrails/arel";
 import type { Nodes } from "@blazetrails/arel";
 
 export type DjarKey = string | string[];
@@ -144,7 +145,7 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
 
   /** @noRailsEquivalent CONVERGEABLE converge-djar-deferred-chain-walk-mode */
   override async pluck(
-    ...columnNames: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
+    ...columnNames: Array<string | Arel.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
   ): Promise<unknown[]> {
     if (this._chainWalker && !(this as unknown as { _isNone: boolean })._isNone) {
       const { relation } = await this._walkOnce();
@@ -155,7 +156,7 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
       Relation.prototype as unknown as {
         pluck: (
           this: unknown,
-          ...columnNames: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
+          ...columnNames: Array<string | Arel.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
         ) => Promise<unknown[]>;
       }
     ).pluck.call(this, ...columnNames);

@@ -11,6 +11,7 @@ import {
 import { fetch, isEmpty } from "@blazetrails/ruby-compat";
 import type { TokenDefinition } from "./token-for.js";
 import { first } from "@blazetrails/ruby-compat";
+import * as Arel from "@blazetrails/arel";
 import { Table, SelectManager, Nodes, sql, star } from "@blazetrails/arel";
 import type { Base } from "./base.js";
 import { ActiveRecordError, RecordNotSaved, RecordNotUnique, UnknownPrimaryKey } from "./errors.js";
@@ -1064,7 +1065,7 @@ export class Relation<T extends Base> {
       for (let i = 0; i < predicates.length; i++) {
         const node = predicates[i];
         if (node instanceof DeferredIdsNotIn || node instanceof DeferredIdsIn) {
-          const attribute = node.left as Nodes.Attribute;
+          const attribute = node.left as Arel.Attribute;
           const ids: unknown[] = [];
           for (const rel of node.innerRelations) {
             ids.push(...(await rel.ids()));
@@ -1538,7 +1539,7 @@ export class Relation<T extends Base> {
   bindAttribute<R>(
     name: string,
     value: unknown,
-    block: (attr: Nodes.Attribute, bind: QueryAttribute) => R,
+    block: (attr: Arel.Attribute, bind: QueryAttribute) => R,
   ): R {
     const reflection = this.model._reflectOnAssociation(name);
     if (reflection) {
@@ -1841,7 +1842,7 @@ export class Relation<T extends Base> {
       if (
         value instanceof Nodes.Node ||
         value instanceof Nodes.SqlLiteral ||
-        value instanceof Nodes.Attribute
+        value instanceof Arel.Attribute
       ) {
         return [attr, value instanceof Nodes.SqlLiteral ? new Nodes.Grouping(value) : value];
       }

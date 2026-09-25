@@ -1,5 +1,5 @@
-import { Visitors } from "../namespaces.js";
-import * as Nodes from "../nodes/index.js";
+import { Nodes, Visitors } from "../namespaces.js";
+import "../nodes/index.js";
 import { Node } from "../nodes/node.js";
 import { SQLString } from "../collectors/sql-string.js";
 import { ToSql } from "./to-sql.js";

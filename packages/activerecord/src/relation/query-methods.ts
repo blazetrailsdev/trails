@@ -505,7 +505,7 @@ const orderClauseIdentities = new WeakMap<object, number>();
 function orderClauseKey(clause: unknown): string {
   if (typeof clause === "string") return `s:${clause}`;
   if (clause instanceof Nodes.SqlLiteral) return `s:${String((clause as any).value ?? "")}`;
-  if (clause instanceof Nodes.Attribute) {
+  if (clause instanceof Arel.Attribute) {
     return `a:${String((clause as any).relation?.name)}.${(clause as any).name}`;
   }
   if (clause instanceof Nodes.Node && "expr" in (clause as any)) {
@@ -1469,7 +1469,7 @@ export function reverseSqlOrder(this: QueryMethodsHost, orderQuery: unknown[]): 
     );
   }
   return orderQuery.flatMap((o) => {
-    if (o instanceof Nodes.Attribute) return [o.desc()];
+    if (o instanceof Arel.Attribute) return [o.desc()];
     if (o instanceof Nodes.Ordering) return [(o as Nodes.Ascending | Nodes.Descending).reverse()];
     if (o instanceof Nodes.NodeExpression) return [o.desc()];
     if (typeof o === "string" || o instanceof Nodes.SqlLiteral) {
@@ -1519,11 +1519,11 @@ export function columnReferences(orderArgs: unknown[]): Nodes.SqlLiteral[] {
       const term = isRubySymbol(arg) ? symbolToName(arg) : arg;
       const t = extractTableNameFrom(term);
       if (t) refs.push(t);
-    } else if (arg instanceof Nodes.Attribute) {
+    } else if (arg instanceof Arel.Attribute) {
       refs.push(String(arg.relation.name));
     } else if (arg instanceof Nodes.Ordering) {
       const expr = (arg as any).expr;
-      if (expr instanceof Nodes.Attribute) {
+      if (expr instanceof Arel.Attribute) {
         refs.push(String(expr.relation.name));
       }
     } else if (arg instanceof Map) {

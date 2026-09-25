@@ -1,7 +1,8 @@
-import * as Nodes from "../nodes/index.js";
+import "../nodes/index.js";
+import type { Attribute } from "../attributes/attribute.js";
 import { Table } from "../table.js";
 import { Visitor } from "./visitor.js";
-import { Visitors } from "../namespaces.js";
+import { Nodes, Visitors } from "../namespaces.js";
 import { PlainString } from "../collectors/plain-string.js";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import { temporalClassName } from "../temporal-tag.js";
@@ -203,7 +204,7 @@ export class Dot extends Visitor {
     this.visitEdge(o, "attribute");
   }
 
-  protected visitArelAttributesAttribute(o: Nodes.Attribute): void {
+  protected visitArelAttributesAttribute(o: Attribute): void {
     this.visitEdge(o, "relation");
     this.visitEdge(o, "name");
   }

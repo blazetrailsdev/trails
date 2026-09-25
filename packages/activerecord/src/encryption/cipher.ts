@@ -1,7 +1,8 @@
 import type { Bytes } from "@blazetrails/ruby-compat";
-import { kernelArray as Array } from "@blazetrails/activesupport";
+import { Autoload, extend, kernelArray as Array, type Extended } from "@blazetrails/activesupport";
 
 import { Aes256Gcm as AesGcmCipher } from "./cipher/aes256-gcm.js";
+import { Encryption } from "../namespaces.js";
 import { Decryption } from "./errors.js";
 import { Message } from "./message.js";
 
@@ -46,3 +47,26 @@ export class Cipher {
     return new AesGcmCipher(secret, { deterministic });
   }
 }
+
+// eslint-disable-next-line @typescript-eslint/no-namespace
+export declare namespace Cipher {
+  const loadPath: Autoload.Autoload["loadPath"];
+  let Aes256Gcm: typeof AesGcmCipher;
+  const autoload: Extended<typeof Autoload>["autoload"];
+  const eagerAutoload: Extended<typeof Autoload>["eagerAutoload"];
+  const eagerLoadBang: Extended<typeof Autoload>["eagerLoadBang"];
+}
+Object.defineProperty(Cipher, "name", { value: "ActiveRecord::Encryption::Cipher" });
+Object.assign(Cipher, {
+  loadPath: {
+    "active_record/encryption/cipher/aes256_gcm": () => import("./cipher/aes256-gcm.js"),
+  },
+});
+extend(Cipher, Autoload);
+
+Cipher.eagerAutoload(() => {
+  Cipher.autoload("Aes256Gcm");
+});
+Cipher.Aes256Gcm = AesGcmCipher;
+
+Encryption.Cipher = Cipher;

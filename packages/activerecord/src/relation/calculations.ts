@@ -1,4 +1,5 @@
 import { TypeError } from "@blazetrails/ruby-compat";
+import type * as Arel from "@blazetrails/arel";
 import { Nodes, Table, SelectManager, sql, star } from "@blazetrails/arel";
 import { ArgumentError, BigIntegerType } from "@blazetrails/activemodel";
 import { any, BigDecimal, isPresent, many, tryCall } from "@blazetrails/activesupport";
@@ -141,7 +142,7 @@ interface CalculationRelation {
   pluck(
     ...columns: Array<
       | string
-      | Nodes.Attribute
+      | Arel.Attribute
       | Nodes.NamedFunction
       | Nodes.SqlLiteral
       | string[]
@@ -151,7 +152,7 @@ interface CalculationRelation {
   pick(
     ...columnNames: Array<
       | string
-      | Nodes.Attribute
+      | Arel.Attribute
       | Nodes.NamedFunction
       | Nodes.SqlLiteral
       | string[]
@@ -382,7 +383,7 @@ export async function pluck(
   this: CalculationRelation,
   ...columnNames: Array<
     | string
-    | Nodes.Attribute
+    | Arel.Attribute
     | Nodes.NamedFunction
     | Nodes.SqlLiteral
     | Record<string, string | string[]>
@@ -424,7 +425,7 @@ export function asyncPluck(
   this: CalculationRelation,
   ...columnNames: Array<
     | string
-    | Nodes.Attribute
+    | Arel.Attribute
     | Nodes.NamedFunction
     | Nodes.SqlLiteral
     | Record<string, string | string[]>
@@ -437,7 +438,7 @@ export async function pick(
   this: CalculationRelation,
   ...columnNames: Array<
     | string
-    | Nodes.Attribute
+    | Arel.Attribute
     | Nodes.NamedFunction
     | Nodes.SqlLiteral
     | Record<string, string | string[]>
@@ -460,7 +461,7 @@ export function asyncPick(
   this: CalculationRelation,
   ...columnNames: Array<
     | string
-    | Nodes.Attribute
+    | Arel.Attribute
     | Nodes.NamedFunction
     | Nodes.SqlLiteral
     | Record<string, string | string[]>
@@ -548,7 +549,7 @@ export interface CalculationMethods {
   pluck(
     ...columns: Array<
       | string
-      | Nodes.Attribute
+      | Arel.Attribute
       | Nodes.NamedFunction
       | Nodes.SqlLiteral
       | string[]
@@ -558,7 +559,7 @@ export interface CalculationMethods {
   asyncPluck(
     ...columns: Array<
       | string
-      | Nodes.Attribute
+      | Arel.Attribute
       | Nodes.NamedFunction
       | Nodes.SqlLiteral
       | string[]
@@ -568,7 +569,7 @@ export interface CalculationMethods {
   pick(
     ...columnNames: Array<
       | string
-      | Nodes.Attribute
+      | Arel.Attribute
       | Nodes.NamedFunction
       | Nodes.SqlLiteral
       | string[]
@@ -578,7 +579,7 @@ export interface CalculationMethods {
   asyncPick(
     ...columnNames: Array<
       | string
-      | Nodes.Attribute
+      | Arel.Attribute
       | Nodes.NamedFunction
       | Nodes.SqlLiteral
       | string[]

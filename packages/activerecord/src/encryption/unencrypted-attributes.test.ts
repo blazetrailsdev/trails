@@ -5,7 +5,7 @@ import {
   restoreEncryptionConfig,
   assertEncryptedAttribute,
   assertNotEncryptedAttribute,
-  withoutEncryption,
+  Encryption,
 } from "./test-helpers.js";
 import { fixtures } from "../test-fixtures.js";
 import type { EncryptedPost as EncryptedPostType } from "../test-helpers/models/post-encrypted.js";
@@ -37,7 +37,7 @@ describe("ActiveRecord::Encryption::UnencryptedAttributesTest", () => {
   it("when :support_unencrypted_data is off, it works with unencrypted attributes normally", async () => {
     Configurable.config.supportUnencryptedData = true;
 
-    const post = await withoutEncryption(() =>
+    const post = await Encryption.withoutEncryption(() =>
       EncryptedPost.create({ title: "The Starfleet is here!", body: "take cover!" }),
     );
     assertNotEncryptedAttribute(post, "title", "The Starfleet is here!");
@@ -50,7 +50,7 @@ describe("ActiveRecord::Encryption::UnencryptedAttributesTest", () => {
   it("when :support_unencrypted_data is on, it won't work with unencrypted attributes", async () => {
     Configurable.config.supportUnencryptedData = false;
 
-    const post = await withoutEncryption(() =>
+    const post = await Encryption.withoutEncryption(() =>
       EncryptedPost.create({ title: "The Starfleet is here!", body: "take cover!" }),
     );
 

@@ -1,3 +1,4 @@
+import type * as Arel from "@blazetrails/arel";
 import { Nodes } from "@blazetrails/arel";
 import { ArgumentError } from "@blazetrails/activemodel";
 
@@ -8,7 +9,7 @@ import { rbInspect } from "@blazetrails/ruby-compat";
 
 export class RelationHandler {
   /** @missingRailsCall empty? — PERMANENT */
-  call(attribute: Nodes.Attribute, value: any): Nodes.Node {
+  call(attribute: Arel.Attribute, value: any): Nodes.Node {
     const deferred = this.deferDistinctPkMaterialization(attribute, value);
     if (deferred) return deferred;
     value = this.applyJoinDependency(value);
@@ -27,10 +28,7 @@ export class RelationHandler {
     return attribute.in(value.arel());
   }
 
-  private deferDistinctPkMaterialization(
-    attribute: Nodes.Attribute,
-    value: any,
-  ): Nodes.Node | null {
+  private deferDistinctPkMaterialization(attribute: Arel.Attribute, value: any): Nodes.Node | null {
     if (typeof value?._isDeferredDistinctPkSubquery !== "function") return null;
     if (!value._isDeferredDistinctPkSubquery()) return null;
     const inlineSubquery = value._buildDeferredDistinctPkInlineSubquery();
