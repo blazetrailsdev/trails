@@ -388,11 +388,18 @@ normalized digest of the vendored Rails body the TS method was ported against.
 `vendor/rails` changes a pinned body, and **STALE** when a pinned method is
 removed or renamed.
 
-**Floor policy: organic until first release.** `body-pins.json` ships empty for
-now — we do **not** seed the `--pin-all` whole-surface floor before a release.
-Until then, pins grow organically: convergence and port stories pin the pairs
-they verify. Each pin is a real "a human verified this TS port matches this
-exact vendored Rails body" claim, recorded via `--pin`:
+**Floor policy: the `--pin-all` floor is taken.** The policy was organic until
+first release, but a vendor bump against an empty manifest reports no drift at
+all, so the whole-surface floor was seeded against rails `v8.0.2` before the
+first bump (RFC 0159-versioned-vendor-layout): every matched pair is pinned at
+the digest of the tree every existing port was written against, and each pin
+records the upstream `ref` it was taken at. A floor pin carries no `reason` —
+it is only a "this is the tree we ported against" claim, weaker than a verified
+port. `ref` is the tag at the pin's _last write_: a bump that leaves a body's
+digest unchanged does not rewrite its pin, so `ref` can trail the vendored tag
+without meaning anything is stale. On top of the floor, convergence and port stories re-pin the pairs they
+verify; that pin is a real "a human verified this TS port matches this exact
+vendored Rails body" claim, recorded via `--pin`:
 
 ```sh
 API_COMPARE_FORCE=1 pnpm parity:api   # refresh output/body-hashes.json
@@ -405,11 +412,12 @@ story id or PR that verified it. Re-pinning preserves an existing `reason`. When
 a Rails bump reports drift, re-verify the port against the new upstream body
 before re-pinning — never re-pin to silence the gate.
 
-At the **first release** we seed the whole-surface floor —
-`pnpm parity:api:pins:all` runs `--pin-all`, pinning every remaining matched pair at
-the released digest so a later `vendor/rails` bump surfaces every changed body.
-A floor pin carries no `reason` (it is only a "this is what we shipped" claim,
-weaker than a verified port); organic pins made before then keep theirs.
+**Re-pinning is a step of every vendor bump.** After the bump, the gate's DRIFT
+list is the worklist: re-verify each drifted port against the new upstream
+body, then re-pin its file. `pnpm parity:api:pins:all` re-runs `--pin-all`,
+which pins newly matched pairs and re-pins every drifted one at once — use it
+only once the drift worklist is burnt down, never to silence the gate. Pins
+keep their `reason` across a re-pin.
 
 When the gate fails:
 
@@ -418,8 +426,8 @@ When the gate fails:
 - **STALE** — the pinned method was removed or renamed upstream (or the TS side
   no longer name-matches). Once you have confirmed the pair is genuinely gone,
   `pnpm tsx scripts/api-compare/body-pins.ts --prune` drops every unresolved pin
-  so the removal doesn't require hand-editing the manifest (relevant mainly once
-  the release floor exists). `--prune` never touches a drifted pin.
+  so the removal doesn't require hand-editing the ~10k-entry floor manifest.
+  `--prune` never touches a drifted pin.
 - **PARTIAL scope** — the artifact was built with a `--package` filter; rebuild
   with `API_COMPARE_FORCE=1 pnpm parity:api` before pinning or gating.
 

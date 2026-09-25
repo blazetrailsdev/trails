@@ -29,9 +29,10 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as prettier from "prettier";
+import { resolvePath } from "../vendor/sources.js";
 
 const ROOT = path.resolve(__dirname, "..");
-const CASES_DIR = path.join(ROOT, "vendor/rails/activerecord/test/cases");
+const CASES_DIR = resolvePath("activerecord", "test");
 const OUT_FILE = path.join(ROOT, "eslint/test-fixture-parity.json");
 
 const SYM_OR_STR = /(?::([a-zA-Z_][\w-]*)|["']([^"']+)["'])/g;

@@ -10,7 +10,9 @@ import {
   missingScope,
   pinPairs,
   prunePins,
+  sourceRefOf,
 } from "./body-pins.js";
+import { SOURCES } from "../../vendor/sources.js";
 
 function record(over: Partial<BodyHashRecord> = {}): BodyHashRecord {
   return {
@@ -113,6 +115,18 @@ describe("pinPairs", () => {
     expect(next.find((p) => p.rubyName === "find")!.digest).toBe("2222000000000000");
   });
 
+  it("records the vendored ref each pin's digest was taken at", () => {
+    const rails = SOURCES.find((s) => s.name === "rails")!.origin.ref;
+    const rack = SOURCES.find((s) => s.name === "rack")!.origin.ref;
+    const next = pinPairs(
+      [record(), record({ package: "rack", rubyFile: "request.rb", rubyName: "get?" })],
+      [],
+      { all: true },
+    );
+    expect(next.find((p) => p.package === "activerecord")!.ref).toBe(rails);
+    expect(next.find((p) => p.package === "rack")!.ref).toBe(rack);
+  });
+
   it("only re-pins the selected Ruby file, leaving other pins untouched", () => {
     const records = [
       record({ rubyName: "save", digest: "new1" }),
@@ -181,5 +195,16 @@ describe("prunePins", () => {
   it("preserves a pin that drifted rather than pruning it", () => {
     const pins = [pin({ digest: "bbbb111111111111", reason: "story-x" })];
     expect(prunePins([record()], pins)).toEqual(pins);
+  });
+});
+
+describe("sourceRefOf", () => {
+  it("answers the origin ref of the source vendoring a package", () => {
+    expect(sourceRefOf("arel")).toBe(SOURCES.find((s) => s.name === "rails")!.origin.ref);
+    expect(sourceRefOf("i18n")).toBe(SOURCES.find((s) => s.name === "i18n")!.origin.ref);
+  });
+
+  it("answers undefined for a package no source vendors", () => {
+    expect(sourceRefOf("nope")).toBeUndefined();
   });
 });

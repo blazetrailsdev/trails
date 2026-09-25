@@ -2,9 +2,10 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
+import { resolveSourcePath } from "../../vendor/sources.js";
 import { deriveArClosure, filterFilesToClosure, DATA_LAYER_PACKAGES } from "./ar-closure.js";
 
-const REAL_VENDOR = path.resolve(__dirname, "../../vendor/rails/activerecord/lib/active_record.rb");
+const REAL_VENDOR = resolveSourcePath("rails", "activerecord/lib/active_record.rb");
 
 function write(root: string, rel: string, body: string): void {
   const full = path.join(root, rel);
@@ -50,37 +51,41 @@ describe("deriveArClosure", () => {
   });
 
   it("includes activesupport files ActiveRecord requires directly", () => {
-    expect(deriveArClosure(root).files.activesupport).toContain(
+    expect(deriveArClosure(path.join(root, "vendor")).files.activesupport).toContain(
       "core_ext/module/attribute_accessors.rb",
     );
   });
 
   it("expands umbrella require-lists transitively", () => {
-    expect(deriveArClosure(root).files.activesupport).toContain("core_ext/array/wrap.rb");
+    expect(deriveArClosure(path.join(root, "vendor")).files.activesupport).toContain(
+      "core_ext/array/wrap.rb",
+    );
   });
 
   it("omits vendored files nothing in the data layer requires", () => {
-    expect(deriveArClosure(root).files.activesupport).not.toContain("core_ext/uri.rb");
+    expect(deriveArClosure(path.join(root, "vendor")).files.activesupport).not.toContain(
+      "core_ext/uri.rb",
+    );
   });
 
   it("follows requires into the other support gems", () => {
     // i18n.rb is the gem entrypoint, above the package root, so only what it
     // pulls in lands in the closure.
-    expect(deriveArClosure(root).files.i18n).toEqual(["backend.rb"]);
+    expect(deriveArClosure(path.join(root, "vendor")).files.i18n).toEqual(["backend.rb"]);
   });
 
   it("stops at a require reaching a package outside the closure", () => {
-    expect(deriveArClosure(root).files.actiondispatch).toBeUndefined();
+    expect(deriveArClosure(path.join(root, "vendor")).files.actiondispatch).toBeUndefined();
   });
 
   it("does not report the data-layer packages, which are rolled up whole", () => {
     for (const pkg of DATA_LAYER_PACKAGES) {
-      expect(deriveArClosure(root).files[pkg]).toBeUndefined();
+      expect(deriveArClosure(path.join(root, "vendor")).files[pkg]).toBeUndefined();
     }
   });
 
   it("reports paths relative to the package root, not the gem lib dir", () => {
-    for (const file of deriveArClosure(root).files.activesupport ?? []) {
+    for (const file of deriveArClosure(path.join(root, "vendor")).files.activesupport ?? []) {
       expect(file.startsWith("active_support/")).toBe(false);
       expect(file.endsWith(".rb")).toBe(true);
     }

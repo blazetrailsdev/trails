@@ -4,12 +4,21 @@
 # Output: [{ package, file, classes: [{ name, parent, tableName, associations, validations, scopes, callbacks, attributes, attrs }] }]
 require "json"
 
-SCRIPT_DIR = File.dirname(__FILE__)
-ROOT = File.expand_path("../..", SCRIPT_DIR)
-MODELS_DIRS = {
-  "activerecord" => File.join(ROOT, "vendor/rails/activerecord/test/models"),
-  "activemodel" => File.join(ROOT, "vendor/rails/activemodel/test/models"),
-}.freeze
+MODELS_PATHS_JSON = ENV.fetch("MODELS_PATHS_JSON") do
+  abort "extract-ruby-models: MODELS_PATHS_JSON env var not set. Run it via `pnpm parity:fixtures`."
+end
+MODELS_DIRS =
+  begin
+    parsed = JSON.parse(MODELS_PATHS_JSON)
+    unless parsed.is_a?(Hash) && parsed.values.all? { |v| v.is_a?(String) }
+      abort "extract-ruby-models: MODELS_PATHS_JSON must be a JSON object of " \
+            "{string: string}; got #{parsed.class}. Run it via `pnpm parity:fixtures`."
+    end
+    parsed.freeze
+  rescue JSON::ParserError => e
+    abort "extract-ruby-models: MODELS_PATHS_JSON is not valid JSON (#{e.message}). " \
+          "Run it via `pnpm parity:fixtures`."
+  end
 
 ASSOC_KINDS = %w[has_and_belongs_to_many has_many has_one belongs_to].freeze
 CALLBACK_KINDS = %w[
@@ -141,7 +150,7 @@ MODELS_DIRS.each do |package, models_dir|
   files = Dir.glob(File.join(models_dir, "**", "*.rb")).sort
   abort "extract-ruby-models: no .rb files found under #{models_dir}" if files.empty?
   files.each do |f|
-    rel = f.delete_prefix(File.join(ROOT, "vendor/rails", package) + "/")
+    rel = f.delete_prefix(File.expand_path("../..", models_dir) + "/")
     classes = parse_file(f)
     result << { package: package, file: rel, classes: classes } unless classes.empty?
   end

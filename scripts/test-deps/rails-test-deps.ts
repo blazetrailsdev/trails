@@ -18,9 +18,10 @@
  */
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { resolvePath } from "../../vendor/sources.js";
 
 const ROOT = path.resolve(__dirname, "../..");
-const CASES_DIR = path.join(ROOT, "vendor/rails/activerecord/test/cases");
+const CASES_DIR = resolvePath("activerecord", "test");
 const OUT_DIR = path.join(__dirname, "output");
 const OUT_FILE = path.join(OUT_DIR, "activerecord-test-deps.json");
 

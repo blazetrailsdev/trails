@@ -13,6 +13,12 @@ import * as fs from "fs/promises";
 import * as path from "path";
 
 import type { ApiManifest } from "@blazetrails/parity/types";
+import {
+  libPathsManifest,
+  resolveSourcePath,
+  testPathsManifest,
+  VENDOR_DIR,
+} from "../../vendor/sources.js";
 import type { TestCaseInfo, TestManifest } from "../test-compare/types.js";
 
 /** Where each result came from — printed so the caller knows how it matched. */
@@ -31,39 +37,18 @@ export interface FindResult {
 
 // Per-package base dir (relative to the worktree root) for vendored test cases
 // and lib source. Mirrors `vendor/sources.ts` (`vendor:fetch --print-{test,lib}
-// -paths`); static so the lookup needs no subprocess, and relative so joining
-// with the CURRENT root resolves in any worktree. Add a row per new vendored gem.
-export const TEST_BASE: Record<string, string> = {
-  arel: "vendor/rails/activerecord/test/cases/arel",
-  activerecord: "vendor/rails/activerecord/test/cases",
-  activemodel: "vendor/rails/activemodel/test/cases",
-  activesupport: "vendor/rails/activesupport/test",
-  actiondispatch: "vendor/rails/actionpack/test",
-  actioncontroller: "vendor/rails/actionpack/test",
-  abstractcontroller: "vendor/rails/actionpack/test/abstract",
-  actionview: "vendor/rails/actionview/test",
-  trailties: "vendor/rails/railties/test",
-  rack: "vendor/rack/test",
-  "did-you-mean": "vendor/did_you_mean/test",
-  globalid: "vendor/globalid/test/cases",
-  "ruby-compat": "vendor/ruby/spec/ruby",
-};
+// -paths`); relative so joining with the CURRENT root resolves in any worktree.
+function repoRelative(abs: string): string {
+  return toPosix(path.relative(path.dirname(VENDOR_DIR), abs));
+}
 
-export const LIB_BASE: Record<string, string> = {
-  arel: "vendor/rails/activerecord/lib/arel",
-  activerecord: "vendor/rails/activerecord/lib/active_record",
-  activemodel: "vendor/rails/activemodel/lib/active_model",
-  activesupport: "vendor/rails/activesupport/lib/active_support",
-  actiondispatch: "vendor/rails/actionpack/lib/action_dispatch",
-  actioncontroller: "vendor/rails/actionpack/lib/action_controller",
-  abstractcontroller: "vendor/rails/actionpack/lib/abstract_controller",
-  actionpackversion: "vendor/rails/actionpack/lib/action_pack",
-  actionview: "vendor/rails/actionview/lib/action_view",
-  trailties: "vendor/rails/railties/lib/rails",
-  rack: "vendor/rack/lib/rack",
-  "did-you-mean": "vendor/did_you_mean/lib/did_you_mean",
-  globalid: "vendor/globalid/lib/global_id",
-};
+function repoRelativeManifest(manifest: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(Object.entries(manifest).map(([pkg, abs]) => [pkg, repoRelative(abs)]));
+}
+
+export const TEST_BASE: Record<string, string> = repoRelativeManifest(testPathsManifest());
+
+export const LIB_BASE: Record<string, string> = repoRelativeManifest(libPathsManifest());
 
 export const TEST_MANIFEST = "scripts/test-compare/output/rails-tests.json";
 export const API_MANIFEST = "scripts/api-compare/output/rails-api.json";
@@ -75,7 +60,7 @@ export const API_MANIFEST = "scripts/api-compare/output/rails-api.json";
 export const LOCKFILE = "vendor/sources.lock.json";
 
 /** Grep fallback is scoped here — the fidelity work that drives this is AR. */
-const GREP_SCOPE = "vendor/rails/activerecord";
+export const GREP_SCOPE = repoRelative(resolveSourcePath("rails", "activerecord"));
 const MAX_GREP_RESULTS = 40;
 
 function toPosix(p: string): string {

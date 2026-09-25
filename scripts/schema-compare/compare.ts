@@ -40,10 +40,11 @@ import { canonicalRegistrySchema } from "../../packages/activerecord/src/support
 import type { RailsColumnOptions, RailsTable } from "./parse-schema-rb.js";
 import { parseSchemaRbWithCoverage } from "./parse-schema-rb.js";
 import { writeJsonManifest } from "@blazetrails/parity/write-json-manifest";
+import { resolveSourcePath } from "../../vendor/sources.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..", "..");
-const SCHEMA_DIR = path.join(ROOT, "vendor/rails/activerecord/test/schema");
+const SCHEMA_DIR = resolveSourcePath("rails", "activerecord/test/schema");
 const BASELINE = path.join(HERE, "invented-baseline.json");
 
 /**
@@ -871,7 +872,7 @@ export async function main(): Promise<void> {
 
   if (regressions.length > 0) {
     console.log(
-      "\nTEST_SCHEMA mirrors vendor/rails/activerecord/test/schema/schema.rb. Add the table/column " +
+      `\nTEST_SCHEMA mirrors ${path.relative(ROOT, path.join(SCHEMA_DIR, "schema.rb"))}. Add the table/column ` +
         "to schema.rb upstream, or drop it here — do not invent canonical schema. The baseline " +
         "records pre-existing debt only and must not grow.",
     );

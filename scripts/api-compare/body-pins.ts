@@ -35,10 +35,15 @@
  * insensitive to indentation, blank lines, and comments — only a change to the
  * code the body runs moves it.
  *
- * Adopted policy: ORGANIC until first release. The manifest ships empty; pins
- * grow via convergence/port stories that pin the pairs they verify (`--pin
- * <file>` plus a `reason`). The whole-surface `--pin-all` floor is deferred to
- * the first release. See CONTRIBUTING.md "Body pins".
+ * Adopted policy: the `--pin-all` FLOOR, taken against rails `v8.0.2` before the
+ * first vendor bump (RFC 0159-versioned-vendor-layout,
+ * `pin-the-body-hash-floor-before-the-first-bump`). The policy was ORGANIC until
+ * first release, but a bump against an empty manifest reports no drift at all,
+ * so the floor was taken while the vendored tree was still the baseline every
+ * existing port was written against. Floor pins carry no `reason`; pins a
+ * convergence/port story verifies (`--pin <file>` plus a `reason`) keep theirs.
+ * Every pin records the upstream `ref` its digest was taken at, and re-pinning
+ * is a step of every bump. See CONTRIBUTING.md "Body pins".
  *
  * Usage:
  *   tsx body-pins.ts --pin <ruby-file>   # pin/re-pin all pairs in one Ruby file
@@ -56,6 +61,7 @@
 import * as fs from "fs/promises";
 import * as path from "path";
 import { fileURLToPath } from "url";
+import { SOURCES } from "../../vendor/sources.js";
 import { OUTPUT_DIR, PACKAGES, ROOT_DIR, SCRIPT_DIR } from "./config.js";
 import { serializeBaseline } from "./baseline-json.js";
 
@@ -88,7 +94,21 @@ export interface BodyPin {
   rubyFile: string;
   rubyName: string;
   digest: string;
+  /**
+   * The upstream tag at the pin's last write, e.g. `v8.0.2`. A bump that leaves
+   * the body's digest unchanged does not rewrite the pin, so `ref` can trail
+   * the currently vendored tag; the digest, not `ref`, is what DRIFT compares.
+   */
+  ref?: string;
   reason?: string;
+}
+
+/**
+ * The `vendor/sources.ts` origin ref a package is vendored at — what a digest
+ * taken now was taken against.
+ */
+export function sourceRefOf(packageName: string): string | undefined {
+  return SOURCES.find((s) => s.packages.some((p) => p.name === packageName))?.origin.ref;
 }
 
 export interface PinKey {
@@ -201,6 +221,7 @@ export function pinPairs(
       rubyFile: r.rubyFile,
       rubyName: r.rubyName,
       digest: r.digest,
+      ref: sourceRefOf(r.package),
       reason: prior?.reason,
     });
   }

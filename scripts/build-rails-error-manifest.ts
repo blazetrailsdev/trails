@@ -14,6 +14,7 @@ import { readdir, readFile } from "fs/promises";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { writeJsonManifest } from "@blazetrails/parity/write-json-manifest";
+import { resolveSourcePath } from "../vendor/sources.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -90,7 +91,7 @@ function lastSegment(qualified: string): string {
 }
 
 async function scanPackage(pkg: Pkg): Promise<ErrorClass[]> {
-  const libDir = path.join(ROOT, "vendor/rails", PKG_GEM[pkg], "lib");
+  const libDir = resolveSourcePath("rails", `${PKG_GEM[pkg]}/lib`);
   const files = await walkRubyFiles(libDir);
 
   // Pass 1: collect every `class X < Y` declaration with its source file.
