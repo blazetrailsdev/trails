@@ -92,8 +92,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(record.x).toEqual(new ActiveRecord.Point(1.1, 2.2));
     });
 
-    it.skip("mutation", async () => {
-      // BLOCKED: in-place mutation of a point attribute stays dirty after save! + reload (filed as 0155-assertion-surfaced-port-bugs/pg-point-mutation-dirty-after-reload)
+    it("mutation", async () => {
       const p = await PostgresqlPoint.createBang({ x: new ActiveRecord.Point(10, 20) });
 
       p.x.y = 25;
@@ -167,8 +166,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(output).toMatch(/t\.point\("legacy_z",\s+\{?\s*default: \[14\.4, 15\.5\] \}\);$/m);
     });
 
-    it.skip("legacy roundtrip", async () => {
-      // BLOCKED: a :legacy_point attribute reads back an ActiveRecord::Point where Rails returns [x, y] (filed as 0155-assertion-surfaced-port-bugs/pg-legacy-point-attribute-type-resolution)
+    it("legacy roundtrip", async () => {
       await PostgresqlPoint.createBang({ legacy_x: [10, 25.2] });
       const record = (await PostgresqlPoint.first())!;
       expect(record.legacy_x).toEqual([10, 25.2]);
@@ -179,8 +177,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(record.legacy_x).toEqual([1.1, 2.2]);
     });
 
-    it.skip("legacy mutation", async () => {
-      // BLOCKED: a :legacy_point attribute reads back an ActiveRecord::Point where Rails returns [x, y] (filed as 0155-assertion-surfaced-port-bugs/pg-legacy-point-attribute-type-resolution)
+    it("legacy mutation", async () => {
       const p = await PostgresqlPoint.createBang({ legacy_x: [10, 20] });
 
       p.legacy_x[1] = 25;

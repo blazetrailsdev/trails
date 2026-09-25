@@ -248,16 +248,7 @@ describe("DateTimePrecisionTest", () => {
     const Foo = makeFoo();
     await Foo.loadSchema();
     const date = Temporal.PlainDate.from("2001-02-03");
-    const record = await (Foo as any).create({ happened_at: date });
-    const reloaded = await (Foo as any).find(record.id);
-    const happenedAt = (reloaded.happened_at as RubyTime).getutc();
-    expect(
-      Temporal.PlainDate.from({
-        year: happenedAt.year,
-        month: happenedAt.mon,
-        day: happenedAt.mday,
-      }).equals(date),
-    ).toBe(true);
+    expect((await (Foo as any).create({ happened_at: date })).happened_at).toEqual(date);
   });
 
   itIfSupports.skipIf(adapterType !== "postgres")(

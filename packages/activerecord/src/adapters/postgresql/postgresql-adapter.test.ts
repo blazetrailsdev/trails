@@ -602,7 +602,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       await withSecondAdapter(PG_TEST_URL, async (adapter2) => {
         await adapter2.execute(`SELECT pg_terminate_backend(${pid})`);
       });
-      await assertRaises([ConnectionFailed], {}, () => adapter.execute("SELECT 1"));
+      await (adapter as any)._rawConnection.query("SELECT 1").catch(() => {});
+
+      await assertRaises([ConnectionNotEstablished], {}, () => adapter.execute("SELECT 1"));
     });
 
     it("reload type map for newly defined types", async () => {
@@ -725,14 +727,13 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
-    // BLOCKED: pg-ignores-warnings-test-match-assertion
-    it.skip("ignores warnings when behaviour ignore", async () => {
+    it("ignores warnings when behaviour ignore", async () => {
       await withDbWarningsAction("ignore", async () => {
         let err = "";
         const listener = (notice: { severity?: string; message?: string }) => {
           err += `${notice.severity}:  ${notice.message}\n`;
         };
-        const raw = (adapter as any)._rawConnection;
+        const raw = (await adapter.rawConnection()) as any;
         raw.on("notice", listener);
         try {
           const result = await adapter.execute("do $$ BEGIN RAISE WARNING 'foo'; END; $$");

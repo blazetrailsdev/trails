@@ -17,6 +17,9 @@ const OID_TIMETZ_ARRAY = 1270;
 const OID_INT8 = 20;
 const OID_CIRCLE = 718;
 
+const OID_POINT = 600;
+const OID_POINT_ARRAY = 1017;
+
 type PgParser = (value: string | Buffer) => unknown;
 
 const passthrough: PgParser = (v) => v;
@@ -38,6 +41,8 @@ const CONNECTION_PARSERS: ReadonlyMap<number, PgParser> = new Map<number, PgPars
   [OID_TIMESTAMP_ARRAY, passthrough],
   [OID_TIMESTAMPTZ_ARRAY, passthrough],
   [OID_TIMETZ_ARRAY, passthrough],
+  [OID_POINT, passthrough],
+  [OID_POINT_ARRAY, passthrough],
 ]);
 
 /** @noRailsEquivalent PERMANENT */

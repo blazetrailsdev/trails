@@ -184,7 +184,7 @@ export class ConnectionHandler {
     this.eachConnectionPool(role, (pool) => {
       pools.push(pool);
     });
-    return pools.some((pool) => pool.activeConnection != null);
+    return pools.some((pool) => pool.isActiveConnection() != null);
   }
 
   clearActiveConnectionsBang(role?: string | null): void {
