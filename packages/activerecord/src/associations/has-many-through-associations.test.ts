@@ -581,9 +581,7 @@ describe("HasManyThroughAssociationsTest", () => {
     });
 
     await post.reload();
-    expect((await (await (post as any).people.reload()).toArray()).map((p: any) => p.id)).toContain(
-      person.id,
-    );
+    expect(await (await (post as any).people.reload()).toArray()).toContainEqual(person);
   });
 
   it("delete all for with dependent option destroy", async () => {
@@ -659,9 +657,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const result = await (post as any).people.concat([person]);
     expect(await (post as any).people.size()).toBe(1);
     expect(await (await (post as any).people.reload()).size()).toBe(1);
-    expect((await (post as any).people.toArray()).map((r: any) => r.id)).toEqual(
-      (await result.toArray()).map((r: any) => r.id),
-    );
+    expect(await (post as any).people.toArray()).toEqual(await result.toArray());
   });
 
   it("associating a persisted record with unsaved changes saves those changes", async () => {
@@ -756,9 +752,7 @@ describe("HasManyThroughAssociationsTest", () => {
     });
 
     await post.reload();
-    expect((await (await (post as any).people.reload()).toArray()).map((p: any) => p.id)).toContain(
-      newPerson.id,
-    );
+    expect(await (await (post as any).people.reload()).toArray()).toContainEqual(newPerson);
   });
 
   it("associate new by building", async () => {
@@ -1290,9 +1284,7 @@ describe("HasManyThroughAssociationsTest", () => {
 
     await post.reload();
     expect((await (post as any).people.reload()).target).toContainEqual(david);
-    expect((await (post as any).people.reload()).target.map((p: any) => p.id)).not.toContain(
-      michael.id,
-    );
+    expect((await (post as any).people.reload()).target).not.toContainEqual(michael);
   });
 
   it("replace association with duplicates", async () => {
@@ -1730,9 +1722,7 @@ describe("HasManyThroughAssociationsTest", () => {
     await (mary as any).authorFavorites.create({ favorite_author_id: 3 });
     const maryFavorites = await (mary as any).authorFavorites.toArray();
     const postFavorites = await (post as any).authorFavorites.toArray();
-    expect(postFavorites.map((f: any) => f.id).sort()).toEqual(
-      maryFavorites.map((f: any) => f.id).sort(),
-    );
+    expect(postFavorites).toEqual(maryFavorites);
   });
 
   it("has many association through a has many association to self", async () => {
@@ -1780,9 +1770,7 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(
       await Categorization.exists({ author_id: author.id, named_category_name: category.name }),
     ).toBeTruthy();
-    expect((await (author as any).namedCategories.reload()).map((c: any) => c.id)).toContain(
-      category.id,
-    );
+    expect(await (author as any).namedCategories.reload()).toContainEqual(category);
   });
 
   it("collection create with nonstandard primary key on belongs to", async () => {
@@ -1791,9 +1779,7 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(
       await Categorization.exists({ author_id: author.id, named_category_name: category.name }),
     ).toBeTruthy();
-    expect((await (author as any).namedCategories.reload()).map((c: any) => c.id)).toContain(
-      category.id,
-    );
+    expect(await (author as any).namedCategories.reload()).toContainEqual(category);
   });
 
   it.skip("collection exists", async () => {
@@ -2152,17 +2138,17 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(proxy.isStaleTarget()).toBeFalsy();
     const mary = await Author.find(authors("mary").id);
     const byId = (a: any, b: any) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
-    expect(
-      (await (post as any).authorCategorizations.toArray()).sort(byId).map((c: any) => c.id),
-    ).toEqual((await (mary as any).categorizations.toArray()).sort(byId).map((c: any) => c.id));
+    expect((await (post as any).authorCategorizations.toArray()).sort(byId)).toEqual(
+      (await (mary as any).categorizations.toArray()).sort(byId),
+    );
 
     (post as any).author_id = authors("david").id;
 
     expect(proxy.isStaleTarget()).toBeTruthy();
     const david = await Author.find(authors("david").id);
-    expect(
-      (await (post as any).authorCategorizations.toArray()).sort(byId).map((c: any) => c.id),
-    ).toEqual((await (david as any).categorizations.toArray()).sort(byId).map((c: any) => c.id));
+    expect((await (post as any).authorCategorizations.toArray()).sort(byId)).toEqual(
+      (await (david as any).categorizations.toArray()).sort(byId),
+    );
   });
 
   it("create with conditions hash on through association", async () => {
@@ -2176,9 +2162,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const post = await Post.find(posts("welcome").id);
     const address = await AuthorAddress.find(authorAddresses("david_address").id);
 
-    expect((await (post as any).authorAddresses.toArray()).map((a: any) => a.id)).toContain(
-      address.id,
-    );
+    expect(await (post as any).authorAddresses.toArray()).toContainEqual(address);
     await (post as any).authorAddresses.delete(address);
     expect((post as any).get("author_count") == null).toBeTruthy();
   });
@@ -2293,7 +2277,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const blackbeard = await Owner.find(owners("blackbeard").id);
     const toys1 = await (blackbeard as any).toys.toArray();
     const toys2 = await (blackbeard as any).toys.withPet().toArray();
-    expect(toys2.map((t: any) => t.id).sort()).toEqual(toys1.map((t: any) => t.id).sort());
+    expect(toys2).toEqual(toys1);
   });
 
   it("has many through with polymorphic source", async () => {
@@ -2656,8 +2640,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const fallSections = (await (fall as any).sections.toArray()).sort(
       (a: any, b: any) => Number(a.id) - Number(b.id),
     );
-    const expectedIds = sections.map((s: any) => s.id).sort();
-    expect(fallSections.map((s: any) => s.id).sort()).toEqual(expectedIds);
+    expect(fallSections).toEqual(sections);
   });
 
   it("post has many tags through association with composite query constraints", async () => {

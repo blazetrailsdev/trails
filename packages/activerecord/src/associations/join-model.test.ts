@@ -92,7 +92,8 @@ class ScopedSourceTag extends Base {
   }
 }
 
-const ids = (records: Base[]): unknown[] => records.map((r) => r.id).sort();
+const sortById = (records: Base[]): Base[] =>
+  [...records].sort((a, b) => Number(a.id) - Number(b.id));
 
 describe("AssociationsJoinModelTest", () => {
   const { authors, posts, categories, tags, taggings, comments, items, books, vertices } = fixtures(
@@ -483,23 +484,24 @@ describe("AssociationsJoinModelTest", () => {
 
   it("has many going through join model with custom primary key", async () => {
     const thinking = await Post.find(posts("thinking").id);
-    expect(
-      ((await (thinking as any).authorsUsingAuthorId.toArray()) as Base[]).map((a) => a.id),
-    ).toEqual([authors("david").id]);
+    expect((await (thinking as any).authorsUsingAuthorId.toArray()) as Base[]).toEqual([
+      authors("david"),
+    ]);
   });
 
   it("has many going through polymorphic join model with custom primary key", async () => {
     const eagerOther = await Post.find(posts("eager_other").id);
-    expect(
-      ((await (eagerOther as any).tagsUsingAuthorId.toArray()) as Base[]).map((t) => t.id),
-    ).toEqual([tags("general").id]);
+    expect((await (eagerOther as any).tagsUsingAuthorId.toArray()) as Base[]).toEqual([
+      tags("general"),
+    ]);
   });
 
   it("has many through with custom primary key on belongs to source", async () => {
     const thinking = await Post.find(posts("thinking").id);
-    expect(
-      ((await (thinking as any).authorUsingCustomPk.toArray()) as Base[]).map((a) => a.id),
-    ).toEqual([authors("david").id, authors("david").id]);
+    expect((await (thinking as any).authorUsingCustomPk.toArray()) as Base[]).toEqual([
+      authors("david"),
+      authors("david"),
+    ]);
   });
 
   it("has many through with custom primary key on has many source", async () => {
@@ -552,9 +554,7 @@ describe("AssociationsJoinModelTest", () => {
   it("has many polymorphic with source type", async () => {
     const general = await Tag.find(tags("general").id);
     const taggedPosts = (await (general as any).taggedPosts.toArray()) as Base[];
-    expect(taggedPosts.map((p) => p.id).sort((a: any, b: any) => Number(a) - Number(b))).toEqual(
-      [posts("welcome").id, posts("thinking").id].sort((a: any, b: any) => Number(a) - Number(b)),
-    );
+    expect(sortById(taggedPosts)).toEqual(sortById([posts("welcome"), posts("thinking")]));
   });
 
   it("has many polymorphic associations merges through scope", async () => {
@@ -581,14 +581,10 @@ describe("AssociationsJoinModelTest", () => {
 
   it("eager has many polymorphic with source type", async () => {
     const tagWithInclude = await Tag.all().includes(":taggedPosts").find(tags("general").id);
-    const desired = [posts("welcome").id, posts("thinking").id].sort(
-      (a: any, b: any) => Number(a) - Number(b),
-    );
+    const desired = sortById([posts("welcome"), posts("thinking")]);
     await assertNoQueries(false, async () => {
       const target = (tagWithInclude as any).association("taggedPosts").target as Base[];
-      expect(target.map((p) => p.id).sort((a: any, b: any) => Number(a) - Number(b))).toEqual(
-        desired,
-      );
+      expect(sortById(target)).toEqual(desired);
     });
     expect(((await (tagWithInclude as any).taggings.toArray()) as Base[]).length).toBe(5);
   });
@@ -631,19 +627,17 @@ describe("AssociationsJoinModelTest", () => {
   it("has many through polymorphic has one", async () => {
     const david = await Author.find(authors("david").id);
     const taggings2 = (await (david as any).taggings_2.toArray()) as Base[];
-    expect(taggings2.map((t) => t.id).sort((a: any, b: any) => Number(a) - Number(b))).toEqual(
-      [taggings("welcome_general").id, taggings("thinking_general").id].sort(
-        (a: any, b: any) => Number(a) - Number(b),
-      ),
+    expect(sortById(taggings2)).toEqual(
+      sortById([taggings("welcome_general"), taggings("thinking_general")]),
     );
   });
 
   it("has many through polymorphic has many", async () => {
     const david = await Author.find(authors("david").id);
     const davidTaggings = (await (david as any).taggings.distinct().toArray()) as Base[];
-    expect(davidTaggings.map((t) => t.id).sort((a: any, b: any) => Number(a) - Number(b))).toEqual([
-      taggings("welcome_general").id,
-      taggings("thinking_general").id,
+    expect(sortById(davidTaggings)).toEqual([
+      taggings("welcome_general"),
+      taggings("thinking_general"),
     ]);
   });
 
@@ -651,9 +645,7 @@ describe("AssociationsJoinModelTest", () => {
     const david = await Author.find(authors("david").id);
     const mary = await Author.find(authors("mary").id);
     expect((await (david as any).favoriteAuthors.toArray()) as Base[]).toEqual([mary]);
-    expect(((await (mary as any).favoriteAuthors.toArray()) as Base[]).map((a) => a.id)).toEqual(
-      [],
-    );
+    expect((await (mary as any).favoriteAuthors.toArray()) as Base[]).toEqual([]);
   });
 
   it("add to self referential has many through", async () => {
@@ -747,7 +739,7 @@ describe("AssociationsJoinModelTest", () => {
   it("delete associate when deleting from has many through with nonstandard id", async () => {
     const bookAwdr = await Book.find(books("awdr").id);
     const count = await (bookAwdr as any).references.count();
-    const referencesBefore = ids(await (bookAwdr as any).references.toArray());
+    const referencesBefore = sortById(await (bookAwdr as any).references.toArray());
     const book = await Book.createBang({ name: "Getting Real" });
     await (bookAwdr as any).references.push(book);
     expect(await (await (bookAwdr as any).references.reload()).size()).toBe(count + 1);
@@ -755,31 +747,31 @@ describe("AssociationsJoinModelTest", () => {
     await assertNothingRaised(() => (bookAwdr as any).references.delete(book));
     expect(await (bookAwdr as any).references.size()).toBe(count);
     expect(await (await (bookAwdr as any).references.reload()).size()).toBe(count);
-    expect(ids(await (bookAwdr as any).references.toArray())).toEqual(referencesBefore);
+    expect(sortById(await (bookAwdr as any).references.toArray())).toEqual(referencesBefore);
   });
 
   it("delete associate when deleting from has many through", async () => {
     const postThinking = await Post.find(posts("thinking").id);
     const count = await (postThinking as any).tags.count();
-    const tagsBefore = ids(await (postThinking as any).tags.toArray());
+    const tagsBefore = sortById(await (postThinking as any).tags.toArray());
     const tag = await Tag.createBang({ name: "doomed" });
     await (postThinking as any).tags.push(tag);
     expect(await (await (postThinking as any).taggings.reload()).size()).toBe(count + 1);
     await (postThinking as any).reload();
     expect(await (await (postThinking as any).tags.reload()).size()).toBe(count + 1);
-    expect(ids(await (postThinking as any).tags.toArray())).not.toEqual(tagsBefore);
+    expect(sortById(await (postThinking as any).tags.toArray())).not.toEqual(tagsBefore);
 
     await assertNothingRaised(() => (postThinking as any).tags.delete(tag));
     expect(await (postThinking as any).tags.size()).toBe(count);
     expect(await (await (postThinking as any).tags.reload()).size()).toBe(count);
     expect(await (await (postThinking as any).taggings.reload()).size()).toBe(count);
-    expect(ids(await (postThinking as any).tags.toArray())).toEqual(tagsBefore);
+    expect(sortById(await (postThinking as any).tags.toArray())).toEqual(tagsBefore);
   });
 
   it("delete associate when deleting from has many through with multiple tags", async () => {
     const postThinking = await Post.find(posts("thinking").id);
     const count = await (postThinking as any).tags.count();
-    const tagsBefore = ids(await (postThinking as any).tags.toArray());
+    const tagsBefore = sortById(await (postThinking as any).tags.toArray());
     const doomed = await Tag.createBang({ name: "doomed" });
     const doomed2 = await Tag.createBang({ name: "doomed2" });
     const quaked = await Tag.createBang({ name: "quaked" });
@@ -790,7 +782,7 @@ describe("AssociationsJoinModelTest", () => {
     await assertNothingRaised(() => (postThinking as any).tags.delete(doomed, doomed2, quaked));
     expect(await (postThinking as any).tags.size()).toBe(count);
     expect(await (await (postThinking as any).tags.reload()).size()).toBe(count);
-    expect(ids(await (postThinking as any).tags.toArray())).toEqual(tagsBefore);
+    expect(sortById(await (postThinking as any).tags.toArray())).toEqual(tagsBefore);
   });
 
   it("adding junk to has many through should raise type mismatch", async () => {
@@ -862,8 +854,8 @@ describe("AssociationsJoinModelTest", () => {
       expect(target).toContainEqual(expected);
     });
     const welcome = await Post.find(posts("welcome").id);
-    expect(((await (welcome as any).taggings.toArray()) as Base[]).map((t) => t.id)).toContain(
-      taggings("welcome_general").id,
+    expect((await (welcome as any).taggings.toArray()) as Base[]).toContainEqual(
+      taggings("welcome_general"),
     );
   });
 
@@ -1114,15 +1106,13 @@ describe("AssociationsJoinModelTest", () => {
     await (savedPost as any).tags.push(newTag);
     expect((newTag as any).isPersisted()).toBeTruthy();
     expect((savedPost as any).isPersisted()).toBeTruthy();
-    expect(((await (savedPost as any).tags.toArray()) as Base[]).map((t) => t.id)).toContain(
-      newTag.id,
-    );
+    expect((await (savedPost as any).tags.toArray()) as Base[]).toContainEqual(newTag);
 
     expect((newTag as any).isPersisted()).toBeTruthy();
     await (savedPost as any).reload();
-    expect(
-      ((await (await (savedPost as any).tags.reload()).toArray()) as Base[]).map((t) => t.id),
-    ).toContain(newTag.id);
+    expect((await (await (savedPost as any).tags.reload()).toArray()) as Base[]).toContainEqual(
+      newTag,
+    );
 
     const newPost = Post.new({
       title: "Association replacement works!",
@@ -1133,16 +1123,14 @@ describe("AssociationsJoinModelTest", () => {
     await (newPost as any).tags.push(savedTag);
     expect((newPost as any).isPersisted()).toBeFalsy();
     expect((savedTag as any).isPersisted()).toBeTruthy();
-    expect(((await (newPost as any).tags.toArray()) as Base[]).map((t) => t.id)).toContain(
-      savedTag.id,
-    );
+    expect((await (newPost as any).tags.toArray()) as Base[]).toContainEqual(savedTag);
 
     await (newPost as any).saveBang();
     expect((newPost as any).isPersisted()).toBeTruthy();
     await (newPost as any).reload();
-    expect(
-      ((await (await (newPost as any).tags.reload()).toArray()) as Base[]).map((t) => t.id),
-    ).toContain(savedTag.id);
+    expect((await (await (newPost as any).tags.reload()).toArray()) as Base[]).toContainEqual(
+      savedTag,
+    );
 
     const thinking = await Post.find(posts("thinking").id);
     expect((thinking as any).tags.build().isPersisted()).toBeFalsy();
