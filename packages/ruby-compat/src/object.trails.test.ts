@@ -57,6 +57,23 @@ describe("Object#respond_to?", () => {
     expect(basicObjRespondTo("foo bar", "toStr")).toBe(true);
     expect(basicObjRespondTo({}, "toStr")).toBe(false);
   });
+
+  it("answers Module#respond_to? for a class: its methods, not its static data or Function.prototype", () => {
+    class Klass {
+      static data = 1;
+      static method(): void {}
+      static get reader(): number {
+        return 1;
+      }
+    }
+    class Sub extends Klass {}
+    expect(basicObjRespondTo(Sub, "method")).toBe(true);
+    expect(basicObjRespondTo(Sub, "reader")).toBe(true);
+    expect(basicObjRespondTo(Sub, "data")).toBe(false);
+    for (const name of ["call", "apply", "bind", "hasOwnProperty"]) {
+      expect(basicObjRespondTo(Sub, name)).toBe(false);
+    }
+  });
 });
 
 describe("rbObjInspect", () => {

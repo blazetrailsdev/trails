@@ -139,7 +139,8 @@ describe("TestDatabasesTest", () => {
     await createAndLoadSchema(1, { envName: "arunit" });
 
     expect(mockReconstructFromSchema).not.toHaveBeenCalled();
-    expect(mockEstablishConnection).toHaveBeenCalledWith(Base, undefined);
+    expect(mockEstablishConnection).toHaveBeenCalledWith(undefined);
+    expect(mockEstablishConnection.mock.contexts).toContain(Base);
   });
 
   it("restores VERBOSE and re-establishes connection after schema load failure", async () => {
@@ -170,7 +171,8 @@ describe("TestDatabasesTest", () => {
 
     try {
       await expect(createAndLoadSchema(7, { envName: "arunit" })).rejects.toThrow(error);
-      expect(mockEstablishConnection).toHaveBeenCalledWith(Base, undefined);
+      expect(mockEstablishConnection).toHaveBeenCalledWith(undefined);
+      expect(mockEstablishConnection.mock.contexts).toContain(Base);
       expect(process.env.VERBOSE).toBe("1");
     } finally {
       if (originalVerbose === undefined) {

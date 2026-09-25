@@ -1942,7 +1942,7 @@ describe("BasicsTest", () => {
     await withTimezoneConfig({ default: "utc" }, async () => {
       const newConfig = {
         ...Base.connectionDbConfig().configurationHash,
-        default_timezone: "local",
+        defaultTimezone: "local",
       };
       await Base.establishConnection(newConfig as Parameters<typeof Base.establishConnection>[0]);
       cleanupConnections.push(async () => {
@@ -1969,7 +1969,7 @@ describe("BasicsTest", () => {
     await withTimezoneConfig({ default: "local" }, async () => {
       const newConfig = {
         ...Base.connectionDbConfig().configurationHash,
-        default_timezone: "utc",
+        defaultTimezone: "utc",
       };
       await Base.establishConnection(newConfig as Parameters<typeof Base.establishConnection>[0]);
       cleanupConnections.push(async () => {

@@ -662,12 +662,14 @@ describe("AbstractAdapter#isPreventingWrites stack matching", () => {
       static {
         this.abstractClass = true;
         this.connectionClass = true;
+        this.connectionSpecificationName = "AnimalsRecord";
       }
     }
     class MealsRecord extends Base {
       static {
         this.abstractClass = true;
         this.connectionClass = true;
+        this.connectionSpecificationName = "MealsRecord";
       }
     }
     await Base.connectionHandler.establishConnection(

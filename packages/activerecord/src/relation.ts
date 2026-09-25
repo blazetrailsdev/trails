@@ -14,7 +14,7 @@ import { first } from "@blazetrails/ruby-compat";
 import * as Arel from "@blazetrails/arel";
 import { Table, SelectManager, Nodes, sql, star } from "@blazetrails/arel";
 import type { Base } from "./base.js";
-import { ActiveRecordError, RecordNotSaved, RecordNotUnique, UnknownPrimaryKey } from "./errors.js";
+import { ActiveRecordError, RecordNotUnique, UnknownPrimaryKey } from "./errors.js";
 import { InvalidSignature } from "@blazetrails/activesupport/message-verifier";
 import { max } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -850,13 +850,9 @@ export class Relation<T extends Base> {
   async createOrFindBy(attributes: Record<string, unknown>, block?: (r: T) => void): Promise<T> {
     return this.withConnection(async (connection) => {
       try {
-        const result = await this._model.transaction(() => this.create(attributes, block), {
+        return (await this.transaction(() => this.create(attributes, block), {
           requiresNew: true,
-        });
-        if (result === undefined) {
-          throw new RecordNotSaved(`${this._model.name}.createOrFindBy rolled back before persist`);
-        }
-        return result;
+        })) as T;
       } catch (e) {
         if (!(e instanceof RecordNotUnique)) throw e;
         if (connection.isTransactionOpen()) {
@@ -873,15 +869,9 @@ export class Relation<T extends Base> {
   ): Promise<T> {
     return this.withConnection(async (connection) => {
       try {
-        const result = await this._model.transaction(() => this.createBang(attributes, block), {
+        return (await this.transaction(() => this.createBang(attributes, block), {
           requiresNew: true,
-        });
-        if (result === undefined) {
-          throw new RecordNotSaved(
-            `${this._model.name}.createOrFindByBang rolled back before persist`,
-          );
-        }
-        return result;
+        })) as T;
       } catch (e) {
         if (!(e instanceof RecordNotUnique)) throw e;
         if (connection.isTransactionOpen()) {
@@ -1974,7 +1964,7 @@ export interface Relation<T extends Base>
   extending<M extends Record<string, (...args: any[]) => any>>(
     mod: M | undefined,
   ): Relation<T> & Partial<M>;
-  extending(mod: Module): Relation<T>;
+  extending(...modules: Module[]): Relation<T>;
   extending(fn: (rel: Relation<T>) => void): Relation<T>;
   extending(): Relation<T>;
   optimizerHints(...args: string[]): Relation<T>;

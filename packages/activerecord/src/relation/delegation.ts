@@ -276,20 +276,7 @@ class ImplicitCountError extends globalThis.TypeError {}
 
 export class Delegation {
   respondToMissing(this: any, method: string, _: boolean): boolean {
-    const model = this._model as typeof Base;
-    if (typeof (model as { respondTo?: unknown }).respondTo === "function") {
-      return rbObjRespondTo(model, method);
-    }
-    for (
-      let o: object | null = model;
-      o !== null && o !== Function.prototype;
-      o = Object.getPrototypeOf(o) as object | null
-    ) {
-      if (Object.prototype.hasOwnProperty.call(o, method)) {
-        return typeof (model as any)[method] === "function";
-      }
-    }
-    return model.respondToMissing(method);
+    return rbObjRespondTo(this.model, method);
   }
 
   length(this: DelegationHost): number | Promise<number> {
