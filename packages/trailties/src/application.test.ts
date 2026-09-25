@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, onTestFinished } from "vit
 import {
   NullLogger,
   Executor,
-  NullStore,
   onLoad,
   Reloader,
   resetLoadHooks,
@@ -10,6 +9,7 @@ import {
   setTrailsRoot,
   trailsRoot,
 } from "@blazetrails/activesupport";
+import { FileStore } from "@blazetrails/activesupport/cache/file-store";
 import {
   env,
   fsAdapterConfig,
@@ -229,7 +229,7 @@ describe("Application", () => {
       await app.initialize();
       expect(app.initialized()).toBe(true);
       expect(app.logger).toBeInstanceOf(NullLogger);
-      expect(app.cache).toBeInstanceOf(NullStore);
+      expect(app.cache).toBeInstanceOf(FileStore);
     });
 
     it("fires :after_initialize load hooks once initialization completes", async () => {

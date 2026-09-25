@@ -20,8 +20,7 @@ Pirate.hasMany("birdsWithAdd", {
   },
 });
 
-Pirate.acceptsNestedAttributesFor("birdsWithAddLoad", { allowDestroy: true });
-Pirate.acceptsNestedAttributesFor("birdsWithAdd", { allowDestroy: true });
+Pirate.acceptsNestedAttributesFor("birdsWithAddLoad", "birdsWithAdd", { allowDestroy: true });
 
 describe("NestedAttributesWithCallbacksTest", () => {
   fixtures([]);

@@ -537,6 +537,9 @@ ${
   } else {
     this.config.actionController.performCaching = false;
   }
+
+  // Change to :null_store to avoid any caching.
+  this.config.cacheStore = ":memory_store";
 ${
   this.skip("ActiveStorage")
     ? ""
@@ -627,6 +630,7 @@ Trails.application!.configure(function () {
 
   // Show full error reports.
   this.config.considerAllRequestsLocal = true;
+  this.config.cacheStore = ":null_store";
 
   // Render exception templates for rescuable exceptions and raise for other exceptions.
   this.config.actionDispatch.showExceptions = "rescuable";

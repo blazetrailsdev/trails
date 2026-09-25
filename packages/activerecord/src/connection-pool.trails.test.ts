@@ -371,11 +371,11 @@ it("the pinned connection holds a leased connection", async () => {
   try {
     const established = await pool.checkout();
     pool.checkin(established);
-    expect(established.inUse).toBeFalsy();
+    expect(established.isInUse()).toBeFalsy();
 
     await new Thread(async () => {
       await pool.pinConnectionBang();
-      expect((await pool.checkout()).inUse).toBeTruthy();
+      expect((await pool.checkout()).isInUse()).toBeTruthy();
       await pool.unpinConnectionBang();
     }).value();
   } finally {
@@ -458,7 +458,7 @@ it("unpinConnectionBang leaves the connection checked out when the rollback rais
     };
 
     await expect(pool.unpinConnectionBang()).rejects.toThrow("rollback exploded");
-    expect(pinned.inUse).toBeTruthy();
+    expect(pinned.isInUse()).toBeTruthy();
     await expect(pool.unpinConnectionBang()).rejects.toThrow(/isn't a pinned connection/);
   } finally {
     await closePoolConnections(pool);

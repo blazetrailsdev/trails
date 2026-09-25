@@ -233,9 +233,7 @@ export interface LoosePerson {
   get bestFriendOf(): LoosePerson | null | Promise<LoosePerson | null>;
   set bestFriendOf(value: LoosePerson | null);
 }
-acceptsNestedAttributesFor(LoosePerson, "bestFriend");
-acceptsNestedAttributesFor(LoosePerson, "bestFriendOf");
-acceptsNestedAttributesFor(LoosePerson, "bestFriends");
+acceptsNestedAttributesFor(LoosePerson, "bestFriend", "bestFriendOf", "bestFriends");
 
 export class LooseDescendant extends LoosePerson {}
 
@@ -258,9 +256,7 @@ export interface TightPerson {
   get bestFriendOf(): TightPerson | null | Promise<TightPerson | null>;
   set bestFriendOf(value: TightPerson | null);
 }
-acceptsNestedAttributesFor(TightPerson, "bestFriend");
-acceptsNestedAttributesFor(TightPerson, "bestFriendOf");
-acceptsNestedAttributesFor(TightPerson, "bestFriends");
+acceptsNestedAttributesFor(TightPerson, "bestFriend", "bestFriendOf", "bestFriends");
 
 export class TightDescendant extends TightPerson {}
 

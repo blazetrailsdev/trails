@@ -19,9 +19,9 @@ describe("AdapterLeasingTest", () => {
   });
 
   it("in use?", () => {
-    expect(adapter.inUse).toBeFalsy();
+    expect(adapter.isInUse()).toBeFalsy();
     adapter.lease();
-    expect(adapter.inUse).toBeTruthy();
+    expect(adapter.isInUse()).toBeTruthy();
   });
 
   it("lease twice", () => {
@@ -31,9 +31,9 @@ describe("AdapterLeasingTest", () => {
 
   it("expire mutates in use", () => {
     adapter.lease();
-    expect(adapter.inUse).toBeTruthy();
+    expect(adapter.isInUse()).toBeTruthy();
     adapter.expire();
-    expect(adapter.inUse).toBeFalsy();
+    expect(adapter.isInUse()).toBeFalsy();
   });
 
   it("close", async () => {
@@ -44,10 +44,10 @@ describe("AdapterLeasingTest", () => {
     adapter.pool = pool;
 
     expect(await pool.leaseConnection()).toBe(adapter);
-    expect(adapter.inUse).toBeTruthy();
+    expect(adapter.isInUse()).toBeTruthy();
 
     await adapter.close();
-    expect(adapter.inUse).toBeFalsy();
+    expect(adapter.isInUse()).toBeFalsy();
 
     expect(await pool.leaseConnection()).toBe(adapter);
   });

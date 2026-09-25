@@ -51,7 +51,7 @@ export class Configuration extends EngineConfiguration {
   autoflushLog = true;
   silenceHealthcheckPath: string | null = null;
   cacheClasses: boolean | null = null;
-  cacheStore: unknown = ["file_store", "tmp/cache/"];
+  cacheStore: unknown = [":file_store", `${this.root ?? ""}/tmp/cache/`];
   reloadClassesOnlyOnChange = true;
   fileWatcher: unknown = null;
   exceptionsApp: unknown = null;

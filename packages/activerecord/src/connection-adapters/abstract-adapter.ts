@@ -991,7 +991,7 @@ export class AbstractAdapter implements Quoting {
     clearQueryCacheMixin.call(this as unknown as QueryCacheHost);
   }
 
-  get inUse(): Thread | Fiber | null {
+  isInUse(): Thread | Fiber | null {
     return this.owner;
   }
 
@@ -1016,7 +1016,7 @@ export class AbstractAdapter implements Quoting {
   }
 
   lease(): void {
-    if (this.inUse) {
+    if (this.isInUse()) {
       let msg = "Cannot lease connection, ";
       if (this._owner === IsolatedExecutionState.context()) {
         msg += "it is already leased by the current thread.";
@@ -1032,7 +1032,7 @@ export class AbstractAdapter implements Quoting {
   }
 
   expire(): void {
-    if (this.inUse) {
+    if (this.isInUse()) {
       if (this._owner !== IsolatedExecutionState.context()) {
         throw new ActiveRecordError(
           "Cannot expire connection, " +
@@ -1469,7 +1469,7 @@ export class AbstractAdapter implements Quoting {
   }
 
   stealBang(): void {
-    if (this.inUse) {
+    if (this.isInUse()) {
       if (this._owner !== IsolatedExecutionState.context()) {
         removeConnectionFromThreadCache(this.pool as ConnectionPool, this, this._owner!);
 
@@ -1481,7 +1481,7 @@ export class AbstractAdapter implements Quoting {
   }
 
   get secondsIdle(): number {
-    if (this.inUse) return 0;
+    if (this.isInUse()) return 0;
     return Process.clockGettime(Process.CLOCK_MONOTONIC) - this._idleSince;
   }
 

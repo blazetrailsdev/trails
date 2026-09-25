@@ -1041,10 +1041,9 @@ export class Base extends Model {
   >;
 
   static acceptsNestedAttributesFor(
-    associationName: string,
-    options?: Parameters<typeof _NestedAttributes.acceptsNestedAttributesFor>[2],
+    ...attrNames: (string | _NestedAttributes.NestedAttributeOptions)[]
   ): void {
-    _NestedAttributes.acceptsNestedAttributesFor(this, associationName, options);
+    _NestedAttributes.acceptsNestedAttributesFor(this, ...attrNames);
   }
 
   declare static tokenDefinitions: _TokenDefinitionsHash;

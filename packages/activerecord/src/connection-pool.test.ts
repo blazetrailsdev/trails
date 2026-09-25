@@ -54,7 +54,7 @@ function makeAmbientPool(
   return new ConnectionPool(pc);
 }
 
-const activeConnections = (pool: ConnectionPool) => pool.connections.filter((c) => c.inUse);
+const activeConnections = (pool: ConnectionPool) => pool.connections.filter((c) => c.isInUse());
 
 async function createPosts(pool: ConnectionPool): Promise<void> {
   if (inMemoryDb()) {
@@ -141,12 +141,12 @@ function makeTransactionAwarePool(size: number = 5): ConnectionPool {
 it("checkout after close", async () => {
   const pool = makePool();
   const connection = await pool.leaseConnection();
-  expect(connection.inUse).toBeTruthy();
+  expect(connection.isInUse()).toBeTruthy();
 
   await connection.close();
-  expect(connection.inUse).toBeFalsy();
+  expect(connection.isInUse()).toBeFalsy();
 
-  expect((await pool.leaseConnection()).inUse).toBeTruthy();
+  expect((await pool.leaseConnection()).isInUse()).toBeTruthy();
 });
 
 it("with connection", async () => {
@@ -335,11 +335,11 @@ it("remove connection", async () => {
   const pool = makePool();
   const conn = await pool.checkout();
   try {
-    expect(conn.inUse).toBeTruthy();
+    expect(conn.isInUse()).toBeTruthy();
 
     const length = pool.connections.length;
     pool.remove(conn);
-    expect(conn.inUse).toBeTruthy();
+    expect(conn.isInUse()).toBeTruthy();
     expect(pool.connections.length).toBe(length - 1);
   } finally {
     await conn.close();
