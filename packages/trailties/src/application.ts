@@ -38,7 +38,6 @@ export class Application extends Engine {
   private _keyGenerators = new Map<string, CachingKeyGenerator>();
   private _credentials?: EncryptedFile;
   private _deprecators?: Deprecators;
-  private _app?: RackApp;
   readonly executor: typeof Executor = class extends Executor {};
   readonly reloader: typeof Reloader = class extends Reloader {};
   logger: Logger | null = null;
@@ -156,13 +155,6 @@ export class Application extends Engine {
     return this;
   }
 
-  app(): RackApp {
-    if (this._app) return this._app;
-    const stack = this.defaultMiddlewareStack();
-    this.config.middleware = this.buildMiddleware().mergeInto(stack);
-    return (this._app = this.config.middleware.build(this.endpoint()));
-  }
-
   /** @internal */
   override buildMiddleware(): MiddlewareStackProxy {
     return this.config.appMiddleware().plus(super.buildMiddleware());
@@ -174,7 +166,7 @@ export class Application extends Engine {
   }
 
   /** @internal */
-  defaultMiddlewareStack(): MiddlewareStack {
+  override defaultMiddlewareStack(): MiddlewareStack {
     const defaultStack = new DefaultMiddlewareStack(this, this.config, this.config.paths());
     return defaultStack.buildStack();
   }

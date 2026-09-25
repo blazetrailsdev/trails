@@ -1019,7 +1019,11 @@ That is the whole constraint, and it splits Rails' sections in two:
 - **Not wrapped**: `connections` (`:443`) and the queue's `synchronize`
   (`connection_pool/queue.rb:80-81`, a bare `block()` in `queue.ts`). Their
   trails bodies contain no `await`, and `connections` is a synchronous reader in
-  Rails, so it could not await the monitor even if it needed to.
+  Rails, so it could not await the monitor even if it needed to. The same holds
+  outside the pool for `Engine#app`'s `@app_build_lock`
+  (`railties/lib/rails/engine.rb:448,516-524`): trails' `app()` builds the
+  stack with no `await`, so its `@app ||` memo is already a single build and
+  the `Mutex#synchronize` double-check is not ported.
 
 This is a genuine language shortcoming, ratified repo-wide here. If one of those
 bodies ever gains an `await`, it gains the monitor in the same change.

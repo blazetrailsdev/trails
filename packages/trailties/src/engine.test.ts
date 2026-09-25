@@ -7,7 +7,7 @@ import {
   type PathAdapter,
 } from "@blazetrails/ruby-compat";
 import { env, setEnv } from "@blazetrails/ruby-compat";
-import { MiddlewareStack, RouteSet } from "@blazetrails/actionpack";
+import { RouteSet } from "@blazetrails/actionpack";
 import { Engine } from "./engine.js";
 import { loaded } from "./__fixtures__/loaded.js";
 import { EngineConfiguration } from "./engine/configuration.js";
@@ -221,22 +221,22 @@ describe("Engine", () => {
     });
 
     it("engine is a rack app and can have its own middleware stack", async () => {
-      const stack = new MiddlewareStack();
-      class Tagger {
+      class Upcaser {
         constructor(private app: (env: never) => Promise<[number, object, string[]]>) {}
         async call(env: never): Promise<[number, object, string[]]> {
-          const [status, headers, body] = await this.app(env);
-          return [status, headers, [...body, "!"]];
+          const response = await this.app(env);
+          response[2] = response[2].map((part) => part.toUpperCase());
+          return response;
         }
       }
-      stack.use(Tagger as never);
 
       class StackEngine extends Engine {}
       Trailtie.register(StackEngine);
-      StackEngine.endpoint((async () => [200, {}, ["OK"]]) as never);
+      StackEngine.endpoint((async () => [200, {}, ["Hello World"]]) as never);
+      (StackEngine.config.middleware as MiddlewareStackProxy).use(Upcaser as never);
 
-      const app = stack.build(StackEngine.instance().endpoint());
-      expect(await app({} as never)).toEqual([200, {}, ["OK", "!"]]);
+      const app = StackEngine.instance().app();
+      expect(await app({} as never)).toEqual([200, {}, ["HELLO WORLD"]]);
     });
   });
 

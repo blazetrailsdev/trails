@@ -10,7 +10,13 @@ import {
   type Included,
 } from "@blazetrails/activesupport";
 import { File, getFs, getPath } from "@blazetrails/ruby-compat";
-import type { DrawCallback, RackApp, RackAppObject, RouteSet } from "@blazetrails/actionpack";
+import {
+  MiddlewareStack,
+  type DrawCallback,
+  type RackApp,
+  type RackAppObject,
+  type RouteSet,
+} from "@blazetrails/actionpack";
 import { Root } from "./paths.js";
 import type { RouteSetLike } from "./application/routes-reloader.js";
 import { Trailtie } from "./trailtie.js";
@@ -27,6 +33,7 @@ export class Engine extends Trailtie {
   private _railtiesCollection?: Trailties;
   private _allLoadPathsCache?: string[];
   private _routes?: RouteSet;
+  private _app?: RackApp;
 
   static calledFrom(value?: string): string | undefined {
     if (value !== undefined) writeOwnState(this, "_calledFrom", value);
@@ -142,6 +149,13 @@ export class Engine extends Trailtie {
     return this;
   }
 
+  app(): RackApp {
+    if (this._app != null) return this._app;
+    const stack = this.defaultMiddlewareStack();
+    this.config.middleware = this.buildMiddleware().mergeInto(stack);
+    return (this._app = this.config.middleware.build(this.endpoint()));
+  }
+
   endpoint(): RackApp | RackAppObject {
     return (this.constructor as typeof Engine).endpoint() ?? this.routes();
   }
@@ -165,6 +179,11 @@ export class Engine extends Trailtie {
         await import(pathToFileURL!(seedFile).href);
       });
     }
+  }
+
+  /** @internal */
+  defaultMiddlewareStack(): MiddlewareStack {
+    return new MiddlewareStack();
   }
 
   /** @internal */
