@@ -14,16 +14,6 @@ interface Cond {
   broadcast(): void;
 }
 
-/**
- * Ruby's `Monitor#new_cond` condition variable, which `Queue` and
- * `BiasedConditionVariable` both build on. Node has no threads to block, so a
- * waiter is a pending promise: `signal` resolves the first one, `broadcast`
- * resolves them all, and a wait that is never signalled resolves itself when
- * its timeout elapses (as `ConditionVariable#wait(timeout)` returns).
- *
- * @noRailsEquivalent Port of the Ruby stdlib primitive `@lock.new_cond`
- * returns; there is no Rails-side class to mirror.
- */
 class ConditionVariable implements Cond {
   private _waiters: Waiter[] = [];
 

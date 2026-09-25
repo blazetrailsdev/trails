@@ -235,10 +235,7 @@ export function initializeDup(
   if (this.constructor.lockingEnabled) _clearLockingColumn.call(this);
 }
 
-/**
- * @internal
- * @missingRailsArgs merge — PERMANENT
- */
+/** @internal */
 export function _queryConstraintsHash(
   this: InstanceLockingHost,
   superFn: () => Record<string, unknown>,

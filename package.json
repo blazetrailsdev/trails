@@ -30,6 +30,7 @@
     "parity:api:build": "pnpm tsx scripts/api-compare/build.ts",
     "parity:api:extra:gate": "pnpm tsx scripts/api-compare/lint-extra-surface-ratchet.ts",
     "parity:api:receipts": "pnpm tsx scripts/api-compare/receipt-audit.ts",
+    "parity:api:receipts:gate": "pnpm tsx scripts/api-compare/receipt-audit.ts --package activerecord --gate",
     "parity:api:extra:tighten": "pnpm tsx scripts/api-compare/lint-extra-surface-ratchet.ts --tighten",
     "parity:api:reasons": "pnpm tsx scripts/api-compare/lint-missing-rails-call-reasons.ts",
     "parity:api:detached": "pnpm tsx scripts/api-compare/lint-detached-jsdoc-tags.ts",

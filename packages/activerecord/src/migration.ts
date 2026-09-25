@@ -312,7 +312,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     return Migration.properTableName(name, Migration.tableNameOptions());
   }
 
-  /** @missingRailsCall compatible_table_definition — PERMANENT */
   async createTable(
     ...args: [
       tableName: string,
@@ -336,7 +335,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     await this.methodMissing("createTable", ...args);
   }
 
-  /** @missingRailsCall compatible_table_definition — PERMANENT */
   async dropTable(
     ...args: Array<
       | string
@@ -693,7 +691,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     await this.methodMissing("removeTimestamps", tableName);
   }
 
-  /** @missingRailsCall compatible_table_definition — PERMANENT */
   async createJoinTable(
     ...args: [
       table1: string,
@@ -717,7 +714,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
   }
 
-  /** @missingRailsCall compatible_table_definition — PERMANENT */
   async changeTable(
     ...args: [
       tableName: string,

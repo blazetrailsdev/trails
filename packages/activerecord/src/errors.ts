@@ -637,13 +637,6 @@ export class UnknownAttributeReference extends ActiveRecordError {
   }
 }
 
-/**
- * What `errors.rb:475` duck-types: anything answering `table_name`. Rails
- * raises this with a Relation as often as with a model class
- * (`token_for.rb:42`).
- *
- * @noRailsEquivalent Ruby needs no name for a duck type.
- */
 type UnknownPrimaryKeyModel = { readonly tableName: string; readonly name?: unknown };
 
 export class UnknownPrimaryKey extends ActiveRecordError {

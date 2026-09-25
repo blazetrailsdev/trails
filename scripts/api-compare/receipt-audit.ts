@@ -10,7 +10,9 @@
  *     always "matches"; and an interface tag's inherited member entries are
  *     never judged redundant. {@link receiptsCoveringNothing} strips every
  *     receipt from the manifest in memory, re-scores, and reports each one whose
- *     name is allowed or exempt without it.
+ *     name is allowed or exempt without it. A `foo: NS.bar` property's copy of
+ *     `bar`'s receipt is not reported: nobody wrote it there, and the written
+ *     one is judged at `bar`'s own declaration.
  *  2. **Unverifiable.** A tag on a declaration the extractor does not surface —
  *     a module-private function, a type alias, a local, a class member marked
  *     `private`, a file outside the extracted tree — never reaches
@@ -22,13 +24,14 @@
  *     compare.ts now writes those as `uncomparedTags` beside `staleTags`; both
  *     are listed here.
  *
- * Report-only: the populations are not yet burnt down, so a gate would be red
- * on arrival. Requires `pnpm parity:api --calls` to have written the artifacts.
+ * `--gate` exits non-zero on any entry in any population; CI runs it for
+ * activerecord, whose populations are burnt down. Requires
+ * `pnpm parity:api --calls` to have written the artifacts.
  */
 import * as fsp from "fs/promises";
 import * as path from "path";
 import type { ApiManifest, MethodInfo } from "@blazetrails/parity/types";
-import { OUTPUT_DIR, packageSrcDir } from "./config.js";
+import { OUTPUT_DIR, overlappingSubDirs, packageSrcDir } from "./config.js";
 import {
   FILE_TAG_NAME,
   allowKeyOf,
@@ -59,7 +62,9 @@ export function stripReceipts(ts: ApiManifest): ApiManifest {
 /**
  * Every receipt the scorer reached — written or inherited from a tagged
  * interface — whose name is NOT extra surface once all receipts are stripped.
- * A file-level tag covers something while its file has any extra left.
+ * A file-level tag covers something while its file has any extra left. A
+ * receipt a `foo: NS.bar` property copies from `bar` is skipped: the written
+ * one at `bar` is what this judges.
  */
 export function receiptsCoveringNothing(
   ruby: ApiManifest,
@@ -68,6 +73,16 @@ export function receiptsCoveringNothing(
 ): TaggedEntry[] {
   const opts = { filterPkg, excludeGlobs: [], novelOnly: false, topN: 0 };
   const { tagged } = buildReport(ruby, ts, opts);
+  const copied = new Set<string>();
+  for (const [pkg, tsPkg] of Object.entries(ts.packages)) {
+    for (const c of [...Object.values(tsPkg.classes), ...Object.values(tsPkg.modules)]) {
+      for (const m of [...c.instanceMethods, ...c.classMethods]) {
+        if (c.file && m.noRailsEquivalentInherited === true) {
+          copied.add(allowKeyOf({ package: pkg, tsFile: c.file, name: m.name }));
+        }
+      }
+    }
+  }
   const stripped = buildReport(ruby, stripReceipts(ts), opts);
   const extras = new Set<string>();
   for (const f of stripped.packages.flatMap((p) => p.extraFiles)) {
@@ -76,7 +91,7 @@ export function receiptsCoveringNothing(
       extras.add(allowKeyOf({ package: f.package, tsFile: f.tsFile, name: e.name }));
     }
   }
-  return tagged.scored.filter((e) => !extras.has(allowKeyOf(e)));
+  return tagged.scored.filter((e) => !extras.has(allowKeyOf(e)) && !copied.has(allowKeyOf(e)));
 }
 
 export interface SourceFile {
@@ -182,9 +197,13 @@ async function readSources(ts: ApiManifest, filterPkg: string | null): Promise<S
   for (const pkg of Object.keys(ts.packages)) {
     if (filterPkg !== null && pkg !== filterPkg) continue;
     const root = packageSrcDir(pkg);
+    // A nested package's files (`src/sqlite/` is `sqlite3`) are its own, as
+    // the extractor attributes them.
+    const nested = overlappingSubDirs(pkg).map((dir) => path.relative(root, dir) + path.sep);
     const entries = await fsp.readdir(root, { recursive: true }).catch(() => [] as string[]);
     for (const file of entries.sort()) {
       if (!file.endsWith(".ts") || file.endsWith(".d.ts") || file.endsWith(".test.ts")) continue;
+      if (nested.some((dir) => file.startsWith(dir))) continue;
       const rel = file.split(path.sep).join("/");
       out.push({
         package: pkg,
@@ -207,10 +226,12 @@ async function readJson<T>(file: string): Promise<T | null> {
 export async function main(argv: readonly string[]): Promise<void> {
   const pkgAt = argv.indexOf("--package");
   const filterPkg = pkgAt === -1 ? null : (argv[pkgAt + 1] ?? null);
+  const gate = argv.includes("--gate");
   const ruby = await readJson<ApiManifest>("rails-api.json");
   const ts = await readJson<ApiManifest>("ts-api.json");
   if (ruby === null || ts === null) {
     console.error("Missing manifests. Run `pnpm parity:api --calls` first.");
+    if (gate) process.exitCode = 1;
     return;
   }
   const coveringNothing = receiptsCoveringNothing(ruby, ts, filterPkg);
@@ -242,6 +263,14 @@ export async function main(argv: readonly string[]): Promise<void> {
       const where = t.compared ? "stale" : "uncompared";
       console.log(`  - ${t.package}  ${t.tsFile}  ${t.tsName}  ${t.call}  (${where})`);
     }
+  }
+  const total = coveringNothing.length + unverifiable.length + calls.length + args.length;
+  if (gate && total > 0) {
+    console.error(
+      `\nreceipt-audit: ${total} receipt(s) above. Delete a receipt its declaration does not ` +
+        `need, or make the declaration measurable; never widen the audit.`,
+    );
+    process.exitCode = 1;
   }
 }
 

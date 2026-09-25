@@ -1683,6 +1683,14 @@ jobs:
         # `naming` rows are report-only. Reports instead of failing until the
         # seed PR lands — see the UNSEEDED arm in lint-call-args.ts.
         run: pnpm exec tsx scripts/api-compare/lint-call-args.ts
+      - name: Receipt audit gate
+        # RFC 0130. Fails on any activerecord receipt no other gate judges: a
+        # `@noRailsEquivalent` covering nothing, one on a declaration the
+        # extractor never harvests, or a `@missingRailsCall` /
+        # `@missingRailsArgs` on a pair nothing compares. Reads the manifests
+        # and the call artifacts the `--calls` step above wrote. The fix is to
+        # delete the receipt or make its declaration measurable.
+        run: pnpm exec tsx scripts/api-compare/receipt-audit.ts --package activerecord --gate
       - name: Ruby-compat call ratchet
         # RFC 0129. Gates the `kind: "rubyCompat"` rows of the shared
         # call-mismatches-exclude/ shards — a ported body that hand-rolls a

@@ -26,10 +26,6 @@ export interface InsertAllOptions {
   recordTimestamps?: boolean;
 }
 
-/**
- * @noRailsEquivalent CONVERGEABLE insert-all-constructor-reads-the-schema-cache-at-its-rails-call-sites
- * @internal
- */
 interface ResolvedConnectionFacts {
   supportsInsertReturning: boolean;
   supportsInsertOnDuplicateSkip: boolean;
@@ -39,10 +35,6 @@ interface ResolvedConnectionFacts {
   indexes: (tableName: string) => unknown[];
 }
 
-/**
- * @noRailsEquivalent CONVERGEABLE insert-all-constructor-reads-the-schema-cache-at-its-rails-call-sites
- * @internal
- */
 async function resolveConnectionFacts(
   model: ModelClass,
   connection: any,

@@ -492,7 +492,6 @@ export class TestFixtures {
   }
 }
 
-/** @noRailsEquivalent PERMANENT */
 function deferConnectionPoolPin(this: TestFixtures, pool: ConnectionPool): void {
   this._pendingPins.push(
     pool.leaseConnection().then((connection) =>
@@ -504,7 +503,6 @@ function deferConnectionPoolPin(this: TestFixtures, pool: ConnectionPool): void 
   );
 }
 
-/** @noRailsEquivalent PERMANENT */
 async function settlePendingPins(this: TestFixtures): Promise<PromiseRejectedResult | undefined> {
   const pinResults = await Promise.allSettled(this._pendingPins);
   this._pendingPins = [];

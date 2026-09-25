@@ -662,22 +662,6 @@ function loadSchemaFromCacheSync(host: SchemaHost): boolean {
   return true;
 }
 
-/**
- * Rails' `schema_cache.columns_hash` is synchronous, so `load_schema!` reflects
- * a cold table right where it stands (model_schema.rb:534-546). trails' cache
- * read is async, which leaves this path with nothing to reflect and — before
- * this — silently yielding an empty attribute set for any model whose columns
- * never came from a query, e.g. `Contact`, whose columns come from the fake
- * adapter's `merge_column` (test/models/contact.rb:30-32).
- *
- * An adapter whose `columns` answers synchronously is exactly that case, so
- * reflect and warm the cache here. A real adapter's `columns` returns a
- * promise; drop it (with its rejection handled) and leave the cold-cache
- * fallback below to run, so DB-backed models are unaffected.
- *
- * @noRailsEquivalent Bridges trails' async `SchemaCache#columns_hash` back to
- * the synchronous read Rails has; retire it when the cache read can block.
- */
 function warmColumnsHashSync(
   adapter: NonNullable<SchemaHost["connection"]>,
   cache: {
