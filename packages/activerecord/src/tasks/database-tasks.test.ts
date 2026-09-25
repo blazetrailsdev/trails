@@ -308,7 +308,7 @@ describe("DatabaseTasksDumpSchemaCacheTest", () => {
 
   it("dump schema cache", async () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-dump-sc-"));
-    const cachePath = path.join(tmp, "schema_cache.json");
+    const cachePath = path.join(tmp, "schema_cache.yml");
     try {
       expect(fs.existsSync(cachePath)).toBeFalsy();
       const adapter = await Base.leaseConnection();
@@ -321,7 +321,7 @@ describe("DatabaseTasksDumpSchemaCacheTest", () => {
   });
   it("clear schema cache", () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-clear-sc-"));
-    const cachePath = path.join(tmp, "schema_cache.json");
+    const cachePath = path.join(tmp, "schema_cache.yml");
     fs.writeFileSync(cachePath, "This is a cache.");
     try {
       expect(fs.existsSync(cachePath)).toBeTruthy();
@@ -335,7 +335,7 @@ describe("DatabaseTasksDumpSchemaCacheTest", () => {
     const config = new HashConfig("development", "primary", {});
 
     DatabaseTasks.dbDir = "db";
-    const expected = "db/schema_cache.json";
+    const expected = "db/schema_cache.yml";
     const dumpPath = DatabaseTasks.cacheDumpFilename(config);
     expect(dumpPath).toBe(expected);
   });
@@ -343,7 +343,7 @@ describe("DatabaseTasksDumpSchemaCacheTest", () => {
     const config = new HashConfig("development", "primary", {});
 
     DatabaseTasks.dbDir = "my_db";
-    const expected = "my_db/schema_cache.json";
+    const expected = "my_db/schema_cache.yml";
     const dumpPath = DatabaseTasks.cacheDumpFilename(config);
     expect(dumpPath).toBe(expected);
   });
@@ -351,7 +351,7 @@ describe("DatabaseTasksDumpSchemaCacheTest", () => {
     const config = new HashConfig("development", "alternate", {});
 
     DatabaseTasks.dbDir = "db";
-    const expected = "db/alternate_schema_cache.json";
+    const expected = "db/alternate_schema_cache.yml";
     const dumpPath = DatabaseTasks.cacheDumpFilename(config);
     expect(dumpPath).toBe(expected);
   });

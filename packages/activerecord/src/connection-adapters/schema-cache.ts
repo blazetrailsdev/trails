@@ -1,5 +1,6 @@
 import { Encoding, File, FileUtils, Zlib } from "@blazetrails/ruby-compat";
 import { atomicWrite } from "@blazetrails/activesupport";
+import { parse as yamlParse, stringify as yamlStringify } from "@blazetrails/activesupport/yaml";
 import { Column } from "./column.js";
 import { deduplicate } from "./deduplicable.js";
 import type { Deduplicable } from "./deduplicable.js";
@@ -134,7 +135,7 @@ export class SchemaCache {
     try {
       if (!File.isFile(filename)) return null;
       const data = await SchemaCache.read(filename, (content) => content);
-      const parsed = JSON.parse(data);
+      const parsed = yamlParse(data);
       const cache = new SchemaCache();
       cache.initWith(parsed);
       return cache;
@@ -416,7 +417,7 @@ export class SchemaCache {
     await this.open(filename, (f) => {
       const coder: Record<string, unknown> = {};
       this.encodeWith(coder);
-      f.write(JSON.stringify(coder, null, 2));
+      f.write(yamlStringify(coder));
     });
   }
 

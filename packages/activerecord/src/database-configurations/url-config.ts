@@ -50,6 +50,10 @@ export class UrlConfig extends HashConfig {
   }
 }
 
+Object.defineProperty(UrlConfig, "name", {
+  value: "ActiveRecord::DatabaseConfigurations::UrlConfig",
+});
+
 function camelizeUrlKeys(hash: Record<string, unknown>): void {
   for (const [snake, camel] of [
     ["schema_dump", "schemaDump"],

@@ -168,3 +168,7 @@ export class DatabaseConfig {
     throw new NotImplementedError();
   }
 }
+
+Object.defineProperty(DatabaseConfig, "name", {
+  value: "ActiveRecord::DatabaseConfigurations::DatabaseConfig",
+});
