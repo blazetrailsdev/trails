@@ -249,13 +249,15 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
 
   override first(): Promise<T | null>;
   override first(n: number): Promise<T[]>;
-  /** @missingRailsCall limit — PERMANENT */
+  /**
+   * @missingRailsCall limit — PERMANENT
+   * @missingRailsArgs first — CONVERGEABLE converge-djar-deferred-chain-walk-mode
+   */
   override async first(limit?: number): Promise<T | T[] | null> {
     if (this._chainWalker) {
-      const rows = await (
-        this as unknown as { findNthWithLimit: (i: number, l: number) => Promise<T[]> }
-      ).findNthWithLimit(0, limit ?? 1);
-      return limit === undefined ? (rows[0] ?? null) : rows;
+      const { relation } = await this._walkOnce();
+      const merged = this._composeChainedState(relation);
+      return limit === undefined ? merged.first() : merged.first(limit);
     }
     const records = await this.toArray();
     return limit === undefined ? (records[0] ?? null) : records.slice(0, limit);

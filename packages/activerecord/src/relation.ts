@@ -83,6 +83,15 @@ import { AliasCounts, AliasTracker } from "./associations/alias-tracker.js";
 export type LoadedRelation<R> = Omit<R, "then">;
 
 /** @internal */
+export type FindEachOptions = {
+  start?: unknown;
+  finish?: unknown;
+  batchSize?: number;
+  errorOnIgnore?: boolean;
+  cursor?: string | string[];
+  order?: "asc" | "desc" | ("asc" | "desc")[];
+};
+
 export type InBatchesOptions = {
   of?: number;
   start?: unknown;
@@ -2099,26 +2108,14 @@ export interface Relation<T extends Base>
   _orderColumns(): string[];
   /** @internal */
   actOnIgnoredOrder(errorOnIgnore: boolean | undefined): void;
-  findEach(opts?: {
-    batchSize?: number;
-    start?: unknown;
-    finish?: unknown;
-    order?: "asc" | "desc" | ("asc" | "desc")[];
-    cursor?: string | string[];
-    errorOnIgnore?: boolean;
-  }): AsyncGenerator<T> & { size(): Promise<number> };
-  findInBatches(opts?: {
-    batchSize?: number;
-    start?: unknown;
-    finish?: unknown;
-    order?: "asc" | "desc" | ("asc" | "desc")[];
-    cursor?: string | string[];
-    errorOnIgnore?: boolean;
-  }): AsyncGenerator<T[]> & { size(): Promise<number> };
+  findEach(opts: FindEachOptions, block: (record: T) => void | Promise<void>): Promise<null>;
+  findEach(opts?: FindEachOptions): AsyncGenerator<T> & { size(): Promise<number> };
+  findInBatches(opts: FindEachOptions, block: (batch: T[]) => void | Promise<void>): Promise<null>;
+  findInBatches(opts?: FindEachOptions): AsyncGenerator<T[]> & { size(): Promise<number> };
   inBatches(
     opts: InBatchesOptions,
     block: (relation: LoadedRelation<Relation<T>>) => void | Promise<void>,
-  ): Promise<void>;
+  ): Promise<null>;
   inBatches(opts?: InBatchesOptions): BatchEnumerator<LoadedRelation<Relation<T>>>;
 }
 

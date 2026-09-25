@@ -162,7 +162,7 @@ export class TimeWithZone {
 
   respondTo(sym: string, includePriv: boolean = false): boolean {
     if (sym === "toStr") return false;
-    return basicObjRespondTo(this, sym, !includePriv) || this.respondToMissing(sym, includePriv);
+    return basicObjRespondTo(this, sym, !includePriv);
   }
 
   respondToMissing(sym: string, includePriv: boolean): boolean {

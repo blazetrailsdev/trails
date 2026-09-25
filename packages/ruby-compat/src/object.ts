@@ -85,25 +85,27 @@ export function rbModSingletonP(klass: unknown): boolean {
  * `basic_obj_respond_to` (`vendor/ruby/vm_method.c:2864`) — the default
  * `Object#respond_to?`, which answers whether the receiver's class defines the
  * method. A JS object answers a name whether it carries a method or a
- * property, so `in` is the whole `method_boundp` here; `respond_to_missing?`
- * has no JS analogue and `method_boundp` never reports the `2` (undefined
- * method) case for one.
+ * property, so the prototype-chain lookup is the whole `method_boundp` here,
+ * and an own `undefined` value is its `2` (undefined method) case. An unbound
+ * name falls through to the receiver's `respond_to_missing?`
+ * (`basic_obj_respond_to_missing`, `vm_method.c:2872-2875`), handed `!pub`.
  *
- * `pub` is declared and plumbed but cannot be read: JS carries no runtime
- * notion of method visibility, so `in` answers the same at both values. See
- * CLAUDE.md, "Method visibility is not a runtime fact in JS".
+ * `pub` cannot change the lookup: JS carries no runtime notion of method
+ * visibility. See CLAUDE.md, "Method visibility is not a runtime fact in JS".
  *
  * @noRailsEquivalent PERMANENT — Ruby core `basic_obj_respond_to`
  * (`vendor/ruby/vm_method.c:2864`).
  */
 export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true): boolean {
-  void pub;
   if (typeof obj === "string" && mid === "toStr") return true;
   for (let o: object | null = Object(obj); o; o = Object.getPrototypeOf(o) as object | null) {
     const entry = Object.getOwnPropertyDescriptor(o, mid);
     if (entry) return !("value" in entry && entry.value === undefined);
   }
-  return false;
+  const respondToMissing = (Object(obj) as { respondToMissing?: unknown }).respondToMissing;
+  if (typeof respondToMissing !== "function") return false;
+  const ret = (respondToMissing as (mid: string, priv: boolean) => unknown).call(obj, mid, !pub);
+  return ret != null && ret !== false;
 }
 
 /**

@@ -2,6 +2,7 @@ import { kernelCatch, NoMethodError, RuntimeError } from "@blazetrails/ruby-comp
 
 import { kernelArray } from "./array-utils.js";
 import { ArgumentError } from "./hash-utils.js";
+import { DescendantsTracker, type AnyClass } from "./descendants-tracker.js";
 
 export type CallbackKind = "before" | "after" | "around";
 
@@ -934,22 +935,19 @@ export function getCallbackChains(target: object): Map<string, CallbackChain> {
     if (parent) {
       for (const [name, chain] of parent) {
         const newChain = new CallbackChain(chain.name, chain.config);
-        for (const entry of chain.entries) {
-          newChain.append(
-            new Callback(
-              entry.name,
-              entry.filter,
-              entry.kind,
-              entry.options,
-              newChain.config,
-              entry.originalObject,
-            ),
-          );
-        }
+        newChain.append(...chain.entries);
         own.set(name, newChain);
       }
     }
     t[CALLBACKS] = own;
+    const klass = (target as { constructor?: unknown }).constructor;
+    if (typeof klass === "function" && klass.prototype === target) {
+      for (let c = klass as AnyClass; Object.getPrototypeOf(c) !== Function.prototype; ) {
+        const superclass = Object.getPrototypeOf(c) as AnyClass;
+        DescendantsTracker.registerSubclass(superclass, c);
+        c = superclass;
+      }
+    }
   }
   return t[CALLBACKS] as Map<string, CallbackChain>;
 }
@@ -1112,9 +1110,18 @@ export namespace Callbacks {
   }
 
   export function resetCallbacks(target: object, name: string): void {
-    const chains = getCallbackChains(target);
-    const chain = chains.get(name);
-    if (chain) chain.clear();
+    const callbacks = getCallbackChains(target).get(name);
+    if (!callbacks) return;
+
+    const klass = (target as { constructor?: unknown }).constructor;
+    if (typeof klass === "function" && klass.prototype === target) {
+      for (const descendant of DescendantsTracker.descendants(klass as AnyClass)) {
+        const chain = getCallbackChains(descendant.prototype as object).get(name)!;
+        callbacks.each((c) => chain.delete(c));
+      }
+    }
+
+    callbacks.clear();
   }
 
   export const ClassMethods = {

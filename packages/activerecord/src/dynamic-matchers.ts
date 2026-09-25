@@ -9,10 +9,9 @@ interface DynamicMatchersHost {
 }
 
 function match(model: DynamicMatchersHost, name: string): string[] | null {
-  if (!name.startsWith("findBy")) return null;
-  const attrPart = name.slice(6);
-  if (!attrPart) return null;
-  const snakePart = attrPart
+  const matched = /^findBy([_a-zA-Z]\w*?)(?:Bang)?$/.exec(name);
+  if (!matched) return null;
+  const snakePart = matched[1]
     .replace(/^./, (c) => c.toLowerCase())
     .replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
   return snakePart.split("_and_").map((name) => model.attributeAliases?.[name] ?? name);

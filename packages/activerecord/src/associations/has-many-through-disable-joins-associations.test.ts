@@ -126,48 +126,46 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
     });
   });
 
-  it.skip("fetching on disable joins through", async () => {
-    // BLOCKED: query count — first runs 0 queries where Rails runs 2 — filed as 0155-assertion-surfaced-port-bugs/disable-joins-first-answers-from-loaded-target
-    expect((await association(author, "noJoinsComments").first())!.id).toBe(
-      (await association(author, "comments").first())!.id,
+  it("fetching on disable joins through", async () => {
+    expect((await (author as any).noJoinsComments.first())!.id).toBe(
+      (await (author as any).comments.first())!.id,
     );
     await assertQueriesCount(2, false, async () => {
-      void (await association(author, "noJoinsComments").first())!.id;
+      void (await (author as any).noJoinsComments.first())!.id;
     });
     await assertQueriesCount(1, false, async () => {
-      void (await association(author, "comments").first())!.id;
+      void (await (author as any).comments.first())!.id;
     });
   });
 
-  it.skip("fetching on disable joins through using custom foreign key", async () => {
-    // BLOCKED: query count — first runs 0 queries where Rails runs 2 — filed as 0155-assertion-surfaced-port-bugs/disable-joins-first-answers-from-loaded-target
-    expect((await association(author, "noJoinsCommentsWithForeignKey").first())!.id).toBe(
-      (await association(author, "commentsWithForeignKey").first())!.id,
+  it("fetching on disable joins through using custom foreign key", async () => {
+    expect((await (author as any).noJoinsCommentsWithForeignKey.first())!.id).toBe(
+      (await (author as any).commentsWithForeignKey.first())!.id,
     );
     await assertQueriesCount(2, false, async () => {
-      void (await association(author, "noJoinsCommentsWithForeignKey").first())!.id;
+      void (await (author as any).noJoinsCommentsWithForeignKey.first())!.id;
     });
     await assertQueriesCount(1, false, async () => {
-      void (await association(author, "commentsWithForeignKey").first())!.id;
+      void (await (author as any).commentsWithForeignKey.first())!.id;
     });
   });
 
   it("to a on disable joins through", async () => {
-    expect(ids(await association(author, "noJoinsComments")).sort(sortIds)).toEqual(
-      ids(await association(author, "comments")).sort(sortIds),
+    expect(ids(await (author as any).noJoinsComments).sort(sortIds)).toEqual(
+      ids(await (author as any).comments).sort(sortIds),
     );
     await author.reload();
     await assertQueriesCount(2, false, async () => {
-      await association(author, "noJoinsComments");
+      await (author as any).noJoinsComments;
     });
     await assertQueriesCount(1, false, async () => {
-      await association(author, "comments");
+      await (author as any).comments;
     });
   });
 
   it("appending on disable joins through", async () => {
     await assertDifference(
-      async () => (await association(author, "noJoinsComments").reload()).size(),
+      async () => (await (author as any).noJoinsComments.reload()).size(),
       1,
       null,
       async () => {
@@ -175,16 +173,16 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
       },
     );
     await assertQueriesCount(2, false, async () => {
-      await association(author, "noJoinsComments").reload();
+      await (author as any).noJoinsComments.reload();
     });
     await assertQueriesCount(1, false, async () => {
-      await association(author, "comments").reload();
+      await (author as any).comments.reload();
     });
   });
 
   it("appending on disable joins through using custom foreign key", async () => {
     await assertDifference(
-      async () => (await association(author, "noJoinsCommentsWithForeignKey").reload()).size(),
+      async () => (await (author as any).noJoinsCommentsWithForeignKey.reload()).size(),
       1,
       null,
       async () => {
@@ -192,10 +190,10 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
       },
     );
     await assertQueriesCount(2, false, async () => {
-      await association(author, "noJoinsCommentsWithForeignKey").reload();
+      await (author as any).noJoinsCommentsWithForeignKey.reload();
     });
     await assertQueriesCount(1, false, async () => {
-      await association(author, "commentsWithForeignKey").reload();
+      await (author as any).commentsWithForeignKey.reload();
     });
   });
 
@@ -354,7 +352,7 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
       member2.id,
       member.id,
     ]);
-    expect(ids(await q(3, () => association(author, "noJoinsMembers").toArray()))).toEqual([
+    expect(ids(await q(3, () => (author as any).noJoinsMembers.toArray()))).toEqual([
       member2.id,
       member.id,
     ]);
@@ -364,15 +362,14 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
     expect(ids(await q(1, () => association(author, "members").unnamed().first()))).toEqual(
       member2.id,
     );
-    expect(ids(await q(3, () => association(author, "noJoinsMembers").unnamed().first()))).toEqual(
+    expect(ids(await q(3, () => (author as any).noJoinsMembers.unnamed().first()))).toEqual(
       member2.id,
     );
   });
 
-  it.skip("first and scope in double join applies order in memory", async () => {
-    // BLOCKED: SQL shape — first emits ORDER BY where Rails orders in memory — filed as 0155-assertion-surfaced-port-bugs/disable-joins-first-orders-in-sql-not-memory
+  it("first and scope in double join applies order in memory", async () => {
     const disableJoinsSql = await captureSql(async () => {
-      await association(author, "noJoinsMembers").unnamed().first();
+      await (author as any).noJoinsMembers.unnamed().first();
     });
     expect(disableJoinsSql[disableJoinsSql.length - 1]).not.toMatch(/ORDER BY/);
   });
