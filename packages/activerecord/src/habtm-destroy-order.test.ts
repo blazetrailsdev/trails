@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { resetCallbacks } from "./testing/test-case.js";
+import { resetCallbacks } from "./support/reset-callbacks.js";
 import {
   assertNoDifference,
   assertNotEmpty,
