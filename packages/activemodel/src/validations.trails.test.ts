@@ -2234,11 +2234,11 @@ describe("ValidationsTest (trails)", () => {
     it("gives the copy its own empty Errors", async () => {
       const topic = new DupTopic();
       expect(await topic.isValid()).toBe(false);
-      expect(topic.errors.empty).toBe(false);
+      expect(topic.errors.isEmpty()).toBe(false);
 
       const duped = topic.dup();
       expect(duped.errors).not.toBe(topic.errors);
-      expect(duped.errors.empty).toBe(true);
+      expect(duped.errors.isEmpty()).toBe(true);
     });
   });
 

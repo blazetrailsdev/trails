@@ -6,8 +6,9 @@
  * `Symbol#inspect` (`vendor/ruby/string.c:11692` `sym_inspect`, which writes
  * the colon back in front of the name).
  *
- * Two members, because two questions are asked of the convention across the
- * tree: is this value a Symbol, and what is its name.
+ * Three members, because three questions are asked of the convention across
+ * the tree: is this value a Symbol, what is its name, and which Ruby method
+ * name a trails member name spells.
  */
 
 /**
@@ -38,4 +39,32 @@ export function isSymbol(value: unknown): value is string {
  */
 export function symbolToS(sym: string): string {
   return sym.slice(1);
+}
+
+const OPERATOR_METHOD_NAMES: Record<string, string> = {
+  compareTo: "<=>",
+  equals: "==",
+  caseEquals: "===",
+  plus: "+",
+  minus: "-",
+  multiply: "*",
+  divide: "/",
+  matchOperator: "=~",
+  append: "<<",
+  uplus: "+@",
+  uminus: "-@",
+  negate: "-@",
+  toString: "to_s",
+  toJSON: "to_json",
+};
+
+/** @noRailsEquivalent PERMANENT */
+export function rbMethodName(name: string): string {
+  const operator = OPERATOR_METHOD_NAMES[name];
+  if (operator !== undefined) return operator;
+  const snake = (camel: string): string =>
+    camel.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`).replace(/^_/, "");
+  if (/^is[A-Z]/.test(name)) return `${snake(name.slice(2))}?`;
+  if (/[a-z]Bang$/.test(name)) return `${snake(name.slice(0, -4))}!`;
+  return snake(name);
 }

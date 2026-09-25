@@ -8,6 +8,7 @@ import {
   basicObjRespondTo,
   Tempfile,
   env,
+  isEmpty,
   getChildProcess,
   rbAnyToS,
   rbEqual,
@@ -407,15 +408,28 @@ export function assertNotPredicate<T>(
   );
 }
 
-export function assertRespondTo(obj: unknown, meth: string, msg?: string): void {
-  assert(respondsTo(Object(obj), meth), msg ?? `Expected ${inspect(obj)} to respond to ${meth}`);
+export function assertRespondTo(
+  obj: unknown,
+  meth: string,
+  msg: string | (() => string) | null = null,
+  { includeAll = false }: { includeAll?: boolean } = {},
+): void {
+  msg = message(
+    msg,
+    null,
+    () => `Expected ${inspect(obj)} (${rbObjClass(obj)}) to respond to #${meth}`,
+  );
+  assert(respondsTo(Object(obj), meth, includeAll), msg);
 }
 
-export function assertNotRespondTo(obj: unknown, meth: string, msg?: string): void {
-  assert(
-    !respondsTo(Object(obj), meth),
-    msg ?? `Expected ${inspect(obj)} to not respond to ${meth}`,
-  );
+export function assertNotRespondTo(
+  obj: unknown,
+  meth: string,
+  msg: string | (() => string) | null = null,
+  { includeAll = false }: { includeAll?: boolean } = {},
+): void {
+  msg = message(msg, null, () => `Expected ${inspect(obj)} to not respond to ${meth}`);
+  refute(respondsTo(Object(obj), meth, includeAll), msg);
 }
 
 export function assertInDelta(exp: number, act: number, delta: number = 0.001, msg?: string): void {
@@ -423,13 +437,16 @@ export function assertInDelta(exp: number, act: number, delta: number = 0.001, m
   assert(delta >= n, msg ?? `Expected |${exp} - ${act}| (${n}) to be <= ${delta}`);
 }
 
-function respondsTo(object: object, name: string): boolean {
+function respondsTo(object: object, name: string, includeAll: boolean): boolean {
   if (Object.getPrototypeOf(object) === String.prototype) {
-    return rbStrRespondTo(object.valueOf() as string, name);
+    return rbStrRespondTo(object.valueOf() as string, name, includeAll);
   }
   const override = findDescriptor(object, "respondTo");
   if (override && typeof override.value === "function") {
-    return (override.value as (name: string) => unknown).call(object, name) !== false;
+    const result = includeAll
+      ? (override.value as (name: string, includeAll: boolean) => unknown).call(object, name, true)
+      : (override.value as (name: string) => unknown).call(object, name);
+    return result != null && result !== false;
   }
   if (name in object) {
     const descriptor = findDescriptor(object, name);
@@ -439,7 +456,7 @@ function respondsTo(object: object, name: string): boolean {
   if (name.endsWith("=") && findDescriptor(object, name.slice(0, -1))?.set !== undefined) {
     return true;
   }
-  return basicObjRespondTo(object, name);
+  return basicObjRespondTo(object, name, !includeAll);
 }
 
 function findDescriptor(object: object, name: string): PropertyDescriptor | undefined {
@@ -450,12 +467,16 @@ function findDescriptor(object: object, name: string): PropertyDescriptor | unde
   return undefined;
 }
 
-export function assertEmpty(obj: unknown, msg?: string): void {
-  assert(isEmptyCollection(obj), msg ?? `Expected ${inspect(obj)} to be empty`);
+export function assertEmpty(obj: unknown, msg: string | (() => string) | null = null): void {
+  msg = message(msg, null, () => `Expected ${inspect(obj)} to be empty`);
+  assertRespondTo(obj, "isEmpty");
+  assert(isEmptyCollection(obj), msg);
 }
 
-export function assertNotEmpty(obj: unknown, msg?: string): void {
-  assert(!isEmptyCollection(obj), msg ?? `Expected ${inspect(obj)} to not be empty`);
+export function assertNotEmpty(obj: unknown, msg: string | (() => string) | null = null): void {
+  msg = message(msg, null, () => `Expected ${inspect(obj)} to not be empty`);
+  assertRespondTo(obj, "isEmpty");
+  refute(isEmptyCollection(obj), msg);
 }
 
 /** @noRailsEquivalent CONVERGEABLE assert-includes-receipt-is-a-scoring-gap-not-permanent */
@@ -501,15 +522,8 @@ function collectionIncludes(collection: unknown, obj: unknown): boolean {
 
 function isEmptyCollection(actual: unknown): boolean {
   const collection = actual as { isEmpty?: () => boolean };
-  if (typeof collection?.isEmpty === "function") return collection.isEmpty();
-  return collectionSize(actual) === 0;
-}
-
-function collectionSize(actual: unknown): number {
-  const collection = actual as { length?: number; size?: number };
-  if (typeof collection?.length === "number") return collection.length;
-  if (typeof collection?.size === "number") return collection.size;
-  return Object.keys(actual as object).length;
+  if (typeof collection.isEmpty === "function") return collection.isEmpty();
+  return isEmpty(actual as object);
 }
 
 export function assertSame(exp: unknown, act: unknown, msg?: string): void {

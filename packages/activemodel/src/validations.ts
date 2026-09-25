@@ -378,7 +378,7 @@ export const InstanceMethods = {
   /** @internal */
   async runValidationsBang(this: RunValidationsHost): Promise<boolean> {
     await this._runValidateCallbacks();
-    return this.errors.empty;
+    return this.errors.isEmpty();
   },
 
   raiseValidationError<TBase extends object = object>(this: { errors: Errors<TBase> }): never {
