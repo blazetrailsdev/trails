@@ -10,9 +10,10 @@
  * JSDoc habit. So every exported declaration under `packages/ruby-compat/src/`
  * carries BOTH halves of the package contract (see the README):
  *
- *   - a `vendor/ruby/<file>:<line>` citation, RESOLVED against the pinned tree
- *     rather than pattern-matched: the file has to exist at the pinned SHA and
- *     the line has to be within it; and
+ *   - a `vendor/ruby/<version>/<file>:<line>` citation, RESOLVED against the
+ *     pinned tree rather than pattern-matched: the version segment has to name
+ *     the lockfile's active version, the file has to exist at the pinned SHA
+ *     and the line has to be within it; and
  *   - a `@noRailsEquivalent PERMANENT` receipt, which re-enters the member into
  *     the measured surface (RFC 0121) and is `PERMANENT` because there is no
  *     Rails method for a Ruby primitive to converge onto.
@@ -24,16 +25,26 @@
  * (eslint/rails-private-jsdoc.config.mjs); a local green proves nothing here.
  * Precedent for a manifest-backed JSDoc requirement:
  * `blazetrails/rails-private-jsdoc`.
+ *
+ * An UNVERSIONED citation (`vendor/ruby/<file>:<line>`) still resolves against
+ * the active version until the RFC 0159 recite sweeps land; the
+ * `ruby-compat-mri-citation-rejects-unversioned` story makes it red.
  */
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { lineLeadingTagReasons } from "./jsdoc-tag-line.mjs";
+import { versionDir } from "../vendor/sources.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-/** `vendor/ruby/<path>:<line>`, anywhere in the doc block. */
-const CITATION = /vendor\/ruby\/([A-Za-z0-9_./+-]+):(\d+)/g;
+/**
+ * `vendor/ruby/<version>/<path>:<line>`, anywhere in the doc block. The version
+ * segment is optional here so an unversioned citation is still read, and `rel`
+ * is always relative to the version directory. No top-level MRI entry starts
+ * with `v<digit>`, so the segment cannot swallow a real path component.
+ */
+const CITATION = /vendor\/ruby\/(?:(v\d[A-Za-z0-9_.]*)\/)?([A-Za-z0-9_./+-]+):(\d+)/g;
 
 function repoRoot() {
   let dir = __dirname;
@@ -46,8 +57,7 @@ function repoRoot() {
 
 function rubyVersionDir() {
   const lockfile = path.join(repoRoot(), "vendor", "sources.lock.json");
-  const ref = JSON.parse(fs.readFileSync(lockfile, "utf8")).sources.ruby.ref;
-  return ref.replaceAll("_", ".");
+  return versionDir(JSON.parse(fs.readFileSync(lockfile, "utf8")).sources.ruby.ref);
 }
 
 /**
@@ -134,14 +144,23 @@ function check(context, node, name) {
   }
 
   const citations = [...text.matchAll(CITATION)];
+  const version = rubyVersionDir();
   if (citations.length === 0) {
-    context.report({ node: target, messageId: "missingCitation", data: { name } });
+    context.report({ node: target, messageId: "missingCitation", data: { name, version } });
     return;
   }
-  for (const [, rel, lineText] of citations) {
+  for (const [, cited, rel, lineText] of citations) {
+    if (cited !== undefined && cited !== version) {
+      context.report({
+        node: target,
+        messageId: "staleVersion",
+        data: { name, cited, rel, version },
+      });
+      return;
+    }
     const lines = lineCountOf(root, rel);
     if (lines === null) {
-      context.report({ node: target, messageId: "unknownFile", data: { name, rel } });
+      context.report({ node: target, messageId: "unknownFile", data: { name, version, rel } });
       return;
     }
     const line = Number(lineText);
@@ -149,7 +168,7 @@ function check(context, node, name) {
       context.report({
         node: target,
         messageId: "lineOutOfRange",
-        data: { name, rel, line: String(line), lines: String(lines) },
+        data: { name, version, rel, line: String(line), lines: String(lines) },
       });
       return;
     }
@@ -161,18 +180,20 @@ const rule = {
     type: "problem",
     docs: {
       description:
-        "Require a resolvable `vendor/ruby/<file>:<line>` citation and a `@noRailsEquivalent PERMANENT` receipt on every ruby-compat export.",
+        "Require a resolvable `vendor/ruby/<version>/<file>:<line>` citation and a `@noRailsEquivalent PERMANENT` receipt on every ruby-compat export.",
     },
     schema: [],
     messages: {
       missingReceipt:
         "`{{name}}` is exported from ruby-compat without a `@noRailsEquivalent PERMANENT` receipt. Every name in this package is extra surface by construction and none of them can converge onto a Rails method.",
       missingCitation:
-        "`{{name}}` is exported from ruby-compat without a `vendor/ruby/<file>:<line>` citation. Name the MRI source this mirrors — the citation is this package's fidelity anchor, in place of the `parity:api` comparison it can never have.",
+        "`{{name}}` is exported from ruby-compat without a `vendor/ruby/{{version}}/<file>:<line>` citation. Name the MRI source this mirrors — the citation is this package's fidelity anchor, in place of the `parity:api` comparison it can never have.",
+      staleVersion:
+        "`{{name}}` cites `vendor/ruby/{{cited}}/{{rel}}`, but the active ruby/ruby version is `{{version}}`. Run `pnpm vendor:recite` to rewrite it to `vendor/ruby/{{version}}/{{rel}}`, then re-check the line against that tree.",
       unknownFile:
-        "`{{name}}` cites `vendor/ruby/{{rel}}`, which the pinned ruby/ruby checkout does not contain.",
+        "`{{name}}` cites `vendor/ruby/{{version}}/{{rel}}`, which the pinned ruby/ruby checkout does not contain.",
       lineOutOfRange:
-        "`{{name}}` cites `vendor/ruby/{{rel}}:{{line}}`, but that file has {{lines}} lines at the pinned SHA.",
+        "`{{name}}` cites `vendor/ruby/{{version}}/{{rel}}:{{line}}`, but that file has {{lines}} lines at the pinned SHA.",
     },
   },
   create(context) {

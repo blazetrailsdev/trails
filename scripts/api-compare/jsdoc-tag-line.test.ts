@@ -10,7 +10,7 @@ import { keptLineLeadingTag } from "../../eslint/no-freeform-comments.mjs";
 import { hasReceipt } from "../../eslint/unbacked-internal-needs-receipt.mjs";
 import { noRailsEquivalentReason } from "./extract-ts-api.js";
 
-/** A stand-in for `vendor/ruby/` at the pinned SHA, as the rule's own test
+/** A stand-in for `vendor/ruby/v3.3.11/` at the pinned SHA, as the rule's own test
  *  builds one: reading the fetched tree would make the outcome depend on
  *  whether the runner ran `pnpm vendor:fetch`. */
 const vendorRoot = fs.mkdtempSync(path.join(os.tmpdir(), "jsdoc-tag-line-"));
@@ -58,24 +58,24 @@ const body = `export function add(a: number, b: number): number { return a + b; 
 
 const forms: Record<string, string> = {
   "own line": `/**
- * Ruby \`Rational#+\` (\`vendor/ruby/rational.c:12\`).
+ * Ruby \`Rational#+\` (\`vendor/ruby/v3.3.11/rational.c:12\`).
  * @noRailsEquivalent PERMANENT — Ruby core.
  */
 ${body}`,
   "closing line": `/**
- * Ruby \`Rational#+\` (\`vendor/ruby/rational.c:12\`).
+ * Ruby \`Rational#+\` (\`vendor/ruby/v3.3.11/rational.c:12\`).
  * @noRailsEquivalent PERMANENT — Ruby core. */
 ${body}`,
   "two-space continuation": `/**
- * Ruby \`Rational#+\` (\`vendor/ruby/rational.c:12\`).
+ * Ruby \`Rational#+\` (\`vendor/ruby/v3.3.11/rational.c:12\`).
  *  @noRailsEquivalent PERMANENT — Ruby core.
  */
 ${body}`,
   "two-space continuation on the closing line": `/**
- * Ruby \`Rational#+\` (\`vendor/ruby/rational.c:12\`).
+ * Ruby \`Rational#+\` (\`vendor/ruby/v3.3.11/rational.c:12\`).
  *  @noRailsEquivalent PERMANENT — Ruby core. */
 ${body}`,
-  "one-line comment": `/** Ruby \`Rational#+\` (\`vendor/ruby/rational.c:12\`). @noRailsEquivalent PERMANENT — Ruby core. */
+  "one-line comment": `/** Ruby \`Rational#+\` (\`vendor/ruby/v3.3.11/rational.c:12\`). @noRailsEquivalent PERMANENT — Ruby core. */
 ${body}`,
 };
 
