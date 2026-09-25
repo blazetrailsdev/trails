@@ -277,7 +277,6 @@ const rotl = (x: number, n: number): number => (x << n) | (x >>> (32 - n));
 const MD5_K = Array.from({ length: 64 }, (_, i) => Math.floor(Math.abs(Math.sin(i + 1)) * 2 ** 32));
 const MD5_S = [7, 12, 17, 22, 5, 9, 14, 20, 4, 11, 16, 23, 6, 10, 15, 21];
 
-// vendor/ruby/v3.3.11/ext/digest/md5/md5.c:199 md5_process
 const md5Process: Transform = (h, w) => {
   let [a, b, c, d] = h;
   for (let i = 0; i < 64; i++) {
@@ -293,7 +292,6 @@ const md5Process: Transform = (h, w) => {
   [a, b, c, d].forEach((x, i) => (h[i] = h[i] + x));
 };
 
-// vendor/ruby/v3.3.11/ext/digest/sha1/sha1.c:132 SHA1_Transform
 const sha1Transform: Transform = (h, block) => {
   const w = [...block];
   for (let t = 16; t < 80; t++) w[t] = rotl(w[t - 3] ^ w[t - 8] ^ w[t - 14] ^ w[t - 16], 1);
@@ -319,7 +317,6 @@ const frac = (x: number): number => Math.floor((x - Math.floor(x)) * 2 ** 32);
 const SHA256_K = PRIMES.map((p) => frac(Math.cbrt(p)));
 const rotr = (x: number, n: number): number => (x >>> n) | (x << (32 - n));
 
-// vendor/ruby/v3.3.11/ext/digest/sha2/sha2.c:449 SHA256_Transform
 const sha256Transform: Transform = (h, block) => {
   const w = [...block];
   for (let j = 16; j < 64; j++) {

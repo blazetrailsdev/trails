@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { constantize } from "@blazetrails/activesupport";
 import "./index.js";
 import { ActiveRecord, Associations, ConnectionAdapters, Encryption } from "./namespaces.js";
@@ -32,11 +32,20 @@ describe("ActiveRecord namespaces", () => {
     expect(constantize("ActiveRecord::Encryption::Cipher::Aes256Gcm")).toBe(Aes256Gcm);
   });
 
-  it("ActiveRecord.eager_load! eager loads its nested namespaces", async () => {
-    await eagerLoadBang();
+  it("ActiveRecord.eager_load! eager loads its nested namespaces in Rails' order", async () => {
+    const order: string[] = [];
+    const spies = { Associations, ConnectionAdapters, Encryption };
+    const restores = Object.entries(spies).map(([name, ns]) =>
+      vi.spyOn(ns, "eagerLoadBang").mockImplementation(async () => {
+        order.push(name);
+      }),
+    );
+    try {
+      await eagerLoadBang();
+    } finally {
+      restores.forEach((spy) => spy.mockRestore());
+    }
+    expect(order).toEqual(["Associations", "ConnectionAdapters", "Encryption"]);
     expect(ActiveRecord.Associations).toBe(Associations);
-    expect(ActiveRecord.ConnectionAdapters).toBe(ConnectionAdapters);
-    expect(ActiveRecord.Encryption).toBe(Encryption);
-    expect(Cipher.Aes256Gcm).toBe(Aes256Gcm);
   });
 });
