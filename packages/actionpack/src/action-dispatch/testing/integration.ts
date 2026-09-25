@@ -1,7 +1,7 @@
 import { Request } from "../http/request.js";
 import { Headers } from "../http/headers.js";
 import { MimeType } from "../http/mime-type.js";
-import { isPresent } from "@blazetrails/activesupport";
+import { isPresent, runLoadHooks } from "@blazetrails/activesupport";
 import { HTTPS, URI, type Generic } from "@blazetrails/ruby-compat";
 import { TestResponse } from "./test-response.js";
 import { FlashHash } from "../middleware/flash.js";
@@ -668,3 +668,5 @@ proto.polymorphicPathForAction = polymorphicRoutes.polymorphicPathForAction;
 proto.polymorphicMapping = polymorphicRoutes.polymorphicMapping;
 proto.parameterize = responseAssertions.parameterize;
 proto.normalizeArgumentToRedirection = responseAssertions.normalizeArgumentToRedirection;
+
+runLoadHooks("action_dispatch_integration_test", IntegrationTest);

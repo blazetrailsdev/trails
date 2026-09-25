@@ -180,6 +180,10 @@ const alias = {
     "packages/activesupport/src/message-pack/index.ts",
   ),
   "@blazetrails/activesupport/yaml": path.resolve(__dirname, "packages/activesupport/src/yaml.ts"),
+  "@blazetrails/activesupport/test-case": path.resolve(
+    __dirname,
+    "packages/activesupport/src/test-case.ts",
+  ),
   "@blazetrails/activesupport/gzip": path.resolve(__dirname, "packages/activesupport/src/gzip.ts"),
   "@blazetrails/activesupport/encrypted-file": path.resolve(
     __dirname,
@@ -256,6 +260,14 @@ const alias = {
   "@blazetrails/activerecord/fixtures": path.resolve(
     __dirname,
     "packages/activerecord/src/fixtures.ts",
+  ),
+  "@blazetrails/activerecord/test-fixtures": path.resolve(
+    __dirname,
+    "packages/activerecord/src/test-fixtures.ts",
+  ),
+  "@blazetrails/activerecord/migration": path.resolve(
+    __dirname,
+    "packages/activerecord/src/migration.ts",
   ),
   "@blazetrails/activerecord/sqlite-adapter": path.resolve(
     __dirname,

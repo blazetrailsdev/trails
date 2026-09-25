@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect } from "vitest";
 import type { TestContext } from "vitest";
 import { Time } from "@blazetrails/date";
+import { runLoadHooks } from "./lazy-load-hooks.js";
 import {
   testOrder as activeSupportTestOrder,
   setTestOrder as activeSupportSetTestOrder,
@@ -108,6 +109,8 @@ export class TestCase {
 }
 
 setupAndTeardownPrepended(TestCase);
+
+runLoadHooks("active_support_test_case", TestCase);
 
 beforeEach(() => {
   _takeAssertions();
