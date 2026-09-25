@@ -1,4 +1,6 @@
 import { ArgumentError } from "./argument-error.js";
+import { rbObjAsString } from "./object.js";
+import { RuntimeError } from "./runtime-error.js";
 import { getCrypto } from "./crypto-adapter.js";
 import { File } from "./file.js";
 import { getFs } from "./fs-adapter.js";
@@ -221,23 +223,34 @@ export class Dir {
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Dir.mktmpdir`
    * (`vendor/ruby/lib/tmpdir.rb:91`), which Rails calls without defining.
    */
-  static mktmpdir(prefixSuffix?: TempfileBasename | null, tmpdir?: string | null): string;
+  static mktmpdir(
+    prefixSuffix?: TempfileBasename | null,
+    tmpdir?: string | null,
+    options?: TmpnameOptions,
+  ): string;
   static mktmpdir<T>(
     prefixSuffix: TempfileBasename | null,
     tmpdir: string | null,
+    options: TmpnameOptions,
     block: (path: string) => T,
   ): T;
   static mktmpdir<T>(
     prefixSuffix: TempfileBasename | null = null,
     tmpdir: string | null = null,
+    options: TmpnameOptions = {},
     block?: (path: string) => T,
   ): string | T {
     let base: string | undefined = undefined;
-    const path = createTmpname(prefixSuffix ?? "d", tmpdir ?? undefined, (path, _n, _opts, d) => {
-      base = d;
-      Dir.mkdir(path);
-      getFs().chmodSync?.(path, 0o700);
-    });
+    const path = createTmpname(
+      prefixSuffix ?? "d",
+      tmpdir ?? undefined,
+      options,
+      (path, _n, _opts, d) => {
+        base = d;
+        Dir.mkdir(path);
+        getFs().chmodSync?.(path, 0o700);
+      },
+    );
     if (block != null) {
       try {
         return block(path);
@@ -374,7 +387,20 @@ function random(): string {
 }
 
 /**
- * `Dir::Tmpname.create(basename, tmpdir = nil)`
+ * The `max_try:` and `**opts` keywords of `Dir::Tmpname.create`
+ * (`vendor/ruby/lib/tmpdir.rb:140`); `Dir.mktmpdir` forwards its own
+ * `**options` there (`tmpdir.rb:93`).
+ *
+ * @noRailsEquivalent PERMANENT — the option hash of Ruby stdlib
+ * `Dir::Tmpname.create` (`vendor/ruby/lib/tmpdir.rb:140`).
+ */
+export interface TmpnameOptions {
+  maxTry?: number | null;
+  [key: string]: unknown;
+}
+
+/**
+ * `Dir::Tmpname.create(basename, tmpdir = nil, max_try: nil, **opts)`
  * (`vendor/ruby/lib/tmpdir.rb:140`) — yields candidate names until one is not
  * taken, retrying on `Errno::EEXIST`, and returns the name that stuck.
  *
@@ -384,10 +410,11 @@ function random(): string {
 export function createTmpname(
   basename: TempfileBasename,
   tmpdir: string | undefined,
+  { maxTry = null, ...opts }: TmpnameOptions,
   block: (
     path: string,
     n: number | null,
-    opts: Record<string, never>,
+    opts: Record<string, unknown>,
     origdir: string | undefined,
   ) => void,
 ): string {
@@ -406,11 +433,15 @@ export function createTmpname(
       `${prefix}${t}-${Process.pid}-${random()}${n != null ? `-${n}` : ""}${suffix ?? ""}`,
     );
     try {
-      block(path, n, {}, origdir);
+      block(path, n, opts, origdir);
       return path;
     } catch (error) {
       if ((error as { code?: string }).code !== "EEXIST") throw error;
       n = (n ?? 0) + 1;
+      if (maxTry == null || n < maxTry) continue;
+      throw new RuntimeError(
+        `cannot generate temporary name using \`${rbObjAsString(basename)}' under \`${tmpdir}'`,
+      );
     }
   }
 }

@@ -304,7 +304,7 @@ function openExclusive(
   options: TempfileOptions = {},
 ): File {
   let tmpfile: File | null = null;
-  createTmpname(basename, tmpdir, (path) => {
+  createTmpname(basename, tmpdir, {}, (path) => {
     tmpfile = File.open(path, "wx+", { perm: 0o600 });
     if (options.encoding != null) tmpfile.setEncoding(options.encoding);
   });

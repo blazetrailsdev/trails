@@ -4,6 +4,7 @@ import {
   NotificationEvent,
   Notifications,
 } from "@blazetrails/activesupport";
+import type { CacheStore } from "@blazetrails/activesupport";
 import { Dir, FileUtils } from "@blazetrails/ruby-compat";
 import { Base as ActionViewBase, type CacheHelperHost } from "@blazetrails/actionview";
 import { LogSubscriber } from "../log-subscriber.js";
@@ -112,7 +113,7 @@ describe("ACLogSubscriberTest", () => {
     controller = new TestCase(LogSubscribersController);
     const controllerClass = LogSubscribersController as unknown as CachingClassMethods;
     cachePath = Dir.mktmpdir(["tmp", "cache"]);
-    controllerClass.cacheStore = [":file_store", cachePath] as never;
+    controllerClass.cacheStore = [":file_store", cachePath] as unknown as CacheStore;
     controllerClass.performCaching = true;
     Notifications.unsubscribeAll();
     LogSubscriber.attachTo("action_controller");

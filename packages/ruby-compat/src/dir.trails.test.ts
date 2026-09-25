@@ -10,7 +10,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Dir } from "./dir.js";
+import { Dir, createTmpname } from "./dir.js";
 
 function fixture(): string {
   const root = mkdtempSync(join(tmpdir(), "trails-dir-"));
@@ -114,7 +114,7 @@ describe("Dir.mktmpdir", () => {
   });
 
   it("removes the directory after yielding it to a block", () => {
-    const path = Dir.mktmpdir(null, null, (dir) => {
+    const path = Dir.mktmpdir(null, null, {}, (dir) => {
       writeFileSync(join(dir, "f"), "");
       return dir;
     });
@@ -126,6 +126,20 @@ describe("Dir.mktmpdir", () => {
     const path = Dir.mktmpdir("x", root);
     expect(path.startsWith(join(root, "x"))).toBe(true);
     expect(statSync(path).isDirectory()).toBe(true);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it("gives up after max_try names are taken", () => {
+    const root = mkdtempSync(join(tmpdir(), "trails-dir-"));
+    const taken = Object.assign(new Error("EEXIST"), { code: "EEXIST" });
+    let tries = 0;
+    expect(() =>
+      createTmpname("x", root, { maxTry: 3 }, () => {
+        tries += 1;
+        throw taken;
+      }),
+    ).toThrow(`cannot generate temporary name using \`x' under \`${root}'`);
+    expect(tries).toBe(3);
     rmSync(root, { recursive: true, force: true });
   });
 });
