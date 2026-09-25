@@ -334,14 +334,14 @@ export class Association<Target extends Base | Base[] = Base | Base[]> {
 
   async create(
     attributes?: Record<string, unknown> | Record<string, unknown>[],
-    block?: (record: Base) => void,
+    block?: (record: Base) => void | Promise<void>,
   ): Promise<Base | Base[] | null> {
     return this._createRecord(attributes, false, block);
   }
 
   async createBang(
     attributes?: Record<string, unknown> | Record<string, unknown>[],
-    block?: (record: Base) => void,
+    block?: (record: Base) => void | Promise<void>,
   ): Promise<Base | Base[]> {
     const record = await this._createRecord(attributes, true, block);
     if (!record) {
@@ -383,10 +383,18 @@ export class Association<Target extends Base | Base[] = Base | Base[]> {
   protected async _createRecord(
     attributes?: Record<string, unknown> | Record<string, unknown>[],
     raise = false,
-    block?: (record: Base) => void,
+    block?: (record: Base) => void | Promise<void>,
   ): Promise<Base | Base[] | null> {
-    const record = this.buildRecord(attributes as Record<string, unknown> | undefined, block);
+    let yielded: unknown;
+    const record = this.buildRecord(
+      attributes as Record<string, unknown> | undefined,
+      block &&
+        ((record: Base) => {
+          yielded = block(record);
+        }),
+    );
     if (!record) return null;
+    await yielded;
     if (typeof (record as any).save === "function") {
       const saved = await (record as any).save();
       if (!saved && raise) {

@@ -1478,17 +1478,17 @@ export class Base extends Model {
   static async create<T extends typeof Base>(
     this: T,
     attrs: Record<string, unknown>[],
-    block?: (record: InstanceType<T>) => void,
+    block?: (record: InstanceType<T>) => void | Promise<void>,
   ): Promise<InstanceType<T>[]>;
   static async create<T extends typeof Base>(
     this: T,
     attrs?: Record<string, unknown>,
-    block?: (record: InstanceType<T>) => void,
+    block?: (record: InstanceType<T>) => void | Promise<void>,
   ): Promise<InstanceType<T>>;
   static async create<T extends typeof Base>(
     this: T,
     attrs: Record<string, unknown> | Record<string, unknown>[] = {},
-    block?: (record: InstanceType<T>) => void,
+    block?: (record: InstanceType<T>) => void | Promise<void>,
   ): Promise<InstanceType<T> | InstanceType<T>[]> {
     return _Persistence.create.call(this, attrs, block);
   }
@@ -1496,17 +1496,17 @@ export class Base extends Model {
   static async createBang<T extends typeof Base>(
     this: T,
     attrs: Record<string, unknown>[],
-    block?: (record: InstanceType<T>) => void,
+    block?: (record: InstanceType<T>) => void | Promise<void>,
   ): Promise<InstanceType<T>[]>;
   static async createBang<T extends typeof Base>(
     this: T,
     attrs?: Record<string, unknown>,
-    block?: (record: InstanceType<T>) => void,
+    block?: (record: InstanceType<T>) => void | Promise<void>,
   ): Promise<InstanceType<T>>;
   static async createBang<T extends typeof Base>(
     this: T,
     attrs: Record<string, unknown> | Record<string, unknown>[] = {},
-    block?: (record: InstanceType<T>) => void,
+    block?: (record: InstanceType<T>) => void | Promise<void>,
   ): Promise<InstanceType<T> | InstanceType<T>[]> {
     return _Persistence.createBang.call(this, attrs, block);
   }

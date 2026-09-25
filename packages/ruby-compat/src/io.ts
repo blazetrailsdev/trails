@@ -721,7 +721,7 @@ export class IO {
    * (`io.c:12997-13050`) reads the source 16 KiB at a time until EOF and writes
    * each chunk to the destination, so the bytes pass through unchanged
    * whatever either stream's encoding. It answers the byte total
-   * (`io.c:13395`).
+   * (`io.c:13392`).
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO.copy_stream`
    * (`vendor/ruby/io.c:13365`).

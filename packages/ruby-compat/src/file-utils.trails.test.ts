@@ -209,7 +209,6 @@ describe("FileUtils", () => {
   });
 
   it("copy_file creates the destination with the source's mode, without preserve", () => {
-    // vendor/ruby/lib/fileutils.rb:2279 — File.open(dest, 'wb', s.stat.mode).
     const src = nodePath.join(root, "src");
     const dest = nodePath.join(root, "dest");
     nodeFs.writeFileSync(src, "contents");

@@ -240,7 +240,7 @@ export abstract class CollectionAssociation extends Association {
   protected override async _createRecord(
     attributes?: Record<string, unknown> | Record<string, unknown>[],
     raise = false,
-    block?: (record: Base) => void,
+    block?: (record: Base) => void | Promise<void>,
   ): Promise<Base | Base[] | null> {
     if (!this.owner.isPersisted()) {
       throw new RecordNotSaved("You cannot call create unless the parent is saved", this.owner);

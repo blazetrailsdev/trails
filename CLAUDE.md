@@ -1383,7 +1383,9 @@ INSERT, and its writes after the record is persisted. **The settled shape is
 the captured-and-awaited block**: each async create path wraps the block to
 capture its return value (`yielded = block(record)`) and `await`s it after the
 build and before the save. That is `create` / `createBang` in `persistence.ts`,
-`CollectionAssociation#_createRecord`, and `SingularAssociation#_createRecord`.
+`CollectionAssociation#_createRecord`, `SingularAssociation#_createRecord`, and
+the `Association#_createRecord` fallback they override. Each of these types its
+block `(record) => void | Promise<void>`.
 `Relation#create` reaches the first through `currentScopeRestoringBlock`, which
 returns the block's value as `relation.rb:1344-1350` does.
 
@@ -1396,8 +1398,9 @@ The alternatives lose:
 
 The synchronous builders (`new`, `build`) do not await: they have nothing to
 order a promise against. This is a genuine language shortcoming — JS has no
-synchronous await — ratified repo-wide here. The wrapper cites **this
-section**; it raises no call or argument row, so it carries no receipt tag.
+synchronous await — ratified repo-wide here. This section is the
+wrapper's receipt: the wrapper raises no call or argument row, so no JSDoc tag
+applies.
 
 ## Trails has no autoloader (`Rails.autoloaders` / Zeitwerk)
 

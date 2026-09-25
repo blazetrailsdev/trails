@@ -130,7 +130,7 @@ export class SingularAssociation extends Association<Base> {
   protected override async _createRecord(
     attributes?: Record<string, unknown>,
     raiseError = false,
-    block?: (record: Base) => void,
+    block?: (record: Base) => void | Promise<void>,
   ): Promise<Base | null> {
     let yielded: unknown;
     const record = this.buildRecord(

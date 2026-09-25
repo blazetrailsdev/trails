@@ -37,6 +37,22 @@ describe("PersistenceTest (trails)", () => {
     expect(all.every((t) => t.title === "same")).toBe(true);
   });
 
+  it("create awaits an async block before saving", async () => {
+    const topic = await Topic.create({ title: "before" }, async (t: Base) => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      (t as InstanceType<typeof Topic>).title = "after";
+    });
+    expect((await Topic.find(topic.id)).title).toBe("after");
+  });
+
+  it("create! awaits an async block before saving", async () => {
+    const topic = await Topic.createBang({ title: "before" }, async (t: Base) => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      (t as InstanceType<typeof Topic>).title = "after";
+    });
+    expect((await Topic.find(topic.id)).title).toBe("after");
+  });
+
   it("create with an array recurses and returns an array of records", async () => {
     const result = await Topic.create([{ title: "a" }, { title: "b" }]);
     expect(result).toHaveLength(2);
