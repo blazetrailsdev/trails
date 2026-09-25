@@ -1009,8 +1009,6 @@ const MODELS_TS_DIRS: Record<string, string> = {
   activemodel: path.join(ROOT, "packages/activemodel/src/test-helpers/models"),
 };
 const RUBY_EXTRACTOR = path.join(HERE, "extract-ruby-models.rb");
-// Fed to extract-ruby-models.rb as `MODELS_PATHS_JSON`, the way
-// extract-ruby-api.rb receives `LIB_PATHS_JSON` from the same registry.
 const MODELS_RUBY_DIRS: Record<string, string> = {
   activerecord: resolveSourcePath("rails", "activerecord/test/models"),
   activemodel: resolveSourcePath("rails", "activemodel/test/models"),

@@ -36,9 +36,8 @@ export interface FindResult {
 }
 
 // Per-package base dir (relative to the worktree root) for vendored test cases
-// and lib source, derived from the `vendor/sources.ts` manifests
-// (`vendor:fetch --print-{test,lib}-paths`). Relative, so joining with the
-// CURRENT root resolves in any worktree.
+// and lib source. Mirrors `vendor/sources.ts` (`vendor:fetch --print-{test,lib}
+// -paths`); relative so joining with the CURRENT root resolves in any worktree.
 function repoRelative(abs: string): string {
   return toPosix(path.relative(path.dirname(VENDOR_DIR), abs));
 }

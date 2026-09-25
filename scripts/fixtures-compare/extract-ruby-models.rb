@@ -4,10 +4,6 @@
 # Output: [{ package, file, classes: [{ name, parent, tableName, associations, validations, scopes, callbacks, attributes, attrs }] }]
 require "json"
 
-# MODELS_DIRS is fed by the caller via MODELS_PATHS_JSON (a JSON map of
-# package name → absolute test/models dir), which fixtures-compare/compare.ts
-# derives from vendor/sources.ts — the same channel extract-ruby-api.rb reads
-# LIB_PATHS_JSON through.
 MODELS_DIRS = begin
   models_paths_json = ENV.fetch("MODELS_PATHS_JSON") do
     abort "extract-ruby-models: MODELS_PATHS_JSON env var not set. Run it via `pnpm parity:fixtures`."

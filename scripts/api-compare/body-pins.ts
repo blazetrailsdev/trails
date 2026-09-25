@@ -87,21 +87,22 @@ export interface Artifact {
 }
 
 // One pinned pair. Identity keys off (package, rubyFile, rubyName) — the same
-// grain compare.ts uses. `ref` is the upstream tag the digest was taken at, so a
-// reader can tell which vendored version a pin (and a later DRIFT) is against.
-// `reason` documents the verification that justified the pin (a convergence
-// story id, a PR, a review note).
+// grain compare.ts uses. `reason` documents the verification that justified the
+// pin (a convergence story id, a PR, a review note).
 export interface BodyPin {
   package: string;
   rubyFile: string;
   rubyName: string;
   digest: string;
+  /** The upstream tag the digest was taken at, e.g. `v8.0.2`. */
   ref?: string;
   reason?: string;
 }
 
-// The `vendor/sources.ts` origin ref a package is vendored at — what a digest
-// taken now was taken against.
+/**
+ * The `vendor/sources.ts` origin ref a package is vendored at — what a digest
+ * taken now was taken against.
+ */
 export function sourceRefOf(packageName: string): string | undefined {
   return SOURCES.find((s) => s.packages.some((p) => p.name === packageName))?.origin.ref;
 }
