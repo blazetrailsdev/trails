@@ -38,7 +38,7 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
   /** @internal */
   protected castValue(value: unknown): DateTimeCastResult | null {
     let seconds: Rational | null = null;
-    // boundary: a JS `Date` and a `Temporal.Instant` stand for the Ruby ::Time `cast_value` receives; a `Temporal.PlainDateTime` (offset 0) or `Temporal.ZonedDateTime` is what `@blazetrails/date`'s `DateTime.civil` returns for a Ruby ::DateTime, so its offset is honoured as Rails' `utc?` / `getutc` would.
+    // boundary: a JS `Date`, a `Temporal.Instant`, and the `Temporal.PlainDateTime` / `Temporal.ZonedDateTime` `DateTime.civil` returns each stand for the Ruby ::Time or ::DateTime `cast_value` receives.
     if (value instanceof Date) {
       seconds = new Rational(value.getTime(), 1000);
     } else if (value instanceof Temporal.Instant) {

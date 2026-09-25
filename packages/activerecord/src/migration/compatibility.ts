@@ -35,12 +35,9 @@ export class V7_1 extends V7_2 {}
 type Options = Record<string, unknown>;
 type Super = (...args: unknown[]) => unknown;
 
-const isOptions = (value: unknown): value is Options =>
-  value != null && typeof value === "object" && !Array.isArray(value);
-
 const LegacyIndexName = {
-  legacyIndexName(tableName: string, options: unknown): string {
-    if (isOptions(options)) {
+  legacyIndexName(tableName: string, options: Options | string | string[]): string {
+    if (typeof options === "object" && !Array.isArray(options)) {
       if (options.column != null) {
         return `index_${tableName}_on_${[options.column].flat().join("_and_")}`;
       } else if (options.name != null) {
@@ -53,7 +50,7 @@ const LegacyIndexName = {
     }
   },
 
-  indexNameOptions(columnNames: unknown): Options {
+  indexNameOptions(columnNames: string | string[]): Options {
     if (LegacyIndexName.isExpressionColumnName(columnNames)) {
       columnNames = (columnNames as string).match(/\w+/g)!.join("_");
     }
@@ -93,8 +90,10 @@ export class V7_0 extends V7_1 {
     },
 
     references(super_: Super, ...args: unknown[]) {
-      const options = isOptions(args[args.length - 1]) ? (args.pop() as Options) : {};
-      return super_(...args, { ...options, _skipValidateOptions: true });
+      const last = args[args.length - 1];
+      let options = (typeof last === "object" && last !== null ? args.pop() : {}) as Options;
+      options = { ...options, _skipValidateOptions: true };
+      return super_(...args, options);
     },
 
     raiseOnIfExistOptions(_super: unknown, _options: Options): void {},
@@ -147,6 +146,15 @@ export class V7_0 extends V7_1 {
     options = { ...options, _usesLegacyTableName: true, _skipValidateOptions: true } as Options;
 
     await super.createTable(tableName, options, fn);
+  }
+
+  override async renameTable(
+    tableName: string,
+    newName: string,
+    options: Options = {},
+  ): Promise<void> {
+    options = { ...options, _usesLegacyTableName: true, _usesLegacyIndexName: true };
+    await super.renameTable(tableName, newName, options);
   }
 
   override async changeColumn(

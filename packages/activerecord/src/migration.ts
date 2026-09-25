@@ -420,8 +420,16 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     await this.methodMissing("changeColumn", ...args);
   }
 
-  async renameTable(oldName: string, newName: string): Promise<void> {
-    await this.methodMissing("renameTable", oldName, newName);
+  async renameTable(
+    oldName: string,
+    newName: string,
+    options?: Record<string, unknown>,
+  ): Promise<void> {
+    if (options !== undefined) {
+      await this.methodMissing("renameTable", oldName, newName, options);
+    } else {
+      await this.methodMissing("renameTable", oldName, newName);
+    }
   }
 
   async tableExists(tableName: string): Promise<boolean | null> {
