@@ -36,7 +36,7 @@ import { User } from "../models/user.js";
 
 export class SessionsController extends ApplicationController {
   static {
-    this.allowUnauthenticatedAccess({ only: ["new_", "create"] });
+    this.allowUnauthenticatedAccess({ only: ["new", "create"] });
     this.rateLimit({
       to: 10, within: minutes(3), only: "create",
       with: function (this: SessionsController) {
@@ -45,9 +45,7 @@ export class SessionsController extends ApplicationController {
     });
   }
 
-  async new_(): Promise<void> {
-    this.render({ action: "new" });
-  }
+  async new(): Promise<void> {}
 
   async create(): Promise<void> {
     const user = await User.authenticateBy(this.params.permit("email_address", "password"));
@@ -150,9 +148,7 @@ export class PasswordsController extends ApplicationController {
 
   declare user: any;
 
-  async new_(): Promise<void> {
-    this.render({ action: "new" });
-  }
+  async new(): Promise<void> {}
 
   async create(): Promise<void> {
     const user = await User.findBy({ email_address: this.params.get("email_address") });
@@ -165,9 +161,7 @@ export class PasswordsController extends ApplicationController {
     });
   }
 
-  async edit(): Promise<void> {
-    this.render({ action: "edit" });
-  }
+  async edit(): Promise<void> {}
 
   async update(): Promise<void> {
     if (await this.user.update(this.params.permit("password", "password_confirmation"))) {

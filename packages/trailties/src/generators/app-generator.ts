@@ -4,6 +4,7 @@ import { ref, tsClass, tsField, tsModule, tsRaw } from "../template-builder/inde
 import { AppBase, type AppBaseOptions } from "./app-base.js";
 import { GeneratorError } from "./generated-attribute.js";
 import { type DatabaseName } from "./database.js";
+import { TEMPLATES } from "./rails/app/templates.js";
 import { LOAD_DEFAULTS_VERSION } from "../application/configuration.js";
 
 const RESERVED_NAMES = ["application", "destroy", "plugin", "runner", "test"];
@@ -464,7 +465,7 @@ export function drawRoutes(mapper: Mapper): void {
 `,
     );
 
-    this.createFile("config/database.ts", this.dbConfig(name));
+    this.databaseYml();
 
     if (!this.skip("ActionCable")) {
       this.createFile(
@@ -1218,67 +1219,18 @@ dist
     );
   }
 
-  private dbConfig(appName: string): string {
-    switch (this.database.name) {
-      case "postgres":
-        return `export default {
-  development: {
-    adapter: "postgresql",
-    database: "${appName}_development",
-    host: "localhost",
-    port: 5432,
-  },
-  test: {
-    adapter: "postgresql",
-    database: "${appName}_test",
-    host: "localhost",
-    port: 5432,
-  },
-  production: {
-    adapter: "postgresql",
-    url: process.env.DATABASE_URL,
-  },
-};
-`;
-      case "mysql":
-      case "mariadb":
-        return `export default {
-  development: {
-    adapter: "mysql2",
-    database: "${appName}_development",
-    host: "localhost",
-    port: 3306,
-  },
-  test: {
-    adapter: "mysql2",
-    database: "${appName}_test",
-    host: "localhost",
-    port: 3306,
-  },
-  production: {
-    adapter: "mysql2",
-    url: process.env.DATABASE_URL,
-  },
-};
-`;
-      default: {
-        const adapter = this.sqliteDriver === "better-sqlite3" ? "sqlite3" : this.sqliteDriver;
-        return `export default {
-  development: {
-    adapter: "${adapter}",
-    database: "storage/development.sqlite3",
-  },
-  test: {
-    adapter: "${adapter}",
-    database: "storage/test.sqlite3",
-  },
-  production: {
-    adapter: "${adapter}",
-    database: "storage/production.sqlite3",
-  },
-};
-`;
-      }
-    }
+  databaseYml(): void {
+    this.template(this.database.template, "config/database.ts");
+  }
+
+  private template(source: string, destination: string): void {
+    this.createFile(
+      destination,
+      TEMPLATES[source]({
+        appName: this.appName(),
+        database: this.database,
+        sqliteDriver: this.sqliteDriver,
+      }),
+    );
   }
 }

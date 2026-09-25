@@ -1,6 +1,7 @@
 import { File, FileUtils } from "@blazetrails/ruby-compat";
 import { GeneratorBase, type GeneratorOptions } from "../../../../base.js";
 import { Database, DATABASES, type DatabaseName } from "../../../../database.js";
+import { TEMPLATES } from "../../../app/templates.js";
 
 const BASE_PACKAGES = ["curl", "libvips"];
 const BUILD_PACKAGES = ["build-essential", "git"];
@@ -50,7 +51,10 @@ export class ChangeGenerator extends GeneratorBase {
   }
 
   private template(source: string, destination: string): void {
-    this.writeOrUpdate(destination, databaseConfigTs(source, this.database, this.appName));
+    this.writeOrUpdate(
+      destination,
+      TEMPLATES[source]({ appName: this.appName, database: this.database }),
+    );
   }
 
   editPackageJson(): void {
@@ -216,31 +220,6 @@ export class ChangeGenerator extends GeneratorBase {
 
     this.writeOrUpdate(rel, JSON.stringify(compose, null, 2) + "\n");
   }
-}
-
-function databaseConfigTs(template: string, database: Database, appName: string): string {
-  if (template === "config/databases/sqlite3.yml") {
-    return [
-      `export default {`,
-      ...["development", "test", "production"].map(
-        (env) => `  ${env}: { adapter: "sqlite3", database: "storage/${env}.sqlite3" },`,
-      ),
-      `};`,
-      ``,
-    ].join("\n");
-  }
-  const adapter = template === "config/databases/postgresql.yml" ? "postgresql" : "mysql2";
-  const port = database.port!;
-  const block = (env: string) =>
-    `  ${env}: { adapter: "${adapter}", database: "${appName}_${env}", host: "localhost", port: ${port} },`;
-  return [
-    `export default {`,
-    block("development"),
-    block("test"),
-    `  production: { adapter: "${adapter}", url: process.env.DATABASE_URL },`,
-    `};`,
-    ``,
-  ].join("\n");
 }
 
 function dockerPackages(base: string[], extra: string | undefined): string {
