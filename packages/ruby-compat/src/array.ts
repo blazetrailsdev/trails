@@ -1,6 +1,7 @@
 import { rbEql, rbEqual } from "./rb-equal.js";
 import { rbHash } from "./rb-hash.js";
 import { ArgumentError } from "./argument-error.js";
+import { cmp, rbCmpint } from "./comparable.js";
 import { rbBuiltinClassName } from "./object.js";
 import { Range } from "./range.js";
 import { TypeError } from "./type-error.js";
@@ -319,4 +320,35 @@ export function uniq<T>(ary: readonly T[]): T[] {
     result.push(element);
   }
   return result;
+}
+
+/**
+ * Ruby `Array#sort` without a block (`vendor/ruby/array.c:3473` `rb_ary_sort`):
+ * a sorted copy, ordered by `sort_2` (`array.c:3301`), which sends `<=>` and
+ * hands the answer to `rb_cmpint`, so a `nil` `<=>` raises
+ * `ArgumentError: comparison of A with B failed`.
+ *
+ * @boundary: `ruby_qsort` (`vendor/ruby/util.c:253`) is the platform `qsort_s`,
+ *  glibc's merge sort, which always passes the earlier element first. V8's
+ *  `Array#sort` does not, and the order names the classes in the message, so
+ *  the merge is written out.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Array#sort` (`vendor/ruby/array.c:3473`).
+ */
+export function sort<T>(ary: readonly T[]): T[] {
+  const sort2 = (a: T, b: T): number => rbCmpint(cmp(a, b), a, b);
+  const msort = (b: T[]): T[] => {
+    if (b.length <= 1) return b;
+    const n1 = b.length >> 1;
+    const b1 = msort(b.slice(0, n1));
+    const b2 = msort(b.slice(n1));
+    const tmp: T[] = [];
+    let i = 0;
+    let j = 0;
+    while (i < b1.length && j < b2.length) {
+      tmp.push(sort2(b1[i], b2[j]) <= 0 ? b1[i++] : b2[j++]);
+    }
+    return tmp.concat(b1.slice(i), b2.slice(j));
+  };
+  return msort([...ary]);
 }

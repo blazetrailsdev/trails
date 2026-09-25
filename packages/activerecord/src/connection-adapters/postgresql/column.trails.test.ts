@@ -1,20 +1,27 @@
 import { describe, it, expect } from "vitest";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
 import { SchemaCache } from "../schema-cache.js";
 import { Column } from "./column.js";
 import { TypeMetadata } from "./type-metadata.js";
 
-function dumpAndLoad(col: Column): Column {
+async function dumpAndLoad(col: Column): Promise<Column> {
   const cache = new SchemaCache();
-  cache.initWith({ columns: { t: [col] } });
-  const coder: Record<string, unknown> = {};
-  cache.encodeWith(coder);
-  const back = new SchemaCache();
-  back.initWith(JSON.parse(JSON.stringify(coder)));
-  return (back as unknown as { _columns: Map<string, Column[]> })._columns.get("t")![0];
+  cache.setColumns("t", [col]);
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "column-dump-and-load-"));
+  const filename = path.join(tmpDir, "schema_cache.json");
+  try {
+    await cache.dumpTo(filename);
+    const back = (await SchemaCache._loadFrom(filename))!;
+    return (back as unknown as { _columns: Map<string, Column[]> })._columns.get("t")![0];
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
 }
 
 describe("PostgreSQL::Column JSON round-trip", () => {
-  it("preserves the subclass and its state through the schema-cache dump", () => {
+  it("preserves the subclass and its state through the schema-cache dump", async () => {
     const col = new Column(
       "tags",
       null,
@@ -25,7 +32,7 @@ describe("PostgreSQL::Column JSON round-trip", () => {
 
     const coder: Record<string, unknown> = {};
     col.encodeWith(coder);
-    const back = dumpAndLoad(col);
+    const back = await dumpAndLoad(col);
 
     expect(Object.keys(coder).sort()).toEqual(
       [
@@ -52,12 +59,12 @@ describe("PostgreSQL::Column JSON round-trip", () => {
 });
 
 describe("PostgreSQL::TypeMetadata JSON round-trip", () => {
-  it("recovers its own class and ivars from the sql_type_metadata payload", () => {
+  it("recovers its own class and ivars from the sql_type_metadata payload", async () => {
     const meta = new TypeMetadata(
       { sqlType: "numeric(10,2)", type: "decimal", precision: 10, scale: 2 },
       { oid: 1700, fmod: 655366 },
     );
-    const back = dumpAndLoad(new Column("n", null, meta)).sqlTypeMetadata!;
+    const back = (await dumpAndLoad(new Column("n", null, meta))).sqlTypeMetadata!;
 
     expect(back).toBeInstanceOf(TypeMetadata);
     expect((back as TypeMetadata).oid).toBe(1700);

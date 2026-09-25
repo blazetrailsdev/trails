@@ -59,8 +59,6 @@ const TYPE_METADATA_CLASSES: Record<string, { prototype: SqlTypeMetadata }> = {
 };
 
 function rehydrateColumn(data: unknown): Column {
-  if (data instanceof Column) return data;
-  if (data == null || typeof data !== "object") return data as Column;
   let coder = data as ColumnCoder;
   const klass = COLUMN_CLASSES[coder["class"] as string] ?? Column;
   const column = Object.create(klass.prototype) as Column;
@@ -77,11 +75,6 @@ function rehydrateColumn(data: unknown): Column {
   return column;
 }
 
-function coderEntries<T>(value: unknown): [string, T][] {
-  if (Array.isArray(value)) return value as [string, T][];
-  return Object.entries((value ?? {}) as Record<string, T>);
-}
-
 function expandIndexOption<T>(
   columns: string | string[],
   value: unknown,
@@ -93,8 +86,6 @@ function expandIndexOption<T>(
 }
 
 function rehydrateIndex(data: unknown): IndexDefinition {
-  if (data instanceof IndexDefinition) return data;
-  if (data == null || typeof data !== "object") return data as IndexDefinition;
   const row = data as Record<string, unknown>;
   const columns = (row["columns"] ?? []) as string | string[];
   return new IndexDefinition(
@@ -135,9 +126,25 @@ export class SchemaCache {
     try {
       if (!File.isFile(filename)) return null;
       const data = await SchemaCache.read(filename, (content) => content);
-      const parsed = yamlParse(data);
+      const parsed = yamlParse(data) as Record<string, Record<string, unknown[]> | null>;
       const cache = new SchemaCache();
-      cache.initWith(parsed);
+      cache.initWith({
+        ...parsed,
+        columns: new Map(
+          Object.entries(parsed["columns"] ?? {}).map(([table, cols]) => [
+            table,
+            cols.map((c) => rehydrateColumn(c)),
+          ]),
+        ),
+        primary_keys: new Map(Object.entries(parsed["primary_keys"] ?? {})),
+        data_sources: new Map(Object.entries(parsed["data_sources"] ?? {})),
+        indexes: new Map(
+          Object.entries(parsed["indexes"] ?? {}).map(([table, idx]) => [
+            table,
+            idx.map((i) => rehydrateIndex(i)),
+          ]),
+        ),
+      });
       return cache;
     } catch {
       return null;
@@ -163,52 +170,22 @@ export class SchemaCache {
   }
 
   encodeWith(coder: Record<string, unknown>): void {
-    const byKey = (a: [string, unknown], b: [string, unknown]) => a[0].localeCompare(b[0]);
-    coder["columns"] = Object.fromEntries(
-      [...this._columns]
-        .sort(byKey)
-        .map(([table, cols]) => [
-          table,
-          Array.isArray(cols) ? cols.map((c) => serializeColumn(c)) : cols,
-        ]),
-    );
-    coder["primary_keys"] = Object.fromEntries([...this._primaryKeys].sort(byKey));
-    coder["data_sources"] = Object.fromEntries([...this._dataSources].sort(byKey));
-    coder["indexes"] = Object.fromEntries([...this._indexes].sort(byKey));
+    const byKey = (a: [string, unknown], b: [string, unknown]) =>
+      a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0;
+    coder["columns"] = new Map([...this._columns].sort(byKey));
+    coder["primary_keys"] = new Map([...this._primaryKeys].sort(byKey));
+    coder["data_sources"] = new Map([...this._dataSources].sort(byKey));
+    coder["indexes"] = new Map([...this._indexes].sort(byKey));
     coder["version"] = this._version;
   }
 
   initWith(coder: Record<string, unknown>): void {
-    this._columns = new Map(
-      coderEntries<unknown[]>(coder["columns"]).map(([table, cols]) => [
-        table,
-        Array.isArray(cols) ? cols.map((c) => rehydrateColumn(c)) : cols,
-      ]),
-    );
-
-    this._columnsHash = new Map(
-      coderEntries<Record<string, unknown>>(coder["columns_hash"]).map(([table, hash]) => [
-        table,
-        hash == null
-          ? hash
-          : Object.fromEntries(
-              Object.entries(hash).map(([name, col]) => [name, rehydrateColumn(col)]),
-            ),
-      ]),
-    );
-
-    this._primaryKeys = new Map(coderEntries<string | string[] | null>(coder["primary_keys"]));
-
-    this._dataSources = new Map(coderEntries<boolean>(coder["data_sources"]));
-
-    this._indexes = new Map(
-      coderEntries<unknown[]>(coder["indexes"]).map(([table, idx]) => [
-        table,
-        Array.isArray(idx) ? idx.map((i) => rehydrateIndex(i)) : idx,
-      ]),
-    );
-
-    this._version = (coder["version"] as string | number) ?? null;
+    this._columns = coder["columns"] as Map<string, Column[]>;
+    this._columnsHash = coder["columns_hash"] as Map<string, Record<string, Column>>;
+    this._primaryKeys = coder["primary_keys"] as Map<string, string | string[] | null>;
+    this._dataSources = coder["data_sources"] as Map<string, boolean>;
+    this._indexes = (coder["indexes"] as Map<string, IndexDefinition[]>) ?? new Map();
+    this._version = (coder["version"] as string | number | null | undefined) ?? null;
 
     if (coder["deduplicated"] == null || coder["deduplicated"] === false) {
       this.deriveColumnsHashAndDeduplicateValues();
@@ -219,15 +196,10 @@ export class SchemaCache {
     return this._columns.has(tableName);
   }
 
-  async primaryKeys(
-    pool: unknown,
-    tableName: string,
-  ): Promise<string | string[] | null | undefined> {
+  async primaryKeys(pool: unknown, tableName: string): Promise<string | string[] | null> {
     if (this._primaryKeys.has(tableName)) {
-      return this._primaryKeys.get(tableName);
+      return this._primaryKeys.get(tableName)!;
     }
-
-    if (this.isIgnoredTable(tableName)) return null;
 
     return withConnection(pool, async (connection) => {
       if (await this.dataSourceExists(connection, tableName)) {
@@ -238,12 +210,12 @@ export class SchemaCache {
         this._primaryKeys.set(tableName, pk);
         return pk;
       }
-      return undefined;
+      return null;
     });
   }
 
-  async dataSourceExists(pool: unknown, name: string): Promise<boolean | undefined> {
-    if (this.isIgnoredTable(name)) return undefined;
+  async dataSourceExists(pool: unknown, name: string): Promise<boolean | null> {
+    if (this.isIgnoredTable(name)) return null;
     if (this._dataSources.size === 0) {
       const tables = await this.tablesToCache(pool);
       for (const source of tables) {
@@ -252,7 +224,7 @@ export class SchemaCache {
     }
 
     if (this._dataSources.has(name)) {
-      return this._dataSources.get(name);
+      return this._dataSources.get(name)!;
     }
 
     return withConnection(pool, async (connection) => {
@@ -261,7 +233,7 @@ export class SchemaCache {
         this._dataSources.set(name, exists);
         return exists;
       }
-      return undefined;
+      return null;
     });
   }
 
@@ -417,6 +389,12 @@ export class SchemaCache {
     await this.open(filename, (f) => {
       const coder: Record<string, unknown> = {};
       this.encodeWith(coder);
+      coder["columns"] = new Map(
+        [...(coder["columns"] as Map<string, Column[]>)].map(([table, cols]) => [
+          table,
+          cols.map((c) => serializeColumn(c)),
+        ]),
+      );
       f.write(yamlStringify(coder));
     });
   }
@@ -465,14 +443,12 @@ export class SchemaCache {
    */
   private deriveColumnsHashAndDeduplicateValues(): void {
     this._columns = deepDeduplicate(this._columns);
-    this._columnsHash.clear();
-    for (const [table, cols] of this._columns) {
-      const hash: Record<string, Column> = {};
-      for (const col of cols) {
-        hash[col.name] = col;
-      }
-      this._columnsHash.set(table, hash);
-    }
+    this._columnsHash = new Map(
+      [...this._columns].map(([table, columns]) => [
+        table,
+        Object.fromEntries(columns.map((column) => [column.name, column])),
+      ]),
+    );
     this._primaryKeys = deepDeduplicate(this._primaryKeys);
     this._dataSources = deepDeduplicate(this._dataSources);
     this._indexes = deepDeduplicate(this._indexes);
@@ -574,14 +550,11 @@ export class SchemaReflection {
     this._cachePromise = null;
   }
 
-  async primaryKeys(
-    pool: unknown,
-    tableName: string,
-  ): Promise<string | string[] | null | undefined> {
+  async primaryKeys(pool: unknown, tableName: string): Promise<string | string[] | null> {
     return (await this.cache(pool)).primaryKeys(pool, tableName);
   }
 
-  async dataSourceExists(pool: unknown, name: string): Promise<boolean | undefined> {
+  async dataSourceExists(pool: unknown, name: string): Promise<boolean | null> {
     return (await this.cache(pool)).dataSourceExists(pool, name);
   }
 
@@ -589,7 +562,7 @@ export class SchemaReflection {
     return (await this.cache(pool)).add(pool, name);
   }
 
-  async dataSources(pool: unknown, name: string): Promise<boolean | undefined> {
+  async dataSources(pool: unknown, name: string): Promise<boolean | null> {
     return (await this.cache(pool)).dataSourceExists(pool, name);
   }
 
@@ -622,14 +595,14 @@ export class SchemaReflection {
     (await this.cache(pool)).clearDataSourceCacheBang(pool, name);
   }
 
-  async isCached(tableName: string): Promise<boolean | undefined> {
+  async isCached(tableName: string): Promise<boolean | null> {
     if (this._cache == null) {
       if (!SchemaReflection.checkSchemaCacheDumpVersion) {
         this._cache = await this.loadCache(null);
       }
     }
 
-    return this._cache?.isCached(tableName);
+    return this._cache?.isCached(tableName) ?? null;
   }
 
   async dumpTo(pool: unknown, filename: string): Promise<SchemaCache> {
@@ -735,15 +708,15 @@ export class BoundSchemaReflection {
     return this;
   }
 
-  async isCached(tableName: string): Promise<boolean | undefined> {
+  async isCached(tableName: string): Promise<boolean | null> {
     return this._schemaReflection.isCached(tableName);
   }
 
-  async primaryKeys(tableName: string): Promise<string | string[] | null | undefined> {
+  async primaryKeys(tableName: string): Promise<string | string[] | null> {
     return this._schemaReflection.primaryKeys(this._pool, tableName);
   }
 
-  async dataSourceExists(name: string): Promise<boolean | undefined> {
+  async dataSourceExists(name: string): Promise<boolean | null> {
     return this._schemaReflection.dataSourceExists(this._pool, name);
   }
 
@@ -751,7 +724,7 @@ export class BoundSchemaReflection {
     return this._schemaReflection.add(this._pool, name);
   }
 
-  async dataSources(name: string): Promise<boolean | undefined> {
+  async dataSources(name: string): Promise<boolean | null> {
     return this._schemaReflection.dataSources(this._pool, name);
   }
 

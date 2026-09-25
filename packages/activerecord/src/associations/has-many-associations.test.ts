@@ -1,6 +1,7 @@
 import { kernelThrow } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { resetCallbacks } from "../support/reset-callbacks.js";
 import { ArgumentError, I18n } from "@blazetrails/activemodel";
 import {
   SubclassNotFound,
@@ -12,7 +13,6 @@ import {
   RecordNotFound,
   RecordNotSaved,
   RecordNotDestroyed,
-  resetCallbacks,
   RecordInvalid,
   AssociationTypeMismatch,
   ReadOnlyRecord,

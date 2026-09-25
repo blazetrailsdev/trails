@@ -3,6 +3,7 @@ import { kernelCatch, NoMethodError, RuntimeError } from "@blazetrails/ruby-comp
 import { kernelArray } from "./array-utils.js";
 import { ArgumentError } from "./hash-utils.js";
 import { DescendantsTracker, type AnyClass } from "./descendants-tracker.js";
+import { camelize } from "./inflector.js";
 
 export type CallbackKind = "before" | "after" | "around";
 
@@ -782,6 +783,12 @@ export class CallbackChain {
     this.chain = [];
   }
 
+  dup(): CallbackChain {
+    const copy = new CallbackChain(this.name, this.config);
+    copy.chain = [...this.chain];
+    return copy;
+  }
+
   compile(type?: CallbackKind): CallbackSequence {
     if (type == null) {
       if (this._allCallbacks) return this._allCallbacks;
@@ -934,9 +941,7 @@ export function getCallbackChains(target: object): Map<string, CallbackChain> {
     const own = new Map<string, CallbackChain>();
     if (parent) {
       for (const [name, chain] of parent) {
-        const newChain = new CallbackChain(chain.name, chain.config);
-        newChain.append(...chain.entries);
-        own.set(name, newChain);
+        own.set(name, chain.dup());
       }
     }
     t[CALLBACKS] = own;
@@ -1033,6 +1038,18 @@ export namespace Callbacks {
     const chains = getCallbackChains(target);
     if (!chains.has(name)) {
       chains.set(name, new CallbackChain(name, options as DefineCallbacksOptions));
+    }
+
+    if (Object.prototype.hasOwnProperty.call(target, "constructor")) {
+      Object.defineProperty(target.constructor, `_${camelize(name, false)}Callbacks`, {
+        get(this: { prototype: object }) {
+          return ClassMethods.getCallbacks.call(this, name);
+        },
+        set(this: { prototype: object }, value: CallbackChain) {
+          ClassMethods.setCallbacks.call(this, name, value);
+        },
+        configurable: true,
+      });
     }
   }
 
@@ -1139,6 +1156,20 @@ export namespace Callbacks {
 
     resetCallbacks(this: { prototype: object }, name: string): void {
       Callbacks.resetCallbacks(this.prototype, name);
+    },
+
+    getCallbacks(this: { prototype: object }, name: string): CallbackChain | undefined {
+      return peekCallbackChain(this.prototype, name);
+    },
+
+    setCallbacks(
+      this: { prototype: object },
+      name: string,
+      callbacks: CallbackChain,
+    ): Map<string, CallbackChain> {
+      const __callbacks = getCallbackChains(this.prototype);
+      __callbacks.set(name, callbacks);
+      return __callbacks;
     },
   };
 

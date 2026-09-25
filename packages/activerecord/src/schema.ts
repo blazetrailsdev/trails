@@ -59,7 +59,7 @@ export class Schema<A extends DatabaseAdapter = DatabaseAdapter> extends Current
   declare static define: DefineClassMethod;
   declare define: (info: SchemaDefineInfo, block: DefineBlock<A>) => Promise<void>;
 
-  private static _classForVersion?: Map<string | number, typeof Migration>;
+  declare private static _classForVersion: Map<string | number, typeof Migration> | undefined;
 
   /** @missingRailsArgs include — PERMANENT */
   static get(version: string | number): typeof Migration {

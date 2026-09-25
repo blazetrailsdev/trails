@@ -109,7 +109,18 @@ export {
   GzipWriter,
 } from "./zlib-adapter.js";
 export type { ZlibAdapter, GzipWriterIO, GzipWriterHandle } from "./zlib-adapter.js";
-export { aryDelete, aryPop, arySlice, compact, drop, first, pack, toA, uniq } from "./array.js";
+export {
+  aryDelete,
+  aryPop,
+  arySlice,
+  compact,
+  drop,
+  first,
+  pack,
+  sort,
+  toA,
+  uniq,
+} from "./array.js";
 export type { OsAdapter } from "./os-adapter.js";
 export { FrozenError } from "./frozen-error.js";
 export { fsAdapterConfig, getFs, getPath, registerFsAdapter } from "./fs-adapter.js";

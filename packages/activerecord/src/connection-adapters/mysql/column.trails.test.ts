@@ -1,20 +1,27 @@
 import { describe, it, expect } from "vitest";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
 import { SchemaCache } from "../schema-cache.js";
 import { Column as MysqlColumn } from "./column.js";
 import { TypeMetadata } from "./type-metadata.js";
 
-function dumpAndLoad(col: MysqlColumn): MysqlColumn {
+async function dumpAndLoad(col: MysqlColumn): Promise<MysqlColumn> {
   const cache = new SchemaCache();
-  cache.initWith({ columns: { t: [col] } });
-  const coder: Record<string, unknown> = {};
-  cache.encodeWith(coder);
-  const back = new SchemaCache();
-  back.initWith(JSON.parse(JSON.stringify(coder)));
-  return (back as unknown as { _columns: Map<string, MysqlColumn[]> })._columns.get("t")![0];
+  cache.setColumns("t", [col]);
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "column-dump-and-load-"));
+  const filename = path.join(tmpDir, "schema_cache.json");
+  try {
+    await cache.dumpTo(filename);
+    const back = (await SchemaCache._loadFrom(filename))!;
+    return (back as unknown as { _columns: Map<string, MysqlColumn[]> })._columns.get("t")![0];
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
 }
 
 describe("MysqlColumn", () => {
-  it("round-trips autoIncrement / unsigned / virtual through encodeWith/initWith", () => {
+  it("round-trips autoIncrement / unsigned / virtual through encodeWith/initWith", async () => {
     const original = new MysqlColumn(
       "id",
       null,
@@ -30,7 +37,7 @@ describe("MysqlColumn", () => {
     expect(Object.keys(coder)).not.toContain("auto_increment");
     expect(Object.keys(coder)).not.toContain("virtual");
 
-    const restored = dumpAndLoad(original);
+    const restored = await dumpAndLoad(original);
     expect(restored.isAutoIncrement()).toBe(true);
     expect(restored.isUnsigned()).toBe(true);
     expect(restored.isVirtual()).toBe(false);
@@ -39,12 +46,12 @@ describe("MysqlColumn", () => {
 });
 
 describe("MySQL::TypeMetadata JSON round-trip", () => {
-  it("recovers its own class and ivars from the sql_type_metadata payload", () => {
+  it("recovers its own class and ivars from the sql_type_metadata payload", async () => {
     const meta = new TypeMetadata(
       { sqlType: "bigint(20)", type: "integer", limit: 8 },
       { extra: "auto_increment" },
     );
-    const back = dumpAndLoad(new MysqlColumn("id", null, meta)).sqlTypeMetadata!;
+    const back = (await dumpAndLoad(new MysqlColumn("id", null, meta))).sqlTypeMetadata!;
 
     expect(back).toBeInstanceOf(TypeMetadata);
     expect((back as TypeMetadata).extra).toBe("auto_increment");
@@ -52,7 +59,7 @@ describe("MySQL::TypeMetadata JSON round-trip", () => {
     expect(back.equals(meta)).toBe(true);
   });
 
-  it("delegates the Column reader to the metadata object", () => {
+  it("delegates the Column reader to the metadata object", async () => {
     const col = new MysqlColumn(
       "id",
       null,
@@ -61,7 +68,7 @@ describe("MySQL::TypeMetadata JSON round-trip", () => {
     expect(col.sqlTypeMetadata).toBeInstanceOf(TypeMetadata);
     expect(col.extra).toBe("auto_increment");
 
-    const restored = dumpAndLoad(col);
+    const restored = await dumpAndLoad(col);
     expect(restored.extra).toBe("auto_increment");
   });
 

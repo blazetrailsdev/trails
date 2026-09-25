@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { registerModel } from "../index.js";
-import { resetCallbacks } from "../callbacks.js";
+import { resetCallbacks } from "../support/reset-callbacks.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Car } from "../test-helpers/models/car.js";

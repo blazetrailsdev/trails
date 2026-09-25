@@ -181,7 +181,7 @@ describe("SchemaCacheTest", () => {
   });
 
   it("primary key for non existent table", async () => {
-    expect(await cache.primaryKeys("omgponies")).toBeUndefined();
+    expect(await cache.primaryKeys("omgponies")).toBeNull();
   });
 
   it("getCachedPrimaryKeys is undefined for an unwarmed table", () => {
@@ -294,7 +294,7 @@ describe("SchemaCacheTest", () => {
       expect(await cache.primaryKeys("courses")).toBe("id");
       expect((await cache.indexes("courses")).length).toBe(1);
 
-      expect(await cache.dataSourceExists("professors")).toBeUndefined();
+      expect(await cache.dataSourceExists("professors")).toBeNull();
       await assertRaises([StatementInvalid], {}, async () => {
         await cache.columns("professors");
       });
@@ -428,20 +428,22 @@ describe("SchemaCacheTest", () => {
     }
   });
   it("#init_with skips deduplication if told to", () => {
-    const col = makeColumn("id", "integer");
-    const cache = new SchemaCache();
-    cache.initWith({ columns: { t: [col] }, deduplicated: true });
-    expect((cache as unknown as { _columns: Map<string, Column[]> })._columns.get("t")![0]).toBe(
-      col,
-    );
+    const coder = {
+      columns: Object.freeze([]),
+      deduplicated: true,
+    };
+
+    const schemaCache = new SchemaCache();
+    schemaCache.initWith(coder);
+    expect((schemaCache as unknown as { _columns: unknown })._columns).toBe(coder["columns"]);
   });
 
   it("#init_with reads columns_hash from the coder", () => {
     const col = makeColumn("id", "integer");
     const cache = new SchemaCache();
     cache.initWith({
-      columns: { t: [col] },
-      columns_hash: { t: { id: col } },
+      columns: new Map([["t", [col]]]),
+      columns_hash: new Map([["t", { id: col }]]),
       deduplicated: true,
     });
     const columnsHash = (cache as unknown as { _columnsHash: Map<string, Record<string, Column>> })
@@ -456,7 +458,7 @@ describe("SchemaCacheTest", () => {
       ["y", null],
       ["x", null],
     ];
-    const expected = Object.fromEntries([...values].sort((a, b) => (a[0] < b[0] ? -1 : 1)));
+    const expected = new Map([...values].sort((a, b) => (a[0] < b[0] ? -1 : 1)));
 
     const coder: Record<string, unknown> = {
       columns: values,
@@ -483,8 +485,8 @@ describe("SchemaCacheTest", () => {
 
     const coder: Record<string, unknown> = {};
     cache.encodeWith(coder);
-    const serialized = coder["primary_keys"] as Record<string, unknown>;
-    expect(serialized["memberships"]).toEqual(["user_id", "group_id"]);
+    const serialized = coder["primary_keys"] as Map<string, unknown>;
+    expect(serialized.get("memberships")).toEqual(["user_id", "group_id"]);
 
     const restored = new SchemaCache();
     restored.initWith(coder);
@@ -573,10 +575,8 @@ describe("SchemaReflectionTest", () => {
 
     const cache = new SchemaCache();
     cache.setColumns("posts", [makeColumn("title", "varchar(255)")]);
-    const coder: Record<string, unknown> = {};
-    cache.encodeWith(coder);
-    coder["version"] = "42";
-    fs.writeFileSync(cachePath, JSON.stringify(coder), "utf-8");
+    (cache as unknown as { _version: string })._version = "42";
+    await cache.dumpTo(cachePath);
 
     const fakeConnection = {
       schemaVersion: async () => "42",
