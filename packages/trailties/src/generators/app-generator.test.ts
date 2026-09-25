@@ -2,13 +2,18 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
+import { assertNoMatch } from "@blazetrails/activesupport";
 import { AppGenerator, type AppDatabase } from "./app-generator.js";
+import * as Assertions from "./testing/assertions.js";
 
 let tmpDir: string;
 let lines: string[];
+const destination = { destinationRoot: "" };
+const assertFile = Assertions.assertFile.bind(destination);
 
 beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-test-"));
+  destination.destinationRoot = tmpDir;
   lines = [];
 });
 
@@ -42,18 +47,6 @@ function appPath(...segments: string[]) {
 
 function exists(...segments: string[]) {
   return fs.existsSync(appPath(...segments));
-}
-
-function assertFile(root: string, relative: string, ...contents: (RegExp | string)[]) {
-  const absolute = path.join(tmpDir, root, relative);
-  expect(fs.existsSync(absolute), `Expected file ${JSON.stringify(relative)} to exist`).toBe(true);
-
-  if (contents.length === 0) return;
-  const read = fs.readFileSync(absolute, "utf-8");
-  for (const content of contents) {
-    if (typeof content === "string") expect(read).toBe(content);
-    else expect(read).toMatch(content);
-  }
 }
 
 describe("AppGenerator", () => {
@@ -182,10 +175,9 @@ describe("AppGenerator", () => {
     await makeGen("sqlite", { ...UNPORTED, skipActiveJob: true }).run();
 
     for (const env of ["production", "development", "test"]) {
-      assertFile("my-app", `config/environments/${env}.ts`);
-      expect(fs.readFileSync(appPath(`config/environments/${env}.ts`), "utf-8")).not.toMatch(
-        /activeJob/,
-      );
+      await assertFile(`my-app/config/environments/${env}.ts`, (content) => {
+        assertNoMatch(/activeJob/, content);
+      });
     }
   });
 
@@ -408,10 +400,8 @@ describe("AppGenerator", () => {
       database: "sqlite",
     });
     await gen.run();
-    const read = (...segs: string[]) =>
-      fs.readFileSync(path.join(tmpDir, "things-43", ...segs), "utf-8");
-    expect(read("config/environment.ts")).toMatch(/Trails\.initialize\(\)/);
-    expect(read("config/application.ts")).toMatch(/^export class Things43 /m);
+    await assertFile("things-43/config/environment.ts", /Trails\.initialize\(\)/);
+    await assertFile("things-43/config/application.ts", /^export class Things43 /m);
   });
 
   it("name option", async () => {
@@ -423,7 +413,7 @@ describe("AppGenerator", () => {
       database: "sqlite",
     });
     await gen.run();
-    assertFile("app-dir", "config/application.ts", /^export class MyApp /m);
+    await assertFile("app-dir/config/application.ts", /^export class MyApp /m);
   });
 
   it("types drawRoutes against Mapper", async () => {

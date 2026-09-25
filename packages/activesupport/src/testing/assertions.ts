@@ -659,7 +659,12 @@ function refute(test: unknown, msg: string | (() => string) | null = null): true
 
 const E = "";
 
-function assertEqual(exp: unknown, act: unknown, msg: string | (() => string) | null = null): true {
+/** @noRailsEquivalent PERMANENT */
+export function assertEqual(
+  exp: unknown,
+  act: unknown,
+  msg: string | (() => string) | null = null,
+): true {
   msg = message(msg, E, () => diff(exp, act));
   const result = assert(deepEqual(exp, act), msg);
 
@@ -694,7 +699,8 @@ export function assertNotNil(obj: unknown, msg: string | (() => string) | null =
   return refuteNil(obj, msg);
 }
 
-function assertMatch(
+/** @noRailsEquivalent PERMANENT */
+export function assertMatch(
   matcher: RegExp | string,
   obj: string,
   msg: string | (() => string) | null = null,
@@ -709,6 +715,24 @@ function assertMatch(
   assert(lastMatch != null, msg);
 
   return lastMatch;
+}
+
+function refuteMatch(
+  matcher: RegExp | string,
+  obj: string,
+  msg: string | (() => string) | null = null,
+): true {
+  msg = message(msg, null, () => `Expected ${inspect(matcher)} to not match ${inspect(obj)}`);
+  if (typeof matcher === "string") matcher = new RegExp(regexpEscape(matcher));
+  return refute(matcher.exec(obj), msg);
+}
+
+export function assertNoMatch(
+  matcher: RegExp | string,
+  obj: string,
+  msg: string | (() => string) | null = null,
+): true {
+  return refuteMatch(matcher, obj, msg);
 }
 
 function caseEqual(expected: unknown, actual: unknown): boolean {

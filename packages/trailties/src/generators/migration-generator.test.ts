@@ -2,13 +2,21 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
+import { assertMatch, assertNoMatch } from "@blazetrails/activesupport";
 import { MigrationGenerator } from "./migration-generator.js";
+import * as Assertions from "./testing/assertions.js";
+import { migrationFileName as _migrationFileName } from "./testing/behavior.js";
 
 let tmpDir: string;
 let lines: string[];
+const destination = { destinationRoot: "" };
+const assertMigration = Assertions.assertMigration.bind(destination);
+const migrationFileName = _migrationFileName.bind(destination);
+const { assertMethod } = Assertions;
 
 beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-test-"));
+  destination.destinationRoot = tmpDir;
   fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
   lines = [];
 });
@@ -26,30 +34,32 @@ function readMigration(files: string[]): string {
 }
 
 describe("MigrationGeneratorTest", () => {
-  it("migration", () => {
-    const gen = makeGen();
-    const files = gen.run("change_title_body_from_posts", []);
-    expect(files.length).toBe(1);
-    expect(files[0]).toMatch(/^db\/migrate\/\d{14}_change_title_body_from_posts\.ts$/);
-    const content = readMigration(files);
-    expect(content).toContain("class ChangeTitleBodyFromPosts extends Migration");
+  it("migration", async () => {
+    const migration = "change_title_body_from_posts";
+    makeGen().run(migration, []);
+    await assertMigration(
+      `db/migrate/${migration}.ts`,
+      /class ChangeTitleBodyFromPosts extends Migration/,
+    );
   });
 
   it("migrations generated simultaneously", () => {
-    const gen1 = makeGen();
-    const gen2 = makeGen();
-    const files1 = gen1.run("change_title_body_from_posts", []);
-    const files2 = gen2.run("change_email_from_comments", []);
-    const ts1 = path.basename(files1[0]).split("_")[0];
-    const ts2 = path.basename(files2[0]).split("_")[0];
-    expect(ts1).not.toBe(ts2);
+    const migrations = ["change_title_body_from_posts", "change_email_from_comments"];
+    const [firstMigrationNumber, secondMigrationNumber] = migrations.map((migration) => {
+      makeGen().run(migration, []);
+      const fileName = migrationFileName(`db/migrate/${migration}.ts`)!;
+      return path.basename(fileName).split("_")[0];
+    });
+    expect(firstMigrationNumber).not.toBe(secondMigrationNumber);
   });
 
-  it("migration with class name", () => {
-    const gen = makeGen();
-    const files = gen.run("ChangeTitleBodyFromPosts", []);
-    const content = readMigration(files);
-    expect(content).toContain("class ChangeTitleBodyFromPosts extends Migration");
+  it("migration with class name", async () => {
+    const migration = "ChangeTitleBodyFromPosts";
+    makeGen().run(migration, []);
+    await assertMigration(
+      "db/migrate/change_title_body_from_posts.ts",
+      new RegExp(`class ${migration} extends Migration`),
+    );
   });
 
   it("migration with invalid file name", () => {
@@ -61,146 +71,162 @@ describe("MigrationGeneratorTest", () => {
     expect(MigrationGenerator.exitOnFailure).toBe(true);
   });
 
-  it("add migration with attributes", () => {
-    const gen = makeGen();
-    const files = gen.run("add_title_body_to_posts", ["title:string", "body:text"]);
-    const content = readMigration(files);
-    expect(content).toContain('addColumn("posts", "title", "string")');
-    expect(content).toContain('addColumn("posts", "body", "text")');
+  it("add migration with attributes", async () => {
+    const migration = "add_title_body_to_posts";
+    makeGen().run(migration, ["title:string", "body:text"]);
+    await assertMigration(`db/migrate/${migration}.ts`, (content) =>
+      assertMethod("change", content, (change) => {
+        assertMatch('addColumn("posts", "title", "string")', change);
+        assertMatch('addColumn("posts", "body", "text")', change);
+      }),
+    );
   });
 
-  it("add migration with table having from in title", () => {
-    const gen = makeGen();
-    const files = gen.run("add_email_address_to_excluded_from_campaign", ["email_address:string"]);
-    const content = readMigration(files);
-    expect(content).toContain('addColumn("excluded_from_campaigns", "email_address", "string")');
+  it("add migration with table having from in title", async () => {
+    const migration = "add_email_address_to_excluded_from_campaign";
+    makeGen().run(migration, ["email_address:string"]);
+    await assertMigration(`db/migrate/${migration}.ts`, (content) =>
+      assertMethod("change", content, (change) => {
+        assertMatch('addColumn("excluded_from_campaigns", "email_address", "string")', change);
+      }),
+    );
   });
 
-  it("remove migration with indexed attribute", () => {
-    const gen = makeGen();
-    const files = gen.run("remove_title_body_from_posts", ["title:string:index", "body:text"]);
-    const content = readMigration(files);
-    expect(content).toContain('removeColumn("posts", "title", "string")');
-    expect(content).toContain('removeColumn("posts", "body", "text")');
-    expect(content).toContain('removeIndex("posts", { column: "title" })');
+  it("remove migration with indexed attribute", async () => {
+    const migration = "remove_title_body_from_posts";
+    makeGen().run(migration, ["title:string:index", "body:text"]);
+    await assertMigration(`db/migrate/${migration}.ts`, (content) =>
+      assertMethod("change", content, (change) => {
+        assertMatch('removeColumn("posts", "title", "string")', change);
+        assertMatch('removeColumn("posts", "body", "text")', change);
+        assertMatch('removeIndex("posts", { column: "title" })', change);
+      }),
+    );
   });
 
-  it("remove migration with attributes", () => {
-    const gen = makeGen();
-    const files = gen.run("remove_title_body_from_posts", ["title:string", "body:text"]);
-    const content = readMigration(files);
-    expect(content).toContain('removeColumn("posts", "title", "string")');
-    expect(content).toContain('removeColumn("posts", "body", "text")');
+  it("remove migration with attributes", async () => {
+    const migration = "remove_title_body_from_posts";
+    makeGen().run(migration, ["title:string", "body:text"]);
+    await assertMigration(`db/migrate/${migration}.ts`, (content) =>
+      assertMethod("change", content, (change) => {
+        assertMatch('removeColumn("posts", "title", "string")', change);
+        assertMatch('removeColumn("posts", "body", "text")', change);
+      }),
+    );
   });
 
-  it("remove migration with table having to in title", () => {
-    const gen = makeGen();
-    const files = gen.run("remove_email_address_from_sent_to_user", ["email_address:string"]);
-    const content = readMigration(files);
-    expect(content).toContain('removeColumn("sent_to_users", "email_address", "string")');
+  it("remove migration with table having to in title", async () => {
+    const migration = "remove_email_address_from_sent_to_user";
+    makeGen().run(migration, ["email_address:string"]);
+    await assertMigration(`db/migrate/${migration}.ts`, (content) =>
+      assertMethod("change", content, (change) => {
+        assertMatch('removeColumn("sent_to_users", "email_address", "string")', change);
+      }),
+    );
   });
 
-  it("remove migration with references options", () => {
-    const gen = makeGen();
-    const files = gen.run("remove_references_from_books", [
-      "author:belongs_to",
-      "distributor:references{polymorphic}",
-    ]);
-    const content = readMigration(files);
-    expect(content).toContain('removeReference("books", "author"');
-    expect(content).toContain('removeReference("books", "distributor"');
-    expect(content).toMatch(/removeReference\("books", "distributor",.*polymorphic: true/);
+  it("remove migration with references options", async () => {
+    const migration = "remove_references_from_books";
+    makeGen().run(migration, ["author:belongs_to", "distributor:references{polymorphic}"]);
+    await assertMigration(`db/migrate/${migration}.ts`, (content) =>
+      assertMethod("change", content, (change) => {
+        assertMatch('removeReference("books", "author"', change);
+        assertMatch(/removeReference\("books", "distributor",.*polymorphic: true/, change);
+      }),
+    );
   });
 
-  it("remove migration with references removes foreign keys", () => {
-    const gen = makeGen();
-    const files = gen.run("remove_references_from_books", [
-      "author:belongs_to",
-      "distributor:references{polymorphic}",
-    ]);
-    const content = readMigration(files);
-    expect(content).toContain('removeReference("books", "author")');
-    expect(content).not.toMatch(/removeReference\("books", "author",.*foreignKey/);
-    expect(content).toMatch(/removeReference\("books", "distributor",.*polymorphic: true/);
+  it("remove migration with references removes foreign keys", async () => {
+    const migration = "remove_references_from_books";
+    makeGen().run(migration, ["author:belongs_to", "distributor:references{polymorphic}"]);
+    await assertMigration(`db/migrate/${migration}.ts`, (content) =>
+      assertMethod("change", content, (change) => {
+        assertNoMatch(/removeReference\("books", "author",.*foreignKey/, change);
+        assertMatch('removeReference("books", "author")', change);
+        assertMatch(/removeReference\("books", "distributor",.*polymorphic: true/, change);
+      }),
+    );
   });
 
   it.skip("remove migration with references removes foreign keys when primary key uuid", () => {});
 
-  it("add migration with attributes and indices", () => {
-    const gen = makeGen();
-    const files = gen.run("add_title_with_index_and_body_to_posts", [
-      "title:string:index",
-      "body:text",
-      "user_id:integer:uniq",
-    ]);
-    const content = readMigration(files);
-    expect(content).toContain('addColumn("posts", "title", "string")');
-    expect(content).toContain('addColumn("posts", "body", "text")');
-    expect(content).toContain('addColumn("posts", "user_id", "integer")');
-    expect(content).toContain('addIndex("posts", "title")');
-    expect(content).toMatch(/addIndex\("posts", "user_id", \{ unique: true \}/);
+  it("add migration with attributes and indices", async () => {
+    const migration = "add_title_with_index_and_body_to_posts";
+    makeGen().run(migration, ["title:string:index", "body:text", "user_id:integer:uniq"]);
+    await assertMigration(`db/migrate/${migration}.ts`, (content) =>
+      assertMethod("change", content, (change) => {
+        assertMatch('addColumn("posts", "title", "string")', change);
+        assertMatch('addColumn("posts", "body", "text")', change);
+        assertMatch('addColumn("posts", "user_id", "integer")', change);
+        assertMatch('addIndex("posts", "title")', change);
+        assertMatch(/addIndex\("posts", "user_id", \{ unique: true \}/, change);
+      }),
+    );
   });
 
-  it("add migration with attributes without type and index", () => {
-    const gen = makeGen();
-    const files = gen.run("add_title_with_index_and_body_to_posts", [
-      "title:index",
-      "body:text",
-      "user_uuid:uniq",
-    ]);
-    const content = readMigration(files);
-    expect(content).toContain('addColumn("posts", "title", "string")');
-    expect(content).toContain('addColumn("posts", "body", "text")');
-    expect(content).toContain('addColumn("posts", "user_uuid", "string")');
-    expect(content).toContain('addIndex("posts", "title")');
-    expect(content).toMatch(/addIndex\("posts", "user_uuid", \{ unique: true \}/);
+  it("add migration with attributes without type and index", async () => {
+    const migration = "add_title_with_index_and_body_to_posts";
+    makeGen().run(migration, ["title:index", "body:text", "user_uuid:uniq"]);
+    await assertMigration(`db/migrate/${migration}.ts`, (content) =>
+      assertMethod("change", content, (change) => {
+        assertMatch('addColumn("posts", "title", "string")', change);
+        assertMatch('addColumn("posts", "body", "text")', change);
+        assertMatch('addColumn("posts", "user_uuid", "string")', change);
+        assertMatch('addIndex("posts", "title")', change);
+        assertMatch(/addIndex\("posts", "user_uuid", \{ unique: true \}/, change);
+      }),
+    );
   });
 
-  it("add migration with attributes index declaration and attribute options", () => {
-    const gen = makeGen();
-    const files = gen.run("add_title_and_content_to_books", [
+  it("add migration with attributes index declaration and attribute options", async () => {
+    const migration = "add_title_and_content_to_books";
+    makeGen().run(migration, [
       "title:string{40}:index",
       "content:string{255}",
       "price:decimal{1,2}:index",
       "discount:decimal{3.4}:uniq",
     ]);
-    const content = readMigration(files);
-    expect(content).toContain('addColumn("books", "title", "string", { limit: 40 })');
-    expect(content).toContain('addColumn("books", "content", "string", { limit: 255 })');
-    expect(content).toContain('addColumn("books", "price", "decimal", { precision: 1, scale: 2 })');
-    expect(content).toContain(
-      'addColumn("books", "discount", "decimal", { precision: 3, scale: 4 })',
-    );
-    expect(content).toContain('addIndex("books", "title")');
-    expect(content).toContain('addIndex("books", "price")');
-    expect(content).toMatch(/addIndex\("books", "discount", \{ unique: true \}/);
+    await assertMigration(`db/migrate/${migration}.ts`, async (content) => {
+      await assertMethod("change", content, (change) => {
+        assertMatch('addColumn("books", "title", "string", { limit: 40 })', change);
+        assertMatch('addColumn("books", "content", "string", { limit: 255 })', change);
+        assertMatch('addColumn("books", "price", "decimal", { precision: 1, scale: 2 })', change);
+        assertMatch(
+          'addColumn("books", "discount", "decimal", { precision: 3, scale: 4 })',
+          change,
+        );
+      });
+      assertMatch('addIndex("books", "title")', content);
+      assertMatch('addIndex("books", "price")', content);
+      assertMatch(/addIndex\("books", "discount", \{ unique: true \}/, content);
+    });
   });
 
-  it("add migration with references options", () => {
-    const gen = makeGen();
-    const files = gen.run("add_references_to_books", [
-      "author:belongs_to",
-      "distributor:references{polymorphic}",
-    ]);
-    const content = readMigration(files);
-    expect(content).toContain('addReference("books", "author"');
-    expect(content).toMatch(/addReference\("books", "distributor",.*polymorphic: true/);
+  it("add migration with references options", async () => {
+    const migration = "add_references_to_books";
+    makeGen().run(migration, ["author:belongs_to", "distributor:references{polymorphic}"]);
+    await assertMigration(`db/migrate/${migration}.ts`, (content) =>
+      assertMethod("change", content, (change) => {
+        assertMatch('addReference("books", "author"', change);
+        assertMatch(/addReference\("books", "distributor",.*polymorphic: true/, change);
+      }),
+    );
   });
 
   it.skip("add migration with references adds null false by default", () => {});
 
   it.skip("add migration with references does not add belongs to when required by default global config is false", () => {});
 
-  it("add migration with references adds foreign keys", () => {
-    const gen = makeGen();
-    const files = gen.run("add_references_to_books", [
-      "author:belongs_to",
-      "distributor:references{polymorphic}",
-    ]);
-    const content = readMigration(files);
-    expect(content).toMatch(/addReference\("books", "author",.*foreignKey: true/);
-    expect(content).toContain('addReference("books", "distributor"');
-    expect(content).not.toMatch(/addReference\("books", "distributor",.*foreignKey: true/);
+  it("add migration with references adds foreign keys", async () => {
+    const migration = "add_references_to_books";
+    makeGen().run(migration, ["author:belongs_to", "distributor:references{polymorphic}"]);
+    await assertMigration(`db/migrate/${migration}.ts`, (content) =>
+      assertMethod("change", content, (change) => {
+        assertMatch(/addReference\("books", "author",.*foreignKey: true/, change);
+        assertMatch('addReference("books", "distributor"', change);
+        assertNoMatch(/addReference\("books", "distributor",.*foreignKey: true/, change);
+      }),
+    );
   });
 
   it("create join table migration", () => {
