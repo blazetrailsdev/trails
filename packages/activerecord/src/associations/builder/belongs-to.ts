@@ -1,4 +1,4 @@
-import { hasKey, type Module } from "@blazetrails/ruby-compat";
+import { Hash, hasKey, type Module } from "@blazetrails/ruby-compat";
 import { underscore, pluralize, isBlank, safeConstantize } from "@blazetrails/activesupport";
 import type { AssociationInstanceHost } from "./association.js";
 import { SingularAssociation } from "./singular-association.js";
@@ -117,7 +117,7 @@ export class BelongsTo extends SingularAssociation {
   /** @missingRailsCall first — PERMANENT */
   static async touchRecord(
     o: any,
-    changes: Record<string, unknown>,
+    changes: Hash<string, unknown>,
     foreignKey: string | string[],
     name: string,
     touch: any,
@@ -125,13 +125,13 @@ export class BelongsTo extends SingularAssociation {
     const fkColumns = Array.isArray(foreignKey) ? foreignKey : [foreignKey];
 
     const oldFkValues = fkColumns.map((col) => {
-      const change = changes[col] as [unknown, unknown] | undefined;
+      const change = changes.get(col) as [unknown, unknown] | undefined;
       if (change) return change[0];
       return typeof o._readAttribute === "function" ? o._readAttribute(col) : o[col];
     });
     const foreignTypeCol = `${underscore(name)}_type`;
     const hasOldFk =
-      fkColumns.some((col) => changes[col] != null) || changes[foreignTypeCol] != null;
+      fkColumns.some((col) => changes.get(col) != null) || changes.get(foreignTypeCol) != null;
 
     if (hasOldFk) {
       const association = typeof o.association === "function" ? o.association(name) : null;
@@ -147,7 +147,7 @@ export class BelongsTo extends SingularAssociation {
             reflection?.options?.foreignType ??
             `${underscore(name)}_type`;
           klass =
-            (changes[foreignType] as [unknown, unknown] | undefined)?.[0] ??
+            (changes.get(foreignType) as [unknown, unknown] | undefined)?.[0] ??
             (typeof o._readAttribute === "function"
               ? o._readAttribute(foreignType)
               : o[foreignType]);
@@ -194,7 +194,7 @@ export class BelongsTo extends SingularAssociation {
 
     const makeCallback = (changesMethod: string) => async (record: any) => {
       const raw = record[changesMethod];
-      const changes = (typeof raw === "function" ? raw.call(record) : raw) ?? {};
+      const changes = (typeof raw === "function" ? raw.call(record) : raw) ?? new Hash();
       await BelongsTo.touchRecord(record, changes, foreignKey, name, touch);
     };
 
@@ -220,7 +220,7 @@ export class BelongsTo extends SingularAssociation {
       });
       model.afterDestroy(async (record: any) => {
         if (typeof record.isNewRecord !== "function" || !record.isNewRecord()) {
-          await BelongsTo.touchRecord(record, {}, foreignKey, name, touch);
+          await BelongsTo.touchRecord(record, new Hash(), foreignKey, name, touch);
         }
       });
     }

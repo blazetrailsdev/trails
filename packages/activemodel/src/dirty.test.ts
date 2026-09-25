@@ -1,3 +1,5 @@
+import { Hash } from "@blazetrails/ruby-compat";
+import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   assert,
@@ -169,9 +171,9 @@ describe("DirtyTest", () => {
   });
 
   it("changes to attribute values", () => {
-    assertNot(model.changes["name"]);
+    assertNot(model.changes.get("name"));
     model.name = "John";
-    expect(model.changes["name"]).toEqual([null, "John"]);
+    expect(model.changes.get("name")).toEqual([null, "John"]);
   });
 
   it("checking if an attribute has changed to a particular value", () => {
@@ -186,8 +188,8 @@ describe("DirtyTest", () => {
 
   it("changes accessible through both strings and symbols", () => {
     model.name = "David";
-    assertNotNil(model.changes["name"]);
-    assertNotNil(model.changes["name"]);
+    assertNotNil(model.changes.get("name"));
+    assertNotNil(model.changes.get("name"));
   });
 
   it("be consistent with symbols arguments after the changes are applied", () => {
@@ -238,8 +240,8 @@ describe("DirtyTest", () => {
     model.name = "Jericho Cane";
     model.status = "waiting";
     model.save();
-    expect(model.previousChanges["name"]).toEqual([null, "Jericho Cane"]);
-    expect(model.previousChanges["status"]).toEqual(["initialized", "waiting"]);
+    expect(model.previousChanges.get("name")).toEqual([null, "Jericho Cane"]);
+    expect(model.previousChanges.get("status")).toEqual(["initialized", "waiting"]);
   });
 
   it("setting new attributes should not affect previous changes", () => {
@@ -249,7 +251,7 @@ describe("DirtyTest", () => {
     model.name = "DudeFella ManGuy";
     model.status = "finished";
     expect(model.namePreviousChange).toEqual([null, "Jericho Cane"]);
-    expect(model.previousChanges["status"]).toEqual(["initialized", "waiting"]);
+    expect(model.previousChanges.get("status")).toEqual(["initialized", "waiting"]);
   });
 
   it("saving should preserve model's previous changed status", () => {
@@ -270,16 +272,20 @@ describe("DirtyTest", () => {
   });
 
   it("previous value is preserved when changed after save", () => {
-    expect(model.changedAttributes).toEqual({});
+    expect(model.changedAttributes).toEqual(new HashWithIndifferentAccess());
     model.name = "Paul";
     model.status = "waiting";
-    expect(model.changedAttributes).toEqual({ name: null, status: "initialized" });
+    expect(model.changedAttributes).toEqual(
+      new HashWithIndifferentAccess({ name: null, status: "initialized" }),
+    );
 
     model.save();
 
     model.name = "John";
     model.status = "finished";
-    expect(model.changedAttributes).toEqual({ name: "Paul", status: "waiting" });
+    expect(model.changedAttributes).toEqual(
+      new HashWithIndifferentAccess({ name: "Paul", status: "waiting" }),
+    );
   });
 
   it("changing the same attribute multiple times retains the correct original value", () => {
@@ -306,13 +312,13 @@ describe("DirtyTest", () => {
     model.save();
     model.name = "Bob";
 
-    expect(model.previousChanges["name"]).toEqual([null, "Dmitry"]);
-    expect(model.changedAttributes["name"]).toBe("Dmitry");
+    expect(model.previousChanges.get("name")).toEqual([null, "Dmitry"]);
+    expect(model.changedAttributes.get("name")).toBe("Dmitry");
 
     model.clearChangesInformation();
 
-    expect(model.previousChanges).toEqual({});
-    expect(model.changedAttributes).toEqual({});
+    expect(model.previousChanges).toEqual(new Hash());
+    expect(model.changedAttributes).toEqual(new HashWithIndifferentAccess());
   });
 
   it("restore_attributes should restore all previous data", () => {

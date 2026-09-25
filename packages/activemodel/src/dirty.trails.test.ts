@@ -1,3 +1,4 @@
+import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
    Each model below spells `include ActiveModel::Dirty` in its class body, the way the Rails test
    model it mirrors does; the empty class/interface merge beside it is how `include()` surfaces
@@ -32,7 +33,7 @@ describe("Dirty across dup", () => {
     const duped = t.dup();
 
     expect(duped.changes).toEqual(t.changes);
-    expect(duped.changes).toEqual({ title: ["A", "B"] });
+    expect(duped.changes).toEqual(new HashWithIndifferentAccess({ title: ["A", "B"] }));
     expect(duped.isChanged).toBe(true);
     expect(duped.attributeWas("title")).toEqual("A");
     expect(duped.previousChanges).toEqual(t.previousChanges);
@@ -44,8 +45,10 @@ describe("Dirty across dup", () => {
 
     duped.body = "new";
 
-    expect(duped.changes).toEqual({ title: [null, "A"], body: [null, "new"] });
-    expect(t.changes).toEqual({ title: [null, "A"] });
+    expect(duped.changes).toEqual(
+      new HashWithIndifferentAccess({ title: [null, "A"], body: [null, "new"] }),
+    );
+    expect(t.changes).toEqual(new HashWithIndifferentAccess({ title: [null, "A"] }));
     expect(t.isChanged).toBe(true);
     expect(t.body).toBeNull();
   });
@@ -56,8 +59,10 @@ describe("Dirty across dup", () => {
 
     t.body = "new";
 
-    expect(t.changes).toEqual({ title: [null, "A"], body: [null, "new"] });
-    expect(duped.changes).toEqual({ title: [null, "A"] });
+    expect(t.changes).toEqual(
+      new HashWithIndifferentAccess({ title: [null, "A"], body: [null, "new"] }),
+    );
+    expect(duped.changes).toEqual(new HashWithIndifferentAccess({ title: [null, "A"] }));
     expect(duped.body).toBeNull();
   });
 
@@ -143,10 +148,12 @@ describe("Dirty Tracking", () => {
     p.changesApplied();
     p._writeAttribute("name", "sam");
     p._writeAttribute("age", 31);
-    expect(p.changes).toEqual({
-      name: ["dean", "sam"],
-      age: [30, 31],
-    });
+    expect(p.changes).toEqual(
+      new HashWithIndifferentAccess({
+        name: ["dean", "sam"],
+        age: [30, 31],
+      }),
+    );
   });
 
   it("setting color to same value should not result in change being recorded", () => {
@@ -190,7 +197,7 @@ describe("Dirty Tracking", () => {
     p._writeAttribute("name", "sam");
     p.changesApplied();
     expect(p.isChanged).toBe(false);
-    expect(p.previousChanges).toEqual({ name: ["dean", "sam"] });
+    expect(p.previousChanges).toEqual(new HashWithIndifferentAccess({ name: ["dean", "sam"] }));
   });
 
   it("setting new attributes should not affect previous changes", () => {
@@ -199,8 +206,8 @@ describe("Dirty Tracking", () => {
     p._writeAttribute("name", "sam");
     p.changesApplied();
     p._writeAttribute("name", "bob");
-    expect(p.previousChanges).toEqual({ name: ["dean", "sam"] });
-    expect(p.changes).toEqual({ name: ["sam", "bob"] });
+    expect(p.previousChanges).toEqual(new HashWithIndifferentAccess({ name: ["dean", "sam"] }));
+    expect(p.changes).toEqual(new HashWithIndifferentAccess({ name: ["sam", "bob"] }));
   });
 
   it("cast-value-aware: same cast value = no change", () => {
@@ -275,14 +282,14 @@ describe("clearChangesInformation", () => {
     p.changesApplied();
     p._writeAttribute("name", "Bob");
     p.changesApplied();
-    expect(Object.keys(p.previousChanges).length).toBeGreaterThan(0);
+    expect(p.previousChanges.size).toBeGreaterThan(0);
 
     p._writeAttribute("age", 31);
     expect(p.isChanged).toBe(true);
 
     p.clearChangesInformation();
     expect(p.isChanged).toBe(false);
-    expect(Object.keys(p.previousChanges).length).toBe(0);
+    expect(p.previousChanges.size).toBe(0);
   });
 });
 describe("clearAttributeChanges clears forced-dirty state", () => {
@@ -577,7 +584,7 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
     m.attributeWillChangeBang("ratio");
     m._writeAttribute("ratio", NaN);
     expect(m.changed).toContain("ratio");
-    expect(m.changes["ratio"]).toEqual([NaN, NaN]);
+    expect(m.changes.get("ratio")).toEqual([NaN, NaN]);
   });
 
   it("float attribute NaN-to-NaN does NOT appear in changes — equal_nan? exemption", () => {
@@ -599,7 +606,7 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
     m.changesApplied();
     m._writeAttribute("ratio", NaN);
     expect(m.changed).not.toContain("ratio");
-    expect(m.changes).not.toHaveProperty("ratio");
+    expect(m.changes.include("ratio")).toBe(false);
   });
 
   it("integer same-cast-value write via boolean raw is still dirty — number_to_non_number? path at model level", () => {

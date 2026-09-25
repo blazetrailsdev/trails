@@ -1,3 +1,5 @@
+import { Hash } from "@blazetrails/ruby-compat";
+import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import { Base } from "./index.js";
 import { ValueType } from "@blazetrails/activemodel";
@@ -222,7 +224,7 @@ describe("DirtyTest", () => {
 
     expect(pirate.attributeChange("catchphrase")).toBeNull();
     expect(pirate.catchphrase).toBe("Yar!");
-    expect(pirate.changes).toEqual({});
+    expect(pirate.changes).toEqual(new HashWithIndifferentAccess());
     expect(pirate.attributeChanged("catchphrase")).toBeFalsy();
   });
 
@@ -237,7 +239,7 @@ describe("DirtyTest", () => {
 
     expect(pirate.attributeChange("catchphrase")).toBeNull();
     expect(pirate.catchphrase).toBe("Ahoy!");
-    expect(pirate.changes).toEqual({});
+    expect(pirate.changes).toEqual(new HashWithIndifferentAccess());
     expect(pirate.attributeChanged("catchphrase")).toBeFalsy();
   });
 
@@ -358,18 +360,18 @@ describe("DirtyTest", () => {
     const pirate = new Pirate();
     expect(pirate.isChanged).toBeFalsy();
     expect(pirate.changedAttributeNamesToSave).toEqual([]);
-    expect(pirate.changes).toEqual({});
+    expect(pirate.changes).toEqual(new HashWithIndifferentAccess());
 
     pirate.catchphrase = "arrr";
     expect(pirate.isChanged).toBeTruthy();
     expect(pirate.attributeWas("catchphrase")).toBeNull();
     expect(pirate.changedAttributeNamesToSave).toEqual(["catchphrase"]);
-    expect(pirate.changes).toEqual({ catchphrase: [null, "arrr"] });
+    expect(pirate.changes).toEqual(new HashWithIndifferentAccess({ catchphrase: [null, "arrr"] }));
 
     await pirate.save();
     expect(pirate.isChanged).toBeFalsy();
     expect(pirate.changedAttributeNamesToSave).toEqual([]);
-    expect(pirate.changes).toEqual({});
+    expect(pirate.changes).toEqual(new HashWithIndifferentAccess());
   });
 
   it("attribute will change!", async () => {
@@ -558,7 +560,7 @@ describe("DirtyTest", () => {
   it("previous changes includes in place serialized attribute mutation", async () => {
     const topic = await Topic.createBang({ content: { a: "a" } });
 
-    expect(topic.previousChanges).toHaveProperty("content");
+    expect(topic.previousChanges.has("content")).toBe(true);
 
     (topic.content as Record<string, string>)["b"] = "b";
 
@@ -567,12 +569,20 @@ describe("DirtyTest", () => {
     await topic.saveBang();
 
     expect(topic.isChanged).toBeFalsy();
-    expect(topic.previousChanges).toHaveProperty("content");
-    expect(topic.savedChanges).toHaveProperty("content");
-    expect((topic.previousChanges["content"][0] as Record<string, string>)["a"]).toBe("a");
-    expect((topic.previousChanges["content"][0] as Record<string, string>)["b"]).toBeUndefined();
-    expect((topic.previousChanges["content"][1] as Record<string, string>)["a"]).toBe("a");
-    expect((topic.previousChanges["content"][1] as Record<string, string>)["b"]).toBe("b");
+    expect(topic.previousChanges.has("content")).toBe(true);
+    expect(topic.savedChanges.has("content")).toBe(true);
+    expect(
+      (topic.previousChanges.get("content")![0] as HashWithIndifferentAccess<string>).get("a"),
+    ).toBe("a");
+    expect(
+      (topic.previousChanges.get("content")![0] as HashWithIndifferentAccess<string>).get("b"),
+    ).toBeUndefined();
+    expect(
+      (topic.previousChanges.get("content")![1] as HashWithIndifferentAccess<string>).get("a"),
+    ).toBe("a");
+    expect(
+      (topic.previousChanges.get("content")![1] as HashWithIndifferentAccess<string>).get("b"),
+    ).toBe("b");
   });
 
   it("save always should update timestamps when serialized attributes are present", async () => {
@@ -618,82 +628,82 @@ describe("DirtyTest", () => {
 
   it("previous changes", async () => {
     let pirate = new Pirate();
-    expect(pirate.previousChanges).toEqual({});
+    expect(pirate.previousChanges).toEqual(new Hash());
     pirate.catchphrase = "arrr";
     await pirate.saveBang();
 
-    expect(Object.keys(pirate.previousChanges).length).toEqual(4);
-    expect(pirate.previousChanges["catchphrase"]).toEqual([null, "arrr"]);
+    expect(pirate.previousChanges.size).toEqual(4);
+    expect(pirate.previousChanges.get("catchphrase")).toEqual([null, "arrr"]);
     expect(pirate.attributePreviouslyWas("catchphrase")).toBeNull();
-    expect(pirate.previousChanges["id"]).toEqual([null, (pirate as any).id]);
-    expect(pirate.previousChanges["updated_on"][0]).toBeNull();
-    expect(pirate.previousChanges["updated_on"][1]).not.toBeNull();
-    expect(pirate.previousChanges["created_on"][0]).toBeNull();
-    expect(pirate.previousChanges["created_on"][1]).not.toBeNull();
-    expect(Object.hasOwn(pirate.previousChanges, "parrot_id")).toBeFalsy();
+    expect(pirate.previousChanges.get("id")).toEqual([null, (pirate as any).id]);
+    expect(pirate.previousChanges.get("updated_on")![0]).toBeNull();
+    expect(pirate.previousChanges.get("updated_on")![1]).not.toBeNull();
+    expect(pirate.previousChanges.get("created_on")![0]).toBeNull();
+    expect(pirate.previousChanges.get("created_on")![1]).not.toBeNull();
+    expect(pirate.previousChanges.has("parrot_id")).toBeFalsy();
 
     pirate = new Pirate();
-    expect(pirate.previousChanges).toEqual({});
+    expect(pirate.previousChanges).toEqual(new Hash());
     pirate.catchphrase = "arrr";
     await pirate.save();
 
-    expect(Object.keys(pirate.previousChanges).length).toEqual(4);
-    expect(pirate.previousChanges["catchphrase"]).toEqual([null, "arrr"]);
+    expect(pirate.previousChanges.size).toEqual(4);
+    expect(pirate.previousChanges.get("catchphrase")).toEqual([null, "arrr"]);
     expect(pirate.attributePreviouslyWas("catchphrase")).toBeNull();
-    expect(pirate.previousChanges["id"]).toEqual([null, (pirate as any).id]);
-    expect(Object.keys(pirate.previousChanges)).toContain("updated_on");
-    expect(Object.keys(pirate.previousChanges)).toContain("created_on");
-    expect(Object.hasOwn(pirate.previousChanges, "parrot_id")).toBeFalsy();
+    expect(pirate.previousChanges.get("id")).toEqual([null, (pirate as any).id]);
+    expect([...pirate.previousChanges.keys()]).toContain("updated_on");
+    expect([...pirate.previousChanges.keys()]).toContain("created_on");
+    expect(pirate.previousChanges.has("parrot_id")).toBeFalsy();
 
     pirate.catchphrase = "Yar!!";
     await pirate.reload();
-    expect(pirate.previousChanges).toEqual({});
+    expect(pirate.previousChanges).toEqual(new Hash());
 
     pirate = (await Pirate.findBy({ catchphrase: "arrr" }))!;
     pirate.catchphrase = "Me Maties!";
     await pirate.saveBang();
 
-    expect(Object.keys(pirate.previousChanges).length).toEqual(2);
-    expect(pirate.previousChanges["catchphrase"]).toEqual(["arrr", "Me Maties!"]);
+    expect(pirate.previousChanges.size).toEqual(2);
+    expect(pirate.previousChanges.get("catchphrase")).toEqual(["arrr", "Me Maties!"]);
     expect(pirate.attributePreviouslyWas("catchphrase")).toBe("arrr");
-    expect(pirate.previousChanges["updated_on"][0]).not.toBeNull();
-    expect(pirate.previousChanges["updated_on"][1]).not.toBeNull();
-    expect(Object.hasOwn(pirate.previousChanges, "parrot_id")).toBeFalsy();
-    expect(Object.hasOwn(pirate.previousChanges, "created_on")).toBeFalsy();
+    expect(pirate.previousChanges.get("updated_on")![0]).not.toBeNull();
+    expect(pirate.previousChanges.get("updated_on")![1]).not.toBeNull();
+    expect(pirate.previousChanges.has("parrot_id")).toBeFalsy();
+    expect(pirate.previousChanges.has("created_on")).toBeFalsy();
 
     pirate = (await Pirate.findBy({ catchphrase: "Me Maties!" }))!;
     pirate.catchphrase = "Thar She Blows!";
     await pirate.save();
 
-    expect(Object.keys(pirate.previousChanges).length).toEqual(2);
-    expect(pirate.previousChanges["catchphrase"]).toEqual(["Me Maties!", "Thar She Blows!"]);
+    expect(pirate.previousChanges.size).toEqual(2);
+    expect(pirate.previousChanges.get("catchphrase")).toEqual(["Me Maties!", "Thar She Blows!"]);
     expect(pirate.attributePreviouslyWas("catchphrase")).toBe("Me Maties!");
-    expect(pirate.previousChanges["updated_on"][0]).not.toBeNull();
-    expect(pirate.previousChanges["updated_on"][1]).not.toBeNull();
-    expect(Object.hasOwn(pirate.previousChanges, "parrot_id")).toBeFalsy();
-    expect(Object.hasOwn(pirate.previousChanges, "created_on")).toBeFalsy();
+    expect(pirate.previousChanges.get("updated_on")![0]).not.toBeNull();
+    expect(pirate.previousChanges.get("updated_on")![1]).not.toBeNull();
+    expect(pirate.previousChanges.has("parrot_id")).toBeFalsy();
+    expect(pirate.previousChanges.has("created_on")).toBeFalsy();
 
     pirate = (await Pirate.findBy({ catchphrase: "Thar She Blows!" }))!;
     await pirate.update({ catchphrase: "Ahoy!" });
 
-    expect(Object.keys(pirate.previousChanges).length).toEqual(2);
-    expect(pirate.previousChanges["catchphrase"]).toEqual(["Thar She Blows!", "Ahoy!"]);
+    expect(pirate.previousChanges.size).toEqual(2);
+    expect(pirate.previousChanges.get("catchphrase")).toEqual(["Thar She Blows!", "Ahoy!"]);
     expect(pirate.attributePreviouslyWas("catchphrase")).toBe("Thar She Blows!");
-    expect(pirate.previousChanges["updated_on"][0]).not.toBeNull();
-    expect(pirate.previousChanges["updated_on"][1]).not.toBeNull();
-    expect(Object.hasOwn(pirate.previousChanges, "parrot_id")).toBeFalsy();
-    expect(Object.hasOwn(pirate.previousChanges, "created_on")).toBeFalsy();
+    expect(pirate.previousChanges.get("updated_on")![0]).not.toBeNull();
+    expect(pirate.previousChanges.get("updated_on")![1]).not.toBeNull();
+    expect(pirate.previousChanges.has("parrot_id")).toBeFalsy();
+    expect(pirate.previousChanges.has("created_on")).toBeFalsy();
 
     pirate = (await Pirate.findBy({ catchphrase: "Ahoy!" }))!;
     await pirate.updateAttribute("catchphrase", "Ninjas suck!");
 
-    expect(Object.keys(pirate.previousChanges).length).toEqual(2);
-    expect(pirate.previousChanges["catchphrase"]).toEqual(["Ahoy!", "Ninjas suck!"]);
+    expect(pirate.previousChanges.size).toEqual(2);
+    expect(pirate.previousChanges.get("catchphrase")).toEqual(["Ahoy!", "Ninjas suck!"]);
     expect(pirate.attributePreviouslyWas("catchphrase")).toBe("Ahoy!");
-    expect(pirate.previousChanges["updated_on"][0]).not.toBeNull();
-    expect(pirate.previousChanges["updated_on"][1]).not.toBeNull();
-    expect(Object.hasOwn(pirate.previousChanges, "parrot_id")).toBeFalsy();
-    expect(Object.hasOwn(pirate.previousChanges, "created_on")).toBeFalsy();
+    expect(pirate.previousChanges.get("updated_on")![0]).not.toBeNull();
+    expect(pirate.previousChanges.get("updated_on")![1]).not.toBeNull();
+    expect(pirate.previousChanges.has("parrot_id")).toBeFalsy();
+    expect(pirate.previousChanges.has("created_on")).toBeFalsy();
   });
 
   it("field named field", async () => {
@@ -805,7 +815,9 @@ describe("DirtyTest", () => {
     expect(pirate.attributeChanged("catchphrase")).toBeTruthy();
 
     expect((pirate as any).catchphrase).toBe(newCatchphrase.toUpperCase());
-    expect(pirate.changes).toEqual({ catchphrase: ["arrrr", newCatchphrase] });
+    expect(pirate.changes).toEqual(
+      new HashWithIndifferentAccess({ catchphrase: ["arrrr", newCatchphrase] }),
+    );
   });
 
   it("changes is correct if override attribute reader", async () => {
@@ -827,7 +839,9 @@ describe("DirtyTest", () => {
     expect(pirate.attributeChanged("catchphrase")).toBeTruthy();
 
     expect((pirate as any).catchphrase).toBe(newCatchphrase.toUpperCase());
-    expect(pirate.changes).toEqual({ catchphrase: ["arrrr", newCatchphrase] });
+    expect(pirate.changes).toEqual(
+      new HashWithIndifferentAccess({ catchphrase: ["arrrr", newCatchphrase] }),
+    );
   });
 
   it("attribute_changed? doesn't compute in-place changes for unrelated attributes", async () => {
@@ -918,13 +932,13 @@ describe("DirtyTest", () => {
   it("saved_change_to_attribute returns the change that occurred in the last save", async () => {
     const person = await Person.create({ first_name: "Sean", gender: "M" });
 
-    expect(person.savedChanges["first_name"]).toEqual([null, "Sean"]);
-    expect(person.savedChanges["gender"]).toEqual([null, "M"]);
+    expect(person.savedChanges.get("first_name")).toEqual([null, "Sean"]);
+    expect(person.savedChanges.get("gender")).toEqual([null, "M"]);
 
     await person.update({ first_name: "Jim" });
 
-    expect(person.savedChanges["first_name"]).toEqual(["Sean", "Jim"]);
-    expect(person.savedChanges["gender"]).toBeUndefined();
+    expect(person.savedChanges.get("first_name")).toEqual(["Sean", "Jim"]);
+    expect(person.savedChanges.get("gender")).toBeUndefined();
   });
 
   it("attribute_before_last_save returns the original value before saving", async () => {
@@ -957,16 +971,16 @@ describe("DirtyTest", () => {
   it("saved_changes returns a hash of all the changes that occurred", async () => {
     const person = await Person.create({ first_name: "Sean", gender: "M" });
 
-    expect(person.savedChanges["first_name"]).toEqual([null, "Sean"]);
-    expect(person.savedChanges["gender"]).toEqual([null, "M"]);
-    expect(Object.keys(person.savedChanges).sort()).toEqual(
+    expect(person.savedChanges.get("first_name")).toEqual([null, "Sean"]);
+    expect(person.savedChanges.get("gender")).toEqual([null, "M"]);
+    expect([...person.savedChanges.keys()].sort()).toEqual(
       ["id", "first_name", "gender", "created_at", "updated_at"].sort(),
     );
 
     await person.update({ first_name: "Jim" });
 
-    expect(person.savedChanges["first_name"]).toEqual(["Sean", "Jim"]);
-    expect(Object.keys(person.savedChanges).sort()).toEqual(
+    expect(person.savedChanges.get("first_name")).toEqual(["Sean", "Jim"]);
+    expect([...person.savedChanges.keys()].sort()).toEqual(
       ["first_name", "lock_version", "updated_at"].sort(),
     );
   });

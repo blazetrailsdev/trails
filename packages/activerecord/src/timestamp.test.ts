@@ -75,7 +75,7 @@ describe("TimestampTest", () => {
     expect(developer.isChanged).toBeTruthy();
     expect(developer.changedAttributeNamesToSave).toEqual(["salary"]);
     expect((developer as any).isSavedChanges()).toBeTruthy();
-    expect(Object.keys(developer.savedChanges).sort()).toEqual([
+    expect([...developer.savedChanges.keys()].sort()).toEqual([
       "legacy_updated_at",
       "legacy_updated_on",
     ]);
@@ -91,10 +91,7 @@ describe("TimestampTest", () => {
     expect(dev.legacy_updated_at).not.toEqual(previouslyUpdatedAt);
     expect(dev.isChanged).toBeFalsy();
     expect((dev as any).isSavedChanges()).toBeTruthy();
-    expect(Object.keys(dev.savedChanges).sort()).toEqual([
-      "legacy_updated_at",
-      "legacy_updated_on",
-    ]);
+    expect([...dev.savedChanges.keys()].sort()).toEqual(["legacy_updated_at", "legacy_updated_on"]);
 
     await dev.reload();
     expect(dev.legacy_updated_at).not.toEqual(previouslyUpdatedAt);

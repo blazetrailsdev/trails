@@ -248,8 +248,8 @@ describe("EnumTest", () => {
     const oldLanguage = (book as any).language;
     (book as any).status = "proposed";
     (book as any).language = "spanish";
-    expect(book.changedAttributes["status"]).toBe(oldStatus);
-    expect(book.changedAttributes["language"]).toBe(oldLanguage);
+    expect(book.changedAttributes.get("status")).toBe(oldStatus);
+    expect(book.changedAttributes.get("language")).toBe(oldLanguage);
   });
 
   it("enum value after write symbol", () => {
@@ -267,8 +267,8 @@ describe("EnumTest", () => {
     const oldLanguage = (book as any).language;
     (book as any).status = "proposed";
     (book as any).language = "spanish";
-    expect(book.changes.status).toEqual([oldStatus, "proposed"]);
-    expect(book.changes.language).toEqual([oldLanguage, "spanish"]);
+    expect(book.changes.get("status")).toEqual([oldStatus, "proposed"]);
+    expect(book.changes.get("language")).toEqual([oldLanguage, "spanish"]);
   });
 
   it("enum attribute was", () => {

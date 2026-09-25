@@ -47,7 +47,7 @@ export async function touchLater(this: Base, ...names: string[]): Promise<void> 
     if (r.macro === "belongsTo") {
       await BelongsToBuilder.touchRecord(
         this,
-        (this as any).changesToSave ?? {},
+        (this as any).changesToSave,
         r.foreignKey() ?? r.options?.foreignKey,
         r.name,
         touch,

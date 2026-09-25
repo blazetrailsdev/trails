@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time } from "@blazetrails/date";
 import {
   isToday,
   isTomorrow,
@@ -54,5 +54,23 @@ describe("DateAndTime::Calculations predicates (trails)", () => {
     const day = allDay.call(at);
     expect(day.begin).not.toBeNull();
     expect(day.end).not.toBeNull();
+  });
+});
+
+describe("DateAndTime::Calculations weekday helpers on a Time (trails)", () => {
+  it("next_weekday and prev_weekday answer a Time on both the weekday and the weekend branch", () => {
+    for (const [day, next, prev] of [
+      [15, "2000-06-16 10:30:45 UTC", "2000-06-14 10:30:45 UTC"],
+      [16, "2000-06-19 10:30:45 UTC", "2000-06-15 10:30:45 UTC"],
+      [17, "2000-06-19 10:30:45 UTC", "2000-06-16 10:30:45 UTC"],
+    ] as const) {
+      const time = Time.utc(2000, 6, day, 10, 30, 45);
+      const nextWeekday = time.nextWeekday();
+      const prevWeekday = time.prevWeekday();
+      expect(nextWeekday).toBeInstanceOf(Time);
+      expect(prevWeekday).toBeInstanceOf(Time);
+      expect((nextWeekday as Time).toS()).toBe(next);
+      expect((prevWeekday as Time).toS()).toBe(prev);
+    }
   });
 });

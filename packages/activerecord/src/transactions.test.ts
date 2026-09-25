@@ -309,7 +309,7 @@ describe("TransactionTest", () => {
       throw new Rollback();
     });
 
-    expect(topic.changes.title).toEqual(["The Fifth Topic of the day", "Ruby on Rails"]);
+    expect(topic.changes.get("title")).toEqual(["The Fifth Topic of the day", "Ruby on Rails"]);
   });
 
   it("transaction does not apply default scope", async () => {
@@ -328,7 +328,7 @@ describe("TransactionTest", () => {
       throw new Rollback();
     });
 
-    expect(topic.changes.title).toEqual(["The Fifth Topic of the day", "Another Title"]);
+    expect(topic.changes.get("title")).toEqual(["The Fifth Topic of the day", "Another Title"]);
   });
 
   it("rollback dirty changes then retry save", async () => {
@@ -340,11 +340,11 @@ describe("TransactionTest", () => {
     });
 
     const titleChange = ["The Fifth Topic of the day", "Ruby on Rails"];
-    expect(topic.changes.title).toEqual(titleChange);
+    expect(topic.changes.get("title")).toEqual(titleChange);
 
     expect(await topic.save()).toBeTruthy();
 
-    expect(topic.savedChanges.title).toEqual(titleChange);
+    expect(topic.savedChanges.get("title")).toEqual(titleChange);
     expect((await topic.reload()).title).toBe(topic.title);
   });
 
@@ -357,11 +357,11 @@ describe("TransactionTest", () => {
     });
 
     const titleChange = [null, "Ruby on Rails"];
-    expect(topic.changes.title).toEqual(titleChange);
+    expect(topic.changes.get("title")).toEqual(titleChange);
 
     expect(await topic.save()).toBeTruthy();
 
-    expect(topic.savedChanges.title).toEqual(titleChange);
+    expect(topic.savedChanges.get("title")).toEqual(titleChange);
     expect((await topic.reload()).title).toBe(topic.title);
   });
 

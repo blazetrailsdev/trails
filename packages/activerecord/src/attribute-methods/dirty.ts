@@ -1,5 +1,10 @@
-import { RuntimeError } from "@blazetrails/ruby-compat";
-import { classAttribute, included, isModuleIncluded } from "@blazetrails/activesupport";
+import { RuntimeError, type Hash } from "@blazetrails/ruby-compat";
+import {
+  classAttribute,
+  type HashWithIndifferentAccess,
+  included,
+  isModuleIncluded,
+} from "@blazetrails/activesupport";
 import type {
   AttributeMutationTracker,
   DirtyOptions,
@@ -80,7 +85,7 @@ export class Dirty {
     base.attributeMethodSuffix("ChangeToBeSaved", "InDatabase", { parameters: false });
   }
 
-  get savedChanges(): Record<string, [unknown, unknown]> {
+  get savedChanges(): Hash<string, [unknown, unknown]> {
     return (this as unknown as DirtyRecord).mutationsBeforeLastSave.changes();
   }
 
@@ -88,7 +93,7 @@ export class Dirty {
     return (this as unknown as DirtyRecord).mutationsFromDatabase.anyChanges();
   }
 
-  get changesToSave(): Record<string, [unknown, unknown]> {
+  get changesToSave(): HashWithIndifferentAccess<[unknown, unknown]> {
     return (this as unknown as DirtyRecord).mutationsFromDatabase.changes();
   }
 
@@ -96,7 +101,7 @@ export class Dirty {
     return (this as unknown as DirtyRecord).mutationsFromDatabase.changedAttributeNames();
   }
 
-  get attributesInDatabase(): Record<string, unknown> {
+  get attributesInDatabase(): HashWithIndifferentAccess<unknown> {
     return (this as unknown as DirtyRecord).mutationsFromDatabase.changedValues();
   }
 }

@@ -1,3 +1,5 @@
+import { Hash } from "@blazetrails/ruby-compat";
+import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging --
    Each model below spells `include ActiveModel::Dirty` in its class body, the way the Rails test
    model it mirrors does; the empty class/interface merge beside it is how `include()` surfaces
@@ -68,9 +70,9 @@ describe("AttributesDirtyTest", () => {
   });
 
   it("changes to attribute values", () => {
-    assertNot(model.changes["name"]);
+    assertNot(model.changes.get("name"));
     model.name = "John";
-    expect(model.changes["name"]).toEqual([null, "John"]);
+    expect(model.changes.get("name")).toEqual([null, "John"]);
   });
 
   it("checking if an attribute has changed to a particular value", () => {
@@ -85,8 +87,8 @@ describe("AttributesDirtyTest", () => {
 
   it("changes accessible through both strings and symbols", () => {
     model.name = "David";
-    assertNotNil(model.changes["name"]);
-    assertNotNil(model.changes["name"]);
+    assertNotNil(model.changes.get("name"));
+    assertNotNil(model.changes.get("name"));
   });
 
   it("be consistent with symbols arguments after the changes are applied", () => {
@@ -135,7 +137,7 @@ describe("AttributesDirtyTest", () => {
   it("saving should preserve previous changes", () => {
     model.name = "Jericho Cane";
     model.save();
-    expect(model.previousChanges["name"]).toEqual([null, "Jericho Cane"]);
+    expect(model.previousChanges.get("name")).toEqual([null, "Jericho Cane"]);
   });
 
   it("setting new attributes should not affect previous changes", () => {
@@ -152,14 +154,14 @@ describe("AttributesDirtyTest", () => {
   });
 
   it("previous value is preserved when changed after save", () => {
-    expect(model.changedAttributes).toEqual({});
+    expect(model.changedAttributes).toEqual(new HashWithIndifferentAccess());
     model.name = "Paul";
-    expect(model.changedAttributes).toEqual({ name: null });
+    expect(model.changedAttributes).toEqual(new HashWithIndifferentAccess({ name: null }));
 
     model.save();
 
     model.name = "John";
-    expect(model.changedAttributes).toEqual({ name: "Paul" });
+    expect(model.changedAttributes).toEqual(new HashWithIndifferentAccess({ name: "Paul" }));
   });
 
   it("changing the same attribute multiple times retains the correct original value", () => {
@@ -182,13 +184,13 @@ describe("AttributesDirtyTest", () => {
     model.save();
     model.name = "Bob";
 
-    expect(model.previousChanges["name"]).toEqual([null, "Dmitry"]);
-    expect(model.changedAttributes["name"]).toBe("Dmitry");
+    expect(model.previousChanges.get("name")).toEqual([null, "Dmitry"]);
+    expect(model.changedAttributes.get("name")).toBe("Dmitry");
 
     model.clearChangesInformation();
 
-    expect(model.previousChanges).toEqual({});
-    expect(model.changedAttributes).toEqual({});
+    expect(model.previousChanges).toEqual(new Hash());
+    expect(model.changedAttributes).toEqual(new HashWithIndifferentAccess());
   });
 
   it("restore_attributes should restore all previous data", () => {
@@ -230,6 +232,6 @@ describe("AttributesDirtyTest", () => {
 
     expect(model.isChanged).toBe(true);
     expect(model.sizeChanged()).toBe(true);
-    expect(model.changes).toEqual({ size: [2, 5] });
+    expect(model.changes).toEqual(new HashWithIndifferentAccess({ size: [2, 5] }));
   });
 });
