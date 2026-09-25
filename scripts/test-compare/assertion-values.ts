@@ -192,15 +192,6 @@ function foldNameToken(token: string): string {
 }
 
 /**
- * Fold a file extension `TOKEN_RENAMES` renames onto its trails spelling:
- * `/path/to/template.html.erb` is `/path/to/template.html.tse` in trails
- * (CLAUDE.md: trails spells `tse`, never `erb`), as
- * `activesupport/test/deprecation_test.rb:797`'s expected message is in
- * `deprecation.test.ts`. That is the repo's token rename, not a fidelity
- * divergence. Applied to BOTH sides, like foldNameToken, so it can only merge
- * tokens, never split them.
- */
-/**
  * `TOKEN_RENAMES.rb` renames a Ruby source file to a JS one, and a trails
  * source file is as often TypeScript: Rails' default `schema.rb`
  * (`activerecord/test/cases/database_configurations/hash_config_test.rb:108`)
@@ -215,6 +206,15 @@ const RENAMED_EXTENSION_RE = new RegExp(
   "g",
 );
 
+/**
+ * Fold a file extension `TOKEN_RENAMES` renames onto its trails spelling:
+ * `/path/to/template.html.erb` is `/path/to/template.html.tse` in trails
+ * (CLAUDE.md: trails spells `tse`, never `erb`), as
+ * `activesupport/test/deprecation_test.rb:797`'s expected message is in
+ * `deprecation.test.ts`. That is the repo's token rename, not a fidelity
+ * divergence. Applied to BOTH sides, like foldNameToken, so it can only merge
+ * tokens, never split them.
+ */
 function foldRenamedExtensionToken(token: string): string {
   if (!token.startsWith("s:")) return token;
   return `s:${token
