@@ -2295,7 +2295,7 @@ describe("HasManyAssociationsTest", () => {
     const firm = companies("first_firm") as any;
     const clientId = (await firm.dependentClientsOfFirm.first()).id;
     expect(await firm.dependentClientsOfFirm.size()).toBe(2);
-    expect((await Client.findBy({ id: clientId }))!.client_of).toBe(1);
+    expect((await (Client as any).findById(clientId))!.client_of).toBe(1);
 
     await firm.dependentClientsOfFirm.clear();
 
@@ -2304,7 +2304,7 @@ describe("HasManyAssociationsTest", () => {
     expect(await firm.dependentClientsOfFirm.size()).toBe(0);
     expect(Client.destroyedClientIds.get(firm.id as number)).toEqual([]);
 
-    expect(await Client.findBy({ id: clientId })).toBeNull();
+    expect(await (Client as any).findById(clientId)).toBeNull();
   });
 
   it("delete all with option delete all", async () => {
@@ -2312,7 +2312,7 @@ describe("HasManyAssociationsTest", () => {
     const clientId = (await firm.dependentClientsOfFirm.first()).id;
     const count = await firm.dependentClientsOfFirm.count();
     expect(await firm.dependentClientsOfFirm.deleteAll("delete_all")).toBe(count);
-    expect(await Client.findBy({ id: clientId })).toBeNull();
+    expect(await (Client as any).findById(clientId)).toBeNull();
   });
 
   it("delete all with option nullify", async () => {
@@ -2343,7 +2343,7 @@ describe("HasManyAssociationsTest", () => {
     expect(await firm.exclusivelyDependentClientsOfFirm.size()).toBe(0);
     expect(Client.destroyedClientIds.get(firm.id as number)).toEqual([]);
 
-    expect(await Client.findBy({ id: clientId })).toBeNull();
+    expect(await (Client as any).findById(clientId)).toBeNull();
   });
 
   it("dependent association respects optional conditions on delete", async () => {
@@ -2385,7 +2385,7 @@ describe("HasManyAssociationsTest", () => {
     const oldRecord = await firm.clientsUsingPrimaryKeyWithDeleteAll.first();
     firm = (await HmFirm.first()) as any;
     await firm.destroy();
-    expect(await Client.findBy({ id: oldRecord.id })).toBeNull();
+    expect(await (Client as any).findById(oldRecord.id)).toBeNull();
   });
 
   it("creation respects hash condition", async () => {
@@ -2417,7 +2417,7 @@ describe("HasManyAssociationsTest", () => {
 
     expect((companies("first_firm") as any).clientsOfFirm.loaded).toBeTruthy();
 
-    const summit = (await Client.findBy({ name: "Summit" }))!;
+    const summit = (await (Client as any).findByName("Summit"))!;
     await (companies("first_firm") as any).clientsOfFirm.delete(summit);
     expect(await (companies("first_firm") as any).clientsOfFirm.size()).toBe(2);
     await (companies("first_firm") as any).clientsOfFirm.reload();

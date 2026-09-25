@@ -108,7 +108,9 @@ describe("ValidationsTest", () => {
     await r.isValid();
     r.errors.add("base", "Reply is not dignifying");
 
-    const errors = r.errors.toArray().reduce<string[]>((result, error) => [...result, error], []);
+    const errors = r.errors
+      .toArray()
+      .reduce<(string | null)[]>((result, error) => [...result, error], []);
 
     expect(r.errors.messagesFor("base")).toEqual(["Reply is not dignifying"]);
 
@@ -123,7 +125,9 @@ describe("ValidationsTest", () => {
     await r.isValid();
     r.errors.add("base", ":invalid");
 
-    const errors = r.errors.toArray().reduce<string[]>((result, error) => [...result, error], []);
+    const errors = r.errors
+      .toArray()
+      .reduce<(string | null)[]>((result, error) => [...result, error], []);
 
     expect(r.errors.messagesFor("base")).toEqual(["is invalid"]);
 

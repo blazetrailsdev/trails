@@ -450,7 +450,7 @@ export const ClassMethods = {
 export const InstanceMethods = {
   /** @missingRailsCall super — PERMANENT */
   methodMissing(this: InstanceMethodsHost, method: string, ...args: unknown[]): unknown {
-    if (this.isRespondToWithoutAttributes(method)) {
+    if (this.isRespondToWithoutAttributes(method, true)) {
       throw new NoMethodError(
         `undefined method '${method}' for an instance of ${(this.constructor as { name?: string }).name ?? "unknown"}`,
       );
@@ -477,8 +477,12 @@ export const InstanceMethods = {
     return target.call(this, match.attrName, ...args);
   },
 
-  isRespondToWithoutAttributes(this: object, method: string): boolean {
-    return basicObjRespondTo(this, method);
+  isRespondToWithoutAttributes(
+    this: object,
+    method: string,
+    includePrivateMethods: boolean = false,
+  ): boolean {
+    return basicObjRespondTo(this, method, !includePrivateMethods);
   },
 
   respondTo(

@@ -128,7 +128,9 @@ describe("ReservedWordTest", () => {
     await x.save();
     x.writeAttribute("order", "y");
     await x.save();
-    expect((await Group.findBy({ order: "y" }))!.id).toBe(x.id);
+    expect(
+      (await (Group as unknown as { findByOrder(o: string): Promise<Group> }).findByOrder("y")).id,
+    ).toBe(x.id);
     expect((await Group.find(x.id)).id).toBe(x.id);
   });
 

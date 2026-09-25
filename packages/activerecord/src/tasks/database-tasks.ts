@@ -36,7 +36,7 @@ export class DatabaseNotSupported extends Error {
   }
 }
 
-export type SchemaFormat = "ts" | "js" | "sql";
+export type SchemaFormat = "ruby" | "sql";
 
 export class DatabaseTasks {
   static readonly LOCAL_HOSTS: readonly string[] = ["127.0.0.1", "localhost"];
@@ -538,19 +538,13 @@ export class DatabaseTasks {
     if (filename == null) return;
 
     FileUtils.mkdirP(this.dbDir);
-    if (format !== "sql") {
+    if (format === "ruby") {
       const { SchemaDumper } = await import("../connection-adapters/abstract/schema-dumper.js");
-      const languageWas = SchemaDumper.language;
-      SchemaDumper.language = format === "js" ? "js" : "ts";
-      try {
-        const migrationConnectionPool = this.migrationConnectionPool();
-        await File.open(filename, "w:utf-8", async (file) => {
-          await SchemaDumper.dump(migrationConnectionPool, file);
-        });
-      } finally {
-        SchemaDumper.language = languageWas;
-      }
-    } else {
+      const migrationConnectionPool = this.migrationConnectionPool();
+      await File.open(filename, "w:utf-8", async (file) => {
+        await SchemaDumper.dump(migrationConnectionPool, file);
+      });
+    } else if (format === "sql") {
       await this.structureDump(dbConfig, filename);
       if (await this.migrationConnectionPool().schemaMigration.tableExists()) {
         await File.open(filename, "a", async (f) => {

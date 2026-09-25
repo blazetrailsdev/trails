@@ -175,7 +175,7 @@ describe("SecurePasswordTrailsTest", () => {
     u.password = "a".repeat(73);
     await u.isValid();
     const msgs = u.errors.fullMessages;
-    expect(msgs.some((m) => m.includes("is too long"))).toBe(true);
+    expect(msgs.some((m) => m != null && m.includes("is too long"))).toBe(true);
   });
 
   it("whitespace-only password digest treated as blank", async () => {

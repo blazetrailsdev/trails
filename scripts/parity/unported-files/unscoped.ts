@@ -333,7 +333,7 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "defined?(@first), respond_to?(:topics, false) (fixtures_test.rb:756-773). trails has " +
       "only the non-instantiating mode, so the flag selects nothing and there is no ivar " +
       "whose absence could be observed; JS also has no runtime method visibility to test " +
-      "(see CLAUDE.md, 'Method visibility is not a runtime fact in JS'). 'accessor " +
+      "(see CLAUDE.md, 'Method visibility is a side table'). 'accessor " +
       "methods', the case in this class that asserts the accessor itself, IS ported.",
   },
   {

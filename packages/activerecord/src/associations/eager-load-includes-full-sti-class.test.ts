@@ -25,16 +25,20 @@ registerModel(Tagging);
 registerModel(NamespacedPost);
 registerModel(Post);
 
+type FindByTitle = { findByTitle(title: string): Promise<NamespacedPost | null> };
+
 function findByTitle(): Promise<NamespacedPost | null> {
-  return NamespacedPost.findBy({ title: "Great stuff" });
+  return (NamespacedPost as unknown as FindByTitle).findByTitle("Great stuff");
 }
 
 function includesFindByTitle(): Promise<NamespacedPost | null> {
-  return NamespacedPost.includes(":tagging").findBy({ title: "Great stuff" });
+  return (NamespacedPost.includes(":tagging") as unknown as FindByTitle).findByTitle("Great stuff");
 }
 
 function eagerLoadFindByTitle(): Promise<NamespacedPost | null> {
-  return NamespacedPost.eagerLoad(":tagging").findBy({ title: "Great stuff" });
+  return (NamespacedPost.eagerLoad(":tagging") as unknown as FindByTitle).findByTitle(
+    "Great stuff",
+  );
 }
 
 describe("FullStiClassNamesTest", () => {

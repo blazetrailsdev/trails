@@ -20,7 +20,13 @@ import {
   TimeType,
   UnknownAttributeError as AMUnknownAttributeError,
 } from "@blazetrails/activemodel";
-import { ArgumentError, Module, basicObjRespondTo, NoMethodError } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  Module,
+  basicObjRespondTo,
+  NoMethodError,
+  rbModPrivate,
+} from "@blazetrails/ruby-compat";
 import { Base, DangerousAttributeError, Type, UnknownAttributeError } from "./index.js";
 
 import { GeneratedAttributeMethods } from "./attribute-methods.js";
@@ -765,12 +771,12 @@ describe("AttributeMethodsTest", () => {
     assertIncludes(exception.message, "private method");
     expect(topic["title?"]).toBeTruthy();
   });
-  // BLOCKED: activerecord-private-attribute-methods-are-still-public
-  it.skip("bulk updates respect access control", async () => {
+  it("bulk updates respect access control", async () => {
     class Target extends Base {
       static {
         this.tableName = "topics";
         this.attribute("title", "string");
+        rbModPrivate(this, "title=");
       }
       private set title(_value: string) {}
     }

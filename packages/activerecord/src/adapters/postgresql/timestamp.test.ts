@@ -338,17 +338,17 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("bc timestamp", async () => {
       const date = RubyTime.utc(0, 1, 1).minus(Duration.weeks(1).toI()) as RubyTime;
       await Developer.createBang({ name: "aaron", updated_at: date });
-      expect((await Developer.findBy({ name: "aaron" }))!.updated_at).toEqual(date);
+      expect((await (Developer as any).findByName("aaron"))!.updated_at).toEqual(date);
     });
     it("bc timestamp leap year", async () => {
       const date = RubyTime.utc(-4, 2, 29);
       await Developer.createBang({ name: "taihou", updated_at: date });
-      expect((await Developer.findBy({ name: "taihou" }))!.updated_at).toEqual(date);
+      expect((await (Developer as any).findByName("taihou"))!.updated_at).toEqual(date);
     });
     it("bc timestamp year zero", async () => {
       const date = RubyTime.utc(0, 4, 7);
       await Developer.createBang({ name: "yahagi", updated_at: date });
-      expect((await Developer.findBy({ name: "yahagi" }))!.updated_at).toEqual(date);
+      expect((await (Developer as any).findByName("yahagi"))!.updated_at).toEqual(date);
     });
   });
 

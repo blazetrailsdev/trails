@@ -250,7 +250,7 @@ describe("HasOneAssociationsTest", () => {
 
   it("finding using primary key", async () => {
     const firm = companies("first_firm") as any;
-    expect((await Account.findBy({ firm_id: firm.id }))!.id).toBe(
+    expect((await (Account as any).findByFirmId(firm.id))!.id).toBe(
       (await readHasOne(firm, "account")).id,
     );
     firm.firm_id = companies("rails_core").id;
@@ -262,7 +262,7 @@ describe("HasOneAssociationsTest", () => {
   it("update with foreign and primary keys", async () => {
     const firm = companies("first_firm") as any;
     const account = await readHasOne(firm, "accountUsingForeignAndPrimaryKeys");
-    expect(account.id).toBe((await Account.findBy({ firm_name: firm.name }))!.id);
+    expect(account.id).toBe((await (Account as any).findByFirmName(firm.name))!.id);
     await firm.save();
     await firm.reload();
     expect((await readHasOne(firm, "accountUsingForeignAndPrimaryKeys")).id).toBe(account.id);

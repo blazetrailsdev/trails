@@ -304,7 +304,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     await freshAdapter();
     const Book = makeEncryptedBookWithDowncaseName();
     await Book.create({ name: "Dune" });
-    expect(await Book.findBy({ name: "dune" })).toBeTruthy();
+    expect(await Book.findByName("dune")).toBeTruthy();
   });
 
   it("when ignore_case: true, it ignores case in queries but keep it when reading the attribute", async () => {
@@ -312,7 +312,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     const Book = makeEncryptedBookThatIgnoresCase();
     new Book();
     await Book.create({ name: "Dune" });
-    const book = await Book.findBy({ name: "dune" });
+    const book = await Book.findByName("dune");
     expect(book).toBeTruthy();
     expect(book!.name).toBe("Dune");
   });

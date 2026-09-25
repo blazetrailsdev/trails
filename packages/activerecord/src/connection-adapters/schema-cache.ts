@@ -372,37 +372,36 @@ export class SchemaCache {
   }
 
   marshalDump(): unknown[] {
-    const columnsData = Object.fromEntries(
-      [...this._columns].map(([table, cols]) => [table, cols.map((c) => serializeColumn(c))]),
-    );
     return [
       this._version,
-      columnsData,
-      {},
-      Object.fromEntries(this._primaryKeys),
-      Object.fromEntries(this._dataSources),
-      Object.fromEntries(this._indexes),
+      this._columns,
+      new Map(),
+      this._primaryKeys,
+      this._dataSources,
+      this._indexes,
     ];
   }
 
   marshalLoad(array: unknown[]): void {
-    const [version, columns, _columnsHash, primaryKeys, dataSources, indexes] = array;
-    this._version = (version as string | number) ?? null;
-
-    const rawCols = (columns as Record<string, unknown[]>) ?? {};
-    this._columns = new Map(
-      Object.entries(rawCols).map(([table, cols]) => [table, cols.map((c) => rehydrateColumn(c))]),
-    );
-    this._primaryKeys = new Map(
-      Object.entries((primaryKeys as Record<string, string | string[] | null>) ?? {}),
-    );
-    this._dataSources = new Map(Object.entries((dataSources as Record<string, boolean>) ?? {}));
-    this._indexes = new Map(
-      Object.entries((indexes as Record<string, unknown[]>) ?? {}).map(([table, idx]) => [
-        table,
-        idx.map((i) => rehydrateIndex(i)),
-      ]),
-    );
+    let _columnsHash: unknown, _databaseVersion: unknown;
+    [
+      this._version,
+      this._columns,
+      _columnsHash,
+      this._primaryKeys,
+      this._dataSources,
+      this._indexes,
+      _databaseVersion,
+    ] = array as [
+      string | number | null,
+      Map<string, Column[]>,
+      unknown,
+      Map<string, string | string[] | null>,
+      Map<string, boolean>,
+      Map<string, IndexDefinition[]>,
+      unknown,
+    ];
+    this._indexes ??= new Map();
 
     this.deriveColumnsHashAndDeduplicateValues();
   }

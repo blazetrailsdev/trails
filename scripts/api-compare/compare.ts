@@ -318,8 +318,8 @@ import { isStdlibMixinGap, stdlibMixinRows } from "./stdlib-mixin-surface.js";
 /**
  * `send` / `public_send` / `__send__` stay OUT of this set and of the call-name
  * comparison: they map to no TS candidate, so significantMissingCalls drops
- * them. The two differ only in visibility, which JS has no run-time fact for
- * (CLAUDE.md § "Method visibility is not a runtime fact in JS"), and both port
+ * them. The two differ only in visibility, which a JS member access cannot see
+ * (CLAUDE.md § "Method visibility is a side table"), and both port
  * to a computed member access — `public_send("#{name}=", value)`
  * (`persistence.rb:533`) is `this[name] = value`, with no callee. A call-name
  * check would flag that correct port too; setter-dispatch.ts reads the

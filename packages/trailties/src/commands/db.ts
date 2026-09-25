@@ -22,6 +22,7 @@ import {
   InternalMetadata,
   MigrationContext,
   Migrator,
+  SchemaDumper,
   SchemaMigration,
   dumpSchemaAfterMigration,
   eachCurrentEnvironment,
@@ -261,16 +262,31 @@ async function runProtectedEnvCheck(config: HashConfig, envName: string): Promis
   }
 }
 
+async function withResolvedSchemaFormat<T>(
+  opts: { format?: string },
+  block: () => Promise<T>,
+): Promise<T> {
+  const previousFormat = schemaFormat();
+  const previousLanguage = SchemaDumper.language;
+  try {
+    const format = await resolveSchemaFormat(opts);
+    if (format === "sql") {
+      setSchemaFormat("sql");
+    } else {
+      setSchemaFormat("ruby");
+      SchemaDumper.language = format;
+    }
+    return await block();
+  } finally {
+    setSchemaFormat(previousFormat);
+    SchemaDumper.language = previousLanguage;
+  }
+}
+
 async function dumpSchemaAfterMigrate(raw: RawConfig, hashConfig?: HashConfig): Promise<void> {
   if (!dumpSchemaAfterMigration()) return;
   const config = hashConfig ?? toDbConfig(raw);
-  const previousFormat = schemaFormat();
-  try {
-    setSchemaFormat(await resolveSchemaFormat());
-    await DatabaseTasks.dumpSchema(config);
-  } finally {
-    setSchemaFormat(previousFormat);
-  }
+  await withResolvedSchemaFormat({}, () => DatabaseTasks.dumpSchema(config));
 }
 
 interface RunOptions {
@@ -751,7 +767,6 @@ export function dbCommand(): Command {
 
       const seedTarget = entries[primaryIndex].hashConfig;
       const previousSeedLoader = DatabaseTasks.seedLoader;
-      const previousFormat = schemaFormat();
       DatabaseTasks.seedLoader = {
         async loadSeed() {
           await DatabaseTasks.withTemporaryPool(seedTarget, async (pool) => {
@@ -760,15 +775,15 @@ export function dbCommand(): Command {
         },
       };
       try {
-        setSchemaFormat(await resolveSchemaFormat());
-        await withRegisteredConfigurations(
-          allEntries.map((entry) => entry.hashConfig),
-          envName,
-          () => DatabaseTasks.prepareAll(),
+        await withResolvedSchemaFormat({}, () =>
+          withRegisteredConfigurations(
+            allEntries.map((entry) => entry.hashConfig),
+            envName,
+            () => DatabaseTasks.prepareAll(),
+          ),
         );
       } finally {
         DatabaseTasks.seedLoader = previousSeedLoader;
-        setSchemaFormat(previousFormat);
       }
     });
 
@@ -872,15 +887,11 @@ export function dbCommand(): Command {
     .option("--database <name>", "Target a specific named database")
     .action(async (opts) => {
       await forEachDatabase(opts, async ({ config, prefix }) => {
-        const previousFormat = schemaFormat();
-        try {
-          setSchemaFormat(await resolveSchemaFormat(opts));
+        await withResolvedSchemaFormat(opts, async () => {
           const filename = DatabaseTasks.schemaDumpPath(config);
           await DatabaseTasks.dumpSchema(config);
           console.log(`${prefix}Schema dumped to ${filename ?? "(skipped — schemaDump disabled)"}`);
-        } finally {
-          setSchemaFormat(previousFormat);
-        }
+        });
       });
     });
 
@@ -895,9 +906,7 @@ export function dbCommand(): Command {
       const fs = getFs();
       await forEachDatabase(opts, async ({ config, prefix }) => {
         await runProtectedEnvCheck(config, config.envName);
-        const previousFormat = schemaFormat();
-        try {
-          setSchemaFormat(await resolveSchemaFormat(opts));
+        await withResolvedSchemaFormat(opts, async () => {
           const filename = DatabaseTasks.schemaDumpPath(config);
           if (!filename || !(await fs.exists(filename))) {
             console.error(`${prefix}No schema file found at ${filename ?? "(none)"}`);
@@ -930,9 +939,7 @@ export function dbCommand(): Command {
             }
             throw error;
           }
-        } finally {
-          setSchemaFormat(previousFormat);
-        }
+        });
       });
     });
 

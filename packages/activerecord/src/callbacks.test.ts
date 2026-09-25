@@ -486,7 +486,7 @@ describe("CallbacksTest", () => {
     expect(await david.destroy()).toBeFalsy();
     const exc = await assertRaise([RecordNotDestroyed], {}, () => david.destroyBang());
     expect((exc as RecordNotDestroyed).record).toBe(david);
-    expect(await ImmutableDeveloper.findBy({ id: developers("david").id })).not.toBeNull();
+    expect(await (ImmutableDeveloper as any).findById(developers("david").id)).not.toBeNull();
 
     const someone = await CallbackHaltedDeveloper.find(developers("david").id);
     someone.cancelBeforeDestroy = true;

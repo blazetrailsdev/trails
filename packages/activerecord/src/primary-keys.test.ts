@@ -145,7 +145,7 @@ describe("PrimaryKeysTest", () => {
     await Keyboard.deleteAll();
     const keyboard = new Keyboard({ name: "HHKB" });
     await keyboard.saveBang();
-    expect(((await Keyboard.findBy({ name: "HHKB" })) as Keyboard).id).toBe(keyboard.id);
+    expect(((await (Keyboard as any).findByName("HHKB")) as Keyboard).id).toBe(keyboard.id);
   });
 
   it("customized primary key can be get before saving", () => {

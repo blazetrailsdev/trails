@@ -788,7 +788,7 @@ describe("BasicsTest", async () => {
       await ((await Topic.find(topic.id)) as any).destroy();
     });
 
-    expect(await Topic.findBy({ id: topic.id })).toBeNull();
+    expect(await (Topic as any).findById(topic.id)).toBeNull();
   });
 
   it("comparison with different objects", async () => {

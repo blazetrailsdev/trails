@@ -57,7 +57,7 @@ export function inGroupsOf<T>(
 }
 
 export function toSentence(
-  array: string[],
+  array: readonly unknown[],
   options: {
     wordsConnector?: string;
     twoWordsConnector?: string;

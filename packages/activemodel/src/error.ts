@@ -72,7 +72,7 @@ export class Error {
   rawType: string | null;
   options: Record<string, unknown>;
 
-  static fullMessage(attribute: string, message: string, base: ModelBase): string {
+  static fullMessage(attribute: string, message: string | null, base: ModelBase): string | null {
     if (attribute === "base") return message;
 
     const baseClass = base?.constructor as ModelClass | undefined;
@@ -203,7 +203,7 @@ export class Error {
     this.options = options;
   }
 
-  get message(): string {
+  get message(): string | null {
     if (this.rawType != null && this.rawType.startsWith(":")) {
       return Error.generateMessage(
         this.attribute,
@@ -212,7 +212,7 @@ export class Error {
         except(this.options, ...CALLBACKS_OPTIONS),
       );
     }
-    return this.rawType as string;
+    return this.rawType;
   }
 
   get details(): Record<string, unknown> {
@@ -226,7 +226,7 @@ export class Error {
     return this.details;
   }
 
-  get fullMessage(): string {
+  get fullMessage(): string | null {
     return (this.constructor as typeof Error).fullMessage(this.attribute, this.message, this.base);
   }
 
