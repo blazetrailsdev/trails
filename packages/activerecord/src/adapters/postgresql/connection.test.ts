@@ -117,7 +117,7 @@ describeIfPg("PostgresqlConnectionTest", () => {
   });
 
   it("statement key is logged", async () => {
-    const bind = new QueryAttribute("", 1, new Value());
+    const bind = new QueryAttribute(null, 1, new Value());
     await adapter.execQuery("SELECT $1::integer", "SQL", [bind], { prepare: true });
 
     const payload = subscriber.payloads.find((p) => p["sql"] === "SELECT $1::integer");
@@ -134,7 +134,7 @@ describeIfPg("PostgresqlConnectionTest", () => {
     const origPrepared = adapter.preparedStatements;
     adapter.preparedStatements = false;
     try {
-      const bind = new QueryAttribute("", 42, new Value());
+      const bind = new QueryAttribute(null, 42, new Value());
       const result = await adapter.execQuery("SELECT $1::integer", "SQL", [bind], {
         prepare: false,
       });

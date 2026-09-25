@@ -63,6 +63,17 @@ describe("PostgreSQL::OID::Range", () => {
     expect(range.end).toBe(10);
   });
 
+  it("keeps an endless daterange's Infinity end against a Date begin", () => {
+    const toDate = (value: unknown) =>
+      value == null ? null : Temporal.PlainDate.from(String(value));
+    const dateSubtype = { cast: toDate, serialize: (value: unknown) => value, deserialize: toDate };
+    const type = new RangeType(dateSubtype, "daterange");
+    const range = type.castValue("[2012-01-02,)") as Range;
+
+    expect(range.begin).toEqual(Temporal.PlainDate.from("2012-01-02"));
+    expect(range.end).toBe(Infinity);
+  });
+
   it("uses subtype infinity values for unbounded ranges", () => {
     const infinityCalls: Array<{ negative?: boolean } | undefined> = [];
     const type = new RangeType(

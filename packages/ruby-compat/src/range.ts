@@ -160,7 +160,7 @@ export class Range<T = unknown> {
    * `clusivity.rb:40-50` selects between. No Rails file declares it.
    */
   cover(value: T): boolean {
-    if (this.begin !== null && rLess(value, this.begin) < 0) return false;
+    if (this.begin !== null && rLess(this.begin, value) > 0) return false;
     if (this.end !== null) {
       const c = rLess(value, this.end);
       if (this.excludeEnd ? c >= 0 : c > 0) return false;

@@ -93,6 +93,14 @@ export function cmp(a: unknown, b: unknown): number | null {
     const y = (b as { epochNanoseconds: bigint }).epochNanoseconds;
     return x < y ? -1 : x > y ? 1 : 0;
   }
+  if (isTemporalDate(a) && (typeof b === "number" || typeof b === "bigint")) {
+    /* `Date#<=>`'s `cmp_gen` (`vendor/ruby/ext/date/date_core.c:6705`): a
+       Numeric is compared against the date's `ajd`. */
+    const ajd = temporalAjd(a);
+    const n = Number(b);
+    if (Number.isNaN(n)) return null;
+    return ajd < n ? -1 : ajd > n ? 1 : 0;
+  }
   if (temporalTag(a) !== null && temporalTag(b) !== null) {
     const x = widenPlainDate(a);
     const y = widenPlainDate(b);
@@ -105,8 +113,28 @@ export function cmp(a: unknown, b: unknown): number | null {
   if (typeof a === "number" || typeof a === "bigint") {
     /* `rb_int_cmp` (`vendor/ruby/numeric.c:4696`) and `flo_cmp`
        (`vendor/ruby/numeric.c:1700`) answer nil for a non-Numeric, and for NaN. */
-    if (typeof b !== "number" && typeof b !== "bigint") return null;
-    if (Number.isNaN(a as number) || Number.isNaN(b as number)) return null;
+    if (Number.isNaN(a as number)) return null;
+    if (typeof b !== "number" && typeof b !== "bigint") {
+      /* `flo_cmp`'s `isinf(a)` arm: a non-Numeric answering `infinite?` —
+         `Date#infinite?` is false (`vendor/ruby/ext/date/lib/date.rb:13`),
+         and trails' Date is a Temporal PlainDate / PlainDateTime. */
+      if (typeof a === "number" && !Number.isFinite(a)) {
+        const i = isTemporalDate(b)
+          ? false
+          : rbObjRespondTo(b, "isInfinite")
+            ? (b as { isInfinite(): unknown }).isInfinite()
+            : undefined;
+        if (i !== undefined) {
+          if (i != null && i !== false) {
+            const j = rbCmpint(i as number, a, b);
+            return a > 0 ? (j > 0 ? 0 : 1) : j < 0 ? 0 : -1;
+          }
+          return a > 0 ? 1 : -1;
+        }
+      }
+      return null;
+    }
+    if (Number.isNaN(b as number)) return null;
     return a < b ? -1 : a > b ? 1 : 0;
   }
   if (typeof a === "string") {
@@ -129,6 +157,39 @@ export function cmp(a: unknown, b: unknown): number | null {
      `==` operand and nil otherwise, rather than JS relational coercion, which
      orders `false` before `true` where Ruby answers nil. */
   return rbEqual(a, b) ? 0 : null;
+}
+
+function isTemporalDate(value: unknown): boolean {
+  const tag = temporalTag(value);
+  return tag === "Temporal.PlainDate" || tag === "Temporal.PlainDateTime";
+}
+
+function temporalAjd(value: unknown): number {
+  const v = value as {
+    year: number;
+    month: number;
+    day: number;
+    hour?: number;
+    minute?: number;
+    second?: number;
+    millisecond?: number;
+    microsecond?: number;
+    nanosecond?: number;
+  };
+  const y = v.month <= 2 ? v.year - 1 : v.year;
+  const era = Math.floor(y / 400);
+  const yoe = y - era * 400;
+  const doy = Math.floor((153 * (v.month + (v.month > 2 ? -3 : 9)) + 2) / 5) + v.day - 1;
+  const doe = yoe * 365 + Math.floor(yoe / 4) - Math.floor(yoe / 100) + doy;
+  const epochDays = era * 146097 + doe - 719468;
+  const seconds =
+    (v.hour ?? 0) * 3600 +
+    (v.minute ?? 0) * 60 +
+    (v.second ?? 0) +
+    (v.millisecond ?? 0) / 1e3 +
+    (v.microsecond ?? 0) / 1e6 +
+    (v.nanosecond ?? 0) / 1e9;
+  return epochDays + 2440587.5 + seconds / 86400;
 }
 
 function isComparable(value: unknown): value is Comparable {

@@ -159,6 +159,8 @@ import { dbWarningsIgnore } from "../active-record.js";
 
 export type AdapterName = "sqlite3" | "postgresql" | "mysql2";
 
+export type RawConnectionOf<A> = A extends { _rawConnection: infer R } ? R : unknown;
+
 export class Version {
   private _version: number[];
 
@@ -801,8 +803,7 @@ export class AbstractAdapter implements Quoting {
         );
       }
     } else {
-      this._unconfiguredConnection = (configOrDeprecatedConnection ??
-        null) as AbstractAdapter | null;
+      this._unconfiguredConnection = configOrDeprecatedConnection ?? null;
       this.logger = rtest(deprecatedLogger)
         ? deprecatedLogger
         : (ActiveRecord.Base?.logger ?? null);
@@ -837,14 +838,14 @@ export class AbstractAdapter implements Quoting {
   }
 
   protected _visitor!: Visitors.ToSql;
-  protected _connection: AbstractAdapter | null = null;
+  protected _connection: unknown = null;
   private _owner: Thread | Fiber | null = null;
   private _preparedStatements: unknown = false;
   private _schemaCache: BoundSchemaReflection | null = null;
   private _idleSince = Process.clockGettime(Process.CLOCK_MONOTONIC);
   protected _lastActivity = 0;
   protected _verified = false;
-  protected _unconfiguredConnection: AbstractAdapter | null = null;
+  protected _unconfiguredConnection: unknown = null;
   /** @internal */
   protected _connectionParameters: unknown = null;
   protected _rawConnectionDirty = false;
@@ -1149,7 +1150,7 @@ export class AbstractAdapter implements Quoting {
 
   /** @internal */
   protected _acceptDeprecatedRawConnection(rawConnection: unknown): void {
-    this._unconfiguredConnection = rawConnection as AbstractAdapter | null;
+    this._unconfiguredConnection = rawConnection;
   }
 
   async disconnectBang(): Promise<void> {
@@ -1414,11 +1415,11 @@ export class AbstractAdapter implements Quoting {
     return false;
   }
 
-  async rawConnection(): Promise<AbstractAdapter | null> {
+  async rawConnection<Self extends AbstractAdapter>(this: Self): Promise<RawConnectionOf<Self>> {
     return this.withRawConnection({}, async (conn) => {
       await this.disableLazyTransactionsBang();
       this._rawConnectionDirty = true;
-      return conn;
+      return conn as RawConnectionOf<Self>;
     });
   }
 
@@ -1923,7 +1924,7 @@ export class AbstractAdapter implements Quoting {
   /** @internal */
   async withRawConnection<T>(
     options: { allowRetry?: boolean; materializeTransactions?: boolean } = {},
-    block: (raw: AbstractAdapter | null) => Promise<T> | T,
+    block: (raw: unknown) => Promise<T> | T,
   ): Promise<T> {
     const allowRetry = options.allowRetry ?? false;
     const materializeTransactions = options.materializeTransactions ?? true;
@@ -1981,7 +1982,7 @@ export class AbstractAdapter implements Quoting {
   }
 
   /** @internal */
-  protected async rawConnectionForBlock(): Promise<AbstractAdapter | null> {
+  protected async rawConnectionForBlock(): Promise<unknown> {
     return this._connection;
   }
 
@@ -2026,12 +2027,12 @@ export class AbstractAdapter implements Quoting {
   }
 
   /** @internal */
-  anyRawConnection(): AbstractAdapter | null | Promise<AbstractAdapter | null> {
+  anyRawConnection(): unknown {
     return this._connection ?? this.validRawConnection();
   }
 
   /** @internal */
-  validRawConnection(): AbstractAdapter | null | Promise<AbstractAdapter | null> {
+  validRawConnection(): unknown {
     if (this._verified && this._connection) return this._connection;
     return this.withRawConnection(
       { allowRetry: false, materializeTransactions: false },

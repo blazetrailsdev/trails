@@ -361,11 +361,11 @@ export class PostgreSQLAdapter
 
   /** @internal */
   get _rawConnection(): RawConnection | null {
-    return this._connection as unknown as RawConnection | null;
+    return this._connection as RawConnection | null;
   }
   /** @internal */
   set _rawConnection(value: RawConnection | null) {
-    this._connection = value as unknown as AbstractAdapter | null;
+    this._connection = value;
   }
   /** @internal */
   private static readonly VALID_CONN_PARAM_KEYS: ReadonlySet<string> = new Set([
@@ -1243,7 +1243,7 @@ export class PostgreSQLAdapter
 
   async getDatabaseVersion(): Promise<number> {
     return await this.withRawConnection({}, async (conn) => {
-      const version = await this._serverVersion(conn as unknown as pg.Client);
+      const version = await this._serverVersion(conn as pg.Client);
       if (version === 0) {
         throw new ConnectionFailed("Could not determine PostgreSQL version");
       }

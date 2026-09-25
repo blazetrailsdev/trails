@@ -12,7 +12,6 @@ import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
 import { Notifications, indexBy } from "@blazetrails/activesupport";
 import type { Database } from "better-sqlite3";
-import type { SqliteConnection } from "../../sqlite-adapter.js";
 import { BinaryData } from "@blazetrails/activemodel";
 
 import { QueryAttribute } from "../../relation/query-attribute.js";
@@ -68,7 +67,7 @@ async function withFileConnection(
 }
 
 async function rawConnectionOf(conn: BetterSQLite3Adapter): Promise<Database> {
-  return ((await conn.rawConnection()) as unknown as SqliteConnection).raw as Database;
+  return (await conn.rawConnection())!.raw as Database;
 }
 
 async function withStrictStringsByDefault(fn: () => Promise<void>): Promise<void> {
@@ -588,7 +587,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     await adapter.execute(`CREATE TABLE "ex" (id int, data string)`);
     await adapter.execQuery("INSERT INTO ex (id, data) VALUES (1, 'foo')");
     const result = await adapter.execQuery("SELECT id, data FROM ex WHERE id = ?", null, [
-      new QueryAttribute("", 1, new ValueType()),
+      new QueryAttribute(null, 1, new ValueType()),
     ]);
 
     expect(result.rows.length).toEqual(1);
@@ -1060,7 +1059,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   it("statement closed", async () => {
     await adapter.connectBang();
 
-    const rawConnection = (await adapter.rawConnection()) as unknown as SqliteConnection;
+    const rawConnection = (await adapter.rawConnection())!;
     const statement = await rawConnection.prepare(
       "CREATE TABLE statement_test (number integer not null)",
     );

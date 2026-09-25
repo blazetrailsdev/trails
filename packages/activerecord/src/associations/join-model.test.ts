@@ -154,19 +154,19 @@ describe("AssociationsJoinModelTest", () => {
   it("has many", async () => {
     const david = await Author.find(authors("david").id);
     const cats = (await (david as any).categories.toArray()) as Base[];
-    expect(cats.map((c) => c.id)).toContain(categories("general").id);
+    expect(cats).toContainEqual(categories("general"));
   });
 
   it("has many inherited", async () => {
     const mary = await Author.find(authors("mary").id);
     const cats = (await (mary as any).categories.toArray()) as Base[];
-    expect(cats.map((c) => c.id)).toContain(categories("sti_test").id);
+    expect(cats).toContainEqual(categories("sti_test"));
   });
 
   it("inherited has many", async () => {
     const stiTest = await Category.find(categories("sti_test").id);
     const stiAuthors = (await (stiTest as any).authors.toArray()) as Base[];
-    expect(stiAuthors.map((a) => a.id)).toContain(authors("mary").id);
+    expect(stiAuthors).toContainEqual(authors("mary"));
   });
 
   it("has many distinct through join model", async () => {
@@ -189,19 +189,19 @@ describe("AssociationsJoinModelTest", () => {
   it("has many find all", async () => {
     const david = await Author.find(authors("david").id);
     const cats = (await (david as any).categories.toArray()) as Base[];
-    expect(cats.map((c) => c.id)).toEqual([categories("general").id]);
+    expect(cats).toEqual([categories("general")]);
   });
 
   it("has many find first", async () => {
     const david = await Author.find(authors("david").id);
     const cat = (await (david as any).categories.first()) as Base;
-    expect(cat.id).toBe(categories("general").id);
+    expect(cat).toEqual(categories("general"));
   });
 
   it("has many with hash conditions", async () => {
     const david = await Author.find(authors("david").id);
     const cat = (await (david as any).categoriesLikeGeneral.first()) as Base;
-    expect(cat.id).toBe(categories("general").id);
+    expect(cat).toEqual(categories("general"));
   });
 
   it("has many find conditions", async () => {
@@ -209,7 +209,7 @@ describe("AssociationsJoinModelTest", () => {
     const general = (await (david as any).categories
       .where("categories.name = 'General'")
       .first()) as Base | null;
-    expect(general?.id).toBe(categories("general").id);
+    expect(general).toEqual(categories("general"));
     const technology = (await (david as any).categories
       .where("categories.name = 'Technology'")
       .first()) as Base | null;
@@ -250,13 +250,13 @@ describe("AssociationsJoinModelTest", () => {
   it("polymorphic has many going through join model with inheritance", async () => {
     const thinking = await Post.find(posts("thinking").id);
     const tag = (await (thinking as any).tags.first()) as Base;
-    expect(tag.id).toBe(tags("general").id);
+    expect(tag).toEqual(tags("general"));
   });
 
   it("polymorphic has many going through join model with inheritance with custom class name", async () => {
     const thinking = await Post.find(posts("thinking").id);
     const tag = (await (thinking as any).funkyTags.first()) as Base;
-    expect(tag.id).toBe(tags("general").id);
+    expect(tag).toEqual(tags("general"));
   });
 
   it("polymorphic has one create model with inheritance", async () => {
@@ -283,7 +283,7 @@ describe("AssociationsJoinModelTest", () => {
     expect(tagging.taggable_type).toBe("Post");
     expect(tagging.taggable_id).toBe(Number(thinking.id));
     const taggable = (await tagging.taggable) as Base;
-    expect(taggable.id).toBe(thinking.id);
+    expect(taggable).toEqual(thinking);
   });
 
   it("set polymorphic has one on new record", async () => {
@@ -296,7 +296,7 @@ describe("AssociationsJoinModelTest", () => {
     expect(tagging.taggable_type).toBe("Post");
     expect(tagging.taggable_id).toBe(Number(post.id));
     const taggable = (await tagging.taggable) as Base;
-    expect(taggable.id).toBe(post.id);
+    expect(taggable).toEqual(post);
   });
 
   it("create polymorphic has many with scope", async () => {
@@ -416,7 +416,7 @@ describe("AssociationsJoinModelTest", () => {
       const detected = (await (category as any).authorsWithSelect.toArray()).find(
         (a: Base) => (a as any).name === "Ernie",
       );
-      expect((detected as Base).id).toBe(ernie.id);
+      expect(detected as Base).toEqual(ernie);
     });
   });
 
@@ -437,7 +437,7 @@ describe("AssociationsJoinModelTest", () => {
     const tagging = taggings("welcome_general");
     await assertNoQueries(false, async () => {
       const target = (post as any).association("tagging").target as Base;
-      expect(target.id).toBe(tagging.id);
+      expect(target).toEqual(tagging);
     });
   });
 
@@ -446,7 +446,7 @@ describe("AssociationsJoinModelTest", () => {
     const tagging = taggings("godfather");
     await assertNoQueries(false, async () => {
       const target = (item as any).association("tagging").target as Base;
-      expect(target.id).toBe(tagging.id);
+      expect(target).toEqual(tagging);
     });
   });
 
@@ -476,13 +476,9 @@ describe("AssociationsJoinModelTest", () => {
 
   it("has many going through join model with custom foreign key", async () => {
     const thinking = await Post.find(posts("thinking").id);
-    expect(((await (thinking as any).authors.toArray()) as Base[]).map((a) => a.id)).toEqual([
-      authors("bob").id,
-    ]);
+    expect((await (thinking as any).authors.toArray()) as Base[]).toEqual([authors("bob")]);
     const authorless = await Post.find(posts("authorless").id);
-    expect(((await (authorless as any).authors.toArray()) as Base[]).map((a) => a.id)).toEqual([
-      authors("mary").id,
-    ]);
+    expect((await (authorless as any).authors.toArray()) as Base[]).toEqual([authors("mary")]);
   });
 
   it("has many going through join model with custom primary key", async () => {
@@ -511,7 +507,7 @@ describe("AssociationsJoinModelTest", () => {
     const authorsUsingCustomPk = (await (thinking as any).authorsUsingCustomPk
       .order("authors.id")
       .toArray()) as Base[];
-    expect(authorsUsingCustomPk.map((a) => a.id)).toEqual([authors("david").id, authors("bob").id]);
+    expect(authorsUsingCustomPk).toEqual([authors("david"), authors("bob")]);
   });
 
   it("unavailable through reflection", async () => {
@@ -570,7 +566,7 @@ describe("AssociationsJoinModelTest", () => {
   it("has many polymorphic with source type merges source reflection scope", async () => {
     const general = await ScopedSourceTag.find(tags("general").id);
     const scoped = (await (general as any).welcomeTaggedPosts.toArray()) as Base[];
-    expect(scoped.map((p) => p.id)).toEqual([posts("welcome").id]);
+    expect(scoped).toEqual([posts("welcome")]);
   });
 
   it("eager has many polymorphic with source type merges source reflection scope", async () => {
@@ -579,7 +575,7 @@ describe("AssociationsJoinModelTest", () => {
       .find(tags("general").id);
     await assertNoQueries(false, async () => {
       const target = (general as any).association("welcomeTaggedPosts").target as Base[];
-      expect(target.map((p) => p.id)).toEqual([posts("welcome").id]);
+      expect(target).toEqual([posts("welcome")]);
     });
   });
 
@@ -600,7 +596,7 @@ describe("AssociationsJoinModelTest", () => {
   it("has many through has many find all", async () => {
     const david = await Author.find(authors("david").id);
     const first = ((await (david as any).comments.order("comments.id").toArray()) as Base[])[0];
-    expect(first.id).toBe(comments("greetings").id);
+    expect(first).toEqual(comments("greetings"));
   });
 
   it("has many through has many find all with custom class", async () => {
@@ -608,13 +604,13 @@ describe("AssociationsJoinModelTest", () => {
     const first = (
       (await (david as any).funkyComments.order("comments.id").toArray()) as Base[]
     )[0];
-    expect(first.id).toBe(comments("greetings").id);
+    expect(first).toEqual(comments("greetings"));
   });
 
   it("has many through has many find first", async () => {
     const david = await Author.find(authors("david").id);
     const first = (await (david as any).comments.order("comments.id").first()) as Base;
-    expect(first.id).toBe(comments("greetings").id);
+    expect(first).toEqual(comments("greetings"));
   });
 
   it("has many through has many find conditions", async () => {
@@ -623,13 +619,13 @@ describe("AssociationsJoinModelTest", () => {
       .where("comments.type = 'SpecialComment'")
       .order("comments.id")
       .first()) as Base;
-    expect(first.id).toBe(comments("does_it_hurt").id);
+    expect(first).toEqual(comments("does_it_hurt"));
   });
 
   it("has many through has many find by id", async () => {
     const david = await Author.find(authors("david").id);
     const comment = (await (david as any).comments.find(2)) as Base;
-    expect(comment.id).toBe(comments("more_greetings").id);
+    expect(comment).toEqual(comments("more_greetings"));
   });
 
   it("has many through polymorphic has one", async () => {
@@ -654,9 +650,7 @@ describe("AssociationsJoinModelTest", () => {
   it("self referential has many through", async () => {
     const david = await Author.find(authors("david").id);
     const mary = await Author.find(authors("mary").id);
-    expect(((await (david as any).favoriteAuthors.toArray()) as Base[]).map((a) => a.id)).toEqual([
-      mary.id,
-    ]);
+    expect((await (david as any).favoriteAuthors.toArray()) as Base[]).toEqual([mary]);
     expect(((await (mary as any).favoriteAuthors.toArray()) as Base[]).map((a) => a.id)).toEqual(
       [],
     );
@@ -668,7 +662,7 @@ describe("AssociationsJoinModelTest", () => {
     await (david as any).authorFavorites.create({ favoriteAuthor: newAuthor });
     await (david as any).reload();
     const first = (await (david as any).favoriteAuthors.first()) as Base;
-    expect(first.id).toBe(newAuthor.id);
+    expect(first).toEqual(newAuthor);
   });
 
   it("has many through uses conditions specified on the has many association", async () => {
@@ -842,7 +836,7 @@ describe("AssociationsJoinModelTest", () => {
   it("has many through has many with sti", async () => {
     const david = await Author.find(authors("david").id);
     const specialComments = (await (david as any).specialPostComments.toArray()) as Base[];
-    expect(specialComments.map((c) => c.id)).toEqual([comments("does_it_hurt").id]);
+    expect(specialComments).toEqual([comments("does_it_hurt")]);
   });
 
   it("distinct has many through should retain order", async () => {
@@ -865,7 +859,7 @@ describe("AssociationsJoinModelTest", () => {
     const p = await Post.includes(":taggings").find(posts("welcome").id);
     await assertNoQueries(false, async () => {
       const target = (p as any).association("taggings").target as Base[];
-      expect(target.map((t) => t.id)).toContain(expected.id);
+      expect(target).toContainEqual(expected);
     });
     const welcome = await Post.find(posts("welcome").id);
     expect(((await (welcome as any).taggings.toArray()) as Base[]).map((t) => t.id)).toContain(
@@ -878,7 +872,7 @@ describe("AssociationsJoinModelTest", () => {
     const tagging = await Tagging.includes(":taggable").find(taggings("welcome_general").id);
     await assertNoQueries(false, async () => {
       const taggable = (tagging as any).association("taggable").target as Base;
-      expect(taggable.id).toBe(expected.id);
+      expect(taggable).toEqual(expected);
     });
   });
 
@@ -887,7 +881,7 @@ describe("AssociationsJoinModelTest", () => {
     await assertNoQueries(false, async () => {
       const firstTagging = ((p as any).association("taggings").target as Base[])[0];
       const taggable = (firstTagging as any).association("taggable").target as Base;
-      expect(taggable.id).toBe(posts("welcome").id);
+      expect(taggable).toEqual(posts("welcome"));
     });
   });
 
@@ -933,7 +927,7 @@ describe("AssociationsJoinModelTest", () => {
     await assertNoQueries(false, async () => {
       const p0 = (commentList[0] as any).association("post").target as Base;
       const p1 = (commentList[1] as any).association("post").target as Base;
-      expect(p0.id).toBe(p1.id);
+      expect(p0).toEqual(p1);
     });
   });
 
@@ -971,9 +965,7 @@ describe("AssociationsJoinModelTest", () => {
   it("has many with pluralize table names false", async () => {
     const aircraft = await Aircraft.createBang({ name: "Airbus 380" });
     const engine = await Engine.createBang({ car_id: aircraft.id });
-    expect(((await (aircraft as any).engines.toArray()) as Base[]).map((e) => e.id)).toEqual([
-      engine.id,
-    ]);
+    expect((await (aircraft as any).engines.toArray()) as Base[]).toEqual([engine]);
   });
 
   it("polymorphic has many through with composite owner primary key", async () => {
@@ -1000,7 +992,7 @@ describe("AssociationsJoinModelTest", () => {
     ]);
 
     const loadedTags = (await (order as any).orderTagNames.toArray()) as Base[];
-    expect(loadedTags.map((t) => (t as any).id)).toEqual([(tag as any).id]);
+    expect(loadedTags).toEqual([tag as any]);
   });
 
   it("has many distinct through count", async () => {
@@ -1023,7 +1015,7 @@ describe("AssociationsJoinModelTest", () => {
   it("polymorphic has many going through join model", async () => {
     const post = await Post.includes(":tags").find(posts("welcome").id);
     const tag = ((post as any).tags.target as Base[])[0];
-    expect(tag.id).toBe(tags("general").id);
+    expect(tag).toEqual(tags("general"));
     await assertNoQueries(false, async () => {
       void (tag as any).tagging;
     });
@@ -1032,7 +1024,7 @@ describe("AssociationsJoinModelTest", () => {
   it("polymorphic has many going through join model with find", async () => {
     const post = await Post.includes(":tags").find(posts("welcome").id);
     const tag = ((post as any).tags.target as Base[])[0];
-    expect(tag.id).toBe(tags("general").id);
+    expect(tag).toEqual(tags("general"));
     await assertNoQueries(false, async () => {
       void (tag as any).tagging;
     });
@@ -1041,7 +1033,7 @@ describe("AssociationsJoinModelTest", () => {
   it("polymorphic has many going through join model with include on source reflection", async () => {
     const post = await Post.includes(":funkyTags").find(posts("welcome").id);
     const tag = ((post as any).funkyTags.target as Base[])[0];
-    expect(tag.id).toBe(tags("general").id);
+    expect(tag).toEqual(tags("general"));
     await assertNoQueries(false, async () => {
       void (tag as any).tagging;
     });
@@ -1050,7 +1042,7 @@ describe("AssociationsJoinModelTest", () => {
   it("polymorphic has many going through join model with include on source reflection with find", async () => {
     const post = await Post.includes(":funkyTags").find(posts("welcome").id);
     const tag = ((post as any).funkyTags.target as Base[])[0];
-    expect(tag.id).toBe(tags("general").id);
+    expect(tag).toEqual(tags("general"));
     await assertNoQueries(false, async () => {
       void (tag as any).tagging;
     });
@@ -1060,17 +1052,17 @@ describe("AssociationsJoinModelTest", () => {
     const post = await Post.find(posts("welcome").id);
     const loadedTags = await (post as any).tags.addJoinsAndSelect();
     const tag = loadedTags[0];
-    expect(tag.id).toBe(tags("general").id);
+    expect(tag).toEqual(tags("general"));
     expect(() => void tag.author_id).not.toThrow();
   });
 
   it("polymorphic has many going through join model with custom foreign key", async () => {
     const tagging = await Tagging.find(taggings("welcome_general").id);
     const superTag = (await (tagging as any).superTag) as Base;
-    expect(superTag.id).toBe(tags("misc").id);
+    expect(superTag).toEqual(tags("misc"));
     const post = await Post.find(posts("welcome").id);
     const superTagsList = (await (post as any).superTags.toArray()) as Base[];
-    expect(superTagsList[0].id).toBe(tags("misc").id);
+    expect(superTagsList[0]).toEqual(tags("misc"));
   });
 
   it("include has many through polymorphic has many", async () => {

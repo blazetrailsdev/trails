@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { Range } from "./range.js";
 import {
   cmp,
   equals,
@@ -22,6 +23,21 @@ describe("<=>", () => {
   it("orders Dates as epoch millis", () => {
     expect(cmp(new Date(0), new Date(1))).toBe(-1);
     expect(cmp(new Date(1), 1)).toBe(0);
+  });
+
+  it("places an infinite Float against a Date through Date#infinite?, as flo_cmp does", () => {
+    const date = { year: 2012, month: 1, day: 2, [Symbol.toStringTag]: "Temporal.PlainDate" };
+    expect(cmp(-Infinity, date)).toBe(-1);
+    expect(cmp(Infinity, date)).toBe(1);
+    expect(cmp(1.5, date)).toBeNull();
+    expect(new Range<unknown>(-Infinity, Infinity).cover(date)).toBe(true);
+  });
+
+  it("compares a Date against a Numeric on its ajd, as cmp_gen does", () => {
+    const date = { year: 2012, month: 1, day: 2, [Symbol.toStringTag]: "Temporal.PlainDate" };
+    expect(cmp(date, 2455928.5)).toBe(0);
+    expect(cmp(date, 2455929)).toBe(-1);
+    expect(cmp(date, Infinity)).toBe(-1);
   });
 
   it("returns nil for an unrelated object, as Object#<=> does", () => {

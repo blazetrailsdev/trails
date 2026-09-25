@@ -43,14 +43,14 @@ export function toEnvelope(coder: AttributeSetCoder): AttributeSetEnvelope {
 
   for (const attr of coder.conciseAttributes ?? []) {
     if (!attr.isInitialized()) {
-      defaultAttributes.push(attr.name);
+      defaultAttributes.push(attr.name!);
       continue;
     }
-    envelope.types[attr.name] =
+    envelope.types[attr.name!] =
       attr.type == null
         ? null
         : (typeRegistry.keyFor(attr.type) ?? UNKNOWN_TYPE_KEY_PREFIX + attr.type.constructor.name);
-    envelope.values[attr.name] = attr.valueBeforeTypeCast;
+    envelope.values[attr.name!] = attr.valueBeforeTypeCast;
   }
   if (defaultAttributes.length > 0) envelope.defaultAttributes = defaultAttributes;
 

@@ -25,6 +25,13 @@ import {
 
 registerFakeAdapter();
 
+expect.addEqualityTesters([
+  function recordEquals(a: unknown, b: unknown): boolean | undefined {
+    if (!(a instanceof Base) || !(b instanceof Base)) return undefined;
+    return a.equals(b);
+  },
+]);
+
 DelegateCache.delegateBaseMethods = false;
 
 I18n.setEnforceAvailableLocales(false);

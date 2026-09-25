@@ -64,8 +64,6 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
 
   const sortIds = (a: any, b: any) => (a < b ? -1 : a > b ? 1 : 0);
 
-  const ids = (r: any): any => (Array.isArray(r) ? r.map((x: any) => x.id) : r?.id);
-
   const q = async <T>(n: number, fn: () => PromiseLike<T>): Promise<T> => {
     let result!: T;
     await assertQueriesCount(n, false, async () => {
@@ -145,8 +143,9 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
   });
 
   it("to a on disable joins through", async () => {
-    expect(ids(await (author as any).noJoinsComments).sort(sortIds)).toEqual(
-      ids(await (author as any).comments).sort(sortIds),
+    const byId = (a: any, b: any) => sortIds(a.id, b.id);
+    expect((await (author as any).noJoinsComments.toArray()).sort(byId)).toEqual(
+      (await (author as any).comments.toArray()).sort(byId),
     );
     await author.reload();
     await assertQueriesCount(2, false, async () => {
@@ -229,13 +228,13 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
   });
 
   it("to a on disable joins with multiple scopes", async () => {
-    expect(ids(await q(1, () => association(author, "goodRatings").toArray()))).toEqual([
-      rating1.id,
-      rating2.id,
+    expect(await q(1, () => association(author, "goodRatings").toArray())).toEqual([
+      rating1,
+      rating2,
     ]);
-    expect(ids(await q(3, () => association(author, "noJoinsGoodRatings").toArray()))).toEqual([
-      rating1.id,
-      rating2.id,
+    expect(await q(3, () => association(author, "noJoinsGoodRatings").toArray())).toEqual([
+      rating1,
+      rating2,
     ]);
   });
 
@@ -256,36 +255,35 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
   });
 
   it("polymophic disable joins through ordering", async () => {
-    expect(ids(await q(1, () => association(author, "orderedMembers").toArray()))).toEqual([
-      member2.id,
-      member.id,
+    expect(await q(1, () => association(author, "orderedMembers").toArray())).toEqual([
+      member2,
+      member,
     ]);
-    expect(ids(await q(3, () => association(author, "noJoinsOrderedMembers").toArray()))).toEqual([
-      member2.id,
-      member.id,
+    expect(await q(3, () => association(author, "noJoinsOrderedMembers").toArray())).toEqual([
+      member2,
+      member,
     ]);
   });
 
   it("polymorphic disable joins through reordering", async () => {
     expect(
-      ids(await q(1, () => association(author, "orderedMembers").reorder({ id: "asc" }).toArray())),
-    ).toEqual([member.id, member2.id]);
+      await q(1, () => association(author, "orderedMembers").reorder({ id: "asc" }).toArray()),
+    ).toEqual([member, member2]);
     expect(
-      ids(
-        await q(3, () =>
-          association(author, "noJoinsOrderedMembers").reorder({ id: "asc" }).toArray(),
-        ),
+      await q(3, () =>
+        association(author, "noJoinsOrderedMembers").reorder({ id: "asc" }).toArray(),
       ),
-    ).toEqual([member.id, member2.id]);
+    ).toEqual([member, member2]);
   });
 
   it("polymorphic disable joins through ordered scopes", async () => {
+    expect(await q(1, () => association(author, "orderedMembers").unnamed().toArray())).toEqual([
+      member2,
+      member,
+    ]);
     expect(
-      ids(await q(1, () => association(author, "orderedMembers").unnamed().toArray())),
-    ).toEqual([member2.id, member.id]);
-    expect(
-      ids(await q(3, () => association(author, "noJoinsOrderedMembers").unnamed().toArray())),
-    ).toEqual([member2.id, member.id]);
+      await q(3, () => association(author, "noJoinsOrderedMembers").unnamed().toArray()),
+    ).toEqual([member2, member]);
   });
 
   it("polymorphic disable joins through ordered chained scopes", async () => {
@@ -301,64 +299,48 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
       origin_id: member4.id,
       origin_type: "Member",
     });
-    const expected = [member3.id, member2.id, member.id];
+    const expected = [member3, member2, member];
     expect(
-      ids(
-        await q(1, () =>
-          association(author, "orderedMembers").unnamed().withMemberTypeId(memberType.id).toArray(),
-        ),
+      await q(1, () =>
+        association(author, "orderedMembers").unnamed().withMemberTypeId(memberType.id).toArray(),
       ),
     ).toEqual(expected);
     expect(
-      ids(
-        await q(3, () =>
-          association(author, "noJoinsOrderedMembers")
-            .unnamed()
-            .withMemberTypeId(memberType.id)
-            .toArray(),
-        ),
+      await q(3, () =>
+        association(author, "noJoinsOrderedMembers")
+          .unnamed()
+          .withMemberTypeId(memberType.id)
+          .toArray(),
       ),
     ).toEqual(expected);
   });
 
   it("polymorphic disable joins through ordered scope limits", async () => {
     expect(
-      ids(await q(1, () => association(author, "orderedMembers").unnamed().limit(1).toArray())),
-    ).toEqual([member2.id]);
+      await q(1, () => association(author, "orderedMembers").unnamed().limit(1).toArray()),
+    ).toEqual([member2]);
     expect(
-      ids(
-        await q(3, () => association(author, "noJoinsOrderedMembers").unnamed().limit(1).toArray()),
-      ),
-    ).toEqual([member2.id]);
+      await q(3, () => association(author, "noJoinsOrderedMembers").unnamed().limit(1).toArray()),
+    ).toEqual([member2]);
   });
 
   it("polymorphic disable joins through ordered scope first", async () => {
-    expect(ids(await q(1, () => association(author, "orderedMembers").unnamed().first()))).toEqual(
-      member2.id,
+    expect(await q(1, () => association(author, "orderedMembers").unnamed().first())).toEqual(
+      member2,
     );
     expect(
-      ids(await q(3, () => association(author, "noJoinsOrderedMembers").unnamed().first())),
-    ).toEqual(member2.id);
+      await q(3, () => association(author, "noJoinsOrderedMembers").unnamed().first()),
+    ).toEqual(member2);
   });
 
   it("order applied in double join", async () => {
-    expect(ids(await q(1, () => association(author, "members").toArray()))).toEqual([
-      member2.id,
-      member.id,
-    ]);
-    expect(ids(await q(3, () => (author as any).noJoinsMembers.toArray()))).toEqual([
-      member2.id,
-      member.id,
-    ]);
+    expect(await q(1, () => association(author, "members").toArray())).toEqual([member2, member]);
+    expect(await q(3, () => (author as any).noJoinsMembers.toArray())).toEqual([member2, member]);
   });
 
   it("first and scope applied in double join", async () => {
-    expect(ids(await q(1, () => association(author, "members").unnamed().first()))).toEqual(
-      member2.id,
-    );
-    expect(ids(await q(3, () => (author as any).noJoinsMembers.unnamed().first()))).toEqual(
-      member2.id,
-    );
+    expect(await q(1, () => association(author, "members").unnamed().first())).toEqual(member2);
+    expect(await q(3, () => (author as any).noJoinsMembers.unnamed().first())).toEqual(member2);
   });
 
   it("first and scope in double join applies order in memory", async () => {
@@ -369,12 +351,12 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
   });
 
   it("limit and scope applied in double join", async () => {
+    expect(await q(1, () => association(author, "members").unnamed().limit(1).toArray())).toEqual([
+      member2,
+    ]);
     expect(
-      ids(await q(1, () => association(author, "members").unnamed().limit(1).toArray())),
-    ).toEqual([member2.id]);
-    expect(
-      ids(await q(3, () => association(author, "noJoinsMembers").unnamed().limit(1).toArray())),
-    ).toEqual([member2.id]);
+      await q(3, () => association(author, "noJoinsMembers").unnamed().limit(1).toArray()),
+    ).toEqual([member2]);
   });
 
   it("limit and scope in double join applies limit in memory", async () => {

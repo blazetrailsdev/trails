@@ -8,7 +8,7 @@ export class UserProvidedDefault extends FromUser {
   private _hasMemoizedVBTC: boolean = false;
 
   constructor(
-    name: string,
+    name: string | null,
     value: unknown,
     type: ValueType | null,
     databaseDefault: Attribute | null = null,
@@ -32,12 +32,12 @@ export class UserProvidedDefault extends FromUser {
     return new UserProvidedDefault(this.name, this.userProvidedValue, type, this.originalAttribute);
   }
 
-  marshalDump(): [string, unknown, ValueType | null, Attribute | null] {
+  marshalDump(): [string | null, unknown, ValueType | null, Attribute | null] {
     return [this.name, this.valueBeforeTypeCast, this.type, this.originalAttribute];
   }
 
   static marshalLoad(
-    values: [string, unknown, ValueType | null, Attribute | null],
+    values: [string | null, unknown, ValueType | null, Attribute | null],
   ): UserProvidedDefault {
     return new UserProvidedDefault(values[0], values[1], values[2], values[3]);
   }

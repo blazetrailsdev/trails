@@ -1474,10 +1474,9 @@ export class MigrationContext<
     return ActiveRecord.ConnectionHandling.DEFAULT_ENV();
   }
 
-  async protectedEnvironment(this: MigrationContext): Promise<boolean> {
-    const stored = await this.lastStoredEnvironment();
-    if (!stored) return false;
-    return ActiveRecord.Base.protectedEnvironments.includes(stored);
+  async protectedEnvironment(this: MigrationContext): Promise<boolean | null> {
+    if (!(await this.lastStoredEnvironment())) return null;
+    return ActiveRecord.Base.protectedEnvironments.includes((await this.lastStoredEnvironment())!);
   }
 
   async lastStoredEnvironment(this: MigrationContext): Promise<string | null> {

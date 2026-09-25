@@ -112,7 +112,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
           MigrationContext,
           "currentVersion",
           null,
-          { times: 4, returns: 1 },
+          { times: 6, returns: 1 },
           async () => {
             expect(protectedEnvironments).not.toContain(currentEnv);
             await DatabaseTasks.checkProtectedEnvironmentsBang(env);

@@ -3,7 +3,7 @@ import { SignedGlobalID } from "./signed-global-id.js";
 import { validateApp } from "./uri/gid.js";
 import { safeConstantize } from "@blazetrails/activesupport";
 import type { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { ArgumentError, except } from "@blazetrails/ruby-compat";
+import { ArgumentError, except, rbObjMethod } from "@blazetrails/ruby-compat";
 
 /** @noRailsEquivalent PERMANENT */
 export interface LocatorModel {
@@ -170,7 +170,7 @@ export class Locator {
     if (!modelIdArityMatches(klass, gid.modelId)) return null;
     const locator = Locator.locatorFor(gid);
 
-    if (methodArity(locator.locate) === 1) {
+    if (rbObjMethod(locator, "locate").arity() === 1) {
       GlobalID.deprecator().warn(
         "It seems your locator is defining the `locate` method only with one argument. Please make sure your locator is receiving the options argument as well, like `locate(gid, options = {})`.",
       );
@@ -284,39 +284,6 @@ export class Locator {
 export function _resetLocators(): void {
   _appLocators.clear();
   _defaultLocator = new UnscopedLocator();
-}
-
-function methodArity(fn: (...args: never[]) => unknown): number {
-  const src = Function.prototype.toString.call(fn);
-  const open = src.indexOf("(");
-  const arrow = src.indexOf("=>");
-  if (arrow !== -1 && (open === -1 || arrow < open)) {
-    return src
-      .slice(0, arrow)
-      .replace(/^async\s+/, "")
-      .trim() === ""
-      ? 0
-      : 1;
-  }
-  let depth = 0;
-  let current = "";
-  const params: string[] = [];
-  for (let i = open + 1; i < src.length; i++) {
-    const ch = src[i];
-    if ("([{".includes(ch)) depth++;
-    else if (")]}".includes(ch)) {
-      if (depth === 0) break;
-      depth--;
-    } else if (ch === "," && depth === 0) {
-      params.push(current.trim());
-      current = "";
-      continue;
-    }
-    current += ch;
-  }
-  if (current.trim() !== "") params.push(current.trim());
-  const required = params.filter((p) => !p.startsWith("...") && !/^[^=]*[^=!<>]=[^=>]/.test(p));
-  return required.length === params.length ? required.length : -(required.length + 1);
 }
 
 type Ctor = new (...args: never[]) => unknown;
