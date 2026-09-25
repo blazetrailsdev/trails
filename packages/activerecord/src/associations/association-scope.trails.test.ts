@@ -456,10 +456,9 @@ describe("AssociationScope", () => {
     registerModel(AscCpkBook);
     registerModel(AscCpkBrokenOrder);
     const owner = new AscCpkBrokenOrder({ shop_id: 1, status: "active" });
-    const reflection = (AscCpkBrokenOrder as any)._reflectOnAssociation("books");
     let error: Error | undefined;
     try {
-      AssociationScope.scope({ owner, reflection, klass: AscCpkBook });
+      owner.association("books");
     } catch (e) {
       error = e as Error;
     }

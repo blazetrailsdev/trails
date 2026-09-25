@@ -334,7 +334,9 @@ complete artifact prints the slack it is carrying, per package and per counter �
 including a run that FAILS on some other counter — the protection currently suspended,
 stated in the run that is not enforcing it. Those numbers only ever fall; one
 that rises is a regression the gate deliberately let through, and the reviewer of
-the converging PR is who catches it.
+the converging PR is who catches it. RFC 0132 (ar-closure-assertion-parity) held the one freeze to
+date; its closing story deleted the marker and reseeded once, so no freeze is up
+now.
 
 **The stale-artifact trap**: the counts are read from
 `scripts/test-compare/output/convention-comparison.json` — no second extractor.

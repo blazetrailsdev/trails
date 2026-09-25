@@ -17,6 +17,7 @@ export interface CachingHost {
   constructor: CachingClassMethods;
   cacheStore?: CacheStore | null;
   performCaching?: boolean;
+  isCacheConfigured(): CacheStore | boolean | null | undefined;
 }
 
 type ConfigReceiver = { config(): Configuration & { cacheStore: CacheStore | null } };
@@ -29,12 +30,12 @@ export const ConfigMethods = {
   set cacheStore(store: unknown) {
     (this as unknown as ConfigReceiver).config().cacheStore = lookupStore(store);
   },
-};
 
-/** @internal */
-export function cacheConfigured(host: CachingHost): boolean {
-  return Boolean(host.performCaching && host.cacheStore);
-}
+  /** @internal */
+  isCacheConfigured(this: Omit<CachingHost, "constructor" | "isCacheConfigured">) {
+    return this.performCaching && this.cacheStore;
+  },
+};
 
 export function viewCacheDependency(
   this: CachingClassMethods,
@@ -64,8 +65,9 @@ export function cache<T>(
   const block = typeof optionsOrBlock === "function" ? (optionsOrBlock as () => T) : maybeBlock!;
   const options = typeof optionsOrBlock === "function" ? ({} as CacheOptions) : optionsOrBlock;
 
-  if (!cacheConfigured(this)) return block();
-
-  const store = this.cacheStore!;
-  return store.fetch(expandCacheKey(key, "controller"), options, block) as T;
+  if (this.isCacheConfigured()) {
+    return this.cacheStore!.fetch(expandCacheKey(key, "controller"), options, block) as T;
+  } else {
+    return block();
+  }
 }

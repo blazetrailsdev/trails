@@ -4,7 +4,6 @@ import type { Base } from "../base.js";
 import type { AssociationReflection, AbstractReflection } from "../reflection.js";
 import { RuntimeReflection } from "../reflection.js";
 import { AliasTracker, aliasedArelTableForReflection } from "./alias-tracker.js";
-import { CompositePrimaryKeyMismatchError } from "./errors.js";
 import { WhereClause } from "../relation/where-clause.js";
 import { constructJoinDependency } from "../relation/query-methods.js";
 import { drop } from "@blazetrails/ruby-compat";
@@ -158,17 +157,6 @@ export class AssociationScope {
     const joinPk = r.joinPrimaryKey();
     const joinPks = Array.isArray(joinPk) ? joinPk : [joinPk];
     const joinFks = Array.isArray(r.joinForeignKey) ? r.joinForeignKey : [r.joinForeignKey];
-    if (joinPks.length !== joinFks.length) {
-      const name = (reflection as { name?: string }).name ?? "<unknown>";
-      const ownerName = (owner.constructor as typeof Base).name;
-      (owner.constructor as typeof Base)._reflectOnAssociation?.(name)?.checkValidityBang?.();
-      throw new CompositePrimaryKeyMismatchError({
-        activeRecord: ownerName,
-        name,
-        associationPrimaryKey: () => joinPks,
-        foreignKey: () => joinFks,
-      });
-    }
     const table = tableName ? this._arelTableFor(reflection, tableName) : null;
     for (let i = 0; i < joinPks.length; i++) {
       const value = this.transformValue(owner._readAttribute(joinFks[i]));
@@ -227,21 +215,6 @@ export class AssociationScope {
     const rJoinPk = r.joinPrimaryKey();
     const joinPks = Array.isArray(rJoinPk) ? rJoinPk : [rJoinPk];
     const joinFks = Array.isArray(r.joinForeignKey) ? r.joinForeignKey : [r.joinForeignKey];
-    if (joinPks.length !== joinFks.length) {
-      const base =
-        (reflection as { reflection?: { name?: string; activeRecord?: { name?: string } } })
-          .reflection ?? (reflection as { name?: string; activeRecord?: { name?: string } });
-      const name = base.name ?? "<unknown>";
-      const ownerName = base.activeRecord?.name ?? "<unknown>";
-      const ownerClass = base.activeRecord as unknown as typeof Base | undefined;
-      ownerClass?._reflectOnAssociation?.(name)?.checkValidityBang?.();
-      throw new CompositePrimaryKeyMismatchError({
-        activeRecord: ownerName,
-        name,
-        associationPrimaryKey: () => joinPks,
-        foreignKey: () => joinFks,
-      });
-    }
     const rAliased = (reflection as Partial<ReflectionProxy>).aliasedTable as
       | string
       | { name?: string }

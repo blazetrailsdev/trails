@@ -21,19 +21,19 @@
       "value": 2
     },
     "activemodel": {
-      "assertionCount": 241,
-      "kind": 374,
-      "value": 33
+      "assertionCount": 0,
+      "kind": 0,
+      "value": 0
     },
     "activerecord": {
-      "assertionCount": 1458,
-      "kind": 3040,
-      "value": 28
+      "assertionCount": 0,
+      "kind": 4,
+      "value": 1
     },
     "activesupport": {
-      "assertionCount": 258,
-      "kind": 414,
-      "value": 26
+      "assertionCount": 1,
+      "kind": 3,
+      "value": 10
     },
     "arel": {
       "assertionCount": 0,
@@ -41,8 +41,8 @@
       "value": 0
     },
     "date": {
-      "assertionCount": 1,
-      "kind": 1,
+      "assertionCount": 0,
+      "kind": 0,
       "value": 0
     },
     "did-you-mean": {
@@ -51,9 +51,9 @@
       "value": 0
     },
     "globalid": {
-      "assertionCount": 23,
-      "kind": 27,
-      "value": 1
+      "assertionCount": 0,
+      "kind": 0,
+      "value": 0
     },
     "i18n": {
       "assertionCount": 0,
@@ -61,9 +61,9 @@
       "value": 0
     },
     "rack": {
-      "assertionCount": 333,
-      "kind": 434,
-      "value": 51
+      "assertionCount": 332,
+      "kind": 433,
+      "value": 50
     },
     "rack-session": {
       "assertionCount": 0,
@@ -83,7 +83,7 @@
     "trailties": {
       "assertionCount": 46,
       "kind": 72,
-      "value": 4
+      "value": 0
     }
   }
 }

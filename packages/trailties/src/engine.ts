@@ -186,6 +186,20 @@ export class Engine extends Trailtie {
     this._allLoadPathsCache = Array.from(new Set(out));
     return this._allLoadPathsCache;
   }
+
+  /**
+   * @internal
+   * @missingRailsArgs join — CONVERGEABLE converge-engine-configuration-root-pathname-new
+   */
+  async fixturesInRootAndNotInVendorOrDotDir(fixtures: string): Promise<boolean> {
+    const root = (await TopLevel.Trails!.root())!;
+    return (
+      (await getFs().exists(fixtures)) &&
+      fixtures.startsWith(root) &&
+      !fixtures.startsWith(getPath().join(root, "vendor")) &&
+      !fixtures.startsWith(`${root}/.`)
+    );
+  }
 }
 
 export interface EngineInitializerApp {
@@ -237,6 +251,17 @@ Engine.initializer("add_view_paths", async function (this: Engine) {
   });
 });
 
+Engine.initializer("add_fixture_paths", async function (this: Engine) {
+  if (this instanceof TopLevel.Trails!.Application) return;
+
+  const fixtures = getPath().join(this.config.root as string, "test", "fixtures");
+  if (await this.fixturesInRootAndNotInVendorOrDotDir(fixtures)) {
+    onLoad("active_record_fixtures", (base: ActiveRecordFixturesLike) => {
+      base.fixturePaths = [...new Set([...base.fixturePaths, `${fixtures}/`])];
+    });
+  }
+});
+
 Engine.initializer("prepend_helpers_path", async function (this: Engine, ...args: unknown[]) {
   const app = args[0] as EngineInitializerApp;
   if (!this.isolated() || (app as unknown) === this) {
@@ -266,6 +291,11 @@ Engine.initializer("engines_blank_point", function () {});
 /** @internal */
 interface EngineReloaderApp {
   reloader: { wrap(block: () => void | Promise<void>): void | Promise<void> };
+}
+
+/** @internal */
+interface ActiveRecordFixturesLike {
+  fixturePaths: string[];
 }
 
 /** @internal */

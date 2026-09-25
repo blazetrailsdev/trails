@@ -278,7 +278,7 @@ export interface BuiltThroughInverse {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy-remainder
+ * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy-remainder-2
  */
 export function buildThroughInverseFor(
   assoc: HasManyThroughAssociation,

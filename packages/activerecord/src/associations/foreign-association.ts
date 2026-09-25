@@ -5,7 +5,7 @@ import type { Base } from "../base.js";
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy-remainder
+ * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy-remainder-2
  */
 export function ownerForeignKeyColumns(
   ctor: typeof Base,

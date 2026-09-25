@@ -1,3 +1,4 @@
+import { extend, included } from "@blazetrails/ruby-compat/include";
 import { NameError } from "./core-ext/name-error.js";
 import { InheritableOptions } from "./ordered-options.js";
 
@@ -100,3 +101,9 @@ export namespace Configurable {
     return this._config;
   }
 }
+
+Object.defineProperty(Configurable, included, {
+  value(base: object): void {
+    extend(base, Configurable.ClassMethods);
+  },
+});

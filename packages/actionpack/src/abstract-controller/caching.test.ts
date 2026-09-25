@@ -1,9 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { Configurable, extend, include, MemoryStore } from "@blazetrails/activesupport";
+import {
+  Configurable,
+  extend,
+  include,
+  MemoryStore,
+  type Extended,
+} from "@blazetrails/activesupport";
 
 import {
   cache,
-  cacheConfigured,
   ConfigMethods,
   viewCacheDependencies,
   viewCacheDependency,
@@ -12,20 +17,18 @@ import {
 import { readFragment, writeFragment } from "./caching/fragments.js";
 
 class HostClass {
-  static config = Configurable.ClassMethods.config;
-  static configAccessor = Configurable.ClassMethods.configAccessor;
-  config = Configurable.config;
-
   static _viewCacheDependencies?: Array<(this: CachingHost) => unknown>;
 
   greeting = "hello";
 }
 
+include(HostClass, Configurable);
+const HostConfigurable = HostClass as typeof HostClass & Extended<typeof Configurable.ClassMethods>;
 include(HostClass, ConfigMethods);
 extend(HostClass, ConfigMethods);
-HostClass.configAccessor("defaultStaticExtension");
-HostClass.configAccessor("performCaching");
-HostClass.configAccessor("enableFragmentCacheLogging");
+HostConfigurable.configAccessor("defaultStaticExtension");
+HostConfigurable.configAccessor("performCaching");
+HostConfigurable.configAccessor("enableFragmentCacheLogging");
 
 const HostConfig = HostClass as unknown as typeof HostClass & {
   cacheStore: unknown;
@@ -34,7 +37,7 @@ const HostConfig = HostClass as unknown as typeof HostClass & {
 };
 
 function makeHost(store?: MemoryStore | null): HostClass & CachingHost & typeof ConfigMethods {
-  HostClass.config().clear();
+  HostConfigurable.config().clear();
   if (store) HostConfig.cacheStore = store;
   HostConfig.performCaching = true;
   HostConfig.defaultStaticExtension = ".html";
@@ -68,20 +71,22 @@ describe("AbstractController::Caching", () => {
 
   describe("cacheConfigured", () => {
     it("is false when no store is wired up", () => {
-      expect(cacheConfigured(makeHost())).toBe(false);
+      expect(makeHost().isCacheConfigured()).toBeUndefined();
     });
     it("is false when performCaching is off, even with a store", () => {
       const host = makeHost(new MemoryStore());
       HostConfig.performCaching = false;
-      expect(cacheConfigured(host)).toBe(false);
+      expect(host.isCacheConfigured()).toBe(false);
     });
     it("is true when both are set", () => {
-      expect(cacheConfigured(makeHost(new MemoryStore()))).toBe(true);
+      const store = new MemoryStore();
+      expect(makeHost(store).isCacheConfigured()).toBe(store);
     });
     it("reads the instance's own store when only the instance carries one", () => {
       const host = makeHost();
-      host.cacheStore = new MemoryStore();
-      expect(cacheConfigured(host)).toBe(true);
+      const store = new MemoryStore();
+      host.cacheStore = store;
+      expect(host.isCacheConfigured()).toBe(store);
     });
   });
 

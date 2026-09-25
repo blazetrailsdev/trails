@@ -1120,10 +1120,20 @@ describe("DeprecationTest", () => {
     deprecator.behavior = (emitted: string) => {
       message = emitted;
     };
+    const RUBY_VERSION: string = "3.3.0";
     generatedMethodThatCallDeprecation(deprecator);
-    expect(message).toEqual(
-      "DEPRECATION WARNING: Here (called from generatedMethodThatCallDeprecation at /path/to/template.html.tse:2)",
-    );
+    // eslint-disable-next-line vitest/no-conditional-in-test -- mirrors deprecation_test.rb:796
+    if (RUBY_VERSION >= "3.4") {
+      // eslint-disable-next-line vitest/no-conditional-expect
+      expect(message).toEqual(
+        "DEPRECATION WARNING: Here (called from DeprecationTest#generatedMethodThatCallDeprecation at /path/to/template.html.tse:2)",
+      );
+    } else {
+      // eslint-disable-next-line vitest/no-conditional-expect
+      expect(message).toEqual(
+        "DEPRECATION WARNING: Here (called from generatedMethodThatCallDeprecation at /path/to/template.html.tse:2)",
+      );
+    }
   });
 
   it("warn deprecation can blame code from internal methods", () => {
@@ -1133,7 +1143,7 @@ describe("DeprecationTest", () => {
     };
     methodThatEmitsDeprecationWithInternalMethod(deprecator);
 
-    assertIncludes(message, "/path/to/user/code.ts");
+    assertIncludes(message, "/path/to/user/code.js");
   });
 });
 
@@ -1148,7 +1158,7 @@ const methodThatEmitsDeprecationWithInternalMethod = (0, eval)(
   `() => function methodThatEmitsDeprecationWithInternalMethod(deprecator) {
   [1].forEach(() => deprecator.warn());
 }
-//# sourceURL=/path/to/user/code.ts`,
+//# sourceURL=/path/to/user/code.js`,
 )() as (deprecator: Deprecation) => void;
 
 const expandedFile = new URL(import.meta.url).pathname;
