@@ -200,6 +200,14 @@ function foldNameToken(token: string): string {
  * divergence. Applied to BOTH sides, like foldNameToken, so it can only merge
  * tokens, never split them.
  */
+/**
+ * `TOKEN_RENAMES.rb` renames a Ruby source file to a JS one, and a trails
+ * source file is as often TypeScript: Rails' default `schema.rb`
+ * (`activerecord/test/cases/database_configurations/hash_config_test.rb:108`)
+ * is trails' `schema.ts`. So `.ts` folds onto the same spelling.
+ */
+const TS_SOURCE_EXTENSION_RE = /\.ts\b/g;
+
 const RENAMED_EXTENSION_RE = new RegExp(
   `\\.(${Object.keys(TOKEN_RENAMES)
     .sort((a, b) => b.length - a.length)
@@ -209,7 +217,10 @@ const RENAMED_EXTENSION_RE = new RegExp(
 
 function foldRenamedExtensionToken(token: string): string {
   if (!token.startsWith("s:")) return token;
-  return `s:${token.slice(2).replace(RENAMED_EXTENSION_RE, (_m, tok: string) => `.${TOKEN_RENAMES[tok]}`)}`;
+  return `s:${token
+    .slice(2)
+    .replace(RENAMED_EXTENSION_RE, (_m, tok: string) => `.${TOKEN_RENAMES[tok]}`)
+    .replace(TS_SOURCE_EXTENSION_RE, `.${TOKEN_RENAMES.rb}`)}`;
 }
 
 /**

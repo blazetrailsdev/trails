@@ -27,6 +27,9 @@ describe("assertionValueMismatch", () => {
 
   it("folds a TOKEN_RENAMES file extension onto its trails spelling", () => {
     expect(
+      assertionValueMismatch(["assert_equal"], ["s:schema.rb"], ["toBe"], ["s:schema.ts"], false),
+    ).toBeNull();
+    expect(
       assertionValueMismatch(
         ["assert_equal"],
         ["s:called from x at /path/to/template.html.erb:2"],
