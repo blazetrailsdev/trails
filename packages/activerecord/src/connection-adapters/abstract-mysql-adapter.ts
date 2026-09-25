@@ -608,10 +608,10 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
       opts["comment"] = column.comment ?? undefined;
     }
 
-    if (opts["collation"] === null) {
+    if (opts["collation"] === "no_collation") {
       delete opts["collation"];
-    } else if (!Object.prototype.hasOwnProperty.call(opts, "collation") && this.isTextType(type)) {
-      opts["collation"] = column.collation ?? undefined;
+    } else if (this.isTextType(type)) {
+      opts["collation"] ??= column.collation ?? undefined;
     }
 
     if (!Object.prototype.hasOwnProperty.call(opts, "autoIncrement")) {

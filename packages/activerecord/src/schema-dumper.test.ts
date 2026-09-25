@@ -12,6 +12,7 @@ import type { TestDatabaseAdapter } from "./test-adapter.js";
 import { itIfSupports, adapterSupports } from "./support/supports.js";
 import { fixtures } from "./test-fixtures.js";
 import { Current, Migration } from "./migration.js";
+import "./migration/compatibility.js";
 import type { TableDefinition as PostgreSQLTableDefinition } from "./connection-adapters/postgresql/schema-definitions.js";
 import { ARUnit2Model } from "./test-helpers/models/arunit2-model.js";
 import {
@@ -393,9 +394,10 @@ describe("SchemaDumperTest", () => {
 });
 
 describe("SchemaDumperTest", () => {
-  afterEach(() => {
+  afterEach(async () => {
     delete (SchemaDumper as unknown as Record<string, unknown>)["ignoreTables"];
     SchemaDumper.fkIgnorePattern = /^fk_rails_[0-9a-f]{10}$/;
+    await (await Base.leaseConnection()).dropTable("timestamps", { ifExists: true });
   });
 
   it("dump schema information with empty versions", async () => {
@@ -855,9 +857,7 @@ describe("SchemaDumperTest", () => {
   it.skipIf(adapterType !== "postgres")(
     "timestamps schema dump before rails 7",
     { timeout: FULL_DUMP_TIMEOUT_MS },
-    async (ctx) => {
-      // BLOCKED: migration-compatibility-v6-1-for-pre-rails-7-dump-tests
-      ctx.skip();
+    async () => {
       class TimestampsMigration extends Migration.get(6.1) {
         override async up(): Promise<void> {
           await this.createTable("timestamps", (t) => {
@@ -883,9 +883,7 @@ describe("SchemaDumperTest", () => {
   it.skipIf(adapterType !== "postgres")(
     "timestamps schema dump before rails 7 with timestamptz setting",
     { timeout: FULL_DUMP_TIMEOUT_MS },
-    async (ctx) => {
-      // BLOCKED: migration-compatibility-v6-1-for-pre-rails-7-dump-tests
-      ctx.skip();
+    async () => {
       let migration!: Migration;
       await withPostgresqlDatetimeType("timestamptz", async () => {
         class TimestampsMigration extends Migration.get(6.1) {
@@ -979,9 +977,7 @@ describe("SchemaDumperTest", () => {
   it.skipIf(adapterType !== "postgres")(
     "schema dump with correct timestamp types via add column before rails 7",
     { timeout: FULL_DUMP_TIMEOUT_MS },
-    async (ctx) => {
-      // BLOCKED: migration-compatibility-v6-1-for-pre-rails-7-dump-tests
-      ctx.skip();
+    async () => {
       class TimestampsMigration extends Migration.get(6.1) {
         override async up(): Promise<void> {
           await this.createTable("timestamps");
@@ -1007,9 +1003,7 @@ describe("SchemaDumperTest", () => {
   it.skipIf(adapterType !== "postgres")(
     "schema dump with correct timestamp types via add column before rails 7 with timestamptz setting",
     { timeout: FULL_DUMP_TIMEOUT_MS },
-    async (ctx) => {
-      // BLOCKED: migration-compatibility-v6-1-for-pre-rails-7-dump-tests
-      ctx.skip();
+    async () => {
       let migration!: Migration;
       await withPostgresqlDatetimeType("timestamptz", async () => {
         class TimestampsMigration extends Migration.get(6.1) {
@@ -1037,9 +1031,7 @@ describe("SchemaDumperTest", () => {
   it.skipIf(adapterType !== "postgres")(
     "schema dump with correct timestamp types via add column with type as string",
     { timeout: FULL_DUMP_TIMEOUT_MS },
-    async (ctx) => {
-      // BLOCKED: migration-compatibility-v6-1-for-pre-rails-7-dump-tests
-      ctx.skip();
+    async () => {
       let migration!: Migration;
       await withPostgresqlDatetimeType("timestamptz", async () => {
         class TimestampsMigration extends Migration.get(6.1) {

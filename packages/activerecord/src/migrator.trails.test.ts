@@ -259,7 +259,7 @@ describe("Migrator trails extensions", () => {
 
   it("findVersion raises for a version above the highest registered one", () => {
     expect(() => Migration.get(8.5)).toThrow(
-      /Unknown migration version "8\.5"; expected one of "7\.1", "7\.2", "8\.0"/,
+      /Unknown migration version "8\.5"; expected one of "6\.1", "7\.0", "7\.1", "7\.2", "8\.0"/,
     );
   });
 

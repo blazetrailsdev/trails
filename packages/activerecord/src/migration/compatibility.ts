@@ -1,8 +1,15 @@
 import { ArgumentError } from "@blazetrails/activemodel";
-import { rbInspect } from "@blazetrails/ruby-compat";
+import { include, prepend, rbInspect, type PrependModule } from "@blazetrails/ruby-compat";
 import { Current } from "../migration.js";
 import * as Compatibility from "./compatibility.js";
 import { Migration } from "../namespaces.js";
+import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
+import type {
+  AddForeignKeyOptions,
+  AddIndexOptions,
+  ColumnOptions,
+  ColumnType,
+} from "../connection-adapters/abstract/schema-definitions.js";
 
 export function find(version: string | number): unknown {
   version =
@@ -24,5 +31,251 @@ export const V8_0 = Current;
 export class V7_2 extends V8_0 {}
 
 export class V7_1 extends V7_2 {}
+
+type Options = Record<string, unknown>;
+type Super = (...args: unknown[]) => unknown;
+
+const isOptions = (value: unknown): value is Options =>
+  value != null && typeof value === "object" && !Array.isArray(value);
+
+const LegacyIndexName = {
+  legacyIndexName(tableName: string, options: unknown): string {
+    if (isOptions(options)) {
+      if (options.column != null) {
+        return `index_${tableName}_on_${[options.column].flat().join("_and_")}`;
+      } else if (options.name != null) {
+        return options.name as string;
+      } else {
+        throw new ArgumentError("You must specify the index name");
+      }
+    } else {
+      return LegacyIndexName.legacyIndexName(tableName, LegacyIndexName.indexNameOptions(options));
+    }
+  },
+
+  indexNameOptions(columnNames: unknown): Options {
+    if (LegacyIndexName.isExpressionColumnName(columnNames)) {
+      columnNames = (columnNames as string).match(/\w+/g)!.join("_");
+    }
+
+    return { column: columnNames };
+  },
+
+  isExpressionColumnName(columnName: unknown): boolean {
+    return typeof columnName === "string" && /\W/.test(columnName);
+  },
+};
+
+export class V7_0 extends V7_1 {
+  static LegacyIndexName = LegacyIndexName;
+
+  static TableDefinition = {
+    column(super_: Super, name: string, type: ColumnType, options: Options = {}) {
+      options = { ...options, _skipValidateOptions: true };
+      return super_(name, type, options);
+    },
+
+    change(super_: Super, name: string, type: ColumnType, options: Options = {}) {
+      options = { ...options, _skipValidateOptions: true };
+      return super_(name, type, options);
+    },
+
+    index(
+      this: { name: string },
+      super_: Super,
+      columnName: string | string[],
+      options: AddIndexOptions = {},
+    ) {
+      if (options.name == null) {
+        options = { ...options, name: LegacyIndexName.legacyIndexName(this.name, columnName) };
+      }
+      return super_(columnName, options);
+    },
+
+    references(super_: Super, ...args: unknown[]) {
+      const options = isOptions(args[args.length - 1]) ? (args.pop() as Options) : {};
+      return super_(...args, { ...options, _skipValidateOptions: true });
+    },
+
+    raiseOnIfExistOptions(_super: unknown, _options: Options): void {},
+  } as unknown as PrependModule;
+
+  override async addColumn(
+    tableName: string,
+    columnName: string,
+    type: ColumnType,
+    options: ColumnOptions & { ifNotExists?: boolean } = {},
+  ): Promise<void> {
+    options = { ...options, _skipValidateOptions: true };
+    await super.addColumn(tableName, columnName, type, options);
+  }
+
+  override async addIndex(
+    tableName: string,
+    columnName: string | string[],
+    options: AddIndexOptions = {},
+  ): Promise<void> {
+    if (options.name == null) {
+      options = { ...options, name: LegacyIndexName.legacyIndexName(tableName, columnName) };
+    }
+    await super.addIndex(tableName, columnName, options);
+  }
+
+  override async addReference(
+    tableName: string,
+    refName: string,
+    options: Parameters<Current["addReference"]>[2] = {},
+  ): Promise<void> {
+    options = { ...options, _skipValidateOptions: true };
+    await super.addReference(tableName, refName, options);
+  }
+
+  override async addBelongsTo(
+    tableName: string,
+    refName: string,
+    options: Parameters<Current["addReference"]>[2] = {},
+  ): Promise<void> {
+    await this.addReference(tableName, refName, options);
+  }
+
+  override async createTable(
+    tableName: string,
+    options?: Parameters<Current["createTable"]>[1],
+    fn?: Parameters<Current["createTable"]>[2],
+  ): Promise<void> {
+    if (typeof options === "function") [options, fn] = [{}, options];
+    options = { ...options, _usesLegacyTableName: true, _skipValidateOptions: true } as Options;
+
+    await super.createTable(tableName, options, fn);
+  }
+
+  override async changeColumn(
+    tableName: string,
+    columnName: string,
+    type: ColumnType,
+    options: ColumnOptions = {},
+  ): Promise<void> {
+    options = { ...options, _skipValidateOptions: true };
+    const connection = await this.connection;
+    if (connection.adapterName === "Mysql2" || connection.adapterName === "Trilogy") {
+      options.collation ??= "no_collation";
+    }
+    await super.changeColumn(tableName, columnName, type, options);
+  }
+
+  override async changeColumnNull(
+    tableName: string,
+    columnName: string,
+    allowNull: boolean,
+    defaultValue?: unknown,
+  ): Promise<void> {
+    await super.changeColumnNull(tableName, columnName, !!allowNull, defaultValue);
+  }
+
+  override async disableExtension(
+    name: string,
+    options: { force?: "cascade" } = {},
+  ): Promise<void> {
+    if ((await this.connection).adapterName === "PostgreSQL") {
+      options = { ...options, force: "cascade" };
+    }
+    await super.disableExtension(name, options);
+  }
+
+  override async addForeignKey(
+    fromTable: string,
+    toTable: string,
+    options: AddForeignKeyOptions = {},
+  ): Promise<void> {
+    if (
+      (await this.connection).adapterName === "PostgreSQL" &&
+      (options.deferrable as unknown) === true
+    ) {
+      options = { ...options, deferrable: "immediate" };
+    }
+    await super.addForeignKey(fromTable, toTable, options);
+  }
+
+  /** @internal */
+  override compatibleTableDefinition<T>(t: T): T {
+    prepend(t as object, V7_0.TableDefinition);
+    return super.compatibleTableDefinition(t);
+  }
+}
+
+include(V7_0, LegacyIndexName);
+
+class PostgreSQLCompat {
+  static compatibleTimestampType(type: ColumnType, connection: AbstractAdapter): ColumnType {
+    if (connection.adapterName === "PostgreSQL") {
+      return type === "datetime" ? "timestamp" : type;
+    } else {
+      return type;
+    }
+  }
+}
+
+export class V6_1 extends V7_0 {
+  static PostgreSQLCompat = PostgreSQLCompat;
+
+  override async addColumn(
+    tableName: string,
+    columnName: string,
+    type: ColumnType,
+    options: ColumnOptions & { ifNotExists?: boolean } = {},
+  ): Promise<void> {
+    if (type === "datetime") {
+      options = { ...options, precision: options.precision ?? null };
+    }
+
+    type = PostgreSQLCompat.compatibleTimestampType(type, await this.connection);
+    await super.addColumn(tableName, columnName, type, options);
+  }
+
+  override async changeColumn(
+    tableName: string,
+    columnName: string,
+    type: ColumnType,
+    options: ColumnOptions = {},
+  ): Promise<void> {
+    if (type === "datetime") {
+      options = { ...options, precision: options.precision ?? null };
+    }
+
+    type = PostgreSQLCompat.compatibleTimestampType(type, await this.connection);
+    await super.changeColumn(tableName, columnName, type, options);
+  }
+
+  static override TableDefinition = {
+    newColumnDefinition(
+      this: { conn: AbstractAdapter },
+      super_: Super,
+      name: string,
+      type: ColumnType,
+      options: Options = {},
+    ) {
+      type = PostgreSQLCompat.compatibleTimestampType(type, this.conn);
+      return super_(name, type, options);
+    },
+
+    change(super_: Super, name: string, type: ColumnType, options: Options = {}) {
+      options = { ...options, precision: options.precision ?? null };
+      return super_(name, type, options);
+    },
+
+    column(super_: Super, name: string, type: ColumnType, options: Options = {}) {
+      options = { ...options, precision: options.precision ?? null };
+      return super_(name, type, options);
+    },
+
+    raiseOnIfExistOptions(_super: unknown, _options: Options): void {},
+  } as unknown as PrependModule;
+
+  /** @internal */
+  override compatibleTableDefinition<T>(t: T): T {
+    prepend(t as object, V6_1.TableDefinition);
+    return super.compatibleTableDefinition(t);
+  }
+}
 
 Migration.Compatibility = Compatibility;
