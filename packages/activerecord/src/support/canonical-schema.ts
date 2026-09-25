@@ -1,6 +1,7 @@
 import type { AdapterName } from "../connection-adapters/abstract-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
-import { pluralize, singularize } from "@blazetrails/activesupport";
+import { singularize } from "@blazetrails/activesupport";
+import "../base.js";
 import { ActiveRecordError } from "../errors.js";
 import {
   ReferenceDefinition,
@@ -2104,8 +2105,7 @@ export async function canonicalRegistrySchema(): Promise<Schema> {
 }
 
 function replayReference(probe: unknown, name: string, o: ReferenceOpts = {}): void {
-  const foreignKey = o.foreignKey ? { toTable: pluralize(name) } : false;
-  new ReferenceDefinition(name, { ...o, foreignKey }).addTo(probe as TableDefinition);
+  new ReferenceDefinition(name, o).addTo(probe as TableDefinition);
 }
 
 function assertSerialPkIsPlainIntegral(
