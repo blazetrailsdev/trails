@@ -117,7 +117,8 @@
     "test:assertions:ratchet": "pnpm parity:test:assertions",
     "test:assertions:ratchet:reseed": "pnpm parity:test:assertions:reseed",
     "test:stubs": "pnpm parity:test:stubs",
-    "vendor:fetch": "pnpm tsx vendor/fetch.ts"
+    "vendor:fetch": "pnpm tsx vendor/fetch.ts",
+    "vendor:recite": "pnpm tsx scripts/vendor-recite.ts"
   },
   "devDependencies": {
     "@blazetrails/activerecord": "workspace:*",
