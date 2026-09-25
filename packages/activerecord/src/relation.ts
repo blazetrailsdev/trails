@@ -589,7 +589,7 @@ export class Relation<T extends Base> {
   }
 
   async isBlank(): Promise<boolean> {
-    return this.isEmpty();
+    return isBlank(await this.records());
   }
 
   /** @noRailsEquivalent PERMANENT */

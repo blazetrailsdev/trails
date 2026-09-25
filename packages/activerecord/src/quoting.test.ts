@@ -104,7 +104,7 @@ describe("QuotingTest", () => {
   });
 
   it("quote object instance", async () => {
-    const object = {};
+    const object = new (class Object {})();
     const e = await assertRaises([TypeError], {}, () => {
       quote(object);
     });
@@ -130,8 +130,7 @@ describe("QuotingTest", () => {
     );
   });
 
-  it.skip("quote duration", async () => {
-    // BLOCKED: quote-error-message-uses-js-constructor-name
+  it("quote duration", async () => {
     const exception = await assertRaises([TypeError], {}, () => {
       quote(minutes(30));
     });

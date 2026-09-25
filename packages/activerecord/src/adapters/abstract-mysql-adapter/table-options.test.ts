@@ -2,8 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Logger } from "@blazetrails/activesupport";
 import { Version } from "../../connection-adapters/abstract-adapter.js";
 import type { SchemaSource } from "../../schema-dumper.js";
-import { Base } from "../../base.js";
-import { Migration, Migrator } from "../../migration.js";
+import { Base, Migration, Migrator } from "../../index.js";
 import type { MigrationProxy } from "../../migration.js";
 import {
   describeIfMysqlAdapter,
@@ -150,8 +149,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       expect(output).toMatch(expected);
     });
 
-    // BLOCKED: assertions-mysql-legacy-migration-engine-innodb-option — Migration::Compatibility stops at V7_1, so Migration[5.1] has no counterpart.
-    it.skip("legacy migrations contain default ENGINE=InnoDB option", async () => {
+    it("legacy migrations contain default ENGINE=InnoDB option", async () => {
       class LegacyMigration extends Migration.get(5.1) {
         override async migrate(_x: unknown): Promise<void> {
           await this.createTable("mysql_table_options", { force: true });

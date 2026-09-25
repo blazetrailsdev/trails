@@ -45,7 +45,7 @@ import { Car, CoolCar, FastCar } from "./test-helpers/models/car.js";
 import { Engine } from "./test-helpers/models/engine.js";
 import { Tyre } from "./test-helpers/models/tyre.js";
 import { Minivan } from "./test-helpers/models/minivan.js";
-import { Developer, DeveloperCalledDavid } from "./test-helpers/models/developer.js";
+import { AuditLog, Developer, DeveloperCalledDavid } from "./test-helpers/models/developer.js";
 import { Project } from "./test-helpers/models/project.js";
 import { Tag } from "./test-helpers/models/tag.js";
 import { Tagging } from "./test-helpers/models/tagging.js";
@@ -120,6 +120,8 @@ describe("RelationTest", () => {
     registerModel(Minivan);
     registerModel(Developer);
     registerModel(DeveloperCalledDavid);
+    registerModel(Project);
+    registerModel(AuditLog);
     registerModel(Tag);
     registerModel(Tagging);
     registerModel(Account);
@@ -2114,14 +2116,19 @@ describe("RelationTest", () => {
     expect(cocks.build().name).toBe("cock");
   });
 
-  it.skip("create with nested attributes", async () => {
-    // BLOCKED: nested attributes — create_with(projects_attributes:) is assigned as a plain attribute and raises UnknownAttributeError (relation-create-with-nested-attributes)
-    const before = await Project.count();
-    const developers = Developer.where({ name: "Aaron" }).createWith({
-      projects_attributes: [{ name: "p1" }],
-    });
-    await developers.createBang();
-    expect(Number(await Project.count()) - Number(before)).toBe(1);
+  it("create with nested attributes", async () => {
+    await assertDifference(
+      async () => Number(await Project.count()),
+      1,
+      null,
+      async () => {
+        let developers = Developer.where({ name: "Aaron" });
+        developers = developers.createWith({
+          projectsAttributes: [{ name: "p1" }],
+        });
+        await developers.createBang();
+      },
+    );
   });
 
   it("except", async () => {
@@ -2430,8 +2437,7 @@ describe("RelationTest", () => {
     );
   });
 
-  it.skip("presence", async () => {
-    // BLOCKED: blank?/present? — Relation#isPresent/isBlank run a COUNT/LIMIT query on every call instead of loading records (relation-blank-present-load-records)
+  it("presence", async () => {
     const topicsRel = Topic.all();
 
     await assertQueriesCount(1, false, async () => {

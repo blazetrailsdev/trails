@@ -591,7 +591,7 @@ export class ReferenceDefinition {
   }
 
   /** @internal */
-  private asOptions(value: unknown): Record<string, unknown> {
+  protected asOptions(value: unknown): Record<string, unknown> {
     return value !== null && typeof value === "object" && !Array.isArray(value)
       ? (value as Record<string, unknown>)
       : {};
@@ -632,11 +632,14 @@ export class ReferenceDefinition {
    * @internal
    * @missingRailsCall merge — PERMANENT
    */
-  private indexOptions(tableName: string): AddIndexOptions {
+  protected indexOptions(tableName: string): AddIndexOptions {
     const opts: AddIndexOptions = {
       ...this.asOptions(this.index),
       ...this.conditionalOptions(),
     };
+
+    if (this.options._usesLegacyReferenceIndexName) return opts;
+
     if (this.polymorphic && !opts.name) {
       opts.name = this.polymorphicIndexName(tableName);
     }
