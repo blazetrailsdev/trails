@@ -230,32 +230,58 @@ export class SpacePirate extends Base {
     this.tableName = "pirates";
 
     this.belongsTo("parrot");
-    this.belongsTo("parrotWithAnnotation", (q: any) => q.annotate("that tells jokes"), {
-      className: "Parrot",
-      foreignKey: "parrot_id",
-    });
+    this.belongsTo(
+      "parrotWithAnnotation",
+      function (this: any) {
+        return this.annotate("that tells jokes");
+      },
+      {
+        className: "Parrot",
+        foreignKey: "parrot_id",
+      },
+    );
     this.hasAndBelongsToMany("parrots", { foreignKey: "pirate_id" });
     this.hasAndBelongsToMany(
       "parrotsWithAnnotation",
-      (q: any) => q.annotate("that are very colorful"),
+      function (this: any) {
+        return this.annotate("that are very colorful");
+      },
       { className: "Parrot", foreignKey: "pirate_id" },
     );
     this.hasOne("ship", { foreignKey: "pirate_id" });
-    this.hasOne("shipWithAnnotation", (q: any) => q.annotate("that is a rocket"), {
-      className: "Ship",
-      foreignKey: "pirate_id",
-    });
+    this.hasOne(
+      "shipWithAnnotation",
+      function (this: any) {
+        return this.annotate("that is a rocket");
+      },
+      {
+        className: "Ship",
+        foreignKey: "pirate_id",
+      },
+    );
     this.hasMany("birds", { foreignKey: "pirate_id" });
-    this.hasMany("birdsWithAnnotation", (q: any) => q.annotate("that are also parrots"), {
-      className: "Bird",
-      foreignKey: "pirate_id",
-    });
+    this.hasMany(
+      "birdsWithAnnotation",
+      function (this: any) {
+        return this.annotate("that are also parrots");
+      },
+      {
+        className: "Bird",
+        foreignKey: "pirate_id",
+      },
+    );
     this.hasMany("treasures", { as: "looter" });
     this.hasMany("treasureEstimates", { through: "treasures", source: "priceEstimates" });
-    this.hasMany("treasureEstimatesWithAnnotation", (q: any) => q.annotate("yarrr"), {
-      through: "treasures",
-      source: "priceEstimates",
-    });
+    this.hasMany(
+      "treasureEstimatesWithAnnotation",
+      function (this: any) {
+        return this.annotate("yarrr");
+      },
+      {
+        through: "treasures",
+        source: "priceEstimates",
+      },
+    );
   }
 }
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
