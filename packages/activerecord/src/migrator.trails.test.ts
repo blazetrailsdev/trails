@@ -121,7 +121,7 @@ describe("Migrator trails extensions", () => {
     await new InternalMetadata(adapter.pool).createTable();
 
     const up = new Migrator("up", [proxy], schemaMigration, internalMetadata);
-    expect(await up.executeMigrationInTransaction(proxy)).toBe(1);
+    expect(await up.executeMigrationInTransaction(proxy)).toBe("1");
     expect(calls).toEqual([["up", 1]]);
 
     const again = new Migrator("up", [proxy], schemaMigration, internalMetadata);

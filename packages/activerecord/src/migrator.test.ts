@@ -592,8 +592,7 @@ describe("MigratorTest", () => {
     expect(result.length).toBe(1);
   });
 
-  it.skip("migrator output when running single migration", async () => {
-    // BLOCKED: migrator-run-returns-version-string
+  it("migrator output when running single migration", async () => {
     const { context: migrator } = migrationContextClass(1);
 
     const result = await migrator.run("up", 1);

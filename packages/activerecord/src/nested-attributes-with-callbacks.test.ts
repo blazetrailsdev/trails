@@ -1,66 +1,40 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, registerModel, acceptsNestedAttributesFor } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
+import { Pirate } from "./test-helpers/models/pirate.js";
+import "./test-helpers/models/bird.js";
+import type { Bird } from "./test-helpers/models/bird.js";
 
-let addCallbackCalled: NwcBird[] = [];
+let addCallbackCalled: Bird[] = [];
 
-class NwcBird extends Base {
-  declare name: string;
-  static {
-    this._tableName = "birds";
-    this.attribute("name", "string");
-    this.attribute("pirate_id", "integer");
-    this.belongsTo("pirate", { className: "NwcPirate", foreignKey: "pirate_id" });
-    this.validates("name", { presence: true });
-  }
-}
-
-class NwcPirate extends Base {
-  static {
-    this._tableName = "pirates";
-    this.attribute("catchphrase", "string");
-  }
-}
-
-NwcPirate.hasMany("birds", {
-  className: "NwcBird",
-  foreignKey: "pirate_id",
-});
-NwcPirate.hasMany("birdsWithAddLoad", {
-  className: "NwcBird",
-  foreignKey: "pirate_id",
+Pirate.hasMany("birdsWithAddLoad", {
+  className: "Bird",
   beforeAdd: (p: any, b: any) => {
     addCallbackCalled.push(b);
     void p.birdsWithAddLoad.toArray();
   },
 });
-NwcPirate.hasMany("birdsWithAdd", {
-  className: "NwcBird",
-  foreignKey: "pirate_id",
+Pirate.hasMany("birdsWithAdd", {
+  className: "Bird",
   beforeAdd: (_p: any, b: any) => {
     addCallbackCalled.push(b);
   },
 });
 
-acceptsNestedAttributesFor(NwcPirate, "birds", {});
-acceptsNestedAttributesFor(NwcPirate, "birdsWithAddLoad", { allowDestroy: true });
-acceptsNestedAttributesFor(NwcPirate, "birdsWithAdd", { allowDestroy: true });
-
-registerModel("NwcBird", NwcBird);
-registerModel("NwcPirate", NwcPirate);
+Pirate.acceptsNestedAttributesFor("birdsWithAddLoad", { allowDestroy: true });
+Pirate.acceptsNestedAttributesFor("birdsWithAdd", { allowDestroy: true });
 
 describe("NestedAttributesWithCallbacksTest", () => {
   fixtures([]);
 
   let pirate: any;
-  let birds: NwcBird[];
+  let birds: Bird[];
 
   beforeEach(async () => {
     addCallbackCalled = [];
-    pirate = new NwcPirate();
+    pirate = new Pirate();
     pirate.catchphrase = "Don't call me!";
     await pirate.setBirdsAttributes([{ name: "Bird1" }, { name: "Bird2" }]);
-    await pirate.save();
+    await pirate.saveBang();
     birds = await pirate.birds.toArray();
   });
 
@@ -69,8 +43,8 @@ describe("NestedAttributesWithCallbacksTest", () => {
 
   const existingBirdsAttributes = () => birds.map((bird) => ({ id: bird.id, name: bird.name }));
 
-  const newBirds = async (): Promise<NwcBird[]> => {
-    const all = (await pirate.birdsWithAdd.toArray()) as NwcBird[];
+  const newBirds = async (): Promise<Bird[]> => {
+    const all = (await pirate.birdsWithAdd.toArray()) as Bird[];
     const existingIds = new Set(birds.map((b) => b.id));
     return all.filter((b) => b.id == null || !existingIds.has(b.id));
   };
@@ -133,10 +107,10 @@ describe("NestedAttributesWithCallbacksTest", () => {
   });
 
   const assertAssignmentAffectsRecordsInTarget = async (associationName: string) => {
-    const association = pirate[associationName].target as NwcBird[];
-    const updated = association.find((b: NwcBird) => String(b.id) === String(birdToUpdate().id));
+    const association = pirate[associationName].target as Bird[];
+    const updated = association.find((b: Bird) => String(b.id) === String(birdToUpdate().id));
     expect(updated!.attributeChanged("name")).toBe(true);
-    const destroyed = association.find((b: NwcBird) => String(b.id) === String(birdToDestroy().id));
+    const destroyed = association.find((b: Bird) => String(b.id) === String(birdToDestroy().id));
     expect(destroyed!.markedForDestruction()).toBe(true);
   };
 

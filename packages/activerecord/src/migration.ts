@@ -1423,7 +1423,7 @@ export class MigrationContext<
     this: MigrationContext,
     direction: "up" | "down",
     targetVersion: number | string,
-  ): Promise<number | undefined> {
+  ): Promise<string | number | undefined> {
     return new Migrator(
       direction,
       this.migrations,
@@ -1672,7 +1672,7 @@ export class Migrator {
     return fnResult as T;
   }
 
-  async run(): Promise<number | undefined> {
+  async run(): Promise<string | number | undefined> {
     return (await this.isUseAdvisoryLock())
       ? this.withAdvisoryLock(() => this.runWithoutLock())
       : this.runWithoutLock();
@@ -1685,7 +1685,7 @@ export class Migrator {
   }
 
   /** @internal */
-  async runWithoutLock(): Promise<number | undefined> {
+  async runWithoutLock(): Promise<string | number | undefined> {
     await this._ensureSchemaTable();
     const migration = this._migrations.find((m) => m.version === this._targetVersion);
     if (!migration) throw new UnknownMigrationVersionError(this._targetVersion ?? "");
@@ -1748,7 +1748,9 @@ export class Migrator {
    * @internal
    * @missingRailsName direction — PERMANENT
    */
-  async executeMigrationInTransaction(migration: MigrationProxy): Promise<number | undefined> {
+  async executeMigrationInTransaction(
+    migration: MigrationProxy,
+  ): Promise<string | number | undefined> {
     try {
       const applied = await this.migrated();
       if (this.isDown() && !applied.has(migration.version)) return undefined;
@@ -1757,16 +1759,15 @@ export class Migrator {
       if (ActiveRecord.Base.logger)
         ActiveRecord.Base.logger.info(`Migrating to ${migration.name} (${migration.version})`);
 
-      await this.ddlTransaction(migration, async () => {
+      return await this.ddlTransaction(migration, async () => {
         await (await migration.migration()).migrate(this._direction);
-        await this.recordVersionStateAfterMigrating(migration.version);
+        return this.recordVersionStateAfterMigrating(migration.version);
       });
     } catch (e) {
       const useTx = await this.isUseTransaction(migration);
       const msg = `An error has occurred, ${useTx ? "this and " : ""}all later migrations canceled:\n\n${e instanceof Error ? e.message : e}`;
       throw Object.assign(new StandardError(msg), { cause: e });
     }
-    return migration.version;
   }
 
   /** @internal */
@@ -1792,14 +1793,14 @@ export class Migrator {
   }
 
   /** @internal */
-  async recordVersionStateAfterMigrating(version: number): Promise<void> {
+  async recordVersionStateAfterMigrating(version: number): Promise<string | number> {
     const migrated = await this.migrated();
     if (this.isDown()) {
       migrated.delete(version);
-      await this._schemaMigration.deleteVersion(String(version));
+      return this._schemaMigration.deleteVersion(String(version));
     } else {
       migrated.add(version);
-      await this._schemaMigration.createVersion(String(version));
+      return this._schemaMigration.createVersion(String(version));
     }
   }
 
@@ -1851,11 +1852,11 @@ export class Migrator {
   }
 
   /** @internal */
-  async ddlTransaction(migration: MigrationProxy, fn: () => Promise<void>): Promise<void> {
+  async ddlTransaction<T>(migration: MigrationProxy, fn: () => Promise<T>): Promise<T | undefined> {
     if (await this.isUseTransaction(migration)) {
-      await (await this.connection).transaction(fn);
+      return (await this.connection).transaction(fn);
     } else {
-      await fn();
+      return fn();
     }
   }
 

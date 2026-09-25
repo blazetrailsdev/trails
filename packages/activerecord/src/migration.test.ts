@@ -15,6 +15,7 @@ import { SchemaMigration } from "./schema-migration.js";
 import type { MigrationProxy } from "./migration.js";
 import { CheckPending, ConcurrentMigrationError, MigrationContext } from "./migration.js";
 import { adapterType } from "./test-adapter.js";
+import { currentAdapter } from "./support/adapter-helper.js";
 import { assertQueriesCount } from "./testing/query-assertions.js";
 import { quoteDefaultExpression } from "./connection-adapters/abstract/quoting.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
@@ -78,36 +79,6 @@ async function freshAdapterWithPeople(): Promise<DatabaseAdapter> {
 
 function envName(adapter: DatabaseAdapter): string {
   return (adapter.pool as { dbConfig: { envName: string } }).dbConfig.envName;
-}
-
-function checkValueOfE(valueOfE: unknown, typeRegistryKey: string | null): void {
-  if (typeRegistryKey === "postgresql") {
-    expect(valueOfE).toBeInstanceOf(BigDecimal);
-    expect((valueOfE as BigDecimal).toString("F")).toBe("2.7182818284590452353602875");
-  } else if (typeRegistryKey === "sqlite3") {
-    expect(valueOfE).toBeInstanceOf(BigDecimal);
-    assertInDelta(
-      2.71828182845905,
-      Number((valueOfE as BigDecimal).toString("F")),
-      0.00000000000001,
-    );
-  } else {
-    expect(Object(valueOfE)).toBeInstanceOf(Number);
-    expect(valueOfE).toBe(2);
-  }
-}
-
-async function checkDefaultFunctionAndInsertRow(
-  adapter: DatabaseAdapter,
-  name: Column,
-): Promise<void> {
-  if (adapterType === "postgres") {
-    expect(name.defaultFunction).toBe("gen_random_uuid()");
-    await adapter.execute("INSERT INTO delete_me DEFAULT VALUES");
-  } else {
-    expect(name.defaultFunction).toBe("uuid()");
-    await adapter.execute("INSERT INTO delete_me () VALUES ()");
-  }
 }
 
 function stubNow(iso: string): () => void {
@@ -427,7 +398,20 @@ describe("MigrationTest", () => {
       expect(b.big_bank_balance).toBeInstanceOf(BigDecimal);
       expect((b.big_bank_balance as BigDecimal).toString("F")).toBe("1000234000567.95");
 
-      checkValueOfE(b.value_of_e, typeRegistryKey);
+      if (currentAdapter("PostgreSQLAdapter")) {
+        expect(b.value_of_e).toBeInstanceOf(BigDecimal);
+        expect((b.value_of_e as BigDecimal).toString("F")).toBe("2.7182818284590452353602875");
+      } else if (currentAdapter("SQLite3Adapter")) {
+        expect(b.value_of_e).toBeInstanceOf(BigDecimal);
+        assertInDelta(
+          2.71828182845905,
+          Number((b.value_of_e as BigDecimal).toString("F")),
+          0.00000000000001,
+        );
+      } else {
+        expect(Object(b.value_of_e)).toBeInstanceOf(Number);
+        expect(b.value_of_e).toBe(2);
+      }
 
       await GiveMeBigNumbers.migrate("down");
       await assertRaises([StatementInvalid], {}, () => BigNumber.first());
@@ -2485,7 +2469,13 @@ describe("BulkAlterTableMigrationsTest", () => {
       const name = cols.find((c) => c.name === "name")!;
       expect(name.default).toBeNull();
 
-      await checkDefaultFunctionAndInsertRow(adapter, name);
+      if (currentAdapter("PostgreSQLAdapter")) {
+        expect(name.defaultFunction).toBe("gen_random_uuid()");
+        await adapter.execute("INSERT INTO delete_me DEFAULT VALUES");
+      } else {
+        expect(name.defaultFunction).toBe("uuid()");
+        await adapter.execute("INSERT INTO delete_me () VALUES ()");
+      }
 
       const personData = await adapter.selectOne("SELECT * FROM delete_me ORDER BY id DESC");
       expect(String(personData!.name)).toMatch(/^(.+)-(.+)-(.+)-(.+)$/);

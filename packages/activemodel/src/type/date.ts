@@ -12,6 +12,7 @@ import {
   AcceptsMultiparameterTime,
   type InstanceMethods,
 } from "./helpers/accepts-multiparameter-time.js";
+import { isUtc } from "./helpers/timezone.js";
 import {
   DateInfinity,
   DateNegativeInfinity,
@@ -115,6 +116,10 @@ export class DateType extends ValueType<DateCastResult> {
       ) => RubyTime | null
     ).call(this, values as Record<string, unknown>);
     return time && this.newDate(time.year, time.mon, time.mday);
+  }
+
+  get isUtc(): boolean {
+    return isUtc();
   }
 }
 

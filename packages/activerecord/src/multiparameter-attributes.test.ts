@@ -103,8 +103,7 @@ describe("MultiParameterAttributeTest", () => {
     expect(topic.last_read).toBeNull();
   });
 
-  it.skip("multiparameter attributes on time", async () => {
-    // BLOCKED: multiparameter-time-local-not-equal-to-time-local
+  it("multiparameter attributes on time", async () => {
     await withTimezoneConfig({ default: "local" }, async () => {
       const topic = await Topic.find(1);
       await topic.assignAttributes({
@@ -115,9 +114,7 @@ describe("MultiParameterAttributeTest", () => {
         "written_on(5i)": "24",
         "written_on(6i)": "00",
       });
-      expect((topic.written_on as RubyTime).valueOf()).toEqual(
-        RubyTime.local(2004, 6, 24, 16, 24, 0).valueOf(),
-      );
+      expect(topic.written_on).toEqual(RubyTime.local(2004, 6, 24, 16, 24, 0));
     });
   });
 
@@ -188,8 +185,7 @@ describe("MultiParameterAttributeTest", () => {
     expect((ex.errors[0] as AttributeAssignmentError).attribute).toBe("written_on");
   });
 
-  it.skip("multiparameter attributes on time will ignore hour if missing", async () => {
-    // BLOCKED: multiparameter-time-local-not-equal-to-time-local
+  it("multiparameter attributes on time will ignore hour if missing", async () => {
     await withTimezoneConfig({ default: "local" }, async () => {
       const attributes = {
         "written_on(1i)": "2004",
@@ -200,9 +196,7 @@ describe("MultiParameterAttributeTest", () => {
       };
       const topic = await Topic.find(1);
       await topic.assignAttributes(attributes);
-      expect((topic.written_on as RubyTime).valueOf()).toEqual(
-        RubyTime.local(2004, 12, 12, 0, 12, 2).valueOf(),
-      );
+      expect(topic.written_on).toEqual(RubyTime.local(2004, 12, 12, 0, 12, 2));
     });
   });
 
@@ -307,8 +301,7 @@ describe("MultiParameterAttributeTest", () => {
     }
   });
 
-  it.skip("multiparameter attributes on time with time zone aware attributes false", async () => {
-    // BLOCKED: multiparameter-time-local-not-equal-to-time-local
+  it("multiparameter attributes on time with time zone aware attributes false", async () => {
     await withTimezoneConfig(
       { default: "local", awareAttributes: false, zone: "Pacific Time (US & Canada)" },
       async () => {
@@ -322,9 +315,7 @@ describe("MultiParameterAttributeTest", () => {
         };
         const topic = await Topic.find(1);
         await topic.assignAttributes(attributes);
-        expect((topic.written_on as RubyTime).valueOf()).toEqual(
-          RubyTime.local(2004, 6, 24, 16, 24, 0).valueOf(),
-        );
+        expect(topic.written_on).toEqual(RubyTime.local(2004, 6, 24, 16, 24, 0));
         assertNotRespondTo(topic.written_on, "timeZone");
       },
     );
@@ -404,8 +395,7 @@ describe("MultiParameterAttributeTest", () => {
     expect((topic.bonus_time as RubyTime).min).toBe(5);
   });
 
-  it.skip("multiparameter attributes on time with empty seconds", async () => {
-    // BLOCKED: multiparameter-time-local-not-equal-to-time-local
+  it("multiparameter attributes on time with empty seconds", async () => {
     await withTimezoneConfig({ default: "local" }, async () => {
       const attributes = {
         "written_on(1i)": "2004",
@@ -417,9 +407,7 @@ describe("MultiParameterAttributeTest", () => {
       };
       const topic = await Topic.find(1);
       await topic.assignAttributes(attributes);
-      expect((topic.written_on as RubyTime).valueOf()).toEqual(
-        RubyTime.local(2004, 6, 24, 16, 24, 0).valueOf(),
-      );
+      expect(topic.written_on).toEqual(RubyTime.local(2004, 6, 24, 16, 24, 0));
     });
   });
 

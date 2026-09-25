@@ -1,6 +1,5 @@
 import { Time } from "@blazetrails/date";
 import { Module, isPlainObject } from "@blazetrails/activesupport";
-import { isUtc } from "./timezone.js";
 
 export interface InstanceMethods<T = unknown> {
   serialize(value: unknown): unknown;
@@ -68,7 +67,7 @@ export class AcceptsMultiparameterTime extends Module {
 
     this.defineMethod(
       "valueFromMultiparameterAssignment",
-      function (valuesHash: Record<string, unknown>): Time | null {
+      function (this: { isUtc: boolean }, valuesHash: Record<string, unknown>): Time | null {
         for (const [k, v] of Object.entries(defaults)) {
           if (valuesHash[k] == null || valuesHash[k] === false) valuesHash[k] = v;
         }
@@ -78,7 +77,7 @@ export class AcceptsMultiparameterTime extends Module {
         const values = Object.entries(valuesHash)
           .sort(([a], [b]) => Number(a) - Number(b))
           .map(([, v]) => v as number | string);
-        return isUtc()
+        return this.isUtc
           ? Time.utc(...(values as [number, number, number]))
           : Time.local(...(values as [number, number, number]));
       },
