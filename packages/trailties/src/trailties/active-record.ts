@@ -54,7 +54,7 @@ export interface ActiveRecordConfig {
   belongsToRequiredValidatesForeignKey: boolean;
   generateSecureTokenOn: "create" | "initialize";
   queues: Record<string, unknown>;
-  migrationError?: "page_load" | "raise" | false;
+  migrationError?: "page_load" | false;
   verboseQueryLogs?: boolean;
   dumpSchemaAfterMigration?: boolean;
   attributesForInspect?: string[] | "all";

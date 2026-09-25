@@ -1685,7 +1685,7 @@ export class PolymorphicReflection extends AbstractReflection {
   private sourceTypeScope(): (...args: any[]) => any {
     const type = (this._previousReflection as any).foreignType;
     const sourceType = (this._previousReflection as any).options?.sourceType;
-    return function (this: any, _object: any) {
+    return function (this: any, object: any) {
       return this.where({ [type]: sourceType });
     };
   }

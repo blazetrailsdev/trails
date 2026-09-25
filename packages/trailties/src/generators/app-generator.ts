@@ -721,7 +721,7 @@ ${
   this.config.logger = TaggedLogging.logger(process.stdout);
 
   // Change to "debug" to log everything (including potentially personally-identifiable information!)
-  this.config.logLevel = (process.env.RAILS_LOG_LEVEL ?? "info") as typeof this.config.logLevel;
+  this.config.logLevel = process.env.RAILS_LOG_LEVEL ?? "info";
 
   // Prevent health checks from clogging up the logs.
   this.config.silenceHealthcheckPath = "/up";
