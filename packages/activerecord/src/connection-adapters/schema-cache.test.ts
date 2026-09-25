@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { SchemaCache, SchemaReflection, BoundSchemaReflection, FakePool } from "./schema-cache.js";
+import {
+  SchemaCache,
+  SchemaReflection,
+  BoundSchemaReflection,
+  FakePool,
+  type Pool,
+} from "./schema-cache.js";
 import { Column } from "./column.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
 import {
@@ -66,13 +72,13 @@ describe("SchemaCacheTest", () => {
   let cache: BoundSchemaReflection;
   let checkSchemaCacheDumpVersionWas: boolean;
 
-  function newBoundReflection(boundPool: unknown = pool): BoundSchemaReflection {
+  function newBoundReflection(boundPool: Pool = pool): BoundSchemaReflection {
     return new BoundSchemaReflection(new SchemaReflection(null), boundPool);
   }
 
   async function loadBoundReflection(
     filename: string,
-    boundPool: unknown = pool,
+    boundPool: Pool = pool,
   ): Promise<BoundSchemaReflection> {
     return new BoundSchemaReflection(new SchemaReflection(filename), boundPool).loadBang();
   }
@@ -93,7 +99,7 @@ describe("SchemaCacheTest", () => {
     let cache = newBoundReflection();
     expect(await cache.isCached("courses")).toBeFalsy();
 
-    void (await cache.columns("courses"))!.length;
+    void (await cache.columns("courses")).length;
     expect(await cache.isCached("courses")).toBeTruthy();
 
     const tempfile = Tempfile.new(["schema_cache-", ".yml"], tmpDir);
@@ -106,7 +112,7 @@ describe("SchemaCacheTest", () => {
     SchemaReflection.checkSchemaCacheDumpVersion = false;
     expect(await reflection.isCached("courses")).toBeTruthy();
 
-    cache = new BoundSchemaReflection(reflection, "__unused_pool__");
+    cache = new BoundSchemaReflection(reflection, ":__unused_pool__" as unknown as Pool);
     expect(await cache.isCached("courses")).toBeTruthy();
   });
 
@@ -119,8 +125,8 @@ describe("SchemaCacheTest", () => {
     cache = await loadBoundReflection(tempfile.path()!);
 
     await assertNoQueries(false, async () => {
-      expect((await cache.columns("courses"))!.length).toBe(3);
-      expect(Object.keys((await cache.columnsHash("courses"))!).length).toBe(3);
+      expect((await cache.columns("courses")).length).toBe(3);
+      expect(Object.keys(await cache.columnsHash("courses")).length).toBe(3);
       expect(await cache.dataSourceExists("courses")).toBeTruthy();
       expect(await cache.primaryKeys("courses")).toBe("id");
       expect((await cache.indexes("courses")).length).toBe(1);
@@ -150,10 +156,8 @@ describe("SchemaCacheTest", () => {
     cache = (await SchemaCache._loadFrom(tempfile.path()!))!;
 
     await assertNoQueries(false, async () => {
-      expect((await (cache as SchemaCache).columns(pool, "courses"))!.length).toBe(3);
-      expect(Object.keys((await (cache as SchemaCache).columnsHash(pool, "courses"))!).length).toBe(
-        3,
-      );
+      expect((await (cache as SchemaCache).columns(pool, "courses")).length).toBe(3);
+      expect(Object.keys(await (cache as SchemaCache).columnsHash(pool, "courses")).length).toBe(3);
       expect(await (cache as SchemaCache).dataSourceExists(pool, "courses")).toBeTruthy();
       expect(await (cache as SchemaCache).primaryKeys(pool, "courses")).toBe("id");
       expect((await (cache as SchemaCache).indexes(pool, "courses")).length).toBe(1);
@@ -162,8 +166,8 @@ describe("SchemaCacheTest", () => {
     cache = await loadBoundReflection(tempfile.path()!);
 
     await assertNoQueries(false, async () => {
-      expect((await cache.columns("courses"))!.length).toBe(3);
-      expect(Object.keys((await cache.columnsHash("courses"))!).length).toBe(3);
+      expect((await cache.columns("courses")).length).toBe(3);
+      expect(Object.keys(await cache.columnsHash("courses")).length).toBe(3);
       expect(await cache.dataSourceExists("courses")).toBeTruthy();
       expect(await cache.primaryKeys("courses")).toBe("id");
       expect((await cache.indexes("courses")).length).toBe(1);
@@ -196,7 +200,7 @@ describe("SchemaCacheTest", () => {
   });
 
   it("columns for existent table", async () => {
-    expect((await cache.columns("courses"))!.length).toBe(3);
+    expect((await cache.columns("courses")).length).toBe(3);
   });
 
   it("columns for non existent table", async () => {
@@ -206,7 +210,7 @@ describe("SchemaCacheTest", () => {
   });
 
   it("columns hash for existent table", async () => {
-    expect(Object.keys((await cache.columnsHash("courses"))!).length).toBe(3);
+    expect(Object.keys(await cache.columnsHash("courses")).length).toBe(3);
   });
 
   it("columns hash for non existent table", async () => {
@@ -249,8 +253,8 @@ describe("SchemaCacheTest", () => {
     cache = dumped;
 
     await assertNoQueries(false, async () => {
-      expect((await cache.columns(pool, "courses"))!.length).toBe(3);
-      expect(Object.keys((await cache.columnsHash(pool, "courses"))!).length).toBe(3);
+      expect((await cache.columns(pool, "courses")).length).toBe(3);
+      expect(Object.keys(await cache.columnsHash(pool, "courses")).length).toBe(3);
       expect(await cache.dataSourceExists(pool, "courses")).toBeTruthy();
       expect(await cache.primaryKeys(pool, "courses")).toBe("id");
       expect((await cache.indexes(pool, "courses")).length).toBe(1);
@@ -266,8 +270,8 @@ describe("SchemaCacheTest", () => {
     cache = await loadBoundReflection(tempfile.path()!);
 
     await assertNoQueries(false, async () => {
-      expect((await cache.columns("courses"))!.length).toBe(3);
-      expect(Object.keys((await cache.columnsHash("courses"))!).length).toBe(3);
+      expect((await cache.columns("courses")).length).toBe(3);
+      expect(Object.keys(await cache.columnsHash("courses")).length).toBe(3);
       expect(await cache.dataSourceExists("courses")).toBeTruthy();
       expect(await cache.primaryKeys("courses")).toBe("id");
       expect((await cache.indexes("courses")).length).toBe(1);
@@ -288,8 +292,8 @@ describe("SchemaCacheTest", () => {
       cache = await loadBoundReflection(tempfile.path()!);
 
       expect(await cache.dataSourceExists("courses")).toBeTruthy();
-      expect((await cache.columns("courses"))!.length).toBe(3);
-      expect(Object.keys((await cache.columnsHash("courses"))!).length).toBe(3);
+      expect((await cache.columns("courses")).length).toBe(3);
+      expect(Object.keys(await cache.columnsHash("courses")).length).toBe(3);
       expect(await cache.dataSourceExists("courses")).toBeTruthy();
       expect(await cache.primaryKeys("courses")).toBe("id");
       expect((await cache.indexes("courses")).length).toBe(1);
@@ -299,7 +303,7 @@ describe("SchemaCacheTest", () => {
         await cache.columns("professors");
       });
       await assertRaises([StatementInvalid], {}, async () => {
-        void Object.keys((await cache.columnsHash("professors"))!).length;
+        void Object.keys(await cache.columnsHash("professors")).length;
       });
       expect(await cache.primaryKeys("professors")).toBeNull();
       expect(await cache.indexes("professors")).toEqual([]);
@@ -317,10 +321,8 @@ describe("SchemaCacheTest", () => {
     cache = (await SchemaCache._loadFrom(tempfile.path()!))!;
 
     await assertNoQueries(false, async () => {
-      expect((await (cache as SchemaCache).columns(pool, "courses"))!.length).toBe(3);
-      expect(Object.keys((await (cache as SchemaCache).columnsHash(pool, "courses"))!).length).toBe(
-        3,
-      );
+      expect((await (cache as SchemaCache).columns(pool, "courses")).length).toBe(3);
+      expect(Object.keys(await (cache as SchemaCache).columnsHash(pool, "courses")).length).toBe(3);
       expect(await (cache as SchemaCache).dataSourceExists(pool, "courses")).toBeTruthy();
       expect(await (cache as SchemaCache).primaryKeys(pool, "courses")).toBe("id");
       expect((await (cache as SchemaCache).indexes(pool, "courses")).length).toBe(1);
@@ -329,8 +331,8 @@ describe("SchemaCacheTest", () => {
     cache = await loadBoundReflection(tempfile.path()!);
 
     await assertNoQueries(false, async () => {
-      expect((await cache.columns("courses"))!.length).toBe(3);
-      expect(Object.keys((await cache.columnsHash("courses"))!).length).toBe(3);
+      expect((await cache.columns("courses")).length).toBe(3);
+      expect(Object.keys(await cache.columnsHash("courses")).length).toBe(3);
       expect(await cache.dataSourceExists("courses")).toBeTruthy();
       expect(await cache.primaryKeys("courses")).toBe("id");
       expect((await cache.indexes("courses")).length).toBe(1);
@@ -490,7 +492,7 @@ describe("SchemaCacheTest", () => {
 
     const restored = new SchemaCache();
     restored.initWith(coder);
-    const pool = null;
+    const pool = new FakePool(null);
     return restored.primaryKeys(pool, "memberships").then((pk) => {
       expect(pk).toEqual(["user_id", "group_id"]);
     });
@@ -506,10 +508,10 @@ describe("SchemaCacheTest", () => {
     restored.marshalLoad(data);
 
     return Promise.all([
-      restored.primaryKeys(null, "memberships").then((pk) => {
+      restored.primaryKeys(new FakePool(null), "memberships").then((pk) => {
         expect(pk).toEqual(["user_id", "group_id"]);
       }),
-      restored.primaryKeys(null, "users").then((pk) => {
+      restored.primaryKeys(new FakePool(null), "users").then((pk) => {
         expect(pk).toBe("id");
       }),
     ]);
@@ -538,11 +540,11 @@ describe("SchemaReflectionTest", () => {
     SchemaReflection.checkSchemaCacheDumpVersion = false;
     try {
       const reflection = new SchemaReflection(cachePath);
-      const cols = await reflection.columns(null, "users");
+      const cols = await reflection.columns(new FakePool(null), "users");
       expect(cols).toHaveLength(2);
-      expect(cols![0]).toBeInstanceOf(Column);
-      expect(cols![0].name).toBe("id");
-      expect(cols![1].sqlType).toBe("text");
+      expect(cols[0]).toBeInstanceOf(Column);
+      expect(cols[0].name).toBe("id");
+      expect(cols[1].sqlType).toBe("text");
     } finally {
       SchemaReflection.checkSchemaCacheDumpVersion = origCheck;
     }
@@ -562,12 +564,13 @@ describe("SchemaReflectionTest", () => {
 
     const fakeConnection = {
       schemaVersion: async () => "2",
+      columns: async () => [makeColumn("live", "text")],
     };
     const pool = new FakePool(fakeConnection);
 
     const reflection = new SchemaReflection(cachePath);
     const cols = await reflection.columns(pool, "users");
-    expect(cols).toBeUndefined();
+    expect(cols.map((c) => c.name)).toEqual(["live"]);
   });
 
   it("accepts cache when version matches", async () => {
@@ -586,8 +589,8 @@ describe("SchemaReflectionTest", () => {
     const reflection = new SchemaReflection(cachePath);
     const cols = await reflection.columns(pool, "posts");
     expect(cols).toHaveLength(1);
-    expect(cols![0]).toBeInstanceOf(Column);
-    expect(cols![0].sqlType).toBe("varchar(255)");
+    expect(cols[0]).toBeInstanceOf(Column);
+    expect(cols[0].sqlType).toBe("varchar(255)");
   });
 
   it("isCached loads from disk without pool when version check disabled", async () => {

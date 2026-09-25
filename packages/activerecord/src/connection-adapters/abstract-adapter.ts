@@ -2162,7 +2162,7 @@ export class AbstractAdapter implements Quoting {
   }): Promise<import("./column.js").Column | undefined> {
     const tableName = String(attribute.relation.name);
     const hash = await this.schemaCache.columnsHash(tableName);
-    return hash?.[toS(attribute.name)];
+    return hash[toS(attribute.name)];
   }
 
   /** @internal */

@@ -5,7 +5,7 @@ import type {
   AbstractAdapter as DatabaseAdapter,
   AdapterName,
 } from "../connection-adapters/abstract-adapter.js";
-import { SchemaCache } from "../connection-adapters/schema-cache.js";
+import { SchemaCache, type Pool } from "../connection-adapters/schema-cache.js";
 import { BOOKKEEPING_TABLE_NAMES } from "./drop-all-tables.js";
 import { supportsExpressionIndex } from "./schema-types.js";
 import { TEMP_DB_PREFIX } from "./sqlite-template.js";
@@ -26,7 +26,7 @@ export async function schemaCacheDumpPathFor(runToken: string): Promise<string> 
 
 export async function dumpTemplateSchemaCache(
   adapter: DatabaseAdapter,
-  pool: unknown,
+  pool: Pool,
   runToken: string,
 ): Promise<{ filename: string; fingerprint: string } | null> {
   const cache = adapter.internalSchemaCache;

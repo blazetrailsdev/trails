@@ -953,7 +953,7 @@ describe("buildFixtureSql / buildFixtureStatements / buildTruncateStatement(s) /
 
   type FixtureHost = DatabaseStatementsHost &
     Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName" | "quoteString"> & {
-      schemaCache: { columnsHash(tableName: string): Promise<Record<string, unknown> | undefined> };
+      schemaCache: { columnsHash(tableName: string): Promise<Record<string, unknown>> };
       supportsVirtualColumns?(): Promise<boolean> | boolean;
       defaultInsertValue?(column: unknown): unknown;
       lookupCastTypeFromColumn(column: unknown): { serialize(value: unknown): unknown };

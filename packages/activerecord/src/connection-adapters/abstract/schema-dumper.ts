@@ -116,7 +116,7 @@ export class SchemaDumper extends BaseSchemaDumper {
   }
 
   /** @internal */
-  protected schemaDefault(column: Column): string | undefined {
+  protected schemaDefault(column: Column): unknown {
     if (!column.hasDefault) return undefined;
     const type = this._adapter().lookupCastTypeFromColumn(column);
     const default_ = type.deserialize(column.default);

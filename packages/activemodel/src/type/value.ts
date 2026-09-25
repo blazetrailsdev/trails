@@ -45,7 +45,7 @@ export class ValueType<T = unknown> {
     return value;
   }
 
-  typeCastForSchema(value: unknown): string {
+  typeCastForSchema(value: unknown): unknown {
     return inspect(value);
   }
 

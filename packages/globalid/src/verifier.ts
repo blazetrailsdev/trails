@@ -1,5 +1,6 @@
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { ArgumentError } from "@blazetrails/ruby-compat";
+import { GlobalID } from "./global-id.js";
 
 export class Verifier extends MessageVerifier {
   protected override encode(data: string | Buffer): string {
@@ -20,3 +21,5 @@ export class Verifier extends MessageVerifier {
     return Buffer.from(str, "base64");
   }
 }
+
+GlobalID.Verifier = Verifier;

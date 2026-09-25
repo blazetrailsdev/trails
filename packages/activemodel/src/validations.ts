@@ -31,6 +31,7 @@ import {
   _defineAroundModelCallback as _defineAroundModelCallbackImpl,
   _defineAfterModelCallback as _defineAfterModelCallbackImpl,
 } from "./callbacks.js";
+import { ActiveModel } from "./namespaces.js";
 
 /** @internal */
 export const _defineBeforeModelCallback = _defineBeforeModelCallbackImpl;
@@ -423,3 +424,5 @@ export interface ConditionalOptions {
   exceptOn?: string | string[];
   prepend?: boolean;
 }
+
+ActiveModel.ValidationError = ValidationError;

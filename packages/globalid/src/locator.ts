@@ -306,3 +306,5 @@ function modelIdArityMatches(
 function idKey(id: unknown): string {
   return Array.isArray(id) ? JSON.stringify(id.map(String)) : String(id);
 }
+
+GlobalID.Locator = Locator;

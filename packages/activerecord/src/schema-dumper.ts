@@ -1,4 +1,4 @@
-import { StringIO, type IO } from "@blazetrails/ruby-compat";
+import { StringIO, rbObjAsString, type IO } from "@blazetrails/ruby-compat";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { Column } from "./connection-adapters/column.js";
 import { isBlank, isPresent } from "@blazetrails/activesupport";
@@ -554,7 +554,7 @@ export abstract class SchemaDumper {
   protected abstract schemaScale(column: Column): string | undefined;
 
   /** @internal */
-  protected abstract schemaDefault(column: Column): string | undefined;
+  protected abstract schemaDefault(column: Column): unknown;
 
   /** @internal */
   protected abstract schemaExpression(column: Column): string | undefined;
@@ -708,7 +708,7 @@ export abstract class SchemaDumper {
         return `${key}: ${
           value && typeof value === "object" && !Array.isArray(value)
             ? `{ ${this.formatColspec(value as Record<string, unknown>)} }`
-            : String(value)
+            : rbObjAsString(value)
         }`;
       })
       .join(", ");

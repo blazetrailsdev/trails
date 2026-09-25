@@ -8,7 +8,7 @@ export class FloatType extends NumericValueType {
     return "float";
   }
 
-  typeCastForSchema(value: unknown): string {
+  typeCastForSchema(value: unknown): unknown {
     if (typeof value === "number") {
       if (isNaN(value)) return "::Float::NAN";
       if (value === Infinity) return "::Float::INFINITY";

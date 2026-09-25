@@ -22,6 +22,7 @@ import {
   creditMixinObjectLiteralKeys,
   harvestObjectLiteralMethods,
   packageFingerprint,
+  seatedClassExpression,
   tsLiteralValue,
 } from "./extract-ts-api.js";
 import { collectTsFileNames } from "./extra-surface.js";
@@ -5522,5 +5523,25 @@ describe("returnsVoid", () => {
       lease: undefined,
       loose: undefined,
     });
+  });
+});
+
+describe("seatedClassExpression", () => {
+  const statements = (source: string) =>
+    ts
+      .createSourceFile("virtual.ts", source, ts.ScriptTarget.Latest, true)
+      .statements.filter(ts.isExpressionStatement);
+
+  it("reads the seat and class of `Ns.Name = class Name { ... }`", () => {
+    const [stmt] = statements("ActiveRecord.Point = class Point { x = 0; };");
+    const seated = seatedClassExpression(stmt);
+    expect(seated?.seat).toBe("ActiveRecord.Point");
+    expect(seated?.cls.name?.text).toBe("Point");
+  });
+
+  it("ignores an anonymous class expression and a non-class assignment", () => {
+    for (const stmt of statements("Ns.A = class { };\nNs.B = 1;\nfoo();")) {
+      expect(seatedClassExpression(stmt)).toBeUndefined();
+    }
   });
 });

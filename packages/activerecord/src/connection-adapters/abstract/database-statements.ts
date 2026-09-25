@@ -1171,7 +1171,7 @@ export function defaultInsertValue(_column: unknown): Nodes.SqlLiteral {
 /** @internal */
 type BuildFixtureHost = DatabaseStatementsHost &
   Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName" | "quoteString"> & {
-    schemaCache: { columnsHash(tableName: string): Promise<Record<string, unknown> | undefined> };
+    schemaCache: { columnsHash(tableName: string): Promise<Record<string, unknown>> };
     supportsVirtualColumns?(): Promise<boolean> | boolean;
     defaultInsertValue?(column: unknown): unknown;
     lookupCastTypeFromColumn(column: unknown): { serialize(value: unknown): unknown };
@@ -1187,7 +1187,7 @@ export async function buildFixtureSql(
 ): Promise<string> {
   if (this.typeMap == null) await this.verifyBang?.();
   const supportsVirtualColumns = (await this.supportsVirtualColumns?.()) ?? false;
-  const columns = Object.entries((await this.schemaCache.columnsHash(tableName)) ?? {}).filter(
+  const columns = Object.entries(await this.schemaCache.columnsHash(tableName)).filter(
     ([, column]) => !(supportsVirtualColumns && (column as { isVirtual(): boolean }).isVirtual()),
   );
   const columnNames = columns.map(([name]) => name);

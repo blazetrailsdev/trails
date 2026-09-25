@@ -674,6 +674,14 @@ export function extractFromProgram(
           info.classes[classKey] = classInfo;
           fileHasClassOrModule = true;
         }
+      } else if (ts.isExpressionStatement(node)) {
+        const seated = seatedClassExpression(node);
+        if (!seated) return;
+        const classInfo = extractClass(seated.cls, checker, relPath, srcDir);
+        if (classInfo) {
+          info.classes[`${relPath}:${seated.seat}`] = classInfo;
+          fileHasClassOrModule = true;
+        }
       } else if (ts.isInterfaceDeclaration(node) && node.name) {
         if (!isExported(node)) return;
         const name = node.name.text;
@@ -3598,8 +3606,27 @@ export function resolveRelModule(fromRel: string, spec: string): string | null {
  * has to guess. Omit it (tests compiling a single virtual file) and the
  * superclass is still recorded by name, without the file.
  */
+/**
+ * The `Ns.Name = class Name { ... }` statement form of a class declaration:
+ * a named class expression assigned to a property of a namespace object
+ * (`ActiveRecord.Point` beside the exported `OID::Point` in `oid/point.ts`).
+ * The caller keys it by `seat`, so it never overwrites the file's exported
+ * class of the same short name.
+ */
+export function seatedClassExpression(
+  node: ts.ExpressionStatement,
+): { seat: string; cls: ts.ClassExpression } | undefined {
+  const expr = node.expression;
+  if (!ts.isBinaryExpression(expr) || expr.operatorToken.kind !== ts.SyntaxKind.EqualsToken) {
+    return undefined;
+  }
+  if (!ts.isPropertyAccessExpression(expr.left)) return undefined;
+  if (!ts.isClassExpression(expr.right) || !expr.right.name) return undefined;
+  return { seat: expr.left.getText(), cls: expr.right };
+}
+
 export function extractClass(
-  node: ts.ClassDeclaration,
+  node: ts.ClassDeclaration | ts.ClassExpression,
   checker: ts.TypeChecker,
   file: string,
   srcDir?: string,

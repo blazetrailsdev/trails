@@ -626,8 +626,7 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   const exists = await cache.dataSourceExists(table);
   if (exists === false) return;
 
-  const hash = await cache.columnsHash(table);
-  if (!hash) return;
+  await cache.columnsHash(table);
 
   await cache.primaryKeys(table);
 

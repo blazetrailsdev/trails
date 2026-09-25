@@ -10,6 +10,7 @@ import { Migration, ProtectedEnvironmentError } from "../migration.js";
 import { DEFAULT_ENV } from "../connection-handling.js";
 import { _setDatabaseTasks } from "./database-tasks-slot.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
+import type { BoundSchemaReflection } from "../connection-adapters/schema-cache.js";
 import { getEnv, isBlank, trailsRoot } from "@blazetrails/activesupport";
 import {
   getCryptoAsync,
@@ -445,46 +446,11 @@ export class DatabaseTasks {
     );
   }
 
-  static async dumpSchemaCache(connOrPool: unknown, filename: string): Promise<void> {
-    const reflection = (connOrPool as { schemaCache?: { dumpTo?: unknown; addAll?: unknown } })
-      ?.schemaCache;
-    if (
-      reflection &&
-      typeof (reflection as { dumpTo?: unknown }).dumpTo === "function" &&
-      typeof (reflection as { addAll?: unknown }).addAll !== "function"
-    ) {
-      await (reflection as { dumpTo: (f: string) => Promise<void> }).dumpTo(filename);
-      return;
-    }
-
-    const required = ["dataSources", "columns", "primaryKey", "indexes"] as const;
-    const assertSupported = (connection: unknown): void => {
-      const missing = required.filter(
-        (m) => typeof (connection as Record<string, unknown>)[m] !== "function",
-      );
-      if (missing.length > 0) {
-        throw new Error(
-          `dumpSchemaCache requires the connection to implement [${missing.join(", ")}]. ` +
-            `The adapter isn't exposing the schema introspection API that ` +
-            `SchemaCache.addAll needs to populate a cache dump.`,
-        );
-      }
-    };
-    const maybePool = connOrPool as {
-      withConnection?: <T>(cb: (connection: unknown) => T | Promise<T>) => Promise<T> | T;
-    };
-    if (typeof maybePool.withConnection === "function") {
-      await maybePool.withConnection((connection: unknown) => {
-        assertSupported(connection);
-      });
-    } else {
-      assertSupported(connOrPool);
-    }
-
-    const { SchemaCache } = await import("../connection-adapters/schema-cache.js");
-    const fresh = new SchemaCache();
-    await fresh.addAll(connOrPool);
-    await fresh.dumpTo(filename);
+  static async dumpSchemaCache(
+    connOrPool: { schemaCache: BoundSchemaReflection },
+    filename: string,
+  ): Promise<void> {
+    await connOrPool.schemaCache.dumpTo(filename);
   }
 
   static clearSchemaCache(filename: string): void {

@@ -15,7 +15,7 @@ export class Trailtie extends BaseTrailtie {
   static {
     BaseTrailtie.register(this);
 
-    this.config.eagerLoadNamespaces.push(ActiveModel);
+    this.config.eagerLoadNamespaces.push(ActiveModel.ActiveModel);
 
     this.config.set("activeModel", {} satisfies ActiveModelConfig);
 

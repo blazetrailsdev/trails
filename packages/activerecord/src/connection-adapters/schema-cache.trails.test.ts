@@ -97,7 +97,7 @@ describe("SchemaCacheIndexDefinitionRoundTripTest", () => {
     await source.indexes(
       new FakePool({
         indexes: async () => [live],
-        dataSourceExists: async () => true,
+        dataSources: async () => ["people"],
       }),
       "people",
     );
@@ -254,7 +254,7 @@ describe("SchemaCacheGzipDumpTest", () => {
     const loaded = await SchemaCache._loadFrom(filename);
     expect(loaded).not.toBeNull();
     const columns = await loaded!.columns(new FakePool({}), "weirds");
-    expect(columns!.map((c) => c.name)).toEqual(["なまえ"]);
+    expect(columns.map((c) => c.name)).toEqual(["なまえ"]);
   });
 
   it("dumping into a missing directory creates it", async () => {
@@ -290,7 +290,7 @@ describe("SchemaCacheColumnClassRoundTripTest", () => {
     await cache.dumpTo(filename);
     const loaded = (await SchemaCache._loadFrom(filename))!;
     fs.rmSync(tmpDir, { recursive: true, force: true });
-    const [column] = (await loaded.columns(new FakePool({}), "people"))!;
+    const [column] = await loaded.columns(new FakePool({}), "people");
 
     expect(column).toBeInstanceOf(MysqlColumn);
     expect((column as MysqlColumn).isAutoIncrement()).toBe(true);
