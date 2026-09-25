@@ -1,7 +1,7 @@
 import { Temporal, Time } from "@blazetrails/date";
 import { ArgumentError, Rational } from "@blazetrails/ruby-compat";
 import {
-  ActsLikeObject,
+  actsLike,
   TimeWithZone,
   inTimeZone as stringInTimeZone,
   toFs,
@@ -23,7 +23,7 @@ interface TimeValueHost {
 export function serializeCastValue(this: TimeValueHost, value: unknown): unknown {
   value = this.applySecondsPrecision(value);
 
-  if (ActsLikeObject.actsLike(value, "time")) {
+  if (actsLike.call(value, "time")) {
     const time = value as Time | TimeWithZone;
     if (this.isUtc) {
       if (!time.isUtc()) value = time.getutc();

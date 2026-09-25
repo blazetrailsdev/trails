@@ -5,11 +5,12 @@ export class NullLogger extends Logger {
     super(null);
   }
 
-  override add(_severity: number, _message?: string | null, _progname?: string): boolean {
-    return true;
-  }
-
-  override log(_severity: number, _message?: string | (() => string), _progname?: string): boolean {
+  override add(
+    _severity: number | null,
+    _message?: unknown,
+    _progname?: string | null,
+    _block?: () => unknown,
+  ): boolean {
     return true;
   }
 

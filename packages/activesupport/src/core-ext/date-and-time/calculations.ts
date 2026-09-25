@@ -5,7 +5,7 @@ import * as time from "../../time-ext.js";
 import { TimeWithZone } from "../../time-with-zone.js";
 import { instantFrom } from "../../temporal.js";
 import { cmp, fetch, include, Range, type Included } from "@blazetrails/ruby-compat";
-import { Object } from "../object/acts-like.js";
+import { actsLike } from "../object/acts-like.js";
 import * as DateAndTimeCalculations from "./calculations.js";
 
 export type DateOrTime = Temporal.PlainDate | RubyDate | Date;
@@ -364,7 +364,7 @@ export function beginningOfWeek(this: Receiver, startDay: string = date.beginnin
   const result = daysAgo.call(this, daysToWeekStart.call(this, startDay));
   if (result instanceof Temporal.PlainDateTime || result instanceof Temporal.ZonedDateTime)
     return dateTime.beginningOfDay(result);
-  return Object.actsLike(this, "time")
+  return actsLike.call(this, "time")
     ? result instanceof RubyTime
       ? result.midnight()
       : time.midnight(receiver(result) as Date)
@@ -436,7 +436,7 @@ export function prevOccurring(this: Receiver, dayOfWeek: string): Result {
 function firstHour(this: Receiver, dateOrTime: Result): Result {
   if (dateOrTime instanceof Temporal.PlainDateTime || dateOrTime instanceof Temporal.ZonedDateTime)
     return dateTime.beginningOfDay(dateOrTime);
-  return Object.actsLike(dateOrTime, "time")
+  return actsLike.call(dateOrTime, "time")
     ? dateOrTime instanceof RubyTime
       ? dateOrTime.beginningOfDay()
       : time.beginningOfDay(receiver(dateOrTime) as Date)
@@ -447,7 +447,7 @@ function firstHour(this: Receiver, dateOrTime: Result): Result {
 function lastHour(this: Receiver, dateOrTime: Result): Result {
   if (dateOrTime instanceof Temporal.PlainDateTime || dateOrTime instanceof Temporal.ZonedDateTime)
     return dateTime.endOfDay(dateOrTime);
-  return Object.actsLike(dateOrTime, "time")
+  return actsLike.call(dateOrTime, "time")
     ? dateOrTime instanceof RubyTime
       ? dateOrTime.endOfDay()
       : time.endOfDay(receiver(dateOrTime) as Date)

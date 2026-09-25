@@ -13,7 +13,7 @@ export function deprecateMethods(
   const methodNamesWithOptions = [...names, ...Object.keys(options)];
 
   for (const methodName of methodNamesWithOptions) {
-    const message = options[methodName] as string | undefined;
+    const message = (options[methodName] as string | undefined) ?? null;
 
     if (methodName in targetModule) {
       const method = targetModule[methodName] as (...args: unknown[]) => unknown;

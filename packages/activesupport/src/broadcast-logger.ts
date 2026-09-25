@@ -89,9 +89,7 @@ export class BroadcastLogger extends Logger {
     return this.dispatch((logger) => logger.add(...(args as Parameters<Logger["add"]>)));
   }
 
-  log(...args: unknown[]): boolean {
-    return this.dispatch((logger) => logger.log(...(args as Parameters<Logger["log"]>)));
-  }
+  declare log: BroadcastLogger["add"];
 
   debug(...args: unknown[]): boolean {
     return this.dispatch((logger) => logger.debug(...(args as Parameters<Logger["debug"]>)));
@@ -206,5 +204,7 @@ export class BroadcastLogger extends Logger {
     return this.broadcasts.some((logger) => rbObjRespondTo(logger, method, includeAll));
   }
 }
+
+BroadcastLogger.prototype.log = BroadcastLogger.prototype.add;
 
 ActiveSupport.BroadcastLogger = BroadcastLogger;

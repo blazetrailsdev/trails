@@ -1,5 +1,5 @@
 import { Nodes, sql as arelSql } from "@blazetrails/arel";
-import { ActsLikeObject, isBlank } from "@blazetrails/activesupport";
+import { actsLike, isBlank } from "@blazetrails/activesupport";
 import { format, rbObjAsString, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import type { Quoting } from "./connection-adapters/abstract/quoting.js";
 import { PreparedStatementInvalid, UnknownAttributeReference } from "./errors.js";
@@ -207,7 +207,7 @@ export function replaceNamedBindVariables(
 
 /** @internal */
 function quoteBoundValue(connection: Quoter, value: unknown): string {
-  if (rbObjRespondTo(value, "map") && !ActsLikeObject.actsLike(value, "string")) {
+  if (rbObjRespondTo(value, "map") && !actsLike.call(value, "string")) {
     const values = (value as { map<R>(b: (v: unknown) => R): R[] }).map((v) =>
       rbObjRespondTo(v, "idForDatabase") ? (v as { idForDatabase: unknown }).idForDatabase : v,
     );

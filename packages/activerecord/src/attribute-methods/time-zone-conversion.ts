@@ -1,5 +1,5 @@
 import { ValueType } from "@blazetrails/activemodel";
-import { ActsLikeObject, TimeWithZone, zone as timeZone } from "@blazetrails/activesupport";
+import { actsLike, TimeWithZone, zone as timeZone } from "@blazetrails/activesupport";
 import {
   type DateOrTime,
   inTimeZone,
@@ -83,7 +83,7 @@ export class TimeZoneConverter extends DelegateClass(ValueType) {
   private convertTimeToTimeZone(value: unknown): unknown {
     if (value == null) return null;
 
-    if (ActsLikeObject.actsLike(value, "time")) {
+    if (actsLike.call(value, "time")) {
       return inTimeZone(value as DateOrTime);
     } else if (isInfinite(value)) {
       return value;

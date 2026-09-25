@@ -614,7 +614,7 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("since with instance of time deprecated", async () => {
-    await assertDeprecated(null, deprecator(), () => {
+    await assertDeprecated(deprecator(), () => {
       RubyTime.now().since(RubyTime.now());
     });
   });

@@ -44,8 +44,6 @@ import {
   onWeekend,
   isPast,
   isFuture,
-  floor,
-  ceil,
   secFraction,
   subsec,
   rfc3339,
@@ -380,32 +378,6 @@ describe("TimeExtCalculationsTest", () => {
   it("sec fraction", () => {
     const t = d(2005, 2, 4, 10, 10, 10, 500);
     expect(secFraction(t)).toBeCloseTo(0.5, 2);
-  });
-
-  it("floor", () => {
-    const t = new Date(2005, 1, 4, 10, 10, 10, 500);
-    const result = asDate(floor(t, 1000));
-    expect(result.getMilliseconds()).toBe(0);
-    expect(result.getSeconds()).toBe(10);
-  });
-
-  it("ceil", () => {
-    const t = new Date(2005, 1, 4, 10, 10, 10, 1);
-    const result = asDate(ceil(t, 1000));
-    expect(result.getMilliseconds()).toBe(0);
-    expect(result.getSeconds()).toBe(11);
-  });
-
-  it("floor and ceil reject non-positive or non-finite ms", () => {
-    const t = new Date(2005, 1, 4, 10, 10, 10, 500);
-    expect(() => floor(t, 0)).toThrow(RangeError);
-    expect(() => floor(t, -1000)).toThrow(RangeError);
-    expect(() => floor(t, Number.NaN)).toThrow(RangeError);
-    expect(() => floor(t, Number.POSITIVE_INFINITY)).toThrow(RangeError);
-    expect(() => ceil(t, 0)).toThrow(RangeError);
-    expect(() => ceil(t, -1000)).toThrow(RangeError);
-    expect(() => ceil(t, Number.NaN)).toThrow(RangeError);
-    expect(() => ceil(t, Number.POSITIVE_INFINITY)).toThrow(RangeError);
   });
 
   it("to fs", () => {

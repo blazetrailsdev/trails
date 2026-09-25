@@ -36,6 +36,7 @@ import {
   assertSame,
 } from "./testing/assertions.js";
 import { assertErrorReported } from "./testing/error-reporter-assertions.js";
+import { assertCalledWith } from "./testing/method-call-assertions.js";
 import {
   assertDeprecated,
   assertNotDeprecated,
@@ -250,7 +251,7 @@ describe("DeprecationTest", () => {
       deprecator.warn("using fubar is deprecated");
     });
 
-    await assertDeprecated(deprecator, null, () => {
+    await assertDeprecated(deprecator, () => {
       deprecator.warn("whatever");
     });
   });
@@ -627,7 +628,7 @@ describe("DeprecationTest", () => {
 
   it("assert_deprecated raises when no deprecation warning", async () => {
     await assertRaises([Assertion], {}, async () => {
-      await assertDeprecated(deprecator, null, () => 1 + 1);
+      await assertDeprecated(deprecator, () => 1 + 1);
     });
   });
 
@@ -640,7 +641,7 @@ describe("DeprecationTest", () => {
   });
 
   it("assert_deprecated without match argument", async () => {
-    await assertDeprecated(deprecator, null, () => {
+    await assertDeprecated(deprecator, () => {
       deprecator.warn();
     });
   });
@@ -673,7 +674,7 @@ describe("DeprecationTest", () => {
       });
     });
 
-    await assertDeprecated(deprecator, null, () => {
+    await assertDeprecated(deprecator, () => {
       deprecator.warn();
     });
 
@@ -696,7 +697,7 @@ describe("DeprecationTest", () => {
       });
     });
 
-    await assertDeprecated(deprecator, null, () => {
+    await assertDeprecated(deprecator, () => {
       deprecator.warn();
     });
   });
@@ -708,7 +709,7 @@ describe("DeprecationTest", () => {
       });
 
       await new Thread(async () => {
-        await assertDeprecated(deprecator, null, () => {
+        await assertDeprecated(deprecator, () => {
           deprecator.warn();
         });
 
@@ -718,7 +719,7 @@ describe("DeprecationTest", () => {
           });
         });
 
-        await assertDeprecated(deprecator, null, () => {
+        await assertDeprecated(deprecator, () => {
           deprecator.warn();
         });
       }).join();
@@ -733,28 +734,22 @@ describe("DeprecationTest", () => {
     const klass = class extends Deprecatee {};
     klass.deprecate("fubar", "setFubar", { deprecator });
 
-    await assertDeprecated(deprecator, null, () => new klass().fubar());
-    await assertDeprecated(deprecator, null, () => {
+    await assertDeprecated(deprecator, () => new klass().fubar());
+    await assertDeprecated(deprecator, () => {
       new klass().setFubar(":foo");
     });
   });
 
   it("Module::deprecate with alternative method", async () => {
     const klass = class extends Deprecatee {};
-    deprecator.deprecateMethods(klass.prototype as unknown as Record<string, unknown>, {
-      fubar: ":fooBar",
-      deprecator,
-    });
+    klass.deprecate({ fubar: ":fooBar", deprecator });
 
     await assertDeprecated(/use fooBar instead/, deprecator, () => new klass().fubar());
   });
 
   it("Module::deprecate with message", async () => {
     const klass = class extends Deprecatee {};
-    deprecator.deprecateMethods(klass.prototype as unknown as Record<string, unknown>, {
-      fubar: "this is the old way",
-      deprecator,
-    });
+    klass.deprecate({ fubar: "this is the old way", deprecator });
 
     await assertDeprecated(/this is the old way/, deprecator, () => new klass().fubar());
   });
@@ -769,12 +764,11 @@ describe("DeprecationTest", () => {
 
     const deprecatee = class {
       method(): void {}
+      static deprecate = deprecate;
+      static {
+        this.deprecate("method", { deprecator });
+      }
     };
-    deprecator.deprecateMethods(
-      deprecatee.prototype as unknown as Record<string, unknown>,
-      "method",
-      { deprecator },
-    );
 
     new deprecatee().method();
     assert(
@@ -785,13 +779,19 @@ describe("DeprecationTest", () => {
   });
 
   it("Module::deprecate with custom deprecator", () => {
-    const custom = new Deprecation();
-    const spy = vi.spyOn(stderr, "write").mockImplementation(() => true);
-    const obj = { fn: () => "ok" };
-    custom.deprecateMethod(obj, "fn", "custom deprecator message");
-    obj.fn();
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining("custom deprecator message"));
-    spy.mockRestore();
+    const customDeprecator = { deprecationWarning: (_method: string, _message?: unknown) => {} };
+
+    assertCalledWith(customDeprecator, "deprecationWarning", ["method", null], {}, () => {
+      const klass = class {
+        method(): void {}
+        static deprecate = deprecate;
+        static {
+          this.deprecate("method", { deprecator: customDeprecator });
+        }
+      };
+
+      new klass().method();
+    });
   });
 
   it("DeprecatedConstantProxy with explicit deprecator", () => {
@@ -938,7 +938,7 @@ describe("DeprecationTest", () => {
     });
 
     deprecator.disallowedWarnings = ["fubar"];
-    await assertDeprecated(deprecator, null, () => {
+    await assertDeprecated(deprecator, () => {
       deprecator.warn();
     });
   });
@@ -959,7 +959,7 @@ describe("DeprecationTest", () => {
     });
 
     await deprecator.allow(":all", {}, async () => {
-      await assertDeprecated(deprecator, null, () => {
+      await assertDeprecated(deprecator, () => {
         deprecator.warn();
       });
     });
@@ -1017,7 +1017,7 @@ describe("DeprecationTest", () => {
     deprecator.disallowedWarnings = ":all";
 
     await deprecator.allow(":all", {}, async () => {
-      await assertDeprecated(deprecator, null, () => {
+      await assertDeprecated(deprecator, () => {
         deprecator.warn();
       });
     });
@@ -1031,7 +1031,7 @@ describe("DeprecationTest", () => {
     deprecator.disallowedWarnings = ":all";
 
     await deprecator.allow(":all", {}, async () => {
-      await assertDeprecated(deprecator, null, () => {
+      await assertDeprecated(deprecator, () => {
         deprecator.warn();
       });
 
@@ -1041,7 +1041,7 @@ describe("DeprecationTest", () => {
         });
 
         await deprecator.allow(":all", {}, async () => {
-          await assertDeprecated(deprecator, null, () => {
+          await assertDeprecated(deprecator, () => {
             deprecator.warn();
           });
         });
@@ -1051,7 +1051,7 @@ describe("DeprecationTest", () => {
         });
       }).join();
 
-      await assertDeprecated(deprecator, null, () => {
+      await assertDeprecated(deprecator, () => {
         deprecator.warn();
       });
     });
@@ -1093,7 +1093,7 @@ describe("DeprecationTest", () => {
     deprecator.disallowedWarnings = ":all";
 
     await deprecator.allow(":all", {}, async () => {
-      await assertDeprecated(deprecator, null, () => {
+      await assertDeprecated(deprecator, () => {
         deprecator.warn();
       });
     });

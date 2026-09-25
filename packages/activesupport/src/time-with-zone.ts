@@ -13,7 +13,7 @@ import {
   rbObjClass,
   rubyClass,
 } from "@blazetrails/ruby-compat";
-import { Object as ObjectExt } from "./core-ext/object/acts-like.js";
+import { actsLike } from "./core-ext/object/acts-like.js";
 import { Duration } from "./duration.js";
 import { currentTime } from "./time-travel.js";
 import { zone as timeZone, findZone, findZoneBang } from "./time-zone-config.js";
@@ -241,7 +241,7 @@ export class TimeWithZone {
   }
 
   private _wrapWithTimeZone(time: unknown): unknown {
-    if (ObjectExt.actsLike(time, "time")) {
+    if (actsLike.call(time, "time")) {
       const local = time as TimeLike;
       const periods = this.timeZone.periodsForLocal(
         this._transferTimeValuesToUtcConstructor(local),

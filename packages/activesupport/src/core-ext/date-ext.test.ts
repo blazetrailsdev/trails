@@ -41,7 +41,7 @@ import {
   assertNotPredicate,
   assertPredicate,
 } from "../testing/assertions.js";
-import { Object as ObjectExt } from "./object/acts-like.js";
+import { actsLike } from "./object/acts-like.js";
 import { ArgumentError, setZone, zone } from "../time-zone-config.js";
 import { Time as RubyTime, resetLocalTimeZoneId } from "@blazetrails/date";
 import { travelTo } from "../testing/time-helpers.js";
@@ -102,7 +102,7 @@ function rubyRange(r: { begin: unknown; end: unknown }): Temporal.PlainDate[] {
 
 describe("DateExtBehaviorTest", () => {
   it("date acts like date", () => {
-    assertPredicate(RubyDate.parse("2005-02-21"), (date) => ObjectExt.actsLike(date, "date"));
+    assertPredicate(RubyDate.parse("2005-02-21"), (date) => actsLike.call(date, "date"));
   });
 
   it("blank?", () => {

@@ -90,9 +90,8 @@ describe("LoggerTest", () => {
   it("should not evaluate block if message wont be logged", () => {
     logger.level = Logger.INFO;
     let evaluated = false;
-    logger.log(Logger.DEBUG, () => {
+    logger.add(Logger.DEBUG, null, null, () => {
       evaluated = true;
-      return "x";
     });
     expect(evaluated == false).toBeTruthy();
   });

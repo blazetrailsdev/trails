@@ -141,3 +141,15 @@ describe("LoggerThreadSafeLevel", () => {
     expect(logger.localLevel).toBeNull();
   });
 });
+
+describe("Logger#add block", () => {
+  it("evaluates the block when message is nil, and log is add's alias", () => {
+    const out: string[] = [];
+    const logger = new Logger({ write: (s) => out.push(s) });
+    logger.formatter = (_sev, _time, _progname, msg) => `${msg}\n`;
+    expect(Logger.prototype.log).toBe(Logger.prototype.add);
+    logger.add(Logger.INFO, null, null, () => "from block");
+    logger.log(Logger.INFO, "from message", null, () => "ignored");
+    expect(out).toEqual(["from block\n", "from message\n"]);
+  });
+});

@@ -6,10 +6,20 @@ import { assert } from "./assertions.js";
 
 /** @missingRailsName escape — PERMANENT */
 export async function assertDeprecated<T>(
+  deprecator: Deprecation,
+  block: () => T | Promise<T>,
+): Promise<T>;
+export async function assertDeprecated<T>(
+  match: RegExp | string | null | undefined,
+  deprecator: Deprecation | null | undefined,
+  block: () => T | Promise<T>,
+): Promise<T>;
+export async function assertDeprecated<T>(
   match: RegExp | string | Deprecation | null | undefined,
-  deprecator?: Deprecation | null,
+  deprecator?: Deprecation | null | (() => T | Promise<T>),
   block?: () => T | Promise<T>,
 ): Promise<T> {
+  if (typeof deprecator === "function") [deprecator, block] = [null, deprecator];
   if (match instanceof Deprecation) [match, deprecator] = [null, match];
 
   if (!deprecator) {
