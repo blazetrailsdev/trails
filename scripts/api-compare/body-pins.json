@@ -19903,13 +19903,6 @@
   {
     "package": "activerecord",
     "rubyFile": "associations.rb",
-    "rubyName": "eager_load!",
-    "digest": "5665fa49a113db62",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "associations.rb",
     "rubyName": "has_and_belongs_to_many",
     "digest": "f59586a88e69f4a5",
     "ref": "v8.0.2"
