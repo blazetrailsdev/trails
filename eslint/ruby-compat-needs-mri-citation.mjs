@@ -45,6 +45,18 @@ function repoRoot() {
 }
 
 /**
+ * The clone's version directory, `vendor/sources.ts#versionDir` of the
+ * lockfile's `ruby` ref (`v3_3_11` → `v3.3.11`). Spelled out here rather than
+ * imported because a `.mjs` rule cannot load a `.ts` module without a warning
+ * on every lint run.
+ */
+function rubyVersionDir() {
+  const lockfile = path.join(repoRoot(), "vendor", "sources.lock.json");
+  const ref = JSON.parse(fs.readFileSync(lockfile, "utf8")).sources.ruby.ref;
+  return ref.replaceAll("_", ".");
+}
+
+/**
  * Test seam: `settings.rubyCompatVendorRoot` points the resolver at a fixture
  * tree, or at `null` for the "vendor tree absent" state. It lives in the config
  * rather than in module state because a RuleTester case runs long after the
@@ -53,7 +65,7 @@ function repoRoot() {
 function vendorRoot(context) {
   const override = context.settings?.rubyCompatVendorRoot;
   if (override !== undefined) return override;
-  const root = path.join(repoRoot(), "vendor", "ruby");
+  const root = path.join(repoRoot(), "vendor", "ruby", rubyVersionDir());
   return fs.existsSync(root) ? root : null;
 }
 

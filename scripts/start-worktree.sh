@@ -220,8 +220,9 @@ echo "==> Running pnpm install"
 ( cd "$TARGET" && pnpm install )
 
 echo "==> Linking upstream Ruby sources from main worktree"
-# vendor/<name>/ entries are populated by `pnpm vendor:fetch` on the main
-# worktree; each new worktree symlinks them to avoid re-cloning ~53 MiB
+# vendor/<name>/<version>/ clones are populated by `pnpm vendor:fetch` on the
+# main worktree; each new worktree symlinks the versioned clone directory (not
+# vendor/<name>/, which can hold several versions) to avoid re-cloning ~53 MiB
 # per worktree.
 #
 # Source the list from the NEW worktree's vendor/sources.ts (it was just
@@ -237,8 +238,8 @@ echo "==> Linking upstream Ruby sources from main worktree"
 VENDOR_PATHS="$(cd "$TARGET" && pnpm --silent tsx vendor/fetch.ts --print-paths)"
 LOCK_JSON="$TARGET/vendor/sources.lock.json"
 while IFS= read -r src; do
-  name="$(basename "$src")"
-  rel="vendor/$name"
+  name="$(basename "$(dirname "$src")")"
+  rel="vendor/$name/$(basename "$src")"
   main_clone="$MAIN_REPO/$rel"
   if [[ -e "$main_clone/.git" ]]; then
     # Validate main's clone HEAD against the new worktree's lockfile.

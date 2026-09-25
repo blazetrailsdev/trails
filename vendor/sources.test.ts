@@ -11,6 +11,7 @@ import {
   validateSources,
   VENDOR_DIR,
   vendoredRoot,
+  versionDir,
 } from "./sources.js";
 
 describe("vendor/sources.ts", () => {
@@ -72,9 +73,13 @@ describe("vendor/sources.ts", () => {
     expect(apiComparePackages()).toContain("rack-session");
     expect(Object.keys(libPathsManifest())).toContain("rack-session");
     expect(Object.keys(testPathsManifest())).toContain("rack-session");
-    expect(resolvePath("rack-session").endsWith("vendor/rack-session/lib/rack/session")).toBe(true);
-    expect(resolvePath("rack-session", "test").endsWith("vendor/rack-session/test")).toBe(true);
-    expect(vendoredRoot("rack-session").endsWith("vendor/rack-session")).toBe(true);
+    expect(
+      resolvePath("rack-session").endsWith("vendor/rack-session/v2.1.0/lib/rack/session"),
+    ).toBe(true);
+    expect(resolvePath("rack-session", "test").endsWith("vendor/rack-session/v2.1.0/test")).toBe(
+      true,
+    );
+    expect(vendoredRoot("rack-session").endsWith("vendor/rack-session/v2.1.0")).toBe(true);
   });
 
   it("declares the rack-test source, enrolled in both api-compare and test-compare", () => {
@@ -99,9 +104,9 @@ describe("vendor/sources.ts", () => {
     expect(apiComparePackages()).toContain("rack-test");
     expect(Object.keys(libPathsManifest())).toContain("rack-test");
     expect(Object.keys(testPathsManifest())).toContain("rack-test");
-    expect(resolvePath("rack-test").endsWith("vendor/rack-test/lib/rack/test")).toBe(true);
-    expect(resolvePath("rack-test", "test").endsWith("vendor/rack-test/spec")).toBe(true);
-    expect(vendoredRoot("rack-test").endsWith("vendor/rack-test")).toBe(true);
+    expect(resolvePath("rack-test").endsWith("vendor/rack-test/v2.2.0/lib/rack/test")).toBe(true);
+    expect(resolvePath("rack-test", "test").endsWith("vendor/rack-test/v2.2.0/spec")).toBe(true);
+    expect(vendoredRoot("rack-test").endsWith("vendor/rack-test/v2.2.0")).toBe(true);
   });
 
   it("declares the globalid source (wave 3)", () => {
@@ -131,7 +136,7 @@ describe("vendor/sources.ts", () => {
     expect(apiComparePackages()).not.toContain("date");
     expect(Object.keys(libPathsManifest())).not.toContain("date");
     expect(Object.keys(testPathsManifest())).toContain("date");
-    expect(resolvePath("date", "test").endsWith("vendor/date/test/date")).toBe(true);
+    expect(resolvePath("date", "test").endsWith("vendor/date/v3.4.1/test/date")).toBe(true);
   });
 
   it("declares the ruby source, read-anchor for api-compare and enrolled in test-compare", () => {
@@ -161,9 +166,9 @@ describe("vendor/sources.ts", () => {
     expect(apiComparePackages()).not.toContain("ruby-compat");
     expect(Object.keys(libPathsManifest())).not.toContain("ruby-compat");
     expect(Object.keys(testPathsManifest())).toContain("ruby-compat");
-    expect(resolvePath("ruby-compat").endsWith("vendor/ruby/lib")).toBe(true);
-    expect(resolvePath("ruby-compat", "test").endsWith("vendor/ruby/spec/ruby")).toBe(true);
-    expect(vendoredRoot("ruby").endsWith("vendor/ruby")).toBe(true);
+    expect(resolvePath("ruby-compat").endsWith("vendor/ruby/v3.3.11/lib")).toBe(true);
+    expect(resolvePath("ruby-compat", "test").endsWith("vendor/ruby/v3.3.11/spec/ruby")).toBe(true);
+    expect(vendoredRoot("ruby").endsWith("vendor/ruby/v3.3.11")).toBe(true);
   });
 
   it("declares the i18n source, enrolled in both api-compare and test-compare", () => {
@@ -191,9 +196,9 @@ describe("vendor/sources.ts", () => {
     expect(apiComparePackages()).toContain("i18n");
     expect(Object.keys(libPathsManifest())).toContain("i18n");
     expect(Object.keys(testPathsManifest())).toContain("i18n");
-    expect(resolvePath("i18n").endsWith("vendor/i18n/lib/i18n")).toBe(true);
-    expect(resolvePath("i18n", "test").endsWith("vendor/i18n/test")).toBe(true);
-    expect(vendoredRoot("i18n").endsWith("vendor/i18n")).toBe(true);
+    expect(resolvePath("i18n").endsWith("vendor/i18n/v1.14.8/lib/i18n")).toBe(true);
+    expect(resolvePath("i18n", "test").endsWith("vendor/i18n/v1.14.8/test")).toBe(true);
+    expect(vendoredRoot("i18n").endsWith("vendor/i18n/v1.14.8")).toBe(true);
   });
 
   it("vendor/sources.lock.json has an entry for every source (commit invariant)", async () => {
@@ -254,12 +259,12 @@ describe("vendor/sources.ts", () => {
 
   it("resolvePath returns absolute lib path for a known package", () => {
     const p = resolvePath("activerecord");
-    expect(p.endsWith("vendor/rails/activerecord/lib/active_record")).toBe(true);
+    expect(p.endsWith("vendor/rails/v8.0.2/activerecord/lib/active_record")).toBe(true);
   });
 
   it("resolvePath('test') returns absolute test path", () => {
     const p = resolvePath("activerecord", "test");
-    expect(p.endsWith("vendor/rails/activerecord/test/cases")).toBe(true);
+    expect(p.endsWith("vendor/rails/v8.0.2/activerecord/test/cases")).toBe(true);
   });
 
   it("resolvePath throws for unknown package", () => {
@@ -271,22 +276,37 @@ describe("vendor/sources.ts", () => {
   });
 
   it("vendoredRoot returns absolute source root", () => {
-    expect(vendoredRoot("rails").endsWith("vendor/rails")).toBe(true);
+    expect(vendoredRoot("rails").endsWith("vendor/rails/v8.0.2")).toBe(true);
+  });
+
+  it("versionDir keeps a dotted tag and normalizes an underscore tag", () => {
+    expect(versionDir("v8.0.2")).toBe("v8.0.2");
+    expect(versionDir("v3_3_11")).toBe("v3.3.11");
+  });
+
+  it("every source root is vendor/<name>/<versionDir of its ref>", () => {
+    for (const source of SOURCES) {
+      expect(vendoredRoot(source.name)).toBe(
+        `${VENDOR_DIR}/${source.name}/${versionDir(source.origin.ref)}`,
+      );
+    }
   });
 
   it("VENDOR_DIR is the vendor/ directory every source root hangs off", () => {
     expect(VENDOR_DIR.endsWith("/vendor")).toBe(true);
-    expect(vendoredRoot("rails")).toBe(`${VENDOR_DIR}/rails`);
+    expect(vendoredRoot("rails")).toBe(`${VENDOR_DIR}/rails/v8.0.2`);
   });
 
   it("resolveSourcePath resolves a gem subdir inside a source root", () => {
-    expect(resolveSourcePath("rails", "activerecord")).toBe(`${VENDOR_DIR}/rails/activerecord`);
+    expect(resolveSourcePath("rails", "activerecord")).toBe(
+      `${VENDOR_DIR}/rails/v8.0.2/activerecord`,
+    );
   });
 
   it("resolveSourcePath resolves the AR test schema, fixtures and models dirs", () => {
     for (const dir of ["schema", "fixtures", "models"]) {
       expect(resolveSourcePath("rails", `activerecord/test/${dir}`)).toBe(
-        `${VENDOR_DIR}/rails/activerecord/test/${dir}`,
+        `${VENDOR_DIR}/rails/v8.0.2/activerecord/test/${dir}`,
       );
     }
   });
@@ -302,7 +322,7 @@ describe("vendor/sources.ts", () => {
 
   it("resolveSourcePath resolves against an explicit vendorDir", () => {
     expect(resolveSourcePath("rails", "activerecord/lib", "/tmp/x/vendor")).toBe(
-      "/tmp/x/vendor/rails/activerecord/lib",
+      "/tmp/x/vendor/rails/v8.0.2/activerecord/lib",
     );
   });
 
@@ -355,12 +375,14 @@ describe("vendor/sources.ts", () => {
   it("libPathsManifest returns absolute lib dirs for every api-compared package", () => {
     const m = libPathsManifest();
     expect(Object.keys(m).sort()).toEqual(apiComparePackages().sort());
-    expect(m["activerecord"].endsWith("vendor/rails/activerecord/lib/active_record")).toBe(true);
+    expect(m["activerecord"].endsWith("vendor/rails/v8.0.2/activerecord/lib/active_record")).toBe(
+      true,
+    );
     expect(
-      m["abstractcontroller"].endsWith("vendor/rails/actionpack/lib/abstract_controller"),
+      m["abstractcontroller"].endsWith("vendor/rails/v8.0.2/actionpack/lib/abstract_controller"),
     ).toBe(true);
-    expect(m["rack"].endsWith("vendor/rack/lib/rack")).toBe(true);
-    expect(m["globalid"].endsWith("vendor/globalid/lib/global_id")).toBe(true);
+    expect(m["rack"].endsWith("vendor/rack/v3.1.14/lib/rack")).toBe(true);
+    expect(m["globalid"].endsWith("vendor/globalid/v1.3.0/lib/global_id")).toBe(true);
   });
 
   it("testPathsManifest returns absolute test dirs for every test-compared package", () => {
@@ -386,9 +408,9 @@ describe("vendor/sources.ts", () => {
         "trailties",
       ].sort(),
     );
-    expect(m["activerecord"].endsWith("vendor/rails/activerecord/test/cases")).toBe(true);
-    expect(m["rack"].endsWith("vendor/rack/test")).toBe(true);
-    expect(m["globalid"].endsWith("vendor/globalid/test/cases")).toBe(true);
+    expect(m["activerecord"].endsWith("vendor/rails/v8.0.2/activerecord/test/cases")).toBe(true);
+    expect(m["rack"].endsWith("vendor/rack/v3.1.14/test")).toBe(true);
+    expect(m["globalid"].endsWith("vendor/globalid/v1.3.0/test/cases")).toBe(true);
   });
 
   it("validateSources rejects missing libPath", () => {

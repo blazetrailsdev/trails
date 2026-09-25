@@ -1099,7 +1099,7 @@ describe("CI runs every tooling test suite", () => {
       // the source, so it is rule data that happens to live in a package.
       "packages/activerecord/src/support/stubbed-ddl-methods.ts",
       // eslint/expected-fixtures.mjs reads the Rails-declared fixture sets.
-      "vendor/rails/activerecord/test/cases/base_test.rb",
+      "vendor/rails/v8.0.2/activerecord/test/cases/base_test.rb",
     ]) {
       expect(lintAll.test(input), `${input} must force a full lint`).toBe(true);
     }

@@ -7,10 +7,11 @@ import { fileURLToPath } from "node:url";
 // them from, and where each one's lib/test directories live on disk after
 // fetching.
 //
-// Each entry corresponds to one vendored root at `vendor/<source-name>/`.
-// `libPath` / `testPath` on each package are relative paths *inside* that
-// root — for monorepo origins they reach into the gem subdir
-// (e.g. `vendor/rails/actionpack/lib/action_dispatch`).
+// Each entry corresponds to one vendored root at
+// `vendor/<source-name>/<versionDir>/` (see `versionDir`). `libPath` /
+// `testPath` on each package are relative paths *inside* that root — for
+// monorepo origins they reach into the gem subdir
+// (e.g. `vendor/rails/v8.0.2/actionpack/lib/action_dispatch`).
 
 export interface GitOrigin {
   type: "git";
@@ -484,8 +485,24 @@ validateSources(SOURCES);
 export const VENDOR_DIR = dirname(fileURLToPath(import.meta.url));
 
 /**
+ * The version directory a source's clone lives under, derived from its ref:
+ * `v8.0.2` stays `v8.0.2`, and MRI's underscore tag `v3_3_11` becomes
+ * `v3.3.11`. The lockfile keeps the verbatim ref as the fetch input; the
+ * directory is the normalized spelling a human reads (RFC 0159, Open
+ * question 1).
+ */
+export function versionDir(ref: string): string {
+  return ref.replaceAll("_", ".");
+}
+
+function sourceRoot(source: UpstreamSource, vendorDir: string = VENDOR_DIR): string {
+  return join(vendorDir, source.name, versionDir(source.origin.ref));
+}
+
+/**
  * Absolute path to a vendored package's `lib` (default) or `test` dir, e.g.
- * `resolvePath("activerecord")` → `/.../vendor/rails/activerecord/lib/active_record`.
+ * `resolvePath("activerecord")` →
+ * `/.../vendor/rails/v8.0.2/activerecord/lib/active_record`.
  * Throws if the package isn't in SOURCES, or if `kind` is "test" but the
  * package has no `testPath`.
  */
@@ -497,9 +514,9 @@ export function resolvePath(packageName: string, kind: "lib" | "test" = "lib"): 
         if (!pkg.testPath) {
           throw new Error(`vendor/sources.ts: package "${packageName}" has no testPath`);
         }
-        return resolve(VENDOR_DIR, source.name, pkg.testPath);
+        return resolve(sourceRoot(source), pkg.testPath);
       }
-      return resolve(VENDOR_DIR, source.name, pkg.libPath);
+      return resolve(sourceRoot(source), pkg.libPath);
     }
   }
   throw new Error(`vendor/sources.ts: no package named "${packageName}"`);
@@ -519,7 +536,7 @@ export function apiComparePackages(): string[] {
 
 /**
  * Absolute path to a vendored source's clone root, e.g.
- * `vendoredRoot("rails")` → `/.../vendor/rails`. Throws on unknown name.
+ * `vendoredRoot("rails")` → `/.../vendor/rails/v8.0.2`. Throws on unknown name.
  */
 export function vendoredRoot(sourceName: string): string {
   return resolveSourcePath(sourceName);
@@ -540,7 +557,7 @@ export function resolveSourcePath(
 ): string {
   const found = SOURCES.find((s) => s.name === sourceName);
   if (!found) throw new Error(`vendor/sources.ts: no source named "${sourceName}"`);
-  return join(vendorDir, sourceName, rel);
+  return join(sourceRoot(found, vendorDir), rel);
 }
 
 /**
@@ -554,7 +571,7 @@ export function libEntryFilesManifest(): Record<string, string> {
     for (const pkg of source.packages) {
       if (pkg.compareApi === false) continue;
       if (!pkg.libEntryFile) continue;
-      out[pkg.name] = resolve(VENDOR_DIR, source.name, pkg.libEntryFile);
+      out[pkg.name] = resolve(sourceRoot(source), pkg.libEntryFile);
     }
   }
   return out;
@@ -571,7 +588,7 @@ export function libPathsManifest(): Record<string, string> {
   for (const source of SOURCES) {
     for (const pkg of source.packages) {
       if (pkg.compareApi === false) continue;
-      out[pkg.name] = resolve(VENDOR_DIR, source.name, pkg.libPath);
+      out[pkg.name] = resolve(sourceRoot(source), pkg.libPath);
     }
   }
   return out;
@@ -588,7 +605,7 @@ export function testPathsManifest(): Record<string, string> {
   for (const source of SOURCES) {
     for (const pkg of source.packages) {
       if (!pkg.testPath || pkg.compareTests === false) continue;
-      out[pkg.name] = resolve(VENDOR_DIR, source.name, pkg.testPath);
+      out[pkg.name] = resolve(sourceRoot(source), pkg.testPath);
     }
   }
   return out;

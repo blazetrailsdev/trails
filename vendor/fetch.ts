@@ -32,6 +32,7 @@ import {
   SOURCES,
   testPathsManifest,
   type UpstreamSource,
+  vendoredRoot,
 } from "./sources.js";
 import { SpellChecker } from "../packages/did-you-mean/src/spell-checker.js";
 
@@ -71,7 +72,7 @@ async function git(args: string[], cwd: string): Promise<string> {
 }
 
 function destFor(source: UpstreamSource): string {
-  return join(VENDOR_DIR, source.name);
+  return vendoredRoot(source.name);
 }
 
 /**
@@ -117,7 +118,7 @@ async function fetchSource(
   }
 
   console.log(`[${source.name}] cloning ${source.origin.url}@${source.origin.ref}...`);
-  mkdirSync(VENDOR_DIR, { recursive: true });
+  mkdirSync(dirname(dest), { recursive: true });
   await execFileAsync("git", [
     "clone",
     "--depth=1",
