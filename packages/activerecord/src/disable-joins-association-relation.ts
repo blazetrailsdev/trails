@@ -212,8 +212,8 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
     return super.execQueries(block);
   }
 
-  override async load(): Promise<LoadedRelation<this>> {
-    await super.load();
+  override async load(block?: (record: T) => void): Promise<LoadedRelation<this>> {
+    await super.load(block);
     if (this._chainWalker) return stripThenable(this);
     const records = this._records;
 
