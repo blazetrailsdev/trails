@@ -15,7 +15,7 @@ import {
   assertEncryptedAttribute,
   assertNotEncryptedAttribute,
   assertCiphertextDecryptsTo,
-  withoutEncryption,
+  Encryption,
 } from "./test-helpers.js";
 import { Scheme } from "./scheme.js";
 import { Configurable } from "./configurable.js";
@@ -47,7 +47,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
     const title = "The Starfleet is here!";
     const body = "<p>the Starfleet is here, we are safe now!</p>";
 
-    const post = await withoutEncryption(() => Post.create({ title, body }));
+    const post = await Encryption.withoutEncryption(() => Post.create({ title, body }));
     await post.encrypt();
 
     await assertEncryptedAttribute(post, "title", title);
@@ -122,7 +122,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
   it("encrypted_attribute? returns false for encrypted attributes which content is not encrypted", async () => {
     await freshAdapter();
     const Book = makeEncryptedBook();
-    const book = await withoutEncryption(() => Book.create({ name: "Dune" }));
+    const book = await Encryption.withoutEncryption(() => Book.create({ name: "Dune" }));
     expect(book.isEncryptedAttribute("name")).toBeFalsy();
   });
 
@@ -182,7 +182,9 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
 
     const oldType = Author.typeForAttribute("name").previousTypes[0];
     const valueEncryptedWithOldType = oldType.serialize("dhh") as string;
-    await withoutEncryption(() => author.updateColumns({ name: valueEncryptedWithOldType }));
+    await Encryption.withoutEncryption(() =>
+      author.updateColumns({ name: valueEncryptedWithOldType }),
+    );
 
     await (await author.reload()).encrypt();
     expect((await author.reload()).name).toBe("dhh");
@@ -192,7 +194,9 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
     await freshAdapter();
     const Post = makeEncryptedPost();
     const title = `The Starfleet is here! ${"OMG👌".repeat(30)}`;
-    const post = await withoutEncryption(() => Post.create({ title, body: "some body" }));
+    const post = await Encryption.withoutEncryption(() =>
+      Post.create({ title, body: "some body" }),
+    );
     await post.encrypt();
     const reloaded = await Post.find(post.id);
     expect(reloaded.title).toBe(title);
@@ -203,7 +207,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
     await freshAdapter();
     const Book = makeEncryptedBook();
     new Book();
-    const book = await withoutEncryption(() => Book.create({ name: "Dune" }));
+    const book = await Encryption.withoutEncryption(() => Book.create({ name: "Dune" }));
     await book.encrypt();
     expect((await book.reload()).name).toBe("Dune");
   });
@@ -213,7 +217,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
     await freshAdapter();
     const Book = makeEncryptedBook();
     new Book();
-    const book = await withoutEncryption(() => Book.create({ name: "Dune" }));
+    const book = await Encryption.withoutEncryption(() => Book.create({ name: "Dune" }));
     await book.encrypt();
     expect((await book.reload()).name).toBe("Dune");
   });
@@ -224,7 +228,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
     const Book = makeEncryptedBookThatIgnoresCase();
     new Book();
     const book = await createUnencryptedBookIgnoringCase(Book, { name: "Dune" });
-    expect(await withoutEncryption(async () => (await book.reload()).name)).toBe("Dune");
+    expect(await Encryption.withoutEncryption(async () => (await book.reload()).name)).toBe("Dune");
     expect(book.name).toBe("Dune");
     await book.encrypt();
     expect((await book.reload()).name).toBe("Dune");
@@ -236,7 +240,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
     const Book = makeEncryptedBookThatIgnoresCase();
     new Book();
     const book = await createUnencryptedBookIgnoringCase(Book, { name: "Dune" });
-    expect(await withoutEncryption(async () => (await book.reload()).name)).toBe("Dune");
+    expect(await Encryption.withoutEncryption(async () => (await book.reload()).name)).toBe("Dune");
     expect(book.name).toBe("Dune");
     await book.encrypt();
     await book.encrypt();

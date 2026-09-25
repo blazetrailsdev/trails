@@ -41,15 +41,5 @@ export {
 } from "./extended-deterministic-uniqueness-validator.js";
 
 export { encrypts } from "./encryptable-record.js";
-export {
-  Encryption,
-  eagerLoadBang,
-  withEncryptionContext,
-  withoutEncryption,
-  protectingEncryptedData,
-  resetDefaultContext,
-  defaultContext,
-  context,
-  currentCustomContext,
-} from "../encryption.js";
+export { Encryption } from "../encryption.js";
 export type { EncryptsOptions } from "../encryption.js";

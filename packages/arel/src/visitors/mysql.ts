@@ -1,7 +1,7 @@
-import { Visitors } from "../namespaces.js";
+import { Nodes, Visitors } from "../namespaces.js";
 import type { Table } from "../table.js";
 import { Node } from "../nodes/node.js";
-import * as Nodes from "../nodes/index.js";
+import "../nodes/index.js";
 import { SQLString } from "../collectors/sql-string.js";
 import { ToSql } from "./to-sql.js";
 import { sql } from "../arel.js";

@@ -10,6 +10,9 @@ import {
   Monitor,
   NameError,
   symbolizeKeys,
+  Autoload,
+  extend,
+  type Extended,
 } from "@blazetrails/activesupport";
 import { stdout, rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Dir, File, FileUtils, StandardError } from "@blazetrails/ruby-compat";
@@ -39,7 +42,8 @@ import type { UniqueConstraintOptions } from "./connection-adapters/postgresql/s
 import { CommandRecorder } from "./migration/command-recorder.js";
 import { SchemaMigration, NullSchemaMigration } from "./schema-migration.js";
 import { InternalMetadata, NullInternalMetadata } from "./internal-metadata.js";
-import { ActiveRecord, Migration as MigrationNamespace } from "./namespaces.js";
+import { ActiveRecord } from "./namespaces.js";
+import type * as CompatibilityModule from "./migration/compatibility.js";
 import type { DatabaseConfig } from "./database-configurations/database-config.js";
 import { _DatabaseTasks } from "./tasks/database-tasks-slot.js";
 import type { SchemaFormat } from "./tasks/database-tasks.js";
@@ -888,7 +892,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   }
 
   static get(version: string | number): typeof Migration {
-    return MigrationNamespace.Compatibility.find(version) as typeof Migration;
+    return Migration.Compatibility.find(version) as typeof Migration;
   }
 
   static currentVersion(): number {
@@ -1270,6 +1274,19 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     });
   }
 }
+
+// eslint-disable-next-line @typescript-eslint/no-namespace
+export declare namespace Migration {
+  let Compatibility: typeof CompatibilityModule;
+  const autoload: Extended<typeof Autoload>["autoload"];
+}
+Object.assign(Migration, {
+  loadPath: {
+    "active_record/migration/compatibility": () => import("./migration/compatibility.js"),
+  },
+});
+extend(Migration, Autoload);
+Migration.autoload("Compatibility", "active_record/migration/compatibility");
 
 let loadMigrationSeq = 0;
 

@@ -1,3 +1,4 @@
+import type * as Arel from "@blazetrails/arel";
 import { Nodes } from "@blazetrails/arel";
 import { rbObjAsString as toS } from "@blazetrails/ruby-compat";
 
@@ -13,7 +14,7 @@ export class BasicObjectHandler {
   }
 
   /** @missingRailsName name — PERMANENT */
-  call(attribute: Nodes.Attribute, value: unknown): Nodes.Node {
+  call(attribute: Arel.Attribute, value: unknown): Nodes.Node {
     const bind = this._predicateBuilder.buildBindAttribute(toS(attribute.name), value);
     return attribute.eq(bind);
   }

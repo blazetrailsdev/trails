@@ -1,3 +1,4 @@
+import type * as Arel from "@blazetrails/arel";
 import { Nodes } from "@blazetrails/arel";
 import type { PredicateBuilder } from "../predicate-builder.js";
 
@@ -13,7 +14,7 @@ export class ArrayHandler {
     this.predicateBuilder = predicateBuilder;
   }
 
-  call(attribute: Nodes.Attribute, value: unknown[] | Set<unknown>): Nodes.Node {
+  call(attribute: Arel.Attribute, value: unknown[] | Set<unknown>): Nodes.Node {
     if ((Array.isArray(value) ? value.length : value.size) === 0) {
       return attribute.in([]);
     }

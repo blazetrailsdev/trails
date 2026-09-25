@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { fakeRecordConnection } from "../test-helpers/connection.js";
 import { mustBeLike } from "../test-helpers/must-be-like.js";
-import { Table, star, sql, Nodes, Visitors, Collectors } from "../index.js";
+import { Attribute, Table, star, sql, Nodes, Visitors, Collectors } from "../index.js";
 
 describe("MysqlTest", () => {
   let visitor: Visitors.MySQL;
@@ -104,7 +104,7 @@ describe("MysqlTest", () => {
 
   describe("Nodes::Regexp", () => {
     let table: Table;
-    let attr: Nodes.Attribute;
+    let attr: Attribute;
     beforeEach(() => {
       table = new Table("users");
       attr = table.get("id");
@@ -127,7 +127,7 @@ describe("MysqlTest", () => {
 
   describe("Nodes::NotRegexp", () => {
     let table: Table;
-    let attr: Nodes.Attribute;
+    let attr: Attribute;
     beforeEach(() => {
       table = new Table("users");
       attr = table.get("id");

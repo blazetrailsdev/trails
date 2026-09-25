@@ -17,7 +17,7 @@ import {
   restoreEncryptionConfig,
   makeEncryptedAuthor,
   makeKeyProvider,
-  withoutEncryption,
+  Encryption,
 } from "./test-helpers.js";
 import { fixtures } from "../test-fixtures.js";
 
@@ -88,7 +88,7 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     const currentType = Author.typeForAttribute("name") as EncryptedAttributeType;
     const prevType = currentType.previousTypes[0];
     const oldCiphertext = prevType.serialize("dhh") as string;
-    await withoutEncryption(async () => {
+    await Encryption.withoutEncryption(async () => {
       await author.updateColumns({ name: oldCiphertext });
     });
     const reloaded = await Author.find(author.id);
@@ -104,7 +104,9 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     await freshAdapter();
     const Author = makeEncryptedAuthor();
     new Author();
-    const author = await withoutEncryption(() => Author.create({ name: "unencrypted author" }));
+    const author = await Encryption.withoutEncryption(() =>
+      Author.create({ name: "unencrypted author" }),
+    );
     const reloaded = await Author.find(author.id);
     expect(() => reloaded.name).toThrow(Decryption);
   });

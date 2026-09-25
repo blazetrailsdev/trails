@@ -1,10 +1,6 @@
 import { AdapterNotFound } from "./errors.js";
-import { ConnectionAdapters as ConnectionAdaptersNamespace } from "./namespaces.js";
+import { ActiveRecord, ConnectionAdapters } from "./namespaces.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
-
-export interface ConnectionAdapters {
-  readonly AbstractAdapter: unknown;
-}
 
 type AdapterLoader = () => Promise<new (...args: any[]) => DatabaseAdapter>;
 type AdapterClass = new (...args: any[]) => DatabaseAdapter;
@@ -86,8 +82,9 @@ export function resolve(adapterName: string | undefined): AdapterClass | Promise
   return promise;
 }
 
-ConnectionAdaptersNamespace.register = register;
-ConnectionAdaptersNamespace.resolve = resolve;
+ConnectionAdapters.register = register;
+ConnectionAdapters.resolve = resolve;
+ActiveRecord.ConnectionAdapters = ConnectionAdapters;
 
 const sqlite3Loader: AdapterLoader = async () =>
   (await import("./connection-adapters/better-sqlite3-adapter.js")).BetterSQLite3Adapter as any;

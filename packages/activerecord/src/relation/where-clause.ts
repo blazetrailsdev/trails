@@ -1,6 +1,7 @@
 import { extractBang, rbEqual } from "@blazetrails/activesupport";
 import { isModuleIncluded, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
+import * as Arel from "@blazetrails/arel";
 import { Nodes, Predications, fetchAttribute, sql } from "@blazetrails/arel";
 import { ArgumentError, Attribute as ModelAttribute } from "@blazetrails/activemodel";
 
@@ -119,8 +120,8 @@ export class WhereClause {
     return false;
   }
 
-  extractAttributes(): (string | Nodes.Attribute | Nodes.Node)[] {
-    const attrs: (string | Nodes.Attribute | Nodes.Node)[] = [];
+  extractAttributes(): (string | Arel.Attribute | Nodes.Node)[] {
+    const attrs: (string | Arel.Attribute | Nodes.Node)[] = [];
     this.eachAttributes((attr) => attrs.push(attr));
     return attrs;
   }
@@ -138,7 +139,7 @@ export class WhereClause {
 
   /** @internal */
   private exceptPredicates(columns: unknown[]): (Nodes.Node | string)[] {
-    const attrs = extractBang(columns, (node) => node instanceof Nodes.Attribute);
+    const attrs = extractBang(columns, (node) => node instanceof Arel.Attribute);
     const nonAttrs = extractBang(
       columns,
       (node) => node != null && isModuleIncluded((node as object).constructor, Predications),
@@ -157,7 +158,7 @@ export class WhereClause {
             node,
             (attr) =>
               attrs.some((a) => rbEqual(a, attr)) ||
-              columns.includes(String((attr as Nodes.Attribute).name)),
+              columns.includes(String((attr as Arel.Attribute).name)),
           )
         ),
     );
@@ -180,10 +181,10 @@ export class WhereClause {
 
   /** @internal */
   private eachAttributes(
-    fn: (attr: Nodes.Attribute | Nodes.Node, node: Nodes.Node | string) => void,
+    fn: (attr: Arel.Attribute | Nodes.Node, node: Nodes.Node | string) => void,
   ): void {
     for (const node of this.predicates) {
-      let attr: Nodes.Attribute | Nodes.Node | null = extractAttribute(node);
+      let attr: Arel.Attribute | Nodes.Node | null = extractAttribute(node);
       if (!attr && isEqualityNode(node)) {
         const left = (node as any).left;
         if (left != null && isModuleIncluded(left.constructor, Predications)) attr = left;
@@ -197,7 +198,7 @@ export class WhereClause {
     const hash: Record<string, Nodes.Node | string> = {};
     this.eachAttributes((attr, node) => {
       const key =
-        attr instanceof Nodes.Attribute
+        attr instanceof Arel.Attribute
           ? `${String(attr.relation.name)}.${attr.name}`
           : String(attr);
       hash[key] = node;
@@ -291,10 +292,10 @@ function wrapSqlLiteral(node: Nodes.SqlLiteral | string): Nodes.Node {
 }
 
 /** @internal */
-function extractAttribute(node: Nodes.Node | string): Nodes.Attribute | null {
-  let attrNode: Nodes.Attribute | null = null;
+function extractAttribute(node: Nodes.Node | string): Arel.Attribute | null {
+  let attrNode: Arel.Attribute | null = null;
   fetchAttribute(node, (attr: Nodes.Node): boolean => {
-    if (!(attr instanceof Nodes.Attribute)) return true;
+    if (!(attr instanceof Arel.Attribute)) return true;
     if (attrNode !== null && !rbEqual(attrNode, attr)) {
       attrNode = null;
       return false;

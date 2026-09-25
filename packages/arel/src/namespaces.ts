@@ -47,7 +47,6 @@ export declare namespace Nodes {
   export type Fragments = NodesModule.Fragments;
   export type Quoted = NodesModule.Quoted;
   export type Casted = NodesModule.Casted;
-  export type Attribute = NodesModule.Attribute;
   export type Distinct = NodesModule.Distinct;
   export type Function = NodesModule.Function;
   export type Exists = NodesModule.Exists;

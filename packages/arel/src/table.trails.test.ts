@@ -1,5 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { Table, Nodes, EmptyJoinError, star, Visitors, SelectManager } from "./index.js";
+import {
+  Attributes,
+  Table,
+  Nodes,
+  EmptyJoinError,
+  star,
+  Visitors,
+  SelectManager,
+} from "./index.js";
 import {
   testConnection,
   mysqlTestConnection,
@@ -69,7 +77,7 @@ describe("TableTest", () => {
   });
 
   it("star returns an Attribute that compiles to table.*", () => {
-    expect(users.get(star())).toBeInstanceOf(Nodes.Attribute);
+    expect(users.get(star())).toBeInstanceOf(Attributes.Attribute);
     expect(users.get(star()).toSql()).toBe('"users".*');
   });
 
@@ -116,7 +124,7 @@ describe("TableTest", () => {
 
   it("manufactures an attribute", () => {
     const attr = users.get("id");
-    expect(attr).toBeInstanceOf(Nodes.Attribute);
+    expect(attr).toBeInstanceOf(Attributes.Attribute);
     expect(attr.name).toBe("id");
     expect(attr.relation).toBe(users);
   });
@@ -131,7 +139,7 @@ describe("TableTest", () => {
     it("builds an attribute on the provided table", () => {
       const other = new Table("others");
       const attr = users.get("id", other);
-      expect(attr).toBeInstanceOf(Nodes.Attribute);
+      expect(attr).toBeInstanceOf(Attributes.Attribute);
       expect(attr.relation).toBe(other);
       expect(attr.name).toBe("id");
     });
@@ -148,7 +156,7 @@ describe("TableTest", () => {
     it("resolves an aliased attribute name", () => {
       const t = new Table("users", { klass: { attributeAliases: { nickname: "name" } } });
       const attr = t.get("nickname");
-      expect(attr).toBeInstanceOf(Nodes.Attribute);
+      expect(attr).toBeInstanceOf(Attributes.Attribute);
       expect(attr.name).toBe("name");
     });
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Table, Nodes, SelectManager } from "./index.js";
+import { Attribute, Attributes, Table, Nodes, SelectManager } from "./index.js";
 import { Predications } from "./predications.js";
 
 const users = new Table("users");
@@ -133,7 +133,7 @@ describe("Predications.isInfinity / isUnboundable / isOpenEnded", () => {
 });
 
 describe("Attribute private helpers (mirror Predications)", () => {
-  type AttributePrivates = Nodes.Attribute & {
+  type AttributePrivates = Attribute & {
     groupingAny: (methodId: string, others: unknown[]) => Nodes.Grouping;
     groupingAll: (methodId: string, others: unknown[]) => Nodes.Grouping;
     isInfinity: (value: unknown) => 1 | -1 | 0;
@@ -166,7 +166,7 @@ describe("Attribute private helpers (mirror Predications)", () => {
 });
 
 describe("between / notBetween self-dispatch (mirror Rails' implicit self)", () => {
-  class OverridingAttribute extends Nodes.Attribute {
+  class OverridingAttribute extends Attributes.Attribute {
     override isInfinity(_value: unknown): 1 | -1 | 0 {
       return 1;
     }

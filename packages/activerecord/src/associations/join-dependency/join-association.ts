@@ -1,4 +1,5 @@
 import type { Base } from "../../base.js";
+import * as Arel from "@blazetrails/arel";
 import { Nodes, Table, fetchAttribute } from "@blazetrails/arel";
 import type { AbstractReflection } from "../../reflection.js";
 import { JoinPart } from "./join-part.js";
@@ -174,7 +175,7 @@ export class JoinAssociation extends JoinPart {
 function nodeReferencesTable(node: Nodes.Node, tableName: string): boolean {
   let found = false;
   fetchAttribute(node, (attr: Nodes.Node): boolean => {
-    if (attr instanceof Nodes.Attribute) {
+    if (attr instanceof Arel.Attribute) {
       const rel = attr.relation;
       if (String(rel.tableAlias ?? rel.name) === tableName) {
         found = true;

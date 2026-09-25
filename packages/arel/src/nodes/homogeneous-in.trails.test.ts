@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { fakeRecordConnection } from "../test-helpers/connection.js";
-import { Table, Nodes, Visitors } from "../index.js";
+import { Attributes, Table, Nodes, Visitors } from "../index.js";
 import { Attribute as AMAttribute, StringType } from "@blazetrails/activemodel";
 
 const STRING_TYPE = new StringType();
@@ -38,7 +38,7 @@ describe("Arel::Nodes::HomogeneousInTest", () => {
         name: "users",
         typeForAttribute: () => ({ isSerializable: () => false, serialize: (v: unknown) => v }),
       };
-      const attr = new Nodes.Attribute(filteringRelation as never, "id");
+      const attr = new Attributes.Attribute(filteringRelation as never, "id");
       const node = new Nodes.HomogeneousIn([1, 2], attr, "in");
       const sql = new Visitors.ToSql(fakeRecordConnection).compile(node);
       expect(sql).toBe('"users"."id" IN (NULL)');

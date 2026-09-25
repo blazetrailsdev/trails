@@ -1,3 +1,4 @@
+import type * as Arel from "@blazetrails/arel";
 import { Nodes } from "@blazetrails/arel";
 
 type DeferredIds = { ids(): Promise<unknown[]> };
@@ -6,7 +7,7 @@ type DeferredIds = { ids(): Promise<unknown[]> };
 export class DeferredIdsIn extends Nodes.In {
   /** @noRailsEquivalent PERMANENT */
   constructor(
-    attribute: Nodes.Attribute,
+    attribute: Arel.Attribute,
     inlineSubquery: Nodes.Node,
     /** @noRailsEquivalent PERMANENT */
     readonly innerRelations: DeferredIds[],
@@ -17,7 +18,7 @@ export class DeferredIdsIn extends Nodes.In {
   /** @noRailsEquivalent PERMANENT */
   invert(): DeferredIdsNotIn {
     return new DeferredIdsNotIn(
-      this.left as Nodes.Attribute,
+      this.left as Arel.Attribute,
       this.right as Nodes.Node,
       this.innerRelations,
     );
@@ -28,7 +29,7 @@ export class DeferredIdsIn extends Nodes.In {
 export class DeferredIdsNotIn extends Nodes.NotIn {
   /** @noRailsEquivalent PERMANENT */
   constructor(
-    attribute: Nodes.Attribute,
+    attribute: Arel.Attribute,
     inlineSubquery: Nodes.Node,
     /** @noRailsEquivalent PERMANENT */
     readonly innerRelations: DeferredIds[],
@@ -39,7 +40,7 @@ export class DeferredIdsNotIn extends Nodes.NotIn {
   /** @noRailsEquivalent PERMANENT */
   invert(): DeferredIdsIn {
     return new DeferredIdsIn(
-      this.left as Nodes.Attribute,
+      this.left as Arel.Attribute,
       this.right as Nodes.Node,
       this.innerRelations,
     );

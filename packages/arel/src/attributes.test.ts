@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { Table, Nodes } from "./index.js";
+import { Attribute, Attributes, Table } from "./index.js";
 import { uniq } from "./test-helpers/uniq.js";
 
-const attribute = (relation: string, name: string): Nodes.Attribute =>
-  new Nodes.Attribute(
-    relation as unknown as ConstructorParameters<typeof Nodes.Attribute>[0],
+const attribute = (relation: string, name: string): Attribute =>
+  new Attributes.Attribute(
+    relation as unknown as ConstructorParameters<typeof Attributes.Attribute>[0],
     name,
   );
 

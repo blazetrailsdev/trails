@@ -38,6 +38,7 @@ import {
   StatementTimeout,
   ValueTooLong,
 } from "../errors.js";
+import type * as Arel from "@blazetrails/arel";
 import { sql as arelSql, Nodes, Visitors } from "@blazetrails/arel";
 import { StatementPool as ConnectionStatementPool } from "./statement-pool.js";
 import type { SchemaCreation as MysqlSchemaCreation } from "./mysql/schema-creation.js";
@@ -840,7 +841,7 @@ WHERE fk.referenced_column_name IS NOT NULL
   }
 
   override async caseSensitiveComparison(
-    attribute: Nodes.Attribute,
+    attribute: Arel.Attribute,
     value: unknown,
   ): Promise<Nodes.Node> {
     const column = (await this.columnForAttribute(attribute)) as MysqlColumn | undefined;

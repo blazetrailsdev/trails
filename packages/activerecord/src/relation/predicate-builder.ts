@@ -1,4 +1,5 @@
 import { ArgumentError, rbObjAsString as toS, Range } from "@blazetrails/ruby-compat";
+import type * as Arel from "@blazetrails/arel";
 import { Nodes, sql } from "@blazetrails/arel";
 import { kernelArray, wrap } from "@blazetrails/activesupport";
 
@@ -24,7 +25,7 @@ export class PredicateBuilder {
   protected set table(value: TableMetadata) {
     this._table = value;
   }
-  private handlers: Array<[any, { call(attr: Nodes.Attribute, value: any): Nodes.Node }]> = [];
+  private handlers: Array<[any, { call(attr: Arel.Attribute, value: any): Nodes.Node }]> = [];
 
   constructor(table: TableMetadata) {
     this._table = table;
@@ -195,7 +196,7 @@ export class PredicateBuilder {
   }
 
   /** @missingRailsName name — PERMANENT */
-  build(attribute: Nodes.Attribute, value: unknown, operator: string | null = null): Nodes.Node {
+  build(attribute: Arel.Attribute, value: unknown, operator: string | null = null): Nodes.Node {
     if (respondsToId(value)) {
       value = (value as { id: unknown }).id;
     }
@@ -240,7 +241,7 @@ export class PredicateBuilder {
 
   registerHandler(
     klass: any,
-    handler: { call(attr: Nodes.Attribute, value: any): Nodes.Node },
+    handler: { call(attr: Arel.Attribute, value: any): Nodes.Node },
   ): void {
     if (
       typeof klass !== "function" ||
@@ -260,7 +261,7 @@ export class PredicateBuilder {
     tableName: string,
     columnName: string,
     fallback?: (name: string) => unknown,
-  ): Nodes.Attribute {
+  ): Arel.Attribute {
     return this.table
       .associatedTable(tableName, fallback as (name: string) => never)
       .arelTable.get(columnName);
@@ -336,7 +337,7 @@ export class PredicateBuilder {
   }
 
   /** @missingRailsCall last — PERMANENT */
-  private handlerFor(object: unknown): { call(attr: Nodes.Attribute, value: any): Nodes.Node } {
+  private handlerFor(object: unknown): { call(attr: Arel.Attribute, value: any): Nodes.Node } {
     return this.handlers.find(([klass]) =>
       klass === BasicObject
         ? true
