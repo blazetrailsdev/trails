@@ -1,5 +1,5 @@
 import type { Time } from "@blazetrails/date";
-import { ActsLikeObject, TimeWithZone, isBlank } from "@blazetrails/activesupport";
+import { actsLike, TimeWithZone, isBlank } from "@blazetrails/activesupport";
 import { DateTime } from "./date-time.js";
 
 export class TimestampWithTimeZone extends DateTime {
@@ -11,7 +11,7 @@ export class TimestampWithTimeZone extends DateTime {
     if (isBlank(value)) return null;
 
     const time = super.castValue(value);
-    if (time instanceof TimeWithZone || !ActsLikeObject.actsLike(time, "time")) return time;
+    if (time instanceof TimeWithZone || !actsLike.call(time, "time")) return time;
 
     if (this.isUtc) {
       return (time as Time).getutc();
