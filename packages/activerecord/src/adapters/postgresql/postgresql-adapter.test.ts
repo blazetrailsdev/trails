@@ -602,9 +602,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await withSecondAdapter(PG_TEST_URL, async (adapter2) => {
         await adapter2.execute(`SELECT pg_terminate_backend(${pid})`);
       });
-      await (adapter as any)._rawConnection.query("SELECT 1").catch(() => {});
-
-      await assertRaises([ConnectionNotEstablished], {}, () => adapter.execute("SELECT 1"));
+      await assertRaises([ConnectionFailed], {}, () => adapter.execute("SELECT 1"));
     });
 
     it("reload type map for newly defined types", async () => {

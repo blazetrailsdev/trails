@@ -849,7 +849,7 @@ export class PostgreSQLAdapter
     const msg = typeof e.message === "string" ? e.message : "";
     if (!msg) return false;
     return (
-      msg.includes("is not queryable") ||
+      msg.includes("Client has encountered a connection error") ||
       msg.includes("invalid frontend message type") ||
       msg.includes("Connection terminated") ||
       msg.includes("client has already ended")
@@ -861,7 +861,7 @@ export class PostgreSQLAdapter
       typeof (err as { message?: string })?.message === "string"
         ? (err as { message: string }).message
         : "";
-    return msg.includes("is not queryable") || msg.includes("client has already ended");
+    return msg.includes("client has already ended") || /client was closed/i.test(msg);
   }
 
   /** @internal */
@@ -1800,6 +1800,7 @@ export class PostgreSQLAdapter
     if (
       !(exception instanceof pg.DatabaseError) &&
       !PostgreSQLAdapter._isConnectionError(exception) &&
+      !PostgreSQLAdapter._isConnectionClosedBeforeSend(exception) &&
       !noConnection
     ) {
       return exception;
@@ -1809,7 +1810,10 @@ export class PostgreSQLAdapter
       case undefined:
         if (noConnection) {
           return new ConnectionNotEstablished(exception, { connectionPool: this.pool });
-        } else if (PostgreSQLAdapter._isConnectionError(exception)) {
+        } else if (
+          PostgreSQLAdapter._isConnectionError(exception) ||
+          PostgreSQLAdapter._isConnectionClosedBeforeSend(exception)
+        ) {
           if (!PostgreSQLAdapter._isConnectionClosedBeforeSend(exception)) {
             return new ConnectionFailed(exception, { connectionPool: this.pool });
           } else {

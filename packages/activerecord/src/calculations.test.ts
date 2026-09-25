@@ -62,8 +62,14 @@ expect.addEqualityTesters([
     const ta = toTime(a);
     const tb = toTime(b);
     if (ta instanceof RubyTime && tb instanceof RubyTime) return ta.toR().cmp(tb.toR()) === 0;
-    if (ta instanceof RubyTime && typeof b === "string") return ta.compare(b) === 0;
-    if (typeof a === "string" && tb instanceof RubyTime) return tb.compare(a) === 0;
+    if (ta instanceof RubyTime && !(tb instanceof RubyTime)) {
+      const cmp = ta.compare(b);
+      if (cmp != null) return cmp === 0;
+    }
+    if (tb instanceof RubyTime && !(ta instanceof RubyTime)) {
+      const cmp = tb.compare(a);
+      if (cmp != null) return cmp === 0;
+    }
     if (a instanceof BigDecimal && typeof b === "number") return Number(a.toString("F")) === b;
     if (b instanceof BigDecimal && typeof a === "number") return Number(b.toString("F")) === a;
     return undefined;
