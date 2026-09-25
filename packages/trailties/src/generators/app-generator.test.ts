@@ -178,6 +178,16 @@ describe("AppGenerator", () => {
     expect(exists("storage/.gitkeep")).toBe(true);
   });
 
+  it("skip active job option", async () => {
+    await makeGen("sqlite", { ...UNPORTED, skipActiveJob: true }).run();
+
+    for (const env of ["production", "development", "test"]) {
+      expect(fs.readFileSync(appPath(`config/environments/${env}.ts`), "utf-8")).not.toMatch(
+        /activeJob/,
+      );
+    }
+  });
+
   it("generates valid package.json", async () => {
     await makeGen().run();
     const pkg = JSON.parse(fs.readFileSync(appPath("package.json"), "utf-8"));

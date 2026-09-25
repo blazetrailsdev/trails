@@ -16,6 +16,16 @@ export interface ActionControllerConfig {
   logQueryTagsAroundActions: boolean;
   wrapParametersByDefault: boolean;
   includeAllHelpers: boolean;
+  performCaching?: boolean;
+  enableFragmentCacheLogging?: boolean;
+  allowForgeryProtection?: boolean;
+  raiseOnMissingCallbackActions?: boolean;
+}
+
+declare module "../trailtie/configuration.js" {
+  interface Configuration {
+    actionController: ActionControllerConfig;
+  }
 }
 
 /** @noRailsEquivalent PERMANENT */

@@ -504,7 +504,10 @@ export function drawRoutes(mapper: Mapper): void {
 
     this.createFile(
       "config/environments/development.ts",
-      `import { Trails } from "@blazetrails/trailties";
+      `import { existsSync } from "node:fs";
+import { join } from "node:path";
+import { days } from "@blazetrails/activesupport";
+import { Trails } from "@blazetrails/trailties";
 
 Trails.application!.configure(function () {
   // Settings specified here will take precedence over those in config/application.ts.
@@ -520,6 +523,79 @@ Trails.application!.configure(function () {
 
   // Enable server timing.
   this.config.serverTiming = true;
+
+  // Enable/disable Action Controller caching. By default Action Controller caching is disabled.
+  // Create tmp/caching-dev.txt to toggle Action Controller caching.
+  if (existsSync(join(this.config.root!, "tmp/caching-dev.txt"))) {
+${
+  this.options.api
+    ? ""
+    : `    this.config.actionController.performCaching = true;
+    this.config.actionController.enableFragmentCacheLogging = true;
+`
+}    this.config.publicFileServer.headers = { "cache-control": \`public, max-age=\${days(2).toI()}\` };
+  } else {
+    this.config.actionController.performCaching = false;
+  }
+${
+  this.skip("ActiveStorage")
+    ? ""
+    : `
+  // Store uploaded files on the local file system (see config/storage.ts for options).
+  this.config.activeStorage.service = "local";
+`
+}${
+        this.skip("ActionMailer")
+          ? ""
+          : `
+  // Don't care if the mailer can't send.
+  this.config.actionMailer.raiseDeliveryErrors = false;
+
+  // Make template changes take effect immediately.
+  this.config.actionMailer.performCaching = false;
+
+  // Set localhost to be used by links generated in mailer templates.
+  this.config.actionMailer.defaultUrlOptions = { host: "localhost", port: 3000 };
+`
+      }
+  // Print deprecation notices to the Trails logger.
+  this.config.activeSupport.deprecation = "log";
+
+${
+  this.skip("ActiveRecord")
+    ? ""
+    : `  // Raise an error on page load if there are pending migrations.
+  this.config.activeRecord.migrationError = "page_load";
+
+  // Highlight code that triggered database queries in logs.
+  this.config.activeRecord.verboseQueryLogs = true;
+
+  // Append comments with runtime information tags to SQL queries in logs.
+  this.config.activeRecord.queryLogTagsEnabled = true;
+
+`
+}${
+        this.skip("ActiveJob")
+          ? ""
+          : `  // Highlight code that enqueued background job in logs.
+  this.config.activeJob.verboseEnqueueLogs = true;
+
+`
+      }  // Raises error for missing translations.
+  // this.config.i18n.raiseOnMissingTranslations = true;
+
+  // Annotate rendered view with file names.
+  this.config.actionView.annotateRenderedViewWithFilenames = true;
+
+${
+  this.skip("ActionCable")
+    ? ""
+    : `  // Uncomment if you wish to allow Action Cable access from any origin.
+  // this.config.actionCable.disableRequestForgeryProtection = true;
+
+`
+}  // Raise error when a before_action's only/except options reference missing actions.
+  this.config.actionController.raiseOnMissingCallbackActions = true;
   // config
 });
 `,
@@ -552,6 +628,43 @@ Trails.application!.configure(function () {
 
   // Show full error reports.
   this.config.considerAllRequestsLocal = true;
+
+  // Render exception templates for rescuable exceptions and raise for other exceptions.
+  this.config.actionDispatch.showExceptions = "rescuable";
+
+  // Disable request forgery protection in test environment.
+  this.config.actionController.allowForgeryProtection = false;
+
+${
+  this.skip("ActiveStorage")
+    ? ""
+    : `  // Store uploaded files on the local file system in a temporary directory.
+  this.config.activeStorage.service = "test";
+
+`
+}${
+        this.skip("ActionMailer")
+          ? ""
+          : `  // Tell Action Mailer not to deliver emails to the real world.
+  // The "test" delivery method accumulates sent emails in the
+  // ActionMailer.Base.deliveries array.
+  this.config.actionMailer.deliveryMethod = "test";
+
+  // Set host to be used by links generated in mailer templates.
+  this.config.actionMailer.defaultUrlOptions = { host: "example.com" };
+
+`
+      }  // Print deprecation notices to the stderr.
+  this.config.activeSupport.deprecation = "stderr";
+
+  // Raises error for missing translations.
+  // this.config.i18n.raiseOnMissingTranslations = true;
+
+  // Annotate rendered view with file names.
+  // this.config.actionView.annotateRenderedViewWithFilenames = true;
+
+  // Raise error when a before_action's only/except options reference missing actions.
+  this.config.actionController.raiseOnMissingCallbackActions = true;
   // config
 });
 `,
@@ -559,7 +672,8 @@ Trails.application!.configure(function () {
 
     this.createFile(
       "config/environments/production.ts",
-      `import { Trails } from "@blazetrails/trailties";
+      `import { TaggedLogging } from "@blazetrails/activesupport";
+import { Trails } from "@blazetrails/trailties";
 
 Trails.application!.configure(function () {
   // Settings specified here will take precedence over those in config/application.ts.
@@ -572,14 +686,28 @@ Trails.application!.configure(function () {
 
   // Full error reports are disabled.
   this.config.considerAllRequestsLocal = false;
-
+${
+  this.options.api
+    ? ""
+    : `
+  // Turn on fragment caching in view templates.
+  this.config.actionController.performCaching = true;
+`
+}
   // Cache assets for far-future expiry since they are all digest stamped.
   this.config.publicFileServer.headers = { "cache-control": "public, max-age=31556952" };
 
   // Enable serving of images, stylesheets, and JavaScripts from an asset server.
   // this.config.assetHost = "http://assets.example.com";
 
-  // Assume all access to the app is happening through a SSL-terminating reverse proxy.
+${
+  this.skip("ActiveStorage")
+    ? ""
+    : `  // Store uploaded files on the local file system (see config/storage.ts for options).
+  this.config.activeStorage.service = "local";
+
+`
+}  // Assume all access to the app is happening through a SSL-terminating reverse proxy.
   this.config.assumeSsl = true;
 
   // Force all access to the app over SSL, use Strict-Transport-Security, and use secure cookies.
@@ -590,6 +718,7 @@ Trails.application!.configure(function () {
 
   // Log to STDOUT with the current request id as a default log tag.
   this.config.logTags = [":request_id"];
+  this.config.logger = TaggedLogging.logger(process.stdout);
 
   // Change to "debug" to log everything (including potentially personally-identifiable information!)
   this.config.logLevel = (process.env.RAILS_LOG_LEVEL ?? "info") as typeof this.config.logLevel;
@@ -597,6 +726,41 @@ Trails.application!.configure(function () {
   // Prevent health checks from clogging up the logs.
   this.config.silenceHealthcheckPath = "/up";
 
+  // Don't log any deprecations.
+  this.config.activeSupport.reportDeprecations = false;
+
+${
+  this.skip("ActiveJob")
+    ? ""
+    : `  // Replace the default in-process and non-durable queuing backend for Active Job.
+  // this.config.activeJob.queueAdapter = "resque";
+
+`
+}${
+        this.skip("ActionMailer")
+          ? ""
+          : `  // Ignore bad email addresses and do not raise email delivery errors.
+  // Set this to true and configure the email server for immediate delivery to raise delivery errors.
+  // this.config.actionMailer.raiseDeliveryErrors = false;
+
+  // Set host to be used by links generated in mailer templates.
+  this.config.actionMailer.defaultUrlOptions = { host: "example.com" };
+
+`
+      }  // Enable locale fallbacks for I18n (makes lookups for any locale fall back to
+  // the I18n.defaultLocale when a translation cannot be found).
+  this.config.i18n.fallbacks = true;
+${
+  this.skip("ActiveRecord")
+    ? ""
+    : `
+  // Do not dump schema after migrations.
+  this.config.activeRecord.dumpSchemaAfterMigration = false;
+
+  // Only use "id" for inspections in production.
+  this.config.activeRecord.attributesForInspect = ["id"];
+`
+}
   // Enable DNS rebinding protection and other \`Host\` header attacks.
   // this.config.hosts = [
   //   "example.com",     // Allow requests from example.com

@@ -1,3 +1,4 @@
+import "./i18n.js";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 import {
   deprecator,
@@ -19,6 +20,12 @@ export interface ActiveSupportConfig {
   deprecation?: BehaviorSetting;
   disallowedDeprecation?: DisallowedBehaviorSetting;
   disallowedDeprecationWarnings?: Deprecation["disallowedWarnings"];
+}
+
+declare module "../trailtie/configuration.js" {
+  interface Configuration {
+    activeSupport: ActiveSupportConfig;
+  }
 }
 
 /** @noRailsEquivalent PERMANENT */

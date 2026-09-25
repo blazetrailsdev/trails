@@ -4,6 +4,14 @@ import { MiddlewareStackProxy } from "../configuration.js";
 
 export type ConfigurationBlock = (this: unknown, ...args: unknown[]) => void;
 
+function hasWriter(target: object, name: string): boolean {
+  for (let proto = Object.getPrototypeOf(target); proto; proto = Object.getPrototypeOf(proto)) {
+    const descriptor = Object.getOwnPropertyDescriptor(proto, name);
+    if (descriptor) return descriptor.set !== undefined;
+  }
+  return false;
+}
+
 export class Configuration {
   /** @internal */
   static readonly _eagerLoadNamespaces: unknown[] = [];
@@ -18,6 +26,33 @@ export class Configuration {
 
   /** @internal */
   static _appMiddleware?: MiddlewareStackProxy;
+
+  constructor() {
+    return new Proxy(this, {
+      get(target, name, receiver) {
+        if (typeof name === "symbol" || name in target) return Reflect.get(target, name, receiver);
+        if (!Object.prototype.hasOwnProperty.call(Configuration._options, name)) return undefined;
+        return target.methodMissing(name);
+      },
+      set(target, name, value, receiver) {
+        if (
+          typeof name === "symbol" ||
+          Object.prototype.hasOwnProperty.call(target, name) ||
+          hasWriter(target, name)
+        ) {
+          return Reflect.set(target, name, value, receiver);
+        }
+        target.methodMissing(`${name}=`, value);
+        return true;
+      },
+      has(target, name) {
+        return (
+          Reflect.has(target, name) ||
+          Object.prototype.hasOwnProperty.call(Configuration._options, name)
+        );
+      },
+    });
+  }
 
   get eagerLoadNamespaces(): unknown[] {
     return Configuration._eagerLoadNamespaces;
@@ -64,19 +99,11 @@ export class Configuration {
   }
 
   get(key: string): unknown {
-    if (!Object.prototype.hasOwnProperty.call(Configuration._options, key)) {
-      throw new NoMethodError(
-        `undefined method '${key}' for an instance of ${this.constructor.name}`,
-      );
-    }
-    return Configuration._options[key];
+    return this.methodMissing(key);
   }
 
   set(key: string, value: unknown): void {
-    if (this._actualMethod(key)) {
-      throw new NoMethodError(`Cannot assign to \`${key}\`, it is a configuration method`);
-    }
-    Configuration._options[key] = value;
+    this.methodMissing(`${key}=`, value);
   }
 
   respondTo(key: string): boolean {
@@ -92,5 +119,21 @@ export class Configuration {
     return (
       !Object.prototype.hasOwnProperty.call(Configuration._options, key) && this.respondTo(key)
     );
+  }
+
+  methodMissing(name: string, ...args: unknown[]): unknown {
+    if (name.endsWith("=")) {
+      const key = name.slice(0, -1);
+      if (this._actualMethod(key)) {
+        throw new NoMethodError(`Cannot assign to \`${key}\`, it is a configuration method`);
+      }
+      return (Configuration._options[key] = args[0]);
+    } else if (Object.prototype.hasOwnProperty.call(Configuration._options, name)) {
+      return Configuration._options[name];
+    } else {
+      throw new NoMethodError(
+        `undefined method '${name}' for an instance of ${this.constructor.name}`,
+      );
+    }
   }
 }
