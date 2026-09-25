@@ -46,7 +46,7 @@ async function newConnInThread(pool: ConnectionPool): Promise<[AbstractAdapter, 
 
   const child = new Thread(async () => {
     conn = await pool.checkout();
-    await conn.selectValue("SELECT 1");
+    await conn.query("SELECT 1");
     set();
     await new Promise(() => {});
   });
