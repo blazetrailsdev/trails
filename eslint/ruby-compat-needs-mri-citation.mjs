@@ -44,12 +44,6 @@ function repoRoot() {
   return path.resolve(__dirname, "..");
 }
 
-/**
- * The clone's version directory, `vendor/sources.ts#versionDir` of the
- * lockfile's `ruby` ref (`v3_3_11` → `v3.3.11`). Spelled out here rather than
- * imported because a `.mjs` rule cannot load a `.ts` module without a warning
- * on every lint run.
- */
 function rubyVersionDir() {
   const lockfile = path.join(repoRoot(), "vendor", "sources.lock.json");
   const ref = JSON.parse(fs.readFileSync(lockfile, "utf8")).sources.ruby.ref;
