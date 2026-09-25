@@ -156,7 +156,7 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
   it("returns distinct insert ids for concurrent inserts inside a transaction", async () => {
     const performQuery = adapter.performQuery;
     let inside = 0;
-    adapter.performQuery = async function (this: SQLite3Adapter, ...args) {
+    adapter.performQuery = async function (...args) {
       inside += 1;
       expect(inside).toBe(1);
       try {
