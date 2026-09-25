@@ -1438,7 +1438,7 @@ export function buildSubquery(
  * @internal
  * @missingRailsCall new — PERMANENT
  */
-export function isDoesNotSupportReverse(order: string): boolean {
+export function isDoesNotSupportReverse(order: string | Nodes.SqlLiteral): boolean {
   const plain = String(order);
   if (
     plain.includes(",") &&
@@ -1471,18 +1471,19 @@ export function reverseSqlOrder(this: QueryMethodsHost, orderQuery: unknown[]): 
     if (o instanceof Nodes.Ordering) return [(o as Nodes.Ascending | Nodes.Descending).reverse()];
     if (o instanceof Nodes.NodeExpression) return [o.desc()];
     if (typeof o === "string" || o instanceof Nodes.SqlLiteral) {
-      const str = typeof o === "string" ? o : o.value;
-      if (isDoesNotSupportReverse(str)) {
+      if (isDoesNotSupportReverse(o)) {
         throw new IrreversibleOrderError(
-          `Order ${rbInspect(str)} cannot be reversed automatically`,
+          `Order ${rbInspect(String(o))} cannot be reversed automatically`,
         );
       }
-      return str.split(",").map((s) => {
-        s = s.trim();
-        if (/\sasc$/i.test(s)) return s.replace(/\sasc$/i, " DESC");
-        if (/\sdesc$/i.test(s)) return s.replace(/\sdesc$/i, " ASC");
-        return `${s} DESC`;
-      });
+      return String(o)
+        .split(",")
+        .map((s) => {
+          s = s.trim();
+          if (/\sasc$/i.test(s)) return s.replace(/\sasc$/i, " DESC");
+          if (/\sdesc$/i.test(s)) return s.replace(/\sdesc$/i, " ASC");
+          return `${s} DESC`;
+        });
     }
     return [o];
   });
