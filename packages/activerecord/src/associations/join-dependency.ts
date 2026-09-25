@@ -260,7 +260,7 @@ export class JoinDependency {
     joinType: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin,
   ): Nodes.Join[] {
     const foreignTable =
-      parent.table ?? aliasedArelTableFor(parent.baseKlass as never, parent.tableName);
+      parent.table ?? aliasedArelTableFor(parent.baseKlass as never, parent.tableName!);
     const foreignKlass = parent.baseKlass;
     const joins: Nodes.Join[] = [];
 

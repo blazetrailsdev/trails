@@ -458,7 +458,7 @@ export class Delegation {
     return (this as unknown as DelegationHost).model.primaryKey;
   }
 
-  get tableName(): string {
+  get tableName(): string | null {
     return (this as unknown as DelegationHost).model.tableName;
   }
 

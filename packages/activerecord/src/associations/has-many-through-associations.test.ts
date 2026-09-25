@@ -1693,8 +1693,7 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(verySpecialComments).toEqual([comments("eager_sti_on_associations_vs_comment")]);
   });
 
-  it.skip("modifying has many through has one reflection should raise", async () => {
-    // BLOCKED: << on a has_many :through over a has_one raises NotNullViolation instead of HasManyThroughCantAssociateThroughHasOneOrManyReflection — filed as 0155-assertion-surfaced-port-bugs/through-has-one-push-skips-ensure-mutable
+  it("modifying has many through has one reflection should raise", async () => {
     const david = await Author.find(authors("david").id);
     const blocks = [
       async () =>

@@ -764,7 +764,7 @@ describe.skipIf(!currentAdapter("PostgreSQLAdapter"))("FixturesResetPkSequenceTe
         ): Promise<void>;
       };
       await connection.resetPkSequenceBang(
-        model.tableName,
+        model.tableName!,
         model.primaryKey as string,
         model.sequenceName,
       );
@@ -781,7 +781,7 @@ describe.skipIf(!currentAdapter("PostgreSQLAdapter"))("FixturesResetPkSequenceTe
       const connection = (await model.leaseConnection()) as unknown as {
         resetPkSequenceBang(table: string): Promise<void>;
       };
-      await connection.resetPkSequenceBang(model.tableName);
+      await connection.resetPkSequenceBang(model.tableName!);
 
       await instance.saveBang();
       expect(instance.id, `Sequence reset for ${model.tableName} failed.`).toBe(1);

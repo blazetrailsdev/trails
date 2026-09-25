@@ -67,14 +67,14 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
     it("primary key", async () => {
       await withOmgPost(async (OmgPost) => {
-        const name = OmgPost.tableName;
+        const name = OmgPost.tableName!;
         expect(await adapter.primaryKey(name)).toBe("id");
       });
     });
 
     it("data source exists?", async () => {
       await withOmgPost(async (OmgPost) => {
-        const name = OmgPost.tableName;
+        const name = OmgPost.tableName!;
         expect(await adapter.dataSourceExists(name)).toBeTruthy();
       });
     });

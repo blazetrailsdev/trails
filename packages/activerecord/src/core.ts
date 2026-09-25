@@ -292,7 +292,7 @@ export function fullInspect(this: CoreRecord): string {
 
 interface CoreHost {
   name: string;
-  tableName?: string;
+  tableName?: string | null;
   primaryKey?: string | string[];
   compositePrimaryKey?: boolean;
   _filterAttributes?: (string | RegExp | ((key: string, value: unknown) => unknown))[];

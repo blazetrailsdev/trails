@@ -885,7 +885,7 @@ WHERE fk.referenced_column_name IS NOT NULL
     let sql: string;
     if (await this.supportsInsertRawAliasSyntax()) {
       const quotedTableName = insert.model.quotedTableName();
-      const valuesAlias = this.quoteTableName(`${parameterize(insert.model.tableName)}_values`);
+      const valuesAlias = this.quoteTableName(`${parameterize(insert.model.tableName!)}_values`);
       sql = `INSERT ${insert.into()} ${await insert.valuesList()} AS ${valuesAlias}`;
 
       if (insert.skipDuplicates()) {

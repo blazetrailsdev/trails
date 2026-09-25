@@ -185,7 +185,7 @@ export class AssociationScope {
       if (tracker && klass) {
         aliasedTable = tracker.aliasedTableFor(klass.arelTable, null, () => {
           const fn = (refl as unknown as { aliasCandidate?: (n: string) => string }).aliasCandidate;
-          return typeof fn === "function" ? fn.call(refl, name) : klass.tableName;
+          return typeof fn === "function" ? fn.call(refl, name) : klass.tableName!;
         });
       } else {
         aliasedTable = klass?.tableName ?? "";

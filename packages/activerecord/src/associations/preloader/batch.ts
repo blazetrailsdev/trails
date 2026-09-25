@@ -38,7 +38,7 @@ export class Batch {
       }
 
       if (loaders.length > 0) {
-        const futureTables = new Set<string>();
+        const futureTables = new Set<string | null>();
         for (const branch of branches) {
           const futureClasses = await branch.futureClasses();
           const runnableClasses = (await branch.runnableLoaders()).map((l) => l.klass);

@@ -1058,9 +1058,9 @@ describeIfSupports("foreign_keys", "Migration", () => {
       const rocket = await Rocket.createBang({ name: "myrocket" });
       await rocket.astronauts.push(await Astronaut.createBang());
 
-      await connection.changeColumnNull(Rocket.tableName, "name", false);
+      await connection.changeColumnNull(Rocket.tableName!, "name", false);
 
-      const foreignKeys = await connection.foreignKeys(Astronaut.tableName);
+      const foreignKeys = await connection.foreignKeys(Astronaut.tableName!);
       expect(foreignKeys.length).toBe(1);
 
       const fk = foreignKeys[0];
@@ -1073,9 +1073,9 @@ describeIfSupports("foreign_keys", "Migration", () => {
       const rocket = await Rocket.createBang({ name: "myrocket" });
       await rocket.astronauts.push(await Astronaut.createBang());
 
-      await connection.renameColumn(Astronaut.tableName, "name", "astronaut_name");
+      await connection.renameColumn(Astronaut.tableName!, "name", "astronaut_name");
 
-      const foreignKeys = await connection.foreignKeys(Astronaut.tableName);
+      const foreignKeys = await connection.foreignKeys(Astronaut.tableName!);
       expect(foreignKeys.length).toBe(1);
 
       const fk = foreignKeys[0];
@@ -1090,9 +1090,9 @@ describeIfSupports("foreign_keys", "Migration", () => {
       const rocket = await Rocket.createBang({ name: "myrocket" });
       await rocket.astronauts.push(await Astronaut.createBang());
 
-      await connection.renameColumn(Astronaut.tableName, "rocket_id", "new_rocket_id");
+      await connection.renameColumn(Astronaut.tableName!, "rocket_id", "new_rocket_id");
 
-      const foreignKeys = await connection.foreignKeys(Astronaut.tableName);
+      const foreignKeys = await connection.foreignKeys(Astronaut.tableName!);
       expect(foreignKeys.length).toBe(1);
 
       const fk = foreignKeys[0];
@@ -1106,29 +1106,29 @@ describeIfSupports("foreign_keys", "Migration", () => {
       const rocket = await Rocket.createBang({ name: "myrocket" });
       await rocket.astronauts.push(await Astronaut.createBang());
 
-      await connection.removeColumn(Astronaut.tableName, "rocket_id");
+      await connection.removeColumn(Astronaut.tableName!, "rocket_id");
 
-      assertEmpty(await connection.foreignKeys(Astronaut.tableName));
+      assertEmpty(await connection.foreignKeys(Astronaut.tableName!));
     });
 
     it("remove foreign key by column", async () => {
       const rocket = await Rocket.createBang({ name: "myrocket" });
       await rocket.astronauts.push(await Astronaut.createBang());
 
-      await connection.removeForeignKey(Astronaut.tableName, { column: "rocket_id" });
+      await connection.removeForeignKey(Astronaut.tableName!, { column: "rocket_id" });
 
-      assertEmpty(await connection.foreignKeys(Astronaut.tableName));
+      assertEmpty(await connection.foreignKeys(Astronaut.tableName!));
     });
 
     it("remove foreign key by column in change table", async () => {
       const rocket = await Rocket.createBang({ name: "myrocket" });
       await rocket.astronauts.push(await Astronaut.createBang());
 
-      await connection.changeTable(Astronaut.tableName, async (t) => {
+      await connection.changeTable(Astronaut.tableName!, async (t) => {
         await t.removeForeignKey({ column: "rocket_id" });
       });
 
-      assertEmpty(await connection.foreignKeys(Astronaut.tableName));
+      assertEmpty(await connection.foreignKeys(Astronaut.tableName!));
     });
   });
 
@@ -1168,9 +1168,9 @@ describeIfSupports("foreign_keys", "Migration", () => {
       const rocket = await Rocket.createBang({ name: "myrocket" });
       await rocket.astronauts.push(await Astronaut.createBang());
 
-      await connection.changeColumnNull(Rocket.tableName, "name", false);
+      await connection.changeColumnNull(Rocket.tableName!, "name", false);
 
-      const foreignKeys = await connection.foreignKeys(Astronaut.tableName);
+      const foreignKeys = await connection.foreignKeys(Astronaut.tableName!);
       expect(foreignKeys.length).toBe(1);
 
       const fk = foreignKeys[0];
@@ -1183,9 +1183,9 @@ describeIfSupports("foreign_keys", "Migration", () => {
       const rocket = await Rocket.createBang({ name: "myrocket" });
       await rocket.astronauts.push(await Astronaut.createBang());
 
-      await connection.renameColumn(Astronaut.tableName, "name", "astronaut_name");
+      await connection.renameColumn(Astronaut.tableName!, "name", "astronaut_name");
 
-      const foreignKeys = await connection.foreignKeys(Astronaut.tableName);
+      const foreignKeys = await connection.foreignKeys(Astronaut.tableName!);
       expect(foreignKeys.length).toBe(1);
 
       const fk = foreignKeys[0];
@@ -1200,9 +1200,9 @@ describeIfSupports("foreign_keys", "Migration", () => {
       const rocket = await Rocket.createBang({ name: "myrocket" });
       await rocket.astronauts.push(await Astronaut.createBang());
 
-      await connection.renameColumn(Astronaut.tableName, "rocket_id", "new_rocket_id");
+      await connection.renameColumn(Astronaut.tableName!, "rocket_id", "new_rocket_id");
 
-      const foreignKeys = await connection.foreignKeys(Astronaut.tableName);
+      const foreignKeys = await connection.foreignKeys(Astronaut.tableName!);
       expect(foreignKeys.length).toBe(1);
 
       const fk = foreignKeys[0];
@@ -1216,29 +1216,29 @@ describeIfSupports("foreign_keys", "Migration", () => {
       const rocket = await Rocket.createBang({ name: "myrocket" });
       await rocket.astronauts.push(await Astronaut.createBang());
 
-      await connection.removeColumn(Astronaut.tableName, "rocket_id");
+      await connection.removeColumn(Astronaut.tableName!, "rocket_id");
 
-      assertEmpty(await connection.foreignKeys(Astronaut.tableName));
+      assertEmpty(await connection.foreignKeys(Astronaut.tableName!));
     });
 
     it("remove foreign key by column", async () => {
       const rocket = await Rocket.createBang({ name: "myrocket" });
       await rocket.astronauts.push(await Astronaut.createBang());
 
-      await connection.removeForeignKey(Astronaut.tableName, { column: "rocket_id" });
+      await connection.removeForeignKey(Astronaut.tableName!, { column: "rocket_id" });
 
-      assertEmpty(await connection.foreignKeys(Astronaut.tableName));
+      assertEmpty(await connection.foreignKeys(Astronaut.tableName!));
     });
 
     it("remove foreign key by column in change table", async () => {
       const rocket = await Rocket.createBang({ name: "myrocket" });
       await rocket.astronauts.push(await Astronaut.createBang());
 
-      await connection.changeTable(Astronaut.tableName, async (t) => {
+      await connection.changeTable(Astronaut.tableName!, async (t) => {
         await t.removeForeignKey({ column: "rocket_id" });
       });
 
-      assertEmpty(await connection.foreignKeys(Astronaut.tableName));
+      assertEmpty(await connection.foreignKeys(Astronaut.tableName!));
     });
   });
 
@@ -1278,9 +1278,9 @@ describeIfSupports("foreign_keys", "Migration", () => {
       const rocket = await Rocket.createBang({ name: "myrocket" });
       await rocket.astronauts.push(await Astronaut.createBang());
 
-      await connection.changeColumnNull(Rocket.tableName, "name", false);
+      await connection.changeColumnNull(Rocket.tableName!, "name", false);
 
-      const foreignKeys = await connection.foreignKeys(Astronaut.tableName);
+      const foreignKeys = await connection.foreignKeys(Astronaut.tableName!);
       expect(foreignKeys.length).toBe(1);
 
       const fk = foreignKeys[0];
@@ -1293,9 +1293,9 @@ describeIfSupports("foreign_keys", "Migration", () => {
       const rocket = await Rocket.createBang({ name: "myrocket" });
       await rocket.astronauts.push(await Astronaut.createBang());
 
-      await connection.renameColumn(Astronaut.tableName, "name", "astronaut_name");
+      await connection.renameColumn(Astronaut.tableName!, "name", "astronaut_name");
 
-      const foreignKeys = await connection.foreignKeys(Astronaut.tableName);
+      const foreignKeys = await connection.foreignKeys(Astronaut.tableName!);
       expect(foreignKeys.length).toBe(1);
 
       const fk = foreignKeys[0];
@@ -1310,9 +1310,9 @@ describeIfSupports("foreign_keys", "Migration", () => {
       const rocket = await Rocket.createBang({ name: "myrocket" });
       await rocket.astronauts.push(await Astronaut.createBang());
 
-      await connection.renameColumn(Astronaut.tableName, "rocket_id", "new_rocket_id");
+      await connection.renameColumn(Astronaut.tableName!, "rocket_id", "new_rocket_id");
 
-      const foreignKeys = await connection.foreignKeys(Astronaut.tableName);
+      const foreignKeys = await connection.foreignKeys(Astronaut.tableName!);
       expect(foreignKeys.length).toBe(1);
 
       const fk = foreignKeys[0];
@@ -1326,29 +1326,29 @@ describeIfSupports("foreign_keys", "Migration", () => {
       const rocket = await Rocket.createBang({ name: "myrocket" });
       await rocket.astronauts.push(await Astronaut.createBang());
 
-      await connection.removeColumn(Astronaut.tableName, "rocket_id");
+      await connection.removeColumn(Astronaut.tableName!, "rocket_id");
 
-      assertEmpty(await connection.foreignKeys(Astronaut.tableName));
+      assertEmpty(await connection.foreignKeys(Astronaut.tableName!));
     });
 
     it("remove foreign key by column", async () => {
       const rocket = await Rocket.createBang({ name: "myrocket" });
       await rocket.astronauts.push(await Astronaut.createBang());
 
-      await connection.removeForeignKey(Astronaut.tableName, { column: "rocket_id" });
+      await connection.removeForeignKey(Astronaut.tableName!, { column: "rocket_id" });
 
-      assertEmpty(await connection.foreignKeys(Astronaut.tableName));
+      assertEmpty(await connection.foreignKeys(Astronaut.tableName!));
     });
 
     it("remove foreign key by column in change table", async () => {
       const rocket = await Rocket.createBang({ name: "myrocket" });
       await rocket.astronauts.push(await Astronaut.createBang());
 
-      await connection.changeTable(Astronaut.tableName, async (t) => {
+      await connection.changeTable(Astronaut.tableName!, async (t) => {
         await t.removeForeignKey({ column: "rocket_id" });
       });
 
-      assertEmpty(await connection.foreignKeys(Astronaut.tableName));
+      assertEmpty(await connection.foreignKeys(Astronaut.tableName!));
     });
   });
 

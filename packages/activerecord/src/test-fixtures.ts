@@ -194,7 +194,7 @@ export async function resolveFixtureNames(
       const models = (Array.isArray(resolved) ? resolved : [resolved]) as BaseClass[];
       registerModel(models);
       const m = models[0];
-      table = m.tableName;
+      table = m.tableName!;
       model = m;
     }
     map[name] = { table, model, data: entry.data };

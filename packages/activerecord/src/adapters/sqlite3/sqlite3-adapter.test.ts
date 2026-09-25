@@ -335,25 +335,27 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     }
   });
 
-  // BLOCKED: pragmas.ts raises JSON-quoted/no Ruby NoMethodError messages (story sqlite-pragma-error-parity)
-  it.skip("overriding default foreign keys pragma", async () => {
-    await withMemoryConnection({ pragmas: { foreign_keys: false } }, async (conn) => {
+  it("overriding default foreign keys pragma", async () => {
+    const methodName = inMemoryDb() ? withMemoryConnection : withFileConnection;
+
+    await methodName({ pragmas: { foreign_keys: false } }, async (conn) => {
       expect(await conn.execute("PRAGMA foreign_keys")).toEqual([{ foreign_keys: 0 }]);
     });
 
-    await withMemoryConnection({ pragmas: { foreign_keys: 0 } }, async (conn) => {
+    await methodName({ pragmas: { foreign_keys: 0 } }, async (conn) => {
       expect(await conn.execute("PRAGMA foreign_keys")).toEqual([{ foreign_keys: 0 }]);
     });
 
-    await withMemoryConnection({ pragmas: { foreign_keys: "false" } }, async (conn) => {
+    await methodName({ pragmas: { foreign_keys: "false" } }, async (conn) => {
       expect(await conn.execute("PRAGMA foreign_keys")).toEqual([{ foreign_keys: 0 }]);
     });
 
-    await expect(
-      withMemoryConnection({ pragmas: { foreign_keys: ":false" } }, async (conn) => {
+    const error = await assertRaises([StatementInvalid], {}, async () => {
+      await methodName({ pragmas: { foreign_keys: ":false" } }, async (conn) => {
         await conn.execute("PRAGMA foreign_keys");
-      }),
-    ).rejects.toThrow(/unrecognized pragma parameter :false/);
+      });
+    });
+    expect(error.message).toMatch(/unrecognized pragma parameter :false/);
   });
 
   it("overriding default journal mode pragma", async () => {
@@ -450,74 +452,109 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     expect(error.message).toMatch(/unrecognized synchronous false/);
   });
 
-  // BLOCKED: pragmas.ts raises JSON-quoted/no Ruby NoMethodError messages (story sqlite-pragma-error-parity)
-  it.skip("overriding default journal size limit pragma", async () => {
-    await withMemoryConnection({ pragmas: { journal_size_limit: 100 } }, async (conn) => {
+  it("overriding default journal size limit pragma", async () => {
+    const methodName = inMemoryDb() ? withMemoryConnection : withFileConnection;
+
+    await methodName({ pragmas: { journal_size_limit: 100 } }, async (conn) => {
       expect(await conn.execute("PRAGMA journal_size_limit")).toEqual([
         { journal_size_limit: 100 },
       ]);
     });
 
-    await withMemoryConnection({ pragmas: { journal_size_limit: "200" } }, async (conn) => {
+    await methodName({ pragmas: { journal_size_limit: "200" } }, async (conn) => {
       expect(await conn.execute("PRAGMA journal_size_limit")).toEqual([
         { journal_size_limit: 200 },
       ]);
     });
 
-    await expect(
-      withMemoryConnection({ pragmas: { journal_size_limit: false } }, async (conn) => {
+    let error = await assertRaises([StatementInvalid], {}, async () => {
+      await methodName({ pragmas: { journal_size_limit: false } }, async (conn) => {
         await conn.execute("PRAGMA journal_size_limit");
-      }),
-    ).rejects.toThrow(/to_i/);
-    await expect(
-      withMemoryConnection({ pragmas: { journal_size_limit: ":false" } }, async (conn) => {
+      });
+    });
+    expect(error.message).toMatch(/undefined method [`']to_i'/);
+
+    error = await assertRaises([StatementInvalid], {}, async () => {
+      await methodName({ pragmas: { journal_size_limit: ":false" } }, async (conn) => {
         await conn.execute("PRAGMA journal_size_limit");
-      }),
-    ).rejects.toThrow(/to_i/);
+      });
+    });
+    expect(error.message).toMatch(/undefined method [`']to_i'/);
   });
 
-  // BLOCKED: pragmas.ts raises JSON-quoted/no Ruby NoMethodError messages (story sqlite-pragma-error-parity)
-  it.skip("overriding default mmap size pragma", async () => {
-    await withMemoryConnection({ pragmas: { mmap_size: 100 } }, async (conn) => {
-      expect(await conn.execute("PRAGMA mmap_size")).toEqual([]);
-    });
+  it("overriding default mmap size pragma", async () => {
+    // eslint-disable-next-line blazetrails/no-conditional-in-test -- mirrors Rails' `if in_memory_db?` (sqlite3_adapter_test.rb:302)
+    if (inMemoryDb()) {
+      await withMemoryConnection({ pragmas: { mmap_size: 100 } }, async (conn) => {
+        expect(await conn.execute("PRAGMA mmap_size")).toEqual([]);
+      });
 
-    await withMemoryConnection({ pragmas: { mmap_size: "200" } }, async (conn) => {
-      expect(await conn.execute("PRAGMA mmap_size")).toEqual([]);
-    });
+      await withMemoryConnection({ pragmas: { mmap_size: "200" } }, async (conn) => {
+        expect(await conn.execute("PRAGMA mmap_size")).toEqual([]);
+      });
 
-    await expect(
-      withMemoryConnection({ pragmas: { mmap_size: false } }, async (conn) => {
-        await conn.execute("PRAGMA mmap_size");
-      }),
-    ).rejects.toThrow(/to_i/);
-    await expect(
-      withMemoryConnection({ pragmas: { mmap_size: ":false" } }, async (conn) => {
-        await conn.execute("PRAGMA mmap_size");
-      }),
-    ).rejects.toThrow(/to_i/);
+      let error = await assertRaises([StatementInvalid], {}, async () => {
+        await withMemoryConnection({ pragmas: { mmap_size: false } }, async (conn) => {
+          await conn.execute("PRAGMA mmap_size");
+        });
+      });
+      expect(error.message).toMatch(/undefined method [`']to_i'/);
+
+      error = await assertRaises([StatementInvalid], {}, async () => {
+        await withMemoryConnection({ pragmas: { mmap_size: ":false" } }, async (conn) => {
+          await conn.execute("PRAGMA mmap_size");
+        });
+      });
+      expect(error.message).toMatch(/undefined method [`']to_i'/);
+    } else {
+      await withFileConnection({ pragmas: { mmap_size: 100 } }, async (conn) => {
+        expect(await conn.execute("PRAGMA mmap_size")).toEqual([{ mmap_size: 100 }]);
+      });
+
+      await withFileConnection({ pragmas: { mmap_size: "200" } }, async (conn) => {
+        expect(await conn.execute("PRAGMA mmap_size")).toEqual([{ mmap_size: 200 }]);
+      });
+
+      let error = await assertRaises([StatementInvalid], {}, async () => {
+        await withFileConnection({ pragmas: { mmap_size: false } }, async (conn) => {
+          await conn.execute("PRAGMA mmap_size");
+        });
+      });
+      expect(error.message).toMatch(/undefined method [`']to_i'/);
+
+      error = await assertRaises([StatementInvalid], {}, async () => {
+        await withFileConnection({ pragmas: { mmap_size: ":false" } }, async (conn) => {
+          await conn.execute("PRAGMA mmap_size");
+        });
+      });
+      expect(error.message).toMatch(/undefined method [`']to_i'/);
+    }
   });
 
-  // BLOCKED: pragmas.ts raises JSON-quoted/no Ruby NoMethodError messages (story sqlite-pragma-error-parity)
-  it.skip("overriding default cache size pragma", async () => {
-    await withMemoryConnection({ pragmas: { cache_size: 100 } }, async (conn) => {
+  it("overriding default cache size pragma", async () => {
+    const methodName = inMemoryDb() ? withMemoryConnection : withFileConnection;
+
+    await methodName({ pragmas: { cache_size: 100 } }, async (conn) => {
       expect(await conn.execute("PRAGMA cache_size")).toEqual([{ cache_size: 100 }]);
     });
 
-    await withMemoryConnection({ pragmas: { cache_size: "200" } }, async (conn) => {
+    await methodName({ pragmas: { cache_size: "200" } }, async (conn) => {
       expect(await conn.execute("PRAGMA cache_size")).toEqual([{ cache_size: 200 }]);
     });
 
-    await expect(
-      withMemoryConnection({ pragmas: { cache_size: false } }, async (conn) => {
+    let error = await assertRaises([StatementInvalid], {}, async () => {
+      await methodName({ pragmas: { cache_size: false } }, async (conn) => {
         await conn.execute("PRAGMA cache_size");
-      }),
-    ).rejects.toThrow(/to_i/);
-    await expect(
-      withMemoryConnection({ pragmas: { cache_size: ":false" } }, async (conn) => {
+      });
+    });
+    expect(error.message).toMatch(/undefined method [`']to_i'/);
+
+    error = await assertRaises([StatementInvalid], {}, async () => {
+      await methodName({ pragmas: { cache_size: ":false" } }, async (conn) => {
         await conn.execute("PRAGMA cache_size");
-      }),
-    ).rejects.toThrow(/to_i/);
+      });
+    });
+    expect(error.message).toMatch(/undefined method [`']to_i'/);
   });
 
   it("setting new pragma", async () => {

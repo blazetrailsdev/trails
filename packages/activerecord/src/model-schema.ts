@@ -33,7 +33,7 @@ function ownSchemaMemo<K extends keyof SchemaHost>(
 }
 
 /** @internal */
-function computeTableName(this: typeof Base): string {
+function computeTableName(this: typeof Base): string | null {
   if (isBaseClass(this)) {
     const contained = containedTableNamePrefix.call(this);
     const pluralizes = (this as any).pluralizeTableNames ?? true;
@@ -61,7 +61,7 @@ function containedTableNamePrefix(this: typeof Base): string {
   if (!parent || (parent as any).abstractClass) return "";
   const contained =
     ((parent as any).pluralizeTableNames ?? true)
-      ? singularize(parent.tableName)
+      ? singularize(parent.tableName!)
       : parent.tableName;
   return `${contained}_`;
 }
@@ -193,7 +193,7 @@ export function columnsHash(this: typeof Base): Record<string, ColumnLike> {
   }
   const cache = adapter?.internalSchemaCache as
     | {
-        getCachedColumnsHash?: (t: string) => Record<string, ColumnLike> | undefined;
+        getCachedColumnsHash?: (t: string | null) => Record<string, ColumnLike> | undefined;
       }
     | undefined;
   const table = klass.tableName;
@@ -240,7 +240,7 @@ type DatabaseAdapterLike = { internalSchemaCache?: unknown };
 export function cachedColumnsHash(klass: typeof Base): Record<string, ColumnLike> | undefined {
   const cachedFrom = (conn: { internalSchemaCache?: unknown } | null | undefined) => {
     const cache = conn?.internalSchemaCache as
-      | { getCachedColumnsHash?: (t: string) => Record<string, ColumnLike> | undefined }
+      | { getCachedColumnsHash?: (t: string | null) => Record<string, ColumnLike> | undefined }
       | undefined;
     return cache?.getCachedColumnsHash?.(klass.tableName);
   };
@@ -266,7 +266,7 @@ export function contentColumns(this: typeof Base): any[] {
 
 export interface SchemaHost {
   name: string;
-  tableName: string;
+  tableName: string | null;
   primaryKey: string | string[];
   _tableName: string | null;
   tableNamePrefix: string;
@@ -295,8 +295,8 @@ export interface SchemaHost {
   reloadSchemaFromCache(recursive?: boolean): void;
 }
 
-export function deriveJoinTableName(firstTable: string, secondTable: string): string {
-  const joined = [String(firstTable), String(secondTable)].sort().join("\0");
+export function deriveJoinTableName(firstTable: string | null, secondTable: string | null): string {
+  const joined = [firstTable ?? "", secondTable ?? ""].sort().join("\0");
   const deduped = joined.replace(/^(.*[_.])(.+)\0\1(.+)/, "$1$2_$3");
   return deduped.replaceAll("\0", "_");
 }
@@ -305,7 +305,7 @@ export function quotedTableName(this: SchemaHost): string {
   return reflectionAdapter(this).quoteTableName(this.tableName);
 }
 
-export function resetTableName(this: SchemaHost): string {
+export function resetTableName(this: SchemaHost): string | null {
   const klass = this as unknown as typeof Base;
   const superclass = Object.getPrototypeOf(klass) as typeof Base | null;
   tableName.call(
@@ -318,7 +318,7 @@ export function resetTableName(this: SchemaHost): string {
           ? superclass.tableName || computeTableName.call(klass)
           : computeTableName.call(klass),
   );
-  return this._tableName ?? "";
+  return this._tableName;
 }
 
 /** @missingRailsArgs module_parents — PERMANENT */
@@ -655,6 +655,7 @@ function loadSchemaFromCacheSync(host: SchemaHost): boolean {
   const cache = adapter.internalSchemaCache;
   if (!cache || typeof cache.getCachedColumnsHash !== "function") return false;
   const table = host.tableName;
+  if (table == null) return false;
   let hash = cache.getCachedColumnsHash(table);
   if (!hash) hash = warmColumnsHashSync(adapter, cache, table);
   if (!hash) return false;
@@ -688,11 +689,11 @@ function warmColumnsHashSync(
   return cache.getCachedColumnsHash(table);
 }
 
-export function tableName(this: SchemaHost, value?: string | null): string {
+export function tableName(this: SchemaHost, value?: string | null): string | null {
   if (value !== undefined) {
     value = value == null ? null : String(value);
     if (Object.prototype.hasOwnProperty.call(this, "_tableName")) {
-      if (value === this._tableName) return this._tableName ?? "";
+      if (value === this._tableName) return this._tableName;
       if (isConnected.call(this as unknown as typeof Base)) {
         void Promise.resolve(resetColumnInformation.call(this)).catch(() => {});
       }
@@ -700,10 +701,10 @@ export function tableName(this: SchemaHost, value?: string | null): string {
     this._tableName = value;
     (this as { _predicateBuilder?: unknown })._predicateBuilder = null;
     (this as { _schemaLoaded?: boolean })._schemaLoaded = false;
-    return this._tableName ?? "";
+    return this._tableName;
   }
   if (!Object.prototype.hasOwnProperty.call(this, "_tableName")) resetTableName.call(this);
-  return this._tableName as string;
+  return this._tableName;
 }
 
 export function protectedEnvironments(this: SchemaHost, value?: string[]): string[] {
@@ -767,7 +768,7 @@ export async function tableExists(this: SchemaHost): Promise<boolean> {
   return (
     (await (this as unknown as typeof Base)
       .connectionPool()
-      .schemaCache.dataSourceExists(this.tableName)) ?? false
+      .schemaCache.dataSourceExists(this.tableName!)) ?? false
   );
 }
 
