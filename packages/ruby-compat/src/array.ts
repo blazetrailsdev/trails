@@ -9,6 +9,12 @@ import { TypeError } from "./type-error.js";
 /** `toofew` (`vendor/ruby/pack.c:120`). */
 const toofew = "too few arguments";
 
+/** `endstr` (`vendor/ruby/pack.c:42`), the types `<` / `>` may follow. */
+const endstr = "sSiIlLqQjJ";
+
+/** `BIGENDIAN_P()` (`vendor/ruby/pack.c:58-75`): the host byte order. */
+const BIGENDIAN_P = new Uint8Array(new Uint16Array([1]).buffer)[0] === 0;
+
 /** `b64_table` (`vendor/ruby/pack.c:789`). */
 const b64Table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
@@ -60,8 +66,15 @@ function encodes(str: string[], s0: Uint8Array, len: number, tailLf: number): vo
  * what `Rack::Test::Session#basic_authorize` packs with
  * (`vendor/rack-test/lib/rack/test.rb:199`) — and to `U` (`pack.c:645-660`),
  * one UTF-8 character per Integer, which `ActiveSupport::Multibyte::Chars`
- * packs codepoints with (`multibyte/chars.rb:136,144`). Every other directive
- * is a separate port, so each reaches `unknown_directive` (`pack.c:761`) here.
+ * packs codepoints with (`multibyte/chars.rb:136,144`) — and to the `C`, `E`,
+ * `l<` and `@` directives `ActiveSupport::Cache::Coder` packs its header with
+ * (`cache/coder.rb:44,77-82`): `C` and `l` through `pack_integer`
+ * (`pack.c:477-551`), `E` (`pack.c:575-583`), and `@` growing or shrinking to
+ * an absolute byte position (`pack.c:617-639`). Every other directive is a
+ * separate port, so each reaches `unknown_directive` (`pack.c:761`) here, and
+ * of the modifiers only `<` / `>` (`pack.c:268-277`) are ported.
+ *
+ * `C`, `E`, `l` and `@` answer bytes, one code unit per byte, as `m` does.
  *
  * A `U` result is a UTF-8 String (`pack.c:299-302`), so it is a JS string of
  * those characters rather than of bytes; `String.fromCodePoint` is
@@ -71,21 +84,22 @@ function encodes(str: string[], s0: Uint8Array, len: number, tailLf: number): vo
  * ASCII-8BIT convention — as `pack.c:663-690` reads `RSTRING_PTR` with no
  * re-encoding. A caller holding a UTF-8 String passes its `String#b`.
  *
- * `*` is `1` for the `PMm` types and the array remainder otherwise
- * (`pack.c:281-284`), so `m*` is `m` and `U*` takes every element. The
+ * `*` is `0` for the `@Xxu` types, `1` for the `PMm` types and the array
+ * remainder otherwise (`pack.c:281-284`), so `m*` is `m` and `U*` takes every
+ * element. The
  * `u`-only `len > 63` clamp (`pack.c:676`) is not reachable without that
  * directive.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Array#pack`
  * (`vendor/ruby/pack.c:197`).
  */
-export function pack(ary: ReadonlyArray<string | number>, fmt: string): string {
+export function pack(ary: ReadonlyArray<string | number | bigint>, fmt: string): string {
   const res: string[] = [];
   let p = 0;
   const pend = fmt.length;
   let idx = 0;
 
-  const nextfrom = (): string | number => {
+  const nextfrom = (): string | number | bigint => {
     if (idx >= ary.length) throw new ArgumentError(toofew);
     return ary[idx++];
   };
@@ -101,9 +115,18 @@ export function pack(ary: ReadonlyArray<string | number>, fmt: string): string {
       continue;
     }
 
+    let explicitEndian = "";
+    while (fmt[p] === "<" || fmt[p] === ">") {
+      if (!endstr.includes(type)) {
+        throw new ArgumentError(`'${fmt[p]}' allowed only after types ${endstr}`);
+      }
+      if (explicitEndian) throw new RangeError("Can't use both '<' and '>'");
+      explicitEndian = fmt[p++];
+    }
+
     let len: number;
     if (fmt[p] === "*") {
-      len = "PMm".includes(type) ? 1 : ary.length - idx;
+      len = "@Xxu".includes(type) ? 0 : "PMm".includes(type) ? 1 : ary.length - idx;
       p++;
     } else if (fmt[p] >= "0" && fmt[p] <= "9") {
       let digits = "";
@@ -125,6 +148,44 @@ export function pack(ary: ReadonlyArray<string | number>, fmt: string): string {
         }
         res.push(String.fromCodePoint(l));
       }
+      continue;
+    }
+    if (type === "C" || type === "l") {
+      const integerSize = type === "C" ? 1 : 4;
+      const bigendianP = explicitEndian ? explicitEndian === ">" : BIGENDIAN_P;
+      while (len-- > 0) {
+        const from = nextfrom();
+        if (typeof from !== "number" && typeof from !== "bigint") {
+          throw new TypeError(`no implicit conversion of ${rbBuiltinClassName(from)} into Integer`);
+        }
+        let v = BigInt.asUintN(
+          integerSize * 8,
+          BigInt(typeof from === "number" ? Math.trunc(from) : from),
+        );
+        const intbuf: string[] = [];
+        for (let i = 0; i < integerSize; i++, v >>= 8n)
+          intbuf.push(String.fromCharCode(Number(v & 0xffn)));
+        res.push((bigendianP ? intbuf.reverse() : intbuf).join(""));
+      }
+      continue;
+    }
+    if (type === "E") {
+      while (len-- > 0) {
+        const from = nextfrom();
+        if (typeof from !== "number" && typeof from !== "bigint") {
+          throw new TypeError(`can't convert ${rbBuiltinClassName(from)} into Float`);
+        }
+        const tmp = new DataView(new ArrayBuffer(8));
+        tmp.setFloat64(0, Number(from), true);
+        for (let i = 0; i < 8; i++) res.push(String.fromCharCode(tmp.getUint8(i)));
+      }
+      continue;
+    }
+    if (type === "@") {
+      const str = res.join("");
+      len -= str.length;
+      res.length = 0;
+      res.push(len > 0 ? str + "\0".repeat(len) : str.slice(0, str.length + len));
       continue;
     }
     if (type !== "m") unknownDirective("pack", type, fmt);
@@ -150,6 +211,103 @@ export function pack(ary: ReadonlyArray<string | number>, fmt: string): string {
   }
 
   return res.join("");
+}
+
+/**
+ * `String#unpack1` (`vendor/ruby/pack.c:1621` `pack_unpack1`), which is
+ * `pack_unpack_internal` (`pack.c:936`) in `UNPACK_1` mode: the first item
+ * the format pushes, or nil when none does. Narrowed to the directives
+ * {@link pack} answers bytes for — `C` and `l` through `unpack_integer`
+ * (`pack.c:1177-1281`), `E` (`pack.c:1306-1315`), and `@` moving to an
+ * absolute byte position (`pack.c:1531-1535`) — plus the `<` / `>` modifiers
+ * (`pack.c:1014-1023`). Every other directive reaches `unknown_directive`.
+ *
+ * `str` is read as bytes, one code unit per byte, as {@link pack} writes them.
+ * `PACK_LENGTH_ADJUST_SIZE` (`pack.c:904-912`) caps a count at what the rest
+ * of the string holds, so an item short of bytes pushes nothing.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `String#unpack1`
+ * (`vendor/ruby/pack.c:1621`).
+ */
+export function unpack1(
+  str: string,
+  fmt: string,
+  { offset = 0 }: { offset?: number } = {},
+): number | null {
+  if (offset < 0) throw new ArgumentError("offset can't be negative");
+  const send = str.length;
+  if (offset > send) throw new ArgumentError("offset outside of string");
+  let s = offset;
+  let p = 0;
+  const pend = fmt.length;
+
+  while (p < pend) {
+    let explicitEndian = "";
+    const type = fmt[p++];
+
+    if (/\s/.test(type)) continue;
+    if (type === "#") {
+      while (p < pend && fmt[p] !== "\n") {
+        p++;
+      }
+      continue;
+    }
+
+    while (fmt[p] === "<" || fmt[p] === ">") {
+      if (!endstr.includes(type)) {
+        throw new ArgumentError(`'${fmt[p]}' allowed only after types ${endstr}`);
+      }
+      if (explicitEndian) throw new RangeError("Can't use both '<' and '>'");
+      explicitEndian = fmt[p++];
+    }
+
+    let len: number;
+    if (p >= pend) {
+      len = 1;
+    } else if (fmt[p] === "*") {
+      len = send - s;
+      p++;
+    } else if (fmt[p] >= "0" && fmt[p] <= "9") {
+      let digits = "";
+      while (fmt[p] >= "0" && fmt[p] <= "9") digits += fmt[p++];
+      len = Number(digits);
+    } else {
+      len = type !== "@" ? 1 : 0;
+    }
+
+    if (type === "C" || type === "l") {
+      const signedP = type === "l";
+      const integerSize = type === "C" ? 1 : 4;
+      const bigendianP = explicitEndian ? explicitEndian === ">" : BIGENDIAN_P;
+      if (len > Math.floor((send - s) / integerSize)) len = Math.floor((send - s) / integerSize);
+      if (len > 0) {
+        let val = 0n;
+        for (let i = 0; i < integerSize; i++) {
+          const byte = BigInt(str.charCodeAt(bigendianP ? s + i : s + integerSize - 1 - i) & 0xff);
+          val = (val << 8n) | byte;
+        }
+        return Number(signedP ? BigInt.asIntN(integerSize * 8, val) : val);
+      }
+      continue;
+    }
+    if (type === "E") {
+      if (len > Math.floor((send - s) / 8)) len = Math.floor((send - s) / 8);
+      if (len > 0) {
+        const tmp = new DataView(new ArrayBuffer(8));
+        for (let i = 0; i < 8; i++) tmp.setUint8(i, str.charCodeAt(s + i) & 0xff);
+        return tmp.getFloat64(0, true);
+      }
+      continue;
+    }
+    if (type === "@") {
+      if (len > str.length) throw new ArgumentError("@ outside of string");
+      s = len;
+      continue;
+    }
+    unknownDirective("unpack", type, fmt);
+  }
+
+  return null;
 }
 
 /**

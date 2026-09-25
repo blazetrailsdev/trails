@@ -8,7 +8,7 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 export type Tagger = string | ((request: Request) => string);
 
 export interface RackLoggerLike {
-  info?(msg: string): void;
+  info?(block: () => string): unknown;
   pushTags?(...tags: string[]): string[];
   popTags?(count?: number): string[];
 }
@@ -42,7 +42,6 @@ export class Logger {
     return this.callApp(request, env);
   }
 
-  /** @missingRailsArgs info — CONVERGEABLE rack-logger-call-app-info-block */
   private async callApp(request: Request, env: RackEnv): Promise<RackResponse> {
     const loggerTagPopCount = env["rails.rackLoggerTagCount"] as number;
 
@@ -51,7 +50,7 @@ export class Logger {
     handle.start();
 
     try {
-      this.logger.info?.(this.startedRequestMessage(request));
+      this.logger.info?.(() => this.startedRequestMessage(request));
       const response = await this.app.call(this.app, env);
       const [status, headers, body] = response;
       const wrapped = new BodyProxy(body as AsyncIterable<unknown>, () =>

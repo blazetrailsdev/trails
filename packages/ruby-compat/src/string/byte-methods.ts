@@ -47,7 +47,13 @@ export function rbStrSetbyte(self: StringReceiver, index: unknown, value: unknow
   return value;
 }
 
-function strByteSubstr(b: number[], beg: number, len: number, empty: boolean): string | null {
+function strByteSubstr(
+  b: ArrayLike<unknown>,
+  beg: number,
+  len: number,
+  empty: boolean,
+  newStr: (beg: number, end: number) => string,
+): string | null {
   const n = b.length;
   if (beg > n || len < 0) return null;
   if (beg < 0) {
@@ -59,7 +65,7 @@ function strByteSubstr(b: number[], beg: number, len: number, empty: boolean): s
     if (!empty) return null;
     len = 0;
   }
-  return strNew(b.slice(beg, beg + len));
+  return newStr(beg, beg + len);
 }
 
 /**
@@ -69,17 +75,38 @@ function strByteSubstr(b: number[], beg: number, len: number, empty: boolean): s
  */
 export function rbStrByteslice(str: string, ...args: unknown[]): string | null {
   const b = bytes(str);
+  return strByteslice(b, args, (beg, end) => strNew(b.slice(beg, end)));
+}
+
+/**
+ * `String#byteslice` (`vendor/ruby/string.c:6330` `rb_str_byteslice`) over an
+ * ASCII-8BIT String, spelled as {@link b} spells one: a byte per code unit.
+ * {@link rbStrByteslice} reads its receiver's UTF-8 bytes, which would count
+ * each code unit from `0x80` up as two.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `String#byteslice`
+ * (`vendor/ruby/string.c:6330`).
+ */
+export function byteslice(str: string, ...args: unknown[]): string | null {
+  return strByteslice(str, args, (beg, end) => str.slice(beg, end));
+}
+
+function strByteslice(
+  b: ArrayLike<unknown>,
+  args: unknown[],
+  newStr: (beg: number, end: number) => string,
+): string | null {
   if (args.length === 2) {
-    return strByteSubstr(b, num2long(args[0]), num2long(args[1]), true);
+    return strByteSubstr(b, num2long(args[0]), num2long(args[1]), true, newStr);
   }
   checkArity(args.length, 1, 2);
   const indx = args[0];
   if (indx instanceof Range) {
     const begLen = rbRangeBegLen(indx, b.length, 0);
     if (begLen === null) return null;
-    return strByteSubstr(b, begLen[0], begLen[1], true);
+    return strByteSubstr(b, begLen[0], begLen[1], true, newStr);
   }
-  return strByteSubstr(b, num2long(indx), 1, false);
+  return strByteSubstr(b, num2long(indx), 1, false, newStr);
 }
 
 function strCheckBegLen(b: number[], beg: number, len: number): [number, number] {

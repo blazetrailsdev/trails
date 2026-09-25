@@ -1,9 +1,0 @@
-[
-  {
-    "package": "trailties",
-    "tsFile": "rack/logger.ts",
-    "rubyName": "call_app",
-    "call": "order:startedRequestMessage,info",
-    "reason": "Recording-order artifact of a Ruby block argument: logger.rb:39 writes `logger.info { started_request_message(request) }`, so the extractor records info first, while TS evaluates the message eagerly as info's argument — RackLoggerLike#info takes the string, not a thunk."
-  }
-]

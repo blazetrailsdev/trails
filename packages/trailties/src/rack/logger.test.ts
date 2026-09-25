@@ -74,8 +74,8 @@ describe("Rack::Logger", () => {
     const calls: string[] = [];
     const middleware = new Logger(okApp, {
       logger: {
-        info(msg) {
-          calls.push(msg);
+        info(block) {
+          calls.push(block());
         },
       },
     });
