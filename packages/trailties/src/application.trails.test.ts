@@ -70,4 +70,14 @@ describe("Application framework railtie initializers", () => {
     expect(first.deprecators.get("activeRecord")).toBeDefined();
     expect(second.deprecators.get("activeRecord")).toBeUndefined();
   });
+
+  it("calls config.loadDefaults from the generated application's static block without a cast", () => {
+    class GeneratedApplication extends Application {
+      static {
+        this.config.loadDefaults("8.0");
+      }
+    }
+
+    expect(GeneratedApplication.config.loadedConfigVersion).toBe("8.0");
+  });
 });
