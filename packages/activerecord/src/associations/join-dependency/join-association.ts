@@ -68,7 +68,7 @@ export class JoinAssociation extends JoinPart {
       if (resolveTable) {
         [table, terminated] = resolveTable(refl, reflectionChain.slice(index));
       } else {
-        table = aliasedArelTableForReflection(refl, refl.tableName);
+        table = aliasedArelTableForReflection(refl, refl.tableName!);
       }
 
       if (!this._table) this._table = table;

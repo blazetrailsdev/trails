@@ -138,7 +138,7 @@ export class AbstractReflection {
     return pk;
   }
 
-  get tableName(): string {
+  get tableName(): string | null {
     return this.klass.tableName;
   }
 
@@ -570,7 +570,7 @@ export class AggregateReflection extends MacroReflection {
     return "composedOf";
   }
 
-  get tableName(): string {
+  get tableName(): string | null {
     return this.activeRecord.tableName;
   }
 

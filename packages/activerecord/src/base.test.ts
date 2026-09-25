@@ -1703,7 +1703,10 @@ describe("BasicsTest", async () => {
 
   it("ignored columns are not present in columns_hash", async () => {
     const conn = await Base.leaseConnection();
-    const cacheColumns = await conn.internalSchemaCache.columnsHash(conn.pool, Developer.tableName);
+    const cacheColumns = await conn.internalSchemaCache.columnsHash(
+      conn.pool,
+      Developer.tableName!,
+    );
     expect(Object.keys(cacheColumns ?? {})).toContain("first_name");
     expect(Object.keys(Developer.columnsHash())).not.toContain("first_name");
     expect(Object.keys(SubDeveloper.columnsHash())).not.toContain("first_name");

@@ -21,15 +21,15 @@ async function column(
   sqlType: string | null = null,
   options: MergeColumnOptions = {},
 ): Promise<void> {
-  (await fakeConnection(this)).mergeColumn(this.tableName, name, sqlType, options);
+  (await fakeConnection(this)).mergeColumn(this.tableName!, name, sqlType, options);
 }
 
 async function extended(base: ContactFakeColumnsHost): Promise<void> {
   await base.establishConnection({ adapter: "fake" });
 
   const connection = await fakeConnection(base);
-  connection.dataSources = [base.tableName];
-  connection.primaryKeys = { [base.tableName]: "id" };
+  connection.dataSources = [base.tableName!];
+  connection.primaryKeys = { [base.tableName!]: "id" };
 
   await base.column("id", "integer");
   await base.column("name", "string");

@@ -85,7 +85,7 @@ export const sanitizeSql = sanitizeSqlForConditions;
 
 export function sanitizeSqlForAssignment(
   this: QuoterHost & {
-    tableName?: string;
+    tableName?: string | null;
     sanitizeSqlArray(ary: [string, ...unknown[]]): string;
     sanitizeSqlHashForAssignment(attrs: Record<string, unknown>, table: string): string;
   },

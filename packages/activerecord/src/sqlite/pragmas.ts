@@ -1,4 +1,4 @@
-import { FloatDomainError, NoMethodError } from "@blazetrails/ruby-compat";
+import { isSymbol, rbInspect, toI } from "@blazetrails/ruby-compat";
 
 import type { SqliteBinds } from "../sqlite-adapter.js";
 import { Exception } from "./errors.js";
@@ -51,23 +51,13 @@ function toS(value: unknown): string {
   return str.startsWith(":") ? str.slice(1) : str;
 }
 
-function toI(value: unknown): number {
-  if (typeof value === "number") {
-    if (!Number.isFinite(value)) throw new FloatDomainError(String(value));
-    return Math.trunc(value);
-  }
-  if (value == null) return 0;
-  if (typeof value === "string") return parseInt(value, 10) || 0;
-  throw new NoMethodError(`undefined method 'to_i' for ${JSON.stringify(value)}`);
-}
-
 export async function getBooleanPragma(this: PragmasHost, name: string): Promise<boolean> {
   return (await this.getFirstValue(`PRAGMA ${name}`)) !== 0;
 }
 
 export function setBooleanPragma(this: PragmasHost, name: string, mode: unknown): unknown {
   let value: string;
-  if (typeof mode === "string") {
+  if (!isSymbol(mode) && typeof mode === "string") {
     switch (mode.toLowerCase()) {
       case "on":
       case "yes":
@@ -84,14 +74,14 @@ export function setBooleanPragma(this: PragmasHost, name: string, mode: unknown)
         value = "'OFF'";
         break;
       default:
-        throw new Exception(`unrecognized pragma parameter ${JSON.stringify(mode)}`);
+        throw new Exception(`unrecognized pragma parameter ${rbInspect(mode)}`);
     }
   } else if (mode === true || mode === 1) {
     value = "ON";
   } else if (mode === false || mode === 0 || mode == null) {
     value = "OFF";
   } else {
-    throw new Exception(`unrecognized pragma parameter ${JSON.stringify(mode)}`);
+    throw new Exception(`unrecognized pragma parameter ${rbInspect(mode)}`);
   }
   return this.execute(`PRAGMA ${name}=${value}`);
 }
@@ -122,12 +112,12 @@ export function setEnumPragma(
 ): unknown {
   const match = enums.find((p) => p.find((i) => toS(i).toLowerCase() === toS(mode).toLowerCase()));
   if (!match) {
-    throw new Exception(`unrecognized ${name} ${JSON.stringify(mode)}`);
+    throw new Exception(`unrecognized ${name} ${rbInspect(mode)}`);
   }
   return this.execute(`PRAGMA ${name}='${toS(match[0]).toUpperCase()}'`);
 }
 
-export async function getIntPragma(this: PragmasHost, name: string): Promise<number> {
+export async function getIntPragma(this: PragmasHost, name: string): Promise<number | bigint> {
   return toI(await this.getFirstValue(`PRAGMA ${name}`));
 }
 
@@ -135,7 +125,7 @@ export function setIntPragma(this: PragmasHost, name: string, value: unknown): u
   return this.execute(`PRAGMA ${name}=${toI(value)}`);
 }
 
-export function applicationId(this: PragmasHost): Promise<number> {
+export function applicationId(this: PragmasHost): Promise<number | bigint> {
   return getIntPragma.call(this, "application_id");
 }
 
@@ -159,7 +149,7 @@ export function setAutomaticIndex(this: PragmasHost, mode: unknown): unknown {
   return setBooleanPragma.call(this, "automatic_index", mode);
 }
 
-export function busyTimeout(this: PragmasHost): Promise<number> {
+export function busyTimeout(this: PragmasHost): Promise<number | bigint> {
   return getIntPragma.call(this, "busy_timeout");
 }
 
@@ -167,7 +157,7 @@ export function setBusyTimeout(this: PragmasHost, milliseconds: unknown): unknow
   return setIntPragma.call(this, "busy_timeout", milliseconds);
 }
 
-export function cacheSize(this: PragmasHost): Promise<number> {
+export function cacheSize(this: PragmasHost): Promise<number | bigint> {
   return getIntPragma.call(this, "cache_size");
 }
 
@@ -219,7 +209,7 @@ export function setCountChanges(this: PragmasHost, mode: unknown): unknown {
   return setBooleanPragma.call(this, "count_changes", mode);
 }
 
-export function dataVersion(this: PragmasHost): Promise<number> {
+export function dataVersion(this: PragmasHost): Promise<number | bigint> {
   return getIntPragma.call(this, "data_version");
 }
 
@@ -227,7 +217,7 @@ export function databaseList(this: PragmasHost, block?: (row: unknown) => void):
   return getQueryPragma.call(this, "database_list", block);
 }
 
-export function defaultCacheSize(this: PragmasHost): Promise<number> {
+export function defaultCacheSize(this: PragmasHost): Promise<number | bigint> {
   return getIntPragma.call(this, "default_cache_size");
 }
 
@@ -287,7 +277,7 @@ export function setForeignKeys(this: PragmasHost, mode: unknown): unknown {
   return setBooleanPragma.call(this, "foreign_keys", mode);
 }
 
-export function freelistCount(this: PragmasHost): Promise<number> {
+export function freelistCount(this: PragmasHost): Promise<number | bigint> {
   return getIntPragma.call(this, "freelist_count");
 }
 
@@ -355,7 +345,7 @@ export function setJournalMode(this: PragmasHost, mode: unknown): unknown {
   return setEnumPragma.call(this, "journal_mode", mode, JOURNAL_MODES);
 }
 
-export function journalSizeLimit(this: PragmasHost): Promise<number> {
+export function journalSizeLimit(this: PragmasHost): Promise<number | bigint> {
   return getIntPragma.call(this, "journal_size_limit");
 }
 
@@ -379,7 +369,7 @@ export function setLockingMode(this: PragmasHost, mode: unknown): unknown {
   return setEnumPragma.call(this, "locking_mode", mode, LOCKING_MODES);
 }
 
-export function maxPageCount(this: PragmasHost): Promise<number> {
+export function maxPageCount(this: PragmasHost): Promise<number | bigint> {
   return getIntPragma.call(this, "max_page_count");
 }
 
@@ -387,7 +377,7 @@ export function setMaxPageCount(this: PragmasHost, size: unknown): unknown {
   return setIntPragma.call(this, "max_page_count", size);
 }
 
-export function mmapSize(this: PragmasHost): Promise<number> {
+export function mmapSize(this: PragmasHost): Promise<number | bigint> {
   return getIntPragma.call(this, "mmap_size");
 }
 
@@ -403,11 +393,11 @@ export function optimize(this: PragmasHost, bitmask: unknown = null): unknown {
   }
 }
 
-export function pageCount(this: PragmasHost): Promise<number> {
+export function pageCount(this: PragmasHost): Promise<number | bigint> {
   return getIntPragma.call(this, "page_count");
 }
 
-export function pageSize(this: PragmasHost): Promise<number> {
+export function pageSize(this: PragmasHost): Promise<number | bigint> {
   return getIntPragma.call(this, "page_size");
 }
 
@@ -455,7 +445,7 @@ export function setReverseUnorderedSelects(this: PragmasHost, mode: unknown): un
   return setBooleanPragma.call(this, "reverse_unordered_selects", mode);
 }
 
-export function schemaCookie(this: PragmasHost): Promise<number> {
+export function schemaCookie(this: PragmasHost): Promise<number | bigint> {
   return getIntPragma.call(this, "schema_cookie");
 }
 
@@ -463,7 +453,7 @@ export function setSchemaCookie(this: PragmasHost, cookie: unknown): unknown {
   return setIntPragma.call(this, "schema_cookie", cookie);
 }
 
-export function schemaVersion(this: PragmasHost): Promise<number> {
+export function schemaVersion(this: PragmasHost): Promise<number | bigint> {
   return getIntPragma.call(this, "schema_version");
 }
 
@@ -491,7 +481,7 @@ export function shrinkMemory(this: PragmasHost): unknown {
   return this.execute("PRAGMA shrink_memory");
 }
 
-export function softHeapLimit(this: PragmasHost): Promise<number> {
+export function softHeapLimit(this: PragmasHost): Promise<number | bigint> {
   return getIntPragma.call(this, "soft_heap_limit");
 }
 
@@ -519,7 +509,7 @@ export function setTempStore(this: PragmasHost, mode: unknown): unknown {
   return setEnumPragma.call(this, "temp_store", mode, TEMP_STORE_MODES);
 }
 
-export function threads(this: PragmasHost): Promise<number> {
+export function threads(this: PragmasHost): Promise<number | bigint> {
   return getIntPragma.call(this, "threads");
 }
 
@@ -527,7 +517,7 @@ export function setThreads(this: PragmasHost, count: unknown): unknown {
   return setIntPragma.call(this, "threads", count);
 }
 
-export function userCookie(this: PragmasHost): Promise<number> {
+export function userCookie(this: PragmasHost): Promise<number | bigint> {
   return getIntPragma.call(this, "user_cookie");
 }
 
@@ -535,7 +525,7 @@ export function setUserCookie(this: PragmasHost, cookie: unknown): unknown {
   return setIntPragma.call(this, "user_cookie", cookie);
 }
 
-export function userVersion(this: PragmasHost): Promise<number> {
+export function userVersion(this: PragmasHost): Promise<number | bigint> {
   return getIntPragma.call(this, "user_version");
 }
 
@@ -563,7 +553,7 @@ export function setVdbeTrace(this: PragmasHost, mode: unknown): unknown {
   return setBooleanPragma.call(this, "vdbe_trace", mode);
 }
 
-export function walAutocheckpoint(this: PragmasHost): Promise<number> {
+export function walAutocheckpoint(this: PragmasHost): Promise<number | bigint> {
   return getIntPragma.call(this, "wal_autocheckpoint");
 }
 

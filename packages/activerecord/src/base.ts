@@ -688,11 +688,11 @@ export class Base extends Model {
 
   declare static tableNameSuffix: string;
 
-  static get tableName(): string {
+  static get tableName(): string | null {
     return ModelSchema.tableName.call(this);
   }
 
-  static set tableName(name: string) {
+  static set tableName(name: string | null) {
     ModelSchema.tableName.call(this, name);
   }
 

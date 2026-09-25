@@ -110,7 +110,7 @@ interface PrimaryKeyHost {
   primaryKey: string | string[];
   _primaryKey?: string | string[];
   name: string;
-  tableName?: string;
+  tableName?: string | null;
   connectionPool?(): {
     activeConnection?: CachedSchemaSource | null;
     poolConfig?: {

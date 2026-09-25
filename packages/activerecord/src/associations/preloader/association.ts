@@ -44,7 +44,7 @@ export class Association {
     this._run = false;
   }
 
-  get tableName(): string {
+  get tableName(): string | null {
     return this.klass.tableName;
   }
 

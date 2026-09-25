@@ -637,7 +637,7 @@ export class UnknownAttributeReference extends ActiveRecordError {
   }
 }
 
-type UnknownPrimaryKeyModel = { readonly tableName: string; readonly name?: unknown };
+type UnknownPrimaryKeyModel = { readonly tableName: string | null; readonly name?: unknown };
 
 export class UnknownPrimaryKey extends ActiveRecordError {
   readonly model: UnknownPrimaryKeyModel | null;

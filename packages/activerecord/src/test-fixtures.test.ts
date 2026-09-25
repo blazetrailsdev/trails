@@ -536,9 +536,10 @@ describe("fixtureRegistry conformance", () => {
         expect(typeof ModelClass.tableName, `${name}: model must declare a tableName`).toBe(
           "string",
         );
-        expect(ModelClass.tableName.length, `${name}: tableName must be non-empty`).toBeGreaterThan(
-          0,
-        );
+        expect(
+          ModelClass.tableName!.length,
+          `${name}: tableName must be non-empty`,
+        ).toBeGreaterThan(0);
       }
 
       const data = (entry as { data: Record<string, unknown> }).data;

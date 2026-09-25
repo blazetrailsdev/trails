@@ -456,7 +456,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("data source exists?", async () => {
       const { Thing1, Thing2, Thing3, Thing4 } = await makeThingModels();
       for (const klass of [Thing1, Thing2, Thing3, Thing4]) {
-        const name = klass.tableName;
+        const name = klass.tableName!;
         expect(
           await adapter.dataSourceExists(name),
           `'${name}' data_source should exist`,

@@ -959,7 +959,9 @@ export class Relation<T extends Base> {
     return hash;
   }
 
-  whereValuesHash(relationTableName: string = this.model.tableName): Record<string, unknown> {
+  whereValuesHash(
+    relationTableName: string | null = this.model.tableName,
+  ): Record<string, unknown> {
     return this.whereClause.toH(relationTableName);
   }
 

@@ -371,7 +371,7 @@ export class InsertAll {
         match.includes(i.name) ||
         (Array.isArray(i.columns) && [...i.columns].sort().join(",") === sortedMatch),
     ) as { name: string; columns: string[]; where?: string } | undefined;
-    const tableName = this.model.tableName;
+    const tableName = this.model.tableName!;
     if (idx) {
       return idx instanceof IndexDefinition
         ? idx
@@ -391,7 +391,7 @@ export class InsertAll {
 
   /** @internal */
   private uniqueIndexes(): unknown[] {
-    return this._facts.indexes(this.model.tableName).filter((i: any) => i.unique);
+    return this._facts.indexes(this.model.tableName!).filter((i: any) => i.unique);
   }
 
   /** @internal */
@@ -519,7 +519,7 @@ export class Builder implements InsertBuilder {
   }
 
   async valuesList(): Promise<string> {
-    const types = await this.extractTypesFromColumnsOn(this.model.tableName, [
+    const types = await this.extractTypesFromColumnsOn(this.model.tableName!, [
       ...this._insertAll.keysIncludingTimestamps(),
     ]);
 

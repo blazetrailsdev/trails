@@ -249,13 +249,13 @@ describe("Migration", () => {
       await self.addColumn("test_models", "age", "integer");
       await self.addColumn("test_models", "approved", "boolean", { default: true });
 
-      let oldColumns = await self.connection.columns(TestModel.tableName);
+      let oldColumns = await self.connection.columns(TestModel.tableName!);
 
       expect(oldColumns.find((c) => c.name === "age" && c.type === "integer")).toBeTruthy();
 
       await self.changeColumn("test_models", "age", "string");
 
-      let newColumns = await self.connection.columns(TestModel.tableName);
+      let newColumns = await self.connection.columns(TestModel.tableName!);
 
       expect(newColumns.find((c) => c.name === "age" && c.type === "integer")).toBeFalsy();
       expect(newColumns.find((c) => c.name === "age" && c.type === "string")).toBeTruthy();
@@ -272,11 +272,11 @@ describe("Migration", () => {
         return undefined;
       };
 
-      oldColumns = await self.connection.columns(TestModel.tableName);
+      oldColumns = await self.connection.columns(TestModel.tableName!);
       expect(await findApproved(oldColumns, true)).toBeTruthy();
 
       await self.changeColumn("test_models", "approved", "boolean", { default: false });
-      newColumns = await self.connection.columns(TestModel.tableName);
+      newColumns = await self.connection.columns(TestModel.tableName!);
 
       expect(await findApproved(newColumns, true)).toBeFalsy();
       expect(await findApproved(newColumns, false)).toBeTruthy();

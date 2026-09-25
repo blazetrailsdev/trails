@@ -55,5 +55,6 @@ describe("#to_i", () => {
   it("raises where Ruby raises", () => {
     expect(() => toI(NaN)).toThrow(FloatDomainError);
     expect(() => toI({})).toThrow(NoMethodError);
+    expect(() => toI(":false")).toThrow("undefined method 'to_i' for an instance of Symbol");
   });
 });

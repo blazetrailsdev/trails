@@ -125,12 +125,12 @@ export class WhereClause {
     return attrs;
   }
 
-  toH(tableName?: string, opts: { equalityOnly?: boolean } = {}): Record<string, unknown> {
+  toH(tableName?: string | null, opts: { equalityOnly?: boolean } = {}): Record<string, unknown> {
     const result: Record<string, unknown> = {};
     for (const node of equalities(this.predicates, opts.equalityOnly ?? false)) {
       const attr = extractAttribute(node);
       if (attr === null) continue;
-      if (tableName !== undefined && String(attr.relation.name) !== tableName) continue;
+      if (tableName != null && String(attr.relation.name) !== tableName) continue;
       result[String(attr.name)] = extractNodeValue((node as any).right);
     }
     return result;

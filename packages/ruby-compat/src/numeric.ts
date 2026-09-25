@@ -3,6 +3,7 @@ import { NilClass } from "./nil-class.js";
 import { NoMethodError } from "./no-method-error.js";
 import { rbObjClass } from "./object.js";
 import { rbStrToI } from "./string/convert.js";
+import { isSymbol } from "./symbol.js";
 
 /**
  * Ruby `Float#round` (`vendor/ruby/numeric.c:2505` `flo_round`): rounds to
@@ -39,7 +40,8 @@ export function anybits(x: number | bigint, mask: number | bigint): boolean {
  * (`vendor/ruby/object.c:4414`), `Integer#to_i` (`vendor/ruby/numeric.c`
  * `int_to_i`), `Float#to_i` (`flo_to_i`, `FloatDomainError` off the finite
  * range), `String#to_i` (`rb_str_to_i`, {@link rbStrToI}), else the
- * receiver's own `toI`.
+ * receiver's own `toI`. A Symbol has no `to_i` (`vendor/ruby/string.c`
+ * defines none on `rb_cSymbol`), so a colon-prefixed string raises.
  *
  * @noRailsEquivalent PERMANENT — a Ruby method send, which JS has no receiver
  * for on a primitive.
@@ -51,6 +53,7 @@ export function toI(obj: unknown): number | bigint {
     if (!Number.isFinite(obj)) throw new FloatDomainError(String(obj));
     return Math.trunc(obj);
   }
+  if (isSymbol(obj)) throw new NoMethodError("undefined method 'to_i' for an instance of Symbol");
   if (typeof obj === "string") return rbStrToI(obj);
   if (typeof (obj as { toI?: unknown }).toI === "function") {
     return (obj as { toI(): number | bigint }).toI();

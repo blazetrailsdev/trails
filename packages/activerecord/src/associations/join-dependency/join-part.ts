@@ -12,7 +12,7 @@ export abstract class JoinPart {
 
   abstract get table(): Table | Nodes.TableAlias | null;
 
-  get tableName(): string {
+  get tableName(): string | null {
     return this.baseKlass.tableName;
   }
 
