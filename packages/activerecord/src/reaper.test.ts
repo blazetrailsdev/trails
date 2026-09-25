@@ -2,21 +2,24 @@ import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { Reaper } from "./connection-adapters/abstract/connection-pool/reaper.js";
 import { assertNothingRaised } from "@blazetrails/activesupport";
 import type { ReapablePool } from "./connection-adapters/abstract/connection-pool/reaper.js";
+import { Thread } from "@blazetrails/ruby-compat";
+import { Base } from "./base.js";
+import { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
+import { PoolConfig } from "./connection-adapters/pool-config.js";
+import { HashConfig } from "./database-configurations/hash-config.js";
+import type { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 
 function makePool(): ReapablePool & {
   reaped: boolean;
   flushed: boolean;
-  inUse: boolean;
   _discarded: boolean;
 } {
   return {
     reaped: false,
     flushed: false,
-    inUse: true,
     _discarded: false,
     async reap() {
       this.reaped = true;
-      this.inUse = false;
     },
     async flush() {
       this.flushed = true;
@@ -25,6 +28,38 @@ function makePool(): ReapablePool & {
       return this._discarded;
     },
   };
+}
+
+function duplicatedPoolConfig(mergeConfigOptions: Record<string, unknown> = {}): PoolConfig {
+  const oldConfig = {
+    ...Base.connectionPool().dbConfig.configurationHash,
+    ...mergeConfigOptions,
+  };
+  const dbConfig = new HashConfig("arunit", "primary", { ...oldConfig });
+  return new PoolConfig(Base, dbConfig, "writing", "default");
+}
+
+async function newConnInThread(pool: ConnectionPool): Promise<[AbstractAdapter, Thread]> {
+  let set!: () => void;
+  const event = new Promise<void>((resolve) => (set = resolve));
+  let conn!: AbstractAdapter;
+
+  const child = new Thread(async () => {
+    conn = await pool.checkout();
+    await conn.selectValue("SELECT 1");
+    set();
+    await new Promise(() => {});
+  });
+
+  await event;
+  return [conn, child];
+}
+
+async function waitForConnIdle(conn: AbstractAdapter, timeout = 5): Promise<void> {
+  const start = performance.now();
+  while (conn.inUse && performance.now() - start < timeout * 1000) {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
 }
 
 function clearReaperState() {
@@ -62,44 +97,73 @@ describe("ReaperTest", () => {
     expect(fp.flushed).toBeTruthy();
   });
 
-  it("pool has reaper", () => {
-    const pool = makePool();
-    const reaper = new Reaper(pool, 60);
-    expect(reaper).toBeTruthy();
+  it("pool has reaper", async () => {
+    const config = Base.configurations().configsFor({ envName: "arunit", name: "primary" })!;
+    const poolConfig = new PoolConfig(Base, config, "writing", "default");
+    const pool = new ConnectionPool(poolConfig);
+    try {
+      expect(pool.reaper).toBeTruthy();
+    } finally {
+      await pool.discardBang();
+    }
   });
 
-  it("reaping frequency configuration", () => {
-    const pool = makePool();
-    const reaper = new Reaper(pool, 10.01);
-    expect(reaper.frequency).toBe(10.01);
+  it("reaping frequency configuration", async () => {
+    const poolConfig = duplicatedPoolConfig({ reapingFrequency: "10.01" });
+    const pool = new ConnectionPool(poolConfig);
+    try {
+      expect(pool.reaper.frequency).toBe(10.01);
+    } finally {
+      await pool.discardBang();
+    }
   });
 
   it("connection pool starts reaper", async () => {
-    const conn = makePool();
-    new Reaper(conn, 60).run();
+    vi.useRealTimers();
+    const poolConfig = duplicatedPoolConfig({ reapingFrequency: "0.0001" });
+    const pool = new ConnectionPool(poolConfig);
+    try {
+      const [conn, child] = await newConnInThread(pool);
 
-    expect(conn.inUse).toBeTruthy();
-    await vi.advanceTimersByTimeAsync(60_000);
-    expect(conn.inUse).toBeFalsy();
+      expect(conn.inUse).toBeTruthy();
+
+      child.exit();
+
+      await waitForConnIdle(conn);
+      expect(conn.inUse).toBeFalsy();
+    } finally {
+      await pool.discardBang();
+    }
   });
 
   it("reaper works after pool discard", async () => {
-    const conn = makePool();
-    new Reaper(conn, 60).run();
+    vi.useRealTimers();
+    const poolConfig = duplicatedPoolConfig({ reapingFrequency: "0.0001" });
 
-    expect(conn.inUse).toBeTruthy();
-    await vi.advanceTimersByTimeAsync(60_000);
-    expect(conn.inUse).toBeFalsy();
+    for (let i = 0; i < 2; i++) {
+      const pool = new ConnectionPool(poolConfig);
 
-    conn._discarded = true;
+      const [conn, child] = await newConnInThread(pool);
+
+      expect(conn.inUse).toBeTruthy();
+
+      child.exit();
+
+      await waitForConnIdle(conn);
+      expect(conn.inUse).toBeFalsy();
+
+      await pool.discardBang();
+    }
   });
 
   it("reap flush on discarded pool", async () => {
-    const pool = makePool();
-    pool._discarded = true;
+    const poolConfig = duplicatedPoolConfig();
+    const pool = new ConnectionPool(poolConfig);
+
+    await pool.discardBang();
     await assertNothingRaised(async () => {
-      await pool.reap?.();
-      await pool.flush?.();
+      await pool.reap();
+      await pool.flush();
     });
   });
 
