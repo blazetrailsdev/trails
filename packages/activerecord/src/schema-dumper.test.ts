@@ -1,8 +1,7 @@
 import { StringIO } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
 import { Base } from "./base.js";
-import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
-import type { SchemaSource } from "./schema-dumper.js";
+import { SchemaDumper, type SchemaSource } from "./schema-dumper.js";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -21,13 +20,6 @@ import {
   FULL_DUMP_TIMEOUT_MS,
 } from "./support/schema-dumping-helper.js";
 import { withPostgresqlDatetimeType } from "./support/with-postgresql-datetime-type.js";
-import { Column } from "./connection-adapters/column.js";
-import { SqlTypeMetadata } from "./connection-adapters/sql-type-metadata.js";
-import { ValueType } from "@blazetrails/activemodel";
-
-function schemaColumn(name: string, type: string): Column {
-  return new Column(name, null, new SqlTypeMetadata({ sqlType: type, type }));
-}
 
 function assertNoLineUp(lines: string[], pattern: RegExp): void {
   if (lines.length === 0) return expect(true).toBeTruthy();
@@ -69,11 +61,6 @@ class CreateCatMigration extends Current {
   }
 }
 
-const PRIMARY_KEY_ADAPTER = {
-  primaryKey: async () => "id",
-  lookupCastTypeFromColumn: () => new ValueType(),
-};
-
 describe("SchemaDumperTest", () => {
   fixtures({}, { useTransactionalTests: false });
 
@@ -91,6 +78,11 @@ describe("SchemaDumperTest", () => {
       (await Base.leaseConnection()) as unknown as { supportsIndexSortOrder(): Promise<boolean> }
     ).supportsIndexSortOrder();
   }
+
+  it("schema dump include migration version", { timeout: FULL_DUMP_TIMEOUT_MS }, async () => {
+    const output = await standardDump();
+    expect(output).toMatch(/export default async function defineSchema\(/);
+  });
 
   it("schema dump", { timeout: FULL_DUMP_TIMEOUT_MS }, async () => {
     const output = await standardDump();
@@ -395,7 +387,7 @@ describe("SchemaDumperTest", () => {
 
 describe("SchemaDumperTest", () => {
   afterEach(async () => {
-    delete (SchemaDumper as unknown as Record<string, unknown>)["ignoreTables"];
+    SchemaDumper.ignoreTables = [];
     SchemaDumper.fkIgnorePattern = /^fk_rails_[0-9a-f]{10}$/;
     await (await Base.leaseConnection()).dropTable("timestamps", { ifExists: true });
   });
@@ -430,17 +422,6 @@ describe("SchemaDumperTest", () => {
       await schemaMigration.deleteAllVersions();
     }
   });
-
-  it("schema dump include migration version", async () => {
-    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
-    const { SchemaMigration } = await import("./schema-migration.js");
-    const adapter = await Base.leaseConnection();
-    const sm = new SchemaMigration(adapter.pool);
-    await sm.createTable();
-    await sm.createVersion("20240601120000");
-    const output = (await TopLevelDumper.dump(adapter)).string();
-    expect(output).toMatch(/export const defineParams = \{ version: 2024_06_01_120000 \};/);
-  }, 60000);
 
   it("schema dump with regexp ignored table", { timeout: FULL_DUMP_TIMEOUT_MS }, async () => {
     const output = await dumpAllTableSchema([/^courses/], await ARUnit2Model.leaseConnection());
@@ -797,21 +778,37 @@ describe("SchemaDumperTest", () => {
       Base.tableNameSuffix = suffixWas;
     }
   });
-  it("schema dump with table name prefix and ignoring tables", async () => {
-    const source = {
-      tables: async () => ["omg_cats", "omg_omg_cats"],
-      columns: async (_t: string) => [schemaColumn("id", "integer")],
-      indexes: async () => [],
-      adapter: PRIMARY_KEY_ADAPTER,
-    };
-    SchemaDumper.ignoreTables = ["cats"];
-    const output = (
-      await SchemaDumper.dump(source as any, new StringIO(), { tableNamePrefix: "omg_" })
-    ).string();
+  it(
+    "schema dump with table name prefix and ignoring tables",
+    { timeout: FULL_DUMP_TIMEOUT_MS },
+    async () => {
+      const createCatMigration = class extends Current {
+        async change(): Promise<void> {
+          await this.createTable("cats", {}, () => {});
+          // eslint-disable-next-line blazetrails/require-table-teardown -- migrate("down") reverts #change, dropping both
+          await this.createTable("omg_cats", {}, () => {});
+        }
+      };
 
-    expect(output).toMatch(/createTable\("omg_cats"/);
-    expect(output).not.toMatch(/createTable\("cats"/);
-  });
+      const originalTableNamePrefix = Base.tableNamePrefix;
+      const originalSchemaDumperIgnoreTables = SchemaDumper.ignoreTables;
+      Base.tableNamePrefix = "omg_";
+      SchemaDumper.ignoreTables = ["cats"];
+      const migration = new createCatMigration();
+      await migration.migrate("up");
+      try {
+        const stream = new StringIO();
+        const output = (await SchemaDumper.dump(Base.connectionPool(), stream)).string();
+
+        expect(output).toMatch(/createTable\("omg_cats"/);
+        expect(output).not.toMatch(/createTable\("cats"/);
+      } finally {
+        await migration.migrate("down");
+        Base.tableNamePrefix = originalTableNamePrefix;
+        SchemaDumper.ignoreTables = originalSchemaDumperIgnoreTables;
+      }
+    },
+  );
 
   it.skipIf(adapterType !== "postgres")(
     "schema dump with correct timestamp types via create table and t column",

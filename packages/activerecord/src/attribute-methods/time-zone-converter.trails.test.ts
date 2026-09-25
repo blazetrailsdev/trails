@@ -122,4 +122,13 @@ describe("TimeZoneConverterTest", () => {
     expect(serialized).toBeInstanceOf(RubyTime);
     expect((serialized as RubyTime).toTime().toInstant().toString()).toBe("2024-06-15T14:00:00Z");
   });
+
+  it("cast returns an infinite value without casting it through the subtype", () => {
+    const subtype = new DateTime();
+    const spy = vi.spyOn(subtype, "cast");
+    const converter = new TimeZoneConverter(subtype);
+    expect(converter.cast(Infinity)).toBe(Infinity);
+    expect(converter.cast(-Infinity)).toBe(-Infinity);
+    expect(spy).not.toHaveBeenCalled();
+  });
 });
