@@ -59,7 +59,7 @@ export function applySecondsPrecision<T>(this: { precision?: number }, value: T)
   }
 }
 
-export function typeCastForSchema(value: unknown): string {
+export function typeCastForSchema(value: unknown): unknown {
   return JSON.stringify(toFs(value as Temporal.Instant, "db"));
 }
 

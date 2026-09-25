@@ -4,6 +4,6 @@ import { Trailtie } from "./active-model.js";
 
 describe("ActiveModel::Railtie class body", () => {
   it("pushes ActiveModel onto the shared eager-load namespace list", () => {
-    expect(Trailtie.config.eagerLoadNamespaces).toContain(ActiveModel);
+    expect(Trailtie.config.eagerLoadNamespaces).toContain(ActiveModel.ActiveModel);
   });
 });

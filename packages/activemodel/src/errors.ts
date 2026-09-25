@@ -16,6 +16,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { Error as ActiveModelError } from "./error.js";
 import { NestedError } from "./nested-error.js";
+import { ActiveModel } from "./namespaces.js";
 
 export type ErrorDetail = ActiveModelError;
 
@@ -363,3 +364,8 @@ export class UnknownAttributeError<TRecord extends object = object> extends glob
     this.attribute = attribute;
   }
 }
+
+ActiveModel.Errors = Errors;
+ActiveModel.RangeError = RangeError;
+ActiveModel.StrictValidationFailed = StrictValidationFailed;
+ActiveModel.UnknownAttributeError = UnknownAttributeError;

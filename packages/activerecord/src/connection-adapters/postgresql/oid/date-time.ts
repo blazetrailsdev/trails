@@ -25,7 +25,7 @@ export class DateTime extends ArDateTime {
     return super.castValue(value);
   }
 
-  override typeCastForSchema(value: unknown): string {
+  override typeCastForSchema(value: unknown): unknown {
     if (value === DateInfinity) return "::Float::INFINITY";
     if (value === DateNegativeInfinity) return "-::Float::INFINITY";
     return super.typeCastForSchema(value);

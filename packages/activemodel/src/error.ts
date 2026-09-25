@@ -2,6 +2,7 @@ import { classAttribute, humanize, deepDup, isPlainObject } from "@blazetrails/a
 import { except, kernelCatch } from "@blazetrails/ruby-compat";
 import { MissingTranslation, type TranslateKey } from "@blazetrails/i18n";
 import { I18n } from "./i18n.js";
+import { ActiveModel } from "./namespaces.js";
 
 type ModelBase = object | null;
 
@@ -281,3 +282,5 @@ export class Error {
     return `#<ActiveModel::Error attribute=${this.attribute}, type=${this.type}, options=${optionsStr}>`;
   }
 }
+
+ActiveModel.Error = Error;

@@ -12,6 +12,10 @@ import { Root } from "../paths.js";
 import { Trails } from "../rails.js";
 import type { ConfigurationBlock } from "../trailtie/configuration.js";
 import type { Mapper } from "@blazetrails/actionpack";
+import { ActiveModel, ValidationError } from "@blazetrails/activemodel";
+import { GlobalID, Verifier } from "@blazetrails/globalid";
+import { Trailtie as ActiveModelTrailtie } from "../trailties/active-model.js";
+import { Trailtie as GlobalIdTrailtie } from "../trailties/global-id.js";
 
 class TestApp extends Finisher {
   sessionStoreArgs: unknown[] | null = null;
@@ -249,6 +253,18 @@ describe("Finisher", () => {
     await run(app, "eager_load!");
     expect(seen).toEqual(["before_eager_load", "namespace"]);
     resetLoadHooks();
+  });
+
+  it("eager_load! eager loads the ActiveModel and GlobalID namespaces", async () => {
+    const app = new TestApp();
+    app.config.eagerLoad = true;
+    app.config.eagerLoadNamespaces = ActiveModelTrailtie.config.eagerLoadNamespaces;
+    expect(app.config.eagerLoadNamespaces).toBe(GlobalIdTrailtie.config.eagerLoadNamespaces);
+    await run(app, "eager_load!");
+    await ActiveModel.eagerLoadBang();
+    await GlobalID.eagerLoadBang();
+    expect(ActiveModel.ValidationError).toBe(ValidationError);
+    expect(GlobalID.Verifier).toBe(Verifier);
   });
 
   it("eager_load! is a no-op when config.eagerLoad is false", async () => {

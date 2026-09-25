@@ -1,5 +1,5 @@
 import { ValueType } from "@blazetrails/activemodel";
-import { rbEqual } from "@blazetrails/ruby-compat";
+import { rbEqual, rbObjAsString } from "@blazetrails/ruby-compat";
 
 const STRUCTURAL_CHARS = /[{}"\\ \t\n\r\v\f]/;
 const NULL_LITERAL = /^null$/i;
@@ -117,7 +117,7 @@ export interface ArraySubtype {
   cast(value: unknown): unknown;
   serialize(value: unknown): unknown;
   deserialize?(value: unknown): unknown;
-  typeCastForSchema?(value: unknown): string;
+  typeCastForSchema?(value: unknown): unknown;
   map?(value: unknown, block: (value: unknown) => unknown): unknown;
   userInputInTimeZone?(value: unknown): unknown;
 }
@@ -200,7 +200,7 @@ export class Array extends ValueType<unknown> {
 
   private formatValueForSchema(value: unknown): string {
     const typeCastForSchema = this.subtype.typeCastForSchema;
-    if (typeCastForSchema) return typeCastForSchema(value);
+    if (typeCastForSchema) return rbObjAsString(typeCastForSchema(value));
     if (typeof value === "bigint") return String(value);
     try {
       return JSON.stringify(value) ?? String(value);

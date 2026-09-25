@@ -1,7 +1,20 @@
 import { getApp } from "./config.js";
 import { GID, validateApp, type GidComponents } from "./uri/gid.js";
-import type { LocateOptions, LocatorLike, LocatorModel } from "./locator.js";
-import { constantize, Deprecation } from "@blazetrails/activesupport";
+import type { Identification as IdentificationModule } from "./identification.js";
+import type {
+  LocateOptions,
+  Locator as LocatorClass,
+  LocatorLike,
+  LocatorModel,
+} from "./locator.js";
+import type { Verifier as VerifierClass } from "./verifier.js";
+import {
+  Autoload,
+  constantize,
+  Deprecation,
+  extend,
+  type Extended,
+} from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 
 let _deprecator: Deprecation | undefined;
@@ -141,3 +154,38 @@ export class GlobalID {
     return Locator.locate(this, options);
   }
 }
+
+// eslint-disable-next-line @typescript-eslint/no-namespace
+export declare namespace GlobalID {
+  const loadPath: Autoload.Autoload["loadPath"];
+  let Locator: typeof LocatorClass;
+  let Identification: typeof IdentificationModule;
+  let Verifier: typeof VerifierClass;
+  const autoload: Extended<typeof Autoload>["autoload"];
+  const eagerAutoload: Extended<typeof Autoload>["eagerAutoload"];
+  const eagerLoadBang: Extended<typeof Autoload>["eagerLoadBang"];
+}
+Object.assign(GlobalID, {
+  loadPath: {
+    "global_id/locator": () => import("./locator.js"),
+    "global_id/identification": () => import("./identification.js"),
+    "global_id/verifier": () => import("./verifier.js"),
+    "global_id/signed_global_id": () => import("./signed-global-id.js"),
+  },
+});
+extend(GlobalID, Autoload);
+
+GlobalID.eagerAutoload(() => {
+  GlobalID.autoload("Locator");
+  GlobalID.autoload("Identification");
+  GlobalID.autoload("Verifier");
+});
+
+Object.defineProperty(GlobalID, "eagerLoadBang", {
+  value: async function eagerLoadBang(this: typeof GlobalID): Promise<void> {
+    await Autoload.eagerLoadBang.call(this);
+    await this.loadPath["global_id/signed_global_id"]();
+  },
+  writable: true,
+  configurable: true,
+});

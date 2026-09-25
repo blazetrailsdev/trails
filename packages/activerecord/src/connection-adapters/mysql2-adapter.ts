@@ -91,10 +91,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     );
   }
 
-  private get _rawConnection(): mysql.Connection | null {
+  /** @internal */
+  get _rawConnection(): mysql.Connection | null {
     return this._connection as mysql.Connection | null;
   }
-  private set _rawConnection(value: mysql.Connection | null) {
+  /** @internal */
+  set _rawConnection(value: mysql.Connection | null) {
     this._connection = value;
   }
   private _connectingPromise: Promise<mysql.Connection> | null = null;

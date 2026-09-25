@@ -12,6 +12,7 @@ ActiveRecord.Point = class Point {
     this.y = y;
   }
 
+  /** @noRailsEquivalent PERMANENT */
   equals(other: unknown): boolean {
     return (
       other instanceof ActiveRecord.Point && rbEqual(this.x, other.x) && rbEqual(this.y, other.y)
@@ -74,9 +75,9 @@ export class Point extends ValueType {
     return super.serialize(value);
   }
 
-  override typeCastForSchema(value: unknown): string {
+  override typeCastForSchema(value: unknown): unknown {
     if (value instanceof ActiveRecord.Point) {
-      return `[${value.x}, ${value.y}]`;
+      return [value.x, value.y];
     }
     return super.typeCastForSchema(value);
   }

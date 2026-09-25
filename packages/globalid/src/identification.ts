@@ -32,3 +32,5 @@ export const Identification = {
   toSgid,
   toSgidParam,
 };
+
+GlobalID.Identification = Identification;

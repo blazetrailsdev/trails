@@ -38,7 +38,7 @@ export class DateType extends ValueType<DateCastResult> {
     return "date";
   }
 
-  typeCastForSchema(value: unknown): string {
+  typeCastForSchema(value: unknown): unknown {
     return JSON.stringify(toFs(value as Temporal.PlainDate, "db"));
   }
 

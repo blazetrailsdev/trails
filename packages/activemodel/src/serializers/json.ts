@@ -17,6 +17,7 @@ import {
   ToJsonWithActiveSupportEncoder,
   type Included,
 } from "@blazetrails/activesupport";
+import { Serializers } from "../namespaces.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class JSON {
@@ -84,3 +85,5 @@ export interface JSON {
 }
 
 include(JSON, ToJsonWithActiveSupportEncoder);
+
+Serializers.JSON = JSON;
