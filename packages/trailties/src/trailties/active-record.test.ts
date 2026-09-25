@@ -1,8 +1,15 @@
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
+import { setEnv } from "@blazetrails/ruby-compat";
+import { useInMemoryDatabaseUrl } from "../support/in-memory-database-url.js";
 import { Trailtie, type ActiveRecordConfig } from "./active-record.js";
-import { Base } from "@blazetrails/activerecord";
+import {
+  Base,
+  setVerifyForeignKeysForFixtures,
+  verifyForeignKeysForFixtures,
+} from "@blazetrails/activerecord";
+import { Fixture, FixtureSet } from "../../../activerecord/src/fixtures.js";
 import { resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
 import { SchemaReflection } from "@blazetrails/activerecord";
 import { SQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js";
@@ -29,6 +36,8 @@ const blogApp = (): {
 });
 
 describe("RailtieTest", () => {
+  useInMemoryDatabaseUrl();
+
   let savedConfig: ActiveRecordConfig;
   let savedTimeZoneAware: boolean;
   let savedTimeZoneAwareTypes: string[];
@@ -41,6 +50,8 @@ describe("RailtieTest", () => {
   let savedRaiseOnAssignToAttrReadonly: boolean;
   let savedExtendQueries: boolean;
   let savedAddToFilterParameters: boolean;
+  let savedEncryptFixtures: boolean;
+  let savedFixtureInitialize: typeof Fixture.prototype.initialize;
 
   beforeEach(() => {
     savedConfig = structuredClone(Trailtie.config.get("activeRecord") as ActiveRecordConfig);
@@ -55,6 +66,8 @@ describe("RailtieTest", () => {
     savedPartialInserts = Base.partialInserts;
     savedRaiseOnAssignToAttrReadonly = raiseOnAssignToAttrReadonly();
     savedExtendQueries = EncryptionConfigurable.config.extendQueries;
+    savedEncryptFixtures = EncryptionConfigurable.config.encryptFixtures;
+    savedFixtureInitialize = Fixture.prototype.initialize;
 
     resetLoadHooks();
     runLoadHooks("active_record", Base);
@@ -75,6 +88,9 @@ describe("RailtieTest", () => {
     setRaiseOnAssignToAttrReadonly(savedRaiseOnAssignToAttrReadonly);
     EncryptionConfigurable.config.addToFilterParameters = savedAddToFilterParameters;
     EncryptionConfigurable.config.extendQueries = savedExtendQueries;
+    EncryptionConfigurable.config.encryptFixtures = savedEncryptFixtures;
+    Fixture.prototype.initialize = savedFixtureInitialize;
+    setVerifyForeignKeysForFixtures(false);
     if (savedExtendQueries) {
       ExtendedDeterministicUniquenessValidator.installSupport({
         UniquenessValidator,
@@ -235,6 +251,48 @@ describe("RailtieTest", () => {
     runLoadHooks("active_record", Base);
 
     expect(Base.partialInserts).toBe(false);
+  });
+
+  it("runInitializers applies every config.active_record key through its ActiveRecord setter", async () => {
+    (Trailtie.config.get("activeRecord") as Record<string, unknown>).verifyForeignKeysForFixtures =
+      true;
+
+    await runTrailtieInitializers(Trailtie, blogApp());
+
+    expect(verifyForeignKeysForFixtures()).toBe(true);
+  });
+
+  it("runInitializers assigns Base.configurations from the database configuration", async () => {
+    await runTrailtieInitializers(Trailtie, blogApp());
+
+    expect(Base.configurations().configsFor({ envName: "test" })).not.toEqual([]);
+  });
+
+  it("runInitializers surfaces a missing database configuration", async () => {
+    setEnv("DATABASE_URL", undefined);
+    try {
+      await expect(runTrailtieInitializers(Trailtie, blogApp())).rejects.toThrow(
+        "Could not load database configuration",
+      );
+    } finally {
+      setEnv("DATABASE_URL", "sqlite3::memory:");
+    }
+  });
+
+  it("runInitializers prepends EncryptedFixtures when encrypt_fixtures is set", async () => {
+    EncryptionConfigurable.config.encryptFixtures = true;
+    await runTrailtieInitializers(Trailtie, blogApp());
+    runLoadHooks("active_record_fixture_set", FixtureSet);
+
+    expect(Fixture.prototype.initialize).not.toBe(savedFixtureInitialize);
+  });
+
+  it("runInitializers does not prepend EncryptedFixtures when encrypt_fixtures is unset", async () => {
+    EncryptionConfigurable.config.encryptFixtures = false;
+    await runTrailtieInitializers(Trailtie, blogApp());
+    runLoadHooks("active_record_fixture_set", FixtureSet);
+
+    expect(Fixture.prototype.initialize).toBe(savedFixtureInitialize);
   });
 
   it("runInitializers installs the executor hooks that open an async query session", async () => {

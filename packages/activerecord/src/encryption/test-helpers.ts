@@ -21,9 +21,13 @@ import { MessagePackMessageSerializer } from "./message-pack-message-serializer.
 
 import { withEncryptionContext } from "../encryption.js";
 import { Key } from "./key.js";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { prepend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { Fixture } from "../fixtures.js";
+import { EncryptedFixtures } from "./encrypted-fixtures.js";
 export { withEncryptionContext, withoutEncryption } from "../encryption.js";
 export { Decryption, Encryption };
+
+prepend(Fixture.prototype, EncryptedFixtures);
 
 import {
   TEST_PRIMARY_KEY,

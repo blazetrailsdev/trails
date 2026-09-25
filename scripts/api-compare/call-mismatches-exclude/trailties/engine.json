@@ -12,16 +12,5 @@
     "rubyName": "config",
     "call": "find_root",
     "reason": "Verified per-site (RFC 0106): `Engine::Configuration.new(self.class.find_root(self.class.called_from))` (engine.rb:553) — `findRoot` walks the filesystem and is async under the hard rule (async fs only), so the synchronous `config` getter cannot await it; the root is resolved via the engine's resolved-root path (engine.ts:80-85)."
-  },
-  {
-    "package": "trailties",
-    "tsFile": "engine.ts",
-    "rubyName": "config",
-    "call": "new",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:findRoot"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   }
 ]

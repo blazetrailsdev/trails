@@ -42,20 +42,20 @@ export class Engine extends Trailtie {
     return readOwnState<boolean>(this, "_isolated") === true;
   }
 
-  static engineName(name?: string): string {
-    return this.railtieName(name);
+  static override get config(): EngineConfiguration {
+    return this.instance().config;
   }
 
-  static engineSubclasses(): Array<typeof Engine> {
-    return Trailtie.subclasses().filter((k): k is typeof Engine => k.prototype instanceof Engine);
+  static engineName(name?: string): string {
+    return this.railtieName(name);
   }
 
   static async find(path: string): Promise<Engine | undefined> {
     const p = getPath();
     const fs = getFs();
     const expanded = await realpathOr(fs, p.resolve(path));
-    for (const klass of this.engineSubclasses()) {
-      const engine = klass.instance();
+    for (const klass of Engine.subclasses()) {
+      const engine = klass.instance() as Engine;
       const root = await engine.root();
       if ((await realpathOr(fs, p.resolve(root))) === expanded) return engine;
     }

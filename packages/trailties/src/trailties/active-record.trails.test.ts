@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { useInMemoryDatabaseUrl } from "../support/in-memory-database-url.js";
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
 import { Trailtie } from "./active-record.js";
 import { Deprecators, Notifications, runLoadHooks } from "@blazetrails/activesupport";
@@ -14,6 +15,8 @@ const blogApp = (): {
 });
 
 describe("RailtieTest (trails-only)", () => {
+  useInMemoryDatabaseUrl();
+
   it("runInitializers includes ControllerRuntime into ActionController::Base", async () => {
     await runTrailtieInitializers(Trailtie, blogApp());
     class LogRuntimeController extends ActionController.Base {}

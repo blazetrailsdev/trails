@@ -4,6 +4,7 @@ import { ref, tsClass, tsField, tsModule, tsRaw } from "../template-builder/inde
 import { AppBase, type AppBaseOptions } from "./app-base.js";
 import { GeneratorError } from "./generated-attribute.js";
 import { type DatabaseName } from "./database.js";
+import { LOAD_DEFAULTS_VERSION } from "../application/configuration.js";
 
 const RESERVED_NAMES = ["application", "destroy", "plugin", "runner", "test"];
 
@@ -37,6 +38,7 @@ const TRAILS = `${TRAILS_LOADER} ${TRAILS_CLI}`;
 
 export class AppGenerator extends AppBase {
   readonly packageManager: PackageManager;
+  private _configTargetVersion: string | null = null;
   readonly sqliteDriver: SqliteDriver;
 
   constructor(options: AppGeneratorOptions) {
@@ -398,7 +400,7 @@ process.exit(status ?? 1);
   }
 
   private configTargetVersion(): string {
-    return "8.0";
+    return this._configTargetVersion ?? LOAD_DEFAULTS_VERSION;
   }
 
   private createConfigFiles(name: string): void {
@@ -992,7 +994,8 @@ LABEL fly_launch_runtime="Trails"
 
 WORKDIR /app
 
-ENV NODE_ENV="production"
+ENV TRAILS_ENV="production" \\
+    NODE_ENV="production"
 
 FROM base AS build
 

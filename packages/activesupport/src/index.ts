@@ -369,6 +369,10 @@ import "./core-ext/time/calculations.js";
 export * from "./core-ext/time/conversions.js";
 export { rfc3339 } from "./time-ext.js";
 export * from "./core-ext/time/compatibility.js";
+export {
+  setUtcToLocalReturnsUtcOffsetTimes,
+  utcToLocalReturnsUtcOffsetTimes,
+} from "./core-ext/date-and-time/compatibility.js";
 export * from "./core-ext/string/zones.js";
 
 export { Duration, seconds, minutes, hours, days, weeks, months, years } from "./duration.js";

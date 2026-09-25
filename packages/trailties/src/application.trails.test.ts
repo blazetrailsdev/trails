@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { useInMemoryDatabaseUrl } from "./support/in-memory-database-url.js";
 import { Trailtie as BaseTrailtie } from "./trailtie.js";
 import { Trailtie as ActiveRecordTrailtie } from "./trailties/active-record.js";
 import { Application } from "./application.js";
 
 describe("Application framework railtie initializers", () => {
+  useInMemoryDatabaseUrl();
+
   it("runs a framework railtie initializer with the application as its argument", async () => {
     const seen: unknown[] = [];
     class RecordAppTrailtie extends BaseTrailtie {}

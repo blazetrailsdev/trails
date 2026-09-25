@@ -2,10 +2,9 @@ import { Trailtie } from "../trailtie.js";
 import { Engine } from "../engine.js";
 
 export class Trailties implements Iterable<Trailtie> {
-  readonly all: Trailtie[] = [
-    ...Trailtie.subclasses().filter((k) => Object.getPrototypeOf(k) === Trailtie),
-    ...Trailtie.subclasses().filter((k) => Object.getPrototypeOf(k) === Engine),
-  ].map((k) => k.instance());
+  readonly all: Trailtie[] = [...Trailtie.subclasses(), ...Engine.subclasses()].map((k) =>
+    k.instance(),
+  );
 
   /** @noRailsEquivalent PERMANENT */
   [Symbol.iterator](): Iterator<Trailtie> {

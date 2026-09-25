@@ -1,6 +1,14 @@
 import "./active-model.js";
 import "./action-controller.js";
-import { include, onLoad, type Deprecators } from "@blazetrails/activesupport";
+import {
+  constantize,
+  include,
+  onLoad,
+  upcaseFirst,
+  type Deprecators,
+} from "@blazetrails/activesupport";
+import { except, prepend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import * as ActiveRecord from "@blazetrails/activerecord";
 import {
   AsynchronousQueriesTracker,
   AutoFilteredParameters,
@@ -12,7 +20,6 @@ import {
   SchemaReflection,
   UniquenessValidator,
   deprecator,
-  setMaintainTestSchema,
   type AutoFilteredParametersApp,
 } from "@blazetrails/activerecord";
 import type { SQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js";
@@ -20,17 +27,13 @@ import type { PostgreSQLAdapter } from "@blazetrails/activerecord/connection-ada
 import {
   Encryption,
   EncryptedAttributeType,
+  EncryptedFixtures,
   EncryptedUniquenessValidator,
   ExtendedDeterministicQueries,
   ExtendedDeterministicUniquenessValidator,
 } from "@blazetrails/activerecord/encryption";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
-import {
-  setBelongsToRequiredValidatesForeignKey,
-  setGenerateSecureTokenOn,
-  setQueues,
-  setRaiseOnAssignToAttrReadonly,
-} from "@blazetrails/activerecord";
+import { databaseConfiguration } from "../database.js";
 
 export type ActiveRecordEncryptionConfig = Parameters<typeof Encryption.configure>[0];
 
@@ -147,18 +150,61 @@ export class Trailtie extends BaseTrailtie {
     });
 
     this.initializer("active_record.set_configs", () => {
-      const cfg = this.config.get("activeRecord") as ActiveRecordConfig;
-      setMaintainTestSchema(cfg.maintainTestSchema);
-      setRaiseOnAssignToAttrReadonly(cfg.raiseOnAssignToAttrReadonly);
-      setBelongsToRequiredValidatesForeignKey(cfg.belongsToRequiredValidatesForeignKey);
-      setGenerateSecureTokenOn(cfg.generateSecureTokenOn);
-      setQueues(cfg.queues);
-      const partialInserts = cfg.partialInserts;
-      if (partialInserts !== undefined) {
-        onLoad("active_record", (base: typeof Base) => {
-          base.partialInserts = partialInserts;
-        });
-      }
+      const configs = this.config.get("activeRecord") as Record<string, unknown>;
+
+      this.config.afterInitialize(() => {
+        for (const [k, v] of Object.entries(configs)) {
+          if (k === "encryption") continue;
+          const setter = `set${upcaseFirst(k)}`;
+          if (rbObjRespondTo(ActiveRecord, setter)) {
+            (ActiveRecord as unknown as Record<string, (v: unknown) => void>)[setter](v);
+          }
+        }
+      });
+
+      onLoad("active_record", (base: typeof Base) => {
+        const configsUsedInOtherInitializers = except(
+          configs,
+          "migrationError",
+          "databaseSelector",
+          "databaseResolver",
+          "databaseResolverContext",
+          "shardSelector",
+          "shardResolver",
+          "queryLogTagsEnabled",
+          "queryLogTags",
+          "queryLogTagsFormat",
+          "cacheQueryLogTags",
+          "sqlite3AdapterStrictStringsByDefault",
+          "checkSchemaCacheDumpVersion",
+          "useSchemaCacheDump",
+          "postgresqlAdapterDecodeDates",
+        );
+
+        for (const [k, v] of Object.entries(configsUsedInOtherInitializers)) {
+          if (k === "encryption") continue;
+          const setter = `set${upcaseFirst(k)}`;
+          if (rbObjRespondTo(ActiveRecord, setter)) {
+            (ActiveRecord as unknown as Record<string, (v: unknown) => void>)[setter](v);
+          } else {
+            (base as unknown as Record<string, unknown>)[k] = v;
+          }
+        }
+      });
+    });
+
+    this.initializer("active_record.initialize_database", async () => {
+      let initializeDatabase: Promise<unknown> | undefined;
+      onLoad("active_record", (base: typeof Base) => {
+        initializeDatabase = (async () => {
+          base.configurations(
+            (await databaseConfiguration()) as Parameters<typeof base.configurations>[0],
+          );
+
+          return base.establishConnection();
+        })();
+      });
+      await initializeDatabase;
     });
 
     this.initializer("active_record.set_executor_hooks", () => {
@@ -184,6 +230,15 @@ export class Trailtie extends BaseTrailtie {
       if (Encryption.config.addToFilterParameters) autoFilteredParameters.enable();
 
       onLoad("active_record", { runOnce: true }, installEncryptionExtendedQueries);
+
+      onLoad("active_record_fixture_set", () => {
+        if (Encryption.config.encryptFixtures) {
+          prepend(
+            (constantize("ActiveRecord::Fixture") as { prototype: object }).prototype,
+            EncryptedFixtures,
+          );
+        }
+      });
     });
   }
 }

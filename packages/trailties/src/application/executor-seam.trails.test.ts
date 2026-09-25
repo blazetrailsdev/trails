@@ -9,6 +9,7 @@ import { Application } from "../application.js";
 import { Configuration } from "./configuration.js";
 import { DefaultMiddlewareStack } from "./default-middleware-stack.js";
 import { Root } from "../paths.js";
+import { useInMemoryDatabaseUrl } from "../support/in-memory-database-url.js";
 
 const SESSION_ERROR = "Can't perform asynchronous queries without a query session";
 
@@ -19,6 +20,8 @@ async function selectOneAsync(): Promise<unknown[]> {
 }
 
 describe("ActionDispatch::Executor around a request (trails)", () => {
+  useInMemoryDatabaseUrl();
+
   class TestApplication extends Application {}
   let app: TestApplication;
 
