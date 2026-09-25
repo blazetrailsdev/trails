@@ -5,9 +5,6 @@ import { Error as ModelError } from "../error.js";
 import { I18n } from "../i18n.js";
 import { Person as BasePerson } from "../test-helpers/models/person.js";
 
-const A = "(?<![\\s\\S])";
-const Z = "(?![\\s\\S])";
-
 describe("I18nValidationTest", () => {
   let personStub: typeof BasePerson | undefined;
   let person: BasePerson & Record<string, any>;
@@ -358,7 +355,7 @@ describe("I18nValidationTest", () => {
     await eachCommonCase(async (validationOptions, generateMessageOptions) => {
       personClass().validatesFormatOf("title", {
         ...validationOptions,
-        with: new RegExp(`${A}[1-9][0-9]*${Z}`),
+        with: /^[1-9][0-9]*$/,
       });
       person.title = "72x";
       const call = ["title", ":invalid", person, { ...generateMessageOptions, value: "72x" }];
@@ -529,7 +526,7 @@ describe("I18nValidationTest", () => {
       (person, optionsToMerge) => {
         (person.constructor as typeof BasePerson).validatesFormatOf("title", {
           ...optionsToMerge,
-          with: new RegExp(`${A}[1-9][0-9]*${Z}`),
+          with: /^[1-9][0-9]*$/,
         });
       },
     ],
