@@ -94,6 +94,9 @@ export class ModelGenerator extends GeneratorBase {
         }
       }
     }
+    if (columns.some((col) => col.name === "password" && col.type === "digest")) {
+      bodyLines.push("    this.hasSecurePassword();");
+    }
 
     const staticBlock = bodyLines.length > 0 ? `\n  static {\n${bodyLines.join("\n")}\n  }\n` : "";
     const ext = this.ext();

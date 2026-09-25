@@ -281,6 +281,7 @@ export type ColumnType =
   | "timestamp"
   | "references"
   | "belongs_to"
+  | "digest"
   | "token"
   | "rich_text"
   | "attachment"
