@@ -1,11 +1,5 @@
-import {
-  GeneratorBase,
-  type GeneratorOptions,
-  classify,
-  dasherize,
-  parseColumns,
-} from "../../base.js";
-import { tableize, underscore } from "@blazetrails/activesupport";
+import { GeneratorBase, type GeneratorOptions, dasherize, parseColumns } from "../../base.js";
+import { camelize, humanize, pluralize, tableize, underscore } from "@blazetrails/activesupport";
 import { ModelGenerator } from "../../model-generator.js";
 import { tsBody, tsMethod, type Method } from "../../../template-builder/index.js";
 import { emitControllerClass } from "../controller/controller-paths.js";
@@ -16,7 +10,7 @@ export class ScaffoldGenerator extends GeneratorBase {
   }
 
   run(name: string, args: string[]): string[] {
-    const className = classify(name);
+    const className = camelize(underscore(name));
     const resourceName = tableize(className);
     const singular = underscore(className);
     const columns = parseColumns(args);
@@ -24,7 +18,7 @@ export class ScaffoldGenerator extends GeneratorBase {
     const modelGen = new ModelGenerator({ cwd: this.cwd, output: this.output });
     this.createdFiles.push(...modelGen.run(name, args));
 
-    const controllerClassName = classify(resourceName) + "Controller";
+    const controllerClassName = camelize(resourceName) + "Controller";
     const controllerFileName = dasherize(resourceName) + "-controller";
     const ext = this.ext();
     const ts = this.isTypeScript();
@@ -130,11 +124,11 @@ describe("${className}", () => {
 }
 
 function indexView(plural: string, singular: string, cols: Col[]): string {
-  const heads = cols.map((c) => `        <th>${classify(c.name)}</th>`).join("\n");
+  const heads = cols.map((c) => `        <th>${humanize(c.name)}</th>`).join("\n");
   const cells = cols.map((c) => `          <td><%= ${singular}.${c.name} %></td>`).join("\n");
-  return `<h1>${classify(plural)}</h1>
+  return `<h1>${pluralize(humanize(singular))}</h1>
 
-<p><a href="/${plural}/new">New ${classify(singular)}</a></p>
+<p><a href="/${plural}/new">New ${humanize(singular)}</a></p>
 
 <table>
   <thead>
@@ -160,9 +154,9 @@ ${cells}
 
 function showView(singular: string, cols: Col[]): string {
   const fields = cols
-    .map((c) => `<p><strong>${classify(c.name)}:</strong> <%= ${singular}.${c.name} %></p>`)
+    .map((c) => `<p><strong>${humanize(c.name)}:</strong> <%= ${singular}.${c.name} %></p>`)
     .join("\n");
-  return `<h1>${classify(singular)}</h1>
+  return `<h1>${humanize(singular)}</h1>
 
 ${fields}
 
@@ -175,7 +169,7 @@ ${fields}
 }
 
 function newView(singular: string, plural: string): string {
-  return `<h1>New ${classify(singular)}</h1>
+  return `<h1>New ${humanize(singular)}</h1>
 
 <%= yield %>
 
@@ -184,7 +178,7 @@ function newView(singular: string, plural: string): string {
 }
 
 function editView(singular: string, plural: string): string {
-  return `<h1>Edit ${classify(singular)}</h1>
+  return `<h1>Edit ${humanize(singular)}</h1>
 
 <%= yield %>
 
@@ -214,12 +208,12 @@ function formPartial(singular: string, cols: Col[]): string {
                   : "text";
       if (inputType === "textarea") {
         return `  <div>
-    <label for="${singular}_${c.name}">${classify(c.name)}</label>
+    <label for="${singular}_${c.name}">${humanize(c.name)}</label>
     <textarea name="${singular}[${c.name}]" id="${singular}_${c.name}"><%= ${singular}.${c.name} ?? "" %></textarea>
   </div>`;
       }
       return `  <div>
-    <label for="${singular}_${c.name}">${classify(c.name)}</label>
+    <label for="${singular}_${c.name}">${humanize(c.name)}</label>
     <input type="${inputType}" name="${singular}[${c.name}]" id="${singular}_${c.name}" value="<%= ${singular}.${c.name} ?? "" %>">
   </div>`;
     })
@@ -228,7 +222,7 @@ function formPartial(singular: string, cols: Col[]): string {
 ${fields}
 
   <div>
-    <input type="submit" value="Save ${classify(singular)}">
+    <input type="submit" value="Save ${humanize(singular)}">
   </div>
 </form>
 `;

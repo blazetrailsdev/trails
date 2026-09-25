@@ -52,3 +52,15 @@ describe("ControllerGenerator view and controller file naming", () => {
     expect(fs.existsSync(path.join(tmpDir, "app/helpers/rfc-pages-helper.ts"))).toBe(true);
   });
 });
+
+describe("ControllerGenerator --parent", () => {
+  it("classifies a plural parent name, singularizing it as parent_class_name.classify does", () => {
+    const gen = makeGen();
+    gen.run("admin/dashboard", ["index"], { parent: "admin_controllers" });
+    const controller = fs.readFileSync(
+      path.join(tmpDir, "app/controllers/admin/dashboard-controller.ts"),
+      "utf8",
+    );
+    expect(controller).toContain("class AdminDashboardController extends AdminController");
+  });
+});

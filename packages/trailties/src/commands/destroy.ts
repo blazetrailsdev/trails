@@ -1,7 +1,7 @@
 import { Dir, File } from "@blazetrails/ruby-compat";
 import { Command } from "commander";
-import { classify, dasherize } from "../generators/base.js";
-import { tableize } from "@blazetrails/activesupport";
+import { dasherize } from "../generators/base.js";
+import { camelize, tableize, underscore } from "@blazetrails/activesupport";
 
 export function destroyCommand(): Command {
   const cmd = new Command("destroy");
@@ -15,7 +15,7 @@ export function destroyCommand(): Command {
     .action((name: string) => {
       const cwd = Dir.pwd();
       const fileName = dasherize(name);
-      const className = classify(name);
+      const className = camelize(underscore(name));
       const tableName = tableize(className);
 
       removeFile(cwd, `app/models/${fileName}.ts`);
@@ -70,7 +70,7 @@ export function destroyCommand(): Command {
     .action((name: string) => {
       const cwd = Dir.pwd();
       const fileName = dasherize(name);
-      const className = classify(name);
+      const className = camelize(underscore(name));
       const tableName = tableize(className);
 
       removeFile(cwd, `app/models/${fileName}.ts`);

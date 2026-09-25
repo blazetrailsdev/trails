@@ -2048,6 +2048,7 @@ export interface Relation<T extends Base>
   reverseOrder(): Relation<T>;
   spawn(): Relation<T>;
   merge<U extends Base>(other: Relation<U>): Relation<T>;
+  merge(other: Partial<Record<ValueMethod, unknown>>): Relation<T>;
   mergeBang(other: any): Relation<T>;
   except(...skips: Array<ExceptSkip>): Relation<T>;
   only(...onlies: Array<ExceptSkip>): Relation<T>;
