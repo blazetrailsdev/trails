@@ -263,7 +263,7 @@ export abstract class CollectionAssociation extends Association {
         }),
     );
     if (!record) return null;
-    if (isThenable(yielded)) await yielded;
+    await yielded;
     await this.transaction(async () => {
       let result: boolean | undefined = undefined;
       await this.addToTarget(record, {}, async () => {

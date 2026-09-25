@@ -1361,6 +1361,44 @@ body reaches a class's singleton class keeps working on the class itself, and
 `ClassAttribute.redefine` does not port its `attached_object.is_a?(Module)`
 arm.
 
+## A create path awaits its block before saving (`create`'s `&block`)
+
+Rails' create paths yield the caller's block synchronously while building the
+record and save only afterwards: `Persistence::ClassMethods#create` /
+`create!` (`activerecord/lib/active_record/persistence.rb:33-58`) call
+`new(attributes, &block)` before `save`,
+`CollectionAssociation#_create_record`
+(`associations/collection_association.rb:353-373`) calls
+`build_record(attributes, &block)` before opening `transaction`, and
+`SingularAssociation#_create_record` (`associations/singular_association.rb:67-73`)
+calls it before `record.save`. So a block that queries — `assert_equal 5,
+Client.count` inside `first_or_create`
+(`test/cases/associations/has_many_associations_test.rb:2727-2745`) — sees the
+pre-INSERT state, and a block that assigns sees its writes saved.
+
+In trails a block that does I/O returns a promise, and the build it runs inside
+is synchronous (a constructor, or `build_record`), so the promise escapes it.
+Left un-awaited, the block races the save: its query can land after the
+INSERT, and its writes after the record is persisted. **The settled shape is
+the captured-and-awaited block**: each async create path wraps the block to
+capture its return value (`yielded = block(record)`) and `await`s it after the
+build and before the save. That is `create` / `createBang` in `persistence.ts`,
+`CollectionAssociation#_createRecord`, and `SingularAssociation#_createRecord`.
+`Relation#create` reaches the first through `currentScopeRestoringBlock`, which
+returns the block's value as `relation.rb:1344-1350` does.
+
+The alternatives lose:
+
+- **Passing the block straight through**, as Rails does, is the race above.
+- **Awaiting inside the build** would make `new` / `build` async, and a JS
+  constructor cannot await — the same wall § "Schema reflection peeks at a warm
+  cache" records for `new Post()`.
+
+The synchronous builders (`new`, `build`) do not await: they have nothing to
+order a promise against. This is a genuine language shortcoming — JS has no
+synchronous await — ratified repo-wide here. The wrapper cites **this
+section**; it raises no call or argument row, so it carries no receipt tag.
+
 ## Trails has no autoloader (`Rails.autoloaders` / Zeitwerk)
 
 `Rails::Autoloaders` (`railties/lib/rails/autoloaders.rb:12-28`) is a pair of

@@ -1,13 +1,21 @@
 import type { RackApp } from "@blazetrails/rack";
-import { include } from "@blazetrails/activesupport";
-import type { SessionId } from "@blazetrails/rack-session";
-import { Compatibility, SessionObject, StaleSessionCheck } from "./abstract-store.js";
 import { CacheStore, type CacheStoreSessionOptions } from "./cache-store.js";
 
 export interface MemCacheStoreSessionOptions extends CacheStoreSessionOptions {
   expires?: number;
 }
 
+/**
+ * `ActionDispatch::Session::MemCacheStore`
+ * (`actionpack/lib/action_dispatch/middleware/session/mem_cache_store.rb:23-26`)
+ * descends from `Rack::Session::Dalli`, a class of the dalli gem, which trails
+ * does not vendor, and includes `Compatibility`, `StaleSessionCheck` and
+ * `SessionObject` into that ancestry. With no Dalli seat, `CacheStore` stands
+ * in as the superclass. `CacheStore` already has the three modules through
+ * `AbstractSecureStore` (`abstract_store.rb:97-100`), so Ruby's
+ * `include_modules_at` would skip all three (`vendor/ruby/class.c:1281,1291,1296`),
+ * and the calls are not made.
+ */
 export class MemCacheStore extends CacheStore {
   constructor(app?: RackApp, options: MemCacheStoreSessionOptions = {}) {
     if (options.expireAfter == null && options.expires != null) {
@@ -15,12 +23,4 @@ export class MemCacheStore extends CacheStore {
     }
     super(app, options);
   }
-
-  override generateSid(): SessionId {
-    return super.generateSid();
-  }
 }
-
-include(MemCacheStore, Compatibility);
-include(MemCacheStore, StaleSessionCheck);
-include(MemCacheStore, SessionObject);

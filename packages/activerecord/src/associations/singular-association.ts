@@ -132,8 +132,16 @@ export class SingularAssociation extends Association<Base> {
     raiseError = false,
     block?: (record: Base) => void,
   ): Promise<Base | null> {
-    const record = this.buildRecord(attributes, block);
+    let yielded: unknown;
+    const record = this.buildRecord(
+      attributes,
+      block &&
+        ((record: Base) => {
+          yielded = block(record);
+        }),
+    );
     if (!record) return null;
+    await yielded;
     let saved = true;
     if (typeof (record as any).save === "function") {
       saved = await (record as any).save();
