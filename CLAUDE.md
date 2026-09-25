@@ -1176,11 +1176,11 @@ The alternatives were tried:
 
 - **Porting `self.lock_thread = nil` verbatim** reds all three tests named in
   `abstract-adapter-null-lock-breaks-concurrent-async-statements`.
-- **Leaning on SQLite's `_statementLock`** (`acquireStatementLock`,
-  `sqlite3/database-statements.ts`) does not cover it: that lock wraps only
+- **An adapter-local statement queue** (SQLite's former `_statementLock`,
+  since retired onto `withRawConnection`) does not cover it: it wrapped only
   `performQuery`, not `withRawConnection`'s `connectBang` (three concurrent
-  opens) nor the post-`rawExecute` `_lastInsertRowid` read, and
-  it exists on one adapter only.
+  opens) nor the post-`rawExecute` `_lastInsertRowid` read, and it existed on
+  one adapter only.
 - **Leasing per promise** has no Ruby counterpart and no JS hook to key on.
 
 So trails' `lock` field initializer is `new LoadInterlockAwareMonitor()`
@@ -1188,6 +1188,13 @@ So trails' `lock` field initializer is `new LoadInterlockAwareMonitor()`
 `setLockThread` itself stays a faithful port of `lock_thread=` — a caller that
 passes `null` still gets `NullLock`. The constructor simply does not make that
 call.
+
+The same gap reaches the monitor's reentrant arm. Ruby's monitor is owned by a
+thread, so a re-entry is always nested in the holder's own call; a
+`Promise.all` inside `withinNewTransaction` starts sibling calls that share
+the holder's async context. So ruby-compat's `synchronize` (`monitor.ts`) runs
+each entry under an owner of its own and serializes re-entries under one
+holder: a nested call re-enters at once, siblings take turns.
 
 This is a genuine language shortcoming, ratified repo-wide here. Stories that
 serialize adapter access (retiring SQLite's statement lock onto

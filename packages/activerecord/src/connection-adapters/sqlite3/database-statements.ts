@@ -118,7 +118,6 @@ interface PerformQueryHost {
   _freshStatement(rawConnection: SqliteConnection, sql: string): Promise<SqliteStatement>;
   _narrowSpilledBigInts(stmt: SqliteStatement, rows: unknown[][]): void;
   verifiedBang(): void;
-  _statementLock: Promise<void> | null;
   _lastAffectedRows: number;
   _lastInsertRowid: number | bigint;
 }
@@ -171,28 +170,6 @@ export async function internalBeginTransaction(
   }
 }
 
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE retire-sqlite-statement-lock-onto-with-raw-connection
- */
-export function acquireStatementLock(host: {
-  _statementLock: Promise<void> | null;
-}): (() => void) | Promise<() => void> {
-  const ahead = host._statementLock;
-  let release!: () => void;
-  const mine = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  const tail = ahead ? ahead.then(() => mine) : mine;
-  host._statementLock = tail;
-  const drain = (): void => {
-    if (host._statementLock === tail) host._statementLock = null;
-    release();
-  };
-  if (!ahead) return drain;
-  return ahead.then(() => drain);
-}
-
 /** @internal */
 export async function performQuery(
   this: PerformQueryHost,
@@ -220,8 +197,6 @@ export async function performQuery(
         : value;
     });
   }
-  const acquired = acquireStatementLock(this);
-  const release = typeof acquired === "function" ? acquired : await acquired;
   let stmt: SqliteStatement | null = null;
   let result: Result;
   let affectedRows: number;
@@ -247,7 +222,6 @@ export async function performQuery(
     affectedRows = await rawConnection.changes();
     insertRowid = await rawConnection.lastInsertRowId();
   } finally {
-    release();
     if (!prepare && stmt !== null) await stmt.close();
   }
   this._lastAffectedRows = affectedRows;
