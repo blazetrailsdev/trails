@@ -31,16 +31,28 @@ export class Club extends Base {
     });
     this.belongsTo("category");
 
-    this.hasMany("favorites", (q: any) => q.where({ memberships: { favorite: true } }), {
-      through: "memberships",
-      source: "member",
-    });
+    this.hasMany(
+      "favorites",
+      function (this: any) {
+        return this.where({ memberships: { favorite: true } });
+      },
+      {
+        through: "memberships",
+        source: "member",
+      },
+    );
 
     this.hasMany("customMemberships", { className: "Membership" });
-    this.hasMany("customFavorites", (q: any) => q.where({ memberships: { favorite: true } }), {
-      through: "customMemberships",
-      source: "member",
-    });
+    this.hasMany(
+      "customFavorites",
+      function (this: any) {
+        return this.where({ memberships: { favorite: true } });
+      },
+      {
+        through: "customMemberships",
+        source: "member",
+      },
+    );
 
     this.scope("general", function (this: any) {
       return this.leftJoins(":category")

@@ -530,11 +530,8 @@ export class MacroReflection extends AbstractReflection {
     return constantize(name) as typeof Base;
   }
 
-  scopeFor(relation: any, owner?: any): any {
-    if (this._scope) {
-      return this._scope.call(relation, relation, owner) || relation;
-    }
-    return relation;
+  scopeFor(relation: any, owner: any = null): any {
+    return this._scope!.call(relation, owner) || relation;
   }
 
   /** @internal */
@@ -940,10 +937,10 @@ export class AssociationReflection extends MacroReflection {
 
   checkEagerLoadableBang(): void {
     if (!this.scope) return;
-    if (this.scope.length > 1) {
+    if (this.scope.length !== 0) {
       throw new ArgumentError(
         `The association scope '${this.nameString}' is instance dependent (the scope ` +
-          `block takes more than one argument). Eager loading instance dependent scopes is not supported.`,
+          `block takes an argument). Eager loading instance dependent scopes is not supported.`,
       );
     }
   }
@@ -1673,9 +1670,9 @@ export class PolymorphicReflection extends AbstractReflection {
         [];
       scopes.push(...prevScopes);
     }
-    const sourceTypeFn = this.sourceTypeScope();
-    const typeScope = this.buildScope(table, predicateBuilder, klass);
-    scopes.push(sourceTypeFn(typeScope));
+    scopes.push(
+      this.sourceTypeScope().call(this.buildScope(table, predicateBuilder, klass), record),
+    );
     return scopes;
   }
 
@@ -1686,9 +1683,11 @@ export class PolymorphicReflection extends AbstractReflection {
 
   /** @internal */
   private sourceTypeScope(): (...args: any[]) => any {
-    const typeCol = (this._previousReflection as any).foreignType;
+    const type = (this._previousReflection as any).foreignType;
     const sourceType = (this._previousReflection as any).options?.sourceType;
-    return (rel: any) => rel?.where?.({ [typeCol]: sourceType }) ?? rel;
+    return function (this: any, object: any) {
+      return this.where({ [type]: sourceType });
+    };
   }
 }
 

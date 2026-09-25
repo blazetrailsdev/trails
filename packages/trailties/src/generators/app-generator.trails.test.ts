@@ -27,4 +27,27 @@ describe("AppGenerator (trails-only)", () => {
     expect(pkg.devDependencies["@blazetrails/activerecord-cli"]).toBeDefined();
     expect(File.isExist(File.join(tmpDir, "my-app", "db", "schema.ts"))).toBe(true);
   });
+
+  it("guards each namespaced environment setting the way the Rails templates do", async () => {
+    await new AppGenerator({
+      cwd: tmpDir,
+      output: () => {},
+      appPath: "my-app",
+      database: "sqlite",
+      api: true,
+      skipActiveRecord: true,
+    }).run();
+
+    const read = (env: string) =>
+      File.read(File.join(tmpDir, "my-app", "config", "environments", `${env}.ts`));
+    for (const env of ["development", "test", "production"]) {
+      expect(read(env)).not.toMatch(/actionController\.performCaching = true/);
+      expect(read(env)).not.toMatch(/activeRecord|actionMailer|activeStorage|activeJob/);
+    }
+    expect(read("development")).toMatch(/actionController\.performCaching = false/);
+    expect(read("production")).toMatch(/this\.config\.i18n\.fallbacks = true;/);
+    expect(read("production")).toMatch(
+      /this\.config\.logger = TaggedLogging\.logger\(process\.stdout\);/,
+    );
+  });
 });

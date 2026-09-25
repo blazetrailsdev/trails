@@ -37,38 +37,64 @@ export class Category extends Base {
     this.hasAndBelongsToMany("otherPosts", { className: "Post" });
     this.hasAndBelongsToMany(
       "postsWithAuthorsSortedByAuthorId",
-      (q: any) => q.includes(":authors").order("authors.id"),
+      function (this: any) {
+        return this.includes(":authors").order("authors.id");
+      },
       { className: "Post" },
     );
     this.hasAndBelongsToMany(
       "selectTestingPosts",
-      (q: any) => q.select("posts.*, 1 as correctness_marker"),
+      function (this: any) {
+        return this.select("posts.*, 1 as correctness_marker");
+      },
       { className: "Post", foreignKey: "category_id", associationForeignKey: "post_id" },
     );
     this.hasAndBelongsToMany(
       "postWithConditions",
-      (q: any) => q.where({ title: "Yet Another Testing Title" }),
+      function (this: any) {
+        return this.where({ title: "Yet Another Testing Title" });
+      },
       { className: "Post" },
     );
-    this.hasAndBelongsToMany("postsGroupedByTitle", (q: any) => q.group("title").select("title"), {
-      className: "Post",
-    });
+    this.hasAndBelongsToMany(
+      "postsGroupedByTitle",
+      function (this: any) {
+        return this.group("title").select("title");
+      },
+      {
+        className: "Post",
+      },
+    );
     this.hasMany("categorizations");
     this.hasMany("specialCategorizations");
     this.hasMany("postComments", { through: "posts", source: "comments" });
-    this.hasMany("orderedPostComments", (q: any) => q.order({ id: "desc" }), {
-      through: "posts",
-      source: "comments",
-    });
+    this.hasMany(
+      "orderedPostComments",
+      function (this: any) {
+        return this.order({ id: "desc" });
+      },
+      {
+        through: "posts",
+        source: "comments",
+      },
+    );
     this.hasMany("authors", { through: "categorizations" });
-    this.hasMany("authorsWithSelect", (q: any) => q.select("authors.*, categorizations.post_id"), {
-      through: "categorizations",
-      source: "author",
-    });
+    this.hasMany(
+      "authorsWithSelect",
+      function (this: any) {
+        return this.select("authors.*, categorizations.post_id");
+      },
+      {
+        through: "categorizations",
+        source: "author",
+      },
+    );
     this.hasMany("essays", { primaryKey: "name" });
     this.hasMany(
       "humanWritersOfTypedEssays",
-      (q: any) => q.where({ essays: { type: "TypedEssay" } }),
+      function (this: any) {
+        return this.where({ essays: { type: "TypedEssay" } });
+      },
       { through: "essays", source: "writer", sourceType: "Human", primaryKey: "name" },
     );
     this.scope("general", function (this: any) {

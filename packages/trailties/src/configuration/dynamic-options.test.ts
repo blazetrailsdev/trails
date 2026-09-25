@@ -3,21 +3,21 @@ import { NoMethodError } from "@blazetrails/ruby-compat";
 import { Configuration } from "../trailtie/configuration.js";
 
 describe("DynamicOptionsTest", () => {
-  let config: Configuration;
+  let config: Configuration & { foo: number };
 
   beforeEach(() => {
-    config = new Configuration();
+    config = new Configuration() as typeof config;
     for (const key of Object.keys(Configuration._options)) {
       delete Configuration._options[key];
     }
   });
 
   it("arbitrary keys can be set, reset, and read", () => {
-    config.set("foo", 1);
-    expect(config.get("foo")).toBe(1);
+    config.foo = 1;
+    expect(config.foo).toBe(1);
 
-    config.set("foo", 2);
-    expect(config.get("foo")).toBe(2);
+    config.foo = 2;
+    expect(config.foo).toBe(2);
   });
 
   it("raises NoMethodError if the key is unset and the method does not exist", () => {
@@ -28,7 +28,7 @@ describe("DynamicOptionsTest", () => {
     let error: Error | undefined;
     expect(() => {
       try {
-        config.set("eagerLoadNamespaces", 1);
+        (config as { eagerLoadNamespaces: unknown }).eagerLoadNamespaces = 1;
       } catch (e) {
         error = e as Error;
         throw e;

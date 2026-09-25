@@ -76,7 +76,9 @@ export class Person extends Base {
     this.hasMany("securePosts", { through: "secureReaders" });
     this.hasMany(
       "postsWithNoComments",
-      (q: any) => q.includes(":comments").where("comments.id is null").references(":comments"),
+      function (this: any) {
+        return this.includes(":comments").where("comments.id is null").references(":comments");
+      },
       { through: "readers", source: "post" },
     );
 
@@ -86,19 +88,39 @@ export class Person extends Base {
 
     this.hasMany("references");
     this.hasMany("badReferences");
-    this.hasMany("fixedBadReferences", (q: any) => q.where({ favorite: true }), {
-      className: "BadReference",
-    });
-    this.hasOne("favoriteReference", (q: any) => q.where({ favorite: true }), {
-      className: "Reference",
-    });
+    this.hasMany(
+      "fixedBadReferences",
+      function (this: any) {
+        return this.where({ favorite: true });
+      },
+      {
+        className: "BadReference",
+      },
+    );
+    this.hasOne(
+      "favoriteReference",
+      function (this: any) {
+        return this.where({ favorite: true });
+      },
+      {
+        className: "Reference",
+      },
+    );
     this.hasOne("favoriteReferenceJob", { through: "favoriteReference", source: "job" });
     this.hasMany(
       "postsWithCommentsSortedByCommentId",
-      (q: any) => q.includes(":comments").order("comments.id"),
+      function (this: any) {
+        return this.includes(":comments").order("comments.id");
+      },
       { through: "readers", source: "post" },
     );
-    this.hasMany("firstPosts", (q: any) => q.where({ id: [1, 2] }), { through: "readers" });
+    this.hasMany(
+      "firstPosts",
+      function (this: any) {
+        return this.where({ id: [1, 2] });
+      },
+      { through: "readers" },
+    );
 
     this.hasMany("jobs", { through: "references" });
     this.hasMany("jobsWithDependentDestroy", {

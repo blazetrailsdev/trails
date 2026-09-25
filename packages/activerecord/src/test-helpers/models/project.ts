@@ -27,33 +27,57 @@ export class Project extends Base {
 
   static {
     this.belongsTo("mentor");
-    this.hasAndBelongsToMany("developers", (q: any) =>
-      q.distinct().order("developers.name desc, developers.id desc"),
-    );
-    this.hasAndBelongsToMany("readonlyDevelopers", (q: any) => q.readonly(), {
-      className: "Developer",
+    this.hasAndBelongsToMany("developers", function (this: any) {
+      return this.distinct().order("developers.name desc, developers.id desc");
     });
+    this.hasAndBelongsToMany(
+      "readonlyDevelopers",
+      function (this: any) {
+        return this.readonly();
+      },
+      {
+        className: "Developer",
+      },
+    );
     this.hasAndBelongsToMany(
       "nonUniqueDevelopers",
-      (q: any) => q.order("developers.name desc, developers.id desc"),
+      function (this: any) {
+        return this.order("developers.name desc, developers.id desc");
+      },
       { className: "Developer" },
     );
-    this.hasAndBelongsToMany("limitedDevelopers", (q: any) => q.limit(1), {
-      className: "Developer",
-    });
+    this.hasAndBelongsToMany(
+      "limitedDevelopers",
+      function (this: any) {
+        return this.limit(1);
+      },
+      {
+        className: "Developer",
+      },
+    );
     this.hasAndBelongsToMany(
       "developersNamedDavid",
-      (q: any) => q.where("name = 'David'").distinct(),
+      function (this: any) {
+        return this.where("name = 'David'").distinct();
+      },
       { className: "Developer" },
     );
     this.hasAndBelongsToMany(
       "developersNamedDavidWithHashConditions",
-      (q: any) => q.where({ name: "David" }).distinct(),
+      function (this: any) {
+        return this.where({ name: "David" }).distinct();
+      },
       { className: "Developer" },
     );
-    this.hasAndBelongsToMany("salariedDevelopers", (q: any) => q.where("salary > 0"), {
-      className: "Developer",
-    });
+    this.hasAndBelongsToMany(
+      "salariedDevelopers",
+      function (this: any) {
+        return this.where("salary > 0");
+      },
+      {
+        className: "Developer",
+      },
+    );
     this.hasAndBelongsToMany("developersWithCallbacks", {
       className: "Developer",
       beforeAdd: (o: any, r: any) => o.developersLog.push(`before_adding${r.id ?? "<new>"}`),
@@ -75,8 +99,11 @@ export class Project extends Base {
     }
     this.hasAndBelongsToMany(
       "wellPaidSalaryGroups",
-      (q: any) =>
-        q.group("developers.salary").having("SUM(salary) > 10000").select("SUM(salary) as salary"),
+      function (this: any) {
+        return this.group("developers.salary")
+          .having("SUM(salary) > 10000")
+          .select("SUM(salary) as salary");
+      },
       { className: "Developer" },
     );
     this.belongsTo("firm");

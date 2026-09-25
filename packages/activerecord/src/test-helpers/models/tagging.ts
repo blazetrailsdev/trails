@@ -16,14 +16,22 @@ export class Tagging extends Base {
   declare taggable_type: string;
 
   static {
-    this.belongsTo("tag", (q: any) => q.includes(":tagging"));
+    this.belongsTo("tag", function (this: any) {
+      return this.includes(":tagging");
+    });
     this.belongsTo("superTag", { className: "Tag", foreignKey: "super_tag_id" });
     this.belongsTo("invalidTag", { className: "Tag", foreignKey: "tag_id" });
     this.belongsTo("orderedTag", { className: "OrderedTag", foreignKey: "tag_id" });
-    this.belongsTo("blueTag", (q: any) => q.where({ tags: { name: "Blue" } }), {
-      className: "Tag",
-      foreignKey: "tag_id",
-    });
+    this.belongsTo(
+      "blueTag",
+      function (this: any) {
+        return this.where({ tags: { name: "Blue" } });
+      },
+      {
+        className: "Tag",
+        foreignKey: "tag_id",
+      },
+    );
     this.belongsTo("tagWithPrimaryKey", {
       className: "Tag",
       foreignKey: "tag_id",

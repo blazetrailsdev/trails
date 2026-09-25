@@ -19,7 +19,13 @@ export class Tag extends Base {
     this.hasOne("tagging");
     this.hasMany("taggedPosts", { through: "taggings", source: "taggable", sourceType: "Post" });
 
-    this.hasMany("nullTaggings", (q: any) => q.none(), { className: "Tagging" });
+    this.hasMany(
+      "nullTaggings",
+      function (this: any) {
+        return this.none();
+      },
+      { className: "Tagging" },
+    );
     this.hasMany("nullTaggedPosts", {
       through: "nullTaggings",
       source: "taggable",
@@ -39,10 +45,16 @@ export class OrderedTag extends Tag {
 
   static {
     this._tableName = "tags";
-    this.hasMany("orderedTaggings", (q: any) => q.order("taggings.id DESC"), {
-      foreignKey: "tag_id",
-      className: "Tagging",
-    });
+    this.hasMany(
+      "orderedTaggings",
+      function (this: any) {
+        return this.order("taggings.id DESC");
+      },
+      {
+        foreignKey: "tag_id",
+        className: "Tagging",
+      },
+    );
     this.hasMany("taggedPosts", {
       through: "orderedTaggings",
       source: "taggable",

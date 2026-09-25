@@ -112,7 +112,9 @@ describe("CollectionProxy#count — non-through fast path", () => {
     Associations.hasMany.call(
       CpcAuthor,
       "cpcPostsByTitle",
-      (rel: any) => rel.group("title").select("title"),
+      function (this: any) {
+        return this.group("title").select("title");
+      },
       {
         className: "CpcPost",
         foreignKey: "author_id",
@@ -129,10 +131,17 @@ describe("CollectionProxy#count — non-through fast path", () => {
   });
 
   it("size() with DISTINCT ignores the unsaved-records shortcut and counts via SQL", async () => {
-    Associations.hasMany.call(CpcAuthor, "cpcPostsDistinct", (rel: any) => rel.distinct(), {
-      className: "CpcPost",
-      foreignKey: "author_id",
-    });
+    Associations.hasMany.call(
+      CpcAuthor,
+      "cpcPostsDistinct",
+      function (this: any) {
+        return this.distinct();
+      },
+      {
+        className: "CpcPost",
+        foreignKey: "author_id",
+      },
+    );
     const author = await CpcAuthor.create({ name: "d" });
     await CpcPost.create({ author_id: author.id, title: "p1", body: "b1" });
     await CpcPost.create({ author_id: author.id, title: "p2", body: "b2" });
@@ -177,10 +186,17 @@ describe("CollectionProxy#count — non-through fast path", () => {
   });
 
   it("_addToTarget dedups a re-fetched record by AR id under a distinct scope", async () => {
-    Associations.hasMany.call(CpcAuthor, "cpcPostsDedup", (rel: any) => rel.distinct(), {
-      className: "CpcPost",
-      foreignKey: "author_id",
-    });
+    Associations.hasMany.call(
+      CpcAuthor,
+      "cpcPostsDedup",
+      function (this: any) {
+        return this.distinct();
+      },
+      {
+        className: "CpcPost",
+        foreignKey: "author_id",
+      },
+    );
     const author = await CpcAuthor.create({ name: "dedup" });
     const post = await CpcPost.create({ author_id: author.id, title: "p1", body: "b1" });
 
@@ -228,10 +244,17 @@ describe("CollectionProxy#count — non-through fast path", () => {
   });
 
   it("count_records clamps the result to the association scope's limit_value", async () => {
-    Associations.hasMany.call(CpcAuthor, "cpcPostsLimited", (rel: any) => rel.limit(2), {
-      className: "CpcPost",
-      foreignKey: "author_id",
-    });
+    Associations.hasMany.call(
+      CpcAuthor,
+      "cpcPostsLimited",
+      function (this: any) {
+        return this.limit(2);
+      },
+      {
+        className: "CpcPost",
+        foreignKey: "author_id",
+      },
+    );
     const author = await CpcAuthor.create({ name: "limited" });
     await CpcPost.create({ author_id: author.id, title: "p1", body: "b1" });
     await CpcPost.create({ author_id: author.id, title: "p2", body: "b2" });

@@ -439,9 +439,15 @@ describeIfPg("PostgreSQLAdapter", () => {
     class UuidForum extends Base {
       static {
         this.tableName = "pg_uuid_forums";
-        this.hasMany("uuidPosts", (rel: any) => rel.order("title DESC"), {
-          className: "UuidPostDj",
-        });
+        this.hasMany(
+          "uuidPosts",
+          function (this: any) {
+            return this.order("title DESC");
+          },
+          {
+            className: "UuidPostDj",
+          },
+        );
         this.hasMany("uuidComments", { className: "UuidCommentDj", through: "uuidPosts" });
         this.hasMany("uuidCommentsWithoutJoins", {
           className: "UuidCommentDj",

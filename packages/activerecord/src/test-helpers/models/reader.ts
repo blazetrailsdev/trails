@@ -20,7 +20,9 @@ export class Reader extends Base {
       foreignKey: "person_id",
       inverseOf: "reader",
     });
-    this.belongsTo("firstPost", (q: any) => q.where({ id: [2, 3] }));
+    this.belongsTo("firstPost", function (this: any) {
+      return this.where({ id: [2, 3] });
+    });
   }
 }
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging

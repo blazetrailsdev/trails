@@ -1279,6 +1279,7 @@ the capability, in a different place. Each is its own `SKIP_GROUPS` entry in
 | `active_support/ordered_options.rb`                   | Proxy                 |
 | `active_support/string_inquirer.rb`                   | Proxy                 |
 | `active_support/time_with_zone.rb`                    | Proxy                 |
+| `rails/railtie/configuration.rb`                      | Proxy                 |
 
 A Proxy row whose Ruby class also defines `respond_to_missing?` forwards a
 name only when that predicate answers it (`broadcast_logger.rb:235-251`): a

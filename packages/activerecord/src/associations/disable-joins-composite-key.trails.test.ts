@@ -125,10 +125,17 @@ describe("DJAS — composite key support", () => {
   });
 
   it("composite-key + ordered upstream: skips DJAR wrap (records load via composite-key WHERE, no in-list reorder)", async () => {
-    Associations.hasMany.call(CkShop, "ckOrdersOrdered", (rel: any) => rel.order("name"), {
-      className: "CkOrder",
-      foreignKey: "shop_id",
-    });
+    Associations.hasMany.call(
+      CkShop,
+      "ckOrdersOrdered",
+      function (this: any) {
+        return this.order("name");
+      },
+      {
+        className: "CkOrder",
+        foreignKey: "shop_id",
+      },
+    );
     Associations.hasMany.call(CkShop, "ckLineItemsOrdered", {
       className: "CkLineItem",
       through: "ckOrdersOrdered",

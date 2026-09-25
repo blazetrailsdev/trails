@@ -1069,28 +1069,29 @@ WHERE fk.referenced_column_name IS NOT NULL
     message: string;
     sql: string;
   }): Promise<Partial<MismatchedForeignKeyOptions>> {
-    const fkFromMsg = /Referencing column '(\w+)' and referenced/i.exec(message)?.[1];
-    const fkPat = fkFromMsg ?? "\\w+";
+    const foreignKeyPat = /Referencing column '(\w+)' and referenced/i.exec(message)?.[1] ?? "\\w+";
 
     const match = new RegExp(
-      String.raw`(?:CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?|ALTER\s+TABLE\s+)(?:\`?\w+\`?\.)?` +
-        String.raw`\`?(?<table>\w+)\`?.+?` +
-        String.raw`FOREIGN\s+KEY\s*\(\`?(?<foreign_key>${fkPat})\`?\)\s*` +
-        String.raw`REFERENCES\s*\`?(?<target_table>\w+)\`?\s*\(\`?(?<primary_key>\w+)\`?\)`,
+      String.raw`(?:CREATE|ALTER)\s+TABLE\s*(?:\`?\w+\`?\.)?\`?(?<table>\w+)\`?.+?` +
+        String.raw`FOREIGN\s+KEY\s*\(\`?(?<foreign_key>${foreignKeyPat})\`?\)\s*` +
+        String.raw`REFERENCES\s*(\`?(?<target_table>\w+)\`?)\s*\(\`?(?<primary_key>\w+)\`?\)`,
       "ims",
     ).exec(sql);
 
-    if (!match?.groups) return {};
+    const options: Partial<MismatchedForeignKeyOptions> = {};
 
-    const {
-      table,
-      foreign_key: foreignKey,
-      target_table: targetTable,
-      primary_key: primaryKey,
-    } = match.groups;
+    if (match) {
+      options.table = match.groups!.table;
+      options.foreignKey = match.groups!.foreign_key;
+      options.targetTable = match.groups!.target_table;
+      options.primaryKey = match.groups!.primary_key;
+      options.primaryKeyColumn = await this.columnFor(
+        match.groups!.target_table,
+        match.groups!.primary_key,
+      );
+    }
 
-    const primaryKeyColumn = await this.columnFor(targetTable, primaryKey);
-    return { table, foreignKey, targetTable, primaryKey, primaryKeyColumn };
+    return options;
   }
 
   /** @internal */

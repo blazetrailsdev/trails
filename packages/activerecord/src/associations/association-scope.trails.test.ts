@@ -159,9 +159,9 @@ describe("AssociationScope", () => {
     Associations.hasMany.call(
       CountAuthor,
       "count_posts",
-      (rel: any) => {
+      function (this: any) {
         calls++;
-        return rel.where({ published: true });
+        return this.where({ published: true });
       },
       {
         className: "CountPost",
@@ -514,10 +514,16 @@ describe("AssociationScope", () => {
 
       static {
         this.attribute("id", "integer");
-        this.hasMany("cc_memberships", (rel: any) => rel.where({ active: true }), {
-          className: "CcMembership",
-          foreignKey: "cc_author_id",
-        });
+        this.hasMany(
+          "cc_memberships",
+          function (this: any) {
+            return this.where({ active: true });
+          },
+          {
+            className: "CcMembership",
+            foreignKey: "cc_author_id",
+          },
+        );
         this.hasMany("cc_tags", {
           className: "CcTag",
           through: "cc_memberships",

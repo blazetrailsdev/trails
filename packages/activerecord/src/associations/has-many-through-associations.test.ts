@@ -339,10 +339,16 @@ describe("HasManyThroughAssociationsTest", () => {
       static {
         this._tableName = "people";
         this.hasMany("readers", { foreignKey: "person_id" });
-        this.hasMany("posts", (q: any) => q.order("posts.id DESC"), {
-          through: "readers",
-          className: "Post",
-        });
+        this.hasMany(
+          "posts",
+          function (this: any) {
+            return this.order("posts.id DESC");
+          },
+          {
+            through: "readers",
+            className: "Post",
+          },
+        );
       }
     }
     registerModel("PersonPrime", PersonPrime);
@@ -2418,9 +2424,15 @@ describe("HasManyThroughAssociationsTest", () => {
   });
 
   it("has many through with scope that should not be fully merged", async () => {
-    Club.hasMany("distinctMemberships", (q: any) => q.distinct(), {
-      className: "Membership",
-    });
+    Club.hasMany(
+      "distinctMemberships",
+      function (this: any) {
+        return this.distinct();
+      },
+      {
+        className: "Membership",
+      },
+    );
     Club.hasMany("specialFavorites", {
       through: "distinctMemberships",
       source: "member",

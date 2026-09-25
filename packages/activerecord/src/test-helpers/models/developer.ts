@@ -151,9 +151,9 @@ export class Developer extends Base {
     this.hasMany("strictLoadingOptAuditLogs", { strictLoading: true, className: "AuditLog" });
     this.hasMany("contracts");
     this.hasMany("firms", { through: "contracts", source: "firm" });
-    this.hasMany("comments", (q: any, developer: any) =>
-      q.where({ body: `I'm ${developer.name}` }),
-    );
+    this.hasMany("comments", function (this: any, developer: any) {
+      return this.where({ body: `I'm ${developer.name}` });
+    });
     this.hasMany("ratings", { through: "comments" });
 
     this.hasOne("ship", { dependent: "nullify" });
@@ -334,10 +334,16 @@ export class DeveloperFilteredOnJoins extends Base {
 
   static {
     this.tableName = "developers";
-    this.hasAndBelongsToMany("projects", (q: any) => q.order("projects.id"), {
-      foreignKey: "developer_id",
-      joinTable: "developers_projects",
-    });
+    this.hasAndBelongsToMany(
+      "projects",
+      function (this: any) {
+        return this.order("projects.id");
+      },
+      {
+        foreignKey: "developer_id",
+        joinTable: "developers_projects",
+      },
+    );
     this.defaultScope((q: any) =>
       q.joins(":projects").where({ projects: { name: "Active Controller" } }),
     );
@@ -485,10 +491,16 @@ export class EagerDeveloperWithDefaultScope extends Base {
 
   static {
     this.tableName = "developers";
-    this.hasAndBelongsToMany("projects", (q: any) => q.order("projects.id"), {
-      foreignKey: "developer_id",
-      joinTable: "developers_projects",
-    });
+    this.hasAndBelongsToMany(
+      "projects",
+      function (this: any) {
+        return this.order("projects.id");
+      },
+      {
+        foreignKey: "developer_id",
+        joinTable: "developers_projects",
+      },
+    );
     this.defaultScope((q: any) => q.includes(":projects"));
   }
 }
@@ -498,10 +510,16 @@ export class EagerDeveloperWithClassMethodDefaultScope extends Base {
 
   static {
     this.tableName = "developers";
-    this.hasAndBelongsToMany("projects", (q: any) => q.order("projects.id"), {
-      foreignKey: "developer_id",
-      joinTable: "developers_projects",
-    });
+    this.hasAndBelongsToMany(
+      "projects",
+      function (this: any) {
+        return this.order("projects.id");
+      },
+      {
+        foreignKey: "developer_id",
+        joinTable: "developers_projects",
+      },
+    );
   }
 
   static defaultScope(this: any): any {
@@ -514,10 +532,16 @@ export class EagerDeveloperWithLambdaDefaultScope extends Base {
 
   static {
     this.tableName = "developers";
-    this.hasAndBelongsToMany("projects", (q: any) => q.order("projects.id"), {
-      foreignKey: "developer_id",
-      joinTable: "developers_projects",
-    });
+    this.hasAndBelongsToMany(
+      "projects",
+      function (this: any) {
+        return this.order("projects.id");
+      },
+      {
+        foreignKey: "developer_id",
+        joinTable: "developers_projects",
+      },
+    );
     this.defaultScope((q: any) => q.includes(":projects"));
   }
 }
@@ -527,10 +551,16 @@ export class EagerDeveloperWithBlockDefaultScope extends Base {
 
   static {
     this.tableName = "developers";
-    this.hasAndBelongsToMany("projects", (q: any) => q.order("projects.id"), {
-      foreignKey: "developer_id",
-      joinTable: "developers_projects",
-    });
+    this.hasAndBelongsToMany(
+      "projects",
+      function (this: any) {
+        return this.order("projects.id");
+      },
+      {
+        foreignKey: "developer_id",
+        joinTable: "developers_projects",
+      },
+    );
     this.defaultScope((q: any) => q.includes(":projects"));
   }
 }
@@ -540,10 +570,16 @@ export class EagerDeveloperWithCallableDefaultScope extends Base {
 
   static {
     this.tableName = "developers";
-    this.hasAndBelongsToMany("projects", (q: any) => q.order("projects.id"), {
-      foreignKey: "developer_id",
-      joinTable: "developers_projects",
-    });
+    this.hasAndBelongsToMany(
+      "projects",
+      function (this: any) {
+        return this.order("projects.id");
+      },
+      {
+        foreignKey: "developer_id",
+        joinTable: "developers_projects",
+      },
+    );
     this.defaultScope((q: any) => q.includes(":projects"));
   }
 }

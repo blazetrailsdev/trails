@@ -68,10 +68,17 @@ describe("DisableJoinsAssociationScope", () => {
       source: "djsComments",
       disableJoins: true,
     });
-    Associations.hasMany.call(DjsAuthor, "djsPostsOrdered", (rel: any) => rel.order("title"), {
-      className: "DjsPost",
-      foreignKey: "djs_author_id",
-    });
+    Associations.hasMany.call(
+      DjsAuthor,
+      "djsPostsOrdered",
+      function (this: any) {
+        return this.order("title");
+      },
+      {
+        className: "DjsPost",
+        foreignKey: "djs_author_id",
+      },
+    );
     Associations.hasMany.call(DjsAuthor, "djsCommentsViaOrderedPosts", {
       className: "DjsComment",
       through: "djsPostsOrdered",

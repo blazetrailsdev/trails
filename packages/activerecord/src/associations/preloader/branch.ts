@@ -209,7 +209,7 @@ export class Branch {
       const klass: typeof Base = (record as any).association(this.association!).klass;
 
       let reflectionScope: any = undefined;
-      if (reflection.scope && reflection.scope.length > 1) {
+      if (reflection.scope && reflection.scope.length !== 0) {
         const scopes = (reflection as any).joinScopes(
           klass.arelTable,
           (klass as any).predicateBuilder,

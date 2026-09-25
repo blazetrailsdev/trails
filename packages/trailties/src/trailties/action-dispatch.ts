@@ -42,6 +42,12 @@ export interface ActionDispatchConfig {
   alwaysWriteCookie?: boolean;
 }
 
+declare module "../trailtie/configuration.js" {
+  interface Configuration {
+    actionDispatch: ActionDispatchConfig;
+  }
+}
+
 export interface ContentSecurityPolicyConfig {
   policy: ContentSecurityPolicy | null;
   reportOnly: boolean;

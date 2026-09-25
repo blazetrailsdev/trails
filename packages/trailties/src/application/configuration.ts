@@ -44,7 +44,7 @@ export class Configuration extends EngineConfiguration {
   timeZone = "UTC";
   beginningOfWeek: WeekDay = ":monday";
   logger: unknown = null;
-  logLevel: LogLevel = "debug";
+  logLevel: LogLevel | number | string = "debug";
   logFormatter: unknown = null;
   logTags: unknown[] = [];
   logFileSize: number | null = null;

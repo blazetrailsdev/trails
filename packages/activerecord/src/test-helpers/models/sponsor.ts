@@ -18,11 +18,17 @@ export class Sponsor extends Base {
       foreignType: "sponsorable_type",
       foreignKey: "sponsorable_id",
     });
-    this.belongsTo("sponsorableWithConditions", (q: any) => q.where({ name: "Ernie" }), {
-      polymorphic: true,
-      foreignType: "sponsorable_type",
-      foreignKey: "sponsorable_id",
-    });
+    this.belongsTo(
+      "sponsorableWithConditions",
+      function (this: any) {
+        return this.where({ name: "Ernie" });
+      },
+      {
+        polymorphic: true,
+        foreignType: "sponsorable_type",
+        foreignKey: "sponsorable_id",
+      },
+    );
   }
 }
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging

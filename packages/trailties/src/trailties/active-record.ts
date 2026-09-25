@@ -54,6 +54,16 @@ export interface ActiveRecordConfig {
   belongsToRequiredValidatesForeignKey: boolean;
   generateSecureTokenOn: "create" | "initialize";
   queues: Record<string, unknown>;
+  migrationError?: "page_load" | false;
+  verboseQueryLogs?: boolean;
+  dumpSchemaAfterMigration?: boolean;
+  attributesForInspect?: string[] | "all";
+}
+
+declare module "../trailtie/configuration.js" {
+  interface Configuration {
+    activeRecord: ActiveRecordConfig;
+  }
 }
 
 const setTimeZoneAwareAttributes = (base: typeof Base): void => {

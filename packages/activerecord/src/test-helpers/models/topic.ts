@@ -119,15 +119,27 @@ export class Topic extends Base {
     });
 
     this.hasMany("replies", { dependent: "destroy", autosave: true, inverseOf: "topic" });
-    this.hasMany("approvedReplies", (q: any) => q.approved(), {
-      className: "Reply",
-      foreignKey: "parent_id",
-      counterCache: "replies_count",
-    });
-    this.hasMany("openReplies", (q: any) => q.open(), {
-      className: "Reply",
-      foreignKey: "parent_id",
-    });
+    this.hasMany(
+      "approvedReplies",
+      function (this: any) {
+        return this.approved();
+      },
+      {
+        className: "Reply",
+        foreignKey: "parent_id",
+        counterCache: "replies_count",
+      },
+    );
+    this.hasMany(
+      "openReplies",
+      function (this: any) {
+        return this.open();
+      },
+      {
+        className: "Reply",
+        foreignKey: "parent_id",
+      },
+    );
     this.hasMany("uniqueReplies", { dependent: "destroy", foreignKey: "parent_id" });
     this.hasMany("sillyUniqueReplies", { dependent: "destroy", foreignKey: "parent_id" });
 

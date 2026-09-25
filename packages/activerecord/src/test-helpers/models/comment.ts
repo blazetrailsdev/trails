@@ -102,10 +102,16 @@ export class Comment extends Base {
     this.belongsTo("firstPost", { foreignKey: "post_id" });
     this.belongsTo("specialPostWithDefaultScope", { foreignKey: "post_id" });
 
-    this.hasOne("postWithInverse", (q: any, comment: any) => q.where({ id: comment.post_id }), {
-      className: "FirstPost",
-      inverseOf: "commentWithInverse",
-    });
+    this.hasOne(
+      "postWithInverse",
+      function (this: any, comment: any) {
+        return this.where({ id: comment.post_id });
+      },
+      {
+        className: "FirstPost",
+        inverseOf: "commentWithInverse",
+      },
+    );
     this.hasMany("children", { className: "Comment", inverseOf: "parent" });
     this.belongsTo("parent", {
       className: "Comment",

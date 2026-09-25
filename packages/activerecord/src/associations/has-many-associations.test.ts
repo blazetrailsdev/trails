@@ -1099,7 +1099,13 @@ describe("HasManyAssociationsTest", () => {
   it("taking with a number", async () => {
     class TakingNumberAuthor extends HmAuthor {
       static {
-        this.hasMany("posts", (q: any) => q.order("id"), { foreignKey: "author_id" });
+        this.hasMany(
+          "posts",
+          function (this: any) {
+            return this.order("id");
+          },
+          { foreignKey: "author_id" },
+        );
       }
     }
     registerModel(TakingNumberAuthor);

@@ -22,6 +22,12 @@ export interface ActionViewConfig {
   annotateRenderedViewWithFilenames: boolean;
 }
 
+declare module "../trailtie/configuration.js" {
+  interface Configuration {
+    actionView: ActionViewConfig;
+  }
+}
+
 /** @noRailsEquivalent PERMANENT */
 interface TrailtieApp {
   deprecators: Deprecators;

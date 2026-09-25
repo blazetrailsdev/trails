@@ -4,6 +4,12 @@ export class College extends ARUnit2Model {
   declare name: string;
   static {
     this.hasMany("courses");
-    this.hasMany("students", (q: any) => q.where({ active: true }), { dependent: "destroy" });
+    this.hasMany(
+      "students",
+      function (this: any) {
+        return this.where({ active: true });
+      },
+      { dependent: "destroy" },
+    );
   }
 }
