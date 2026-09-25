@@ -1,11 +1,5 @@
-import {
-  GeneratorBase,
-  GeneratorOptions,
-  migrationTimestamp,
-  classify,
-  ColumnType,
-} from "./base.js";
-import { pluralize, singularize, tableize, underscore } from "@blazetrails/activesupport";
+import { GeneratorBase, GeneratorOptions, migrationTimestamp, ColumnType } from "./base.js";
+import { camelize, pluralize, singularize, tableize, underscore } from "@blazetrails/activesupport";
 
 const VIRTUAL_TYPES = new Set(["rich_text", "attachment", "attachments"]);
 
@@ -204,7 +198,7 @@ export class MigrationGenerator extends GeneratorBase {
 
     const { timestamps = true, primaryKeyType } = options;
     const columns = parseColumnsWithModifiers(args);
-    const className = classify(name);
+    const className = camelize(underscore(name));
     const body = this.inferBody(name, className, columns, args, timestamps, primaryKeyType);
     let timestamp = migrationTimestamp();
     if (lastTimestamp && timestamp <= lastTimestamp) {

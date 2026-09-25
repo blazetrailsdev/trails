@@ -3470,6 +3470,9 @@ export function blazetrailsDepKeys(pkg: string): string[] {
  * `foreign` is filled with every entity a DEP package contributed — the
  * candidates {@link resolveEntityByDeclaringFile} must not rank by path.
  */
+export const isFixture = (e: ClassInfo) =>
+  (e.file ?? "").includes("__fixtures__") || (e.file ?? "").startsWith("tsc-wrapper/");
+
 export function buildEntitiesByName(
   pkg: string,
   ts: ApiManifest,
@@ -3477,9 +3480,6 @@ export function buildEntitiesByName(
   pkgOf?: Map<ClassInfo, string>,
 ): Map<string, ClassInfo[]> {
   const map = new Map<string, ClassInfo[]>();
-
-  const isFixture = (e: ClassInfo) =>
-    (e.file ?? "").includes("__fixtures__") || (e.file ?? "").startsWith("tsc-wrapper/");
 
   const addPkg = (pkgKey: string) => {
     const p = ts.packages[pkgKey];
@@ -4090,7 +4090,7 @@ export function main() {
       };
 
       for (const entity of [...Object.values(tsPkg.classes), ...Object.values(tsPkg.modules)]) {
-        if (!entity.file) continue;
+        if (!entity.file || isFixture(entity)) continue;
         const allMethods = getInherited(entity, new Set());
         const fileMethods = tsMethodsByFile.get(entity.file) || new Set();
         for (const m of allMethods) {

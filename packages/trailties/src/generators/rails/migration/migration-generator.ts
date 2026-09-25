@@ -7,7 +7,8 @@ import {
   tsModule,
 } from "../../../template-builder/index.js";
 import { NamedBase } from "../../named-base.js";
-import { classify, migrationTimestamp } from "../../base.js";
+import { migrationTimestamp } from "../../base.js";
+import { camelize } from "@blazetrails/activesupport";
 
 let lastTimestamp: string | null = null;
 
@@ -52,7 +53,7 @@ export class MigrationGenerator extends NamedBase {
     }
     lastTimestamp = timestamp;
     const filename = `db/migrate/${timestamp}_${this.fileName}${this.ext()}`;
-    this.createFile(filename, emitMigrationSource(classify(this.fileName), timestamp));
+    this.createFile(filename, emitMigrationSource(camelize(this.fileName), timestamp));
     return this.getCreatedFiles();
   }
 }

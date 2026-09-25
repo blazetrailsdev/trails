@@ -1,11 +1,5 @@
-import {
-  GeneratorBase,
-  type GeneratorOptions,
-  classify,
-  dasherize,
-  parseColumns,
-} from "../../base.js";
-import { singularize, tableize, underscore } from "@blazetrails/activesupport";
+import { GeneratorBase, type GeneratorOptions, dasherize, parseColumns } from "../../base.js";
+import { camelize, singularize, tableize, underscore } from "@blazetrails/activesupport";
 import { tsBody, tsMethod, type Method } from "../../../template-builder/index.js";
 import { emitControllerClass } from "../controller/controller-paths.js";
 import { emitResourceRouteSnippet } from "../resource-route/resource-route-generator.js";
@@ -31,14 +25,14 @@ export class ScaffoldControllerGenerator extends GeneratorBase {
     const stripped = name.replace(/[_-]?controller$/i, "");
     const parts = stripped.split("/");
     const leaf = parts[parts.length - 1];
-    const nsClass = parts.slice(0, -1).map((p) => classify(p));
+    const nsClass = parts.slice(0, -1).map((p) => camelize(underscore(p)));
     const nsDashed = parts.slice(0, -1).map((p) => dasherize(underscore(p)));
     const nsUnderscored = parts.slice(0, -1).map((p) => underscore(p));
     const singularLeaf = singularize(underscore(leaf));
-    const modelClassName = [...nsClass, classify(singularLeaf)].join("");
-    const resourceName = tableize(classify(singularLeaf));
+    const modelClassName = [...nsClass, camelize(singularLeaf)].join("");
+    const resourceName = tableize(camelize(singularLeaf));
     const singular = singularLeaf;
-    const controllerClassName = [...nsClass, classify(resourceName)].join("") + "Controller";
+    const controllerClassName = [...nsClass, camelize(resourceName)].join("") + "Controller";
     const controllerFileName = [...nsDashed, dasherize(resourceName)].join("/") + "-controller";
     const ext = this.ext();
     const ts = this.isTypeScript();
@@ -72,7 +66,7 @@ ${skip("index")}${skip("show")}${skip("new")}${skip("create")}${skip("edit")}${s
 
     if (helper && !api) {
       const helperFileName = [...nsDashed, dasherize(resourceName)].join("/") + "-helper";
-      const helperConstName = [...nsClass, classify(resourceName)].join("") + "Helper";
+      const helperConstName = [...nsClass, camelize(resourceName)].join("") + "Helper";
       this.createFile(
         `app/helpers/${helperFileName}${ext}`,
         `export const ${helperConstName} = {\n};\n`,

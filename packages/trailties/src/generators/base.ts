@@ -1,8 +1,4 @@
-import {
-  underscore as _underscore,
-  camelize as _camelize,
-  dasherize as _dasherize,
-} from "@blazetrails/activesupport";
+import { underscore as _underscore, dasherize as _dasherize } from "@blazetrails/activesupport";
 import { File, FileUtils } from "@blazetrails/ruby-compat";
 import * as Actions from "./actions.js";
 import type { GeneratorActionsState } from "./actions.js";
@@ -148,10 +144,6 @@ export function migrationTimestamp(): string {
   const min = now.getMinutes().toString().padStart(2, "0");
   const sec = now.getSeconds().toString().padStart(2, "0");
   return `${y}${m}${d}${h}${min}${sec}`;
-}
-
-export function classify(name: string): string {
-  return _camelize(name.replace(/-/g, "_"));
 }
 
 export function dasherize(name: string): string {

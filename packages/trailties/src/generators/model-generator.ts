@@ -1,6 +1,6 @@
-import { GeneratorBase, GeneratorOptions, classify, dasherize, ColumnType } from "./base.js";
+import { GeneratorBase, GeneratorOptions, dasherize, ColumnType } from "./base.js";
 import { MigrationGenerator } from "./migration-generator.js";
-import { singularize, tableize, underscore } from "@blazetrails/activesupport";
+import { camelize, classify, singularize, tableize, underscore } from "@blazetrails/activesupport";
 
 interface ModelOptions {
   migration?: boolean;
@@ -50,7 +50,7 @@ export class ModelGenerator extends GeneratorBase {
     } = options;
 
     const singularName = singularize(underscore(name));
-    const className = classify(singularName);
+    const className = camelize(singularName);
     const fileName = dasherize(singularName);
     const columns = parseColumnsDefaultString(args);
 
@@ -122,7 +122,7 @@ describe("${className}", () => {
     }
 
     if (migration && !parent) {
-      const tableName = classify(tableize(className));
+      const tableName = camelize(tableize(className));
       const migGen = this.createMigrationGenerator();
 
       const migArgs = indexes

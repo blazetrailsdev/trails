@@ -7,6 +7,7 @@ import type { Root } from "../paths.js";
 import type { ConfigurationBlock } from "../trailtie/configuration.js";
 import type { DrawCallback } from "@blazetrails/actionpack";
 import { controllerConstants, type DispatchableControllerClass } from "@blazetrails/actionpack";
+import { Base, registerModel } from "@blazetrails/activerecord";
 
 export interface FinisherRoutes {
   prepend(block: DrawCallback): void;
@@ -62,6 +63,7 @@ Finisher.initializer("setup_main_autoloader", async function (this: FinisherHost
   for (const [name, klass] of await loadControllers(await this.paths())) {
     controllerConstants.set(name, klass);
   }
+  registerModel(await loadModels(await this.paths()));
 });
 
 Finisher.initializer(
@@ -179,6 +181,45 @@ async function collectControllers(
       if (typeof value === "function" && value.name.endsWith("Controller")) {
         const name = `${prefix}${underscore(match[1].replace(/-/g, "_"))}`;
         out.set(name, value as DispatchableControllerClass);
+      }
+    }
+  }
+}
+
+/** @noRailsEquivalent PERMANENT */
+async function loadModels(paths: Root): Promise<(typeof Base)[]> {
+  const out: (typeof Base)[] = [];
+  const node = paths.get("app/models");
+  if (!node) return out;
+
+  for (const dir of await node.existentDirectories()) {
+    await collectModels(dir, true, out);
+  }
+  return out;
+}
+
+/** @internal */
+async function collectModels(dir: string, root: boolean, out: (typeof Base)[]): Promise<void> {
+  const fs = getFs();
+  const p = getPath();
+  if (!fs.readdir || !fs.stat || !p.pathToFileURL) return;
+
+  for (const entry of await fs.readdir(dir)) {
+    const full = p.join(dir, entry);
+    if ((await fs.stat(full)).isDirectory()) {
+      if (root && entry === "concerns") continue;
+      await collectModels(full, false, out);
+      continue;
+    }
+    if (!/\.(?:ts|js)$/.test(entry) || /\.d\.ts$/.test(entry)) continue;
+    const mod = (await import(p.pathToFileURL(full).href)) as Record<string, unknown>;
+    for (const value of Object.values(mod)) {
+      if (
+        typeof value === "function" &&
+        value.prototype instanceof Base &&
+        !out.includes(value as typeof Base)
+      ) {
+        out.push(value as typeof Base);
       }
     }
   }

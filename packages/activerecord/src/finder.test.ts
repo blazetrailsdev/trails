@@ -1106,7 +1106,7 @@ describe("FinderTest", () => {
       select: 'posts.*, authors.id as "author_id"',
       limit: 3,
       order: "posts.id",
-    } as never)) as unknown[];
+    })) as unknown[];
     expect(postsResult.length).toBe(3);
     expect(postsResult.map((p) => (p as { author_id: number | null }).author_id)).toEqual([
       1,

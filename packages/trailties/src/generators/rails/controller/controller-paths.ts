@@ -1,5 +1,5 @@
-import { classify, dasherize } from "../../base.js";
-import { camelize, underscore } from "@blazetrails/activesupport";
+import { dasherize } from "../../base.js";
+import { camelize, classify, underscore } from "@blazetrails/activesupport";
 import {
   ref,
   tsBody,

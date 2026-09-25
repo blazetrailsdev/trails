@@ -205,24 +205,53 @@ export class FamousPirate extends Base {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class SpacePirate extends Base {
   declare parrots: AssociationProxy<Parrot>;
+  declare parrotsWithAnnotation: AssociationProxy<Parrot>;
   declare birds: AssociationProxy<Bird>;
+  declare birdsWithAnnotation: AssociationProxy<Bird>;
   declare treasures: AssociationProxy<Treasure>;
   declare treasureEstimates: AssociationProxy<PriceEstimate>;
+  declare treasureEstimatesWithAnnotation: AssociationProxy<PriceEstimate>;
 
   static {
     this.tableName = "pirates";
+
     this.belongsTo("parrot");
+    this.belongsTo("parrotWithAnnotation", (q: any) => q.annotate("that tells jokes"), {
+      className: "Parrot",
+      foreignKey: "parrot_id",
+    });
     this.hasAndBelongsToMany("parrots", { foreignKey: "pirate_id" });
+    this.hasAndBelongsToMany(
+      "parrotsWithAnnotation",
+      (q: any) => q.annotate("that are very colorful"),
+      { className: "Parrot", foreignKey: "pirate_id" },
+    );
     this.hasOne("ship", { foreignKey: "pirate_id" });
+    this.hasOne("shipWithAnnotation", (q: any) => q.annotate("that is a rocket"), {
+      className: "Ship",
+      foreignKey: "pirate_id",
+    });
     this.hasMany("birds", { foreignKey: "pirate_id" });
+    this.hasMany("birdsWithAnnotation", (q: any) => q.annotate("that are also parrots"), {
+      className: "Bird",
+      foreignKey: "pirate_id",
+    });
     this.hasMany("treasures", { as: "looter" });
     this.hasMany("treasureEstimates", { through: "treasures", source: "priceEstimates" });
+    this.hasMany("treasureEstimatesWithAnnotation", (q: any) => q.annotate("yarrr"), {
+      through: "treasures",
+      source: "priceEstimates",
+    });
   }
 }
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface SpacePirate {
   get parrot(): Parrot | null | Promise<Parrot | null>;
   set parrot(value: Parrot | null);
+  get parrotWithAnnotation(): Parrot | null | Promise<Parrot | null>;
+  set parrotWithAnnotation(value: Parrot | null);
   get ship(): Ship | null | Promise<Ship | null>;
   set ship(value: Ship | null);
+  get shipWithAnnotation(): Ship | null | Promise<Ship | null>;
+  set shipWithAnnotation(value: Ship | null);
 }
