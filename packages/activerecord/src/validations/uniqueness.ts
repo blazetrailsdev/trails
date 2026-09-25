@@ -120,7 +120,7 @@ export class UniquenessValidator extends EachValidator {
       if (conditioned != null) relation = conditioned;
     }
 
-    const exists = await relation.exists();
+    const exists = await relation.isExists();
     if (exists) {
       const errorOpts: Record<string, unknown> = except(
         opts ?? {},

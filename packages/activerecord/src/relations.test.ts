@@ -25,6 +25,7 @@ import {
   assertRespondTo,
   isBlank,
   isPresent,
+  toXmlArray,
 } from "@blazetrails/activesupport";
 import { pp } from "./pretty-print.js";
 import { fixtures } from "./test-fixtures.js";
@@ -197,15 +198,14 @@ describe("RelationTest", () => {
   });
 
   it.skip("to yaml", async () => {
-    // BLOCKED: missing surface — Relation#toYaml and Array#toYaml do not exist (relations-array-to-yaml-xml)
+    // BLOCKED: missing surface — no Psych emitter drives encode_with, so Relation#toYaml and Array#toYaml do not exist (relation-to-yaml-psych-dump)
     expect(() => (Bird.all() as any).toYaml()).not.toThrow();
     expect(() => (Bird.all() as any).toA().toYaml()).not.toThrow();
   });
 
-  it.skip("to xml", async () => {
-    // BLOCKED: missing surface — Array#toXml does not exist, only Relation#toXml (relations-array-to-yaml-xml)
+  it("to xml", async () => {
     await expect(Bird.all().toXml()).resolves.not.toThrow();
-    await expect((async () => ((await Bird.all()) as any).toXml())()).resolves.not.toThrow();
+    await expect((async () => toXmlArray(await Bird.all()))()).resolves.not.toThrow();
   });
 
   it("scoped all", async () => {
@@ -902,8 +902,7 @@ describe("RelationTest", () => {
     });
   });
 
-  it.skip("extracted association", async () => {
-    // BLOCKED: extract_associated — extractAssociated calls record[association]() but association readers are properties (relations-extract-associated)
+  it("extracted association", async () => {
     let relationAuthors: unknown;
     await assertQueriesCount(2, false, async () => {
       relationAuthors = await Post.all().extractAssociated("author");
@@ -1228,10 +1227,9 @@ describe("RelationTest", () => {
     });
   });
 
-  it.skip("find all using where with relation with no selects and composite primary key raises", async () => {
-    // BLOCKED: composite primary key subquery — where(id: subquery.select(:id)) raises SqliteError instead of resolving (relation-where-cpk-subquery-select)
+  it("find all using where with relation with no selects and composite primary key raises", async () => {
     const order = cpkOrders("cpk_groceries_order_1");
-    const subquery = CpkOrder.where({ [CpkOrder.primaryKey as string]: [order.id] });
+    const subquery = CpkOrder.where(new Map([[CpkOrder.primaryKey, [order.id]]]));
 
     await expect(CpkOrder.where({ id: subquery.select("id") }).toArray()).resolves.not.toThrow();
 
@@ -2517,8 +2515,7 @@ describe("RelationTest", () => {
     });
   });
 
-  it.skip("find_by requires at least one argument", async () => {
-    // BLOCKED: find_by! — findByBang() with no arguments raises TypeError (where(...).take is not a function), not ArgumentError (relation-find-by-bang-no-arguments)
+  it("find_by requires at least one argument", async () => {
     await expect((Post.all() as any).findByBang()).rejects.toThrow(ArgumentError);
   });
 
@@ -2821,8 +2818,7 @@ describe("RelationTest", () => {
     expect(await postsRel.unscope({ where: "body" }).count()).toBe(1);
   });
 
-  it.skip("unscope with aliased column", async () => {
-    // BLOCKED: unscope — unscope(where: posts.text) does not remove the predicate written through the text alias (relation-unscope-where-qualified-alias)
+  it("unscope with aliased column", async () => {
     let postsRel = Post.where({ author: authors("mary"), text: "hullo" }).order("id");
     expect((await postsRel).map((p) => p.id)).toEqual([posts("misc_by_mary").id]);
 
@@ -2843,8 +2839,7 @@ describe("RelationTest", () => {
     expect((await commentsRel).map((c) => c.id)).toEqual([comments("greetings").id]);
   });
 
-  it.skip("unscope with table name qualified hash", async () => {
-    // BLOCKED: unscope — unscope(where: { posts: id }) does not remove the table-qualified predicate (relation-unscope-where-hash)
+  it("unscope with table name qualified hash", async () => {
     let commentsRel = Comment.joins(":post").where({ "posts.id": posts("thinking") });
     expect((await commentsRel).map((c) => c.id)).toEqual([comments("does_it_hurt").id]);
 

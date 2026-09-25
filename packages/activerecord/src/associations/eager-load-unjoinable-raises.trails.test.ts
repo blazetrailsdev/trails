@@ -37,11 +37,11 @@ describe("eager_load with an unresolvable association", () => {
   });
 
   it("raises on the exists? path", async () => {
-    await expect(Post.all().eagerLoad(":monkeys").exists()).rejects.toThrow(expected);
+    await expect(Post.all().eagerLoad(":monkeys").isExists()).rejects.toThrow(expected);
   });
 
   it("raises EagerLoadPolymorphicError on the exists? path", async () => {
-    await expect(Tagging.all().eagerLoad(":taggable").exists()).rejects.toThrow(
+    await expect(Tagging.all().eagerLoad(":taggable").isExists()).rejects.toThrow(
       /Cannot eagerly load the polymorphic association :taggable\./,
     );
   });
@@ -61,7 +61,7 @@ describe("eager_load with an unresolvable association", () => {
     await expect(essays.eagerLoad(":writer").group("writer_type").sum("writer_id")).rejects.toThrow(
       EagerLoadPolymorphicError,
     );
-    expect(await essays.eagerLoad(":writer").exists(false)).toBe(false);
+    expect(await essays.eagerLoad(":writer").isExists(false)).toBe(false);
     await expect(essays.eagerLoad(":nope").count()).rejects.toThrow(/misspelled it/);
   });
 });

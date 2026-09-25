@@ -1768,7 +1768,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const category = (author as any).namedCategories.build({ name: "Primary" });
     await author.save();
     expect(
-      await Categorization.exists({ author_id: author.id, named_category_name: category.name }),
+      await Categorization.isExists({ author_id: author.id, named_category_name: category.name }),
     ).toBeTruthy();
     expect(await (author as any).namedCategories.reload()).toContainEqual(category);
   });
@@ -1777,7 +1777,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const author = await Author.find(authors("mary").id);
     const category = await (author as any).namedCategories.create({ name: "Primary" });
     expect(
-      await Categorization.exists({ author_id: author.id, named_category_name: category.name }),
+      await Categorization.isExists({ author_id: author.id, named_category_name: category.name }),
     ).toBeTruthy();
     expect(await (author as any).namedCategories.reload()).toContainEqual(category);
   });
@@ -1786,9 +1786,9 @@ describe("HasManyThroughAssociationsTest", () => {
     // BLOCKED: mass assignment — Category.createBang({ author_ids }) raises UnknownAttributeError — filed as 0155-assertion-surfaced-port-bugs/ctor-mass-assign-collection-ids-unsupported
     const author = await Author.find(authors("mary").id);
     const category = await Category.createBang({ author_ids: [author.id], name: "Primary" });
-    expect(await (category as any).authors.exists({ id: author.id })).toBeTruthy();
+    expect(await (category as any).authors.isExists({ id: author.id })).toBeTruthy();
     await category.reload();
-    expect(await (category as any).authors.exists({ id: author.id })).toBeTruthy();
+    expect(await (category as any).authors.isExists({ id: author.id })).toBeTruthy();
   });
 
   it("collection delete with nonstandard primary key on belongs to", async () => {
@@ -1796,7 +1796,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const category = await (author as any).namedCategories.create({ name: "Primary" });
     await (author as any).namedCategories.delete(category);
     expect(
-      await Categorization.exists({ author_id: author.id, named_category_name: category.name }),
+      await Categorization.isExists({ author_id: author.id, named_category_name: category.name }),
     ).toBeFalsy();
     assertEmpty((await (author as any).namedCategories.reload()).target);
   });

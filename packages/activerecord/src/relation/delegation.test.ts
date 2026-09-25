@@ -19,7 +19,7 @@ describe("DelegationTest", () => {
 
   it("not respond to arel method", () => {
     const target = Comment.all();
-    assertNotRespondTo(target, "project");
+    assertNotRespondTo(target, "exists");
   });
 
   describe("delegate_base_methods guard", () => {
@@ -111,7 +111,7 @@ describe("DelegationTest", () => {
       "thirdToLast",
       "thirdToLastBang",
       "sole",
-      "exists",
+      "isExists",
       "count",
       "sum",
       "average",

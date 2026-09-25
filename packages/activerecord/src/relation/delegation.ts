@@ -2,18 +2,14 @@ import type { Base } from "../base.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { SerializeOptions } from "@blazetrails/activemodel";
 import {
-  renameKey,
   type RenameKeyOptions,
-  IndentedXmlStringBuilder,
-  toTag,
   inGroups,
   inGroupsOf,
   publicInstanceMethods,
-  pluralize,
-  singularize,
   split,
-  underscore,
   toSentence,
+  toXmlArray,
+  type XmlBuilder,
 } from "@blazetrails/activesupport";
 import { NotImplementedError } from "../errors.js";
 import {
@@ -271,6 +267,8 @@ const RECORD_DELEGATES: Record<string, RecordDelegate> = {
       .map((record) => (record as unknown as { inspect(): string }).inspect())
       .join(", ")}]`;
   },
+  toXml: (records, options?: ToXmlOptions, block?: (builder: XmlBuilder) => void) =>
+    toXmlArray(records, options, block),
 };
 RECORD_DELEGATES.toFormattedS = RECORD_DELEGATES.toFs;
 
@@ -425,33 +423,15 @@ export class Delegation {
     );
   }
 
-  async toXml(this: DelegationHost, options: ToXmlOptions = {}): Promise<string> {
-    const records = await this.records();
-    const builder = new IndentedXmlStringBuilder();
-    const { root: rootOption, children: childrenOption, skipInstruct = false, ...rest } = options;
-    const firstClass = records[0]?.constructor;
-    const root =
-      rootOption ??
-      (firstClass !== Object && records.every((record) => record instanceof firstClass)
-        ? pluralize(underscore(firstClass?.name ?? "NilClass")).replace(/\//g, "_")
-        : "objects");
-
-    const instruct = skipInstruct ? "" : '<?xml version="1.0" encoding="UTF-8"?>\n';
-
-    const rootTag = renameKey(root, rest);
-    const children = childrenOption ?? singularize(rootTag);
-    const attributes: Record<string, string> = rest.skipTypes ? {} : { type: "array" };
-
-    if (records.length === 0) {
-      builder.tag(rootTag, undefined, attributes);
-    } else {
-      builder.openTag(rootTag, attributes);
-      for (const record of records) {
-        toTag(children, record, { ...rest, builder });
-      }
-      builder.closeTag(rootTag);
-    }
-    return instruct + builder.target();
+  toXml(
+    this: DelegationHost,
+    options?: ToXmlOptions,
+    block?: (builder: XmlBuilder) => void,
+  ): string | Promise<string> {
+    return withRecords(
+      this,
+      (records) => RECORD_DELEGATES.toXml(records, options, block) as string,
+    );
   }
 
   get connection(): Promise<DatabaseAdapter | null> {

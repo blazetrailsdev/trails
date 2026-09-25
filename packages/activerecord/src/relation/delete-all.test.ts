@@ -123,7 +123,7 @@ describe("DeleteAllTest", () => {
   it("delete all with joins and where part is hash", async () => {
     const pets = Pet.joins(":toys").where({ toys: { name: "Bone" } });
 
-    expect(await pets.exists()).toBe(true);
+    expect(await pets.isExists()).toBe(true);
     const sqls = await captureSql(async () => {
       const count = await pets.count();
       expect(await pets.deleteAll()).toBe(count);
@@ -143,7 +143,7 @@ describe("DeleteAllTest", () => {
   it("delete all with joins and where part is not hash", async () => {
     const pets = Pet.joins(":toys").where("toys.name = ?", "Bone");
 
-    expect(await pets.exists()).toBe(true);
+    expect(await pets.isExists()).toBe(true);
     const countBefore = await pets.count();
     expect(await pets.deleteAll()).toBe(countBefore);
   });
@@ -151,7 +151,7 @@ describe("DeleteAllTest", () => {
   it("delete all with left joins", async () => {
     const pets = Pet.leftJoins(":toys").where({ toys: { name: "Bone" } });
 
-    expect(await pets.exists()).toBe(true);
+    expect(await pets.isExists()).toBe(true);
     const countBefore = await pets.count();
     expect(await pets.deleteAll()).toBe(countBefore);
   });
@@ -159,7 +159,7 @@ describe("DeleteAllTest", () => {
   it("delete all with includes", async () => {
     const pets = Pet.includes(":toys").where({ toys: { name: "Bone" } });
 
-    expect(await pets.exists()).toBe(true);
+    expect(await pets.isExists()).toBe(true);
     const countBefore = await pets.count();
     expect(await pets.deleteAll()).toBe(countBefore);
   });

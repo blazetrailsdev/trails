@@ -691,7 +691,7 @@ describe("RelationTest", () => {
     const pluckedIds = await CanonPost.where({ author_id: subquery() }).order("id").pluck("id");
     expect(pluckedIds).toEqual(expectedPostIds);
 
-    expect(await CanonPost.where({ author_id: subquery() }).exists()).toBe(true);
+    expect(await CanonPost.where({ author_id: subquery() }).isExists()).toBe(true);
   });
 
   it("where with a grouped eager-loading limited subquery does not defer materialization", () => {

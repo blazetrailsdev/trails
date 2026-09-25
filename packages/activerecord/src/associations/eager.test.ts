@@ -1035,7 +1035,7 @@ describe("EagerAssociationTest", () => {
 
     await expect(essays.eagerLoad(":writer").toArray()).rejects.toThrow(EagerLoadPolymorphicError);
     await expect(essays.eagerLoad(":writer").count()).rejects.toThrow(EagerLoadPolymorphicError);
-    await expect(essays.eagerLoad(":writer").exists()).rejects.toThrow(EagerLoadPolymorphicError);
+    await expect(essays.eagerLoad(":writer").isExists()).rejects.toThrow(EagerLoadPolymorphicError);
   });
   it("preloading has_many_through association avoids calling association.reader", async () => {
     await assertNotCalledOnInstanceOf(HasManyThroughAssociation, "reader", null, async () => {
@@ -2214,8 +2214,8 @@ describe("EagerAssociationTest", () => {
 
     await assertNothingRaised(async () => {
       await (david as any).essays.includes(":writer").isAny();
-      await (david as any).essays.includes(":writer").exists();
-      await (david as any).essays.includes(":owner").where("name IS NOT NULL").exists();
+      await (david as any).essays.includes(":writer").isExists();
+      await (david as any).essays.includes(":owner").where("name IS NOT NULL").isExists();
     });
   });
 

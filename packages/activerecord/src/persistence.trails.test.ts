@@ -86,8 +86,8 @@ describe("PersistenceTest (trails)", () => {
         Topic.createBang([{ title: "first" }, { title: "" }, { title: "third" }]),
       ).rejects.toThrow();
 
-      expect(await Topic.all().where({ title: "first" }).exists()).toBe(true);
-      expect(await Topic.all().where({ title: "third" }).exists()).toBe(false);
+      expect(await Topic.all().where({ title: "first" }).isExists()).toBe(true);
+      expect(await Topic.all().where({ title: "third" }).isExists()).toBe(false);
     });
   });
 

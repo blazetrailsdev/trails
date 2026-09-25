@@ -172,7 +172,7 @@ describe("RelationTest", () => {
 
   it("no queries on empty relation exists?", async () => {
     await assertQueriesCount(0, false, async () => {
-      await CanonPost.where({ id: [] }).exists(123);
+      await CanonPost.where({ id: [] }).isExists(123);
     });
   });
 
@@ -212,7 +212,7 @@ describe("RelationTest", () => {
 
   it("no queries on empty condition exists?", async () => {
     await assertQueriesCount(0, false, async () => {
-      await CanonPost.all().exists({ id: [] });
+      await CanonPost.all().isExists({ id: [] });
     });
   });
 

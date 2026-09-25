@@ -15,7 +15,7 @@ export class ExtendedDeterministicQueries {
     Relation: {
       prototype: {
         where: (...args: any[]) => unknown;
-        exists: (...args: any[]) => unknown;
+        isExists: (...args: any[]) => unknown;
         scopeForCreate: (...args: any[]) => unknown;
       };
     };
@@ -34,7 +34,7 @@ export class ExtendedDeterministicQueries {
     >;
     const missing: string[] = [];
     if (typeof relProto.where !== "function") missing.push("Relation.prototype.where");
-    if (typeof relProto.exists !== "function") missing.push("Relation.prototype.exists");
+    if (typeof relProto.isExists !== "function") missing.push("Relation.prototype.isExists");
     if (typeof relProto.scopeForCreate !== "function")
       missing.push("Relation.prototype.scopeForCreate");
     if (typeof eatProto.serialize !== "function")
@@ -49,7 +49,7 @@ export class ExtendedDeterministicQueries {
       where(super_, ...args) {
         return RelationQueries.where.call(this, super_ as (...args: any[]) => unknown, args);
       },
-      exists(super_, ...args) {
+      isExists(super_, ...args) {
         return RelationQueries.isExists.call(this, super_ as (...args: any[]) => unknown, args);
       },
       scopeForCreate(super_) {

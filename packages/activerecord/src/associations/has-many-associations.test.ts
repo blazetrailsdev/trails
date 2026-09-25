@@ -1016,7 +1016,7 @@ describe("HasManyAssociationsTest", () => {
     person.first_name = "Sasuke";
     await person.references.push(HmReference.new());
     await person.saveBang();
-    expect(await person.references.exists()).toBeTruthy();
+    expect(await person.references.isExists()).toBeTruthy();
   });
 
   it("counting with counter sql", async () => {
@@ -2698,8 +2698,8 @@ describe("HasManyAssociationsTest", () => {
     await firm.companies.create({ name: "child" });
     assertNotEmpty(await firm.companies.toArray());
     await expect(firm.destroy()).rejects.toThrow(DeleteRestrictionError);
-    expect(await RestrictedWithExceptionFirm.exists({ name: "restrict" })).toBeTruthy();
-    expect(await firm.companies.exists({ name: "child" })).toBeTruthy();
+    expect(await RestrictedWithExceptionFirm.isExists({ name: "restrict" })).toBeTruthy();
+    expect(await firm.companies.isExists({ name: "child" })).toBeTruthy();
   });
 
   it("restrict with error", async () => {
@@ -2715,8 +2715,8 @@ describe("HasManyAssociationsTest", () => {
     expect(firm.errors.messagesFor("base")[0]).toBe(
       "Cannot delete record because dependent companies exist",
     );
-    expect(await RestrictedWithErrorFirm.exists({ name: "restrict" })).toBeTruthy();
-    expect(await firm.companies.exists({ name: "child" })).toBeTruthy();
+    expect(await RestrictedWithErrorFirm.isExists({ name: "restrict" })).toBeTruthy();
+    expect(await firm.companies.isExists({ name: "child" })).toBeTruthy();
   });
 
   it("restrict with error with locale", async () => {
@@ -2739,8 +2739,8 @@ describe("HasManyAssociationsTest", () => {
       expect(firm.errors.get("base")[0]).toBe(
         "Cannot delete record because dependent client companies exist",
       );
-      expect(await RestrictedWithErrorFirm.exists({ name: "restrict" })).toBeTruthy();
-      expect(await firm.companies.exists({ name: "child" })).toBeTruthy();
+      expect(await RestrictedWithErrorFirm.isExists({ name: "restrict" })).toBeTruthy();
+      expect(await firm.companies.isExists({ name: "child" })).toBeTruthy();
     } finally {
       await I18n.backend().reloadBang();
     }
@@ -3708,7 +3708,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("collection proxy respects default scope", async () => {
     const author = await HmAuthor.find(authors("mary").id);
-    expect(await author.firstPosts.exists()).toBeFalsy();
+    expect(await author.firstPosts.isExists()).toBeFalsy();
   });
 
   it("association with extend option", () => {
@@ -4159,8 +4159,8 @@ describe("HasManyAssociationsTest", () => {
     const { RecordNotDestroyed: RND } = await import("../index.js");
     await expect((post as any).haltingComments.destroy(first, second)).rejects.toBeInstanceOf(RND);
 
-    expect(await HaltingComment.exists(first.id)).toBe(true);
-    expect(await HaltingComment.exists(second.id)).toBe(true);
+    expect(await HaltingComment.isExists(first.id)).toBe(true);
+    expect(await HaltingComment.isExists(second.id)).toBe(true);
   });
 
   it("ids reader memoization", async () => {

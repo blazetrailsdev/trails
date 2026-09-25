@@ -2,6 +2,7 @@ import {
   extend,
   fetch,
   hasKey,
+  isModuleIncluded,
   rbInspect,
   rbObjClass,
   rbObjRespondTo,
@@ -10,7 +11,7 @@ import {
   transformValues,
 } from "@blazetrails/ruby-compat";
 import * as Arel from "@blazetrails/arel";
-import { Nodes, SelectManager, Table as ArelTable } from "@blazetrails/arel";
+import { Nodes, Predications, SelectManager, Table as ArelTable } from "@blazetrails/arel";
 import {
   ArgumentError,
   Attribute,
@@ -41,6 +42,7 @@ import {
   foreignKey,
   included,
   isBlank,
+  kernelArray,
   rbEqual,
   rbHash,
   wrap,
@@ -249,7 +251,7 @@ function preloadBang(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
 async function extractAssociated(this: QueryMethodsHost, association: string): Promise<any[]> {
   const records = await preload.call(this, association);
   const associated: any[] = [];
-  for (const record of records) associated.push(await record[association]());
+  for (const record of records) associated.push(await record[association]);
   return associated;
 }
 
@@ -619,16 +621,16 @@ function unscopeBang(
           `Called unscope() with invalid unscoping argument ':${scope}'. Valid arguments are :${[...VALID_UNSCOPING_VALUES].join(", :")}.`,
         );
       }
+      assertModifiableBang.call(this);
       delete this._values[scope as UnscopeType];
     } else if (rawScope && typeof rawScope === "object") {
-      for (const [key, target] of Object.entries(rawScope)) {
+      for (const [key, targetValue] of Object.entries(rawScope)) {
         if (key !== "where") {
-          throw new ArgumentError(
-            `Object arguments to unscope() must use "where" as the key, e.g. unscope({ where: "column_name" }).`,
-          );
+          throw new ArgumentError("Hash arguments in .unscope(*args) must have :where as the key.");
         }
-        const targets = Array.isArray(target) ? target : [target];
-        this.whereClause = this.whereClause.except(...targets);
+
+        const targetValues = resolveArelAttributes.call(this, wrap(targetValue));
+        this.whereClause = this.whereClause.except(...targetValues);
       }
     } else {
       throw new ArgumentError(
@@ -1629,27 +1631,27 @@ export function buildCaseForValuePosition(
 
 /** @internal */
 export function resolveArelAttributes(this: QueryMethodsHost, attrs: unknown[]): unknown[] {
-  const builder = (this as any).predicateBuilder;
   return attrs.flatMap((attr) => {
-    if (attr !== null && typeof attr === "object" && typeof (attr as any).eq === "function") {
+    if (attr != null && isModuleIncluded((attr as object).constructor, Predications)) {
       return [attr];
-    }
-    if (attr !== null && typeof attr === "object" && !Array.isArray(attr)) {
-      return Object.entries(attr as Record<string, unknown>).flatMap(([table, columns]) => {
-        const tableName = String(table);
-        return (Array.isArray(columns) ? columns : [columns]).map(
-          (column) =>
-            builder?.resolveArelAttribute?.(tableName, String(column)) ??
-            new ArelTable(tableName).get(String(column)),
+    } else if (isPlainObject(attr)) {
+      return Object.entries(attr).flatMap(([table, columns]) => {
+        table = String(table);
+        return kernelArray(columns).map((column) =>
+          this.predicateBuilder.resolveArelAttribute(table, String(column)),
         );
       });
+    } else {
+      attr = String(attr);
+      const dot = (attr as string).indexOf(".");
+      if (dot !== -1) {
+        const table = (attr as string).slice(0, dot);
+        const column = (attr as string).slice(dot + 1);
+        return [this.predicateBuilder.resolveArelAttribute(table, column)];
+      } else {
+        return [attr];
+      }
     }
-    const s = String(attr);
-    if (s.includes(".")) {
-      const [table, column] = s.split(".", 2);
-      return [builder?.resolveArelAttribute?.(table, column) ?? new ArelTable(table).get(column)];
-    }
-    return [s];
   });
 }
 

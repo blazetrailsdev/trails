@@ -35,7 +35,7 @@ describe("RelationTest", () => {
 
   it("exists on contradiction where-clause issues no query", async () => {
     await assertNoQueries(false, async () => {
-      expect(await Author.all().where({ id: [] }).exists()).toBe(false);
+      expect(await Author.all().where({ id: [] }).isExists()).toBe(false);
     });
   });
 });

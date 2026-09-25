@@ -125,7 +125,7 @@ describe("UpdateAllTest", () => {
   it("update all with joins", async () => {
     const petsScope = Pet.joins(":toys").where({ toys: { name: "Bone" } });
 
-    expect(await petsScope.exists()).toBe(true);
+    expect(await petsScope.isExists()).toBe(true);
     const sqls = await captureSql(async () => {
       const count = await petsScope.count();
       expect(await petsScope.updateAll({ name: "Bob" })).toBe(count);
@@ -145,7 +145,7 @@ describe("UpdateAllTest", () => {
   it("update all with left joins", async () => {
     const petsScope = Pet.leftJoins(":toys").where({ toys: { name: "Bone" } });
 
-    expect(await petsScope.exists()).toBe(true);
+    expect(await petsScope.isExists()).toBe(true);
     const countBefore = await petsScope.count();
     expect(await petsScope.updateAll({ name: "Bob" })).toBe(countBefore);
   });
@@ -153,7 +153,7 @@ describe("UpdateAllTest", () => {
   it("update all with includes", async () => {
     const petsScope = Pet.includes(":toys").where({ toys: { name: "Bone" } });
 
-    expect(await petsScope.exists()).toBe(true);
+    expect(await petsScope.isExists()).toBe(true);
     const countBefore = await petsScope.count();
     expect(await petsScope.updateAll({ name: "Bob" })).toBe(countBefore);
   });

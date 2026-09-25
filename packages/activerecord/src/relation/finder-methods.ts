@@ -66,7 +66,7 @@ interface FinderRelation {
   /** @internal */
   findNthFromLast(index: number): Promise<any | null>;
   /** @internal */
-  exists(conditions?: unknown): Promise<boolean>;
+  isExists(conditions?: unknown): Promise<boolean>;
   /** @internal */
   constructRelationForExists(conditions: unknown): any;
   /** @internal */
@@ -120,6 +120,9 @@ export async function findBy(
   arg: unknown,
   ...args: unknown[]
 ): Promise<any | null> {
+  if (arguments.length === 0) {
+    throw new ArgumentError("wrong number of arguments (given 0, expected 1+)");
+  }
   try {
     return await this.where(arg, ...args).take();
   } catch (err) {
@@ -133,6 +136,9 @@ export async function findByBang(
   arg: unknown,
   ...args: unknown[]
 ): Promise<any> {
+  if (arguments.length === 0) {
+    throw new ArgumentError("wrong number of arguments (given 0, expected 1+)");
+  }
   const record = await findBy.call(this, arg, ...args);
   if (!record) {
     raiseRecordNotFoundExceptionBang.call(this.where(arg, ...args));
@@ -294,7 +300,7 @@ export const secondToLastBang = bangFinder(secondToLast);
 export const thirdToLastBang = bangFinder(thirdToLast);
 
 /** @missingRailsCall size — PERMANENT */
-export async function exists(
+export async function isExists(
   this: FinderRelation,
   conditions?: Record<string, unknown> | unknown,
 ): Promise<boolean> {
@@ -308,7 +314,7 @@ export async function exists(
   if (conditions === false || conditions === null || this.limitValue === 0) return false;
   if (this.isEagerLoading) {
     return this.applyJoinDependency({ eagerLoading: false }, (relation) =>
-      relation.exists(conditions),
+      relation.isExists(conditions),
     );
   }
   const relation = this.constructRelationForExists(conditions);
@@ -339,7 +345,7 @@ export async function include(this: FinderRelation, record: any): Promise<boolea
       )
     : record.id;
 
-  return this.exists(id);
+  return this.isExists(id);
 }
 
 export const member = include;
@@ -425,7 +431,7 @@ export const FinderMethods = {
   secondToLastBang,
   thirdToLast,
   thirdToLastBang,
-  exists,
+  isExists,
   include,
   member,
   raiseRecordNotFoundExceptionBang,

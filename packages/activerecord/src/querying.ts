@@ -35,7 +35,7 @@ export const QUERYING_METHODS = [
   "thirdToLastBang",
   "secondToLast",
   "secondToLastBang",
-  "exists",
+  "isExists",
   "isAny",
   "isMany",
   "isNone",
@@ -622,14 +622,11 @@ export function sole<T extends typeof Base>(this: T): Promise<InstanceType<T>> {
   return this.all().sole();
 }
 
-export async function exists<T extends typeof Base>(
+export async function isExists<T extends typeof Base>(
   this: T,
   idOrConditions?: unknown,
 ): Promise<boolean> {
-  if (idOrConditions === false || idOrConditions === null) {
-    return false;
-  }
-  return this.all().exists(idOrConditions);
+  return this.all().isExists(idOrConditions);
 }
 
 export function findOrCreateBy<T extends typeof Base>(

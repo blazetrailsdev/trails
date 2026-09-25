@@ -320,7 +320,7 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
 
     const savedMethods = {
       where: Relation.prototype.where,
-      exists: (Relation.prototype as any).exists,
+      isExists: (Relation.prototype as any).isExists,
       scopeForCreate: (Relation.prototype as any).scopeForCreate,
       findBy: (Base as any).findBy,
       serialize: EncryptedAttributeType.prototype.serialize,
@@ -366,7 +366,7 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
       expect(found!.name).toBe("alice");
     } finally {
       Relation.prototype.where = savedMethods.where;
-      (Relation.prototype as any).exists = savedMethods.exists;
+      (Relation.prototype as any).isExists = savedMethods.isExists;
       (Relation.prototype as any).scopeForCreate = savedMethods.scopeForCreate;
       (Base as any).findBy = savedMethods.findBy;
       EncryptedAttributeType.prototype.serialize = savedMethods.serialize;
@@ -382,7 +382,7 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
 
     const savedMethods = {
       where: Relation.prototype.where,
-      exists: (Relation.prototype as any).exists,
+      isExists: (Relation.prototype as any).isExists,
       scopeForCreate: (Relation.prototype as any).scopeForCreate,
       findBy: (Base as any).findBy,
       serialize: EncryptedAttributeType.prototype.serialize,
@@ -413,7 +413,7 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
       expect(await encryptedAuthorClass.findBy({ name: "stephen king" })).toBeNull();
     } finally {
       Relation.prototype.where = savedMethods.where;
-      (Relation.prototype as any).exists = savedMethods.exists;
+      (Relation.prototype as any).isExists = savedMethods.isExists;
       (Relation.prototype as any).scopeForCreate = savedMethods.scopeForCreate;
       (Base as any).findBy = savedMethods.findBy;
       EncryptedAttributeType.prototype.serialize = savedMethods.serialize;
