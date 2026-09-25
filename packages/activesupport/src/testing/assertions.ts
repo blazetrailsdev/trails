@@ -405,19 +405,14 @@ export function assertNotPredicate<T>(
   );
 }
 
-/** @noRailsEquivalent PERMANENT */
-export function assertRespondTo(actual: unknown, name: string, message?: string): void {
-  assert(
-    respondsTo(Object(actual), name),
-    message ?? `Expected ${inspect(actual)} to respond to ${name}`,
-  );
+export function assertRespondTo(obj: unknown, meth: string, msg?: string): void {
+  assert(respondsTo(Object(obj), meth), msg ?? `Expected ${inspect(obj)} to respond to ${meth}`);
 }
 
-/** @noRailsEquivalent PERMANENT */
-export function assertNotRespondTo(actual: unknown, name: string, message?: string): void {
+export function assertNotRespondTo(obj: unknown, meth: string, msg?: string): void {
   assert(
-    !respondsTo(Object(actual), name),
-    message ?? `Expected ${inspect(actual)} to not respond to ${name}`,
+    !respondsTo(Object(obj), meth),
+    msg ?? `Expected ${inspect(obj)} to not respond to ${meth}`,
   );
 }
 
@@ -452,14 +447,12 @@ function findDescriptor(object: object, name: string): PropertyDescriptor | unde
   return undefined;
 }
 
-/** @noRailsEquivalent PERMANENT */
-export function assertEmpty(actual: unknown, message?: string): void {
-  assert(isEmptyCollection(actual), message ?? `Expected ${inspect(actual)} to be empty`);
+export function assertEmpty(obj: unknown, msg?: string): void {
+  assert(isEmptyCollection(obj), msg ?? `Expected ${inspect(obj)} to be empty`);
 }
 
-/** @noRailsEquivalent PERMANENT */
-export function assertNotEmpty(actual: unknown, message?: string): void {
-  assert(!isEmptyCollection(actual), message ?? `Expected ${inspect(actual)} to not be empty`);
+export function assertNotEmpty(obj: unknown, msg?: string): void {
+  assert(!isEmptyCollection(obj), msg ?? `Expected ${inspect(obj)} to not be empty`);
 }
 
 /** @noRailsEquivalent CONVERGEABLE assert-includes-receipt-is-a-scoring-gap-not-permanent */
@@ -516,19 +509,14 @@ function collectionSize(actual: unknown): number {
   return Object.keys(actual as object).length;
 }
 
-/** @noRailsEquivalent PERMANENT */
-export function assertSame(expected: unknown, actual: unknown, message?: string): void {
-  assert(
-    Object.is(expected, actual),
-    message ?? `Expected ${inspect(actual)} to be the same as ${inspect(expected)}`,
-  );
+export function assertSame(exp: unknown, act: unknown, msg?: string): void {
+  assert(Object.is(exp, act), msg ?? `Expected ${inspect(act)} to be the same as ${inspect(exp)}`);
 }
 
-/** @noRailsEquivalent PERMANENT */
-export function assertNotSame(expected: unknown, actual: unknown, message?: string): void {
+export function assertNotSame(exp: unknown, act: unknown, msg?: string): void {
   assert(
-    !Object.is(expected, actual),
-    message ?? `Expected ${inspect(actual)} to not be the same as ${inspect(expected)}`,
+    !Object.is(exp, act),
+    msg ?? `Expected ${inspect(act)} to not be the same as ${inspect(exp)}`,
   );
 }
 

@@ -161,7 +161,7 @@ export class ThroughAssociation extends Association {
       return [];
     }
 
-    const preloader = new Preloader({
+    const preloader = Preloader.new({
       records: middleRecords,
       associations: [sourceRefl.name],
       scope: this.scope,
@@ -180,7 +180,7 @@ export class ThroughAssociation extends Association {
       return this._throughPreloaders;
     }
 
-    const preloader = new Preloader({
+    const preloader = Preloader.new({
       records: this.owners,
       associations: [throughRefl.name],
       scope: this.throughScope(),

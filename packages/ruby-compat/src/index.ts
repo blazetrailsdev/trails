@@ -119,6 +119,7 @@ export {
   defineModule,
   extend,
   extended,
+  rbObjClone,
   include,
   included,
   initialize,

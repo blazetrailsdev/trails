@@ -1271,7 +1271,7 @@ export class Relation<T extends Base> {
     const { Preloader } = await import("./associations/preloader.js");
     const scope = this.strictLoadingValue ? StrictLoadingScope : undefined;
     for (const associations of preload) {
-      const preloader = new Preloader({
+      const preloader = Preloader.new({
         records: records as unknown as import("./base.js").Base[],
         associations: [associations],
         scope,

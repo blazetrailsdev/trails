@@ -27,6 +27,11 @@ export class Preloader {
   private _availableRecords: (Base | Base[])[];
   private _materialized: boolean;
 
+  /** @noRailsEquivalent PERMANENT */
+  static new(options: PreloaderOptions): Preloader {
+    return new this(options);
+  }
+
   constructor(options: PreloaderOptions) {
     this.records = options.records;
     this.associations = options.associations;

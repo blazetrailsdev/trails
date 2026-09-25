@@ -841,6 +841,30 @@ export function include(klass: AnyClass, mod: ModuleObject | AnyClass | Module):
 export type Extended<M extends object> = CallableMethods<M>;
 
 /**
+ * Mirrors: Ruby's Object#clone — vendor/ruby/object.c:536 `rb_obj_clone`, via
+ * `rb_obj_clone_setup` (:457-527): a new object of the same class carrying a
+ * copy of the receiver's singleton class and instance variables, frozen when
+ * the receiver is. The singleton class is copied, not shared, so the clone's
+ * `extend()` registries are its own.
+ *
+ * @noRailsEquivalent PERMANENT — a Ruby core-language primitive, which Rails
+ * uses but does not define.
+ */
+export function rbObjClone<T extends object>(obj: T): T {
+  const descriptors = Object.getOwnPropertyDescriptors(obj) as Record<
+    string | symbol,
+    PropertyDescriptor
+  >;
+  for (const registry of [extendedKeys, includedModulesKey]) {
+    const table = descriptors[registry];
+    if (table) descriptors[registry] = { ...table, value: new Set(table.value as Set<unknown>) };
+  }
+  const clone = Object.create(Object.getPrototypeOf(obj) as object | null, descriptors) as T;
+  if (Object.isFrozen(obj)) Object.freeze(clone);
+  return clone;
+}
+
+/**
  * Ruby-style `prepend` for mixing module methods into a class *above* it.
  *
  * Ruby's `prepend` inserts the module ahead of the class in the ancestry, so a

@@ -6,6 +6,7 @@ import {
   extend,
   included,
   extended,
+  rbObjClone,
   Module,
   initialize,
   initializeIncludedModules,
@@ -1028,5 +1029,18 @@ describe("Module.new", () => {
     include(Host, mod);
     expect(yielded).toBe(mod);
     expect((new Host() as unknown as { greet(): string }).greet()).toBe("hello");
+  });
+});
+
+describe("rbObjClone", () => {
+  it("copies class, ivars, singleton methods and frozen state", () => {
+    const a = () => "a";
+    const obj = Object.assign(new (class Host {})(), { ivar: 1 });
+    extend(obj, { a });
+    const clone = rbObjClone(Object.freeze(obj));
+
+    expect(Object.getPrototypeOf(clone)).toBe(Object.getPrototypeOf(obj));
+    expect(clone).toMatchObject({ ivar: 1, a });
+    expect(Object.isFrozen(clone)).toBe(true);
   });
 });
