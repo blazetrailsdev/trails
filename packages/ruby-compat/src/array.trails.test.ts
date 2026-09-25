@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ArgumentError } from "./argument-error.js";
 import { TypeError } from "./type-error.js";
-import { aryDelete, arySlice, compact, pack, toA, uniq } from "./array.js";
+import { aryDelete, aryPop, arySlice, compact, pack, toA, uniq } from "./array.js";
 
 describe("Array#pack", () => {
   const long = "a".repeat(100);
@@ -163,5 +163,20 @@ describe("aryDelete", () => {
     expect(aryDelete(ary, 3)).toBeUndefined();
     expect(aryDelete(ary, 3, (item) => `not found: ${item}`)).toBe("not found: 3");
     expect(ary).toEqual([1, 2]);
+  });
+});
+
+describe("aryPop", () => {
+  it("pops the last n elements in place, all of them past the length", () => {
+    const ary = [1, 2, 3];
+    expect(aryPop(ary, 2)).toEqual([2, 3]);
+    expect(ary).toEqual([1]);
+    expect(aryPop(ary, 0)).toEqual([]);
+    expect(aryPop(ary, 5)).toEqual([1]);
+    expect(ary).toEqual([]);
+  });
+
+  it("raises for a negative count", () => {
+    expect(() => aryPop([1], -1)).toThrow("negative array size");
   });
 });

@@ -232,6 +232,24 @@ export function aryDelete<T, U = undefined>(ary: T[], item: T, block?: (item: T)
 }
 
 /**
+ * Ruby `Array#pop(n)` (`vendor/ruby/array.c:1437` `rb_ary_pop_m`): removes, in
+ * place, the last `n` elements and answers them in order. `n` past the length
+ * takes them all, and a negative `n` raises (`ary_take_first_or_last_n`,
+ * `array.c:1292-1307`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function aryPop<T>(ary: T[], n: number): T[] {
+  const len = ary.length;
+  if (n > len) {
+    n = len;
+  } else if (n < 0) {
+    throw new ArgumentError("negative array size");
+  }
+  return ary.splice(len - n, n);
+}
+
+/**
  * Ruby `Array#first` with no argument (`vendor/ruby/array.c:1901` `ary_first`):
  * the first element, or `nil` for an empty array.
  *

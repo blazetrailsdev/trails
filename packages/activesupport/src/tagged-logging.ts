@@ -1,6 +1,7 @@
 import { Logger, SimpleFormatter, type LoggerFormatter } from "./logger.js";
 import type { Temporal } from "@blazetrails/date";
 import {
+  aryPop,
   extend,
   extended,
   isEmpty,
@@ -116,7 +117,7 @@ export class TagStack {
 
   popTags(count: number): unknown[] {
     this._tagsString = null;
-    return this._tags.splice(this._tags.length - Math.min(count, this._tags.length));
+    return aryPop(this._tags, count);
   }
 
   clear(): unknown[] {
