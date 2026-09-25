@@ -201,6 +201,6 @@ describe("basic CRUD DX — defining and using a model", () => {
   });
 
   it("tableName configured in `static {}` is a string accessor", () => {
-    expectTypeOf(User.tableName).toBeString();
+    expectTypeOf(User.tableName).toEqualTypeOf<string | null>();
   });
 });

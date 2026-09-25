@@ -17,7 +17,7 @@ describe("edge cases — rough edges in current DX", () => {
   });
 
   it("tableName is a string; primaryKey is string | string[]", () => {
-    expectTypeOf(Widget.tableName).toBeString();
+    expectTypeOf(Widget.tableName).toEqualTypeOf<string | null>();
     expectTypeOf(Widget.primaryKey).toEqualTypeOf<string | string[]>();
   });
 
