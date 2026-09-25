@@ -1,6 +1,7 @@
 import { getFs, getPath, type FsAdapter } from "@blazetrails/ruby-compat";
 import { regexpEscape } from "@blazetrails/ruby-compat";
 import { assertNoRubySource } from "../template-builder/no-ruby-source.js";
+import { optimizeIndentation, rebaseIndentation } from "./actions.js";
 
 type AsyncFs = FsAdapter & {
   readFile: NonNullable<FsAdapter["readFile"]>;
@@ -71,30 +72,77 @@ export async function pkg(
   this.output(`         pkg  ${name}`);
 }
 
-export async function route(this: TrailsActionsHost, tsCode: string): Promise<void> {
-  assertNoRubySource(tsCode);
-  await insertAtMarker(this, "config/routes.ts", "// routes", tsCode);
-  this.output(`       route  ${summarize(tsCode)}`);
+export interface RouteOptions {
+  namespace?: string | string[] | null;
+}
+
+export async function route(
+  this: TrailsActionsHost,
+  routingCode: string,
+  { namespace: namespaceOption }: RouteOptions = {},
+): Promise<void> {
+  assertNoRubySource(routingCode);
+  const namespace = namespaceOption == null ? [] : ([] as string[]).concat(namespaceOption);
+  let namespacePattern = routeNamespacePattern(namespace);
+  routingCode = [...namespace]
+    .reverse()
+    .reduce(
+      (code, name) =>
+        `mapper.namespace(${JSON.stringify(name)}, () => {\n${rebaseIndentation(code, 2)}});`,
+      routingCode,
+    );
+
+  this.output(`       route  ${summarize(routingCode)}`);
+
+  const namespaceMatch = await matchFile(this, "config/routes.ts", namespacePattern);
+  if (namespaceMatch) {
+    const captures = namespaceMatch
+      .slice(1)
+      .filter((c): c is string => c != null)
+      .map((c) => c.length);
+    const baseIndent = captures[0];
+    const existingBlockIndent = captures.length > 1 ? captures.at(-1) : undefined;
+    routingCode = rebaseIndentation(routingCode, baseIndent + 2);
+    if (existingBlockIndent !== undefined) {
+      routingCode = routingCode.replace(
+        new RegExp(`^[ ]{0,${existingBlockIndent}}\\S.+\\n?`, "gm"),
+        "",
+      );
+    }
+    namespacePattern = new RegExp(regexpEscape(namespaceMatch[0]));
+  }
+
+  await injectIntoFile(this, "config/routes.ts", routingCode, { after: namespacePattern });
 }
 
 export interface EnvironmentOptions {
-  env?: string;
+  env?: string | string[] | null;
 }
 
 export async function environment(
   this: TrailsActionsHost,
-  tsCode: string,
+  data: string,
   options: EnvironmentOptions = {},
 ): Promise<void> {
-  assertNoRubySource(tsCode);
-  if (options.env !== undefined && !/^[a-z0-9_-]+$/i.test(options.env)) {
-    throw new Error(
-      `environment name must match /^[a-z0-9_-]+$/i, got ${JSON.stringify(options.env)}`,
-    );
+  const sentinel = " extends Application {\n  static {\n";
+  const envFileSentinel = "Trails.application!.configure(function () {\n";
+  assertNoRubySource(data);
+
+  if (options.env == null) {
+    await injectIntoFile(this, "config/application.ts", optimizeIndentation(data, 4), {
+      after: sentinel,
+    });
+  } else {
+    for (const env of ([] as string[]).concat(options.env)) {
+      if (!/^[a-z0-9_-]+$/i.test(env)) {
+        throw new Error(`environment name must match /^[a-z0-9_-]+$/i, got ${JSON.stringify(env)}`);
+      }
+      await injectIntoFile(this, `config/environments/${env}.ts`, optimizeIndentation(data, 2), {
+        after: envFileSentinel,
+      });
+    }
   }
-  const relPath = options.env ? `config/environments/${options.env}.ts` : "config/application.ts";
-  await insertAtMarker(this, relPath, "// config", tsCode);
-  this.output(` environment  ${summarize(tsCode)}`);
+  this.output(` environment  ${summarize(data)}`);
 }
 
 export async function initializer(
@@ -121,32 +169,47 @@ export async function initializer(
   this.output(`      create  config/initializers/${filename}`);
 }
 
-async function insertAtMarker(
+function routeNamespacePattern(namespace: string[]): RegExp {
+  const pattern = namespace
+    .map((name, i) => [name, i] as const)
+    .reverse()
+    .reduce<string | null>((pattern, [name, i]) => {
+      const cumulativeMargin = `\\${i + 1}[ ]{2}`;
+      const blankOrIndentedLine = `^[ ]*\\n|^${cumulativeMargin}.*\\n`;
+      return `(?:(?:${blankOrIndentedLine})*?^(${cumulativeMargin})mapper\\.namespace\\(${regexpEscape(JSON.stringify(name))}, \\(\\) => \\{\\n${pattern ?? ""})?`;
+    }, null);
+  return new RegExp(
+    `^([ ]*).+drawRoutes\\(mapper: Mapper\\): void \\{[ ]*\\n${pattern ?? ""}`,
+    "m",
+  );
+}
+
+async function matchFile(
   host: TrailsActionsHost,
   relPath: string,
-  marker: string,
-  insertion: string,
+  pattern: RegExp,
+): Promise<RegExpMatchArray | null> {
+  const fs = await requireAsyncFs(["readFile"]);
+  const full = getPath().join(host.cwd, relPath);
+  if (!(await fs.exists(full))) return null;
+  return (await fs.readFile(full, "utf-8")).match(pattern);
+}
+
+async function injectIntoFile(
+  host: TrailsActionsHost,
+  relPath: string,
+  replacement: string,
+  { after }: { after: string | RegExp },
 ): Promise<void> {
   const fs = await requireAsyncFs(["readFile", "writeFile"]);
-  const path = getPath();
-  const full = path.join(host.cwd, relPath);
-  const existing = await fs.readFile(full, "utf-8");
-  const re = new RegExp(`^([\\t ]*)${regexpEscape(marker)}[\\t ]*$`, "gm");
-  let match: RegExpExecArray | null;
-  let last: RegExpExecArray | null = null;
-  while ((match = re.exec(existing)) !== null) last = match;
-  if (!last) {
-    throw new Error(`marker ${JSON.stringify(marker)} not found in ${relPath}`);
-  }
-  const lineStart = last.index;
-  const indent = last[1];
-  const block = insertion
-    .split("\n")
-    .map((line) => (line.length === 0 ? line : indent + line))
-    .join("\n");
-  const text = block.endsWith("\n") ? block : block + "\n";
-  const updated = existing.slice(0, lineStart) + text + existing.slice(lineStart);
-  await fs.writeFile(full, updated);
+  const full = getPath().join(host.cwd, relPath);
+  const content = await fs.readFile(full, "utf-8");
+  if (content.includes(replacement)) return;
+  const flag = typeof after === "string" ? new RegExp(regexpEscape(after)) : after;
+  await fs.writeFile(
+    full,
+    content.replace(flag, (match) => match + replacement),
+  );
 }
 
 function summarize(s: string): string {

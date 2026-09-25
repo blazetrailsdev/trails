@@ -426,7 +426,6 @@ export class ${this.appConstBase()} extends Application {
   //
   // config.timeZone = "Central Time (US & Canada)";
   // config.eagerLoadPaths.push("extras");
-  // config
 }
 
 Application.register(${this.appConstBase()});
@@ -597,7 +596,6 @@ ${
 `
 }  // Raise error when a before_action's only/except options reference missing actions.
   this.config.actionController.raiseOnMissingCallbackActions = true;
-  // config
 });
 `,
     );
@@ -666,7 +664,6 @@ ${
 
   // Raise error when a before_action's only/except options reference missing actions.
   this.config.actionController.raiseOnMissingCallbackActions = true;
-  // config
 });
 `,
     );
@@ -779,7 +776,6 @@ ${
   //
   // Skip DNS rebinding protection for the default health check endpoint.
   // this.config.hostAuthorization = { exclude: (request) => request.path === "/up" };
-  // config
 });
 `,
     );

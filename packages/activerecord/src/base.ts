@@ -808,7 +808,7 @@ export class Base extends Model {
           [key: string]: unknown;
         },
   ): Promise<ConnectionPool> {
-    return ConnectionHandling.establishConnection(this, configOrEnv);
+    return ConnectionHandling.establishConnection.call(this, configOrEnv);
   }
 
   declare static connectsTo: typeof ConnectionHandling.connectsTo;
@@ -2341,15 +2341,14 @@ export class Base extends Model {
       return `${name}(abstract)`;
     } else if (!ModelSchema.isSchemaLoaded.call(this as never) && !this.isConnected()) {
       return `${name} (call '${name}.load_schema' to load schema informations)`;
-    }
-    const columns = this.columnsHash();
-    if (Object.keys(columns).length === 0) {
+    } else if (ModelSchema.cachedTableExists.call(this as never)) {
+      const attrList = Object.entries(this.attributeTypes())
+        .map(([name, type]) => `${name}: ${type!.type() ?? ""}`)
+        .join(", ");
+      return `${this.name}(${attrList})`;
+    } else {
       return `${name}(Table doesn't exist)`;
     }
-    const attrList = Object.entries(this.attributeTypes())
-      .map(([attr, type]) => `${attr}: ${type!.type() ?? ""}`)
-      .join(", ");
-    return `${name}(${attrList})`;
   }
 
   static hasAttribute(attrName: string): boolean {

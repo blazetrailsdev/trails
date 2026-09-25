@@ -30,6 +30,7 @@ export abstract class GeneratorBase implements GeneratorActionsState {
   pkg = TrailsActions.pkg;
   route = TrailsActions.route;
   environment = TrailsActions.environment;
+  application = TrailsActions.environment;
   initializer = TrailsActions.initializer;
 
   constructor(options: GeneratorOptions) {

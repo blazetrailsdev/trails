@@ -16,7 +16,7 @@ import { Base } from "../../base.js";
 import * as Type from "../../type.js";
 import type { Relation } from "../../relation.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
-import { Range } from "@blazetrails/ruby-compat";
+import { Module, Range } from "@blazetrails/ruby-compat";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Developer extends Base {
@@ -54,17 +54,13 @@ export class Developer extends Base {
 
   static instanceCount: number | undefined;
 
-  static projectsAssociationExtension = {
-    async findMostRecent(this: Relation<Base>) {
-      return this.order("id DESC").first();
-    },
-  };
+  declare static ProjectsAssociationExtension: Module;
 
-  static projectsAssociationExtension2 = {
-    async findLeastRecent(this: Relation<Base>) {
+  static ProjectsAssociationExtension2 = new Module((mod) => {
+    mod.defineMethod("findLeastRecent", async function (this: Relation<Base>) {
       return this.order("id ASC").first();
-    },
-  };
+    });
+  });
 
   static {
     this.ignoredColumns = ["first_name", "last_name"];
@@ -100,33 +96,44 @@ export class Developer extends Base {
     this.hasAndBelongsToMany("sharedComputers", { className: "Computer" });
     this.hasMany("computers", { foreignKey: "developer" });
 
-    this.hasAndBelongsToMany("projectsExtendedByName", {
-      className: "Project",
-      joinTable: "developers_projects",
-      associationForeignKey: "project_id",
-      extend: Developer.projectsAssociationExtension,
-    });
+    this.hasAndBelongsToMany(
+      "projectsExtendedByName",
+      (q: any) => q.extending(Developer.ProjectsAssociationExtension),
+      {
+        className: "Project",
+        joinTable: "developers_projects",
+        associationForeignKey: "project_id",
+      },
+    );
 
-    this.hasAndBelongsToMany("projectsExtendedByNameTwice", {
-      className: "Project",
-      joinTable: "developers_projects",
-      associationForeignKey: "project_id",
-      extend: [Developer.projectsAssociationExtension, Developer.projectsAssociationExtension2],
-    });
+    this.hasAndBelongsToMany(
+      "projectsExtendedByNameTwice",
+      (q: any) =>
+        q.extending(
+          Developer.ProjectsAssociationExtension,
+          Developer.ProjectsAssociationExtension2,
+        ),
+      {
+        className: "Project",
+        joinTable: "developers_projects",
+        associationForeignKey: "project_id",
+      },
+    );
 
-    this.hasAndBelongsToMany("projectsExtendedByNameAndBlock", {
-      className: "Project",
-      joinTable: "developers_projects",
-      associationForeignKey: "project_id",
-      extend: [
-        Developer.projectsAssociationExtension,
-        {
-          async findLeastRecent(this: Relation<Base>) {
-            return this.order("id ASC").first();
-          },
-        },
-      ],
-    });
+    this.hasAndBelongsToMany(
+      "projectsExtendedByNameAndBlock",
+      (q: any) => q.extending(Developer.ProjectsAssociationExtension),
+      {
+        className: "Project",
+        joinTable: "developers_projects",
+        associationForeignKey: "project_id",
+      },
+      (mod) => {
+        mod.defineMethod("findLeastRecent", async function (this: Relation<Base>) {
+          return this.order("id ASC").first();
+        });
+      },
+    );
 
     this.hasAndBelongsToMany("strictLoadingProjects", {
       joinTable: "developers_projects",

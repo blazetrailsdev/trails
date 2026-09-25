@@ -95,6 +95,12 @@ export function rbModSingletonP(klass: unknown): boolean {
  * `empty?` for (`array.c:2686`, `hash.c:3023`, `string.c:2243`), whose JS
  * values carry no such member.
  *
+ * A class receiver (a non-writable `prototype`, which a plain function, the
+ * JS spelling of a `Proc`, does not have) answers `Module#respond_to?`: its static data fields hold
+ * what Ruby keeps in class-level ivars, not methods, and the lookup stops
+ * short of `Function.prototype`, whose `call` / `apply` / `bind` no Ruby
+ * `Module` defines.
+ *
  * `pub` cannot change the lookup: JS carries no runtime notion of method
  * visibility. See CLAUDE.md, "Method visibility is not a runtime fact in JS".
  *
@@ -113,9 +119,19 @@ export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true
   ) {
     return true;
   }
-  for (let o: object | null = Object(obj); o; o = Object.getPrototypeOf(o) as object | null) {
+  const klass =
+    typeof obj === "function" &&
+    Object.getOwnPropertyDescriptor(obj, "prototype")?.writable === false;
+  for (
+    let o: object | null = Object(obj);
+    o && !(klass && o === Function.prototype);
+    o = Object.getPrototypeOf(o) as object | null
+  ) {
     const entry = Object.getOwnPropertyDescriptor(o, mid);
-    if (entry) return !("value" in entry && entry.value === undefined);
+    if (entry) {
+      if (!("value" in entry)) return true;
+      return klass ? typeof entry.value === "function" : entry.value !== undefined;
+    }
   }
   let cme: PropertyDescriptor | undefined;
   for (

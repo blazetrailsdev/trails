@@ -4,7 +4,6 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import type { HashConfig } from "./database-configurations/hash-config.js";
 import { DatabaseConfig } from "./database-configurations/database-config.js";
-import { resolve as resolveConnectionAdapter } from "./connection-adapters.js";
 import { NotImplementedError, ActiveRecordError } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
@@ -17,7 +16,7 @@ import {
 } from "./core.js";
 import { IsolatedExecutionState, getEnv, presence } from "@blazetrails/activesupport";
 import * as ConnectionHandlingModule from "./connection-handling.js";
-import { readingRole, setDefaultTimezone, writingRole } from "./active-record.js";
+import { readingRole, writingRole } from "./active-record.js";
 import { permanentConnectionCheckout } from "./active-record.js";
 import { deprecator } from "./deprecator.js";
 
@@ -375,33 +374,18 @@ export async function removeConnection(this: typeof Base): Promise<HashConfig | 
 }
 
 export function connectionSpecificationName(this: typeof Base): string {
-  const ownHas = Object.prototype.hasOwnProperty.call(this, "_connectionSpecificationName");
-
-  if (ownHas && (this as any)._connectionSpecificationName != null) {
-    return (this as any)._connectionSpecificationName;
+  const connectionSpecificationName = Object.prototype.hasOwnProperty.call(
+    this,
+    "_connectionSpecificationName",
+  )
+    ? (this as any)._connectionSpecificationName
+    : null;
+  if (connectionSpecificationName == null) {
+    return (this as unknown) === ActiveRecord.Base
+      ? "ActiveRecord::Base"
+      : (Object.getPrototypeOf(this) as typeof Base).connectionSpecificationName;
   }
-
-  if (ownHas) {
-    if ((this as unknown) === ActiveRecord.Base) return "ActiveRecord::Base";
-    const parent = Object.getPrototypeOf(this);
-    if (parent && typeof parent === "function" && parent !== this) {
-      return connectionSpecificationName.call(parent as typeof Base);
-    }
-    return "ActiveRecord::Base";
-  }
-
-  if ((this as unknown) === ActiveRecord.Base) return "ActiveRecord::Base";
-  if (typeof (this as any).isPrimaryClass === "function" && (this as any).isPrimaryClass()) {
-    return "ActiveRecord::Base";
-  }
-  if ((this as any).isConnectionClass?.()) {
-    return this.name;
-  }
-  const parent = Object.getPrototypeOf(this);
-  if (parent && typeof parent === "function" && parent !== this) {
-    return connectionSpecificationName.call(parent as typeof Base);
-  }
-  return "ActiveRecord::Base";
+  return connectionSpecificationName;
 }
 
 export function schemaCache(this: typeof Base) {
@@ -511,10 +495,6 @@ export function appendToConnectedToStack(entry: {
   connectedToStack().push(entry);
 }
 
-async function _loadAdapter(name: string): Promise<new (arg: unknown) => DatabaseAdapter> {
-  return resolveConnectionAdapter(name) as Promise<new (arg: unknown) => DatabaseAdapter>;
-}
-
 /** @missingRailsCall Rails.env — PERMANENT */
 export const RAILS_ENV = (): string | undefined =>
   presence(getEnv("TRAILS_ENV")) ?? presence(getEnv("NODE_ENV"));
@@ -522,12 +502,8 @@ export const RAILS_ENV = (): string | undefined =>
 /** @missingRailsCall call — PERMANENT */
 export const DEFAULT_ENV = (): string => RAILS_ENV() || "default_env";
 
-/**
- * @missingRailsCall call — PERMANENT
- * @missingRailsCall connection_handler — PERMANENT
- */
 export async function establishConnection(
-  modelClass: typeof Base,
+  this: typeof Base,
   configOrEnv?:
     | string
     | DatabaseConfig
@@ -542,43 +518,13 @@ export async function establishConnection(
         [key: string]: unknown;
       },
 ): Promise<ConnectionPool> {
-  if (!modelClass.name) throw new Error("Anonymous class is not allowed.");
-
   configOrEnv ??= `:${DEFAULT_ENV()}`;
-  const dbConfig = modelClass.resolveConfigForConnection(configOrEnv);
-  return establishWithDbConfig(modelClass, dbConfig);
-}
-
-function validateConfigDefaultTimezone(config: { [key: string]: unknown }): "utc" | "local" | null {
-  const raw = config.default_timezone;
-  if (raw == null) return null;
-  if (raw !== "utc" && raw !== "local") {
-    throw new ArgumentError("default_timezone must be either 'utc' or 'local'");
-  }
-  return raw;
-}
-
-async function establishWithDbConfig(
-  modelClass: typeof Base,
-  dbConfig: HashConfig,
-): Promise<ConnectionPool> {
-  const config = dbConfig.configurationHash as Record<string, unknown>;
-  const tz = validateConfigDefaultTimezone(config);
-
-  if (dbConfig.adapter) await _loadAdapter(dbConfig.adapter);
-
-  modelClass.connectionClass = true;
-
-  const role = coreCurrentRole.call(modelClass as any);
-  const shard = coreCurrentShard.call(modelClass as any);
-
-  const pool = await modelClass.connectionHandler.establishConnection(dbConfig, {
-    ownerName: modelClass.connectionClassForSelf(),
-    role,
-    shard,
+  const dbConfig = this.resolveConfigForConnection(configOrEnv);
+  return this.connectionHandler.establishConnection(dbConfig, {
+    ownerName: this,
+    role: this.currentRole(),
+    shard: this.currentShard(),
   });
-  if (tz) setDefaultTimezone(tz);
-  return pool;
 }
 
 export const ConnectionHandling = {

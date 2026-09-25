@@ -1086,9 +1086,12 @@ function distinctBang(this: QueryMethodsHost, value = true): any {
   return this;
 }
 
-function extending(this: QueryMethodsHost, modules?: object | ((rel: any) => void)): any {
-  if (!modules) return this;
-  return extendingBang.call(this.spawn(), modules);
+function extending(this: QueryMethodsHost, ...modules: Array<object | ((rel: any) => void)>): any {
+  if (modules.some((mod) => mod != null && (mod as unknown) !== false)) {
+    return extendingBang.call(this.spawn(), ...modules);
+  } else {
+    return this;
+  }
 }
 
 function extendingBang(

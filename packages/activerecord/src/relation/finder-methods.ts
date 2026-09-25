@@ -4,7 +4,6 @@ import { inOrderOf, wrap } from "@blazetrails/activesupport";
 import { pluralize } from "@blazetrails/activesupport/core-ext/string/inflections";
 import {
   ArgumentError,
-  RangeError as ActiveModelRangeError,
   sanitizeForMassAssignment as sanitizeForbiddenAttributes,
 } from "@blazetrails/activemodel";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
@@ -123,12 +122,7 @@ export async function findBy(
   if (arguments.length === 0) {
     throw new ArgumentError("wrong number of arguments (given 0, expected 1+)");
   }
-  try {
-    return await this.where(arg, ...args).take();
-  } catch (err) {
-    if (err instanceof ActiveModelRangeError) return null;
-    throw err;
-  }
+  return this.where(arg, ...args).take();
 }
 
 export async function findByBang(
@@ -139,11 +133,7 @@ export async function findByBang(
   if (arguments.length === 0) {
     throw new ArgumentError("wrong number of arguments (given 0, expected 1+)");
   }
-  const record = await findBy.call(this, arg, ...args);
-  if (!record) {
-    raiseRecordNotFoundExceptionBang.call(this.where(arg, ...args));
-  }
-  return record;
+  return this.where(arg, ...args).takeBang();
 }
 
 export async function findSoleBy(this: FinderRelation, ...conditions: unknown[]): Promise<any> {

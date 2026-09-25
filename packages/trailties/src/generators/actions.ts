@@ -1,4 +1,5 @@
 import { getChildProcess, env as processEnv } from "@blazetrails/ruby-compat";
+import { chomp, indent, stripHeredoc } from "@blazetrails/activesupport";
 
 export interface ActionsHost {
   cwd: string;
@@ -103,3 +104,14 @@ export function executeCommand(
 function splitArgs(s: string): string[] {
   return s.split(/\s+/).filter(Boolean);
 }
+
+/**
+ * @missingRailsArgs chomp — PERMANENT
+ * @missingRailsArgs indent — PERMANENT
+ */
+export function optimizeIndentation(value: unknown, amount: number = 0): string {
+  if (typeof value !== "string") return `${String(value)}\n`;
+  return `${chomp(indent(stripHeredoc(value), amount))}\n`;
+}
+
+export const rebaseIndentation = optimizeIndentation;

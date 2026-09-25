@@ -115,55 +115,60 @@ describe("TrailsActions", () => {
   });
 
   describe("route", () => {
-    it("inserts code before the // routes marker", async () => {
-      files.set(
-        "/app/config/routes.ts",
-        `export function drawRoutes(router: any): void {\n  // routes\n}\n`,
-      );
-      await makeGen().route(`router.resources("posts");`);
+    const draw = `import type { Mapper } from "@blazetrails/actionpack";\n\nexport function drawRoutes(mapper: Mapper): void {\n`;
+
+    it("injects code after the drawRoutes sentinel", async () => {
+      files.set("/app/config/routes.ts", `${draw}  mapper.get("up");\n}\n`);
+      await makeGen().route(`mapper.resources("posts");`);
       expect(files.get("/app/config/routes.ts")).toBe(
-        `export function drawRoutes(router: any): void {\n  router.resources("posts");\n  // routes\n}\n`,
+        `${draw}  mapper.resources("posts");\n  mapper.get("up");\n}\n`,
       );
     });
 
-    it("ignores marker substrings that aren't standalone lines", async () => {
-      files.set(
-        "/app/config/routes.ts",
-        `// inline mention of // routes in a leading comment\nexport function drawRoutes(router: any): void {\n  // routes\n}\n`,
-      );
-      await makeGen().route(`router.resources("posts");`);
+    it("does not inject code that is already present", async () => {
+      files.set("/app/config/routes.ts", `${draw}}\n`);
+      await makeGen().route(`mapper.resources("posts");`);
+      await makeGen().route(`mapper.resources("posts");`);
+      expect(files.get("/app/config/routes.ts")).toBe(`${draw}  mapper.resources("posts");\n}\n`);
+    });
+
+    it("wraps code in the given namespaces", async () => {
+      files.set("/app/config/routes.ts", `${draw}}\n`);
+      await makeGen().route(`mapper.resources("posts");`, { namespace: ["admin", "blog"] });
       expect(files.get("/app/config/routes.ts")).toBe(
-        `// inline mention of // routes in a leading comment\nexport function drawRoutes(router: any): void {\n  router.resources("posts");\n  // routes\n}\n`,
+        `${draw}  mapper.namespace("admin", () => {\n    mapper.namespace("blog", () => {\n      mapper.resources("posts");\n    });\n  });\n}\n`,
       );
     });
 
-    it("targets the original marker even when prior insertions contain the marker string", async () => {
+    it("injects into an existing namespace block", async () => {
       files.set(
         "/app/config/routes.ts",
-        `export function drawRoutes(router: any): void {\n  // routes\n}\n`,
+        `${draw}  mapper.namespace("admin", () => {\n    mapper.resources("users");\n  });\n}\n`,
       );
-      await makeGen().route(`// routes (user note)\nrouter.resources("posts");`);
-      await makeGen().route(`router.resources("comments");`);
+      await makeGen().route(`mapper.resources("posts");`, { namespace: "admin" });
       expect(files.get("/app/config/routes.ts")).toBe(
-        `export function drawRoutes(router: any): void {\n  // routes (user note)\n  router.resources("posts");\n  router.resources("comments");\n  // routes\n}\n`,
+        `${draw}  mapper.namespace("admin", () => {\n    mapper.resources("posts");\n    mapper.resources("users");\n  });\n}\n`,
       );
-    });
-
-    it("errors when the marker is missing", async () => {
-      files.set("/app/config/routes.ts", "export function drawRoutes() {}\n");
-      await expect(makeGen().route("x")).rejects.toThrow(/marker .* not found/);
     });
   });
 
   describe("environment", () => {
-    it("inserts code before the // config marker in application.ts by default", async () => {
-      files.set(
-        "/app/config/application.ts",
-        `export const app = {\n  config: {\n    // config\n  },\n};\n`,
-      );
-      await makeGen().environment(`logLevel: "debug",`);
+    const app = `export class MyApp extends Application {\n  static {\n    this.config.loadDefaults("8.0");\n  }\n}\n`;
+    const env = `Trails.application!.configure(function () {\n  this.config.eagerLoad = false;\n});\n`;
+
+    it("injects code into application.ts after the class sentinel by default", async () => {
+      files.set("/app/config/application.ts", app);
+      await makeGen().environment(`this.config.logLevel = "debug";`);
       expect(files.get("/app/config/application.ts")).toBe(
-        `export const app = {\n  config: {\n    logLevel: "debug",\n    // config\n  },\n};\n`,
+        `export class MyApp extends Application {\n  static {\n    this.config.logLevel = "debug";\n    this.config.loadDefaults("8.0");\n  }\n}\n`,
+      );
+    });
+
+    it("application is an alias of environment", async () => {
+      files.set("/app/config/application.ts", app);
+      await makeGen().application(`this.config.logLevel = "debug";`);
+      expect(files.get("/app/config/application.ts")).toContain(
+        `  static {\n    this.config.logLevel = "debug";\n`,
       );
     });
 
@@ -176,15 +181,17 @@ describe("TrailsActions", () => {
       );
     });
 
-    it("with env option targets the env-specific config file", async () => {
-      files.set(
-        "/app/config/environments/production.ts",
-        `Trails.application!.configure(function () {\n  // config\n});\n`,
-      );
-      await makeGen().environment(`this.config.logLevel = "warn";`, { env: "production" });
-      expect(files.get("/app/config/environments/production.ts")).toBe(
-        `Trails.application!.configure(function () {\n  this.config.logLevel = "warn";\n  // config\n});\n`,
-      );
+    it("with env option targets each env-specific config file", async () => {
+      files.set("/app/config/environments/production.ts", env);
+      files.set("/app/config/environments/test.ts", env);
+      await makeGen().environment(`this.config.logLevel = "warn";`, {
+        env: ["production", "test"],
+      });
+      for (const name of ["production", "test"]) {
+        expect(files.get(`/app/config/environments/${name}.ts`)).toBe(
+          `Trails.application!.configure(function () {\n  this.config.logLevel = "warn";\n  this.config.eagerLoad = false;\n});\n`,
+        );
+      }
     });
   });
 
@@ -221,14 +228,6 @@ describe("TrailsActions", () => {
   });
 
   it("route and environment reject Ruby-shape source", async () => {
-    files.set(
-      "/app/config/routes.ts",
-      `export function drawRoutes(r: any): void {\n  // routes\n}\n`,
-    );
-    files.set(
-      "/app/config/application.ts",
-      `export const app = {\n  config: {\n    // config\n  },\n};\n`,
-    );
     await expect(makeGen().route("class Foo\nend")).rejects.toThrow(/Ruby-like source/);
     await expect(makeGen().environment("class Foo\nend")).rejects.toThrow(/Ruby-like source/);
   });
