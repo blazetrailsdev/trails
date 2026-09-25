@@ -12,7 +12,7 @@ import { SqlTypeMetadata } from "./sql-type-metadata.js";
 import { TypeMetadata as MysqlTypeMetadata } from "./mysql/type-metadata.js";
 import { TypeMetadata as PostgresqlTypeMetadata } from "./postgresql/type-metadata.js";
 import { isSchemaCacheIgnoredTable } from "../active-record.js";
-import { StatementInvalid } from "../errors.js";
+import { ActiveRecordError, StatementInvalid } from "../errors.js";
 import { IndexDefinition } from "./abstract/schema-definitions.js";
 
 export type Pool = {
@@ -630,8 +630,10 @@ export class SchemaReflection {
           return null;
         }
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        console.warn(`Failed to validate the schema cache because of ${errorMessage}`);
+        if (!(error instanceof ActiveRecordError)) throw error;
+        console.warn(
+          `Failed to validate the schema cache because of ${error.name}: ${error.message}`,
+        );
         return null;
       }
     }

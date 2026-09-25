@@ -675,10 +675,6 @@ export function extractFromProgram(
           fileHasClassOrModule = true;
         }
       } else if (ts.isExpressionStatement(node)) {
-        // `ActiveRecord.Point = class Point { ... }` — a class seated on a
-        // namespace object, where the file's own export already holds the short
-        // name (`point.rb`'s `ActiveRecord::Point` beside `OID::Point`). Keyed by
-        // the seat so it does not overwrite the exported class of that name.
         const seated = seatedClassExpression(node);
         if (!seated) return;
         const classInfo = extractClass(seated.cls, checker, relPath, srcDir);
@@ -3612,7 +3608,10 @@ export function resolveRelModule(fromRel: string, spec: string): string | null {
  */
 /**
  * The `Ns.Name = class Name { ... }` statement form of a class declaration:
- * a named class expression assigned to a property of a namespace object.
+ * a named class expression assigned to a property of a namespace object
+ * (`ActiveRecord.Point` beside the exported `OID::Point` in `oid/point.ts`).
+ * The caller keys it by `seat`, so it never overwrites the file's exported
+ * class of the same short name.
  */
 export function seatedClassExpression(
   node: ts.ExpressionStatement,
