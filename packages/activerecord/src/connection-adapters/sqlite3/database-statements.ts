@@ -237,8 +237,9 @@ export async function performQuery(
       result = Result.empty();
     } else if (stmt.reader) {
       stmt.bindParams(typeCastedBinds);
+      const toA = await stmt.toA();
       const columns = stmt.columns().map((c) => c.name);
-      result = new Result(columns, await stmt.toA());
+      result = new Result(columns, toA);
       this._narrowSpilledBigInts(stmt, result.rows);
     } else {
       await stmt.run(typeCastedBinds);
