@@ -247,7 +247,7 @@ export class SchemaCache {
 
     return pool.withConnection(async (connection) => {
       const cols: Column[] = deepDeduplicate(await connection.columns(tableName));
-      this._columns.set(deepDeduplicate(tableName), cols);
+      this.setColumns(deepDeduplicate(tableName), cols);
       return cols;
     });
   }
