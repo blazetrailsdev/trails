@@ -9,7 +9,7 @@ import {
   setVerifyForeignKeysForFixtures,
   verifyForeignKeysForFixtures,
 } from "@blazetrails/activerecord";
-import { Fixture, FixtureSet } from "../../../activerecord/src/fixtures.js";
+import { Fixture, FixtureSet } from "@blazetrails/activerecord/fixtures";
 import { resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
 import { SchemaReflection } from "@blazetrails/activerecord";
 import { SQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js";

@@ -19,7 +19,7 @@ export function serverCommand(): Command {
     )
     .option(
       "-e, --environment <name>",
-      "Specifies the environment to run this server under (test/development/production).",
+      "The environment to run `server` in (e.g. test / development / production).",
     )
     .action(async (options) => {
       options.environment = environment(options);

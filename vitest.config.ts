@@ -253,6 +253,10 @@ const alias = {
     __dirname,
     "packages/activerecord/src/type-virtualization/auto-import.ts",
   ),
+  "@blazetrails/activerecord/fixtures": path.resolve(
+    __dirname,
+    "packages/activerecord/src/fixtures.ts",
+  ),
   "@blazetrails/activerecord/sqlite-adapter": path.resolve(
     __dirname,
     "packages/activerecord/src/sqlite-adapter.ts",
