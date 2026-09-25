@@ -659,7 +659,6 @@ function refute(test: unknown, msg: string | (() => string) | null = null): true
 
 const E = "";
 
-/** @noRailsEquivalent PERMANENT */
 export function assertEqual(
   exp: unknown,
   act: unknown,
@@ -699,7 +698,6 @@ export function assertNotNil(obj: unknown, msg: string | (() => string) | null =
   return refuteNil(obj, msg);
 }
 
-/** @noRailsEquivalent PERMANENT */
 export function assertMatch(
   matcher: RegExp | string,
   obj: string,
