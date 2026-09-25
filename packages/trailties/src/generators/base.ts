@@ -63,7 +63,13 @@ export abstract class GeneratorBase implements GeneratorActionsState {
   constructor(options: GeneratorOptions) {
     this.cwd = options.cwd;
     this.output = options.output;
-    this.options = options;
+    const opts: Record<string, unknown> = { ...options };
+    for (const [name, option] of Object.entries(
+      (this.constructor as typeof GeneratorBase).classOptions(),
+    )) {
+      if (option.default != null && opts[name] === undefined) opts[name] = option.default;
+    }
+    this.options = opts as unknown as GeneratorOptions;
     this.behavior = options.behavior === "revoke" ? "revoke" : "invoke";
   }
 
@@ -141,7 +147,6 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     const options: Record<string, unknown> = {};
     const switches = new Map<string, [string, ClassOptionConfig]>();
     for (const [name, option] of Object.entries(this.classOptions())) {
-      if (option.default != null) options[name] = option.default;
       switches.set(`--${dasherize(name)}`, [name, option]);
       for (const alias of [option.aliases ?? []].flat()) switches.set(alias, [name, option]);
     }

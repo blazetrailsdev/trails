@@ -74,18 +74,19 @@ export class DevcontainerGenerator extends GeneratorBase {
 
   constructor(options: DevcontainerGeneratorOptions) {
     super(options);
-    const database = options.database ?? "sqlite3";
+    const { appName, database, redis, systemTest, activeStorage, node, dev, kamal } = this
+      .options as Required<DevcontainerGeneratorOptions>;
     if (!(DATABASES as readonly string[]).includes(database))
       throw new Error(`Unknown database: ${database}`);
     this.opts = {
-      appName: options.appName ?? "rails_app",
+      appName,
       database,
-      redis: options.redis !== false,
-      systemTest: options.systemTest !== false,
-      activeStorage: options.activeStorage !== false,
-      node: options.node === true,
-      dev: options.dev === true,
-      kamal: options.kamal !== false,
+      redis,
+      systemTest,
+      activeStorage,
+      node,
+      dev,
+      kamal,
       sqliteDriver: options.sqliteDriver ?? "better-sqlite3",
       nodeVersion: options.nodeVersion ?? "24.16.0",
     };

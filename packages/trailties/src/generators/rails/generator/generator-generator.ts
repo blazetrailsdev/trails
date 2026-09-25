@@ -17,14 +17,6 @@ export class GeneratorGenerator extends NamedBase {
     });
   }
 
-  constructor(options: GeneratorGeneratorOptions) {
-    const withDefaults: GeneratorGeneratorOptions = {
-      ...options,
-      namespace: options.namespace ?? true,
-    };
-    super(withDefaults);
-  }
-
   run(): string[] {
     const dir = this.generatorDir();
     const ext = this.ext();

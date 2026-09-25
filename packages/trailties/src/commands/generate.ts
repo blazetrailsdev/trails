@@ -2,8 +2,6 @@ import { Dir } from "@blazetrails/ruby-compat";
 import { Command } from "commander";
 import { ModelGenerator } from "../generators/model-generator.js";
 import { MigrationGenerator } from "../generators/migration-generator.js";
-import { ControllerGenerator } from "../generators/rails/controller/controller-generator.js";
-import { ScaffoldGenerator } from "../generators/rails/scaffold/scaffold-generator.js";
 import { Generators } from "../generators.js";
 
 export function generateCommand(): Command {
@@ -42,26 +40,6 @@ export function generateCommand(): Command {
     .action((name: string, columns: string[]) => {
       const gen = new MigrationGenerator({ cwd: Dir.pwd(), output: console.log });
       gen.run(name, columns);
-    });
-
-  cmd
-    .command("controller")
-    .description("Generate a controller with actions")
-    .argument("<name>", "Controller name (e.g. Posts)")
-    .argument("[actions...]", "Action names (e.g. index show create)")
-    .action((name: string, actions: string[]) => {
-      const gen = new ControllerGenerator({ cwd: Dir.pwd(), output: console.log });
-      gen.run(name, actions);
-    });
-
-  cmd
-    .command("scaffold")
-    .description("Generate a complete CRUD resource")
-    .argument("<name>", "Resource name (e.g. Post)")
-    .argument("[attributes...]", "Attributes as name:type pairs")
-    .action((name: string, attributes: string[]) => {
-      const gen = new ScaffoldGenerator({ cwd: Dir.pwd(), output: console.log });
-      gen.run(name, attributes);
     });
 
   const registered = new Set(cmd.commands.map((c) => c.name()));

@@ -1,6 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { beforeAll, describe, it, expect } from "vitest";
 import { createProgram } from "./cli.js";
 import { VERSION } from "./version.js";
+import { Generators } from "./generators.js";
+
+beforeAll(async () => {
+  await Generators.lookupBang();
+});
 
 describe("CLI", () => {
   it("prints version with --version flag", () => {

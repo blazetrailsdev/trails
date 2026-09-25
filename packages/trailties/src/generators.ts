@@ -1,5 +1,5 @@
 import { dasherize, underscore } from "@blazetrails/activesupport";
-import { Dir, File, getPath } from "@blazetrails/ruby-compat";
+import { Dir, File, LoadError, getPath, regexpEscape } from "@blazetrails/ruby-compat";
 import { GeneratorBase, type GeneratorOptions } from "./generators/base.js";
 
 export type GeneratorClass = Omit<typeof GeneratorBase, "prototype" | "start"> & {
@@ -21,9 +21,9 @@ const HIDDEN_FROM_LISTING = [
 
 let _subclasses: GeneratorClass[] | undefined;
 let _hiddenNamespaces: string[] | undefined;
+let _commandType: string | undefined;
+let _lookupPaths: URL[] | undefined;
 
-const LOOKUP_PATHS = [new URL("./generators/", import.meta.url)];
-const COMMAND_TYPE = "generator";
 const EXTENSION = /\.[cm]?[tj]s$/.exec(import.meta.url)![0];
 
 function urlToPath(url: URL): string {
@@ -45,17 +45,20 @@ export class Generators {
     const paths = Generators.namespacesToPaths(namespaces);
 
     for (const rawPath of paths) {
-      for (const base of LOOKUP_PATHS) {
-        const path = `${urlToPath(base)}${dasherize(rawPath)}-${COMMAND_TYPE}${EXTENSION}`;
+      for (const base of Generators.lookupPaths()) {
+        const path = `${urlToPath(base)}${dasherize(rawPath)}-${Generators.commandType()}${EXTENSION}`;
 
         try {
-          await requireGenerator(path);
+          await requireGenerator(base, path);
           return;
         } catch (e) {
-          if (!File.isExist(path)) continue;
-          console.warn(
-            `[WARNING] Could not load ${COMMAND_TYPE} ${JSON.stringify(path)}. Error: ${(e as Error).message}.\n${(e as Error).stack}`,
-          );
+          if (e instanceof LoadError) {
+            if (!new RegExp(`${regexpEscape(path)}$`).test(e.message)) throw e;
+          } else if (e instanceof Error) {
+            console.warn(
+              `[WARNING] Could not load ${Generators.commandType()} ${JSON.stringify(path)}. Error: ${e.message}.\n${e.stack}`,
+            );
+          }
         }
       }
     }
@@ -63,17 +66,18 @@ export class Generators {
 
   /** @internal */
   static async lookupBang(): Promise<void> {
-    const walk = async (dir: string): Promise<void> => {
+    const walk = async (base: URL, dir: string): Promise<void> => {
       for (const entry of Dir.children(dir).slice().sort()) {
         const full = getPath().join(dir, entry);
         if (File.isDirectory(full)) {
-          await walk(full);
+          await walk(base, full);
         } else if (/-generator\.[cm]?[tj]s$/.test(entry) && !/\.(test|d)\./.test(entry)) {
-          await requireGenerator(full).catch(() => undefined);
+          await requireGenerator(base, full).catch(() => undefined);
         }
       }
     };
-    for (const base of LOOKUP_PATHS) await walk(getPath().join(urlToPath(base), "rails"));
+    for (const base of Generators.lookupPaths())
+      await walk(base, getPath().join(urlToPath(base), "rails"));
   }
 
   /** @internal */
@@ -189,6 +193,14 @@ export class Generators {
     }
   }
 
+  private static commandType(): string {
+    return (_commandType ??= "generator");
+  }
+
+  private static lookupPaths(): URL[] {
+    return (_lookupPaths ??= [new URL("./generators/", import.meta.url)]);
+  }
+
   private static printList(
     base: string,
     namespaces: string[],
@@ -202,10 +214,12 @@ export class Generators {
   }
 }
 
-async function requireGenerator(path: string): Promise<void> {
+async function requireGenerator(base: URL, path: string): Promise<void> {
+  if (!File.isExist(path)) throw new LoadError(`cannot load such file -- ${path}`);
   const mod = (await import(getPath().pathToFileURL!(path).href)) as Record<string, unknown>;
-  const base = urlToPath(LOOKUP_PATHS[0]);
-  const namespace = getPath().dirname(path.slice(base.length)).split(/[\\/]/);
+  const namespace = getPath()
+    .dirname(path.slice(urlToPath(base).length))
+    .split(/[\\/]/);
   for (const value of Object.values(mod)) {
     if (typeof value === "function" && value.prototype instanceof GeneratorBase) {
       const klass = value as unknown as GeneratorClass;

@@ -1,5 +1,10 @@
-import { describe, it, expect } from "vitest";
+import { beforeAll, describe, it, expect } from "vitest";
 import { createProgram } from "../cli.js";
+import { Generators } from "../generators.js";
+
+beforeAll(async () => {
+  await Generators.lookupBang();
+});
 
 describe("GenerateCommand", () => {
   it("has model subcommand", () => {
