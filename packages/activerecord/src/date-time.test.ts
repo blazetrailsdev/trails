@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { assertRaises, assertInDelta } from "@blazetrails/activesupport";
-import { Time as RubyTime } from "@blazetrails/date";
+import { DateTime, Time as RubyTime } from "@blazetrails/date";
 import { inTimeZone } from "./cases/helper.js";
 import { fixtures } from "./test-fixtures.js";
 import { Task } from "./test-helpers/models/task.js";
@@ -98,10 +98,10 @@ describe("DateTimeTest", () => {
   });
 
   it("assign in local timezone", async () => {
-    const now = RubyTime.local(2017, 3, 1, 12, 0, 0);
+    const now = DateTime.civil(2017, 3, 1, 12, 0, 0);
     await withTimezoneConfig({ default: "local" }, () => {
       const task = new Task({ starting: now });
-      expect(task.starting).toEqual(now);
+      expect(task.starting.compare(now)).toBe(0);
     });
   });
 
