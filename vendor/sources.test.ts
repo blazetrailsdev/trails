@@ -4,10 +4,12 @@ import {
   libEntryFilesManifest,
   libPathsManifest,
   resolvePath,
+  resolveSourcePath,
   SOURCES,
   testPathsManifest,
   type UpstreamSource,
   validateSources,
+  VENDOR_DIR,
   vendoredRoot,
 } from "./sources.js";
 
@@ -270,6 +272,42 @@ describe("vendor/sources.ts", () => {
 
   it("vendoredRoot returns absolute source root", () => {
     expect(vendoredRoot("rails").endsWith("vendor/rails")).toBe(true);
+  });
+
+  it("VENDOR_DIR is the vendor/ directory every source root hangs off", () => {
+    expect(VENDOR_DIR.endsWith("/vendor")).toBe(true);
+    expect(vendoredRoot("rails")).toBe(`${VENDOR_DIR}/rails`);
+  });
+
+  it("resolveSourcePath resolves a gem subdir inside a source root", () => {
+    expect(resolveSourcePath("rails", "activerecord")).toBe(`${VENDOR_DIR}/rails/activerecord`);
+  });
+
+  it("resolveSourcePath resolves the AR test schema, fixtures and models dirs", () => {
+    for (const dir of ["schema", "fixtures", "models"]) {
+      expect(resolveSourcePath("rails", `activerecord/test/${dir}`)).toBe(
+        `${VENDOR_DIR}/rails/activerecord/test/${dir}`,
+      );
+    }
+  });
+
+  it("resolveSourcePath agrees with resolvePath for a package's lib and test dirs", () => {
+    expect(resolveSourcePath("rails", "activerecord/lib/active_record")).toBe(
+      resolvePath("activerecord"),
+    );
+    expect(resolveSourcePath("rails", "activerecord/test/cases")).toBe(
+      resolvePath("activerecord", "test"),
+    );
+  });
+
+  it("resolveSourcePath resolves against an explicit vendorDir", () => {
+    expect(resolveSourcePath("rails", "activerecord/lib", "/tmp/x/vendor")).toBe(
+      "/tmp/x/vendor/rails/activerecord/lib",
+    );
+  });
+
+  it("resolveSourcePath throws for unknown source", () => {
+    expect(() => resolveSourcePath("nope", "lib")).toThrow(/no source named "nope"/);
   });
 
   it("vendoredRoot throws for unknown source", () => {

@@ -7,13 +7,13 @@
 import * as path from "path";
 import { fileURLToPath } from "url";
 
-import { railsFind, type FindMode, type FindResult } from "./core.js";
+import { GREP_SCOPE, railsFind, type FindMode, type FindResult } from "./core.js";
 
 const MODE_HEADINGS: Record<FindMode, string> = {
   test: "test-index (rails-tests.json)",
   method: "api-index (rails-api.json)",
   constant: "api-index (rails-api.json)",
-  grep: "grep fallback (vendor/rails/activerecord)",
+  grep: `grep fallback (${GREP_SCOPE})`,
 };
 
 function render(results: FindResult[]): string {

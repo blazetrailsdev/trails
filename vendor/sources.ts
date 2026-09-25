@@ -476,7 +476,12 @@ export function validateSources(sources: readonly UpstreamSource[]): void {
 
 validateSources(SOURCES);
 
-const VENDOR_DIR = dirname(fileURLToPath(import.meta.url));
+/**
+ * Absolute path of this checkout's `vendor/` — the directory every source's
+ * clone root hangs off. Exported so a caller that needs a repo-relative
+ * spelling (`vendor/rails/...`) derives it from here instead of a literal.
+ */
+export const VENDOR_DIR = dirname(fileURLToPath(import.meta.url));
 
 /**
  * Absolute path to a vendored package's `lib` (default) or `test` dir, e.g.
@@ -517,9 +522,25 @@ export function apiComparePackages(): string[] {
  * `vendoredRoot("rails")` → `/.../vendor/rails`. Throws on unknown name.
  */
 export function vendoredRoot(sourceName: string): string {
+  return resolveSourcePath(sourceName);
+}
+
+/**
+ * Absolute path of `rel` inside a vendored source's clone root — for the dirs
+ * no package's `libPath` / `testPath` names, such as a gem subdir
+ * (`resolveSourcePath("rails", "activerecord")`) or the AR test schema,
+ * fixtures and models dirs (`resolveSourcePath("rails",
+ * "activerecord/test/schema")`). `vendorDir` defaults to this checkout's
+ * `vendor/`; a test points it at a synthetic tree. Throws on unknown name.
+ */
+export function resolveSourcePath(
+  sourceName: string,
+  rel: string = "",
+  vendorDir: string = VENDOR_DIR,
+): string {
   const found = SOURCES.find((s) => s.name === sourceName);
   if (!found) throw new Error(`vendor/sources.ts: no source named "${sourceName}"`);
-  return join(VENDOR_DIR, sourceName);
+  return join(vendorDir, sourceName, rel);
 }
 
 /**

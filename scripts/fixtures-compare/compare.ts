@@ -14,10 +14,11 @@ import {
   isWrappedSchema,
   columnsOf,
 } from "../../packages/activerecord/src/support/schema-types.js";
+import { resolveSourcePath } from "../../vendor/sources.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..", "..");
-const YML_DIR = path.join(ROOT, "vendor/rails/activerecord/test/fixtures");
+const YML_DIR = resolveSourcePath("rails", "activerecord/test/fixtures");
 const TS_DIR = path.join(ROOT, "packages/activerecord/src/test-helpers/fixtures");
 
 type Row = Record<string, unknown>;
@@ -1008,6 +1009,12 @@ const MODELS_TS_DIRS: Record<string, string> = {
   activemodel: path.join(ROOT, "packages/activemodel/src/test-helpers/models"),
 };
 const RUBY_EXTRACTOR = path.join(HERE, "extract-ruby-models.rb");
+// Fed to extract-ruby-models.rb as `MODELS_PATHS_JSON`, the way
+// extract-ruby-api.rb receives `LIB_PATHS_JSON` from the same registry.
+const MODELS_RUBY_DIRS: Record<string, string> = {
+  activerecord: resolveSourcePath("rails", "activerecord/test/models"),
+  activemodel: resolveSourcePath("rails", "activemodel/test/models"),
+};
 
 export interface RubyAssoc {
   kind: string;
@@ -1069,7 +1076,10 @@ interface ModelResult {
 }
 
 function loadRubyModelsManifest(): RubyFileEntry[] {
-  const out = execFileSync("ruby", [RUBY_EXTRACTOR], { encoding: "utf8" });
+  const out = execFileSync("ruby", [RUBY_EXTRACTOR], {
+    encoding: "utf8",
+    env: { ...process.env, MODELS_PATHS_JSON: JSON.stringify(MODELS_RUBY_DIRS) },
+  });
   return JSON.parse(out) as RubyFileEntry[];
 }
 
