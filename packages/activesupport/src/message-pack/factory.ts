@@ -45,8 +45,13 @@ export class Factory {
     return new Packer(this);
   }
 
-  unpacker(buf: Buffer | string): Unpacker {
-    return new Unpacker(typeof buf === "string" ? Buffer.from(buf, "latin1") : buf, this);
+  unpacker<T>(block: (unpacker: Unpacker) => T): T {
+    const unpacker = new Unpacker(Buffer.alloc(0), this);
+    try {
+      return block(unpacker);
+    } finally {
+      unpacker.reset();
+    }
   }
 }
 
@@ -196,6 +201,28 @@ export class Unpacker {
     private buf: Buffer,
     private factory: Factory,
   ) {}
+
+  feedReference(data: Buffer | string): this {
+    const buf = typeof data === "string" ? Buffer.from(data, "latin1") : data;
+    this.buf = Buffer.concat([this.buf.subarray(this.pos), buf]);
+    this.pos = 0;
+    return this;
+  }
+
+  fullUnpack(): unknown {
+    const obj = this.read();
+    const extra = this.buf.length - this.pos;
+    if (extra > 0) {
+      throw new MessagePackError(`${extra} extra bytes after the deserialized object`);
+    }
+    this.reset();
+    return obj;
+  }
+
+  reset(): void {
+    this.buf = Buffer.alloc(0);
+    this.pos = 0;
+  }
 
   /** @internal */
   private readUint(n: number): number {

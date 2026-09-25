@@ -1,6 +1,8 @@
 import { Temporal } from "@blazetrails/date";
+import { b, byteslice, forceEncoding, pack, Range, unpack1 } from "@blazetrails/ruby-compat";
 import { Entry } from "./entry.js";
 import { DeserializationError } from "./deserialization-error.js";
+import { SerializerWithFallback } from "./serializer-with-fallback.js";
 
 const PREFIX = "~#";
 const UNDEF = "~#u";
@@ -121,16 +123,41 @@ export interface CoderCompressor {
   inflate(value: string): string;
 }
 
-const SIGNATURE = "\x00\x11";
-const HEADER_SEP = "\x00";
+const SIGNATURE = b("\x00\x11");
+
 const OBJECT_DUMP_TYPE = 0x01;
-const STRING_TYPE = 0x02;
+
+const STRING_ENCODINGS = new Map<number, string>([
+  [0x02, "UTF-8"],
+  [0x03, "BINARY"],
+  [0x04, "US-ASCII"],
+]);
+
 const COMPRESSED_FLAG = 0x80;
 
-const stringDeserializer: CoderSerializer = {
-  dump: (value) => value as string,
-  load: (dumped) => dumped,
-};
+const PACKED_TEMPLATE = "CEl<";
+const PACKED_TYPE_TEMPLATE = `@${SIGNATURE.length}C`;
+const PACKED_EXPIRES_AT_TEMPLATE = `@${pack([0], PACKED_TYPE_TEMPLATE).length}E`;
+const PACKED_VERSION_LENGTH_TEMPLATE = `@${pack([0], PACKED_EXPIRES_AT_TEMPLATE).length}l<`;
+const PACKED_VERSION_INDEX = pack([0], PACKED_VERSION_LENGTH_TEMPLATE).length;
+
+const MARSHAL_SIGNATURE = b("\x04\x08");
+
+class StringDeserializer implements CoderSerializer {
+  constructor(private encoding: string) {}
+
+  dump(value: unknown): string {
+    return value as string;
+  }
+
+  load(payload: string): string {
+    return forceEncoding(payload, this.encoding);
+  }
+}
+
+const STRING_DESERIALIZERS = new Map(
+  [...STRING_ENCODINGS].map(([type, encoding]) => [type, new StringDeserializer(encoding)]),
+);
 
 type LazyEntryOptions = { version: string | null; expiresAt: number | null };
 let lazyEntry:
@@ -192,50 +219,60 @@ export class Coder {
 
   dump(entry: Entry): string {
     if (this.legacySerializer) return this.serializer.dump(entry);
+
     return this.dumpCompressed(entry, Infinity);
   }
 
+  /** @missingRailsArgs b — PERMANENT */
   dumpCompressed(entry: Entry, threshold: number): string {
     if (this.legacySerializer) return this.serializer.dumpCompressed!(entry, threshold);
 
-    const value = entry.value;
-    let type = this.typeForString(value);
+    let type = this.typeForString(entry.value);
     let payload: string;
     if (type !== undefined) {
-      payload = value as string;
+      payload = b(entry.value as string);
     } else {
       type = OBJECT_DUMP_TYPE;
-      payload = this.serializer.dump(value);
+      payload = this.serializer.dump(entry.value);
     }
 
     const compressed = this.tryCompress(payload, threshold);
     if (compressed !== undefined) {
       payload = compressed;
-      type |= COMPRESSED_FLAG;
+      type = type | COMPRESSED_FLAG;
     }
 
-    const version = entry.version === null ? null : this.dumpVersion(entry.version);
-    const header = JSON.stringify([type, entry.expiresAt ?? -1, version]);
-    return SIGNATURE + header + HEADER_SEP + payload;
+    const expiresAt = entry.expiresAt ?? -1.0;
+
+    const version = entry.version != null ? this.dumpVersion(entry.version) : null;
+    const versionLength = version?.length ?? -1;
+
+    let packed = SIGNATURE;
+    packed += pack([type, expiresAt, versionLength], PACKED_TEMPLATE);
+    if (version != null) packed += version;
+    packed += payload;
+    return packed;
   }
 
   load(dumped: unknown): unknown {
     if (!this.isSignature(dumped)) return this.serializer.load(dumped as string);
 
-    const rest = dumped.slice(SIGNATURE.length);
-    const sep = rest.indexOf(HEADER_SEP);
-    const [type, rawExpiresAt, rawVersion] = JSON.parse(rest.slice(0, sep)) as [
-      number,
-      number,
-      string | null,
-    ];
-    const payload = rest.slice(sep + 1);
+    const type = unpack1(dumped, PACKED_TYPE_TEMPLATE)!;
+    let expiresAt = unpack1(dumped, PACKED_EXPIRES_AT_TEMPLATE);
+    const versionLength = unpack1(dumped, PACKED_VERSION_LENGTH_TEMPLATE)!;
 
-    const expiresAt = rawExpiresAt < 0 ? null : rawExpiresAt;
-    const version = rawVersion === null ? null : this.loadVersion(rawVersion);
-    const compressor = type & COMPRESSED_FLAG ? this.compressor : null;
-    const serializer =
-      (type & ~COMPRESSED_FLAG) === STRING_TYPE ? stringDeserializer : this.serializer;
+    if (expiresAt! < 0) expiresAt = null;
+    const version =
+      versionLength >= 0
+        ? this.loadVersion(byteslice(dumped, PACKED_VERSION_INDEX, versionLength)!)
+        : null;
+    const payload = byteslice(
+      dumped,
+      new Range(PACKED_VERSION_INDEX + Math.max(versionLength, 0), null),
+    )!;
+
+    const compressor = (type & COMPRESSED_FLAG) > 0 ? this.compressor : null;
+    const serializer = STRING_DESERIALIZERS.get(type & ~COMPRESSED_FLAG) ?? this.serializer;
 
     return new (lazyEntryClass())(serializer, compressor, payload, { version, expiresAt });
   }
@@ -245,22 +282,32 @@ export class Coder {
   }
 
   private typeForString(value: unknown): number | undefined {
-    return typeof value === "string" ? STRING_TYPE : undefined;
-  }
-
-  private dumpVersion(version: string): string {
-    return version;
-  }
-
-  private loadVersion(dumpedVersion: string): string {
-    return dumpedVersion;
+    if (typeof value !== "string") return undefined;
+    for (const [type, encoding] of STRING_ENCODINGS) if (encoding === "UTF-8") return type;
+    return undefined;
   }
 
   private tryCompress(string: string, threshold: number): string | undefined {
-    if (this.compressor && Buffer.byteLength(string) >= threshold) {
+    if (this.compressor && string.length >= threshold) {
       const compressed = this.compressor.deflate(string);
-      if (compressed.length < Buffer.byteLength(string)) return compressed;
+      if (compressed.length < string.length) return compressed;
     }
     return undefined;
+  }
+
+  private dumpVersion(version: string): string {
+    if (version.startsWith(MARSHAL_SIGNATURE)) {
+      return SerializerWithFallback.get("marshal_7_1").dump(version) as string;
+    } else {
+      return b(version);
+    }
+  }
+
+  private loadVersion(dumpedVersion: string): string {
+    if (dumpedVersion.startsWith(MARSHAL_SIGNATURE)) {
+      return SerializerWithFallback.get("marshal_7_1").load(dumpedVersion) as string;
+    } else {
+      return forceEncoding(dumpedVersion, "UTF-8");
+    }
   }
 }

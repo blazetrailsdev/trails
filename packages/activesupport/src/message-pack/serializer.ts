@@ -26,12 +26,13 @@ export class Serializer {
     return packer.toBuffer();
   }
 
-  /** @missingRailsArgs unpacker — CONVERGEABLE message-pack-serializer-load-unpacker-block */
   load(dumped: Buffer | string): unknown {
-    const unpacker = this.messagePackPool().unpacker(dumped);
-    if (unpacker.read() !== SIGNATURE_INT)
-      throw new MessagePackError("Invalid serialization format");
-    return unpacker.read();
+    return this.messagePackPool().unpacker((unpacker) => {
+      unpacker.feedReference(dumped);
+      if (unpacker.read() !== SIGNATURE_INT)
+        throw new MessagePackError("Invalid serialization format");
+      return unpacker.fullUnpack();
+    });
   }
 
   isSignature(dumped: Buffer): boolean {

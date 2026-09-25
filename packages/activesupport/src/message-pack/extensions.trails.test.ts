@@ -11,7 +11,9 @@ describe("MessagePackExtensionsTest", () => {
     const packer = factory.packer();
     packer.write(numerator);
     if (denominator !== undefined) packer.write(denominator);
-    return Extensions.readRational(factory.unpacker(packer.toBuffer()));
+    return factory.unpacker((unpacker) =>
+      Extensions.readRational(unpacker.feedReference(packer.toBuffer())),
+    );
   };
 
   it("normalizes the sign of a decoded Rational onto the numerator", () => {
@@ -41,7 +43,9 @@ describe("MessagePackExtensionsTest", () => {
     const nested = factory.packer();
     nested.write(new HashWithIndifferentAccess({ b: 1 }));
     expect([...dumped].join(",")).toContain([...nested.toBuffer()].join(","));
-    const result = factory.unpacker(dumped).read() as HashWithIndifferentAccess;
+    const result = factory.unpacker((unpacker) =>
+      unpacker.feedReference(dumped).read(),
+    ) as HashWithIndifferentAccess;
     expect(result).toBeInstanceOf(HashWithIndifferentAccess);
     expect(result.get("a")).toBeInstanceOf(HashWithIndifferentAccess);
   });

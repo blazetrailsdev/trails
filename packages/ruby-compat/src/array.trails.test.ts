@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { ArgumentError } from "./argument-error.js";
 import { TypeError } from "./type-error.js";
-import { aryDelete, aryPop, arySlice, compact, pack, sort, toA, uniq } from "./array.js";
+import { aryDelete, aryPop, arySlice, compact, pack, sort, toA, uniq, unpack1 } from "./array.js";
+import { Range } from "./range.js";
+import { byteslice } from "./string/byte-methods.js";
 
 describe("Array#pack", () => {
   const long = "a".repeat(100);
@@ -78,6 +80,84 @@ describe("Array#pack", () => {
     expect(() => pack(["a"], "U")).toThrow(
       new TypeError("no implicit conversion of String into Integer"),
     );
+  });
+});
+
+describe("Array#pack integer, float and position directives", () => {
+  it("packs the CEl< header Cache::Coder writes", () => {
+    expect(pack([0x81, 1.5, 15], "CEl<")).toBe("\x81\x00\x00\x00\x00\x00\x00\xF8?\x0F\x00\x00\x00");
+  });
+
+  it("C truncates to the low byte and converts with to_int", () => {
+    expect(pack([300], "C")).toBe(",");
+    expect(pack([1.5], "C")).toBe("\x01");
+    expect(() => pack(["x"], "C")).toThrow(
+      new TypeError("no implicit conversion of String into Integer"),
+    );
+  });
+
+  it("l packs two's complement, little-endian with < and big-endian with >", () => {
+    expect(pack([-1], "l<")).toBe("\xFF\xFF\xFF\xFF");
+    expect(pack([-2], "l>")).toBe("\xFF\xFF\xFF\xFE");
+    expect(pack([2 ** 32 + 5], "l<")).toBe("\x05\x00\x00\x00");
+  });
+
+  it("E packs a little-endian double", () => {
+    expect(pack([1], "E")).toBe("\x00\x00\x00\x00\x00\x00\xF0?");
+    expect(pack([-1.0], "E")).toBe("\x00\x00\x00\x00\x00\x00\xF0\xBF");
+    expect(() => pack(["x"], "E")).toThrow(new TypeError("can't convert String into Float"));
+    expect(() => pack([null as never], "E")).toThrow(new TypeError("can't convert nil into Float"));
+  });
+
+  it("@ null-fills to, or truncates back to, an absolute position", () => {
+    expect(pack([0], "@2C")).toBe("\x00\x00\x00");
+    expect(pack([1, 2], "@0C@5C")).toBe("\x01\x00\x00\x00\x00\x02");
+    expect(pack([1, 2], "CC@1")).toBe("\x01");
+    expect(pack([1, 2], "C@4")).toBe("\x01\x00\x00\x00");
+  });
+
+  it("< is allowed only after the endstr types", () => {
+    expect(() => pack([1], "C<")).toThrow(
+      new ArgumentError("'<' allowed only after types sSiIlLqQjJ"),
+    );
+  });
+});
+
+describe("String#unpack1", () => {
+  const packed = "\x00\x11" + pack([0x81, 1.5, -1], "CEl<") + "ab";
+
+  it("reads the Cache::Coder header back at its fixed offsets", () => {
+    expect(unpack1(packed, "@2C")).toBe(129);
+    expect(unpack1(packed, "@3E")).toBe(1.5);
+    expect(unpack1(packed, "@11l<")).toBe(-1);
+    expect(unpack1("\x00\x00\x00\x01", "l>")).toBe(1);
+    expect(unpack1("\x00\x00\x00\x80", "l<")).toBe(-2147483648);
+  });
+
+  it("answers nil when the string is short of an item's bytes", () => {
+    expect(unpack1("ab", "@2l<")).toBeNull();
+    expect(unpack1("", "E")).toBeNull();
+    expect(unpack1("a", "C*")).toBe(97);
+  });
+
+  it("raises when @ or the offset is outside of the string", () => {
+    expect(() => unpack1("ab", "@3C")).toThrow(new ArgumentError("@ outside of string"));
+    expect(() => unpack1("a", "C", { offset: 2 })).toThrow(
+      new ArgumentError("offset outside of string"),
+    );
+    expect(() => unpack1("a", "y")).toThrow(
+      new ArgumentError("unknown unpack directive 'y' in 'y'"),
+    );
+  });
+});
+
+describe("String#byteslice over an ASCII-8BIT string", () => {
+  const packed = "\x00\x11" + pack([0x81, 1.5, 2], "CEl<") + "ab";
+
+  it("counts one byte per code unit", () => {
+    expect(byteslice(packed, 15, 2)).toBe("ab");
+    expect(byteslice(packed, new Range(15, null))).toBe("ab");
+    expect(byteslice("\xFF", 0, 1)).toBe("\xFF");
   });
 });
 
