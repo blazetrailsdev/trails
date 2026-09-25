@@ -58,7 +58,7 @@ interface ServerOptions {
 }
 
 function setEnvironment(options: ServerOptions): void {
-  if (!presence(getEnv("TRAILS_ENV"))) setEnv("TRAILS_ENV", options.environment);
+  if (getEnv("TRAILS_ENV") === undefined) setEnv("TRAILS_ENV", options.environment);
 }
 
 /** @internal */

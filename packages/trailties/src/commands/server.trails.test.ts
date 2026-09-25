@@ -85,4 +85,12 @@ describe("trails server environment (trails)", () => {
 
     expect(env.TRAILS_ENV).toBe("test");
   });
+
+  it("leaves an explicitly-empty TRAILS_ENV alone", async () => {
+    setEnv("TRAILS_ENV", "");
+
+    await serverCommand().parseAsync(["-e", "production"], { from: "user" });
+
+    expect(env.TRAILS_ENV).toBe("");
+  });
 });
