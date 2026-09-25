@@ -53,6 +53,8 @@
     "parity:api:params": "pnpm tsx scripts/api-compare/lint-param-names.ts",
     "parity:api:parents": "pnpm tsx scripts/api-compare/lint-ambiguous-parents.ts",
     "parity:api:parents:tighten": "pnpm tsx scripts/api-compare/lint-ambiguous-parents.ts --tighten",
+    "parity:api:predicates": "pnpm tsx scripts/api-compare/lint-predicate-kinds.ts",
+    "parity:api:predicates:tighten": "pnpm tsx scripts/api-compare/lint-predicate-kinds.ts --tighten",
     "parity:api:params:tighten": "pnpm tsx scripts/api-compare/lint-param-names.ts --tighten",
     "parity:api:blocks": "pnpm tsx scripts/api-compare/lint-block-params.ts",
     "parity:api:blocks:tighten": "pnpm tsx scripts/api-compare/lint-block-params.ts --tighten",
