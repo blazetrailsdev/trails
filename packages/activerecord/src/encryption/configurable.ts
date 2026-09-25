@@ -26,6 +26,18 @@ export class Configurable {
     _listeners = value;
   }
 
+  get config(): Config {
+    return (_config ??= new Config());
+  }
+
+  get encryptedAttributeDeclarationListeners(): DeclarationListener[] | undefined {
+    return _listeners;
+  }
+
+  set encryptedAttributeDeclarationListeners(value: DeclarationListener[] | undefined) {
+    _listeners = value;
+  }
+
   static get keyProvider(): unknown {
     return Contexts.context.keyProvider;
   }
