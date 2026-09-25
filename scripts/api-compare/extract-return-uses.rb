@@ -2,7 +2,7 @@
 
 # The Ruby half of `pnpm parity:api:returns` (RFC 0156): every method NAME whose
 # return value some Rails body or Rails test reads, per package. A read is one
-# of four shapes:
+# of three shapes:
 #
 #   pool = establish_connection(...)     # assignment RHS (also ||=, a, b = …)
 #   assert_equal true, assert_not(nil)   # a call argument, kwarg values included
@@ -13,6 +13,10 @@
 # extractor never walks a test file, which is where `assert_not`'s one reader
 # (`activesupport/test/test_case_test.rb:20-28`) lives. So this walks both.
 #
+# A name Ruby's core classes answer (`each`, `delete`, `call`) attributes
+# nothing, and neither does `assert_nil m`'s argument, which asserts there is no
+# return value (`trilogy_adapter_test.rb:162`).
+#
 # Usage: ruby extract-return-uses.rb '{"<pkg>": ["<dir>", …], …}'
 # Prints {"<pkg>": {"<name>": {"count": N, "site": "<file>:<line>"}}}.
 require "json"
@@ -21,14 +25,9 @@ require "set"
 
 CALL_WRAPPERS = %i[method_add_arg method_add_block].freeze
 
-# A name Ruby's core classes answer (`each`, `delete`, `call`, `write`) is read
-# off an Array, Hash, Proc or IO far more often than off the Rails method that
-# shares it, and a name-keyed read cannot tell which, so it attributes nothing.
 CORE_NAMES = [Object, Array, Hash, String, Symbol, Integer, Float, Proc, IO, Set, Range]
   .flat_map(&:public_instance_methods).to_set { |m| m.to_s }.freeze
 
-# The name of the call `node` evaluates to, with the line it is spelled on, or
-# nil when `node` is not a call. A `:var_ref` is a local, never a call.
 def call_name(node)
   return nil unless node.is_a?(Array)
 
@@ -45,7 +44,6 @@ def ident(node)
   [node[1], node[2][0]]
 end
 
-# The argument expressions of a call node, kwarg values flattened in.
 def call_arguments(node)
   args =
     case node[0]
@@ -62,8 +60,6 @@ def call_arguments(node)
   end
 end
 
-# `assert_nil conn.disconnect!` reads the return only to assert there is none,
-# which a void port already satisfies (`trilogy_adapter_test.rb:162`).
 def value_reads(node)
   return [] if %i[method_add_arg command].include?(node[0]) && call_name(node)&.first == "assert_nil"
 
