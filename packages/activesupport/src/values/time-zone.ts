@@ -13,7 +13,14 @@ import { TimeWithZone } from "../time-with-zone.js";
 import { Duration } from "../duration.js";
 import { ArgumentError } from "../hash-utils.js";
 import { Temporal, Date as RubyDate, Time, tzdataIsdst } from "@blazetrails/date";
-import { fetch, hasKey, KeyError, Rational, sprintf } from "@blazetrails/ruby-compat";
+import {
+  equals as cmpEquals,
+  fetch,
+  hasKey,
+  KeyError,
+  Rational,
+  sprintf,
+} from "@blazetrails/ruby-compat";
 import type { DateParts } from "@blazetrails/date";
 import { instantFrom } from "../temporal.js";
 import { currentTime } from "../time-travel.js";
@@ -366,6 +373,19 @@ function ignoringOffset(time: Date | Temporal.Instant | Time): Date {
   return date;
 }
 
+const ETC_GMT_LINKS = new Set([
+  "Etc/GMT",
+  "Etc/GMT+0",
+  "Etc/GMT-0",
+  "Etc/GMT0",
+  "Etc/Greenwich",
+  "GMT",
+  "GMT+0",
+  "GMT-0",
+  "GMT0",
+  "Greenwich",
+]);
+
 function getZoneInfo(
   ianaName: string,
   date: Date,
@@ -376,7 +396,8 @@ function getZoneInfo(
   });
   const parts = formatter.formatToParts(date);
   const tzPart = parts.find((p) => p.type === "timeZoneName");
-  const abbreviation = tzPart?.value ?? ianaName;
+  let abbreviation = tzPart?.value ?? ianaName;
+  if (abbreviation === "UTC" && ETC_GMT_LINKS.has(ianaName)) abbreviation = "GMT";
 
   const roundedDate = new Date(Math.floor(date.getTime() / 60000) * 60000);
 
@@ -750,6 +771,8 @@ export class TimeZone {
     if (result === 0) result = this.name < other.name ? -1 : this.name > other.name ? 1 : 0;
     return result;
   }
+
+  equals = cmpEquals;
 
   utcToLocal(time: Time): Temporal.ZonedDateTime | Time {
     const t = this.tzinfo.utcToLocal(time);

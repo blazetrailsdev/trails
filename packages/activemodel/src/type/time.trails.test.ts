@@ -86,7 +86,7 @@ describe("TimeType userInputInTimeZone", () => {
       const result = type.userInputInTimeZone("14:30:00") as TimeWithZone;
       expect(result).toBeInstanceOf(TimeWithZone);
       expect(result.hour).toBe(14);
-      expect(result.timeZone.tzinfo.identifier).toBe("America/New_York");
+      expect(result.timeZone.name).toBe("Eastern Time (US & Canada)");
     });
   });
 

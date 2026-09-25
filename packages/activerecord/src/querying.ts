@@ -635,25 +635,25 @@ export async function exists<T extends typeof Base>(
 export function findOrCreateBy<T extends typeof Base>(
   this: T,
   conditions: Record<string, unknown>,
-  extra?: Record<string, unknown>,
+  block?: (r: InstanceType<T>) => void,
 ): Promise<InstanceType<T>> {
-  return this.all().findOrCreateBy(conditions, extra);
+  return this.all().findOrCreateBy(conditions, block);
 }
 
 export function findOrCreateByBang<T extends typeof Base>(
   this: T,
   conditions: Record<string, unknown>,
-  extra?: Record<string, unknown>,
+  block?: (r: InstanceType<T>) => void,
 ): Promise<InstanceType<T>> {
-  return this.all().findOrCreateByBang(conditions, extra);
+  return this.all().findOrCreateByBang(conditions, block);
 }
 
 export function findOrInitializeBy<T extends typeof Base>(
   this: T,
   conditions: Record<string, unknown>,
-  extra?: Record<string, unknown>,
+  block?: (r: InstanceType<T>) => void,
 ): Promise<InstanceType<T>> {
-  return this.all().findOrInitializeBy(conditions, extra);
+  return this.all().findOrInitializeBy(conditions, block);
 }
 
 export function isAny<T extends typeof Base>(
@@ -686,25 +686,30 @@ export function isNone<T extends typeof Base>(
 
 export function firstOrCreate<T extends typeof Base>(
   this: T,
-  extra?: Parameters<ReturnType<T["all"]>["firstOrCreate"]>[0],
+  attributes?: Parameters<ReturnType<T["all"]>["firstOrCreate"]>[0],
+  block?: Parameters<ReturnType<T["all"]>["firstOrCreate"]>[1],
 ): ReturnType<ReturnType<T["all"]>["firstOrCreate"]> {
-  return this.all().firstOrCreate(extra) as ReturnType<ReturnType<T["all"]>["firstOrCreate"]>;
+  return this.all().firstOrCreate(attributes, block) as ReturnType<
+    ReturnType<T["all"]>["firstOrCreate"]
+  >;
 }
 
 export function firstOrCreateBang<T extends typeof Base>(
   this: T,
-  extra?: Parameters<ReturnType<T["all"]>["firstOrCreateBang"]>[0],
+  attributes?: Parameters<ReturnType<T["all"]>["firstOrCreateBang"]>[0],
+  block?: Parameters<ReturnType<T["all"]>["firstOrCreateBang"]>[1],
 ): ReturnType<ReturnType<T["all"]>["firstOrCreateBang"]> {
-  return this.all().firstOrCreateBang(extra) as ReturnType<
+  return this.all().firstOrCreateBang(attributes, block) as ReturnType<
     ReturnType<T["all"]>["firstOrCreateBang"]
   >;
 }
 
 export function firstOrInitialize<T extends typeof Base>(
   this: T,
-  extra?: Parameters<ReturnType<T["all"]>["firstOrInitialize"]>[0],
+  attributes?: Parameters<ReturnType<T["all"]>["firstOrInitialize"]>[0],
+  block?: Parameters<ReturnType<T["all"]>["firstOrInitialize"]>[1],
 ): ReturnType<ReturnType<T["all"]>["firstOrInitialize"]> {
-  return this.all().firstOrInitialize(extra) as ReturnType<
+  return this.all().firstOrInitialize(attributes, block) as ReturnType<
     ReturnType<T["all"]>["firstOrInitialize"]
   >;
 }

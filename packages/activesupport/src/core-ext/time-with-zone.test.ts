@@ -1181,10 +1181,7 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("marshal dump and load with tzinfo identifier", () => {
-    const tzinfoTwz = new TimeWithZone(
-      utc,
-      Timezone.get("America/New_York") as unknown as TimeZone,
-    );
+    const tzinfoTwz = new TimeWithZone(utc, Timezone.get("America/New_York"));
     const mtime = marshalRoundTrip(tzinfoTwz);
     expect(mtime.utc()).toEqual(RubyTime.utc(2000, 1, 1, 0));
     assertPredicate(mtime.utc(), (t) => t.isUtc());

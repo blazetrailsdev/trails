@@ -428,7 +428,7 @@ export class AbstractReflection {
     const val = opts?.[optionName];
     if (typeof val === "function" && /^class[\s{]/.test(Function.prototype.toString.call(val))) {
       throw new ArgumentError(
-        `A class was passed to \`:${optionName}\` but we are expecting a string.`,
+        `A class was passed to \`:${underscore(optionName)}\` but we are expecting a string.`,
       );
     }
   }

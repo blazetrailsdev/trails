@@ -1,4 +1,4 @@
-import { PeriodNotFound, TimeZone, TimezonePeriod } from "./values/time-zone.js";
+import { PeriodNotFound, TimeZone, Timezone, TimezonePeriod } from "./values/time-zone.js";
 import {
   Range,
   basicObjRespondTo,
@@ -20,7 +20,7 @@ import { zone as timeZone, findZone, findZoneBang } from "./time-zone-config.js"
 import { DateTime, Temporal } from "@blazetrails/date";
 import { instantFrom } from "./temporal.js";
 import { Time } from "@blazetrails/date";
-import { Rational, rational, rbInspect } from "@blazetrails/ruby-compat";
+import { Rational, rational, rbEqual, rbInspect } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "./hash-utils.js";
 import { Encoding } from "./json/encoding.js";
 import { DATE_FORMATS, toFs } from "./core-ext/time/conversions.js";
@@ -118,7 +118,7 @@ const METHOD_MISSING_HANDLER: ProxyHandler<TimeWithZone> = {
 export class TimeWithZone {
   private _utc!: Time | null;
   private _time!: TimeLike | null;
-  private _timeZone!: TimeZone;
+  private _timeZone!: TimeZone | Timezone;
   private _period?: TimezonePeriod;
   private _toTimeWithTimezone?: Time;
   private _toTimeWithInstanceOffset?: Time;
@@ -126,7 +126,7 @@ export class TimeWithZone {
 
   constructor(
     utcTime: TimeLike | null,
-    timeZone: TimeZone,
+    timeZone: TimeZone | Timezone,
     localTime: TimeLike | null = null,
     period: TimezonePeriod | null = null,
   ) {
@@ -136,7 +136,7 @@ export class TimeWithZone {
 
   initialize(
     utcTime: TimeLike | null,
-    timeZone: TimeZone,
+    timeZone: TimeZone | Timezone,
     localTime: TimeLike | null = null,
     period: TimezonePeriod | null = null,
   ): void {
@@ -149,7 +149,7 @@ export class TimeWithZone {
   }
 
   private get _zoned(): Temporal.ZonedDateTime {
-    return this.utc().toTime().toInstant().toZonedDateTimeISO(this._timeZone.tzinfo.identifier);
+    return this.localtime(this.utcOffset).toTime();
   }
 
   private get _epochMs(): number {
@@ -266,7 +266,7 @@ export class TimeWithZone {
     return (this._period ??= this._timeZone.periodForUtc(this._utc!));
   }
 
-  get timeZone(): TimeZone {
+  get timeZone(): TimeZone | Timezone {
     return this._timeZone;
   }
 
@@ -300,17 +300,7 @@ export class TimeWithZone {
   }
 
   isUtc(): boolean {
-    const tz = this._timeZone.tzinfo.identifier;
-    return (
-      this.utcOffset === 0 &&
-      (tz === "Etc/UTC" ||
-        tz === "UTC" ||
-        tz === "UCT" ||
-        tz === "Etc/UCT" ||
-        tz === "Etc/Universal" ||
-        tz === "Universal" ||
-        this._timeZone.name === "UTC")
-    );
+    return this.zone === "UTC" || this.zone === "UCT";
   }
 
   isGmt(): boolean {
@@ -327,16 +317,16 @@ export class TimeWithZone {
     millisecond: number;
     nsec: number;
   } {
-    const z = this._zoned;
+    const t = this.time;
     return {
-      year: z.year,
-      month: z.month,
-      day: z.day,
-      hour: z.hour,
-      minute: z.minute,
-      second: z.second,
-      millisecond: z.millisecond,
-      nsec: z.millisecond * 1_000_000 + z.microsecond * 1_000 + z.nanosecond,
+      year: t.year,
+      month: t.mon,
+      day: t.day,
+      hour: t.hour,
+      minute: t.min,
+      second: t.sec,
+      millisecond: Math.floor(t.nsec / 1_000_000),
+      nsec: t.nsec,
     };
   }
 
@@ -429,7 +419,9 @@ export class TimeWithZone {
 
   toTime(): Time {
     if (this.preserveTimezone() === ":zone") {
-      return (this._toTimeWithTimezone ??= this.getlocal(this.timeZone.tzinfo.identifier));
+      return (this._toTimeWithTimezone ??= this.getlocal(
+        TimeZone.find(this.timeZone)!.tzinfo.identifier,
+      ));
     } else if (this.preserveTimezone()) {
       return (this._toTimeWithInstanceOffset ??= this.getlocal(this.utcOffset));
     } else {
@@ -475,8 +467,8 @@ export class TimeWithZone {
       if (!currentZone) return this;
       newZone = currentZone;
     }
+    if (rbEqual(this._timeZone, newZone)) return this;
     const tz = findZoneBang(newZone) as TimeZone;
-    if (tz.tzinfo.identifier === this._timeZone.tzinfo.identifier) return this;
     return new TimeWithZone(this._zoned.toInstant(), tz);
   }
 
@@ -663,7 +655,7 @@ export class TimeWithZone {
 
     const newTime = timeChange.call(this.time, options);
 
-    let newZone: TimeZone | null | false = null;
+    let newZone: TimeZone | Timezone | null | false = null;
     if (options.zone != null && options.zone !== false) {
       newZone = findZone(options.zone);
     } else if (options.offset != null) {

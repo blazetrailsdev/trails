@@ -163,6 +163,12 @@ describe("Time", () => {
     expect(time.strftime("%L")).toBe("500");
   });
 
+  it("subsec keeps the sub-nanosecond residual", () => {
+    expect(Time.at(0).plus(0.1234560001).subsec).toEqual(
+      new Rational(8895942336752191n, 72057594037927936n),
+    );
+  });
+
   it("Time.new keeps a fractional second", () => {
     const time = new Time(2008, 3, 1, 6, 0, 1.123456789, "UTC");
     expect(time.sec).toBe(1);

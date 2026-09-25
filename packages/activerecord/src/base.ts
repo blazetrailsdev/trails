@@ -1413,17 +1413,17 @@ export class Base extends Model {
   static createOrFindBy<T extends typeof Base>(
     this: T,
     conditions: Record<string, unknown>,
-    extra?: Record<string, unknown>,
+    block?: (r: InstanceType<T>) => void,
   ): Promise<InstanceType<T>> {
-    return this.all().createOrFindBy(conditions, extra);
+    return this.all().createOrFindBy(conditions, block);
   }
 
   static createOrFindByBang<T extends typeof Base>(
     this: T,
     conditions: Record<string, unknown>,
-    extra?: Record<string, unknown>,
+    block?: (r: InstanceType<T>) => void,
   ): Promise<InstanceType<T>> {
-    return this.all().createOrFindByBang(conditions, extra);
+    return this.all().createOrFindByBang(conditions, block);
   }
 
   static new<T extends typeof Base>(

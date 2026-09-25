@@ -1302,7 +1302,7 @@ export class Time {
   }
 
   get subsec(): number | Rational {
-    const ret = new Rational(this.nsec, 1_000_000_000);
+    const ret = new Rational(this.nsec, 1).add(this.#subnano).quo(1_000_000_000);
     if (ret.denominator === 1n) return Number(ret.numerator);
     return ret;
   }
