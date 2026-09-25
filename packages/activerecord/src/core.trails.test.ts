@@ -222,7 +222,7 @@ describe("init_internals / initialize_dup super chain", () => {
     const duped = topic.dup();
 
     expect(duped.errors).not.toBe(topic.errors);
-    expect(duped.errors.empty).toBe(true);
+    expect(duped.errors.isEmpty()).toBe(true);
     expect(topic.errors.size).toBe(1);
 
     expect(duped.title).toBe("Bob");

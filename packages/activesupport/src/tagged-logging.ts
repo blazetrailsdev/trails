@@ -1,6 +1,7 @@
 import { Logger, SimpleFormatter, type LoggerFormatter } from "./logger.js";
 import type { Temporal } from "@blazetrails/date";
 import {
+  aryPop,
   extend,
   extended,
   isEmpty,
@@ -9,6 +10,7 @@ import {
   rbObjId,
 } from "@blazetrails/ruby-compat";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
+import { isBlank } from "./core-ext/object/blank.js";
 
 type Tag = string | number | boolean | null | undefined | readonly Tag[];
 
@@ -20,11 +22,11 @@ export interface TaggedFormatter {
     msg: unknown,
   ): string;
   tagged<T>(...tags: (Tag | ((formatter: TaggedFormatter) => T))[]): T;
-  pushTags(...tags: unknown[]): string[];
-  popTags(count?: number): string[];
-  clearTagsBang(): string[];
+  pushTags(...tags: unknown[]): unknown[];
+  popTags(count?: number): unknown[];
+  clearTagsBang(): unknown[];
   tagStack: TagStack;
-  readonly currentTags: string[];
+  readonly currentTags: unknown[];
   readonly tagsText: string;
   _threadKey?: string;
 }
@@ -34,9 +36,9 @@ export interface TaggedLogger extends Logger {
   set formatter(value: LoggerFormatter | null);
   tagged<T>(...tags: [...Tag[], (logger: TaggedLogger) => T]): T;
   tagged(...tags: Tag[]): TaggedLogger;
-  pushTags(...tags: unknown[]): string[];
-  popTags(count?: number): string[];
-  clearTagsBang(): string[];
+  pushTags(...tags: unknown[]): unknown[];
+  popTags(count?: number): unknown[];
+  clearTagsBang(): unknown[];
   flush(): void;
 }
 
@@ -67,15 +69,15 @@ export const Formatter = {
     }
   },
 
-  pushTags(this: TaggedFormatter, ...tags: unknown[]): string[] {
+  pushTags(this: TaggedFormatter, ...tags: unknown[]): unknown[] {
     return this.tagStack.pushTags(tags);
   },
 
-  popTags(this: TaggedFormatter, count: number = 1): string[] {
+  popTags(this: TaggedFormatter, count: number = 1): unknown[] {
     return this.tagStack.popTags(count);
   },
 
-  clearTagsBang(this: TaggedFormatter): string[] {
+  clearTagsBang(this: TaggedFormatter): unknown[] {
     return this.tagStack.clear();
   },
 
@@ -88,7 +90,7 @@ export const Formatter = {
     );
   },
 
-  get currentTags(): string[] {
+  get currentTags(): unknown[] {
     return (this as unknown as TaggedFormatter).tagStack.tags;
   },
 
@@ -98,32 +100,27 @@ export const Formatter = {
 };
 
 export class TagStack {
-  private _tags: string[] = [];
+  private _tags: unknown[] = [];
   private _tagsString: string | null = null;
 
-  get tags(): string[] {
-    return [...this._tags];
+  get tags(): unknown[] {
+    return this._tags;
   }
 
-  pushTags(tags: unknown[]): string[] {
+  pushTags(tags: unknown[]): unknown[] {
     this._tagsString = null;
-    const flat = tags
-      .flat(Infinity)
-      .map((t) => (t == null ? "" : globalThis.String(t)))
-      .filter((t) => t.length > 0 && !/^\s*$/.test(t));
-    this._tags.push(...flat);
-    return flat;
+    tags.splice(0, tags.length, ...tags.flat(Infinity));
+    tags.splice(0, tags.length, ...tags.filter((tag) => !isBlank(tag)));
+    this._tags.push(...tags);
+    return tags;
   }
 
-  popTags(count: number = 1): string[] {
-    if (count <= 0) return [];
+  popTags(count: number): unknown[] {
     this._tagsString = null;
-    const n = Math.min(Math.trunc(count), this._tags.length);
-    if (n <= 0) return [];
-    return this._tags.splice(-n, n);
+    return aryPop(this._tags, count);
   }
 
-  clear(): string[] {
+  clear(): unknown[] {
     this._tagsString = null;
     this._tags.length = 0;
     return this._tags;
@@ -134,10 +131,10 @@ export class TagStack {
     if (isEmpty(this._tags)) {
       return message;
     } else if (this._tags.length === 1) {
-      return `[${this._tags[0]}] ${rbObjAsString(message)}`;
+      return `[${rbObjAsString(this._tags[0])}] ${rbObjAsString(message)}`;
     } else {
       if (this._tagsString === null) {
-        this._tagsString = `[${this._tags.join("] [")}] `;
+        this._tagsString = `[${this._tags.map((tag) => rbObjAsString(tag)).join("] [")}] `;
       }
       return `${this._tagsString}${rbObjAsString(message)}`;
     }
@@ -180,15 +177,15 @@ export const TaggedLogging = {
     return logger as TaggedLogger;
   },
 
-  pushTags(this: TaggedLogger, ...tags: unknown[]): string[] {
+  pushTags(this: TaggedLogger, ...tags: unknown[]): unknown[] {
     return this.formatter.pushTags(...tags);
   },
 
-  popTags(this: TaggedLogger, count: number = 1): string[] {
+  popTags(this: TaggedLogger, count: number = 1): unknown[] {
     return this.formatter.popTags(count);
   },
 
-  clearTagsBang(this: TaggedLogger): string[] {
+  clearTagsBang(this: TaggedLogger): unknown[] {
     return this.formatter.clearTagsBang();
   },
 

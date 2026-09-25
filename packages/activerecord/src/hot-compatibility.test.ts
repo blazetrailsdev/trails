@@ -4,11 +4,11 @@ import { Base } from "./index.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { adapterType } from "./test-adapter.js";
 import { PreparedStatementCacheExpired } from "./errors.js";
-import type { StatementPool } from "./connection-adapters/postgresql-adapter.js";
 import { fixtures } from "./test-fixtures.js";
 
-function getPreparedStatementCache(connection: DatabaseAdapter): StatementPool {
-  return (connection as unknown as { _statements: StatementPool })._statements;
+function getPreparedStatementCache(connection: DatabaseAdapter): Map<string, unknown> {
+  return (connection as unknown as { _statements: { cache: Map<string, unknown> } })._statements
+    .cache;
 }
 
 describe("HotCompatibilityTest", () => {
@@ -93,7 +93,7 @@ describe("HotCompatibilityTest", () => {
             await record.reload();
           });
 
-          expect(getPreparedStatementCache(adapter).length > 0).toBeTruthy();
+          expect(getPreparedStatementCache(adapter).size > 0).toBeTruthy();
 
           await ddlConnection.addColumn("hot_compatibilities", "baz", "string");
 
@@ -123,7 +123,7 @@ describe("HotCompatibilityTest", () => {
             await record.reload();
           });
 
-          expect(getPreparedStatementCache(adapter).length > 0).toBeTruthy();
+          expect(getPreparedStatementCache(adapter).size > 0).toBeTruthy();
 
           await ddlConnection.addColumn("hot_compatibilities", "baz", "string");
 

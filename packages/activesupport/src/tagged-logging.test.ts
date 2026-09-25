@@ -375,16 +375,38 @@ describe("TagStack", () => {
     expect(stack.tags).toEqual([]);
   });
 
-  it("pushTags stringifies non-string values", () => {
+  it("pushTags keeps non-string tags and rejects blank ones", () => {
     const stack = new TagStack();
-    stack.pushTags([42, true, { toString: () => "obj" }] as unknown[]);
-    expect(stack.tags).toEqual(["42", "true", "obj"]);
+    const tag = new (class {
+      toString(): string {
+        return "obj";
+      }
+    })();
+    stack.pushTags([null, undefined, 0, false, true, tag] as unknown[]);
+    expect(stack.tags).toEqual([0, true, tag]);
+    expect(stack.formatMessage("msg")).toBe("[0] [true] [obj] msg");
   });
 
-  it("pushTags filters null and undefined after stringification", () => {
+  it("pushTags returns the argument array, flattened and filtered in place", () => {
     const stack = new TagStack();
-    stack.pushTags([null, undefined, 0, false] as unknown[]);
-    expect(stack.tags).toEqual(["0", "false"]);
+    const tags: unknown[] = ["A", ["", ["B"]]];
+    expect(stack.pushTags(tags)).toBe(tags);
+    expect(tags).toEqual(["A", "B"]);
+  });
+
+  it("tags returns the backing array", () => {
+    const stack = new TagStack();
+    stack.pushTags(["A"]);
+    const tags = stack.tags;
+    stack.pushTags(["B"]);
+    expect(tags).toEqual(["A", "B"]);
+  });
+
+  it("popTags pops at most the tags present", () => {
+    const stack = new TagStack();
+    stack.pushTags(["A", "B"]);
+    expect(stack.popTags(0)).toEqual([]);
+    expect(stack.popTags(5)).toEqual(["A", "B"]);
   });
 
   it("formatMessage with no tags returns message unchanged", () => {

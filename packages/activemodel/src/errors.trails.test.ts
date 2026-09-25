@@ -36,10 +36,10 @@ describe("Errors — trails-only coverage", () => {
 
   it("detecting whether there are errors with empty?, blank?, include?", () => {
     const e = new Errors(null);
-    expect(e.empty).toBe(true);
+    expect(e.isEmpty()).toBe(true);
     expect(e.isAny()).toBe(false);
     e.add("name", ":blank");
-    expect(e.empty).toBe(false);
+    expect(e.isEmpty()).toBe(false);
     expect(e.isAny()).toBe(true);
   });
 
@@ -48,7 +48,7 @@ describe("Errors — trails-only coverage", () => {
     e.add("name", ":blank");
     e.clear();
     expect(e.count).toBe(0);
-    expect(e.empty).toBe(true);
+    expect(e.isEmpty()).toBe(true);
   });
 
   it("where filters by attribute and type", () => {

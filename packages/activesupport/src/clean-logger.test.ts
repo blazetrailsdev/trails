@@ -25,7 +25,7 @@ describe("CleanLoggerTest", () => {
     const lines: string[] = [];
     const logger = new Logger({ write: (s) => lines.push(s) });
     const anObject = [1, 2, 3, 4, 5];
-    logger.debug(anObject as unknown as string);
+    logger.debug(anObject);
     expect(lines.join("")).toEqual(`${rbInspect(anObject)}\n`);
   });
 });

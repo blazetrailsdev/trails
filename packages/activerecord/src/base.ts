@@ -2373,7 +2373,7 @@ export class Base extends Model {
     const effectiveContext =
       context ?? this._validationContext ?? defaultValidationContext.call(this);
     const output = await validationsIsValid.call(this, effectiveContext);
-    return this.errors.empty && output;
+    return this.errors.isEmpty() && output;
   }
 
   declare isPresent: () => boolean;

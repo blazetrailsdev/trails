@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { isEmpty } from "@blazetrails/ruby-compat";
 
 import { benchmark as benchmarkFn, type BenchmarkOptions } from "./benchmarkable.js";
 import { Logger } from "./logger.js";
@@ -16,6 +17,9 @@ describe("BenchmarkableTest", () => {
     }
     get size(): number {
       return this.lines.length;
+    }
+    isEmpty(): boolean {
+      return isEmpty(this.lines);
     }
     count(): number {
       return this.lines.length;

@@ -87,6 +87,15 @@ export class Logger {
   static Formatter = Formatter;
 
   protected _formatter: LoggerFormatter | null = null;
+  private _defaultFormatter: Formatter;
+
+  get datetimeFormat(): string | null {
+    return this._defaultFormatter.datetimeFormat;
+  }
+  set datetimeFormat(datetimeFormat: string | null) {
+    this._defaultFormatter.datetimeFormat = datetimeFormat;
+  }
+
   get formatter(): LoggerFormatter | null {
     return this._formatter;
   }
@@ -134,6 +143,7 @@ export class Logger {
   static readonly UNKNOWN = 5;
 
   constructor(output: LoggerOutput | null = defaultOutput) {
+    this._defaultFormatter = new Formatter();
     this.output = output;
     this._formatter ??= new SimpleFormatter();
   }
@@ -141,7 +151,7 @@ export class Logger {
   add(
     severity: number | null,
     message: unknown = null,
-    progname: string | null = null,
+    progname: unknown = null,
     block?: () => unknown,
   ): boolean {
     severity ??= Logger.UNKNOWN;
@@ -166,39 +176,39 @@ export class Logger {
 
   declare log: Logger["add"];
 
-  debug(progname?: string | (() => string)): boolean {
+  debug(progname?: unknown): boolean {
     return typeof progname === "function"
-      ? this.add(Logger.DEBUG, null, null, progname)
+      ? this.add(Logger.DEBUG, null, null, progname as () => unknown)
       : this.add(Logger.DEBUG, null, progname);
   }
 
-  info(progname?: string | (() => string)): boolean {
+  info(progname?: unknown): boolean {
     return typeof progname === "function"
-      ? this.add(Logger.INFO, null, null, progname)
+      ? this.add(Logger.INFO, null, null, progname as () => unknown)
       : this.add(Logger.INFO, null, progname);
   }
 
-  warn(progname?: string | (() => string)): boolean {
+  warn(progname?: unknown): boolean {
     return typeof progname === "function"
-      ? this.add(Logger.WARN, null, null, progname)
+      ? this.add(Logger.WARN, null, null, progname as () => unknown)
       : this.add(Logger.WARN, null, progname);
   }
 
-  error(progname?: string | (() => string)): boolean {
+  error(progname?: unknown): boolean {
     return typeof progname === "function"
-      ? this.add(Logger.ERROR, null, null, progname)
+      ? this.add(Logger.ERROR, null, null, progname as () => unknown)
       : this.add(Logger.ERROR, null, progname);
   }
 
-  fatal(progname?: string | (() => string)): boolean {
+  fatal(progname?: unknown): boolean {
     return typeof progname === "function"
-      ? this.add(Logger.FATAL, null, null, progname)
+      ? this.add(Logger.FATAL, null, null, progname as () => unknown)
       : this.add(Logger.FATAL, null, progname);
   }
 
-  unknown(progname?: string | (() => string)): boolean {
+  unknown(progname?: unknown): boolean {
     return typeof progname === "function"
-      ? this.add(Logger.UNKNOWN, null, null, progname)
+      ? this.add(Logger.UNKNOWN, null, null, progname as () => unknown)
       : this.add(Logger.UNKNOWN, null, progname);
   }
 
@@ -251,13 +261,13 @@ export class Logger {
   private formatMessage(
     severity: string,
     datetime: Temporal.Instant,
-    progname: string | null,
+    progname: unknown,
     msg: unknown,
   ): string {
-    const formatter = this.formatter ?? new Formatter();
+    const formatter = this.formatter ?? this._defaultFormatter;
     return typeof formatter === "function"
-      ? formatter(severity, datetime, progname, msg)
-      : formatter.call(severity, datetime, progname, msg);
+      ? formatter(severity, datetime, progname as string | null, msg)
+      : formatter.call(severity, datetime, progname as string | null, msg);
   }
 
   append(s: string): void {

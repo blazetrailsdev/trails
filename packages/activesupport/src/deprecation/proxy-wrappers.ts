@@ -1,8 +1,8 @@
 import { callerLocations, type CallerLocation, type Deprecation } from "../deprecation.js";
 import { extend, include, Module, prepend } from "@blazetrails/ruby-compat/include";
-import { constantize, underscore } from "../inflector.js";
+import { constantize } from "../inflector.js";
 import { PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
-import { rbEqual, rbObjRespondTo, rbStrSend } from "@blazetrails/ruby-compat";
+import { rbEqual, rbMethodName, rbObjRespondTo, rbStrSend } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "../hash-utils.js";
 
 function inspect(value: unknown): string {
@@ -135,7 +135,7 @@ export class DeprecatedInstanceVariableProxy extends DeprecationProxy {
 
   protected override warn(callstack: CallerLocation[], called: string, args: unknown[]): void {
     this._deprecator.warn(
-      `${this._var} is deprecated! Call ${this._method}.${underscore(called)} instead of ${this._var}.${underscore(called)}. Args: ${inspect(args)}`,
+      `${this._var} is deprecated! Call ${rbMethodName(this._method)}.${rbMethodName(called)} instead of ${this._var}.${rbMethodName(called)}. Args: ${inspect(args)}`,
       callstack,
     );
   }

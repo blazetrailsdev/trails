@@ -91,6 +91,9 @@ export function rbModSingletonP(klass: unknown): boolean {
  * (`basic_obj_respond_to_missing`, `vm_method.c:2850-2861`), handed `!pub`.
  * Like `callable_method_entry` there, the entry is found by descriptor lookup,
  * never by a property read a `methodMissingProxy` `get` trap would answer.
+ * `isEmpty` is bound for the core receivers `ruby-empty.ts`'s `isEmpty` answers
+ * `empty?` for (`array.c:2686`, `hash.c:3023`, `string.c:2243`), whose JS
+ * values carry no such member.
  *
  * `pub` cannot change the lookup: JS carries no runtime notion of method
  * visibility. See CLAUDE.md, "Method visibility is not a runtime fact in JS".
@@ -100,6 +103,16 @@ export function rbModSingletonP(klass: unknown): boolean {
  */
 export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true): boolean {
   if (typeof obj === "string" && mid === "toStr") return true;
+  if (
+    mid === "isEmpty" &&
+    (typeof obj === "string" ||
+      Array.isArray(obj) ||
+      obj instanceof Set ||
+      obj instanceof Map ||
+      isPlainHash(obj))
+  ) {
+    return true;
+  }
   for (let o: object | null = Object(obj); o; o = Object.getPrototypeOf(o) as object | null) {
     const entry = Object.getOwnPropertyDescriptor(o, mid);
     if (entry) return !("value" in entry && entry.value === undefined);

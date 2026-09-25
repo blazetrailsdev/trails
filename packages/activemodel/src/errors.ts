@@ -9,6 +9,7 @@ import {
   Enumerable,
   FrozenError,
   Hash,
+  isEmpty,
   rbEqual,
   rbInspect,
   transformValues,
@@ -42,8 +43,8 @@ export class Errors<TBase extends object = object> {
     this._errors.length = 0;
   }
 
-  get empty(): boolean {
-    return this._errors.length === 0;
+  isEmpty(): boolean {
+    return isEmpty(this._errors);
   }
 
   get size(): number {

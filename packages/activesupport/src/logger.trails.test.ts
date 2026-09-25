@@ -153,3 +153,16 @@ describe("Logger#add block", () => {
     expect(out).toEqual(["from block\n", "from message\n"]);
   });
 });
+
+describe("Logger#datetime_format", () => {
+  it("is read and written on the default formatter, which formats when formatter is nil", () => {
+    const lines: string[] = [];
+    const logger = new Logger({ write: (s) => lines.push(s) });
+    expect(logger.datetimeFormat).toBeNull();
+    logger.datetimeFormat = "%Y-%m-%d";
+    expect(logger.datetimeFormat).toBe("%Y-%m-%d");
+    logger.formatter = null;
+    logger.info("hello");
+    expect(lines.join("")).toMatch(/^I, \[\d{4}-\d\d-\d\d #\d+\] {2}INFO -- : hello\n$/);
+  });
+});
