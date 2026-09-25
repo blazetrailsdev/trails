@@ -65,12 +65,18 @@ export function generateCommand(): Command {
     });
 
   const registered = new Set(cmd.commands.map((c) => c.name()));
-  for (const { name, namespace, hidden } of Generators.namespacesForHelp()) {
+  for (const { name, namespace, hidden, klass } of Generators.namespacesForHelp()) {
     if (registered.has(name)) continue;
     cmd
       .command(name, { hidden })
       .description(`Run the ${name} generator`)
       .argument("[args...]", "Generator arguments")
+      .allowUnknownOption()
+      .addHelpText("after", () => {
+        const lines = [""];
+        klass.classOptionsHelp((line) => lines.push(line));
+        return lines.join("\n");
+      })
       .action(async (args: string[]) => {
         await Generators.invoke(namespace, args, { cwd: Dir.pwd(), output: console.log });
       });

@@ -1,4 +1,4 @@
-import { underscore } from "@blazetrails/activesupport";
+import { dasherize, underscore } from "@blazetrails/activesupport";
 import { Dir, File, getPath } from "@blazetrails/ruby-compat";
 import { GeneratorBase, type GeneratorOptions } from "./generators/base.js";
 
@@ -22,7 +22,9 @@ const HIDDEN_FROM_LISTING = [
 let _subclasses: GeneratorClass[] | undefined;
 let _hiddenNamespaces: string[] | undefined;
 
-const GENERATORS_ROOT = new URL("./generators/rails/", import.meta.url);
+const LOOKUP_PATHS = [new URL("./generators/", import.meta.url)];
+const COMMAND_TYPE = "generator";
+const EXTENSION = /\.[cm]?[tj]s$/.exec(import.meta.url)![0];
 
 function urlToPath(url: URL): string {
   const p = decodeURIComponent(url.pathname);
@@ -39,34 +41,51 @@ export class Generators {
   }
 
   /** @internal */
-  static async lookupBang(): Promise<void> {
-    if (_subclasses) return;
-    const path = getPath();
-    if (!path.pathToFileURL) {
-      throw new Error("PathAdapter.pathToFileURL() is required to look up generators.");
+  static async lookup(namespaces: string[]): Promise<void> {
+    const paths = Generators.namespacesToPaths(namespaces);
+
+    for (const rawPath of paths) {
+      for (const base of LOOKUP_PATHS) {
+        const path = `${urlToPath(base)}${dasherize(rawPath)}-${COMMAND_TYPE}${EXTENSION}`;
+
+        try {
+          await requireGenerator(path);
+          return;
+        } catch (e) {
+          if (!File.isExist(path)) continue;
+          console.warn(
+            `[WARNING] Could not load ${COMMAND_TYPE} ${JSON.stringify(path)}. Error: ${(e as Error).message}.\n${(e as Error).stack}`,
+          );
+        }
+      }
     }
-    const root = urlToPath(GENERATORS_ROOT);
-    const found: GeneratorClass[] = [];
-    const walk = async (dir: string, namespace: string[]): Promise<void> => {
-      const entries = Dir.children(dir);
-      for (const entry of entries.slice().sort()) {
-        const full = path.join(dir, entry);
+  }
+
+  /** @internal */
+  static async lookupBang(): Promise<void> {
+    const walk = async (dir: string): Promise<void> => {
+      for (const entry of Dir.children(dir).slice().sort()) {
+        const full = getPath().join(dir, entry);
         if (File.isDirectory(full)) {
-          await walk(full, [...namespace, underscore(entry.replace(/-/g, "_"))]);
+          await walk(full);
         } else if (/-generator\.[cm]?[tj]s$/.test(entry) && !/\.(test|d)\./.test(entry)) {
-          const klass = await importGenerator(path.pathToFileURL!(full).href);
-          if (klass) {
-            Object.defineProperty(klass, "namespace", {
-              value: ["rails", ...namespace].join(":"),
-              configurable: true,
-            });
-            found.push(klass);
-          }
+          await requireGenerator(full).catch(() => undefined);
         }
       }
     };
-    await walk(root, []);
-    _subclasses = found;
+    for (const base of LOOKUP_PATHS) await walk(getPath().join(urlToPath(base), "rails"));
+  }
+
+  /** @internal */
+  static namespacesToPaths(namespaces: string[]): string[] {
+    const paths: string[] = [];
+    for (const namespace of namespaces) {
+      const pieces = namespace.split(":");
+      const path = pieces.join("/");
+      paths.push(`${path}/${pieces.at(-1)}`);
+      paths.push(path);
+    }
+    return [...new Set(paths)];
   }
 
   static async findByNamespace(name: string, base?: string): Promise<GeneratorClass | undefined> {
@@ -79,7 +98,8 @@ export class Generators {
       }
       lookups.push(name);
     }
-    await Generators.lookupBang();
+    await Generators.lookup(lookups);
+
     const namespaces = new Map(Generators.subclasses().map((k) => [k.namespace, k]));
     for (const namespace of lookups) {
       const klass = namespaces.get(namespace);
@@ -146,14 +166,19 @@ export class Generators {
   }
 
   /** @noRailsEquivalent PERMANENT */
-  static namespacesForHelp(): Array<{ name: string; namespace: string; hidden: boolean }> {
+  static namespacesForHelp(): Array<{
+    name: string;
+    namespace: string;
+    hidden: boolean;
+    klass: GeneratorClass;
+  }> {
     return Generators.subclasses().map((k) => {
       const name = k.namespace.startsWith("rails:")
         ? k.namespace.slice("rails:".length)
         : k.namespace;
       const hidden =
         HIDDEN_FROM_LISTING.includes(name) || Generators.hiddenNamespaces().includes(name);
-      return { name, namespace: k.namespace, hidden };
+      return { name, namespace: k.namespace, hidden, klass: k };
     });
   }
 
@@ -177,17 +202,20 @@ export class Generators {
   }
 }
 
-async function importGenerator(href: string): Promise<GeneratorClass | undefined> {
-  let mod: Record<string, unknown>;
-  try {
-    mod = (await import(href)) as Record<string, unknown>;
-  } catch {
-    return undefined;
-  }
+async function requireGenerator(path: string): Promise<void> {
+  const mod = (await import(getPath().pathToFileURL!(path).href)) as Record<string, unknown>;
+  const base = urlToPath(LOOKUP_PATHS[0]);
+  const namespace = getPath().dirname(path.slice(base.length)).split(/[\\/]/);
   for (const value of Object.values(mod)) {
     if (typeof value === "function" && value.prototype instanceof GeneratorBase) {
-      return value as unknown as GeneratorClass;
+      const klass = value as unknown as GeneratorClass;
+      Object.defineProperty(klass, "namespace", {
+        value: namespace.map((piece) => underscore(piece.replace(/-/g, "_"))).join(":"),
+        configurable: true,
+      });
+      _subclasses ??= [];
+      if (!_subclasses.includes(klass)) _subclasses.push(klass);
+      return;
     }
   }
-  return undefined;
 }

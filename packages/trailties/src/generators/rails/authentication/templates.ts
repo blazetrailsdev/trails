@@ -36,7 +36,7 @@ import { User } from "../models/user.js";
 
 export class SessionsController extends ApplicationController {
   static {
-    (this as any).allowUnauthenticatedAccess({ only: ["new_", "create"] });
+    this.allowUnauthenticatedAccess({ only: ["new_", "create"] });
     this.rateLimit({
       to: 10, within: minutes(3), only: "create",
       with: function (this: SessionsController) {
@@ -52,15 +52,15 @@ export class SessionsController extends ApplicationController {
   async create(): Promise<void> {
     const user = await User.authenticateBy(this.params.permit("email_address", "password"));
     if (user) {
-      await (this as any).startNewSessionFor(user);
-      this.redirectTo((this as any).afterAuthenticationUrl());
+      await this.startNewSessionFor(user);
+      this.redirectTo(this.afterAuthenticationUrl());
     } else {
       this.redirectTo("/session/new", { alert: "Try another email address or password." });
     }
   }
 
   async destroy(): Promise<void> {
-    await (this as any).terminateSession();
+    await this.terminateSession();
     this.redirectTo("/session/new");
   }
 }
@@ -144,7 +144,7 @@ import { PasswordsMailer } from "../mailers/passwords-mailer.js";
 
 export class PasswordsController extends ApplicationController {
   static {
-    (this as any).allowUnauthenticatedAccess();
+    this.allowUnauthenticatedAccess();
     this.beforeAction("setUserByToken", { only: ["edit", "update"] });
   }
 

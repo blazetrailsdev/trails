@@ -1,7 +1,6 @@
 import { camelize } from "@blazetrails/activesupport";
 import { File } from "@blazetrails/ruby-compat";
 import { NamedBase, type NamedBaseOptions } from "../../named-base.js";
-import type { GeneratorOptions } from "../../base.js";
 
 export interface GeneratorGeneratorOptions extends NamedBaseOptions {
   namespace?: boolean;
@@ -10,18 +9,20 @@ export interface GeneratorGeneratorOptions extends NamedBaseOptions {
 export class GeneratorGenerator extends NamedBase {
   declare options: GeneratorGeneratorOptions;
 
+  static {
+    this.classOption("namespace", {
+      type: "boolean",
+      default: true,
+      desc: "Namespace generator under lib/generators/name",
+    });
+  }
+
   constructor(options: GeneratorGeneratorOptions) {
     const withDefaults: GeneratorGeneratorOptions = {
       ...options,
       namespace: options.namespace ?? true,
     };
     super(withDefaults);
-  }
-
-  static override async start(args: string[], config: GeneratorOptions): Promise<string[]> {
-    const generator = new GeneratorGenerator({ ...config, name: args[0] ?? "" });
-    generator.run();
-    return generator.getCreatedFiles();
   }
 
   run(): string[] {

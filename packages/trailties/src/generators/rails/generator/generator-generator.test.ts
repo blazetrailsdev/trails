@@ -43,14 +43,12 @@ describe("GeneratorGeneratorTest", () => {
     expect(src).toMatch(/class AwesomeGenerator extends NamedBase/);
   });
 
-  it("generator_skeleton_is_created_without_file_name_namespace", () => {
-    const gen = new GeneratorGenerator({
+  it("generator_skeleton_is_created_without_file_name_namespace", async () => {
+    const created = await GeneratorGenerator.start(["awesome", "--namespace", "false"], {
       cwd: tmpDir,
       output: () => {},
-      name: "awesome",
-      namespace: false,
     });
-    expect(gen.run()).toEqual([
+    expect(created).toEqual([
       "lib/generators/USAGE",
       "lib/generators/templates/.keep",
       "lib/generators/awesome-generator.ts",
@@ -58,14 +56,11 @@ describe("GeneratorGeneratorTest", () => {
     expect(fs.existsSync(path.join(tmpDir, "lib/generators/awesome-generator.ts"))).toBe(true);
   });
 
-  it("namespaced_generator_skeleton_without_file_name_namespace", () => {
-    const gen = new GeneratorGenerator({
+  it("namespaced_generator_skeleton_without_file_name_namespace", async () => {
+    await GeneratorGenerator.start(["rails/awesome", "--namespace", "false"], {
       cwd: tmpDir,
       output: () => {},
-      name: "rails/awesome",
-      namespace: false,
     });
-    gen.run();
     for (const p of ["lib/generators/rails/USAGE", "lib/generators/rails/templates/.keep"]) {
       expect(fs.existsSync(path.join(tmpDir, p))).toBe(true);
     }
