@@ -4,7 +4,7 @@ import { Notifications, isPlainObject as _isPlainObject } from "@blazetrails/act
 import type { Base } from "./base.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { FutureResult, Complete } from "./future-result.js";
-import type { Relation } from "./relation.js";
+import type { FindEachOptions, Relation } from "./relation.js";
 import type { Result } from "./result.js";
 import type { AssociationSpec, JoinSpec } from "./relation/query-methods.js";
 import type { SumBlock } from "./relation/calculations.js";
@@ -711,23 +711,43 @@ export function firstOrInitialize<T extends typeof Base>(
 
 export function findEach<T extends typeof Base>(
   this: T,
-  opts?: Parameters<ReturnType<T["all"]>["findEach"]>[0],
-): ReturnType<ReturnType<T["all"]>["findEach"]> {
-  return this.all().findEach(opts) as ReturnType<ReturnType<T["all"]>["findEach"]>;
+  opts: FindEachOptions,
+  block: (record: InstanceType<T>) => void | Promise<void>,
+): Promise<null>;
+export function findEach<T extends typeof Base>(
+  this: T,
+  opts?: FindEachOptions,
+): AsyncGenerator<InstanceType<T>> & { size(): Promise<number> };
+export function findEach<T extends typeof Base>(
+  this: T,
+  opts?: FindEachOptions,
+  block?: (record: InstanceType<T>) => void | Promise<void>,
+): (AsyncGenerator<InstanceType<T>> & { size(): Promise<number> }) | Promise<null> {
+  return (this.all() as any).findEach(opts, block);
 }
 
 export function findInBatches<T extends typeof Base>(
   this: T,
-  opts?: Parameters<ReturnType<T["all"]>["findInBatches"]>[0],
-): ReturnType<ReturnType<T["all"]>["findInBatches"]> {
-  return this.all().findInBatches(opts) as ReturnType<ReturnType<T["all"]>["findInBatches"]>;
+  opts: FindEachOptions,
+  block: (batch: InstanceType<T>[]) => void | Promise<void>,
+): Promise<null>;
+export function findInBatches<T extends typeof Base>(
+  this: T,
+  opts?: FindEachOptions,
+): AsyncGenerator<InstanceType<T>[]> & { size(): Promise<number> };
+export function findInBatches<T extends typeof Base>(
+  this: T,
+  opts?: FindEachOptions,
+  block?: (batch: InstanceType<T>[]) => void | Promise<void>,
+): (AsyncGenerator<InstanceType<T>[]> & { size(): Promise<number> }) | Promise<null> {
+  return (this.all() as any).findInBatches(opts, block);
 }
 
 export function inBatches<T extends typeof Base>(
   this: T,
   opts: Parameters<ReturnType<T["all"]>["inBatches"]>[0],
   block: (relation: any) => void | Promise<void>,
-): Promise<void>;
+): Promise<null>;
 export function inBatches<T extends typeof Base>(
   this: T,
   opts?: Parameters<ReturnType<T["all"]>["inBatches"]>[0],
@@ -736,7 +756,7 @@ export function inBatches<T extends typeof Base>(
   this: T,
   opts?: Parameters<ReturnType<T["all"]>["inBatches"]>[0],
   block?: (relation: any) => void | Promise<void>,
-): ReturnType<ReturnType<T["all"]>["inBatches"]> | Promise<void> {
+): ReturnType<ReturnType<T["all"]>["inBatches"]> | Promise<null> {
   return (this.all() as any).inBatches(opts, block);
 }
 

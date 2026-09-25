@@ -1050,8 +1050,9 @@ the nearest own descriptor answers, and an own `undefined` value is
 `ActiveModel::AttributeMethods#respond_to?`
 (`activemodel/lib/active_model/attribute_methods.rb:528-533`) makes two `super`
 calls that differ only in it, and dropping it collapses them into one call
-eslint's `no-dupe-else-if` rejects as a dead branch — but its body is
-`void pub;`.
+eslint's `no-dupe-else-if` rejects as a dead branch — and its one reader is
+the unbound-name arm, which hands `!pub` to the receiver's `respondToMissing`
+exactly as `basic_obj_respond_to_missing` does (`vm_method.c:2872-2875`).
 
 This is a genuine language shortcoming, not a preference, and it is ratified
 repo-wide here. `basicObjRespondTo` (`packages/ruby-compat/src/object.ts`) cites

@@ -2,6 +2,7 @@ import { kernelCatch, NoMethodError, RuntimeError } from "@blazetrails/ruby-comp
 
 import { kernelArray } from "./array-utils.js";
 import { ArgumentError } from "./hash-utils.js";
+import { DescendantsTracker, type AnyClass } from "./descendants-tracker.js";
 
 export type CallbackKind = "before" | "after" | "around";
 
@@ -934,22 +935,18 @@ export function getCallbackChains(target: object): Map<string, CallbackChain> {
     if (parent) {
       for (const [name, chain] of parent) {
         const newChain = new CallbackChain(chain.name, chain.config);
-        for (const entry of chain.entries) {
-          newChain.append(
-            new Callback(
-              entry.name,
-              entry.filter,
-              entry.kind,
-              entry.options,
-              newChain.config,
-              entry.originalObject,
-            ),
-          );
-        }
+        newChain.append(...chain.entries);
         own.set(name, newChain);
       }
     }
     t[CALLBACKS] = own;
+    for (
+      let klass = target.constructor as AnyClass;
+      Object.getPrototypeOf(klass) !== Function.prototype;
+      klass = Object.getPrototypeOf(klass) as AnyClass
+    ) {
+      DescendantsTracker.registerSubclass(Object.getPrototypeOf(klass) as AnyClass, klass);
+    }
   }
   return t[CALLBACKS] as Map<string, CallbackChain>;
 }
@@ -1112,9 +1109,15 @@ export namespace Callbacks {
   }
 
   export function resetCallbacks(target: object, name: string): void {
-    const chains = getCallbackChains(target);
-    const chain = chains.get(name);
-    if (chain) chain.clear();
+    const callbacks = getCallbackChains(target).get(name)!;
+    const klass = target.constructor as AnyClass;
+
+    for (const target of DescendantsTracker.descendants(klass)) {
+      const chain = getCallbackChains(target.prototype as object).get(name)!;
+      callbacks.each((c) => chain.delete(c));
+    }
+
+    callbacks.clear();
   }
 
   export const ClassMethods = {

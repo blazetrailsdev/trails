@@ -30,23 +30,19 @@ describe("FinderRespondToTest", () => {
     assertRespondTo(Topic, "toString");
   });
 
-  it.skip("should respond to find by one attribute before caching", () => {
-    // BLOCKED: finder-respond-to-dynamic-finders-invisible-to-in
+  it("should respond to find by one attribute before caching", () => {
     assertRespondTo(Topic, "findByTitle");
   });
 
-  it.skip("should respond to find by with bang", () => {
-    // BLOCKED: finder-respond-to-dynamic-finders-invisible-to-in
-    assertRespondTo(Topic, "findByTitle!");
+  it("should respond to find by with bang", () => {
+    assertRespondTo(Topic, "findByTitleBang");
   });
 
-  it.skip("should respond to find by two attributes", () => {
-    // BLOCKED: finder-respond-to-dynamic-finders-invisible-to-in
+  it("should respond to find by two attributes", () => {
     assertRespondTo(Topic, "findByTitleAndAuthorName");
   });
 
-  it.skip("should respond to find all by an aliased attribute", () => {
-    // BLOCKED: finder-respond-to-dynamic-finders-invisible-to-in
+  it("should respond to find all by an aliased attribute", () => {
     Topic.aliasAttribute("heading", "title");
     assertRespondTo(Topic, "findByHeading");
   });

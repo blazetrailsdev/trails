@@ -830,8 +830,7 @@ describe("ResetCallbackTest", () => {
     expect(events.length).toBe(1);
   });
 
-  it.skip("reset impacts subclasses", () => {
-    // BLOCKED: reset-callbacks-does-not-remove-from-descendants
+  it("reset impacts subclasses", () => {
     const events: unknown[] = [];
     const klass = buildClass(events);
     class Subclass extends klass {

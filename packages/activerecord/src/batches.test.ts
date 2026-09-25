@@ -50,9 +50,9 @@ describe("EachTest", () => {
   });
 
   // BLOCKED: find-each-find-in-batches-block-arm
-  it.skip("each should not return query chain and execute only one query", async () => {
+  it("each should not return query chain and execute only one query", async () => {
     await assertQueriesCount(1, false, async () => {
-      const result = await (Post as any).findEach({ batchSize: 100000 }, () => {});
+      const result = await Post.findEach({ batchSize: 100000 }, () => {});
       expect(result).toBeNull();
     });
   });
@@ -249,14 +249,18 @@ describe("EachTest", () => {
   });
 
   it("find in batches should not use records after yielding them in case original array is modified", async () => {
+    const notAPost = {
+      get id(): never {
+        throw new Error("not_a_post had #id called on it");
+      },
+    };
     await expect(
-      (async () => {
-        for await (const batch of Post.findInBatches({ batchSize: 1 })) {
-          expect(batch).toBeInstanceOf(Array);
-          expect(batch[0]).toBeInstanceOf(Post);
-          batch.splice(0, batch.length);
-        }
-      })(),
+      Post.findInBatches({ batchSize: 1 }, (batch) => {
+        expect(batch).toBeInstanceOf(Array);
+        expect(batch[0]).toBeInstanceOf(Post);
+
+        batch.forEach((_, i) => (batch[i] = notAPost as unknown as Post));
+      }),
     ).resolves.not.toThrow();
   });
 

@@ -8,11 +8,12 @@ interface DynamicMatchersHost {
   reflectOnAggregation?(aggregation: string): unknown;
 }
 
+const matchers = [/^findBy(?!\w*Bang$)([_a-zA-Z]\w*)$/, /^findBy([_a-zA-Z]\w*)Bang$/];
+
 function match(model: DynamicMatchersHost, name: string): string[] | null {
-  if (!name.startsWith("findBy")) return null;
-  const attrPart = name.slice(6);
-  if (!attrPart) return null;
-  const snakePart = attrPart
+  const matched = matchers.map((pattern) => pattern.exec(name)).find((m) => m !== null);
+  if (!matched) return null;
+  const snakePart = matched[1]
     .replace(/^./, (c) => c.toLowerCase())
     .replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
   return snakePart.split("_and_").map((name) => model.attributeAliases?.[name] ?? name);

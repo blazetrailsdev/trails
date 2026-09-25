@@ -5,7 +5,7 @@ import { WhereClause } from "./where-clause.js";
 import { stripThenable } from "./thenable.js";
 import { BatchEnumerator } from "./batches/batch-enumerator.js";
 import type { Base } from "../base.js";
-import type { InBatchesOptions, LoadedRelation, Relation } from "../relation.js";
+import type { FindEachOptions, InBatchesOptions, LoadedRelation, Relation } from "../relation.js";
 import { errorOnIgnoredOrder } from "../active-record.js";
 
 export class Batches {
@@ -14,97 +14,112 @@ export class Batches {
 
   findEach<T extends Base>(
     this: any,
+    opts: FindEachOptions,
+    block: (record: T) => void | Promise<void>,
+  ): Promise<null>;
+  findEach<T extends Base>(
+    this: any,
+    opts?: FindEachOptions,
+  ): AsyncGenerator<T> & { size(): Promise<number> };
+  findEach<T extends Base>(
+    this: any,
     {
-      batchSize = 1000,
       start,
       finish,
-      order,
-      cursor = this.primaryKey,
+      batchSize = 1000,
       errorOnIgnore,
-    }: {
-      batchSize?: number;
-      start?: unknown;
-      finish?: unknown;
-      order?: "asc" | "desc" | ("asc" | "desc")[];
-      cursor?: string | string[];
-      errorOnIgnore?: boolean;
-    } = {},
-  ): AsyncGenerator<T> & { size(): Promise<number> } {
-    const relation = this;
-    const enumerator = (async function* () {
-      for await (const batch of relation.findInBatches({
-        batchSize,
-        start,
-        finish,
-        order,
-        cursor,
-        errorOnIgnore,
-      })) {
-        for (const record of batch as T[]) {
-          yield record;
+      cursor = this.primaryKey,
+      order,
+    }: FindEachOptions = {},
+    block?: (record: T) => void | Promise<void>,
+  ): (AsyncGenerator<T> & { size(): Promise<number> }) | Promise<null> {
+    if (block) {
+      return this.findInBatches(
+        { start, finish, batchSize, errorOnIgnore, cursor, order },
+        async (records: T[]) => {
+          for (const record of records) await block(record);
+        },
+      );
+    } else {
+      const relation = this;
+      const enumerator = (async function* () {
+        for await (const records of relation.findInBatches({
+          start,
+          finish,
+          batchSize,
+          errorOnIgnore,
+          cursor,
+          order,
+        })) {
+          yield* records as T[];
         }
-      }
-    })() as AsyncGenerator<T> & { size(): Promise<number> };
-    enumerator.size = async (): Promise<number> => {
-      cursor = Array(cursor);
-      return applyLimits(relation, cursor, start, finish, buildBatchOrders(cursor, order)).size();
-    };
-    return enumerator;
+      })() as AsyncGenerator<T> & { size(): Promise<number> };
+      enumerator.size = async (): Promise<number> => {
+        cursor = Array(cursor);
+        return applyLimits(relation, cursor, start, finish, buildBatchOrders(cursor, order)).size();
+      };
+      return enumerator;
+    }
   }
 
   findInBatches<T extends Base>(
     this: any,
+    opts: FindEachOptions,
+    block: (batch: T[]) => void | Promise<void>,
+  ): Promise<null>;
+  findInBatches<T extends Base>(
+    this: any,
+    opts?: FindEachOptions,
+  ): AsyncGenerator<T[]> & { size(): Promise<number> };
+  findInBatches<T extends Base>(
+    this: any,
     {
-      batchSize = 1000,
       start,
       finish,
-      order,
-      cursor = this.primaryKey,
+      batchSize = 1000,
       errorOnIgnore,
-    }: {
-      batchSize?: number;
-      start?: unknown;
-      finish?: unknown;
-      order?: "asc" | "desc" | ("asc" | "desc")[];
-      cursor?: string | string[];
-      errorOnIgnore?: boolean;
-    } = {},
-  ): AsyncGenerator<T[]> & { size(): Promise<number> } {
+      cursor = this.primaryKey,
+      order,
+    }: FindEachOptions = {},
+    block?: (batch: T[]) => void | Promise<void>,
+  ): (AsyncGenerator<T[]> & { size(): Promise<number> }) | Promise<null> {
     const relation = this;
-    const size = async (): Promise<number> => {
-      cursor = Array(cursor);
-      const total = await applyLimits(
-        relation,
-        cursor,
-        start,
-        finish,
-        buildBatchOrders(cursor, order),
-      ).size();
-      return Math.floor((total - 1) / batchSize) + 1;
-    };
-    const enumerator = (async function* () {
-      const enumerator = relation.inBatches({
-        of: batchSize,
-        start,
-        finish,
-        load: true,
-        errorOnIgnore,
-        cursor,
-        order,
-      });
-      for await (const batchRel of enumerator._generator()) {
-        yield (batchRel._records ?? []) as T[];
-      }
-    })() as AsyncGenerator<T[]> & { size(): Promise<number> };
-    enumerator.size = size;
-    return enumerator;
+    if (!block) {
+      const size = async (): Promise<number> => {
+        cursor = Array(cursor);
+        const total = await applyLimits(
+          relation,
+          cursor,
+          start,
+          finish,
+          buildBatchOrders(cursor, order),
+        ).size();
+        return Math.floor((total - 1) / batchSize) + 1;
+      };
+      const enumerator = (async function* () {
+        for await (const batch of relation
+          .inBatches({ of: batchSize, start, finish, load: true, errorOnIgnore, cursor, order })
+          ._generator()) {
+          yield (await batch.toArray()) as T[];
+        }
+      })() as AsyncGenerator<T[]> & { size(): Promise<number> };
+      enumerator.size = size;
+      return enumerator;
+    }
+
+    return relation.inBatches(
+      { of: batchSize, start, finish, load: true, errorOnIgnore, cursor, order },
+      async (batch: LoadedRelation<Relation<T>>) => {
+        await block(await batch.toArray());
+      },
+    );
   }
 
   inBatches<T extends Base>(
     this: any,
     opts: InBatchesOptions,
     block: (relation: LoadedRelation<Relation<T>>) => void | Promise<void>,
-  ): Promise<void>;
+  ): Promise<null>;
   inBatches<T extends Base>(
     this: any,
     opts?: InBatchesOptions,
@@ -122,7 +137,7 @@ export class Batches {
       useRanges,
     }: InBatchesOptions = {},
     block?: (relation: LoadedRelation<Relation<T>>) => void | Promise<void>,
-  ): BatchEnumerator<LoadedRelation<Relation<T>>> | Promise<void> {
+  ): BatchEnumerator<LoadedRelation<Relation<T>>> | Promise<null> {
     const self = this;
     const cursor = Array(cursorOption ?? this.primaryKey).map(String);
     const ensureValidOptions = () =>
@@ -237,6 +252,7 @@ export class Batches {
         for await (const batchRelation of generator()) {
           await block(batchRelation);
         }
+        return null;
       })();
     }
 

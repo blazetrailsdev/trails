@@ -5,6 +5,7 @@ import {
   Exception,
   RbConfig,
   StandardError,
+  basicObjRespondTo,
   Tempfile,
   env,
   getChildProcess,
@@ -434,9 +435,10 @@ function respondsTo(object: object, name: string): boolean {
     if (descriptor && "value" in descriptor && descriptor.value === undefined) return false;
     return !(descriptor && descriptor.set !== undefined && descriptor.get === undefined);
   }
-  if (!name.endsWith("=")) return false;
-  const descriptor = findDescriptor(object, name.slice(0, -1));
-  return descriptor?.set !== undefined;
+  if (name.endsWith("=") && findDescriptor(object, name.slice(0, -1))?.set !== undefined) {
+    return true;
+  }
+  return basicObjRespondTo(object, name);
 }
 
 function findDescriptor(object: object, name: string): PropertyDescriptor | undefined {
