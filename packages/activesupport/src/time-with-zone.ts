@@ -20,7 +20,7 @@ import { zone as timeZone, findZone, findZoneBang } from "./time-zone-config.js"
 import { DateTime, Temporal } from "@blazetrails/date";
 import { instantFrom } from "./temporal.js";
 import { Time } from "@blazetrails/date";
-import { Rational, rational, rbInspect } from "@blazetrails/ruby-compat";
+import { Rational, rational, rbEqual, rbInspect } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "./hash-utils.js";
 import { Encoding } from "./json/encoding.js";
 import { DATE_FORMATS, toFs } from "./core-ext/time/conversions.js";
@@ -149,7 +149,7 @@ export class TimeWithZone {
   }
 
   private get _zoned(): Temporal.ZonedDateTime {
-    return this.utc().toTime().toInstant().toZonedDateTimeISO(this._timeZone.tzinfo.identifier);
+    return this.localtime(this.utcOffset).toTime();
   }
 
   private get _epochMs(): number {
@@ -300,17 +300,7 @@ export class TimeWithZone {
   }
 
   isUtc(): boolean {
-    const tz = this._timeZone.tzinfo.identifier;
-    return (
-      this.utcOffset === 0 &&
-      (tz === "Etc/UTC" ||
-        tz === "UTC" ||
-        tz === "UCT" ||
-        tz === "Etc/UCT" ||
-        tz === "Etc/Universal" ||
-        tz === "Universal" ||
-        this._timeZone.name === "UTC")
-    );
+    return this.zone === "UTC" || this.zone === "UCT";
   }
 
   isGmt(): boolean {
@@ -327,16 +317,16 @@ export class TimeWithZone {
     millisecond: number;
     nsec: number;
   } {
-    const z = this._zoned;
+    const t = this.time;
     return {
-      year: z.year,
-      month: z.month,
-      day: z.day,
-      hour: z.hour,
-      minute: z.minute,
-      second: z.second,
-      millisecond: z.millisecond,
-      nsec: z.millisecond * 1_000_000 + z.microsecond * 1_000 + z.nanosecond,
+      year: t.year,
+      month: t.mon,
+      day: t.day,
+      hour: t.hour,
+      minute: t.min,
+      second: t.sec,
+      millisecond: Math.floor(t.nsec / 1_000_000),
+      nsec: t.nsec,
     };
   }
 
@@ -475,8 +465,8 @@ export class TimeWithZone {
       if (!currentZone) return this;
       newZone = currentZone;
     }
+    if (rbEqual(this._timeZone, newZone)) return this;
     const tz = findZoneBang(newZone) as TimeZone;
-    if (tz.tzinfo.identifier === this._timeZone.tzinfo.identifier) return this;
     return new TimeWithZone(this._zoned.toInstant(), tz);
   }
 

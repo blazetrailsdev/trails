@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { TimeWithZone } from "./time-with-zone.js";
-import { TimeZone } from "./values/time-zone.js";
+import { TimeZone, Timezone } from "./values/time-zone.js";
 import { Temporal, Time } from "@blazetrails/date";
 import { DATE_FORMATS } from "./core-ext/time/conversions.js";
 import { Range } from "@blazetrails/ruby-compat/range";
@@ -153,5 +153,19 @@ describe("TimeWithZone Comparable", () => {
     expect(() => twz.isBefore("foo")).toThrow(message);
     expect(() => twz.isAfter("foo")).toThrow(message);
     expect(() => twz.isBetween("foo", "bar")).toThrow(message);
+  });
+});
+
+describe("TimeWithZone built with a TZInfo Timezone", () => {
+  const twz = () =>
+    new TimeWithZone(Time.utc(2000, 1, 1, 0), Timezone.get("America/New_York") as never);
+
+  it("inspect reads the zone through its protocol", () => {
+    expect(twz().inspect()).toBe("1999-12-31 19:00:00.000000000 EST -05:00");
+  });
+
+  it("utc? answers from the zone abbreviation", () => {
+    expect(twz().isUtc()).toBe(false);
+    expect(new TimeWithZone(Time.utc(2000), Timezone.get("Etc/UTC") as never).isUtc()).toBe(true);
   });
 });
