@@ -340,6 +340,9 @@ export async function runFetch(
   }
 
   if (opts.ref !== undefined) {
+    if (opts.sourceFilter === undefined) {
+      throw new Error("--ref needs --source: a candidate is fetched for one source at a time");
+    }
     const [source] = targets;
     if (versionDir(opts.ref) !== activeVersion(source)) {
       await fetchCandidate(source, opts.ref, { refresh: opts.refresh ?? false });

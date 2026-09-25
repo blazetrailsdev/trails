@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
-import { fetchCandidate, fetchSource, parseArgs, pruneSource } from "./fetch.js";
+import { fetchCandidate, fetchSource, parseArgs, pruneSource, runFetch } from "./fetch.js";
 import {
   libEntryFilesManifest,
   libPathsManifest,
@@ -148,6 +148,10 @@ describe("vendor/fetch.ts parseArgs", () => {
   it("--ref <ref> needs --source", () => {
     expect(parseArgs(["--source", "rails", "--ref", "v8.1.0"]).ref).toBe("v8.1.0");
     expect(() => parseArgs(["--ref", "v8.1.0"])).toThrow(/--ref needs --source/);
+  });
+
+  it("runFetch refuses a ref with no source filter", async () => {
+    await expect(runFetch({ ref: "v8.1.0" })).rejects.toThrow(/--ref needs --source/);
   });
 
   it("--prune sets the flag and refuses --ref", () => {
