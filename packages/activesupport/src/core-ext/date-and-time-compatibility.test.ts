@@ -66,7 +66,7 @@ describe("DateAndTimeCompatibilityTest", () => {
     await withPreserveTimezone(true, () =>
       withEnvTz("US/Eastern", () => {
         const source = new RubyTime(2016, 4, 23, 15, 11, 12, 3600);
-        const time = toTime(source);
+        const time = source.toTime();
 
         expect(time).toBeInstanceOf(RubyTime);
         expect(getutc(time.toZonedDateTime()).epochNanoseconds).toEqual(
@@ -82,7 +82,7 @@ describe("DateAndTimeCompatibilityTest", () => {
     await withPreserveTimezone(false, () =>
       withEnvTz("US/Eastern", () => {
         const source = new RubyTime(2016, 4, 23, 15, 11, 12, 3600);
-        const time = toTime(source);
+        const time = source.toTime();
 
         expect(time).toBeInstanceOf(RubyTime);
         expect(getutc(time.toZonedDateTime()).epochNanoseconds).toEqual(
@@ -98,11 +98,11 @@ describe("DateAndTimeCompatibilityTest", () => {
     await withPreserveTimezone(null, async () => {
       await withEnvTz("US/Eastern", async () => {
         const source = new RubyTime(2016, 4, 23, 15, 11, 12);
-        const baseTime = toTime(source);
+        const baseTime = source.toTime();
 
         const utcTimeValue = baseTime.getutc();
         const convertedTime: RubyTime = await assertDeprecated(deprecator(), () =>
-          toTime(utcTimeValue),
+          utcTimeValue.toTime(),
         );
 
         expect(baseTime.toZonedDateTime().epochNanoseconds).toEqual(
@@ -119,11 +119,11 @@ describe("DateAndTimeCompatibilityTest", () => {
     await withPreserveTimezone(null, async () => {
       await withEnvTz("US/Eastern", async () => {
         const source = new RubyTime(2016, 11, 23, 15, 11, 12);
-        const baseTime = toTime(source);
+        const baseTime = source.toTime();
 
         const utcTimeValue = baseTime.getutc();
         const convertedTime: RubyTime = await assertDeprecated(deprecator(), () =>
-          toTime(utcTimeValue),
+          utcTimeValue.toTime(),
         );
 
         expect(baseTime.toZonedDateTime().epochNanoseconds).toEqual(
@@ -143,7 +143,7 @@ describe("DateAndTimeCompatibilityTest", () => {
       await withEnvTz("US/Eastern", async () => {
         const foreignTime = new RubyTime(2016, 4, 23, 15, 11, 12, "-0700");
         const convertedTime: RubyTime = await assertDeprecated(deprecator(), () =>
-          toTime(foreignTime),
+          foreignTime.toTime(),
         );
 
         expect(convertedTime.toZonedDateTime().epochNanoseconds).toEqual(
@@ -158,7 +158,7 @@ describe("DateAndTimeCompatibilityTest", () => {
       await withEnvTz("US/Eastern", async () => {
         const foreignTime = new RubyTime(2016, 11, 23, 15, 11, 12, "-0700");
         const convertedTime: RubyTime = await assertDeprecated(deprecator(), () =>
-          toTime(foreignTime),
+          foreignTime.toTime(),
         );
 
         expect(convertedTime.toZonedDateTime().epochNanoseconds).toEqual(
@@ -208,7 +208,7 @@ describe("DateAndTimeCompatibilityTest", () => {
     await withPreserveTimezone(true, () =>
       withEnvTz("US/Eastern", () => {
         const source = Object.freeze(new RubyTime(2016, 4, 23, 15, 11, 12, 3600)) as RubyTime;
-        const time = toTime(source);
+        const time = source.toTime();
 
         expect(time).toBeInstanceOf(RubyTime);
         expect(getutc(time.toZonedDateTime()).epochNanoseconds).toEqual(
@@ -225,7 +225,7 @@ describe("DateAndTimeCompatibilityTest", () => {
     await withPreserveTimezone(false, () =>
       withEnvTz("US/Eastern", () => {
         const source = Object.freeze(new RubyTime(2016, 4, 23, 15, 11, 12, 3600)) as RubyTime;
-        const time = toTime(source);
+        const time = source.toTime();
 
         expect(time).toBeInstanceOf(RubyTime);
         expect(getutc(time.toZonedDateTime()).epochNanoseconds).toEqual(

@@ -7,9 +7,9 @@ export interface DateTime extends Timezone {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class DateTime extends ActiveModelDateTime {
-  constructor(options?: TimezoneOptions) {
-    super(options);
-    this._timezone = options?.timezone;
+  constructor({ timezone, ...kwargs }: TimezoneOptions = {}) {
+    super(kwargs);
+    this._timezone = timezone;
   }
 }
 

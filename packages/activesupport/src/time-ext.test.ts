@@ -417,13 +417,13 @@ describe("TimeExtCalculationsTest", () => {
 
   it("to datetime", () => {
     const t = new RubyTime(2005, 2, 4, 10, 10, 10, 3600);
-    const result = toTime(t);
+    const result = t.toTime();
     expect(result.toZonedDateTime().epochNanoseconds).toBe(t.toZonedDateTime().epochNanoseconds);
   });
 
   it("to time", () => {
     const t = new RubyTime(2005, 2, 4, 10, 10, 10, 3600);
-    const result = toTime(t);
+    const result = t.toTime();
     expect(result.toZonedDateTime().epochNanoseconds).toBe(t.toZonedDateTime().epochNanoseconds);
   });
 

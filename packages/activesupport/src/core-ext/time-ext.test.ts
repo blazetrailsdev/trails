@@ -40,7 +40,6 @@ import {
   prevYear,
 } from "../time-ext.js";
 import { toFs, DATE_FORMATS, formattedOffset } from "./time/conversions.js";
-import { toTime } from "./time/compatibility.js";
 import {
   lastQuarter,
   isFuture,
@@ -1567,11 +1566,11 @@ describe("TimeExtCalculationsTest", () => {
 
   it("to time", () => {
     withEnvTz("US/Eastern", () => {
-      expect(toTime(RubyTime.local(2005, 2, 21, 17, 44, 30)).constructor).toBe(RubyTime);
-      expect(toTime(RubyTime.local(2005, 2, 21, 17, 44, 30))).toEqual(
+      expect(RubyTime.local(2005, 2, 21, 17, 44, 30).toTime().constructor).toBe(RubyTime);
+      expect(RubyTime.local(2005, 2, 21, 17, 44, 30).toTime()).toEqual(
         RubyTime.local(2005, 2, 21, 17, 44, 30),
       );
-      expect(toTime(RubyTime.local(2005, 2, 21, 17, 44, 30)).utcOffset).toBe(
+      expect(RubyTime.local(2005, 2, 21, 17, 44, 30).toTime().utcOffset).toBe(
         RubyTime.local(2005, 2, 21, 17, 44, 30).utcOffset,
       );
     });
