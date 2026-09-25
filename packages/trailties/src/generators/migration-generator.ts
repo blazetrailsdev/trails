@@ -138,6 +138,9 @@ function referenceOpts(col: ParsedColumn): string {
 }
 
 function columnLine(col: ParsedColumn): string {
+  if (col.name === "password" && col.type === "digest") {
+    return `      t.string("password_digest"${columnOptsObj(col)});`;
+  }
   if (isReference(col.type)) {
     return `      t.references("${col.name}", ${referenceOpts(col)});`;
   }
