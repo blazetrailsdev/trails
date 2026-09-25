@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Dir } from "./dir.js";
@@ -89,5 +97,28 @@ describe("Dir", () => {
     expect(Dir.foreach(root, (filename) => yielded.push(filename))).toBe(null);
     expect(yielded.slice(0, 2)).toEqual([".", ".."]);
     expect(yielded.slice(2).sort()).toEqual(Dir.children(root).sort());
+  });
+});
+
+describe("Dir.mktmpdir", () => {
+  it("creates a 0700 directory named by Dir::Tmpname.create and answers its path", () => {
+    // vendor/ruby/lib/tmpdir.rb:91-111
+    const path = Dir.mktmpdir(["tmp", "cache"]);
+    try {
+      expect(path.startsWith(join(Dir.tmpdir(), "tmp"))).toBe(true);
+      expect(path.endsWith("cache")).toBe(true);
+      expect(statSync(path).isDirectory()).toBe(true);
+      expect(statSync(path).mode & 0o777).toBe(0o700);
+    } finally {
+      rmSync(path, { recursive: true, force: true });
+    }
+  });
+
+  it("removes the directory after yielding it to a block", () => {
+    const path = Dir.mktmpdir(null, (dir) => {
+      writeFileSync(join(dir, "f"), "");
+      return dir;
+    });
+    expect(existsSync(path)).toBe(false);
   });
 });
