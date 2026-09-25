@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { pack } from "@blazetrails/ruby-compat";
 import { Coder } from "./coder.js";
 import { coder } from "./coder.js";
 import { Entry } from "./entry.js";
@@ -21,8 +22,12 @@ const Compressor = { deflate, inflate };
 
 const STRING = "x".repeat(100);
 const COMPRESSIBLE_VALUES: unknown[] = [{ string: STRING }, STRING];
-const VALUES: unknown[] = [null, true, 1, "", "ümlaut", ...COMPRESSIBLE_VALUES];
-const VERSIONS: (string | null)[] = [null, "", "ümlaut", "x".repeat(256)];
+const BYTES = pack(
+  Array.from({ length: 256 }, (_, i) => i),
+  "C*",
+);
+const VALUES: unknown[] = [null, true, 1, "", "ümlaut", BYTES, ...COMPRESSIBLE_VALUES];
+const VERSIONS: (string | null)[] = [null, "", "ümlaut", BYTES, "x".repeat(256)];
 const EXPIRIES: (number | null)[] = [null, 0, 100 * 365 * 24 * 3600];
 
 const ENTRIES = VALUES.flatMap((value) =>
