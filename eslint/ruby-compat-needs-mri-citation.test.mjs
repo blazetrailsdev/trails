@@ -3,6 +3,7 @@ import * as os from "os";
 import * as path from "path";
 import { RuleTester } from "eslint";
 import rule from "./ruby-compat-needs-mri-citation.mjs";
+import { versionDir } from "../vendor/sources.ts";
 
 // A stand-in for `vendor/ruby/` at the pinned SHA: one file, 20 lines. Reading
 // the real (fetched, uncommitted) tree would make the outcome depend on whether
@@ -28,7 +29,10 @@ const withoutVendorTree = new RuleTester({
   settings: { rubyCompatVendorRoot: null },
 });
 
-const cite = (line) => `vendor/ruby/rational.c:${line}`;
+const lockfile = new URL("../vendor/sources.lock.json", import.meta.url);
+const version = versionDir(JSON.parse(fs.readFileSync(lockfile, "utf8")).sources.ruby.ref);
+
+const cite = (line) => `vendor/ruby/${version}/rational.c:${line}`;
 
 tester.run("ruby-compat-needs-mri-citation", rule, {
   valid: [
@@ -58,6 +62,12 @@ export function add(a: number, b: number): number { return a + b + x; }`,
  * @noRailsEquivalent PERMANENT
  */
 export default class Rational {}`,
+    `/**
+ * Mirrors vendor/ruby/rational.c:12.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function add(a: number, b: number): number { return a + b; }`,
     // Not exported, and an interface: neither is measured surface.
     `function add(a: number, b: number): number { return a + b; }`,
     `export interface Rational { numerator: number; }`,
@@ -98,12 +108,44 @@ export function add(a: number, b: number): number { return a + b; }`,
     },
     {
       code: `/**
+ * Mirrors vendor/ruby/${version}/nosuch.c:3.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function add(a: number, b: number): number { return a + b; }`,
+      errors: [{ messageId: "unknownFile" }],
+    },
+    {
+      code: `/**
  * Mirrors vendor/ruby/nosuch.c:3.
  *
  * @noRailsEquivalent PERMANENT
  */
 export function add(a: number, b: number): number { return a + b; }`,
       errors: [{ messageId: "unknownFile" }],
+    },
+    {
+      code: `/**
+ * Mirrors vendor/ruby/v0.0.1/rational.c:12.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function add(a: number, b: number): number { return a + b; }`,
+      errors: [
+        {
+          messageId: "staleVersion",
+          data: { name: "add", cited: "v0.0.1", rel: "rational.c", version },
+        },
+      ],
+    },
+    {
+      code: `/**
+ * Mirrors ${cite(12)} and vendor/ruby/v0.0.1/rational.c:12.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function add(a: number, b: number): number { return a + b; }`,
+      errors: [{ messageId: "staleVersion" }],
     },
     {
       code: `export default class Rational {}`,
@@ -117,6 +159,12 @@ withoutVendorTree.run("ruby-compat-needs-mri-citation (vendor/ruby absent)", rul
     `export function add(a: number, b: number): number { return a + b; }`,
     `/**
  * Mirrors vendor/ruby/nosuch.c:3.
+ */
+export class Rational {}`,
+    `/**
+ * Mirrors vendor/ruby/v0.0.1/rational.c:3.
+ *
+ * @noRailsEquivalent PERMANENT
  */
 export class Rational {}`,
   ],
