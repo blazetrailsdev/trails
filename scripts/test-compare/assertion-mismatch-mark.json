@@ -27,7 +27,7 @@
     },
     "activerecord": {
       "assertionCount": 0,
-      "kind": 5,
+      "kind": 4,
       "value": 1
     },
     "activesupport": {
@@ -83,7 +83,7 @@
     "trailties": {
       "assertionCount": 46,
       "kind": 72,
-      "value": 4
+      "value": 0
     }
   }
 }

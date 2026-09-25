@@ -25,6 +25,33 @@ describe("assertionValueMismatch", () => {
     ).toEqual([{ kind: "equal", rails: ["s:short"], trails: ["s:long"] }]);
   });
 
+  it("folds a TOKEN_RENAMES file extension onto its trails spelling", () => {
+    expect(
+      assertionValueMismatch(
+        ["assert_equal"],
+        ["s:called from x at /path/to/template.html.erb:2"],
+        ["toEqual"],
+        ["s:called from x at /path/to/template.html.tse:2"],
+        false,
+      ),
+    ).toBeNull();
+    expect(
+      assertionValueMismatch(
+        ["assert_equal"],
+        ["s:/path/to/template.html.erb"],
+        ["toEqual"],
+        ["s:/path/to/template.html.haml"],
+        false,
+      ),
+    ).toEqual([
+      {
+        kind: "equal",
+        rails: ["s:/path/to/template.html.tse"],
+        trails: ["s:/path/to/template.html.haml"],
+      },
+    ]);
+  });
+
   it("folds a snake_case attribute-name literal onto its camelCase spelling", () => {
     expect(
       assertionValueMismatch(

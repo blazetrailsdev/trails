@@ -33,6 +33,7 @@
 // value counter cannot rise for that shape, with no exclusion list needed. See
 // the regression test in assertion-values.test.ts.
 
+import { TOKEN_RENAMES } from "@blazetrails/parity/conventions";
 import { normalizeRailsKind, normalizeTrailsKind, type CanonicalKind } from "./assertion-kinds.js";
 
 /**
@@ -110,7 +111,11 @@ function collectSide(
     if (value != null) {
       if (LOOSE_RAILS_KINDS.has(kinds[i])) entry.loose.add(entry.captured.length);
       const token = foldSymbolToken(value);
-      entry.captured.push(foldNameToken(side === "trails" ? foldDumpStatementToken(token) : token));
+      entry.captured.push(
+        foldRenamedExtensionToken(
+          foldNameToken(side === "trails" ? foldDumpStatementToken(token) : token),
+        ),
+      );
     }
   }
   return map;
@@ -184,6 +189,27 @@ function foldNameToken(token: string): string {
   return `s:${text.replace(SNAKE_IDENTIFIER_RE, (name) =>
     name.replace(/_([a-z0-9])/g, (_, ch: string) => ch.toUpperCase()),
   )}`;
+}
+
+/**
+ * Fold a file extension `TOKEN_RENAMES` renames onto its trails spelling:
+ * `/path/to/template.html.erb` is `/path/to/template.html.tse` in trails
+ * (CLAUDE.md: trails spells `tse`, never `erb`), as
+ * `activesupport/test/deprecation_test.rb:797`'s expected message is in
+ * `deprecation.test.ts`. That is the repo's token rename, not a fidelity
+ * divergence. Applied to BOTH sides, like foldNameToken, so it can only merge
+ * tokens, never split them.
+ */
+const RENAMED_EXTENSION_RE = new RegExp(
+  `\\.(${Object.keys(TOKEN_RENAMES)
+    .sort((a, b) => b.length - a.length)
+    .join("|")})\\b`,
+  "g",
+);
+
+function foldRenamedExtensionToken(token: string): string {
+  if (!token.startsWith("s:")) return token;
+  return `s:${token.slice(2).replace(RENAMED_EXTENSION_RE, (_m, tok: string) => `.${TOKEN_RENAMES[tok]}`)}`;
 }
 
 /**
