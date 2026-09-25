@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ArgumentError } from "./argument-error.js";
 import { TypeError } from "./type-error.js";
-import { aryDelete, aryPop, arySlice, compact, pack, toA, uniq } from "./array.js";
+import { aryDelete, aryPop, arySlice, compact, pack, sort, toA, uniq } from "./array.js";
 
 describe("Array#pack", () => {
   const long = "a".repeat(100);
@@ -178,5 +178,22 @@ describe("aryPop", () => {
 
   it("raises for a negative count", () => {
     expect(() => aryPop([1], -1)).toThrow("negative array size");
+  });
+});
+
+describe("Array#sort", () => {
+  it("orders by <=> and leaves the receiver alone", () => {
+    const ary = [3, 1, 2, 1];
+    expect(sort(ary)).toEqual([1, 1, 2, 3]);
+    expect(sort(["b", "c", "a"])).toEqual(["a", "b", "c"]);
+    expect(ary).toEqual([3, 1, 2, 1]);
+  });
+
+  it("raises ArgumentError naming both classes when <=> is nil", () => {
+    class A {}
+    expect(() => sort([1, new A()])).toThrow(
+      new ArgumentError("comparison of Integer with A failed"),
+    );
+    expect(() => sort(["a", 1])).toThrow(new ArgumentError("comparison of String with 1 failed"));
   });
 });

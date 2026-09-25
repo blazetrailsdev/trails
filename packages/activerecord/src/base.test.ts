@@ -57,7 +57,7 @@ import { Bird } from "./test-helpers/models/bird.js";
 import { LoosePerson, LooseDescendant } from "./test-helpers/models/person.js";
 import "./support/canonical-model-index.js";
 import { MultiparameterAssignmentErrors, type AttributeAssignmentError } from "./errors.js";
-import { Range as ArRange, RuntimeError } from "@blazetrails/ruby-compat";
+import { Range as ArRange, RuntimeError, sort } from "@blazetrails/ruby-compat";
 import { raiseOnAssignToAttrReadonly, setRaiseOnAssignToAttrReadonly } from "./active-record.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -770,15 +770,7 @@ describe("BasicsTest", async () => {
     const first = (await topics("first")) as any;
     const welcome = await posts("welcome");
     await assertRaises([ArgumentError], {}, () => {
-      [first, welcome].sort((a: any, b: any) => {
-        const result = a.compare(b);
-        if (result === undefined) {
-          throw new ArgumentError(
-            `comparison of ${a.constructor.name} with ${b.constructor.name} failed`,
-          );
-        }
-        return result;
-      });
+      sort([first, welcome]);
     });
   });
 
@@ -808,12 +800,7 @@ describe("BasicsTest", async () => {
   it("comparison with different objects in array", async () => {
     const topic = (await Topic.create()) as any;
     await assertRaises([ArgumentError], {}, () => {
-      [1, topic].sort((a: any, b: any) => {
-        const result = typeof b === "number" ? undefined : b.compare(a);
-        if (result === undefined)
-          throw new ArgumentError("comparison of Integer with Topic failed");
-        return result;
-      });
+      sort([1, topic]);
     });
   });
 
