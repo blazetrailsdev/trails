@@ -2,6 +2,7 @@ import {
   extend,
   fetch,
   hasKey,
+  isModuleIncluded,
   rbInspect,
   rbObjClass,
   rbObjRespondTo,
@@ -10,7 +11,7 @@ import {
   transformValues,
 } from "@blazetrails/ruby-compat";
 import * as Arel from "@blazetrails/arel";
-import { Nodes, SelectManager, Table as ArelTable } from "@blazetrails/arel";
+import { Nodes, Predications, SelectManager, Table as ArelTable } from "@blazetrails/arel";
 import {
   ArgumentError,
   Attribute,
@@ -41,6 +42,7 @@ import {
   foreignKey,
   included,
   isBlank,
+  kernelArray,
   rbEqual,
   rbHash,
   wrap,
@@ -1630,12 +1632,12 @@ export function buildCaseForValuePosition(
 /** @internal */
 export function resolveArelAttributes(this: QueryMethodsHost, attrs: unknown[]): unknown[] {
   return attrs.flatMap((attr) => {
-    if (typeof (attr as any)?.eq === "function") {
+    if (attr != null && isModuleIncluded((attr as object).constructor, Predications)) {
       return [attr];
     } else if (isPlainObject(attr)) {
       return Object.entries(attr).flatMap(([table, columns]) => {
         table = String(table);
-        return wrap(columns).map((column) =>
+        return kernelArray(columns).map((column) =>
           this.predicateBuilder.resolveArelAttribute(table, String(column)),
         );
       });

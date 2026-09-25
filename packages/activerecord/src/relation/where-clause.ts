@@ -1,7 +1,7 @@
 import { extractBang, rbEqual } from "@blazetrails/activesupport";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { isModuleIncluded, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
-import { Nodes, fetchAttribute, sql } from "@blazetrails/arel";
+import { Nodes, Predications, fetchAttribute, sql } from "@blazetrails/arel";
 import { ArgumentError, Attribute as ModelAttribute } from "@blazetrails/activemodel";
 
 export class WhereClause {
@@ -139,14 +139,18 @@ export class WhereClause {
   /** @internal */
   private exceptPredicates(columns: unknown[]): (Nodes.Node | string)[] {
     const attrs = extractBang(columns, (node) => node instanceof Nodes.Attribute);
-    const nonAttrs = extractBang(columns, (node) => typeof (node as any)?.eq === "function");
+    const nonAttrs = extractBang(
+      columns,
+      (node) => node != null && isModuleIncluded((node as object).constructor, Predications),
+    );
 
     return this.predicates.filter(
       (node) =>
         !(
           (nonAttrs.length !== 0 &&
           isEqualityNode(node) &&
-          typeof (node as any).left?.eq === "function"
+          (node as any).left != null &&
+          isModuleIncluded((node as any).left.constructor, Predications)
             ? nonAttrs.some((nonAttr) => rbEqual(nonAttr, (node as any).left))
             : undefined) ||
           fetchAttribute(
@@ -182,7 +186,7 @@ export class WhereClause {
       let attr: Nodes.Attribute | Nodes.Node | null = extractAttribute(node);
       if (!attr && isEqualityNode(node)) {
         const left = (node as any).left;
-        if (left && typeof left.eq === "function") attr = left;
+        if (left != null && isModuleIncluded(left.constructor, Predications)) attr = left;
       }
       if (attr) fn(attr, node);
     }
