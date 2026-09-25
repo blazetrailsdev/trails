@@ -211,7 +211,7 @@ async function collectModels(dir: string, root: boolean, out: (typeof Base)[]): 
       await collectModels(full, false, out);
       continue;
     }
-    if (!/\.(?:ts|js)$/.test(entry) || /\.(?:test|d)\.ts$/.test(entry)) continue;
+    if (!/\.(?:ts|js)$/.test(entry) || /\.d\.ts$/.test(entry)) continue;
     const mod = (await import(p.pathToFileURL(full).href)) as Record<string, unknown>;
     for (const value of Object.values(mod)) {
       if (

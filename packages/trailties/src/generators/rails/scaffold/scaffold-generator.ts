@@ -128,7 +128,7 @@ function indexView(plural: string, singular: string, cols: Col[]): string {
   const cells = cols.map((c) => `          <td><%= ${singular}.${c.name} %></td>`).join("\n");
   return `<h1>${pluralize(humanize(singular))}</h1>
 
-<p><a href="/${plural}/new">New ${humanize(singular)}</a></p>
+<p><a href="/${plural}/new">New ${humanize(singular).toLowerCase()}</a></p>
 
 <table>
   <thead>
@@ -169,7 +169,7 @@ ${fields}
 }
 
 function newView(singular: string, plural: string): string {
-  return `<h1>New ${humanize(singular)}</h1>
+  return `<h1>New ${humanize(singular).toLowerCase()}</h1>
 
 <%= yield %>
 
@@ -178,7 +178,7 @@ function newView(singular: string, plural: string): string {
 }
 
 function editView(singular: string, plural: string): string {
-  return `<h1>Edit ${humanize(singular)}</h1>
+  return `<h1>Edit ${humanize(singular).toLowerCase()}</h1>
 
 <%= yield %>
 
