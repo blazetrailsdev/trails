@@ -2,6 +2,7 @@ import {
   extend,
   fetch,
   hasKey,
+  rbInspect,
   rbObjClass,
   rbObjRespondTo,
   RuntimeError,
@@ -1119,40 +1120,8 @@ function reverseOrder(this: QueryMethodsHost): any {
 }
 
 function reverseOrderBang(this: QueryMethodsHost): any {
-  const clauses = this.orderValues.filter(
-    (clause) => clause != null && !(typeof clause === "string" && /^\s*$/.test(clause)),
-  );
-  if (clauses.length === 0) {
-    this.orderValues = reverseSqlOrder.call(this, []) as typeof this.orderValues;
-    return this;
-  }
-  this.orderValues = clauses.map((clause) => {
-    if (clause instanceof Nodes.Node) {
-      if (clause instanceof Nodes.SqlLiteral) {
-        const raw = String((clause as any).value ?? "").trim();
-        if (isDoesNotSupportReverse(raw)) {
-          throw new IrreversibleOrderError(
-            `Order ${JSON.stringify(raw)} cannot be reversed automatically`,
-          );
-        }
-        const flipped = raw
-          .split(",")
-          .map((term) => {
-            const s = term.trim();
-            if (/\s+ASC$/i.test(s)) return s.replace(/\s+ASC$/i, " DESC");
-            if (/\s+DESC$/i.test(s)) return s.replace(/\s+DESC$/i, " ASC");
-            return `${s} DESC`;
-          })
-          .join(", ");
-        return new Nodes.SqlLiteral(flipped);
-      }
-      if (typeof (clause as any).reverse === "function") return (clause as any).reverse();
-      if (typeof (clause as any).desc === "function") return (clause as any).desc();
-      return clause;
-    }
-    const reversed = reverseSqlOrder.call(this, [clause]) as string[];
-    return new Nodes.SqlLiteral(reversed.join(", "));
-  });
+  const orders = compactBlank(this.orderValues as unknown[]);
+  this.orderValues = reverseSqlOrder.call(this, orders) as typeof this.orderValues;
   return this;
 }
 
@@ -1498,17 +1467,17 @@ export function reverseSqlOrder(this: QueryMethodsHost, orderQuery: unknown[]): 
     );
   }
   return orderQuery.flatMap((o) => {
-    if (o instanceof Nodes.Node) {
-      if (typeof (o as any).reverse === "function") return [(o as any).reverse()];
-      if (typeof (o as any).desc === "function") return [(o as any).desc()];
-    }
-    if (typeof o === "string") {
-      if (isDoesNotSupportReverse(o)) {
+    if (o instanceof Nodes.Attribute) return [o.desc()];
+    if (o instanceof Nodes.Ordering) return [(o as Nodes.Ascending | Nodes.Descending).reverse()];
+    if (o instanceof Nodes.NodeExpression) return [o.desc()];
+    if (typeof o === "string" || o instanceof Nodes.SqlLiteral) {
+      const str = typeof o === "string" ? o : o.value;
+      if (isDoesNotSupportReverse(str)) {
         throw new IrreversibleOrderError(
-          `Order ${JSON.stringify(o)} cannot be reversed automatically`,
+          `Order ${rbInspect(str)} cannot be reversed automatically`,
         );
       }
-      return o.split(",").map((s) => {
+      return str.split(",").map((s) => {
         s = s.trim();
         if (/\sasc$/i.test(s)) return s.replace(/\sasc$/i, " DESC");
         if (/\sdesc$/i.test(s)) return s.replace(/\sdesc$/i, " ASC");

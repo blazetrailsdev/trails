@@ -16,6 +16,9 @@ describe("SQLite3Adapter bigint narrowing", () => {
       "CREATE TABLE widgets (id INTEGER PRIMARY KEY, wide BIGINT, narrow INTEGER)",
     );
     await adapter.execute("INSERT INTO widgets (id, wide, narrow) VALUES (1, 7, 2)");
+    await adapter.execute(
+      "INSERT INTO widgets (id, wide, narrow) VALUES (2, 9223372036854775807, 3)",
+    );
   });
 
   afterEach(async () => {
@@ -26,15 +29,17 @@ describe("SQLite3Adapter bigint narrowing", () => {
 
   it("narrows spilled bigints identically through execQuery and execute", async () => {
     const sql = "SELECT id, wide, narrow FROM widgets";
-    const viaExecQuery = (await adapter.execQuery(sql)).toArray()[0];
-    const viaExecute = (await adapter.execute(sql))![0];
+    const [viaExecQuery, wideViaExecQuery] = (await adapter.execQuery(sql)).toArray();
+    const [viaExecute, wideViaExecute] = (await adapter.execute(sql))!;
 
     expect(typeof viaExecQuery.narrow).toBe("number");
     expect(typeof viaExecute.narrow).toBe("number");
     expect(typeof viaExecQuery.id).toBe("number");
     expect(typeof viaExecute.id).toBe("number");
-    expect(typeof viaExecQuery.wide).toBe("bigint");
-    expect(typeof viaExecute.wide).toBe("bigint");
+    expect(typeof viaExecQuery.wide).toBe("number");
+    expect(typeof viaExecute.wide).toBe("number");
+    expect(wideViaExecQuery.wide).toBe(9223372036854775807n);
+    expect(wideViaExecute.wide).toBe(9223372036854775807n);
     expect(viaExecute).toEqual(viaExecQuery);
   });
 

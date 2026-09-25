@@ -107,9 +107,8 @@ describe("RelationMutationTest", () => {
     expect(node.expr.relation.name).toBe("posts");
   });
 
-  it.skip("reverse_order!", () => {
-    // BLOCKED: relation-mutation-order-values-sqlliteral-not-string
-    const rel: any = Post.order("title ASC", "comments_count DESC");
+  it("reverse_order!", () => {
+    const rel: any = Post.order("title ASC, comments_count DESC");
     rel.reverseOrderBang();
     expect(rel.orderValues.at(0)).toEqual("title DESC");
     expect(rel.orderValues.at(-1)).toEqual("comments_count ASC");

@@ -300,14 +300,12 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   _narrowSpilledBigInts(stmt: SqliteStatement, rows: unknown[][]): void {
-    const wide = stmt.columns().map((c) => c.type !== null && /bigint/i.test(c.type));
-    if (!wide.includes(true)) return;
+    if (!stmt.columns().some((c) => c.type !== null && /bigint/i.test(c.type))) return;
     for (const row of rows) {
       for (let i = 0; i < row.length; i++) {
         const value = row[i];
         if (
           typeof value === "bigint" &&
-          !wide[i] &&
           value >= BigInt(Number.MIN_SAFE_INTEGER) &&
           value <= BigInt(Number.MAX_SAFE_INTEGER)
         ) {

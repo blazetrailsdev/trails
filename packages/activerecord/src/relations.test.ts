@@ -2733,8 +2733,7 @@ describe("RelationTest", () => {
     });
   });
 
-  it.skip("joins with select", async () => {
-    // BLOCKED: select alias type — a selected joined column reads back as bigint (1n) rather than Integer (relation-joins-select-bigint)
+  it("joins with select", async () => {
     const postsRel = await Post.joins(":author")
       .select("id", "authors.author_address_id")
       .order("posts.id")
