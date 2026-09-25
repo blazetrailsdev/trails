@@ -423,22 +423,22 @@ describe("HasManyAssociationsTest", () => {
   it("build and create from association should respect unscope over default scope", async () => {
     const car = (await Car.create({ name: "honda" })) as any;
 
-    let bulb = car.bulbs.unscope({ where: "name" }).build();
+    let bulb = car.bulbs.unscope({ ":where": "name" }).build();
     expect(bulb.name).toBeNull();
 
-    bulb = await car.bulbs.unscope({ where: "name" }).create();
+    bulb = await car.bulbs.unscope({ ":where": "name" }).create();
     expect(bulb.name).toBeNull();
 
-    bulb = await car.bulbs.unscope({ where: "name" }).createBang();
+    bulb = await car.bulbs.unscope({ ":where": "name" }).createBang();
     expect(bulb.name).toBeNull();
 
-    bulb = car.awesomeBulbs.unscope({ where: "frickinawesome" }).build();
+    bulb = car.awesomeBulbs.unscope({ ":where": "frickinawesome" }).build();
     expect(bulb.frickinawesome).toBe(false);
 
-    bulb = await car.awesomeBulbs.unscope({ where: "frickinawesome" }).create();
+    bulb = await car.awesomeBulbs.unscope({ ":where": "frickinawesome" }).create();
     expect(bulb.frickinawesome).toBe(false);
 
-    bulb = await car.awesomeBulbs.unscope({ where: "frickinawesome" }).createBang();
+    bulb = await car.awesomeBulbs.unscope({ ":where": "frickinawesome" }).createBang();
     expect(bulb.frickinawesome).toBe(false);
   });
 

@@ -178,7 +178,7 @@ interface QueryMethodsHost {
   leftOuterJoinsValues: AssociationSpec[];
   referencesValues: Array<string | Nodes.SqlLiteral>;
   extendingValues: object[];
-  unscopeValues: Array<string | { where: string | string[] }>;
+  unscopeValues: UnscopeArg[];
   optimizerHintsValues: string[];
   annotateValues: string[];
   withValues: Array<Record<string, unknown>>;
@@ -575,6 +575,8 @@ export const VALID_UNSCOPING_VALUES: ReadonlySet<UnscopeType> = new Set<UnscopeT
   "with",
 ]);
 
+export type UnscopeArg = `:${UnscopeType}` | ":leftJoins" | { ":where": string | string[] };
+
 export type ExceptKey =
   | UnscopeType
   | "distinct"
@@ -600,32 +602,28 @@ export const EXCEPT_ONLY_KEYS: readonly ExceptKey[] = [
 
 export type ExceptSkip = ExceptKey | (string & {});
 
-function unscope(
-  this: QueryMethodsHost,
-  ...args: Array<UnscopeType | { where: string | string[] }>
-): any {
+function unscope(this: QueryMethodsHost, ...args: UnscopeArg[]): any {
   checkIfMethodHasArgumentsBang.call(this, ":unscope", args as unknown[]);
-  return unscopeBang.apply(this.spawn(), args as any);
+  return unscopeBang.apply(this.spawn(), args);
 }
 
-function unscopeBang(
-  this: QueryMethodsHost,
-  ...args: Array<string | { where: string | string[] }>
-): any {
+function unscopeBang(this: QueryMethodsHost, ...args: UnscopeArg[]): any {
   this.unscopeValues = [...this.unscopeValues, ...args];
-  for (const rawScope of args) {
-    if (typeof rawScope === "string") {
-      const scope = rawScope === "leftJoins" ? "leftOuterJoins" : rawScope;
-      if (!VALID_UNSCOPING_VALUES.has(scope as UnscopeType)) {
+
+  for (let scope of args as unknown[]) {
+    if (isRubySymbol(scope)) {
+      if (scope === ":leftJoins") scope = ":leftOuterJoins";
+      const name = (scope as string).slice(1) as UnscopeType;
+      if (!VALID_UNSCOPING_VALUES.has(name)) {
         throw new ArgumentError(
-          `Called unscope() with invalid unscoping argument ':${scope}'. Valid arguments are :${[...VALID_UNSCOPING_VALUES].join(", :")}.`,
+          `Called unscope() with invalid unscoping argument '${scope}'. Valid arguments are :${[...VALID_UNSCOPING_VALUES].join(", :")}.`,
         );
       }
       assertModifiableBang.call(this);
-      delete this._values[scope as UnscopeType];
-    } else if (rawScope && typeof rawScope === "object") {
-      for (const [key, targetValue] of Object.entries(rawScope)) {
-        if (key !== "where") {
+      delete this._values[name];
+    } else if (rbObjClass(scope) === "Hash") {
+      for (const [key, targetValue] of Object.entries(scope as object)) {
+        if (key !== ":where") {
           throw new ArgumentError("Hash arguments in .unscope(*args) must have :where as the key.");
         }
 
@@ -634,10 +632,11 @@ function unscopeBang(
       }
     } else {
       throw new ArgumentError(
-        `Unrecognized scoping: ${JSON.stringify(rawScope)}. Use unscope({ where: "column_name" }) or one of: ${[...VALID_UNSCOPING_VALUES].join(", ")}.`,
+        `Unrecognized scoping: ${rbInspect(args)}. Use .unscope(where: :attribute_name) or .unscope(:order), for example.`,
       );
     }
   }
+
   return this;
 }
 
@@ -763,7 +762,7 @@ function whereBang(this: QueryMethodsHost, opts: any, ...rest: unknown[]): any {
 }
 
 function rewhere(this: QueryMethodsHost, conditions: Record<string, unknown> | null): any {
-  if (conditions == null) return unscope.call(this, "where");
+  if (conditions == null) return unscope.call(this, ":where");
   conditions = sanitizeForbiddenAttributes(conditions);
   const rel = this.spawn();
   const newClause = buildWhereClause.call(rel, conditions);

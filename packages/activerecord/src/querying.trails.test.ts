@@ -31,7 +31,7 @@ describe("QueryingTest — static forwarders on Base", () => {
   });
 
   it("unscope() static forwarder returns a Relation", () => {
-    expect(Topic.unscope("where")).toBeInstanceOf(Relation);
+    expect(Topic.unscope(":where")).toBeInstanceOf(Relation);
   });
 
   it("reselect() returns a Relation", () => {

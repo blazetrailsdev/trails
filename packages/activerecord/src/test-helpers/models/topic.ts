@@ -124,7 +124,10 @@ export class Topic extends Base {
       foreignKey: "parent_id",
       counterCache: "replies_count",
     });
-    this.hasMany("openReplies", { className: "Reply", foreignKey: "parent_id" });
+    this.hasMany("openReplies", (q: any) => q.open(), {
+      className: "Reply",
+      foreignKey: "parent_id",
+    });
     this.hasMany("uniqueReplies", { dependent: "destroy", foreignKey: "parent_id" });
     this.hasMany("sillyUniqueReplies", { dependent: "destroy", foreignKey: "parent_id" });
 

@@ -24,9 +24,9 @@ export class UniquenessValidator extends EachValidator {
 
   constructor(options: Record<string, unknown> = {}) {
     if (options.conditions != null && typeof options.conditions !== "function") {
-      throw new Error(
+      throw new ArgumentError(
         `${options.conditions} was passed as :conditions but is not callable. ` +
-          "Pass a callable instead: `conditions: () => where({ approved: true })`",
+          "Pass a callable instead: `conditions: -> { where(approved: true) }`",
       );
     }
     const scopes =

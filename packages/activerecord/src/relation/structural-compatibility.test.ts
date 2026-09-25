@@ -28,7 +28,7 @@ describe("StructuralCompatibilityTest", () => {
   });
 
   it("incompatible unscope", () => {
-    const left = Post.order("body asc").where("id = 1").unscope("order");
+    const left = Post.order("body asc").where("id = 1").unscope(":order");
     const right = Post.order("body asc").where("id = 2");
 
     expect(left.structurallyCompatible(right)).toBeFalsy();

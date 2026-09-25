@@ -68,7 +68,7 @@ describe("Relation value accessor Rails semantics", () => {
   it("unscope(:readonly) clears readonly_value back to nil (null)", () => {
     const rel = relation().readonly();
     expect(rel.readonlyValue).toBe(true);
-    expect(rel.unscope("readonly").readonlyValue).toBeNull();
+    expect(rel.unscope(":readonly").readonlyValue).toBeNull();
   });
 
   it("except(:strict_loading) clears strict_loading_value back to nil (null)", () => {

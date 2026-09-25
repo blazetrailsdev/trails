@@ -86,7 +86,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
           "/*+ NO_RANGE_OPTIMIZATION(posts index_posts_on_author_id) */",
         );
         posts = posts.select("id").where({ author_id: [0, 1] });
-        await posts.unscope("optimizerHints").load();
+        await posts.unscope(":optimizerHints").load();
       });
     });
 

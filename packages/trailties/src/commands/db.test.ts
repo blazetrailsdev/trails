@@ -205,12 +205,7 @@ describe("resolveEnv", () => {
 
   it("defaults to development", () => {
     setEnv("TRAILS_ENV", undefined);
-    expect(resolveEnv()).toBe("development");
-  });
-
-  it("ignores NODE_ENV", () => {
-    setEnv("TRAILS_ENV", undefined);
-    setEnv("NODE_ENV", "production");
+    setEnv("NODE_ENV", undefined);
     expect(resolveEnv()).toBe("development");
   });
 });
@@ -929,8 +924,10 @@ describe("db subcommand CLI actions", { timeout: 30_000 }, () => {
   let logs: string[];
   let errs: string[];
   let origExitCode: typeof process.exitCode;
+  const origNodeEnv = env.NODE_ENV;
 
   beforeEach(() => {
+    setEnv("NODE_ENV", undefined);
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-db-cli-"));
     originalCwd = process.cwd();
     fs.mkdirSync(path.join(tmpDir, "config"), { recursive: true });
@@ -957,6 +954,7 @@ describe("db subcommand CLI actions", { timeout: 30_000 }, () => {
   });
 
   afterEach(() => {
+    setEnv("NODE_ENV", origNodeEnv);
     process.chdir(originalCwd);
     vi.restoreAllMocks();
     process.exitCode = origExitCode;

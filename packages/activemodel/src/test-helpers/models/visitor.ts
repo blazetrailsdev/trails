@@ -8,4 +8,13 @@ export class Visitor {
   }
 
   password_digest: string | null = null;
+  declare _passwordConfirmation: unknown;
+
+  get passwordConfirmation(): unknown {
+    return this._passwordConfirmation ?? null;
+  }
+
+  set passwordConfirmation(value: unknown) {
+    Reflect.set(Object.getPrototypeOf(Visitor.prototype), "passwordConfirmation", value, this);
+  }
 }

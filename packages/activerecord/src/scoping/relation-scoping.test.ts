@@ -245,7 +245,7 @@ describe("RelationScopingTest", () => {
     const log = await captureSql(async () => {
       developer = (await Developer.annotate("unscope")
         .where("name = 'David'")
-        .unscope("annotate")
+        .unscope(":annotate")
         .first()) as Developer;
     });
 

@@ -533,7 +533,6 @@ export async function destroyBang<T extends DestroyRecord & { destroy(): Promise
 }
 
 interface AttributeSingleSave {
-  writeAttribute(name: string, value: unknown): void;
   save(options?: { validate?: boolean }): Promise<boolean | undefined>;
   saveBang(options?: { validate?: boolean }): Promise<true | undefined>;
 }
@@ -545,7 +544,7 @@ export async function updateAttribute<T extends AttributeSingleSave>(
 ): Promise<boolean | undefined> {
   name = String(name);
   verifyReadonlyAttribute.call(this as unknown as PersistencePrivateHost, name);
-  this.writeAttribute(name, value);
+  (this as unknown as Record<string, unknown>)[name] = value;
   return this.save({ validate: false });
 }
 
@@ -556,7 +555,7 @@ export async function updateAttributeBang<T extends AttributeSingleSave>(
 ): Promise<true | undefined> {
   name = String(name);
   verifyReadonlyAttribute.call(this as unknown as PersistencePrivateHost, name);
-  this.writeAttribute(name, value);
+  (this as unknown as Record<string, unknown>)[name] = value;
   return this.saveBang({ validate: false });
 }
 

@@ -327,7 +327,7 @@ export class Author extends Base {
       through: "postsSortedById",
       source: "comments",
     });
-    this.hasMany("unorderedComments", (q: any) => q.unscope("order").distinct(), {
+    this.hasMany("unorderedComments", (q: any) => q.unscope(":order").distinct(), {
       through: "postsSortedByIdLimited",
       source: "comments",
     });

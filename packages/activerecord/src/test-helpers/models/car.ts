@@ -43,11 +43,15 @@ export class Car extends Base {
   static {
     this.belongsTo("person", { counterCache: true });
     this.hasMany("bulbs");
-    this.hasMany("allBulbs", (q: any) => q.unscope({ where: "name" }), { className: "Bulb" });
-    this.hasMany("allBulbs2", (q: any) => q.unscope("where"), { className: "Bulb" });
-    this.hasMany("otherBulbs", (q: any) => q.unscope({ where: "name" }).where({ name: "other" }), {
-      className: "Bulb",
-    });
+    this.hasMany("allBulbs", (q: any) => q.unscope({ ":where": "name" }), { className: "Bulb" });
+    this.hasMany("allBulbs2", (q: any) => q.unscope(":where"), { className: "Bulb" });
+    this.hasMany(
+      "otherBulbs",
+      (q: any) => q.unscope({ ":where": "name" }).where({ name: "other" }),
+      {
+        className: "Bulb",
+      },
+    );
     this.hasMany("oldBulbs", (q: any) => q.rewhere({ name: "old" }), { className: "Bulb" });
     this.hasMany("funkyBulbs", { className: "FunkyBulb", dependent: "destroy" });
     this.hasMany("failedBulbs", { className: "FailedBulb", dependent: "destroy" });

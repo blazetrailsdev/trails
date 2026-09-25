@@ -251,7 +251,7 @@ describeIfSupports("common_table_expressions", "WithTest", () => {
 
     const ctes = relation.values()["with"] as Array<Record<string, unknown>>;
     expect(ctes.flatMap((c) => Object.keys(c)).includes("posts_with_comments")).toBe(true);
-    const unscoped = relation.unscope("with");
+    const unscoped = relation.unscope(":with");
     expect(unscoped.values()["with"]).toBeUndefined();
     expect(await unscoped.count()).toEqual(await Post.count());
   });

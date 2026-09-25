@@ -4,7 +4,7 @@ export default Book.where({ status: "draft" })
   .where({ active: false })
   .order({ title: "asc" })
   .limit(100)
-  .unscope("limit", "order")
+  .unscope(":limit", ":order")
   .rewhere({ status: "published" })
   .order({ id: "desc" })
   .limit(5);

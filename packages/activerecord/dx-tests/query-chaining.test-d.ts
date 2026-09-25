@@ -94,7 +94,7 @@ describe("query chaining DX", () => {
   it("Post.annotate / extending / unscope / createWith return Relation<Post>", () => {
     expectTypeOf(Post.annotate("hint")).toMatchTypeOf<Relation<Post>>();
     expectTypeOf(Post.extending()).toMatchTypeOf<Relation<Post>>();
-    expectTypeOf(Post.unscope("where")).toMatchTypeOf<Relation<Post>>();
+    expectTypeOf(Post.unscope(":where")).toMatchTypeOf<Relation<Post>>();
     expectTypeOf(Post.createWith({ title: "x" })).toMatchTypeOf<Relation<Post>>();
   });
 

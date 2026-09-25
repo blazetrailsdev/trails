@@ -739,7 +739,7 @@ function buildCountSubquery(
   const selectValue = operationOverAggregateColumn(columnAlias, "count", false);
 
   return isAll
-    ? relation.unscope("order").buildSubquery(subqueryAlias, selectValue)
+    ? relation.unscope(":order").buildSubquery(subqueryAlias, selectValue)
     : relation.buildSubquery(subqueryAlias, selectValue);
 }
 
@@ -767,7 +767,7 @@ export async function executeSimpleCalculation(
       distinct === true,
     );
   } else {
-    relation = rel.unscope("order").distinctBang(false) as CalculationRelation;
+    relation = rel.unscope(":order").distinctBang(false) as CalculationRelation;
 
     column = aggregateColumn(relation, columnName as string | Nodes.Node | number | null);
     const selectValue = operationOverAggregateColumn(
