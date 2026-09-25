@@ -109,8 +109,7 @@ export class Batches {
 
     return relation.inBatches(
       { of: batchSize, start, finish, load: true, errorOnIgnore, cursor, order },
-      async (batch: Relation<T>) => {
-        // eslint-disable-next-line blazetrails/prefer-await-relation -- in_batches yields a stripThenable view
+      async (batch: LoadedRelation<Relation<T>>) => {
         await block(await batch.toArray());
       },
     );

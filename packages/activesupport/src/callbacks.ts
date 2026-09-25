@@ -940,13 +940,12 @@ export function getCallbackChains(target: object): Map<string, CallbackChain> {
       }
     }
     t[CALLBACKS] = own;
-    const klass = (target as { constructor?: unknown }).constructor;
-    if (typeof klass === "function" && klass.prototype === target) {
-      for (let c = klass as AnyClass; Object.getPrototypeOf(c) !== Function.prototype; ) {
-        const superclass = Object.getPrototypeOf(c) as AnyClass;
-        DescendantsTracker.registerSubclass(superclass, c);
-        c = superclass;
-      }
+    for (
+      let klass = target.constructor as AnyClass;
+      Object.getPrototypeOf(klass) !== Function.prototype;
+      klass = Object.getPrototypeOf(klass) as AnyClass
+    ) {
+      DescendantsTracker.registerSubclass(Object.getPrototypeOf(klass) as AnyClass, klass);
     }
   }
   return t[CALLBACKS] as Map<string, CallbackChain>;
@@ -1110,15 +1109,12 @@ export namespace Callbacks {
   }
 
   export function resetCallbacks(target: object, name: string): void {
-    const callbacks = getCallbackChains(target).get(name);
-    if (!callbacks) return;
+    const callbacks = getCallbackChains(target).get(name)!;
+    const klass = target.constructor as AnyClass;
 
-    const klass = (target as { constructor?: unknown }).constructor;
-    if (typeof klass === "function" && klass.prototype === target) {
-      for (const descendant of DescendantsTracker.descendants(klass as AnyClass)) {
-        const chain = getCallbackChains(descendant.prototype as object).get(name)!;
-        callbacks.each((c) => chain.delete(c));
-      }
+    for (const target of DescendantsTracker.descendants(klass)) {
+      const chain = getCallbackChains(target.prototype as object).get(name)!;
+      callbacks.each((c) => chain.delete(c));
     }
 
     callbacks.clear();
