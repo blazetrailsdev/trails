@@ -1,4 +1,4 @@
-import { ActionController } from "@blazetrails/actionpack";
+import { ActionController, controllerConstants } from "@blazetrails/actionpack";
 
 type PWARenderOptions = ActionController.RenderOptions & { template?: string };
 
@@ -17,3 +17,5 @@ export class PWAController extends ActionController.Base {
 }
 
 PWAController.skipBeforeAction("verifyAuthenticityToken");
+
+controllerConstants.set("rails/pwa", PWAController);

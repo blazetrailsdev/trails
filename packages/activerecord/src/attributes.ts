@@ -44,6 +44,13 @@ export function defineAttribute(
   });
 }
 
+let replayingOverColdSchema = false;
+
+/** @noRailsEquivalent PERMANENT */
+export function isReplayingOverColdSchema(): boolean {
+  return replayingOverColdSchema;
+}
+
 export function _defaultAttributes(this: AnyClass): AttributeSet {
   if (!isSchemaLoaded.call(this) && !this.abstractClass && this.tableName) {
     try {
@@ -59,12 +66,11 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
   ) {
     registerSubclass(Object.getPrototypeOf(cacheHost), cacheHost);
 
-    const columns: Record<string, unknown> =
+    const reflected: Record<string, unknown> | undefined =
       (Object.prototype.hasOwnProperty.call(cacheHost, "_columnsHash")
         ? cacheHost._columnsHash
-        : undefined) ??
-      cachedColumnsHash(cacheHost) ??
-      {};
+        : undefined) ?? cachedColumnsHash(cacheHost);
+    const columns: Record<string, unknown> = reflected ?? {};
     const ignored = new Set<string>(cacheHost.ignoredColumns ?? []);
     const buildAttributesHash = (connection: unknown) => {
       const attributesHash: Record<string, Attribute> = Object.create(null) as Record<
@@ -84,10 +90,21 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
     const attributesHash = cacheHost.connectionPool().withConnectionSync(buildAttributesHash);
 
     const attributeSet = new AttributeSet(attributesHash);
-    AttributeRegistration.ClassMethods.applyPendingAttributeModifications.call(
-      cacheHost,
-      attributeSet,
-    );
+    const cold =
+      reflected === undefined &&
+      !isSchemaLoaded.call(cacheHost) &&
+      !cacheHost.abstractClass &&
+      !!cacheHost.tableName;
+    const wasCold = replayingOverColdSchema;
+    replayingOverColdSchema = cold;
+    try {
+      AttributeRegistration.ClassMethods.applyPendingAttributeModifications.call(
+        cacheHost,
+        attributeSet,
+      );
+    } finally {
+      replayingOverColdSchema = wasCold;
+    }
 
     cacheHost._cachedDefaultAttributes = attributeSet;
   }

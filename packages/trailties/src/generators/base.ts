@@ -11,11 +11,15 @@ import * as TrailsActions from "./trails-actions.js";
 export interface GeneratorOptions {
   cwd: string;
   output: (msg: string) => void;
+  quiet?: boolean;
+  behavior?: "invoke" | "revoke";
 }
 
 export abstract class GeneratorBase implements GeneratorActionsState {
   cwd: string;
   output: (msg: string) => void;
+  options: GeneratorOptions;
+  behavior: "invoke" | "revoke";
   protected createdFiles: string[] = [];
   pendingGenerators: Array<{ what: string; args: string[] }> = [];
   afterInstallCallbacks: Array<() => void | Promise<void>> = [];
@@ -35,6 +39,33 @@ export abstract class GeneratorBase implements GeneratorActionsState {
   constructor(options: GeneratorOptions) {
     this.cwd = options.cwd;
     this.output = options.output;
+    this.options = options;
+    this.behavior = options.behavior === "revoke" ? "revoke" : "invoke";
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  say(message: unknown = "", _color: string | null = null): void {
+    if (this.isQuiet()) return;
+
+    this.output(String(message));
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  sayStatus(status: unknown, message: unknown, logStatus: string | boolean = true): void {
+    if (this.isQuiet() || logStatus === false) return;
+    const spaces = "  ";
+    const statusText = String(status).padStart(12);
+    const margin = " ".repeat(statusText.length) + spaces;
+
+    const text = String(message)
+      .replace(/(\r\n|\r|\n)$/, "")
+      .replace(/\n(?=[^])/g, `\n${margin}`);
+    this.output(`${statusText}${spaces}${text}`);
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  isQuiet(): boolean {
+    return !!this.options.quiet;
   }
 
   static async start(

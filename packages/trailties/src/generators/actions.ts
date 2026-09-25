@@ -3,6 +3,10 @@ import { getChildProcess, env as processEnv } from "@blazetrails/ruby-compat";
 export interface ActionsHost {
   cwd: string;
   output: (msg: string) => void;
+  options: { quiet?: boolean };
+  behavior: "invoke" | "revoke";
+  say(message: unknown, color?: string | null): void;
+  sayStatus(status: unknown, message: unknown, logStatus?: string | boolean): void;
 }
 
 export interface GeneratorActionsState {
@@ -10,12 +14,12 @@ export interface GeneratorActionsState {
   afterInstallCallbacks: Array<() => void | Promise<void>>;
 }
 
-/** @missingRailsCall say_status — PERMANENT */
 export function log(this: ActionsHost, ...args: unknown[]): void {
   if (args.length === 1) {
-    this.output(String(args[0]));
+    if (!this.options.quiet) this.say(String(args[0]));
   } else {
-    this.output(`${String(args[0]).padStart(12)}  ${String(args[1] ?? "")}`);
+    args.push(this.behavior === "invoke" ? "green" : "red");
+    this.sayStatus(...(args as [unknown, unknown, string]));
   }
 }
 

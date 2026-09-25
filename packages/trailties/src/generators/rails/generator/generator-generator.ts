@@ -1,32 +1,38 @@
 import { camelize } from "@blazetrails/activesupport";
+import { File } from "@blazetrails/ruby-compat";
 import { NamedBase, type NamedBaseOptions } from "../../named-base.js";
 import type { GeneratorOptions } from "../../base.js";
 
-export interface GeneratorRunOptions {
+export interface GeneratorGeneratorOptions extends NamedBaseOptions {
   namespace?: boolean;
 }
 
 export class GeneratorGenerator extends NamedBase {
-  constructor(options: NamedBaseOptions) {
-    super(options);
+  declare options: GeneratorGeneratorOptions;
+
+  constructor(options: GeneratorGeneratorOptions) {
+    const withDefaults: GeneratorGeneratorOptions = {
+      ...options,
+      namespace: options.namespace ?? true,
+    };
+    super(withDefaults);
   }
 
   static override async start(args: string[], config: GeneratorOptions): Promise<string[]> {
     const generator = new GeneratorGenerator({ ...config, name: args[0] ?? "" });
-    generator.run({});
+    generator.run();
     return generator.getCreatedFiles();
   }
 
-  run(options: GeneratorRunOptions = {}): string[] {
-    const namespace = options.namespace !== false;
-    const dir = this.generatorDir(namespace);
+  run(): string[] {
+    const dir = this.generatorDir();
     const ext = this.ext();
     const className = camelize(this.fileName);
 
-    this.createFile(`${dir}/USAGE`, `Description:\n    Explain the generator\n`);
-    this.createFile(`${dir}/templates/.keep`, "");
+    this.createFile(File.join(dir, "USAGE"), `Description:\n    Explain the generator\n`);
+    this.createFile(File.join(dir, "templates/.keep"), "");
     this.createFile(
-      `${dir}/${this.fileName}-generator${ext}`,
+      File.join(dir, `${this.fileName}-generator${ext}`),
       `import { NamedBase } from "@blazetrails/trailties/generators";
 
 export class ${className}Generator extends NamedBase {
@@ -39,14 +45,11 @@ export class ${className}Generator extends NamedBase {
     return this.getCreatedFiles();
   }
 
-  private regularClassPath(): string {
-    return this.classPathParts.join("/");
-  }
-
-  private generatorDir(namespace: boolean): string {
-    const parts = ["lib", "generators"];
-    if (this.regularClassPath()) parts.push(this.regularClassPath());
-    if (namespace) parts.push(this.fileName);
-    return parts.join("/");
+  private generatorDir(): string {
+    if (this.options.namespace) {
+      return File.join("lib", "generators", this.regularClassPath(), this.fileName);
+    } else {
+      return File.join("lib", "generators", this.regularClassPath());
+    }
   }
 }

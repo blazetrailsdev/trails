@@ -1,3 +1,4 @@
+import { ArgumentError } from "./argument-error.js";
 import { Encoding } from "./encoding.js";
 import { getFs, getPath } from "./fs-adapter.js";
 import type { FsStatResult } from "./fs-adapter.js";
@@ -35,6 +36,44 @@ function chompdirsep(path: string): string {
   let end = path.length;
   while (end > 0 && isdirsep(path[end - 1])) end--;
   return path.slice(0, end);
+}
+
+type FileJoinArg = string | readonly FileJoinArg[];
+
+const joining = new Set<readonly FileJoinArg[]>();
+
+/**
+ * `file_inspect_join` (`vendor/ruby/file.c:5006`), the `rb_exec_recursive`
+ * callback that joins a nested Array component.
+ */
+function fileInspectJoin(ary: readonly FileJoinArg[], arg: readonly FileJoinArg[]): string {
+  if (joining.has(arg) || ary === arg) throw new ArgumentError("recursive array");
+  joining.add(arg);
+  try {
+    return rbFileJoin(arg);
+  } finally {
+    joining.delete(arg);
+  }
+}
+
+/** `rb_file_join` (`vendor/ruby/file.c:5013`). */
+function rbFileJoin(ary: readonly FileJoinArg[]): string {
+  if (ary.length === 0) return "";
+  let result = "";
+  for (let i = 0; i < ary.length; i++) {
+    let tmp = ary[i];
+    if (typeof tmp !== "string") {
+      if (ary === tmp) throw new ArgumentError("recursive array");
+      tmp = fileInspectJoin(ary, tmp);
+    }
+    if (i !== 0) {
+      const tail = chompdirsep(result);
+      if (isdirsep(tmp.charAt(0))) result = tail;
+      else if (tail.length === result.length) result = `${result}${File.SEPARATOR}`;
+    }
+    result = `${result}${tmp}`;
+  }
+  return result;
 }
 
 /**
@@ -531,21 +570,15 @@ export class File extends IO {
    * empty component keeps its separator, so `File.join("a", "")` is `"a/"`.
    * Both boundary arms test with `isdirsep`, so a `File::ALT_SEPARATOR` at the
    * boundary is a separator too: `File.join("a\\", "b")` is `"a\\b"` on
-   * Windows and `"a\\/b"` on POSIX.
+   * Windows and `"a\\/b"` on POSIX. An Array component is joined first and
+   * spliced in (`file.c:5048-5054`), so an empty one contributes `""`:
+   * `File.join("a", [], "b")` is `"a/b"`.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.join`
    * (`vendor/ruby/file.c:5013`).
    */
-  static join(...args: string[]): string {
-    if (args.length === 0) return "";
-    let result = args[0];
-    for (const tmp of args.slice(1)) {
-      const tail = chompdirsep(result);
-      if (isdirsep(tmp.charAt(0))) result = `${tail}${tmp}`;
-      else if (tail.length === result.length) result = `${result}${File.SEPARATOR}${tmp}`;
-      else result = `${result}${tmp}`;
-    }
-    return result;
+  static join(...args: FileJoinArg[]): string {
+    return rbFileJoin(args);
   }
 
   /**

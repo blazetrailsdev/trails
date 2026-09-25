@@ -1,4 +1,4 @@
-import { ActionController } from "@blazetrails/actionpack";
+import { ActionController, controllerConstants } from "@blazetrails/actionpack";
 
 export class HealthController extends ActionController.Base {
   static override controllerPath(): string {
@@ -28,3 +28,5 @@ export class HealthController extends ActionController.Base {
 HealthController.rescueFrom(Error, function (this: HealthController) {
   this.renderDown();
 });
+
+controllerConstants.set("rails/health", HealthController);

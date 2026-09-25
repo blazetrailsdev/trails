@@ -1260,7 +1260,6 @@ describe("InsertAllTest", () => {
     Book.tableName = `${databaseName}.books`;
 
     try {
-      await Book.loadSchema();
       await expect(Book.insertAllBang([{ name: "Rework", author_id: 1 }])).resolves.not.toThrow();
     } finally {
       Book.tableName = "books";

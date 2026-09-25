@@ -136,14 +136,12 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("enum type cast", async () => {
-      await PostgresqlEnum.loadSchema();
       const enumRecord = new PostgresqlEnum();
       (enumRecord as any).writeAttribute("current_mood", "happy");
       expect((enumRecord as any).readAttribute("current_mood")).toBe("happy");
     });
 
     it("assigning enum to nil", async () => {
-      await PostgresqlEnum.loadSchema();
       const model = new PostgresqlEnum();
       (model as any).writeAttribute("current_mood", null);
       expect((model as any).readAttribute("current_mood")).toBeNull();

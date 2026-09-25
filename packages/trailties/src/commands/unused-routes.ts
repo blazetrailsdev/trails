@@ -90,6 +90,7 @@ export class UnusedRoutesCommand {
     this.options = options;
   }
 
+  /** @missingRailsCall say — CONVERGEABLE generator-and-command-bodies-bypass-thor-say */
   async perform(): Promise<void> {
     await bootApplicationBang();
 

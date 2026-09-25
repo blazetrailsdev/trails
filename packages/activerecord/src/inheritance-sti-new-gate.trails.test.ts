@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { SubclassNotFound } from "./errors.js";
-import { DeadParrot } from "./test-helpers/models/parrot.js";
+import { VerySpecialClient } from "./test-helpers/models/company.js";
 
 describe("new() STI dispatch gate", () => {
   it("raises SubclassNotFound for a bad type on a cold STI leaf", () => {
-    expect(DeadParrot._hasAttribute("parrot_sti_class")).toBe(false);
+    expect(VerySpecialClient._hasAttribute("type")).toBe(false);
 
-    expect(() => DeadParrot.new({ parrot_sti_class: "InvalidType" })).toThrow(SubclassNotFound);
+    expect(() => VerySpecialClient.new({ type: "InvalidType" })).toThrow(SubclassNotFound);
   });
 });

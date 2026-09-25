@@ -1,4 +1,4 @@
-import { ActionController } from "@blazetrails/actionpack";
+import { ActionController, controllerConstants } from "@blazetrails/actionpack";
 
 export class WelcomeController extends ActionController.Base {
   static override controllerPath(): string {
@@ -11,3 +11,5 @@ export class WelcomeController extends ActionController.Base {
 }
 
 WelcomeController.skipBeforeAction("verifyAuthenticityToken");
+
+controllerConstants.set("rails/welcome", WelcomeController);

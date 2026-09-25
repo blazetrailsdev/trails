@@ -10,6 +10,10 @@ import type { Configuration } from "./application/configuration.js";
 import { resolveEnv } from "./database.js";
 import type { InitializerGroup } from "./initializable.js";
 import { VERSION } from "./version.js";
+import "./info-controller.js";
+import "./welcome-controller.js";
+import "./health-controller.js";
+import "./pwa-controller.js";
 
 let _application: Application | null = null;
 let _cache: CacheStore | null = null;

@@ -18,7 +18,9 @@ export interface DevcontainerGeneratorOptions extends GeneratorOptions {
 
 type JsonObject = { [k: string]: JsonValue };
 type JsonValue = string | number | boolean | null | JsonValue[] | JsonObject;
-type ResolvedOptions = Required<Omit<DevcontainerGeneratorOptions, "cwd" | "output">>;
+type ResolvedOptions = Required<
+  Omit<DevcontainerGeneratorOptions, "cwd" | "output" | "quiet" | "behavior">
+>;
 
 export class DevcontainerGenerator extends GeneratorBase {
   readonly opts: ResolvedOptions;

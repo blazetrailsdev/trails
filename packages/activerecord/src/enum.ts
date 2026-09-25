@@ -16,6 +16,7 @@ import {
 } from "./attribute-methods.js";
 import { Relation } from "./relation.js";
 import { loadSchema as reflectSchemaSync } from "./model-schema.js";
+import { isReplayingOverColdSchema } from "./attributes.js";
 
 type EnumValue = number | string | boolean | null;
 
@@ -234,7 +235,7 @@ export function _enum(
   }
 
   this.decorateAttributes([name], (_name: string, subtype: ValueType | null) => {
-    if (subtype === defaultValue()) {
+    if (subtype === defaultValue() && !isReplayingOverColdSchema()) {
       throw new RuntimeError(
         `Undeclared attribute type for enum '${name}' in ${this.name}. Enums must be` +
           " backed by a database column or declared with an explicit type" +

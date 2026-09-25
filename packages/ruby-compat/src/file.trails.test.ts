@@ -66,6 +66,17 @@ describe("File", () => {
     expect(File.join("a")).toBe("a");
   });
 
+  it("join splices an Array component, and an empty one away", () => {
+    // vendor/ruby/file.c:5048-5054, verified against ruby 3.3.11.
+    expect(File.join("lib", "generators", [], "x")).toBe("lib/generators/x");
+    expect(File.join("lib", "generators", [])).toBe("lib/generators/");
+    expect(File.join("a", ["b", ["c"]], "d")).toBe("a/b/c/d");
+    expect(File.join(["a"], "b")).toBe("a/b");
+    const ary: unknown[] = ["a"];
+    ary.push(ary);
+    expect(() => File.join(ary as string[])).toThrow("recursive array");
+  });
+
   it("extname keeps a trailing dot and skips a leading one", () => {
     // vendor/ruby/file.c:4954.
     expect(File.extname("a/b.tar.gz")).toBe(".gz");

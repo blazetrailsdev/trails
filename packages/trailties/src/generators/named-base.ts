@@ -38,6 +38,10 @@ export class NamedBase extends GeneratorBase {
   pluralFileName = (): string => pluralize(this.fileName);
   fixtureFileName = (): string => this.pluralFileName();
 
+  regularClassPath(): string[] {
+    return this.classPathParts;
+  }
+
   attributesNames(): string[] {
     const names: string[] = [];
     for (const a of this.attributes) {
