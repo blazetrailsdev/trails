@@ -686,25 +686,30 @@ export function isNone<T extends typeof Base>(
 
 export function firstOrCreate<T extends typeof Base>(
   this: T,
-  extra?: Parameters<ReturnType<T["all"]>["firstOrCreate"]>[0],
+  attributes?: Parameters<ReturnType<T["all"]>["firstOrCreate"]>[0],
+  block?: Parameters<ReturnType<T["all"]>["firstOrCreate"]>[1],
 ): ReturnType<ReturnType<T["all"]>["firstOrCreate"]> {
-  return this.all().firstOrCreate(extra) as ReturnType<ReturnType<T["all"]>["firstOrCreate"]>;
+  return this.all().firstOrCreate(attributes, block) as ReturnType<
+    ReturnType<T["all"]>["firstOrCreate"]
+  >;
 }
 
 export function firstOrCreateBang<T extends typeof Base>(
   this: T,
-  extra?: Parameters<ReturnType<T["all"]>["firstOrCreateBang"]>[0],
+  attributes?: Parameters<ReturnType<T["all"]>["firstOrCreateBang"]>[0],
+  block?: Parameters<ReturnType<T["all"]>["firstOrCreateBang"]>[1],
 ): ReturnType<ReturnType<T["all"]>["firstOrCreateBang"]> {
-  return this.all().firstOrCreateBang(extra) as ReturnType<
+  return this.all().firstOrCreateBang(attributes, block) as ReturnType<
     ReturnType<T["all"]>["firstOrCreateBang"]
   >;
 }
 
 export function firstOrInitialize<T extends typeof Base>(
   this: T,
-  extra?: Parameters<ReturnType<T["all"]>["firstOrInitialize"]>[0],
+  attributes?: Parameters<ReturnType<T["all"]>["firstOrInitialize"]>[0],
+  block?: Parameters<ReturnType<T["all"]>["firstOrInitialize"]>[1],
 ): ReturnType<ReturnType<T["all"]>["firstOrInitialize"]> {
-  return this.all().firstOrInitialize(extra) as ReturnType<
+  return this.all().firstOrInitialize(attributes, block) as ReturnType<
     ReturnType<T["all"]>["firstOrInitialize"]
   >;
 }
