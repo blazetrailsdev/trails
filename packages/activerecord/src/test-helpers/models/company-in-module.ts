@@ -32,22 +32,46 @@ export class MyAppBusinessFirm extends MyAppBusinessCompany {
   static _demodulizedName = "Firm";
 
   static {
-    this.hasMany("clients", (q: any) => q.order("id"), {
-      foreignKey: "firm_id",
-      dependent: "destroy",
-    });
-    this.hasMany("clientsSortedDesc", (q: any) => q.order("id DESC"), {
-      className: "Client",
-      foreignKey: "firm_id",
-    });
-    this.hasMany("clientsOfFirm", (q: any) => q.order("id"), {
-      foreignKey: "client_of",
-      className: "Client",
-    });
-    this.hasMany("clientsLikeMs", (q: any) => q.where("name = 'Microsoft'").order("id"), {
-      className: "Client",
-      foreignKey: "firm_id",
-    });
+    this.hasMany(
+      "clients",
+      function (this: any) {
+        return this.order("id");
+      },
+      {
+        foreignKey: "firm_id",
+        dependent: "destroy",
+      },
+    );
+    this.hasMany(
+      "clientsSortedDesc",
+      function (this: any) {
+        return this.order("id DESC");
+      },
+      {
+        className: "Client",
+        foreignKey: "firm_id",
+      },
+    );
+    this.hasMany(
+      "clientsOfFirm",
+      function (this: any) {
+        return this.order("id");
+      },
+      {
+        foreignKey: "client_of",
+        className: "Client",
+      },
+    );
+    this.hasMany(
+      "clientsLikeMs",
+      function (this: any) {
+        return this.where("name = 'Microsoft'").order("id");
+      },
+      {
+        className: "Client",
+        foreignKey: "firm_id",
+      },
+    );
     this.hasOne("account", {
       className: "MyApplication::Billing::Account",
       foreignKey: "firm_id",

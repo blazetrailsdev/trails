@@ -23,7 +23,9 @@ export class Owner extends Base {
 
   static {
     this._primaryKey = "owner_id";
-    this.hasMany("pets", (q: any) => q.order("pets.name desc"));
+    this.hasMany("pets", function (this: any) {
+      return this.order("pets.name desc");
+    });
     this.hasMany("toys", { through: "pets" });
     this.hasMany("persons", { through: "pets" });
     this.belongsTo("lastPet", { className: "Pet" });

@@ -456,7 +456,7 @@ export function scope(
         [foreignKey]: record._readAttribute(ownerKey as string),
       });
     }
-    if (assocDef.scope) rel = assocDef.scope.call(rel, rel, record) || rel;
+    if (assocDef.scope) rel = assocDef.scope.call(rel, record) || rel;
   }
   return rel;
 }

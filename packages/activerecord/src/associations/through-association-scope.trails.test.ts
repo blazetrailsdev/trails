@@ -17,7 +17,9 @@ registerModel(Tagging);
 
 (Tag as any).hasMany(
   "welcomeTaggedPosts",
-  (rel: any) => rel.where("posts.title = 'Welcome to the weblog'"),
+  function (this: any) {
+    return this.where("posts.title = 'Welcome to the weblog'");
+  },
   {
     through: "taggings",
     source: "taggable",
@@ -25,15 +27,23 @@ registerModel(Tagging);
   },
 );
 
-(Author as any).hasMany("annotatedComments", (rel: any) => rel.annotate("preload-through"), {
-  className: "Comment",
-  through: "posts",
-  source: "comments",
-});
+(Author as any).hasMany(
+  "annotatedComments",
+  function (this: any) {
+    return this.annotate("preload-through");
+  },
+  {
+    className: "Comment",
+    through: "posts",
+    source: "comments",
+  },
+);
 
 (Author as any).hasMany(
   "commentsWithSourceCondition",
-  (rel: any) => rel.where("comments.body = 'first comment'"),
+  function (this: any) {
+    return this.where("comments.body = 'first comment'");
+  },
   {
     className: "Comment",
     through: "posts",
@@ -43,7 +53,9 @@ registerModel(Tagging);
 
 (Author as any).hasMany(
   "commentsWithThroughCondition",
-  (rel: any) => rel.where({ posts: { title: "Welcome to the weblog" } }),
+  function (this: any) {
+    return this.where({ posts: { title: "Welcome to the weblog" } });
+  },
   {
     className: "Comment",
     through: "posts",
@@ -53,7 +65,9 @@ registerModel(Tagging);
 
 (Author as any).hasMany(
   "commentsWithRawThroughCondition",
-  (rel: any) => rel.where("posts.title = 'Welcome to the weblog'"),
+  function (this: any) {
+    return this.where("posts.title = 'Welcome to the weblog'");
+  },
   {
     className: "Comment",
     through: "posts",
@@ -63,7 +77,9 @@ registerModel(Tagging);
 
 (Author as any).hasMany(
   "commentsWithMixedCondition",
-  (rel: any) => rel.where("posts.title = 'Welcome to the weblog' OR comments.body = 'x'"),
+  function (this: any) {
+    return this.where("posts.title = 'Welcome to the weblog' OR comments.body = 'x'");
+  },
   {
     className: "Comment",
     through: "posts",

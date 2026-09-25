@@ -78,7 +78,9 @@ describe("PredicateBuilderTest", () => {
       static {
         this.belongsTo(
           "regexp_topic",
-          (rel: any) => rel.where({ title: new RegexFilter("rails") }),
+          function (this: any) {
+            return this.where({ title: new RegexFilter("rails") });
+          },
           {
             className: "Topic",
             foreignKey: "parent_id",

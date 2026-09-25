@@ -85,7 +85,9 @@ export class SuperMembership extends Membership {
   static {
     registerModel(SuperMembership);
     registerSubclass(SuperMembership);
-    this.belongsTo("member", (q: any) => q.order("members.id DESC"));
+    this.belongsTo("member", function (this: any) {
+      return this.order("members.id DESC");
+    });
     this.belongsTo("club");
   }
 }

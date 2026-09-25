@@ -378,8 +378,7 @@ export class AssociationScope {
     const relation = (reflection as unknown as ScopeBuilder).buildScope(
       (reflection as Partial<ReflectionProxy>).aliasedTable,
     );
-    const evaluated = scope.call(relation, relation, owner);
-    return evaluated != null && evaluated !== false ? evaluated : relation;
+    return scope.call(relation, owner) || relation;
   }
 
   /** @internal */

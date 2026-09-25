@@ -31,10 +31,11 @@ type HasManyHost = {
 
 (Member as unknown as HasManyHost).hasMany(
   "rawClubs",
-  (rel: JoinWhere) =>
-    rel
-      .joins("INNER JOIN categories ON categories.id = clubs.category_id")
-      .where("categories.name = 'General'"),
+  function (this: JoinWhere) {
+    return this.joins("INNER JOIN categories ON categories.id = clubs.category_id").where(
+      "categories.name = 'General'",
+    );
+  },
   {
     through: "favoriteMemberships",
     source: "club",

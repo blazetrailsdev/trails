@@ -4,12 +4,15 @@ import { fixtures } from "../test-fixtures.js";
 import { Preloader } from "./preloader.js";
 import { ThroughAssociation } from "./preloader/through-association.js";
 import { CpkOrder, CpkOrderTag, CpkTag } from "../test-helpers/models/cpk.js";
+import type { Relation } from "../relation.js";
 
 registerModel([CpkOrder, CpkOrderTag, CpkTag]);
 
 CpkOrder.hasMany(
   "tagsWithMixedCondition",
-  (rel) => rel.where("cpk_order_tags.order_id > 0 AND cpk_tags.name = 'Digital product'"),
+  function (this: Relation<CpkTag>) {
+    return this.where("cpk_order_tags.order_id > 0 AND cpk_tags.name = 'Digital product'");
+  },
   {
     className: "CpkTag",
     through: "orderTags",

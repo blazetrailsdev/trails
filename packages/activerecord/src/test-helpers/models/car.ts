@@ -43,20 +43,52 @@ export class Car extends Base {
   static {
     this.belongsTo("person", { counterCache: true });
     this.hasMany("bulbs");
-    this.hasMany("allBulbs", (q: any) => q.unscope({ ":where": "name" }), { className: "Bulb" });
-    this.hasMany("allBulbs2", (q: any) => q.unscope(":where"), { className: "Bulb" });
+    this.hasMany(
+      "allBulbs",
+      function (this: any) {
+        return this.unscope({ ":where": "name" });
+      },
+      { className: "Bulb" },
+    );
+    this.hasMany(
+      "allBulbs2",
+      function (this: any) {
+        return this.unscope(":where");
+      },
+      { className: "Bulb" },
+    );
     this.hasMany(
       "otherBulbs",
-      (q: any) => q.unscope({ ":where": "name" }).where({ name: "other" }),
+      function (this: any) {
+        return this.unscope({ ":where": "name" }).where({ name: "other" });
+      },
       {
         className: "Bulb",
       },
     );
-    this.hasMany("oldBulbs", (q: any) => q.rewhere({ name: "old" }), { className: "Bulb" });
+    this.hasMany(
+      "oldBulbs",
+      function (this: any) {
+        return this.rewhere({ name: "old" });
+      },
+      { className: "Bulb" },
+    );
     this.hasMany("funkyBulbs", { className: "FunkyBulb", dependent: "destroy" });
     this.hasMany("failedBulbs", { className: "FailedBulb", dependent: "destroy" });
-    this.hasMany("fooBulbs", (q: any) => q.where({ name: "foo" }), { className: "Bulb" });
-    this.hasMany("awesomeBulbs", (q: any) => q.awesome(), { className: "Bulb" });
+    this.hasMany(
+      "fooBulbs",
+      function (this: any) {
+        return this.where({ name: "foo" });
+      },
+      { className: "Bulb" },
+    );
+    this.hasMany(
+      "awesomeBulbs",
+      function (this: any) {
+        return this.awesome();
+      },
+      { className: "Bulb" },
+    );
 
     this.hasOne("bulb");
 

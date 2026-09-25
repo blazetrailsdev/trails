@@ -41,8 +41,11 @@ type HasManyHost = {
 
 (Member as unknown as HasOneHost).hasOne(
   "davidCategorizedClub",
-  (rel: NestedRel) =>
-    rel.leftJoins({ ":category": ":categorizations" }).where({ categorizations: { author_id: 1 } }),
+  function (this: NestedRel) {
+    return this.leftJoins({ ":category": ":categorizations" }).where({
+      categorizations: { author_id: 1 },
+    });
+  },
   {
     through: "currentMembership",
     source: "club",
@@ -51,10 +54,11 @@ type HasManyHost = {
 
 (Member as unknown as HasOneHost).hasOne(
   "davidIncludedCategorizedClub",
-  (rel: NestedRel) =>
-    (rel as unknown as { includes: (s: Record<string, unknown>) => NestedRel })
+  function (this: NestedRel) {
+    return (this as unknown as { includes: (s: Record<string, unknown>) => NestedRel })
       .includes({ ":category": ":categorizations" })
-      .where({ categorizations: { author_id: 1 } }),
+      .where({ categorizations: { author_id: 1 } });
+  },
   {
     through: "currentMembership",
     source: "club",
@@ -63,10 +67,11 @@ type HasManyHost = {
 
 (Member as unknown as HasManyHost).hasMany(
   "generalClubs",
-  (rel: NestedRel) =>
-    (rel as unknown as { includes: (s: string) => NestedRel })
+  function (this: NestedRel) {
+    return (this as unknown as { includes: (s: string) => NestedRel })
       .includes(":category")
-      .where({ categories: { name: "General" } }),
+      .where({ categories: { name: "General" } });
+  },
   {
     through: "favoriteMemberships",
     source: "club",
@@ -75,10 +80,11 @@ type HasManyHost = {
 
 (Member as unknown as HasManyHost).hasMany(
   "categorizedClubs",
-  (rel: NestedRel) =>
-    (rel as unknown as { includes: (s: Record<string, unknown>) => NestedRel })
+  function (this: NestedRel) {
+    return (this as unknown as { includes: (s: Record<string, unknown>) => NestedRel })
       .includes({ ":category": ":categorizations" })
-      .where({ categorizations: { author_id: 1 } }),
+      .where({ categorizations: { author_id: 1 } });
+  },
   {
     through: "favoriteMemberships",
     source: "club",

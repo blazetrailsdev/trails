@@ -38,10 +38,11 @@ type HasOneHost = {
 
 (Member as unknown as HasManyHost).hasMany(
   "rawMembersOfClub",
-  (rel: JoinWhere) =>
-    rel
-      .joins("INNER JOIN categories ON categories.id = memberships.club_id")
-      .where("categories.name = 'General'"),
+  function (this: JoinWhere) {
+    return this.joins("INNER JOIN categories ON categories.id = memberships.club_id").where(
+      "categories.name = 'General'",
+    );
+  },
   {
     through: "club",
     source: "members",
@@ -50,10 +51,11 @@ type HasOneHost = {
 
 (Club as unknown as HasManyHost).hasMany(
   "rawMembers",
-  (rel: JoinWhere) =>
-    rel
-      .joins("INNER JOIN categories ON categories.id = members.id")
-      .where("categories.name = 'General'"),
+  function (this: JoinWhere) {
+    return this.joins("INNER JOIN categories ON categories.id = members.id").where(
+      "categories.name = 'General'",
+    );
+  },
   {
     through: "memberships",
     source: "member",
@@ -61,7 +63,9 @@ type HasOneHost = {
 );
 (Member as unknown as HasManyHost).hasMany(
   "membersViaRawClub",
-  (rel: JoinWhere) => rel.where("clubs.name IS NOT NULL"),
+  function (this: JoinWhere) {
+    return this.where("clubs.name IS NOT NULL");
+  },
   {
     through: "club",
     source: "rawMembers",
@@ -70,7 +74,9 @@ type HasOneHost = {
 
 (Member as unknown as HasManyHost).hasMany(
   "noWhereRawMembersOfClub",
-  (rel: JoinWhere) => rel.joins("INNER JOIN categories ON categories.id = memberships.club_id"),
+  function (this: JoinWhere) {
+    return this.joins("INNER JOIN categories ON categories.id = memberships.club_id");
+  },
   {
     through: "club",
     source: "members",
@@ -79,10 +85,11 @@ type HasOneHost = {
 
 (Member as unknown as HasOneHost).hasOne(
   "rawCategoryOfClub",
-  (rel: JoinWhere) =>
-    rel
-      .joins("INNER JOIN categorizations ON categorizations.category_id = categories.id")
-      .where("categorizations.author_id = 1"),
+  function (this: JoinWhere) {
+    return this.joins(
+      "INNER JOIN categorizations ON categorizations.category_id = categories.id",
+    ).where("categorizations.author_id = 1");
+  },
   {
     through: "club",
     source: "category",

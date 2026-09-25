@@ -87,4 +87,22 @@ describe("Mysql2Adapter mismatched foreign key translation", () => {
     expect((raised as MismatchedForeignKey).stack).toBe((sqlLess as Error).stack);
     await adapter.disconnectBang();
   });
+
+  it("an IF NOT EXISTS statement captures IF as the table, as Rails' pattern does", async () => {
+    const adapter = makeAdapter();
+    const sql =
+      "CREATE TABLE IF NOT EXISTS `wheels` (`id` bigint, `wheelable_id` int, " +
+      "FOREIGN KEY (`wheelable_id`) REFERENCES `vehicles` (`id`))";
+    const translated = (await adapter.translateExceptionClass(
+      fkDriverError(),
+      sql,
+      [],
+    )) as MismatchedForeignKey;
+
+    expect(translated).toBeInstanceOf(MismatchedForeignKey);
+    expect(translated.message).toContain(
+      "Column `wheelable_id` on table `IF` does not match column `id` on `vehicles`",
+    );
+    await adapter.disconnectBang();
+  });
 });
