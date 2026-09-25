@@ -1,4 +1,4 @@
-import { basicObjRespondTo, rbObjSingletonClass } from "@blazetrails/ruby-compat";
+import { basicObjRespondTo, type Hash, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/date";
 import "./i18n.js";
 import { GlobalID as _GlobalIDCtor } from "@blazetrails/globalid";
@@ -2428,11 +2428,11 @@ export interface Base extends Included<typeof AutosaveAssociation>, JSONSerializ
   /** @internal */
   _associationInstances: Map<string, AssociationInstance>;
   association(name: string): AssociationInstance;
-  readonly savedChanges: Record<string, [unknown, unknown]>;
+  readonly savedChanges: Hash<string, [unknown, unknown]>;
   readonly hasChangesToSave: boolean;
-  readonly changesToSave: Record<string, [unknown, unknown]>;
+  readonly changesToSave: HashWithIndifferentAccess<[unknown, unknown]>;
   readonly changedAttributeNamesToSave: string[];
-  readonly attributesInDatabase: Record<string, unknown>;
+  readonly attributesInDatabase: HashWithIndifferentAccess<unknown>;
   readonly idInDatabase: unknown;
   isSavedChanges(): boolean;
   isSavedChangeToAttribute(attr: string, options?: DirtyOptions): boolean;

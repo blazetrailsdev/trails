@@ -74,55 +74,49 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
     return result;
   };
 
-  it.skip("counting on disable joins through", async () => {
-    // BLOCKED: query count — the disable-joins chain walk runs 1 query where Rails runs 2 — filed as 0155-assertion-surfaced-port-bugs/disable-joins-through-skips-per-reflection-pluck
-    expect(await association(author, "noJoinsComments").count()).toEqual(
-      await association(author, "comments").count(),
-    );
+  it("counting on disable joins through", async () => {
+    expect(await author.noJoinsComments.count()).toEqual(await author.comments.count());
     await assertQueriesCount(2, false, async () => {
-      await association(author, "noJoinsComments").count();
+      await author.noJoinsComments.count();
     });
     await assertQueriesCount(1, false, async () => {
-      await association(author, "comments").count();
+      await author.comments.count();
     });
   });
 
-  it.skip("counting on disable joins through using custom foreign key", async () => {
-    // BLOCKED: query count — the disable-joins chain walk runs 1 query where Rails runs 2 — filed as 0155-assertion-surfaced-port-bugs/disable-joins-through-skips-per-reflection-pluck
-    expect(await association(author, "noJoinsCommentsWithForeignKey").count()).toEqual(
-      await association(author, "commentsWithForeignKey").count(),
+  it("counting on disable joins through using custom foreign key", async () => {
+    expect(await author.noJoinsCommentsWithForeignKey.count()).toEqual(
+      await author.commentsWithForeignKey.count(),
     );
     await assertQueriesCount(2, false, async () => {
-      await association(author, "noJoinsCommentsWithForeignKey").count();
+      await author.noJoinsCommentsWithForeignKey.count();
     });
     await assertQueriesCount(1, false, async () => {
-      await association(author, "commentsWithForeignKey").count();
+      await author.commentsWithForeignKey.count();
     });
   });
 
-  it.skip("pluck on disable joins through", async () => {
-    // BLOCKED: query count — the disable-joins chain walk runs 1 query where Rails runs 2 — filed as 0155-assertion-surfaced-port-bugs/disable-joins-through-skips-per-reflection-pluck
-    expect((await association(author, "noJoinsComments").pluck("id")).sort(sortIds)).toEqual(
-      (await association(author, "comments").pluck("id")).sort(sortIds),
+  it("pluck on disable joins through", async () => {
+    expect((await author.noJoinsComments.pluck("id")).sort(sortIds)).toEqual(
+      (await author.comments.pluck("id")).sort(sortIds),
     );
     await assertQueriesCount(2, false, async () => {
-      await association(author, "noJoinsComments").pluck("id");
+      await author.noJoinsComments.pluck("id");
     });
     await assertQueriesCount(1, false, async () => {
-      await association(author, "comments").pluck("id");
+      await author.comments.pluck("id");
     });
   });
 
-  it.skip("pluck on disable joins through using custom foreign key", async () => {
-    // BLOCKED: query count — the disable-joins chain walk runs 1 query where Rails runs 2 — filed as 0155-assertion-surfaced-port-bugs/disable-joins-through-skips-per-reflection-pluck
-    expect(
-      (await association(author, "noJoinsCommentsWithForeignKey").pluck("id")).sort(sortIds),
-    ).toEqual((await association(author, "commentsWithForeignKey").pluck("id")).sort(sortIds));
+  it("pluck on disable joins through using custom foreign key", async () => {
+    expect((await author.noJoinsCommentsWithForeignKey.pluck("id")).sort(sortIds)).toEqual(
+      (await author.commentsWithForeignKey.pluck("id")).sort(sortIds),
+    );
     await assertQueriesCount(2, false, async () => {
-      await association(author, "noJoinsCommentsWithForeignKey").pluck("id");
+      await author.noJoinsCommentsWithForeignKey.pluck("id");
     });
     await assertQueriesCount(1, false, async () => {
-      await association(author, "commentsWithForeignKey").pluck("id");
+      await author.commentsWithForeignKey.pluck("id");
     });
   });
 

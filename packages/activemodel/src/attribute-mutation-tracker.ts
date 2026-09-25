@@ -1,4 +1,6 @@
 import { Temporal } from "@blazetrails/date";
+import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
+import { Hash } from "@blazetrails/ruby-compat";
 import { AttributeSet } from "./attribute-set.js";
 
 /** @internal */
@@ -43,21 +45,23 @@ export class AttributeMutationTracker {
     return this.attrNames().filter((attrName) => this.isChanged(attrName));
   }
 
-  changedValues(): Record<string, unknown> {
-    const result: Record<string, unknown> = {};
+  changedValues(): HashWithIndifferentAccess<unknown> {
+    const result = new HashWithIndifferentAccess<unknown>();
     for (const attrName of this.attrNames()) {
       if (this.isChanged(attrName)) {
-        result[attrName] = this.originalValue(attrName);
+        result.set(attrName, this.originalValue(attrName));
       }
     }
     return result;
   }
 
-  changes(): Record<string, [unknown, unknown]> {
-    const result: Record<string, [unknown, unknown]> = {};
+  changes(): HashWithIndifferentAccess<[unknown, unknown]> {
+    const result = new HashWithIndifferentAccess<[unknown, unknown]>();
     for (const attrName of this.attrNames()) {
       const change = this.changeToAttribute(attrName);
-      if (change) result[attrName] = change;
+      if (change) {
+        result.mergeBang({ [attrName]: change });
+      }
     }
     return result;
   }
@@ -134,7 +138,7 @@ export interface ForcedMutationTrackerHost {
 }
 
 export class ForcedMutationTracker extends AttributeMutationTracker {
-  private finalizedChanges: Record<string, [unknown, unknown]> | null = null;
+  private finalizedChanges: HashWithIndifferentAccess<[unknown, unknown]> | null = null;
 
   constructor(attributes: ForcedMutationTrackerHost) {
     super(attributes as unknown as AttributeSet);
@@ -145,8 +149,8 @@ export class ForcedMutationTracker extends AttributeMutationTracker {
   }
 
   changeToAttribute(attrName: string): [unknown, unknown] | null {
-    if (this.finalizedChanges && Object.hasOwn(this.finalizedChanges, attrName)) {
-      return [...this.finalizedChanges[attrName]];
+    if (this.finalizedChanges?.include(attrName)) {
+      return [...this.finalizedChanges.get(attrName)!];
     }
     return super.changeToAttribute(attrName);
   }
@@ -204,12 +208,12 @@ export class NullMutationTracker {
     return [];
   }
 
-  changedValues(): Record<string, unknown> {
-    return {};
+  changedValues(): Hash<string, unknown> {
+    return new Hash();
   }
 
-  changes(): Record<string, [unknown, unknown]> {
-    return {};
+  changes(): Hash<string, [unknown, unknown]> {
+    return new Hash();
   }
 
   changeToAttribute(_attrName: string): [unknown, unknown] | null {

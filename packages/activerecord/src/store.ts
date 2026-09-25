@@ -7,7 +7,7 @@ import {
 } from "@blazetrails/activesupport";
 import { buildColumnSerializer } from "./attribute-methods/serialization.js";
 import { YAMLColumn, type YamlColumnOptions } from "./coders/yaml-column.js";
-import { Module, include } from "@blazetrails/ruby-compat";
+import { type Hash, Module, include } from "@blazetrails/ruby-compat";
 
 interface CoderLike {
   dump(v: unknown): unknown;
@@ -180,32 +180,38 @@ function storeAccessor(
 
       mod.defineMethod(`${accessorKey}Changed`, function (this: StoreDirtyHost) {
         if (!this.attributeChanged(storeAttribute)) return false;
-        const [prevStore, newStore] = this.changes[storeAttribute] ?? [undefined, undefined];
+        const [prevStore, newStore] = this.changes.get(storeAttribute) ?? [undefined, undefined];
         return dig(prevStore, key) !== dig(newStore, key);
       });
       mod.defineMethod(`${accessorKey}Change`, function (this: StoreDirtyHost) {
         if (!this.attributeChanged(storeAttribute)) return null;
-        const [prevStore, newStore] = this.changes[storeAttribute] ?? [undefined, undefined];
+        const [prevStore, newStore] = this.changes.get(storeAttribute) ?? [undefined, undefined];
         return [dig(prevStore, key) ?? null, dig(newStore, key) ?? null];
       });
       mod.defineMethod(`${accessorKey}Was`, function (this: StoreDirtyHost) {
         if (!this.attributeChanged(storeAttribute)) return null;
-        const [prevStore] = this.changes[storeAttribute] ?? [undefined];
+        const [prevStore] = this.changes.get(storeAttribute) ?? [undefined];
         return dig(prevStore, key) ?? null;
       });
       mod.defineMethod(`isSavedChangeTo${cap}`, function (this: StoreDirtyHost) {
         if (!this.isSavedChangeToAttribute?.(storeAttribute)) return false;
-        const [prevStore, newStore] = this.savedChanges?.[storeAttribute] ?? [undefined, undefined];
+        const [prevStore, newStore] = this.savedChanges?.get(storeAttribute) ?? [
+          undefined,
+          undefined,
+        ];
         return dig(prevStore, key) !== dig(newStore, key);
       });
       mod.defineMethod(`savedChangeTo${cap}`, function (this: StoreDirtyHost) {
         if (!this.isSavedChangeToAttribute?.(storeAttribute)) return null;
-        const [prevStore, newStore] = this.savedChanges?.[storeAttribute] ?? [undefined, undefined];
+        const [prevStore, newStore] = this.savedChanges?.get(storeAttribute) ?? [
+          undefined,
+          undefined,
+        ];
         return [dig(prevStore, key) ?? null, dig(newStore, key) ?? null];
       });
       mod.defineMethod(`${accessorKey}BeforeLastSave`, function (this: StoreDirtyHost) {
         if (!this.isSavedChangeToAttribute?.(storeAttribute)) return null;
-        const [prevStore] = this.savedChanges?.[storeAttribute] ?? [undefined];
+        const [prevStore] = this.savedChanges?.get(storeAttribute) ?? [undefined];
         return dig(prevStore, key) ?? null;
       });
     }
@@ -223,8 +229,8 @@ function storeAccessor(
 interface StoreDirtyHost {
   attributeChanged(name: string): boolean;
   isSavedChangeToAttribute(name: string): boolean;
-  changes: Record<string, [unknown, unknown]>;
-  savedChanges: Record<string, [unknown, unknown]>;
+  changes: HashWithIndifferentAccess<[unknown, unknown]>;
+  savedChanges: Hash<string, [unknown, unknown]>;
 }
 
 function dig(obj: unknown, key: string): unknown {

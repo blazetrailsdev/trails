@@ -1803,16 +1803,16 @@ describe("AttributeMethodsTest", () => {
     )[0] as any;
 
     expect(object.string_value).toBe("Firm");
-    expect(object.queryAttribute("string_value")).toBeTruthy();
+    expect(object["string_value?"]).toBeTruthy();
 
-    object.writeAttribute("string_value", "  ");
-    expect(object.queryAttribute("string_value")).toBeFalsy();
+    object.string_value = "  ";
+    expect(object["string_value?"]).toBeFalsy();
 
     expect(Number(object.int_value)).toBe(1);
-    expect(object.queryAttribute("int_value")).toBeTruthy();
+    expect(object["int_value?"]).toBeTruthy();
 
-    object.writeAttribute("int_value", "0");
-    expect(object.queryAttribute("int_value")).toBeFalsy();
+    object.int_value = "0";
+    expect(object["int_value?"]).toBeFalsy();
   });
 
   it("update array content", async () => {

@@ -1,3 +1,4 @@
+import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { kernelThrow } from "@blazetrails/ruby-compat";
 import { describe, it, expect, afterEach, afterAll, vi } from "vitest";
 import { LoadInterlockAwareMonitor } from "@blazetrails/activesupport";
@@ -20,7 +21,7 @@ interface TxRecordInternals {
   readAttribute(name: string): unknown;
   _startTransactionState: StartTransactionState;
   isChanged: boolean;
-  changes: Record<string, unknown>;
+  changes: HashWithIndifferentAccess<unknown>;
   attributeChanged(name: string): boolean;
   attributeWas(name: string): unknown;
 }
@@ -232,9 +233,11 @@ describe("rememberTransactionRecordState / restoreTransactionRecordState (Story 
 
     expect(internals._startTransactionState).toBeNull();
     expect(internals.readAttribute("title")).toBe("changed-during-tx");
-    expect(internals.changes).toEqual({
-      title: ["original", "changed-during-tx"],
-    });
+    expect(internals.changes).toEqual(
+      new HashWithIndifferentAccess({
+        title: ["original", "changed-during-tx"],
+      }),
+    );
   });
 });
 
@@ -278,9 +281,11 @@ describe("restore_transaction_record_state after rollback (Story K-followup)", (
     expect(internals.readAttribute("title")).toBe("tx-edit");
     expect(internals.attributeChanged("title")).toBe(true);
     expect(internals.attributeWas("title")).toBe("original");
-    expect(internals.changes).toEqual({
-      title: ["original", "tx-edit"],
-    });
+    expect(internals.changes).toEqual(
+      new HashWithIndifferentAccess({
+        title: ["original", "tx-edit"],
+      }),
+    );
   });
 
   it("rollback leaves clean attributes unchanged (no spurious dirty)", async () => {
@@ -299,7 +304,7 @@ describe("restore_transaction_record_state after rollback (Story K-followup)", (
     });
 
     expect(internals.isChanged).toBe(false);
-    expect(internals.changes).toEqual({});
+    expect(internals.changes).toEqual(new HashWithIndifferentAccess());
   });
 });
 

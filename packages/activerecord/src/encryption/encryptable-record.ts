@@ -330,7 +330,7 @@ export function preserveOriginalEncrypted(this: any, name: string): void {
 /** @internal */
 export function cantModifyEncryptedAttributesWhenFrozen(this: any): void {
   for (const attribute of this.constructor.encryptedAttributes) {
-    if (Object.keys(this.changedAttributes).includes(attribute)) {
+    if (this.changedAttributes.include(attribute)) {
       this.errors.add(attribute, "can't be modified because it is encrypted");
     }
   }

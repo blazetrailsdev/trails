@@ -217,7 +217,7 @@ describe("OptimisticLockingTest", () => {
     expect(p1.lock_version).toBe(1);
     expect(p1.isChanged).toBeFalsy();
     expect(p1.isSavedChanges()).toBeTruthy();
-    expect(Object.keys(p1.savedChanges).sort()).toEqual(["lock_version", "updated_at"]);
+    expect([...p1.savedChanges.keys()].sort()).toEqual(["lock_version", "updated_at"]);
   });
 
   it("touch stale object", async () => {
@@ -330,7 +330,7 @@ describe("OptimisticLockingTest", () => {
     expect(t1.lock_version).toBe(1);
     expect(t1.isChanged).toBeFalsy();
     expect(t1.isSavedChanges()).toBeTruthy();
-    expect(Object.keys(t1.savedChanges).sort()).toEqual(["lock_version", "updated_at"]);
+    expect([...t1.savedChanges.keys()].sort()).toEqual(["lock_version", "updated_at"]);
   });
 
   it("touch stale object with lock without default", async () => {

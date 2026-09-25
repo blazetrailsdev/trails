@@ -82,7 +82,7 @@ describe("StoreTest", () => {
 
   it("updating the store populates the changed array correctly", () => {
     john.color = "red";
-    const [prev, next] = john.changes["settings"];
+    const [prev, next] = john.changes.get("settings")!;
     expect((prev as any).get("color")).toBe("black");
     expect((next as any).get("color")).toBe("red");
   });

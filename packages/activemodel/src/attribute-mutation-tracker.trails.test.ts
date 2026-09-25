@@ -1,3 +1,5 @@
+import { Hash } from "@blazetrails/ruby-compat";
+import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { describe, it, expect } from "vitest";
 import { Attribute } from "./attribute.js";
 import { AttributeSet } from "./attribute-set.js";
@@ -30,7 +32,7 @@ describe("AttributeMutationTracker", () => {
     const tracker = new AttributeMutationTracker(set);
     expect(tracker.anyChanges()).toBe(false);
     expect(tracker.changedAttributeNames()).toEqual([]);
-    expect(tracker.changes()).toEqual({});
+    expect(tracker.changes()).toEqual(new HashWithIndifferentAccess());
   });
 
   it("detects changes after writeFromUser", () => {
@@ -154,8 +156,8 @@ describe("AttributeMutationTracker", () => {
 
     set.writeFromUser("name", "Bob");
     const changed = tracker.changedValues();
-    expect(changed.name).toBe("Alice");
-    expect(changed.age).toBeUndefined();
+    expect(changed.get("name")).toBe("Alice");
+    expect(changed.get("age")).toBeUndefined();
   });
 });
 
@@ -219,7 +221,7 @@ describe("NullMutationTracker", () => {
     const tracker = new NullMutationTracker();
     expect(tracker.anyChanges()).toBe(false);
     expect(tracker.changedAttributeNames()).toEqual([]);
-    expect(tracker.changes()).toEqual({});
+    expect(tracker.changes()).toEqual(new Hash());
     expect(tracker.isChanged("anything")).toBe(false);
     expect(tracker.originalValue("anything")).toBeUndefined();
     expect(tracker.changeToAttribute("anything")).toBeNull();

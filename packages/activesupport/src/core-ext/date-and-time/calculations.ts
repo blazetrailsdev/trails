@@ -59,6 +59,7 @@ function toDate(this: Receiver): Temporal.PlainDate {
 }
 
 function wday(this: Receiver): number {
+  if (this instanceof RubyTime) return this.wday;
   const self = receiver(this);
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   if (self instanceof Date) return self.getDay();
@@ -100,6 +101,7 @@ function change(
     nsec?: number;
   },
 ): Result {
+  if (this instanceof RubyTime) return this.change(options);
   if (this instanceof Temporal.PlainDateTime || this instanceof Temporal.ZonedDateTime)
     return dateTime.change(this, options);
   const self = receiver(this);
@@ -116,39 +118,46 @@ function receiver(dateOrTime: Receiver): DateOrTime {
 }
 
 function year(this: Receiver): number {
+  if (this instanceof RubyTime) return this.year;
   const self = receiver(this);
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   return self instanceof Date ? self.getFullYear() : Number(self.year);
 }
 
 function month(this: Receiver): number {
+  if (this instanceof RubyTime) return this.month;
   const self = receiver(this);
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   return self instanceof Date ? self.getMonth() + 1 : self.month;
 }
 
 function day(this: Receiver): number {
+  if (this instanceof RubyTime) return this.day;
   const self = receiver(this);
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   return self instanceof Date ? self.getDate() : self.day;
 }
 
 function hour(this: Receiver): number {
+  if (this instanceof RubyTime) return this.hour;
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   return this instanceof Date ? this.getHours() : 0;
 }
 
 function min(this: Receiver): number {
+  if (this instanceof RubyTime) return this.min;
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   return this instanceof Date ? this.getMinutes() : 0;
 }
 
 function sec(this: Receiver): number {
+  if (this instanceof RubyTime) return this.sec;
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   return this instanceof Date ? this.getSeconds() : 0;
 }
 
 function nsec(this: Receiver): number | undefined {
+  if (this instanceof RubyTime) return this.nsec;
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   return this instanceof Date ? this.getMilliseconds() * 1_000_000 : undefined;
 }
@@ -355,7 +364,11 @@ export function beginningOfWeek(this: Receiver, startDay: string = date.beginnin
   const result = daysAgo.call(this, daysToWeekStart.call(this, startDay));
   if (result instanceof Temporal.PlainDateTime || result instanceof Temporal.ZonedDateTime)
     return dateTime.beginningOfDay(result);
-  return Object.actsLike(this, "time") ? time.midnight(receiver(result) as Date) : result;
+  return Object.actsLike(this, "time")
+    ? result instanceof RubyTime
+      ? result.midnight()
+      : time.midnight(receiver(result) as Date)
+    : result;
 }
 
 export const atBeginningOfWeek = beginningOfWeek;
@@ -424,7 +437,9 @@ function firstHour(this: Receiver, dateOrTime: Result): Result {
   if (dateOrTime instanceof Temporal.PlainDateTime || dateOrTime instanceof Temporal.ZonedDateTime)
     return dateTime.beginningOfDay(dateOrTime);
   return Object.actsLike(dateOrTime, "time")
-    ? time.beginningOfDay(receiver(dateOrTime) as Date)
+    ? dateOrTime instanceof RubyTime
+      ? dateOrTime.beginningOfDay()
+      : time.beginningOfDay(receiver(dateOrTime) as Date)
     : dateOrTime;
 }
 
@@ -433,7 +448,9 @@ function lastHour(this: Receiver, dateOrTime: Result): Result {
   if (dateOrTime instanceof Temporal.PlainDateTime || dateOrTime instanceof Temporal.ZonedDateTime)
     return dateTime.endOfDay(dateOrTime);
   return Object.actsLike(dateOrTime, "time")
-    ? time.endOfDay(receiver(dateOrTime) as Date)
+    ? dateOrTime instanceof RubyTime
+      ? dateOrTime.endOfDay()
+      : time.endOfDay(receiver(dateOrTime) as Date)
     : dateOrTime;
 }
 

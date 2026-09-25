@@ -1,3 +1,4 @@
+import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging --
    Each model below spells `include ActiveModel::Dirty` in its class body, the way the Rails test
    model it mirrors does; the empty class/interface merge beside it is how `include()` surfaces
@@ -24,9 +25,11 @@ describe("DirtyMutations", () => {
   it("mutationsFromDatabase tracks pending writes vs the loaded values", () => {
     const p = new Person({ name: "Alice", age: 30 });
     p.changesApplied();
-    expect(p.mutationsFromDatabase.changes()).toEqual({});
+    expect(p.mutationsFromDatabase.changes()).toEqual(new HashWithIndifferentAccess());
     (p as any).name = "Bob";
-    expect(p.mutationsFromDatabase.changes()).toEqual({ name: ["Alice", "Bob"] });
+    expect(p.mutationsFromDatabase.changes()).toEqual(
+      new HashWithIndifferentAccess({ name: ["Alice", "Bob"] }),
+    );
   });
 
   it("mutationsFromDatabase clears after changesApplied", () => {
@@ -34,16 +37,20 @@ describe("DirtyMutations", () => {
     p.changesApplied();
     (p as any).name = "Bob";
     p.changesApplied();
-    expect(p.mutationsFromDatabase.changes()).toEqual({});
+    expect(p.mutationsFromDatabase.changes()).toEqual(new HashWithIndifferentAccess());
   });
 
   it("mutationsBeforeLastSave snapshots pending changes at save time", () => {
     const p = new Person({ name: "Alice" });
     p.changesApplied();
-    expect(p.mutationsBeforeLastSave.changes()).toEqual({ name: [null, "Alice"] });
+    expect(p.mutationsBeforeLastSave.changes()).toEqual(
+      new HashWithIndifferentAccess({ name: [null, "Alice"] }),
+    );
     (p as any).name = "Bob";
     p.changesApplied();
-    expect(p.mutationsBeforeLastSave.changes()).toEqual({ name: ["Alice", "Bob"] });
+    expect(p.mutationsBeforeLastSave.changes()).toEqual(
+      new HashWithIndifferentAccess({ name: ["Alice", "Bob"] }),
+    );
   });
 
   it("mutationsBeforeLastSave is replaced on the next save", () => {
@@ -53,7 +60,9 @@ describe("DirtyMutations", () => {
     p.changesApplied();
     (p as any).name = "Carol";
     p.changesApplied();
-    expect(p.mutationsBeforeLastSave.changes()).toEqual({ name: ["Bob", "Carol"] });
+    expect(p.mutationsBeforeLastSave.changes()).toEqual(
+      new HashWithIndifferentAccess({ name: ["Bob", "Carol"] }),
+    );
   });
 
   it("forgetAttributeAssignments drops pending tracking without reverting values", () => {
@@ -62,7 +71,7 @@ describe("DirtyMutations", () => {
     (p as any).name = "Bob";
     (p as any).age = 40;
     p.forgetAttributeAssignments();
-    expect(p.mutationsFromDatabase.changes()).toEqual({});
+    expect(p.mutationsFromDatabase.changes()).toEqual(new HashWithIndifferentAccess());
     expect((p as any).name).toBe("Bob");
     expect((p as any).age).toBe(40);
   });
@@ -73,7 +82,9 @@ describe("DirtyMutations", () => {
     (p as any).name = "Bob";
     p.forgetAttributeAssignments();
     (p as any).name = "Carol";
-    expect(p.mutationsFromDatabase.changes()).toEqual({ name: ["Bob", "Carol"] });
+    expect(p.mutationsFromDatabase.changes()).toEqual(
+      new HashWithIndifferentAccess({ name: ["Bob", "Carol"] }),
+    );
   });
 
   it("forgetAttributeAssignments preserves mutationsBeforeLastSave", () => {
@@ -83,7 +94,9 @@ describe("DirtyMutations", () => {
     p.changesApplied();
     (p as any).name = "Carol";
     p.forgetAttributeAssignments();
-    expect(p.mutationsBeforeLastSave.changes()).toEqual({ name: ["Alice", "Bob"] });
+    expect(p.mutationsBeforeLastSave.changes()).toEqual(
+      new HashWithIndifferentAccess({ name: ["Alice", "Bob"] }),
+    );
   });
 
   it("clearAttributeChange drops a single attribute's pending change", () => {
@@ -92,7 +105,9 @@ describe("DirtyMutations", () => {
     (p as any).name = "Bob";
     (p as any).age = 40;
     p.clearAttributeChange("name");
-    expect(p.mutationsFromDatabase.changes()).toEqual({ age: [30, 40] });
+    expect(p.mutationsFromDatabase.changes()).toEqual(
+      new HashWithIndifferentAccess({ age: [30, 40] }),
+    );
     expect((p as any).name).toBe("Bob");
   });
 
@@ -102,6 +117,8 @@ describe("DirtyMutations", () => {
     (p as any).name = "Bob";
     p.clearAttributeChange("name");
     (p as any).name = "Carol";
-    expect(p.mutationsFromDatabase.changes()).toEqual({ name: ["Bob", "Carol"] });
+    expect(p.mutationsFromDatabase.changes()).toEqual(
+      new HashWithIndifferentAccess({ name: ["Bob", "Carol"] }),
+    );
   });
 });

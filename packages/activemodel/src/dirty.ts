@@ -1,4 +1,10 @@
-import { included, kernelArray, prepend } from "@blazetrails/activesupport";
+import {
+  HashWithIndifferentAccess,
+  included,
+  kernelArray,
+  prepend,
+} from "@blazetrails/activesupport";
+import type { Hash } from "@blazetrails/ruby-compat";
 
 import { AttributeSet } from "./attribute-set.js";
 import {
@@ -85,15 +91,15 @@ export class Dirty {
     attrNames.forEach((attrName) => this.clearAttributeChange(attrName));
   }
 
-  get changedAttributes(): Record<string, unknown> {
+  get changedAttributes(): HashWithIndifferentAccess<unknown> {
     return this.mutationsFromDatabase.changedValues();
   }
 
-  get changes(): Record<string, [unknown, unknown]> {
+  get changes(): HashWithIndifferentAccess<[unknown, unknown]> {
     return this.mutationsFromDatabase.changes();
   }
 
-  get previousChanges(): Record<string, [unknown, unknown]> {
+  get previousChanges(): Hash<string, [unknown, unknown]> {
     return this.mutationsBeforeLastSave.changes();
   }
 

@@ -1,3 +1,4 @@
+import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { describe, it, expect, afterAll, afterEach, vi } from "vitest";
 import { Base, NotImplementedError, ReadonlyAttributeError, Relation } from "./index.js";
 import {
@@ -275,11 +276,11 @@ describe("BasicsTest", async () => {
   it("previously changed", async () => {
     const topic = (await Topic.first()) as any;
     topic.title = "<3<3<3";
-    expect(topic.previousChanges).toEqual({});
+    expect(topic.previousChanges).toEqual(new HashWithIndifferentAccess());
 
     await topic.saveBang();
     const expected = ["The First Topic", "<3<3<3"];
-    expect(topic.previousChanges["title"]).toEqual(expected);
+    expect(topic.previousChanges.get("title")).toEqual(expected);
   });
 
   it("previously changed dup", async () => {

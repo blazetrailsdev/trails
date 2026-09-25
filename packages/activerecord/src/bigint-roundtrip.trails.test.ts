@@ -59,7 +59,7 @@ describe("bigint model round-trip (all adapters)", () => {
     const found = await Metric.find(m.id);
     found.score = BIG + 1n;
     expect(found.isChanged).toBe(true);
-    expect(found.changes.score).toEqual([BIG, BIG + 1n]);
+    expect(found.changes.get("score")).toEqual([BIG, BIG + 1n]);
   });
 
   it("JSON.stringify emits decimal string for bigint attribute", async () => {

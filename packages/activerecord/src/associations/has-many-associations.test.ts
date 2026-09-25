@@ -38,7 +38,7 @@ import { Project } from "../test-helpers/models/project.js";
 import { isAssociationCached } from "../associations.js";
 import { DeleteRestrictionError } from "./errors.js";
 import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
-import { assertNotCalledOnInstanceOf } from "@blazetrails/activesupport";
+import { assertCalled, assertNotCalledOnInstanceOf } from "@blazetrails/activesupport";
 import { AssociationReflection } from "../reflection.js";
 import {
   assertDifference,
@@ -3383,34 +3383,9 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("association proxy transaction method starts transaction in association class", async () => {
-    class TxProxyAuthor extends Base {
-      declare name: string | null;
-      declare tx_proxy_posts: AssociationProxy<TxProxyPost>;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("tx_proxy_posts", {
-          className: "TxProxyPost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class TxProxyPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(TxProxyAuthor);
-    registerModel(TxProxyPost);
-    const author = await TxProxyAuthor.create({ name: "Alice" });
-    const proxy = association(author, "tx_proxy_posts");
-    expect(proxy).toBeDefined();
+    await assertCalled(Comment, "transaction", null, {}, async () => {
+      await (await HmPost.first())!.comments.transaction(async () => {});
+    });
   });
 
   it("sending new to association proxy should have same effect as calling new", () => {
