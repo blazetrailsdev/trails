@@ -87,3 +87,26 @@ describe("GlobalID::Railtie against a real Application", () => {
     }
   });
 });
+
+describe("GlobalID::Railtie Active Record identification", () => {
+  afterEach(() => {
+    _resetApp();
+    resetLoadHooks();
+  });
+
+  it("includes GlobalID::Identification into the class the active_record hook runs on", async () => {
+    const app: TrailtieApp = {
+      railtieName: "blog_app_application",
+      config: { get: () => ({}) as GlobalIdConfig, set: () => {} },
+      keyGenerator: () => new KeyGenerator("x".repeat(30), { iterations: 1000 }),
+    };
+    class Person {
+      id = 5;
+    }
+    await runTrailtieInitializers(Trailtie, app);
+    runLoadHooks("active_record", Person);
+    const person = new Person() as Person & { toGlobalId(): GlobalID; toGidParam(): string };
+    expect(person.toGlobalId().toString()).toBe("gid://blog-app/Person/5");
+    expect(person.toGidParam()).toBe(person.toGlobalId().toParam());
+  });
+});

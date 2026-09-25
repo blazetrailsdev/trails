@@ -1,7 +1,7 @@
 import { describe, expect, test, beforeEach } from "vitest";
 import { BacktraceCleaner } from "./backtrace-cleaner.js";
 
-describe("BacktraceCleaner", () => {
+describe("BacktraceCleanerTest", () => {
   let cleaner: BacktraceCleaner;
 
   beforeEach(() => {

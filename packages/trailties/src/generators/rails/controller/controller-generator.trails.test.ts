@@ -36,4 +36,19 @@ describe("ControllerGenerator view and controller file naming", () => {
     gen.run("RfcPages", ["show"]);
     expect(fs.existsSync(path.join(tmpDir, "app/controllers/rfc-pages-controller.ts"))).toBe(true);
   });
+
+  it("camelizes a plural multi-word name without singularizing it", () => {
+    const gen = makeGen();
+    gen.run("rfc_pages", ["show"]);
+    const controller = fs.readFileSync(
+      path.join(tmpDir, "app/controllers/rfc-pages-controller.ts"),
+      "utf8",
+    );
+    expect(controller).toContain("class RfcPagesController");
+    expect(fs.existsSync(path.join(tmpDir, "app/views/rfc_pages/show.html.tse"))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, "test/controllers/rfc-pages-controller.test.ts"))).toBe(
+      true,
+    );
+    expect(fs.existsSync(path.join(tmpDir, "app/helpers/rfc-pages-helper.ts"))).toBe(true);
+  });
 });

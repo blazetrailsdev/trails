@@ -8,7 +8,7 @@ export function toGlobalId(this: GlobalIDModel, options: GlobalIDOptions = {}): 
 export const toGid = toGlobalId;
 
 export function toGidParam(this: GlobalIDModel, options: GlobalIDOptions = {}): string {
-  return GlobalID.create(this, options).toParam();
+  return toGlobalId.call(this, options).toParam();
 }
 
 export function toSignedGlobalId(
@@ -21,5 +21,14 @@ export function toSignedGlobalId(
 export const toSgid = toSignedGlobalId;
 
 export function toSgidParam(this: GlobalIDModel, options: SignedGlobalIDOptions): string {
-  return SignedGlobalID.create(this, options).toParam();
+  return toSignedGlobalId.call(this, options).toParam();
 }
+
+export const Identification = {
+  toGlobalId,
+  toGid,
+  toGidParam,
+  toSignedGlobalId,
+  toSgid,
+  toSgidParam,
+};

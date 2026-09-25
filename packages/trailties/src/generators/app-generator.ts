@@ -702,7 +702,11 @@ Trails.application!.config.filterParameters = Trails.application!.config.filterP
       "app/models/application-record.ts",
       tsModule({
         imports: [{ from: "@blazetrails/activerecord", named: { Base: "named" } }],
-        declarations: [tsClass({ name: "ApplicationRecord", extends: ref("Base"), body: [] })],
+        declarations: [
+          tsRaw(
+            `export class ApplicationRecord extends Base {\n  static {\n    this.primaryAbstractClass();\n  }\n}`,
+          ),
+        ],
       }),
     );
 

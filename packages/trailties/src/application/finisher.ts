@@ -112,7 +112,7 @@ Finisher.initializer("finisher_hook", function (this: FinisherHost) {
 });
 
 Finisher.initializer("add_internal_routes", function (this: FinisherHost) {
-  if (!(Trails.env as unknown as Record<string, () => boolean>)["development?"]()) return;
+  if (!Trails.env["development?"]()) return;
   this.routes().prepend((mapper) => {
     mapper.get("/rails/info/properties", { to: "rails/info#properties", internal: true });
     mapper.get("/rails/info/routes", { to: "rails/info#routes", internal: true });

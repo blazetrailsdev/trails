@@ -1,21 +1,10 @@
 import { basicObjRespondTo, type Hash, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/date";
 import "./i18n.js";
-import { GlobalID as _GlobalIDCtor } from "@blazetrails/globalid";
+import type { Identification } from "@blazetrails/globalid";
 import { Transaction as _UserTransaction } from "./transaction.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 
-interface ToSgidOptions {
-  app?: string;
-  for?: string;
-  expiresIn?: number;
-  expiresAt?: Temporal.Instant;
-  [key: string]: unknown;
-}
-import type {
-  GlobalIDModel,
-  SignedGlobalID as SignedGlobalIDType,
-} from "@blazetrails/globalid/signed-global-id";
 import {
   ArgumentError,
   AttributeMethods as AMAttributeMethods,
@@ -128,7 +117,6 @@ import {
   type DirtyOptions,
   dirtyInitAttributes,
 } from "@blazetrails/activemodel";
-import { SignedGlobalID as _SignedGlobalIDCtor } from "@blazetrails/globalid/signed-global-id";
 import * as Inheritance from "./inheritance.js";
 import * as SignedId from "./signed-id.js";
 import {
@@ -1964,34 +1952,12 @@ export class Base extends Model {
   declare prettyPrint: typeof _Core.prettyPrint;
   declare attributeForInspect: (attrName: string) => string;
 
-  toGid(
-    options?: import("@blazetrails/globalid").GlobalIDOptions,
-  ): import("@blazetrails/globalid").GlobalID {
-    return this.toGlobalId(options);
-  }
-
-  toSgid(options?: ToSgidOptions): SignedGlobalIDType {
-    const verifier = (this.constructor as typeof Base).signedIdVerifier;
-    return _SignedGlobalIDCtor.create(this as GlobalIDModel, { ...options, verifier });
-  }
-
-  toSgidParam(options?: Parameters<Base["toSgid"]>[0]): string {
-    return this.toSgid(options).toParam();
-  }
-
-  toGlobalId(
-    options?: import("@blazetrails/globalid").GlobalIDOptions,
-  ): import("@blazetrails/globalid").GlobalID {
-    return _GlobalIDCtor.create(this as unknown as GlobalIDModel, options);
-  }
-
-  toGidParam(options?: import("@blazetrails/globalid").GlobalIDOptions): string {
-    return this.toGlobalId(options).toParam();
-  }
-
-  toSignedGlobalId(options?: Parameters<Base["toSgid"]>[0]): SignedGlobalIDType {
-    return this.toSgid(options);
-  }
+  declare toGlobalId: typeof Identification.toGlobalId;
+  declare toGid: typeof Identification.toGid;
+  declare toGidParam: typeof Identification.toGidParam;
+  declare toSignedGlobalId: typeof Identification.toSignedGlobalId;
+  declare toSgid: typeof Identification.toSgid;
+  declare toSgidParam: typeof Identification.toSgidParam;
 
   declare touch: typeof _Persistence.touch;
   declare touchLater: typeof TouchLater.touchLater;

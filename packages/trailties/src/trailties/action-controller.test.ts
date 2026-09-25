@@ -48,6 +48,24 @@ describe("ActionController::Trailtie", () => {
     expect(cfg.wrapParametersByDefault).toBe(false);
     expect(cfg.includeAllHelpers).toBe(true);
   });
+
+  it("set_configs wraps JSON parameters when wrapParametersByDefault is on", async () => {
+    resetLoadHooks();
+    (Trailtie.config.get("actionController") as ActionControllerConfig).wrapParametersByDefault =
+      true;
+    class WrappedController extends ActionController.Base {}
+    await runTrailtieInitializers(Trailtie, app);
+    runLoadHooks("action_controller", WrappedController);
+    expect(WrappedController._wrapperOptions.format).toEqual(["json"]);
+  });
+
+  it("set_configs leaves parameter wrapping off when wrapParametersByDefault is off", async () => {
+    resetLoadHooks();
+    class UnwrappedController extends ActionController.Base {}
+    await runTrailtieInitializers(Trailtie, app);
+    runLoadHooks("action_controller", UnwrappedController);
+    expect(UnwrappedController._wrapperOptions.format).toEqual([]);
+  });
 });
 
 describe("action_controller.set_helpers_path", () => {
