@@ -5300,6 +5300,28 @@ describe("extractFromProgram — classAttribute() generated accessors", () => {
     ]);
   });
 
+  it("credits mattrReader / mattrAccessor with only the halves each macro installs, and no predicate", () => {
+    const info = extractFromFiles("/p", {
+      "configurable.ts": `
+        import { mattrAccessor, mattrReader } from "@blazetrails/activesupport";
+        export class Configurable {
+          static {
+            mattrReader.call(this, "config", { default: 1 });
+            mattrAccessor.call(this, "listeners");
+          }
+        }
+      `,
+    });
+    const klass = info.classes["configurable.ts:Configurable"];
+    const seats = (name: string) =>
+      [...klass.classMethods, ...klass.instanceMethods]
+        .filter((m) => m.name === name)
+        .map((m) => `${m.isStatic ? "static" : "instance"}${m.writer ? " writer" : ""}`);
+    expect(seats("config")).toEqual(["static", "instance"]);
+    expect(seats("listeners")).toEqual(["static", "static writer", "instance", "instance writer"]);
+    expect(seats("isConfig")).toEqual([]);
+  });
+
   it("does not seat an object literal with no [included] or [extended] hook", () => {
     const info = extractFromFiles("/p", {
       "helpers.ts": `

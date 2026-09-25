@@ -41,17 +41,13 @@ export {
 
 export { encrypts } from "./encryptable-record.js";
 export {
+  Encryption,
   eagerLoadBang,
   withEncryptionContext,
   withoutEncryption,
   protectingEncryptedData,
   resetDefaultContext,
-  configure,
-  config,
   defaultContext,
-  encryptedAttributeDeclarationListeners,
-  onEncryptedAttributeDeclared,
-  encryptedAttributeWasDeclared,
   context,
   currentCustomContext,
 } from "../encryption.js";

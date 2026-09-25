@@ -204,20 +204,6 @@ export function _resetConstants(): void {
   _constants.clear();
 }
 
-/** @internal */
-function missingSegment(path: string): [string, unknown] {
-  const segments = path.split("::");
-  for (let i = 1; i <= segments.length; i++) {
-    if (!_constants.has(segments.slice(0, i).join("::"))) {
-      return [
-        segments[i - 1],
-        i === 1 ? Object : _constants.get(segments.slice(0, i - 1).join("::")),
-      ];
-    }
-  }
-  return [segments[segments.length - 1], Object];
-}
-
 function isValidConstantPath(path: string): boolean {
   if (path.length === 0) return false;
   return path.split("::").every((segment) => /^[A-Z]\w*$/.test(segment));
@@ -228,11 +214,24 @@ export function constantize(camelCasedWord: string): unknown {
   if (!isValidConstantPath(path)) {
     throw new NameError(`wrong constant name ${camelCasedWord}`);
   }
-  if (!_constants.has(path)) {
-    const [name, receiver] = missingSegment(path);
-    throw new NameError(`uninitialized constant ${path}`, name, { receiver });
+  if (_constants.has(path)) return _constants.get(path);
+  const segments = path.split("::");
+  let receiver: unknown = Object;
+  for (let i = 1; i <= segments.length; i++) {
+    const key = segments.slice(0, i).join("::");
+    const value = _constants.has(key)
+      ? _constants.get(key)
+      : i > 1 &&
+          receiver != null &&
+          (typeof receiver === "object" || typeof receiver === "function")
+        ? (receiver as Record<string, unknown>)[segments[i - 1]]
+        : undefined;
+    if (value === undefined) {
+      throw new NameError(`uninitialized constant ${key}`, segments[i - 1], { receiver });
+    }
+    receiver = value;
   }
-  return _constants.get(path);
+  return receiver;
 }
 
 export function safeConstantize(camelCasedWord: string): unknown {

@@ -18,7 +18,7 @@ import {
 import type { SQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js";
 import type { PostgreSQLAdapter } from "@blazetrails/activerecord/connection-adapters/postgresql-adapter.js";
 import {
-  Configurable as EncryptionConfigurable,
+  Encryption,
   EncryptedAttributeType,
   EncryptedUniquenessValidator,
   ExtendedDeterministicQueries,
@@ -32,7 +32,7 @@ import {
   setRaiseOnAssignToAttrReadonly,
 } from "@blazetrails/activerecord";
 
-export type ActiveRecordEncryptionConfig = Parameters<typeof EncryptionConfigurable.configure>[0];
+export type ActiveRecordEncryptionConfig = Parameters<typeof Encryption.configure>[0];
 
 export interface ActiveRecordConfig {
   encryption: ActiveRecordEncryptionConfig;
@@ -68,7 +68,7 @@ const onPostgresqlAdapterLoadedPushTimestamptz = (): void => {
 };
 
 const installEncryptionExtendedQueries = (): void => {
-  if (EncryptionConfigurable.config.extendQueries) {
+  if (Encryption.config.extendQueries) {
     ExtendedDeterministicQueries.installSupport({ Relation, Base, EncryptedAttributeType });
     ExtendedDeterministicUniquenessValidator.installSupport({
       UniquenessValidator,
@@ -177,11 +177,11 @@ export class Trailtie extends BaseTrailtie {
       const cfg = this.config.get("activeRecord") as ActiveRecordConfig;
       const enc = cfg.encryption;
       if (enc && Object.keys(enc).length > 0) {
-        EncryptionConfigurable.configure(enc);
+        Encryption.configure(enc);
       }
 
       const autoFilteredParameters = new AutoFilteredParameters(app as AutoFilteredParametersApp);
-      if (EncryptionConfigurable.config.addToFilterParameters) autoFilteredParameters.enable();
+      if (Encryption.config.addToFilterParameters) autoFilteredParameters.enable();
 
       onLoad("active_record", { runOnce: true }, installEncryptionExtendedQueries);
     });

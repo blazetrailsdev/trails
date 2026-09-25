@@ -5,7 +5,7 @@ import { type ValueType } from "@blazetrails/activemodel";
 import { Module, include } from "@blazetrails/ruby-compat";
 import { initializeGeneratedModules } from "../attribute-methods.js";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
-import { Configurable } from "./configurable.js";
+import { Encryption } from "../encryption.js";
 
 /**
  * Mirrors Rails' EncryptableRecord#global_previous_schemes_for.
@@ -17,7 +17,7 @@ import { Configurable } from "./configurable.js";
  * @internal
  */
 export function globalPreviousSchemesFor(scheme: Scheme): Scheme[] {
-  return Configurable.config.previousSchemes
+  return Encryption.config.previousSchemes
     .filter((previousScheme) => scheme.isCompatibleWith(previousScheme))
     .map((previousScheme) => scheme.merge(previousScheme));
 }
@@ -46,7 +46,7 @@ export class EncryptableRecord {
    * @noRailsEquivalent CONVERGEABLE the missing-original-column raise of encrypts (encryption/encryptable_record.rb:101-103), split out for the deferred re-check.
    */
   static requireOriginalColumnPresent(modelClass: any, name: string, colNames: string[]): void {
-    if (Configurable.config.supportUnencryptedData) return;
+    if (Encryption.config.supportUnencryptedData) return;
     const originalName = `${ORIGINAL_ATTRIBUTE_PREFIX}${name}`;
     if (colNames.length === 0 || colNames.includes(originalName)) return;
     throw new Configuration(
@@ -80,7 +80,7 @@ export class EncryptableRecord {
   static loadSchemaBang(this: typeof EncryptableRecord, superFn: () => void): void {
     superFn();
 
-    if (Configurable.config.validateColumnSize) {
+    if (Encryption.config.validateColumnSize) {
       addLengthValidationForEncryptedColumns.call(this);
     }
   }
@@ -113,7 +113,7 @@ export function overrideAccessorsToPreserveOriginal(
             const value = mod.superMethod(this, name)!();
             if (
               (value != null && value !== false && isEncryptedAttribute.call(this, name)) ||
-              !Configurable.config.supportUnencryptedData
+              !Encryption.config.supportUnencryptedData
             ) {
               return this[originalAttributeName];
             } else {
@@ -298,7 +298,7 @@ export function encryptAttribute(this: any, name: string, options: SchemeOptions
     preserveOriginalEncrypted.call(this, name);
   }
 
-  Configurable.encryptedAttributeWasDeclared(this, name);
+  Encryption.encryptedAttributeWasDeclared(this, name);
 }
 
 /** @internal */
@@ -314,7 +314,7 @@ export function preserveOriginalEncrypted(this: any, name: string): void {
 
   const columnNames: string[] = this.columnNames?.() ?? [];
   if (
-    !Configurable.config.supportUnencryptedData &&
+    !Encryption.config.supportUnencryptedData &&
     columnNames.length !== 0 &&
     !columnNames.includes(originalAttributeName)
   ) {

@@ -1,6 +1,5 @@
 import { NotImplementedError } from "../errors.js";
-import { ActiveRecord } from "../namespaces.js";
-import { _ConnectionAdapters } from "../connection-adapters-slot.js";
+import { ActiveRecord, ConnectionAdapters } from "../namespaces.js";
 export interface DatabaseConfigOptions {
   adapter?: string;
   database?: string;
@@ -43,7 +42,7 @@ export class DatabaseConfig {
 
   adapterClass(): (new (...args: any[]) => unknown) | Promise<new (...args: any[]) => unknown> {
     if (this.#adapterClass) return this.#adapterClass;
-    const adapterClass = _ConnectionAdapters!.resolve(this.adapter);
+    const adapterClass = ConnectionAdapters.resolve(this.adapter);
     if (!(adapterClass instanceof Promise)) return (this.#adapterClass = adapterClass);
     return adapterClass.then((klass) => (this.#adapterClass = klass));
   }

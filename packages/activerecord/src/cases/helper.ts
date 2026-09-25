@@ -8,7 +8,7 @@ import { I18n } from "@blazetrails/activemodel";
 import { afterTeardown, zone as timeZone, setZone } from "@blazetrails/activesupport";
 import { DelegateCache } from "../relation/delegation.js";
 import { registerFakeAdapter } from "../support/fake-adapter.js";
-import { Configurable as EncryptionConfigurable } from "../encryption/configurable.js";
+import { Encryption } from "../encryption.js";
 import { ExtendedDeterministicQueries } from "../encryption/extended-deterministic-queries.js";
 import {
   ExtendedDeterministicUniquenessValidator,
@@ -41,13 +41,13 @@ export const TEST_PRIMARY_KEY = "test master key";
 export const TEST_DETERMINISTIC_KEY = "test deterministic key";
 export const TEST_KEY_DERIVATION_SALT = "testing key derivation salt";
 
-EncryptionConfigurable.configure({
+Encryption.configure({
   primaryKey: TEST_PRIMARY_KEY,
   deterministicKey: TEST_DETERMINISTIC_KEY,
   keyDerivationSalt: TEST_KEY_DERIVATION_SALT,
 });
 
-EncryptionConfigurable.config.extendQueries = true;
+Encryption.config.extendQueries = true;
 ExtendedDeterministicQueries.installSupport({ Relation, Base, EncryptedAttributeType });
 ExtendedDeterministicUniquenessValidator.installSupport({
   UniquenessValidator,

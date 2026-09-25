@@ -1,4 +1,4 @@
-import { Autoload, extend, type Extended } from "@blazetrails/activesupport";
+import { Autoload, extend, registerConstant, type Extended } from "@blazetrails/activesupport";
 import type { AssociationRelation as AssociationRelationClass } from "./association-relation.js";
 import type { BelongsToAssociation } from "./associations/belongs-to-association.js";
 import type { BelongsToPolymorphicAssociation } from "./associations/belongs-to-polymorphic-association.js";
@@ -10,10 +10,13 @@ import type { HasOneAssociation } from "./associations/has-one-association.js";
 import type { HasOneThroughAssociation } from "./associations/has-one-through-association.js";
 import type { Base } from "./base.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
+import type { register, resolve } from "./connection-adapters.js";
 import type * as ConnectionHandling from "./connection-handling.js";
 import type { DisableJoinsAssociationRelation } from "./disable-joins-association-relation.js";
 import type { Configurable } from "./encryption/configurable.js";
+import type { Contexts } from "./encryption/contexts.js";
 import type { Fixture } from "./fixtures.js";
+import type { Migration as MigrationClass } from "./migration.js";
 import type * as Compatibility from "./migration/compatibility.js";
 import type * as ModelSchema from "./model-schema.js";
 import type { Relation } from "./relation.js";
@@ -45,6 +48,7 @@ const loadPath: Record<string, () => Promise<unknown>> = {
   "active_record/associations/disable_joins_association_scope": () =>
     import("./associations/disable-joins-association-scope.js"),
   "active_record/encryption/configurable": () => import("./encryption/configurable.js"),
+  "active_record/migration": () => import("./migration.js"),
   "active_record/migration/compatibility": () => import("./migration/compatibility.js"),
   "active_record/connection_adapters/abstract/connection_pool": () =>
     import("./connection-adapters/abstract/connection-pool.js"),
@@ -54,16 +58,19 @@ export const ActiveRecord = { name: "ActiveRecord", loadPath } as AutoloadModule
   Base: typeof Base;
   ConnectionHandling: typeof ConnectionHandling;
   Fixture: typeof Fixture;
+  Migration: typeof MigrationClass;
   ModelSchema: typeof ModelSchema;
   AssociationRelation: typeof AssociationRelationClass;
   DisableJoinsAssociationRelation: typeof DisableJoinsAssociationRelation;
   Relation: typeof Relation;
   Point: new (x: number, y: number) => { x: number; y: number; equals(other: unknown): boolean };
 };
+registerConstant("ActiveRecord", ActiveRecord);
 extend(ActiveRecord, Autoload);
 ActiveRecord.autoload("Base");
 ActiveRecord.autoload("ConnectionHandling");
 ActiveRecord.autoload("Fixture", "active_record/fixtures");
+ActiveRecord.autoload("Migration");
 ActiveRecord.autoload("ModelSchema");
 ActiveRecord.eagerAutoload(() => {
   ActiveRecord.autoload("AssociationRelation");
@@ -98,6 +105,8 @@ export const ConnectionAdapters = {
   loadPath,
 } as AutoloadModule & {
   ConnectionPool: typeof ConnectionPool;
+  register: typeof register;
+  resolve: typeof resolve;
 };
 extend(ConnectionAdapters, Autoload);
 ConnectionAdapters.autoloadAt("active_record/connection_adapters/abstract/connection_pool", () => {
@@ -106,7 +115,8 @@ ConnectionAdapters.autoloadAt("active_record/connection_adapters/abstract/connec
 
 export const Encryption = { name: "ActiveRecord::Encryption", loadPath } as AutoloadModule & {
   Configurable: typeof Configurable;
-} & Omit<typeof Configurable, "prototype">;
+} & Omit<typeof Configurable, "prototype"> &
+  Omit<typeof Contexts, "prototype">;
 extend(Encryption, Autoload);
 Encryption.eagerAutoload(() => {
   Encryption.autoload("Configurable");

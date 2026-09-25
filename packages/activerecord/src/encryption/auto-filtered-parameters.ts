@@ -1,5 +1,5 @@
 import { underscore } from "@blazetrails/activesupport";
-import { Configurable } from "./configurable.js";
+import { Encryption } from "../encryption.js";
 
 export interface AutoFilteredParametersApp {
   config: { filterParameters: Array<string | RegExp> };
@@ -38,7 +38,7 @@ export class AutoFilteredParameters {
 
   /** @internal */
   private installCollectingHook(): void {
-    Configurable.onEncryptedAttributeDeclared((klass: any, attribute: string) => {
+    Encryption.onEncryptedAttributeDeclared((klass: any, attribute: string) => {
       this.attributeWasDeclared(klass, attribute);
     });
   }
@@ -51,7 +51,7 @@ export class AutoFilteredParameters {
   /** @internal */
   private isExcludedFromFilterParameters(filterParameter: string): boolean {
     return (
-      Configurable.config.excludedFromFilterParameters.find(
+      Encryption.config.excludedFromFilterParameters.find(
         (excludedFilter) => String(excludedFilter) === filterParameter,
       ) !== undefined
     );
@@ -74,7 +74,7 @@ export class AutoFilteredParameters {
   }
 
   private applyFilter(klass: any, attribute: string): void {
-    if (!Configurable.config.addToFilterParameters) return;
+    if (!Encryption.config.addToFilterParameters) return;
     const filter = [klass?.name ? underscore(klass.name) : null, String(attribute)]
       .filter((part) => part != null)
       .join(".");
