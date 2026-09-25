@@ -941,9 +941,7 @@ export function getCallbackChains(target: object): Map<string, CallbackChain> {
     const own = new Map<string, CallbackChain>();
     if (parent) {
       for (const [name, chain] of parent) {
-        const newChain = new CallbackChain(chain.name, chain.config);
-        newChain.append(...chain.entries);
-        own.set(name, newChain);
+        own.set(name, chain.dup());
       }
     }
     t[CALLBACKS] = own;
