@@ -1793,22 +1793,21 @@ export class PostgreSQLAdapter
     exception: unknown,
     { message, sql, binds }: { message: string; sql: string; binds: unknown[] },
   ): unknown {
+    if (!(exception instanceof Error)) return exception;
+    const noConnection =
+      /connection is closed/i.test(exception.message) ||
+      /no connection to the server/i.test(exception.message);
     if (
-      !(exception instanceof Error) ||
-      (!(exception instanceof pg.DatabaseError) &&
-        !PostgreSQLAdapter._isConnectionError(exception) &&
-        !/connection is closed/i.test(exception.message) &&
-        !/no connection to the server/i.test(exception.message))
+      !(exception instanceof pg.DatabaseError) &&
+      !PostgreSQLAdapter._isConnectionError(exception) &&
+      !noConnection
     ) {
       return exception;
     }
 
     switch (exception instanceof pg.DatabaseError ? exception.code : undefined) {
       case undefined:
-        if (
-          /connection is closed/i.test(exception.message) ||
-          /no connection to the server/i.test(exception.message)
-        ) {
+        if (noConnection) {
           return new ConnectionNotEstablished(exception, { connectionPool: this.pool });
         } else if (PostgreSQLAdapter._isConnectionError(exception)) {
           if (!PostgreSQLAdapter._isConnectionClosedBeforeSend(exception)) {
