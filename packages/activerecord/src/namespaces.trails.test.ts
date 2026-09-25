@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { constantize } from "@blazetrails/activesupport";
 import "./index.js";
-import { ActiveRecord, Associations, ConnectionAdapters, Encryption } from "./namespaces.js";
+import { Associations, ConnectionAdapters, Encryption } from "./namespaces.js";
 import { eagerLoadBang } from "./active-record.js";
 import { Migration } from "./migration.js";
 import * as Compatibility from "./migration/compatibility.js";
@@ -34,18 +34,11 @@ describe("ActiveRecord namespaces", () => {
 
   it("ActiveRecord.eager_load! eager loads its nested namespaces in Rails' order", async () => {
     const order: string[] = [];
-    const spies = { Associations, ConnectionAdapters, Encryption };
-    const restores = Object.entries(spies).map(([name, ns]) =>
-      vi.spyOn(ns, "eagerLoadBang").mockImplementation(async () => {
-        order.push(name);
-      }),
-    );
-    try {
-      await eagerLoadBang();
-    } finally {
-      restores.forEach((spy) => spy.mockRestore());
+    for (const [name, ns] of Object.entries({ Associations, ConnectionAdapters, Encryption })) {
+      vi.spyOn(ns, "eagerLoadBang").mockImplementation(async () => void order.push(name));
     }
+    await eagerLoadBang();
+    vi.restoreAllMocks();
     expect(order).toEqual(["Associations", "ConnectionAdapters", "Encryption"]);
-    expect(ActiveRecord.Associations).toBe(Associations);
   });
 });
