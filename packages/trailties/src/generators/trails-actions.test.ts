@@ -173,6 +173,14 @@ describe("TrailsActions", () => {
       );
     });
 
+    it("injects after every occurrence of the sentinel, as Thor's gsub! does", async () => {
+      files.set("/app/config/environments/production.ts", `${env}${env}`);
+      await makeGen().environment(`this.config.logLevel = "warn";`, { env: "production" });
+      expect(
+        files.get("/app/config/environments/production.ts")!.match(/this\.config\.logLevel/g),
+      ).toHaveLength(2);
+    });
+
     it("rejects env names containing path separators or traversal segments", async () => {
       await expect(makeGen().environment(`x: 1,`, { env: "../evil" })).rejects.toThrow(
         /environment name must match/,
