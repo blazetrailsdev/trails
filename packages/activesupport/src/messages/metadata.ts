@@ -107,7 +107,6 @@ export abstract class Metadata {
     return { _rails: hash };
   }
 
-  /** @missingRailsCall utc — PERMANENT */
   protected extractFromMetadataEnvelope(
     envelope: unknown,
     { purpose = null }: ExpectedMetadataOptions = {},
@@ -115,8 +114,11 @@ export abstract class Metadata {
     const hash = (envelope as Record<string, unknown>)._rails as Record<string, unknown>;
 
     if (isPresent(hash.exp)) {
-      const expiry = this.parseExpiry(hash.exp as string | Time);
-      if (Temporal.Instant.compare(currentTimeInstant(), expiry) >= 0) {
+      if (
+        Time.at(new Rational(currentTimeInstant().epochNanoseconds, 1_000_000_000n))
+          .utc()
+          .compare(this.parseExpiry(hash.exp as string | Time))! >= 0
+      ) {
         throw new Thrown("invalid_message_content", "expired");
       }
     }
@@ -136,7 +138,6 @@ export abstract class Metadata {
     return string.startsWith('{"_rails":{"message":');
   }
 
-  /** @missingRailsCall advance — PERMANENT */
   protected pickExpiry(
     expiresAt: Temporal.Instant | null | undefined,
     expiresIn: number | null | undefined,
@@ -145,8 +146,9 @@ export abstract class Metadata {
     if (isPresent(expiresAt)) {
       expiry = Time.at(new Rational(expiresAt!.epochNanoseconds, 1_000_000_000n)).utc();
     } else if (isPresent(expiresIn)) {
-      const instant = currentTimeInstant().add({ milliseconds: Math.round(expiresIn! * 1000) });
-      expiry = Time.at(new Rational(instant.epochNanoseconds, 1_000_000_000n)).utc();
+      expiry = Time.at(new Rational(currentTimeInstant().epochNanoseconds, 1_000_000_000n))
+        .utc()
+        .advance({ seconds: expiresIn! });
     }
 
     if (!Metadata.TIMESTAMP_SERIALIZERS.includes(this.serializer)) {
@@ -156,13 +158,13 @@ export abstract class Metadata {
     return expiry;
   }
 
-  protected parseExpiry(expiresAt: string | Time): Temporal.Instant {
+  protected parseExpiry(expiresAt: string | Time): Time {
     if (typeof expiresAt !== "string") {
-      return expiresAt.toTime().toInstant();
+      return expiresAt;
     } else if (Encoding.useStandardJsonTimeFormat) {
-      return Time.iso8601(expiresAt).toTime().toInstant();
+      return Time.iso8601(expiresAt);
     } else {
-      return Time.parse(expiresAt).toTime().toInstant();
+      return Time.parse(expiresAt);
     }
   }
 

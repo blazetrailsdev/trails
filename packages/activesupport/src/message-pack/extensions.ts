@@ -126,7 +126,7 @@ export const Extensions = {
       type: 7,
       klass: "Time",
       recursive: true,
-      match: (v) => Object.prototype.isPrototypeOf.call(Time.prototype, v),
+      match: (v) => Object.prototype.isPrototypeOf.call(Time.prototype, v as object),
       packer: (v, packer) => Extensions.writeTime(v as Time, packer),
       unpacker: (unpacker) => Extensions.readTime(unpacker as Unpacker),
     });
