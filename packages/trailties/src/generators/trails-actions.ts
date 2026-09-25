@@ -142,7 +142,6 @@ export async function environment(
       });
     }
   }
-  this.output(` environment  ${summarize(data)}`);
 }
 
 export async function initializer(
