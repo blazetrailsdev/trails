@@ -2,7 +2,7 @@ import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
 import { HasManyAssociation } from "./has-many-association.js";
-import { Hash, NotImplementedError, rbEqual } from "@blazetrails/ruby-compat";
+import { Hash, NotImplementedError, rbEql, rbEqual, rbHash } from "@blazetrails/ruby-compat";
 import { underscore, singularize, isBlank } from "@blazetrails/activesupport";
 import { collectionProxyFor as collectionProxyFor } from "../associations.js";
 import { ThroughAssociation, sourceReflection, throughBuildRecord } from "./through-association.js";
@@ -73,16 +73,19 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   }
 
   protected markOccurrence(distribution: Distribution, record: Base): false | Distribution {
-    return (
-      distribution.get(record.hash())! > 0 &&
-      distribution.set(record.hash(), distribution.get(record.hash())! - 1)
-    );
+    const key =
+      [...distribution.keys()].find((k) => rbHash(k) === rbHash(record) && rbEql(k, record)) ??
+      record;
+    return distribution.get(key)! > 0 && distribution.set(key, distribution.get(key)! - 1);
   }
 
   protected distribution(array: Base[]): Distribution {
     const distribution: Distribution = new Hash(0);
     for (const record of array) {
-      distribution.set(record.hash(), distribution.get(record.hash())! + 1);
+      const key =
+        [...distribution.keys()].find((k) => rbHash(k) === rbHash(record) && rbEql(k, record)) ??
+        record;
+      distribution.set(key, distribution.get(key)! + 1);
     }
     return distribution;
   }
@@ -467,7 +470,7 @@ function deleteThroughRecords(
 }
 
 /** @internal */
-type Distribution = Hash<unknown, number>;
+type Distribution = Hash<Base, number>;
 
 /** @internal */
 interface ThroughTargetStore {

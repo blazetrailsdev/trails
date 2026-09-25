@@ -74,7 +74,7 @@ export function rbHash(value: unknown): number {
     }
     return h >>> 0;
   }
-  return identityHash(value as object);
+  return rbObjHash(value as object);
 }
 
 function stringHash(input: string): number {
@@ -89,7 +89,14 @@ function stringHash(input: string): number {
 const identityHashes = new WeakMap<object, number>();
 let nextIdentityHash = 1;
 
-function identityHash(object: object): number {
+/**
+ * `Kernel#hash`'s identity arm (`vendor/ruby/hash.c:344` `rb_obj_hash`, over
+ * `objid_hash`): a per-object Integer that `super` from a `hash` override
+ * reaches.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbObjHash(object: object): number {
   let h = identityHashes.get(object);
   if (h === undefined) {
     h = Math.imul(nextIdentityHash++, 0x01000193) >>> 0;

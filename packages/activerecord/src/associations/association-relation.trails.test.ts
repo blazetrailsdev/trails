@@ -104,7 +104,7 @@ describe("AssociationRelation", () => {
 
     const scope = proxy.where({}) as unknown as AssociationRelation<ShipPart>;
     const [part] = await scope;
-    expect((part as any)._associationCache("ship")?.target).toBe(ship);
+    expect((part as any).association("ship").target).toBe(ship);
   });
 
   it("sets inverse_of through records() and load() as well as toArray()", async () => {
@@ -114,14 +114,14 @@ describe("AssociationRelation", () => {
     const seed = () => proxy.where({}) as unknown as AssociationRelation<ShipPart>;
 
     const [viaToArray] = await seed();
-    expect((viaToArray as any)._associationCache("ship")?.target).toBe(ship);
+    expect((viaToArray as any).association("ship").target).toBe(ship);
 
     const [viaRecords] = await seed().records();
-    expect((viaRecords as any)._associationCache("ship")?.target).toBe(ship);
+    expect((viaRecords as any).association("ship").target).toBe(ship);
 
     const loaded = seed();
     await loaded.load();
     const [viaLoad] = await loaded.records();
-    expect((viaLoad as any)._associationCache("ship")?.target).toBe(ship);
+    expect((viaLoad as any).association("ship").target).toBe(ship);
   });
 });

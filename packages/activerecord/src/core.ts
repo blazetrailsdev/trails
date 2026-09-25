@@ -5,6 +5,8 @@ import {
   hasKey,
   include,
   rbEql,
+  rbHash,
+  rbObjHash,
 } from "@blazetrails/ruby-compat";
 import { getApplicationRecordClass } from "./inheritance.js";
 import {
@@ -136,55 +138,14 @@ export function equals(this: CoreRecord, other: unknown): boolean {
 
 export const eql = equals;
 
-const identityHashKeys = new WeakMap<object, symbol>();
+export function hash(this: CoreRecord): number {
+  const id = this.id;
 
-const constructorHashTokens = new WeakMap<object, number>();
-let nextConstructorToken = 0;
-
-function constructorToken(ctor: object): number {
-  let token = constructorHashTokens.get(ctor);
-  if (token === undefined) {
-    token = nextConstructorToken++;
-    constructorHashTokens.set(ctor, token);
+  if ((this as unknown as { isPrimaryKeyValuesPresent(): boolean }).isPrimaryKeyValuesPresent()) {
+    return rbHash(this.constructor) ^ rbHash(id);
+  } else {
+    return rbObjHash(this);
   }
-  return token;
-}
-
-const idHashTokens = new WeakMap<WeakKey, number>();
-let nextIdHashToken = 0;
-
-function serializeIdForHash(id: unknown): string | undefined {
-  if (Array.isArray(id)) {
-    const parts = [...id].map(serializeIdForHash);
-    if (parts.includes(undefined)) return undefined;
-    return `A${parts.map((part) => lengthPrefixed(part!)).join("")}`;
-  }
-  if (typeof id === "number" && Number.isNaN(id)) return undefined;
-  if (typeof id !== "symbol" && typeof id !== "function" && (typeof id !== "object" || !id)) {
-    return `S${typeof id}:${String(id)}`;
-  }
-  if (typeof id === "symbol" && Symbol.keyFor(id) !== undefined) return `R${Symbol.keyFor(id)}`;
-  if (!idHashTokens.has(id as WeakKey)) idHashTokens.set(id as WeakKey, nextIdHashToken++);
-  return `O${idHashTokens.get(id as WeakKey)}`;
-}
-
-function lengthPrefixed(value: string): string {
-  return `${value.length}:${value}`;
-}
-
-export function hash(this: CoreRecord): unknown {
-  const serialized = (
-    this as unknown as { isPrimaryKeyValuesPresent(): boolean }
-  ).isPrimaryKeyValuesPresent()
-    ? serializeIdForHash(this.id)
-    : undefined;
-  if (serialized !== undefined) return `${constructorToken(this.constructor)}#${serialized}`;
-  let key = identityHashKeys.get(this);
-  if (key === undefined) {
-    key = Symbol("record-hash");
-    identityHashKeys.set(this, key);
-  }
-  return key;
 }
 
 function primaryKeyValuesEqual(a: unknown, b: unknown): boolean {

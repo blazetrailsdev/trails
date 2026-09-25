@@ -21,13 +21,11 @@ describe("replace_on_target inversing (trails)", () => {
   it("tracks a persisted record added through the inversing path so a later add replaces in place", async () => {
     await withHasManyInversing(Interest, async () => {
       const interest = interests("trainspotting") as Base & { id: number };
-      const human = (await loadSingularTarget(interest, "human")) as Base & {
-        _associationCache(name: string): { target: Base[] } | undefined;
-      };
-      const interestIds = (): unknown[] => {
-        const cached = human._associationCache("interests") as { target: Base[] } | undefined;
-        return (cached?.target ?? []).map((i: Base) => (i as Base & { id: number }).id);
-      };
+      const human = (await loadSingularTarget(interest, "human")) as Base;
+      const interestIds = (): unknown[] =>
+        (human.association("interests").target as Base[]).map(
+          (i: Base) => (i as Base & { id: number }).id,
+        );
 
       expect(interestIds()).toEqual([interest.id]);
 

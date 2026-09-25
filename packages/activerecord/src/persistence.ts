@@ -621,7 +621,7 @@ interface ReloadRecord {
   _previouslyNewRecord: boolean;
   _mutationsBeforeLastSave: unknown;
   _mutationsFromDatabase: unknown;
-  _associationInstances: Map<string, { owner: unknown }>;
+  _associationCache: Map<string, { owner: unknown }>;
   id: unknown;
   constructor: {
     name: string;
@@ -663,7 +663,7 @@ export async function reload<T extends ReloadRecord>(
       : await ctor.unscoped(() => _findRecord.call(this as never, findOptions))
   ) as {
     _attributes: unknown;
-    _associationInstances: Map<string, { owner: unknown }>;
+    _associationCache: Map<string, { owner: unknown }>;
   };
 
   this._attributes = fresh._attributes;
@@ -680,8 +680,8 @@ export async function reload<T extends ReloadRecord>(
   this._mutationsBeforeLastSave = null;
   this._mutationsFromDatabase = null;
 
-  this._associationInstances = fresh._associationInstances;
-  for (const association of this._associationInstances.values()) {
+  this._associationCache = fresh._associationCache;
+  for (const association of this._associationCache.values()) {
     association.owner = this;
   }
   return this;
@@ -760,7 +760,7 @@ interface PersistencePrivateHost {
   id: unknown;
   idInDatabase: unknown;
   attributeInDatabase?(col: string): unknown;
-  _associationInstances?: Map<
+  _associationCache?: Map<
     string,
     { owner?: { isStrictLoading?(): boolean; isStrictLoadingNPlusOneOnly?(): boolean } } | null
   >;
@@ -807,7 +807,7 @@ export function initInternals(this: PersistencePrivateHost, super_: () => void):
 
 /** @internal */
 export function strictLoadedAssociations(this: PersistencePrivateHost): string[] {
-  return [...(this._associationInstances ?? [])]
+  return [...(this._associationCache ?? [])]
     .filter(
       ([, assoc]) =>
         assoc?.owner?.isStrictLoading?.() && !assoc?.owner?.isStrictLoadingNPlusOneOnly?.(),

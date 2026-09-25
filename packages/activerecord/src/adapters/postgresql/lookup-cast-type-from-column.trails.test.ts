@@ -3,6 +3,7 @@ import { Uuid } from "../../connection-adapters/postgresql/oid/uuid.js";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Base } from "../../index.js";
+import { ConnectionNotEstablished } from "../../errors.js";
 
 const UUID_OID = 2950;
 
@@ -32,7 +33,7 @@ describeIfPg("PostgreSQLAdapter#lookupCastTypeFromColumn", () => {
 
       expect(() =>
         fresh.lookupCastTypeFromColumn({ oid: UUID_OID, fmod: -1, sqlType: "uuid" }),
-      ).toThrow(/type map is not loaded/);
+      ).toThrow(ConnectionNotEstablished);
     });
   });
 });

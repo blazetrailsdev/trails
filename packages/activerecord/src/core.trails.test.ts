@@ -8,7 +8,7 @@ import { DatabaseConfigurations } from "./database-configurations.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
 import { BooleanType, IntegerType, StringType } from "@blazetrails/activemodel";
 import { establishConnectionTo } from "./test-helpers/adapter-double.js";
-import { uniq } from "@blazetrails/ruby-compat";
+import { rbHash, uniq } from "@blazetrails/ruby-compat";
 import { equals as coreEquals, hash as coreHash } from "./core.js";
 
 describe("frozen / isFrozen", () => {
@@ -204,7 +204,7 @@ describe("init_internals / initialize_dup super chain", () => {
     expect(topic._touchAttrNames).toBe(null);
     expect(topic._skipDirtyTracking).toBe(null);
     expect(topic._touchRecord).toBe(null);
-    expect((topic._associationInstances as Map<string, unknown>).size).toBe(0);
+    expect((topic._associationCache as Map<string, unknown>).size).toBe(0);
     expect(topic._alreadyCalled).toBe(null);
     expect(topic._startTransactionState).toBe(null);
     expect(topic._committedAlreadyCalled).toBe(null);
@@ -243,12 +243,6 @@ describe("hash agrees with ==", () => {
     Object.assign(new Keyed(), { id, isPrimaryKeyValuesPresent: () => true }) as never;
   const hashOf = (id: unknown) => coreHash.call(record(id));
 
-  it("gives ids that are never == distinct hashes", () => {
-    expect(hashOf(NaN)).not.toEqual(hashOf(NaN));
-    expect(hashOf(Symbol("x"))).not.toEqual(hashOf(Symbol("x")));
-    expect(hashOf([1, NaN])).not.toEqual(hashOf([1, NaN]));
-  });
-
   it("gives == ids one hash", () => {
     const id = Symbol("x");
     expect(coreEquals.call(record(id), record(id))).toBe(true);
@@ -259,5 +253,13 @@ describe("hash agrees with ==", () => {
     expect(hashOf(Symbol.for("x"))).toEqual(hashOf(Symbol.for("x")));
     expect(coreEquals.call(record(Array(1)), record([undefined]))).toBe(true);
     expect(hashOf(Array(1))).toEqual(hashOf([undefined]));
+  });
+
+  it("is an Integer an Array of records folds into its own hash", () => {
+    expect(Number.isInteger(new Topic().hash())).toBe(true);
+    expect(Number.isInteger(hashOf(1))).toBe(true);
+    expect(() => rbHash([new Topic()])).not.toThrow();
+    expect(rbHash([new Topic({ id: 1 })])).toEqual(rbHash([new Topic({ id: 1 })]));
+    expect(rbHash([new Topic({ id: 1 })])).not.toEqual(rbHash([new Topic({ id: 2 })]));
   });
 });

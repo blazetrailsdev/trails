@@ -12,7 +12,7 @@ type CollectionProxyLike = {
 type RecordInternals = {
   _attributes: { writeCastValue(name: string, value: unknown): void };
   _readAttribute(name: string): unknown;
-  _associationInstances: Map<string, { find(...args: unknown[]): Promise<Base | Base[] | null> }>;
+  association(name: string): { find(...args: unknown[]): Promise<Base | Base[] | null> };
   clientsOfFirm: CollectionProxyLike;
 };
 
@@ -39,7 +39,7 @@ describe("CollectionAssociation BigInt PK / number find(id) key match", () => {
   it("finds a loaded record via CollectionAssociation#findByScan when its in-memory PK is a BigInt and the id is a number", async () => {
     const { firm, numberId } = await loadFirmWithBigIntTargetPk();
 
-    const assoc = internals(firm)._associationInstances.get("clientsOfFirm")!;
+    const assoc = internals(firm).association("clientsOfFirm");
     const found = (await assoc.find(numberId)) as Base;
     expect(Number(internals(found)._readAttribute("id"))).toBe(numberId);
   });

@@ -308,9 +308,9 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
   it("clear() invalidates the cached _associationIds (Batch 158 / B32)", async () => {
     const author = await authorWithPosts();
     const proxy = association<Post>(author, "posts");
-    const instance = (
-      author as unknown as { _associationInstances: Map<string, unknown> }
-    )._associationInstances.get("posts") as { _associationIds: unknown[] | null };
+    const instance = (author as unknown as { association(name: string): unknown }).association(
+      "posts",
+    ) as { _associationIds: unknown[] | null };
     instance._associationIds = [1, 2, 3];
     await proxy.clear();
     expect(instance._associationIds).toBeNull();
@@ -319,23 +319,12 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
   it("destroyAll() invalidates the cached _associationIds (Batch 158 / B32)", async () => {
     const author = await authorWithPosts();
     const proxy = association<Post>(author, "posts");
-    const instance = (
-      author as unknown as { _associationInstances: Map<string, unknown> }
-    )._associationInstances.get("posts") as { _associationIds: unknown[] | null };
+    const instance = (author as unknown as { association(name: string): unknown }).association(
+      "posts",
+    ) as { _associationIds: unknown[] | null };
     instance._associationIds = [1, 2, 3];
     await proxy.destroyAll();
     expect(instance._associationIds).toBeNull();
-  });
-
-  it("_associationCache() returns the proxy whose target is the read accessor for loaded collections", async () => {
-    const author = await authorWithPosts();
-    const proxy = association<Post>(author, "posts") as any;
-    expect((author as any)._associationCache("posts").target).toBe(proxy.target);
-  });
-
-  it("_associationCache() returns undefined when no proxy is loaded or seeded", async () => {
-    const author = await Author.create({ name: "Dev" });
-    expect((author as any)._associationCache("posts")).toBeUndefined();
   });
 });
 

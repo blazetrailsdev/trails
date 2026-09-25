@@ -945,7 +945,7 @@ describe("InverseBelongsToTests", () => {
       const interest = interests("trainspotting");
       const human = (await loadSingularTarget(interest, "human")) as any;
       expect(human.interests).not.toBeNull();
-      const cached = human._associationCache("interests")?.target as any[];
+      const cached = human.association("interests").target as any[];
       const iz = cached.find((i: any) => i.id === (interest as any).id);
       expect(iz).toBeDefined();
       expect(iz.topic).toBe((interest as any).topic);
@@ -1180,7 +1180,7 @@ describe("InversePolymorphicBelongsToTests", () => {
       const interest = interests("llama_wrangling");
       const human = (await loadSingularTarget(interest, "polymorphicHuman")) as any;
       expect(human.polymorphicInterests).not.toBeNull();
-      const cached = human._associationCache("polymorphicInterests")?.target as any[];
+      const cached = human.association("polymorphicInterests").target as any[];
       const iz = cached.find((i: any) => i.id === (interest as any).id);
       expect(iz).toBeDefined();
       expect(iz.topic).toBe((interest as any).topic);

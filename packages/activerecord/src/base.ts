@@ -1725,24 +1725,6 @@ export class Base extends Model {
   private _destroyedByAssociation: unknown = null;
   _transactionAction: "create" | "update" | "destroy" | undefined = undefined;
 
-  /** @internal */
-  _associationCache(name: string): { target?: Base | Base[] | null } | undefined {
-    const instance = this._associationInstances.get(name) as
-      | (AssociationInstance & {
-          target?: Base | Base[] | null;
-        })
-      | undefined;
-    if (instance?.isLoaded() && !instance.isCollection()) return instance;
-    if (
-      instance?.isCollection() === true &&
-      (instance.isLoaded() === true ||
-        (Array.isArray(instance.target) && instance.target.length > 0))
-    ) {
-      return instance;
-    }
-    return undefined;
-  }
-
   /** @missingRailsCall init_internals — CONVERGEABLE base-constructor-calls-init-internals-not-activemodel */
   constructor(attrs: Record<string, unknown> = {}, initBlock?: (record: Base) => void) {
     (new.target as typeof Base | undefined)?._requireConcreteClass();
@@ -2426,7 +2408,7 @@ export interface Base extends Included<typeof AutosaveAssociation>, JSONSerializ
   /** @internal */
   _strictLoadingMode?: _Core.StrictLoadingMode;
   /** @internal */
-  _associationInstances: Map<string, AssociationInstance>;
+  _associationCache: Map<string, AssociationInstance>;
   association(name: string): AssociationInstance;
   readonly savedChanges: Hash<string, [unknown, unknown]>;
   readonly hasChangesToSave: boolean;

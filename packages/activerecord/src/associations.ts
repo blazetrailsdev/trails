@@ -344,7 +344,7 @@ export class Associations {
 }
 
 export function isAssociationCached(record: Base, name: string): boolean {
-  return record._associationInstances.has(name);
+  return record._associationCache.has(name);
 }
 
 /** @internal */
@@ -611,30 +611,9 @@ export function _buildAssociationInstance(
   }
 }
 
-function syncAssociationInstance(this: Base, name: string, instance: AssociationInstance): void {
-  if (instance.isCollection()) return;
-  const cached = this._associationCache(name);
-  if (cached === instance) return;
-  if (cached !== undefined) {
-    if (instance.isLoaded()) {
-      instance._writeTargetStore((cached.target as Base | Base[] | null) ?? null);
-    } else {
-      instance.target = (cached.target as Base | Base[] | null) ?? null;
-    }
-    return;
-  }
-  const holder = associationInstanceGet.call(this, name) as AssociationInstance | null;
-  if (holder?.isLoaded() && !(holder._staleStateIsSnapshotted && holder.isStaleTarget())) {
-    instance.target = (holder.target ?? null) as any;
-  }
-}
-
 export function association(this: Base, name: string): AssociationInstance {
   const existing = associationInstanceGet.call(this, name) as AssociationInstance | null;
-  if (existing) {
-    syncAssociationInstance.call(this, name, existing);
-    return existing;
-  }
+  if (existing) return existing;
 
   const ctor = this.constructor as typeof Base;
   const assocDef = ctor._reflectOnAssociation?.(name) as unknown as
@@ -646,27 +625,26 @@ export function association(this: Base, name: string): AssociationInstance {
 
   const instance = _buildAssociationInstance.call(this, assocDef);
   associationInstanceSet.call(this, name, instance);
-  syncAssociationInstance.call(this, name, instance);
   return instance;
 }
 
 /** @internal */
 export function initInternals(this: Base, super_: () => void): void {
   super_();
-  this._associationInstances = new Map();
+  this._associationCache = new Map();
 }
 
 export function initializeDup(this: Base, super_: (other: unknown) => void, other: unknown): void {
-  this._associationInstances = new Map();
+  this._associationCache = new Map();
   super_(other);
 }
 
 /** @internal */
 export function associationInstanceGet(this: Base, name: string): unknown {
-  return this._associationInstances.get(name) ?? null;
+  return this._associationCache.get(name) ?? null;
 }
 
 /** @internal */
 export function associationInstanceSet(this: Base, name: string, association: unknown): void {
-  this._associationInstances.set(name, association as AssociationInstance);
+  this._associationCache.set(name, association as AssociationInstance);
 }
