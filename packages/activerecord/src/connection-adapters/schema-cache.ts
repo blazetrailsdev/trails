@@ -595,14 +595,14 @@ export class SchemaReflection {
     (await this.cache(pool)).clearDataSourceCacheBang(pool, name);
   }
 
-  async isCached(tableName: string): Promise<boolean | undefined> {
+  async isCached(tableName: string): Promise<boolean | null> {
     if (this._cache == null) {
       if (!SchemaReflection.checkSchemaCacheDumpVersion) {
         this._cache = await this.loadCache(null);
       }
     }
 
-    return this._cache?.isCached(tableName);
+    return this._cache?.isCached(tableName) ?? null;
   }
 
   async dumpTo(pool: unknown, filename: string): Promise<SchemaCache> {
@@ -708,7 +708,7 @@ export class BoundSchemaReflection {
     return this;
   }
 
-  async isCached(tableName: string): Promise<boolean | undefined> {
+  async isCached(tableName: string): Promise<boolean | null> {
     return this._schemaReflection.isCached(tableName);
   }
 
