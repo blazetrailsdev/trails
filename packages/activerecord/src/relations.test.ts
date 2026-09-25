@@ -173,8 +173,7 @@ describe("RelationTest", () => {
     });
   });
 
-  it.skip("dynamic finder", () => {
-    // BLOCKED: respond_to — Post class does not answer respondTo for generated dynamic finders such as findById (relation-dynamic-finders)
+  it("dynamic finder", () => {
     const x = Post.where("author_id = ?", 1);
     assertRespondTo(x.model, "findById");
   });
@@ -833,8 +832,7 @@ describe("RelationTest", () => {
     expect((Topic as any).leftJoins([]).leftOuterJoinsValues).toEqual([]);
   });
 
-  it.skip("respond to dynamic finders", () => {
-    // BLOCKED: respond_to — Relation does not answer respondTo for findByTitle / findByTitleAndAuthorName (relation-dynamic-finders)
+  it("respond to dynamic finders", () => {
     const relation = Topic.all();
 
     for (const method of ["findByTitle", "findByTitleAndAuthorName"]) {
@@ -1049,8 +1047,7 @@ describe("RelationTest", () => {
     expect((await post.lastComment)!.equals(directLastComment)).toBe(true);
   });
 
-  it.skip("dynamic find by attributes", async () => {
-    // BLOCKED: dynamic finders — Relation/Model do not define find_by_<attr> methods such as findById (relation-dynamic-finders)
+  it("dynamic find by attributes", async () => {
     const david = authors("david");
     const author = await (Author.preload(":taggings") as any).findById(david.id);
     const expectedTaggings = [taggings("welcome_general"), taggings("thinking_general")];
@@ -1066,8 +1063,7 @@ describe("RelationTest", () => {
     expect(await authorsRel.findByIdAndNameBang(david.id, david.name)).toEqual(david);
   });
 
-  it.skip("dynamic find by attributes bang", async () => {
-    // BLOCKED: dynamic finders — Relation/Model do not define find_by_<attr>! methods such as findByIdBang (relation-dynamic-finders)
+  it("dynamic find by attributes bang", async () => {
     const author = await (Author.all() as any).findByIdBang(authors("david").id);
     expect(author.name).toBe("David");
 

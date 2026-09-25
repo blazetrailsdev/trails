@@ -1587,9 +1587,9 @@ describe("HasManyThroughAssociationsTest", () => {
 
   it("dynamic find should respect association include", async () => {
     const person = await Person.find(1);
-    const post = await (person as any).postsWithCommentsSortedByCommentId.findBy({
-      title: "Welcome to the weblog",
-    });
+    const post = await (person as any).postsWithCommentsSortedByCommentId.findByTitle(
+      "Welcome to the weblog",
+    );
     expect(post).toBeTruthy();
   });
 

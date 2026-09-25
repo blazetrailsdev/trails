@@ -26,7 +26,7 @@ export function beforeSetup(): void {
 
 /** @internal */
 export function taggedLogger(): TaggedLogger | null {
-  return taggedLoggerValue ?? TopLevel.Trails?.logger ?? null;
+  return (taggedLoggerValue ??= TopLevel.Trails?.logger ?? null);
 }
 
 /** @internal */

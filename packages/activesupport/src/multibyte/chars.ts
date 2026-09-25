@@ -33,7 +33,10 @@ export class Chars {
           };
         }
         const member = (target.wrappedString as unknown as Record<string, unknown>)[prop];
-        if (!(prop in STRING_METHOD_TABLE) && typeof member !== "function") {
+        if (
+          typeof member !== "function" &&
+          (member !== undefined || !(prop in STRING_METHOD_TABLE))
+        ) {
           return target.methodMissing.call(receiver, prop);
         }
         return (...args: unknown[]) => target.methodMissing.call(receiver, prop, ...args);

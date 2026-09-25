@@ -1248,11 +1248,11 @@ the capability, in a different place. Each is its own `SKIP_GROUPS` entry in
 | `active_model/attribute_methods.rb`                   | named method, no trap |
 | `active_record/attribute_methods.rb`                  | records: not a Proxy  |
 | `connection_adapters/abstract/connection_pool.rb`     | Proxy (`NullPool`)    |
-| `active_record/dynamic_matchers.rb`                   | `respondToMissing`    |
+| `active_record/dynamic_matchers.rb`                   | named method, no trap |
 | `migration/command_recorder.rb`                       | typed forwarders      |
 | `migration/default_strategy.rb`                       | typed forwarders      |
 | `active_record/migration.rb`                          | typed forwarders      |
-| `relation/delegation.rb`                              | named method, no trap |
+| `relation/delegation.rb`                              | Proxy                 |
 | `active_record/test_fixtures.rb`                      | nothing               |
 | `active_support/array_inquirer.rb`                    | Proxy                 |
 | `active_support/broadcast_logger.rb`                  | Proxy                 |
@@ -1278,8 +1278,11 @@ reads `undefined`, and calling it is a `TypeError` where Ruby raises
 `NoMethodError`.
 
 A "named method, no trap" row answers only an explicit `methodMissing` call,
-which is where `finder-respond-to-dynamic-finders-invisible-to-in` and
-`relation-dynamic-finders` sit. These rows are decided per class, not ratified: a "nothing" row with a
+which is where `finder-respond-to-dynamic-finders-invisible-to-in` sits: a
+model class is not a Proxy, so `findByTitle` dispatches to
+`DynamicMatchers#method_missing` only from a relation's Proxy, whose
+`ClassSpecificRelation#methodMissing` falls into it where Ruby's
+`public_send` would. These rows are decided per class, not ratified: a "nothing" row with a
 dispatch-dependent Rails test is a gap, filed against its package.
 
 ## `inherited` is deferred to own-property memo guards (`ModelSchema.inherited`)

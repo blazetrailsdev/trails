@@ -1,4 +1,5 @@
-import { camelize } from "@blazetrails/activesupport";
+import { camelize, underscore } from "@blazetrails/activesupport";
+import { ArgumentError, NoMethodError, NotImplementedError } from "@blazetrails/ruby-compat";
 import { ActiveRecord } from "./namespaces.js";
 
 interface DynamicMatchersHost {
@@ -8,30 +9,133 @@ interface DynamicMatchersHost {
   reflectOnAggregation?(aggregation: string): unknown;
 }
 
-const matchers = [/^findBy(?!\w*Bang$)([_a-zA-Z]\w*)$/, /^findBy([_a-zA-Z]\w*)Bang$/];
-
-function match(model: DynamicMatchersHost, name: string): string[] | null {
-  const matched = matchers.map((pattern) => pattern.exec(name)).find((m) => m !== null);
-  if (!matched) return null;
-  const snakePart = matched[1]
-    .replace(/^./, (c) => c.toLowerCase())
-    .replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
-  return snakePart.split("_and_").map((name) => model.attributeAliases?.[name] ?? name);
-}
-
-function valid(model: DynamicMatchersHost, attributeNames: string[]): boolean {
-  const columnsHash = model.columnsHash();
-  return attributeNames.every(
-    (name) =>
-      columnsHash[name] != null || model.reflectOnAggregation?.(camelize(name, false)) != null,
-  );
-}
-
 export function respondToMissing(this: DynamicMatchersHost, name: string): boolean {
   if ((this as unknown) === ActiveRecord.Base) {
     return false;
   } else {
-    const matched = match(this, name);
-    return (matched !== null && valid(this, matched)) || false;
+    const match = Method.match(this, name);
+    return (match !== null && match.isValid()) || false;
   }
 }
+
+export function methodMissing(
+  this: DynamicMatchersHost,
+  name: string,
+  ...args: unknown[]
+): unknown {
+  const match = Method.match(this, name);
+
+  if (match !== null && match.isValid()) {
+    match.define();
+    return (this as unknown as Record<string, (...args: unknown[]) => unknown>)[name](...args);
+  } else {
+    throw new NoMethodError(`undefined method '${name}' for class ${this.name}`);
+  }
+}
+
+abstract class Method {
+  static matchers: (typeof FindBy | typeof FindByBang)[] = [];
+
+  static match(model: DynamicMatchersHost, name: string): Method | null {
+    const klass = this.matchers.find((k) => k.pattern().test(name));
+    return klass ? new klass(model, name) : null;
+  }
+
+  private static _pattern?: RegExp;
+
+  static pattern(): RegExp {
+    if (!Object.prototype.hasOwnProperty.call(this, "_pattern")) {
+      this._pattern = new RegExp(
+        `^${this.prefix()}([_a-zA-Z]\\w*)${this.suffix() || "(?<!Bang)"}$`,
+      );
+    }
+    return this._pattern!;
+  }
+
+  static prefix(): string {
+    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/dynamic_matchers.rb:42
+    throw new NotImplementedError();
+  }
+
+  static suffix(): string {
+    return "";
+  }
+
+  readonly model: DynamicMatchersHost;
+  readonly name: string;
+  readonly attributeNames: string[];
+
+  constructor(model: DynamicMatchersHost, methodName: string) {
+    this.model = model;
+    this.name = methodName;
+    this.attributeNames = underscore(
+      this.name.match((this.constructor as typeof Method).pattern())![1],
+    ).split("_and_");
+    this.attributeNames = this.attributeNames.map(
+      (name) => this.model.attributeAliases?.[name] ?? name,
+    );
+  }
+
+  isValid(): boolean {
+    const columnsHash = this.model.columnsHash();
+    return this.attributeNames.every(
+      (name) =>
+        columnsHash[name] != null ||
+        this.model.reflectOnAggregation?.(camelize(name, false)) != null,
+    );
+  }
+
+  define(): void {
+    const method = this;
+    Object.defineProperty(this.model, this.name, {
+      value: function (
+        this: Record<string, (hash: Record<string, unknown>) => unknown>,
+        ...args: unknown[]
+      ) {
+        const arity = method.attributeNames.length;
+        if (args.length !== arity) {
+          throw new ArgumentError(
+            `wrong number of arguments (given ${args.length}, expected ${arity})`,
+          );
+        }
+        return this[method.finder()](method.attributesHash(args));
+      },
+      writable: true,
+      configurable: true,
+    });
+  }
+
+  /** @internal */
+  private attributesHash(args: unknown[]): Record<string, unknown> {
+    return Object.fromEntries(this.attributeNames.map((name, i) => [name, args[i]]));
+  }
+
+  /** @internal */
+  protected abstract finder(): string;
+}
+
+class FindBy extends Method {
+  static prefix(): string {
+    return "findBy";
+  }
+
+  protected finder(): string {
+    return "findBy";
+  }
+}
+Method.matchers.push(FindBy);
+
+class FindByBang extends Method {
+  static prefix(): string {
+    return "findBy";
+  }
+
+  static suffix(): string {
+    return "Bang";
+  }
+
+  protected finder(): string {
+    return "findByBang";
+  }
+}
+Method.matchers.push(FindByBang);

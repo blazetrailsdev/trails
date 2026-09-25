@@ -53,6 +53,8 @@ import {
 import { isToday, isTomorrow, isYesterday } from "./core-ext/date-and-time/calculations.js";
 import { toFs, formattedOffset, xmlschema } from "./core-ext/time/conversions.js";
 import { toTime } from "./core-ext/time/compatibility.js";
+import { withEnvTz } from "./time-zone-test-helpers.js";
+import { inTimeZone } from "./core-ext/date-and-time/zones.js";
 import { toTime as dateToTime } from "./core-ext/date/conversions.js";
 
 function d(year: number, month: number, day: number, hour = 0, min = 0, sec = 0, ms = 0): Date {
@@ -490,13 +492,39 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("past with time current as time local", () => {
-    const past = new Date(Date.now() - 10000);
-    expect(isPast(past)).toBe(true);
+    withEnvTz("US/Eastern", () => {
+      const spy = vi
+        .spyOn(RubyTime, "current")
+        .mockReturnValue(RubyTime.local(2005, 2, 10, 15, 30, 45));
+      try {
+        expect(RubyTime.local(2005, 2, 10, 15, 30, 44).isPast()).toEqual(true);
+        expect(RubyTime.local(2005, 2, 10, 15, 30, 45).isPast()).toEqual(false);
+        expect(RubyTime.local(2005, 2, 10, 15, 30, 46).isPast()).toEqual(false);
+        expect(RubyTime.utc(2005, 2, 10, 20, 30, 44).isPast()).toEqual(true);
+        expect(RubyTime.utc(2005, 2, 10, 20, 30, 45).isPast()).toEqual(false);
+        expect(RubyTime.utc(2005, 2, 10, 20, 30, 46).isPast()).toEqual(false);
+      } finally {
+        spy.mockRestore();
+      }
+    });
   });
 
   it("future with time current as time local", () => {
-    const future = new Date(Date.now() + 10000);
-    expect(isFuture(future)).toBe(true);
+    withEnvTz("US/Eastern", () => {
+      const spy = vi
+        .spyOn(RubyTime, "current")
+        .mockReturnValue(RubyTime.local(2005, 2, 10, 15, 30, 45));
+      try {
+        expect(RubyTime.local(2005, 2, 10, 15, 30, 44).isFuture()).toEqual(false);
+        expect(RubyTime.local(2005, 2, 10, 15, 30, 45).isFuture()).toEqual(false);
+        expect(RubyTime.local(2005, 2, 10, 15, 30, 46).isFuture()).toEqual(true);
+        expect(RubyTime.utc(2005, 2, 10, 20, 30, 44).isFuture()).toEqual(false);
+        expect(RubyTime.utc(2005, 2, 10, 20, 30, 45).isFuture()).toEqual(false);
+        expect(RubyTime.utc(2005, 2, 10, 20, 30, 46).isFuture()).toEqual(true);
+      } finally {
+        spy.mockRestore();
+      }
+    });
   });
 
   it("change", () => {
@@ -553,13 +581,37 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("past with time current as time with zone", () => {
-    const past = new Date(Date.now() - 10000);
-    expect(isPast(past)).toBe(true);
+    withEnvTz("US/Eastern", () => {
+      const twz = inTimeZone(RubyTime.utc(2005, 2, 10, 15, 30, 45), "Central Time (US & Canada)");
+      const spy = vi.spyOn(RubyTime, "current").mockReturnValue(twz);
+      try {
+        expect(RubyTime.local(2005, 2, 10, 10, 30, 44).isPast()).toEqual(true);
+        expect(RubyTime.local(2005, 2, 10, 10, 30, 45).isPast()).toEqual(false);
+        expect(RubyTime.local(2005, 2, 10, 10, 30, 46).isPast()).toEqual(false);
+        expect(RubyTime.utc(2005, 2, 10, 15, 30, 44).isPast()).toEqual(true);
+        expect(RubyTime.utc(2005, 2, 10, 15, 30, 45).isPast()).toEqual(false);
+        expect(RubyTime.utc(2005, 2, 10, 15, 30, 46).isPast()).toEqual(false);
+      } finally {
+        spy.mockRestore();
+      }
+    });
   });
 
   it("future with time current as time with zone", () => {
-    const future = new Date(Date.now() + 10000);
-    expect(isFuture(future)).toBe(true);
+    withEnvTz("US/Eastern", () => {
+      const twz = inTimeZone(RubyTime.utc(2005, 2, 10, 15, 30, 45), "Central Time (US & Canada)");
+      const spy = vi.spyOn(RubyTime, "current").mockReturnValue(twz);
+      try {
+        expect(RubyTime.local(2005, 2, 10, 10, 30, 44).isFuture()).toEqual(false);
+        expect(RubyTime.local(2005, 2, 10, 10, 30, 45).isFuture()).toEqual(false);
+        expect(RubyTime.local(2005, 2, 10, 10, 30, 46).isFuture()).toEqual(true);
+        expect(RubyTime.utc(2005, 2, 10, 15, 30, 44).isFuture()).toEqual(false);
+        expect(RubyTime.utc(2005, 2, 10, 15, 30, 45).isFuture()).toEqual(false);
+        expect(RubyTime.utc(2005, 2, 10, 15, 30, 46).isFuture()).toEqual(true);
+      } finally {
+        spy.mockRestore();
+      }
+    });
   });
 
   it("to fs custom date format", () => {

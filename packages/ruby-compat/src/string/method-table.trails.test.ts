@@ -135,6 +135,11 @@ describe("STRING_METHOD_TABLE", () => {
     for (const [recv, method, args, want] of rows) expect(send(recv, method, args)).toEqual(want);
   });
 
+  it("String#length answers as MRI does", () => {
+    const rows: Row[] = [["😀a", "length", [], { res: 2, recv: { s: "😀a" } }]];
+    for (const [recv, method, args, want] of rows) expect(send(recv, method, args)).toEqual(want);
+  });
+
   it("String#size answers as MRI does", () => {
     const rows: Row[] = [
       ["😀a", "size", [], { res: 2, recv: { s: "😀a" } }],

@@ -70,13 +70,15 @@ type Method = (self: StringReceiver, ...args: unknown[]) => unknown;
  * predicate as `isX`, a bang form as `xBang`. Every position is a character
  * (code point) offset, as MRI's are for a UTF-8 String; a block is a trailing
  * function argument. A package that reopens String, as ActiveSupport's
- * `core_ext/string` does, assigns an entry.
+ * `core_ext/string` does, assigns an entry. `length` counts characters, as
+ * `size` does; a proxy forwarding to String reads it as a property, where the
+ * JS string's own `length` is.
  *
  * Not in the table, because a JS string cannot carry what they read or
  * write: `force_encoding` and `b` retag the receiver's bytes, and a JS string
  * has no encoding tag (it is always the UTF-8 `encoding` answers); `crypt`
- * is the platform's `crypt(3)`; `length` is the JS string's own property;
- * `initialize` and `initialize_copy` are private.
+ * is the platform's `crypt(3)`; `initialize` and `initialize_copy` are
+ * private.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -98,6 +100,7 @@ export const STRING_METHOD_TABLE: Record<string, StringMethod> = Object.assign(
     get: rbStrArefM,
     set: rbStrAsetM,
     insert: rbDefineMethod(2, rbStrInsert),
+    length: rbDefineMethod(0, (self) => strlen(self.string)),
     size: rbDefineMethod(0, (self) => strlen(self.string)),
     bytesize: rbDefineMethod(0, (self) => bytes(self.string).length),
     isEmpty: rbDefineMethod(0, (self) => self.string.length === 0),
@@ -211,7 +214,6 @@ export const STRING_METHOD_TABLE: Record<string, StringMethod> = Object.assign(
 );
 
 const JS_STRING_METHODS = new Set(Object.getOwnPropertyNames(String.prototype));
-JS_STRING_METHODS.delete("length");
 
 /**
  * `str.__send__(method, *args)` (`vendor/ruby/vm_eval.c:1330` `rb_f_send`): the
