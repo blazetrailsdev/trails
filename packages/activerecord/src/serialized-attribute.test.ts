@@ -1,3 +1,4 @@
+import { rbInspect } from "@blazetrails/ruby-compat";
 import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
 import { assertNoQueries } from "./testing/query-assertions.js";
 import { ValueType, MissingAttributeError } from "@blazetrails/activemodel";
@@ -427,7 +428,7 @@ describe("SerializedAttributeTest", () => {
         throw e;
       }
     }).toThrow(SerializationTypeMismatch);
-    const expected = `can't load \`content\`: was supposed to be a Array, but was a Object. -- ${{ zomg: true }}`;
+    const expected = `can't load \`content\`: was supposed to be a Array, but was a Hash. -- ${rbInspect({ zomg: true })}`;
     expect(error.message).toEqual(expected);
   });
 
@@ -691,7 +692,7 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
         throw e;
       }
     }).toThrow(SerializationTypeMismatch);
-    const expected = `can't load \`content\`: was supposed to be a Array, but was a Object. -- ${{ zomg: true }}`;
+    const expected = `can't load \`content\`: was supposed to be a Array, but was a Hash. -- ${rbInspect({ zomg: true })}`;
     expect(error.message).toEqual(expected);
   });
 
