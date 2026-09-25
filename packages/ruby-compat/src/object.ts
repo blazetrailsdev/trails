@@ -88,7 +88,9 @@ export function rbModSingletonP(klass: unknown): boolean {
  * property, so the prototype-chain lookup is the whole `method_boundp` here,
  * and an own `undefined` value is its `2` (undefined method) case. An unbound
  * name falls through to the receiver's `respond_to_missing?`
- * (`basic_obj_respond_to_missing`, `vm_method.c:2872-2875`), handed `!pub`.
+ * (`basic_obj_respond_to_missing`, `vm_method.c:2850-2861`), handed `!pub`.
+ * Like `callable_method_entry` there, the entry is found by descriptor lookup,
+ * never by a property read a `methodMissingProxy` `get` trap would answer.
  *
  * `pub` cannot change the lookup: JS carries no runtime notion of method
  * visibility. See CLAUDE.md, "Method visibility is not a runtime fact in JS".
@@ -102,9 +104,16 @@ export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true
     const entry = Object.getOwnPropertyDescriptor(o, mid);
     if (entry) return !("value" in entry && entry.value === undefined);
   }
-  const respondToMissing = (Object(obj) as { respondToMissing?: unknown }).respondToMissing;
-  if (typeof respondToMissing !== "function") return false;
-  const ret = (respondToMissing as (mid: string, priv: boolean) => unknown).call(obj, mid, !pub);
+  let cme: PropertyDescriptor | undefined;
+  for (
+    let o: object | null = Object(obj);
+    o && !cme;
+    o = Object.getPrototypeOf(o) as object | null
+  ) {
+    cme = Object.getOwnPropertyDescriptor(o, "respondToMissing");
+  }
+  if (typeof cme?.value !== "function") return false;
+  const ret = (cme.value as (mid: string, priv: boolean) => unknown).call(obj, mid, !pub);
   return ret != null && ret !== false;
 }
 
