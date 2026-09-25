@@ -459,7 +459,6 @@ export class Configuration extends EngineConfiguration {
 
 export class Custom {
   [configuration: string]: any;
-
   #configurations: Map<string, unknown>;
 
   constructor() {
@@ -491,10 +490,8 @@ export class Custom {
       this.#configurations.set(method.slice(0, -1), args[0]);
       return args[0];
     } else if (args.length === 0) {
-      if (this.#configurations.has(method)) return this.#configurations.get(method);
-      const options = new OrderedOptions();
-      this.#configurations.set(method, options);
-      return options;
+      if (!this.#configurations.has(method)) this.#configurations.set(method, new OrderedOptions());
+      return this.#configurations.get(method);
     } else {
       throw new ArgumentError(
         `wrong number of arguments (given ${args.length}, expected 0) when reading configuration \`${method}\``,

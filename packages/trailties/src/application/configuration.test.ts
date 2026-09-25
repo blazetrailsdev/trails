@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { OrderedOptions, resetLoadHooks } from "@blazetrails/activesupport";
+import { assertRaises, OrderedOptions, resetLoadHooks } from "@blazetrails/activesupport";
 import { env, RuntimeError, setEnv } from "@blazetrails/ruby-compat";
 import { Application } from "../application.js";
 import { Trails, _resetTrailsEnv } from "../rails.js";
@@ -74,55 +74,42 @@ describe("ConfigurationTest", () => {
 
   it("config_for loads custom configuration from YAML accessible as symbol or string", async () => {
     await setCustomConfig(`export default { development: { foo: "bar" } };`);
-
     const myCustomConfig = (await (await app("development")).configFor("custom")) as OrderedOptions;
-
     expect(myCustomConfig.get("foo")).toBe("bar");
     expect(myCustomConfig.get("foo")).toBe("bar");
   });
 
   it("config_for loads nested custom configuration from YAML as symbol keys", async () => {
     await setCustomConfig(`export default { development: { foo: { bar: { baz: 1 } } } };`);
-
     const myCustomConfig = (await (await app("development")).configFor("custom")) as OrderedOptions;
-
     expect((myCustomConfig.get("foo") as { bar: { baz: number } }).bar.baz).toBe(1);
   });
 
   it("config_for does not assume config is a hash", async () => {
     await setCustomConfig(`export default { development: ["foo", "bar"] };`);
-
     expect(await (await app("development")).configFor("custom")).toEqual(["foo", "bar"]);
   });
 
   it("config_for works with only a shared root array", async () => {
     await setCustomConfig(`export default { shared: ["foo", "bar"] };`);
-
     expect(await (await app("development")).configFor("custom")).toEqual(["foo", "bar"]);
   });
 
   it("config_for returns only the env array when shared is an array", async () => {
     await setCustomConfig(`export default { development: ["baz"], shared: ["foo", "bar"] };`);
-
     expect(await (await app("development")).configFor("custom")).toEqual(["baz"]);
   });
 
   it("config_for raises an exception if the file does not exist", async () => {
     const application = await app("development");
-
-    const exception = await application.configFor("custom").then(
-      () => null,
-      (error: unknown) => error,
-    );
-    expect(exception).toBeInstanceOf(RuntimeError);
-    expect((exception as Error).message).toBe(
+    const exception = await assertRaises([RuntimeError], {}, () => application.configFor("custom"));
+    expect(exception.message).toBe(
       `Could not load configuration. No such file - ${appPath}/config/custom.ts`,
     );
   });
 
   it("config_for without the environment configured returns nil", async () => {
     await setCustomConfig(`export default { test: { key: "custom key" } };`);
-
     expect(await (await app("development")).configFor("custom")).toBeNull();
   });
 
@@ -130,9 +117,7 @@ describe("ConfigurationTest", () => {
     await setCustomConfig(
       `export default { shared: { foo: ":from_shared" }, test: { foo: ":from_env" } };`,
     );
-
     const myCustomConfig = (await (await app("test")).configFor("custom")) as OrderedOptions;
-
     expect(myCustomConfig.get("foo")).toBe(":from_env");
   });
 
@@ -140,9 +125,7 @@ describe("ConfigurationTest", () => {
     await setCustomConfig(
       `export default { shared: { foo: ":from_shared" }, test: { foo: ":from_env" } };`,
     );
-
     const myCustomConfig = (await (await app("development")).configFor("custom")) as OrderedOptions;
-
     expect(myCustomConfig.get("foo")).toBe(":from_shared");
   });
 
@@ -150,15 +133,12 @@ describe("ConfigurationTest", () => {
     await setCustomConfig(
       `export default { shared: { foo: { bar: { baz: 1 } } }, development: { foo: { bar: { qux: 2 } } } };`,
     );
-
     const myCustomConfig = (await (await app("development")).configFor("custom")) as OrderedOptions;
-
     expect((myCustomConfig.get("foo") as { bar: unknown }).bar).toEqual({ baz: 1, qux: 2 });
   });
 
   it("config_for with empty file returns nil", async () => {
     await setCustomConfig("");
-
     expect(await (await app("development")).configFor("custom")).toBeNull();
   });
 
@@ -166,11 +146,9 @@ describe("ConfigurationTest", () => {
     await setCustomConfig(
       `export default { test: { key: "walrus" }, production: { key: "unicorn" } };`,
     );
-
     const myCustomConfig = (await (
       await app("test")
     ).configFor("custom", { env: "production" })) as OrderedOptions;
-
     expect(myCustomConfig.get("key")).toBe("unicorn");
   });
 
@@ -178,15 +156,12 @@ describe("ConfigurationTest", () => {
     await setCustomConfig(
       `export default { shared: { some_key: "default" }, development: { some_key: "value" }, test: null };`,
     );
-
     const application = await app("development");
-
     let config = (await application.configFor("custom")) as OrderedOptions;
-    expect(config.constructor).toBe(OrderedOptions);
+    expect(config).toBeInstanceOf(OrderedOptions);
     expect(config.get("some_key")).toBe("value");
-
     config = (await application.configFor("custom", { env: "test" })) as OrderedOptions;
-    expect(config.constructor).toBe(OrderedOptions);
+    expect(config).toBeInstanceOf(OrderedOptions);
     expect(config.get("some_key")).toBe("default");
   });
 });

@@ -23,7 +23,7 @@ export interface Pirate {
 export class Pirate extends Base {
   declare parrotsLimit: number;
 
-  cancelSaveFromCallback: boolean = false;
+  declare cancelSaveFromCallback: boolean | undefined;
   declare catchphrase: string;
 
   declare parrots: AssociationProxy<Parrot>;

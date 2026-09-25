@@ -10,9 +10,9 @@ export class Bird extends Base {
   declare name: string;
   declare pirate_id: number;
 
-  cancelSaveFromCallback: boolean = false;
-  totalCount: number = 0;
-  enableCount: boolean = false;
+  declare cancelSaveFromCallback: boolean | undefined;
+  declare totalCount: number | undefined;
+  declare enableCount: boolean | undefined;
 
   static {
     this.belongsTo("pirate");

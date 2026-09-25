@@ -431,7 +431,7 @@ describe("developerFixtureData", () => {
         throughReflection: {
           foreignKey: () => "developer_id",
           tableName: "computers_developers",
-          klass: { _allTimestampAttributesInModel: [] },
+          klass: { allTimestampAttributesInModel: () => [] },
         },
       },
     };

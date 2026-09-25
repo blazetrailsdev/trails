@@ -51,12 +51,10 @@ describe("timestamp reload_schema_from_cache", () => {
       static {
         this.tableName = "books";
       }
-
       static timestampAttributesForUpdateInModel(): string[] {
         return ["updated_on"];
       }
     }
-
     const book = (await BookTouchingOnlyUpdatedOn.first())!;
     await book.updateColumn("updated_at", new Date("2001-01-01T00:00:00Z"));
     await book.reload();

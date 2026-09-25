@@ -246,17 +246,12 @@ export class Application extends Engine {
   ): Promise<unknown> {
     const configDir = ((await (await this.paths()).get("config")?.existent()) ?? [])[0];
     const yaml = `${configDir}/${name}`;
-    const fs = getFs();
-    const ext = (await fs.exists(`${yaml}.ts`))
-      ? ".ts"
-      : (await fs.exists(`${yaml}.js`))
-        ? ".js"
-        : null;
-
-    if (ext !== null) {
-      const mod = (await import(getPath().pathToFileURL!(`${yaml}${ext}`).href)) as {
-        default?: unknown;
-      };
+    let ext: string | undefined;
+    for (const e of [".ts", ".js"]) ext ??= (await getFs().exists(`${yaml}${e}`)) ? e : undefined;
+    if (ext !== undefined) {
+      const mod: { default?: unknown } = await import(
+        getPath().pathToFileURL!(`${yaml}${ext}`).href
+      );
       const allConfigs = mod.default ?? {};
       let config = (allConfigs as Record<string, unknown>)[env] ?? null;
       const shared = (allConfigs as Record<string, unknown>).shared;

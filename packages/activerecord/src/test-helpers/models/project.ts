@@ -23,7 +23,7 @@ export class Project extends Base {
   declare name: string;
   declare "type": string;
 
-  developersLog: string[] = [];
+  declare developersLog: string[];
 
   static {
     this.belongsTo("mentor");

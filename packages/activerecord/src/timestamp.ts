@@ -1,6 +1,6 @@
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Rational } from "@blazetrails/ruby-compat";
-import { currentTimeInstant } from "@blazetrails/activesupport";
+import { currentTimeInstant, indexWith } from "@blazetrails/activesupport";
 import { reloadSchemaFromCache as attributesReloadSchemaFromCache } from "./attributes.js";
 import { isUtc } from "./type/internal/timezone.js";
 
@@ -51,15 +51,14 @@ export function touchAttributesWithTime(
   this: TimestampHost,
   ...args: [...names: string[], time: RubyTime | undefined]
 ): Record<string, RubyTime> {
-  const names = args.slice(0, -1) as string[];
+  let names = args.slice(0, -1) as string[];
   const time = args[args.length - 1] as RubyTime | undefined;
-  const resolvedTime = time ?? this.currentTimeFromProperTimezone();
-  const resolved = names.map((n) => this.attributeAliases?.[n] ?? n);
-  const updateAttrs = this.timestampAttributesForUpdateInModel();
-  const allNames = [...new Set([...updateAttrs, ...resolved])];
-  const result: Record<string, RubyTime> = {};
-  for (const name of allNames) result[name] = resolvedTime;
-  return result;
+  names = names.map((name) => this.attributeAliases?.[name] ?? name);
+  let attributeNames = this.timestampAttributesForUpdateInModel();
+  attributeNames = [...new Set([...attributeNames, ...names])];
+  return Object.fromEntries(
+    indexWith(attributeNames, time ?? this.currentTimeFromProperTimezone()),
+  );
 }
 
 export type CounterCacheTouchOption =

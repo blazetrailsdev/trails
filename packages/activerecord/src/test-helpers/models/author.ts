@@ -164,7 +164,7 @@ export class Author extends Base {
     },
   };
 
-  postLog: string[] = [];
+  declare postLog: string[];
 
   static {
     this.hasMany("posts");
