@@ -112,7 +112,7 @@ describe("ACLogSubscriberTest", () => {
     controller = new TestCase(LogSubscribersController);
     const controllerClass = LogSubscribersController as unknown as CachingClassMethods;
     cachePath = Dir.mktmpdir(["tmp", "cache"]);
-    controllerClass.cacheStore = [":file_store", cachePath];
+    controllerClass.cacheStore = [":file_store", cachePath] as never;
     controllerClass.performCaching = true;
     Notifications.unsubscribeAll();
     LogSubscriber.attachTo("action_controller");
