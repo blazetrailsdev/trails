@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { registerModel, registerSubclass, resetCallbacks } from "../index.js";
+import { registerModel, registerSubclass } from "../index.js";
+import { resetCallbacks } from "../testing/test-case.js";
 import { fixtures } from "../test-fixtures.js";
 import { Base } from "../base.js";
 import { Author } from "../test-helpers/models/author.js";

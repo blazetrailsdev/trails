@@ -1,7 +1,7 @@
 import type { Base } from "./base.js";
-import { include, included, type Callback } from "@blazetrails/activesupport";
+import { include, included } from "@blazetrails/activesupport";
 import { ValidationsCallbacks } from "@blazetrails/activemodel";
-import { getCallbackChains, peekCallbackChain, runCallbacks } from "@blazetrails/activesupport";
+import { runCallbacks } from "@blazetrails/activesupport";
 import { _createRecord as counterCacheCreateRecord } from "./counter-cache.js";
 import { _createRecord as encryptableRecordCreateRecord } from "./encryption/encryptable-record.js";
 import { recordUpdateTimestamps } from "./timestamp.js";
@@ -24,30 +24,6 @@ export const InstanceMethods = {
     base.defineModelCallbacks("save", "create", "update", "destroy");
   },
 };
-
-export async function resetCallbacks(
-  modelClass: ModelCtor,
-  event: string,
-  fn: () => void | Promise<void>,
-): Promise<void> {
-  const oldCallbacks = new Map<ModelCtor, Callback[] | undefined>();
-  const targets = [modelClass, ...modelClass.subclasses];
-  for (const klass of targets) {
-    const chain = peekCallbackChain((klass as { prototype: object }).prototype, event);
-    oldCallbacks.set(klass, chain ? [...chain.entries] : undefined);
-  }
-  try {
-    await fn();
-  } finally {
-    for (const klass of targets) {
-      const chains = getCallbackChains((klass as { prototype: object }).prototype);
-      const chain = chains.get(event);
-      if (!chain) continue;
-      chain.clear();
-      for (const entry of oldCallbacks.get(klass) ?? []) chain.append(entry);
-    }
-  }
-}
 
 /** @internal */
 export function createOrUpdate(this: any, block?: (record: any) => void): Promise<boolean> {
