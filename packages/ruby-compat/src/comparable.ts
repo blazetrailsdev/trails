@@ -93,10 +93,8 @@ export function cmp(a: unknown, b: unknown): number | null {
     const y = (b as { epochNanoseconds: bigint }).epochNanoseconds;
     return x < y ? -1 : x > y ? 1 : 0;
   }
-  if (isTemporalDate(a) && (typeof b === "number" || typeof b === "bigint")) {
-    /* `Date#<=>`'s `cmp_gen` (`vendor/ruby/ext/date/date_core.c:6705`): a
-       Numeric is compared against the date's `ajd`. */
-    const ajd = temporalAjd(a);
+  if (kDateP(a) && (typeof b === "number" || typeof b === "bigint")) {
+    const ajd = mAjd(a);
     const n = Number(b);
     if (Number.isNaN(n)) return null;
     return ajd < n ? -1 : ajd > n ? 1 : 0;
@@ -115,11 +113,8 @@ export function cmp(a: unknown, b: unknown): number | null {
        (`vendor/ruby/numeric.c:1700`) answer nil for a non-Numeric, and for NaN. */
     if (Number.isNaN(a as number)) return null;
     if (typeof b !== "number" && typeof b !== "bigint") {
-      /* `flo_cmp`'s `isinf(a)` arm: a non-Numeric answering `infinite?` —
-         `Date#infinite?` is false (`vendor/ruby/ext/date/lib/date.rb:13`),
-         and trails' Date is a Temporal PlainDate / PlainDateTime. */
       if (typeof a === "number" && !Number.isFinite(a)) {
-        const i = isTemporalDate(b)
+        const i = kDateP(b)
           ? false
           : rbObjRespondTo(b, "isInfinite")
             ? (b as { isInfinite(): unknown }).isInfinite()
@@ -159,12 +154,12 @@ export function cmp(a: unknown, b: unknown): number | null {
   return rbEqual(a, b) ? 0 : null;
 }
 
-function isTemporalDate(value: unknown): boolean {
+function kDateP(value: unknown): boolean {
   const tag = temporalTag(value);
   return tag === "Temporal.PlainDate" || tag === "Temporal.PlainDateTime";
 }
 
-function temporalAjd(value: unknown): number {
+function mAjd(value: unknown): number {
   const v = value as {
     year: number;
     month: number;

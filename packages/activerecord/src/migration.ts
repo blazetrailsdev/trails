@@ -1475,7 +1475,7 @@ export class MigrationContext<
   }
 
   async protectedEnvironment(this: MigrationContext): Promise<boolean | null> {
-    if (!(await this.lastStoredEnvironment())) return null;
+    if ((await this.lastStoredEnvironment()) == null) return null;
     return ActiveRecord.Base.protectedEnvironments.includes((await this.lastStoredEnvironment())!);
   }
 
