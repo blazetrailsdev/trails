@@ -7,6 +7,7 @@ import {
   assertDeprecated,
   assertDifference,
   assertEmpty,
+  assertIncludes,
   assertNotEmpty,
   assertNoDifference,
   assertNotCalled,
@@ -1891,14 +1892,14 @@ describe("HasManyThroughAssociationsTest", () => {
     const person = new Person();
     const reference = (person as any).references.build();
     const job = reference.buildJob();
-    expect(await (person as any).jobs.isInclude(job)).toBeTruthy();
+    await assertIncludes((person as any).jobs, job);
   });
 
   it("include method in association through should return true for instance added with nested builds", async () => {
     const author = new Author();
     const post = (author as any).posts.build();
     const comment = post.comments.build();
-    expect(await (author as any).comments.isInclude(comment)).toBeTruthy();
+    await assertIncludes((author as any).comments, comment);
   });
 
   it("through association readonly should be false", async () => {

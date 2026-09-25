@@ -480,20 +480,42 @@ export function assertNotEmpty(obj: unknown, msg: string | (() => string) | null
 }
 
 /** @noRailsEquivalent CONVERGEABLE assert-includes-receipt-is-a-scoring-gap-not-permanent */
-export function assertIncludes(collection: unknown, obj: unknown, message?: string): void {
+export function assertIncludes(
+  collection: { isInclude(obj: never): Promise<unknown> },
+  obj: unknown,
+  message?: string,
+): Promise<void>;
+export function assertIncludes(collection: unknown, obj: unknown, message?: string): void;
+export function assertIncludes(
+  collection: unknown,
+  obj: unknown,
+  message?: string,
+): void | Promise<void> {
   assert(respondsToInclude(collection), `Expected ${inspect(collection)} to respond to include?`);
-  assert(
-    collectionIncludes(collection, obj),
-    message ?? `Expected ${inspect(collection)} to include ${inspect(obj)}`,
-  );
+  const included = collectionIncludes(collection, obj);
+  const check = (result: unknown): void => {
+    assert(result, message ?? `Expected ${inspect(collection)} to include ${inspect(obj)}`);
+  };
+  return included instanceof Promise ? included.then(check) : check(included);
 }
 
-export function assertNotIncludes(collection: unknown, obj: unknown, message?: string): void {
+export function assertNotIncludes(
+  collection: { isInclude(obj: never): Promise<unknown> },
+  obj: unknown,
+  message?: string,
+): Promise<void>;
+export function assertNotIncludes(collection: unknown, obj: unknown, message?: string): void;
+export function assertNotIncludes(
+  collection: unknown,
+  obj: unknown,
+  message?: string,
+): void | Promise<void> {
   assert(respondsToInclude(collection), `Expected ${inspect(collection)} to respond to include?`);
-  assertNot(
-    collectionIncludes(collection, obj),
-    message ?? `Expected ${inspect(collection)} to not include ${inspect(obj)}`,
-  );
+  const included = collectionIncludes(collection, obj);
+  const check = (result: unknown): void => {
+    assertNot(result, message ?? `Expected ${inspect(collection)} to not include ${inspect(obj)}`);
+  };
+  return included instanceof Promise ? included.then(check) : check(included);
 }
 
 function respondsToInclude(collection: unknown): boolean {
@@ -506,12 +528,12 @@ function respondsToInclude(collection: unknown): boolean {
   );
 }
 
-function collectionIncludes(collection: unknown, obj: unknown): boolean {
+function collectionIncludes(collection: unknown, obj: unknown): boolean | Promise<boolean> {
   if (typeof collection === "string") return collection.includes(obj as string);
   if (Array.isArray(collection)) return collection.some((element) => rbEqual(element, obj));
   const target = collection as {
     include?: (obj: never) => boolean;
-    isInclude?: (obj: never) => boolean;
+    isInclude?: (obj: never) => boolean | Promise<boolean>;
     has?: (obj: never) => boolean;
   };
   if (typeof target.isInclude === "function") return target.isInclude(obj as never);
