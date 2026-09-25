@@ -41,7 +41,7 @@ Bootstrap.initializer<BootstrapHost>("initialize_logger", { group: "all" }, func
 
 Bootstrap.initializer<BootstrapHost>("initialize_cache", { group: "all" }, function () {
   if (!this.cache) {
-    this.cache = lookupStore(...[this.config.cacheStore].flat());
+    this.cache = lookupStore(this.config.cacheStore);
 
     if (rbObjRespondTo(this.cache, "middleware")) {
       this.config.middleware!.insertBefore(

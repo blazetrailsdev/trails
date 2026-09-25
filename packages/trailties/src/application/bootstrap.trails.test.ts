@@ -7,9 +7,10 @@ import {
 } from "@blazetrails/activesupport";
 import { FileStore } from "@blazetrails/activesupport/cache/file-store";
 import { Runtime } from "@blazetrails/rack";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Bootstrap, type BootstrapConfig, type BootstrapHost } from "./bootstrap.js";
 import { Configuration } from "./configuration.js";
+import type { MiddlewareStackProxy } from "../configuration.js";
 
 class TestApp extends Bootstrap implements BootstrapHost {
   logger: Logger | null = null;
@@ -54,14 +55,12 @@ describe(":initialize_cache lookup_store arms", () => {
   it("inserts the store's middleware before Rack::Runtime", async () => {
     const app = new TestApp();
     const middleware = class LocalCacheMiddleware {};
-    const store = Object.assign(new NullStore(), { middleware });
-    const inserted: unknown[][] = [];
-    app.config = {
-      cacheStore: store,
-      middleware: { insertBefore: (...args: unknown[]) => inserted.push(args) },
-    };
+    const config = new Configuration("/app");
+    config.cacheStore = Object.assign(new NullStore(), { middleware });
+    const insertBefore = vi.spyOn(config.middleware as MiddlewareStackProxy, "insertBefore");
+    app.config = config as unknown as BootstrapConfig;
     await app.runInitializers("all");
-    expect(inserted).toEqual([[Runtime, middleware]]);
+    expect(insertBefore).toHaveBeenCalledWith(Runtime, middleware);
   });
 
   it("defaults config.cacheStore to a file store under root", () => {

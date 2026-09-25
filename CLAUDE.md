@@ -1202,25 +1202,6 @@ iterations on #7208, on every ActiveModel instance:
 
 A proxied object defeats the property-read inlining those reads get, and the
 internal-field number lands on every framework read, not only user code.
-
-The narrower carrier — a `Proxy` as the **last prototype** of the root class,
-so its `get` trap fires only for a name nothing else on the chain answers — was
-measured too (`activerecord-record-method-missing-carrier`; best-of-5, Node 24,
-a four-class chain ending in the Proxy against the same chain without it).
-Hits stay cheap (generated reader 1.0×, own field 1.8×), but every lookup that
-_misses_ now reaches a trap, and JS misses constantly where Ruby does not:
-
-| carrier             | miss read | construction | late own-prop write |
-| ------------------- | --------- | ------------ | ------------------- |
-| `get` + `set` traps | 50×       | 5.9×         | 9.7×                |
-| `get` trap only     | 48×       | 3.7×         | 6.1×                |
-
-Construction regresses because assigning a not-yet-own property is an
-`OrdinarySet` that walks the prototype chain into the Proxy. And a miss is not
-an error in JS: `await record` reads `then`, vitest's `toEqual` reads
-`asymmetricMatch` and `$$typeof`, and the framework duck-types records with
-`typeof record.x === "function"`. A raising trap needs an allowlist of names
-Ruby would never see, which is itself invented surface.
 **Records are not Proxies.** As a consequence:
 
 - An undefined name on a record is a type error, not a `NoMethodError`, and
