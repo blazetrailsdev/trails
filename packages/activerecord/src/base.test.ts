@@ -1575,7 +1575,7 @@ describe("BasicsTest", async () => {
 
     const c2 = await cache.columns(conn.pool, "posts");
     expect(cache.size).not.toBe(0);
-    expect(c2!.map((column, i) => column.equals(c1![i]))).toEqual(new Array(c1!.length).fill(true));
+    expect(c2.map((column, i) => column.equals(c1[i]))).toEqual(new Array(c1.length).fill(true));
 
     await cache.addAll(conn.pool);
   });
