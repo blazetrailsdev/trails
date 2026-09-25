@@ -310,7 +310,7 @@ export class SchemaCache {
   }
 
   async version(pool: Pool): Promise<string | number | null> {
-    if (this._version !== null) return this._version;
+    if (this._version != null) return this._version;
 
     return (this._version = await pool.withConnection((connection) => connection.schemaVersion()));
   }

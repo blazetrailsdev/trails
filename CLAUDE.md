@@ -1318,7 +1318,8 @@ test files (~22 s either way). Placing it at the chain's root instead would tax
 only misses, but its identity then replaces `Function.prototype` as the root's
 parent, which ~20 chain walkers terminate on. The name is untyped (a static
 `findBy${string}` index signature breaks subclass assignability to
-`typeof Base`), so a caller spells `(Topic as any).findByTitle(...)`, and `in`
+`typeof Base`), so a call site reaches it through a cast — `(Topic as any).findByTitle(...)`,
+or a narrower structural type where the file bans `any` — and `in`
 still cannot see it (`finder-respond-to-dynamic-finders-invisible-to-in`).
 
 ## `inherited` is deferred to own-property memo guards (`ModelSchema.inherited`)
