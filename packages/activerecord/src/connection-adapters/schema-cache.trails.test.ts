@@ -120,10 +120,12 @@ describe("SchemaCacheDeepDeduplicateTest", () => {
   it("the derive step shares structurally identical columns between tables", () => {
     const cache = new SchemaCache();
     cache.initWith({
-      columns: {
-        people: [makeColumn("id", "integer")],
-        places: [makeColumn("id", "integer")],
-      },
+      columns: new Map([
+        ["people", [makeColumn("id", "integer")]],
+        ["places", [makeColumn("id", "integer")]],
+      ]),
+      primary_keys: new Map(),
+      data_sources: new Map(),
     });
 
     const columns = (cache as unknown as { _columns: Map<string, Column[]> })._columns;
@@ -131,23 +133,32 @@ describe("SchemaCacheDeepDeduplicateTest", () => {
     expect(Object.isFrozen(columns.get("people")![0])).toBe(true);
   });
 
-  it("init_with rehydrates plain coder rows into Column and IndexDefinition instances", () => {
-    const cache = new SchemaCache();
-    cache.initWith({
-      columns: {
-        people: [
-          {
-            name: "id",
-            default: null,
-            sql_type_metadata: { sqlType: "integer", type: "integer" },
-            null: true,
-          },
-        ],
-      },
-      indexes: {
-        people: [{ table: "people", name: "index_people_on_id", unique: true, columns: ["id"] }],
-      },
-    });
+  it("_load_from rehydrates plain coder rows into Column and IndexDefinition instances", async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "schema-cache-rehydrate-test-"));
+    const filename = path.join(tmpDir, "schema_cache.json");
+    fs.writeFileSync(
+      filename,
+      JSON.stringify({
+        columns: {
+          people: [
+            {
+              name: "id",
+              default: null,
+              sql_type_metadata: { sqlType: "integer", type: "integer" },
+              null: true,
+            },
+          ],
+        },
+        primary_keys: {},
+        data_sources: {},
+        indexes: {
+          people: [{ table: "people", name: "index_people_on_id", unique: true, columns: ["id"] }],
+        },
+        version: null,
+      }),
+    );
+    const cache = (await SchemaCache._loadFrom(filename))!;
+    fs.rmSync(tmpDir, { recursive: true, force: true });
 
     const columns = (cache as unknown as { _columns: Map<string, Column[]> })._columns;
     expect(columns.get("people")![0]).toBeInstanceOf(Column);
@@ -163,9 +174,12 @@ describe("SchemaCacheDeepDeduplicateTest", () => {
   it("deduplication leaves indexes as IndexDefinition instances", () => {
     const cache = new SchemaCache();
     cache.initWith({
-      indexes: {
-        people: [new IndexDefinition("people", "index_people_on_id", true, ["id"])],
-      },
+      columns: new Map(),
+      primary_keys: new Map(),
+      data_sources: new Map(),
+      indexes: new Map([
+        ["people", [new IndexDefinition("people", "index_people_on_id", true, ["id"])]],
+      ]),
     });
 
     const [index] = (cache as unknown as { _indexes: Map<string, IndexDefinition[]> })._indexes.get(
@@ -271,10 +285,11 @@ describe("SchemaCacheColumnClassRoundTripTest", () => {
       "people",
     );
 
-    const coder: Record<string, unknown> = {};
-    cache.encodeWith(coder);
-    const loaded = new SchemaCache();
-    loaded.initWith(JSON.parse(JSON.stringify(coder)));
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "schema-cache-round-trip-test-"));
+    const filename = path.join(tmpDir, "schema_cache.json");
+    await cache.dumpTo(filename);
+    const loaded = (await SchemaCache._loadFrom(filename))!;
+    fs.rmSync(tmpDir, { recursive: true, force: true });
     const [column] = (await loaded.columns(new FakePool({}), "people"))!;
 
     expect(column).toBeInstanceOf(MysqlColumn);
