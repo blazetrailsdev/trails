@@ -39,3 +39,19 @@ export function rbModConstMissing(klass: { name?: string } | null, name: string)
     throw new NameError(`uninitialized constant ${name}`, name);
   }
 }
+
+/**
+ * `rb_const_get` (`vendor/ruby/variable.c:3210`), the lookup behind
+ * `Module#const_get(name)` (`vendor/ruby/object.c:2423` `rb_mod_const_get`):
+ * `rb_const_search` walks `klass` and then its ancestors, which in JS is the
+ * prototype chain `in` reads, and a miss goes to `rb_const_missing`
+ * (`vendor/ruby/variable.c:2346`), which sends `const_missing` to `klass`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbConstGet(klass: object, id: string): unknown {
+  if (id in klass) return (klass as Record<string, unknown>)[id];
+  const { constMissing } = klass as { constMissing?: (name: string) => unknown };
+  if (constMissing !== undefined) return constMissing.call(klass, id);
+  return rbModConstMissing(klass, id);
+}

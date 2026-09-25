@@ -1,7 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Deprecation } from "../deprecation.js";
-import { rbEqual } from "@blazetrails/ruby-compat";
-import { DeprecatedInstanceVariableProxy, DeprecatedObjectProxy } from "./proxy-wrappers.js";
+import { NameError, rbEqual } from "@blazetrails/ruby-compat";
+import {
+  DeprecatedConstantProxy,
+  DeprecatedInstanceVariableProxy,
+  DeprecatedObjectProxy,
+} from "./proxy-wrappers.js";
+import { registerConstant, unregisterConstant } from "../inflector.js";
 import { assertDeprecated } from "../testing/deprecation.js";
 
 class Record {
@@ -75,5 +80,38 @@ describe("DeprecationProxy#method_missing ==", () => {
   it("is not reached from String#== on the target side, as rb_str_equal's to_str probe misses", () => {
     const proxy = DeprecatedObjectProxy.new("foo", ":bomb:", deprecator);
     expect(rbEqual("foo", proxy)).toBe(false);
+  });
+});
+
+describe("DeprecatedConstantProxy#const_missing", () => {
+  const deprecator = new Deprecation();
+
+  class Base {
+    static INHERITED = "from the ancestor";
+  }
+  class Target extends Base {
+    static CHILD = "only a static member";
+  }
+  Object.defineProperty(Target, "name", { value: "Undeprecated::Target" });
+
+  beforeAll(() => registerConstant("Undeprecated::Target", Target));
+  afterAll(() => unregisterConstant("Undeprecated::Target", Target));
+
+  it("resolves a child constant against the target itself, as target.const_get does", async () => {
+    const proxy = DeprecatedConstantProxy.new("Old", "Undeprecated::Target", deprecator) as {
+      CHILD: unknown;
+      INHERITED: unknown;
+      MISSING: unknown;
+    };
+    await assertDeprecated("Old", deprecator, () => {
+      expect(proxy.CHILD).toBe("only a static member");
+    });
+    await assertDeprecated("Old", deprecator, () => {
+      expect(proxy.INHERITED).toBe("from the ancestor");
+    });
+    await assertDeprecated("Old", deprecator, () => {
+      expect(() => proxy.MISSING).toThrow(NameError);
+      expect(() => proxy.MISSING).toThrow("uninitialized constant Undeprecated::Target::MISSING");
+    });
   });
 });

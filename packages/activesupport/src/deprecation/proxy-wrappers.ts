@@ -2,7 +2,13 @@ import { callerLocations, type CallerLocation, type Deprecation } from "../depre
 import { extend, include, Module, prepend } from "@blazetrails/ruby-compat/include";
 import { constantize } from "../inflector.js";
 import { PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
-import { rbEqual, rbMethodName, rbObjRespondTo, rbStrSend } from "@blazetrails/ruby-compat";
+import {
+  rbConstGet,
+  rbEqual,
+  rbMethodName,
+  rbObjRespondTo,
+  rbStrSend,
+} from "@blazetrails/ruby-compat";
 import { ArgumentError } from "../hash-utils.js";
 
 function inspect(value: unknown): string {
@@ -225,7 +231,7 @@ export class DeprecatedConstantProxy extends Module {
 
   private constMissing(name: string): unknown {
     this._deprecator.warn(this._message, callerLocations());
-    return constantize(`${String(this._newConst)}::${name}`);
+    return rbConstGet(this.target as object, name);
   }
 
   private methodMissing(called: string, args: unknown[]): unknown {

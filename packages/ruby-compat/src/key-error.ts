@@ -1,3 +1,4 @@
+import { ArgumentError } from "./argument-error.js";
 import { IndexError } from "./index-error.js";
 
 /**
@@ -16,6 +17,46 @@ import { IndexError } from "./index-error.js";
  * @noRailsEquivalent PERMANENT — Ruby core `KeyError`, which Rails inherits
  * rather than defines.
  */
-export class KeyError extends IndexError {}
+export class KeyError extends IndexError {
+  #receiver: unknown;
+  #hasReceiver: boolean;
+  #key: unknown;
+  #hasKey: boolean;
+
+  /**
+   * Ruby's `KeyError.new(message=nil, receiver: nil, key: nil)`
+   * (`vendor/ruby/error.c:2537` `key_err_initialize`), which sets each
+   * attribute only when its keyword was passed.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  constructor(message?: string, options: { receiver?: unknown; key?: unknown } = {}) {
+    super(message);
+    this.#hasReceiver = "receiver" in options;
+    this.#receiver = options.receiver;
+    this.#hasKey = "key" in options;
+    this.#key = options.key;
+  }
+
+  /**
+   * Ruby's `KeyError#receiver` (`vendor/ruby/error.c:2491` `key_err_receiver`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  receiver(): unknown {
+    if (this.#hasReceiver) return this.#receiver;
+    throw new ArgumentError("no receiver is available");
+  }
+
+  /**
+   * Ruby's `KeyError#key` (`vendor/ruby/error.c:2508` `key_err_key`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  key(): unknown {
+    if (this.#hasKey) return this.#key;
+    throw new ArgumentError("no key is available");
+  }
+}
 
 KeyError.prototype.name = "KeyError";

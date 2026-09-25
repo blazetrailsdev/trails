@@ -22,6 +22,7 @@ import {
 } from "./hash.js";
 import { KeyError } from "./key-error.js";
 import { FrozenError } from "./frozen-error.js";
+import { IndexError } from "./index-error.js";
 
 describe("Hash#fetch", () => {
   it("returns a stored null rather than the default", () => {
@@ -47,6 +48,19 @@ describe("Hash#fetch", () => {
     expect(() => fetch({}, "expression")).toThrow(KeyError);
     expect(() => fetch({}, "expression")).toThrow('key not found: "expression"');
     expect(() => fetch({}, ":expression")).toThrow("key not found: :expression");
+  });
+
+  it("sets the receiver and key on the KeyError, as rb_key_err_raise does", () => {
+    const hash = { a: 1 };
+    let error: unknown;
+    try {
+      fetch(hash, "b");
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeInstanceOf(IndexError);
+    expect((error as KeyError).receiver()).toBe(hash);
+    expect((error as KeyError).key()).toBe("b");
   });
 
   it("ellipsizes a description past 65 characters, as rb_str_ellipsize does", () => {
@@ -172,6 +186,17 @@ describe("Hash#freeze", () => {
     expect(() => hash.clear()).toThrow(FrozenError);
     expect(() => hash.setDefault(0)).toThrow(FrozenError);
     expect(hash.get("a")).toBe(1);
+  });
+
+  it("sets the frozen hash as the FrozenError's receiver", () => {
+    const hash = new Hash<string, number>().freeze();
+    let error: unknown;
+    try {
+      hash.clear();
+    } catch (e) {
+      error = e;
+    }
+    expect((error as FrozenError).receiver()).toBe(hash);
   });
 });
 
