@@ -1,5 +1,5 @@
 /** @noRailsEquivalent PERMANENT MOVED-BY-SHORT-NAME: pp. */
-import { rbInspect } from "@blazetrails/ruby-compat";
+import { rbAnyToS, rbInspect } from "@blazetrails/ruby-compat";
 
 export interface PrettyPrinter {
   text(str: string): void;
@@ -58,10 +58,8 @@ class PrettyPrint implements PrettyPrinter {
   }
 
   async objectAddressGroup(obj: object, fn: () => void | Promise<void>): Promise<void> {
-    const name = (obj as { constructor?: { name?: string } }).constructor?.name ?? "Object";
-    this.text(`#<${name}`);
-    await fn();
-    this.text(">");
+    const str = rbAnyToS(obj).replace(/>$/, "");
+    await this.group(1, str, ">", fn);
   }
 
   async pp(obj: unknown): Promise<void> {

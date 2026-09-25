@@ -729,10 +729,10 @@ describe("inspect wrapper class name", () => {
     expect(relation.inspect().startsWith("#<ActiveRecord::AssociationRelation [")).toBe(true);
   });
 
-  it("renders the qualified Rails class name for an unloaded relation", () => {
+  it("renders the qualified Rails class name for an unloaded relation", async () => {
     const relation = CanonPost.all();
     expect(relation.isLoaded).toBe(false);
-    expect(relation.inspect()).toBe("#<ActiveRecord::Relation [...]>");
+    expect(await relation.inspect()).toMatch(/^#<ActiveRecord::Relation \[#<Post /);
   });
 
   it("defaults an unordered reverseOrder to the primary key descending", () => {

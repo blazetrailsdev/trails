@@ -635,25 +635,25 @@ export async function exists<T extends typeof Base>(
 export function findOrCreateBy<T extends typeof Base>(
   this: T,
   conditions: Record<string, unknown>,
-  extra?: Record<string, unknown>,
+  block?: (r: InstanceType<T>) => void,
 ): Promise<InstanceType<T>> {
-  return this.all().findOrCreateBy(conditions, extra);
+  return this.all().findOrCreateBy(conditions, block);
 }
 
 export function findOrCreateByBang<T extends typeof Base>(
   this: T,
   conditions: Record<string, unknown>,
-  extra?: Record<string, unknown>,
+  block?: (r: InstanceType<T>) => void,
 ): Promise<InstanceType<T>> {
-  return this.all().findOrCreateByBang(conditions, extra);
+  return this.all().findOrCreateByBang(conditions, block);
 }
 
 export function findOrInitializeBy<T extends typeof Base>(
   this: T,
   conditions: Record<string, unknown>,
-  extra?: Record<string, unknown>,
+  block?: (r: InstanceType<T>) => void,
 ): Promise<InstanceType<T>> {
-  return this.all().findOrInitializeBy(conditions, extra);
+  return this.all().findOrInitializeBy(conditions, block);
 }
 
 export function isAny<T extends typeof Base>(

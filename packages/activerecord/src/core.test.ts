@@ -129,26 +129,30 @@ describe("CoreTest", () => {
     const topic = new Topic({});
     const actual = await ppString(topic);
     const expected =
-      `#<Topic id: nil, title: nil, author_name: nil, ` +
+      `#<Topic:0xXXXXXX id: nil, title: nil, author_name: nil, ` +
       `author_email_address: "test@test.com", written_on: nil, bonus_time: nil, ` +
       `last_read: nil, content: nil, important: nil, binary_content: nil, ` +
       `approved: true, replies_count: 0, unique_replies_count: 0, parent_id: nil, ` +
       `parent_title: nil, type: nil, group: nil, created_at: nil, updated_at: nil>\n`;
-    expect(actual.startsWith(expected.slice(0, 8))).toBeTruthy();
-    expect(actual.endsWith(expected.slice(8))).toBeTruthy();
+    expect(actual.startsWith(expected.split("XXXXXX")[0])).toBeTruthy();
+    expect(actual.endsWith(expected.split("XXXXXX").at(-1)!)).toBeTruthy();
   });
 
   it("pretty print persisted", async () => {
     const topic = topics("first") as any;
     const actual = await ppString(topic);
-    expect(actual).toMatch(new RegExp(`^${regexpEscape(fullInspectString(topic))}\n$`));
+    expect(actual).toMatch(
+      new RegExp(`^#<Topic:0x\\w+ ${regexpEscape(fullInspectString(topic).slice(8))}\n$`),
+    );
   });
 
   it("pretty print full", async () => {
     await withAttributesForInspect("all", async () => {
       const topic = topics("first") as any;
       const actual = await ppString(topic);
-      expect(actual).toMatch(new RegExp(`^${regexpEscape(fullInspectString(topic))}\n$`));
+      expect(actual).toMatch(
+        new RegExp(`^#<Topic:0x\\w+ ${regexpEscape(fullInspectString(topic).slice(8))}\n$`),
+      );
     });
   });
 

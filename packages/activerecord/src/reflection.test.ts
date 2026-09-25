@@ -572,7 +572,9 @@ describe("ReflectionTest", () => {
         Firm,
       );
     });
-    expect(error.message).toBe("A class was passed to `:className` but we are expecting a string.");
+    expect(error.message).toBe(
+      "A class was passed to `:class_name` but we are expecting a string.",
+    );
   });
   it("class for source type", async () => {
     const error = await assertRaises([ArgumentError], {}, () => {
@@ -585,7 +587,7 @@ describe("ReflectionTest", () => {
       );
     });
     expect(error.message).toBe(
-      "A class was passed to `:sourceType` but we are expecting a string.",
+      "A class was passed to `:source_type` but we are expecting a string.",
     );
   });
   it("join table with common prefix", () => {

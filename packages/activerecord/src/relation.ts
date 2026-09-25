@@ -399,15 +399,15 @@ export class Relation<T extends Base> {
     }
   }
 
-  inspect(): string {
-    const className = (this.constructor as typeof Relation)._railsClassName;
-    if (this.isLoaded && !this.isScheduled) {
-      const max = takeLimit(this.limitValue);
-      const entries = this._records.slice(0, max).map((record) => record.inspect());
+  inspect(): string | Promise<string> {
+    const max = takeLimit(this.limitValue);
+    const inspectEntries = (subject: T[]): string => {
+      const entries = subject.map((record) => record.inspect());
       if (entries.length === 11) entries[10] = "...";
-      return `#<${className} [${entries.join(", ")}]>`;
-    }
-    return `#<${className} [...]>`;
+      return `#<${(this.constructor as typeof Relation)._railsClassName} [${entries.join(", ")}]>`;
+    };
+    if (this.isLoaded && !this.isScheduled) return inspectEntries(this._records.slice(0, max));
+    return this.annotate("loading for inspect").take(max).then(inspectEntries);
   }
 
   async prettyPrint(pp: PrettyPrinter): Promise<void> {
@@ -835,52 +835,23 @@ export class Relation<T extends Base> {
     return this.updateAll(this.model.touchAttributesWithTime(...(names as string[]), time));
   }
 
-  async findOrCreateBy(
-    attributes: Record<string, unknown>,
-    extra?: Record<string, unknown>,
-  ): Promise<T> {
-    const existing = await this.findBy(attributes);
-    if (existing) return existing;
-    return this.createOrFindBy(attributes, extra);
+  async findOrCreateBy(attributes: Record<string, unknown>, block?: (r: T) => void): Promise<T> {
+    return (await this.findBy(attributes)) || this.createOrFindBy(attributes, block);
   }
 
   async findOrCreateByBang(
     attributes: Record<string, unknown>,
-    extra?: Record<string, unknown>,
+    block?: (r: T) => void,
   ): Promise<T> {
-    const existing = await this.findBy(attributes);
-    if (existing) return existing;
-    return this.createOrFindByBang(attributes, extra);
+    return (await this.findBy(attributes)) || this.createOrFindByBang(attributes, block);
   }
 
-  async findOrInitializeBy(
-    attributes: Record<string, unknown>,
-    extra?: Record<string, unknown>,
-  ): Promise<T> {
-    const existing = await this.findBy(attributes);
-    if (existing) return existing;
-    return new (this._model as any)({
-      ...this.scopeForCreate(),
-      ...attributes,
-      ...extra,
-    }) as T;
-  }
-
-  async createOrFindBy(
-    attributes: Record<string, unknown>,
-    extra?: Record<string, unknown>,
-  ): Promise<T> {
+  async createOrFindBy(attributes: Record<string, unknown>, block?: (r: T) => void): Promise<T> {
     return this.withConnection(async (connection) => {
       try {
-        const result = await this._model.transaction(
-          () =>
-            this._model.create({
-              ...this.scopeForCreate(),
-              ...attributes,
-              ...extra,
-            }) as Promise<T>,
-          { requiresNew: true },
-        );
+        const result = await this._model.transaction(() => this.create(attributes, block), {
+          requiresNew: true,
+        });
         if (result === undefined) {
           throw new RecordNotSaved(`${this._model.name}.createOrFindBy rolled back before persist`);
         }
@@ -897,19 +868,13 @@ export class Relation<T extends Base> {
 
   async createOrFindByBang(
     attributes: Record<string, unknown>,
-    extra?: Record<string, unknown>,
+    block?: (r: T) => void,
   ): Promise<T> {
     return this.withConnection(async (connection) => {
       try {
-        const result = await this._model.transaction(
-          () =>
-            this._model.createBang({
-              ...this.scopeForCreate(),
-              ...attributes,
-              ...extra,
-            }) as Promise<T>,
-          { requiresNew: true },
-        );
+        const result = await this._model.transaction(() => this.createBang(attributes, block), {
+          requiresNew: true,
+        });
         if (result === undefined) {
           throw new RecordNotSaved(
             `${this._model.name}.createOrFindByBang rolled back before persist`,
@@ -924,6 +889,13 @@ export class Relation<T extends Base> {
         return this.findByBang(attributes);
       }
     });
+  }
+
+  async findOrInitializeBy(
+    attributes: Record<string, unknown>,
+    block?: (r: T) => void,
+  ): Promise<T> {
+    return (await this.findBy(attributes)) || this.new(attributes, block);
   }
 
   async firstOrCreate(attributes?: Record<string, unknown>, block?: (r: T) => void): Promise<T> {

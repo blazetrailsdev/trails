@@ -405,7 +405,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return this._association.isFindFromTarget();
   }
 
-  // @ts-expect-error async divergence from Relation#inspect — see doc comment.
   async inspect(): Promise<string> {
     if (this.isFindFromTarget()) await this.loadTarget();
     const limitValue = (this as any).limitValue as number | null;

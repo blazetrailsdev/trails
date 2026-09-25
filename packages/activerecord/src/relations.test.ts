@@ -1771,8 +1771,7 @@ describe("RelationTest", () => {
     expect(parrot.color).toBe("green");
   });
 
-  it.skip("first or create with block", async () => {
-    // BLOCKED: block argument — Relation#firstOrCreate takes no block, so the block never runs (relation-first-or-create-block)
+  it("first or create with block", async () => {
     const canary = await Bird.createBang({ color: "yellow", name: "canary" });
     const parrot = await (Bird.where({ color: "green" }) as any).firstOrCreate(
       undefined,
@@ -1836,8 +1835,7 @@ describe("RelationTest", () => {
     await expect(Bird.where({ color: "green" }).firstOrCreateBang()).rejects.toThrow(RecordInvalid);
   });
 
-  it.skip("first or create bang with valid block", async () => {
-    // BLOCKED: block argument — Relation#firstOrCreateBang takes no block, so the block never runs (relation-first-or-create-block)
+  it("first or create bang with valid block", async () => {
     const canary = await Bird.createBang({ color: "yellow", name: "canary" });
     const parrot = await (Bird.where({ color: "green" }) as any).firstOrCreateBang(
       undefined,
@@ -1978,8 +1976,7 @@ describe("RelationTest", () => {
     ).toBe(true);
   });
 
-  it.skip("find or create by with block", async () => {
-    // BLOCKED: block argument — findOrCreateBy takes an extra attributes hash where Rails takes a block (relation-find-or-create-by-block)
+  it("find or create by with block", async () => {
     expect(await Bird.findBy({ name: "bob" })).toBeNull();
 
     const bird = await (Bird as any).findOrCreateBy({ name: "bob" }, (record: Bird) => {
@@ -2003,8 +2000,7 @@ describe("RelationTest", () => {
     expect((await Subscriber.createOrFindBy({ nick: "cat" })).nick).not.toBe(subscriber.nick);
   });
 
-  it.skip("create or find by with block", async () => {
-    // BLOCKED: block argument — createOrFindBy takes an extra attributes hash where Rails takes a block (relation-find-or-create-by-block)
+  it("create or find by with block", async () => {
     expect(await Subscriber.findBy({ nick: "bob" })).toBeNull();
 
     const subscriber = await (Subscriber as any).createOrFindBy(
@@ -2085,8 +2081,7 @@ describe("RelationTest", () => {
     expect((await Bird.findOrInitializeBy({ name: "bob" })).equals(bird)).toBe(true);
   });
 
-  it.skip("find or initialize by with block", async () => {
-    // BLOCKED: block argument — findOrInitializeBy takes an extra attributes hash where Rails takes a block (relation-find-or-create-by-block)
+  it("find or initialize by with block", async () => {
     expect(await Bird.findBy({ name: "bob" })).toBeNull();
 
     const bird = await (Bird as any).findOrInitializeBy({ name: "bob" }, (record: Bird) => {
@@ -2617,15 +2612,13 @@ describe("RelationTest", () => {
     );
   });
 
-  it.skip("relations don't load all records in #inspect", async () => {
-    // BLOCKED: inspect — Relation#inspect is synchronous and never queries an unloaded relation (relation-inspect-loads-limited-records)
+  it("relations don't load all records in #inspect", async () => {
     await assertQueriesMatch(/LIMIT|ROWNUM <=|FETCH FIRST/, undefined, false, async () => {
       await (Post.all() as any).inspect();
     });
   });
 
-  it.skip("loading query is annotated in #inspect", async () => {
-    // BLOCKED: inspect — Relation#inspect is synchronous and never queries an unloaded relation (relation-inspect-loads-limited-records)
+  it("loading query is annotated in #inspect", async () => {
     await assertQueriesMatch(/\/\* loading for inspect \*\//, undefined, false, async () => {
       await (Post.all() as any).inspect();
     });
@@ -2644,8 +2637,7 @@ describe("RelationTest", () => {
     });
   });
 
-  it.skip("relations limit the records in #pretty_print at 10", async () => {
-    // BLOCKED: pretty_print — pp of a loaded Relation does not render each record as #<Post:...> (relation-pretty-print-record-format)
+  it("relations limit the records in #pretty_print at 10", async () => {
     const relation = Post.limit(11);
     const out: string[] = [];
     await pp(relation, { write: (str) => out.push(str) });
