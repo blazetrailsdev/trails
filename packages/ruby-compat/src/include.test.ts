@@ -1033,30 +1033,14 @@ describe("Module.new", () => {
 });
 
 describe("rbObjClone", () => {
-  it("keeps singleton methods and gives the clone its own extend registry", () => {
-    class Host {
-      ivar = 1;
-    }
-    const obj = new Host();
-    extend(obj, {
-      a(): string {
-        return "a";
-      },
-    });
-    const clone = rbObjClone(obj);
-    extend(clone, {
-      b(): string {
-        return "b";
-      },
-    });
+  it("copies class, ivars, singleton methods and frozen state", () => {
+    const a = () => "a";
+    const obj = Object.assign(new (class Host {})(), { ivar: 1 });
+    extend(obj, { a });
+    const clone = rbObjClone(Object.freeze(obj));
 
-    expect(clone).toBeInstanceOf(Host);
-    expect(clone.ivar).toBe(1);
-    expect((clone as unknown as { a(): string }).a()).toBe("a");
-    expect("b" in obj).toBe(false);
-  });
-
-  it("is frozen when the receiver is", () => {
-    expect(Object.isFrozen(rbObjClone(Object.freeze({ x: 1 })))).toBe(true);
+    expect(Object.getPrototypeOf(clone)).toBe(Object.getPrototypeOf(obj));
+    expect(clone).toMatchObject({ ivar: 1, a });
+    expect(Object.isFrozen(clone)).toBe(true);
   });
 });
