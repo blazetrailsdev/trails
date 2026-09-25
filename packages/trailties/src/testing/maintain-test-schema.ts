@@ -1,13 +1,13 @@
 import { Base, Migration } from "@blazetrails/activerecord";
 import { PendingMigrationError } from "@blazetrails/activerecord/migration";
-import { exit, puts, stdout } from "@blazetrails/ruby-compat";
+import { exit, stdout } from "@blazetrails/ruby-compat";
 import { Trails } from "../rails.js";
 
 try {
   await Migration.maintainTestSchemaBang();
 } catch (e) {
   if (!(e instanceof PendingMigrationError)) throw e;
-  puts.call(stdout, e.toString().trim());
+  stdout.write(`${e.toString().trim()}\n`);
   exit(1);
 }
 
