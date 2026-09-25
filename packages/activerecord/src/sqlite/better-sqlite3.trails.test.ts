@@ -259,3 +259,37 @@ describe("SqliteDriver — better-sqlite3 binds unsupplied placeholders as NULL"
     for (const c of conns) await c.close();
   });
 });
+
+describe("SqliteDriver — better-sqlite3 readonly :memory:", () => {
+  it("opens an empty, read-only in-memory connection that refuses writes", async () => {
+    const conn = await betterSqlite3Driver.open({ database: ":memory:", readOnly: true });
+    try {
+      expect(conn.pragma("schema_version", { simple: true })).toBe(0);
+      expect(() => conn.exec("CREATE TABLE t (id INTEGER)")).toThrow(
+        /attempt to write a readonly database/,
+      );
+    } finally {
+      await conn.close();
+    }
+  });
+});
+
+describe("SqliteDriver — better-sqlite3 strict", () => {
+  it("rejects unknown double-quoted identifiers under strict: true", async () => {
+    const conn = await betterSqlite3Driver.open({ database: ":memory:", strict: true });
+    try {
+      expect(() => conn.prepare(`SELECT "missing_col" AS v`)).toThrow(/no such column/i);
+    } finally {
+      await conn.close();
+    }
+  });
+
+  it("still rejects unknown double-quoted identifiers under strict: false (built with SQLITE_DQS=0)", async () => {
+    const conn = await betterSqlite3Driver.open({ database: ":memory:", strict: false });
+    try {
+      expect(() => conn.prepare(`SELECT "missing_col" AS v`)).toThrow(/no such column/i);
+    } finally {
+      await conn.close();
+    }
+  });
+});
