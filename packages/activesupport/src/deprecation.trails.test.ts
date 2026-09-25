@@ -1,6 +1,7 @@
 import { beforeEach, describe, it, expect, vi } from "vitest";
 import { Thread, stderr } from "@blazetrails/ruby-compat";
-import { Deprecation, DeprecationException } from "./deprecation.js";
+import { Deprecation, DeprecationException, callerLocations } from "./deprecation.js";
+import type { CallerLocation } from "./deprecation.js";
 import { deprecator } from "./deprecator.js";
 
 describe("Deprecation#allow (trails)", () => {
@@ -104,5 +105,18 @@ describe("DeprecationTest", () => {
     const d = new Deprecation();
     d.silenced = true;
     expect(d.silenced).toBe(true);
+  });
+});
+
+describe("callerLocations (trails)", () => {
+  it("leaves absolutePath nil for an eval-compiled frame, as Ruby's absolute_path is", () => {
+    const generated = (0, eval)(
+      `(callerLocations) => function generated() { return callerLocations(0, 1); }
+//# sourceURL=/path/to/template.html.tse`,
+    )(callerLocations) as () => CallerLocation[];
+    const [frame] = generated();
+    expect(frame.path).toEqual("/path/to/template.html.tse");
+    expect(frame.absolutePath).toBeUndefined();
+    expect(callerLocations(0, 1)[0].absolutePath).toEqual(new URL(import.meta.url).pathname);
   });
 });
