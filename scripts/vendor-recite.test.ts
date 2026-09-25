@@ -12,7 +12,6 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const rails = activeVersion(SOURCES.find((s) => s.name === "rails")!);
 const ruby = activeVersion(SOURCES.find((s) => s.name === "ruby")!);
 
-// The three input shapes: unversioned, correctly versioned, stale.
 const FIXTURES: Record<string, { input: string; recited: string }> = {
   "packages/ruby-compat/src/unversioned.ts": {
     input:
@@ -30,7 +29,6 @@ const FIXTURES: Record<string, { input: string; recited: string }> = {
   },
 };
 
-// A regex-bearing file on the exclusion list: rewriting it would break the rule.
 const REGEX_BEARING = "eslint/ruby-compat-needs-mri-citation.mjs";
 const REGEX_SOURCE =
   "const CITATION = /vendor\\/ruby\\/([A-Za-z0-9_./+-]+):(\\d+)/g;\n// vendor/ruby/rational.c:1\n";
@@ -87,7 +85,6 @@ describe("vendor:recite", () => {
   it("leaves a regex-bearing file on the exclusion list alone", async () => {
     const root = await fixtureTree();
     try {
-      // It would be rewritten if it were not excluded.
       expect(reciteText(REGEX_SOURCE)).not.toBe(REGEX_SOURCE);
       await recite(root, PATHS);
       expect(await readFile(join(root, REGEX_BEARING), "utf8")).toBe(REGEX_SOURCE);

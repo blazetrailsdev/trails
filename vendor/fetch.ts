@@ -339,8 +339,6 @@ export async function runFetch(
     return;
   }
 
-  // A --ref naming the active version is just the active fetch below, lock
-  // check included.
   if (opts.ref !== undefined) {
     const [source] = targets;
     if (versionDir(opts.ref) !== activeVersion(source)) {

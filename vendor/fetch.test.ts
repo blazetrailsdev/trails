@@ -179,7 +179,6 @@ describe("vendor/fetch.ts version directories", () => {
         "v1.0.0",
       );
 
-      // --refresh re-clones the candidate only; the active version survives.
       await writeFile(join(versionsDir, "v1.0.0", "marker"), "");
       await fetchCandidate(source, "v2.0.0", { refresh: true, versionsDir });
       expect((await readdir(versionsDir)).sort()).toEqual(["v1.0.0", "v2.0.0"]);

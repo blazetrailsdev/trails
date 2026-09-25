@@ -1,19 +1,4 @@
 #!/usr/bin/env -S npx tsx
-// Rewrite every tracked `vendor/<source>/…` citation to name the source's
-// active version directory: `vendor/<source>/<activeVersion>/…` (RFC 0159).
-//
-// CLI:
-//   tsx scripts/vendor-recite.ts [--check]
-//
-//   --check:  report the files that would change, write nothing, and exit
-//             non-zero when there is at least one.
-//
-// An unversioned citation gains the segment, a correctly versioned one is left
-// alone, and a stale one — naming a version that is not the active one — has
-// its segment replaced. Sources and versions come from vendor/sources.ts, the
-// registry the resolvers read, so a citation is rewritten to exactly the tree
-// the comparers see.
-
 import { execFile } from "node:child_process";
 import { lstat, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
@@ -32,13 +17,10 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
  * A key ending in `/` excludes the whole directory. Every entry names why.
  */
 export const EXCLUDED: Readonly<Record<string, string>> = {
-  // The registry, its tests, README and lockfile spell source paths as data.
   "vendor/": "registry data, not citations",
-  // `CITATION` (:36) matches citations and the message templates (:158-169) build them.
   "eslint/ruby-compat-needs-mri-citation.mjs": "matches and builds citations",
   "eslint/ruby-compat-needs-mri-citation.test.mjs": "fixtures for the citation rule's resolver",
   "scripts/api-compare/jsdoc-tag-line.test.ts": "fixtures for the tag-line parser",
-  // `SKIPPED_PATHS` is a `vendor/rails` prefix match over the file tree.
   "scripts/parity/legacy-script-names.ts": "SKIPPED_PATHS is a path prefix, not a citation",
   "scripts/vendor-recite.ts": "this codemod",
   "scripts/vendor-recite.test.ts": "the codemod's input-shape fixtures",
@@ -67,8 +49,12 @@ export function reciteText(text: string): string {
 }
 
 /**
- * Recite each of `paths` (relative to `root`) in place and return the ones
- * that changed. With `check`, nothing is written.
+ * `pnpm vendor:recite [--check]` (RFC 0159). Recite each of `paths` (relative
+ * to `root`) in place and return the ones that changed: an unversioned
+ * `vendor/<source>/…` citation gains its source's `activeVersion` segment, a
+ * correctly versioned one is left alone, and a stale segment is replaced.
+ * Tracked symlinks, submodules and binary files are skipped. With `check`,
+ * nothing is written, and the CLI exits non-zero when anything would change.
  */
 export async function recite(
   root: string,
@@ -79,7 +65,6 @@ export async function recite(
   for (const path of paths) {
     if (isExcluded(path)) continue;
     const file = join(root, path);
-    // A tracked symlink or submodule is not a text file of its own.
     if (!(await lstat(file)).isFile()) continue;
     const text = await readFile(file, "utf8");
     if (text.includes("\0")) continue;
