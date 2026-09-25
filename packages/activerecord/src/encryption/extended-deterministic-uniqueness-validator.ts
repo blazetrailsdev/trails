@@ -1,3 +1,4 @@
+import { Encryption } from "../namespaces.js";
 import { prepend } from "@blazetrails/activesupport";
 import { Contexts } from "./contexts.js";
 
@@ -47,3 +48,5 @@ export const EncryptedUniquenessValidator = {
     }
   },
 };
+
+Encryption.ExtendedDeterministicUniquenessValidator = ExtendedDeterministicUniquenessValidator;

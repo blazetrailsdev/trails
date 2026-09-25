@@ -1,3 +1,4 @@
+import { Encryption } from "../namespaces.js";
 import { deflateSync, inflateSync } from "zlib";
 
 import { presence } from "@blazetrails/activesupport";
@@ -131,3 +132,5 @@ export class Config {
     this.previousSchemes.push(new Scheme(properties));
   }
 }
+
+Encryption.Config = Config;

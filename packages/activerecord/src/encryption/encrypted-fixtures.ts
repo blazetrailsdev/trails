@@ -1,3 +1,4 @@
+import { Encryption } from "../namespaces.js";
 import type { PrependModule } from "@blazetrails/ruby-compat";
 import type { ValueType } from "@blazetrails/activemodel";
 
@@ -58,3 +59,5 @@ export const EncryptedFixtures: PrependModule = {
     return super_(fixture, modelClass);
   },
 };
+
+Encryption.EncryptedFixtures = EncryptedFixtures;

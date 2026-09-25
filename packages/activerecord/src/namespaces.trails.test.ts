@@ -7,6 +7,13 @@ import { Migration } from "./migration.js";
 import * as Compatibility from "./migration/compatibility.js";
 import { Cipher } from "./encryption/cipher.js";
 import { Aes256Gcm } from "./encryption/cipher/aes256-gcm.js";
+import { CommandRecorder } from "./migration/command-recorder.js";
+import * as JoinTable from "./migration/join-table.js";
+import { ExecutionStrategy } from "./migration/execution-strategy.js";
+import { DefaultStrategy } from "./migration/default-strategy.js";
+import { NullEncryptor } from "./encryption/null-encryptor.js";
+import { Scheme } from "./encryption/scheme.js";
+import * as Errors from "./encryption/errors.js";
 
 describe("ActiveRecord namespaces", () => {
   it("constantize resolves the namespaces nested on ActiveRecord", () => {
@@ -40,5 +47,19 @@ describe("ActiveRecord namespaces", () => {
     await eagerLoadBang();
     vi.restoreAllMocks();
     expect(order).toEqual(["Associations", "ConnectionAdapters", "Encryption"]);
+  });
+
+  it("constantize resolves every constant migration.rb:572-576 autoloads on Migration", () => {
+    expect(constantize("ActiveRecord::Migration::CommandRecorder")).toBe(CommandRecorder);
+    expect(constantize("ActiveRecord::Migration::JoinTable")).toBe(JoinTable);
+    expect(constantize("ActiveRecord::Migration::ExecutionStrategy")).toBe(ExecutionStrategy);
+    expect(constantize("ActiveRecord::Migration::DefaultStrategy")).toBe(DefaultStrategy);
+  });
+
+  it("constantize resolves the constants encryption.rb:10-35 eager autoloads", async () => {
+    await Encryption.eagerLoadBang();
+    expect(constantize("ActiveRecord::Encryption::NullEncryptor")).toBe(NullEncryptor);
+    expect(constantize("ActiveRecord::Encryption::Scheme")).toBe(Scheme);
+    expect(constantize("ActiveRecord::Encryption::Errors::Decryption")).toBe(Errors.Decryption);
   });
 });

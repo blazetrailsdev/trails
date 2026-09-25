@@ -1,3 +1,4 @@
+import { Encryption } from "../namespaces.js";
 import { Message } from "./message.js";
 import { Properties } from "./properties.js";
 import { Decryption, ForbiddenClass } from "./errors.js";
@@ -132,3 +133,5 @@ export class MessageSerializer implements MessageSerializerLike {
     return value;
   }
 }
+
+Encryption.MessageSerializer = MessageSerializer;

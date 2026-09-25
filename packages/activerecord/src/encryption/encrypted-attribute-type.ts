@@ -307,3 +307,5 @@ function isAdditionalValue(value: unknown): boolean {
     (value as Record<symbol, unknown>)[ADDITIONAL_VALUE_BRAND] === true
   );
 }
+
+Encryption.EncryptedAttributeType = EncryptedAttributeType;

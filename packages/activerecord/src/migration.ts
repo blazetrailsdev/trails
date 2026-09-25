@@ -47,7 +47,9 @@ import type * as CompatibilityModule from "./migration/compatibility.js";
 import type { DatabaseConfig } from "./database-configurations/database-config.js";
 import { _DatabaseTasks } from "./tasks/database-tasks-slot.js";
 import type { SchemaFormat } from "./tasks/database-tasks.js";
-import type { ExecutionStrategy } from "./migration/execution-strategy.js";
+import { ExecutionStrategy } from "./migration/execution-strategy.js";
+import { DefaultStrategy } from "./migration/default-strategy.js";
+import * as JoinTableModule from "./migration/join-table.js";
 import { PendingMigrationConnection } from "./migration/pending-migration-connection.js";
 import { VERSION } from "./gem-version.js";
 
@@ -56,8 +58,7 @@ export type {
   AddForeignKeyOptions,
 } from "./connection-adapters/abstract/schema-definitions.js";
 
-export { ExecutionStrategy } from "./migration/execution-strategy.js";
-export { DefaultStrategy } from "./migration/default-strategy.js";
+export { ExecutionStrategy, DefaultStrategy };
 export { PendingMigrationConnection } from "./migration/pending-migration-connection.js";
 
 import { ActiveRecordError, NoDatabaseError } from "./errors.js";
@@ -1277,16 +1278,34 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export declare namespace Migration {
+  let CommandRecorder:
+    | typeof import("./migration/command-recorder.js").CommandRecorder
+    | import("@blazetrails/ruby-compat").PrependModule;
   let Compatibility: typeof CompatibilityModule;
+  let JoinTable: typeof JoinTableModule;
+  let ExecutionStrategy: typeof import("./migration/execution-strategy.js").ExecutionStrategy;
+  let DefaultStrategy: typeof import("./migration/default-strategy.js").DefaultStrategy;
   const autoload: Extended<typeof Autoload>["autoload"];
 }
 Object.assign(Migration, {
   loadPath: {
+    "active_record/migration/command_recorder": () => import("./migration/command-recorder.js"),
     "active_record/migration/compatibility": () => import("./migration/compatibility.js"),
+    "active_record/migration/join_table": () => import("./migration/join-table.js"),
+    "active_record/migration/execution_strategy": () => import("./migration/execution-strategy.js"),
+    "active_record/migration/default_strategy": () => import("./migration/default-strategy.js"),
   },
 });
 extend(Migration, Autoload);
+Migration.autoload("CommandRecorder", "active_record/migration/command_recorder");
 Migration.autoload("Compatibility", "active_record/migration/compatibility");
+Migration.autoload("JoinTable", "active_record/migration/join_table");
+Migration.autoload("ExecutionStrategy", "active_record/migration/execution_strategy");
+Migration.autoload("DefaultStrategy", "active_record/migration/default_strategy");
+Migration.CommandRecorder = CommandRecorder;
+Migration.JoinTable = JoinTableModule;
+Migration.ExecutionStrategy = ExecutionStrategy;
+Migration.DefaultStrategy = DefaultStrategy;
 
 let loadMigrationSeq = 0;
 
@@ -2076,3 +2095,4 @@ export class CheckPending {
 
 Migration.delegate = new Migration();
 ActiveRecord.Migration = Migration;
+ActiveRecord.IrreversibleMigration = IrreversibleMigration;

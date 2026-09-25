@@ -163,3 +163,5 @@ export class Scheme {
     }
   }
 }
+
+Encryption.Scheme = Scheme;

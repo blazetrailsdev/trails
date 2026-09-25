@@ -22,3 +22,5 @@ export class Key {
     return new Key(secret);
   }
 }
+
+Encryption.Key = Key;

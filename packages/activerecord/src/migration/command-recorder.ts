@@ -1,7 +1,7 @@
 import { hasKey } from "@blazetrails/ruby-compat";
 import { extractOptionsBang, isPlainObject, methodMissingProxy } from "@blazetrails/activesupport";
 
-import { IrreversibleMigration } from "../migration.js";
+import { ActiveRecord } from "../namespaces.js";
 import type { Table } from "../connection-adapters/abstract/schema-definitions.js";
 import {
   findJoinTableName as _findJoinTableName,
@@ -78,7 +78,7 @@ export class CommandRecorder {
   ): Promise<MigrationCommand> {
     const method = `invert${command.charAt(0).toUpperCase()}${command.slice(1)}` as keyof this;
     if (!(method in this)) {
-      throw new IrreversibleMigration(
+      throw new ActiveRecord.IrreversibleMigration(
         `This migration uses ${command}, which is not automatically reversible.\n` +
           `To make the migration reversible you can either:\n` +
           `1. Define #up and #down methods in place of the #change method.\n` +
@@ -163,13 +163,13 @@ export class CommandRecorder {
     delete options["ifExists"];
 
     if (args.length > 1) {
-      throw new IrreversibleMigration(
+      throw new ActiveRecord.IrreversibleMigration(
         "To avoid mistakes, drop_table is only reversible if given a single table name.",
       );
     }
 
     if (args.length === 1 && Object.keys(options).length === 0 && block == null) {
-      throw new IrreversibleMigration(
+      throw new ActiveRecord.IrreversibleMigration(
         "To avoid mistakes, drop_table is only reversible if given options or a block (can be empty).",
       );
     }
@@ -214,7 +214,9 @@ export class CommandRecorder {
   /** @internal */
   invertRemoveColumn(args: unknown[], block?: MigrationBlock): MigrationCommand {
     if (typeof args[2] !== "string") {
-      throw new IrreversibleMigration("remove_column is only reversible if given a type.");
+      throw new ActiveRecord.IrreversibleMigration(
+        "remove_column is only reversible if given a type.",
+      );
     }
     return ["addColumn", args, block];
   }
@@ -246,7 +248,9 @@ export class CommandRecorder {
       delete options["column"];
     }
     if (!columns) {
-      throw new IrreversibleMigration("remove_index is only reversible if given a :column option.");
+      throw new ActiveRecord.IrreversibleMigration(
+        "remove_index is only reversible if given a :column option.",
+      );
     }
     delete options["ifExists"];
     const result: unknown[] = [table, columns];
@@ -324,7 +328,7 @@ export class CommandRecorder {
       delete options["toTable"];
     }
     if (!toTable) {
-      throw new IrreversibleMigration(
+      throw new ActiveRecord.IrreversibleMigration(
         "remove_foreign_key is only reversible if given a second table",
       );
     }
@@ -351,7 +355,7 @@ export class CommandRecorder {
   /** @internal */
   invertRemoveCheckConstraint(args: unknown[], block?: MigrationBlock): MigrationCommand {
     if (args.length < 2) {
-      throw new IrreversibleMigration(
+      throw new ActiveRecord.IrreversibleMigration(
         "remove_check_constraint is only reversible if given an expression.",
       );
     }
@@ -378,7 +382,7 @@ export class CommandRecorder {
   /** @internal */
   invertRemoveExclusionConstraint(args: unknown[], block?: MigrationBlock): MigrationCommand {
     if (args.length < 2) {
-      throw new IrreversibleMigration(
+      throw new ActiveRecord.IrreversibleMigration(
         "remove_exclusion_constraint is only reversible if given an expression.",
       );
     }
@@ -392,7 +396,7 @@ export class CommandRecorder {
         ? (args[args.length - 1] as Record<string, unknown>)
         : {};
     if (options["usingIndex"]) {
-      throw new IrreversibleMigration(
+      throw new ActiveRecord.IrreversibleMigration(
         "add_unique_constraint is not reversible if given an using_index.",
       );
     }
@@ -412,7 +416,7 @@ export class CommandRecorder {
     }
     const columns = a[1];
     if (!columns) {
-      throw new IrreversibleMigration(
+      throw new ActiveRecord.IrreversibleMigration(
         "remove_unique_constraint is only reversible if given an column_name.",
       );
     }
@@ -438,7 +442,7 @@ export class CommandRecorder {
    * @noRailsEquivalent CONVERGEABLE CommandRecorder#invert_change_column, which Ruby defines only to raise IrreversibleMigration (command_recorder.rb:53).
    */
   invertChangeColumn(_args: unknown[]): [string, unknown[]] {
-    throw new IrreversibleMigration(
+    throw new ActiveRecord.IrreversibleMigration(
       "change_column is not reversible. Use change_column_default or change_column_null instead.",
     );
   }
@@ -470,7 +474,9 @@ export class CommandRecorder {
         hasKey(last as Record<string, unknown>, "type")
       )
     ) {
-      throw new IrreversibleMigration("remove_columns is only reversible if given a type.");
+      throw new ActiveRecord.IrreversibleMigration(
+        "remove_columns is only reversible if given a type.",
+      );
     }
     return ["addColumns", args];
   }
@@ -500,7 +506,7 @@ export class CommandRecorder {
         "to" in (options as Record<string, unknown>)
       )
     ) {
-      throw new IrreversibleMigration(
+      throw new ActiveRecord.IrreversibleMigration(
         "change_column_default is only reversible if given a :from and :to option.",
       );
     }
@@ -526,7 +532,7 @@ export class CommandRecorder {
         "to" in (options as Record<string, unknown>)
       )
     ) {
-      throw new IrreversibleMigration(
+      throw new ActiveRecord.IrreversibleMigration(
         "change_column_comment is only reversible if given a :from and :to option.",
       );
     }
@@ -545,7 +551,7 @@ export class CommandRecorder {
         "to" in (options as Record<string, unknown>)
       )
     ) {
-      throw new IrreversibleMigration(
+      throw new ActiveRecord.IrreversibleMigration(
         "change_table_comment is only reversible if given a :from and :to option.",
       );
     }
@@ -613,7 +619,7 @@ export class CommandRecorder {
       a.pop();
     }
     if (a[1] === undefined) {
-      throw new IrreversibleMigration(
+      throw new ActiveRecord.IrreversibleMigration(
         "drop_enum is only reversible if given a list of enum values.",
       );
     }
@@ -643,7 +649,7 @@ export class CommandRecorder {
         "to" in (options as Record<string, unknown>)
       )
     ) {
-      throw new IrreversibleMigration(
+      throw new ActiveRecord.IrreversibleMigration(
         "rename_enum_value is only reversible if given a :from and :to option.",
       );
     }
@@ -663,7 +669,9 @@ export class CommandRecorder {
       a.pop();
     }
     if (a[1] === undefined) {
-      throw new IrreversibleMigration("drop_virtual_table is only reversible if given options.");
+      throw new ActiveRecord.IrreversibleMigration(
+        "drop_virtual_table is only reversible if given options.",
+      );
     }
     return ["createVirtualTable", args, block];
   }

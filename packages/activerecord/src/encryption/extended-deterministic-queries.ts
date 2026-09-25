@@ -1,3 +1,4 @@
+import { Encryption } from "../namespaces.js";
 import { Concern, any, isPlainObject, prepend, transformKeys } from "@blazetrails/activesupport";
 import { Module, extend, include, isEmpty } from "@blazetrails/ruby-compat";
 import { Relation } from "../relation.js";
@@ -233,3 +234,5 @@ export class ExtendedEncryptableType {
     return originalSerialize(data);
   }
 }
+
+Encryption.ExtendedDeterministicQueries = ExtendedDeterministicQueries;

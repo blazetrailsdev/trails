@@ -1,3 +1,4 @@
+import { Encryption } from "../namespaces.js";
 import { Configuration } from "./errors.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 
@@ -10,3 +11,5 @@ export class DeterministicKeyProvider extends DerivedSecretKeyProvider {
     super(passwords);
   }
 }
+
+Encryption.DeterministicKeyProvider = DeterministicKeyProvider;
