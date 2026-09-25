@@ -369,12 +369,11 @@ async function findTarget(
   if (rel === null) return [];
 
   const association = record.association(assocName);
-  rel._instantiateBlock = (child: Base) => {
-    association.setInverseInstance(child);
-  };
-  const results: Base[] = await rel.toArray();
-
-  return results;
+  return (
+    await rel.load((child: Base) => {
+      association.setInverseInstance(child);
+    })
+  ).toArray();
 }
 
 /**

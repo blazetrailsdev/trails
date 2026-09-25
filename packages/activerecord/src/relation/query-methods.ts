@@ -37,6 +37,7 @@ import { JoinDependency } from "../associations/join-dependency.js";
 import type { AliasCounts, AliasTracker } from "../associations/alias-tracker.js";
 import {
   any,
+  actsLike,
   compactBlank,
   defineModule,
   foreignKey,
@@ -287,6 +288,8 @@ function unionReferences(
   return result;
 }
 
+function withCte(this: QueryMethodsHost, block: (...args: any[]) => unknown): never;
+function withCte(this: QueryMethodsHost, ...args: any[]): any;
 function withCte(this: QueryMethodsHost, ...args: any[]): any {
   if (args.some((cte) => typeof cte === "function")) {
     throw new ArgumentError("ActiveRecord::Relation#with does not accept a block");
@@ -313,6 +316,8 @@ function withRecursiveBang(this: QueryMethodsHost, ...args: unknown[]): any {
   return this;
 }
 
+function select(this: QueryMethodsHost, block: (record: any) => unknown): Promise<any[]>;
+function select(this: QueryMethodsHost, ...fields: any[]): any;
 function select(this: QueryMethodsHost, ...fields: any[]): any {
   if (fields.length >= 1 && typeof fields[fields.length - 1] === "function") {
     if (fields.length > 1) {
@@ -1365,10 +1370,10 @@ export function buildNamedBoundSqlLiteral(
   values: Record<string, unknown>,
 ): Nodes.BoundSqlLiteral {
   const boundValues = transformValues(values, (value) => {
-    if (isRelationLike(value)) {
-      return Arel.sql((value as { toSql(): string }).toSql());
-    } else if (Array.isArray(value) || value instanceof Set) {
-      const values = Array.from(value).map((v) =>
+    if (value instanceof Relation) {
+      return Arel.sql(value.toSql());
+    } else if (rbObjRespondTo(value, "map") && !actsLike.call(value, "string")) {
+      const values = (value as { map<R>(b: (v: unknown) => R): R[] }).map((v) =>
         rbObjRespondTo(v, "idForDatabase") ? (v as { idForDatabase: unknown }).idForDatabase : v,
       );
       return values.length === 0 ? null : values;
@@ -1394,10 +1399,10 @@ export function buildBoundSqlLiteral(
   values: unknown[],
 ): Nodes.BoundSqlLiteral {
   const boundValues = values.map((value) => {
-    if (isRelationLike(value)) {
-      return Arel.sql((value as { toSql(): string }).toSql());
-    } else if (Array.isArray(value) || value instanceof Set) {
-      const values = Array.from(value).map((v) =>
+    if (value instanceof Relation) {
+      return Arel.sql(value.toSql());
+    } else if (rbObjRespondTo(value, "map") && !actsLike.call(value, "string")) {
+      const values = (value as { map<R>(b: (v: unknown) => R): R[] }).map((v) =>
         rbObjRespondTo(v, "idForDatabase") ? (v as { idForDatabase: unknown }).idForDatabase : v,
       );
       return values.length === 0 ? null : values;

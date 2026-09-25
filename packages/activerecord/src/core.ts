@@ -710,10 +710,18 @@ function relation(this: CoreHost): any {
   return (this as any).all();
 }
 
+export function find(this: CoreHost, block: (record: any) => unknown): Promise<any>;
+export function find(this: CoreHost, ...ids: unknown[]): Promise<any>;
 export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
   await this.ensureSchemaLoaded();
   if (ids.length !== 1) return this.all().find(...ids);
-  if (this.primaryKey == null || this.isScopeAttributes()) return this.all().find(...ids);
+  if (
+    typeof ids[ids.length - 1] === "function" ||
+    this.primaryKey == null ||
+    this.isScopeAttributes()
+  ) {
+    return this.all().find(...ids);
+  }
 
   const id = ids[0];
 

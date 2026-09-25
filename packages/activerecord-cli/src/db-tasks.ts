@@ -34,9 +34,12 @@ export async function dbCreate(cwd: string, args: string[]): Promise<number> {
   }
 
   const env = DatabaseTasks.env;
-  const configs = all
-    ? DatabaseTasks.eachLocalConfiguration()
-    : DatabaseTasks.configsFor({ envName: env });
+  const configs: import("@blazetrails/activerecord").HashConfig[] = [];
+  if (all) {
+    await DatabaseTasks.eachLocalConfiguration((dbConfig) => configs.push(dbConfig));
+  } else {
+    configs.push(...DatabaseTasks.configsFor({ envName: env }));
+  }
   if (!all && configs.length === 0) {
     console.error(`ar: no database configuration found for environment "${env}"`);
     return 1;
@@ -58,9 +61,12 @@ export async function dbDrop(cwd: string, args: string[]): Promise<number> {
   }
 
   const env = DatabaseTasks.env;
-  const configs = all
-    ? DatabaseTasks.eachLocalConfiguration()
-    : DatabaseTasks.configsFor({ envName: env });
+  const configs: import("@blazetrails/activerecord").HashConfig[] = [];
+  if (all) {
+    await DatabaseTasks.eachLocalConfiguration((dbConfig) => configs.push(dbConfig));
+  } else {
+    configs.push(...DatabaseTasks.configsFor({ envName: env }));
+  }
   if (!all && configs.length === 0) {
     console.error(`ar: no database configuration found for environment "${env}"`);
     return 1;

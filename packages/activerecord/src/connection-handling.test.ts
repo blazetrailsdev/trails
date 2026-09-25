@@ -10,6 +10,8 @@ import { fixtures } from "./test-fixtures.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
 import { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
 import { Post } from "./test-helpers/models/post.js";
+import { Relation } from "./relation.js";
+import { stripThenable } from "./relation/thenable.js";
 import { connectedToStack, currentRole, currentShard, currentPreventingWrites } from "./core.js";
 import { adapterType } from "./test-adapter.js";
 import { restoreWorkerConnection } from "./support/connection.js";
@@ -571,15 +573,12 @@ describe("withRoleAndShard loads Relation return values within scope (Story K ga
   it("calls .load() on a Relation returned from the block", async () => {
     const { withRoleAndShard } = await import("./connection-handling.js");
     let loadCalled = false;
-    const fakeRelation = {
+    const fakeRelation = Object.assign(Object.create(Relation.prototype), {
       load() {
         loadCalled = true;
-        return Promise.resolve(this);
+        return Promise.resolve(stripThenable(this));
       },
-      toArray() {
-        return Promise.resolve([]);
-      },
-    };
+    });
 
     class FakeModel extends Base {}
 
@@ -606,24 +605,17 @@ describe("withRoleAndShard loads Relation return values within scope (Story K ga
   it("calls .load() on a Relation returned from an async block", async () => {
     const { withRoleAndShard } = await import("./connection-handling.js");
     let loadCalled = false;
-    const fakeRelation = {
+    const fakeRelation = Object.assign(Object.create(Relation.prototype), {
       load() {
         loadCalled = true;
-        return Promise.resolve(this);
+        return Promise.resolve(stripThenable(this));
       },
-      toArray() {
-        return Promise.resolve([]);
-      },
-    };
+    });
 
     class FakeModel extends Base {}
 
-    await withRoleAndShard.call(
-      FakeModel as any,
-      undefined,
-      undefined,
-      false,
-      async () => fakeRelation,
+    await withRoleAndShard.call(FakeModel as any, undefined, undefined, false, async () =>
+      stripThenable(fakeRelation),
     );
 
     expect(loadCalled).toBe(true);

@@ -351,10 +351,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return records;
   }
 
+  override find(block: (record: T) => unknown): Promise<T | null>;
   override find(ids: unknown[]): Promise<T[]>;
   override find(id: unknown): Promise<T>;
   override find(...ids: unknown[]): Promise<T | T[]>;
-  override async find(...args: unknown[]): Promise<T | T[]> {
+  override async find(...args: unknown[]): Promise<T | T[] | null> {
+    if (typeof args[args.length - 1] === "function") return super.find(...args);
     const assoc = this._association.owner.association(this._assocName) as unknown as {
       find(...args: unknown[]): Promise<Base | Base[] | null>;
     };

@@ -412,14 +412,6 @@ function isThenable(value: unknown): value is PromiseLike<unknown> {
   return value != null && typeof (value as any).then === "function";
 }
 
-function isRelationLike(value: unknown): boolean {
-  return (
-    value != null &&
-    typeof (value as any).load === "function" &&
-    typeof (value as any).toArray === "function"
-  );
-}
-
 function withCleanup<T>(result: T, cleanup: () => void): T {
   if (isThenable(result)) {
     return Promise.resolve(result).finally(cleanup) as T;
@@ -461,20 +453,13 @@ export function withRoleAndShard<T>(
     throw error;
   }
 
-  if (isRelationLike(result)) {
-    let loaded: unknown;
-    try {
-      loaded = (result as any).load();
-    } catch (error) {
-      removeStackEntry(entry);
-      throw error;
-    }
-    return withCleanup(loaded as T, () => removeStackEntry(entry));
+  if (result instanceof ActiveRecord.Relation) {
+    return withCleanup(result.load() as T, () => removeStackEntry(entry));
   }
 
   if (isThenable(result)) {
     const loaded = Promise.resolve(result as unknown).then((v) =>
-      isRelationLike(v) ? (v as any).load() : v,
+      v instanceof ActiveRecord.Relation ? v.load() : v,
     );
     return withCleanup(loaded as unknown as T, () => removeStackEntry(entry));
   }

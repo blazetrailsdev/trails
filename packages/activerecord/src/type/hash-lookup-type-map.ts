@@ -12,6 +12,11 @@ export class HashLookupTypeMap {
     return this.fetch(lookupKey, ...args, () => new ValueType());
   }
 
+  fetch(
+    lookupKey: string | number,
+    block: (lookupKey: string | number, ...args: unknown[]) => ValueType,
+  ): ValueType;
+  fetch(lookupKey: string | number, ...rest: unknown[]): ValueType;
   fetch(lookupKey: string | number, ...rest: unknown[]): ValueType {
     let fallback: ((lookupKey: string | number, ...args: unknown[]) => ValueType) | undefined;
     let args: unknown[];

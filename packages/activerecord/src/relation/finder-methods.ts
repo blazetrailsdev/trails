@@ -90,6 +90,8 @@ function buildPkWhere(pk: string[], tuple: unknown[]): Record<string, unknown> {
   return conditions;
 }
 
+export function find(this: FinderRelation, block: (record: any) => unknown): Promise<any>;
+export function find(this: FinderRelation, ...args: unknown[]): Promise<any>;
 export async function find(this: FinderRelation, ...args: unknown[]): Promise<any> {
   const block = args[args.length - 1];
   if (typeof block === "function") {

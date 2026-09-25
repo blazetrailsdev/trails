@@ -4,6 +4,9 @@ import { Base } from "./base.js";
 import { leaseConnection, withConnection, connection } from "./connection-handling.js";
 import { adapterDouble, establishConnectionTo } from "./test-helpers/adapter-double.js";
 import { permanentConnectionCheckout, setPermanentConnectionCheckout } from "./active-record.js";
+import { Relation } from "./relation.js";
+import { fixtures } from "./test-fixtures.js";
+import { Topic } from "./test-helpers/models/topic.js";
 
 describe("directly bound adapter", () => {
   it("connection, leaseConnection and withConnection resolve to the same session", async () => {
@@ -93,5 +96,27 @@ describe("Arel toSql through Table.engine", () => {
     expect(() => pool.withConnectionSync((conn) => conn)).toThrow("checkout failed");
     expect(pool.activeConnection).toBeNull();
     expect(pool.isPermanentLease()).toBe(true);
+  });
+});
+
+describe("withRoleAndShard return value", () => {
+  fixtures(["topics"]);
+
+  it("loads a Relation the block returns and settles to that relation", async () => {
+    const relation = Topic.all();
+    const returned = await Base.connectedTo({ role: "writing" }, () => relation);
+
+    expect(returned).toBeInstanceOf(Relation);
+    expect((returned as unknown as Relation<Topic>).isLoaded).toBe(true);
+    expect(relation.isLoaded).toBe(true);
+  });
+
+  it("does not load a non-Relation that answers load and toArray", async () => {
+    const load = vi.fn();
+    const duck = { load, toArray: () => [] };
+    const returned = Base.connectedTo({ role: "writing" }, () => duck);
+
+    expect(returned).toBe(duck);
+    expect(load).not.toHaveBeenCalled();
   });
 });

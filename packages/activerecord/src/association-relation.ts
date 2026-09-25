@@ -114,22 +114,15 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
     return false;
   }
 
-  protected override async execQueries(): Promise<T[]> {
+  protected override async execQueries(block?: (record: T) => void): Promise<T[]> {
     const association = this.proxyAssociation.owner.association(
       this.proxyAssociation.reflection.name,
     );
-    const prevBlock = this._instantiateBlock;
-    this._instantiateBlock = (record: T): void => {
+    return super.execQueries((record) => {
       association.setInverseInstanceFromQueries(record);
       association.setStrictLoading(record);
-      if (prevBlock) prevBlock(record);
-    };
-
-    try {
-      return await super.execQueries();
-    } finally {
-      this._instantiateBlock = prevBlock;
-    }
+      if (block) block(record);
+    });
   }
 }
 
