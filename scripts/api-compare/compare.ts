@@ -5182,12 +5182,6 @@ export function main() {
             false,
             level,
           );
-          // `seen` counts a name once per file, so a second Ruby class
-          // declaring it (`QueryCacheRegistry#compute_if_absent` beside
-          // `Store#compute_if_absent`, query_cache.rb:97-114) never reached
-          // the call-set gate. Each further owner the TS file declares the
-          // member on is compared against its own body; the denominator is
-          // unchanged.
           if (
             !seam &&
             !claimedByAnother &&
