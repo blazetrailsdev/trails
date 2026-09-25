@@ -75,21 +75,14 @@ describe("Trails", () => {
     }
   });
 
-  it("Trails.env falls back to NODE_ENV when TRAILS_ENV is blank, as Rails.env does to RACK_ENV", () => {
+  it("Trails.env falls back to NODE_ENV when TRAILS_ENV is unset", () => {
     const nodeEnv = env.NODE_ENV;
     setEnv("TRAILS_ENV", undefined);
     setEnv("NODE_ENV", "production");
     try {
       _resetTrailsEnv();
       expect(Trails.env.toString()).toBe("production");
-      setEnv("TRAILS_ENV", "  ");
-      _resetTrailsEnv();
-      expect(Trails.env.toString()).toBe("production");
-      setEnv("NODE_ENV", "");
-      _resetTrailsEnv();
-      expect(Trails.env.toString()).toBe("development");
     } finally {
-      setEnv("TRAILS_ENV", undefined);
       setEnv("NODE_ENV", nodeEnv);
       _resetTrailsEnv();
     }

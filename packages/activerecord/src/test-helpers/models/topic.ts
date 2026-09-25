@@ -119,7 +119,7 @@ export class Topic extends Base {
     });
 
     this.hasMany("replies", { dependent: "destroy", autosave: true, inverseOf: "topic" });
-    this.hasMany("approvedReplies", {
+    this.hasMany("approvedReplies", (q: any) => q.approved(), {
       className: "Reply",
       foreignKey: "parent_id",
       counterCache: "replies_count",
