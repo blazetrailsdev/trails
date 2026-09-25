@@ -25,6 +25,7 @@ import {
   setSchemaFormat,
 } from "@blazetrails/activerecord";
 import { MigrationProxy } from "@blazetrails/activerecord";
+import { parse as yamlParse } from "@blazetrails/activesupport/yaml";
 
 function discoverMigrations(migrationsPath: string): MigrationProxy[] {
   return new MigrationContext(
@@ -1832,9 +1833,9 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
 
     await runDb(["schema:cache:dump"]);
 
-    const cachePath = path.join(tmpDir, "db", "schema_cache.json");
+    const cachePath = path.join(tmpDir, "db", "schema_cache.yml");
     expect(fs.existsSync(cachePath)).toBe(true);
-    const parsed = JSON.parse(fs.readFileSync(cachePath, "utf8")) as {
+    const parsed = yamlParse(fs.readFileSync(cachePath, "utf8")) as {
       columns: Record<string, unknown[]>;
       data_sources: Record<string, boolean>;
     };
@@ -1843,7 +1844,7 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
   });
 
   it("db schema:cache:clear deletes the schema_cache.json file", async () => {
-    const cachePath = path.join(tmpDir, "db", "schema_cache.json");
+    const cachePath = path.join(tmpDir, "db", "schema_cache.yml");
     fs.writeFileSync(cachePath, "{}");
     expect(fs.existsSync(cachePath)).toBe(true);
 
@@ -1853,7 +1854,7 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
   });
 
   it("db schema:cache:clear is a no-op when no cache file exists", async () => {
-    const cachePath = path.join(tmpDir, "db", "schema_cache.json");
+    const cachePath = path.join(tmpDir, "db", "schema_cache.yml");
     expect(fs.existsSync(cachePath)).toBe(false);
     await runDb(["schema:cache:clear"]);
     expect(errs).toHaveLength(0);
@@ -1881,8 +1882,8 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
 
     await runDb(["schema:cache:dump"]);
 
-    const cachePath = path.join(tmpDir, "db", "schema_cache.json");
-    const parsed = JSON.parse(fs.readFileSync(cachePath, "utf8")) as {
+    const cachePath = path.join(tmpDir, "db", "schema_cache.yml");
+    const parsed = yamlParse(fs.readFileSync(cachePath, "utf8")) as {
       indexes: Record<
         string,
         Array<{ table: string; name: string; columns: string[]; unique: boolean }>
@@ -2296,11 +2297,11 @@ export class CreateCats extends Migration {
 
     await runDb(["schema:cache:dump"]);
 
-    const primaryCache = JSON.parse(
-      fs.readFileSync(path.join(tmpDir, "db", "schema_cache.json"), "utf8"),
+    const primaryCache = yamlParse(
+      fs.readFileSync(path.join(tmpDir, "db", "schema_cache.yml"), "utf8"),
     ) as { columns: Record<string, unknown[]> };
-    const animalsCache = JSON.parse(
-      fs.readFileSync(path.join(tmpDir, "db", "animals_schema_cache.json"), "utf8"),
+    const animalsCache = yamlParse(
+      fs.readFileSync(path.join(tmpDir, "db", "animals_schema_cache.yml"), "utf8"),
     ) as { columns: Record<string, unknown[]> };
     expect(Object.keys(primaryCache.columns)).toContain("widgets");
     expect(Object.keys(animalsCache.columns)).toContain("dogs");

@@ -1,6 +1,8 @@
 import { fetch, File, hasKey } from "@blazetrails/ruby-compat";
 import { ActiveRecord } from "../namespaces.js";
 import { DatabaseConfig, type DatabaseConfigOptions } from "./database-config.js";
+import { schemaFormat } from "../active-record.js";
+import type { SchemaFormat } from "../tasks/database-tasks.js";
 
 export class HashConfig extends DatabaseConfig {
   protected _configurationHash: DatabaseConfigOptions;
@@ -92,9 +94,9 @@ export class HashConfig extends DatabaseConfig {
 
   defaultSchemaCachePath(dbDir: string = "db"): string {
     if (this.isPrimary()) {
-      return File.join(dbDir, "schema_cache.json");
+      return File.join(dbDir, "schema_cache.yml");
     } else {
-      return File.join(dbDir, `${this.name}_schema_cache.json`);
+      return File.join(dbDir, `${this.name}_schema_cache.yml`);
     }
   }
 
@@ -114,7 +116,7 @@ export class HashConfig extends DatabaseConfig {
     );
   }
 
-  schemaDump(format: "ruby" | "sql" | "ts" | "js" = "ts"): string | null {
+  schemaDump(format: "ruby" | SchemaFormat = schemaFormat()): string | null {
     if (
       hasKey(this.configurationHash, "schemaDump") &&
       this.configurationHash.schemaDump !== undefined
@@ -158,6 +160,10 @@ export class HashConfig extends DatabaseConfig {
     }
   }
 }
+
+Object.defineProperty(HashConfig, "name", {
+  value: "ActiveRecord::DatabaseConfigurations::HashConfig",
+});
 
 function toInt(value: unknown): number {
   if (typeof value === "number") {

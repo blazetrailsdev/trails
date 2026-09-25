@@ -3,6 +3,7 @@ import { Thread, ThreadPoolExecutor } from "@blazetrails/ruby-compat";
 import { tmpdir } from "os";
 import { join } from "path";
 import { describe, it, expect, vi } from "vitest";
+import { parse as yamlParse } from "@blazetrails/activesupport/yaml";
 import { Result } from "./result.js";
 import { NoMethodError } from "@blazetrails/activemodel";
 import { Reaper } from "./connection-adapters/abstract/connection-pool/reaper.js";
@@ -667,9 +668,9 @@ describe("ConnectionPool schema cache", () => {
       await withCacheDir(async (dir) => {
         const pool = makeAmbientPool();
         try {
-          const filename = join(dir, "schema_cache.json");
+          const filename = join(dir, "schema_cache.yml");
           await pool.schemaCache.dumpTo(filename);
-          const parsed = JSON.parse(await readFile(filename, "utf8")) as {
+          const parsed = yamlParse(await readFile(filename, "utf8")) as {
             columns: Record<string, unknown[]>;
           };
           expect(Object.keys(parsed.columns)).toContain("posts");
@@ -709,7 +710,7 @@ describe("ConnectionPool schema cache", () => {
       );
       const cachePath = (pc.schemaReflection as unknown as { _cachePath: string | null })
         ._cachePath;
-      expect(cachePath).toBe("custom_db_dir/schema_cache.json");
+      expect(cachePath).toBe("custom_db_dir/schema_cache.yml");
     } finally {
       DatabaseTasks.dbDir = originalDbDir;
     }

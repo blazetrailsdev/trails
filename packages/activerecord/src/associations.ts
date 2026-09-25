@@ -256,12 +256,14 @@ export class Associations {
     name: string,
     scope: ((...args: any[]) => any) | AssociationOptions | null = {},
     options: AssociationOptions = {},
+    extension?: (mod: Module) => void,
   ): void {
     const reflection = HasManyBuilder.build(
       this,
       name,
       scope as ((...args: any[]) => any) | Record<string, unknown> | null,
       options as Record<string, unknown>,
+      extension,
     );
     Reflection.addReflection(this as any, name, reflection);
   }
@@ -270,6 +272,7 @@ export class Associations {
     name: string,
     scope: ((...args: any[]) => any) | (AssociationOptions & { joinTable?: string }) | null = {},
     options: AssociationOptions & { joinTable?: string } = {},
+    extension?: (mod: Module) => void,
   ): void {
     if (
       typeof scope === "object" &&
@@ -334,7 +337,7 @@ export class Associations {
       if (Object.prototype.hasOwnProperty.call(options, k)) hmOptions[k] = options[k];
     }
 
-    this.hasMany(name, scope as ((...args: any[]) => any) | null, hmOptions);
+    this.hasMany(name, scope as ((...args: any[]) => any) | null, hmOptions, extension);
     (self._reflections as Record<string, { parentReflection?: unknown }>)[name].parentReflection =
       habtmReflection;
   }

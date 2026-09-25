@@ -116,7 +116,7 @@ describe("DatabaseConfigurations", () => {
       await resolve("trails_inspect_adapter");
       await config.adapterClass();
       expect(config.inspect()).toBe(
-        "#<HashConfig env_name=default_env name=primary adapter_class=TrailsInspectAdapter>",
+        "#<ActiveRecord::DatabaseConfigurations::HashConfig env_name=default_env name=primary adapter_class=TrailsInspectAdapter>",
       );
     });
 
@@ -145,7 +145,7 @@ describe("DatabaseConfigurations", () => {
         adapter: "trails_inflight_adapter",
       });
       expect(config.inspect()).toBe(
-        "#<HashConfig env_name=default_env name=primary adapter_class=trails_inflight_adapter>",
+        "#<ActiveRecord::DatabaseConfigurations::HashConfig env_name=default_env name=primary adapter_class=trails_inflight_adapter>",
       );
     });
 

@@ -147,10 +147,9 @@ describe("DatabaseConfigurations", () => {
       expect(config.idleTimeout).toBeNull();
     });
 
-    it.skip("default schema dump value", () => {
-      // BLOCKED: hash-config-defaults-diverge-from-rails-schema-dump-and-cache-path
+    it("default schema dump value", () => {
       const config = new HashConfig("default_env", "primary", { adapter: "abstract" });
-      expect(config.schemaDump()).toBe("schema.rb");
+      expect(config.schemaDump()).toBe("schema.ts");
     });
 
     it("schema dump value set to filename", () => {
@@ -196,20 +195,17 @@ describe("DatabaseConfigurations", () => {
       expect(config.databaseTasks()).toBe(true);
     });
 
-    it.skip("schema cache path default for primary", () => {
-      // BLOCKED: hash-config-defaults-diverge-from-rails-schema-dump-and-cache-path
+    it("schema cache path default for primary", () => {
       const config = new HashConfig("default_env", "primary", { adapter: "abstract" });
       expect(config.defaultSchemaCachePath()).toBe("db/schema_cache.yml");
     });
 
-    it.skip("schema cache path default for custom name", () => {
-      // BLOCKED: hash-config-defaults-diverge-from-rails-schema-dump-and-cache-path
+    it("schema cache path default for custom name", () => {
       const config = new HashConfig("default_env", "alternate", { adapter: "abstract" });
       expect(config.defaultSchemaCachePath()).toBe("db/alternate_schema_cache.yml");
     });
 
-    it.skip("schema cache path default for different db dir", () => {
-      // BLOCKED: hash-config-defaults-diverge-from-rails-schema-dump-and-cache-path
+    it("schema cache path default for different db dir", () => {
       const config = new HashConfig("default_env", "alternate", { adapter: "abstract" });
       expect(config.defaultSchemaCachePath("my_db")).toBe("my_db/alternate_schema_cache.yml");
     });
@@ -230,8 +226,7 @@ describe("DatabaseConfigurations", () => {
       expect(config.lazySchemaCachePath()).toBe("db/config_schema_cache.yml");
     });
 
-    it.skip("lazy schema cache path uses default if config is not present", () => {
-      // BLOCKED: hash-config-defaults-diverge-from-rails-schema-dump-and-cache-path
+    it("lazy schema cache path uses default if config is not present", () => {
       const config = new HashConfig("default_env", "alternate", { adapter: "abstract" });
       expect(config.lazySchemaCachePath()).toBe("db/alternate_schema_cache.yml");
     });
@@ -243,8 +238,7 @@ describe("DatabaseConfigurations", () => {
       await assertRaises([AdapterNotFound], {}, () => config.validateBang());
     });
 
-    it.skip("inspect does not show secrets", () => {
-      // BLOCKED: hash-config-inspect-omits-ruby-class-path
+    it("inspect does not show secrets", () => {
       const config = new HashConfig("default_env", "primary", {
         adapter: "abstract",
         password: "hunter2",

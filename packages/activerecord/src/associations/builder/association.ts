@@ -68,6 +68,7 @@ export class Association {
     name: string,
     scope: ((...args: any[]) => any) | null | Record<string, unknown>,
     options: Record<string, unknown> = {},
+    block?: (mod: Module) => void,
   ): any {
     if (
       typeof scope === "object" &&
@@ -90,7 +91,7 @@ export class Association {
       );
     }
 
-    const reflection = this.createReflection(model, name, scope as any, options);
+    const reflection = this.createReflection(model, name, scope as any, options, block);
     this.defineAccessors(model, reflection);
     this.defineCallbacks(model, reflection);
     this.defineValidations(model, reflection);
@@ -103,6 +104,7 @@ export class Association {
     name: string,
     scope: ((...args: any[]) => any) | null,
     options: Record<string, unknown>,
+    block?: (mod: Module) => void,
   ): any {
     if (typeof name !== "string") {
       throw new ArgumentError("association names must be a Symbol");
@@ -110,7 +112,7 @@ export class Association {
 
     this.validateOptions(options);
 
-    const extension = this.defineExtensions(model, name);
+    const extension = this.defineExtensions(model, name, block);
     if (extension) {
       options.extend = [
         ...(options.extend
@@ -154,7 +156,7 @@ export class Association {
     assertValidKeys(options, this.validOptions(options));
   }
 
-  static defineExtensions(_model: any, _name: string): any {
+  static defineExtensions(_model: any, _name: string, _block?: (mod: Module) => void): any {
     return undefined;
   }
 

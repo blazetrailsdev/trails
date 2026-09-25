@@ -246,7 +246,7 @@ describeIfMysqlAdapter("AbstractMysqlAdapter#buildChangeColumnDefinition", () =>
     const col = makeTextColumn({ collation: "utf8mb4_unicode_ci" });
     const adapter = await makeAdapter(col);
     const cd = await adapter.buildChangeColumnDefinition("users", "body", "text", {
-      collation: null,
+      collation: "no_collation",
     });
     expect(cd.column.options.collation).toBeUndefined();
   });

@@ -939,7 +939,7 @@ export function dbCommand(): Command {
   cmd
     .command("schema:cache:dump")
     .description(
-      "Dump db/schema_cache.json for every database configuration in the current environment",
+      "Dump db/schema_cache.yml for every database configuration in the current environment",
     )
     .action(async () => {
       const envName = resolveEnv();
@@ -963,7 +963,7 @@ export function dbCommand(): Command {
   cmd
     .command("schema:cache:clear")
     .description(
-      "Delete db/schema_cache.json for every database configuration in the current environment",
+      "Delete db/schema_cache.yml for every database configuration in the current environment",
     )
     .action(async () => {
       const fs = getFs();

@@ -16,9 +16,6 @@ import { ArgumentError } from "../attribute-assignment.js";
 import { Topic } from "../test-helpers/models/topic.js";
 import { Person } from "../test-helpers/models/person.js";
 
-const A = "(?<![\\s\\S])";
-const Z = "(?![\\s\\S])";
-
 describe("FormatValidationTest", () => {
   afterEach(() => {
     Topic.clearValidatorsBang();
@@ -26,7 +23,7 @@ describe("FormatValidationTest", () => {
 
   it("validate format", async () => {
     Topic.validatesFormatOf("title", "content", {
-      with: new RegExp(`${A}Validation\\smacros \\w+!${Z}`),
+      with: /^Validation\smacros \w+!$/,
       message: "is bad data",
     });
 
@@ -45,7 +42,7 @@ describe("FormatValidationTest", () => {
 
   it("validate format with allow blank", async () => {
     Topic.validatesFormatOf("title", {
-      with: new RegExp(`${A}Validation\\smacros \\w+!${Z}`),
+      with: /^Validation\smacros \w+!$/,
       allowBlank: true,
     });
     assertPredicate(await new Topic({ title: "Shouldn't be valid" }).isInvalid(), (v) => v);
@@ -56,7 +53,7 @@ describe("FormatValidationTest", () => {
 
   it("validate format numeric", async () => {
     Topic.validatesFormatOf("title", "content", {
-      with: new RegExp(`${A}[1-9][0-9]*${Z}`),
+      with: /^[1-9][0-9]*$/,
       message: "is bad data",
     });
 
@@ -86,7 +83,7 @@ describe("FormatValidationTest", () => {
 
   it("validate format with formatted message", async () => {
     Topic.validatesFormatOf("title", {
-      with: new RegExp(`${A}Valid Title${Z}`),
+      with: /^Valid Title$/,
       message: "can't be %{value}",
     });
     const t = new Topic({ title: "Invalid title" });
@@ -143,8 +140,7 @@ describe("FormatValidationTest", () => {
 
   it("validates format of with lambda", async () => {
     Topic.validatesFormatOf("content", {
-      with: (topic: Topic) =>
-        topic.title === "digit" ? new RegExp(`${A}\\d+${Z}`) : new RegExp(`${A}\\S+${Z}`),
+      with: (topic: Topic) => (topic.title === "digit" ? /^\d+$/ : /^\S+$/),
     });
 
     const t = new Topic();
@@ -157,7 +153,7 @@ describe("FormatValidationTest", () => {
   });
 
   it("validates format of with lambda without arguments", async () => {
-    Topic.validatesFormatOf("title", { with: () => new RegExp(`${A}[A-Z]`) });
+    Topic.validatesFormatOf("title", { with: () => /^[A-Z]/ });
 
     const t = new Topic();
     t.title = "lowercase";
@@ -169,8 +165,7 @@ describe("FormatValidationTest", () => {
 
   it("validates format of without lambda", async () => {
     Topic.validatesFormatOf("content", {
-      without: (topic: Topic) =>
-        topic.title === "characters" ? new RegExp(`${A}\\d+${Z}`) : new RegExp(`${A}\\S+${Z}`),
+      without: (topic: Topic) => (topic.title === "characters" ? /^\d+$/ : /^\S+$/),
     });
 
     const t = new Topic();
@@ -195,7 +190,7 @@ describe("FormatValidationTest", () => {
 
   it("validates format of for ruby class", async () => {
     try {
-      Person.validatesFormatOf("karma", { with: new RegExp(`${A}\\d+${Z}`) });
+      Person.validatesFormatOf("karma", { with: /^\d+$/ });
 
       const p = new Person();
       p.karma = "Pixies";

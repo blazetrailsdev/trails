@@ -2223,6 +2223,10 @@ export class AbstractAdapter implements Quoting {
   }
 }
 
+Object.defineProperty(AbstractAdapter, "name", {
+  value: "ActiveRecord::ConnectionAdapters::AbstractAdapter",
+});
+
 let abstractTypeMap: TypeMap | undefined;
 
 include(AbstractAdapter, DatabaseStatements);

@@ -82,7 +82,10 @@ export function checkOptionsValidity(
 /** @internal */
 export function regexpUsingMultilineAnchors(regexp: RegExp): boolean {
   const source = regexp.source;
-  return source.startsWith("^") || (source.endsWith("$") && !source.endsWith("\\$"));
+  return (
+    regexp.multiline &&
+    (source.startsWith("^") || (source.endsWith("$") && !source.endsWith("\\$")))
+  );
 }
 
 function matchStateless(regexp: RegExp, target: string): boolean {
