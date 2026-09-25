@@ -120,3 +120,14 @@ describe("advance over a JS Date receiver", () => {
     });
   });
 });
+
+describe("DateAndTime::Calculations over a ::Time receiver", () => {
+  it("before?/after? compare instants, not dates", () => {
+    const morning = RubyTime.utc(2017, 3, 6, 9, 0, 0);
+    const evening = RubyTime.utc(2017, 3, 6, 21, 0, 0);
+    expect(morning.isBefore(evening)).toBe(true);
+    expect(morning.isAfter(evening)).toBe(false);
+    expect(evening.isAfter(morning)).toBe(true);
+    expect(evening.isBefore(morning)).toBe(false);
+  });
+});

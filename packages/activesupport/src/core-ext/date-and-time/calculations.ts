@@ -66,7 +66,8 @@ function wday(this: Receiver): number {
   return self instanceof RubyDate ? self.wday : self.dayOfWeek % 7;
 }
 
-function classCurrent(this: Receiver): Comparable {
+function classCurrent(this: Receiver): Comparable | RubyTime {
+  if (this instanceof RubyTime) return RubyTime.current();
   if (this instanceof Temporal.PlainDateTime || this instanceof Temporal.ZonedDateTime) {
     return dateTime.current();
   }
@@ -82,6 +83,7 @@ function toInstant(dateOrTime: Comparable | RubyTime): Temporal.Instant {
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   if (dateOrTime instanceof Date) return instantFrom(dateOrTime);
   if (dateOrTime instanceof TimeWithZone) return dateOrTime.utc().toTime().toInstant();
+  if (dateOrTime instanceof RubyTime) return dateOrTime.toTime().toInstant();
   if (dateOrTime instanceof Temporal.Instant) return dateOrTime;
   if (dateOrTime instanceof Temporal.PlainDateTime)
     return dateOrTime.toZonedDateTime("UTC").toInstant();
@@ -220,11 +222,11 @@ export function isOnWeekday(this: Receiver): boolean {
   return !WEEKEND_DAYS.includes(wday.call(this));
 }
 
-export function isBefore(this: Receiver, dateOrTime: Comparable): boolean {
+export function isBefore(this: Receiver, dateOrTime: Comparable | RubyTime): boolean {
   return compare.call(this, dateOrTime) < 0;
 }
 
-export function isAfter(this: Receiver, dateOrTime: Comparable): boolean {
+export function isAfter(this: Receiver, dateOrTime: Comparable | RubyTime): boolean {
   return compare.call(this, dateOrTime) > 0;
 }
 

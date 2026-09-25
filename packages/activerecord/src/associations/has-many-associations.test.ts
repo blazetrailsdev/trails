@@ -988,7 +988,7 @@ describe("HasManyAssociationsTest", () => {
     const post = (await HmPost.first())!;
 
     expect(await (person as any).readers.toArray()).toEqual([]);
-    expect(await (person as any).readers.findBy({ post_id: post.id })).toBeNull();
+    expect(await (person as any).readers.findByPostId(post.id)).toBeNull();
 
     await (person as any).readers.create({ post_id: post.id });
 
@@ -1073,7 +1073,7 @@ describe("HasManyAssociationsTest", () => {
     expect((await firstFirm.clientsSortedDesc.where("type = 'Client'").first()).id).toBe(
       companies("another_first_firm_client").id,
     );
-    expect((await firstFirm.clientsSortedDesc.findBy({ type: "Client" })).id).toBe(
+    expect((await firstFirm.clientsSortedDesc.findByType("Client")).id).toBe(
       companies("another_first_firm_client").id,
     );
   });
@@ -3079,7 +3079,7 @@ describe("HasManyAssociationsTest", () => {
         .where("comments.type = 'SpecialComment'")
         .first(),
     ).toEqual(await Comment.find(10));
-    expect(await (authors("david") as any).commentsDesc.findBy({ type: "SpecialComment" })).toEqual(
+    expect(await (authors("david") as any).commentsDesc.findByType("SpecialComment")).toEqual(
       await Comment.find(10),
     );
   });

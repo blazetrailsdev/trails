@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+import { TopLevel } from "../namespaces.js";
 import { assertDifference, UnexpectedError } from "./assertions.js";
-import { beforeSetup, setTaggedLogger } from "./tagged-logging.js";
+import { beforeSetup, setTaggedLogger, taggedLogger } from "./tagged-logging.js";
 
 describe("TaggedLoggingTest", () => {
   it("the tagged_logger writer receives the assertion warning with the test-case identity", async () => {
@@ -66,5 +67,19 @@ describe("TaggedLoggingTest", () => {
     }
 
     expect(infos).toEqual([]);
+  });
+
+  it("memoizes with Rails' `||=`, so a later Trails.logger does not retroactively win", () => {
+    const first = { warn() {}, debug() {} };
+    try {
+      TopLevel.Trails = { logger: first } as never;
+      expect(taggedLogger()).toBe(first);
+
+      TopLevel.Trails = { logger: { warn() {}, debug() {} } } as never;
+      expect(taggedLogger()).toBe(first);
+    } finally {
+      setTaggedLogger(null);
+      delete TopLevel.Trails;
+    }
   });
 });

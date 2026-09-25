@@ -365,7 +365,7 @@ import {
   writeStoreAttribute as _writeStoreAttribute,
   storeAccessorFor as _storeAccessorFor,
 } from "./store.js";
-import { respondToMissing } from "./dynamic-matchers.js";
+import { methodMissing, respondToMissing } from "./dynamic-matchers.js";
 
 export type PrimaryKeyScalar = string | number | bigint | null | undefined;
 
@@ -1246,6 +1246,8 @@ export class Base extends Model {
   ) => Promise<InstanceType<T>>;
 
   static respondToMissing = respondToMissing;
+
+  static methodMissing = methodMissing;
 
   static async findSoleBy<T extends typeof Base>(
     this: T,

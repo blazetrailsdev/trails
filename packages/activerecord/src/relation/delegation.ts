@@ -143,7 +143,11 @@ export class ClassSpecificRelation {
         model.generateRelationMethod(method);
       }
 
-      return this.scoping(() => (model as any)[method](...args));
+      return this.scoping(() =>
+        method in model
+          ? (model as any)[method](...args)
+          : (model as any).methodMissing(method, ...args),
+      );
     } else {
       throw new NoMethodError(
         `undefined method '${method}' for an instance of ${this.constructor.name}`,
@@ -287,7 +291,7 @@ export class Delegation {
         return typeof (model as any)[method] === "function";
       }
     }
-    return false;
+    return model.respondToMissing(method);
   }
 
   length(this: DelegationHost): number | Promise<number> {
