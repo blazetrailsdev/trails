@@ -196,15 +196,10 @@ export class SchemaCache {
     return this._columns.has(tableName);
   }
 
-  async primaryKeys(
-    pool: unknown,
-    tableName: string,
-  ): Promise<string | string[] | null | undefined> {
+  async primaryKeys(pool: unknown, tableName: string): Promise<string | string[] | null> {
     if (this._primaryKeys.has(tableName)) {
-      return this._primaryKeys.get(tableName);
+      return this._primaryKeys.get(tableName)!;
     }
-
-    if (this.isIgnoredTable(tableName)) return null;
 
     return withConnection(pool, async (connection) => {
       if (await this.dataSourceExists(connection, tableName)) {
@@ -215,12 +210,12 @@ export class SchemaCache {
         this._primaryKeys.set(tableName, pk);
         return pk;
       }
-      return undefined;
+      return null;
     });
   }
 
-  async dataSourceExists(pool: unknown, name: string): Promise<boolean | undefined> {
-    if (this.isIgnoredTable(name)) return undefined;
+  async dataSourceExists(pool: unknown, name: string): Promise<boolean | null> {
+    if (this.isIgnoredTable(name)) return null;
     if (this._dataSources.size === 0) {
       const tables = await this.tablesToCache(pool);
       for (const source of tables) {
@@ -229,7 +224,7 @@ export class SchemaCache {
     }
 
     if (this._dataSources.has(name)) {
-      return this._dataSources.get(name);
+      return this._dataSources.get(name)!;
     }
 
     return withConnection(pool, async (connection) => {
@@ -238,7 +233,7 @@ export class SchemaCache {
         this._dataSources.set(name, exists);
         return exists;
       }
-      return undefined;
+      return null;
     });
   }
 
@@ -555,14 +550,11 @@ export class SchemaReflection {
     this._cachePromise = null;
   }
 
-  async primaryKeys(
-    pool: unknown,
-    tableName: string,
-  ): Promise<string | string[] | null | undefined> {
+  async primaryKeys(pool: unknown, tableName: string): Promise<string | string[] | null> {
     return (await this.cache(pool)).primaryKeys(pool, tableName);
   }
 
-  async dataSourceExists(pool: unknown, name: string): Promise<boolean | undefined> {
+  async dataSourceExists(pool: unknown, name: string): Promise<boolean | null> {
     return (await this.cache(pool)).dataSourceExists(pool, name);
   }
 
@@ -570,7 +562,7 @@ export class SchemaReflection {
     return (await this.cache(pool)).add(pool, name);
   }
 
-  async dataSources(pool: unknown, name: string): Promise<boolean | undefined> {
+  async dataSources(pool: unknown, name: string): Promise<boolean | null> {
     return (await this.cache(pool)).dataSourceExists(pool, name);
   }
 
@@ -720,11 +712,11 @@ export class BoundSchemaReflection {
     return this._schemaReflection.isCached(tableName);
   }
 
-  async primaryKeys(tableName: string): Promise<string | string[] | null | undefined> {
+  async primaryKeys(tableName: string): Promise<string | string[] | null> {
     return this._schemaReflection.primaryKeys(this._pool, tableName);
   }
 
-  async dataSourceExists(name: string): Promise<boolean | undefined> {
+  async dataSourceExists(name: string): Promise<boolean | null> {
     return this._schemaReflection.dataSourceExists(this._pool, name);
   }
 
@@ -732,7 +724,7 @@ export class BoundSchemaReflection {
     return this._schemaReflection.add(this._pool, name);
   }
 
-  async dataSources(name: string): Promise<boolean | undefined> {
+  async dataSources(name: string): Promise<boolean | null> {
     return this._schemaReflection.dataSources(this._pool, name);
   }
 

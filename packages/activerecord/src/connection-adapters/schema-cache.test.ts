@@ -181,7 +181,7 @@ describe("SchemaCacheTest", () => {
   });
 
   it("primary key for non existent table", async () => {
-    expect(await cache.primaryKeys("omgponies")).toBeUndefined();
+    expect(await cache.primaryKeys("omgponies")).toBeNull();
   });
 
   it("getCachedPrimaryKeys is undefined for an unwarmed table", () => {
@@ -294,7 +294,7 @@ describe("SchemaCacheTest", () => {
       expect(await cache.primaryKeys("courses")).toBe("id");
       expect((await cache.indexes("courses")).length).toBe(1);
 
-      expect(await cache.dataSourceExists("professors")).toBeUndefined();
+      expect(await cache.dataSourceExists("professors")).toBeNull();
       await assertRaises([StatementInvalid], {}, async () => {
         await cache.columns("professors");
       });
