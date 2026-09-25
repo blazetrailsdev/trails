@@ -145,4 +145,27 @@ describe("ActionsTest", () => {
     for (const cb of gen.afterInstallCallbacks) cb();
     expect(order).toEqual([1, 2]);
   });
+
+  function action(quiet: boolean, ...args: unknown[]): string {
+    const lines: string[] = [];
+    const gen = new TestGenerator({ cwd: "/tmp", output: (m) => lines.push(`${m}\n`), quiet });
+    gen.log(...args);
+    return lines.join("");
+  }
+
+  it("log", () => {
+    expect(action(false, "YES")).toBe("YES\n");
+  });
+
+  it("log with status", () => {
+    expect(action(false, "yes", "YES")).toBe("         yes  YES\n");
+  });
+
+  it("log with quiet", () => {
+    expect(action(true, "YES")).toBe("");
+  });
+
+  it("log with status with quiet", () => {
+    expect(action(true, "yes", "YES")).toBe("");
+  });
 });

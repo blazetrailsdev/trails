@@ -30,12 +30,16 @@ export class CredentialsGenerator extends GeneratorBase {
 
   async addCredentialsFile(): Promise<void> {
     if (this.fileExists(this.contentPath)) return;
-    this.output(`Adding ${this.contentPath} to store encrypted credentials.`);
+    this.say(`Adding ${this.contentPath} to store encrypted credentials.`);
+    this.say("");
     const content = this.renderTemplate();
     await this.encryptedFile().write(content);
-    this.output("The following content has been encrypted with the Rails master key:");
-    this.output(content);
-    this.output("You can edit encrypted credentials with `trails credentials edit`.");
+    this.say("The following content has been encrypted with the Rails master key:");
+    this.say("");
+    this.say(content, "on_green");
+    this.say("");
+    this.say("You can edit encrypted credentials with `bin/rails credentials:edit`.");
+    this.say("");
   }
 
   private encryptedFile(): EncryptedFile {

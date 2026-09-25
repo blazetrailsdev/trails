@@ -1,4 +1,4 @@
-import { ActionController } from "@blazetrails/actionpack";
+import { ActionController, controllerConstants } from "@blazetrails/actionpack";
 import { Info } from "./info.js";
 
 export interface RouteSearchResult {
@@ -35,3 +35,5 @@ export function matchingRoutes(query: string, _exactMatch: boolean): string[] {
   if (!query) return [];
   return [];
 }
+
+controllerConstants.set("rails/info", InfoController);
