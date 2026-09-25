@@ -1,5 +1,6 @@
 import { onLoad } from "@blazetrails/activesupport";
 import { NoMethodError } from "@blazetrails/ruby-compat";
+import { PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
 import { MiddlewareStackProxy } from "../configuration.js";
 
 export type ConfigurationBlock = (this: unknown, ...args: unknown[]) => void;
@@ -31,7 +32,7 @@ export class Configuration {
     return new Proxy(this, {
       get(target, name, receiver) {
         if (typeof name === "symbol" || name in target) return Reflect.get(target, name, receiver);
-        if (!Object.prototype.hasOwnProperty.call(Configuration._options, name)) return undefined;
+        if (PROTOCOL_PROBES.has(name)) return undefined;
         return target.methodMissing(name);
       },
       set(target, name, value, receiver) {

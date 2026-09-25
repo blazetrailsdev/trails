@@ -182,6 +182,7 @@ describe("AppGenerator", () => {
     await makeGen("sqlite", { ...UNPORTED, skipActiveJob: true }).run();
 
     for (const env of ["production", "development", "test"]) {
+      assertFile("my-app", `config/environments/${env}.ts`);
       expect(fs.readFileSync(appPath(`config/environments/${env}.ts`), "utf-8")).not.toMatch(
         /activeJob/,
       );

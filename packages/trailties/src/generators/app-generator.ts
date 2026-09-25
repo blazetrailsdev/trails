@@ -746,6 +746,15 @@ ${
   // Set host to be used by links generated in mailer templates.
   this.config.actionMailer.defaultUrlOptions = { host: "example.com" };
 
+  // Specify outgoing SMTP server. Remember to add smtp/* credentials via trails credentials edit.
+  // this.config.actionMailer.smtpSettings = {
+  //   userName: Trails.application!.credentials.dig("smtp", "user_name"),
+  //   password: Trails.application!.credentials.dig("smtp", "password"),
+  //   address: "smtp.example.com",
+  //   port: 587,
+  //   authentication: "plain",
+  // };
+
 `
       }  // Enable locale fallbacks for I18n (makes lookups for any locale fall back to
   // the I18n.defaultLocale when a translation cannot be found).

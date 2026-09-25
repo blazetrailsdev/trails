@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { NoMethodError } from "@blazetrails/ruby-compat";
 import { Configuration } from "./configuration.js";
 
 describe("Railtie::Configuration (trails)", () => {
@@ -17,5 +18,17 @@ describe("Railtie::Configuration (trails)", () => {
     config.set("_actualMethod", 2);
     expect(config.get("_options")).toBe(1);
     expect(config.get("_actualMethod")).toBe(2);
+  });
+
+  it("a property read of an unset key reaches method_missing's super arm", () => {
+    const config = new Configuration() as Configuration & { neverSetKey: unknown };
+    expect(() => config.neverSetKey).toThrow(NoMethodError);
+    config.set("neverSetKey", 1);
+    expect(config.neverSetKey).toBe(1);
+  });
+
+  it("answers JS protocol probes without raising", () => {
+    const config = new Configuration() as Configuration & { then: unknown };
+    expect(config.then).toBeUndefined();
   });
 });
