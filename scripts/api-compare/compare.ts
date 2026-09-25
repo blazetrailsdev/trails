@@ -5182,6 +5182,23 @@ export function main() {
             false,
             level,
           );
+          if (
+            !seam &&
+            !claimedByAnother &&
+            !writerPairedWithReader(rubyName, directMatch, siblingRubyNames)
+          ) {
+            const tsOwners = tsOwnersByFileName.get(expectedTs)?.get(directMatch);
+            for (const other of rubyOwnersByName.get(rubyName) ?? []) {
+              if (other === rubyModule) continue;
+              const otherLevel = rubyOwnerSeat(
+                other,
+                rubyKlassOwnerNames.has(ownerKey(other, rubyName)),
+              );
+              if (otherLevel !== level) continue;
+              if (!tsOwners?.has(other.split("::").at(-1) ?? other)) continue;
+              checkCalls(rubyName, directMatch, expectedTs, other, otherLevel);
+            }
+          }
           continue;
         }
 

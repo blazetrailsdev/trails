@@ -144,56 +144,28 @@ TableDefinition.defineColumnMethods(
 
 deprecate.call(TableDefinition, "unsignedFloat", "unsignedDecimal", { deprecator: deprecator() });
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface below.
 export class Table extends AbstractTable {
   constructor(tableName: string, schema: SchemaStatementsLike) {
     super(tableName, schema);
   }
-
-  async blob(...args: unknown[]): Promise<void> {
-    await this.definedColumn("blob" as ColumnType, args);
-  }
-
-  async tinyblob(...args: unknown[]): Promise<void> {
-    await this.definedColumn("tinyblob" as ColumnType, args);
-  }
-
-  async mediumblob(...args: unknown[]): Promise<void> {
-    await this.definedColumn("mediumblob" as ColumnType, args);
-  }
-
-  async longblob(...args: unknown[]): Promise<void> {
-    await this.definedColumn("longblob" as ColumnType, args);
-  }
-
-  async tinytext(...args: unknown[]): Promise<void> {
-    await this.definedColumn("tinytext" as ColumnType, args);
-  }
-
-  async mediumtext(...args: unknown[]): Promise<void> {
-    await this.definedColumn("mediumtext" as ColumnType, args);
-  }
-
-  async longtext(...args: unknown[]): Promise<void> {
-    await this.definedColumn("longtext" as ColumnType, args);
-  }
-
-  async unsignedInteger(...args: unknown[]): Promise<void> {
-    await this.definedColumn("unsigned_integer" as ColumnType, args);
-  }
-
-  async unsignedBigint(...args: unknown[]): Promise<void> {
-    await this.definedColumn("unsigned_bigint" as ColumnType, args);
-  }
-
-  /** @deprecated */
-  async unsignedFloat(...args: unknown[]): Promise<void> {
-    await this.definedColumn("unsigned_float" as ColumnType, args);
-  }
-
-  /** @deprecated */
-  async unsignedDecimal(...args: unknown[]): Promise<void> {
-    await this.definedColumn("unsigned_decimal" as ColumnType, args);
-  }
 }
+
+/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ColumnMethods` (`mysql/schema_definitions.rb:102`); the class/interface merge is how a mixin surfaces on the type side. */
+export interface Table extends ColumnMethods {}
+
+Table.defineColumnMethods(
+  "blob",
+  "tinyblob",
+  "mediumblob",
+  "longblob",
+  "tinytext",
+  "mediumtext",
+  "longtext",
+  "unsigned_integer",
+  "unsigned_bigint",
+  "unsigned_float",
+  "unsigned_decimal",
+);
 
 deprecate.call(Table, "unsignedFloat", "unsignedDecimal", { deprecator: deprecator() });

@@ -1,0 +1,72 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/schema-cache.ts",
+    "rubyName": "columns",
+    "call": "deep_deduplicate",
+    "reason": "Surfaced when the call-set gate began comparing every same-name Ruby owner in a file, not only the first-seen one (compare.ts direct-match arm); pre-existing, triage and convergence tracked by story `converge-same-name-second-owner-call-rows` (RFC 0130)."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/schema-cache.ts",
+    "rubyName": "columns",
+    "call": "fetch",
+    "reason": "Surfaced when the call-set gate began comparing every same-name Ruby owner in a file, not only the first-seen one (compare.ts direct-match arm); pre-existing, triage and convergence tracked by story `converge-same-name-second-owner-call-rows` (RFC 0130)."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/schema-cache.ts",
+    "rubyName": "columns_hash",
+    "call": "fetch",
+    "reason": "Surfaced when the call-set gate began comparing every same-name Ruby owner in a file, not only the first-seen one (compare.ts direct-match arm); pre-existing, triage and convergence tracked by story `converge-same-name-second-owner-call-rows` (RFC 0130)."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/schema-cache.ts",
+    "rubyName": "columns_hash",
+    "call": "index_by",
+    "reason": "Surfaced when the call-set gate began comparing every same-name Ruby owner in a file, not only the first-seen one (compare.ts direct-match arm); pre-existing, triage and convergence tracked by story `converge-same-name-second-owner-call-rows` (RFC 0130)."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/schema-cache.ts",
+    "rubyName": "data_source_exists?",
+    "call": "deep_deduplicate",
+    "reason": "Surfaced when the call-set gate began comparing every same-name Ruby owner in a file, not only the first-seen one (compare.ts direct-match arm); pre-existing, triage and convergence tracked by story `converge-same-name-second-owner-call-rows` (RFC 0130)."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/schema-cache.ts",
+    "rubyName": "data_source_exists?",
+    "call": "empty?",
+    "reason": "Surfaced when the call-set gate began comparing every same-name Ruby owner in a file, not only the first-seen one (compare.ts direct-match arm); pre-existing, triage and convergence tracked by story `converge-same-name-second-owner-call-rows` (RFC 0130)."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/schema-cache.ts",
+    "rubyName": "dump_to",
+    "call": "dump",
+    "reason": "Surfaced when the call-set gate began comparing every same-name Ruby owner in a file, not only the first-seen one (compare.ts direct-match arm); pre-existing, triage and convergence tracked by story `converge-same-name-second-owner-call-rows` (RFC 0130)."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/schema-cache.ts",
+    "rubyName": "indexes",
+    "call": "fetch",
+    "reason": "Surfaced when the call-set gate began comparing every same-name Ruby owner in a file, not only the first-seen one (compare.ts direct-match arm); pre-existing, triage and convergence tracked by story `converge-same-name-second-owner-call-rows` (RFC 0130)."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/schema-cache.ts",
+    "rubyName": "primary_keys",
+    "call": "deep_deduplicate",
+    "reason": "Surfaced when the call-set gate began comparing every same-name Ruby owner in a file, not only the first-seen one (compare.ts direct-match arm); pre-existing, triage and convergence tracked by story `converge-same-name-second-owner-call-rows` (RFC 0130)."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/schema-cache.ts",
+    "rubyName": "primary_keys",
+    "call": "fetch",
+    "reason": "Surfaced when the call-set gate began comparing every same-name Ruby owner in a file, not only the first-seen one (compare.ts direct-match arm); pre-existing, triage and convergence tracked by story `converge-same-name-second-owner-call-rows` (RFC 0130)."
+  }
+]

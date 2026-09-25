@@ -1,0 +1,39 @@
+[
+  {
+    "package": "rack",
+    "tsFile": "request.ts",
+    "rubyName": "delete_param",
+    "call": "delete",
+    "reason": "Surfaced when the call-set gate began comparing every same-name Ruby owner in a file, not only the first-seen one (compare.ts direct-match arm); pre-existing, triage and convergence tracked by story `converge-same-name-second-owner-call-rows` (RFC 0130)."
+  },
+  {
+    "package": "rack",
+    "tsFile": "request.ts",
+    "rubyName": "query_parser",
+    "call": "default_query_parser",
+    "reason": "Surfaced when the call-set gate began comparing every same-name Ruby owner in a file, not only the first-seen one (compare.ts direct-match arm); pre-existing, triage and convergence tracked by story `converge-same-name-second-owner-call-rows` (RFC 0130)."
+  },
+  {
+    "package": "rack",
+    "tsFile": "request.ts",
+    "rubyName": "trusted_proxy?",
+    "call": "call",
+    "reason": "Surfaced when the call-set gate began comparing every same-name Ruby owner in a file, not only the first-seen one (compare.ts direct-match arm); pre-existing, triage and convergence tracked by story `converge-same-name-second-owner-call-rows` (RFC 0130)."
+  },
+  {
+    "package": "rack",
+    "tsFile": "request.ts",
+    "rubyName": "update_param",
+    "call": "has_key?",
+    "reason": "Surfaced when the call-set gate began comparing every same-name Ruby owner in a file, not only the first-seen one (compare.ts direct-match arm); pre-existing, triage and convergence tracked by story `converge-same-name-second-owner-call-rows` (RFC 0130)."
+  },
+  {
+    "package": "rack",
+    "tsFile": "request.ts",
+    "rubyName": "update_param",
+    "call": "has_key?",
+    "kind": "rubyCompat",
+    "tsExport": "hasKey",
+    "reason": "Surfaced when the call-set gate began comparing every same-name Ruby owner in a file, not only the first-seen one (compare.ts direct-match arm); pre-existing, triage and convergence tracked by story `converge-same-name-second-owner-call-rows` (RFC 0130)."
+  }
+]
