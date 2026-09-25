@@ -56,7 +56,6 @@ export {
   modelRegistry,
   collectionProxyFor,
   isAssociationCached,
-  eagerLoadBang,
 } from "./associations.js";
 export { CollectionProxy } from "./associations/collection-proxy.js";
 export type { AssociationProxy } from "./associations/collection-proxy.js";

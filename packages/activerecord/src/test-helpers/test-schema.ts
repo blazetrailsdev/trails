@@ -214,16 +214,19 @@ export const TEST_SCHEMA: Schema = {
   },
 
   cars: {
-    person_id: "integer",
-    name: "string",
-    engines_count: "integer",
-    wheels_count: { type: "integer", default: 0, null: false },
-    wheels_owned_at: "datetime",
-    bulbs_count: "integer",
-    custom_tyres_count: "integer",
-    lock_version: { type: "integer", null: false, default: 0 },
-    created_at: { type: "datetime", null: false },
-    updated_at: { type: "datetime", null: false },
+    columns: {
+      person_id: "big_integer",
+      name: "string",
+      engines_count: "integer",
+      wheels_count: { type: "integer", default: 0, null: false },
+      wheels_owned_at: "datetime",
+      bulbs_count: "integer",
+      custom_tyres_count: "integer",
+      lock_version: { type: "integer", null: false, default: 0 },
+      created_at: { type: "datetime", null: false },
+      updated_at: { type: "datetime", null: false },
+    },
+    indexes: [{ columns: "person_id" }],
   },
 
   old_cars: {
@@ -499,9 +502,12 @@ export const TEST_SCHEMA: Schema = {
   },
 
   content: {
-    title: "string",
-    book_id: "integer",
-    book_destroy_async_id: "integer",
+    columns: {
+      title: "string",
+      book_id: "big_integer",
+      book_destroy_async_id: "big_integer",
+    },
+    indexes: [{ columns: "book_id" }, { columns: "book_destroy_async_id" }],
   },
 
   content_positions: {
@@ -1195,7 +1201,7 @@ export const TEST_SCHEMA: Schema = {
       tags_with_destroy_count: { type: "integer", default: 0 },
       tags_with_nullify_count: { type: "integer", default: 0 },
     },
-    indexes: [{ columns: "author_id", name: "index_posts_on_author_id" }],
+    indexes: [{ columns: "author_id" }],
   },
 
   postesques: {
@@ -1309,9 +1315,16 @@ export const TEST_SCHEMA: Schema = {
   },
 
   sections: {
-    short_name: "string",
-    session_id: "integer",
-    seminar_id: "integer",
+    columns: {
+      short_name: "string",
+      session_id: "big_integer",
+      seminar_id: "big_integer",
+    },
+    indexes: [{ columns: "session_id" }, { columns: "seminar_id" }],
+    foreignKeys: [
+      { toTable: "sessions", column: "session_id" },
+      { toTable: "seminars", column: "seminar_id" },
+    ],
   },
 
   shape_expressions: {
@@ -1332,15 +1345,18 @@ export const TEST_SCHEMA: Schema = {
   },
 
   ships: {
-    name: "string",
-    pirate_id: "integer",
-    developer_id: "integer",
-    update_only_pirate_id: "integer",
-    treasures_count: { type: "integer", default: 0 },
-    created_at: "datetime",
-    created_on: "datetime",
-    updated_at: "datetime",
-    updated_on: "datetime",
+    columns: {
+      name: "string",
+      pirate_id: "integer",
+      developer_id: "big_integer",
+      update_only_pirate_id: "integer",
+      treasures_count: { type: "integer", default: 0 },
+      created_at: "datetime",
+      created_on: "datetime",
+      updated_at: "datetime",
+      updated_on: "datetime",
+    },
+    indexes: [{ columns: "developer_id" }],
   },
 
   ship_parts: {
@@ -1351,7 +1367,10 @@ export const TEST_SCHEMA: Schema = {
 
   squeaks: { mouse_id: "integer" },
 
-  prisoners: { ship_id: "integer" },
+  prisoners: {
+    columns: { ship_id: "big_integer" },
+    indexes: [{ columns: "ship_id" }],
+  },
 
   sinks: {
     columns: {
@@ -1493,7 +1512,10 @@ export const TEST_SCHEMA: Schema = {
 
   unused_destroy_asyncs: {},
 
-  unused_belongs_to: { unused_destroy_async_id: "integer" },
+  unused_belongs_to: {
+    columns: { unused_destroy_async_id: "big_integer" },
+    indexes: [{ columns: "unused_destroy_async_id" }],
+  },
 
   variants: {
     columns: {

@@ -1,5 +1,5 @@
 import { ArgumentError } from "@blazetrails/activemodel";
-import { ActiveSupport, any, InheritableOptions } from "@blazetrails/activesupport";
+import { ActiveSupport, any, Autoload, InheritableOptions } from "@blazetrails/activesupport";
 import { ThreadPoolExecutor } from "@blazetrails/ruby-compat";
 import { ActiveRecord } from "./namespaces.js";
 import type { SQLWarning } from "./errors.js";
@@ -430,9 +430,10 @@ export function setProtocolAdapters(protocolAdapters: InheritableOptions): void 
 }
 
 export async function eagerLoadBang(): Promise<void> {
-  const Associations = await import("./associations.js");
+  await Autoload.eagerLoadBang.call(ActiveRecord);
+  await ActiveRecord.Associations.eagerLoadBang();
+  await ActiveRecord.ConnectionAdapters.eagerLoadBang();
   const { Encryption } = await import("./encryption.js");
-  await Associations.eagerLoadBang();
   await Encryption.eagerLoadBang();
 }
 

@@ -1,11 +1,12 @@
 import type { AdapterName } from "../connection-adapters/abstract-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
-import { singularize } from "@blazetrails/activesupport";
+import { pluralize, singularize } from "@blazetrails/activesupport";
 import { ActiveRecordError } from "../errors.js";
-import type {
-  TableDefinition,
-  AddIndexOptions,
-  AddForeignKeyOptions,
+import {
+  ReferenceDefinition,
+  type TableDefinition,
+  type AddIndexOptions,
+  type AddForeignKeyOptions,
 } from "../connection-adapters/abstract/schema-definitions.js";
 import type { SchemaStatements } from "../connection-adapters/abstract/schema-statements.js";
 import type {
@@ -32,6 +33,13 @@ interface ColOpts {
   null?: boolean;
   default?: unknown;
   defaultFunction?: string;
+}
+
+interface ReferenceOpts {
+  polymorphic?: boolean;
+  null?: boolean;
+  index?: boolean | { name: string };
+  foreignKey?: boolean;
 }
 
 interface IndexOpts {
@@ -94,8 +102,11 @@ class TableBuilder {
   integer(name: string, o?: ColOpts): void {
     this.col(name, "integer", o);
   }
-  references(name: string): void {
-    this.t.references(name, { index: false });
+  references(name: string, o: ReferenceOpts = {}): void {
+    this.t.references(name, o);
+  }
+  belongsTo(name: string, o: ReferenceOpts = {}): void {
+    this.references(name, o);
   }
   bigInteger(name: string, o?: ColOpts): void {
     this.col(name, "big_integer", o);
@@ -242,7 +253,7 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   });
 
   await define("accounts", {}, (t) => {
-    t.bigInteger("firm_id");
+    t.references("firm", { index: false });
     t.string("firm_name");
     t.integer("credit_limit");
     t.string("status");
@@ -268,8 +279,7 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.string("json_data", { limit: 1024, null: true });
     t.string("json_data_empty", { limit: 1024, null: true, default: "" });
     t.text("params");
-    t.bigInteger("account_id");
-    t.index("account_id");
+    t.references("account");
     t.json("json_options");
   });
 
@@ -283,8 +293,7 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.string("json_data", { limit: 1024, null: true });
     t.string("json_data_empty", { limit: 1024, null: true, default: "" });
     t.text("params");
-    t.bigInteger("account_id");
-    t.index("account_id");
+    t.references("account");
   });
 
   await define("aircraft", {}, (t) => {
@@ -297,23 +306,17 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   await define("articles", {}, (t) => {});
 
   await define("articles_magazines", {}, (t) => {
-    t.bigInteger("article_id");
-    t.index("article_id");
-    t.bigInteger("magazine_id");
-    t.index("magazine_id");
+    t.references("article");
+    t.references("magazine");
   });
 
   await define("articles_tags", {}, (t) => {
-    t.bigInteger("article_id");
-    t.index("article_id");
-    t.bigInteger("tag_id");
-    t.index("tag_id");
+    t.references("article");
+    t.references("tag");
   });
 
   await define("attachments", {}, (t) => {
-    t.string("record_type", { null: false });
-    t.bigInteger("record_id", { null: false });
-    t.index(["record_type", "record_id"], { name: "index_attachments_on_record" });
+    t.references("record", { polymorphic: true, null: false });
   });
 
   await define("audit_logs", {}, (t) => {
@@ -326,10 +329,8 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
 
   await define("authors", {}, (t) => {
     t.string("name", { null: false });
-    t.bigInteger("author_address_id");
-    t.index("author_address_id");
-    t.bigInteger("author_address_extra_id");
-    t.index("author_address_extra_id");
+    t.references("author_address");
+    t.references("author_address_extra");
     t.string("organization_id");
     t.string("owned_essay_id");
     t.foreignKey("author_addresses", {
@@ -363,8 +364,7 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   });
 
   await define("books", {}, (t) => {
-    t.bigInteger("author_id");
-    t.index("author_id");
+    t.references("author");
     t.string("format");
     t.integer("format_record_id");
     t.string("format_record_type");
@@ -393,8 +393,7 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   });
 
   await define("encrypted_books", {}, (t) => {
-    t.bigInteger("author_id");
-    t.index("author_id");
+    t.references("author");
     t.string("format");
     t.string("name", { limit: 1024, default: "<untitled>" });
     t.string("original_name");
@@ -411,8 +410,7 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   });
 
   await define("branches", {}, (t) => {
-    t.bigInteger("branch_id");
-    t.index("branch_id");
+    t.references("branch");
   });
 
   await define("bulbs", { serialPk: "ID" }, (t) => {
@@ -428,7 +426,7 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   });
 
   await define("cars", {}, (t) => {
-    t.integer("person_id");
+    t.belongsTo("person");
     t.string("name");
     t.integer("engines_count");
     t.integer("wheels_count", { null: false, default: 0 });
@@ -472,12 +470,9 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   });
 
   await define("citations", {}, (t) => {
-    t.bigInteger("book1_id");
-    t.bigInteger("book2_id");
-    t.bigInteger("citation_id");
-    t.index("book1_id");
-    t.index("book2_id");
-    t.index("citation_id");
+    t.references("book1");
+    t.references("book2");
+    t.references("citation");
   });
 
   await define("cpk_books", { primaryKey: ["author_id", "id"] }, (t) => {
@@ -554,8 +549,7 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   });
 
   await define("paragraphs", {}, (t) => {
-    t.bigInteger("book_id");
-    t.index("book_id");
+    t.references("book");
   });
 
   await define("clothing_items", {}, (t) => {
@@ -572,9 +566,7 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
 
   await define("sharded_blog_posts", {}, (t) => {
     t.string("title");
-    t.string("parent_type");
-    t.bigInteger("parent_id");
-    t.index(["parent_type", "parent_id"], { name: "index_sharded_blog_posts_on_parent" });
+    t.references("parent", { polymorphic: true });
     t.integer("blog_id");
     t.integer("revision");
   });
@@ -610,8 +602,7 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   });
 
   await define("columns", {}, (t) => {
-    t.bigInteger("record_id");
-    t.index("record_id");
+    t.references("record");
   });
 
   await define("comments", {}, (t) => {
@@ -622,9 +613,7 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.integer("tags_count", { default: 0 });
     t.integer("children_count", { default: 0 });
     t.integer("parent_id");
-    t.string("author_type");
-    t.bigInteger("author_id");
-    t.index(["author_type", "author_id"], { name: "index_comments_on_author" });
+    t.references("author", { polymorphic: true });
     t.string("resource_id");
     t.string("resource_type");
     t.integer("origin_id");
@@ -639,13 +628,12 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   await define("comment_overlapping_counter_caches", {}, (t) => {
     t.integer("user_comments_count_id");
     t.integer("post_comments_count_id");
-    t.string("commentable_type");
-    t.bigInteger("commentable_id");
+    t.references("commentable", { polymorphic: true, index: false });
   });
 
   await define("companies", {}, (t) => {
     t.string("type");
-    t.bigInteger("firm_id");
+    t.references("firm", { index: false });
     t.string("firm_name");
     t.string("name");
     t.bigInteger("client_of");
@@ -674,8 +662,8 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
 
   await define("content", {}, (t) => {
     t.string("title");
-    t.integer("book_id");
-    t.integer("book_destroy_async_id");
+    t.belongsTo("book");
+    t.belongsTo("book_destroy_async");
   });
 
   await define("content_positions", {}, (t) => {
@@ -698,17 +686,15 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   });
 
   await define("computers_developers", { id: false }, (t) => {
-    t.bigInteger("computer_id");
-    t.index("computer_id");
-    t.bigInteger("developer_id");
-    t.index("developer_id");
+    t.references("computer");
+    t.references("developer");
     t.datetime("created_at");
     t.datetime("updated_at");
   });
 
   await define("contracts", {}, (t) => {
-    t.bigInteger("developer_id");
-    t.bigInteger("company_id");
+    t.references("developer", { index: false });
+    t.references("company", { index: false });
     t.string("metadata");
     t.integer("count");
   });
@@ -723,10 +709,8 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   });
 
   await define("customer_carriers", {}, (t) => {
-    t.bigInteger("customer_id");
-    t.index("customer_id");
-    t.bigInteger("carrier_id");
-    t.index("carrier_id");
+    t.references("customer");
+    t.references("carrier");
   });
 
   await define("dashboards", { id: false }, (t) => {
@@ -751,28 +735,23 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
 
   await define("dl_keyed_belongs_tos", { serialPk: "belongs_key" }, (t) => {
     t.integer("belongs_key");
-    t.bigInteger("destroy_async_parent_id");
-    t.index("destroy_async_parent_id");
+    t.references("destroy_async_parent");
   });
 
   await define("dl_keyed_belongs_to_soft_deletes", {}, (t) => {
-    t.bigInteger("destroy_async_parent_soft_delete_id");
-    t.index("destroy_async_parent_soft_delete_id", { name: "soft_del_parent" });
+    t.references("destroy_async_parent_soft_delete", { index: { name: "soft_del_parent" } });
     t.boolean("deleted");
   });
 
   await define("dl_keyed_has_ones", { serialPk: "has_one_key" }, (t) => {
     t.integer("has_one_key");
-    t.bigInteger("destroy_async_parent_id");
-    t.index("destroy_async_parent_id");
-    t.bigInteger("destroy_async_parent_soft_delete_id");
-    t.index("destroy_async_parent_soft_delete_id");
+    t.references("destroy_async_parent");
+    t.references("destroy_async_parent_soft_delete");
   });
 
   await define("dl_keyed_has_manies", { serialPk: "many_key" }, (t) => {
     t.integer("many_key");
-    t.bigInteger("destroy_async_parent_id");
-    t.index("destroy_async_parent_id");
+    t.references("destroy_async_parent");
   });
 
   await define("dl_keyed_has_many_throughs", { serialPk: "through_key" }, (t) => {
@@ -781,17 +760,15 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
 
   await define("dl_keyed_joins", { serialPk: "joins_key" }, (t) => {
     t.integer("joins_key");
-    t.bigInteger("destroy_async_parent_id");
-    t.index("destroy_async_parent_id");
-    t.bigInteger("dl_keyed_has_many_through_id");
-    t.index("dl_keyed_has_many_through_id");
+    t.references("destroy_async_parent");
+    t.references("dl_keyed_has_many_through");
   });
 
   await define("developers", {}, (t) => {
     t.string("name");
     t.string("first_name");
     t.integer("salary", { default: 70000 });
-    t.bigInteger("firm_id");
+    t.references("firm", { index: false });
     t.integer("mentor_id");
     t.datetime("legacy_created_at");
     t.datetime("legacy_updated_at");
@@ -840,7 +817,7 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   });
 
   await define("engines", {}, (t) => {
-    t.bigInteger("car_id");
+    t.references("car", { index: false });
   });
 
   await define("entrants", {}, (t) => {
@@ -862,8 +839,7 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.string("writer_type");
     t.string("category_id");
     t.string("author_id");
-    t.bigInteger("book_id");
-    t.index("book_id");
+    t.references("book");
   });
 
   await define("events", {}, (t) => {
@@ -875,10 +851,8 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   await define("families", {}, (t) => {});
 
   await define("family_trees", {}, (t) => {
-    t.bigInteger("family_id");
-    t.index("family_id");
-    t.bigInteger("member_id");
-    t.index("member_id");
+    t.references("family");
+    t.references("member");
     t.string("token");
   });
 
@@ -940,8 +914,7 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   });
 
   await define("iris", {}, (t) => {
-    t.bigInteger("eye_id");
-    t.index("eye_id");
+    t.references("eye");
     t.string("color");
   });
 
@@ -954,10 +927,8 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   });
 
   await define("jobs_pool", { id: false }, (t) => {
-    t.bigInteger("job_id", { null: false });
-    t.index("job_id");
-    t.bigInteger("user_id", { null: false });
-    t.index("user_id");
+    t.references("job", { null: false, index: true });
+    t.references("user", { null: false, index: true });
   });
 
   await define("keyboards", { serialPk: "key_number" }, (t) => {
@@ -983,10 +954,8 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   });
 
   await define("lessons_students", { id: false }, (t) => {
-    t.bigInteger("lesson_id");
-    t.index("lesson_id");
-    t.bigInteger("student_id");
-    t.index("student_id");
+    t.references("lesson");
+    t.references("student");
     t.foreignKey("students", {
       column: "student_id",
       onDelete: "cascade",
@@ -1035,9 +1004,8 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
 
   await define("members", {}, (t) => {
     t.string("name");
-    t.bigInteger("member_type_id");
-    t.string("admittable_type");
-    t.bigInteger("admittable_id");
+    t.references("member_type", { index: false });
+    t.references("admittable", { polymorphic: true, index: false });
   });
 
   await define("member_details", {}, (t) => {
@@ -1179,55 +1147,36 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   await define("treasures", {}, (t) => {
     t.string("name");
     t.string("type");
-    t.string("looter_type");
-    t.bigInteger("looter_id");
-    t.index(["looter_type", "looter_id"], { name: "index_treasures_on_looter" });
-    t.bigInteger("ship_id");
-    t.index("ship_id");
+    t.references("looter", { polymorphic: true });
+    t.references("ship");
   });
 
   await define("parrots_pirates", { id: false }, (t) => {
-    t.bigInteger("parrot_id");
-    t.index("parrot_id");
-    t.foreignKey("parrots", { column: "parrot_id" });
-    t.bigInteger("pirate_id");
-    t.index("pirate_id");
-    t.foreignKey("pirates", { column: "pirate_id" });
+    t.references("parrot", { foreignKey: true });
+    t.references("pirate", { foreignKey: true });
   });
 
   await define("parrots_treasures", { id: false }, (t) => {
-    t.bigInteger("parrot_id");
-    t.index("parrot_id");
-    t.foreignKey("parrots", { column: "parrot_id" });
-    t.bigInteger("treasure_id");
-    t.index("treasure_id");
-    t.foreignKey("treasures", { column: "treasure_id" });
+    t.references("parrot", { foreignKey: true });
+    t.references("treasure", { foreignKey: true });
   });
 
   await define("parrot_treasures", { id: false }, (t) => {
-    t.bigInteger("parrot_id");
-    t.index("parrot_id");
-    t.foreignKey("parrots", { column: "parrot_id" });
-    t.bigInteger("treasure_id");
-    t.index("treasure_id");
-    t.foreignKey("treasures", { column: "treasure_id" });
+    t.references("parrot", { foreignKey: true });
+    t.references("treasure", { foreignKey: true });
   });
 
   await define("people", {}, (t) => {
     t.string("first_name", { null: false });
-    t.bigInteger("primary_contact_id");
-    t.index("primary_contact_id");
+    t.references("primary_contact");
     t.string("gender", { limit: 1 });
-    t.bigInteger("number1_fan_id");
-    t.index("number1_fan_id");
+    t.references("number1_fan");
     t.integer("lock_version", { null: false, default: 0 });
     t.string("comments");
     t.integer("followers_count", { default: 0 });
     t.integer("friends_too_count", { default: 0 });
-    t.bigInteger("best_friend_id");
-    t.index("best_friend_id");
-    t.bigInteger("best_friend_of_id");
-    t.index("best_friend_of_id");
+    t.references("best_friend");
+    t.references("best_friend_of");
     t.integer("insures", { null: false, default: 0 });
     t.datetime("born_at");
     t.integer("cars_count", { default: 0 });
@@ -1263,7 +1212,6 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
 
   await define("posts", {}, (t) => {
     t.references("author");
-    t.index("author_id", { name: "index_posts_on_author_id" });
     t.string("title", { null: false });
     t.text("body", { null: false });
     t.string("type");
@@ -1303,10 +1251,8 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   });
 
   await define("products", {}, (t) => {
-    t.bigInteger("collection_id");
-    t.index("collection_id");
-    t.bigInteger("type_id");
-    t.index("type_id");
+    t.references("collection");
+    t.references("type");
     t.string("name");
     t.decimal("price");
     t.decimal("discounted_price");
@@ -1320,7 +1266,7 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   await define("projects", {}, (t) => {
     t.string("name");
     t.string("type");
-    t.bigInteger("firm_id");
+    t.references("firm", { index: false });
     t.integer("mentor_id");
   });
 
@@ -1364,14 +1310,10 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   });
 
   await define("rooms", {}, (t) => {
-    t.bigInteger("user_id");
-    t.index("user_id");
-    t.bigInteger("owner_id");
-    t.index("owner_id");
-    t.bigInteger("landlord_id");
-    t.index("landlord_id");
-    t.bigInteger("tenant_id");
-    t.index("tenant_id");
+    t.references("user");
+    t.references("owner");
+    t.references("landlord");
+    t.references("tenant");
   });
 
   await define("seminars", {}, (t) => {
@@ -1386,8 +1328,8 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
 
   await define("sections", {}, (t) => {
     t.string("short_name");
-    t.integer("session_id");
-    t.integer("seminar_id");
+    t.belongsTo("session", { foreignKey: true });
+    t.belongsTo("seminar", { foreignKey: true });
   });
 
   await define("shape_expressions", {}, (t) => {
@@ -1410,7 +1352,7 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   await define("ships", {}, (t) => {
     t.string("name");
     t.integer("pirate_id");
-    t.integer("developer_id");
+    t.belongsTo("developer");
     t.integer("update_only_pirate_id");
     t.integer("treasures_count", { default: 0 });
     t.datetime("created_at");
@@ -1430,19 +1372,16 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   });
 
   await define("prisoners", {}, (t) => {
-    t.integer("ship_id");
+    t.belongsTo("ship");
   });
 
   await define("sinks", {}, (t) => {
-    t.bigInteger("kitchen_id");
-    t.index("kitchen_id");
+    t.references("kitchen");
   });
 
   await define("shop_accounts", {}, (t) => {
-    t.bigInteger("customer_id");
-    t.index("customer_id");
-    t.bigInteger("customer_carrier_id");
-    t.index("customer_carrier_id");
+    t.references("customer");
+    t.references("customer_carrier");
   });
 
   await define("speedometers", { id: false }, (t) => {
@@ -1453,10 +1392,8 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
 
   await define("sponsors", {}, (t) => {
     t.integer("club_id");
-    t.string("sponsorable_type");
-    t.bigInteger("sponsorable_id");
-    t.string("sponsor_type");
-    t.bigInteger("sponsor_id");
+    t.references("sponsorable", { polymorphic: true, index: false });
+    t.references("sponsor", { polymorphic: true, index: false });
   });
 
   await define("string_key_objects", { id: false }, (t) => {
@@ -1541,8 +1478,7 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.string("locale", { null: false });
     t.string("key", { null: false });
     t.string("value", { null: false });
-    t.bigInteger("attachment_id");
-    t.index("attachment_id");
+    t.references("attachment");
   });
 
   await define("tuning_pegs", {}, (t) => {
@@ -1557,12 +1493,11 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   await define("unused_destroy_asyncs", {}, (t) => {});
 
   await define("unused_belongs_to", {}, (t) => {
-    t.integer("unused_destroy_async_id");
+    t.belongsTo("unused_destroy_async");
   });
 
   await define("variants", {}, (t) => {
-    t.bigInteger("product_id");
-    t.index("product_id");
+    t.references("product");
     t.string("name");
   });
 
@@ -1597,8 +1532,7 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.string("poly_human_without_inverse_type");
     t.integer("puzzled_polymorphic_human_id");
     t.string("puzzled_polymorphic_human_type");
-    t.string("super_human_type");
-    t.bigInteger("super_human_id");
+    t.references("super_human", { polymorphic: true, index: false });
   });
 
   await define("interests", {}, (t) => {
@@ -1619,9 +1553,7 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
 
   await define("wheels", {}, (t) => {
     t.integer("size");
-    t.string("wheelable_type");
-    t.bigInteger("wheelable_id");
-    t.index(["wheelable_type", "wheelable_id"], { name: "index_wheels_on_wheelable" });
+    t.references("wheelable", { polymorphic: true });
   });
 
   await define("countries", { primaryKey: ["country_id"] }, (t) => {
@@ -1710,15 +1642,14 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   });
 
   await define("fk_test_has_fk", {}, (t) => {
-    t.bigInteger("fk_id", { null: false });
-    t.index("fk_id");
+    t.references("fk", { null: false });
     t.foreignKey("fk_test_has_pk", { column: "fk_id", name: "fk_name", primaryKey: "pk_id" });
   });
 
   await define("fk_object_to_point_tos", {}, (t) => {});
 
   await define("fk_pointing_to_non_existent_objects", {}, (t) => {
-    t.bigInteger("fk_object_to_point_to_id", { null: false });
+    t.references("fk_object_to_point_to", { null: false, index: false });
     t.foreignKey("fk_object_to_point_tos", {
       column: "fk_object_to_point_to_id",
       name: "fk_that_will_be_broken",
@@ -1777,10 +1708,8 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   });
 
   await define("courses_professors", { id: false, arunit2: true }, (t) => {
-    t.bigInteger("course_id");
-    t.bigInteger("professor_id");
-    t.index("course_id");
-    t.index("professor_id");
+    t.references("course");
+    t.references("professor");
   });
 
   await define("to_be_linked_accounts", {}, (t) => {
@@ -2092,8 +2021,10 @@ export async function canonicalForeignKeyDependents(): Promise<Map<string, strin
   const dependents = new Map<string, string[]>();
   for (const def of await buildCanonicalRegistry()) {
     const probe = {
+      name: def.name,
       column: () => {},
-      references: () => {},
+      index: () => {},
+      references: (name: string, o: ReferenceOpts) => replayReference(probe, name, o),
       checkConstraint: () => {},
       foreignKey: (toTable: string) => {
         const children = dependents.get(toTable) ?? [];
@@ -2112,13 +2043,16 @@ export async function canonicalRegistrySchema(): Promise<Schema> {
   for (const def of await buildCanonicalRegistry()) {
     const columns: Record<string, ColumnSpec> = {};
     const foreignKeys: ForeignKeySpec[] = [];
+    const referenceIndexes: { columns: string | string[]; opts: IndexOpts }[] = [];
     const probe = {
+      name: def.name,
       column: (name: string, type: string, options: Record<string, unknown> = {}) => {
         columns[name] = specFromColumnCall(type, options);
       },
-      references: (name: string) => {
-        columns[`${name}_id`] = specFromColumnCall("bigint", {});
+      index: (c: string | string[], opts: IndexOpts = {}) => {
+        referenceIndexes.push({ columns: c.length === 1 ? c[0] : c, opts });
       },
+      references: (name: string, o: ReferenceOpts) => replayReference(probe, name, o),
       checkConstraint: () => {},
       foreignKey: (toTable: string, opts: Partial<AddForeignKeyOptions> = {}) => {
         const join = (v: string | string[] | undefined): string | undefined =>
@@ -2143,10 +2077,12 @@ export async function canonicalRegistrySchema(): Promise<Schema> {
     if (def.meta.primaryKey !== undefined && def.meta.serialPk === undefined) {
       for (const column of def.meta.primaryKey) declaredSpec(def.name, column, columns[column]);
     }
-    const indexes: IndexSpec[] = builder.indexes.map(({ columns: c, opts }) => ({
-      columns: c,
-      ...opts,
-    }));
+    const indexes: IndexSpec[] = [...referenceIndexes, ...builder.indexes].map(
+      ({ columns: c, opts }) => ({
+        columns: c,
+        ...opts,
+      }),
+    );
     const primaryKey =
       def.meta.primaryKey ??
       (def.meta.serialPk !== undefined
@@ -2165,6 +2101,11 @@ export async function canonicalRegistrySchema(): Promise<Schema> {
     schema[def.name] = columns;
   }
   return schema;
+}
+
+function replayReference(probe: unknown, name: string, o: ReferenceOpts = {}): void {
+  const foreignKey = o.foreignKey ? { toTable: pluralize(name) } : false;
+  new ReferenceDefinition(name, { ...o, foreignKey }).addTo(probe as TableDefinition);
 }
 
 function assertSerialPkIsPlainIntegral(

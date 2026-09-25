@@ -13,7 +13,7 @@ import { AssociationNotFoundError } from "./associations/errors.js";
 import { AssociationScope } from "./associations/association-scope.js";
 import type { Association as AssociationInstance } from "./associations/association.js";
 export { joinTableName as joinHabtmTableNames } from "./migration/join-table.js";
-import { registerConstant, unregisterConstant } from "@blazetrails/activesupport";
+import { Autoload, registerConstant, unregisterConstant } from "@blazetrails/activesupport";
 import { registerSubclass } from "./inheritance.js";
 import { flushPendingCounterCacheColumns } from "./counter-cache.js";
 import { BelongsTo as BelongsToBuilder } from "./associations/builder/belongs-to.js";
@@ -23,8 +23,6 @@ import { HasAndBelongsToMany as HabtmBuilder } from "./associations/builder/has-
 import * as Reflection from "./reflection.js";
 import { hasQueryConstraints, queryConstraintsList } from "./persistence.js";
 import { Module, include, rbInspect } from "@blazetrails/ruby-compat";
-
-export async function eagerLoadBang(): Promise<void> {}
 
 export type CollectionCallback<K extends string> =
   | string
@@ -638,5 +636,17 @@ export function associationInstanceGet(this: Base, name: string): unknown {
 export function associationInstanceSet(this: Base, name: string, association: unknown): void {
   this._associationCache.set(name, association as AssociationInstance);
 }
+
+Object.defineProperty(AssociationsNamespace, "eagerLoadBang", {
+  /**
+   * @missingRailsCall Preloader.eager_load! — CONVERGEABLE preloader-and-join-dependency-are-not-autoload-namespaces
+   * @missingRailsCall JoinDependency.eager_load! — CONVERGEABLE preloader-and-join-dependency-are-not-autoload-namespaces
+   */
+  value: async function eagerLoadBang(this: typeof AssociationsNamespace): Promise<void> {
+    await Autoload.eagerLoadBang.call(this);
+  },
+  writable: true,
+  configurable: true,
+});
 
 ActiveRecord.Associations = AssociationsNamespace;
