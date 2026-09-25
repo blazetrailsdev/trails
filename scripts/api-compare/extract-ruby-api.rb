@@ -2082,6 +2082,25 @@ class ApiExtractor
     record_file_hash_keys(collect_ivar_option_keys(body))
     digest = body_digest(body)
     entry[:bodyDigest] = digest if digest
+    entry[:lastExpr] = body_last_expr(body)
+  end
+
+  def body_last_expr(body)
+    node = body
+    node = node[1] if node.is_a?(Array) && node[0] == :bodystmt
+    node = node.reject { |n| n == [:void_stmt] }.last if node.is_a?(Array) && node[0].is_a?(Array)
+    return "other" unless node.is_a?(Array)
+    case node[0]
+    when :return then "return"
+    when :assign, :opassign, :massign then "assign"
+    when :method_add_arg, :method_add_block then body_last_expr(node[1])
+    when :call, :command_call
+      node[3].is_a?(Array) && node[3][1] == "new" ? "new" : "call"
+    when :command, :fcall, :vcall
+      %w[raise fail].include?(node[1].is_a?(Array) && node[1][1]) ? "other" : "call"
+    when :super, :zsuper, :yield, :yield0 then "call"
+    else "other"
+    end
   end
 
   # Members of an `.each` receiver, whichever way it is spelled: a literal
