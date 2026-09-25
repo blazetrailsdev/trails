@@ -75,6 +75,21 @@ class BetterSqlite3Statement implements SqliteStatement, SyncSqliteStatement {
     return this.bind(binds, (args) => this.stmt.iterate(...args));
   }
 
+  private boundParams: SqliteBinds | undefined;
+
+  bindParams(binds: SqliteBinds): void {
+    this.boundParams = binds;
+  }
+
+  toA(): unknown[][] {
+    this.stmt.raw(true);
+    try {
+      return this.bind(this.boundParams, (args) => this.stmt.all(...args) as unknown[][]);
+    } finally {
+      this.stmt.raw(false);
+    }
+  }
+
   get reader(): boolean {
     return this.stmt.reader;
   }

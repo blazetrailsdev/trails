@@ -2,7 +2,7 @@ import { expect, it } from "vitest";
 
 import { Encoding } from "../json/encoding.js";
 import { NullSerializer } from "../message-encryptor.js";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time } from "@blazetrails/date";
 import { currentTimeInstant, setFrozenInstant } from "../time-travel.js";
 import type { MessageSerializer } from "./codec.js";
 import { Metadata, type ExpectedMetadataOptions, type MetadataOptions } from "./metadata.js";
@@ -35,13 +35,17 @@ export function freezeTime(
 
 expect.addEqualityTesters([
   function (a: unknown, b: unknown): boolean | undefined {
+    const toInstant = (x: unknown) => (x instanceof Time ? x.toTime().toInstant() : x);
+    const [x, y] = [toInstant(a), toInstant(b)];
     const [instant, other] =
-      a instanceof Temporal.Instant
-        ? [a, b]
-        : b instanceof Temporal.Instant
-          ? [b, a]
+      x instanceof Temporal.Instant
+        ? [x, y]
+        : y instanceof Temporal.Instant
+          ? [y, x]
           : [null, null];
-    if (instant === null || typeof other !== "string") return undefined;
+    if (instant === null) return undefined;
+    if (other instanceof Temporal.Instant) return instant.equals(other);
+    if (typeof other !== "string") return undefined;
     const slash = other.match(/^(\d+)\/(\d\d)\/(\d\d) (\d\d:\d\d:\d\d) ([+-]\d\d)(\d\d)$/);
     const iso = slash
       ? `${slash[1]}-${slash[2]}-${slash[3]}T${slash[4]}${slash[5]}:${slash[6]}`
@@ -54,7 +58,7 @@ expect.addEqualityTesters([
   },
 ]);
 
-const A_TIME = Temporal.Instant.from("2004-01-01T00:00:00Z");
+const A_TIME = Time.local(2004);
 
 const DATA: readonly unknown[] = [
   "a string",

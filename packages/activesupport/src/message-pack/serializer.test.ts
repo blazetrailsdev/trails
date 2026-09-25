@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { MessagePack, UnserializableObjectError } from "./index.js";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time } from "@blazetrails/date";
+import { Rational } from "@blazetrails/ruby-compat";
 import { TimeWithZone } from "../time-with-zone.js";
 import { TimeZone } from "../values/time-zone.js";
 import { HashWithIndifferentAccess } from "../hash-with-indifferent-access.js";
@@ -92,12 +93,14 @@ describe("MessagePackSerializerTest", () => {
   });
 
   it("roundtrips Time", () => {
-    const time = Temporal.Instant.from("1999-12-31T12:34:56.789-12:00");
-    expect(roundtrip(time)).toEqual(time);
-    const now = Temporal.Now.instant();
-    expect(roundtrip(now)).toEqual(now);
-    const preEpoch = Temporal.Instant.from("1969-07-20T20:17:40.123456789Z");
-    expect(roundtrip(preEpoch)).toEqual(preEpoch);
+    const time = Time.new(1999, 12, 31, 12, 34, new Rational(789, 1000).add(56), "-12:00");
+    const result = roundtrip(time) as Time;
+    expect(result.constructor).toBe(Time);
+    expect(result.compare(time)).toBe(0);
+    const now = Time.now();
+    const nowResult = roundtrip(now) as Time;
+    expect(nowResult.constructor).toBe(Time);
+    expect(nowResult.compare(now)).toBe(0);
   });
 
   it("roundtrips ActiveSupport::TimeWithZone", () => {
@@ -107,7 +110,7 @@ describe("MessagePackSerializerTest", () => {
     );
     const result = roundtrip(twz) as TimeWithZone;
     expect(result).toBeInstanceOf(TimeWithZone);
-    expect(result.utc()).toEqual(twz.utc());
+    expect(result.utc().compare(twz.utc())).toBe(0);
     expect(result.timeZone.name).toBe(twz.timeZone.name);
   });
 

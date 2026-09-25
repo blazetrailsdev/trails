@@ -64,6 +64,21 @@ class NodeSqliteStatement implements SqliteStatement, SyncSqliteStatement {
     return this.call<Iterable<unknown>>("iterate", binds);
   }
 
+  private boundParams: SqliteBinds | undefined;
+
+  bindParams(binds: SqliteBinds): void {
+    this.boundParams = binds;
+  }
+
+  toA(): unknown[][] {
+    this.stmt.setReturnArrays(true);
+    try {
+      return this.call<unknown[][]>("all", this.boundParams);
+    } finally {
+      this.stmt.setReturnArrays(false);
+    }
+  }
+
   columns(): ColumnInfo[] {
     return this.stmt.columns().map((c) => ({
       name: c.name,

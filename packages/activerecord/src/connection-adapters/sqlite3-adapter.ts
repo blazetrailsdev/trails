@@ -299,24 +299,19 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     }
   }
 
-  _narrowSpilledBigInts(stmt: SqliteStatement, rows: Record<string, unknown>[]): void {
-    const wide = new Set(
-      stmt
-        .columns()
-        .filter((c) => c.type !== null && /bigint/i.test(c.type))
-        .map((c) => c.name),
-    );
-    if (wide.size === 0) return;
+  _narrowSpilledBigInts(stmt: SqliteStatement, rows: unknown[][]): void {
+    const wide = stmt.columns().map((c) => c.type !== null && /bigint/i.test(c.type));
+    if (!wide.includes(true)) return;
     for (const row of rows) {
-      for (const key of Object.keys(row)) {
-        const value = row[key];
+      for (let i = 0; i < row.length; i++) {
+        const value = row[i];
         if (
           typeof value === "bigint" &&
-          !wide.has(key) &&
+          !wide[i] &&
           value >= BigInt(Number.MIN_SAFE_INTEGER) &&
           value <= BigInt(Number.MAX_SAFE_INTEGER)
         ) {
-          row[key] = Number(value);
+          row[i] = Number(value);
         }
       }
     }

@@ -46,6 +46,21 @@ class LibsqlStatement implements SqliteStatement, SyncSqliteStatement {
     return this.stmt.iterate(...bindArgs(binds));
   }
 
+  private boundParams: SqliteBinds | undefined;
+
+  bindParams(binds: SqliteBinds): void {
+    this.boundParams = binds;
+  }
+
+  toA(): unknown[][] {
+    this.stmt.raw(true);
+    try {
+      return this.stmt.all(...bindArgs(this.boundParams)) as unknown[][];
+    } finally {
+      this.stmt.raw(false);
+    }
+  }
+
   get reader(): boolean {
     return this.stmt.reader;
   }

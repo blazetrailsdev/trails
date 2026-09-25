@@ -1293,6 +1293,10 @@ export class Time {
     );
   }
 
+  get tvNsec(): number {
+    return this.nsec;
+  }
+
   get usec(): number {
     return this.#plain.millisecond * 1_000 + this.#plain.microsecond;
   }
@@ -1350,6 +1354,10 @@ export class Time {
     const nanoseconds = this.#instant.epochNanoseconds;
     const seconds = nanoseconds / 1_000_000_000n - (nanoseconds % 1_000_000_000n < 0n ? 1n : 0n);
     return Number(seconds);
+  }
+
+  tvSec(): number {
+    return this.toI();
   }
 
   toF(): number {
