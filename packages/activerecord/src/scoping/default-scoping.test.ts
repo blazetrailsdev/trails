@@ -750,9 +750,11 @@ describe("DefaultScopingTest", () => {
   });
 
   it("unscope errors with invalid value", () => {
-    expect(() => Developer.where({ name: "Jamis" }).unscope(":incorrect_value" as any)).toThrow(
-      ArgumentError,
-    );
+    expect(() =>
+      Developer.includes(":projects")
+        .where({ name: "Jamis" })
+        .unscope(":incorrect_value" as any),
+    ).toThrow(ArgumentError);
     expect(() =>
       Developer.all().unscope(":includes", ":select", ":some_broken_value" as any),
     ).toThrow(ArgumentError);
