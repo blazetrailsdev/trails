@@ -2117,12 +2117,18 @@ describe("RelationTest", () => {
   });
 
   it("create with nested attributes", async () => {
-    const before = await Project.count();
-    const developers = Developer.where({ name: "Aaron" }).createWith({
-      projectsAttributes: [{ name: "p1" }],
-    });
-    await developers.createBang();
-    expect(Number(await Project.count()) - Number(before)).toBe(1);
+    await assertDifference(
+      async () => Number(await Project.count()),
+      1,
+      null,
+      async () => {
+        let developers = Developer.where({ name: "Aaron" });
+        developers = developers.createWith({
+          projectsAttributes: [{ name: "p1" }],
+        });
+        await developers.createBang();
+      },
+    );
   });
 
   it("except", async () => {
