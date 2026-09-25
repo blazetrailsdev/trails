@@ -194,7 +194,7 @@ export class Engine extends Trailtie {
   async fixturesInRootAndNotInVendorOrDotDir(fixtures: string): Promise<boolean> {
     const root = (await TopLevel.Trails!.root())!;
     return (
-      File.isExist(fixtures) &&
+      (await getFs().exists(fixtures)) &&
       fixtures.startsWith(root) &&
       !fixtures.startsWith(getPath().join(root, "vendor")) &&
       !fixtures.startsWith(`${root}/.`)
