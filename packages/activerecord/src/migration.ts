@@ -15,7 +15,7 @@ import { stdout, rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Dir, File, FileUtils, StandardError } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Zlib } from "@blazetrails/ruby-compat";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time } from "@blazetrails/date";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import {
@@ -993,10 +993,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
           : BigInt(typeof number === "number" ? Math.max(0, Math.trunc(number)) : number);
     const n = raw < 0n ? 0n : raw;
     if (!timestampedMigrations()) return n.toString().padStart(3, "0");
-    const stamp = Temporal.Now.instant()
-      .toString()
-      .replace(/[-T:Z.]/g, "")
-      .slice(0, 14);
+    const stamp = Time.now().utc().strftime("%Y%m%d%H%M%S");
     if (number == null) return stamp;
     return n > BigInt(stamp) ? n.toString().padStart(14, "0") : stamp;
   }

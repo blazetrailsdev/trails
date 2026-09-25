@@ -9,6 +9,8 @@ import {
   assertNothingRaised,
   assertRaises,
   assertInDelta,
+  travelBack,
+  travelTo,
 } from "@blazetrails/activesupport";
 import { Base, Migrator, RecordNotUnique, Rollback, StatementInvalid } from "./index.js";
 import { SchemaMigration } from "./schema-migration.js";
@@ -46,7 +48,7 @@ import { Person } from "./test-helpers/models/person.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
 import { itIfSupports, describeIfSupports } from "./support/supports.js";
 import { describeIfPostgresqlAdapter } from "./support/describe-if-postgresql-adapter.js";
-import { Temporal } from "@blazetrails/date";
+import { Time } from "@blazetrails/date";
 import {
   Dir,
   File,
@@ -79,11 +81,6 @@ async function freshAdapterWithPeople(): Promise<DatabaseAdapter> {
 
 function envName(adapter: DatabaseAdapter): string {
   return (adapter.pool as { dbConfig: { envName: string } }).dbConfig.envName;
-}
-
-function stubNow(iso: string): () => void {
-  const spy = vi.spyOn(Temporal.Now, "instant").mockReturnValue(Temporal.Instant.from(iso));
-  return () => spy.mockRestore();
 }
 
 function anonymousMigrationProxy(): MigrationProxy {
@@ -1973,7 +1970,7 @@ AND query LIKE '%${lockId}%'`;
       migrationsPath = `${MIGRATIONS_ROOT}/valid_with_timestamps`;
       existingMigrations = migrationFiles();
 
-      const restoreNow = stubNow("2010-07-26T10:10:10Z");
+      travelTo(Time.utc(2010, 7, 26, 10, 10, 10));
       try {
         let copied = await Migration.copy(migrationsPath, {
           bukkits: `${MIGRATIONS_ROOT}/to_copy_with_timestamps`,
@@ -1997,7 +1994,7 @@ AND query LIKE '%${lockId}%'`;
         expect(migrationFiles().length).toBe(filesCount);
         assertEmpty(copied);
       } finally {
-        restoreNow();
+        travelBack();
       }
     });
 
@@ -2009,7 +2006,7 @@ AND query LIKE '%${lockId}%'`;
       sources.bukkits = `${MIGRATIONS_ROOT}/to_copy_with_timestamps`;
       sources.omg = `${MIGRATIONS_ROOT}/to_copy_with_timestamps2`;
 
-      const restoreNow = stubNow("2010-07-26T10:10:10Z");
+      travelTo(Time.utc(2010, 7, 26, 10, 10, 10));
       try {
         const copied = await Migration.copy(migrationsPath, sources);
         expect(
@@ -2030,7 +2027,7 @@ AND query LIKE '%${lockId}%'`;
         await Migration.copy(migrationsPath, sources);
         expect(migrationFiles().length).toBe(filesCount);
       } finally {
-        restoreNow();
+        travelBack();
       }
     });
 
@@ -2038,7 +2035,7 @@ AND query LIKE '%${lockId}%'`;
       migrationsPath = `${MIGRATIONS_ROOT}/valid_with_timestamps`;
       existingMigrations = migrationFiles();
 
-      const restoreNow = stubNow("2010-02-20T10:10:10Z");
+      travelTo(Time.utc(2010, 2, 20, 10, 10, 10));
       try {
         await Migration.copy(migrationsPath, {
           bukkits: `${MIGRATIONS_ROOT}/to_copy_with_timestamps`,
@@ -2057,7 +2054,7 @@ AND query LIKE '%${lockId}%'`;
         expect(migrationFiles().length).toBe(filesCount);
         assertEmpty(copied);
       } finally {
-        restoreNow();
+        travelBack();
       }
     });
 
@@ -2139,7 +2136,7 @@ AND query LIKE '%${lockId}%'`;
       migrationsPath = `${MIGRATIONS_ROOT}/non_existing`;
       existingMigrations = [];
 
-      const restoreNow = stubNow("2010-07-26T10:10:10Z");
+      travelTo(Time.utc(2010, 7, 26, 10, 10, 10));
       try {
         const copied = await Migration.copy(migrationsPath, {
           bukkits: `${MIGRATIONS_ROOT}/to_copy_with_timestamps`,
@@ -2152,7 +2149,7 @@ AND query LIKE '%${lockId}%'`;
         ).toBeTruthy();
         expect(copied.length).toBe(2);
       } finally {
-        restoreNow();
+        travelBack();
         const toDelete = migrationFiles();
         if (toDelete.length > 0) File.delete(...toDelete);
         Dir.delete(migrationsPath);
@@ -2163,7 +2160,7 @@ AND query LIKE '%${lockId}%'`;
       migrationsPath = `${MIGRATIONS_ROOT}/empty`;
       existingMigrations = [];
 
-      const restoreNow = stubNow("2010-07-26T10:10:10Z");
+      travelTo(Time.utc(2010, 7, 26, 10, 10, 10));
       try {
         const copied = await Migration.copy(migrationsPath, {
           bukkits: `${MIGRATIONS_ROOT}/to_copy_with_timestamps`,
@@ -2176,7 +2173,7 @@ AND query LIKE '%${lockId}%'`;
         ).toBeTruthy();
         expect(copied.length).toBe(2);
       } finally {
-        restoreNow();
+        travelBack();
       }
     });
 
@@ -2342,7 +2339,7 @@ AND query LIKE '%${lockId}%'`;
 
         try {
           await withTempMigrationFiles(migrations, migrationsPathSource, async () => {
-            const restoreNow = stubNow("2023-12-01T10:10:59Z");
+            travelTo(Time.utc(2023, 12, 1, 10, 10, 59));
             try {
               await Migration.copy(migrationsPathDest, { temp: migrationsPathSource });
 
@@ -2368,7 +2365,7 @@ AND query LIKE '%${lockId}%'`;
               expect(await destMigrator.currentVersion()).toBe(20231201101061);
               expect(await destMigrator.needsMigration()).toBeFalsy();
             } finally {
-              restoreNow();
+              travelBack();
             }
           });
         } finally {
