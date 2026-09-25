@@ -6,6 +6,7 @@
     "rootDir": "src"
   },
   "include": ["src"],
+  "exclude": ["src/__fixtures__/boot-app/app/models", "src/__fixtures__/boot-app/db"],
   "references": [
     { "path": "../ruby-compat" },
     { "path": "../activesupport" },

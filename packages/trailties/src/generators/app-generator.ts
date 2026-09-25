@@ -154,7 +154,7 @@ export class AppGenerator extends AppBase {
             },
           },
           scripts: {
-            build: "tsc",
+            build: "trails-tsc --schema db/schema.ts",
             test: "vitest run",
             trails: TRAILS,
             dev: `${TRAILS} server`,
@@ -176,6 +176,7 @@ export class AppGenerator extends AppBase {
             ...dbDep,
           },
           devDependencies: {
+            "@blazetrails/activerecord-cli": "*",
             "@blazetrails/trails-tsc": "*",
             tsx: "^4.20.0",
             typescript: "^5.7.0",

@@ -217,6 +217,14 @@ describe("AppGenerator", () => {
     expect(gitignore).toContain("/.trails/");
   });
 
+  it("builds with trails-tsc against db/schema.ts so models need no declares", async () => {
+    await makeGen().run();
+    const pkg = JSON.parse(fs.readFileSync(appPath("package.json"), "utf-8"));
+    expect(pkg.scripts.build).toBe("trails-tsc --schema db/schema.ts");
+    expect(pkg.devDependencies["@blazetrails/activerecord-cli"]).toBeDefined();
+    expect(exists("db/schema.ts")).toBe(true);
+  });
+
   it("exports *.tse with types before default", async () => {
     await makeGen().run();
     const pkg = JSON.parse(fs.readFileSync(appPath("package.json"), "utf-8"));

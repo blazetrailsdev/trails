@@ -1,0 +1,44 @@
+{
+  "extends": "../../../../../tsconfig.json",
+  "compilerOptions": {
+    "composite": false,
+    "noEmit": true,
+    "paths": {
+      "@blazetrails/activerecord": ["../../../../activerecord/src/index.ts"],
+      "@blazetrails/activemodel": ["../../../../activemodel/src/index.ts"],
+      "@blazetrails/arel": ["../../../../arel/src/index.ts"],
+      "@blazetrails/activesupport": ["../../../../activesupport/src/index.ts"],
+      "@blazetrails/i18n": ["../../../../i18n/src/index.ts"],
+      "@blazetrails/ruby-compat/include": ["../../../../ruby-compat/src/include.ts"],
+      "@blazetrails/ruby-compat/method-missing-proxy": [
+        "../../../../ruby-compat/src/method-missing-proxy.ts"
+      ],
+      "@blazetrails/ruby-compat/name-error": ["../../../../ruby-compat/src/name-error.ts"],
+      "@blazetrails/ruby-compat/range": ["../../../../ruby-compat/src/range.ts"],
+      "@blazetrails/ruby-compat": ["../../../../ruby-compat/src/index.ts"],
+      "@blazetrails/date": ["../../../../date/src/index.ts"],
+      "@blazetrails/activesupport/message-verifier": [
+        "../../../../activesupport/src/message-verifier.ts"
+      ],
+      "@blazetrails/activesupport/core-ext/date/conversions": [
+        "../../../../activesupport/src/core-ext/date/conversions.ts"
+      ],
+      "@blazetrails/activesupport/core-ext/date/calculations": [
+        "../../../../activesupport/src/core-ext/date/calculations.ts"
+      ],
+      "@blazetrails/activesupport/core-ext/date-and-time/zones": [
+        "../../../../activesupport/src/core-ext/date-and-time/zones.ts"
+      ],
+      "@blazetrails/activesupport/core-ext/hash/slice": [
+        "../../../../activesupport/src/core-ext/hash/slice.ts"
+      ],
+      "@blazetrails/activesupport/core-ext/string/inflections": [
+        "../../../../activesupport/src/core-ext/string/inflections.ts"
+      ],
+      "@blazetrails/activesupport/gzip": ["../../../../activesupport/src/gzip.ts"],
+      "@blazetrails/activesupport/yaml": ["../../../../activesupport/src/yaml.ts"],
+      "@blazetrails/globalid/signed-global-id": ["../../../../globalid/src/signed-global-id.ts"]
+    }
+  },
+  "include": ["app/models", "db"]
+}
