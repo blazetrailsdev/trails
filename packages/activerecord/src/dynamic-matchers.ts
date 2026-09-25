@@ -45,7 +45,7 @@ abstract class Method {
 
   static pattern(): RegExp {
     if (!Object.prototype.hasOwnProperty.call(this, "_pattern")) {
-      this._pattern = new RegExp(`^${this.prefix()}([_a-zA-Z]\\w*)${this.suffix()}$`);
+      this._pattern = new RegExp(`^${this.prefix()}([_a-zA-Z]\\w*(?<!Bang))${this.suffix()}$`);
     }
     return this._pattern!;
   }
@@ -56,7 +56,7 @@ abstract class Method {
   }
 
   static suffix(): string {
-    return "(?<!Bang)";
+    return "";
   }
 
   readonly model: DynamicMatchersHost;
