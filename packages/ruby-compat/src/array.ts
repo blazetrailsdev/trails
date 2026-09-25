@@ -12,6 +12,9 @@ const toofew = "too few arguments";
 /** `endstr` (`vendor/ruby/pack.c:42`), the types `<` / `>` may follow. */
 const endstr = "sSiIlLqQjJ";
 
+/** `BIGENDIAN_P()` (`vendor/ruby/pack.c:58-75`): the host byte order. */
+const BIGENDIAN_P = new Uint8Array(new Uint16Array([1]).buffer)[0] === 0;
+
 /** `b64_table` (`vendor/ruby/pack.c:789`). */
 const b64Table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
@@ -149,7 +152,7 @@ export function pack(ary: ReadonlyArray<string | number | bigint>, fmt: string):
     }
     if (type === "C" || type === "l") {
       const integerSize = type === "C" ? 1 : 4;
-      const bigendianP = explicitEndian === ">";
+      const bigendianP = explicitEndian ? explicitEndian === ">" : BIGENDIAN_P;
       while (len-- > 0) {
         const from = nextfrom();
         if (typeof from !== "number" && typeof from !== "bigint") {
@@ -275,7 +278,7 @@ export function unpack1(
     if (type === "C" || type === "l") {
       const signedP = type === "l";
       const integerSize = type === "C" ? 1 : 4;
-      const bigendianP = explicitEndian === ">";
+      const bigendianP = explicitEndian ? explicitEndian === ">" : BIGENDIAN_P;
       if (len > Math.floor((send - s) / integerSize)) len = Math.floor((send - s) / integerSize);
       if (len > 0) {
         let val = 0n;

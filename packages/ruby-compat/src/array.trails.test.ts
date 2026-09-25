@@ -102,6 +102,12 @@ describe("Array#pack integer, float and position directives", () => {
     expect(pack([2 ** 32 + 5], "l<")).toBe("\x05\x00\x00\x00");
   });
 
+  it("l with no modifier packs in the host byte order", () => {
+    const host = String.fromCharCode(...new Uint8Array(new Uint32Array([1]).buffer));
+    expect(pack([1], "l")).toBe(host);
+    expect(unpack1(host, "l")).toBe(1);
+  });
+
   it("E packs a little-endian double", () => {
     expect(pack([1], "E")).toBe("\x00\x00\x00\x00\x00\x00\xF0?");
     expect(pack([-1.0], "E")).toBe("\x00\x00\x00\x00\x00\x00\xF0\xBF");
