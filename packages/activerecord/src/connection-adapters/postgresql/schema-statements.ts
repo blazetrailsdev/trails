@@ -679,7 +679,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     )
       return;
     throw new ArgumentError(
-      `deferrable must be \`:immediate\` or \`:deferred\`, got: \`${JSON.stringify(deferrable)}\``,
+      `deferrable must be \`:immediate\` or \`:deferred\`, got: \`${rbInspect(deferrable)}\``,
     );
   }
 

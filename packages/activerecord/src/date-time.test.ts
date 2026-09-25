@@ -1,10 +1,11 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { assertRaises, assertInDelta } from "@blazetrails/activesupport";
 import { Time as RubyTime } from "@blazetrails/date";
+import { inTimeZone } from "./cases/helper.js";
 import { fixtures } from "./test-fixtures.js";
 import { Task } from "./test-helpers/models/task.js";
 import { Topic } from "./test-helpers/models/topic.js";
-import { withTimezoneConfig } from "./test-helper.js";
+import { withEnvTz, withTimezoneConfig } from "./test-helper.js";
 import { Base } from "./index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { setDefaultTimezone } from "./active-record.js";
@@ -37,14 +38,18 @@ describe("DateTimeTest", () => {
   });
 
   it("saves both date and time", async () => {
-    await withTimezoneConfig({ default: "utc" }, async () => {
-      const now = RubyTime.utc(1807, 2, 10, 15, 30, 45);
+    await withEnvTz("America/New_York", async () => {
+      await withTimezoneConfig({ default: "utc" }, async () => {
+        const timeValues = [1807, 2, 10, 15, 30, 45] as const;
+        const localOffset = RubyTime.local(...timeValues).utcOffset;
+        const now = RubyTime.new(...timeValues, localOffset);
 
-      const task = new Task();
-      task.starting = now;
-      await task.saveBang();
+        const task = new Task();
+        task.starting = now;
+        await task.saveBang();
 
-      expect((await Task.find(task.id)).starting).toEqual(now);
+        expect((await Task.find(task.id)).starting).toEqual(RubyTime.local(...timeValues));
+      });
     });
   });
 
@@ -62,15 +67,12 @@ describe("DateTimeTest", () => {
     expect((task as any).ending).toBeNull();
   });
 
-  it("assign bad date time with timezone", () => {
-    class Task extends Base {
-      static {
-        this.attribute("starting", "datetime");
-      }
-    }
-    const task = new Task();
-    (task as any).starting = "2014-07-01T24:59:59GMT";
-    expect((task as any).starting).toBeNull();
+  it("assign bad date time with timezone", async () => {
+    await inTimeZone("Pacific Time (US & Canada)", () => {
+      const task = new Task();
+      (task as any).starting = "2014-07-01T24:59:59GMT";
+      expect(task.starting).toBeNull();
+    });
   });
 
   it("assign empty date", () => {
@@ -96,7 +98,7 @@ describe("DateTimeTest", () => {
   });
 
   it("assign in local timezone", async () => {
-    const now = RubyTime.utc(2017, 3, 1, 12, 0, 0);
+    const now = RubyTime.local(2017, 3, 1, 12, 0, 0);
     await withTimezoneConfig({ default: "local" }, () => {
       const task = new Task({ starting: now });
       expect(task.starting).toEqual(now);

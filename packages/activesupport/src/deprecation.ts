@@ -113,12 +113,12 @@ export interface CallerLocation {
 }
 
 /** @noRailsEquivalent PERMANENT */
-export function callerLocations(start = 1): CallerLocation[] {
+export function callerLocations(start = 1, length?: number): CallerLocation[] {
   const stack = new Error().stack;
   if (stack == null) return [];
-  return stack
+  const locations = stack
     .split("\n")
-    .slice(1 + start)
+    .slice(2 + start)
     .flatMap((line) => {
       const m = /\((.*):(\d+):\d+\)$|at (.*):(\d+):\d+$/.exec(line.trim());
       if (!m) return [];
@@ -127,6 +127,7 @@ export function callerLocations(start = 1): CallerLocation[] {
       const label = /at ([^ (]+)/.exec(line.trim())?.[1] ?? "";
       return [{ path, lineno, label, toString: () => `${path}:${lineno}:in '${label}'` }];
     });
+  return length == null ? locations : locations.slice(0, length);
 }
 
 const TRAILS_GEM_ROOT = new URL(".", import.meta.url).pathname;

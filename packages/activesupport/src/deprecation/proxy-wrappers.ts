@@ -16,6 +16,7 @@ function undefMethodProxy<T extends object>(
   instance: T,
   methodMissing: MethodMissing,
   superclass: object,
+  constMissing?: (this: unknown, name: string) => unknown,
 ): T {
   return new Proxy(instance, {
     get(target, prop, receiver) {
@@ -23,6 +24,7 @@ function undefMethodProxy<T extends object>(
       if (prop.startsWith("__") || !isUndefined(target, prop, superclass)) {
         return Reflect.get(target, prop, receiver);
       }
+      if (constMissing !== undefined && /^[A-Z]/.test(prop)) return constMissing.call(target, prop);
       return (...args: unknown[]) => methodMissing.call(target, prop, args);
     },
   });
@@ -151,6 +153,7 @@ export class DeprecatedConstantProxy extends Module {
       instance,
       DeprecatedConstantProxy.prototype.methodMissing as MethodMissing,
       Module.prototype,
+      DeprecatedConstantProxy.prototype.constMissing,
     );
   }
 
@@ -217,6 +220,11 @@ export class DeprecatedConstantProxy extends Module {
 
   private get target(): unknown {
     return constantize(String(this._newConst));
+  }
+
+  private constMissing(name: string): unknown {
+    this._deprecator.warn(this._message, callerLocations());
+    return constantize(`${String(this._newConst)}::${name}`);
   }
 
   private methodMissing(called: string, args: unknown[]): unknown {

@@ -127,7 +127,7 @@ function writerMethod(
         isPlainObject(part) && Object.keys(part).every((key) => /^\d+$/.test(key));
       if (hashFromMultiparameterAssignment) {
         const keys = Object.keys(part as object).map(Number);
-        if (keys.length !== Math.max(...keys)) throw new ArgumentError();
+        if (keys.length !== Math.max(...keys)) throw new ArgumentError("ArgumentError");
         part = new klass(
           ...keys.sort((a, b) => a - b).map((key) => (part as Record<number, unknown>)[key]),
         );

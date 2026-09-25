@@ -1,3 +1,5 @@
+import { vi } from "vitest";
+import { resetLocalTimeZoneId } from "@blazetrails/date";
 import { Base } from "./base.js";
 import { zone, setZone } from "@blazetrails/activesupport";
 import { defaultTimezone, setDefaultTimezone } from "./active-record.js";
@@ -7,6 +9,17 @@ interface TimezoneConfig {
   awareAttributes?: boolean;
   awareTypes?: string[];
   zone?: string;
+}
+
+export async function withEnvTz<T>(newTz: string, fn: () => Promise<T> | T): Promise<T> {
+  vi.stubEnv("TZ", newTz);
+  resetLocalTimeZoneId();
+  try {
+    return await fn();
+  } finally {
+    vi.stubEnv("TZ", undefined as unknown as string);
+    resetLocalTimeZoneId();
+  }
 }
 
 export async function withTimezoneConfig(

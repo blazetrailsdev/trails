@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { StandardError, Thread, rbEqual, stderr } from "@blazetrails/ruby-compat";
+import { NameError, StandardError, Thread, rbEqual, stderr } from "@blazetrails/ruby-compat";
 import { Module } from "@blazetrails/ruby-compat/include";
 import {
   Deprecation,
@@ -562,18 +562,19 @@ describe("DeprecationTest", () => {
     expect(fubarClass).toEqual((UndeprecatedFoo.BAR as string).constructor);
   });
 
-  it.skip("DeprecatedConstantProxy with child constant", async () => {
-    // BLOCKED: deprecated-constant-proxy-does-not-raise-on-a-missing-child-constant
+  it("DeprecatedConstantProxy with child constant", async () => {
     const proxy = DeprecatedConstantProxy.new("Fuu", "Undeprecated::Foo", deprecator);
 
     await assertDeprecated("Fuu", deprecator, () => {
-      expect((proxy as { BAR(): unknown }).BAR()).toEqual(UndeprecatedFoo.BAR);
+      expect((proxy as { BAR: unknown }).BAR).toEqual(UndeprecatedFoo.BAR);
     });
 
     await assertDeprecated("Fuu", deprecator, async () => {
-      await assertRaises([Error], {}, () => {
-        (proxy as { DOES_NOT_EXIST(): unknown }).DOES_NOT_EXIST();
-      });
+      await assertRaises(
+        [NameError],
+        {},
+        () => (proxy as { DOES_NOT_EXIST: unknown }).DOES_NOT_EXIST,
+      );
     });
   });
 
@@ -1104,37 +1105,54 @@ describe("DeprecationTest", () => {
     });
   });
 
-  it.skip("warn deprecation skips the internal caller locations", () => {
-    // BLOCKED: deprecation-callstack-blame-has-no-eval-file-attribution
+  it("warn deprecation skips the internal caller locations", () => {
     let callstack: CallerLocation[] = [];
     deprecator.behavior = (_message: string, frames: unknown[]) => {
       callstack = frames as CallerLocation[];
     };
-    deprecator.warn();
-    expect(callstack[0].absolutePath ?? callstack[0].path).toEqual(import.meta.url);
-    expect(callstack[0].lineno).toEqual(0);
+    methodThatEmitsDeprecation(deprecator);
+    expect(callstack[0].absolutePath ?? callstack[0].path).toEqual(expandedFile);
+    expect(callstack[0].lineno).toEqual(callerLocations(0)[0].lineno - 2);
   });
 
-  it.skip("warn deprecation can blame code generated with eval", () => {
-    // BLOCKED: deprecation-callstack-blame-has-no-eval-file-attribution
+  it("warn deprecation can blame code generated with eval", () => {
     let message = "";
     deprecator.behavior = (emitted: string) => {
       message = emitted;
     };
-    deprecator.warn("Here", [new CallerLocationFixture("generatedMethodThatCallDeprecation", 2)]);
+    generatedMethodThatCallDeprecation(deprecator);
     expect(message).toEqual(
       "DEPRECATION WARNING: Here (called from generatedMethodThatCallDeprecation at /path/to/template.html.tse:2)",
     );
   });
 
-  it.skip("warn deprecation can blame code from internal methods", () => {
-    // BLOCKED: deprecation-callstack-blame-has-no-eval-file-attribution
+  it("warn deprecation can blame code from internal methods", () => {
     let message = "";
     deprecator.behavior = (emitted: string) => {
       message = emitted;
     };
-    deprecator.warn();
+    methodThatEmitsDeprecationWithInternalMethod(deprecator);
 
     assertIncludes(message, "/path/to/user/code.ts");
   });
 });
+
+const generatedMethodThatCallDeprecation = (0, eval)(
+  `(callerLocations) => function generatedMethodThatCallDeprecation(deprecator) {
+  deprecator.warn("Here", callerLocations(0, 10));
+}
+//# sourceURL=/path/to/template.html.tse`,
+)(callerLocations) as (deprecator: Deprecation) => void;
+
+const methodThatEmitsDeprecationWithInternalMethod = (0, eval)(
+  `() => function methodThatEmitsDeprecationWithInternalMethod(deprecator) {
+  [1].forEach(() => deprecator.warn());
+}
+//# sourceURL=/path/to/user/code.ts`,
+)() as (deprecator: Deprecation) => void;
+
+const expandedFile = new URL(import.meta.url).pathname;
+
+function methodThatEmitsDeprecation(deprecator: Deprecation): void {
+  deprecator.warn();
+}

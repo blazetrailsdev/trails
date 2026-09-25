@@ -7,22 +7,17 @@ import {
   TableDefinition as MysqlTableDefinition,
   Table as MysqlTable,
 } from "./schema-definitions.js";
-import type {
-  ColumnType,
-  ColumnOptions,
-  AddForeignKeyOptions,
-} from "../abstract/schema-definitions.js";
+import type { ColumnType, ColumnOptions } from "../abstract/schema-definitions.js";
 import { Column } from "./column.js";
 import type { ValueType } from "@blazetrails/activemodel";
 import { SchemaStatements as BaseSchemaStatements } from "../abstract/schema-statements.js";
 import { SchemaCreation as MysqlSchemaCreation } from "./schema-creation.js";
 import { SchemaDumper as MysqlSchemaDumper } from "./schema-dumper.js";
-import { ForeignKeyDefinition, IndexDefinition } from "../abstract/schema-definitions.js";
-import { quoteColumnName, unquoteIdentifier } from "./quoting.js";
+import { IndexDefinition } from "../abstract/schema-definitions.js";
+import { quoteColumnName } from "./quoting.js";
 import type { TableDefinitionOf } from "../abstract/schema-definitions.js";
 import type { SchemaStatementsLike } from "../abstract/schema-statements-like.js";
 import type { VisitorHostAdapter } from "./schema-creation.js";
-import type { Result } from "../../result.js";
 
 type CreateTableArgs = Parameters<BaseSchemaStatements["createTable"]>;
 type CreateTableOptions = Extract<CreateTableArgs[1], { options?: string }>;
@@ -458,76 +453,4 @@ export function integerToSql(limit: number | null | undefined): string {
         `No integer type has byte size ${limit}. Use a decimal with scale 0 instead.`,
       );
   }
-}
-
-/** @internal */
-interface ForeignKeysHost {
-  internalExecQuery(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
-  quote(value: unknown): string;
-  /** @internal */
-  extractForeignKeyAction(specifier: string): "cascade" | "nullify" | "restrict" | undefined;
-}
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE move-mysql-foreign-keys-onto-abstract-mysql-adapter
- */
-export async function foreignKeys(
-  this: ForeignKeysHost,
-  tableName: string,
-): Promise<ForeignKeyDefinition[]> {
-  const scope = quotedScope.call(this, tableName);
-  const rows = (
-    await this.internalExecQuery(
-      `SELECT fk.referenced_table_name AS to_table,
-            fk.referenced_column_name AS primary_key,
-            fk.column_name AS \`column\`,
-            fk.constraint_name AS name,
-            fk.ordinal_position AS position,
-            rc.update_rule AS on_update,
-            rc.delete_rule AS on_delete
-     FROM information_schema.referential_constraints rc
-     JOIN information_schema.key_column_usage fk
-       USING (constraint_schema, constraint_name)
-     WHERE fk.referenced_column_name IS NOT NULL
-       AND fk.table_schema = ${scope.schema}
-       AND fk.table_name = ${scope.name}
-       AND rc.constraint_schema = ${scope.schema}
-       AND rc.table_name = ${scope.name}
-     ORDER BY fk.constraint_name, fk.ordinal_position`,
-      "SCHEMA",
-    )
-  ).toArray();
-
-  const grouped = new Map<string, Array<Record<string, unknown>>>();
-  for (const row of rows) {
-    const name = row.name as string;
-    if (!grouped.has(name)) grouped.set(name, []);
-    grouped.get(name)!.push(row);
-  }
-  const results: ForeignKeyDefinition[] = [];
-  for (const group of grouped.values()) {
-    group.sort((a, b) => (a.position as number) - (b.position as number));
-    const first = group[0];
-    const toTable = unquoteIdentifier(first.to_table as string) as string;
-    const fkName = first.name as string;
-    const onDelete = this.extractForeignKeyAction(first.on_delete as string);
-    const onUpdate = this.extractForeignKeyAction(first.on_update as string);
-    const options: Partial<AddForeignKeyOptions> = {
-      name: fkName,
-      onUpdate,
-      onDelete,
-    };
-
-    if (group.length === 1) {
-      options.column = unquoteIdentifier(first.column as string) as string;
-      options.primaryKey = first.primary_key as string;
-    } else {
-      options.column = group.map((r) => unquoteIdentifier(r.column as string) as string);
-      options.primaryKey = group.map((r) => r.primary_key as string);
-    }
-
-    results.push(new ForeignKeyDefinition(tableName, toTable, options));
-  }
-  return results;
 }

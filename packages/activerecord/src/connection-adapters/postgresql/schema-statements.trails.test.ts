@@ -499,6 +499,12 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(() => adapter.assertValidDeferrable(true)).toThrow();
     });
 
+    it("assertValidDeferrable renders the rejected value with inspect", () => {
+      expect(() => adapter.assertValidDeferrable({ foo: "immediate" })).toThrow(
+        'deferrable must be `:immediate` or `:deferred`, got: `{"foo"=>"immediate"}`',
+      );
+    });
+
     it("extractForeignKeyAction", () => {
       expect(adapter.extractForeignKeyAction("c")).toBe("cascade");
       expect(adapter.extractForeignKeyAction("n")).toBe("nullify");
