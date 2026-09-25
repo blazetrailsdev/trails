@@ -4,9 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Encoding } from "./encoding.js";
 import { File } from "./file.js";
-import { IO, puts } from "./io.js";
+import { IO, STDOUT, puts } from "./io.js";
 import { InvalidByteSequenceError } from "./invalid-byte-sequence-error.js";
-import { stderr } from "./process-adapter.js";
+import { stderr, stdout } from "./process-adapter.js";
 
 describe("IO", () => {
   it("binwrite writes the string and answers its byte count", () => {
@@ -328,5 +328,22 @@ describe("IO", () => {
     expect(file.setEncoding("internal").externalEncoding()).toBeNull();
     expect(file.setEncoding("external").externalEncoding()).toBe(Encoding.defaultExternal);
     file.close();
+  });
+});
+
+describe("STDOUT", () => {
+  it("is an IO answering write / puts / print over the process adapter's stdout", () => {
+    // vendor/ruby/io.c:9338 — rb_io_prep_stdout, an IO at "<STDOUT>".
+    const write = vi.spyOn(stdout, "write").mockReturnValue(true);
+    try {
+      expect(STDOUT).toBeInstanceOf(IO);
+      expect(STDOUT.path()).toBe("<STDOUT>");
+      expect(STDOUT.write("héllo")).toBe(6);
+      STDOUT.puts("a", ["b"]);
+      STDOUT.print(1, null);
+      expect(write.mock.calls.map(([chunk]) => chunk).join("")).toBe("hélloa\nb\n1");
+    } finally {
+      write.mockRestore();
+    }
   });
 });
