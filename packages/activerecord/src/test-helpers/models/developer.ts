@@ -98,7 +98,9 @@ export class Developer extends Base {
 
     this.hasAndBelongsToMany(
       "projectsExtendedByName",
-      (q: any) => q.extending(Developer.ProjectsAssociationExtension),
+      function (this: any) {
+        return this.extending(Developer.ProjectsAssociationExtension);
+      },
       {
         className: "Project",
         joinTable: "developers_projects",
@@ -108,11 +110,12 @@ export class Developer extends Base {
 
     this.hasAndBelongsToMany(
       "projectsExtendedByNameTwice",
-      (q: any) =>
-        q.extending(
+      function (this: any) {
+        return this.extending(
           Developer.ProjectsAssociationExtension,
           Developer.ProjectsAssociationExtension2,
-        ),
+        );
+      },
       {
         className: "Project",
         joinTable: "developers_projects",
@@ -122,7 +125,9 @@ export class Developer extends Base {
 
     this.hasAndBelongsToMany(
       "projectsExtendedByNameAndBlock",
-      (q: any) => q.extending(Developer.ProjectsAssociationExtension),
+      function (this: any) {
+        return this.extending(Developer.ProjectsAssociationExtension);
+      },
       {
         className: "Project",
         joinTable: "developers_projects",
