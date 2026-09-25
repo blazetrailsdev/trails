@@ -3,6 +3,7 @@ import {
   ArgumentError,
   dasherize,
   extend,
+  include,
   months,
   onLoad,
   type Deprecators,
@@ -13,6 +14,7 @@ import {
   type FixtureSetHost,
   setApp,
   GlobalID,
+  Identification,
   SignedGlobalID,
   Verifier,
 } from "@blazetrails/globalid";
@@ -65,6 +67,10 @@ export class Trailtie extends BaseTrailtie {
           }
         })();
         SignedGlobalID.verifier = config.verifier;
+      });
+
+      onLoad("active_record", (base: new (...args: never[]) => unknown) => {
+        include(base, Identification);
       });
 
       onLoad("active_record_fixture_set", (fixtureSet: FixtureSetHost) => {

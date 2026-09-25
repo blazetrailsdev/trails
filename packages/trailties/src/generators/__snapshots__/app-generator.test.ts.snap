@@ -35,7 +35,9 @@ exports[`AppGenerator > snapshots emitted TypeScript sources > application-recor
 "import { Base } from "@blazetrails/activerecord";
 
 export class ApplicationRecord extends Base {
-
+  static {
+    this.primaryAbstractClass();
+  }
 }
 "
 `;

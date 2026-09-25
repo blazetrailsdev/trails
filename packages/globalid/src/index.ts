@@ -22,6 +22,7 @@ export type {
   LocatorLike,
 } from "./locator.js";
 export {
+  Identification,
   toGlobalId,
   toGid,
   toGidParam,

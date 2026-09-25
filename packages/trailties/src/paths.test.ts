@@ -50,7 +50,7 @@ afterEach(() => {
   fsAdapterConfig.adapter = PREV;
 });
 
-describe("Rails::Paths", () => {
+describe("PathsTest", () => {
   test("a paths object initialized with nil can be updated", async () => {
     const r = new Root(null);
     r.add("app");
@@ -100,26 +100,6 @@ describe("Rails::Paths", () => {
     expect(await root.loadPaths()).toEqual([]);
   });
 
-  test("A failed symlink is still a valid file", async () => {
-    registerFsAdapter(
-      "sym",
-      {
-        cwd: () => "/",
-        exists: async () => false,
-        existsSync: () => false,
-        stat: async () => stat(false),
-        statSync: () => stat(false),
-        lstat: async () => ({ ...stat(false), isSymbolicLink: () => true }),
-        lstatSync: () => ({ ...stat(false), isSymbolicLink: () => true }),
-      } as unknown as FsAdapter,
-      posixPath,
-    );
-    fsAdapterConfig.adapter = "sym";
-    root = new Root("/foo");
-    root.add("bar.rb");
-    await expect(root.get("bar.rb")!.existent()).rejects.toThrow(/symlink/);
-  });
-
   test("it is possible to remove a path that should be autoloaded only once", async () => {
     root.add("app", { with: "/app" });
     root.get("app")!.autoloadOnceBang();
@@ -138,5 +118,27 @@ describe("Rails::Paths", () => {
     root.get("app")!.skipEagerLoadBang();
     expect(root.get("app")!.isEagerLoad()).toBeFalsy();
     expect(await root.eagerLoad()).not.toContain((await root.get("app")!.toA())[0]);
+  });
+});
+
+describe("PathsIntegrationTest", () => {
+  test("A failed symlink is still a valid file", async () => {
+    registerFsAdapter(
+      "sym",
+      {
+        cwd: () => "/",
+        exists: async () => false,
+        existsSync: () => false,
+        stat: async () => stat(false),
+        statSync: () => stat(false),
+        lstat: async () => ({ ...stat(false), isSymbolicLink: () => true }),
+        lstatSync: () => ({ ...stat(false), isSymbolicLink: () => true }),
+      } as unknown as FsAdapter,
+      posixPath,
+    );
+    fsAdapterConfig.adapter = "sym";
+    root = new Root("/foo");
+    root.add("bar.rb");
+    await expect(root.get("bar.rb")!.existent()).rejects.toThrow(/symlink/);
   });
 });

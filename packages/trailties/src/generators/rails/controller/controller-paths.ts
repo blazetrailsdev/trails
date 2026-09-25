@@ -1,5 +1,5 @@
 import { classify, dasherize } from "../../base.js";
-import { underscore } from "@blazetrails/activesupport";
+import { camelize, underscore } from "@blazetrails/activesupport";
 import {
   ref,
   tsBody,
@@ -28,12 +28,12 @@ export function controllerPathHelpers(name: string): ControllerPaths {
   const parts = stripped.split("/");
   const className =
     parts.length > 1
-      ? parts.map((p) => classify(p)).join("") + "Controller"
-      : classify(stripped) + "Controller";
+      ? parts.map((p) => camelize(underscore(p))).join("") + "Controller"
+      : camelize(underscore(stripped)) + "Controller";
   const displayName =
     parts.length > 1
-      ? parts.map((p) => classify(p)).join("::") + "Controller"
-      : classify(stripped) + "Controller";
+      ? parts.map((p) => camelize(underscore(p))).join("::") + "Controller"
+      : camelize(underscore(stripped)) + "Controller";
   const controllerFile =
     parts.length > 1
       ? parts.map((p) => dasherize(underscore(p))).join("/") + "-controller"
@@ -41,7 +41,7 @@ export function controllerPathHelpers(name: string): ControllerPaths {
   const viewBase =
     parts.length > 1 ? parts.map((p) => underscore(p)).join("/") : underscore(stripped);
   const leaf = parts[parts.length - 1];
-  const helperName = classify(leaf) + "Helper";
+  const helperName = camelize(underscore(leaf)) + "Helper";
   const helperFile = dasherize(underscore(leaf)) + "-helper";
   return {
     className,

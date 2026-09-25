@@ -114,9 +114,8 @@ export class Engine extends Trailtie {
   }
 
   async paths(): Promise<Root> {
-    const cfg = this.config;
-    if (cfg.root === null) cfg.setRoot(await this.root());
-    return cfg.paths();
+    await this.root();
+    return this.config.paths();
   }
 
   async helpersPaths(): Promise<string[]> {

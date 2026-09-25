@@ -149,8 +149,8 @@ export class Application extends Engine {
 
   async initialize(group: InitializerGroup = "default"): Promise<this> {
     if (this._initialized) throw new Error("Application has been already initialized.");
-    const bootRoot = await this.root();
-    setTrailsRoot(() => this.config.root ?? bootRoot);
+    await this.root();
+    setTrailsRoot(() => this.config.root);
     await this.runInitializers(group, this);
     this._initialized = true;
     return this;

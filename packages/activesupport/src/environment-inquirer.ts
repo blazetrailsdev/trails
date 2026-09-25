@@ -6,6 +6,14 @@ export const DEFAULT_ENVIRONMENTS = ["development", "test", "production"];
 
 export const LOCAL_ENVIRONMENTS = ["development", "test"];
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- environment_inquirer.rb:28-32 class_evals these; the merge is how the runtime-defined methods surface on the type side.
+export interface EnvironmentInquirer {
+  "development?"(): boolean;
+  "test?"(): boolean;
+  "production?"(): boolean;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class EnvironmentInquirer extends StringInquirer {
   #local: boolean;
 

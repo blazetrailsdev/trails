@@ -1,5 +1,5 @@
-import { GeneratorBase, type GeneratorOptions, classify, dasherize } from "../../base.js";
-import { underscore } from "@blazetrails/activesupport";
+import { GeneratorBase, type GeneratorOptions, dasherize } from "../../base.js";
+import { camelize, underscore } from "@blazetrails/activesupport";
 
 export interface HelperRunOptions {
   test?: boolean;
@@ -51,8 +51,8 @@ export function helperPaths(name: string): HelperPaths {
   const leaf = parts[parts.length - 1];
   const helperName =
     parts.length > 1
-      ? parts.map((p) => classify(p)).join("") + "Helper"
-      : classify(leaf) + "Helper";
+      ? parts.map((p) => camelize(underscore(p))).join("") + "Helper"
+      : camelize(underscore(leaf)) + "Helper";
   const helperFile =
     parts.length > 1
       ? parts.map((p) => dasherize(underscore(p))).join("/") + "-helper"

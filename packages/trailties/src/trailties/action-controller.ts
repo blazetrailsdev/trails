@@ -8,7 +8,7 @@ import {
   type Deprecators,
 } from "@blazetrails/activesupport";
 import { ActionController, AbstractController } from "@blazetrails/actionpack";
-import { Dir, File, getPath } from "@blazetrails/ruby-compat";
+import { Dir, File, getPath, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 
 export interface ActionControllerConfig {
@@ -47,6 +47,11 @@ export class Trailtie extends BaseTrailtie {
         const routes = (app as TrailtieApp).routes();
         include(base as unknown as new (...args: never[]) => unknown, routes.mountedHelpers());
         AbstractController.withRoutesHelpers(routes)(base);
+
+        if (options.wrapParametersByDefault && rbObjRespondTo(base, "wrapParameters")) {
+          (base as unknown as typeof ActionController.Base).wrapParameters({ format: ["json"] });
+        }
+
         (base as ActionController.HelpersPathControllerClass).includeAllHelpers =
           options.includeAllHelpers;
       });
