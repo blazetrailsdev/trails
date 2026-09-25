@@ -213,6 +213,9 @@ function openDatabase(config: SqliteOpenConfig): Database.Database {
     readonly: config.readOnly ?? false,
   };
   if (config.timeout !== undefined) opts.timeout = config.timeout;
+  if (opts.readonly && config.database === ":memory:") {
+    return new Database(new Database(":memory:").serialize(), opts);
+  }
   return new Database(config.database, opts);
 }
 

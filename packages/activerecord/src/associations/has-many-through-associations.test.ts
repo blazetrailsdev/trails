@@ -7,6 +7,7 @@ import {
   assertDeprecated,
   assertDifference,
   assertEmpty,
+  assertIncludes,
   assertNotEmpty,
   assertNoDifference,
   assertNotCalled,
@@ -1886,20 +1887,18 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(newSubscriber.name).toBe("Marcelo Giorgi");
   });
 
-  it.skip("include method in association through should return true for instance added with build", async () => {
-    // BLOCKED: an unsaved owner's has_many :through target omits records built through the join association — filed as 0155-assertion-surfaced-port-bugs/through-target-omits-through-built-records-on-new-owner
+  it("include method in association through should return true for instance added with build", async () => {
     const person = new Person();
     const reference = (person as any).references.build();
     const job = reference.buildJob();
-    expect(await (person as any).jobs.toArray()).toContain(job);
+    await assertIncludes((person as any).jobs, job);
   });
 
-  it.skip("include method in association through should return true for instance added with nested builds", async () => {
-    // BLOCKED: an unsaved owner's has_many :through target omits records built through the join association — filed as 0155-assertion-surfaced-port-bugs/through-target-omits-through-built-records-on-new-owner
+  it("include method in association through should return true for instance added with nested builds", async () => {
     const author = new Author();
     const post = (author as any).posts.build();
     const comment = post.comments.build();
-    expect(await (author as any).comments.toArray()).toContain(comment);
+    await assertIncludes((author as any).comments, comment);
   });
 
   it("through association readonly should be false", async () => {

@@ -20,7 +20,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:types": "vitest run --config vitest.dx-tests.config.ts",
-    "test:types:virtualized": "tsc -b packages/activerecord-cli && node packages/activerecord-cli/bin/trails-tsc.js -p packages/activerecord/virtualized-dx-tests/tsconfig.json",
+    "test:types:virtualized": "tsc -b packages/activerecord-cli && node packages/activerecord-cli/bin/trails-tsc.js -p packages/activerecord/virtualized-dx-tests/tsconfig.json && cd packages/trailties/virtualized-dx-tests && node ../../activerecord-cli/bin/trails-tsc.js --schema db/schema.ts",
     "test:db": "ARCONN=postgresql PGHOST=localhost PGPORT=25432 PGUSER=rails MYSQL_HOST=127.0.0.1 MYSQL_PORT=13306 vitest run",
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down",

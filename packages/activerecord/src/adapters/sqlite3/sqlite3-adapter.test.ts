@@ -10,6 +10,7 @@ import { inMemoryDb } from "../../support/adapter-helper.js";
 import { itIfSupports } from "../../support/supports.js";
 import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
+import { NodeSQLiteAdapter } from "../../connection-adapters/node-sqlite-adapter.js";
 import { Notifications, indexBy } from "@blazetrails/activesupport";
 import type { Database } from "better-sqlite3";
 import { BinaryData } from "@blazetrails/activemodel";
@@ -1139,8 +1140,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     await conn.disconnectBang();
   });
 
-  // BLOCKED: better-sqlite3 refuses readonly on :memory: (story sqlite-readonly-memory-and-strict-false)
-  it.skip("db is readonly when readonly option is true", async () => {
+  it("db is readonly when readonly option is true", async () => {
     const conn = new BetterSQLite3Adapter({ database: ":memory:", readonly: true });
     await conn.connectBang();
 
@@ -1148,7 +1148,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     await conn.disconnectBang();
   });
 
-  // BLOCKED: better-sqlite3 refuses readonly on :memory: (story sqlite-readonly-memory-and-strict-false)
+  // BLOCKED: drivers raise SqliteError, not SQLite3::ReadOnlyException (story sqlite-drivers-raise-sqlite3-gem-exception-classes)
   it.skip("writes are not permitted to readonly databases", async () => {
     const conn = new BetterSQLite3Adapter({ database: ":memory:", readonly: true });
     await conn.connectBang();
@@ -1161,9 +1161,8 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     await conn.disconnectBang();
   });
 
-  // BLOCKED: strict: false is not applied to the connection (story sqlite-readonly-memory-and-strict-false)
-  it.skip("strict strings by default", async () => {
-    let conn = new BetterSQLite3Adapter({ database: ":memory:" });
+  it("strict strings by default", async () => {
+    let conn = new NodeSQLiteAdapter({ database: ":memory:" });
     await conn.createTable("testings");
 
     await assertNothingRaised(async () => {
@@ -1172,7 +1171,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     await conn.disconnectBang();
 
     await withStrictStringsByDefault(async () => {
-      conn = new BetterSQLite3Adapter({ database: ":memory:" });
+      conn = new NodeSQLiteAdapter({ database: ":memory:" });
       await conn.createTable("testings");
 
       const error: any = await assertRaises([StandardError], {}, async () => {
@@ -1208,9 +1207,8 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     });
   });
 
-  // BLOCKED: strict: false is not applied to the connection (story sqlite-readonly-memory-and-strict-false)
-  it.skip("strict strings by default and false in database yml", async () => {
-    let conn = new BetterSQLite3Adapter({ database: ":memory:", strict: false });
+  it("strict strings by default and false in database yml", async () => {
+    let conn = new NodeSQLiteAdapter({ database: ":memory:", strict: false });
     await conn.createTable("testings");
 
     await assertNothingRaised(async () => {
@@ -1219,7 +1217,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     await conn.disconnectBang();
 
     await withStrictStringsByDefault(async () => {
-      conn = new BetterSQLite3Adapter({ database: ":memory:", strict: false });
+      conn = new NodeSQLiteAdapter({ database: ":memory:", strict: false });
       await conn.createTable("testings");
 
       await assertNothingRaised(async () => {
