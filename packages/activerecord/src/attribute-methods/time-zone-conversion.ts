@@ -73,6 +73,9 @@ export class TimeZoneConverter extends DelegateClass(ValueType) {
       const casted = super.cast(subtype.userInputInTimeZone(value));
       return casted != null && casted !== false ? casted : super.cast(value);
     }
+    if (isInfinite(value)) {
+      return value;
+    }
     return this.map(super.cast(value), (v) => this.cast(v));
   }
 
