@@ -11,7 +11,7 @@ export class LibSQLReplicaAdapter extends SQLite3Adapter {
 
   async syncReplica(): Promise<void> {
     await this.withRawConnection({ materializeTransactions: false }, async (raw) => {
-      const conn = raw as unknown as Partial<SyncableSqliteConnection>;
+      const conn = raw as Partial<SyncableSqliteConnection>;
       if (typeof conn.sync !== "function") {
         throw new ConfigurationError(
           "syncReplica() requires a libsql embedded-replica connection (opened " +

@@ -1206,7 +1206,7 @@ WHERE fk.referenced_column_name IS NOT NULL
 
   /** @internal */
   async handleWarnings(sql: string): Promise<void> {
-    const rawConnection = this._connection as unknown as {
+    const rawConnection = this._connection as {
       warningCount?: unknown;
       query(sql: string): Promise<[unknown, unknown]>;
     } | null;

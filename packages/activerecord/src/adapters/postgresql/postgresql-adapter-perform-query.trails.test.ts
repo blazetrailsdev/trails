@@ -169,11 +169,7 @@ describeIfPg("PostgreSQLAdapterPerformQueryTest (trails)", () => {
     const sql = "select * from pq_missing_table where id = $1";
     await adapter.withRawConnection({}, async (conn) => {
       await expect(
-        adapter.prepareStatement(
-          sql,
-          [1],
-          conn as unknown as Parameters<typeof adapter.prepareStatement>[2],
-        ),
+        adapter.prepareStatement(sql, [1], conn as Parameters<typeof adapter.prepareStatement>[2]),
       ).rejects.toBeInstanceOf(StatementInvalid);
     });
     expect(adapter._statements.isKey(adapter.sqlKey(sql))).toBe(false);
