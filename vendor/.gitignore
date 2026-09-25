@@ -1,8 +1,6 @@
 # Vendored sources are fetched on demand by the unified fetcher (wave 2).
 # Everything under vendor/ is gitignored except the registry, this file,
-# the README, the lockfile (added in wave 2), and the package.json that marks
-# sources.ts an ES module when eslint/ruby-compat-needs-mri-citation.mjs
-# imports it under Node's type stripping.
+# the README, and the lockfile (added in wave 2).
 *
 !.gitignore
 !README.md

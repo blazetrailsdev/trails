@@ -25,10 +25,6 @@
  * (eslint/rails-private-jsdoc.config.mjs); a local green proves nothing here.
  * Precedent for a manifest-backed JSDoc requirement:
  * `blazetrails/rails-private-jsdoc`.
- *
- * An UNVERSIONED citation (`vendor/ruby/<file>:<line>`) still resolves against
- * the active version until the RFC 0159 recite sweeps land; the
- * `ruby-compat-mri-citation-rejects-unversioned` story makes it red.
  */
 import * as fs from "fs";
 import * as path from "path";
@@ -38,12 +34,7 @@ import { versionDir } from "../vendor/sources.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-/**
- * `vendor/ruby/<version>/<path>:<line>`, anywhere in the doc block. The version
- * segment is optional here so an unversioned citation is still read, and `rel`
- * is always relative to the version directory. No top-level MRI entry starts
- * with `v<digit>`, so the segment cannot swallow a real path component.
- */
+/** `vendor/ruby/<version>/<path>:<line>`, anywhere in the doc block. */
 const CITATION = /vendor\/ruby\/(?:(v\d[A-Za-z0-9_.]*)\/)?([A-Za-z0-9_./+-]+):(\d+)/g;
 
 function repoRoot() {

@@ -5,7 +5,7 @@ import { RuleTester } from "eslint";
 import rule from "./ruby-compat-needs-mri-citation.mjs";
 import { versionDir } from "../vendor/sources.ts";
 
-// A stand-in for `vendor/ruby/<version>/` at the pinned SHA: one file, 20 lines. Reading
+// A stand-in for `vendor/ruby/` at the pinned SHA: one file, 20 lines. Reading
 // the real (fetched, uncommitted) tree would make the outcome depend on whether
 // the runner ran `pnpm vendor:fetch`.
 const vendorRoot = fs.mkdtempSync(path.join(os.tmpdir(), "ruby-compat-citation-"));
@@ -62,8 +62,6 @@ export function add(a: number, b: number): number { return a + b + x; }`,
  * @noRailsEquivalent PERMANENT
  */
 export default class Rational {}`,
-    // Unversioned still resolves against the active version until the RFC 0159
-    // recite sweeps land.
     `/**
  * Mirrors vendor/ruby/rational.c:12.
  *
@@ -141,8 +139,6 @@ export function add(a: number, b: number): number { return a + b; }`,
       ],
     },
     {
-      // A versioned citation's `rel` is relative to the version directory, so
-      // the segment is not read as part of the cited path.
       code: `/**
  * Mirrors ${cite(12)} and vendor/ruby/v0.0.1/rational.c:12.
  *
