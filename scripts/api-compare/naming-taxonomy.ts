@@ -50,8 +50,9 @@ export const NAMING_CLASSES: NamingClassInfo[] = [
     reason:
       "Ruby construct spelled as the JS builtin doing the same work (`inject`/`reduce`, " +
       "`last`/`at(-1)`), or as the ruby-compat export RUBY_COMPAT_EXPORTS names its port " +
-      "(`Float(x)`/`kernelFloat(x)`, `Regexp.escape`/`regexpEscape`). Same call; only the " +
-      "language's name for it differs.",
+      "(`Float(x)`/`kernelFloat(x)`, `Regexp.escape`/`regexpEscape`), or as the one export " +
+      "RUBY_COMPAT_CHAIN_EXPORTS names for a Ruby call chain (`x.class.name`/`rbObjClass(x)`). " +
+      "Same call; only the language's name for it differs.",
   },
   {
     name: "conventions-rename",
@@ -212,6 +213,30 @@ const RUBY_COMPAT_EXPORT_BY_REF = new Map(
   }),
 );
 
+/**
+ * Ruby call chains ONE ruby-compat export stands for, keyed by the chain's
+ * outermost callee — the only link the recorder keeps — and valued by the
+ * export. `first.class.name` (core_ext/array/conversions.rb:191) records as
+ * `ref:name`; `rbObjClass` (ruby-compat/src/object.ts) answers the class NAME,
+ * not the class, because a JS `number` is the seat for both `Integer` and
+ * `Float` and only the value can say which, so `first.constructor.name` would
+ * answer `Number` where Ruby answers `Integer`. The key alone would admit any
+ * `.name`; the export on the TS side is what narrows it, since `rbObjClass`
+ * cannot be read as the port of any other `name`.
+ */
+export const RUBY_COMPAT_CHAIN_EXPORTS: Record<string, string> = {
+  name: "rbObjClass",
+};
+
+/**
+ * A ruby-compat export in the spelling the recorder gives a TS `ref:`: it runs
+ * the TS identifier through {@link snakeToCamel} too, whose token renames turn
+ * an `rb` prefix into `js` (`rbObjClass` records as `jsObjClass`).
+ */
+function recordedExport(tsExport: string): string {
+  return snakeToCamel(tsExport);
+}
+
 /** The bare identifier behind a recorded `ref:` argument, or undefined. */
 export function refName(arg: string): string | undefined {
   return arg.startsWith("ref:") ? arg.slice("ref:".length) : undefined;
@@ -277,7 +302,16 @@ export function classifyPair(
     ? NO_JS_EQUIVALENT[rubyRef]
     : NO_JS_EQUIVALENT_BY_CAMEL.get(rubyRef);
   if (noJsEquivalent?.includes(tsRef)) return "no-js-equivalent";
-  if (RUBY_COMPAT_EXPORT_BY_REF.get(rubyRef) === tsRef) return "no-js-equivalent";
+  const rubyCompatExport = RUBY_COMPAT_EXPORT_BY_REF.get(rubyRef);
+  if (rubyCompatExport !== undefined && recordedExport(rubyCompatExport) === tsRef) {
+    return "no-js-equivalent";
+  }
+  const chainExport = Object.hasOwn(RUBY_COMPAT_CHAIN_EXPORTS, rubyRef)
+    ? RUBY_COMPAT_CHAIN_EXPORTS[rubyRef]
+    : undefined;
+  if (chainExport !== undefined && recordedExport(chainExport) === tsRef) {
+    return "no-js-equivalent";
+  }
   if (tsRef === "toS" || tsRef === "toString" || rubyRef === "toS" || rubyRef === "to_s") {
     return "implicit-to-s";
   }

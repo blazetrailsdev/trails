@@ -20,6 +20,8 @@ export interface SqliteStatement {
   get(binds?: SqliteBinds): unknown | Promise<unknown>;
   all(binds?: SqliteBinds): unknown[] | Promise<unknown[]>;
   iterate(binds?: SqliteBinds): Iterable<unknown> | AsyncIterable<unknown>;
+  bindParams(binds: SqliteBinds): void;
+  toA(): unknown[][] | Promise<unknown[][]>;
   columns(): ColumnInfo[];
   setReadBigInts(on: boolean): void;
   readonly reader: boolean;
@@ -50,6 +52,8 @@ export interface SyncSqliteStatement {
   get(binds?: SqliteBinds): unknown;
   all(binds?: SqliteBinds): unknown[];
   iterate(binds?: SqliteBinds): Iterable<unknown>;
+  bindParams(binds: SqliteBinds): void;
+  toA(): unknown[][];
   columns(): ColumnInfo[];
   setReadBigInts(on: boolean): void;
   readonly reader: boolean;

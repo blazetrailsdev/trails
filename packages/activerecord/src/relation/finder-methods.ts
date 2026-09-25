@@ -344,7 +344,10 @@ export async function include(this: FinderRelation, record: any): Promise<boolea
 
 export const member = include;
 
-/** @missingRailsCall size — PERMANENT */
+/**
+ * @missingRailsCall size — PERMANENT
+ * @missingRailsName size — PERMANENT
+ */
 export function raiseRecordNotFoundExceptionBang(
   this: FinderRelation,
   ids?: unknown,

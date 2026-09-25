@@ -21,24 +21,22 @@ describe("DateTimePrecisionTest", () => {
   fixtures({}, { useTransactionalTests: false });
   let adapter: DatabaseAdapter;
 
+  class Foo extends Base {
+    static override tableName = "foos";
+  }
+
   beforeEach(async () => {
     adapter = await Base.leaseConnection();
+    await Foo.resetColumnInformation();
   });
   afterEach(async () => {
     await adapter.dropTable("foos", { ifExists: true });
   });
-  function makeFoo() {
-    class Foo extends Base {
-      static override tableName = "foos";
-    }
-    return Foo;
-  }
 
   itIfSupports("datetime_with_precision", "datetime data type with precision", async () => {
     await adapter.createTable("foos", { force: true }, () => {});
     await adapter.addColumn("foos", "created_at", "datetime", { precision: 0 });
     await adapter.addColumn("foos", "updated_at", "datetime", { precision: 5 });
-    const Foo = makeFoo();
     await Foo.loadSchema();
     expect((Foo.columnsHash() as any)["created_at"].precision).toBe(0);
     expect((Foo.columnsHash() as any)["updated_at"].precision).toBe(5);
@@ -51,7 +49,6 @@ describe("DateTimePrecisionTest", () => {
       await adapter.createTable("foos", { force: true }, () => {});
       await adapter.addColumn("foos", "created_at", "datetime", { precision: 0 });
       await adapter.addColumn("foos", "updated_at", "datetime", { precision: 6 });
-      const Foo = makeFoo();
       await Foo.loadSchema();
       const time = Temporal.Instant.from("2000-01-01T12:00:00.123456789Z");
       const foo = new Foo({ created_at: time, updated_at: time });
@@ -71,7 +68,6 @@ describe("DateTimePrecisionTest", () => {
       await adapter.createTable("foos", { force: true }, () => {});
       await adapter.addColumn("foos", "created_at", "datetime", { precision: null });
       await adapter.addColumn("foos", "updated_at", "datetime");
-      const Foo = makeFoo();
       await Foo.loadSchema();
       const time = RubyTime.now().change({ nsec: 123 });
       const foo = new Foo({ created_at: time, updated_at: time });
@@ -88,7 +84,6 @@ describe("DateTimePrecisionTest", () => {
     await adapter.createTable("foos", { force: true }, (t) => {
       t.timestamps({ precision: 4 });
     });
-    const Foo = makeFoo();
     await Foo.loadSchema();
     expect((Foo.columnsHash() as any)["created_at"].precision).toBe(4);
     expect((Foo.columnsHash() as any)["updated_at"].precision).toBe(4);
@@ -101,7 +96,6 @@ describe("DateTimePrecisionTest", () => {
       await adapter.createTable("foos", { force: true }, (t) => {
         t.timestamps({ precision: 4 });
       });
-      const Foo = makeFoo();
       await Foo.loadSchema();
       expect((Foo.columnsHash() as any)["created_at"].limit).toBeNull();
       expect((Foo.columnsHash() as any)["updated_at"].limit).toBeNull();
@@ -123,7 +117,6 @@ describe("DateTimePrecisionTest", () => {
       await adapter.createTable("foos", { force: true }, () => {});
       await adapter.addColumn("foos", "created_at", "datetime", { precision: 0 });
       await adapter.addColumn("foos", "updated_at", "datetime", { precision: 4 });
-      const Foo = makeFoo();
       await Foo.loadSchema();
 
       const date = RubyTime.utc(2014, 8, 17, 12, 30, 0, 999999);
@@ -151,7 +144,6 @@ describe("DateTimePrecisionTest", () => {
             t.datetime("created_at", { precision: 0 });
             t.datetime("updated_at", { precision: 4 });
           });
-          const Foo = makeFoo();
           await Foo.loadSchema();
 
           const date = RubyTime.utc(2014, 8, 17, 12, 30, 0, 999999);
@@ -179,7 +171,6 @@ describe("DateTimePrecisionTest", () => {
           t.datetime("created_at", { precision: 0 });
           t.datetime("updated_at", { precision: 4 });
         });
-        const Foo = makeFoo();
         await Foo.loadSchema();
 
         const date = RubyTime.utc(2014, 8, 17, 12, 30, 0, 999999);
@@ -209,7 +200,6 @@ describe("DateTimePrecisionTest", () => {
               t.datetime("created_at", { precision: 0 });
               t.datetime("updated_at", { precision: 4 });
             });
-            const Foo = makeFoo();
             await Foo.loadSchema();
 
             const date = RubyTime.utc(2014, 8, 17, 12, 30, 0, 999999);
@@ -233,7 +223,6 @@ describe("DateTimePrecisionTest", () => {
     await adapter.createTable("foos", { force: true }, (t) => {
       t.datetime("happened_at");
     });
-    const Foo = makeFoo();
     await Foo.loadSchema();
     const r1 = await (Foo as any).create({ happened_at: null });
     expect(r1.happened_at).toBeNull();
@@ -245,7 +234,6 @@ describe("DateTimePrecisionTest", () => {
     await adapter.createTable("foos", { force: true }, (t) => {
       t.datetime("happened_at");
     });
-    const Foo = makeFoo();
     await Foo.loadSchema();
     const date = Temporal.PlainDate.from("2001-02-03");
     const record = await (Foo as any).create({ happened_at: date });
@@ -268,7 +256,6 @@ describe("DateTimePrecisionTest", () => {
         await adapter.createTable("foos", { force: true }, (t) => {
           t.datetime("happened_at");
         });
-        const Foo = makeFoo();
         await Foo.loadSchema();
         expect((await (Foo as any).create({ happened_at: null })).happened_at).toBeNull();
         expect((await (Foo as any).create({ happened_at: "" })).happened_at).toBeNull();
@@ -284,7 +271,6 @@ describe("DateTimePrecisionTest", () => {
         await adapter.createTable("foos", { force: true }, (t) => {
           t.datetime("happened_at");
         });
-        const Foo = makeFoo();
         await Foo.loadSchema();
         const date = Temporal.PlainDate.from("2001-02-03");
         expect((await (Foo as any).create({ happened_at: date })).happened_at).toEqual(date);
@@ -300,7 +286,6 @@ describe("DateTimePrecisionTest", () => {
         await adapter.createTable("foos", { force: true }, (t) => {
           t.datetime("happened_at");
         });
-        const Foo = makeFoo();
         await Foo.loadSchema();
         await inTimeZone("Pacific Time (US & Canada)", () => {
           const time = zone()!.now();

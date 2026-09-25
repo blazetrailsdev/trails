@@ -3,6 +3,7 @@ import { ActiveSupportJSON } from "../json.js";
 import { Encoding } from "../json/encoding.js";
 import { MessagePack } from "../message-pack/index.js";
 import { Temporal, Time } from "@blazetrails/date";
+import { Rational } from "@blazetrails/ruby-compat";
 import { currentTimeInstant } from "../time-travel.js";
 import type { MessageSerializer } from "./codec.js";
 import { SERIALIZERS, Thrown } from "./serializer-with-fallback.js";
@@ -106,7 +107,6 @@ export abstract class Metadata {
     return { _rails: hash };
   }
 
-  /** @missingRailsCall utc — PERMANENT */
   protected extractFromMetadataEnvelope(
     envelope: unknown,
     { purpose = null }: ExpectedMetadataOptions = {},
@@ -114,8 +114,11 @@ export abstract class Metadata {
     const hash = (envelope as Record<string, unknown>)._rails as Record<string, unknown>;
 
     if (isPresent(hash.exp)) {
-      const expiry = this.parseExpiry(hash.exp as string | Temporal.Instant);
-      if (Temporal.Instant.compare(currentTimeInstant(), expiry) >= 0) {
+      if (
+        Time.at(new Rational(currentTimeInstant().epochNanoseconds, 1_000_000_000n))
+          .utc()
+          .compare(this.parseExpiry(hash.exp as string | Time))! >= 0
+      ) {
         throw new Thrown("invalid_message_content", "expired");
       }
     }
@@ -135,35 +138,33 @@ export abstract class Metadata {
     return string.startsWith('{"_rails":{"message":');
   }
 
-  /**
-   * @missingRailsCall utc — PERMANENT
-   * @missingRailsCall advance — PERMANENT
-   */
   protected pickExpiry(
     expiresAt: Temporal.Instant | null | undefined,
     expiresIn: number | null | undefined,
-  ): Temporal.Instant | string | undefined {
-    let expiry: Temporal.Instant | undefined;
+  ): Time | string | undefined {
+    let expiry: Time | undefined;
     if (isPresent(expiresAt)) {
-      expiry = expiresAt!;
+      expiry = Time.at(new Rational(expiresAt!.epochNanoseconds, 1_000_000_000n)).utc();
     } else if (isPresent(expiresIn)) {
-      expiry = currentTimeInstant().add({ milliseconds: Math.round(expiresIn! * 1000) });
+      expiry = Time.at(new Rational(currentTimeInstant().epochNanoseconds, 1_000_000_000n))
+        .utc()
+        .advance({ seconds: expiresIn! });
     }
 
     if (!Metadata.TIMESTAMP_SERIALIZERS.includes(this.serializer)) {
-      return expiry?.toString({ smallestUnit: "millisecond" });
+      return expiry?.xmlschema(3);
     }
 
     return expiry;
   }
 
-  protected parseExpiry(expiresAt: string | Temporal.Instant): Temporal.Instant {
+  protected parseExpiry(expiresAt: string | Time): Time {
     if (typeof expiresAt !== "string") {
       return expiresAt;
     } else if (Encoding.useStandardJsonTimeFormat) {
-      return Time.iso8601(expiresAt).toTime().toInstant();
+      return Time.iso8601(expiresAt);
     } else {
-      return Time.parse(expiresAt).toTime().toInstant();
+      return Time.parse(expiresAt);
     }
   }
 

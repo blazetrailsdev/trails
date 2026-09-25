@@ -18,6 +18,9 @@ import { ConfigurationError } from "../errors.js";
 /** @internal */
 interface ExpoSQLiteStatement {
   executeAsync(params?: unknown[] | Record<string, unknown>): Promise<ExpoSQLiteExecuteResult>;
+  executeForRawResultAsync(
+    params?: unknown[] | Record<string, unknown>,
+  ): Promise<ExpoSQLiteExecuteResult>;
   finalizeAsync(): Promise<void>;
 }
 /** @internal */
@@ -95,6 +98,17 @@ class ExpoSqliteStatement implements SqliteStatement {
     for await (const row of result) {
       yield row;
     }
+  }
+
+  private boundParams: SqliteBinds | undefined;
+
+  bindParams(binds: SqliteBinds): void {
+    this.boundParams = binds;
+  }
+
+  async toA(): Promise<unknown[][]> {
+    const result = await this.stmt.executeForRawResultAsync(expandBinds(this.boundParams));
+    return (await result.getAllAsync()) as unknown[][];
   }
 
   columns(): ColumnInfo[] {

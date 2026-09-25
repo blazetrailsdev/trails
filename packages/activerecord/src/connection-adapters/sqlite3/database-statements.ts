@@ -116,7 +116,7 @@ interface InternalBeginTransactionHost {
 interface PerformQueryHost {
   _cachedStatement(rawConnection: SqliteConnection, sql: string): Promise<SqliteStatement>;
   _freshStatement(rawConnection: SqliteConnection, sql: string): Promise<SqliteStatement>;
-  _narrowSpilledBigInts(stmt: SqliteStatement, rows: Record<string, unknown>[]): void;
+  _narrowSpilledBigInts(stmt: SqliteStatement, rows: unknown[][]): void;
   verifiedBang(): void;
   _statementLock: Promise<void> | null;
   _lastAffectedRows: number;
@@ -236,13 +236,10 @@ export async function performQuery(
       await rawConnection.exec(sql);
       result = Result.empty();
     } else if (stmt.reader) {
-      const rows = (await stmt.all(typeCastedBinds)) as Record<string, unknown>[];
-      this._narrowSpilledBigInts(stmt, rows);
+      stmt.bindParams(typeCastedBinds);
       const columns = stmt.columns().map((c) => c.name);
-      result = new Result(
-        columns,
-        rows.map((row) => columns.map((column) => row[column])),
-      );
+      result = new Result(columns, await stmt.toA());
+      this._narrowSpilledBigInts(stmt, result.rows);
     } else {
       await stmt.run(typeCastedBinds);
       result = Result.empty();

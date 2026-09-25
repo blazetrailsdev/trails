@@ -100,6 +100,7 @@ const TS_API_PATH = path.join(OUTPUT_DIR, "ts-api.json");
  */
 export const NAMING_ENROLLED_PACKAGES: readonly string[] = [
   "activemodel",
+  "activerecord",
   "activerecord-test-support",
   "arel",
   "globalid",

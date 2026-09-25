@@ -181,6 +181,7 @@ export function toFs(self: unknown[], format = "default"): string {
 
 export { toFs as toFormattedS };
 
+/** @missingRailsName name — PERMANENT */
 export function toXml(
   self: unknown[],
   options: XmlMini.ToXmlOptions = {},

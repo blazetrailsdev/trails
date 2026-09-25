@@ -42,7 +42,7 @@ export function current(): TimeWithZone | RubyTime {
     : RubyTime.at(new Rational(currentTimeInstant().epochNanoseconds, 1_000_000_000n));
 }
 
-const atWithoutCoercion = RubyTime.at.bind(RubyTime);
+export const atWithoutCoercion = RubyTime.at.bind(RubyTime);
 
 export function atWithCoercion(timeOrNumber: unknown, ...args: unknown[]): RubyTime {
   if (args.length === 0) {

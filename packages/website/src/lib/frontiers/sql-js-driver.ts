@@ -56,6 +56,25 @@ class SqlJsStatement implements SyncSqliteStatement {
     }
   }
 
+  private boundParams: SqliteBinds | undefined;
+
+  bindParams(binds: SqliteBinds): void {
+    this.boundParams = binds;
+  }
+
+  toA(): unknown[][] {
+    const rows: unknown[][] = [];
+    this.stmt.bind(bindParams(this.boundParams));
+    try {
+      while (this.stmt.step()) {
+        rows.push(this.stmt.get(undefined, { useBigInt: this.readBigInts }));
+      }
+    } finally {
+      this.stmt.reset();
+    }
+    return rows;
+  }
+
   columns(): ColumnInfo[] {
     return this.stmt
       .getColumnNames()

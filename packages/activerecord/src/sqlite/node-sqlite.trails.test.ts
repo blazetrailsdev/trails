@@ -44,6 +44,13 @@ describe.skipIf(!isNodeSqliteAvailable)("SqliteDriver — node-sqlite round-trip
     ).toBe(true);
   });
 
+  it("toA() returns positional rows for the bound params, duplicate column names included", async () => {
+    const select = await conn.prepare("SELECT name, qty AS name FROM widgets WHERE name = ?");
+    select.bindParams(["sprocket"]);
+    expect(await select.toA()).toEqual([["sprocket", 42]]);
+    expect(await select.get(["sprocket"])).toMatchObject({ name: 42 });
+  });
+
   it("returns all rows", async () => {
     const select = await conn.prepare("SELECT id, name, qty FROM widgets ORDER BY id");
     const rows = (await select.all()) as Record<string, unknown>[];

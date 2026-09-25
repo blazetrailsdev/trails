@@ -42,6 +42,21 @@ describe("classifyPair", () => {
     expect(classifyPair("float", "value")).toBe("burndown");
   });
 
+  // The recorder token-renames the TS side as well, so `rbInspect` records as
+  // `jsInspect`; only that spelling can ever reach here.
+  it("names an rb-prefixed ruby-compat export under the spelling the recorder gives it", () => {
+    expect(classifyPair("inspect", "jsInspect")).toBe("no-js-equivalent");
+  });
+
+  // core_ext/array/conversions.rb:191 `underscore(first.class.name)` against
+  // array-utils.ts' `underscore(rbObjClass(first))`: the chain records as
+  // `name`, the export as `jsObjClass`.
+  it("names a Ruby call chain spelled as the one ruby-compat export that ports it", () => {
+    expect(classifyPair("name", "jsObjClass")).toBe("no-js-equivalent");
+    expect(classifyPair("name", "klassName")).toBe("burndown");
+    expect(classifyPair("constructor", "jsObjClass")).toBe("burndown");
+  });
+
   it("names what the conventions table itself produces", () => {
     expect(classifyPair("primary_class?", "isPrimaryClass")).toBe("conventions-rename");
     expect(classifyPair("@callbacks", "_callbacks")).toBe("conventions-rename");

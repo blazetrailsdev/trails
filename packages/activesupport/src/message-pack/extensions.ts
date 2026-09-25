@@ -1,9 +1,10 @@
 import { MessagePackError } from "./factory.js";
 import type { Factory, Packer, Unpacker } from "./factory.js";
 import { HashWithIndifferentAccess } from "../hash-with-indifferent-access.js";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time } from "@blazetrails/date";
 import { Rational, rational } from "@blazetrails/ruby-compat";
 import { TimeWithZone } from "../time-with-zone.js";
+import { atWithoutCoercion } from "../core-ext/time/calculations.js";
 import { TimeZone } from "../values/time-zone.js";
 
 const JD_UNIX_EPOCH = 2440588;
@@ -125,8 +126,8 @@ export const Extensions = {
       type: 7,
       klass: "Time",
       recursive: true,
-      match: (v) => v instanceof Temporal.Instant,
-      packer: (v, packer) => Extensions.writeTime(v as Temporal.Instant, packer),
+      match: (v) => Object.prototype.isPrototypeOf.call(Time.prototype, v as object),
+      packer: (v, packer) => Extensions.writeTime(v as Time, packer),
       unpacker: (unpacker) => Extensions.readTime(unpacker as Unpacker),
     });
 
@@ -235,25 +236,20 @@ export const Extensions = {
     return dateFromJulianDay(unpacker.read() as number);
   },
 
-  writeTime(time: Temporal.Instant, packer: Packer): void {
-    const nanos = time.epochNanoseconds;
-    const seconds = nanos / BigInt(NANOS_PER_SECOND);
-    const remainder = nanos % BigInt(NANOS_PER_SECOND);
-    const borrow = remainder < 0n ? 1n : 0n;
-    packer.write(seconds - borrow);
-    packer.write(remainder + borrow * BigInt(NANOS_PER_SECOND));
-    packer.write(0);
+  writeTime(time: Time, packer: Packer): void {
+    packer.write(time.tvSec());
+    packer.write(time.tvNsec);
+    packer.write(time.utcOffset);
   },
 
-  readTime(unpacker: Unpacker): Temporal.Instant {
-    const seconds = BigInt(unpacker.read() as number | bigint);
-    const nanos = BigInt(unpacker.read() as number | bigint);
-    unpacker.read();
-    return Temporal.Instant.fromEpochNanoseconds(seconds * BigInt(NANOS_PER_SECOND) + nanos);
+  readTime(unpacker: Unpacker): Time {
+    return atWithoutCoercion(unpacker.read(), unpacker.read(), "nanosecond", {
+      in: unpacker.read() as number,
+    });
   },
 
   writeTimeWithZone(twz: TimeWithZone, packer: Packer): void {
-    Extensions.writeTime(twz.utc().toTime().toInstant(), packer);
+    Extensions.writeTime(twz.utc(), packer);
     Extensions.writeTimeZone(twz.timeZone, packer);
   },
 
