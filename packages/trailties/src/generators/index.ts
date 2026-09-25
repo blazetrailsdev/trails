@@ -17,7 +17,7 @@ export type { TaskRunOptions } from "./rails/task/task-generator.js";
 export { ScriptGenerator } from "./rails/script/script-generator.js";
 export { AuthenticationGenerator } from "./rails/authentication/authentication-generator.js";
 export { GeneratorGenerator } from "./rails/generator/generator-generator.js";
-export type { GeneratorRunOptions } from "./rails/generator/generator-generator.js";
+export type { GeneratorGeneratorOptions } from "./rails/generator/generator-generator.js";
 export { GeneratedAttribute, GeneratorError } from "./generated-attribute.js";
 export type { AttrOptions, IndexType } from "./generated-attribute.js";
 export { ActiveModel } from "./active-model.js";
