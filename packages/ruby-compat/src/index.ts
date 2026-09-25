@@ -120,7 +120,6 @@ export {
   sort,
   toA,
   uniq,
-  unpack1,
 } from "./array.js";
 export type { OsAdapter } from "./os-adapter.js";
 export { FrozenError } from "./frozen-error.js";
@@ -200,7 +199,6 @@ export { Cipher, HMAC, OpenSSL } from "./openssl.js";
 export { StringIO } from "./string-io.js";
 export { b } from "./string/b.js";
 export { bytes } from "./string/bytes.js";
-export { byteslice } from "./string/byte-methods.js";
 export { scrub } from "./string/scrub.js";
 export { chomp } from "./string/chomp.js";
 export { stringDelete } from "./string/delete.js";
