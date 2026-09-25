@@ -8,17 +8,15 @@ interface DynamicMatchersHost {
   reflectOnAggregation?(aggregation: string): unknown;
 }
 
-const matchers = [/^findBy([_a-zA-Z]\w*)$/, /^findBy([_a-zA-Z]\w*)Bang$/];
+const matchers = [/^findBy(?!\w*Bang$)([_a-zA-Z]\w*)$/, /^findBy([_a-zA-Z]\w*)Bang$/];
 
-function match(model: DynamicMatchersHost, name: string): string[][] {
-  return matchers.flatMap((pattern) => {
-    const matched = pattern.exec(name);
-    if (!matched) return [];
-    const snakePart = matched[1]
-      .replace(/^./, (c) => c.toLowerCase())
-      .replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
-    return [snakePart.split("_and_").map((name) => model.attributeAliases?.[name] ?? name)];
-  });
+function match(model: DynamicMatchersHost, name: string): string[] | null {
+  const matched = matchers.map((pattern) => pattern.exec(name)).find((m) => m !== null);
+  if (!matched) return null;
+  const snakePart = matched[1]
+    .replace(/^./, (c) => c.toLowerCase())
+    .replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
+  return snakePart.split("_and_").map((name) => model.attributeAliases?.[name] ?? name);
 }
 
 function valid(model: DynamicMatchersHost, attributeNames: string[]): boolean {
@@ -33,6 +31,7 @@ export function respondToMissing(this: DynamicMatchersHost, name: string): boole
   if ((this as unknown) === ActiveRecord.Base) {
     return false;
   } else {
-    return match(this, name).some((attributeNames) => valid(this, attributeNames));
+    const matched = match(this, name);
+    return (matched !== null && valid(this, matched)) || false;
   }
 }
