@@ -59,10 +59,10 @@ export class SchemaMigration {
     )) as string;
   }
 
-  async deleteVersion(version: string): Promise<void> {
+  async deleteVersion(version: string): Promise<number> {
     const dm = new DeleteManager(this.arelTable);
     dm.where(this.arelTable.get(this.primaryKey).eq(version));
-    await this._pool.withConnection((connection) =>
+    return this._pool.withConnection((connection) =>
       connection.delete(dm, `${this.constructor.name} Destroy`),
     );
   }

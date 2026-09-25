@@ -103,8 +103,7 @@ describe("MultiParameterAttributeTest", () => {
     expect(topic.last_read).toBeNull();
   });
 
-  it.skip("multiparameter attributes on time", async () => {
-    // BLOCKED: multiparameter-time-local-not-equal-to-time-local
+  it("multiparameter attributes on time", async () => {
     await withTimezoneConfig({ default: "local" }, async () => {
       const topic = await Topic.find(1);
       await topic.assignAttributes({
@@ -115,9 +114,7 @@ describe("MultiParameterAttributeTest", () => {
         "written_on(5i)": "24",
         "written_on(6i)": "00",
       });
-      expect((topic.written_on as RubyTime).valueOf()).toEqual(
-        RubyTime.local(2004, 6, 24, 16, 24, 0).valueOf(),
-      );
+      expect(topic.written_on).toEqual(RubyTime.local(2004, 6, 24, 16, 24, 0));
     });
   });
 
@@ -189,7 +186,6 @@ describe("MultiParameterAttributeTest", () => {
   });
 
   it.skip("multiparameter attributes on time will ignore hour if missing", async () => {
-    // BLOCKED: multiparameter-time-local-not-equal-to-time-local
     await withTimezoneConfig({ default: "local" }, async () => {
       const attributes = {
         "written_on(1i)": "2004",
@@ -308,7 +304,6 @@ describe("MultiParameterAttributeTest", () => {
   });
 
   it.skip("multiparameter attributes on time with time zone aware attributes false", async () => {
-    // BLOCKED: multiparameter-time-local-not-equal-to-time-local
     await withTimezoneConfig(
       { default: "local", awareAttributes: false, zone: "Pacific Time (US & Canada)" },
       async () => {
@@ -405,7 +400,6 @@ describe("MultiParameterAttributeTest", () => {
   });
 
   it.skip("multiparameter attributes on time with empty seconds", async () => {
-    // BLOCKED: multiparameter-time-local-not-equal-to-time-local
     await withTimezoneConfig({ default: "local" }, async () => {
       const attributes = {
         "written_on(1i)": "2004",
@@ -417,9 +411,15 @@ describe("MultiParameterAttributeTest", () => {
       };
       const topic = await Topic.find(1);
       await topic.assignAttributes(attributes);
-      expect((topic.written_on as RubyTime).valueOf()).toEqual(
+      console.log(
+        "DBG",
+        String(topic.written_on),
+        (topic.written_on as any)?.constructor?.name,
+        (topic.written_on as any)?.valueOf?.(),
+        String(RubyTime.local(2004, 6, 24, 16, 24, 0)),
         RubyTime.local(2004, 6, 24, 16, 24, 0).valueOf(),
       );
+      expect(topic.written_on).toEqual(RubyTime.local(2004, 6, 24, 16, 24, 0));
     });
   });
 

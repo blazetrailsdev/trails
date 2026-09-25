@@ -586,8 +586,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.dropTable("postgresql_geometrics", { ifExists: true });
     });
 
-    it.skip("geometric types", async () => {
-      // BLOCKED: circle column reads back as an object, not the '<(x,y),r>' string (filed as 0155-assertion-surfaced-port-bugs/pg-circle-column-reads-object)
+    it("geometric types", async () => {
       const g = new PostgresqlGeometric({
         a_line_segment: "(2.0, 3), (5.5, 7.0)",
         a_box: "2.0, 3, 5.5, 7.0",
@@ -607,8 +606,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(h.a_circle).toBe("<(5.3,10.4),2>");
     });
 
-    it.skip("alternative format", async () => {
-      // BLOCKED: circle column reads back as an object, not the '<(x,y),r>' string (filed as 0155-assertion-surfaced-port-bugs/pg-circle-column-reads-object)
+    it("alternative format", async () => {
       const g = new PostgresqlGeometric({
         a_line_segment: "((2.0, 3), (5.5, 7.0))",
         a_box: "(2.0, 3), (5.5, 7.0)",

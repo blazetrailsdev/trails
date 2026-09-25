@@ -16,24 +16,14 @@ beforeEach(() => {
 });
 
 describe("RelationMutationTest", () => {
-  it("#!", () => {
-    const MULTI: ReadonlyArray<[string, string]> = [
-      ["includesBang", "includesValues"],
-      ["eagerLoadBang", "eagerLoadValues"],
-      ["preloadBang", "preloadValues"],
-      ["groupBang", "groupValues"],
-      ["joinsBang", "joinsValues"],
-      ["leftOuterJoinsBang", "leftOuterJoinsValues"],
-      ["referencesBang", "referencesValues"],
-      ["optimizerHintsBang", "optimizerHintsValues"],
-      ["annotateBang", "annotateValues"],
-    ];
-    for (const [bang, field] of MULTI) {
-      const rel = relation();
-      expect(rel[bang]("foo") === rel).toBeTruthy();
-      expect(rel[field]).toEqual(["foo"]);
-    }
-  });
+  for (const method of Relation.MULTI_VALUE_METHODS.filter(
+    (m) => !["extending", "order", "unscope", "select", "with"].includes(m),
+  )) {
+    it(`#${method}!`, () => {
+      expect(relation()[`${method}Bang`]("foo") === relation()).toBeTruthy();
+      expect(relation()[`${method}Values`]).toEqual(["foo"]);
+    });
+  }
 
   it("#_select!", () => {
     const rel = relation();
@@ -174,19 +164,22 @@ describe("RelationMutationTest", () => {
     expect(rel.groupValues).toEqual(["bar"]);
   });
 
-  it("#!", () => {
-    const SINGLE: ReadonlyArray<[string, unknown, string, unknown]> = [
-      ["limitBang", 5, "limitValue", 5],
-      ["offsetBang", 5, "offsetValue", 5],
-      ["readonlyBang", true, "readonlyValue", true],
-      ["distinctBang", true, "distinctValue", true],
-    ];
-    for (const [bang, arg, field, expected] of SINGLE) {
-      const rel = relation();
-      expect(rel[bang](arg) === rel).toBeTruthy();
-      expect(rel[field]).toBe(expected);
-    }
-  });
+  for (const method of Relation.SINGLE_VALUE_METHODS.filter(
+    (m) =>
+      ![
+        "lock",
+        "reordering",
+        "reverseOrder",
+        "createWith",
+        "skipQueryCache",
+        "strictLoading",
+      ].includes(m),
+  )) {
+    it(`#${method}!`, () => {
+      expect(relation()[`${method}Bang`]("foo") === relation()).toBeTruthy();
+      expect(relation()[`${method}Value`]).toEqual("foo");
+    });
+  }
 
   it("distinct!", () => {
     const rel = relation();
