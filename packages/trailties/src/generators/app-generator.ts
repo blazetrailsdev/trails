@@ -170,6 +170,7 @@ export class AppGenerator extends AppBase {
             "@blazetrails/activemodel": "*",
             "@blazetrails/activesupport": "*",
             "@blazetrails/rack": "*",
+            "@blazetrails/ruby-compat": "*",
             "@blazetrails/actionpack": "*",
             "@blazetrails/actionview": "*",
             "@blazetrails/trailties": "*",
@@ -848,11 +849,17 @@ Trails.application!.config.filterParameters = Trails.application!.config.filterP
   private createTestFiles(): void {
     this.createFile(
       "test/test-helper.ts",
-      `// Test helper — loaded before all test files.
+      `import { TestCase } from "@blazetrails/activesupport/test-case";
+import { env, setEnv } from "@blazetrails/ruby-compat";
 
-export async function setupTestDatabase(): Promise<void> {
-  // Configure test database connection
-}
+if (env.TRAILS_ENV == null) setEnv("TRAILS_ENV", "test");
+await import("../config/environment.js");
+await import("@blazetrails/trailties/test-help");
+
+// Setup all fixtures in test/fixtures/*.yml for all tests in alphabetical order.
+(TestCase as typeof TestCase & { fixtures(...names: string[]): void }).fixtures(":all");
+
+// Add more helper methods to be used by all tests here...
 `,
     );
 

@@ -1,4 +1,11 @@
-import { camelize, include, isPlainObject, toXml, type Included } from "@blazetrails/activesupport";
+import {
+  camelize,
+  include,
+  isPlainObject,
+  runLoadHooks,
+  toXml,
+  type Included,
+} from "@blazetrails/activesupport";
 import { KeyError, merge, SecureRandom, StringIO } from "@blazetrails/ruby-compat";
 import {
   DEFAULT_OPTIONS,
@@ -408,6 +415,8 @@ export class TestCase {
     return env;
   }
 }
+
+runLoadHooks("action_controller_test_case", TestCase);
 
 export class TestRequest extends AbstractTestRequest {
   /** @internal */

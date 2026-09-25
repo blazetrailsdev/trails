@@ -9,6 +9,10 @@
     ".": "./dist/cli.js",
     "./all": "./dist/all.js",
     "./generators": "./dist/generators/index.js",
+    "./test-help": {
+      "types": "./dist/test-help.d.ts",
+      "default": "./dist/test-help.js"
+    },
     "./vite": {
       "types": "./dist/server/vite-plugin.d.ts",
       "default": "./dist/server/vite-plugin.js"
