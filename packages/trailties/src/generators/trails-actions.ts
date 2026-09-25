@@ -204,7 +204,10 @@ async function injectIntoFile(
   const full = getPath().join(host.cwd, relPath);
   const content = await fs.readFile(full, "utf-8");
   if (content.includes(replacement)) return;
-  const flag = typeof after === "string" ? new RegExp(regexpEscape(after)) : after;
+  const flag =
+    typeof after === "string"
+      ? new RegExp(regexpEscape(after), "g")
+      : new RegExp(after.source, after.flags.includes("g") ? after.flags : `${after.flags}g`);
   await fs.writeFile(
     full,
     content.replace(flag, (match) => match + replacement),

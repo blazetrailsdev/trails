@@ -6,6 +6,7 @@ import {
   type PathAdapter,
 } from "@blazetrails/ruby-compat";
 import { GeneratorBase } from "./base.js";
+import { optimizeIndentation } from "./actions.js";
 
 class TestGenerator extends GeneratorBase {}
 
@@ -225,6 +226,12 @@ describe("TrailsActions", () => {
       await expect(makeGen().initializer(".", "export {};")).rejects.toThrow(/leaf name/);
       await expect(makeGen().initializer("..", "export {};")).rejects.toThrow(/leaf name/);
     });
+  });
+
+  it('optimizeIndentation interpolates a nil value as Ruby\'s "#{nil}\\n" does', () => {
+    expect(optimizeIndentation(null)).toBe("\n");
+    expect(optimizeIndentation(undefined)).toBe("\n");
+    expect(optimizeIndentation("  a\n    b\n", 2)).toBe("  a\n    b\n");
   });
 
   it("route and environment reject Ruby-shape source", async () => {
