@@ -138,52 +138,68 @@ export class Logger {
     this._formatter ??= new SimpleFormatter();
   }
 
-  add(severity: number, message?: string | null, progname?: string): boolean {
-    if (severity < this.level) return true;
-    let msg: unknown;
-    let formatterProgname: string | null;
-    if (message != null) {
-      msg = message;
-      formatterProgname = progname ?? this.progname;
-    } else {
-      msg = progname ?? this.progname;
-      formatterProgname = this.progname;
+  add(
+    severity: number | null,
+    message: unknown = null,
+    progname: string | null = null,
+    block?: () => unknown,
+  ): boolean {
+    severity ??= Logger.UNKNOWN;
+    if (this.output == null || severity < this.level) {
+      return true;
+    }
+    if (progname == null) {
+      progname = this.progname;
+    }
+    if (message == null) {
+      if (block !== undefined) {
+        message = block();
+      } else {
+        message = progname;
+        progname = this.progname;
+      }
     }
     const severityName = (LEVEL_NAMES[severity] ?? "unknown").toUpperCase();
-    this.output?.write(
-      this.formatMessage(severityName, Temporal.Now.instant(), formatterProgname, msg),
-    );
+    this.output.write(this.formatMessage(severityName, Temporal.Now.instant(), progname, message));
     return true;
   }
 
-  log(severity: number, message?: string | (() => string), progname?: string): boolean {
-    if (severity < this.level) return true;
-    const msg = typeof message === "function" ? String(message()) : message;
-    return this.add(severity, msg, progname);
+  declare log: Logger["add"];
+
+  debug(progname?: string | (() => string)): boolean {
+    return typeof progname === "function"
+      ? this.add(Logger.DEBUG, null, null, progname)
+      : this.add(Logger.DEBUG, null, progname);
   }
 
-  debug(message?: string | (() => string)): boolean {
-    return this.log(Logger.DEBUG, message);
+  info(progname?: string | (() => string)): boolean {
+    return typeof progname === "function"
+      ? this.add(Logger.INFO, null, null, progname)
+      : this.add(Logger.INFO, null, progname);
   }
 
-  info(message?: string | (() => string)): boolean {
-    return this.log(Logger.INFO, message);
+  warn(progname?: string | (() => string)): boolean {
+    return typeof progname === "function"
+      ? this.add(Logger.WARN, null, null, progname)
+      : this.add(Logger.WARN, null, progname);
   }
 
-  warn(message?: string | (() => string)): boolean {
-    return this.log(Logger.WARN, message);
+  error(progname?: string | (() => string)): boolean {
+    return typeof progname === "function"
+      ? this.add(Logger.ERROR, null, null, progname)
+      : this.add(Logger.ERROR, null, progname);
   }
 
-  error(message?: string | (() => string)): boolean {
-    return this.log(Logger.ERROR, message);
+  fatal(progname?: string | (() => string)): boolean {
+    return typeof progname === "function"
+      ? this.add(Logger.FATAL, null, null, progname)
+      : this.add(Logger.FATAL, null, progname);
   }
 
-  fatal(message?: string | (() => string)): boolean {
-    return this.log(Logger.FATAL, message);
-  }
-
-  unknown(message?: string | (() => string)): boolean {
-    return this.log(Logger.UNKNOWN, message);
+  unknown(progname?: string | (() => string)): boolean {
+    return typeof progname === "function"
+      ? this.add(Logger.UNKNOWN, null, null, progname)
+      : this.add(Logger.UNKNOWN, null, progname);
   }
 
   get "debug?"(): boolean {
@@ -268,6 +284,8 @@ export interface Logger {
   logAt(level: number | LogLevel, fn: () => void): void;
 }
 include(Logger, LoggerThreadSafeLevel);
+
+Logger.prototype.log = Logger.prototype.add;
 
 export class SimpleFormatter extends Formatter {
   override call(

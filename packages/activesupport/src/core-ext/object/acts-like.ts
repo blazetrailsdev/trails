@@ -1,18 +1,16 @@
 import { actsLikeDate, actsLikeTime } from "@blazetrails/date";
 import { actsLikeString } from "../string/behavior.js";
 
-export class Object {
-  static actsLike(self: unknown, duck: string): boolean {
-    switch (duck) {
-      case "time":
-        return actsLikeTime(self) || respondTo.call(self, "acts_like_time?");
-      case "date":
-        return actsLikeDate(self) || respondTo.call(self, "acts_like_date?");
-      case "string":
-        return actsLikeString(self) || respondTo.call(self, "acts_like_string?");
-      default:
-        return respondTo.call(self, `acts_like_${duck}?`);
-    }
+export function actsLike(this: unknown, duck: string): boolean {
+  switch (duck) {
+    case "time":
+      return actsLikeTime(this) || respondTo.call(this, "acts_like_time?");
+    case "date":
+      return actsLikeDate(this) || respondTo.call(this, "acts_like_date?");
+    case "string":
+      return actsLikeString(this) || respondTo.call(this, "acts_like_string?");
+    default:
+      return respondTo.call(this, `acts_like_${duck}?`);
   }
 }
 

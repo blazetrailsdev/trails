@@ -38,7 +38,7 @@ import {
   assertRespondTo,
   assertNil,
 } from "../testing/assertions.js";
-import { Object as ObjectExt } from "./object/acts-like.js";
+import { actsLike } from "./object/acts-like.js";
 import { deprecator } from "../deprecator.js";
 
 type MethodMissing = TimeWithZone &
@@ -622,8 +622,8 @@ describe("TimeWithZoneTest", () => {
 
   it("acts like time", () => {
     assertPredicate(twz, (t) => t.actsLikeTime());
-    assert(ObjectExt.actsLike(twz, "time"));
-    assert(ObjectExt.actsLike(new TimeWithZone(DateTime.civil(2000), timeZone), "time"));
+    assert(actsLike.call(twz, "time"));
+    assert(actsLike.call(new TimeWithZone(DateTime.civil(2000), timeZone), "time"));
   });
 
   it("blank?", () => {
@@ -1146,7 +1146,7 @@ describe("TimeWithZoneTest", () => {
   it("to time without preserve timezone configured", async () => {
     setPreserveTimezone(null);
     await withEnvTz("US/Eastern", async () => {
-      const time: any = await assertDeprecated(null, deprecator(), () => twz.toTime());
+      const time: any = await assertDeprecated(deprecator(), () => twz.toTime());
 
       expect(time.constructor).toEqual(RubyTime);
       expect(time).toBe(twz.toTime());
@@ -1546,7 +1546,7 @@ describe("TimeWithZoneTest", () => {
 
   it("plus two time instances raises deprecation warning", async () => {
     const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1))), eastern);
-    await assertDeprecated(null, deprecator(), () => twz.plus(Duration.days(10).ago() as RubyTime));
+    await assertDeprecated(deprecator(), () => twz.plus(Duration.days(10).ago() as RubyTime));
   });
 });
 

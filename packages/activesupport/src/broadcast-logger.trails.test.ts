@@ -50,3 +50,19 @@ describe("BroadcastLogger severity setters", () => {
     expect([log1.level, log2.level]).toEqual([Logger.FATAL, Logger.FATAL]);
   });
 });
+
+describe("BroadcastLogger#log", () => {
+  it("is add's alias, dispatching each broadcast's add", () => {
+    const calls: unknown[][] = [];
+    class AddRecorder extends Logger {
+      override add(...args: Parameters<Logger["add"]>): boolean {
+        calls.push(args);
+        return true;
+      }
+    }
+    const logger = new BroadcastLogger(new AddRecorder({ write: () => {} }));
+    expect(BroadcastLogger.prototype.log).toBe(BroadcastLogger.prototype.add);
+    logger.log(Logger.INFO, "hi");
+    expect(calls).toEqual([[Logger.INFO, "hi"]]);
+  });
+});

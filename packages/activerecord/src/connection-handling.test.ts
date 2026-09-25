@@ -137,7 +137,7 @@ describe("ConnectionHandlingTest", () => {
 
     Base.releaseConnection();
 
-    await assertDeprecated(null, deprecator(), async () => {
+    await assertDeprecated(deprecator(), async () => {
       await Base.connection;
     });
 
@@ -147,14 +147,14 @@ describe("ConnectionHandlingTest", () => {
 
     Base.releaseConnection();
 
-    await assertDeprecated(null, deprecator(), async () => {
+    await assertDeprecated(deprecator(), async () => {
       await Base.connection;
     });
 
     Base.releaseConnection();
 
     await Base.withConnection(async () => {
-      await assertDeprecated(null, deprecator(), async () => {
+      await assertDeprecated(deprecator(), async () => {
         await Base.connection;
       });
     });

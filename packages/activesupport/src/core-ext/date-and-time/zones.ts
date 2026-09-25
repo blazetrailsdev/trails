@@ -4,7 +4,7 @@ import { TimeZone } from "../../values/time-zone.js";
 import { findZoneBang, zone as currentZone } from "../../time-zone-config.js";
 import { instantFrom } from "../../temporal.js";
 import { toTime } from "../date/conversions.js";
-import { Object } from "../object/acts-like.js";
+import { actsLike } from "../object/acts-like.js";
 
 export type DateOrTime =
   | Temporal.PlainDate
@@ -15,7 +15,6 @@ export type DateOrTime =
   | RubyTime
   | TimeWithZone;
 
-/** @missingRailsArgs acts_like? — PERMANENT */
 export function inTimeZone(dateOrTime: Temporal.PlainDate, zone?: unknown): TimeWithZone | RubyTime;
 export function inTimeZone(dateOrTime: Date, zone?: unknown): TimeWithZone | Date;
 export function inTimeZone(
@@ -37,7 +36,7 @@ export function inTimeZone(dateOrTime: DateOrTime, zone: unknown = currentZone()
   if (dateOrTime instanceof TimeWithZone) return dateOrTime.inTimeZone(zone);
 
   const timeZone = findZoneBang(zone);
-  const time = Object.actsLike(dateOrTime, "time") ? (dateOrTime as TimeLike) : null;
+  const time = actsLike.call(dateOrTime, "time") ? (dateOrTime as TimeLike) : null;
 
   if (timeZone) {
     return timeWithZone(dateOrTime, time, timeZone);

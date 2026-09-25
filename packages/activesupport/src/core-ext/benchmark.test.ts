@@ -5,7 +5,7 @@ import { assertDeprecated } from "../testing/deprecation.js";
 
 describe("BenchmarkTest", () => {
   it("is deprecated", async () => {
-    await assertDeprecated(null, deprecator(), () => {
+    await assertDeprecated(deprecator(), () => {
       expect(Object(Benchmark.ms(() => {}))).toBeInstanceOf(Number);
     });
   });

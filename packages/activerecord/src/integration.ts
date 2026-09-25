@@ -64,7 +64,7 @@ export function cacheKey(this: Identifiable): string {
   const timestamp = maxUpdatedColumnTimestamp(this);
   if (timestamp) {
     const cacheTimestampFormat: string = klass.cacheTimestampFormat ?? "usec";
-    return `${modelKey}/${idStr}-${toFs(timestamp, cacheTimestampFormat)}`;
+    return `${modelKey}/${idStr}-${toFs(timestamp.utc(), cacheTimestampFormat)}`;
   }
 
   return `${modelKey}/${idStr}`;
@@ -82,7 +82,10 @@ export function cacheVersion(this: Identifiable): string | null {
     timestamp = this.readAttribute("updated_at");
     if (timestamp instanceof RubyTime || timestamp instanceof Temporal.Instant) {
       const cacheTimestampFormat: string = klass.cacheTimestampFormat ?? "usec";
-      return toFs(timestamp, cacheTimestampFormat);
+      return toFs(
+        timestamp instanceof RubyTime ? timestamp.utc() : timestamp,
+        cacheTimestampFormat,
+      );
     }
     return null;
   }

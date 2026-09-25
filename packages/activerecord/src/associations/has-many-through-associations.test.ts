@@ -1486,12 +1486,12 @@ describe("HasManyThroughAssociationsTest", () => {
       const firm = await Company.find(companies("first_firm").id);
       const lifo = new Developer({ name: "lifo" });
       await assertRaises([RecordInvalid], {}, () =>
-        assertDeprecated(null, deprecator(), () => (firm as any).developers.push(lifo)),
+        assertDeprecated(deprecator(), () => (firm as any).developers.push(lifo)),
       );
 
       const lifo2 = await Developer.createBang({ name: "lifo" });
       await assertRaises([RecordInvalid], {}, () =>
-        assertDeprecated(null, deprecator(), () => (firm as any).developers.push(lifo2)),
+        assertDeprecated(deprecator(), () => (firm as any).developers.push(lifo2)),
       );
     } finally {
       (Contract as any).clearValidatorsBang();

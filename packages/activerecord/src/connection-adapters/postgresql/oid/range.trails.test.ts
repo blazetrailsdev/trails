@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Temporal } from "@blazetrails/date";
+import { TimeZone } from "@blazetrails/activesupport";
 import { RangeType } from "./range.js";
 import { Range } from "@blazetrails/ruby-compat";
 
@@ -113,6 +114,12 @@ describe("PostgreSQL::OID::Range", () => {
       const type = new RangeType(passthroughSubtype, "tstzrange");
       const instant = Temporal.Instant.from("2026-04-28T00:00:00Z");
       expect(type.typeCastForSchema(instant)).toContain("2026-04-28");
+    });
+
+    it("formats a TimeWithZone via its own inspect, as range.rb:16's value.inspect", () => {
+      const type = new RangeType(passthroughSubtype, "tstzrange");
+      const twz = TimeZone.find("UTC")!.local(2026, 4, 28);
+      expect(type.typeCastForSchema(twz)).toBe(twz.inspect());
     });
 
     it("throws on Date passed directly to typeCastForSchema / inspect()", () => {

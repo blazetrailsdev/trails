@@ -429,20 +429,6 @@ export function isFuture(date: Date | Temporal.Instant): boolean {
   return Temporal.Instant.compare(instant, Temporal.Now.instant()) > 0;
 }
 
-export function floor(date: Date, ms: number): Temporal.Instant {
-  if (!Number.isFinite(ms) || ms <= 0) {
-    throw new RangeError(`floor: ms must be a positive finite number, got ${ms}`);
-  }
-  return instantFrom(new Date(Math.floor(date.getTime() / ms) * ms));
-}
-
-export function ceil(date: Date, ms: number): Temporal.Instant {
-  if (!Number.isFinite(ms) || ms <= 0) {
-    throw new RangeError(`ceil: ms must be a positive finite number, got ${ms}`);
-  }
-  return instantFrom(new Date(Math.ceil(date.getTime() / ms) * ms));
-}
-
 export function secFraction(datetime: Temporal.PlainDateTime | Temporal.ZonedDateTime): number;
 export function secFraction(date: Date): number;
 export function secFraction(

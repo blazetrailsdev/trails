@@ -8,7 +8,7 @@ import {
   resetLocalTimeZoneId,
 } from "@blazetrails/date";
 import { Rational } from "@blazetrails/ruby-compat";
-import { Object as ObjectExt } from "./object/acts-like.js";
+import { actsLike } from "./object/acts-like.js";
 import {
   advance,
   ago,
@@ -593,11 +593,11 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("acts like date", () => {
-    assertPredicate(DateTime.civil(-4712), (x) => ObjectExt.actsLike(x, "date"));
+    assertPredicate(DateTime.civil(-4712), (x) => actsLike.call(x, "date"));
   });
 
   it("acts like time", () => {
-    assertPredicate(DateTime.civil(-4712), (x) => ObjectExt.actsLike(x, "time"));
+    assertPredicate(DateTime.civil(-4712), (x) => actsLike.call(x, "time"));
   });
 
   it("blank?", () => {

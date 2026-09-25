@@ -208,7 +208,7 @@ export class Deprecation {
 
   deprecationWarning(
     deprecatedMethodName: string,
-    message?: string,
+    message: string | null = null,
     callerBacktrace?: CallerLocation[],
   ): string {
     callerBacktrace ??= callerLocations(2);
@@ -217,7 +217,7 @@ export class Deprecation {
     return msg;
   }
 
-  private deprecatedMethodWarning(methodName: string, message?: string): string {
+  private deprecatedMethodWarning(methodName: string, message: string | null = null): string {
     const warning = `${methodName} is deprecated and will be removed from ${this.gemName} ${this.deprecationHorizon}`;
     if (message == null) return warning;
     if (message.startsWith(":")) return `${warning} (use ${message.slice(1)} instead)`;

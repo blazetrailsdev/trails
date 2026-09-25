@@ -1,5 +1,6 @@
 import { ValueType } from "@blazetrails/activemodel";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { TimeWithZone } from "@blazetrails/activesupport";
 import { ArgumentError, Range, rbEqual, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 export interface RangeSubtype {
@@ -142,6 +143,7 @@ export class RangeType extends ValueType<Range<unknown>> {
 function inspect(value: unknown): string {
   if (value === null || value === undefined) return "nil";
   if (typeof value === "string") return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+  if (value instanceof TimeWithZone) return value.inspect();
   if (value instanceof RubyTime) return value.toS();
   if (value instanceof Temporal.Instant) return value.toString();
   if (value instanceof Temporal.PlainDateTime) return value.toString();

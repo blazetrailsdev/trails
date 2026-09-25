@@ -521,7 +521,7 @@ describe("GlobalLocatorTest", () => {
     };
     Locator.use("deprecated", deprecated);
     try {
-      await assertDeprecated(null, GlobalID.deprecator(), async () => {
+      await assertDeprecated(GlobalID.deprecator(), async () => {
         expect(await Locator.locate("gid://deprecated/Person/1")).toBe("deprecated");
       });
       expect(

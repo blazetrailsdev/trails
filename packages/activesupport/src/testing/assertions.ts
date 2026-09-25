@@ -13,6 +13,7 @@ import {
   rbEqual,
   rbObjClass,
   rbStrRespondTo,
+  regexpEscape,
   stderr,
   verbose,
 } from "@blazetrails/ruby-compat";
@@ -661,10 +662,17 @@ function assertMatch(
   matcher: RegExp | string,
   obj: string,
   msg: string | (() => string) | null = null,
-): void {
-  const m = message(msg, null, () => `Expected ${inspect(matcher)} to match ${inspect(obj)}`);
-  const matched = typeof matcher === "string" ? obj.includes(matcher) : matcher.test(obj);
-  assert(matched, m);
+): RegExpExecArray | null {
+  msg = message(msg, null, () => `Expected ${inspect(matcher)} to match ${inspect(obj)}`);
+  assert(
+    typeof matcher === "string" || matcher instanceof RegExp,
+    `Expected ${inspect(matcher)} (${rbObjClass(matcher)}) to respond to #=~`,
+  );
+  if (typeof matcher === "string") matcher = new RegExp(regexpEscape(matcher));
+  const lastMatch = matcher.exec(obj);
+  assert(lastMatch != null, msg);
+
+  return lastMatch;
 }
 
 function caseEqual(expected: unknown, actual: unknown): boolean {

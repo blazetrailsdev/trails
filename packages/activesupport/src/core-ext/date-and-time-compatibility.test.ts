@@ -97,7 +97,7 @@ describe("DateAndTimeCompatibilityTest", () => {
         const baseTime = toTime(source);
 
         const utcTimeValue = baseTime.getutc();
-        const convertedTime: RubyTime = await assertDeprecated(null, deprecator(), () =>
+        const convertedTime: RubyTime = await assertDeprecated(deprecator(), () =>
           toTime(utcTimeValue),
         );
 
@@ -114,7 +114,7 @@ describe("DateAndTimeCompatibilityTest", () => {
         const baseTime = toTime(source);
 
         const utcTimeValue = baseTime.getutc();
-        const convertedTime: RubyTime = await assertDeprecated(null, deprecator(), () =>
+        const convertedTime: RubyTime = await assertDeprecated(deprecator(), () =>
           toTime(utcTimeValue),
         );
 
@@ -130,7 +130,7 @@ describe("DateAndTimeCompatibilityTest", () => {
     await withPreserveTimezone(null, async () => {
       await withEnvTz("US/Eastern", async () => {
         const foreignTime = new RubyTime(2016, 4, 23, 15, 11, 12, "-0700");
-        const convertedTime: RubyTime = await assertDeprecated(null, deprecator(), () =>
+        const convertedTime: RubyTime = await assertDeprecated(deprecator(), () =>
           toTime(foreignTime),
         );
 
@@ -145,7 +145,7 @@ describe("DateAndTimeCompatibilityTest", () => {
     await withPreserveTimezone(null, async () => {
       await withEnvTz("US/Eastern", async () => {
         const foreignTime = new RubyTime(2016, 11, 23, 15, 11, 12, "-0700");
-        const convertedTime: RubyTime = await assertDeprecated(null, deprecator(), () =>
+        const convertedTime: RubyTime = await assertDeprecated(deprecator(), () =>
           toTime(foreignTime),
         );
 
@@ -166,10 +166,8 @@ describe("DateAndTimeCompatibilityTest", () => {
         const foreignTime = foreignZone.tzinfo.utcToLocal(
           new RubyTime(2016, 4, 23, 15, 11, 12, "-0700"),
         );
-        const convertedTime: Temporal.ZonedDateTime = await assertDeprecated(
-          null,
-          deprecator(),
-          () => toTime(foreignTime),
+        const convertedTime: Temporal.ZonedDateTime = await assertDeprecated(deprecator(), () =>
+          toTime(foreignTime),
         );
 
         expect(convertedTime.epochNanoseconds).toEqual(foreignTime.epochNanoseconds);
@@ -183,10 +181,8 @@ describe("DateAndTimeCompatibilityTest", () => {
         const foreignTime = foreignZone.tzinfo.utcToLocal(
           new RubyTime(2016, 11, 23, 15, 11, 12, "-0700"),
         );
-        const convertedTime: Temporal.ZonedDateTime = await assertDeprecated(
-          null,
-          deprecator(),
-          () => toTime(foreignTime),
+        const convertedTime: Temporal.ZonedDateTime = await assertDeprecated(deprecator(), () =>
+          toTime(foreignTime),
         );
 
         expect(convertedTime.epochNanoseconds).toEqual(foreignTime.epochNanoseconds);
@@ -436,15 +432,13 @@ describe("DateAndTimeCompatibilityTest", () => {
     try {
       await assertNotDeprecated(deprecator(), () => toTimePreservesTimezone());
 
-      await assertDeprecated(null, deprecator(), () => setToTimePreservesTimezone(":offset"));
+      await assertDeprecated(deprecator(), () => setToTimePreservesTimezone(":offset"));
 
-      await assertDeprecated(null, deprecator(), () => setToTimePreservesTimezone(false));
+      await assertDeprecated(deprecator(), () => setToTimePreservesTimezone(false));
 
-      await assertDeprecated(null, deprecator(), () => setToTimePreservesTimezone(null));
+      await assertDeprecated(deprecator(), () => setToTimePreservesTimezone(null));
 
-      await assertDeprecated(null, deprecator(), () =>
-        expect(toTimePreservesTimezone()).toEqual(false),
-      );
+      await assertDeprecated(deprecator(), () => expect(toTimePreservesTimezone()).toEqual(false));
 
       await assertNotDeprecated(deprecator(), () => toTimePreservesTimezone());
     } finally {
@@ -460,13 +454,13 @@ describe("DateAndTimeCompatibilityTest", () => {
 
       await assertNotDeprecated(deprecator(), () => setToTimePreservesTimezone(":zone"));
 
-      await assertDeprecated(null, deprecator(), () => setToTimePreservesTimezone(":offset"));
+      await assertDeprecated(deprecator(), () => setToTimePreservesTimezone(":offset"));
 
-      await assertDeprecated(null, deprecator(), () => setToTimePreservesTimezone(true));
+      await assertDeprecated(deprecator(), () => setToTimePreservesTimezone(true));
 
-      await assertDeprecated(null, deprecator(), () => setToTimePreservesTimezone("offset"));
+      await assertDeprecated(deprecator(), () => setToTimePreservesTimezone("offset"));
 
-      await assertDeprecated(null, deprecator(), () => setToTimePreservesTimezone(":foo"));
+      await assertDeprecated(deprecator(), () => setToTimePreservesTimezone(":foo"));
     } finally {
       deprecator().silence(() => setToTimePreservesTimezone(currentPreserveTz));
     }
