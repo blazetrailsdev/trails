@@ -1,6 +1,8 @@
 import { Attribute } from "@blazetrails/activemodel";
 import {
   BacktraceCleaner,
+  callerLocations,
+  classAttribute,
   LogSubscriber as BaseLogSubscriber,
   NotificationEvent as Event,
   type Logger,
@@ -44,6 +46,9 @@ function safeJsonStringify(value: unknown): string {
 
 export class LogSubscriber extends BaseLogSubscriber {
   static readonly IGNORE_PAYLOAD_NAMES = ["SCHEMA", "EXPLAIN"];
+
+  declare static backtraceCleaner: BacktraceCleaner;
+  declare backtraceCleaner: BacktraceCleaner;
 
   strictLoadingViolation(event: Event): void {
     this._debug(() => {
@@ -124,33 +129,12 @@ export class LogSubscriber extends BaseLogSubscriber {
   }
 
   private querySourceLocation(): string | null {
-    try {
-      const err = new Error();
-      const stack = (err.stack?.split("\n") ?? []).slice(2).map((l) => l.trim());
-      const cleaned = LogSubscriber._backtraceCleaner.clean(stack);
-      const frame = cleaned[0];
-      return frame ? frame.replace(/^at\s+/, "") : null;
-    } catch {
-      return null;
+    for (const location of callerLocations()) {
+      const frame = this.backtraceCleaner.cleanFrame(String(location));
+      if (frame) return frame;
     }
+    return null;
   }
-
-  static get backtraceCleaner(): BacktraceCleaner {
-    return LogSubscriber._backtraceCleaner;
-  }
-
-  private static _backtraceCleaner: BacktraceCleaner = (() => {
-    const cleaner = new BacktraceCleaner();
-    cleaner.addFilter((line) => line.replace(/^at\s+/, ""));
-    cleaner.addSilencer(
-      (line) =>
-        line.includes("log-subscriber") ||
-        line.includes("LogSubscriber") ||
-        line.includes("notifications") ||
-        line.includes("node_modules"),
-    );
-    return cleaner;
-  })();
 
   private typeCastedBinds(castedBinds: unknown): any[] {
     if (typeof castedBinds === "function") return castedBinds();
@@ -231,6 +215,8 @@ export class LogSubscriber extends BaseLogSubscriber {
     return ActiveRecord.Base.inspectionFilter().filterParam(name as string, value);
   }
 }
+
+classAttribute.call(LogSubscriber, "backtraceCleaner", { default: new BacktraceCleaner() });
 
 LogSubscriber.subscribeLogLevel("sql", "debug");
 LogSubscriber.subscribeLogLevel("strict_loading_violation", "debug");

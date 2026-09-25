@@ -2,7 +2,13 @@ import type { Base } from "./base.js";
 import type { CollectionAssociation } from "./associations/collection-association.js";
 import { modelRegistry, collectionProxyFor as collectionProxyFor } from "./associations.js";
 import { ActiveRecordError, RecordNotFound } from "./errors.js";
-import { singularize, camelize, isBlank } from "@blazetrails/activesupport";
+import {
+  assertValidKeys,
+  camelize,
+  extractOptionsBang,
+  isBlank,
+  singularize,
+} from "@blazetrails/activesupport";
 import { except } from "@blazetrails/ruby-compat";
 import { defineAutosaveValidationCallbacks } from "./autosave-association.js";
 import { ArgumentError, BooleanType } from "@blazetrails/activemodel";
@@ -31,30 +37,37 @@ export interface NestedAttributeOptions {
 
 export function acceptsNestedAttributesFor(
   modelClass: typeof Base,
-  associationName: string,
-  options: NestedAttributeOptions = {},
+  ...attrNames: (string | NestedAttributeOptions)[]
 ): void {
-  if (options.rejectIf === "all_blank") {
-    options = { ...options, rejectIf: REJECT_ALL_BLANK_PROC };
+  const options: NestedAttributeOptions = { allowDestroy: false, updateOnly: false };
+  Object.assign(options, extractOptionsBang(attrNames));
+  assertValidKeys(
+    options as Record<string, unknown>,
+    "allowDestroy",
+    "rejectIf",
+    "limit",
+    "updateOnly",
+  );
+  if (options.rejectIf === "all_blank") options.rejectIf = REJECT_ALL_BLANK_PROC;
+
+  for (const associationName of attrNames as string[]) {
+    const reflection = (modelClass as any)._reflectOnAssociation?.(associationName);
+    if (reflection) {
+      reflection.autosave = true;
+      defineAutosaveValidationCallbacks.call(modelClass, reflection);
+
+      const nestedAttributesOptions = { ...modelClass.nestedAttributesOptions };
+      nestedAttributesOptions[associationName] = options;
+      modelClass.nestedAttributesOptions = nestedAttributesOptions;
+
+      const type = reflection.isCollection() ? "collection" : "one_to_one";
+      modelClass.generateAssociationWriter(associationName, type);
+    } else {
+      throw new ArgumentError(
+        `No association found for name \`${associationName}'. Has it been defined yet?`,
+      );
+    }
   }
-
-  const reflection = (modelClass as any)._reflectOnAssociation?.(associationName);
-  if (!reflection) {
-    throw new ArgumentError(
-      `No association found for name \`${associationName}'. Has it been defined yet?`,
-    );
-  }
-
-  reflection.autosave = true;
-
-  defineAutosaveValidationCallbacks.call(modelClass, reflection);
-
-  const nestedAttributesOptions = { ...modelClass.nestedAttributesOptions };
-  nestedAttributesOptions[associationName] = options;
-  modelClass.nestedAttributesOptions = nestedAttributesOptions;
-
-  const type = reflection.isCollection() ? "collection" : "one_to_one";
-  modelClass.generateAssociationWriter(associationName, type);
 }
 
 const UNASSIGNABLE_KEYS = ["id", "_destroy"] as const;

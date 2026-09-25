@@ -69,20 +69,6 @@ describe("Bootstrap", () => {
       await app.runInitializers("all");
       expect(app.cache).toBe(store);
     });
-
-    it("invokes config.cacheStore when given as a factory", async () => {
-      const app = new TestApp();
-      const store = new NullStore();
-      app.config = { cacheStore: () => store };
-      await app.runInitializers("all");
-      expect(app.cache).toBe(store);
-    });
-
-    it("falls back to a NullStore when cacheStore is unset", async () => {
-      const app = new TestApp();
-      await app.runInitializers("all");
-      expect(app.cache).toBeInstanceOf(NullStore);
-    });
   });
 
   describe(":bootstrap_hook", () => {

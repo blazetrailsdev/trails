@@ -17,9 +17,9 @@ describe("AdapterLeasingTest", () => {
         /^Cannot expire connection, it is owned by a different thread: #<Thread:0x0{16} run>\. Current thread: #<Thread:0x[0-9a-f]{16} \S+:\d+ run>\.$/,
       );
     }).value();
-    expect(adapter.inUse).toBeTruthy();
+    expect(adapter.isInUse()).toBeTruthy();
     adapter.expire();
-    expect(adapter.inUse).toBeFalsy();
+    expect(adapter.isInUse()).toBeFalsy();
   });
 
   it("lease from a different thread names the owner", async () => {
@@ -43,6 +43,6 @@ describe("AdapterLeasingTest", () => {
       adapter.stealBang();
       expect(() => adapter.expire()).not.toThrow();
     }).value();
-    expect(adapter.inUse).toBeFalsy();
+    expect(adapter.isInUse()).toBeFalsy();
   });
 });

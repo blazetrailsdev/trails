@@ -603,9 +603,9 @@ export class ConnectionPool implements ReapablePool {
     return {
       size: this.size,
       connections: this._connections?.length ?? 0,
-      busy: this._connections?.filter((c) => c.inUse && c.owner!.isAlive()).length ?? 0,
-      dead: this._connections?.filter((c) => c.inUse && !c.owner!.isAlive()).length ?? 0,
-      idle: this._connections?.filter((c) => !c.inUse).length ?? 0,
+      busy: this._connections?.filter((c) => c.isInUse() && c.owner!.isAlive()).length ?? 0,
+      dead: this._connections?.filter((c) => c.isInUse() && !c.owner!.isAlive()).length ?? 0,
+      idle: this._connections?.filter((c) => !c.isInUse()).length ?? 0,
       waiting: this.numWaitingInQueue(),
       checkoutTimeout: this.checkoutTimeout,
     };
@@ -615,7 +615,7 @@ export class ConnectionPool implements ReapablePool {
     await this.withExclusivelyAcquiredAllConnections(raiseOnAcquisitionTimeout, () =>
       synchronize.call(this, async () => {
         for (const conn of this._connections ?? []) {
-          if (conn.inUse) {
+          if (conn.isInUse()) {
             conn.stealBang();
             this.checkin(conn);
           }
@@ -653,7 +653,7 @@ export class ConnectionPool implements ReapablePool {
     await this.withExclusivelyAcquiredAllConnections(raiseOnAcquisitionTimeout, () =>
       synchronize.call(this, async () => {
         for (const conn of this._connections ?? []) {
-          if (conn.inUse) {
+          if (conn.isInUse()) {
             conn.stealBang();
             this.checkin(conn);
           }
@@ -682,7 +682,7 @@ export class ConnectionPool implements ReapablePool {
     const staleConnections = await (synchronize<DatabaseAdapter[]>).call(this, () => {
       if (this.isDiscarded()) return [];
       const stale = (this._connections ?? []).filter(
-        (conn) => conn.inUse && !conn.owner!.isAlive(),
+        (conn) => conn.isInUse() && !conn.owner!.isAlive(),
       );
       for (const conn of stale) conn.stealBang();
       return stale;
@@ -709,7 +709,7 @@ export class ConnectionPool implements ReapablePool {
     if (!this._connections || !this._available) return [];
 
     const idleConnections = this._connections.filter(
-      (conn) => !conn.inUse && conn.secondsIdle >= minimumIdle,
+      (conn) => !conn.isInUse() && conn.secondsIdle >= minimumIdle,
     );
     for (const conn of idleConnections) {
       conn.lease();

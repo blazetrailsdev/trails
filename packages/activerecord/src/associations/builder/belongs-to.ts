@@ -1,4 +1,4 @@
-import { Hash, hasKey, type Module } from "@blazetrails/ruby-compat";
+import { type Hash, hasKey, type Module } from "@blazetrails/ruby-compat";
 import { underscore, pluralize, isBlank, safeConstantize } from "@blazetrails/activesupport";
 import type { AssociationInstanceHost } from "./association.js";
 import { SingularAssociation } from "./singular-association.js";
@@ -216,11 +216,7 @@ export class BelongsTo extends SingularAssociation {
       model.afterUpdate(makeCallback("savedChanges"), {
         if: (record: any) => record.isSavedChanges(),
       });
-      model.afterDestroy(async (record: any) => {
-        if (typeof record.isNewRecord !== "function" || !record.isNewRecord()) {
-          await BelongsTo.touchRecord(record, new Hash(), foreignKey, name, touch);
-        }
-      });
+      model.afterDestroy(makeCallback("changesToSave"));
     }
 
     if (typeof model.afterTouch === "function") {

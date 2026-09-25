@@ -42,9 +42,7 @@ function computeTableName(this: typeof Base): string | null {
       pluralizes,
     )}${fullTableNameSuffix.call(this as any)}`;
   }
-  const base = baseClass.call(this);
-  if (base === this) return "";
-  return base.tableName;
+  return baseClass.call(this).tableName;
 }
 
 /** @internal */

@@ -2,7 +2,7 @@ import type { Base } from "./base.js";
 import type { AssociationReflection, ThroughReflection } from "./reflection.js";
 import "./relation.js";
 import type { Relation } from "./relation.js";
-import type { CollectionProxy, AssociationProxy } from "./associations/collection-proxy.js";
+import type { AssociationProxy } from "./associations/collection-proxy.js";
 import { ActiveRecord, Associations as AssociationsNamespace } from "./namespaces.js";
 import { hasDefaultScopeOverride } from "./scoping/default.js";
 import { qualifiedName } from "./inheritance.js";
@@ -564,27 +564,17 @@ export function collectionProxyFor<T extends Base = Base>(
 ): AssociationProxy<T> {
   const instance = record.association(assocName) as unknown as {
     isCollection(): boolean;
-    reflection: AssociationDefinition;
-    _proxy?: AssociationProxy<T>;
+    reader: AssociationProxy<T>;
   };
-  if (instance._proxy) return instance._proxy;
-
-  const ctor = record.constructor as typeof Base;
   if (!instance.isCollection()) {
+    const ctor = record.constructor as typeof Base;
     throw new TypeError(
       `association() builds a CollectionProxy, which Rails has only for a collection ` +
         `reflection; "${assocName}" on ${ctor.name} is singular. ` +
         `Use record.association("${assocName}") for the singular association object.`,
     );
   }
-  const proxy = (
-    AssociationsNamespace.CollectionProxy as unknown as {
-      _create: (r: Base, n: string, d: AssociationDefinition) => CollectionProxy<T>;
-    }
-  )._create(record, assocName, instance.reflection);
-
-  instance._proxy = proxy as AssociationProxy<T>;
-  return instance._proxy;
+  return instance.reader;
 }
 
 /** @internal */

@@ -180,14 +180,20 @@ export interface Pirate {
 
 const rejectIfEmpty = (attrs: Record<string, unknown>) => Object.keys(attrs).length === 0;
 
-acceptsNestedAttributesFor(Pirate, "parrots", { allowDestroy: true, rejectIf: rejectIfEmpty });
-acceptsNestedAttributesFor(Pirate, "birds", { allowDestroy: true, rejectIf: rejectIfEmpty });
+acceptsNestedAttributesFor(Pirate, "parrots", "birds", {
+  allowDestroy: true,
+  rejectIf: rejectIfEmpty,
+});
 acceptsNestedAttributesFor(Pirate, "ship", { allowDestroy: true, rejectIf: rejectIfEmpty });
 acceptsNestedAttributesFor(Pirate, "updateOnlyShip", { updateOnly: true });
-acceptsNestedAttributesFor(Pirate, "parrotsWithMethodCallbacks", { allowDestroy: true });
-acceptsNestedAttributesFor(Pirate, "parrotsWithProcCallbacks", { allowDestroy: true });
-acceptsNestedAttributesFor(Pirate, "birdsWithMethodCallbacks", { allowDestroy: true });
-acceptsNestedAttributesFor(Pirate, "birdsWithProcCallbacks", { allowDestroy: true });
+acceptsNestedAttributesFor(
+  Pirate,
+  "parrotsWithMethodCallbacks",
+  "parrotsWithProcCallbacks",
+  "birdsWithMethodCallbacks",
+  "birdsWithProcCallbacks",
+  { allowDestroy: true },
+);
 acceptsNestedAttributesFor(Pirate, "birdsWithRejectAllBlank", { rejectIf: "all_blank" });
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging

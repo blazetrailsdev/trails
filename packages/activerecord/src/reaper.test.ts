@@ -57,7 +57,7 @@ async function newConnInThread(pool: ConnectionPool): Promise<[AbstractAdapter, 
 
 async function waitForConnIdle(conn: AbstractAdapter, timeout = 5): Promise<void> {
   const start = performance.now();
-  while (conn.inUse && performance.now() - start < timeout * 1000) {
+  while (conn.isInUse() && performance.now() - start < timeout * 1000) {
     await new Promise((resolve) => setTimeout(resolve, 0));
   }
 }
@@ -125,12 +125,12 @@ describe("ReaperTest", () => {
     try {
       const [conn, child] = await newConnInThread(pool);
 
-      expect(conn.inUse).toBeTruthy();
+      expect(conn.isInUse()).toBeTruthy();
 
       child.exit();
 
       await waitForConnIdle(conn);
-      expect(conn.inUse).toBeFalsy();
+      expect(conn.isInUse()).toBeFalsy();
     } finally {
       await pool.discardBang();
     }
@@ -145,12 +145,12 @@ describe("ReaperTest", () => {
 
       const [conn, child] = await newConnInThread(pool);
 
-      expect(conn.inUse).toBeTruthy();
+      expect(conn.isInUse()).toBeTruthy();
 
       child.exit();
 
       await waitForConnIdle(conn);
-      expect(conn.inUse).toBeFalsy();
+      expect(conn.isInUse()).toBeFalsy();
 
       await pool.discardBang();
     }

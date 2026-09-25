@@ -1,17 +1,20 @@
+import { lookupStore } from "@blazetrails/activesupport/cache";
 import {
   type CacheStore,
   type Logger,
   type LogLevel,
   NullLogger,
-  NullStore,
   runLoadHooks,
 } from "@blazetrails/activesupport";
+import { Runtime } from "@blazetrails/rack";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Initializable } from "../initializable.js";
 
 export interface BootstrapConfig {
   logger?: Logger | null;
   logLevel?: LogLevel | number | string;
-  cacheStore?: CacheStore | (() => CacheStore);
+  cacheStore?: unknown;
+  middleware?: { insertBefore(...args: unknown[]): void };
 }
 
 export interface BootstrapHost {
@@ -38,9 +41,14 @@ Bootstrap.initializer<BootstrapHost>("initialize_logger", { group: "all" }, func
 
 Bootstrap.initializer<BootstrapHost>("initialize_cache", { group: "all" }, function () {
   if (!this.cache) {
-    const store = this.config.cacheStore;
-    if (Array.isArray(store)) this.cache = new NullStore();
-    else this.cache = typeof store === "function" ? store() : (store ?? new NullStore());
+    this.cache = lookupStore(...[this.config.cacheStore].flat());
+
+    if (rbObjRespondTo(this.cache, "middleware")) {
+      this.config.middleware!.insertBefore(
+        Runtime,
+        (this.cache as unknown as { middleware: unknown }).middleware,
+      );
+    }
   }
 });
 
