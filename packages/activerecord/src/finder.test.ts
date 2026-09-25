@@ -390,24 +390,24 @@ describe("FinderTest", () => {
   it("exists with large number", async () => {
     const big = 9223372036854775808n;
     const negBig = -9223372036854775809n;
-    expect(await Topic.where({ id: [1, big] }).exists()).toBe(true);
-    expect(await Topic.where({ id: new Range(1n, big) }).exists()).toBe(true);
-    expect(await Topic.where({ id: new Range(negBig, big) }).exists()).toBe(true);
-    expect(await Topic.where({ id: new Range(big, 9223372036854775809n) }).exists()).toBe(false);
-    expect(await Topic.where({ id: new Range(-9223372036854775810n, negBig) }).exists()).toBe(
+    expect(await Topic.where({ id: [1, big] }).isExists()).toBe(true);
+    expect(await Topic.where({ id: new Range(1n, big) }).isExists()).toBe(true);
+    expect(await Topic.where({ id: new Range(negBig, big) }).isExists()).toBe(true);
+    expect(await Topic.where({ id: new Range(big, 9223372036854775809n) }).isExists()).toBe(false);
+    expect(await Topic.where({ id: new Range(-9223372036854775810n, negBig) }).isExists()).toBe(
       false,
     );
-    expect(await Topic.where({ id: new Range(big, 1n) }).exists()).toBe(false);
+    expect(await Topic.where({ id: new Range(big, 1n) }).isExists()).toBe(false);
     expect(
       await Topic.where({ id: 1 })
         .or(Topic.where({ id: big }))
-        .exists(),
+        .isExists(),
     ).toBe(true);
-    expect(await Topic.where().not({ id: big }).exists()).toBe(true);
+    expect(await Topic.where().not({ id: big }).isExists()).toBe(true);
 
     const id = Topic.arelTable.get("id");
     const bind = (v: bigint) => Topic.predicateBuilder.buildBindAttribute("id", v);
-    const existsWhere = (node: unknown) => Topic.where(node as any).exists();
+    const existsWhere = (node: unknown) => Topic.where(node as any).isExists();
 
     expect(await existsWhere(id.gt(bind(negBig)))).toBeTruthy();
     expect(await existsWhere(id.gteq(bind(negBig)))).toBeTruthy();
@@ -426,11 +426,11 @@ describe("FinderTest", () => {
 
     const inRel = Topic.where({ id: [big, negBig] });
     expect(inRel.toSql()).toMatch(/IN \(NULL\)/);
-    expect(await inRel.exists()).toBe(false);
+    expect(await inRel.isExists()).toBe(false);
 
     const notInRel = Topic.where().not({ id: [big, negBig] });
     expect(notInRel.toSql()).toMatch(/NOT IN \(NULL\)/);
-    expect(await notInRel.exists()).toBe(false);
+    expect(await notInRel.isExists()).toBe(false);
   });
 });
 
@@ -1162,13 +1162,13 @@ describe("FinderTest", () => {
   it("#skip_query_cache! for #exists?", async () => {
     await Topic.cache(async () => {
       await assertQueriesCount(1, false, async () => {
-        await Topic.exists();
-        await Topic.exists();
+        await Topic.isExists();
+        await Topic.isExists();
       });
 
       await assertQueriesCount(2, false, async () => {
-        await Topic.all().skipQueryCacheBang().exists();
-        await Topic.all().skipQueryCacheBang().exists();
+        await Topic.all().skipQueryCacheBang().isExists();
+        await Topic.all().skipQueryCacheBang().isExists();
       });
     });
   });
@@ -1176,13 +1176,13 @@ describe("FinderTest", () => {
   it("#skip_query_cache! for #exists? with a limited eager load", async () => {
     await Topic.cache(async () => {
       await assertQueriesCount(1, false, async () => {
-        await Topic.eagerLoad(":replies").limit(1).exists();
-        await Topic.eagerLoad(":replies").limit(1).exists();
+        await Topic.eagerLoad(":replies").limit(1).isExists();
+        await Topic.eagerLoad(":replies").limit(1).isExists();
       });
 
       await assertQueriesCount(2, false, async () => {
-        await Topic.eagerLoad(":replies").limit(1).skipQueryCacheBang().exists();
-        await Topic.eagerLoad(":replies").limit(1).skipQueryCacheBang().exists();
+        await Topic.eagerLoad(":replies").limit(1).skipQueryCacheBang().isExists();
+        await Topic.eagerLoad(":replies").limit(1).skipQueryCacheBang().isExists();
       });
     });
   });
@@ -1799,7 +1799,7 @@ describe("FinderTest", () => {
 
   it("include on unloaded relation with mismatched class", async () => {
     const topic = topics("first");
-    expect(await Customer.exists(topic.id)).toBeTruthy();
+    expect(await Customer.isExists(topic.id)).toBeTruthy();
 
     await assertNoQueries(false, async () => {
       expect(await Customer.where({ name: "David" }).include(topic as never)).toBe(false);
@@ -1893,7 +1893,7 @@ describe("FinderTest", () => {
 
   it("member on unloaded relation with mismatched class", async () => {
     const topic = topics("first");
-    expect(await Customer.exists(topic.id)).toBeTruthy();
+    expect(await Customer.isExists(topic.id)).toBeTruthy();
 
     await assertNoQueries(false, async () => {
       expect(await Customer.where({ name: "David" }).member(topic as never)).toBe(false);
@@ -1959,7 +1959,7 @@ describe("FinderTest", () => {
     const existingAddress = (
       customers("david") as InstanceType<typeof Customer> & { address: Address }
     ).address;
-    expect(await Customer.exists({ address: existingAddress })).toBe(true);
+    expect(await Customer.isExists({ address: existingAddress })).toBe(true);
   });
 
   it("exists with aggregate having three mappings with one difference", async () => {
@@ -1967,7 +1967,7 @@ describe("FinderTest", () => {
       customers("david") as InstanceType<typeof Customer> & { address: Address }
     ).address;
     expect(
-      await Customer.exists({
+      await Customer.isExists({
         address: new Address(
           existingAddress.street,
           existingAddress.city,
@@ -1976,7 +1976,7 @@ describe("FinderTest", () => {
       }),
     ).toBe(false);
     expect(
-      await Customer.exists({
+      await Customer.isExists({
         address: new Address(
           existingAddress.street,
           existingAddress.city + "1",
@@ -1985,7 +1985,7 @@ describe("FinderTest", () => {
       }),
     ).toBe(false);
     expect(
-      await Customer.exists({
+      await Customer.isExists({
         address: new Address(
           existingAddress.street + "1",
           existingAddress.city,
@@ -2022,39 +2022,39 @@ describe("FinderTest", () => {
   registerModel("SpecialComment", SpecialComment);
 
   it("exists", async () => {
-    expect(await Topic.exists(1)).toBe(true);
-    expect(await Topic.exists("1")).toBe(true);
-    expect(await Topic.exists({ title: "The First Topic" })).toBe(true);
-    expect(await Topic.exists({ heading: "The First Topic" })).toBe(true);
-    expect(await Topic.exists({ author_name: "Mary", approved: true })).toBe(true);
-    expect(await Topic.exists(["parent_id = ?", 1])).toBe(true);
-    expect(await Topic.exists({ id: [1, 9999] })).toBe(true);
+    expect(await Topic.isExists(1)).toBe(true);
+    expect(await Topic.isExists("1")).toBe(true);
+    expect(await Topic.isExists({ title: "The First Topic" })).toBe(true);
+    expect(await Topic.isExists({ heading: "The First Topic" })).toBe(true);
+    expect(await Topic.isExists({ author_name: "Mary", approved: true })).toBe(true);
+    expect(await Topic.isExists(["parent_id = ?", 1])).toBe(true);
+    expect(await Topic.isExists({ id: [1, 9999] })).toBe(true);
 
-    expect(await Topic.exists(45)).toBe(false);
-    expect(await Topic.exists(9999999999999999999999999999999n)).toBe(false);
-    expect(await Topic.exists((new Topic() as any).id)).toBe(false);
+    expect(await Topic.isExists(45)).toBe(false);
+    expect(await Topic.isExists(9999999999999999999999999999999n)).toBe(false);
+    expect(await Topic.isExists((new Topic() as any).id)).toBe(false);
 
-    await expect(Topic.exists([1, 2])).rejects.toThrow(ArgumentError);
+    await expect(Topic.isExists([1, 2])).rejects.toThrow(ArgumentError);
   });
 
   it("exists with scope", async () => {
     const davids = Author.where({ name: "David" });
-    expect(await davids.exists()).toBe(true);
-    expect(await davids.exists(authors("david").id)).toBe(true);
-    expect(await davids.exists(authors("mary").id)).toBe(false);
-    expect(await davids.exists("42")).toBe(false);
-    expect(await davids.exists(42)).toBe(false);
-    expect(await davids.exists((davids.new() as any).id)).toBe(false);
+    expect(await davids.isExists()).toBe(true);
+    expect(await davids.isExists(authors("david").id)).toBe(true);
+    expect(await davids.isExists(authors("mary").id)).toBe(false);
+    expect(await davids.isExists("42")).toBe(false);
+    expect(await davids.isExists(42)).toBe(false);
+    expect(await davids.isExists((davids.new() as any).id)).toBe(false);
 
     const fake = Author.where({ name: "fake author" });
-    expect(await fake.exists()).toBe(false);
-    expect(await fake.exists(authors("david").id)).toBe(false);
+    expect(await fake.isExists()).toBe(false);
+    expect(await fake.isExists(authors("david").id)).toBe(false);
   });
 
   it("exists uses existing scope", async () => {
     const post = (await authors("david").posts.first())!;
     const authorsRel = Author.includes(":posts").where({ name: "David", posts: { id: post.id } });
-    expect(await authorsRel.exists(authors("david").id)).toBe(true);
+    expect(await authorsRel.isExists(authors("david").id)).toBe(true);
   });
 
   it("exists with polymorphic relation", async () => {
@@ -2065,41 +2065,43 @@ describe("FinderTest", () => {
     });
     const relation = Post.taggedWithComment("tagging comment");
 
-    expect(await relation.exists({ title: ["Post"] })).toBe(true);
-    expect(await relation.exists(["title LIKE ?", "Post%"])).toBe(true);
-    expect(await relation.exists()).toBe(true);
-    expect(await relation.exists(post.id)).toBe(true);
-    expect(await relation.exists(String(post.id))).toBe(true);
+    expect(await relation.isExists({ title: ["Post"] })).toBe(true);
+    expect(await relation.isExists(["title LIKE ?", "Post%"])).toBe(true);
+    expect(await relation.isExists()).toBe(true);
+    expect(await relation.isExists(post.id)).toBe(true);
+    expect(await relation.isExists(String(post.id))).toBe(true);
 
-    expect(await relation.exists(false)).toBe(false);
+    expect(await relation.isExists(false)).toBe(false);
   });
 
   it("exists with string", async () => {
-    expect(await Subscriber.exists("foo")).toBe(false);
-    expect(await Subscriber.exists("   ")).toBe(false);
+    expect(await Subscriber.isExists("foo")).toBe(false);
+    expect(await Subscriber.isExists("   ")).toBe(false);
 
     await Subscriber.createBang({ id: "foo" });
     await Subscriber.createBang({ id: "   " });
 
-    expect(await Subscriber.exists("foo")).toBe(true);
-    expect(await Subscriber.exists("   ")).toBe(true);
+    expect(await Subscriber.isExists("foo")).toBe(true);
+    expect(await Subscriber.isExists("   ")).toBe(true);
   });
 
   it("exists with strong parameters", async () => {
-    expect(await Subscriber.exists(new ProtectedParams({ nick: "foo" }).permitBang())).toBe(false);
+    expect(await Subscriber.isExists(new ProtectedParams({ nick: "foo" }).permitBang())).toBe(
+      false,
+    );
 
     await Subscriber.createBang({ nick: "foo" });
 
-    expect(await Subscriber.exists(new ProtectedParams({ nick: "foo" }).permitBang())).toBe(true);
+    expect(await Subscriber.isExists(new ProtectedParams({ nick: "foo" }).permitBang())).toBe(true);
 
-    await expect(Subscriber.exists(new ProtectedParams({ nick: "foo" }))).rejects.toThrow(
+    await expect(Subscriber.isExists(new ProtectedParams({ nick: "foo" }))).rejects.toThrow(
       ForbiddenAttributesError,
     );
   });
 
   it("exists passing active record object is not permitted", async () => {
-    await expect(Topic.exists(new Topic())).rejects.toThrow(ArgumentError);
-    const error = await Topic.exists(new Topic()).catch((e: unknown) => e);
+    await expect(Topic.isExists(new Topic())).rejects.toThrow(ArgumentError);
+    const error = await Topic.isExists(new Topic()).catch((e: unknown) => e);
     expect((error as Error).message).toBe(
       "You are passing an instance of ActiveRecord::Base to `exists?`. " +
         "Please pass the id of the object by calling `.id`.",
@@ -2112,23 +2114,23 @@ describe("FinderTest", () => {
       undefined,
       false,
       async () => {
-        await Topic.exists();
+        await Topic.isExists();
       },
     );
   });
 
   it("exists returns true with one record and no args", async () => {
-    expect(await Topic.exists()).toBe(true);
+    expect(await Topic.isExists()).toBe(true);
   });
 
   it("exists returns false with false arg", async () => {
-    expect(await Topic.exists(false)).toBe(false);
+    expect(await Topic.isExists(false)).toBe(false);
   });
 
   it("exists with loaded relation", async () => {
     const relation = await Topic.all().load();
     await assertQueriesMatch(/SELECT 1 AS one/i, 1, false, async () => {
-      expect(await relation.exists()).toBeTruthy();
+      expect(await relation.isExists()).toBeTruthy();
     });
   });
 
@@ -2136,7 +2138,7 @@ describe("FinderTest", () => {
     await Topic.deleteAll();
     const relation = await Topic.all().load();
     await assertQueriesMatch(/SELECT 1 AS one/i, 1, false, async () => {
-      expect(await relation.exists()).toBeFalsy();
+      expect(await relation.isExists()).toBeFalsy();
     });
   });
 
@@ -2147,7 +2149,7 @@ describe("FinderTest", () => {
     for (const post of await posts.records()) await post.destroy();
 
     await assertQueriesMatch(/SELECT 1 AS one/i, undefined, false, async () => {
-      expect(await author.posts.exists()).toBeFalsy();
+      expect(await author.posts.isExists()).toBeFalsy();
     });
   });
 
@@ -2161,30 +2163,30 @@ describe("FinderTest", () => {
     }
 
     await assertQueriesCount(1, false, async () => {
-      expect(await author.posts.exists()).toBeFalsy();
+      expect(await author.posts.isExists()).toBeFalsy();
     });
   });
 
   it("exists with nil arg", async () => {
-    expect(await Topic.exists(null)).toBe(false);
-    expect(await Topic.exists()).toBe(true);
+    expect(await Topic.isExists(null)).toBe(false);
+    expect(await Topic.isExists()).toBe(true);
 
-    expect(await (await Topic.first())!.replies.exists(null)).toBe(false);
-    expect(await (await Topic.first())!.replies.exists()).toBe(true);
+    expect(await (await Topic.first())!.replies.isExists(null)).toBe(false);
+    expect(await (await Topic.first())!.replies.isExists()).toBe(true);
   });
 
   it("exists with empty hash arg", async () => {
-    expect(await Topic.exists({})).toBe(true);
+    expect(await Topic.isExists({})).toBe(true);
   });
 
   it("exists with distinct and offset and joins", async () => {
-    expect(await Post.leftJoins(":comments").distinct().offset(10).exists()).toBeTruthy();
-    expect(await Post.leftJoins(":comments").distinct().offset(11).exists()).toBeFalsy();
+    expect(await Post.leftJoins(":comments").distinct().offset(10).isExists()).toBeTruthy();
+    expect(await Post.leftJoins(":comments").distinct().offset(11).isExists()).toBeFalsy();
   });
 
   it("exists with distinct and offset and select", async () => {
-    expect(await Post.select("body").distinct().offset(4).exists()).toBeTruthy();
-    expect(await Post.select("body").distinct().offset(5).exists()).toBeFalsy();
+    expect(await Post.select("body").distinct().offset(4).isExists()).toBeTruthy();
+    expect(await Post.select("body").distinct().offset(5).isExists()).toBeFalsy();
   });
 
   it("exists with distinct and offset and eagerload and order", async () => {
@@ -2193,23 +2195,23 @@ describe("FinderTest", () => {
         .distinct()
         .offset(10)
         .merge(Comment.order({ post_id: "asc" }))
-        .exists(),
+        .isExists(),
     ).toBeTruthy();
     expect(
       await Post.eagerLoad(":comments")
         .distinct()
         .offset(11)
         .merge(Comment.order({ post_id: "asc" }))
-        .exists(),
+        .isExists(),
     ).toBeFalsy();
   });
 
   it("exists with order and distinct", async () => {
-    expect(await Topic.order("id").distinct().exists()).toBe(true);
+    expect(await Topic.order("id").distinct().isExists()).toBe(true);
   });
 
   it("exists with order", async () => {
-    expect(await Topic.order(arelSql("invalid sql here")).exists()).toBe(true);
+    expect(await Topic.order(arelSql("invalid sql here")).isExists()).toBe(true);
   });
 
   it("exists with joins", async () => {
@@ -2217,7 +2219,7 @@ describe("FinderTest", () => {
       await Topic.joins(":replies")
         .where({ replies_topics: { approved: true } })
         .order("replies_topics.created_at DESC")
-        .exists(),
+        .isExists(),
     ).toBe(true);
   });
 
@@ -2226,7 +2228,7 @@ describe("FinderTest", () => {
       await Topic.leftJoins(":replies")
         .where({ replies_topics: { approved: true } })
         .order("replies_topics.created_at DESC")
-        .exists(),
+        .isExists(),
     ).toBe(true);
   });
 
@@ -2235,16 +2237,16 @@ describe("FinderTest", () => {
       await Topic.eagerLoad(":replies")
         .where({ replies_topics: { approved: true } })
         .order("replies_topics.created_at DESC")
-        .exists(),
+        .isExists(),
     ).toBe(true);
   });
 
   it("exists with includes limit and empty result", async () => {
     await assertNoQueries(false, async () => {
-      expect(await Topic.includes(":replies").limit(0).exists()).toBe(false);
+      expect(await Topic.includes(":replies").limit(0).isExists()).toBe(false);
     });
     await assertQueriesCount(1, false, async () => {
-      expect(await Topic.includes(":replies").limit(1).where("0 = 1").exists()).toBe(false);
+      expect(await Topic.includes(":replies").limit(1).where("0 = 1").isExists()).toBe(false);
     });
   });
 
@@ -2254,10 +2256,10 @@ describe("FinderTest", () => {
       ":specialComments",
     );
     await assertNoQueries(false, async () => {
-      expect(await uniqueCategorizedPosts.limit(0).exists()).toBe(false);
+      expect(await uniqueCategorizedPosts.limit(0).isExists()).toBe(false);
     });
     await assertQueriesCount(1, false, async () => {
-      expect(await uniqueCategorizedPosts.limit(1).exists()).toBe(true);
+      expect(await uniqueCategorizedPosts.limit(1).isExists()).toBe(true);
     });
   });
 
@@ -2267,10 +2269,10 @@ describe("FinderTest", () => {
       .includes(":specialComments")
       .order("comments.tags_count DESC");
     await assertNoQueries(false, async () => {
-      expect(await uniqueCategorizedPosts.limit(0).exists()).toBe(false);
+      expect(await uniqueCategorizedPosts.limit(0).isExists()).toBe(false);
     });
     await assertQueriesCount(1, false, async () => {
-      expect(await uniqueCategorizedPosts.limit(1).exists()).toBe(true);
+      expect(await uniqueCategorizedPosts.limit(1).isExists()).toBe(true);
     });
   });
 
@@ -2279,13 +2281,13 @@ describe("FinderTest", () => {
       .includes({ ":comment": ":post" })
       .where({ posts: { id: 1 } });
     await assertQueriesCount(1, false, async () => {
-      expect(await ratings.limit(1).exists()).toBeFalsy();
+      expect(await ratings.limit(1).isExists()).toBeFalsy();
     });
   });
 
   it("exists with empty table and no args given", async () => {
     await Topic.deleteAll();
-    expect(await Topic.exists()).toBe(false);
+    expect(await Topic.isExists()).toBe(false);
   });
 
   it("exists does not instantiate records", async () => {
@@ -2296,7 +2298,7 @@ describe("FinderTest", () => {
       return original.apply(this, args);
     };
     try {
-      await Developer.exists();
+      await Developer.isExists();
     } finally {
       (Developer as any).instantiate = original;
     }

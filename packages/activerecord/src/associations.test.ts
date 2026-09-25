@@ -2094,7 +2094,7 @@ describe("AssociationsTest", () => {
         blog_post_id: blogPost.id,
         blog_id: blogPost.blog_id,
         tag_id: tag.id,
-      }).exists(),
+      }).isExists(),
       (e: boolean) => e,
     );
   });
@@ -2112,7 +2112,7 @@ describe("AssociationsTest", () => {
         blog_post_id: blogPost.id,
         blog_id: blogPost.blog_id,
         tag_id: tag.id,
-      }).exists(),
+      }).isExists(),
       (e: boolean) => e,
     );
   });
@@ -2364,7 +2364,7 @@ describe("AssociationsTest", () => {
       await ShardedBlogPostTag.where({
         blog_post_id: blogPost.id,
         blog_id: blogPost.blog_id,
-      }).exists(),
+      }).isExists(),
       (e: boolean) => e,
     );
   });

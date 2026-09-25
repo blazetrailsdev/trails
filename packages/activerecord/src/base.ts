@@ -1580,7 +1580,7 @@ export class Base extends Model {
   declare static take: typeof Querying.take;
   declare static takeBang: typeof Querying.takeBang;
   declare static sole: typeof Querying.sole;
-  declare static exists: typeof Querying.exists;
+  declare static isExists: typeof Querying.isExists;
   declare static findOrCreateBy: typeof Querying.findOrCreateBy;
   declare static findOrCreateByBang: typeof Querying.findOrCreateByBang;
   declare static findOrInitializeBy: typeof Querying.findOrInitializeBy;

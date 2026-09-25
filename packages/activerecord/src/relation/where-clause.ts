@@ -1,4 +1,4 @@
-import { rbEqual } from "@blazetrails/activesupport";
+import { extractBang, rbEqual } from "@blazetrails/activesupport";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import { Nodes, fetchAttribute, sql } from "@blazetrails/arel";
@@ -61,7 +61,7 @@ export class WhereClause {
     return new WhereClause([new Nodes.Not(this.ast)]);
   }
 
-  except(...columns: (string | Nodes.Attribute | Nodes.Node)[]): WhereClause {
+  except(...columns: unknown[]): WhereClause {
     return new WhereClause(this.exceptPredicates(columns));
   }
 
@@ -137,34 +137,26 @@ export class WhereClause {
   }
 
   /** @internal */
-  private exceptPredicates(
-    columns: (string | Nodes.Attribute | Nodes.Node)[],
-  ): (Nodes.Node | string)[] {
-    const attrNodes: Nodes.Attribute[] = [];
-    const exprNodes: Nodes.Node[] = [];
-    const colStrings = new Set<string>();
-    for (const c of columns) {
-      if (typeof c === "string") colStrings.add(c);
-      else if (c instanceof Nodes.Attribute) {
-        attrNodes.push(c);
-        colStrings.add(`${String(c.relation.name)}.${c.name}`);
-      } else if (c instanceof Nodes.Node) {
-        exprNodes.push(c);
-      }
-    }
-    return this.predicates.filter((node) => {
-      const attr = extractAttribute(node);
-      if (attr === null) {
-        const left = predicationLeft(node);
-        if (left !== null && exprNodes.some((e) => rbEqual(e, left))) return false;
-        return true;
-      }
-      if (attrNodes.some((a) => rbEqual(a, attr))) return false;
-      if (colStrings.has(String(attr.name))) return false;
-      const qualified = `${String(attr.relation.name)}.${attr.name}`;
-      if (colStrings.has(qualified)) return false;
-      return true;
-    });
+  private exceptPredicates(columns: unknown[]): (Nodes.Node | string)[] {
+    const attrs = extractBang(columns, (node) => node instanceof Nodes.Attribute);
+    const nonAttrs = extractBang(columns, (node) => typeof (node as any)?.eq === "function");
+
+    return this.predicates.filter(
+      (node) =>
+        !(
+          (nonAttrs.length !== 0 &&
+          isEqualityNode(node) &&
+          typeof (node as any).left?.eq === "function"
+            ? nonAttrs.some((nonAttr) => rbEqual(nonAttr, (node as any).left))
+            : undefined) ||
+          fetchAttribute(
+            node,
+            (attr) =>
+              attrs.some((a) => rbEqual(a, attr)) ||
+              columns.includes(String((attr as Nodes.Attribute).name)),
+          )
+        ),
+    );
   }
 
   /** @internal */
@@ -232,14 +224,6 @@ function subtractNodes(
     }
   }
   return result;
-}
-
-function predicationLeft(node: Nodes.Node | string): Nodes.Node | null {
-  const isEquality = typeof (node as any).isEquality === "function" && (node as any).isEquality();
-  if (!isEquality) return null;
-  const left = (node as any).left;
-  if (left instanceof Nodes.Node && !(left instanceof Nodes.Attribute)) return left;
-  return null;
 }
 
 /** @internal */

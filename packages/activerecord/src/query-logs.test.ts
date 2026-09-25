@@ -103,7 +103,7 @@ describe("QueryLogsTest", () => {
   it("exists is commented", async () => {
     queryLogs.tags = ["application"];
     await assertQueriesMatch(/\/\*application:active_record\*\//, undefined, false, async () => {
-      await Dashboard.exists();
+      await Dashboard.isExists();
     });
   });
 

@@ -283,7 +283,7 @@ describe("LogSubscriberTest", () => {
 
   it("exists query logging", async () => {
     Base.logger = mockLogger;
-    await Developer.exists(1);
+    await Developer.isExists(1);
     const debug = mockLogger.logged("debug");
     expect(debug.length).toBe(1);
     expect(debug[debug.length - 1]).toMatch(/Developer Exists/);

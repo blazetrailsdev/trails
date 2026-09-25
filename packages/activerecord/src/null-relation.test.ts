@@ -49,7 +49,7 @@ describe("NullRelationTest", () => {
       expect(await Developer.none().deleteAll()).toBe(0);
       expect(await Developer.none().updateAll({ name: "David" })).toBe(0);
       expect(await Developer.none().delete(1)).toBe(0);
-      expect(await Developer.none().exists(1)).toBe(false);
+      expect(await Developer.none().isExists(1)).toBe(false);
     });
   });
 

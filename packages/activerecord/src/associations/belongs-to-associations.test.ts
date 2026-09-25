@@ -247,8 +247,8 @@ describe("BelongsToWithForeignKeyTest", () => {
 
     await author.destroy();
 
-    assertNot(await AuthorAddress.exists(address.id));
-    assertNot(await Author.exists(author.id));
+    assertNot(await AuthorAddress.isExists(address.id));
+    assertNot(await Author.isExists(author.id));
   });
 });
 

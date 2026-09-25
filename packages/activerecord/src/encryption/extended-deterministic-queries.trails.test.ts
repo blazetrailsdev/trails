@@ -62,7 +62,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest (trails ext
     Configurable.config.deterministicKey = "test-deterministic-key";
 
     savedMethods.where = relProto.where;
-    savedMethods.exists = relProto.exists;
+    savedMethods.isExists = relProto.isExists;
     savedMethods.scopeForCreate = relProto.scopeForCreate;
     savedMethods.findBy = baseStatics.findBy;
     savedMethods.serialize = EncryptedAttributeType.prototype.serialize;
@@ -79,7 +79,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest (trails ext
 
   afterAll(() => {
     relProto.where = savedMethods.where;
-    relProto.exists = savedMethods.exists;
+    relProto.isExists = savedMethods.isExists;
     relProto.scopeForCreate = savedMethods.scopeForCreate;
     baseStatics.findBy = savedMethods.findBy;
     EncryptedAttributeType.prototype.serialize =
@@ -97,7 +97,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest (trails ext
     await EncryptedSerializedBook.create({ name: "Dune" });
     expect(await EncryptedSerializedBook.findBy({ name: "Dune" })).not.toBeNull();
     expect(await EncryptedSerializedBook.where("id > 0").findBy({ name: "Dune" })).not.toBeNull();
-    expect(await EncryptedSerializedBook.exists({ name: "Dune" })).toBe(true);
+    expect(await EncryptedSerializedBook.isExists({ name: "Dune" })).toBe(true);
   });
 
   it("raises NoMethodError when a previous-scheme candidate reaches the serialized coder", async () => {

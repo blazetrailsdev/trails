@@ -20,7 +20,7 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
   let savedExtendQueries: boolean;
   const savedMethods: {
     where?: (...args: any[]) => unknown;
-    exists?: (...args: any[]) => unknown;
+    isExists?: (...args: any[]) => unknown;
     scopeForCreate?: (...args: any[]) => unknown;
     findBy?: (...args: any[]) => unknown;
     serialize?: (...args: any[]) => unknown;
@@ -33,7 +33,7 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
     configureEncryption();
 
     savedMethods.where = Relation.prototype.where;
-    savedMethods.exists = (Relation.prototype as any).exists;
+    savedMethods.isExists = (Relation.prototype as any).isExists;
     savedMethods.scopeForCreate = (Relation.prototype as any).scopeForCreate;
     savedMethods.findBy = (Base as any).findBy;
     savedMethods.serialize = EncryptedAttributeType.prototype.serialize;
@@ -44,7 +44,7 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
 
   afterEach(() => {
     Relation.prototype.where = savedMethods.where as typeof Relation.prototype.where;
-    (Relation.prototype as any).exists = savedMethods.exists;
+    (Relation.prototype as any).isExists = savedMethods.isExists;
     (Relation.prototype as any).scopeForCreate = savedMethods.scopeForCreate;
     (Base as any).findBy = savedMethods.findBy;
     EncryptedAttributeType.prototype.serialize =

@@ -397,7 +397,7 @@ export abstract class CollectionAssociation extends Association {
     if (this.isLoaded() || this._associationIds || this.reflection.hasActiveCachedCounter?.()) {
       return (await this.size()) === 0;
     }
-    return this.target.length === 0 && !(await this.scope().exists());
+    return this.target.length === 0 && !(await this.scope().isExists());
   }
 
   replace(otherArray: Base[]): Promise<Base[] | undefined> | Base[] {
@@ -434,7 +434,7 @@ export abstract class CollectionAssociation extends Association {
             (klass.primaryKey as string[]).map((key, i) => [key, (record.id as unknown[])[i]]),
           )
         : record.id;
-      return await this.scope().exists(recordId);
+      return await this.scope().isExists(recordId);
     }
   }
 

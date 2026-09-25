@@ -345,8 +345,8 @@ describe("QueryCacheTest", () => {
   it("exists queries with cache", async () => {
     await Post.cache(async () => {
       await assertQueriesCount(1, false, async () => {
-        await Post.exists();
-        await Post.exists();
+        await Post.isExists();
+        await Post.isExists();
       });
     });
   });

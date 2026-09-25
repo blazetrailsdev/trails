@@ -543,7 +543,7 @@ export class Relation<T extends Base> {
 
   async isEmpty(): Promise<boolean> {
     if (this.isLoaded) return (await this.records()).length === 0;
-    return !(await this.exists());
+    return !(await this.isExists());
   }
 
   async isAny(args?: EnumerablePattern<T>): Promise<boolean> {
@@ -1950,7 +1950,7 @@ export interface Relation<T extends Base>
   fortyTwoBang(): Promise<T>;
   secondToLastBang(): Promise<T>;
   thirdToLastBang(): Promise<T>;
-  exists(conditions?: Record<string, unknown> | unknown): Promise<boolean>;
+  isExists(conditions?: Record<string, unknown> | unknown): Promise<boolean>;
   include(record: T): Promise<boolean>;
   member(record: T): Promise<boolean>;
   raiseRecordNotFoundExceptionBang(

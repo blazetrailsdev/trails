@@ -185,7 +185,7 @@ describe("LeftOuterJoinAssociationTest", () => {
     const selected = Author.select(
       "authors.name, (authors.author_address_id || ' ' || authors.author_address_extra_id) as addr_id",
     ).leftOuterJoins(":posts");
-    expect(await selected.exists()).toBeTruthy();
+    expect(await selected.isExists()).toBeTruthy();
     const first = await selected.first();
     assertRespondTo(first, "addr_id");
   });

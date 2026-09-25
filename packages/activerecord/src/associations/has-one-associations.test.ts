@@ -424,7 +424,7 @@ describe("HasOneAssociationsTest", () => {
     expect(await readHasOne(firm, "account")).not.toBeNull();
 
     await assertRaises([DeleteRestrictionError], {}, () => firm.destroy());
-    assert(await RestrictedWithExceptionFirm.exists({ name: "restrict" }));
+    assert(await RestrictedWithExceptionFirm.isExists({ name: "restrict" }));
     assertPredicate(await readHasOne(firm, "account"), isPresent);
   });
 
@@ -440,7 +440,7 @@ describe("HasOneAssociationsTest", () => {
     expect(firm.errors.messagesFor("base")[0]).toBe(
       "Cannot delete record because a dependent account exists",
     );
-    assert(await RestrictedWithErrorFirm.exists({ name: "restrict" }));
+    assert(await RestrictedWithErrorFirm.isExists({ name: "restrict" }));
     assertPredicate(await readHasOne(firm, "account"), isPresent);
   });
 
@@ -459,7 +459,7 @@ describe("HasOneAssociationsTest", () => {
       expect(firm.errors.messagesFor("base")[0]).toBe(
         "Cannot delete record because a dependent firm account exists",
       );
-      assert(await RestrictedWithErrorFirm.exists({ name: "restrict" }));
+      assert(await RestrictedWithErrorFirm.isExists({ name: "restrict" }));
       assertPredicate(await readHasOne(firm, "account"), isPresent);
     } finally {
       resetI18n();
@@ -1184,7 +1184,7 @@ describe("HasOneAssociationsTest", () => {
     const book = await (DestroyByParentBook as any).create({ author });
     await author.destroy();
 
-    assertNot(await DestroyByParentBook.exists(book.id));
+    assertNot(await DestroyByParentBook.isExists(book.id));
   });
 
   it("destroyed_by_association set in child destroy callback on replace", async () => {
@@ -1217,7 +1217,7 @@ describe("HasOneAssociationsTest", () => {
     );
     await author.save();
 
-    assertNot(await DbaReplBook.exists(book.id));
+    assertNot(await DbaReplBook.isExists(book.id));
   });
 
   it("dependency should halt parent destruction", async () => {
