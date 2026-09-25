@@ -1305,8 +1305,8 @@ export class MigrationProxy {
     (await this.migration()).write(text);
   }
 
-  async disableDdlTransaction(): Promise<boolean> {
-    return (await this.migration()).disableDdlTransaction;
+  get disableDdlTransaction(): Promise<boolean> {
+    return this.migration().then((migration) => migration.disableDdlTransaction);
   }
 
   /** @internal */
@@ -1765,7 +1765,7 @@ export class Migrator {
         ActiveRecord.Base.logger.info(`Migrating to ${migration.name} (${migration.version})`);
 
       return await this.ddlTransaction(migration, async () => {
-        await (await migration.migration()).migrate(this._direction);
+        await migration.migrate(this._direction);
         return this.recordVersionStateAfterMigrating(migration.version);
       });
     } catch (e) {
@@ -1867,7 +1867,7 @@ export class Migrator {
 
   /** @internal */
   async isUseTransaction(migration: MigrationProxy): Promise<boolean> {
-    if ((await migration.migration()).disableDdlTransaction) return false;
+    if (await migration.disableDdlTransaction) return false;
     return (await this.connection).supportsDdlTransactions?.() ?? false;
   }
 

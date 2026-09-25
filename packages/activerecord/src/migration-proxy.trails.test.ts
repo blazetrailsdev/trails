@@ -49,7 +49,7 @@ describe("MigrationProxy", () => {
     expect(migrate).toHaveBeenCalledWith("up");
     expect(announce).toHaveBeenCalledWith("hello");
     expect(write).toHaveBeenCalledWith("text");
-    await expect(proxy.disableDdlTransaction()).resolves.toBe(true);
+    await expect(proxy.disableDdlTransaction).resolves.toBe(true);
   });
 
   it("migration() caches the result of loadMigration()", async () => {

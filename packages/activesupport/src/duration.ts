@@ -83,6 +83,8 @@ function mergeParts(
 export class Duration {
   readonly parts: DurationParts;
 
+  readonly [rubyClass] = "ActiveSupport::Duration";
+
   /** @internal */
   private readonly _partKeys: readonly (keyof DurationParts)[];
 

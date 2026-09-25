@@ -9,8 +9,8 @@ class MigrationStruct extends MigrationProxy {
     super(name, version, "", "");
   }
 
-  override async disableDdlTransaction(): Promise<boolean> {
-    return false;
+  override get disableDdlTransaction(): Promise<boolean> {
+    return Promise.resolve(false);
   }
 
   override async migrate(_direction: "up" | "down"): Promise<void> {}

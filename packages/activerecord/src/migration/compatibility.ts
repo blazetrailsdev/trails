@@ -4,6 +4,9 @@ import { Current } from "../migration.js";
 import * as Compatibility from "./compatibility.js";
 import { Migration } from "../namespaces.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
+import { ReferenceDefinition as ConnectionAdaptersReferenceDefinition } from "../connection-adapters/abstract/schema-definitions.js";
+import type { CommentStatements } from "../connection-adapters/abstract/schema-statements.js";
+import type { CommandRecorder as MigrationCommandRecorder } from "./command-recorder.js";
 import type {
   AddForeignKeyOptions,
   AddIndexOptions,
@@ -283,6 +286,159 @@ export class V6_1 extends V7_0 {
   override compatibleTableDefinition<T>(t: T): T {
     prepend(t as object, V6_1.TableDefinition);
     return super.compatibleTableDefinition(t);
+  }
+}
+
+class V6_0ReferenceDefinition extends ConnectionAdaptersReferenceDefinition {
+  protected override indexOptions(_tableName: string): AddIndexOptions {
+    return this.asOptions(this.index);
+  }
+}
+
+export class V6_0 extends V6_1 {
+  static ReferenceDefinition = V6_0ReferenceDefinition;
+
+  static override TableDefinition = {
+    references(super_: Super, ...args: unknown[]) {
+      const last = args[args.length - 1];
+      let options = (typeof last === "object" && last !== null ? args.pop() : {}) as Options;
+      options = { ...options, _usesLegacyReferenceIndexName: true };
+      return super_(...args, options);
+    },
+
+    belongsTo(super_: Super, ...args: unknown[]) {
+      return (V6_0.TableDefinition.references as Super).call(this, super_, ...args);
+    },
+
+    column(super_: Super, name: string, type: ColumnType, options: Options = {}) {
+      options = { ...options, precision: options.precision ?? null };
+      return super_(name, type, options);
+    },
+
+    raiseOnIfExistOptions(_super: unknown, _options: Options): void {},
+  } as unknown as PrependModule;
+
+  override async addReference(
+    tableName: string,
+    refName: string,
+    options: Parameters<Current["addReference"]>[2] = {},
+  ): Promise<void> {
+    if ((await this.connection).adapterName === "SQLite") {
+      options = { ...options, type: "integer" };
+    }
+
+    options = { ...options, _usesLegacyReferenceIndexName: true };
+    await super.addReference(tableName, refName, options);
+  }
+
+  override async addBelongsTo(
+    tableName: string,
+    refName: string,
+    options: Parameters<Current["addReference"]>[2] = {},
+  ): Promise<void> {
+    await this.addReference(tableName, refName, options);
+  }
+
+  /** @internal */
+  override compatibleTableDefinition<T>(t: T): T {
+    prepend(t as object, V6_0.TableDefinition);
+    return super.compatibleTableDefinition(t);
+  }
+}
+
+const V5_2CommandRecorder = {
+  invertTransaction(_super: unknown, args: unknown[], block?: unknown) {
+    return ["transaction", args, block];
+  },
+
+  invertChangeColumnComment(_super: unknown, args: unknown[]) {
+    return ["changeColumnComment", args];
+  },
+
+  invertChangeTableComment(_super: unknown, args: unknown[]) {
+    return ["changeTableComment", args];
+  },
+} as unknown as PrependModule;
+
+export class V5_2 extends V6_0 {
+  static override TableDefinition = {
+    timestamps(super_: Super, options: Options = {}) {
+      options = { ...options, precision: options.precision ?? null };
+      return super_(options);
+    },
+
+    column(super_: Super, name: string, type: ColumnType, options: Options = {}) {
+      options = { ...options, precision: options.precision ?? null };
+      return super_(name, type, options);
+    },
+
+    raiseOnIfExistOptions(_super: unknown, _options: Options): void {},
+
+    raiseOnDuplicateColumn(_super: unknown, _name: string): void {},
+  } as unknown as PrependModule;
+
+  static CommandRecorder = V5_2CommandRecorder;
+
+  override async addTimestamps(tableName: string, options: ColumnOptions = {}): Promise<void> {
+    options = { ...options, precision: options.precision ?? null } as ColumnOptions;
+    await super.addTimestamps(tableName, options);
+  }
+
+  /** @internal */
+  override compatibleTableDefinition<T>(t: T): T {
+    prepend(t as object, V5_2.TableDefinition);
+    return super.compatibleTableDefinition(t);
+  }
+
+  /** @internal */
+  override async commandRecorder(): Promise<MigrationCommandRecorder> {
+    const recorder = await super.commandRecorder();
+    prepend(recorder, V5_2.CommandRecorder);
+    return recorder;
+  }
+}
+
+export class V5_1 extends V5_2 {
+  override async changeColumn(
+    tableName: string,
+    columnName: string,
+    type: ColumnType,
+    options: ColumnOptions = {},
+  ): Promise<void> {
+    const connection = await this.connection;
+    if (connection.adapterName === "PostgreSQL") {
+      const { default: _d, null: _n, comment: _c, ...except } = options;
+      await super.changeColumn(tableName, columnName, type, except);
+      if (Object.hasOwn(options, "default")) {
+        await connection.changeColumnDefault(tableName, columnName, options.default);
+      }
+      if (Object.hasOwn(options, "null")) {
+        await connection.changeColumnNull(tableName, columnName, options.null!, options.default);
+      }
+      if (Object.hasOwn(options, "comment")) {
+        await (connection as unknown as CommentStatements).changeColumnComment(
+          tableName,
+          columnName,
+          options.comment!,
+        );
+      }
+    } else {
+      await super.changeColumn(tableName, columnName, type, options);
+    }
+  }
+
+  override async createTable(
+    tableName: string,
+    options?: Parameters<Current["createTable"]>[1],
+    fn?: Parameters<Current["createTable"]>[2],
+  ): Promise<void> {
+    const connection = await this.connection;
+    if (connection.adapterName === "Mysql2" || connection.adapterName === "Trilogy") {
+      if (typeof options === "function") [options, fn] = [{}, options];
+      await super.createTable(tableName, { options: "ENGINE=InnoDB", ...options }, fn);
+    } else {
+      await super.createTable(tableName, options, fn);
+    }
   }
 }
 

@@ -17,6 +17,7 @@
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { BigDecimal, TimeWithZone } from "@blazetrails/activesupport";
 import { Attribute as ModelAttribute, BinaryData, type ValueType } from "@blazetrails/activemodel";
+import { rbObjClass } from "@blazetrails/ruby-compat";
 import type { TypeMap } from "../../type/type-map.js";
 import { NotImplementedError } from "../../errors.js";
 import { formatPlainDateTimeForSql, formatPlainDateForSql } from "./sql-datetime.js";
@@ -96,7 +97,7 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
   if (typeof value === "function" && value.name) {
     return `'${value.name}'`;
   }
-  throw new TypeError(`can't quote ${(value as object).constructor?.name ?? typeof value}`);
+  throw new TypeError(`can't quote ${rbObjClass(value)}`);
 }
 
 export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
