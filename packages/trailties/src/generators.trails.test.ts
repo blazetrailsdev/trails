@@ -1,9 +1,12 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, vi } from "vitest";
 import * as fs from "node:fs";
 import * as nodePath from "node:path";
 import * as os from "node:os";
 import { Generators } from "./generators.js";
+import { DATABASES } from "./generators/database.js";
 import { createProgram } from "./cli.js";
+import { AuthenticationGenerator } from "./generators/rails/authentication/authentication-generator.js";
+import { GeneratorGenerator } from "./generators/rails/generator/generator-generator.js";
 import { getFs, getPath } from "@blazetrails/ruby-compat";
 
 beforeAll(async () => {
@@ -71,5 +74,57 @@ describe("GeneratorsTest", () => {
       expect(help).not.toMatch(new RegExp(`^\\s+${name}\\b`, "m"));
     }
     expect(help).toMatch(/^\s+helper\b/m);
+  });
+
+  it("trails generate passes declared class options through to the generator", async () => {
+    const seen: unknown[] = [];
+    const auth = vi.spyOn(AuthenticationGenerator.prototype, "run").mockImplementation(function (
+      this: AuthenticationGenerator,
+    ) {
+      seen.push(this.options.api);
+      return [];
+    });
+    const gen = vi.spyOn(GeneratorGenerator.prototype, "run").mockImplementation(function (
+      this: GeneratorGenerator,
+    ) {
+      seen.push(this.options.namespace);
+      return [];
+    });
+    try {
+      await createProgram().parseAsync(["generate", "authentication", "--api"], { from: "user" });
+      await createProgram().parseAsync(["generate", "generator", "foo", "--no-namespace"], {
+        from: "user",
+      });
+    } finally {
+      auth.mockRestore();
+      gen.mockRestore();
+    }
+    expect(seen).toEqual([true, false]);
+  });
+
+  it("a lookup-registered subcommand advertises its generator's class options", () => {
+    const generate = createProgram().commands.find((c) => c.name() === "generate")!;
+    const sub = generate.commands.find((c) => c.name() === "generator")!;
+    let help = "";
+    sub.configureOutput({ writeOut: (str) => (help += str) });
+    sub.outputHelp();
+    expect(help).toMatch(
+      /\[--namespace\], \[--no-namespace\], \[--skip-namespace\]\s+# Namespace generator/,
+    );
+    expect(help).toMatch(/\[--skip-collision-check\]/);
+  });
+
+  it("find by namespace imports only the candidate generator files", async () => {
+    vi.resetModules();
+    const { Generators: fresh } = await import("./generators.js");
+    await fresh.findByNamespace("rails:helper");
+    expect(fresh.subclasses().map((k) => k.namespace)).toEqual(["rails:helper"]);
+  });
+
+  it("an enum class option rejects an undeclared value with Thor's message", async () => {
+    const devcontainer = (await Generators.findByNamespace("devcontainer"))!;
+    await expect(
+      devcontainer.start(["--database", "oracle"], { cwd: "/tmp", output: () => {} }),
+    ).rejects.toThrow(`Expected '--database' to be one of ${DATABASES.join(", ")}; got "oracle"`);
   });
 });

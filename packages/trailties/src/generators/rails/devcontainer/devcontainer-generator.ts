@@ -23,24 +23,70 @@ type ResolvedOptions = Required<
 >;
 
 export class DevcontainerGenerator extends GeneratorBase {
+  static {
+    this.classOption("appName", { type: "string", default: "rails_app", desc: "Name of the app" });
+    this.classOption("database", {
+      enum: DATABASES,
+      type: "string",
+      default: "sqlite3",
+      desc: "Include configuration for selected database",
+    });
+    this.classOption("redis", {
+      type: "boolean",
+      default: true,
+      desc: "Include configuration for Redis",
+    });
+    this.classOption("systemTest", {
+      type: "boolean",
+      default: true,
+      desc: "Include configuration for System Tests",
+    });
+    this.classOption("activeStorage", {
+      type: "boolean",
+      default: true,
+      desc: "Include configuration for Active Storage",
+    });
+    this.classOption("node", {
+      type: "boolean",
+      default: false,
+      desc: "Include configuration for Node",
+    });
+    this.classOption("dev", {
+      type: "boolean",
+      default: false,
+      desc: "For applications pointing to a local Rails checkout",
+    });
+    this.classOption("kamal", {
+      type: "boolean",
+      default: true,
+      desc: "Include configuration for Kamal",
+    });
+    this.classOption("skipSolid", {
+      type: "boolean",
+      default: null,
+      desc: "Skip Solid Cache, Queue, and Cable setup",
+    });
+  }
+
   readonly opts: ResolvedOptions;
   /** @internal */
   readonly database: Database;
 
   constructor(options: DevcontainerGeneratorOptions) {
     super(options);
-    const database = options.database ?? "sqlite3";
+    const { appName, database, redis, systemTest, activeStorage, node, dev, kamal } = this
+      .options as Required<DevcontainerGeneratorOptions>;
     if (!(DATABASES as readonly string[]).includes(database))
       throw new Error(`Unknown database: ${database}`);
     this.opts = {
-      appName: options.appName ?? "rails_app",
+      appName,
       database,
-      redis: options.redis !== false,
-      systemTest: options.systemTest !== false,
-      activeStorage: options.activeStorage !== false,
-      node: options.node === true,
-      dev: options.dev === true,
-      kamal: options.kamal !== false,
+      redis,
+      systemTest,
+      activeStorage,
+      node,
+      dev,
+      kamal,
       sqliteDriver: options.sqliteDriver ?? "better-sqlite3",
       nodeVersion: options.nodeVersion ?? "24.16.0",
     };

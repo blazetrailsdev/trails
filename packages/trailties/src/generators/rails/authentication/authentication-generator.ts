@@ -3,27 +3,29 @@ import { GeneratorBase, type GeneratorOptions } from "../../base.js";
 import { MigrationGenerator } from "../../migration-generator.js";
 import { TEMPLATES } from "./templates.js";
 
-export interface AuthenticationRunOptions {
+export interface AuthenticationGeneratorOptions extends GeneratorOptions {
   api?: boolean;
-  skipMailer?: boolean;
   skipActionCable?: boolean;
 }
 
 export class AuthenticationGenerator extends GeneratorBase {
-  constructor(options: GeneratorOptions) {
+  declare options: AuthenticationGeneratorOptions;
+
+  static {
+    this.classOption("api", {
+      type: "boolean",
+      desc: "Generate API-only controllers and models, with no view templates",
+    });
+  }
+
+  constructor(options: AuthenticationGeneratorOptions) {
     super(options);
   }
 
-  static override async start(args: string[], config: GeneratorOptions): Promise<string[]> {
-    const generator = new AuthenticationGenerator(config);
-    generator.run({});
-    return generator.getCreatedFiles();
-  }
-
-  run(options: AuthenticationRunOptions = {}): string[] {
+  run(): string[] {
     if (!this.isTypeScript())
       throw new Error("AuthenticationGenerator currently emits TypeScript only.");
-    this.createAuthenticationFiles(options);
+    this.createAuthenticationFiles();
     this.configureApplicationController();
     this.configureAuthenticationRoutes();
     this.enableBcrypt();
@@ -31,9 +33,7 @@ export class AuthenticationGenerator extends GeneratorBase {
     return this.getCreatedFiles();
   }
 
-  private createAuthenticationFiles(options: AuthenticationRunOptions): void {
-    const { api = false, skipMailer = false, skipActionCable = true } = options;
-
+  private createAuthenticationFiles(): void {
     this.template("app/models/session.rb");
     this.template("app/models/user.rb");
     this.template("app/models/current.rb");
@@ -42,16 +42,15 @@ export class AuthenticationGenerator extends GeneratorBase {
     this.template("app/controllers/concerns/authentication.rb");
     this.template("app/controllers/passwords_controller.rb");
 
-    if (!skipActionCable) this.template("app/channels/application_cable/connection.rb");
+    if (this.options.skipActionCable === false)
+      this.template("app/channels/application_cable/connection.rb");
 
-    if (!skipMailer) {
-      this.template("app/mailers/passwords_mailer.rb");
-      if (!api) {
-        this.template("app/views/passwords_mailer/reset.html.erb");
-        this.template("app/views/passwords_mailer/reset.text.erb");
-      }
-      this.template("test/mailers/previews/passwords_mailer_preview.rb");
-    }
+    this.template("app/mailers/passwords_mailer.rb");
+
+    this.template("app/views/passwords_mailer/reset.html.erb");
+    this.template("app/views/passwords_mailer/reset.text.erb");
+
+    this.template("test/mailers/previews/passwords_mailer_preview.rb");
   }
 
   private template(file: string): void {
@@ -79,7 +78,8 @@ export class AuthenticationGenerator extends GeneratorBase {
     const m = src.match(/export\s+class\s+ApplicationController\b[^{]*\{/);
     if (!m || m.index === undefined) return;
     const at = m.index + m[0].length;
-    src = imp + src.slice(0, at) + mixin + src.slice(at);
+    const surface = mixin ? INCLUDED_SURFACE : "";
+    src = imp + src.slice(0, m.index) + surface + src.slice(m.index, at) + mixin + src.slice(at);
     File.write(full, src);
   }
 
@@ -127,6 +127,9 @@ export class AuthenticationGenerator extends GeneratorBase {
   }
 }
 
-const INCLUDE_IMPORT = `import { include } from "@blazetrails/activesupport";\n`;
-const AUTH_IMPORT = `import { Authentication } from "./concerns/authentication.js";\n`;
-const STATIC_INIT = `\n  static {\n    include(this, Authentication);\n  }`;
+const INCLUDE_IMPORT = `import { include, type Extended, type Included } from "@blazetrails/activesupport";\n`;
+const AUTH_IMPORT = `import { Authentication, type ClassMethods } from "./concerns/authentication.js";\n`;
+const INCLUDED_SURFACE = `export interface ApplicationController extends Included<typeof Authentication> {}\n\n`;
+const STATIC_INIT =
+  `\n  declare static allowUnauthenticatedAccess: Extended<typeof ClassMethods>["allowUnauthenticatedAccess"];\n` +
+  `\n  static {\n    include(this, Authentication);\n  }`;

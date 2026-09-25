@@ -16,7 +16,8 @@ const APP_CTRL_EMPTY = `import { ActionController } from "@blazetrails/actionpac
 let tmpDir: string;
 const read = (rel: string) => fs.readFileSync(path.join(tmpDir, rel), "utf-8");
 const exists = (rel: string) => fs.existsSync(path.join(tmpDir, rel));
-const makeGen = () => new AuthenticationGenerator({ cwd: tmpDir, output: () => {} });
+const makeGen = (options: { skipActionCable?: boolean } = {}) =>
+  new AuthenticationGenerator({ cwd: tmpDir, output: () => {}, ...options });
 
 const write = (rel: string, content: string) => {
   const full = path.join(tmpDir, rel);
@@ -44,7 +45,7 @@ afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
 
 describe("AuthenticationGenerator", () => {
   it("emits the full file set; each .ts file parses + carries no Ruby source", () => {
-    makeGen().run({ skipMailer: false, skipActionCable: false });
+    makeGen({ skipActionCable: false }).run();
     for (const rel of VIEWS) expect(exists(rel), rel).toBe(true);
     const combined: string[] = [];
     for (const rel of TS_EMIT) {
@@ -56,20 +57,16 @@ describe("AuthenticationGenerator", () => {
     expect(combined.join("\n")).toMatchSnapshot();
   });
 
-  it("--skip-mailer drops mailer/preview/views; --api keeps mailer but drops views", () => {
-    makeGen().run({ skipMailer: true });
-    expect(exists("app/mailers/passwords-mailer.ts")).toBe(false);
-    expect(exists(VIEWS[0])).toBe(false);
-    expect(exists("test/mailers/previews/passwords-mailer-preview.ts")).toBe(false);
-    makeGen().run({ api: true, skipMailer: false });
-    expect(exists("app/mailers/passwords-mailer.ts")).toBe(true);
-    expect(exists(VIEWS[0])).toBe(false);
-  });
-
-  it("skips the channel file while its package is unported", () => {
-    makeGen().run();
+  it("--api still templates the mailer, its views and its preview", async () => {
+    await AuthenticationGenerator.start(["--api"], { cwd: tmpDir, output: () => {} });
     expect(exists("app/mailers/passwords-mailer.ts")).toBe(true);
     for (const rel of VIEWS) expect(exists(rel), rel).toBe(true);
+    expect(exists("test/mailers/previews/passwords-mailer-preview.ts")).toBe(true);
+  });
+
+  it("connection_class_skipped_without_action_cable", () => {
+    makeGen().run();
+
     expect(exists("app/channels/application-cable/connection.ts")).toBe(false);
   });
 
@@ -113,14 +110,16 @@ describe("AuthenticationGenerator", () => {
     writeAC("{\n}", "{\n  static {\n    include(this, Authentication);\n  }\n}");
     makeGen().run();
     const ac = read(APP_CTRL_PATH);
-    expect(ac).toContain('import { Authentication } from "./concerns/authentication.js";');
+    expect(ac).toContain(
+      'import { Authentication, type ClassMethods } from "./concerns/authentication.js";',
+    );
     expect(ac.match(/include\(this, Authentication\)/g)).toHaveLength(1);
     expect(parseTs(ac).diagnostics).toEqual([]);
   });
 
   it("does not clobber a pre-existing application-cable Connection", () => {
     write("app/channels/application-cable/connection.ts", "// user\n");
-    makeGen().run({ skipActionCable: false });
+    makeGen({ skipActionCable: false }).run();
     expect(read("app/channels/application-cable/connection.ts")).toBe("// user\n");
   });
 
@@ -133,7 +132,7 @@ describe("AuthenticationGenerator", () => {
   });
 
   it("emits working method bodies, not comment stubs", () => {
-    makeGen().run({ skipMailer: false, skipActionCable: false });
+    makeGen({ skipActionCable: false }).run();
     for (const rel of TS_EMIT) expect(read(rel), rel).not.toMatch(/\{\s*\/\/[^\n]*\n\s*\}/);
     expect(read("app/controllers/sessions-controller.ts")).toContain("User.authenticateBy(");
     expect(read("app/controllers/concerns/authentication.ts")).toContain("Session.findBy(");

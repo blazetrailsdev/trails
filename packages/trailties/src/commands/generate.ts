@@ -2,8 +2,6 @@ import { Dir } from "@blazetrails/ruby-compat";
 import { Command } from "commander";
 import { ModelGenerator } from "../generators/model-generator.js";
 import { MigrationGenerator } from "../generators/migration-generator.js";
-import { ControllerGenerator } from "../generators/rails/controller/controller-generator.js";
-import { ScaffoldGenerator } from "../generators/rails/scaffold/scaffold-generator.js";
 import { Generators } from "../generators.js";
 
 export function generateCommand(): Command {
@@ -44,33 +42,19 @@ export function generateCommand(): Command {
       gen.run(name, columns);
     });
 
-  cmd
-    .command("controller")
-    .description("Generate a controller with actions")
-    .argument("<name>", "Controller name (e.g. Posts)")
-    .argument("[actions...]", "Action names (e.g. index show create)")
-    .action((name: string, actions: string[]) => {
-      const gen = new ControllerGenerator({ cwd: Dir.pwd(), output: console.log });
-      gen.run(name, actions);
-    });
-
-  cmd
-    .command("scaffold")
-    .description("Generate a complete CRUD resource")
-    .argument("<name>", "Resource name (e.g. Post)")
-    .argument("[attributes...]", "Attributes as name:type pairs")
-    .action((name: string, attributes: string[]) => {
-      const gen = new ScaffoldGenerator({ cwd: Dir.pwd(), output: console.log });
-      gen.run(name, attributes);
-    });
-
   const registered = new Set(cmd.commands.map((c) => c.name()));
-  for (const { name, namespace, hidden } of Generators.namespacesForHelp()) {
+  for (const { name, namespace, hidden, klass } of Generators.namespacesForHelp()) {
     if (registered.has(name)) continue;
     cmd
       .command(name, { hidden })
       .description(`Run the ${name} generator`)
       .argument("[args...]", "Generator arguments")
+      .allowUnknownOption()
+      .addHelpText("after", () => {
+        const lines = [""];
+        klass.classOptionsHelp((line) => lines.push(line));
+        return lines.join("\n");
+      })
       .action(async (args: string[]) => {
         await Generators.invoke(namespace, args, { cwd: Dir.pwd(), output: console.log });
       });
