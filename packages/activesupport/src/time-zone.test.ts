@@ -187,7 +187,9 @@ describe("TimeZoneTest", () => {
   it("now", () => {
     withEnvTz("US/Eastern", () => {
       const zone = TimeZone.create("Eastern Time (US & Canada)");
-      Object.assign(zone, { timeNow: () => new Date(Time.local(2000).toTime().epochMilliseconds) });
+      Object.assign(zone, {
+        timeNow: () => new Date(Time.local(2000).toZonedDateTime().epochMilliseconds),
+      });
       expect(zone.now()).toBeInstanceOf(TimeWithZone);
       expect(zone.now().utc()).toEqual(Time.utc(2000, 1, 1, 5));
       expect(zone.now().time).toEqual(Time.utc(2000));
@@ -199,7 +201,7 @@ describe("TimeZoneTest", () => {
     withEnvTz("US/Eastern", () => {
       const zone = TimeZone.create("Eastern Time (US & Canada)");
       Object.assign(zone, {
-        timeNow: () => new Date(Time.local(2006, 4, 2, 2).toTime().epochMilliseconds),
+        timeNow: () => new Date(Time.local(2006, 4, 2, 2).toZonedDateTime().epochMilliseconds),
       });
 
       expect(zone.now().time).toEqual(Time.utc(2006, 4, 2, 3));
@@ -211,7 +213,7 @@ describe("TimeZoneTest", () => {
     withEnvTz("US/Eastern", () => {
       const zone = TimeZone.create("Eastern Time (US & Canada)");
       Object.assign(zone, {
-        timeNow: () => new Date(Time.at(1162098000).toTime().epochMilliseconds),
+        timeNow: () => new Date(Time.at(1162098000).toZonedDateTime().epochMilliseconds),
       });
       expect(zone.now().time).toEqual(Time.utc(2006, 10, 29, 1));
       expect(zone.now().dst()).toEqual(true);
@@ -994,21 +996,21 @@ describe("TimeZoneTest", () => {
 
   it("abbr", () => {
     const zone = TimeZone.find("America/Toronto")!;
-    expect(zone.abbr(Time.utc(2000, 4, 2, 6).toTime().toInstant())).toEqual("EST");
-    expect(zone.abbr(Time.utc(2000, 4, 2, 7).toTime().toInstant())).toEqual("EDT");
-    expect(zone.abbr(Time.utc(2000, 4, 2, 8).toTime().toInstant())).toEqual("EDT");
-    expect(zone.abbr(Time.utc(2000, 10, 29, 5).toTime().toInstant())).toEqual("EDT");
-    expect(zone.abbr(Time.utc(2000, 10, 29, 6).toTime().toInstant())).toEqual("EST");
-    expect(zone.abbr(Time.utc(2000, 10, 29, 7).toTime().toInstant())).toEqual("EST");
+    expect(zone.abbr(Time.utc(2000, 4, 2, 6).toZonedDateTime().toInstant())).toEqual("EST");
+    expect(zone.abbr(Time.utc(2000, 4, 2, 7).toZonedDateTime().toInstant())).toEqual("EDT");
+    expect(zone.abbr(Time.utc(2000, 4, 2, 8).toZonedDateTime().toInstant())).toEqual("EDT");
+    expect(zone.abbr(Time.utc(2000, 10, 29, 5).toZonedDateTime().toInstant())).toEqual("EDT");
+    expect(zone.abbr(Time.utc(2000, 10, 29, 6).toZonedDateTime().toInstant())).toEqual("EST");
+    expect(zone.abbr(Time.utc(2000, 10, 29, 7).toZonedDateTime().toInstant())).toEqual("EST");
   });
 
   it("dst", () => {
     const zone = TimeZone.find("America/Toronto")!;
-    expect(zone.isDst(Time.utc(2000, 4, 2, 6).toTime().toInstant())).toEqual(false);
-    expect(zone.isDst(Time.utc(2000, 4, 2, 7).toTime().toInstant())).toEqual(true);
-    expect(zone.isDst(Time.utc(2000, 4, 2, 8).toTime().toInstant())).toEqual(true);
-    expect(zone.isDst(Time.utc(2000, 10, 29, 5).toTime().toInstant())).toEqual(true);
-    expect(zone.isDst(Time.utc(2000, 10, 29, 6).toTime().toInstant())).toEqual(false);
-    expect(zone.isDst(Time.utc(2000, 10, 29, 7).toTime().toInstant())).toEqual(false);
+    expect(zone.isDst(Time.utc(2000, 4, 2, 6).toZonedDateTime().toInstant())).toEqual(false);
+    expect(zone.isDst(Time.utc(2000, 4, 2, 7).toZonedDateTime().toInstant())).toEqual(true);
+    expect(zone.isDst(Time.utc(2000, 4, 2, 8).toZonedDateTime().toInstant())).toEqual(true);
+    expect(zone.isDst(Time.utc(2000, 10, 29, 5).toZonedDateTime().toInstant())).toEqual(true);
+    expect(zone.isDst(Time.utc(2000, 10, 29, 6).toZonedDateTime().toInstant())).toEqual(false);
+    expect(zone.isDst(Time.utc(2000, 10, 29, 7).toZonedDateTime().toInstant())).toEqual(false);
   });
 });

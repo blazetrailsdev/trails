@@ -13,7 +13,7 @@ import { fixtures } from "./test-fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Address, Customer } from "./test-helpers/models/customer.js";
 
-const utc = (v: RubyTime) => v.getutc().toTime();
+const utc = (v: RubyTime) => v.getutc().toZonedDateTime();
 
 describe("MultiParameterAttributeTest", () => {
   fixtures(["topics"]);

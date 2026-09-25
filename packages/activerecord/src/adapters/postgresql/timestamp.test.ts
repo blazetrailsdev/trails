@@ -207,7 +207,7 @@ describeIfPg("PostgreSQLAdapter", () => {
               time: TimeWithZone;
             };
             expect(record.time).toBeInstanceOf(TimeWithZone);
-            expect(record.time.utc().toTime().epochNanoseconds).toBe(
+            expect(record.time.utc().toZonedDateTime().epochNanoseconds).toBe(
               Temporal.Instant.from("2010-01-01T11:00:00Z").epochNanoseconds,
             );
           },
@@ -274,7 +274,7 @@ describeIfPg("PostgreSQLAdapter", () => {
                 time: TimeWithZone;
               };
               expect(record.time).toBeInstanceOf(TimeWithZone);
-              expect(record.time.utc().toTime().epochNanoseconds).toBe(
+              expect(record.time.utc().toZonedDateTime().epochNanoseconds).toBe(
                 Temporal.Instant.from("2010-01-01T11:00:00Z").epochNanoseconds,
               );
             },

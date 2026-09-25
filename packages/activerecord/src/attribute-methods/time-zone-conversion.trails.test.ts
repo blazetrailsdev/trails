@@ -165,7 +165,7 @@ describe("TimeZoneConverter#serialize containers", () => {
     const converter = new TimeZoneConverter(new RangeType(new Types.DateTimeType({})));
     const serialized = converter.serialize(new Range(twz(), twz(), true)) as Range;
     expect(serialized.begin).toBeInstanceOf(RubyTime);
-    expect((serialized.begin as RubyTime).toTime().toInstant().epochNanoseconds).toBe(
+    expect((serialized.begin as RubyTime).toZonedDateTime().toInstant().epochNanoseconds).toBe(
       instant.epochNanoseconds,
     );
   });
@@ -177,7 +177,7 @@ describe("TimeZoneConverter#serialize containers", () => {
     const serialized = converter.serialize([new Range(twz(), twz(), true)]) as { values: Range[] };
     const begin = serialized.values[0].begin;
     expect(begin).toBeInstanceOf(RubyTime);
-    expect((begin as RubyTime).toTime().toInstant().epochNanoseconds).toBe(
+    expect((begin as RubyTime).toZonedDateTime().toInstant().epochNanoseconds).toBe(
       instant.epochNanoseconds,
     );
   });

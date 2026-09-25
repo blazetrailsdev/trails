@@ -24,7 +24,7 @@ registerModel(Ship);
 function expectedUsec(ts: RubyTime | Temporal.Instant | Temporal.PlainDateTime): string {
   const dt =
     ts instanceof RubyTime
-      ? ts.getutc().toTime()
+      ? ts.getutc().toZonedDateTime()
       : ts instanceof Temporal.Instant
         ? ts.toZonedDateTimeISO("UTC")
         : ts.toZonedDateTime("UTC");

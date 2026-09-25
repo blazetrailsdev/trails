@@ -1,4 +1,10 @@
-import { basicObjRespondTo, type Hash, rbObjSingletonClass } from "@blazetrails/ruby-compat";
+import {
+  basicObjRespondTo,
+  type Hash,
+  rbModSingletonP,
+  rbModToS,
+  rbObjSingletonClass,
+} from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/date";
 import "./i18n.js";
 import type { Identification } from "@blazetrails/globalid";
@@ -2333,8 +2339,12 @@ export class Base extends Model {
   }
 
   static inspect(): string {
-    const name = this === Base ? "ActiveRecord::Base" : this.name;
-    if (this === Base) {
+    const name = rbModSingletonP(this)
+      ? rbModToS(this)
+      : this === Base
+        ? "ActiveRecord::Base"
+        : this.name;
+    if (this === Base || rbModSingletonP(this)) {
       return name;
     } else if (this.abstractClass) {
       return `${name}(abstract)`;

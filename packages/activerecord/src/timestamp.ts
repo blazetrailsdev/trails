@@ -2,7 +2,7 @@ import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Rational } from "@blazetrails/ruby-compat";
 import { currentTimeInstant } from "@blazetrails/activesupport";
 import { reloadSchemaFromCache as attributesReloadSchemaFromCache } from "./attributes.js";
-import { isUtc } from "./type/internal/timezone.js";
+import { defaultTimezone } from "./active-record.js";
 
 export interface TouchOptions {
   time?: Date | RubyTime | null;
@@ -95,7 +95,7 @@ export function allTimestampAttributesInModel(this: TimestampHost): string[] {
 /** @missingRailsCall with_connection — PERMANENT */
 export function currentTimeFromProperTimezone(): RubyTime {
   const now = RubyTime.at(new Rational(currentTimeInstant().epochNanoseconds, 1_000_000_000n));
-  return isUtc() ? now.getutc() : now.getlocal();
+  return defaultTimezone() === "utc" ? now.getutc() : now.getlocal();
 }
 
 /** @internal */

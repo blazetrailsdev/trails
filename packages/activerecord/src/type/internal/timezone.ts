@@ -7,18 +7,10 @@ export interface TimezoneOptions {
 
 import { defaultTimezone } from "../../active-record.js";
 
-export function isUtc(timezone?: "utc" | "local"): boolean {
-  return (timezone ?? defaultTimezone()) === "utc";
-}
-
 export class Timezone {
-  private _timezone?: "utc" | "local";
+  declare _timezone?: "utc" | "local";
 
-  constructor(options?: TimezoneOptions) {
-    this._timezone = options?.timezone;
-  }
-
-  isUtc(): boolean {
+  get isUtc(): boolean {
     return this.defaultTimezone === "utc";
   }
 

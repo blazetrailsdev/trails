@@ -48,7 +48,7 @@ function sleep(seconds: number): void {
 }
 
 function instantOf(time: Time): bigint {
-  return time.toTime().epochNanoseconds;
+  return time.toZonedDateTime().epochNanoseconds;
 }
 
 describe("TimeTravelTest", () => {

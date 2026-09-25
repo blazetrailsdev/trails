@@ -14,7 +14,7 @@ describe("TestDateNew", () => {
   const offset = (d: Temporal.PlainDateTime | Temporal.ZonedDateTime): string | number =>
     d instanceof Temporal.ZonedDateTime ? d.offset : 0;
 
-  const epochSeconds = (t: Time): number => t.toTime().epochMilliseconds / 1000;
+  const epochSeconds = (t: Time): number => t.toZonedDateTime().epochMilliseconds / 1000;
 
   it("jd", () => {
     const d = Date.jd();

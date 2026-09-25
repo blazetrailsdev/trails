@@ -145,7 +145,7 @@ export function change(this: RubyTime, options: ChangeOptions): RubyTime {
     return RubyTime.utc(newYear, newMonth, newDay, newHour, newMin, newSec);
   } else if (this.isZoneObject) {
     let newTime = RubyTime.new(newYear, newMonth, newDay, newHour, newMin, newSec, null, {
-      in: this.toTime().timeZoneId,
+      in: this.toZonedDateTime().timeZoneId,
     });
 
     if (!Number.isInteger(newTime.utcOffset)) {

@@ -352,7 +352,7 @@ function inspect(value: unknown): string {
 
 function toDate(at: Date | Temporal.Instant | Time): Date {
   if (at instanceof Date) return at;
-  if (at instanceof Time) return new Date(at.toTime().toInstant().epochMilliseconds);
+  if (at instanceof Time) return new Date(at.toZonedDateTime().toInstant().epochMilliseconds);
   return new Date(at.epochMilliseconds);
 }
 
@@ -583,7 +583,7 @@ export class Timezone {
   }
 
   utcToLocal(time: Time): Temporal.ZonedDateTime {
-    return time.toTime().toInstant().toZonedDateTimeISO(this.identifier);
+    return time.toZonedDateTime().toInstant().toZonedDateTimeISO(this.identifier);
   }
 
   localToUtc(time: Time, dst: boolean | null = true): Time {
@@ -732,7 +732,7 @@ export class TimeZone {
     microsecondsWithFrac: number | bigint | Rational = 0,
   ): TimeWithZone {
     return new TimeWithZone(
-      Time.at(seconds, microsecondsWithFrac).getutc().toTime().toInstant(),
+      Time.at(seconds, microsecondsWithFrac).getutc().toZonedDateTime().toInstant(),
       this,
     );
   }

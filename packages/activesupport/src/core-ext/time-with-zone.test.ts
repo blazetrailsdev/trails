@@ -116,7 +116,7 @@ describe("TimeWithZoneTest", () => {
 
   it("time", () => {
     const twz = maketwz();
-    expect(twz.time.toTime().epochMilliseconds).toBe(Date.UTC(1999, 11, 31, 19, 0, 0));
+    expect(twz.time.toZonedDateTime().epochMilliseconds).toBe(Date.UTC(1999, 11, 31, 19, 0, 0));
   });
 
   it("time zone", () => {
@@ -148,7 +148,7 @@ describe("TimeWithZoneTest", () => {
   it("in time zone with ambiguous time", () => {
     const moscow = TimeZone.find("Moscow")!;
     const twz = moscow.local(2014, 10, 26, 1, 0, 0);
-    expect(twz.utc().toTime().epochMilliseconds).toBe(Date.UTC(2014, 9, 25, 22, 0, 0));
+    expect(twz.utc().toZonedDateTime().epochMilliseconds).toBe(Date.UTC(2014, 9, 25, 22, 0, 0));
   });
 
   it("localtime", () => {
@@ -644,7 +644,7 @@ describe("TimeWithZoneTest", () => {
 
   it("local to utc conversion with far future datetime", () => {
     const twz = eastern.local(2049, 12, 31, 19, 0, 0);
-    const utcMs = twz.utc().toTime().epochMilliseconds;
+    const utcMs = twz.utc().toZonedDateTime().epochMilliseconds;
     expect(utcMs).toBe(Date.UTC(2050, 0, 1, 0, 0, 0));
   });
 
@@ -1101,7 +1101,7 @@ describe("TimeWithZoneTest", () => {
     expect(twz.toTime()).toBe(time);
     expect(time).toEqual(localTime);
     expect(time.utcOffset).toEqual(localTime.utcOffset);
-    expect(time.zone).toEqual(timeZone.tzinfo.abbr(time.toTime().toInstant()));
+    expect(time.zone).toEqual(timeZone.tzinfo.abbr(time.toZonedDateTime().toInstant()));
   });
 
   it("to time with preserve timezone using offset", () => {
@@ -1267,7 +1267,7 @@ describe("TimeWithZoneTest", () => {
 
   it("instance created with local time returns correct utc time", () => {
     const twz = eastern.local(1999, 12, 31, 19);
-    expect(twz.utc().toTime().epochMilliseconds).toBe(Date.UTC(2000, 0, 1));
+    expect(twz.utc().toZonedDateTime().epochMilliseconds).toBe(Date.UTC(2000, 0, 1));
   });
 
   it("instance created with local time enforces spring dst rules", () => {
@@ -1754,7 +1754,9 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
     withEnvTz("US/Eastern", () => {
       travelTo(RubyTime.local(2000).toTime(), {}, () => {
         expect(current() instanceof TimeWithZone).toEqual(false);
-        expect(current()).toEqual(new Date(RubyTime.local(2000).toTime().epochMilliseconds));
+        expect(current()).toEqual(
+          new Date(RubyTime.local(2000).toZonedDateTime().epochMilliseconds),
+        );
       });
     });
   });

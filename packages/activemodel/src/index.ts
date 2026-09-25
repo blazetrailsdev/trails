@@ -103,11 +103,6 @@ export { ImmutableStringType } from "./type/immutable-string.js";
 export { ValueType } from "./type/value.js";
 export { BinaryType, Data as BinaryData } from "./type/binary.js";
 export { TimeType } from "./type/time.js";
-/** @noRailsEquivalent PERMANENT */
-export {
-  isUtc as isUtcTimezone,
-  defaultTimezone as getDefaultTimezone,
-} from "./type/helpers/timezone.js";
 
 import { StringType } from "./type/string.js";
 import { IntegerType } from "./type/integer.js";

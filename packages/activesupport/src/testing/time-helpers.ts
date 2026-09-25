@@ -123,8 +123,7 @@ export function travelTo(
 
   let now: typeof dateOrTime;
   if (dateOrTime instanceof Temporal.PlainDate) {
-    const dateMidnight = midnight(dateOrTime);
-    now = dateMidnight instanceof Time ? toTime(dateMidnight) : dateMidnight.toTime();
+    now = midnight(dateOrTime).toTime();
   } else if (typeof dateOrTime === "string") {
     const zone = timeZone();
     now = zone
@@ -177,7 +176,7 @@ export function travelTo(
     );
   });
 
-  stubs.stubObject(clock, "now", () => now.toTime().toInstant());
+  stubs.stubObject(clock, "now", () => now.toZonedDateTime().toInstant());
 
   if (block) {
     try {

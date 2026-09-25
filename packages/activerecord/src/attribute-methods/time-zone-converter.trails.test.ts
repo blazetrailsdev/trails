@@ -64,7 +64,7 @@ describe("TimeZoneConverterTest", () => {
     expect(twz.hour).toBe(10);
     expect(twz.min).toBe(30);
     expect(twz.timeZone.name).toBe("Eastern Time (US & Canada)");
-    expect(twz.utc().toTime().epochMilliseconds).toBe(
+    expect(twz.utc().toZonedDateTime().epochMilliseconds).toBe(
       Temporal.Instant.from("2024-06-15T14:30:00Z").epochMilliseconds,
     );
   });
@@ -110,7 +110,9 @@ describe("TimeZoneConverterTest", () => {
     const twz = new TimeWithZone(instant, eastern);
     const result = converter.serialize(twz);
     expect(result).toBeInstanceOf(RubyTime);
-    expect((result as RubyTime).toTime().toInstant().toString()).toBe("2024-06-15T14:00:00Z");
+    expect((result as RubyTime).toZonedDateTime().toInstant().toString()).toBe(
+      "2024-06-15T14:00:00Z",
+    );
   });
 
   it("serialize round-trips: deserialize then serialize returns the cast value", () => {
@@ -120,7 +122,9 @@ describe("TimeZoneConverterTest", () => {
     expect(deserialized).toBeInstanceOf(TimeWithZone);
     const serialized = converter.serialize(deserialized);
     expect(serialized).toBeInstanceOf(RubyTime);
-    expect((serialized as RubyTime).toTime().toInstant().toString()).toBe("2024-06-15T14:00:00Z");
+    expect((serialized as RubyTime).toZonedDateTime().toInstant().toString()).toBe(
+      "2024-06-15T14:00:00Z",
+    );
   });
 
   it("cast returns an infinite value without casting it through the subtype", () => {

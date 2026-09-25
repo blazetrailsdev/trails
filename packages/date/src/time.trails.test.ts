@@ -99,29 +99,29 @@ describe("Time", () => {
     const time = Time.new("2013-09-04 03:00:00 -00:44:30");
     expect(time.utcOffset).toBe(-2670);
     expect(time.toI()).toBe(1378266270);
-    expect(time.toTime().epochNanoseconds).toBe(1378266270000000000n);
+    expect(time.toZonedDateTime().epochNanoseconds).toBe(1378266270000000000n);
   });
 
   it("toTime keeps the wall clock a sub-minute offset names, as MRI's hour/min/sec do", () => {
     const time = Time.new("2013-09-04 03:00:00 -00:44:30");
-    expect(time.toTime().toPlainDateTime().toString()).toBe("2013-09-04T03:00:00");
-    expect(time.toTime().hour).toBe(3);
-    expect(time.toTime().minute).toBe(0);
-    expect(time.toTime().second).toBe(0);
-    expect(time.toTime().toInstant().epochNanoseconds).toBe(1378266270000000000n);
-    expect(time.toTime().epochMilliseconds).toBe(1378266270000);
+    expect(time.toZonedDateTime().toPlainDateTime().toString()).toBe("2013-09-04T03:00:00");
+    expect(time.toZonedDateTime().hour).toBe(3);
+    expect(time.toZonedDateTime().minute).toBe(0);
+    expect(time.toZonedDateTime().second).toBe(0);
+    expect(time.toZonedDateTime().toInstant().epochNanoseconds).toBe(1378266270000000000n);
+    expect(time.toZonedDateTime().epochMilliseconds).toBe(1378266270000);
     expect(time.utcOffset).toBe(-2670);
   });
 
   it("toTime keeps the wall clock for a positive sub-minute offset", () => {
     const time = new Time(2008, 3, 1, 6, 0, 0, 32430);
-    expect(time.toTime().toPlainDateTime().toString()).toBe("2008-03-01T06:00:00");
-    expect(time.toTime().epochNanoseconds).toBe(BigInt(time.toI()) * 1000000000n);
+    expect(time.toZonedDateTime().toPlainDateTime().toString()).toBe("2008-03-01T06:00:00");
+    expect(time.toZonedDateTime().epochNanoseconds).toBe(BigInt(time.toI()) * 1000000000n);
   });
 
   it("toTime moves a sub-minute-offset receiver to another zone by its exact instant", () => {
     const time = Time.new("2013-09-04 03:00:00 -00:44:30");
-    expect(time.toTime().withTimeZone("UTC").toPlainDateTime().toString()).toBe(
+    expect(time.toZonedDateTime().withTimeZone("UTC").toPlainDateTime().toString()).toBe(
       "2013-09-04T03:44:30",
     );
   });
@@ -186,12 +186,14 @@ describe("Time", () => {
   });
 
   it("the usec positional is exact, matching the Rational spelling", () => {
-    expect(Time.utc(2005, 2, 27, 23, 50, 19, 275038).toTime().epochNanoseconds).toBe(
-      Time.utc(2005, 2, 27, 23, 50, new Rational(19275038, 1000000)).toTime().epochNanoseconds,
+    expect(Time.utc(2005, 2, 27, 23, 50, 19, 275038).toZonedDateTime().epochNanoseconds).toBe(
+      Time.utc(2005, 2, 27, 23, 50, new Rational(19275038, 1000000)).toZonedDateTime()
+        .epochNanoseconds,
     );
     expect(Time.utc(2005, 2, 27, 23, 50, 19, 275038).nsec).toBe(275038000);
-    expect(Time.mktime(2005, 2, 27, 23, 50, 19, 275038).toTime().epochNanoseconds).toBe(
-      Time.mktime(2005, 2, 27, 23, 50, new Rational(19275038, 1000000)).toTime().epochNanoseconds,
+    expect(Time.mktime(2005, 2, 27, 23, 50, 19, 275038).toZonedDateTime().epochNanoseconds).toBe(
+      Time.mktime(2005, 2, 27, 23, 50, new Rational(19275038, 1000000)).toZonedDateTime()
+        .epochNanoseconds,
     );
   });
 
@@ -300,13 +302,13 @@ describe("Time", () => {
       const edt = Time.at(1225603800);
       expect(edt.strftime("%Y-%m-%d %H:%M:%S %z %Z")).toBe("2008-11-02 01:30:00 -0400 EDT");
       expect(edt.utcOffset).toBe(-14400);
-      expect(Number(edt.toTime().epochMilliseconds) / 1_000).toBe(1225603800);
+      expect(Number(edt.toZonedDateTime().epochMilliseconds) / 1_000).toBe(1225603800);
       expect(edt.getutc().strftime("%Y-%m-%d %H:%M:%S")).toBe("2008-11-02 05:30:00");
 
       const est = Time.at(1225607400);
       expect(est.strftime("%Y-%m-%d %H:%M:%S %z %Z")).toBe("2008-11-02 01:30:00 -0500 EST");
       expect(est.utcOffset).toBe(-18000);
-      expect(Number(est.toTime().epochMilliseconds) / 1_000).toBe(1225607400);
+      expect(Number(est.toZonedDateTime().epochMilliseconds) / 1_000).toBe(1225607400);
       expect(est.getutc().strftime("%Y-%m-%d %H:%M:%S")).toBe("2008-11-02 06:30:00");
     });
   });
@@ -367,7 +369,7 @@ describe("Time", () => {
     it("answers the same instant in the local system zone", () => {
       const t = Time.utc(2020, 1, 1, 12, 0, 0);
       const local = t.getlocal();
-      expect(local.toTime().epochNanoseconds).toBe(t.toTime().epochNanoseconds);
+      expect(local.toZonedDateTime().epochNanoseconds).toBe(t.toZonedDateTime().epochNanoseconds);
       expect(local.utcOffset).toBe(
         Number(
           Temporal.Instant.fromEpochMilliseconds(946728000000).toZonedDateTimeISO(

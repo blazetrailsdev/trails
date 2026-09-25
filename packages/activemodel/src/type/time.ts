@@ -17,13 +17,14 @@ import {
   AcceptsMultiparameterTime,
   type InstanceMethods,
 } from "./helpers/accepts-multiparameter-time.js";
-import { isUtc } from "./helpers/timezone.js";
+import { Timezone } from "./helpers/timezone.js";
 import { TimeValue } from "./helpers/time-value.js";
 import { ValueType } from "./value.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (time.rb:40-42); the class/interface merge is how `include()` surfaces on the type side.
 export interface TimeType
   extends
+    Timezone,
     InstanceMethods<TimeWithZone | RubyTime>,
     Omit<Included<typeof TimeValue>, "userInputInTimeZone" | "serializeCastValue"> {
   serializeCastValue(value: TimeWithZone | RubyTime | null): unknown;
@@ -105,15 +106,13 @@ export class TimeType extends ValueType<TimeWithZone | RubyTime> {
     );
   }
 
-  get isUtc(): boolean {
-    return isUtc();
-  }
-
   /** @internal */
   #zoneId(): string {
     return this.isUtc ? "UTC" : Temporal.Now.timeZoneId();
   }
 }
+
+include(TimeType, Timezone);
 
 const acceptsMultiparameterTime = new AcceptsMultiparameterTime({
   defaults: { "1": 2000, "2": 1, "3": 1, "4": 0, "5": 0 },

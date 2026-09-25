@@ -103,7 +103,7 @@ function withFrozen<T>(
 ): T {
   const instant =
     now instanceof Time
-      ? now.toTime().toInstant()
+      ? now.toZonedDateTime().toInstant()
       : now instanceof Temporal.PlainDateTime
         ? now.toZonedDateTime("UTC").toInstant()
         : now.toInstant();
@@ -116,11 +116,13 @@ function withFrozen<T>(
 }
 
 function sameInstant(expected: Time, actual: Temporal.ZonedDateTime): void {
-  expect(actual.epochNanoseconds).toBe(expected.toTime().epochNanoseconds);
+  expect(actual.epochNanoseconds).toBe(expected.toZonedDateTime().epochNanoseconds);
 }
 
 function sameTime(actual: Time, expected: Time): void {
-  expect(actual.toTime().epochNanoseconds).toBe(expected.toTime().epochNanoseconds);
+  expect(actual.toZonedDateTime().epochNanoseconds).toBe(
+    expected.toZonedDateTime().epochNanoseconds,
+  );
 }
 
 function d(year: number, month: number, day: number, hour = 0, min = 0, sec = 0, ms = 0): Date {
@@ -666,7 +668,8 @@ describe("DateTimeExtCalculationsTest", () => {
 
   it("compare with time with zone", () => {
     const utcZone = TimeZone.find("UTC")!;
-    const twz = (t: Time): TimeWithZone => new TimeWithZone(t.toTime().toInstant(), utcZone);
+    const twz = (t: Time): TimeWithZone =>
+      new TimeWithZone(t.toZonedDateTime().toInstant(), utcZone);
     expect(compare(dt(2000), twz(Time.utc(1999, 12, 31, 23, 59, 59)))).toBe(1);
     expect(compare(dt(2000), twz(Time.utc(2000, 1, 1, 0, 0, 0)))).toBe(0);
     expect(compare(dt(2000), twz(Time.utc(2000, 1, 1, 0, 0, 1)))).toBe(-1);

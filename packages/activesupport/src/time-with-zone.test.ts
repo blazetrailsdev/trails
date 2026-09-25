@@ -118,16 +118,22 @@ describe("TimeWithZoneTest", () => {
     const twz = eastern.local(2024, 1, 15, 10, 30, 0);
     const utc = twz.utc();
     expect(utc).toBeInstanceOf(Time);
-    const z = utc.toTime();
+    const z = utc.toZonedDateTime();
     expect(z.hour).toBe(15);
     expect(z.minute).toBe(30);
   });
 
   it("getutc() and getgm() are aliases", () => {
     const twz = eastern.local(2024, 1, 15, 10, 0, 0);
-    expect(twz.getutc().toTime().epochMilliseconds).toBe(twz.utc().toTime().epochMilliseconds);
-    expect(twz.getgm().toTime().epochMilliseconds).toBe(twz.utc().toTime().epochMilliseconds);
-    expect(twz.gmtime().toTime().epochMilliseconds).toBe(twz.utc().toTime().epochMilliseconds);
+    expect(twz.getutc().toZonedDateTime().epochMilliseconds).toBe(
+      twz.utc().toZonedDateTime().epochMilliseconds,
+    );
+    expect(twz.getgm().toZonedDateTime().epochMilliseconds).toBe(
+      twz.utc().toZonedDateTime().epochMilliseconds,
+    );
+    expect(twz.gmtime().toZonedDateTime().epochMilliseconds).toBe(
+      twz.utc().toZonedDateTime().epochMilliseconds,
+    );
   });
 
   it("toI() returns unix timestamp", () => {
@@ -160,7 +166,9 @@ describe("TimeWithZoneTest", () => {
     const pstTime = estTime.inTimeZone(pacific);
 
     expect(pstTime.hour).toBe(9);
-    expect(pstTime.utc().toTime().epochMilliseconds).toBe(estTime.utc().toTime().epochMilliseconds);
+    expect(pstTime.utc().toZonedDateTime().epochMilliseconds).toBe(
+      estTime.utc().toZonedDateTime().epochMilliseconds,
+    );
   });
 
   it("inTimeZone() accepts a TimeZone object", () => {
@@ -383,7 +391,7 @@ describe("TimeWithZoneTest", () => {
 
   it("minus() with a Date returns seconds", () => {
     const twz = eastern.local(2024, 1, 15, 12, 0, 0);
-    const date = twz.utc().toTime().toInstant();
+    const date = twz.utc().toZonedDateTime().toInstant();
     expect(twz.minus(date)).toBe(0);
   });
 
@@ -515,7 +523,7 @@ describe("TimeWithZoneTest", () => {
 
   it("equals() works with Date", () => {
     const twz = eastern.local(2024, 1, 15, 12, 0, 0);
-    const date = twz.utc().toTime().toInstant();
+    const date = twz.utc().toZonedDateTime().toInstant();
     expect(twz.equals(date)).toBe(true);
   });
 
@@ -579,7 +587,7 @@ describe("TimeWithZoneTest", () => {
 
   it("handles year boundary crossing", () => {
     const twz = eastern.local(2024, 12, 31, 23, 0, 0);
-    const z = twz.utc().toTime();
+    const z = twz.utc().toZonedDateTime();
     expect(z.year).toBe(2025);
     expect(z.month).toBe(1);
     expect(z.day).toBe(1);
@@ -784,7 +792,7 @@ describe("TimeWithZoneTest", () => {
     expect(twz.utcOffset).toBe(-10 * 3600);
     expect(twz.dst()).toBe(false);
 
-    expect(twz.utc().toTime().hour).toBe(10);
+    expect(twz.utc().toZonedDateTime().hour).toBe(10);
   });
 
   it("Alaska timezone basic operations", () => {
@@ -804,10 +812,10 @@ describe("TimeWithZoneTest", () => {
     const hawaii_twz = pacific_twz.inTimeZone(hawaii);
     const back_to_eastern = hawaii_twz.inTimeZone(eastern);
 
-    expect(eastern_twz.utc().toTime().epochMilliseconds).toBe(utcTime.getTime());
-    expect(pacific_twz.utc().toTime().epochMilliseconds).toBe(utcTime.getTime());
-    expect(hawaii_twz.utc().toTime().epochMilliseconds).toBe(utcTime.getTime());
-    expect(back_to_eastern.utc().toTime().epochMilliseconds).toBe(utcTime.getTime());
+    expect(eastern_twz.utc().toZonedDateTime().epochMilliseconds).toBe(utcTime.getTime());
+    expect(pacific_twz.utc().toZonedDateTime().epochMilliseconds).toBe(utcTime.getTime());
+    expect(hawaii_twz.utc().toZonedDateTime().epochMilliseconds).toBe(utcTime.getTime());
+    expect(back_to_eastern.utc().toZonedDateTime().epochMilliseconds).toBe(utcTime.getTime());
 
     expect(eastern_twz.hour).toBe(8);
     expect(pacific_twz.hour).toBe(5);
@@ -893,7 +901,8 @@ describe("TimeWithZoneMethodsForString", () => {
     setZone("Moscow");
     try {
       expect(
-        (inTimeZone("2014-10-26 01:00:00") as TimeWithZone).utc().toTime().epochMilliseconds,
+        (inTimeZone("2014-10-26 01:00:00") as TimeWithZone).utc().toZonedDateTime()
+          .epochMilliseconds,
       ).toEqual(Temporal.Instant.from("2014-10-25T22:00:00Z").epochMilliseconds);
     } finally {
       setZone(previousZone);

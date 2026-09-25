@@ -7,7 +7,7 @@ import { fixtures } from "./test-fixtures.js";
 import { setDefaultTimezone } from "./active-record.js";
 
 function usec(ts: unknown): string {
-  if (ts instanceof RubyTime) ts = ts.getutc().toTime().toInstant();
+  if (ts instanceof RubyTime) ts = ts.getutc().toZonedDateTime().toInstant();
   if (!(ts instanceof Temporal.Instant)) throw new Error("expected an Instant");
   const dt = ts.toZonedDateTimeISO("UTC");
   const y = dt.year.toString().padStart(4, "0");

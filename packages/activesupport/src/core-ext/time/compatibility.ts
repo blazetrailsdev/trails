@@ -8,15 +8,19 @@ export function toTime(
 export function toTime(
   time: RubyTime | Temporal.PlainDateTime | Temporal.ZonedDateTime,
 ): RubyTime | Temporal.ZonedDateTime {
-  if (time instanceof RubyTime) {
-    return preserveTimezone(time) ? time : time.getlocal();
-  }
+  if (time instanceof RubyTime) return time.toTime();
 
   const zoned = time instanceof Temporal.PlainDateTime ? time.toZonedDateTime("UTC") : time;
   return compatibilityPreserveTimezone()
     ? zoned.withTimeZone(zoned.offset)
     : zoned.withTimeZone(Temporal.Now.timeZoneId());
 }
+
+Object.assign(RubyTime.prototype, {
+  toTime(this: RubyTime): RubyTime {
+    return preserveTimezone(this) ? this : this.getlocal();
+  },
+});
 
 export function preserveTimezone(time: RubyTime): boolean | string {
   return isSystemLocalTime(time) || compatibilityPreserveTimezone();

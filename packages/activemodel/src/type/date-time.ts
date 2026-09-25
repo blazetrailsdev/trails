@@ -15,7 +15,7 @@ import {
   AcceptsMultiparameterTime,
   type InstanceMethods,
 } from "./helpers/accepts-multiparameter-time.js";
-import { isUtc } from "./helpers/timezone.js";
+import { Timezone } from "./helpers/timezone.js";
 import { TimeValue } from "./helpers/time-value.js";
 import { ValueType } from "./value.js";
 
@@ -24,6 +24,7 @@ export type DateTimeCastResult = RubyTime | DateInfinityType | DateNegativeInfin
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (date_time.rb:44-46); the class/interface merge is how `include()` surfaces on the type side.
 export interface DateTimeType
   extends
+    Timezone,
     Omit<InstanceMethods<DateTimeCastResult>, "valueFromMultiparameterAssignment">,
     Omit<Included<typeof TimeValue>, "serializeCastValue"> {
   serializeCastValue(value: DateTimeCastResult | null): DateTimeCastResult | null;
@@ -110,11 +111,9 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
     ).call(this, valuesHash as Record<string, unknown>);
     return time;
   }
-
-  get isUtc(): boolean {
-    return isUtc();
-  }
 }
+
+include(DateTimeType, Timezone);
 
 const acceptsMultiparameterTime = new AcceptsMultiparameterTime({ defaults: { "4": 0, "5": 0 } });
 include(DateTimeType, acceptsMultiparameterTime);

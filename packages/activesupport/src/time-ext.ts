@@ -407,7 +407,7 @@ export function change(
     null,
     null,
   );
-  return Temporal.Instant.fromEpochMilliseconds(newTime.toTime().epochMilliseconds);
+  return Temporal.Instant.fromEpochMilliseconds(newTime.toZonedDateTime().epochMilliseconds);
 }
 
 export function onWeekday(date: Date): boolean {

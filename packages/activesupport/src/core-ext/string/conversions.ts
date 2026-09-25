@@ -27,8 +27,8 @@ export function toTime(str: string, form: string = "local"): Temporal.ZonedDateT
     offset instanceof Rational ? offset.toF() : offset,
   );
 
-  if (form === "utc") return time.getutc().toTime();
-  const local = time.toTime();
+  if (form === "utc") return time.getutc().toZonedDateTime();
+  const local = time.toZonedDateTime();
   return preserveTimezone(time) ? local : local.withTimeZone(Temporal.Now.timeZoneId());
 }
 

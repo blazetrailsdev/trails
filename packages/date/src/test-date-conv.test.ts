@@ -4,13 +4,21 @@ import { Rational } from "@blazetrails/ruby-compat";
 
 describe("TestDateConv", () => {
   it("to class", () => {
-    const subjects: [Time | Date | DateTime, new (...args: never[]) => object][] = [
-      [new Time(2004, 9, 19, 1, 2, 3, "+03:00"), Temporal.ZonedDateTime],
-      [new Date(2004, 9, 19), Temporal.PlainDateTime],
-      [new DateTime(2004, 9, 19, 1, 2, 3, new Rational(8, 24)), Temporal.ZonedDateTime],
+    const subjects: [
+      Time | Date | DateTime,
+      new (...args: never[]) => object,
+      new (...args: never[]) => object,
+    ][] = [
+      [new Time(2004, 9, 19, 1, 2, 3, "+03:00"), Time, Temporal.ZonedDateTime],
+      [new Date(2004, 9, 19), Temporal.ZonedDateTime, Temporal.PlainDateTime],
+      [
+        new DateTime(2004, 9, 19, 1, 2, 3, new Rational(8, 24)),
+        Temporal.ZonedDateTime,
+        Temporal.ZonedDateTime,
+      ],
     ];
-    for (const [o, datetimeClass] of subjects) {
-      expect(o.toTime()).toBeInstanceOf(Temporal.ZonedDateTime);
+    for (const [o, timeClass, datetimeClass] of subjects) {
+      expect(o.toTime()).toBeInstanceOf(timeClass);
       expect(o.toDate()).toBeInstanceOf(Temporal.PlainDate);
       expect(o.toDatetime()).toBeInstanceOf(datetimeClass);
     }
@@ -19,22 +27,20 @@ describe("TestDateConv", () => {
   it("to time  from time", () => {
     let t = Time.mktime(2004, 9, 19, 1, 2, 3, 456789);
     let t2 = t.toTime();
-    expect([t2.year, t2.month, t2.day, t2.hour, t2.minute, t2.second, usec(t2)]).toEqual([
+    expect([t2.year, t2.mon, t2.mday, t2.hour, t2.min, t2.sec, t2.usec]).toEqual([
       2004, 9, 19, 1, 2, 3, 456789,
     ]);
 
     t = Time.utc(2004, 9, 19, 1, 2, 3, 456789);
-    t2 = t.toTime().withTimeZone("UTC");
-    expect([t2.year, t2.month, t2.day, t2.hour, t2.minute, t2.second, usec(t2)]).toEqual([
+    t2 = t.toTime().utc();
+    expect([t2.year, t2.mon, t2.mday, t2.hour, t2.min, t2.sec, t2.usec]).toEqual([
       2004, 9, 19, 1, 2, 3, 456789,
     ]);
 
     t = new Time(2004, 9, 19, 1, 2, 3, "+03:00");
     t2 = t.toTime();
-    expect([t2.year, t2.month, t2.day, t2.hour, t2.minute, t2.second]).toEqual([
-      2004, 9, 19, 1, 2, 3,
-    ]);
-    expect(t2.offsetNanoseconds / 1_000_000_000).toBe(3 * 60 * 60);
+    expect([t2.year, t2.mon, t2.mday, t2.hour, t2.min, t2.sec]).toEqual([2004, 9, 19, 1, 2, 3]);
+    expect(t2.gmtOffset).toBe(3 * 60 * 60);
   });
 
   it("to time  from date", () => {
