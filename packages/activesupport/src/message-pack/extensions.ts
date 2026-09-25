@@ -5,7 +5,7 @@ import { Temporal, Time } from "@blazetrails/date";
 import { Rational, rational } from "@blazetrails/ruby-compat";
 import { TimeWithZone } from "../time-with-zone.js";
 import { atWithoutCoercion } from "../core-ext/time/calculations.js";
-import { TimeZone } from "../values/time-zone.js";
+import { TimeZone, type Timezone } from "../values/time-zone.js";
 
 const JD_UNIX_EPOCH = 2440588;
 
@@ -257,7 +257,7 @@ export const Extensions = {
     return new TimeWithZone(Extensions.readTime(unpacker), Extensions.readTimeZone(unpacker)!);
   },
 
-  dumpTimeZone(timeZone: TimeZone): string {
+  dumpTimeZone(timeZone: TimeZone | Timezone): string {
     return timeZone.name;
   },
 
@@ -265,7 +265,7 @@ export const Extensions = {
     return TimeZone.find(name);
   },
 
-  writeTimeZone(timeZone: TimeZone, packer: Packer): void {
+  writeTimeZone(timeZone: TimeZone | Timezone, packer: Packer): void {
     packer.write(Extensions.dumpTimeZone(timeZone));
   },
 

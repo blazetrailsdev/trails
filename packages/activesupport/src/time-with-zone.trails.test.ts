@@ -157,8 +157,7 @@ describe("TimeWithZone Comparable", () => {
 });
 
 describe("TimeWithZone built with a TZInfo Timezone", () => {
-  const twz = () =>
-    new TimeWithZone(Time.utc(2000, 1, 1, 0), Timezone.get("America/New_York") as never);
+  const twz = () => new TimeWithZone(Time.utc(2000, 1, 1, 0), Timezone.get("America/New_York"));
 
   it("inspect reads the zone through its protocol", () => {
     expect(twz().inspect()).toBe("1999-12-31 19:00:00.000000000 EST -05:00");
@@ -166,6 +165,6 @@ describe("TimeWithZone built with a TZInfo Timezone", () => {
 
   it("utc? answers from the zone abbreviation", () => {
     expect(twz().isUtc()).toBe(false);
-    expect(new TimeWithZone(Time.utc(2000), Timezone.get("Etc/UTC") as never).isUtc()).toBe(true);
+    expect(new TimeWithZone(Time.utc(2000), Timezone.get("Etc/UTC")).isUtc()).toBe(true);
   });
 });

@@ -1,4 +1,4 @@
-import { PeriodNotFound, TimeZone, TimezonePeriod } from "./values/time-zone.js";
+import { PeriodNotFound, TimeZone, Timezone, TimezonePeriod } from "./values/time-zone.js";
 import {
   Range,
   basicObjRespondTo,
@@ -118,7 +118,7 @@ const METHOD_MISSING_HANDLER: ProxyHandler<TimeWithZone> = {
 export class TimeWithZone {
   private _utc!: Time | null;
   private _time!: TimeLike | null;
-  private _timeZone!: TimeZone;
+  private _timeZone!: TimeZone | Timezone;
   private _period?: TimezonePeriod;
   private _toTimeWithTimezone?: Time;
   private _toTimeWithInstanceOffset?: Time;
@@ -126,7 +126,7 @@ export class TimeWithZone {
 
   constructor(
     utcTime: TimeLike | null,
-    timeZone: TimeZone,
+    timeZone: TimeZone | Timezone,
     localTime: TimeLike | null = null,
     period: TimezonePeriod | null = null,
   ) {
@@ -136,7 +136,7 @@ export class TimeWithZone {
 
   initialize(
     utcTime: TimeLike | null,
-    timeZone: TimeZone,
+    timeZone: TimeZone | Timezone,
     localTime: TimeLike | null = null,
     period: TimezonePeriod | null = null,
   ): void {
@@ -266,7 +266,7 @@ export class TimeWithZone {
     return (this._period ??= this._timeZone.periodForUtc(this._utc!));
   }
 
-  get timeZone(): TimeZone {
+  get timeZone(): TimeZone | Timezone {
     return this._timeZone;
   }
 
@@ -419,7 +419,9 @@ export class TimeWithZone {
 
   toTime(): Time {
     if (this.preserveTimezone() === ":zone") {
-      return (this._toTimeWithTimezone ??= this.getlocal(this.timeZone.tzinfo.identifier));
+      return (this._toTimeWithTimezone ??= this.getlocal(
+        TimeZone.find(this.timeZone)!.tzinfo.identifier,
+      ));
     } else if (this.preserveTimezone()) {
       return (this._toTimeWithInstanceOffset ??= this.getlocal(this.utcOffset));
     } else {
@@ -653,7 +655,7 @@ export class TimeWithZone {
 
     const newTime = timeChange.call(this.time, options);
 
-    let newZone: TimeZone | null | false = null;
+    let newZone: TimeZone | Timezone | null | false = null;
     if (options.zone != null && options.zone !== false) {
       newZone = findZone(options.zone);
     } else if (options.offset != null) {
