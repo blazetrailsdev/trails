@@ -1194,7 +1194,11 @@ thread, so a re-entry is always nested in the holder's own call; a
 `Promise.all` inside `withinNewTransaction` starts sibling calls that share
 the holder's async context. So ruby-compat's `synchronize` (`monitor.ts`) runs
 each entry under an owner of its own and serializes re-entries under one
-holder: a nested call re-enters at once, siblings take turns.
+holder: a nested call re-enters at once, siblings take turns. For the same
+reason `SQLite3Adapter#disconnectBang` closes the handle under `lock`, where
+Rails' `disconnect!` (`sqlite3_adapter.rb:221-226`) closes it after `super`
+releases `@lock`: a statement can be in flight on the adapter from the same
+async context, which a Ruby thread never is.
 
 This is a genuine language shortcoming, ratified repo-wide here. Stories that
 serialize adapter access (retiring SQLite's statement lock onto

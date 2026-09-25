@@ -24,10 +24,10 @@ export type ErrorDetailHash = { error: string; [k: string]: unknown };
 
 const EMPTY_ARRAY: readonly never[] = new Proxy(Object.freeze([]), {
   set(target): boolean {
-    throw new FrozenError(`can't modify frozen Array: ${rbInspect(target)}`);
+    throw new FrozenError(`can't modify frozen Array: ${rbInspect(target)}`, { receiver: target });
   },
   deleteProperty(target): boolean {
-    throw new FrozenError(`can't modify frozen Array: ${rbInspect(target)}`);
+    throw new FrozenError(`can't modify frozen Array: ${rbInspect(target)}`, { receiver: target });
   },
 });
 
