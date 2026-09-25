@@ -1,0 +1,9 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/postgresql/schema-definitions.ts",
+    "rubyName": "export_name_on_schema_dump?",
+    "call": "match?",
+    "reason": "Surfaced when the call-set gate began comparing every same-name Ruby owner in a file, not only the first-seen one (compare.ts direct-match arm); pre-existing, triage and convergence tracked by story `converge-same-name-second-owner-call-rows` (RFC 0130)."
+  }
+]

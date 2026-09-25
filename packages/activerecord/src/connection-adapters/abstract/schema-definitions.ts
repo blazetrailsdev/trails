@@ -12,7 +12,7 @@ import {
 import { ArgumentError } from "@blazetrails/activemodel";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { ActiveRecord } from "../../namespaces.js";
-import { extractOptionsBang, wrap } from "@blazetrails/activesupport";
+import { wrap } from "@blazetrails/activesupport";
 
 export type ColumnType =
   | "string"
@@ -1030,6 +1030,7 @@ TableDefinition.defineColumnMethods(
 TableDefinition.prototype.blob = TableDefinition.prototype.binary;
 TableDefinition.prototype.numeric = TableDefinition.prototype.decimal;
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface below.
 export class Table {
   constructor(
     private _tableName: string,
@@ -1041,100 +1042,24 @@ export class Table {
   }
 
   /** @internal */
-  protected async definedColumn(type: ColumnType, args: unknown[]): Promise<void> {
-    const names = [...args] as string[];
-    const options = extractOptionsBang(names) as ColumnOptions;
-    if (names.length === 0) throw new ArgumentError(`Missing column name(s) for ${type}`);
-    for (const name of names) {
-      await this.column(name, type, options);
+  static defineColumnMethods(...columnTypes: string[]): void {
+    for (const columnType of columnTypes) {
+      (this.prototype as unknown as Record<string, unknown>)[camelize(columnType, false)] =
+        async function (this: Table, ...names: unknown[]): Promise<unknown[]> {
+          const last = names[names.length - 1];
+          const options = (
+            typeof last === "object" && last !== null ? names.pop() : {}
+          ) as ColumnOptions;
+          if (names.length === 0) {
+            throw new ArgumentError(`Missing column name(s) for ${columnType}`);
+          }
+          for (const name of names)
+            await this.column(name as string, columnType as ColumnType, options);
+          return names;
+        };
     }
   }
 
-  async string(...names: string[]): Promise<void>;
-  async string(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
-  async string(...args: unknown[]): Promise<void> {
-    await this.definedColumn("string", args);
-  }
-  async text(...names: string[]): Promise<void>;
-  async text(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
-  async text(...args: unknown[]): Promise<void> {
-    await this.definedColumn("text", args);
-  }
-  async integer(...names: string[]): Promise<void>;
-  async integer(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
-  async integer(...args: unknown[]): Promise<void> {
-    await this.definedColumn("integer", args);
-  }
-  async float(...names: string[]): Promise<void>;
-  async float(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
-  async float(...args: unknown[]): Promise<void> {
-    await this.definedColumn("float", args);
-  }
-  async decimal(...names: string[]): Promise<void>;
-  async decimal(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
-  async decimal(...args: unknown[]): Promise<void> {
-    await this.definedColumn("decimal", args);
-  }
-  async boolean(...names: string[]): Promise<void>;
-  async boolean(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
-  async boolean(...args: unknown[]): Promise<void> {
-    await this.definedColumn("boolean", args);
-  }
-  async date(...names: string[]): Promise<void>;
-  async date(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
-  async date(...args: unknown[]): Promise<void> {
-    await this.definedColumn("date", args);
-  }
-  async datetime(...names: string[]): Promise<void>;
-  async datetime(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
-  async datetime(...args: unknown[]): Promise<void> {
-    await this.definedColumn("datetime", args);
-  }
-  async bigint(...names: string[]): Promise<void>;
-  async bigint(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
-  async bigint(...args: unknown[]): Promise<void> {
-    await this.definedColumn("bigint", args);
-  }
-  async json(...names: string[]): Promise<void>;
-  async json(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
-  async json(...args: unknown[]): Promise<void> {
-    await this.definedColumn("json", args);
-  }
-  async time(...names: string[]): Promise<void>;
-  async time(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
-  async time(...args: unknown[]): Promise<void> {
-    await this.definedColumn("time", args);
-  }
-  async timestamp(...names: string[]): Promise<void>;
-  async timestamp(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
-  async timestamp(...args: unknown[]): Promise<void> {
-    await this.definedColumn("timestamp", args);
-  }
-  async binary(...names: string[]): Promise<void>;
-  async binary(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
-  async binary(...args: unknown[]): Promise<void> {
-    await this.definedColumn("binary", args);
-  }
-  async blob(...names: string[]): Promise<void>;
-  async blob(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
-  async blob(...args: unknown[]): Promise<void> {
-    await this.definedColumn("binary", args);
-  }
-  async numeric(...names: string[]): Promise<void>;
-  async numeric(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
-  async numeric(...args: unknown[]): Promise<void> {
-    await this.definedColumn("decimal", args);
-  }
-  async virtual(...names: string[]): Promise<void>;
-  async virtual(
-    ...args: [
-      ...names: string[],
-      options: ColumnOptions & { type?: ColumnType; as?: string; stored?: boolean },
-    ]
-  ): Promise<void>;
-  async virtual(...args: unknown[]): Promise<void> {
-    await this.definedColumn("virtual" as ColumnType, args);
-  }
   async remove(...columnNames: string[]): Promise<void>;
   async remove(...args: [...columnNames: string[], options: ColumnOptions]): Promise<void>;
   async remove(...args: unknown[]): Promise<void> {
@@ -1404,3 +1329,25 @@ export class Table {
     }
   }
 }
+
+/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ColumnMethods` (`abstract/schema_definitions.rb:716`); the class/interface merge is how a mixin surfaces on the type side. */
+export interface Table extends ColumnMethods {}
+
+Table.defineColumnMethods(
+  "bigint",
+  "binary",
+  "boolean",
+  "date",
+  "datetime",
+  "decimal",
+  "float",
+  "integer",
+  "json",
+  "string",
+  "text",
+  "time",
+  "timestamp",
+  "virtual",
+);
+Table.prototype.blob = Table.prototype.binary;
+Table.prototype.numeric = Table.prototype.decimal;

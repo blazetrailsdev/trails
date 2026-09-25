@@ -12,5 +12,12 @@
     "rubyName": "execute",
     "call": "wrap",
     "reason": "Verified per-site (RFC 0106 wave 4g): `async ? Promise.wrap([]) : []` in the `rescue ::RangeError` (statement_cache.rb:154). trails returns the bare `[]` because the `async` arm does not exist — `ActiveRecord::Promise` is unported, same gap as the `async_find_by_sql` row above, tracked by story `port-promise-complete-for-async-loaded-arms` (RFC 0023)."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "statement-cache.ts",
+    "rubyName": "initialize",
+    "call": "map",
+    "reason": "Surfaced when the call-set gate began comparing every same-name Ruby owner in a file, not only the first-seen one (compare.ts direct-match arm); pre-existing, triage and convergence tracked by story `converge-same-name-second-owner-call-rows` (RFC 0130)."
   }
 ]

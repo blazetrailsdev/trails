@@ -5182,6 +5182,29 @@ export function main() {
             false,
             level,
           );
+          // `seen` counts a name once per file, so a second Ruby class
+          // declaring it (`QueryCacheRegistry#compute_if_absent` beside
+          // `Store#compute_if_absent`, query_cache.rb:97-114) never reached
+          // the call-set gate. Each further owner the TS file declares the
+          // member on is compared against its own body; the denominator is
+          // unchanged.
+          if (
+            !seam &&
+            !claimedByAnother &&
+            !writerPairedWithReader(rubyName, directMatch, siblingRubyNames)
+          ) {
+            const tsOwners = tsOwnersByFileName.get(expectedTs)?.get(directMatch);
+            for (const other of rubyOwnersByName.get(rubyName) ?? []) {
+              if (other === rubyModule) continue;
+              const otherLevel = rubyOwnerSeat(
+                other,
+                rubyKlassOwnerNames.has(ownerKey(other, rubyName)),
+              );
+              if (otherLevel !== level) continue;
+              if (!tsOwners?.has(other.split("::").at(-1) ?? other)) continue;
+              checkCalls(rubyName, directMatch, expectedTs, other, otherLevel);
+            }
+          }
           continue;
         }
 
