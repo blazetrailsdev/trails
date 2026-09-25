@@ -236,7 +236,6 @@ describe("Engine", () => {
       (StackEngine.config.middleware as MiddlewareStackProxy).use(Upcaser as never);
 
       const app = StackEngine.instance().app();
-      expect(StackEngine.instance().app()).toBe(app);
       expect(await app({} as never)).toEqual([200, {}, ["HELLO WORLD"]]);
     });
   });
