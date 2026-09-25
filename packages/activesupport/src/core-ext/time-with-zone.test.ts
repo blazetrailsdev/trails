@@ -1101,7 +1101,7 @@ describe("TimeWithZoneTest", () => {
     expect(twz.toTime()).toBe(time);
     expect(time).toEqual(localTime);
     expect(time.utcOffset).toEqual(localTime.utcOffset);
-    expect(time.zone).toEqual(timeZone.tzinfo.abbr(time.toZonedDateTime().toInstant()));
+    expect((time.zone as { identifier: string }).identifier).toEqual(timeZone.tzinfo.identifier);
   });
 
   it("to time with preserve timezone using offset", () => {

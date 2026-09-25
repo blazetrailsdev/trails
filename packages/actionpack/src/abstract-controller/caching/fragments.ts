@@ -18,8 +18,8 @@ export interface FragmentsHost {
   performCaching?: boolean;
   isCacheConfigured(): unknown;
   urlFor?(options: unknown): string;
-  instrumentName?(): string;
-  instrumentPayload?(key: unknown): Record<string, unknown>;
+  instrumentName(): string;
+  instrumentPayload(key: unknown): Record<string, unknown>;
 }
 
 export function fragmentCacheKey(
@@ -87,7 +87,7 @@ export function writeFragment(
 ): unknown {
   if (!this.isCacheConfigured()) return content;
   key = stringifyKey(combinedFragmentCacheKey.call(this, key));
-  instrumentFragmentCache(this, "write_fragment", key, () => {
+  instrumentFragmentCache.call(this, "write_fragment", key, () => {
     content = toStr(content);
     this.cacheStore!.write(key as string, content, options);
   });
@@ -97,7 +97,7 @@ export function writeFragment(
 export function readFragment(this: FragmentsHost, key: unknown, options?: CacheOptions): unknown {
   if (!this.isCacheConfigured()) return undefined;
   key = stringifyKey(combinedFragmentCacheKey.call(this, key));
-  return instrumentFragmentCache(this, "read_fragment", key, () =>
+  return instrumentFragmentCache.call(this, "read_fragment", key, () =>
     this.cacheStore!.read(key as string, options),
   );
 }
@@ -109,16 +109,16 @@ export function fragmentExist(
 ): boolean | undefined {
   if (!this.isCacheConfigured()) return undefined;
   key = stringifyKey(combinedFragmentCacheKey.call(this, key));
-  return instrumentFragmentCache(this, "exist_fragment?", key, () =>
+  return instrumentFragmentCache.call(this, "exist_fragment?", key, () =>
     this.cacheStore!.exist(key as string, options),
-  );
+  ) as boolean | undefined;
 }
 
 export function expireFragment(this: FragmentsHost, key: unknown, options?: CacheOptions): unknown {
   if (!this.isCacheConfigured()) return undefined;
   if (!(key instanceof RegExp)) key = stringifyKey(combinedFragmentCacheKey.call(this, key));
 
-  return instrumentFragmentCache(this, "expire_fragment", key, () => {
+  return instrumentFragmentCache.call(this, "expire_fragment", key, () => {
     if (key instanceof RegExp) {
       return this.cacheStore!.deleteMatched(key, options);
     } else {
@@ -128,14 +128,16 @@ export function expireFragment(this: FragmentsHost, key: unknown, options?: Cach
 }
 
 export function instrumentFragmentCache<T>(
-  host: FragmentsHost,
+  this: FragmentsHost,
   name: string,
   key: unknown,
   block: () => T,
 ): T {
-  const ns = host.instrumentName?.() ?? "abstract_controller";
-  const payload = host.instrumentPayload?.(key) ?? { key };
-  return Notifications.instrument(`${name}.${ns}`, payload, block) as T;
+  return Notifications.instrument(
+    `${name}.${this.instrumentName()}`,
+    this.instrumentPayload(key),
+    block,
+  ) as T;
 }
 
 function stringifyKey(parts: unknown[]): string {

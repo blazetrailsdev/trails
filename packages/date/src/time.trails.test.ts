@@ -1,7 +1,7 @@
 import { Temporal } from "@js-temporal/polyfill";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ArgumentError } from "./date.js";
-import { Time, resetLocalTimeZoneId } from "./time.js";
+import { Time, Timezone, resetLocalTimeZoneId } from "./time.js";
 import { Rational } from "@blazetrails/ruby-compat";
 
 describe("Time", () => {
@@ -124,6 +124,26 @@ describe("Time", () => {
     expect(time.toZonedDateTime().withTimeZone("UTC").toPlainDateTime().toString()).toBe(
       "2013-09-04T03:44:30",
     );
+  });
+
+  it("toTime adds to a sub-minute-offset receiver from its exact instant, as MRI's Time#+ does", () => {
+    const time = Time.new("2013-09-04 03:00:00 -00:44:30");
+    expect(time.toZonedDateTime().add({ seconds: 1 }).epochNanoseconds).toBe(1378266271000000000n);
+    expect(time.toZonedDateTime().subtract({ seconds: 1 }).epochNanoseconds).toBe(
+      1378266269000000000n,
+    );
+  });
+
+  it("toTime compares a sub-minute-offset receiver by its exact instant, as MRI's Time#<=> does", () => {
+    const time = Time.new("2013-09-04 03:00:00 -00:44:30");
+    const exact =
+      Temporal.Instant.fromEpochNanoseconds(1378266270000000000n).toZonedDateTimeISO("UTC");
+    expect(time.toZonedDateTime().equals(exact.withTimeZone("-00:44"))).toBe(true);
+    expect(Temporal.ZonedDateTime.compare(time.toZonedDateTime(), exact)).toBe(0);
+    expect(
+      Temporal.ZonedDateTime.compare(time.toZonedDateTime(), exact.add({ nanoseconds: 1 })),
+    ).toBe(-1);
+    expect(time.toZonedDateTime().since(exact).total("nanoseconds")).toBe(0);
   });
 
   it("Time.new rejects an out-of-range offset", () => {
@@ -397,7 +417,9 @@ describe("Time", () => {
       const t = Time.utc(2020, 1, 1, 12, 0, 0);
       const eastern = t.getlocal("America/New_York");
       expect(eastern.utcOffset).toBe(-18000);
-      expect(eastern.zone).toBe("EST");
+      expect(eastern.zone).toBeInstanceOf(Timezone);
+      expect((eastern.zone as Timezone).identifier).toBe("America/New_York");
+      expect(eastern.strftime("%Z")).toBe("EST");
     });
   });
   describe("Time.new given a String", () => {

@@ -28,6 +28,12 @@ class HostClass {
   urlFor(o: Record<string, unknown>) {
     return `http://test.host/${o.controller}/${o.action}/${o.id ?? ""}`;
   }
+  instrumentPayload(key: unknown) {
+    return { key };
+  }
+  instrumentName() {
+    return "action_controller";
+  }
 }
 
 include(HostClass, Configurable);
@@ -189,26 +195,25 @@ describe("read/write/expire fragment", () => {
 });
 
 describe("instrumentFragmentCache", () => {
-  it("fires under abstract_controller by default and honours host overrides", () => {
+  it("fires under the host's instrumentName with its instrumentPayload", () => {
     const host = makeHost();
-    const sub = vi.fn();
-    const h1 = Notifications.subscribe("write_fragment.abstract_controller", sub);
-    try {
-      expect(instrumentFragmentCache(host, "write_fragment", "k", () => "ok")).toBe("ok");
-      expect(sub.mock.calls[0][4]).toEqual({ key: "k" });
-    } finally {
-      Notifications.unsubscribe(h1);
-    }
-
-    host.instrumentName = () => "action_controller";
+    host.instrumentName = () => "pages_controller";
     host.instrumentPayload = (key) => ({ key, controller: "Pages" });
-    const sub2 = vi.fn();
-    const h2 = Notifications.subscribe("read_fragment.action_controller", sub2);
+    const sub = vi.fn();
+    const h = Notifications.subscribe("read_fragment.pages_controller", sub);
     try {
-      instrumentFragmentCache(host, "read_fragment", "k", () => null);
-      expect(sub2.mock.calls[0][4]).toEqual({ key: "k", controller: "Pages" });
+      expect(instrumentFragmentCache.call(host, "read_fragment", "k", () => "ok")).toBe("ok");
+      expect(sub.mock.calls[0][4]).toEqual({ key: "k", controller: "Pages" });
     } finally {
-      Notifications.unsubscribe(h2);
+      Notifications.unsubscribe(h);
     }
+  });
+
+  it("raises when the host does not answer instrumentName", () => {
+    const host = makeHost() as unknown as { instrumentName?: unknown };
+    host.instrumentName = undefined;
+    expect(() =>
+      instrumentFragmentCache.call(host as FragmentsHost, "read_fragment", "k", () => null),
+    ).toThrow(TypeError);
   });
 });

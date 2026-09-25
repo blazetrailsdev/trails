@@ -32,7 +32,7 @@ export function activeSupportLocalZone(): string | null {
   if (_activeSupportLocalTz !== Temporal.Now.timeZoneId()) _activeSupportLocalZone = null;
   if (_activeSupportLocalZone == null) {
     _activeSupportLocalTz = Temporal.Now.timeZoneId();
-    _activeSupportLocalZone = RubyTime.now().zone;
+    _activeSupportLocalZone = RubyTime.now().zone as string | null;
   }
   return _activeSupportLocalZone;
 }
