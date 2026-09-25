@@ -389,7 +389,6 @@ describe("SchemaDumperTest", () => {
   afterEach(async () => {
     SchemaDumper.ignoreTables = [];
     SchemaDumper.fkIgnorePattern = /^fk_rails_[0-9a-f]{10}$/;
-    await (await Base.leaseConnection()).dropTable("timestamps", { ifExists: true });
   });
 
   it("dump schema information with empty versions", async () => {
@@ -815,19 +814,31 @@ describe("SchemaDumperTest", () => {
     "schema dump with correct timestamp types via create table and t column",
     { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
-      await (
-        await Base.leaseConnection()
-      ).createTable("timestamps", { force: true }, (t) => {
-        t.datetime("this_should_remain_datetime");
-        t.timestamp("this_is_an_alias_of_datetime");
-        t.column("without_time_zone", "timestamp");
-        t.column("with_time_zone", "timestamptz");
-      });
-      const output = await dumpTableSchema(await Base.leaseConnection(), "timestamps");
-      expect(output.includes('t.datetime("this_should_remain_datetime"')).toBeTruthy();
-      expect(output.includes('t.datetime("this_is_an_alias_of_datetime"')).toBeTruthy();
-      expect(output.includes('t.datetime("without_time_zone"')).toBeTruthy();
-      expect(output.includes('t.timestamptz("with_time_zone"')).toBeTruthy();
+      class TimestampsMigration extends Current {
+        override async up(): Promise<void> {
+          await this.createTable("timestamps", (t) => {
+            t.datetime("this_should_remain_datetime");
+            t.timestamp("this_is_an_alias_of_datetime");
+            t.column("without_time_zone", "timestamp");
+            t.column("with_time_zone", "timestamptz");
+          });
+        }
+        override async down(): Promise<void> {
+          await this.dropTable("timestamps");
+        }
+      }
+      const migration = new TimestampsMigration();
+      try {
+        await migration.migrate("up");
+
+        const output = await dumpTableSchema(await Base.leaseConnection(), "timestamps");
+        expect(output.includes('t.datetime("this_should_remain_datetime"')).toBeTruthy();
+        expect(output.includes('t.datetime("this_is_an_alias_of_datetime"')).toBeTruthy();
+        expect(output.includes('t.datetime("without_time_zone"')).toBeTruthy();
+        expect(output.includes('t.timestamptz("with_time_zone"')).toBeTruthy();
+      } finally {
+        await migration.migrate("down");
+      }
     },
   );
 
@@ -835,23 +846,37 @@ describe("SchemaDumperTest", () => {
     "schema dump with timestamptz datetime format",
     { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
-      await withPostgresqlDatetimeType("timestamptz", async () => {
-        await (
-          await Base.leaseConnection()
-        ).createTable("timestamps", { force: true }, (t) => {
-          t.datetime("this_should_remain_datetime");
-          (t as PostgreSQLTableDefinition).timestamptz("this_is_an_alias_of_datetime");
-          t.column("without_time_zone", "timestamp");
-          t.column("with_time_zone", "timestamptz");
+      let migration!: Migration;
+      try {
+        await withPostgresqlDatetimeType("timestamptz", async () => {
+          class TimestampsMigration extends Current {
+            override async up(): Promise<void> {
+              await this.createTable("timestamps", (t) => {
+                t.datetime("this_should_remain_datetime");
+                (t as PostgreSQLTableDefinition).timestamptz("this_is_an_alias_of_datetime");
+                t.column("without_time_zone", "timestamp");
+                t.column("with_time_zone", "timestamptz");
+              });
+            }
+            override async down(): Promise<void> {
+              await this.dropTable("timestamps");
+            }
+          }
+          migration = new TimestampsMigration();
+          await migration.migrate("up");
+
+          const output = await dumpTableSchema(await Base.leaseConnection(), "timestamps");
+          expect(output.includes('t.datetime("this_should_remain_datetime"')).toBeTruthy();
+          expect(output.includes('t.datetime("this_is_an_alias_of_datetime"')).toBeTruthy();
+          expect(output.includes('t.timestamp("without_time_zone"')).toBeTruthy();
+          expect(output.includes('t.datetime("with_time_zone"')).toBeTruthy();
         });
-        const output = await dumpTableSchema(await Base.leaseConnection(), "timestamps");
-        expect(output.includes('t.datetime("this_should_remain_datetime"')).toBeTruthy();
-        expect(output.includes('t.datetime("this_is_an_alias_of_datetime"')).toBeTruthy();
-        expect(output.includes('t.timestamp("without_time_zone"')).toBeTruthy();
-        expect(output.includes('t.datetime("with_time_zone"')).toBeTruthy();
-      });
+      } finally {
+        await migration.migrate("down");
+      }
     },
   );
+
   it.skipIf(adapterType !== "postgres")(
     "timestamps schema dump before rails 7",
     { timeout: FULL_DUMP_TIMEOUT_MS },
@@ -869,86 +894,118 @@ describe("SchemaDumperTest", () => {
         }
       }
       const migration = new TimestampsMigration();
-      await migration.migrate("up");
+      try {
+        await migration.migrate("up");
 
-      const output = await dumpTableSchema(await Base.leaseConnection(), "timestamps");
-      expect(output.includes('t.datetime("this_should_remain_datetime"')).toBeTruthy();
-      expect(output.includes('t.datetime("this_is_an_alias_of_datetime"')).toBeTruthy();
-      expect(output.includes('t.datetime("this_is_also_an_alias_of_datetime"')).toBeTruthy();
-      await migration.migrate("down");
+        const output = await dumpTableSchema(await Base.leaseConnection(), "timestamps");
+        expect(output.includes('t.datetime("this_should_remain_datetime"')).toBeTruthy();
+        expect(output.includes('t.datetime("this_is_an_alias_of_datetime"')).toBeTruthy();
+        expect(output.includes('t.datetime("this_is_also_an_alias_of_datetime"')).toBeTruthy();
+      } finally {
+        await migration.migrate("down");
+      }
     },
   );
+
   it.skipIf(adapterType !== "postgres")(
     "timestamps schema dump before rails 7 with timestamptz setting",
     { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
       let migration!: Migration;
-      await withPostgresqlDatetimeType("timestamptz", async () => {
-        class TimestampsMigration extends Migration.get(6.1) {
-          override async up(): Promise<void> {
-            await this.createTable("timestamps", (t) => {
-              t.datetime("this_should_change_to_timestamp");
-              t.timestamp("this_should_stay_as_timestamp");
-              t.column("this_should_also_stay_as_timestamp", "timestamp");
-            });
+      try {
+        await withPostgresqlDatetimeType("timestamptz", async () => {
+          class TimestampsMigration extends Migration.get(6.1) {
+            override async up(): Promise<void> {
+              await this.createTable("timestamps", (t) => {
+                t.datetime("this_should_change_to_timestamp");
+                t.timestamp("this_should_stay_as_timestamp");
+                t.column("this_should_also_stay_as_timestamp", "timestamp");
+              });
+            }
+            override async down(): Promise<void> {
+              await this.dropTable("timestamps");
+            }
           }
-          override async down(): Promise<void> {
-            await this.dropTable("timestamps");
-          }
-        }
-        migration = new TimestampsMigration();
-        await migration.migrate("up");
+          migration = new TimestampsMigration();
+          await migration.migrate("up");
 
-        const output = await dumpTableSchema(await Base.leaseConnection(), "timestamps");
-        expect(output.includes('t.timestamp("this_should_change_to_timestamp"')).toBeTruthy();
-        expect(output.includes('t.timestamp("this_should_stay_as_timestamp"')).toBeTruthy();
-        expect(output.includes('t.timestamp("this_should_also_stay_as_timestamp"')).toBeTruthy();
-      });
-      await migration.migrate("down");
+          const output = await dumpTableSchema(await Base.leaseConnection(), "timestamps");
+          expect(output.includes('t.timestamp("this_should_change_to_timestamp"')).toBeTruthy();
+          expect(output.includes('t.timestamp("this_should_stay_as_timestamp"')).toBeTruthy();
+          expect(output.includes('t.timestamp("this_should_also_stay_as_timestamp"')).toBeTruthy();
+        });
+      } finally {
+        await migration.migrate("down");
+      }
     },
   );
+
   it.skipIf(adapterType !== "postgres")(
     "schema dump when changing datetime type for an existing app",
     { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
-      await (
-        await Base.leaseConnection()
-      ).createTable("timestamps", { force: true }, (t) => {
-        t.datetime("default_format");
-        t.column("without_time_zone", "timestamp");
-        t.column("with_time_zone", "timestamptz");
-      });
+      class TimestampsMigration extends Current {
+        override async up(): Promise<void> {
+          await this.createTable("timestamps", (t) => {
+            t.datetime("default_format");
+            t.column("without_time_zone", "timestamp");
+            t.column("with_time_zone", "timestamptz");
+          });
+        }
+        override async down(): Promise<void> {
+          await this.dropTable("timestamps");
+        }
+      }
+      const migration = new TimestampsMigration();
+      try {
+        await migration.migrate("up");
 
-      let output = await dumpTableSchema(await Base.leaseConnection(), "timestamps");
-      expect(output.includes('t.datetime("default_format"')).toBeTruthy();
-      expect(output.includes('t.datetime("without_time_zone"')).toBeTruthy();
-      expect(output.includes('t.timestamptz("with_time_zone"')).toBeTruthy();
+        let output = await dumpTableSchema(await Base.leaseConnection(), "timestamps");
+        expect(output.includes('t.datetime("default_format"')).toBeTruthy();
+        expect(output.includes('t.datetime("without_time_zone"')).toBeTruthy();
+        expect(output.includes('t.timestamptz("with_time_zone"')).toBeTruthy();
 
-      await withPostgresqlDatetimeType("timestamptz", async () => {
-        output = await dumpTableSchema(await Base.leaseConnection(), "timestamps");
-        expect(output.includes('t.timestamp("default_format"')).toBeTruthy();
-        expect(output.includes('t.timestamp("without_time_zone"')).toBeTruthy();
-        expect(output.includes('t.datetime("with_time_zone"')).toBeTruthy();
-      });
+        await withPostgresqlDatetimeType("timestamptz", async () => {
+          output = await dumpTableSchema(await Base.leaseConnection(), "timestamps");
+          expect(output.includes('t.timestamp("default_format"')).toBeTruthy();
+          expect(output.includes('t.timestamp("without_time_zone"')).toBeTruthy();
+          expect(output.includes('t.datetime("with_time_zone"')).toBeTruthy();
+        });
+      } finally {
+        await migration.migrate("down");
+      }
     },
   );
+
   it.skipIf(adapterType !== "postgres")(
     "schema dump with correct timestamp types via create table and t timestamptz",
     { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
-      await (
-        await Base.leaseConnection()
-      ).createTable("timestamps", { force: true }, (t) => {
-        t.datetime("default_format");
-        t.datetime("without_time_zone");
-        t.timestamp("also_without_time_zone");
-        (t as PostgreSQLTableDefinition).timestamptz("with_time_zone");
-      });
-      const output = await dumpTableSchema(await Base.leaseConnection(), "timestamps");
-      expect(output.includes('t.datetime("default_format"')).toBeTruthy();
-      expect(output.includes('t.datetime("without_time_zone"')).toBeTruthy();
-      expect(output.includes('t.datetime("also_without_time_zone"')).toBeTruthy();
-      expect(output.includes('t.timestamptz("with_time_zone"')).toBeTruthy();
+      class TimestampsMigration extends Current {
+        override async up(): Promise<void> {
+          await this.createTable("timestamps", (t) => {
+            t.datetime("default_format");
+            t.datetime("without_time_zone");
+            t.timestamp("also_without_time_zone");
+            (t as PostgreSQLTableDefinition).timestamptz("with_time_zone");
+          });
+        }
+        override async down(): Promise<void> {
+          await this.dropTable("timestamps");
+        }
+      }
+      const migration = new TimestampsMigration();
+      try {
+        await migration.migrate("up");
+
+        const output = await dumpTableSchema(await Base.leaseConnection(), "timestamps");
+        expect(output.includes('t.datetime("default_format"')).toBeTruthy();
+        expect(output.includes('t.datetime("without_time_zone"')).toBeTruthy();
+        expect(output.includes('t.datetime("also_without_time_zone"')).toBeTruthy();
+        expect(output.includes('t.timestamptz("with_time_zone"')).toBeTruthy();
+      } finally {
+        await migration.migrate("down");
+      }
     },
   );
 
@@ -956,19 +1013,31 @@ describe("SchemaDumperTest", () => {
     "schema dump with correct timestamp types via add column",
     { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
-      await (await Base.leaseConnection()).createTable("timestamps", { force: true }, () => {});
-      await (await Base.leaseConnection()).addColumn("timestamps", "default_format", "datetime");
-      await (await Base.leaseConnection()).addColumn("timestamps", "without_time_zone", "datetime");
-      await (
-        await Base.leaseConnection()
-      ).addColumn("timestamps", "also_without_time_zone", "timestamp");
-      await (await Base.leaseConnection()).addColumn("timestamps", "with_time_zone", "timestamptz");
+      class TimestampsMigration extends Current {
+        override async up(): Promise<void> {
+          await this.createTable("timestamps");
 
-      const output = await dumpTableSchema(await Base.leaseConnection(), "timestamps");
-      expect(output.includes('t.datetime("default_format"')).toBeTruthy();
-      expect(output.includes('t.datetime("without_time_zone"')).toBeTruthy();
-      expect(output.includes('t.datetime("also_without_time_zone"')).toBeTruthy();
-      expect(output.includes('t.timestamptz("with_time_zone"')).toBeTruthy();
+          await this.addColumn("timestamps", "default_format", "datetime");
+          await this.addColumn("timestamps", "without_time_zone", "datetime");
+          await this.addColumn("timestamps", "also_without_time_zone", "timestamp");
+          await this.addColumn("timestamps", "with_time_zone", "timestamptz");
+        }
+        override async down(): Promise<void> {
+          await this.dropTable("timestamps");
+        }
+      }
+      const migration = new TimestampsMigration();
+      try {
+        await migration.migrate("up");
+
+        const output = await dumpTableSchema(await Base.leaseConnection(), "timestamps");
+        expect(output.includes('t.datetime("default_format"')).toBeTruthy();
+        expect(output.includes('t.datetime("without_time_zone"')).toBeTruthy();
+        expect(output.includes('t.datetime("also_without_time_zone"')).toBeTruthy();
+        expect(output.includes('t.timestamptz("with_time_zone"')).toBeTruthy();
+      } finally {
+        await migration.migrate("down");
+      }
     },
   );
 
@@ -989,40 +1058,47 @@ describe("SchemaDumperTest", () => {
         }
       }
       const migration = new TimestampsMigration();
-      await migration.migrate("up");
+      try {
+        await migration.migrate("up");
 
-      const output = await dumpTableSchema(await Base.leaseConnection(), "timestamps");
-      expect(output.includes('t.datetime("default_format"')).toBeTruthy();
-      expect(output.includes('t.datetime("without_time_zone"')).toBeTruthy();
-      expect(output.includes('t.datetime("also_without_time_zone"')).toBeTruthy();
-      await migration.migrate("down");
+        const output = await dumpTableSchema(await Base.leaseConnection(), "timestamps");
+        expect(output.includes('t.datetime("default_format"')).toBeTruthy();
+        expect(output.includes('t.datetime("without_time_zone"')).toBeTruthy();
+        expect(output.includes('t.datetime("also_without_time_zone"')).toBeTruthy();
+      } finally {
+        await migration.migrate("down");
+      }
     },
   );
+
   it.skipIf(adapterType !== "postgres")(
     "schema dump with correct timestamp types via add column before rails 7 with timestamptz setting",
     { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
       let migration!: Migration;
-      await withPostgresqlDatetimeType("timestamptz", async () => {
-        class TimestampsMigration extends Migration.get(6.1) {
-          override async up(): Promise<void> {
-            await this.createTable("timestamps");
+      try {
+        await withPostgresqlDatetimeType("timestamptz", async () => {
+          class TimestampsMigration extends Migration.get(6.1) {
+            override async up(): Promise<void> {
+              await this.createTable("timestamps");
 
-            await this.addColumn("timestamps", "this_should_change_to_timestamp", "datetime");
-            await this.addColumn("timestamps", "this_should_stay_as_timestamp", "timestamp");
+              await this.addColumn("timestamps", "this_should_change_to_timestamp", "datetime");
+              await this.addColumn("timestamps", "this_should_stay_as_timestamp", "timestamp");
+            }
+            override async down(): Promise<void> {
+              await this.dropTable("timestamps");
+            }
           }
-          override async down(): Promise<void> {
-            await this.dropTable("timestamps");
-          }
-        }
-        migration = new TimestampsMigration();
-        await migration.migrate("up");
+          migration = new TimestampsMigration();
+          await migration.migrate("up");
 
-        const output = await dumpTableSchema(await Base.leaseConnection(), "timestamps");
-        expect(output.includes('t.timestamp("this_should_change_to_timestamp"')).toBeTruthy();
-        expect(output.includes('t.timestamp("this_should_stay_as_timestamp"')).toBeTruthy();
-      });
-      await migration.migrate("down");
+          const output = await dumpTableSchema(await Base.leaseConnection(), "timestamps");
+          expect(output.includes('t.timestamp("this_should_change_to_timestamp"')).toBeTruthy();
+          expect(output.includes('t.timestamp("this_should_stay_as_timestamp"')).toBeTruthy();
+        });
+      } finally {
+        await migration.migrate("down");
+      }
     },
   );
 
@@ -1031,26 +1107,29 @@ describe("SchemaDumperTest", () => {
     { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
       let migration!: Migration;
-      await withPostgresqlDatetimeType("timestamptz", async () => {
-        class TimestampsMigration extends Migration.get(6.1) {
-          override async up(): Promise<void> {
-            await this.createTable("timestamps");
+      try {
+        await withPostgresqlDatetimeType("timestamptz", async () => {
+          class TimestampsMigration extends Migration.get(6.1) {
+            override async up(): Promise<void> {
+              await this.createTable("timestamps");
 
-            await this.addColumn("timestamps", "this_should_change_to_timestamp", "datetime");
-            await this.addColumn("timestamps", "this_should_stay_as_timestamp", "timestamp");
+              await this.addColumn("timestamps", "this_should_change_to_timestamp", "datetime");
+              await this.addColumn("timestamps", "this_should_stay_as_timestamp", "timestamp");
+            }
+            override async down(): Promise<void> {
+              await this.dropTable("timestamps");
+            }
           }
-          override async down(): Promise<void> {
-            await this.dropTable("timestamps");
-          }
-        }
-        migration = new TimestampsMigration();
-        await migration.migrate("up");
+          migration = new TimestampsMigration();
+          await migration.migrate("up");
 
-        const output = await dumpTableSchema(await Base.leaseConnection(), "timestamps");
-        expect(output.includes('t.timestamp("this_should_change_to_timestamp"')).toBeTruthy();
-        expect(output.includes('t.timestamp("this_should_stay_as_timestamp"')).toBeTruthy();
-      });
-      await migration.migrate("down");
+          const output = await dumpTableSchema(await Base.leaseConnection(), "timestamps");
+          expect(output.includes('t.timestamp("this_should_change_to_timestamp"')).toBeTruthy();
+          expect(output.includes('t.timestamp("this_should_stay_as_timestamp"')).toBeTruthy();
+        });
+      } finally {
+        await migration.migrate("down");
+      }
     },
   );
 });

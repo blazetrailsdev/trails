@@ -1,6 +1,6 @@
 import { Session } from "@blazetrails/actionpack";
-import { setUtcToLocalReturnsUtcOffsetTimes } from "@blazetrails/activesupport";
-import { File, OpenSSL } from "@blazetrails/ruby-compat";
+import { OrderedOptions, setUtcToLocalReturnsUtcOffsetTimes } from "@blazetrails/activesupport";
+import { ArgumentError, File, OpenSSL } from "@blazetrails/ruby-compat";
 import { RuntimeError } from "@blazetrails/ruby-compat";
 import { EngineConfiguration } from "../engine/configuration.js";
 import { Trails } from "../rails.js";
@@ -56,6 +56,7 @@ export class Configuration extends EngineConfiguration {
   fileWatcher: unknown = null;
   exceptionsApp: unknown = null;
   private _debugExceptionResponseFormat: "default" | "api" | null = null;
+  x: Custom = new Custom();
   railtiesOrder: Array<string | { instance(): unknown }> = [":all"];
   relativeUrlRoot: string | null = null;
   requireMasterKey = false;
@@ -453,5 +454,55 @@ export class Configuration extends EngineConfiguration {
     if (!paths.get("public")) paths.add("public");
     if (!paths.get("lib/templates")) paths.add("lib/templates");
     return paths;
+  }
+}
+
+export class Custom {
+  [configuration: string]: any;
+
+  #configurations: Map<string, unknown>;
+
+  constructor() {
+    this.#configurations = new Map();
+    return new Proxy(this, {
+      get(target, method, receiver) {
+        if (typeof method === "symbol" || method in target) {
+          return Reflect.get(target, method, receiver);
+        }
+        return target.methodMissing(method);
+      },
+      set(target, method, value, receiver) {
+        if (typeof method === "symbol" || method in target) {
+          return Reflect.set(target, method, value, receiver);
+        }
+        target.methodMissing(`${method}=`, value);
+        return true;
+      },
+      has(target, method) {
+        return typeof method === "symbol"
+          ? method in target
+          : target.respondToMissing(method, false);
+      },
+    });
+  }
+
+  methodMissing(method: string, ...args: unknown[]): unknown {
+    if (method.endsWith("=")) {
+      this.#configurations.set(method.slice(0, -1), args[0]);
+      return args[0];
+    } else if (args.length === 0) {
+      if (this.#configurations.has(method)) return this.#configurations.get(method);
+      const options = new OrderedOptions();
+      this.#configurations.set(method, options);
+      return options;
+    } else {
+      throw new ArgumentError(
+        `wrong number of arguments (given ${args.length}, expected 0) when reading configuration \`${method}\``,
+      );
+    }
+  }
+
+  respondToMissing(_symbol: string, _includePrivate: boolean): boolean {
+    return true;
   }
 }

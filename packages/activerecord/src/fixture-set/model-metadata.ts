@@ -1,5 +1,4 @@
 import type { Base } from "../base.js";
-import { allTimestampAttributesInModel } from "../timestamp.js";
 
 export class ModelMetadata {
   private _modelClass: typeof Base | null;
@@ -43,7 +42,7 @@ export class ModelMetadata {
   }
 
   get timestampColumnNames(): string[] {
-    return allTimestampAttributesInModel.call(this._modelClass as never);
+    return this._modelClass!.allTimestampAttributesInModel();
   }
 
   get inheritanceColumnName(): string | null {

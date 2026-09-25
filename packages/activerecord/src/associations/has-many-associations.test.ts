@@ -2123,7 +2123,7 @@ describe("HasManyAssociationsTest", () => {
   it("calling empty with counter cache", async () => {
     const post = posts("welcome") as any;
     await assertNoQueries(false, async () => {
-      expect(await post.comments.isEmpty()).toBe(false);
+      await assertNotEmpty(post.comments);
     });
   });
 
@@ -4064,10 +4064,10 @@ describe("HasManyAssociationsTest", () => {
     await Bulb.create({ car_id: car.id });
     const carTwo = (await Car.create({})) as any;
     await assertQueriesCount(1, false, async () => {
-      expect(await car.bulbs.isEmpty()).toBe(false);
+      await assertNotEmpty(car.bulbs);
     });
     await assertQueriesCount(1, false, async () => {
-      expect(await carTwo.bulbs.isEmpty()).toBe(true);
+      await assertEmpty(carTwo.bulbs);
     });
   });
 
@@ -4078,10 +4078,10 @@ describe("HasManyAssociationsTest", () => {
     const carTwo = (await Car.create({})) as any;
     await carTwo.bulbIds;
     await assertNoQueries(false, async () => {
-      expect(await car.bulbs.isEmpty()).toBe(false);
+      await assertNotEmpty(car.bulbs);
     });
     await assertNoQueries(false, async () => {
-      expect(await carTwo.bulbs.isEmpty()).toBe(true);
+      await assertEmpty(carTwo.bulbs);
     });
   });
 

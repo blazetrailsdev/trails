@@ -797,7 +797,9 @@ describe("Application key/message/credentials wiring", () => {
     expect(app.keyGenerator()).toBe(gen);
     const v = app.messageVerifier("cookies");
     expect(v.verify(v.generate({ foo: 1 }))).toEqual({ foo: 1 });
-    await expect(app.configFor("exception_notification")).rejects.toThrow(/only "database"/);
+    await expect(app.configFor("exception_notification")).rejects.toThrow(
+      /Could not load configuration. No such file/,
+    );
   });
 
   it("credentials prefers env-specific config/credentials/{env}.yml.enc, else config/credentials.yml.enc", async () => {

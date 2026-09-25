@@ -27,7 +27,7 @@ export class CpkBook extends Base {
   static _tableName = "cpk_books";
   static _demodulizedName = "Book";
 
-  failDestroy = false;
+  declare failDestroy: boolean | undefined;
 
   static {
     this._primaryKey = ["author_id", "id"];
