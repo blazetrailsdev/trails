@@ -227,7 +227,7 @@ export function constantize(camelCasedWord: string): unknown {
         ? (receiver as Record<string, unknown>)[segments[i - 1]]
         : undefined;
     if (value === undefined) {
-      throw new NameError(`uninitialized constant ${path}`, segments[i - 1], { receiver });
+      throw new NameError(`uninitialized constant ${key}`, segments[i - 1], { receiver });
     }
     receiver = value;
   }
