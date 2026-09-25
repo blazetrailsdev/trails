@@ -3,7 +3,7 @@ import {
   dasherize as _dasherize,
   humanize,
 } from "@blazetrails/activesupport";
-import { File, FileUtils } from "@blazetrails/ruby-compat";
+import { File, FileUtils, rbInspect } from "@blazetrails/ruby-compat";
 import * as Actions from "./actions.js";
 import type { GeneratorActionsState } from "./actions.js";
 import * as TrailsActions from "./trails-actions.js";
@@ -176,7 +176,9 @@ export abstract class GeneratorBase implements GeneratorActionsState {
       } else if (value === undefined) value = args[++i];
       if (option.type === "numeric") value = Number(value);
       if (option.enum && !option.enum.includes(value as string))
-        throw new Error(`Expected '${sw}' to be one of ${option.enum.join(", ")}; got ${value}`);
+        throw new Error(
+          `Expected '${sw}' to be one of ${option.enum.join(", ")}; got ${rbInspect(value)}`,
+        );
       options[name] = value;
     }
 

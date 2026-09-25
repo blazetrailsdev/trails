@@ -3,6 +3,7 @@ import * as fs from "node:fs";
 import * as nodePath from "node:path";
 import * as os from "node:os";
 import { Generators } from "./generators.js";
+import { DATABASES } from "./generators/database.js";
 import { createProgram } from "./cli.js";
 import { AuthenticationGenerator } from "./generators/rails/authentication/authentication-generator.js";
 import { GeneratorGenerator } from "./generators/rails/generator/generator-generator.js";
@@ -118,5 +119,12 @@ describe("GeneratorsTest", () => {
     const { Generators: fresh } = await import("./generators.js");
     await fresh.findByNamespace("rails:helper");
     expect(fresh.subclasses().map((k) => k.namespace)).toEqual(["rails:helper"]);
+  });
+
+  it("an enum class option rejects an undeclared value with Thor's message", async () => {
+    const devcontainer = (await Generators.findByNamespace("devcontainer"))!;
+    await expect(
+      devcontainer.start(["--database", "oracle"], { cwd: "/tmp", output: () => {} }),
+    ).rejects.toThrow(`Expected '--database' to be one of ${DATABASES.join(", ")}; got "oracle"`);
   });
 });

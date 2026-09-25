@@ -64,10 +64,9 @@ describe("AuthenticationGenerator", () => {
     expect(exists("test/mailers/previews/passwords-mailer-preview.ts")).toBe(true);
   });
 
-  it("skips the channel file while its package is unported", () => {
+  it("connection_class_skipped_without_action_cable", () => {
     makeGen().run();
-    expect(exists("app/mailers/passwords-mailer.ts")).toBe(true);
-    for (const rel of VIEWS) expect(exists(rel), rel).toBe(true);
+
     expect(exists("app/channels/application-cable/connection.ts")).toBe(false);
   });
 
