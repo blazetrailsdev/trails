@@ -86,7 +86,7 @@ describe("WhereChainTest", () => {
 
   it("associated unscoped merged with scope on association", async () => {
     expect(
-      await Post.unscope("where")
+      await Post.unscope(":where")
         .where()
         .associated("author")
         .merge(Author.where({ id: 1 }))
@@ -97,7 +97,7 @@ describe("WhereChainTest", () => {
   it("associated unscoped merged joined with scope on association", async () => {
     expect(
       await Post.joins(":author")
-        .unscope("where")
+        .unscope(":where")
         .where()
         .associated("author")
         .merge(Author.where({ id: 1 }))
@@ -109,7 +109,7 @@ describe("WhereChainTest", () => {
     expect(
       await Post.extending(Post.namedExtension)
         .joins(":author")
-        .unscope("where")
+        .unscope(":where")
         .where()
         .associated("author")
         .merge(Author.where({ id: 1 }))
@@ -120,7 +120,7 @@ describe("WhereChainTest", () => {
   it("associated unscoped merged joined extended late with scope on association", async () => {
     expect(
       await Post.joins(":author")
-        .unscope("where")
+        .unscope(":where")
         .where()
         .associated("author")
         .merge(Author.where({ id: 1 }))
@@ -168,7 +168,7 @@ describe("WhereChainTest", () => {
   });
 
   it("associated with enum unscoped", async () => {
-    const first = await Author.unscope("where")
+    const first = await Author.unscope(":where")
       .joins(":readingListing")
       .where()
       .associated("readingListing")
@@ -265,7 +265,7 @@ describe("WhereChainTest", () => {
   it("missing unscoped merged with scope on association", async () => {
     expect(
       await Post.joins(":author")
-        .unscope("where")
+        .unscope(":where")
         .where()
         .missing("author")
         .merge(Author.where({ id: 1 }))
@@ -275,7 +275,7 @@ describe("WhereChainTest", () => {
 
   it("missing unscoped merged joined with scope on association", async () => {
     expect(
-      await Post.unscope("where")
+      await Post.unscope(":where")
         .where()
         .missing("author")
         .merge(Author.where({ id: 1 }))
@@ -308,7 +308,7 @@ describe("WhereChainTest", () => {
     expect(
       await Post.extending(Post.namedExtension)
         .joins(":author")
-        .unscope("where")
+        .unscope(":where")
         .where()
         .missing("author")
         .merge(Author.where({ id: 1 }))
@@ -319,7 +319,7 @@ describe("WhereChainTest", () => {
   it("missing unscoped merged joined extended late with scope on association", async () => {
     expect(
       await Post.joins(":author")
-        .unscope("where")
+        .unscope(":where")
         .where()
         .missing("author")
         .merge(Author.where({ id: 1 }))
@@ -343,7 +343,7 @@ describe("WhereChainTest", () => {
   });
 
   it("missing with enum unscoped", async () => {
-    const first = await Author.unscope("where")
+    const first = await Author.unscope(":where")
       .joins(":readingListing")
       .where()
       .missing("unreadListing")

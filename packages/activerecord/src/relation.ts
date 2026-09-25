@@ -35,7 +35,7 @@ export { Range };
 import {
   WhereChain,
   QueryMethods,
-  type UnscopeType,
+  type UnscopeArg,
   type ExceptSkip,
   type AssociationSpec,
   type JoinSpec,
@@ -161,7 +161,7 @@ export type ValuesHash = {
   leftOuterJoins?: AssociationSpec[];
   references?: string[];
   extending?: Array<Record<string, (...args: any[]) => any>>;
-  unscope?: Array<string | { where: string | string[] }>;
+  unscope?: UnscopeArg[];
   optimizerHints?: string[];
   annotate?: string[];
   with?: Array<{ name: string; expression: Nodes.Node; recursive: boolean }>;
@@ -1704,7 +1704,7 @@ export class Relation<T extends Base> {
             sql(selectValues.replace("%s", subqueryColumn)),
           );
         } else {
-          const query = collection.unscope("order");
+          const query = collection.unscope(":order");
           query.selectValues = [sql(selectValues.replace("%s", column))];
           arel = query.arel();
         }
@@ -1902,7 +1902,7 @@ export interface Relation<T extends Base> {
   referencesValues: Array<string | Nodes.SqlLiteral>;
   extendingValues: object[];
   readonly extensions: object[];
-  unscopeValues: Array<string | { where: string | string[] }>;
+  unscopeValues: UnscopeArg[];
   optimizerHintsValues: string[];
   annotateValues: string[];
   withValues: Array<Record<string, unknown>>;
@@ -1963,7 +1963,7 @@ export interface Relation<T extends Base>
     key?: string | string[],
     notFoundIds?: unknown[],
   ): never;
-  unscope(...args: Array<UnscopeType | { where: string | string[] }>): Relation<T>;
+  unscope(...args: UnscopeArg[]): Relation<T>;
   lock(locks?: string | boolean | null): Relation<T>;
   none(): Relation<T>;
   readonly(value?: boolean): Relation<T>;

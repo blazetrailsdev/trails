@@ -306,7 +306,7 @@ describe("DefaultScopingTest", () => {
 
   it("unscope overrides default scope", async () => {
     const expected = namesAndIds(await Developer.all());
-    const received = namesAndIds(await DeveloperCalledJamis.unscope("where"));
+    const received = namesAndIds(await DeveloperCalledJamis.unscope(":where"));
     expect(received).toEqual(expected);
   });
 
@@ -314,24 +314,24 @@ describe("DefaultScopingTest", () => {
     const expected = namesAndIds(await Developer.order("id DESC, name DESC"));
     const received = namesAndIds(
       await DeveloperOrderedBySalary.reorder("name DESC")
-        .unscope("order")
+        .unscope(":order")
         .order("id DESC, name DESC"),
     );
     expect(received).toEqual(expected);
 
     const expected2 = namesAndIds(await Developer.all());
-    const received2 = namesAndIds(await Developer.order("id DESC, name DESC").unscope("order"));
+    const received2 = namesAndIds(await Developer.order("id DESC, name DESC").unscope(":order"));
     expect(received2).toEqual(expected2);
 
     const expected3 = namesAndIds(await Developer.all());
-    const received3 = namesAndIds(await Developer.reorder("name DESC").unscope("order"));
+    const received3 = namesAndIds(await Developer.reorder("name DESC").unscope(":order"));
     expect(received3).toEqual(expected3);
   });
 
   it("unscope with where attributes", async () => {
     const expected = names(await Developer.order("salary DESC"));
     const received = names(
-      await DeveloperOrderedBySalary.where({ name: "David" }).unscope({ where: "name" }),
+      await DeveloperOrderedBySalary.where({ name: "David" }).unscope({ ":where": "name" }),
     );
     expect(received.sort()).toEqual(expected.sort());
 
@@ -339,7 +339,7 @@ describe("DefaultScopingTest", () => {
     const received2 = names(
       await DeveloperOrderedBySalary.select("id")
         .where({ name: "Jamis" })
-        .unscope({ where: "name" }, "select"),
+        .unscope({ ":where": "name" }, ":select"),
     );
     expect(received2.sort()).toEqual(expected2.sort());
 
@@ -347,13 +347,13 @@ describe("DefaultScopingTest", () => {
     const received3 = names(
       await DeveloperOrderedBySalary.select("id")
         .where({ name: "Jamis" })
-        .unscope("select", "where"),
+        .unscope(":select", ":where"),
     );
     expect(received3.sort()).toEqual(expected3.sort());
 
     const expected4 = names(await Developer.order("salary DESC"));
     const received4 = names(
-      await DeveloperOrderedBySalary.where().not({ name: "Jamis" }).unscope({ where: "name" }),
+      await DeveloperOrderedBySalary.where().not({ name: "Jamis" }).unscope({ ":where": "name" }),
     );
     expect(received4.sort()).toEqual(expected4.sort());
 
@@ -362,7 +362,7 @@ describe("DefaultScopingTest", () => {
       await DeveloperOrderedBySalary.where()
         .not({ name: ["Jamis", "David"] })
         .unscope({
-          where: "name",
+          ":where": "name",
         }),
     );
     expect(received5.sort()).toEqual(expected5.sort());
@@ -371,7 +371,7 @@ describe("DefaultScopingTest", () => {
     const received6 = names(
       await DeveloperOrderedBySalary.where(
         Developer.arelTable.get("name").eq("David") as any,
-      ).unscope({ where: "name" }),
+      ).unscope({ ":where": "name" }),
     );
     expect(received6.sort()).toEqual(expected6.sort());
 
@@ -379,7 +379,7 @@ describe("DefaultScopingTest", () => {
     const received7 = names(
       await DeveloperOrderedBySalary.where(
         Developer.arelTable.get("name").eq("David") as any,
-      ).unscope({ where: "name" }),
+      ).unscope({ ":where": "name" }),
     );
     expect(received7.sort()).toEqual(expected7.sort());
   });
@@ -389,48 +389,48 @@ describe("DefaultScopingTest", () => {
     const received = names(
       await DeveloperOrderedBySalary.where({ name: "Jamis" })
         .where({ id: 1 })
-        .unscope({ where: ["name", "id"] }),
+        .unscope({ ":where": ["name", "id"] }),
     );
     expect(received.sort()).toEqual(expected.sort());
   });
 
   it("unscope with grouping attributes", async () => {
     const expected = names(await Developer.order("salary DESC"));
-    const received = names(await DeveloperOrderedBySalary.group("name").unscope("group"));
+    const received = names(await DeveloperOrderedBySalary.group("name").unscope(":group"));
     expect(received.sort()).toEqual(expected.sort());
 
     const expected2 = names(await Developer.order("salary DESC"));
-    const received2 = names(await DeveloperOrderedBySalary.group("name").unscope("group"));
+    const received2 = names(await DeveloperOrderedBySalary.group("name").unscope(":group"));
     expect(received2.sort()).toEqual(expected2.sort());
   });
 
   it("unscope with limit in query", async () => {
     const expected = names(await Developer.order("salary DESC"));
-    const received = names(await DeveloperOrderedBySalary.limit(1).unscope("limit"));
+    const received = names(await DeveloperOrderedBySalary.limit(1).unscope(":limit"));
     expect(received.sort()).toEqual(expected.sort());
   });
 
   it("unscope reverse order", async () => {
     const expected = names(await Developer.all());
-    const received = names(await Developer.order("salary DESC").reverseOrder().unscope("order"));
+    const received = names(await Developer.order("salary DESC").reverseOrder().unscope(":order"));
     expect(received).toEqual(expected);
   });
 
   it("unscope select", async () => {
     const expected = names(await Developer.order("salary ASC"));
     const received = names(
-      await Developer.order("salary DESC").reverseOrder().select("name").unscope("select"),
+      await Developer.order("salary DESC").reverseOrder().select("name").unscope(":select"),
     );
     expect(received).toEqual(expected);
 
     const expected2 = (await Developer.all()).map((d: any) => d.id);
-    const received2 = (await Developer.select("name").unscope("select")).map((d: any) => d.id);
+    const received2 = (await Developer.select("name").unscope(":select")).map((d: any) => d.id);
     expect(received2).toEqual(expected2);
   });
 
   it("unscope offset", async () => {
     const expected = names(await Developer.all());
-    const received = names(await Developer.offset(5).unscope("offset"));
+    const received = names(await Developer.offset(5).unscope(":offset"));
     expect(received).toEqual(expected);
   });
 
@@ -570,7 +570,7 @@ describe("DefaultScopingTest", () => {
   it("unscope having", async () => {
     const expected = names(await DeveloperOrderedBySalary.all());
     const received = names(
-      await DeveloperOrderedBySalary.having("name IN ('Jamis', 'David')").unscope("having"),
+      await DeveloperOrderedBySalary.having("name IN ('Jamis', 'David')").unscope(":having"),
     );
     expect(received).toEqual(expected);
   });
@@ -578,7 +578,7 @@ describe("DefaultScopingTest", () => {
   it("unscope includes", async () => {
     const expected = names(await Developer.all());
     const received = names(
-      await Developer.includes(":projects").select("id").unscope("includes", "select"),
+      await Developer.includes(":projects").select("id").unscope(":includes", ":select"),
     );
     expect(received).toEqual(expected);
   });
@@ -586,14 +586,16 @@ describe("DefaultScopingTest", () => {
   it("unscope left outer joins", async () => {
     const expected = names(await Developer.all());
     const received = names(
-      await Developer.leftOuterJoins(":projects").select("id").unscope("leftOuterJoins", "select"),
+      await Developer.leftOuterJoins(":projects")
+        .select("id")
+        .unscope(":leftOuterJoins", ":select"),
     );
     expect(received).toEqual(expected);
   });
 
   it("unscope eager load", async () => {
     const expected = names(await Developer.all());
-    const received = Developer.eagerLoad(":projects").select("id").unscope("eagerLoad", "select");
+    const received = Developer.eagerLoad(":projects").select("id").unscope(":eagerLoad", ":select");
     const rows = await received;
     expect(names(rows)).toEqual(expected);
     expect((rows[0] as any).projects.loaded).toBe(false);
@@ -601,7 +603,7 @@ describe("DefaultScopingTest", () => {
 
   it("unscope preloads", async () => {
     const expected = names(await Developer.all());
-    const received = Developer.preload(":projects").select("id").unscope("preload", "select");
+    const received = Developer.preload(":projects").select("id").unscope(":preload", ":select");
     const rows = await received;
     expect(names(rows)).toEqual(expected);
     expect((rows[0] as any).projects.loaded).toBe(false);
@@ -612,7 +614,7 @@ describe("DefaultScopingTest", () => {
     const received = names(
       await Developer.joins("JOIN developers_projects ON id = developer_id")
         .select("id")
-        .unscope("joins", "select"),
+        .unscope(":joins", ":select"),
     );
     expect(received).toEqual(expected);
   });
@@ -621,7 +623,7 @@ describe("DefaultScopingTest", () => {
     const expected = names(await Developer.order("salary DESC"));
     const received = names(
       await DeveloperOrderedBySalary.where(Developer.arelTable.get("id").lteq(2) as any).unscope({
-        where: "id",
+        ":where": "id",
       }),
     );
     expect(received.sort()).toEqual(expected.sort());
@@ -629,7 +631,7 @@ describe("DefaultScopingTest", () => {
     const expected2 = names(await Developer.order("salary DESC"));
     const received2 = names(
       await DeveloperOrderedBySalary.where(Developer.arelTable.get("id").lt(2) as any).unscope({
-        where: "id",
+        ":where": "id",
       }),
     );
     expect(received2.sort()).toEqual(expected2.sort());
@@ -642,7 +644,7 @@ describe("DefaultScopingTest", () => {
     const received = names(
       await DeveloperOrderedBySalary.where({ name: "Jamis" })
         .where("legacy_created_at > ?", "2020-01-01")
-        .unscope({ where: ["name"] }),
+        .unscope({ ":where": ["name"] }),
     );
     expect(received.sort()).toEqual(expected.sort());
   });
@@ -652,7 +654,7 @@ describe("DefaultScopingTest", () => {
       declare static byName: (name: string) => any;
       static {
         this.scope("byName", function (this: any, name: string) {
-          return this.unscope({ where: "name" }).where({ name });
+          return this.unscope({ ":where": "name" }).where({ name });
         });
       }
     }
@@ -748,24 +750,25 @@ describe("DefaultScopingTest", () => {
   });
 
   it("unscope errors with invalid value", () => {
-    expect(() => Developer.where({ name: "Jamis" }).unscope("incorrect_value" as any)).toThrow(
-      ArgumentError,
-    );
-    expect(() => Developer.all().unscope("includes", "select", "some_broken_value" as any)).toThrow(
-      ArgumentError,
-    );
+    expect(() =>
+      Developer.includes(":projects")
+        .where({ name: "Jamis" })
+        .unscope(":incorrect_value" as any),
+    ).toThrow(ArgumentError);
+    expect(() =>
+      Developer.all().unscope(":includes", ":select", ":some_broken_value" as any),
+    ).toThrow(ArgumentError);
     expect(() =>
       Developer.order("name DESC")
         .reverseOrder()
-        .unscope("reverse_order" as any),
+        .unscope(":reverse_order" as any),
     ).toThrow(ArgumentError);
     expect(() => Developer.order("name DESC").where({ name: "Jamis" }).unscope()).toThrow(
       ArgumentError,
     );
   });
 
-  // BLOCKED: unscope-symbol-vs-string-raising-arms
-  it.skip("unscope errors with non where hash keys", () => {
+  it("unscope errors with non where hash keys", () => {
     expect(() =>
       Developer.where({ name: "Jamis" })
         .limit(4)
@@ -777,8 +780,7 @@ describe("DefaultScopingTest", () => {
     );
   });
 
-  // BLOCKED: unscope-symbol-vs-string-raising-arms
-  it.skip("unscope errors with non symbol or hash arguments", () => {
+  it("unscope errors with non symbol or hash arguments", () => {
     expect(() =>
       Developer.where({ name: "Jamis" })
         .limit(3)
@@ -795,14 +797,14 @@ describe("DefaultScopingTest", () => {
     const received = names(
       await (Developer.leftJoins(":projects") as any)
         .select("id")
-        .unscope("leftJoins", "select")
+        .unscope(":leftJoins", ":select")
         .toArray(),
     );
     expect(received).toEqual(expected);
   });
 
   it("unscope merging", () => {
-    const merged = Developer.where({ name: "Jamis" }).merge(Developer.unscope("where"));
+    const merged = Developer.where({ name: "Jamis" }).merge(Developer.unscope(":where"));
     assertEmpty((merged as any).whereClause);
     assertNotEmpty((merged.where({ name: "Jon" }) as any).whereClause);
   });
@@ -810,7 +812,7 @@ describe("DefaultScopingTest", () => {
   it("order to unscope reordering", () => {
     const scope = DeveloperOrderedBySalary.order("salary DESC, name ASC")
       .reverseOrder()
-      .unscope("order");
+      .unscope(":order");
     expect(scope.toSql()).not.toMatch(/order/i);
   });
 
@@ -915,11 +917,11 @@ describe("DefaultScopingTest", () => {
     await SubConditionalStiPost.create({ title: "Hello world", body: "" });
     expect(await ConditionalStiPost.count()).toBe(2);
     expect((await ConditionalStiPost.all()).length).toBe(2);
-    expect((await ConditionalStiPost.unscope({ where: "title" })).length).toBe(3);
+    expect((await ConditionalStiPost.unscope({ ":where": "title" })).length).toBe(3);
 
     expect(await SubConditionalStiPost.count()).toBe(1);
     expect((await SubConditionalStiPost.all()).length).toBe(1);
-    expect((await SubConditionalStiPost.unscope({ where: "title" })).length).toBe(2);
+    expect((await SubConditionalStiPost.unscope({ ":where": "title" })).length).toBe(2);
   });
 
   it("default scope include with count", async () => {

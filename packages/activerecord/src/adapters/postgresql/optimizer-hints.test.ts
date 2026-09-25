@@ -79,7 +79,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await Post.optimizerHints("/*+ SeqScan(posts) */")
           .select("id")
           .where({ author_id: [0, 1] })
-          .unscope("optimizerHints")
+          .unscope(":optimizerHints")
           .load();
       });
     });

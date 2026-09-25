@@ -32,7 +32,7 @@ describe("Relation#unscope — full Rails key coverage", () => {
   it("unscope('createWith') clears createWithValue", () => {
     const rel = (UscAuthor as any).all().createWith({ name: "default" });
     expect(rel.createWithValue).toEqual({ name: "default" });
-    const cleared = rel.unscope("createWith");
+    const cleared = rel.unscope(":createWith");
     expect(cleared.createWithValue).toEqual({});
   });
 
@@ -43,7 +43,7 @@ describe("Relation#unscope — full Rails key coverage", () => {
       .includes(":uscPosts")
       .eagerLoad(":uscPosts");
     expect(rel.preloadValues).toEqual([":uscPosts"]);
-    const cleared = rel.unscope("preload");
+    const cleared = rel.unscope(":preload");
     expect(cleared.preloadValues).toEqual([]);
     expect(cleared.includesValues).toEqual([":uscPosts"]);
     expect(cleared.eagerLoadValues).toEqual([":uscPosts"]);
@@ -55,7 +55,7 @@ describe("Relation#unscope — full Rails key coverage", () => {
       .preload(":uscPosts")
       .includes(":uscPosts")
       .eagerLoad(":uscPosts");
-    const cleared = rel.unscope("eagerLoad");
+    const cleared = rel.unscope(":eagerLoad");
     expect(cleared.eagerLoadValues).toEqual([]);
     expect(cleared.includesValues).toEqual([":uscPosts"]);
     expect(cleared.preloadValues).toEqual([":uscPosts"]);
@@ -67,7 +67,7 @@ describe("Relation#unscope — full Rails key coverage", () => {
       .preload(":uscPosts")
       .includes(":uscPosts")
       .eagerLoad(":uscPosts");
-    const cleared = rel.unscope("includes");
+    const cleared = rel.unscope(":includes");
     expect(cleared.includesValues).toEqual([]);
     expect(cleared.preloadValues).toEqual([":uscPosts"]);
     expect(cleared.eagerLoadValues).toEqual([":uscPosts"]);

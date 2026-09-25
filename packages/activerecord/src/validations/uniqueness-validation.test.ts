@@ -613,7 +613,7 @@ describe("UniquenessValidationTest", () => {
       Topic.validatesUniquenessOf("title", {
         conditions: Topic.where({ approved: true }) as any,
       }),
-    ).toThrow();
+    ).toThrow(ArgumentError);
   });
 
   it("validate uniqueness with conditions with record arg", async () => {

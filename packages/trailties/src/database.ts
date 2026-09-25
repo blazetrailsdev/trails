@@ -1,4 +1,4 @@
-import { reverseMerge, trailsRoot } from "@blazetrails/activesupport";
+import { presence, reverseMerge, trailsRoot } from "@blazetrails/activesupport";
 import { getFs, getPath } from "@blazetrails/ruby-compat";
 import { env } from "@blazetrails/ruby-compat";
 import type { DatabaseAdapter } from "@blazetrails/activerecord";
@@ -16,7 +16,7 @@ export interface DatabaseConfig {
 }
 
 export function resolveEnv(): string {
-  return env.TRAILS_ENV || "development";
+  return presence(env.TRAILS_ENV) ?? presence(env.NODE_ENV) ?? "development";
 }
 
 export interface DatabaseConfigModule {

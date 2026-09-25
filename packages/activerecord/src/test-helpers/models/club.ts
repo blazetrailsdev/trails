@@ -45,7 +45,7 @@ export class Club extends Base {
     this.scope("general", function (this: any) {
       return this.leftJoins(":category")
         .where({ categories: { name: "General" } })
-        .unscope("limit");
+        .unscope(":limit");
     });
   }
 }

@@ -1021,7 +1021,7 @@ describe("InverseBelongsToTests", () => {
     const human = (await loadSingularTarget(interest, "human"))!;
     const createdHuman = await Human.create({ name: "wrong human" });
     const foundInterest = await (createdHuman as any).interests
-      .unscope("where")
+      .unscope(":where")
       .detect((thisInterest: any) => (interest as any).id === thisInterest.id);
     const foundHuman = await loadSingularTarget(foundInterest, "human");
     expect((foundHuman as any).id).toBe((human as any).id);

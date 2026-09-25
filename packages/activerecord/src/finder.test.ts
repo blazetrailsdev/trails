@@ -1018,7 +1018,7 @@ describe("FinderTest", () => {
     const customersRel = Customer.where({ address }).order("id");
     expect((await customersRel).map(rid)).toEqual([rid(customers("david"))]);
     expect(
-      (await customersRel.unscope({ where: ["address_city", "address_country"] })).map(rid),
+      (await customersRel.unscope({ ":where": ["address_city", "address_country"] })).map(rid),
     ).toEqual([customers("david"), customers("mary")].map(rid));
   });
 

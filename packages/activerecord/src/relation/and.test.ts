@@ -31,7 +31,7 @@ describe("AndTest", () => {
   });
 
   it("and with structurally incompatible scope", async () => {
-    const postsScope = Author.unscope("order").limit(10).offset(10).select("id").order("id");
+    const postsScope = Author.unscope(":order").limit(10).offset(10).select("id").order("id");
     const error = await assertRaises([ArgumentError], {}, () => {
       Author.limit(10).select("id").order("name").and(postsScope);
     });

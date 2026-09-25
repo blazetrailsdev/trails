@@ -533,7 +533,7 @@ describe("RelationTest", () => {
 
   it("can unscope empty IN", async () => {
     await assertQueriesCount(1, false, async () => {
-      await CanonPost.where({ id: [] }).unscope({ where: "id" }).load();
+      await CanonPost.where({ id: [] }).unscope({ ":where": "id" }).load();
     });
   });
 

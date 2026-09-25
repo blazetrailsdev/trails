@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished } from "vitest";
 import {
   NullLogger,
   Executor,
@@ -11,8 +11,10 @@ import {
   trailsRoot,
 } from "@blazetrails/activesupport";
 import {
+  env,
   fsAdapterConfig,
   registerFsAdapter,
+  setEnv,
   type FsAdapter,
   type PathAdapter,
 } from "@blazetrails/ruby-compat";
@@ -799,6 +801,9 @@ describe("Application key/message/credentials wiring", () => {
   });
 
   it("credentials prefers env-specific config/credentials/{env}.yml.enc, else config/credentials.yml.enc", async () => {
+    const nodeEnv = env.NODE_ENV;
+    setEnv("NODE_ENV", undefined);
+    onTestFinished(() => setEnv("NODE_ENV", nodeEnv));
     const b = "/app/config/credentials";
     installFs(
       new Set(["/", "/app", "/app/config", b]),

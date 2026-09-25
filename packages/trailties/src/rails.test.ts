@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { EnvironmentInquirer, NullLogger, trailsRoot } from "@blazetrails/activesupport";
-import { setEnv } from "@blazetrails/ruby-compat";
+import { env, setEnv } from "@blazetrails/ruby-compat";
 import { getFs } from "@blazetrails/ruby-compat";
 import { Trails, _resetTrailsEnv } from "./rails.js";
 import { Application } from "./application.js";
@@ -71,6 +71,19 @@ describe("Trails", () => {
       expect(Trails.env.toString()).toBe("staging");
     } finally {
       setEnv("TRAILS_ENV", undefined);
+      _resetTrailsEnv();
+    }
+  });
+
+  it("Trails.env falls back to NODE_ENV when TRAILS_ENV is unset", () => {
+    const nodeEnv = env.NODE_ENV;
+    setEnv("TRAILS_ENV", undefined);
+    setEnv("NODE_ENV", "production");
+    try {
+      _resetTrailsEnv();
+      expect(Trails.env.toString()).toBe("production");
+    } finally {
+      setEnv("NODE_ENV", nodeEnv);
       _resetTrailsEnv();
     }
   });

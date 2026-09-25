@@ -103,25 +103,25 @@ describe("OrTest", () => {
   it("or with unscope where", async () => {
     const expected = await Post.where("id = 1 or id = 2");
     const partial = Post.where("id = 1 and id != 2");
-    expect(await partial.or(partial.unscope("where").where("id = 2"))).toEqual(expected);
+    expect(await partial.or(partial.unscope(":where").where("id = 2"))).toEqual(expected);
   });
 
   it("or with unscope where column", async () => {
     const expected = await Post.where("id = 1 or id = 2");
     const partial = Post.where({ id: 1 }).where().not({ id: 2 });
-    expect(await partial.or(partial.unscope({ where: "id" }).where("id = 2"))).toEqual(expected);
+    expect(await partial.or(partial.unscope({ ":where": "id" }).where("id = 2"))).toEqual(expected);
   });
 
   it("or with unscope order", async () => {
     const expected = byId(await Post.where("id = 1 or id = 2"));
     expect(
-      byId(await Post.order("body asc").where("id = 1").unscope("order").or(Post.where("id = 2"))),
+      byId(await Post.order("body asc").where("id = 1").unscope(":order").or(Post.where("id = 2"))),
     ).toEqual(expected);
     expect(
       byId(
         await Post.order("id")
           .where("id = 1")
-          .or(Post.order("id").where("id = 2").unscope("order")),
+          .or(Post.order("id").where("id = 2").unscope(":order")),
       ),
     ).toEqual(expected);
   });
@@ -130,7 +130,7 @@ describe("OrTest", () => {
     const error = await assertRaises([ArgumentError], {}, () =>
       Post.order("body asc")
         .where("id = 1")
-        .unscope("order")
+        .unscope(":order")
         .or(Post.order("body asc").where("id = 2")),
     );
 

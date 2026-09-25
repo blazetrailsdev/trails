@@ -2770,7 +2770,7 @@ describe("RelationTest", () => {
     expect(p1.toSql()).not.toBe(p2.toSql());
 
     const commentsRel = Comment.where({ post: p1 })
-      .unscope({ where: "post_id" })
+      .unscope({ ":where": "post_id" })
       .where({ post: p2 });
 
     expect((await (await p1.first())!.comments).map((c: Comment) => c.id)).not.toEqual(
@@ -2788,7 +2788,7 @@ describe("RelationTest", () => {
     expect((await p0).map((p) => p.id)).toEqual([posts("authorless").id]);
     expect((await p1).map((p) => p.id)).toEqual([posts("thinking").id]);
 
-    const commentsRel = Comment.merge(p0).unscope({ where: "author_id" }).where({ post: p1 });
+    const commentsRel = Comment.merge(p0).unscope({ ":where": "author_id" }).where({ post: p1 });
 
     expect((await (await p0.first())!.comments).map((c: Comment) => c.id)).not.toEqual(
       (await commentsRel).map((c) => c.id),
@@ -2802,11 +2802,11 @@ describe("RelationTest", () => {
     const comment = comments("greetings");
     await comment.updateBang({ comments: 1 });
 
-    let commentsRel = Comment.where({ comments: 1 }).unscope({ where: "unknown_column" });
+    let commentsRel = Comment.where({ comments: 1 }).unscope({ ":where": "unknown_column" });
     expect((await commentsRel).map((c) => c.id)).toEqual([comment.id]);
 
     commentsRel = Comment.where({ comments: 1 }).unscope({
-      where: { comments: "unknown_column" } as any,
+      ":where": { comments: "unknown_column" } as any,
     });
     expect((await commentsRel).map((c) => c.id)).toEqual([comment.id]);
   });
@@ -2814,15 +2814,15 @@ describe("RelationTest", () => {
   it("unscope specific where value", async () => {
     const postsRel = Post.where({ title: "Welcome to the weblog", body: "Such a lovely day" });
     expect(await postsRel.count()).toBe(1);
-    expect(await postsRel.unscope({ where: "title" }).count()).toBe(1);
-    expect(await postsRel.unscope({ where: "body" }).count()).toBe(1);
+    expect(await postsRel.unscope({ ":where": "title" }).count()).toBe(1);
+    expect(await postsRel.unscope({ ":where": "body" }).count()).toBe(1);
   });
 
   it("unscope with aliased column", async () => {
     let postsRel = Post.where({ author: authors("mary"), text: "hullo" }).order("id");
     expect((await postsRel).map((p) => p.id)).toEqual([posts("misc_by_mary").id]);
 
-    postsRel = postsRel.unscope({ where: "posts.text" });
+    postsRel = postsRel.unscope({ ":where": "posts.text" });
     expect(
       [posts("eager_other"), posts("misc_by_mary"), posts("other_by_mary")].map((p) => p.id),
     ).toEqual((await postsRel).map((p) => p.id));
@@ -2835,7 +2835,7 @@ describe("RelationTest", () => {
     commentsRel = commentsRel.where({ id: comments("greetings") });
     assertEmpty(await commentsRel);
 
-    commentsRel = commentsRel.unscope({ where: "posts.id" });
+    commentsRel = commentsRel.unscope({ ":where": "posts.id" });
     expect((await commentsRel).map((c) => c.id)).toEqual([comments("greetings").id]);
   });
 
@@ -2846,7 +2846,7 @@ describe("RelationTest", () => {
     commentsRel = commentsRel.where({ id: comments("greetings") });
     assertEmpty(await commentsRel);
 
-    commentsRel = commentsRel.unscope({ where: { posts: "id" } as any });
+    commentsRel = commentsRel.unscope({ ":where": { posts: "id" } as any });
     expect((await commentsRel).map((c) => c.id)).toEqual([comments("greetings").id]);
   });
 
@@ -2854,12 +2854,12 @@ describe("RelationTest", () => {
     let postsRel = Post.where(arelSql("'Welcome to the weblog'").eq(Post.arelTable.get("title")));
 
     expect(await postsRel.count()).toBe(1);
-    expect(await postsRel.unscope({ where: "title" }).count()).toBe(await Post.count());
+    expect(await postsRel.unscope({ ":where": "title" }).count()).toBe(await Post.count());
 
     postsRel = Post.where(arelSql("posts.title").eq("Welcome to the weblog"));
 
     expect(await postsRel.count()).toBe(1);
-    expect(await postsRel.unscope({ where: "title" }).count()).toBe(1);
+    expect(await postsRel.unscope({ ":where": "title" }).count()).toBe(1);
   });
 
   it("unscope grouped where", async () => {
@@ -2867,19 +2867,19 @@ describe("RelationTest", () => {
       title: ["Welcome to the weblog", "So I was thinking", null],
     });
     expect(await postsRel.count()).toBe(2);
-    expect(await postsRel.unscope({ where: "title" }).count()).toBe(await Post.count());
+    expect(await postsRel.unscope({ ":where": "title" }).count()).toBe(await Post.count());
   });
 
   it("unscope with double dot where", async () => {
     const postsRel = Post.where({ id: [1, 2] });
     expect(await postsRel.count()).toBe(2);
-    expect(await postsRel.unscope({ where: "id" }).count()).toBe(await Post.count());
+    expect(await postsRel.unscope({ ":where": "id" }).count()).toBe(await Post.count());
   });
 
   it("unscope with triple dot where", async () => {
     const postsRel = Post.where({ id: [1, 2] });
     expect(await postsRel.count()).toBe(2);
-    expect(await postsRel.unscope({ where: "id" }).count()).toBe(await Post.count());
+    expect(await postsRel.unscope({ ":where": "id" }).count()).toBe(await Post.count());
   });
 
   it("locked should not build arel", () => {
@@ -2894,8 +2894,7 @@ describe("RelationTest", () => {
     );
   });
 
-  it.skip("relation with private kernel method", async () => {
-    // BLOCKED: association scope — Topic hasMany openReplies is declared without Rails' -> { open } scope (topic-open-replies-scope)
+  it("relation with private kernel method", async () => {
     const accountsRel: any = Account.all();
     expect((await accountsRel.open().toArray()).map((a: Account) => a.id)).toEqual([
       accounts("signals37").id,

@@ -191,19 +191,31 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
   });
 
   it.skip("empty on disable joins through", async () => {
-    // BLOCKED: query count — all on an empty owner runs 1 query where Rails runs 0 — filed as 0155-assertion-surfaced-port-bugs/through-all-on-empty-owner-runs-a-query
+    // BLOCKED: the through-id pluck runs at load, not at scope build (disable_joins_association_scope.rb:25) — converge-djar-deferred-chain-walk-mode
     const emptyAuthor = await Author.find(authors("bob").id);
-    expect(await q(0, () => association(emptyAuthor, "comments").all())).toEqual([]);
-    expect(await q(1, () => association(emptyAuthor, "noJoinsComments").all())).toEqual([]);
+    let comments: unknown;
+    await assertQueriesCount(0, false, () => {
+      comments = association(emptyAuthor, "comments").all();
+    });
+    expect(await comments).toEqual([]);
+    await assertQueriesCount(1, false, () => {
+      comments = association(emptyAuthor, "noJoinsComments").all();
+    });
+    expect(await comments).toEqual([]);
   });
 
   it.skip("empty on disable joins through using custom foreign key", async () => {
-    // BLOCKED: query count — all on an empty owner runs 1 query where Rails runs 0 — filed as 0155-assertion-surfaced-port-bugs/through-all-on-empty-owner-runs-a-query
+    // BLOCKED: the through-id pluck runs at load, not at scope build (disable_joins_association_scope.rb:25) — converge-djar-deferred-chain-walk-mode
     const emptyAuthor = await Author.find(authors("bob").id);
-    expect(await q(0, () => association(emptyAuthor, "commentsWithForeignKey").all())).toEqual([]);
-    expect(
-      await q(1, () => association(emptyAuthor, "noJoinsCommentsWithForeignKey").all()),
-    ).toEqual([]);
+    let comments: unknown;
+    await assertQueriesCount(0, false, () => {
+      comments = association(emptyAuthor, "commentsWithForeignKey").all();
+    });
+    expect(await comments).toEqual([]);
+    await assertQueriesCount(1, false, () => {
+      comments = association(emptyAuthor, "noJoinsCommentsWithForeignKey").all();
+    });
+    expect(await comments).toEqual([]);
   });
 
   it("pluck on disable joins through a through", async () => {

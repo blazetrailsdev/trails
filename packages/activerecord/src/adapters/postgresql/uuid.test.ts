@@ -174,8 +174,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     }
 
-    it.skip("acceptable uuid regex", async () => {
-      // BLOCKED: uuid-cast-array-stringification
+    it("acceptable uuid regex", async () => {
       await UUIDType.loadSchema();
       [
         "A0EEBC99-9C0B-4EF8-BB6D-6BB9BD380A11",
