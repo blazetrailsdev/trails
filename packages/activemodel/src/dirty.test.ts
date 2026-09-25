@@ -1,4 +1,4 @@
-import { Hash } from "@blazetrails/ruby-compat";
+import { Hash, rbEqual } from "@blazetrails/ruby-compat";
 import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeEach } from "vitest";
 import {
@@ -18,6 +18,13 @@ import {
 import * as AttributeMethods from "./attribute-methods.js";
 import { Dirty, asJson as dirtyAsJson, initializeDup as dirtyInitializeDup } from "./dirty.js";
 import { API } from "./api.js";
+
+expect.addEqualityTesters([
+  function rubyHashEquals(a: unknown, b: unknown): boolean | undefined {
+    if (!(a instanceof Hash) || !(b instanceof Hash)) return undefined;
+    return rbEqual(a, b);
+  },
+]);
 
 const ivars = Symbol("ivars");
 
@@ -317,7 +324,7 @@ describe("DirtyTest", () => {
 
     model.clearChangesInformation();
 
-    expect(model.previousChanges).toEqual(new Hash());
+    expect(model.previousChanges).toEqual(new HashWithIndifferentAccess());
     expect(model.changedAttributes).toEqual(new HashWithIndifferentAccess());
   });
 

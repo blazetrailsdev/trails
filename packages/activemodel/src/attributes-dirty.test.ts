@@ -1,4 +1,4 @@
-import { Hash } from "@blazetrails/ruby-compat";
+import { Hash, rbEqual } from "@blazetrails/ruby-compat";
 import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging --
    Each model below spells `include ActiveModel::Dirty` in its class body, the way the Rails test
@@ -17,6 +17,13 @@ import {
 import { Dirty } from "./dirty.js";
 import { Model } from "./index.js";
 import { Attributes, type AttributesClassHalf } from "./attributes.js";
+
+expect.addEqualityTesters([
+  function rubyHashEquals(a: unknown, b: unknown): boolean | undefined {
+    if (!(a instanceof Hash) || !(b instanceof Hash)) return undefined;
+    return rbEqual(a, b);
+  },
+]);
 
 describe("AttributesDirtyTest", () => {
   class DirtyModel extends Model {
@@ -189,7 +196,7 @@ describe("AttributesDirtyTest", () => {
 
     model.clearChangesInformation();
 
-    expect(model.previousChanges).toEqual(new Hash());
+    expect(model.previousChanges).toEqual(new HashWithIndifferentAccess());
     expect(model.changedAttributes).toEqual(new HashWithIndifferentAccess());
   });
 
