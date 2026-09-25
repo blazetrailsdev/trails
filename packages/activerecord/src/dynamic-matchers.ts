@@ -1,5 +1,5 @@
 import { camelize, underscore } from "@blazetrails/activesupport";
-import { NoMethodError, NotImplementedError } from "@blazetrails/ruby-compat";
+import { ArgumentError, NoMethodError, NotImplementedError } from "@blazetrails/ruby-compat";
 import { ActiveRecord } from "./namespaces.js";
 
 interface DynamicMatchersHost {
@@ -45,13 +45,15 @@ abstract class Method {
 
   static pattern(): RegExp {
     if (!Object.prototype.hasOwnProperty.call(this, "_pattern")) {
-      this._pattern = new RegExp(`^${this.prefix()}([_a-zA-Z]\\w*(?<!Bang))${this.suffix()}$`);
+      this._pattern = new RegExp(
+        `^${this.prefix()}([_a-zA-Z]\\w*)${this.suffix() || "(?<!Bang)"}$`,
+      );
     }
     return this._pattern!;
   }
 
   static prefix(): string {
-    // @nie disposition=keep-as-strategy-hook
+    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/dynamic_matchers.rb:42
     throw new NotImplementedError();
   }
 
@@ -90,6 +92,12 @@ abstract class Method {
         this: Record<string, (hash: Record<string, unknown>) => unknown>,
         ...args: unknown[]
       ) {
+        const arity = method.attributeNames.length;
+        if (args.length !== arity) {
+          throw new ArgumentError(
+            `wrong number of arguments (given ${args.length}, expected ${arity})`,
+          );
+        }
         return this[method.finder()](method.attributesHash(args));
       },
       writable: true,
