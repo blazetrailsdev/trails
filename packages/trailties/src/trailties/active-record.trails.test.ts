@@ -4,7 +4,12 @@ import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
 import { Trailtie } from "./active-record.js";
 import { Deprecators, Notifications, runLoadHooks } from "@blazetrails/activesupport";
 import { ActionController, Request, Response } from "@blazetrails/actionpack";
-import { RuntimeRegistry } from "@blazetrails/activerecord";
+import {
+  RuntimeRegistry,
+  generateSecureTokenOn,
+  setGenerateSecureTokenOn,
+} from "@blazetrails/activerecord";
+import { Configuration } from "../application/configuration.js";
 
 const blogApp = (): {
   config: { filterParameters: Array<string | RegExp> };
@@ -56,5 +61,21 @@ describe("RailtieTest (trails-only)", () => {
     expect(LogRuntimeController.logProcessAction(events[0])).toContain(
       "ActiveRecord: 12.0ms (1 query, 0 cached)",
     );
+  });
+
+  it("config.loadDefaults 7.1 makes generate_secure_token_on initialize on a booted app", async () => {
+    const saved = Trailtie.config.get("activeRecord");
+    try {
+      const config = new Configuration();
+      config.set("activeRecord", { encryption: {} });
+      config.loadDefaults("7.1");
+
+      await runTrailtieInitializers(Trailtie, blogApp());
+
+      expect(generateSecureTokenOn()).toBe("initialize");
+    } finally {
+      Trailtie.config.set("activeRecord", saved);
+      setGenerateSecureTokenOn("create");
+    }
   });
 });

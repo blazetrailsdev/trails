@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 
 import { Base } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
+import { setGenerateSecureTokenOn } from "./active-record.js";
 
 describe("SecureTokenTest", () => {
   fixtures([]);
@@ -46,5 +47,20 @@ describe("SecureTokenTest", () => {
     await (user as unknown as TokenRecord).regenerateToken();
 
     expect((user as unknown as TokenRecord).token).toBe("x".repeat(24));
+  });
+
+  it("has_secure_token without on: defaults to ActiveRecord.generate_secure_token_on", async () => {
+    class InitializeTokenUser extends Base {
+      static _tableName = "users";
+    }
+    await InitializeTokenUser.loadSchema();
+    setGenerateSecureTokenOn("initialize");
+    try {
+      InitializeTokenUser.hasSecureToken("token");
+    } finally {
+      setGenerateSecureTokenOn("create");
+    }
+
+    expect((new InitializeTokenUser() as unknown as TokenRecord).token).toHaveLength(24);
   });
 });

@@ -313,7 +313,7 @@ export class Configuration extends EngineConfiguration {
           activeRecord.encryption.supportSha1ForNonDeterministicEncryption = false;
           activeRecord.marshallingFormatVersion = 7.1;
           activeRecord.runAfterTransactionCallbacksInOrderDefined = true;
-          activeRecord.generateSecureTokenOn = ":initialize";
+          activeRecord.generateSecureTokenOn = "initialize";
         }
 
         if (this.respondTo("actionDispatch")) {

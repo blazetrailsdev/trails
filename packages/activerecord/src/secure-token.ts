@@ -1,5 +1,6 @@
 import { base58 } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
+import { generateSecureTokenOn } from "./active-record.js";
 
 export class MinimumLengthError extends Error {
   /** @noRailsEquivalent PERMANENT */
@@ -39,7 +40,7 @@ export function hasSecureToken(
     configurable: true,
   });
 
-  const on = options?.on ?? "create";
+  const on = options?.on ?? generateSecureTokenOn();
   this.setCallback(on, on === "initialize" ? "after" : "before", function (this: any) {
     if (this.isNewRecord() && !this.queryAttribute(attribute)) {
       this[attribute] = (this.constructor as typeof Base).generateUniqueSecureToken({ length });
