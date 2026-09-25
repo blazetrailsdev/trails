@@ -1,6 +1,6 @@
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
-import { env as processEnv, setEnv } from "@blazetrails/ruby-compat";
+import { Trails, _resetTrailsEnv } from "../rails.js";
 import { Trailtie, type ActiveModelConfig } from "./active-model.js";
 import { Deprecators } from "@blazetrails/activesupport";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
@@ -11,31 +11,28 @@ import { Error as ActiveModelError } from "@blazetrails/activemodel";
 import { deprecator } from "@blazetrails/activemodel";
 
 describe("RailtieTest", () => {
-  let savedEnv: string | undefined;
-
   beforeEach(() => {
     deprecators = new Deprecators();
     app = { deprecators };
-    savedEnv = processEnv.TRAILS_ENV;
     Trailtie.config.set("activeModel", {} as ActiveModelConfig);
   });
 
   afterEach(() => {
     SecurePassword.minCost = false;
     ActiveModelError.i18nCustomizeFullMessage = false;
-    setEnv("TRAILS_ENV", savedEnv);
+    _resetTrailsEnv();
     Trailtie.config.set("activeModel", {} as ActiveModelConfig);
   });
 
   it("secure password min_cost is false in the development environment", async () => {
-    setEnv("TRAILS_ENV", "development");
+    Trails.env = "development";
     await runTrailtieInitializers(Trailtie, app);
 
     expect(SecurePassword.minCost).toBe(false);
   });
 
   it("secure password min_cost is true in the test environment", async () => {
-    setEnv("TRAILS_ENV", "test");
+    Trails.env = "test";
     await runTrailtieInitializers(Trailtie, app);
 
     expect(SecurePassword.minCost).toBe(true);

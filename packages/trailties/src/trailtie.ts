@@ -33,7 +33,7 @@ export class Trailtie extends Initializable {
 
   static subclasses(): Array<typeof Trailtie> {
     return [...Trailtie._registry]
-      .filter((s) => !s.isAbstractRailtie())
+      .filter((s) => Object.getPrototypeOf(s) === this && !s.isAbstractRailtie())
       .sort(
         (a, b) =>
           (readOwnState<number>(a, "_loadIndex") ?? 0) -

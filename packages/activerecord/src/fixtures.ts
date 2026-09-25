@@ -16,10 +16,8 @@ import {
   Dir,
   File as RubyFile,
   Zlib,
-  prepend,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
-import { EncryptedFixtures } from "./encryption/encrypted-fixtures.js";
 import { ActiveRecord } from "./namespaces.js";
 import { TableRows } from "./fixture-set/table-rows.js";
 import { File } from "./fixture-set/file.js";
@@ -439,7 +437,5 @@ export class Fixture {
 }
 
 ActiveRecord.Fixture = Fixture;
-
-prepend(Fixture.prototype, EncryptedFixtures);
 
 runLoadHooks("active_record_fixture_set", FixtureSet);

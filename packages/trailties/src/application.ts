@@ -67,6 +67,10 @@ export class Application extends Engine {
     }
   }
 
+  static override get config(): Configuration {
+    return this.instance().config;
+  }
+
   static async findRoot(from: string): Promise<string> {
     const fs = getFs();
     return this.findRootWithFlag("config.ts", from, fs.cwd());

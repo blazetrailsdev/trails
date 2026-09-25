@@ -41,7 +41,6 @@ import {
 import { Engine } from "./engine.js";
 import { Collection } from "./initializable.js";
 import { Root } from "./paths.js";
-import { Trailtie } from "./trailtie.js";
 import { Trails } from "./rails.js";
 import { HelloWorldApp, buildRoutes } from "./__fixtures__/hello-world/app.js";
 import { bodyToString } from "@blazetrails/rack";
@@ -136,7 +135,7 @@ describe("Application", () => {
     it("registers the subclass in the Trailtie registry", () => {
       class MyApp3 extends Application {}
       Application.register(MyApp3);
-      expect(Trailtie.subclasses()).toContain(MyApp3);
+      expect(Application.subclasses()).toContain(MyApp3);
     });
 
     it("is idempotent — :before_configuration fires once per subclass", () => {

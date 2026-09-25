@@ -1,5 +1,4 @@
-import { type Deprecators } from "@blazetrails/activesupport";
-import { env as processEnv } from "@blazetrails/ruby-compat";
+import { TopLevel, type Deprecators, type EnvironmentInquirer } from "@blazetrails/activesupport";
 import { SecurePassword, Error as ActiveModelError, deprecator } from "@blazetrails/activemodel";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 
@@ -23,7 +22,8 @@ export class Trailtie extends BaseTrailtie {
     });
 
     this.initializer("active_model.secure_password", () => {
-      SecurePassword.minCost = Trailtie.detectEnv() === "test";
+      const env = TopLevel.Trails!.env as EnvironmentInquirer & Record<string, () => boolean>;
+      SecurePassword.minCost = env["test?"]();
     });
 
     this.initializer("active_model.i18n_customize_full_message", () => {
@@ -32,10 +32,6 @@ export class Trailtie extends BaseTrailtie {
       delete activeModel.i18nCustomizeFullMessage;
       ActiveModelError.i18nCustomizeFullMessage = i18nCustomizeFullMessage || false;
     });
-  }
-
-  private static detectEnv(): string {
-    return processEnv.TRAILS_ENV || "development";
   }
 }
 

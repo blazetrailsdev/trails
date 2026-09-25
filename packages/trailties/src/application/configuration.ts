@@ -1,4 +1,5 @@
 import { Session } from "@blazetrails/actionpack";
+import { setUtcToLocalReturnsUtcOffsetTimes } from "@blazetrails/activesupport";
 import { File, OpenSSL } from "@blazetrails/ruby-compat";
 import { RuntimeError } from "@blazetrails/ruby-compat";
 import { EngineConfiguration } from "../engine/configuration.js";
@@ -24,6 +25,9 @@ type WeekDay =
   | ":friday"
   | ":saturday";
 type LogLevel = "debug" | "info" | "warn" | "error" | "fatal" | "unknown";
+
+/** @noRailsEquivalent PERMANENT */
+export const LOAD_DEFAULTS_VERSION = "8.0";
 
 export class Configuration extends EngineConfiguration {
   allowConcurrency: boolean | null = null;
@@ -220,6 +224,8 @@ export class Configuration extends EngineConfiguration {
           const actionMailer = this.get("actionMailer") as Record<string, unknown>;
           actionMailer.deliverLaterQueueName = null;
         }
+
+        setUtcToLocalReturnsUtcOffsetTimes(true);
         break;
       }
       case "7.0": {
