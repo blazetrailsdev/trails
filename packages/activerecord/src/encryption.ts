@@ -1,4 +1,4 @@
-import { Autoload, extend } from "@blazetrails/activesupport";
+import { Autoload, extend, runLoadHooks } from "@blazetrails/activesupport";
 import { ActiveRecord, Encryption } from "./namespaces.js";
 import { type SchemeOptions } from "./encryption/scheme.js";
 import { Cipher } from "./encryption/cipher.js";
@@ -22,5 +22,7 @@ Object.defineProperty(Encryption, "eagerLoadBang", {
 });
 
 ActiveRecord.Encryption = Encryption;
+
+runLoadHooks("active_record_encryption", Encryption);
 
 export { Encryption };

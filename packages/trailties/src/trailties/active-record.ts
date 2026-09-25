@@ -230,14 +230,16 @@ export class Trailtie extends BaseTrailtie {
     });
 
     this.initializer("active_record_encryption.configuration", (app) => {
-      const cfg = this.config.get("activeRecord") as ActiveRecordConfig;
-      const enc = cfg.encryption;
-      if (enc && Object.keys(enc).length > 0) {
-        Encryption.configure(enc);
-      }
+      onLoad("active_record_encryption", () => {
+        const cfg = this.config.get("activeRecord") as ActiveRecordConfig;
+        const enc = cfg.encryption;
+        if (enc && Object.keys(enc).length > 0) {
+          Encryption.configure(enc);
+        }
 
-      const autoFilteredParameters = new AutoFilteredParameters(app as AutoFilteredParametersApp);
-      if (Encryption.config.addToFilterParameters) autoFilteredParameters.enable();
+        const autoFilteredParameters = new AutoFilteredParameters(app as AutoFilteredParametersApp);
+        if (Encryption.config.addToFilterParameters) autoFilteredParameters.enable();
+      });
 
       onLoad("active_record", { runOnce: true }, installEncryptionExtendedQueries);
 
