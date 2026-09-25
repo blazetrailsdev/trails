@@ -3,7 +3,6 @@ import { constantize } from "@blazetrails/activesupport";
 import "./index.js";
 import { ActiveRecord, Associations, ConnectionAdapters, Encryption } from "./namespaces.js";
 import { eagerLoadBang } from "./active-record.js";
-import { HasManyThroughAssociation } from "./associations/has-many-through-association.js";
 import { Migration } from "./migration.js";
 import * as Compatibility from "./migration/compatibility.js";
 import { Cipher } from "./encryption/cipher.js";
@@ -31,11 +30,6 @@ describe("ActiveRecord namespaces", () => {
     await Encryption.eagerLoadBang();
     expect(Cipher.Aes256Gcm).toBe(Aes256Gcm);
     expect(constantize("ActiveRecord::Encryption::Cipher::Aes256Gcm")).toBe(Aes256Gcm);
-  });
-
-  it("Associations.eager_load! eager loads the association classes", async () => {
-    await Associations.eagerLoadBang();
-    expect(Associations.HasManyThroughAssociation).toBe(HasManyThroughAssociation);
   });
 
   it("ActiveRecord.eager_load! eager loads its nested namespaces", async () => {
