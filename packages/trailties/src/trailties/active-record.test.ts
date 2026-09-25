@@ -17,6 +17,7 @@ import { PostgreSQLAdapter } from "@blazetrails/activerecord/connection-adapters
 import {
   Configurable as EncryptionConfigurable,
   EncryptedUniquenessValidator,
+  Encryption,
 } from "@blazetrails/activerecord/encryption";
 import { ExtendedDeterministicUniquenessValidator } from "@blazetrails/activerecord";
 import { UniquenessValidator } from "@blazetrails/activerecord";
@@ -71,6 +72,7 @@ describe("RailtieTest", () => {
 
     resetLoadHooks();
     runLoadHooks("active_record", Base);
+    runLoadHooks("active_record_encryption", Encryption);
     runLoadHooks("active_record_postgresqladapter", PostgreSQLAdapter);
     runLoadHooks("active_record_sqlite3adapter", SQLite3Adapter);
   });
