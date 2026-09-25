@@ -1404,9 +1404,9 @@ describe("FinderTest", () => {
   });
 
   it("find by one attribute with several options", async () => {
-    const found = await Account.order("id DESC")
-      .where("id != ?", rid(accounts("rails_core_account")))
-      .findBy({ credit_limit: 50 });
+    const found = await (
+      Account.order("id DESC").where("id != ?", rid(accounts("rails_core_account"))) as any
+    ).findByCreditLimit(50);
     expect(rid(found)).toBe(rid(accounts("unknown")));
   });
 });
