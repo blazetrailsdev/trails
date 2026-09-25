@@ -10,7 +10,7 @@ coverage
 package-lock.json
 pnpm-lock.yaml
 .claude
-vendor/*/
+vendor/*/*/
 # Byte-for-byte copies of vendor/i18n/test/test_data/locales — `invalid/` holds
 # deliberately malformed YAML that prettier cannot parse, and reformatting the
 # rest would drift the fixtures away from the gem's.

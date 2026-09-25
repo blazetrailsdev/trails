@@ -1590,17 +1590,17 @@ jobs:
       - name: Cache vendored upstream Ruby sources
         uses: actions/cache@v4
         with:
-          # Cache only the gitignored clones (vendor/*/), not tracked files
-          # under vendor/. Caching vendor/ wholesale would restore stale
-          # versions of vendor/README.md / fetch.ts / sources.ts on top of
-          # the checkout when a PR changes one of those without bumping the
-          # cache key.
-          path: vendor/*/
+          # Cache only the gitignored clones (vendor/<source>/<version>/),
+          # not tracked files under vendor/. Caching vendor/ wholesale would
+          # restore stale versions of vendor/README.md / fetch.ts / sources.ts
+          # on top of the checkout when a PR changes one of those without
+          # bumping the cache key.
+          path: vendor/*/*/
           # Invalidates when sources.ts (declared refs) or sources.lock.json
           # (resolved SHAs) change. fetch.ts checksum keeps the cache fresh
           # if the fetcher logic itself changes.
           # Exact-match only — no restore-keys. A partial restore of an older
-          # cache would produce a vendor/<source>/.git/HEAD that doesn't match
+          # cache would produce a vendor/<source>/<version>/.git/HEAD that doesn't match
           # the current sources.lock.json, and vendor/fetch.ts would abort
           # rather than silently re-fetch.
           key: vendor-sources-${{ hashFiles('vendor/sources.ts', 'vendor/sources.lock.json', 'vendor/fetch.ts') }}

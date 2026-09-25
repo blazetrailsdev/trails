@@ -90,7 +90,7 @@ out = roots.to_h do |pkg, dirs|
   uses = {}
   dirs.each do |dir|
     Dir.glob(File.join(dir, "**", "*.rb")).sort.each do |path|
-      walk(Ripper.sexp(File.read(path)), path.sub(%r{\A.*/vendor/[^/]+/}, ""), uses)
+      walk(Ripper.sexp(File.read(path)), path.sub(%r{\A.*/vendor/[^/]+/[^/]+/}, ""), uses)
     end
   end
   [pkg, uses]

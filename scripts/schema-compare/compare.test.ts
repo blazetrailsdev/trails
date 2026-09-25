@@ -538,7 +538,7 @@ describe("applyBaseline", () => {
 // synthetic cases above only prove the parser handles forms we already knew about.
 describe("against the vendored schema.rb", () => {
   const source = readFileSync(
-    new URL("../../vendor/rails/activerecord/test/schema/schema.rb", import.meta.url),
+    new URL("../../vendor/rails/v8.0.2/activerecord/test/schema/schema.rb", import.meta.url),
     "utf8",
   );
   const railsTables = parseSchemaRb(source);

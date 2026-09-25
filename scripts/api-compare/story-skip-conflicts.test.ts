@@ -15,7 +15,7 @@ describe("rubyFileMentions", () => {
   it.each([
     [
       "a lib path",
-      "`vendor/rails/activesupport/lib/active_support/test_case.rb:23`",
+      "`vendor/rails/v8.0.2/activesupport/lib/active_support/test_case.rb:23`",
       as("test_case.rb"),
     ],
     [

@@ -5,11 +5,11 @@ schema-parity tooling.
 
 - `sources.ts` — declarative registry. Single source of truth for which
   gems we mirror and at what version.
-- Per-source subdirs (`rails/`, `rack/`, `rack-session/`, `rack-test/`,
-  `globalid/`, …) are
-  gitignored
-  shallow clones of the upstream repo at the pinned tag. They land here
-  via the unified fetcher (wave 2).
+- Per-source, per-version subdirs (`rails/v8.0.2/`, `rack/v3.1.14/`,
+  `ruby/v3.3.11/`, …) are gitignored shallow clones of the upstream repo at
+  the pinned tag. The version directory is `versionDir(ref)` in `sources.ts`
+  — the tag with `_` normalized to `.`, so MRI's `v3_3_11` lands at
+  `ruby/v3.3.11/` (RFC 0159). They land here via the unified fetcher (wave 2).
 - `sources.lock.json` (committed, wave 2) records resolved git SHAs for
   reproducibility.
 

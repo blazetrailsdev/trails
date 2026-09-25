@@ -15,7 +15,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
-import { SOURCES } from "../../vendor/sources.js";
+import { SOURCES, vendoredRoot } from "../../vendor/sources.js";
 import { diffGemList, gemNamesFromPaths } from "./gem-list.js";
 import type { ApiManifest } from "@blazetrails/parity/types";
 import { describeExtractorSkew, detectExtractorSkew } from "./extractor-skew.js";
@@ -137,10 +137,10 @@ async function gemspecPaths(cloneRoot: string): Promise<string[]> {
  *  each ref's monorepo subgem list. Surfaces whole-gem drift that
  *  `diffManifests` can't see (it only diffs gems present in both manifests).
  *  The base list comes from the vendored source `parity:api` already fetched
- *  (`vendor/rails`, the exact pin `rails-api.json` was extracted from) — not a
+ *  (`vendor/rails/<version>`, the exact pin `rails-api.json` was extracted from) — not a
  *  re-clone — so it can't disagree with the base manifest. */
 async function gemListDelta(targetClone: string) {
-  const baseSource = join(ROOT, "vendor", RAILS!.name);
+  const baseSource = vendoredRoot(RAILS!.name);
   if (!existsSync(baseSource)) {
     throw new Error(`missing ${baseSource} — run \`pnpm parity:api\` first`);
   }

@@ -20,30 +20,30 @@ describe("deriveArClosure", () => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), "ar-closure-"));
     write(
       root,
-      "vendor/rails/activerecord/lib/active_record/base.rb",
+      "vendor/rails/v8.0.2/activerecord/lib/active_record/base.rb",
       'require "active_support/core_ext/module/attribute_accessors"\nrequire "active_support/core_ext/array"\n',
     );
     write(
       root,
-      "vendor/rails/activemodel/lib/active_model/naming.rb",
+      "vendor/rails/v8.0.2/activemodel/lib/active_model/naming.rb",
       'require "i18n"\nrequire "action_dispatch/http/response"\n',
     );
     write(
       root,
-      "vendor/rails/activesupport/lib/active_support/core_ext/module/attribute_accessors.rb",
+      "vendor/rails/v8.0.2/activesupport/lib/active_support/core_ext/module/attribute_accessors.rb",
       "",
     );
     // An umbrella: a file whose whole body is a require list.
     write(
       root,
-      "vendor/rails/activesupport/lib/active_support/core_ext/array.rb",
+      "vendor/rails/v8.0.2/activesupport/lib/active_support/core_ext/array.rb",
       'require "active_support/core_ext/array/wrap"\n',
     );
-    write(root, "vendor/rails/activesupport/lib/active_support/core_ext/array/wrap.rb", "");
+    write(root, "vendor/rails/v8.0.2/activesupport/lib/active_support/core_ext/array/wrap.rb", "");
     // Vendored but never required by AR/AM.
-    write(root, "vendor/rails/activesupport/lib/active_support/core_ext/uri.rb", "");
-    write(root, "vendor/i18n/lib/i18n.rb", 'require "i18n/backend"\n');
-    write(root, "vendor/i18n/lib/i18n/backend.rb", "");
+    write(root, "vendor/rails/v8.0.2/activesupport/lib/active_support/core_ext/uri.rb", "");
+    write(root, "vendor/i18n/v1.14.8/lib/i18n.rb", 'require "i18n/backend"\n');
+    write(root, "vendor/i18n/v1.14.8/lib/i18n/backend.rb", "");
   });
 
   afterAll(() => {

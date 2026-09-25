@@ -56,7 +56,7 @@ describe("findTests", () => {
     const [r] = findTests(TEST_MANIFEST_FIXTURE as never, "primary key");
     expect(r).toMatchObject({
       mode: "test",
-      file: "vendor/rails/activerecord/test/cases/active_record_schema_test.rb",
+      file: "vendor/rails/v8.0.2/activerecord/test/cases/active_record_schema_test.rb",
       line: 25,
     });
     expect(findTests(TEST_MANIFEST_FIXTURE as never, "test_has_primary_key")).toHaveLength(1);
@@ -77,7 +77,7 @@ describe("findMethods", () => {
     const [inst] = findMethods(API_MANIFEST_FIXTURE as never, "save");
     expect(inst).toMatchObject({
       mode: "method",
-      file: "vendor/rails/activerecord/lib/active_record/persistence.rb",
+      file: "vendor/rails/v8.0.2/activerecord/lib/active_record/persistence.rb",
       line: 60,
       label: "ActiveRecord::Base#save", // # for instance
     });
@@ -103,7 +103,7 @@ describe("grepVendor + railsFind fallback", () => {
 
   beforeEach(async () => {
     root = await mkdtemp(path.join(tmpdir(), "rails-find-"));
-    const arDir = path.join(root, "vendor/rails/activerecord/lib/active_record");
+    const arDir = path.join(root, "vendor/rails/v8.0.2/activerecord/lib/active_record");
     await mkdir(arDir, { recursive: true });
     await writeFile(
       path.join(arDir, "sample.rb"),
@@ -120,7 +120,7 @@ describe("grepVendor + railsFind fallback", () => {
     expect(results).toHaveLength(1);
     expect(results[0]).toMatchObject({
       mode: "grep",
-      file: "vendor/rails/activerecord/lib/active_record/sample.rb",
+      file: "vendor/rails/v8.0.2/activerecord/lib/active_record/sample.rb",
       line: 2,
     });
   });
