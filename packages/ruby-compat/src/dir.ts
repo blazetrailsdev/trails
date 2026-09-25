@@ -221,14 +221,19 @@ export class Dir {
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Dir.mktmpdir`
    * (`vendor/ruby/lib/tmpdir.rb:91`), which Rails calls without defining.
    */
-  static mktmpdir(prefixSuffix?: TempfileBasename | null): string;
-  static mktmpdir<T>(prefixSuffix: TempfileBasename | null, block: (path: string) => T): T;
+  static mktmpdir(prefixSuffix?: TempfileBasename | null, tmpdir?: string | null): string;
+  static mktmpdir<T>(
+    prefixSuffix: TempfileBasename | null,
+    tmpdir: string | null,
+    block: (path: string) => T,
+  ): T;
   static mktmpdir<T>(
     prefixSuffix: TempfileBasename | null = null,
+    tmpdir: string | null = null,
     block?: (path: string) => T,
   ): string | T {
     let base: string | undefined = undefined;
-    const path = createTmpname(prefixSuffix ?? "d", undefined, (path, _n, d) => {
+    const path = createTmpname(prefixSuffix ?? "d", tmpdir ?? undefined, (path, _n, _opts, d) => {
       base = d;
       Dir.mkdir(path);
       getFs().chmodSync?.(path, 0o700);
@@ -379,7 +384,12 @@ function random(): string {
 export function createTmpname(
   basename: TempfileBasename,
   tmpdir: string | undefined,
-  block: (path: string, n: number | null, origdir: string | undefined) => void,
+  block: (
+    path: string,
+    n: number | null,
+    opts: Record<string, never>,
+    origdir: string | undefined,
+  ) => void,
 ): string {
   const origdir = tmpdir;
   tmpdir ??= Dir.tmpdir();
@@ -396,7 +406,7 @@ export function createTmpname(
       `${prefix}${t}-${Process.pid}-${random()}${n != null ? `-${n}` : ""}${suffix ?? ""}`,
     );
     try {
-      block(path, n, origdir);
+      block(path, n, {}, origdir);
       return path;
     } catch (error) {
       if ((error as { code?: string }).code !== "EEXIST") throw error;

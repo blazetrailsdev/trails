@@ -333,7 +333,6 @@ describe("IO", () => {
 
 describe("STDOUT", () => {
   it("is an IO answering write / puts / print over the process adapter's stdout", () => {
-    // vendor/ruby/io.c:9338 — rb_io_prep_stdout, an IO at "<STDOUT>".
     const write = vi.spyOn(stdout, "write").mockReturnValue(true);
     try {
       expect(STDOUT).toBeInstanceOf(IO);

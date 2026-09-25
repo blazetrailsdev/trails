@@ -1078,8 +1078,8 @@ export class IO {
  * `rb_io_open_descriptor` (`io.c:9290`) standing in for trails' protected
  * constructor.
  */
-function prepStdio(f: WriteStream, fd: number, fmode: string, path: string): IO {
-  const io = new (IO as unknown as new (fd: number, pathv: string | null, vmode: string) => IO)(
+function prepStdio(f: WriteStream, fd: number, fmode: string, klass: typeof IO, path: string): IO {
+  const io = new (klass as unknown as new (fd: number, pathv: string | null, vmode: string) => IO)(
     fd,
     path,
     fmode,
@@ -1095,4 +1095,4 @@ function prepStdio(f: WriteStream, fd: number, fmode: string, path: string): IO 
  *
  * @noRailsEquivalent PERMANENT — Ruby core `STDOUT` (`vendor/ruby/io.c:15586`).
  */
-export const STDOUT: IO = prepStdio(stdout, 1, "w", "<STDOUT>");
+export const STDOUT: IO = prepStdio(stdout, 1, "w", IO, "<STDOUT>");

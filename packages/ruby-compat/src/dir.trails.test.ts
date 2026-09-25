@@ -102,7 +102,6 @@ describe("Dir", () => {
 
 describe("Dir.mktmpdir", () => {
   it("creates a 0700 directory named by Dir::Tmpname.create and answers its path", () => {
-    // vendor/ruby/lib/tmpdir.rb:91-111
     const path = Dir.mktmpdir(["tmp", "cache"]);
     try {
       expect(path.startsWith(join(Dir.tmpdir(), "tmp"))).toBe(true);
@@ -115,10 +114,18 @@ describe("Dir.mktmpdir", () => {
   });
 
   it("removes the directory after yielding it to a block", () => {
-    const path = Dir.mktmpdir(null, (dir) => {
+    const path = Dir.mktmpdir(null, null, (dir) => {
       writeFileSync(join(dir, "f"), "");
       return dir;
     });
     expect(existsSync(path)).toBe(false);
+  });
+
+  it("creates the directory under an explicit tmpdir", () => {
+    const root = mkdtempSync(join(tmpdir(), "trails-dir-"));
+    const path = Dir.mktmpdir("x", root);
+    expect(path.startsWith(join(root, "x"))).toBe(true);
+    expect(statSync(path).isDirectory()).toBe(true);
+    rmSync(root, { recursive: true, force: true });
   });
 });
