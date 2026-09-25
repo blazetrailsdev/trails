@@ -626,9 +626,6 @@ export async function isExists<T extends typeof Base>(
   this: T,
   idOrConditions?: unknown,
 ): Promise<boolean> {
-  if (idOrConditions === false || idOrConditions === null) {
-    return false;
-  }
   return this.all().isExists(idOrConditions);
 }
 
