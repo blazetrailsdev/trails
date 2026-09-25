@@ -101,7 +101,6 @@ function change(
     nsec?: number;
   },
 ): Result {
-  // boundary: `change` is Time's own (core_ext/time/calculations.rb:123), so a RubyTime receiver answers it itself and returns a RubyTime.
   if (this instanceof RubyTime) return this.change(options);
   if (this instanceof Temporal.PlainDateTime || this instanceof Temporal.ZonedDateTime)
     return dateTime.change(this, options);
@@ -365,8 +364,11 @@ export function beginningOfWeek(this: Receiver, startDay: string = date.beginnin
   const result = daysAgo.call(this, daysToWeekStart.call(this, startDay));
   if (result instanceof Temporal.PlainDateTime || result instanceof Temporal.ZonedDateTime)
     return dateTime.beginningOfDay(result);
-  if (!Object.actsLike(this, "time")) return result;
-  return result instanceof RubyTime ? result.midnight() : time.midnight(receiver(result) as Date);
+  return Object.actsLike(this, "time")
+    ? result instanceof RubyTime
+      ? result.midnight()
+      : time.midnight(receiver(result) as Date)
+    : result;
 }
 
 export const atBeginningOfWeek = beginningOfWeek;
@@ -434,20 +436,22 @@ export function prevOccurring(this: Receiver, dayOfWeek: string): Result {
 function firstHour(this: Receiver, dateOrTime: Result): Result {
   if (dateOrTime instanceof Temporal.PlainDateTime || dateOrTime instanceof Temporal.ZonedDateTime)
     return dateTime.beginningOfDay(dateOrTime);
-  if (!Object.actsLike(dateOrTime, "time")) return dateOrTime;
-  return dateOrTime instanceof RubyTime
-    ? dateOrTime.beginningOfDay()
-    : time.beginningOfDay(receiver(dateOrTime) as Date);
+  return Object.actsLike(dateOrTime, "time")
+    ? dateOrTime instanceof RubyTime
+      ? dateOrTime.beginningOfDay()
+      : time.beginningOfDay(receiver(dateOrTime) as Date)
+    : dateOrTime;
 }
 
 /** @internal */
 function lastHour(this: Receiver, dateOrTime: Result): Result {
   if (dateOrTime instanceof Temporal.PlainDateTime || dateOrTime instanceof Temporal.ZonedDateTime)
     return dateTime.endOfDay(dateOrTime);
-  if (!Object.actsLike(dateOrTime, "time")) return dateOrTime;
-  return dateOrTime instanceof RubyTime
-    ? dateOrTime.endOfDay()
-    : time.endOfDay(receiver(dateOrTime) as Date);
+  return Object.actsLike(dateOrTime, "time")
+    ? dateOrTime instanceof RubyTime
+      ? dateOrTime.endOfDay()
+      : time.endOfDay(receiver(dateOrTime) as Date)
+    : dateOrTime;
 }
 
 /** @internal */

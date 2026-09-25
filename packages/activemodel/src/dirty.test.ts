@@ -188,7 +188,7 @@ describe("DirtyTest", () => {
 
   it("changes accessible through both strings and symbols", () => {
     model.name = "David";
-    assertNotNil(model.changes.get("name"));
+    assertNotNil(model.changes.get(":name"));
     assertNotNil(model.changes.get("name"));
   });
 
