@@ -204,7 +204,7 @@ async function collectModels(dir: string, root: boolean, out: (typeof Base)[]): 
   const p = getPath();
   if (!fs.readdir || !fs.stat || !p.pathToFileURL) return;
 
-  for (const entry of (await fs.readdir(dir)).sort()) {
+  for (const entry of await fs.readdir(dir)) {
     const full = p.join(dir, entry);
     if ((await fs.stat(full)).isDirectory()) {
       if (root && entry === "concerns") continue;
