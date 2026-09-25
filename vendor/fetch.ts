@@ -3,10 +3,18 @@
 //
 // CLI:
 //   tsx vendor/fetch.ts [--source <name>] [--refresh]
+//   tsx vendor/fetch.ts --source <name> --ref <ref> [--refresh]
+//   tsx vendor/fetch.ts [--source <name>] --prune
 //   tsx vendor/fetch.ts --print-paths [<name>]
 //
 //   --source <name>:      limit to one source.
-//   --refresh:            rm -rf <dest> and re-clone (hard reset).
+//   --ref <ref>:          clone <ref> as a candidate into its own version
+//                         directory beside the active one. Needs --source.
+//                         Never reads or writes the lockfile, and no
+//                         --print-* manifest ever answers it (RFC 0159).
+//   --refresh:            rm -rf the version directory being fetched and
+//                         re-clone (hard reset). Never the whole vendor/<name>/.
+//   --prune:              remove every inactive version directory.
 //   --print-paths:        no fetch; print absolute path of every source,
 //                         one per line. With <name>: print just that one.
 //   --print-test-paths:   no fetch; print JSON map {package: absolute_test_dir}
@@ -19,7 +27,7 @@
 //                         extract-ruby-api.rb via the LIB_PATHS_JSON env var.
 
 import { execFile } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -27,12 +35,14 @@ import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
 
 import {
+  activeVersion,
   libEntryFilesManifest,
   libPathsManifest,
   SOURCES,
   testPathsManifest,
   type UpstreamSource,
   vendoredRoot,
+  versionDir,
 } from "./sources.js";
 import { SpellChecker } from "../packages/did-you-mean/src/spell-checker.js";
 
@@ -48,12 +58,19 @@ interface Lockfile {
   sources: Record<string, LockEntry>;
 }
 
-function loadLockfile(): Lockfile {
-  if (!existsSync(LOCKFILE_PATH)) return { sources: {} };
-  return JSON.parse(readFileSync(LOCKFILE_PATH, "utf8")) as Lockfile;
+async function exists(path: string): Promise<boolean> {
+  return stat(path).then(
+    () => true,
+    () => false,
+  );
 }
 
-function writeLockfile(lock: Lockfile): void {
+async function loadLockfile(): Promise<Lockfile> {
+  if (!(await exists(LOCKFILE_PATH))) return { sources: {} };
+  return JSON.parse(await readFile(LOCKFILE_PATH, "utf8")) as Lockfile;
+}
+
+async function writeLockfile(lock: Lockfile): Promise<void> {
   const sorted: Lockfile = { sources: {} };
   for (const name of Object.keys(lock.sources).sort()) {
     sorted.sources[name] = lock.sources[name];
@@ -62,13 +79,18 @@ function writeLockfile(lock: Lockfile): void {
   // Only write when content actually changed. Otherwise every no-op fetch
   // would bump the lockfile mtime and defeat extract-ruby-api.rb's cache
   // gate (which compares output_path mtime to LOCKFILE_PATH mtime).
-  if (existsSync(LOCKFILE_PATH) && readFileSync(LOCKFILE_PATH, "utf8") === next) return;
-  writeFileSync(LOCKFILE_PATH, next);
+  if ((await exists(LOCKFILE_PATH)) && (await readFile(LOCKFILE_PATH, "utf8")) === next) return;
+  await writeFile(LOCKFILE_PATH, next);
 }
 
 async function git(args: string[], cwd: string): Promise<string> {
   const { stdout } = await execFileAsync("git", args, { cwd });
   return stdout.trim();
+}
+
+/** `vendor/<name>/`, the directory every version of a source sits in. */
+function versionsDirFor(source: UpstreamSource): string {
+  return dirname(vendoredRoot(source.name));
 }
 
 function destFor(source: UpstreamSource): string {
@@ -80,16 +102,16 @@ function destFor(source: UpstreamSource): string {
  * lockfile writes after all parallel fetches resolve (writing inside this
  * function would race when called via Promise.all).
  */
-async function fetchSource(
+export async function fetchSource(
   source: UpstreamSource,
-  opts: { refresh: boolean; offline?: boolean; lockEntry?: LockEntry },
+  opts: { refresh: boolean; offline?: boolean; lockEntry?: LockEntry; dest?: string },
 ): Promise<LockEntry> {
-  const dest = destFor(source);
+  const dest = opts.dest ?? destFor(source);
   const lockEntry = opts.lockEntry;
 
-  if (opts.refresh && existsSync(dest)) {
+  if (opts.refresh && (await exists(dest))) {
     console.log(`[${source.name}] --refresh: removing ${dest}`);
-    rmSync(dest, { recursive: true, force: true });
+    await rm(dest, { recursive: true, force: true });
   }
 
   // Offline fast-path: when the clone exists and the lockfile already pins a
@@ -98,13 +120,13 @@ async function fetchSource(
   // out from under us (manual checkout, interrupted --refresh); the common
   // warm case is steady-state, so we still verify the declared paths exist but
   // avoid spawning git per source. `--refresh`/FORCE take the full path.
-  if (opts.offline && lockEntry && existsSync(join(dest, ".git"))) {
+  if (opts.offline && lockEntry && (await exists(join(dest, ".git")))) {
     console.log(`[${source.name}] offline: pinned at ${lockEntry.sha.slice(0, 12)}`);
-    verifyPackages(source);
+    await verifyPackages(source, dest);
     return lockEntry;
   }
 
-  if (existsSync(join(dest, ".git"))) {
+  if (await exists(join(dest, ".git"))) {
     const headSha = await git(["rev-parse", "HEAD"], dest);
     if (lockEntry && lockEntry.sha !== headSha) {
       throw new Error(
@@ -113,24 +135,14 @@ async function fetchSource(
       );
     }
     console.log(`[${source.name}] up to date at ${headSha.slice(0, 12)}`);
-    verifyPackages(source);
+    await verifyPackages(source, dest);
     return { ref: source.origin.ref, sha: headSha };
   }
 
-  console.log(`[${source.name}] cloning ${source.origin.url}@${source.origin.ref}...`);
-  mkdirSync(dirname(dest), { recursive: true });
-  await execFileAsync("git", [
-    "clone",
-    "--depth=1",
-    "--branch",
-    source.origin.ref,
-    source.origin.url,
-    dest,
-  ]);
-  const sha = await git(["rev-parse", "HEAD"], dest);
+  const sha = await cloneRef(source, source.origin.ref, dest);
 
   if (lockEntry && lockEntry.sha !== sha) {
-    rmSync(dest, { recursive: true, force: true });
+    await rm(dest, { recursive: true, force: true });
     throw new Error(
       `[${source.name}] clone resolved ${sha} but lockfile pins ${lockEntry.sha}. ` +
         `Upstream may have re-tagged ${source.origin.ref}; investigate before --refresh. ` +
@@ -138,8 +150,66 @@ async function fetchSource(
     );
   }
   console.log(`[${source.name}] cloned at ${sha.slice(0, 12)}`);
-  verifyPackages(source);
+  await verifyPackages(source, dest);
   return { ref: source.origin.ref, sha };
+}
+
+async function cloneRef(source: UpstreamSource, ref: string, dest: string): Promise<string> {
+  console.log(`[${source.name}] cloning ${source.origin.url}@${ref}...`);
+  await mkdir(dirname(dest), { recursive: true });
+  await execFileAsync("git", ["clone", "--depth=1", "--branch", ref, source.origin.url, dest]);
+  return git(["rev-parse", "HEAD"], dest);
+}
+
+/**
+ * Fetch `ref` as a candidate into `vendor/<name>/<versionDir(ref)>/`, beside
+ * the active version. There is no lockfile entry to check a candidate against
+ * and none is written, so the lockfile keeps naming the active version only.
+ * Its declared paths are not verified: a candidate's layout is exactly what an
+ * upgrade is there to diff.
+ */
+export async function fetchCandidate(
+  source: UpstreamSource,
+  ref: string,
+  opts: { refresh: boolean; versionsDir?: string },
+): Promise<string> {
+  const dest = join(opts.versionsDir ?? versionsDirFor(source), versionDir(ref));
+
+  if (opts.refresh && (await exists(dest))) {
+    console.log(`[${source.name}] --refresh: removing ${dest}`);
+    await rm(dest, { recursive: true, force: true });
+  }
+
+  if (await exists(join(dest, ".git"))) {
+    const headSha = await git(["rev-parse", "HEAD"], dest);
+    console.log(`[${source.name}] candidate ${ref} present at ${headSha.slice(0, 12)}`);
+    return dest;
+  }
+
+  const sha = await cloneRef(source, ref, dest);
+  console.log(`[${source.name}] candidate ${ref} cloned at ${sha.slice(0, 12)} into ${dest}`);
+  return dest;
+}
+
+/**
+ * Remove every version directory of `source` other than the active one, and
+ * return the paths removed. Pruning is only ever explicit (RFC 0159, Open
+ * question 5): a candidate is the tree an upgrade is diffing against.
+ */
+export async function pruneSource(
+  source: UpstreamSource,
+  versionsDir: string = versionsDirFor(source),
+): Promise<string[]> {
+  if (!(await exists(versionsDir))) return [];
+  const active = activeVersion(source);
+  const removed: string[] = [];
+  for (const entry of await readdir(versionsDir, { withFileTypes: true })) {
+    if (entry.name === active || !(entry.isDirectory() || entry.isSymbolicLink())) continue;
+    const path = join(versionsDir, entry.name);
+    await rm(path, { recursive: true, force: true });
+    removed.push(path);
+  }
+  return removed;
 }
 
 /**
@@ -148,12 +218,11 @@ async function fetchSource(
  * skip missing directories and produce undercounted output. Runs after every
  * fetch, including when an existing clone is reused.
  */
-function verifyPackages(source: UpstreamSource): void {
-  const root = destFor(source);
+async function verifyPackages(source: UpstreamSource, root: string): Promise<void> {
   const missing: string[] = [];
   for (const pkg of source.packages) {
-    if (!existsSync(join(root, pkg.libPath))) missing.push(`${pkg.name}: ${pkg.libPath}`);
-    if (pkg.testPath && !existsSync(join(root, pkg.testPath))) {
+    if (!(await exists(join(root, pkg.libPath)))) missing.push(`${pkg.name}: ${pkg.libPath}`);
+    if (pkg.testPath && !(await exists(join(root, pkg.testPath)))) {
       missing.push(`${pkg.name}: ${pkg.testPath}`);
     }
   }
@@ -193,7 +262,9 @@ function printLibEntryFiles(): void {
 
 export interface ParsedArgs {
   sourceFilter?: string;
+  ref?: string;
   refresh: boolean;
+  prune: boolean;
   printPaths: { active: boolean; name?: string };
   printTestPaths: boolean;
   printLibPaths: boolean;
@@ -203,6 +274,7 @@ export interface ParsedArgs {
 export function parseArgs(argv: string[]): ParsedArgs {
   const out: ParsedArgs = {
     refresh: false,
+    prune: false,
     printPaths: { active: false },
     printTestPaths: false,
     printLibPaths: false,
@@ -211,7 +283,9 @@ export function parseArgs(argv: string[]): ParsedArgs {
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--source") out.sourceFilter = argv[++i];
+    else if (a === "--ref") out.ref = argv[++i];
     else if (a === "--refresh") out.refresh = true;
+    else if (a === "--prune") out.prune = true;
     else if (a === "--print-test-paths") out.printTestPaths = true;
     else if (a === "--print-lib-paths") out.printLibPaths = true;
     else if (a === "--print-lib-entry-files") out.printLibEntryFiles = true;
@@ -222,6 +296,12 @@ export function parseArgs(argv: string[]): ParsedArgs {
         name: next && !next.startsWith("--") ? argv[++i] : undefined,
       };
     } else throw new Error(`unknown flag: ${a}`);
+  }
+  if (out.ref !== undefined && out.sourceFilter === undefined) {
+    throw new Error("--ref needs --source: a candidate is fetched for one source at a time");
+  }
+  if (out.ref !== undefined && out.prune) {
+    throw new Error("--ref and --prune cannot be combined: --prune removes every candidate");
   }
   return out;
 }
@@ -238,7 +318,9 @@ export function parseArgs(argv: string[]): ParsedArgs {
 export async function runFetch(
   opts: {
     sourceFilter?: string;
+    ref?: string;
     refresh?: boolean;
+    prune?: boolean;
     offline?: boolean;
   } = {},
 ): Promise<void> {
@@ -250,10 +332,33 @@ export async function runFetch(
     throw new Error(`--source: no entry named "${opts.sourceFilter}" in vendor/sources.ts.${hint}`);
   }
 
+  if (opts.prune) {
+    const removed = (await Promise.all(targets.map((source) => pruneSource(source)))).flat();
+    for (const path of removed) console.log(`--prune: removed ${path}`);
+    if (removed.length === 0) console.log("--prune: no inactive version directories");
+    return;
+  }
+
+  // A --ref naming the active version is just the active fetch below, lock
+  // check included.
+  if (opts.ref !== undefined) {
+    const [source] = targets;
+    if (versionDir(opts.ref) !== activeVersion(source)) {
+      await fetchCandidate(source, opts.ref, { refresh: opts.refresh ?? false });
+      return;
+    }
+    if (opts.ref !== source.origin.ref) {
+      throw new Error(
+        `[${source.name}] --ref ${opts.ref} lands in the active version directory ` +
+          `${activeVersion(source)} but is not the active ref ${source.origin.ref}.`,
+      );
+    }
+  }
+
   // Fetch in parallel: cold runs are sum(clone times) sequentially → max(...)
   // here. Lockfile entries are returned, not written in fetchSource, so there's
   // no write race. The pre-load is the single read; we merge results below.
-  const lock = loadLockfile();
+  const lock = await loadLockfile();
   const results = await Promise.all(
     targets.map((source) =>
       fetchSource(source, {
@@ -264,7 +369,7 @@ export async function runFetch(
     ),
   );
   for (const { name, entry } of results) lock.sources[name] = entry;
-  writeLockfile(lock);
+  await writeLockfile(lock);
 }
 
 async function main(argv: string[]): Promise<void> {
@@ -287,7 +392,12 @@ async function main(argv: string[]): Promise<void> {
     return;
   }
 
-  await runFetch({ sourceFilter: args.sourceFilter, refresh: args.refresh });
+  await runFetch({
+    sourceFilter: args.sourceFilter,
+    ref: args.ref,
+    refresh: args.refresh,
+    prune: args.prune,
+  });
 }
 
 // Only run main() when invoked as a script, not when imported by tests.

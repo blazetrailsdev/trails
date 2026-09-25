@@ -495,8 +495,20 @@ export function versionDir(ref: string): string {
   return ref.replaceAll("_", ".");
 }
 
+/**
+ * The active version directory of a source: `versionDir` of the ref the
+ * lockfile pins (`sources.test.ts` holds `origin.ref` equal to the lockfile's
+ * `ref`). Every resolver below reads the tree through it, and so does
+ * `vendor:recite`, so a citation is rewritten to exactly the directory the
+ * comparers read. A candidate fetched beside it with `vendor:fetch --ref` is
+ * never active.
+ */
+export function activeVersion(source: UpstreamSource): string {
+  return versionDir(source.origin.ref);
+}
+
 function sourceRoot(source: UpstreamSource, vendorDir: string = VENDOR_DIR): string {
-  return join(vendorDir, source.name, versionDir(source.origin.ref));
+  return join(vendorDir, source.name, activeVersion(source));
 }
 
 /**
