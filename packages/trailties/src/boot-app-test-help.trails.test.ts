@@ -50,4 +50,22 @@ describe("test_help wires a booted app into the test case classes", () => {
     controllerTest.beforeSetup();
     expect(controllerTest.routes).toBe(Trails.application!.routes());
   });
+
+  it("renders a view through ActionController::TestCase", async () => {
+    const { PostsController } =
+      await import("./__fixtures__/boot-app/app/controllers/posts-controller.js");
+    const controllerTest = new ActionController.TestCase(PostsController);
+    await controllerTest.get("show");
+    expect(controllerTest.response.status).toBe(200);
+    expect(controllerTest.responseBody).toContain("<p>Hello from TSE</p>");
+  });
+
+  it("routes an integration request through the app's config/routes.ts", async () => {
+    const session = new ActionController.IntegrationTest();
+    session.beforeSetup();
+    session.app = Trails.application!.app();
+    await session.get("/posts/show");
+    expect(session.response.status).toBe(200);
+    expect(session.response.body).toContain("<p>Hello from TSE</p>");
+  });
 });
