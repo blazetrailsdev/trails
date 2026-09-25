@@ -112,13 +112,6 @@ import { CompositePrimaryKeyMismatchError } from "./errors.js";
 import { TypedEssay } from "../test-helpers/models/essay.js";
 import { PersonWithPolymorphicDependentNullifyComments } from "../test-helpers/models/person.js";
 
-expect.addEqualityTesters([
-  function rubyEquals(a: unknown, b: unknown): boolean | undefined {
-    if (a instanceof Base && b instanceof Base) return a.equals(b);
-    return undefined;
-  },
-]);
-
 const recordId = (record: any): number => Number(record.id);
 
 describe("HasManyAssociationsTestForReorderWithJoinDependency", () => {

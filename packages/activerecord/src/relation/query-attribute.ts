@@ -31,7 +31,7 @@ export class QueryAttribute extends Attribute {
   /** @internal */
   private _unboundable?: 1 | -1 | false;
 
-  constructor(name: string, value: unknown, type: CastType | null) {
+  constructor(name: string | null, value: unknown, type: CastType | null) {
     super(name, value, ensureType(type));
   }
 

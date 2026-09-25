@@ -15,7 +15,7 @@ export class YAMLEncoder {
     attributeSet.eachValue((attr) => eachValue.push(attr));
 
     coder.conciseAttributes = eachValue.map((attr) => {
-      if (attr.type === this.defaultTypes[attr.name]) {
+      if (attr.type === this.defaultTypes[attr.name!]) {
         return attr.withType(null);
       } else {
         return attr;
@@ -30,7 +30,7 @@ export class YAMLEncoder {
       const attributesHash = Object.fromEntries(
         coder.conciseAttributes!.map((attr) => {
           if (attr.type == null) {
-            attr = attr.withType(this.defaultTypes[attr.name]);
+            attr = attr.withType(this.defaultTypes[attr.name!]);
           }
           return [attr.name, attr];
         }),

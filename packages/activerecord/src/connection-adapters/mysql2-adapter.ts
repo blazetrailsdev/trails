@@ -13,7 +13,7 @@ import { rtest } from "@blazetrails/ruby-compat";
 import { TypeMap } from "../type/type-map.js";
 import * as Type from "../type.js";
 import { UnsignedInteger } from "../type/unsigned-integer.js";
-import { AbstractAdapter, RAW_CONNECTION_DEPRECATION_MESSAGE } from "./abstract-adapter.js";
+import { RAW_CONNECTION_DEPRECATION_MESSAGE } from "./abstract-adapter.js";
 import { deprecator } from "../deprecator.js";
 import {
   AdapterTimeout,
@@ -92,10 +92,10 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   private get _rawConnection(): mysql.Connection | null {
-    return this._connection as unknown as mysql.Connection | null;
+    return this._connection as mysql.Connection | null;
   }
   private set _rawConnection(value: mysql.Connection | null) {
-    this._connection = value as unknown as AbstractAdapter | null;
+    this._connection = value;
   }
   private _connectingPromise: Promise<mysql.Connection> | null = null;
   private _connectGeneration = 0;
@@ -439,9 +439,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   /** @internal */
   override async getFullVersion(): Promise<string | null> {
     type Handshake = { _handshakePacket?: { serverVersion?: string } };
-    const conn = (await this.anyRawConnection()) as unknown as
-      | (Handshake & { connection?: Handshake })
-      | null;
+    const conn = (await this.anyRawConnection()) as (Handshake & { connection?: Handshake }) | null;
     return (conn?.connection ?? conn)?._handshakePacket?.serverVersion ?? null;
   }
 

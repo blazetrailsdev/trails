@@ -8,7 +8,7 @@ class DisconnectAdapter extends AbstractAdapter {
     this._connection = this;
   }
 
-  currentConnection(): AbstractAdapter | null {
+  currentConnection(): unknown {
     return this._connection;
   }
 }
@@ -18,7 +18,7 @@ describe("AbstractAdapter#disconnect!", () => {
     const adapter = new DisconnectAdapter({});
     adapter.attachRawConnection();
 
-    const observed: Array<AbstractAdapter | null> = [];
+    const observed: unknown[] = [];
     const query = adapter.lock.synchronize(async () => {
       for (let i = 0; i < 5; i++) {
         observed.push(adapter.currentConnection());

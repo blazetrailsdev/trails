@@ -50,6 +50,49 @@ export class Method {
   name(): string {
     return this.#name;
   }
+
+  /**
+   * `Method#arity` (`vendor/ruby/proc.c:2872` `method_arity`, over
+   * `method_def_arity` at `:2808`): the required count when it is also the
+   * maximum, else `-min-1`. JS `Function#length` stops counting at the first
+   * default, so `(gid)` and `(gid, options = {})` both report 1; the parameter
+   * list is read from the function's source instead.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  arity(): number {
+    const src = Function.prototype.toString.call(this.#func);
+    const open = src.indexOf("(");
+    const arrow = src.indexOf("=>");
+    if (arrow !== -1 && (open === -1 || arrow < open)) {
+      return src
+        .slice(0, arrow)
+        .replace(/^async\s+/, "")
+        .trim() === ""
+        ? 0
+        : 1;
+    }
+    let depth = 0;
+    let current = "";
+    const params: string[] = [];
+    for (let i = open + 1; i < src.length; i++) {
+      const ch = src[i];
+      if ("([{".includes(ch)) depth++;
+      else if (")]}".includes(ch)) {
+        if (depth === 0) break;
+        depth--;
+      } else if (ch === "," && depth === 0) {
+        params.push(current.trim());
+        current = "";
+        continue;
+      }
+      current += ch;
+    }
+    if (current.trim() !== "") params.push(current.trim());
+    const min = params.filter((p) => !p.startsWith("...") && !/^[^=]*[^=!<>]=[^=>]/.test(p)).length;
+    const max = params.some((p) => p.startsWith("...")) ? -1 : params.length;
+    return min === max ? min : -min - 1;
+  }
 }
 
 /**

@@ -169,7 +169,7 @@ export function initAttributes(
   if ((other as { isPersisted(): boolean }).isPersisted() && klass._defaultAttributes) {
     return klass
       ._defaultAttributes()
-      .map((attr) => attr.withValueFromUser(attrs.fetchValue(attr.name)));
+      .map((attr) => attr.withValueFromUser(attrs.fetchValue(attr.name!)));
   }
   return attrs;
 }

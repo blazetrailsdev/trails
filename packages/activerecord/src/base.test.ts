@@ -64,7 +64,6 @@ vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 
 expect.addEqualityTesters([
   function rubyEquals(a: unknown, b: unknown): boolean | undefined {
-    if (a instanceof Base && b instanceof Base) return a.equals(b);
     const toTime = (x: unknown) => (x instanceof TimeWithZone ? x.utc() : x);
     const ta = toTime(a);
     const tb = toTime(b);

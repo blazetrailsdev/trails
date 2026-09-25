@@ -170,11 +170,11 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   /** @internal */
   get _rawConnection(): SqliteConnection | null {
-    return this._connection as unknown as SqliteConnection;
+    return this._connection as SqliteConnection;
   }
   /** @internal */
   set _rawConnection(value: SqliteConnection | null) {
-    this._connection = value as unknown as AbstractAdapter | null;
+    this._connection = value;
   }
   private _closingDriver: Promise<void> | null = null;
   override async active(): Promise<boolean> {
@@ -550,9 +550,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
         ? result.then(SQLite3Adapter.parseEncoding)
         : SQLite3Adapter.parseEncoding(result);
     };
-    const rawConnection = this.anyRawConnection() as unknown as
-      | SqliteConnection
-      | Promise<SqliteConnection>;
+    const rawConnection = this.anyRawConnection() as SqliteConnection | Promise<SqliteConnection>;
     return rawConnection instanceof Promise ? rawConnection.then(read) : read(rawConnection);
   }
 

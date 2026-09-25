@@ -1311,7 +1311,7 @@ export class CreatePosts extends Migration {
     try {
       const internalMetadata = new InternalMetadata(adapter.pool);
       const context = new MigrationContext([], new SchemaMigration(adapter.pool), internalMetadata);
-      expect(await context.protectedEnvironment()).toBe(false);
+      expect(await context.protectedEnvironment()).toBeNull();
 
       expect(await internalMetadata.tableExists()).toBe(false);
 
@@ -1428,7 +1428,7 @@ export class CreatePosts extends Migration {
         new InternalMetadata(adapter.pool),
       );
       expect(await context.lastStoredEnvironment()).toBeNull();
-      expect(await context.protectedEnvironment()).toBe(false);
+      expect(await context.protectedEnvironment()).toBeNull();
     } finally {
       await adapter.disconnectBang();
     }

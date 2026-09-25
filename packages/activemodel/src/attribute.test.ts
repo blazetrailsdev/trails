@@ -33,13 +33,13 @@ describe("AttributeTest", () => {
   });
 
   it("from_database + read type casts from database", () => {
-    const attribute = Attribute.fromDatabase(null!, "a value", type);
+    const attribute = Attribute.fromDatabase(null, "a value", type);
 
     expect(attribute.value).toEqual("deserialize(a value)");
   });
 
   it("from_user + read type casts from user", () => {
-    const attribute = Attribute.fromUser(null!, "a value", type);
+    const attribute = Attribute.fromUser(null, "a value", type);
 
     expect(attribute.value).toEqual("cast(a value)");
   });
@@ -51,7 +51,7 @@ describe("AttributeTest", () => {
       return value;
     };
 
-    const attribute = Attribute.fromDatabase(null!, "whatever", type);
+    const attribute = Attribute.fromDatabase(null, "whatever", type);
 
     void attribute.value;
     void attribute.value;
@@ -65,7 +65,7 @@ describe("AttributeTest", () => {
       return false;
     };
 
-    const attribute = Attribute.fromDatabase(null!, "whatever", type);
+    const attribute = Attribute.fromDatabase(null, "whatever", type);
 
     void attribute.value;
     void attribute.value;
@@ -73,7 +73,7 @@ describe("AttributeTest", () => {
   });
 
   it("value_before_type_cast returns the given value", () => {
-    const attribute = Attribute.fromDatabase(null!, "raw value", type);
+    const attribute = Attribute.fromDatabase(null, "raw value", type);
 
     const rawValue = attribute.valueBeforeTypeCast;
 
@@ -81,13 +81,13 @@ describe("AttributeTest", () => {
   });
 
   it("from_database + value_for_database type casts to and from database", () => {
-    const attribute = Attribute.fromDatabase(null!, "whatever", type);
+    const attribute = Attribute.fromDatabase(null, "whatever", type);
 
     expect(attribute.valueForDatabase).toEqual("serialize(deserialize(whatever))");
   });
 
   it("from_user + value_for_database type casts from the user to the database", () => {
-    const attribute = Attribute.fromUser(null!, "whatever", type);
+    const attribute = Attribute.fromUser(null, "whatever", type);
 
     expect(attribute.valueForDatabase).toEqual("serialize(cast(whatever))");
   });
@@ -99,7 +99,7 @@ describe("AttributeTest", () => {
       }
     })();
 
-    const attribute = Attribute.fromUser(null!, "whatever", type);
+    const attribute = Attribute.fromUser(null, "whatever", type);
 
     expect(attribute.valueForDatabase).toEqual("serialize_cast_value(cast(whatever))");
   });
@@ -111,7 +111,7 @@ describe("AttributeTest", () => {
       return null;
     };
 
-    const attribute = Attribute.fromUser(null!, "whatever", type);
+    const attribute = Attribute.fromUser(null, "whatever", type);
 
     void attribute.valueForDatabase;
     void attribute.valueForDatabase;
@@ -126,7 +126,7 @@ describe("AttributeTest", () => {
     };
     type.isChangedInPlace = (): boolean => true;
 
-    const attribute = Attribute.fromUser(null!, "whatever", type);
+    const attribute = Attribute.fromUser(null, "whatever", type);
 
     void attribute.valueForDatabase;
     void attribute.valueForDatabase;
@@ -135,14 +135,14 @@ describe("AttributeTest", () => {
 
   // BLOCKED: assertions-immutable-js-string-values
   it.skip("duping dups the value", () => {
-    const attribute = Attribute.fromDatabase(null!, "a value", type);
+    const attribute = Attribute.fromDatabase(null, "a value", type);
 
     expect(attribute.value).not.toBe(attribute.dup().value);
   });
 
   it("duping does not dup the value if it is not dupable", () => {
     type.deserialize = (value: unknown): unknown => value;
-    const attribute = Attribute.fromDatabase(null!, false, type);
+    const attribute = Attribute.fromDatabase(null, false, type);
 
     expect(attribute.value).toBe(attribute.dup().value);
   });
@@ -154,7 +154,7 @@ describe("AttributeTest", () => {
       deserializeCalledWith = value;
       return (deserializeCalled = true);
     };
-    const attribute = Attribute.fromDatabase(null!, "my_attribute_value", type);
+    const attribute = Attribute.fromDatabase(null, "my_attribute_value", type);
 
     attribute.dup();
     expect(deserializeCalled).toBeFalsy();
@@ -174,7 +174,7 @@ describe("AttributeTest", () => {
   }
 
   it("with_value_from_user returns a new attribute with the value from the user", () => {
-    const old = Attribute.fromDatabase(null!, "old", new MyType());
+    const old = Attribute.fromDatabase(null, "old", new MyType());
     const newAttribute = old.withValueFromUser("new");
 
     expect(old.value).toEqual("old from database");
@@ -182,7 +182,7 @@ describe("AttributeTest", () => {
   });
 
   it("with_value_from_database returns a new attribute with the value from the database", () => {
-    const old = Attribute.fromUser(null!, "old", new MyType());
+    const old = Attribute.fromUser(null, "old", new MyType());
     const newAttribute = old.withValueFromDatabase("new");
 
     expect(old.value).toEqual("old from user");

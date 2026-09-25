@@ -538,8 +538,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect(emptyRange.int8_range).toBeNull();
       });
 
-      it.skip("daterange values", () => {
-        // BLOCKED: port-bug — an endless daterange reads back with a null end instead of Infinity (postgresql-endless-daterange-end-reads-null)
+      it("daterange values", () => {
         expect(firstRange.date_range).toEqual(
           new Range(
             Temporal.PlainDate.from("2012-01-02"),

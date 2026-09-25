@@ -28,7 +28,7 @@ export abstract class Attribute {
 
   declare static UserProvidedDefault: typeof UserProvidedDefault;
 
-  readonly name: string;
+  readonly name: string | null;
   protected _valueBeforeTypeCast: unknown;
   readonly type: ValueType | null;
   /** @internal */
@@ -39,7 +39,7 @@ export abstract class Attribute {
   protected _hasValueForDatabase: boolean;
 
   static fromDatabase(
-    name: string,
+    name: string | null,
     valueBeforeTypeCast: unknown,
     type: ValueType | null,
     value?: unknown,
@@ -48,7 +48,7 @@ export abstract class Attribute {
   }
 
   static fromUser(
-    name: string,
+    name: string | null,
     valueBeforeTypeCast: unknown,
     type: ValueType | null,
     originalAttribute: Attribute | null = null,
@@ -57,18 +57,18 @@ export abstract class Attribute {
   }
 
   static withCastValue(
-    name: string,
+    name: string | null,
     valueBeforeTypeCast: unknown,
     type: ValueType | null,
   ): WithCastValue {
     return new WithCastValue(name, valueBeforeTypeCast, type);
   }
 
-  static null(name: string): Null {
+  static null(name: string | null): Null {
     return new Null(name);
   }
 
-  static uninitialized(name: string, type: ValueType | null): Uninitialized {
+  static uninitialized(name: string | null, type: ValueType | null): Uninitialized {
     return new Uninitialized(name, type);
   }
 
@@ -77,7 +77,7 @@ export abstract class Attribute {
   }
 
   constructor(
-    name: string,
+    name: string | null,
     valueBeforeTypeCast: unknown,
     type: ValueType | null,
     originalAttribute: Attribute | null = null,
@@ -167,7 +167,7 @@ export abstract class Attribute {
       return this.withValueFromUser(this.value).withType(type);
     }
     const Ctor = this.constructor as new (
-      name: string,
+      name: string | null,
       valueBeforeTypeCast: unknown,
       type: ValueType | null,
       originalAttribute: Attribute | null,
@@ -302,7 +302,7 @@ export class WithCastValue extends Attribute {
 export class Null extends Attribute {
   /** @noRailsEquivalent PERMANENT */
   static readonly [rubyNamespace]: string = "ActiveModel::Attribute";
-  constructor(name: string) {
+  constructor(name: string | null) {
     super(name, null, defaultValue());
   }
 
@@ -330,7 +330,7 @@ export class Null extends Attribute {
 export class Uninitialized extends Attribute {
   /** @noRailsEquivalent PERMANENT */
   static readonly [rubyNamespace]: string = "ActiveModel::Attribute";
-  constructor(name: string, type: ValueType | null) {
+  constructor(name: string | null, type: ValueType | null) {
     super(name, null, type);
   }
 

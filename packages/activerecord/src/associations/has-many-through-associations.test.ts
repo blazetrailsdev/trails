@@ -255,14 +255,14 @@ describe("HasManyThroughAssociationsTest", () => {
     const mary = await Author.find(authors("mary").id);
     const eagerOtherComment = await Comment.find(comments("eager_other_comment1").id);
     const result = await (mary as any).comments.merge(Post.joins(":comments")).toArray();
-    expect(result.map((c: any) => c.id)).toEqual([eagerOtherComment.id]);
+    expect(result).toEqual([eagerOtherComment]);
   });
 
   it("through association with left joins", async () => {
     const mary = await Author.find(authors("mary").id);
     const eagerOtherComment = await Comment.find(comments("eager_other_comment1").id);
     const result = await (mary as any).comments.merge(Post.leftOuterJoins(":comments")).toArray();
-    expect(result.map((c: any) => c.id)).toEqual([eagerOtherComment.id]);
+    expect(result).toEqual([eagerOtherComment]);
   });
 
   it("through association with through scope and nested where", async () => {
@@ -276,7 +276,7 @@ describe("HasManyThroughAssociationsTest", () => {
       .where()
       .not({ "contracts.id": null })
       .toArray();
-    expect(result.map((d: any) => d.id)).toEqual([developer.id]);
+    expect(result).toEqual([developer]);
   });
 
   it("preload with nested association", async () => {
@@ -310,7 +310,7 @@ describe("HasManyThroughAssociationsTest", () => {
       (a: any, b: any) => Number(a.id) - Number(b.id),
     );
     const expected = [member1, member2].sort((a, b) => Number(a.id) - Number(b.id));
-    expect(clubMembers.map((m: any) => m.id)).toEqual(expected.map((m) => m.id));
+    expect(clubMembers).toEqual(expected);
   });
 
   it("preload multiple instances of the same record", async () => {
@@ -557,7 +557,7 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(sCategories.length).toBeGreaterThan(0);
     const sorted1 = [...sCategories].sort((a: any, b: any) => Number(a.id) - Number(b.id));
     const sorted2 = [...categories2].sort((a: any, b: any) => Number(a.id) - Number(b.id));
-    expect(sorted1.map((c: any) => c.id)).toEqual(sorted2.map((c: any) => c.id));
+    expect(sorted1).toEqual(sorted2);
   });
 
   it("include?", async () => {
@@ -565,7 +565,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const post = new Post();
     await (person as any).posts.push(post);
     const personPosts = await (person as any).posts.toArray();
-    expect(personPosts.map((p: any) => p.id)).toContain(post.id);
+    expect(personPosts).toContainEqual(post);
   });
 
   it("associate existing", async () => {
@@ -577,13 +577,11 @@ describe("HasManyThroughAssociationsTest", () => {
     });
 
     await assertQueriesCount(1, false, async () => {
-      expect((await (post as any).people.toArray()).map((p: any) => p.id)).toContain(person.id);
+      expect(await (post as any).people.toArray()).toContainEqual(person);
     });
 
     await post.reload();
-    expect((await (await (post as any).people.reload()).toArray()).map((p: any) => p.id)).toContain(
-      person.id,
-    );
+    expect(await (await (post as any).people.reload()).toArray()).toContainEqual(person);
   });
 
   it("delete all for with dependent option destroy", async () => {
@@ -659,9 +657,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const result = await (post as any).people.concat([person]);
     expect(await (post as any).people.size()).toBe(1);
     expect(await (await (post as any).people.reload()).size()).toBe(1);
-    expect((await (post as any).people.toArray()).map((r: any) => r.id)).toEqual(
-      (await result.toArray()).map((r: any) => r.id),
-    );
+    expect(await (post as any).people.toArray()).toEqual(await result.toArray());
   });
 
   it("associating a persisted record with unsaved changes saves those changes", async () => {
@@ -733,7 +729,7 @@ describe("HasManyThroughAssociationsTest", () => {
       await (post as any).people.delete(person);
     });
 
-    expect((await (post as any).people.reload()).map((p: any) => p.id)).not.toContain(person.id);
+    expect(await (post as any).people.reload()).not.toContainEqual(person);
   });
 
   it("associating new", async () => {
@@ -752,13 +748,11 @@ describe("HasManyThroughAssociationsTest", () => {
     });
 
     await assertQueriesCount(1, false, async () => {
-      expect((await (post as any).people.toArray()).map((p: any) => p.id)).toContain(newPerson.id);
+      expect(await (post as any).people.toArray()).toContainEqual(newPerson);
     });
 
     await post.reload();
-    expect((await (await (post as any).people.reload()).toArray()).map((p: any) => p.id)).toContain(
-      newPerson.id,
-    );
+    expect(await (await (post as any).people.reload()).toArray()).toContainEqual(newPerson);
   });
 
   it("associate new by building", async () => {
@@ -796,7 +790,7 @@ describe("HasManyThroughAssociationsTest", () => {
     await person.save();
     await post.reload();
 
-    expect((await (post as any).people.toArray()).map((p: any) => p.id)).toContain(person.id);
+    expect(await (post as any).people.toArray()).toContainEqual(person);
   });
 
   it("build then save with has one inverse", async () => {
@@ -805,7 +799,7 @@ describe("HasManyThroughAssociationsTest", () => {
     await person.save();
     await post.reload();
 
-    expect((await (post as any).singlePeople.toArray()).map((p: any) => p.id)).toContain(person.id);
+    expect(await (post as any).singlePeople.toArray()).toContainEqual(person);
   });
 
   it("build then remove then save", async () => {
@@ -919,7 +913,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const loadedOrder = await (orderTag as any).association("order").loadTarget();
     expect(loadedOrder?.id_value).toBe((order as any).id_value);
     const loadedTag = await (orderTag as any).association("tag").loadTarget();
-    expect(loadedTag?.id).toBe((tag as any).id);
+    expect(loadedTag).toEqual(tag as any);
     await (orderTag as any).update({ attached_reason: "This is our loyal customer" });
     const orderTags = await (order as any).orderTags.toArray();
     const found = orderTags.find((ot: any) => Number(ot.tag_id) === Number((tag as any).id));
@@ -958,7 +952,7 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(sql).toMatch(new RegExp(`${orderId} =`, "i"));
 
     const rows = await (book as any).orderAgreements.toArray();
-    expect(rows.map((a: any) => a.id)).toEqual([agreement.id]);
+    expect(rows).toEqual([agreement]);
   });
 
   it("composite-pk target and through model has_many through routes via join scope", async () => {
@@ -1284,15 +1278,13 @@ describe("HasManyThroughAssociationsTest", () => {
     });
 
     await assertNoQueries(false, async () => {
-      expect((post as any).people.target.map((p: any) => p.id)).toContain(david.id);
-      expect((post as any).people.target.map((p: any) => p.id)).not.toContain(michael.id);
+      expect((post as any).people.target).toContainEqual(david);
+      expect((post as any).people.target).not.toContainEqual(michael);
     });
 
     await post.reload();
-    expect((await (post as any).people.reload()).target.map((p: any) => p.id)).toContain(david.id);
-    expect((await (post as any).people.reload()).target.map((p: any) => p.id)).not.toContain(
-      michael.id,
-    );
+    expect((await (post as any).people.reload()).target).toContainEqual(david);
+    expect((await (post as any).people.reload()).target).not.toContainEqual(michael);
   });
 
   it("replace association with duplicates", async () => {
@@ -1692,15 +1684,13 @@ describe("HasManyThroughAssociationsTest", () => {
   it("find on has many association collection with include and conditions", async () => {
     const michael = await Person.find(people("michael").id);
     const postWithNoComments = await (michael as any).postsWithNoComments.first();
-    expect(postWithNoComments.id).toBe(posts("authorless").id);
+    expect(postWithNoComments).toEqual(posts("authorless"));
   });
 
   it("has many through has one reflection", async () => {
     const david = await Author.find(authors("david").id);
     const verySpecialComments = await (david as any).verySpecialComments.toArray();
-    expect(verySpecialComments.map((c: any) => c.id)).toEqual([
-      comments("eager_sti_on_associations_vs_comment").id,
-    ]);
+    expect(verySpecialComments).toEqual([comments("eager_sti_on_associations_vs_comment")]);
   });
 
   it.skip("modifying has many through has one reflection should raise", async () => {
@@ -1732,9 +1722,7 @@ describe("HasManyThroughAssociationsTest", () => {
     await (mary as any).authorFavorites.create({ favorite_author_id: 3 });
     const maryFavorites = await (mary as any).authorFavorites.toArray();
     const postFavorites = await (post as any).authorFavorites.toArray();
-    expect(postFavorites.map((f: any) => f.id).sort()).toEqual(
-      maryFavorites.map((f: any) => f.id).sort(),
-    );
+    expect(postFavorites).toEqual(maryFavorites);
   });
 
   it("has many association through a has many association to self", async () => {
@@ -1752,7 +1740,7 @@ describe("HasManyThroughAssociationsTest", () => {
       number1_fan_id: 1,
     });
     const sarahAgents = await (sarah as any).agents.toArray();
-    expect(sarahAgents.map((a: any) => a.id)).toEqual([john.id]);
+    expect(sarahAgents).toEqual([john]);
 
     const susanAgentsOfAgents = (await (susan as any).agentsOfAgents.toArray())
       .map((a: any) => a.id)
@@ -1782,9 +1770,7 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(
       await Categorization.exists({ author_id: author.id, named_category_name: category.name }),
     ).toBeTruthy();
-    expect((await (author as any).namedCategories.reload()).map((c: any) => c.id)).toContain(
-      category.id,
-    );
+    expect(await (author as any).namedCategories.reload()).toContainEqual(category);
   });
 
   it("collection create with nonstandard primary key on belongs to", async () => {
@@ -1793,9 +1779,7 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(
       await Categorization.exists({ author_id: author.id, named_category_name: category.name }),
     ).toBeTruthy();
-    expect((await (author as any).namedCategories.reload()).map((c: any) => c.id)).toContain(
-      category.id,
-    );
+    expect(await (author as any).namedCategories.reload()).toContainEqual(category);
   });
 
   it.skip("collection exists", async () => {
@@ -1837,7 +1821,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const dev = (await Developer.first())!;
     await (company as any).association("developers").idsWriter([dev.id as number]);
     const devs = await (company as any).developers.toArray();
-    expect(devs.map((d: any) => d.id)).toEqual([dev.id]);
+    expect(devs).toEqual([dev]);
   });
 
   it("collection singular ids setter with required type cast", async () => {
@@ -1845,7 +1829,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const dev = (await Developer.first())!;
     await (company as any).association("developers").idsWriter([`${dev.id}`]);
     const devs = await (company as any).developers.toArray();
-    expect(devs.map((d: any) => d.id)).toEqual([dev.id]);
+    expect(devs).toEqual([dev]);
   });
 
   it("collection singular ids setter with string primary keys", async () => {
@@ -2022,43 +2006,41 @@ describe("HasManyThroughAssociationsTest", () => {
       ":generalPosts",
       ":generalCategorizations",
     ).first())!.generalCategorizations;
-    expect(preloadedGeneralCats.map((c: any) => c.id)).toEqual([davidWelcomeGeneral.id]);
+    expect(await preloadedGeneralCats).toEqual([davidWelcomeGeneral]);
 
     const eagerGeneralCats = (await Author.eagerLoad(
       ":generalPosts",
       ":generalCategorizations",
     ).first())!.generalCategorizations;
-    expect(eagerGeneralCats.map((c: any) => c.id)).toEqual([davidWelcomeGeneral.id]);
+    expect(await eagerGeneralCats).toEqual([davidWelcomeGeneral]);
 
     const welcomePost = await Post.find(posts("welcome").id);
     const preloadedGeneralPosts = (await Author.preload(
       ":generalCategorizations",
       ":generalPosts",
     ).first())!.generalPosts;
-    expect(preloadedGeneralPosts.map((p: any) => p.id)).toEqual([welcomePost.id]);
+    expect(await preloadedGeneralPosts).toEqual([welcomePost]);
 
     const eagerGeneralPosts = (await Author.eagerLoad(
       ":generalCategorizations",
       ":generalPosts",
     ).first())!.generalPosts;
-    expect(eagerGeneralPosts.map((p: any) => p.id)).toEqual([welcomePost.id]);
+    expect(await eagerGeneralPosts).toEqual([welcomePost]);
   });
 
   it("has many through polymorphic with rewhere", async () => {
     const post = await TaggedPost.create({ title: "Tagged", body: "Post" });
     const tag = await (post as any).tags.create({ name: "Tag" });
     const preloaded = (await TaggedPost.preload(":tags").last())!.tags;
-    expect(preloaded.map((t: any) => t.id)).toEqual([tag.id]);
+    expect(await preloaded).toEqual([tag]);
     const eagerLoaded = (await TaggedPost.eagerLoad(":tags").last())!.tags;
-    expect(eagerLoaded.map((t: any) => t.id)).toEqual([tag.id]);
+    expect(await eagerLoaded).toEqual([tag]);
   });
 
   it("has many through polymorphic with primary key option", async () => {
     const david = await Author.find(authors("david").id);
     const general = await Category.find(categories("general").id);
-    expect((await (david as any).essayCategories.toArray()).map((c: any) => c.id)).toEqual([
-      general.id,
-    ]);
+    expect(await (david as any).essayCategories.toArray()).toEqual([general]);
 
     let joinedAuthors = await Author.joins(":essayCategories").where({
       "categories.id": general.id,
@@ -2066,9 +2048,7 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(joinedAuthors[0].id).toEqual(david.id);
 
     const blackbeard = await Owner.find(owners("blackbeard").id);
-    expect((await (david as any).essayOwners.toArray()).map((o: any) => o.id)).toEqual([
-      blackbeard.id,
-    ]);
+    expect(await (david as any).essayOwners.toArray()).toEqual([blackbeard]);
 
     joinedAuthors = await Author.joins(":essayOwners").where("owners.name = 'blackbeard'");
     expect(joinedAuthors[0].id).toEqual(david.id);
@@ -2077,9 +2057,7 @@ describe("HasManyThroughAssociationsTest", () => {
   it("has many through with primary key option", async () => {
     const david = await Author.find(authors("david").id);
     const general = await Category.find(categories("general").id);
-    expect((await (david as any).essayCategories_2.toArray()).map((c: any) => c.id)).toEqual([
-      general.id,
-    ]);
+    expect(await (david as any).essayCategories_2.toArray()).toEqual([general]);
 
     const joinedAuthors = await Author.joins(":essayCategories_2").where({
       "categories.id": general.id,
@@ -2100,7 +2078,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const welcome = await Post.find(posts("welcome").id);
     const commentsOnFirst = await (david as any).commentsOnFirstPosts.toArray();
     const welcomeComments = await (welcome as any).comments.order("id").toArray();
-    expect(commentsOnFirst.map((c: any) => c.id)).toEqual(welcomeComments.map((c: any) => c.id));
+    expect(commentsOnFirst).toEqual(welcomeComments);
   });
 
   it("create has many through with default scope on join model", async () => {
@@ -2122,11 +2100,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const postList = await Post.joins(":authorCategorizations")
       .order("posts.id")
       .where({ "categorizations.id": maryCatId });
-    expect(postList.map((p: any) => p.id)).toEqual([
-      posts("eager_other").id,
-      posts("misc_by_mary").id,
-      posts("other_by_mary").id,
-    ]);
+    expect(postList).toEqual([posts("eager_other"), posts("misc_by_mary"), posts("other_by_mary")]);
   });
 
   it("select chosen fields only", async () => {
@@ -2164,17 +2138,17 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(proxy.isStaleTarget()).toBeFalsy();
     const mary = await Author.find(authors("mary").id);
     const byId = (a: any, b: any) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
-    expect(
-      (await (post as any).authorCategorizations.toArray()).sort(byId).map((c: any) => c.id),
-    ).toEqual((await (mary as any).categorizations.toArray()).sort(byId).map((c: any) => c.id));
+    expect((await (post as any).authorCategorizations.toArray()).sort(byId)).toEqual(
+      (await (mary as any).categorizations.toArray()).sort(byId),
+    );
 
     (post as any).author_id = authors("david").id;
 
     expect(proxy.isStaleTarget()).toBeTruthy();
     const david = await Author.find(authors("david").id);
-    expect(
-      (await (post as any).authorCategorizations.toArray()).sort(byId).map((c: any) => c.id),
-    ).toEqual((await (david as any).categorizations.toArray()).sort(byId).map((c: any) => c.id));
+    expect((await (post as any).authorCategorizations.toArray()).sort(byId)).toEqual(
+      (await (david as any).categorizations.toArray()).sort(byId),
+    );
   });
 
   it("create with conditions hash on through association", async () => {
@@ -2188,9 +2162,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const post = await Post.find(posts("welcome").id);
     const address = await AuthorAddress.find(authorAddresses("david_address").id);
 
-    expect((await (post as any).authorAddresses.toArray()).map((a: any) => a.id)).toContain(
-      address.id,
-    );
+    expect(await (post as any).authorAddresses.toArray()).toContainEqual(address);
     await (post as any).authorAddresses.delete(address);
     expect((post as any).get("author_count") == null).toBeTruthy();
   });
@@ -2204,7 +2176,7 @@ describe("HasManyThroughAssociationsTest", () => {
     });
 
     const namedCats = await (post as any).namedCategories.toArray();
-    expect(namedCats.map((c: any) => c.id)).toEqual([general.id]);
+    expect(namedCats).toEqual([general]);
 
     const namedIds = await (post as any).namedCategoryIds;
     expect([...namedIds]).toEqual([(general as any).name]);
@@ -2298,14 +2270,14 @@ describe("HasManyThroughAssociationsTest", () => {
       .includes({ ":pets": ":persons" })
       .first();
     const persons = await (result as any).persons.toArray();
-    expect(persons.map((p: any) => p.id)).toEqual([person.id]);
+    expect(persons).toEqual([person]);
   });
 
   it("explicitly joining join table", async () => {
     const blackbeard = await Owner.find(owners("blackbeard").id);
     const toys1 = await (blackbeard as any).toys.toArray();
     const toys2 = await (blackbeard as any).toys.withPet().toArray();
-    expect(toys2.map((t: any) => t.id).sort()).toEqual(toys1.map((t: any) => t.id).sort());
+    expect(toys2).toEqual(toys1);
   });
 
   it("has many through with polymorphic source", async () => {
@@ -2313,7 +2285,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const post = await (general as any).taggedPosts.create({ title: "foo", body: "bar" });
     const reloaded = await Post.find(post.id);
     const postTags = await (reloaded as any).tags.toArray();
-    expect(postTags.map((t: any) => t.id)).toEqual([general.id]);
+    expect(postTags).toEqual([general]);
   });
 
   it("has many through with polymorhic join model", async () => {
@@ -2401,10 +2373,10 @@ describe("HasManyThroughAssociationsTest", () => {
     await Membership.create({ club_id: club.id, member_id: member.id });
 
     await (club as any).favorites.push(member);
-    expect((await (club as any).favorites.toArray()).map((m: any) => m.id)).toEqual([member.id]);
+    expect(await (club as any).favorites.toArray()).toEqual([member]);
 
     await club.reload();
-    expect((await (club as any).favorites.toArray()).map((m: any) => m.id)).toEqual([member.id]);
+    expect(await (club as any).favorites.toArray()).toEqual([member]);
   });
 
   it("insert records via has many through association with scope and association name different from the joining table name", async () => {
@@ -2413,14 +2385,10 @@ describe("HasManyThroughAssociationsTest", () => {
     await Membership.create({ club_id: club.id, member_id: member.id });
 
     await (club as any).customFavorites.push(member);
-    expect((await (club as any).customFavorites.toArray()).map((m: any) => m.id)).toEqual([
-      member.id,
-    ]);
+    expect(await (club as any).customFavorites.toArray()).toEqual([member]);
 
     await club.reload();
-    expect((await (club as any).customFavorites.toArray()).map((m: any) => m.id)).toEqual([
-      member.id,
-    ]);
+    expect(await (club as any).customFavorites.toArray()).toEqual([member]);
   });
 
   it("has many through unscope default scope", async () => {
@@ -2472,7 +2440,7 @@ describe("HasManyThroughAssociationsTest", () => {
     TenantMembership.currentMember = member;
     try {
       const tenantClubs = await (member as any).tenantClubs.toArray();
-      expect(tenantClubs.map((c: any) => c.id)).toEqual([club.id]);
+      expect(tenantClubs).toEqual([club]);
 
       TenantMembership.currentMember = null;
 
@@ -2481,7 +2449,7 @@ describe("HasManyThroughAssociationsTest", () => {
       await TenantMembership.create({ member_id: otherMember.id, club_id: otherClub.id });
 
       const otherTenantClubs = await (otherMember as any).tenantClubs.toArray();
-      expect(otherTenantClubs.map((c: any) => c.id)).toEqual([otherClub.id]);
+      expect(otherTenantClubs).toEqual([otherClub]);
     } finally {
       TenantMembership.currentMember = null;
     }
@@ -2490,21 +2458,21 @@ describe("HasManyThroughAssociationsTest", () => {
   it("has many through with scope that has joined same table with parent relation", async () => {
     const david = await Author.find(authors("david").id);
     const result = await Author.joins(":commentsForFirstAuthor").take();
-    expect(result?.id).toBe(david.id);
+    expect(result).toEqual(david);
   });
 
   it("has many through with left joined same table with through table", async () => {
     const mary = await Author.find(authors("mary").id);
     const eagerOther = await Comment.find(comments("eager_other_comment1").id);
     const result = await (mary as any).comments.leftJoins(":post").toArray();
-    expect(result.map((c: any) => c.id)).toEqual([eagerOther.id]);
+    expect(result).toEqual([eagerOther]);
   });
 
   it("has many through with unscope should affect to through scope", async () => {
     const mary = await Author.find(authors("mary").id);
     const eagerOther = await Comment.find(comments("eager_other_comment1").id);
     const result = await (mary as any).unorderedComments.toArray();
-    expect(result.map((c: any) => c.id)).toEqual([eagerOther.id]);
+    expect(result).toEqual([eagerOther]);
   });
 
   it("has many through with scope should accept string and hash join", async () => {
@@ -2515,7 +2483,7 @@ describe("HasManyThroughAssociationsTest", () => {
       .joins("inner join posts posts_alias on authors.id = posts_alias.author_id")
       .eagerLoad(":categories")
       .take();
-    expect(result?.id).toBe(david.id);
+    expect(result).toEqual(david);
   });
 
   it("has many through with scope should respect table alias", async () => {
@@ -2596,7 +2564,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const sub1 = (await Subscription.first())!;
     await (book1 as any).subscriptions.push(sub1);
     const subs = await (post as any).subscriptions.toArray();
-    expect(subs.map((s: any) => s.id)).toEqual([sub1.id]);
+    expect(subs).toEqual([sub1]);
 
     const bob = await Author.find(authors("bob").id);
     (post as any).author = bob;
@@ -2605,7 +2573,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const sub2 = (await Subscription.second())!;
     await (book2 as any).subscriptions.push(sub2);
     const subs2 = await (post as any).subscriptions.toArray();
-    expect(subs2.map((s: any) => s.id)).toEqual([sub2.id]);
+    expect(subs2).toEqual([sub2]);
   });
 
   it("nested has many through association with unpersisted parent instance", async () => {
@@ -2625,7 +2593,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const sub1 = (await Subscription.first())!;
     await (book1 as any).subscriptions.push(sub1);
     const subs = await (post as any).subscriptions.toArray();
-    expect(subs.map((s: any) => s.id)).toEqual([sub1.id]);
+    expect(subs).toEqual([sub1]);
 
     const bob = await Author.find(authors("bob").id);
     (post as any).author = bob;
@@ -2634,7 +2602,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const sub2 = (await Subscription.second())!;
     await (book2 as any).subscriptions.push(sub2);
     const subs2 = await (post as any).subscriptions.toArray();
-    expect(subs2.map((s: any) => s.id)).toEqual([sub2.id]);
+    expect(subs2).toEqual([sub2]);
   });
 
   it("child is visible to join model in add association callbacks", async () => {
@@ -2672,8 +2640,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const fallSections = (await (fall as any).sections.toArray()).sort(
       (a: any, b: any) => Number(a.id) - Number(b.id),
     );
-    const expectedIds = sections.map((s: any) => s.id).sort();
-    expect(fallSections.map((s: any) => s.id).sort()).toEqual(expectedIds);
+    expect(fallSections).toEqual(sections);
   });
 
   it("post has many tags through association with composite query constraints", async () => {
@@ -2750,7 +2717,7 @@ describe("HasManyThroughAssociationsTest", () => {
       await import("../test-helpers/models/cpk.js").then((m) => m.CpkOrderAgreement)
     ).create({ order_id: (order as any).id_value });
     const agreements = await (book as any).orderAgreements.toArray();
-    expect(agreements.map((a: any) => a.id)).toEqual([agreement.id]);
+    expect(agreements).toEqual([agreement]);
   });
 
   it("cpk stale target", async () => {
@@ -2838,7 +2805,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const tag = tagsBefore[0];
     const postTags2 = await Post.joins(":tags").where({ id: post.id });
     expect(postTags2.length).toBeGreaterThan(0);
-    expect(postTags2.map((p: any) => p.id)).toContain(post.id);
+    expect(postTags2).toContainEqual(post);
   });
 
   it("delete_all for with dependent option delete_all", async () => {

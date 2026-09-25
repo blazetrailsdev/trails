@@ -119,8 +119,8 @@ describe("SQLite3Adapter pragmas option", () => {
     adapter = new BetterSQLite3Adapter({ database: ":memory:", pragmas: { cache_size: 500 } });
     await adapter.connectBang();
     const result = (
-      (await adapter.rawConnection()) as unknown as { raw: import("better-sqlite3").Database }
-    ).raw.pragma("cache_size") as Array<{ cache_size: number }>;
+      (await adapter.rawConnection())!.raw as import("better-sqlite3").Database
+    ).pragma("cache_size") as Array<{ cache_size: number }>;
     expect(result[0]?.cache_size).toBe(500);
   });
 
@@ -128,8 +128,8 @@ describe("SQLite3Adapter pragmas option", () => {
     adapter = new BetterSQLite3Adapter({ database: ":memory:", pragmas: { synchronous: "FULL" } });
     await adapter.connectBang();
     const result = (
-      (await adapter.rawConnection()) as unknown as { raw: import("better-sqlite3").Database }
-    ).raw.pragma("synchronous") as Array<{ synchronous: number }>;
+      (await adapter.rawConnection())!.raw as import("better-sqlite3").Database
+    ).pragma("synchronous") as Array<{ synchronous: number }>;
     expect(result[0]?.synchronous).toBe(2);
   });
 
@@ -137,8 +137,8 @@ describe("SQLite3Adapter pragmas option", () => {
     adapter = new BetterSQLite3Adapter({ database: ":memory:", pragmas: { foreign_keys: true } });
     await adapter.connectBang();
     const result = (
-      (await adapter.rawConnection()) as unknown as { raw: import("better-sqlite3").Database }
-    ).raw.pragma("foreign_keys") as Array<{ foreign_keys: number }>;
+      (await adapter.rawConnection())!.raw as import("better-sqlite3").Database
+    ).pragma("foreign_keys") as Array<{ foreign_keys: number }>;
     expect(result[0]?.foreign_keys).toBe(1);
   });
 
@@ -172,8 +172,8 @@ describe("SQLite3Adapter pragmas option", () => {
     adapter = new BetterSQLite3Adapter({ database: ":memory:", pragmas: { foreign_keys: false } });
     await adapter.connectBang();
     const result = (
-      (await adapter.rawConnection()) as unknown as { raw: import("better-sqlite3").Database }
-    ).raw.pragma("foreign_keys") as Array<{ foreign_keys: number }>;
+      (await adapter.rawConnection())!.raw as import("better-sqlite3").Database
+    ).pragma("foreign_keys") as Array<{ foreign_keys: number }>;
     expect(result[0]?.foreign_keys).toBe(0);
   });
 
@@ -206,9 +206,7 @@ describe("SQLite3Adapter pragmas option", () => {
       );
       const check = new BetterSQLite3Adapter({ database: dbPath });
       await check.connectBang();
-      const rows = (
-        (await check.rawConnection()) as unknown as { raw: import("better-sqlite3").Database }
-      ).raw
+      const rows = ((await check.rawConnection())!.raw as import("better-sqlite3").Database)
         .prepare("SELECT count(*) AS c FROM sqlite_master WHERE name = 'sentinel'")
         .get();
       expect(rows).toEqual({ c: 1 });
@@ -223,8 +221,8 @@ describe("SQLite3Adapter pragmas option", () => {
     adapter = new BetterSQLite3Adapter({ database: ":memory:" });
     await adapter.connectBang();
     const result = (
-      (await adapter.rawConnection()) as unknown as { raw: import("better-sqlite3").Database }
-    ).raw.pragma("cache_size") as Array<{ cache_size: number }>;
+      (await adapter.rawConnection())!.raw as import("better-sqlite3").Database
+    ).pragma("cache_size") as Array<{ cache_size: number }>;
     expect(result[0]?.cache_size).toBe(2000);
   });
 });
