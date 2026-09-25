@@ -792,11 +792,12 @@ describe("SchemaDumperTest", () => {
 
       const originalTableNamePrefix = Base.tableNamePrefix;
       const originalSchemaDumperIgnoreTables = SchemaDumper.ignoreTables;
-      Base.tableNamePrefix = "omg_";
-      SchemaDumper.ignoreTables = ["cats"];
       const migration = new createCatMigration();
-      await migration.migrate("up");
       try {
+        Base.tableNamePrefix = "omg_";
+        SchemaDumper.ignoreTables = ["cats"];
+        await migration.migrate("up");
+
         const stream = new StringIO();
         const output = (await SchemaDumper.dump(Base.connectionPool(), stream)).string();
 
