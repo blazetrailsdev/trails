@@ -1,5 +1,5 @@
-import type { Module } from "@blazetrails/ruby-compat";
-import { singularize } from "@blazetrails/activesupport";
+import { Module } from "@blazetrails/ruby-compat";
+import { camelize, singularize } from "@blazetrails/activesupport";
 import { Association, type AssociationInstanceHost } from "./association.js";
 import { addAutosaveAssociationCallbacks } from "../../autosave-association.js";
 
@@ -32,10 +32,14 @@ export class CollectionAssociation extends Association {
     addAutosaveAssociationCallbacks.call(model, reflection);
   }
 
-  static override defineExtensions(model: any, name: string, block?: (...args: any[]) => any): any {
+  static override defineExtensions(
+    model: any,
+    name: string,
+    block?: (mod: Module) => void,
+  ): Module | undefined {
     if (block) {
-      const extensionModuleName = `${name.charAt(0).toUpperCase()}${name.slice(1)}AssociationExtension`;
-      const extension = { name: extensionModuleName, block };
+      const extensionModuleName = `${camelize(name)}AssociationExtension`;
+      const extension = new Module(block);
       model[extensionModuleName] = extension;
       return extension;
     }

@@ -153,7 +153,7 @@ export class Post extends Base {
 
   static namedExtension = new Module();
 
-  static CommentsWithExtendAssociationExtension = new Module();
+  declare static CommentsWithExtendAssociationExtension: Module;
 
   static namedExtension2 = new Module();
 
@@ -272,12 +272,14 @@ export class Post extends Base {
         },
       },
     });
-    this.CommentsWithExtendAssociationExtension.defineMethod("greeting", () => "hello");
-    this.hasMany("commentsWithExtend", {
-      extend: [Post.namedExtension, Post.CommentsWithExtendAssociationExtension],
-      className: "Comment",
-      foreignKey: "post_id",
-    });
+    this.hasMany(
+      "commentsWithExtend",
+      null,
+      { extend: Post.namedExtension, className: "Comment", foreignKey: "post_id" },
+      (mod) => {
+        mod.defineMethod("greeting", () => "hello");
+      },
+    );
     this.hasMany("commentsWithExtending", (q: any) => q.extending(Post.namedExtension), {
       className: "Comment",
       foreignKey: "post_id",

@@ -74,15 +74,16 @@ export class Developer extends Base {
     this.aliasAttribute("created_on", "legacy_created_on");
     this.aliasAttribute("updated_on", "legacy_updated_on");
 
-    this.hasAndBelongsToMany("projects", {
-      joinTable: "developers_projects",
-      associationForeignKey: "project_id",
-      extend: {
-        async findMostRecent(this: Relation<Base>) {
+    this.hasAndBelongsToMany(
+      "projects",
+      null,
+      { joinTable: "developers_projects", associationForeignKey: "project_id" },
+      (mod) => {
+        mod.defineMethod("findMostRecent", async function (this: Relation<Base>) {
           return this.order("id DESC").first();
-        },
+        });
       },
-    });
+    );
 
     this.belongsTo("mentor");
     this.belongsTo("strictLoadingMentor", {

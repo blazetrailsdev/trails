@@ -101,7 +101,7 @@ describe("DateTimeTest", () => {
     const now = DateTime.civil(2017, 3, 1, 12, 0, 0);
     await withTimezoneConfig({ default: "local" }, () => {
       const task = new Task({ starting: now });
-      expect(task.starting.compare(now)).toBe(0);
+      expect(task.starting!.compare(now)).toBe(0);
     });
   });
 
