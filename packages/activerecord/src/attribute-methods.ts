@@ -54,7 +54,6 @@ export interface InstanceMethodHost {
   writeAttribute(name: string, value: unknown): void;
   /** @internal */
   _readAttribute(name: string, block?: (name: string) => unknown): unknown;
-  _writeAttribute(name: string, value: unknown): void;
 }
 
 export function respondTo(
@@ -668,33 +667,6 @@ export function set(this: InstanceMethodHost, attrName: string, value: unknown):
 
 export function queryAttribute(this: InstanceMethodHost, attrName: string): boolean {
   return _queryAttribute.call(this as any, attrName);
-}
-
-export function toKey(this: InstanceMethodHost): unknown[] | null {
-  const pk = this.id;
-  if (pk == null) return null;
-  const arr = Array.isArray(pk) ? pk : [pk];
-  return arr.some((v: unknown) => v == null) ? null : arr;
-}
-
-export function id(this: InstanceMethodHost, value?: unknown): unknown {
-  const ctor = this.constructor as any;
-  const pk = ctor.primaryKey as string | string[];
-  if (value !== undefined) {
-    if (Array.isArray(pk)) {
-      if (!Array.isArray(value)) {
-        throw new TypeError(
-          `Expected an array for composite primary key [${pk.join(", ")}], got ${value === null ? "null" : typeof value}`,
-        );
-      }
-      pk.forEach((col: string, i: number) => this._writeAttribute(col, (value as unknown[])[i]));
-    } else {
-      this._writeAttribute(pk, value);
-    }
-    return value;
-  }
-  if (Array.isArray(pk)) return pk.map((col: string) => this._readAttribute(col));
-  return this._readAttribute(pk);
 }
 
 export async function reload<T>(this: T): Promise<T> {

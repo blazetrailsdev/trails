@@ -1683,8 +1683,8 @@ describe("BelongsToAssociationsTest", () => {
 
     await (client as any).firm;
     await (client as any).firmWithCondition;
-    const firmProxy = (client as any)._associationInstances?.get("firm");
-    const firmWithConditionProxy = (client as any)._associationInstances?.get("firmWithCondition");
+    const firmProxy = (client as any).association("firm");
+    const firmWithConditionProxy = (client as any).association("firmWithCondition");
 
     assertNotPredicate(firmProxy, (p: any) => p.isStaleTarget());
     assertNotPredicate(firmWithConditionProxy, (p: any) => p.isStaleTarget());

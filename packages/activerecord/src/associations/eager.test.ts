@@ -574,7 +574,7 @@ describe("EagerAssociationTest", () => {
     expect(loaded).not.toBeNull();
     expect(loaded.name).toBe(david.name);
 
-    const btProxy = (posts2[0] as any)._associationInstances.get("author");
+    const btProxy = (posts2[0] as any).association("author");
     expect(btProxy).toBeDefined();
     expect(btProxy.loaded).toBe(true);
     expect(btProxy.target).not.toBeNull();
@@ -588,7 +588,7 @@ describe("EagerAssociationTest", () => {
     const profile = (users[0] as any).association("post").target;
     expect(profile).not.toBeNull();
 
-    const hoProxy = (users[0] as any)._associationInstances.get("post");
+    const hoProxy = (users[0] as any).association("post");
     expect(hoProxy).toBeDefined();
     expect(hoProxy.loaded).toBe(true);
     expect(hoProxy.target).not.toBeNull();
@@ -598,7 +598,7 @@ describe("EagerAssociationTest", () => {
 
     const authorsArr = await Author.where({ id: author.id }).eagerLoad(":posts");
     expect(authorsArr).toHaveLength(1);
-    const proxy = (authorsArr[0] as any)._associationInstances.get("posts");
+    const proxy = (authorsArr[0] as any).association("posts");
     expect(proxy).toBeDefined();
     expect(proxy.loaded).toBe(true);
     expect(proxy.target).toEqual([]);

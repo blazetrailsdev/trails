@@ -462,10 +462,7 @@ export class JoinDependency {
       const isCollection = node.reflection.isCollection();
       if (isCollection) {
         this._markCollectionLoaded(arParent, node);
-      } else if (
-        arParent._associationInstances &&
-        isAssociationCached(arParent, (node.reflection as any).name)
-      ) {
+      } else if (isAssociationCached(arParent, (node.reflection as any).name)) {
         const model = arParent.association?.((node.reflection as any).name)?.target;
         this.construct(model, node, row, seen, modelCache, strictLoadingValue);
         continue;

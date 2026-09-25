@@ -22,6 +22,7 @@ import { Data as XmlData } from "./oid/xml.js";
 import { Utils } from "./utils.js";
 import { format, rbObjAsString as toS, Range } from "@blazetrails/ruby-compat";
 import { raiseIntWiderThan64bit } from "../../active-record.js";
+import { ConnectionNotEstablished } from "../../errors.js";
 
 export class IntegerOutOf64BitRange extends Error {
   constructor(msg: string) {
@@ -251,9 +252,10 @@ function regtypeOid(this: RegtypeOidHost, sqlType: string | null): string | numb
 }
 
 export function lookupCastTypeFromColumn(
-  this: { typeMap: LookupableTypeMap },
+  this: { typeMap: LookupableTypeMap | null },
   column: CastableColumn,
 ): ValueType {
+  if (this.typeMap == null) throw new ConnectionNotEstablished();
   return this.typeMap.lookup(column.oid as number, column.fmod as number, column.sqlType as string);
 }
 

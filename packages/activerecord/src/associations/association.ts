@@ -362,11 +362,8 @@ export class Association<Target extends Base | Base[] = Base | Base[]> {
     const owner = this.owner;
     const name = this.reflection.name;
 
-    const cached = owner._associationCache(name);
-    if (cached !== undefined && (cached as unknown) !== (this as unknown)) {
-      return cached.target as Base | Base[] | null;
-    }
     const holder = associationInstanceGet.call(owner, name) as Association | null;
+    if (holder != null && holder !== this && holder.isLoaded()) return holder.target ?? null;
     if (holder?.isLoaded() && !(holder._staleStateIsSnapshotted && holder.isStaleTarget())) {
       return holder.target ?? null;
     }

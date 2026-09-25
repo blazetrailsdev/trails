@@ -65,7 +65,6 @@ interface ValidationsHost {
   _newRecord?: boolean;
   errors: { isAny(): boolean };
   isValid(context?: ValidationContextArg): Promise<boolean>;
-  _associationCache?(name: string): { target?: unknown } | undefined;
   association?(name: string): { loaded?: boolean; target?: unknown } | undefined;
   readAttribute(name: string): unknown;
 }
@@ -129,8 +128,6 @@ export function readAttributeForValidation(this: ValidationsHost, attribute: str
       if (assoc && (assoc.loaded === true || assoc.target != null)) return assoc.target;
     } catch {}
   }
-  const cached = this._associationCache?.(attribute)?.target;
-  if (cached !== undefined) return cached;
   const holder = associationInstanceGet.call(
     this as unknown as Base,
     attribute,

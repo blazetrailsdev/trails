@@ -655,11 +655,6 @@ export class PostgreSQLAdapter
   }
 
   override lookupCastTypeFromColumn(column: CastableColumn): ValueType {
-    if (this._typeMap == null) {
-      throw new ConnectionNotEstablished(
-        "PostgreSQL type map is not loaded; the connection has not been configured",
-      );
-    }
     return pgLookupCastTypeFromColumn.call(this, column);
   }
 

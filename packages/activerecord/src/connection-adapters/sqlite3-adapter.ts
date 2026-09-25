@@ -1367,34 +1367,23 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
    * @missingRailsName connectionParameters — PERMANENT
    */
   private connect(): void | Promise<void> {
-    if (this.driverIsAsync()) return this.connectAsync();
-    try {
-      this._rawConnection = (this.constructor as typeof SQLite3Adapter).newClient(
-        this._connectionParameters,
-      ) as SqliteConnection;
-    } catch (ex) {
+    const rescue = (ex: unknown): never => {
       if (ex instanceof ConnectionNotEstablished) throw ex.setPool(this.pool);
       throw ex;
-    }
-  }
-
-  /** @internal */
-  private async connectAsync(): Promise<void> {
+    };
     try {
-      this._rawConnection = await (this.constructor as typeof SQLite3Adapter).newClient(
+      const rawConnection = (this.constructor as typeof SQLite3Adapter).newClient(
         this._connectionParameters,
       );
+      if (rawConnection instanceof Promise) {
+        return rawConnection.then((connection) => {
+          this._rawConnection = connection;
+        }, rescue);
+      }
+      this._rawConnection = rawConnection;
     } catch (ex) {
-      if (ex instanceof ConnectionNotEstablished) throw ex.setPool(this.pool);
-      throw ex;
+      rescue(ex);
     }
-  }
-
-  /** @internal */
-  private driverIsAsync(): boolean {
-    return !(this.constructor as typeof SQLite3Adapter).resolveDriverFactory(
-      this._config as SQLite3Config,
-    ).openSync;
   }
 
   /** @internal */

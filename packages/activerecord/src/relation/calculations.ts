@@ -171,7 +171,7 @@ interface CalculationRelation {
   maximum(columnName: string | Nodes.Node): Promise<unknown | null | Map<unknown, unknown>>;
   arelColumns(columns: unknown[]): unknown[];
   flattenedArgs(args: unknown[]): unknown[];
-  skipQueryCacheIfNecessary<R>(fn: () => Promise<R>): Promise<R>;
+  skipQueryCacheIfNecessary<R>(block: () => R): R;
   /** @internal */
   _materializeDeferredDistinctPkPredicates(): Promise<void> | void;
   /** @internal */
@@ -411,8 +411,10 @@ export async function pluck(
   relation.selectValues = columns as (string | Nodes.Node)[];
   const result = await this.skipQueryCacheIfNecessary(() =>
     this.whereClause.isContradiction()
-      ? Promise.resolve(Result.empty())
-      : this.model.withConnection((c) => c.selectAll(relation.arel(), `${this.model.name} Pluck`)),
+      ? Result.empty({ async: this._async })
+      : this.model.withConnection((c) =>
+          c.selectAll(relation.arel(), `${this.model.name} Pluck`, [], { async: this._async }),
+        ),
   );
 
   return await typeCastPluckValues.call(this, result, columns);
@@ -428,7 +430,7 @@ export function asyncPluck(
     | Record<string, string | string[]>
   >
 ): Promise<unknown[]> {
-  return this.pluck(...columnNames);
+  return this.async().pluck(...columnNames);
 }
 
 export async function pick(
@@ -464,7 +466,7 @@ export function asyncPick(
     | Record<string, string | string[]>
   >
 ): Promise<unknown> {
-  return this.pick(...columnNames);
+  return this.async().pick(...columnNames);
 }
 
 export function ids(this: CalculationRelation): Promise<unknown[]> | unknown[] {
@@ -501,7 +503,7 @@ export function ids(this: CalculationRelation): Promise<unknown[]> | unknown[] {
       : await this.skipQueryCacheIfNecessary(() =>
           this.withConnection(async (c) => {
             const manager = relation.arel();
-            return c.selectAll(manager, `${this.model.name} Ids`);
+            return c.selectAll(manager, `${this.model.name} Ids`, [], { async: this._async });
           }),
         );
 
@@ -510,7 +512,7 @@ export function ids(this: CalculationRelation): Promise<unknown[]> | unknown[] {
 }
 
 export function asyncIds(this: CalculationRelation): Promise<unknown[]> {
-  return Promise.resolve(this.ids());
+  return Promise.resolve(this.async().ids());
 }
 
 export interface CalculationMethods {
