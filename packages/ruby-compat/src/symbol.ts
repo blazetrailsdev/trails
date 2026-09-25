@@ -65,6 +65,9 @@ export function rbMethodName(name: string): string {
   const snake = (camel: string): string =>
     camel.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`).replace(/^_/, "");
   if (/^is[A-Z]/.test(name)) return `${snake(name.slice(2))}?`;
+  if (/^(has|supports|can|should|needs|includes|responds|allows|uses)[A-Z]/.test(name)) {
+    return `${snake(name)}?`;
+  }
   if (/[a-z]Bang$/.test(name)) return `${snake(name.slice(0, -4))}!`;
   return snake(name);
 }

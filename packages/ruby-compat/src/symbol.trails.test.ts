@@ -9,5 +9,7 @@ describe("rbMethodName", () => {
     expect(rbMethodName("equals")).toBe("==");
     expect(rbMethodName("toS")).toBe("to_s");
     expect(rbMethodName("fooBar")).toBe("foo_bar");
+    expect(rbMethodName("hasKey")).toBe("has_key?");
+    expect(rbMethodName("supportsDdlTransactions")).toBe("supports_ddl_transactions?");
   });
 });
