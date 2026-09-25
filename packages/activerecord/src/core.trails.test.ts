@@ -255,7 +255,7 @@ describe("hash agrees with ==", () => {
     expect(hashOf(Array(1))).toEqual(hashOf([undefined]));
   });
 
-  it("is an Integer an Array of records folds into its own hash", () => {
+  it("is an Integer, and an Array of records folds it into its own hash", () => {
     expect(Number.isInteger(new Topic().hash())).toBe(true);
     expect(Number.isInteger(hashOf(1))).toBe(true);
     expect(() => rbHash([new Topic()])).not.toThrow();
