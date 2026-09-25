@@ -178,7 +178,7 @@ function newView(singular: string, plural: string): string {
 }
 
 function editView(singular: string, plural: string): string {
-  return `<h1>Edit ${humanize(singular).toLowerCase()}</h1>
+  return `<h1>Editing ${humanize(singular).toLowerCase()}</h1>
 
 <%= yield %>
 
