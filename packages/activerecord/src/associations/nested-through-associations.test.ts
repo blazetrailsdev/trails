@@ -918,12 +918,10 @@ describe("NestedThroughAssociationsTest", () => {
       chefs: [(cakeDesigner as any).chef, (drinkDesigner as any).chef],
     });
     await Hotel.create({ departments: [dept] });
-    const [hotel] = await Hotel.includes(":cakeDesigners", ":drinkDesigners").limit(1);
+    const hotel = (await Hotel.includes(":cakeDesigners", ":drinkDesigners").take())!;
 
-    const cakes = (hotel.association("cakeDesigners").target ?? []) as any[];
-    const drinks = (hotel.association("drinkDesigners").target ?? []) as any[];
-    expect(cakes.map((r) => r.id)).toEqual([cakeDesigner.id]);
-    expect(drinks.map((r) => r.id)).toEqual([drinkDesigner.id]);
+    expect((await hotel.cakeDesigners).map(recordKey)).toEqual([cakeDesigner].map(recordKey));
+    expect((await hotel.drinkDesigners).map(recordKey)).toEqual([drinkDesigner].map(recordKey));
   });
 
   it("polymorphic has many through when through association has already loaded", async () => {
@@ -933,11 +931,10 @@ describe("NestedThroughAssociationsTest", () => {
       chefs: [(cakeDesigner as any).chef, (drinkDesigner as any).chef],
     });
     await Hotel.create({ departments: [dept] });
-    const [hotel] = await Hotel.includes(":chefs", ":cakeDesigners", ":drinkDesigners").limit(1);
-    const cakes = (hotel.association("cakeDesigners").target ?? []) as any[];
-    const drinks = (hotel.association("drinkDesigners").target ?? []) as any[];
-    expect(cakes.map((r) => r.id)).toEqual([cakeDesigner.id]);
-    expect(drinks.map((r) => r.id)).toEqual([drinkDesigner.id]);
+    const hotel = (await Hotel.includes(":chefs", ":cakeDesigners", ":drinkDesigners").take())!;
+
+    expect((await hotel.cakeDesigners).map(recordKey)).toEqual([cakeDesigner].map(recordKey));
+    expect((await hotel.drinkDesigners).map(recordKey)).toEqual([drinkDesigner].map(recordKey));
   });
 
   it("polymorphic has many through joined different table twice", async () => {
@@ -966,12 +963,12 @@ describe("NestedThroughAssociationsTest", () => {
   });
 
   it("has many through reset source reflection after loading is complete", async () => {
-    const [, preloaded] = (await Category.preload(":orderedPostComments").find(1, 2)) as any[];
+    const preloaded = (
+      (await Category.preload(":orderedPostComments").find(1, 2)) as Category[]
+    ).at(-1)!;
     const original = await Category.find(2);
-    const preloadedIds = ((preloaded.association("orderedPostComments").target ?? []) as any[]).map(
-      (c: any) => c.id,
+    expect(await original.orderedPostComments.ids()).toEqual(
+      await preloaded.orderedPostComments.ids(),
     );
-    const originalIds = (await original.orderedPostComments).map((c: any) => c.id);
-    expect(originalIds).toEqual(preloadedIds);
   });
 });

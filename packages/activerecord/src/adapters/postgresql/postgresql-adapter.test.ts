@@ -725,14 +725,13 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
-    // BLOCKED: pg-ignores-warnings-test-match-assertion
-    it.skip("ignores warnings when behaviour ignore", async () => {
+    it("ignores warnings when behaviour ignore", async () => {
       await withDbWarningsAction("ignore", async () => {
         let err = "";
         const listener = (notice: { severity?: string; message?: string }) => {
           err += `${notice.severity}:  ${notice.message}\n`;
         };
-        const raw = (adapter as any)._rawConnection;
+        const raw = (await adapter.rawConnection()) as any;
         raw.on("notice", listener);
         try {
           const result = await adapter.execute("do $$ BEGIN RAISE WARNING 'foo'; END; $$");

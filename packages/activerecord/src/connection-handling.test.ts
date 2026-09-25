@@ -43,29 +43,29 @@ describe("ConnectionHandlingTest", () => {
 
   it("#with_connection lease the connection for the duration of the block", async () => {
     Base.releaseConnection();
-    expect(Base.connectionPool().activeConnection).toBeFalsy();
+    expect(Base.connectionPool().isActiveConnection()).toBeFalsy();
 
     await Base.withConnection(() => {
-      expect(Base.connectionPool().activeConnection).toBeTruthy();
+      expect(Base.connectionPool().isActiveConnection()).toBeTruthy();
     });
 
-    expect(Base.connectionPool().activeConnection).toBeFalsy();
+    expect(Base.connectionPool().isActiveConnection()).toBeFalsy();
   });
 
   it("#lease_connection makes the lease permanent even inside #with_connection", async () => {
     Base.releaseConnection();
-    expect(Base.connectionPool().activeConnection).toBeFalsy();
+    expect(Base.connectionPool().isActiveConnection()).toBeFalsy();
 
     let conn: unknown = null;
     await Base.withConnection(async (connection) => {
       conn = connection;
-      expect(Base.connectionPool().activeConnection).toBeTruthy();
+      expect(Base.connectionPool().isActiveConnection()).toBeTruthy();
       for (let i = 0; i < 2; i++) {
         expect(await Base.leaseConnection()).toBe(connection);
       }
     });
 
-    expect(Base.connectionPool().activeConnection).toBeTruthy();
+    expect(Base.connectionPool().isActiveConnection()).toBeTruthy();
     expect(await Base.leaseConnection()).toBe(conn);
   });
 
@@ -77,25 +77,25 @@ describe("ConnectionHandlingTest", () => {
       },
       { preventPermanentCheckout: true },
     );
-    expect(Base.connectionPool().activeConnection).toBeFalsy();
+    expect(Base.connectionPool().isActiveConnection()).toBeFalsy();
   });
 
   it("#with_connection use the already leased connection if available", async () => {
     const leasedConnection = await Base.leaseConnection();
-    expect(Base.connectionPool().activeConnection).toBeTruthy();
+    expect(Base.connectionPool().isActiveConnection()).toBeTruthy();
 
     await Base.withConnection(async (connection) => {
       expect(connection).toBe(leasedConnection);
       expect(await Base.leaseConnection()).toBe(connection);
     });
 
-    expect(Base.connectionPool().activeConnection).toBeTruthy();
+    expect(Base.connectionPool().isActiveConnection()).toBeTruthy();
     expect(await Base.leaseConnection()).toBe(leasedConnection);
   });
 
   it("#with_connection is reentrant", async () => {
     const leasedConnection = await Base.leaseConnection();
-    expect(Base.connectionPool().activeConnection).toBeTruthy();
+    expect(Base.connectionPool().isActiveConnection()).toBeTruthy();
 
     await Base.withConnection(async (connection) => {
       expect(connection).toBe(leasedConnection);
@@ -107,7 +107,7 @@ describe("ConnectionHandlingTest", () => {
       });
     });
 
-    expect(Base.connectionPool().activeConnection).toBeTruthy();
+    expect(Base.connectionPool().isActiveConnection()).toBeTruthy();
     expect(await Base.leaseConnection()).toBe(leasedConnection);
   });
 
@@ -115,18 +115,18 @@ describe("ConnectionHandlingTest", () => {
     setPermanentConnectionCheckout(true);
 
     Base.releaseConnection();
-    expect(Base.connectionPool().activeConnection).toBeFalsy();
+    expect(Base.connectionPool().isActiveConnection()).toBeFalsy();
 
     let conn: unknown = null;
     await Base.withConnection(async (connection) => {
       conn = connection;
-      expect(Base.connectionPool().activeConnection).toBeTruthy();
+      expect(Base.connectionPool().isActiveConnection()).toBeTruthy();
       for (let i = 0; i < 2; i++) {
         expect(await Base.connection).toBe(connection);
       }
     });
 
-    expect(Base.connectionPool().activeConnection).toBeTruthy();
+    expect(Base.connectionPool().isActiveConnection()).toBeTruthy();
     expect(await Base.connection).toBe(conn);
 
     Base.releaseConnection();
@@ -186,22 +186,22 @@ describe("ConnectionHandlingTest", () => {
       { preventPermanentCheckout: true },
     );
 
-    expect(Base.connectionPool().activeConnection).toBeFalsy();
+    expect(Base.connectionPool().isActiveConnection()).toBeFalsy();
   });
 
   it("common APIs don't permanently hold a connection when permanent checkout is deprecated or disallowed", async () => {
     setPermanentConnectionCheckout("deprecated");
     Base.releaseConnection();
-    expect(Base.connectionPool().activeConnection).toBeFalsy();
+    expect(Base.connectionPool().isActiveConnection()).toBeFalsy();
 
     await Post.createBang({ title: "foo", body: "bar" });
-    expect(Post.connectionPool().activeConnection).toBeFalsy();
+    expect(Post.connectionPool().isActiveConnection()).toBeFalsy();
 
     await Post.first();
-    expect(Post.connectionPool().activeConnection).toBeFalsy();
+    expect(Post.connectionPool().isActiveConnection()).toBeFalsy();
 
     await Post.count();
-    expect(Post.connectionPool().activeConnection).toBeFalsy();
+    expect(Post.connectionPool().isActiveConnection()).toBeFalsy();
   });
 
   it("connected_to switches role for block", async () => {
@@ -284,7 +284,7 @@ describe("ConnectionHandlingTest", () => {
     expect(conn).toBeTruthy();
     expect(Base.connectionPool().activeConnection).toBe(conn);
     Base.releaseConnection();
-    expect(Base.connectionPool().activeConnection).toBeNull();
+    expect(Base.connectionPool().isActiveConnection()).toBeNull();
   });
 
   it("connection_pool returns pool", async () => {

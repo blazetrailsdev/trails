@@ -222,7 +222,7 @@ export class ExecutorHooks {
 
   static complete(): void {
     ActiveRecord.Base.connectionHandler.eachConnectionPool((pool) => {
-      const connection = pool.activeConnection;
+      const connection = pool.isActiveConnection();
       if (connection) {
         const txn =
           (connection as any).currentTransaction?.() ??
@@ -343,8 +343,12 @@ export class ConnectionPool implements ReapablePool {
     return new MigrationContext(this.migrationsPaths, this.schemaMigration, this.internalMetadata);
   }
 
-  get activeConnection(): DatabaseAdapter | null {
+  isActiveConnection(): DatabaseAdapter | null {
     return this.connectionLease().connection;
+  }
+
+  get activeConnection(): DatabaseAdapter | null {
+    return this.isActiveConnection();
   }
 
   isConnected(): boolean {

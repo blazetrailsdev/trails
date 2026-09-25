@@ -192,14 +192,14 @@ it.skipIf(inMemoryDb())("new connection no query", async () => {
 
 it("active connection in use", async () => {
   const pool = makePool();
-  expect(pool.activeConnection).toBeFalsy();
+  expect(pool.isActiveConnection()).toBeFalsy();
   const mainThread = await pool.leaseConnection();
 
-  expect(pool.activeConnection).toBeTruthy();
+  expect(pool.isActiveConnection()).toBeTruthy();
 
   await mainThread.close();
 
-  expect(pool.activeConnection).toBeFalsy();
+  expect(pool.isActiveConnection()).toBeFalsy();
 });
 
 it("full pool exception", async () => {
@@ -348,11 +348,11 @@ it("remove connection", async () => {
 
 it("active connection?", async () => {
   const pool = makePool();
-  expect(pool.activeConnection).toBeFalsy();
+  expect(pool.isActiveConnection()).toBeFalsy();
   expect(await pool.leaseConnection()).toBeTruthy();
-  expect(pool.activeConnection).toBeTruthy();
+  expect(pool.isActiveConnection()).toBeTruthy();
   pool.releaseConnection();
-  expect(pool.activeConnection).toBeFalsy();
+  expect(pool.isActiveConnection()).toBeFalsy();
 });
 
 it("checkout behavior", async () => {
@@ -578,18 +578,18 @@ it("role and shard is returned", async () => {
 
 it("pin connection always returns the same connection", async () => {
   const pool = makePool();
-  expect(pool.activeConnection).toBeFalsy();
+  expect(pool.isActiveConnection()).toBeFalsy();
   await pool.pinConnectionBang(true);
   const pinnedConnection = await pool.checkout();
 
-  expect(pool.activeConnection).toBeFalsy();
+  expect(pool.isActiveConnection()).toBeFalsy();
   expect(await pool.leaseConnection()).toBe(pinnedConnection);
-  expect(pool.activeConnection).toBeTruthy();
+  expect(pool.isActiveConnection()).toBeTruthy();
 
   expect(await pool.checkout()).toBe(pinnedConnection);
 
   pool.releaseConnection();
-  expect(pool.activeConnection).toBeFalsy();
+  expect(pool.isActiveConnection()).toBeFalsy();
   expect(await pool.checkout()).toBe(pinnedConnection);
 });
 

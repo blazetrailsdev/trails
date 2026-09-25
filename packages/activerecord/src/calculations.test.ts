@@ -62,6 +62,14 @@ expect.addEqualityTesters([
     const ta = toTime(a);
     const tb = toTime(b);
     if (ta instanceof RubyTime && tb instanceof RubyTime) return ta.toR().cmp(tb.toR()) === 0;
+    if (ta instanceof RubyTime && !(tb instanceof RubyTime)) {
+      const cmp = ta.compare(b);
+      if (cmp != null) return cmp === 0;
+    }
+    if (tb instanceof RubyTime && !(ta instanceof RubyTime)) {
+      const cmp = tb.compare(a);
+      if (cmp != null) return cmp === 0;
+    }
     if (a instanceof BigDecimal && typeof b === "number") return Number(a.toString("F")) === b;
     if (b instanceof BigDecimal && typeof a === "number") return Number(b.toString("F")) === a;
     return undefined;
@@ -1179,8 +1187,7 @@ describe("CalculationsTest", () => {
     expect(count).toBe(1);
   });
 
-  // BLOCKED: pluck-aggregate-expression-not-type-cast
-  it.skip("pluck type cast", async () => {
+  it("pluck type cast", async () => {
     const topic = topics("first");
     const relation = Topic.where({ id: topic.id });
     expect(await relation.pluck("approved")).toEqual([topic.approved]);
