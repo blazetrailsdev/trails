@@ -36,7 +36,7 @@
  * code the body runs moves it.
  *
  * Adopted policy: the `--pin-all` FLOOR, taken against rails `v8.0.2` before the
- * first vendor bump (RFC 0000-versioned-vendor-layout,
+ * first vendor bump (RFC 0159-versioned-vendor-layout,
  * `pin-the-body-hash-floor-before-the-first-bump`). The policy was ORGANIC until
  * first release, but a bump against an empty manifest reports no drift at all,
  * so the floor was taken while the vendored tree was still the baseline every

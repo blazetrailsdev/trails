@@ -391,7 +391,7 @@ removed or renamed.
 **Floor policy: the `--pin-all` floor is taken.** The policy was organic until
 first release, but a vendor bump against an empty manifest reports no drift at
 all, so the whole-surface floor was seeded against rails `v8.0.2` before the
-first bump (RFC 0000-versioned-vendor-layout): every matched pair is pinned at
+first bump (RFC 0159-versioned-vendor-layout): every matched pair is pinned at
 the digest of the tree every existing port was written against, and each pin
 records the upstream `ref` it was taken at. A floor pin carries no `reason` —
 it is only a "this is the tree we ported against" claim, weaker than a verified
