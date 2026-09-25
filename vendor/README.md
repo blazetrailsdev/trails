@@ -163,8 +163,8 @@ decision, not something the report does.
 
 Re-pinning the body-hash floor is a step of **every** bump.
 `scripts/api-compare/body-pins.json` pins each matched pair's normalized Ruby
-body digest, and records the `ref` it was taken at (the floor was taken against
-`v8.0.2`). After the bump, `pnpm parity:api:pins` reports every pinned body that
+body digest, and records the `ref` at the pin's last write (the floor was taken
+against `v8.0.2`; a pin whose body a bump leaves unchanged keeps its old `ref`). After the bump, `pnpm parity:api:pins` reports every pinned body that
 changed upstream as DRIFT — that list is the re-verification worklist. Re-verify
 each port, then re-pin (`pnpm tsx scripts/api-compare/body-pins.ts --pin
 <ruby-file>`, or `pnpm parity:api:pins:all` once the list is burnt down). See

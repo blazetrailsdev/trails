@@ -4,12 +4,21 @@
 # Output: [{ package, file, classes: [{ name, parent, tableName, associations, validations, scopes, callbacks, attributes, attrs }] }]
 require "json"
 
-MODELS_DIRS = begin
-  models_paths_json = ENV.fetch("MODELS_PATHS_JSON") do
-    abort "extract-ruby-models: MODELS_PATHS_JSON env var not set. Run it via `pnpm parity:fixtures`."
-  end
-  JSON.parse(models_paths_json).freeze
+MODELS_PATHS_JSON = ENV.fetch("MODELS_PATHS_JSON") do
+  abort "extract-ruby-models: MODELS_PATHS_JSON env var not set. Run it via `pnpm parity:fixtures`."
 end
+MODELS_DIRS =
+  begin
+    parsed = JSON.parse(MODELS_PATHS_JSON)
+    unless parsed.is_a?(Hash) && parsed.values.all? { |v| v.is_a?(String) }
+      abort "extract-ruby-models: MODELS_PATHS_JSON must be a JSON object of " \
+            "{string: string}; got #{parsed.class}. Run it via `pnpm parity:fixtures`."
+    end
+    parsed.freeze
+  rescue JSON::ParserError => e
+    abort "extract-ruby-models: MODELS_PATHS_JSON is not valid JSON (#{e.message}). " \
+          "Run it via `pnpm parity:fixtures`."
+  end
 
 ASSOC_KINDS = %w[has_and_belongs_to_many has_many has_one belongs_to].freeze
 CALLBACK_KINDS = %w[

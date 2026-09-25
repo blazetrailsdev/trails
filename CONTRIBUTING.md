@@ -395,7 +395,9 @@ first bump (RFC 0000-versioned-vendor-layout): every matched pair is pinned at
 the digest of the tree every existing port was written against, and each pin
 records the upstream `ref` it was taken at. A floor pin carries no `reason` —
 it is only a "this is the tree we ported against" claim, weaker than a verified
-port. On top of the floor, convergence and port stories re-pin the pairs they
+port. `ref` is the tag at the pin's _last write_: a bump that leaves a body's
+digest unchanged does not rewrite its pin, so `ref` can trail the vendored tag
+without meaning anything is stale. On top of the floor, convergence and port stories re-pin the pairs they
 verify; that pin is a real "a human verified this TS port matches this exact
 vendored Rails body" claim, recorded via `--pin`:
 

@@ -94,7 +94,11 @@ export interface BodyPin {
   rubyFile: string;
   rubyName: string;
   digest: string;
-  /** The upstream tag the digest was taken at, e.g. `v8.0.2`. */
+  /**
+   * The upstream tag at the pin's last write, e.g. `v8.0.2`. A bump that leaves
+   * the body's digest unchanged does not rewrite the pin, so `ref` can trail
+   * the currently vendored tag; the digest, not `ref`, is what DRIFT compares.
+   */
   ref?: string;
   reason?: string;
 }
