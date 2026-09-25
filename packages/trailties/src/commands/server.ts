@@ -22,26 +22,19 @@ export function serverCommand(): Command {
       "Specifies the environment to run this server under (test/development/production).",
     )
     .action(async (options) => {
-      const environment: string =
-        options.environment ||
-        presence(getEnv("TRAILS_ENV")) ||
-        presence(getEnv("NODE_ENV")) ||
-        "development";
-      if (!presence(getEnv("TRAILS_ENV"))) setEnv("TRAILS_ENV", environment);
+      options.environment = environment(options);
+      setEnvironment(options);
 
       const root = Dir.pwd();
       await requireApplicationBang();
       const app = await Trails.initialize();
       const port = parseInt(options.port, 10);
-      const host: string =
-        options.binding ??
-        getEnv("BINDING", environment === "development" ? "localhost" : "0.0.0.0");
-      if (environment !== "development" || !(await hasViteConfig(root))) {
-        const server = await Handler.Node.run(app.app(), { Port: port, Host: host });
+      if (options.environment !== "development" || !(await hasViteConfig(root))) {
+        const server = await Handler.Node.run(app.app(), { Port: port, Host: host(options) });
         const address = server.address();
         const boundPort = address && typeof address === "object" ? address.port : port;
         console.log(
-          `=> Trails application starting in ${Trails.env} on http://${host}:${boundPort}`,
+          `=> Trails application starting in ${Trails.env} on http://${host(options)}:${boundPort}`,
         );
         console.log(`=> Ctrl+C to stop`);
         console.log("");
@@ -49,7 +42,7 @@ export function serverCommand(): Command {
       }
       const server = new DevServer({
         port,
-        host,
+        host: host(options),
         cwd: root,
         app: app.app(),
       });
@@ -57,6 +50,35 @@ export function serverCommand(): Command {
     });
 
   return cmd;
+}
+
+interface ServerOptions {
+  binding?: string;
+  environment?: string;
+}
+
+function setEnvironment(options: ServerOptions): void {
+  if (!presence(getEnv("TRAILS_ENV"))) setEnv("TRAILS_ENV", options.environment);
+}
+
+/** @internal */
+function host(options: ServerOptions): string {
+  if (options.binding) {
+    return options.binding;
+  } else {
+    const defaultHost = environment(options) === "development" ? "localhost" : "0.0.0.0";
+
+    return getEnv("BINDING", defaultHost);
+  }
+}
+
+/** @internal */
+function environment(options: ServerOptions): string {
+  return options.environment || commandEnvironment();
+}
+
+function commandEnvironment(): string {
+  return presence(getEnv("TRAILS_ENV")) || presence(getEnv("NODE_ENV")) || "development";
 }
 
 async function hasViteConfig(root: string): Promise<boolean> {
