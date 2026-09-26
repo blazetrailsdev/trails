@@ -302,8 +302,8 @@ describe("ModelGeneratorTest", () => {
     const gen = makeGen();
     const files = gen.run("Account", ["supplier:belongs_to", "user:references"]);
     const content = findMigration(files);
-    expect(content).toMatch(/t\.references\("supplier",.*foreignKey: true/);
-    expect(content).toMatch(/t\.references\("user",.*foreignKey: true/);
+    expect(content).toMatch(/t\.belongsTo\("supplier",.*\sforeignKey: true/);
+    expect(content).toMatch(/t\.references\("user",.*\sforeignKey: true/);
   });
 
   it("foreign key is skipped for polymorphic references", () => {

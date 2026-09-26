@@ -99,7 +99,7 @@ describe("MigrationGeneratorTest", () => {
       assertMethod("change", content, (change) => {
         assertMatch('removeColumn("posts", "title", "string")', change);
         assertMatch('removeColumn("posts", "body", "text")', change);
-        assertMatch('removeIndex("posts", { column: "title" })', change);
+        assertMatch('removeIndex("posts", "title")', change);
       }),
     );
   });
@@ -141,9 +141,9 @@ describe("MigrationGeneratorTest", () => {
     makeGen().run(migration, ["author:belongs_to", "distributor:references{polymorphic}"]);
     await assertMigration(`db/migrate/${migration}.ts`, (content) =>
       assertMethod("change", content, (change) => {
-        assertNoMatch(/removeReference\("books", "author",.*foreignKey/, change);
-        assertMatch('removeReference("books", "author")', change);
-        assertMatch(/removeReference\("books", "distributor",.*polymorphic: true/, change);
+        assertMatch(/removeReference\("books", "author",.*\sforeignKey: true/, change);
+        assertMatch('removeReference("books", "distributor"', change);
+        assertNoMatch(/removeReference\("books", "distributor",.*\sforeignKey: true/, change);
       }),
     );
   });

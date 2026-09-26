@@ -7,38 +7,11 @@ export interface MigrationRunOptions {
   primaryKeyType?: string;
 }
 
-function columnOptsObj(attribute: GeneratedAttribute): string {
-  const { limit, precision, scale } = attribute.attrOptions;
-  const opts: string[] = [];
-  if (limit) opts.push(`limit: ${limit}`);
-  if (precision != null) opts.push(`precision: ${precision}`);
-  if (scale != null) opts.push(`scale: ${scale}`);
-  if (attribute.attrOptions.null === false) opts.push("null: false");
-  return opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
-}
-
-function referenceOpts(attribute: GeneratedAttribute): string {
-  const opts: string[] = [];
-  if (attribute.polymorphic()) {
-    opts.push("polymorphic: true");
-  } else {
-    opts.push("foreignKey: true");
-  }
-  if (attribute.attrOptions.index) {
-    opts.push("index: { unique: true }");
-  }
-  return `{ ${opts.join(", ")} }`;
-}
-
 function indexNameLiteral(attribute: GeneratedAttribute): string {
   const indexName = attribute.indexName();
   return Array.isArray(indexName)
     ? `[${indexName.map((n) => `"${n}"`).join(", ")}]`
     : `"${indexName}"`;
-}
-
-function injectIndexOptions(attribute: GeneratedAttribute): string {
-  return attribute.hasUniqIndex() ? ", { unique: true }" : "";
 }
 
 let lastTimestamp: string | null = null;
@@ -102,14 +75,16 @@ ${body}
       const colLines: string[] = [];
       for (const attribute of attributes) {
         if (attribute.passwordDigest()) {
-          colLines.push(`      t.string("password_digest"${columnOptsObj(attribute)});`);
+          colLines.push(`      t.string("password_digest"${attribute.injectOptions()});`);
         } else if (attribute.token()) {
-          colLines.push(`      t.string("${attribute.name}"${columnOptsObj(attribute)});`);
+          colLines.push(`      t.string("${attribute.name}"${attribute.injectOptions()});`);
         } else if (attribute.reference()) {
-          colLines.push(`      t.references("${attribute.name}", ${referenceOpts(attribute)});`);
+          colLines.push(
+            `      t.${camelize(attribute.type, false)}("${attribute.name}"${attribute.injectOptions()});`,
+          );
         } else if (!attribute.virtual()) {
           colLines.push(
-            `      t.${attribute.type}("${attribute.name}"${columnOptsObj(attribute)});`,
+            `      t.${attribute.type}("${attribute.name}"${attribute.injectOptions()});`,
           );
         }
       }
@@ -120,12 +95,12 @@ ${body}
       ];
       for (const attribute of attributes.filter((a) => a.token())) {
         parts.push(
-          `    await this.addIndex("${table}", ${indexNameLiteral(attribute)}, { unique: true });`,
+          `    await this.addIndex("${table}", ${indexNameLiteral(attribute)}${attribute.injectIndexOptions() || ", { unique: true }"});`,
         );
       }
       for (const attribute of attributes.filter((a) => !a.reference() && a.hasIndex())) {
         parts.push(
-          `    await this.addIndex("${table}", ${indexNameLiteral(attribute)}${injectIndexOptions(attribute)});`,
+          `    await this.addIndex("${table}", ${indexNameLiteral(attribute)}${attribute.injectIndexOptions()});`,
         );
       }
       return parts.join("\n");
@@ -143,22 +118,22 @@ ${body}
       for (const attribute of attributes) {
         if (attribute.reference()) {
           lines.push(
-            `    await this.addReference("${table}", "${attribute.name}", ${referenceOpts(attribute)});`,
+            `    await this.addReference("${table}", "${attribute.name}"${attribute.injectOptions()});`,
           );
         } else if (attribute.token()) {
           lines.push(
-            `    await this.addColumn("${table}", "${attribute.name}", "string"${columnOptsObj(attribute)});`,
+            `    await this.addColumn("${table}", "${attribute.name}", "string"${attribute.injectOptions()});`,
           );
           lines.push(
-            `    await this.addIndex("${table}", ${indexNameLiteral(attribute)}, { unique: true });`,
+            `    await this.addIndex("${table}", ${indexNameLiteral(attribute)}${attribute.injectIndexOptions() || ", { unique: true }"});`,
           );
         } else if (!attribute.virtual()) {
           lines.push(
-            `    await this.addColumn("${table}", "${attribute.name}", "${attribute.type}"${columnOptsObj(attribute)});`,
+            `    await this.addColumn("${table}", "${attribute.name}", "${attribute.type}"${attribute.injectOptions()});`,
           );
           if (attribute.hasIndex()) {
             lines.push(
-              `    await this.addIndex("${table}", ${indexNameLiteral(attribute)}${injectIndexOptions(attribute)});`,
+              `    await this.addIndex("${table}", ${indexNameLiteral(attribute)}${attribute.injectIndexOptions()});`,
             );
           }
         }
@@ -173,19 +148,17 @@ ${body}
       for (const attribute of attributes) {
         if (attribute.reference()) {
           lines.push(
-            attribute.polymorphic()
-              ? `    await this.removeReference("${table}", "${attribute.name}", { polymorphic: true });`
-              : `    await this.removeReference("${table}", "${attribute.name}");`,
+            `    await this.removeReference("${table}", "${attribute.name}"${attribute.injectOptions()});`,
           );
         } else {
           if (attribute.hasIndex()) {
             lines.push(
-              `    await this.removeIndex("${table}", { column: ${indexNameLiteral(attribute)} });`,
+              `    await this.removeIndex("${table}", ${indexNameLiteral(attribute)}${attribute.injectIndexOptions()});`,
             );
           }
           if (!attribute.virtual()) {
             lines.push(
-              `    await this.removeColumn("${table}", "${attribute.name}", "${attribute.type}");`,
+              `    await this.removeColumn("${table}", "${attribute.name}", "${attribute.type}"${attribute.injectOptions()});`,
             );
           }
         }

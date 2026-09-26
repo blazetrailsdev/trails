@@ -22,14 +22,7 @@ export class ModelGenerator extends GeneratorBase {
   }
 
   run(name: string, args: string[], options: ModelOptions = {}): string[] {
-    const {
-      migration = true,
-      test = true,
-      timestamps = true,
-      parent,
-      indexes = true,
-      primaryKeyType,
-    } = options;
+    const { migration = true, test = true, timestamps = true, parent, primaryKeyType } = options;
 
     const singularName = singularize(underscore(name));
     const className = camelize(singularName);
@@ -98,11 +91,7 @@ describe("${className}", () => {
       const tableName = camelize(tableize(className));
       const migGen = this.createMigrationGenerator();
 
-      const migArgs = indexes
-        ? args
-        : args.map((a) => a.replace(/:index/, "").replace(/:uniq/, ""));
-
-      const migFiles = migGen.run(`Create${tableName}`, migArgs, { timestamps, primaryKeyType });
+      const migFiles = migGen.run(`Create${tableName}`, args, { timestamps, primaryKeyType });
       this.createdFiles.push(...migFiles);
     }
 

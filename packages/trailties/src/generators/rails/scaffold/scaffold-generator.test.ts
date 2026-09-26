@@ -48,7 +48,7 @@ describe("ScaffoldGeneratorTest", () => {
 
     const migration = files.find((f) => f.startsWith("db/migrate/"))!;
     const migContent = readFile(migration);
-    expect(migContent).toContain('t.references("product"');
+    expect(migContent).toContain('t.belongsTo("product"');
     expect(migContent).toContain('t.boolean("approved")');
     expect(migContent).toContain('t.references("user"');
 
@@ -102,7 +102,7 @@ describe("ScaffoldGeneratorTest", () => {
 
     const migration = files.find((f) => f.startsWith("db/migrate/"))!;
     const migContent = readFile(migration);
-    expect(migContent).toContain('t.references("product"');
+    expect(migContent).toContain('t.belongsTo("product"');
     expect(migContent).toContain('t.references("cart"');
   });
 
