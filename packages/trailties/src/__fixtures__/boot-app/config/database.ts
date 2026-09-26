@@ -1,3 +1,3 @@
 export default {
-  test: { adapter: "sqlite3", database: ":memory:" },
+  test: { adapter: "sqlite3", database: "storage/test.sqlite3" },
 };

@@ -15,8 +15,10 @@ import {
   type DrawCallback,
   type RackApp,
   type RackAppObject,
+  Request,
   type RouteSet,
 } from "@blazetrails/actionpack";
+import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { Root } from "./paths.js";
 import type { RouteSetLike } from "./application/routes-reloader.js";
 import { Trailtie } from "./trailtie.js";
@@ -34,6 +36,7 @@ export class Engine extends Trailtie {
   private _allLoadPathsCache?: string[];
   private _routes?: RouteSet;
   private _app?: RackApp;
+  private _envConfig?: Record<string, unknown>;
 
   static calledFrom(value?: string): string | undefined {
     if (value !== undefined) writeOwnState(this, "_calledFrom", value);
@@ -160,6 +163,15 @@ export class Engine extends Trailtie {
     return (this.constructor as typeof Engine).endpoint() ?? this.routes();
   }
 
+  call(env: RackEnv): Promise<RackResponse> {
+    const req = this.buildRequest(env);
+    return this.app()(req.env);
+  }
+
+  envConfig(): Record<string, unknown> {
+    return (this._envConfig ??= {});
+  }
+
   async loadConfigInitializer(initializer: string): Promise<void> {
     const { pathToFileURL } = getPath();
     await Notifications.instrument(
@@ -184,6 +196,15 @@ export class Engine extends Trailtie {
   /** @internal */
   defaultMiddlewareStack(): MiddlewareStack {
     return new MiddlewareStack();
+  }
+
+  /** @internal */
+  buildRequest(env: RackEnv): Request {
+    Object.assign(env, this.envConfig());
+    const req = new Request(env);
+    req.routes = this.routes();
+    req.setEngineScriptName(req.scriptName);
+    return req;
   }
 
   /** @internal */

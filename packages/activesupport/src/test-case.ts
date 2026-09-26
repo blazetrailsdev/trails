@@ -51,6 +51,14 @@ import {
 } from "./testing/time-helpers.js";
 
 export class TestCase {
+  name: string;
+  declare beforeSetup?: () => unknown;
+  declare afterTeardown?: () => unknown;
+
+  constructor(name: string) {
+    this.name = name;
+  }
+
   static setTestOrder(newOrder: string | null): void {
     activeSupportSetTestOrder(newOrder);
   }
@@ -112,13 +120,24 @@ setupAndTeardownPrepended(TestCase);
 
 runLoadHooks("active_support_test_case", TestCase);
 
-beforeEach(() => {
+const runningTestCases = new WeakMap<object, TestCase>();
+
+beforeEach(async (context: TestContext) => {
   _takeAssertions();
+  const testCase = new TestCase(context.task.name);
+  runningTestCases.set(context.task, testCase);
+  await testCase.beforeSetup?.();
   TestCase.beforeSetup();
 });
 
-afterEach((context: TestContext) => {
-  TestCase.afterTeardown(_runningTest(context));
+afterEach(async (context: TestContext) => {
+  const testCase = runningTestCases.get(context.task);
+  runningTestCases.delete(context.task);
+  try {
+    TestCase.afterTeardown(_runningTest(context));
+  } finally {
+    await testCase?.afterTeardown?.();
+  }
 });
 
 /** @noRailsEquivalent PERMANENT */

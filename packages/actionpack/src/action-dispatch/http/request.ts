@@ -602,6 +602,11 @@ export class Request {
     return this.getHeader(routes.envKey);
   }
 
+  /** @internal */
+  setEngineScriptName(name: string): void {
+    this.setHeader((this.routes as { envKey: string }).envKey, name);
+  }
+
   get keyGenerator(): { generateKey(salt: string, keySize?: number): Buffer | string } | undefined {
     return this.env["action_dispatch.key_generator"] as
       | { generateKey(salt: string, keySize?: number): Buffer | string }

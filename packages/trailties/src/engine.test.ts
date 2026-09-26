@@ -8,6 +8,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { env, setEnv } from "@blazetrails/ruby-compat";
 import { RouteSet } from "@blazetrails/actionpack";
+import { MockRequest } from "@blazetrails/rack";
 import { Engine } from "./engine.js";
 import { loaded } from "./__fixtures__/loaded.js";
 import { EngineConfiguration } from "./engine/configuration.js";
@@ -235,8 +236,8 @@ describe("Engine", () => {
       StackEngine.endpoint((async () => [200, {}, ["Hello World"]]) as never);
       (StackEngine.config.middleware as MiddlewareStackProxy).use(Upcaser as never);
 
-      const app = StackEngine.instance().app();
-      expect(await app({} as never)).toEqual([200, {}, ["HELLO WORLD"]]);
+      const response = await StackEngine.instance().call(MockRequest.envFor("/bukkits"));
+      expect(response[2]).toEqual(["HELLO WORLD"]);
     });
   });
 

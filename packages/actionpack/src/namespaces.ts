@@ -13,9 +13,14 @@ const loadPath: Record<string, () => Promise<unknown>> = {
     import("./action-dispatch/routing/polymorphic-routes.js"),
 };
 
-export const ActionDispatch = { name: "ActionDispatch", loadPath } as AutoloadModule & {
+export const ActionDispatch = {
+  name: "ActionDispatch",
+  loadPath,
+  testApp: null,
+} as AutoloadModule & {
   Request: typeof Request;
   Routing: typeof Routing;
+  testApp: unknown;
 };
 extend(ActionDispatch, Autoload);
 ActionDispatch.eagerAutoload(() => {

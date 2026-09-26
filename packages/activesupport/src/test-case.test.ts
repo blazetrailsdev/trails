@@ -837,7 +837,7 @@ SubclassSetupAndTeardownTestCase.teardown(":bar");
 
 describe("SetupAndTeardownTest", () => {
   it("inherited setup callbacks", () => {
-    const instance = new SetupAndTeardownTestCase();
+    const instance = new SetupAndTeardownTestCase("test_inherited_setup_callbacks");
     instance.resetCallbackRecord();
     instance.foo();
 
@@ -853,7 +853,7 @@ describe("SetupAndTeardownTest", () => {
 
 describe("SubclassSetupAndTeardownTest", () => {
   it("inherited setup callbacks", () => {
-    const instance = new SubclassSetupAndTeardownTestCase();
+    const instance = new SubclassSetupAndTeardownTestCase("test_inherited_setup_callbacks");
     instance.resetCallbackRecord();
     instance.foo();
     instance.bar();

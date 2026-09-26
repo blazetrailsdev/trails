@@ -23,8 +23,9 @@ import * as urlForMod from "../routing/url-for.js";
 import * as polymorphicRoutes from "../routing/polymorphic-routes.js";
 import type { UrlForRoutes } from "../routing/url-for.js";
 import { RequestEncoder } from "./request-encoder.js";
+import { ActionDispatch } from "../../namespaces.js";
 import { Session as RackTestSession, type CookieJar } from "@blazetrails/rack-test";
-import { DEFAULT_PORTS, type RackApp } from "@blazetrails/rack";
+import { DEFAULT_PORTS, type RackApp, type RackMiddleware } from "@blazetrails/rack";
 import type { UploadedFile } from "@blazetrails/rack-test";
 
 export interface IntegrationRequestOptions {
@@ -342,7 +343,7 @@ export class IntegrationTest {
 
   /** @internal */
   get _mockSession(): RackTestSession {
-    this._mockSessionMemo ??= new RackTestSession(this.app as RackApp, this.host);
+    this._mockSessionMemo ??= new RackTestSession(this.app as RackApp | RackMiddleware, this.host);
     return this._mockSessionMemo;
   }
 
@@ -454,7 +455,20 @@ export class IntegrationTest {
     this._app = value;
   }
 
-  static app: unknown = null;
+  /** @internal */
+  static _app: unknown = null;
+
+  static get app(): unknown {
+    if (IntegrationTest._app != null && IntegrationTest._app !== false) {
+      return IntegrationTest._app;
+    } else {
+      return ActionDispatch.testApp;
+    }
+  }
+
+  static set app(app: unknown) {
+    IntegrationTest._app = app;
+  }
 
   static registerEncoder(
     args: string,

@@ -28,7 +28,8 @@ import "./assets/trailtie.js";
 import { Trails } from "./rails.js";
 import { Collection, type InitializerGroup } from "./initializable.js";
 import type { Logger } from "@blazetrails/activesupport";
-import type { MiddlewareStack, RackApp } from "@blazetrails/actionpack";
+import type { MiddlewareStack, RackApp, Request } from "@blazetrails/actionpack";
+import type { RackEnv } from "@blazetrails/rack";
 
 let _appClass: typeof Application | null = null;
 /** @internal */
@@ -155,6 +156,14 @@ export class Application extends Engine {
     await this.runInitializers(group, this);
     this._initialized = true;
     return this;
+  }
+
+  /** @internal */
+  override buildRequest(env: RackEnv): Request {
+    const req = super.buildRequest(env);
+    env["ORIGINAL_FULLPATH"] = req.fullpath;
+    env["ORIGINAL_SCRIPT_NAME"] = req.scriptName;
+    return req;
   }
 
   /** @internal */

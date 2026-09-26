@@ -385,3 +385,57 @@ describe("main cross-file credit", () => {
     await fs.rm(dir, { recursive: true });
   });
 });
+
+describe("main erb description credit", () => {
+  it("credits a tse-spelled description against its erb-spelled Rails original", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "compare-"));
+    const pkg = "actionview";
+    const src = PKG_SRC_DIRS[pkg];
+    const tc = (ancestors: string[], description: string) => ({ ancestors, description });
+    const rubyFile = "template/dependency_tracker_test.rb";
+    const ruby = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        [pkg]: {
+          files: [
+            {
+              file: rubyFile,
+              testCases: [
+                tc(
+                  ["RubyTemplateDependencyTrackerTest"],
+                  "dependency of erb template with number in filename",
+                ),
+              ],
+            },
+          ],
+        },
+      },
+    };
+    const ts = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        [pkg]: {
+          files: [
+            {
+              file: `${src}${rubyToConventionTs(rubyFile, pkg)}`,
+              testCases: [
+                tc(["DependencyTrackerTest"], "dependency of tse template with number in filename"),
+              ],
+            },
+          ],
+        },
+      },
+    };
+    await fs.writeFile(path.join(dir, "rails-tests.json"), JSON.stringify(ruby));
+    await fs.writeFile(path.join(dir, "ts-tests.json"), JSON.stringify(ts));
+    main(["--package", pkg, "--json"], dir);
+    const { results } = JSON.parse(
+      await fs.readFile(path.join(dir, "convention-comparison.json"), "utf-8"),
+    ) as { results: { files: ConventionFileResult[] }[] };
+    const tracker = results[0].files.find((f) => f.rubyFile === rubyFile)!;
+    expect([tracker.matched, tracker.missing, tracker.extra]).toEqual([1, 0, 0]);
+    await fs.rm(dir, { recursive: true });
+  });
+});
