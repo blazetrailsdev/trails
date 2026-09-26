@@ -349,7 +349,10 @@ import {
   hasSecureToken as _hasSecureToken,
   generateUniqueSecureToken as _generateUniqueSecureToken,
 } from "./secure-token.js";
-import { authenticateBy as _authenticateBy } from "./secure-password.js";
+import {
+  authenticateBy as _authenticateBy,
+  hasSecurePassword as _hasSecurePassword,
+} from "./secure-password.js";
 import { ClassMethods as _AggregationsClassMethods } from "./aggregations.js";
 import {
   ClassMethods as _StoreClassMethods,
@@ -1140,6 +1143,8 @@ export class Base extends Model {
   declare static storeAccessor: typeof _StoreClassMethods.storeAccessor;
 
   declare static _storeAccessorsModule: typeof _StoreClassMethods._storeAccessorsModule;
+
+  static hasSecurePassword = _hasSecurePassword;
 
   static authenticateBy = _authenticateBy;
 

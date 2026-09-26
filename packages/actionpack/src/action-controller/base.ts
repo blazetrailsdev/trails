@@ -232,6 +232,7 @@ export class Base extends Metal {
   static _impliedLayoutName = _impliedLayoutName;
   declare static _layout: Parameters<typeof layout>[0];
   declare static _layoutConditions: Record<string, string[]>;
+  declare static _flashTypes: string[];
 
   static _routes: ViewContextRoutes | null = null;
 
@@ -447,15 +448,32 @@ export class Base extends Metal {
 
   redirectTo(
     options: string,
-    responseOptions: { status?: number | string; allow_other_host?: boolean } = {},
+    responseOptionsAndFlash: {
+      status?: number | string;
+      allow_other_host?: boolean;
+      flash?: Record<string, unknown>;
+      [flashType: string]: unknown;
+    } = {},
   ): void {
+    for (const flashType of (this.constructor as typeof Base)._flashTypes) {
+      const type = responseOptionsAndFlash[flashType];
+      delete responseOptionsAndFlash[flashType];
+      if (type != null && type !== false) this.flash.set(flashType, type);
+    }
+
+    const otherFlashes = responseOptionsAndFlash.flash;
+    delete responseOptionsAndFlash.flash;
+    if (otherFlashes != null) this.flash.update(otherFlashes);
+
     if (this.performed) {
       throw new DoubleRenderError(
         "Render and/or redirect were called multiple times in this action.",
       );
     }
 
-    const proposedStatus = responseOptions.status ? statusCode(responseOptions.status) : 302;
+    const proposedStatus = responseOptionsAndFlash.status
+      ? statusCode(responseOptionsAndFlash.status)
+      : 302;
     this.status = proposedStatus;
     this.setHeader("location", options);
     this.contentType = "text/html; charset=utf-8";
@@ -929,6 +947,8 @@ classAttribute.call(Base, "_layoutConditions", {
   default: {},
 });
 Base._writeLayoutMethod();
+classAttribute.call(Base, "_flashTypes", { instanceAccessor: false, default: [] });
+Base._flashTypes = [...Base._flashTypes, "alert", "notice"];
 Base.prototype.viewCacheDependencies = viewCacheDependencies;
 Base.prototype.cache = cache;
 Base.prototype.combinedFragmentCacheKey = combinedFragmentCacheKey;

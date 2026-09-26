@@ -11,6 +11,8 @@ export class Session extends ApplicationRecord {
   "app/models/user.rb": `import { ApplicationRecord } from "./application-record.js";
 
 export class User extends ApplicationRecord {
+  declare static findByPasswordResetTokenBang: (token: unknown) => Promise<User>;
+
   static {
     this.hasSecurePassword();
     this.hasMany("sessions", { dependent: "destroy" });
@@ -21,11 +23,14 @@ export class User extends ApplicationRecord {
 `,
 
   "app/models/current.rb": `import { CurrentAttributes, delegate } from "@blazetrails/activesupport";
+import type { Session } from "./session.js";
 
 export class Current extends CurrentAttributes {
+  declare static session: Session | null | undefined;
+
   static {
     this.attribute("session");
-    delegate(this.prototype, ["user"], { to: "session", allowNil: true });
+    delegate.call(this.prototype, "user", { to: "session", allowNil: true });
   }
 }
 `,

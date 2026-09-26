@@ -2,6 +2,29 @@ import { describe, it, expect } from "vitest";
 import { FlashHash } from "../../action-dispatch/flash.js";
 import { FlashTypeRegistry } from "../metal/flash.js";
 import { Base } from "../base.js";
+import { Request } from "../../action-dispatch/http/request.js";
+import { Response } from "../../action-dispatch/http/response.js";
+
+class TestController extends Base {
+  async redirectWithAlert(): Promise<void> {
+    this.redirectTo("/nowhere", { alert: "Beware the nowheres!" });
+  }
+
+  async redirectWithNotice(): Promise<void> {
+    this.redirectTo("/somewhere", { notice: "Good luck in the somewheres!" });
+  }
+
+  async redirectWithOtherFlashes(): Promise<void> {
+    this.redirectTo("/wonderland", { flash: { joyride: "Horses!" } });
+  }
+}
+
+async function get(action: string): Promise<TestController> {
+  const controller = new TestController();
+  const env = { REQUEST_METHOD: "GET", PATH_INFO: "/", HTTP_HOST: "test.host" };
+  await controller.dispatch(action, new Request(env), new Response());
+  return controller;
+}
 
 describe("FlashTest", () => {
   it("flash", () => {
@@ -50,17 +73,14 @@ describe("FlashTest", () => {
     expect(discarded).toEqual({ a: "1", b: "2" });
   });
 
-  it("redirect to with alert", () => {
-    const flash = new FlashHash();
-    flash.alert = "danger";
-    expect(flash.alert).toBe("danger");
-    expect(flash.get("alert")).toBe("danger");
+  it("redirect to with alert", async () => {
+    const controller = await get("redirectWithAlert");
+    expect(controller.flash.get("alert")).toBe("Beware the nowheres!");
   });
 
-  it("redirect to with notice", () => {
-    const flash = new FlashHash();
-    flash.notice = "saved";
-    expect(flash.notice).toBe("saved");
+  it("redirect to with notice", async () => {
+    const controller = await get("redirectWithNotice");
+    expect(controller.flash.get("notice")).toBe("Good luck in the somewheres!");
   });
 
   it("render with flash now alert", () => {
@@ -75,10 +95,9 @@ describe("FlashTest", () => {
     expect(flash.notice).toBe("immediate notice");
   });
 
-  it("redirect to with other flashes", () => {
-    const flash = new FlashHash();
-    flash.set("custom", "value");
-    expect(flash.get("custom")).toBe("value");
+  it("redirect to with other flashes", async () => {
+    const controller = await get("redirectWithOtherFlashes");
+    expect(controller.flash.get("joyride")).toBe("Horses!");
   });
 
   it("from session value nil returns empty", () => {

@@ -121,7 +121,7 @@ afterEach(() => {
 
 describe("rateLimiting (instance helper)", () => {
   it("increments the store with controller_path + name + identity", async () => {
-    const calls: Array<{ key: string; amount: number; expiresIn: number }> = [];
+    const calls: Array<{ key: string; amount: number; expiresIn: unknown }> = [];
     const store: RateLimitStore = {
       increment(key, amount, options) {
         calls.push({ key, amount, expiresIn: options.expiresIn });

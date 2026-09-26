@@ -8,7 +8,7 @@ class LayoutTest extends ActionController.Base {
   static override controllerPath(): string {
     return "views";
   }
-  static override _impliedLayoutName = function (this: typeof LayoutTest): string {
+  static override _impliedLayoutName = function (this: { name: string }): string {
     return underscore(this.name).replace(/_controller$/, "");
   };
 
