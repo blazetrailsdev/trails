@@ -24,7 +24,7 @@ export {
 export interface UrlForRoutes {
   urlFor(options: Record<string, unknown>, routeName?: string | null): string;
   /** @internal */
-  optimizeRoutesGeneration?(): boolean;
+  isOptimizeRoutesGeneration?(): boolean;
   polymorphicMappings?: Map<string, PolymorphicMappingEntry>;
 }
 
@@ -103,7 +103,7 @@ export function routeFor(this: UrlForHost, name: string, ...args: unknown[]): st
 /** @internal */
 export function optimizeRoutesGeneration(this: UrlForHost): boolean {
   return (
-    (this._routes!.optimizeRoutesGeneration?.() ?? true) &&
+    (this._routes!.isOptimizeRoutesGeneration?.() ?? true) &&
     Object.keys(this.defaultUrlOptions).length === 0
   );
 }

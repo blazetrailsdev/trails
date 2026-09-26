@@ -28,7 +28,7 @@ function makeRoutes(): UrlForRoutes & {
       calls.push([opts, routeName ?? null]);
       return `/generated?${Object.keys(opts).sort().join(",")}`;
     },
-    optimizeRoutesGeneration() {
+    isOptimizeRoutesGeneration() {
       return true;
     },
   };

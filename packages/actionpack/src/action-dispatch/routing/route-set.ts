@@ -1,4 +1,4 @@
-import { isPlainObject, isPresent } from "@blazetrails/activesupport";
+import { isPlainObject, isPresent, symbolizeKeys, toParam } from "@blazetrails/activesupport";
 import { MockRequest, type RackEnv, type RackResponse } from "@blazetrails/rack";
 import {
   extend,
@@ -190,21 +190,31 @@ export const DEFAULT_CONFIG: RouteSetConfig = {
 export class MountedHelpers {}
 
 /** @internal */
-/** @missingRailsCall optimize_helper? — CONVERGEABLE port-optimized-url-helper-and-rails-shape-url-for */
 class UrlHelper {
+  static create(route: Route, options: Record<string, unknown>, routeName: string): UrlHelper {
+    if (this.isOptimizeHelper(route)) {
+      return new OptimizedUrlHelper(route, options, routeName);
+    } else {
+      return new this(route, options, routeName);
+    }
+  }
+
+  static isOptimizeHelper(route: Route): boolean {
+    return Object.keys(route.pathConstraints).length === 0 && !route.isGlob();
+  }
+
   readonly routeName: string;
   /** @internal */
-  private readonly options: Record<string, unknown>;
+  protected readonly options: Record<string, unknown>;
   /** @internal */
   private readonly segmentKeys: readonly string[];
-
-  static create(route: Route, options: Record<string, unknown>, routeName: string): UrlHelper {
-    return new UrlHelper(route, options, routeName);
-  }
+  /** @internal */
+  protected readonly route: Route;
 
   constructor(route: Route, options: Record<string, unknown>, routeName: string) {
     this.options = options;
     this.segmentKeys = [...new Set(route.pathParamNames)];
+    this.route = route;
     this.routeName = routeName;
   }
 
@@ -259,6 +269,91 @@ class UrlHelper {
   }
 }
 
+/** @internal */
+class OptimizedUrlHelper extends UrlHelper {
+  readonly argSize: number;
+  /** @internal */
+  private readonly requiredParts: readonly string[];
+
+  constructor(route: Route, options: Record<string, unknown>, routeName: string) {
+    super(route, options, routeName);
+    this.requiredParts = this.route.requiredParts;
+    this.argSize = this.requiredParts.length;
+  }
+
+  override call(
+    t: UrlHelperContext,
+    methodName: string,
+    args: unknown[],
+    innerOptions: Record<string, unknown> | undefined,
+    urlStrategy: UrlStrategy,
+  ): string {
+    if (args.length === this.argSize && !innerOptions && this.optimizeRoutesGeneration(t)) {
+      const options: Record<string, unknown> = { ...(t.urlOptions?.() ?? {}), ...this.options };
+      let path = this.optimizedHelper(args);
+      const trailingSlash = options["trailingSlash"];
+      if (trailingSlash != null && trailingSlash !== false && !path.endsWith("/")) path += "/";
+      options["path"] = path;
+
+      const originalScriptName = options["originalScriptName"] as string | null | undefined;
+      delete options["originalScriptName"];
+      let scriptName = t._routes.findScriptName(options);
+
+      if (originalScriptName != null && (originalScriptName as unknown) !== false) {
+        scriptName = originalScriptName + scriptName;
+      }
+
+      options["scriptName"] = scriptName;
+
+      return urlStrategy(options as UrlOptions);
+    } else {
+      return super.call(t, methodName, args, innerOptions, urlStrategy);
+    }
+  }
+
+  /** @internal */
+  private optimizedHelper(args: unknown[]): string {
+    const params = this.parameterizeArgs(args, () => {
+      this.raiseGenerationError(args);
+    });
+
+    return this.route.format(params);
+  }
+
+  /** @internal */
+  private optimizeRoutesGeneration(t: UrlHelperContext): boolean {
+    return t.optimizeRoutesGeneration();
+  }
+
+  /** @internal */
+  private parameterizeArgs(args: unknown[], block: (key: string) => void): Record<string, unknown> {
+    const params: Record<string, unknown> = {};
+    for (let i = 0; i < this.argSize; i++) {
+      const key = this.requiredParts[i];
+      const value = toParam(args[i]);
+      if (value == null || value === "") block(key);
+      params[key] = value;
+    }
+    return params;
+  }
+
+  /** @internal */
+  private raiseGenerationError(args: unknown[]): never {
+    const missingKeys: string[] = [];
+    const params = this.parameterizeArgs(args, (missingKey) => {
+      missingKeys.push(missingKey);
+    });
+    const merged: Record<string, unknown> = { ...this.route.requirements, ...params };
+    const constraints = Object.fromEntries(
+      Object.entries(merged).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+    );
+    let message = `No route matches ${rbInspect(symbolizeKeys(constraints))}`;
+    message += `, missing required keys: ${rbInspect(missingKeys.sort().map((k) => `:${k}`))}`;
+
+    throw new UrlGenerationError(message);
+  }
+}
+
 type UrlStrategy = (options: UrlOptions) => string;
 
 const PATH: UrlStrategy = (options) => URL.pathFor(options);
@@ -283,6 +378,7 @@ export const RESERVED_OPTIONS: readonly string[] = [
 export interface UrlHelperContext {
   _routes: RouteSet;
   urlOptions?(): Record<string, unknown>;
+  optimizeRoutesGeneration(): boolean;
 }
 
 export type NamedRouteHelper = (this: UrlHelperContext, ...args: unknown[]) => string;
@@ -440,6 +536,7 @@ export class UrlHelpersModule {
       "urlFor",
       "fullUrlFor",
       "routeFor",
+      "optimizeRoutesGeneration",
       "polymorphicUrl",
       "polymorphicPath",
       "polymorphicUrlForAction",
@@ -464,6 +561,9 @@ export class UrlHelpersModule {
   }
   routeFor(name: string, ...args: unknown[]): string {
     return this._proxy.routeFor(name, ...args);
+  }
+  optimizeRoutesGeneration(): boolean {
+    return this._proxy.optimizeRoutesGeneration();
   }
   polymorphicUrl(recordOrHashOrArray: PolymorphicArg, options: PolymorphicOptions = {}): string {
     return polymorphicUrlFn.call(
