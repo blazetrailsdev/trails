@@ -96,6 +96,9 @@ export class Template {
     TemplateHandlers.registerDefaultTemplateHandler("raw", new Raw());
     TemplateHandlers.registerTemplateHandler("tse", new Tse());
     TemplateHandlers.registerTemplateHandler("html", new Html());
+    TemplateHandlers.registerTemplateHandler("ruby", {
+      call: (_: unknown, source: string) => source,
+    });
   }
 
   static Error = TemplateError;

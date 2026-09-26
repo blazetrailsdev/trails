@@ -5,7 +5,7 @@ import { TemplateRenderer } from "./template-renderer.js";
 import { PartialRenderer } from "./partial-renderer.js";
 import { ObjectRenderer } from "./object-renderer.js";
 import { CollectionRenderer } from "./collection-renderer.js";
-import { StreamingBody } from "./streaming-template-renderer.js";
+import { type Body, StreamingTemplateRenderer } from "./streaming-template-renderer.js";
 
 export type { ViewContext, RenderOptions };
 export { RenderedTemplate };
@@ -32,14 +32,14 @@ export class Renderer {
     return this.renderTemplateToObject(context, options);
   }
 
-  async renderBody(context: ViewContext, options: RenderOptions): Promise<(string | null)[]> {
+  async renderBody(
+    context: ViewContext,
+    options: RenderOptions,
+  ): Promise<Body | (string | null)[]> {
     if (Object.prototype.hasOwnProperty.call(options, "partial")) {
       return [await this.renderPartial(context, options)];
     }
-    if (options.stream) {
-      return new StreamingBody(this.lookupContext, context, options).toArray();
-    }
-    return [(await this.renderTemplateToObject(context, options)).body];
+    return new StreamingTemplateRenderer(this.lookupContext).render(context, options);
   }
 
   /** @internal */

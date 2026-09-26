@@ -1,6 +1,8 @@
 import { getOsAsync, getFs, getPath } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { I18n } from "@blazetrails/activesupport";
+
 import { LookupContext } from "../lookup-context.js";
 import { FileSystemResolver } from "./resolver.js";
 import { FixtureResolver } from "../testing/resolvers.js";
@@ -109,5 +111,49 @@ describe("FixtureResolver", () => {
     });
 
     expect(resolver.allTemplatePaths().map((path) => path.virtual)).toEqual(["posts/index"]);
+  });
+});
+
+describe("PathParser locales", () => {
+  let originalLocale: ReturnType<typeof I18n.locale>;
+
+  beforeEach(() => {
+    originalLocale = I18n.locale();
+    I18n.setEnforceAvailableLocales(false);
+    TemplateHandlers.registerTemplateHandler("tse", new Tse());
+  });
+
+  afterEach(() => {
+    I18n.setLocale(originalLocale);
+    I18n.setAvailableLocales(null);
+    I18n.setEnforceAvailableLocales(true);
+    TemplateHandlers.clear();
+  });
+
+  it("resolves a dashed-locale template when the locale is pt-BR", () => {
+    const resolver = new FixtureResolver({
+      "posts/show.html.tse": "Hello world",
+      "posts/show.pt-BR.html.tse": "Ola mundo",
+    });
+    I18n.setLocale("pt-BR");
+    const ctx = new LookupContext(null, {}, []);
+    ctx.appendViewPaths([resolver]);
+
+    expect(ctx.findTemplate("show", ["posts"])?.source).toBe("Ola mundo");
+  });
+
+  it("unions I18n.available_locales into the locale group, rebuilt by clear_cache", () => {
+    const resolver = new FixtureResolver({ "posts/show.sr-Latn.html.tse": "Zdravo svete" });
+    I18n.setLocale("sr-Latn");
+    const before = new LookupContext(null, {}, []);
+    before.appendViewPaths([resolver]);
+    expect(before.isExists("show", ["posts"])).toBe(false);
+
+    I18n.setAvailableLocales(["en", "sr-Latn"]);
+    resolver.clearCache();
+    const ctx = new LookupContext(null, {}, []);
+    ctx.appendViewPaths([resolver]);
+
+    expect(ctx.findTemplate("show", ["posts"])?.source).toBe("Zdravo svete");
   });
 });

@@ -1,5 +1,5 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { RouteSet } from "../routing/route-set.js";
+import { describe, it, expect, afterEach, beforeEach } from "vitest";
+import { RouteSet, type NamedRouteHelper } from "../routing/route-set.js";
 import { Route } from "../routing/route.js";
 import { bodyFromString, bodyToString } from "@blazetrails/rack";
 import { Response } from "../http/response.js";
@@ -7,6 +7,7 @@ import { controllerConstants, type Request } from "../http/request.js";
 import type { DispatchableControllerClass } from "../routing/dispatcher.js";
 import { escapeSegment, unescapeUri } from "../journey/router/utils.js";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { IntegrationTest } from "../testing/integration.js";
 
 afterEach(() => {
   controllerConstants.delete("posts");
@@ -2049,11 +2050,88 @@ describe("TestNamedRouteUrlHelpers", () => {
 });
 
 describe("TestUrlConstraints", () => {
-  it.skip("constraints are copied to defaults when using constraints method", () => {});
-  it.skip("constraints are copied to defaults when using scope constraints hash", () => {});
-  it.skip("constraints are copied to defaults when using route constraints hash", () => {});
-  it.skip("false constraint expressions check for absence of values", () => {});
-  it.skip("true constraint expressions check for presence of values", () => {});
+  const Routes = new RouteSet();
+  Routes.draw((app) => {
+    const ok = (_env: Record<string, unknown>) => [
+      200,
+      { "Content-Type": "text/plain" },
+      bodyFromString(""),
+    ];
+
+    app.constraints({ subdomain: "admin" }, () => {
+      app.get("/", { to: ok, as: "admin_root" });
+    });
+
+    app.scope({ constraints: { protocol: "https://" } }, () => {
+      app.get("/", { to: ok, as: "secure_root" });
+    });
+
+    app.get("/", { to: ok, as: "alternate_root", constraints: { port: 8080 } });
+
+    app.get("/search", { to: ok, constraints: { subdomain: false } });
+
+    app.get("/logs", { to: ok, constraints: { subdomain: true } });
+  });
+
+  let t: IntegrationTest;
+  const urlHelper = (name: string) => (): string =>
+    (Routes.namedRoutes.urlHelpersModule.instanceMethod(name)!.value as NamedRouteHelper).call({
+      _routes: Routes,
+      urlOptions: () => t.urlOptions(),
+    });
+  const adminRootUrl = urlHelper("admin_rootUrl");
+  const secureRootUrl = urlHelper("secure_rootUrl");
+  const alternateRootUrl = urlHelper("alternate_rootUrl");
+  const searchUrl = urlHelper("searchUrl");
+  const logsUrl = urlHelper("logsUrl");
+
+  const get = (path: string): Promise<void> => t.get(path);
+  const assertResponse = (type: string): void => t.assertResponse(type);
+
+  beforeEach(() => {
+    t = new IntegrationTest();
+    t.routes = Routes;
+    t.app = (env: Record<string, unknown>) => Routes.call(env);
+  });
+
+  it("constraints are copied to defaults when using constraints method", async () => {
+    expect(adminRootUrl()).toBe("http://admin.example.com/");
+
+    await get("http://admin.example.com/");
+    assertResponse("success");
+  });
+
+  it("constraints are copied to defaults when using scope constraints hash", async () => {
+    expect(secureRootUrl()).toBe("https://www.example.com/");
+
+    await get("https://www.example.com/");
+    assertResponse("success");
+  });
+
+  it("constraints are copied to defaults when using route constraints hash", async () => {
+    expect(alternateRootUrl()).toBe("http://www.example.com:8080/");
+
+    await get("http://www.example.com:8080/");
+    assertResponse("success");
+  });
+
+  it("false constraint expressions check for absence of values", async () => {
+    await get("http://example.com/search");
+    assertResponse("success");
+    expect(searchUrl()).toBe("http://example.com/search");
+
+    await get("http://api.example.com/search");
+    assertResponse("not_found");
+  });
+
+  it("true constraint expressions check for presence of values", async () => {
+    await get("http://api.example.com/logs");
+    assertResponse("success");
+    expect(logsUrl()).toBe("http://api.example.com/logs");
+
+    await get("http://example.com/logs");
+    assertResponse("not_found");
+  });
 });
 
 describe("TestInvalidUrls", () => {

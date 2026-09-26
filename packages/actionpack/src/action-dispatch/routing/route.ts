@@ -15,7 +15,7 @@ import type { RackEnv, RackResponse } from "@blazetrails/rack";
 const PATHFOR_SEPARATORS = "/.?";
 
 export interface RouteConstraints {
-  [key: string]: string | RegExp;
+  [key: string]: string | RegExp | number | boolean;
 }
 
 export type MountableApp =

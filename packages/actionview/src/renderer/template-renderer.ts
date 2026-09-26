@@ -9,7 +9,7 @@ import { AbstractRenderer, RenderedTemplate } from "./abstract-renderer.js";
 import type { RenderableTemplate, ViewContext, RenderOptions } from "./abstract-renderer.js";
 
 /** @internal */
-export class TemplateRenderer extends AbstractRenderer {
+export class TemplateRenderer<Rendered = RenderedTemplate> extends AbstractRenderer {
   /** @internal */
   protected details: Record<string, readonly (string | symbol)[]> = {};
 
@@ -17,7 +17,7 @@ export class TemplateRenderer extends AbstractRenderer {
     super(lookupContext);
   }
 
-  async render(context: ViewContext, options: RenderOptions): Promise<RenderedTemplate> {
+  async render(context: ViewContext, options: RenderOptions): Promise<Rendered> {
     this.details = this.extractDetails(options as Record<string, unknown>);
     const template = this.determineTemplate(options);
     this.prependFormats(template.format ? [template.format] : null);
@@ -75,8 +75,8 @@ export class TemplateRenderer extends AbstractRenderer {
     template: RenderableTemplate,
     layoutName: RenderOptions["layout"],
     locals: Record<string, unknown>,
-  ): Promise<RenderedTemplate> {
-    return this.renderWithLayout(view, template, layoutName, locals, (layout) =>
+  ): Promise<Rendered> {
+    return (await this.renderWithLayout(view, template, layoutName, locals, (layout) =>
       Notifications.instrument<Promise<string>>(
         "render_template.action_view",
         {
@@ -86,7 +86,7 @@ export class TemplateRenderer extends AbstractRenderer {
         },
         async () => template.render(view, locals),
       ),
-    );
+    )) as unknown as Rendered;
   }
 
   /** @internal */

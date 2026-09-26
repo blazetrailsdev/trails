@@ -1,79 +1,85 @@
 import { Notifications } from "@blazetrails/activesupport";
-import type { LookupContext } from "../lookup-context.js";
-import { RenderedTemplate } from "./abstract-renderer.js";
-import type { RenderableTemplate, ViewContext, RenderOptions } from "./abstract-renderer.js";
+import { ActionView } from "../namespaces.js";
 import { TemplateRenderer } from "./template-renderer.js";
-import type { Template } from "../template.js";
+import type {
+  RenderableTemplate,
+  RenderedTemplate,
+  RenderOptions,
+  ViewContext,
+} from "./abstract-renderer.js";
 
-type StreamableTemplate = RenderableTemplate & Pick<Template, "supportsStreaming">;
+type Buffer = (chunk: string) => void;
 
 /** @internal */
-export class StreamingTemplateRenderer extends TemplateRenderer {
-  override render(..._args: unknown[]): never {
-    throw new Error("Use renderStream() for streaming rendering.");
+export class Body {
+  /** @internal */
+  private readonly start: (buffer: Buffer) => Promise<void>;
+
+  constructor(start: (buffer: Buffer) => Promise<void>) {
+    this.start = start;
   }
 
-  async *renderStream(context: ViewContext, options: RenderOptions): AsyncGenerator<string> {
-    const locals = options.locals ?? {};
-    const keys = Object.keys(locals);
-
-    this.details = this.extractDetails(options as Record<string, unknown>);
-    const found = this.lookupContext.findAll(
-      options.template as string,
-      options.prefixes ?? [],
-      false,
-      keys,
-      this.details,
-    ) as unknown as StreamableTemplate[];
-
-    const template =
-      found.length > 0
-        ? found[0]
-        : (this.lookupContext.findTemplate(
-            options.template as string,
-            options.prefixes ?? [],
-            this.formats,
-          ) as unknown as StreamableTemplate | null);
-
-    if (!template) {
-      throw new Error(`Missing template: ${String(options.template)}`);
-    }
-
-    if (template.format) {
-      this.prependFormats([template.format]);
-    }
-
-    const layoutName = options.layout;
-
-    if (!(layoutName != null && layoutName !== false && template.supportsStreaming())) {
-      yield (await super.renderTemplate(context, template, layoutName, locals)).body;
-      return;
-    }
-
-    const layout = this.findLayout(layoutName, keys, [(this.formats[0] as string) ?? ":html"]);
-
+  async each(block: Buffer): Promise<this> {
     try {
-      yield* this.delayedRender(context, template, layout, locals);
-    } catch (err) {
-      logError(err);
-      yield streamingCompletionOnException;
+      await this.start(block);
+    } catch (exception) {
+      this.logError(exception);
+      block(ActionView.Base.streamingCompletionOnException);
     }
+    return this;
+  }
+
+  /** @internal */
+  private logError(exception: unknown): void {
+    const logger = ActionView.Base.logger as { fatal(message: string): unknown } | null;
+    if (!logger) return;
+
+    const error = exception instanceof Error ? exception : new Error(String(exception));
+    let message = `\n${error.name} (${error.message}):\n`;
+    const annotated = (error as { annotatedSourceCode?: () => unknown }).annotatedSourceCode;
+    if (typeof annotated === "function") message += String(annotated.call(error) ?? "");
+    message += "  " + (error.stack ?? "").split("\n").slice(1).join("\n  ");
+    logger.fatal(`${message}\n\n`);
+  }
+}
+
+/** @internal */
+export class StreamingTemplateRenderer extends TemplateRenderer<Body | (string | null)[]> {
+  /** @internal */
+  protected override async renderTemplate(
+    view: ViewContext,
+    template: RenderableTemplate,
+    layoutName: RenderOptions["layout"] = null,
+    locals: Record<string, unknown> = {},
+  ): Promise<Body | (string | null)[]> {
+    if (!(layoutName != null && layoutName !== false && template.supportsStreaming?.())) {
+      const rendered = await super.renderTemplate(view, template, layoutName, locals);
+      return [(rendered as unknown as RenderedTemplate).body];
+    }
+
+    locals ??= {};
+    const layout = this.findLayout(layoutName, Object.keys(locals), [
+      (this.formats[0] as string) ?? ":html",
+    ]);
+
+    return new Body((buffer) => this.delayedRender(buffer, template, layout, view, locals));
   }
 
   /**
    * @internal
    * @missingRailsCall instrument — PERMANENT
    */
-  private async *delayedRender(
-    context: ViewContext,
+  private async delayedRender(
+    buffer: Buffer,
     template: RenderableTemplate,
     layout: RenderableTemplate | null,
+    view: ViewContext,
     locals: Record<string, unknown>,
-  ): AsyncGenerator<string> {
+  ): Promise<void> {
     const sentinel = `\x00STREAM_YIELD_${Date.now()}_${Math.random()}\x00`;
     const streamingContext: ViewContext = {
-      ...context,
-      _layoutFor: (name?: string) => (name ? (context._layoutFor?.(name) ?? "") : sentinel),
+      ...view,
+      _layoutFor: (name?: string) => (name ? (view._layoutFor?.(name) ?? "") : sentinel),
     };
 
     const payload: Record<string, unknown> = {
@@ -86,8 +92,7 @@ export class StreamingTemplateRenderer extends TemplateRenderer {
 
     try {
       if (!layout) {
-        const templateBody = await template.render(context, locals);
-        yield templateBody;
+        buffer(await template.render(view, locals));
         return;
       }
 
@@ -95,21 +100,13 @@ export class StreamingTemplateRenderer extends TemplateRenderer {
       const sentinelIdx = layoutBody.indexOf(sentinel);
 
       if (sentinelIdx === -1) {
-        const templateBody = await template.render(context, locals);
-        const fullBody = layoutBody + templateBody;
-        yield fullBody;
+        buffer(layoutBody + (await template.render(view, locals)));
         return;
       }
 
-      const layoutPrefix = layoutBody.slice(0, sentinelIdx);
-      const layoutSuffix = layoutBody.slice(sentinelIdx + sentinel.length);
-
-      yield layoutPrefix;
-
-      const templateBody = await template.render(context, locals);
-      yield templateBody;
-
-      yield layoutSuffix;
+      buffer(layoutBody.slice(0, sentinelIdx));
+      buffer(await template.render(view, locals));
+      buffer(layoutBody.slice(sentinelIdx + sentinel.length));
     } catch (e) {
       payload.exception = [
         e instanceof Error ? e.name : String(e),
@@ -120,49 +117,5 @@ export class StreamingTemplateRenderer extends TemplateRenderer {
     } finally {
       handle.finish();
     }
-  }
-}
-
-/** @internal */
-const streamingCompletionOnException = "";
-
-/** @internal */
-function logError(exception: unknown): void {
-  const message =
-    exception instanceof Error ? `${exception.name}: ${exception.message}` : String(exception);
-
-  console.error(`\n${message}\n`);
-}
-
-/** @internal */
-export class StreamingBody {
-  constructor(
-    private readonly lookupContext: LookupContext,
-    private readonly context: ViewContext,
-    private readonly options: RenderOptions,
-  ) {}
-
-  async *each(): AsyncGenerator<string> {
-    const renderer = new StreamingTemplateRenderer(this.lookupContext);
-    yield* renderer.renderStream(this.context, this.options);
-  }
-
-  /** @internal */
-  async toArray(): Promise<string[]> {
-    const chunks: string[] = [];
-    for await (const chunk of this.each()) {
-      chunks.push(chunk);
-    }
-    return chunks;
-  }
-}
-
-/** @internal */
-export class StreamingRenderedTemplate extends RenderedTemplate {
-  constructor(
-    readonly streamingBody: StreamingBody,
-    template: import("./abstract-renderer.js").RenderableTemplate | null,
-  ) {
-    super("", template);
   }
 }

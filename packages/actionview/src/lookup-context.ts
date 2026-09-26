@@ -1,3 +1,5 @@
+import { I18n } from "@blazetrails/activesupport";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import type { RenderContext } from "./template/handlers.js";
 import { Base } from "./base.js";
 import { TemplateHandlers } from "./template/handlers.js";
@@ -19,7 +21,13 @@ function registerDetail(name: string, proc: DefaultProc): void {
   DEFAULT_PROCS[name] = proc;
 }
 
-registerDetail("locale", () => ["en"]);
+registerDetail("locale", () => {
+  const locales: (string | symbol)[] = [I18n.locale() as string];
+  if (rbObjRespondTo(I18n, "fallbacks"))
+    locales.push(...I18n.fallbacks().get(I18n.locale() as string));
+  locales.push(I18n.defaultLocale());
+  return [...new Set(locales)];
+});
 registerDetail(
   "formats",
   () => Base.defaultFormats ?? [":html", ":text", ":js", ":css", ":xml", ":json"],
