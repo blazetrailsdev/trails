@@ -199,6 +199,7 @@ class UrlHelper {
     }
   }
 
+  /** @missingRailsCall requirements — CONVERGEABLE mapping-requirements-normalize-format-feed-optimize-helper */
   static isOptimizeHelper(route: Route): boolean {
     return Object.keys(route.pathConstraints).length === 0 && !route.isGlob();
   }
@@ -225,7 +226,7 @@ class UrlHelper {
     innerOptions: Record<string, unknown> | undefined,
     urlStrategy: UrlStrategy,
   ): string {
-    const controllerOptions = t.urlOptions?.() ?? {};
+    const controllerOptions = t.urlOptions();
     const options: Record<string, unknown> = { ...controllerOptions, ...this.options };
     const hash = this.handlePositionalArgs(controllerOptions, innerOptions ?? {}, args, options, [
       ...this.segmentKeys,
@@ -289,7 +290,7 @@ class OptimizedUrlHelper extends UrlHelper {
     urlStrategy: UrlStrategy,
   ): string {
     if (args.length === this.argSize && !innerOptions && this.optimizeRoutesGeneration(t)) {
-      const options: Record<string, unknown> = { ...(t.urlOptions?.() ?? {}), ...this.options };
+      const options: Record<string, unknown> = { ...t.urlOptions(), ...this.options };
       let path = this.optimizedHelper(args);
       const trailingSlash = options["trailingSlash"];
       if (trailingSlash != null && trailingSlash !== false && !path.endsWith("/")) path += "/";
@@ -377,7 +378,7 @@ export const RESERVED_OPTIONS: readonly string[] = [
 
 export interface UrlHelperContext {
   _routes: RouteSet;
-  urlOptions?(): Record<string, unknown>;
+  urlOptions(): Record<string, unknown>;
   optimizeRoutesGeneration(): boolean;
 }
 
