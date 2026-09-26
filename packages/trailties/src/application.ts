@@ -218,7 +218,8 @@ export class Application extends Engine {
   async credentials(): Promise<EncryptedFile> {
     if (this._credentials) return this._credentials;
     const c = this.config.credentials;
-    const def = await credentialsDefaults(await this.root());
+    await this.root();
+    const def = await this.config.credentialsDefaults();
     return (this._credentials = await this.encrypted(c.contentPath ?? def.contentPath, {
       keyPath: c.keyPath ?? def.keyPath,
     }));
@@ -272,21 +273,6 @@ export class Application extends Engine {
       throw new RuntimeError(`Could not load configuration. No such file - ${yaml}.ts`);
     }
   }
-}
-
-async function credentialsDefaults(
-  root: string,
-): Promise<{ contentPath: string; keyPath: string }> {
-  const path = getPath();
-  const fs = getFs();
-  let contentPath = path.resolve(root, `config/credentials/${Trails.env}.yml.enc`);
-  if (!(await fs.exists(contentPath)))
-    contentPath = path.resolve(root, "config/credentials.yml.enc");
-
-  let keyPath = path.resolve(root, `config/credentials/${Trails.env}.key`);
-  if (!(await fs.exists(keyPath))) keyPath = path.resolve(root, "config/master.key");
-
-  return { contentPath: contentPath, keyPath: keyPath };
 }
 
 Object.defineProperty(Application, "name", { value: "Rails::Application" });

@@ -208,6 +208,7 @@ describe("RailtieTest (trails-only)", () => {
           disablePreparedStatements: disablePreparedStatements(),
           tagsFormatter: queryLogs.tagsFormatter,
           application: queryLogs.taggings.application,
+          taggingKeys: Object.keys(queryLogs.taggings),
         };
       } finally {
         Trails.application = null;
@@ -233,6 +234,14 @@ describe("RailtieTest (trails-only)", () => {
       expect(booted.transformers).toContain(queryLogs);
       expect(booted.disablePreparedStatements).toBe(true);
       expect(booted.application).toBe("BlogApplication");
+      expect(booted.taggingKeys).toEqual([
+        "application",
+        "pid",
+        "socket",
+        "db_host",
+        "database",
+        "source_location",
+      ]);
     });
 
     it("config.loadDefaults 7.1 makes the tags formatter sqlcommenter on a booted app", async () => {

@@ -298,11 +298,11 @@ export class Trailtie extends BaseTrailtie {
             pid: () => Process.pid.toString(),
             socket: (context) =>
               (context as unknown as QueryLogsContext).connection.pool.dbConfig.socket,
-            dbHost: (context) =>
+            db_host: (context) =>
               (context as unknown as QueryLogsContext).connection.pool.dbConfig.host,
             database: (context) =>
               (context as unknown as QueryLogsContext).connection.pool.dbConfig.database,
-            sourceLocation: () => queryLogs.querySourceLocation(),
+            source_location: () => queryLogs.querySourceLocation(),
           };
           ActiveRecord.setDisablePreparedStatements(true);
 
