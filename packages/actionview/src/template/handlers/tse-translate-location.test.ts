@@ -1,9 +1,9 @@
+import { tokenize } from "@blazetrails/activesupport";
 import { describe, it, expect } from "vitest";
 import {
   LocationParsingError,
   findOffset,
   sourceLines,
-  tokenizeLine,
   translateLocation,
 } from "./tse-translate-location.js";
 
@@ -15,100 +15,22 @@ describe("sourceLines", () => {
   });
 });
 
-describe("tokenizeLine", () => {
-  it("yields CODE for tag contents (trimmed, matching the compiler) and TEXT for static spans", () => {
-    expect(tokenizeLine("hi <%= name %>!")).toEqual([
-      { kind: "TEXT", value: "hi " },
-      { kind: "OPEN", value: "<%= " },
-      { kind: "CODE", value: "name" },
-      { kind: "CLOSE", value: " %>" },
-      { kind: "TEXT", value: "!" },
-    ]);
-  });
-
-  it("strips the trim `-` markers from CODE bounds", () => {
-    expect(tokenizeLine("<%- x -%>")).toEqual([
-      { kind: "OPEN", value: "<%- " },
-      { kind: "CODE", value: "x" },
-      { kind: "CLOSE", value: " -%>" },
-    ]);
-  });
-
-  it("consumes following `[ \\t]*\\r?\\n` after a `-%>` tag (trim-right parity with the lexer)", () => {
-    expect(tokenizeLine("<%= x -%>\n")).toEqual([
-      { kind: "OPEN", value: "<%= " },
-      { kind: "CODE", value: "x" },
-      { kind: "CLOSE", value: " -%>\n" },
-    ]);
-    expect(tokenizeLine("a <%= x -%>  \nb")).toEqual([
-      { kind: "TEXT", value: "a " },
-      { kind: "OPEN", value: "<%= " },
-      { kind: "CODE", value: "x" },
-      { kind: "CLOSE", value: " -%>  \n" },
-      { kind: "TEXT", value: "b" },
-    ]);
-  });
-
-  it("strips trailing `[ \\t]*` from preceding TEXT when a `<%-` tag opens", () => {
-    expect(tokenizeLine("hi   \t<%- x %> after")).toEqual([
-      { kind: "TEXT", value: "hi" },
-      { kind: "OPEN", value: "   \t<%- " },
-      { kind: "CODE", value: "x" },
-      { kind: "CLOSE", value: " %>" },
-      { kind: "TEXT", value: " after" },
-    ]);
-  });
-
-  it("returns an empty token list for a line with no tags and no text", () => {
-    expect(tokenizeLine("")).toEqual([]);
-  });
-
-  it("drops `<%# ... %>` comments — they're absent from compiled output", () => {
-    expect(tokenizeLine("a <%# note %> <%= x %>")).toEqual([
-      { kind: "TEXT", value: "a " },
-      { kind: "OPEN", value: "<%# note %>" },
-      { kind: "TEXT", value: " " },
-      { kind: "OPEN", value: "<%= " },
-      { kind: "CODE", value: "x" },
-      { kind: "CLOSE", value: " %>" },
-    ]);
-  });
-
-  it("drops `<%! types: ... !%>` typesMagic blocks", () => {
-    expect(tokenizeLine("pre <%! types: T !%> <%= x %>")).toEqual([
-      { kind: "TEXT", value: "pre " },
-      { kind: "OPEN", value: "<%! types: T !%>" },
-      { kind: "TEXT", value: " " },
-      { kind: "OPEN", value: "<%= " },
-      { kind: "CODE", value: "x" },
-      { kind: "CLOSE", value: " %>" },
-    ]);
-  });
-
-  it("treats `<%%` / `%%>` as literal TEXT, not as code-tag delimiters", () => {
-    expect(tokenizeLine("a <%% b %%> c")).toEqual([{ kind: "TEXT", value: "a <% b %> c" }]);
-    expect(tokenizeLine("<%% <%= x %> %%>")).toEqual([
-      { kind: "TEXT", value: "<% " },
-      { kind: "OPEN", value: "<%= " },
-      { kind: "CODE", value: "x" },
-      { kind: "CLOSE", value: " %>" },
-      { kind: "TEXT", value: " %>" },
-    ]);
-  });
-});
-
 describe("findOffset", () => {
   it("returns the source-line column for a CODE token matched in compiled output", () => {
-    const tokens = tokenizeLine("<%= name %>");
-    const compiled = "_ob.append(name);";
+    const tokens = tokenize("<%= name %>");
+    const compiled = "_ob.append( name );";
     const errorColumn = compiled.indexOf("name");
     expect(findOffset(compiled, tokens, errorColumn)).toBe(4);
   });
 
+  it("counts a `<%%` OPEN token at its own width", () => {
+    const tokens = tokenize("a <%% b %> <%= x %>");
+    const compiled = '_ob.safeAppend("a <% b %> "); _ob.append( x );';
+    expect(findOffset(compiled, tokens, compiled.indexOf("x )"))).toBe(15);
+  });
+
   it("throws LocationParsingError when no anchor is found", () => {
-    expect(() => findOffset("nothing here", tokenizeLine("<%= x %>"), 0)).toThrow(
-      LocationParsingError,
-    );
+    expect(() => findOffset("nothing here", tokenize("<%= x %>"), 0)).toThrow(LocationParsingError);
   });
 });
 
@@ -116,14 +38,15 @@ describe("translateLocation", () => {
   it("mutates and returns the spot on success", () => {
     const source = "line1\n<%= value %>\n";
     const spot = {
-      snippet: "_ob.append(value);",
+      snippet: "_ob.append( value );",
       firstLineno: 2,
       lastLineno: 2,
-      firstColumn: 11,
-      lastColumn: 16,
+      firstColumn: 12,
+      lastColumn: 17,
     };
     const out = translateLocation(spot, { lineno: 2 }, source);
     expect(out).toBe(spot);
+    expect(out!.firstColumn).toBe(4);
     expect(out!.scriptLines).toEqual(["line1\n", "<%= value %>\n"]);
   });
 

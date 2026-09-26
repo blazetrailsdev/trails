@@ -38,6 +38,10 @@ describe("ExceptionWrapper template spots", () => {
       raised = e;
     }
     expect((raised as TemplateError).lineNumber()).toBe(2);
+    const frames = ((raised as Error).cause as Error)
+      .stack!.split("\n")
+      .filter((l) => l.includes(template.methodName()));
+    expect(frames).toHaveLength(1);
     const wrapper = new ExceptionWrapper(null, (raised as Error).cause as Error);
     const extract = wrapper.sourceExtracts.find((e) => e.file.includes(template.methodName()));
 

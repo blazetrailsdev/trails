@@ -7,7 +7,7 @@ describe("compileJs", () => {
     expect(code).toBe(
       [
         "export default function render(context, locals) { const _ob = context.outputBuffer;" +
-          ' _ob.safeAppend("<h1>"); _ob.append(name); _ob.safeAppend("</h1>");',
+          ' _ob.safeAppend("<h1>"); _ob.append( name ); _ob.safeAppend("</h1>");',
         "return _ob;",
         "}",
         "",
@@ -18,16 +18,18 @@ describe("compileJs", () => {
   it("emits each template line's code on the same line of the compiled source", () => {
     const { code } = compileJs("first line\n<%= boom() %>\n<% if (x) { %>\n<% } %>last\n");
     const lines = code.split("\n");
-    expect(lines[1]).toContain("_ob.append(boom());");
+    expect(lines[1]).toContain("_ob.append( boom() );");
     expect(lines[2]).toContain("if (x) {");
     expect(lines[3]).toContain('_ob.safeAppend("last\\n");');
   });
 
   it("dispatches expression sites by escape mode and indicator", () => {
-    expect(compileJs("<%= n %>").code).toContain("_ob.append(n);");
-    expect(compileJs("<%= n %>", { escapeIgnore: true }).code).toContain("_ob.safeExprAppend(n);");
-    expect(compileJs("<%== n %>").code).toContain("_ob.safeExprAppend(n);");
-    expect(compileJs("<% const x = 1 %>").code).toContain("const x = 1;");
+    expect(compileJs("<%= n %>").code).toContain("_ob.append( n );");
+    expect(compileJs("<%= n %>", { escapeIgnore: true }).code).toContain(
+      "_ob.safeExprAppend( n );",
+    );
+    expect(compileJs("<%== n %>").code).toContain("_ob.safeExprAppend( n );");
+    expect(compileJs("<% const x = 1 %>").code).toContain(" const x = 1 ;");
   });
 
   it("emits block-expr with capture wrapper so inner writes go to capture buffer", () => {
@@ -37,7 +39,7 @@ describe("compileJs", () => {
       [
         "export default function render(context, locals) { const _ob = context.outputBuffer;" +
           " _ob.append(forEach(items, (item) => context.capture(() => {" +
-          ' context.outputBuffer.safeAppend("<li>"); context.outputBuffer.append(item);' +
+          ' context.outputBuffer.safeAppend("<li>"); context.outputBuffer.append( item );' +
           ' context.outputBuffer.safeAppend("</li>"); })));',
         "return _ob;",
         "}",

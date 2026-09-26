@@ -3,8 +3,6 @@ import { Base } from "../../base.js";
 import { TemplateHandlers } from "../handlers.js";
 import { Tse, type TseImplementation } from "./tse.js";
 
-const methodName = (): string => "_t";
-
 describe("Template::Handlers::Tse", () => {
   const originalImpl = Tse.implementation;
   const originalEscapeIgnore = Tse.escapeIgnoreList;
@@ -42,40 +40,37 @@ describe("Template::Handlers::Tse", () => {
   });
 
   it("compiles a static template to a JS render module", () => {
-    const code = new Tse().call({ methodName, type: "text/html" }, "<h1>hi</h1>");
-    expect(code).toContain("function _t(");
+    const code = new Tse().call({ type: "text/html" }, "<h1>hi</h1>");
+    expect(code).not.toMatch(/\bfunction\b/);
     expect(code).toContain("safeAppend");
     expect(code).toContain("<h1>hi</h1>");
   });
 
   it("leaves strict-locals binding to Template#compile", () => {
-    const code = new Tse().call(
-      { methodName, type: "text/html" },
-      "<%# locals: (name:) %><%= name %>",
-    );
+    const code = new Tse().call({ type: "text/html" }, "<%# locals: (name:) %><%= name %>");
     expect(code).not.toContain("import ");
     expect(code).not.toContain("StrictLocalsError");
-    expect(() => new Function("localAssigns", `return ${code}`)).not.toThrow();
+    expect(() => new Function("localAssigns", code)).not.toThrow();
   });
 
   it("emits the escaping append for html templates", () => {
-    const code = new Tse().call({ methodName, type: "text/html" }, "<%= name %>");
-    expect(code).toMatch(/_ob\.append\(name\)/);
+    const code = new Tse().call({ type: "text/html" }, "<%= name %>");
+    expect(code).toMatch(/_ob\.append\( name \)/);
   });
 
   it("emits the non-escaping append for templates in escapeIgnoreList", () => {
-    const code = new Tse().call({ methodName, type: "text/plain" }, "<%= name %>");
-    expect(code).toMatch(/_ob\.safeExprAppend\(name\)/);
+    const code = new Tse().call({ type: "text/plain" }, "<%= name %>");
+    expect(code).toMatch(/_ob\.safeExprAppend\( name \)/);
   });
 
   it("treats unknown template.type as escaping (not in ignore list)", () => {
-    const code = new Tse().call({ methodName, type: "application/json" }, "<%= name %>");
-    expect(code).toMatch(/_ob\.append\(name\)/);
+    const code = new Tse().call({ type: "application/json" }, "<%= name %>");
+    expect(code).toMatch(/_ob\.append\( name \)/);
   });
 
   it("treats missing template.type as escaping", () => {
-    const code = new Tse().call({ methodName }, "<%= name %>");
-    expect(code).toMatch(/_ob\.append\(name\)/);
+    const code = new Tse().call({}, "<%= name %>");
+    expect(code).toMatch(/_ob\.append\( name \)/);
   });
 
   it("strips a single trailing newline when stripTrailingNewlines is enabled", () => {
@@ -86,11 +81,11 @@ describe("Template::Handlers::Tse", () => {
     }) as TseImplementation;
 
     Tse.stripTrailingNewlines = true;
-    new Tse().call({ methodName, type: "text/html" }, "hello\n");
+    new Tse().call({ type: "text/html" }, "hello\n");
     expect(captured[0]).toBe("hello");
 
     Tse.stripTrailingNewlines = false;
-    new Tse().call({ methodName, type: "text/html" }, "hello\n");
+    new Tse().call({ type: "text/html" }, "hello\n");
     expect(captured[1]).toBe("hello\n");
   });
 
@@ -102,9 +97,9 @@ describe("Template::Handlers::Tse", () => {
     }) as TseImplementation;
     Tse.stripTrailingNewlines = true;
 
-    new Tse().call({ methodName, type: "text/html" }, "a\n");
-    new Tse().call({ methodName, type: "text/html" }, "b\r\n");
-    new Tse().call({ methodName, type: "text/html" }, "c\r");
+    new Tse().call({ type: "text/html" }, "a\n");
+    new Tse().call({ type: "text/html" }, "b\r\n");
+    new Tse().call({ type: "text/html" }, "c\r");
     expect(captured).toEqual(["a", "b", "c"]);
   });
 
@@ -115,25 +110,25 @@ describe("Template::Handlers::Tse", () => {
       return { code: "STUB", localsSignature: null, typesAnnotation: null };
     }) as TseImplementation;
 
-    const out = new Tse().call({ methodName, type: "text/plain" }, "src");
-    expect(out).toBe("(STUB)(this, localAssigns)");
+    const out = new Tse().call({ type: "text/plain" }, "src");
+    expect(out).toBe("STUB");
     expect(calls).toEqual([{ source: "src", escapeIgnore: true }]);
   });
 
   it("Tse.call delegates to a fresh instance", () => {
-    const code = Tse.call({ methodName, type: "text/html" }, "<%= name %>");
-    expect(code).toMatch(/_ob\.append\(name\)/);
+    const code = Tse.call({ type: "text/html" }, "<%= name %>");
+    expect(code).toMatch(/_ob\.append\( name \)/);
   });
 
   describe("translateLocation", () => {
     it("anchors a compiled spot to the source-line column (Rails parity)", () => {
       const source = "<h1>hi</h1>\n<%= name %>\n";
       const spot = {
-        snippet: "_ob.append(name);",
+        snippet: "_ob.append( name );",
         firstLineno: 2,
         lastLineno: 2,
-        firstColumn: 11,
-        lastColumn: 15,
+        firstColumn: 12,
+        lastColumn: 16,
       };
       const out = new Tse().translateLocation(spot, { lineno: 2 }, source);
       expect(out).not.toBeNull();
@@ -168,7 +163,6 @@ describe("Template::Handlers::Tse", () => {
     it("defaults to false — no annotation comments emitted", () => {
       const code = new Tse().call(
         {
-          methodName,
           type: "text/html",
           format: ":html",
           shortIdentifier: "app/views/posts/show.html.tse",
@@ -183,7 +177,7 @@ describe("Template::Handlers::Tse", () => {
       Base.annotateRenderedViewWithFilenames = true;
       const id = "app/views/posts/show.html.tse";
       const code = new Tse().call(
-        { methodName, type: "text/html", format: ":html", shortIdentifier: id },
+        { type: "text/html", format: ":html", shortIdentifier: id },
         "<h1>hi</h1>",
       );
       expect(code).toContain(`_ob.safeAppend("<!-- BEGIN ${id} -->");`);
@@ -195,7 +189,6 @@ describe("Template::Handlers::Tse", () => {
       Base.annotateRenderedViewWithFilenames = true;
       const code = new Tse().call(
         {
-          methodName,
           type: "application/json",
           format: ":json",
           shortIdentifier: "app/views/posts/show.json.tse",
@@ -209,7 +202,6 @@ describe("Template::Handlers::Tse", () => {
       Base.annotateRenderedViewWithFilenames = true;
       const code = new Tse().call(
         {
-          methodName,
           type: "text/plain",
           format: ":text",
           shortIdentifier: "app/views/mailer/body.text.tse",
@@ -221,10 +213,7 @@ describe("Template::Handlers::Tse", () => {
 
     it("does not annotate when shortIdentifier is absent", () => {
       Base.annotateRenderedViewWithFilenames = true;
-      const code = new Tse().call(
-        { methodName, type: "text/html", format: ":html" },
-        "<h1>hi</h1>",
-      );
+      const code = new Tse().call({ type: "text/html", format: ":html" }, "<h1>hi</h1>");
       expect(code).not.toContain("BEGIN");
     });
 
@@ -232,13 +221,13 @@ describe("Template::Handlers::Tse", () => {
       Base.annotateRenderedViewWithFilenames = true;
       const id = "app/views/posts/index.html.tse";
       const code = new Tse().call(
-        { methodName, type: "text/html", format: ":html", shortIdentifier: id },
+        { type: "text/html", format: ":html", shortIdentifier: id },
         "<p>items</p>",
       );
-      const fnStart = code.indexOf("export default function render");
+      const fnStart = code.indexOf("const context = this;");
       const beginPos = code.indexOf("BEGIN");
       const endPos = code.indexOf("END");
-      const fnEnd = code.lastIndexOf("}");
+      const fnEnd = code.lastIndexOf("return _ob;");
       expect(beginPos).toBeGreaterThan(fnStart);
       expect(endPos).toBeLessThan(fnEnd);
     });

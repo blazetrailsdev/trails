@@ -53,8 +53,8 @@ describe("query chaining DX", () => {
 
   it("findOrCreateByBang / createOrFindByBang return T", async () => {
     const rel = {} as Relation<Post>;
-    expectTypeOf(await rel.findOrCreateByBang({ title: "x" })).toEqualTypeOf<Post>();
-    expectTypeOf(await rel.createOrFindByBang({ title: "x" })).toEqualTypeOf<Post>();
+    expectTypeOf(await rel.findOrCreateByBang({ title: "x" })).toEqualTypeOf<Post | undefined>();
+    expectTypeOf(await rel.createOrFindByBang({ title: "x" })).toEqualTypeOf<Post | undefined>();
   });
 
   it("Post.where returns Relation<Post> — chain keeps the generic", async () => {

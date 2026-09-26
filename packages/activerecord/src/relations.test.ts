@@ -1933,10 +1933,10 @@ describe("RelationTest", () => {
   it("find or create by", async () => {
     expect(await Bird.findBy({ name: "bob" })).toBeNull();
 
-    const bird = await Bird.findOrCreateBy({ name: "bob" });
+    const bird = (await Bird.findOrCreateBy({ name: "bob" }))!;
     assertPredicate(bird, (b) => b.isPersisted());
 
-    expect((await Bird.findOrCreateBy({ name: "bob" })).equals(bird)).toBe(true);
+    expect((await Bird.findOrCreateBy({ name: "bob" }))!.equals(bird)).toBe(true);
   });
 
   it("find or create by race condition", async () => {
@@ -1953,7 +1953,7 @@ describe("RelationTest", () => {
     vi.spyOn(Relation.prototype as any, "findBy").mockImplementation(findByMock as any);
     vi.spyOn(Relation.prototype as any, "findByBang").mockImplementation(findByMock as any);
 
-    expect((await relation.findOrCreateBy({ nick: "bob" })).equals(bob)).toBe(true);
+    expect((await relation.findOrCreateBy({ nick: "bob" }))!.equals(bob)).toBe(true);
 
     assertPredicate(results, (r) => r.length === 0);
   });
@@ -1961,12 +1961,12 @@ describe("RelationTest", () => {
   it("find or create by with create with", async () => {
     expect(await Bird.findBy({ name: "bob" })).toBeNull();
 
-    const bird = await Bird.createWith({ color: "green" }).findOrCreateBy({ name: "bob" });
+    const bird = (await Bird.createWith({ color: "green" }).findOrCreateBy({ name: "bob" }))!;
     assertPredicate(bird, (b) => b.isPersisted());
     expect(bird.color).toBe("green");
 
     expect(
-      (await Bird.createWith({ color: "blue" }).findOrCreateBy({ name: "bob" })).equals(bird),
+      (await Bird.createWith({ color: "blue" }).findOrCreateBy({ name: "bob" }))!.equals(bird),
     ).toBe(true);
   });
 
@@ -1980,7 +1980,7 @@ describe("RelationTest", () => {
     expect(bird.name).toBe("bob");
     expect(bird.color).toBe("blue");
 
-    expect((await Bird.findOrCreateBy({ name: "bob", color: "blue" })).equals(bird)).toBe(true);
+    expect((await Bird.findOrCreateBy({ name: "bob", color: "blue" }))!.equals(bird)).toBe(true);
   });
 
   it("find or create by!", async () => {
@@ -1990,8 +1990,8 @@ describe("RelationTest", () => {
   it("create or find by", async () => {
     expect(await Subscriber.findBy({ nick: "bob" })).toBeNull();
     const subscriber = await Subscriber.createBang({ nick: "bob" });
-    expect((await Subscriber.createOrFindBy({ nick: "bob" })).nick).toBe(subscriber.nick);
-    expect((await Subscriber.createOrFindBy({ nick: "cat" })).nick).not.toBe(subscriber.nick);
+    expect((await Subscriber.createOrFindBy({ nick: "bob" }))!.nick).toBe(subscriber.nick);
+    expect((await Subscriber.createOrFindBy({ nick: "cat" }))!.nick).not.toBe(subscriber.nick);
   });
 
   it("create or find by with block", async () => {
@@ -2007,14 +2007,14 @@ describe("RelationTest", () => {
     expect(subscriber.nick).toBe("bob");
     expect(subscriber.name).toBe("the builder");
     assertPredicate(subscriber, (s: Subscriber) => s.isPersisted());
-    expect((await Subscriber.createOrFindBy({ nick: "bob" })).equals(subscriber)).toBe(true);
-    expect((await Subscriber.createOrFindBy({ nick: "cat" })).equals(subscriber)).not.toBe(true);
+    expect((await Subscriber.createOrFindBy({ nick: "bob" }))!.equals(subscriber)).toBe(true);
+    expect((await Subscriber.createOrFindBy({ nick: "cat" }))!.equals(subscriber)).not.toBe(true);
   });
 
   it("create or find by should not raise due to validation errors", async () => {
     await expect(
       (async () => {
-        const bird = await Bird.createOrFindBy({ color: "green" });
+        const bird = (await Bird.createOrFindBy({ color: "green" }))!;
         expect(await bird.isInvalid()).toBeTruthy();
       })(),
     ).resolves.not.toThrow();
@@ -2032,16 +2032,16 @@ describe("RelationTest", () => {
     expect(await Subscriber.findBy({ nick: "bob" })).toBeNull();
     const subscriber = await Subscriber.createBang({ nick: "bob" });
     await Subscriber.transaction(async () => {
-      expect((await Subscriber.createOrFindBy({ nick: "bob" })).nick).toBe(subscriber.nick);
-      expect((await Subscriber.createOrFindBy({ nick: "cat" })).nick).not.toBe(subscriber.nick);
+      expect((await Subscriber.createOrFindBy({ nick: "bob" }))!.nick).toBe(subscriber.nick);
+      expect((await Subscriber.createOrFindBy({ nick: "cat" }))!.nick).not.toBe(subscriber.nick);
     });
   });
 
   it("create or find by with bang", async () => {
     expect(await Subscriber.findBy({ nick: "bob" })).toBeNull();
     const subscriber = await Subscriber.createBang({ nick: "bob" });
-    expect((await Subscriber.createOrFindByBang({ nick: "bob" })).nick).toBe(subscriber.nick);
-    expect((await Subscriber.createOrFindByBang({ nick: "cat" })).nick).not.toBe(subscriber.nick);
+    expect((await Subscriber.createOrFindByBang({ nick: "bob" }))!.nick).toBe(subscriber.nick);
+    expect((await Subscriber.createOrFindByBang({ nick: "cat" }))!.nick).not.toBe(subscriber.nick);
   });
 
   it("create or find by with bang should raise due to validation errors", async () => {
@@ -2060,8 +2060,10 @@ describe("RelationTest", () => {
     expect(await Subscriber.findBy({ nick: "bob" })).toBeNull();
     const subscriber = await Subscriber.createBang({ nick: "bob" });
     await Subscriber.transaction(async () => {
-      expect((await Subscriber.createOrFindByBang({ nick: "bob" })).nick).toBe(subscriber.nick);
-      expect((await Subscriber.createOrFindByBang({ nick: "cat" })).nick).not.toBe(subscriber.nick);
+      expect((await Subscriber.createOrFindByBang({ nick: "bob" }))!.nick).toBe(subscriber.nick);
+      expect((await Subscriber.createOrFindByBang({ nick: "cat" }))!.nick).not.toBe(
+        subscriber.nick,
+      );
     });
   });
 

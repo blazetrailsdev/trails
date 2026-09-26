@@ -28,8 +28,8 @@ class FakeTemplate {
   }
 }
 
-const Neckbeard: TemplateHandler = { extensions: ["neckbeard"], call: (_t, source) => source };
-const Bowtie: TemplateHandler = { extensions: ["bowtie"], call: (_t, source) => source };
+const Neckbeard: TemplateHandler = { call: (_t, source) => source };
+const Bowtie: TemplateHandler = { call: (_t, source) => source };
 
 function asTemplate(template: FakeTemplate): Template {
   return template as unknown as Template;

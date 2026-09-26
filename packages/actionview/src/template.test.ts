@@ -10,8 +10,8 @@ import { Raw } from "./template/handlers/raw.js";
 import { Tse } from "./template/handlers/tse.js";
 
 const echo: TemplateHandler = {
-  extensions: ["txt"],
-  call: (_template, source) => JSON.stringify(`${source}::`) + " + JSON.stringify(localAssigns)",
+  call: (_template, source) =>
+    `return ${JSON.stringify(`${source}::`)} + JSON.stringify(localAssigns);`,
 };
 
 const view = (): Base => new (Base.withEmptyTemplateCache())(null, {}, null);
@@ -62,7 +62,6 @@ describe("ActionView::Template (smoke)", () => {
       identifier: "y",
       extension: "txt",
       handler: {
-        extensions: ["txt"],
         call: () => {
           throw new Error("boom");
         },
@@ -72,7 +71,7 @@ describe("ActionView::Template (smoke)", () => {
   });
 
   it("render returns nil when given a buffer and the _run result verbatim otherwise", () => {
-    const handler: TemplateHandler = { extensions: ["txt"], call: () => "42" };
+    const handler: TemplateHandler = { call: () => "return 42;" };
     const t = new Template({ source: "hi", identifier: "z", extension: "txt", handler });
     expect(t.render(view(), {})).toBe(42);
 
@@ -103,7 +102,7 @@ describe("ActionView::Template (smoke)", () => {
       source: "x",
       identifier: "posts/show",
       extension: "txt",
-      handler: { extensions: ["txt"], call: () => "((((" },
+      handler: { call: () => "((((" },
     });
     let raised: unknown;
     try {
@@ -122,7 +121,7 @@ describe("ActionView::Template (smoke)", () => {
       source: "one\ntwo",
       identifier: "posts/show",
       extension: "txt",
-      handler: { extensions: ["txt"], call: () => "((((" },
+      handler: { call: () => "((((" },
     });
     let raised: unknown;
     try {

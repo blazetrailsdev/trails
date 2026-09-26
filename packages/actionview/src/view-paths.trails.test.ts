@@ -112,8 +112,7 @@ describe("ViewPaths", () => {
 
   test("an appended resolver is searched by template_exists?", () => {
     TemplateHandlers.registerTemplateHandler("tse", {
-      extensions: ["tse"],
-      call: () => '""',
+      call: () => 'return "";',
     });
     const resolver = new FixtureResolver({ "posts/index.html.tse": "hello" });
     PostsController.viewPaths([]);

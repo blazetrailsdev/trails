@@ -30,8 +30,7 @@ async function dispatch(c: Base, action: string): Promise<unknown> {
 
 beforeAll(() => {
   TemplateHandlers.registerTemplateHandler("html", {
-    extensions: ["html"],
-    call: (_template: unknown, source: string) => JSON.stringify(source),
+    call: (_template: unknown, source: string) => `return ${JSON.stringify(source)};`,
   });
   DefaultLayoutController.prependViewPath(
     new FixtureResolver({

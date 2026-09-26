@@ -356,7 +356,7 @@ export class Template {
     const parameters = methodParameters(methodArguments);
     const scope = setStrictLocals != null ? "__strictLocals" : "localAssigns";
 
-    return `Object.assign(function ${this.methodName()}(localAssigns, outputBuffer, __kwargs = {}, _) {${setStrictLocals != null ? kwargsCode(parameters) : ""} this.virtualPath = ${JSON.stringify(this.virtualPath)}; const __yield = _ ? { get yield() { return _(); } } : {}; with (this) { with (__yield) { with (${scope}) {${this.localsCode()} return ${code};
+    return `Object.assign(function ${this.methodName()}(localAssigns, outputBuffer, __kwargs = {}, _) {${setStrictLocals != null ? kwargsCode(parameters) : ""} this.virtualPath = ${JSON.stringify(this.virtualPath)}; const __yield = _ ? { get yield() { return _(); } } : {}; with (this) { with (__yield) { with (${scope}) {${this.localsCode()} ${code}
   } } }
 }, { parameters: ${JSON.stringify(parameters.map(([type, name]) => (name === undefined ? [type] : [type, name])))} })`;
   }

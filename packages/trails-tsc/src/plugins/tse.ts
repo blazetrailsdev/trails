@@ -77,6 +77,7 @@ function contextYield(value: string): string {
 }
 
 function emitNode(node: TseAst["nodes"][number]): string {
+  if (node.kind !== "text") node = { ...node, value: node.value.trim() };
   switch (node.kind) {
     case "text":
       return `  _ob.safeAppend(${JSON.stringify(node.value)});`;

@@ -206,7 +206,7 @@ describe("RelationTest", () => {
 
   it("create with value", async () => {
     const rel = CanonPost.all().createWith({ body: "default" });
-    const post = await rel.findOrCreateBy({ title: "reltest-cwv" });
+    const post = (await rel.findOrCreateBy({ title: "reltest-cwv" }))!;
     expect(post.body).toBe("default");
   });
 
