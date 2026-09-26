@@ -554,7 +554,7 @@ describe("LegacyRouteSetTests", () => {
     });
 
     expect(await rackGet(rs, "http://www.example.org/foo/")).toBe("default");
-    expect(scopeCalled).toBe(true);
+    expect(scopeCalled).toBeTruthy();
   });
 
   it("scoped lambda with get lambda", async () => {
@@ -578,7 +578,7 @@ describe("LegacyRouteSetTests", () => {
     });
 
     expect(await rackGet(rs, "http://www.example.org/foo/")).toBe("default");
-    expect(innerCalled).toBe(true);
+    expect(innerCalled).toBeTruthy();
   });
 
   it.skip("default setup", () => {});
