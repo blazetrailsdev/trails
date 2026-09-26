@@ -14,7 +14,7 @@ function digitValue(c: string): number {
 }
 
 /**
- * `rb_int_parse_cstr` (`vendor/ruby/bignum.c:4074`) without `badcheck`: optional
+ * `rb_int_parse_cstr` (`vendor/ruby/v3.3.11/bignum.c:4074`) without `badcheck`: optional
  * leading whitespace and sign, a radix prefix, then digits with single
  * underscores between them; whatever cannot be read answers 0. A base of 0
  * or below reads the prefix (`0x`, `0b`, `0o`, `0d`, a bare `0` for octal),
@@ -73,7 +73,7 @@ export function rbIntParseCstr(str: string, base: number): number | bigint {
 }
 
 /**
- * `String#to_i` (`vendor/ruby/string.c:6602` `rb_str_to_i`).
+ * `String#to_i` (`vendor/ruby/v3.3.11/string.c:6602` `rb_str_to_i`).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -85,7 +85,7 @@ export function rbStrToI(str: string, ...args: unknown[]): number | bigint {
 }
 
 /**
- * `String#hex` (`vendor/ruby/string.c:10183` `rb_str_hex`).
+ * `String#hex` (`vendor/ruby/v3.3.11/string.c:10183` `rb_str_hex`).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -94,7 +94,7 @@ export function rbStrHex(str: string): number | bigint {
 }
 
 /**
- * `String#oct` (`vendor/ruby/string.c:10210` `rb_str_oct`): octal, unless a
+ * `String#oct` (`vendor/ruby/v3.3.11/string.c:10210` `rb_str_oct`): octal, unless a
  * radix prefix says otherwise.
  *
  * @noRailsEquivalent PERMANENT
@@ -107,8 +107,8 @@ const FLOAT_PREFIX =
   /^[\t\n\v\f\r ]*([+-]?(?:\d+(?:_\d+)*(?:\.\d+(?:_\d+)*)?|\.\d+(?:_\d+)*)(?:[eE][+-]?\d+(?:_\d+)*)?)/;
 
 /**
- * `String#to_f` (`vendor/ruby/string.c:6633` `rb_str_to_f`, over
- * `rb_cstr_to_dbl_raise` at `vendor/ruby/object.c:3362` without `badcheck`):
+ * `String#to_f` (`vendor/ruby/v3.3.11/string.c:6633` `rb_str_to_f`, over
+ * `rb_cstr_to_dbl_raise` at `vendor/ruby/v3.3.11/object.c:3362` without `badcheck`):
  * the leading decimal float, 0.0 when there is none.
  *
  * @noRailsEquivalent PERMANENT
@@ -133,7 +133,7 @@ const DUMP_ESCAPES: Record<string, string> = {
 };
 
 /**
- * `String#dump` (`vendor/ruby/string.c:6901` `rb_str_dump`): printable ASCII
+ * `String#dump` (`vendor/ruby/v3.3.11/string.c:6901` `rb_str_dump`): printable ASCII
  * as is, `#` escaped before `$`, `@` and `{`, a non-ASCII character as
  * `\uXXXX` / `\u{X}`, any other byte as `\xHH`.
  *
@@ -183,7 +183,7 @@ function utf8(cp: number): number[] {
 }
 
 /**
- * `String#undump` (`vendor/ruby/string.c:7196` `str_undump`, with
+ * `String#undump` (`vendor/ruby/v3.3.11/string.c:7196` `str_undump`, with
  * `undump_after_backslash` at `:7071`): the inverse of {@link rbStrDump}. A
  * `.force_encoding("...")` epilogue re-reads the bytes through
  * `forceEncoding`, the one tag a JS string can take.

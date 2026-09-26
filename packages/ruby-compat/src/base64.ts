@@ -1,15 +1,15 @@
 import { pack } from "./array.js";
 
 /**
- * `Base64` (`vendor/ruby/lib/base64.rb:184`), narrowed to the one member Rails
+ * `Base64` (`vendor/ruby/v3.3.11/lib/base64.rb:184`), narrowed to the one member Rails
  * calls on it.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib `Base64`
- * (`vendor/ruby/lib/base64.rb:184`), which Rails uses but does not define.
+ * (`vendor/ruby/v3.3.11/lib/base64.rb:184`), which Rails uses but does not define.
  */
 export class Base64 {
   /**
-   * `Base64.strict_encode64` (`vendor/ruby/lib/base64.rb:273`), which is
+   * `Base64.strict_encode64` (`vendor/ruby/v3.3.11/lib/base64.rb:273`), which is
    * `[bin].pack("m0")` (`base64.rb:274`) — Base64 over the String's BYTES,
    * with no line breaks.
    *
@@ -18,7 +18,7 @@ export class Base64 {
    * consumes.
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Base64.strict_encode64`
-   * (`vendor/ruby/lib/base64.rb:273`).
+   * (`vendor/ruby/v3.3.11/lib/base64.rb:273`).
    */
   static strictEncode64(bin: string): string {
     return pack([bin], "m0");

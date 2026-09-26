@@ -6,25 +6,25 @@ import { rbBuiltinClassName } from "./object.js";
 import { Range } from "./range.js";
 import { TypeError } from "./type-error.js";
 
-/** `toofew` (`vendor/ruby/pack.c:120`). */
+/** `toofew` (`vendor/ruby/v3.3.11/pack.c:120`). */
 const toofew = "too few arguments";
 
-/** `endstr` (`vendor/ruby/pack.c:42`), the types `<` / `>` may follow. */
+/** `endstr` (`vendor/ruby/v3.3.11/pack.c:42`), the types `<` / `>` may follow. */
 const endstr = "sSiIlLqQjJ";
 
-/** `BIGENDIAN_P()` (`vendor/ruby/pack.c:58-75`): the host byte order. */
+/** `BIGENDIAN_P()` (`vendor/ruby/v3.3.11/pack.c:58-75`): the host byte order. */
 const BIGENDIAN_P = new Uint8Array(new Uint16Array([1]).buffer)[0] === 0;
 
-/** `b64_table` (`vendor/ruby/pack.c:789`). */
+/** `b64_table` (`vendor/ruby/v3.3.11/pack.c:789`). */
 const b64Table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
-/** `unknown_directive` (`vendor/ruby/pack.c:160`). */
+/** `unknown_directive` (`vendor/ruby/v3.3.11/pack.c:160`). */
 function unknownDirective(mode: string, type: string, fmt: string): never {
   throw new ArgumentError(`unknown ${mode} directive '${type}' in '${fmt}'`);
 }
 
 /**
- * `encodes` (`vendor/ruby/pack.c:791`) for `type == 'm'` — `len` bytes of `s0`
+ * `encodes` (`vendor/ruby/v3.3.11/pack.c:791`) for `type == 'm'` — `len` bytes of `s0`
  * as Base64, plus the trailing newline `tailLf` asks for. MRI's `buff_size`
  * flush has no analogue: a JS array grows.
  */
@@ -60,11 +60,11 @@ function encodes(str: string[], s0: Uint8Array, len: number, tailLf: number): vo
 }
 
 /**
- * `pack_pack` (`vendor/ruby/pack.c:197`), narrowed to the `m` directive
+ * `pack_pack` (`vendor/ruby/v3.3.11/pack.c:197`), narrowed to the `m` directive
  * (`pack.c:663-690`) — Base64, wrapped at `len` input bytes per line, or
  * strict with no line breaks at all when the count is an explicit `0`. `m0` is
  * what `Rack::Test::Session#basic_authorize` packs with
- * (`vendor/rack-test/lib/rack/test.rb:199`) — and to `U` (`pack.c:645-660`),
+ * (`vendor/rack-test/v2.2.0/lib/rack/test.rb:199`) — and to `U` (`pack.c:645-660`),
  * one UTF-8 character per Integer, which `ActiveSupport::Multibyte::Chars`
  * packs codepoints with (`multibyte/chars.rb:136,144`) — and to the `C`, `E`,
  * `l<` and `@` directives `ActiveSupport::Cache::Coder` packs its header with
@@ -91,7 +91,7 @@ function encodes(str: string[], s0: Uint8Array, len: number, tailLf: number): vo
  * directive.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Array#pack`
- * (`vendor/ruby/pack.c:197`).
+ * (`vendor/ruby/v3.3.11/pack.c:197`).
  */
 export function pack(ary: ReadonlyArray<string | number | bigint>, fmt: string): string {
   const res: string[] = [];
@@ -214,7 +214,7 @@ export function pack(ary: ReadonlyArray<string | number | bigint>, fmt: string):
 }
 
 /**
- * `String#unpack1` (`vendor/ruby/pack.c:1621` `pack_unpack1`), which is
+ * `String#unpack1` (`vendor/ruby/v3.3.11/pack.c:1621` `pack_unpack1`), which is
  * `pack_unpack_internal` (`pack.c:936`) in `UNPACK_1` mode: the first item
  * the format pushes, or nil when none does. Narrowed to the directives
  * {@link pack} answers bytes for — `C` and `l` through `unpack_integer`
@@ -227,7 +227,7 @@ export function pack(ary: ReadonlyArray<string | number | bigint>, fmt: string):
  * of the string holds, so an item short of bytes pushes nothing.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `String#unpack1`
- * (`vendor/ruby/pack.c:1621`).
+ * (`vendor/ruby/v3.3.11/pack.c:1621`).
  */
 export function unpack1(
   str: string,
@@ -311,10 +311,10 @@ export function unpack1(
 }
 
 /**
- * Ruby `Array#slice` / `Array#[]` (`vendor/ruby/array.c:1827` `rb_ary_aref`):
+ * Ruby `Array#slice` / `Array#[]` (`vendor/ruby/v3.3.11/array.c:1827` `rb_ary_aref`):
  * `(index)` answers the element or nil, `(start, length)` a subarray
  * (`rb_ary_aref2`, `:1837`), and a Range a subarray through
- * `rb_range_beg_len` (`vendor/ruby/range.c:1744`); an out-of-range start is nil.
+ * `rb_range_beg_len` (`vendor/ruby/v3.3.11/range.c:1744`); an out-of-range start is nil.
  * @noRailsEquivalent PERMANENT
  */
 export function arySlice<T>(
@@ -356,7 +356,7 @@ function subseq<T>(ary: readonly T[], beg: number, len: number): T[] | null {
 }
 
 /**
- * Ruby `Array#delete` (`vendor/ruby/array.c:3973` `rb_ary_delete`): removes, in
+ * Ruby `Array#delete` (`vendor/ruby/v3.3.11/array.c:3973` `rb_ary_delete`): removes, in
  * place, every element `==` to `item` (`rb_equal`, so a record matches by
  * `ActiveRecord::Core#==`, not identity) and answers the last one removed.
  * When nothing matched it answers the block's value for `item`, or nil.
@@ -391,7 +391,7 @@ export function aryDelete<T, U = undefined>(ary: T[], item: T, block?: (item: T)
 }
 
 /**
- * Ruby `Array#pop(n)` (`vendor/ruby/array.c:1437` `rb_ary_pop_m`): removes, in
+ * Ruby `Array#pop(n)` (`vendor/ruby/v3.3.11/array.c:1437` `rb_ary_pop_m`): removes, in
  * place, the last `n` elements and answers them in order. `n` past the length
  * takes them all, and a negative `n` raises (`ary_take_first_or_last_n`,
  * `array.c:1292-1307`).
@@ -409,7 +409,7 @@ export function aryPop<T>(ary: T[], n: number): T[] {
 }
 
 /**
- * Ruby `Array#first` with no argument (`vendor/ruby/array.c:1901` `ary_first`):
+ * Ruby `Array#first` with no argument (`vendor/ruby/v3.3.11/array.c:1901` `ary_first`):
  * the first element, or `nil` for an empty array.
  *
  * @noRailsEquivalent PERMANENT
@@ -419,7 +419,7 @@ export function first<T>(ary: readonly T[]): T | undefined {
 }
 
 /**
- * Ruby `Array#to_a` (`vendor/ruby/array.c:2952` `rb_ary_to_a`): the receiver
+ * Ruby `Array#to_a` (`vendor/ruby/v3.3.11/array.c:2952` `rb_ary_to_a`): the receiver
  * itself, or a plain-Array copy of an instance of an Array subclass.
  *
  * @noRailsEquivalent PERMANENT
@@ -434,7 +434,7 @@ export function toA<T>(ary: T[]): T[] {
 }
 
 /**
- * Ruby `Array#drop` (`vendor/ruby/array.c:7594` `rb_ary_drop`): every element
+ * Ruby `Array#drop` (`vendor/ruby/v3.3.11/array.c:7594` `rb_ary_drop`): every element
  * after the first `n`.
  *
  * @noRailsEquivalent PERMANENT
@@ -448,23 +448,23 @@ export function drop<T>(ary: readonly T[], n: number): T[] {
 }
 
 /**
- * Ruby `Array#compact` (`vendor/ruby/array.c:6240` `rb_ary_compact`): a new
+ * Ruby `Array#compact` (`vendor/ruby/v3.3.11/array.c:6240` `rb_ary_compact`): a new
  * array with every `nil` element removed.
  * @noRailsEquivalent PERMANENT — Ruby core `Array#compact`
- *   (`vendor/ruby/array.c:6240`).
+ *   (`vendor/ruby/v3.3.11/array.c:6240`).
  */
 export function compact<T>(ary: readonly T[]): Array<NonNullable<T>> {
   return ary.filter((element) => element != null);
 }
 
 /**
- * Ruby `Array#uniq` (`vendor/ruby/array.c:6177` `rb_ary_uniq`): the elements in
+ * Ruby `Array#uniq` (`vendor/ruby/v3.3.11/array.c:6177` `rb_ary_uniq`): the elements in
  * order, deduplicated through `ary_make_hash` (`array.c:5342`) — a Hash, so it
  * keys on `hash`/`eql?`, never `==` or identity: `1` and `1n` collapse the way
  * Ruby's `1` and `1` do, a tuple is `eql?` by its elements, and a value whose
  * class defines only `==` stays distinct.
  * @noRailsEquivalent PERMANENT — Ruby core `Array#uniq`
- *   (`vendor/ruby/array.c:6177`).
+ *   (`vendor/ruby/v3.3.11/array.c:6177`).
  */
 export function uniq<T>(ary: readonly T[]): T[] {
   const hash = new Map<number, T[]>();
@@ -481,17 +481,17 @@ export function uniq<T>(ary: readonly T[]): T[] {
 }
 
 /**
- * Ruby `Array#sort` without a block (`vendor/ruby/array.c:3473` `rb_ary_sort`):
+ * Ruby `Array#sort` without a block (`vendor/ruby/v3.3.11/array.c:3473` `rb_ary_sort`):
  * a sorted copy, ordered by `sort_2` (`array.c:3301`), which sends `<=>` and
  * hands the answer to `rb_cmpint`, so a `nil` `<=>` raises
  * `ArgumentError: comparison of A with B failed`.
  *
- * @boundary: `ruby_qsort` (`vendor/ruby/util.c:253`) is the platform `qsort_s`,
+ * @boundary: `ruby_qsort` (`vendor/ruby/v3.3.11/util.c:253`) is the platform `qsort_s`,
  *  glibc's merge sort, which always passes the earlier element first. V8's
  *  `Array#sort` does not, and the order names the classes in the message, so
  *  the merge is written out.
  *
- * @noRailsEquivalent PERMANENT — Ruby core `Array#sort` (`vendor/ruby/array.c:3473`).
+ * @noRailsEquivalent PERMANENT — Ruby core `Array#sort` (`vendor/ruby/v3.3.11/array.c:3473`).
  */
 export function sort<T>(ary: readonly T[]): T[] {
   const sort2 = (a: T, b: T): number => rbCmpint(cmp(a, b), a, b);

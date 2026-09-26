@@ -1,10 +1,10 @@
 import { Encoding } from "../encoding.js";
 
 /**
- * Ruby core `String#force_encoding` (`vendor/ruby/string.c:11005`
+ * Ruby core `String#force_encoding` (`vendor/ruby/v3.3.11/string.c:11005`
  * `rb_str_force_encoding`), which Rails inherits rather than defines.
  *
- * `rb_to_encoding` (`vendor/ruby/encoding.c:323`) resolves the argument, so the
+ * `rb_to_encoding` (`vendor/ruby/v3.3.11/encoding.c:323`) resolves the argument, so the
  * accepted names are {@link Encoding.find}'s registry rather than
  * `TextDecoder`'s WHATWG labels, and an unregistered name raises `ArgumentError`
  * from there. A JS string carries no encoding tag, so the two binary names —

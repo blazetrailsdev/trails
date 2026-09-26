@@ -20,11 +20,11 @@ function currentSlot(): AsyncContext<Fiber> {
 }
 
 /**
- * @noRailsEquivalent PERMANENT — Ruby core `Fiber` (`vendor/ruby/cont.c:3530`).
+ * @noRailsEquivalent PERMANENT — Ruby core `Fiber` (`vendor/ruby/v3.3.11/cont.c:3530`).
  */
 export class Fiber<R = unknown> {
   /**
-   * @noRailsEquivalent PERMANENT — Ruby core `Fiber.current` (`vendor/ruby/cont.c:3534`).
+   * @noRailsEquivalent PERMANENT — Ruby core `Fiber.current` (`vendor/ruby/v3.3.11/cont.c:3534`).
    */
   static current(): Fiber {
     const thread = Thread.current();
@@ -43,14 +43,14 @@ export class Fiber<R = unknown> {
   #status: "created" | "resumed" | "terminated" = "created";
 
   /**
-   * @noRailsEquivalent PERMANENT — Ruby core `Fiber.new` (`vendor/ruby/cont.c:3539`).
+   * @noRailsEquivalent PERMANENT — Ruby core `Fiber.new` (`vendor/ruby/v3.3.11/cont.c:3539`).
    */
   constructor(block: () => R) {
     this.#block = block;
   }
 
   /**
-   * @noRailsEquivalent PERMANENT — Ruby core `Fiber#resume` (`vendor/ruby/cont.c:3543`).
+   * @noRailsEquivalent PERMANENT — Ruby core `Fiber#resume` (`vendor/ruby/v3.3.11/cont.c:3543`).
    */
   resume(): R {
     if (this.#status === "terminated") {
@@ -82,7 +82,7 @@ export class Fiber<R = unknown> {
   }
 
   /**
-   * @noRailsEquivalent PERMANENT — Ruby core `Fiber#alive?` (`vendor/ruby/cont.c:3551`).
+   * @noRailsEquivalent PERMANENT — Ruby core `Fiber#alive?` (`vendor/ruby/v3.3.11/cont.c:3551`).
    */
   isAlive(): boolean {
     return this.#status !== "terminated";

@@ -19,7 +19,7 @@ function chompNewline(str: string, p: number, e: number): number {
 }
 
 /**
- * `rb_str_enumerate_lines` (`vendor/ruby/string.c:9037`): the lines of `str`
+ * `rb_str_enumerate_lines` (`vendor/ruby/v3.3.11/string.c:9037`): the lines of `str`
  * split after each `rs` (`$/`, `"\n"`, by default), in paragraph mode for an
  * empty `rs`, whole for a nil one; `chomp: true` drops each separator.
  *
@@ -98,7 +98,7 @@ function* enumerate<T>(items: Iterable<T>): Generator<T> {
 }
 
 /**
- * The `each_*` iteration shape (`vendor/ruby/string.c:9186` `rb_str_each_line`):
+ * The `each_*` iteration shape (`vendor/ruby/v3.3.11/string.c:9186` `rb_str_each_line`):
  * each item yielded to the block and the receiver returned, or — with no
  * block — a generator standing for `RETURN_SIZED_ENUMERATOR`, JS's own
  * external iterator.
@@ -116,7 +116,7 @@ export function eachOrEnumerator<T>(
 }
 
 /**
- * `String#each_line` (`vendor/ruby/string.c:9186` `rb_str_each_line`).
+ * `String#each_line` (`vendor/ruby/v3.3.11/string.c:9186` `rb_str_each_line`).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -126,7 +126,7 @@ export function rbStrEachLine(self: StringReceiver, ...argv: unknown[]): unknown
 }
 
 /**
- * `String#grapheme_clusters` (`vendor/ruby/string.c:9552`), through
+ * `String#grapheme_clusters` (`vendor/ruby/v3.3.11/string.c:9552`), through
  * `Intl.Segmenter`'s extended grapheme clusters.
  *
  * @noRailsEquivalent PERMANENT
@@ -136,7 +136,7 @@ export function graphemeClusters(str: string): string[] {
 }
 
 /**
- * `String#codepoints` (`vendor/ruby/string.c:9382` `rb_str_codepoints`).
+ * `String#codepoints` (`vendor/ruby/v3.3.11/string.c:9382` `rb_str_codepoints`).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -147,7 +147,7 @@ export function codepoints(str: string): number[] {
 /**
  * The iteration table entries: `lines`/`each_line`, `chars`/`each_char`,
  * `bytes`/`each_byte`, `codepoints`/`each_codepoint`,
- * `grapheme_clusters`/`each_grapheme_cluster` (`vendor/ruby/string.c:9202`,
+ * `grapheme_clusters`/`each_grapheme_cluster` (`vendor/ruby/v3.3.11/string.c:9202`,
  * `:9307`, `:9322`, `:9238`, `:9367`, `:9537`).
  *
  * @noRailsEquivalent PERMANENT
@@ -190,7 +190,7 @@ function each<T>(self: StringReceiver, argv: unknown[], items: T[]): string | Ge
 }
 
 /**
- * `rb_str_upto_each` (`vendor/ruby/string.c:5042`): single ASCII characters
+ * `rb_str_upto_each` (`vendor/ruby/v3.3.11/string.c:5042`): single ASCII characters
  * by code, all-digit edges numerically at the first edge's width, anything
  * else by `succ`.
  *
@@ -239,7 +239,7 @@ export function* rbStrUptoEach(beg: string, endArg: unknown, excl: boolean): Gen
 }
 
 /**
- * `String#upto` (`vendor/ruby/string.c:5032` `rb_str_upto`).
+ * `String#upto` (`vendor/ruby/v3.3.11/string.c:5032` `rb_str_upto`).
  *
  * @noRailsEquivalent PERMANENT
  */

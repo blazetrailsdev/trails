@@ -10,7 +10,7 @@ type Delegating<T extends MixinBase> = new (obj: unknown) => InstanceType<T> & {
 };
 
 /**
- * `DelegateClass(superclass)` (`vendor/ruby/lib/delegate.rb:394-443`) — builds a
+ * `DelegateClass(superclass)` (`vendor/ruby/v3.3.11/lib/delegate.rb:394-443`) — builds a
  * class that forwards to a wrapped object, the way
  * `ActiveRecord::Type::Serialized < DelegateClass(ActiveModel::Type::Value)`
  * (`activerecord/lib/active_record/type/serialized.rb:5`) asks for.

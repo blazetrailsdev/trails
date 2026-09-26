@@ -108,12 +108,12 @@ const ROWS: readonly [name: string, decoderLabel: string | null, aliases: string
 
 /**
  * Ruby core `Encoding` — the registry `Encoding.find` (`enc_find`,
- * `vendor/ruby/encoding.c:1368`) resolves a name against, which Rails inherits
+ * `vendor/ruby/v3.3.11/encoding.c:1368`) resolves a name against, which Rails inherits
  * rather than defines.
  *
  * The registry is Ruby's, not WHATWG's, because that is the accept/reject
  * criterion every caller is porting: `Rack::Multipart::Parser#find_encoding`
- * (`vendor/rack/lib/rack/multipart/parser.rb:489-493`) treats an unknown
+ * (`vendor/rack/v3.1.14/lib/rack/multipart/parser.rb:489-493`) treats an unknown
  * charset as binary, and which charsets are unknown is what the two registries
  * disagree about. `TextDecoder` rejects `ASCII-8BIT`, `BINARY`, `CP932`,
  * `CP949` and `646`, all of which Ruby resolves, and accepts WHATWG-only
@@ -136,7 +136,7 @@ const ROWS: readonly [name: string, decoderLabel: string | null, aliases: string
  * `null` row still
  * resolves, because the accept/reject criterion is the registry's and not the
  * decoder's — `Rack::Multipart::Parser#find_encoding`
- * (`vendor/rack/lib/rack/multipart/parser.rb:489-493`) asks the registry, and
+ * (`vendor/rack/v3.1.14/lib/rack/multipart/parser.rb:489-493`) asks the registry, and
  * a name Ruby registers must not fall to `BINARY` here. MRI has no such field
  * because its decoder IS the registry entry (`rb_encoding *`), and JS keeps
  * the two apart.
@@ -146,24 +146,24 @@ const ROWS: readonly [name: string, decoderLabel: string | null, aliases: string
  * registers them with `enc_alias_internal` (`encoding.c:1497,1563`) against
  * the seats below, and re-points them whenever a seat moves.
  *
- * @noRailsEquivalent PERMANENT — Ruby core `Encoding` (`vendor/ruby/encoding.c:1368`).
+ * @noRailsEquivalent PERMANENT — Ruby core `Encoding` (`vendor/ruby/v3.3.11/encoding.c:1368`).
  */
 export class Encoding {
   static readonly #registry = new Map<string, Encoding | null>();
 
   /**
-   * `rb_locale_encoding` (`vendor/ruby/encoding.c:1490-1500`) — the seat the
+   * `rb_locale_encoding` (`vendor/ruby/v3.3.11/encoding.c:1490-1500`) — the seat the
    * `locale` alias resolves through. MRI reads it off the process environment;
    * trails has no locale to read, so it is `UTF-8`.
    */
   static #locale: Encoding;
 
   /**
-   * `rb_filesystem_encoding` (`vendor/ruby/encoding.c:1520`) — the seat the
+   * `rb_filesystem_encoding` (`vendor/ruby/v3.3.11/encoding.c:1520`) — the seat the
    * `filesystem` alias resolves through, which off Windows is
    * `Init_enc_set_filesystem_encoding`'s
    * `rb_enc_to_index(rb_default_external_encoding())`
-   * (`vendor/ruby/localeinit.c:135`, `miniinit.c:36`) and so tracks
+   * (`vendor/ruby/v3.3.11/localeinit.c:135`, `miniinit.c:36`) and so tracks
    * `default_external` rather than standing on its own.
    */
   static #filesystem: Encoding;
@@ -190,7 +190,7 @@ export class Encoding {
 
   /**
    * @noRailsEquivalent PERMANENT — Ruby core `Encoding#name`
-   * (`vendor/ruby/encoding.c:1112` `enc_name`).
+   * (`vendor/ruby/v3.3.11/encoding.c:1112` `enc_name`).
    */
   readonly name: string;
 
@@ -207,7 +207,7 @@ export class Encoding {
 
   /**
    * @noRailsEquivalent PERMANENT — Ruby core `Encoding#to_s`
-   * (`vendor/ruby/encoding.c:1112` `enc_name`, aliased to `to_s`).
+   * (`vendor/ruby/v3.3.11/encoding.c:1112` `enc_name`, aliased to `to_s`).
    */
   toString(): string {
     return this.name;
@@ -215,20 +215,20 @@ export class Encoding {
 
   /**
    * @noRailsEquivalent PERMANENT — Ruby core `Encoding#inspect`
-   * (`vendor/ruby/encoding.c:1094` `enc_inspect`).
+   * (`vendor/ruby/v3.3.11/encoding.c:1094` `enc_inspect`).
    */
   inspect(): string {
     return `#<Encoding:${this.name}>`;
   }
 
   /**
-   * `Encoding.find` (`enc_find`, `vendor/ruby/encoding.c:1368`) — the registry
+   * `Encoding.find` (`enc_find`, `vendor/ruby/v3.3.11/encoding.c:1368`) — the registry
    * lookup, which `str_to_encindex` (`encoding.c:307-313`) raises
    * `ArgumentError: unknown encoding name - <name>` from when the name is not
    * registered. The lookup is case-insensitive, as `enc_registered`'s
    * case-folding table is.
    *
-   * @noRailsEquivalent PERMANENT — Ruby core `Encoding.find` (`vendor/ruby/encoding.c:1368`).
+   * @noRailsEquivalent PERMANENT — Ruby core `Encoding.find` (`vendor/ruby/v3.3.11/encoding.c:1368`).
    */
   static find(enc: string | Encoding): Encoding | null {
     if (enc instanceof Encoding) return enc;
@@ -241,7 +241,7 @@ export class Encoding {
 
   /**
    * `Encoding.default_external` (`get_default_external`,
-   * `vendor/ruby/encoding.c:1619`) and its writer
+   * `vendor/ruby/v3.3.11/encoding.c:1619`) and its writer
    * (`rb_enc_set_default_external`, `encoding.c:1625-1633`), which raises
    * rather than accept `nil`. `enc_set_default_encoding` re-points the
    * `external` alias, and — for this seat alone — re-derives the `filesystem`
@@ -266,7 +266,7 @@ export class Encoding {
 
   /**
    * `Encoding.default_internal` (`get_default_internal`,
-   * `vendor/ruby/encoding.c:1703`) and its writer
+   * `vendor/ruby/v3.3.11/encoding.c:1703`) and its writer
    * (`rb_enc_set_default_internal`, `encoding.c:1709-1714`), which does accept
    * `nil` — the unset state `Encoding.find("internal")` answers `nil` from.
    *
@@ -286,7 +286,7 @@ export class Encoding {
    * `Encoding::ASCII_8BIT` and its `BINARY` alias, `Encoding::UTF_8` and
    * `Encoding::US_ASCII` — the four registry constants trails' callers name.
    * MRI defines one per registered name and alias, from `set_encoding_const`
-   * (`rb_define_const`, `vendor/ruby/encoding.c:1753`).
+   * (`rb_define_const`, `vendor/ruby/v3.3.11/encoding.c:1753`).
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Encoding::ASCII_8BIT`.
    */

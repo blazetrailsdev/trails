@@ -4,11 +4,11 @@ import { getFs, getPath } from "./fs-adapter.js";
 import type { FsStatResult } from "./fs-adapter.js";
 import { IO } from "./io.js";
 
-/** `FMODE_SETENC_BY_BOM` (`vendor/ruby/include/ruby/io.h:368`). */
+/** `FMODE_SETENC_BY_BOM` (`vendor/ruby/v3.3.11/include/ruby/io.h:368`). */
 const FMODE_SETENC_BY_BOM = 0x00100000;
 
 /**
- * `rb_stat` (`vendor/ruby/file.c:1296`), which `fstat`s an open stream and
+ * `rb_stat` (`vendor/ruby/v3.3.11/file.c:1296`), which `fstat`s an open stream and
  * `stat`s a name, answering `< 0` — `null` here — where the call fails.
  */
 function rbStat(file: IO | string): FsStatResult | null {
@@ -20,7 +20,7 @@ function rbStat(file: IO | string): FsStatResult | null {
 }
 
 /**
- * `isdirsep` (`vendor/ruby/file.c:3306,3311`) — `'/'` on every platform, and
+ * `isdirsep` (`vendor/ruby/v3.3.11/file.c:3306,3311`) — `'/'` on every platform, and
  * `FILE_ALT_SEPARATOR` as well where the build defines one (`file.c:3303`).
  */
 function isdirsep(c: string): boolean {
@@ -28,7 +28,7 @@ function isdirsep(c: string): boolean {
 }
 
 /**
- * `chompdirsep` (`vendor/ruby/file.c:3484`), which answers the path without
+ * `chompdirsep` (`vendor/ruby/v3.3.11/file.c:3484`), which answers the path without
  * the run of separators that terminates it, and the whole path where none
  * does.
  */
@@ -43,7 +43,7 @@ type FileJoinArg = string | readonly FileJoinArg[];
 const joining = new Set<readonly FileJoinArg[]>();
 
 /**
- * `file_inspect_join` (`vendor/ruby/file.c:5006`), the `rb_exec_recursive`
+ * `file_inspect_join` (`vendor/ruby/v3.3.11/file.c:5006`), the `rb_exec_recursive`
  * callback that joins a nested Array component.
  */
 function fileInspectJoin(ary: readonly FileJoinArg[], arg: readonly FileJoinArg[]): string {
@@ -56,7 +56,7 @@ function fileInspectJoin(ary: readonly FileJoinArg[], arg: readonly FileJoinArg[
   }
 }
 
-/** `rb_file_join` (`vendor/ruby/file.c:5013`). */
+/** `rb_file_join` (`vendor/ruby/v3.3.11/file.c:5013`). */
 function rbFileJoin(ary: readonly FileJoinArg[]): string {
   if (ary.length === 0) return "";
   let result = "";
@@ -77,7 +77,7 @@ function rbFileJoin(ary: readonly FileJoinArg[]): string {
 }
 
 /**
- * `to_uid` (`vendor/ruby/file.c:2661`), which maps a `nil` owner onto `-1` —
+ * `to_uid` (`vendor/ruby/v3.3.11/file.c:2661`), which maps a `nil` owner onto `-1` —
  * the id `chown(2)` reads as "leave this one unchanged".
  */
 function toUid(u: number | null): number {
@@ -85,17 +85,17 @@ function toUid(u: number | null): number {
   return u;
 }
 
-/** `to_gid` (`vendor/ruby/file.c:2670`), `to_uid`'s group half. */
+/** `to_gid` (`vendor/ruby/v3.3.11/file.c:2670`), `to_uid`'s group half. */
 function toGid(g: number | null): number {
   if (g == null) return -1;
   return g;
 }
 
 /**
- * `File` (`vendor/ruby/file.c:7354` `rb_cFile`), the sliver of it trails calls.
+ * `File` (`vendor/ruby/v3.3.11/file.c:7354` `rb_cFile`), the sliver of it trails calls.
  *
  * Rails reaches the filesystem through this class — `File.exist?(key)` in
- * `vendor/rails/activesupport/lib/active_support/cache/file_store.rb:125`,
+ * `vendor/rails/v8.0.2/activesupport/lib/active_support/cache/file_store.rb:125`,
  * `File.join(cache_path, ...)` at `file_store.rb:185`,
  * `File.realpath(dir)` at `file_store.rb:196` — so trails reaches it through a
  * class of the same name rather than through members named after node's `fs`.
@@ -104,23 +104,23 @@ function toGid(g: number | null): number {
  * runtime.
  *
  * Only the members ported bodies call are here. `File::SEPARATOR` is `"/"` on
- * every platform (`vendor/ruby/file.c:7427`); the backslash is
+ * every platform (`vendor/ruby/v3.3.11/file.c:7427`); the backslash is
  * `File::ALT_SEPARATOR`, which is `nil` off DOSISH (`file.c:7435`).
  *
- * @noRailsEquivalent PERMANENT — Ruby core `File` (`vendor/ruby/file.c:7354`),
+ * @noRailsEquivalent PERMANENT — Ruby core `File` (`vendor/ruby/v3.3.11/file.c:7354`),
  * which Rails calls without defining, so no Rails or gem file declares the
  * class this file's single export lives in.
  */
 export class File extends IO {
   /**
-   * `vendor/ruby/file.c:7427` — `File::SEPARATOR`, `"/"` on every platform.
+   * `vendor/ruby/v3.3.11/file.c:7427` — `File::SEPARATOR`, `"/"` on every platform.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File::SEPARATOR`.
    */
   static readonly SEPARATOR = "/";
 
   /**
-   * `vendor/ruby/file.c:7433` — `File::ALT_SEPARATOR`, the `'\\'` of
+   * `vendor/ruby/v3.3.11/file.c:7433` — `File::ALT_SEPARATOR`, the `'\\'` of
    * `FILE_ALT_SEPARATOR` (`file.c:3303`) where the build is DOSISH, and `nil`
    * everywhere else (`file.c:7435`). The platform answer comes from the
    * registered path backend's separator rather than from a runtime global.
@@ -132,7 +132,7 @@ export class File extends IO {
   }
 
   /**
-   * `vendor/ruby/file.c:7440` — `File::PATH_SEPARATOR`, the `';'` of a DOSISH
+   * `vendor/ruby/v3.3.11/file.c:7440` — `File::PATH_SEPARATOR`, the `';'` of a DOSISH
    * build and `':'` everywhere else. The platform answer comes from the
    * registered path backend's separator, as `ALT_SEPARATOR` above does.
    *
@@ -143,7 +143,7 @@ export class File extends IO {
   }
 
   /**
-   * `vendor/ruby/file.c:7841` — `File::LOCK_EX`, the exclusive-lock operation
+   * `vendor/ruby/v3.3.11/file.c:7841` — `File::LOCK_EX`, the exclusive-lock operation
    * `File#flock` takes (`file.c:5198`).
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File::LOCK_EX`.
@@ -151,7 +151,7 @@ export class File extends IO {
   static readonly LOCK_EX = 2;
 
   /**
-   * `vendor/ruby/file.c:7843` — `File::LOCK_UN`, the release operation
+   * `vendor/ruby/v3.3.11/file.c:7843` — `File::LOCK_UN`, the release operation
    * `File#flock` takes (`file.c:5204`).
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File::LOCK_UN`.
@@ -159,70 +159,70 @@ export class File extends IO {
   static readonly LOCK_UN = 8;
 
   /**
-   * `vendor/ruby/dir.c:3678` — a backslash is an ordinary character, not an escape.
+   * `vendor/ruby/v3.3.11/dir.c:3678` — a backslash is an ordinary character, not an escape.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File::FNM_NOESCAPE`.
    */
   static readonly FNM_NOESCAPE = 0x01;
 
   /**
-   * `vendor/ruby/dir.c:3682` — `*`, `?` and a bracket stop at `/`, and `**` + `/` walks elements.
+   * `vendor/ruby/v3.3.11/dir.c:3682` — `*`, `?` and a bracket stop at `/`, and `**` + `/` walks elements.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File::FNM_PATHNAME`.
    */
   static readonly FNM_PATHNAME = 0x02;
 
   /**
-   * `vendor/ruby/dir.c:3686` — a wildcard may match a leading period.
+   * `vendor/ruby/v3.3.11/dir.c:3686` — a wildcard may match a leading period.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File::FNM_DOTMATCH`.
    */
   static readonly FNM_DOTMATCH = 0x04;
 
   /**
-   * `vendor/ruby/dir.c:3674` — case-insensitive matching.
+   * `vendor/ruby/v3.3.11/dir.c:3674` — case-insensitive matching.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File::FNM_CASEFOLD`.
    */
   static readonly FNM_CASEFOLD = 0x08;
 
   /**
-   * `vendor/ruby/dir.c:222-226` — `FNM_CASEFOLD` on a case-folding filesystem
+   * `vendor/ruby/v3.3.11/dir.c:222-226` — `FNM_CASEFOLD` on a case-folding filesystem
    * and `0` otherwise, which is the arm `Entry_#descendant_directory?` selects
-   * on (`vendor/ruby/lib/fileutils.rb:2453`).
+   * on (`vendor/ruby/v3.3.11/lib/fileutils.rb:2453`).
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File::FNM_SYSCASE`.
    */
   static readonly FNM_SYSCASE = 0;
 
   /**
-   * `vendor/ruby/dir.c:3690` — `{a,b}` alternation, expanded by `ruby_brace_expand` (`dir.c:3471-3478`).
+   * `vendor/ruby/v3.3.11/dir.c:3690` — `{a,b}` alternation, expanded by `ruby_brace_expand` (`dir.c:3471-3478`).
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File::FNM_EXTGLOB`.
    */
   static readonly FNM_EXTGLOB = 0x10;
 
   /**
-   * `vendor/ruby/file.c:1806` `rb_file_exist_p`, which is `rb_stat(fname)`
+   * `vendor/ruby/v3.3.11/file.c:1806` `rb_file_exist_p`, which is `rb_stat(fname)`
    * against a FOLLOWED symlink — so a broken symlink is `false` even though
    * `File.symlink?` is `true`.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.exist?`
-   * (`vendor/ruby/file.c:1806`).
+   * (`vendor/ruby/v3.3.11/file.c:1806`).
    */
   static isExist(fileName: string): boolean {
     return getFs().existsSync(fileName);
   }
 
   /**
-   * `vendor/ruby/file.c:2196` `rb_file_identical_p` — `false` unless both
+   * `vendor/ruby/v3.3.11/file.c:2196` `rb_file_identical_p` — `false` unless both
    * names stat successfully and report the same `st_dev` and `st_ino`
    * (`file.c:2201-2205`). Either argument may be an open stream, which
    * `rb_stat` (`file.c:1296`) `fstat`s instead. An adapter that reports no
    * device identity cannot answer, so it answers `false`.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.identical?`
-   * (`vendor/ruby/file.c:2196`).
+   * (`vendor/ruby/v3.3.11/file.c:2196`).
    */
   static isIdentical(fileName1: IO | string, fileName2: IO | string): boolean {
     const st1 = rbStat(fileName1);
@@ -235,11 +235,11 @@ export class File extends IO {
   }
 
   /**
-   * `vendor/ruby/file.c:1615` `rb_file_directory_p`, which answers `false`
+   * `vendor/ruby/v3.3.11/file.c:1615` `rb_file_directory_p`, which answers `false`
    * rather than raising when the stat fails (`file.c:1622`).
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.directory?`
-   * (`vendor/ruby/file.c:1615`).
+   * (`vendor/ruby/v3.3.11/file.c:1615`).
    */
   static isDirectory(fileName: string): boolean {
     try {
@@ -250,12 +250,12 @@ export class File extends IO {
   }
 
   /**
-   * `vendor/ruby/file.c:1723` `rb_file_symlink_p`, which `lstat`s the name and
+   * `vendor/ruby/v3.3.11/file.c:1723` `rb_file_symlink_p`, which `lstat`s the name and
    * answers `false` rather than raising when the `lstat` fails
    * (`file.c:1730`), the way its {@link File.isDirectory} neighbour does.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.symlink?`
-   * (`vendor/ruby/file.c:1723`).
+   * (`vendor/ruby/v3.3.11/file.c:1723`).
    */
   static isSymlink(fileName: string): boolean {
     try {
@@ -266,10 +266,10 @@ export class File extends IO {
   }
 
   /**
-   * `vendor/ruby/file.c:2009` `rb_file_file_p`, `false` on a failed stat.
+   * `vendor/ruby/v3.3.11/file.c:2009` `rb_file_file_p`, `false` on a failed stat.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.file?`
-   * (`vendor/ruby/file.c:2009`).
+   * (`vendor/ruby/v3.3.11/file.c:2009`).
    */
   static isFile(fileName: string): boolean {
     try {
@@ -280,14 +280,14 @@ export class File extends IO {
   }
 
   /**
-   * `vendor/ruby/file.c:1826` `rb_file_readable_p`, which is
+   * `vendor/ruby/v3.3.11/file.c:1826` `rb_file_readable_p`, which is
    * `rb_eaccess(fname, R_OK) >= 0` and so is `false` both for a file that is
    * not there and for one the effective user cannot read. `R_OK` is POSIX's
    * `4` rather than a Ruby constant. A backend with no access check has no
    * `accessSync`, and there existence is all that can be answered.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.readable?`
-   * (`vendor/ruby/file.c:1826`).
+   * (`vendor/ruby/v3.3.11/file.c:1826`).
    */
   static isReadable(fileName: string): boolean {
     const fs = getFs();
@@ -301,35 +301,35 @@ export class File extends IO {
   }
 
   /**
-   * `vendor/ruby/file.c:1329` `rb_file_s_stat`, which RAISES `Errno::ENOENT`
+   * `vendor/ruby/v3.3.11/file.c:1329` `rb_file_s_stat`, which RAISES `Errno::ENOENT`
    * rather than answering `nil` when the path is not there — the predicates
    * above are the arms that swallow it.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.stat`
-   * (`vendor/ruby/file.c:1329`).
+   * (`vendor/ruby/v3.3.11/file.c:1329`).
    */
   static stat(fileName: string): FsStatResult {
     return getFs().statSync(fileName);
   }
 
   /**
-   * `vendor/ruby/file.c:1305` `rb_file_s_size` — the byte size of the named
+   * `vendor/ruby/v3.3.11/file.c:1305` `rb_file_s_size` — the byte size of the named
    * file, which is `File.stat(file_name).size`.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.size`
-   * (`vendor/ruby/file.c:1305`).
+   * (`vendor/ruby/v3.3.11/file.c:1305`).
    */
   static size(fileName: string): number {
     return File.stat(fileName).size;
   }
 
   /**
-   * `vendor/ruby/file.c:2047` `rb_file_size_p` — `File.size?`, `nil` both when
+   * `vendor/ruby/v3.3.11/file.c:2047` `rb_file_size_p` — `File.size?`, `nil` both when
    * the file is missing AND when it is empty, which is what makes it a
    * three-state answer rather than a size.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.size?`
-   * (`vendor/ruby/file.c:2047`).
+   * (`vendor/ruby/v3.3.11/file.c:2047`).
    */
   static isSize(fileName: string): number | null {
     let size: number;
@@ -342,7 +342,7 @@ export class File extends IO {
   }
 
   /**
-   * `vendor/ruby/io.c:15418`, where `rb_cFile` registers `rb_io_s_open`
+   * `vendor/ruby/v3.3.11/io.c:15418`, where `rb_cFile` registers `rb_io_s_open`
    * (`io.c:8148`): with a block the stream is closed once the block returns
    * and the block's value is the answer. Ruby's mode string carries the
    * binary flag node's `flags` has no letter for, so `b` is dropped from the
@@ -351,7 +351,7 @@ export class File extends IO {
    *
    * `rb_io_s_open` takes the `opt` hash Ruby's `File.open(filename, mode, opt)`
    * form passes through to `open(2)`, of which `perm:` is the mode
-   * `Tempfile#initialize` sets to `0600` (`vendor/ruby/lib/tempfile.rb:158`)
+   * `Tempfile#initialize` sets to `0600` (`vendor/ruby/v3.3.11/lib/tempfile.rb:158`)
    * and `external_encoding:` the stream's external encoding
    * (`rb_io_extract_encoding_option`, `io.c:6725,6750`).
    * Ruby's block is a block and its `opt` a trailing argument; TypeScript has
@@ -368,7 +368,7 @@ export class File extends IO {
    * to a closed stream.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.open`
-   * (`vendor/ruby/io.c:8148`).
+   * (`vendor/ruby/v3.3.11/io.c:8148`).
    */
   static open(
     fileName: string,
@@ -418,7 +418,7 @@ export class File extends IO {
   }
 
   /**
-   * `vendor/ruby/io.c:12200` `rb_io_s_read`, in its whole-file form: its `opt`
+   * `vendor/ruby/v3.3.11/io.c:12200` `rb_io_s_read`, in its whole-file form: its `opt`
    * hash reaches `open_key_args` (`io.c:12163`), which opens the stream with
    * it — so `encoding:` is `rb_io_extract_encoding_option`'s external encoding
    * (`io.c:6725,6750`) and the read tags its String with it (`io_enc_str`,
@@ -426,7 +426,7 @@ export class File extends IO {
    * `open_key_args` closes the stream through `rb_ensure` (`io.c:12180`).
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.read` (`IO.read`,
-   * `vendor/ruby/io.c:12200`).
+   * `vendor/ruby/v3.3.11/io.c:12200`).
    */
   static read(name: string, opt?: { encoding?: Encoding | string }): string {
     const file = File.open(name, "r", { externalEncoding: opt?.encoding });
@@ -438,14 +438,14 @@ export class File extends IO {
   }
 
   /**
-   * `vendor/ruby/io.c:12063` `rb_io_s_foreach` in its block form: the stream
+   * `vendor/ruby/v3.3.11/io.c:12063` `rb_io_s_foreach` in its block form: the stream
    * opens through `open_key_args` (`io.c:12163`), `rb_io_each_line`
    * (`io.c:4159`) yields each line with its separator retained, and
    * `rb_ensure` (`io.c:12180`) closes it. The file is read in chunks, never
    * whole; the decoder streams so a character straddling two chunks survives.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.foreach` (`IO.foreach`,
-   * `vendor/ruby/io.c:12063`).
+   * `vendor/ruby/v3.3.11/io.c:12063`).
    */
   static foreach(name: string, block: (line: string) => void): null {
     const fs = getFs();
@@ -477,11 +477,11 @@ export class File extends IO {
   }
 
   /**
-   * `vendor/ruby/io.c:12377` `rb_io_s_write`, which answers the number of
+   * `vendor/ruby/v3.3.11/io.c:12377` `rb_io_s_write`, which answers the number of
    * BYTES written rather than the string itself.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.write` (`IO.write`,
-   * `vendor/ruby/io.c:12377`).
+   * `vendor/ruby/v3.3.11/io.c:12377`).
    */
   static write(name: string, string: string): number {
     getFs().writeFileSync(name, string);
@@ -489,11 +489,11 @@ export class File extends IO {
   }
 
   /**
-   * `vendor/ruby/file.c:3202` `rb_file_s_unlink`, which answers the number of
+   * `vendor/ruby/v3.3.11/file.c:3202` `rb_file_s_unlink`, which answers the number of
    * files deleted and raises on the first failure.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.delete`
-   * (`vendor/ruby/file.c:3202`).
+   * (`vendor/ruby/v3.3.11/file.c:3202`).
    */
   static delete(...files: string[]): number {
     for (const file of files) getFs().unlinkSync(file);
@@ -501,12 +501,12 @@ export class File extends IO {
   }
 
   /**
-   * `vendor/ruby/file.c:2575` `rb_file_s_chmod`, which answers the number of
+   * `vendor/ruby/v3.3.11/file.c:2575` `rb_file_s_chmod`, which answers the number of
    * files whose mode was set. A backend with no permission bits has no
    * `chmodSync`, and there the call is a no-op.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.chmod`
-   * (`vendor/ruby/file.c:2575`).
+   * (`vendor/ruby/v3.3.11/file.c:2575`).
    */
   static chmod(mode: number, ...files: string[]): number {
     for (const file of files) getFs().chmodSync?.(file, mode);
@@ -514,14 +514,14 @@ export class File extends IO {
   }
 
   /**
-   * `vendor/ruby/file.c:2706` `rb_file_s_chown`, which answers the number of
+   * `vendor/ruby/v3.3.11/file.c:2706` `rb_file_s_chown`, which answers the number of
    * files whose owner was set. A `nil` owner or group is ignored
    * (`file.c:2698`) — `File.chown(nil, 100, "testfile")` — which `to_uid` /
    * `to_gid` (`file.c:2661,2670`) carry through as `-1`. A backend with no
    * ownership has no `chownSync`, and there the call is a no-op.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.chown`
-   * (`vendor/ruby/file.c:2706`).
+   * (`vendor/ruby/v3.3.11/file.c:2706`).
    */
   static chown(owner: number | null, group: number | null, ...files: string[]): number {
     const uid = toUid(owner);
@@ -531,11 +531,11 @@ export class File extends IO {
   }
 
   /**
-   * `vendor/ruby/file.c:3231` `rb_file_s_rename`, which answers `0` and
+   * `vendor/ruby/v3.3.11/file.c:3231` `rb_file_s_rename`, which answers `0` and
    * replaces `to` when it already exists.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.rename`
-   * (`vendor/ruby/file.c:3231`).
+   * (`vendor/ruby/v3.3.11/file.c:3231`).
    */
   static rename(from: string, to: string): number {
     getFs().renameSync(from, to);
@@ -543,25 +543,25 @@ export class File extends IO {
   }
 
   /**
-   * `vendor/ruby/file.c:2427` `rb_file_s_mtime`, the modification Time of a
+   * `vendor/ruby/v3.3.11/file.c:2427` `rb_file_s_mtime`, the modification Time of a
    * FOLLOWED symlink — it raises `ENOENT` rather than answering `nil` when the
    * path does not exist.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.mtime`
-   * (`vendor/ruby/file.c:2427`).
+   * (`vendor/ruby/v3.3.11/file.c:2427`).
    */
   static mtime(fileName: string): Date {
     return getFs().statSync(fileName).mtime;
   }
 
   /**
-   * `vendor/ruby/file.c:4559` `rb_file_s_realpath`, which resolves every
+   * `vendor/ruby/v3.3.11/file.c:4559` `rb_file_s_realpath`, which resolves every
    * symlink and raises `ENOENT` when the path does not exist. A backend with
    * no symlink support has no `realpathSync`, and there the path resolves
    * lexically.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.realpath`
-   * (`vendor/ruby/file.c:4559`).
+   * (`vendor/ruby/v3.3.11/file.c:4559`).
    */
   static realpath(pathname: string): string {
     const fs = getFs();
@@ -570,7 +570,7 @@ export class File extends IO {
   }
 
   /**
-   * `vendor/ruby/file.c:5013` `rb_file_join`, which is a STRING join and not
+   * `vendor/ruby/v3.3.11/file.c:5013` `rb_file_join`, which is a STRING join and not
    * a path normalization: `File.join("a", "..", "b")` is `"a/../b"`, where
    * node's `path.join` answers `"b"`. A separator at the boundary is squeezed
    * to one (`file.c:5061-5067`) — `File.join("a//", "/b")` is `"a/b"` — and an
@@ -582,29 +582,29 @@ export class File extends IO {
    * `File.join("a", [], "b")` is `"a/b"`.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.join`
-   * (`vendor/ruby/file.c:5013`).
+   * (`vendor/ruby/v3.3.11/file.c:5013`).
    */
   static join(...args: FileJoinArg[]): string {
     return rbFileJoin(args);
   }
 
   /**
-   * `vendor/ruby/file.c:4770` `rb_file_s_dirname`.
+   * `vendor/ruby/v3.3.11/file.c:4770` `rb_file_s_dirname`.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.dirname`
-   * (`vendor/ruby/file.c:4770`).
+   * (`vendor/ruby/v3.3.11/file.c:4770`).
    */
   static dirname(fileName: string): string {
     return getPath().dirname(fileName);
   }
 
   /**
-   * `vendor/ruby/file.c:4705` `rb_file_s_basename`. The optional `suffix` is
+   * `vendor/ruby/v3.3.11/file.c:4705` `rb_file_s_basename`. The optional `suffix` is
    * stripped, and the literal `".*"` strips whatever extension is there
    * (`file.c:4664-4680`).
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.basename`
-   * (`vendor/ruby/file.c:4705`).
+   * (`vendor/ruby/v3.3.11/file.c:4705`).
    */
   static basename(fileName: string, suffix?: string): string {
     const base = getPath().basename(fileName);
@@ -619,23 +619,23 @@ export class File extends IO {
   }
 
   /**
-   * `vendor/ruby/file.c:4954` `rb_file_s_extname`: a leading dot is not an
+   * `vendor/ruby/v3.3.11/file.c:4954` `rb_file_s_extname`: a leading dot is not an
    * extension (`".bashrc"` is `""`) and a trailing dot is (`"b."` is `"."`).
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.extname`
-   * (`vendor/ruby/file.c:4954`).
+   * (`vendor/ruby/v3.3.11/file.c:4954`).
    */
   static extname(fileName: string): string {
     return getPath().extname(fileName);
   }
 
   /**
-   * `vendor/ruby/dir.c:3457` `file_s_fnmatch` — `true` when `path` matches the
+   * `vendor/ruby/v3.3.11/dir.c:3457` `file_s_fnmatch` — `true` when `path` matches the
    * glob `pattern`. Under `FNM_EXTGLOB` the pattern is brace-expanded first and
    * the first alternative that matches wins (`dir.c:3471-3478`).
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.fnmatch`
-   * (`vendor/ruby/dir.c:3457`).
+   * (`vendor/ruby/v3.3.11/dir.c:3457`).
    */
   static fnmatch(pattern: string, path: string, flags: number = 0): boolean {
     if (flags & File.FNM_EXTGLOB) {
@@ -645,34 +645,34 @@ export class File extends IO {
   }
 
   /**
-   * `vendor/ruby/file.c:4126` `rb_file_s_expand_path`, which resolves
+   * `vendor/ruby/v3.3.11/file.c:4126` `rb_file_s_expand_path`, which resolves
    * `fileName` against `dirString` — the working directory when it is omitted.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.expand_path`
-   * (`vendor/ruby/file.c:4126`).
+   * (`vendor/ruby/v3.3.11/file.c:4126`).
    */
   static expandPath(fileName: string, dirString?: string): string {
     return getPath().resolve(dirString ?? getFs().cwd(), fileName);
   }
 
   /**
-   * `vendor/ruby/file.c:4210` `rb_file_s_absolute_path_p`.
+   * `vendor/ruby/v3.3.11/file.c:4210` `rb_file_s_absolute_path_p`.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.absolute_path?`
-   * (`vendor/ruby/file.c:4210`).
+   * (`vendor/ruby/v3.3.11/file.c:4210`).
    */
   static isAbsolutePath(fileName: string): boolean {
     return getPath().isAbsolute?.(fileName) ?? fileName.startsWith(File.SEPARATOR);
   }
 
   /**
-   * `vendor/ruby/file.c:5301` `rb_file_flock`, which answers `0` once the lock
+   * `vendor/ruby/v3.3.11/file.c:5301` `rb_file_flock`, which answers `0` once the lock
    * is held. A backend with no advisory locking — node's `fs` exposes no
    * `flock(2)` — has no `flockSync`, and there the stream is left unlocked,
    * which is what an unlockable file already behaves like.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File#flock`
-   * (`vendor/ruby/file.c:5301`).
+   * (`vendor/ruby/v3.3.11/file.c:5301`).
    */
   flock(operation: number): number {
     getFs().flockSync?.(this.fd, operation === File.LOCK_UN ? "un" : "ex");
@@ -680,12 +680,12 @@ export class File extends IO {
   }
 
   /**
-   * `vendor/ruby/file.c:1330` `rb_file_size` — `fstat(2)` of the open
+   * `vendor/ruby/v3.3.11/file.c:1330` `rb_file_size` — `fstat(2)` of the open
    * descriptor, which is why it answers the bytes already written rather than
    * what a stale `File.stat` of the path would say.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File#size`
-   * (`vendor/ruby/file.c:1330`).
+   * (`vendor/ruby/v3.3.11/file.c:1330`).
    */
   size(): number {
     return this.stat().size;
@@ -693,7 +693,7 @@ export class File extends IO {
 }
 
 /**
- * `Inc(p, e, enc)` (`vendor/ruby/dir.c:237`) — the cursor advance MRI spells
+ * `Inc(p, e, enc)` (`vendor/ruby/v3.3.11/dir.c:237`) — the cursor advance MRI spells
  * through `rb_enc_mbclen`, one whole character. A JS string is UTF-16, so an
  * astral character is the two code units of a surrogate pair.
  */
@@ -704,7 +704,7 @@ function inc(str: string, i: number): number {
 
 /**
  * The one whole character at `i` — what MRI's `memcmp(t1, s, r)`
- * (`vendor/ruby/dir.c:277`) and `rb_enc_codepoint` (`dir.c:281`) read, where a
+ * (`vendor/ruby/v3.3.11/dir.c:277`) and `rb_enc_codepoint` (`dir.c:281`) read, where a
  * JS index reads one code unit.
  */
 function charAt(str: string, i: number): string {
@@ -713,7 +713,7 @@ function charAt(str: string, i: number): string {
 }
 
 /**
- * `bracket` (`vendor/ruby/dir.c:240`), which answers the pattern index just
+ * `bracket` (`vendor/ruby/v3.3.11/dir.c:240`), which answers the pattern index just
  * past the closing `]` when `s` is in the class, and `null` when it is not or
  * the class never closes. Its `FNM_CASEFOLD` arm casefolds against `p`, the
  * character AFTER `t1` (`dir.c:296`) — mirrored, not corrected.
@@ -771,7 +771,7 @@ function bracket(
 
 /**
  * The `rb_enc_toupper` comparison `bracket` and `fnmatch_helper` share
- * (`vendor/ruby/dir.c:281-297,383-386`).
+ * (`vendor/ruby/v3.3.11/dir.c:281-297,383-386`).
  */
 function compareChar(a: string, b: string, nocase: number): number {
   const x = nocase ? a.toUpperCase() : a;
@@ -780,7 +780,7 @@ function compareChar(a: string, b: string, nocase: number): number {
 }
 
 /**
- * `fnmatch_helper` (`vendor/ruby/dir.c:317`), which matches one path element
+ * `fnmatch_helper` (`vendor/ruby/v3.3.11/dir.c:317`), which matches one path element
  * under `FNM_PATHNAME` and the whole string without it. The cursors it
  * advances through `*pcur` / `*scur` are the returned pair; `unescape` / `isEndP`
  * / `isEndS` / `ret` are its `UNESCAPE` / `ISEND` / `RETURN` macros
@@ -871,7 +871,7 @@ function fnmatchHelper(
 }
 
 /**
- * `fnmatch` (`vendor/ruby/dir.c:411`) — the `FNM_PATHNAME` element walk with
+ * `fnmatch` (`vendor/ruby/v3.3.11/dir.c:411`) — the `FNM_PATHNAME` element walk with
  * its `**` + `/` backtrack, falling through to a single `fnmatch_helper` without.
  */
 function fnmatch(pattern: string, string: string, flags: number): boolean {
@@ -921,7 +921,7 @@ function fnmatch(pattern: string, string: string, flags: number): boolean {
 }
 
 /**
- * `ruby_brace_expand` (`vendor/ruby/dir.c:3019`), which calls back once per
+ * `ruby_brace_expand` (`vendor/ruby/v3.3.11/dir.c:3019`), which calls back once per
  * `{a,b}` alternative and stops at the first non-zero status — for
  * `fnmatch_brace` (`dir.c:3430`), the first alternative that matches.
  */

@@ -47,14 +47,14 @@ function withWindowsPath(block: () => void): void {
 
 describe("File", () => {
   it("exist? follows the symlink, so a broken one is false", () => {
-    // vendor/ruby/file.c:1806 stats the symlink TARGET.
+    // vendor/ruby/v3.3.11/file.c:1806 stats the symlink TARGET.
     const root = fixture();
     expect(File.isExist(join(root, "a.rb"))).toBe(true);
     expect(File.isExist(join(root, "broken"))).toBe(false);
   });
 
   it("join squeezes one separator at the boundary and does not normalize", () => {
-    // vendor/ruby/file.c:5013, verified against ruby 3.3.11.
+    // vendor/ruby/v3.3.11/file.c:5013, verified against ruby 3.3.11.
     expect(File.join("a", "/b")).toBe("a/b");
     expect(File.join("a/", "/b")).toBe("a/b");
     expect(File.join("a//", "/b")).toBe("a/b");
@@ -67,7 +67,7 @@ describe("File", () => {
   });
 
   it("join splices an Array component, and an empty one away", () => {
-    // vendor/ruby/file.c:5048-5054, verified against ruby 3.3.11.
+    // vendor/ruby/v3.3.11/file.c:5048-5054, verified against ruby 3.3.11.
     expect(File.join("lib", "generators", [], "x")).toBe("lib/generators/x");
     expect(File.join("lib", "generators", [])).toBe("lib/generators/");
     expect(File.join("a", ["b", ["c"]], "d")).toBe("a/b/c/d");
@@ -78,14 +78,14 @@ describe("File", () => {
   });
 
   it("extname keeps a trailing dot and skips a leading one", () => {
-    // vendor/ruby/file.c:4954.
+    // vendor/ruby/v3.3.11/file.c:4954.
     expect(File.extname("a/b.tar.gz")).toBe(".gz");
     expect(File.extname("a/.bashrc")).toBe("");
     expect(File.extname("a/b.")).toBe(".");
   });
 
   it("basename strips a suffix, and .* strips whatever extension is there", () => {
-    // vendor/ruby/file.c:4705.
+    // vendor/ruby/v3.3.11/file.c:4705.
     expect(File.basename("/a/b/")).toBe("b");
     expect(File.basename("/a/b.rb", ".rb")).toBe("b");
     expect(File.basename("/a/b.rb", ".*")).toBe("b");
@@ -114,13 +114,13 @@ describe("File", () => {
   });
 
   it("directory? and file? answer false rather than raising on a missing path", () => {
-    // vendor/ruby/file.c:1622.
+    // vendor/ruby/v3.3.11/file.c:1622.
     expect(File.isDirectory("/nope/nope")).toBe(false);
     expect(File.isFile("/nope/nope")).toBe(false);
   });
 
   it("size? is nil both for a missing file and for an empty one", () => {
-    // vendor/ruby/file.c:2047 answers nil in BOTH cases, not 0.
+    // vendor/ruby/v3.3.11/file.c:2047 answers nil in BOTH cases, not 0.
     const root = fixture();
     writeFileSync(join(root, "empty.rb"), "");
     expect(File.isSize(join(root, "a.rb"))).toBe(7);
@@ -129,7 +129,7 @@ describe("File", () => {
   });
 
   it("stat raises where the predicates swallow, and mtime reads through it", () => {
-    // vendor/ruby/file.c:1329 raises Errno::ENOENT rather than answering nil.
+    // vendor/ruby/v3.3.11/file.c:1329 raises Errno::ENOENT rather than answering nil.
     const root = fixture();
     expect(File.stat(join(root, "a.rb")).size).toBe(7);
     expect(File.mtime(join(root, "a.rb"))).toBeInstanceOf(Date);
@@ -137,7 +137,7 @@ describe("File", () => {
   });
 
   it("readable? is an access check, not the existence check exist? is", () => {
-    // vendor/ruby/file.c:1826 is eaccess(R_OK), not the stat exist? does.
+    // vendor/ruby/v3.3.11/file.c:1826 is eaccess(R_OK), not the stat exist? does.
     const root = fixture();
     const path = join(root, "a.rb");
     chmodSync(path, 0o000);
@@ -254,7 +254,7 @@ describe("File.fnmatch", () => {
   });
 
   it("read decodes through the encoding: option, rather than always as UTF-8", () => {
-    // vendor/ruby/io.c:12163 open_key_args — the opt hash opens the stream.
+    // vendor/ruby/v3.3.11/io.c:12163 open_key_args — the opt hash opens the stream.
     const path = File.join(mkdtempSync(join(tmpdir(), "trails-file-")), "latin1.txt");
     File.binwrite(path, "h\u00e9l");
     expect(File.read(path, { encoding: "ISO-8859-1" })).toBe("hél");

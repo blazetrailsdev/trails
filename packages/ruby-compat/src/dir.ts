@@ -11,7 +11,7 @@ import { verbose } from "./verbose.js";
 import { FileUtils } from "./file-utils.js";
 
 /**
- * `Kernel#warn` (`vendor/ruby/error.c:555` `rb_warn_m`), which writes nothing
+ * `Kernel#warn` (`vendor/ruby/v3.3.11/error.c:555` `rb_warn_m`), which writes nothing
  * at all while `$VERBOSE` is `nil` (`error.c:561`, `!NIL_P(ruby_verbose)`) —
  * `false` still warns, so the guard is against `nil` alone — and terminates
  * the message with a newline where it lacks one (`error.c:573`).
@@ -21,10 +21,10 @@ function warn(message: string): void {
   stderr.write(`${message}\n`);
 }
 
-/** `W_OK` (`vendor/ruby/file.c:1898` `rb_file_writable_p`). */
+/** `W_OK` (`vendor/ruby/v3.3.11/file.c:1898` `rb_file_writable_p`). */
 const W_OK = 2;
 
-/** `File::Stat#writable?` (`vendor/ruby/file.c:1898`), as `access(2)`. */
+/** `File::Stat#writable?` (`vendor/ruby/v3.3.11/file.c:1898`), as `access(2)`. */
 function isWritable(dir: string): boolean {
   const accessSync = getFs().accessSync;
   if (!accessSync) return true;
@@ -36,7 +36,7 @@ function isWritable(dir: string): boolean {
   }
 }
 
-/** `Dir::SYSTMPDIR` (`vendor/ruby/lib/tmpdir.rb:20`). */
+/** `Dir::SYSTMPDIR` (`vendor/ruby/v3.3.11/lib/tmpdir.rb:20`). */
 const SYSTMPDIR = "/tmp";
 
 const MAGIC = /[*?[{]/;
@@ -139,32 +139,32 @@ function globHelper(base: string, segments: string[], found: string[], enumerate
 }
 
 /**
- * `Dir` (`vendor/ruby/dir.c:3632` `rb_cDir`), the sliver of it trails calls.
+ * `Dir` (`vendor/ruby/v3.3.11/dir.c:3632` `rb_cDir`), the sliver of it trails calls.
  *
  * Rails reaches directories through this class — `Dir.children(cache_path)` in
- * `vendor/rails/activesupport/lib/active_support/cache/file_store.rb:34`,
+ * `vendor/rails/v8.0.2/activesupport/lib/active_support/cache/file_store.rb:34`,
  * `Dir.delete(dir)` at `file_store.rb:198`, `Dir.each_child(dir)` at
  * `file_store.rb:210` — so trails reaches them through a class of the same
  * name. The backend is the `FsAdapter` contract in `./fs-adapter.js`.
  *
- * @noRailsEquivalent PERMANENT — Ruby core `Dir` (`vendor/ruby/dir.c:3632`),
+ * @noRailsEquivalent PERMANENT — Ruby core `Dir` (`vendor/ruby/v3.3.11/dir.c:3632`),
  * which Rails calls without defining, so no Rails or gem file declares the
  * class this file's single export lives in.
  */
 export class Dir {
   /**
-   * `vendor/ruby/dir.c:1413` `dir_s_getwd`, registered under both `getwd` and
+   * `vendor/ruby/v3.3.11/dir.c:1413` `dir_s_getwd`, registered under both `getwd` and
    * `pwd` (`dir.c:3661-3662`) — the path to the current working directory.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Dir.pwd`
-   * (`vendor/ruby/dir.c:1413`).
+   * (`vendor/ruby/v3.3.11/dir.c:1413`).
    */
   static pwd(): string {
     return getFs().cwd();
   }
 
   /**
-   * `Dir.tmpdir` (`vendor/ruby/lib/tmpdir.rb:26`) — the first of `TMPDIR`,
+   * `Dir.tmpdir` (`vendor/ruby/v3.3.11/lib/tmpdir.rb:26`) — the first of `TMPDIR`,
    * `TMP`, `TEMP`, `SYSTMPDIR` (`tmpdir.rb:20`, `/tmp` off a build without
    * `Etc.systmpdir`), `/tmp` and `.` that names a writable directory, and
    * `ArgumentError` when none does (`tmpdir.rb:43`).
@@ -175,7 +175,7 @@ export class Dir {
    * (`tmpdir.rb:37`) are the `0o002` and `0o1000` bits of the stat's mode.
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Dir.tmpdir`
-   * (`vendor/ruby/lib/tmpdir.rb:26`), which Rails calls without defining.
+   * (`vendor/ruby/v3.3.11/lib/tmpdir.rb:26`), which Rails calls without defining.
    */
   static tmpdir(): string {
     const candidates: [string, string | undefined][] = [
@@ -214,14 +214,14 @@ export class Dir {
   }
 
   /**
-   * `Dir.mktmpdir` (`vendor/ruby/lib/tmpdir.rb:91`) — creates a directory
+   * `Dir.mktmpdir` (`vendor/ruby/v3.3.11/lib/tmpdir.rb:91`) — creates a directory
    * under `Dir.tmpdir` named by `Dir::Tmpname.create`, mode `0700`, and
    * answers its path; given a block, yields the path and removes the directory
    * afterwards, raising first when `base` is nil and the parent is
    * world-writable but not sticky (`tmpdir.rb:101-106`).
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Dir.mktmpdir`
-   * (`vendor/ruby/lib/tmpdir.rb:91`), which Rails calls without defining.
+   * (`vendor/ruby/v3.3.11/lib/tmpdir.rb:91`), which Rails calls without defining.
    */
   static mktmpdir(
     prefixSuffix?: TempfileBasename | null,
@@ -270,13 +270,13 @@ export class Dir {
   }
 
   /**
-   * `vendor/ruby/dir.c:1494` `dir_s_mkdir` — ONE directory, so a missing
+   * `vendor/ruby/v3.3.11/dir.c:1494` `dir_s_mkdir` — ONE directory, so a missing
    * parent is an `Errno::ENOENT` and an existing `dirname` an `Errno::EEXIST`,
    * which is the pair `Entry_#copy`'s directory arm rescues
-   * (`vendor/ruby/lib/fileutils.rb:2248-2252`).
+   * (`vendor/ruby/v3.3.11/lib/fileutils.rb:2248-2252`).
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Dir.mkdir`
-   * (`vendor/ruby/dir.c:1494`).
+   * (`vendor/ruby/v3.3.11/dir.c:1494`).
    */
   static mkdir(dirname: string): number {
     getFs().mkdirSync(dirname);
@@ -284,26 +284,26 @@ export class Dir {
   }
 
   /**
-   * `vendor/ruby/dir.c:3421` `dir_s_children`: every entry EXCEPT `"."` and
+   * `vendor/ruby/v3.3.11/dir.c:3421` `dir_s_children`: every entry EXCEPT `"."` and
    * `".."`, and it raises rather than answering `[]` when the directory is
    * missing.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Dir.children`
-   * (`vendor/ruby/dir.c:3421`).
+   * (`vendor/ruby/v3.3.11/dir.c:3421`).
    */
   static children(dirname: string): string[] {
     return getFs().readdirSync(dirname);
   }
 
   /**
-   * `vendor/ruby/dir.c:3288` `dir_foreach`, which yields `"."` and `".."`
+   * `vendor/ruby/v3.3.11/dir.c:3288` `dir_foreach`, which yields `"."` and `".."`
    * ahead of the entries `Dir.children` answers — the two `dir_each` reads
    * out of the directory stream and `dir_each_entry` filters only for
    * `each_child` — and raises rather than yielding nothing when the directory
    * is missing.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Dir.foreach`
-   * (`vendor/ruby/dir.c:3288`).
+   * (`vendor/ruby/v3.3.11/dir.c:3288`).
    */
   static foreach(dirname: string, block: (filename: string) => void): null {
     const children = Dir.children(dirname);
@@ -312,22 +312,22 @@ export class Dir {
   }
 
   /**
-   * `vendor/ruby/dir.c:3347` `dir_s_each_child`, which yields each of
+   * `vendor/ruby/v3.3.11/dir.c:3347` `dir_s_each_child`, which yields each of
    * `Dir.children`'s names.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Dir.each_child`
-   * (`vendor/ruby/dir.c:3347`).
+   * (`vendor/ruby/v3.3.11/dir.c:3347`).
    */
   static eachChild(dirname: string, block: (filename: string) => void): void {
     for (const filename of Dir.children(dirname)) block(filename);
   }
 
   /**
-   * `vendor/ruby/dir.c:1535` `dir_s_rmdir`, which answers `0` and removes only
+   * `vendor/ruby/v3.3.11/dir.c:1535` `dir_s_rmdir`, which answers `0` and removes only
    * an EMPTY directory.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Dir.delete`
-   * (`vendor/ruby/dir.c:1535`).
+   * (`vendor/ruby/v3.3.11/dir.c:1535`).
    */
   static delete(dirname: string): number {
     getFs().rmdirSync(dirname);
@@ -335,7 +335,7 @@ export class Dir {
   }
 
   /**
-   * `vendor/ruby/dir.c:3227` `dir_s_glob`. Three things node's globbers get
+   * `vendor/ruby/v3.3.11/dir.c:3227` `dir_s_glob`. Three things node's globbers get
    * wrong. `**` matching ZERO directories is tried on each entry before that
    * entry is descended into, so the two depths interleave rather than a
    * directory's own matches all preceding its children's —
@@ -356,7 +356,7 @@ export class Dir {
    * that still needs the stat.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Dir.glob`
-   * (`vendor/ruby/dir.c:3227`).
+   * (`vendor/ruby/v3.3.11/dir.c:3227`).
    */
   static glob(pattern: string): string[] {
     const found: string[] = [];
@@ -371,11 +371,11 @@ export class Dir {
   }
 }
 
-/** `Dir::Tmpname::UNUSABLE_CHARS` (`vendor/ruby/lib/tmpdir.rb:123`). */
+/** `Dir::Tmpname::UNUSABLE_CHARS` (`vendor/ruby/v3.3.11/lib/tmpdir.rb:123`). */
 const UNUSABLE_CHARS = /[^,\-.0-9A-Z_a-z~]/g;
 
 /**
- * `Dir::Tmpname::RANDOM.next` (`vendor/ruby/lib/tmpdir.rb:132`) —
+ * `Dir::Tmpname::RANDOM.next` (`vendor/ruby/v3.3.11/lib/tmpdir.rb:132`) —
  * `Random.urandom(4)` read as a little-endian `L`, modulo `36**6`
  * (`tmpdir.rb:129`), in base 36.
  */
@@ -388,11 +388,11 @@ function random(): string {
 
 /**
  * The `max_try:` and `**opts` keywords of `Dir::Tmpname.create`
- * (`vendor/ruby/lib/tmpdir.rb:140`); `Dir.mktmpdir` forwards its own
+ * (`vendor/ruby/v3.3.11/lib/tmpdir.rb:140`); `Dir.mktmpdir` forwards its own
  * `**options` there (`tmpdir.rb:93`).
  *
  * @noRailsEquivalent PERMANENT — the option hash of Ruby stdlib
- * `Dir::Tmpname.create` (`vendor/ruby/lib/tmpdir.rb:140`).
+ * `Dir::Tmpname.create` (`vendor/ruby/v3.3.11/lib/tmpdir.rb:140`).
  */
 export interface TmpnameOptions {
   maxTry?: number | null;
@@ -401,11 +401,11 @@ export interface TmpnameOptions {
 
 /**
  * `Dir::Tmpname.create(basename, tmpdir = nil, max_try: nil, **opts)`
- * (`vendor/ruby/lib/tmpdir.rb:140`) — yields candidate names until one is not
+ * (`vendor/ruby/v3.3.11/lib/tmpdir.rb:140`) — yields candidate names until one is not
  * taken, retrying on `Errno::EEXIST`, and returns the name that stuck.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib `Dir::Tmpname.create`
- * (`vendor/ruby/lib/tmpdir.rb:140`).
+ * (`vendor/ruby/v3.3.11/lib/tmpdir.rb:140`).
  */
 export function createTmpname(
   basename: TempfileBasename,

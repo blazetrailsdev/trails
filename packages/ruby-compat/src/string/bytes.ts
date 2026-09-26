@@ -1,9 +1,9 @@
 /**
- * `String#bytes` (`vendor/ruby/string.c:9253` `rb_str_bytes`): the receiver's
+ * `String#bytes` (`vendor/ruby/v3.3.11/string.c:9253` `rb_str_bytes`): the receiver's
  * UTF-8 bytes. A JS string holds UTF-16, so a byte that is not part of a
  * well-formed UTF-8 sequence is carried as the lone low surrogate
  * `U+DC80`..`U+DCFF` (`"\udc80"` is Ruby's `"\x80"`), the one code unit a
- * UTF-8 String cannot otherwise hold (`vendor/ruby/string.c:6845`). Any
+ * UTF-8 String cannot otherwise hold (`vendor/ruby/v3.3.11/string.c:6845`). Any
  * other lone surrogate contributes its generalized UTF-8 bytes.
  *
  * @noRailsEquivalent PERMANENT
@@ -27,7 +27,7 @@ export function bytes(str: string): number[] {
 
 /**
  * A well-formed UTF-8 sequence's length at `i`, or the negated length of the
- * invalid chunk there (`vendor/ruby/enc/utf_8.c:50` `EncLen_UTF8`).
+ * invalid chunk there (`vendor/ruby/v3.3.11/enc/utf_8.c:50` `EncLen_UTF8`).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -58,7 +58,7 @@ export function sequenceLength(b: number[], i: number): number {
 }
 
 /**
- * `rb_str_new` (`vendor/ruby/string.c:907`) over raw UTF-8 bytes: each
+ * `rb_str_new` (`vendor/ruby/v3.3.11/string.c:907`) over raw UTF-8 bytes: each
  * well-formed sequence decoded, every other byte carried as {@link bytes}
  * describes.
  *
@@ -82,7 +82,7 @@ export function strNew(b: number[]): string {
 
 /**
  * Whether byte offset `pos` starts a character (`str_ensure_byte_pos`,
- * `vendor/ruby/string.c:4082`).
+ * `vendor/ruby/v3.3.11/string.c:4082`).
  *
  * @noRailsEquivalent PERMANENT
  */

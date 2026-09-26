@@ -1,5 +1,5 @@
 /**
- * `String#b` (`vendor/ruby/string.c:10955` `rb_str_b`) — a copy of the
+ * `String#b` (`vendor/ruby/v3.3.11/string.c:10955` `rb_str_b`) — a copy of the
  * receiver tagged `ASCII-8BIT`, which Rails inherits rather than defines.
  * `str_replace_shared_without_enc` shares the receiver's bytes and leaves the
  * receiver itself untouched, which is the whole difference from
@@ -13,7 +13,7 @@
  * site Rails makes, where the transcoding is the identity.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `String#b`
- * (`vendor/ruby/string.c:10955` `rb_str_b`).
+ * (`vendor/ruby/v3.3.11/string.c:10955` `rb_str_b`).
  */
 export function b(str: string): string {
   const bytes = new TextEncoder().encode(str);

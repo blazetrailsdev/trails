@@ -6,7 +6,7 @@ import { IO } from "./io.js";
 import { NotImplementedError } from "./not-implemented-error.js";
 import { stdout } from "./process-adapter.js";
 
-/** `File.directory?` (`vendor/ruby/file.c:1615`). */
+/** `File.directory?` (`vendor/ruby/v3.3.11/file.c:1615`). */
 function isDirectory(path: string): boolean {
   try {
     return getFs().statSync(path).isDirectory();
@@ -16,7 +16,7 @@ function isDirectory(path: string): boolean {
 }
 
 /**
- * `SystemCallError` (`vendor/ruby/error.c:3380`), the parent of the `Errno`
+ * `SystemCallError` (`vendor/ruby/v3.3.11/error.c:3380`), the parent of the `Errno`
  * classes — which is what the fs backend's own errors are: they carry a
  * `.code`. Anything else propagates, as it does past Ruby's
  * `rescue SystemCallError`.
@@ -25,7 +25,7 @@ function isSystemCallError(error: unknown): boolean {
   return typeof (error as { code?: unknown } | null | undefined)?.code === "string";
 }
 
-/** `Entry_#exist?` / `#directory?` (`vendor/ruby/lib/fileutils.rb:2109,2123`). */
+/** `Entry_#exist?` / `#directory?` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2109,2123`). */
 function statOrNull(path: string): FsStatResult | null {
   try {
     return getFs().statSync(path);
@@ -35,7 +35,7 @@ function statOrNull(path: string): FsStatResult | null {
 }
 
 /**
- * `SystemCallError` (`vendor/ruby/error.c:3899` `rb_eSystemCallError`), whose
+ * `SystemCallError` (`vendor/ruby/v3.3.11/error.c:3899` `rb_eSystemCallError`), whose
  * subclass is picked by an errno — spelled here as the `code` the fs layer's
  * own errors already carry.
  *
@@ -47,7 +47,7 @@ interface SystemCallError extends Error {
 }
 
 /**
- * `Errno::EEXIST` (`vendor/ruby/lib/fileutils.rb:1163`) — a `SystemCallError`,
+ * `Errno::EEXIST` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1163`) — a `SystemCallError`,
  * whose `.code` the fs layer's own errors carry and callers branch on.
  */
 function errnoEexist(path: string): SystemCallError {
@@ -56,18 +56,18 @@ function errnoEexist(path: string): SystemCallError {
   return error;
 }
 
-/** `remove_trailing_slash` (`vendor/ruby/lib/fileutils.rb:276-278`). */
+/** `remove_trailing_slash` (`vendor/ruby/v3.3.11/lib/fileutils.rb:276-278`). */
 function removeTrailingSlash(dir: string): string {
   return dir === "/" ? dir : dir.endsWith("/") ? dir.slice(0, -1) : dir;
 }
 
-/** `fu_list` (`vendor/ruby/lib/fileutils.rb:2461-2463`). */
+/** `fu_list` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2461-2463`). */
 function fuList(arg: string | string[]): string[] {
   return Array.isArray(arg) ? [...arg] : [arg];
 }
 
 /**
- * `fu_mkdir` (`vendor/ruby/lib/fileutils.rb:396-404`). Ruby's `Dir.mkdir path,
+ * `fu_mkdir` (`vendor/ruby/v3.3.11/lib/fileutils.rb:396-404`). Ruby's `Dir.mkdir path,
  * mode` takes the mode in the create call; the backend contract's `mkdirSync`
  * does not, so the mode arrives through the `File.chmod` half alone.
  */
@@ -81,7 +81,7 @@ function fuMkdir(path: string, mode: number | undefined): void {
   }
 }
 
-/** `fu_same?` (`vendor/ruby/lib/fileutils.rb:2491-2493`) — `File.identical?`. */
+/** `fu_same?` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2491-2493`) — `File.identical?`. */
 function fuSame(a: string, b: string): boolean {
   const realpathSync = getFs().realpathSync;
   if (!realpathSync) return a === b;
@@ -92,7 +92,7 @@ function fuSame(a: string, b: string): boolean {
   }
 }
 
-/** `fu_each_src_dest0` (`vendor/ruby/lib/fileutils.rb:2474-2489`). */
+/** `fu_each_src_dest0` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2474-2489`). */
 function fuEachSrcDest0(
   src: string | string[],
   dest: string,
@@ -112,7 +112,7 @@ function fuEachSrcDest0(
   }
 }
 
-/** `fu_each_src_dest` (`vendor/ruby/lib/fileutils.rb:2466-2472`). */
+/** `fu_each_src_dest` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2466-2472`). */
 function fuEachSrcDest(
   src: string | string[],
   dest: string,
@@ -125,7 +125,7 @@ function fuEachSrcDest(
 }
 
 /**
- * `File.lchown` (`vendor/ruby/file.c:3567`), which raises `NotImplementedError`
+ * `File.lchown` (`vendor/ruby/v3.3.11/file.c:3567`), which raises `NotImplementedError`
  * on a platform whose C library has no `lchown` — spelled here as a backend
  * with no `lchownSync`.
  */
@@ -136,7 +136,7 @@ function fileLchown(uid: number, gid: number, path: string): void {
   lchownSync(path, uid, gid);
 }
 
-/** `File.lchmod` (`vendor/ruby/file.c:3211`), `NotImplementedError` as above. */
+/** `File.lchmod` (`vendor/ruby/v3.3.11/file.c:3211`), `NotImplementedError` as above. */
 function fileLchmod(mode: number, path: string): void {
   const lchmodSync = getFs().lchmodSync;
   if (!lchmodSync)
@@ -144,7 +144,7 @@ function fileLchmod(mode: number, path: string): void {
   lchmodSync(path, mode);
 }
 
-/** `File.readlink` (`vendor/ruby/file.c:3081`). */
+/** `File.readlink` (`vendor/ruby/v3.3.11/file.c:3081`). */
 function fileReadlink(path: string): string {
   const readlinkSync = getFs().readlinkSync;
   if (!readlinkSync)
@@ -152,7 +152,7 @@ function fileReadlink(path: string): string {
   return readlinkSync(path);
 }
 
-/** `File.symlink` (`vendor/ruby/file.c:3033`). */
+/** `File.symlink` (`vendor/ruby/v3.3.11/file.c:3033`). */
 function fileSymlink(old: string, newName: string): void {
   const symlinkSync = getFs().symlinkSync;
   if (!symlinkSync)
@@ -161,7 +161,7 @@ function fileSymlink(old: string, newName: string): void {
 }
 
 /**
- * `File.utime` (`vendor/ruby/file.c:2983`). `utimesSync` is optional on the
+ * `File.utime` (`vendor/ruby/v3.3.11/file.c:2983`). `utimesSync` is optional on the
  * backend contract, and an adapter without one still has to raise `ENOENT` for
  * a missing path — which is the branch `touch` reads — so the fallback stats
  * the path for exactly that, and no-ops the timestamp update itself: against
@@ -178,7 +178,7 @@ function fileUtime(atime: Date, mtime: Date, path: string): void {
 }
 
 /**
- * `Entry_` (`vendor/ruby/lib/fileutils.rb:2069-2459`), the one directory-tree
+ * `Entry_` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2069-2459`), the one directory-tree
  * walker every recursive `FileUtils` body is written against: `copy_entry`
  * (`fileutils.rb:1044-1052`) hands it two procs, `remove_entry`
  * (`fileutils.rb:1450`) traverses it in postorder.
@@ -198,7 +198,7 @@ class Entry_ {
   private _lstat: FsStatResult | null = null;
 
   /**
-   * `Entry_::S_IF_DOOR` (`vendor/ruby/lib/fileutils.rb:2153`), the file-type
+   * `Entry_::S_IF_DOOR` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2153`), the file-type
    * bits `door?` masks a mode against. `private` because `Entry_` itself is
    * Ruby's `internal use only` class and `door?` is its only reader: a public
    * constant in a file no Rails file maps onto is measured extra surface, and
@@ -207,7 +207,7 @@ class Entry_ {
    */
   private static readonly S_IF_DOOR = 0xd000;
 
-  /** `Entry_#initialize` (`vendor/ruby/lib/fileutils.rb:2072-2083`). */
+  /** `Entry_#initialize` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2072-2083`). */
   constructor(a: string, b: string | null = null, deref = false) {
     if (b != null) {
       this._prefix = a;
@@ -218,7 +218,7 @@ class Entry_ {
     this._deref = deref;
   }
 
-  /** `Entry_#path` (`vendor/ruby/lib/fileutils.rb:2089-2095`). */
+  /** `Entry_#path` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2089-2095`). */
   get path(): string {
     if (this._path != null) {
       return this._path;
@@ -227,77 +227,77 @@ class Entry_ {
     }
   }
 
-  /** `Entry_#prefix` (`vendor/ruby/lib/fileutils.rb:2097-2099`). */
+  /** `Entry_#prefix` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2097-2099`). */
   get prefix(): string | null {
     return this._prefix ?? this._path;
   }
 
-  /** `Entry_#rel` (`vendor/ruby/lib/fileutils.rb:2101-2103`). */
+  /** `Entry_#rel` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2101-2103`). */
   get rel(): string | null {
     return this._rel;
   }
 
-  /** `Entry_#dereference?` (`vendor/ruby/lib/fileutils.rb:2105-2107`). */
+  /** `Entry_#dereference?` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2105-2107`). */
   get isDereference(): boolean {
     return this._deref;
   }
 
-  /** `Entry_#file?` (`vendor/ruby/lib/fileutils.rb:2118-2121`). */
+  /** `Entry_#file?` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2118-2121`). */
   get isFile(): boolean {
     const s = this.lstatBang();
     return s != null && s.isFile();
   }
 
-  /** `Entry_#directory?` (`vendor/ruby/lib/fileutils.rb:2123-2126`). */
+  /** `Entry_#directory?` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2123-2126`). */
   get isDirectory(): boolean {
     const s = this.lstatBang();
     return s != null && s.isDirectory();
   }
 
-  /** `Entry_#symlink?` (`vendor/ruby/lib/fileutils.rb:2128-2131`). */
+  /** `Entry_#symlink?` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2128-2131`). */
   get isSymlink(): boolean {
     const s = this.lstatBang();
     return s != null && s.isSymbolicLink?.() === true;
   }
 
-  /** `Entry_#chardev?` (`vendor/ruby/lib/fileutils.rb:2133-2136`). */
+  /** `Entry_#chardev?` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2133-2136`). */
   get isChardev(): boolean {
     const s = this.lstatBang();
     return s != null && s.isCharacterDevice?.() === true;
   }
 
-  /** `Entry_#blockdev?` (`vendor/ruby/lib/fileutils.rb:2138-2141`). */
+  /** `Entry_#blockdev?` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2138-2141`). */
   get isBlockdev(): boolean {
     const s = this.lstatBang();
     return s != null && s.isBlockDevice?.() === true;
   }
 
-  /** `Entry_#socket?` (`vendor/ruby/lib/fileutils.rb:2143-2146`). */
+  /** `Entry_#socket?` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2143-2146`). */
   get isSocket(): boolean {
     const s = this.lstatBang();
     return s != null && s.isSocket?.() === true;
   }
 
-  /** `Entry_#pipe?` (`vendor/ruby/lib/fileutils.rb:2148-2151`). */
+  /** `Entry_#pipe?` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2148-2151`). */
   get isPipe(): boolean {
     const s = this.lstatBang();
     return s != null && s.isFIFO?.() === true;
   }
 
-  /** `Entry_#door?` (`vendor/ruby/lib/fileutils.rb:2155-2158`). */
+  /** `Entry_#door?` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2155-2158`). */
   get isDoor(): boolean {
     const s = this.lstatBang();
     return s != null && (s.mode & 0xf000) === Entry_.S_IF_DOOR;
   }
 
-  /** `Entry_#entries` (`vendor/ruby/lib/fileutils.rb:2159-2167`). */
+  /** `Entry_#entries` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2159-2167`). */
   entries(): Entry_[] {
     const files = Dir.children(this.path);
 
     return files.map((n) => new Entry_(this.prefix as string, this.join(this.rel, n)));
   }
 
-  /** `Entry_#lstat` (`vendor/ruby/lib/fileutils.rb:2192-2198`). */
+  /** `Entry_#lstat` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2192-2198`). */
   lstat(): FsStatResult {
     if (this.isDereference) {
       return (this._lstat ??= getFs().statSync(this.path));
@@ -306,7 +306,7 @@ class Entry_ {
     }
   }
 
-  /** `Entry_#lstat!` (`vendor/ruby/lib/fileutils.rb:2200-2204`). */
+  /** `Entry_#lstat!` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2200-2204`). */
   lstatBang(): FsStatResult | null {
     try {
       return this.lstat();
@@ -317,7 +317,7 @@ class Entry_ {
   }
 
   /**
-   * `Entry_#copy` (`vendor/ruby/lib/fileutils.rb:2239-2274`).
+   * `Entry_#copy` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2239-2274`).
    *
    * The `socket?` and `pipe?` arms each raise before their copy under an
    * interpreter that answers no `UNIXServer` (`fileutils.rb:2258-2263`) and no
@@ -352,7 +352,7 @@ class Entry_ {
     }
   }
 
-  /** `Entry_#copy_file` (`vendor/ruby/lib/fileutils.rb:2277-2283`). */
+  /** `Entry_#copy_file` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2277-2283`). */
   copyFile(dest: string): void {
     File.open(this.path, "r", (s) => {
       File.open(dest, "wb", { perm: s.stat().mode }, (f) => {
@@ -361,7 +361,7 @@ class Entry_ {
     });
   }
 
-  /** `Entry_#copy_metadata` (`vendor/ruby/lib/fileutils.rb:2285-2312`). */
+  /** `Entry_#copy_metadata` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2285-2312`). */
   copyMetadata(path: string): void {
     const st = this.lstat();
     const symlink = st.isSymbolicLink?.() === true;
@@ -396,7 +396,7 @@ class Entry_ {
     }
   }
 
-  /** `Entry_#remove` (`vendor/ruby/lib/fileutils.rb:2314-2320`). */
+  /** `Entry_#remove` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2314-2320`). */
   remove(): void {
     if (this.isDirectory) {
       this.removeDir1();
@@ -405,17 +405,17 @@ class Entry_ {
     }
   }
 
-  /** `Entry_#remove_dir1` (`vendor/ruby/lib/fileutils.rb:2322-2326`). */
+  /** `Entry_#remove_dir1` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2322-2326`). */
   removeDir1(): void {
     getFs().rmdirSync(removeTrailingSlash(this.path));
   }
 
-  /** `Entry_#remove_file` (`vendor/ruby/lib/fileutils.rb:2328-2332`). */
+  /** `Entry_#remove_file` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2328-2332`). */
   removeFile(): void {
     getFs().unlinkSync(this.path);
   }
 
-  /** `Entry_#preorder_traverse` (`vendor/ruby/lib/fileutils.rb:2354-2360`). */
+  /** `Entry_#preorder_traverse` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2354-2360`). */
   preorderTraverse(yieldFn: (ent: Entry_) => void): void {
     const stack: Entry_[] = [this];
     let ent: Entry_ | undefined;
@@ -425,7 +425,7 @@ class Entry_ {
     }
   }
 
-  /** `Entry_#postorder_traverse` (`vendor/ruby/lib/fileutils.rb:2364-2382`). */
+  /** `Entry_#postorder_traverse` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2364-2382`). */
   postorderTraverse(yieldFn: (ent: Entry_) => void): void {
     if (this.isDirectory) {
       let children: Entry_[];
@@ -446,7 +446,7 @@ class Entry_ {
     yieldFn(this);
   }
 
-  /** `Entry_#wrap_traverse` (`vendor/ruby/lib/fileutils.rb:2386-2393`). */
+  /** `Entry_#wrap_traverse` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2386-2393`). */
   wrapTraverse(pre: (ent: Entry_) => void, post: (ent: Entry_) => void): void {
     pre(this);
     if (this.isDirectory) {
@@ -457,7 +457,7 @@ class Entry_ {
     post(this);
   }
 
-  /** `Entry_#join` (`vendor/ruby/lib/fileutils.rb:2432-2446`). */
+  /** `Entry_#join` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2432-2446`). */
   private join(dir: string | null, base: string | null): string {
     if (base == null || base === ".") return dir as string;
     if (dir == null || dir === ".") return base;
@@ -465,7 +465,7 @@ class Entry_ {
   }
 
   /**
-   * `Entry_#descendant_directory?` (`vendor/ruby/lib/fileutils.rb:2452-2458`),
+   * `Entry_#descendant_directory?` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2452-2458`),
    * the guard `Entry_#copy`'s directory arm raises on (`fileutils.rb:2245-2247`).
    */
   private isDescendantDirectory(descendant: string, ascendant: string): boolean {
@@ -482,21 +482,21 @@ class Entry_ {
 
 /**
  * The `output.puts msg` receiver `fu_output_message`
- * (`vendor/ruby/lib/fileutils.rb:2496-2503`) writes to — `$stdout` by default,
+ * (`vendor/ruby/v3.3.11/lib/fileutils.rb:2496-2503`) writes to — `$stdout` by default,
  * or whatever `@fileutils_output` was set to.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `IO`, which Rails calls without
  * defining.
  */
 export interface FileUtilsOutput {
-  /** `IO#puts` (`vendor/ruby/io.c:8580`).
+  /** `IO#puts` (`vendor/ruby/v3.3.11/io.c:8580`).
    * @noRailsEquivalent PERMANENT — Ruby core `IO`, which Rails calls without
    * defining.
    */
   puts(msg: string): void;
 }
 
-/** `$stdout` (`vendor/ruby/lib/fileutils.rb:2498`), reached through the process
+/** `$stdout` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2498`), reached through the process
  * backend so the leaf writes without importing one. */
 const fuStdout: FileUtilsOutput = {
   puts: (msg) => {
@@ -504,7 +504,7 @@ const fuStdout: FileUtilsOutput = {
   },
 };
 
-/** `fu_output_message` (`vendor/ruby/lib/fileutils.rb:2496-2503`). */
+/** `fu_output_message` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2496-2503`). */
 function fuOutputMessage(msg: string): void {
   const output = FileUtils.fileutilsOutput ?? fuStdout;
   if (FileUtils.fileutilsLabel != null) {
@@ -514,7 +514,7 @@ function fuOutputMessage(msg: string): void {
 }
 
 /**
- * Ruby's `FileUtils` (stdlib, `vendor/ruby/lib/fileutils.rb:1`), the file
+ * Ruby's `FileUtils` (stdlib, `vendor/ruby/v3.3.11/lib/fileutils.rb:1`), the file
  * operations Rails sends from ported bodies — `mkdir_p` when a schema dump or a
  * cache root has to exist, `rm`/`rm_f`/`rm_r` when one is torn down, `cp`, `mv`
  * and `touch`. Only the members Ruby code in this repo sends are ported.
@@ -528,21 +528,21 @@ function fuOutputMessage(msg: string): void {
  * for it while Rails bodies send `FileUtils.mkdir_p` and friends.
  */
 export class FileUtils {
-  /** `@fileutils_output` (`vendor/ruby/lib/fileutils.rb:2497`), the sink
+  /** `@fileutils_output` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2497`), the sink
    * `fu_output_message` writes to when a host has set one.
    * @noRailsEquivalent PERMANENT — the JS spelling of a Ruby module instance
    * variable, which has no member of its own to mirror.
    */
   static fileutilsOutput?: FileUtilsOutput;
 
-  /** `@fileutils_label` (`vendor/ruby/lib/fileutils.rb:2500`), prefixed to
+  /** `@fileutils_label` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2500`), prefixed to
    * every message when a host has set one.
    * @noRailsEquivalent PERMANENT — the JS spelling of a Ruby module instance
    * variable, which has no member of its own to mirror.
    */
   static fileutilsLabel?: string;
 
-  /** `FileUtils.mkdir_p` (`vendor/ruby/lib/fileutils.rb:365-388`).
+  /** `FileUtils.mkdir_p` (`vendor/ruby/v3.3.11/lib/fileutils.rb:365-388`).
    * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
    */
   static mkdirP(
@@ -576,12 +576,12 @@ export class FileUtils {
     return list;
   }
 
-  /** `FileUtils.makedirs` (`vendor/ruby/lib/fileutils.rb:392-394`), an alias of `mkdir_p`.
+  /** `FileUtils.makedirs` (`vendor/ruby/v3.3.11/lib/fileutils.rb:392-394`), an alias of `mkdir_p`.
    * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
    */
   static makedirs = FileUtils.mkdirP;
 
-  /** `FileUtils.cp` (`vendor/ruby/lib/fileutils.rb:873-879`).
+  /** `FileUtils.cp` (`vendor/ruby/v3.3.11/lib/fileutils.rb:873-879`).
    * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
    */
   static cp(
@@ -598,7 +598,7 @@ export class FileUtils {
   }
 
   /**
-   * `copy_entry` (`vendor/ruby/lib/fileutils.rb:1040-1053`), whose `wrap_traverse`
+   * `copy_entry` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1040-1053`), whose `wrap_traverse`
    * walks a directory tree and copies each entry with `Entry_#copy`
    * (`fileutils.rb:2239-2274`), then its `copy_metadata` under `preserve`.
    *
@@ -611,7 +611,7 @@ export class FileUtils {
    * (`fileutils.rb:1041-1043`) so a symlinked root is copied as its target, and
    * `remove_destination` unlinks an existing destination entry before each copy
    * (`fileutils.rb:1047`), through `File.delete` — the name Ruby's `File.unlink`
-   * is an alias of (`vendor/ruby/file.c:3202`).
+   * is an alias of (`vendor/ruby/v3.3.11/file.c:3202`).
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
    */
@@ -640,7 +640,7 @@ export class FileUtils {
     );
   }
 
-  /** `FileUtils.copy_file` (`vendor/ruby/lib/fileutils.rb:1076-1080`), whose
+  /** `FileUtils.copy_file` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1076-1080`), whose
    * `Entry_#copy_file` (`fileutils.rb:2277-2283`) copies the bytes and
    * `copy_metadata` (`fileutils.rb:2285-2312`) the timestamps, ownership and
    * mode. Ruby's `dereference` reaches only `Entry_#lstat`
@@ -654,7 +654,7 @@ export class FileUtils {
     if (preserve) ent.copyMetadata(dest);
   }
 
-  /** `FileUtils.mv` (`vendor/ruby/lib/fileutils.rb:1157-1183`). Ruby's `secure:`
+  /** `FileUtils.mv` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1157-1183`). Ruby's `secure:`
    * kwarg routes the cross-device fallback's teardown through
    * `remove_entry_secure` (`fileutils.rb:1351-1447`), which is built on
    * `Process.euid`; `process.*` is unavailable here, so the kwarg has no arm to
@@ -689,7 +689,7 @@ export class FileUtils {
     });
   }
 
-  /** `FileUtils.rm` (`vendor/ruby/lib/fileutils.rb:1216-1225`).
+  /** `FileUtils.rm` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1216-1225`).
    * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
    */
   static rm(
@@ -706,7 +706,7 @@ export class FileUtils {
     return list;
   }
 
-  /** `FileUtils.rm_f` (`vendor/ruby/lib/fileutils.rb:1241-1243`).
+  /** `FileUtils.rm_f` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1241-1243`).
    * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
    */
   static rmF(
@@ -716,7 +716,7 @@ export class FileUtils {
     return FileUtils.rm(list, { force: true, noop, verbose });
   }
 
-  /** `FileUtils.rm_r` (`vendor/ruby/lib/fileutils.rb:1299-1310`).
+  /** `FileUtils.rm_r` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1299-1310`).
    * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
    */
   static rmR(
@@ -732,7 +732,7 @@ export class FileUtils {
     return list;
   }
 
-  /** `FileUtils.rm_rf` (`vendor/ruby/lib/fileutils.rb:1328-1330`). Ruby's
+  /** `FileUtils.rm_rf` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1328-1330`). Ruby's
    * `secure:` kwarg routes `rm_r` through `remove_entry_secure`
    * (`fileutils.rb:1351-1447`), which is unported, so the kwarg has no arm to
    * select and is not accepted — as on `rm_r` itself.
@@ -745,7 +745,7 @@ export class FileUtils {
     return FileUtils.rmR(list, { force: true, noop, verbose });
   }
 
-  /** `FileUtils.remove_entry` (`vendor/ruby/lib/fileutils.rb:1449-1456`).
+  /** `FileUtils.remove_entry` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1449-1456`).
    * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
    */
   static removeEntry(path: string, force = false): void {
@@ -762,7 +762,7 @@ export class FileUtils {
     }
   }
 
-  /** `FileUtils.remove_file` (`vendor/ruby/lib/fileutils.rb:1473-1477`).
+  /** `FileUtils.remove_file` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1473-1477`).
    * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
    */
   static removeFile(path: string, force = false): void {
@@ -773,7 +773,7 @@ export class FileUtils {
     }
   }
 
-  /** `FileUtils.touch` (`vendor/ruby/lib/fileutils.rb:2006-2026`). The verbose
+  /** `FileUtils.touch` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2006-2026`). The verbose
    * line's `t.strftime('-t %Y%m%d%H%M.%S ')` is spelled out digit by digit:
    * `strftime` lives in `@blazetrails/activesupport`, which this leaf cannot
    * import.
