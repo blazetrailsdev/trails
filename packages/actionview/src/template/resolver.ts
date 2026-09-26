@@ -249,7 +249,7 @@ export class PathParser {
   private regex: RegExp | null = null;
 
   buildPathRegex(): RegExp {
-    const handlers = union(TemplateHandlers.extensions());
+    const handlers = union(TemplateHandlers.extensions().map(symbolToS));
     const formats = union(Template.Types.symbols().map(symbolToS));
     const availableLocales = I18n.availableLocales().map(String);
     const regularLocales = [/[a-z]{2}(?:[-_][A-Z]{2})?/];
@@ -275,10 +275,10 @@ export class PathParser {
     const [, prefix, partial, action, locale, format, variant, handler] = match;
     const templatePath = TemplatePath.build(action, prefix ?? "", partial != null);
     const details = new TemplateDetails(
-      locale ?? null,
+      locale != null ? `:${locale}` : null,
       handler != null ? `:${handler}` : null,
       format != null ? `:${format}` : null,
-      variant ?? null,
+      variant != null ? `:${variant}` : null,
     );
     return new ParsedPath(templatePath, details);
   }

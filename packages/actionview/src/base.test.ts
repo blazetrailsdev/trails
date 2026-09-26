@@ -249,8 +249,8 @@ describe("ActionView::Base lookup_context delegation", () => {
     expect(view.formats).toEqual([":json"]);
 
     view.locale = "fr";
-    expect(lookupContext.locale).toBe("fr");
-    expect(view.locale).toBe("fr");
+    expect(lookupContext.locale).toBe(":fr");
+    expect(view.locale).toBe(":fr");
   });
 
   it("reads view_paths through, and refuses a write as Rails' missing writer does", () => {

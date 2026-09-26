@@ -41,6 +41,11 @@ export function symbolToS(sym: string): string {
   return sym.slice(1);
 }
 
+/** @noRailsEquivalent PERMANENT */
+export function stringToSym(value: string): string {
+  return isSymbol(value) ? value : `:${value}`;
+}
+
 const OPERATOR_METHOD_NAMES: Record<string, string> = {
   compareTo: "<=>",
   equals: "==",

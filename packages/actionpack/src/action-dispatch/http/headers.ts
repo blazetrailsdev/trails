@@ -23,15 +23,17 @@ const CGI_VARIABLES = new Set([
   "SERVER_SOFTWARE",
 ]);
 
+const HTTP_HEADER = /^[A-Za-z0-9-]+$/;
+
 /** @internal */
 function envName(key: string): string {
-  const str = String(key);
-  if (str.includes(".")) return str;
-  if (CGI_VARIABLES.has(str) || str.startsWith("HTTP_")) return str;
-  const upper = str.toUpperCase().replace(/-/g, "_");
-  if (CGI_VARIABLES.has(upper)) return upper;
-  if (upper.startsWith("HTTP_")) return upper;
-  return "HTTP_" + upper;
+  key = String(key);
+  if (HTTP_HEADER.test(key)) {
+    key = key.toUpperCase();
+    key = key.replace(/-/g, "_");
+    if (!CGI_VARIABLES.has(key)) key = "HTTP_" + key;
+  }
+  return key;
 }
 
 export class Headers {
@@ -53,24 +55,16 @@ export class Headers {
     this._req.setHeader(envName(String(key)), value);
   }
 
-  has(key: string): boolean {
-    return this._req.hasHeader(envName(String(key)));
-  }
-
-  isKey(key: string): boolean {
-    return this.has(key);
-  }
-
-  mergeBang(headersOrEnv: Record<string, unknown>): this {
-    return this.mergeInPlace(headersOrEnv);
-  }
-
   static fromHash(hash: Record<string, unknown>): Headers {
     return new Headers(new ActionDispatch.Request(hash));
   }
 
   add(key: string, value: unknown): void {
     this._req.addHeader(envName(String(key)), value);
+  }
+
+  isKey(key: string): boolean {
+    return this._req.hasHeader(envName(String(key)));
   }
 
   fetch(key: string, ...defaultValue: unknown[]): unknown {
@@ -90,14 +84,14 @@ export class Headers {
 
   merge(headersOrEnv: Record<string, unknown>): Headers {
     const headers = Headers.fromHash(this.env);
-    headers.mergeInPlace(headersOrEnv);
+    headers.mergeBang(headersOrEnv);
     return headers;
   }
 
-  mergeInPlace(other: Record<string, unknown>): this {
-    for (const [key, value] of Object.entries(other)) {
+  mergeBang(headersOrEnv: Record<string, unknown>): Record<string, unknown> {
+    for (const [key, value] of Object.entries(headersOrEnv)) {
       this._req.setHeader(envName(String(key)), value);
     }
-    return this;
+    return headersOrEnv;
   }
 }

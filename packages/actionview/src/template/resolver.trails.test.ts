@@ -113,9 +113,9 @@ describe("FileSystemResolver", () => {
     const ctx = new LookupContext(null, {}, []);
     ctx.appendViewPaths([new FileSystemResolver(dir)]);
 
-    expect(ctx.isExists("index", ["posts"], false, [], { variants: ["phone"] })).toBe(true);
-    expect(ctx.findAll("index", ["posts"], false, [], { variants: ["phone"] })).toHaveLength(2);
-    expect(ctx.find("index", ["posts"], false, [], { variants: ["phone"] })).toMatchObject({
+    expect(ctx.isExists("index", ["posts"], false, [], { variants: [":phone"] })).toBe(true);
+    expect(ctx.findAll("index", ["posts"], false, [], { variants: [":phone"] })).toHaveLength(2);
+    expect(ctx.find("index", ["posts"], false, [], { variants: [":phone"] })).toMatchObject({
       source: "<h1>Phone</h1>",
     });
   });
@@ -146,7 +146,7 @@ describe("FileSystemResolver", () => {
     await fs.writeFile!(path.join(dir, "posts", "index.html+tablet.tse"), "<h1>Tablet</h1>");
 
     expect(
-      ctx.disableCache(() => ctx.find("index", ["posts"], false, [], { variants: ["tablet"] })),
+      ctx.disableCache(() => ctx.find("index", ["posts"], false, [], { variants: [":tablet"] })),
     ).toMatchObject({ source: "<h1>Tablet</h1>" });
   });
 

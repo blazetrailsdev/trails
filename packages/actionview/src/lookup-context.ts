@@ -1,5 +1,5 @@
 import { I18n } from "@blazetrails/activesupport";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbObjRespondTo, stringToSym } from "@blazetrails/ruby-compat";
 import type { NestedDependencies } from "./digestor.js";
 import { Base } from "./base.js";
 import { TemplateHandlers } from "./template/handlers.js";
@@ -22,10 +22,10 @@ function registerDetail(name: string, proc: DefaultProc): void {
 }
 
 registerDetail("locale", () => {
-  const locales: (string | symbol)[] = [I18n.locale() as string];
+  const locales: (string | symbol)[] = [stringToSym(I18n.locale() as string)];
   if (rbObjRespondTo(I18n, "fallbacks"))
-    locales.push(...I18n.fallbacks().get(I18n.locale() as string));
-  locales.push(I18n.defaultLocale());
+    locales.push(...I18n.fallbacks().get(I18n.locale() as string).map(stringToSym));
+  locales.push(stringToSym(I18n.defaultLocale()));
   return [...new Set(locales)];
 });
 registerDetail(
@@ -173,7 +173,12 @@ export class LookupContext {
     return this._details.locale[0] ?? null;
   }
   set locale(value: string | symbol | null) {
-    this._setDetail("locale", value == null ? DEFAULT_PROCS.locale() : [value]);
+    this._setDetail(
+      "locale",
+      value == null
+        ? DEFAULT_PROCS.locale()
+        : [typeof value === "string" ? stringToSym(value) : value],
+    );
   }
 
   defaultFormats(): DetailValue {
