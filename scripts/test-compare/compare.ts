@@ -206,7 +206,7 @@ export function rubyToConventionTs(rubyFile: string, pkg: string): string {
  * `name.sub(/^test_/, "").tr("_", " ")` (extract-ruby-tests.rb:648), so the
  * doubled underscore of `test__parse` becomes a leading space and is the only
  * thing telling it apart from `test_parse` in the same file.
- * `vendor/date/test/date/test_date_parse.rb` has five such pairs — `test__parse`
+ * `vendor/date/v3.4.1/test/date/test_date_parse.rb` has five such pairs — `test__parse`
  * (:8) / `test_parse` (:214), and the same split on `_parse__2`, `_iso8601`,
  * `_xmlschema` and `_jisx0301`. Trimming mapped each pair onto one key, so the
  * greedy matcher handed a single ported test to whichever Ruby case came first

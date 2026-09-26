@@ -9,7 +9,7 @@
  *
  * ── Keyed by the MRI SPELLING, and why that is not enough on its own ────────
  * Rows are keyed `Receiver#method` / `Receiver.method`, because the bare name is
- * ambiguous across receivers: `fetch` is `Hash#fetch` (`vendor/ruby/hash.c:2176`),
+ * ambiguous across receivers: `fetch` is `Hash#fetch` (`vendor/ruby/v3.3.11/hash.c:2176`),
  * `Array#fetch` AND `ActiveSupport::Cache::Store#fetch` — the last of which is
  * Rails, must keep flagging, and would be silently credited by a TS `fetch`.
  *
@@ -33,7 +33,7 @@
 /**
  * MRI spelling → the `@blazetrails/ruby-compat` export that is its port.
  *
- * `Regexp.escape` (`vendor/ruby/re.c:4144` `rb_reg_s_quote`) is the entry folded
+ * `Regexp.escape` (`vendor/ruby/v3.3.11/re.c:4144` `rb_reg_s_quote`) is the entry folded
  * in from `enumerable-idioms.ts`'s former `CORE_LIBRARY_ALIASES`. Its argument
  * for admission is the one every row needs: the TS name must be implausible as
  * the port of a DIFFERENT Ruby method of the same bare name. `regexpEscape`
@@ -99,7 +99,7 @@ export const RECEIVER_KEYED_RUBY_COMPAT_EXPORTS = new Map<
   ["Hash#delete", { tsExport: "hashDelete", receiver: "hash" }],
   ["Hash#except", { tsExport: "except", receiver: "hash" }],
   ["Hash#fetch", { tsExport: "fetch", receiver: "hash" }],
-  // MRI defines `include?` onto `rb_hash_has_key` (`vendor/ruby/hash.c:7255`),
+  // MRI defines `include?` onto `rb_hash_has_key` (`vendor/ruby/v3.3.11/hash.c:7255`),
   // the same body `key?` and `has_key?` get, so its port is `hasKey` too.
   ["Hash#include?", { tsExport: "hasKey", receiver: "hash" }],
   ["Hash#merge", { tsExport: "merge", receiver: "hash" }],

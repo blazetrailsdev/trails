@@ -10,13 +10,13 @@ PR #4468 converged the anonymous HABTM join-model source `belongsTo` name to
 Rails (`singularize(assocName)` — `post`/`otherPost`/`specialPost` for
 Category's `posts`/`otherPosts`/`specialPosts`, all `class_name: "Post"` on
 `categories_posts`; see
-`vendor/rails/activerecord/lib/active_record/associations/builder/has_and_belongs_to_many.rb:39-43`).
+`vendor/rails/v8.0.2/activerecord/lib/active_record/associations/builder/has_and_belongs_to_many.rb:39-43`).
 
 That exposed a preloader conflation. trails' `Preloader::Batch` groups
 preloads by `LoaderQuery` — the same four fields Rails keys on
 (`association_key_name`, `scope.table_name`, `connection_specification_name`,
 `values_for_queries`;
-`vendor/rails/activerecord/lib/active_record/associations/preloader/association.rb:17-26`).
+`vendor/rails/v8.0.2/activerecord/lib/active_record/associations/preloader/association.rb:17-26`).
 For the three sibling HABTM **middle (through) loaders** those four fields are
 byte-identical, so trails batches them into one query and instantiates every
 `categories_posts` row as whichever anonymous join model wins the group
@@ -27,7 +27,7 @@ PR #4468 added a trails-local guard: `LoaderQuery._joinModelDiscriminator`
 appends the anonymous `HABTM_*` class name to the batch key. Rails has **no**
 such discriminator, yet
 `test_eager_with_multiple_associations_with_same_table_has_many_and_habtm`
-(`vendor/rails/activerecord/test/cases/associations/eager_test.rb:1028`) passes.
+(`vendor/rails/v8.0.2/activerecord/test/cases/associations/eager_test.rb:1028`) passes.
 Why?
 
 ## Method
@@ -72,7 +72,7 @@ The isolation is **not** a `Batch`/`Branch` scheduling subtlety (both trails and
 Rails run the identical `batch.rb` algorithm). It is one level up, in the driver
 that invokes the preloader. Rails'
 `ActiveRecord::Relation#preload_associations`
-(`vendor/rails/activerecord/lib/active_record/relation.rb:1321-1328`) runs **one
+(`vendor/rails/v8.0.2/activerecord/lib/active_record/relation.rb:1321-1328`) runs **one
 `Preloader.call` per top-level entry**:
 
 ```ruby

@@ -1,4 +1,4 @@
--- rake db:mysql:build_user (vendor/rails/activerecord/Rakefile:227-235), which
+-- rake db:mysql:build_user (vendor/rails/v8.0.2/activerecord/Rakefile:227-235), which
 -- CREATEs the user with no IDENTIFIED BY — `username: rails` in
 -- test/config.example.yml:4,24 connects with no password.
 --

@@ -18,7 +18,7 @@
  *
  * Path mapping (trails ↔ Rails):
  *   packages/activerecord/src/<dir>/<name>.test.ts
- *     ↔ vendor/rails/activerecord/test/cases/<dir>/<name>_test.rb
+ *     ↔ vendor/rails/v8.0.2/activerecord/test/cases/<dir>/<name>_test.rb
  *   kebab-case basenames (and dirs) round-trip to snake_case Rails paths.
  *
  * Fails open if the deps JSON is missing — `pnpm prelint` regenerates it.

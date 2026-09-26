@@ -57,7 +57,7 @@
  * Being dropped *somewhere* in the file is not enough: a `dropTable` at the end
  * of an `it` body only runs when every assertion above it passed, so a failing
  * test strands the table in the shared per-worker database. Rails gets this for
- * free from `teardown` — `vendor/rails/activerecord/test/cases/migration_test.rb:53-67`,
+ * free from `teardown` — `vendor/rails/v8.0.2/activerecord/test/cases/migration_test.rb:53-67`,
  * and the swallowing form at `:1231-1233`
  * (`teardown { drop_table(:delete_me) rescue nil }`).
  *
@@ -1072,7 +1072,7 @@ const rule = {
       noDropAllTables:
         'Avoid `dropAllTables()` — drop the specific tables this file created with `dropTable("…")` instead. The carpet-bomb teardown also wipes tables other code seeded, and hides which tables a test actually owns. If this is genuinely necessary, add `// eslint-disable-next-line blazetrails/require-table-teardown`.',
       unguardedTeardown:
-        "Table `{{table}}` is only dropped on the happy path — a failing assertion above this drop skips it and strands the table in the shared per-worker database. Move the drop into an `afterEach`/`afterAll` hook or a `finally` block, as Rails does with `teardown` (vendor/rails/activerecord/test/cases/migration_test.rb:53-67). If the drop is itself the subject under test, add `// eslint-disable-next-line blazetrails/require-table-teardown` with the reason.",
+        "Table `{{table}}` is only dropped on the happy path — a failing assertion above this drop skips it and strands the table in the shared per-worker database. Move the drop into an `afterEach`/`afterAll` hook or a `finally` block, as Rails does with `teardown` (vendor/rails/v8.0.2/activerecord/test/cases/migration_test.rb:53-67). If the drop is itself the subject under test, add `// eslint-disable-next-line blazetrails/require-table-teardown` with the reason.",
       preferTableList:
         'Merge adjacent dropTable() calls into a single dropTable("a", "b") list call — shorter teardown code, one call instead of N.',
     },

@@ -240,7 +240,7 @@ on both sides.
   - Ruby remains a dev/CI dependency only, same as today.
 - **Refresh trigger**: same gate as
   [`extract-ruby-api.rb`](../scripts/api-compare/extract-ruby-api.rb) lines
-  16–28 — compare cache mtime to `vendor/rails/.git/HEAD`, honour
+  16–28 — compare cache mtime to `vendor/rails/v8.0.2/.git/HEAD`, honour
   `API_COMPARE_FORCE=1`. Regeneration runs whenever the extractor is
   invoked, locally via `pnpm parity:api` or in CI via the explicit
   workflow step (next bullet).

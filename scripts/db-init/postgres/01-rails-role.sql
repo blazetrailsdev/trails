@@ -1,4 +1,4 @@
--- rake db:postgresql:build (vendor/rails/activerecord/Rakefile:258-262) creates
+-- rake db:postgresql:build (vendor/rails/v8.0.2/activerecord/Rakefile:258-262) creates
 -- no role at all — it runs createdb as the local user, and Rails' postgresql:
 -- entries carry no credential (test/config.example.yml:74-81).
 --

@@ -11,7 +11,7 @@ const messagePack = new CacheSerializer();
 
 /**
  * `Marshal.dump` answers an ASCII-8BIT String — its buffer is
- * `rb_str_buf_new(0)` (`vendor/ruby/marshal.c:1241`), and it sends `binmode`
+ * `rb_str_buf_new(0)` (`vendor/ruby/v3.3.11/marshal.c:1241`), and it sends `binmode`
  * to an IO port (`marshal.c:1246`) —
  * so a serialized cache payload is BYTES: what `File.atomic_write` writes and
  * `File.binread` reads back at `file_store.rb:124,127`. trails' Marshal stand-in

@@ -122,7 +122,7 @@ let currentChecker: ts.TypeChecker | undefined;
 /**
  * The local names a file binds `block` from `@blazetrails/ruby-compat` to —
  * the mark a value-or-block argument position carries (`rb_block_given_p`,
- * `vendor/ruby/eval.c:866`). Read by `isMarkedBlockArg`, so a same-named local
+ * `vendor/ruby/v3.3.11/eval.c:866`). Read by `isMarkedBlockArg`, so a same-named local
  * parameter cannot pass for it.
  */
 const blockMarkNames = new WeakMap<ts.SourceFile, ReadonlySet<string>>();
@@ -4885,7 +4885,7 @@ function describeArgs(args: ts.NodeArray<ts.Expression> | undefined, flags: stri
     }
     // `block(fn)` is ruby-compat's brand for a block passed into a
     // value-or-block argument position (`rb_block_given_p`,
-    // `vendor/ruby/eval.c:866`). It IS the block, so it drops like one.
+    // `vendor/ruby/v3.3.11/eval.c:866`). It IS the block, so it drops like one.
     if (isMarkedBlockArg(expr)) {
       flags.push("block");
       continue;

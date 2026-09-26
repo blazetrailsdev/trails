@@ -1,7 +1,7 @@
 /**
  * Extract per-file model/fixture dependencies from Rails activerecord tests.
  *
- * Scans vendor/rails/activerecord/test/cases/**\/*_test.rb and records, for
+ * Scans vendor/rails/v8.0.2/activerecord/test/cases/**\/*_test.rb and records, for
  * each test file:
  *   - requires:         `require "models/<path>"` model imports
  *   - fixtures:         `fixtures :a, :b, "warehouse-things"` declarations

@@ -148,7 +148,7 @@ export default defineConfig(
       "**/dist/**",
       // The Journey visualizer's shipped assets: fsm.js and fsm.css are
       // byte-for-byte copies of
-      // vendor/rails/actionpack/lib/action_dispatch/journey/visualizer/, and
+      // vendor/rails/v8.0.2/actionpack/lib/action_dispatch/journey/visualizer/, and
       // index.html.tse is that directory's index.html.erb. TransitionTable#visualizer
       // reads all three off disk (transition_table.rb:128-131).
       "packages/actionpack/src/action-dispatch/journey/visualizer/**",

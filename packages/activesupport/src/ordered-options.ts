@@ -57,11 +57,11 @@ export class OrderedOptions {
 
   /**
    * Mirrors `dig` (ordered_options.rb:45-47), whose `super` is `rb_hash_dig`
-   * (`vendor/ruby/hash.c:4627`): `rb_hash_aref` for the first key — which is
+   * (`vendor/ruby/v3.3.11/hash.c:4627`): `rb_hash_aref` for the first key — which is
    * `get`, so the default block runs — and `rb_obj_dig`
-   * (`vendor/ruby/object.c:3906`) for the rest. That loop ends on `nil`,
+   * (`vendor/ruby/v3.3.11/object.c:3906`) for the rest. That loop ends on `nil`,
    * indexes a Hash through `rb_hash_aref` and an Array through `rb_ary_at`
-   * — whose index goes through `NUM2LONG` (`vendor/ruby/array.c:1881-1883`),
+   * — whose index goes through `NUM2LONG` (`vendor/ruby/v3.3.11/array.c:1881-1883`),
    * so a String identifier is a TypeError there and not an index —
    * hands the remaining identifiers to an object that answers `dig`, and
    * otherwise raises `no_dig_method`'s TypeError (`object.c:3897-3900`). A

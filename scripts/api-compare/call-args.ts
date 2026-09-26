@@ -161,8 +161,8 @@ export type CallArgResult =
     };
 
 /**
- * Kernel's conversion FUNCTIONS (`vendor/ruby/object.c` `rb_f_integer`,
- * `vendor/ruby/rational.c:2691` `nurat_s_convert`, ...). They are methods whose
+ * Kernel's conversion FUNCTIONS (`vendor/ruby/v3.3.11/object.c` `rb_f_integer`,
+ * `vendor/ruby/v3.3.11/rational.c:2691` `nurat_s_convert`, ...). They are methods whose
  * names are capitalized, so `Rational(999999999, 1000)`
  * (`core_ext/date_time/calculations.rb:117`) ports as `rational(...)` by the
  * ordinary method rule, and the `id:`/`call:` collapse below means the const

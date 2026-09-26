@@ -99,7 +99,7 @@ export const RECEIVER_AS_FIRST_ARG = new Set([
   // prototype to hang it on, so activerecord's `ruby-empty.ts` exports it as
   // `isEmpty(collection)` and the Ruby receiver is TS argument 1.
   "empty?",
-  // Ruby core `Integer#anybits?` (`vendor/ruby/numeric.c:3647`) — a bit test on
+  // Ruby core `Integer#anybits?` (`vendor/ruby/v3.3.11/numeric.c:3647`) — a bit test on
   // a Number, which TS cannot hang on `Number.prototype` any more than it can
   // on `String.prototype`, so @blazetrails/ruby-compat exports it as
   // `anybits(x, mask)` and the Ruby receiver is TS argument 1.
@@ -124,7 +124,7 @@ export const RECEIVER_AS_FIRST_ARG = new Set([
   // names a JS method Ruby never calls, so @blazetrails/ruby-compat
   // exports it as `drop(collection, n)` and the Ruby receiver is TS argument 1.
   "drop",
-  // Ruby core `Array#pack` (`vendor/ruby/pack.c:197`) — `codepoints.pack("U*")`
+  // Ruby core `Array#pack` (`vendor/ruby/v3.3.11/pack.c:197`) — `codepoints.pack("U*")`
   // (multibyte/chars.rb:136,144). The same shape as `drop` above:
   // @blazetrails/ruby-compat exports it as `pack(ary, fmt)` and the Ruby
   // receiver is TS argument 1.

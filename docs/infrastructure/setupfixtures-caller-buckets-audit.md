@@ -71,7 +71,7 @@ must not be under-scoped:
 
 - **Table creation is not a defining trait.** Rails' fixture wiring is per-test
   transactional setup (`setup_fixtures` / `teardown_fixtures`,
-  `vendor/rails/activerecord/lib/active_record/test_fixtures.rb:108-133`), fully
+  `vendor/rails/v8.0.2/activerecord/lib/active_record/test_fixtures.rb:108-133`), fully
   independent of how — or whether — a suite creates its tables. In Bucket A,
   **41 of the 54** files call **no** `createTable()` at all (e.g.
   `attribute-methods.test.ts`, `base.test.ts`, most `associations/*`,

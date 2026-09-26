@@ -10,7 +10,7 @@ import { isPlainObject, valuesAt } from "./hash-utils.js";
 import { isBlank } from "./string-utils.js";
 
 /**
- * Ruby core `Enumerable#sum` (`vendor/ruby/enum.c:4760` `enum_sum`), which
+ * Ruby core `Enumerable#sum` (`vendor/ruby/v3.3.11/enum.c:4760` `enum_sum`), which
  * Rails' `core_ext/enumerable.rb` inherits rather than defines: `init` (default
  * `0`) is added to each element (or each block value) by the element's own `+`.
  */
@@ -30,7 +30,7 @@ export function sum<T>(collection: Iterable<T>, ...args: unknown[]): unknown {
   return v;
 }
 
-/** `sum_iter_some_value` (`vendor/ruby/enum.c:4581`): `memo->v + i`. */
+/** `sum_iter_some_value` (`vendor/ruby/v3.3.11/enum.c:4581`): `memo->v + i`. */
 function sumIterSomeValue(v: unknown, i: unknown): unknown {
   if (typeof v === "number" || typeof v === "bigint" || v instanceof Rational) {
     return numericPlus(v, i);
@@ -55,8 +55,8 @@ function sumIterSomeValue(v: unknown, i: unknown): unknown {
 }
 
 /**
- * `Integer#+` / `Float#+` / `Rational#+` (`vendor/ruby/numeric.c:3983` `rb_int_plus`,
- * `numeric.c:1176` `rb_float_plus`, `vendor/ruby/rational.c:724` `rb_rational_plus`); a
+ * `Integer#+` / `Float#+` / `Rational#+` (`vendor/ruby/v3.3.11/numeric.c:3983` `rb_int_plus`,
+ * `numeric.c:1176` `rb_float_plus`, `vendor/ruby/v3.3.11/rational.c:724` `rb_rational_plus`); a
  * non-numeric addend goes through `rb_num_coerce_bin` (`numeric.c:477`).
  */
 function numericPlus(v: number | bigint | Rational, i: unknown): unknown {
@@ -71,7 +71,7 @@ function numericPlus(v: number | bigint | Rational, i: unknown): unknown {
     const [n, b] = typeof v === "bigint" ? [i as number, v] : [v, i as bigint];
     return Number.isInteger(n) ? BigInt(n) + b : n + Number(b);
   }
-  // `do_coerce` (`vendor/ruby/numeric.c:455`).
+  // `do_coerce` (`vendor/ruby/v3.3.11/numeric.c:455`).
   const coerce = (i as { coerce?: unknown } | null)?.coerce;
   if (typeof coerce !== "function") {
     throw new TypeError(`${rbBuiltinClassName(i)} can't be coerced into ${rbObjClass(v)}`);

@@ -11,7 +11,7 @@
  * book survived into the `ignore_case: true` case and `findBy({ name: "dune" })`
  * read the wrong row. The fix was to give that describe the Rails shape, since
  * Rails' own `ActiveRecord::TestCase` runs with `use_transactional_tests` on
- * (vendor/rails/activerecord/lib/active_record/test_fixtures.rb:113, :146).
+ * (vendor/rails/v8.0.2/activerecord/lib/active_record/test_fixtures.rb:113, :146).
  *
  * What was left is an unenforced invariant: a test file that writes rows must
  * either ride `fixtures()`,

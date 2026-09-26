@@ -228,19 +228,19 @@ function instantOf(value: TimeLike): Temporal.Instant {
   return value;
 }
 
-/** Ruby's `Time#utc?` (`vendor/ruby/time.c:4340`). */
+/** Ruby's `Time#utc?` (`vendor/ruby/v3.3.11/time.c:4340`). */
 function isUtc(value: TimeLike): boolean {
   if (value instanceof TimeWithZone || value instanceof RubyTime) return value.isUtc();
   if (value instanceof Temporal.ZonedDateTime) return value.timeZoneId === "UTC";
   return true;
 }
 
-/** Ruby's `Time#getutc` (`vendor/ruby/time.c:4425`). */
+/** Ruby's `Time#getutc` (`vendor/ruby/v3.3.11/time.c:4425`). */
 function getutc(value: TimeLike): Temporal.ZonedDateTime {
   return instantOf(value).toZonedDateTimeISO("UTC");
 }
 
-/** Ruby's `Time#getlocal` (`vendor/ruby/time.c:4374`). */
+/** Ruby's `Time#getlocal` (`vendor/ruby/v3.3.11/time.c:4374`). */
 function getlocal(value: TimeLike): Temporal.ZonedDateTime {
   return instantOf(value).toZonedDateTimeISO(Temporal.Now.timeZoneId());
 }

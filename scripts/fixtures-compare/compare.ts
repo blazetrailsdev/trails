@@ -68,7 +68,7 @@ export const FK_OVERRIDES: Readonly<Record<string, Readonly<Record<string, strin
 export const ENUM_MAPS: Readonly<
   Record<string, Readonly<Record<string, Readonly<Record<string, number | null>>>>>
 > = {
-  // Book — `vendor/rails/activerecord/test/models/book.rb`. Symbol/string
+  // Book — `vendor/rails/v8.0.2/activerecord/test/models/book.rb`. Symbol/string
   // enum members on the Rails side resolve to the integer (or NULL) the TS
   // fixture stores.
   books: {

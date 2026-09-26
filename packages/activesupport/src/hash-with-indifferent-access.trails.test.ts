@@ -1,9 +1,9 @@
 /**
  * trails-only covers for `HashWithIndifferentAccess`'s two inherited seats:
- * `rb_obj_dig`'s Array and `no_dig_method` arms (`vendor/ruby/object.c:3906`,
+ * `rb_obj_dig`'s Array and `no_dig_method` arms (`vendor/ruby/v3.3.11/object.c:3906`,
  * `:3897-3900`), which Rails' own suite only reaches through nested hashes,
  * and `rb_hash_default_value`'s yield of the RECEIVER
- * (`vendor/ruby/hash.c:2068`), which subclassing `Hash` is what buys.
+ * (`vendor/ruby/v3.3.11/hash.c:2068`), which subclassing `Hash` is what buys.
  */
 import { describe, it, expect } from "vitest";
 import { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";

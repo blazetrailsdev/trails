@@ -79,7 +79,7 @@ SKIP_PATTERNS = [
 # `Symbol#to_s` shares `Symbol#id2name`'s body (to_s_spec.rb:5).
 # `Rational#numerator`/`#denominator` and `Range#begin`/`#end`/`#exclude_end?`
 # are ported as public readonly fields (`rational.ts:96` cites
-# `vendor/ruby/rational.c:580` `nurat_numerator`), so they count as ported.
+# `vendor/ruby/v3.3.11/rational.c:580` `nurat_numerator`), so they count as ported.
 RUBY_COMPAT_SPECS = {
   "comparable" => %w[between equal_value gt gte lt lte],
   "hash" => %w[

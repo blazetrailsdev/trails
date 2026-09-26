@@ -5581,7 +5581,7 @@ export class Date {
    * disagrees with the gem: `dayOfWeek`, `dayOfYear`, and the commercial
    * triple (`yearOfWeek` / `weekOfYear`). MRI computes those from the Julian
    * day itself — `c_jd_to_commercial` / `c_valid_commercial_p`
-   * (`vendor/date/ext/date/date_core.c`) — so `Date.commercial(-4712, 1, 1)`
+   * (`vendor/date/v3.4.1/ext/date/date_core.c`) — so `Date.commercial(-4712, 1, 1)`
    * has `cwday` 1 in Ruby while the seat reads `dayOfWeek` 4. `dayOfYear`
    * happens to agree wherever the ISO and Julian leap rules coincide, and has
    * the same defect where they do not (1900 under `Date::JULIAN`).

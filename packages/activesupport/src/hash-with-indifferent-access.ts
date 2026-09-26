@@ -495,12 +495,12 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
 
   /**
    * Mirrors `dig` (hash_with_indifferent_access.rb:208-211) — the first key is
-   * converted, then `super` is `rb_hash_dig` (`vendor/ruby/hash.c:4627`),
+   * converted, then `super` is `rb_hash_dig` (`vendor/ruby/v3.3.11/hash.c:4627`),
    * whose `rb_hash_aref` yields to the default_proc on a miss the way `[]`
    * does, and whose remaining keys go to `rb_obj_dig`
-   * (`vendor/ruby/object.c:3906`): `nil` ends the walk, an Array is indexed
+   * (`vendor/ruby/v3.3.11/object.c:3906`): `nil` ends the walk, an Array is indexed
    * through `rb_ary_at` — whose index goes through `NUM2LONG`
-   * (`vendor/ruby/array.c:1881-1883`), so a String identifier is a TypeError
+   * (`vendor/ruby/v3.3.11/array.c:1881-1883`), so a String identifier is a TypeError
    * there and not an index — an object that answers `dig` is handed the rest, and
    * anything else is `no_dig_method`'s TypeError (`object.c:3897-3900`).
    */

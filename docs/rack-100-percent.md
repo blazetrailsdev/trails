@@ -1,7 +1,7 @@
 # @blazetrails/rack — Road to 100%
 
 Mirror of `rack/rack` v3.1.14 vendored at
-`vendor/rack/lib/rack/`.
+`vendor/rack/v3.1.14/lib/rack/`.
 
 Forward-only — completed slots live in git. Refresh counts:
 
@@ -163,7 +163,7 @@ are now back in scope — see slots 13–14 above.
 git fetch origin main
 scripts/start-worktree.sh rack-<slot>
 cd ~/github/blazetrailsdev/worktrees/rack-<slot>
-less vendor/rack/lib/rack/<file>.rb
+less vendor/rack/v3.1.14/lib/rack/<file>.rb
 $EDITOR packages/rack/src/<file>.ts
 $EDITOR packages/rack/src/<file>.test.ts
 pnpm vitest run packages/rack/src/<file>.test.ts

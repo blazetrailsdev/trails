@@ -7,7 +7,7 @@
  * `scripts/api-compare/ar-closure.ts` (RFC 0098) — a transitive walk of
  * `require "…"` from `activerecord/lib` + `activemodel/lib`. This module is
  * the same closure expressed as a test-file boundary, because
- * `vendor/rails/activesupport/test/` is organized by feature, not by consumer.
+ * `vendor/rails/v8.0.2/activesupport/test/` is organized by feature, not by consumer.
  *
  * The boundary is two derived rules plus a reviewed table:
  *

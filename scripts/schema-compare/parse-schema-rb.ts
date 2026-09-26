@@ -1,5 +1,5 @@
 // Targeted `create_table` parser for
-// vendor/rails/activerecord/test/schema/schema.rb. Deliberately not a Ruby
+// vendor/rails/v8.0.2/activerecord/test/schema/schema.rb. Deliberately not a Ruby
 // parser: it recognises the handful of `t.*` forms schema.rb actually uses and
 // records anything else as `dynamic`, so the comparator can soften its verdict
 // on tables it could not read completely (rather than reporting a column as

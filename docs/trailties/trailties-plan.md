@@ -121,8 +121,8 @@ think one is wrong.
 
 **Blocked by:** none.
 
-**Source:** `vendor/rails/railties/lib/rails/railtie.rb`,
-`vendor/rails/railties/lib/rails/railtie/configurable.rb`.
+**Source:** `vendor/rails/v8.0.2/railties/lib/rails/railtie.rb`,
+`vendor/rails/v8.0.2/railties/lib/rails/railtie/configurable.rb`.
 
 **Scope:**
 
@@ -138,7 +138,7 @@ think one is wrong.
 
 **Blocked by:** none.
 
-**Source:** `vendor/rails/railties/lib/rails/paths.rb`.
+**Source:** `vendor/rails/v8.0.2/railties/lib/rails/paths.rb`.
 
 **Current:** 12/28 matched. The Rails `Root` and `Path` classes together have
 28 public methods; the TS port has the core path resolution but is missing the
@@ -166,7 +166,7 @@ collection/array-protocol surface.
 
 **Blocked by:** PR B2 (`Paths` surface needed for `envConfig`/`helpers` method bodies).
 
-**Source:** `vendor/rails/railties/lib/rails/engine.rb`.
+**Source:** `vendor/rails/v8.0.2/railties/lib/rails/engine.rb`.
 
 **Current:** 14/36 matched.
 
@@ -206,7 +206,7 @@ collection/array-protocol surface.
 
 **Blocked by:** none (can parallel with B3).
 
-**Source:** `vendor/rails/railties/lib/rails/application/configuration.rb`.
+**Source:** `vendor/rails/v8.0.2/railties/lib/rails/application/configuration.rb`.
 
 **Current:** 87/120 matched (73%).
 
@@ -239,8 +239,8 @@ collection/array-protocol surface.
 **Blocked by:** B3 (`RoutesReloader` depends on `Engine#routes` surface,
 `Finisher` depends on middleware stack being buildable).
 
-**Source:** `vendor/rails/railties/lib/rails/application/finisher.rb`,
-`vendor/rails/railties/lib/rails/application/routes_reloader.rb`.
+**Source:** `vendor/rails/v8.0.2/railties/lib/rails/application/finisher.rb`,
+`vendor/rails/v8.0.2/railties/lib/rails/application/routes_reloader.rb`.
 
 **Finisher current:** 2/5 matched. Missing:
 
@@ -270,7 +270,7 @@ collection/array-protocol surface.
 **Blocked by:** B3 (engine middleware), B4 (`secretKeyBase`, `sessionStore`,
 `databaseConfiguration`), B5 (finisher + routes-reloader hooks).
 
-**Source:** `vendor/rails/railties/lib/rails/application.rb`.
+**Source:** `vendor/rails/v8.0.2/railties/lib/rails/application.rb`.
 
 **Current:** 28/61 matched (46%).
 
@@ -281,7 +281,7 @@ collection/array-protocol surface.
   `http_auth_salt`, `signed_cookie_salt`, `encrypted_cookie_salt`,
   `encrypted_signed_cookie_salt`, `authenticated_encrypted_cookie_salt`,
   `action_dispatch.show_exceptions`, CSP config, cookie config, etc.
-  Read `vendor/rails/railties/lib/rails/application.rb#env_config` in full.
+  Read `vendor/rails/v8.0.2/railties/lib/rails/application.rb#env_config` in full.
 - `orderedRailties` — respects `config.railtiesOrder`; partitions the
   registered railtie list around the `Trails::Application` sentinel.
 - `railtiesInitializers` — calls `orderedRailties.flatMap(&:initializers)`.
@@ -290,7 +290,7 @@ collection/array-protocol surface.
 - `messageVerifiers` — `ActiveSupport::MessageVerifiers` instance memoized
   on the application; keyed by purpose string.
 - `deprecators` — `ActiveSupport::Deprecation::Deprecators` proxy over
-  all registered framework deprecators. Read `vendor/rails/activesupport/lib/active_support/deprecation/deprecators.rb`.
+  all registered framework deprecators. Read `vendor/rails/v8.0.2/activesupport/lib/active_support/deprecation/deprecators.rb`.
 - `migrationRailties` — railtie list filtered to those with migrations.
 - `toApp` — builds and returns the rack app (`endpoint`). Called by Rack.
 - `buildRequest(env)`, `buildMiddleware` — same shape as Engine, but
