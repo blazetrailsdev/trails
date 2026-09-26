@@ -1,6 +1,5 @@
 import { extend, type Extended } from "@blazetrails/ruby-compat/include";
 import * as Autoload from "./dependencies/autoload.js";
-import type { BacktraceCleaner } from "./backtrace-cleaner.js";
 import type { BroadcastLogger } from "./broadcast-logger.js";
 import type { EnvironmentInquirer } from "./environment-inquirer.js";
 import type { Logger } from "./logger.js";
@@ -30,7 +29,6 @@ export const TopLevel: {
   Trails?: {
     env: EnvironmentInquirer;
     logger: Logger | null;
-    backtraceCleaner: BacktraceCleaner;
     application: { reloadRoutesUnlessLoaded(): Promise<boolean> | undefined } | null;
     Application: abstract new (...args: never[]) => unknown;
     root(): Promise<string | undefined>;

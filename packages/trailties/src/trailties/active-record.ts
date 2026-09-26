@@ -4,7 +4,6 @@ import {
   constantize,
   include,
   onLoad,
-  TopLevel,
   upcaseFirst,
   type Deprecators,
 } from "@blazetrails/activesupport";
@@ -34,6 +33,7 @@ import {
   ExtendedDeterministicQueries,
   ExtendedDeterministicUniquenessValidator,
 } from "@blazetrails/activerecord/encryption";
+import { Trails } from "../rails.js";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 import { databaseConfiguration } from "../database.js";
 
@@ -79,7 +79,7 @@ const pushTimestamptzToTimeZoneAwareTypes = (base: typeof Base): void => {
 };
 
 const setLogSubscriberBacktraceCleaner = (): void => {
-  LogSubscriber.backtraceCleaner = TopLevel.Trails!.backtraceCleaner;
+  LogSubscriber.backtraceCleaner = Trails.backtraceCleaner;
 };
 
 const onPostgresqlAdapterLoadedPushTimestamptz = (): void => {
