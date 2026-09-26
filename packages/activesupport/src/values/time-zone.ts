@@ -533,7 +533,7 @@ export class Timezone {
     return getZoneInfo(this.identifier, toDate(time)).utcOffsetSeconds;
   }
 
-  isDst(time: Date | Temporal.Instant): boolean {
+  isDst(time: Date | Temporal.Instant | Time): boolean {
     return tzdataIsdst(this.identifier, Math.floor(toDate(time).getTime() / 1000));
   }
 
@@ -809,7 +809,7 @@ export class TimeZone {
     return this.tzinfo.abbr(time);
   }
 
-  isDst(time: Date | Temporal.Instant): boolean {
+  isDst(time: Date | Temporal.Instant | Time): boolean {
     return this.tzinfo.isDst(time);
   }
 

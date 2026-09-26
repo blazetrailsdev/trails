@@ -13,6 +13,7 @@ import {
   jdLocalToUtc,
   of2str,
   strftime,
+  SubMinuteOffsetZonedDateTime,
   timeToDf,
 } from "./date.js";
 import { Rational, kernelInteger, rbObjRespondTo, stringInspect } from "@blazetrails/ruby-compat";
@@ -198,6 +199,13 @@ function validateVtmRange(mem: string, value: number, b: number, e: number): voi
   if (value < b || value > e) throw new ArgumentError(`${mem} out of range`);
 }
 
+function maybeTzobjP(obj: unknown): obj is object {
+  if (obj == null) return false;
+  if (typeof obj === "number" || typeof obj === "bigint") return false;
+  if (typeof obj === "string") return false;
+  return true;
+}
+
 function isTimeNewOptions(arg: unknown): arg is TimeNewOptions {
   return (
     typeof arg === "object" &&
@@ -352,56 +360,6 @@ let seatedTime: {
 } | null = null;
 
 /** @noRailsEquivalent PERMANENT */
-class SubMinuteOffsetZonedDateTime extends Temporal.ZonedDateTime {
-  constructor(instant: Temporal.Instant, utcOffset: number) {
-    super(instant.epochNanoseconds, of2str(utcOffset));
-    const truncated = Math.sign(utcOffset) * Math.floor(Math.abs(utcOffset) / 60) * 60 || 0;
-    const wallClock = new Temporal.ZonedDateTime(
-      instant.epochNanoseconds + BigInt(Math.round((utcOffset - truncated) * 1_000_000_000)),
-      of2str(utcOffset),
-    );
-    for (const name of SUB_MINUTE_WALL_CLOCK_MEMBERS) {
-      const value = wallClock[name];
-      Object.defineProperty(this, name, {
-        value: typeof value === "function" ? value.bind(wallClock) : value,
-        configurable: true,
-      });
-    }
-  }
-}
-
-/** @noRailsEquivalent PERMANENT */
-const SUB_MINUTE_WALL_CLOCK_MEMBERS = [
-  "year",
-  "month",
-  "monthCode",
-  "day",
-  "hour",
-  "minute",
-  "second",
-  "millisecond",
-  "microsecond",
-  "nanosecond",
-  "era",
-  "eraYear",
-  "dayOfWeek",
-  "dayOfYear",
-  "weekOfYear",
-  "yearOfWeek",
-  "daysInWeek",
-  "daysInMonth",
-  "daysInYear",
-  "monthsInYear",
-  "inLeapYear",
-  "toPlainDate",
-  "toPlainTime",
-  "toPlainDateTime",
-  "toString",
-  "toJSON",
-  "toLocaleString",
-] as const satisfies readonly (keyof Temporal.ZonedDateTime)[];
-
-/** @noRailsEquivalent PERMANENT */
 export class Timezone {
   readonly identifier: string;
 
@@ -454,7 +412,9 @@ export class Time {
   /** @internal */
   #subnano: Rational;
   /** @internal */
-  #zoneObject: Timezone | null = null;
+  #zoneObject: object | null = null;
+  /** @internal */
+  #isdstMemo: boolean | null = null;
 
   /** @internal */
   get #plain(): Temporal.PlainDateTime {
@@ -519,11 +479,13 @@ export class Time {
 
   static #atInstant(
     instant: Temporal.Instant,
-    zone: string | number | Timezone | null = null,
+    zone: string | number | object | null = null,
     tzmodeUtc?: boolean,
     subnano: Rational = new Rational(0, 1),
   ): Time {
     if (zone instanceof Timezone) zone = zone.identifier;
+    if (maybeTzobjP(zone))
+      return Time.#zoneLocaltime(zone, Time.#atInstant(instant, "UTC", false, subnano))!;
     const timeZoneId =
       zone == null ? nowTimeZoneId() : typeof zone === "number" ? of2str(zone) : zone;
     const zoned = instant.toZonedDateTimeISO(timeZoneId);
@@ -536,6 +498,23 @@ export class Time {
       subnano,
     };
     return new Time(0);
+  }
+
+  static #zoneLocaltime(zone: object, time: Time): Time | null {
+    if (!rbObjRespondTo(zone, "utcToLocal")) return null;
+    const local = (zone as { utcToLocal(tm: Time): unknown }).utcToLocal(time);
+    const s =
+      local instanceof Time
+        ? local.toI() + (local.#localZone ? 0 : local.utcOffset)
+        : Math.floor(Number((local as Temporal.ZonedDateTime).epochMilliseconds) / 1000) +
+          Number((local as Temporal.ZonedDateTime).offsetNanoseconds) / 1_000_000_000;
+    const t = Time.#atInstant(time.#instant, s - time.toI(), false, time.#subnano);
+    t.#zoneObject = zone;
+    const dst = rbObjRespondTo(zone, "isDst")
+      ? (zone as { isDst(tm: Time): unknown }).isDst(time)
+      : undefined;
+    t.#isdstMemo = dst !== undefined && dst != null && dst !== false;
+    return t;
   }
 
   static #timeNewTimew(timew: Rational): Time {
@@ -1380,16 +1359,16 @@ export class Time {
     return this.#plain.dayOfYear;
   }
 
-  get zone(): string | Timezone | null {
+  get zone(): string | object | null {
     if (this.#tzmodeUtc) return "UTC";
-    if (this.#timeZoneId == null) return null;
+    if (this.#timeZoneId == null) return this.#zoneObject;
     if (!this.#localZone) return (this.#zoneObject ??= new Timezone(this.#timeZoneId));
     return tzdataAbbreviation(this.#instant.toZonedDateTimeISO(this.#timeZoneId));
   }
 
   /** @internal */
-  #zoneArgument(): string | number | null {
-    return this.#localZone ? null : (this.#timeZoneId ?? this.#utcOffset);
+  #zoneArgument(): string | number | object | null {
+    return this.#localZone ? null : (this.#timeZoneId ?? this.#zoneObject ?? this.#utcOffset);
   }
 
   get utcOffset(): number {
@@ -1401,6 +1380,7 @@ export class Time {
   }
 
   get isdst(): boolean {
+    if (this.#isdstMemo != null) return this.#isdstMemo;
     if (this.#timeZoneId == null || this.#timeZoneId === "UTC") return false;
     return tzdataIsdst(this.#timeZoneId, Math.floor(this.#instant.epochMilliseconds / 1000));
   }
@@ -1608,10 +1588,23 @@ export class Time {
     );
   }
 
-  getlocal(utcOffset: number | string | Timezone | null = null): Time {
+  getlocal(utcOffset: number | string | object | null = null): Time {
     if (utcOffset instanceof Timezone) utcOffset = utcOffset.identifier;
-    if (typeof utcOffset === "string" && !isZoneIdentifier(utcOffset)) {
-      return Time.#atInstant(this.#instant, utcOffsetArgument(utcOffset), undefined, this.#subnano);
+    const zone = utcOffset;
+    if (maybeTzobjP(zone)) {
+      const t = Time.#zoneLocaltime(zone, this);
+      if (t) return t;
+    }
+    if (
+      (typeof utcOffset === "string" && !isZoneIdentifier(utcOffset)) ||
+      (typeof utcOffset === "object" && utcOffset !== null)
+    ) {
+      return Time.#atInstant(
+        this.#instant,
+        utcOffsetArgument(typeof utcOffset === "string" ? utcOffset : numExact(utcOffset)),
+        undefined,
+        this.#subnano,
+      );
     }
     return Time.#atInstant(this.#instant, utcOffset, undefined, this.#subnano);
   }

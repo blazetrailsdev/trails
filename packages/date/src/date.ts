@@ -3943,6 +3943,56 @@ export function of2str(of: number): string {
   return `${s}${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
+/** @noRailsEquivalent PERMANENT */
+export class SubMinuteOffsetZonedDateTime extends Temporal.ZonedDateTime {
+  constructor(instant: Temporal.Instant, utcOffset: number) {
+    super(instant.epochNanoseconds, of2str(utcOffset));
+    const truncated = Math.sign(utcOffset) * Math.floor(Math.abs(utcOffset) / 60) * 60 || 0;
+    const wallClock = new Temporal.ZonedDateTime(
+      instant.epochNanoseconds + BigInt(Math.round((utcOffset - truncated) * 1_000_000_000)),
+      of2str(utcOffset),
+    );
+    for (const name of SUB_MINUTE_WALL_CLOCK_MEMBERS) {
+      const value = wallClock[name];
+      Object.defineProperty(this, name, {
+        value: typeof value === "function" ? value.bind(wallClock) : value,
+        configurable: true,
+      });
+    }
+  }
+}
+
+/** @noRailsEquivalent PERMANENT */
+const SUB_MINUTE_WALL_CLOCK_MEMBERS = [
+  "year",
+  "month",
+  "monthCode",
+  "day",
+  "hour",
+  "minute",
+  "second",
+  "millisecond",
+  "microsecond",
+  "nanosecond",
+  "era",
+  "eraYear",
+  "dayOfWeek",
+  "dayOfYear",
+  "weekOfYear",
+  "yearOfWeek",
+  "daysInWeek",
+  "daysInMonth",
+  "daysInYear",
+  "monthsInYear",
+  "inLeapYear",
+  "toPlainDate",
+  "toPlainTime",
+  "toPlainDateTime",
+  "toString",
+  "toJSON",
+  "toLocaleString",
+] as const satisfies readonly (keyof Temporal.ZonedDateTime)[];
+
 /** @internal */
 export function dtNewByFrags(hash: DateParts | null, sg = DEFAULT_SG): DateTime {
   let jd: number | bigint | null;
@@ -6574,6 +6624,12 @@ export class DateTime extends DateWithoutParseStatics {
       nanosecond: ns % 1000,
     });
     if (this.#of === 0) return plain;
+    if (this.#of % 60 !== 0) {
+      return new SubMinuteOffsetZonedDateTime(
+        plain.toZonedDateTime("UTC").toInstant().subtract({ seconds: this.#of }),
+        this.#of,
+      );
+    }
     return plain.toZonedDateTime(of2str(this.#of));
   }
 

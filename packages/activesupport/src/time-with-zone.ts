@@ -405,11 +405,11 @@ export class TimeWithZone {
     return this.utc();
   }
 
-  localtime(utcOffset: string | number | null = null): Time {
+  localtime(utcOffset: string | number | object | null = null): Time {
     return this.utc().getlocal(utcOffset);
   }
 
-  getlocal(utcOffset: string | number | null = null): Time {
+  getlocal(utcOffset: string | number | object | null = null): Time {
     return this.localtime(utcOffset);
   }
 
@@ -419,9 +419,7 @@ export class TimeWithZone {
 
   toTime(): Time {
     if (this.preserveTimezone() === ":zone") {
-      return (this._toTimeWithTimezone ??= this.getlocal(
-        TimeZone.find(this.timeZone)!.tzinfo.identifier,
-      ));
+      return (this._toTimeWithTimezone ??= this.getlocal(this.timeZone));
     } else if (this.preserveTimezone()) {
       return (this._toTimeWithInstanceOffset ??= this.getlocal(this.utcOffset));
     } else {
