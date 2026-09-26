@@ -36,8 +36,8 @@ interface ResourceLike {
   param?: string;
   resourceScope?: string;
   actions?: ResourceAction[];
-  shallow?: () => boolean;
-  singleton?: () => boolean;
+  shallow: () => boolean;
+  singleton: () => boolean;
   collectionScope: string;
   memberScope: string;
   nestedScope: string;
@@ -1336,7 +1336,7 @@ export class Mapper {
   }
 
   private isShallow(): boolean {
-    return !this.parentResource()!.singleton?.() && this._scope.get("shallow") === true;
+    return !this.parentResource()!.singleton() && this._scope.get("shallow") === true;
   }
 
   /** @internal */
@@ -1485,7 +1485,7 @@ export class Mapper {
   shallowNestingDepth(): number {
     return [...this._scope]
       .filter((node) => node.frame?.scopeLevelResource)
-      .filter((node) => (node.frame!.scopeLevelResource as ResourceLike).shallow?.()).length;
+      .filter((node) => (node.frame!.scopeLevelResource as ResourceLike).shallow()).length;
   }
 
   /** @internal */

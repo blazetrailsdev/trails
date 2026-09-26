@@ -520,9 +520,10 @@ export class TestRequest extends AbstractTestRequest {
             this._customParamParsers[contentMimeType!.symbol!] = () => nonPathParameters;
             data = buildNestedQuery(nonPathParameters);
         }
+        data = b(data);
       }
 
-      const dataStream = new StringIO(b(data));
+      const dataStream = new StringIO(data);
       this.setHeader("CONTENT_LENGTH", String(dataStream.size()));
       this.setHeader("rack.input", dataStream);
     }
