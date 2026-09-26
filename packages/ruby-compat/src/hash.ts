@@ -208,6 +208,20 @@ export function deleteIf<T>(hash: Record<string, T>, block: PairBlock<T>): Recor
 }
 
 /**
+ * Ruby `Hash#keep_if` (`vendor/ruby/hash.c:2844` `rb_hash_keep_if`) — the
+ * inverse of `delete_if`: MUTATES the receiver, dropping every pair the block
+ * answers falsily for (`keep_if_i`, `hash.c:2757`), and returns it.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#keep_if` (`vendor/ruby/hash.c:2844`).
+ */
+export function keepIf<T>(hash: Record<string, T>, block: PairBlock<T>): Record<string, T> {
+  for (const key of Object.keys(hash)) {
+    const kept = block(key, hash[key]);
+    if (kept == null || kept === false) delete hash[key];
+  }
+  return hash;
+}
+
+/**
  * Ruby `Hash#reject` (`vendor/ruby/hash.c:2626` `rb_hash_reject`) — the
  * non-mutating twin: `delete_if` over a dup.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#reject` (`vendor/ruby/hash.c:2626`).

@@ -5,6 +5,7 @@ import { bodyFromString, bodyToString } from "@blazetrails/rack";
 import type { Request } from "../../action-dispatch/http/request.js";
 import { RouteSet } from "../../action-dispatch/routing/route-set.js";
 import { RoutingError, UrlGenerationError } from "../metal/exceptions.js";
+import { ArgumentError } from "@blazetrails/activemodel";
 import { controllerConstants } from "../../action-dispatch/http/request.js";
 import type { DispatchableControllerClass } from "../../action-dispatch/routing/dispatcher.js";
 
@@ -618,4 +619,70 @@ describe("LegacyRouteSetTests", () => {
   it.skip("id encoding", () => {});
 
   it.skip("set to nil forgets", () => {});
+});
+
+describe("RouteSetTest", () => {
+  let set: RouteSet;
+
+  beforeEach(() => {
+    set = new RouteSet();
+  });
+
+  it("route constraints on request object with anchors are valid", () => {
+    expect(() => {
+      set.draw((r) => {
+        r.get("page/:id", { to: "pages#show", constraints: { host: /^foo$/ } });
+      });
+    }).not.toThrow();
+  });
+
+  it("route constraints with anchor chars are invalid", () => {
+    expect(() => {
+      set.draw((r) => {
+        r.get("page/:id", { to: "pages#show", id: /^\d+/ } as Parameters<typeof r.get>[1]);
+      });
+    }).toThrow(ArgumentError);
+    expect(() => {
+      set.draw((r) => {
+        r.get("page/:id", { to: "pages#show", id: new RegExp("\\A\\d+") } as Parameters<
+          typeof r.get
+        >[1]);
+      });
+    }).toThrow(ArgumentError);
+    expect(() => {
+      set.draw((r) => {
+        r.get("page/:id", { to: "pages#show", id: /\d+$/ } as Parameters<typeof r.get>[1]);
+      });
+    }).toThrow(ArgumentError);
+    expect(() => {
+      set.draw((r) => {
+        r.get("page/:id", { to: "pages#show", id: new RegExp("\\d+\\Z") } as Parameters<
+          typeof r.get
+        >[1]);
+      });
+    }).toThrow(ArgumentError);
+    expect(() => {
+      set.draw((r) => {
+        r.get("page/:id", { to: "pages#show", id: new RegExp("\\d+\\z") } as Parameters<
+          typeof r.get
+        >[1]);
+      });
+    }).toThrow(ArgumentError);
+  });
+
+  it("route constraints with unsupported regexp options must error", () => {
+    expect(() => {
+      set.draw((r) => {
+        r.get("page/:name", { to: "pages#show", constraints: { name: /(david|jamis)/s } });
+      });
+    }).toThrow(ArgumentError);
+  });
+
+  it("route constraints with supported options must not error", () => {
+    expect(() => {
+      set.draw((r) => {
+        r.get("page/:name", { to: "pages#show", constraints: { name: /(david|jamis)/i } });
+      });
+    }).not.toThrow();
+  });
 });

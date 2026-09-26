@@ -29,6 +29,13 @@ describe("Object#inspect", () => {
   it("escapes a quote inside a string", () => {
     expect(inspect('q"u')).toBe('"q\\"u"');
   });
+
+  it("renders a Regexp with Ruby's option letters, dotAll as m", () => {
+    expect(inspect(/(david|jamis)/s)).toBe("/(david|jamis)/m");
+    expect(inspect(/a\/b/is)).toBe("/a\\/b/mi");
+    expect(inspect(/x/)).toBe("/x/");
+    expect(inspect(new RegExp("a/b"))).toBe("/a\\/b/");
+  });
 });
 
 describe("Object#to_s", () => {
