@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, it, expect } from "vitest";
 import { MimeType } from "@blazetrails/actionpack";
 import { I18n } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/ruby-compat";
+import { Base } from "./base.js";
 import { DetailsKey, LookupContext } from "./lookup-context.js";
 import type { RenderableTemplate, RenderOptions } from "./renderer/abstract-renderer.js";
 import { MissingTemplate } from "./template/error.js";
@@ -26,6 +27,14 @@ describe("LookupContext", () => {
   afterEach(() => {
     I18n.setLocale("en");
     I18n.setEnforceAvailableLocales(enforceAvailableLocales);
+  });
+
+  it("allows to override default_formats with ActionView::Base.default_formats", () => {
+    const formats = Base.defaultFormats;
+    Base.defaultFormats = [":foo", ":bar"];
+
+    expect(new LookupContext([]).defaultFormats()).toEqual([":foo", ":bar"]);
+    Base.defaultFormats = formats;
   });
 
   it("handles */* formats", () => {
