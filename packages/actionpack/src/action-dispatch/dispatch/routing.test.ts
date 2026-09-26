@@ -8,6 +8,7 @@ import type { DispatchableControllerClass } from "../routing/dispatcher.js";
 import { escapeSegment, unescapeUri } from "../journey/router/utils.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { IntegrationTest } from "../testing/integration.js";
+import { UrlGenerationError } from "../../action-controller/metal/exceptions.js";
 
 afterEach(() => {
   controllerConstants.delete("posts");
@@ -2002,7 +2003,21 @@ describe("TestUrlGenerationErrors", () => {
     expect(() => routes.pathFor({}, "nonexistent")).toThrow(/No route matches/);
   });
 
-  it.skip("URL helpers raise a 'missing keys' error for a nil param with optimized helpers", () => {});
+  it("URL helpers raise a 'missing keys' error for a nil param with optimized helpers", () => {
+    const Routes = new RouteSet();
+    Routes.draw((app) => {
+      app.get("/products/:id", { to: "products#show", as: "product" });
+    });
+    const message =
+      'No route matches {:action=>"show", :controller=>"products", :id=>nil}, missing required keys: [:id]';
+
+    const urlHelpers = Routes.urlHelpers() as unknown as Record<
+      string,
+      (...args: unknown[]) => string
+    >;
+    expect(() => urlHelpers.productPath(null)).toThrow(UrlGenerationError);
+    expect(() => urlHelpers.productPath(null)).toThrow(message);
+  });
 
   it.skip("URL helpers raise a 'constraint failure' error for a nil param with non-optimized helpers", () => {});
 
@@ -2035,16 +2050,79 @@ describe("TestGlobRoutingMapper", () => {
 });
 
 describe("TestOptimizedNamedRoutes", () => {
-  it.skip("enabled when not mounted and default_url_options is empty", () => {});
-  it.skip("named route called as singleton method", () => {});
-  it.skip("named route called on included module", () => {});
-  it.skip("nested optional segments are removed", () => {});
-  it.skip("segments with same prefix are replaced correctly", () => {});
-  it.skip("segments separated with a period are replaced correctly", () => {});
-  it.skip("segments with question marks are escaped", () => {});
-  it.skip("segments with slashes are escaped", () => {});
-  it.skip("glob segments with question marks are escaped", () => {});
-  it.skip("glob segments with slashes are not escaped", () => {});
+  const Routes = new RouteSet();
+  Routes.draw((app) => {
+    const ok = (_env: Record<string, unknown>) => [
+      200,
+      { "Content-Type": "text/plain" },
+      bodyFromString(""),
+    ];
+    app.get("/foo", { to: ok, as: "foo" });
+    app.get("/post(/:action(/:id))", { to: ok, as: "posts" });
+    app.get("/:foo/:foo_type/bars/:id", { to: ok, as: "bar" });
+    app.get("/projects/:id.:format", { to: ok, as: "project" });
+    app.get("/pages/:id", { to: ok, as: "page" });
+    app.get("/wiki/*page", { to: ok, as: "wiki" });
+  });
+
+  const urlHelpers = () =>
+    Routes.urlHelpers() as unknown as Record<string, (...args: unknown[]) => string>;
+  const included = (name: string, ...args: unknown[]): string =>
+    (Routes.namedRoutes.pathHelpersModule.instanceMethod(name)!.value as NamedRouteHelper).call(
+      {
+        _routes: Routes,
+        urlOptions: () => ({}),
+        optimizeRoutesGeneration: () => Routes.isOptimizeRoutesGeneration(),
+      },
+      ...args,
+    );
+
+  it("enabled when not mounted and default_url_options is empty", () => {
+    expect(Routes.urlHelpers().optimizeRoutesGeneration()).toBe(true);
+  });
+
+  it("named route called as singleton method", () => {
+    expect(urlHelpers().fooPath()).toBe("/foo");
+  });
+
+  it("named route called on included module", () => {
+    expect(included("fooPath")).toBe("/foo");
+  });
+
+  it("nested optional segments are removed", () => {
+    expect(urlHelpers().postsPath()).toBe("/post");
+    expect(included("postsPath")).toBe("/post");
+  });
+
+  it("segments with same prefix are replaced correctly", () => {
+    expect(urlHelpers().barPath("foo", "baz", "1")).toBe("/foo/baz/bars/1");
+    expect(included("barPath", "foo", "baz", "1")).toBe("/foo/baz/bars/1");
+  });
+
+  it("segments separated with a period are replaced correctly", () => {
+    expect(urlHelpers().projectPath(1, "json")).toBe("/projects/1.json");
+    expect(included("projectPath", 1, "json")).toBe("/projects/1.json");
+  });
+
+  it("segments with question marks are escaped", () => {
+    expect(urlHelpers().pagePath("foo?bar")).toBe("/pages/foo%3Fbar");
+    expect(included("pagePath", "foo?bar")).toBe("/pages/foo%3Fbar");
+  });
+
+  it("segments with slashes are escaped", () => {
+    expect(urlHelpers().pagePath("foo/bar")).toBe("/pages/foo%2Fbar");
+    expect(included("pagePath", "foo/bar")).toBe("/pages/foo%2Fbar");
+  });
+
+  it("glob segments with question marks are escaped", () => {
+    expect(urlHelpers().wikiPath("foo?bar")).toBe("/wiki/foo%3Fbar");
+    expect(included("wikiPath", "foo?bar")).toBe("/wiki/foo%3Fbar");
+  });
+
+  it("glob segments with slashes are not escaped", () => {
+    expect(urlHelpers().wikiPath("foo/bar")).toBe("/wiki/foo/bar");
+    expect(included("wikiPath", "foo/bar")).toBe("/wiki/foo/bar");
+  });
 });
 
 describe("TestNamedRouteUrlHelpers", () => {
@@ -2080,6 +2158,7 @@ describe("TestUrlConstraints", () => {
     (Routes.namedRoutes.urlHelpersModule.instanceMethod(name)!.value as NamedRouteHelper).call({
       _routes: Routes,
       urlOptions: () => t.urlOptions(),
+      optimizeRoutesGeneration: () => Routes.isOptimizeRoutesGeneration(),
     });
   const adminRootUrl = urlHelper("adminRootUrl");
   const secureRootUrl = urlHelper("secureRootUrl");

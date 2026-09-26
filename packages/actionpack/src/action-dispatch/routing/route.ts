@@ -300,7 +300,16 @@ export class Route {
     return { route: this, params: match.params };
   }
 
-  pathFor(params: Record<string, string | number> = {}): string {
+  format(pathOptions: Record<string, unknown>): string {
+    return this.pathFormatter().evaluate(pathOptions);
+  }
+
+  isGlob(): boolean {
+    return new Ast(new Parser().parse(this.path)!, true).isGlob();
+  }
+
+  /** @internal */
+  private pathFormatter(): Format {
     if (this._pathFormatter === null) {
       const tree = new Parser().parse(this.path)!;
       this._pathTree = tree;
@@ -320,6 +329,11 @@ export class Route {
       }
       this._pathRequirements = safeReqs;
     }
+    return this._pathFormatter;
+  }
+
+  pathFor(params: Record<string, string | number> = {}): string {
+    const pathFormatter = this.pathFormatter();
     let missingKeys: string[] | null = null;
     const tests = this._pathRequirements!;
     for (const key of this.requiredParts) {
@@ -348,7 +362,7 @@ export class Route {
     for (const [k, v] of Object.entries(params)) {
       if (v != null) hash[k] = String(v);
     }
-    let out = this._pathFormatter.evaluate(hash);
+    let out = pathFormatter.evaluate(hash);
     if (!emittedSlashInPathPreservingCapture(params, this.path, out)) {
       out = out.replace(/\/{2,}/g, "/");
     }
