@@ -370,7 +370,7 @@ export class Template {
     ) => CompiledMethod;
     try {
       factory = (0, eval)(
-        `(function (ArgumentError, htmlSafe, OutputBuffer) { return ${compiledSource}; })\n//# sourceURL=${this.identifier}`,
+        `(function (ArgumentError, htmlSafe, OutputBuffer) { return ${compiledSource}; })\n//# sourceURL=${this.identifier.replace(/[\r\n\u2028\u2029]/g, "")}`,
       ) as (
         argumentError: typeof ArgumentError,
         safe: typeof htmlSafe,
