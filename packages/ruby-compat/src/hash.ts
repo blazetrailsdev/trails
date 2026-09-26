@@ -476,7 +476,7 @@ export class Hash<K, V> extends Map<K, V> {
    */
   override set(key: K, value: V): this {
     this.modifyCheck();
-    const stored = this.stKey(key);
+    const stored = this.hashStlikeLookup(key);
     if (stored === key && isObjectKey(key) && !super.has(key)) {
       const h = rbHash(key);
       const bucket = this._eqlKeys.get(h);
@@ -493,7 +493,7 @@ export class Hash<K, V> extends Map<K, V> {
    * @noRailsEquivalent PERMANENT — Ruby core `Hash#key?` (`vendor/ruby/hash.c:3671`).
    */
   override has(key: K): boolean {
-    return super.has(this.stKey(key));
+    return super.has(this.hashStlikeLookup(key));
   }
 
   /**
@@ -503,7 +503,7 @@ export class Hash<K, V> extends Map<K, V> {
    * `Map` keys an object by identity, so two equal Arrays would otherwise be
    * two entries. A primitive's identity is already its `eql?`.
    */
-  private stKey(key: K): K {
+  private hashStlikeLookup(key: K): K {
     if (!isObjectKey(key)) return key;
     return this._eqlKeys.get(rbHash(key))?.find((stored) => rbEql(stored, key)) ?? key;
   }
@@ -521,7 +521,7 @@ export class Hash<K, V> extends Map<K, V> {
   }
 
   override get(key: K): V | undefined {
-    const stored = this.stKey(key);
+    const stored = this.hashStlikeLookup(key);
     if (super.has(stored)) return super.get(stored);
     return this.default(key);
   }
@@ -611,7 +611,7 @@ export class Hash<K, V> extends Map<K, V> {
    */
   override delete(key: K, block?: (key: K) => V): MapBoundaryReturn {
     this.modifyCheck();
-    const stored = this.stKey(key);
+    const stored = this.hashStlikeLookup(key);
     if (super.has(stored)) {
       const val = super.get(stored);
       super.delete(stored);

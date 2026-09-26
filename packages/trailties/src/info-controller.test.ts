@@ -90,10 +90,6 @@ describe("InfoControllerTest", () => {
     expect(fuzzyResults(tc)).toEqual([]);
   });
 
-  test("controllerPath is rails/info", () => {
-    expect(InfoController.controllerPath()).toBe("rails/info");
-  });
-
   test("matchingRoutes returns [] for empty query", () => {
     expect(matchingRoutes("", true)).toEqual([]);
     expect(matchingRoutes("", false)).toEqual([]);

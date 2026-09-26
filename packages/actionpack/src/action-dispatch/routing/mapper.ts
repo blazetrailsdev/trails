@@ -1193,7 +1193,6 @@ export class Mapper {
     optionsConstraints: RouteOptions["constraints"],
   ): void {
     const path = _path ?? action;
-    const verb = via;
     const fullPath = Mapping.normalizePath(
       RFC2396_PARSER.escape(
         ((this._scope.get("path") as string | undefined) ?? "") + "/" + path.replace(/^\/+/, ""),
@@ -1273,7 +1272,7 @@ export class Mapper {
       Object.assign(constraints, optionsConstraints);
     }
 
-    const route = new Route(verb, fullPath, controller, action, {
+    const route = new Route(via, fullPath, controller, action, {
       ...options,
       anchor,
       format: formatted,
@@ -1292,7 +1291,7 @@ export class Mapper {
       controller || undefined,
       action || undefined,
       route.to ?? route.redirectEndpoint,
-      typeof verb === "string" ? [verb] : verb,
+      typeof via === "string" ? [via] : via,
       formatted,
       optionsConstraints,
       route.anchor,
