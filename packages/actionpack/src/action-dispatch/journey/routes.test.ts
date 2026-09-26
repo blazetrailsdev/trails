@@ -6,6 +6,7 @@ import { Route } from "./route.js";
 import { Routes, type Mapping } from "./routes.js";
 import { RouteSet } from "../routing/route-set.js";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { assertEmpty, assertNotEmpty } from "@blazetrails/activesupport";
 
 function makePattern(
   path: string,
@@ -27,14 +28,14 @@ function mappingFor(
   };
 }
 
-describe("ActionDispatch::Journey::Routes", () => {
+describe("TestRoutes", () => {
   it("clear", () => {
     const routes = new Routes();
     routes.addRoute("aaron", mappingFor("/foo(/:id)"));
-    expect(routes.isEmpty()).toBe(false);
+    assertNotEmpty(routes);
     expect(routes.length).toBe(1);
     routes.clear();
-    expect(routes.isEmpty()).toBe(true);
+    assertEmpty(routes);
     expect(routes.length).toBe(0);
   });
 
@@ -58,7 +59,7 @@ describe("ActionDispatch::Journey::Routes", () => {
     const routes = new Routes();
     routes.addRoute("aaron", mappingFor("/foo(/:id)"));
     expect(routes.anchoredRoutes.length).toBe(1);
-    expect(routes.customRoutes.length).toBe(0);
+    assertEmpty(routes.customRoutes);
 
     routes.addRoute("bar", mappingFor("/not_anchored/hello/:who-notanchored", false));
     expect(routes.customRoutes.length).toBe(1);
@@ -69,10 +70,11 @@ describe("ActionDispatch::Journey::Routes", () => {
     const routes = new Routes();
     routes.addRoute("aaron", mappingFor("/foo/:bar"));
     expect(routes.anchoredRoutes.length).toBe(1);
+    assertEmpty(routes.customRoutes);
 
     routes.addRoute("bar", mappingFor("/:user/:repo", true, { repo: /[\w.]+/ }));
     expect(routes.anchoredRoutes.length).toBe(2);
-    expect(routes.customRoutes.length).toBe(0);
+    assertEmpty(routes.customRoutes);
   });
 
   it("first name wins", () => {

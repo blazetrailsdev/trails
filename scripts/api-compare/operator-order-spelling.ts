@@ -51,6 +51,9 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
     "[]": ["get"],
     "[]=": ["set"],
   },
+  "ActionDispatch::Journey::GTG::TransitionTable": {
+    "[]=": ["set"],
+  },
   // connection_pool.rb:179 LeaseRegistry `def [](context)` → connection-pool.ts
   // `LeaseRegistry#get`.
   "ActiveRecord::ConnectionAdapters::ConnectionPool::LeaseRegistry": { "[]": ["get"] },

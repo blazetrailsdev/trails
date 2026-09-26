@@ -673,6 +673,10 @@ export function extractFromProgram(
           const classKey = `${relPath}:${classInfo.name}`;
           info.classes[classKey] = classInfo;
           fileHasClassOrModule = true;
+          for (const nested of staticClassExpressions(node, classInfo.name)) {
+            const nestedInfo = extractClass(nested.cls, checker, relPath, srcDir);
+            if (nestedInfo) info.classes[`${relPath}:${nested.seat}`] = nestedInfo;
+          }
         }
       } else if (ts.isExpressionStatement(node)) {
         const seated = seatedClassExpression(node);
@@ -882,6 +886,17 @@ export function extractFromProgram(
             ? { missingRailsArgsReasons: fnMissingRailsArgsReasons }
             : {}),
         });
+      } else if (ts.isVariableStatement(node) && isExported(node) && constClassExpression(node)) {
+        const { seat, cls } = constClassExpression(node)!;
+        const classInfo = extractClass(cls, checker, relPath, srcDir);
+        if (classInfo) {
+          info.classes[`${relPath}:${seat}`] = classInfo;
+          fileHasClassOrModule = true;
+          for (const nested of staticClassExpressions(cls, seat)) {
+            const nestedInfo = extractClass(nested.cls, checker, relPath, srcDir);
+            if (nestedInfo) info.classes[`${relPath}:${nested.seat}`] = nestedInfo;
+          }
+        }
       } else if (ts.isVariableStatement(node) && isExported(node)) {
         // Capture `export const X = { method() {...}, foo, bar: ... }`
         // as a module. This is the shape every `include(Host, Mod)`
@@ -3623,6 +3638,41 @@ export function seatedClassExpression(
   if (!ts.isPropertyAccessExpression(expr.left)) return undefined;
   if (!ts.isClassExpression(expr.right) || !expr.right.name) return undefined;
   return { seat: expr.left.getText(), cls: expr.right };
+}
+
+/**
+ * A nested Ruby class ported as a named class expression on a static property
+ * (`class Scanner { static Scanner = class Scanner { ... } }`, the only way TS
+ * lets `Journey::Scanner::Scanner` share its outer class's name). Keyed by the
+ * dotted seat so it never overwrites the outer class; recurses for deeper
+ * nesting.
+ */
+export function staticClassExpressions(
+  node: ts.ClassDeclaration | ts.ClassExpression,
+  seat: string,
+): { seat: string; cls: ts.ClassExpression }[] {
+  const found: { seat: string; cls: ts.ClassExpression }[] = [];
+  for (const member of node.members) {
+    if (!ts.isPropertyDeclaration(member) || !ts.isIdentifier(member.name)) continue;
+    if (!member.modifiers?.some((m) => m.kind === ts.SyntaxKind.StaticKeyword)) continue;
+    const init = member.initializer;
+    if (!init || !ts.isClassExpression(init) || !init.name) continue;
+    const nestedSeat = `${seat}.${member.name.text}`;
+    found.push({ seat: nestedSeat, cls: init }, ...staticClassExpressions(init, nestedSeat));
+  }
+  return found;
+}
+
+/** The `export const Name = class Name { ... }` form of a class declaration. */
+export function constClassExpression(
+  node: ts.VariableStatement,
+): { seat: string; cls: ts.ClassExpression } | undefined {
+  const [decl, ...rest] = node.declarationList.declarations;
+  if (!decl || rest.length > 0 || !ts.isIdentifier(decl.name)) return undefined;
+  if (!(node.declarationList.flags & ts.NodeFlags.Const)) return undefined;
+  const init = decl.initializer;
+  if (!init || !ts.isClassExpression(init) || !init.name) return undefined;
+  return { seat: decl.name.text, cls: init };
 }
 
 export function extractClass(

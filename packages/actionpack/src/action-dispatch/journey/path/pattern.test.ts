@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { regexpEscape } from "@blazetrails/ruby-compat";
 import { Parser } from "../parser.js";
 import { Ast } from "../ast.js";
 import { Pattern } from "./pattern.js";
@@ -19,6 +20,63 @@ function buildPath(
 const pathFromString = (p: string) => buildPath(p, {}, "/.?", true);
 
 describe("TestPattern", () => {
+  const x = /.+/;
+  for (const [path, expected] of Object.entries({
+    "/:controller(/:action)": String.raw`^/(${x.source})(?:/([^/.?]+))?$`,
+    "/:controller/foo": String.raw`^/(${x.source})/foo$`,
+    "/:controller/:action": String.raw`^/(${x.source})/([^/.?]+)$`,
+    "/:controller": String.raw`^/(${x.source})$`,
+    "/:controller(/:action(/:id))": String.raw`^/(${x.source})(?:/([^/.?]+)(?:/([^/.?]+))?)?$`,
+    "/:controller/:action.xml": String.raw`^/(${x.source})/([^/.?]+)\.xml$`,
+    "/:controller.:format": String.raw`^/(${x.source})\.([^/.?]+)$`,
+    "/:controller(.:format)": String.raw`^/(${x.source})(?:\.([^/.?]+))?$`,
+    "/:controller/*foo": String.raw`^/(${x.source})/(.+)$`,
+    "/:controller/*foo/bar": String.raw`^/(${x.source})/(.+)/bar$`,
+    "/:foo|*bar": String.raw`^/(?:([^/.?]+)|(.+))$`,
+  })) {
+    it(`to regexp ${regexpEscape(path)}`, () => {
+      const pattern = buildPath(path, { controller: /.+/ }, SEPARATORS, true);
+      expect(pattern.toRegexp()).toEqual(new RegExp(expected));
+    });
+  }
+
+  for (const [path, expected] of Object.entries({
+    "/:controller(/:action)": String.raw`^/(${x.source})(?:/([^/.?]+))?(?:\b|$|/)`,
+    "/:controller/foo": String.raw`^/(${x.source})/foo(?:\b|$|/)`,
+    "/:controller/:action": String.raw`^/(${x.source})/([^/.?]+)(?:\b|$|/)`,
+    "/:controller": String.raw`^/(${x.source})(?:\b|$|/)`,
+    "/:controller(/:action(/:id))": String.raw`^/(${x.source})(?:/([^/.?]+)(?:/([^/.?]+))?)?(?:\b|$|/)`,
+    "/:controller/:action.xml": String.raw`^/(${x.source})/([^/.?]+)\.xml(?:\b|$|/)`,
+    "/:controller.:format": String.raw`^/(${x.source})\.([^/.?]+)(?:\b|$|/)`,
+    "/:controller(.:format)": String.raw`^/(${x.source})(?:\.([^/.?]+))?(?:\b|$|/)`,
+    "/:controller/*foo": String.raw`^/(${x.source})/(.+)(?:\b|$|/)`,
+    "/:controller/*foo/bar": String.raw`^/(${x.source})/(.+)/bar(?:\b|$|/)`,
+    "/:foo|*bar": String.raw`^/(?:([^/.?]+)|(.+))(?:\b|$|/)`,
+  })) {
+    it(`to non anchored regexp ${regexpEscape(path)}`, () => {
+      const pattern = buildPath(path, { controller: /.+/ }, SEPARATORS, false);
+      expect(pattern.toRegexp()).toEqual(new RegExp(expected));
+    });
+  }
+
+  for (const [path, expected] of Object.entries({
+    "/:controller(/:action)": ["controller", "action"],
+    "/:controller/foo": ["controller"],
+    "/:controller/:action": ["controller", "action"],
+    "/:controller": ["controller"],
+    "/:controller(/:action(/:id))": ["controller", "action", "id"],
+    "/:controller/:action.xml": ["controller", "action"],
+    "/:controller.:format": ["controller", "format"],
+    "/:controller(.:format)": ["controller", "format"],
+    "/:controller/*foo": ["controller", "foo"],
+    "/:controller/*foo/bar": ["controller", "foo"],
+  })) {
+    it(`names ${regexpEscape(path)}`, () => {
+      const pattern = buildPath(path, { controller: /.+/ }, SEPARATORS, true);
+      expect(pattern.names).toEqual(expected);
+    });
+  }
+
   it("to regexp with extended group", () => {
     const path = buildPath("/page/:name", { name: /(tender|love)/ }, SEPARATORS, true);
     expect("/page/tender").toMatch(path.toRegexp());

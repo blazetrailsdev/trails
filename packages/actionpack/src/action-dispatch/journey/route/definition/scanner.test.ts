@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Scanner, type Token } from "../../scanner.js";
 
-describe("ActionDispatch::Journey::Scanner", () => {
+describe("TestScanner", () => {
   let scanner: Scanner;
 
   beforeEach(() => {

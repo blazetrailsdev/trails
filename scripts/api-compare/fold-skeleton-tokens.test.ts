@@ -22,6 +22,14 @@ describe("foldSkeletonTokens", () => {
     ]);
   });
 
+  it("reads a blockless reverse_each chained into drop_while as the one loop drop_while lowers to", () => {
+    const ts = ["ref:parts", "ref:reverse", "loop", "if"];
+    expect(
+      foldSkeletonTokens(["ref:parts", "ref:reverse_each", "ref:drop_while"], "ruby", ts),
+    ).toEqual(["ref:parts", "loop", "if"]);
+    expect(foldSkeletonTokens(["ref:reverse_each", "ref:save"])).toEqual(["loop", "ref:save"]);
+  });
+
   it("leaves control tokens and constructors untouched", () => {
     const skeleton = ["if", "new:Relation", "try", "throw", "ref:get"];
     expect(foldSkeletonTokens(skeleton)).toEqual(skeleton);

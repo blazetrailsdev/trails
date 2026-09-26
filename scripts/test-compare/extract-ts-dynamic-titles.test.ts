@@ -27,6 +27,37 @@ describe("statically expanded loop-generated it() titles", () => {
     ]);
   });
 
+  it("expands Object.entries whose values are not literals, binding only the key", () => {
+    expect(
+      titles(`
+        for (const [path, expected] of Object.entries({ "/:a(/:b)": /x/, "/*c": ["c"] })) {
+          it(\`names \${regexpEscape(path)}\`, () => {});
+          it(\`value \${expected}\`, () => {});
+        }
+      `),
+    ).toEqual([
+      ["names /:a\\(/:b\\)", false],
+      ["value <expr>", true],
+      ["names /\\*c", false],
+    ]);
+  });
+
+  it("binds the names beside a nested destructuring pattern", () => {
+    expect(
+      titles(`
+        for (const [name, [requestPath, expected]] of Object.entries({
+          segment: ["/a", { segment: "a" }],
+          splat: ["/b", { splat: "b" }],
+        })) {
+          it(\`recognize \${name}\`, () => {});
+        }
+      `),
+    ).toEqual([
+      ["recognize segment", false],
+      ["recognize splat", false],
+    ]);
+  });
+
   it("resolves filter/map chains over an already-resolved const array", () => {
     expect(
       titles(`
@@ -66,15 +97,8 @@ describe("statically expanded loop-generated it() titles", () => {
         for (const format of OTHER) {
           it(\`loads \${format}\`, () => {});
         }
-        const MIXED = { a: "x", b: someCall() };
-        for (const [k, v] of Object.entries(MIXED)) {
-          it(\`entry \${k}\`, () => {});
-        }
       `),
-    ).toEqual([
-      ["loads <expr>", true],
-      ["entry <expr>", true],
-    ]);
+    ).toEqual([["loads <expr>", true]]);
   });
 
   it("expands a loop over a literal array", () => {

@@ -173,6 +173,7 @@ import {
   NEGATED_ALIASES,
   partitionNegatedCalls,
   requiresNegatedAlias,
+  SKELETON_IDIOM_LOWERINGS,
   skeletonIdiomLowering,
 } from "./enumerable-idioms.js";
 import { isSetterDispatchPortedAsDirectWrite } from "./setter-dispatch.js";
@@ -192,6 +193,21 @@ import { isStdlibMixinGap, stdlibMixinRows } from "./stdlib-mixin-surface.js";
 // (extract-ruby-api.rb) drops callees starting with `_` or not matching
 // /\A[a-z]/, so e.g. `_run_save_callbacks` can never match — the
 // non-underscore `run_callbacks` path covers callback dispatch instead.
+
+/**
+ * A blockless `each`-family call chained straight into another lowered iterator
+ * (`route.parts.reverse_each.drop_while { … }`, journey/formatter.rb:122) returns
+ * an Enumerator and iterates nothing itself; the chained iterator carries the loop.
+ */
+function isEnumeratorReceiver(name: string, next: string | undefined): boolean {
+  const isPlainLoop = (n: string) =>
+    SKELETON_IDIOM_LOWERINGS.get(n)
+      ?.map((l) => l.join(" "))
+      .join() === "loop";
+  if (!isPlainLoop(name) || next?.startsWith("ref:") !== true) return false;
+  const chained = next.slice("ref:".length);
+  return SKELETON_IDIOM_LOWERINGS.has(chained) && !isPlainLoop(chained);
+}
 
 // The significant set (RFC 0047): admits EVERY ported Ruby call name as
 // significant, except `super` (which the module-mixin port structurally drops —
@@ -428,12 +444,13 @@ export function foldSkeletonTokens(
   counterpart?: readonly string[],
 ): string[] {
   const folded: string[] = [];
-  for (const token of skeleton) {
+  for (const [index, token] of skeleton.entries()) {
     if (!token.startsWith("ref:")) {
       folded.push(token);
       continue;
     }
     const name = token.slice("ref:".length);
+    if (side === "ruby" && isEnumeratorReceiver(name, skeleton[index + 1])) continue;
     if (name === JS_ITERATION_CALLEE) {
       folded.push("loop");
       continue;

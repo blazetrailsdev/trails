@@ -754,10 +754,11 @@ class TestExtractor
       return true
     end
 
-    defines.each do |name_node, define_node|
-      names = elements.map do |value|
+    defines.each do |name_node, define_node, nested|
+      names = elements.flat_map do |value|
         bindings = loop_bindings(vars, value)
-        bindings && interpolated_name(name_node, bindings)
+        next [nil] if bindings.nil?
+        nested_bindings(bindings, nested).map { |bound| bound && interpolated_name(name_node, bound) }
       end
       if names.any?(&:nil?)
         report_unexpanded_loop(node)
@@ -938,7 +939,7 @@ class TestExtractor
 
   # Every `define_method(<name>) do ... end` in a block body, as
   # [name-argument node, method_add_block node].
-  def collect_define_methods(node, out)
+  def collect_define_methods(node, out, nested = [])
     return unless node.is_a?(Array)
 
     if node[0] == :method_add_block
@@ -953,12 +954,34 @@ class TestExtractor
         end
       if args
         name_node = define_method_name_node(args)
-        out << [name_node, node] if name_node
+        out << [name_node, node, nested] if name_node
+        return
+      end
+
+      block = node[2]
+      iterator = inner if inner.is_a?(Array) && inner[0] == :call
+      if iterator && ident_name(iterator[3]) == "each" &&
+         block.is_a?(Array) && %i[do_block brace_block].include?(block[0])
+        each_loop = [block_var_names(block[1]), loop_elements(iterator[1])]
+        collect_define_methods(block[2], out, nested + [each_loop])
         return
       end
     end
 
-    node.each { |child| collect_define_methods(child, out) if child.is_a?(Array) }
+    node.each { |child| collect_define_methods(child, out, nested) if child.is_a?(Array) }
+  end
+
+  def nested_bindings(bindings, nested)
+    nested.reduce([bindings]) do |acc, (vars, elements)|
+      return [nil] if vars.nil? || elements.nil?
+      acc.flat_map do |outer|
+        elements.map do |value|
+          inner = loop_bindings(vars, value)
+          return [nil] if inner.nil?
+          outer.merge(inner)
+        end
+      end
+    end
   end
 
   # The first argument of `define_method`, which Rails spells either as a string
@@ -1027,7 +1050,8 @@ class TestExtractor
       path = const_path(node)
       path && qualified_const_name(path)
     when :symbol_literal
-      name = ident_name(node[1].is_a?(Array) && node[1][0] == :symbol ? node[1][1] : node[1])
+      symbol = node[1].is_a?(Array) && node[1][0] == :symbol ? node[1][1] : node[1]
+      name = ident_name(symbol) || (symbol.is_a?(Array) && symbol[0] == :@op ? symbol[1] : nil)
       name && LoopSymbolName.new(name)
     when :dyna_symbol
       name = extract_string_content([:string_literal, node[1]])
@@ -1162,7 +1186,7 @@ class TestExtractor
         receiver = eval_loop_expr(inner[1], bindings)
         return nil if receiver.nil?
         return nil unless args && args.length == 2
-        pattern = extract_string_content(args[0])
+        pattern = extract_string_content(args[0]) || regexp_literal_value(args[0])
         replacement = extract_string_content(args[1])
         return nil if pattern.nil? || replacement.nil?
         receiver.gsub(pattern, replacement)
@@ -1182,6 +1206,18 @@ class TestExtractor
         keys.join(separator)
       end
     end
+  end
+
+  def regexp_literal_value(node)
+    return nil unless node.is_a?(Array) && node[0] == :regexp_literal
+    parts = node[1]
+    return nil unless parts.is_a?(Array) && parts.all? { |part| part.is_a?(Array) && part[0] == :@tstring_content }
+    flags = node[2].is_a?(Array) && node[2][0] == :@regexp_end ? node[2][1][1..] : ""
+    options = 0
+    options |= Regexp::IGNORECASE if flags.include?("i")
+    options |= Regexp::EXTENDED if flags.include?("x")
+    options |= Regexp::MULTILINE if flags.include?("m")
+    Regexp.new(parts.map { |part| part[1] }.join, options)
   end
 
   # `<var>.keys.map(&:to_s)` over a bound hash, or nil for any other receiver —

@@ -461,8 +461,8 @@ export function extractTestsFromSource(content: string, relativePath: string): T
     } else if (ts.isArrayBindingPattern(name)) {
       names = [];
       for (const element of name.elements) {
-        if (ts.isOmittedExpression(element) || !ts.isIdentifier(element.name)) return false;
-        names.push(element.name.text);
+        if (ts.isOmittedExpression(element)) return false;
+        names.push(ts.isIdentifier(element.name) ? element.name.text : "");
       }
     } else {
       return false;
@@ -473,12 +473,14 @@ export function extractTestsFromSource(content: string, relativePath: string): T
       const values = ts.isIdentifier(name) ? [element.scalar] : (element.tuple ?? []);
       const shadowed = names.map((n) => bindings.get(n));
       names.forEach((n, i) => {
+        if (n === "") return;
         const value = values[i];
         if (value === null || value === undefined) bindings.delete(n);
         else bindings.set(n, value);
       });
       run();
       names.forEach((n, i) => {
+        if (n === "") return;
         const prior = shadowed[i];
         if (prior === undefined) bindings.delete(n);
         else bindings.set(n, prior);
@@ -856,7 +858,7 @@ function resolveTemplateTitle(
   return out;
 }
 
-/** A `${...}` span's value: a bound loop variable, or `JSON.stringify` of one. */
+/** A `${...}` span's value: a bound loop variable, or `JSON.stringify` / `regexpEscape` of one. */
 function evalBoundExpression(
   expr: ts.Expression,
   bindings: ReadonlyMap<string, string>,
@@ -873,6 +875,15 @@ function evalBoundExpression(
   ) {
     const inner = evalBoundExpression(e.arguments[0], bindings);
     return inner === null ? null : JSON.stringify(inner);
+  }
+  if (
+    ts.isCallExpression(e) &&
+    ts.isIdentifier(e.expression) &&
+    e.expression.text === "regexpEscape" &&
+    e.arguments.length === 1
+  ) {
+    const inner = evalBoundExpression(e.arguments[0], bindings);
+    return inner === null ? null : inner.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
   return null;
 }
@@ -935,7 +946,6 @@ function staticIterableElements(
       const entries = staticObjectEntries(e.arguments[0], decls);
       if (!entries) return null;
       if (method === "keys") return entries.map(([key]) => ({ scalar: key, tuple: null }));
-      if (entries.some(([, value]) => value === null)) return null;
       return entries.map(([key, value]) => ({ scalar: null, tuple: [key, value] }));
     }
     if ((method === "filter" || method === "map") && e.arguments.length === 1) {

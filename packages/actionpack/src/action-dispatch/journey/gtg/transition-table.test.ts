@@ -48,7 +48,7 @@ function dotInstalled(): boolean {
   }
 }
 
-describe("ActionDispatch::Journey::GTG::TransitionTable", () => {
+describe("TestGeneralizedTable", () => {
   it("to json", () => {
     const table = tt([
       "/articles(.:format)",
