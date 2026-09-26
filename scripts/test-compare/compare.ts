@@ -693,7 +693,7 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
         const tc = file.testCases[i];
         const description = tc.dynamic ? collapseDynamicTitle(tc.description) : tc.description;
         const np = normPath(tc.ancestors, description);
-        const nd = normalize(description);
+        const nd = normalizeErb(description);
         tests.push({
           path: np,
           desc: nd,
@@ -766,7 +766,7 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
       for (const tc of file.testCases) {
         if (isTestCaseUnported(file.file, tc.description, tc.ancestors[0])) continue;
         const np = normPath(tc.ancestors, tc.description);
-        const nd = normalize(tc.description);
+        const nd = normalizeErb(tc.description);
         if (!seenPaths.has(np)) {
           seenPaths.add(np);
           increment(rubyPathToFileCount, np);
@@ -826,7 +826,7 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
       for (const tc of file.testCases) {
         const klass = rubyTestClass(tc);
         if (klass === undefined) continue;
-        const nd = normalize(tc.description);
+        const nd = normalizeErb(tc.description);
         const seen = rubyClassesByDesc.get(nd);
         if (seen === undefined) rubyClassesByDesc.set(nd, new Set([klass]));
         else seen.add(klass);
@@ -954,7 +954,7 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
         const tc = file.testCases[ri];
         if (isTestCaseUnported(file.file, tc.description, tc.ancestors[0])) continue;
         const np = normPath(tc.ancestors, tc.description);
-        const nd = normalize(tc.description);
+        const nd = normalizeErb(tc.description);
 
         const candidates = descCandidates(nd, consumedTs);
         if (!candidates) continue;
@@ -997,7 +997,7 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
         if (isTestCaseUnported(file.file, tc.description, tc.ancestors[0])) continue;
         totalRuby++;
         const np = normPath(tc.ancestors, tc.description);
-        const nd = normalize(tc.description);
+        const nd = normalizeErb(tc.description);
 
         const candidates = descCandidates(nd, consumedTs);
         let descIdx = -1;

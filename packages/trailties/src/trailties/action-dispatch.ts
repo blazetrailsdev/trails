@@ -1,6 +1,7 @@
 import { type Deprecators } from "@blazetrails/activesupport";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import {
+  ActionDispatch,
   deprecator,
   X_REQUEST_ID,
   URL as HttpURL,
@@ -111,7 +112,7 @@ export class Trailtie extends BaseTrailtie {
       (app as TrailtieApp).deprecators.set("actionDispatch", deprecator());
     });
 
-    this.initializer("action_dispatch.configure", () => {
+    this.initializer("action_dispatch.configure", (app) => {
       const cfg = this.config.get("actionDispatch") as ActionDispatchConfig;
 
       HttpURL.tldLength = cfg.tldLength;
@@ -122,6 +123,7 @@ export class Trailtie extends BaseTrailtie {
 
       Object.assign(ExceptionWrapper.rescueResponses, cfg.rescueResponses);
       Object.assign(ExceptionWrapper.rescueTemplates, cfg.rescueTemplates);
+      ActionDispatch.testApp = app;
     });
   }
 }

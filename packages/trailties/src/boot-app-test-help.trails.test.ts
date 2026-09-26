@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ActionController } from "@blazetrails/actionpack";
 import { TestCase } from "@blazetrails/activesupport/test-case";
+import { DatabaseTasks } from "@blazetrails/activerecord";
 import { env, setEnv } from "@blazetrails/ruby-compat";
 import { Application } from "./application.js";
 import { Trails } from "./rails.js";
@@ -13,11 +14,11 @@ describe("test_help wires a booted app into the test case classes", () => {
 
   beforeAll(async () => {
     previousEnv = env.TRAILS_ENV;
-    setEnv("TRAILS_ENV", "test");
     await import("./__fixtures__/boot-app/config/application.js");
     Trails.application!.config.setRoot(root);
-    await Trails.initialize();
-    await import("./test-help.js");
+    DatabaseTasks.root = root;
+    DatabaseTasks.dbDir = `${root}/db`;
+    await import("./__fixtures__/boot-app/test/test-helper.js");
   }, 15_000);
 
   afterAll(() => {
@@ -60,10 +61,24 @@ describe("test_help wires a booted app into the test case classes", () => {
     expect(controllerTest.responseBody).toContain("<p>Hello from TSE</p>");
   });
 
+  it("rolls a model test's writes back after the test", async () => {
+    const { Post } = await import("./__fixtures__/boot-app/app/models/post.js");
+    await Post.create({ title: "Rolled back" });
+    expect(await Post.count()).toBe(3);
+  });
+
+  it("loads the app's test/fixtures/*.yml rows into each model test", async () => {
+    const { Post } = await import("./__fixtures__/boot-app/app/models/post.js");
+    expect(await Post.count()).toBe(2);
+    expect((await Post.order("title").pluck("title")) as string[]).toEqual([
+      "A second post",
+      "Welcome to Trails",
+    ]);
+  });
+
   it("routes an integration request through the app's config/routes.ts", async () => {
     const session = new ActionController.IntegrationTest();
     session.beforeSetup();
-    session.app = Trails.application!.app();
     await session.get("/posts/show");
     expect(session.response.status).toBe(200);
     expect(session.response.body).toContain("<p>Hello from TSE</p>");

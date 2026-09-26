@@ -8,6 +8,7 @@ import {
   release,
   type RackApp,
   type RackEnv,
+  type RackMiddleware,
 } from "@blazetrails/rack";
 import { CookieJar } from "./cookie-jar.js";
 import type { Utils } from "./utils.js";
@@ -35,7 +36,7 @@ export class Session {
   readonly defaultHost: string;
 
   /** @internal */
-  private readonly app: RackApp;
+  private readonly app: RackApp | RackMiddleware;
 
   /** @internal */
   private _env: RackEnv = {};
@@ -49,7 +50,7 @@ export class Session {
   /** @internal */
   private _lastResponse: MockResponse | null = null;
 
-  static new(app: RackApp | Session, defaultHost: string = DEFAULT_HOST): Session {
+  static new(app: RackApp | RackMiddleware | Session, defaultHost: string = DEFAULT_HOST): Session {
     if (app instanceof Session) {
       return app;
     } else {
@@ -57,7 +58,7 @@ export class Session {
     }
   }
 
-  constructor(app: RackApp, defaultHost: string = DEFAULT_HOST) {
+  constructor(app: RackApp | RackMiddleware, defaultHost: string = DEFAULT_HOST) {
     this._env = {};
     this.app = app;
     this._afterRequest = [];
@@ -352,10 +353,7 @@ export class Session {
     }
   }
 
-  /**
-   * @missingRailsCall call — PERMANENT
-   * @internal
-   */
+  /** @internal */
   private async processRequest(
     uri: Generic,
     env: RackEnv,
@@ -363,7 +361,9 @@ export class Session {
   ): Promise<MockResponse> {
     env["HTTP_COOKIE"] ??= this.cookieJar.for(uri);
     this._lastRequest = new Request(env);
-    const [status, headers, rackBody] = await this.app(env);
+    const [status, headers, rackBody] = await (typeof this.app === "function"
+      ? this.app(env)
+      : this.app.call(env));
     const body: string[] = [];
     for await (const chunk of rackBody) body.push(String(chunk));
 
