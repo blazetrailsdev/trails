@@ -4,6 +4,7 @@ import { Module } from "@blazetrails/ruby-compat";
 import {
   Base,
   deprecator,
+  Resolver,
   RoutingUrlFor,
   setApplyStylesheetMediaDefault,
   setPreloadLinksHeader,
@@ -20,6 +21,7 @@ export interface ActionViewConfig {
   preloadLinksHeader?: boolean | null;
   prependContentExfiltrationPrevention: boolean;
   annotateRenderedViewWithFilenames: boolean;
+  cacheTemplateLoading?: boolean | null;
 }
 
 declare module "../trailtie/configuration.js" {
@@ -31,7 +33,7 @@ declare module "../trailtie/configuration.js" {
 /** @noRailsEquivalent PERMANENT */
 interface TrailtieApp {
   deprecators: Deprecators;
-  config: { get(key: string): unknown };
+  config: { get(key: string): unknown; reloadingEnabled(): boolean };
 }
 
 export class Trailtie extends BaseTrailtie {
@@ -61,6 +63,15 @@ export class Trailtie extends BaseTrailtie {
 
     this.initializer("action_view.deprecator", { before: "load_environment_config" }, (app) => {
       (app as TrailtieApp).deprecators.set("actionView", deprecator());
+    });
+
+    this.initializer("action_view.caching", (app) => {
+      onLoad("action_view", () => {
+        const actionView = (app as TrailtieApp).config.get("actionView") as ActionViewConfig;
+        if (actionView.cacheTemplateLoading == null) {
+          Resolver.caching = !(app as TrailtieApp).config.reloadingEnabled();
+        }
+      });
     });
 
     this.initializer("action_view.setup_action_pack", () => {
