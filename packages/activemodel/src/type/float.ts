@@ -19,11 +19,14 @@ export class FloatType extends NumericValueType {
 
   /** @internal */
   protected castValue(value: unknown): number | null {
-    if (typeof value === "number") return value;
+    if (value instanceof Number || (typeof value === "number" && !Number.isInteger(value))) {
+      return value as number;
+    }
     if (value === "Infinity") return Number.POSITIVE_INFINITY;
     if (value === "-Infinity") return Number.NEGATIVE_INFINITY;
     if (value === "NaN") return Number.NaN;
-    const parsed = parseFloat(String(value));
-    return isNaN(parsed) ? 0 : parsed;
+    const parsed = typeof value === "number" ? value : parseFloat(String(value));
+    const toF = isNaN(parsed) ? 0 : parsed;
+    return (Number.isInteger(toF) ? new Number(toF) : toF) as number;
   }
 }

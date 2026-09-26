@@ -69,7 +69,9 @@ export function castBoundValue(value: unknown): unknown {
     const f = value.toF();
     return Number.isInteger(f) ? `${f}.0` : String(f);
   }
-  if (typeof value === "number" || typeof value === "bigint") return String(value);
+  if (typeof value === "number" || typeof value === "bigint" || value instanceof Number) {
+    return toS(value);
+  }
   if (value instanceof BigDecimal) return value.toString("F");
   if (value === true) return "1";
   if (value === false) return "0";

@@ -83,6 +83,9 @@ export function cmp(a: unknown, b: unknown): number | null {
   // boundary: Date endpoints are compared as epoch millis.
   if (a instanceof Date) a = a.getTime();
   if (b instanceof Date) b = b.getTime();
+  /* `flo_cmp` (`vendor/ruby/numeric.c:1700`) orders a boxed Float seat by its value. */
+  if (a instanceof Number) a = a.valueOf();
+  if (b instanceof Number) b = b.valueOf();
   if (isComparable(a)) return a.compareTo(b) ?? null;
   if (isCmpSpelling(a)) return a.cmp(b) ?? null;
   if (rbObjClass(a) === "Time" && rbObjClass(b) === "Time") {

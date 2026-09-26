@@ -5,6 +5,7 @@
 import { include } from "@blazetrails/activesupport";
 import { Dirty } from "../dirty.js";
 import { describe, it, expect } from "vitest";
+import { cmp, rbEql, rbEqual, rbObjAsString, rbObjClass } from "@blazetrails/ruby-compat";
 import { Model, Types } from "../index.js";
 import { Attributes, type AttributesClassHalf } from "../attributes.js";
 
@@ -56,8 +57,8 @@ describe("FloatType (trails)", () => {
 
   it("casting booleans via Helpers::Numeric — true → 1.0, false → 0.0", () => {
     const type = new Types.FloatType();
-    expect(type.cast(true)).toBe(1);
-    expect(type.cast(false)).toBe(0);
+    expect(type.cast(true)).toEqual(new Number(1.0));
+    expect(type.cast(false)).toEqual(new Number(0.0));
   });
 
   it('cast "NaN" returns Number.NaN', () => {
@@ -77,9 +78,9 @@ describe("FloatType (trails)", () => {
 
   it("special strings are case-sensitive — lowercase variants take the to_f arm", () => {
     const type = new Types.FloatType();
-    expect(type.cast("nan")).toBe(0);
-    expect(type.cast("infinity")).toBe(0);
-    expect(type.cast("INFINITY")).toBe(0);
+    expect(type.cast("nan")).toEqual(new Number(0.0));
+    expect(type.cast("infinity")).toEqual(new Number(0.0));
+    expect(type.cast("INFINITY")).toEqual(new Number(0.0));
   });
 
   it('serialize("NaN") round-trips to Number.NaN via Helpers::Numeric', () => {
@@ -92,5 +93,36 @@ describe("FloatType (trails)", () => {
     expect(type.typeCastForSchema(NaN)).toBe("::Float::NAN");
     expect(type.typeCastForSchema(Infinity)).toBe("::Float::INFINITY");
     expect(type.typeCastForSchema(-Infinity)).toBe("-::Float::INFINITY");
+  });
+
+  it("a whole-valued float attribute interpolates as a Float", () => {
+    class MyModel extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
+      static {
+        include(this, Attributes);
+        this.attribute("value", "float");
+      }
+    }
+    const read = (attrs: Record<string, unknown>) =>
+      (new MyModel(attrs) as unknown as Attributes)._readAttribute("value");
+    const value = read({ value: "1" });
+    expect(rbObjClass(value)).toBe("Float");
+    expect(rbObjAsString(value)).toBe("1.0");
+    expect(rbObjAsString(read({ value: 2 }))).toBe("2.0");
+  });
+
+  it("a whole-valued float still does arithmetic and compares by value", () => {
+    const type = new Types.FloatType();
+    const value = type.cast("1") as number;
+    expect(value + 1).toBe(2);
+    expect(value * 2.5).toBe(2.5);
+    expect(value < 2).toBe(true);
+    expect(cmp(value, 1)).toBe(0);
+    expect(rbEqual(value, 1)).toBe(true);
+    expect(rbEqual(value, type.cast(1.0))).toBe(true);
+    expect(rbEql(value, 1)).toBe(false);
+    expect(rbEql(value, type.cast(1.0))).toBe(true);
+    expect(type.isChanged(value, type.cast("1.0"), "1.0")).toBe(false);
   });
 });

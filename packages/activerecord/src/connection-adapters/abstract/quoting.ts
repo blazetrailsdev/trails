@@ -17,7 +17,7 @@
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { BigDecimal, TimeWithZone } from "@blazetrails/activesupport";
 import { Attribute as ModelAttribute, BinaryData, type ValueType } from "@blazetrails/activemodel";
-import { rbObjClass } from "@blazetrails/ruby-compat";
+import { rbObjAsString, rbObjClass } from "@blazetrails/ruby-compat";
 import type { TypeMap } from "../../type/type-map.js";
 import { NotImplementedError } from "../../errors.js";
 import { formatPlainDateTimeForSql, formatPlainDateForSql } from "./sql-datetime.js";
@@ -73,7 +73,9 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
   if (typeof value === "boolean") return value ? this.quotedTrue() : this.quotedFalse();
   if (value === null || value === undefined) return "NULL";
   if (value instanceof BigDecimal) return value.toString("F");
-  if (typeof value === "number" || typeof value === "bigint") return String(value);
+  if (typeof value === "number" || typeof value === "bigint" || value instanceof Number) {
+    return rbObjAsString(value);
+  }
   if (value instanceof BinaryData) return this.quotedBinary(value);
   if (ArrayBuffer.isView(value)) {
     const bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
@@ -107,6 +109,7 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   if (value === null || value === undefined) return value;
   if (value instanceof BigDecimal) return value.toString("F");
   if (typeof value === "number" || typeof value === "bigint") return value;
+  if (value instanceof Number) return value.valueOf();
   if (typeof value === "string") return value;
   if (value instanceof TimeValue) return this.quotedTime(value);
   if (

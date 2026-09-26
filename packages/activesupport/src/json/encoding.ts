@@ -46,8 +46,8 @@ export class JSONGemEncoder {
       value === false
     ) {
       return value;
-    } else if (typeof value === "number") {
-      return Float.asJson(value);
+    } else if (typeof value === "number" || value instanceof Number) {
+      return Float.asJson(value as number);
     } else if (value instanceof Map || isPlainObject(value as object)) {
       const result: Record<string, unknown> = {};
       const entries = value instanceof Map ? value.entries() : Object.entries(value as object);

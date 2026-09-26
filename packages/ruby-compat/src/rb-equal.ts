@@ -36,6 +36,10 @@ export function rbEql(a: unknown, b: unknown): boolean {
   return equalOrEql(a, b, true);
 }
 
+function isFloat(v: unknown): boolean {
+  return v instanceof Number || (typeof v === "number" && !Number.isInteger(v));
+}
+
 /**
  * `rb_equal` (`vendor/ruby/object.c:147`) and `rb_eql`
  * (`object.c:159`) over one body, the way `hash_equal`
@@ -57,6 +61,18 @@ function equalOrEql(a: unknown, b: unknown, eql: boolean): boolean {
   if (typeof a === "bigint" || typeof b === "bigint") {
     if (typeof a === "number") return Number.isInteger(a) && BigInt(a) === b;
     if (typeof b === "number") return Number.isInteger(b) && a === BigInt(b);
+  }
+  /* A whole-valued Float arrives boxed (`new Number(x)`, see `floToS`), and a
+     box is an object, so `===` is identity. `rb_float_equal`
+     (`vendor/ruby/numeric.c:1614`) and `fix_equal` (`:4606`) compare an Integer
+     and a Float by value; `rb_float_eql` (`:1926`) answers true only for
+     another Float. */
+  if (a instanceof Number || b instanceof Number) {
+    if (eql && !(isFloat(a) && isFloat(b))) return false;
+    const x = a instanceof Number ? a.valueOf() : a;
+    const y = b instanceof Number ? b.valueOf() : b;
+    if (typeof x === "bigint" || typeof y === "bigint") return equalOrEql(x, y, eql);
+    return typeof x === "number" && typeof y === "number" && x === y;
   }
   /* Ruby's `Date#==` (`vendor/ruby/ext/date/date_core.c:6902` `d_lite_equal`) is
      `<=>`-based (`vendor/ruby/ext/date/date_core.c:6810` `d_lite_cmp`), so it
