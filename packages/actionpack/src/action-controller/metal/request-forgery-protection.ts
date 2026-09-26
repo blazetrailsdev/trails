@@ -7,7 +7,7 @@ import {
   URI,
   type Bytes,
 } from "@blazetrails/ruby-compat";
-import { isBlank } from "@blazetrails/activesupport";
+import { ActiveSupportJSON, isBlank } from "@blazetrails/activesupport";
 import {
   CookieJar,
   cookieJar,
@@ -136,20 +136,20 @@ export class CookieStore {
     const contents = request.cookieJar().encrypted.get(this._cookieName);
     if (contents == null) return null;
 
-    let value: { token?: string; session_id?: { publicId?: string } };
+    let value: { token?: string; session_id?: { public_id?: string } };
     try {
       value = JSON.parse(contents as string) as typeof value;
     } catch {
       return null;
     }
-    if (value.session_id?.publicId !== request.session?.idWas?.()?.publicId) return null;
+    if (value.session_id?.public_id !== request.session?.idWas?.()?.publicId) return null;
 
     return value.token ?? null;
   }
 
   store(request: CsrfRequest, csrfToken: string): void {
     request.cookieJar().encrypted.permanent.set(this._cookieName, {
-      value: JSON.stringify({ token: csrfToken, session_id: request.session?.id?.() }),
+      value: ActiveSupportJSON.encode({ token: csrfToken, session_id: request.session?.id?.() }),
       httpOnly: true,
       sameSite: "lax",
     });

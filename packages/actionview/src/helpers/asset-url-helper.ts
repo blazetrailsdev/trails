@@ -168,3 +168,13 @@ export function stylesheetPath(
 }
 
 export const pathToStylesheet = stylesheetPath;
+
+export function imagePath(
+  this: AssetUrlHelperHost,
+  source: string,
+  options: AssetPathOptions = {},
+): string {
+  return pathToAsset.call(this, source, { type: "image", ...options });
+}
+
+export const pathToImage = imagePath;

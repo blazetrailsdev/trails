@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { DebugExceptions } from "../middleware/debug-exceptions.js";
 import { Request } from "../http/request.js";
+import { MimeType } from "../http/mime-type.js";
+import { HASH_CONVERSIONS } from "@blazetrails/activesupport";
+import { bodyToString } from "@blazetrails/rack";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 
 const errorApp = async (_env: RackEnv): Promise<RackResponse> => {
@@ -68,5 +71,22 @@ describe("DebugExceptions interceptors", () => {
       interceptors: [(request) => (received = request)],
     }).call({ REQUEST_METHOD: "GET", PATH_INFO: "/test" });
     expect(received).toBeInstanceOf(Request);
+  });
+});
+
+describe("DebugExceptions API body conversions", () => {
+  it("selects a Hash conversion activesupport adds by the matching Mime symbol", async () => {
+    MimeType.register("text/wibble", ":wibble");
+    HASH_CONVERSIONS.toWibble = (hash) => `wibble:${String(hash.status)}`;
+    try {
+      const [, headers, body] = await new DebugExceptions(errorApp, {
+        responseFormat: "api",
+      }).call({ REQUEST_METHOD: "GET", PATH_INFO: "/test", HTTP_ACCEPT: "text/wibble" });
+      expect(String(headers["content-type"])).toContain("text/wibble");
+      expect(await bodyToString(body)).toBe("wibble:500");
+    } finally {
+      delete HASH_CONVERSIONS.toWibble;
+      MimeType.unregister(":wibble");
+    }
   });
 });

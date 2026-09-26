@@ -315,11 +315,12 @@ describe("DebugExceptionsTest", () => {
     const [status, headers, body] = await mw.call(makeEnv({ HTTP_ACCEPT: "application/json" }));
     expect(status).toBe(500);
     expect(headers["content-type"]).toContain("application/json");
-    const json = JSON.parse(await bodyToString(body));
+    const raw = await bodyToString(body);
+    const json = JSON.parse(raw);
     expect(json.exception).toBeDefined();
     expect(json.traces["Application Trace"]).toBeDefined();
     expect(json.traces["Framework Trace"]).toBeDefined();
-    expect(headers["content-length"]).toBe(String(Buffer.byteLength(JSON.stringify(json), "utf8")));
+    expect(headers["content-length"]).toBe(String(Buffer.byteLength(raw, "utf8")));
   });
 
   it("isApiRequest is false for HTML accept even when responseFormat is 'api'", () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Request } from "./request.js";
+import { ENV_METHODS, Request } from "./request.js";
 import { BadRequest } from "../../action-controller/metal/exceptions.js";
 import { StringIO } from "@blazetrails/ruby-compat";
 
@@ -22,5 +22,25 @@ describe("Request#GET / #POST", () => {
     });
     expect(() => req.POST()).toThrow(BadRequest);
     expect(() => req.POST()).toThrow("Invalid request parameters:");
+  });
+});
+
+describe("Request ENV_METHODS readers", () => {
+  it("each ENV_METHODS entry generates a reader named by its header, read through get_header", () => {
+    const req = new Request({
+      HTTP_X_FORWARDED_HOST: "proxy.example.com",
+      HTTP_ACCEPT_CHARSET: "utf-8",
+      SERVER_NAME: "example.com",
+    });
+    expect(ENV_METHODS).toContain("HTTP_X_FORWARDED_HOST");
+    expect(req.xForwardedHost).toBe("proxy.example.com");
+    expect(req.acceptCharset).toBe("utf-8");
+    expect(req.serverName).toBe("example.com");
+    expect(req.xRequestId).toBeUndefined();
+  });
+
+  it("raw_host_with_port skips a blank X-Forwarded-Host, as presence does", () => {
+    const req = new Request({ HTTP_X_FORWARDED_HOST: " ", HTTP_HOST: "example.com:8080" });
+    expect(req.rawHostWithPort).toBe("example.com:8080");
   });
 });

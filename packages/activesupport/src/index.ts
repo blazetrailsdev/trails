@@ -204,6 +204,7 @@ export {
   toXml,
   fromXml,
   fromTrustedXml,
+  HASH_CONVERSIONS,
 } from "./hash-utils.js";
 
 export { XMLConverter, DisallowedType, DISALLOWED_TYPES } from "./core-ext/hash/conversions.js";

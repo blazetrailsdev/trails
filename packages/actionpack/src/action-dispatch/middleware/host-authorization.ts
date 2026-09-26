@@ -1,5 +1,6 @@
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString } from "@blazetrails/rack";
+import { isBlank } from "@blazetrails/activesupport";
 import { Request } from "../http/request.js";
 import { IPAddr, regexpEscape } from "@blazetrails/ruby-compat";
 import type { Logger } from "./debug-exceptions.js";
@@ -140,9 +141,9 @@ export class HostAuthorization {
       "localhost";
     if (!this.permissions.allows(originHost)) out.push(originHost);
 
-    const forwardedHeader = env["HTTP_X_FORWARDED_HOST"] as string | undefined;
-    const forwarded = forwardedHeader?.split(/,\s?/).pop()?.trim();
-    if (forwarded && !this.permissions.allows(forwarded)) out.push(forwarded);
+    const forwardedHost = request.xForwardedHost?.split(/,\s?/).at(-1);
+    if (!(isBlank(forwardedHost) || this.permissions.allows(forwardedHost!)))
+      out.push(forwardedHost!);
     return out;
   }
 

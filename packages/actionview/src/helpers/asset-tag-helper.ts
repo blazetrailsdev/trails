@@ -6,16 +6,31 @@ import {
   isPresent,
   stringifyKeys,
 } from "@blazetrails/activesupport";
+import { ArgumentError, NoMethodError } from "@blazetrails/ruby-compat";
 import {
+  pathToAsset,
+  pathToImage,
   pathToStylesheet,
   type AssetPathOptions,
   type AssetUrlHelperHost,
 } from "./asset-url-helper.js";
 import { tag } from "./tag-helper.js";
 
+export let imageLoading: string | null = null;
+
+export let imageDecoding: string | null = null;
+
 export let preloadLinksHeader: boolean | null = null;
 
 export let applyStylesheetMediaDefault: boolean | null = null;
+
+export function setImageLoading(value: string | null): void {
+  imageLoading = value;
+}
+
+export function setImageDecoding(value: string | null): void {
+  imageDecoding = value;
+}
 
 export function setPreloadLinksHeader(value: boolean | null): void {
   preloadLinksHeader = value;
@@ -38,6 +53,7 @@ interface PreloadHeaderHost {
 export type AssetTagHelperHost = AssetUrlHelperHost &
   PreloadHeaderHost & {
     contentSecurityPolicyNonce?(): string | null;
+    polymorphicUrl?(record: unknown): string;
   };
 
 export function stylesheetLinkTag(this: AssetTagHelperHost, ...sources: unknown[]): SafeBuffer {
@@ -102,6 +118,95 @@ export function stylesheetLinkTag(this: AssetTagHelperHost, ...sources: unknown[
   }
 
   return sourcesTags;
+}
+
+export function imageTag(
+  this: AssetTagHelperHost,
+  source: unknown,
+  options: Record<string, unknown> = {},
+): SafeBuffer {
+  options = { ...options };
+  checkForImageTagErrors.call(this, options);
+  const skipPipeline = deleteKey(options, "skipPipeline") as boolean | undefined;
+
+  options["src"] = resolveAssetSource.call(this, "image", source, skipPipeline);
+
+  const srcset = options["srcset"];
+  if (srcset != null && srcset !== false && typeof srcset !== "string") {
+    options["srcset"] = (
+      Array.isArray(srcset) ? srcset : Object.entries(srcset as Record<string, unknown>)
+    )
+      .map(([srcPath, size]: [string, unknown]) => {
+        srcPath = pathToImage.call(this, srcPath, { skipPipeline });
+        return `${srcPath} ${String(size)}`;
+      })
+      .join(", ");
+  }
+
+  if (options["size"] != null && options["size"] !== false) {
+    const dimensions = extractDimensions.call(this, deleteKey(options, "size"));
+    options["width"] = dimensions?.[0];
+    options["height"] = dimensions?.[1];
+  }
+
+  if (imageLoading != null && (options["loading"] == null || options["loading"] === false)) {
+    options["loading"] = imageLoading;
+  }
+  if (imageDecoding != null && (options["decoding"] == null || options["decoding"] === false)) {
+    options["decoding"] = imageDecoding;
+  }
+
+  return tag("img", options) as SafeBuffer;
+}
+
+/** @internal */
+export function resolveAssetSource(
+  this: AssetTagHelperHost,
+  assetType: string,
+  source: unknown,
+  skipPipeline: boolean | undefined,
+): string {
+  try {
+    if (typeof source === "string") {
+      return pathToAsset.call(this, source, { type: assetType, skipPipeline });
+    } else {
+      if (typeof this.polymorphicUrl !== "function") {
+        throw new NoMethodError(`undefined method 'polymorphic_url'`);
+      }
+      return this.polymorphicUrl(source);
+    }
+  } catch (e) {
+    if (e instanceof NoMethodError) {
+      throw new ArgumentError(`Can't resolve ${assetType} into URL: ${e.message}`);
+    }
+    throw e;
+  }
+}
+
+/** @internal */
+export function extractDimensions(this: AssetTagHelperHost, size: unknown): string[] | undefined {
+  size = String(size);
+  if (/^\d+(?:\.\d+)?x\d+(?:\.\d+)?$/.test(size as string)) {
+    return (size as string).split("x");
+  } else if (/^\d+(?:\.\d+)?$/.test(size as string)) {
+    return [size as string, size as string];
+  }
+  return undefined;
+}
+
+/** @internal */
+export function checkForImageTagErrors(
+  this: AssetTagHelperHost,
+  options: Record<string, unknown>,
+): void {
+  if (
+    options["size"] != null &&
+    options["size"] !== false &&
+    ((options["height"] != null && options["height"] !== false) ||
+      (options["width"] != null && options["width"] !== false))
+  ) {
+    throw new ArgumentError("Cannot pass a :size option with a :height or :width option");
+  }
 }
 
 /** @internal */

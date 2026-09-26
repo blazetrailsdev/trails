@@ -1,4 +1,4 @@
-import { camelize, NameError, toSentence, underscore } from "@blazetrails/activesupport";
+import { camelize, NameError, presence, toSentence, underscore } from "@blazetrails/activesupport";
 import type { RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
 import {
   parseNestedQuery,
@@ -169,8 +169,52 @@ function envName(key: string): string {
   return key;
 }
 
+export const ENV_METHODS: readonly string[] = Object.freeze([
+  "AUTH_TYPE",
+  "GATEWAY_INTERFACE",
+  "PATH_TRANSLATED",
+  "REMOTE_HOST",
+  "REMOTE_IDENT",
+  "REMOTE_USER",
+  "REMOTE_ADDR",
+  "SERVER_NAME",
+  "SERVER_PROTOCOL",
+  "ORIGINAL_SCRIPT_NAME",
+
+  "HTTP_ACCEPT",
+  "HTTP_ACCEPT_CHARSET",
+  "HTTP_ACCEPT_ENCODING",
+  "HTTP_ACCEPT_LANGUAGE",
+  "HTTP_CACHE_CONTROL",
+  "HTTP_FROM",
+  "HTTP_NEGOTIATE",
+  "HTTP_PRAGMA",
+  "HTTP_CLIENT_IP",
+  "HTTP_X_FORWARDED_FOR",
+  "HTTP_ORIGIN",
+  "HTTP_VERSION",
+  "HTTP_X_CSRF_TOKEN",
+  "HTTP_X_REQUEST_ID",
+  "HTTP_X_FORWARDED_HOST",
+]);
+
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Request {
+  static {
+    for (const env of ENV_METHODS) {
+      Object.defineProperty(
+        this.prototype,
+        camelize(env.replace(/^HTTP_/, "").toLowerCase(), false),
+        {
+          get(this: Request) {
+            return this.getHeader(env);
+          },
+          configurable: true,
+        },
+      );
+    }
+  }
+
   readonly env: RackEnv;
 
   #method?: string;
@@ -217,8 +261,8 @@ export class Request {
   }
 
   get rawHostWithPort(): string {
-    const forwarded = (this.env["HTTP_X_FORWARDED_HOST"] as string | undefined)?.trim();
-    if (forwarded) {
+    const forwarded = presence(this.xForwardedHost);
+    if (forwarded != null) {
       const parts = forwarded.split(/,\s?/);
       return parts[parts.length - 1];
     }
@@ -303,10 +347,6 @@ export class Request {
     if (!cl) return undefined;
     const n = parseInt(cl, 10);
     return isNaN(n) ? undefined : n;
-  }
-
-  get accept(): string {
-    return (this.env["HTTP_ACCEPT"] as string) || "";
   }
 
   declare readonly ifModifiedSince: Date | undefined;
@@ -916,7 +956,39 @@ export interface Request extends Omit<
   | "POST"
   | "formData"
   | "defaultSession"
+  | "serverName"
+  | "acceptEncoding"
+  | "acceptLanguage"
 > {}
+
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging */
+export interface Request {
+  get authType(): string | undefined;
+  get gatewayInterface(): string | undefined;
+  get pathTranslated(): string | undefined;
+  get remoteHost(): string | undefined;
+  get remoteIdent(): string | undefined;
+  get remoteUser(): string | undefined;
+  get remoteAddr(): string | undefined;
+  get serverName(): string | undefined;
+  get serverProtocol(): string | undefined;
+  get originalScriptName(): string | undefined;
+  get accept(): string | undefined;
+  get acceptCharset(): string | undefined;
+  get acceptEncoding(): string | undefined;
+  get acceptLanguage(): string | undefined;
+  get cacheControl(): string | undefined;
+  get from(): string | undefined;
+  get negotiate(): string | undefined;
+  get pragma(): string | undefined;
+  get clientIp(): string | undefined;
+  get xForwardedFor(): string | undefined;
+  get origin(): string | undefined;
+  get version(): string | undefined;
+  get xCsrfToken(): string | undefined;
+  get xRequestId(): string | undefined;
+  get xForwardedHost(): string | undefined;
+}
 
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging */
 export interface Request extends CspRequest {}
