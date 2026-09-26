@@ -2,10 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import {
-  ScaffoldControllerGenerator,
-  type ScaffoldControllerGeneratorOptions,
-} from "./scaffold-controller-generator.js";
+import { ScaffoldControllerGenerator } from "./scaffold-controller-generator.js";
+import type { ScaffoldControllerGeneratorOptions as Options } from "./scaffold-controller-generator.js";
 import { parseTs, assertNoRubySource } from "../../../template-builder/testing.js";
 
 let tmpDir: string;
@@ -19,18 +17,9 @@ beforeEach(() => {
 
 afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
 
-function makeGen(
-  name: string,
-  attributes: string[] = [],
-  options: Partial<ScaffoldControllerGeneratorOptions> = {},
-) {
-  return new ScaffoldControllerGenerator({
-    cwd: tmpDir,
-    output: () => {},
-    name,
-    attributes,
-    ...options,
-  });
+function makeGen(name: string, attributes: string[] = [], options: Partial<Options> = {}) {
+  const config = { cwd: tmpDir, output: () => {}, name, attributes, ...options };
+  return new ScaffoldControllerGenerator(config);
 }
 
 function read(rel: string): string {
