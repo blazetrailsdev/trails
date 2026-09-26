@@ -939,10 +939,6 @@ class TestExtractor
 
   # Every `define_method(<name>) do ... end` in a block body, as
   # [name-argument node, method_add_block node].
-  # Each define carries the `each` loops nested between it and the outer loop
-  # (`%w(get post ...).each do |method|` inside `%w(controller ...).each` at
-  # actionpack/test/controller/test_case_test.rb:888-889), as
-  # [block variables, elements] pairs `nested_bindings` crosses in order.
   def collect_define_methods(node, out, nested = [])
     return unless node.is_a?(Array)
 
@@ -975,8 +971,6 @@ class TestExtractor
     node.each { |child| collect_define_methods(child, out, nested) if child.is_a?(Array) }
   end
 
-  # The outer loop's bindings crossed with every nested loop's elements, or a
-  # single nil when a nested loop does not resolve, so its define is reported.
   def nested_bindings(bindings, nested)
     nested.reduce([bindings]) do |acc, (vars, elements)|
       return [nil] if vars.nil? || elements.nil?
@@ -1056,7 +1050,6 @@ class TestExtractor
       path = const_path(node)
       path && qualified_const_name(path)
     when :symbol_literal
-      # `:+`, `:[]`, `:|` (relation/delegation_test.rb:10-18) are Ripper `@op`s.
       symbol = node[1].is_a?(Array) && node[1][0] == :symbol ? node[1][1] : node[1]
       name = ident_name(symbol) || (symbol.is_a?(Array) && symbol[0] == :@op ? symbol[1] : nil)
       name && LoopSymbolName.new(name)
@@ -1215,8 +1208,6 @@ class TestExtractor
     end
   end
 
-  # An interpolation-free regexp literal (`expected.gsub(/\W/, '')` at
-  # actionview/test/template/erb_util_test.rb:24), or nil.
   def regexp_literal_value(node)
     return nil unless node.is_a?(Array) && node[0] == :regexp_literal
     parts = node[1]

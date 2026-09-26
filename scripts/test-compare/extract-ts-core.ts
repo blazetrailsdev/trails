@@ -462,9 +462,6 @@ export function extractTestsFromSource(content: string, relativePath: string): T
       names = [];
       for (const element of name.elements) {
         if (ts.isOmittedExpression(element)) return false;
-        // A nested pattern (`[name, [requestPath, expected]]`, the port of
-        // Ruby's `|name, (request_path, expected)|`) binds nothing a title can
-        // name; its position is kept so the names after it stay aligned.
         names.push(ts.isIdentifier(element.name) ? element.name.text : "");
       }
     } else {
@@ -861,11 +858,7 @@ function resolveTemplateTitle(
   return out;
 }
 
-/**
- * A `${...}` span's value: a bound loop variable, `JSON.stringify` of one, or
- * ruby-compat's `regexpEscape` of one (the port of the `Regexp.escape(path)` a
- * Rails `define_method` title interpolates, journey/path/pattern_test.rb:29).
- */
+/** A `${...}` span's value: a bound loop variable, or `JSON.stringify` / `regexpEscape` of one. */
 function evalBoundExpression(
   expr: ts.Expression,
   bindings: ReadonlyMap<string, string>,
