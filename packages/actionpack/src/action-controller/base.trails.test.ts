@@ -79,6 +79,8 @@ describe("ActionController::Cookies#cookies", () => {
     expect(controller.cookies()).toBe(request.cookieJar());
     expect(controller.cookies().get("flavor")).toBe("oatmeal");
     expect(request.cookieJar().get("user_name")).toBe("david");
-    expect(CookiesController._helperMethods).toContain("cookies");
+    expect((CookiesController as unknown as { _helperMethods: string[] })._helperMethods).toContain(
+      "cookies",
+    );
   });
 });
