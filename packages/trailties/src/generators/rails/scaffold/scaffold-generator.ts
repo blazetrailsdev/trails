@@ -44,7 +44,7 @@ export class ScaffoldGenerator extends NamedBase {
       `app/controllers/${controllerFileName}${ext}`,
       emitControllerClass({
         className: controllerClassName,
-        methods: crudMethods(className, singular, plural, ts),
+        methods: crudMethods(className, singular, plural, this.routeUrl(), ts),
       }),
     );
     this.createFile(
@@ -81,7 +81,13 @@ include(ScaffoldGenerator, ResourceHelpers);
 
 type Col = { name: string; type: string };
 
-function crudMethods(model: string, singular: string, plural: string, ts: boolean): Method[] {
+function crudMethods(
+  model: string,
+  singular: string,
+  plural: string,
+  routeUrl: string,
+  ts: boolean,
+): Method[] {
   const retT = ts ? "Promise<void>" : undefined;
   const anyArr = ts ? ": any[]" : "";
   const mk = (name: string, body: string) =>
@@ -98,7 +104,7 @@ function crudMethods(model: string, singular: string, plural: string, ts: boolea
     mk("new_", `const ${singular} = {};\nthis.render({ action: "new", locals: { ${singular} } });`),
     mk(
       "create",
-      `// const ${singular} = await ${model}.create(this.params.get("${singular}"));\nthis.redirectTo("/${plural}");`,
+      `// const ${singular} = await ${model}.create(this.params.get("${singular}"));\nthis.redirectTo("${routeUrl}");`,
     ),
     mk(
       "edit",
@@ -106,11 +112,11 @@ function crudMethods(model: string, singular: string, plural: string, ts: boolea
     ),
     mk(
       "update",
-      `// const ${singular} = await ${model}.find(this.params.get("id"));\n// await ${singular}.update(this.params.get("${singular}"));\nthis.redirectTo("/${plural}/" + this.params.get("id"));`,
+      `// const ${singular} = await ${model}.find(this.params.get("id"));\n// await ${singular}.update(this.params.get("${singular}"));\nthis.redirectTo("${routeUrl}/" + this.params.get("id"));`,
     ),
     mk(
       "destroy",
-      `// const ${singular} = await ${model}.find(this.params.get("id"));\n// await ${singular}.destroy();\nthis.redirectTo("/${plural}");`,
+      `// const ${singular} = await ${model}.find(this.params.get("id"));\n// await ${singular}.destroy();\nthis.redirectTo("${routeUrl}");`,
     ),
   ];
 }
