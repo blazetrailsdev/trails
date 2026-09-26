@@ -307,10 +307,9 @@ export class Route {
   matches(request: VerbRequest): boolean {
     if (!this.matchVerb(request)) return false;
     for (const [method, value] of Object.entries(this.constraints)) {
-      if (value instanceof RegExp) {
-        if (!value.test(String(rbFSend(request, method) ?? ""))) return false;
-      } else if (typeof value === "string") {
-        if (value !== String(rbFSend(request, method) ?? "")) return false;
+      if (value instanceof RegExp || typeof value === "string") {
+        const actual = String(rbFSend(request, method) ?? "");
+        if (!(value instanceof RegExp ? value.test(actual) : value === actual)) return false;
       } else if (Array.isArray(value)) {
         if (!value.includes(rbFSend(request, method))) return false;
       } else if (value === true) {
