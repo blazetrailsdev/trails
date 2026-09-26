@@ -7,19 +7,36 @@ import {
   Logger,
   NotificationEvent,
   Notifications,
+  resetLoadHooks,
   runLoadHooks,
 } from "@blazetrails/activesupport";
-import { ActionController, Request, Response } from "@blazetrails/actionpack";
 import {
+  ActionController,
+  Callbacks,
+  MiddlewareStack,
+  Request,
+  Response,
+} from "@blazetrails/actionpack";
+import {
+  ActiveRecord,
   Base,
   LogSubscriber,
+  Migration,
   RuntimeRegistry,
+  disablePreparedStatements,
   generateSecureTokenOn,
+  queryLogs,
+  queryTransformers,
+  setDisablePreparedStatements,
   setGenerateSecureTokenOn,
+  setQueryTransformers,
   setVerboseQueryLogs,
 } from "@blazetrails/activerecord";
 import { Configuration } from "../application/configuration.js";
+import { Configuration as TrailtieConfiguration } from "../trailtie/configuration.js";
+import { MiddlewareStackProxy } from "../configuration.js";
 import { Trails } from "../rails.js";
+import type { ActiveRecordConfig } from "./active-record.js";
 
 const blogApp = (): {
   config: { filterParameters: Array<string | RegExp> };
@@ -125,5 +142,112 @@ describe("RailtieTest (trails-only)", () => {
       Base.logger = savedLogger;
       setVerboseQueryLogs(false);
     }
+  });
+
+  it("pushes the ActiveRecord namespace onto config.eagerLoadNamespaces", () => {
+    expect(Trailtie.config.eagerLoadNamespaces).toContain(ActiveRecord);
+  });
+
+  describe("active_record.migration_error", () => {
+    const mergedStack = async (migrationError: ActiveRecordConfig["migrationError"]) => {
+      const saved = Trailtie.config.get("activeRecord") as ActiveRecordConfig;
+      const savedProxy = TrailtieConfiguration._appMiddleware;
+      TrailtieConfiguration._appMiddleware = new MiddlewareStackProxy();
+      try {
+        Trailtie.config.set("activeRecord", { ...saved, migrationError });
+        const fileWatcher = class {};
+        await runTrailtieInitializers(Trailtie, {
+          ...blogApp(),
+          config: { filterParameters: [], fileWatcher },
+        });
+        const stack = new MiddlewareStack();
+        stack.use(Callbacks as never);
+        Trailtie.config.appMiddleware().mergeInto(stack);
+        return { stack, fileWatcher };
+      } finally {
+        Trailtie.config.set("activeRecord", saved);
+        TrailtieConfiguration._appMiddleware = savedProxy;
+      }
+    };
+
+    it("inserts CheckPending after ActionDispatch::Callbacks when set to page_load", async () => {
+      const { stack, fileWatcher } = await mergedStack("page_load");
+
+      expect(stack.middlewares.map((m) => m.klass)).toEqual([Callbacks, Migration.CheckPending]);
+      expect(stack.middlewares[1].args).toEqual([{ fileWatcher }]);
+    });
+
+    it("does not insert CheckPending otherwise", async () => {
+      const { stack } = await mergedStack(false);
+
+      expect(stack.includes(Migration.CheckPending as never)).toBe(false);
+    });
+  });
+
+  describe("active_record.query_log_tags_config", () => {
+    const boot = async (cfg: Partial<ActiveRecordConfig>, loadDefaults?: string) => {
+      const saved = Trailtie.config.get("activeRecord") as ActiveRecordConfig;
+      const savedTransformers = queryTransformers();
+      const savedDisable = disablePreparedStatements();
+      const savedTags = queryLogs.tags;
+      const savedFormatter = queryLogs.tagsFormatter;
+      const savedTaggings = queryLogs.taggings;
+      setQueryTransformers([]);
+      resetLoadHooks();
+      class BlogApplication {}
+      Trails.application = new BlogApplication() as never;
+      try {
+        Trailtie.config.set("activeRecord", { ...saved, ...cfg });
+        const config = new Configuration();
+        if (loadDefaults) config.loadDefaults(loadDefaults);
+        const app = { deprecators: new Deprecators(), config };
+        await runTrailtieInitializers(Trailtie, app);
+        runLoadHooks("after_initialize", app);
+        return {
+          transformers: [...queryTransformers()],
+          disablePreparedStatements: disablePreparedStatements(),
+          tagsFormatter: queryLogs.tagsFormatter,
+          application: queryLogs.taggings.application,
+          taggingKeys: Object.keys(queryLogs.taggings),
+        };
+      } finally {
+        Trails.application = null;
+        Trailtie.config.set("activeRecord", saved);
+        setQueryTransformers(savedTransformers);
+        setDisablePreparedStatements(savedDisable);
+        queryLogs.tags = savedTags;
+        queryLogs.tagsFormatter = savedFormatter;
+        queryLogs.taggings = savedTaggings;
+        resetLoadHooks();
+      }
+    };
+
+    it("does not modify the query execution path by default", async () => {
+      const booted = await boot({});
+
+      expect(booted.transformers).not.toContain(queryLogs);
+    });
+
+    it("appends QueryLogs to the query transformers and disables prepared statements when enabled", async () => {
+      const booted = await boot({ queryLogTagsEnabled: true });
+
+      expect(booted.transformers).toContain(queryLogs);
+      expect(booted.disablePreparedStatements).toBe(true);
+      expect(booted.application).toBe("BlogApplication");
+      expect(booted.taggingKeys).toEqual([
+        "application",
+        "pid",
+        "socket",
+        "db_host",
+        "database",
+        "source_location",
+      ]);
+    });
+
+    it("config.loadDefaults 7.1 makes the tags formatter sqlcommenter on a booted app", async () => {
+      const booted = await boot({ queryLogTagsEnabled: true }, "7.1");
+
+      expect(booted.tagsFormatter).toBe("sqlcommenter");
+    });
   });
 });

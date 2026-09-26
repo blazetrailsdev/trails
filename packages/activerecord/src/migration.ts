@@ -1285,6 +1285,7 @@ export declare namespace Migration {
   let JoinTable: typeof JoinTableModule;
   let ExecutionStrategy: typeof import("./migration/execution-strategy.js").ExecutionStrategy;
   let DefaultStrategy: typeof import("./migration/default-strategy.js").DefaultStrategy;
+  let CheckPending: typeof import("./migration.js").CheckPending;
   const autoload: Extended<typeof Autoload>["autoload"];
 }
 Object.assign(Migration, {
@@ -2093,6 +2094,7 @@ export class CheckPending {
   }
 }
 
+Migration.CheckPending = CheckPending;
 Migration.delegate = new Migration();
 ActiveRecord.Migration = Migration;
 ActiveRecord.IrreversibleMigration = IrreversibleMigration;

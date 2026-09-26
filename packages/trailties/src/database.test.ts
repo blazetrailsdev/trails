@@ -4,7 +4,8 @@ import { Base } from "@blazetrails/activerecord";
 import * as nodeFs from "node:fs";
 import * as nodeOs from "node:os";
 import * as nodePath from "node:path";
-import { databaseConfiguration } from "./database.js";
+import { databaseConfiguration, loadDatabaseConfig } from "./database.js";
+import { Trails } from "./rails.js";
 
 describe("databaseConfiguration", () => {
   let tmpRoot: string;
@@ -101,5 +102,22 @@ describe("databaseConfiguration", () => {
     const config = (await databaseConfiguration()) as Record<string, Record<string, unknown>>;
     expect(config.staging).toEqual({ adapter: "sqlite3", database: "db/shared.sqlite3" });
     expect(Object.keys(config)).toEqual(["test"]);
+  });
+
+  it("loadDatabaseConfig defaults its environment to Trails.env", async () => {
+    tmpRoot = nodeFs.mkdtempSync(nodePath.join(nodeOs.tmpdir(), "trailties-root-"));
+    nodeFs.mkdirSync(nodePath.join(tmpRoot, "config"));
+    nodeFs.writeFileSync(
+      nodePath.join(tmpRoot, "config", "database.js"),
+      `export default { test: { adapter: "sqlite3", database: "db/test.sqlite3" }, staging: { adapter: "sqlite3", database: "db/staging.sqlite3" } };`,
+    );
+    const originalEnv = Trails.env;
+    Trails.env = "staging";
+    try {
+      const config = await loadDatabaseConfig(undefined, tmpRoot);
+      expect(config.database).toBe("db/staging.sqlite3");
+    } finally {
+      Trails.env = originalEnv;
+    }
   });
 });

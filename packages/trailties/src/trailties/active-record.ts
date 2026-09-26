@@ -3,11 +3,14 @@ import "./action-controller.js";
 import {
   constantize,
   include,
+  isPresent,
   onLoad,
+  TopLevel,
   upcaseFirst,
   type Deprecators,
 } from "@blazetrails/activesupport";
-import { except, prepend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { except, prepend, Process, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { Callbacks } from "@blazetrails/actionpack";
 import * as ActiveRecord from "@blazetrails/activerecord";
 import {
   AsynchronousQueriesTracker,
@@ -19,8 +22,10 @@ import {
   QueryCache,
   Relation,
   SchemaReflection,
+  Migration,
   UniquenessValidator,
   deprecator,
+  queryLogs,
   type AutoFilteredParametersApp,
 } from "@blazetrails/activerecord";
 import type { SQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js";
@@ -107,6 +112,14 @@ const setPostgresqlDecodeDates = (adapter: typeof PostgreSQLAdapter): void => {
 /** @noRailsEquivalent PERMANENT */
 interface TrailtieApp {
   deprecators: Deprecators;
+  config: { get(key: string): unknown; fileWatcher: unknown };
+}
+
+/** @noRailsEquivalent PERMANENT */
+interface QueryLogsContext {
+  connection: {
+    pool: { dbConfig: { socket?: string; host?: string; database?: string } };
+  };
 }
 
 export class Trailtie extends BaseTrailtie {
@@ -129,6 +142,8 @@ export class Trailtie extends BaseTrailtie {
       queues: {},
     } satisfies ActiveRecordConfig);
 
+    this.config.eagerLoadNamespaces.push(ActiveRecord.ActiveRecord);
+
     this.initializer("active_record.deprecator", { before: "load_environment_config" }, (app) => {
       (app as TrailtieApp).deprecators.set("activeRecord", deprecator());
     });
@@ -147,6 +162,15 @@ export class Trailtie extends BaseTrailtie {
 
     this.initializer("active_record.backtrace_cleaner", () => {
       onLoad("active_record", { runOnce: true }, setLogSubscriberBacktraceCleaner);
+    });
+
+    this.initializer("active_record.migration_error", (app) => {
+      const cfg = this.config.get("activeRecord") as ActiveRecordConfig;
+      if (cfg.migrationError === "page_load") {
+        this.config.appMiddleware().insertAfter(Callbacks, Migration.CheckPending, {
+          fileWatcher: (app as TrailtieApp).config.fileWatcher,
+        });
+      }
     });
 
     this.initializer("active_record.copy_schema_cache_config", () => {
@@ -259,6 +283,40 @@ export class Trailtie extends BaseTrailtie {
             (constantize("ActiveRecord::Fixture") as { prototype: object }).prototype,
             EncryptedFixtures,
           );
+        }
+      });
+    });
+
+    this.initializer("active_record.query_log_tags_config", (app) => {
+      this.config.afterInitialize(() => {
+        const cfg = (app as TrailtieApp).config.get("activeRecord") as ActiveRecordConfig;
+        if (cfg.queryLogTagsEnabled) {
+          ActiveRecord.queryTransformers().push(queryLogs);
+          queryLogs.taggings = {
+            ...queryLogs.taggings,
+            application: TopLevel.Trails!.application!.constructor.name.split("::")[0],
+            pid: () => Process.pid.toString(),
+            socket: (context) =>
+              (context as unknown as QueryLogsContext).connection.pool.dbConfig.socket,
+            db_host: (context) =>
+              (context as unknown as QueryLogsContext).connection.pool.dbConfig.host,
+            database: (context) =>
+              (context as unknown as QueryLogsContext).connection.pool.dbConfig.database,
+            source_location: () => queryLogs.querySourceLocation(),
+          };
+          ActiveRecord.setDisablePreparedStatements(true);
+
+          if (isPresent(cfg.queryLogTags)) {
+            queryLogs.tags = cfg.queryLogTags;
+          }
+
+          if (cfg.queryLogTagsFormat) {
+            queryLogs.tagsFormatter = cfg.queryLogTagsFormat;
+          }
+
+          if (cfg.cacheQueryLogTags) {
+            queryLogs.cacheQueryLogTags = true;
+          }
         }
       });
     });

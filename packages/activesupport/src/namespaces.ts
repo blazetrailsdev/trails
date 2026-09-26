@@ -1,6 +1,7 @@
 import { extend, type Extended } from "@blazetrails/ruby-compat/include";
 import * as Autoload from "./dependencies/autoload.js";
 import type { BroadcastLogger } from "./broadcast-logger.js";
+import type { CacheStore } from "./cache/index.js";
 import type { EnvironmentInquirer } from "./environment-inquirer.js";
 import type { Logger } from "./logger.js";
 
@@ -29,6 +30,7 @@ export const TopLevel: {
   Trails?: {
     env: EnvironmentInquirer;
     logger: Logger | null;
+    cache: CacheStore | null;
     application: { reloadRoutesUnlessLoaded(): Promise<boolean> | undefined } | null;
     Application: abstract new (...args: never[]) => unknown;
     root(): Promise<string | undefined>;
@@ -42,4 +44,5 @@ export const TopLevel: {
     };
   };
   ActionController?: { Parameters: new (...args: never[]) => ParametersInstance };
+  ActionCable?: { Engine?: unknown };
 } = {};

@@ -1,27 +1,22 @@
-import {
-  type CacheStore,
-  Logger,
-  NullLogger,
-  NullStore,
-  onLoad,
-  resetLoadHooks,
-} from "@blazetrails/activesupport";
+import { Logger, NullLogger, NullStore, onLoad, resetLoadHooks } from "@blazetrails/activesupport";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Initializable } from "../initializable.js";
 import { Bootstrap, type BootstrapConfig, type BootstrapHost } from "./bootstrap.js";
+import { Trails } from "../rails.js";
 
 class TestApp extends Bootstrap implements BootstrapHost {
   logger: Logger | null = null;
-  cache: CacheStore | null = null;
   config: BootstrapConfig = {};
 }
 
 describe("Bootstrap", () => {
   beforeEach(() => {
     resetLoadHooks();
+    Trails.cache = null;
   });
   afterEach(() => {
     resetLoadHooks();
+    Trails.cache = null;
   });
 
   describe("class shape", () => {
@@ -67,7 +62,7 @@ describe("Bootstrap", () => {
       const store = new NullStore();
       app.config = { cacheStore: store };
       await app.runInitializers("all");
-      expect(app.cache).toBe(store);
+      expect(Trails.cache).toBe(store);
     });
   });
 

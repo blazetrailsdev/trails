@@ -1,10 +1,10 @@
 import { lookupStore } from "@blazetrails/activesupport/cache";
 import {
-  type CacheStore,
   type Logger,
   type LogLevel,
   NullLogger,
   runLoadHooks,
+  TopLevel,
 } from "@blazetrails/activesupport";
 import { Runtime } from "@blazetrails/rack";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
@@ -19,13 +19,11 @@ export interface BootstrapConfig {
 
 export interface BootstrapHost {
   logger: Logger | null;
-  cache: CacheStore | null;
   config: BootstrapConfig;
 }
 
 export abstract class Bootstrap extends Initializable implements BootstrapHost {
   abstract logger: Logger | null;
-  abstract cache: CacheStore | null;
   abstract config: BootstrapConfig;
 }
 
@@ -40,13 +38,13 @@ Bootstrap.initializer<BootstrapHost>("initialize_logger", { group: "all" }, func
 });
 
 Bootstrap.initializer<BootstrapHost>("initialize_cache", { group: "all" }, function () {
-  if (!this.cache) {
-    this.cache = lookupStore(this.config.cacheStore);
+  if (TopLevel.Trails!.cache == null) {
+    TopLevel.Trails!.cache = lookupStore(this.config.cacheStore);
 
-    if (rbObjRespondTo(this.cache, "middleware")) {
+    if (rbObjRespondTo(TopLevel.Trails!.cache, "middleware")) {
       this.config.middleware!.insertBefore(
         Runtime,
-        (this.cache as unknown as { middleware: unknown }).middleware,
+        (TopLevel.Trails!.cache as unknown as { middleware: unknown }).middleware,
       );
     }
   }

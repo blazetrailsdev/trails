@@ -19,6 +19,7 @@ export class GetKeyHandler {
 }
 
 export class QueryLogs implements QueryTransformer {
+  private _taggings: Record<string, TagValue | TagHandler> = {};
   private _tags: TagDefinition[] = [];
   private _tagsFormatter: "legacy" | "sqlcommenter" = "legacy";
   private _formatter: QueryLogsFormatter = LegacyFormatter;
@@ -46,8 +47,13 @@ export class QueryLogs implements QueryTransformer {
     this._cachedComment = undefined;
   }
 
-  set taggings(tags: TagDefinition[]) {
-    this.tags = tags;
+  get taggings(): Record<string, TagValue | TagHandler> {
+    return this._taggings;
+  }
+
+  set taggings(taggings: Record<string, TagValue | TagHandler>) {
+    this._taggings = Object.freeze({ ...taggings });
+    this._cachedComment = undefined;
   }
 
   get prependComment(): boolean {
@@ -148,7 +154,10 @@ export class QueryLogs implements QueryTransformer {
           handler = new GetKeyHandler(tag);
           this._keyHandlers.set(tag, handler);
         }
-        const value = handler.call(context);
+        const value =
+          this._taggings[tag] == null
+            ? handler.call(context)
+            : buildHandler(tag, this._taggings[tag])(context);
         if (value != null) {
           entries.push([tag, value]);
         }

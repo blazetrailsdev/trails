@@ -100,6 +100,7 @@ export {
 export { QueryCache } from "./query-cache.js";
 export { Store as QueryCacheStore } from "./connection-adapters/abstract/query-cache.js";
 export { QueryLogs, LegacyFormatter, SQLCommenter } from "./query-logs.js";
+export { queryLogs } from "./query-logs-instance.js";
 export type { TagValue, TagHandler, TagDefinition, QueryLogsFormatter } from "./query-logs.js";
 export type { QueryTransformer } from "./query-transformers.js";
 export {
@@ -236,6 +237,7 @@ export { UrlConfig } from "./database-configurations/url-config.js";
 export { DatabaseConfigurations } from "./database-configurations.js";
 export { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 export * from "./active-record.js";
+export { ActiveRecord } from "./namespaces.js";
 export { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
 export { DatabaseTasks, DatabaseNotSupported } from "./tasks/database-tasks.js";
 export type {

@@ -1,6 +1,7 @@
 import type { Base } from "../base.js";
 import type { Fixture } from "../fixtures.js";
-import { currentTimeFromProperTimezone } from "../timestamp.js";
+import { Time as RubyTime } from "@blazetrails/date";
+import { defaultTimezone } from "../active-record.js";
 import { TableRow } from "./table-row.js";
 import { ModelMetadata } from "./model-metadata.js";
 
@@ -35,7 +36,7 @@ export class TableRows {
   }
 
   private buildTableRowsFrom(tableName: string, fixtures: Record<string, Fixture>): void {
-    const now = currentTimeFromProperTimezone();
+    const now = defaultTimezone() === "utc" ? RubyTime.now().getutc() : RubyTime.now();
 
     this.tables.set(
       tableName,

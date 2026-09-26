@@ -1,6 +1,6 @@
 import { Session } from "@blazetrails/actionpack";
 import { OrderedOptions, setUtcToLocalReturnsUtcOffsetTimes } from "@blazetrails/activesupport";
-import { ArgumentError, File, OpenSSL } from "@blazetrails/ruby-compat";
+import { ArgumentError, File, getFs, getPath, OpenSSL } from "@blazetrails/ruby-compat";
 import { RuntimeError } from "@blazetrails/ruby-compat";
 import { EngineConfiguration } from "../engine/configuration.js";
 import { Trails } from "../rails.js";
@@ -305,7 +305,7 @@ export class Configuration extends EngineConfiguration {
           };
           activeRecord.runCommitCallbacksOnFirstSavedInstancesInTransaction = false;
           activeRecord.sqlite3AdapterStrictStringsByDefault = true;
-          activeRecord.queryLogTagsFormat = ":sqlcommenter";
+          activeRecord.queryLogTagsFormat = "sqlcommenter";
           activeRecord.raiseOnAssignToAttrReadonly = true;
           activeRecord.belongsToRequiredValidatesForeignKey = false;
           activeRecord.beforeCommittedOnAllRecords = true;
@@ -454,6 +454,19 @@ export class Configuration extends EngineConfiguration {
     if (!paths.get("public")) paths.add("public");
     if (!paths.get("lib/templates")) paths.add("lib/templates");
     return paths;
+  }
+
+  /** @internal */
+  async credentialsDefaults(): Promise<{ contentPath: string; keyPath: string }> {
+    const root = this.root as string;
+    let contentPath = getPath().join(root, `config/credentials/${Trails.env}.yml.enc`);
+    if (!(await getFs().exists(contentPath)))
+      contentPath = getPath().join(root, "config/credentials.yml.enc");
+
+    let keyPath = getPath().join(root, `config/credentials/${Trails.env}.key`);
+    if (!(await getFs().exists(keyPath))) keyPath = getPath().join(root, "config/master.key");
+
+    return { contentPath: contentPath, keyPath: keyPath };
   }
 }
 

@@ -1,4 +1,4 @@
-import { presence, reverseMerge, trailsRoot } from "@blazetrails/activesupport";
+import { presence, reverseMerge, TopLevel, trailsRoot } from "@blazetrails/activesupport";
 import { getFs, getPath } from "@blazetrails/ruby-compat";
 import { env } from "@blazetrails/ruby-compat";
 import type { DatabaseAdapter } from "@blazetrails/activerecord";
@@ -147,7 +147,7 @@ export async function databaseConfiguration(root?: string): Promise<DatabaseConf
 }
 
 export async function loadDatabaseConfig(env?: string, cwd?: string): Promise<DatabaseConfig> {
-  const resolvedEnv = env ?? resolveEnv();
+  const resolvedEnv = env ?? TopLevel.Trails?.env.toString() ?? resolveEnv();
   const loaded = await loadDatabaseConfigModule(cwd);
   if (!loaded) {
     throw new Error("No database config found. Expected config/database.ts (.js)");
@@ -201,7 +201,7 @@ export async function loadAllDatabaseConfigs(
   env?: string,
   cwd?: string,
 ): Promise<NamedDatabaseConfig[]> {
-  const resolvedEnv = env ?? resolveEnv();
+  const resolvedEnv = env ?? TopLevel.Trails?.env.toString() ?? resolveEnv();
   const loaded = await loadDatabaseConfigModule(cwd);
   if (!loaded) {
     throw new Error("No database config found. Expected config/database.ts (.js)");
