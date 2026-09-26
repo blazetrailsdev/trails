@@ -303,7 +303,13 @@ export class Metal extends AbstractController {
       contentType = options.content_type;
       for (const [key, value] of Object.entries(options)) {
         if (key === "location" || key === "content_type") continue;
-        this.headers.set(key.replace(/_/g, "-"), String(value));
+        this.headers.set(
+          key
+            .split(/[-_]/)
+            .map((v) => v[0].toUpperCase() + v.slice(1))
+            .join("-"),
+          String(value),
+        );
       }
     }
     this.status = resolvedStatus;
