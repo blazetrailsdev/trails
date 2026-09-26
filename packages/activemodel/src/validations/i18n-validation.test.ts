@@ -276,19 +276,6 @@ describe("I18nValidationTest", () => {
     ["given option that is not reserved", { format: "jpg" }, { format: "jpg" }],
   ];
 
-  async function eachCommonCase(
-    body: (
-      validationOptions: Record<string, unknown>,
-      generateMessageOptions: Record<string, unknown>,
-    ) => Promise<void>,
-  ): Promise<void> {
-    for (const [, validationOptions, generateMessageOptions] of COMMON_CASES) {
-      await teardown();
-      setup();
-      await body(validationOptions, generateMessageOptions);
-    }
-  }
-
   function validateAndReadMessages(): () => Promise<void> {
     return async () => {
       await person.isValid();
@@ -296,8 +283,8 @@ describe("I18nValidationTest", () => {
     };
   }
 
-  it("validates_confirmation_of on generated message", async () => {
-    await eachCommonCase(async (validationOptions, generateMessageOptions) => {
+  for (const [name, validationOptions, generateMessageOptions] of COMMON_CASES) {
+    it(`validates_confirmation_of on generated message ${name}`, async () => {
       personClass().validatesConfirmationOf("title", validationOptions);
       person.titleConfirmation = "foo";
       const call = [
@@ -308,51 +295,51 @@ describe("I18nValidationTest", () => {
       ];
       await assertCalledWith(ModelError, "generateMessage", call, {}, validateAndReadMessages());
     });
-  });
+  }
 
-  it("validates_acceptance_of on generated message", async () => {
-    await eachCommonCase(async (validationOptions, generateMessageOptions) => {
+  for (const [name, validationOptions, generateMessageOptions] of COMMON_CASES) {
+    it(`validates_acceptance_of on generated message ${name}`, async () => {
       personClass().validatesAcceptanceOf("title", { ...validationOptions, allowNil: false });
       const call = ["title", ":accepted", person, generateMessageOptions];
       await assertCalledWith(ModelError, "generateMessage", call, {}, validateAndReadMessages());
     });
-  });
+  }
 
-  it("validates_presence_of on generated message", async () => {
-    await eachCommonCase(async (validationOptions, generateMessageOptions) => {
+  for (const [name, validationOptions, generateMessageOptions] of COMMON_CASES) {
+    it(`validates_presence_of on generated message ${name}`, async () => {
       personClass().validatesPresenceOf("title", validationOptions);
       const call = ["title", ":blank", person, generateMessageOptions];
       await assertCalledWith(ModelError, "generateMessage", call, {}, validateAndReadMessages());
     });
-  });
+  }
 
-  it("validates_length_of for :within on generated message when too short", async () => {
-    await eachCommonCase(async (validationOptions, generateMessageOptions) => {
+  for (const [name, validationOptions, generateMessageOptions] of COMMON_CASES) {
+    it(`validates_length_of for :within on generated message when too short ${name}`, async () => {
       personClass().validatesLengthOf("title", { ...validationOptions, within: new Range(3, 5) });
       const call = ["title", ":too_short", person, { ...generateMessageOptions, count: 3 }];
       await assertCalledWith(ModelError, "generateMessage", call, {}, validateAndReadMessages());
     });
-  });
+  }
 
-  it("validates_length_of for :too_long generated message", async () => {
-    await eachCommonCase(async (validationOptions, generateMessageOptions) => {
+  for (const [name, validationOptions, generateMessageOptions] of COMMON_CASES) {
+    it(`validates_length_of for :too_long generated message ${name}`, async () => {
       personClass().validatesLengthOf("title", { ...validationOptions, within: new Range(3, 5) });
       person.title = "this title is too long";
       const call = ["title", ":too_long", person, { ...generateMessageOptions, count: 5 }];
       await assertCalledWith(ModelError, "generateMessage", call, {}, validateAndReadMessages());
     });
-  });
+  }
 
-  it("validates_length_of for :is on generated message", async () => {
-    await eachCommonCase(async (validationOptions, generateMessageOptions) => {
+  for (const [name, validationOptions, generateMessageOptions] of COMMON_CASES) {
+    it(`validates_length_of for :is on generated message ${name}`, async () => {
       personClass().validatesLengthOf("title", { ...validationOptions, is: 5 });
       const call = ["title", ":wrong_length", person, { ...generateMessageOptions, count: 5 }];
       await assertCalledWith(ModelError, "generateMessage", call, {}, validateAndReadMessages());
     });
-  });
+  }
 
-  it("validates_format_of on generated message", async () => {
-    await eachCommonCase(async (validationOptions, generateMessageOptions) => {
+  for (const [name, validationOptions, generateMessageOptions] of COMMON_CASES) {
+    it(`validates_format_of on generated message ${name}`, async () => {
       personClass().validatesFormatOf("title", {
         ...validationOptions,
         with: /^[1-9][0-9]*$/,
@@ -361,19 +348,19 @@ describe("I18nValidationTest", () => {
       const call = ["title", ":invalid", person, { ...generateMessageOptions, value: "72x" }];
       await assertCalledWith(ModelError, "generateMessage", call, {}, validateAndReadMessages());
     });
-  });
+  }
 
-  it("validates_inclusion_of on generated message", async () => {
-    await eachCommonCase(async (validationOptions, generateMessageOptions) => {
+  for (const [name, validationOptions, generateMessageOptions] of COMMON_CASES) {
+    it(`validates_inclusion_of on generated message ${name}`, async () => {
       personClass().validatesInclusionOf("title", { ...validationOptions, in: ["a", "b", "c"] });
       person.title = "z";
       const call = ["title", ":inclusion", person, { ...generateMessageOptions, value: "z" }];
       await assertCalledWith(ModelError, "generateMessage", call, {}, validateAndReadMessages());
     });
-  });
+  }
 
-  it("validates_inclusion_of using :within on generated message", async () => {
-    await eachCommonCase(async (validationOptions, generateMessageOptions) => {
+  for (const [name, validationOptions, generateMessageOptions] of COMMON_CASES) {
+    it(`validates_inclusion_of using :within on generated message ${name}`, async () => {
       personClass().validatesInclusionOf("title", {
         ...validationOptions,
         within: ["a", "b", "c"],
@@ -382,19 +369,19 @@ describe("I18nValidationTest", () => {
       const call = ["title", ":inclusion", person, { ...generateMessageOptions, value: "z" }];
       await assertCalledWith(ModelError, "generateMessage", call, {}, validateAndReadMessages());
     });
-  });
+  }
 
-  it("validates_exclusion_of generated message", async () => {
-    await eachCommonCase(async (validationOptions, generateMessageOptions) => {
+  for (const [name, validationOptions, generateMessageOptions] of COMMON_CASES) {
+    it(`validates_exclusion_of generated message ${name}`, async () => {
       personClass().validatesExclusionOf("title", { ...validationOptions, in: ["a", "b", "c"] });
       person.title = "a";
       const call = ["title", ":exclusion", person, { ...generateMessageOptions, value: "a" }];
       await assertCalledWith(ModelError, "generateMessage", call, {}, validateAndReadMessages());
     });
-  });
+  }
 
-  it("validates_exclusion_of using :within generated message", async () => {
-    await eachCommonCase(async (validationOptions, generateMessageOptions) => {
+  for (const [name, validationOptions, generateMessageOptions] of COMMON_CASES) {
+    it(`validates_exclusion_of using :within generated message ${name}`, async () => {
       personClass().validatesExclusionOf("title", {
         ...validationOptions,
         within: ["a", "b", "c"],
@@ -403,19 +390,19 @@ describe("I18nValidationTest", () => {
       const call = ["title", ":exclusion", person, { ...generateMessageOptions, value: "a" }];
       await assertCalledWith(ModelError, "generateMessage", call, {}, validateAndReadMessages());
     });
-  });
+  }
 
-  it("validates_numericality_of generated message", async () => {
-    await eachCommonCase(async (validationOptions, generateMessageOptions) => {
+  for (const [name, validationOptions, generateMessageOptions] of COMMON_CASES) {
+    it(`validates_numericality_of generated message ${name}`, async () => {
       personClass().validatesNumericalityOf("title", validationOptions);
       person.title = "a";
       const call = ["title", ":not_a_number", person, { ...generateMessageOptions, value: "a" }];
       await assertCalledWith(ModelError, "generateMessage", call, {}, validateAndReadMessages());
     });
-  });
+  }
 
-  it("validates_numericality_of for :only_integer on generated message", async () => {
-    await eachCommonCase(async (validationOptions, generateMessageOptions) => {
+  for (const [name, validationOptions, generateMessageOptions] of COMMON_CASES) {
+    it(`validates_numericality_of for :only_integer on generated message ${name}`, async () => {
       personClass().validatesNumericalityOf("title", { ...validationOptions, onlyInteger: true });
       person.title = "0.0";
       const call = [
@@ -426,10 +413,10 @@ describe("I18nValidationTest", () => {
       ];
       await assertCalledWith(ModelError, "generateMessage", call, {}, validateAndReadMessages());
     });
-  });
+  }
 
-  it("validates_numericality_of for :odd on generated message", async () => {
-    await eachCommonCase(async (validationOptions, generateMessageOptions) => {
+  for (const [name, validationOptions, generateMessageOptions] of COMMON_CASES) {
+    it(`validates_numericality_of for :odd on generated message ${name}`, async () => {
       personClass().validatesNumericalityOf("title", {
         ...validationOptions,
         onlyInteger: true,
@@ -439,10 +426,10 @@ describe("I18nValidationTest", () => {
       const call = ["title", ":odd", person, { ...generateMessageOptions, value: 0 }];
       await assertCalledWith(ModelError, "generateMessage", call, {}, validateAndReadMessages());
     });
-  });
+  }
 
-  it("validates_numericality_of for :less_than on generated message", async () => {
-    await eachCommonCase(async (validationOptions, generateMessageOptions) => {
+  for (const [name, validationOptions, generateMessageOptions] of COMMON_CASES) {
+    it(`validates_numericality_of for :less_than on generated message ${name}`, async () => {
       personClass().validatesNumericalityOf("title", {
         ...validationOptions,
         onlyInteger: true,
@@ -457,7 +444,7 @@ describe("I18nValidationTest", () => {
       ];
       await assertCalledWith(ModelError, "generateMessage", call, {}, validateAndReadMessages());
     });
-  });
+  }
 
   const VALIDATION_EXPECTATIONS: [
     string,

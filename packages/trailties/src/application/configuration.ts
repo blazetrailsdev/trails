@@ -445,7 +445,7 @@ export class Configuration extends EngineConfiguration {
   set enableReloading(value: boolean) {
     this.cacheClasses = !value;
   }
-  reloadingEnabled(): boolean {
+  isReloadingEnabled(): boolean {
     return this.enableReloading;
   }
 

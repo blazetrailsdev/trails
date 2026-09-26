@@ -30,6 +30,7 @@ import {
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
 import { Inline } from "./template/inline.js";
+import { Resolver } from "./template/resolver.js";
 import { RawFile } from "./template/raw-file.js";
 import { TemplateHandlers, type TemplateHandler } from "./template/handlers.js";
 
@@ -81,6 +82,14 @@ export class Base {
   static logger: unknown = null;
 
   static _compiledMethods: Map<string, CompiledMethod> = new Map();
+
+  static get cacheTemplateLoading(): boolean {
+    return Resolver.isCaching();
+  }
+
+  static set cacheTemplateLoading(value: boolean) {
+    Resolver.caching = value;
+  }
 
   static isXssSafe(): boolean {
     return true;

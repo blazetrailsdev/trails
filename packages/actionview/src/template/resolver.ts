@@ -1,4 +1,4 @@
-import { I18n } from "@blazetrails/activesupport";
+import { I18n, cattrAccessor } from "@blazetrails/activesupport";
 import { Dir, File, NotImplementedError, symbolToS } from "@blazetrails/ruby-compat";
 import type { LookupDetails, PathSetResolver } from "../path-set.js";
 import { Requested, TemplateDetails, type DetailKey } from "../template-details.js";
@@ -8,7 +8,16 @@ import { TemplatePath } from "../template-path.js";
 import { Template } from "../template.js";
 
 export abstract class Resolver implements PathSetResolver {
-  static caching: boolean = true;
+  declare static caching: boolean;
+  declare caching: boolean;
+
+  static {
+    cattrAccessor.call(this, "caching", { default: true });
+  }
+
+  static isCaching(): boolean {
+    return this.caching;
+  }
 
   clearCache(): void {}
 
@@ -48,6 +57,11 @@ export abstract class Resolver implements PathSetResolver {
     locals: ReadonlyArray<string>,
   ): Template[] {
     return this.findTemplates(name, prefix, partial, details, locals);
+  }
+
+  /** @internal */
+  protected isCaching(): boolean {
+    return (this.constructor as typeof Resolver).isCaching();
   }
 
   /** @internal */

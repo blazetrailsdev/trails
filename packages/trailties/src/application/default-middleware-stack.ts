@@ -75,7 +75,7 @@ export class DefaultMiddlewareStack {
       stack.use(ActionableExceptions as never);
     }
 
-    if (config.reloadingEnabled()) {
+    if (config.isReloadingEnabled()) {
       stack.use(Reloader as never, this.app.reloader);
     }
 

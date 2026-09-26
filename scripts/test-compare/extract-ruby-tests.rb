@@ -163,6 +163,8 @@ ADAPTER_SYMBOL_MAP = {
 # (activesupport/test/cache/serializer_with_fallback_test.rb:42-43).
 class LoopSymbolName < String; end
 
+LOOP_OPAQUE_HASH = Object.new.freeze
+
 class TestExtractor
   attr_reader :test_files, :unexpanded_loops
 
@@ -753,12 +755,18 @@ class TestExtractor
       report_unexpanded_loop(node)
       return true
     end
+    elements = elements.each_with_index.map { |value, index| [value, index.to_s] } if ident_name(call[3]) == "each_with_index"
 
-    defines.each do |name_node, define_node, nested|
+    defines.each do |name_node, define_node, nested, guards|
       names = elements.flat_map do |value|
         bindings = loop_bindings(vars, value)
         next [nil] if bindings.nil?
-        nested_bindings(bindings, nested).map { |bound| bound && interpolated_name(name_node, bound) }
+        nested_bindings(bindings, nested).flat_map do |bound|
+          next [nil] if bound.nil?
+          taken = guards_taken?(guards, bound)
+          next [nil] if taken.nil?
+          taken ? [interpolated_name(name_node, bound)] : []
+        end
       end
       if names.any?(&:nil?)
         report_unexpanded_loop(node)
@@ -867,9 +875,34 @@ class TestExtractor
   # Bind the block parameters to one element: a single parameter takes the whole
   # element, several destructure it, exactly as Ruby's block arity does.
   def loop_bindings(vars, value)
-    return { vars.first => value } if vars.length == 1
+    return { vars.first => value } if vars.length == 1 && !vars.first.is_a?(Array)
     return nil unless value.is_a?(Array) && value.length >= vars.length
-    vars.each_with_index.to_h { |var, index| [var, value[index]] }
+    vars.each_with_index.reduce({}) do |bound, (var, index)|
+      next bound.merge(var => value[index]) unless var.is_a?(Array)
+      inner = loop_bindings(var, value[index])
+      return nil if inner.nil?
+      bound.merge(inner)
+    end
+  end
+
+  def guards_taken?(guards, bindings)
+    guards.each do |cond, polarity|
+      value = eval_loop_condition(cond, bindings)
+      return nil if value.nil?
+      return false unless value == polarity
+    end
+    true
+  end
+
+  def eval_loop_condition(node, bindings)
+    return nil unless node.is_a?(Array) && node[0] == :binary
+    _, left, op, right = node
+    return nil unless left.is_a?(Array) && left[0] == :call && %w[length size].include?(ident_name(left[3]))
+    receiver = left[1]
+    return nil unless receiver.is_a?(Array) && %i[var_ref vcall].include?(receiver[0])
+    bound = bindings[ident_name(receiver[1])]
+    return nil unless bound.is_a?(Array) && right.is_a?(Array) && right[0] == :@int
+    %i[> >= < <= ==].include?(op) ? bound.length.public_send(op, Integer(right[1])) : nil
   end
 
   # Collect every same-file `CONST = [...]`, name → the array's literal element
@@ -939,8 +972,16 @@ class TestExtractor
 
   # Every `define_method(<name>) do ... end` in a block body, as
   # [name-argument node, method_add_block node].
-  def collect_define_methods(node, out, nested = [])
+  def collect_define_methods(node, out, nested = [], guards = [])
     return unless node.is_a?(Array)
+
+    if %i[if elsif].include?(node[0])
+      cond = node[1]
+      collect_define_methods(node[2], out, nested, guards + [[cond, true]])
+      rest = node[3].is_a?(Array) && node[3][0] == :else ? node[3][1] : node[3]
+      collect_define_methods(rest, out, nested, guards + [[cond, false]])
+      return
+    end
 
     if node[0] == :method_add_block
       inner = node[1]
@@ -954,7 +995,7 @@ class TestExtractor
         end
       if args
         name_node = define_method_name_node(args)
-        out << [name_node, node, nested] if name_node
+        out << [name_node, node, nested, guards] if name_node
         return
       end
 
@@ -963,12 +1004,12 @@ class TestExtractor
       if iterator && ident_name(iterator[3]) == "each" &&
          block.is_a?(Array) && %i[do_block brace_block].include?(block[0])
         each_loop = [block_var_names(block[1]), loop_elements(iterator[1])]
-        collect_define_methods(block[2], out, nested + [each_loop])
+        collect_define_methods(block[2], out, nested + [each_loop], guards)
         return
       end
     end
 
-    node.each { |child| collect_define_methods(child, out, nested) if child.is_a?(Array) }
+    node.each { |child| collect_define_methods(child, out, nested, guards) if child.is_a?(Array) }
   end
 
   def nested_bindings(bindings, nested)
@@ -1027,9 +1068,13 @@ class TestExtractor
     # A nested destructuring parameter (`do |name, (request_path, expected)|` at
     # journey/router_test.rb:341) consumes a position without binding a name the
     # generated name can interpolate.
-    names = required.map do |param|
-      param.is_a?(Array) && param[0] == :mlhs ? "" : ident_name(param)
-    end
+    names = required.map { |param| block_param_name(param) }
+    names.any?(&:nil?) ? nil : names
+  end
+
+  def block_param_name(param)
+    return ident_name(param) unless param.is_a?(Array) && param[0] == :mlhs
+    names = param[1..].map { |inner| block_param_name(inner) }
     names.any?(&:nil?) ? nil : names
   end
 
@@ -1061,6 +1106,8 @@ class TestExtractor
     when :@tstring_content
       # `%w(a b)` / `%i(a b)` elements, which Ripper emits bare.
       node[1]
+    when :@int
+      node[1]
     when :array
       # A table row (`["/", [:SLASH]]`) — resolved so a destructuring loop can
       # bind each position.
@@ -1070,13 +1117,14 @@ class TestExtractor
       # resolves only when every key and value does, since the loop reads it
       # whole (`expected.keys`).
       pairs = hash_literal_pairs(node)
-      pairs && pairs.none? { |(_, value)| value.nil? } ? pairs.to_h : nil
+      return nil if pairs.nil?
+      pairs.none? { |(key, value)| key.nil? || value.nil? } ? pairs.to_h : LOOP_OPAQUE_HASH
     end
   end
 
   # The literal key/value pairs of a hash literal, or nil when the node is not a
-  # hash literal or a KEY does not resolve. A value that does not resolve is
-  # kept as nil rather than failing the hash: `{ path => %r{...} }.each do
+  # hash literal. A key or value that does not resolve is kept as nil rather
+  # than failing the hash: `{ path => %r{...} }.each do
   # |path, expected|` (journey/path/pattern_test.rb:16) interpolates only the
   # key, and `interpolated_name` still returns nil — reporting the loop — for a
   # name that does read the unresolved binding.
@@ -1098,9 +1146,7 @@ class TestExtractor
 
     pairs = assocs.map do |assoc|
       return nil unless assoc.is_a?(Array) && assoc[0] == :assoc_new
-      key = hash_key_value(assoc[1])
-      return nil if key.nil?
-      [key, array_element_value(assoc[2])]
+      [hash_key_value(assoc[1]), array_element_value(assoc[2])]
     end
     pairs
   end

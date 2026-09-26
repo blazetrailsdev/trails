@@ -1,7 +1,13 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { Deprecators, runLoadHooks, resetLoadHooks } from "@blazetrails/activesupport";
 import { ActionController, RouteSet } from "@blazetrails/actionpack";
-import { RoutingUrlFor, type RoutingUrlForHost, type UrlHelperHost } from "@blazetrails/actionview";
+import {
+  Base,
+  Resolver,
+  RoutingUrlFor,
+  type RoutingUrlForHost,
+  type UrlHelperHost,
+} from "@blazetrails/actionview";
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
 import {
   applyStylesheetMediaDefault,
@@ -45,7 +51,7 @@ describe("action_view.setup_action_pack", () => {
 
   it("includes ActionDispatch::Routing::UrlFor into ActionView::RoutingUrlFor", async () => {
     await runTrailtieInitializers(Trailtie, {
-      config: Trailtie.config,
+      config: Object.assign(Object.create(Trailtie.config), { isReloadingEnabled: () => false }),
       deprecators: new Deprecators(),
     });
     runLoadHooks("action_controller", ActionController.Base);
@@ -58,7 +64,7 @@ describe("action_view.setup_action_pack", () => {
 
   it("leaves RoutingUrlFor's own overrides on top of the included module", async () => {
     await runTrailtieInitializers(Trailtie, {
-      config: Trailtie.config,
+      config: Object.assign(Object.create(Trailtie.config), { isReloadingEnabled: () => false }),
       deprecators: new Deprecators(),
     });
     runLoadHooks("action_controller", ActionController.Base);
@@ -71,7 +77,7 @@ describe("action_view.setup_action_pack", () => {
 
   it("url_for with a Hash from a view generates a path, not a full URL, by default", async () => {
     await runTrailtieInitializers(Trailtie, {
-      config: Trailtie.config,
+      config: Object.assign(Object.create(Trailtie.config), { isReloadingEnabled: () => false }),
       deprecators: new Deprecators(),
     });
     runLoadHooks("action_controller", ActionController.Base);
@@ -89,5 +95,29 @@ describe("action_view.setup_action_pack", () => {
     expect(view.urlFor({ controller: "foo", action: "other", onlyPath: false })).toBe(
       "http://example.com/foo/other",
     );
+  });
+});
+
+describe("action_view.caching", () => {
+  afterEach(() => {
+    resetLoadHooks();
+    Resolver.caching = true;
+    Trailtie.config.set("actionView", {
+      applyStylesheetMediaDefault: true,
+      annotateRenderedViewWithFilenames: false,
+    } as ActionViewConfig);
+  });
+
+  it("leaves Resolver.caching alone when cache_template_loading is set", async () => {
+    const actionView = Trailtie.config.get("actionView") as ActionViewConfig;
+    actionView.cacheTemplateLoading = false;
+    const config = Object.assign(Object.create(Trailtie.config), {
+      isReloadingEnabled: () => false,
+    });
+    Resolver.caching = false;
+    await runTrailtieInitializers(Trailtie, { config, deprecators: new Deprecators() });
+    runLoadHooks("action_view", Base);
+
+    expect(Resolver.isCaching()).toBe(false);
   });
 });

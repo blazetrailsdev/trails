@@ -7,12 +7,15 @@ import { Trailtie as BaseTrailtie } from "../trailtie.js";
 import { deprecator } from "@blazetrails/actionview";
 
 let deprecators: Deprecators;
-let app: { deprecators: Deprecators };
+let app: { deprecators: Deprecators; config: unknown };
 
 describe("RailtieTest", () => {
   beforeEach(() => {
     deprecators = new Deprecators();
-    app = { deprecators };
+    app = {
+      deprecators,
+      config: Object.assign(Object.create(Trailtie.config), { isReloadingEnabled: () => false }),
+    };
   });
 
   const originalAnnotate = Base.annotateRenderedViewWithFilenames;
