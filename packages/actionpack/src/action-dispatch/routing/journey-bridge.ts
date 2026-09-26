@@ -56,6 +56,8 @@ export function buildJourneyRouter(
           },
           requestMethodMatch,
           precedence: index,
+          scopeOptions: r.scopeOptions,
+          requiredDefaults: r.requiredDefaults,
         });
         JOURNEY_TO_LOCAL.set(journeyRoute, r);
         return journeyRoute;

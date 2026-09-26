@@ -44,6 +44,7 @@ export interface RouteOptions {
   pathNames?: { new?: string; edit?: string };
   anchor?: boolean;
   scopeOptions?: Record<string, unknown>;
+  requiredDefaults?: readonly string[];
   shallow?: boolean;
   internal?: boolean;
   on?: string;
@@ -83,6 +84,7 @@ export class Route {
   readonly formatted: boolean;
   readonly internal: boolean;
   readonly scopeOptions: Record<string, unknown>;
+  readonly requiredDefaults: readonly string[];
   /** @internal */
   readonly to: MountableApp | undefined;
   /** @internal */
@@ -132,6 +134,7 @@ export class Route {
     this.formatted = options.format !== false;
     this.internal = options.internal === true;
     this.scopeOptions = options.scopeOptions ?? {};
+    this.requiredDefaults = options.requiredDefaults ?? [];
     this.to = options.app;
 
     this.paramNames = collectParamNamesFromJourneyAst(this.path);

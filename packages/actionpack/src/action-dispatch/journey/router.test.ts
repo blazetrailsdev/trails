@@ -36,7 +36,7 @@ function _generate(
   options: Record<string, unknown>,
   recall: Record<string, unknown>,
 ): [string, Record<string, string>] {
-  const path = routeSet.generate(routeName, options, recall).path();
+  const path = routeSet.generate(routeName, options, recall).path(null);
   const captures = new Set<string>();
   for (const route of routeSet.getRoutes()) {
     for (const name of route.pathParamNames) captures.add(name);
@@ -105,7 +105,7 @@ describe("TestRouter", () => {
       r.get("/foo/:id", { constraints: { id: /\d/ }, anchor: false, to: "foo#bar" });
     });
 
-    expect(() => routeSet.generate(null, { controller: "foo", action: "bar", id: "10" })).toThrow(
+    expect(() => routeSet.urlFor({ controller: "foo", action: "bar", id: "10" }, null)).toThrow(
       UrlGenerationError,
     );
   });
@@ -401,7 +401,7 @@ describe("TestRouter", () => {
       ...missingParameters,
     };
 
-    const message = `No route matches {:action=>"show", :controller=>"tasks"}, missing required keys: [:${missingKey}]`;
+    const message = `No route matches {:action=>"show", :controller=>"tasks", :id=>1, :${missingKey}=>nil, :relative_url_root=>nil}`;
 
     let error: Error | undefined;
     expect(() => {
