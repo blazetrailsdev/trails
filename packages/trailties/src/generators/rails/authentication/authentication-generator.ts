@@ -1,3 +1,4 @@
+import { TopLevel } from "@blazetrails/activesupport";
 import { File } from "@blazetrails/ruby-compat";
 import { GeneratorBase, type GeneratorOptions } from "../../base.js";
 import { MigrationGenerator } from "../../migration-generator.js";
@@ -5,7 +6,6 @@ import { TEMPLATES } from "./templates.js";
 
 export interface AuthenticationGeneratorOptions extends GeneratorOptions {
   api?: boolean;
-  skipActionCable?: boolean;
 }
 
 export class AuthenticationGenerator extends GeneratorBase {
@@ -42,7 +42,7 @@ export class AuthenticationGenerator extends GeneratorBase {
     this.template("app/controllers/concerns/authentication.rb");
     this.template("app/controllers/passwords_controller.rb");
 
-    if (this.options.skipActionCable === false)
+    if (TopLevel.ActionCable?.Engine !== undefined)
       this.template("app/channels/application_cable/connection.rb");
 
     this.template("app/mailers/passwords_mailer.rb");

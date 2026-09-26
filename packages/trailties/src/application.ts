@@ -25,10 +25,9 @@ import { Finisher } from "./application/finisher.js";
 import { Configuration } from "./application/configuration.js";
 import { RoutesReloader } from "./application/routes-reloader.js";
 import "./assets/trailtie.js";
-import { resolveEnv } from "./database.js";
 import { Trails } from "./rails.js";
 import { Collection, type InitializerGroup } from "./initializable.js";
-import type { CacheStore, Logger } from "@blazetrails/activesupport";
+import type { Logger } from "@blazetrails/activesupport";
 import type { MiddlewareStack, RackApp } from "@blazetrails/actionpack";
 
 let _appClass: typeof Application | null = null;
@@ -45,7 +44,6 @@ export class Application extends Engine {
   readonly executor: typeof Executor = class extends Executor {};
   readonly reloader: typeof Reloader = class extends Reloader {};
   logger: Logger | null = null;
-  cache: CacheStore | null = null;
   readonly reloaders: unknown[] = [];
 
   constructor() {
@@ -202,7 +200,7 @@ export class Application extends Engine {
   keyGenerator(secretKeyBase: string | null = this.secretKeyBase()): CachingKeyGenerator {
     if (secretKeyBase === null) {
       throw new ArgumentError(
-        `Missing \`secret_key_base\` for '${resolveEnv()}' environment, set this string with \`bin/rails credentials:edit\``,
+        `Missing \`secret_key_base\` for '${Trails.env}' environment, set this string with \`bin/rails credentials:edit\``,
       );
     }
     let gen = this._keyGenerators.get(secretKeyBase);
@@ -220,7 +218,7 @@ export class Application extends Engine {
   async credentials(): Promise<EncryptedFile> {
     if (this._credentials) return this._credentials;
     const c = this.config.credentials;
-    const def = await defaultCredentialPaths(await this.root());
+    const def = await credentialsDefaults(await this.root());
     return (this._credentials = await this.encrypted(c.contentPath ?? def.contentPath, {
       keyPath: c.keyPath ?? def.keyPath,
     }));
@@ -276,23 +274,19 @@ export class Application extends Engine {
   }
 }
 
-async function defaultCredentialPaths(
+async function credentialsDefaults(
   root: string,
 ): Promise<{ contentPath: string; keyPath: string }> {
   const path = getPath();
   const fs = getFs();
-  const env = resolveEnv();
-  const envContent = path.resolve(root, "config", "credentials", `${env}.yml.enc`);
-  if (await fs.exists(envContent)) {
-    return {
-      contentPath: envContent,
-      keyPath: path.resolve(root, "config", "credentials", `${env}.key`),
-    };
-  }
-  return {
-    contentPath: path.resolve(root, "config", "credentials.yml.enc"),
-    keyPath: path.resolve(root, "config", "master.key"),
-  };
+  let contentPath = path.resolve(root, `config/credentials/${Trails.env}.yml.enc`);
+  if (!(await fs.exists(contentPath)))
+    contentPath = path.resolve(root, "config/credentials.yml.enc");
+
+  let keyPath = path.resolve(root, `config/credentials/${Trails.env}.key`);
+  if (!(await fs.exists(keyPath))) keyPath = path.resolve(root, "config/master.key");
+
+  return { contentPath: contentPath, keyPath: keyPath };
 }
 
 Object.defineProperty(Application, "name", { value: "Rails::Application" });

@@ -441,6 +441,12 @@ export async function eagerLoadBang(): Promise<void> {
   await Encryption.eagerLoadBang();
 }
 
+Object.defineProperty(ActiveRecord, "eagerLoadBang", {
+  value: eagerLoadBang,
+  writable: true,
+  configurable: true,
+});
+
 export async function disconnectAllBang(): Promise<void> {
   const { PoolConfig } = await import("./connection-adapters/pool-config.js");
   await PoolConfig.disconnectAllBang();

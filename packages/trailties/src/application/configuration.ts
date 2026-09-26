@@ -305,7 +305,7 @@ export class Configuration extends EngineConfiguration {
           };
           activeRecord.runCommitCallbacksOnFirstSavedInstancesInTransaction = false;
           activeRecord.sqlite3AdapterStrictStringsByDefault = true;
-          activeRecord.queryLogTagsFormat = ":sqlcommenter";
+          activeRecord.queryLogTagsFormat = "sqlcommenter";
           activeRecord.raiseOnAssignToAttrReadonly = true;
           activeRecord.belongsToRequiredValidatesForeignKey = false;
           activeRecord.beforeCommittedOnAllRecords = true;

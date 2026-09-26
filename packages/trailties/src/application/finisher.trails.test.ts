@@ -1,4 +1,4 @@
-import { afterEach, describe, it, expect } from "vitest";
+import { afterEach, beforeEach, describe, it, expect } from "vitest";
 import {
   Finisher,
   type FinisherConfig,
@@ -16,6 +16,8 @@ import { ActiveModel, ValidationError } from "@blazetrails/activemodel";
 import { GlobalID, Verifier } from "@blazetrails/globalid";
 import { Trailtie as ActiveModelTrailtie } from "../trailties/active-model.js";
 import { Trailtie as GlobalIdTrailtie } from "../trailties/global-id.js";
+import { Trailtie as ActiveRecordTrailtie } from "../trailties/active-record.js";
+import { ActiveRecord, AssociationRelation } from "@blazetrails/activerecord";
 
 class TestApp extends Finisher {
   sessionStoreArgs: unknown[] | null = null;
@@ -95,6 +97,9 @@ async function run(app: TestApp, name: string): Promise<void> {
 
 describe("Finisher", () => {
   const originalEnv = Trails.env.toString();
+  beforeEach(() => {
+    resetLoadHooks();
+  });
   afterEach(() => {
     Trails.env = originalEnv;
   });
@@ -255,16 +260,38 @@ describe("Finisher", () => {
     resetLoadHooks();
   });
 
-  it("eager_load! eager loads the ActiveModel and GlobalID namespaces", async () => {
+  it("eager_load! eager loads the ActiveModel, GlobalID and ActiveRecord namespaces", async () => {
     const app = new TestApp();
     app.config.eagerLoad = true;
     app.config.eagerLoadNamespaces = ActiveModelTrailtie.config.eagerLoadNamespaces;
     expect(app.config.eagerLoadNamespaces).toBe(GlobalIdTrailtie.config.eagerLoadNamespaces);
+    expect(app.config.eagerLoadNamespaces).toBe(ActiveRecordTrailtie.config.eagerLoadNamespaces);
+    expect(app.config.eagerLoadNamespaces).toContain(ActiveRecord);
     await run(app, "eager_load!");
-    await ActiveModel.eagerLoadBang();
-    await GlobalID.eagerLoadBang();
     expect(ActiveModel.ValidationError).toBe(ValidationError);
     expect(GlobalID.Verifier).toBe(Verifier);
+    expect(ActiveRecord.AssociationRelation).toBe(AssociationRelation);
+  });
+
+  it("eager_load! finishes each namespace's eager load before finisher_hook runs", async () => {
+    const app = new TestApp();
+    const seen: string[] = [];
+    onLoad("after_initialize", () => {
+      seen.push("after_initialize");
+    });
+    app.config.eagerLoad = true;
+    app.config.eagerLoadNamespaces = [
+      {
+        eagerLoadBang: async () => {
+          await new Promise((resolve) => setTimeout(resolve, 0));
+          seen.push("namespace");
+        },
+      },
+    ];
+    await run(app, "eager_load!");
+    await run(app, "finisher_hook");
+    expect(seen).toEqual(["namespace", "after_initialize"]);
+    resetLoadHooks();
   });
 
   it("eager_load! is a no-op when config.eagerLoad is false", async () => {

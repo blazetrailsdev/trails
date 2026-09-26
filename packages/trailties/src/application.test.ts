@@ -11,10 +11,8 @@ import {
 } from "@blazetrails/activesupport";
 import { FileStore } from "@blazetrails/activesupport/cache/file-store";
 import {
-  env,
   fsAdapterConfig,
   registerFsAdapter,
-  setEnv,
   type FsAdapter,
   type PathAdapter,
 } from "@blazetrails/ruby-compat";
@@ -229,7 +227,7 @@ describe("Application", () => {
       await app.initialize();
       expect(app.initialized()).toBe(true);
       expect(app.logger).toBeInstanceOf(NullLogger);
-      expect(app.cache).toBeInstanceOf(FileStore);
+      expect(Trails.cache).toBeInstanceOf(FileStore);
     });
 
     it("fires :after_initialize load hooks once initialization completes", async () => {
@@ -803,9 +801,11 @@ describe("Application key/message/credentials wiring", () => {
   });
 
   it("credentials prefers env-specific config/credentials/{env}.yml.enc, else config/credentials.yml.enc", async () => {
-    const nodeEnv = env.NODE_ENV;
-    setEnv("NODE_ENV", undefined);
-    onTestFinished(() => setEnv("NODE_ENV", nodeEnv));
+    const originalEnv = Trails.env;
+    Trails.env = "development";
+    onTestFinished(() => {
+      Trails.env = originalEnv;
+    });
     const b = "/app/config/credentials";
     installFs(
       new Set(["/", "/app", "/app/config", b]),
@@ -829,5 +829,26 @@ describe("Application key/message/credentials wiring", () => {
       "/o/config/master.key",
       "RAILS_MASTER_KEY",
     ]);
+  });
+
+  it("credentials and the secret_key_base error read Trails.env, deciding content and key paths independently", async () => {
+    const originalEnv = Trails.env;
+    Trails.env = "staging";
+    onTestFinished(() => {
+      Trails.env = originalEnv;
+    });
+    const b = "/app/config/credentials";
+    installFs(
+      new Set(["/", "/app", "/app/config", b]),
+      new Set(["/app/config.ts", `${b}/staging.yml.enc`]),
+    );
+    class A extends Application {}
+    A.calledFrom("/app");
+    Application.register(A);
+    const f = await A.instance().credentials();
+    expect([f.contentPath, f.keyPath]).toEqual([`${b}/staging.yml.enc`, "/app/config/master.key"]);
+    expect(() => A.instance().keyGenerator(null)).toThrow(
+      "Missing `secret_key_base` for 'staging' environment, set this string with `bin/rails credentials:edit`",
+    );
   });
 });

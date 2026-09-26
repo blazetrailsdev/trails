@@ -3,6 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { registerChildProcessAdapter, childProcessAdapterConfig } from "@blazetrails/ruby-compat";
+import { TopLevel } from "@blazetrails/activesupport";
 import { AuthenticationGenerator } from "./authentication-generator.js";
 import { parseTs, assertNoRubySource } from "../../../template-builder/testing.js";
 
@@ -16,8 +17,17 @@ const APP_CTRL_EMPTY = `import { ActionController } from "@blazetrails/actionpac
 let tmpDir: string;
 const read = (rel: string) => fs.readFileSync(path.join(tmpDir, rel), "utf-8");
 const exists = (rel: string) => fs.existsSync(path.join(tmpDir, rel));
-const makeGen = (options: { skipActionCable?: boolean } = {}) =>
+const makeGen = (options: { api?: boolean } = {}) =>
   new AuthenticationGenerator({ cwd: tmpDir, output: () => {}, ...options });
+const withActionCableEngine = (block: () => void) => {
+  const oldValue = TopLevel.ActionCable;
+  TopLevel.ActionCable = { Engine: class Engine {} };
+  try {
+    block();
+  } finally {
+    TopLevel.ActionCable = oldValue;
+  }
+};
 
 const write = (rel: string, content: string) => {
   const full = path.join(tmpDir, rel);
@@ -45,7 +55,7 @@ afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
 
 describe("AuthenticationGenerator", () => {
   it("emits the full file set; each .ts file parses + carries no Ruby source", () => {
-    makeGen({ skipActionCable: false }).run();
+    withActionCableEngine(() => makeGen().run());
     for (const rel of VIEWS) expect(exists(rel), rel).toBe(true);
     const combined: string[] = [];
     for (const rel of TS_EMIT) {
@@ -65,7 +75,13 @@ describe("AuthenticationGenerator", () => {
   });
 
   it("connection_class_skipped_without_action_cable", () => {
-    makeGen().run();
+    const oldValue = TopLevel.ActionCable;
+    TopLevel.ActionCable = {};
+    try {
+      makeGen().run();
+    } finally {
+      TopLevel.ActionCable = oldValue;
+    }
 
     expect(exists("app/channels/application-cable/connection.ts")).toBe(false);
   });
@@ -119,7 +135,7 @@ describe("AuthenticationGenerator", () => {
 
   it("does not clobber a pre-existing application-cable Connection", () => {
     write("app/channels/application-cable/connection.ts", "// user\n");
-    makeGen({ skipActionCable: false }).run();
+    withActionCableEngine(() => makeGen().run());
     expect(read("app/channels/application-cable/connection.ts")).toBe("// user\n");
   });
 
@@ -132,7 +148,7 @@ describe("AuthenticationGenerator", () => {
   });
 
   it("emits working method bodies, not comment stubs", () => {
-    makeGen({ skipActionCable: false }).run();
+    withActionCableEngine(() => makeGen().run());
     for (const rel of TS_EMIT) expect(read(rel), rel).not.toMatch(/\{\s*\/\/[^\n]*\n\s*\}/);
     expect(read("app/controllers/sessions-controller.ts")).toContain("User.authenticateBy(");
     expect(read("app/controllers/concerns/authentication.ts")).toContain("Session.findBy(");

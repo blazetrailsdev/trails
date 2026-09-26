@@ -100,11 +100,11 @@ Finisher.initializer("run_prepare_callbacks", function (this: FinisherHost) {
  * @missingRailsCall eager_load! — PERMANENT
  * @missingRailsCall after_class_unload — PERMANENT
  */
-Finisher.initializer("eager_load!", function (this: FinisherHost) {
+Finisher.initializer("eager_load!", async function (this: FinisherHost) {
   if (this.config.eagerLoad === true) {
     runLoadHooks("before_eager_load", this);
     for (const namespace of this.config.eagerLoadNamespaces) {
-      (namespace as { eagerLoadBang(): void }).eagerLoadBang();
+      await (namespace as { eagerLoadBang(): Promise<void> }).eagerLoadBang();
     }
   }
 });
