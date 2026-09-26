@@ -27,7 +27,6 @@ import {
   _impliedLayoutName,
   _isConditionalLayout,
   _isIncludeLayout,
-  _layout,
   _layoutForOption,
   _normalizeLayout,
   _prefixes,
@@ -39,6 +38,7 @@ import {
   isAnyTemplates,
   lookupContext,
   templateExists,
+  viewPathsPrependViewPath,
   viewPathsFormats,
   viewPathsLocale,
   viewPathsSetFormats,
@@ -380,6 +380,8 @@ export class Base extends Metal {
 
   templateExists = templateExists;
 
+  prependViewPath: (path: ViewPathsInput) => void = viewPathsPrependViewPath;
+
   isAnyTemplates = isAnyTemplates;
 
   defaultRender = defaultRender;
@@ -462,7 +464,9 @@ export class Base extends Metal {
 
     const otherFlashes = responseOptions.flash;
     delete responseOptions.flash;
-    if (otherFlashes != null) this.flash.update(otherFlashes);
+    if (otherFlashes != null && (otherFlashes as unknown) !== false) {
+      this.flash.update(otherFlashes);
+    }
 
     if (this.performed) {
       throw new DoubleRenderError(
@@ -790,7 +794,6 @@ export class Base extends Metal {
   }
 
   /** @internal */
-  /** @internal */
   _actionHasLayout?: boolean;
   /** @internal */
   declare _layoutConditions: Record<string, string[]>;
@@ -800,7 +803,11 @@ export class Base extends Metal {
   /** @internal */
   declare _isConditionalLayout: typeof _isConditionalLayout;
   /** @internal */
-  declare _layout: typeof _layout;
+  declare _layout: (
+    lookupContext: LookupContext,
+    formats: readonly string[],
+    keys: readonly string[],
+  ) => unknown;
   /** @internal */
   declare _layoutForOption: typeof _layoutForOption;
   /** @internal */

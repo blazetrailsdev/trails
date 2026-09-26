@@ -45,6 +45,7 @@ export {
   detailsForLookup,
   templateExists,
   isAnyTemplates,
+  prependViewPath as viewPathsPrependViewPath,
   formats as viewPathsFormats,
   setFormats as viewPathsSetFormats,
   locale as viewPathsLocale,

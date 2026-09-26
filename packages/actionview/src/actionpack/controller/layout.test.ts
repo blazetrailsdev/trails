@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { underscore } from "@blazetrails/activesupport";
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import { ActionController, Request, Response } from "@blazetrails/actionpack";
 import { FixtureResolver } from "../../testing/resolvers.js";
 import { MissingTemplate } from "../../template/error.js";
@@ -28,6 +29,12 @@ LayoutTest.viewPaths(
 
 class DefaultLayoutController extends LayoutTest {}
 
+class AbsolutePathLayoutController extends LayoutTest {
+  static {
+    this.layout("/fixtures/actionpack/layout_tests/layouts/layout_test");
+  }
+}
+
 class HasOwnLayoutController extends LayoutTest {
   static {
     this.layout("item");
@@ -47,6 +54,13 @@ class HasNilLayoutSymbol extends LayoutTest {
 class HasNilLayoutProc extends LayoutTest {
   static {
     this.layout(() => null);
+  }
+}
+
+class PrependsViewPathController extends LayoutTest {
+  override async hello(): Promise<void> {
+    this.prependViewPath(new FixtureResolver({ "layouts/alt.tse": "alt.erb <%= yield %>" }));
+    this.render({ layout: "alt" });
   }
 }
 
@@ -121,6 +135,14 @@ describe("LayoutSetInResponseTest", () => {
 
   test("layout is not set when none rendered", async () => {
     expect(await get(new RendersNoLayoutController(), "hello")).toBe("hello.erb");
+  });
+
+  test("layout is picked from the controller instances view path", async () => {
+    expect(await get(new PrependsViewPathController(), "hello")).toContain("alt.erb");
+  });
+
+  test("absolute pathed layout", async () => {
+    await expect(get(new AbsolutePathLayoutController(), "hello")).rejects.toThrow(ArgumentError);
   });
 });
 
