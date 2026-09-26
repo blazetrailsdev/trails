@@ -1,4 +1,4 @@
-import { include, onLoad, type Deprecators } from "@blazetrails/activesupport";
+import { include, onLoad, type Deprecators, type Reloader } from "@blazetrails/activesupport";
 import { UrlFor } from "@blazetrails/actionpack";
 import { Module } from "@blazetrails/ruby-compat";
 import {
@@ -8,6 +8,7 @@ import {
   RoutingUrlFor,
   setApplyStylesheetMediaDefault,
   setPreloadLinksHeader,
+  ViewReloader,
 } from "@blazetrails/actionview";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 
@@ -33,7 +34,9 @@ declare module "../trailtie/configuration.js" {
 /** @noRailsEquivalent PERMANENT */
 interface TrailtieApp {
   deprecators: Deprecators;
-  config: { get(key: string): unknown; isReloadingEnabled(): boolean };
+  config: { get(key: string): unknown; isReloadingEnabled(): boolean; fileWatcher: unknown };
+  reloaders: unknown[];
+  reloader: typeof Reloader;
 }
 
 export class Trailtie extends BaseTrailtie {
@@ -59,6 +62,27 @@ export class Trailtie extends BaseTrailtie {
       const applyStylesheetMediaDefault = actionView.applyStylesheetMediaDefault;
       delete actionView.applyStylesheetMediaDefault;
       setApplyStylesheetMediaDefault(applyStylesheetMediaDefault ?? null);
+    });
+
+    this.config.afterInitialize((app) => {
+      const { config } = app as TrailtieApp;
+      const actionView = config.get("actionView") as ActionViewConfig;
+      const enableCaching =
+        actionView.cacheTemplateLoading == null
+          ? !config.isReloadingEnabled()
+          : actionView.cacheTemplateLoading;
+
+      if (!enableCaching) {
+        const viewReloader = new ViewReloader({
+          watcher: config.fileWatcher as ConstructorParameters<typeof ViewReloader>[0]["watcher"],
+        });
+
+        (app as TrailtieApp).reloaders.push(viewReloader);
+        (app as TrailtieApp).reloader.toRun(function (this: Reloader) {
+          this.requireUnloadLockBang();
+          return viewReloader.execute();
+        });
+      }
     });
 
     this.initializer("action_view.deprecator", { before: "load_environment_config" }, (app) => {

@@ -11,7 +11,7 @@ export class FileUpdateChecker {
 
   constructor(
     files: string[],
-    dirs: Record<string, string | string[]> = {},
+    dirs: Record<string, string | string[]> | string[] = {},
     block?: () => Promise<void> | void,
   ) {
     if (!block) {
@@ -29,7 +29,7 @@ export class FileUpdateChecker {
     this.lastUpdateAt = this.updatedAt(this.lastWatched);
   }
 
-  updated(): boolean {
+  isUpdated(): boolean {
     const currentWatched = this.watched();
     if (this.lastWatched.length !== currentWatched.length) {
       this.watchedMemo = currentWatched;
@@ -58,7 +58,7 @@ export class FileUpdateChecker {
   }
 
   async executeIfUpdated(block?: () => Promise<void> | void): Promise<boolean> {
-    if (this.updated()) {
+    if (this.isUpdated()) {
       if (block) await block();
       await this.execute();
       return true;
@@ -97,10 +97,13 @@ export class FileUpdateChecker {
     return maxMtime;
   }
 
-  private compileGlob(hash: Record<string, string | string[]>): string | undefined {
+  private compileGlob(hash: Record<string, string | string[]> | string[]): string | undefined {
     if (Object.keys(hash).length === 0) return undefined;
 
-    const globs = Object.entries(hash).map(
+    const pairs = Array.isArray(hash)
+      ? hash.map((key) => [key, null] as const)
+      : Object.entries(hash);
+    const globs = pairs.map(
       ([key, value]) => `${this.escape(key)}/**/*${this.compileExt(value) ?? ""}`,
     );
     return `{${globs.join(",")}}`;
@@ -110,8 +113,8 @@ export class FileUpdateChecker {
     return key.replaceAll(",", "\\,");
   }
 
-  private compileExt(array: string | string[]): string | undefined {
-    array = Array.isArray(array) ? array : [array];
+  private compileExt(array: string | string[] | null): string | undefined {
+    array = array == null ? [] : Array.isArray(array) ? array : [array];
     if (array.length === 0) return undefined;
     return `.{${array.join(",")}}`;
   }

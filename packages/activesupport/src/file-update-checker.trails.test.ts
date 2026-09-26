@@ -84,4 +84,14 @@ describe("FileUpdateChecker", () => {
 
     expect(await checker.executeIfUpdated()).toBe(false);
   });
+
+  it("watches every file under an Array of dirs", () => {
+    const file = path.join(tmpDir, "index.html.tse");
+    touch(file, -10);
+    const checker = new FileUpdateChecker([], [tmpDir], () => {});
+    expect(checker.isUpdated()).toBe(false);
+
+    touch(path.join(tmpDir, "show.html.tse"), -5);
+    expect(checker.isUpdated()).toBe(true);
+  });
 });

@@ -1,9 +1,11 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { Deprecators, runLoadHooks, resetLoadHooks } from "@blazetrails/activesupport";
+import { Deprecators, Reloader, runLoadHooks, resetLoadHooks } from "@blazetrails/activesupport";
 import { ActionController, RouteSet } from "@blazetrails/actionpack";
 import {
   Base,
+  PathRegistry,
   Resolver,
+  ViewReloader,
   RoutingUrlFor,
   type RoutingUrlForHost,
   type UrlHelperHost,
@@ -25,6 +27,51 @@ const host = {
   request: { baseUrl: "http://www.example.com", protocol: "http://" },
 } as unknown as AssetTagHelperHost;
 
+describe("ActionView::Railtie view reloader (trails)", () => {
+  afterEach(() => {
+    PathRegistry.reset();
+    Trailtie.config.set("actionView", {
+      applyStylesheetMediaDefault: true,
+      annotateRenderedViewWithFilenames: false,
+    } as ActionViewConfig);
+  });
+
+  function bootApp(reloadingEnabled: boolean, cacheTemplateLoading?: boolean) {
+    if (cacheTemplateLoading !== undefined) {
+      (Trailtie.config.get("actionView") as ActionViewConfig).cacheTemplateLoading =
+        cacheTemplateLoading;
+    }
+    const app = {
+      config: Object.assign(Object.create(Trailtie.config), {
+        isReloadingEnabled: () => reloadingEnabled,
+        fileWatcher: class {},
+      }),
+      reloaders: [] as unknown[],
+      reloader: class extends Reloader {},
+    };
+    runLoadHooks("after_initialize", app);
+    return app;
+  }
+
+  it("registers a ViewReloader when reloading is enabled", () => {
+    const app = bootApp(true);
+    expect(app.reloaders).toHaveLength(1);
+    expect(app.reloaders[0]).toBeInstanceOf(ViewReloader);
+    expect(PathRegistry.fileSystemResolverHooks).toHaveLength(1);
+  });
+
+  it("registers nothing for a production-shaped config", () => {
+    const app = bootApp(false);
+    expect(app.reloaders).toEqual([]);
+    expect(PathRegistry.fileSystemResolverHooks).toHaveLength(0);
+  });
+
+  it("cache_template_loading overrides reloading_enabled?", () => {
+    expect(bootApp(true, true).reloaders).toEqual([]);
+    expect(bootApp(false, false).reloaders).toHaveLength(1);
+  });
+});
+
 describe("ActionView::Railtie asset tag wiring (trails)", () => {
   afterEach(() => {
     setApplyStylesheetMediaDefault(null);
@@ -36,7 +83,10 @@ describe("ActionView::Railtie asset tag wiring (trails)", () => {
   });
 
   it("after_initialize applies apply_stylesheet_media_default so stylesheet_link_tag emits media=screen", () => {
-    const app = { config: Trailtie.config };
+    const app = {
+      config: Object.assign(Object.create(Trailtie.config), { isReloadingEnabled: () => false }),
+      reloaders: [],
+    };
     runLoadHooks("after_initialize", app);
 
     expect(applyStylesheetMediaDefault).toBe(true);
