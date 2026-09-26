@@ -456,6 +456,18 @@ write.
    the rename, never the mark. Converged one? `pnpm parity:api:params:tighten`
    writes the mark DOWN; there is no reseed.
 
+   **Did you port a Ruby predicate?** `foo?` is answered by `isFoo` (or a
+   member whose type holds a boolean), never by a value-typed `foo` getter.
+
+   ```bash
+   pnpm parity:api:predicates   # the predicate-kind ratchet (RFC 0156)
+   ```
+
+   counts, per package, each `foo?` credited only through a `foo` whose type
+   cannot hold a boolean, against `scripts/api-compare/predicate-kind-mark.json`.
+   Only-shrink: the fix is the predicate, never the mark. Converged one?
+   `pnpm parity:api:predicates:tighten`; there is no reseed.
+
 4. **Did you add any public TS name?** `pnpm parity:api:extra --package <pkg>` — it
    lists every public TS method, getter, class, and top-level function in a
    Rails-matched file with no Ruby counterpart. Anything you added and can't

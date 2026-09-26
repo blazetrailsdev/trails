@@ -270,6 +270,127 @@ function subtleHash(digest: string): string {
   return name.toUpperCase();
 }
 
+type Transform = (h: Uint32Array, w: Uint32Array) => void;
+
+const rotl = (x: number, n: number): number => (x << n) | (x >>> (32 - n));
+
+const MD5_K = Array.from({ length: 64 }, (_, i) => Math.floor(Math.abs(Math.sin(i + 1)) * 2 ** 32));
+const MD5_S = [7, 12, 17, 22, 5, 9, 14, 20, 4, 11, 16, 23, 6, 10, 15, 21];
+
+const md5Process: Transform = (h, w) => {
+  let [a, b, c, d] = h;
+  for (let i = 0; i < 64; i++) {
+    const r = i >> 4;
+    const f = [(b & c) | (~b & d), (d & b) | (~d & c), b ^ c ^ d, c ^ (b | ~d)][r];
+    const g = [i, 5 * i + 1, 3 * i + 5, 7 * i][r] & 15;
+    const t = d;
+    d = c;
+    c = b;
+    b = (b + rotl((a + f + MD5_K[i] + w[g]) | 0, MD5_S[r * 4 + (i & 3)])) | 0;
+    a = t;
+  }
+  [a, b, c, d].forEach((x, i) => (h[i] = h[i] + x));
+};
+
+const sha1Transform: Transform = (h, block) => {
+  const w = [...block];
+  for (let t = 16; t < 80; t++) w[t] = rotl(w[t - 3] ^ w[t - 8] ^ w[t - 14] ^ w[t - 16], 1);
+  let [a, b, c, d, e] = h;
+  for (let t = 0; t < 80; t++) {
+    const r = Math.floor(t / 20);
+    const f = [(b & c) | (~b & d), b ^ c ^ d, (b & c) | (b & d) | (c & d), b ^ c ^ d][r];
+    const k = [0x5a827999, 0x6ed9eba1, 0x8f1bbcdc, 0xca62c1d6][r];
+    const temp = (rotl(a, 5) + f + e + k + w[t]) | 0;
+    e = d;
+    d = c;
+    c = rotl(b, 30);
+    b = a;
+    a = temp;
+  }
+  [a, b, c, d, e].forEach((x, i) => (h[i] = h[i] + x));
+};
+
+const PRIMES = [...Array(312).keys()].filter(
+  (n) => n > 1 && [...Array(n).keys()].slice(2).every((m) => n % m !== 0),
+);
+const frac = (x: number): number => Math.floor((x - Math.floor(x)) * 2 ** 32);
+const SHA256_K = PRIMES.map((p) => frac(Math.cbrt(p)));
+const rotr = (x: number, n: number): number => (x >>> n) | (x << (32 - n));
+
+const sha256Transform: Transform = (h, block) => {
+  const w = [...block];
+  for (let j = 16; j < 64; j++) {
+    const s0 = rotr(w[j - 15], 7) ^ rotr(w[j - 15], 18) ^ (w[j - 15] >>> 3);
+    const s1 = rotr(w[j - 2], 17) ^ rotr(w[j - 2], 19) ^ (w[j - 2] >>> 10);
+    w[j] = (w[j - 16] + s0 + w[j - 7] + s1) | 0;
+  }
+  let [a, b, c, d, e, f, g, hh] = h;
+  for (let j = 0; j < 64; j++) {
+    const t1 =
+      hh + (rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)) + ((e & f) ^ (~e & g)) + SHA256_K[j] + w[j];
+    const t2 = (rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22)) + ((a & b) ^ (a & c) ^ (b & c));
+    [hh, g, f, e, d, c, b, a] = [g, f, e, (d + t1) | 0, c, b, a, (t1 + t2) | 0];
+  }
+  [a, b, c, d, e, f, g, hh].forEach((x, i) => (h[i] = h[i] + x));
+};
+
+const WEB_DIGESTS: Record<string, { init: () => number[]; transform: Transform; le: boolean }> = {
+  md5: {
+    init: () => [0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476],
+    transform: md5Process,
+    le: true,
+  },
+  sha1: {
+    init: () => [0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476, 0xc3d2e1f0],
+    transform: sha1Transform,
+    le: false,
+  },
+  sha256: {
+    init: () => PRIMES.slice(0, 8).map((p) => frac(Math.sqrt(p))),
+    transform: sha256Transform,
+    le: false,
+  },
+};
+
+function webDigest(algorithm: string, message: Uint8Array): Uint8Array {
+  const { init, transform, le } = WEB_DIGESTS[algorithm];
+  const padded = new Uint8Array(Math.ceil((message.length + 9) / 64) * 64);
+  padded.set(message);
+  padded[message.length] = 0x80;
+  const view = new DataView(padded.buffer);
+  const bits = message.length * 8;
+  view.setUint32(padded.length - (le ? 8 : 4), bits >>> 0, le);
+  view.setUint32(padded.length - (le ? 4 : 8), Math.floor(bits / 2 ** 32), le);
+  const h = new Uint32Array(init());
+  const w = new Uint32Array(16);
+  for (let offset = 0; offset < padded.length; offset += 64) {
+    for (let i = 0; i < 16; i++) w[i] = view.getUint32(offset + i * 4, le);
+    transform(h, w);
+  }
+  const out = new DataView(new ArrayBuffer(h.length * 4));
+  h.forEach((x, i) => out.setUint32(i * 4, x, le));
+  return new Uint8Array(out.buffer);
+}
+
+function webHashAdapter(algorithm: string, finish: (message: Uint8Array) => Uint8Array) {
+  const name = algorithm.toLowerCase().replace("-", "");
+  if (!(name in WEB_DIGESTS)) throw new Error("Digest method not supported");
+  const parts: Uint8Array[] = [];
+  const adapter = {
+    update(data: string | Uint8Array) {
+      parts.push(typeof data === "string" ? new TextEncoder().encode(data) : data);
+      return adapter;
+    },
+    digest(encoding?: string) {
+      const message = new Uint8Array(parts.reduce((n, part) => n + part.length, 0));
+      parts.reduce((offset, part) => (message.set(part, offset), offset + part.length), 0);
+      const bytes = toBytes(finish(message));
+      return encoding === undefined ? bytes : bytes.toString(encoding);
+    },
+  };
+  return { name, adapter: adapter as HashAdapter & HmacAdapter };
+}
+
 function wrapWebCrypto(crypto: WebCrypto): CryptoAdapter {
   const adapter: Partial<CryptoAdapter> = {
     randomBytes(size: number): Bytes {
@@ -284,6 +405,24 @@ function wrapWebCrypto(crypto: WebCrypto): CryptoAdapter {
       let diff = 0;
       for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
       return diff === 0;
+    },
+    createHash(algorithm: string): HashAdapter {
+      const hash = webHashAdapter(algorithm, (message) => webDigest(hash.name, message));
+      return hash.adapter;
+    },
+    createHmac(algorithm: string, key: string | Uint8Array): HmacAdapter {
+      const hmac = webHashAdapter(algorithm, (message) => {
+        let k = typeof key === "string" ? new TextEncoder().encode(key) : key;
+        if (k.length > 64) k = webDigest(hmac.name, k);
+        const pad = (byte: number, tail: Uint8Array): Uint8Array => {
+          const block = new Uint8Array(64 + tail.length);
+          for (let i = 0; i < 64; i++) block[i] = (k[i] ?? 0) ^ byte;
+          block.set(tail, 64);
+          return block;
+        };
+        return webDigest(hmac.name, pad(0x5c, webDigest(hmac.name, pad(0x36, message))));
+      });
+      return hmac.adapter;
     },
     async pbkdf2(
       password: string | Uint8Array,

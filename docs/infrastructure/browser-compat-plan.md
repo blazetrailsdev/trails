@@ -49,14 +49,38 @@ Crypto adapter under the name `web` whenever `globalThis.crypto.getRandomValues`
 exists. Node is tried first, so a Node host (which also exposes
 `globalThis.crypto`) is unaffected.
 
-The Web Crypto adapter serves the members Web Crypto can serve synchronously:
+The Web Crypto adapter serves:
 
-| Member                                                                         | Browser implementation                                                  |
-| ------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
-| `randomBytes`                                                                  | `crypto.getRandomValues`                                                |
-| `timingSafeEqual`                                                              | constant-time compare over the two arrays                               |
-| `pbkdf2` (async)                                                               | `crypto.subtle.importKey` + `deriveBits`                                |
-| `createHash`, `createHmac`, `createCipheriv`, `createDecipheriv`, `pbkdf2Sync` | none — `crypto.subtle` is Promise-returning and has no streaming cipher |
+| Member                                             | Browser implementation                                                |
+| -------------------------------------------------- | --------------------------------------------------------------------- |
+| `randomBytes`                                      | `crypto.getRandomValues`                                              |
+| `timingSafeEqual`                                  | constant-time compare over the two arrays                             |
+| `pbkdf2` (async)                                   | `crypto.subtle.importKey` + `deriveBits`                              |
+| `createHash`, `createHmac`                         | synchronous pure JS: MD5, SHA-1, SHA-256, and RFC 2104 HMAC over them |
+| `createCipheriv`, `createDecipheriv`, `pbkdf2Sync` | none yet — see below                                                  |
+
+**Digest, HMAC and cipher are synchronous in a browser.** Two shapes were on
+the table: an `await`-able twin on the seam over `crypto.subtle`
+(`createHashAsync`), or a synchronous pure-JS implementation registered in the
+`web` adapter. The seam takes the second. Every Ruby caller is synchronous —
+`ActiveSupport::Digest.hexdigest` (`activesupport/lib/active_support/digest.rb:16`),
+`MessageVerifier#generate` / `#verified` (`message_verifier.rb:172,206`),
+`MessageEncryptor` (`message_encryptor.rb:191-215`) and
+`KeyGenerator#generate_key` (`key_generator.rb:29-31`) all return a value — so an
+async twin would push a Promise through each of them and through every caller
+above them. That is the fan-out § "Serialization's dual sync/async hash" in
+`CLAUDE.md` rejects for `as_json`, and it would also split every body into a
+Node arm and a browser arm. `crypto.subtle` stays the `pbkdf2Async` route only.
+
+The digests are ports of MRI's own C implementations —
+`vendor/ruby/v3.3.11/ext/digest/md5/md5.c:199`, `sha1/sha1.c:132`,
+`sha2/sha2.c:449` — which are exactly the three `Digest` constants trails names
+(`ruby-compat/src/digest.ts`). So `ActiveSupport::Digest.hexdigest`,
+`MessageVerifier` and SHA-1/SHA-256 HMACs work in a browser with no call-site
+change. An algorithm outside those three raises `Digest method not supported`,
+as Node does. The AES-GCM cipher `MessageEncryptor` and
+`ActiveRecord::Encryption` drive, and `pbkdf2Sync`, take the same synchronous
+shape and are filed as `web-crypto-adapter-has-no-cipher-or-pbkdf2-sync`.
 
 That covers `SecureRandom` (`hex`, `uuid`, `randomBytes`),
 `Instrumenter#uniqueId`, secure comparison, and asynchronous key derivation
@@ -65,7 +89,7 @@ accepts `hex`, `base64`, `binary`/`latin1` and `utf-8`, so no `Buffer` shim is
 needed — `Bytes` (`ruby-compat/src/fs-adapter.ts`) is `Uint8Array`-based and
 `Buffer` is a Node-adapter implementation detail.
 
-The five members Web Crypto cannot serve are not silently absent. The seam
+The members the `web` adapter does not yet serve are not silently absent. The seam
 completes a partial adapter at resolve time, so calling one raises
 `Crypto adapter "web" does not implement createHash.` naming the missing
 member, rather than a `TypeError` deep inside `digest.ts` /

@@ -1759,6 +1759,12 @@ jobs:
         # scripts/api-compare/block-param-mark.json. Only-shrink; narrow with
         # `pnpm parity:api:blocks:tighten` — there is no reseed.
         run: pnpm exec tsx scripts/api-compare/lint-block-params.ts
+      - name: Predicate-kind ratchet
+        # RFC 0156. A Ruby predicate `foo?` credited only through a TS `foo`
+        # whose type cannot hold a boolean, counted per package against
+        # scripts/api-compare/predicate-kind-mark.json. Only-shrink; narrow with
+        # `pnpm parity:api:predicates:tighten` — there is no reseed.
+        run: pnpm exec tsx scripts/api-compare/lint-predicate-kinds.ts
       - name: Ambiguous-parent ratchet
         # RFC 0126. An inheritance edge whose parent name resolves to several
         # same-named candidates, none sharing a leading path segment with the
