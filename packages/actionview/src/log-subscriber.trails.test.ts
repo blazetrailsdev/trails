@@ -48,7 +48,7 @@ describe("ActionView::LogSubscriber", () => {
   it("logs one Rendering line and one Rendered line for a template render", async () => {
     const template: RenderableTemplate = {
       identifier: "/srv/app/app/views/test/hello_world.tse",
-      format: "html",
+      format: ":html",
       virtualPath: "test/hello_world",
       render: async () => "Hello world",
     };

@@ -7,6 +7,7 @@ import { TemplateHandlers, type TemplateHandler } from "./template/handlers.js";
 import { Html } from "./template/handlers/html.js";
 import { Raw } from "./template/handlers/raw.js";
 import { Tse } from "./template/handlers/tse.js";
+import { SimpleType } from "./template/types.js";
 import {
   sourceLines,
   type BacktraceLocation,
@@ -19,6 +20,12 @@ type LocationTranslatingHandler = TemplateHandler & {
     backtraceLocation: BacktraceLocation,
     source: string,
   ) => Spot | null;
+};
+
+type TypesImplementation = {
+  symbols(): readonly string[];
+  isValidSymbols(symbols: readonly unknown[]): boolean;
+  get(type: string): { readonly symbol: string | null; toString(): string } | undefined;
 };
 
 const STRICT_LOCALS_REGEX = /#\s+locals:\s+\((.*)\)/;
@@ -92,6 +99,14 @@ export class Template {
   }
 
   static Error = TemplateError;
+
+  static Types: TypesImplementation = SimpleType;
+
+  static set mimeTypesImplementation(implementation: TypesImplementation) {
+    if (this.Types !== implementation) {
+      this.Types = implementation;
+    }
+  }
 
   readonly identifier: string;
   readonly handler: TemplateHandler | null;

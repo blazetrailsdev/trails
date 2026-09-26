@@ -78,9 +78,9 @@ describe("ViewPaths", () => {
     PostsController.viewPaths([]);
     const controller = new PostsController();
 
-    controller.formats(["json"]);
-    expect(controller.formats()).toEqual(["json"]);
-    expect(controller.lookupContext().formats).toEqual(["json"]);
+    controller.formats([":json"]);
+    expect(controller.formats()).toEqual([":json"]);
+    expect(controller.lookupContext().formats).toEqual([":json"]);
 
     controller.locale("de");
     expect(controller.locale()).toBe("de");

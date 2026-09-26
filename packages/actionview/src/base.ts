@@ -53,7 +53,7 @@ interface TseUtilMethods {
 export class Base {
   static streamingCompletionOnException = `"><script>window.location = "/500.html"</script></html>`;
 
-  static defaultFormats: string[] = ["html", "text", "js", "css", "xml", "json"];
+  static defaultFormats: readonly string[] | null = null;
 
   static annotateRenderedViewWithFilenames: boolean = false;
 
@@ -332,8 +332,8 @@ export class Base {
 
     if (!this.lookupContext?.htmlFallbackForJs && options.formats) {
       const formats = Array.isArray(options.formats) ? [...options.formats] : [options.formats];
-      if (formats.length === 1 && formats[0] === "js") {
-        formats.push("html");
+      if (formats.length === 1 && formats[0] === ":js") {
+        formats.push(":html");
       }
       this.lookupContext = this.lookupContext!.withPrependedFormats(formats);
     }
@@ -354,7 +354,7 @@ export class Base {
 
   /** @internal */
   private currentFormat(): string {
-    return this.currentTemplate?.format ?? "html";
+    return this.currentTemplate?.format ?? ":html";
   }
 }
 

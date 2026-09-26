@@ -1,5 +1,5 @@
 import { registerDefaultMimeTypes } from "./mime-types.js";
-import { KeyError, symbolToS } from "@blazetrails/ruby-compat";
+import { isSymbol, KeyError, symbolToS } from "@blazetrails/ruby-compat";
 
 export class Mimes {
   /** @internal */
@@ -41,8 +41,8 @@ export class Mimes {
   }
 
   /** @internal */
-  validSymbols(symbols: string[]): boolean {
-    return symbols.every((s) => this._symbolsSet.has(s));
+  isValidSymbols(symbols: readonly unknown[]): boolean {
+    return symbols.every((s) => this._symbolsSet.has(s as string));
   }
 
   /** @internal */
@@ -245,7 +245,8 @@ export class MimeType {
   }
 
   static lookupByExtension(extension: string): MimeType | undefined {
-    return MimeType.extensionMap.get(extension.replace(/^\./, ""));
+    const ext = isSymbol(extension) ? symbolToS(extension) : extension;
+    return MimeType.extensionMap.get(ext.replace(/^\./, ""));
   }
 
   static all(): MimeType[] {
@@ -401,6 +402,20 @@ export class MimeType {
 registerDefaultMimeTypes(MimeType);
 
 export const Mime = {
+  get(type: MimeType | string): MimeType | undefined {
+    if (type instanceof MimeType) return type;
+    return MimeType.lookupByExtension(type);
+  },
+
+  symbols(): string[] {
+    return MimeType.SET.symbols;
+  },
+
+  /** @internal */
+  isValidSymbols(symbols: readonly unknown[]): boolean {
+    return MimeType.SET.isValidSymbols(symbols);
+  },
+
   fetch(type: MimeType | string, fallback?: (key: string) => MimeType): MimeType {
     if (type instanceof MimeType) return type;
     const found = MimeType.lookupByExtension(type);

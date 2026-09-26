@@ -5,7 +5,7 @@ import { LookupContext } from "../lookup-context.js";
 import { MissingTemplate } from "../template/error.js";
 import type { RenderableTemplate, ViewContext } from "./abstract-renderer.js";
 
-function makeFakeTemplate(body: string, format = "html"): RenderableTemplate {
+function makeFakeTemplate(body: string, format = ":html"): RenderableTemplate {
   return {
     identifier: "fake",
     format,
@@ -68,7 +68,7 @@ describe("TemplateRenderer", () => {
     it("renders html: directly", async () => {
       const renderer = new TemplateRenderer(lc);
       const result = await renderer.render(ctx, { html: "<b>bold</b>" });
-      expect(result.body).toBe("<b>bold</b>");
+      expect(result.body).toBe("&lt;b&gt;bold&lt;/b&gt;");
     });
 
     it("renders inline: source directly", async () => {

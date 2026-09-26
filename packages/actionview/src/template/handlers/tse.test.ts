@@ -116,7 +116,7 @@ describe("Template::Handlers::Tse", () => {
   });
 
   it("normalizes a format-token template.type ('text') to MIME before the escapeIgnoreList check", () => {
-    const code = new Tse().call({ type: "text" }, "<%= name %>");
+    const code = new Tse().call({ type: ":text" }, "<%= name %>");
     expect(code).toMatch(/_ob\.safeExprAppend\(name\)/);
   });
 
@@ -167,7 +167,7 @@ describe("Template::Handlers::Tse", () => {
   describe("annotateRenderedViewWithFilenames", () => {
     it("defaults to false — no annotation comments emitted", () => {
       const code = new Tse().call(
-        { type: "text/html", format: "html", shortIdentifier: "app/views/posts/show.html.tse" },
+        { type: "text/html", format: ":html", shortIdentifier: "app/views/posts/show.html.tse" },
         "<h1>hi</h1>",
       );
       expect(code).not.toContain("BEGIN");
@@ -178,7 +178,7 @@ describe("Template::Handlers::Tse", () => {
       Base.annotateRenderedViewWithFilenames = true;
       const id = "app/views/posts/show.html.tse";
       const code = new Tse().call(
-        { type: "text/html", format: "html", shortIdentifier: id },
+        { type: "text/html", format: ":html", shortIdentifier: id },
         "<h1>hi</h1>",
       );
       expect(code).toContain(`_ob.safeAppend("<!-- BEGIN ${id} -->");`);
@@ -191,7 +191,7 @@ describe("Template::Handlers::Tse", () => {
       const code = new Tse().call(
         {
           type: "application/json",
-          format: "json",
+          format: ":json",
           shortIdentifier: "app/views/posts/show.json.tse",
         },
         "<%= data %>",
@@ -202,7 +202,7 @@ describe("Template::Handlers::Tse", () => {
     it("does not annotate non-html formats (text/plain)", () => {
       Base.annotateRenderedViewWithFilenames = true;
       const code = new Tse().call(
-        { type: "text/plain", format: "text", shortIdentifier: "app/views/mailer/body.text.tse" },
+        { type: "text/plain", format: ":text", shortIdentifier: "app/views/mailer/body.text.tse" },
         "hello",
       );
       expect(code).not.toContain("BEGIN");
@@ -210,7 +210,7 @@ describe("Template::Handlers::Tse", () => {
 
     it("does not annotate when shortIdentifier is absent", () => {
       Base.annotateRenderedViewWithFilenames = true;
-      const code = new Tse().call({ type: "text/html", format: "html" }, "<h1>hi</h1>");
+      const code = new Tse().call({ type: "text/html", format: ":html" }, "<h1>hi</h1>");
       expect(code).not.toContain("BEGIN");
     });
 
@@ -218,7 +218,7 @@ describe("Template::Handlers::Tse", () => {
       Base.annotateRenderedViewWithFilenames = true;
       const id = "app/views/posts/index.html.tse";
       const code = new Tse().call(
-        { type: "text/html", format: "html", shortIdentifier: id },
+        { type: "text/html", format: ":html", shortIdentifier: id },
         "<p>items</p>",
       );
       const fnStart = code.indexOf("export default function render");

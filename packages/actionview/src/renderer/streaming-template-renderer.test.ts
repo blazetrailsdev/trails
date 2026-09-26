@@ -5,7 +5,7 @@ import { Renderer } from "./renderer.js";
 import { LookupContext } from "../lookup-context.js";
 import type { RenderableTemplate, ViewContext } from "./abstract-renderer.js";
 
-function makeFakeTemplate(body: string, format = "html"): RenderableTemplate {
+function makeFakeTemplate(body: string, format = ":html"): RenderableTemplate {
   return {
     identifier: "fake",
     format,
@@ -53,7 +53,7 @@ describe("StreamingTemplateRenderer", () => {
 
       const layoutFake: RenderableTemplate = {
         identifier: "layout",
-        format: "html",
+        format: ":html",
         render: vi.fn().mockImplementation((viewCtx: ViewContext) => {
           const yieldContent = viewCtx?._layoutFor?.() ?? "";
           return Promise.resolve(`<header>HEAD</header>${yieldContent}<footer>FOOT</footer>`);
@@ -78,7 +78,7 @@ describe("StreamingTemplateRenderer", () => {
 
       const layoutFake: RenderableTemplate = {
         identifier: "layout",
-        format: "html",
+        format: ":html",
         render: vi.fn().mockImplementation((viewCtx: ViewContext) => {
           const yieldContent = viewCtx?._layoutFor?.() ?? "";
           return Promise.resolve(`<header>HEAD</header>${yieldContent}<footer>FOOT</footer>`);
@@ -99,7 +99,7 @@ describe("StreamingTemplateRenderer", () => {
 
       const layoutFake: RenderableTemplate = {
         identifier: "layout",
-        format: "html",
+        format: ":html",
         render: vi.fn().mockResolvedValue("<wrapper>no yield here</wrapper>"),
       };
       vi.spyOn(lc, "findLayout").mockReturnValue(layoutFake as never);
@@ -124,7 +124,7 @@ describe("StreamingTemplateRenderer", () => {
         const layoutFake: RenderableTemplate = {
           identifier: "layout",
           virtualPath: "layouts/application",
-          format: "html",
+          format: ":html",
           render: vi.fn().mockImplementation((viewCtx: ViewContext) => {
             const yieldContent = viewCtx?._layoutFor?.() ?? "";
             return Promise.resolve(`<header>${yieldContent}</header>`);
@@ -182,7 +182,7 @@ describe("StreamingTemplateRenderer", () => {
         boom.name = "ActionView::Template::Error";
         const templateFake: RenderableTemplate = {
           identifier: "fake",
-          format: "html",
+          format: ":html",
           render: vi.fn().mockRejectedValue(boom),
         };
         vi.spyOn(lc, "findTemplate").mockReturnValue(templateFake as never);
@@ -206,7 +206,7 @@ describe("StreamingTemplateRenderer", () => {
     it("handles error mid-render — yields completion sentinel and does not throw", async () => {
       vi.spyOn(lc, "findTemplate").mockReturnValue({
         identifier: "bad",
-        format: "html",
+        format: ":html",
         render: vi.fn().mockRejectedValue(new Error("render boom")),
       } as never);
 

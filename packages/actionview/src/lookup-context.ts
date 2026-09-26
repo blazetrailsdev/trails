@@ -1,12 +1,11 @@
 import type { RenderContext } from "./template/handlers.js";
 import { Base } from "./base.js";
 import { TemplateHandlers } from "./template/handlers.js";
-import type { Template } from "./template.js";
+import { Template } from "./template.js";
 import { PathRegistry } from "./path-registry.js";
 import { PathSet, type PathSetResolver } from "./path-set.js";
 import { Requested } from "./template-details.js";
 import { MissingTemplate } from "./template/error.js";
-import { Types } from "./template/types.js";
 
 type DetailValue = ReadonlyArray<string | symbol>;
 type DetailsMap = Record<string, DetailValue>;
@@ -23,7 +22,7 @@ function registerDetail(name: string, proc: DefaultProc): void {
 registerDetail("locale", () => ["en"]);
 registerDetail(
   "formats",
-  () => Base.defaultFormats ?? ["html", "text", "js", "css", "xml", "json"],
+  () => Base.defaultFormats ?? [":html", ":text", ":js", ":css", ":xml", ":json"],
 );
 registerDetail("variants", () => []);
 registerDetail("handlers", () => TemplateHandlers.extensions() as DetailValue);
@@ -36,9 +35,9 @@ export class DetailsKey {
 
   static detailsCacheKey(details: DetailsMap): Requested {
     let formats = details.formats;
-    if (formats && !Types.isValidSymbols(formats)) {
+    if (formats && !Template.Types.isValidSymbols(formats)) {
       formats = formats.filter(
-        (f) => typeof f === "string" && Types.symbols().includes(f),
+        (f) => typeof f === "string" && Template.Types.symbols().includes(f),
       ) as DetailValue;
     }
     const normalized: DetailsMap = { ...details, formats: formats ?? [] };
@@ -183,14 +182,14 @@ export class LookupContext {
       arr = arr.filter((v) => v !== "*/*").concat(DEFAULT_PROCS.formats());
     }
     arr = Array.from(new Set(arr));
-    if (!Types.isValidSymbols(arr)) {
+    if (!Template.Types.isValidSymbols(arr)) {
       const invalidValues = arr.filter(
-        (f) => typeof f !== "string" || !Types.symbols().includes(f),
+        (f) => typeof f !== "string" || !Template.Types.symbols().includes(f),
       );
       throw new Error(`Invalid formats: ${invalidValues.map((v) => String(v)).join(", ")}`);
     }
-    if (arr.length === 1 && arr[0] === "js") {
-      arr.push("html");
+    if (arr.length === 1 && arr[0] === ":js") {
+      arr.push(":html");
       this._htmlFallbackForJs = true;
     }
     this._setDetail("formats", arr);
@@ -405,7 +404,7 @@ export class LookupContext {
     options: { layout?: string | false; view?: Base } = {},
   ): Promise<string> {
     const controller = String(prefixes[0] ?? "");
-    const format = String(formats[0] ?? "html");
+    const format = String(formats[0] ?? ":html");
     const template = this.findTemplate(action, prefixes, formats);
     if (!template) {
       throw new MissingTemplate(this._viewPaths, action, prefixes, false, {

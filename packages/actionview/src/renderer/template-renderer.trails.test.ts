@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { htmlSafe } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import { TemplateRenderer } from "./template-renderer.js";
 import { LookupContext } from "../lookup-context.js";
@@ -8,7 +9,7 @@ import type { RenderableTemplate, ViewContext } from "./abstract-renderer.js";
 const ctx: ViewContext = { viewRenderer: { cacheHits: {} } };
 
 function fakeTemplate(body: string): RenderableTemplate {
-  return { identifier: "fake", format: "html", render: vi.fn().mockResolvedValue(body) };
+  return { identifier: "fake", format: ":html", render: vi.fn().mockResolvedValue(body) };
 }
 
 describe("TemplateRenderer raises", () => {
@@ -55,5 +56,19 @@ describe("TemplateRenderer raises", () => {
       .render(ctx, { template: "posts/show", layout: "layouts/missing" })
       .catch((err: unknown) => err);
     expect(e).toBeInstanceOf(MissingTemplate);
+  });
+});
+
+describe("TemplateRenderer html:", () => {
+  it("rendering HTML should escape the string if it is not HTML safe", async () => {
+    const renderer = new TemplateRenderer(new LookupContext());
+    const result = await renderer.render(ctx, { html: "<p>hello world</p>" });
+    expect(result.body).toBe("&lt;p&gt;hello world&lt;/p&gt;");
+  });
+
+  it("rendering HTML should not escape the string if it is HTML safe", async () => {
+    const renderer = new TemplateRenderer(new LookupContext());
+    const result = await renderer.render(ctx, { html: htmlSafe("<p>hello world</p>") });
+    expect(result.body).toBe("<p>hello world</p>");
   });
 });

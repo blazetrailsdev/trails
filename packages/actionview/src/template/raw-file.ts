@@ -1,9 +1,9 @@
 import { File } from "@blazetrails/ruby-compat";
 
-import { Types } from "./types.js";
+import { Template } from "../template.js";
 
 export class RawFile {
-  type: Types;
+  type: ReturnType<(typeof Template.Types)["get"]>;
 
   format: string;
 
@@ -12,8 +12,8 @@ export class RawFile {
   constructor(filename: unknown) {
     this.filename = filename == null ? "" : String(filename);
     const extname = File.extname(this.filename).replaceAll(".", "");
-    this.type = Types.get(extname) ?? Types.get("text");
-    this.format = this.type.symbol;
+    this.type = Template.Types.get(extname) ?? Template.Types.get(":text");
+    this.format = this.type!.symbol!;
   }
 
   get identifier(): string {

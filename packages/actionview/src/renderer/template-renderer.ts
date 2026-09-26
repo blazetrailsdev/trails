@@ -1,4 +1,4 @@
-import { Notifications } from "@blazetrails/activesupport";
+import { h, Notifications } from "@blazetrails/activesupport";
 
 import { ArgumentError, File } from "@blazetrails/ruby-compat";
 
@@ -35,7 +35,7 @@ export class TemplateRenderer extends AbstractRenderer {
       return new PlainTemplate(String(options.plain ?? ""));
     }
     if (Object.prototype.hasOwnProperty.call(options, "html")) {
-      return new HtmlTemplate(String(options.html ?? ""), (this.formats[0] as string) ?? "html");
+      return new HtmlTemplate(options.html, (this.formats[0] as string) ?? ":html");
     }
     if (Object.prototype.hasOwnProperty.call(options, "file")) {
       if (File.isExist(options.file as string)) {
@@ -99,7 +99,7 @@ export class TemplateRenderer extends AbstractRenderer {
   ): Promise<RenderedTemplate> {
     const layout =
       path != null && path !== false
-        ? this.findLayout(path, Object.keys(locals), [(this.formats[0] as string) ?? "html"])
+        ? this.findLayout(path, Object.keys(locals), [(this.formats[0] as string) ?? ":html"])
         : null;
 
     let body: string;
@@ -177,7 +177,7 @@ export class TemplateRenderer extends AbstractRenderer {
     const lastSlash = name.lastIndexOf("/");
     const baseName = lastSlash >= 0 ? name.slice(lastSlash + 1) : name;
     const prefix = lastSlash >= 0 ? name.slice(0, lastSlash) : (prefixes[0] ?? "");
-    const format = (this.formats[0] as string | undefined) ?? "html";
+    const format = (this.formats[0] as string | undefined) ?? ":html";
     const template = this.lookupContext.findTemplate(baseName, [prefix], [format]);
     if (template) return template as unknown as RenderableTemplate;
 
@@ -201,7 +201,7 @@ class BodyTemplate implements RenderableTemplate {
 
 class PlainTemplate implements RenderableTemplate {
   readonly identifier = "plain template";
-  readonly format = "text";
+  readonly format = ":text";
 
   constructor(private readonly content: string) {}
 
@@ -213,13 +213,17 @@ class PlainTemplate implements RenderableTemplate {
 class HtmlTemplate implements RenderableTemplate {
   readonly identifier = "html template";
 
+  private readonly string: unknown;
+
   constructor(
-    private readonly content: string,
+    string: unknown,
     readonly format: string,
-  ) {}
+  ) {
+    this.string = string ?? "";
+  }
 
   async render(..._args: unknown[]): Promise<string> {
-    return this.content;
+    return h(this.string).toString();
   }
 }
 

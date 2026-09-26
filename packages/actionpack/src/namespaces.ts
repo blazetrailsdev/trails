@@ -1,4 +1,6 @@
-import { Autoload, TopLevel, extend, type Extended } from "@blazetrails/activesupport";
+import { Autoload, TopLevel, extend, onLoad, type Extended } from "@blazetrails/activesupport";
+import { Base, DetailsKey, Template } from "@blazetrails/actionview";
+import { Mime, MimeType } from "./action-dispatch/http/mime-type.js";
 import type { Parameters } from "./action-controller/metal/strong-parameters.js";
 import type { Request } from "./action-dispatch/http/request.js";
 import type * as PolymorphicRoutes from "./action-dispatch/routing/polymorphic-routes.js";
@@ -36,3 +38,9 @@ extend(ActionController, Autoload);
 
 TopLevel.ActionDispatch = ActionDispatch;
 TopLevel.ActionController = ActionController;
+
+onLoad("action_view", () => {
+  Base.defaultFormats ??= MimeType.SET.symbols;
+  Template.mimeTypesImplementation = Mime;
+  DetailsKey.clear();
+});

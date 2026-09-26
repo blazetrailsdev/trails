@@ -1,69 +1,34 @@
 import { isBlank } from "@blazetrails/activesupport";
+import { isSymbol, symbolToS } from "@blazetrails/ruby-compat";
 
-const SYMBOLS: readonly string[] = [
-  "html",
-  "text",
-  "js",
-  "css",
-  "ics",
-  "csv",
-  "vcf",
-  "vtt",
-  "png",
-  "jpeg",
-  "gif",
-  "bmp",
-  "tiff",
-  "svg",
-  "webp",
-  "mpeg",
-  "mp3",
-  "ogg",
-  "m4a",
-  "webm",
-  "mp4",
-  "otf",
-  "ttf",
-  "woff",
-  "woff2",
-  "xml",
-  "rss",
-  "atom",
-  "yaml",
-  "multipart_form",
-  "url_encoded_form",
-  "json",
-  "pdf",
-  "zip",
-  "gzip",
-];
+const SYMBOLS: readonly string[] = [":html", ":text", ":js", ":css", ":xml", ":json"];
 
-export class Types {
+export class SimpleType {
   static symbols(): readonly string[] {
     return SYMBOLS;
   }
 
-  static get(type: string | Types): Types {
-    if (type instanceof Types) {
+  static get(type: string | SimpleType): SimpleType {
+    if (type instanceof this) {
       return type;
     } else {
-      return new Types(type);
+      return new this(type);
     }
   }
 
   /** @internal */
-  static isValidSymbols(symbols: ReadonlyArray<string | symbol>): boolean {
-    return symbols.every((s) => typeof s === "string" && SYMBOLS.includes(s));
+  static isValidSymbols(symbols: readonly unknown[]): boolean {
+    return symbols.every((s) => SYMBOLS.includes(s as string));
   }
 
   readonly symbol: string;
 
   constructor(symbol: string) {
-    this.symbol = symbol;
+    this.symbol = isSymbol(symbol) ? symbol : `:${symbol}`;
   }
 
   toString(): string {
-    return this.symbol;
+    return symbolToS(this.symbol);
   }
 
   ref(): string {
@@ -76,7 +41,8 @@ export class Types {
 
   equals(type: unknown): boolean | undefined {
     if (!isBlank(type)) {
-      return this.symbol === (type instanceof Types ? type.toSym() : String(type));
+      const sym = type instanceof SimpleType ? type.toSym() : String(type);
+      return this.symbol === (isSymbol(sym) ? sym : `:${sym}`);
     }
   }
 }
