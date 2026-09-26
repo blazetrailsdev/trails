@@ -187,7 +187,7 @@ export class CookieJar implements Iterable<[string, string]> {
     const val = this._cookies.get(name);
     if (val !== undefined) return val;
     if (args !== undefined) return args;
-    throw new KeyError(`key not found: "${name}"`);
+    throw new KeyError(`key not found: "${name}"`, { receiver: this._cookies, key: name });
   }
 
   has(key: string): boolean {

@@ -55,7 +55,10 @@ export function fetch(hash: Record<string, unknown>, key: string, ...rest: unkno
     if (blockGiven) {
       return (rest[0] as Block<unknown>)(key);
     } else if (rest.length === 0) {
-      throw new KeyError(`key not found: ${strEllipsize(rbInspect(key), 65)}`);
+      throw new KeyError(`key not found: ${strEllipsize(rbInspect(key), 65)}`, {
+        receiver: hash,
+        key,
+      });
     } else {
       return rest[0];
     }
@@ -173,7 +176,7 @@ export function hashDelete<T, U = null>(
   block?: (key: string) => U,
 ): T | U | null {
   if (Object.isFrozen(hash)) {
-    throw new FrozenError(`can't modify frozen Hash: ${rbInspect(hash)}`);
+    throw new FrozenError(`can't modify frozen Hash: ${rbInspect(hash)}`, { receiver: hash });
   }
   if (Object.hasOwn(hash, key)) {
     const val = hash[key];
@@ -456,7 +459,9 @@ export class Hash<K, V> extends Map<K, V> {
    */
   private modifyCheck(): void {
     if (this._frozen) {
-      throw new FrozenError(`can't modify frozen ${this.constructor.name}: ${inspect(this)}`);
+      throw new FrozenError(`can't modify frozen ${this.constructor.name}: ${inspect(this)}`, {
+        receiver: this,
+      });
     }
   }
 

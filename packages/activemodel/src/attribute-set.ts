@@ -15,7 +15,7 @@ import { ValueType } from "./type/value.js";
 function frozenErrorRaisingStore(attributes: Record<string, Attribute>): Record<string, Attribute> {
   const raiseIfFrozen = (target: Record<string, Attribute>): void => {
     if (Object.isFrozen(target)) {
-      throw new FrozenError(`can't modify frozen Hash: ${rbInspect(target)}`);
+      throw new FrozenError(`can't modify frozen Hash: ${rbInspect(target)}`, { receiver: target });
     }
   };
   return new Proxy(attributes, {
@@ -42,7 +42,7 @@ export class AttributeSet {
     if (hasKey(attributes, name)) return attributes[name];
     if (typeof defaultOrBlock === "function") return (defaultOrBlock as (name: string) => T)(name);
     if (defaultOrBlock !== undefined) return defaultOrBlock;
-    throw new KeyError(`key not found: ${rbInspect(name)}`);
+    throw new KeyError(`key not found: ${rbInspect(name)}`, { receiver: attributes, key: name });
   }
 
   except(...names: string[]): Record<string, Attribute> {

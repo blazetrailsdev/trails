@@ -282,7 +282,7 @@ export class Session {
     if (defaultValue === Unspecified) {
       if (Object.hasOwn(this.delegate, k)) return this.delegate[k];
       if (block) return block(k);
-      throw new KeyError(`key not found: "${k}"`);
+      throw new KeyError(`key not found: "${k}"`, { receiver: this.delegate, key: k });
     } else {
       if (Object.hasOwn(this.delegate, k)) return this.delegate[k];
       if (block) return block(k);

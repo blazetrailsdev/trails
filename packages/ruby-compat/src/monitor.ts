@@ -5,8 +5,7 @@ import {
 } from "./async-context-adapter.js";
 
 interface MonData {
-  owner: symbol | null;
-  chain: Promise<void> | null;
+  holders: Map<symbol | null, Promise<void> | null>;
   storage: AsyncContext<symbol> | null;
   adapter: AsyncContextAdapter | null;
 }
@@ -16,7 +15,7 @@ const MON_DATA = new WeakMap<object, MonData>();
 function monData(self: object): MonData {
   let data = MON_DATA.get(self);
   if (!data) {
-    data = { owner: null, chain: null, storage: null, adapter: null };
+    data = { holders: new Map([[null, null]]), storage: null, adapter: null };
     MON_DATA.set(self, data);
   }
   const adapter = getAsyncContext();
@@ -27,6 +26,11 @@ function monData(self: object): MonData {
   return data;
 }
 
+function heldBy(data: MonData): symbol | null {
+  const store = data.storage!.getStore();
+  return store !== undefined && data.holders.has(store) ? store : null;
+}
+
 /**
  * `vendor/ruby/ext/monitor/lib/monitor.rb:191` `mon_owned?`, true when the
  * current execution context holds the monitor.
@@ -35,43 +39,46 @@ function monData(self: object): MonData {
  * (`vendor/ruby/ext/monitor/lib/monitor.rb:191`).
  */
 export function isMonOwned(this: object): boolean {
-  const data = monData(this);
-  return data.owner !== null && data.storage!.getStore() === data.owner;
+  return heldBy(monData(this)) !== null;
 }
 
 /**
  * `vendor/ruby/ext/monitor/lib/monitor.rb:200` `mon_synchronize`, aliased
  * `synchronize` at `:203`.
  *
+ * Ruby's monitor is owned by a thread, and one thread runs one call at a time,
+ * so a re-entry is always nested inside the holder's own call. Concurrent
+ * promises started inside a held block share its async context, so a
+ * re-entry here is serialized against the other re-entries under the same
+ * holder, each running under an owner of its own: a nested call re-enters at
+ * once, and two sibling calls from one `Promise.all` take turns, as two
+ * threads would.
+ *
  * @noRailsEquivalent PERMANENT — Ruby stdlib `MonitorMixin#synchronize`
  * (`vendor/ruby/ext/monitor/lib/monitor.rb:200,203`).
  */
 export async function synchronize<T>(this: object, block: () => T | Promise<T>): Promise<T> {
   const data = monData(this);
-  const storage = data.storage!;
+  const parent = heldBy(data);
 
-  if (data.owner !== null && storage.getStore() === data.owner) {
-    return await block();
-  }
-
-  const predecessor = data.chain;
+  const predecessor = data.holders.get(parent)!;
   let monExit!: () => void;
   const mine = new Promise<void>((resolve) => {
     monExit = resolve;
   });
   const tail = predecessor ? predecessor.then(() => mine) : mine;
-  data.chain = tail;
+  data.holders.set(parent, tail);
 
   if (predecessor) await predecessor;
 
   const owner = Symbol("monitor");
-  data.owner = owner;
+  data.holders.set(owner, null);
 
   try {
-    return await storage.run(owner, () => block());
+    return await data.storage!.run(owner, () => block());
   } finally {
-    data.owner = null;
-    if (data.chain === tail) data.chain = null;
+    data.holders.delete(owner);
+    if (data.holders.get(parent) === tail) data.holders.set(parent, null);
     monExit();
   }
 }

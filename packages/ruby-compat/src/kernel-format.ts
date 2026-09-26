@@ -203,7 +203,8 @@ export function format(fmt: string, ...argv: unknown[]): string {
           nextvalue = hashLookup(namedHash, sym);
           if (nextvalue === UNDEF) {
             nextvalue = hashDefaultValue(namedHash, sym);
-            if (nextvalue == null) throw new KeyError(`key${name} not found`);
+            if (nextvalue == null)
+              throw new KeyError(`key${name} not found`, { receiver: namedHash, key: sym });
           }
           if (term === "}") {
             buf += formatS(getArg(), "s", flags, width, prec);

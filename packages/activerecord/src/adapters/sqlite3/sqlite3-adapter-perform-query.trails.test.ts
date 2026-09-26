@@ -5,7 +5,6 @@ import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
 import { ReadOnlyError } from "../../errors.js";
 import { Result } from "../../result.js";
-import { acquireStatementLock } from "../../connection-adapters/sqlite3/database-statements.js";
 
 let adapter: SQLite3Adapter;
 
@@ -107,66 +106,97 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
   });
 
   it("serializes statements queued on one connection", async () => {
-    const host: { _statementLock: Promise<void> | null } = { _statementLock: null };
+    const withRawConnection = adapter.withRawConnection.bind(adapter);
     let inside = 0;
     let arrivals = 0;
     const served: number[] = [];
-
-    await Promise.all(
-      Array.from({ length: 25 }, async (_unused, i) => {
-        for (let stagger = 0; stagger < i % 4; stagger++) await Promise.resolve();
-        const arrival = arrivals++;
-        const release = await acquireStatementLock(host);
+    adapter.withRawConnection = (options, block) => {
+      const arrival = arrivals++;
+      return withRawConnection(options, async (raw) => {
         inside += 1;
         expect(inside).toBe(1);
         served.push(arrival);
         await new Promise((resolve) => setTimeout(resolve, 0));
-        inside -= 1;
-        release();
+        try {
+          return await block(raw);
+        } finally {
+          inside -= 1;
+        }
+      });
+    };
+
+    await Promise.all(
+      Array.from({ length: 25 }, async (_unused, i) => {
+        for (let stagger = 0; stagger < i % 4; stagger++) await Promise.resolve();
+        await adapter.insert(`INSERT INTO "pq" ("nick") VALUES ('n${i}')`);
       }),
     );
 
-    expect(served).toEqual(Array.from({ length: 25 }, (_unused, i) => i));
+    expect(served).toEqual(Array.from({ length: arrivals }, (_unused, i) => i));
   });
 
   it("does not let a late statement barge ahead of one already queued", async () => {
-    const host: { _statementLock: Promise<void> | null } = { _statementLock: null };
-    const served: string[] = [];
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const held = adapter.lock.synchronize(() => gate);
 
-    const held = await acquireStatementLock(host);
-    const queued = (async () => {
-      const release = await acquireStatementLock(host);
-      served.push("queued");
-      release();
-    })();
-    await Promise.resolve();
+    const queued = adapter.insert(`INSERT INTO "pq" ("nick") VALUES ('queued')`);
+    for (let i = 0; i < 100; i++) await Promise.resolve();
 
-    held();
-    const late = (async () => {
-      const release = await acquireStatementLock(host);
-      served.push("late");
-      release();
-    })();
+    release();
+    const late = adapter.insert(`INSERT INTO "pq" ("nick") VALUES ('late')`);
 
-    await Promise.all([queued, late]);
-    expect(served).toEqual(["queued", "late"]);
+    await Promise.all([held, queued, late]);
+    expect(await adapter.selectValues(`SELECT "nick" FROM "pq" ORDER BY "id"`)).toEqual([
+      "queued",
+      "late",
+    ]);
+  });
+
+  it("returns distinct insert ids for concurrent inserts inside a transaction", async () => {
+    const performQuery = adapter.performQuery;
+    let inside = 0;
+    adapter.performQuery = async function (...args) {
+      inside += 1;
+      expect(inside).toBe(1);
+      try {
+        return await performQuery.apply(this, args);
+      } finally {
+        inside -= 1;
+      }
+    };
+    const n = 25;
+    const ids = await adapter.transaction(() =>
+      Promise.all(
+        Array.from({ length: n }, (_, i) =>
+          adapter.insert(`INSERT INTO "pq" ("nick") VALUES ('t${i}')`),
+        ),
+      ),
+    );
+    expect(new Set(ids).size).toBe(n);
+    for (const [i, id] of ids!.entries()) {
+      expect(await adapter.selectValue(`SELECT "nick" FROM "pq" WHERE "id" = ${Number(id)}`)).toBe(
+        `t${i}`,
+      );
+    }
   });
 
   it("does not close the handle out from under a statement holding the lock", async () => {
     const closing = new BetterSQLite3Adapter({ database: ":memory:" });
     // eslint-disable-next-line blazetrails/require-table-teardown
     await closing.execute(`CREATE TABLE "dc" ("id" INTEGER PRIMARY KEY)`);
-    const release = await acquireStatementLock(closing);
-    const held = closing._statementLock;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const held = closing.lock.synchronize(() => gate);
 
     const queued = closing.insert(`INSERT INTO "dc" DEFAULT VALUES`, null, "id");
-    for (let i = 0; i < 100 && closing._statementLock === held; i++) await Promise.resolve();
-    expect(closing._statementLock).not.toBe(held);
+    for (let i = 0; i < 100; i++) await Promise.resolve();
 
     const disconnecting = closing.disconnectBang();
     expect(closing.isActive()).toBe(true);
 
     release();
+    await held;
     await expect(queued).resolves.toBe(1);
     await disconnecting;
 
@@ -177,15 +207,17 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
     const closing = new BetterSQLite3Adapter({ database: ":memory:" });
     // eslint-disable-next-line blazetrails/require-table-teardown
     await closing.execute(`CREATE TABLE "dc2" ("id" INTEGER PRIMARY KEY)`);
-    const release = await acquireStatementLock(closing);
-    const held = closing._statementLock;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const held = closing.lock.synchronize(() => gate);
 
     const queued = closing.insert(`INSERT INTO "dc2" DEFAULT VALUES`, null, "id");
-    for (let i = 0; i < 100 && closing._statementLock === held; i++) await Promise.resolve();
+    for (let i = 0; i < 100; i++) await Promise.resolve();
 
     const disconnecting = closing.disconnectBang();
 
     release();
+    await held;
     await expect(queued).resolves.toBe(1);
     await disconnecting;
     const answered = closing.active();

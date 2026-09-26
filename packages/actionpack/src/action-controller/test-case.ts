@@ -631,7 +631,9 @@ export class TestSession extends SecureSessionHash {
     const k = String(key);
     if (Object.hasOwn(this.data, k)) return this.data[k];
     if (block) return block(k);
-    if (arguments.length < 2) throw new KeyError(`key not found: "${k}"`);
+    if (arguments.length < 2) {
+      throw new KeyError(`key not found: "${k}"`, { receiver: this.data, key: k });
+    }
     return args;
   }
 

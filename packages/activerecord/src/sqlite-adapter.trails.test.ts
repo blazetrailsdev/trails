@@ -187,9 +187,12 @@ describe("SQLite adapter driver binding", () => {
 
     const queued = await new SQLite3Adapter({ database: ":memory:", driver }).connectBang();
     let releaseStatement: () => void;
-    queued._statementLock = new Promise<void>((resolve) => {
-      releaseStatement = resolve;
-    });
+    const statement = queued.lock.synchronize(
+      () =>
+        new Promise<void>((resolve) => {
+          releaseStatement = resolve;
+        }),
+    );
     closed = false;
     closeGate = new Promise<void>((resolve) => {
       resolveClose = resolve;
@@ -199,6 +202,7 @@ describe("SQLite adapter driver binding", () => {
       settled = true;
     });
     releaseStatement!();
+    await statement;
     await new Promise((r) => setTimeout(r, 10));
     expect(settled).toBe(false);
     resolveClose!();

@@ -1,4 +1,4 @@
-import { StandardError } from "./standard-error.js";
+import { RangeError } from "./range-error.js";
 
 /**
  * Ruby's core `FloatDomainError` (`vendor/ruby/numeric.c:6155`
@@ -8,15 +8,11 @@ import { StandardError } from "./standard-error.js";
  * Float's own `to_s` as the message: `Integer(Float::INFINITY)` is
  * `FloatDomainError: Infinity`.
  *
- * Ruby's chain is `FloatDomainError < RangeError < StandardError`; it extends
- * `StandardError` directly, with no ruby-compat `RangeError` link, because Rails declares `RangeError` itself twice
- * (`activemodel/lib/active_model/errors.rb:523`,
- * `activerecord/lib/active_record/errors.rb:301`), so that name is not
- * Ruby-core surface this package owns.
+ * Ruby's chain is `FloatDomainError < RangeError < StandardError`.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `FloatDomainError`, which Rails
  * inherits rather than defines.
  */
-export class FloatDomainError extends StandardError {}
+export class FloatDomainError extends RangeError {}
 
 FloatDomainError.prototype.name = "FloatDomainError";

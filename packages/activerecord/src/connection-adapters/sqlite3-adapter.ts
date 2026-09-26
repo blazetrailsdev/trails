@@ -185,8 +185,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   _connectionParameters: SQLite3ConnectionParameters;
   private _strict: boolean;
   /** @internal */
-  _statementLock: Promise<void> | null = null;
-  /** @internal */
   _lastAffectedRows = 0;
   _lastInsertRowid: number | bigint = 0;
   private _memoryDatabase: boolean;
@@ -499,12 +497,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   override async disconnectBang(): Promise<void> {
     await super.disconnectBang();
 
-    const ahead = this._statementLock;
-    if (ahead) {
-      this._chainClose(ahead.then(() => this._disconnect()));
-    } else {
+    await this.lock.synchronize(() => {
       void this._disconnect();
-    }
+    });
     await this._closingDriver;
   }
 

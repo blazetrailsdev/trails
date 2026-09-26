@@ -174,9 +174,13 @@ export function methodMissingProxy<T extends object>(
           : value;
       }
       if (typeof prop === "symbol" || PROTOCOL_PROBES.has(prop)) return undefined;
-      return () => {
+      return (...args: unknown[]) => {
         throw new NoMethodError(
           `undefined method '${prop}' for an instance of ${(proxyTarget as object).constructor.name}`,
+          prop,
+          args,
+          false,
+          { receiver },
         );
       };
     },
