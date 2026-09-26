@@ -151,10 +151,10 @@ export function setFormats(this: ViewPaths, values: DetailValue | null): void {
   lookupContext.call(this).formats = values;
 }
 
-export function locale(this: ViewPaths): string | symbol | null {
+export function locale(this: ViewPaths): string | null {
   return lookupContext.call(this).locale;
 }
 
-export function setLocale(this: ViewPaths, value: string | symbol | null): void {
+export function setLocale(this: ViewPaths, value: string | null): void {
   lookupContext.call(this).locale = value;
 }

@@ -36,7 +36,6 @@ export {
 export {
   _routesInstanceDefault,
   _routesClassDefault,
-  NO_ROUTES_MESSAGE,
   UrlForDefaults,
   type NamedRoutesLike,
   type RouteSetLike,

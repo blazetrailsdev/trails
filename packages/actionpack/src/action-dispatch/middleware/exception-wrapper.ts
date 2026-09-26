@@ -1,6 +1,6 @@
 import { excBacktraceLocations, File, hasKey, type Location } from "@blazetrails/ruby-compat";
 
-import { ActionableError, type BacktraceCleaner } from "@blazetrails/activesupport";
+import { ActionableError, cattrAccessor, type BacktraceCleaner } from "@blazetrails/activesupport";
 import { statusCode } from "@blazetrails/rack";
 import { PathRegistry, type Spot, type Template } from "@blazetrails/actionview";
 import { RoutingError } from "../../action-controller/metal/exceptions.js";
@@ -33,40 +33,6 @@ export interface ShowExceptionsRequest {
   getHeader(name: string): unknown;
 }
 
-const rescueResponses: Record<string, string> = {
-  "ActionController::RoutingError": ":not_found",
-  "AbstractController::ActionNotFound": ":not_found",
-  "ActionController::MethodNotAllowed": ":method_not_allowed",
-  "ActionController::UnknownHttpMethod": ":method_not_allowed",
-  "ActionController::NotImplemented": ":not_implemented",
-  "ActionController::UnknownFormat": ":not_acceptable",
-  "ActionDispatch::Http::MimeNegotiation::InvalidType": ":not_acceptable",
-  "ActionController::MissingExactTemplate": ":not_acceptable",
-  "ActionController::InvalidAuthenticityToken": ":unprocessable_entity",
-  "ActionController::InvalidCrossOriginRequest": ":unprocessable_entity",
-  "ActionDispatch::Http::Parameters::ParseError": ":bad_request",
-  "ActionController::BadRequest": ":bad_request",
-  "ActionController::ParameterMissing": ":bad_request",
-  "Rack::QueryParser::ParameterTypeError": ":bad_request",
-  "Rack::QueryParser::InvalidParameterError": ":bad_request",
-};
-
-const rescueTemplates: Record<string, string> = {
-  "ActionView::MissingTemplate": "missing_template",
-  "ActionController::RoutingError": "routing_error",
-  "AbstractController::ActionNotFound": "unknown_action",
-  "ActiveRecord::StatementInvalid": "invalid_statement",
-  "ActionView::Template::Error": "template_error",
-  "ActionController::MissingExactTemplate": "missing_exact_template",
-};
-
-const wrapperExceptions: string[] = ["ActionView::Template::Error"];
-
-const silentExceptions: string[] = [
-  "ActionController::RoutingError",
-  "ActionDispatch::Http::MimeNegotiation::InvalidType",
-];
-
 /** @noRailsEquivalent PERMANENT */
 export function classNameOf(e: Error): string {
   if (e.name && e.name !== "Error") return e.name;
@@ -93,6 +59,59 @@ export type SourceExtract = TraceEntry & {
 };
 
 export class ExceptionWrapper {
+  declare static rescueResponses: Record<string, string>;
+  declare static rescueTemplates: Record<string, string>;
+  declare static wrapperExceptions: string[];
+  declare static silentExceptions: string[];
+  declare rescueResponses: Record<string, string>;
+  declare rescueTemplates: Record<string, string>;
+  declare wrapperExceptions: string[];
+  declare silentExceptions: string[];
+
+  static {
+    cattrAccessor.call(this, "rescueResponses", {
+      default: {
+        "ActionController::RoutingError": ":not_found",
+        "AbstractController::ActionNotFound": ":not_found",
+        "ActionController::MethodNotAllowed": ":method_not_allowed",
+        "ActionController::UnknownHttpMethod": ":method_not_allowed",
+        "ActionController::NotImplemented": ":not_implemented",
+        "ActionController::UnknownFormat": ":not_acceptable",
+        "ActionDispatch::Http::MimeNegotiation::InvalidType": ":not_acceptable",
+        "ActionController::MissingExactTemplate": ":not_acceptable",
+        "ActionController::InvalidAuthenticityToken": ":unprocessable_entity",
+        "ActionController::InvalidCrossOriginRequest": ":unprocessable_entity",
+        "ActionDispatch::Http::Parameters::ParseError": ":bad_request",
+        "ActionController::BadRequest": ":bad_request",
+        "ActionController::ParameterMissing": ":bad_request",
+        "Rack::QueryParser::ParameterTypeError": ":bad_request",
+        "Rack::QueryParser::InvalidParameterError": ":bad_request",
+      },
+    });
+
+    cattrAccessor.call(this, "rescueTemplates", {
+      default: {
+        "ActionView::MissingTemplate": "missing_template",
+        "ActionController::RoutingError": "routing_error",
+        "AbstractController::ActionNotFound": "unknown_action",
+        "ActiveRecord::StatementInvalid": "invalid_statement",
+        "ActionView::Template::Error": "template_error",
+        "ActionController::MissingExactTemplate": "missing_exact_template",
+      },
+    });
+
+    cattrAccessor.call(this, "wrapperExceptions", {
+      default: ["ActionView::Template::Error"],
+    });
+
+    cattrAccessor.call(this, "silentExceptions", {
+      default: [
+        "ActionController::RoutingError",
+        "ActionDispatch::Http::MimeNegotiation::InvalidType",
+      ],
+    });
+  }
+
   readonly exception: Error;
   readonly backtraceCleaner: BacktraceCleaner | null;
   readonly exceptionClassName: string;
@@ -115,7 +134,7 @@ export class ExceptionWrapper {
 
   get unwrappedException(): Error {
     if (
-      wrapperExceptions.includes(this.exceptionClassName) &&
+      this.wrapperExceptions.includes(this.exceptionClassName) &&
       this.exception.cause instanceof Error
     ) {
       return this.exception.cause;
@@ -183,8 +202,8 @@ export class ExceptionWrapper {
   }
 
   rescueTemplate(): string {
-    return hasKey(rescueTemplates, this.exceptionClassName)
-      ? rescueTemplates[this.exceptionClassName]
+    return hasKey(this.rescueTemplates, this.exceptionClassName)
+      ? this.rescueTemplates[this.exceptionClassName]
       : "diagnostics";
   }
 
@@ -230,7 +249,7 @@ export class ExceptionWrapper {
 
   exceptionTrace(): BacktraceLine[] {
     const app = this.applicationTrace;
-    if (app.length === 0 && !silentExceptions.includes(this.exceptionClassName)) {
+    if (app.length === 0 && !this.silentExceptions.includes(this.exceptionClassName)) {
       return this.frameworkTrace;
     }
     return app;
@@ -257,8 +276,8 @@ export class ExceptionWrapper {
   }
 
   static statusCodeForException(className: string): number {
-    const status = hasKey(rescueResponses, className)
-      ? rescueResponses[className]
+    const status = hasKey(this.rescueResponses, className)
+      ? this.rescueResponses[className]
       : ":internal_server_error";
     return statusCode(status.slice(1));
   }
@@ -271,7 +290,7 @@ export class ExceptionWrapper {
   }
 
   rescueResponse(): boolean {
-    return hasKey(rescueResponses, this.exceptionClassName);
+    return hasKey(this.rescueResponses, this.exceptionClassName);
   }
 
   exceptionInspect(): string {

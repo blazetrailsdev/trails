@@ -13,10 +13,6 @@ export interface UrlForClassMethods {
   _routes: RouteSetLike | null;
 }
 
-export const NO_ROUTES_MESSAGE =
-  "In order to use #url_for, you must include routing helpers explicitly. " +
-  "For instance, `include Rails.application.routes.url_helpers`.";
-
 export const _routesClassDefault: RouteSetLike | null = null;
 
 export const _routesInstanceDefault: RouteSetLike | null = null;

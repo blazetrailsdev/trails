@@ -1,5 +1,5 @@
 import { I18n } from "@blazetrails/activesupport";
-import { rbObjRespondTo, stringToSym } from "@blazetrails/ruby-compat";
+import { isSymbol, rbObjRespondTo, stringToSym, symbolToS } from "@blazetrails/ruby-compat";
 import type { NestedDependencies } from "./digestor.js";
 import { Base } from "./base.js";
 import { TemplateHandlers } from "./template/handlers.js";
@@ -173,16 +173,19 @@ export class LookupContext {
     this._prefixes = value;
   }
 
-  get locale(): string | symbol | null {
-    return this._details.locale[0] ?? null;
+  get locale(): string | null {
+    return (this._details.locale[0] as string | undefined) ?? null;
   }
-  set locale(value: string | symbol | null) {
-    this._setDetail(
-      "locale",
-      value == null
-        ? DEFAULT_PROCS.locale()
-        : [typeof value === "string" ? stringToSym(value) : value],
-    );
+  set locale(value: string | null) {
+    if (value != null) {
+      const config = rbObjRespondTo(I18n.config(), "originalConfig")
+        ? (I18n.config() as unknown as { originalConfig: ReturnType<typeof I18n.config> })
+            .originalConfig
+        : I18n.config();
+      config.locale = isSymbol(value) ? symbolToS(value) : value;
+    }
+
+    this._setDetail("locale", DEFAULT_PROCS.locale());
   }
 
   defaultFormats(): DetailValue {

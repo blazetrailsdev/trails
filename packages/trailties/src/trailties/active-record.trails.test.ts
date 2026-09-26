@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { useInMemoryDatabaseUrl } from "../support/in-memory-database-url.js";
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
 import { Trailtie } from "./active-record.js";
+import { Trailtie as ActionDispatchTrailtie } from "./action-dispatch.js";
 import {
   Deprecators,
   Logger,
@@ -13,6 +14,7 @@ import {
 import {
   ActionController,
   Callbacks,
+  ExceptionWrapper,
   MiddlewareStack,
   Request,
   Response,
@@ -22,6 +24,7 @@ import {
   Base,
   LogSubscriber,
   Migration,
+  RecordNotFound,
   RuntimeRegistry,
   disablePreparedStatements,
   generateSecureTokenOn,
@@ -249,5 +252,18 @@ describe("RailtieTest (trails-only)", () => {
 
       expect(booted.tagsFormatter).toBe("sqlcommenter");
     });
+  });
+});
+
+describe("ActiveRecord::Railtie rescue_responses", () => {
+  it("merges ActiveRecord's rescue_responses into ExceptionWrapper through action_dispatch.configure", async () => {
+    expect(Trailtie.config.actionDispatch.rescueResponses).toMatchObject({
+      "ActiveRecord::RecordNotFound": ":not_found",
+      "ActiveRecord::StaleObjectError": ":conflict",
+      "ActiveRecord::RecordInvalid": ":unprocessable_entity",
+      "ActiveRecord::RecordNotSaved": ":unprocessable_entity",
+    });
+    await runTrailtieInitializers(ActionDispatchTrailtie, { deprecators: new Deprecators() });
+    expect(new ExceptionWrapper(null, new RecordNotFound("gone")).statusCode).toBe(404);
   });
 });

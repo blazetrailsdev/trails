@@ -142,6 +142,13 @@ export class Trailtie extends BaseTrailtie {
       queues: {},
     } satisfies ActiveRecordConfig);
 
+    Object.assign(this.config.actionDispatch.rescueResponses, {
+      "ActiveRecord::RecordNotFound": ":not_found",
+      "ActiveRecord::StaleObjectError": ":conflict",
+      "ActiveRecord::RecordInvalid": ":unprocessable_entity",
+      "ActiveRecord::RecordNotSaved": ":unprocessable_entity",
+    });
+
     this.config.eagerLoadNamespaces.push(ActiveRecord.ActiveRecord);
 
     this.initializer("active_record.deprecator", { before: "load_environment_config" }, (app) => {

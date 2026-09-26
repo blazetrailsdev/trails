@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, it, expect } from "vitest";
 import { MimeType } from "@blazetrails/actionpack";
+import { I18n } from "@blazetrails/activesupport";
 import { DetailsKey, LookupContext } from "./lookup-context.js";
 import type { RenderableTemplate, RenderOptions } from "./renderer/abstract-renderer.js";
 import { MissingTemplate } from "./template/error.js";
@@ -16,10 +17,32 @@ function render(ctx: LookupContext, options: RenderOptions): Promise<string | nu
 }
 
 describe("LookupContext", () => {
+  let enforceAvailableLocales: boolean;
+  beforeEach(() => {
+    enforceAvailableLocales = I18n.enforceAvailableLocales();
+    I18n.setEnforceAvailableLocales(false);
+  });
+  afterEach(() => {
+    I18n.setLocale("en");
+    I18n.setEnforceAvailableLocales(enforceAvailableLocales);
+  });
+
   it("handles */* formats", () => {
     const lookupContext = new LookupContext([]);
     lookupContext.formats = ["*/*"];
     expect(lookupContext.formats).toEqual(MimeType.SET.symbols);
+  });
+
+  it("provides getters and setters for locale", () => {
+    const lookupContext = new LookupContext([], {});
+    lookupContext.locale = ":pt";
+    expect(lookupContext.locale).toBe(":pt");
+  });
+
+  it("changing lookup_context locale, changes I18n.locale", () => {
+    const lookupContext = new LookupContext([], {});
+    lookupContext.locale = ":pt";
+    expect(I18n.locale()).toBe("pt");
   });
 });
 

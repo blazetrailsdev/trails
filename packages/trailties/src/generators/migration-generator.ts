@@ -1,186 +1,44 @@
-import { GeneratorBase, GeneratorOptions, migrationTimestamp, ColumnType } from "./base.js";
+import { GeneratorBase, GeneratorOptions, migrationTimestamp } from "./base.js";
+import { GeneratedAttribute } from "./generated-attribute.js";
 import { camelize, pluralize, singularize, tableize, underscore } from "@blazetrails/activesupport";
-
-const VIRTUAL_TYPES = new Set(["rich_text", "attachment", "attachments"]);
-
-interface ParsedColumn {
-  name: string;
-  type: ColumnType;
-  index?: boolean;
-  unique?: boolean;
-  polymorphic?: boolean;
-  required?: boolean;
-  limit?: number;
-  precision?: number;
-  scale?: number;
-  token?: boolean;
-}
 
 export interface MigrationRunOptions {
   timestamps?: boolean;
   primaryKeyType?: string;
 }
 
-function parseColumnsWithModifiers(args: string[]): ParsedColumn[] {
-  const columns: ParsedColumn[] = [];
-  for (const arg of args) {
-    if (arg.startsWith("-")) continue;
-
-    const polyMatch = arg.match(/^(\w+):(references|belongs_to)\{polymorphic\}(.*)$/);
-    if (polyMatch) {
-      const [, name, type, rest] = polyMatch;
-      const modifiers = rest ? rest.split(":").filter(Boolean) : [];
-      columns.push({
-        name,
-        type: type as ColumnType,
-        polymorphic: true,
-        index: modifiers.includes("index") || modifiers.includes("uniq"),
-        unique: modifiers.includes("uniq"),
-      });
-      continue;
-    }
-
-    const attrOptsMatch = arg.match(/^(\w+):(\w+!?)\{([^}]+)\}(.*)$/);
-    if (attrOptsMatch) {
-      const [, name, rawType, opts, rest] = attrOptsMatch;
-      const required = rawType.endsWith("!");
-      const type = (required ? rawType.slice(0, -1) : rawType) as ColumnType;
-      const modifiers = rest ? rest.split(":").filter(Boolean) : [];
-
-      const col: ParsedColumn = {
-        name,
-        type,
-        required,
-        index: modifiers.includes("index") || modifiers.includes("uniq"),
-        unique: modifiers.includes("uniq"),
-      };
-
-      if (opts.includes(",") || opts.includes(".")) {
-        const parts = opts.split(/[,.]/);
-        col.precision = parseInt(parts[0], 10);
-        col.scale = parseInt(parts[1], 10);
-      } else {
-        col.limit = parseInt(opts, 10);
-      }
-
-      columns.push(col);
-      continue;
-    }
-
-    const parts = arg.split(":");
-    const [name, rawType, ...modifiers] = parts;
-    if (!name) continue;
-
-    if (rawType === "token") {
-      columns.push({
-        name,
-        type: "string" as ColumnType,
-        token: true,
-        index: true,
-        unique: true,
-      });
-      continue;
-    }
-
-    if (rawType === "index" || rawType === "uniq") {
-      columns.push({
-        name,
-        type: "string" as ColumnType,
-        index: true,
-        unique: rawType === "uniq",
-      });
-      continue;
-    }
-
-    const effectiveType = rawType || "string";
-    const required = effectiveType.endsWith("!");
-    const type = (required ? effectiveType.slice(0, -1) : effectiveType) as ColumnType;
-
-    columns.push({
-      name,
-      type,
-      required,
-      index: modifiers.includes("index") || modifiers.includes("uniq"),
-      unique: modifiers.includes("uniq"),
-    });
-  }
-  return columns;
-}
-
-function isReference(type: string): boolean {
-  return type === "references" || type === "belongs_to";
-}
-
-function isVirtual(type: string): boolean {
-  return VIRTUAL_TYPES.has(type);
-}
-
-function columnOptsObj(col: ParsedColumn): string {
+function columnOptsObj(attribute: GeneratedAttribute): string {
+  const { limit, precision, scale } = attribute.attrOptions;
   const opts: string[] = [];
-  if (col.limit) opts.push(`limit: ${col.limit}`);
-  if (col.precision != null) opts.push(`precision: ${col.precision}`);
-  if (col.scale != null) opts.push(`scale: ${col.scale}`);
-  if (col.required) opts.push("null: false");
+  if (limit) opts.push(`limit: ${limit}`);
+  if (precision != null) opts.push(`precision: ${precision}`);
+  if (scale != null) opts.push(`scale: ${scale}`);
+  if (attribute.attrOptions.null === false) opts.push("null: false");
   return opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
 }
 
-function referenceOpts(col: ParsedColumn): string {
+function referenceOpts(attribute: GeneratedAttribute): string {
   const opts: string[] = [];
-  if (col.polymorphic) {
+  if (attribute.polymorphic()) {
     opts.push("polymorphic: true");
   } else {
     opts.push("foreignKey: true");
   }
-  if (col.unique) {
-    opts.push("index: false");
+  if (attribute.attrOptions.index) {
+    opts.push("index: { unique: true }");
   }
   return `{ ${opts.join(", ")} }`;
 }
 
-function columnLine(col: ParsedColumn): string {
-  if (col.name === "password" && col.type === "digest") {
-    return `      t.string("password_digest"${columnOptsObj(col)});`;
-  }
-  if (isReference(col.type)) {
-    return `      t.references("${col.name}", ${referenceOpts(col)});`;
-  }
-  return `      t.${col.type}("${col.name}"${columnOptsObj(col)});`;
+function indexNameLiteral(attribute: GeneratedAttribute): string {
+  const indexName = attribute.indexName();
+  return Array.isArray(indexName)
+    ? `[${indexName.map((n) => `"${n}"`).join(", ")}]`
+    : `"${indexName}"`;
 }
 
-function indexLines(table: string, columns: ParsedColumn[]): string {
-  const lines: string[] = [];
-  for (const col of columns) {
-    if (isReference(col.type)) {
-      if (!col.unique) continue;
-      const cols = col.polymorphic ? `["${col.name}_id", "${col.name}_type"]` : `"${col.name}_id"`;
-      lines.push(`    await this.addIndex("${table}", ${cols}, { unique: true });`);
-    } else if (col.token) {
-      lines.push(`    await this.addIndex("${table}", "${col.name}", { unique: true });`);
-    } else if (col.index || col.unique) {
-      const opts = col.unique ? ", { unique: true }" : "";
-      lines.push(`    await this.addIndex("${table}", "${col.name}"${opts});`);
-    }
-  }
-  return lines.join("\n");
-}
-
-function removeIndexLines(table: string, columns: ParsedColumn[]): string {
-  const lines: string[] = [];
-  for (const col of columns) {
-    if (!(col.index || col.unique || col.token)) continue;
-    let columnExpr: string;
-    if (isReference(col.type)) {
-      if (col.polymorphic) {
-        columnExpr = `["${col.name}_id", "${col.name}_type"]`;
-      } else {
-        columnExpr = `"${col.name}_id"`;
-      }
-    } else {
-      columnExpr = `"${col.name}"`;
-    }
-    lines.push(`    await this.removeIndex("${table}", { column: ${columnExpr} });`);
-  }
-  return lines.join("\n");
+function injectIndexOptions(attribute: GeneratedAttribute): string {
+  return attribute.hasUniqIndex() ? ", { unique: true }" : "";
 }
 
 let lastTimestamp: string | null = null;
@@ -200,9 +58,11 @@ export class MigrationGenerator extends GeneratorBase {
     }
 
     const { timestamps = true, primaryKeyType } = options;
-    const columns = parseColumnsWithModifiers(args);
+    const attributes = args
+      .filter((arg) => !arg.startsWith("-"))
+      .map((arg) => GeneratedAttribute.parse(arg));
     const className = camelize(underscore(name));
-    const body = this.inferBody(name, className, columns, args, timestamps, primaryKeyType);
+    const body = this.inferBody(name, className, attributes, args, timestamps, primaryKeyType);
     let timestamp = migrationTimestamp();
     if (lastTimestamp && timestamp <= lastTimestamp) {
       timestamp = (parseInt(lastTimestamp, 10) + 1).toString();
@@ -231,24 +91,43 @@ ${body}
   private inferBody(
     _name: string,
     _className: string,
-    columns: ParsedColumn[],
+    attributes: GeneratedAttribute[],
     rawArgs: string[],
     timestamps: boolean = true,
     primaryKeyType?: string,
   ): string {
-    const realColumns = columns.filter((c) => !isVirtual(c.type));
-
     const createMatch = _name.match(/^create[_-]?(.+)$/i);
     if (createMatch) {
       const table = tableize(createMatch[1]);
-      const colLines = realColumns.map((c) => columnLine(c)).join("\n");
+      const colLines: string[] = [];
+      for (const attribute of attributes) {
+        if (attribute.passwordDigest()) {
+          colLines.push(`      t.string("password_digest"${columnOptsObj(attribute)});`);
+        } else if (attribute.token()) {
+          colLines.push(`      t.string("${attribute.name}"${columnOptsObj(attribute)});`);
+        } else if (attribute.reference()) {
+          colLines.push(`      t.references("${attribute.name}", ${referenceOpts(attribute)});`);
+        } else if (!attribute.virtual()) {
+          colLines.push(
+            `      t.${attribute.type}("${attribute.name}"${columnOptsObj(attribute)});`,
+          );
+        }
+      }
       const tsLine = timestamps ? "\n      t.timestamps();" : "";
-      const idxLines = indexLines(table, realColumns);
       const idOpt = primaryKeyType ? `, { id: "${primaryKeyType}" }` : "";
       const parts = [
-        `    await this.createTable("${table}"${idOpt}, (t) => {\n${colLines}${tsLine}\n    });`,
+        `    await this.createTable("${table}"${idOpt}, (t) => {\n${colLines.join("\n")}${tsLine}\n    });`,
       ];
-      if (idxLines) parts.push(idxLines);
+      for (const attribute of attributes.filter((a) => a.token())) {
+        parts.push(
+          `    await this.addIndex("${table}", ${indexNameLiteral(attribute)}, { unique: true });`,
+        );
+      }
+      for (const attribute of attributes.filter((a) => !a.reference() && a.hasIndex())) {
+        parts.push(
+          `    await this.addIndex("${table}", ${indexNameLiteral(attribute)}${injectIndexOptions(attribute)});`,
+        );
+      }
       return parts.join("\n");
     }
 
@@ -260,34 +139,58 @@ ${body}
     const addMatch = _name.match(/^add[_-]?(.+?)[_-]?to[_-]?(.+)$/i);
     if (addMatch) {
       const table = tableize(addMatch[2]);
-      const upLines = realColumns
-        .map((c) => {
-          if (isReference(c.type)) {
-            return `    await this.addReference("${table}", "${c.name}", ${referenceOpts(c)});`;
+      const lines: string[] = [];
+      for (const attribute of attributes) {
+        if (attribute.reference()) {
+          lines.push(
+            `    await this.addReference("${table}", "${attribute.name}", ${referenceOpts(attribute)});`,
+          );
+        } else if (attribute.token()) {
+          lines.push(
+            `    await this.addColumn("${table}", "${attribute.name}", "string"${columnOptsObj(attribute)});`,
+          );
+          lines.push(
+            `    await this.addIndex("${table}", ${indexNameLiteral(attribute)}, { unique: true });`,
+          );
+        } else if (!attribute.virtual()) {
+          lines.push(
+            `    await this.addColumn("${table}", "${attribute.name}", "${attribute.type}"${columnOptsObj(attribute)});`,
+          );
+          if (attribute.hasIndex()) {
+            lines.push(
+              `    await this.addIndex("${table}", ${indexNameLiteral(attribute)}${injectIndexOptions(attribute)});`,
+            );
           }
-          return `    await this.addColumn("${table}", "${c.name}", "${c.type}"${columnOptsObj(c)});`;
-        })
-        .join("\n");
-      const idxLines = indexLines(table, realColumns);
-      return idxLines ? `${upLines}\n${idxLines}` : upLines;
+        }
+      }
+      return lines.join("\n");
     }
 
     const removeMatch = _name.match(/^remove[_-]?(.+?)[_-]?from[_-]?(.+)$/i);
     if (removeMatch) {
       const table = tableize(removeMatch[2]);
-      const rmIdxLines = removeIndexLines(table, realColumns);
-      const upLines = realColumns
-        .map((c) => {
-          if (isReference(c.type)) {
-            if (c.polymorphic) {
-              return `    await this.removeReference("${table}", "${c.name}", { polymorphic: true });`;
-            }
-            return `    await this.removeReference("${table}", "${c.name}");`;
+      const lines: string[] = [];
+      for (const attribute of attributes) {
+        if (attribute.reference()) {
+          lines.push(
+            attribute.polymorphic()
+              ? `    await this.removeReference("${table}", "${attribute.name}", { polymorphic: true });`
+              : `    await this.removeReference("${table}", "${attribute.name}");`,
+          );
+        } else {
+          if (attribute.hasIndex()) {
+            lines.push(
+              `    await this.removeIndex("${table}", { column: ${indexNameLiteral(attribute)} });`,
+            );
           }
-          return `    await this.removeColumn("${table}", "${c.name}", "${c.type}");`;
-        })
-        .join("\n");
-      return rmIdxLines ? `${rmIdxLines}\n${upLines}` : upLines;
+          if (!attribute.virtual()) {
+            lines.push(
+              `    await this.removeColumn("${table}", "${attribute.name}", "${attribute.type}");`,
+            );
+          }
+        }
+      }
+      return lines.join("\n");
     }
 
     return "";

@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { RuntimeError } from "@blazetrails/ruby-compat";
+
+import { _routes as abstractControllerRoutes } from "../../abstract-controller/url-for.js";
 import { Parameters } from "../../action-controller/metal/strong-parameters.js";
 
 import {
@@ -250,7 +253,9 @@ describe("ActionDispatch::Routing::UrlFor", () => {
   });
 
   it("throws Rails-shaped NO_ROUTES_MESSAGE when _routes missing", () => {
-    const host = makeHost({ _routes: null });
+    const host = makeHost();
+    Object.defineProperty(host, "_routes", { get: abstractControllerRoutes });
+    expect(() => fullUrlFor.call(host, null)).toThrow(RuntimeError);
     expect(() => fullUrlFor.call(host, null)).toThrow(/include routing helpers explicitly/);
   });
 });
