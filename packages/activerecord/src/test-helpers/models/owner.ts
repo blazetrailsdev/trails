@@ -25,7 +25,6 @@ export class Owner extends Base {
     this.hasMany("pets", function (this: any) {
       return this.order("pets.name desc");
     });
-    this.acceptsNestedAttributesFor("pets", { allowDestroy: true });
     this.hasMany("toys", { through: "pets" });
     this.hasMany("persons", { through: "pets" });
     this.belongsTo("lastPet", { className: "Pet" });
@@ -44,6 +43,7 @@ export class Owner extends Base {
     this.afterCommit(async (owner: Owner) => {
       await owner.executeBlocks();
     });
+    this.acceptsNestedAttributesFor("pets", { allowDestroy: true });
   }
 
   get blocks(): Array<(owner: Owner) => void | Promise<void>> {

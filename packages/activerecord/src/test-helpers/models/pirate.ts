@@ -90,15 +90,6 @@ export class Pirate extends Base {
     this.hasMany("birds", function (this: any) {
       return this.order("birds.id ASC");
     });
-    this.acceptsNestedAttributesFor("parrots", "birds", {
-      allowDestroy: true,
-      rejectIf: (attrs) => Object.keys(attrs).length === 0,
-    });
-    this.acceptsNestedAttributesFor("ship", {
-      allowDestroy: true,
-      rejectIf: (attrs) => Object.keys(attrs).length === 0,
-    });
-    this.acceptsNestedAttributesFor("updateOnlyShip", { updateOnly: true });
     this.hasMany("birdsWithMethodCallbacks", {
       className: "Bird",
       beforeAdd: (p: any, b: any) => p.logBeforeAdd(b),
@@ -113,15 +104,7 @@ export class Pirate extends Base {
       beforeRemove: (p: any, b: any) => p.shipLog.push(`before_removing_proc_bird_${b.id}`),
       afterRemove: (p: any, b: any) => p.shipLog.push(`after_removing_proc_bird_${b.id}`),
     });
-    this.acceptsNestedAttributesFor(
-      "parrotsWithMethodCallbacks",
-      "parrotsWithProcCallbacks",
-      "birdsWithMethodCallbacks",
-      "birdsWithProcCallbacks",
-      { allowDestroy: true },
-    );
     this.hasMany("birdsWithRejectAllBlank", { className: "Bird" });
-    this.acceptsNestedAttributesFor("birdsWithRejectAllBlank", { rejectIf: "all_blank" });
 
     this.hasOne(
       "fooBulb",
@@ -136,6 +119,23 @@ export class Pirate extends Base {
 
     this.hasMany("mateys", { foreignKey: "pirate_id" });
     this.hasOne("attackerMatey", { foreignKey: "target_id", className: "Matey" });
+    this.acceptsNestedAttributesFor("parrots", "birds", {
+      allowDestroy: true,
+      rejectIf: (attrs) => Object.keys(attrs).length === 0,
+    });
+    this.acceptsNestedAttributesFor("ship", {
+      allowDestroy: true,
+      rejectIf: (attrs) => Object.keys(attrs).length === 0,
+    });
+    this.acceptsNestedAttributesFor("updateOnlyShip", { updateOnly: true });
+    this.acceptsNestedAttributesFor(
+      "parrotsWithMethodCallbacks",
+      "parrotsWithProcCallbacks",
+      "birdsWithMethodCallbacks",
+      "birdsWithProcCallbacks",
+      { allowDestroy: true },
+    );
+    this.acceptsNestedAttributesFor("birdsWithRejectAllBlank", { rejectIf: "all_blank" });
 
     this.validates("catchphrase", { presence: true });
 

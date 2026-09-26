@@ -79,7 +79,6 @@ export class Developer extends Base {
         });
       },
     );
-    this.acceptsNestedAttributesFor("projects");
 
     this.belongsTo("mentor");
     this.belongsTo("strictLoadingMentor", {
@@ -92,6 +91,7 @@ export class Developer extends Base {
       foreignKey: "mentor_id",
       className: "Mentor",
     });
+    this.acceptsNestedAttributesFor("projects");
 
     this.hasAndBelongsToMany("sharedComputers", { className: "Computer" });
     this.hasMany("computers", { foreignKey: "developer" });

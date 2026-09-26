@@ -15,8 +15,8 @@ export class Bird extends Base {
 
   static {
     this.belongsTo("pirate");
-    this.acceptsNestedAttributesFor("pirate");
     this.validates("name", { presence: true });
+    this.acceptsNestedAttributesFor("pirate");
 
     this.beforeSave(async function (this: Bird) {
       const conn = await (this.constructor as typeof Base).leaseConnection();

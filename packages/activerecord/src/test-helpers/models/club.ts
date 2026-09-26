@@ -20,7 +20,6 @@ export class Club extends Base {
 
   static {
     this.hasOne("membership", { touch: true });
-    this.acceptsNestedAttributesFor("membership");
     this.hasMany("memberships", { inverseOf: false });
     this.hasMany("members", { through: "memberships" });
     this.hasOne("sponsor");
@@ -59,6 +58,7 @@ export class Club extends Base {
         .where({ categories: { name: "General" } })
         .unscope(":limit");
     });
+    this.acceptsNestedAttributesFor("membership");
   }
 }
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging

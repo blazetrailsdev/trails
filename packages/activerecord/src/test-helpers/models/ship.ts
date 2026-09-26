@@ -31,13 +31,13 @@ export class Ship extends Base {
     this.belongsTo("updateOnlyPirate", { className: "Pirate" });
     this.belongsTo("developer", { dependent: "destroy" });
     this.hasMany("parts", { className: "ShipPart" });
+    this.hasMany("treasures");
     this.acceptsNestedAttributesFor("parts", { allowDestroy: true });
     this.acceptsNestedAttributesFor("pirate", {
       allowDestroy: true,
       rejectIf: (attrs) => Object.keys(attrs).length === 0,
     });
     this.acceptsNestedAttributesFor("updateOnlyPirate", { updateOnly: true });
-    this.hasMany("treasures");
 
     this.validates("name", { presence: true });
 
