@@ -1,9 +1,11 @@
 import { describe, it, expect } from "vitest";
+import { assertRespondTo } from "@blazetrails/activesupport";
 import { relationClassFor, uncacheableMethods } from "./delegation.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Company, Firm } from "../test-helpers/models/company.js";
 import { fixtures } from "../test-fixtures.js";
+import { tsName } from "../test-helpers/array-delegate-spellings.js";
 import { registerModel } from "../index.js";
 import { CollectionProxy } from "../associations/collection-proxy.js";
 import { Relation } from "../relation.js";
@@ -312,4 +314,36 @@ describe("partition delegated to Array", () => {
       records.filter((c) => c.id !== someId).map((c) => c.id),
     );
   });
+});
+
+describe("ARRAY_DELEGATES on DelegationRelationTest and DelegationRecordsTest targets", () => {
+  fixtures(["posts", "comments"]);
+
+  registerModel(Post);
+  registerModel(Comment);
+
+  const ARRAY_DELEGATES = (
+    "+ - | & [] shuffle all? collect compact detect each each_cons each_with_index exclude? " +
+    "find_all flat_map group_by include? length map none? one? partition reject reverse rotate " +
+    "sample second sort sort_by slice third index rindex to_ary to_set to_xml to_yaml join " +
+    "in_groups in_groups_of to_sentence to_formatted_s to_fs as_json intersect?"
+  ).split(" ");
+  const RELATION_GAPS =
+    "all? collect each_cons each_with_index exclude? find_all include? to_set to_yaml";
+  const RECORDS_ARRAY_GAPS =
+    "+ - | & shuffle all? collect compact detect each each_cons each_with_index exclude? find_all " +
+    "group_by include? none? one? partition reject rotate sample second sort_by third index rindex " +
+    "to_ary to_set to_xml to_yaml in_groups in_groups_of to_sentence to_formatted_s to_fs as_json intersect?";
+
+  for (const method of ARRAY_DELEGATES.filter((m) => !RELATION_GAPS.split(" ").includes(m))) {
+    it(`Comment.all delegates ${method} to Array`, () => {
+      assertRespondTo(Comment.all(), tsName(method));
+    });
+  }
+
+  for (const method of ARRAY_DELEGATES.filter((m) => !RECORDS_ARRAY_GAPS.split(" ").includes(m))) {
+    it(`Comment.all.records delegates ${method} to Array`, async () => {
+      assertRespondTo(await Comment.all().records(), tsName(method));
+    });
+  }
 });

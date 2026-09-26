@@ -6,6 +6,7 @@ import { DelegateCache } from "./delegation.js";
 import { NotImplementedError } from "../errors.js";
 import { CollectionProxy } from "../associations/collection-proxy.js";
 import { fixtures } from "../test-fixtures.js";
+import { tsName } from "../test-helpers/array-delegate-spellings.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Project } from "../test-helpers/models/project.js";
@@ -271,36 +272,6 @@ describe("DelegationTest", () => {
     "intersect?",
   ] as const;
 
-  const TS_SPELLINGS: Readonly<Record<string, string>> = {
-    "+": "plus",
-    "-": "difference",
-    "|": "union",
-    "&": "intersection",
-    "[]": "at",
-    each_cons: "eachCons",
-    each_with_index: "eachWithIndex",
-    find_all: "findAll",
-    flat_map: "flatMap",
-    group_by: "groupBy",
-    "all?": "isAll",
-    "exclude?": "isExclude",
-    "include?": "isInclude",
-    "none?": "isNone",
-    "one?": "isOne",
-    "intersect?": "isIntersect",
-    sort_by: "sortBy",
-    to_ary: "toArray",
-    to_set: "toSet",
-    to_xml: "toXml",
-    to_yaml: "toYaml",
-    in_groups: "inGroups",
-    in_groups_of: "inGroupsOf",
-    to_sentence: "toSentence",
-    to_formatted_s: "toFormattedS",
-    to_fs: "toFs",
-    as_json: "asJson",
-  };
-
   const RELATION_ENUMERABLE_GAPS = [
     "all?",
     "collect",
@@ -316,7 +287,7 @@ describe("DelegationTest", () => {
     for (const method of ARRAY_DELEGATES) {
       if ((RELATION_ENUMERABLE_GAPS as readonly string[]).includes(method)) continue;
       it(`delegates ${method.replaceAll("_", " ")} to Array`, () => {
-        assertRespondTo(new Post().comments, TS_SPELLINGS[method] ?? method);
+        assertRespondTo(new Post().comments, tsName(method));
       });
     }
 

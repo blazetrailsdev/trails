@@ -755,9 +755,7 @@ class TestExtractor
       report_unexpanded_loop(node)
       return true
     end
-    if ident_name(call[3]) == "each_with_index"
-      elements = elements.each_with_index.map { |value, index| [value, index.to_s] }
-    end
+    elements = elements.each_with_index.map { |value, index| [value, index.to_s] } if ident_name(call[3]) == "each_with_index"
 
     defines.each do |name_node, define_node, nested, guards|
       names = elements.flat_map do |value|
@@ -898,22 +896,13 @@ class TestExtractor
 
   def eval_loop_condition(node, bindings)
     return nil unless node.is_a?(Array) && node[0] == :binary
-    left = node[1]
-    right = node[3]
+    _, left, op, right = node
     return nil unless left.is_a?(Array) && left[0] == :call && %w[length size].include?(ident_name(left[3]))
     receiver = left[1]
     return nil unless receiver.is_a?(Array) && %i[var_ref vcall].include?(receiver[0])
     bound = bindings[ident_name(receiver[1])]
     return nil unless bound.is_a?(Array) && right.is_a?(Array) && right[0] == :@int
-    length = bound.length
-    limit = Integer(right[1])
-    case node[2]
-    when :> then length > limit
-    when :>= then length >= limit
-    when :< then length < limit
-    when :<= then length <= limit
-    when :== then length == limit
-    end
+    %i[> >= < <= ==].include?(op) ? bound.length.public_send(op, Integer(right[1])) : nil
   end
 
   # Collect every same-file `CONST = [...]`, name → the array's literal element
@@ -989,12 +978,8 @@ class TestExtractor
     if %i[if elsif].include?(node[0])
       cond = node[1]
       collect_define_methods(node[2], out, nested, guards + [[cond, true]])
-      rest = node[3]
-      if rest.is_a?(Array) && rest[0] == :else
-        collect_define_methods(rest[1], out, nested, guards + [[cond, false]])
-      elsif rest.is_a?(Array)
-        collect_define_methods(rest, out, nested, guards + [[cond, false]])
-      end
+      rest = node[3].is_a?(Array) && node[3][0] == :else ? node[3][1] : node[3]
+      collect_define_methods(rest, out, nested, guards + [[cond, false]])
       return
     end
 
