@@ -228,7 +228,7 @@ describe("RailtieTest (trails-only)", () => {
       expect(booted.transformers).not.toContain(queryLogs);
     });
 
-    it("prepends the query execution path and disables prepared statements when enabled", async () => {
+    it("appends QueryLogs to the query transformers and disables prepared statements when enabled", async () => {
       const booted = await boot({ queryLogTagsEnabled: true });
 
       expect(booted.transformers).toContain(queryLogs);
