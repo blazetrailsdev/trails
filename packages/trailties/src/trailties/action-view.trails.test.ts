@@ -51,7 +51,7 @@ describe("action_view.setup_action_pack", () => {
 
   it("includes ActionDispatch::Routing::UrlFor into ActionView::RoutingUrlFor", async () => {
     await runTrailtieInitializers(Trailtie, {
-      config: Trailtie.config,
+      config: Object.assign(Object.create(Trailtie.config), { isReloadingEnabled: () => false }),
       deprecators: new Deprecators(),
     });
     runLoadHooks("action_controller", ActionController.Base);
@@ -64,7 +64,7 @@ describe("action_view.setup_action_pack", () => {
 
   it("leaves RoutingUrlFor's own overrides on top of the included module", async () => {
     await runTrailtieInitializers(Trailtie, {
-      config: Trailtie.config,
+      config: Object.assign(Object.create(Trailtie.config), { isReloadingEnabled: () => false }),
       deprecators: new Deprecators(),
     });
     runLoadHooks("action_controller", ActionController.Base);
@@ -77,7 +77,7 @@ describe("action_view.setup_action_pack", () => {
 
   it("url_for with a Hash from a view generates a path, not a full URL, by default", async () => {
     await runTrailtieInitializers(Trailtie, {
-      config: Trailtie.config,
+      config: Object.assign(Object.create(Trailtie.config), { isReloadingEnabled: () => false }),
       deprecators: new Deprecators(),
     });
     runLoadHooks("action_controller", ActionController.Base);
