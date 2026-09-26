@@ -429,7 +429,9 @@ describe("TestRoutingMapper", () => {
         r.root("products#root");
       });
     });
-    expect(routes.recognize("GET", "/products")!.route.action).toBe("index");
+    const recognized = routes.recognize("GET", "/products")!.route;
+    expect(`${recognized.controller}#${recognized.action}`).toBe("products#root");
+    expect(routes.pathFor({}, "products_root")).toBe("/products");
   });
 
   it("module scope", () => {

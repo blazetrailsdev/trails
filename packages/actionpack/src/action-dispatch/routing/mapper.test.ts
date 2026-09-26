@@ -142,18 +142,6 @@ describe("Mapper public DSL additions", () => {
     expect(set.getRoutes().find((r) => r.path === "/")!.name).toBe("root");
   });
 
-  it("root nested in resources does not yet get the resources? scope wrap", () => {
-    const set = new RouteSet();
-    const m = new Mapper(set);
-    m.resources("products", () => {
-      m.root("products#root");
-    });
-    const root = set.getRoutes().find((r) => r.action === "root")!;
-
-    expect(root.path).toBe("/products/:product_id(.:format)");
-    expect(root.name).toBe("product_root");
-  });
-
   it("draw raises when the external file is not found", async () => {
     const set = new RouteSet();
     const m = new Mapper(set);

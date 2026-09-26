@@ -1,4 +1,4 @@
-import { I18n } from "@blazetrails/activesupport";
+import { I18n, camelize } from "@blazetrails/activesupport";
 import {
   ArgumentError,
   isSymbol,
@@ -22,29 +22,6 @@ type DefaultProc = () => DetailValue;
 
 const DEFAULT_PROCS: Record<string, DefaultProc> = {};
 const REGISTERED_DETAILS: string[] = [];
-
-function registerDetail(name: string, proc: DefaultProc): void {
-  if (!REGISTERED_DETAILS.includes(name)) REGISTERED_DETAILS.push(name);
-  DEFAULT_PROCS[name] = proc;
-}
-
-registerDetail("locale", () => {
-  const locales: (string | symbol)[] = [stringToSym(I18n.locale() as string)];
-  if (rbObjRespondTo(I18n, "fallbacks"))
-    locales.push(
-      ...I18n.fallbacks()
-        .get(I18n.locale() as string)
-        .map(stringToSym),
-    );
-  locales.push(stringToSym(I18n.defaultLocale()));
-  return [...new Set(locales)];
-});
-registerDetail(
-  "formats",
-  () => Base.defaultFormats ?? [":html", ":text", ":js", ":css", ":xml", ":json"],
-);
-registerDetail("variants", () => []);
-registerDetail("handlers", () => TemplateHandlers.extensions());
 
 type DigestCache = Map<string | NestedDependencies, string | NestedDependencies>;
 
@@ -139,13 +116,25 @@ export class LookupContext {
 
   /** @internal */
   static registerDetail(name: string, proc: DefaultProc): void {
-    registerDetail(name, proc);
+    REGISTERED_DETAILS.push(name);
+    DEFAULT_PROCS[name] = proc;
+
+    Object.defineProperty(LookupContext.prototype, camelize(`default_${name}`, false), {
+      value: proc,
+      writable: true,
+      configurable: true,
+    });
   }
 
   /** @internal */
   static _defaultProcs(): Record<string, DefaultProc> {
     return DEFAULT_PROCS;
   }
+
+  declare defaultLocale: DefaultProc;
+  declare defaultFormats: DefaultProc;
+  declare defaultVariants: DefaultProc;
+  declare defaultHandlers: DefaultProc;
 
   private _details: DetailsMap;
   private _prefixes: string[];
@@ -192,11 +181,7 @@ export class LookupContext {
       config.locale = isSymbol(value) ? symbolToS(value) : value;
     }
 
-    this._setDetail("locale", DEFAULT_PROCS.locale());
-  }
-
-  defaultFormats(): DetailValue {
-    return DEFAULT_PROCS.formats();
+    this._setDetail("locale", this.defaultLocale());
   }
 
   get formats(): DetailValue {
@@ -204,13 +189,13 @@ export class LookupContext {
   }
   set formats(values: DetailValue | null | undefined) {
     if (!values) {
-      this._setDetail("formats", DEFAULT_PROCS.formats());
+      this._setDetail("formats", this.defaultFormats());
       return;
     }
     let arr = [...values];
     const hadWildcard = arr.includes("*/*");
     if (hadWildcard) {
-      arr = arr.filter((v) => v !== "*/*").concat(DEFAULT_PROCS.formats());
+      arr = arr.filter((v) => v !== "*/*").concat(this.defaultFormats());
     }
     arr = Array.from(new Set(arr));
     if (!Template.Types.isValidSymbols(arr)) {
@@ -233,20 +218,14 @@ export class LookupContext {
     return this._details.variants;
   }
   set variants(values: DetailValue | null | undefined) {
-    this._setDetail(
-      "variants",
-      values && values.length > 0 ? [...values] : DEFAULT_PROCS.variants(),
-    );
+    this._setDetail("variants", values && values.length > 0 ? [...values] : this.defaultVariants());
   }
 
   get handlers(): DetailValue {
     return this._details.handlers;
   }
   set handlers(values: DetailValue | null | undefined) {
-    this._setDetail(
-      "handlers",
-      values && values.length > 0 ? [...values] : DEFAULT_PROCS.handlers(),
-    );
+    this._setDetail("handlers", values && values.length > 0 ? [...values] : this.defaultHandlers());
   }
 
   /** @internal */
@@ -454,3 +433,21 @@ export class LookupContext {
 }
 
 (LookupContext as { DetailsKey: typeof DetailsKey }).DetailsKey = DetailsKey;
+
+LookupContext.registerDetail("locale", () => {
+  const locales: (string | symbol)[] = [stringToSym(I18n.locale() as string)];
+  if (rbObjRespondTo(I18n, "fallbacks"))
+    locales.push(
+      ...I18n.fallbacks()
+        .get(I18n.locale() as string)
+        .map(stringToSym),
+    );
+  locales.push(stringToSym(I18n.defaultLocale()));
+  return [...new Set(locales)];
+});
+LookupContext.registerDetail(
+  "formats",
+  () => Base.defaultFormats ?? [":html", ":text", ":js", ":css", ":xml", ":json"],
+);
+LookupContext.registerDetail("variants", () => []);
+LookupContext.registerDetail("handlers", () => TemplateHandlers.extensions());

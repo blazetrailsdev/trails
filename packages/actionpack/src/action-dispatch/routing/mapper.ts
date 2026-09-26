@@ -34,6 +34,7 @@ interface ResourceLike {
   collectionName?: string;
   nestedParam?: string;
   param?: string;
+  path: string;
   resourceScope?: string;
   actions?: ResourceAction[];
   shallow: () => boolean;
@@ -393,7 +394,15 @@ export class Mapper {
   root(path: string, options: RouteOptions = {}): void {
     options.to = path;
 
-    this.matchRootRoute(options);
+    if (this._scope.isResources()) {
+      this.withScopeLevel("root", () => {
+        this.pathScope(this.parentResource()!.path, () => {
+          this.matchRootRoute(options);
+        });
+      });
+    } else {
+      this.matchRootRoute(options);
+    }
   }
 
   resources(
@@ -451,6 +460,25 @@ export class Mapper {
     const newPath = this.actionPath("new");
     const editPath = this.actionPath("edit");
 
+    if (cb) {
+      const resource: ResourceLike = {
+        memberName: singular,
+        collectionName: name,
+        nestedParam: `${singular}_id`,
+        param: "id",
+        path: name,
+        resourceScope: controller,
+        actions: Array.from(allowed),
+        shallow: () => shallow,
+        singleton: () => false,
+        collectionScope: name,
+        memberScope: `${name}/:id`,
+        nestedScope: `${name}/:${singular}_id`,
+        newScope: (newPath) => `${name}/${newPath}`,
+      };
+      this.withScopeLevel("resources", () => this.resourceScope(resource, () => cb(this)));
+    }
+
     if (allowed.has("index")) {
       const as = routeName(name);
       this.addRouteToSet(
@@ -475,24 +503,6 @@ export class Mapper {
         }),
         as,
       );
-    }
-
-    if (cb) {
-      const resource: ResourceLike = {
-        memberName: singular,
-        collectionName: name,
-        nestedParam: `${singular}_id`,
-        param: "id",
-        resourceScope: controller,
-        actions: Array.from(allowed),
-        shallow: () => shallow,
-        singleton: () => false,
-        collectionScope: name,
-        memberScope: `${name}/:id`,
-        nestedScope: `${name}/:${singular}_id`,
-        newScope: (newPath) => `${name}/${newPath}`,
-      };
-      this.withScopeLevel("resources", () => this.resourceScope(resource, () => cb(this)));
     }
 
     if (allowed.has("edit")) {
@@ -564,6 +574,25 @@ export class Mapper {
     const newPath = this.actionPath("new");
     const editPath = this.actionPath("edit");
 
+    if (cb) {
+      const resource: ResourceLike = {
+        memberName: name,
+        collectionName: name,
+        nestedParam: `${name}_id`,
+        param: "id",
+        path: name,
+        resourceScope: controller,
+        actions: Array.from(allowed),
+        shallow: () => shallow,
+        singleton: () => true,
+        collectionScope: name,
+        memberScope: name,
+        nestedScope: name,
+        newScope: (newPath) => `${name}/${newPath}`,
+      };
+      this.withScopeLevel("resource", () => this.resourceScope(resource, () => cb(this)));
+    }
+
     if (allowed.has("new")) {
       const as = routeName(`new_${name}`);
       this.addRouteToSet(
@@ -605,24 +634,6 @@ export class Mapper {
 
     if (allowed.has("destroy")) {
       this.addRouteToSet(new Route("DELETE", basePath, controller, "destroy"));
-    }
-
-    if (cb) {
-      const resource: ResourceLike = {
-        memberName: name,
-        collectionName: name,
-        nestedParam: `${name}_id`,
-        param: "id",
-        resourceScope: controller,
-        actions: Array.from(allowed),
-        shallow: () => shallow,
-        singleton: () => true,
-        collectionScope: name,
-        memberScope: name,
-        nestedScope: name,
-        newScope: (newPath) => `${name}/${newPath}`,
-      };
-      this.withScopeLevel("resource", () => this.resourceScope(resource, () => cb(this)));
     }
   }
 
@@ -1226,28 +1237,11 @@ export class Mapper {
       controller = scopeModulePrefix + "/" + controller;
     }
     const asGiven = options.as !== undefined ? options.as : options.name;
-    const asSuppressed = asGiven === null || asGiven === false;
-    const explicitName = asSuppressed ? undefined : asGiven;
-    const inferredName =
-      !asSuppressed && options.as === undefined && options.name === undefined && !isRedirect
-        ? (() => {
-            const cleaned = path.replace(/^\/+/, "").replace(/\(\.:format\)$/, "");
-            const segs = cleaned.split("/").filter(Boolean);
-            if (
-              segs.length === 0 ||
-              segs.some((s) => !/^\w+$/.test(s)) ||
-              !/^[_a-zA-Z]/.test(segs[0])
-            )
-              return undefined;
-            return segs.join("_");
-          })()
-        : undefined;
-    const name = explicitName ?? inferredName;
-    const namePrefix = this._scope.get("as") as string | undefined;
-    let fullName = name ? (namePrefix ? `${namePrefix}_${name}` : name) : undefined;
-    if (explicitName === undefined && fullName && this.hasNamedRoute(fullName)) {
-      fullName = undefined;
-    }
+    const actionForName = /^[\w\-/]+$/.test(path) ? path : undefined;
+    const fullName =
+      asGiven === null || asGiven === false
+        ? undefined
+        : this.nameForAction(asGiven, actionForName);
 
     const scopeDefaults = this._scope.get("defaults") as Record<string, string> | undefined;
     let mergedDefaults =
@@ -1501,8 +1495,18 @@ export class Mapper {
   nameForAction(as: string | undefined, action: string | undefined): string | undefined {
     const prefix = this.prefixNameForAction(as, action);
     const namePrefix = this._scope.get("as") as string | undefined;
-    const parts = [namePrefix, prefix].filter((p): p is string => Boolean(p));
-    const candidate = parts.join("_");
+    let collectionName: string | undefined;
+    let memberName: string | undefined;
+
+    if (this.parentResource()) {
+      if (!(as || action)) return undefined;
+
+      collectionName = this.parentResource()!.collectionName;
+      memberName = this.parentResource()!.memberName;
+    }
+
+    const actionName = this._scope.actionName(namePrefix, prefix, collectionName, memberName);
+    const candidate = actionName.filter((p): p is string => Boolean(p)).join("_");
     if (!candidate) return undefined;
     if (as === undefined) {
       if (!/^[_a-z]/i.test(candidate) || this.hasNamedRoute(candidate)) return undefined;
