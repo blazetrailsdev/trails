@@ -11,7 +11,7 @@ import type { RenderableTemplate, ViewContext, RenderOptions } from "./abstract-
 /** @internal */
 export class TemplateRenderer extends AbstractRenderer {
   /** @internal */
-  private details: Record<string, readonly (string | symbol)[]> = {};
+  protected details: Record<string, readonly (string | symbol)[]> = {};
 
   constructor(lookupContext: LookupContext) {
     super(lookupContext);
@@ -70,7 +70,7 @@ export class TemplateRenderer extends AbstractRenderer {
   }
 
   /** @internal */
-  private async renderTemplate(
+  protected async renderTemplate(
     view: ViewContext,
     template: RenderableTemplate,
     layoutName: RenderOptions["layout"],
@@ -119,7 +119,7 @@ export class TemplateRenderer extends AbstractRenderer {
   }
 
   /** @internal */
-  private findLayout(
+  protected findLayout(
     layout: RenderOptions["layout"],
     keys: string[],
     formats: string[],

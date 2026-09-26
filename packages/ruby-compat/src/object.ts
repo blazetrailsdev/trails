@@ -434,6 +434,12 @@ function inspectValue(value: unknown, recursing: Set<object>): string {
   if (isPlainHash(value) || value instanceof Map) return inspectHash(value, recursing);
   const own = (value as { inspect?: unknown }).inspect;
   if (typeof own === "function") return String((own as () => unknown).call(value));
+  if (
+    typeof value === "function" &&
+    Object.getOwnPropertyDescriptor(value, "prototype")?.writable === false
+  ) {
+    return rbModToS(value as abstract new (...args: never) => unknown);
+  }
   return String(value);
 }
 

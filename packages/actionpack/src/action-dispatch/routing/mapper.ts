@@ -136,7 +136,8 @@ interface ConstraintLike {
 
 /** @noRailsEquivalent PERMANENT */
 function callableOf(target: unknown): (...args: unknown[]) => unknown {
-  return typeof target === "function"
+  return typeof target === "function" &&
+    Object.getOwnPropertyDescriptor(target, "prototype")?.writable !== false
     ? (target as (...args: unknown[]) => unknown)
     : (target as { call: (...args: unknown[]) => unknown }).call;
 }
@@ -816,11 +817,12 @@ export class Mapper {
   appName(app: MountableApp, railsApp: boolean): string | undefined {
     if (railsApp) {
       return (app as { railtieName?: string }).railtieName;
-    }
-    if (typeof app === "function") {
-      const name = (app as { name?: string }).name;
-      if (!name) return undefined;
-      return underscore(name).replace(/\//g, "_");
+    } else if (
+      typeof app === "function" &&
+      Object.getOwnPropertyDescriptor(app, "prototype")?.writable === false
+    ) {
+      const className = app.name;
+      return underscore(className).replace(/\//g, "_");
     }
     return undefined;
   }

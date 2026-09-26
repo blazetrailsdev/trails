@@ -23,6 +23,8 @@ export { escapeJavascript, j, javascriptCdataSection, javascriptTag } from "./ja
 export { capture, contentFor, isContentFor, provide, withOutputBuffer } from "./capture-helper.js";
 export type { CaptureHelperHost } from "./capture-helper.js";
 
+export { _layoutFor } from "./rendering-helper.js";
+
 export {
   numberToPhone,
   numberToCurrency,

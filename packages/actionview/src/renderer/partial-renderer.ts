@@ -52,7 +52,11 @@ export class PartialRenderer extends AbstractRenderer {
     this.details = this.extractDetails(options as Record<string, unknown>);
   }
 
-  async render(partial: string, context: ViewContext, block: unknown): Promise<RenderedTemplate> {
+  async render(
+    partial: string,
+    context: ViewContext,
+    block: ((...args: unknown[]) => unknown) | null | undefined,
+  ): Promise<RenderedTemplate> {
     const template = this.findTemplate(partial, this.templateKeys(partial));
 
     let layout: RenderableTemplate | null = null;
@@ -75,7 +79,7 @@ export class PartialRenderer extends AbstractRenderer {
     locals: Record<string, unknown>,
     template: RenderableTemplate,
     layout: RenderableTemplate | null,
-    block: unknown,
+    block: ((...args: unknown[]) => unknown) | null | undefined,
   ): Promise<RenderedTemplate> {
     return Notifications.instrument<Promise<RenderedTemplate>>(
       "render_partial.action_view",
@@ -85,12 +89,15 @@ export class PartialRenderer extends AbstractRenderer {
         locals,
       },
       async (payload) => {
-        let content = await template.render(view, locals, null, { addToStack: block == null });
+        let content = await template.render(
+          view,
+          locals,
+          null,
+          { addToStack: block == null },
+          (...name) => view._layoutFor!(...name, block),
+        );
 
-        if (layout) {
-          view.viewFlow?.set("layout", content);
-          content = await layout.render(view, locals);
-        }
+        if (layout) content = await layout.render(view, locals, null, {}, () => content);
         payload["cache_hit"] = view.viewRenderer.cacheHits[template.virtualPath as string];
         return this.buildRenderedTemplate(content, template);
       },

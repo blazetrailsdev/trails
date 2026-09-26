@@ -64,7 +64,10 @@ export class RouteWrapper {
   get endpoint(): string {
     if (this.app.dispatcher()) {
       return `${this.controller}#${this.action}`;
-    } else if (typeof this.rackApp === "function") {
+    } else if (
+      typeof this.rackApp === "function" &&
+      Object.getOwnPropertyDescriptor(this.rackApp, "prototype")?.writable !== false
+    ) {
       return "Inline handler (Proc/Lambda)";
     } else {
       return rbInspect(this.rackApp);

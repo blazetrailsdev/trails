@@ -5,12 +5,9 @@ import { RouteSet } from "../../routing/route-set.js";
 import { ConsoleFormatter, RoutesFormatter, RoutesInspector } from "../../routing/inspector.js";
 
 class MountedRackApp {
-  call(_env: Record<string, unknown>): void {}
-  inspect(): string {
-    return "MountedRackApp";
-  }
+  static call(_env: Record<string, unknown>): void {}
 }
-const mountedRackApp = new MountedRackApp() as unknown as MountableApp;
+const mountedRackApp = MountedRackApp as unknown as MountableApp;
 
 describe("RoutesInspectorTest", () => {
   let set: RouteSet;
@@ -95,7 +92,15 @@ describe("RoutesInspectorTest", () => {
 
   it.skip("rails routes shows route with rack app", () => {});
 
-  it.skip("rails routes shows named route with mounted rack app", () => {});
+  it("rails routes shows named route with mounted rack app", () => {
+    const output = draw((r) => {
+      r.mount(mountedRackApp, { at: "/foo" });
+    });
+    expect(output).toEqual([
+      "          Prefix Verb URI Pattern Controller#Action",
+      "mounted_rack_app      /foo        MountedRackApp",
+    ]);
+  });
 
   it("rails routes shows overridden named route with mounted rack app with name", () => {
     const output = draw((r) => {
