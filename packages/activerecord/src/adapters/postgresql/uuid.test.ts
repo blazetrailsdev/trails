@@ -3,7 +3,8 @@ import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { RecordNotFound } from "../../errors.js";
 import { itIfSupports } from "../../support/supports.js";
 import { fixtures } from "../../test-fixtures.js";
-import { Base, registerModel } from "../../index.js";
+import { Base, Migration, Migrator, registerModel } from "../../index.js";
+import type { MigrationProxy } from "../../migration.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 import { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
 import {
@@ -346,7 +347,39 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
-    it.skip("schema dumper for uuid primary key default in legacy migration", () => {});
+    it("schema dumper for uuid primary key default in legacy migration", async () => {
+      const verboseWas = Migration.verbose;
+      Migration.verbose = false;
+
+      try {
+        const migration = new (class extends Migration.get(5.0) {
+          override get version(): number {
+            return 101;
+          }
+
+          override async migrate(_x: unknown): Promise<void> {
+            await this.createTable("pg_uuids_4", { id: "uuid" });
+          }
+        })();
+
+        const pool = Base.connectionPool();
+        await new Migrator(
+          "up",
+          [migration as unknown as MigrationProxy],
+          pool.schemaMigration,
+          pool.internalMetadata,
+        ).migrate();
+
+        const schema = await dumpTableSchema(adapter, "pg_uuids_4");
+        expect(schema).toMatch(
+          /\bcreateTable\("pg_uuids_4", \{ id: "uuid", default: \(\) => "uuid_generate_v4\(\)"/,
+        );
+      } finally {
+        await dropTable("pg_uuids_4");
+        Migration.verbose = verboseWas;
+        await Base.connectionPool().schemaMigration.deleteAllVersions();
+      }
+    });
   });
 
   describe("PostgreSQLUUIDTestNilDefault", () => {
@@ -376,7 +409,37 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(schema).toMatch(/\bcreateTable\("pg_uuids", \{ id: "uuid", default: null/);
     });
 
-    it.skip("schema dumper for uuid primary key with default nil in legacy migration", () => {});
+    it("schema dumper for uuid primary key with default nil in legacy migration", async () => {
+      const verboseWas = Migration.verbose;
+      Migration.verbose = false;
+
+      try {
+        const migration = new (class extends Migration.get(5.0) {
+          override get version(): number {
+            return 101;
+          }
+
+          override async migrate(_x: unknown): Promise<void> {
+            await this.createTable("pg_uuids_4", { id: "uuid", default: null });
+          }
+        })();
+
+        const pool = Base.connectionPool();
+        await new Migrator(
+          "up",
+          [migration as unknown as MigrationProxy],
+          pool.schemaMigration,
+          pool.internalMetadata,
+        ).migrate();
+
+        const schema = await dumpTableSchema(adapter, "pg_uuids_4");
+        expect(schema).toMatch(/\bcreateTable\("pg_uuids_4", \{ id: "uuid", default: null/);
+      } finally {
+        await dropTable("pg_uuids_4");
+        Migration.verbose = verboseWas;
+        await Base.connectionPool().schemaMigration.deleteAllVersions();
+      }
+    });
   });
 
   describe("PostgreSQLUUIDTestInverseOf", () => {

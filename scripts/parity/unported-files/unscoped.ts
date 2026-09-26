@@ -725,17 +725,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "select_all(async: true) returns a FutureResult::Complete from the thread-backed " +
       "load_async infrastructure, which is excluded (see the future_result.rb entry).",
   },
-  {
-    testFile: "adapters/postgresql/uuid_test.rb",
-    tests: [
-      "schema dumper for uuid primary key default in legacy migration",
-      "schema dumper for uuid primary key with default nil in legacy migration",
-    ],
-    reason:
-      "Pre-1.0: ActiveRecord::Migration[5.0] legacy version-compatibility semantics are " +
-      "out of scope (matches the migration/compatibility exclusion). The non-legacy " +
-      "schema-dump emission is covered by the passing sibling tests.",
-  },
   // --- Permanently not-portable: scattered YAML/Marshal serialization ---
   {
     testFile: "serialized_attribute_test.rb",

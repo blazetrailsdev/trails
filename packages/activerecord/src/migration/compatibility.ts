@@ -1,4 +1,5 @@
 import { ArgumentError } from "@blazetrails/activemodel";
+import { isPresent } from "@blazetrails/activesupport";
 import { include, prepend, rbInspect, type PrependModule } from "@blazetrails/ruby-compat";
 import { Current, Migration } from "../migration.js";
 import * as Compatibility from "./compatibility.js";
@@ -438,6 +439,220 @@ export class V5_1 extends V5_2 {
     } else {
       await super.createTable(tableName, options, fn);
     }
+  }
+}
+
+export class V5_0 extends V5_1 {
+  static override TableDefinition = {
+    primaryKey(
+      super_: Super,
+      name: string,
+      type: ColumnType = "primary_key",
+      options: Options = {},
+    ) {
+      if (type === "primary_key") type = "integer";
+      return super_(name, type, options);
+    },
+
+    references(super_: Super, ...args: unknown[]) {
+      const last = args[args.length - 1];
+      const options = (typeof last === "object" && last !== null ? args.pop() : {}) as Options;
+      return super_(...args, { type: "integer", ...options });
+    },
+
+    belongsTo(super_: Super, ...args: unknown[]) {
+      return (V5_0.TableDefinition.references as Super).call(this, super_, ...args);
+    },
+
+    raiseOnIfExistOptions(_super: unknown, _options: Options): void {},
+  } as unknown as PrependModule;
+
+  override async createTable(
+    tableName: string,
+    options?: Parameters<Current["createTable"]>[1],
+    fn?: Parameters<Current["createTable"]>[2],
+  ): Promise<void> {
+    if (typeof options === "function") [options, fn] = [{}, options];
+    options = { ...options };
+    const connection = await this.connection;
+    if (connection.adapterName === "PostgreSQL") {
+      if (options.id === "uuid" && !Object.hasOwn(options, "default")) {
+        options.default = "uuid_generate_v4()";
+      }
+    }
+
+    if (
+      !(
+        (connection.adapterName === "Mysql2" || connection.adapterName === "Trilogy") &&
+        options.id === "bigint"
+      )
+    ) {
+      if (
+        (options.id === "integer" || options.id === "bigint") &&
+        !Object.hasOwn(options, "default")
+      ) {
+        options.default = null;
+      }
+    }
+
+    if (!Object.hasOwn(options, "id")) {
+      options.id = "integer";
+    }
+
+    await super.createTable(tableName, options, fn);
+  }
+
+  override async createJoinTable(
+    table1: string,
+    table2: string,
+    options?: Parameters<Current["createJoinTable"]>[2],
+    fn?: Parameters<Current["createJoinTable"]>[3],
+  ): Promise<void> {
+    if (typeof options === "function") [options, fn] = [{}, options];
+    const columnOptions = { type: "integer", ...options?.columnOptions };
+    await super.createJoinTable(table1, table2, { ...options, columnOptions }, fn);
+  }
+
+  override async addColumn(
+    tableName: string,
+    columnName: string,
+    type: ColumnType,
+    options: ColumnOptions & { ifNotExists?: boolean } = {},
+  ): Promise<void> {
+    if (type === "primary_key") {
+      type = "integer";
+      options = { ...options, primaryKey: true };
+    } else if (type === "datetime") {
+      options = { ...options, precision: options.precision ?? null };
+    }
+    await super.addColumn(tableName, columnName, type, options);
+  }
+
+  override async addReference(
+    tableName: string,
+    refName: string,
+    options: Parameters<Current["addReference"]>[2] = {},
+  ): Promise<void> {
+    await super.addReference(tableName, refName, { type: "integer", ...options });
+  }
+
+  override async addBelongsTo(
+    tableName: string,
+    refName: string,
+    options: Parameters<Current["addReference"]>[2] = {},
+  ): Promise<void> {
+    await this.addReference(tableName, refName, options);
+  }
+
+  /** @internal */
+  override compatibleTableDefinition<T>(t: T): T {
+    prepend(t as object, V5_0.TableDefinition);
+    return super.compatibleTableDefinition(t);
+  }
+}
+
+type RemoveIndexOptions = { column?: string | string[]; name?: string; ifExists?: boolean };
+
+export class V4_2 extends V5_0 {
+  static override TableDefinition = {
+    references(super_: Super, ...args: unknown[]) {
+      const last = args[args.length - 1];
+      const options = (typeof last === "object" && last !== null ? args.pop() : {}) as Options;
+      return super_(...args, { ...options, index: options.index || false });
+    },
+
+    belongsTo(super_: Super, ...args: unknown[]) {
+      return (V4_2.TableDefinition.references as Super).call(this, super_, ...args);
+    },
+
+    timestamps(super_: Super, options: Options = {}) {
+      if (options.null == null) options = { ...options, null: true };
+      return super_(options);
+    },
+
+    raiseOnIfExistOptions(_super: unknown, _options: Options): void {},
+  } as unknown as PrependModule;
+
+  override async addReference(
+    tableName: string,
+    refName: string,
+    options: Parameters<Current["addReference"]>[2] = {},
+  ): Promise<void> {
+    options = { ...options, index: options.index || false };
+    await super.addReference(tableName, refName, options);
+  }
+
+  override async addBelongsTo(
+    tableName: string,
+    refName: string,
+    options: Parameters<Current["addReference"]>[2] = {},
+  ): Promise<void> {
+    await this.addReference(tableName, refName, options);
+  }
+
+  override async addTimestamps(tableName: string, options: ColumnOptions = {}): Promise<void> {
+    if (options.null == null) options = { ...options, null: true };
+    await super.addTimestamps(tableName, options);
+  }
+
+  override async indexExists(
+    tableName: string,
+    columnName: string | string[],
+    options: { unique?: boolean; name?: string; valid?: boolean } = {},
+  ): Promise<boolean> {
+    const columnNames = [columnName].flat().map(String);
+    options = {
+      ...options,
+      name: isPresent(options.name)
+        ? String(options.name)
+        : (await this.connection).indexName(tableName, { column: columnNames }),
+    };
+    return super.indexExists(tableName, columnName, options);
+  }
+
+  override async removeIndex(
+    tableName: string,
+    columnName: string | string[] | RemoveIndexOptions | null = null,
+    options: RemoveIndexOptions = {},
+  ): Promise<void> {
+    if (!(typeof columnName === "string" || Array.isArray(columnName))) {
+      options = { ...columnName, ...options };
+      columnName = null;
+    }
+
+    options = { ...options, name: await this.indexNameForRemove(tableName, columnName, options) };
+    await super.removeIndex(tableName, columnName ?? undefined, options);
+  }
+
+  /** @internal */
+  override compatibleTableDefinition<T>(t: T): T {
+    prepend(t as object, V4_2.TableDefinition);
+    return super.compatibleTableDefinition(t);
+  }
+
+  /** @internal */
+  async indexNameForRemove(
+    tableName: string,
+    columnName: string | string[] | null,
+    options: RemoveIndexOptions,
+  ): Promise<string> {
+    const connection = await this.connection;
+    const indexName = connection.indexName(tableName, columnName ?? options);
+
+    if (!(await connection.indexNameExists(tableName, indexName))) {
+      if (Object.hasOwn(options, "name")) {
+        const { column: _column, ...optionsWithoutColumn } = options;
+        const indexNameWithoutColumn = connection.indexName(tableName, optionsWithoutColumn);
+
+        if (await connection.indexNameExists(tableName, indexNameWithoutColumn)) {
+          return indexNameWithoutColumn;
+        }
+      }
+
+      throw new ArgumentError(`Index name '${indexName}' on table '${tableName}' does not exist`);
+    }
+
+    return indexName;
   }
 }
 
