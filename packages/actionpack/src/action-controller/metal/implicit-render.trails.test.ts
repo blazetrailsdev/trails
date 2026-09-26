@@ -33,7 +33,7 @@ beforeAll(() => {
       "implicit_render_test/variantWithImplicitTemplateRendering.html+mobile.html": "mobile",
     }),
   );
-  ImplicitRenderTestController.layout = false;
+  ImplicitRenderTestController.layout(false);
 });
 
 describe("ImplicitRenderTest", () => {

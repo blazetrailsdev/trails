@@ -37,12 +37,12 @@ beforeAll(() => {
     new FixtureResolver({
       "default_layout/hello.html.html": "hello",
       "named_layout/hello.html.html": "hello",
-      "layouts/application.html.html": "layout",
+      "layouts/default_layout.html.html": "layout",
       "layouts/item.html.html": "item layout",
     }),
   );
   BareController.prependViewPath(new FixtureResolver({ "bare/hello.html.html": "hello" }));
-  NamedLayoutController.layout = "missing";
+  NamedLayoutController.layout("missing");
 });
 
 describe("ActionController::Base#renderAsync layout", () => {

@@ -21,40 +21,6 @@ export interface RenderOptions {
 }
 
 /** @internal */
-export interface Rendering {
-  lookupContext: LookupContext;
-  render(options: RenderOptions | string, extra?: RenderOptions): string;
-  renderToString(options: RenderOptions | string, extra?: RenderOptions): string;
-  renderToBody(options?: RenderOptions): string;
-  /** @internal */
-  _normalizeArgs(action: unknown, options?: RenderOptions): RenderOptions;
-  _normalizeOptions(options: RenderOptions): RenderOptions;
-  _normalizeRender(options: RenderOptions): RenderOptions;
-}
-
-/**
- * Stub for `ActionView::Layouts` (`action_view/layouts.rb:205`) — real impl
- * in Phase 4, as the sibling stubs above say.
- *
- * @internal
- * @noRailsEquivalent CONVERGEABLE (story:
- * port-action-view-layouts-behind-rendering-stubs). Deleted once the module
- * is ported to `actionview/src/layouts.ts`.
- */
-export interface Layouts {
-  _layoutForRendering(formats: string[]): string | false | undefined;
-  _layoutFor(name?: string | symbol): string;
-}
-
-/** @internal */
-export interface LayoutsClass {
-  layout(
-    name: string | symbol | false | null | ((...args: unknown[]) => unknown),
-    conditions?: { only?: string | string[]; except?: string | string[] },
-  ): void;
-}
-
-/** @internal */
 export interface ViewContextClassMethods {
   _routes?: ViewContextRoutes | null;
   _helpers?: object | null;
@@ -153,4 +119,26 @@ export function viewContext(this: ViewContextHost): Base {
     this.viewAssigns(),
     this as unknown as null,
   );
+}
+
+/** @internal */
+export interface RenderTemplateOptionsHost {
+  actionName: string;
+  _prefixes(): string[];
+}
+
+/** @internal */
+export function _processRenderTemplateOptions(
+  this: RenderTemplateOptionsHost,
+  options: Record<string, unknown>,
+): void {
+  if (options["partial"] === true) {
+    options["partial"] = this.actionName;
+  }
+
+  if (!["partial", "file", "template"].some((k) => k in options)) {
+    options["prefixes"] ??= this._prefixes();
+  }
+
+  options["template"] ??= String(options["action"] ?? this.actionName);
 }

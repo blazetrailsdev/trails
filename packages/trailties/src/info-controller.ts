@@ -7,7 +7,11 @@ export interface RouteSearchResult {
 }
 
 export class InfoController extends ActionController.Base {
-  static layout: string | false = "application";
+  static {
+    this.layout(function (this: InfoController) {
+      return this.request.xhr ? false : "application";
+    });
+  }
 
   index(): void {
     this.redirectTo("/rails/info/routes");

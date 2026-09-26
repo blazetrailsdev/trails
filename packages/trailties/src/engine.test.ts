@@ -379,7 +379,7 @@ describe("Engine", () => {
     await engine.initializers.find((i) => i.name === "add_view_paths")!.run();
 
     class PostsController extends ActionController.Base {}
-    PostsController.layout = false;
+    PostsController.layout(false);
     runLoadHooks("action_controller", PostsController);
 
     const controller = new PostsController();

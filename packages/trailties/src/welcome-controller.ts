@@ -5,7 +5,9 @@ export class WelcomeController extends ActionController.Base {
     return "rails/welcome";
   }
 
-  static override layout: string | false = false;
+  static {
+    this.layout(false);
+  }
 
   index(): void {}
 }

@@ -25,9 +25,6 @@ export type { DigestorOptions } from "./digestor.js";
 export { Base } from "./base.js";
 
 export type {
-  Rendering,
-  Layouts,
-  LayoutsClass,
   RenderOptions as RenderingOptions,
   ViewContextClassMethods,
   ViewContextHost,
@@ -55,7 +52,22 @@ export {
 } from "./view-paths.js";
 export type { ViewPaths, ViewPathsClass, ViewPathsInput } from "./view-paths.js";
 
-export { _normalizeLayout } from "./layouts.js";
+export {
+  LayoutConditions,
+  layout,
+  _writeLayoutMethod,
+  _impliedLayoutName,
+  _processRenderTemplateOptions,
+  setActionHasLayout,
+  isActionHasLayout,
+  _isConditionalLayout,
+  _layout,
+  _layoutForOption,
+  _normalizeLayout,
+  _defaultLayout,
+  _isIncludeLayout,
+} from "./layouts.js";
+export type { Layouts, LayoutsClass } from "./layouts.js";
 
 export { Renderer, RenderedTemplate } from "./renderer.js";
 export type { ViewContext, RenderOptions as RendererOptions } from "./renderer.js";

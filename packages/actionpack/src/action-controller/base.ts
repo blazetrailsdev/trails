@@ -23,8 +23,19 @@ import type {
 import {
   LookupContext,
   ViewPathsClassMethods,
+  _defaultLayout,
+  _impliedLayoutName,
+  _isConditionalLayout,
+  _isIncludeLayout,
+  _layout,
+  _layoutForOption,
   _normalizeLayout,
   _prefixes,
+  _processRenderTemplateOptions,
+  _writeLayoutMethod,
+  isActionHasLayout,
+  layout,
+  setActionHasLayout,
   detailsForLookup,
   isAnyTemplates,
   lookupContext,
@@ -42,8 +53,8 @@ import {
   viewContextClass,
 } from "@blazetrails/actionview";
 import type {
+  RendererOptions,
   PathSet,
-  Template,
   ViewPathsInput,
   ViewContextHost,
   ViewContextRoutes,
@@ -215,7 +226,12 @@ export class Base extends Metal {
     (paths: ViewPathsInput): void;
   } = ViewPathsClassMethods.viewPaths;
 
-  static layout: string | false = "application";
+  static layout = layout;
+  static _writeLayoutMethod = _writeLayoutMethod;
+  /** @internal */
+  static _impliedLayoutName = _impliedLayoutName;
+  declare static _layout: Parameters<typeof layout>[0];
+  declare static _layoutConditions: Record<string, string[]>;
 
   static _routes: ViewContextRoutes | null = null;
 
@@ -224,6 +240,7 @@ export class Base extends Metal {
 
   constructor(...args: unknown[]) {
     super(...(args as []));
+    this._actionHasLayout = true;
     fireInherited(
       new.target as unknown as HelpersPathControllerClass,
       Base as unknown as HelpersPathControllerClass,
@@ -386,9 +403,6 @@ export class Base extends Metal {
 
     const locals = { ...options.locals };
     const view = this.viewContext();
-    let owner = this.constructor as typeof Base;
-    while (!Object.hasOwn(owner, "layout")) owner = Object.getPrototypeOf(owner);
-    const layout = owner === Base ? owner.layout : _normalizeLayout(owner.layout);
 
     if (options.partial !== undefined) {
       this.body = (await view.viewRenderer.render(view, {
@@ -398,21 +412,13 @@ export class Base extends Metal {
         locals,
       })) as string;
     } else {
+      const templateOptions: Record<string, unknown> = { ...options };
+      this._processRenderTemplateOptions(templateOptions);
       this.body = (await view.viewRenderer.render(view, {
-        template: String(options.template ?? options.action ?? this.actionName),
-        prefixes: options.template !== undefined ? [] : _prefixes.call(this as never),
+        template: templateOptions.template as string,
+        prefixes: (templateOptions.prefixes as string[] | undefined) ?? [],
         locals,
-        layout:
-          typeof options.layout === "string"
-            ? _normalizeLayout(options.layout)
-            : options.layout === false || !layout
-              ? null
-              : owner !== Base
-                ? layout
-                : (lookupContext, formats, keys) =>
-                    lookupContext.findAll(layout, ["layouts"], false, keys, { formats })[0] as
-                      | Template
-                      | undefined,
+        layout: templateOptions.layout as RendererOptions["layout"],
       })) as string;
     }
 
@@ -769,6 +775,26 @@ export class Base extends Metal {
   }
 
   /** @internal */
+  /** @internal */
+  _actionHasLayout?: boolean;
+  /** @internal */
+  declare _layoutConditions: Record<string, string[]>;
+  /** @internal */
+  declare _processRenderTemplateOptions: typeof _processRenderTemplateOptions;
+  declare setActionHasLayout: typeof setActionHasLayout;
+  declare isActionHasLayout: typeof isActionHasLayout;
+  /** @internal */
+  declare _isConditionalLayout: typeof _isConditionalLayout;
+  /** @internal */
+  declare _layout: typeof _layout;
+  /** @internal */
+  declare _layoutForOption: typeof _layoutForOption;
+  /** @internal */
+  declare _normalizeLayout: typeof _normalizeLayout;
+  /** @internal */
+  declare _defaultLayout: typeof _defaultLayout;
+  /** @internal */
+  declare _isIncludeLayout: typeof _isIncludeLayout;
   declare viewCacheDependencies: typeof viewCacheDependencies;
   declare cache: typeof cache;
   declare combinedFragmentCacheKey: typeof combinedFragmentCacheKey;
@@ -888,6 +914,21 @@ export class Base extends Metal {
 }
 
 include(Base, ConfigMethods);
+Base.prototype._processRenderTemplateOptions = _processRenderTemplateOptions;
+Base.prototype.setActionHasLayout = setActionHasLayout;
+Base.prototype.isActionHasLayout = isActionHasLayout;
+Base.prototype._isConditionalLayout = _isConditionalLayout;
+Base.prototype._layoutForOption = _layoutForOption;
+Base.prototype._normalizeLayout = _normalizeLayout;
+Base.prototype._defaultLayout = _defaultLayout;
+Base.prototype._isIncludeLayout = _isIncludeLayout;
+classAttribute.call(Base, "_layout", { instanceAccessor: false });
+classAttribute.call(Base, "_layoutConditions", {
+  instanceAccessor: false,
+  instanceReader: true,
+  default: {},
+});
+Base._writeLayoutMethod();
 Base.prototype.viewCacheDependencies = viewCacheDependencies;
 Base.prototype.cache = cache;
 Base.prototype.combinedFragmentCacheKey = combinedFragmentCacheKey;
