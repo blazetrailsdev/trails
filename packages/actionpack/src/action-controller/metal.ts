@@ -31,8 +31,11 @@ import {
 } from "./metal/rendering.js";
 
 export class MiddlewareStack extends AbstractMiddlewareStack {
-  build(action: string | RackApp | RackAppObject, app?: RackApp | RackAppObject): RackApp {
-    if (typeof action !== "string") return super.build(action);
+  override build(app: RackApp | RackAppObject): RackApp;
+  override build(action: string, app?: RackApp | RackAppObject): RackApp;
+  override build(action: string | RackApp | RackAppObject, app?: RackApp | RackAppObject): RackApp {
+    action = String(action);
+
     let current: RackApp =
       typeof app === "function" ? app : (env: RackEnv) => (app as RackAppObject).call(env);
     const middlewares = this.middlewares as Middleware[];
@@ -106,7 +109,7 @@ const _middlewareStacks = new WeakMap<object, MiddlewareStack>();
 export class Metal extends AbstractController {
   _request!: Request;
   _response!: Response;
-  _params: Parameters = new Parameters({});
+  _params: Parameters | null = null;
 
   constructor() {
     super();
@@ -114,7 +117,7 @@ export class Metal extends AbstractController {
   }
 
   get params(): Parameters {
-    return this._params;
+    return (this._params ??= new Parameters(this.request.parameters));
   }
   set params(value: Parameters) {
     this._params = value;
@@ -231,13 +234,8 @@ export class Metal extends AbstractController {
   async dispatch(name: string, request: Request, response: Response): Promise<RackResponse> {
     this.setRequestBang(request);
     this.setResponseBang(response);
-    const reqParams = request.parameters;
-    this.params = reqParams instanceof Parameters ? reqParams : new Parameters(reqParams);
-
     await this.process(name);
-
     request.commitFlash();
-
     return this.toRackResponse();
   }
 
