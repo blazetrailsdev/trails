@@ -1159,9 +1159,9 @@ describe("DateTime", () => {
     );
   });
 
-  it("names an instant the truncated offset moves, which the gem-shaped object still holds", () => {
+  it("names the exact instant of a sub-minute offset, as the gem-shaped object does", () => {
     const seat = RubyDateTime.parse("2008-03-01T06:00:00-00:44:30") as Temporal.ZonedDateTime;
-    expect(Number(seat.epochNanoseconds / 1000000000n)).toBe(1204353870 - 30);
+    expect(Number(seat.epochNanoseconds / 1000000000n)).toBe(1204353870);
 
     const gem = gemDateTime("2008-03-01T06:00:00-00:44:30");
     expect(gem.offset.mul(86400).toI()).toBe(-2670);

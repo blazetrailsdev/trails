@@ -8,6 +8,7 @@ import { Topic } from "./test-helpers/models/topic.js";
 import { withEnvTz, withTimezoneConfig } from "./test-helper.js";
 import { Base } from "./index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { Rational } from "@blazetrails/ruby-compat";
 import { setDefaultTimezone } from "./active-record.js";
 
 afterEach(() => {
@@ -41,8 +42,8 @@ describe("DateTimeTest", () => {
     await withEnvTz("America/New_York", async () => {
       await withTimezoneConfig({ default: "utc" }, async () => {
         const timeValues = [1807, 2, 10, 15, 30, 45] as const;
-        const localOffset = RubyTime.local(...timeValues).utcOffset;
-        const now = RubyTime.new(...timeValues, localOffset);
+        const localOffset = new Rational(RubyTime.local(...timeValues).utcOffset, 86400);
+        const now = DateTime.civil(...timeValues, localOffset);
 
         const task = new Task();
         task.starting = now;

@@ -46,7 +46,7 @@ describe("SchemaDumper trails-only cases", () => {
       lookupCastTypeFromColumn: () => new ValueType(),
       adapter: PRIMARY_KEY_ADAPTER,
     };
-    const output = (await TopLevelDumper.dump(source)).string();
+    const output = (await TopLevelDumper.dump(source, new StringIO())).string();
     expect(output).toContain(`() => "gen_random_uuid()"`);
   });
 
@@ -60,10 +60,10 @@ describe("SchemaDumper trails-only cases", () => {
       lookupCastTypeFromColumn: () => new ValueType(),
       adapter: PRIMARY_KEY_ADAPTER,
     });
-    const one = (await TopLevelDumper.dump(source(["books"]))).string();
+    const one = (await TopLevelDumper.dump(source(["books"]), new StringIO())).string();
     expect(one).not.toContain("});\n\n}");
 
-    const two = (await TopLevelDumper.dump(source(["authors", "books"]))).string();
+    const two = (await TopLevelDumper.dump(source(["authors", "books"]), new StringIO())).string();
     expect(two).toContain('});\n\n  await ctx.createTable("books"');
     expect(two).not.toContain("});\n\n}");
   });
@@ -90,7 +90,7 @@ describe("SchemaDumper trails-only cases", () => {
       lookupCastTypeFromColumn: () => new ValueType(),
       adapter: PRIMARY_KEY_ADAPTER,
     };
-    const output = (await TopLevelDumper.dump(source)).string();
+    const output = (await TopLevelDumper.dump(source, new StringIO())).string();
     for (const helper of [
       "int4range",
       "int8range",
@@ -127,7 +127,7 @@ describe("SchemaDumper trails-only cases", () => {
       lookupCastTypeFromColumn: () => new ValueType(),
       adapter: PRIMARY_KEY_ADAPTER,
     };
-    const output = (await TopLevelDumper.dump(source)).string();
+    const output = (await TopLevelDumper.dump(source, new StringIO())).string();
     expect(output).toContain('t.timestamptz("ts"');
     expect(output).toContain('t.uuid("guid"');
     expect(output).toContain('t.interval("span"');
@@ -228,11 +228,15 @@ describe("SchemaDumper trails-only cases", () => {
       ],
     });
     const autoName = "fk_rails_abc123def4";
-    const autoOutput = (await SchemaDumper.dump(mkSource(autoName) as any)).string();
+    const autoOutput = (
+      await SchemaDumper.dump(mkSource(autoName) as any, new StringIO())
+    ).string();
     expect(autoOutput).toContain("addForeignKey");
     expect(autoOutput).not.toContain(`"${autoName}"`);
     const customName = "fk_books_author_id";
-    const customOutput = (await SchemaDumper.dump(mkSource(customName) as any)).string();
+    const customOutput = (
+      await SchemaDumper.dump(mkSource(customName) as any, new StringIO())
+    ).string();
     expect(customOutput).toContain(`name: "${customName}"`);
   });
 
@@ -246,11 +250,15 @@ describe("SchemaDumper trails-only cases", () => {
       ],
     });
     const autoName = "chk_rails_abc123def4";
-    const autoOutput = (await SchemaDumper.dump(mkSource(autoName) as any)).string();
+    const autoOutput = (
+      await SchemaDumper.dump(mkSource(autoName) as any, new StringIO())
+    ).string();
     expect(autoOutput).toContain("t.checkConstraint");
     expect(autoOutput).not.toContain(`"${autoName}"`);
     const customChkName = "products_price_check";
-    const customOutput = (await SchemaDumper.dump(mkSource(customChkName) as any)).string();
+    const customOutput = (
+      await SchemaDumper.dump(mkSource(customChkName) as any, new StringIO())
+    ).string();
     expect(customOutput).toContain(`name: "${customChkName}"`);
   });
 });
@@ -311,7 +319,7 @@ describe("SchemaDumperAdapterTest", () => {
     await adapter.createTable("reminders", {}, (t) => {
       t.string("name");
     });
-    const result = (await TopLevelDumper.dump(adapter)).string();
+    const result = (await TopLevelDumper.dump(adapter, new StringIO())).string();
     expect(result).toContain("reminders");
     expect(result).not.toContain("schema_migrations");
     expect(result).not.toContain("ar_internal_metadata");

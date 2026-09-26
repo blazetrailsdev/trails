@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
+import { StringIO } from "@blazetrails/ruby-compat";
 import { describeIfPg, PostgreSQLAdapter, pgServerVersion } from "./test-helper.js";
 import { SchemaDumper } from "../../connection-adapters/abstract/schema-dumper.js";
 import { Base, Schema } from "../../index.js";
@@ -304,7 +305,7 @@ describeIfPg("PostgreSQLAdapter", () => {
             )
           `);
 
-          const output = (await SchemaDumper.dump(adapter)).string();
+          const output = (await SchemaDumper.dump(adapter, new StringIO())).string();
 
           expect(output).toContain('await ctx.createEnum("public.mood", ["sad","ok","happy"]);');
           expect(output).toContain(

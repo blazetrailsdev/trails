@@ -3,6 +3,7 @@ import type { SchemaSource } from "../schema-dumper.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { SchemaDumper } from "../connection-adapters/abstract/schema-dumper.js";
 import { Base } from "../base.js";
+import { capture } from "@blazetrails/activesupport";
 
 export const FULL_DUMP_TIMEOUT_MS = 30_000;
 
@@ -17,7 +18,10 @@ export async function dumpTableSchema(
     : await (pool as SchemaSource).tables();
   BaseSchemaDumper.ignoreTables = dataSources.filter((name) => !tables.includes(name));
   try {
-    return (await SchemaDumper.dump(pool)).string();
+    const output = await capture("stdout", async () => {
+      await SchemaDumper.dump(pool);
+    });
+    return output;
   } finally {
     BaseSchemaDumper.ignoreTables = oldIgnoreTables;
   }
@@ -30,7 +34,10 @@ export async function dumpAllTableSchema(
   const oldIgnoreTables = BaseSchemaDumper.ignoreTables;
   BaseSchemaDumper.ignoreTables = ignoreTables;
   try {
-    return (await SchemaDumper.dump(pool)).string();
+    const output = await capture("stdout", async () => {
+      await SchemaDumper.dump(pool);
+    });
+    return output;
   } finally {
     BaseSchemaDumper.ignoreTables = oldIgnoreTables;
   }

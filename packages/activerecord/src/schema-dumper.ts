@@ -1,4 +1,4 @@
-import { StringIO, rbObjAsString, type IO } from "@blazetrails/ruby-compat";
+import { STDOUT, StringIO, rbObjAsString, type IO } from "@blazetrails/ruby-compat";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { Column } from "./connection-adapters/column.js";
 import { isBlank, isPresent } from "@blazetrails/activesupport";
@@ -216,9 +216,9 @@ export abstract class SchemaDumper {
     ) => InstanceType<T>)(connection, options);
   }
 
-  static dump<S extends IO | StringIO = StringIO>(
+  static dump<S extends IO | StringIO = IO>(
     pool: ConnectionPoolLike | SchemaSource | DatabaseAdapter = baseClass().connectionPool(),
-    stream: S = new StringIO() as S,
+    stream: S = STDOUT as S,
     config: SchemaDumperConfig = baseClass(),
   ): Promise<S> {
     const options = this.generateOptions(config);
