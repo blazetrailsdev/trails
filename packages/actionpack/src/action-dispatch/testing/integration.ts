@@ -459,7 +459,7 @@ export class IntegrationTest {
   static _app: unknown = null;
 
   static get app(): unknown {
-    if (IntegrationTest._app != null) {
+    if (IntegrationTest._app != null && IntegrationTest._app !== false) {
       return IntegrationTest._app;
     } else {
       return ActionDispatch.testApp;
