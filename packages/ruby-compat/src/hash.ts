@@ -616,8 +616,10 @@ export class Hash<K, V> extends Map<K, V> {
       const val = super.get(stored);
       super.delete(stored);
       if (isObjectKey(stored)) {
-        const bucket = this._eqlKeys.get(rbHash(stored))!;
+        const h = rbHash(stored);
+        const bucket = this._eqlKeys.get(h)!;
         bucket.splice(bucket.indexOf(stored), 1);
+        if (bucket.length === 0) this._eqlKeys.delete(h);
       }
       return val;
     }

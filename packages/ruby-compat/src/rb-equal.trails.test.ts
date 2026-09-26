@@ -92,5 +92,12 @@ describe("rbEqq, the === send", () => {
     expect(rbEqq((x: unknown) => (x === 2 ? 0 : null), 3)).toBe(false);
     expect(rbEqq((x: unknown) => (x === 2 ? 0 : null), 2)).toBe(true);
     expect(rbEqq([1, 2], [1, 2])).toBe(true);
+    expect(
+      rbEqq(function (x: unknown) {
+        return x === 2;
+      }, 2),
+    ).toBe(true);
+    class Point {}
+    expect(rbEqq(Point, new Point())).toBe(true);
   });
 });

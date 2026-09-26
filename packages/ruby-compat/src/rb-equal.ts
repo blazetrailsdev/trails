@@ -188,7 +188,9 @@ export function rbEqq(pattern: unknown, target: unknown): boolean {
   }
   if (pattern instanceof Set) return pattern.has(target);
   if (typeof pattern === "function") {
-    if (pattern.prototype !== undefined) return Object(target) instanceof pattern;
+    if (Object.getOwnPropertyDescriptor(pattern, "prototype")?.writable === false) {
+      return Object(target) instanceof pattern;
+    }
     return rtest((pattern as (arg: unknown) => unknown)(target));
   }
   return rbEqual(pattern, target);
