@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import { PartialRenderer } from "./partial-renderer.js";
 import { ObjectRenderer } from "./object-renderer.js";
 import { CollectionRenderer, PartialIteration } from "./collection-renderer.js";
@@ -117,8 +118,12 @@ describe("ObjectRenderer", () => {
 
   it("raises when object has no toPartialPath", async () => {
     await expect(
-      new ObjectRenderer(lc).renderObjectDerivePartial({ id: 1 }, ctx, undefined),
-    ).rejects.toThrow("toPartialPath");
+      new ObjectRenderer(lc).renderObjectDerivePartial(null, ctx, undefined),
+    ).rejects.toThrow(
+      new ArgumentError(
+        "'nil' is not an ActiveModel-compatible object. It must implement #to_partial_path.",
+      ),
+    );
   });
 });
 
