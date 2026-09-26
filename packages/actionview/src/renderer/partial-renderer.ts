@@ -109,7 +109,7 @@ export class PartialRenderer extends AbstractRenderer {
     )[0];
     if (!template) {
       const { name, prefix } = this.parsePartialPath(path);
-      const format = (this.lookupContext.formats[0] as string | undefined) ?? "html";
+      const format = (this.lookupContext.formats[0] as string | undefined) ?? ":html";
       throw new MissingTemplate(this.lookupContext.viewPaths, name, [prefix], true, {
         ...this.details,
         formats: [format],

@@ -48,7 +48,7 @@ export class StreamingTemplateRenderer extends AbstractRenderer {
         return;
       }
 
-      const layout = this.resolveLayout(layoutName, keys, [(this.formats[0] as string) ?? "html"]);
+      const layout = this.resolveLayout(layoutName, keys, [(this.formats[0] as string) ?? ":html"]);
 
       yield* this.delayedRender(context, template, layout, locals);
     } catch (err) {

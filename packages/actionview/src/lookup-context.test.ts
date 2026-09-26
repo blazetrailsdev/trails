@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, it, expect } from "vitest";
+import { MimeType } from "@blazetrails/actionpack";
 import { LookupContext } from "./lookup-context.js";
 import { MissingTemplate } from "./template/error.js";
 import { Resolver } from "./template/resolver.js";
@@ -12,7 +13,7 @@ describe("LookupContext", () => {
   it("handles */* formats", () => {
     const lookupContext = new LookupContext([]);
     lookupContext.formats = ["*/*"];
-    expect(lookupContext.formats).toEqual(["html", "text", "js", "css", "xml", "json"]);
+    expect(lookupContext.formats).toEqual(MimeType.SET.symbols);
   });
 });
 
@@ -95,7 +96,7 @@ describe("LookupContext allCandidatePaths wiring", () => {
 
     let caught: MissingTemplate | undefined;
     try {
-      await ctx.render(["posts"], "indx", ["html"]);
+      await ctx.render(["posts"], "indx", [":html"]);
     } catch (e) {
       if (e instanceof MissingTemplate) caught = e;
     }
@@ -112,7 +113,7 @@ describe("LookupContext allCandidatePaths wiring", () => {
 
     let caught: MissingTemplate | undefined;
     try {
-      await ctx.renderPartial("frm", "posts", "html");
+      await ctx.renderPartial("frm", "posts", ":html");
     } catch (e) {
       if (e instanceof MissingTemplate) caught = e;
     }
@@ -150,17 +151,17 @@ describe("LookupContext#renderPartialSync", () => {
       "shared/_spacer": "spacer",
       "posts/_byline": "byline",
     });
-    expect(ctx.renderPartialSync("post", "posts", "html")).toBe("spacer|byline");
+    expect(ctx.renderPartialSync("post", "posts", ":html")).toBe("spacer|byline");
   });
 
   it("renders a partial by bare name against the given prefix", () => {
     const ctx = contextWith({ "posts/_form": "<%= title %>" });
-    expect(ctx.renderPartialSync("form", "posts", "html", { title: "New" })).toBe("New");
+    expect(ctx.renderPartialSync("form", "posts", ":html", { title: "New" })).toBe("New");
   });
 
   it("takes the prefix from a qualified name", () => {
     const ctx = contextWith({ "users/_user": "<li><%= user %></li>" });
-    expect(ctx.renderPartialSync("users/user", "posts", "html", { user: "Ada" })).toBe(
+    expect(ctx.renderPartialSync("users/user", "posts", ":html", { user: "Ada" })).toBe(
       "<li>Ada</li>",
     );
   });
@@ -170,12 +171,12 @@ describe("LookupContext#renderPartialSync", () => {
       "posts/_post": '<%= render({ partial: "posts/byline", locals: { name: name } }) %>',
       "posts/_byline": "by <%= name %>",
     });
-    expect(ctx.renderPartialSync("post", "posts", "html", { name: "Ada" })).toBe("by Ada");
+    expect(ctx.renderPartialSync("post", "posts", ":html", { name: "Ada" })).toBe("by Ada");
   });
 
   it("raises MissingTemplate when the partial does not resolve", () => {
     const ctx = contextWith({ "posts/_form": "" });
-    expect(() => ctx.renderPartialSync("frm", "posts", "html")).toThrow(MissingTemplate);
+    expect(() => ctx.renderPartialSync("frm", "posts", ":html")).toThrow(MissingTemplate);
   });
 
   it("is reachable from a template rendered through renderTemplate", async () => {
@@ -186,10 +187,10 @@ describe("LookupContext#renderPartialSync", () => {
         identifier: "posts/index",
         virtualPath: "posts/index",
         extension: "tse",
-        format: "html",
+        format: ":html",
       }),
       {},
-      { controller: "posts", action: "index", format: "html" },
+      { controller: "posts", action: "index", format: ":html" },
     );
     expect(out).toBe("form!");
   });
@@ -220,7 +221,7 @@ describe("LookupContext#render with a layout", () => {
       "posts/index": "<p>body</p>",
       "layouts/application": "<main><%= yield %></main>",
     });
-    expect(await ctx.render(["posts"], "index", ["html"], {}, { layout: "application" })).toBe(
+    expect(await ctx.render(["posts"], "index", [":html"], {}, { layout: "application" })).toBe(
       "<main><p>body</p></main>",
     );
   });
@@ -228,7 +229,7 @@ describe("LookupContext#render with a layout", () => {
   it("finds a template through an inherited prefix", async () => {
     const ctx = contextWith({ "application/show": "<p>inherited</p>" });
     expect(
-      await ctx.render(["posts", "application"], "show", ["html"], {}, { layout: false }),
+      await ctx.render(["posts", "application"], "show", [":html"], {}, { layout: false }),
     ).toBe("<p>inherited</p>");
   });
 
@@ -237,7 +238,7 @@ describe("LookupContext#render with a layout", () => {
       "posts/index": '<% contentFor("title", () => { %>Home<% }) %><p>body</p>',
       "layouts/application": '<title><%= _layoutFor("title") %></title><%= yield %>',
     });
-    expect(await ctx.render(["posts"], "index", ["html"], {}, { layout: "application" })).toBe(
+    expect(await ctx.render(["posts"], "index", [":html"], {}, { layout: "application" })).toBe(
       "<title>Home</title><p>body</p>",
     );
   });

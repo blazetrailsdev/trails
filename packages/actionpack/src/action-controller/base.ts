@@ -382,7 +382,7 @@ export class Base extends Metal {
 
     const controllerPrefix = this.controllerPath();
     const formats = this.formats;
-    const format = String(formats[0] ?? "html");
+    const format = String(formats[0] ?? ":html");
     const locals = { ...options.locals };
     const view = this.viewContext();
     const layout =

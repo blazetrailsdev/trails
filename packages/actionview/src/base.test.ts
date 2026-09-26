@@ -244,9 +244,9 @@ describe("ActionView::Base lookup_context delegation", () => {
     const lookupContext = new LookupContext(null, {}, []);
     const view = new (Base.withEmptyTemplateCache())(lookupContext, {}, null);
 
-    view.formats = ["json"];
-    expect(lookupContext.formats).toEqual(["json"]);
-    expect(view.formats).toEqual(["json"]);
+    view.formats = [":json"];
+    expect(lookupContext.formats).toEqual([":json"]);
+    expect(view.formats).toEqual([":json"]);
 
     view.locale = "fr";
     expect(lookupContext.locale).toBe("fr");
@@ -373,7 +373,7 @@ describe("ActionView::Base#render", () => {
   it("renders through the formats-prepended lookup context in_rendering_context built", () => {
     expect(
       buildView()
-        .render({ template: "test/hello_world", formats: ["json"] })
+        .render({ template: "test/hello_world", formats: [":json"] })
         .toString(),
     ).toBe('{"hello":"world"}');
   });
@@ -387,7 +387,7 @@ describe("ActionView::Base#render", () => {
   it("restores the lookup context after in_rendering_context prepends formats", () => {
     const view = buildView();
     const before = view.lookupContext;
-    view.render({ template: "test/hello_world", formats: ["html"] });
+    view.render({ template: "test/hello_world", formats: [":html"] });
     expect(view.lookupContext).toBe(before);
   });
 });

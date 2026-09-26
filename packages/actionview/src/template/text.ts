@@ -24,6 +24,6 @@ export class Text {
   }
 
   format(): string {
-    return "text";
+    return ":text";
   }
 }

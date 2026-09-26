@@ -1,9 +1,8 @@
-import { Dir, File, NotImplementedError } from "@blazetrails/ruby-compat";
+import { Dir, File, NotImplementedError, symbolToS } from "@blazetrails/ruby-compat";
 import type { LookupDetails, PathSetResolver } from "../path-set.js";
 import { Requested, TemplateDetails, type DetailKey } from "../template-details.js";
 import { TemplateHandlers } from "../template/handlers.js";
 import { TemplatePath } from "../template-path.js";
-import { Types } from "../template/types.js";
 import { Template } from "../template.js";
 
 export interface TemplateWithDetails {
@@ -260,7 +259,7 @@ export class PathParser {
 
   buildPathRegex(): RegExp {
     const handlers = union(TemplateHandlers.extensions());
-    const formats = union(Types.symbols());
+    const formats = union(Template.Types.symbols().map(symbolToS));
     const locales = "[a-z]{2}(?:[-_][A-Z]{2})?";
     const variants = "[^.]*";
 
@@ -285,7 +284,7 @@ export class PathParser {
     const details = new TemplateDetails(
       locale ?? null,
       handler ?? null,
-      format ?? null,
+      format != null ? `:${format}` : null,
       variant ?? null,
     );
     return new ParsedPath(templatePath, details);

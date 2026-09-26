@@ -4,7 +4,7 @@ import { Text } from "./text.js";
 
 describe("TextTest", () => {
   it("format always return :text", () => {
-    expect(new Text("").format()).toBe("text");
+    expect(new Text("").format()).toBe(":text");
   });
 
   it("identifier should return 'text template'", () => {

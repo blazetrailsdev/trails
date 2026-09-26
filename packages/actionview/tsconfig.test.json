@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "outDir": "dist-test",
+    "rootDir": "src",
+    "paths": { "@blazetrails/actionpack": ["../actionpack/src/index.ts"] }
+  },
+  "include": ["src/**/*.test.ts"],
+  "references": [{ "path": "./tsconfig.json" }, { "path": "../actionpack" }]
+}

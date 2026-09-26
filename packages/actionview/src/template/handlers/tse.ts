@@ -55,10 +55,10 @@ export class Tse implements TemplateHandler {
     const mime = template.type != null ? formatToMimeType(template.type) : null;
     const escapeIgnore = mime != null && ctor.escapeIgnoreList.includes(mime);
     const options: EmitJsOptions = { escapeIgnore, raiseOnStrictLocalsMismatch: false };
-    const format = template.format ?? (mime === "text/html" ? "html" : null);
+    const format = template.format ?? (mime === "text/html" ? ":html" : null);
     if (
       ActionView.Base.annotateRenderedViewWithFilenames &&
-      format === "html" &&
+      format === ":html" &&
       template.shortIdentifier
     ) {
       const id = template.shortIdentifier;
@@ -79,17 +79,17 @@ export class Tse implements TemplateHandler {
 /** @internal */
 function formatToMimeType(format: string): string {
   switch (format) {
-    case "html":
+    case ":html":
       return "text/html";
-    case "text":
+    case ":text":
       return "text/plain";
-    case "json":
+    case ":json":
       return "application/json";
-    case "xml":
+    case ":xml":
       return "application/xml";
-    case "js":
+    case ":js":
       return "text/javascript";
-    case "css":
+    case ":css":
       return "text/css";
     default:
       return format;

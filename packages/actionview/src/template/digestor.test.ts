@@ -295,8 +295,8 @@ describe("TemplateDigestorTest", () => {
   });
 
   it("different formats with same logical template names results in different digests", () => {
-    const htmlDigest = digest("comments/_comment", { format: "html" });
-    const jsonDigest = digest("comments/_comment", { format: "json" });
+    const htmlDigest = digest("comments/_comment", { format: ":html" });
+    const jsonDigest = digest("comments/_comment", { format: ":json" });
 
     expect(htmlDigest).not.toBe(jsonDigest);
   });
