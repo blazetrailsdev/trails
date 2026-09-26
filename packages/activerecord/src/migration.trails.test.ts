@@ -542,7 +542,8 @@ describe("Migration::Compatibility::V7_0#renameTable", () => {
         expect(await connection.tableExists("more_testings")).toBe(false);
       }
     } finally {
-      await connection.dropTable("more_testings", longTableName, { ifExists: true });
+      await connection.dropTable("more_testings").catch(() => null);
+      await connection.dropTable(longTableName).catch(() => null);
     }
   });
 });
