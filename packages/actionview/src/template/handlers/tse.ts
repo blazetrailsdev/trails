@@ -54,7 +54,7 @@ export class Tse implements TemplateHandler {
     const prepared = ctor.stripTrailingNewlines ? chomp(source) : source;
     const mime = template.type != null ? formatToMimeType(template.type) : null;
     const escapeIgnore = mime != null && ctor.escapeIgnoreList.includes(mime);
-    const options: EmitJsOptions = { escapeIgnore, raiseOnStrictLocalsMismatch: false };
+    const options: EmitJsOptions = { escapeIgnore };
     const format = template.format ?? (mime === "text/html" ? ":html" : null);
     if (
       ActionView.Base.annotateRenderedViewWithFilenames &&
@@ -69,7 +69,6 @@ export class Tse implements TemplateHandler {
     return (
       "(" +
       result.code
-        .replace(/^import\s+\{[^}]*\}\s+from\s+"[^"]*";\n?/u, "")
         .replace(/^\s*export\s+default\s+/u, "")
         .replace(/^function\s+render\b/u, "function __tseCompiled") +
       ")(this, localAssigns)"

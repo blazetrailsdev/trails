@@ -1,13 +1,10 @@
 import { parse, type TseAst, type TseNode } from "./parser.js";
-import { parseLocalsSignature, type LocalEntry } from "./parse-locals.js";
 import { generateSourceMap, type RawSourceMap, type LineMapping } from "./source-map.js";
 
 export interface EmitJsOptions {
   escapeIgnore?: boolean;
   preamble?: string;
   postamble?: string;
-  raiseOnStrictLocalsMismatch?: boolean;
-  shortIdentifier?: string;
   fileName?: string;
   sourceFileName?: string;
 }
@@ -56,63 +53,8 @@ function netUnclosedParens(code: string): number {
   return Math.max(0, depth);
 }
 
-function emitLocalsBlock(
-  ast: TseAst,
-  raiseOnMismatch: boolean,
-  shortIdentifierFor: string,
-): { entries: LocalEntry[]; lines: string[] } {
-  if (ast.localsSignature === null) return { entries: [], lines: [] };
-  const entries = parseLocalsSignature(ast.localsSignature);
-  const lines: string[] = [];
-
-  if (raiseOnMismatch) {
-    const keyreq = entries.filter((e) => e.defaultExpr === null).map((e) => e.name);
-    const keywords = entries.map((e) => e.name);
-    const shortIdentifier = JSON.stringify(shortIdentifierFor);
-    if (keyreq.length > 0) {
-      lines.push(
-        `  const __missingKeys = ${JSON.stringify(keyreq)}.filter((k) => !Object.hasOwn(locals, k));`,
-        '  if (__missingKeys.length > 0) throw new StrictLocalsError(new ArgumentError(`missing keyword${__missingKeys.length > 1 ? "s" : ""}: ${__missingKeys.map((k) => ":" + k).join(", ")}`), { shortIdentifier: ' +
-          shortIdentifier +
-          " });",
-      );
-    }
-    if (keywords.length === 0) {
-      lines.push(
-        '  if (Object.keys(locals).length > 0) throw new StrictLocalsError(new ArgumentError("no keywords accepted"), { shortIdentifier: ' +
-          shortIdentifier +
-          " });",
-      );
-    } else {
-      lines.push(
-        `  const __allowedKeys = ${JSON.stringify(keywords)};`,
-        "  const __extraKeys = Object.keys(locals).filter((k) => !__allowedKeys.includes(k));",
-        '  if (__extraKeys.length > 0) throw new StrictLocalsError(new ArgumentError(`unknown keyword${__extraKeys.length > 1 ? "s" : ""}: ${__extraKeys.map((k) => ":" + k).join(", ")}`), { shortIdentifier: ' +
-          shortIdentifier +
-          " });",
-      );
-    }
-  }
-
-  if (entries.length > 0) {
-    const pieces = entries.map((e) =>
-      e.defaultExpr === null ? e.name : `${e.name} = ${e.defaultExpr}`,
-    );
-    lines.push(`  const { ${pieces.join(", ")} } = locals;`);
-  }
-
-  return { entries, lines };
-}
-
 function emit(ast: TseAst, options: EmitJsOptions): { code: string; mappings: LineMapping[] } {
   const exprAppend = options.escapeIgnore === true ? "safeExprAppend" : "append";
-  const shortIdentifier = options.shortIdentifier ?? options.sourceFileName ?? options.fileName;
-  const raiseOnMismatch = options.raiseOnStrictLocalsMismatch ?? ast.localsSignature !== null;
-  if (raiseOnMismatch && ast.localsSignature !== null && shortIdentifier == null) {
-    throw new Error("TSE: raiseOnStrictLocalsMismatch requires a shortIdentifier");
-  }
-  const { lines: localsLines } = emitLocalsBlock(ast, raiseOnMismatch, shortIdentifier ?? "");
-
   const lines: string[] = [];
   const lineMappings: LineMapping[] = [];
   let nextGenLine = 0;
@@ -127,14 +69,9 @@ function emit(ast: TseAst, options: EmitJsOptions): { code: string; mappings: Li
     lines.push(line);
   };
 
-  if (raiseOnMismatch && ast.localsSignature !== null) {
-    push('import { StrictLocalsError } from "@blazetrails/actionview";');
-    push('import { ArgumentError } from "@blazetrails/ruby-compat";');
-  }
   push("export default function render(context, locals) {");
   push("  const _ob = context.outputBuffer;");
   if (options.preamble) push("  " + options.preamble);
-  for (const l of localsLines) push(l);
   const innerDepths: number[] = [];
   const innerCallExprParens: number[] = [];
   for (const node of ast.nodes) {

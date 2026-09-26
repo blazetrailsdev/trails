@@ -1,4 +1,5 @@
 import {
+  ActiveSupportJSON,
   camelize,
   include,
   isPlainObject,
@@ -511,7 +512,7 @@ export class TestRequest extends AbstractTestRequest {
           case null:
             throw new Error(`Unknown Content-Type: ${this.contentType ?? ""}`);
           case ":json":
-            data = JSON.stringify(nonPathParameters);
+            data = ActiveSupportJSON.encode(nonPathParameters);
             break;
           case ":xml":
             data = toXml(nonPathParameters);
