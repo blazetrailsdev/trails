@@ -67,6 +67,8 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // actionview template/types.rb:39 `def ==(type)` → template/types.ts
   // `SimpleType#equals` (the class Rails aliases to `Types` at :47).
   "ActionView::Template::SimpleType": { "==": ["equals"] },
+  "ActionDispatch::Journey::Path::Pattern::MatchData": { "[]": ["at"] },
+  "ActionDispatch::Journey::GTG::TransitionTable": { "[]=": ["set"] },
   // arel/table.rb:82 `def [](name, table = self)` → table.ts `get`.
   "Arel::Table": { "[]": ["get"] },
   // active_model/errors.rb:229 `def [](attribute)` → errors.ts `get`.

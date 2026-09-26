@@ -63,6 +63,7 @@ export const JS_ENUMERABLE_ALIASES = new Map<string, string[]>([
   ["detect", ["find"]],
   ["collect", ["map"]],
   ["collect_concat", ["flatMap"]],
+  ["flatten", ["flat"]],
   ["each", ["forEach"]],
   ["inject", ["reduce"]],
   ["index", ["indexOf", "findIndex"]],

@@ -1,3 +1,4 @@
+import { isEmpty } from "@blazetrails/ruby-compat";
 import type { PathSet } from "../path-set.js";
 import type { TemplatePath } from "../template-path.js";
 
@@ -15,7 +16,7 @@ export class WildcardResolver {
   }
 
   resolve(): string[] {
-    if (!this.viewPaths || this.wildcardDependencies.length === 0) {
+    if (!this.viewPaths || isEmpty(this.wildcardDependencies)) {
       return [...new Set(this.explicitDependencies)];
     }
 

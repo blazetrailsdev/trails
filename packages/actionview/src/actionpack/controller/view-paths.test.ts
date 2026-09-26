@@ -47,7 +47,7 @@ class TestController implements ViewPaths {
 }
 
 function assertPaths(actual: PathSet, ...paths: string[]): void {
-  expect(actual.toArray().map((r) => (r as unknown as FileSystemResolver).path())).toEqual(
+  expect(actual.toArray().map((r) => (r as unknown as FileSystemResolver).path)).toEqual(
     expand(paths),
   );
 }

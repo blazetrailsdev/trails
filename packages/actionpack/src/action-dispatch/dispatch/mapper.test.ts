@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { bodyFromString } from "@blazetrails/rack";
 import { Mapper } from "../routing/mapper.js";
 import { RouteSet } from "../routing/route-set.js";
+import { ArgumentError } from "@blazetrails/activemodel";
 
 class FakeSet extends RouteSet {
   override resourcesPathNames: Record<string, string> = {};
@@ -18,10 +19,10 @@ describe("MapperTest", () => {
     expect(() => m.scope({ anchor: false } as Parameters<Mapper["scope"]>[0], () => {})).toThrow();
   });
 
-  it.skip("blows up without via", () => {
+  it("blows up without via", () => {
     const fakeset = new FakeSet();
     const m = new Mapper(fakeset);
-    expect(() => m.match("/", { to: "posts#index", as: "main" })).toThrow();
+    expect(() => m.match("/", { to: "posts#index", as: "main" })).toThrow(ArgumentError);
   });
 
   it.skip("unscoped formatted", () => {

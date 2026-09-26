@@ -116,10 +116,6 @@ export class GlobalID {
     return this.toString();
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
   toJSON(): string {
     return this.asJson();
   }
