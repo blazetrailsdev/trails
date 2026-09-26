@@ -1,0 +1,9 @@
+[
+  {
+    "package": "actiondispatch",
+    "tsFile": "routing/mapper.ts",
+    "rubyName": "defaults",
+    "call": "new",
+    "reason": "False positive: `@scope.new(...)` (mapper.rb:1046) calls the instance method Scope#new (mapper.rb:2351), which trails' `this._scope.new(...)` does; conventions.ts maps every Ruby `new` to `constructor`. Surfaced when exporting Mapping disambiguated Mapper#defaults from Mapping#defaults."
+  }
+]

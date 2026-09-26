@@ -99,7 +99,7 @@ export class Scope {
     return SCOPE_OPTIONS;
   }
 
-  newChild(hash: ScopeFrameHash): Scope {
+  new(hash: ScopeFrameHash): Scope {
     return new Scope(hash, this, this.scopeLevel);
   }
   newLevel(level: ScopeLevel): Scope {

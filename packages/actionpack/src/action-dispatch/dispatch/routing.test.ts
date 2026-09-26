@@ -187,7 +187,7 @@ describe("TestRoutingMapper", () => {
   it("constraints on dynamic segments", () => {
     const routes = new RouteSet();
     routes.draw((r) => {
-      r.get("/posts/:id", { to: "posts#show", as: "post", constraints: { id: /^\d+$/ } });
+      r.get("/posts/:id", { to: "posts#show", as: "post", constraints: { id: /\d+/ } });
     });
     expect(routes.recognize("GET", "/posts/42")).not.toBeNull();
     expect(routes.recognize("GET", "/posts/abc")).toBeNull();
