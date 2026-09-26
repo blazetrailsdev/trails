@@ -110,11 +110,11 @@ export function _writeLayoutMethod(this: LayoutsClass): void {
       return layout;
     };
   } else if (typeof layoutOption === "function") {
+    (this.prototype as { _layoutFromProc: unknown })._layoutFromProc = layoutOption;
     layoutDefinition = function (lookupContext, formats, keys) {
-      const result = (layoutOption as (self?: unknown) => LayoutValue).call(
-        this,
-        ...(layoutOption.length === 0 ? [] : [this]),
-      );
+      const result = (
+        this as unknown as { _layoutFromProc(self?: unknown): LayoutValue }
+      )._layoutFromProc(...(layoutOption.length === 0 ? [] : [this]));
       if (result == null) return defaultBehavior.call(this, lookupContext, formats, keys);
       return result;
     };

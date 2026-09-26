@@ -132,8 +132,6 @@ class SetsNonExistentLayoutFile extends LayoutTest {
 
 describe("LayoutExceptionRaisedTest", () => {
   test("exception raised when layout file not found", async () => {
-    await expect(get(new SetsNonExistentLayoutFile(), "hello")).rejects.toBeInstanceOf(
-      MissingTemplate,
-    );
+    await expect(get(new SetsNonExistentLayoutFile(), "hello")).rejects.toThrow(MissingTemplate);
   });
 });
