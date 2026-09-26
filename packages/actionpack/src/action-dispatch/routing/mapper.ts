@@ -35,7 +35,17 @@ import {
   stringSplit,
 } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { fetch, hasKey, hashDelete, isSymbol, merge, mergeBang, symbolToS } from "@blazetrails/ruby-compat";
+import {
+  dup,
+  fetch,
+  hasKey,
+  hashDelete,
+  isSymbol,
+  keepIf,
+  merge,
+  mergeBang,
+  symbolToS,
+} from "@blazetrails/ruby-compat";
 import { deprecator } from "../deprecator.js";
 
 type MapperCallback = (mapper: Mapper) => void;
@@ -399,12 +409,9 @@ export class Mapping {
     currentConditions: Record<string, unknown>,
     requestClass: { prototype: object },
   ): Record<string, unknown> {
-    const conditions = { ...currentConditions };
+    const conditions = dup(currentConditions);
 
-    for (const k of Object.keys(conditions)) {
-      if (!(k in requestClass.prototype)) delete conditions[k];
-    }
-    return conditions;
+    return keepIf(conditions, (k) => k in requestClass.prototype);
   }
 
   /** @internal */
@@ -495,7 +502,7 @@ export class Mapping {
 
       if (Mapping.ANCHOR_CHARACTERS_REGEX.test(regex.source)) {
         throw new ArgumentError(
-          `Regexp anchor characters are not allowed in routing requirements: :${requirement}`,
+          `Regexp anchor characters are not allowed in routing requirements: ${rbInspect(`:${requirement}`)}`,
         );
       }
 

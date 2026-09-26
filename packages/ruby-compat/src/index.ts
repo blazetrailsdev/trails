@@ -48,6 +48,7 @@ export {
   Hash,
   block,
   deleteIf,
+  keepIf,
   dup,
   eachKey,
   eachPair,
