@@ -44,6 +44,24 @@ describe("FileSystemResolver", () => {
     expect(ctx.findTemplate("index", ["posts"], [":html"])?.source).toBe("<h1>Posts</h1>");
   });
 
+  it("binds the requested locals, memoizing one template per locals set", () => {
+    const resolver = new FileSystemResolver(dir);
+    const details = { formats: [":html"], handlers: ["tse"] };
+
+    const [bound] = resolver.findAll("index", "posts", false, details, null, ["b", "a"]);
+    expect(bound.locals).toEqual(["a", "b"]);
+    expect(resolver.findAll("index", "posts", false, details, {}, ["a", "b"])[0].locals).toEqual([
+      "a",
+      "b",
+    ]);
+
+    const key = {};
+    const first = resolver.findAll("index", "posts", false, details, key, ["b", "a"])[0];
+    expect(resolver.findAll("index", "posts", false, details, key, ["a", "b"])[0]).toBe(first);
+    expect(resolver.findAll("index", "posts", false, details, key, [])[0]).not.toBe(first);
+    expect(resolver.builtTemplates()).toContain(first);
+  });
+
   it("finds a partial through the same paths as exists?", () => {
     const ctx = new LookupContext(null, {}, []);
     ctx.appendViewPaths([new FileSystemResolver(dir)]);

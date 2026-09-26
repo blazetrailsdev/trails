@@ -2,14 +2,10 @@ import { I18n } from "@blazetrails/activesupport";
 import { Dir, File, NotImplementedError, symbolToS } from "@blazetrails/ruby-compat";
 import type { LookupDetails, PathSetResolver } from "../path-set.js";
 import { Requested, TemplateDetails, type DetailKey } from "../template-details.js";
+import { UnboundTemplate } from "../unbound-template.js";
 import { TemplateHandlers } from "../template/handlers.js";
 import { TemplatePath } from "../template-path.js";
 import { Template } from "../template.js";
-
-export interface TemplateWithDetails {
-  template: Template;
-  details: TemplateDetails;
-}
 
 export abstract class Resolver implements PathSetResolver {
   static caching: boolean = true;
@@ -67,37 +63,6 @@ export abstract class Resolver implements PathSetResolver {
       "Subclasses must implement a findTemplates(name, prefix, partial, details, locals = []) method",
     );
   }
-
-  /** @internal */
-  protected requestedDetailsFor(details: LookupDetails, key: unknown): Requested {
-    if (key instanceof Requested) return key;
-    const d = details as Record<string, ReadonlyArray<DetailKey> | undefined>;
-    return new Requested({
-      locale: d.locale ?? [],
-      handlers: d.handlers ?? [],
-      formats: d.formats ?? [],
-      variants: d.variants ?? [],
-    });
-  }
-
-  /** @internal */
-  protected filterAndSortByDetails(
-    templates: ReadonlyArray<TemplateWithDetails>,
-    requestedDetails: Requested,
-  ): Template[] {
-    const filteredTemplates = templates.filter((t) => t.details.matches(requestedDetails));
-
-    if (filteredTemplates.length > 1) {
-      filteredTemplates.sort((a, b) =>
-        compareSortKeys(
-          a.details.sortKeyFor(requestedDetails),
-          b.details.sortKeyFor(requestedDetails),
-        ),
-      );
-    }
-
-    return filteredTemplates.map((t) => t.template);
-  }
 }
 
 function compareSortKeys(
@@ -111,7 +76,7 @@ function compareSortKeys(
 }
 
 export class FileSystemResolver extends Resolver {
-  private templatesCache = new Map<string, TemplateWithDetails[]>();
+  private unboundTemplates = new Map<string, UnboundTemplate[]>();
   private pathParser = new PathParser();
   protected _path: string;
 
@@ -127,7 +92,7 @@ export class FileSystemResolver extends Resolver {
   }
 
   override clearCache(): void {
-    this.templatesCache.clear();
+    this.unboundTemplates.clear();
     this.pathParser = new PathParser();
     super.clearCache();
   }
@@ -149,9 +114,9 @@ export class FileSystemResolver extends Resolver {
   }
 
   override builtTemplates(): Template[] {
-    return Array.from(this.templatesCache.values()).flatMap((templates) =>
-      templates.map((t) => t.template),
-    );
+    return Array.from(this.unboundTemplates.values())
+      .flat()
+      .flatMap((unboundTemplate) => unboundTemplate.builtTemplates());
   }
 
   override allTemplatePaths(): readonly TemplatePath[] {
@@ -170,19 +135,31 @@ export class FileSystemResolver extends Resolver {
     partial: boolean,
     details: LookupDetails,
     key: unknown,
-    _locals: ReadonlyArray<string>,
+    locals: ReadonlyArray<string>,
   ): Template[] {
-    const requestedDetails = this.requestedDetailsFor(details, key);
-    const path = TemplatePath.build(name, prefix, partial);
+    const d = details as Record<string, ReadonlyArray<DetailKey> | undefined>;
+    const requestedDetails =
+      key instanceof Requested
+        ? key
+        : new Requested({
+            locale: d.locale ?? [],
+            handlers: d.handlers ?? [],
+            formats: d.formats ?? [],
+            variants: d.variants ?? [],
+          });
+    const cache = key != null ? this.unboundTemplates : new Map<string, UnboundTemplate[]>();
 
-    const cache = key != null ? this.templatesCache : undefined;
-    let templates = cache?.get(path.virtual);
-    if (templates === undefined) {
-      templates = this.unboundTemplatesFromPath(path);
-      cache?.set(path.virtual, templates);
+    const virtual = TemplatePath.virtual(name, prefix, partial);
+    let unboundTemplates = cache.get(virtual);
+    if (unboundTemplates === undefined) {
+      const path = TemplatePath.build(name, prefix, partial);
+      unboundTemplates = this.unboundTemplatesFromPath(path);
+      cache.set(virtual, unboundTemplates);
     }
 
-    return this.filterAndSortByDetails(templates, requestedDetails);
+    return this.filterAndSortByDetails(unboundTemplates, requestedDetails).map((unboundTemplate) =>
+      unboundTemplate.bindLocals(locals),
+    );
   }
 
   /**
@@ -194,38 +171,53 @@ export class FileSystemResolver extends Resolver {
   }
 
   /** @internal */
-  protected buildUnboundTemplate(template: string): TemplateWithDetails | null {
+  protected buildUnboundTemplate(template: string): UnboundTemplate | null {
     const parsed = this.pathParser.parse(template.slice(this._path.length + 1));
     const details = parsed.details;
     if (typeof details.handler !== "string") return null;
+    const source = this.sourceForTemplate(template);
 
-    const built = new Template({
-      source: this.sourceForTemplate(template),
-      extension: details.handler,
-      identifier: template,
+    return new UnboundTemplate(source, template, {
+      details: details,
       virtualPath: parsed.path.virtual,
-      format: typeof details.format === "string" ? details.format : null,
-      variant: typeof details.variant === "string" ? details.variant : null,
-      fullPath: template,
-      isPartial: parsed.path.partial,
     });
-
-    return { template: built, details };
   }
 
   /** @internal */
-  protected unboundTemplatesFromPath(path: TemplatePath): TemplateWithDetails[] {
-    if (path.name.includes(".")) return [];
-
-    const paths = this.templateGlob(`${this.escapeEntry(path.virtual)}*`);
-    const templates: TemplateWithDetails[] = [];
-
-    for (const template of paths) {
-      const built = this.buildUnboundTemplate(template);
-      if (built !== null && built.template.virtualPath === path.virtual) templates.push(built);
+  protected unboundTemplatesFromPath(path: TemplatePath): UnboundTemplate[] {
+    if (path.name.includes(".")) {
+      return [];
     }
 
-    return templates;
+    const paths = this.templateGlob(`${this.escapeEntry(path.toString())}*`);
+
+    return paths
+      .map((path) => this.buildUnboundTemplate(path))
+      .filter(
+        (template): template is UnboundTemplate =>
+          template !== null && template.virtualPath === path.virtual,
+      );
+  }
+
+  /** @internal */
+  private filterAndSortByDetails(
+    templates: ReadonlyArray<UnboundTemplate>,
+    requestedDetails: Requested,
+  ): UnboundTemplate[] {
+    const filteredTemplates = templates.filter((template) =>
+      template.details.matches(requestedDetails),
+    );
+
+    if (filteredTemplates.length > 1) {
+      filteredTemplates.sort((a, b) =>
+        compareSortKeys(
+          a.details.sortKeyFor(requestedDetails),
+          b.details.sortKeyFor(requestedDetails),
+        ),
+      );
+    }
+
+    return filteredTemplates;
   }
 
   /** @internal */
