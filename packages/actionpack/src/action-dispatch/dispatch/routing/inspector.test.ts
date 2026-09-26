@@ -1,4 +1,6 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { TopLevel } from "@blazetrails/activesupport";
+import { stringSplit } from "@blazetrails/ruby-compat";
 import { Mapper } from "../../routing/mapper.js";
 import type { MountableApp } from "../../routing/route.js";
 import { RouteSet } from "../../routing/route-set.js";
@@ -9,11 +11,32 @@ class MountedRackApp {
 }
 const mountedRackApp = MountedRackApp as unknown as MountableApp;
 
+class Engine {}
+
+function engineClass(): typeof Engine & { routes: RouteSet } {
+  return class extends Engine {
+    static routes = new RouteSet();
+
+    static inspect(): string {
+      return "Blog::Engine";
+    }
+
+    static call(_env: Record<string, unknown>): void {}
+  };
+}
+
 describe("RoutesInspectorTest", () => {
   let set: RouteSet;
+  let trails: typeof TopLevel.Trails;
 
   beforeEach(() => {
     set = new RouteSet();
+    trails = TopLevel.Trails;
+    TopLevel.Trails = { Engine } as never;
+  });
+
+  afterEach(() => {
+    TopLevel.Trails = trails;
   });
 
   function draw(
@@ -22,12 +45,45 @@ describe("RoutesInspectorTest", () => {
   ): string[] {
     set.draw(cb as Parameters<typeof set.draw>[0]);
     const { formatter = new ConsoleFormatter.Sheet(), ...filter } = opts;
-    return new RoutesInspector(set.getRoutes()).format(formatter, filter).split("\n");
+    return stringSplit(new RoutesInspector(set.getRoutes()).format(formatter, filter), "\n");
   }
 
-  it.skip("displaying routes for engines", () => {});
+  it("displaying routes for engines", () => {
+    const engine = engineClass();
+    engine.routes.draw((r) => {
+      r.get("/cart", { to: "cart#show" });
+    });
 
-  it.skip("displaying routes for engines without routes", () => {});
+    const output = draw((r) => {
+      r.get("/custom/assets", { to: "custom_assets#show" });
+      r.mount(engine as unknown as MountableApp, { at: "/blog", as: "blog" });
+    });
+
+    expect(output).toEqual([
+      "       Prefix Verb URI Pattern              Controller#Action",
+      "custom_assets GET  /custom/assets(.:format) custom_assets#show",
+      "         blog      /blog                    Blog::Engine",
+      "",
+      "Routes for Blog::Engine:",
+      "  cart GET  /cart(.:format) cart#show",
+    ]);
+  });
+
+  it("displaying routes for engines without routes", () => {
+    const engine = engineClass();
+    engine.routes.draw(() => {});
+
+    const output = draw((r) => {
+      r.mount(engine as unknown as MountableApp, { at: "/blog", as: "blog" });
+    });
+
+    expect(output).toEqual([
+      "Prefix Verb URI Pattern Controller#Action",
+      "  blog      /blog       Blog::Engine",
+      "",
+      "Routes for Blog::Engine:",
+    ]);
+  });
 
   it("cart inspect", () => {
     const output = draw((r) => {

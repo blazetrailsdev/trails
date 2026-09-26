@@ -6,6 +6,7 @@ import { TopLevel } from "@blazetrails/activesupport";
 import type { CacheStore, Logger } from "@blazetrails/activesupport";
 import { Application } from "./application.js";
 import { BacktraceCleaner } from "./backtrace-cleaner.js";
+import { Engine } from "./engine.js";
 import type { Configuration } from "./application/configuration.js";
 import { resolveEnv } from "./database.js";
 import type { InitializerGroup } from "./initializable.js";
@@ -27,6 +28,10 @@ export class Trails {
 
   static get Application(): typeof Application {
     return Application;
+  }
+
+  static get Engine(): typeof Engine {
+    return Engine;
   }
 
   static get application(): Application | null {
