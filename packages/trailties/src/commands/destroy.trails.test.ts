@@ -53,4 +53,25 @@ describe("DestroyCommand", () => {
     expect(listFiles(tmpDir)).toEqual(before);
     expect(fs.readFileSync(path.join(tmpDir, "config", "routes.ts"), "utf-8")).toBe(routes);
   });
+
+  it("a pretended revoke reports but leaves files and the routes line in place", async () => {
+    fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
+    fs.mkdirSync(path.join(tmpDir, "config"));
+    fs.writeFileSync(path.join(tmpDir, "config", "routes.ts"), "// routes\n");
+    await Generators.invoke("scaffold", ["Post"], { cwd: tmpDir, output: () => {} });
+    const generated = listFiles(tmpDir);
+    const routes = fs.readFileSync(path.join(tmpDir, "config", "routes.ts"), "utf-8");
+
+    const lines: string[] = [];
+    await Generators.invoke("scaffold", ["Post"], {
+      cwd: tmpDir,
+      output: (m) => lines.push(m),
+      behavior: "revoke",
+      pretend: true,
+    });
+
+    expect(lines).toContain("      remove  app/models/post.ts");
+    expect(listFiles(tmpDir)).toEqual(generated);
+    expect(fs.readFileSync(path.join(tmpDir, "config", "routes.ts"), "utf-8")).toBe(routes);
+  });
 });

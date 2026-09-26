@@ -209,7 +209,7 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     const fullPath = File.join(this.cwd, relativePath);
     if (this.behavior === "revoke") {
       this.output(`      remove  ${relativePath}`);
-      if (File.isExist(fullPath)) FileUtils.rmRf(fullPath);
+      if (!this.options.pretend && File.isExist(fullPath)) FileUtils.rmRf(fullPath);
       return;
     }
     FileUtils.mkdirP(File.dirname(fullPath));
@@ -257,13 +257,18 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     this.output(`    subtract  ${relativePath}`);
     if (!File.isExist(fullPath)) return;
     const existing = File.read(fullPath);
-    const updated = existing.replace(new RegExp(pattern), content);
-    if (updated !== existing) File.write(fullPath, updated);
+    const updated = existing.replace(new RegExp(pattern, "g"), content);
+    if (!this.options.pretend) File.write(fullPath, updated);
   }
 
-  /** @noRailsEquivalent PERMANENT */
-  relativeToOriginalDestinationRoot(path: string): string {
-    return path.startsWith(`${this.cwd}/`) ? path.slice(this.cwd.length + 1) : path;
+  relativeToOriginalDestinationRoot(path: string, removeDot: boolean = true): string {
+    const root = this.cwd;
+    if (path.startsWith(root) && ["/", ""].includes(path.slice(root.length, root.length + 1))) {
+      path = "." + path.slice(root.length);
+      return removeDot ? path.slice(2) : path;
+    } else {
+      return path;
+    }
   }
 
   protected readFile(relativePath: string): string {

@@ -125,6 +125,7 @@ export class AuthenticationGenerator extends GeneratorBase {
         cwd: this.cwd,
         output: this.output,
         behavior: this.behavior,
+        pretend: this.options.pretend,
       });
       for (const file of generator.run(words[0], words.slice(1))) this.createdFiles.push(file);
     }
