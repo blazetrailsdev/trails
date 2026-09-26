@@ -8,7 +8,7 @@ describe("WelcomeController", () => {
   });
 
   it("disables the layout (mirrors Rails `layout false`)", () => {
-    expect(WelcomeController.layout).toBe(false);
+    expect(WelcomeController._layout).toBe(false);
   });
 
   it("index raises MissingExactTemplate when no template resolver is configured", async () => {

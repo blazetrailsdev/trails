@@ -35,7 +35,6 @@ import {
   _writeLayoutMethod,
   isActionHasLayout,
   layout,
-  setActionHasLayout,
   detailsForLookup,
   isAnyTemplates,
   lookupContext,
@@ -448,7 +447,7 @@ export class Base extends Metal {
 
   redirectTo(
     options: string,
-    responseOptionsAndFlash: {
+    responseOptions: {
       status?: number | string;
       allow_other_host?: boolean;
       flash?: Record<string, unknown>;
@@ -456,13 +455,13 @@ export class Base extends Metal {
     } = {},
   ): void {
     for (const flashType of (this.constructor as typeof Base)._flashTypes) {
-      const type = responseOptionsAndFlash[flashType];
-      delete responseOptionsAndFlash[flashType];
+      const type = responseOptions[flashType];
+      delete responseOptions[flashType];
       if (type != null && type !== false) this.flash.set(flashType, type);
     }
 
-    const otherFlashes = responseOptionsAndFlash.flash;
-    delete responseOptionsAndFlash.flash;
+    const otherFlashes = responseOptions.flash;
+    delete responseOptions.flash;
     if (otherFlashes != null) this.flash.update(otherFlashes);
 
     if (this.performed) {
@@ -471,9 +470,7 @@ export class Base extends Metal {
       );
     }
 
-    const proposedStatus = responseOptionsAndFlash.status
-      ? statusCode(responseOptionsAndFlash.status)
-      : 302;
+    const proposedStatus = responseOptions.status ? statusCode(responseOptions.status) : 302;
     this.status = proposedStatus;
     this.setHeader("location", options);
     this.contentType = "text/html; charset=utf-8";
@@ -799,7 +796,6 @@ export class Base extends Metal {
   declare _layoutConditions: Record<string, string[]>;
   /** @internal */
   declare _processRenderTemplateOptions: typeof _processRenderTemplateOptions;
-  declare setActionHasLayout: typeof setActionHasLayout;
   declare isActionHasLayout: typeof isActionHasLayout;
   /** @internal */
   declare _isConditionalLayout: typeof _isConditionalLayout;
@@ -933,7 +929,6 @@ export class Base extends Metal {
 
 include(Base, ConfigMethods);
 Base.prototype._processRenderTemplateOptions = _processRenderTemplateOptions;
-Base.prototype.setActionHasLayout = setActionHasLayout;
 Base.prototype.isActionHasLayout = isActionHasLayout;
 Base.prototype._isConditionalLayout = _isConditionalLayout;
 Base.prototype._layoutForOption = _layoutForOption;

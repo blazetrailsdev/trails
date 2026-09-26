@@ -14,8 +14,7 @@ type LayoutMethod = (
 ) => LayoutValue;
 type LayoutOption = string | ((...args: never[]) => unknown) | boolean | null | undefined;
 
-/** @internal */
-export interface Layouts {
+type Layouts = {
   actionName: string;
   _actionHasLayout?: boolean;
   _layoutConditions: Record<string, string[]>;
@@ -26,10 +25,9 @@ export interface Layouts {
     formats: readonly string[],
     keys: readonly string[],
   ): unknown;
-}
+};
 
-/** @internal */
-export interface LayoutsClass {
+type LayoutsClass = {
   name: string;
   prototype: object;
   _layout?: LayoutOption;
@@ -38,7 +36,7 @@ export interface LayoutsClass {
   viewPaths(): PathSet;
   _writeLayoutMethod(): void;
   _impliedLayoutName(): string;
-}
+};
 
 export const LayoutConditions = {
   /** @internal */
@@ -154,10 +152,6 @@ export function _processRenderTemplateOptions(
     delete options["layout"];
     options["layout"] = _layoutForOption.call(this, layout as LayoutOption);
   }
-}
-
-export function setActionHasLayout(this: Layouts, value: boolean): void {
-  this._actionHasLayout = value;
 }
 
 export function isActionHasLayout(this: Layouts): boolean {
