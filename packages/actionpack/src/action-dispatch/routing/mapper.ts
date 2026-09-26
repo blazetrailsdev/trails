@@ -1080,12 +1080,12 @@ export class Mapper {
     path: string | Record<string, unknown>,
     ...rest: (string | (RouteOptions & { via?: string | string[] }))[]
   ): void {
-    let options: RouteOptions & { via?: string | string[] };
+    let options: Record<string, unknown>;
     let paths: string[];
     if (rest.length === 0 && isPlainObject(path)) {
-      const hash: Record<string, unknown> = path;
+      options = path;
       let to: unknown;
-      [path, to] = (Object.entries(hash).find(([name, _value]) => !isSymbol(name)) ?? []) as [
+      [path, to] = (Object.entries(options).find(([name, _value]) => !isSymbol(name)) ?? []) as [
         string,
         unknown,
       ];
@@ -1093,31 +1093,31 @@ export class Mapper {
       if (path == null) throw new ArgumentError("Route path not specified");
 
       if (isSymbol(to)) {
-        hash[":action"] = symbolToS(to);
+        options[":action"] = symbolToS(to);
       } else if (typeof to === "string") {
         if (to.includes("#")) {
-          hash[":to"] = to;
+          options[":to"] = to;
         } else {
-          hash[":controller"] = to;
+          options[":controller"] = to;
         }
       } else {
-        hash[":to"] = to;
+        options[":to"] = to;
       }
 
-      hashDelete(hash, path);
-      options = stringifyKeys(hash);
+      hashDelete(options, path);
+      options = stringifyKeys(options);
       paths = [path];
     } else {
-      options = (rest.pop() as RouteOptions & { via?: string | string[] }) ?? {};
+      options = (rest.pop() as Record<string, unknown> | undefined) ?? {};
       paths = [path as string, ...(rest as string[])];
     }
 
     if ("defaults" in options) {
       const defaults = options.defaults as Record<string, string>;
       delete options.defaults;
-      this.defaults(defaults, () => this.mapMatch(paths, options));
+      this.defaults(defaults, () => this.mapMatch(paths, options as RouteOptions));
     } else {
-      this.mapMatch(paths, options);
+      this.mapMatch(paths, options as RouteOptions);
     }
   }
 
