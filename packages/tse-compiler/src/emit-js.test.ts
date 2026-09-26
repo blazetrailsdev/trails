@@ -6,16 +6,21 @@ describe("compileJs", () => {
     const { code } = compileJs("<h1><%= name %></h1>");
     expect(code).toBe(
       [
-        "export default function render(context, locals) {",
-        "  const _ob = context.outputBuffer;",
-        '  _ob.safeAppend("<h1>");',
-        "  _ob.append(name);",
-        '  _ob.safeAppend("</h1>");',
-        "  return _ob;",
+        "export default function render(context, locals) { const _ob = context.outputBuffer;" +
+          ' _ob.safeAppend("<h1>"); _ob.append(name); _ob.safeAppend("</h1>");',
+        "return _ob;",
         "}",
         "",
       ].join("\n"),
     );
+  });
+
+  it("emits each template line's code on the same line of the compiled source", () => {
+    const { code } = compileJs("first line\n<%= boom() %>\n<% if (x) { %>\n<% } %>last\n");
+    const lines = code.split("\n");
+    expect(lines[1]).toContain("_ob.append(boom());");
+    expect(lines[2]).toContain("if (x) {");
+    expect(lines[3]).toContain('_ob.safeAppend("last\\n");');
   });
 
   it("dispatches expression sites by escape mode and indicator", () => {
@@ -30,15 +35,11 @@ describe("compileJs", () => {
     const { code } = compileJs(src);
     expect(code).toBe(
       [
-        "export default function render(context, locals) {",
-        "  const _ob = context.outputBuffer;",
-        "  _ob.append(forEach(items, (item) =>",
-        "  context.capture(() => {",
-        '  context.outputBuffer.safeAppend("<li>");',
-        "  context.outputBuffer.append(item);",
-        '  context.outputBuffer.safeAppend("</li>");',
-        "  })));",
-        "  return _ob;",
+        "export default function render(context, locals) { const _ob = context.outputBuffer;" +
+          " _ob.append(forEach(items, (item) => context.capture(() => {" +
+          ' context.outputBuffer.safeAppend("<li>"); context.outputBuffer.append(item);' +
+          ' context.outputBuffer.safeAppend("</li>"); })));',
+        "return _ob;",
         "}",
         "",
       ].join("\n"),
@@ -48,38 +49,33 @@ describe("compileJs", () => {
   it("handles nested block expressions", () => {
     const src = "<%= outer((x) => { %><%= inner((y) => { %><% }) %><% }) %>";
     const { code } = compileJs(src);
-    const lines = code.split("\n");
-    expect(lines).toContain("  _ob.append(outer((x) =>");
-    expect(lines).toContain("  context.outputBuffer.append(inner((y) =>");
-    expect(lines.filter((l) => l === "  })));")).toHaveLength(2);
+    expect(code).toContain("_ob.append(outer((x) =>");
+    expect(code).toContain("context.outputBuffer.append(inner((y) =>");
+    expect(code.split(" })));")).toHaveLength(3);
   });
 
   it("does not close blockExpr on inner code braces", () => {
     const src = "<%= forEach(items, (item) => { %><% if (x) { %><%= item %><% } %><% }) %>";
     const { code } = compileJs(src);
-    const lines = code.split("\n");
-    expect(lines).toContain("  _ob.append(forEach(items, (item) =>");
-    expect(lines.some((l) => l.includes("if (x) {"))).toBe(true);
-    expect(lines).toContain("  })));");
-    expect(lines.filter((l) => l === "  })));")).toHaveLength(1);
+    expect(code).toContain("_ob.append(forEach(items, (item) =>");
+    expect(code).toContain("if (x) {");
+    expect(code.split(" })));")).toHaveLength(2);
   });
 
   it("tracks } else { as net-zero brace delta so the blockExpr closer is recognised", () => {
     const src =
       "<%= forEach(items, (item) => { %><% if (x) { %><%= item %><% } else { %><%= other %><% } %><% }) %>";
     const { code } = compileJs(src);
-    const lines = code.split("\n");
-    expect(lines).toContain("  _ob.append(forEach(items, (item) =>");
-    expect(lines.filter((l) => l === "  })));")).toHaveLength(1);
+    expect(code).toContain("_ob.append(forEach(items, (item) =>");
+    expect(code.split(" })));")).toHaveLength(2);
   });
 
   it("closes correctly when the blockExpr has no wrapping helper call (zero callExpr parens)", () => {
     const src = "<%= (x) => { %><span><%= x %></span><% } %>";
     const { code } = compileJs(src);
-    const lines = code.split("\n");
-    expect(lines).toContain("  _ob.append((x) =>");
-    expect(lines).toContain("  context.capture(() => {");
-    expect(lines).toContain("  }));");
+    expect(code).toContain("_ob.append((x) =>");
+    expect(code).toContain("context.capture(() => {");
+    expect(code).toContain(" }));");
   });
 
   it("throws a clear error for function-form blockExpr (arrow syntax required)", () => {
@@ -152,10 +148,7 @@ describe("compileJs", () => {
         preamble: "_ob.safeAppend('<!-- BEGIN -->');",
         postamble: "_ob.safeAppend('<!-- END -->');",
       });
-      const lines = code.split("\n");
-      const obIdx = lines.findIndex((l) => l.includes("const _ob"));
-      const preIdx = lines.findIndex((l) => l.includes("<!-- BEGIN -->"));
-      expect(preIdx).toBe(obIdx + 1);
+      expect(code).toContain("const _ob = context.outputBuffer; _ob.safeAppend('<!-- BEGIN -->');");
     });
 
     it("emits postamble immediately before return _ob", () => {
@@ -163,10 +156,7 @@ describe("compileJs", () => {
         preamble: "_ob.safeAppend('<!-- BEGIN -->');",
         postamble: "_ob.safeAppend('<!-- END -->');",
       });
-      const lines = code.split("\n");
-      const postIdx = lines.findIndex((l) => l.includes("<!-- END -->"));
-      const returnIdx = lines.findIndex((l) => l.trim() === "return _ob;");
-      expect(postIdx).toBe(returnIdx - 1);
+      expect(code).toContain("_ob.safeAppend('<!-- END -->'); return _ob;");
     });
 
     it("emits nothing extra when preamble/postamble are omitted", () => {

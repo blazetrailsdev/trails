@@ -55,23 +55,32 @@ function netUnclosedParens(code: string): number {
 
 function emit(ast: TseAst, options: EmitJsOptions): { code: string; mappings: LineMapping[] } {
   const exprAppend = options.escapeIgnore === true ? "safeExprAppend" : "append";
-  const lines: string[] = [];
+  let code = "";
   const lineMappings: LineMapping[] = [];
-  let nextGenLine = 0;
+  let genLine = 0;
+  let lineStart = true;
   const push = (line: string, srcLine?: number): void => {
+    if (srcLine !== undefined) {
+      while (genLine < srcLine) {
+        code += "\n";
+        genLine += 1;
+        lineStart = true;
+      }
+    }
     const newlines = line.match(/\n/g)?.length ?? 0;
     if (srcLine !== undefined) {
       for (let i = 0; i <= newlines; i++) {
-        lineMappings.push({ genLine: nextGenLine + i, srcLine: srcLine + i });
+        lineMappings.push({ genLine: genLine + i, srcLine: srcLine + i });
       }
     }
-    nextGenLine += 1 + newlines;
-    lines.push(line);
+    code += (lineStart ? "" : " ") + line;
+    genLine += newlines;
+    lineStart = false;
   };
 
   push("export default function render(context, locals) {");
-  push("  const _ob = context.outputBuffer;");
-  if (options.preamble) push("  " + options.preamble);
+  push("const _ob = context.outputBuffer;");
+  if (options.preamble) push(options.preamble);
   const innerDepths: number[] = [];
   const innerCallExprParens: number[] = [];
   for (const node of ast.nodes) {
@@ -87,8 +96,8 @@ function emit(ast: TseAst, options: EmitJsOptions): { code: string; mappings: Li
       const callExpr = trimmed.replace(/\s*\{\s*$/, "").trimEnd();
       innerDepths.push(0);
       innerCallExprParens.push(netUnclosedParens(callExpr));
-      push(`  ${bufRef}.${exprAppend}(${callExpr}`, node.srcLine);
-      push("  context.capture(() => {");
+      push(`${bufRef}.${exprAppend}(${callExpr}`, node.srcLine);
+      push("context.capture(() => {");
     } else if (node.kind === "code" && insideBlock) {
       const innerDepth = innerDepths[innerDepths.length - 1];
       if (BLOCK_CLOSE_RE.test(node.value) && innerDepth === 0) {
@@ -98,13 +107,13 @@ function emit(ast: TseAst, options: EmitJsOptions): { code: string; mappings: Li
         const tClean = t.endsWith(";") ? t.slice(0, -1) : t;
         const closingParensInT = (tClean.match(/\)/g) ?? []).length;
         const suffix = ")".repeat(Math.max(0, 2 + callExprParens - closingParensInT)) + ";";
-        push(`  ${tClean}${suffix}`, node.srcLine);
+        push(`${tClean}${suffix}`, node.srcLine);
       } else {
         innerDepths[innerDepths.length - 1] += netBraceDepth(node.value);
-        push("  " + emitNode(node, exprAppend, "context.outputBuffer"), node.srcLine);
+        push(emitNode(node, exprAppend, "context.outputBuffer"), node.srcLine);
       }
     } else {
-      push("  " + emitNode(node, exprAppend, bufRef), node.srcLine);
+      push(emitNode(node, exprAppend, bufRef), node.srcLine);
     }
   }
   if (innerDepths.length > 0) {
@@ -112,10 +121,10 @@ function emit(ast: TseAst, options: EmitJsOptions): { code: string; mappings: Li
       `TSE: ${innerDepths.length} block-expr tag(s) were never closed — missing <% } %> or <% }) %>`,
     );
   }
-  if (options.postamble) push("  " + options.postamble);
-  push("  return _ob;");
-  push("}");
-  return { code: lines.join("\n") + "\n", mappings: lineMappings };
+  code += "\n";
+  if (options.postamble) code += options.postamble + " ";
+  code += "return _ob;\n}\n";
+  return { code, mappings: lineMappings };
 }
 
 function emitNode(node: TseNode, exprAppend: string, bufRef: string): string {

@@ -19,20 +19,32 @@ describe("tokenizeLine", () => {
   it("yields CODE for tag contents (trimmed, matching the compiler) and TEXT for static spans", () => {
     expect(tokenizeLine("hi <%= name %>!")).toEqual([
       { kind: "TEXT", value: "hi " },
+      { kind: "OPEN", value: "<%= " },
       { kind: "CODE", value: "name" },
+      { kind: "CLOSE", value: " %>" },
       { kind: "TEXT", value: "!" },
     ]);
   });
 
   it("strips the trim `-` markers from CODE bounds", () => {
-    expect(tokenizeLine("<%- x -%>")).toEqual([{ kind: "CODE", value: "x" }]);
+    expect(tokenizeLine("<%- x -%>")).toEqual([
+      { kind: "OPEN", value: "<%- " },
+      { kind: "CODE", value: "x" },
+      { kind: "CLOSE", value: " -%>" },
+    ]);
   });
 
   it("consumes following `[ \\t]*\\r?\\n` after a `-%>` tag (trim-right parity with the lexer)", () => {
-    expect(tokenizeLine("<%= x -%>\n")).toEqual([{ kind: "CODE", value: "x" }]);
+    expect(tokenizeLine("<%= x -%>\n")).toEqual([
+      { kind: "OPEN", value: "<%= " },
+      { kind: "CODE", value: "x" },
+      { kind: "CLOSE", value: " -%>\n" },
+    ]);
     expect(tokenizeLine("a <%= x -%>  \nb")).toEqual([
       { kind: "TEXT", value: "a " },
+      { kind: "OPEN", value: "<%= " },
       { kind: "CODE", value: "x" },
+      { kind: "CLOSE", value: " -%>  \n" },
       { kind: "TEXT", value: "b" },
     ]);
   });
@@ -40,7 +52,9 @@ describe("tokenizeLine", () => {
   it("strips trailing `[ \\t]*` from preceding TEXT when a `<%-` tag opens", () => {
     expect(tokenizeLine("hi   \t<%- x %> after")).toEqual([
       { kind: "TEXT", value: "hi" },
+      { kind: "OPEN", value: "   \t<%- " },
       { kind: "CODE", value: "x" },
+      { kind: "CLOSE", value: " %>" },
       { kind: "TEXT", value: " after" },
     ]);
   });
@@ -52,16 +66,22 @@ describe("tokenizeLine", () => {
   it("drops `<%# ... %>` comments — they're absent from compiled output", () => {
     expect(tokenizeLine("a <%# note %> <%= x %>")).toEqual([
       { kind: "TEXT", value: "a " },
+      { kind: "OPEN", value: "<%# note %>" },
       { kind: "TEXT", value: " " },
+      { kind: "OPEN", value: "<%= " },
       { kind: "CODE", value: "x" },
+      { kind: "CLOSE", value: " %>" },
     ]);
   });
 
   it("drops `<%! types: ... !%>` typesMagic blocks", () => {
     expect(tokenizeLine("pre <%! types: T !%> <%= x %>")).toEqual([
       { kind: "TEXT", value: "pre " },
+      { kind: "OPEN", value: "<%! types: T !%>" },
       { kind: "TEXT", value: " " },
+      { kind: "OPEN", value: "<%= " },
       { kind: "CODE", value: "x" },
+      { kind: "CLOSE", value: " %>" },
     ]);
   });
 
@@ -69,7 +89,9 @@ describe("tokenizeLine", () => {
     expect(tokenizeLine("a <%% b %%> c")).toEqual([{ kind: "TEXT", value: "a <% b %> c" }]);
     expect(tokenizeLine("<%% <%= x %> %%>")).toEqual([
       { kind: "TEXT", value: "<% " },
+      { kind: "OPEN", value: "<%= " },
       { kind: "CODE", value: "x" },
+      { kind: "CLOSE", value: " %>" },
       { kind: "TEXT", value: " %>" },
     ]);
   });
@@ -80,7 +102,7 @@ describe("findOffset", () => {
     const tokens = tokenizeLine("<%= name %>");
     const compiled = "_ob.append(name);";
     const errorColumn = compiled.indexOf("name");
-    expect(findOffset(compiled, tokens, errorColumn)).toBe(0);
+    expect(findOffset(compiled, tokens, errorColumn)).toBe(4);
   });
 
   it("throws LocationParsingError when no anchor is found", () => {
