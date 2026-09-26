@@ -15,7 +15,7 @@ import {
   strftime,
   timeToDf,
 } from "./date.js";
-import { Rational, kernelInteger, stringInspect } from "@blazetrails/ruby-compat";
+import { Rational, kernelInteger, rbObjRespondTo, stringInspect } from "@blazetrails/ruby-compat";
 
 let localTimeZoneId: string | null = null;
 
@@ -199,12 +199,17 @@ function validateVtmRange(mem: string, value: number, b: number, e: number): voi
 }
 
 function isTimeNewOptions(arg: unknown): arg is TimeNewOptions {
-  return typeof arg === "object" && arg !== null && !(arg instanceof Rational);
+  return (
+    typeof arg === "object" &&
+    arg !== null &&
+    !(arg instanceof Rational) &&
+    !(arg instanceof Timezone)
+  );
 }
 
 /** @noRailsEquivalent PERMANENT */
 export interface TimeAtOptions {
-  in?: string | number | null;
+  in?: string | number | Timezone | null;
 }
 
 function getScale(unit: string): number {
@@ -332,7 +337,7 @@ function timeInitParse(
 
 /** @noRailsEquivalent PERMANENT */
 export interface TimeNewOptions {
-  in?: string | number | null;
+  in?: string | number | Timezone | null;
   precision?: number | null;
 }
 
@@ -348,32 +353,88 @@ let seatedTime: {
 
 /** @noRailsEquivalent PERMANENT */
 class SubMinuteOffsetZonedDateTime extends Temporal.ZonedDateTime {
-  #exactEpochNanoseconds: bigint;
-
   constructor(instant: Temporal.Instant, utcOffset: number) {
+    super(instant.epochNanoseconds, of2str(utcOffset));
     const truncated = Math.sign(utcOffset) * Math.floor(Math.abs(utcOffset) / 60) * 60 || 0;
-    super(
+    const wallClock = new Temporal.ZonedDateTime(
       instant.epochNanoseconds + BigInt(Math.round((utcOffset - truncated) * 1_000_000_000)),
       of2str(utcOffset),
     );
-    this.#exactEpochNanoseconds = instant.epochNanoseconds;
-    Object.defineProperty(this, "epochNanoseconds", {
-      value: instant.epochNanoseconds,
-      configurable: true,
-    });
-    Object.defineProperty(this, "epochMilliseconds", {
-      value: instant.epochMilliseconds,
-      configurable: true,
-    });
+    for (const name of SUB_MINUTE_WALL_CLOCK_MEMBERS) {
+      const value = wallClock[name];
+      Object.defineProperty(this, name, {
+        value: typeof value === "function" ? value.bind(wallClock) : value,
+        configurable: true,
+      });
+    }
+  }
+}
+
+/** @noRailsEquivalent PERMANENT */
+const SUB_MINUTE_WALL_CLOCK_MEMBERS = [
+  "year",
+  "month",
+  "monthCode",
+  "day",
+  "hour",
+  "minute",
+  "second",
+  "millisecond",
+  "microsecond",
+  "nanosecond",
+  "era",
+  "eraYear",
+  "dayOfWeek",
+  "dayOfYear",
+  "weekOfYear",
+  "yearOfWeek",
+  "daysInWeek",
+  "daysInMonth",
+  "daysInYear",
+  "monthsInYear",
+  "inLeapYear",
+  "toPlainDate",
+  "toPlainTime",
+  "toPlainDateTime",
+  "toString",
+  "toJSON",
+  "toLocaleString",
+] as const satisfies readonly (keyof Temporal.ZonedDateTime)[];
+
+/** @noRailsEquivalent PERMANENT */
+export class Timezone {
+  readonly identifier: string;
+
+  constructor(identifier: string) {
+    this.identifier = identifier;
   }
 
-  override toInstant(): Temporal.Instant {
-    return Temporal.Instant.fromEpochNanoseconds(this.#exactEpochNanoseconds);
+  get name(): string {
+    return this.identifier;
   }
 
-  override withTimeZone(timeZone: Temporal.TimeZoneLike): Temporal.ZonedDateTime {
-    return this.toInstant().toZonedDateTimeISO(timeZone as Temporal.TimeZoneLike & string);
+  utcToLocal(time: Time): Time {
+    return time.getlocal(this.identifier);
   }
+
+  abbr(time: Time): string {
+    return tzdataAbbreviation(time.toZonedDateTime().withTimeZone(this.identifier));
+  }
+}
+
+/** `rb_time_zone_abbreviation` (`vendor/ruby/time.c:5746-5775`). */
+function rbTimeZoneAbbreviation(zone: unknown, time: Time): string {
+  if (typeof zone === "string") return zone;
+  const tzobj = zone as {
+    abbr(tm: Time): unknown;
+    strftime(format: string, tm: Time): unknown;
+    name: unknown;
+  };
+  let abbr: unknown;
+  if (rbObjRespondTo(tzobj, "abbr")) abbr = tzobj.abbr(time);
+  else if (rbObjRespondTo(tzobj, "strftime")) abbr = tzobj.strftime("%Z", time);
+  else abbr = rbObjRespondTo(tzobj, "name") ? tzobj.name : null;
+  return abbr == null ? "" : String(abbr);
 }
 
 export class Time {
@@ -392,6 +453,8 @@ export class Time {
   #utcOffsetMemo: number | null;
   /** @internal */
   #subnano: Rational;
+  /** @internal */
+  #zoneObject: Timezone | null = null;
 
   /** @internal */
   get #plain(): Temporal.PlainDateTime {
@@ -403,7 +466,7 @@ export class Time {
     return (this.#utcOffsetMemo ??= Number(this.#zoned!.offsetNanoseconds) / 1_000_000_000);
   }
 
-  static now({ in: inZone = null }: { in?: string | number | null } = {}): Time {
+  static now({ in: inZone = null }: { in?: string | number | Timezone | null } = {}): Time {
     return Time.#atInstant(Temporal.Instant.fromEpochNanoseconds(systemEpochNs()), inZone);
   }
 
@@ -414,7 +477,7 @@ export class Time {
     hour: number | string | TimeNewOptions | null = 0,
     min: number | string | TimeNewOptions | null = 0,
     sec: number | string | Rational | TimeNewOptions | null = 0,
-    zone: string | number | Rational | TimeNewOptions | null = null,
+    zone: string | number | Rational | Timezone | TimeNewOptions | null = null,
     options: TimeNewOptions = {},
   ): Time {
     const given = [year, month, day, hour, min, sec, zone];
@@ -449,17 +512,18 @@ export class Time {
       hour as number | string | null,
       min as number | string | null,
       sec as number | string | Rational | null,
-      zone as string | number | Rational | null,
+      zone as string | number | Rational | Timezone | null,
       options,
     );
   }
 
   static #atInstant(
     instant: Temporal.Instant,
-    zone: string | number | null = null,
+    zone: string | number | Timezone | null = null,
     tzmodeUtc?: boolean,
     subnano: Rational = new Rational(0, 1),
   ): Time {
+    if (zone instanceof Timezone) zone = zone.identifier;
     const timeZoneId =
       zone == null ? nowTimeZoneId() : typeof zone === "number" ? of2str(zone) : zone;
     const zoned = instant.toZonedDateTimeISO(timeZoneId);
@@ -661,7 +725,7 @@ export class Time {
     } else if (
       (() => {
         try {
-          return (t = Time.local(year, 1, 1)).zone!.toUpperCase() === zone;
+          return ((t = Time.local(year, 1, 1)).zone as string).toUpperCase() === zone;
         } catch {
           return false;
         }
@@ -671,7 +735,7 @@ export class Time {
     } else if (
       (() => {
         try {
-          return (t = Time.local(year, 7, 1)).zone!.toUpperCase() === zone;
+          return ((t = Time.local(year, 7, 1)).zone as string).toUpperCase() === zone;
         } catch {
           return false;
         }
@@ -1173,7 +1237,7 @@ export class Time {
     hour: number | string | null = 0,
     min: number | string | null = 0,
     sec: number | string | Rational | null = 0,
-    zone: string | number | Rational | null = null,
+    zone: string | number | Rational | Timezone | null = null,
     options: TimeNewOptions = {},
   ) {
     if (seatedTime !== null) {
@@ -1225,11 +1289,16 @@ export class Time {
       hour === 24 ? plain.add({ hours: 1 }) : wholeSec === 60 ? plain.add({ seconds: 1 }) : plain;
     const zoneArgument = zone ?? options.in ?? null;
     const zoneObject =
-      zone == null && typeof zoneArgument === "string" && isZoneIdentifier(zoneArgument)
-        ? zoneArgument
-        : null;
+      zoneArgument instanceof Timezone
+        ? zoneArgument.identifier
+        : zone == null && typeof zoneArgument === "string" && isZoneIdentifier(zoneArgument)
+          ? zoneArgument
+          : null;
     const utcOffset =
-      zoneObject ?? (zoneArgument == null ? nowTimeZoneId() : utcOffsetArgument(zoneArgument));
+      zoneObject ??
+      (zoneArgument == null
+        ? nowTimeZoneId()
+        : utcOffsetArgument(zoneArgument as string | number | Rational));
     this.#timeZoneId = typeof utcOffset === "number" ? null : utcOffset;
     this.#tzmodeUtc = zoneArgument != null && this.#timeZoneId === "UTC";
     this.#localZone = zoneArgument == null;
@@ -1311,21 +1380,11 @@ export class Time {
     return this.#plain.dayOfYear;
   }
 
-  get zone(): string | null {
+  get zone(): string | Timezone | null {
+    if (this.#tzmodeUtc) return "UTC";
     if (this.#timeZoneId == null) return null;
+    if (!this.#localZone) return (this.#zoneObject ??= new Timezone(this.#timeZoneId));
     return tzdataAbbreviation(this.#instant.toZonedDateTimeISO(this.#timeZoneId));
-  }
-
-  /**
-   * Whether `zone` is a timezone object (`Time.new(..., in: tz)` / `getlocal(tz)`)
-   * rather than the process-local zone's String — MRI's `vtm.zone` is one or the
-   * other (`vendor/ruby/time.c:5020-5037` `time_zone`), where trails' `zone`
-   * answers an abbreviation for both.
-   *
-   * @noRailsEquivalent PERMANENT
-   */
-  get isZoneObject(): boolean {
-    return this.#timeZoneId != null && !this.#localZone;
   }
 
   /** @internal */
@@ -1439,7 +1498,8 @@ export class Time {
         sec: this.sec,
         nsec: new Rational(this.nsec, 1).add(this.#subnano),
         get zone(): string {
-          return self.zone ?? "";
+          const zone = self.zone;
+          return zone == null ? "" : rbTimeZoneAbbreviation(zone, self);
         },
         utcOffset: this.utcOffset,
       },
@@ -1548,7 +1608,8 @@ export class Time {
     );
   }
 
-  getlocal(utcOffset: number | string | null = null): Time {
+  getlocal(utcOffset: number | string | Timezone | null = null): Time {
+    if (utcOffset instanceof Timezone) utcOffset = utcOffset.identifier;
     if (typeof utcOffset === "string" && !isZoneIdentifier(utcOffset)) {
       return Time.#atInstant(this.#instant, utcOffsetArgument(utcOffset), undefined, this.#subnano);
     }

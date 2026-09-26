@@ -1,5 +1,5 @@
 import { Date as RubyDate, Temporal, Time as RubyTime } from "@blazetrails/date";
-import { Rational, rbObjClass } from "@blazetrails/ruby-compat";
+import { Rational, rbObjClass, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { deprecator } from "../../deprecator.js";
 import { Duration } from "../../duration.js";
 import { ArgumentError } from "../../hash-utils.js";
@@ -142,10 +142,8 @@ export function change(this: RubyTime, options: ChangeOptions): RubyTime {
     return RubyTime.new(newYear, newMonth, newDay, newHour, newMin, newSec, newOffset);
   } else if (this.isUtc()) {
     return RubyTime.utc(newYear, newMonth, newDay, newHour, newMin, newSec);
-  } else if (this.isZoneObject) {
-    let newTime = RubyTime.new(newYear, newMonth, newDay, newHour, newMin, newSec, null, {
-      in: this.toZonedDateTime().timeZoneId,
-    });
+  } else if (rbObjRespondTo(this.zone, "utcToLocal")) {
+    let newTime = RubyTime.new(newYear, newMonth, newDay, newHour, newMin, newSec, this.zone);
 
     if (!Number.isInteger(newTime.utcOffset)) {
       newTime = newTime.plus(0);

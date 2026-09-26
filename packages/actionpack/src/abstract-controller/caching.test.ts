@@ -20,6 +20,12 @@ class HostClass {
   static _viewCacheDependencies?: Array<(this: CachingHost) => unknown>;
 
   greeting = "hello";
+  instrumentPayload(key: unknown) {
+    return { key };
+  }
+  instrumentName() {
+    return "action_controller";
+  }
 }
 
 include(HostClass, Configurable);
