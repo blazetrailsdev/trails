@@ -255,19 +255,44 @@ export function rbModProtected(
  * @noRailsEquivalent PERMANENT — Ruby core `Kernel#public_send` (`vendor/ruby/vm_eval.c:1350`).
  */
 export function rbFPublicSend(recv: unknown, mid: string, ...args: unknown[]): unknown {
-  const visi = methodEntryVisi(recv, mid);
-  if (visi === "private" || visi === "protected") {
-    throw new NoMethodError(
-      `${visi} method '${mid}' called for an instance of ${rbObjClass(recv)}`,
-      mid,
-      { receiver: recv },
-    );
+  return sendInternal(args.length, [mid, ...args], recv, "public");
+}
+
+/**
+ * `Kernel#send` (`rb_f_send`, `vendor/ruby/vm_eval.c:1330`): calls the nearest
+ * entry for `mid` whatever its visibility. A zero-argument reader ported as a
+ * JS accessor or a field answers through its getter or its value, as the Ruby
+ * reader it ports would.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Kernel#send` (`vendor/ruby/vm_eval.c:1330`).
+ */
+export function rbFSend(recv: unknown, mid: string, ...args: unknown[]): unknown {
+  return sendInternal(args.length, [mid, ...args], recv, "fcall");
+}
+
+function sendInternal(
+  argc: number,
+  argv: [string, ...unknown[]],
+  recv: unknown,
+  scope: "public" | "fcall",
+): unknown {
+  const [mid, ...args] = argv;
+  if (scope === "public") {
+    const visi = methodEntryVisi(recv, mid);
+    if (visi === "private" || visi === "protected") {
+      throw new NoMethodError(
+        `${visi} method '${mid}' called for an instance of ${rbObjClass(recv)}`,
+        mid,
+        { receiver: recv },
+      );
+    }
   }
   const obj = Object(recv) as Record<string, unknown>;
   const attr = mid.endsWith("=") ? mid.slice(0, -1) : undefined;
   for (let o: object | null = obj; o; o = Object.getPrototypeOf(o) as object | null) {
-    const method = Object.getOwnPropertyDescriptor(o, mid)?.value;
-    if (typeof method === "function") return (method as AnyFunction).apply(recv, args);
+    const desc = Object.getOwnPropertyDescriptor(o, mid);
+    if (typeof desc?.value === "function") return (desc.value as AnyFunction).apply(recv, args);
+    if (desc && argc === 0) return desc.get ? desc.get.call(recv) : desc.value;
     const setter = attr === undefined ? undefined : Object.getOwnPropertyDescriptor(o, attr)?.set;
     if (setter) return setter.call(recv, args[0]);
   }

@@ -11,6 +11,8 @@ import {
   isAnyTemplates,
   locale,
   lookupContext,
+  setFormats,
+  setLocale,
   templateExists,
   type ViewPaths,
   type ViewPathsClass,
@@ -34,7 +36,9 @@ class BaseController implements ViewPaths {
   lookupContext = lookupContext;
   detailsForLookup = detailsForLookup;
   formats = formats;
+  setFormats = setFormats;
   locale = locale;
+  setLocale = setLocale;
   templateExists = templateExists;
   appendViewPath = appendViewPath;
   isAnyTemplates = isAnyTemplates;
@@ -78,11 +82,11 @@ describe("ViewPaths", () => {
     PostsController.viewPaths([]);
     const controller = new PostsController();
 
-    controller.formats([":json"]);
+    controller.setFormats([":json"]);
     expect(controller.formats()).toEqual([":json"]);
     expect(controller.lookupContext().formats).toEqual([":json"]);
 
-    controller.locale("de");
+    controller.setLocale("de");
     expect(controller.locale()).toBe("de");
     expect(controller.lookupContext().locale).toBe("de");
   });

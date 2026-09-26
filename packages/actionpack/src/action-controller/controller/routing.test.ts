@@ -526,7 +526,27 @@ describe("LegacyRouteSetTests", () => {
 
   it.skip("named route with regexps", () => {});
 
-  it.skip("class and lambda constraints", () => {});
+  it("class and lambda constraints", async () => {
+    const subdomain = class {
+      matches(request: Request): boolean {
+        return isPresent(request.subdomain()) && request.subdomain() !== "clients";
+      }
+    };
+
+    rs.draw((r) => {
+      r.get("/", {
+        constraints: new subdomain(),
+        to: async () => [200, {}, bodyFromString("default")],
+      });
+      r.get("/", {
+        constraints: { subdomain: "clients" },
+        to: async () => [200, {}, bodyFromString("clients")],
+      });
+    });
+
+    expect(await rackGet(rs, "http://www.example.org/")).toBe("default");
+    expect(await rackGet(rs, "http://clients.example.org/")).toBe("clients");
+  });
 
   it("lambda constraints", async () => {
     rs.draw((r) => {

@@ -1,7 +1,6 @@
 import { Notifications } from "@blazetrails/activesupport";
 
 import type { LookupContext } from "../lookup-context.js";
-import { MissingTemplate } from "../template/error.js";
 import { AbstractRenderer, RenderedTemplate } from "./abstract-renderer.js";
 import {
   cacheCollectionRender,
@@ -100,28 +99,12 @@ export class PartialRenderer extends AbstractRenderer {
   /** @internal */
   protected findTemplate(path: string, locals: readonly string[]): RenderableTemplate {
     const prefixes = path.includes("/") ? [] : this.lookupContext.prefixes;
-    const template = this.lookupContext.findAll(
+    return this.lookupContext.find(
       path,
       prefixes,
       true,
       locals,
       this.details as Record<string, never>,
-    )[0];
-    if (!template) {
-      const { name, prefix } = this.parsePartialPath(path);
-      const format = (this.lookupContext.formats[0] as string | undefined) ?? ":html";
-      throw new MissingTemplate(this.lookupContext.viewPaths, name, [prefix], true, {
-        ...this.details,
-        formats: [format],
-      });
-    }
-    return template as RenderableTemplate;
-  }
-
-  protected parsePartialPath(partial: string): { name: string; prefix: string } {
-    const slash = partial.lastIndexOf("/");
-    return slash >= 0
-      ? { name: partial.slice(slash + 1), prefix: partial.slice(0, slash) }
-      : { name: partial, prefix: "" };
+    ) as RenderableTemplate;
   }
 }

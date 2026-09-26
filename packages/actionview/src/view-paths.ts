@@ -143,19 +143,18 @@ export function viewPaths(this: ViewPaths): PathSet {
   return lookupContext.call(this).viewPaths;
 }
 
-export function formats(this: ViewPaths): DetailValue;
-export function formats(this: ViewPaths, values: DetailValue | null): void;
-export function formats(this: ViewPaths, values?: DetailValue | null): DetailValue | void {
-  if (values === undefined) return lookupContext.call(this).formats;
+export function formats(this: ViewPaths): DetailValue {
+  return lookupContext.call(this).formats;
+}
+
+export function setFormats(this: ViewPaths, values: DetailValue | null): void {
   lookupContext.call(this).formats = values;
 }
 
-export function locale(this: ViewPaths): string | symbol | null;
-export function locale(this: ViewPaths, value: string | symbol | null): void;
-export function locale(
-  this: ViewPaths,
-  value?: string | symbol | null,
-): string | symbol | null | void {
-  if (value === undefined) return lookupContext.call(this).locale;
+export function locale(this: ViewPaths): string | symbol | null {
+  return lookupContext.call(this).locale;
+}
+
+export function setLocale(this: ViewPaths, value: string | symbol | null): void {
   lookupContext.call(this).locale = value;
 }

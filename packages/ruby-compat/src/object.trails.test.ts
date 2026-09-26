@@ -6,7 +6,11 @@ import {
   rbObjId,
   rbObjAsString as toS,
   rbObjRespondTo,
+  rbFPublicSend,
+  rbFSend,
+  rbModPrivate,
 } from "./object.js";
+import { NoMethodError } from "./no-method-error.js";
 
 describe("Object#inspect", () => {
   it("renders nested arrays, hashes, nil, strings and numbers as MRI does", () => {
@@ -98,5 +102,38 @@ describe("rbObjId", () => {
 
     expect(rbObjId(a)).toBe(id);
     expect(rbObjId(b)).toBe(id + 20);
+  });
+});
+
+class Req {
+  field = "f";
+  get host(): string {
+    return "example.org";
+  }
+  subdomain(): string {
+    return "clients";
+  }
+  secret(): string {
+    return "s";
+  }
+}
+rbModPrivate(Req, "secret");
+
+describe("rbFSend", () => {
+  it("calls a method, a getter, or reads a field by name", () => {
+    const req = new Req();
+    expect(rbFSend(req, "subdomain")).toBe("clients");
+    expect(rbFSend(req, "host")).toBe("example.org");
+    expect(rbFSend(req, "field")).toBe("f");
+  });
+
+  it("calls a private method where public_send raises", () => {
+    const req = new Req();
+    expect(rbFSend(req, "secret")).toBe("s");
+    expect(() => rbFPublicSend(req, "secret")).toThrow(NoMethodError);
+  });
+
+  it("raises NoMethodError for an unbound name", () => {
+    expect(() => rbFSend(new Req(), "nope")).toThrow(NoMethodError);
   });
 });
