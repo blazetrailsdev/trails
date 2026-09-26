@@ -1,7 +1,7 @@
-import { camelize } from "@blazetrails/activesupport";
+import { camelize, include } from "@blazetrails/activesupport";
 import { tsClass, tsField, tsImport, tsModule } from "../../../template-builder/index.js";
 import { NamedBase, type NamedBaseOptions } from "../../named-base.js";
-import { normalizeModelName, type ModelHelpersOptions } from "../../model-helpers.js";
+import { ModelHelpers, type ModelHelpersOptions } from "../../model-helpers.js";
 
 export interface ModelGeneratorOptions extends NamedBaseOptions, ModelHelpersOptions {}
 
@@ -25,12 +25,6 @@ export function emitModelSource(className: string, fields: Array<[string, string
 }
 
 export class ModelGenerator extends NamedBase {
-  /** @missingRailsCall say — CONVERGEABLE generator-and-command-bodies-bypass-thor-say */
-  constructor(options: ModelGeneratorOptions) {
-    const normalized = normalizeModelName(options.name, options, options.output);
-    super({ ...options, name: normalized });
-  }
-
   run(): string[] {
     const filename = `app/models/${this.filePath()}${this.ext()}`;
     const className = [...this.classPathParts, this.fileName].map((p) => camelize(p)).join("");
@@ -41,3 +35,5 @@ export class ModelGenerator extends NamedBase {
     return this.getCreatedFiles();
   }
 }
+
+include(ModelGenerator, ModelHelpers);

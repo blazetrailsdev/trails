@@ -1,9 +1,0 @@
-[
-  {
-    "package": "trailties",
-    "tsFile": "generators/rails/model/model-generator.ts",
-    "rubyName": "initialize",
-    "call": "inflection_impossible?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  }
-]

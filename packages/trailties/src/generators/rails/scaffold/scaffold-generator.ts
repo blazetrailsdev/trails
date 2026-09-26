@@ -1,25 +1,42 @@
-import { GeneratorBase, type GeneratorOptions, dasherize, parseColumns } from "../../base.js";
-import { camelize, humanize, pluralize, tableize, underscore } from "@blazetrails/activesupport";
+/* eslint-disable @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ResourceHelpers` (`resource_generator.rb:9`, inherited by `scaffold_generator.rb:7`); the class/interface merge is how a mixin surfaces on the type side. */
+import { humanize, include, pluralize, type Included } from "@blazetrails/activesupport";
+import { dasherize, parseColumns } from "../../base.js";
+import { NamedBase, type NamedBaseOptions } from "../../named-base.js";
+import type { ModelHelpersOptions } from "../../model-helpers.js";
+import { ResourceHelpers } from "../../resource-helpers.js";
 import { ModelGenerator } from "../../model-generator.js";
 import { tsBody, tsMethod, type Method } from "../../../template-builder/index.js";
 import { emitControllerClass } from "../controller/controller-paths.js";
+import { emitResourceRouteSnippet } from "../resource-route/resource-route-generator.js";
 
-export class ScaffoldGenerator extends GeneratorBase {
-  constructor(options: GeneratorOptions) {
-    super(options);
-  }
+export interface ScaffoldGeneratorOptions extends NamedBaseOptions, ModelHelpersOptions {
+  modelName?: string;
+}
 
-  run(name: string, args: string[]): string[] {
-    const className = camelize(underscore(name));
-    const resourceName = tableize(className);
-    const singular = underscore(className);
+export interface ScaffoldGenerator extends Included<typeof ResourceHelpers> {}
+
+export class ScaffoldGenerator extends NamedBase {
+  declare controllerName: string;
+  declare controllerFileName: string;
+  declare _controllerClassPath: string[];
+
+  run(): string[] {
+    const args = (this.options as ScaffoldGeneratorOptions).attributes ?? [];
+    const className = this.className().split("::").join("");
+    const singular = this.singularTableName();
+    const plural = this.pluralTableName();
+    const viewsPath = `app/views/${this.controllerFilePath()}`;
     const columns = parseColumns(args);
 
-    const modelGen = new ModelGenerator({ cwd: this.cwd, output: this.output });
-    this.createdFiles.push(...modelGen.run(name, args));
+    const modelGen = new ModelGenerator({
+      cwd: this.cwd,
+      output: this.output,
+      behavior: this.behavior,
+    });
+    this.createdFiles.push(...modelGen.run(this.name, args));
 
-    const controllerClassName = camelize(resourceName) + "Controller";
-    const controllerFileName = dasherize(resourceName) + "-controller";
+    const controllerClassName = this.controllerClassName().split("::").join("") + "Controller";
+    const controllerFileName = dasherize(this.controllerFilePath()) + "-controller";
     const ext = this.ext();
     const ts = this.isTypeScript();
 
@@ -27,7 +44,7 @@ export class ScaffoldGenerator extends GeneratorBase {
       `app/controllers/${controllerFileName}${ext}`,
       emitControllerClass({
         className: controllerClassName,
-        methods: crudMethods(className, singular, resourceName, ts),
+        methods: crudMethods(className, singular, plural, this.routeUrl(), ts),
       }),
     );
     this.createFile(
@@ -35,14 +52,11 @@ export class ScaffoldGenerator extends GeneratorBase {
       controllerTestSource(controllerClassName, controllerFileName),
     );
 
-    this.createFile(
-      `app/views/${resourceName}/index.html.tse`,
-      indexView(resourceName, singular, columns),
-    );
-    this.createFile(`app/views/${resourceName}/show.html.tse`, showView(singular, columns));
-    this.createFile(`app/views/${resourceName}/new.html.tse`, newView(singular, resourceName));
-    this.createFile(`app/views/${resourceName}/edit.html.tse`, editView(singular, resourceName));
-    this.createFile(`app/views/${resourceName}/_form.html.tse`, formPartial(singular, columns));
+    this.createFile(`${viewsPath}/index.html.tse`, indexView(plural, singular, columns));
+    this.createFile(`${viewsPath}/show.html.tse`, showView(singular, columns));
+    this.createFile(`${viewsPath}/new.html.tse`, newView(singular, plural));
+    this.createFile(`${viewsPath}/edit.html.tse`, editView(singular, plural));
+    this.createFile(`${viewsPath}/_form.html.tse`, formPartial(singular, columns));
     if (!this.fileExists("app/views/layouts/application.html.tse")) {
       this.createFile("app/views/layouts/application.html.tse", layoutTemplate());
     }
@@ -53,15 +67,27 @@ export class ScaffoldGenerator extends GeneratorBase {
         ? "config/routes.js"
         : null;
     if (routesFile) {
-      this.insertIntoFile(routesFile, "// routes", `  router.resources("${resourceName}");\n`);
+      this.insertIntoFile(
+        routesFile,
+        "// routes",
+        emitResourceRouteSnippet(this.controllerClassPath(), this.controllerFileName),
+      );
     }
     return this.getCreatedFiles();
   }
 }
 
+include(ScaffoldGenerator, ResourceHelpers);
+
 type Col = { name: string; type: string };
 
-function crudMethods(model: string, singular: string, plural: string, ts: boolean): Method[] {
+function crudMethods(
+  model: string,
+  singular: string,
+  plural: string,
+  routeUrl: string,
+  ts: boolean,
+): Method[] {
   const retT = ts ? "Promise<void>" : undefined;
   const anyArr = ts ? ": any[]" : "";
   const mk = (name: string, body: string) =>
@@ -78,7 +104,7 @@ function crudMethods(model: string, singular: string, plural: string, ts: boolea
     mk("new_", `const ${singular} = {};\nthis.render({ action: "new", locals: { ${singular} } });`),
     mk(
       "create",
-      `// const ${singular} = await ${model}.create(this.params.get("${singular}"));\nthis.redirectTo("/${plural}");`,
+      `// const ${singular} = await ${model}.create(this.params.get("${singular}"));\nthis.redirectTo("${routeUrl}");`,
     ),
     mk(
       "edit",
@@ -86,11 +112,11 @@ function crudMethods(model: string, singular: string, plural: string, ts: boolea
     ),
     mk(
       "update",
-      `// const ${singular} = await ${model}.find(this.params.get("id"));\n// await ${singular}.update(this.params.get("${singular}"));\nthis.redirectTo("/${plural}/" + this.params.get("id"));`,
+      `// const ${singular} = await ${model}.find(this.params.get("id"));\n// await ${singular}.update(this.params.get("${singular}"));\nthis.redirectTo("${routeUrl}/" + this.params.get("id"));`,
     ),
     mk(
       "destroy",
-      `// const ${singular} = await ${model}.find(this.params.get("id"));\n// await ${singular}.destroy();\nthis.redirectTo("/${plural}");`,
+      `// const ${singular} = await ${model}.find(this.params.get("id"));\n// await ${singular}.destroy();\nthis.redirectTo("${routeUrl}");`,
     ),
   ];
 }

@@ -526,7 +526,7 @@ Trails.application!.configure(function () {
   this.config.serverTiming = true;
 
   // Enable/disable Action Controller caching. By default Action Controller caching is disabled.
-  // Create tmp/caching-dev.txt to toggle Action Controller caching.
+  // Run trails dev:cache to toggle Action Controller caching.
   if (existsSync(join(this.config.root!, "tmp/caching-dev.txt"))) {
 ${
   this.options.api

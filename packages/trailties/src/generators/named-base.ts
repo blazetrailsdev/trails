@@ -1,4 +1,5 @@
 import { underscore, camelize, pluralize, singularize, humanize } from "@blazetrails/activesupport";
+import { initializeIncludedModules } from "@blazetrails/ruby-compat";
 import { GeneratorBase, type GeneratorOptions } from "./base.js";
 import { GeneratedAttribute } from "./generated-attribute.js";
 
@@ -10,18 +11,16 @@ export interface NamedBaseOptions extends GeneratorOptions {
 export class NamedBase extends GeneratorBase {
   name: string;
   attributes: GeneratedAttribute[];
-  classPathParts: string[];
+  classPathParts!: string[];
   /** @internal */
-  fileName: string;
+  fileName!: string;
 
   constructor(options: NamedBaseOptions) {
     super(options);
     this.name = options.name;
-    const parts = this.name.includes("/") ? this.name.split("/") : this.name.split("::");
-    const underscored = parts.map((p) => underscore(p));
-    this.fileName = underscored.pop()!;
-    this.classPathParts = underscored;
+    this.assignNamesBang(this.name);
     this.attributes = (options.attributes ?? []).map((a) => GeneratedAttribute.parse(a));
+    initializeIncludedModules(this);
   }
 
   singularName = (): string => this.fileName;
@@ -37,6 +36,24 @@ export class NamedBase extends GeneratorBase {
   pluralTableName = (): string => this.tableName();
   pluralFileName = (): string => pluralize(this.fileName);
   fixtureFileName = (): string => this.pluralFileName();
+
+  /** @missingRailsArgs join — PERMANENT */
+  routeUrl(this: NamedBase & { controllerClassPath(): string[] }): string {
+    return (
+      this.controllerClassPath()
+        .map((dname) => "/" + dname)
+        .join("") +
+      "/" +
+      this.pluralFileName()
+    );
+  }
+
+  /** @internal */
+  assignNamesBang(name: string): void {
+    this.classPathParts = name.includes("/") ? name.split("/") : name.split("::");
+    this.classPathParts = this.classPathParts.map((p) => underscore(p));
+    this.fileName = this.classPathParts.pop()!;
+  }
 
   regularClassPath(): string[] {
     return this.classPathParts;

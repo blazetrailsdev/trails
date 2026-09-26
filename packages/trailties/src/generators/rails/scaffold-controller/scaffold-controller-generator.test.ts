@@ -3,6 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { ScaffoldControllerGenerator } from "./scaffold-controller-generator.js";
+import type { ScaffoldControllerGeneratorOptions as Options } from "./scaffold-controller-generator.js";
 import { parseTs, assertNoRubySource } from "../../../template-builder/testing.js";
 
 let tmpDir: string;
@@ -16,8 +17,9 @@ beforeEach(() => {
 
 afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
 
-function makeGen() {
-  return new ScaffoldControllerGenerator({ cwd: tmpDir, output: () => {} });
+function makeGen(name: string, attributes: string[] = [], options: Partial<Options> = {}) {
+  const config = { cwd: tmpDir, output: () => {}, name, attributes, ...options };
+  return new ScaffoldControllerGenerator(config);
 }
 
 function read(rel: string): string {
@@ -26,7 +28,7 @@ function read(rel: string): string {
 
 describe("ScaffoldControllerGeneratorTest", () => {
   it("controller content", () => {
-    makeGen().run("User", ["name:string", "age:integer"]);
+    makeGen("User", ["name:string", "age:integer"]).run();
     const c = read("app/controllers/users-controller.ts");
     expect(c).toContain("class UsersController extends ActionController.Base");
     for (const action of ["index", "show", "new_", "create", "edit", "update", "destroy"]) {
@@ -35,71 +37,71 @@ describe("ScaffoldControllerGeneratorTest", () => {
   });
 
   it("don't use require", () => {
-    makeGen().run("User");
+    makeGen("User").run();
     expect(read("app/controllers/users-controller.ts")).not.toMatch(/\brequire\(/);
   });
 
   it("check class collision", () => {
-    makeGen().run("user_controller");
+    makeGen("user_controller").run();
     expect(fs.existsSync(path.join(tmpDir, "app/controllers/users-controller.ts"))).toBe(true);
   });
 
   it("invokes default test framework", () => {
-    makeGen().run("User");
+    makeGen("User").run();
     expect(fs.existsSync(path.join(tmpDir, "test/controllers/users-controller.test.ts"))).toBe(
       true,
     );
   });
 
   it("does not invoke test framework if required", () => {
-    makeGen().run("User", [], { test: false });
+    makeGen("User", [], { test: false }).run();
     expect(fs.existsSync(path.join(tmpDir, "test/controllers/users-controller.test.ts"))).toBe(
       false,
     );
   });
 
   it("invokes helper", () => {
-    makeGen().run("User");
+    makeGen("User").run();
     expect(fs.existsSync(path.join(tmpDir, "app/helpers/users-helper.ts"))).toBe(true);
   });
 
   it("does not invoke helper if required", () => {
-    makeGen().run("User", [], { helper: false });
+    makeGen("User", [], { helper: false }).run();
     expect(fs.existsSync(path.join(tmpDir, "app/helpers/users-helper.ts"))).toBe(false);
   });
 
   it("add routes", () => {
-    makeGen().run("User");
+    makeGen("User").run();
     expect(read("config/routes.ts")).toContain('router.resources("users")');
   });
 
   it("skip routes", () => {
-    makeGen().run("User", [], { skipRoutes: true });
+    makeGen("User", [], { skipRoutes: true }).run();
     expect(read("config/routes.ts")).not.toContain('router.resources("users")');
   });
 
   it("permits the parameters passed", () => {
-    makeGen().run("User", ["name:string", "age:integer"]);
+    makeGen("User", ["name:string", "age:integer"]).run();
     const c = read("app/controllers/users-controller.ts");
     expect(c).toContain('this.params.expect({ user: ["name", "age"] })');
     expect(c).toContain("userParams()");
   });
 
   it("with no attributes falls back to params.fetch", () => {
-    makeGen().run("User");
+    makeGen("User").run();
     const c = read("app/controllers/users-controller.ts");
     expect(c).toContain('this.params.fetch("user", {})');
   });
 
   it("emits valid TypeScript with no Ruby leakage", () => {
-    makeGen().run("User", ["name:string", "age:integer"]);
+    makeGen("User", ["name:string", "age:integer"]).run();
     const c = read("app/controllers/users-controller.ts");
     expect(parseTs(c).diagnostics).toEqual([]);
     assertNoRubySource(c);
   });
 
   it("api controller", () => {
-    makeGen().run("User", ["name:string"], { api: true });
+    makeGen("User", ["name:string"], { api: true }).run();
     const c = read("app/controllers/users-controller.ts");
     expect(c).toContain("renderJson");
     expect(c).not.toContain("async new_()");
@@ -111,17 +113,17 @@ describe("ScaffoldControllerGeneratorTest", () => {
   });
 
   it("generated test file parses as valid TypeScript", () => {
-    makeGen().run("User");
+    makeGen("User").run();
     const t = read("test/controllers/users-controller.test.ts");
     expect(parseTs(t).diagnostics).toEqual([]);
   });
 
   it("namespaced scaffold controller emits flattened class name and nested paths", () => {
-    makeGen().run("admin/account", ["name:string"]);
+    makeGen("admin/account", ["name:string"]).run();
     const c = read("app/controllers/admin/accounts-controller.ts");
     expect(c).toContain("class AdminAccountsController");
     expect(c).not.toMatch(/::/);
-    expect(c).toContain('this.params.expect({ account: ["name"] })');
+    expect(c).toContain('this.params.expect({ admin_account: ["name"] })');
     expect(parseTs(c).diagnostics).toEqual([]);
     expect(fs.existsSync(path.join(tmpDir, "app/helpers/admin/accounts-helper.ts"))).toBe(true);
     const routes = read("config/routes.ts");
@@ -131,7 +133,7 @@ describe("ScaffoldControllerGeneratorTest", () => {
   });
 
   it("singularizes plural input for model + params key", () => {
-    makeGen().run("posts", ["title:string"]);
+    makeGen("posts", ["title:string"]).run();
     const c = read("app/controllers/posts-controller.ts");
     expect(c).toContain("class PostsController");
     expect(c).toContain("Post.all()");
@@ -140,7 +142,7 @@ describe("ScaffoldControllerGeneratorTest", () => {
   });
 
   it("uses underscored namespace in routes (not dasherized)", () => {
-    makeGen().run("admin_panel/users");
+    makeGen("admin_panel/users").run();
     const routes = read("config/routes.ts");
     expect(routes).toContain('router.namespace("admin_panel"');
     expect(routes).not.toContain('router.namespace("admin-panel"');
@@ -148,7 +150,7 @@ describe("ScaffoldControllerGeneratorTest", () => {
   });
 
   it("strips dashed controller suffix", () => {
-    makeGen().run("posts-controller");
+    makeGen("posts-controller").run();
     const c = read("app/controllers/posts-controller.ts");
     expect(c).toContain("class PostsController");
     expect(c).not.toContain("PostsControllerController");
