@@ -714,7 +714,10 @@ export class RouteSet {
     return this.routes.length === 0;
   }
 
-  addRoute(mapping: Route, name?: string | null): Route {
+  addRoute(
+    mapping: { makeRoute(name: string | null | false | undefined, precedence: number): Route },
+    name?: string | null | false,
+  ): Route {
     if (name && !ROUTE_NAME_RE.test(name)) {
       throw new ArgumentError(`Invalid route name: '${name}'`);
     }
@@ -728,10 +731,11 @@ export class RouteSet {
           "https://guides.rubyonrails.org/routing.html#restricting-the-routes-created",
       );
     }
-    this.routes.push(mapping);
-    if (name) this.namedRoutes.add(name, mapping);
+    const route = mapping.makeRoute(name, this.routes.length);
+    this.routes.push(route);
+    if (name) this.namedRoutes.add(name, route);
     this._journeyRouter = null;
-    return mapping;
+    return route;
   }
 
   addPolymorphicMapping(

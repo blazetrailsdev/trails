@@ -33,8 +33,8 @@ export interface RouteOptions {
   defaults?: Record<string, string | null>;
   format?: boolean;
   as?: string | null | false;
-  to?: string | MountableApp;
-  controller?: string;
+  to?: string | MountableApp | Redirect;
+  controller?: string | RegExp;
   action?: string;
   only?: ResourceAction | ResourceAction[];
   except?: ResourceAction | ResourceAction[];

@@ -14,13 +14,22 @@ import type { DispatchableControllerClass } from "./dispatcher.js";
 import type { Request } from "../http/request.js";
 import { X_CASCADE } from "../constants.js";
 import { Scope, type ScopeFrameHash, type ScopeLevel } from "./scope.js";
-import { isPlainObject, isPresent, kernelArray, underscore } from "@blazetrails/activesupport";
+import { Parser } from "../journey/parser.js";
+import { Ast, type Node } from "../journey/nodes/node.js";
+import {
+  isBlank,
+  isPlainObject,
+  isPresent,
+  kernelArray,
+  underscore,
+} from "@blazetrails/activesupport";
 import {
   getFs,
   getPath,
   RFC2396_PARSER,
   rbInspect,
   rbObjRespondTo,
+  stringSplit,
 } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { fetch } from "@blazetrails/ruby-compat";
@@ -58,7 +67,7 @@ const RESOURCE_OPTIONS: ReadonlySet<string> = new Set([
 /** @internal */
 interface RouteSetLike {
   namedRoutes: { get(name: string): unknown };
-  addRoute(route: Route, name?: string | null): unknown;
+  addRoute(mapping: Mapping, name?: string | null | false): unknown;
   resourcesPathNames: Record<string, string>;
   drawPaths: string[];
   defaultUrlOptions: Record<string, unknown>;
@@ -173,16 +182,22 @@ class Mapping {
 
   readonly defaults: Record<string, unknown>;
   readonly to: unknown;
-  readonly defaultController: string | undefined;
+  readonly defaultController: string | RegExp | undefined;
   readonly defaultAction: string | undefined;
+  readonly ast: Ast;
   readonly scopeOptions: Record<string, unknown>;
   private readonly _blocks: readonly unknown[];
+  private readonly _anchor: boolean;
+  private readonly _via: readonly string[];
+  private readonly _formatted: boolean | undefined;
+  private readonly _internal: boolean | undefined;
+  private readonly _constraints: RouteConstraints;
 
   static build(
     scope: Scope,
     set: RouteSetLike | undefined,
-    ast: string,
-    controller: string | undefined,
+    ast: Node,
+    controller: string | RegExp | undefined,
     defaultAction: string | undefined,
     to: unknown,
     via: readonly string[],
@@ -244,16 +259,20 @@ class Mapping {
   }
 
   constructor({
+    ast,
     controller,
     defaultAction,
     to,
+    formatted,
+    via,
     optionsConstraints,
+    anchor,
     scopeParams,
     options,
   }: {
     set: RouteSetLike | undefined;
-    ast: string;
-    controller: string | undefined;
+    ast: Node;
+    controller: string | RegExp | undefined;
     defaultAction: string | undefined;
     to: unknown;
     formatted: boolean | undefined;
@@ -267,7 +286,24 @@ class Mapping {
     this.to = to;
     this.defaultController = controller;
     this.defaultAction = defaultAction;
+    this._anchor = anchor;
+    this._via = via;
+    this._formatted = formatted;
+    this._internal = options.internal as boolean | undefined;
+    delete options.internal;
     this.scopeOptions = scopeParams.options;
+    this.ast = new Ast(ast, formatted);
+
+    options = { ...this.ast.wildcardOptions, ...options };
+
+    options = this.normalizeOptionsBang(options, this.ast.pathParams, scopeParams.module);
+
+    const constraints: RouteConstraints = {
+      ...scopeParams.constraints,
+      ...(Object.fromEntries(
+        Object.entries(options).filter(([, option]) => option instanceof RegExp),
+      ) as RouteConstraints),
+    };
 
     if (isPlainObject(optionsConstraints)) {
       defaults = {
@@ -281,15 +317,89 @@ class Mapping {
         ...defaults,
       };
       this._blocks = scopeParams.blocks;
+      Object.assign(constraints, optionsConstraints);
     } else {
       this._blocks = this.blocks(optionsConstraints);
     }
+    this._constraints = constraints;
 
     this.defaults = { ...defaults, ...this.normalizeDefaults(options) };
+
+    if (this.ast.pathParams.includes("action") && !Object.hasOwn(constraints, "action")) {
+      if (this.defaults.action == null || this.defaults.action === false) {
+        this.defaults.action = "index";
+      }
+    }
+  }
+
+  makeRoute(name: string | null | false | undefined, _precedence: number): Route {
+    const route = new Route(
+      this._via,
+      this.ast.tree.toString(),
+      (this.defaults.controller as string | undefined) ?? "",
+      (this.defaults.action as string | undefined) ?? "",
+      {
+        name,
+        redirectEndpoint: this.to instanceof Redirect ? this.to : undefined,
+        constraints: Object.keys(this._constraints).length > 0 ? this._constraints : undefined,
+        defaults: this.defaults as Record<string, string | null>,
+        anchor: this._anchor,
+        format: this._formatted,
+        internal: this._internal,
+        scopeOptions: this.scopeOptions,
+      },
+    );
+    route.app = this.application();
+    return route;
   }
 
   application(): Endpoint {
     return this.app(this._blocks);
+  }
+
+  /** @internal */
+  private normalizeOptionsBang(
+    options: Record<string, unknown>,
+    pathParams: readonly string[],
+    modyoule: string | undefined,
+  ): Record<string, unknown> {
+    if (pathParams.includes("controller")) {
+      if (modyoule) {
+        throw new ArgumentError(":controller segment is not allowed within a namespace block");
+      }
+
+      if (options.controller == null || options.controller === false) {
+        options.controller = /.+?/;
+      }
+    }
+
+    if (rbObjRespondTo(this.to, "action") || rbObjRespondTo(this.to, "call")) {
+      return options;
+    } else {
+      let controller: string | RegExp | undefined;
+      let action: string | undefined;
+      if (this.to == null) {
+        controller = this.defaultController;
+        action = this.defaultAction;
+      } else if (typeof this.to === "string") {
+        if (this.to.includes("#")) {
+          const toEndpoint = stringSplit(this.to, "#");
+          controller = toEndpoint[0];
+          action = toEndpoint[1];
+        } else {
+          controller = this.defaultController;
+          action = this.to;
+        }
+      } else {
+        throw new ArgumentError(
+          ":to must respond to `action` or `call`, or it must be a String that includes '#', or the controller should be implicit",
+        );
+      }
+
+      controller = this.addControllerModule(controller, modyoule);
+
+      return Object.assign(options, this.checkControllerAndAction(pathParams, controller, action));
+    }
   }
 
   /** @internal */
@@ -314,6 +424,70 @@ class Mapping {
     } else {
       return this.dispatcher(Object.hasOwn(this.defaults, "controller"));
     }
+  }
+
+  /** @internal */
+  private checkControllerAndAction(
+    pathParams: readonly string[],
+    controller: string | RegExp | undefined,
+    action: string | RegExp | undefined,
+  ): Record<string, unknown> {
+    const hash = this.checkPart("controller", controller, pathParams, {}, (part) =>
+      this.translateController(part, () => {
+        let message = `'${part}' is not a supported controller name. This can lead to potential routing problems.`;
+        message +=
+          " See https://guides.rubyonrails.org/routing.html#specifying-a-controller-to-use";
+
+        throw new ArgumentError(message);
+      }),
+    );
+
+    return this.checkPart("action", action, pathParams, hash, (part) =>
+      part instanceof RegExp ? part : String(part),
+    );
+  }
+
+  /** @internal */
+  private checkPart(
+    name: string,
+    part: string | RegExp | undefined,
+    pathParams: readonly string[],
+    hash: Record<string, unknown>,
+    block: (part: string | RegExp) => unknown,
+  ): Record<string, unknown> {
+    if (part != null) {
+      hash[name] = block(part);
+    } else {
+      if (!pathParams.includes(name)) {
+        const message = `Missing :${name} key on routes definition, please check your routes.`;
+        throw new ArgumentError(message);
+      }
+    }
+    return hash;
+  }
+
+  /** @internal */
+  private addControllerModule(
+    controller: string | RegExp | undefined,
+    modyoule: string | undefined,
+  ): string | RegExp | undefined {
+    if (modyoule && !(controller instanceof RegExp)) {
+      if (controller?.startsWith("/")) {
+        return controller.slice(1);
+      } else {
+        return [modyoule, controller].filter((part) => part != null).join("/");
+      }
+    } else {
+      return controller;
+    }
+  }
+
+  /** @internal */
+  private translateController(controller: string | RegExp, block: () => never): string | RegExp {
+    if (controller instanceof RegExp) return controller;
+    if (/^[a-z_0-9][a-z_0-9/]*$/.test(controller)) return controller;
+
+    return block();
   }
 
   /** @internal */
@@ -344,10 +518,6 @@ export class Mapper {
   ];
 
   private concerns: Map<string, ConcernCallback> = new Map();
-  /** @internal */
-  private redirectInstances: Map<string, Redirect> = new Map();
-  /** @internal */
-  private redirectCounter = 0;
   /** @internal */
   _set: RouteSetLike;
   /** @internal */
@@ -430,8 +600,7 @@ export class Mapper {
     options = this.applyActionOptions("resources", options);
 
     const shallow = this._scope.get("shallow") === true;
-    const controllerPrefix = this._scope.get("module") as string | undefined;
-    const controller = controllerPrefix ? `${controllerPrefix}/${name}` : name;
+    const controller = name;
     const prefix = (this._scope.get("path") as string | undefined) ?? "";
     const basePath = `${prefix}/${name}`;
     const singular = singularize(name);
@@ -567,9 +736,7 @@ export class Mapper {
     if (this.applyCommonBehaviorFor("resource", [name], options, cb)) return;
     options = this.applyActionOptions("resource", options);
 
-    const controllerPrefix = this._scope.get("module") as string | undefined;
-    const rawController = pluralize(name);
-    const controller = controllerPrefix ? `${controllerPrefix}/${rawController}` : rawController;
+    const controller = pluralize(name);
     const prefix = (this._scope.get("path") as string | undefined) ?? "";
     const basePath = `${prefix}/${name}`;
     const namePrefix = this._scope.get("as") as string | undefined;
@@ -894,7 +1061,7 @@ export class Mapper {
     }
   }
 
-  redirect(args: string | RedirectOptions | RedirectFunction): string {
+  redirect(args: string | RedirectOptions | RedirectFunction): Redirect {
     let endpoint: Redirect;
     if (typeof args === "string") {
       endpoint = redirectFactory(args);
@@ -904,9 +1071,7 @@ export class Mapper {
       const { status, ...opts } = args;
       endpoint = redirectFactory({ ...opts, status });
     }
-    const id = `__redirect__:${this.redirectCounter++}`;
-    this.redirectInstances.set(id, endpoint);
-    return id;
+    return endpoint;
   }
 
   match(path: string, options: RouteOptions & { via?: string | string[] } = {}): void {
@@ -973,7 +1138,7 @@ export class Mapper {
       format: false,
       ...options,
       via: options.via ?? ":all",
-      app,
+      to: app,
     };
     if (asName) matchOpts.as = asName;
     delete matchOpts.at;
@@ -1110,10 +1275,10 @@ export class Mapper {
   /** @internal */
   decomposedMatch(
     path: string,
-    controller: string | undefined,
+    controller: string | RegExp | undefined,
     options: RouteOptions & { on?: string },
     _path: string | undefined,
-    to: string | MountableApp | undefined,
+    to: string | MountableApp | Redirect | undefined,
     via: string | string[],
     formatted: boolean | undefined,
     anchor: boolean,
@@ -1199,130 +1364,84 @@ export class Mapper {
   > = new Map();
 
   private addRoute(
-    action: string,
-    controller: string | undefined,
+    action: string | undefined,
+    controller: string | RegExp | undefined,
     options: RouteOptions,
     _path: string | undefined,
-    to: string | MountableApp | undefined,
+    to: string | MountableApp | Redirect | undefined,
     via: string | string[],
     formatted: boolean | undefined,
     anchor: boolean,
     optionsConstraints: RouteOptions["constraints"],
   ): void {
-    const path = _path ?? action;
-    const fullPath = Mapping.normalizePath(
-      RFC2396_PARSER.escape(
-        ((this._scope.get("path") as string | undefined) ?? "") + "/" + path.replace(/^\/+/, ""),
-      ),
-      formatted,
-    );
-    const scopeAction = this._scope.get("action") as string | undefined;
-    const toApp = typeof to === "string" ? undefined : to;
-    const endpoint =
-      (typeof to === "string" ? to : undefined) ??
-      `${controller ?? ""}#${options.action ?? scopeAction ?? ""}`;
-    const scopeModulePrefix = this._scope.get("module") as string | undefined;
+    let path = this.pathForAction(action!, _path);
+    if (isBlank(path)) throw new ArgumentError("path is required");
 
-    let redirectEndpoint: Redirect | undefined;
-    let redirectTarget: string | RedirectOptions | RedirectFunction | undefined;
-    if (typeof endpoint === "string" && endpoint.startsWith("__redirect__:")) {
-      redirectEndpoint = this.redirectInstances.get(endpoint);
-      if (!redirectEndpoint) {
-        throw new Error(`Mapper#redirect token ${endpoint} has no registered Redirect endpoint`);
+    action = String(action);
+
+    let defaultAction: string | undefined =
+      options.action != null && (options.action as unknown) !== false
+        ? options.action
+        : (this._scope.get("action") as string | undefined);
+    delete options.action;
+
+    if (/^[\w\-/]+$/.test(action)) {
+      if (
+        !action.includes("/") &&
+        (defaultAction == null || (defaultAction as unknown) === false)
+      ) {
+        defaultAction = action.replace(/-/g, "_");
       }
-    }
-    if (options.redirect) {
-      redirectTarget = options.redirect;
-    }
-
-    const isRedirect = redirectEndpoint !== undefined || redirectTarget !== undefined;
-    [controller, action] = isRedirect ? ["", ""] : parseEndpoint(endpoint);
-    if (!isRedirect && scopeModulePrefix && !controller) {
-      controller = scopeModulePrefix;
-    } else if (scopeModulePrefix && controller && !controller.includes("/")) {
-      controller = scopeModulePrefix + "/" + controller;
-    }
-    const asGiven = options.as !== undefined ? options.as : options.name;
-    const actionForName = /^[\w\-/]+$/.test(path) ? path : undefined;
-    const fullName =
-      asGiven === null || asGiven === false
-        ? undefined
-        : this.nameForAction(asGiven, actionForName);
-
-    const scopeDefaults = this._scope.get("defaults") as Record<string, string> | undefined;
-    let mergedDefaults =
-      scopeDefaults || options.defaults
-        ? { ...(scopeDefaults ?? {}), ...(options.defaults ?? {}) }
-        : undefined;
-
-    const constraints: RouteConstraints = {
-      ...((this._scope.get("constraints") as RouteConstraints | undefined) ?? {}),
-    };
-    if (isPlainObject(optionsConstraints)) {
-      mergedDefaults = {
-        ...(Object.fromEntries(
-          Object.entries(optionsConstraints).filter(
-            ([key, defaultValue]) =>
-              Mapper.URL_OPTIONS.includes(key) &&
-              (typeof defaultValue === "string" || Number.isInteger(defaultValue)),
-          ),
-        ) as Record<string, string>),
-        ...(mergedDefaults ?? {}),
-      };
-      Object.assign(constraints, optionsConstraints);
+    } else {
+      action = undefined;
     }
 
-    const route = new Route(via, fullPath, controller, action, {
-      ...options,
-      anchor,
-      format: formatted,
-      constraints: Object.keys(constraints).length > 0 ? constraints : undefined,
-      app: toApp ?? options.app,
-      name: fullName,
-      redirect: redirectTarget,
-      redirectEndpoint,
-      defaults: mergedDefaults,
-      scopeOptions: (this._scope.get("options") as Record<string, unknown> | undefined) ?? {},
-    });
+    let as: string | null | false | undefined;
+    const asOption = fetch<unknown>(options as Record<string, unknown>, "as", true);
+    if (asOption == null || asOption === false) {
+      as = options.as;
+      delete options.as;
+    } else {
+      const given = options.as as string | undefined;
+      delete options.as;
+      as = this.nameForAction(given, action);
+    }
+
+    path = Mapping.normalizePath(RFC2396_PARSER.escape(path), formatted);
+    const ast = Parser.parse(path)!;
+
     const mapping = Mapping.build(
       this._scope,
       this._set,
-      fullPath,
-      controller || undefined,
-      action || undefined,
-      route.to ?? route.redirectEndpoint,
-      typeof via === "string" ? [via] : via,
+      ast,
+      controller,
+      defaultAction,
+      to,
+      kernelArray(via),
       formatted,
       optionsConstraints,
-      route.anchor,
-      { ...options.defaults, ...(controller ? { controller, action } : {}) },
+      anchor,
+      options as Record<string, unknown>,
     );
-    this.addRouteToSet(route, fullName, mapping);
+    this._set.addRoute(mapping, as);
   }
 
   /** @internal */
-  private addRouteToSet(
-    route: Route,
-    name?: string | null,
-    mapping: Mapping = Mapping.build(
+  private addRouteToSet(route: Route, name?: string | null): void {
+    const mapping = Mapping.build(
       this._scope,
       this._set,
-      route.path,
+      Parser.parse(route.path)!,
       route.controller,
       route.action,
-      route.to ?? route.redirectEndpoint,
+      undefined,
       route.verb.split("|"),
       route.formatted,
       route.constraints,
       route.anchor,
-      {
-        ...route.defaults,
-        ...(route.controller ? { controller: route.controller, action: route.action } : {}),
-      },
-    ),
-  ): void {
-    route.app = mapping.application();
-    this._set.addRoute(route, name);
+      { ...route.defaults },
+    );
+    this._set.addRoute(mapping, name);
   }
 
   private isShallow(): boolean {
@@ -1481,9 +1600,12 @@ export class Mapper {
   /** @internal */
   pathForAction(action: string, path: string | undefined): string {
     const prefix = (this._scope.get("path") as string | undefined) ?? "";
-    if (path) return `${prefix}/${path}`;
-    if (this.canonicalAction(action)) return prefix;
-    return `${prefix}/${action}`;
+    if (path != null) return `${prefix}/${path}`;
+    if (this.canonicalAction(action)) {
+      return prefix;
+    } else {
+      return `${prefix}/${this.actionPath(action)}`;
+    }
   }
 
   /** @internal */
@@ -1514,7 +1636,7 @@ export class Mapper {
     const actionName = this._scope.actionName(namePrefix, prefix, collectionName, memberName);
     const candidate = actionName.filter((p): p is string => isPresent(p)).join("_");
     if (!candidate) return undefined;
-    if (as === undefined) {
+    if (as == null) {
       if (!/^[_a-z]/i.test(candidate) || this.hasNamedRoute(candidate)) return undefined;
     }
     return candidate;
@@ -1751,11 +1873,6 @@ function normalizeOptions(optionsOrEndpoint: RouteOptions | string): RouteOption
     return { to: optionsOrEndpoint };
   }
   return optionsOrEndpoint;
-}
-
-function parseEndpoint(endpoint: string): [string, string] {
-  const parts = endpoint.split("#");
-  return [parts[0] || "", parts[1] || ""];
 }
 
 function singularize(word: string): string {
