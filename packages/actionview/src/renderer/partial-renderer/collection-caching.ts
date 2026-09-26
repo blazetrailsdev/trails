@@ -61,7 +61,7 @@ export async function cacheCollectionRender(
 
   const collectionIterator = collection;
 
-  const [keyedCollection, orderedKeys] = collectionByCacheKeys.call(
+  const [keyedCollection, orderedKeys] = await collectionByCacheKeys.call(
     this,
     view,
     template,
@@ -96,22 +96,22 @@ export function isCallableCacheKey(this: CollectionCachingHost): boolean {
 }
 
 /** @internal */
-export function collectionByCacheKeys(
+export async function collectionByCacheKeys(
   this: CollectionCachingHost,
   view: CollectionCachingView,
   template: RenderableTemplate,
   collection: SameCollectionIterator,
-): [Map<unknown[], unknown>, unknown[][]] {
+): Promise<[Map<unknown[], unknown>, unknown[][]]> {
   const seed = isCallableCacheKey.call(this)
     ? (this.options.cached as (i: unknown) => unknown)
     : (i: unknown) => i;
 
   const digestPath = view.digestPathFromTemplate(template);
-  if (isCallableCacheKey.call(this)) collection.preloadBang();
+  if (isCallableCacheKey.call(this)) await collection.preloadBang();
 
   const hash = new Map<unknown[], unknown>();
   const orderedKeys: unknown[][] = [];
-  collection.each((item) => {
+  await collection.each((item) => {
     const key = expandedCacheKey.call(this, seed(item), view, template, digestPath);
     orderedKeys.push(key);
     hash.set(key, item);
