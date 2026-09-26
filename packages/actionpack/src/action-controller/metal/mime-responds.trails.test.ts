@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { Base } from "../base.js";
 import { Request } from "../../action-dispatch/http/request.js";
 import { Response } from "../../action-dispatch/http/response.js";
-import { Collector } from "./mime-responds.js";
+import { Collector, VariantCollector } from "./mime-responds.js";
 import { RespondToMismatchError, UnknownFormat } from "./exceptions.js";
 
 describe("Collector#isAnyResponse", () => {
@@ -71,7 +71,8 @@ describe("Collector#custom", () => {
     collector.html(() => "first");
     collector.any("html", () => "second");
 
-    expect(collector.negotiate({ format: "html" })?.handler()).toBe("first");
+    collector.negotiateFormat({ format: "html" });
+    expect(collector.response?.()).toBe("first");
   });
 
   it("keeps the first registration across repeated custom calls", () => {
@@ -79,7 +80,8 @@ describe("Collector#custom", () => {
     collector.custom("html", () => "first");
     collector.custom("html", () => "second");
 
-    expect(collector.negotiate({ format: "html" })?.handler()).toBe("first");
+    collector.negotiateFormat({ format: "html" });
+    expect(collector.response?.()).toBe("first");
   });
 });
 
@@ -141,5 +143,73 @@ describe("Base#respondTo", () => {
     });
 
     expect(base.contentType).toMatch(/^json/);
+  });
+});
+
+describe("Collector#response", () => {
+  type Variants = VariantCollector & Record<string, (block?: () => unknown) => void>;
+
+  function controller(variant?: string | string[]): Base {
+    const base = new Base();
+    const request = new Request({ HTTP_ACCEPT: "text/html" });
+    if (variant !== undefined) request.variant = variant;
+    base.request = request as unknown as Base["request"];
+    base.setResponseBang(new Response());
+    return base;
+  }
+
+  it("calls the variant block for the inline variant syntax", () => {
+    const rendered: string[] = [];
+    controller("phone").respondTo((format) => {
+      const html = format.custom("html") as Variants;
+      html.none(() => rendered.push("none"));
+      html.phone(() => rendered.push("phone"));
+    });
+
+    expect(rendered).toEqual(["phone"]);
+  });
+
+  it("calls the none variant for the inline variant syntax when no variant is set", () => {
+    const rendered: string[] = [];
+    controller().respondTo((format) => {
+      const html = format.custom("html") as Variants;
+      html.none(() => rendered.push("none"));
+      html.phone(() => rendered.push("phone"));
+    });
+
+    expect(rendered).toEqual(["none"]);
+  });
+
+  it("yields a variant collector to a format block that takes one", () => {
+    const rendered: string[] = [];
+    controller("tablet").respondTo((format) => {
+      format.html((variant: VariantCollector) => {
+        variant.any("tablet", "phablet", () => rendered.push("any"));
+        (variant as Variants).phone(() => rendered.push("phone"));
+      });
+    });
+
+    expect(rendered).toEqual(["any"]);
+  });
+
+  it("falls back to the any variant for an unmatched variant", () => {
+    const rendered: string[] = [];
+    controller("yolo").respondTo((format) => {
+      format.html((variant: VariantCollector) => {
+        variant.any(() => rendered.push("any"));
+        (variant as Variants).phone(() => rendered.push("phone"));
+      });
+    });
+
+    expect(rendered).toEqual(["any"]);
+  });
+
+  it("answers a zero-arity format block itself", () => {
+    const collector = new Collector();
+    const block = () => "html";
+    collector.html(block);
+    collector.negotiateFormat({ format: "html" });
+
+    expect(collector.response).toBe(block);
   });
 });

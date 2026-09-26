@@ -21,10 +21,12 @@
  * literal values, kwarg keys. `naming` rows (differing only in how a `ref:`
  * identifier is spelled) are the local/parameter-identifier dimension surfacing
  * through the argument comparison rather than an argument defect, and are never
- * baselined. They are gated per package instead (RFC 0153): in a package listed
- * in {@link NAMING_ENROLLED_PACKAGES}, every differing identifier is renamed
- * away or carries an `@missingRailsName` receipt, and a receipt is legal only
- * on a pair `classifyPair` files as permanent. Elsewhere they are report-only.
+ * baselined. They are gated per package instead (RFC 0153): in every package of
+ * the AR require-closure `ar-closure.ts` resolves, and in any other package
+ * listed in {@link NAMING_ENROLLED_PACKAGES}, every differing identifier is
+ * renamed away or carries an `@missingRailsName` receipt, and a receipt is
+ * legal only on a pair `classifyPair` files as permanent. Elsewhere they are
+ * report-only.
  *
  * A plain gating run first regenerates the artifact itself by shelling out to
  * `pnpm parity:api --calls` (see gate-regen.ts): gating a stale artifact is
@@ -45,6 +47,7 @@
 import * as fs from "fs/promises";
 import * as path from "path";
 import { fileURLToPath } from "url";
+import { type ArClosure, DATA_LAYER_PACKAGES } from "./ar-closure.js";
 import { OUTPUT_DIR, ROOT_DIR } from "./config.js";
 import { TAG as ARGS_TAG } from "./missing-rails-args-tags.js";
 import { TAG as NAME_TAG } from "./missing-rails-name-tags.js";
@@ -91,6 +94,7 @@ import {
 
 const ARTIFACT_PATH = path.join(OUTPUT_DIR, "call-arg-mismatches.json");
 const TS_API_PATH = path.join(OUTPUT_DIR, "ts-api.json");
+const AR_CLOSURE_PATH = path.join(OUTPUT_DIR, "ar-closure.json");
 
 /**
  * The packages whose `naming` rows are gated (RFC 0153 §2). Only-grow, like
@@ -107,6 +111,23 @@ export const NAMING_ENROLLED_PACKAGES: readonly string[] = [
   "globalid",
   "i18n",
 ];
+
+/**
+ * The packages whose `naming` rows gate: the AR require-closure — the data
+ * layer plus every support gem the closure resolves a file into, read from the
+ * `ar-closure.json` compare.ts regenerates from vendor/rails — together with
+ * the enrollment set. A `require` that moves a gem into the closure moves it
+ * into the gate with no edit here.
+ */
+export function namingGatedPackages(closure: ArClosure): string[] {
+  return [
+    ...new Set([
+      ...NAMING_ENROLLED_PACKAGES,
+      ...DATA_LAYER_PACKAGES,
+      ...Object.keys(closure.files),
+    ]),
+  ].sort();
+}
 
 export interface NamingFinding {
   package: string;
@@ -163,7 +184,7 @@ export function namingFindings(
 
 export function renderNamingFindings(findings: NamingFinding[]): string {
   return [
-    `\ncall-args naming gate: ${findings.length} failure(s) in NAMING_ENROLLED_PACKAGES.`,
+    `\ncall-args naming gate: ${findings.length} failure(s) in the AR closure / NAMING_ENROLLED_PACKAGES.`,
     "Rename the TS identifier to the Rails one (camelCased). A pair no rename can close takes " +
       `\`${NAME_TAG} <ruby_identifier> — PERMANENT\` on the enclosing declaration; a receipt on ` +
       "a convergeable pair is rejected, and a receipt matching no row must be deleted.\n",
@@ -258,12 +279,13 @@ export async function main(write: boolean): Promise<number> {
   const staleTags = artifact.staleTags ?? [];
   if (staleTags.length > 0) console.error(renderStaleTags(staleTags));
   const api = await readJson<TsApi>(TS_API_PATH);
-  const naming = namingFindings(artifact, thisTypedFunctionsByPackage(api));
+  const gated = namingGatedPackages(await readJson<ArClosure>(AR_CLOSURE_PATH));
+  const naming = namingFindings(artifact, thisTypedFunctionsByPackage(api), gated);
   if (naming.length > 0) console.error(renderNamingFindings(naming));
   if (added.length === 0 && stale.length === 0 && staleTags.length === 0 && naming.length === 0) {
     console.log(
       `call-args ratchet: OK (${baseline.length} baselined shape row(s); naming gated in ` +
-        `${NAMING_ENROLLED_PACKAGES.join(", ")})`,
+        `${gated.join(", ")})`,
     );
     return 0;
   }
@@ -306,8 +328,8 @@ export function renderStaleTags(staleTags: NonNullable<CallArgArtifact["staleTag
   ].join("\n");
 }
 
-/** `--report`: the whole artifact, `naming` included — the excluded class is
- *  reachable only here. Never fails. */
+/** `--report`: the whole artifact, `naming` included in every package — outside
+ *  the gated set it is reachable only here. Never fails. */
 async function reportMain(top: number): Promise<number> {
   console.log(renderReport(await loadArtifact(), top));
   return 0;

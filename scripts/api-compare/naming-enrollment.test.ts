@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { CallArgArtifact } from "./call-args-baseline.js";
-import { NAMING_ENROLLED_PACKAGES, namingFindings } from "./lint-call-args.js";
+import { NAMING_ENROLLED_PACKAGES, namingFindings, namingGatedPackages } from "./lint-call-args.js";
 
 type Row = CallArgArtifact["mismatches"][number];
 
@@ -96,6 +96,27 @@ describe("NAMING_ENROLLED_PACKAGES", () => {
   it("only grows: every package ever enrolled stays enrolled", () => {
     expect(NAMING_ENROLLED_PACKAGES).toEqual(
       expect.arrayContaining(["activerecord-test-support", "globalid", "i18n"]),
+    );
+  });
+});
+
+describe("namingGatedPackages", () => {
+  it("gates the data layer and every support gem the AR closure resolves", () => {
+    const gated = namingGatedPackages({ files: { activesupport: ["a.rb"], date: ["d.rb"] } });
+    expect(gated).toEqual(
+      expect.arrayContaining(["activemodel", "activerecord", "activesupport", "arel", "date"]),
+    );
+  });
+
+  it("keeps every enrolled package gated when the closure does not resolve it", () => {
+    expect(namingGatedPackages({ files: {} })).toEqual(
+      expect.arrayContaining([...NAMING_ENROLLED_PACKAGES]),
+    );
+  });
+
+  it("does not gate a package outside both the closure and the enrollment set", () => {
+    expect(namingGatedPackages({ files: { activesupport: ["a.rb"] } })).not.toContain(
+      "actiondispatch",
     );
   });
 });

@@ -427,14 +427,16 @@ write.
    `call-mismatches-exclude/` shards — its rows carry `kind: "args"` and the
    argument list in the key, and each gate reads only its own kind. It gates
    `shape` rows — count, order, literal values, kwarg keys. `naming` rows (a
-   `ref:` identifier spelled differently) are never baselined: in a package
-   listed in `NAMING_ENROLLED_PACKAGES` (only-grow, per RFC 0153, in
+   `ref:` identifier spelled differently) are never baselined: in every
+   package of the AR require-closure (resolved from `ar-closure.ts`, so a moved
+   `require` moves the gate) and in any other package listed in
+   `NAMING_ENROLLED_PACKAGES` (only-grow, per RFC 0153, in
    `lint-call-args.ts`) every differing identifier is renamed to the Rails
    one or, when `classifyPair` files that pair permanent, receipted with
    `@missingRailsName <ruby_identifier> — PERMANENT|CONVERGEABLE <story-id>` on
    the enclosing declaration. A receipt on a convergeable pair, or one matching
-   no row, reds the same gate. Elsewhere they are report-only via
-   `pnpm parity:api:calls:args:report`. New `shape` row? Pass what Rails passes;
+   no row, reds the same gate. Everywhere else (the actionpack family, rack,
+   trailties) they remain report-only via `pnpm parity:api:calls:args:report`. New `shape` row? Pass what Rails passes;
    baselining is the fallback and costs a one-line `reason` on the baseline row.
    A single argument-shape deviation can instead carry a
    `@missingRailsArgs <ruby_call> — PERMANENT|CONVERGEABLE <story-id>` JSDoc tag
@@ -1321,6 +1323,7 @@ the capability, in a different place. Each is its own `SKIP_GROUPS` entry in
 | `active_support/string_inquirer.rb`                   | Proxy                 |
 | `active_support/time_with_zone.rb`                    | Proxy                 |
 | `rails/railtie/configuration.rb`                      | Proxy                 |
+| `action_controller/metal/mime_responds.rb`            | Proxy                 |
 
 A Proxy row whose Ruby class also defines `respond_to_missing?` forwards a
 name only when that predicate answers it (`broadcast_logger.rb:235-251`): a
