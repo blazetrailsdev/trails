@@ -75,6 +75,20 @@ export class TestRequest extends Request {
     this.setHeader("HTTP_USER_AGENT", ua);
   }
 
+  get accept(): string | undefined {
+    return super.accept;
+  }
+
+  set accept(mimeTypes: unknown) {
+    this.deleteHeader("action_dispatch.request.accepts");
+    this.setHeader(
+      "HTTP_ACCEPT",
+      (Array.isArray(mimeTypes) ? mimeTypes : mimeTypes == null ? [] : [mimeTypes])
+        .map(String)
+        .join(","),
+    );
+  }
+
   set action(actionName: string) {
     this.pathParameters = { ...this.pathParameters, action: String(actionName) };
   }
