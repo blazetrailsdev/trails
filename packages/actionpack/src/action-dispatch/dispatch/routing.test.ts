@@ -6,6 +6,7 @@ import { Response } from "../http/response.js";
 import { controllerConstants, type Request } from "../http/request.js";
 import type { DispatchableControllerClass } from "../routing/dispatcher.js";
 import { escapeSegment, unescapeUri } from "../journey/router/utils.js";
+import { ArgumentError } from "@blazetrails/activemodel";
 
 afterEach(() => {
   controllerConstants.delete("posts");
@@ -2073,7 +2074,14 @@ describe("TestFormatConstraints", () => {
 });
 
 describe("TestCallableConstraintValidation", () => {
-  it.skip("constraint with object not callable", () => {});
+  it("constraint with object not callable", () => {
+    expect(() => {
+      new RouteSet().draw((r) => {
+        const ok = () => [200, { "Content-Type": "text/plain" }, []];
+        r.get("/test", { to: ok as never, constraints: new (class {})() as never });
+      });
+    }).toThrow(ArgumentError);
+  });
 });
 
 describe("TestRouteDefaults", () => {

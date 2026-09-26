@@ -532,6 +532,12 @@ export class Mapper {
     const previous = this._scope;
     const frame: ScopeFrameHash = { ...options };
     frame.blocks = this.mergeBlocksScope(this._scope.get("blocks") as unknown[] | undefined, block);
+    if (frame.constraints !== undefined) {
+      frame.constraints = this.mergeConstraintsScope(
+        this._scope.get("constraints") as RouteConstraints | undefined,
+        frame.constraints as RouteConstraints,
+      );
+    }
     if (frame.shallowPath !== undefined) {
       frame.shallowPath = this.mergeShallowPathScope(
         this._scope.get("shallowPath") as string | undefined,
@@ -1092,11 +1098,13 @@ export class Mapper {
         : undefined;
 
     const optionsConstraints = options.constraints ?? {};
+    const constraints: RouteConstraints = {
+      ...((this._scope.get("constraints") as RouteConstraints | undefined) ?? {}),
+    };
     let blocks: readonly unknown[];
-    let constraints: RouteConstraints | undefined;
     if (isPlainObject(optionsConstraints)) {
       blocks = (this._scope.get("blocks") as unknown[] | undefined) ?? [];
-      constraints = options.constraints as RouteConstraints | undefined;
+      Object.assign(constraints, optionsConstraints);
     } else {
       blocks = Mapping.blocks(optionsConstraints);
     }
@@ -1104,7 +1112,7 @@ export class Mapper {
     this.addRouteToSet(
       new Route(verb, fullPath, controller, action, {
         ...options,
-        constraints,
+        constraints: Object.keys(constraints).length > 0 ? constraints : undefined,
         blocks,
         app: toApp ?? options.app,
         name: fullName,

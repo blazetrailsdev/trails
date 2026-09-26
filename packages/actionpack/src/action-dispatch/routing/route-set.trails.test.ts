@@ -79,6 +79,22 @@ describe("ActionDispatch::Routing::Mapper::Mapping#app", () => {
     expect(routes.getRoutes()[0].app).toBeInstanceOf(StaticDispatcher);
   });
 
+  it("merges nested Hash scope constraints onto a matched route", () => {
+    const routes = new RouteSet();
+    routes.draw((r) => {
+      r.scope({ constraints: { subdomain: "api" } }, () => {
+        r.scope({ constraints: { id: /\d+/ } }, () => {
+          r.get("/posts/:id", { to: "posts#show", constraints: { format: "json" } });
+        });
+      });
+    });
+    expect(routes.getRoutes()[0].constraints).toEqual({
+      subdomain: "api",
+      id: /\d+/,
+      format: "json",
+    });
+  });
+
   it("raises for a constraint answering neither call nor matches?", () => {
     const routes = new RouteSet();
     expect(() =>
