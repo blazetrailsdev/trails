@@ -18,7 +18,7 @@ describe("Template::Handlers.extended", () => {
   };
 
   it("registers raw as the default and the tse, html and ruby handlers", () => {
-    expect(TemplateHandlers.extensions()).toEqual(["raw", "tse", "html", "ruby"]);
+    expect(TemplateHandlers.extensions()).toEqual([":raw", ":tse", ":html", ":ruby"]);
   });
 
   it("renders a .html template through the Html handler", () => {
