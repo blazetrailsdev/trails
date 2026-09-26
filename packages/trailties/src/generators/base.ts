@@ -252,7 +252,6 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     this.output(`      insert  ${relativePath}`);
   }
 
-  /** @noRailsEquivalent PERMANENT */
   protected revokeInjection(relativePath: string, pattern: string, content: string): void {
     const fullPath = File.join(this.cwd, relativePath);
     this.output(`    subtract  ${relativePath}`);
