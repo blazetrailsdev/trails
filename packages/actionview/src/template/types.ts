@@ -8,7 +8,7 @@ export class SimpleType {
     return SYMBOLS;
   }
 
-  static get(type: string | SimpleType): SimpleType {
+  static get(type: string | SimpleType | null): SimpleType {
     if (type instanceof this) {
       return type;
     } else {
@@ -23,7 +23,7 @@ export class SimpleType {
 
   readonly symbol: string;
 
-  constructor(symbol: string) {
+  constructor(symbol: string | null) {
     this.symbol = isSymbol(symbol) ? symbol : `:${symbol}`;
   }
 

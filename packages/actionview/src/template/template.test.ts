@@ -78,4 +78,8 @@ describe("TestTSETemplate", () => {
       ]),
     ).toBe("Hello-2");
   });
+  it("rails local assigns and strict locals", () => {
+    const template = newTemplate('<%# locals: (class: ) -%>\n<%= localAssigns["class"] %>');
+    expect(render(template, { class: "some-class" }, ["message"])).toBe("some-class");
+  });
 });

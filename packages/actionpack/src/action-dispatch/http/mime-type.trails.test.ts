@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { FixtureResolver, LookupContext, Template } from "@blazetrails/actionview";
+import { FixtureResolver, LookupContext, Template, TseHandler } from "@blazetrails/actionview";
 import "../../namespaces.js";
 import { Mime, MimeType } from "./mime-type.js";
 
@@ -24,5 +24,11 @@ describe("ActionView::Template::Types once Action Dispatch loads", () => {
     lookupContext.appendViewPaths([new FixtureResolver({ "posts/index.foobar.tse": "foo" })]);
     lookupContext.formats = [":foobar"];
     expect((lookupContext.findTemplate("index", ["posts"]) as Template).format).toBe(":foobar");
+  });
+
+  it("answers Template#type as the Mime::Type, which the TSE escape_ignore_list matches (erb.rb:82)", () => {
+    const template = new Template({ source: "<%= name %>", identifier: "t", format: ":text" });
+    expect(template.type).toBe(Mime.get(":text"));
+    expect(new TseHandler().call(template, template.source)).toMatch(/_ob\.safeExprAppend\(name\)/);
   });
 });

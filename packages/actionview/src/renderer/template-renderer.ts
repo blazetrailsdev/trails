@@ -104,7 +104,7 @@ export class TemplateRenderer<Rendered = RenderedTemplate> extends AbstractRende
           layout: layout && layout.virtualPath,
           locals,
         },
-        async () => template.render(view, locals),
+        async () => template.render(view, locals, null, {}, (...name) => view._layoutFor!(...name)),
       ),
     )) as unknown as Rendered;
   }
@@ -129,7 +129,7 @@ export class TemplateRenderer<Rendered = RenderedTemplate> extends AbstractRende
         { identifier: layout.identifier },
         async () => {
           view.viewFlow?.set("layout", await block(layout));
-          return layout.render(view, locals);
+          return layout.render(view, locals, null, {}, (...name) => view._layoutFor!(...name));
         },
       );
     } else {

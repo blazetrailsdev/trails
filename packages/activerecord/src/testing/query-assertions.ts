@@ -115,3 +115,10 @@ export async function assertNoQueriesMatch<T>(
 ): Promise<T> {
   return await assertQueriesMatch(match, 0, includeSchema, fn);
 }
+
+export const QueryAssertions = {
+  assertQueriesCount,
+  assertNoQueries,
+  assertQueriesMatch,
+  assertNoQueriesMatch,
+};

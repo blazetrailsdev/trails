@@ -146,8 +146,16 @@ export class Base {
     return new this(context, assigns, controller);
   }
 
-  viewRenderer: Renderer;
-  lookupContext: LookupContext | null;
+  private _viewRenderer: Renderer;
+  private _lookupContext: LookupContext | null;
+
+  get viewRenderer(): Renderer {
+    return this._viewRenderer;
+  }
+
+  get lookupContext(): LookupContext | null {
+    return this._lookupContext;
+  }
 
   get formats(): LookupContext["formats"] | undefined {
     return this.lookupContext?.formats;
@@ -206,8 +214,8 @@ export class Base {
     controller: unknown = null,
   ) {
     this._config = new InheritableOptions();
-    this.lookupContext = lookupContext;
-    this.viewRenderer = new Renderer(this.lookupContext!);
+    this._lookupContext = lookupContext;
+    this._viewRenderer = new Renderer(this._lookupContext!);
     this.currentTemplate = null;
     this.assignController(controller as Parameters<typeof Helpers.assignController>[0]);
     this._prepareContext();
@@ -368,22 +376,24 @@ export class Base {
     });
   }
 
-  /** @missingRailsCall new — PERMANENT */
   inRenderingContext<T>(options: RenderOptions, block: (renderer: LookupContext) => T): T {
-    const oldLookupContext = this.lookupContext;
+    const oldViewRenderer = this._viewRenderer;
+    const oldLookupContext = this._lookupContext;
 
     if (!this.lookupContext?.htmlFallbackForJs && options.formats) {
       const formats = Array.isArray(options.formats) ? [...options.formats] : [options.formats];
       if (formats.length === 1 && formats[0] === ":js") {
         formats.push(":html");
       }
-      this.lookupContext = this.lookupContext!.withPrependedFormats(formats);
+      this._lookupContext = this.lookupContext!.withPrependedFormats(formats);
+      this._viewRenderer = new Renderer(this._lookupContext);
     }
 
     try {
-      return block(this.lookupContext!);
+      return block(this._lookupContext!);
     } finally {
-      this.lookupContext = oldLookupContext;
+      this._viewRenderer = oldViewRenderer;
+      this._lookupContext = oldLookupContext;
     }
   }
 

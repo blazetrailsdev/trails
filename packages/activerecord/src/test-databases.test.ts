@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
-import { createAndLoadSchema } from "./test-databases.js";
+import { TestDatabases } from "./test-databases.js";
 import { Base } from "./index.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
@@ -49,7 +49,7 @@ describe("TestDatabasesTest", () => {
 
     Base.configurations(stubConfigurations([mockConfig]));
 
-    await createAndLoadSchema(2, { envName: "arunit" });
+    await TestDatabases.createAndLoadSchema(2, { envName: "arunit" });
 
     expect(mockConfig.database).toBe("test/db/primary.sqlite3-2");
   });
@@ -76,7 +76,7 @@ describe("TestDatabasesTest", () => {
 
     Base.configurations(mockConfigurations);
 
-    await createAndLoadSchema(42, { envName: "arunit" });
+    await TestDatabases.createAndLoadSchema(42, { envName: "arunit" });
 
     expect(mockConfig.database).toBe("test/db/primary.sqlite3-42");
     expect(mockConfigurations.configsFor({ envName: "arunit" })[0].database).toBe(
@@ -101,7 +101,7 @@ describe("TestDatabasesTest", () => {
 
     Base.configurations(mockConfigurations);
 
-    await createAndLoadSchema(42, { envName: "arunit" });
+    await TestDatabases.createAndLoadSchema(42, { envName: "arunit" });
 
     const reconstructedNames = mockReconstructFromSchema.mock.calls.map(
       (call: any[]) => call[0].name,
@@ -122,7 +122,7 @@ describe("TestDatabasesTest", () => {
 
     Base.configurations(stubConfigurations([dbConfig]));
 
-    await createAndLoadSchema(5, { envName: "arunit" });
+    await TestDatabases.createAndLoadSchema(5, { envName: "arunit" });
     expect(dbConfig.database).toBe("test/db/primary.sqlite3-5");
   });
 
@@ -136,7 +136,7 @@ describe("TestDatabasesTest", () => {
 
     Base.configurations({});
 
-    await createAndLoadSchema(1, { envName: "arunit" });
+    await TestDatabases.createAndLoadSchema(1, { envName: "arunit" });
 
     expect(mockReconstructFromSchema).not.toHaveBeenCalled();
     expect(mockEstablishConnection).toHaveBeenCalledWith(undefined);
@@ -170,7 +170,9 @@ describe("TestDatabasesTest", () => {
     process.env.VERBOSE = "1";
 
     try {
-      await expect(createAndLoadSchema(7, { envName: "arunit" })).rejects.toThrow(error);
+      await expect(TestDatabases.createAndLoadSchema(7, { envName: "arunit" })).rejects.toThrow(
+        error,
+      );
       expect(mockEstablishConnection).toHaveBeenCalledWith(undefined);
       expect(mockEstablishConnection.mock.contexts).toContain(Base);
       expect(process.env.VERBOSE).toBe("1");

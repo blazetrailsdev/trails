@@ -2,27 +2,26 @@ import { Base } from "./base.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
 import { schemaFormat } from "./active-record.js";
 
-export async function createAndLoadSchema(
-  i: number,
-  { envName }: { envName: string } = { envName: "test" },
-): Promise<void> {
-  const old = process.env.VERBOSE;
-  process.env.VERBOSE = "false";
+export class TestDatabases {
+  static async createAndLoadSchema(i: number, { envName }: { envName: string }): Promise<void> {
+    const old = process.env.VERBOSE;
+    process.env.VERBOSE = "false";
 
-  try {
-    const configs = Base.configurations().configsFor({ envName });
-    for (const dbConfig of configs) {
-      dbConfig._database = `${dbConfig.database}-${i}`;
-      await DatabaseTasks.reconstructFromSchema(dbConfig, schemaFormat(), undefined);
-    }
-  } finally {
     try {
-      await Base.establishConnection();
+      const configs = Base.configurations().configsFor({ envName });
+      for (const dbConfig of configs) {
+        dbConfig._database = `${dbConfig.database}-${i}`;
+        await DatabaseTasks.reconstructFromSchema(dbConfig, schemaFormat(), undefined);
+      }
     } finally {
-      if (old !== undefined) {
-        process.env.VERBOSE = old;
-      } else {
-        delete process.env.VERBOSE;
+      try {
+        await Base.establishConnection();
+      } finally {
+        if (old !== undefined) {
+          process.env.VERBOSE = old;
+        } else {
+          delete process.env.VERBOSE;
+        }
       }
     }
   }
