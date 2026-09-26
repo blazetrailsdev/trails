@@ -37,6 +37,7 @@ export class UnboundTemplate {
     return this.details.handler;
   }
 
+  /** @missingRailsArgs new — PERMANENT */
   bindLocals(locals: ReadonlyArray<string>): Template {
     let template = this._templates.get(JSON.stringify(locals)) ?? this._templatesDefault;
     if (template === undefined) {
