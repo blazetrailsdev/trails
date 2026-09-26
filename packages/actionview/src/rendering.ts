@@ -122,14 +122,8 @@ export function viewContext(this: ViewContextHost): Base {
 }
 
 /** @internal */
-export interface RenderTemplateOptionsHost {
-  actionName: string;
-  _prefixes(): string[];
-}
-
-/** @internal */
 export function _processRenderTemplateOptions(
-  this: RenderTemplateOptionsHost,
+  this: { actionName: string; _prefixes(): string[] },
   options: Record<string, unknown>,
 ): void {
   if (options["partial"] === true) {

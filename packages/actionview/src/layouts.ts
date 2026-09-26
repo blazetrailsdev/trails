@@ -101,7 +101,7 @@ export function _writeLayoutMethod(this: LayoutsClass): void {
         layoutOption.slice(1)
       ]();
       if (layout == null) return defaultBehavior.call(this, lookupContext, formats, keys);
-      if (!(typeof layout === "string" || !layout)) {
+      if (!(typeof layout === "string" || layout === false)) {
         throw new ArgumentError(
           `Your layout method ${layoutOption} returned ${String(layout)}. It ` +
             "should have returned a String, false, or nil",
