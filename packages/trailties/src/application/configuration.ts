@@ -1,5 +1,9 @@
 import { Session } from "@blazetrails/actionpack";
-import { OrderedOptions, setUtcToLocalReturnsUtcOffsetTimes } from "@blazetrails/activesupport";
+import {
+  FileUpdateChecker,
+  OrderedOptions,
+  setUtcToLocalReturnsUtcOffsetTimes,
+} from "@blazetrails/activesupport";
 import { ArgumentError, File, getFs, getPath, OpenSSL } from "@blazetrails/ruby-compat";
 import { RuntimeError } from "@blazetrails/ruby-compat";
 import { EngineConfiguration } from "../engine/configuration.js";
@@ -53,7 +57,7 @@ export class Configuration extends EngineConfiguration {
   cacheClasses: boolean | null = null;
   cacheStore: unknown = [":file_store", `${this.root ?? ""}/tmp/cache/`];
   reloadClassesOnlyOnChange = true;
-  fileWatcher: unknown = null;
+  fileWatcher: unknown = FileUpdateChecker;
   exceptionsApp: unknown = null;
   private _debugExceptionResponseFormat: "default" | "api" | null = null;
   x: Custom = new Custom();

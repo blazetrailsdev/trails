@@ -18,6 +18,7 @@ export { MissingTemplate, StrictLocalsError, TemplateError } from "./template/er
 export type { TemplateErrorOptions } from "./template/error.js";
 
 export { PathRegistry } from "./path-registry.js";
+export { ViewReloader } from "./cache-expiry.js";
 
 export { Digestor } from "./digestor.js";
 export type { DigestorOptions } from "./digestor.js";
