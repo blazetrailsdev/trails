@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { TemplateRenderer } from "./template-renderer.js";
 import { Renderer } from "./renderer.js";
-import { LookupContext } from "../lookup-context.js";
+import { DetailsKey, LookupContext } from "../lookup-context.js";
 import { MissingTemplate } from "../template/error.js";
 import type { RenderableTemplate, ViewContext } from "./abstract-renderer.js";
 
@@ -71,10 +71,15 @@ describe("TemplateRenderer", () => {
       expect(result.body).toBe("&lt;b&gt;bold&lt;/b&gt;");
     });
 
-    it("renders inline: source directly", async () => {
+    it("renders inline: through the handler for its type", async () => {
       const renderer = new TemplateRenderer(lc);
-      const result = await renderer.render(ctx, { inline: "<%= 1 + 1 %>" });
-      expect(result.body).toBe("<%= 1 + 1 %>");
+      const view = new (DetailsKey.viewContextClass())(lc, {}, null) as unknown as ViewContext;
+      const result = await renderer.render(view, {
+        inline: "Hello, <%= name %>!",
+        locals: { name: "Josh" },
+      });
+      expect(result.body).toBe("Hello, Josh!");
+      expect(result.template!.identifier).toBe("inline template");
     });
 
     it("renders renderable: objects", async () => {

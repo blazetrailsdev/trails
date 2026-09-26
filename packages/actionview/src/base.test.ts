@@ -378,9 +378,22 @@ describe("ActionView::Base#render", () => {
     ).toBe('{"hello":"world"}');
   });
 
-  it("says so, rather than that no option was given, for file: and inline:", () => {
-    expect(() => buildView().render({ file: "/tmp/x.html" })).toThrow(
-      "render file: is not available on the synchronous view path",
+  it("render inline", () => {
+    expect(buildView().render({ inline: "Hello, World!" }).toString()).toBe("Hello, World!");
+  });
+
+  it("render inline with locals", () => {
+    expect(
+      buildView()
+        .render({ inline: "Hello, <%= name %>!", locals: { name: "Josh" } })
+        .toString(),
+    ).toBe("Hello, Josh!");
+  });
+
+  it("render file with relative path", () => {
+    const templatePath = "fixtures/test/hello_world.erb";
+    expect(() => buildView().render({ file: templatePath })).toThrow(
+      /`render file:` should be given the absolute path to a file. (.+) was given instead/,
     );
   });
 
