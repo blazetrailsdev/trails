@@ -10,8 +10,8 @@ describe("ActionDispatch::Routing::RouteSet generation", () => {
     routes.draw((r) => {
       r.get("/posts(/:page)", { to: "posts#index", as: "posts", defaults: { page: "1" } });
     });
-    expect(routes.generate("posts", { page: "1" }).path()).toBe("/posts");
-    expect(routes.generate("posts", { page: "2" }).path()).toBe("/posts/2");
+    expect(routes.generate("posts", { page: "1" }).path(null)).toBe("/posts");
+    expect(routes.generate("posts", { page: "2" }).path(null)).toBe("/posts/2");
   });
 
   it("never trims a required part that restates the route default", () => {
@@ -19,7 +19,7 @@ describe("ActionDispatch::Routing::RouteSet generation", () => {
     routes.draw((r) => {
       r.get("/posts/:page", { to: "posts#index", as: "posts", defaults: { page: "1" } });
     });
-    expect(routes.generate("posts", { page: "1" }).path()).toBe("/posts/1");
+    expect(routes.generate("posts", { page: "1" }).path(null)).toBe("/posts/1");
   });
 
   it("keeps a trailing part named only by the enclosing scope", () => {
@@ -29,7 +29,7 @@ describe("ActionDispatch::Routing::RouteSet generation", () => {
         m.get("/posts(/:page)", { to: "posts#index", as: "posts" });
       });
     });
-    expect(routes.generate("posts", {}, { page: "3" }).path()).toBe("/posts/3");
+    expect(routes.generate("posts", {}, { page: "3" }).path(null)).toBe("/posts/3");
   });
 });
 

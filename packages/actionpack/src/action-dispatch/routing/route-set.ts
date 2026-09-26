@@ -1,9 +1,12 @@
-import { isPlainObject, isPresent, symbolizeKeys, toParam } from "@blazetrails/activesupport";
+import { isPlainObject, symbolizeKeys, toParam } from "@blazetrails/activesupport";
 import { MockRequest, type RackEnv, type RackResponse } from "@blazetrails/rack";
 import {
+  except,
   extend,
+  hasKey,
   InvalidURIError,
   Module,
+  URI,
   rbInspect,
   RFC2396_PARSER,
 } from "@blazetrails/ruby-compat";
@@ -24,7 +27,6 @@ import type {
 import {
   polymorphicUrl as polymorphicUrlFn,
   polymorphicMapping as polymorphicMappingFn,
-  symbolToString,
   type PolymorphicArg,
   type PolymorphicHost,
   type PolymorphicMappingEntry,
@@ -52,7 +54,11 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { normalizePath } from "../journey/router/utils.js";
 import { URL, type UrlOptions } from "../http/url.js";
 import { Routes as JourneyRoutes } from "../journey/routes.js";
-import type { Formatter as JourneyFormatter, RouteWithParams } from "../journey/formatter.js";
+import {
+  Formatter as JourneyFormatter,
+  type MissingRoute,
+  type RouteWithParams,
+} from "../journey/formatter.js";
 
 const ROUTE_NAME_RE = /^[_a-z]\w*$/i;
 
@@ -103,6 +109,117 @@ export class CustomUrlHelper implements PolymorphicMappingEntry {
     if (!onlyPath) return url;
     const m = url.match(/(?<!\/)\/(?!\/)(.*)$/);
     return m ? "/" + m[1] : url;
+  }
+}
+
+export class Generator {
+  readonly options: Record<string, unknown>;
+  readonly recall: Record<string, unknown>;
+  readonly set: RouteSet;
+  readonly namedRoute: string | null | undefined;
+
+  constructor(
+    namedRoute: string | null | undefined,
+    options: Record<string, unknown>,
+    recall: Record<string, unknown>,
+    set: RouteSet,
+  ) {
+    this.namedRoute = namedRoute;
+    this.options = options;
+    this.recall = recall;
+    this.set = set;
+
+    this.normalizeOptionsBang();
+    this.normalizeControllerActionIdBang();
+    this.useRelativeControllerBang();
+    this.normalizeControllerBang();
+  }
+
+  get controller(): string {
+    return this.options["controller"] as string;
+  }
+
+  get currentController(): string {
+    return this.recall["controller"] as string;
+  }
+
+  useRecallFor(key: string): unknown {
+    if (
+      this.recall[key] != null &&
+      this.recall[key] !== false &&
+      (!hasKey(this.options, key) || this.options[key] === this.recall[key])
+    ) {
+      if (!this.isNamedRouteExists() || this.segmentKeys().includes(key)) {
+        return (this.options[key] = this.recall[key]);
+      }
+    }
+    return null;
+  }
+
+  normalizeOptionsBang(): void {
+    if (this.options["controller"] != null && this.options["controller"] !== false) {
+      if (this.options["action"] == null || this.options["action"] === false) {
+        this.options["action"] = "index";
+      }
+      this.options["controller"] = toS(this.options["controller"]);
+    }
+
+    if (hasKey(this.options, "action")) {
+      const action = this.options["action"];
+      this.options["action"] = toS(action != null && action !== false ? action : "index");
+    }
+  }
+
+  normalizeControllerActionIdBang(): void {
+    const controller = this.useRecallFor("controller");
+    if (controller == null || controller === false) return;
+    const action = this.useRecallFor("action");
+    if (action == null || action === false) return;
+    this.useRecallFor("id");
+  }
+
+  useRelativeControllerBang(): void {
+    if (
+      this.namedRoute == null &&
+      this.isDifferentController() &&
+      !this.controller.startsWith("/")
+    ) {
+      const oldParts = this.currentController.split("/");
+      const size = (this.controller.match(/\//g) ?? []).length + 1;
+      const parts = [...oldParts.slice(0, -size), this.controller];
+      this.options["controller"] = parts.join("/");
+    }
+  }
+
+  normalizeControllerBang(): void {
+    if (this.controller != null && (this.controller as unknown) !== false) {
+      if (this.controller.startsWith("/")) {
+        this.options["controller"] = this.controller.slice(1);
+      } else {
+        this.options["controller"] = this.controller;
+      }
+    }
+  }
+
+  generate(): RouteWithParams | MissingRoute {
+    return this.set.formatter.generate(this.namedRoute ?? null, this.options, this.recall);
+  }
+
+  isDifferentController(): boolean {
+    if (this.currentController == null || (this.currentController as unknown) === false) {
+      return false;
+    }
+    return toParam(this.controller) !== toParam(this.currentController);
+  }
+
+  /** @internal */
+  private isNamedRouteExists(): unknown {
+    return this.namedRoute != null && this.set.namedRoutes.get(this.namedRoute);
+  }
+
+  /** @internal */
+  private segmentKeys(): readonly string[] {
+    return this.set.namedRoutes.get(this.namedRoute!)!.pathParamNames;
   }
 }
 
@@ -615,10 +732,19 @@ export class RouteSet {
   readonly envKey: string = `ROUTES_${(RouteSet._envSeq = (RouteSet._envSeq ?? 0) + 1)}_SCRIPT_NAME`;
   private static _envSeq?: number;
   set: JourneyRoutes = new JourneyRoutes();
-  formatter: Pick<JourneyFormatter, "clear" | "eagerLoadBang"> = {
-    clear() {},
-    eagerLoadBang() {},
-  };
+  formatter: JourneyFormatter = ((set: RouteSet) =>
+    new JourneyFormatter({
+      get routes() {
+        return set.journeyRouter.routes;
+      },
+      namedRoutes: {
+        has: (name) => set.namedRoutes.isKey(name),
+        get: (name) => {
+          const route = set.namedRoutes.get(name);
+          return route && set.journeyRouter.routes.routes[set.routes.indexOf(route)];
+        },
+      },
+    }))(this);
   /** @internal */
   private _urlHelpersWithPaths?: UrlHelpersModule;
   /** @internal */
@@ -836,6 +962,7 @@ export class RouteSet {
     this.routes.push(route);
     if (name) this.namedRoutes.add(name, route);
     this._journeyRouter = null;
+    this.formatter.clear();
     return route;
   }
 
@@ -858,77 +985,8 @@ export class RouteSet {
     options: Record<string, unknown>,
     recall: Record<string, unknown> = {},
     _methodName?: string | null,
-  ): Pick<RouteWithParams, "path" | "params"> {
-    const opts: Record<string, unknown> = { ...options };
-    if (opts["controller"] != null) opts["action"] ??= "index";
-    for (const key of ["controller", "action", "id"] as const) {
-      if (opts[key] == null && recall[key] != null) opts[key] = recall[key];
-      else if (opts[key] == null) break;
-    }
-    let route: Route | undefined;
-    if (routeName) route = this.namedRoutes.get(routeName);
-    route ??= this.routes.find((r) => {
-      const parts = new Set<string>(r.pathParamNames);
-      if (!parts.has("controller") && r.controller !== opts["controller"]) return false;
-      if (!parts.has("action") && r.action !== opts["action"]) return false;
-      return true;
-    });
-    if (!route) {
-      throw new UrlGenerationError(`No route matches ${JSON.stringify(options)}`);
-    }
-    const parameterizedParts = this.extractParameterizedParts(route, opts, recall);
-    const params: Record<string, unknown> = { ...options };
-    for (const key of Object.keys(params)) {
-      if (Object.hasOwn(parameterizedParts, key) || Object.hasOwn(route.defaults, key)) {
-        delete params[key];
-      }
-    }
-
-    const defaults = route.defaults;
-    const requiredParts = route.requiredParts;
-    const parts = [...route.pathParamNames];
-
-    for (let i = parts.length - 1; i >= 0; i--) {
-      const key = parts[i];
-      const partVal = parameterizedParts[key];
-      if (defaults[key] == null && isPresent(partVal)) break;
-      if (toS(partVal) !== toS(defaults[key])) continue;
-      if (requiredParts.includes(key)) break;
-      delete parameterizedParts[key];
-    }
-
-    const path = route.pathFor(parameterizedParts as Record<string, string | number>);
-    return { path: () => path, params };
-  }
-
-  /** @internal */
-  private extractParameterizedParts(
-    route: Route,
-    options: Record<string, unknown>,
-    recall: Record<string, unknown>,
-  ): Record<string, unknown> {
-    const parameterizedParts: Record<string, unknown> = { ...recall, ...options };
-
-    const parts = route.pathParamNames;
-    let kept = parts.length;
-    while (kept > 0) {
-      const part = parts[kept - 1];
-      if (
-        (Object.hasOwn(options, part) || Object.hasOwn(route.scopeOptions, part)) &&
-        (options[part] ?? recall[part]) != null
-      )
-        break;
-      kept--;
-    }
-    const keysToKeep = new Set<string>([...parts.slice(0, kept), ...route.requiredParts]);
-
-    for (const badKey of Object.keys(parameterizedParts)) {
-      if (!keysToKeep.has(badKey)) delete parameterizedParts[badKey];
-    }
-    for (const k of Object.keys(parameterizedParts)) {
-      if (parameterizedParts[k] == null) delete parameterizedParts[k];
-    }
-    return parameterizedParts;
+  ): RouteWithParams | MissingRoute {
+    return new Generator(routeName, options, recall, this).generate();
   }
 
   isOptimizeRoutesGeneration(): boolean {
@@ -992,7 +1050,7 @@ export class RouteSet {
     for (const ro of reserved) delete pathOptions[ro];
 
     const routeWithParams = this.generate(routeName, pathOptions, recall);
-    let path = routeWithParams.path(methodName ?? undefined);
+    let path = routeWithParams.path(methodName);
 
     const trailingSlash = options["trailingSlash"];
     const format = options["format"];
@@ -1146,36 +1204,15 @@ export class RouteSet {
     options: Record<string, unknown>,
     recall: Record<string, unknown> = {},
   ): [string, string[]] {
-    let route: Route | undefined;
-    const useRoute = options["useRoute"];
-    if (typeof useRoute === "string" || typeof useRoute === "symbol") {
-      delete options["useRoute"];
-      route = this.namedRoutes.get(
-        typeof useRoute === "symbol" ? symbolToString(useRoute) : useRoute,
-      );
+    if (recall != null) {
+      options = { ...options, _recall: recall };
     }
-    const { controller, action } = options;
-    route ??= this.routes.find((r) => r.controller === controller && r.action === action);
-    if (!route) {
-      throw new UrlGenerationError(`No route matches ${JSON.stringify(options)}`);
-    }
-    const captureNames = new Set<string>(route.pathParamNames);
-    const captureParams: Record<string, unknown> = Object.create(null);
-    for (const name of captureNames) {
-      const v = options[name];
-      if (v != null) captureParams[name] = v;
-    }
-    const path = route.pathFor(captureParams as Record<string, string | number>);
-    const routeDefaults = route.defaults as Record<string, unknown>;
-    const extras: string[] = [];
-    for (const k of Object.keys(options)) {
-      if (k === "controller" || k === "action" || captureNames.has(k)) continue;
-      const v = options[k];
-      if (Object.hasOwn(routeDefaults, k) && routeDefaults[k] === v) continue;
-      if (Object.hasOwn(recall, k) && recall[k] === v) continue;
-      extras.push(k);
-    }
-    return [path, extras];
+
+    const routeName = options["useRoute"] as string | null | undefined;
+    delete options["useRoute"];
+    const generator = this.generate(routeName, options, recall);
+    const pathInfo = this.pathFor(options, routeName ?? null, []);
+    return [URI.parse(pathInfo).path!, Object.keys(except(generator.params, "_recall"))];
   }
 
   recognize(method: string, path: string): MatchedRoute | null {

@@ -17,7 +17,7 @@ export class RouteWithParams {
     readonly params: Record<string, unknown>,
   ) {}
 
-  path(_?: string): string {
+  path(_?: string | null): string {
     return this._route.format(this._parameterizedParts);
   }
 }
@@ -31,7 +31,7 @@ export class MissingRoute {
     readonly name: string | null,
   ) {}
 
-  path(methodName: string): never {
+  path(methodName: string | null): never {
     throw new UrlGenerationError(this.message, this.routes, this.name, methodName);
   }
 

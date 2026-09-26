@@ -390,6 +390,7 @@ export class Mapping {
         format: this._formatted,
         internal: this._internal,
         scopeOptions: this.scopeOptions,
+        requiredDefaults: this.requiredDefaults,
       },
     );
     route.app = this.application();

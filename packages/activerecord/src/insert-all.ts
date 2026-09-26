@@ -106,7 +106,6 @@ export class InsertAll {
     ) as Promise<Result>;
   }
 
-  /** @missingRailsArgs except — PERMANENT */
   constructor(
     relation: Relation<any>,
     connection: NonNullable<Awaited<ModelClass["connection"]>>,
