@@ -12,6 +12,11 @@
  *   date/time representation, so `quote` and `typeCast` both reject a JS `Date`
  *   with guidance rather than formatting it. rb:85 is ported onto the Temporal
  *   branches via the `quoted_date` self-send.
+ *
+ *   Rails' `when nil, Numeric, String then value` (quoting.rb:102) hands a
+ *   Float to the driver unchanged. trails' whole-valued Float is a boxed
+ *   `new Number(x)` (the seat `ActiveModel::Type::Float#cast_value` produces),
+ *   which a JS driver cannot bind, so `typeCast` passes its `valueOf()`.
  */
 
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
