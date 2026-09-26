@@ -226,7 +226,9 @@ describe("AssociationScope", () => {
       static {
         this.attribute("ds_author_id", "integer");
         this.attribute("published", "boolean");
-        this.defaultScope((rel: any) => rel.where({ published: true }));
+        this.defaultScope(function (this: any) {
+          return this.where({ published: true });
+        });
       }
     }
     registerModel(DsAuthor);

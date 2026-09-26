@@ -103,7 +103,9 @@ export class SelectedMembership extends Membership {
   static {
     registerModel(SelectedMembership);
     registerSubclass(SelectedMembership);
-    this.defaultScope((q: any) => q.select("'1' as foo"));
+    this.defaultScope(function (this: any) {
+      return this.select("'1' as foo");
+    });
   }
 }
 
@@ -116,11 +118,11 @@ export class TenantMembership extends Membership {
     registerSubclass(TenantMembership);
     this.belongsTo("member");
     this.belongsTo("club");
-    this.defaultScope((q: any) => {
+    this.defaultScope(function (this: any) {
       if (TenantMembership.currentMember) {
-        return q.where({ member: TenantMembership.currentMember });
+        return this.where({ member: TenantMembership.currentMember });
       }
-      return q.all();
+      return this.all();
     });
   }
 }

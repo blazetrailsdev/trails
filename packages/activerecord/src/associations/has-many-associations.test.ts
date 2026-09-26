@@ -297,9 +297,9 @@ describe("HasManyAssociationsTest", () => {
       static {
         this.tableName = "comments";
         this.belongsTo("post", { className: "DefaultScopeCounterPost", foreignKey: "post_id" });
-        this.defaultScope((q: any) => {
+        this.defaultScope(function (this: any) {
           counter += 1;
-          return q.where(`id = ${counter}`);
+          return this.where(`id = ${counter}`);
         });
       }
     }

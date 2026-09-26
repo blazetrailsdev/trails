@@ -145,9 +145,9 @@ describe("query chaining DX", () => {
           expectTypeOf(days).toBeNumber();
           return this;
         });
-        this.defaultScope((rel) => {
-          expectTypeOf(rel).toMatchTypeOf<Relation<Article>>();
-          return rel.where({ published: true });
+        this.defaultScope(function () {
+          expectTypeOf(this).toMatchTypeOf<Relation<Article>>();
+          return this.where({ published: true });
         });
       }
     }

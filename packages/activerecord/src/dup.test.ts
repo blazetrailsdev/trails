@@ -184,7 +184,11 @@ describe("DupTest", () => {
 
   it("dup with default scope", async () => {
     const prevDefaultScopes = Topic.defaultScopes;
-    Topic.defaultScopes = [new DefaultScope((q: Relation<Topic>) => q.where({ approved: true }))];
+    Topic.defaultScopes = [
+      new DefaultScope(function (this: Relation<Topic>) {
+        return this.where({ approved: true });
+      }),
+    ];
     try {
       const topic = new Topic({ approved: false });
       expect(topic.dup().approved).toBeFalsy();

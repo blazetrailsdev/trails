@@ -742,7 +742,9 @@ export class SubAbstractStiPost extends AbstractStiPost {
 
 export class NullPost extends Post {
   static {
-    this.defaultScope((q: any) => q.none());
+    this.defaultScope(function (this: any) {
+      return this.none();
+    });
   }
 }
 
@@ -753,7 +755,9 @@ export class FirstPost extends Base {
   static {
     this.inheritanceColumn = "disabled";
     this._tableName = "posts";
-    this.defaultScope((q: any) => q.where({ id: 1 }));
+    this.defaultScope(function (this: any) {
+      return this.where({ id: 1 });
+    });
 
     this.hasMany("comments", { foreignKey: "post_id" });
     this.hasOne("comment", { foreignKey: "post_id" });
@@ -774,7 +778,9 @@ export interface FirstPost {
 export class PostWithDefaultSelect extends Base {
   static {
     this._tableName = "posts";
-    this.defaultScope((q: any) => q.select("author_id"));
+    this.defaultScope(function (this: any) {
+      return this.select("author_id");
+    });
   }
 }
 
@@ -802,7 +808,9 @@ export class PostWithDefaultInclude extends Base {
   static {
     this.inheritanceColumn = "disabled";
     this._tableName = "posts";
-    this.defaultScope((q: any) => q.includes(":comments"));
+    this.defaultScope(function (this: any) {
+      return this.includes(":comments");
+    });
     this.hasMany("comments", { foreignKey: "post_id" });
   }
 }
@@ -812,12 +820,11 @@ export class PostWithSpecialCategorization extends Post {
 
   static {
     this.hasMany("categorizations", { foreignKey: "post_id" });
-    this.defaultScope((q: any) =>
-      q
-        .where({ type: "PostWithSpecialCategorization" })
+    this.defaultScope(function (this: any) {
+      return this.where({ type: "PostWithSpecialCategorization" })
         .joins(":categorizations")
-        .where({ categorizations: { special: true } }),
-    );
+        .where({ categorizations: { special: true } });
+    });
   }
 }
 
@@ -825,7 +832,9 @@ export class PostWithDefaultScope extends Base {
   static {
     this.inheritanceColumn = "disabled";
     this._tableName = "posts";
-    this.defaultScope((q: any) => q.order("title"));
+    this.defaultScope(function (this: any) {
+      return this.order("title");
+    });
   }
 }
 
@@ -835,7 +844,9 @@ export class PostWithPreloadDefaultScope extends Base {
   static {
     this._tableName = "posts";
     this.hasMany("readers", { foreignKey: "post_id" });
-    this.defaultScope((q: any) => q.preload(":readers"));
+    this.defaultScope(function (this: any) {
+      return this.preload(":readers");
+    });
   }
 }
 
@@ -845,7 +856,9 @@ export class PostWithIncludesDefaultScope extends Base {
   static {
     this._tableName = "posts";
     this.hasMany("readers", { foreignKey: "post_id" });
-    this.defaultScope((q: any) => q.includes(":readers"));
+    this.defaultScope(function (this: any) {
+      return this.includes(":readers");
+    });
   }
 }
 
@@ -856,7 +869,9 @@ export class SpecialPostWithDefaultScope extends Base {
   static {
     this.inheritanceColumn = "disabled";
     this._tableName = "posts";
-    this.defaultScope((q: any) => q.where({ id: [1, 5, 6] }));
+    this.defaultScope(function (this: any) {
+      return this.where({ id: [1, 5, 6] });
+    });
     this.scope("unscopedAll", function (this: any) {
       return this.model.unscoped(() => this.model.all());
     });
@@ -932,7 +947,9 @@ export class SerializedPost extends Base {
 
 export class ConditionalStiPost extends Post {
   static {
-    this.defaultScope((q: any) => q.where({ title: "Untitled" }));
+    this.defaultScope(function (this: any) {
+      return this.where({ title: "Untitled" });
+    });
   }
 }
 

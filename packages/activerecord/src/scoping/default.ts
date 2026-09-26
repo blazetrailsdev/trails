@@ -1,24 +1,24 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { any } from "@blazetrails/activesupport";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
-import type { Relation } from "../relation.js";
+import { Relation } from "../relation.js";
 import { ScopeRegistry, isScopeAttributes as baseIsScopeAttributes } from "../scoping.js";
 
+type DefaultScopeBody<R = any> = ((this: R) => any) | { call(): any };
+
 export class DefaultScope {
-  readonly scope: (rel: any) => any;
+  readonly scope: DefaultScopeBody;
   readonly allQueries: boolean;
 
-  constructor(scope: (rel: any) => any, allQueries = false) {
+  constructor(scope: DefaultScopeBody, allQueries = false) {
     this.scope = scope;
     this.allQueries = allQueries;
   }
 }
 
 export class Default {
-  /**
-   * @internal
-   * @missingRailsArgs scope — CONVERGEABLE build-default-scope-instance-exec-scope-body
-   */
+  /** @internal */
   static buildDefaultScope(
     this: any,
     relation: any,
@@ -48,8 +48,12 @@ export class Default {
         let combinedScope = relation;
         for (const scopeObj of scopes) {
           if (isExecuteScope(allQueries, scopeObj)) {
-            const result = scopeObj.scope(combinedScope);
-            if (result != null) combinedScope = result;
+            const scope =
+              typeof scopeObj.scope === "function"
+                ? scopeObj.scope
+                : scopeObj.scope.call.bind(scopeObj.scope);
+
+            combinedScope = scope.call(combinedScope) || combinedScope;
           }
         }
         return combinedScope;
@@ -84,20 +88,20 @@ export function hasDefaultScopeOverride(modelClass: any): boolean {
 
 export function defaultScope<T extends typeof Base>(
   this: T,
-  scope: (rel: Relation<InstanceType<T>>) => Relation<any>,
+  scope: DefaultScopeBody<Relation<InstanceType<T>>>,
   options?: { allQueries?: boolean },
 ): void;
 export function defaultScope<T extends typeof Base>(
   this: T,
-  scope: (rel: Relation<InstanceType<T>>) => Relation<any>,
+  scope: DefaultScopeBody<Relation<InstanceType<T>>>,
   allQueries?: boolean,
 ): void;
 export function defaultScope<T extends typeof Base>(
   this: T,
-  scope: (rel: Relation<InstanceType<T>>) => Relation<any>,
+  scope: DefaultScopeBody<Relation<InstanceType<T>>>,
   optionsOrAllQueries?: { allQueries?: boolean } | boolean,
 ): void {
-  if (typeof scope !== "function") {
+  if (scope instanceof Relation || !rbObjRespondTo(scope, "call")) {
     throw new ArgumentError(
       "Support for calling #default_scope without a block is removed. For " +
         "example instead of `default_scope where(color: 'red')`, please use " +
@@ -111,7 +115,7 @@ export function defaultScope<T extends typeof Base>(
       ? optionsOrAllQueries
       : (optionsOrAllQueries?.allQueries ?? false);
 
-  const scopeObj = new DefaultScope(scope as (rel: any) => any, allQueries);
+  const scopeObj = new DefaultScope(scope, allQueries);
   (this as any).defaultScopes = [...(this as any).defaultScopes, scopeObj];
 }
 

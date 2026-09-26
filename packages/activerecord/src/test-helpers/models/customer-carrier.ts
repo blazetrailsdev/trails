@@ -13,11 +13,11 @@ export class CustomerCarrier extends Base {
     this.belongsTo("customer");
     this.belongsTo("carrier");
 
-    this.defaultScope((q: any) => {
+    this.defaultScope(function (this: any) {
       if (CustomerCarrier.currentCustomer) {
-        return q.where({ customer: CustomerCarrier.currentCustomer });
+        return this.where({ customer: CustomerCarrier.currentCustomer });
       }
-      return q.all();
+      return this.all();
     });
   }
 }

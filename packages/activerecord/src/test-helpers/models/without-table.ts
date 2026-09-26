@@ -2,6 +2,8 @@ import { Base } from "../../base.js";
 
 export class WithoutTable extends Base {
   static {
-    this.defaultScope((q: any) => q.where({ published: true }));
+    this.defaultScope(function (this: any) {
+      return this.where({ published: true });
+    });
   }
 }

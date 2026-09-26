@@ -44,6 +44,8 @@ export class BadReference extends Base {
   static _tableName = "references";
 
   static {
-    this.defaultScope((q: any) => q.where({ favorite: false }));
+    this.defaultScope(function (this: any) {
+      return this.where({ favorite: false });
+    });
   }
 }
