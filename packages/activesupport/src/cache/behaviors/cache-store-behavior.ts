@@ -139,11 +139,14 @@ export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
     const otherKey = crypto.randomUUID();
     cache.write(otherKey, "baz");
     cache.write(crypto.randomUUID(), "biz");
-    expect(cache.readMulti(key, otherKey)).toEqual({ [key]: "bar", [otherKey]: "baz" });
+    expect(Object.fromEntries(cache.readMulti(key, otherKey))).toEqual({
+      [key]: "bar",
+      [otherKey]: "baz",
+    });
   });
 
   it("read multi empty list", () => {
-    expect(cache.readMulti()).toEqual({});
+    expect(Object.fromEntries(cache.readMulti())).toEqual({});
   });
 
   it("write multi", () => {
@@ -160,9 +163,13 @@ export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
     cache.write(key, "bar");
     cache.write(otherKey, "biz");
 
-    const values = cache.fetchMulti(key, otherKey, thirdKey, (value: string) => value + value);
+    const values = cache.fetchMulti(key, otherKey, thirdKey, (value) => `${value}${value}`);
 
-    expect(values).toEqual({ [key]: "bar", [otherKey]: "biz", [thirdKey]: thirdKey + thirdKey });
+    expect(Object.fromEntries(values)).toEqual({
+      [key]: "bar",
+      [otherKey]: "biz",
+      [thirdKey]: thirdKey + thirdKey,
+    });
     expect(cache.read(thirdKey)).toBe(thirdKey + thirdKey);
   });
 
@@ -172,10 +179,10 @@ export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
     const thirdKey = crypto.randomUUID().toLowerCase();
     cache.write(key, "BAM");
 
-    const values = cache.fetchMulti(otherKey, thirdKey, key, (k: string) => k.toUpperCase());
+    const values = cache.fetchMulti(otherKey, thirdKey, key, (k) => (k as string).toUpperCase());
 
-    expect(Object.keys(values)).toEqual([otherKey, thirdKey, key]);
-    expect(Object.values(values)).toEqual([otherKey.toUpperCase(), thirdKey.toUpperCase(), "BAM"]);
+    expect([...values.keys()]).toEqual([otherKey, thirdKey, key]);
+    expect([...values.values()]).toEqual([otherKey.toUpperCase(), thirdKey.toUpperCase(), "BAM"]);
   });
 
   it("fetch multi with forced cache miss", () => {
@@ -183,11 +190,14 @@ export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
     const otherKey = crypto.randomUUID();
     cache.write(key, "bar");
 
-    const values = cache.fetchMulti(key, otherKey, { force: true }, (value: string) =>
-      value.concat(value),
+    const values = cache.fetchMulti(key, otherKey, { force: true }, (value) =>
+      (value as string).concat(value as string),
     );
 
-    expect(values).toEqual({ [key]: key + key, [otherKey]: otherKey + otherKey });
+    expect(Object.fromEntries(values)).toEqual({
+      [key]: key + key,
+      [otherKey]: otherKey + otherKey,
+    });
     expect(cache.read(key)).toEqual(key + key);
     expect(cache.read(otherKey)).toEqual(otherKey + otherKey);
   });

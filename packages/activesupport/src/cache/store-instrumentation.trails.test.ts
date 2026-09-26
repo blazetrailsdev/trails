@@ -31,7 +31,7 @@ describe("Cache::Store instrumentation", () => {
 
   it("fetchMulti extracts a trailing options hash before instrumenting", () => {
     const events = withInstrumentation("read_multi", () => {
-      cache.fetchMulti("a", "b", { namespace: "foo" }, (key: string) => key + key);
+      cache.fetchMulti("a", "b", { namespace: "foo" }, (key) => `${key}${key}`);
     });
     const opts = { namespace: "foo" };
     expect(events[0].payload.key).toEqual([normalizedKey("a", opts), normalizedKey("b", opts)]);

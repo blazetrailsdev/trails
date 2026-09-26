@@ -62,7 +62,7 @@ export function cacheInstrumentationBehavior(host: CacheInstrumentationBehaviorH
     const key2 = crypto.randomUUID();
 
     const events = withInstrumentation("read_multi", () => {
-      cache.fetchMulti(key2, key1, (key: string) => key + key);
+      cache.fetchMulti(key2, key1, (key) => `${key}${key}`);
     });
 
     expect(events.map((e) => e.name)).toEqual(["cache_read_multi.active_support"]);
@@ -86,7 +86,7 @@ export function cacheInstrumentationBehavior(host: CacheInstrumentationBehaviorH
       callback,
     );
     try {
-      cache.fetchMulti(key1, key2, (key: string) => key + key);
+      cache.fetchMulti(key1, key2, (key) => `${key}${key}`);
     } finally {
       Notifications.unsubscribe(subscription);
     }

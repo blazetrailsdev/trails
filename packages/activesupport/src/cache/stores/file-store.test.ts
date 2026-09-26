@@ -213,14 +213,14 @@ describe("FileStoreTest", () => {
     store.write("foo", "old", { expiresIn: 0.01 });
     await new Promise((r) => setTimeout(r, 20));
     const result = store.fetchMulti("foo", "bar", (key) => `${key}-generated`);
-    expect(result).toEqual({ foo: "foo-generated", bar: "bar-generated" });
+    expect(Object.fromEntries(result)).toEqual({ foo: "foo-generated", bar: "bar-generated" });
     expect(store.read("foo")).toBe("foo-generated");
   });
 
   it("fetch_multi honors version mismatch", () => {
     store.write("foo", "old", { version: "v1" });
     const result = store.fetchMulti("foo", { version: "v2" }, (key) => `${key}-generated`);
-    expect(result).toEqual({ foo: "foo-generated" });
+    expect(Object.fromEntries(result)).toEqual({ foo: "foo-generated" });
   });
 
   cacheStoreBehavior({ lookupStore: (options?: StoreOptions) => new FileStore(cacheDir, options) });

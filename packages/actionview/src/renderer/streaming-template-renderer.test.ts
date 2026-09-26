@@ -53,7 +53,6 @@ describe("StreamingTemplateRenderer", () => {
 
     it("renders with layout — yields prefix, template body, suffix as separate chunks", async () => {
       const templateFake = makeFakeTemplate("inner content");
-      vi.spyOn(lc, "findTemplate").mockReturnValue(templateFake as never);
 
       const layoutFake: RenderableTemplate = {
         identifier: "layout",
@@ -63,7 +62,9 @@ describe("StreamingTemplateRenderer", () => {
           return Promise.resolve(`<header>HEAD</header>${yieldContent}<footer>FOOT</footer>`);
         }),
       };
-      vi.spyOn(lc, "find").mockReturnValue(layoutFake as never);
+      vi.spyOn(lc, "find")
+        .mockReturnValueOnce(templateFake as never)
+        .mockReturnValueOnce(layoutFake as never);
 
       const renderer = new StreamingTemplateRenderer(lc);
       const chunks = await collectChunks(
@@ -78,7 +79,6 @@ describe("StreamingTemplateRenderer", () => {
 
     it("renders with layout — joined chunks equal fully rendered page", async () => {
       const templateFake = makeFakeTemplate("inner content");
-      vi.spyOn(lc, "findTemplate").mockReturnValue(templateFake as never);
 
       const layoutFake: RenderableTemplate = {
         identifier: "layout",
@@ -88,7 +88,9 @@ describe("StreamingTemplateRenderer", () => {
           return Promise.resolve(`<header>HEAD</header>${yieldContent}<footer>FOOT</footer>`);
         }),
       };
-      vi.spyOn(lc, "find").mockReturnValue(layoutFake as never);
+      vi.spyOn(lc, "find")
+        .mockReturnValueOnce(templateFake as never)
+        .mockReturnValueOnce(layoutFake as never);
 
       const renderer = new StreamingTemplateRenderer(lc);
       const chunks = await collectChunks(
@@ -99,14 +101,15 @@ describe("StreamingTemplateRenderer", () => {
 
     it("renders layout that never yields — appends template body after layout", async () => {
       const templateFake = makeFakeTemplate("template body");
-      vi.spyOn(lc, "findTemplate").mockReturnValue(templateFake as never);
 
       const layoutFake: RenderableTemplate = {
         identifier: "layout",
         format: ":html",
         render: vi.fn().mockResolvedValue("<wrapper>no yield here</wrapper>"),
       };
-      vi.spyOn(lc, "find").mockReturnValue(layoutFake as never);
+      vi.spyOn(lc, "find")
+        .mockReturnValueOnce(templateFake as never)
+        .mockReturnValueOnce(layoutFake as never);
 
       const renderer = new StreamingTemplateRenderer(lc);
       const chunks = await collectChunks(
@@ -123,7 +126,6 @@ describe("StreamingTemplateRenderer", () => {
       );
       try {
         const templateFake = makeFakeTemplate("inner content");
-        vi.spyOn(lc, "findTemplate").mockReturnValue(templateFake as never);
 
         const layoutFake: RenderableTemplate = {
           identifier: "layout",
@@ -134,7 +136,9 @@ describe("StreamingTemplateRenderer", () => {
             return Promise.resolve(`<header>${yieldContent}</header>`);
           }),
         };
-        vi.spyOn(lc, "find").mockReturnValue(layoutFake as never);
+        vi.spyOn(lc, "find")
+          .mockReturnValueOnce(templateFake as never)
+          .mockReturnValueOnce(layoutFake as never);
 
         const renderer = new StreamingTemplateRenderer(lc);
         await collectChunks(
@@ -157,9 +161,9 @@ describe("StreamingTemplateRenderer", () => {
       );
       try {
         const templateFake = makeFakeTemplate("bare body");
-        vi.spyOn(lc, "findTemplate").mockReturnValue(templateFake as never);
-        vi.spyOn(lc, "findAll").mockReturnValue([] as never);
-        vi.spyOn(lc, "find").mockReturnValue(null as never);
+        vi.spyOn(lc, "find")
+          .mockReturnValueOnce(templateFake as never)
+          .mockReturnValueOnce(null as never);
 
         const renderer = new StreamingTemplateRenderer(lc);
         const chunks = await collectChunks(
@@ -190,9 +194,9 @@ describe("StreamingTemplateRenderer", () => {
           supportsStreaming: () => true,
           render: vi.fn().mockRejectedValue(boom),
         };
-        vi.spyOn(lc, "findTemplate").mockReturnValue(templateFake as never);
-        vi.spyOn(lc, "findAll").mockReturnValue([] as never);
-        vi.spyOn(lc, "find").mockReturnValue(null as never);
+        vi.spyOn(lc, "find")
+          .mockReturnValueOnce(templateFake as never)
+          .mockReturnValueOnce(null as never);
 
         const renderer = new StreamingTemplateRenderer(lc);
         await collectChunks(
@@ -208,13 +212,14 @@ describe("StreamingTemplateRenderer", () => {
     });
 
     it("handles error mid-render — yields completion sentinel and does not throw", async () => {
-      vi.spyOn(lc, "findTemplate").mockReturnValue({
-        identifier: "bad",
-        format: ":html",
-        supportsStreaming: () => true,
-        render: vi.fn().mockRejectedValue(new Error("render boom")),
-      } as never);
-      vi.spyOn(lc, "find").mockReturnValue(null as never);
+      vi.spyOn(lc, "find")
+        .mockReturnValueOnce({
+          identifier: "bad",
+          format: ":html",
+          supportsStreaming: () => true,
+          render: vi.fn().mockRejectedValue(new Error("render boom")),
+        } as never)
+        .mockReturnValueOnce(null as never);
 
       const fatal = vi.fn();
       const oldLogger = Base.logger;
@@ -237,7 +242,6 @@ describe("StreamingTemplateRenderer", () => {
         ...makeFakeTemplate("inner content"),
         supportsStreaming: () => false,
       };
-      vi.spyOn(lc, "findTemplate").mockReturnValue(templateFake as never);
 
       const flow = new Map<string, string>();
       const view: ViewContext = { ...ctx, viewFlow: { set: (k, v) => void flow.set(k, v) } };
@@ -250,7 +254,9 @@ describe("StreamingTemplateRenderer", () => {
             Promise.resolve(`<header>HEAD</header>${flow.get("layout")}<footer>FOOT</footer>`),
           ),
       };
-      vi.spyOn(lc, "find").mockReturnValue(layoutFake as never);
+      vi.spyOn(lc, "find")
+        .mockReturnValueOnce(templateFake as never)
+        .mockReturnValueOnce(layoutFake as never);
 
       const renderer = new StreamingTemplateRenderer(lc);
       const chunks = await collectChunks(

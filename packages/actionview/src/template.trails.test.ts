@@ -25,13 +25,13 @@ describe("Template#compile! across DetailsKey.clear", () => {
     const ctx = new LookupContext(null, {}, []);
     ctx.appendViewPaths([resolver]);
 
-    const before = ctx.findPartial("n", ["posts"], [":html"]);
+    const before = ctx.findTemplate("n", ["posts"], true);
     const containerBefore = DetailsKey.viewContextClass();
     expect(ctx.renderPartialSync("n", "posts", ":html")).toBe("2");
 
     DetailsKey.clear();
 
-    const after = ctx.findPartial("n", ["posts"], [":html"]);
+    const after = ctx.findTemplate("n", ["posts"], true);
     expect(DetailsKey.viewContextClass()).not.toBe(containerBefore);
     expect(after).not.toBe(before);
     expect(ctx.renderPartialSync("n", "posts", ":html")).toBe("2");

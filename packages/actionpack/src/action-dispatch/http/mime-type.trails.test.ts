@@ -23,6 +23,6 @@ describe("ActionView::Template::Types once Action Dispatch loads", () => {
     const lookupContext = new LookupContext(null, {}, []);
     lookupContext.appendViewPaths([new FixtureResolver({ "posts/index.foobar.tse": "foo" })]);
     lookupContext.formats = [":foobar"];
-    expect(lookupContext.findTemplate("index", ["posts"], [":foobar"])?.format).toBe(":foobar");
+    expect((lookupContext.findTemplate("index", ["posts"]) as Template).format).toBe(":foobar");
   });
 });

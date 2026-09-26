@@ -6,7 +6,7 @@ import { DetailsKey } from "../lookup-context.js";
 import { FixtureResolver } from "../testing/resolvers.js";
 
 describe("Digestor.digest nested dependencies", () => {
-  function digest(dependencies: ReadonlyArray<string | ReadonlyArray<string>>): string {
+  function digest(dependencies: ReadonlyArray<string | ReadonlyArray<string>>) {
     DetailsKey.clear();
     const finder = new LookupContext();
     finder.appendViewPaths([new FixtureResolver({ "posts/show.html.tse": "hello" })]);

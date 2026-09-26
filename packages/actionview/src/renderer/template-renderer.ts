@@ -2,7 +2,7 @@ import { h, Notifications } from "@blazetrails/activesupport";
 
 import { ArgumentError, File, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
-import { LookupContext } from "../lookup-context.js";
+import type { LookupContext } from "../lookup-context.js";
 import { MissingTemplate } from "../template/error.js";
 import { RawFile } from "../template/raw-file.js";
 import { Inline } from "../template/inline.js";
@@ -73,7 +73,13 @@ export class TemplateRenderer<Rendered = RenderedTemplate> extends AbstractRende
       if (typeof tmpl === "object" && typeof tmpl.render === "function") {
         return tmpl;
       }
-      return this.findTemplateForName(tmpl as string, options.prefixes ?? [], keys);
+      return this.lookupContext.findTemplate(
+        tmpl as string,
+        options.prefixes,
+        false,
+        keys,
+        this.details,
+      ) as RenderableTemplate;
     }
     throw new Error(
       "You invoked render but did not give any of :body, :file, :html, :inline, :partial, :plain, :renderable, or :template option.",
@@ -151,51 +157,28 @@ export class TemplateRenderer<Rendered = RenderedTemplate> extends AbstractRende
         if (layout.startsWith("/")) {
           throw new ArgumentError("Rendering layouts from an absolute path is not supported.");
         } else {
-          return this.lookupContext.find(layout, [], false, keys, details) as RenderableTemplate;
+          return this.lookupContext.findTemplate(
+            layout,
+            [],
+            false,
+            keys,
+            details,
+          ) as RenderableTemplate;
         }
       } catch (e) {
         if (!(e instanceof MissingTemplate)) throw e;
         const allDetails = {
           ...this.details,
-          formats: LookupContext._defaultProcs()["formats"]() as readonly string[],
+          formats: this.lookupContext.defaultFormats() as readonly string[],
         };
         if (!this.templateExists(layout, [], false, keys, allDetails)) throw e;
         return null;
       }
     }
     if (typeof layout === "function") {
-      const resolved = layout(this.lookupContext, this.formats as readonly string[], keys);
-      return resolved ? this.resolveLayout(resolved, keys, formats) : null;
+      return this.resolveLayout(layout(this.lookupContext, formats, keys), keys, formats);
     }
-    return null;
-  }
-
-  /** @internal */
-  private findTemplateForName(
-    name: string,
-    prefixes: readonly string[],
-    keys: readonly string[],
-  ): RenderableTemplate {
-    const found = this.lookupContext.findAll(
-      name,
-      prefixes as string[],
-      false,
-      keys,
-      this.details,
-    ) as RenderableTemplate[];
-    if (found.length > 0) return found[0];
-
-    const lastSlash = name.lastIndexOf("/");
-    const baseName = lastSlash >= 0 ? name.slice(lastSlash + 1) : name;
-    const prefix = lastSlash >= 0 ? name.slice(0, lastSlash) : (prefixes[0] ?? "");
-    const format = (this.formats[0] as string | undefined) ?? ":html";
-    const template = this.lookupContext.findTemplate(baseName, [prefix], [format]);
-    if (template) return template as unknown as RenderableTemplate;
-
-    throw new MissingTemplate(this.lookupContext.viewPaths, baseName, [prefix], false, {
-      ...this.details,
-      formats: [format],
-    });
+    return layout || null;
   }
 }
 

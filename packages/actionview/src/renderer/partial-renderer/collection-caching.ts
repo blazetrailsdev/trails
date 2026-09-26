@@ -1,6 +1,5 @@
 import { MemoryStore, SafeBuffer, indexWith } from "@blazetrails/activesupport";
 import type { CacheStore } from "@blazetrails/activesupport";
-import { expandCacheKey } from "@blazetrails/activesupport/cache";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import { OutputBuffer } from "../../buffers.js";
@@ -70,10 +69,10 @@ export async function cacheCollectionRender(
   );
 
   const cachedPartials = collectionCache().readMulti(...keyedCollection.keys());
-  instrumentationPayload["cache_hits"] = Object.keys(cachedPartials).length;
+  instrumentationPayload["cache_hits"] = cachedPartials.size;
 
   const filtered = [...keyedCollection]
-    .filter(([key]) => !Object.hasOwn(cachedPartials, key))
+    .filter(([key]) => !cachedPartials.has(key))
     .map(([, item]) => item);
 
   const renderedPartials =
@@ -102,7 +101,7 @@ export function collectionByCacheKeys(
   view: CollectionCachingView,
   template: RenderableTemplate,
   collection: SameCollectionIterator,
-): [Map<string, unknown>, string[]] {
+): [Map<unknown[], unknown>, unknown[][]] {
   const seed = isCallableCacheKey.call(this)
     ? (this.options.cached as (i: unknown) => unknown)
     : (i: unknown) => i;
@@ -110,8 +109,8 @@ export function collectionByCacheKeys(
   const digestPath = view.digestPathFromTemplate(template);
   if (isCallableCacheKey.call(this)) collection.preloadBang();
 
-  const hash = new Map<string, unknown>();
-  const orderedKeys: string[] = [];
+  const hash = new Map<unknown[], unknown>();
+  const orderedKeys: unknown[][] = [];
   collection.each((item) => {
     const key = expandedCacheKey.call(this, seed(item), view, template, digestPath);
     orderedKeys.push(key);
@@ -127,22 +126,23 @@ export function expandedCacheKey(
   view: CollectionCachingView,
   template: RenderableTemplate,
   digestPath: string,
-): string {
-  return expandCacheKey(view.combinedFragmentCacheKey(view.cacheFragmentName(key, { digestPath })));
+): unknown[] {
+  key = view.combinedFragmentCacheKey(view.cacheFragmentName(key, { digestPath }));
+  return Object.isFrozen(key) ? [...(key as unknown[])] : (key as unknown[]);
 }
 
 /** @internal */
 export function fetchOrCachePartial(
   this: CollectionCachingHost,
-  cachedPartials: Record<string, unknown>,
+  cachedPartials: Map<unknown, unknown>,
   template: RenderableTemplate,
-  { orderBy }: { orderBy: string[] },
+  { orderBy }: { orderBy: unknown[][] },
   block: () => RenderedTemplate,
-): Map<string, RenderedTemplate> {
-  const entriesToWrite: Record<string, unknown> = {};
+): Map<unknown[], RenderedTemplate> {
+  const entriesToWrite = new Map<unknown[], unknown>();
 
   const keyedPartials = indexWith(orderBy, (cacheKey): RenderedTemplate => {
-    const content = cachedPartials[cacheKey];
+    const content = cachedPartials.get(cacheKey);
     if (content != null && content !== false) {
       return this.buildRenderedTemplate(content as string, template);
     } else {
@@ -153,12 +153,12 @@ export function fetchOrCachePartial(
         body = (body as { toStr(): string }).toStr();
       }
 
-      entriesToWrite[cacheKey] = body;
+      entriesToWrite.set(cacheKey, body);
       return renderedPartial;
     }
   });
 
-  if (Object.keys(entriesToWrite).length !== 0) {
+  if (entriesToWrite.size !== 0) {
     collectionCache().writeMulti(entriesToWrite);
   }
 

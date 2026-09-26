@@ -272,29 +272,32 @@ export abstract class Store {
     });
   }
 
-  readMulti(...names: [...string[], StoreOptions] | string[]): Record<string, unknown> {
-    if (names.length === 0) return {};
-    let options = extractOptions(names as unknown[]);
-    const nameList = names as string[];
+  readMulti(...names: unknown[]): Map<unknown, unknown> {
+    if (names.length === 0) return new Map();
+    let options = extractOptions(names);
     options = this.mergedOptions(options);
-    const keys = nameList.map((name) => this.normalizeKey(name, options));
+    const keys = names.map((name) => this.normalizeKey(name, options));
     return this.instrumentMulti("read_multi", keys, options, (payload) => {
-      const results = this.readMultiEntries(nameList, options);
-      payload.hits = Object.keys(results).map((name) => this.normalizeKey(name, options));
+      const results = this.readMultiEntries(names, options);
+      payload.hits = [...results.keys()].map((name) => this.normalizeKey(name, options));
       return results;
     });
   }
 
-  writeMulti(hash: Record<string, unknown>, options?: StoreOptions): Record<string, unknown> {
-    if (Object.keys(hash).length === 0) return hash;
+  writeMulti(
+    hash: Map<unknown, unknown> | Record<string, unknown>,
+    options?: StoreOptions,
+  ): Map<unknown, unknown> | Record<string, unknown> {
+    const pairs = hash instanceof Map ? [...hash] : Object.entries(hash);
+    if (pairs.length === 0) return hash;
     options = this.mergedOptions(options);
     const normalizedHash: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(hash)) {
+    for (const [key, value] of pairs) {
       normalizedHash[this.normalizeKey(key, options)] = value;
     }
     return this.instrumentMulti("write_multi", normalizedHash, options, () => {
       const entries: Record<string, Entry> = {};
-      for (const [name, value] of Object.entries(hash)) {
+      for (const [name, value] of pairs) {
         entries[this.normalizeKey(name, options)] = new Entry(value, {
           expiresIn: typeof options.expiresIn === "number" ? options.expiresIn : null,
           version: this.normalizeVersion(name, options) ?? undefined,
@@ -306,31 +309,32 @@ export abstract class Store {
 
   fetchMulti(
     ...names:
-      | [...string[], StoreOptions, (key: string) => unknown]
-      | [...string[], (key: string) => unknown]
-  ): Record<string, unknown> {
-    const block = (names as unknown[]).pop() as ((key: string) => unknown) | undefined;
+      | [...NonNullable<unknown>[], StoreOptions, (key: unknown) => unknown]
+      | [...NonNullable<unknown>[], (key: unknown) => unknown]
+  ): Map<unknown, unknown> {
+    const block = (names as unknown[]).pop() as ((key: unknown) => unknown) | undefined;
     if (typeof block !== "function")
       throw new ArgumentError("Missing block: `Cache#fetch_multi` requires a block.");
-    if (names.length === 0) return {};
+    if (names.length === 0) return new Map();
     let options = extractOptions(names as unknown[]);
     options = this.mergedOptions(options);
-    const keys = (names as string[]).map((name) => this.normalizeKey(name, options));
-    const writes: Record<string, unknown> = {};
+    const keys = (names as unknown[]).map((name) => this.normalizeKey(name, options));
+    const writes = new Map<unknown, unknown>();
     const ordered = this.instrumentMulti("read_multi", keys, options, (payload) => {
-      const reads = options.force ? {} : this.readMultiEntries(names as string[], options);
-      const result: Record<string, unknown> = {};
-      for (const name of names as string[]) {
-        result[name] = Object.prototype.hasOwnProperty.call(reads, name)
-          ? reads[name]
-          : (writes[name] = block(name));
+      const reads = options.force
+        ? new Map<unknown, unknown>()
+        : this.readMultiEntries(names, options);
+      const result = new Map<unknown, unknown>();
+      for (const name of names) {
+        if (!reads.has(name)) writes.set(name, block(name));
+        result.set(name, reads.has(name) ? reads.get(name) : writes.get(name));
       }
       if (options.skipNil) {
-        for (const k of Object.keys(writes)) {
-          if (writes[k] == null) delete writes[k];
+        for (const [k, v] of writes) {
+          if (v == null) writes.delete(k);
         }
       }
-      payload.hits = Object.keys(reads).map((name) => this.normalizeKey(name, options));
+      payload.hits = [...reads.keys()].map((name) => this.normalizeKey(name, options));
       payload.super_operation = "fetch_multi";
       return result;
     });
@@ -498,8 +502,8 @@ export abstract class Store {
     }
   }
 
-  protected readMultiEntries(names: string[], options: StoreOptions): Record<string, unknown> {
-    const results: Record<string, unknown> = {};
+  protected readMultiEntries(names: unknown[], options: StoreOptions): Map<unknown, unknown> {
+    const results = new Map<unknown, unknown>();
     for (const name of names) {
       const key = this.normalizeKey(name, options);
       const entry = this.readEntry(key, options);
@@ -510,7 +514,7 @@ export abstract class Store {
       if (entry.isExpired()) {
         this.deleteEntry(key, options);
       } else if (!entry.isMismatched(version)) {
-        results[name] = entry.value;
+        results.set(name, entry.value);
       }
     }
     return results;

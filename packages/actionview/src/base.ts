@@ -20,6 +20,7 @@ import { LookupContext } from "./lookup-context.js";
 import type { Template } from "./template.js";
 import { StrictLocalsError } from "./template/error.js";
 import type { RenderOptions } from "./renderer/abstract-renderer.js";
+import { Renderer } from "./renderer/renderer.js";
 import {
   ArgumentError,
   excBacktraceLocations,
@@ -136,6 +137,7 @@ export class Base {
     return new this(context, assigns, controller);
   }
 
+  viewRenderer: Renderer;
   lookupContext: LookupContext | null;
 
   get formats(): LookupContext["formats"] | undefined {
@@ -196,6 +198,7 @@ export class Base {
   ) {
     this._config = new InheritableOptions();
     this.lookupContext = lookupContext;
+    this.viewRenderer = new Renderer(this.lookupContext!);
     this.currentTemplate = null;
     this.assignController(controller as Parameters<typeof Helpers.assignController>[0]);
     this._prepareContext();

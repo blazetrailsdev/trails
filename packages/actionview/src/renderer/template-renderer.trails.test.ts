@@ -39,7 +39,7 @@ describe("TemplateRenderer raises", () => {
 
   it("raises ArgumentError for an absolute layout path", async () => {
     const lc = new LookupContext();
-    vi.spyOn(lc, "findTemplate").mockReturnValue(fakeTemplate("content") as never);
+    vi.spyOn(lc, "findTemplate").mockReturnValueOnce(fakeTemplate("content") as never);
     const renderer = new TemplateRenderer(lc);
     const e = await renderer
       .render(ctx, { template: "posts/show", layout: "/layouts/application" })
@@ -50,7 +50,7 @@ describe("TemplateRenderer raises", () => {
 
   it("re-raises MissingTemplate when the layout does not exist in any format", async () => {
     const lc = new LookupContext();
-    vi.spyOn(lc, "findTemplate").mockReturnValue(fakeTemplate("content") as never);
+    vi.spyOn(lc, "findTemplate").mockReturnValueOnce(fakeTemplate("content") as never);
     const renderer = new TemplateRenderer(lc);
     const e = await renderer
       .render(ctx, { template: "posts/show", layout: "layouts/missing" })

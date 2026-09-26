@@ -1,4 +1,5 @@
 import { ArgumentError, File, rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import type { SafeBuffer } from "@blazetrails/activesupport";
 import type { LookupContext } from "../lookup-context.js";
 import type { Template } from "../template.js";
 
@@ -27,8 +28,8 @@ export interface RenderableTemplate {
 }
 
 export interface ViewContext {
-  readonly lookupContext?: LookupContext;
-  _layoutFor?(...args: unknown[]): string | null;
+  readonly lookupContext?: LookupContext | null;
+  _layoutFor?(...args: unknown[]): string | SafeBuffer | null;
   viewFlow?: { set(key: string, content: string): void };
   prefixPartialPathWithControllerNamespace?: boolean;
   viewRenderer: { cacheHits: Record<string, unknown> };
@@ -47,7 +48,12 @@ export interface RenderOptions {
     | string
     | false
     | null
-    | ((ctx: LookupContext, formats: readonly string[], keys: readonly string[]) => string);
+    | RenderableTemplate
+    | ((
+        ctx: LookupContext,
+        formats: readonly string[],
+        keys: readonly string[],
+      ) => RenderOptions["layout"]);
   locals?: Record<string, unknown>;
   collection?: readonly unknown[];
   as?: string;

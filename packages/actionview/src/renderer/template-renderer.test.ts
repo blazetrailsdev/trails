@@ -92,7 +92,6 @@ describe("TemplateRenderer", () => {
 
   describe("raises on missing template", () => {
     it("raises MissingTemplate when template cannot be found", async () => {
-      vi.spyOn(lc, "findTemplate").mockReturnValue(null);
       const renderer = new TemplateRenderer(lc);
       await expect(renderer.render(ctx, { template: "posts/missing" })).rejects.toBeInstanceOf(
         MissingTemplate,
@@ -104,8 +103,9 @@ describe("TemplateRenderer", () => {
     it("wraps template body in layout when layout: is set", async () => {
       const templateFake = makeFakeTemplate("content");
       const layoutFake = makeFakeTemplate("LAYOUT[content]");
-      vi.spyOn(lc, "findTemplate").mockReturnValue(templateFake as never);
-      vi.spyOn(lc, "find").mockReturnValue(layoutFake as never);
+      vi.spyOn(lc, "findTemplate")
+        .mockReturnValueOnce(templateFake as never)
+        .mockReturnValueOnce(layoutFake as never);
       const renderer = new TemplateRenderer(lc);
       const result = await renderer.render(ctx, {
         template: "posts/show",

@@ -23,6 +23,7 @@ import type {
 import {
   LookupContext,
   ViewPathsClassMethods,
+  _normalizeLayout,
   _prefixes,
   detailsForLookup,
   isAnyTemplates,
@@ -42,6 +43,7 @@ import {
 } from "@blazetrails/actionview";
 import type {
   PathSet,
+  Template,
   ViewPathsInput,
   ViewContextHost,
   ViewContextRoutes,
@@ -382,47 +384,36 @@ export class Base extends Metal {
       this.status = options.status;
     }
 
-    const ctx = this.lookupContext;
-
-    const formats = this.formats;
-    const format = String(formats[0] ?? ":html");
     const locals = { ...options.locals };
     const view = this.viewContext();
-    const layout =
-      options.layout === false
-        ? false
-        : typeof options.layout === "string"
-          ? options.layout
-          : (this.constructor as typeof Base).layout;
+    let owner = this.constructor as typeof Base;
+    while (!Object.hasOwn(owner, "layout")) owner = Object.getPrototypeOf(owner);
+    const layout = owner === Base ? owner.layout : _normalizeLayout(owner.layout);
 
     if (options.partial !== undefined) {
-      if (options.collection !== undefined) {
-        this.body = await ctx.renderCollection(
-          options.partial,
-          _prefixes.call(this as never),
-          format,
-          options.collection,
-          options.as,
-        );
-      } else {
-        this.body = await ctx.renderPartial(
-          options.partial,
-          _prefixes.call(this as never),
-          format,
-          locals,
-          view,
-        );
-      }
+      this.body = (await view.viewRenderer.render(view, {
+        partial: options.partial,
+        ...(options.collection !== undefined ? { collection: options.collection } : {}),
+        as: options.as,
+        locals,
+      })) as string;
     } else {
-      const template = String(options.template ?? options.action ?? this.actionName);
-      const [action, prefixes] = ctx.normalizeName(
-        template,
-        options.template !== undefined ? [] : _prefixes.call(this as never),
-      );
-      this.body = await ctx.render(prefixes, action, formats, locals, {
-        layout: layout === false ? false : layout || undefined,
-        view,
-      });
+      this.body = (await view.viewRenderer.render(view, {
+        template: String(options.template ?? options.action ?? this.actionName),
+        prefixes: options.template !== undefined ? [] : _prefixes.call(this as never),
+        locals,
+        layout:
+          typeof options.layout === "string"
+            ? _normalizeLayout(options.layout)
+            : options.layout === false || !layout
+              ? null
+              : owner !== Base
+                ? layout
+                : (lookupContext, formats, keys) =>
+                    lookupContext.findAll(layout, ["layouts"], false, keys, { formats })[0] as
+                      | Template
+                      | undefined,
+      })) as string;
     }
 
     this.contentType = options.contentType ?? "text/html; charset=utf-8";

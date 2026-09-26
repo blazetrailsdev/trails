@@ -145,7 +145,7 @@ describe("TemplateDigestorTest", () => {
     for (const path of finder().viewPaths) path.clearCache?.();
   }
 
-  function digest(templateName: string, options: DigestOptions = {}): string {
+  function digest(templateName: string, options: DigestOptions = {}) {
     finder().variants = options.variants ?? [];
 
     const finderWithFormats = options.format
@@ -160,7 +160,7 @@ describe("TemplateDigestorTest", () => {
     });
   }
 
-  function dependencies(templateName: string): string[] {
+  function dependencies(templateName: string) {
     const tree = Digestor.tree(templateName, finder());
     return tree.children.map((node) => node.name);
   }
