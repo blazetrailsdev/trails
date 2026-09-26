@@ -203,6 +203,77 @@ describe("Ruby extractor define_method loop expansion", () => {
     expect(unexpandedLoops).toEqual(["cases/foo_test.rb:3"]);
   });
 
+  it("expands a same-file constant hash receiver", () => {
+    const { cases, unexpandedLoops } = extract(`
+  CASES = {
+    "&" => '\\u0026',
+    ">" => '\\u003e',
+  }
+
+  CASES.each do |given, expected|
+    define_method "test_json_escape_#{expected.gsub(/\\W/, '')}" do
+      assert_equal expected, json_escape(given)
+    end
+  end
+`);
+    expect(cases.map((c) => c.description)).toEqual(["json escape u0026", "json escape u003e"]);
+    expect(unexpandedLoops).toEqual([]);
+  });
+
+  it("expands a constant array of operator symbols", () => {
+    const { cases, unexpandedLoops } = extract(`
+  ARRAY_DELEGATES = [
+    :+, :[], :|, :all?,
+  ]
+
+  ARRAY_DELEGATES.each do |method|
+    define_method "test_delegates_#{method}_to_Array" do
+      assert_respond_to target, method
+    end
+  end
+`);
+    expect(cases.map((c) => c.description)).toEqual([
+      "delegates + to Array",
+      "delegates [] to Array",
+      "delegates | to Array",
+      "delegates all? to Array",
+    ]);
+    expect(unexpandedLoops).toEqual([]);
+  });
+
+  it("expands an each loop nested inside the outer loop", () => {
+    const { cases, unexpandedLoops } = extract(`
+  %w(controller response).each do |variable|
+    %w(get post).each do |method|
+      define_method("test_#{variable}_missing_for_#{method}_raises_error") do
+        assert_equal 1, 1
+      end
+    end
+  end
+`);
+    expect(cases.map((c) => c.description)).toEqual([
+      "controller missing for get raises error",
+      "controller missing for post raises error",
+      "response missing for get raises error",
+      "response missing for post raises error",
+    ]);
+    expect(unexpandedLoops).toEqual([]);
+  });
+
+  it("reports a nested loop whose receiver is a runtime value", () => {
+    const { cases, unexpandedLoops } = extract(`
+  %w(controller response).each do |variable|
+    Encoding.list.each do |encoding|
+      define_method("test_#{variable}_#{encoding.name}") do
+        assert_equal 1, 1
+      end
+    end
+  end
+`);
+    expect(cases).toEqual([]);
+    expect(unexpandedLoops).toEqual(["cases/foo_test.rb:3"]);
+  });
+
   it("neither expands nor reports a loop that generates ordinary helpers", () => {
     const { cases, unexpandedLoops } = extract(`
   (1..3).each do |i|

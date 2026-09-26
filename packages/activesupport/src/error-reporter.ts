@@ -34,6 +34,7 @@ export class ErrorReporter {
   static readonly DEFAULT_RESCUE: readonly ErrorClass[] = Object.freeze([Error]);
 
   static readonly UnexpectedError = class UnexpectedError extends Error {
+    /** @noRailsEquivalent PERMANENT */
     readonly [ABOVE_STANDARD_ERROR] = true;
 
     constructor(message: string, options?: { cause?: unknown }) {

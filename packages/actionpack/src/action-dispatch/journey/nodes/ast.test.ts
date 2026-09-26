@@ -1,9 +1,10 @@
 import { describe, it, expect } from "vitest";
+import { assertNotPredicate, assertPredicate } from "@blazetrails/activesupport";
 import { Parser } from "../parser.js";
 import { Ast } from "../ast.js";
 import { Symbol as SymbolNode, Terminal } from "./node.js";
 
-describe("ActionDispatch::Journey::Nodes::Ast", () => {
+describe("TestAst", () => {
   it("ast sets regular expressions", () => {
     const requirements: Record<string, RegExp> = { name: /(tender|love)/, value: /./ };
     const tree = new Parser().parse("/page/:name/:value")!;
@@ -24,12 +25,12 @@ describe("ActionDispatch::Journey::Nodes::Ast", () => {
 
   it("contains glob", () => {
     const ast = new Ast(new Parser().parse("/*glob")!, true);
-    expect(ast.isGlob()).toBe(true);
+    assertPredicate(ast, (a) => a.isGlob());
   });
 
   it("does not contain glob", () => {
     const ast = new Ast(new Parser().parse("/")!, true);
-    expect(ast.isGlob()).toBe(false);
+    assertNotPredicate(ast, (a) => a.isGlob());
   });
 
   it("names", () => {

@@ -5526,6 +5526,41 @@ describe("returnsVoid", () => {
   });
 });
 
+describe("extractFromProgram — nested class expressions", () => {
+  it("records a named class expression on a static property under its dotted seat", () => {
+    const info = extractFromFiles("/p", {
+      "scanner.ts": `
+        export class Scanner {
+          static Scanner = class Scanner {
+            peekByte(): number { return 0; }
+            /** @internal */
+            isEos(): boolean { return true; }
+            static Inner = class Inner { deep(): void {} };
+          };
+          nextToken(): void {}
+        }
+      `,
+    });
+    expect(info.classes["scanner.ts:Scanner"].instanceMethods.map((m) => m.name)).toContain(
+      "nextToken",
+    );
+    const nested = info.classes["scanner.ts:Scanner.Scanner"];
+    expect(nested.instanceMethods.find((m) => m.name === "peekByte")?.internal).toBeUndefined();
+    expect(nested.instanceMethods.find((m) => m.name === "isEos")?.internal).toBe(true);
+    expect(
+      info.classes["scanner.ts:Scanner.Scanner.Inner"].instanceMethods.map((m) => m.name),
+    ).toEqual(["deep"]);
+  });
+
+  it("records `export const Name = class Name { ... }` as a class", () => {
+    const info = extractFromFiles("/p", {
+      "point.ts": `export const Point = class Point { x(): number { return 0; } };`,
+    });
+    expect(info.classes["point.ts:Point"].instanceMethods.map((m) => m.name)).toEqual(["x"]);
+    expect(info.modules["point.ts:Point"]).toBeUndefined();
+  });
+});
+
 describe("seatedClassExpression", () => {
   const statements = (source: string) =>
     ts

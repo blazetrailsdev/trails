@@ -18,7 +18,7 @@ function tt(strings: string[]) {
   return new Builder(new Or(asts(strings))).transitionTable();
 }
 
-describe("ActionDispatch::Journey::GTG::Builder", () => {
+describe("TestBuilder", () => {
   it("following states multi", () => {
     const t = tt(["a|a"]);
     expect(t.move([[0, null]], "a", 0, 1).length).toBe(1);

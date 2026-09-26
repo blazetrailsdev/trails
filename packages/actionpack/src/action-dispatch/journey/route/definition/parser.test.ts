@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Parser } from "../../parser.js";
 
-describe("ActionDispatch::Journey::Parser", () => {
+describe("TestParser", () => {
   const parser = new Parser();
   const assertRoundTrip = (str: string) => expect(parser.parse(str)!.toString()).toBe(str);
 

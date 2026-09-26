@@ -243,24 +243,8 @@ describe("DelegationTest", () => {
   ] as const;
 
   describe("DelegationAssociationTest", () => {
-    it("delegates partition to Array", async () => {
-      const post = await Post.first();
-      const target = (post as any).comments;
-      expect(typeof target.partition).toBe("function");
-      expect(target.loaded).toBe(false);
-
-      const someId = (await Comment.first())!.id;
-      const [matched, unmatched] = await target.partition((c: any) => c.id === someId);
-
-      expect(target.loaded).toBe(true);
-      const records: any[] = target.target;
-      expect(records.length).toBeGreaterThan(0);
-      expect(matched.map((c: any) => c.id)).toEqual(
-        records.filter((c: any) => c.id === someId).map((c: any) => c.id),
-      );
-      expect(unmatched.map((c: any) => c.id)).toEqual(
-        records.filter((c: any) => c.id !== someId).map((c: any) => c.id),
-      );
+    it("delegates partition to Array", () => {
+      assertRespondTo(new Post().comments, "partition");
     });
 
     for (const method of DELEGATED_ARRAY_METHODS) {
@@ -288,21 +272,8 @@ describe("DelegationTest", () => {
   });
 
   describe("DelegationRelationTest", () => {
-    it("delegates partition to Array", async () => {
-      const target = Comment.all();
-      expect(typeof (target as any).partition).toBe("function");
-
-      const someId = (await Comment.first())!.id;
-      const [matched, unmatched] = await (target as any).partition((c: any) => c.id === someId);
-
-      const records: any[] = await (target as any).toArray();
-      expect(records.length).toBeGreaterThan(0);
-      expect(matched.map((c: any) => c.id)).toEqual(
-        records.filter((c: any) => c.id === someId).map((c: any) => c.id),
-      );
-      expect(unmatched.map((c: any) => c.id)).toEqual(
-        records.filter((c: any) => c.id !== someId).map((c: any) => c.id),
-      );
+    it("delegates partition to Array", () => {
+      assertRespondTo(Comment.all(), "partition");
     });
 
     for (const method of DELEGATED_ARRAY_METHODS) {

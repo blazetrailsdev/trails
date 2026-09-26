@@ -269,3 +269,47 @@ describe("respond_to_missing? — `in` on the dispatch proxies", () => {
     expect(comments.whatAreYou).toBeUndefined();
   });
 });
+
+describe("partition delegated to Array", () => {
+  fixtures(["posts", "comments"]);
+
+  type Partitioned = Promise<[Comment[], Comment[]]>;
+  type Partitionable = { partition(fn: (c: Comment) => boolean): Partitioned };
+
+  it("loads an association and splits its records", async () => {
+    const post = (await Post.first())!;
+    const target = post.comments as unknown as Partitionable & {
+      loaded: boolean;
+      target: Comment[];
+    };
+    expect(target.loaded).toBe(false);
+
+    const someId = (await Comment.first())!.id;
+    const [matched, unmatched] = await target.partition((c) => c.id === someId);
+
+    expect(target.loaded).toBe(true);
+    const records = target.target;
+    expect(records.length).toBeGreaterThan(0);
+    expect(matched.map((c) => c.id)).toEqual(
+      records.filter((c) => c.id === someId).map((c) => c.id),
+    );
+    expect(unmatched.map((c) => c.id)).toEqual(
+      records.filter((c) => c.id !== someId).map((c) => c.id),
+    );
+  });
+
+  it("splits a relation's records", async () => {
+    const target = Comment.all() as unknown as Partitionable & { toArray(): Promise<Comment[]> };
+    const someId = (await Comment.first())!.id;
+    const [matched, unmatched] = await target.partition((c) => c.id === someId);
+
+    const records = await target.toArray();
+    expect(records.length).toBeGreaterThan(0);
+    expect(matched.map((c) => c.id)).toEqual(
+      records.filter((c) => c.id === someId).map((c) => c.id),
+    );
+    expect(unmatched.map((c) => c.id)).toEqual(
+      records.filter((c) => c.id !== someId).map((c) => c.id),
+    );
+  });
+});

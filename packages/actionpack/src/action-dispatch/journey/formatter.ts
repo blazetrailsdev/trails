@@ -1,4 +1,5 @@
 import { isPlainObject, isPresent, toParam } from "@blazetrails/activesupport";
+import { block, fetch } from "@blazetrails/ruby-compat";
 import { UrlGenerationError } from "../../action-controller/metal/exceptions.js";
 import type { Route } from "./route.js";
 
@@ -137,18 +138,20 @@ export class Formatter {
   ): Record<string, unknown> {
     const parameterizedParts: Record<string, unknown> = { ...recall, ...options };
 
-    const parts = [...route.parts].reverse();
-    let dropping = true;
-    const keysToKeep = new Set<string>();
-    for (const part of parts) {
-      if (dropping) {
-        const supplied = Object.hasOwn(options, part) || Object.hasOwn(route.scopeOptions, part);
-        const present = options[part] != null || recall[part] != null;
-        if (supplied && present) dropping = false;
-        else continue;
+    const reversed = [...route.parts].reverse();
+    let dropped = 0;
+    for (const part of reversed) {
+      if (
+        !(
+          !(Object.hasOwn(options, part) || Object.hasOwn(route.scopeOptions, part)) ||
+          (options[part] == null && recall[part] == null)
+        )
+      ) {
+        break;
       }
-      keysToKeep.add(part);
+      dropped++;
     }
+    const keysToKeep = new Set<string>(reversed.slice(dropped));
     for (const p of route.requiredParts) keysToKeep.add(p);
 
     for (const badKey of Object.keys(parameterizedParts)) {
@@ -253,7 +256,11 @@ export class Formatter {
     depth = 0,
   ): [number, Route][] {
     return [
-      ...((cache["___routes"] as [number, Route][]) ?? []),
+      ...fetch<[number, Route][]>(
+        cache,
+        "___routes",
+        block(() => []),
+      ),
       ...Object.entries(options)
         .map(([k, v]) => pairKey(k, v))
         .filter((pair) => Object.hasOwn(cache, pair))
