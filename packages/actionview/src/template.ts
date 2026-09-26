@@ -220,11 +220,6 @@ export class Template {
     return this.strictLocalsBang() != null;
   }
 
-  /**
-   * `template.rb:279-286`. A Ruby `SafeBuffer` is a `String`, so Rails hands
-   * one back verbatim; a trails `SafeBuffer` is an object, so it is read out as
-   * the string it holds, the same way `OutputBuffer#to_s` is.
-   */
   render(
     view: Base,
     locals?: Record<string, unknown>,
