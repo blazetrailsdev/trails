@@ -184,7 +184,7 @@ export class Generator {
       !this.controller.startsWith("/")
     ) {
       const oldParts = this.currentController.split("/");
-      const size = this.controller.split("/").length;
+      const size = (this.controller.match(/\//g) ?? []).length + 1;
       const parts = [...oldParts.slice(0, -size), this.controller];
       this.options["controller"] = parts.join("/");
     }
