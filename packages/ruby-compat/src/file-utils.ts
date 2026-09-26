@@ -2,6 +2,7 @@ import { ArgumentError } from "./argument-error.js";
 import { Dir } from "./dir.js";
 import { File } from "./file.js";
 import { getFs, getPath, type FsStatResult } from "./fs-adapter.js";
+import { IO } from "./io.js";
 import { NotImplementedError } from "./not-implemented-error.js";
 import { stdout } from "./process-adapter.js";
 
@@ -353,7 +354,11 @@ class Entry_ {
 
   /** `Entry_#copy_file` (`vendor/ruby/lib/fileutils.rb:2277-2283`). */
   copyFile(dest: string): void {
-    getFs().copyFileSync(this.path, dest);
+    File.open(this.path, "r", (s) => {
+      File.open(dest, "wb", { perm: s.stat().mode }, (f) => {
+        IO.copyStream(s, f);
+      });
+    });
   }
 
   /** `Entry_#copy_metadata` (`vendor/ruby/lib/fileutils.rb:2285-2312`). */

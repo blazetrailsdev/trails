@@ -104,7 +104,7 @@ describe("Tempfile", () => {
     const bytes = [0x00, 0xff, 0x80, 0xc3, 0x28, 0xfe];
     const tempfile = Tempfile.new("bin");
     tempfile.binmode();
-    tempfile.write(bytes.map((byte) => String.fromCharCode(byte)).join(""));
+    tempfile.write(Uint8Array.from(bytes));
     expect(tempfile.read()).toBe("");
     tempfile.rewind();
     expect([...tempfile.read()].map((c) => c.charCodeAt(0))).toEqual(bytes);
@@ -127,7 +127,7 @@ describe("Tempfile", () => {
     const bytes = [0x00, 0xff, 0x80, 0xc3, 0x28, 0xfe];
     const tempfile = Tempfile.new("enc");
     tempfile.setEncoding(Encoding.BINARY);
-    tempfile.write(bytes.map((byte) => String.fromCharCode(byte)).join(""));
+    tempfile.write(Uint8Array.from(bytes));
     tempfile.rewind();
     expect([...tempfile.read()].map((c) => c.charCodeAt(0))).toEqual(bytes);
     tempfile.close();

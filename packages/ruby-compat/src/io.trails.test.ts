@@ -83,7 +83,7 @@ describe("IO", () => {
     const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "bin.dat");
     const file = File.open(path, "w+");
     file.binmode();
-    expect(file.write("h\u00c3\u00a9llo")).toBe(6);
+    expect(file.write("héllo")).toBe(6);
     file.rewind();
     expect(file.read()).toBe("h\u00c3\u00a9llo");
     file.close();

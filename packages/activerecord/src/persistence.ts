@@ -49,7 +49,7 @@ interface PersistenceHost {
 export async function create(
   this: PersistenceHost,
   attributes: Record<string, unknown> | Record<string, unknown>[] = {},
-  block?: (record: any) => void,
+  block?: (record: any) => void | Promise<void>,
 ): Promise<any> {
   if (Array.isArray(attributes)) {
     const records: any[] = [];
@@ -60,7 +60,15 @@ export async function create(
   }
   await this.ensureSchemaLoaded();
   const mergedAttrs = (this as any)._mergeCurrentScopeAttrs(attributes);
-  const record = new this(mergedAttrs, block);
+  let yielded: unknown;
+  const record = new this(
+    mergedAttrs,
+    block &&
+      ((record: any) => {
+        yielded = block(record);
+      }),
+  );
+  await yielded;
   await record.save();
   return record;
 }
@@ -68,7 +76,7 @@ export async function create(
 export async function createBang(
   this: PersistenceHost,
   attributes: Record<string, unknown> | Record<string, unknown>[] = {},
-  block?: (record: any) => void,
+  block?: (record: any) => void | Promise<void>,
 ): Promise<any> {
   if (Array.isArray(attributes)) {
     const records: any[] = [];
@@ -79,7 +87,15 @@ export async function createBang(
   }
   await this.ensureSchemaLoaded();
   const mergedAttrs = (this as any)._mergeCurrentScopeAttrs(attributes);
-  const record = new this(mergedAttrs, block);
+  let yielded: unknown;
+  const record = new this(
+    mergedAttrs,
+    block &&
+      ((record: any) => {
+        yielded = block(record);
+      }),
+  );
+  await yielded;
   await record.saveBang();
   return record;
 }

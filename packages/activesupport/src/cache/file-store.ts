@@ -137,7 +137,7 @@ export class FileStore extends Store implements CacheStore {
   protected writeSerializedEntry(key: string, payload: string, options: StoreOptions): boolean {
     if (options.unlessExist && File.isExist(key)) return false;
     this.ensureCachePath(File.dirname(key));
-    atomicWrite(key, this.cachePath, (f) => f.write(payload));
+    atomicWrite(key, this.cachePath, (f) => f.write(Buffer.from(payload, "latin1")));
     return true;
   }
 

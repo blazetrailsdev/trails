@@ -208,6 +208,18 @@ describe("FileUtils", () => {
     expect(nodeFs.readFileSync(dest, "utf-8")).toEqual("contents");
   });
 
+  it("copy_file creates the destination with the source's mode, without preserve", () => {
+    const src = nodePath.join(root, "src");
+    const dest = nodePath.join(root, "dest");
+    nodeFs.writeFileSync(src, "contents");
+    nodeFs.chmodSync(src, 0o755);
+
+    FileUtils.copyFile(src, dest);
+
+    expect(nodeFs.statSync(dest).mode & 0o777).toEqual(0o755);
+    expect(nodeFs.readFileSync(dest, "utf-8")).toEqual("contents");
+  });
+
   it("copy_file with preserve copies the mtime and the mode", () => {
     const src = nodePath.join(root, "src");
     const dest = nodePath.join(root, "dest");

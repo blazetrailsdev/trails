@@ -1,4 +1,4 @@
-import { Encoding, File, FileUtils, Zlib } from "@blazetrails/ruby-compat";
+import { File, FileUtils, Zlib } from "@blazetrails/ruby-compat";
 import { atomicWrite } from "@blazetrails/activesupport";
 import { parse as yamlParse, stringify as yamlStringify } from "@blazetrails/activesupport/yaml";
 import { Column } from "./column.js";
@@ -454,7 +454,6 @@ export class SchemaCache {
         await zipper.flush();
         await zipper.close();
       } else {
-        file.setEncoding(Encoding.UTF_8);
         block(file);
       }
     });

@@ -9235,20 +9235,6 @@
   {
     "package": "actiondispatch",
     "rubyFile": "middleware/session/mem_cache_store.rb",
-    "rubyName": "commit_session",
-    "digest": "794b2ae2c124b587",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "middleware/session/mem_cache_store.rb",
-    "rubyName": "extract_session_id",
-    "digest": "e71772eb93e1b42f",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "middleware/session/mem_cache_store.rb",
     "rubyName": "generate_sid",
     "digest": "d572e599e8eeda2b",
     "ref": "v8.0.2"
@@ -9258,48 +9244,6 @@
     "rubyFile": "middleware/session/mem_cache_store.rb",
     "rubyName": "initialize",
     "digest": "568988e04fc2d7ed",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "middleware/session/mem_cache_store.rb",
-    "rubyName": "initialize_sid",
-    "digest": "ee73ed48cb44fe45",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "middleware/session/mem_cache_store.rb",
-    "rubyName": "load_session",
-    "digest": "e71772eb93e1b42f",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "middleware/session/mem_cache_store.rb",
-    "rubyName": "loaded_session?",
-    "digest": "31ea2997584ebe7e",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "middleware/session/mem_cache_store.rb",
-    "rubyName": "make_request",
-    "digest": "85bc9006fcfb6711",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "middleware/session/mem_cache_store.rb",
-    "rubyName": "prepare_session",
-    "digest": "c50d15a0a47386f0",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "middleware/session/mem_cache_store.rb",
-    "rubyName": "stale_session_check!",
-    "digest": "8020aebe2af1dfba",
     "ref": "v8.0.2"
   },
   {

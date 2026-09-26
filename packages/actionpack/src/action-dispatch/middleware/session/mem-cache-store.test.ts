@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MemoryStore } from "@blazetrails/activesupport";
+import { CacheStore } from "./cache-store.js";
 import { MemCacheStore } from "./mem-cache-store.js";
 import { SessionId } from "@blazetrails/rack-session";
 
@@ -44,6 +45,7 @@ describe("ActionDispatch::Session::MemCacheStore", () => {
     ];
     for (const name of ownNames) {
       expect(name in proto).toBe(true);
+      expect((proto as any)[name]).toBe((CacheStore.prototype as any)[name]);
     }
   });
 

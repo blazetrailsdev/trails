@@ -356,7 +356,7 @@ export class File extends IO {
    * (`rb_io_extract_encoding_option`, `io.c:6725,6750`).
    * Ruby's block is a block and its `opt` a trailing argument; TypeScript has
    * only the one trailing position for both, so the third parameter is either,
-   * discriminated by `typeof`.
+   * discriminated by `typeof`, and a block that follows an `opt` is the fourth.
    *
    * The mode string carries that encoding too — everything after the first
    * `:` is `parse_mode_enc`'s `"enc"`, `"enc2:enc"` or `"enc:-"`
@@ -379,9 +379,16 @@ export class File extends IO {
   static open<T>(
     fileName: string,
     mode: string,
+    opt: { perm?: number; externalEncoding?: Encoding | string },
+    block: (file: File) => T,
+  ): T;
+  static open<T>(
+    fileName: string,
+    mode: string,
     blockOrOpt?: ((file: File) => T) | { perm?: number; externalEncoding?: Encoding | string },
+    optBlock?: (file: File) => T,
   ): T | File {
-    const block = typeof blockOrOpt === "function" ? blockOrOpt : undefined;
+    const block = typeof blockOrOpt === "function" ? blockOrOpt : optBlock;
     const opt = typeof blockOrOpt === "function" ? undefined : blockOrOpt;
     const colon = mode.indexOf(":");
     const estr = colon === -1 ? null : mode.slice(colon + 1);

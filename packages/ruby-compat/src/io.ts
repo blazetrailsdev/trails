@@ -284,8 +284,9 @@ function utf32Str(bytes: Uint8Array, littleEndian: boolean): string {
  * (`io.c:714`): a stream carrying an external encoding other than ASCII-8BIT
  * transcodes the String to it (`common_encoding`, `io.c:1925-1926`), and one
  * carrying none — or carrying ASCII-8BIT — writes the String's own bytes,
- * which for the ASCII-8BIT String a binary stream takes is one byte per
- * character and for every other String is its UTF-8.
+ * which for a JS string, a UTF-8 String, is its UTF-8: binmode suppresses the
+ * transcode and nothing else. An ASCII-8BIT String's bytes reach
+ * {@link IO#write} as a `Uint8Array`.
  * `TextEncoder` produces UTF-8 and nothing else, so UTF-8 is the only
  * `common_encoding` the transcode arm can reach; every other raises what
  * `rb_econv_open` raises for a pair it has no converter for
@@ -293,13 +294,10 @@ function utf32Str(bytes: Uint8Array, littleEndian: boolean): string {
  * writing the bytes of an encoding the stream did not ask for.
  */
 function doWriteconv(string: string, enc: Encoding | null): Uint8Array {
-  if (enc !== null && enc !== Encoding.ASCII_8BIT) {
-    if (enc !== Encoding.UTF_8) {
-      throw new ConverterNotFoundError(`code converter not found (UTF-8 to ${enc})`);
-    }
-    return new TextEncoder().encode(string);
+  if (enc !== null && enc !== Encoding.ASCII_8BIT && enc !== Encoding.UTF_8) {
+    throw new ConverterNotFoundError(`code converter not found (UTF-8 to ${enc})`);
   }
-  return enc === Encoding.ASCII_8BIT ? binaryBytes(string) : new TextEncoder().encode(string);
+  return new TextEncoder().encode(string);
 }
 
 /** `FMODE_READABLE` (`vendor/ruby/include/ruby/io.h:270`). */
@@ -717,6 +715,30 @@ export class IO {
   }
 
   /**
+   * `vendor/ruby/io.c:13365` `rb_io_s_copy_stream`, in the IO-to-IO form
+   * `Entry_#copy_file` calls (`vendor/ruby/lib/fileutils.rb:2280`). With no
+   * `src_length` and no `src_offset`, `nogvl_copy_stream_read_write`
+   * (`io.c:12997-13050`) reads the source 16 KiB at a time until EOF and writes
+   * each chunk to the destination, so the bytes pass through unchanged
+   * whatever either stream's encoding. It answers the byte total
+   * (`io.c:13392`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO.copy_stream`
+   * (`vendor/ruby/io.c:13365`).
+   */
+  static copyStream(src: IO, dst: IO): number {
+    const buf = new Uint8Array(1024 * 16);
+    let total = 0;
+    for (;;) {
+      const ss = getFs().readSync(src.fd, buf, 0, buf.length, src._pos);
+      if (ss <= 0) return total;
+      src._pos += ss;
+      dst.write(buf.subarray(0, ss));
+      total += ss;
+    }
+  }
+
+  /**
    * `vendor/ruby/io.c:2858` `rb_io_fileno` — the integer descriptor the
    * stream was opened on.
    *
@@ -1013,11 +1035,11 @@ export class IO {
   /**
    * `vendor/ruby/io.c:2263` `io_write_m` in its one-argument form, which
    * answers the number of bytes written. On a binary stream — {@link binmode},
-   * or a mode carrying `b` (`rb_io_binmode`, `io.c:6311`) — `string` is an
-   * ASCII-8BIT String and its characters go out as bytes; otherwise
-   * `do_writeconv` (`io.c:1904`) transcodes it to the external encoding. A
-   * `Uint8Array` is a String's bytes already and goes out unchanged, which is
-   * how a binary producer hands over bytes without a character per byte.
+   * or a mode carrying `b` (`rb_io_binmode`, `io.c:6311`) — `string` goes out
+   * as its own bytes, its UTF-8; otherwise `do_writeconv` (`io.c:1904`)
+   * transcodes it to the external encoding. A `Uint8Array` is a String's bytes
+   * already and goes out unchanged, which is how an ASCII-8BIT producer hands
+   * over its bytes.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#write`
    * (`vendor/ruby/io.c:2263`).
