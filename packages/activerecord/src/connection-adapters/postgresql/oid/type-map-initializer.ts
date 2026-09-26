@@ -158,4 +158,5 @@ interface OidSubtype {
   cast(value: unknown): unknown;
   serialize(value: unknown): unknown;
   deserialize?(value: unknown): unknown;
+  typeCastForSchema(value: unknown): unknown;
 }

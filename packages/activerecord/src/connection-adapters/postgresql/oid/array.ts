@@ -117,7 +117,7 @@ export interface ArraySubtype {
   cast(value: unknown): unknown;
   serialize(value: unknown): unknown;
   deserialize?(value: unknown): unknown;
-  typeCastForSchema?(value: unknown): unknown;
+  typeCastForSchema(value: unknown): unknown;
   map?(value: unknown, block: (value: unknown) => unknown): unknown;
   userInputInTimeZone?(value: unknown): unknown;
 }
@@ -198,20 +198,17 @@ export class Array extends ValueType<unknown> {
     return super.deserialize(value);
   }
 
-  private formatValueForSchema(value: unknown): string {
-    const typeCastForSchema = this.subtype.typeCastForSchema;
-    if (typeCastForSchema) return rbObjAsString(typeCastForSchema(value));
-    if (typeof value === "bigint") return String(value);
-    try {
-      return JSON.stringify(value) ?? String(value);
-    } catch {
-      return String(value);
-    }
-  }
-
-  override typeCastForSchema(value: unknown): string {
-    if (!globalThis.Array.isArray(value)) return this.formatValueForSchema(value);
-    return `[${value.map((item) => this.formatValueForSchema(item)).join(", ")}]`;
+  override typeCastForSchema(value: unknown): unknown {
+    if (!globalThis.Array.isArray(value)) return super.typeCastForSchema(value);
+    return (
+      "[" +
+      value
+        .map((v) => this.subtype.typeCastForSchema(v))
+        .flat(Infinity)
+        .map((v) => rbObjAsString(v))
+        .join(", ") +
+      "]"
+    );
   }
 
   map(value: unknown, block: (value: unknown) => unknown): unknown {

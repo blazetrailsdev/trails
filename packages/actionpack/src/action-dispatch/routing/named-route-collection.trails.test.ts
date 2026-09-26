@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { RouteSet, type UrlHelperContext } from "./route-set.js";
+import { RouteSet, type NamedRouteHelper, type UrlHelperContext } from "./route-set.js";
 
 function drawn(): RouteSet {
   const routeSet = new RouteSet();
@@ -13,8 +13,8 @@ function drawn(): RouteSet {
 describe("NamedRouteCollection", () => {
   it("defines a name_path and a name_url helper per named route", () => {
     const named = drawn().namedRoutes;
-    expect(Object.keys(named.pathHelpersModule)).toEqual(["postsPath", "postPath"]);
-    expect(Object.keys(named.urlHelpersModule)).toEqual(["postsUrl", "postUrl"]);
+    expect(named.pathHelpersModule.instanceMethods()).toEqual(["postsPath", "postPath"]);
+    expect(named.urlHelpersModule.instanceMethods()).toEqual(["postsUrl", "postUrl"]);
     expect(named.helperNames()).toEqual(["postsPath", "postPath", "postsUrl", "postUrl"]);
     expect(named.names()).toEqual(["posts", "post"]);
     expect(named.length()).toBe(2);
@@ -34,7 +34,7 @@ describe("NamedRouteCollection", () => {
   it("clear! removes the generated helpers", () => {
     const routeSet = drawn();
     routeSet.namedRoutes.clearBang();
-    expect(Object.keys(routeSet.namedRoutes.pathHelpersModule)).toEqual([]);
+    expect(routeSet.namedRoutes.pathHelpersModule.instanceMethods()).toEqual([]);
     expect(routeSet.namedRoutes.helperNames()).toEqual([]);
   });
 
@@ -49,7 +49,28 @@ describe("NamedRouteCollection", () => {
     expect(named.helperNames()).toContain("profileUrl");
 
     const context = { _routes: routeSet } as unknown as UrlHelperContext;
-    expect(named.pathHelpersModule["profilePath"].call(context)).toBe("/profile");
-    expect(named.urlHelpersModule["profileUrl"].call(context)).toBe("/profile");
+    expect(
+      (named.pathHelpersModule.instanceMethod("profilePath")!.value as NamedRouteHelper).call(
+        context,
+      ),
+    ).toBe("/profile");
+    expect(
+      (named.urlHelpersModule.instanceMethod("profileUrl")!.value as NamedRouteHelper).call(
+        context,
+      ),
+    ).toBe("/profile");
+  });
+
+  it("a url helpers module built before a route is added answers its helpers", () => {
+    const routeSet = new RouteSet();
+    const helpers = routeSet.urlHelpers() as unknown as Record<string, () => string>;
+
+    routeSet.draw((r) => {
+      r.get("/posts", { to: "posts#index", as: "posts" });
+    });
+
+    expect(routeSet.urlHelpers()).toBe(helpers);
+    expect(helpers["postsPath"]()).toBe("/posts");
+    expect(helpers["postsUrl"]).toBeTypeOf("function");
   });
 });

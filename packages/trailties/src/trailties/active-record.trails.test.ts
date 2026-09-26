@@ -2,14 +2,24 @@ import { describe, it, expect } from "vitest";
 import { useInMemoryDatabaseUrl } from "../support/in-memory-database-url.js";
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
 import { Trailtie } from "./active-record.js";
-import { Deprecators, Notifications, runLoadHooks } from "@blazetrails/activesupport";
+import {
+  Deprecators,
+  Logger,
+  NotificationEvent,
+  Notifications,
+  runLoadHooks,
+} from "@blazetrails/activesupport";
 import { ActionController, Request, Response } from "@blazetrails/actionpack";
 import {
+  Base,
+  LogSubscriber,
   RuntimeRegistry,
   generateSecureTokenOn,
   setGenerateSecureTokenOn,
+  setVerboseQueryLogs,
 } from "@blazetrails/activerecord";
 import { Configuration } from "../application/configuration.js";
+import { Trails } from "../rails.js";
 
 const blogApp = (): {
   config: { filterParameters: Array<string | RegExp> };
@@ -76,6 +86,44 @@ describe("RailtieTest (trails-only)", () => {
     } finally {
       Trailtie.config.set("activeRecord", saved);
       setGenerateSecureTokenOn("create");
+    }
+  });
+
+  it("active_record.backtrace_cleaner points the verbose query log at the app frame", async () => {
+    const saved = Trailtie.config.get("activeRecord");
+    const savedCleaner = LogSubscriber.backtraceCleaner;
+    const savedLogger = Base.logger;
+    const debug: string[] = [];
+    const logger = new Logger(null);
+    logger.debug = (message?: string | (() => string)): boolean => {
+      debug.push(typeof message === "function" ? message() : (message ?? ""));
+      return true;
+    };
+    try {
+      Trailtie.config.set("activeRecord", { ...(saved as object), verboseQueryLogs: true });
+      Trails.backtraceCleaner.setRoot("/srv/blog");
+      Base.logger = logger;
+
+      await runTrailtieInitializers(Trailtie, blogApp());
+
+      const event = new NotificationEvent("sql.active_record", null, null, "id", {
+        sql: "SELECT 1",
+      });
+      const postsIndex = new Function(
+        "subscriber",
+        "event",
+        "subscriber.sql(event);\n//# sourceURL=/srv/blog/app/models/post.js",
+      ) as (subscriber: LogSubscriber, event: NotificationEvent) => void;
+      postsIndex(new LogSubscriber(), event);
+
+      expect(LogSubscriber.backtraceCleaner).toBe(Trails.backtraceCleaner);
+      expect(debug[debug.length - 1]).toBe("  ↳ app/models/post.js:3:in 'eval'");
+    } finally {
+      Trailtie.config.set("activeRecord", saved);
+      Trails.backtraceCleaner.setRoot(undefined);
+      LogSubscriber.backtraceCleaner = savedCleaner;
+      Base.logger = savedLogger;
+      setVerboseQueryLogs(false);
     }
   });
 });

@@ -1,7 +1,9 @@
 import { isPlainObject, isPresent } from "@blazetrails/activesupport";
 import { MockRequest, type RackEnv, type RackResponse } from "@blazetrails/rack";
 import {
+  extend,
   InvalidURIError,
+  Module,
   rbInspect,
   rbObjRespondTo,
   RFC2396_PARSER,
@@ -289,8 +291,8 @@ export type NamedRouteHelper = (this: UrlHelperContext, ...args: unknown[]) => s
 export class NamedRouteCollection {
   /** @internal */
   private readonly _routes: Map<string, Route> = new Map();
-  readonly pathHelpersModule: Record<string, NamedRouteHelper> = {};
-  readonly urlHelpersModule: Record<string, NamedRouteHelper> = {};
+  readonly pathHelpersModule: Module = new Module();
+  readonly urlHelpersModule: Module = new Module();
   /** @internal */
   private readonly pathHelpers: Set<string> = new Set();
   /** @internal */
@@ -310,8 +312,13 @@ export class NamedRouteCollection {
   }
 
   clearBang(): void {
-    for (const helper of this.pathHelpers) delete this.pathHelpersModule[helper];
-    for (const helper of this.urlHelpers) delete this.urlHelpersModule[helper];
+    for (const helper of this.pathHelpers) {
+      this.pathHelpersModule.removeMethod(helper);
+    }
+
+    for (const helper of this.urlHelpers) {
+      this.urlHelpersModule.removeMethod(helper);
+    }
 
     this._routes.clear();
     this.pathHelpers.clear();
@@ -323,8 +330,8 @@ export class NamedRouteCollection {
     const urlName = `${name}Url`;
 
     if (this._routes.has(name)) {
-      delete this.pathHelpersModule[pathName];
-      delete this.urlHelpersModule[urlName];
+      this.pathHelpersModule.undefMethod(pathName);
+      this.urlHelpersModule.undefMethod(urlName);
     }
     this._routes.set(name, route);
 
@@ -362,13 +369,17 @@ export class NamedRouteCollection {
     const pathName = `${name}Path`;
     const urlName = `${name}Url`;
 
-    this.pathHelpersModule[pathName] = function (this: UrlHelperContext, ...args): string {
-      return helper.call(this as unknown as PolymorphicHost, args, true);
-    };
+    this.pathHelpersModule.moduleEval((mod) => {
+      mod[pathName] = function (this: UrlHelperContext, ...args: unknown[]): string {
+        return helper.call(this as unknown as PolymorphicHost, args, true);
+      };
+    });
 
-    this.urlHelpersModule[urlName] = function (this: UrlHelperContext, ...args): string {
-      return helper.call(this as unknown as PolymorphicHost, args, false);
-    };
+    this.urlHelpersModule.moduleEval((mod) => {
+      mod[urlName] = function (this: UrlHelperContext, ...args: unknown[]): string {
+        return helper.call(this as unknown as PolymorphicHost, args, false);
+      };
+    });
 
     this.pathHelpers.add(pathName);
     this.urlHelpers.add(urlName);
@@ -377,19 +388,19 @@ export class NamedRouteCollection {
   }
 
   private defineUrlHelper(
-    mod: Record<string, NamedRouteHelper>,
+    mod: Module,
     name: string,
     helper: UrlHelper,
     urlStrategy: UrlStrategy,
   ): void {
-    mod[name] = function (this: UrlHelperContext, ...args: unknown[]): string {
+    mod.defineMethod(name, function (this: UrlHelperContext, ...args: unknown[]): string {
       const last = args[args.length - 1];
       const options =
         (last as object | null)?.constructor === Object
           ? (args.pop() as Record<string, unknown>)
           : undefined;
       return helper.call(this, name, args, options, urlStrategy);
-    };
+    });
   }
 }
 
@@ -416,9 +427,14 @@ export class UrlHelpersModule {
       urlOptions: () => ({ ...routes.defaultUrlOptions }),
     };
     this._proxy = new RoutesProxy(target, scope, {});
-    Object.assign(this, routes.namedRoutes.urlHelpersModule);
+    const urlHelpers = routes.namedRoutes.urlHelpersModule;
+
+    extend(this, urlHelpers);
+
     if (supportsPath) {
-      Object.assign(this, routes.namedRoutes.pathHelpersModule);
+      const pathHelpers = routes.namedRoutes.pathHelpersModule;
+
+      extend(this, pathHelpers);
     }
 
     for (const name of [
@@ -685,8 +701,6 @@ export class RouteSet {
     this.set.clear();
     this.formatter.clear();
     this.polymorphicMappings.clear();
-    this._urlHelpersWithPaths = undefined;
-    this._urlHelpersWithoutPaths = undefined;
     this._defaultEnv = undefined;
     this._journeyRouter = null;
     for (const blk of this._prepend) this.evalBlock(blk);
@@ -719,8 +733,6 @@ export class RouteSet {
     mapping.app = this._app(mapping);
     this.routes.push(mapping);
     if (name) this.namedRoutes.add(name, mapping);
-    this._urlHelpersWithPaths = undefined;
-    this._urlHelpersWithoutPaths = undefined;
     this._journeyRouter = null;
     return mapping;
   }
@@ -1100,8 +1112,6 @@ export class RouteSet {
     this.set.clear();
     this.formatter.clear();
     this.polymorphicMappings.clear();
-    this._urlHelpersWithPaths = undefined;
-    this._urlHelpersWithoutPaths = undefined;
     this._defaultEnv = undefined;
     this._journeyRouter = null;
   }

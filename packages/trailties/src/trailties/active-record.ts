@@ -15,6 +15,7 @@ import {
   Base,
   ConnectionPool,
   ControllerRuntime,
+  LogSubscriber,
   QueryCache,
   Relation,
   SchemaReflection,
@@ -32,6 +33,7 @@ import {
   ExtendedDeterministicQueries,
   ExtendedDeterministicUniquenessValidator,
 } from "@blazetrails/activerecord/encryption";
+import { Trails } from "../rails.js";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 import { databaseConfiguration } from "../database.js";
 
@@ -74,6 +76,10 @@ const pushTimestamptzToTimeZoneAwareTypes = (base: typeof Base): void => {
   if (!base.timeZoneAwareTypes.includes("timestamptz")) {
     base.timeZoneAwareTypes.push("timestamptz");
   }
+};
+
+const setLogSubscriberBacktraceCleaner = (): void => {
+  LogSubscriber.backtraceCleaner = Trails.backtraceCleaner;
 };
 
 const onPostgresqlAdapterLoadedPushTimestamptz = (): void => {
@@ -137,6 +143,10 @@ export class Trailtie extends BaseTrailtie {
         { runOnce: true },
         onPostgresqlAdapterLoadedPushTimestamptz,
       );
+    });
+
+    this.initializer("active_record.backtrace_cleaner", () => {
+      onLoad("active_record", { runOnce: true }, setLogSubscriberBacktraceCleaner);
     });
 
     this.initializer("active_record.copy_schema_cache_config", () => {

@@ -6,6 +6,7 @@ describe("PostgreSQL array deserialize of an already-decoded array", () => {
     cast: (value: unknown) => `cast(${String(value)})`,
     serialize: (value: unknown) => value,
     deserialize: (value: unknown) => `deserialize(${String(value)})`,
+    typeCastForSchema: (value: unknown) => value,
   };
 
   it("routes elements through the subtype's deserialize, not its cast", () => {

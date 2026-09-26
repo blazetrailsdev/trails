@@ -615,18 +615,18 @@ export class SchemaReflection {
 
     if (SchemaReflection.checkSchemaCacheDumpVersion) {
       try {
-        const currentVersion = await pool!.withConnection((connection) =>
-          connection.schemaVersion(),
-        );
+        const expired = await pool!.withConnection(async (connection) => {
+          const currentVersion = await connection.schemaVersion();
 
-        if (newCache.schemaVersion !== currentVersion) {
-          console.warn(
-            `Ignoring ${this._cachePath} because it has expired. ` +
-              `The current schema version is ${currentVersion}, ` +
-              `but the one in the schema cache file is ${newCache.schemaVersion}.`,
-          );
-          return null;
-        }
+          if ((await newCache.version(connection)) !== currentVersion) {
+            console.warn(
+              `Ignoring ${this._cachePath} because it has expired. The current schema version is ${currentVersion}, but the one in the schema cache file is ${newCache.schemaVersion}.`,
+            );
+            return true;
+          }
+          return false;
+        });
+        if (expired) return null;
       } catch (error) {
         if (!(error instanceof ActiveRecordError)) throw error;
         console.warn(

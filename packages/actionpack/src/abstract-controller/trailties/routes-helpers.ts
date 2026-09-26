@@ -51,7 +51,8 @@ export interface RoutesHelpersControllerClass extends RoutesHelpersClassMethods 
 function includedMember(mod: HelperMethodsModule, key: string): unknown {
   let current: object | null = mod;
   while (current && current !== Object.prototype) {
-    if (Object.prototype.propertyIsEnumerable.call(current, key)) {
+    const own = Object.getOwnPropertyDescriptor(current, key);
+    if (own && (own.enumerable || !Object.prototype.hasOwnProperty.call(current, "constructor"))) {
       const value = (mod as Record<string, unknown>)[key];
       return typeof value === "function" || key === "_routes" ? value : undefined;
     }
