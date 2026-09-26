@@ -951,11 +951,6 @@ function literalValue(expr: ts.Expression): string | null {
  */
 type IterableElement = { scalar: string | null; tuple: (BoundValue | null)[] | null };
 
-/**
- * What a loop variable can be bound to: a string, or an object literal's
- * statically-known keys, so `Object.keys(expected).join(" ")` over an
- * `Object.entries` value still titles its `it()`.
- */
 type BoundValue = string | { readonly keys: readonly string[] };
 
 /**
@@ -1067,7 +1062,6 @@ function staticObjectEntries(
   return out;
 }
 
-/** An inline object literal's keys, or null when any key is not static. */
 function staticObjectKeys(expr: ts.Expression): BoundValue | null {
   const e = unwrapExpression(expr);
   if (!ts.isObjectLiteralExpression(e)) return null;

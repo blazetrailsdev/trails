@@ -2,7 +2,14 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { assertRaises, OrderedOptions, resetLoadHooks } from "@blazetrails/activesupport";
+import {
+  assertRaises,
+  OrderedOptions,
+  resetLoadHooks,
+  runLoadHooks,
+} from "@blazetrails/activesupport";
+import { Base, Resolver } from "@blazetrails/actionview";
+import "../trailties/action-view.js";
 import { env, RuntimeError, setEnv } from "@blazetrails/ruby-compat";
 import { Application } from "../application.js";
 import { Trails, _resetTrailsEnv } from "../rails.js";
@@ -53,6 +60,7 @@ describe("ConfigurationTest", () => {
   });
 
   afterEach(async () => {
+    Resolver.caching = true;
     Application.appClass = null;
     resetLoadHooks();
     setEnv("TRAILS_ENV", trailsEnv);
@@ -163,5 +171,23 @@ describe("ConfigurationTest", () => {
     config = (await application.configFor("custom", { env: "test" })) as OrderedOptions;
     expect(config).toBeInstanceOf(OrderedOptions);
     expect(config.get("some_key")).toBe("default");
+  });
+
+  it("config.action_view.cache_template_loading with config.enable_reloading default", async () => {
+    const application = await app("development");
+    application.config.enableReloading = false;
+    await application.initialize();
+    runLoadHooks("action_view", Base);
+
+    expect(Resolver.isCaching()).toBe(true);
+  });
+
+  it("config.action_view.cache_template_loading without config.enable_reloading default", async () => {
+    const application = await app("development");
+    application.config.enableReloading = true;
+    await application.initialize();
+    runLoadHooks("action_view", Base);
+
+    expect(Resolver.isCaching()).toBe(false);
   });
 });

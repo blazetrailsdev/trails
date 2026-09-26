@@ -33,7 +33,7 @@ declare module "../trailtie/configuration.js" {
 /** @noRailsEquivalent PERMANENT */
 interface TrailtieApp {
   deprecators: Deprecators;
-  config: { get(key: string): unknown; reloadingEnabled(): boolean };
+  config: { get(key: string): unknown; isReloadingEnabled(): boolean };
 }
 
 export class Trailtie extends BaseTrailtie {
@@ -69,7 +69,7 @@ export class Trailtie extends BaseTrailtie {
       onLoad("action_view", () => {
         const actionView = (app as TrailtieApp).config.get("actionView") as ActionViewConfig;
         if (actionView.cacheTemplateLoading == null) {
-          Resolver.caching = !(app as TrailtieApp).config.reloadingEnabled();
+          Resolver.caching = !(app as TrailtieApp).config.isReloadingEnabled();
         }
       });
     });

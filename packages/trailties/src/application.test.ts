@@ -662,7 +662,7 @@ describe("Application::Configuration", () => {
     expect(c.enableReloading).toBe(false);
     c.enableReloading = true;
     expect(c.cacheClasses).toBe(false);
-    expect(c.reloadingEnabled()).toBe(true);
+    expect(c.isReloadingEnabled()).toBe(true);
   });
 });
 

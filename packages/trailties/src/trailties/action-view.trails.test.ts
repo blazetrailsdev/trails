@@ -108,24 +108,16 @@ describe("action_view.caching", () => {
     } as ActionViewConfig);
   });
 
-  async function boot(reloadingEnabled: boolean, cacheTemplateLoading?: boolean): Promise<void> {
+  it("leaves Resolver.caching alone when cache_template_loading is set", async () => {
     const actionView = Trailtie.config.get("actionView") as ActionViewConfig;
-    actionView.cacheTemplateLoading = cacheTemplateLoading ?? null;
+    actionView.cacheTemplateLoading = false;
     const config = Object.assign(Object.create(Trailtie.config), {
-      reloadingEnabled: () => reloadingEnabled,
+      isReloadingEnabled: () => false,
     });
+    Resolver.caching = false;
     await runTrailtieInitializers(Trailtie, { config, deprecators: new Deprecators() });
     runLoadHooks("action_view", Base);
-  }
 
-  it("sets Resolver.caching from reloading_enabled? when cache_template_loading is nil", async () => {
-    await boot(true);
     expect(Resolver.isCaching()).toBe(false);
-    expect(Base.cacheTemplateLoading).toBe(false);
-  });
-
-  it("leaves Resolver.caching alone when cache_template_loading is set", async () => {
-    await boot(true, true);
-    expect(Resolver.isCaching()).toBe(true);
   });
 });

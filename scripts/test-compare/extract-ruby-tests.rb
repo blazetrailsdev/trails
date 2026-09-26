@@ -163,10 +163,6 @@ ADAPTER_SYMBOL_MAP = {
 # (activesupport/test/cache/serializer_with_fallback_test.rb:42-43).
 class LoopSymbolName < String; end
 
-# A hash literal inside a loop table whose keys or values do not all resolve
-# (`{ id: Model.new("1") }` at url_for_integration_test.rb:110). It still
-# counts toward the row's length, which `if params.length > 1` reads, but no
-# name can interpolate it.
 LOOP_OPAQUE_HASH = Object.new.freeze
 
 class TestExtractor
@@ -759,8 +755,6 @@ class TestExtractor
       report_unexpanded_loop(node)
       return true
     end
-    # `each_with_index do |(url, params), i|` (url_for_integration_test.rb:77)
-    # yields each element beside its index.
     if ident_name(call[3]) == "each_with_index"
       elements = elements.each_with_index.map { |value, index| [value, index.to_s] }
     end
@@ -893,10 +887,6 @@ class TestExtractor
     end
   end
 
-  # Whether every enclosing `if` arm a `define_method` sits under is taken for
-  # one element (url_for_integration_test.rb:78-92 defines one method per arm of
-  # `if params.length > 1`): true / false, or nil when a condition does not
-  # evaluate statically.
   def guards_taken?(guards, bindings)
     guards.each do |cond, polarity|
       value = eval_loop_condition(cond, bindings)
@@ -906,8 +896,6 @@ class TestExtractor
     true
   end
 
-  # `<var>.length <op> <int>` over a bound array, the one condition Rails
-  # branches a define_method table on.
   def eval_loop_condition(node, bindings)
     return nil unless node.is_a?(Array) && node[0] == :binary
     left = node[1]
@@ -1099,9 +1087,6 @@ class TestExtractor
     names.any?(&:nil?) ? nil : names
   end
 
-  # A block parameter's name, or for a nested destructuring one
-  # (`|(url, params), i|` at url_for_integration_test.rb:77) the names it
-  # binds, which `loop_bindings` destructures the element position into.
   def block_param_name(param)
     return ident_name(param) unless param.is_a?(Array) && param[0] == :mlhs
     names = param[1..].map { |inner| block_param_name(inner) }
@@ -1154,12 +1139,10 @@ class TestExtractor
 
   # The literal key/value pairs of a hash literal, or nil when the node is not a
   # hash literal. A key or value that does not resolve is kept as nil rather
-  # than failing the hash: `{ path => %r{...} }.each do |path, expected|`
-  # (journey/path/pattern_test.rb:16) interpolates only the key, and
-  # `MixtureToTitleCase.each_with_index` (inflector_test.rb:123, whose last key
-  # is `ActiveSupport::SafeBuffer.new(...)`) only the index. `interpolated_name`
-  # still returns nil — reporting the loop — for a name that does read the
-  # unresolved binding.
+  # than failing the hash: `{ path => %r{...} }.each do
+  # |path, expected|` (journey/path/pattern_test.rb:16) interpolates only the
+  # key, and `interpolated_name` still returns nil — reporting the loop — for a
+  # name that does read the unresolved binding.
   def hash_literal_pairs(node)
     return nil unless node.is_a?(Array)
     assocs =
