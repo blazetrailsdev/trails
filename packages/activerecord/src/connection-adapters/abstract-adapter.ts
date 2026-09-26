@@ -221,7 +221,7 @@ export interface AbstractAdapter {
           ((t: TableDefinition) => void) | undefined,
         ]
   ): Promise<void>;
-  renameTable(tableName: string, newName: string): Promise<void>;
+  renameTable(tableName: string, newName: string, options?: Record<string, unknown>): Promise<void>;
   /** @internal */
   fetchTypeMetadata(
     sqlType: string | null,

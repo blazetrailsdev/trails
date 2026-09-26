@@ -517,6 +517,36 @@ describe("Migration#removeColumns forwards to the connection", () => {
   });
 });
 
+describe("Migration::Compatibility::V7_0#renameTable", () => {
+  fixtures({}, { useTransactionalTests: false });
+
+  it("hands the legacy options to the adapter, which skips validate_table_length!", async () => {
+    const connection = await Base.leaseConnection();
+    const longTableName = "a".repeat(connection.tableNameLength() + 1);
+    await connection.createTable("more_testings");
+    const migration = new (class extends Migration.get(7.0) {
+      override write(): void {}
+      async up(): Promise<void> {
+        await this.renameTable("more_testings", longTableName);
+      }
+    })();
+    migration.connection = connection;
+    try {
+      if (adapterType === "mysql") {
+        await expect(migration.migrate("up")).rejects.toThrow(
+          new RegExp(`'${longTableName}'`, "i"),
+        );
+      } else {
+        await migration.migrate("up");
+        expect(await connection.tableExists(longTableName)).toBe(true);
+        expect(await connection.tableExists("more_testings")).toBe(false);
+      }
+    } finally {
+      await connection.dropTable("more_testings", longTableName, { ifExists: true });
+    }
+  });
+});
+
 describe("Migration#formatArguments", () => {
   it("inspects the trailing options hash with Symbol keys and drops internal options", () => {
     const m = new Migration();
