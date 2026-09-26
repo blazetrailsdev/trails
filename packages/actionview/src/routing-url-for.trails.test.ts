@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { RoutingUrlFor, type RoutingUrlForHost } from "./routing-url-for.js";
+import { _backUrl, type UrlHelperHost } from "./helpers/url-helper.js";
 import { TopLevel, include } from "@blazetrails/activesupport";
 import { Module } from "@blazetrails/ruby-compat";
 
@@ -26,7 +27,7 @@ const builder = {
   handleModelCall: (_target: unknown, record: unknown) => `model:${(record as { id: number }).id}`,
 };
 
-interface Host extends RoutingUrlFor, RoutingUrlForHost {
+interface Host extends RoutingUrlFor, RoutingUrlForHost, UrlHelperHost {
   seen: unknown[];
 }
 
@@ -60,7 +61,8 @@ beforeEach(() => {
   host = Object.assign(Object.create(RoutingUrlFor.prototype) as RoutingUrlFor, {
     controller: null as unknown,
     seen: [] as unknown[],
-    _backUrl: () => "http://www.example.com",
+    _backUrl,
+    _filteredReferrer: () => "http://www.example.com",
   }) as Host;
 });
 

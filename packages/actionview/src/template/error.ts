@@ -2,7 +2,9 @@ import { isPresent, symbolizeKeys } from "@blazetrails/activesupport";
 import { Jaro } from "@blazetrails/did-you-mean";
 import {
   ArgumentError,
+  excBacktraceLocations,
   File,
+  type Location,
   rbInspect,
   regexpEscape,
   StandardError,
@@ -197,6 +199,10 @@ export class TemplateError extends Error {
     const stack = this.original.stack;
     if (stack == null) return [];
     return stack.split("\n").slice(1);
+  }
+
+  backtraceLocations(): Location[] | null {
+    return excBacktraceLocations(this.original);
   }
 
   fileName(): string {

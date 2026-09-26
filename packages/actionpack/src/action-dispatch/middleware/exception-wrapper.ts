@@ -1,53 +1,32 @@
-import { hasKey } from "@blazetrails/ruby-compat";
+import { excBacktraceLocations, File, hasKey, type Location } from "@blazetrails/ruby-compat";
 
 import { ActionableError, type BacktraceCleaner } from "@blazetrails/activesupport";
-import { File } from "@blazetrails/ruby-compat";
 import { statusCode } from "@blazetrails/rack";
-import {
-  PathRegistry,
-  type BacktraceLocation,
-  type Spot,
-  type Template,
-} from "@blazetrails/actionview";
+import { PathRegistry, type Spot, type Template } from "@blazetrails/actionview";
 import { RoutingError } from "../../action-controller/metal/exceptions.js";
 
 /** @noRailsEquivalent PERMANENT */
 export type BacktraceLine = string | SourceMapLocation;
 
 class SourceMapLocation extends String {
+  private location: Location;
   private template: Template;
 
-  constructor(location: string, template: Template) {
-    super(location);
+  constructor(location: Location, template: Template) {
+    super(location.toS());
+    this.location = location;
     this.template = template;
   }
 
   /** @missingRailsCall super — PERMANENT */
   spot(exc: Error): Spot | null {
-    const getobj = backtraceLocationFor(String(this));
-    if (!getobj) return null;
-    const location = this.template.spot(getobj);
+    const location = this.template.spot(this.location);
 
     if (location) {
-      return this.template.translateLocation(getobj, location);
+      return this.template.translateLocation(this.location, location);
     }
     return null;
   }
-}
-
-/** @noRailsEquivalent PERMANENT */
-function labelFor(trace: string): string | null {
-  const match = /^at\s+([^\s(]+)\s*\(/.exec(trace.trim());
-  if (!match) return null;
-  const qualified = match[1];
-  return qualified.slice(qualified.lastIndexOf(".") + 1);
-}
-
-/** @noRailsEquivalent PERMANENT */
-function backtraceLocationFor(trace: string): BacktraceLocation | null {
-  const match = /:(\d+):(\d+)\)?$/.exec(trace.trim());
-  if (!match) return null;
-  return { lineno: Number(match[1]), column: Number(match[2]) };
 }
 
 export interface ShowExceptionsRequest {
@@ -330,21 +309,13 @@ export class ExceptionWrapper {
       }
     }
 
-    const stack = this.exception.stack;
-    if (!stack) return [];
-    return stack
-      .split("\n")
-      .slice(1)
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0)
-      .map((loc) => {
-        const label = labelFor(loc);
-        if (label !== null && builtMethods.has(label)) {
-          return new SourceMapLocation(loc, builtMethods.get(label)!);
-        } else {
-          return loc;
-        }
-      });
+    return (excBacktraceLocations(this.exception) ?? []).map((loc) => {
+      if (builtMethods.has(loc.label ?? "")) {
+        return new SourceMapLocation(loc, builtMethods.get(loc.label ?? "")!);
+      } else {
+        return loc.toS();
+      }
+    });
   }
 
   /** @internal */
