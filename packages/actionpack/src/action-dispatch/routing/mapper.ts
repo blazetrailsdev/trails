@@ -182,7 +182,7 @@ class Mapping {
 
   readonly defaults: Record<string, unknown>;
   readonly to: unknown;
-  readonly defaultController: string | undefined;
+  readonly defaultController: string | RegExp | undefined;
   readonly defaultAction: string | undefined;
   readonly ast: Ast;
   readonly scopeOptions: Record<string, unknown>;
@@ -197,7 +197,7 @@ class Mapping {
     scope: Scope,
     set: RouteSetLike | undefined,
     ast: Node,
-    controller: string | undefined,
+    controller: string | RegExp | undefined,
     defaultAction: string | undefined,
     to: unknown,
     via: readonly string[],
@@ -272,7 +272,7 @@ class Mapping {
   }: {
     set: RouteSetLike | undefined;
     ast: Node;
-    controller: string | undefined;
+    controller: string | RegExp | undefined;
     defaultAction: string | undefined;
     to: unknown;
     formatted: boolean | undefined;
@@ -374,7 +374,7 @@ class Mapping {
     if (rbObjRespondTo(this.to, "action") || rbObjRespondTo(this.to, "call")) {
       return options;
     } else {
-      let controller: string | undefined;
+      let controller: string | RegExp | undefined;
       let action: string | undefined;
       if (this.to == null) {
         controller = this.defaultController;
@@ -427,8 +427,8 @@ class Mapping {
   /** @internal */
   private checkControllerAndAction(
     pathParams: readonly string[],
-    controller: string | undefined,
-    action: string | undefined,
+    controller: string | RegExp | undefined,
+    action: string | RegExp | undefined,
   ): Record<string, unknown> {
     const hash = this.checkPart("controller", controller, pathParams, {}, (part) =>
       this.translateController(part, () => {
@@ -440,16 +440,18 @@ class Mapping {
       }),
     );
 
-    return this.checkPart("action", action, pathParams, hash, (part) => String(part));
+    return this.checkPart("action", action, pathParams, hash, (part) =>
+      part instanceof RegExp ? part : String(part),
+    );
   }
 
   /** @internal */
   private checkPart(
     name: string,
-    part: string | undefined,
+    part: string | RegExp | undefined,
     pathParams: readonly string[],
     hash: Record<string, unknown>,
-    block: (part: string) => unknown,
+    block: (part: string | RegExp) => unknown,
   ): Record<string, unknown> {
     if (part != null) {
       hash[name] = block(part);
@@ -464,10 +466,10 @@ class Mapping {
 
   /** @internal */
   private addControllerModule(
-    controller: string | undefined,
+    controller: string | RegExp | undefined,
     modyoule: string | undefined,
-  ): string | undefined {
-    if (modyoule) {
+  ): string | RegExp | undefined {
+    if (modyoule && !(controller instanceof RegExp)) {
       if (controller?.startsWith("/")) {
         return controller.slice(1);
       } else {
@@ -479,7 +481,8 @@ class Mapping {
   }
 
   /** @internal */
-  private translateController(controller: string, block: () => never): string {
+  private translateController(controller: string | RegExp, block: () => never): string | RegExp {
+    if (controller instanceof RegExp) return controller;
     if (/^[a-z_0-9][a-z_0-9/]*$/.test(controller)) return controller;
 
     return block();
@@ -1270,7 +1273,7 @@ export class Mapper {
   /** @internal */
   decomposedMatch(
     path: string,
-    controller: string | undefined,
+    controller: string | RegExp | undefined,
     options: RouteOptions & { on?: string },
     _path: string | undefined,
     to: string | MountableApp | Redirect | undefined,
@@ -1360,7 +1363,7 @@ export class Mapper {
 
   private addRoute(
     action: string | undefined,
-    controller: string | undefined,
+    controller: string | RegExp | undefined,
     options: RouteOptions,
     _path: string | undefined,
     to: string | MountableApp | Redirect | undefined,

@@ -34,7 +34,7 @@ export interface RouteOptions {
   format?: boolean;
   as?: string | null | false;
   to?: string | MountableApp | Redirect;
-  controller?: string;
+  controller?: string | RegExp;
   action?: string;
   only?: ResourceAction | ResourceAction[];
   except?: ResourceAction | ResourceAction[];
