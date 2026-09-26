@@ -175,15 +175,16 @@ export class StatementCache {
     params: unknown[],
     connection: unknown,
     opts: { allowRetry?: boolean } = {},
+    block?: (record: InstanceType<typeof Base>) => void,
   ): Promise<InstanceType<typeof Base>[]> {
     try {
       const bindValues = this._bindMap.bind(params);
       const sql = this._queryBuilder.sqlFor(bindValues, connection);
       const allowRetry = opts.allowRetry ?? false;
       if (this._queryBuilder instanceof PartialQuery) {
-        return await this._model.findBySql(sql, [], { allowRetry, preparable: true });
+        return await this._model.findBySql(sql, [], { allowRetry, preparable: true }, block);
       }
-      return await this._model.findBySql(sql, bindValues, { allowRetry, preparable: true });
+      return await this._model.findBySql(sql, bindValues, { allowRetry, preparable: true }, block);
     } catch (e) {
       if (e instanceof ActiveModelRangeError || e instanceof ARRangeError) return [];
       throw e;

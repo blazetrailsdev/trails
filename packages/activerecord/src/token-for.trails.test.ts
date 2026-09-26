@@ -7,10 +7,8 @@ import { fixtures } from "./test-fixtures.js";
 class TokenUser extends User {
   static {
     this.generatesTokenFor("lookup");
-    this.generatesTokenFor("token_snapshot", {
-      block: function (this: TokenUser) {
-        return this.token;
-      },
+    this.generatesTokenFor("token_snapshot", {}, function (this: TokenUser) {
+      return this.token;
     });
   }
 }

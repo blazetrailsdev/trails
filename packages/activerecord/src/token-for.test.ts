@@ -14,13 +14,10 @@ import "./support/canonical-model-index.js";
 class TokenUser extends User {
   static {
     this.generatesTokenFor("lookup");
-    this.generatesTokenFor("password_reset", {
-      expiresIn: 15 * 60,
-      block: (r: any) => String(r.password_digest ?? "").slice(-(31 + 22), -(31 + 22) + 10),
-    });
-    this.generatesTokenFor("snapshot", {
-      block: (r: any) => ({ updated_at: r.updated_at }),
-    });
+    this.generatesTokenFor("password_reset", { expiresIn: 15 * 60 }, (r: any) =>
+      String(r.password_digest ?? "").slice(-(31 + 22), -(31 + 22) + 10),
+    );
+    this.generatesTokenFor("snapshot", {}, (r: any) => ({ updated_at: r.updated_at }));
   }
 }
 

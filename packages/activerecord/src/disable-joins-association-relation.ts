@@ -188,7 +188,7 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
     this._chainWalker = source._chainWalker;
   }
 
-  protected override async execQueries(): Promise<T[]> {
+  protected override async execQueries(block?: (record: T) => void): Promise<T[]> {
     if (this._chainWalker) {
       const { relation } = await this._walkOnce();
       const merged = this._composeChainedState(relation);
@@ -209,11 +209,11 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
       }
       return merged.toArray();
     }
-    return super.execQueries();
+    return super.execQueries(block);
   }
 
-  override async load(): Promise<LoadedRelation<this>> {
-    await super.load();
+  override async load(block?: (record: T) => void): Promise<LoadedRelation<this>> {
+    await super.load(block);
     if (this._chainWalker) return stripThenable(this);
     const records = this._records;
 

@@ -343,7 +343,6 @@ export class Relation<T extends Base> {
   }
   protected _take?: T | null;
   protected _offsets?: Map<number, T | null>;
-  _instantiateBlock?: (record: T) => void;
   private _futureResult?: FutureResult | Complete | Promise<Result>;
   private _loadToken = 0;
 
@@ -464,7 +463,10 @@ export class Relation<T extends Base> {
     return this._records;
   }
 
-  /** @missingRailsCall with_connection — CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073 */
+  /**
+   * @missingRailsCall with_connection — CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073
+   * @missingRailsCall load — PERMANENT
+   */
   loadAsync(): Relation<T> {
     this._model.connectionPool().withConnectionSync((c: DatabaseAdapter) => {
       if (!this.isLoaded) {
@@ -622,11 +624,11 @@ export class Relation<T extends Base> {
     return ENUMERABLE_DELEGATES.compactBlank(await this.toArray());
   }
 
-  async load(): Promise<LoadedRelation<this>> {
+  async load(block?: (record: T) => void): Promise<LoadedRelation<this>> {
     if (this.isNullRelation()) return stripThenable(this);
     if (!this.isLoaded || this.isScheduled) {
       const token = this._loadToken;
-      const records = await this.withConnection(() => this.execQueries());
+      const records = await this.withConnection(() => this.execQueries(block));
       if (token === this._loadToken) this.loadRecords(records);
     }
     return stripThenable(this);
@@ -636,7 +638,7 @@ export class Relation<T extends Base> {
     return [...(await this.records())];
   }
 
-  protected async execQueries(): Promise<T[]> {
+  protected async execQueries(block?: (record: T) => void): Promise<T[]> {
     return this.skipQueryCacheIfNecessary(async () => {
       await (
         this._model as unknown as { ensureSchemaLoaded(): Promise<void> }
@@ -655,7 +657,7 @@ export class Relation<T extends Base> {
         rows = await this.execMainQuery();
       }
       if (token !== this._loadToken) return [];
-      const records = this.instantiateRecords(rows);
+      const records = this.instantiateRecords(rows, block);
 
       if (!this.skipPreloadingValue) {
         await this.preloadAssociations(records);
@@ -1087,9 +1089,8 @@ export class Relation<T extends Base> {
     );
   }
 
-  private instantiateRecords(rows: Result): T[] {
+  private instantiateRecords(rows: Result, block?: (record: T) => void): T[] {
     if (rows.isEmpty()) return [];
-    const block = this._instantiateBlock;
 
     const joinDependency = this._joinDependency;
     if (joinDependency) {
@@ -1913,6 +1914,7 @@ export interface Relation<T extends Base> {
 
 export interface Relation<T extends Base>
   extends Included<typeof QueryMethods>, Included<typeof Explain>, CalculationMethods {
+  find(block: (record: T) => unknown): Promise<T | null>;
   find(ids: unknown[]): Promise<T[]>;
   find(id: unknown): Promise<T>;
   find(...ids: unknown[]): Promise<T | T[]>;

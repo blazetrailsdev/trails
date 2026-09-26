@@ -1053,7 +1053,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("finding array compatibility", async () => {
     const firm = await HmFirm.order("id").find((f: any) => f.id > 0);
-    expect((await firm.clients).length).toBe(3);
+    expect((await firm!.clients).length).toBe(3);
   });
 
   it("find many with merged options", async () => {

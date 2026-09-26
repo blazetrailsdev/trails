@@ -72,12 +72,9 @@ export function hasSecurePassword(
 
   const tokenHost = this as unknown as TokenHost;
   if (resetToken && typeof tokenHost.generatesTokenFor === "function") {
-    tokenHost.generatesTokenFor(`${attribute}_reset`, {
-      expiresIn: 15 * 60,
-      block: (record: Model) => {
-        const salt = publicSend(record, `${attribute}Salt`) as string | null;
-        return salt?.slice(-10) ?? null;
-      },
+    tokenHost.generatesTokenFor(`${attribute}_reset`, { expiresIn: 15 * 60 }, (record: Model) => {
+      const salt = publicSend(record, `${attribute}Salt`) as string | null;
+      return salt?.slice(-10) ?? null;
     });
 
     const findByMethod = `findBy${camelize(attribute)}ResetToken`;
@@ -101,7 +98,8 @@ export function hasSecurePassword(
 interface TokenHost {
   generatesTokenFor?: (
     purpose: string,
-    options: { expiresIn?: number; block?: (record: Model) => unknown },
+    options: { expiresIn?: number },
+    block: (record: Model) => unknown,
   ) => void;
   findByTokenFor?: (purpose: string, token: string) => unknown;
   findByTokenForBang?: (purpose: string, token: string) => unknown;

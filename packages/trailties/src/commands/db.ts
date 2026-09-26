@@ -750,11 +750,10 @@ export function dbCommand(): Command {
     )
     .action(async () => {
       const envName = resolveEnv();
-      const entriesByEnv = await Promise.all(
-        eachCurrentEnvironment(envName).map((environment) =>
-          taskableDatabaseEntries({}, environment),
-        ),
-      );
+      const entriesByEnv: Awaited<ReturnType<typeof taskableDatabaseEntries>>[] = [];
+      await eachCurrentEnvironment(envName, async (environment) => {
+        entriesByEnv.push(await taskableDatabaseEntries({}, environment));
+      });
       const entries = entriesByEnv[0];
       if (entries.length === 0) {
         throw new Error(`No database configuration found for environment "${envName}".`);

@@ -56,25 +56,16 @@
     }
   },
   "activerecord": {
-    "total": 32,
+    "total": 10,
     "byFile": {
-      "association_relation.rb": 1,
-      "associations/collection_proxy.rb": 1,
       "associations/has_one_through_association.rb": 1,
       "base.rb": 2,
       "connection_adapters/abstract/database_statements.rb": 1,
       "connection_adapters/postgresql_adapter.rb": 1,
-      "core.rb": 2,
+      "core.rb": 1,
       "log_subscriber.rb": 1,
-      "relation.rb": 8,
-      "relation/batches.rb": 4,
-      "relation/finder_methods.rb": 1,
-      "relation/query_methods.rb": 2,
-      "schema.rb": 1,
-      "statement_cache.rb": 1,
-      "tasks/database_tasks.rb": 3,
-      "token_for.rb": 1,
-      "type/hash_lookup_type_map.rb": 1
+      "relation/batches.rb": 2,
+      "schema.rb": 1
     }
   },
   "activesupport": {

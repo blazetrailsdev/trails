@@ -73,13 +73,11 @@ export type TokenDefinitionsHash = Readonly<Record<string, TokenDefinition>>;
 export function generatesTokenFor(
   this: typeof Base,
   purpose: string,
-  options: {
-    expiresIn?: number;
-    block?: (record: any) => unknown;
-  } = {},
+  { expiresIn }: { expiresIn?: number } = {},
+  block?: (record: any) => unknown,
 ): void {
   this.tokenDefinitions = merge(this.tokenDefinitions, {
-    [purpose]: new TokenDefinition(this, purpose, options.expiresIn, options.block),
+    [purpose]: new TokenDefinition(this, purpose, expiresIn, block),
   });
 }
 

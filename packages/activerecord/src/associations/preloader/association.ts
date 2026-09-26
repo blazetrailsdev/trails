@@ -357,14 +357,12 @@ export class LoaderQuery {
       for (const [k, v] of Object.entries(conditions)) {
         whereObj[k] = [...v];
       }
-      const rel = this.scope.where(whereObj);
-      if (instantiateBlock) rel._instantiateBlock = instantiateBlock;
-      return rel.toArray();
+      return (await this.scope.where(whereObj).load(instantiateBlock)).toArray();
     }
 
-    const rel = this.scope.where({ [this.associationKeyName]: keys });
-    if (instantiateBlock) rel._instantiateBlock = instantiateBlock;
-    return rel.toArray();
+    return (
+      await this.scope.where({ [this.associationKeyName]: keys }).load(instantiateBlock)
+    ).toArray();
   }
 
   recordsFor(loaders: Association[]): Promise<Base[]> {

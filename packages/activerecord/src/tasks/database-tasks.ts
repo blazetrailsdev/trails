@@ -166,18 +166,18 @@ export class DatabaseTasks {
   static async createAll(): Promise<void> {
     const dbConfig = (await this.migrationConnection()).pool.dbConfig as HashConfig;
 
-    for (const dbConfig of this.eachLocalConfiguration()) {
+    await this.eachLocalConfiguration(async (dbConfig) => {
       await this.create(dbConfig);
-    }
+    });
 
     await this.migrationClass().establishConnection(dbConfig);
   }
 
   static async createCurrent(environment?: string, name?: string): Promise<void> {
     environment = this._normalizeEnv(environment);
-    for (const dbConfig of this.eachCurrentConfiguration(environment, name)) {
+    await this.eachCurrentConfiguration(environment, name, async (dbConfig) => {
       await this.create(dbConfig);
-    }
+    });
     await this.migrationClass().establishConnection(`:${environment}`);
   }
 
@@ -202,15 +202,15 @@ export class DatabaseTasks {
   }
 
   static async dropAll(): Promise<void> {
-    for (const dbConfig of this.eachLocalConfiguration()) {
+    await this.eachLocalConfiguration(async (dbConfig) => {
       await this.drop(dbConfig);
-    }
+    });
   }
 
   static async dropCurrent(environment?: string): Promise<void> {
-    for (const dbConfig of this.eachCurrentConfiguration(this._normalizeEnv(environment))) {
+    await this.eachCurrentConfiguration(this._normalizeEnv(environment), async (dbConfig) => {
       await this.drop(dbConfig);
-    }
+    });
   }
 
   static async migrate(options?: { skipInitialize?: boolean }): Promise<void>;
@@ -277,16 +277,16 @@ export class DatabaseTasks {
 
   static async purgeCurrent(environment?: string): Promise<void> {
     environment = this._normalizeEnv(environment);
-    for (const dbConfig of this.eachCurrentConfiguration(environment)) {
+    await this.eachCurrentConfiguration(environment, async (dbConfig) => {
       await this.purge(dbConfig);
-    }
+    });
     await this.migrationClass().establishConnection(`:${environment}`);
   }
 
   static async purgeAll(): Promise<void> {
-    for (const dbConfig of this.eachLocalConfiguration()) {
+    await this.eachLocalConfiguration(async (dbConfig) => {
       await this.purge(dbConfig);
-    }
+    });
   }
 
   static async truncateAll(environment: string = DatabaseTasks.env): Promise<void> {
@@ -400,15 +400,19 @@ export class DatabaseTasks {
   }
 
   /** @internal */
-  private static eachCurrentConfiguration(environment: string, name?: string): HashConfig[] {
-    const results: HashConfig[] = [];
-    for (const env of eachCurrentEnvironment(environment)) {
+  private static async eachCurrentConfiguration(
+    environment: string,
+    name: string | undefined | ((dbConfig: HashConfig) => unknown),
+    block?: (dbConfig: HashConfig) => unknown,
+  ): Promise<void> {
+    if (typeof name === "function") [name, block] = [undefined, name];
+    await eachCurrentEnvironment(environment, async (env) => {
       for (const dbConfig of this.configsFor({ envName: env })) {
         if (name != null && name !== dbConfig.name) continue;
-        results.push(dbConfig);
+
+        await block!(dbConfig);
       }
-    }
-    return results;
+    });
   }
 
   private static _normalizeEnv(environment?: string): string {
@@ -417,19 +421,18 @@ export class DatabaseTasks {
   }
 
   /** @internal */
-  static eachLocalConfiguration(): HashConfig[] {
-    const result: HashConfig[] = [];
+  static async eachLocalConfiguration(block: (dbConfig: HashConfig) => unknown): Promise<void> {
     for (const dbConfig of configurationsStore().configsFor()) {
       if (!dbConfig.database) continue;
+
       if (this.isLocalDatabase(dbConfig)) {
-        result.push(dbConfig);
+        await block(dbConfig);
       } else {
         stderr.write(
           `This task only modifies local databases. ${dbConfig.database} is on a remote host.\n`,
         );
       }
     }
-    return result;
   }
 
   /** @internal */
@@ -623,11 +626,11 @@ export class DatabaseTasks {
     file?: string,
     environment?: string,
   ): Promise<void> {
-    for (const dbConfig of this.eachCurrentConfiguration(this._normalizeEnv(environment))) {
+    await this.eachCurrentConfiguration(this._normalizeEnv(environment), async (dbConfig) => {
       await this.withTemporaryConnection(dbConfig, async () => {
         await this.loadSchema(dbConfig, format, file);
       });
-    }
+    });
   }
 
   static async loadSeed(): Promise<void> {
@@ -692,12 +695,12 @@ export class DatabaseTasks {
     let seed = false;
     const dumpDbConfigs: HashConfig[] = [];
 
-    for (const dbConfig of this.eachCurrentConfiguration(env)) {
+    await this.eachCurrentConfiguration(env, async (dbConfig) => {
       const databaseInitialized = await initializeDatabase(dbConfig);
       if (databaseInitialized && dbConfig.seeds) seed = true;
-    }
+    });
 
-    for (const environment of eachCurrentEnvironment(env)) {
+    await eachCurrentEnvironment(env, async (environment) => {
       const mappedVersions = await this.dbConfigsWithVersions(environment);
       const sorted = Array.from(mappedVersions.entries()).sort(([a], [b]) =>
         BigInt(String(a)) < BigInt(String(b)) ? -1 : BigInt(String(a)) > BigInt(String(b)) ? 1 : 0,
@@ -710,7 +713,7 @@ export class DatabaseTasks {
           });
         }
       }
-    }
+    });
 
     if (dumpSchemaAfterMigration()) {
       for (const dbConfig of dumpDbConfigs) {
@@ -931,16 +934,20 @@ export function isVerbose(): boolean {
 }
 
 /** @internal */
-export function eachCurrentEnvironment(environment: string): string[] {
-  const envs = [environment];
+export async function eachCurrentEnvironment(
+  environment: string,
+  block: (env: string) => unknown,
+): Promise<string[]> {
+  const environments = [environment];
   if (
     environment === "development" &&
     getEnv("SKIP_TEST_DATABASE") === undefined &&
     getEnv("DATABASE_URL") === undefined
   ) {
-    envs.push("test");
+    environments.push("test");
   }
-  return envs;
+  for (const env of environments) await block(env);
+  return environments;
 }
 
 /** @internal */
