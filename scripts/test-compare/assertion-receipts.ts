@@ -37,14 +37,14 @@ export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
       value: null,
       as: "assert_equal",
       reason:
-        "attributes_test.rb:42 `assert_kind_of Integer` — a JS number has no Integer class; the port asserts `Number.isInteger(...)` equals true",
+        "attributes_test.rb:43 `assert_kind_of Integer` — a JS number has no Integer class; the port asserts `Number.isInteger(...)` equals true",
     },
     {
       kind: "assert_kind_of",
       value: null,
-      as: null,
+      as: "assert_equal",
       reason:
-        "attributes_test.rb:44 `assert_kind_of Float` on `2.0` — `2.0 === 2` in JS, so no value distinguishes a Float from an Integer",
+        'attributes_test.rb:45 `assert_kind_of Float` — a JS number has no Float class; the port asserts `rbObjClass(...)` equals "Float", the boxed Float seat FloatType#castValue produces',
     },
   ],
   "activesupport:core_ext/duration_test.rb › DurationTest › is a": [

@@ -58,6 +58,18 @@ function equalOrEql(a: unknown, b: unknown, eql: boolean): boolean {
     if (typeof a === "number") return Number.isInteger(a) && BigInt(a) === b;
     if (typeof b === "number") return Number.isInteger(b) && a === BigInt(b);
   }
+  if (a instanceof Number || b instanceof Number) {
+    const x = a instanceof Number ? a.valueOf() : a;
+    const y = b instanceof Number ? b.valueOf() : b;
+    if (eql) {
+      return (
+        (a instanceof Number || (typeof x === "number" && !Number.isInteger(x))) &&
+        (b instanceof Number || (typeof y === "number" && !Number.isInteger(y))) &&
+        x === y
+      );
+    }
+    return equalOrEql(x, y, eql);
+  }
   /* Ruby's `Date#==` (`vendor/ruby/ext/date/date_core.c:6902` `d_lite_equal`) is
      `<=>`-based (`vendor/ruby/ext/date/date_core.c:6810` `d_lite_cmp`), so it
      answers `false` for an operand of another class instead of raising, and a

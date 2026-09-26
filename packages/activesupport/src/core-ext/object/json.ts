@@ -67,7 +67,7 @@ export class Numeric {
 
 export class Float {
   static asJson(value: number, options: EncodeOptions | null = null): number | null {
-    return globalThis.Number.isFinite(value) ? value : null;
+    return globalThis.Number.isFinite(globalThis.Number(value)) ? value : null;
   }
 }
 
@@ -288,7 +288,9 @@ export function asJson(value: unknown, options: EncodeOptions | null = null): un
   if (value == null) return NilClass.asJson(value, options);
   if (typeof value === "boolean") return TrueClass.asJson(value, options);
   if (typeof value === "string") return String.asJson(value, options);
-  if (typeof value === "number") return Float.asJson(value, options);
+  if (typeof value === "number" || value instanceof globalThis.Number) {
+    return Float.asJson(value as number, options);
+  }
   if (typeof value === "bigint") return Numeric.asJson(value, options);
 
   const own = (value as { asJson?: (o?: unknown) => unknown }).asJson;
