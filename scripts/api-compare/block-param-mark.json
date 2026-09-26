@@ -32,17 +32,14 @@
     }
   },
   "actionview": {
-    "total": 19,
+    "total": 15,
     "byFile": {
-      "base.rb": 1,
       "helpers/debug_helper.rb": 5,
       "helpers/number_helper.rb": 1,
       "helpers/tag_helper.rb": 1,
       "helpers/text_helper.rb": 5,
       "path_set.rb": 1,
-      "renderer/renderer.rb": 2,
-      "renderer/streaming_template_renderer.rb": 2,
-      "template.rb": 1
+      "renderer/streaming_template_renderer.rb": 2
     }
   },
   "activemodel": {
