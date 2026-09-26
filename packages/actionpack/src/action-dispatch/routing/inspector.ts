@@ -3,6 +3,7 @@ import { pluralize } from "@blazetrails/activesupport/core-ext/string/inflection
 import { RFC2396_PARSER, rbInspect } from "@blazetrails/ruby-compat";
 import type { Endpoint } from "./endpoint.js";
 import type { Route } from "./route.js";
+import { RouteSet } from "./route-set.js";
 
 export interface InspectedRoute {
   name: string;
@@ -222,12 +223,14 @@ export class RoutesInspector {
 
   /** @internal */
   private collectEngineRoutes(route: RouteWrapper): void {
-    if (!route.isEngine()) return;
     const name = route.endpoint;
+    if (!route.isEngine()) return;
     if (this.engines[name]) return;
-    const app = route.rackApp as { routes?: { routes?: readonly Route[] } } | undefined;
-    const engineRoutes = app?.routes?.routes;
-    if (engineRoutes) this.engines[name] = this.collectRoutes(engineRoutes);
+
+    const routes = (route.rackApp as { routes: unknown }).routes;
+    if (routes instanceof RouteSet) {
+      this.engines[name] = this.collectRoutes(routes.getRoutes());
+    }
   }
 }
 

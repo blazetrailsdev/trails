@@ -1,3 +1,4 @@
+import { TopLevel } from "@blazetrails/activesupport";
 import type { Request } from "../http/request.js";
 
 /** @internal */
@@ -23,6 +24,11 @@ export class Endpoint {
   }
 
   engine(): boolean {
-    return false;
+    const rackApp = this.rackApp();
+    return (
+      typeof rackApp === "function" &&
+      Object.getOwnPropertyDescriptor(rackApp, "prototype")?.writable === false &&
+      rackApp.prototype instanceof TopLevel.Trails!.Engine
+    );
   }
 }
