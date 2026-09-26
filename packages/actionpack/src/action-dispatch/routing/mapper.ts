@@ -49,11 +49,11 @@ const RESOURCE_OPTIONS: ReadonlySet<string> = new Set([
 
 /** @internal */
 interface RouteSetLike {
-  namedRoutes?: { get(name: string): unknown };
+  namedRoutes: { get(name: string): unknown };
   addRoute(route: Route, name?: string | null): unknown;
   resourcesPathNames: Record<string, string>;
-  drawPaths?: string[];
-  defaultUrlOptions?: Record<string, unknown>;
+  drawPaths: string[];
+  defaultUrlOptions: Record<string, unknown>;
 }
 
 /** @internal */
@@ -200,7 +200,7 @@ export class Mapper {
 
   constructor(set: RouteSetLike) {
     this._set = set;
-    this._drawPaths = set.drawPaths ?? [];
+    this._drawPaths = set.drawPaths;
     this._scope = new Scope({ pathNames: this._set.resourcesPathNames });
   }
 
@@ -209,7 +209,7 @@ export class Mapper {
   }
 
   get defaultUrlOptions(): Record<string, unknown> {
-    return this._set.defaultUrlOptions ?? {};
+    return this._set.defaultUrlOptions;
   }
 
   get(path: string, optionsOrEndpoint: RouteOptions | string = {}): void {
@@ -1374,7 +1374,7 @@ export class Mapper {
 
   /** @internal */
   hasNamedRoute(name: string): boolean {
-    return this._set?.namedRoutes?.get(name) !== undefined;
+    return this._set.namedRoutes.get(name) !== undefined;
   }
 
   /** @internal */
