@@ -78,6 +78,9 @@ export const RECEIVER_AS_FIRST_ARG = new Set([
   // objects have no such primitive to hang it on.
   "transform_keys",
   "transform_keys!",
+  // Ruby core `Hash#except` — `hash.except(*keys)`, exported by ruby-compat
+  // as `except(hash, ...keys)`.
+  "except",
   // active_support/core_ext/hash/indifferent_access.rb — `hash.with_indifferent_access`,
   // exported by @blazetrails/activesupport as `withIndifferentAccess(obj)`.
   "with_indifferent_access",

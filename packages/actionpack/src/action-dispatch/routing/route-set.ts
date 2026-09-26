@@ -46,7 +46,7 @@ import { Endpoint } from "./endpoint.js";
 import { X_CASCADE } from "../constants.js";
 import type { DispatchableControllerClass } from "./dispatcher.js";
 import type { Response as AdResponse } from "../http/response.js";
-import { RoutingError } from "../../action-controller/metal/exceptions.js";
+import { RoutingError, UrlGenerationError } from "../../action-controller/metal/exceptions.js";
 import { RoutesProxy, type ScriptNamer } from "./routes-proxy.js";
 import { Request as AdRequest } from "../http/request.js";
 import { camelize, NameError } from "@blazetrails/activesupport";
