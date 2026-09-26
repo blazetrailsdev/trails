@@ -9,7 +9,7 @@ describe("Rails::InfoController", () => {
   });
 
   it("drops the layout for an xhr request and uses application otherwise", () => {
-    const layout = InfoController.layout as (this: unknown) => string | false;
+    const layout = InfoController._layout as (this: unknown) => string | false;
     expect(layout.call({ request: { xhr: true } })).toBe(false);
     expect(layout.call({ request: { xhr: false } })).toBe("application");
   });
