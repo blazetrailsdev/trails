@@ -24,7 +24,11 @@ function registerDetail(name: string, proc: DefaultProc): void {
 registerDetail("locale", () => {
   const locales: (string | symbol)[] = [stringToSym(I18n.locale() as string)];
   if (rbObjRespondTo(I18n, "fallbacks"))
-    locales.push(...I18n.fallbacks().get(I18n.locale() as string).map(stringToSym));
+    locales.push(
+      ...I18n.fallbacks()
+        .get(I18n.locale() as string)
+        .map(stringToSym),
+    );
   locales.push(stringToSym(I18n.defaultLocale()));
   return [...new Set(locales)];
 });
@@ -33,7 +37,7 @@ registerDetail(
   () => Base.defaultFormats ?? [":html", ":text", ":js", ":css", ":xml", ":json"],
 );
 registerDetail("variants", () => []);
-registerDetail("handlers", () => TemplateHandlers.extensions().map((extension) => `:${extension}`));
+registerDetail("handlers", () => TemplateHandlers.extensions());
 
 type DigestCache = Map<string | NestedDependencies, string | NestedDependencies>;
 
