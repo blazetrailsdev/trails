@@ -1,6 +1,11 @@
 import { isPlainObject, isPresent } from "@blazetrails/activesupport";
 import { MockRequest, type RackEnv, type RackResponse } from "@blazetrails/rack";
-import { InvalidURIError, rbInspect, RFC2396_PARSER } from "@blazetrails/ruby-compat";
+import {
+  InvalidURIError,
+  rbInspect,
+  rbObjRespondTo,
+  RFC2396_PARSER,
+} from "@blazetrails/ruby-compat";
 import { Constraints, Mapper } from "./mapper.js";
 import type { MatchedRoute } from "./route.js";
 import { Route } from "./route.js";
@@ -1004,10 +1009,15 @@ export class RouteSet {
     let app = this._routeApps.get(route);
     if (!app) {
       const to = route.to ?? route.redirectEndpoint;
-      if (to !== undefined) {
-        app = new Constraints(to, [], Constraints.CALL);
+      const blocks = route.blocks;
+      const raiseOnNameError = route.controller !== "" || "controller" in route.defaults;
+      if (rbObjRespondTo(to, "action")) {
+        app = new StaticDispatcher(to as unknown as DispatchableControllerClass);
+      } else if (rbObjRespondTo(to, "call")) {
+        app = new Constraints(to, blocks, Constraints.CALL);
+      } else if (blocks.length > 0) {
+        app = new Constraints(new Dispatcher(raiseOnNameError), blocks, Constraints.SERVE);
       } else {
-        const raiseOnNameError = route.controller !== "" || "controller" in route.defaults;
         app = new Dispatcher(raiseOnNameError);
       }
       this._routeApps.set(route, app);

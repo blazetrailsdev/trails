@@ -1,7 +1,7 @@
 import type { Node } from "./nodes/node.js";
 import { escapePath, escapeSegment } from "./router/utils.js";
 
-type Escaper = (value: string) => string;
+type Escaper = (value: unknown) => string;
 const ESCAPE_PATH: Escaper = (value) => escapePath(value);
 const ESCAPE_SEGMENT: Escaper = (value) => escapeSegment(value);
 
@@ -13,7 +13,7 @@ export class Parameter {
 
   /** @missingRailsCall call — PERMANENT */
   escape(value: unknown): string {
-    return this.escaper(globalThis.String(value));
+    return this.escaper(value);
   }
 }
 
