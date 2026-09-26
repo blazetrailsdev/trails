@@ -11,12 +11,14 @@ class RecordingStore extends MemoryStore {
   readMultiCalls = 0;
   writeMultiCalls = 0;
 
-  override readMulti(...names: string[]): Record<string, unknown> {
+  override readMulti(...names: unknown[]): Map<unknown, unknown> {
     this.readMultiCalls += 1;
     return super.readMulti(...names);
   }
 
-  override writeMulti(hash: Record<string, unknown>): Record<string, unknown> {
+  override writeMulti(
+    hash: Map<unknown, unknown> | Record<string, unknown>,
+  ): Map<unknown, unknown> | Record<string, unknown> {
     this.writeMultiCalls += 1;
     return super.writeMulti(hash);
   }

@@ -65,14 +65,17 @@ describe("MemoryStoreTest", () => {
     store.write("a", 1);
     store.write("b", 2);
     const result = store.readMulti("a", "b", "c");
-    expect(result).toEqual({ a: 1, b: 2 });
+    expect(Object.fromEntries(result)).toEqual({ a: 1, b: 2 });
   });
 
   it("readMulti applies trailing namespace option", () => {
     store.write("a", 1, { namespace: "tester" });
     store.write("b", 2, { namespace: "tester" });
-    expect(store.readMulti("a", "b", { namespace: "tester" })).toEqual({ a: 1, b: 2 });
-    expect(store.readMulti("a", "b")).toEqual({});
+    expect(Object.fromEntries(store.readMulti("a", "b", { namespace: "tester" }))).toEqual({
+      a: 1,
+      b: 2,
+    });
+    expect(Object.fromEntries(store.readMulti("a", "b"))).toEqual({});
   });
 
   it("writeMulti writes multiple keys", () => {
@@ -331,14 +334,17 @@ describe("FileStoreTest", () => {
     store.write("a", 1);
     store.write("b", 2);
     const result = store.readMulti("a", "b", "c");
-    expect(result).toEqual({ a: 1, b: 2 });
+    expect(Object.fromEntries(result)).toEqual({ a: 1, b: 2 });
   });
 
   it("readMulti applies trailing namespace option", () => {
     store.write("a", 1, { namespace: "tester" });
     store.write("b", 2, { namespace: "tester" });
-    expect(store.readMulti("a", "b", { namespace: "tester" })).toEqual({ a: 1, b: 2 });
-    expect(store.readMulti("a", "b")).toEqual({});
+    expect(Object.fromEntries(store.readMulti("a", "b", { namespace: "tester" }))).toEqual({
+      a: 1,
+      b: 2,
+    });
+    expect(Object.fromEntries(store.readMulti("a", "b"))).toEqual({});
   });
 
   it("writeMulti writes multiple keys", () => {

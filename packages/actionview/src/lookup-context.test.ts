@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, it, expect } from "vitest";
 import { MimeType } from "@blazetrails/actionpack";
-import { LookupContext } from "./lookup-context.js";
+import { DetailsKey, LookupContext } from "./lookup-context.js";
+import type { RenderableTemplate, RenderOptions } from "./renderer/abstract-renderer.js";
 import { MissingTemplate } from "./template/error.js";
 import { Resolver } from "./template/resolver.js";
 import { FixtureResolver } from "./testing/resolvers.js";
@@ -8,6 +9,11 @@ import { Template } from "./template.js";
 import { TemplatePath } from "./template-path.js";
 import { TemplateHandlers } from "./template/handlers.js";
 import { Tse } from "./template/handlers/tse.js";
+
+function render(ctx: LookupContext, options: RenderOptions): Promise<string | null> {
+  const view = new (DetailsKey.viewContextClass())(ctx, {}, null);
+  return view.viewRenderer.render(view, options);
+}
 
 describe("LookupContext", () => {
   it("handles */* formats", () => {
@@ -96,7 +102,7 @@ describe("LookupContext allCandidatePaths wiring", () => {
 
     let caught: MissingTemplate | undefined;
     try {
-      await ctx.render(["posts"], "indx", [":html"]);
+      await render(ctx, { template: "indx", prefixes: ["posts"] });
     } catch (e) {
       if (e instanceof MissingTemplate) caught = e;
     }
@@ -113,7 +119,7 @@ describe("LookupContext allCandidatePaths wiring", () => {
 
     let caught: MissingTemplate | undefined;
     try {
-      await ctx.renderPartial("frm", ["posts"], ":html");
+      await render(ctx, { partial: "posts/frm" });
     } catch (e) {
       if (e instanceof MissingTemplate) caught = e;
     }
@@ -181,17 +187,15 @@ describe("LookupContext#renderPartialSync", () => {
 
   it("is reachable from a template rendered through renderTemplate", async () => {
     const ctx = contextWith({ "posts/_form": "form!" });
-    const out = await ctx.renderTemplate(
-      new Template({
+    const out = await render(ctx, {
+      template: new Template({
         source: '<%= render({ partial: "form" }) %>',
         identifier: "posts/index",
         virtualPath: "posts/index",
         extension: "tse",
         format: ":html",
-      }),
-      {},
-      { controller: "posts", action: "index", format: ":html" },
-    );
+      }) as unknown as RenderableTemplate,
+    });
     expect(out).toBe("form!");
   });
 });
@@ -221,15 +225,14 @@ describe("LookupContext#render with a layout", () => {
       "posts/index": "<p>body</p>",
       "layouts/application": "<main><%= yield %></main>",
     });
-    expect(await ctx.render(["posts"], "index", [":html"], {}, { layout: "application" })).toBe(
-      "<main><p>body</p></main>",
-    );
+    const options = { template: "index", prefixes: ["posts"], layout: "layouts/application" };
+    expect(await render(ctx, options)).toBe("<main><p>body</p></main>");
   });
 
   it("finds a template through an inherited prefix", async () => {
     const ctx = contextWith({ "application/show": "<p>inherited</p>" });
     expect(
-      await ctx.render(["posts", "application"], "show", [":html"], {}, { layout: false }),
+      await render(ctx, { template: "show", prefixes: ["posts", "application"], layout: false }),
     ).toBe("<p>inherited</p>");
   });
 
@@ -238,8 +241,7 @@ describe("LookupContext#render with a layout", () => {
       "posts/index": '<% contentFor("title", () => { %>Home<% }) %><p>body</p>',
       "layouts/application": '<title><%= _layoutFor("title") %></title><%= yield %>',
     });
-    expect(await ctx.render(["posts"], "index", [":html"], {}, { layout: "application" })).toBe(
-      "<title>Home</title><p>body</p>",
-    );
+    const options = { template: "index", prefixes: ["posts"], layout: "layouts/application" };
+    expect(await render(ctx, options)).toBe("<title>Home</title><p>body</p>");
   });
 });

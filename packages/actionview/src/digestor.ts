@@ -21,7 +21,12 @@ interface Logger {
 }
 
 export class Digestor {
-  static digest({ name, format = null, finder, dependencies = null }: DigestorOptions): string {
+  static digest({
+    name,
+    format = null,
+    finder,
+    dependencies = null,
+  }: DigestorOptions): string | NestedDependencies {
     let cacheKey: string;
     if (dependencies == null || dependencies.length === 0) {
       cacheKey = `${name}.${format ?? ""}`;
@@ -41,7 +46,7 @@ export class Digestor {
     const root = this.tree(path.toString(), finder, path.isPartial());
     if (dependencies) {
       for (const injectedDep of dependencies) {
-        root.children.push(new Injected(injectedDep as string, null, null));
+        root.children.push(new Injected(injectedDep, null, null));
       }
     }
     const digest = root.digest(finder);
@@ -108,7 +113,7 @@ export class Digestor {
 }
 
 export class Node {
-  readonly name: string;
+  readonly name: string | NestedDependencies;
   readonly logicalName: string | null;
   readonly template: Template | null;
   readonly children: Node[];
@@ -124,7 +129,7 @@ export class Node {
   }
 
   constructor(
-    name: string,
+    name: string | NestedDependencies,
     logicalName: string | null,
     template: Template | null,
     children: Node[] = [],
@@ -135,13 +140,13 @@ export class Node {
     this.children = children;
   }
 
-  digest(finder: LookupContext, stack: Node[] = []): string {
+  digest(finder: LookupContext, stack: Node[] = []): string | NestedDependencies {
     return Digest.hexdigest(`${this.template!.source}-${this.dependencyDigest(finder, stack)}`);
   }
 
   dependencyDigest(finder: LookupContext, stack: Node[]): string {
     return this.children
-      .map((node) => {
+      .map((node): unknown => {
         if (stack.includes(node)) {
           return false;
         } else {
@@ -163,7 +168,7 @@ export class Node {
     if (!seen.has(this)) {
       seen.add(this);
       return any(this.children)
-        ? { [this.name]: this.children.map((c) => c.toDepMap(seen)) }
+        ? { [String(this.name)]: this.children.map((c) => c.toDepMap(seen)) }
         : this.name;
     } else {
       return this.name;
@@ -174,13 +179,13 @@ export class Node {
 export class Partial extends Node {}
 
 export class Missing extends Node {
-  override digest(finder: LookupContext, _: Node[] = []): string {
+  override digest(finder: LookupContext, _: Node[] = []): string | NestedDependencies {
     return "";
   }
 }
 
 export class Injected extends Node {
-  override digest(finder: LookupContext, _: Node[] = []): string {
+  override digest(finder: LookupContext, _: Node[] = []): string | NestedDependencies {
     return this.name;
   }
 }

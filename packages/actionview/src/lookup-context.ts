@@ -1,6 +1,6 @@
 import { I18n } from "@blazetrails/activesupport";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
-import type { RenderContext } from "./template/handlers.js";
+import type { NestedDependencies } from "./digestor.js";
 import { Base } from "./base.js";
 import { TemplateHandlers } from "./template/handlers.js";
 import { Template } from "./template.js";
@@ -35,11 +35,13 @@ registerDetail(
 registerDetail("variants", () => []);
 registerDetail("handlers", () => TemplateHandlers.extensions().map((extension) => `:${extension}`));
 
+type DigestCache = Map<string | NestedDependencies, string | NestedDependencies>;
+
 export class DetailsKey {
   /** @internal */
   static _detailsKeys = new Map<string, Requested>();
   /** @internal */
-  static _digestCache = new Map<Requested, Map<string, string>>();
+  static _digestCache = new Map<Requested, DigestCache>();
 
   static detailsCacheKey(details: DetailsMap): Requested {
     let formats = details.formats;
@@ -62,7 +64,7 @@ export class DetailsKey {
     return req;
   }
 
-  static digestCache(details: DetailsMap): Map<string, string> {
+  static digestCache(details: DetailsMap): DigestCache {
     const req = DetailsKey.detailsCacheKey(details);
     let cache = DetailsKey._digestCache.get(req);
     if (!cache) {
@@ -72,7 +74,7 @@ export class DetailsKey {
     return cache;
   }
 
-  static digestCaches(): Array<Map<string, string>> {
+  static digestCaches(): Array<DigestCache> {
     return Array.from(DetailsKey._digestCache.values());
   }
 
@@ -134,8 +136,6 @@ export class LookupContext {
     return DEFAULT_PROCS;
   }
 
-  private layoutName: string | false | null = "application";
-
   private _details: DetailsMap;
   private _prefixes: string[];
   private _detailsKey: Requested | null = null;
@@ -174,6 +174,10 @@ export class LookupContext {
   }
   set locale(value: string | symbol | null) {
     this._setDetail("locale", value == null ? DEFAULT_PROCS.locale() : [value]);
+  }
+
+  defaultFormats(): DetailValue {
+    return DEFAULT_PROCS.formats();
   }
 
   get formats(): DetailValue {
@@ -256,7 +260,7 @@ export class LookupContext {
     }
   }
 
-  digestCache(): Map<string, string> {
+  digestCache(): DigestCache {
     return DetailsKey.digestCache(this._details);
   }
 
@@ -293,6 +297,16 @@ export class LookupContext {
     const [base, pfxs] = this.normalizeName(name, prefixes);
     const [details, key] = this.detailArgsFor(options);
     return this._viewPaths.find(base, pfxs, partial, details, key, keys);
+  }
+
+  findTemplate(
+    name: string,
+    prefixes: ReadonlyArray<string> = [],
+    partial = false,
+    keys: ReadonlyArray<string> = [],
+    options: Record<string, DetailValue> = {},
+  ): unknown {
+    return this.find(name, prefixes, partial, keys, options);
   }
 
   findAll(
@@ -363,137 +377,6 @@ export class LookupContext {
     return [base, pfxs];
   }
 
-  setLayout(name: string | false): void {
-    this.layoutName = name;
-  }
-
-  getLayout(): string | false | null {
-    return this.layoutName;
-  }
-
-  /** @internal */
-  findTemplate(
-    name: string,
-    prefixes: ReadonlyArray<string> = [],
-    formats?: DetailValue,
-  ): Template | null {
-    return (
-      (this.findAll(name, prefixes, false, [], formats ? { formats } : {})[0] as Template) ?? null
-    );
-  }
-
-  findPartial(
-    name: string,
-    prefixes: ReadonlyArray<string> = [],
-    formats?: DetailValue,
-  ): Template | null {
-    return (
-      (this.findAll(name, prefixes, true, [], formats ? { formats } : {})[0] as Template) ?? null
-    );
-  }
-
-  /** @internal */
-  findLayout(
-    name: string,
-    prefixes: ReadonlyArray<string> = ["layouts"],
-    formats?: DetailValue,
-  ): Template | null {
-    const template = this.findAll(name, prefixes, false, [], formats ? { formats } : {})[0] as
-      | Template
-      | undefined;
-    return template ? template.asLayout() : null;
-  }
-
-  async render(
-    prefixes: ReadonlyArray<string>,
-    action: string,
-    formats: DetailValue,
-    locals: Record<string, unknown> = {},
-    options: { layout?: string | false; view?: Base } = {},
-  ): Promise<string> {
-    const controller = String(prefixes[0] ?? "");
-    const format = String(formats[0] ?? ":html");
-    const template = this.findTemplate(action, prefixes, formats);
-    if (!template) {
-      throw new MissingTemplate(this._viewPaths, action, prefixes, false, {
-        ...this._details,
-        formats,
-      });
-    }
-
-    const context: RenderContext = {
-      controller,
-      action,
-      format,
-    };
-
-    const view = options.view ?? this.buildViewContext();
-    let output = await this.renderTemplate(template, locals, { ...context, view });
-
-    const layoutName = options.layout !== undefined ? options.layout : this.layoutName;
-    if (layoutName !== false && layoutName) {
-      const layoutTemplate = this.findLayout(layoutName, ["layouts"], formats);
-      if (layoutTemplate) {
-        view.viewFlow.set("layout", output);
-        output = await this.renderTemplate(layoutTemplate, locals, { ...context, view });
-      }
-    }
-
-    return output;
-  }
-
-  async renderPartial(
-    name: string,
-    prefixes: ReadonlyArray<string>,
-    format: string,
-    locals: Record<string, unknown> = {},
-    view?: Base,
-  ): Promise<string> {
-    const template = this.find(name, name.includes("/") ? [] : prefixes, true, [], {
-      formats: [format],
-    }) as Template;
-
-    const context: RenderContext = {
-      controller: prefixes[0] ?? "",
-      action: `_${name}`,
-      format,
-    };
-
-    return this.renderTemplate(template, locals, { ...context, view });
-  }
-
-  async renderCollection(
-    partial: string,
-    prefixes: ReadonlyArray<string>,
-    format: string,
-    collection: unknown[],
-    as?: string,
-  ): Promise<string> {
-    const varName = as ?? partial;
-    const parts: string[] = [];
-
-    for (let i = 0; i < collection.length; i++) {
-      const locals: Record<string, unknown> = {
-        [varName]: collection[i],
-        [`${varName}_counter`]: i,
-        [`${varName}_iteration`]: { index: i, first: i === 0, last: i === collection.length - 1 },
-      };
-      parts.push(await this.renderPartial(partial, prefixes, format, locals));
-    }
-
-    return parts.join("");
-  }
-
-  async renderTemplate(
-    template: Template,
-    locals: Record<string, unknown>,
-    context: RenderContext & { view?: Base },
-  ): Promise<string> {
-    const view = context.view ?? this.buildViewContext();
-    if (context.yield !== undefined) view.viewFlow.set("layout", context.yield);
-    return template.render(view, locals);
-  }
-
   /** @noRailsEquivalent PERMANENT */
   renderPartialSync(
     name: string,
@@ -506,7 +389,9 @@ export class LookupContext {
     const partialPrefix = slash === -1 ? prefix : name.slice(0, slash);
     const partialName = slash === -1 ? name : name.slice(slash + 1);
 
-    const template = this.findPartial(partialName, [partialPrefix], [format]);
+    const template = this.findAll(partialName, [partialPrefix], true, [], {
+      formats: [format],
+    })[0] as Template | undefined;
     if (!template) {
       throw new MissingTemplate(this._viewPaths, partialName, [partialPrefix], true, {
         ...this._details,
@@ -531,7 +416,9 @@ export class LookupContext {
     const templatePrefix = slash === -1 ? prefix : name.slice(0, slash);
     const templateName = slash === -1 ? name : name.slice(slash + 1);
 
-    const template = this.findTemplate(templateName, [templatePrefix], [format]);
+    const template = this.findAll(templateName, [templatePrefix], false, [], {
+      formats: [format],
+    })[0] as Template | undefined;
     if (!template) {
       throw new MissingTemplate(this._viewPaths, templateName, [templatePrefix], false, {
         ...this._details,

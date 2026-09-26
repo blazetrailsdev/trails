@@ -42,7 +42,7 @@ describe("FileSystemResolver", () => {
 
     expect(ctx.isExists("index", ["posts"])).toBe(true);
     expect(ctx.isExists("missing", ["posts"])).toBe(false);
-    expect(ctx.findTemplate("index", ["posts"], [":html"])?.source).toBe("<h1>Posts</h1>");
+    expect((ctx.findTemplate("index", ["posts"]) as Template).source).toBe("<h1>Posts</h1>");
   });
 
   it("binds the requested locals, memoizing one template per locals set", () => {
@@ -106,7 +106,7 @@ describe("FileSystemResolver", () => {
     ctx.appendViewPaths([new FileSystemResolver(dir)]);
 
     expect(ctx.isExists("form", ["posts"], true)).toBe(true);
-    expect(ctx.findPartial("form", ["posts"], [":html"])?.source).toBe("<form></form>");
+    expect((ctx.findTemplate("form", ["posts"], true) as Template).source).toBe("<form></form>");
   });
 
   it("prefers the requested variant", () => {
@@ -124,7 +124,7 @@ describe("FileSystemResolver", () => {
     const ctx = new LookupContext(null, {}, []);
     ctx.appendViewPaths([new FileSystemResolver(dir)]);
 
-    expect(ctx.findTemplate("i*x", ["posts"], [":html"])?.source).toBe("<h1>Star</h1>");
+    expect((ctx.findTemplate("i*x", ["posts"]) as Template).source).toBe("<h1>Star</h1>");
     expect(ctx.isExists("i*dex", ["posts"])).toBe(false);
   });
 
@@ -133,7 +133,7 @@ describe("FileSystemResolver", () => {
     ctx.appendViewPaths([new FileSystemResolver(dir)]);
 
     expect(ctx.isExists("index", ["po?sts"])).toBe(true);
-    expect(ctx.findTemplate("index", ["po?sts"], [":html"])?.source).toBe("<h1>Query</h1>");
+    expect((ctx.findTemplate("index", ["po?sts"]) as Template).source).toBe("<h1>Query</h1>");
   });
 
   it("rescans the filesystem when the details cache is off", async () => {
@@ -196,7 +196,7 @@ describe("PathParser locales", () => {
     const ctx = new LookupContext(null, {}, []);
     ctx.appendViewPaths([resolver]);
 
-    expect(ctx.findTemplate("show", ["posts"])?.source).toBe("Ola mundo");
+    expect((ctx.findTemplate("show", ["posts"]) as Template).source).toBe("Ola mundo");
   });
 
   it("unions I18n.available_locales into the locale group, rebuilt by clear_cache", () => {
@@ -211,6 +211,6 @@ describe("PathParser locales", () => {
     const ctx = new LookupContext(null, {}, []);
     ctx.appendViewPaths([resolver]);
 
-    expect(ctx.findTemplate("show", ["posts"])?.source).toBe("Zdravo svete");
+    expect((ctx.findTemplate("show", ["posts"]) as Template).source).toBe("Zdravo svete");
   });
 });
