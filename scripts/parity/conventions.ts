@@ -100,7 +100,7 @@ const TOKEN_RENAME_PATTERN = new RegExp(`(^|_)(${tokenRenameAlternation()})(?=_|
  */
 const FILE_TOKEN_RENAME_PATTERN = new RegExp(`\\b(${tokenRenameAlternation()})\\b`, "g");
 
-function applyTokenRenames(snake: string): string {
+export function applyTokenRenames(snake: string): string {
   return snake.replace(TOKEN_RENAME_PATTERN, (_m, pre, tok: string) => pre + TOKEN_RENAMES[tok]);
 }
 

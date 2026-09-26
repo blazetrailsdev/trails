@@ -83,13 +83,14 @@ export { redirectTo, redirectBack, type RedirectResult } from "./redirect.js";
 export { FlashHash } from "./middleware/flash.js";
 export { Static, type StaticOptions } from "./middleware/static.js";
 export * as Session from "./middleware/session/index.js";
+export { InvalidAuthenticityToken } from "../action-controller/metal/request-forgery-protection.js";
 export {
   RequestForgeryProtection,
-  InvalidAuthenticityToken,
   type CsrfOptions,
   type CsrfStrategy,
 } from "./request-forgery-protection.js";
-export { respondTo, Collector, UnknownFormat } from "./respond-to.js";
+export { UnknownFormat } from "../action-controller/metal/exceptions.js";
+export { respondTo, Collector } from "./respond-to.js";
 export { PermissionsPolicy, type PolicySource } from "./http/permissions-policy.js";
 export { UploadedFile, type UploadedFileOptions } from "./http/upload.js";
 export { ContentDisposition, type ContentDispositionOptions } from "./http/content-disposition.js";

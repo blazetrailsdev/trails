@@ -13,10 +13,17 @@ export interface RenderableTemplate {
   render(
     view: ViewContext,
     locals: Record<string, unknown>,
-    buffer?: unknown,
+    buffer?: null,
     options?: { implicitLocals?: readonly string[]; addToStack?: boolean },
     block?: (...name: unknown[]) => unknown,
   ): string | Promise<string>;
+  render(
+    view: ViewContext,
+    locals: Record<string, unknown>,
+    buffer: unknown,
+    options?: { implicitLocals?: readonly string[]; addToStack?: boolean },
+    block?: (...name: unknown[]) => unknown,
+  ): string | null | Promise<string | null>;
 }
 
 export interface ViewContext {

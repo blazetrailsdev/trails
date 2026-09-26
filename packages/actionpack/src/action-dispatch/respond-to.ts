@@ -1,12 +1,6 @@
 import { symbolToS } from "@blazetrails/ruby-compat";
+import { UnknownFormat } from "../action-controller/metal/exceptions.js";
 import { MimeType } from "./http/mime-type.js";
-
-export class UnknownFormat extends Error {
-  constructor(message = "Unknown format") {
-    super(message);
-    this.name = "ActionController::UnknownFormat";
-  }
-}
 
 export type FormatHandler = () => unknown;
 
