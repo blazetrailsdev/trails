@@ -1627,8 +1627,14 @@ export class PostgreSQLAdapter
     return singularize(table);
   }
 
-  async renameTable(tableName: string, newName: string): Promise<void> {
-    this.validateTableLengthBang(newName);
+  async renameTable(
+    tableName: string,
+    newName: string,
+    options: Record<string, unknown> = {},
+  ): Promise<void> {
+    if (options._usesLegacyTableName == null || options._usesLegacyTableName === false) {
+      this.validateTableLengthBang(newName);
+    }
     await this.clearCacheBang();
     await this.schemaCache.clearDataSourceCacheBang(tableName);
     await this.schemaCache.clearDataSourceCacheBang(newName);
@@ -1652,7 +1658,7 @@ export class PostgreSQLAdapter
         await this.execute(`ALTER TABLE ${seq.quoted()} RENAME TO ${this.quoteTableName(newSeq)}`);
       }
     }
-    await this.renameTableIndexes(tableName, newName);
+    await this.renameTableIndexes(tableName, newName, options);
   }
 
   async addIndex(

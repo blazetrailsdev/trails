@@ -687,14 +687,20 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     await this.dropTable(tableName);
   }
 
-  async renameTable(tableName: string, newName: string): Promise<void> {
-    this.validateTableLengthBang(newName);
+  async renameTable(
+    tableName: string,
+    newName: string,
+    options: Record<string, unknown> = {},
+  ): Promise<void> {
+    if (options._usesLegacyTableName == null || options._usesLegacyTableName === false) {
+      this.validateTableLengthBang(newName);
+    }
     await this.schemaCache.clearDataSourceCacheBang(tableName);
     await this.schemaCache.clearDataSourceCacheBang(newName);
     await this.execQuery(
       `ALTER TABLE ${quoteTableName(tableName)} RENAME TO ${quoteTableName(newName)}`,
     );
-    await this.renameTableIndexes(tableName, newName);
+    await this.renameTableIndexes(tableName, newName, options);
   }
 
   async addColumn(

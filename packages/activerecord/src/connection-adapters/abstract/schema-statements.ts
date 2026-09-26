@@ -403,7 +403,11 @@ export class SchemaStatements {
     throw new NotImplementedError("change_column is not implemented");
   }
 
-  async renameTable(_tableName: string, _newName: string): Promise<void> {
+  async renameTable(
+    _tableName: string,
+    _newName: string,
+    _options: Record<string, unknown> = {},
+  ): Promise<void> {
     // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb:524
     throw new NotImplementedError("rename_table is not implemented");
   }
