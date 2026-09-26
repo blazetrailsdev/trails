@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { respondTo, Collector, UnknownFormat } from "../../../action-dispatch/respond-to.js";
+import { respondTo, Collector } from "../../../action-dispatch/respond-to.js";
+import { UnknownFormat } from "../../metal/exceptions.js";
 
 describe("RespondToControllerTest", () => {
   it("html", () => {

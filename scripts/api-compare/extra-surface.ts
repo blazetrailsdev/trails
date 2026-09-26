@@ -94,6 +94,7 @@ import {
   SKIP,
   SKIP_TS_MIRROR_IS_DRIFT,
   TS_CLASS_RENAMES,
+  applyTokenRenames,
   rubyFileToTs,
   overriddenRubyFiles,
   rubyMethodToTs,
@@ -462,15 +463,23 @@ function rubyMethodCandidates(rubyName: string): string[] | null {
  * silently absolve a genuinely novel TS `version` everywhere the allow-set is
  * unioned in, a far worse trade than the one drift-read it saves.
  *
+ * `TOKEN_RENAMES` reaches a constant as it reaches a method name, so the
+ * renamed spelling is a candidate too: `DependencyTracker::ERBTracker`
+ * (`dependency_tracker/erb_tracker.rb:5`) is ported as `TSETracker`.
+ *
  * This is deliberately narrower than `constantNameMatches`, which may pair
  * `VERSION` with a TS `version` for value comparison. Pairing a *known* TS
  * constant to diff its value is safe; minting a lowercase allow-set entry that
  * any method name can collide with is not.
  */
 function rubyConstantCandidates(name: string): string[] {
-  if (!/^[A-Z0-9]+(_[A-Z0-9]+)+$/.test(name)) return [name];
+  const candidates = [name];
+  const renamed = applyTokenRenames(name);
+  if (renamed !== name) candidates.push(renamed);
+  if (!/^[A-Z0-9]+(_[A-Z0-9]+)+$/.test(name)) return candidates;
   const camel = snakeToCamel(name.toLowerCase());
-  return camel === name ? [name] : [name, camel];
+  if (camel !== name) candidates.push(camel);
+  return candidates;
 }
 
 /**

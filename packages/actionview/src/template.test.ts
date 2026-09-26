@@ -2,9 +2,11 @@ import { htmlSafe } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Base } from "./base.js";
+import { OutputBuffer } from "./buffers.js";
 import { Template } from "./template.js";
 import { StrictLocalsError, SyntaxErrorInTemplate, TemplateError } from "./template/error.js";
 import { TemplateHandlers, type TemplateHandler } from "./template/handlers.js";
+import { Raw } from "./template/handlers/raw.js";
 import { Tse } from "./template/handlers/tse.js";
 
 const echo: TemplateHandler = {
@@ -67,6 +69,20 @@ describe("ActionView::Template (smoke)", () => {
       },
     });
     expect(() => boom.render(view())).toThrow(TemplateError);
+  });
+
+  it("render returns nil when given a buffer and the _run result verbatim otherwise", () => {
+    const handler: TemplateHandler = { extensions: ["txt"], call: () => "42" };
+    const t = new Template({ source: "hi", identifier: "z", extension: "txt", handler });
+    expect(t.render(view(), {})).toBe(42);
+
+    const raw = new Template({ source: "<b>", identifier: "r", handler: new Raw() });
+    expect(raw.render(view(), {})).toBe("<b>");
+
+    const tse = new Template({ source: "hi", identifier: "w", handler: new Tse() });
+    const buffer = new OutputBuffer();
+    expect(tse.render(view(), {}, buffer)).toBeNull();
+    expect(buffer.toStr()).toBe("hi");
   });
 
   it("render throws a helpful error when no handler is registered", () => {

@@ -1,6 +1,7 @@
 import type { Session } from "./request/session.js";
 
 import { OpenSSL, SecureRandom, type Bytes } from "@blazetrails/ruby-compat";
+import { InvalidAuthenticityToken } from "../action-controller/metal/request-forgery-protection.js";
 
 const AUTHENTICITY_TOKEN_LENGTH = 32;
 const CSRF_TOKEN_HEADER = "X-CSRF-Token";
@@ -16,13 +17,6 @@ export interface CsrfOptions {
   allowedOrigins?: string[];
   logging?: boolean;
   perFormTokens?: boolean;
-}
-
-export class InvalidAuthenticityToken extends Error {
-  constructor(message = "Can't verify CSRF token authenticity.") {
-    super(message);
-    this.name = "ActionController::InvalidAuthenticityToken";
-  }
 }
 
 export class RequestForgeryProtection {
@@ -193,7 +187,7 @@ export class RequestForgeryProtection {
   handleUnverified(session: Session): void {
     switch (this.strategy) {
       case "exception":
-        throw new InvalidAuthenticityToken();
+        throw new InvalidAuthenticityToken("Can't verify CSRF token authenticity.");
       case "reset_session":
         session.clear();
         break;

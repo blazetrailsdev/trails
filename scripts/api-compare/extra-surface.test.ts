@@ -1693,6 +1693,59 @@ describe("buildReport — novel vs moved classification", () => {
     expect(f!.extras.map((e) => e.name)).toEqual(["genuinelyNovel"]);
   });
 
+  it("admits a TOKEN_RENAMES declaration name (ERBTracker -> TSETracker)", () => {
+    // `TOKEN_RENAMES` maps `ERB` to `TSE`, so `DependencyTracker::ERBTracker`
+    // (dependency_tracker/erb_tracker.rb:5) is ported as `TSETracker` in the
+    // mirrored file and must not read as novel surface there.
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        actionview: {
+          classes: {
+            "ActionView::DependencyTracker::ERBTracker": rubyClass({
+              name: "ERBTracker",
+              file: "dependency_tracker/erb_tracker.rb",
+            }),
+          },
+          modules: {},
+        },
+      },
+    };
+    const tsClass = (name: string) => ({
+      name,
+      file: "dependency-tracker/tse-tracker.ts",
+      includes: [],
+      extends: [],
+      instanceMethods: [],
+      classMethods: [],
+    });
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        actionview: {
+          classes: {
+            TSETracker: tsClass("TSETracker"),
+            GenuinelyNovelTracker: tsClass("GenuinelyNovelTracker"),
+          },
+          modules: {},
+        },
+      },
+    };
+    const report = buildReport(ruby, ts, {
+      filterPkg: "actionview",
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    const f = report.packages[0].extraFiles.find(
+      (x) => x.tsFile === "dependency-tracker/tse-tracker.ts",
+    );
+    expect(f).toBeDefined();
+    expect(f!.extras.map((e) => e.name)).toEqual(["GenuinelyNovelTracker"]);
+  });
+
   it("admits a TS_PARENT_ALIASES declaration name (Type::Integer -> IntegerType)", () => {
     // `resolveTsClassForRuby` already matches Ruby `Type::Integer` to TS
     // `IntegerType` through TS_PARENT_ALIASES, so the declaration-name pass

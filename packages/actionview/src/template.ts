@@ -1,4 +1,10 @@
-import { htmlSafe, Notifications, pluralize, toSentence } from "@blazetrails/activesupport";
+import {
+  htmlSafe,
+  Notifications,
+  pluralize,
+  SafeBuffer,
+  toSentence,
+} from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import type { Base, CompiledMethod, CompiledMethodContainer } from "./base.js";
 import { OutputBuffer } from "./buffers.js";
@@ -214,6 +220,25 @@ export class Template {
     return this.strictLocalsBang() != null;
   }
 
+  /**
+   * `template.rb:279-286`. A Ruby `SafeBuffer` is a `String`, so Rails hands
+   * one back verbatim; a trails `SafeBuffer` is an object, so it is read out as
+   * the string it holds, the same way `OutputBuffer#to_s` is.
+   */
+  render(
+    view: Base,
+    locals?: Record<string, unknown>,
+    buffer?: null,
+    options?: { implicitLocals?: readonly string[]; addToStack?: boolean },
+    block?: (...name: unknown[]) => unknown,
+  ): string;
+  render(
+    view: Base,
+    locals: Record<string, unknown>,
+    buffer: OutputBuffer,
+    options?: { implicitLocals?: readonly string[]; addToStack?: boolean },
+    block?: (...name: unknown[]) => unknown,
+  ): null;
   render(
     view: Base,
     locals: Record<string, unknown> = {},
@@ -223,9 +248,9 @@ export class Template {
       addToStack = true,
     }: { implicitLocals?: readonly string[]; addToStack?: boolean } = {},
     block?: (...name: unknown[]) => unknown,
-  ): string {
+  ): string | null {
     try {
-      return this.instrumentRenderTemplate<string>(() => {
+      return this.instrumentRenderTemplate<string | null>(() => {
         this.compileBang(view);
 
         if (this.isStrictLocals() && this._strictLocalKeys && implicitLocals.length > 0) {
@@ -242,7 +267,7 @@ export class Template {
             { addToStack, hasStrictLocals: this.isStrictLocals() },
             block,
           );
-          return "";
+          return null;
         } else {
           const result = view._run(
             this.methodName(),
@@ -252,7 +277,9 @@ export class Template {
             { addToStack, hasStrictLocals: this.isStrictLocals() },
             block,
           );
-          return result instanceof OutputBuffer ? result.toStr() : String(result ?? "");
+          return result instanceof OutputBuffer || result instanceof SafeBuffer
+            ? result.toStr()
+            : (result as string);
         }
       });
     } catch (e) {
