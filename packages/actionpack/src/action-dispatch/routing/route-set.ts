@@ -715,8 +715,8 @@ export class RouteSet {
   }
 
   addRoute(
-    mapping: { makeRoute(name: string | null | undefined, precedence: number): Route },
-    name?: string | null,
+    mapping: { makeRoute(name: string | null | false | undefined, precedence: number): Route },
+    name?: string | null | false,
   ): Route {
     if (name && !ROUTE_NAME_RE.test(name)) {
       throw new ArgumentError(`Invalid route name: '${name}'`);

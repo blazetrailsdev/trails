@@ -67,7 +67,7 @@ const RESOURCE_OPTIONS: ReadonlySet<string> = new Set([
 /** @internal */
 interface RouteSetLike {
   namedRoutes: { get(name: string): unknown };
-  addRoute(mapping: Mapping, name?: string | null): unknown;
+  addRoute(mapping: Mapping, name?: string | null | false): unknown;
   resourcesPathNames: Record<string, string>;
   drawPaths: string[];
   defaultUrlOptions: Record<string, unknown>;
@@ -330,8 +330,7 @@ class Mapping {
     }
   }
 
-  makeRoute(name: string | null | undefined, _precedence: number): Route {
-    const to = this.to instanceof Redirect ? undefined : (this.to as MountableApp | undefined);
+  makeRoute(name: string | null | false | undefined, _precedence: number): Route {
     const route = new Route(
       this._via,
       this.ast.tree.toString(),
@@ -339,7 +338,6 @@ class Mapping {
       (this.defaults.action as string | undefined) ?? "",
       {
         name,
-        app: to,
         redirectEndpoint: this.to instanceof Redirect ? this.to : undefined,
         constraints: Object.keys(this._constraints).length > 0 ? this._constraints : undefined,
         defaults: this.defaults as Record<string, string | null>,
@@ -1413,7 +1411,7 @@ export class Mapper {
       anchor,
       options as Record<string, unknown>,
     );
-    this._set.addRoute(mapping, as === false ? null : as);
+    this._set.addRoute(mapping, as);
   }
 
   /** @internal */
