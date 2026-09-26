@@ -6,9 +6,8 @@
     }
   },
   "actioncontroller": {
-    "total": 4,
+    "total": 3,
     "byFile": {
-      "metal/live.rb": 1,
       "metal/strong_parameters.rb": 3
     }
   },

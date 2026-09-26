@@ -117,7 +117,12 @@ export class Metal extends AbstractController {
   }
 
   get params(): Parameters {
-    return (this._params ??= new Parameters(this.request.parameters));
+    return (this._params ??= new Parameters(this.request.parameters, {
+      controller: this.constructor.name,
+      action: this.actionName,
+      request: this.request,
+      params: this.request.filteredParameters(),
+    }));
   }
   set params(value: Parameters) {
     this._params = value;

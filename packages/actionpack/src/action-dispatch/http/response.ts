@@ -83,7 +83,9 @@ export class ResponseBuffer {
     if (this._strBody !== null) {
       yield this._strBody;
     } else {
-      yield* this.eachChunk();
+      const chunks: unknown[] = [];
+      this.eachChunk((chunk) => chunks.push(chunk));
+      yield* chunks;
     }
   }
 
@@ -99,8 +101,8 @@ export class ResponseBuffer {
   }
 
   /** @internal */
-  protected *eachChunk(): IterableIterator<unknown> {
-    yield* this._buf;
+  protected eachChunk(block: (chunk: unknown) => void): void {
+    this._buf.forEach(block);
   }
 }
 

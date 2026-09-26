@@ -75,11 +75,11 @@ export class Buffer extends ResponseBuffer {
   }
 
   /** @internal */
-  protected override *eachChunk(): IterableIterator<string> {
+  protected override eachChunk(block: (chunk: unknown) => void): void {
     while (true) {
       const str = this._buf.shift() as string | null | undefined;
       if (str === null || str === undefined) break;
-      yield str;
+      block(str);
     }
   }
 
