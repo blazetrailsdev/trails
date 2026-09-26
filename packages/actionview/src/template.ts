@@ -31,7 +31,7 @@ type LocationTranslatingHandler = TemplateHandler & {
 type TypesImplementation = {
   symbols(): readonly string[];
   isValidSymbols(symbols: readonly unknown[]): boolean;
-  get(type: string): { readonly symbol: string | null; toString(): string } | undefined;
+  get(type: string | null): { readonly symbol: string | null; toString(): string } | undefined;
 };
 
 const STRICT_LOCALS_REGEX = /#\s+locals:\s+\((.*)\)/;
@@ -164,7 +164,7 @@ export class Template {
   }
 
   get type(): ReturnType<TypesImplementation["get"]> {
-    return (this._type ??= this.format == null ? undefined : Template.Types.get(this.format));
+    return (this._type ??= Template.Types.get(this.format));
   }
 
   get shortIdentifier(): string {

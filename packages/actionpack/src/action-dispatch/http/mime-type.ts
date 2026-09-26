@@ -248,8 +248,8 @@ export class MimeType {
     return MimeType.registry.has(stripped);
   }
 
-  static lookupByExtension(extension: string): MimeType | undefined {
-    const ext = isSymbol(extension) ? symbolToS(extension) : extension;
+  static lookupByExtension(extension: string | null): MimeType | undefined {
+    const ext = extension == null ? "" : isSymbol(extension) ? symbolToS(extension) : extension;
     return MimeType.extensionMap.get(ext.replace(/^\./, ""));
   }
 
@@ -406,7 +406,7 @@ export class MimeType {
 registerDefaultMimeTypes(MimeType);
 
 export const Mime = {
-  get(type: MimeType | string): MimeType | undefined {
+  get(type: MimeType | string | null): MimeType | undefined {
     if (type instanceof MimeType) return type;
     return MimeType.lookupByExtension(type);
   },
