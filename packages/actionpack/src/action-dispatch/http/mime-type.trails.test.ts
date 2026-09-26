@@ -29,6 +29,8 @@ describe("ActionView::Template::Types once Action Dispatch loads", () => {
   it("answers Template#type as the Mime::Type, which the TSE escape_ignore_list matches (erb.rb:82)", () => {
     const template = new Template({ source: "<%= name %>", identifier: "t", format: ":text" });
     expect(template.type).toBe(Mime.get(":text"));
-    expect(new TseHandler().call(template, template.source)).toMatch(/_ob\.safeExprAppend\(name\)/);
+    expect(new TseHandler().call(template, template.source)).toMatch(
+      /_ob\.safeExprAppend\( name \)/,
+    );
   });
 });

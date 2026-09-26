@@ -88,10 +88,10 @@ describe("basic CRUD DX — defining and using a model", () => {
   });
 
   it("find_or / destroyBy / destroyAll / update / destroy all preserve User", async () => {
-    expectTypeOf(await User.findOrCreateBy({ name: "a" })).toEqualTypeOf<User>();
+    expectTypeOf(await User.findOrCreateBy({ name: "a" })).toEqualTypeOf<User | undefined>();
     expectTypeOf(await User.findOrInitializeBy({ name: "a" })).toEqualTypeOf<User>();
-    expectTypeOf(await User.createOrFindBy({ name: "a" })).toEqualTypeOf<User>();
-    expectTypeOf(await User.createOrFindByBang({ name: "a" })).toEqualTypeOf<User>();
+    expectTypeOf(await User.createOrFindBy({ name: "a" })).toEqualTypeOf<User | undefined>();
+    expectTypeOf(await User.createOrFindByBang({ name: "a" })).toEqualTypeOf<User | undefined>();
     expectTypeOf(await User.destroyBy({ name: "a" })).toEqualTypeOf<User[]>();
     expectTypeOf(await User.destroyAll()).toEqualTypeOf<User[]>();
     expectTypeOf(await User.update(1, { name: "b" })).toEqualTypeOf<User>();

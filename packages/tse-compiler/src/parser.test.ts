@@ -11,7 +11,7 @@ describe("parse", () => {
     expect(ast.typesAnnotation).toBe("{ name: string }");
     expect(ast.nodes).toEqual([
       { kind: "text", value: "hi", srcLine: 0 },
-      { kind: "expr", value: "name", srcLine: 0 },
+      { kind: "expr", value: " name ", srcLine: 0 },
     ]);
   });
 

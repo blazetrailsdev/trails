@@ -838,23 +838,29 @@ export class Relation<T extends Base> {
     return this.updateAll(this.model.touchAttributesWithTime(...(names as string[]), time));
   }
 
-  async findOrCreateBy(attributes: Record<string, unknown>, block?: (r: T) => void): Promise<T> {
+  async findOrCreateBy(
+    attributes: Record<string, unknown>,
+    block?: (r: T) => void,
+  ): Promise<T | undefined> {
     return (await this.findBy(attributes)) || this.createOrFindBy(attributes, block);
   }
 
   async findOrCreateByBang(
     attributes: Record<string, unknown>,
     block?: (r: T) => void,
-  ): Promise<T> {
+  ): Promise<T | undefined> {
     return (await this.findBy(attributes)) || this.createOrFindByBang(attributes, block);
   }
 
-  async createOrFindBy(attributes: Record<string, unknown>, block?: (r: T) => void): Promise<T> {
+  async createOrFindBy(
+    attributes: Record<string, unknown>,
+    block?: (r: T) => void,
+  ): Promise<T | undefined> {
     return this.withConnection(async (connection) => {
       try {
-        return (await this.transaction(() => this.create(attributes, block), {
+        return await this.transaction(() => this.create(attributes, block), {
           requiresNew: true,
-        })) as T;
+        });
       } catch (e) {
         if (!(e instanceof RecordNotUnique)) throw e;
         if (connection.isTransactionOpen()) {
@@ -868,12 +874,12 @@ export class Relation<T extends Base> {
   async createOrFindByBang(
     attributes: Record<string, unknown>,
     block?: (r: T) => void,
-  ): Promise<T> {
+  ): Promise<T | undefined> {
     return this.withConnection(async (connection) => {
       try {
-        return (await this.transaction(() => this.createBang(attributes, block), {
+        return await this.transaction(() => this.createBang(attributes, block), {
           requiresNew: true,
-        })) as T;
+        });
       } catch (e) {
         if (!(e instanceof RecordNotUnique)) throw e;
         if (connection.isTransactionOpen()) {

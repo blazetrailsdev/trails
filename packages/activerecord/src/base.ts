@@ -1424,7 +1424,7 @@ export class Base extends Model {
     this: T,
     conditions: Record<string, unknown>,
     block?: (r: InstanceType<T>) => void,
-  ): Promise<InstanceType<T>> {
+  ): Promise<InstanceType<T> | undefined> {
     return this.all().createOrFindBy(conditions, block);
   }
 
@@ -1432,7 +1432,7 @@ export class Base extends Model {
     this: T,
     conditions: Record<string, unknown>,
     block?: (r: InstanceType<T>) => void,
-  ): Promise<InstanceType<T>> {
+  ): Promise<InstanceType<T> | undefined> {
     return this.all().createOrFindByBang(conditions, block);
   }
 

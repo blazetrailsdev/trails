@@ -441,6 +441,7 @@ export {
   htmlEscapeOnce,
   jsonEscape,
   xmlNameEscape,
+  tokenize,
 } from "./core-ext/tse/util.js";
 export { HtmlSafeTranslation } from "./html-safe-translation.js";
 export { BacktraceCleaner } from "./backtrace-cleaner.js";

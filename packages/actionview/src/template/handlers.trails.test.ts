@@ -10,7 +10,8 @@ describe("Template::Handlers.extended", () => {
   const buildView = (): Base => {
     const resolver = new FixtureResolver({
       "test/greeting.html": "<p>Hello</p>",
-      "ruby_template.ruby": '["Hello", "from", "Ruby", "code"].join(" ")',
+      "ruby_template.ruby":
+        'let body = "";\nbody += ["Hello", "from", "Ruby", "code"].join(" ");\nreturn body;',
     });
     const lookupContext = new LookupContext(null, {}, []);
     lookupContext.appendViewPaths([resolver]);

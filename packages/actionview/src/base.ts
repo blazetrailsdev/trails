@@ -406,7 +406,7 @@ export class Base {
 
   /** @internal */
   private currentFormat(): string {
-    return this.currentTemplate?.format ?? ":html";
+    return this.currentTemplate?.format ?? (this.lookupContext!.formats[0] as string);
   }
 }
 

@@ -633,7 +633,7 @@ export function findOrCreateBy<T extends typeof Base>(
   this: T,
   conditions: Record<string, unknown>,
   block?: (r: InstanceType<T>) => void,
-): Promise<InstanceType<T>> {
+): Promise<InstanceType<T> | undefined> {
   return this.all().findOrCreateBy(conditions, block);
 }
 
@@ -641,7 +641,7 @@ export function findOrCreateByBang<T extends typeof Base>(
   this: T,
   conditions: Record<string, unknown>,
   block?: (r: InstanceType<T>) => void,
-): Promise<InstanceType<T>> {
+): Promise<InstanceType<T> | undefined> {
   return this.all().findOrCreateByBang(conditions, block);
 }
 
