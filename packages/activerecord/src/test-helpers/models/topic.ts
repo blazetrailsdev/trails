@@ -177,11 +177,15 @@ export class Topic extends Base {
     });
   }
 
-  afterTouchCalled = 0;
+  declare afterTouchCalled: number;
 
   static {
-    this.afterTouch(async (record: any) => {
-      record.afterTouchCalled = (record.afterTouchCalled ?? 0) + 1;
+    this.afterInitialize((record: Topic) => {
+      record.afterTouchCalled = 0;
+    });
+
+    this.afterTouch(async (record: Topic) => {
+      record.afterTouchCalled += 1;
     });
   }
 

@@ -660,7 +660,7 @@ export class AuditRequiredDeveloper extends Base {
 }
 
 export class DevWithAfterTouch extends Base {
-  afterTouchCalled = false;
+  declare afterTouchCalled: boolean | undefined;
 
   static {
     this.tableName = "developers";

@@ -980,6 +980,10 @@ export class Base extends Model {
   static benchmark = benchmarkable;
 
   declare static touchAttributesWithTime: typeof Timestamp.touchAttributesWithTime;
+  declare static timestampAttributesForCreateInModel: typeof Timestamp.timestampAttributesForCreateInModel;
+  declare static timestampAttributesForUpdateInModel: typeof Timestamp.timestampAttributesForUpdateInModel;
+  declare static allTimestampAttributesInModel: typeof Timestamp.allTimestampAttributesInModel;
+  declare static currentTimeFromProperTimezone: typeof Timestamp.currentTimeFromProperTimezone;
   /** @internal */
   declare static timestampAttributesForCreate: typeof Timestamp.timestampAttributesForCreate;
   /** @internal */
@@ -2625,6 +2629,10 @@ extend(Base, {
 });
 extend(Base, {
   touchAttributesWithTime: Timestamp.touchAttributesWithTime,
+  timestampAttributesForCreateInModel: Timestamp.timestampAttributesForCreateInModel,
+  timestampAttributesForUpdateInModel: Timestamp.timestampAttributesForUpdateInModel,
+  allTimestampAttributesInModel: Timestamp.allTimestampAttributesInModel,
+  currentTimeFromProperTimezone: Timestamp.currentTimeFromProperTimezone,
   timestampAttributesForCreate: Timestamp.timestampAttributesForCreate,
   timestampAttributesForUpdate: Timestamp.timestampAttributesForUpdate,
 });

@@ -1,6 +1,5 @@
 import type { Base } from "./base.js";
 import { ActiveRecordError } from "./errors.js";
-import { timestampAttributesForUpdateInModel, currentTimeFromProperTimezone } from "./timestamp.js";
 import type { TouchArgs, TouchOptions } from "./timestamp.js";
 import { extractOptionsBang } from "@blazetrails/activesupport";
 import { BelongsTo as BelongsToBuilder } from "./associations/builder/belongs-to.js";
@@ -24,7 +23,7 @@ export async function touchLater(this: Base, ...names: string[]): Promise<void> 
   const self = this as any;
 
   if (!self._deferTouchAttrs) {
-    self._deferTouchAttrs = [...timestampAttributesForUpdateInModel.call(ctor)];
+    self._deferTouchAttrs = [...self.timestampAttributesForUpdateInModel()];
   }
 
   if (names.length > 0) {
@@ -35,7 +34,7 @@ export async function touchLater(this: Base, ...names: string[]): Promise<void> 
     }
   }
 
-  self._touchTime = currentTimeFromProperTimezone();
+  self._touchTime = self.currentTimeFromProperTimezone();
   surreptitiouslyTouch.call(this, self._deferTouchAttrs as string[]);
 
   await addToTransaction.call(this);

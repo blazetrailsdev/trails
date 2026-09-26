@@ -14,7 +14,6 @@ import { isPresent, many, reverseMerge } from "@blazetrails/activesupport";
 import { except } from "@blazetrails/ruby-compat";
 import { first } from "@blazetrails/ruby-compat";
 import { withConnection } from "./connection-handling.js";
-import { allTimestampAttributesInModel, timestampAttributesForUpdateInModel } from "./timestamp.js";
 
 type ModelClass = typeof Base;
 
@@ -217,7 +216,7 @@ export class InsertAll {
     if (this._keysIncludingTimestamps) return this._keysIncludingTimestamps;
     if (this.recordTimestamps()) {
       const result = new Set(this.keys);
-      for (const col of allTimestampAttributesInModel.call(this.model as never)) {
+      for (const col of this.model.allTimestampAttributesInModel()) {
         result.add(col);
       }
       this._keysIncludingTimestamps = result;
@@ -415,7 +414,7 @@ export class InsertAll {
   private timestampsForCreate(): Record<string, unknown> {
     const now = Temporal.Now.instant();
     const result: Record<string, unknown> = {};
-    for (const col of allTimestampAttributesInModel.call(this.model as never)) {
+    for (const col of this.model.allTimestampAttributesInModel()) {
       result[col] = now;
     }
     return result;
@@ -552,8 +551,8 @@ export class Builder implements InsertBuilder {
     if (!this._insertAll.updateDuplicates() || !this._insertAll.recordTimestamps()) {
       return "";
     }
-    return timestampAttributesForUpdateInModel
-      .call(this.model as never)
+    return this.model
+      .timestampAttributesForUpdateInModel()
       .filter((columnName) => this.touchTimestampAttribute(columnName))
       .map(
         (columnName) =>

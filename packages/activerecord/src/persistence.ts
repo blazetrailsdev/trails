@@ -1,11 +1,5 @@
 import { Time as RubyTime } from "@blazetrails/date";
-import {
-  currentTimeFromProperTimezone,
-  timestampAttributesForUpdateInModel,
-  type TimestampHost,
-  type TouchArgs,
-  type TouchOptions,
-} from "./timestamp.js";
+import { type TouchArgs, type TouchOptions } from "./timestamp.js";
 import { Rational, basicObjRespondTo, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import type { CounterCacheCounters } from "./counter-cache.js";
@@ -779,6 +773,7 @@ type PersistenceInternalHost = PersistencePrivateHost & {
   _writeAttribute(name: string, val: unknown): void;
   _triggerUpdateCallback?: boolean | null;
   _attributes?: { keys?(): Iterable<string> };
+  currentTimeFromProperTimezone(): RubyTime;
   constructor: PersistencePrivateHost["constructor"] & {
     columnNames?(): string[];
     _counterCacheColumns?: string[];
@@ -897,9 +892,7 @@ export async function touch(this: Base, ...names: TouchArgs): Promise<boolean> {
   const aliases: Record<string, string> = (ctor as any).attributeAliases ?? {};
   const resolvedNames = (names as string[]).map((name) => aliases[name] ?? name);
 
-  const updateTimestampAttrs = timestampAttributesForUpdateInModel.call(
-    ctor as unknown as TimestampHost,
-  );
+  const updateTimestampAttrs: string[] = (this as any).timestampAttributesForUpdateInModel();
   for (const name of new Set([...updateTimestampAttrs, ...resolvedNames])) {
     verifyReadonlyAttribute.call(this as unknown as PersistencePrivateHost, name);
   }
@@ -926,7 +919,7 @@ export function _touchRow(
   attributeNames: string[],
   time?: RubyTime | Date | null,
 ): Promise<number> {
-  time ??= currentTimeFromProperTimezone();
+  time ??= this.currentTimeFromProperTimezone();
   if (time instanceof Date) time = RubyTime.at(new Rational(time.getTime(), 1000)); // boundary: accepts JS Date from touch(time:) callers
   for (const attrName of attributeNames) {
     this._writeAttribute(attrName, time);

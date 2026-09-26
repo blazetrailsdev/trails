@@ -1,13 +1,16 @@
 import {
   ArgumentError,
   dasherize,
+  deepMerge,
   EncryptedFile,
   getEnv,
+  isPlainObject,
+  OrderedOptions,
   runLoadHooks,
   setTrailsRoot,
   underscore,
 } from "@blazetrails/activesupport";
-import { getFs, getPath } from "@blazetrails/ruby-compat";
+import { getFs, getPath, RuntimeError } from "@blazetrails/ruby-compat";
 import { Executor, Reloader } from "@blazetrails/activesupport";
 import { CachingKeyGenerator, KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
@@ -22,7 +25,8 @@ import { Finisher } from "./application/finisher.js";
 import { Configuration } from "./application/configuration.js";
 import { RoutesReloader } from "./application/routes-reloader.js";
 import "./assets/trailtie.js";
-import { resolveEnv, loadDatabaseConfig, type DatabaseConfig } from "./database.js";
+import { resolveEnv } from "./database.js";
+import { Trails } from "./rails.js";
 import { Collection, type InitializerGroup } from "./initializable.js";
 import type { CacheStore, Logger } from "@blazetrails/activesupport";
 import type { MiddlewareStack, RackApp } from "@blazetrails/actionpack";
@@ -236,11 +240,39 @@ export class Application extends Engine {
     });
   }
 
-  async configFor(name: string, opts: { env?: string } = {}): Promise<DatabaseConfig> {
-    if (name !== "database") {
-      throw new Error(`configFor: only "database" is supported in trailties (got "${name}").`);
+  async configFor(
+    name: string,
+    { env = Trails.env.toString() }: { env?: string } = {},
+  ): Promise<unknown> {
+    const configDir = ((await (await this.paths()).get("config")?.existent()) ?? [])[0];
+    const yaml = `${configDir}/${name}`;
+    let ext: string | undefined;
+    for (const e of [".ts", ".js"]) ext ??= (await getFs().exists(`${yaml}${e}`)) ? e : undefined;
+    if (ext !== undefined) {
+      const mod: { default?: unknown } = await import(
+        getPath().pathToFileURL!(`${yaml}${ext}`).href
+      );
+      const allConfigs = mod.default ?? {};
+      let config = (allConfigs as Record<string, unknown>)[env] ?? null;
+      const shared = (allConfigs as Record<string, unknown>).shared;
+
+      if (shared != null && shared !== false) {
+        if (config == null && isPlainObject(shared)) config = {};
+        if (isPlainObject(config) && isPlainObject(shared)) {
+          config = deepMerge(shared, config);
+        } else if (config == null) {
+          config = shared;
+        }
+      }
+
+      if (isPlainObject(config)) {
+        config = new OrderedOptions().update(config);
+      }
+
+      return config;
+    } else {
+      throw new RuntimeError(`Could not load configuration. No such file - ${yaml}.ts`);
     }
-    return loadDatabaseConfig(opts.env ?? resolveEnv(), await this.root());
   }
 }
 

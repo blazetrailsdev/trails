@@ -467,16 +467,36 @@ function findDescriptor(object: object, name: string): PropertyDescriptor | unde
   return undefined;
 }
 
-export function assertEmpty(obj: unknown, msg: string | (() => string) | null = null): void {
+export function assertEmpty(
+  obj: { isEmpty(): Promise<unknown> },
+  msg?: string | (() => string) | null,
+): Promise<void>;
+export function assertEmpty(obj: unknown, msg?: string | (() => string) | null): void;
+export function assertEmpty(
+  obj: unknown,
+  msg: string | (() => string) | null = null,
+): void | Promise<void> {
   msg = message(msg, null, () => `Expected ${inspect(obj)} to be empty`);
   assertRespondTo(obj, "isEmpty");
-  assert(isEmptyCollection(obj), msg);
+  const empty = isEmptyCollection(obj);
+  if (empty instanceof Promise) return empty.then((result) => void assert(result, msg));
+  assert(empty, msg);
 }
 
-export function assertNotEmpty(obj: unknown, msg: string | (() => string) | null = null): void {
+export function assertNotEmpty(
+  obj: { isEmpty(): Promise<unknown> },
+  msg?: string | (() => string) | null,
+): Promise<void>;
+export function assertNotEmpty(obj: unknown, msg?: string | (() => string) | null): void;
+export function assertNotEmpty(
+  obj: unknown,
+  msg: string | (() => string) | null = null,
+): void | Promise<void> {
   msg = message(msg, null, () => `Expected ${inspect(obj)} to not be empty`);
   assertRespondTo(obj, "isEmpty");
-  refute(isEmptyCollection(obj), msg);
+  const empty = isEmptyCollection(obj);
+  if (empty instanceof Promise) return empty.then((result) => void refute(result, msg));
+  refute(empty, msg);
 }
 
 /** @noRailsEquivalent CONVERGEABLE assert-includes-receipt-is-a-scoring-gap-not-permanent */
@@ -542,8 +562,8 @@ function collectionIncludes(collection: unknown, obj: unknown): boolean | Promis
   return false;
 }
 
-function isEmptyCollection(actual: unknown): boolean {
-  const collection = actual as { isEmpty?: () => boolean };
+function isEmptyCollection(actual: unknown): unknown {
+  const collection = actual as { isEmpty?: () => unknown };
   if (typeof collection.isEmpty === "function") return collection.isEmpty();
   return isEmpty(actual as object);
 }

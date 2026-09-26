@@ -2,7 +2,6 @@ import { hasKey, hashDelete } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import { FixtureSet, type Fixture } from "../fixtures.js";
 import { findStiClass } from "../inheritance.js";
-import { allTimestampAttributesInModel } from "../timestamp.js";
 import type { TableRows } from "./table-rows.js";
 import type { ModelMetadata } from "./model-metadata.js";
 
@@ -55,7 +54,7 @@ export class HasManyThroughProxy extends ReflectionProxy {
   }
 
   get timestampColumnNames(): string[] {
-    return allTimestampAttributesInModel.call(this._association.throughReflection.klass as never);
+    return this._association.throughReflection.klass.allTimestampAttributesInModel();
   }
 }
 

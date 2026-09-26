@@ -120,6 +120,11 @@ export class OrderedOptions {
     return undefined;
   }
 
+  update(otherHash: Record<string, unknown>): this {
+    for (const [key, value] of Object.entries(otherHash)) this.set(key, value);
+    return this;
+  }
+
   clear(): this {
     this.data.clear();
     return this;

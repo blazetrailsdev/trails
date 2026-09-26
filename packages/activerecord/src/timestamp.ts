@@ -1,6 +1,6 @@
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Rational } from "@blazetrails/ruby-compat";
-import { currentTimeInstant } from "@blazetrails/activesupport";
+import { currentTimeInstant, indexWith } from "@blazetrails/activesupport";
 import { reloadSchemaFromCache as attributesReloadSchemaFromCache } from "./attributes.js";
 import { isUtc } from "./type/internal/timezone.js";
 
@@ -21,6 +21,10 @@ export interface TimestampHost {
   _allTimestampAttributesInModel?: string[];
   timestampAttributesForCreate(): string[];
   timestampAttributesForUpdate(): string[];
+  timestampAttributesForCreateInModel(): string[];
+  timestampAttributesForUpdateInModel(): string[];
+  allTimestampAttributesInModel(): string[];
+  currentTimeFromProperTimezone(): RubyTime;
 }
 
 interface TimestampInstanceHost {
@@ -33,6 +37,9 @@ interface TimestampInstanceHost {
   hasChangesToSave?: boolean;
   id?: unknown;
   recordTimestamps?: boolean;
+  timestampAttributesForUpdateInModel(): string[];
+  allTimestampAttributesInModel(): string[];
+  currentTimeFromProperTimezone(): RubyTime;
   constructor: TimestampHost & { recordTimestamps: boolean; partialUpdates?: boolean };
 }
 
@@ -44,15 +51,14 @@ export function touchAttributesWithTime(
   this: TimestampHost,
   ...args: [...names: string[], time: RubyTime | undefined]
 ): Record<string, RubyTime> {
-  const names = args.slice(0, -1) as string[];
+  let names = args.slice(0, -1) as string[];
   const time = args[args.length - 1] as RubyTime | undefined;
-  const resolvedTime = time ?? currentTimeFromProperTimezone();
-  const resolved = names.map((n) => this.attributeAliases?.[n] ?? n);
-  const updateAttrs = timestampAttributesForUpdateInModel.call(this);
-  const allNames = [...new Set([...updateAttrs, ...resolved])];
-  const result: Record<string, RubyTime> = {};
-  for (const name of allNames) result[name] = resolvedTime;
-  return result;
+  names = names.map((name) => this.attributeAliases?.[name] ?? name);
+  let attributeNames = this.timestampAttributesForUpdateInModel();
+  attributeNames = [...new Set([...attributeNames, ...names])];
+  return Object.fromEntries(
+    indexWith(attributeNames, time ?? this.currentTimeFromProperTimezone()),
+  );
 }
 
 export type CounterCacheTouchOption =
@@ -86,8 +92,8 @@ export function timestampAttributesForUpdateInModel(this: TimestampHost): string
 export function allTimestampAttributesInModel(this: TimestampHost): string[] {
   if (this._allTimestampAttributesInModel) return this._allTimestampAttributesInModel;
   this._allTimestampAttributesInModel = [
-    ...timestampAttributesForCreateInModel.call(this),
-    ...timestampAttributesForUpdateInModel.call(this),
+    ...this.timestampAttributesForCreateInModel(),
+    ...this.timestampAttributesForUpdateInModel(),
   ];
   return this._allTimestampAttributesInModel;
 }
@@ -139,9 +145,9 @@ export async function _createRecord(
   superFn: () => Promise<unknown>,
 ): Promise<unknown> {
   if ((this.recordTimestamps ?? this.constructor.recordTimestamps) !== false) {
-    const currentTime = currentTimeFromProperTimezone();
+    const currentTime = this.currentTimeFromProperTimezone();
 
-    for (const column of allTimestampAttributesInModel.call(this.constructor)) {
+    for (const column of this.allTimestampAttributesInModel()) {
       if (this._readAttribute?.(column) == null) {
         this._writeAttribute?.(column, currentTime);
       }
@@ -177,8 +183,8 @@ export async function recordUpdateTimestamps<T>(
   block?: () => Promise<T>,
 ): Promise<T | undefined> {
   if (this._touchRecord && shouldRecordTimestamps.call(this)) {
-    const currentTime = currentTimeFromProperTimezone();
-    for (const column of timestampAttributesForUpdateInModel.call(this.constructor)) {
+    const currentTime = this.currentTimeFromProperTimezone();
+    for (const column of this.timestampAttributesForUpdateInModel()) {
       if (!this.isWillSaveChangeToAttribute?.(column)) {
         this._writeAttribute?.(column, currentTime);
       }
@@ -198,7 +204,7 @@ export function shouldRecordTimestamps(this: TimestampInstanceHost): boolean {
 
 /** @internal */
 export function maxUpdatedColumnTimestamp(this: TimestampInstanceHost): RubyTime | null {
-  const attrs = timestampAttributesForUpdateInModel.call(this.constructor);
+  const attrs = this.timestampAttributesForUpdateInModel();
   let max: RubyTime | null = null;
   for (const attr of attrs) {
     const v = this.readAttribute?.(attr);
@@ -216,7 +222,7 @@ export function maxUpdatedColumnTimestamp(this: TimestampInstanceHost): RubyTime
 
 /** @internal */
 export function clearTimestampAttributes(this: TimestampInstanceHost): void {
-  for (const attributeName of allTimestampAttributesInModel.call(this.constructor)) {
+  for (const attributeName of this.allTimestampAttributesInModel()) {
     (this as unknown as Record<string, unknown>)[attributeName] = null;
     this.clearAttributeChange?.(attributeName);
   }
@@ -227,15 +233,17 @@ export const InstanceMethods = {
   recordUpdateTimestamps,
   shouldRecordTimestamps,
   timestampAttributesForCreateInModel(this: { constructor: TimestampHost }): string[] {
-    return timestampAttributesForCreateInModel.call(this.constructor);
+    return this.constructor.timestampAttributesForCreateInModel();
   },
   timestampAttributesForUpdateInModel(this: { constructor: TimestampHost }): string[] {
-    return timestampAttributesForUpdateInModel.call(this.constructor);
+    return this.constructor.timestampAttributesForUpdateInModel();
   },
   allTimestampAttributesInModel(this: { constructor: TimestampHost }): string[] {
-    return allTimestampAttributesInModel.call(this.constructor);
+    return this.constructor.allTimestampAttributesInModel();
   },
-  currentTimeFromProperTimezone,
+  currentTimeFromProperTimezone(this: { constructor: TimestampHost }): RubyTime {
+    return this.constructor.currentTimeFromProperTimezone();
+  },
   maxUpdatedColumnTimestamp,
   clearTimestampAttributes,
 };

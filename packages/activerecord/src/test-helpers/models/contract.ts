@@ -11,8 +11,8 @@ export class Contract extends Base {
   declare count: number;
   declare developer_id: number;
 
-  hiCount = 0;
-  byeCount = 0;
+  declare hiCount: number | undefined;
+  declare byeCount: number | undefined;
 
   static {
     this.belongsTo("company");

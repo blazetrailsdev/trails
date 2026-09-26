@@ -147,7 +147,7 @@ describe("createFixtures", () => {
 
   function makePlainThroughAuthor() {
     const Categorization = makeModel("categorizations", new Map());
-    Categorization._allTimestampAttributesInModel = [];
+    Categorization.allTimestampAttributesInModel = () => [];
     const Author = makeModel(
       "authors",
       new Map([

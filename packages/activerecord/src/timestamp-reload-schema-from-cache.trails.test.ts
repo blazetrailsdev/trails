@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import { Base } from "./base.js";
 import { Toy } from "./test-helpers/models/toy.js";
 import { fixtures } from "./test-fixtures.js";
-import * as Timestamp from "./timestamp.js";
 
 describe("timestamp reload_schema_from_cache", () => {
   fixtures(["toys", "books"]);
@@ -10,10 +9,7 @@ describe("timestamp reload_schema_from_cache", () => {
   it("clears the memoized timestamp attributes", async () => {
     await Toy.first();
 
-    expect(Timestamp.allTimestampAttributesInModel.call(Toy as never)).toEqual([
-      "created_at",
-      "updated_at",
-    ]);
+    expect(Toy.allTimestampAttributesInModel()).toEqual(["created_at", "updated_at"]);
     const klass = Toy as unknown as Record<string, unknown>;
     expect(klass._allTimestampAttributesInModel).toBeDefined();
     expect(klass._timestampAttributesForCreateInModel).toBeDefined();
@@ -47,8 +43,24 @@ describe("timestamp reload_schema_from_cache", () => {
       expect(book.readAttribute("updated_on")).toEqual(updatedOn);
       expect(book.readAttribute("updated_at")).not.toBeNull();
     }
-    expect(
-      Timestamp.timestampAttributesForUpdateInModel.call(BookWithoutUpdatedOn as never),
-    ).toEqual(["updated_at"]);
+    expect(BookWithoutUpdatedOn.timestampAttributesForUpdateInModel()).toEqual(["updated_at"]);
+  });
+
+  it("touch dispatches timestamp_attributes_for_update_in_model through the model class", async () => {
+    class BookTouchingOnlyUpdatedOn extends Base {
+      static {
+        this.tableName = "books";
+      }
+      static timestampAttributesForUpdateInModel(): string[] {
+        return ["updated_on"];
+      }
+    }
+    const book = (await BookTouchingOnlyUpdatedOn.first())!;
+    await book.updateColumn("updated_at", new Date("2001-01-01T00:00:00Z"));
+    await book.reload();
+    const updatedAt = book.readAttribute("updated_at");
+    await book.touch();
+    await book.reload();
+    expect(book.readAttribute("updated_at")).toEqual(updatedAt);
   });
 });

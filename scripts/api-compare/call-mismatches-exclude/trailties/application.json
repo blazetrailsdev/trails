@@ -23,13 +23,6 @@
   {
     "package": "trailties",
     "tsFile": "application.ts",
-    "rubyName": "config_for",
-    "call": "update",
-    "reason": "application.rb:180 `ActiveSupport::OrderedOptions.new.update(config)` — the receiver is an `OrderedOptions`, and trails' `configFor` supports only `\"database\"`, loading it through `loadDatabaseConfig` rather than parsing a YAML file into an options object (application.ts:278-283)."
-  },
-  {
-    "package": "trailties",
-    "tsFile": "application.ts",
     "rubyName": "find_root",
     "call": "find_root_with_flag",
     "kind": "args",
