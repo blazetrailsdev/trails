@@ -161,9 +161,8 @@ describe("Collector#response", () => {
   it("calls the variant block for the inline variant syntax", () => {
     const rendered: string[] = [];
     controller("phone").respondTo((format) => {
-      const html = format.custom("html") as Variants;
-      html.none(() => rendered.push("none"));
-      html.phone(() => rendered.push("phone"));
+      (format.html() as Variants).none(() => rendered.push("none"));
+      (format.html() as Variants).phone(() => rendered.push("phone"));
     });
 
     expect(rendered).toEqual(["phone"]);
@@ -172,9 +171,8 @@ describe("Collector#response", () => {
   it("calls the none variant for the inline variant syntax when no variant is set", () => {
     const rendered: string[] = [];
     controller().respondTo((format) => {
-      const html = format.custom("html") as Variants;
-      html.none(() => rendered.push("none"));
-      html.phone(() => rendered.push("phone"));
+      (format.html() as Variants).none(() => rendered.push("none"));
+      (format.html() as Variants).phone(() => rendered.push("phone"));
     });
 
     expect(rendered).toEqual(["none"]);
@@ -202,6 +200,16 @@ describe("Collector#response", () => {
     });
 
     expect(rendered).toEqual(["any"]);
+  });
+
+  it("reuses the catch-all variant collector across blockless any calls", () => {
+    const rendered: string[] = [];
+    controller("phone").respondTo((format) => {
+      (format.any() as Variants).phone(() => rendered.push("phone"));
+      (format.any() as Variants).tablet(() => rendered.push("tablet"));
+    });
+
+    expect(rendered).toEqual(["phone"]);
   });
 
   it("answers a zero-arity format block itself", () => {

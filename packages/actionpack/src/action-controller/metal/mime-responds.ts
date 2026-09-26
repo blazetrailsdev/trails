@@ -11,7 +11,7 @@ export { type FormatHandler };
 type VariantBlock = (variant: VariantCollector) => unknown;
 type Response = FormatHandler | VariantBlock | VariantCollector;
 
-export class Collector extends DispatchCollector<Response> {
+export class Collector extends DispatchCollector<Response, Response, Response | string[]> {
   #variant: readonly string[] | null;
   private _response: Response | undefined;
 
@@ -25,21 +25,20 @@ export class Collector extends DispatchCollector<Response> {
     return this.resolvedFormat;
   }
 
-  override any(...args: (string | Response | undefined)[]): this {
+  override any(...args: (string | Response | undefined)[]): Response | string[] {
     const last = args[args.length - 1];
-    const handler = typeof last === "function" ? (args.pop() as FormatHandler) : undefined;
-    const types = args.filter((arg): arg is string => typeof arg === "string");
-
-    if (types.length > 0) {
-      for (const type of types) {
-        this.custom(type, handler);
-      }
-      return this;
+    const block =
+      typeof last === "function" ? (args.pop() as FormatHandler | VariantBlock) : undefined;
+    if (args.length > 0) {
+      for (const type of args as string[]) this.custom(type, block);
+      return args as string[];
+    } else {
+      if (!this.anyHandler) super.any(block ?? new VariantCollector(this.#variant));
+      return this.anyHandler!;
     }
-    return super.any(handler ?? new VariantCollector(this.#variant));
   }
 
-  all(...args: (string | Response | undefined)[]): this {
+  all(...args: (string | Response | undefined)[]): Response | string[] {
     return this.any(...args);
   }
 
@@ -52,9 +51,8 @@ export class Collector extends DispatchCollector<Response> {
     return response;
   }
 
-  override on(format: string, handler?: Response): this {
-    this.custom(format, handler as FormatHandler | VariantBlock | undefined);
-    return this;
+  override on(format: string, handler?: Response): Response {
+    return this.custom(format, handler as FormatHandler | VariantBlock | undefined);
   }
 
   isAnyResponse(): boolean {
