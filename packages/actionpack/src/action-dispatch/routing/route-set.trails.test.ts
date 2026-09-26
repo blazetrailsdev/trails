@@ -70,6 +70,22 @@ describe("ActionDispatch::Routing::Mapper::Mapping#app", () => {
     expect(headers[X_CASCADE]).toBe("pass");
   });
 
+  it("wraps resource routes in Constraints(SERVE) under a constraints block", () => {
+    const routes = new RouteSet();
+    const constraint = () => true;
+    routes.draw((r) => {
+      r.constraints(constraint, () => {
+        r.resources("posts", { only: ["index", "show"] });
+      });
+    });
+    const apps = routes.getRoutes().map((route) => route.app);
+    expect(apps).toHaveLength(2);
+    for (const app of apps) {
+      expect(app).toBeInstanceOf(Constraints);
+      expect((app as Constraints).constraints).toEqual([constraint]);
+    }
+  });
+
   it("dispatches a mounted app answering action through StaticDispatcher", () => {
     const routes = new RouteSet();
     const app = { action: () => app, call: () => [200, {}, []] };
