@@ -197,9 +197,20 @@ describe("ModelGeneratorTest", () => {
 
   it.skip("migration is skipped on skip behavior", () => {});
 
-  it.skip("migration error is not shown on revoke", () => {});
+  it("migration error is not shown on revoke", () => {
+    makeGen().run("Account", []);
+    const revoke = new ModelGenerator({ cwd: tmpDir, output: () => {}, behavior: "revoke" });
+    expect(() => revoke.run("Account", [])).not.toThrow(
+      /Another migration is already named create_accounts/,
+    );
+  });
 
-  it.skip("migration is removed on revoke", () => {});
+  it("migration is removed on revoke", () => {
+    makeGen().run("Account", []);
+    new ModelGenerator({ cwd: tmpDir, output: () => {}, behavior: "revoke" }).run("Account", []);
+    const migrations = fs.readdirSync(path.join(tmpDir, "db/migrate"));
+    expect(migrations.some((f) => /^\d+_create_accounts\.ts$/.test(f))).toBe(false);
+  });
 
   it.skip("existing migration is removed on force", () => {});
 

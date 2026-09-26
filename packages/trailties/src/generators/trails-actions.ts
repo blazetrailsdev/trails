@@ -25,6 +25,7 @@ async function requireAsyncFs(needs: ReadonlyArray<keyof AsyncFs>): Promise<Asyn
 export interface TrailsActionsHost {
   cwd: string;
   output: (msg: string) => void;
+  behavior?: "invoke" | "revoke";
 }
 
 export interface PkgOptions {
@@ -203,6 +204,12 @@ async function injectIntoFile(
   const fs = await requireAsyncFs(["readFile", "writeFile"]);
   const full = getPath().join(host.cwd, relPath);
   const content = await fs.readFile(full, "utf-8");
+  if (host.behavior === "revoke") {
+    const flag = typeof after === "string" ? regexpEscape(after) : after.source;
+    const regexp = new RegExp(`(${flag})([^]*)(${regexpEscape(replacement)})`);
+    await fs.writeFile(full, content.replace(regexp, "$1$2"));
+    return;
+  }
   if (content.includes(replacement)) return;
   const flag =
     typeof after === "string"

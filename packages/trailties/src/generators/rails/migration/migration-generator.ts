@@ -9,6 +9,8 @@ import {
 import { NamedBase } from "../../named-base.js";
 import { migrationTimestamp } from "../../base.js";
 import { camelize } from "@blazetrails/activesupport";
+import { File } from "@blazetrails/ruby-compat";
+import { CreateMigration } from "../../actions/create-migration.js";
 
 let lastTimestamp: string | null = null;
 
@@ -39,6 +41,8 @@ export function emitMigrationSource(className: string, timestamp: string): strin
 }
 
 export class MigrationGenerator extends NamedBase {
+  migrationFileName = "";
+
   static exitOnFailure(): boolean {
     return true;
   }
@@ -53,6 +57,11 @@ export class MigrationGenerator extends NamedBase {
     }
     lastTimestamp = timestamp;
     const filename = `db/migrate/${timestamp}_${this.fileName}${this.ext()}`;
+    if (this.behavior === "revoke") {
+      this.migrationFileName = this.fileName;
+      new CreateMigration(this, File.join(this.cwd, filename), "").revoke();
+      return this.getCreatedFiles();
+    }
     this.createFile(filename, emitMigrationSource(camelize(this.fileName), timestamp));
     return this.getCreatedFiles();
   }
