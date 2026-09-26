@@ -248,8 +248,8 @@ export class Request {
     return this.port === this.standardPort;
   }
 
-  get optionalPort(): string {
-    return this.isStandardPort ? "" : `:${this.port}`;
+  get optionalPort(): number | null {
+    return this.isStandardPort ? null : this.port;
   }
 
   get portString(): string {
@@ -586,6 +586,10 @@ export class Request {
   }
   set routeUriPattern(pattern: string | undefined) {
     this.env["action_dispatch.route_uri_pattern"] = pattern;
+  }
+
+  get originalScriptName(): string | undefined {
+    return this.getHeader("ORIGINAL_SCRIPT_NAME") as string | undefined;
   }
 
   /** @internal */

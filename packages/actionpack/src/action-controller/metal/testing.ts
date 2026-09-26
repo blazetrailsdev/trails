@@ -1,5 +1,5 @@
 export function recycle(controller: Record<string, unknown>): void {
-  controller._url_options = undefined;
+  controller._urlOptions = null;
   controller.formats = undefined;
   controller.params = undefined;
 }

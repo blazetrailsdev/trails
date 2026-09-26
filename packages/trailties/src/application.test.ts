@@ -451,6 +451,28 @@ describe("Trails.application integration (boot-app fixture)", () => {
     expect(JSON.parse(await bodyToString(body))).toEqual({ href: "/posts" });
   });
 
+  it("calls a named *_url helper from a controller action against the request host", async () => {
+    const { BootApp } = await import("./__fixtures__/boot-app/config/application.js");
+    class BootAppUrlHelpers extends BootApp {}
+    Application.register(BootAppUrlHelpers);
+    runLoadHooks("action_controller", ActionController.Base);
+    const app = Trails.application!;
+    app.config.setRoot(new URL("./__fixtures__/boot-app", import.meta.url).pathname);
+
+    await Trails.initialize();
+
+    const [status, , body] = await app.app()({
+      REQUEST_METHOD: "GET",
+      PATH_INFO: "/posts/url",
+      HTTP_HOST: "blog.example.com:8080",
+      "rack.url_scheme": "https",
+    });
+    expect(status).toBe(200);
+    expect(JSON.parse(await bodyToString(body))).toEqual({
+      href: "https://blog.example.com:8080/posts",
+    });
+  });
+
   it("renders the dev error page through DebugExceptions rather than an ad-hoc catch", async () => {
     const { BootApp } = await import("./__fixtures__/boot-app/config/application.js");
     class BootAppDebug extends BootApp {}

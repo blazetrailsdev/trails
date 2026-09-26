@@ -74,9 +74,9 @@ describe("RequestPort", () => {
 
   it("optional port", () => {
     const req = new Request({ SERVER_PORT: "80", "rack.url_scheme": "http" });
-    expect(req.optionalPort).toBe("");
+    expect(req.optionalPort).toBeNull();
     const req2 = new Request({ HTTP_HOST: "example.com:3000" });
-    expect(req2.optionalPort).toBe(":3000");
+    expect(req2.optionalPort).toBe(3000);
   });
 
   it("port string", () => {

@@ -114,6 +114,7 @@ import {
   type ParamsWrapperHost,
 } from "./metal/params-wrapper.js";
 import { processAction as _processAction } from "./metal/rendering.js";
+import { urlOptions } from "./metal/url-for.js";
 import {
   appendInfoToPayload,
   cleanupViewRuntime,
@@ -241,6 +242,7 @@ export class Base extends Metal {
 
   constructor(...args: unknown[]) {
     super(...(args as []));
+    this._urlOptions = null;
     this._actionHasLayout = true;
     fireInherited(
       new.target as unknown as HelpersPathControllerClass,
@@ -825,6 +827,11 @@ export class Base extends Metal {
   declare fragmentExist: typeof fragmentExist;
   declare expireFragment: typeof expireFragment;
 
+  declare urlOptions: typeof urlOptions;
+  /** @internal */
+  declare _urlOptions: Readonly<Record<string, unknown>> | null;
+  declare defaultUrlOptions: Record<string, unknown>;
+
   /** @internal */
   declare sendFileHeadersBang: typeof sendFileHeadersBang;
   /** @internal */
@@ -989,6 +996,9 @@ helperMethod(Base as unknown as HelpersClassMethods, "viewCacheDependencies");
 
 runLoadHooks("action_controller_base", Base);
 runLoadHooks("action_controller", Base);
+
+Base.prototype.urlOptions = urlOptions;
+classAttribute.call(Base, "defaultUrlOptions", { default: {} });
 
 Base.prototype.sendFileHeadersBang = sendFileHeadersBang;
 
