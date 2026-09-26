@@ -270,7 +270,6 @@ export function rbFSend(recv: unknown, mid: string, ...args: unknown[]): unknown
   return sendInternal(args.length, [mid, ...args], recv, "fcall");
 }
 
-/** `send_internal` (`vendor/ruby/vm_eval.c:1227`). */
 function sendInternal(
   argc: number,
   argv: [string, ...unknown[]],
