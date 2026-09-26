@@ -2,7 +2,7 @@
 import { humanize, include, pluralize, type Included } from "@blazetrails/activesupport";
 import { dasherize, parseColumns } from "../../base.js";
 import { NamedBase, type NamedBaseOptions } from "../../named-base.js";
-import { normalizeModelName, type ModelHelpersOptions } from "../../model-helpers.js";
+import type { ModelHelpersOptions } from "../../model-helpers.js";
 import { ResourceHelpers } from "../../resource-helpers.js";
 import { ModelGenerator } from "../../model-generator.js";
 import { tsBody, tsMethod, type Method } from "../../../template-builder/index.js";
@@ -19,15 +19,6 @@ export class ScaffoldGenerator extends NamedBase {
   declare controllerName: string;
   declare controllerFileName: string;
   declare _controllerClassPath: string[];
-
-  constructor(options: ScaffoldGeneratorOptions) {
-    super(options);
-    const singular = normalizeModelName(this.name, options, options.output);
-    if (singular !== this.name) {
-      this.name = singular;
-      this.assignNamesBang(this.name);
-    }
-  }
 
   run(): string[] {
     const args = (this.options as ScaffoldGeneratorOptions).attributes ?? [];

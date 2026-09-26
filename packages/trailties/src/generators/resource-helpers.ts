@@ -1,8 +1,17 @@
-import { camelize, included, initialize, pluralize, underscore } from "@blazetrails/activesupport";
+import {
+  camelize,
+  include,
+  included,
+  initialize,
+  pluralize,
+  underscore,
+} from "@blazetrails/activesupport";
+import { ModelHelpers } from "./model-helpers.js";
 import type { GeneratorBase } from "./base.js";
 import type { NamedBase } from "./named-base.js";
 
 export interface ResourceHelpersHost extends NamedBase {
+  options: NamedBase["options"] & { modelName?: string };
   controllerName: string;
   controllerFileName: string;
   _controllerClassPath: string[];
@@ -13,13 +22,9 @@ export interface ResourceHelpersHost extends NamedBase {
   controllerFilePath(): string;
 }
 
-function modelName(host: NamedBase): string | undefined {
-  return (host.options as { modelName?: string }).modelName;
-}
-
 /** @internal */
 function controllerClassPath(this: ResourceHelpersHost): string[] {
-  if (modelName(this) != null) {
+  if (this.options.modelName != null) {
     return this._controllerClassPath;
   } else {
     return this.classPathParts;
@@ -62,16 +67,15 @@ export const ResourceHelpers = {
   controllerI18nScope,
 
   [included](base: unknown): void {
-    (base as typeof GeneratorBase).classOption("modelName", {
-      type: "string",
-      desc: "ModelName to be used",
-    });
+    const klass = base as typeof GeneratorBase & (new (...args: never[]) => GeneratorBase);
+    include(klass, ModelHelpers);
+    klass.classOption("modelName", { type: "string", desc: "ModelName to be used" });
   },
 
   [initialize](this: ResourceHelpersHost): void {
     const controllerName = this.name;
-    if (modelName(this) != null) {
-      this.name = modelName(this)!;
+    if (this.options.modelName != null) {
+      this.name = this.options.modelName;
       this.assignNamesBang(this.name);
     }
 
