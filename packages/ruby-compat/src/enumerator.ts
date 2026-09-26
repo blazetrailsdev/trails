@@ -1,5 +1,5 @@
 /**
- * `Enumerator` (`vendor/ruby/enumerator.c:411` `enumerator_init`): the
+ * `Enumerator` (`vendor/ruby/v3.3.11/enumerator.c:411` `enumerator_init`): the
  * receiver, method and arguments a block-less `to_enum` records.
  *
  * @noRailsEquivalent PERMANENT
@@ -13,7 +13,7 @@ export class Enumerator {
   ) {}
 
   /**
-   * `enumerator_each` (`vendor/ruby/enumerator.c:613`), without its
+   * `enumerator_each` (`vendor/ruby/v3.3.11/enumerator.c:613`), without its
    * appending-arguments arm.
    *
    * @noRailsEquivalent PERMANENT
@@ -26,7 +26,7 @@ export class Enumerator {
 }
 
 /**
- * `Kernel#to_enum` (`vendor/ruby/enumerator.c:383` `obj_to_enum`), without the
+ * `Kernel#to_enum` (`vendor/ruby/v3.3.11/enumerator.c:383` `obj_to_enum`), without the
  * size block.
  *
  * @noRailsEquivalent PERMANENT

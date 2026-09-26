@@ -1,5 +1,5 @@
 /**
- * Ruby's core `Exception` (`vendor/ruby/error.c:3294` `rb_eException`) — the
+ * Ruby's core `Exception` (`vendor/ruby/v3.3.11/error.c:3294` `rb_eException`) — the
  * root every raisable class descends from. A class declared `< Exception`
  * rather than `< StandardError` escapes a bare `rescue => e`, which rescues
  * `StandardError` only.

@@ -6,7 +6,7 @@ import { ArgumentError } from "./argument-error.js";
 import { FileUtils } from "./file-utils.js";
 import { fsAdapterConfig, getFs, getPath, registerFsAdapter } from "./fs-adapter.js";
 
-/** Forces `mv`'s cross-device fallback (`vendor/ruby/lib/fileutils.rb:1170-1173`). */
+/** Forces `mv`'s cross-device fallback (`vendor/ruby/v3.3.11/lib/fileutils.rb:1170-1173`). */
 function registerExdevFs(): void {
   const fs = getFs();
   registerFsAdapter(
@@ -25,7 +25,7 @@ function registerExdevFs(): void {
 
 /**
  * Answers `predicate` for every `lstat`, so `Entry_#copy`'s arms after
- * `symlink?` (`vendor/ruby/lib/fileutils.rb:2255-2273`) can be reached against
+ * `symlink?` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2255-2273`) can be reached against
  * a backend no test can make a real device, socket or door on.
  */
 function registerSpecialLstatFs(predicate: string): void {
@@ -155,7 +155,7 @@ describe("FileUtils", () => {
   });
 
   it("remove_entry unlinks a symlink to a directory rather than descending into it", () => {
-    // vendor/ruby/lib/fileutils.rb:2192-2198 Entry_#lstat is File.lstat unless dereference?.
+    // vendor/ruby/v3.3.11/lib/fileutils.rb:2192-2198 Entry_#lstat is File.lstat unless dereference?.
     const outside = nodePath.join(root, "outside");
     FileUtils.mkdirP(outside);
     FileUtils.touch(nodePath.join(outside, "keep"));

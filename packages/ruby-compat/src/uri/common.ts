@@ -4,52 +4,52 @@ import { RFC3986Parser } from "./rfc3986-parser.js";
 import type { SplitComponents } from "./rfc3986-parser.js";
 
 /**
- * `URI::RFC3986_PARSER` (`vendor/ruby/lib/uri/common.rb:20`), the parser
+ * `URI::RFC3986_PARSER` (`vendor/ruby/v3.3.11/lib/uri/common.rb:20`), the parser
  * `URI.parse` splits with and the one every parsed URI carries.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `URI::RFC3986_PARSER`
- * (`vendor/ruby/lib/uri/common.rb:20`) ships with the interpreter.
+ * (`vendor/ruby/v3.3.11/lib/uri/common.rb:20`) ships with the interpreter.
  */
 export const RFC3986_PARSER = new RFC3986Parser();
 
 /**
- * `URI::RFC2396_PARSER` (`vendor/ruby/lib/uri/common.rb:22`), which
- * `Rack::Utils::URI_PARSER` (`vendor/rack/lib/rack/utils.rb:27`) and
+ * `URI::RFC2396_PARSER` (`vendor/ruby/v3.3.11/lib/uri/common.rb:22`), which
+ * `Rack::Utils::URI_PARSER` (`vendor/rack/v3.1.14/lib/rack/utils.rb:27`) and
  * `RoutesInspector#normalize_filter` (`inspector.rb:104`) escape through.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `URI::RFC2396_PARSER`
- * (`vendor/ruby/lib/uri/common.rb:22`) ships with the interpreter.
+ * (`vendor/ruby/v3.3.11/lib/uri/common.rb:22`) ships with the interpreter.
  */
 export const RFC2396_PARSER = new RFC2396Parser();
 
 /**
- * `URI::DEFAULT_PARSER` (`vendor/ruby/lib/uri/common.rb:26`), `URI::Parser.new`
+ * `URI::DEFAULT_PARSER` (`vendor/ruby/v3.3.11/lib/uri/common.rb:26`), `URI::Parser.new`
  * — `Parser` is `RFC2396_Parser` (`common.rb:19`) — and the parser
  * `URI::Generic#initialize` defaults to (`generic.rb:174`). MRI's `const_set`
  * loop copying its tables onto `URI` (`common.rb:27-34`) has no port: nothing
  * here reads `URI::ABS_URI`, and the tables hang off the parser.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `URI::DEFAULT_PARSER`
- * (`vendor/ruby/lib/uri/common.rb:26`) ships with the interpreter.
+ * (`vendor/ruby/v3.3.11/lib/uri/common.rb:26`) ships with the interpreter.
  */
 export const DEFAULT_PARSER = new RFC2396Parser();
 
 /**
- * `URI::Error` (`vendor/ruby/lib/uri/common.rb:140`), the base class of every
+ * `URI::Error` (`vendor/ruby/v3.3.11/lib/uri/common.rb:140`), the base class of every
  * URI exception. It extends `globalThis.Error` rather than a bare `Error`
  * because the class's own binding shadows the global inside its own heritage
  * clause; `StandardError`, Ruby's superclass here, is the JS `Error`.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `URI::Error`
- * (`vendor/ruby/lib/uri/common.rb:140`).
+ * (`vendor/ruby/v3.3.11/lib/uri/common.rb:140`).
  */
 export class Error extends globalThis.Error {}
 
 /**
- * `URI::InvalidURIError` (`vendor/ruby/lib/uri/common.rb:144`) — not a URI.
+ * `URI::InvalidURIError` (`vendor/ruby/v3.3.11/lib/uri/common.rb:144`) — not a URI.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails:
- * `URI::InvalidURIError` (`vendor/ruby/lib/uri/common.rb:144`).
+ * `URI::InvalidURIError` (`vendor/ruby/v3.3.11/lib/uri/common.rb:144`).
  */
 export class InvalidURIError extends Error {
   constructor(message: string) {
@@ -59,11 +59,11 @@ export class InvalidURIError extends Error {
 }
 
 /**
- * `URI::InvalidComponentError` (`vendor/ruby/lib/uri/common.rb:148`) — not a
+ * `URI::InvalidComponentError` (`vendor/ruby/v3.3.11/lib/uri/common.rb:148`) — not a
  * URI component.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails:
- * `URI::InvalidComponentError` (`vendor/ruby/lib/uri/common.rb:148`).
+ * `URI::InvalidComponentError` (`vendor/ruby/v3.3.11/lib/uri/common.rb:148`).
  */
 export class InvalidComponentError extends Error {
   constructor(message: string) {
@@ -73,11 +73,11 @@ export class InvalidComponentError extends Error {
 }
 
 /**
- * `URI::BadURIError` (`vendor/ruby/lib/uri/common.rb:152`) — the URI is valid,
+ * `URI::BadURIError` (`vendor/ruby/v3.3.11/lib/uri/common.rb:152`) — the URI is valid,
  * the usage is not.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `URI::BadURIError`
- * (`vendor/ruby/lib/uri/common.rb:152`).
+ * (`vendor/ruby/v3.3.11/lib/uri/common.rb:152`).
  */
 export class BadURIError extends Error {
   constructor(message: string) {
@@ -87,19 +87,19 @@ export class BadURIError extends Error {
 }
 
 /** The `URI::Generic` initializer every registered scheme class answers to
- *  (`vendor/ruby/lib/uri/generic.rb:169`). */
+ *  (`vendor/ruby/v3.3.11/lib/uri/generic.rb:169`). */
 export type GenericClass = new (
   ...args: [...SplitComponents, (RFC2396Parser | RFC3986Parser)?]
 ) => Generic;
 
-/** `URI::Schemes` (`vendor/ruby/lib/uri/common.rb:69`), the namespace
+/** `URI::Schemes` (`vendor/ruby/v3.3.11/lib/uri/common.rb:69`), the namespace
  *  `register_scheme` sets a constant on. A Map here: a JS module has no
  *  namespace to hang a constant off, and MRI's `const_set` is doing no more
  *  than this. */
 const Schemes = new Map<string, GenericClass>();
 
 /**
- * `URI::TBLENCWWWCOMP_` (`vendor/ruby/lib/uri/common.rb:283-289`), the
+ * `URI::TBLENCWWWCOMP_` (`vendor/ruby/v3.3.11/lib/uri/common.rb:283-289`), the
  * byte-to-escape table `encode_www_form_component` substitutes through, with
  * `' '` mapped to `'+'`. `TBLENCURICOMP_` (`common.rb:287`) has no call site
  * here and is not ported.
@@ -111,20 +111,20 @@ for (let i = 0; i < 256; i++) {
 TBLENCWWWCOMP_[" "] = "+";
 
 /**
- * `URI` (`vendor/ruby/lib/uri/common.rb:15`), the module `parse` and the
+ * `URI` (`vendor/ruby/v3.3.11/lib/uri/common.rb:15`), the module `parse` and the
  * scheme registry live on. Only the members trails sends are ported —
  * `scheme_list` (`common.rb:99`), `split` (`common.rb:172`) and `join`
  * (`common.rb:213`) have no call site in this repo and are not.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `URI`
- * (`vendor/ruby/lib/uri/common.rb:15`) ships with the interpreter.
+ * (`vendor/ruby/v3.3.11/lib/uri/common.rb:15`) ships with the interpreter.
  */
 export class URI {
   /**
-   * `URI.register_scheme` (`vendor/ruby/lib/uri/common.rb:81`).
+   * `URI.register_scheme` (`vendor/ruby/v3.3.11/lib/uri/common.rb:81`).
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails:
-   * `URI.register_scheme` (`vendor/ruby/lib/uri/common.rb:81`).
+   * `URI.register_scheme` (`vendor/ruby/v3.3.11/lib/uri/common.rb:81`).
    */
   static registerScheme(scheme: string, klass: GenericClass): GenericClass {
     Schemes.set(scheme.toUpperCase(), klass);
@@ -132,7 +132,7 @@ export class URI {
   }
 
   /**
-   * `URI.for` (`vendor/ruby/lib/uri/common.rb:125`). MRI reads the
+   * `URI.for` (`vendor/ruby/v3.3.11/lib/uri/common.rb:125`). MRI reads the
    * Ractor-shareable `INITIAL_SCHEMES` snapshot before `Schemes` itself and
    * guards the `const_get` with `/\A[A-Z]\w*\z/` (`common.rb:126-131`);
    * there is one Map registry here, so one lookup answers both and a Map key
@@ -150,13 +150,13 @@ export class URI {
   }
 
   /**
-   * `URI.encode_www_form_component` (`vendor/ruby/lib/uri/common.rb:337-339`).
+   * `URI.encode_www_form_component` (`vendor/ruby/v3.3.11/lib/uri/common.rb:337-339`).
    * `enc` keeps its position and its `nil` default but has no effect: there is
    * one string encoding here, so MRI's `encode!` pair (`common.rb:387-391`) has
    * nothing to transcode between.
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails:
-   * `URI.encode_www_form_component` (`vendor/ruby/lib/uri/common.rb:337`).
+   * `URI.encode_www_form_component` (`vendor/ruby/v3.3.11/lib/uri/common.rb:337`).
    */
   static encodeWwwFormComponent(
     str: { toString(): string } | null | undefined,
@@ -167,7 +167,7 @@ export class URI {
 
   /**
    * `URI._encode_uri_component`
-   * (`vendor/ruby/lib/uri/common.rb:385-397`), private in MRI. `str.to_s` is
+   * (`vendor/ruby/v3.3.11/lib/uri/common.rb:385-397`), private in MRI. `str.to_s` is
    * `""` for `nil`, and the `force_encoding(ASCII_8BIT)` MRI does before the
    * `gsub!` is the UTF-8 byte expansion here, so the table is indexed by byte
    * exactly as MRI indexes it.
@@ -187,7 +187,7 @@ export class URI {
     return bytes.replace(regexp, (c) => table[c]);
   }
 
-  /** `URI.parse` (`vendor/ruby/lib/uri/common.rb:186`). */
+  /** `URI.parse` (`vendor/ruby/v3.3.11/lib/uri/common.rb:186`). */
   static parse(uri: string): Generic {
     return RFC3986_PARSER.parse(uri);
   }

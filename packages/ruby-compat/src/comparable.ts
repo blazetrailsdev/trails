@@ -1,5 +1,5 @@
 /**
- * Ruby's core `Comparable` module (`vendor/ruby/compar.c:313`
+ * Ruby's core `Comparable` module (`vendor/ruby/v3.3.11/compar.c:313`
  * `Init_Comparable`) and the `<=>` send its members derive from. JS has no
  * `<=>` and no module to include, so both halves live here: {@link cmp} is the
  * send, and the derived operators are `this`-typed functions a class assigns to
@@ -12,7 +12,7 @@
  * `rb_cmperr`'s `ArgumentError`; `equals` is the one that does not raise.
  *
  * @boundary-file: a JS `Date` is compared as epoch millis, since Ruby's
- *  `Time#<=>` (`vendor/ruby/time.c:3951` `time_cmp`) orders by the instant and
+ *  `Time#<=>` (`vendor/ruby/v3.3.11/time.c:3951` `time_cmp`) orders by the instant and
  *  JS `Date` carries no relational operators of its own.
  */
 
@@ -26,14 +26,14 @@ import { temporalTag, widenPlainDate } from "./temporal-tag.js";
  * `Date::Infinity`, which no JS `constructor.name` can spell. A JS `Symbol`
  * because it is a brand, not a Ruby Symbol value.
  * @noRailsEquivalent PERMANENT — the brand standing in for `rb_obj_class`
- * (`vendor/ruby/compar.c:28`); Ruby core, not Rails.
+ * (`vendor/ruby/v3.3.11/compar.c:28`); Ruby core, not Rails.
  */
 export const rubyClass = Symbol.for("@blazetrails/ruby-compat:rubyClass");
 
 /**
  * The receiver of the mixin: a class that defines `<=>`, spelled `compareTo`
  * here since `Comparable#==` already claims `equals`.
- * @noRailsEquivalent PERMANENT — Ruby core `Comparable` (`vendor/ruby/compar.c:315`).
+ * @noRailsEquivalent PERMANENT — Ruby core `Comparable` (`vendor/ruby/v3.3.11/compar.c:315`).
  */
 export interface Comparable {
   compareTo(other: unknown): number | null;
@@ -44,7 +44,7 @@ export interface Comparable {
  * The same `<=>` under the other spelling trails gives it: `@blazetrails/date`
  * names `Date#<=>` and `Rational#<=>` `cmp`, ActiveSupport names
  * `TimeWithZone#<=>` `compareTo`. One Ruby method, two TS names.
- * @noRailsEquivalent PERMANENT — the one Ruby `<=>` (`vendor/ruby/compar.c:315`).
+ * @noRailsEquivalent PERMANENT — the one Ruby `<=>` (`vendor/ruby/v3.3.11/compar.c:315`).
  */
 interface CmpSpelling {
   cmp(other: unknown): number | null;
@@ -54,12 +54,12 @@ interface CmpSpelling {
  * Ruby's `a <=> b` over the values trails carries: the receiver's own `<=>`
  * when it has one, and otherwise the relational reading `Integer#<=>`,
  * `Float#<=>` and `String#<=>` each define, falling back to the inherited
- * `Object#<=>` (`vendor/ruby/object.c:1665` `rb_obj_cmp`) for everything else.
+ * `Object#<=>` (`vendor/ruby/v3.3.11/object.c:1665` `rb_obj_cmp`) for everything else.
  * `nil` for an operand it cannot place, which includes `Float::NAN`, a
  * cross-type operand, and `rb_obj_cmp`'s unequal arm.
  *
  * @boundary: a Temporal value carrying an instant is trails' seat for a Ruby
- * `Time`, whose `<=>` (`vendor/ruby/time.c:3951` `time_cmp`) orders by that
+ * `Time`, whose `<=>` (`vendor/ruby/v3.3.11/time.c:3951` `time_cmp`) orders by that
  * instant, so it is ordered on `epochNanoseconds` — reached through
  * {@link rbObjClass}'s `Time` arm, which seats that reading, rather than
  * through `@blazetrails/date`, which this package does not depend on. The receiver's
@@ -74,7 +74,7 @@ interface CmpSpelling {
  * true.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Comparable` — the `<=>` send it is defined over
- * (`vendor/ruby/compar.c:315`), which Rails inherits rather than defines.
+ * (`vendor/ruby/v3.3.11/compar.c:315`), which Rails inherits rather than defines.
  */
 export function cmp(a: unknown, b: unknown): number | null {
   if (a === null || a === undefined || b === null || b === undefined) {
@@ -111,8 +111,8 @@ export function cmp(a: unknown, b: unknown): number | null {
     }
   }
   if (typeof a === "number" || typeof a === "bigint") {
-    /* `rb_int_cmp` (`vendor/ruby/numeric.c:4696`) and `flo_cmp`
-       (`vendor/ruby/numeric.c:1700`) answer nil for a non-Numeric, and for NaN. */
+    /* `rb_int_cmp` (`vendor/ruby/v3.3.11/numeric.c:4696`) and `flo_cmp`
+       (`vendor/ruby/v3.3.11/numeric.c:1700`) answer nil for a non-Numeric, and for NaN. */
     if (Number.isNaN(a as number)) return null;
     if (typeof b !== "number" && typeof b !== "bigint") {
       if (typeof a === "number" && !Number.isFinite(a)) {
@@ -135,7 +135,7 @@ export function cmp(a: unknown, b: unknown): number | null {
     return a < b ? -1 : a > b ? 1 : 0;
   }
   if (typeof a === "string") {
-    /* `rb_str_cmp_m` (`vendor/ruby/string.c:3803`): `rb_check_string_type`
+    /* `rb_str_cmp_m` (`vendor/ruby/v3.3.11/string.c:3803`): `rb_check_string_type`
        converts an operand answering `to_str`, and anything else goes to
        `rb_invcmp` (`compar.c:43`), the negated reverse `<=>`. */
     const s =
@@ -150,7 +150,7 @@ export function cmp(a: unknown, b: unknown): number | null {
     }
     return a < s ? -1 : a > s ? 1 : 0;
   }
-  /* `vendor/ruby/object.c:1665` `rb_obj_cmp` — the inherited `<=>`: `0` for an
+  /* `vendor/ruby/v3.3.11/object.c:1665` `rb_obj_cmp` — the inherited `<=>`: `0` for an
      `==` operand and nil otherwise, rather than JS relational coercion, which
      orders `false` before `true` where Ruby answers nil. */
   return rbEqual(a, b) ? 0 : null;
@@ -198,7 +198,7 @@ function isCmpSpelling(value: unknown): value is CmpSpelling {
 }
 
 /**
- * Ruby's `rb_cmperr` (`vendor/ruby/compar.c:28`), which names the operand by
+ * Ruby's `rb_cmperr` (`vendor/ruby/v3.3.11/compar.c:28`), which names the operand by
  * `inspect` for a special constant or a Float and by `rb_obj_class` otherwise. */
 function rbCmperr(x: unknown, y: unknown): never {
   const classname = specialConstP(y) ? rbInspect(y) : rbObjClass(y);
@@ -206,10 +206,10 @@ function rbCmperr(x: unknown, y: unknown): never {
 }
 
 /**
- * `SPECIAL_CONST_P` (`vendor/ruby/include/ruby/internal/special_consts.h`) plus
+ * `SPECIAL_CONST_P` (`vendor/ruby/v3.3.11/include/ruby/internal/special_consts.h`) plus
  * `rb_cmperr`'s `BUILTIN_TYPE(y) == T_FLOAT` arm: nil, true, false, a Symbol, a
  * Float, and a Fixnum — an Integer up to `RUBY_FIXNUM_MAX`
- * (`vendor/ruby/include/ruby/internal/arithmetic/fixnum.h:55`, `LONG_MAX / 2`).
+ * (`vendor/ruby/v3.3.11/include/ruby/internal/arithmetic/fixnum.h:55`, `LONG_MAX / 2`).
  * A Bignum is a heap object, so `rb_cmperr` names it by class.
  */
 function specialConstP(y: unknown): boolean {
@@ -218,11 +218,11 @@ function specialConstP(y: unknown): boolean {
 }
 
 /**
- * Ruby's `rb_cmpint` (`vendor/ruby/bignum.c:2959`), which turns a `<=>` result
+ * Ruby's `rb_cmpint` (`vendor/ruby/v3.3.11/bignum.c:2959`), which turns a `<=>` result
  * into a C int and sends a `nil` one to `rb_cmperr` — the free-function form
  * `Array#max` reaches through `OPTIMIZED_CMP`, where {@link cmpint} is the
  * `Comparable` method form.
- * @noRailsEquivalent PERMANENT — Ruby core `rb_cmpint` (`vendor/ruby/bignum.c:2959`).
+ * @noRailsEquivalent PERMANENT — Ruby core `rb_cmpint` (`vendor/ruby/v3.3.11/bignum.c:2959`).
  */
 export function rbCmpint(val: number | null | undefined, a: unknown, b: unknown): number {
   if (val === null || val === undefined) rbCmperr(a, b);
@@ -232,9 +232,9 @@ export function rbCmpint(val: number | null | undefined, a: unknown, b: unknown)
 }
 
 /**
- * Ruby's `cmpint` (`vendor/ruby/compar.c:91`), the one body every operator
+ * Ruby's `cmpint` (`vendor/ruby/v3.3.11/compar.c:91`), the one body every operator
  * below is derived from: a `nil` `<=>` is an `ArgumentError`, not a `false`.
- * @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmpint` (`vendor/ruby/compar.c:91`).
+ * @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmpint` (`vendor/ruby/v3.3.11/compar.c:91`).
  */
 export function cmpint(this: Comparable, other: unknown): number {
   const c = this.compareTo(other);
@@ -243,42 +243,42 @@ export function cmpint(this: Comparable, other: unknown): number {
 }
 
 /**
- * Ruby `Comparable#<` (`vendor/ruby/compar.c:133` `cmp_lt`).
- * @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmp_lt` (`vendor/ruby/compar.c:133`).
+ * Ruby `Comparable#<` (`vendor/ruby/v3.3.11/compar.c:133` `cmp_lt`).
+ * @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmp_lt` (`vendor/ruby/v3.3.11/compar.c:133`).
  */
 export function lessThan(this: Comparable, other: unknown): boolean {
   return cmpint.call(this, other) < 0;
 }
 
 /**
- * Ruby `Comparable#<=` (`vendor/ruby/compar.c:147` `cmp_le`).
- * @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmp_le` (`vendor/ruby/compar.c:147`).
+ * Ruby `Comparable#<=` (`vendor/ruby/v3.3.11/compar.c:147` `cmp_le`).
+ * @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmp_le` (`vendor/ruby/v3.3.11/compar.c:147`).
  */
 export function lessThanOrEqual(this: Comparable, other: unknown): boolean {
   return cmpint.call(this, other) <= 0;
 }
 
 /**
- * Ruby `Comparable#>` (`vendor/ruby/compar.c:105` `cmp_gt`).
- * @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmp_gt` (`vendor/ruby/compar.c:105`).
+ * Ruby `Comparable#>` (`vendor/ruby/v3.3.11/compar.c:105` `cmp_gt`).
+ * @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmp_gt` (`vendor/ruby/v3.3.11/compar.c:105`).
  */
 export function greaterThan(this: Comparable, other: unknown): boolean {
   return cmpint.call(this, other) > 0;
 }
 
 /**
- * Ruby `Comparable#>=` (`vendor/ruby/compar.c:119` `cmp_ge`).
- * @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmp_ge` (`vendor/ruby/compar.c:119`).
+ * Ruby `Comparable#>=` (`vendor/ruby/v3.3.11/compar.c:119` `cmp_ge`).
+ * @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmp_ge` (`vendor/ruby/v3.3.11/compar.c:119`).
  */
 export function greaterThanOrEqual(this: Comparable, other: unknown): boolean {
   return cmpint.call(this, other) >= 0;
 }
 
 /**
- * Ruby `Comparable#==` (`vendor/ruby/compar.c:79` `cmp_equal`), the one derived
+ * Ruby `Comparable#==` (`vendor/ruby/v3.3.11/compar.c:79` `cmp_equal`), the one derived
  * operator that does NOT raise: a `nil` `<=>` is `false`, and an identical
  * object is `true` before `<=>` is sent at all.
- * @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmp_equal` (`vendor/ruby/compar.c:79`).
+ * @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmp_equal` (`vendor/ruby/v3.3.11/compar.c:79`).
  */
 export function equals(this: Comparable, other: unknown): boolean {
   if ((this as unknown) === other) return true;
@@ -288,18 +288,18 @@ export function equals(this: Comparable, other: unknown): boolean {
 }
 
 /**
- * Ruby `Comparable#between?` (`vendor/ruby/compar.c:168` `cmp_between`), which
+ * Ruby `Comparable#between?` (`vendor/ruby/v3.3.11/compar.c:168` `cmp_between`), which
  * is `cmpint` on both ends and so raises for an operand `<=>` cannot place.
- * @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmp_between` (`vendor/ruby/compar.c:168`).
+ * @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmp_between` (`vendor/ruby/v3.3.11/compar.c:168`).
  */
 export function isBetween(this: Comparable, min: unknown, max: unknown): boolean {
   return cmpint.call(this, min) >= 0 && cmpint.call(this, max) <= 0;
 }
 
 /**
- * Ruby `Array#max` (`vendor/ruby/array.c:5848` `rb_ary_max`), the no-argument,
+ * Ruby `Array#max` (`vendor/ruby/v3.3.11/array.c:5848` `rb_ary_max`), the no-argument,
  * no-block arm: `nil` for an empty array, and otherwise the first element
- * carried through `ary_max_generic` (`vendor/ruby/array.c:5719`). MRI's
+ * carried through `ary_max_generic` (`vendor/ruby/v3.3.11/array.c:5719`). MRI's
  * `CMP_OPTIMIZABLE` fast paths for a Fixnum / String / Float first element are
  * omitted — each one falls back to `ary_max_generic` the moment an element is
  * not of that type, so they change speed, not the answer.
@@ -309,7 +309,7 @@ export function isBetween(this: Comparable, min: unknown, max: unknown): boolean
  * so a `nil` reaching the comparison is an `ArgumentError`, not a skipped
  * element.
  *
- * @noRailsEquivalent PERMANENT — Ruby core `Array#max` (`vendor/ruby/array.c:5848`).
+ * @noRailsEquivalent PERMANENT — Ruby core `Array#max` (`vendor/ruby/v3.3.11/array.c:5848`).
  */
 export function max<T>(ary: readonly T[]): T | null {
   const n = ary.length;

@@ -1,5 +1,5 @@
 /**
- * Ruby's `Thread::Backtrace::Location` (`vendor/ruby/vm_backtrace.c:1345`),
+ * Ruby's `Thread::Backtrace::Location` (`vendor/ruby/v3.3.11/vm_backtrace.c:1345`),
  * one frame of `Exception#backtrace_locations`.
  *
  * MRI builds each one from the VM's frame record when the exception is raised.
@@ -38,7 +38,7 @@ export class Location {
   }
 
   /**
-   * `Thread::Backtrace::Location#to_s` (`vendor/ruby/vm_backtrace.c:439`).
+   * `Thread::Backtrace::Location#to_s` (`vendor/ruby/v3.3.11/vm_backtrace.c:439`).
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -48,7 +48,7 @@ export class Location {
 }
 
 /**
- * `Exception#backtrace_locations` (`vendor/ruby/error.c:1789`): nil for an
+ * `Exception#backtrace_locations` (`vendor/ruby/v3.3.11/error.c:1789`): nil for an
  * exception that was never raised, else one `Location` per frame.
  *
  * @noRailsEquivalent PERMANENT

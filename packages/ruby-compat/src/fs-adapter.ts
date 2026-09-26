@@ -1,6 +1,6 @@
 /**
  * The byte string a backend answers when no encoding is asked for — Ruby's
- * `File.binread` (`vendor/ruby/file.c:6222` `rb_io_s_binread`), which is an
+ * `File.binread` (`vendor/ruby/v3.3.11/file.c:6222` `rb_io_s_binread`), which is an
  * ASCII-8BIT String. Node's `Buffer` is one such container and is what the
  * Node backend below hands over, but naming `Buffer` here would put an ambient
  * Node global in the leaf's type surface, so the contract names the structural
@@ -21,7 +21,7 @@ export interface FsStatResult {
   isSocket?(): boolean;
   isFIFO?(): boolean;
   /**
-   * Ruby's `File::Stat#executable?` (`vendor/ruby/file.c:2244`
+   * Ruby's `File::Stat#executable?` (`vendor/ruby/v3.3.11/file.c:2244`
    * `rb_stat_executable_p`), which is `eaccess(X_OK)` on the named file. Every
    * Ruby `File::Stat` answers it, so every backend must: node's `fs.Stats`
    * carries no such predicate and the node backend derives it from `mode`.

@@ -9,7 +9,7 @@ interface CaseFlags {
 }
 
 /**
- * `check_case_options` (`vendor/ruby/string.c:7304`): the `:ascii`, `:turkic`,
+ * `check_case_options` (`vendor/ruby/v3.3.11/string.c:7304`): the `:ascii`, `:turkic`,
  * `:lithuanian` and `:fold` options, spelled as the `":name"` strings trails
  * gives a Ruby Symbol. `:lithuanian` is accepted and, as in Onigmo, maps
  * nothing differently.
@@ -62,7 +62,7 @@ function downcaseChar(c: string, flags: CaseFlags): string {
 /**
  * The characters whose titlecase differs from both their upper and lower
  * case: the Latin digraphs and the Greek letters with ypogegrammeni, which
- * `onigenc_unicode_case_map` (`vendor/ruby/enc/unicode.c:684`) titlecases
+ * `onigenc_unicode_case_map` (`vendor/ruby/v3.3.11/enc/unicode.c:684`) titlecases
  * through `CaseMappingSpecials`.
  */
 const TITLECASE: Record<string, string> = Object.fromEntries([
@@ -88,7 +88,7 @@ function titlecaseChar(c: string, flags: CaseFlags): string {
 }
 
 /**
- * `String#upcase` (`vendor/ruby/string.c:7574` `rb_str_upcase`).
+ * `String#upcase` (`vendor/ruby/v3.3.11/string.c:7574` `rb_str_upcase`).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -98,7 +98,7 @@ export function upcase(str: string, argv: unknown[]): string {
 }
 
 /**
- * `String#downcase` (`vendor/ruby/string.c:7676` `rb_str_downcase`).
+ * `String#downcase` (`vendor/ruby/v3.3.11/string.c:7676` `rb_str_downcase`).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -108,7 +108,7 @@ export function downcase(str: string, argv: unknown[]): string {
 }
 
 /**
- * `String#capitalize` (`vendor/ruby/string.c:7760` `rb_str_capitalize`): the first
+ * `String#capitalize` (`vendor/ruby/v3.3.11/string.c:7760` `rb_str_capitalize`): the first
  * character titlecased, the rest downcased.
  *
  * @noRailsEquivalent PERMANENT
@@ -121,7 +121,7 @@ export function capitalize(str: string, argv: unknown[]): string {
 }
 
 /**
- * `String#swapcase` (`vendor/ruby/string.c:7838` `rb_str_swapcase`).
+ * `String#swapcase` (`vendor/ruby/v3.3.11/string.c:7838` `rb_str_swapcase`).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -134,7 +134,7 @@ export function swapcase(str: string, argv: unknown[]): string {
 }
 
 /**
- * `String#casecmp` (`vendor/ruby/string.c:3844` `rb_str_casecmp` over `str_casecmp`
+ * `String#casecmp` (`vendor/ruby/v3.3.11/string.c:3844` `rb_str_casecmp` over `str_casecmp`
  * at `:3854`): ASCII letters compare case-insensitively, everything else by
  * its bytes; nil for an incomparable argument.
  *
@@ -168,7 +168,7 @@ export function casecmp(str1: string, other: unknown): number | null {
 }
 
 /**
- * `String#casecmp?` (`vendor/ruby/string.c:3934` `rb_str_casecmp_p` over
+ * `String#casecmp?` (`vendor/ruby/v3.3.11/string.c:3934` `rb_str_casecmp_p` over
  * `str_casecmp_p` at `:3944`): equal after Unicode case folding; nil for an
  * incomparable argument.
  *

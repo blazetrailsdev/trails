@@ -22,7 +22,7 @@ type Parsed = {
 };
 
 /**
- * Mirrors: `vendor/ruby/ext/bigdecimal/bigdecimal.c:4392` `Init_bigdecimal`.
+ * Mirrors: `vendor/ruby/v3.3.11/ext/bigdecimal/bigdecimal.c:4392` `Init_bigdecimal`.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -79,7 +79,7 @@ export class BigDecimal {
   }
 
   /**
-   * Ruby's `BigDecimal#to_s` (`vendor/ruby/ext/bigdecimal/bigdecimal.c:2710`
+   * Ruby's `BigDecimal#to_s` (`vendor/ruby/v3.3.11/ext/bigdecimal/bigdecimal.c:2710`
    * `BigDecimal_to_s`): with no format it is engineering notation
    * (`0.123456789e6`). `"F"` is only the default once ActiveSupport's
    * `BigDecimalWithDefaultFormat` is prepended.
@@ -178,7 +178,7 @@ export class BigDecimal {
   }
 
   /**
-   * Ruby's `BigDecimal#<=>` (`vendor/ruby/ext/bigdecimal/bigdecimal.c:1657`
+   * Ruby's `BigDecimal#<=>` (`vendor/ruby/v3.3.11/ext/bigdecimal/bigdecimal.c:1657`
    * `BigDecimal_comp`), which coerces an Integer or Float operand through
    * `GetVpValueWithPrec` rather than answering nil for it. This is the
    * `compareTo` spelling `ruby-compat`'s `cmp` dispatches on, so a BigDecimal
@@ -198,7 +198,7 @@ export class BigDecimal {
   }
 
   /**
-   * Ruby's `BigDecimal#==` (`vendor/ruby/ext/bigdecimal/bigdecimal.c:1673`
+   * Ruby's `BigDecimal#==` (`vendor/ruby/v3.3.11/ext/bigdecimal/bigdecimal.c:1673`
    * `BigDecimal_eq`), which is `<=>`-based and so is true for an equal
    * Integer or Float.
    *
@@ -256,9 +256,9 @@ export class BigDecimal {
   }
 
   /**
-   * Ruby's `BigDecimal#sign` (`vendor/ruby/ext/bigdecimal/bigdecimal.c:3818`
+   * Ruby's `BigDecimal#sign` (`vendor/ruby/v3.3.11/ext/bigdecimal/bigdecimal.c:3818`
    * `BigDecimal_sign`), answering the `VP_SIGN_*` code
-   * (`vendor/ruby/ext/bigdecimal/bigdecimal.h:148-154`).
+   * (`vendor/ruby/v3.3.11/ext/bigdecimal/bigdecimal.h:148-154`).
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -456,7 +456,7 @@ const INTERPRET_LOOSELY_REGEX =
   /^\s*[+-]?(?:\d(?:_?\d)*(?:\.(?:\d(?:_?\d)*)?)?|\.\d(?:_?\d)*)(?:[eE][+-]?\d(?:_?\d)*)?/;
 
 /**
- * Ruby's `String#to_d` (`vendor/ruby/ext/bigdecimal/lib/bigdecimal/util.rb:72`).
+ * Ruby's `String#to_d` (`vendor/ruby/v3.3.11/ext/bigdecimal/lib/bigdecimal/util.rb:72`).
  *
  * @noRailsEquivalent PERMANENT
  */

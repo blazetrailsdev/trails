@@ -20,7 +20,7 @@ function strEnsureBytePos(b: number[], pos: number): void {
 }
 
 /**
- * `String#getbyte` (`vendor/ruby/string.c:6141` `rb_str_getbyte`).
+ * `String#getbyte` (`vendor/ruby/v3.3.11/string.c:6141` `rb_str_getbyte`).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -33,7 +33,7 @@ export function rbStrGetbyte(str: string, index: unknown): number | null {
 }
 
 /**
- * `String#setbyte` (`vendor/ruby/string.c:6166` `rb_str_setbyte`).
+ * `String#setbyte` (`vendor/ruby/v3.3.11/string.c:6166` `rb_str_setbyte`).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -69,7 +69,7 @@ function strByteSubstr(
 }
 
 /**
- * `String#byteslice` (`vendor/ruby/string.c:6330` `rb_str_byteslice`).
+ * `String#byteslice` (`vendor/ruby/v3.3.11/string.c:6330` `rb_str_byteslice`).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -79,13 +79,13 @@ export function rbStrByteslice(str: string, ...args: unknown[]): string | null {
 }
 
 /**
- * `String#byteslice` (`vendor/ruby/string.c:6330` `rb_str_byteslice`) over an
+ * `String#byteslice` (`vendor/ruby/v3.3.11/string.c:6330` `rb_str_byteslice`) over an
  * ASCII-8BIT String, spelled as {@link b} spells one: a byte per code unit.
  * {@link rbStrByteslice} reads its receiver's UTF-8 bytes, which would count
  * each code unit from `0x80` up as two.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `String#byteslice`
- * (`vendor/ruby/string.c:6330`).
+ * (`vendor/ruby/v3.3.11/string.c:6330`).
  */
 export function byteslice(str: string, ...args: unknown[]): string | null {
   return strByteslice(str, args, (beg, end) => str.slice(beg, end));
@@ -131,7 +131,7 @@ function rangeOrRaise(range: unknown, len: number): [number, number] {
 }
 
 /**
- * `String#bytesplice` (`vendor/ruby/string.c:6385` `rb_str_bytesplice`).
+ * `String#bytesplice` (`vendor/ruby/v3.3.11/string.c:6385` `rb_str_bytesplice`).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -206,7 +206,7 @@ function regexpByteSearch(re: RegExp, str: string, pos: number, reverse: boolean
 }
 
 /**
- * `String#byteindex` (`vendor/ruby/string.c:4135` `rb_str_byteindex_m`).
+ * `String#byteindex` (`vendor/ruby/v3.3.11/string.c:4135` `rb_str_byteindex_m`).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -228,7 +228,7 @@ export function rbStrByteindexM(str: string, ...args: unknown[]): number | null 
 }
 
 /**
- * `String#byterindex` (`vendor/ruby/string.c:4456` `rb_str_byterindex_m`).
+ * `String#byterindex` (`vendor/ruby/v3.3.11/string.c:4456` `rb_str_byterindex_m`).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -251,7 +251,7 @@ export function rbStrByterindexM(str: string, ...args: unknown[]): number | null
 }
 
 /**
- * `String#sum` (`vendor/ruby/string.c:10371` `rb_str_sum`): the byte sum modulo
+ * `String#sum` (`vendor/ruby/v3.3.11/string.c:10371` `rb_str_sum`): the byte sum modulo
  * `2**bits`, unmasked for a `bits` of 0 or less.
  *
  * @noRailsEquivalent PERMANENT

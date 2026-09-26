@@ -1,5 +1,5 @@
 /**
- * Ruby's core `Enumerable` module (`vendor/ruby/enum.c:5047` `Init_Enumerable`):
+ * Ruby's core `Enumerable` module (`vendor/ruby/v3.3.11/enum.c:5047` `Init_Enumerable`):
  * members derived from the including class's `each`, mixed in with
  * `include(Klass, Enumerable)`.
  *
@@ -25,7 +25,7 @@ function rbBlockCall<T>(obj: Each<T>, block: (i: T) => void): void {
 }
 
 /**
- * Mirrors: Ruby's Enumerable#map — `vendor/ruby/enum.c:638` `enum_collect`.
+ * Mirrors: Ruby's Enumerable#map — `vendor/ruby/v3.3.11/enum.c:638` `enum_collect`.
  * @noRailsEquivalent PERMANENT
  */
 function map<T, R>(this: Each<T>, block: (i: T) => R): R[] {
@@ -37,7 +37,7 @@ function map<T, R>(this: Each<T>, block: (i: T) => R): R[] {
 }
 
 /**
- * Mirrors: Ruby's Enumerable#first — `vendor/ruby/enum.c:1284` `enum_first`,
+ * Mirrors: Ruby's Enumerable#first — `vendor/ruby/v3.3.11/enum.c:1284` `enum_first`,
  * whose `n` arm is `enum_take` (`:3514`).
  * @noRailsEquivalent PERMANENT
  */
@@ -63,7 +63,7 @@ function first<T>(this: Each<T>, n?: number): T | null | T[] {
 }
 
 /**
- * Mirrors: Ruby's Enumerable#any? — `vendor/ruby/enum.c:1861` `enum_any`,
+ * Mirrors: Ruby's Enumerable#any? — `vendor/ruby/v3.3.11/enum.c:1861` `enum_any`,
  * `RTEST`ing the block's result, or the element itself with no block.
  * @noRailsEquivalent PERMANENT
  */

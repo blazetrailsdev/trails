@@ -28,7 +28,7 @@ function fixture(): string {
 
 describe("Dir", () => {
   it("glob interleaves ** with the match at each level", () => {
-    // vendor/ruby/dir.c:3227, verified against ruby 3.3.11.
+    // vendor/ruby/v3.3.11/dir.c:3227, verified against ruby 3.3.11.
     const root = fixture();
     expect(Dir.glob(`${root}/**/*.rb`)).toEqual([
       `${root}/B.rb`,
@@ -41,7 +41,7 @@ describe("Dir", () => {
   });
 
   it("glob reads a backslash as an escape rather than a brace separator", () => {
-    // vendor/ruby/dir.c:314 and dir.c:3019, verified against ruby 3.3.11.
+    // vendor/ruby/v3.3.11/dir.c:314 and dir.c:3019, verified against ruby 3.3.11.
     const root = mkdtempSync(join(tmpdir(), "trails-dir-"));
     mkdirSync(join(root, "a,b"));
     writeFileSync(join(root, "a,b", "x.rb"), "");
@@ -49,7 +49,7 @@ describe("Dir", () => {
   });
 
   it("glob sorts each directory and leaves a dotfile to a literal dot", () => {
-    // vendor/ruby/dir.c:325, and the sort: true default at dir.c:3210.
+    // vendor/ruby/v3.3.11/dir.c:325, and the sort: true default at dir.c:3210.
     const root = fixture();
     expect(Dir.glob(`${root}/*.rb`)).toEqual([`${root}/B.rb`, `${root}/a.rb`, `${root}/z.rb`]);
     expect(Dir.glob(`${root}/.*.rb`)).toEqual([`${root}/.hidden.rb`]);
@@ -75,7 +75,7 @@ describe("Dir", () => {
   });
 
   it("children excludes . and .., and each_child yields them", () => {
-    // vendor/ruby/dir.c:3421.
+    // vendor/ruby/v3.3.11/dir.c:3421.
     const root = fixture();
     expect(Dir.children(join(root, "a"))).toEqual(["x.rb"]);
     const seen: string[] = [];
@@ -84,14 +84,14 @@ describe("Dir", () => {
   });
 
   it("delete removes an empty directory and refuses a full one", () => {
-    // vendor/ruby/dir.c:1535.
+    // vendor/ruby/v3.3.11/dir.c:1535.
     const root = fixture();
     mkdirSync(join(root, "made"));
     expect(Dir.delete(join(root, "made"))).toBe(0);
     expect(() => Dir.delete(join(root, "a"))).toThrow();
   });
   it('foreach yields "." and ".." ahead of the children', () => {
-    // vendor/ruby/dir.c:3288 reads the directory stream unfiltered.
+    // vendor/ruby/v3.3.11/dir.c:3288 reads the directory stream unfiltered.
     const root = fixture();
     const yielded: string[] = [];
     expect(Dir.foreach(root, (filename) => yielded.push(filename))).toBe(null);
