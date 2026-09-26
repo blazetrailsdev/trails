@@ -87,7 +87,7 @@ describe("RouteDispatcher", () => {
 
   it("raises ActionController::RoutingError when defaults pin the controller", async () => {
     const routes = new RouteSet();
-    routes.draw((r) => r.get("/x/:action", { defaults: { controller: "posts" } }));
+    routes.draw((r) => r.get("/x/:action", { controller: "posts" }));
 
     await expect(routes.serve(makeReq("/x/index"))).rejects.toThrow(
       /uninitialized constant PostsController/,

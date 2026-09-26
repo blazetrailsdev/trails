@@ -3,7 +3,6 @@ import { MockRequest } from "@blazetrails/rack";
 import { controllerConstants } from "../../http/request.js";
 import type { DispatchableControllerClass } from "../../routing/dispatcher.js";
 import { RouteSet } from "../../routing/route-set.js";
-import { Route } from "../../routing/route.js";
 import { escapeSegment } from "../../journey/router/utils.js";
 
 class StubController {}
@@ -161,7 +160,7 @@ describe("RouteSetTest", () => {
 
   it("addRoute rejects invalid names", () => {
     const routes = new RouteSet();
-    expect(() => routes.addRoute(new Route("GET", "/x", "x", "i"), "9bad")).toThrow(
+    expect(() => routes.draw((r) => r.get("/x", { to: "x#i", as: "9bad" }))).toThrow(
       /Invalid route name/,
     );
   });

@@ -113,7 +113,7 @@ describe("LegacyRouteSetTests", () => {
   it("symbols with dashes", async () => {
     rs.draw((r) => {
       r.get("/:artist/:song-omg", {
-        app: async (env: any) => {
+        to: async (env: any) => {
           const params = env["action_dispatch.request.path_parameters"] as Record<string, string>;
           return [200, {}, bodyFromString(JSON.stringify(params))];
         },
@@ -127,7 +127,7 @@ describe("LegacyRouteSetTests", () => {
   it("id with dash", async () => {
     rs.draw((r) => {
       r.get("/journey/:id", {
-        app: async (env: any) => {
+        to: async (env: any) => {
           const params = env["action_dispatch.request.path_parameters"] as Record<string, string>;
           return [200, {}, bodyFromString(JSON.stringify(params))];
         },
@@ -142,7 +142,7 @@ describe("LegacyRouteSetTests", () => {
     rs.draw((r) => {
       r.get("/:artist/:song-omg", {
         constraints: { song: /\d+/ },
-        app: async (env: any) => {
+        to: async (env: any) => {
           const params = env["action_dispatch.request.path_parameters"] as Record<string, string>;
           return [200, {}, bodyFromString(JSON.stringify(params))];
         },
@@ -157,7 +157,7 @@ describe("LegacyRouteSetTests", () => {
   it("pre dash", async () => {
     rs.draw((r) => {
       r.get("/:artist/omg-:song", {
-        app: async (env: any) => {
+        to: async (env: any) => {
           const params = env["action_dispatch.request.path_parameters"] as Record<string, string>;
           return [200, {}, bodyFromString(JSON.stringify(params))];
         },
@@ -172,7 +172,7 @@ describe("LegacyRouteSetTests", () => {
     rs.draw((r) => {
       r.get("/:artist/omg-:song", {
         constraints: { song: /\d+/ },
-        app: async (env: any) => {
+        to: async (env: any) => {
           const params = env["action_dispatch.request.path_parameters"] as Record<string, string>;
           return [200, {}, bodyFromString(JSON.stringify(params))];
         },
@@ -188,7 +188,7 @@ describe("LegacyRouteSetTests", () => {
     rs.draw((r) => {
       r.get("/*path", {
         format: false,
-        app: async (env: any) => {
+        to: async (env: any) => {
           const params = env["action_dispatch.request.path_parameters"] as Record<string, string>;
           return [200, {}, bodyFromString(params["path"])];
         },
@@ -202,7 +202,7 @@ describe("LegacyRouteSetTests", () => {
   it.skip("star paths are greedy but not too much", async () => {
     rs.draw((r) => {
       r.get("/*path", {
-        app: async (env: any) => {
+        to: async (env: any) => {
           const params = env["action_dispatch.request.path_parameters"];
           return [200, {}, bodyFromString(JSON.stringify(params))];
         },
@@ -218,7 +218,7 @@ describe("LegacyRouteSetTests", () => {
     rs.draw((r) => {
       r.get("/(*filters)", {
         format: false,
-        app: async (env: any) => {
+        to: async (env: any) => {
           const params = env["action_dispatch.request.path_parameters"] as Record<string, string>;
           return [200, {}, bodyFromString(params["filters"])];
         },
@@ -232,7 +232,7 @@ describe("LegacyRouteSetTests", () => {
   it.skip("optional star paths are greedy but not too much", async () => {
     rs.draw((r) => {
       r.get("/(*filters)", {
-        app: async (env: any) => {
+        to: async (env: any) => {
           const params = env["action_dispatch.request.path_parameters"];
           return [200, {}, bodyFromString(JSON.stringify(params))];
         },
@@ -253,10 +253,10 @@ describe("LegacyRouteSetTests", () => {
     rs.draw((r) => {
       r.get("/whois/:domain", {
         constraints: { domain: /\w+\.[\w.]+/ },
-        app: async (_env: any) => [200, {}, bodyFromString("regexp")],
+        to: async (_env: any) => [200, {}, bodyFromString("regexp")],
       });
       r.get("/whois/:id", {
-        app: async (_env: any) => [200, {}, bodyFromString("id")],
+        to: async (_env: any) => [200, {}, bodyFromString("id")],
       });
     });
 
@@ -268,11 +268,11 @@ describe("LegacyRouteSetTests", () => {
     rs.draw((r) => {
       r.get("/api", {
         constraints: { format: "json" },
-        app: async (_env: any) => [200, {}, bodyFromString("json")],
+        to: async (_env: any) => [200, {}, bodyFromString("json")],
       });
       r.get("/api", {
         constraints: { format: "xml" },
-        app: async (_env: any) => [200, {}, bodyFromString("xml")],
+        to: async (_env: any) => [200, {}, bodyFromString("xml")],
       });
     });
 
@@ -284,7 +284,7 @@ describe("LegacyRouteSetTests", () => {
     rs.draw((r) => {
       r.get("/:username", {
         constraints: { username: /[^/]+/ },
-        app: async (_env: any) => [200, {}, bodyFromString("foo")],
+        to: async (_env: any) => [200, {}, bodyFromString("foo")],
       });
     });
 
@@ -297,7 +297,7 @@ describe("LegacyRouteSetTests", () => {
     rs.draw((r) => {
       r.get("/posts/:id(/*filters)", {
         constraints: { filters: /.+?/ },
-        app: async (env: any) => {
+        to: async (env: any) => {
           capturedParams = env["action_dispatch.request.path_parameters"];
           return [200, {}, bodyFromString("foo")];
         },
