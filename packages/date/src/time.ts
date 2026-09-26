@@ -15,7 +15,7 @@ import {
   strftime,
   timeToDf,
 } from "./date.js";
-import { Rational, kernelInteger, stringInspect } from "@blazetrails/ruby-compat";
+import { Rational, kernelInteger, rbObjRespondTo, stringInspect } from "@blazetrails/ruby-compat";
 
 let localTimeZoneId: string | null = null;
 
@@ -423,9 +423,18 @@ export class Timezone {
 }
 
 /** `rb_time_zone_abbreviation` (`vendor/ruby/time.c:5746-5775`). */
-function rbTimeZoneAbbreviation(zone: string | Timezone, time: Time): string {
+function rbTimeZoneAbbreviation(zone: unknown, time: Time): string {
   if (typeof zone === "string") return zone;
-  return zone.abbr(time);
+  const tzobj = zone as {
+    abbr(tm: Time): unknown;
+    strftime(format: string, tm: Time): unknown;
+    name: unknown;
+  };
+  let abbr: unknown;
+  if (rbObjRespondTo(tzobj, "abbr")) abbr = tzobj.abbr(time);
+  else if (rbObjRespondTo(tzobj, "strftime")) abbr = tzobj.strftime("%Z", time);
+  else abbr = rbObjRespondTo(tzobj, "name") ? tzobj.name : null;
+  return abbr == null ? "" : String(abbr);
 }
 
 export class Time {
