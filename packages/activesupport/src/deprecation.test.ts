@@ -82,7 +82,7 @@ expect.addEqualityTesters([
   },
 ]);
 
-const UndeprecatedFoo: Record<string, unknown> = { BAR: "foo bar" };
+const UndeprecatedFoo = Object.assign(new Module(), { name: "Undeprecated::Foo", BAR: "foo bar" });
 registerConstant("Undeprecated::Foo", UndeprecatedFoo);
 registerConstant("Undeprecated::Foo::BAR", UndeprecatedFoo.BAR);
 class UndeprecatedError extends StandardError {}
@@ -560,7 +560,7 @@ describe("DeprecationTest", () => {
     const fubarClass = await assertNotDeprecated(deprecator, () =>
       (proxy as { class(): unknown }).class(),
     );
-    expect(fubarClass).toEqual((UndeprecatedFoo.BAR as string).constructor);
+    expect(fubarClass).toEqual(UndeprecatedFoo.BAR.constructor);
   });
 
   it("DeprecatedConstantProxy with child constant", async () => {
