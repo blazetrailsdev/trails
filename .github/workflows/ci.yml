@@ -887,6 +887,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
+      - run: pnpm build
       - run: pnpm vitest run packages/trailties
 
   # Reporting-only code coverage. Runs the light (non-AR) packages together

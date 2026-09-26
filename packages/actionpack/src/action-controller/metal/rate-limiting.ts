@@ -1,9 +1,9 @@
-import { Notifications } from "@blazetrails/activesupport";
+import { Notifications, type Duration } from "@blazetrails/activesupport";
 import type { CallbackOptions } from "../../abstract-controller/callbacks.js";
 
 export interface RateLimitOptions<TController = RateLimitingHost> {
   to: number;
-  within: number;
+  within: number | Duration;
   by?: (this: TController) => string | null | undefined;
   with?: (this: TController) => void | Promise<void>;
   store?: RateLimitStore;
@@ -19,7 +19,7 @@ export interface RateLimitStore {
   increment(
     key: string,
     amount: number,
-    options: { expiresIn: number },
+    options: { expiresIn: number | Duration },
   ): number | null | Promise<number | null>;
 }
 
@@ -30,14 +30,16 @@ export class MemoryRateLimitStore implements RateLimitStore {
   private _pruneThreshold = MemoryRateLimitStore._PRUNE_BASELINE;
   private _skipSweepInserts = 0;
 
-  increment(key: string, amount: number, options: { expiresIn: number }): number {
+  increment(key: string, amount: number, options: { expiresIn: number | Duration }): number {
+    const expiresIn =
+      typeof options.expiresIn === "number" ? options.expiresIn : options.expiresIn.toF();
     const now = Date.now();
     const entry = this._entries.get(key);
     if (entry && entry.expiresAt > now) {
       entry.count += amount;
       return entry.count;
     }
-    this._entries.set(key, { count: amount, expiresAt: now + options.expiresIn * 1000 });
+    this._entries.set(key, { count: amount, expiresAt: now + expiresIn * 1000 });
     if (this._entries.size >= this._pruneThreshold) {
       if (this._skipSweepInserts > 0) {
         this._skipSweepInserts -= 1;
@@ -131,7 +133,7 @@ export async function rateLimiting(
   this: RateLimitingHost,
   args: {
     to: number;
-    within: number;
+    within: number | Duration;
     by?: (this: RateLimitingHost) => string | null | undefined;
     with?: (this: RateLimitingHost) => void | Promise<void>;
     store: RateLimitStore;

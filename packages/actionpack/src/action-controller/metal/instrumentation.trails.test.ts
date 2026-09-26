@@ -139,7 +139,7 @@ describe("ActionController::Instrumentation#process_action", () => {
         this.render({ template: "slow_widgets/index" });
       }
     }
-    SlowWidgetsController.layout = false;
+    SlowWidgetsController.layout(false);
     SlowWidgetsController.prependViewPath(
       new FixtureResolver({ "slow_widgets/index.html.html": "hello" }),
     );

@@ -1,6 +1,6 @@
-import { ActionController } from "@blazetrails/actionpack";
+import { ApplicationController } from "./application-controller.js";
 
-export class PostsController extends ActionController.Base {
+export class PostsController extends ApplicationController {
   async index(): Promise<void> {
     this.render({ json: { posts: [] } });
   }

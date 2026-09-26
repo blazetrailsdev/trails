@@ -26,6 +26,7 @@ export function fireInherited(
     if (fired.has(k)) continue;
     fired.add(k);
     inherited(k, base);
+    (k as unknown as { _writeLayoutMethod(): void })._writeLayoutMethod();
   }
 }
 

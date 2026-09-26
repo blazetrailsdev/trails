@@ -4,7 +4,7 @@ import { DelegateClass, rbObjInspect } from "@blazetrails/ruby-compat";
 
 export type NormalizesArgs = [
   ...names: string[],
-  options: { with: (value: unknown) => unknown; applyToNil?: boolean },
+  options: { with: (value: never) => unknown; applyToNil?: boolean },
 ];
 
 /** @internal */
