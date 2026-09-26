@@ -456,18 +456,18 @@ export class IntegrationTest {
   }
 
   /** @internal */
-  static _classApp: unknown = null;
+  static _app: unknown = null;
 
   static get app(): unknown {
-    if (IntegrationTest._classApp != null) {
-      return IntegrationTest._classApp;
+    if (IntegrationTest._app != null) {
+      return IntegrationTest._app;
     } else {
       return ActionDispatch.testApp;
     }
   }
 
   static set app(app: unknown) {
-    IntegrationTest._classApp = app;
+    IntegrationTest._app = app;
   }
 
   static registerEncoder(
