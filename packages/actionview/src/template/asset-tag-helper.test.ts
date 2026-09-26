@@ -8,7 +8,15 @@ import {
   stylesheetPath,
   type AssetUrlHelperHost,
 } from "../helpers/asset-url-helper.js";
-import { stylesheetLinkTag, type AssetTagHelperHost } from "../helpers/asset-tag-helper.js";
+import {
+  imageDecoding,
+  imageLoading,
+  imageTag,
+  setImageDecoding,
+  setImageLoading,
+  stylesheetLinkTag,
+  type AssetTagHelperHost,
+} from "../helpers/asset-tag-helper.js";
 
 const request = { baseUrl: "http://www.example.com", protocol: "http://" };
 const host = {
@@ -102,5 +110,50 @@ describe("AssetTagHelperTest", () => {
 
   it("stylesheet link tag", () => {
     StyleLinkToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
+  });
+
+  it("image tag does not modify options", () => {
+    const options = { size: "16x10" };
+    imageTag.call(host, "icon", options);
+    expect(options).toEqual({ size: "16x10" });
+  });
+
+  it("image tag raises an error for competing size arguments", () => {
+    expect(() =>
+      imageTag.call(host, "gold.png", { height: "100", width: "200", size: "45x70" }),
+    ).toThrow(
+      expect.objectContaining({
+        constructor: ArgumentError,
+        message: "Cannot pass a :size option with a :height or :width option",
+      }),
+    );
+  });
+
+  it("image tag loading attribute default value", () => {
+    const originalImageLoading = imageLoading;
+    setImageLoading("lazy");
+    try {
+      assertDomEqual(`<img src="" loading="lazy" />`, imageTag.call(host, ""));
+      assertDomEqual(
+        `<img loading="eager" src="" />`,
+        imageTag.call(host, "", { loading: "eager" }),
+      );
+    } finally {
+      setImageLoading(originalImageLoading);
+    }
+  });
+
+  it("image tag decoding attribute default value", () => {
+    const originalImageDecoding = imageDecoding;
+    setImageDecoding("async");
+    try {
+      assertDomEqual(`<img src="" decoding="async" />`, imageTag.call(host, ""));
+      assertDomEqual(
+        `<img decoding="sync" src="" />`,
+        imageTag.call(host, "", { decoding: "sync" }),
+      );
+    } finally {
+      setImageDecoding(originalImageDecoding);
+    }
   });
 });
