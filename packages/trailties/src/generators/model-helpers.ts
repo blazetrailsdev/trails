@@ -1,11 +1,5 @@
-import {
-  included,
-  initialize,
-  pluralize,
-  singularize,
-  underscore,
-} from "@blazetrails/activesupport";
-import { format } from "@blazetrails/ruby-compat";
+import { pluralize, singularize, underscore } from "@blazetrails/activesupport";
+import { format, included, initialize } from "@blazetrails/ruby-compat";
 import type { GeneratorBase } from "./base.js";
 import { GeneratorError } from "./generated-attribute.js";
 import type { NamedBase } from "./named-base.js";

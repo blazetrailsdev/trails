@@ -1,11 +1,5 @@
-import {
-  underscore,
-  camelize,
-  pluralize,
-  singularize,
-  humanize,
-  initializeIncludedModules,
-} from "@blazetrails/activesupport";
+import { underscore, camelize, pluralize, singularize, humanize } from "@blazetrails/activesupport";
+import { initializeIncludedModules } from "@blazetrails/ruby-compat";
 import { GeneratorBase, type GeneratorOptions } from "./base.js";
 import { GeneratedAttribute } from "./generated-attribute.js";
 

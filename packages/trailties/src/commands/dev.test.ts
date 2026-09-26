@@ -23,17 +23,11 @@ function appFile(path: string, contents: string): void {
 }
 
 async function runDevCacheCommand(): Promise<string> {
-  const chunks: string[] = [];
-  const write = vi.spyOn(stdout, "write").mockImplementation((...args: unknown[]) => {
-    chunks.push(String(args[0]));
-    return true as never;
-  });
-  try {
-    await devCommand().parseAsync(["cache"], { from: "user" });
-  } finally {
-    write.mockRestore();
-  }
-  return chunks.join("");
+  const write = vi.spyOn(stdout, "write").mockReturnValue(true as never);
+  await devCommand().parseAsync(["cache"], { from: "user" });
+  const output = write.mock.calls.map((args) => String(args[0])).join("");
+  write.mockRestore();
+  return output;
 }
 
 describe("Rails::Command::DevTest", () => {

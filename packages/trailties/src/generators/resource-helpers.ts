@@ -1,11 +1,5 @@
-import {
-  camelize,
-  include,
-  included,
-  initialize,
-  pluralize,
-  underscore,
-} from "@blazetrails/activesupport";
+import { camelize, pluralize, underscore } from "@blazetrails/activesupport";
+import { include, included, initialize } from "@blazetrails/ruby-compat";
 import { ModelHelpers } from "./model-helpers.js";
 import type { GeneratorBase } from "./base.js";
 import type { NamedBase } from "./named-base.js";
