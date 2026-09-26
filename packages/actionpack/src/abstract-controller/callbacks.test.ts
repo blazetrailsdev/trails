@@ -39,18 +39,18 @@ class Callback2 extends AbstractController {
   _second() {
     this.second = "Goodbye";
   }
+  async _aroundz(block: () => Promise<void>) {
+    this.aroundz = "FIRST";
+    await block();
+    this.aroundz += "SECOND";
+  }
   async index() {
     this.responseBody = this.text ?? "";
   }
 }
 Callback2.beforeAction("first");
-Callback2.afterAction((c) => (c as Callback2)._second());
-Callback2.aroundAction(async (c, next) => {
-  const self = c as Callback2;
-  self.aroundz = "FIRST";
-  await next();
-  self.aroundz += "SECOND";
-});
+Callback2.afterAction("_second");
+Callback2.aroundAction("_aroundz");
 
 class Callback2Overwrite extends Callback2 {}
 Callback2Overwrite.beforeAction("first", { except: "index" });

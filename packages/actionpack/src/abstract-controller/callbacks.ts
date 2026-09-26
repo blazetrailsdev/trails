@@ -1,6 +1,7 @@
 import { kernelThrow } from "@blazetrails/ruby-compat";
 import {
   extractOptionsBang,
+  MethodCall,
   defineCallbacks as asDefineCallbacks,
   setCallback as asSetCallback,
   runCallbacks as asRunCallbacks,
@@ -192,18 +193,7 @@ export function _registerActionCallback(
   _normalizeCallbackOptions(opts);
   delete opts.filters;
 
-  if (typeof callback === "string") {
-    const methodName = callback;
-    options = { ...options, name: methodName };
-    callback =
-      kind === "around"
-        ? (controller: AbstractController, block: () => Promise<void>) =>
-            (controller as unknown as Record<string, (block: () => Promise<void>) => void>)[
-              methodName
-            ](block)
-        : (controller: AbstractController) =>
-            (controller as unknown as Record<string, () => void>)[methodName]();
-  }
+  if (typeof callback === "string") options = { ...options, name: callback };
 
   if (options.name !== undefined) {
     const chain = getCallbackChains(prototype).get(PROCESS_ACTION_CHAIN);
@@ -224,7 +214,14 @@ export function _registerActionCallback(
   if (unlessFns) asOpts.unless = unlessFns;
   if (options.name !== undefined) asOpts._trailsName = options.name;
 
-  const filter = kind === "before" ? _wrapBefore(callback as ActionCallback) : callback;
+  const filter =
+    typeof callback === "string"
+      ? kind === "before"
+        ? _wrapBefore(new MethodCall(callback).makeLambda() as unknown as ActionCallback)
+        : `:${callback}`
+      : kind === "before"
+        ? _wrapBefore(callback as ActionCallback)
+        : callback;
   asSetCallback(
     prototype,
     PROCESS_ACTION_CHAIN,
