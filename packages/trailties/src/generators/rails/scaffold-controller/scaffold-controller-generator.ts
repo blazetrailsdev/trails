@@ -1,57 +1,62 @@
-import { GeneratorBase, type GeneratorOptions, dasherize, parseColumns } from "../../base.js";
-import { camelize, singularize, tableize, underscore } from "@blazetrails/activesupport";
+/* eslint-disable @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ResourceHelpers` (`scaffold_controller_generator.rb:8`); the class/interface merge is how a mixin surfaces on the type side. */
+import { camelize, include, type Included } from "@blazetrails/activesupport";
+import { dasherize, parseColumns } from "../../base.js";
+import { NamedBase, type NamedBaseOptions } from "../../named-base.js";
+import { normalizeModelName, type ModelHelpersOptions } from "../../model-helpers.js";
+import { ResourceHelpers } from "../../resource-helpers.js";
 import { tsBody, tsMethod, type Method } from "../../../template-builder/index.js";
 import { emitControllerClass } from "../controller/controller-paths.js";
 import { emitResourceRouteSnippet } from "../resource-route/resource-route-generator.js";
 
-export interface ScaffoldControllerRunOptions {
+export interface ScaffoldControllerGeneratorOptions extends NamedBaseOptions, ModelHelpersOptions {
   api?: boolean;
   skipRoutes?: boolean;
   test?: boolean;
   helper?: boolean;
+  modelName?: string;
 }
 
-export class ScaffoldControllerGenerator extends GeneratorBase {
-  constructor(options: GeneratorOptions) {
-    super(options);
+export interface ScaffoldControllerGenerator extends Included<typeof ResourceHelpers> {}
+
+export class ScaffoldControllerGenerator extends NamedBase {
+  /** @internal */
+  declare controllerName: string;
+  /** @internal */
+  declare controllerFileName: string;
+  /** @internal */
+  declare _controllerClassPath: string[];
+  declare options: ScaffoldControllerGeneratorOptions;
+
+  constructor(options: ScaffoldControllerGeneratorOptions) {
+    const name = options.name.replace(/[_-]?controller$/i, "");
+    super({ ...options, name: normalizeModelName(name, options, options.output) });
   }
 
-  run(
-    name: string,
-    attributes: string[] = [],
-    options: ScaffoldControllerRunOptions = {},
-  ): string[] {
-    const { api = false, skipRoutes = false, test = true, helper = true } = options;
-    const stripped = name.replace(/[_-]?controller$/i, "");
-    const parts = stripped.split("/");
-    const leaf = parts[parts.length - 1];
-    const nsClass = parts.slice(0, -1).map((p) => camelize(underscore(p)));
-    const nsDashed = parts.slice(0, -1).map((p) => dasherize(underscore(p)));
-    const nsUnderscored = parts.slice(0, -1).map((p) => underscore(p));
-    const singularLeaf = singularize(underscore(leaf));
-    const modelClassName = [...nsClass, camelize(singularLeaf)].join("");
-    const resourceName = tableize(camelize(singularLeaf));
-    const singular = singularLeaf;
-    const controllerClassName = [...nsClass, camelize(resourceName)].join("") + "Controller";
-    const controllerFileName = [...nsDashed, dasherize(resourceName)].join("/") + "-controller";
+  run(): string[] {
+    const { api = false, skipRoutes = false, test = true, helper = true } = this.options;
+    const modelClassName = this.className().split("::").join("");
+    const singular = this.singularTableName();
+    const controllerClassName = this.controllerClassName().split("::").join("") + "Controller";
+    const controllerFileName = dasherize(this.controllerFilePath()) + "-controller";
+    const routeUrl = this.routeUrl();
     const ext = this.ext();
     const ts = this.isTypeScript();
-    const attrNames = parseColumns(attributes).map((c) => c.name);
+    const attrNames = parseColumns(this.options.attributes ?? []).map((c) => c.name);
 
     this.createFile(
       `app/controllers/${controllerFileName}${ext}`,
       emitControllerClass({
         className: controllerClassName,
         methods: api
-          ? apiCrudMethods(modelClassName, singular, resourceName, attrNames, ts)
-          : crudMethods(modelClassName, singular, resourceName, attrNames, ts),
+          ? apiCrudMethods(modelClassName, singular, this.pluralTableName(), attrNames, ts)
+          : crudMethods(modelClassName, singular, this.pluralTableName(), routeUrl, attrNames, ts),
       }),
     );
 
     if (test) {
       const skip = (a: string) =>
         api && (a === "new" || a === "edit") ? "" : `  it("${a}", () => {});\n`;
-      const importPrefix = "../".repeat(nsDashed.length + 2);
+      const importPrefix = "../".repeat(this.controllerClassPath().length + 2);
       this.createFile(
         `test/controllers/${controllerFileName}.test${ext}`,
         `import { describe, it } from "vitest";
@@ -65,8 +70,8 @@ ${skip("index")}${skip("show")}${skip("new")}${skip("create")}${skip("edit")}${s
     }
 
     if (helper && !api) {
-      const helperFileName = [...nsDashed, dasherize(resourceName)].join("/") + "-helper";
-      const helperConstName = [...nsClass, camelize(resourceName)].join("") + "Helper";
+      const helperFileName = dasherize(this.controllerFilePath()) + "-helper";
+      const helperConstName = this.controllerClassName().split("::").join("") + "Helper";
       this.createFile(
         `app/helpers/${helperFileName}${ext}`,
         `export const ${helperConstName} = {\n};\n`,
@@ -83,13 +88,15 @@ ${skip("index")}${skip("show")}${skip("new")}${skip("create")}${skip("edit")}${s
         this.insertIntoFile(
           routesFile,
           "// routes",
-          emitResourceRouteSnippet(nsUnderscored, resourceName),
+          emitResourceRouteSnippet(this.controllerClassPath(), this.controllerFileName),
         );
       }
     }
     return this.getCreatedFiles();
   }
 }
+
+include(ScaffoldControllerGenerator, ResourceHelpers);
 
 function mk(name: string, body: string, ts: boolean): Method {
   return tsMethod({
@@ -107,7 +114,7 @@ function paramsMethod(singular: string, attrs: string[], ts: boolean): Method {
       ? `return this.params.fetch("${singular}", {});`
       : `return this.params.expect({ ${singular}: [${attrs.map((a) => `"${a}"`).join(", ")}] });`;
   return tsMethod({
-    name: `${singular}Params`,
+    name: `${camelize(singular, false)}Params`,
     params: [],
     returnType: ts ? "unknown" : undefined,
     body: tsBody`${list}`,
@@ -118,11 +125,12 @@ function crudMethods(
   model: string,
   singular: string,
   plural: string,
+  routeUrl: string,
   attrs: string[],
   ts: boolean,
 ): Method[] {
   const anyArr = ts ? ": any[]" : "";
-  const params = `this.${singular}Params()`;
+  const params = `this.${camelize(singular, false)}Params()`;
   return [
     mk(
       "index",
@@ -137,7 +145,7 @@ function crudMethods(
     mk("new_", `this.render({ action: "new", locals: { ${singular}: {} } });`, ts),
     mk(
       "create",
-      `// const ${singular} = await ${model}.create(${params});\nthis.redirectTo("/${plural}");`,
+      `// const ${singular} = await ${model}.create(${params});\nthis.redirectTo("${routeUrl}");`,
       ts,
     ),
     mk(
@@ -147,12 +155,12 @@ function crudMethods(
     ),
     mk(
       "update",
-      `// const ${singular} = await ${model}.find(this.params.get("id"));\n// await ${singular}.update(${params});\nthis.redirectTo("/${plural}/" + this.params.get("id"));`,
+      `// const ${singular} = await ${model}.find(this.params.get("id"));\n// await ${singular}.update(${params});\nthis.redirectTo("${routeUrl}/" + this.params.get("id"));`,
       ts,
     ),
     mk(
       "destroy",
-      `// const ${singular} = await ${model}.find(this.params.get("id"));\n// await ${singular}.destroy();\nthis.redirectTo("/${plural}");`,
+      `// const ${singular} = await ${model}.find(this.params.get("id"));\n// await ${singular}.destroy();\nthis.redirectTo("${routeUrl}");`,
       ts,
     ),
     paramsMethod(singular, attrs, ts),
@@ -167,7 +175,7 @@ function apiCrudMethods(
   ts: boolean,
 ): Method[] {
   const anyArr = ts ? ": any[]" : "";
-  const params = `this.${singular}Params()`;
+  const params = `this.${camelize(singular, false)}Params()`;
   return [
     mk(
       "index",
