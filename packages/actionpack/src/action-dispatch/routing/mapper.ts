@@ -12,8 +12,14 @@ import { Endpoint } from "./endpoint.js";
 import type { Request } from "../http/request.js";
 import { X_CASCADE } from "../constants.js";
 import { Scope, type ScopeFrameHash, type ScopeLevel } from "./scope.js";
-import { underscore } from "@blazetrails/activesupport";
-import { getFs, getPath, RFC2396_PARSER } from "@blazetrails/ruby-compat";
+import { isPlainObject, underscore } from "@blazetrails/activesupport";
+import {
+  getFs,
+  getPath,
+  RFC2396_PARSER,
+  rbInspect,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { fetch } from "@blazetrails/ruby-compat";
 
@@ -59,10 +65,7 @@ export class Constraints extends Endpoint {
 
   static readonly SERVE: ConstraintsStrategy = (app, req) =>
     (app as { serve(req: ConstraintsRequest): unknown }).serve(req);
-  static readonly CALL: ConstraintsStrategy = (app, req) =>
-    typeof app === "function"
-      ? (app as (env: Record<string, unknown>) => unknown)(req.env)
-      : (app as { call(env: Record<string, unknown>): unknown }).call(req.env);
+  static readonly CALL: ConstraintsStrategy = (app, req) => callableOf(app).call(app, req.env);
 
   private readonly _strategy: ConstraintsStrategy;
   private readonly _app: unknown;
@@ -87,18 +90,19 @@ export class Constraints extends Endpoint {
   override matches(req: Request): boolean {
     return this.constraints.every((constraint) => {
       const c = constraint as ConstraintLike;
-      if (typeof c.matches === "function") {
-        const matched = c.matches(req);
+      if (rbObjRespondTo(c, "matches")) {
+        const matched = c.matches!(req);
         if (matched != null && matched !== false) return true;
       }
-      if (typeof c.call === "function") {
-        const called = c.call(...this.constraintArgs(c, req));
+      if (rbObjRespondTo(c, "call")) {
+        const called = callableOf(c).apply(c, this.constraintArgs(c, req));
         if (called != null && called !== false) return true;
       }
       return false;
     });
   }
 
+  /** @missingRailsCall call — PERMANENT */
   serve(req: ConstraintsRequest): unknown {
     if (!this.matches(req as unknown as Request)) {
       return [404, { [X_CASCADE]: "pass" }, []];
@@ -108,8 +112,10 @@ export class Constraints extends Endpoint {
   }
 
   /** @internal */
-  private constraintArgs(constraint: ConstraintLike, request: Request): readonly unknown[] {
-    const arity = typeof constraint.arity === "number" ? constraint.arity : constraint.call!.length;
+  private constraintArgs(constraint: ConstraintLike, request: Request): unknown[] {
+    const arity = rbObjRespondTo(constraint, "arity")
+      ? constraint.arity!
+      : callableOf(constraint).length;
 
     if (arity < 1) {
       return [];
@@ -126,6 +132,13 @@ interface ConstraintLike {
   arity?: number;
   matches?: (req: Request) => unknown;
   call?: (...args: unknown[]) => unknown;
+}
+
+/** @noRailsEquivalent PERMANENT */
+function callableOf(target: unknown): (...args: unknown[]) => unknown {
+  return typeof target === "function"
+    ? (target as (...args: unknown[]) => unknown)
+    : (target as { call: (...args: unknown[]) => unknown }).call;
 }
 
 /** @internal */
@@ -154,6 +167,18 @@ class Mapping {
 
   static optionalFormat(path: string, format: boolean | undefined): boolean {
     return format !== false && !Mapping.OPTIONAL_FORMAT_REGEX.test(path);
+  }
+
+  /** @internal */
+  static blocks(callableConstraint: unknown): unknown[] {
+    if (
+      !(rbObjRespondTo(callableConstraint, "call") || rbObjRespondTo(callableConstraint, "matches"))
+    ) {
+      throw new ArgumentError(
+        `Invalid constraint: ${rbInspect(callableConstraint)} must respond to :call or :matches?`,
+      );
+    }
+    return [callableConstraint];
   }
 }
 
@@ -266,8 +291,8 @@ export class Mapper {
     ]);
     const scopeConstraints = this.currentScopeConstraints();
     const constraints = scopeConstraints
-      ? { ...scopeConstraints, ...options.constraints }
-      : options.constraints;
+      ? { ...scopeConstraints, ...(options.constraints as RouteConstraints | undefined) }
+      : (options.constraints as RouteConstraints | undefined);
     const scopePathNames =
       (this._scope.get("pathNames") as Record<string, string> | undefined) ?? {};
     const pathNames = { ...scopePathNames, ...(options.pathNames ?? {}) };
@@ -498,8 +523,15 @@ export class Mapper {
       ? this.currentPrefix() + "/" + path.replace(/^\/+/, "")
       : this.currentPrefix();
 
+    let block: unknown;
+    if (options.constraints !== undefined && !isPlainObject(options.constraints)) {
+      block = options.constraints;
+      options = { ...options, constraints: {} };
+    }
+
     const previous = this._scope;
     const frame: ScopeFrameHash = { ...options };
+    frame.blocks = this.mergeBlocksScope(this._scope.get("blocks") as unknown[] | undefined, block);
     if (frame.shallowPath !== undefined) {
       frame.shallowPath = this.mergeShallowPathScope(
         this._scope.get("shallowPath") as string | undefined,
@@ -662,11 +694,11 @@ export class Mapper {
     constraints: RouteOptions["constraints"] | MapperCallback,
     callback?: MapperCallback,
   ): void {
-    if (typeof constraints === "function") {
-      constraints(this);
-    } else {
-      callback?.(this);
+    if (callback === undefined) {
+      callback = constraints as MapperCallback;
+      constraints = {};
     }
+    this.scope({ constraints }, callback);
   }
 
   concern(name: string, callable: ConcernCallback): void {
@@ -700,7 +732,7 @@ export class Mapper {
       ? Array.isArray(options.via)
         ? options.via
         : [options.via]
-      : ["ALL"];
+      : [":all"];
 
     this.addRoute(methods, path, options);
   }
@@ -756,7 +788,7 @@ export class Mapper {
       anchor: false,
       format: false,
       ...options,
-      via: options.via ?? "ALL",
+      via: options.via ?? ":all",
       app,
     };
     if (asName) matchOpts.as = asName;
@@ -830,7 +862,8 @@ export class Mapper {
     delete options.path;
     let to = options.to;
     delete options.to;
-    const viaIn = options.via ?? (this._scope.get("via") as string | string[] | undefined) ?? "ALL";
+    const viaIn =
+      options.via ?? (this._scope.get("via") as string | string[] | undefined) ?? ":all";
     delete options.via;
     const formatted = options.format ?? (this._scope.get("format") as boolean | undefined);
     delete options.format;
@@ -896,7 +929,7 @@ export class Mapper {
     via: string | string[],
     formatted: boolean | undefined,
     anchor: boolean,
-    optionsConstraints: RouteConstraints,
+    optionsConstraints: RouteOptions["constraints"],
   ): void {
     const recurse = () =>
       this.decomposedMatch(
@@ -921,8 +954,12 @@ export class Mapper {
     if (this._scope.scopeLevel === "resources") return this.withScopeLevel("nested", recurse);
     if (this._scope.scopeLevel === "resource") return this.member(recurse);
     const merged: RouteOptions & { via?: string | string[] } = { ...options, via };
-    const mergedConstraints = { ...(optionsConstraints ?? {}), ...(options.constraints ?? {}) };
-    if (Object.keys(mergedConstraints).length > 0) merged.constraints = mergedConstraints;
+    if (isPlainObject(optionsConstraints)) {
+      const mergedConstraints = { ...optionsConstraints, ...(options.constraints ?? {}) };
+      if (Object.keys(mergedConstraints).length > 0) merged.constraints = mergedConstraints;
+    } else {
+      merged.constraints = optionsConstraints;
+    }
     if (to) merged.to = to;
     if (controller && !merged.to) merged.controller = controller;
     if (formatted !== undefined) merged.format = formatted;
@@ -1054,9 +1091,21 @@ export class Mapper {
         ? { ...(scopeDefaults ?? {}), ...(options.defaults ?? {}) }
         : undefined;
 
+    const optionsConstraints = options.constraints ?? {};
+    let blocks: readonly unknown[];
+    let constraints: RouteConstraints | undefined;
+    if (isPlainObject(optionsConstraints)) {
+      blocks = (this._scope.get("blocks") as unknown[] | undefined) ?? [];
+      constraints = options.constraints as RouteConstraints | undefined;
+    } else {
+      blocks = Mapping.blocks(optionsConstraints);
+    }
+
     this.addRouteToSet(
       new Route(verb, fullPath, controller, action, {
         ...options,
+        constraints,
+        blocks,
         app: toApp ?? options.app,
         name: fullName,
         redirect: redirectTarget,
@@ -1213,10 +1262,7 @@ export class Mapper {
   }
 
   /** @internal */
-  mergeBlocksScope(
-    parent: MapperCallback[] | undefined,
-    child: MapperCallback | undefined,
-  ): MapperCallback[] {
+  mergeBlocksScope(parent: unknown[] | undefined, child: unknown): unknown[] {
     const merged = parent ? [...parent] : [];
     if (child) merged.push(child);
     return merged;
@@ -1482,7 +1528,7 @@ export class Mapper {
       return true;
     }
 
-    const constraints = options.constraints ?? {};
+    const constraints = (options.constraints ?? {}) as RouteConstraints;
     let pulledAny = false;
     for (const k of Object.keys(options) as Array<keyof RouteOptions>) {
       const v = options[k];

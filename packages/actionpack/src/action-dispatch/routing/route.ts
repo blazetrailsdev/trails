@@ -5,7 +5,7 @@ import type { Format } from "../journey/visitors.js";
 import { normalizePath as journeyNormalizePath } from "../journey/router/utils.js";
 import { buildJourneyRouter, journeyRecognize } from "./journey-bridge.js";
 import type { Router as JourneyRouter } from "../journey/router.js";
-import { Route as JourneyRoute, VerbMatchers, type VerbMatcher } from "../journey/route.js";
+import { Route as JourneyRoute, type VerbMatcher } from "../journey/route.js";
 import { OptionRedirect, PathRedirect, Redirect } from "./redirection.js";
 import { MissingRoute } from "../journey/formatter.js";
 import { Request } from "../http/request.js";
@@ -22,9 +22,15 @@ export type MountableApp =
   | ((env: RackEnv) => RackResponse | Promise<RackResponse>)
   | { call: (env: RackEnv) => RackResponse | Promise<RackResponse> };
 
+export type CallableConstraint =
+  | ((...args: never[]) => unknown)
+  | { matches(req: Request): unknown }
+  | { call(...args: never[]): unknown };
+
 export interface RouteOptions {
   name?: string | null | false;
-  constraints?: RouteConstraints;
+  constraints?: RouteConstraints | CallableConstraint;
+  blocks?: readonly unknown[];
   defaults?: Record<string, string | null>;
   format?: boolean;
   as?: string | null | false;
@@ -71,6 +77,8 @@ export class Route {
   readonly action: string;
   readonly defaults: Record<string, string | null>;
   readonly constraints: RouteConstraints;
+  /** @internal */
+  readonly blocks: readonly unknown[];
   readonly ip: string | RegExp;
   readonly redirectTarget: string | RedirectOptions | RedirectFunction | undefined;
   readonly anchor: boolean;
@@ -107,14 +115,15 @@ export class Route {
     options: RouteOptions = {},
   ) {
     this.requestMethodMatch = (Array.isArray(verb) ? verb : [verb as string]).map((v) =>
-      v.toUpperCase() === "ALL" ? VerbMatchers.All : JourneyRoute.verbMatcher(v.toUpperCase()),
+      JourneyRoute.verbMatcher(v),
     );
     this.path = normalizePath(path);
     this.controller = controller;
     this.action = action;
     this.name = (options.name ?? options.as) || undefined;
     this.defaults = options.defaults ?? {};
-    this.constraints = options.constraints ?? {};
+    this.constraints = (options.constraints as RouteConstraints | undefined) ?? {};
+    this.blocks = options.blocks ?? [];
     this.ip = options.ip ?? /(?:)/;
     if (options.redirect !== undefined && options.redirectEndpoint !== undefined) {
       throw new Error(
@@ -138,7 +147,7 @@ export class Route {
 
   /** @internal */
   private verbs(): string[] {
-    return this.requestMethodMatch.map((m) => (m === VerbMatchers.All ? "ALL" : m.verb));
+    return this.requestMethodMatch.map((m) => m.verb);
   }
 
   get app(): Endpoint | undefined {

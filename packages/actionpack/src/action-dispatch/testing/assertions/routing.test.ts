@@ -19,7 +19,7 @@ function buildHost(): RoutingAssertionsHost {
     m.post("/items", { to: "items#create" });
     m.get("/items/list/:id", { to: "items#list" });
     m.get("/items/show/:id", { to: "items#show" });
-    m.match("/all", { to: "x#a", via: "all" });
+    m.match("/all", { to: "x#a", via: ":all" });
   });
   return { routes };
 }

@@ -426,7 +426,7 @@ describe("ResourcesTest", () => {
 
   it("test_assert_routing_accepts_all_as_a_valid_method", () => {
     const host = makeHost();
-    host.routes!.draw((m) => m.match("/products", { to: "products#show", via: "all" }));
+    host.routes!.draw((m) => m.match("/products", { to: "products#show", via: ":all" }));
     assertRouting.call(
       host,
       { path: "/products", method: "all" },

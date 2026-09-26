@@ -72,15 +72,15 @@ export class UriEncoder {
 
 const ENCODER = new UriEncoder();
 
-export function escapePath(path: string): string {
+export function escapePath(path: unknown): string {
   return ENCODER.escapePath(String(path));
 }
 
-export function escapeSegment(segment: string): string {
+export function escapeSegment(segment: unknown): string {
   return ENCODER.escapeSegment(String(segment));
 }
 
-export function escapeFragment(fragment: string): string {
+export function escapeFragment(fragment: unknown): string {
   return ENCODER.escapeFragment(String(fragment));
 }
 

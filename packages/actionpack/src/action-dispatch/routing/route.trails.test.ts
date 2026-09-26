@@ -73,6 +73,12 @@ describe("ActionDispatch::Routing::Route", () => {
     expect(route.ip).toEqual(/(?:)/);
   });
 
+  it("a route built from the :all via reports the All matcher's empty verb", () => {
+    const route = new Route(":all", "/posts", "posts", "index");
+    expect(route.verb).toBe("");
+    expect(route.match("DELETE", "/posts")).not.toBeNull();
+  });
+
   it("a route built from a multi-verb via answers every listed verb", () => {
     const route = new Route(["GET", "POST"], "/search", "search", "index");
     expect(route.verb).toBe("GET|POST");

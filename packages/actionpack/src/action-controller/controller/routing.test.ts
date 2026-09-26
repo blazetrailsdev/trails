@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 
+import { isPresent } from "@blazetrails/activesupport";
 import { bodyFromString, bodyToString } from "@blazetrails/rack";
+import type { Request } from "../../action-dispatch/http/request.js";
 import { RouteSet } from "../../action-dispatch/routing/route-set.js";
 import { RoutingError, UrlGenerationError } from "../metal/exceptions.js";
 import { controllerConstants } from "../../action-dispatch/http/request.js";
@@ -526,11 +528,58 @@ describe("LegacyRouteSetTests", () => {
 
   it.skip("class and lambda constraints", () => {});
 
-  it.skip("lambda constraints", () => {});
+  it("lambda constraints", async () => {
+    rs.draw((r) => {
+      r.get("/", {
+        constraints: (req: Request) => isPresent(req.subdomain()) && req.subdomain() !== "clients",
+        to: async () => [200, {}, bodyFromString("default")],
+      });
 
-  it.skip("scoped lambda", () => {});
+      r.get("/", {
+        constraints: (req: Request) => isPresent(req.subdomain()) && req.subdomain() === "clients",
+        to: async () => [200, {}, bodyFromString("clients")],
+      });
+    });
 
-  it.skip("scoped lambda with get lambda", () => {});
+    expect(await rackGet(rs, "http://www.example.org/")).toBe("default");
+    expect(await rackGet(rs, "http://clients.example.org/")).toBe("clients");
+  });
+
+  it("scoped lambda", async () => {
+    let scopeCalled = false;
+    rs.draw((r) => {
+      r.scope("/foo", { constraints: (_req: Request) => (scopeCalled = true) }, () => {
+        r.get("/", { to: async () => [200, {}, bodyFromString("default")] });
+      });
+    });
+
+    expect(await rackGet(rs, "http://www.example.org/foo/")).toBe("default");
+    expect(scopeCalled).toBe(true);
+  });
+
+  it("scoped lambda with get lambda", async () => {
+    let innerCalled = false;
+
+    rs.draw((r) => {
+      r.scope(
+        "/foo",
+        {
+          constraints: (_req: Request) => {
+            throw new Error("should not be called");
+          },
+        },
+        () => {
+          r.get("/", {
+            constraints: (_req: Request) => (innerCalled = true),
+            to: async () => [200, {}, bodyFromString("default")],
+          });
+        },
+      );
+    });
+
+    expect(await rackGet(rs, "http://www.example.org/foo/")).toBe("default");
+    expect(innerCalled).toBe(true);
+  });
 
   it.skip("default setup", () => {});
 

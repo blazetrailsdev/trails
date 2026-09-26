@@ -54,8 +54,7 @@ export class RouteWrapper {
   isMatchesFilter(filter: string, value: RegExp | string): boolean {
     if (filter === "exact_path_match") {
       if (typeof value !== "string") return false;
-      const verb = this.route.verb === "ALL" ? "GET" : this.route.verb;
-      return this.route.match(verb, value) !== null;
+      return this.route.match(this.route.verb, value) !== null;
     }
     const re = value instanceof RegExp ? value : new RegExp(String(value));
     const target = (this as unknown as Record<string, unknown>)[filter];
@@ -99,7 +98,7 @@ export class RouteWrapper {
     return this.route.name ?? "";
   }
   get verb(): string {
-    return this.route.verb === "ALL" ? "" : this.route.verb;
+    return this.route.verb;
   }
   get controller(): string {
     return this.route.pathParamNames.includes("controller")
