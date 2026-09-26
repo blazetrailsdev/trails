@@ -21,6 +21,7 @@ import {
   isPlainObject,
   isPresent,
   kernelArray,
+  stringifyKeys,
   underscore,
 } from "@blazetrails/activesupport";
 import {
@@ -32,7 +33,8 @@ import {
   stringSplit,
 } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { fetch } from "@blazetrails/ruby-compat";
+import { fetch, hashDelete, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
+import { deprecator } from "../deprecator.js";
 
 type MapperCallback = (mapper: Mapper) => void;
 type ConcernCallback = (mapper: Mapper) => void;
@@ -1074,8 +1076,41 @@ export class Mapper {
     return endpoint;
   }
 
-  match(path: string, options: RouteOptions & { via?: string | string[] } = {}): void {
-    const paths = [path];
+  match(
+    path: string | Record<string, unknown>,
+    ...rest: (string | (RouteOptions & { via?: string | string[] }))[]
+  ): void {
+    let options: RouteOptions & { via?: string | string[] };
+    let paths: string[];
+    if (rest.length === 0 && isPlainObject(path)) {
+      const hash: Record<string, unknown> = path;
+      let to: unknown;
+      [path, to] = (Object.entries(hash).find(([name, _value]) => !isSymbol(name)) ?? []) as [
+        string,
+        unknown,
+      ];
+
+      if (path == null) throw new ArgumentError("Route path not specified");
+
+      if (isSymbol(to)) {
+        hash[":action"] = symbolToS(to);
+      } else if (typeof to === "string") {
+        if (to.includes("#")) {
+          hash[":to"] = to;
+        } else {
+          hash[":controller"] = to;
+        }
+      } else {
+        hash[":to"] = to;
+      }
+
+      hashDelete(hash, path);
+      options = stringifyKeys(hash);
+      paths = [path];
+    } else {
+      options = (rest.pop() as RouteOptions & { via?: string | string[] }) ?? {};
+      paths = [path as string, ...(rest as string[])];
+    }
 
     if ("defaults" in options) {
       const defaults = options.defaults as Record<string, string>;
@@ -1196,6 +1231,12 @@ export class Mapper {
       path?: string;
     },
   ): void {
+    if (paths.length > 1) {
+      deprecator().warn(
+        "Mapping a route with multiple paths is deprecated and will be removed in Rails 8.1. Please use multiple method calls instead.",
+      );
+    }
+
     if (options.on !== undefined) assertValidOnOption(options.on);
 
     const scopeTo = this._scope.get("to") as string | undefined;
