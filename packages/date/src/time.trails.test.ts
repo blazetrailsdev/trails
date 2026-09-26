@@ -427,17 +427,20 @@ describe("Time", () => {
       const tz = {
         utcToLocal: (tm: Time) => tm.getlocal("America/New_York"),
         abbr: (tm: Time) => tm.getlocal("America/New_York").strftime("%Z"),
+        isDst: (tm: Time) => tm.getlocal("America/New_York").isdst,
       };
       const eastern = Time.utc(2020, 1, 1, 12, 0, 0).getlocal(tz);
       expect(eastern.zone).toBe(tz);
       expect(eastern.utcOffset).toBe(-18000);
       expect(eastern.hour).toBe(7);
       expect(eastern.strftime("%Z")).toBe("EST");
+      expect(eastern.isdst).toBe(false);
       const summer = eastern.plus(182 * 86400);
       expect(summer.zone).toBe(tz);
       expect(summer.utcOffset).toBe(-14400);
+      expect(summer.isdst).toBe(true);
       expect(Time.utc(2020, 1, 1).getlocal(new Rational(3600, 1)).utcOffset).toBe(3600);
-      expect(() => Time.utc(2020, 1, 1).getlocal({})).toThrow(ArgumentError);
+      expect(() => Time.utc(2020, 1, 1).getlocal({})).toThrow(TypeError);
     });
   });
   describe("Time.new given a String", () => {

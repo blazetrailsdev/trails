@@ -199,7 +199,6 @@ function validateVtmRange(mem: string, value: number, b: number, e: number): voi
   if (value < b || value > e) throw new ArgumentError(`${mem} out of range`);
 }
 
-/** `maybe_tzobj_p` (`vendor/ruby/time.c:2180-2186`). */
 function maybeTzobjP(obj: unknown): obj is object {
   if (obj == null) return false;
   if (typeof obj === "number" || typeof obj === "bigint") return false;
@@ -414,6 +413,8 @@ export class Time {
   #subnano: Rational;
   /** @internal */
   #zoneObject: object | null = null;
+  /** @internal */
+  #isdstMemo: boolean | null = null;
 
   /** @internal */
   get #plain(): Temporal.PlainDateTime {
@@ -499,11 +500,6 @@ export class Time {
     return new Time(0);
   }
 
-  /**
-   * `zone_localtime` (`vendor/ruby/time.c:2415-2435`): asks the timezone object
-   * for the wall clock at `time`'s instant and seats the object as the zone,
-   * `zone_set_offset` (`time.c`) taking the offset as local minus UTC.
-   */
   static #zoneLocaltime(zone: object, time: Time): Time | null {
     if (!rbObjRespondTo(zone, "utcToLocal")) return null;
     const local = (zone as { utcToLocal(tm: Time): unknown }).utcToLocal(time);
@@ -514,6 +510,10 @@ export class Time {
           Number((local as Temporal.ZonedDateTime).offsetNanoseconds) / 1_000_000_000;
     const t = Time.#atInstant(time.#instant, s - time.toI(), false, time.#subnano);
     t.#zoneObject = zone;
+    const dst = rbObjRespondTo(zone, "isDst")
+      ? (zone as { isDst(tm: Time): unknown }).isDst(time)
+      : undefined;
+    t.#isdstMemo = dst !== undefined && dst != null && dst !== false;
     return t;
   }
 
@@ -1380,6 +1380,7 @@ export class Time {
   }
 
   get isdst(): boolean {
+    if (this.#isdstMemo != null) return this.#isdstMemo;
     if (this.#timeZoneId == null || this.#timeZoneId === "UTC") return false;
     return tzdataIsdst(this.#timeZoneId, Math.floor(this.#instant.epochMilliseconds / 1000));
   }
@@ -1600,7 +1601,7 @@ export class Time {
     ) {
       return Time.#atInstant(
         this.#instant,
-        utcOffsetArgument(utcOffset as string | Rational),
+        utcOffsetArgument(typeof utcOffset === "string" ? utcOffset : numExact(utcOffset)),
         undefined,
         this.#subnano,
       );
