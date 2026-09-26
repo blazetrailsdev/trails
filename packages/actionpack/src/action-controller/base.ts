@@ -115,6 +115,7 @@ import {
 } from "./metal/params-wrapper.js";
 import { processAction as _processAction } from "./metal/rendering.js";
 import { urlOptions } from "./metal/url-for.js";
+import { Cookies } from "./metal/cookies.js";
 import {
   appendInfoToPayload,
   cleanupViewRuntime,
@@ -827,6 +828,8 @@ export class Base extends Metal {
   declare fragmentExist: typeof fragmentExist;
   declare expireFragment: typeof expireFragment;
 
+  /** @internal */
+  declare cookies: Cookies["cookies"];
   declare urlOptions: typeof urlOptions;
   /** @internal */
   declare _urlOptions: Readonly<Record<string, unknown>> | null;
@@ -862,10 +865,6 @@ export class Base extends Metal {
       contentType: options.contentType,
       body: Buffer.isBuffer(data) ? data.toString("latin1") : data,
     });
-  }
-
-  get cookies(): Record<string, string> {
-    return (this.request as any)?.cookies ?? {};
   }
 
   private _renderTemplate(action: string, _options: RenderOptions): void {
@@ -943,6 +942,7 @@ export class Base extends Metal {
 }
 
 include(Base, ConfigMethods);
+include(Base, Cookies);
 Base.prototype._processRenderTemplateOptions = _processRenderTemplateOptions;
 Base.prototype.isActionHasLayout = isActionHasLayout;
 Base.prototype._isConditionalLayout = _isConditionalLayout;

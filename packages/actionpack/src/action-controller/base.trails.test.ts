@@ -58,3 +58,27 @@ describe("ActionController::Base render partial:", () => {
     expect(c.responseBody).toBe("footer");
   });
 });
+
+describe("ActionController::Cookies#cookies", () => {
+  class CookiesController extends ApplicationController {
+    async authenticate(): Promise<void> {
+      this.cookies().set("user_name", "david");
+      this.head("ok");
+    }
+  }
+
+  it("is the request's cookie jar, reachable as a view helper", async () => {
+    const request = new Request({
+      REQUEST_METHOD: "GET",
+      PATH_INFO: "/",
+      HTTP_HOST: "localhost",
+      HTTP_COOKIE: "flavor=oatmeal",
+    });
+    const controller = new CookiesController();
+    await controller.dispatch("authenticate", request, new Response());
+    expect(controller.cookies()).toBe(request.cookieJar());
+    expect(controller.cookies().get("flavor")).toBe("oatmeal");
+    expect(request.cookieJar().get("user_name")).toBe("david");
+    expect(CookiesController._helperMethods).toContain("cookies");
+  });
+});
