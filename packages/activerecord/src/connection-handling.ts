@@ -72,17 +72,19 @@ export async function connectsTo(
     ? shards
     : { default: database };
   (this as any)._defaultShard = Object.keys(shardEntries)[0];
-  (this as any).connectionClass = true;
 
   for (const [shard, dbKeys] of Object.entries(shardEntries)) {
     for (const [role, dbKey] of Object.entries(dbKeys)) {
       const dbConfig = resolveConfigForConnection.call(this, dbKey);
-      const pool = await this.connectionHandler.establishConnection(dbConfig, {
-        ownerName: this.connectionClassForSelf(),
-        role,
-        shard,
-      });
-      connections.push(pool);
+
+      (this as any).connectionClass = true;
+      connections.push(
+        await this.connectionHandler.establishConnection(dbConfig, {
+          ownerName: this,
+          role,
+          shard,
+        }),
+      );
     }
   }
 

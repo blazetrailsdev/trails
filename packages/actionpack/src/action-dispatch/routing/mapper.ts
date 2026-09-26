@@ -50,8 +50,8 @@ const RESOURCE_OPTIONS: ReadonlySet<string> = new Set([
 /** @internal */
 interface RouteSetLike {
   namedRoutes?: { get(name: string): unknown };
-  addRoute?(route: Route, name?: string | null): unknown;
-  resourcesPathNames?: Record<string, string>;
+  addRoute(route: Route, name?: string | null): unknown;
+  resourcesPathNames: Record<string, string>;
   drawPaths?: string[];
   defaultUrlOptions?: Record<string, unknown>;
 }
@@ -183,7 +183,6 @@ class Mapping {
 }
 
 export class Mapper {
-  readonly routes: Route[] = [];
   private scopeStack: ScopeFrame[] = [];
   private concerns: Map<string, ConcernCallback> = new Map();
   /** @internal */
@@ -191,30 +190,26 @@ export class Mapper {
   /** @internal */
   private redirectCounter = 0;
   /** @internal */
-  _set: RouteSetLike | undefined;
+  _set: RouteSetLike;
   /** @internal */
   _drawPaths: string[];
   /** @internal */
   _scope: Scope;
   /** @internal */
   _apiOnly = false;
-  /** @internal */
-  private _defaultUrlOptions: Record<string, unknown> = {};
 
-  constructor(set?: RouteSetLike) {
+  constructor(set: RouteSetLike) {
     this._set = set;
-    this._drawPaths = set?.drawPaths ?? [];
-    const pathNames = set?.resourcesPathNames ?? { new: "new", edit: "edit" };
-    this._scope = new Scope({ pathNames }, Scope.ROOT, null);
+    this._drawPaths = set.drawPaths ?? [];
+    this._scope = new Scope({ pathNames: this._set.resourcesPathNames });
   }
 
   set defaultUrlOptions(options: Record<string, unknown>) {
-    if (this._set) this._set.defaultUrlOptions = options;
-    else this._defaultUrlOptions = options;
+    this._set.defaultUrlOptions = options;
   }
 
   get defaultUrlOptions(): Record<string, unknown> {
-    return this._set?.defaultUrlOptions ?? this._defaultUrlOptions;
+    return this._set.defaultUrlOptions ?? {};
   }
 
   get(path: string, optionsOrEndpoint: RouteOptions | string = {}): void {
@@ -300,24 +295,28 @@ export class Mapper {
     const editPath = pathNames.edit ?? "edit";
 
     if (allowed.has("index")) {
-      this.addRouteToSet(
+      const as = routeName(name);
+      this._set.addRoute(
         new Route("GET", basePath, controller, "index", {
-          name: routeName(name),
+          name: as,
           constraints,
         }),
+        as,
       );
     }
 
     if (allowed.has("create")) {
-      this.addRouteToSet(new Route("POST", basePath, controller, "create", { constraints }));
+      this._set.addRoute(new Route("POST", basePath, controller, "create", { constraints }));
     }
 
     if (allowed.has("new")) {
-      this.addRouteToSet(
+      const as = routeName(`new_${singular}`);
+      this._set.addRoute(
         new Route("GET", `${basePath}/${newPath}`, controller, "new", {
-          name: routeName(`new_${singular}`),
+          name: as,
           constraints,
         }),
+        as,
       );
     }
 
@@ -349,34 +348,38 @@ export class Mapper {
     }
 
     if (allowed.has("edit")) {
-      this.addRouteToSet(
+      const as = shallowName(`edit_${singular}`);
+      this._set.addRoute(
         new Route("GET", `${shallowPath}/:id/${editPath}`, controller, "edit", {
-          name: shallowName(`edit_${singular}`),
+          name: as,
           constraints,
         }),
+        as,
       );
     }
 
     if (allowed.has("show")) {
-      this.addRouteToSet(
+      const as = singular !== name ? shallowName(singular) : undefined;
+      this._set.addRoute(
         new Route("GET", `${shallowPath}/:id`, controller, "show", {
-          name: singular !== name ? shallowName(singular) : undefined,
+          name: as,
           constraints,
         }),
+        as,
       );
     }
 
     if (allowed.has("update")) {
-      this.addRouteToSet(
+      this._set.addRoute(
         new Route("PATCH", `${shallowPath}/:id`, controller, "update", { constraints }),
       );
-      this.addRouteToSet(
+      this._set.addRoute(
         new Route("PUT", `${shallowPath}/:id`, controller, "update", { constraints }),
       );
     }
 
     if (allowed.has("destroy")) {
-      this.addRouteToSet(
+      this._set.addRoute(
         new Route("DELETE", `${shallowPath}/:id`, controller, "destroy", { constraints }),
       );
     }
@@ -413,40 +416,46 @@ export class Mapper {
     const editPath = pathNames.edit ?? "edit";
 
     if (allowed.has("new")) {
-      this.addRouteToSet(
+      const as = routeName(`new_${name}`);
+      this._set.addRoute(
         new Route("GET", `${basePath}/${newPath}`, controller, "new", {
-          name: routeName(`new_${name}`),
+          name: as,
         }),
+        as,
       );
     }
 
     if (allowed.has("create")) {
-      this.addRouteToSet(new Route("POST", basePath, controller, "create"));
+      this._set.addRoute(new Route("POST", basePath, controller, "create"));
     }
 
     if (allowed.has("show")) {
-      this.addRouteToSet(
+      const as = routeName(name);
+      this._set.addRoute(
         new Route("GET", basePath, controller, "show", {
-          name: routeName(name),
+          name: as,
         }),
+        as,
       );
     }
 
     if (allowed.has("edit")) {
-      this.addRouteToSet(
+      const as = routeName(`edit_${name}`);
+      this._set.addRoute(
         new Route("GET", `${basePath}/${editPath}`, controller, "edit", {
-          name: routeName(`edit_${name}`),
+          name: as,
         }),
+        as,
       );
     }
 
     if (allowed.has("update")) {
-      this.addRouteToSet(new Route("PATCH", basePath, controller, "update"));
-      this.addRouteToSet(new Route("PUT", basePath, controller, "update"));
+      this._set.addRoute(new Route("PATCH", basePath, controller, "update"));
+      this._set.addRoute(new Route("PUT", basePath, controller, "update"));
     }
 
     if (allowed.has("destroy")) {
-      this.addRouteToSet(new Route("DELETE", basePath, controller, "destroy"));
+      this._set.addRoute(new Route("DELETE", basePath, controller, "destroy"));
     }
 
     if (cb) {
@@ -682,29 +691,29 @@ export class Mapper {
     const controller = frame?.resourceController ?? "";
     const editPath = frame?.resourcePathNames?.edit ?? this.actionPath("edit");
     if (actions.includes("edit")) {
-      this.addRouteToSet(new Route("GET", `${memberPath}/${editPath}`, controller, "edit"));
+      this._set.addRoute(new Route("GET", `${memberPath}/${editPath}`, controller, "edit"));
     }
     if (actions.includes("show")) {
-      this.addRouteToSet(new Route("GET", memberPath, controller, "show"));
+      this._set.addRoute(new Route("GET", memberPath, controller, "show"));
     }
     if (actions.includes("update")) {
-      this.addRouteToSet(new Route("PATCH", memberPath, controller, "update"));
-      this.addRouteToSet(new Route("PUT", memberPath, controller, "update"));
+      this._set.addRoute(new Route("PATCH", memberPath, controller, "update"));
+      this._set.addRoute(new Route("PUT", memberPath, controller, "update"));
     }
     if (actions.includes("destroy")) {
-      this.addRouteToSet(new Route("DELETE", memberPath, controller, "destroy"));
+      this._set.addRoute(new Route("DELETE", memberPath, controller, "destroy"));
     }
   }
 
   constraints(
-    constraints: RouteOptions["constraints"] | MapperCallback,
-    callback?: MapperCallback,
+    constraints: RouteOptions["constraints"] | MapperCallback = {},
+    block?: MapperCallback,
   ): void {
-    if (callback === undefined) {
-      callback = constraints as MapperCallback;
+    if (block === undefined) {
+      block = constraints as MapperCallback;
       constraints = {};
     }
-    this.scope({ constraints }, callback);
+    this.scope({ constraints }, block);
   }
 
   concern(name: string, callable: ConcernCallback): void {
@@ -1109,7 +1118,7 @@ export class Mapper {
       blocks = Mapping.blocks(optionsConstraints);
     }
 
-    this.addRouteToSet(
+    this._set.addRoute(
       new Route(verb, fullPath, controller, action, {
         ...options,
         constraints: Object.keys(constraints).length > 0 ? constraints : undefined,
@@ -1121,13 +1130,8 @@ export class Mapper {
         defaults: mergedDefaults,
         scopeOptions: (this._scope.get("options") as Record<string, unknown> | undefined) ?? {},
       }),
+      fullName,
     );
-  }
-
-  /** @internal */
-  private addRouteToSet(route: Route): void {
-    this.routes.push(route);
-    this._set?.addRoute?.(route, route.name);
   }
 
   private currentPrefix(): string {

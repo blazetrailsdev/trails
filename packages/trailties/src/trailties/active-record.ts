@@ -4,6 +4,7 @@ import {
   constantize,
   include,
   onLoad,
+  TopLevel,
   upcaseFirst,
   type Deprecators,
 } from "@blazetrails/activesupport";
@@ -15,6 +16,7 @@ import {
   Base,
   ConnectionPool,
   ControllerRuntime,
+  LogSubscriber,
   QueryCache,
   Relation,
   SchemaReflection,
@@ -74,6 +76,10 @@ const pushTimestamptzToTimeZoneAwareTypes = (base: typeof Base): void => {
   if (!base.timeZoneAwareTypes.includes("timestamptz")) {
     base.timeZoneAwareTypes.push("timestamptz");
   }
+};
+
+const setLogSubscriberBacktraceCleaner = (): void => {
+  LogSubscriber.backtraceCleaner = TopLevel.Trails!.backtraceCleaner;
 };
 
 const onPostgresqlAdapterLoadedPushTimestamptz = (): void => {
@@ -137,6 +143,10 @@ export class Trailtie extends BaseTrailtie {
         { runOnce: true },
         onPostgresqlAdapterLoadedPushTimestamptz,
       );
+    });
+
+    this.initializer("active_record.backtrace_cleaner", () => {
+      onLoad("active_record", { runOnce: true }, setLogSubscriberBacktraceCleaner);
     });
 
     this.initializer("active_record.copy_schema_cache_config", () => {

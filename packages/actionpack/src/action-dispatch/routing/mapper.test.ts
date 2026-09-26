@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { Mapper } from "./mapper.js";
+import { RouteSet } from "./route-set.js";
 
 describe("Mapper.normalizePath", () => {
   it("collapses duplicate slashes", () => {
@@ -41,7 +42,7 @@ describe("Mapper.normalizeName", () => {
 });
 
 describe("scope-merge helpers", () => {
-  const m = new Mapper();
+  const m = new Mapper(new RouteSet());
 
   it("mergePathScope concatenates and normalizes", () => {
     expect(m.mergePathScope("/foo", "bar")).toBe("/foo/bar");
@@ -88,12 +89,14 @@ describe("scope-merge helpers", () => {
 
 describe("Mapper public DSL additions", () => {
   it("nested throws outside a resource scope", () => {
-    const m = new Mapper();
+    const set = new RouteSet();
+    const m = new Mapper(set);
     expect(() => m.nested(() => {})).toThrow(/can't use nested outside resource\(s\) scope/);
   });
 
   it("nested runs inside a resources block", () => {
-    const m = new Mapper();
+    const set = new RouteSet();
+    const m = new Mapper(set);
     let ran = false;
     m.resources("posts", () => {
       m.nested(() => {
@@ -104,7 +107,8 @@ describe("Mapper public DSL additions", () => {
   });
 
   it("shallow preserves the outer path prefix on its frame", () => {
-    const m = new Mapper();
+    const set = new RouteSet();
+    const m = new Mapper(set);
     let observedInside: string | undefined;
     m.scope("/admin", () => {
       m.shallow(() => {
@@ -120,35 +124,39 @@ describe("Mapper public DSL additions", () => {
       join(dir, "external.ts"),
       'export function drawRoutes(mapper) { mapper.get("/external", { to: "external#index" }); }\n',
     );
-    const m = new Mapper();
+    const set = new RouteSet();
+    const m = new Mapper(set);
     m._drawPaths.push(dir);
 
     await m.draw("external");
 
-    expect(m.routes.map((r) => r.path)).toContain("/external(.:format)");
+    expect(set.getRoutes().map((r) => r.path)).toContain("/external(.:format)");
   });
 
   it("root routes through match_root_route and keeps the bare slash", () => {
-    const m = new Mapper();
+    const set = new RouteSet();
+    const m = new Mapper(set);
     m.root("pages#home");
 
-    expect(m.routes.map((r) => r.path)).toContain("/");
-    expect(m.routes.find((r) => r.path === "/")!.name).toBe("root");
+    expect(set.getRoutes().map((r) => r.path)).toContain("/");
+    expect(set.getRoutes().find((r) => r.path === "/")!.name).toBe("root");
   });
 
   it("root nested in resources does not yet get the resources? scope wrap", () => {
-    const m = new Mapper();
+    const set = new RouteSet();
+    const m = new Mapper(set);
     m.resources("products", () => {
       m.root("products#root");
     });
-    const root = m.routes.find((r) => r.action === "root")!;
+    const root = set.getRoutes().find((r) => r.action === "root")!;
 
     expect(root.path).toBe("/products/:product_id(.:format)");
     expect(root.name).toBe("product_root");
   });
 
   it("draw raises when the external file is not found", async () => {
-    const m = new Mapper();
+    const set = new RouteSet();
+    const m = new Mapper(set);
     m._drawPaths.push("/nonexistent/config/routes");
 
     await expect(m.draw("external")).rejects.toThrow(
@@ -157,13 +165,14 @@ describe("Mapper public DSL additions", () => {
   });
 
   it("defaultUrlOptions getter/setter round-trip", () => {
-    const m = new Mapper();
+    const set = new RouteSet();
+    const m = new Mapper(set);
     m.defaultUrlOptions = { host: "example.com" };
     expect(m.defaultUrlOptions).toEqual({ host: "example.com" });
   });
 
   it("defaultUrlOptions delegates to an attached set", () => {
-    const set: { defaultUrlOptions: Record<string, unknown> } = { defaultUrlOptions: {} };
+    const set = new RouteSet();
     const m = new Mapper(set);
     m.defaultUrlOptions = { port: 3000 };
     expect(set.defaultUrlOptions).toEqual({ port: 3000 });
@@ -171,13 +180,14 @@ describe("Mapper public DSL additions", () => {
   });
 
   it("setMemberMappingsForResource emits canonical member routes for the parent resource actions", () => {
-    const m = new Mapper();
+    const set = new RouteSet();
+    const m = new Mapper(set);
     let before = 0;
     m.resources("posts", () => {
-      before = m.routes.length;
+      before = set.getRoutes().length;
       m.setMemberMappingsForResource();
     });
-    const added = m.routes.slice(before, before + 5);
+    const added = set.getRoutes().slice(before, before + 5);
     expect(added.map((r) => `${r.verb} ${r.path}#${r.action}`)).toEqual([
       "GET /posts/:id/edit#edit",
       "GET /posts/:id#show",
@@ -189,46 +199,51 @@ describe("Mapper public DSL additions", () => {
   });
 
   it("shallow inside a namespace preserves the namespace prefix on member paths", () => {
-    const m = new Mapper();
+    const set = new RouteSet();
+    const m = new Mapper(set);
     m.namespace("admin", () => {
       m.resources("posts", { shallow: true }, () => {
         m.resources("comments");
       });
     });
-    const commentShow = m.routes.find(
-      (r) => r.action === "show" && r.controller.endsWith("comments"),
-    );
+    const commentShow = set
+      .getRoutes()
+      .find((r) => r.action === "show" && r.controller.endsWith("comments"));
     expect(commentShow?.path).toBe("/admin/comments/:id");
   });
 
   it("setMemberMappingsForResource is a safe no-op outside a resource scope", () => {
-    const m = new Mapper();
+    const set = new RouteSet();
+    const m = new Mapper(set);
     expect(() => m.setMemberMappingsForResource()).not.toThrow();
-    expect(m.routes).toEqual([]);
+    expect(set.getRoutes()).toEqual([]);
   });
 
   it("shallow inside a namespace preserves the namespace prefix on member route names", () => {
-    const m = new Mapper();
+    const set = new RouteSet();
+    const m = new Mapper(set);
     m.namespace("admin", () => {
       m.resources("posts", { shallow: true }, () => {
         m.resources("comments");
       });
     });
-    const commentShow = m.routes.find(
-      (r) => r.action === "show" && r.controller.endsWith("comments"),
-    );
+    const commentShow = set
+      .getRoutes()
+      .find((r) => r.action === "show" && r.controller.endsWith("comments"));
     expect(commentShow?.name).toBe("admin_comment");
   });
 
   it("update routes emit PATCH before PUT (Rails parity)", () => {
-    const m = new Mapper();
+    const set = new RouteSet();
+    const m = new Mapper(set);
     m.resources("posts");
-    const updates = m.routes.filter((r) => r.action === "update");
+    const updates = set.getRoutes().filter((r) => r.action === "update");
     expect(updates.map((r) => r.verb)).toEqual(["PATCH", "PUT"]);
   });
 
   it("new() scope helper scopes to the new action path", () => {
-    const m = new Mapper();
+    const set = new RouteSet();
+    const m = new Mapper(set);
     let observedPath: string | undefined;
     m.resources("posts", () => {
       m.new(() => {
@@ -239,18 +254,22 @@ describe("Mapper public DSL additions", () => {
   });
 
   it("new() throws outside a resource scope", () => {
-    const m = new Mapper();
+    const set = new RouteSet();
+    const m = new Mapper(set);
     expect(() => m.new(() => {})).toThrow(/can't use new outside resource\(s\) scope/);
   });
 
   it("namespace inside a resource scope nests through nested", () => {
-    const m = new Mapper();
+    const set = new RouteSet();
+    const m = new Mapper(set);
     m.resources("posts", () => {
       m.namespace("admin", () => {
         m.resources("tags");
       });
     });
-    const tagIndex = m.routes.find((r) => r.action === "index" && r.controller.includes("tags"));
+    const tagIndex = set
+      .getRoutes()
+      .find((r) => r.action === "index" && r.controller.includes("tags"));
     expect(tagIndex?.path).toBe("/posts/:post_id/admin/tags");
   });
 });

@@ -6,7 +6,7 @@ import { Base, ColumnNotSerializableError, StatementInvalid } from "../../index.
 import { TimeZone, setZone, change as timeChange } from "@blazetrails/activesupport";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Array as OidArray } from "../../connection-adapters/postgresql/oid/array.js";
-import { ValueType, ModelName } from "@blazetrails/activemodel";
+import { ValueType, ModelName, StringType } from "@blazetrails/activemodel";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
 const textArray = new OidArray(new ValueType());
@@ -412,16 +412,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("quoting non standard delimiters", async () => {
-      const { Array: OidArray } = await import("../../connection-adapters/postgresql/oid/array.js");
-      const stringSubtype = {
-        type: "string",
-        cast: (v: unknown) => (v == null ? null : String(v)),
-        serialize: (v: unknown) => (v == null ? null : String(v)),
-        deserialize: (v: unknown) => (v == null ? null : String(v)),
-      };
       const strings = ["hello,", "world;"];
-      const commaDelim = new OidArray(stringSubtype, ",");
-      const semicolonDelim = new OidArray(stringSubtype, ";");
+      const commaDelim = new OidArray(new StringType(), ",");
+      const semicolonDelim = new OidArray(new StringType(), ";");
       expect(adapter.typeCast(commaDelim.serialize(strings))).toBe('{"hello,",world;}');
       expect(adapter.typeCast(semicolonDelim.serialize(strings))).toBe('{hello,;"world;"}');
     });
