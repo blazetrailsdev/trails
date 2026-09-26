@@ -261,9 +261,17 @@ const alias = {
     __dirname,
     "packages/activerecord/src/fixtures.ts",
   ),
+  "@blazetrails/activerecord/test-databases": path.resolve(
+    __dirname,
+    "packages/activerecord/src/test-databases.ts",
+  ),
   "@blazetrails/activerecord/test-fixtures": path.resolve(
     __dirname,
     "packages/activerecord/src/test-fixtures.ts",
+  ),
+  "@blazetrails/activerecord/testing/query-assertions": path.resolve(
+    __dirname,
+    "packages/activerecord/src/testing/query-assertions.ts",
   ),
   "@blazetrails/activerecord/migration": path.resolve(
     __dirname,

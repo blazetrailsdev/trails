@@ -134,6 +134,7 @@ export class Template {
   /** @internal */
   _strictLocalKeys: readonly string[] | null = null;
   private _shortIdentifier?: string;
+  private _type?: ReturnType<TypesImplementation["get"]>;
   private _methodName?: string;
   private readonly _objectId = ++nextObjectId;
   private _compiled = false;
@@ -162,8 +163,8 @@ export class Template {
     return this.isStrictLocals() ? null : this._locals;
   }
 
-  get type(): string | null {
-    return this.format;
+  get type(): ReturnType<TypesImplementation["get"]> {
+    return (this._type ??= this.format == null ? undefined : Template.Types.get(this.format));
   }
 
   get shortIdentifier(): string {

@@ -72,3 +72,36 @@ describe("TemplateRenderer html:", () => {
     expect(result.body).toBe("<p>hello world</p>");
   });
 });
+
+describe("TemplateRenderer _layout_for blocks", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("renders the template and the layout with a view._layout_for block (template_renderer.rb:66,77)", async () => {
+    const layoutFor = vi.fn((...name: unknown[]) => `<${name.join(",")}>`);
+    const view: ViewContext = {
+      viewRenderer: { cacheHits: {} },
+      _layoutFor: layoutFor,
+      viewFlow: { set: () => {} },
+    };
+    const template: RenderableTemplate = {
+      identifier: "t",
+      format: ":html",
+      render: vi.fn(async (_v, _l, _b, _o, block) => String(block!("sidebar"))),
+    };
+    const layout: RenderableTemplate = {
+      identifier: "l",
+      format: ":html",
+      render: vi.fn(async (_v, _l, _b, _o, block) => `[${String(block!())}]`),
+    };
+    const lc = new LookupContext();
+    vi.spyOn(lc, "findTemplate").mockReturnValue(template as never);
+    const renderer = new TemplateRenderer(lc);
+    vi.spyOn(renderer as never, "findLayout").mockReturnValue(layout as never);
+
+    const result = await renderer.render(view, { template: "t", layout: "l" });
+    expect(result.body).toBe("[<>]");
+    expect(layoutFor).toHaveBeenCalledWith("sidebar");
+  });
+});

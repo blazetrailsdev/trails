@@ -1,4 +1,5 @@
 import { chomp } from "@blazetrails/activesupport";
+import { rbEqual } from "@blazetrails/ruby-compat";
 import { compileJs, type EmitJsOptions, type EmitResult } from "@blazetrails/tse-compiler";
 import { ActionView } from "../../namespaces.js";
 import type { TemplateHandler } from "../handlers.js";
@@ -15,7 +16,7 @@ export {
 } from "./tse-translate-location.js";
 
 export interface TseTemplate {
-  type?: string | null;
+  type?: unknown;
   format?: string | null;
   shortIdentifier?: string | null;
   methodName(): string;
@@ -50,16 +51,16 @@ export class Tse implements TemplateHandler {
     return translateLocationImpl(spot, backtraceLocation, source);
   }
 
+  /** @missingRailsCall include? — PERMANENT */
   call(template: TseTemplate, source: string): string {
     const ctor = this.constructor as typeof Tse;
     const prepared = ctor.stripTrailingNewlines ? chomp(source) : source;
-    const mime = template.type != null ? formatToMimeType(template.type) : null;
-    const escapeIgnore = mime != null && ctor.escapeIgnoreList.includes(mime);
-    const options: EmitJsOptions = { escapeIgnore };
-    const format = template.format ?? (mime === "text/html" ? ":html" : null);
+    const options: EmitJsOptions = {
+      escapeIgnore: ctor.escapeIgnoreList.some((type) => rbEqual(type, template.type)),
+    };
     if (
       ActionView.Base.annotateRenderedViewWithFilenames &&
-      format === ":html" &&
+      template.format === ":html" &&
       template.shortIdentifier
     ) {
       const id = template.shortIdentifier;
@@ -74,24 +75,5 @@ export class Tse implements TemplateHandler {
         .replace(/^function\s+render\b/u, `function ${template.methodName()}`) +
       ")(this, localAssigns)"
     );
-  }
-}
-/** @internal */
-function formatToMimeType(format: string): string {
-  switch (format) {
-    case ":html":
-      return "text/html";
-    case ":text":
-      return "text/plain";
-    case ":json":
-      return "application/json";
-    case ":xml":
-      return "application/xml";
-    case ":js":
-      return "text/javascript";
-    case ":css":
-      return "text/css";
-    default:
-      return format;
   }
 }

@@ -120,11 +120,6 @@ describe("Template::Handlers::Tse", () => {
     expect(calls).toEqual([{ source: "src", escapeIgnore: true }]);
   });
 
-  it("normalizes a format-token template.type ('text') to MIME before the escapeIgnoreList check", () => {
-    const code = new Tse().call({ methodName, type: ":text" }, "<%= name %>");
-    expect(code).toMatch(/_ob\.safeExprAppend\(name\)/);
-  });
-
   it("Tse.call delegates to a fresh instance", () => {
     const code = Tse.call({ methodName, type: "text/html" }, "<%= name %>");
     expect(code).toMatch(/_ob\.append\(name\)/);

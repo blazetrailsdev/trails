@@ -5,7 +5,7 @@ import { TemplateHandlers } from "../template/handlers.js";
 import { Tse } from "../template/handlers/tse.js";
 import { FixtureResolver } from "../testing/resolvers.js";
 import type { ViewContext } from "./abstract-renderer.js";
-import { Renderer } from "./renderer.js";
+import type { Renderer } from "./renderer.js";
 
 describe("PartialRenderer render blocks", () => {
   let lookupContext: LookupContext;
@@ -21,10 +21,9 @@ describe("PartialRenderer render blocks", () => {
     });
     lookupContext = new LookupContext(null, {}, []);
     lookupContext.appendViewPaths([resolver]);
-    renderer = new Renderer(lookupContext);
-    view = Object.assign(new (Base.withEmptyTemplateCache())(lookupContext, {}, null), {
-      viewRenderer: renderer,
-    }) as unknown as ViewContext;
+    const base = new (Base.withEmptyTemplateCache())(lookupContext, {}, null);
+    renderer = base.viewRenderer;
+    view = base as unknown as ViewContext;
   });
 
   afterEach(() => {

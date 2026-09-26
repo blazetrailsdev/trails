@@ -1,6 +1,8 @@
 import { include, onLoad } from "@blazetrails/activesupport";
 import { TestCase } from "@blazetrails/activesupport/test-case";
+import { TestDatabases } from "@blazetrails/activerecord/test-databases";
 import { TestFixtures } from "@blazetrails/activerecord/test-fixtures";
+import { QueryAssertions } from "@blazetrails/activerecord/testing/query-assertions";
 import { abort } from "@blazetrails/ruby-compat";
 import { Trails } from "./rails.js";
 
@@ -22,7 +24,9 @@ await import("./testing/maintain-test-schema.js");
 const root = await Trails.root();
 
 onLoad("active_support_test_case", function (this: typeof TestCase & FixtureHost) {
+  include(this, TestDatabases);
   include(this, TestFixtures);
+  include(this, QueryAssertions);
 
   this.fixturePaths.push(`${root}/test/fixtures/`);
   this.fileFixturePath = `${root}/test/fixtures/files`;

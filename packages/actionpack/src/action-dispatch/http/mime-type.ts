@@ -162,6 +162,10 @@ export class MimeType {
     return this.string;
   }
 
+  toStr(): string {
+    return this.toString();
+  }
+
   match(mimeType: string | RegExp): boolean {
     if (mimeType instanceof RegExp) return mimeType.test(this.string);
     if (mimeType === "*/*") return true;

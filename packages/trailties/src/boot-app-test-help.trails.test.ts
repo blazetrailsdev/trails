@@ -2,7 +2,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ActionController } from "@blazetrails/actionpack";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { DatabaseTasks } from "@blazetrails/activerecord";
-import { env, setEnv } from "@blazetrails/ruby-compat";
+import { TestDatabases } from "@blazetrails/activerecord/test-databases";
+import { QueryAssertions } from "@blazetrails/activerecord/testing/query-assertions";
+import { env, includedModules, setEnv } from "@blazetrails/ruby-compat";
 import { Application } from "./application.js";
 import { Trails } from "./rails.js";
 
@@ -32,6 +34,15 @@ describe("test_help wires a booted app into the test case classes", () => {
     expect(typeof testCase.fixtures).toBe("function");
     expect(testCase.fixturePaths).toContain(`${root}/test/fixtures/`);
     expect(testCase.fileFixturePath).toBe(`${root}/test/fixtures/files`);
+  });
+
+  it("includes TestDatabases and QueryAssertions into ActiveSupport::TestCase (test_help.rb:17,19)", () => {
+    const modules = includedModules(TestCase);
+    expect(modules).toContain(TestDatabases);
+    expect(modules).toContain(QueryAssertions);
+    expect(typeof (TestCase.prototype as { assertQueriesCount?: unknown }).assertQueriesCount).toBe(
+      "function",
+    );
   });
 
   it("shares ActiveSupport::TestCase's fixture paths with IntegrationTest", () => {
