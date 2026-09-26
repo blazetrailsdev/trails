@@ -1,21 +1,21 @@
-import { h, type SafeBuffer } from "@blazetrails/activesupport";
+import { h, SafeBuffer } from "@blazetrails/activesupport";
 
 export class HTML {
   readonly type: unknown;
 
-  private readonly string: string;
+  private readonly string: string | SafeBuffer;
 
   constructor(string: unknown, type: unknown) {
-    this.string = string == null ? "" : String(string);
+    this.string = string == null ? "" : string instanceof SafeBuffer ? string : String(string);
     this.type = type;
   }
 
-  identifier(): string {
+  get identifier(): string {
     return "html template";
   }
 
   inspect(): string {
-    return this.identifier();
+    return this.identifier;
   }
 
   toString(): SafeBuffer {
@@ -26,7 +26,7 @@ export class HTML {
     return this.toString();
   }
 
-  format(): unknown {
+  get format(): unknown {
     return this.type;
   }
 }

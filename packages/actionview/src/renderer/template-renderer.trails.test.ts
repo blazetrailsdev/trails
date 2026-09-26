@@ -63,12 +63,12 @@ describe("TemplateRenderer html:", () => {
   it("rendering HTML should escape the string if it is not HTML safe", async () => {
     const renderer = new TemplateRenderer(new LookupContext());
     const result = await renderer.render(ctx, { html: "<p>hello world</p>" });
-    expect(result.body).toBe("&lt;p&gt;hello world&lt;/p&gt;");
+    expect(String(result.body)).toBe("&lt;p&gt;hello world&lt;/p&gt;");
   });
 
   it("rendering HTML should not escape the string if it is HTML safe", async () => {
     const renderer = new TemplateRenderer(new LookupContext());
     const result = await renderer.render(ctx, { html: htmlSafe("<p>hello world</p>") });
-    expect(result.body).toBe("<p>hello world</p>");
+    expect(String(result.body)).toBe("<p>hello world</p>");
   });
 });

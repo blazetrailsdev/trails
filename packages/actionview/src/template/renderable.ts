@@ -8,7 +8,7 @@ export class Renderable {
     this.renderable = renderable;
   }
 
-  identifier(): string {
+  get identifier(): string {
     return this.renderable == null ? "NilClass" : (this.renderable as object).constructor.name;
   }
 
@@ -28,7 +28,7 @@ export class Renderable {
     }
   }
 
-  format(): unknown {
+  get format(): unknown {
     return tryCall(this.renderable as object, "format");
   }
 }
