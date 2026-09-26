@@ -5,6 +5,7 @@ import { bodyFromString, bodyToString } from "@blazetrails/rack";
 import type { Request } from "../../action-dispatch/http/request.js";
 import { RouteSet } from "../../action-dispatch/routing/route-set.js";
 import { RoutingError, UrlGenerationError } from "../metal/exceptions.js";
+import { ArgumentError } from "@blazetrails/activemodel";
 import { controllerConstants } from "../../action-dispatch/http/request.js";
 import type { DispatchableControllerClass } from "../../action-dispatch/routing/dispatcher.js";
 
@@ -618,4 +619,44 @@ describe("LegacyRouteSetTests", () => {
   it.skip("id encoding", () => {});
 
   it.skip("set to nil forgets", () => {});
+});
+
+describe("RouteSetTest", () => {
+  let set: RouteSet;
+
+  beforeEach(() => {
+    set = new RouteSet();
+  });
+
+  it("route constraints on request object with anchors are valid", () => {
+    expect(() => {
+      set.draw((r) => {
+        r.get("page/:id", { to: "pages#show", constraints: { host: /^foo$/ } });
+      });
+    }).not.toThrow();
+  });
+
+  it("route constraints with anchor chars are invalid", () => {
+    for (const id of [
+      /^\d+/,
+      new RegExp("\\A\\d+"),
+      /\d+$/,
+      new RegExp("\\d+\\Z"),
+      new RegExp("\\d+\\z"),
+    ]) {
+      expect(() => {
+        set.draw((r) => {
+          r.get("page/:id", { to: "pages#show", id } as Parameters<typeof r.get>[1]);
+        });
+      }).toThrow(ArgumentError);
+    }
+  });
+
+  it("route constraints with unsupported regexp options must error", () => {
+    expect(() => {
+      set.draw((r) => {
+        r.get("page/:name", { to: "pages#show", constraints: { name: /(david|jamis)/s } });
+      });
+    }).toThrow(ArgumentError);
+  });
 });

@@ -101,14 +101,18 @@ describe("Mapper#nested under a singleton resource", () => {
   it("constrains the nested param as SingletonResource#nested_param names it", () => {
     const set = new RouteSet();
     const m = new Mapper(set);
+    let nestedConstraints: unknown;
     m.resource("session", { constraints: { id: /\d+/ } }, () => {
       m.resources("infos");
+      m.nested(() => {
+        nestedConstraints = m._scope.get("constraints");
+      });
     });
     const index = set
       .getRoutes()
       .find((r) => r.action === "index" && r.controller.endsWith("infos"));
     expect(index?.path).toBe("/session/infos");
     expect(index?.name).toBe("session_infos");
-    expect(index?.constraints["session_id"]).toEqual(/\d+/);
+    expect((nestedConstraints as Record<string, unknown>)["session_id"]).toEqual(/\d+/);
   });
 });

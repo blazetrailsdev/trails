@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { RouteSet } from "./route-set.js";
+import { Route } from "./route.js";
+import { buildJourneyRouter, journeyRecognize } from "./journey-bridge.js";
 
 describe("RouteSet — Journey bridge", () => {
   it("journeyRecognize resolves a simple GET route", () => {
@@ -62,14 +64,13 @@ describe("RouteSet — Journey bridge", () => {
   });
 
   it("journeyRecognize honors anchored regex constraints (^/$ stripped)", () => {
-    const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/posts/:id", { to: "posts#show", constraints: { id: /^\d+$/ } });
-    });
-    const m = routes.journeyRecognize("GET", "/posts/7");
+    const router = buildJourneyRouter([
+      new Route("GET", "/posts/:id", "posts", "show", { constraints: { id: /^\d+$/ } }),
+    ]);
+    const m = journeyRecognize(router, "GET", "/posts/7");
     expect(m).not.toBeNull();
     expect(m!.params["id"]).toBe("7");
-    expect(routes.journeyRecognize("GET", "/posts/abc")).toBeNull();
+    expect(journeyRecognize(router, "GET", "/posts/abc")).toBeNull();
   });
 
   it("journeyRecognize honors string constraints", () => {

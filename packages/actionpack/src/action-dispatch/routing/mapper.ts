@@ -16,6 +16,7 @@ import { X_CASCADE } from "../constants.js";
 import { Scope, type ScopeFrameHash, type ScopeLevel } from "./scope.js";
 import { Parser } from "../journey/parser.js";
 import { Ast, type Node } from "../journey/nodes/node.js";
+import { Pattern } from "../journey/path/pattern.js";
 import {
   isBlank,
   isPlainObject,
@@ -32,7 +33,7 @@ import {
   stringSplit,
 } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { fetch } from "@blazetrails/ruby-compat";
+import { fetch, hasKey, merge, mergeBang } from "@blazetrails/ruby-compat";
 
 type MapperCallback = (mapper: Mapper) => void;
 type ConcernCallback = (mapper: Mapper) => void;
@@ -71,6 +72,7 @@ interface RouteSetLike {
   resourcesPathNames: Record<string, string>;
   drawPaths: string[];
   defaultUrlOptions: Record<string, unknown>;
+  requestClass(): { prototype: object };
 }
 
 /** @internal */
@@ -176,23 +178,31 @@ interface MappingScopeParams {
   options: Record<string, unknown>;
 }
 
+const SEPARATORS = ["/", ".", "?"];
+
 /** @internal */
-class Mapping {
+export class Mapping {
+  static readonly ANCHOR_CHARACTERS_REGEX = /^(\\A|\^)|(\\Z|\\z|\$)(?=\n?$)/;
   static readonly OPTIONAL_FORMAT_REGEX = /(?:\(\.:format\)+|\.:format|\/)(?=\n?$)/;
 
+  readonly path: Pattern;
+  readonly requirements: Record<string, unknown>;
   readonly defaults: Record<string, unknown>;
   readonly to: unknown;
   readonly defaultController: string | RegExp | undefined;
   readonly defaultAction: string | undefined;
+  readonly requiredDefaults: string[];
   readonly ast: Ast;
   readonly scopeOptions: Record<string, unknown>;
+  private readonly _set: RouteSetLike | undefined;
   private readonly _blocks: readonly unknown[];
   private readonly _anchor: boolean;
   private readonly _via: readonly string[];
   private readonly _formatted: boolean | undefined;
   private readonly _internal: boolean | undefined;
-  private readonly _constraints: RouteConstraints;
+  private readonly _conditions: Record<string, unknown>;
 
+  /** @missingRailsArgs merge — PERMANENT */
   static build(
     scope: Scope,
     set: RouteSetLike | undefined,
@@ -225,7 +235,7 @@ class Mapping {
       optionsConstraints,
       anchor,
       scopeParams,
-      options: { ...scopeParams.options, ...options },
+      options: merge(scopeParams.options, options),
     });
   }
 
@@ -259,6 +269,7 @@ class Mapping {
   }
 
   constructor({
+    set,
     ast,
     controller,
     defaultAction,
@@ -283,6 +294,7 @@ class Mapping {
     options: Record<string, unknown>;
   }) {
     let defaults = scopeParams.defaults;
+    this._set = set;
     this.to = to;
     this.defaultController = controller;
     this.defaultAction = defaultAction;
@@ -298,12 +310,12 @@ class Mapping {
 
     options = this.normalizeOptionsBang(options, this.ast.pathParams, scopeParams.module);
 
-    const constraints: RouteConstraints = {
-      ...scopeParams.constraints,
-      ...(Object.fromEntries(
-        Object.entries(options).filter(([, option]) => option instanceof RegExp),
-      ) as RouteConstraints),
-    };
+    const splitOptions = this.constraints(options, this.ast.pathParams);
+
+    const constraints: Record<string, unknown> = merge(
+      scopeParams.constraints,
+      Object.fromEntries(splitOptions.constraints ?? []),
+    );
 
     if (isPlainObject(optionsConstraints)) {
       defaults = {
@@ -317,20 +329,38 @@ class Mapping {
         ...defaults,
       };
       this._blocks = scopeParams.blocks;
-      Object.assign(constraints, optionsConstraints);
+      mergeBang(constraints, optionsConstraints);
     } else {
       this._blocks = this.blocks(optionsConstraints);
     }
-    this._constraints = constraints;
 
-    this.defaults = { ...defaults, ...this.normalizeDefaults(options) };
+    const [requirements, conditions] = this.splitConstraints(this.ast.pathParams, constraints);
+    this.verifyRegexpRequirements(requirements, this.ast.wildcardOptions);
 
-    if (this.ast.pathParams.includes("action") && !Object.hasOwn(constraints, "action")) {
+    const formats = this.normalizeFormat(formatted);
+
+    this.requirements = { ...formats.requirements, ...Object.fromEntries(requirements) };
+    this._conditions = Object.fromEntries(conditions);
+    this.defaults = { ...formats.defaults, ...defaults, ...this.normalizeDefaults(options) };
+
+    if (this.ast.pathParams.includes("action") && !hasKey(this.requirements, "action")) {
       if (this.defaults.action == null || this.defaults.action === false) {
         this.defaults.action = "index";
       }
     }
+
+    this.requiredDefaults = (splitOptions.requiredDefaults ?? []).map(([key]) => key);
+
+    this.ast.requirements = this.requirements as Record<string, RegExp>;
+    this.path = new Pattern(
+      this.ast,
+      this.requirements as Record<string, RegExp>,
+      Mapping.JOINED_SEPARATORS,
+      this._anchor,
+    );
   }
+
+  static readonly JOINED_SEPARATORS = SEPARATORS.join("");
 
   makeRoute(name: string | null | false | undefined, _precedence: number): Route {
     const route = new Route(
@@ -341,7 +371,7 @@ class Mapping {
       {
         name,
         redirectEndpoint: this.to instanceof Redirect ? this.to : undefined,
-        constraints: Object.keys(this._constraints).length > 0 ? this._constraints : undefined,
+        constraints: { ...this.requirements, ...this.conditions() } as RouteConstraints,
         defaults: this.defaults as Record<string, string | null>,
         anchor: this._anchor,
         format: this._formatted,
@@ -355,6 +385,23 @@ class Mapping {
 
   application(): Endpoint {
     return this.app(this._blocks);
+  }
+
+  conditions(): Record<string, unknown> {
+    return this.buildConditions(this._conditions, this._set!.requestClass());
+  }
+
+  /** @internal */
+  private buildConditions(
+    currentConditions: Record<string, unknown>,
+    requestClass: { prototype: object },
+  ): Record<string, unknown> {
+    const conditions = { ...currentConditions };
+
+    for (const k of Object.keys(conditions)) {
+      if (!(k in requestClass.prototype)) delete conditions[k];
+    }
+    return conditions;
   }
 
   /** @internal */
@@ -403,6 +450,63 @@ class Mapping {
   }
 
   /** @internal */
+  private splitConstraints(
+    pathParams: readonly string[],
+    constraints: Record<string, unknown>,
+  ): [[string, unknown][], [string, unknown][]] {
+    const requirements: [string, unknown][] = [];
+    const conditions: [string, unknown][] = [];
+    for (const [key, requirement] of Object.entries(constraints)) {
+      if (pathParams.includes(key) || key === "controller") {
+        requirements.push([key, requirement]);
+      } else {
+        conditions.push([key, requirement]);
+      }
+    }
+    return [requirements, conditions];
+  }
+
+  /** @internal */
+  private normalizeFormat(formatted: unknown): {
+    requirements: Record<string, RegExp>;
+    defaults: Record<string, unknown>;
+  } {
+    if (formatted === true) {
+      return { requirements: { format: /.+/ }, defaults: {} };
+    } else if (formatted instanceof RegExp) {
+      return { requirements: { format: formatted }, defaults: { format: null } };
+    } else if (typeof formatted === "string") {
+      return { requirements: { format: new RegExp(formatted) }, defaults: { format: formatted } };
+    } else {
+      return { requirements: {}, defaults: {} };
+    }
+  }
+
+  /** @internal */
+  private verifyRegexpRequirements(
+    requirements: [string, unknown][],
+    wildcardOptions: Record<string, RegExp>,
+  ): void {
+    for (const [requirement, regex] of requirements) {
+      if (!(regex instanceof RegExp)) continue;
+
+      if (Mapping.ANCHOR_CHARACTERS_REGEX.test(regex.source)) {
+        throw new ArgumentError(
+          `Regexp anchor characters are not allowed in routing requirements: :${requirement}`,
+        );
+      }
+
+      if (regex.dotAll) {
+        if (hasKey(wildcardOptions, requirement)) continue;
+
+        throw new ArgumentError(
+          `Regexp multiline option is not allowed in routing requirements: ${rbInspect(regex)}`,
+        );
+      }
+    }
+  }
+
+  /** @internal */
   private normalizeDefaults(options: Record<string, unknown>): Record<string, unknown> {
     return Object.fromEntries(
       Object.entries(options).filter(([, default_]) => !(default_ instanceof RegExp)),
@@ -417,12 +521,12 @@ class Mapping {
       return new Constraints(this.to, blocks, Constraints.CALL);
     } else if (blocks.length > 0) {
       return new Constraints(
-        this.dispatcher(Object.hasOwn(this.defaults, "controller")),
+        this.dispatcher(hasKey(this.defaults, "controller")),
         blocks,
         Constraints.SERVE,
       );
     } else {
-      return this.dispatcher(Object.hasOwn(this.defaults, "controller"));
+      return this.dispatcher(hasKey(this.defaults, "controller"));
     }
   }
 
@@ -500,6 +604,28 @@ class Mapping {
       );
     }
     return [callableConstraint];
+  }
+
+  /** @internal */
+  private constraints(
+    options: Record<string, unknown>,
+    pathParams: readonly string[],
+  ): Record<string, [string, unknown][]> {
+    const groups: Record<string, [string, unknown][]> = {};
+    for (const [key, option] of Object.entries(options)) {
+      let group: string;
+      if (option instanceof RegExp) {
+        group = "constraints";
+      } else {
+        if (pathParams.includes(key)) {
+          group = "pathParams";
+        } else {
+          group = "requiredDefaults";
+        }
+      }
+      (groups[group] ??= []).push([key, option]);
+    }
+    return groups;
   }
 
   /** @internal */
@@ -914,7 +1040,7 @@ export class Mapper {
     }
 
     const previous = this._scope;
-    this._scope = this._scope.newChild(scope);
+    this._scope = this._scope.new(scope);
     try {
       cb(this);
     } finally {
@@ -980,7 +1106,7 @@ export class Mapper {
 
   shallow(callback: MapperCallback): void {
     const previous = this._scope;
-    this._scope = this._scope.newChild({ shallow: true });
+    this._scope = this._scope.new({ shallow: true });
     try {
       callback(this);
     } finally {
@@ -1101,7 +1227,7 @@ export class Mapper {
 
   controller(controller: string, callback: MapperCallback): void {
     const previous = this._scope;
-    this._scope = this._scope.newChild({ controller });
+    this._scope = this._scope.new({ controller });
     try {
       callback(this);
     } finally {
@@ -1115,7 +1241,7 @@ export class Mapper {
       this._scope.get("defaults") as Record<string, string> | undefined,
       defaults,
     );
-    this._scope = this._scope.newChild({ defaults: merged });
+    this._scope = this._scope.new({ defaults: merged });
     try {
       callback(this);
     } finally {
@@ -1436,7 +1562,7 @@ export class Mapper {
       route.action,
       undefined,
       route.verb.split("|"),
-      route.formatted,
+      this._scope.get("format") as boolean | undefined,
       route.constraints,
       route.anchor,
       { ...route.defaults },
@@ -1662,7 +1788,7 @@ export class Mapper {
   pathScope<T>(path: string, fn: () => T): T {
     const previous = this._scope;
     const merged = this.mergePathScope(this._scope.get("path") as string | undefined, path);
-    this._scope = this._scope.newChild({ path: merged });
+    this._scope = this._scope.new({ path: merged });
     try {
       return fn();
     } finally {
@@ -1673,9 +1799,9 @@ export class Mapper {
   /** @internal */
   resourceScope<T>(resource: ResourceLike, fn: () => T): T {
     const before = this._scope;
-    this._scope = this._scope.newChild({ scopeLevelResource: resource });
+    this._scope = this._scope.new({ scopeLevelResource: resource });
     if (resource.resourceScope !== undefined) {
-      this._scope = this._scope.newChild({ controller: resource.resourceScope });
+      this._scope = this._scope.new({ controller: resource.resourceScope });
     }
     try {
       return fn();
@@ -1687,7 +1813,7 @@ export class Mapper {
   /** @internal */
   shallowScope<T>(fn: () => T): T {
     const previous = this._scope;
-    this._scope = this._scope.newChild({
+    this._scope = this._scope.new({
       as: this._scope.get("shallowPrefix"),
       path: this._scope.get("shallowPath"),
     });

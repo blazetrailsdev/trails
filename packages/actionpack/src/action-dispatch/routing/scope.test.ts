@@ -12,7 +12,7 @@ describe("Scope", () => {
 
   it("newChild merges over parent frame and inherits scopeLevel", () => {
     const a = new Scope({ path: "/admin", as: "admin" }, Scope.ROOT, "resources");
-    const b = a.newChild({ as: "users" });
+    const b = a.new({ as: "users" });
     expect(b.get("path")).toBe("/admin");
     expect(b.get("as")).toBe("users");
     expect(b.scopeLevel).toBe("resources");
@@ -49,8 +49,8 @@ describe("Scope", () => {
 
   it("iterator yields each frame up to (not including) ROOT", () => {
     const a = new Scope({ path: "/a" });
-    const b = a.newChild({ as: "b" });
-    const c = b.newChild({ controller: "c" });
+    const b = a.new({ as: "b" });
+    const c = b.new({ controller: "c" });
     expect([...c]).toEqual([c, b, a]);
     expect([...Scope.ROOT]).toEqual([]);
   });
