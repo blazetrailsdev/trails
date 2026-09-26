@@ -17,8 +17,14 @@ describe("TestTSETemplate", () => {
       locals: [],
     });
 
-  const render = (template: Template): string =>
-    template.render(new (Base.withEmptyTemplateCache())(null, {}, null), {});
+  const render = (
+    template: Template,
+    locals: Record<string, unknown> = {},
+    implicitLocals: readonly string[] = [],
+  ): string =>
+    template.render(new (Base.withEmptyTemplateCache())(null, {}, null), locals, null, {
+      implicitLocals,
+    });
 
   it("locals cannot be specified with positional arguments", () => {
     const template = newTemplate("<%# locals: (argument = 'content') -%>\n<%= argument %>");
@@ -32,5 +38,44 @@ describe("TestTSETemplate", () => {
     expect(() => render(template)).toThrow(
       "`block` set as non-keyword argument for hello template. Locals can only be set as keyword arguments.",
     );
+  });
+
+  it("rails injected locals does not raise error if not passed", () => {
+    const template = newTemplate("<%# locals: (message:) -%>");
+    expect(() =>
+      render(template, { message: "Hi", message_counter: 1, message_iteration: 1 }, [
+        "message_counter",
+        "message_iteration",
+      ]),
+    ).not.toThrow();
+  });
+
+  it("rails injected locals can be specified", () => {
+    const template = newTemplate("<%# locals: (message: 'Hello') -%>\n<%= message %>");
+    expect(render(template, { message: "Hello" }, ["message"])).toBe("Hello");
+  });
+
+  it("rails injected locals can be specified as kwargs", () => {
+    const template = newTemplate(
+      "<%# locals: (message: 'Hello', **kwargs) -%>\n<%= kwargs.message_counter %>-<%= kwargs.message_iteration %>",
+    );
+    expect(
+      render(template, { message: "Hello", message_counter: 1, message_iteration: 2 }, [
+        "message_counter",
+        "message_iteration",
+      ]),
+    ).toBe("1-2");
+  });
+
+  it("rails injected locals can be specified as required argument", () => {
+    const template = newTemplate(
+      "<%# locals: (message: 'Hello', message_iteration:) -%>\n<%= message %>-<%= message_iteration %>",
+    );
+    expect(
+      render(template, { message: "Hello", message_counter: 1, message_iteration: 2 }, [
+        "message_counter",
+        "message_iteration",
+      ]),
+    ).toBe("Hello-2");
   });
 });

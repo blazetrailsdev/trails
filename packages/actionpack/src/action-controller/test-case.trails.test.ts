@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { BigDecimal } from "@blazetrails/activesupport";
 import { TestRequest, TestSession } from "./test-case.js";
 
 describe("TestRequest#assignParameters Content-Type case", () => {
@@ -17,6 +18,15 @@ describe("TestRequest#assignParameters Content-Type case", () => {
     req.setHeader("CONTENT_TYPE", "application/xml");
     req.assignParameters(null, "api", "create", { x: "1" }, "/api", ["x"]);
     expect(req.getHeader("rack.input").string()).toContain("<x>1</x>");
+  });
+
+  it("encodes a :json body with ActiveSupport::JSON.encode", () => {
+    const req = TestRequest.create();
+    req.setHeader("REQUEST_METHOD", "POST");
+    req.setHeader("CONTENT_TYPE", "application/json");
+    const price = new BigDecimal("1.50");
+    req.assignParameters(null, "api", "create", { price, name: "<b>" }, "/api", ["price", "name"]);
+    expect(req.getHeader("rack.input").string()).toBe(`{"price":"1.5","name":"\\u003cb\\u003e"}`);
   });
 });
 
