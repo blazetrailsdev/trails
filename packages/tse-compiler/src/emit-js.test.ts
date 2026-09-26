@@ -102,21 +102,12 @@ describe("compileJs", () => {
   });
 
   describe("strict locals", () => {
-    it("emits locals destructuring with defaults when a locals signature is present", () => {
-      const { code } = compileJs('<%# locals: (count: 0, name: "x") %><%= name %>');
-      expect(code).toContain('const { count = 0, name = "x" } = locals;');
-    });
-
-    it("leaves the strict-locals check to ActionView::Template", () => {
-      const { code } = compileJs("<%# locals: (count:) %>");
+    it("leaves the locals signature to ActionView::Template", () => {
+      const { code, localsSignature } = compileJs("<%# locals: (count: 0) %><%= count %>");
+      expect(localsSignature).toBe("count: 0");
       expect(code).not.toContain("StrictLocalsError");
       expect(code).not.toContain("import ");
-      expect(code).toContain("const { count } = locals;");
-    });
-
-    it("emits no destructuring when there are no declared locals (empty parens)", () => {
-      const { code } = compileJs("<%# locals: () %><p>hi</p>");
-      expect(code).not.toContain("const {");
+      expect(code).not.toContain("= locals");
     });
   });
 

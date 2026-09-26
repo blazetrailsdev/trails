@@ -1,5 +1,4 @@
 import { parse, type TseAst, type TseNode } from "./parser.js";
-import { parseLocalsSignature, type LocalEntry } from "./parse-locals.js";
 import { generateSourceMap, type RawSourceMap, type LineMapping } from "./source-map.js";
 
 export interface EmitJsOptions {
@@ -54,25 +53,8 @@ function netUnclosedParens(code: string): number {
   return Math.max(0, depth);
 }
 
-function emitLocalsBlock(ast: TseAst): { entries: LocalEntry[]; lines: string[] } {
-  if (ast.localsSignature === null) return { entries: [], lines: [] };
-  const entries = parseLocalsSignature(ast.localsSignature);
-  const lines: string[] = [];
-
-  if (entries.length > 0) {
-    const pieces = entries.map((e) =>
-      e.defaultExpr === null ? e.name : `${e.name} = ${e.defaultExpr}`,
-    );
-    lines.push(`  const { ${pieces.join(", ")} } = locals;`);
-  }
-
-  return { entries, lines };
-}
-
 function emit(ast: TseAst, options: EmitJsOptions): { code: string; mappings: LineMapping[] } {
   const exprAppend = options.escapeIgnore === true ? "safeExprAppend" : "append";
-  const { lines: localsLines } = emitLocalsBlock(ast);
-
   const lines: string[] = [];
   const lineMappings: LineMapping[] = [];
   let nextGenLine = 0;
@@ -90,7 +72,6 @@ function emit(ast: TseAst, options: EmitJsOptions): { code: string; mappings: Li
   push("export default function render(context, locals) {");
   push("  const _ob = context.outputBuffer;");
   if (options.preamble) push("  " + options.preamble);
-  for (const l of localsLines) push(l);
   const innerDepths: number[] = [];
   const innerCallExprParens: number[] = [];
   for (const node of ast.nodes) {
