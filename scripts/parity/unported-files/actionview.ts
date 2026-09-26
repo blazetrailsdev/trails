@@ -84,11 +84,6 @@ export const ACTIONVIEW_UNPORTED_FILES: UnportedFile[] = [
       "on top of I18n; trails ports the I18n gem itself, not the view wrappers.",
   },
   {
-    pattern: "helpers/url_helper.rb",
-    package: "actionview",
-    reason: "`link_to`/`button_to` HTML generation over the routing layer; no trails view layer.",
-  },
-  {
     pattern: "/layouts.rb",
     package: "actionview",
     reason: "Layout resolution for rendered templates; no trails template renderer.",

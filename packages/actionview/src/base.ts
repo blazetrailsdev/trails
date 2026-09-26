@@ -20,7 +20,7 @@ import { LookupContext } from "./lookup-context.js";
 import type { Template } from "./template.js";
 import { StrictLocalsError } from "./template/error.js";
 import type { RenderOptions } from "./renderer/abstract-renderer.js";
-import { ArgumentError, include } from "@blazetrails/ruby-compat";
+import { ArgumentError, excBacktraceLocations, extend, include } from "@blazetrails/ruby-compat";
 
 export type CompiledMethod = ((
   this: Base,
@@ -230,8 +230,8 @@ export class Base {
           return compiled.call(this, locals, buffer, locals, block);
         } catch (argumentError) {
           if (!(argumentError instanceof ArgumentError)) throw argumentError;
-          const frame = argumentError.stack?.split("\n")[1];
-          if (frame?.includes(method)) {
+          const frame = excBacktraceLocations(argumentError)?.[1];
+          if (frame?.label === "_run") {
             throw new StrictLocalsError(argumentError, this.currentTemplate!);
           }
           throw argumentError;
@@ -383,11 +383,14 @@ Object.defineProperty(Base.prototype, "yield", {
 export interface Base extends Context, HelperMethods, TseUtilMethods {
   controller: Parameters<typeof Helpers.assignController>[0];
   request: unknown;
+  _backUrl: typeof Helpers._backUrl;
+  _filteredReferrer: typeof Helpers._filteredReferrer;
   /** @noRailsEquivalent PERMANENT */
   readonly yield: SafeBuffer;
 }
 
 include(Base, Context);
+extend(Base, Helpers.UrlHelperClassMethods);
 
 runLoadHooks("action_view", Base);
 

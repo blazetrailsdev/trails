@@ -138,3 +138,12 @@ export type {
   CacheHelperController,
   CacheFragmentNameOptions,
 } from "./cache-helper.js";
+
+export {
+  BUTTON_TAG_METHOD_VERBS,
+  ClassMethods as UrlHelperClassMethods,
+  urlFor,
+  _backUrl,
+  _filteredReferrer,
+} from "./url-helper.js";
+export type { UrlHelperHost } from "./url-helper.js";

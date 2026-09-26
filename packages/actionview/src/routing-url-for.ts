@@ -1,14 +1,15 @@
 import { TopLevel, extractOptionsBang, isPlainObject } from "@blazetrails/activesupport";
 import { isSymbol, symbolToS } from "@blazetrails/ruby-compat";
 
+import type { UrlHelperHost } from "./helpers/url-helper.js";
+
 export interface RoutingUrlForHost {
   controller: unknown;
-  _backUrl(): string;
 }
 
 export type UrlForOptions = string | null | undefined | object | ReadonlyArray<unknown>;
 
-type Host = RoutingUrlFor & RoutingUrlForHost;
+type Host = RoutingUrlFor & RoutingUrlForHost & Pick<UrlHelperHost, "_backUrl">;
 
 type Parameters = InstanceType<NonNullable<typeof TopLevel.ActionController>["Parameters"]>;
 
