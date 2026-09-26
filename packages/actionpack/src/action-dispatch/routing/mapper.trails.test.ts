@@ -1,9 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { Constraints, Mapper, type ConstraintsRequest } from "./mapper.js";
 import { RouteSet } from "./route-set.js";
 import type { Request } from "../http/request.js";
 import { X_CASCADE } from "../constants.js";
+import { deprecator } from "../deprecator.js";
 
 function fakeRequest(): ConstraintsRequest & Request {
   return {
@@ -110,5 +111,68 @@ describe("Mapper#nested under a singleton resource", () => {
     expect(index?.path).toBe("/session/infos");
     expect(index?.name).toBe("session_infos");
     expect(index?.constraints["session_id"]).toEqual(/\d+/);
+  });
+});
+
+describe("Mapper#match hash form and multi-path arms", () => {
+  it("takes the route path from the one key that is not a Symbol", () => {
+    const set = new RouteSet();
+    new Mapper(set).match({ "/foo": "posts#index", ":via": "get" });
+    const [route] = set.getRoutes();
+    expect(route.path).toBe("/foo(.:format)");
+    expect(route.controller).toBe("posts");
+    expect(route.action).toBe("index");
+  });
+
+  it("keys a multi-word Symbol option by its camelCase name", () => {
+    const m = new Mapper(new RouteSet());
+    let received: unknown;
+    vi.spyOn(m, "mapMatch").mockImplementation((_paths, options) => void (received = options));
+    m.match({ "/foo": "posts#index", ":via": "get", ":path_names": { new: "nuevo" } });
+    expect(received).toEqual({
+      via: "get",
+      pathNames: { new: "nuevo" },
+      to: "posts#index",
+    });
+  });
+
+  it("leaves a second String key as it is", () => {
+    const m = new Mapper(new RouteSet());
+    let received: unknown;
+    vi.spyOn(m, "mapMatch").mockImplementation((_paths, options) => void (received = options));
+    m.match({ "/foo": "posts#index", extra: "x", ":via": "get" });
+    expect(received).toEqual({ extra: "x", via: "get", to: "posts#index" });
+  });
+
+  it("raises when no route path is specified", () => {
+    expect(() => new Mapper(new RouteSet()).match({ ":to": "posts#index", ":via": "get" })).toThrow(
+      "Route path not specified",
+    );
+  });
+
+  it("maps a Symbol to onto :action and a String to without # onto :controller", () => {
+    const set = new RouteSet();
+    const m = new Mapper(set);
+    m.controller("posts", () => m.match({ "/all": ":index", ":via": "get" }));
+    m.match({ "/comments/:action": "comments", ":via": "get" });
+    const [all, comments] = set.getRoutes();
+    expect([all.controller, all.action]).toEqual(["posts", "index"]);
+    expect(comments.controller).toBe("comments");
+  });
+
+  it("maps every path of the multi-path form and warns that it is deprecated", () => {
+    const set = new RouteSet();
+    const warnings: string[] = [];
+    const m = new Mapper(set);
+    const dep = deprecator();
+    const previous = dep.behavior;
+    dep.behavior = (message: unknown) => void warnings.push(String(message));
+    try {
+      m.match("/one", "/two", { to: "posts#index", via: "get" });
+    } finally {
+      dep.behavior = previous;
+    }
+    expect(set.getRoutes().map((r) => r.path)).toEqual(["/one(.:format)", "/two(.:format)"]);
+    expect(warnings[0]).toContain("Mapping a route with multiple paths is deprecated");
   });
 });

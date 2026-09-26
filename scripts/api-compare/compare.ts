@@ -4331,6 +4331,11 @@ export function main() {
       const seen = new Map<string, SeenRubyMethod>();
       // First-sighting Ruby params per name (mirrors `seen`'s dedup) for arity.
       const rubyParamsByName = new Map<string, ParamInfo[]>();
+      // Every same-file definition's params per name, for the param-NAME
+      // check only: `Mapper::Base#match(path, options = nil)` is a doc stub
+      // (mapper.rb:592) that `Resources#match(path, *rest)` (:1689) overrides,
+      // and the first sighting is the stub.
+      const rubyParamListsByName = new Map<string, ParamInfo[][]>();
       // Names whose first-sighting Ruby entry is a forwarding-macro placeholder
       // (see arity.ts). Recorded in lockstep with rubyParamsByName so the verdict
       // always describes the very params the arity check would compare.
@@ -4394,6 +4399,10 @@ export function main() {
             rubyParamsByName.set(rm.name, rm.params);
             if (isForwardingRubyEntry(rm)) rubyForwardingNames.add(rm.name);
           }
+          rubyParamListsByName.set(rm.name, [
+            ...(rubyParamListsByName.get(rm.name) ?? []),
+            rm.params,
+          ]);
           if (rm.takesBlock) {
             const blockKey = `${rmLevel}|${rm.name}`;
             rubyBlockOwners.set(blockKey, [...(rubyBlockOwners.get(blockKey) ?? []), item.fqn]);
@@ -5006,6 +5015,13 @@ export function main() {
           // `OutputBuffer#capture(*args)` reported `args → fn` off
           // `StreamingBuffer#capture(fn)` (buffers.rb:72,126).
           let verdict = matchParamNamesAgainst(rubyParams, fileCandidates);
+          // A clean alignment against ANY same-file Ruby definition of the
+          // name settles it, the Ruby-side twin of the rule above.
+          for (const other of rubyParamListsByName.get(rubyName) ?? []) {
+            if (verdict.rows.length === 0) break;
+            const otherVerdict = matchParamNamesAgainst(other, fileCandidates);
+            if (otherVerdict.aligned && otherVerdict.rows.length === 0) verdict = otherVerdict;
+          }
           if (verdict.rows.length > 0) {
             const rubyOwner = rubyModule.split("::").at(-1) ?? rubyModule;
             const byOwnerName = tsParamsByFileOwnerNameInPkg.get(tsFile);
