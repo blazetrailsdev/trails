@@ -151,8 +151,7 @@ export class Formatter {
       }
       dropped++;
     }
-    const keysToKeep = new Set<string>(reversed.slice(dropped));
-    for (const p of route.requiredParts) keysToKeep.add(p);
+    const keysToKeep = new Set<string>([...reversed.slice(dropped), ...route.requiredParts]);
 
     for (const badKey of Object.keys(parameterizedParts)) {
       if (!keysToKeep.has(badKey)) delete parameterizedParts[badKey];
