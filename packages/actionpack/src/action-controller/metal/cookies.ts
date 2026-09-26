@@ -3,14 +3,12 @@ import { helperMethod, type HelpersClassMethods } from "../../abstract-controlle
 import type { CookieJar } from "../../action-dispatch/middleware/cookies.js";
 
 export class Cookies {
-  declare request: { cookieJar(): CookieJar };
-
   static [included](base: HelpersClassMethods): void {
     helperMethod(base, "cookies");
   }
 
   /** @internal */
-  cookies(): CookieJar {
+  cookies(this: { request: { cookieJar(): CookieJar } }): CookieJar {
     return this.request.cookieJar();
   }
 }
