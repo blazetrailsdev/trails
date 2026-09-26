@@ -22,7 +22,14 @@ export class ModelGenerator extends GeneratorBase {
   }
 
   run(name: string, args: string[], options: ModelOptions = {}): string[] {
-    const { migration = true, test = true, timestamps = true, parent, primaryKeyType } = options;
+    const {
+      migration = true,
+      test = true,
+      timestamps = true,
+      parent,
+      indexes = true,
+      primaryKeyType,
+    } = options;
 
     const singularName = singularize(underscore(name));
     const className = camelize(singularName);
@@ -88,6 +95,12 @@ describe("${className}", () => {
     }
 
     if (migration && !parent) {
+      if (indexes === false) {
+        for (const a of attributes) {
+          if (a.reference() && !a.hasIndex()) delete a.attrOptions.index;
+        }
+      }
+
       const tableName = camelize(tableize(className));
       const migGen = this.createMigrationGenerator();
 
