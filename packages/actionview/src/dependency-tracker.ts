@@ -1,4 +1,5 @@
 import type { PathSet } from "./path-set.js";
+import "./template.js";
 import type { Template } from "./template.js";
 import { TemplateHandlers } from "./template/handlers.js";
 import type { TemplateHandler } from "./template/handlers.js";

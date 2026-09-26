@@ -5,10 +5,9 @@ import {
   InvalidURIError,
   Module,
   rbInspect,
-  rbObjRespondTo,
   RFC2396_PARSER,
 } from "@blazetrails/ruby-compat";
-import { Constraints, Mapper } from "./mapper.js";
+import { Mapper } from "./mapper.js";
 import type { MatchedRoute } from "./route.js";
 import { Route } from "./route.js";
 import {
@@ -533,7 +532,6 @@ export class RouteSet {
   /** @internal */
   private _journeyRouter: JourneyRouter | null = null;
   /** @internal */
-  private readonly _routeApps = new WeakMap<Route, Endpoint>();
 
   constructor(config: RouteSetConfig = { ...DEFAULT_CONFIG }) {
     this._config = { ...config };
@@ -730,7 +728,6 @@ export class RouteSet {
           "https://guides.rubyonrails.org/routing.html#restricting-the-routes-created",
       );
     }
-    mapping.app = this._app(mapping);
     this.routes.push(mapping);
     if (name) this.namedRoutes.add(name, mapping);
     this._journeyRouter = null;
@@ -1006,7 +1003,7 @@ export class RouteSet {
   get journeyRouter(): JourneyRouter {
     if (!this._journeyRouter) {
       this._journeyRouter = buildJourneyRouter(this.routes, {
-        app: (r) => this._app(r) as unknown as RoutableApp,
+        app: (r) => r.app as unknown as RoutableApp,
       });
     }
     return this._journeyRouter;
@@ -1014,27 +1011,6 @@ export class RouteSet {
 
   journeyRecognize(method: string, path: string): JourneyMatch | null {
     return recognizeViaJourney(this.journeyRouter, method, path);
-  }
-
-  /** @internal */
-  private _app(route: Route): Endpoint {
-    let app = this._routeApps.get(route);
-    if (!app) {
-      const to = route.to ?? route.redirectEndpoint;
-      const blocks = route.blocks;
-      const raiseOnNameError = route.controller !== "" || "controller" in route.defaults;
-      if (rbObjRespondTo(to, "action")) {
-        app = new StaticDispatcher(to as unknown as DispatchableControllerClass);
-      } else if (rbObjRespondTo(to, "call")) {
-        app = new Constraints(to, blocks, Constraints.CALL);
-      } else if (blocks.length > 0) {
-        app = new Constraints(new Dispatcher(raiseOnNameError), blocks, Constraints.SERVE);
-      } else {
-        app = new Dispatcher(raiseOnNameError);
-      }
-      this._routeApps.set(route, app);
-    }
-    return app;
   }
 
   serve(req: RouterRequest): Promise<RackishResponse> {

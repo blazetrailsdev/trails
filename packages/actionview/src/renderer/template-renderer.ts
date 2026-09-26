@@ -1,10 +1,12 @@
 import { h, Notifications } from "@blazetrails/activesupport";
 
-import { ArgumentError, File } from "@blazetrails/ruby-compat";
+import { ArgumentError, File, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import { LookupContext } from "../lookup-context.js";
 import { MissingTemplate } from "../template/error.js";
 import { RawFile } from "../template/raw-file.js";
+import { Inline } from "../template/inline.js";
+import { TemplateHandlers, type TemplateHandler } from "../template/handlers.js";
 import { AbstractRenderer, RenderedTemplate } from "./abstract-renderer.js";
 import type { RenderableTemplate, ViewContext, RenderOptions } from "./abstract-renderer.js";
 
@@ -51,8 +53,17 @@ export class TemplateRenderer<Rendered = RenderedTemplate> extends AbstractRende
       }
     }
     if (Object.prototype.hasOwnProperty.call(options, "inline")) {
-      const inlineFormat = (this.formats[0] as string | undefined) ?? null;
-      return new InlineTemplate(String(options.inline ?? ""), inlineFormat);
+      const handler = TemplateHandlers.handlerForExtension(options.type ?? "tse");
+      const format = rbObjRespondTo(handler, "defaultFormat")
+        ? (handler as TemplateHandler & { defaultFormat: string }).defaultFormat
+        : ((this.lookupContext.formats[0] as string | undefined) ?? null);
+      return new Inline({
+        source: options.inline as string,
+        identifier: "inline template",
+        handler,
+        locals: keys,
+        format,
+      }) as unknown as RenderableTemplate;
     }
     if (Object.prototype.hasOwnProperty.call(options, "renderable") && options.renderable) {
       return new RenderableWrapper(options.renderable);
@@ -224,19 +235,6 @@ class HtmlTemplate implements RenderableTemplate {
 
   async render(..._args: unknown[]): Promise<string> {
     return h(this.string).toString();
-  }
-}
-
-class InlineTemplate implements RenderableTemplate {
-  readonly identifier = "inline template";
-
-  constructor(
-    private readonly source: string,
-    readonly format: string | null,
-  ) {}
-
-  async render(..._args: unknown[]): Promise<string> {
-    return this.source;
   }
 }
 

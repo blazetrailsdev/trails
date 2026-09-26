@@ -20,7 +20,17 @@ import { LookupContext } from "./lookup-context.js";
 import type { Template } from "./template.js";
 import { StrictLocalsError } from "./template/error.js";
 import type { RenderOptions } from "./renderer/abstract-renderer.js";
-import { ArgumentError, excBacktraceLocations, extend, include } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  excBacktraceLocations,
+  extend,
+  File,
+  include,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat";
+import { Inline } from "./template/inline.js";
+import { RawFile } from "./template/raw-file.js";
+import { TemplateHandlers, type TemplateHandler } from "./template/handlers.js";
 
 export type CompiledMethod = ((
   this: Base,
@@ -297,11 +307,32 @@ export class Base {
       if (Object.hasOwn(hash, "body")) return htmlSafe(String(hash.body ?? ""));
       if (Object.hasOwn(hash, "plain")) return htmlSafe(String(hash.plain ?? ""));
       if (Object.hasOwn(hash, "html")) return htmlEscape(hash.html ?? "");
-      if (Object.hasOwn(hash, "file") || Object.hasOwn(hash, "inline")) {
-        throw new Error(
-          `render ${Object.hasOwn(hash, "file") ? "file:" : "inline:"} is not available on the ` +
-            "synchronous view path; render it through the controller.",
-        );
+      if (Object.hasOwn(hash, "file")) {
+        if (File.isExist(hash.file!)) {
+          return htmlSafe(new RawFile(hash.file!).render());
+        } else {
+          if (File.isAbsolutePath(hash.file!)) {
+            throw new ArgumentError(`File ${hash.file} does not exist`);
+          } else {
+            throw new ArgumentError(
+              `\`render file:\` should be given the absolute path to a file. '${hash.file}' was given instead`,
+            );
+          }
+        }
+      }
+      if (Object.hasOwn(hash, "inline")) {
+        const handler = TemplateHandlers.handlerForExtension(hash.type ?? "tse");
+        const inlineFormat = rbObjRespondTo(handler, "defaultFormat")
+          ? (handler as TemplateHandler & { defaultFormat: string }).defaultFormat
+          : ((renderer.formats[0] as string | undefined) ?? null);
+        const template = new Inline({
+          source: hash.inline!,
+          identifier: "inline template",
+          handler,
+          locals: Object.keys(hash.locals ?? {}),
+          format: inlineFormat,
+        });
+        return htmlSafe(template.render(this, { ...(hash.locals ?? {}) }));
       }
       if (Object.hasOwn(hash, "renderable")) {
         const renderable = hash.renderable as { renderIn(context: unknown): string };

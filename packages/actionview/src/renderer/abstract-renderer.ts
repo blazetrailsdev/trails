@@ -1,4 +1,4 @@
-import { ArgumentError, File } from "@blazetrails/ruby-compat";
+import { ArgumentError, File, rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import type { LookupContext } from "../lookup-context.js";
 import type { Template } from "../template.js";
 
@@ -158,23 +158,14 @@ export function raiseInvalidOptionAs(as: unknown): never {
 /** @internal */
 export function partialPath(this: ObjectRenderingHost, object: unknown, view: ViewContext): string {
   const contextPrefix = this.contextPrefix;
-  const model =
-    object !== null &&
-    object !== undefined &&
-    typeof (object as { toModel?: () => unknown }).toModel === "function"
-      ? (object as { toModel(): unknown }).toModel()
-      : object;
+  if (rbObjRespondTo(object, "toModel")) object = (object as { toModel(): unknown }).toModel();
 
   let path: string;
-  if (
-    model !== null &&
-    model !== undefined &&
-    typeof (model as { toPartialPath?: () => string }).toPartialPath === "function"
-  ) {
-    path = (model as { toPartialPath(): string }).toPartialPath();
+  if (rbObjRespondTo(object, "toPartialPath")) {
+    path = (object as { toPartialPath(): string }).toPartialPath();
   } else {
-    throw new Error(
-      `'${String(model)}' is not an ActiveModel-compatible object. It must implement #toPartialPath.`,
+    throw new ArgumentError(
+      `'${rbInspect(object)}' is not an ActiveModel-compatible object. It must implement #to_partial_path.`,
     );
   }
 
