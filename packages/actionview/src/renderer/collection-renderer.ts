@@ -298,10 +298,7 @@ export class CollectionRenderer extends PartialRenderer implements ObjectRenderi
       let content = await _template.render(view, locals, null, {
         implicitLocals: [counter, iteration],
       });
-      if (layout) {
-        view.viewFlow?.set("layout", content);
-        content = await layout.render(view, locals);
-      }
+      if (layout) content = await layout.render(view, locals, null, {}, () => content);
       partialIteration.iterateBang();
       rendered.push(this.buildRenderedTemplate(content, _template));
     }

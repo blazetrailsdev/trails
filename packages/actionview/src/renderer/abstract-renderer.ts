@@ -14,12 +14,13 @@ export interface RenderableTemplate {
     locals: Record<string, unknown>,
     buffer?: unknown,
     options?: { implicitLocals?: readonly string[]; addToStack?: boolean },
+    block?: (...name: unknown[]) => unknown,
   ): string | Promise<string>;
 }
 
 export interface ViewContext {
   readonly lookupContext?: LookupContext;
-  _layoutFor?(name?: string): string;
+  _layoutFor?(...args: unknown[]): string | null;
   viewFlow?: { set(key: string, content: string): void };
   prefixPartialPathWithControllerNamespace?: boolean;
   viewRenderer: { cacheHits: Record<string, unknown> };

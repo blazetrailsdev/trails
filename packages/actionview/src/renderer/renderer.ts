@@ -46,7 +46,7 @@ export class Renderer {
   async renderPartial(
     context: ViewContext,
     options: RenderOptions,
-    block?: unknown,
+    block?: (...args: unknown[]) => unknown,
   ): Promise<string | null> {
     return (await this.renderPartialToObject(context, options, block)).body;
   }
@@ -63,7 +63,7 @@ export class Renderer {
   private renderPartialToObject(
     context: ViewContext,
     options: RenderOptions,
-    block?: unknown,
+    block?: (...args: unknown[]) => unknown,
   ):
     | RenderedTemplate
     | RenderedCollection

@@ -27,6 +27,7 @@ export type CompiledMethod = ((
   localAssigns: Record<string, unknown>,
   outputBuffer: OutputBuffer,
   kwargs?: Record<string, unknown>,
+  block?: (...name: unknown[]) => unknown,
 ) => unknown) & { parameters?: Array<[type: string, name?: string]> };
 
 export interface CompiledMethodContainer {
@@ -212,6 +213,7 @@ export class Base {
     locals: Record<string, unknown>,
     buffer: OutputBuffer,
     options: { addToStack?: boolean; hasStrictLocals?: boolean } = {},
+    block?: (...name: unknown[]) => unknown,
   ): unknown {
     const compiled = this.compiledMethodContainer()._compiledMethods.get(method);
     if (!compiled) throw new Error(`undefined method '${method}'`);
@@ -225,7 +227,7 @@ export class Base {
     try {
       if (hasStrictLocals) {
         try {
-          return compiled.call(this, locals, buffer, locals);
+          return compiled.call(this, locals, buffer, locals, block);
         } catch (argumentError) {
           if (!(argumentError instanceof ArgumentError)) throw argumentError;
           const frame = argumentError.stack?.split("\n")[1];
@@ -235,7 +237,7 @@ export class Base {
           throw argumentError;
         }
       } else {
-        return compiled.call(this, locals, buffer);
+        return compiled.call(this, locals, buffer, undefined, block);
       }
     } finally {
       this.outputBuffer = oldOutputBuffer;
@@ -244,10 +246,7 @@ export class Base {
     }
   }
 
-  /**
-   * @missingRailsCall view_renderer.render — PERMANENT
-   * @missingRailsCall view_renderer.render_partial — PERMANENT
-   */
+  /** @missingRailsCall render_partial — PERMANENT */
   render(
     options: RenderOptions | string = {},
     locals: Record<string, unknown> = {},

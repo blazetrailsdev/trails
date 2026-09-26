@@ -1,11 +1,15 @@
 import { Notifications } from "@blazetrails/activesupport";
 import type { LookupContext } from "../lookup-context.js";
-import { AbstractRenderer, RenderedTemplate } from "./abstract-renderer.js";
+import { RenderedTemplate } from "./abstract-renderer.js";
 import type { RenderableTemplate, ViewContext, RenderOptions } from "./abstract-renderer.js";
+import { TemplateRenderer } from "./template-renderer.js";
+import type { Template } from "../template.js";
+
+type StreamableTemplate = RenderableTemplate & Pick<Template, "supportsStreaming">;
 
 /** @internal */
-export class StreamingTemplateRenderer extends AbstractRenderer {
-  render(..._args: unknown[]): never {
+export class StreamingTemplateRenderer extends TemplateRenderer {
+  override render(..._args: unknown[]): never {
     throw new Error("Use renderStream() for streaming rendering.");
   }
 
@@ -13,14 +17,14 @@ export class StreamingTemplateRenderer extends AbstractRenderer {
     const locals = options.locals ?? {};
     const keys = Object.keys(locals);
 
-    const details = this.extractDetails(options as Record<string, unknown>);
+    this.details = this.extractDetails(options as Record<string, unknown>);
     const found = this.lookupContext.findAll(
       options.template as string,
       options.prefixes ?? [],
       false,
       keys,
-      details,
-    ) as RenderableTemplate[];
+      this.details,
+    ) as unknown as StreamableTemplate[];
 
     const template =
       found.length > 0
@@ -29,7 +33,7 @@ export class StreamingTemplateRenderer extends AbstractRenderer {
             options.template as string,
             options.prefixes ?? [],
             this.formats,
-          ) as unknown as RenderableTemplate | null);
+          ) as unknown as StreamableTemplate | null);
 
     if (!template) {
       throw new Error(`Missing template: ${String(options.template)}`);
@@ -41,15 +45,14 @@ export class StreamingTemplateRenderer extends AbstractRenderer {
 
     const layoutName = options.layout;
 
+    if (!(layoutName != null && layoutName !== false && template.supportsStreaming())) {
+      yield (await super.renderTemplate(context, template, layoutName, locals)).body;
+      return;
+    }
+
+    const layout = this.findLayout(layoutName, keys, [(this.formats[0] as string) ?? ":html"]);
+
     try {
-      if (layoutName == null || layoutName === false) {
-        const body = await template.render(context, locals);
-        yield body;
-        return;
-      }
-
-      const layout = this.resolveLayout(layoutName, keys, [(this.formats[0] as string) ?? ":html"]);
-
       yield* this.delayedRender(context, template, layout, locals);
     } catch (err) {
       logError(err);
@@ -117,35 +120,6 @@ export class StreamingTemplateRenderer extends AbstractRenderer {
     } finally {
       handle.finish();
     }
-  }
-
-  /** @internal */
-  private resolveLayout(
-    layout: RenderOptions["layout"],
-    keys: string[],
-    formats: string[],
-  ): RenderableTemplate | null {
-    if (typeof layout === "string") {
-      const detailsWithFormats = { formats };
-      const found = this.lookupContext.findAll(
-        layout,
-        [],
-        false,
-        keys,
-        detailsWithFormats,
-      ) as RenderableTemplate[];
-      if (found.length > 0) return found[0];
-      return this.lookupContext.findLayout(
-        layout,
-        ["layouts"],
-        formats,
-      ) as unknown as RenderableTemplate | null;
-    }
-    if (typeof layout === "function") {
-      const resolved = layout(this.lookupContext, this.formats as readonly string[], keys);
-      return resolved ? this.resolveLayout(resolved, keys, formats) : null;
-    }
-    return null;
   }
 }
 

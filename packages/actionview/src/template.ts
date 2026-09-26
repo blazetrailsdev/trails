@@ -222,6 +222,7 @@ export class Template {
       implicitLocals = [],
       addToStack = true,
     }: { implicitLocals?: readonly string[]; addToStack?: boolean } = {},
+    block?: (...name: unknown[]) => unknown,
   ): string {
     try {
       return this.instrumentRenderTemplate<string>(() => {
@@ -233,16 +234,24 @@ export class Template {
         }
 
         if (buffer) {
-          view._run(this.methodName(), this, locals, buffer, {
-            addToStack,
-            hasStrictLocals: this.isStrictLocals(),
-          });
+          view._run(
+            this.methodName(),
+            this,
+            locals,
+            buffer,
+            { addToStack, hasStrictLocals: this.isStrictLocals() },
+            block,
+          );
           return "";
         } else {
-          const result = view._run(this.methodName(), this, locals, new OutputBuffer(), {
-            addToStack,
-            hasStrictLocals: this.isStrictLocals(),
-          });
+          const result = view._run(
+            this.methodName(),
+            this,
+            locals,
+            new OutputBuffer(),
+            { addToStack, hasStrictLocals: this.isStrictLocals() },
+            block,
+          );
           return result instanceof OutputBuffer ? result.toStr() : String(result ?? "");
         }
       });
@@ -320,11 +329,12 @@ export class Template {
     const parameters = methodParameters(methodArguments);
     const scope = setStrictLocals != null ? "__strictLocals" : "localAssigns";
 
-    return `Object.assign(function ${this.methodName()}(localAssigns, outputBuffer, __kwargs = {}) {${setStrictLocals != null ? kwargsCode(parameters) : ""}
+    return `Object.assign(function ${this.methodName()}(localAssigns, outputBuffer, __kwargs = {}, _) {${setStrictLocals != null ? kwargsCode(parameters) : ""}
   this.virtualPath = ${JSON.stringify(this.virtualPath)};
-  with (this) { with (${scope}) {${this.localsCode()}
+  const __yield = _ ? { get yield() { return _(); } } : {};
+  with (this) { with (__yield) { with (${scope}) {${this.localsCode()}
     return ${code};
-  } }
+  } } }
 }, { parameters: ${JSON.stringify(parameters.map(([type, name]) => (name === undefined ? [type] : [type, name])))} })`;
   }
 

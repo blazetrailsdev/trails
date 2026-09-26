@@ -1,16 +1,19 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { Logger, StringIO } from "@blazetrails/activesupport";
 
-import { Digestor } from "../digestor.js";
+import { Base } from "../base.js";
+import { Digestor, type Node } from "../digestor.js";
 import { DetailsKey, LookupContext } from "../lookup-context.js";
 import { FixtureResolver } from "../testing/resolvers.js";
+import { Resolver } from "./resolver.js";
 
 const FIXTURES: Record<string, string> = {
   "comments/_comment.html.tse": "Great story!",
-  "comments/_comment.json.tse": '{"content": "Great story!"}',
   "comments/_comments.html.tse": `<%= render partial: "comments/comment", collection: commentable.comments %>`,
   "comments/_cycle_a.html.tse": `<% if some_condition %>\n  <%= render partial: "cycle_b" %>\n<% end %>`,
   "comments/_cycle_b.html.tse": `<% if some_other_condition %>\n  <%= render partial: "cycle_a" %>\n<% end %>`,
   "comments/cycle.html.tse": `<%= render partial: "cycle_a" %>`,
+  "comments/show.js.tse": `alert("<%=j render("comments/comment") %>")\n`,
   "events/_completed.html.tse": "",
   "events/_event.html.tse": "",
   "events/index.html.tse": "<% # Template Dependency: events/* %>",
@@ -29,6 +32,21 @@ const FIXTURES: Record<string, string> = {
   "messages/_header.html.tse": "",
   "messages/index.html.tse": "<%= render this.messages %>\n<%= render this.events %>\n",
   "messages/_message.html.tse": "THIS BE WHERE THEM MESSAGE GO, YO!",
+  "messages/new.html+iphone.tse": `<%# Template Dependency: messages/message %>
+
+<%= render "header" %>
+<%= render "comments/comments" %>
+
+<%= render "messages/actions/move" %>
+
+<%= render this.message.history.events %>
+
+<%# render "something_missing"   %>
+<%# render "something_missing_1" %>
+
+<%
+  # Template Dependency: messages/form
+%>`,
   "messages/peek.html.tse": `<%# Template Dependency: messages/message %>
 <%= render "comments/comments" %>
 `,
@@ -47,29 +65,89 @@ const FIXTURES: Record<string, string> = {
   # Template Dependency: messages/form
 %>
 `,
+  "messages/thread.json.tse": `<%= render "comments/comments" %>\n`,
 };
+
+const API_FIXTURES: Record<string, string> = {
+  "comments/_comment.json.tse": '{"content": "Great story!"}\n',
+  "comments/_comments.json.tse": `<%= render partial: "comments/comment", collection: commentable.comments %>\n`,
+};
+
+let templates: Record<string, string>;
+let apiTemplates: Record<string, string>;
+
+class FixtureFinder extends LookupContext {
+  static build(details: ConstructorParameters<typeof LookupContext>[1] = {}): FixtureFinder {
+    return new this(
+      [new FixtureResolver(templates), new FixtureResolver(apiTemplates)],
+      details,
+      [],
+    );
+  }
+}
 
 interface DigestOptions {
   dependencies?: string[];
   format?: string;
+  variants?: string[];
 }
 
 describe("TemplateDigestorTest", () => {
-  let templates: Record<string, string>;
-  let _finder: LookupContext;
+  let _finder: LookupContext | null;
 
   beforeEach(() => {
     DetailsKey.clear();
     templates = { ...FIXTURES };
-    _finder = new LookupContext();
-    _finder.appendViewPaths([new FixtureResolver(templates)]);
+    apiTemplates = { ...API_FIXTURES };
+    _finder = null;
   });
 
-  function finder(): LookupContext {
-    return _finder;
+  function flatten(node: Node): Node[] {
+    return [node, ...node.children.flatMap((child) => flatten(child))];
+  }
+
+  function assertLogged(message: string, block: () => void): void {
+    const oldLogger = Base.logger;
+    const log = new StringIO();
+    Base.logger = new Logger(log);
+
+    try {
+      block();
+
+      log.rewind();
+      expect(log.read()).toMatch(message);
+    } finally {
+      Base.logger = oldLogger;
+    }
+  }
+
+  function assertDigestDifference(
+    templateName: string,
+    options: DigestOptions,
+    block: () => void,
+  ): void;
+  function assertDigestDifference(templateName: string, block: () => void): void;
+  function assertDigestDifference(
+    templateName: string,
+    optionsOrBlock: DigestOptions | (() => void),
+    maybeBlock?: () => void,
+  ): void {
+    const options = typeof optionsOrBlock === "function" ? {} : optionsOrBlock;
+    const block = typeof optionsOrBlock === "function" ? optionsOrBlock : maybeBlock!;
+    const previousDigest = digest(templateName, options);
+    for (const path of finder().viewPaths) path.clearCache?.();
+    finder().digestCache().clear();
+
+    block();
+
+    expect(digest(templateName, options), "digest didn't change").not.toBe(previousDigest);
+    finder().digestCache().clear();
+    for (const path of finder().viewPaths) path.clearCache?.();
   }
 
   function digest(templateName: string, options: DigestOptions = {}): string {
+    finder().variants = options.variants ?? [];
+
     const finderWithFormats = options.format
       ? finder().withPrependedFormats([options.format])
       : finder();
@@ -82,29 +160,45 @@ describe("TemplateDigestorTest", () => {
     });
   }
 
+  function dependencies(templateName: string): string[] {
+    const tree = Digestor.tree(templateName, finder());
+    return tree.children.map((node) => node.name);
+  }
+
   function nestedDependencies(templateName: string): unknown[] {
     const tree = Digestor.tree(templateName, finder());
     return tree.children.map((node) => node.toDepMap());
   }
 
-  function changeTemplate(templateName: string): void {
-    templates[`${templateName}.html.tse`] = "\nTHIS WAS CHANGED!";
+  function treeTemplateFormats(templateName: string): (string | null)[] {
+    const tree = Digestor.tree(templateName, finder());
+    return flatten(tree)
+      .map((node) => node.template?.format)
+      .filter((format) => format != null);
   }
+
+  function disableResolverCaching(block: () => void): void {
+    const oldCaching = Resolver.caching;
+    Resolver.caching = false;
+    try {
+      block();
+    } finally {
+      Resolver.caching = oldCaching;
+    }
+  }
+
+  function finder(): LookupContext {
+    return (_finder ??= FixtureFinder.build());
+  }
+
+  function changeTemplate(templateName: string, variant: string | null = null): void {
+    const suffix = variant ? `+${variant}` : "";
+    templates[`${templateName}.html${suffix}.tse`] = "\nTHIS WAS CHANGED!";
+  }
+  const addTemplate = changeTemplate;
 
   function removeTemplate(templateName: string): void {
     delete templates[`${templateName}.html.tse`];
-  }
-
-  function assertDigestDifference(templateName: string, block: () => void): void {
-    const previousDigest = digest(templateName);
-    for (const path of finder().viewPaths) path.clearCache?.();
-    finder().digestCache().clear();
-
-    block();
-
-    expect(digest(templateName), "digest didn't change").not.toBe(previousDigest);
-    finder().digestCache().clear();
-    for (const path of finder().viewPaths) path.clearCache?.();
   }
 
   it("top level change reflected", () => {
@@ -132,16 +226,20 @@ describe("TemplateDigestorTest", () => {
   });
 
   it("explicit dependency wildcard picks up added file", () => {
-    assertDigestDifference("events/index", () => {
-      changeTemplate("events/_uncompleted");
+    disableResolverCaching(() => {
+      assertDigestDifference("events/index", () => {
+        addTemplate("events/_uncompleted");
+      });
     });
   });
 
   it("explicit dependency wildcard picks up removed file", () => {
-    changeTemplate("events/_subscribers_changed");
+    disableResolverCaching(() => {
+      addTemplate("events/_subscribers_changed");
 
-    assertDigestDifference("events/index", () => {
-      removeTemplate("events/_subscribers_changed");
+      assertDigestDifference("events/index", () => {
+        removeTemplate("events/_subscribers_changed");
+      });
     });
   });
 
@@ -166,6 +264,30 @@ describe("TemplateDigestorTest", () => {
   it("directory depth dependency", () => {
     assertDigestDifference("level/below/index", () => {
       changeTemplate("level/below/_header");
+    });
+  });
+
+  it("logging of missing template", () => {
+    assertLogged("Couldn't find template for digesting: messages/something_missing", () => {
+      digest("messages/show");
+    });
+  });
+
+  it("logging of missing template ending with number", () => {
+    assertLogged("Couldn't find template for digesting: messages/something_missing_1", () => {
+      digest("messages/show");
+    });
+  });
+
+  it("logging of missing template for dependencies", () => {
+    assertLogged("Couldn't find template for digesting: messages/something_missing", () => {
+      dependencies("messages/something_missing");
+    });
+  });
+
+  it("logging of missing template for nested dependencies", () => {
+    assertLogged("Couldn't find template for digesting: messages/something_missing", () => {
+      nestedDependencies("messages/something_missing");
     });
   });
 
@@ -203,6 +325,30 @@ describe("TemplateDigestorTest", () => {
       "messages/form",
     ];
     expect(nestedDependencies("messages/show")).toEqual(nestedDeps);
+  });
+
+  it("nested template deps with non default rendered format", () => {
+    const nestedDeps = [{ "comments/comments": ["comments/comment"] }];
+    expect(nestedDependencies("messages/thread")).toEqual(nestedDeps);
+  });
+
+  it("template formats of nested deps with non default rendered format", () => {
+    _finder = finder().withPrependedFormats([":json"]);
+    expect([...new Set(treeTemplateFormats("messages/thread"))]).toEqual([":json"]);
+  });
+
+  it("template formats of dependencies with same logical name and different rendered format", () => {
+    expect([...new Set(treeTemplateFormats("messages/show"))]).toEqual([":html"]);
+  });
+
+  it("template dependencies with fallback from js to html format", () => {
+    expect(dependencies("comments/show")).toEqual(["comments/comment"]);
+  });
+
+  it("template digest with fallback from js to html format", () => {
+    assertDigestDifference("comments/show", () => {
+      changeTemplate("comments/_comment");
+    });
   });
 
   it("recursion in renders", () => {
@@ -250,6 +396,17 @@ describe("TemplateDigestorTest", () => {
     });
   });
 
+  it("details are included in cache key", () => {
+    _finder = FixtureFinder.build({ formats: [":html"] });
+    const oldDigest = digest("events/_event");
+
+    changeTemplate("events/_event");
+
+    _finder = FixtureFinder.build();
+
+    expect(digest("events/_event")).not.toBe(oldDigest);
+  });
+
   it("extra whitespace in render partial", () => {
     assertDigestDifference("messages/edit", () => {
       changeTemplate("messages/_form");
@@ -277,6 +434,13 @@ describe("TemplateDigestorTest", () => {
   it("old style hash in render invocation", () => {
     assertDigestDifference("messages/edit", () => {
       changeTemplate("comments/_comment");
+    });
+  });
+
+  it("variants", () => {
+    assertDigestDifference("messages/new", { variants: ["iphone"] }, () => {
+      changeTemplate("messages/new", "iphone");
+      changeTemplate("messages/_header", "iphone");
     });
   });
 
@@ -321,5 +485,16 @@ describe("TemplateDigestorTest", () => {
       },
     ];
     expect(nestedDependencies("comments/cycle")).toEqual(expectedDeps);
+  });
+
+  it("digest cache cleanup with recursion and template caching off", () => {
+    disableResolverCaching(() => {
+      const firstDigest = digest("level/_recursion");
+      const secondDigest = digest("level/_recursion");
+
+      expect(firstDigest).toBeTruthy();
+
+      expect(secondDigest).toBe(firstDigest);
+    });
   });
 });

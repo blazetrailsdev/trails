@@ -30,7 +30,7 @@ export class ObjectRenderer extends PartialRenderer implements ObjectRenderingHo
     object: unknown,
     partial: string,
     context: ViewContext,
-    block: unknown,
+    block: ((...args: unknown[]) => unknown) | null | undefined,
   ): Promise<RenderedTemplate> {
     this.object = object;
     this.localName = this.localVariable(partial);
@@ -40,7 +40,7 @@ export class ObjectRenderer extends PartialRenderer implements ObjectRenderingHo
   async renderObjectDerivePartial(
     object: unknown,
     context: ViewContext,
-    block: unknown,
+    block: ((...args: unknown[]) => unknown) | null | undefined,
   ): Promise<RenderedTemplate> {
     const path = this.partialPath(object, context);
     return this.renderObjectWithPartial(object, path, context, block);
@@ -57,7 +57,7 @@ export class ObjectRenderer extends PartialRenderer implements ObjectRenderingHo
     locals: Record<string, unknown>,
     template: RenderableTemplate,
     layout: RenderableTemplate | null,
-    block: unknown,
+    block: ((...args: unknown[]) => unknown) | null | undefined,
   ): Promise<RenderedTemplate> {
     locals[this.localName ?? template.variable!] = this.object;
     return super.renderPartialTemplate(view, locals, template, layout, block);

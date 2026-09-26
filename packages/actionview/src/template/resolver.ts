@@ -11,6 +11,8 @@ export interface TemplateWithDetails {
 }
 
 export abstract class Resolver implements PathSetResolver {
+  static caching: boolean = true;
+
   clearCache(): void {}
 
   findAll(
