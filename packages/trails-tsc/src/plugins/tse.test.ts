@@ -286,6 +286,17 @@ describe("virtualizeTse", () => {
       expect(diagnose(out)).toEqual([]);
     });
 
+    it("binds a bare yield to context.yield, with or without a section", () => {
+      const out = virtualizeTse(
+        '<main><%= yield %></main><%= yield "sidebar" %><%= yield("footer") %><%== yield %>',
+      );
+      expect(out).toContain("_ob.append(context.yield());");
+      expect(out).toContain('_ob.append(context.yield("sidebar"));');
+      expect(out).toContain('_ob.append(context.yield("footer"));');
+      expect(out).toContain("_ob.safeExprAppend(context.yield());");
+      expect(diagnose(out)).toEqual([]);
+    });
+
     it("accepts context.concat and context.contentFor calls", () => {
       const out = virtualizeTse("<% context.concat('x'); context.contentFor('nav', () => {}); %>");
       expect(diagnose(out)).toEqual([]);

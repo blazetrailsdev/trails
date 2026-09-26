@@ -94,3 +94,13 @@ describe("ActionDispatch::Routing::Route", () => {
     expect(() => route.pathFor({})).toThrow(/missing required keys: \[:id\]/);
   });
 });
+
+describe("Route#requestConstraints", () => {
+  it("keeps only constraints the request class defines, as Mapping#build_conditions does", () => {
+    const route = new Route("GET", "/posts/:post_id/comments", "comments", "index", {
+      constraints: { post_id: /\d+/, id: /\d+/, subdomain: "api" },
+    });
+    expect(Object.keys(route.requestConstraints)).toEqual(["subdomain"]);
+    expect(Object.keys(route.pathConstraints)).toEqual(["post_id"]);
+  });
+});

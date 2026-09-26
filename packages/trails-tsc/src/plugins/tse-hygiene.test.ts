@@ -22,6 +22,7 @@ const FIXTURES: Record<string, string> = {
   contentFor: "<% context.contentFor('nav', () => { %><nav>hi</nav><% }); %>",
   raw: "<%= context.raw('<b>bold</b>') %>",
   yield: "<%= context.yield() %><%= context.yield('sidebar') %>",
+  "layout bare yield": '<main><%= yield %></main><aside><%= yield "sidebar" %></aside>',
   "code block with for loop":
     "<% const items = [1, 2, 3]; %><% for (const item of items) { %><li><%= item %></li><% } %>",
   "types annotation":

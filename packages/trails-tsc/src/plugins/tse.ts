@@ -67,6 +67,15 @@ function emitNodes(nodes: TseAst["nodes"]): string[] {
   return lines;
 }
 
+const YIELD_EXPR_RE = /^\s*yield(?:\s*\(([\s\S]*)\)|\s+([\s\S]*?))?\s*;?\s*$/;
+
+function contextYield(value: string): string {
+  const m = YIELD_EXPR_RE.exec(value);
+  if (m === null) return value;
+  const section = m[1] ?? m[2] ?? "";
+  return `context.yield(${section.trim()})`;
+}
+
 function emitNode(node: TseAst["nodes"][number]): string {
   switch (node.kind) {
     case "text":
@@ -77,9 +86,9 @@ function emitNode(node: TseAst["nodes"][number]): string {
       return `  ${node.value}${needsSemi ? ";" : ""}`;
     }
     case "expr":
-      return `  _ob.append(${node.value});`;
+      return `  _ob.append(${contextYield(node.value)});`;
     case "rawExpr":
-      return `  _ob.safeExprAppend(${node.value});`;
+      return `  _ob.safeExprAppend(${contextYield(node.value)});`;
     case "blockExpr":
       return `  _ob.append(${node.value}`;
     default:

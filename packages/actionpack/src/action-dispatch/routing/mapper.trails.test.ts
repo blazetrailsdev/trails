@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { Constraints, type ConstraintsRequest } from "./mapper.js";
+import { Constraints, Mapper, type ConstraintsRequest } from "./mapper.js";
+import { RouteSet } from "./route-set.js";
 import type { Request } from "../http/request.js";
 import { X_CASCADE } from "../constants.js";
 
@@ -93,5 +94,21 @@ describe("ActionDispatch::Routing::Mapper::Constraints", () => {
     );
     expect(wrapped.app()).toBe(app);
     expect(wrapped.constraints).toEqual([outer, inner]);
+  });
+});
+
+describe("Mapper#nested under a singleton resource", () => {
+  it("constrains the nested param as SingletonResource#nested_param names it", () => {
+    const set = new RouteSet();
+    const m = new Mapper(set);
+    m.resource("session", { constraints: { id: /\d+/ } }, () => {
+      m.resources("infos");
+    });
+    const index = set
+      .getRoutes()
+      .find((r) => r.action === "index" && r.controller.endsWith("infos"));
+    expect(index?.path).toBe("/session/infos");
+    expect(index?.name).toBe("session_infos");
+    expect(index?.constraints["session_id"]).toEqual(/\d+/);
   });
 });

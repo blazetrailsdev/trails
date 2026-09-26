@@ -7,7 +7,7 @@ import {
   toXml,
   type Included,
 } from "@blazetrails/activesupport";
-import { KeyError, merge, SecureRandom, StringIO } from "@blazetrails/ruby-compat";
+import { b, KeyError, merge, SecureRandom, StringIO } from "@blazetrails/ruby-compat";
 import {
   DEFAULT_OPTIONS,
   Persisted,
@@ -24,7 +24,6 @@ import {
 import { Request } from "../action-dispatch/http/request.js";
 import { Response } from "../action-dispatch/http/response.js";
 import { TestRequest as AbstractTestRequest } from "../action-dispatch/testing/test-request.js";
-import { RequestUtils, type ParamValue } from "../action-dispatch/request/utils.js";
 import type { ParameterParsers } from "../action-dispatch/http/parameters.js";
 import { FlashHash } from "../action-dispatch/middleware/flash.js";
 import type { Metal } from "./metal.js";
@@ -495,18 +494,15 @@ export class TestRequest extends AbstractTestRequest {
         this.queryString = buildNestedQuery(nonPathParameters);
       }
     } else {
+      let data: string;
       if (TestRequest.ENCODER.shouldMultipart(nonPathParameters)) {
-        this.setHeader("CONTENT_TYPE", TestRequest.ENCODER.contentType);
-        const data = TestRequest.ENCODER.buildMultipart(nonPathParameters)!;
-        this.setHeader("CONTENT_LENGTH", String(Buffer.byteLength(data, "binary")));
-        this.setHeader("rack.input", new StringIO(data));
-        this.env["action_dispatch.request.request_parameters"] = nonPathParameters;
+        this.contentType = TestRequest.ENCODER.contentType;
+        data = TestRequest.ENCODER.buildMultipart(nonPathParameters)!;
       } else {
         this.fetchHeader("CONTENT_TYPE", (k) => {
           this.setHeader(k, "application/x-www-form-urlencoded");
         });
 
-        let data: string;
         const contentMimeType = this.contentMimeType;
         switch (contentMimeType?.symbol ?? null) {
           case null:
@@ -524,11 +520,12 @@ export class TestRequest extends AbstractTestRequest {
             this._customParamParsers[contentMimeType!.symbol!] = () => nonPathParameters;
             data = buildNestedQuery(nonPathParameters);
         }
-
-        const encoded = new TextEncoder().encode(data);
-        this.setHeader("CONTENT_LENGTH", String(encoded.byteLength));
-        this.setHeader("rack.input", new StringIO(data));
+        data = b(data);
       }
+
+      const dataStream = new StringIO(data);
+      this.setHeader("CONTENT_LENGTH", String(dataStream.size()));
+      this.setHeader("rack.input", dataStream);
     }
 
     this.fetchHeader("PATH_INFO", (k) => {
@@ -552,20 +549,6 @@ export class TestRequest extends AbstractTestRequest {
   override paramsParsers(): ParameterParsers {
     const base = super.paramsParsers();
     return merge<unknown>(base, this._customParamParsers) as ParameterParsers;
-  }
-
-  /** @internal */
-  override get requestParameters(): Record<string, unknown> {
-    const cached = this.env["action_dispatch.request.request_parameters"];
-    if (cached && typeof cached === "object") return cached as Record<string, unknown>;
-    const fallback = (): Record<string, unknown> => this.fallbackRequestParameters();
-    const params = this.parseFormattedParameters(this.paramsParsers(), fallback);
-    const normalized = RequestUtils.normalizeEncodeParams(params as ParamValue) as Record<
-      string,
-      unknown
-    >;
-    this.env["action_dispatch.request.request_parameters"] = normalized;
-    return normalized;
   }
 }
 

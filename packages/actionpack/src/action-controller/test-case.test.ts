@@ -3,6 +3,7 @@ import { SessionId } from "@blazetrails/rack-session";
 import { TestCase, TestRequest, LiveTestResponse, TestSession } from "./test-case.js";
 import { StringIO } from "@blazetrails/ruby-compat";
 import { UploadedFile } from "@blazetrails/rack-test";
+import { UploadedFile as HttpUploadedFile } from "../action-dispatch/http/upload.js";
 import { Base } from "./base.js";
 import { MimeType } from "../action-dispatch/http/mime-type.js";
 
@@ -175,7 +176,12 @@ describe("ActionController::TestRequest helpers", () => {
     expect(ct).toContain("boundary=");
     const body = req.getHeader("rack.input").string();
     expect(body).toContain(`name="upload"; filename="hello.txt"`);
-    expect(req.requestParameters["upload"]).toBeInstanceOf(UploadedFile);
+    const upload = req.requestParameters["upload"] as HttpUploadedFile;
+    expect(upload).toBeInstanceOf(HttpUploadedFile);
+    expect(upload).not.toBe(file);
+    expect(upload.originalFilename).toBe("hello.txt");
+    expect(upload.contentType).toBe("text/plain");
+    expect(upload.read()).toBe("hi");
   });
 
   it("assignParameters registers custom parser for unknown content types, wired into requestParameters", () => {

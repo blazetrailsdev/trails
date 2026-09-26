@@ -36,7 +36,12 @@ interface ResourceLike {
   param?: string;
   resourceScope?: string;
   actions?: ResourceAction[];
-  shallow?: () => boolean;
+  shallow: () => boolean;
+  singleton: () => boolean;
+  collectionScope: string;
+  memberScope: string;
+  nestedScope: string;
+  newScope(newPath: string): string;
 }
 
 const RESOURCE_OPTIONS: ReadonlySet<string> = new Set([
@@ -337,7 +342,6 @@ export class Mapper {
     "port",
   ];
 
-  private scopeStack: ScopeFrame[] = [];
   private concerns: Map<string, ConcernCallback> = new Map();
   /** @internal */
   private redirectInstances: Map<string, Redirect> = new Map();
@@ -407,22 +411,23 @@ export class Mapper {
       cb = callback;
     }
 
-    const shallow = options.shallow || this.isShallow();
-    const controllerPrefix = this.currentControllerPrefix();
+    if (this.applyCommonBehaviorFor("resources", [name], options, cb)) return;
+    options = this.applyActionOptions("resources", options);
+
+    const shallow = this._scope.get("shallow") === true;
+    const controllerPrefix = this._scope.get("module") as string | undefined;
     const controller = controllerPrefix ? `${controllerPrefix}/${name}` : name;
-    const prefix = this.currentPrefix();
+    const prefix = (this._scope.get("path") as string | undefined) ?? "";
     const basePath = `${prefix}/${name}`;
     const singular = singularize(name);
-    const namePrefix = this.currentNamePrefix();
+    const namePrefix = this._scope.get("as") as string | undefined;
     const routeName = (suffix: string) => (namePrefix ? `${namePrefix}_${suffix}` : suffix);
 
-    const shallowPrefix = shallow
-      ? ((this._scope.get("shallowPath") as string | undefined) ?? this.outerNonResourcePrefix())
-      : prefix;
-    const shallowPath = shallow ? `${shallowPrefix}/${name}` : basePath;
+    const shallowPath = shallow
+      ? `${(this._scope.get("shallowPath") as string | undefined) ?? ""}/${name}`
+      : basePath;
     const outerNamePrefix = shallow
-      ? ((this._scope.get("shallowPrefix") as string | undefined) ??
-        this.outerNonResourceNamePrefix())
+      ? (this._scope.get("shallowPrefix") as string | undefined)
       : undefined;
     const shallowRouteName = (suffix: string) =>
       outerNamePrefix ? `${outerNamePrefix}_${suffix}` : suffix;
@@ -438,15 +443,13 @@ export class Mapper {
       "update",
       "destroy",
     ]);
-    const scopeConstraints = this.currentScopeConstraints();
-    const constraints = scopeConstraints
-      ? { ...scopeConstraints, ...(options.constraints as RouteConstraints | undefined) }
-      : (options.constraints as RouteConstraints | undefined);
-    const scopePathNames =
-      (this._scope.get("pathNames") as Record<string, string> | undefined) ?? {};
-    const pathNames = { ...scopePathNames, ...(options.pathNames ?? {}) };
-    const newPath = pathNames.new ?? "new";
-    const editPath = pathNames.edit ?? "edit";
+    const merged = {
+      ...((this._scope.get("constraints") as RouteConstraints | undefined) ?? {}),
+      ...((options.constraints as RouteConstraints | undefined) ?? {}),
+    };
+    const constraints = Object.keys(merged).length > 0 ? merged : undefined;
+    const newPath = this.actionPath("new");
+    const editPath = this.actionPath("edit");
 
     if (allowed.has("index")) {
       const as = routeName(name);
@@ -475,30 +478,21 @@ export class Mapper {
     }
 
     if (cb) {
-      const nestedConstraints: RouteConstraints = {};
-      if (constraints?.id) {
-        nestedConstraints[`${singular}_id`] = constraints.id;
-      }
-      this.scopeStack.push({
-        path: basePath + `/:${singular}_id`,
-        namePrefix: singular,
-        controller: undefined,
-        shallow,
-        constraints: Object.keys(nestedConstraints).length > 0 ? nestedConstraints : undefined,
-        memberPath: `${shallowPath}/:id`,
-        resource: {
-          memberName: singular,
-          collectionName: name,
-          nestedParam: `${singular}_id`,
-          param: "id",
-          resourceScope: controller,
-          actions: Array.from(allowed),
-        },
-        resourceController: controller,
-        resourcePathNames: pathNames,
-      });
-      cb(this);
-      this.scopeStack.pop();
+      const resource: ResourceLike = {
+        memberName: singular,
+        collectionName: name,
+        nestedParam: `${singular}_id`,
+        param: "id",
+        resourceScope: controller,
+        actions: Array.from(allowed),
+        shallow: () => shallow,
+        singleton: () => false,
+        collectionScope: name,
+        memberScope: `${name}/:id`,
+        nestedScope: `${name}/:${singular}_id`,
+        newScope: (newPath) => `${name}/${newPath}`,
+      };
+      this.withScopeLevel("resources", () => this.resourceScope(resource, () => cb(this)));
     }
 
     if (allowed.has("edit")) {
@@ -554,20 +548,21 @@ export class Mapper {
       cb = callback;
     }
 
-    const controllerPrefix = this.currentControllerPrefix();
+    if (this.applyCommonBehaviorFor("resource", [name], options, cb)) return;
+    options = this.applyActionOptions("resource", options);
+
+    const controllerPrefix = this._scope.get("module") as string | undefined;
     const rawController = pluralize(name);
     const controller = controllerPrefix ? `${controllerPrefix}/${rawController}` : rawController;
-    const prefix = this.currentPrefix();
+    const prefix = (this._scope.get("path") as string | undefined) ?? "";
     const basePath = `${prefix}/${name}`;
-    const namePrefix = this.currentNamePrefix();
+    const namePrefix = this._scope.get("as") as string | undefined;
     const routeName = (suffix: string) => (namePrefix ? `${namePrefix}_${suffix}` : suffix);
 
+    const shallow = this._scope.get("shallow") === true;
     const allowed = allowedActions(options, ["show", "new", "create", "edit", "update", "destroy"]);
-    const scopePathNames =
-      (this._scope.get("pathNames") as Record<string, string> | undefined) ?? {};
-    const pathNames = { ...scopePathNames, ...(options.pathNames ?? {}) };
-    const newPath = pathNames.new ?? "new";
-    const editPath = pathNames.edit ?? "edit";
+    const newPath = this.actionPath("new");
+    const editPath = this.actionPath("edit");
 
     if (allowed.has("new")) {
       const as = routeName(`new_${name}`);
@@ -613,23 +608,21 @@ export class Mapper {
     }
 
     if (cb) {
-      this.scopeStack.push({
-        path: basePath,
-        namePrefix: name,
-        controller: undefined,
-        memberPath: basePath,
-        resource: {
-          memberName: name,
-          collectionName: pluralize(name),
-          param: "id",
-          resourceScope: controller,
-          actions: Array.from(allowed),
-        },
-        resourceController: controller,
-        resourcePathNames: pathNames,
-      });
-      cb(this);
-      this.scopeStack.pop();
+      const resource: ResourceLike = {
+        memberName: name,
+        collectionName: name,
+        nestedParam: `${name}_id`,
+        param: "id",
+        resourceScope: controller,
+        actions: Array.from(allowed),
+        shallow: () => shallow,
+        singleton: () => true,
+        collectionScope: name,
+        memberScope: name,
+        nestedScope: name,
+        newScope: (newPath) => `${name}/${newPath}`,
+      };
+      this.withScopeLevel("resource", () => this.resourceScope(resource, () => cb(this)));
     }
   }
 
@@ -682,13 +675,18 @@ export class Mapper {
       cb = callbackOrOptions as MapperCallback;
     }
 
-    const prefix = path
-      ? this.currentPrefix() + "/" + path.replace(/^\/+/, "")
-      : this.currentPrefix();
+    options = { ...options };
+    const scope: ScopeFrameHash = {};
+
+    if (path !== undefined) options.path = path;
+    options.constraints ??= {};
+
+    if (!this.isNestedScope()) {
+      if ("path" in options) options.shallowPath ??= options.path as string;
+      if ("as" in options) options.shallowPrefix ??= options.as;
+    }
 
     let block: unknown;
-    options = { ...options, constraints: options.constraints ?? {} };
-
     if (isPlainObject(options.constraints)) {
       const defaults = Object.fromEntries(
         Object.entries(options.constraints).filter(
@@ -703,126 +701,106 @@ export class Mapper {
       options.constraints = {};
     }
 
-    const previous = this._scope;
-    const frame: ScopeFrameHash = { ...options };
-    frame.blocks = this.mergeBlocksScope(this._scope.get("blocks") as unknown[] | undefined, block);
-    if (frame.constraints !== undefined) {
-      frame.constraints = this.mergeConstraintsScope(
-        this._scope.get("constraints") as RouteConstraints | undefined,
-        frame.constraints as RouteConstraints,
-      );
+    if ("only" in options || "except" in options) {
+      scope.actionOptions = { only: options.only, except: options.except };
+      delete options.only;
+      delete options.except;
     }
-    if (frame.defaults !== undefined) {
-      frame.defaults = this.mergeDefaultsScope(
-        this._scope.get("defaults") as Record<string, unknown> | undefined,
-        frame.defaults as Record<string, unknown>,
-      );
+
+    if ("anchor" in options) {
+      throw new ArgumentError("anchor is ignored unless passed to `match`");
     }
-    if (frame.shallowPath !== undefined) {
-      frame.shallowPath = this.mergeShallowPathScope(
-        this._scope.get("shallowPath") as string | undefined,
-        frame.shallowPath as string,
-      );
-    }
-    if (frame.shallowPrefix !== undefined) {
-      frame.shallowPrefix = this.mergeShallowPrefixScope(
-        this._scope.get("shallowPrefix") as string | undefined,
-        frame.shallowPrefix as string,
-      );
-    }
-    const leftover: Record<string, unknown> = { ...(options as Record<string, unknown>) };
+
+    const merges = this as unknown as Record<string, (parent: unknown, child: unknown) => unknown>;
     for (const option of this._scope.options()) {
-      if (option === "options") break;
-      if (option === "blocks") continue;
-      delete leftover[option];
+      let value: unknown = POISON;
+      if (option === "blocks") {
+        value = block;
+      } else if (option === "options") {
+        value = options;
+      } else if (option in options) {
+        value = options[option];
+        delete options[option];
+      }
+
+      if (value !== POISON) {
+        const merge = `merge${option[0].toUpperCase()}${option.slice(1)}Scope`;
+        scope[option] = merges[merge](this._scope.get(option), value);
+      }
     }
-    frame.options = this.mergeOptionsScope(
-      this._scope.get("options") as Record<string, unknown> | undefined,
-      leftover,
-    );
-    this._scope = this._scope.newChild(frame);
-    this.scopeStack.push({
-      path: prefix,
-      namePrefix: options.as,
-      controller: options.module,
-    });
+
+    const previous = this._scope;
+    this._scope = this._scope.newChild(scope);
     try {
       cb(this);
     } finally {
-      this.scopeStack.pop();
       this._scope = previous;
     }
   }
 
   member(callback: MapperCallback): void {
-    const frame = this.scopeStack[this.scopeStack.length - 1];
-    if (frame?.memberPath) {
-      const saved = frame.path;
-      frame.path = frame.memberPath;
-      callback(this);
-      frame.path = saved;
-    } else {
-      callback(this);
+    if (!this.isResourceScope()) {
+      throw new ArgumentError("can't use member outside resource(s) scope");
     }
+
+    this.withScopeLevel("member", () => {
+      if (this.isShallow()) {
+        this.shallowScope(() => {
+          this.pathScope(this.parentResource()!.memberScope, () => callback(this));
+        });
+      } else {
+        this.pathScope(this.parentResource()!.memberScope, () => callback(this));
+      }
+    });
   }
 
   collection(callback: MapperCallback): void {
-    const current = this.currentPrefix();
-    const collectionPath = current.replace(/\/:[^/]+$/, "");
-    this.scopeStack.push({
-      path: collectionPath,
-      namePrefix: undefined,
-      controller: undefined,
+    if (!this.isResourceScope()) {
+      throw new ArgumentError("can't use collection outside resource(s) scope");
+    }
+
+    this.withScopeLevel("collection", () => {
+      this.pathScope(this.parentResource()!.collectionScope, () => callback(this));
     });
-    callback(this);
-    this.scopeStack.pop();
   }
 
   nested(callback: MapperCallback): void {
     if (!this.isResourceScope()) {
-      throw new Error("can't use nested outside resource(s) scope");
+      throw new ArgumentError("can't use nested outside resource(s) scope");
     }
+
     this.withScopeLevel("nested", () => {
-      const shallowKeysSet =
-        this._scope.get("shallowPath") !== undefined ||
-        this._scope.get("shallowPrefix") !== undefined;
-      if (shallowKeysSet && this.isShallow() && this.shallowNestingDepth() >= 1) {
-        this.shallowScope(() => callback(this));
+      if (this.isShallow() && this.shallowNestingDepth() >= 1) {
+        this.shallowScope(() => {
+          this.pathScope(this.parentResource()!.nestedScope, () => {
+            this.scope(this.nestedOptions(), callback);
+          });
+        });
       } else {
-        callback(this);
+        this.pathScope(this.parentResource()!.nestedScope, () => {
+          this.scope(this.nestedOptions(), callback);
+        });
       }
     });
   }
 
   new(callback: MapperCallback): void {
     if (!this.isResourceScope()) {
-      throw new Error("can't use new outside resource(s) scope");
+      throw new ArgumentError("can't use new outside resource(s) scope");
     }
-    const frame = [...this.scopeStack].reverse().find((f) => f.resource);
-    const newSegment = frame?.resourcePathNames?.new ?? "new";
-    const framePath = frame?.path ?? this.currentPrefix();
-    const basePath = framePath.replace(/\/:[^/]+$/, "");
-    const newPath = `${basePath}/${newSegment}`;
-    this.scopeStack.push({
-      path: newPath,
-      namePrefix: undefined,
-      controller: undefined,
+
+    this.withScopeLevel("new", () => {
+      this.pathScope(this.parentResource()!.newScope(this.actionPath("new")), () => callback(this));
     });
-    callback(this);
-    this.scopeStack.pop();
   }
 
   shallow(callback: MapperCallback): void {
-    this.scopeStack.push({
-      path: this.currentPrefix(),
-      namePrefix: undefined,
-      controller: undefined,
-      shallow: true,
-    });
+    const previous = this._scope;
+    this._scope = this._scope.newChild({ shallow: true });
     try {
       callback(this);
     } finally {
-      this.scopeStack.pop();
+      this._scope = previous;
     }
   }
 
@@ -857,23 +835,24 @@ export class Mapper {
     const parent = this.parentResource();
     if (!parent) return;
     const actions = parent.actions ?? [];
-    const frame = [...this.scopeStack].reverse().find((f) => f.resource === parent);
-    const memberPath = frame?.memberPath ?? this.currentPrefix();
-    const controller = frame?.resourceController ?? "";
-    const editPath = frame?.resourcePathNames?.edit ?? this.actionPath("edit");
-    if (actions.includes("edit")) {
-      this.addRouteToSet(new Route("GET", `${memberPath}/${editPath}`, controller, "edit"));
-    }
-    if (actions.includes("show")) {
-      this.addRouteToSet(new Route("GET", memberPath, controller, "show"));
-    }
-    if (actions.includes("update")) {
-      this.addRouteToSet(new Route("PATCH", memberPath, controller, "update"));
-      this.addRouteToSet(new Route("PUT", memberPath, controller, "update"));
-    }
-    if (actions.includes("destroy")) {
-      this.addRouteToSet(new Route("DELETE", memberPath, controller, "destroy"));
-    }
+    this.member(() => {
+      const memberPath = this._scope.get("path") as string;
+      const controller = parent.resourceScope ?? "";
+      const editPath = this.actionPath("edit");
+      if (actions.includes("edit")) {
+        this.addRouteToSet(new Route("GET", `${memberPath}/${editPath}`, controller, "edit"));
+      }
+      if (actions.includes("show")) {
+        this.addRouteToSet(new Route("GET", memberPath, controller, "show"));
+      }
+      if (actions.includes("update")) {
+        this.addRouteToSet(new Route("PATCH", memberPath, controller, "update"));
+        this.addRouteToSet(new Route("PUT", memberPath, controller, "update"));
+      }
+      if (actions.includes("destroy")) {
+        this.addRouteToSet(new Route("DELETE", memberPath, controller, "destroy"));
+      }
+    });
   }
 
   constraints(
@@ -1213,9 +1192,17 @@ export class Mapper {
 
   private addRoute(verb: string | readonly string[], path: string, options: RouteOptions): void {
     if (options.on !== undefined) assertValidOnOption(options.on);
+    if (this._scope.scopeLevel === "resources") {
+      return this.nested(() => this.addRoute(verb, path, options));
+    }
+    if (this._scope.scopeLevel === "resource") {
+      return this.member(() => this.addRoute(verb, path, options));
+    }
     const formatted = options.format ?? (this._scope.get("format") as boolean | undefined);
     const fullPath = Mapping.normalizePath(
-      RFC2396_PARSER.escape(this.currentPrefix() + "/" + path.replace(/^\/+/, "")),
+      RFC2396_PARSER.escape(
+        ((this._scope.get("path") as string | undefined) ?? "") + "/" + path.replace(/^\/+/, ""),
+      ),
       formatted,
     );
     const scopeTo = this._scope.get("to") as string | undefined;
@@ -1229,7 +1216,7 @@ export class Mapper {
     const effectiveController = options.controller ?? scopeController;
     const endpoint =
       effectiveTo ?? `${effectiveController ?? ""}#${options.action ?? scopeAction ?? ""}`;
-    const scopeModulePrefix = this.currentControllerPrefix();
+    const scopeModulePrefix = this._scope.get("module") as string | undefined;
 
     let redirectEndpoint: Redirect | undefined;
     let redirectTarget: string | RedirectOptions | RedirectFunction | undefined;
@@ -1269,7 +1256,7 @@ export class Mapper {
           })()
         : undefined;
     const name = explicitName ?? inferredName;
-    const namePrefix = this.currentNamePrefix();
+    const namePrefix = this._scope.get("as") as string | undefined;
     let fullName = name ? (namePrefix ? `${namePrefix}_${name}` : name) : undefined;
     if (explicitName === undefined && fullName && this.hasNamedRoute(fullName)) {
       fullName = undefined;
@@ -1350,62 +1337,8 @@ export class Mapper {
     this._set.addRoute(route, name);
   }
 
-  private currentPrefix(): string {
-    if (this.scopeStack.length === 0) return "";
-    return this.scopeStack[this.scopeStack.length - 1].path;
-  }
-
-  /** @internal */
-  private outerNonResourcePrefix(): string {
-    let last = "";
-    for (const f of this.scopeStack) {
-      if (f.resource) return last;
-      if (f.shallow) continue;
-      last = f.path;
-    }
-    return last;
-  }
-
-  /** @internal */
-  private outerNonResourceNamePrefix(): string | undefined {
-    const parts: string[] = [];
-    for (const f of this.scopeStack) {
-      if (f.resource) break;
-      if (f.shallow) continue;
-      if (f.namePrefix) parts.push(f.namePrefix);
-    }
-    return parts.length > 0 ? parts.join("_") : undefined;
-  }
-
-  private prefixedName(name: string): string {
-    const prefix = this.currentNamePrefix();
-    return prefix ? `${prefix}_${name}` : name;
-  }
-
   private isShallow(): boolean {
-    return this.scopeStack.some((f) => f.shallow);
-  }
-
-  private currentNamePrefix(): string | undefined {
-    const parts = this.scopeStack.map((f) => f.namePrefix).filter(Boolean) as string[];
-    return parts.length > 0 ? parts.join("_") : undefined;
-  }
-
-  private currentControllerPrefix(): string | undefined {
-    const parts = this.scopeStack.map((f) => f.controller).filter(Boolean) as string[];
-    return parts.length > 0 ? parts.join("/") : undefined;
-  }
-
-  private currentScopeConstraints(): RouteConstraints | undefined {
-    const merged: RouteConstraints = {};
-    let any = false;
-    for (const frame of this.scopeStack) {
-      if (frame.constraints) {
-        Object.assign(merged, frame.constraints);
-        any = true;
-      }
-    }
-    return any ? merged : undefined;
+    return !this.parentResource()!.singleton() && this._scope.get("shallow") === true;
   }
 
   /** @internal */
@@ -1526,12 +1459,12 @@ export class Mapper {
 
   /** @internal */
   isResourceScope(): boolean {
-    return this.scopeStack.some((f) => f.memberPath !== undefined);
+    return this._scope.isResourceScope();
   }
 
   /** @internal */
   isNestedScope(): boolean {
-    return this.scopeStack.length > 1;
+    return this._scope.isNested();
   }
 
   /** @internal */
@@ -1541,24 +1474,25 @@ export class Mapper {
 
   /** @internal */
   isParamConstraint(): boolean {
-    const c = this.currentScopeConstraints();
-    return Boolean(c && c.id instanceof RegExp);
+    const constraints = this._scope.get("constraints") as RouteConstraints | undefined;
+    return constraints?.[this.parentResource()!.param!] instanceof RegExp;
   }
 
   /** @internal */
-  paramConstraint(): RegExp | undefined {
-    const c = this.currentScopeConstraints();
-    return c?.id instanceof RegExp ? c.id : undefined;
+  paramConstraint(): RouteConstraints[string] {
+    return (this._scope.get("constraints") as RouteConstraints)[this.parentResource()!.param!];
   }
 
   /** @internal */
   shallowNestingDepth(): number {
-    return this.scopeStack.filter((f) => f.shallow).length;
+    return [...this._scope]
+      .filter((node) => node.frame?.scopeLevelResource)
+      .filter((node) => (node.frame!.scopeLevelResource as ResourceLike).shallow()).length;
   }
 
   /** @internal */
   pathForAction(action: string, path: string | undefined): string {
-    const prefix = this.currentPrefix();
+    const prefix = (this._scope.get("path") as string | undefined) ?? "";
     if (path) return `${prefix}/${path}`;
     if (this.canonicalAction(action)) return prefix;
     return `${prefix}/${action}`;
@@ -1578,7 +1512,7 @@ export class Mapper {
   /** @internal */
   nameForAction(as: string | undefined, action: string | undefined): string | undefined {
     const prefix = this.prefixNameForAction(as, action);
-    const namePrefix = this.currentNamePrefix();
+    const namePrefix = this._scope.get("as") as string | undefined;
     const parts = [namePrefix, prefix].filter((p): p is string => Boolean(p));
     const candidate = parts.join("_");
     if (!candidate) return undefined;
@@ -1609,15 +1543,9 @@ export class Mapper {
     const previous = this._scope;
     const merged = this.mergePathScope(this._scope.get("path") as string | undefined, path);
     this._scope = this._scope.newChild({ path: merged });
-    this.scopeStack.push({
-      path: Mapper.normalizePath(this.currentPrefix() + "/" + path),
-      namePrefix: undefined,
-      controller: undefined,
-    });
     try {
       return fn();
     } finally {
-      this.scopeStack.pop();
       this._scope = previous;
     }
   }
@@ -1657,10 +1585,6 @@ export class Mapper {
 
   /** @internal */
   parentResource(): ResourceLike | undefined {
-    for (let i = this.scopeStack.length - 1; i >= 0; i--) {
-      const r = this.scopeStack[i].resource;
-      if (r) return r;
-    }
     return this._scope.get("scopeLevelResource") as ResourceLike | undefined;
   }
 
@@ -1693,13 +1617,14 @@ export class Mapper {
   }
 
   /** @internal */
-  nestedOptions(): { as?: string; constraints?: RouteConstraints } {
-    const parent = this.parentResource();
-    const options: { as?: string; constraints?: RouteConstraints } = { as: parent?.memberName };
-    if (this.isParamConstraint() && parent?.nestedParam) {
-      const c = this.paramConstraint();
-      if (c) options.constraints = { [parent.nestedParam]: c };
+  nestedOptions(): ScopeOptions {
+    const options: ScopeOptions = { as: this.parentResource()!.memberName };
+    if (this.isParamConstraint()) {
+      options.constraints = {
+        [this.parentResource()!.nestedParam!]: this.paramConstraint(),
+      };
     }
+
     return options;
   }
 
@@ -1742,17 +1667,11 @@ export class Mapper {
     }
     if (options.shallow) {
       delete options.shallow;
-      const beforeShallow = this._scope;
-      this._scope = this._scope.newChild({ shallow: true });
-      try {
-        dispatch(resources.pop()!, options, block);
-      } finally {
-        this._scope = beforeShallow;
-      }
+      this.shallow(() => dispatch(resources.pop()!, options, block));
       return true;
     }
-    if (this._scope.isResourceScope()) {
-      this.withScopeLevel("nested", () => dispatch(resources.pop()!, options, block));
+    if (this.isResourceScope()) {
+      this.nested(() => dispatch(resources.pop()!, options, block));
       return true;
     }
 
@@ -1787,23 +1706,13 @@ export class Mapper {
 
 const CANONICAL_ACTIONS = ["index", "create", "new", "show", "update", "destroy"];
 
+const POISON = {};
+
 const VALID_ON_OPTIONS: ReadonlySet<string> = new Set(["new", "collection", "member"]);
 
 /** @internal */
 function assertValidOnOption(on: string): void {
   if (!VALID_ON_OPTIONS.has(on)) throw new Error(`Unknown scope :${on} given to :on`);
-}
-
-interface ScopeFrame {
-  path: string;
-  namePrefix?: string;
-  controller?: string;
-  shallow?: boolean;
-  constraints?: RouteConstraints;
-  memberPath?: string;
-  resource?: ResourceLike;
-  resourceController?: string;
-  resourcePathNames?: Record<string, string>;
 }
 
 /** @noRailsEquivalent PERMANENT */

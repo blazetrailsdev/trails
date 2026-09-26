@@ -112,7 +112,7 @@ describe("Mapper public DSL additions", () => {
     let observedInside: string | undefined;
     m.scope("/admin", () => {
       m.shallow(() => {
-        observedInside = m["currentPrefix"]();
+        observedInside = m._scope.get("path") as string;
       });
     });
     expect(observedInside).toBe("/admin");
@@ -247,7 +247,7 @@ describe("Mapper public DSL additions", () => {
     let observedPath: string | undefined;
     m.resources("posts", () => {
       m.new(() => {
-        observedPath = m["currentPrefix"]();
+        observedPath = m._scope.get("path") as string;
       });
     });
     expect(observedPath).toBe("/posts/new");

@@ -757,7 +757,7 @@ export class Request {
 
         let paramList: Array<[string, unknown]> | null = null;
         const host = this._paramsHost;
-        let pr = _parseFormattedParameters.call(host, _paramsParsers.call(host), () => {
+        let pr = _parseFormattedParameters.call(host, this.paramsParsers(), () => {
           if ((paramList = this.requestParametersList()) != null) {
             return ParamBuilder.fromPairs(paramList, { encodingTemplate: encodingTemplate });
           } else {

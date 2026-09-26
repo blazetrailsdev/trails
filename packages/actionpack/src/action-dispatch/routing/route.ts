@@ -206,7 +206,7 @@ export class Route {
     const out: Record<string, unknown> = Object.create(null);
     const paths = new Set<string>(this.paramNames);
     for (const k of Object.keys(this.constraints)) {
-      if (!paths.has(k)) out[k] = this.constraints[k];
+      if (!paths.has(k) && k in Request.prototype) out[k] = this.constraints[k];
     }
     return out;
   }
