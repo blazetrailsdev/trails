@@ -79,7 +79,7 @@ describe("Template::Handlers", () => {
 
     TemplateHandlers.registerTemplateHandler("raw", makeHandler(["raw"]));
     expect(TemplateHandlers.extensions()).not.toBe(first);
-    expect(TemplateHandlers.extensions()).toEqual(["tse", "raw"]);
+    expect(TemplateHandlers.extensions()).toEqual([":tse", ":raw"]);
   });
 });
 

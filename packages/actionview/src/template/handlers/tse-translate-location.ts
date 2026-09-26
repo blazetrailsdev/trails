@@ -18,7 +18,7 @@ export interface Spot {
 }
 
 interface SourceToken {
-  kind: "CODE" | "TEXT";
+  kind: "CODE" | "TEXT" | "OPEN" | "CLOSE";
   value: string;
 }
 
@@ -54,18 +54,31 @@ export function tokenizeLine(line: string): SourceToken[] {
       textBuf += "%>";
       continue;
     }
-    if (m[2] === "-") textBuf = textBuf.replace(/[ \t]*$/, "");
-    if (m[5] === "-") {
-      const tail = /^[ \t]*\r?\n/.exec(line.slice(last));
-      if (tail !== null) last += tail[0].length;
+    let trimmed = "";
+    if (m[2] === "-") {
+      const kept = textBuf.replace(/[ \t]*$/, "");
+      trimmed = textBuf.slice(kept.length);
+      textBuf = kept;
     }
-    if (m[1] !== undefined) {
-      flushText();
-    } else if (m[3] === "#") {
-      flushText();
+    let tail = "";
+    if (m[5] === "-") {
+      tail = /^[ \t]*\r?\n/.exec(line.slice(last))?.[0] ?? "";
+      last += tail.length;
+    }
+    flushText();
+    if (m[1] !== undefined || m[3] === "#") {
+      tokens.push({ kind: "OPEN", value: trimmed + m[0] + tail });
     } else {
-      flushText();
-      tokens.push({ kind: "CODE", value: m[4].trim() });
+      const code = m[4];
+      const open = m[0].slice(0, m[0].length - code.length - (m[5] === "-" ? 3 : 2));
+      const leading = code.length - code.trimStart().length;
+      const trailing = code.length - code.trimEnd().length;
+      tokens.push({ kind: "OPEN", value: trimmed + open + code.slice(0, leading) });
+      tokens.push({ kind: "CODE", value: code.trim() });
+      tokens.push({
+        kind: "CLOSE",
+        value: code.slice(code.length - trailing) + (m[5] ?? "") + "%>" + tail,
+      });
     }
   }
   textBuf += line.slice(last);
@@ -73,15 +86,16 @@ export function tokenizeLine(line: string): SourceToken[] {
   return tokens;
 }
 
-function offsetSourceTokens(tokens: SourceToken[]): OffsetToken[] {
-  const result: OffsetToken[] = [];
-  let offset = 0;
-  for (const t of tokens) {
-    result.push({ kind: t.kind, value: t.value, offset });
-    offset += t.value.length;
+function offsetSourceTokens(sourceTokens: SourceToken[]): OffsetToken[] {
+  let sourceOffset = 0;
+  const withOffset: OffsetToken[] = [];
+  for (const { kind: name, value: str } of sourceTokens) {
+    if (name === "CODE" || name === "TEXT")
+      withOffset.push({ kind: name, value: str, offset: sourceOffset });
+    sourceOffset += str.length;
   }
-  result.push({ kind: "EOS", value: "", offset });
-  return result;
+  withOffset.push({ kind: "EOS", value: "", offset: sourceOffset });
+  return withOffset;
 }
 
 export function findOffset(

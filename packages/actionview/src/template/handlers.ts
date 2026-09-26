@@ -1,3 +1,5 @@
+import { stringToSym, symbolToS } from "@blazetrails/ruby-compat";
+
 export interface RenderContext {
   controller: string;
   action: string;
@@ -21,25 +23,25 @@ export const TemplateHandlers = {
     const handler = extensionsAndHandler[extensionsAndHandler.length - 1] as TemplateHandler;
     const extensions = extensionsAndHandler.slice(0, -1) as string[];
     if (extensions.length === 0) throw new Error("Extension is required");
-    for (const extension of extensions) handlers.set(extension, handler);
+    for (const extension of extensions) handlers.set(stringToSym(extension), handler);
     cachedExtensions = null;
   },
 
   unregisterTemplateHandler(...extensions: string[]): void {
     for (const ext of extensions) {
-      const handler = handlers.get(ext);
-      handlers.delete(ext);
+      const handler = handlers.get(stringToSym(ext));
+      handlers.delete(stringToSym(ext));
       if (defaultHandler === handler) defaultHandler = null;
     }
     cachedExtensions = null;
   },
 
   templateHandlerExtensions(): string[] {
-    return [...handlers.keys()].sort();
+    return [...handlers.keys()].map(symbolToS).sort();
   },
 
   registeredTemplateHandler(extension: string | null | undefined): TemplateHandler | undefined {
-    return extension ? handlers.get(extension) : undefined;
+    return extension ? handlers.get(stringToSym(extension)) : undefined;
   },
 
   registerDefaultTemplateHandler(extension: string, klass: TemplateHandler): void {

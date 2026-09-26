@@ -438,7 +438,7 @@ describe("TemplateDigestorTest", () => {
   });
 
   it("variants", () => {
-    assertDigestDifference("messages/new", { variants: ["iphone"] }, () => {
+    assertDigestDifference("messages/new", { variants: [":iphone"] }, () => {
       changeTemplate("messages/new", "iphone");
       changeTemplate("messages/_header", "iphone");
     });

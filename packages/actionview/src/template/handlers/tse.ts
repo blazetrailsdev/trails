@@ -18,6 +18,7 @@ export interface TseTemplate {
   type?: string | null;
   format?: string | null;
   shortIdentifier?: string | null;
+  methodName(): string;
 }
 
 export type TseImplementation = (source: string, options?: EmitJsOptions) => EmitResult;
@@ -70,7 +71,7 @@ export class Tse implements TemplateHandler {
       "(" +
       result.code
         .replace(/^\s*export\s+default\s+/u, "")
-        .replace(/^function\s+render\b/u, "function __tseCompiled") +
+        .replace(/^function\s+render\b/u, `function ${template.methodName()}`) +
       ")(this, localAssigns)"
     );
   }

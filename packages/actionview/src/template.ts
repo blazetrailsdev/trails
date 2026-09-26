@@ -355,11 +355,7 @@ export class Template {
     const parameters = methodParameters(methodArguments);
     const scope = setStrictLocals != null ? "__strictLocals" : "localAssigns";
 
-    return `Object.assign(function ${this.methodName()}(localAssigns, outputBuffer, __kwargs = {}, _) {${setStrictLocals != null ? kwargsCode(parameters) : ""}
-  this.virtualPath = ${JSON.stringify(this.virtualPath)};
-  const __yield = _ ? { get yield() { return _(); } } : {};
-  with (this) { with (__yield) { with (${scope}) {${this.localsCode()}
-    return ${code};
+    return `Object.assign(function ${this.methodName()}(localAssigns, outputBuffer, __kwargs = {}, _) {${setStrictLocals != null ? kwargsCode(parameters) : ""} this.virtualPath = ${JSON.stringify(this.virtualPath)}; const __yield = _ ? { get yield() { return _(); } } : {}; with (this) { with (__yield) { with (${scope}) {${this.localsCode()} return ${code};
   } } }
 }, { parameters: ${JSON.stringify(parameters.map(([type, name]) => (name === undefined ? [type] : [type, name])))} })`;
   }
@@ -373,11 +369,8 @@ export class Template {
       outputBuffer: typeof OutputBuffer,
     ) => CompiledMethod;
     try {
-      factory = new Function(
-        "ArgumentError",
-        "htmlSafe",
-        "OutputBuffer",
-        `return ${compiledSource};`,
+      factory = (0, eval)(
+        `(function (ArgumentError, htmlSafe, OutputBuffer) { return ${compiledSource}; })\n//# sourceURL=${this.identifier.replace(/[\r\n\u2028\u2029]/g, "")}`,
       ) as (
         argumentError: typeof ArgumentError,
         safe: typeof htmlSafe,
@@ -555,7 +548,7 @@ function kwargsCode(parameters: Parameter[]): string {
     );
   }
 
-  return lines.map((line) => `\n  ${line}`).join("");
+  return lines.map((line) => ` ${line}`).join("");
 }
 
 function stringHash(value: string): number {

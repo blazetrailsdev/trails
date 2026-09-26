@@ -1,5 +1,6 @@
 import type { DetailKey, TemplateDetails } from "./template-details.js";
 import { Template } from "./template.js";
+import { symbolToS } from "@blazetrails/ruby-compat";
 
 export class UnboundTemplate {
   readonly virtualPath: string;
@@ -71,7 +72,7 @@ export class UnboundTemplate {
       handler: this.details.handlerClass(),
 
       format: this.details.formatOrDefault() as string | null,
-      variant: (this.variant as string | null) ?? null,
+      variant: this.variant != null ? symbolToS(this.variant as string) : null,
       virtualPath: this.virtualPath,
 
       locals: [...locals],

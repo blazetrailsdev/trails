@@ -23,7 +23,7 @@ describe("ExceptionWrapper template spots", () => {
   it("remaps a compiled-template frame onto the template's own source", () => {
     TemplateHandlers.registerTemplateHandler("tse", new TseHandler());
     const template = new Template({
-      source: "first line\n<%= boom() %>\nlast line\n",
+      source: "first line\n<%= [].boom.length %>\nlast line\n",
       identifier: "posts/show.html.tse",
       virtualPath: "posts/show",
       extension: "tse",
@@ -37,12 +37,17 @@ describe("ExceptionWrapper template spots", () => {
     } catch (e) {
       raised = e;
     }
+    expect((raised as TemplateError).lineNumber()).toBe(2);
     const wrapper = new ExceptionWrapper(null, (raised as Error).cause as Error);
     const extract = wrapper.sourceExtracts.find((e) => e.file.includes(template.methodName()));
 
     expect(extract).toBeDefined();
-    expect(extract!.code).toBeDefined();
-    expect(Object.keys(extract!.code!)).toContain(String(extract!.line));
+    expect(extract!.line).toBe(2);
+    expect(extract!.code).toEqual({
+      1: "first line\n",
+      2: ["<%= [].boom.", "length %>\n", ""],
+      3: "last line\n",
+    });
   });
 });
 

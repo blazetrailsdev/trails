@@ -225,7 +225,7 @@ export { forceEncoding } from "./string/force-encoding.js";
 export { Encoding } from "./encoding.js";
 export { stringInspect } from "./string/inspect.js";
 export { succ } from "./string/succ.js";
-export { isSymbol, rbMethodName, symbolToS } from "./symbol.js";
+export { isSymbol, rbMethodName, stringToSym, symbolToS } from "./symbol.js";
 export { Monitor, isMonOwned, synchronize } from "./monitor.js";
 export { Mutex } from "./mutex.js";
 export { Fiber } from "./fiber.js";

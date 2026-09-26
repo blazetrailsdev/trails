@@ -87,8 +87,8 @@ describe("ViewPaths", () => {
     expect(controller.lookupContext().formats).toEqual([":json"]);
 
     controller.setLocale("de");
-    expect(controller.locale()).toBe("de");
-    expect(controller.lookupContext().locale).toBe("de");
+    expect(controller.locale()).toBe(":de");
+    expect(controller.lookupContext().locale).toBe(":de");
   });
 
   test("template_exists? and any_templates? delegate to the lookup context", () => {

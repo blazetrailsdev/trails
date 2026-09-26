@@ -19,14 +19,15 @@ import { PartialRenderer } from "./partial-renderer.js";
 import type { CollectionCachingView } from "./partial-renderer/collection-caching.js";
 
 /** @internal */
-export interface PreloadableRelation {
-  isLoaded(): boolean;
-  skipPreloadingBang(): void;
-  preloadAssociations(records: readonly unknown[]): void;
-}
-
-/** @internal */
 export type IterationVariables = readonly string[];
+
+type Collection = readonly unknown[] | PromiseLike<readonly unknown[]>;
+
+type Relation = PromiseLike<readonly unknown[]> & {
+  readonly isLoaded: boolean;
+  skipPreloadingBang(): unknown;
+  preloadAssociations(records: Collection): Promise<void>;
+};
 
 export class PartialIteration {
   readonly size: number;
@@ -54,25 +55,26 @@ export class PartialIteration {
 
 /** @internal */
 export class CollectionIterator {
-  protected collection: readonly unknown[];
+  protected collection: Collection;
 
-  constructor(collection: readonly unknown[]) {
+  constructor(collection: Collection) {
     this.collection = collection;
   }
 
-  each(blk: (object: unknown) => void): void {
-    this.collection.forEach((object) => blk(object));
+  async each(blk: (object: unknown) => void): Promise<void> {
+    (await this.collection).forEach((object) => blk(object));
   }
 
-  size(): number {
-    return this.collection.length;
+  async size(): Promise<number> {
+    return (await this.collection).length;
   }
 
-  length(): number {
-    return rbObjRespondTo(this.collection, "length") ? this.collection.length : this.size();
+  async length(): Promise<number> {
+    const collection = await this.collection;
+    return rbObjRespondTo(collection, "length") ? collection.length : this.size();
   }
 
-  preloadBang(): void {}
+  async preloadBang(): Promise<void> {}
 }
 
 /** @internal */
@@ -81,52 +83,54 @@ export class SameCollectionIterator extends CollectionIterator {
 
   protected variables: IterationVariables;
 
-  constructor(collection: readonly unknown[], path: string, variables: IterationVariables) {
+  constructor(collection: Collection, path: string, variables: IterationVariables) {
     super(collection);
     this.path = path;
     this.variables = variables;
   }
 
-  fromCollection(collection: readonly unknown[]): SameCollectionIterator {
+  fromCollection(collection: Collection): SameCollectionIterator {
     return new (this.constructor as new (
-      collection: readonly unknown[],
+      collection: Collection,
       path: string,
       variables: IterationVariables,
     ) => SameCollectionIterator)(collection, this.path, this.variables);
   }
 
-  eachWithInfo(blk: (object: unknown, variables: IterationVariables) => void): void {
+  async eachWithInfo(blk: (object: unknown, variables: IterationVariables) => void): Promise<void> {
     const variables = [this.path, ...this.variables];
-    this.collection.forEach((o) => blk(o, variables));
+    (await this.collection).forEach((o) => blk(o, variables));
   }
 }
 
 /** @internal */
 export class PreloadCollectionIterator extends SameCollectionIterator {
-  private relation: PreloadableRelation;
+  private relation: Relation;
 
   constructor(
-    collection: readonly unknown[],
+    collection: Collection,
     path: string,
     variables: IterationVariables,
-    relation: PreloadableRelation,
+    relation: Relation,
   ) {
     super(collection, path, variables);
-    if (!relation.isLoaded()) relation.skipPreloadingBang();
+    if (!relation.isLoaded) relation.skipPreloadingBang();
     this.relation = relation;
   }
 
-  override fromCollection(collection: readonly unknown[]): SameCollectionIterator {
+  override fromCollection(collection: Collection): SameCollectionIterator {
     return new PreloadCollectionIterator(collection, this.path, this.variables, this.relation);
   }
 
-  override eachWithInfo(blk: (object: unknown, variables: IterationVariables) => void): void {
-    this.preloadBang();
-    super.eachWithInfo(blk);
+  override async eachWithInfo(
+    blk: (object: unknown, variables: IterationVariables) => void,
+  ): Promise<void> {
+    await this.preloadBang();
+    await super.eachWithInfo(blk);
   }
 
-  override preloadBang(): void {
-    this.relation.preloadAssociations(this.collection);
+  override async preloadBang(): Promise<void> {
+    await this.relation.preloadAssociations(this.collection);
   }
 }
 
@@ -134,13 +138,13 @@ export class PreloadCollectionIterator extends SameCollectionIterator {
 export class MixedCollectionIterator extends CollectionIterator {
   private paths: readonly IterationVariables[];
 
-  constructor(collection: readonly unknown[], paths: readonly IterationVariables[]) {
+  constructor(collection: Collection, paths: readonly IterationVariables[]) {
     super(collection);
     this.paths = paths;
   }
 
-  eachWithInfo(blk: (object: unknown, variables: IterationVariables) => void): void {
-    this.collection.forEach((o, i) => blk(o, this.paths[i]));
+  async eachWithInfo(blk: (object: unknown, variables: IterationVariables) => void): Promise<void> {
+    (await this.collection).forEach((o, i) => blk(o, this.paths[i]));
   }
 }
 
@@ -160,7 +164,7 @@ export class CollectionRenderer extends PartialRenderer implements ObjectRenderi
   }
 
   async renderCollectionWithPartial(
-    collection: readonly unknown[],
+    collection: Collection,
     partial: string,
     context: ViewContext,
     block: unknown,
@@ -172,7 +176,7 @@ export class CollectionRenderer extends PartialRenderer implements ObjectRenderi
           collection,
           partial,
           iterVars,
-          collection as unknown as PreloadableRelation,
+          collection as unknown as Relation,
         )
       : new SameCollectionIterator(collection, partial, iterVars);
 
@@ -232,7 +236,7 @@ export class CollectionRenderer extends PartialRenderer implements ObjectRenderi
       {
         identifier,
         layout: layout && layout.virtualPath,
-        count: collection.length(),
+        count: await collection.length(),
       },
       async (payload) => {
         let spacer: RenderedTemplate;
@@ -279,10 +283,10 @@ export class CollectionRenderer extends PartialRenderer implements ObjectRenderi
     const locals = this.locals;
     const cache: Record<string, RenderableTemplate> = {};
 
-    const partialIteration = new PartialIteration(collection.size());
+    const partialIteration = new PartialIteration(await collection.size());
 
     const pairs: [unknown, IterationVariables][] = [];
-    collection.eachWithInfo((object, variables) => pairs.push([object, variables]));
+    await collection.eachWithInfo((object, variables) => pairs.push([object, variables]));
 
     const rendered: RenderedTemplate[] = [];
     for (const [object, [path, as, counter, iteration]] of pairs) {

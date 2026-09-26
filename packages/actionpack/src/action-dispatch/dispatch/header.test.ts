@@ -83,8 +83,8 @@ describe("HeaderTest", () => {
 
   it("key?", () => {
     const headers = setup();
-    expect(headers.has("CONTENT_TYPE")).toBe(true);
-    expect(headers.has("Content-Type")).toBe(true);
+    expect(headers.isKey("CONTENT_TYPE")).toBe(true);
+    expect(headers.isKey("Content-Type")).toBe(true);
   });
 
   it("fetch with block", () => {
@@ -114,7 +114,7 @@ describe("HeaderTest", () => {
 
   it("#merge! headers with mutation", () => {
     const headers = setup();
-    headers.mergeInPlace({ Host: "http://example.test", "Content-Type": "text/html" });
+    headers.mergeBang({ Host: "http://example.test", "Content-Type": "text/html" });
     expect(headers.env).toEqual({
       HTTP_HOST: "http://example.test",
       CONTENT_TYPE: "text/html",
@@ -124,7 +124,7 @@ describe("HeaderTest", () => {
 
   it("#merge! env with mutation", () => {
     const headers = setup();
-    headers.mergeInPlace({ HTTP_HOST: "http://first.com", CONTENT_TYPE: "text/html" });
+    headers.mergeBang({ HTTP_HOST: "http://first.com", CONTENT_TYPE: "text/html" });
     expect(headers.env).toEqual({
       HTTP_HOST: "http://first.com",
       CONTENT_TYPE: "text/html",
@@ -151,7 +151,7 @@ describe("HeaderTest", () => {
 
   it("env variables with . are not modified", () => {
     const headers = makeHeaders({});
-    headers.mergeInPlace({
+    headers.mergeBang({
       "rack.input": "",
       "rack.request.cookie_hash": "",
       "action_dispatch.logger": "",
@@ -165,7 +165,7 @@ describe("HeaderTest", () => {
 
   it("symbols are treated as strings", () => {
     const headers = makeHeaders({});
-    headers.mergeInPlace({
+    headers.mergeBang({
       SERVER_NAME: "example.com",
       HTTP_REFERER: "/",
       Host: "test.com",
