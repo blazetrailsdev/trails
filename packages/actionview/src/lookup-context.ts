@@ -436,21 +436,17 @@ export class LookupContext {
 
   async renderPartial(
     name: string,
-    prefix: string,
+    prefixes: ReadonlyArray<string>,
     format: string,
     locals: Record<string, unknown> = {},
     view?: Base,
   ): Promise<string> {
-    const template = this.findPartial(name, [prefix], [format]);
-    if (!template) {
-      throw new MissingTemplate(this._viewPaths, name, [prefix], true, {
-        ...this._details,
-        formats: [format],
-      });
-    }
+    const template = this.find(name, name.includes("/") ? [] : prefixes, true, [], {
+      formats: [format],
+    }) as Template;
 
     const context: RenderContext = {
-      controller: prefix,
+      controller: prefixes[0] ?? "",
       action: `_${name}`,
       format,
     };
@@ -460,7 +456,7 @@ export class LookupContext {
 
   async renderCollection(
     partial: string,
-    prefix: string,
+    prefixes: ReadonlyArray<string>,
     format: string,
     collection: unknown[],
     as?: string,
@@ -474,7 +470,7 @@ export class LookupContext {
         [`${varName}_counter`]: i,
         [`${varName}_iteration`]: { index: i, first: i === 0, last: i === collection.length - 1 },
       };
-      parts.push(await this.renderPartial(partial, prefix, format, locals));
+      parts.push(await this.renderPartial(partial, prefixes, format, locals));
     }
 
     return parts.join("");

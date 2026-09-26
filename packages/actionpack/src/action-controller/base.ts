@@ -28,6 +28,10 @@ import {
   isAnyTemplates,
   lookupContext,
   templateExists,
+  viewPathsFormats,
+  viewPathsLocale,
+  viewPathsSetFormats,
+  viewPathsSetLocale,
 } from "@blazetrails/actionview";
 import {
   Base as ActionViewBase,
@@ -342,17 +346,17 @@ export class Base extends Metal {
   detailsForLookup = detailsForLookup;
 
   get formats(): ReadonlyArray<string | symbol> {
-    return this.lookupContext.formats;
+    return viewPathsFormats.call(this as never);
   }
   set formats(values: ReadonlyArray<string | symbol> | null) {
-    this.lookupContext.formats = values;
+    viewPathsSetFormats.call(this as never, values);
   }
 
   get locale(): string | symbol | null {
-    return this.lookupContext.locale;
+    return viewPathsLocale.call(this as never);
   }
   set locale(value: string | symbol | null) {
-    this.lookupContext.locale = value;
+    viewPathsSetLocale.call(this as never, value);
   }
 
   templateExists = templateExists;
@@ -380,7 +384,6 @@ export class Base extends Metal {
 
     const ctx = this.lookupContext;
 
-    const controllerPrefix = this.controllerPath();
     const formats = this.formats;
     const format = String(formats[0] ?? ":html");
     const locals = { ...options.locals };
@@ -396,7 +399,7 @@ export class Base extends Metal {
       if (options.collection !== undefined) {
         this.body = await ctx.renderCollection(
           options.partial,
-          controllerPrefix,
+          _prefixes.call(this as never),
           format,
           options.collection,
           options.as,
@@ -404,7 +407,7 @@ export class Base extends Metal {
       } else {
         this.body = await ctx.renderPartial(
           options.partial,
-          controllerPrefix,
+          _prefixes.call(this as never),
           format,
           locals,
           view,

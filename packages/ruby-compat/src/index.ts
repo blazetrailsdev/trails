@@ -39,6 +39,7 @@ export {
   rbObjRespondTo,
   rbObjSingletonClass,
   rbFPublicSend,
+  rbFSend,
   rbModPrivate,
   rbModProtected,
   rtest,
@@ -199,6 +200,7 @@ export { isEmpty } from "./ruby-empty.js";
 export { RuntimeError } from "./runtime-error.js";
 export { Exception } from "./exception.js";
 export { StandardError } from "./standard-error.js";
+export { ObjectSpace } from "./object-space.js";
 export { SecureRandom } from "./secure-random.js";
 export { Digest, DigestClass, DigestInstance } from "./digest.js";
 export { Cipher, HMAC, OpenSSL } from "./openssl.js";

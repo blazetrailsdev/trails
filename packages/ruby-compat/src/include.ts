@@ -74,23 +74,46 @@ export class Module {
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
   moduleEval<T>(block: (mod: Record<string, unknown>) => T): T {
-    const result = block(carrierOf(this));
+    const carrier = carrierOf(this);
+    const before = Object.getOwnPropertyDescriptors(carrier);
+    const result = block(carrier);
+    const installed = trackedKeys(carrier);
+    for (const key of installed) {
+      const after = Object.getOwnPropertyDescriptor(carrier, key);
+      if (after?.value !== before[key]?.value || after?.get !== before[key]?.get) {
+        installed.delete(key);
+      }
+    }
     relinkIncluders(this);
     return result;
   }
 
+  /**
+   * Mirrors: Ruby's Module#include into a module — vendor/ruby/class.c:1179
+   * `rb_include_module`, which splices `mod` BELOW this module, so a method
+   * this module defines itself outranks the included one. A module already
+   * included is skipped (`include_modules_at`, class.c:1281,1291,1296).
+   *
+   * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+   */
   include(mod: ModuleObject): this {
     const carrier = carrierOf(this);
-    const members = mod as Record<string, unknown>;
-    for (const key of Object.keys(members)) {
-      if (typeof members[key] !== "function" || /^[A-Z]/.test(key)) continue;
-      Object.defineProperty(carrier, key, {
-        value: members[key],
-        writable: true,
-        configurable: true,
-      });
+    if (!isModuleMethodTablePresent({ prototype: carrier }, mod)) {
+      trackIncludedModule(carrier, mod);
+      const installed = trackedKeys(carrier);
+      const members = mod as Record<string, unknown>;
+      for (const key of Object.keys(members)) {
+        if (typeof members[key] !== "function" || /^[A-Z]/.test(key)) continue;
+        if (Object.prototype.hasOwnProperty.call(carrier, key) && !installed.has(key)) continue;
+        installed.add(key);
+        Object.defineProperty(carrier, key, {
+          value: members[key],
+          writable: true,
+          configurable: true,
+        });
+      }
+      relinkIncluders(this);
     }
-    relinkIncluders(this);
     if (typeof (mod as ModuleHooks)[included] === "function") {
       (mod as ModuleHooks)[included]!(this);
     }
@@ -104,6 +127,7 @@ export class Module {
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
   defineMethod(name: string, body: (...args: never[]) => unknown): void {
+    trackedKeys(carrierOf(this)).delete(name);
     Object.defineProperty(carrierOf(this), name, {
       value: body,
       writable: true,
@@ -172,6 +196,7 @@ export class Module {
         if (!Object.prototype.hasOwnProperty.call(carrier, name) || isUndefEntry(carrier, name)) {
           throw new NameError(`undefined method '${name}' for module '#<Module>'`, name);
         }
+        trackedKeys(carrier).delete(name);
         Object.defineProperty(carrier, name, {
           value: undefined,
           writable: true,
@@ -195,6 +220,7 @@ export class Module {
     if (!descriptor) {
       throw new NameError(`undefined method '${oldName}' for module '#<Module>'`, oldName);
     }
+    trackedKeys(carrierOf(this)).delete(newName);
     Object.defineProperty(carrierOf(this), newName, descriptor);
     relinkIncluders(this);
     return newName;

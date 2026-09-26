@@ -48,6 +48,10 @@ export {
   detailsForLookup,
   templateExists,
   isAnyTemplates,
+  formats as viewPathsFormats,
+  setFormats as viewPathsSetFormats,
+  locale as viewPathsLocale,
+  setLocale as viewPathsSetLocale,
 } from "./view-paths.js";
 export type { ViewPaths, ViewPathsClass, ViewPathsInput } from "./view-paths.js";
 

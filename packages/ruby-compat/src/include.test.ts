@@ -337,6 +337,38 @@ describe("include", () => {
     expect(new Removed().greet()).toBe("parent");
   });
 
+  it("keeps a Module's own method ahead of a module it includes", () => {
+    const mod = new Module();
+    mod.defineMethod("x", () => "own");
+    mod.include({ x: () => "other", y: () => "included" });
+    class Host {}
+    include(Host, mod);
+    const host = new Host() as { x(): string; y(): string };
+    expect(host.x()).toBe("own");
+    expect(host.y()).toBe("included");
+  });
+
+  it("lets a later include replace an earlier included method, not an own one", () => {
+    const mod = new Module();
+    const first = { y: () => "first" };
+    mod.include(first);
+    mod.include({ y: () => "second" });
+    expect((mod.instanceMethod("y")!.value as () => string)()).toBe("second");
+    mod.defineMethod("y", () => "own");
+    mod.include({ y: () => "third" });
+    expect((mod.instanceMethod("y")!.value as () => string)()).toBe("own");
+  });
+
+  it("is a no-op when a Module includes the same module twice", () => {
+    const mod = new Module();
+    const inner = { y: () => "inner" };
+    mod.include(inner);
+    mod.defineMethod("y", () => "own");
+    mod.include(inner);
+    expect((mod.instanceMethod("y")!.value as () => string)()).toBe("own");
+    expect(mod.instanceMethods()).toEqual(["y"]);
+  });
+
   it("keeps a class-body method ahead of an included Module", () => {
     class User {
       greet() {

@@ -1,5 +1,14 @@
-import { dasherize } from "@blazetrails/activesupport";
-import { block, deleteIf, dup, fetch, isSymbol, merge, symbolToS } from "@blazetrails/ruby-compat";
+import { dasherize, isBlank, isPresent } from "@blazetrails/activesupport";
+import {
+  block,
+  deleteIf,
+  dup,
+  fetch,
+  isSymbol,
+  merge,
+  rbFSend,
+  symbolToS,
+} from "@blazetrails/ruby-compat";
 import type { Pattern } from "./path/pattern.js";
 import type { Node } from "./nodes/node.js";
 import type { Format } from "./visitors.js";
@@ -295,22 +304,21 @@ export class Route {
     return Boolean((this.app as Dispatchable | undefined)?.dispatcher?.());
   }
 
-  matches(request: VerbRequest & Record<string, unknown>): boolean {
+  matches(request: VerbRequest): boolean {
     if (!this.matchVerb(request)) return false;
     for (const [method, value] of Object.entries(this.constraints)) {
-      const actual = request[method];
       if (value instanceof RegExp) {
-        if (!value.test(String(actual ?? ""))) return false;
+        if (!value.test(String(rbFSend(request, method) ?? ""))) return false;
       } else if (typeof value === "string") {
-        if (value !== String(actual ?? "")) return false;
+        if (value !== String(rbFSend(request, method) ?? "")) return false;
       } else if (Array.isArray(value)) {
-        if (!value.includes(actual)) return false;
+        if (!value.includes(rbFSend(request, method))) return false;
       } else if (value === true) {
-        if (actual == null || actual === "" || actual === false) return false;
+        if (!isPresent(rbFSend(request, method))) return false;
       } else if (value === false) {
-        if (actual != null && actual !== "" && actual !== false) return false;
+        if (!isBlank(rbFSend(request, method))) return false;
       } else {
-        if (value !== actual) return false;
+        if (value !== rbFSend(request, method)) return false;
       }
     }
     return true;

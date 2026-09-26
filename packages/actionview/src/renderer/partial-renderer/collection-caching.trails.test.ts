@@ -65,7 +65,7 @@ describe("CollectionCaching", () => {
   });
 
   it("reads the whole collection in one multi-read and writes the misses in one multi-write", async () => {
-    vi.spyOn(lc, "findAll").mockReturnValue([buildTemplate(["<david>", "<mary>"])] as never);
+    vi.spyOn(lc, "find").mockReturnValue(buildTemplate(["<david>", "<mary>"]) as never);
 
     const rendered = await new CollectionRenderer(lc, {
       cached: true,
@@ -79,7 +79,7 @@ describe("CollectionCaching", () => {
   it("serves a second render from the cache without re-rendering the partial", async () => {
     const render = () => {
       const template = buildTemplate(["<david>", "<mary>"]);
-      vi.spyOn(lc, "findAll").mockReturnValue([template] as never);
+      vi.spyOn(lc, "find").mockReturnValue(template as never);
       return {
         template,
         result: new CollectionRenderer(lc, { cached: true }).renderCollectionWithPartial(
@@ -101,7 +101,7 @@ describe("CollectionCaching", () => {
 
   it("keys on the template digest, so a changed partial misses the cache", async () => {
     const first = buildTemplate(["<old>"]);
-    vi.spyOn(lc, "findAll").mockReturnValue([first] as never);
+    vi.spyOn(lc, "find").mockReturnValue(first as never);
     await new CollectionRenderer(lc, { cached: true }).renderCollectionWithPartial(
       ["david"],
       "customers/customer",
@@ -110,7 +110,7 @@ describe("CollectionCaching", () => {
     );
 
     const second = buildTemplate(["<new>"]);
-    vi.spyOn(lc, "findAll").mockReturnValue([second] as never);
+    vi.spyOn(lc, "find").mockReturnValue(second as never);
     const rendered = await new CollectionRenderer(lc, { cached: true }).renderCollectionWithPartial(
       ["david"],
       "customers/customer",
@@ -123,7 +123,7 @@ describe("CollectionCaching", () => {
   });
 
   it("renders without touching the cache when the controller is not caching", async () => {
-    vi.spyOn(lc, "findAll").mockReturnValue([buildTemplate(["<david>"])] as never);
+    vi.spyOn(lc, "find").mockReturnValue(buildTemplate(["<david>"]) as never);
     const view = buildView() as unknown as { controller: { performCaching: boolean } };
     view.controller.performCaching = false;
 
@@ -145,7 +145,7 @@ describe("CollectionCaching", () => {
     });
 
     try {
-      vi.spyOn(lc, "findAll").mockReturnValue([buildTemplate(["<david>", "<mary>"])] as never);
+      vi.spyOn(lc, "find").mockReturnValue(buildTemplate(["<david>", "<mary>"]) as never);
       await new CollectionRenderer(lc, { cached: true }).renderCollectionWithPartial(
         ["david", "mary"],
         "customers/customer",

@@ -113,7 +113,7 @@ describe("LookupContext allCandidatePaths wiring", () => {
 
     let caught: MissingTemplate | undefined;
     try {
-      await ctx.renderPartial("frm", "posts", ":html");
+      await ctx.renderPartial("frm", ["posts"], ":html");
     } catch (e) {
       if (e instanceof MissingTemplate) caught = e;
     }
