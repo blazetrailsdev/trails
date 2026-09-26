@@ -13,6 +13,7 @@ import { notesCommand } from "./commands/notes.js";
 import { statsCommand } from "./commands/stats.js";
 import { credentialsCommand } from "./commands/credentials.js";
 import { encryptedCommand } from "./commands/encrypted.js";
+import { devCommand } from "./commands/dev.js";
 
 export { Trails } from "./rails.js";
 export { Application } from "./application.js";
@@ -50,6 +51,7 @@ export function createProgram(): Command {
   program.addCommand(statsCommand());
   program.addCommand(credentialsCommand());
   program.addCommand(encryptedCommand());
+  program.addCommand(devCommand());
 
   return program;
 }
