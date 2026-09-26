@@ -17,10 +17,12 @@ import { Scope, type ScopeFrameHash, type ScopeLevel } from "./scope.js";
 import { Parser } from "../journey/parser.js";
 import { Ast, type Node } from "../journey/nodes/node.js";
 import {
+  camelize,
   isBlank,
   isPlainObject,
   isPresent,
   kernelArray,
+  transformKeys,
   underscore,
 } from "@blazetrails/activesupport";
 import {
@@ -32,7 +34,8 @@ import {
   stringSplit,
 } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { fetch } from "@blazetrails/ruby-compat";
+import { fetch, hashDelete, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
+import { deprecator } from "../deprecator.js";
 
 type MapperCallback = (mapper: Mapper) => void;
 type ConcernCallback = (mapper: Mapper) => void;
@@ -1074,15 +1077,50 @@ export class Mapper {
     return endpoint;
   }
 
-  match(path: string, options: RouteOptions & { via?: string | string[] } = {}): void {
-    const paths = [path];
+  match(
+    path: string | Record<string, unknown>,
+    ...rest: (string | (RouteOptions & { via?: string | string[] }))[]
+  ): void {
+    let options: Record<string, unknown>;
+    let paths: string[];
+    if (rest.length === 0 && isPlainObject(path)) {
+      options = path;
+      let to: unknown;
+      [path, to] = (Object.entries(options).find(([name, _value]) => !isSymbol(name)) ?? []) as [
+        string,
+        unknown,
+      ];
+
+      if (path == null) throw new ArgumentError("Route path not specified");
+
+      if (isSymbol(to)) {
+        options[":action"] = symbolToS(to);
+      } else if (typeof to === "string") {
+        if (to.includes("#")) {
+          options[":to"] = to;
+        } else {
+          options[":controller"] = to;
+        }
+      } else {
+        options[":to"] = to;
+      }
+
+      hashDelete(options, path);
+      options = transformKeys(options, (name) =>
+        isSymbol(name) ? camelize(symbolToS(name), false) : name,
+      );
+      paths = [path];
+    } else {
+      options = (rest.pop() as Record<string, unknown> | undefined) ?? {};
+      paths = [path as string, ...(rest as string[])];
+    }
 
     if ("defaults" in options) {
       const defaults = options.defaults as Record<string, string>;
       delete options.defaults;
-      this.defaults(defaults, () => this.mapMatch(paths, options));
+      this.defaults(defaults, () => this.mapMatch(paths, options as RouteOptions));
     } else {
-      this.mapMatch(paths, options);
+      this.mapMatch(paths, options as RouteOptions);
     }
   }
 
@@ -1196,6 +1234,12 @@ export class Mapper {
       path?: string;
     },
   ): void {
+    if (paths.length > 1) {
+      deprecator().warn(
+        "Mapping a route with multiple paths is deprecated and will be removed in Rails 8.1. Please use multiple method calls instead.",
+      );
+    }
+
     if (options.on !== undefined) assertValidOnOption(options.on);
 
     const scopeTo = this._scope.get("to") as string | undefined;
