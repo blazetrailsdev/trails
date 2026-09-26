@@ -426,7 +426,7 @@ describe("TestRoutingMapper", () => {
     const routes = new RouteSet();
     routes.draw((r) => {
       r.resources("products", (r) => {
-        r.root("products#root");
+        r.root({ to: "products#root" });
       });
     });
     const recognized = routes.recognize("GET", "/products")!.route;

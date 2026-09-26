@@ -14,7 +14,7 @@ import type { DispatchableControllerClass } from "./dispatcher.js";
 import type { Request } from "../http/request.js";
 import { X_CASCADE } from "../constants.js";
 import { Scope, type ScopeFrameHash, type ScopeLevel } from "./scope.js";
-import { isPlainObject, kernelArray, underscore } from "@blazetrails/activesupport";
+import { isPlainObject, isPresent, kernelArray, underscore } from "@blazetrails/activesupport";
 import {
   getFs,
   getPath,
@@ -391,8 +391,14 @@ export class Mapper {
     this.mapMethod("DELETE", path, normalizeOptions(optionsOrEndpoint));
   }
 
-  root(path: string, options: RouteOptions = {}): void {
-    options.to = path;
+  root(path: string | RouteOptions, options: RouteOptions = {}): void {
+    if (typeof path === "string") {
+      options.to = path;
+    } else if (isPlainObject(path) && Object.keys(options).length === 0) {
+      options = path;
+    } else {
+      throw new ArgumentError("must be called with a path and/or options");
+    }
 
     if (this._scope.isResources()) {
       this.withScopeLevel("root", () => {
@@ -466,7 +472,7 @@ export class Mapper {
         collectionName: name,
         nestedParam: `${singular}_id`,
         param: "id",
-        path: name,
+        path: String((options as { path?: string }).path ?? name),
         resourceScope: controller,
         actions: Array.from(allowed),
         shallow: () => shallow,
@@ -580,7 +586,7 @@ export class Mapper {
         collectionName: name,
         nestedParam: `${name}_id`,
         param: "id",
-        path: name,
+        path: String((options as { path?: string }).path ?? name),
         resourceScope: controller,
         actions: Array.from(allowed),
         shallow: () => shallow,
@@ -1499,14 +1505,14 @@ export class Mapper {
     let memberName: string | undefined;
 
     if (this.parentResource()) {
-      if (!(as || action)) return undefined;
+      if (as == null && action == null) return undefined;
 
       collectionName = this.parentResource()!.collectionName;
       memberName = this.parentResource()!.memberName;
     }
 
     const actionName = this._scope.actionName(namePrefix, prefix, collectionName, memberName);
-    const candidate = actionName.filter((p): p is string => Boolean(p)).join("_");
+    const candidate = actionName.filter((p): p is string => isPresent(p)).join("_");
     if (!candidate) return undefined;
     if (as === undefined) {
       if (!/^[_a-z]/i.test(candidate) || this.hasNamedRoute(candidate)) return undefined;
