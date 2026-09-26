@@ -4,7 +4,7 @@ import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString } from "@blazetrails/rack";
 import { ExceptionWrapper } from "./exception-wrapper.js";
 import { X_CASCADE } from "../constants.js";
-import type { MimeType } from "../http/mime-type.js";
+import { Mime, type MimeType } from "../http/mime-type.js";
 import { Request } from "../http/request.js";
 import { RoutingError } from "../../action-controller/metal/exceptions.js";
 
@@ -81,20 +81,20 @@ export class DebugExceptions {
     const toFormat = camelize(`to_${contentType?.symbol?.replace(/^:/, "") ?? ""}`, false);
 
     let formattedBody: string;
-    let format: string;
+    let format: MimeType;
     if (contentType && HASH_CONVERSIONS[toFormat]) {
       formattedBody = HASH_CONVERSIONS[toFormat](body);
-      format = contentType.toString();
+      format = contentType;
     } else {
       formattedBody = HASH_CONVERSIONS.toJson(body);
-      format = "application/json";
+      format = Mime.get("json")!;
     }
 
     return this.render(wrapper.statusCode, formattedBody, format);
   }
 
   /** @internal */
-  render(status: number, body: string, format: string): RackResponse {
+  render(status: number, body: string, format: MimeType | string): RackResponse {
     const charset = "utf-8";
     return [
       status,
