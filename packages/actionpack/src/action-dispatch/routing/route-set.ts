@@ -5,7 +5,6 @@ import {
   InvalidURIError,
   Module,
   rbInspect,
-  rbObjRespondTo,
   RFC2396_PARSER,
 } from "@blazetrails/ruby-compat";
 import { Mapper } from "./mapper.js";
