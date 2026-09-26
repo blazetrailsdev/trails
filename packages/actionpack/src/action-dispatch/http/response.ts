@@ -49,48 +49,58 @@ const NULL_CONTENT_TYPE_HEADER: ContentTypeHeader = { mimeType: undefined, chars
 const BODY_METHODS = ["toAry", "call", "toPath"] as const;
 
 export class ResponseBuffer {
-  private response: Response;
-  private buf: Array<unknown>;
-  private closed = false;
-  private strBody: string | null = null;
+  /** @internal */
+  protected _response: Response;
+  /** @internal */
+  protected _buf: Array<unknown>;
+  /** @internal */
+  protected _closed = false;
+  /** @internal */
+  protected _strBody: string | null = null;
 
   constructor(response: Response, buf: Array<unknown>) {
-    this.response = response;
-    this.buf = buf;
+    this._response = response;
+    this._buf = buf;
   }
 
   get body(): string {
-    if (this.strBody !== null) return this.strBody;
-    this.strBody = this.buf.map((c) => String(c)).join("");
-    return this.strBody;
+    if (this._strBody !== null) return this._strBody;
+    let buf = "";
+    for (const chunk of this.each()) buf += String(chunk);
+    this._strBody = buf;
+    return this._strBody;
   }
 
   write(string: string): void {
-    if (this.closed) throw new IOError("closed stream");
-    this.strBody = null;
-    this.response.commitBang();
-    this.buf.push(string);
+    if (this.isClosed) throw new IOError("closed stream");
+
+    this._strBody = null;
+    this._response.commitBang();
+    this._buf.push(string);
   }
 
   *each(): IterableIterator<unknown> {
-    if (this.strBody !== null) {
-      yield this.strBody;
-      return;
+    if (this._strBody !== null) {
+      yield this._strBody;
+    } else {
+      yield* this.eachChunk();
     }
-    for (const chunk of this.buf) yield chunk;
   }
 
-  abort(): void {
-    this.close();
-  }
+  abort(): void {}
 
   close(): void {
-    this.response.commitBang();
-    this.closed = true;
+    this._response.commitBang();
+    this._closed = true;
   }
 
   get isClosed(): boolean {
-    return this.closed;
+    return this._closed;
+  }
+
+  /** @internal */
+  protected *eachChunk(): IterableIterator<unknown> {
+    yield* this._buf;
   }
 }
 
