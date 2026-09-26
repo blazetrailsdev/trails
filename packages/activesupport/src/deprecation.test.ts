@@ -1111,7 +1111,7 @@ describe("DeprecationTest", () => {
       callstack = frames as CallerLocation[];
     };
     methodThatEmitsDeprecation(deprecator);
-    expect(callstack[0].absolutePath ?? callstack[0].path).toEqual(expandedFile);
+    expect(callstack[0].absolutePath).toEqual(expandedFile);
     expect(callstack[0].lineno).toEqual(callerLocations(0)[0].lineno - 2);
   });
 

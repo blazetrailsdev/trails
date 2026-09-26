@@ -335,3 +335,5 @@ export function cantModifyEncryptedAttributesWhenFrozen(this: any): void {
     }
   }
 }
+
+Encryption.EncryptableRecord = EncryptableRecord;

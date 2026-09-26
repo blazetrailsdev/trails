@@ -232,3 +232,5 @@ export class Encryptor {
     return Encryption.config.forcedEncodingForDeterministicEncryption;
   }
 }
+
+Encryption.Encryptor = Encryptor;

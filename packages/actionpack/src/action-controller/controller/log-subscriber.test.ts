@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   LogSubscriber as BaseLogSubscriber,
-  MemoryStore,
   NotificationEvent,
   Notifications,
 } from "@blazetrails/activesupport";
+import type { CacheStore } from "@blazetrails/activesupport";
+import { Dir, FileUtils } from "@blazetrails/ruby-compat";
 import { Base as ActionViewBase, type CacheHelperHost } from "@blazetrails/actionview";
 import { LogSubscriber } from "../log-subscriber.js";
 import { Base } from "../base.js";
@@ -97,6 +98,7 @@ describe("ACLogSubscriberTest", () => {
   let controller: TestCase;
   let logs: string[];
   let oldEnableFragmentCacheLogging: boolean;
+  let cachePath: string;
 
   beforeEach(() => {
     subscriber = new LogSubscriber();
@@ -110,7 +112,8 @@ describe("ACLogSubscriberTest", () => {
 
     controller = new TestCase(LogSubscribersController);
     const controllerClass = LogSubscribersController as unknown as CachingClassMethods;
-    controllerClass.cacheStore = new MemoryStore();
+    cachePath = Dir.mktmpdir(["tmp", "cache"]);
+    controllerClass.cacheStore = [":file_store", cachePath] as unknown as CacheStore;
     controllerClass.performCaching = true;
     Notifications.unsubscribeAll();
     LogSubscriber.attachTo("action_controller");
@@ -119,6 +122,7 @@ describe("ACLogSubscriberTest", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     Notifications.unsubscribeAll();
+    FileUtils.rmRf(cachePath);
     (Base as unknown as CachingClassMethods).enableFragmentCacheLogging =
       oldEnableFragmentCacheLogging;
   });

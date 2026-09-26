@@ -1,3 +1,4 @@
+import { Encryption } from "../namespaces.js";
 import { Key } from "./key.js";
 import { KeyProvider } from "./key-provider.js";
 import { KeyGenerator } from "./key-generator.js";
@@ -29,3 +30,5 @@ export class DerivedSecretKeyProvider extends KeyProvider {
     return new Key(secret);
   }
 }
+
+Encryption.DerivedSecretKeyProvider = DerivedSecretKeyProvider;

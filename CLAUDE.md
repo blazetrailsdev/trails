@@ -942,7 +942,12 @@ modules converged onto `Autoload`:
   `ActiveRecord.Migration` (`active_record.rb:60`). `Migration.Compatibility`
   (`migration.rb:573`, read at `:629-631` and `schema.rb:72`) is autoloaded on
   the `Migration` class itself, which migration.ts `extend`s with `Autoload`,
-  and seated by compatibility.ts. `ActiveRecord` registers
+  and seated by compatibility.ts. `CommandRecorder`, `JoinTable`, `ExecutionStrategy` and
+  `DefaultStrategy` (`migration.rb:572-576`) are autoloaded beside it and seated
+  by migration.ts, which imports all four; command-recorder.ts reads
+  `ActiveRecord.IrreversibleMigration` (seated by migration.ts) at call time, so
+  it takes no edge back into migration.ts. `Encryption` autoloads the whole
+  `encryption.rb:10-35` `eager_autoload` list, each seated by its defining module. `ActiveRecord` registers
   itself with `constantize`, which walks each further segment through the
   constant seated on its namespace, as `Object.const_get` does
   (`inflector/methods.rb:289-291`). `ActiveRecord.Point`

@@ -1,3 +1,4 @@
+import { Encryption } from "../namespaces.js";
 export class NullEncryptor {
   encrypt(cleanText: string, _options?: Record<string, unknown>): string {
     return cleanText;
@@ -15,3 +16,5 @@ export class NullEncryptor {
     return false;
   }
 }
+
+Encryption.NullEncryptor = NullEncryptor;

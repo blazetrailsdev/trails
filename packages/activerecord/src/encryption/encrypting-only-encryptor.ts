@@ -1,3 +1,4 @@
+import { Encryption } from "../namespaces.js";
 import { Encryptor } from "./encryptor.js";
 
 export class EncryptingOnlyEncryptor extends Encryptor {
@@ -5,3 +6,5 @@ export class EncryptingOnlyEncryptor extends Encryptor {
     return encryptedText;
   }
 }
+
+Encryption.EncryptingOnlyEncryptor = EncryptingOnlyEncryptor;

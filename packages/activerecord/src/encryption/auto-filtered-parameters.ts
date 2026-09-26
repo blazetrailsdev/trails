@@ -88,3 +88,5 @@ export class AutoFilteredParameters {
     }
   }
 }
+
+Encryption.AutoFilteredParameters = AutoFilteredParameters;

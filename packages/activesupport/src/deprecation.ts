@@ -114,18 +114,36 @@ export interface CallerLocation {
 
 /** @noRailsEquivalent PERMANENT */
 export function callerLocations(start = 1, length?: number): CallerLocation[] {
-  const stack = new Error().stack;
+  let sites: { isEval(): boolean }[] = [];
+  const prepareStackTrace = Error.prepareStackTrace;
+  Error.prepareStackTrace = (error, callSites) => {
+    sites = callSites;
+    return prepareStackTrace
+      ? prepareStackTrace(error, callSites)
+      : [String(error), ...callSites.map((site) => `    at ${site}`)].join("\n");
+  };
+  let stack: string | undefined;
+  try {
+    stack = new Error().stack;
+  } finally {
+    Error.prepareStackTrace = prepareStackTrace;
+  }
   if (stack == null) return [];
   const locations = stack
     .split("\n")
     .slice(2 + start)
-    .flatMap((line) => {
+    .flatMap((line, i) => {
       const m = /\((.*):(\d+):\d+\)$|at (.*):(\d+):\d+$/.exec(line.trim());
       if (!m) return [];
       const path = m[1] ?? m[3];
+      const absolutePath = sites[1 + start + i]?.isEval()
+        ? undefined
+        : path.replace(/^file:\/\//, "");
       const lineno = Number(m[2] ?? m[4]);
       const label = /at ([^ (]+)/.exec(line.trim())?.[1] ?? "";
-      return [{ path, lineno, label, toString: () => `${path}:${lineno}:in '${label}'` }];
+      return [
+        { path, absolutePath, lineno, label, toString: () => `${path}:${lineno}:in '${label}'` },
+      ];
     });
   return length == null ? locations : locations.slice(0, length);
 }

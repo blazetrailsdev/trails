@@ -7,7 +7,7 @@ export { InvalidByteSequenceError } from "./invalid-byte-sequence-error.js";
 export { EOFError } from "./eof-error.js";
 export { File } from "./file.js";
 export { Base64 } from "./base64.js";
-export { IO } from "./io.js";
+export { IO, STDOUT } from "./io.js";
 export { IOError } from "./io-error.js";
 export {
   cmp,

@@ -1,3 +1,4 @@
+import { Encryption as ActiveRecordEncryption } from "../namespaces.js";
 import { Encryption } from "./errors.js";
 
 export class ReadOnlyNullEncryptor {
@@ -17,3 +18,5 @@ export class ReadOnlyNullEncryptor {
     return false;
   }
 }
+
+ActiveRecordEncryption.ReadOnlyNullEncryptor = ReadOnlyNullEncryptor;

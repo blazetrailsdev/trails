@@ -5,7 +5,7 @@ import { getFs, type FsStatResult } from "./fs-adapter.js";
 import { EOFError } from "./eof-error.js";
 import { IOError } from "./io-error.js";
 import { ArgumentError } from "./argument-error.js";
-import { stderr } from "./process-adapter.js";
+import { stderr, stdout, type WriteStream } from "./process-adapter.js";
 import { verbose } from "./verbose.js";
 
 /** The `rb_exec_recursive` guard `io_puts_ary` (`vendor/ruby/io.c:8880`) is called through. */
@@ -521,6 +521,13 @@ export class IO {
 
   /** `fptr->encs.enc2` (`vendor/ruby/io.c:11718`). */
   protected enc2: Encoding | null = null;
+
+  /**
+   * `fptr->stdio_file` (`vendor/ruby/io.c:9328`), the C stream `prep_stdio`
+   * attaches to a standard descriptor. In trails the process adapter owns the
+   * standard streams, so a write reaches them through it rather than the fs.
+   */
+  protected stdioFile: WriteStream | null = null;
 
   /** @internal */
   private _pos = 0;
@@ -1046,6 +1053,10 @@ export class IO {
    */
   write(string: string | Uint8Array): number {
     const buffer = typeof string === "string" ? doWriteconv(string, this.enc) : string;
+    if (this.stdioFile != null) {
+      this.stdioFile.write(new TextDecoder().decode(buffer));
+      return buffer.length;
+    }
     let n = 0;
     while (n < buffer.length) {
       n += getFs().writeSync(this.fd, buffer, n, buffer.length - n, this._pos + n);
@@ -1083,3 +1094,27 @@ export class IO {
     return null;
   }
 }
+
+/**
+ * `prep_stdio` (`vendor/ruby/io.c:9313`): an `IO` over a standard descriptor,
+ * `rb_io_open_descriptor` (`io.c:9290`) standing in for trails' protected
+ * constructor.
+ */
+function prepStdio(f: WriteStream, fd: number, fmode: string, klass: typeof IO, path: string): IO {
+  const io = new (klass as unknown as new (fd: number, pathv: string | null, vmode: string) => IO)(
+    fd,
+    path,
+    fmode,
+  );
+  (io as unknown as { stdioFile: WriteStream | null }).stdioFile = f;
+  return io;
+}
+
+/**
+ * `STDOUT` / `$stdout`, `rb_io_prep_stdout` (`vendor/ruby/io.c:9338`), defined
+ * at `io.c:15586`: an `IO` answering `write` / `puts` / `print` over the process
+ * adapter's stdout.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `STDOUT` (`vendor/ruby/io.c:15586`).
+ */
+export const STDOUT: IO = prepStdio(stdout, 1, "w", IO, "<STDOUT>");

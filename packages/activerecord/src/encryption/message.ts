@@ -1,3 +1,4 @@
+import { Encryption } from "../namespaces.js";
 import type { Bytes } from "@blazetrails/ruby-compat";
 import { Properties } from "./properties.js";
 import { ForbiddenClass } from "./errors.js";
@@ -37,3 +38,5 @@ export class Message {
     }
   }
 }
+
+Encryption.Message = Message;

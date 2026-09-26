@@ -1,9 +1,7 @@
-import { getCrypto } from "./crypto-adapter.js";
 import { DelegateClass } from "./delegate.js";
-import { Dir } from "./dir.js";
+import { createTmpname } from "./dir.js";
 import { Encoding } from "./encoding.js";
 import { File } from "./file.js";
-import { Process } from "./process.js";
 
 /**
  * The `basename` argument of `Tempfile.new` (`vendor/ruby/lib/tempfile.rb:150`):
@@ -28,54 +26,6 @@ export type TempfileBasename = string | [string, string];
  */
 export interface TempfileOptions {
   encoding?: Encoding | string;
-}
-
-/** `Dir::Tmpname::UNUSABLE_CHARS` (`vendor/ruby/lib/tmpdir.rb:123`). */
-const UNUSABLE_CHARS = /[^,\-.0-9A-Z_a-z~]/g;
-
-/**
- * `Dir::Tmpname::RANDOM.next` (`vendor/ruby/lib/tmpdir.rb:132`) —
- * `Random.urandom(4)` read as a little-endian `L`, modulo `36**6`
- * (`tmpdir.rb:129`), in base 36.
- */
-function random(): string {
-  const MAX = 36 ** 6;
-  const bytes = getCrypto().randomBytes(4);
-  const l = (bytes[0] | (bytes[1] << 8) | (bytes[2] << 16) | (bytes[3] << 24)) >>> 0;
-  return (l % MAX).toString(36);
-}
-
-/**
- * `Dir::Tmpname.create(basename, tmpdir = nil)`
- * (`vendor/ruby/lib/tmpdir.rb:140`) — yields candidate names until one is not
- * taken, retrying on `Errno::EEXIST`, and returns the name that stuck.
- */
-function createTmpname(
-  basename: TempfileBasename,
-  tmpdir: string | undefined,
-  block: (path: string) => void,
-): string {
-  tmpdir ??= Dir.tmpdir();
-  let [prefix, suffix] = typeof basename === "string" ? [basename, undefined] : basename;
-  prefix = prefix.replace(UNUSABLE_CHARS, "");
-  suffix &&= suffix.replace(UNUSABLE_CHARS, "");
-
-  let n: number | null = null;
-  for (;;) {
-    const now = new Date();
-    const t = `${String(now.getFullYear()).padStart(4, "0")}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
-    const path = File.join(
-      tmpdir,
-      `${prefix}${t}-${Process.pid}-${random()}${n != null ? `-${n}` : ""}${suffix ?? ""}`,
-    );
-    try {
-      block(path);
-      return path;
-    } catch (error) {
-      if ((error as { code?: string }).code !== "EEXIST") throw error;
-      n = (n ?? 0) + 1;
-    }
-  }
 }
 
 /**
@@ -354,7 +304,7 @@ function openExclusive(
   options: TempfileOptions = {},
 ): File {
   let tmpfile: File | null = null;
-  createTmpname(basename, tmpdir, (path) => {
+  createTmpname(basename, tmpdir, {}, (path) => {
     tmpfile = File.open(path, "wx+", { perm: 0o600 });
     if (options.encoding != null) tmpfile.setEncoding(options.encoding);
   });

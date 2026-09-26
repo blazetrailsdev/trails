@@ -39,3 +39,5 @@ export class KeyGenerator {
     return 32;
   }
 }
+
+Encryption.KeyGenerator = KeyGenerator;

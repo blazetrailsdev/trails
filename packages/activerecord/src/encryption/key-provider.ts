@@ -38,3 +38,5 @@ export class KeyProvider {
     return (this._keysGroupedById ??= groupBy(this._keys, (key) => key.id));
   }
 }
+
+Encryption.KeyProvider = KeyProvider;

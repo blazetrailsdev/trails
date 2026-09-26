@@ -1,3 +1,4 @@
+import { Encryption } from "../namespaces.js";
 import { Context } from "./context.js";
 import { NullEncryptor } from "./null-encryptor.js";
 import { EncryptingOnlyEncryptor } from "./encrypting-only-encryptor.js";
@@ -69,3 +70,5 @@ export class Contexts {
     _defaultContext = new Context();
   }
 }
+
+Encryption.Contexts = Contexts;

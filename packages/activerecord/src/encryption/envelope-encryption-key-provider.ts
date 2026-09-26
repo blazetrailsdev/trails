@@ -68,3 +68,5 @@ export class EnvelopeEncryptionKeyProvider {
     return (Encryption.keyGenerator as KeyGenerator).generateRandomKey();
   }
 }
+
+Encryption.EnvelopeEncryptionKeyProvider = EnvelopeEncryptionKeyProvider;

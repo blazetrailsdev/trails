@@ -48,3 +48,5 @@ export class Context {
     return new DerivedSecretKeyProvider(Encryption.config.primaryKey);
   }
 }
+
+Encryption.Context = Context;

@@ -1,3 +1,4 @@
+import { Encryption } from "../namespaces.js";
 import type { Bytes } from "@blazetrails/ruby-compat";
 import { EncryptedContentIntegrity, ForbiddenClass } from "./errors.js";
 
@@ -163,3 +164,5 @@ function _typeNameFor(value: unknown): string {
   }
   return t;
 }
+
+Encryption.Properties = Properties;
