@@ -1,4 +1,5 @@
-import { ActionController, controllerConstants } from "@blazetrails/actionpack";
+import { DebugView, controllerConstants } from "@blazetrails/actionpack";
+import { ApplicationController } from "./application-controller.js";
 import { Info } from "./info.js";
 
 export interface RouteSearchResult {
@@ -6,7 +7,11 @@ export interface RouteSearchResult {
   fuzzy: string[];
 }
 
-export class InfoController extends ActionController.Base {
+export class InfoController extends ApplicationController {
+  static override controllerPath(): string {
+    return "rails/info";
+  }
+
   static {
     this.layout(function (this: InfoController) {
       return this.request.xhr ? false : "application";
@@ -39,5 +44,8 @@ export function matchingRoutes(query: string, _exactMatch: boolean): string[] {
   if (!query) return [];
   return [];
 }
+
+InfoController.prependViewPath(DebugView.RESCUES_TEMPLATE_PATHS);
+InfoController.beforeAction("requireLocalBang");
 
 controllerConstants.set("rails/info", InfoController);

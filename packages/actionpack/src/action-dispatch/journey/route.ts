@@ -6,6 +6,7 @@ import {
   fetch,
   isSymbol,
   merge,
+  rbEqq,
   rbFSend,
   symbolToS,
 } from "@blazetrails/ruby-compat";
@@ -308,8 +309,7 @@ export class Route {
     if (!this.matchVerb(request)) return false;
     for (const [method, value] of Object.entries(this.constraints)) {
       if (value instanceof RegExp || typeof value === "string") {
-        const actual = String(rbFSend(request, method) ?? "");
-        if (!(value instanceof RegExp ? value.test(actual) : value === actual)) return false;
+        if (!rbEqq(value, String(rbFSend(request, method) ?? ""))) return false;
       } else if (Array.isArray(value)) {
         if (!value.includes(rbFSend(request, method))) return false;
       } else if (value === true) {
@@ -317,7 +317,7 @@ export class Route {
       } else if (value === false) {
         if (!isBlank(rbFSend(request, method))) return false;
       } else {
-        if (value !== rbFSend(request, method)) return false;
+        if (!rbEqq(value, rbFSend(request, method))) return false;
       }
     }
     return true;

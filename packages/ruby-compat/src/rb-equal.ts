@@ -1,4 +1,4 @@
-import { rbObjRespondTo } from "./object.js";
+import { rbObjRespondTo, rtest } from "./object.js";
 import { temporalTag, widenPlainDate } from "./temporal-tag.js";
 
 /**
@@ -160,4 +160,36 @@ function hashEntries(value: unknown): [unknown, unknown][] | null {
     return Object.entries(value as Record<string, unknown>);
   }
   return null;
+}
+
+/**
+ * The `===` send (`rb_funcall(pattern, idEqq, 1, target)`, what
+ * `check_match` issues for a `case`/`when`, `vendor/ruby/vm_insnhelper.c:2445-2446`),
+ * dispatched over the JS seats of the classes that define it: a receiver's own
+ * `caseEquals` (Range's `range_eqq`, `vendor/ruby/range.c:2644`), Regexp's
+ * `rb_reg_eqq` (`vendor/ruby/re.c:3676`, a non-String operand is `false`),
+ * Set's `include?` alias, `Module#===` (`rb_mod_eqq`, `vendor/ruby/object.c:1771`)
+ * for a constructor, `Proc#===` (`proc_call`, `vendor/ruby/proc.c:4302`) for
+ * any other function, and `Kernel#===` (`case_equal`, `object.c:4372`), which
+ * is `rb_equal`, for everything else.
+ *
+ * @noRailsEquivalent PERMANENT — the `===` send is a C method dispatch
+ *   (`vendor/ruby/vm_insnhelper.c:2446`); JS has no `===` send at all, so one
+ *   copy serves every ported `===`.
+ */
+export function rbEqq(pattern: unknown, target: unknown): boolean {
+  if (pattern != null && typeof (pattern as { caseEquals?: unknown }).caseEquals === "function") {
+    return (pattern as { caseEquals(other: unknown): boolean }).caseEquals(target);
+  }
+  if (pattern instanceof RegExp) {
+    if (typeof target !== "string") return false;
+    pattern.lastIndex = 0;
+    return pattern.test(target);
+  }
+  if (pattern instanceof Set) return pattern.has(target);
+  if (typeof pattern === "function") {
+    if (pattern.prototype !== undefined) return Object(target) instanceof pattern;
+    return rtest((pattern as (arg: unknown) => unknown)(target));
+  }
+  return rbEqual(pattern, target);
 }

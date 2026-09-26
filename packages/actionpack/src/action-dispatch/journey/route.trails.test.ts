@@ -3,6 +3,7 @@ import { Parser } from "./parser.js";
 import { Ast } from "./ast.js";
 import { Pattern } from "./path/pattern.js";
 import { Request } from "@blazetrails/rack";
+import { Range } from "@blazetrails/ruby-compat";
 import { Route, VerbMatchers } from "./route.js";
 
 const SEPARATORS = "/.?";
@@ -88,6 +89,21 @@ describe("ActionDispatch::Journey::Route", () => {
     expect(
       route.matches(request("GET", { subdomain: "api", format: "json", signedIn: false })),
     ).toBe(false);
+  });
+
+  it("matches() dispatches the else arm through the value's own ===", () => {
+    const route = new Route({
+      name: "name",
+      path: pathFromString("/posts"),
+      constraints: { port: new Range(3000, 3010), signedIn: (v: unknown) => v === 1 },
+    });
+    const onPort = (port: string, signedIn: number) =>
+      Object.assign(new Request({ REQUEST_METHOD: "GET", HTTP_HOST: `example.com:${port}` }), {
+        signedIn,
+      });
+    expect(route.matches(onPort("3005", 1))).toBe(true);
+    expect(route.matches(onPort("3011", 1))).toBe(false);
+    expect(route.matches(onPort("3005", 2))).toBe(false);
   });
 
   it("verb getter joins all request_method_match verbs with |", () => {

@@ -193,7 +193,7 @@ export { Range } from "./range.js";
 export { Rational, ZeroDivisionError, rational } from "./rational.js";
 export { Enumerator, toEnum } from "./enumerator.js";
 export { RUBY_PLATFORM } from "./ruby-platform.js";
-export { rbEql, rbEqual } from "./rb-equal.js";
+export { rbEql, rbEqq, rbEqual } from "./rb-equal.js";
 export { rbHash, rbObjHash } from "./rb-hash.js";
 export { rbConstGet, rbConstMissing, rbModConstMissing } from "./variable.js";
 export { isEmpty } from "./ruby-empty.js";

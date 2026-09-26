@@ -31,7 +31,10 @@ export const TopLevel: {
     env: EnvironmentInquirer;
     logger: Logger | null;
     cache: CacheStore | null;
-    application: { reloadRoutesUnlessLoaded(): Promise<boolean> | undefined } | null;
+    application: {
+      config: { considerAllRequestsLocal: boolean };
+      reloadRoutesUnlessLoaded(): Promise<boolean> | undefined;
+    } | null;
     Application: abstract new (...args: never[]) => unknown;
     Engine: abstract new (...args: never[]) => unknown;
     root(): Promise<string | undefined>;

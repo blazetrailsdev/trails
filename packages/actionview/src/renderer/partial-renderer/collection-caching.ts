@@ -1,6 +1,6 @@
 import { MemoryStore, SafeBuffer, indexWith } from "@blazetrails/activesupport";
 import type { CacheStore } from "@blazetrails/activesupport";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { Hash, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import { OutputBuffer } from "../../buffers.js";
 import type { SameCollectionIterator } from "../collection-renderer.js";
@@ -109,7 +109,7 @@ export async function collectionByCacheKeys(
   const digestPath = view.digestPathFromTemplate(template);
   if (isCallableCacheKey.call(this)) await collection.preloadBang();
 
-  const hash = new Map<unknown[], unknown>();
+  const hash = new Hash<unknown[], unknown>();
   const orderedKeys: unknown[][] = [];
   await collection.each((item) => {
     const key = expandedCacheKey.call(this, seed(item), view, template, digestPath);
@@ -139,7 +139,7 @@ export function fetchOrCachePartial(
   { orderBy }: { orderBy: unknown[][] },
   block: () => RenderedTemplate,
 ): Map<unknown[], RenderedTemplate> {
-  const entriesToWrite = new Map<unknown[], unknown>();
+  const entriesToWrite = new Hash<unknown[], unknown>();
 
   const keyedPartials = indexWith(orderBy, (cacheKey): RenderedTemplate => {
     const content = cachedPartials.get(cacheKey);
