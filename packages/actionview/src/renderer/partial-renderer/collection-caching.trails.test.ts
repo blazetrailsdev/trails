@@ -78,6 +78,25 @@ describe("CollectionCaching", () => {
     expect(rendered.body).toBe("<david><mary>");
   });
 
+  it("collapses items with equal cache keys into one render and one written entry", async () => {
+    const template = buildTemplate(["<david>"]);
+    vi.spyOn(lc, "find").mockReturnValue(template as never);
+    const writeMulti = vi.spyOn(store, "writeMulti");
+
+    const rendered = await new CollectionRenderer(lc, {
+      cached: true,
+    }).renderCollectionWithPartial(
+      ["david", "david"],
+      "customers/customer",
+      buildView(),
+      undefined,
+    );
+
+    expect(template.render).toHaveBeenCalledTimes(1);
+    expect((writeMulti.mock.calls[0][0] as Map<unknown, unknown>).size).toBe(1);
+    expect(rendered.body).toBe("<david><david>");
+  });
+
   it("serves a second render from the cache without re-rendering the partial", async () => {
     const render = () => {
       const template = buildTemplate(["<david>", "<mary>"]);

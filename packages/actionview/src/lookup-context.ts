@@ -1,5 +1,12 @@
 import { I18n } from "@blazetrails/activesupport";
-import { isSymbol, rbObjRespondTo, stringToSym, symbolToS } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  isSymbol,
+  rbInspect,
+  rbObjRespondTo,
+  stringToSym,
+  symbolToS,
+} from "@blazetrails/ruby-compat";
 import type { NestedDependencies } from "./digestor.js";
 import { Base } from "./base.js";
 import { TemplateHandlers } from "./template/handlers.js";
@@ -210,7 +217,7 @@ export class LookupContext {
       const invalidValues = arr.filter(
         (f) => typeof f !== "string" || !Template.Types.symbols().includes(f),
       );
-      throw new Error(`Invalid formats: ${invalidValues.map((v) => String(v)).join(", ")}`);
+      throw new ArgumentError(`Invalid formats: ${invalidValues.map(rbInspect).join(", ")}`);
     }
     if (arr.length === 1 && arr[0] === ":js") {
       arr.push(":html");

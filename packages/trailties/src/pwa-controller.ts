@@ -1,8 +1,9 @@
 import { ActionController, controllerConstants } from "@blazetrails/actionpack";
+import { ApplicationController } from "./application-controller.js";
 
 type PWARenderOptions = ActionController.RenderOptions & { template?: string };
 
-export class PWAController extends ActionController.Base {
+export class PWAController extends ApplicationController {
   static override controllerPath(): string {
     return "rails/pwa";
   }

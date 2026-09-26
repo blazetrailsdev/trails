@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, it, expect } from "vitest";
 import { MimeType } from "@blazetrails/actionpack";
 import { I18n } from "@blazetrails/activesupport";
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import { DetailsKey, LookupContext } from "./lookup-context.js";
 import type { RenderableTemplate, RenderOptions } from "./renderer/abstract-renderer.js";
 import { MissingTemplate } from "./template/error.js";
@@ -31,6 +32,18 @@ describe("LookupContext", () => {
     const lookupContext = new LookupContext([]);
     lookupContext.formats = ["*/*"];
     expect(lookupContext.formats).toEqual(MimeType.SET.symbols);
+  });
+
+  it("raises on invalid format assignment", () => {
+    const lookupContext = new LookupContext([]);
+    let ex: unknown;
+    try {
+      lookupContext.formats = [":html", ":invalid", "also bad"];
+    } catch (e) {
+      ex = e;
+    }
+    expect(ex).toBeInstanceOf(ArgumentError);
+    expect((ex as ArgumentError).message).toBe('Invalid formats: :invalid, "also bad"');
   });
 
   it("provides getters and setters for locale", () => {

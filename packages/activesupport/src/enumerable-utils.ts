@@ -1,4 +1,5 @@
 import {
+  Hash,
   NoMethodError,
   Rational,
   TypeError,
@@ -92,7 +93,7 @@ export function indexBy<T, K extends string | number>(
 }
 
 export function indexWith<T, V>(collection: T[], defaultOrBlock: V | ((elem: T) => V)): Map<T, V> {
-  const result = new Map<T, V>();
+  const result = new Hash<T, V>();
   if (typeof defaultOrBlock === "function") {
     const block = defaultOrBlock as (elem: T) => V;
     for (const elem of collection) result.set(elem, block(elem));

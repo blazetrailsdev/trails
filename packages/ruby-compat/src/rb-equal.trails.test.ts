@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { rbEql, rbEqual } from "./rb-equal.js";
+import { rbEql, rbEqq, rbEqual } from "./rb-equal.js";
+import { Range } from "./range.js";
 
 describe("rbEqual over the values a Ruby binary String stands in for", () => {
   it("compares Uint8Array byte strings by value", () => {
@@ -75,5 +76,28 @@ describe("rbEql is rb_equal without the `==` arm", () => {
     const key = new OnlyEquals();
     expect(rbEqual(new Map([[key, 1]]), new Map([[key, 1]]))).toBe(true);
     expect(rbEqual(new Map([[key, 1]]), new Map([[new OnlyEquals(), 1]]))).toBe(false);
+  });
+});
+
+describe("rbEqq, the === send", () => {
+  it("dispatches to Range, Regexp, Set, Module, Proc and Kernel#===", () => {
+    expect(rbEqq(new Range(1, 5), 3)).toBe(true);
+    expect(rbEqq(new Range(1, 5), 6)).toBe(false);
+    expect(rbEqq(/b/, "abc")).toBe(true);
+    expect(rbEqq(/b/, 1)).toBe(false);
+    expect(rbEqq(new Set([1, 2]), 2)).toBe(true);
+    expect(rbEqq(Number, 3)).toBe(true);
+    expect(rbEqq(Array, 3)).toBe(false);
+    expect(rbEqq((x: unknown) => x === 2, 2)).toBe(true);
+    expect(rbEqq((x: unknown) => (x === 2 ? 0 : null), 3)).toBe(false);
+    expect(rbEqq((x: unknown) => (x === 2 ? 0 : null), 2)).toBe(true);
+    expect(rbEqq([1, 2], [1, 2])).toBe(true);
+    expect(
+      rbEqq(function (x: unknown) {
+        return x === 2;
+      }, 2),
+    ).toBe(true);
+    class Point {}
+    expect(rbEqq(Point, new Point())).toBe(true);
   });
 });

@@ -1,6 +1,7 @@
 import {
   Benchmark,
   Notifications,
+  SafeBuffer,
   classAttribute,
   extend,
   include,
@@ -131,7 +132,7 @@ export { type ActionCallback, type AroundCallback, type CallbackOptions };
 export type RenderOptions = {
   json?: unknown;
   plain?: string;
-  html?: string;
+  html?: string | SafeBuffer;
   body?: string;
   text?: string;
   action?: string;
@@ -313,7 +314,7 @@ export class Base extends Metal {
           this.body = options.plain;
         } else if (options.html !== undefined) {
           this.contentType = options.contentType ?? "text/html; charset=utf-8";
-          this.body = options.html;
+          this.body = options.html.toString();
         } else if (options.body !== undefined) {
           if (options.contentType != null) {
             this.contentType = String(options.contentType);

@@ -1,6 +1,8 @@
 import { FrozenError } from "./frozen-error.js";
 import { KeyError } from "./key-error.js";
 import { rbInspect } from "./object.js";
+import { rbEql } from "./rb-equal.js";
+import { rbHash } from "./rb-hash.js";
 
 const BLOCK = Symbol.for("@blazetrails/ruby-compat:block");
 
@@ -404,6 +406,7 @@ export class Hash<K, V> extends Map<K, V> {
   private _default?: V;
   private _defaultProc?: DefaultProc<K, V>;
   private _frozen = false;
+  private _eqlKeys = new Map<number, K[]>();
 
   /**
    * `Hash.new` (`vendor/ruby/hash.c:1782` `rb_hash_initialize`): a block is
@@ -473,7 +476,36 @@ export class Hash<K, V> extends Map<K, V> {
    */
   override set(key: K, value: V): this {
     this.modifyCheck();
-    return super.set(key, value);
+    const stored = this.hashStlikeLookup(key);
+    if (stored === key && isObjectKey(key) && !super.has(key)) {
+      const h = rbHash(key);
+      const bucket = this._eqlKeys.get(h);
+      if (bucket) bucket.push(key);
+      else this._eqlKeys.set(h, [key]);
+    }
+    return super.set(stored, value);
+  }
+
+  /**
+   * `Hash#key?` (`vendor/ruby/hash.c:3671` `rb_hash_has_key`), a lookup by
+   * the key's `hash` / `eql?`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Hash#key?` (`vendor/ruby/hash.c:3671`).
+   */
+  override has(key: K): boolean {
+    return super.has(this.hashStlikeLookup(key));
+  }
+
+  /**
+   * The stored key `eql?` to `key`, found by `hash_stlike_lookup`
+   * (`vendor/ruby/hash.c:2084`) through the `hash` / `eql?` pair
+   * (`rb_any_hash`, `hash.c:241`; `rb_any_cmp`, `hash.c:126`). A JS
+   * `Map` keys an object by identity, so two equal Arrays would otherwise be
+   * two entries. A primitive's identity is already its `eql?`.
+   */
+  private hashStlikeLookup(key: K): K {
+    if (!isObjectKey(key)) return key;
+    return this._eqlKeys.get(rbHash(key))?.find((stored) => rbEql(stored, key)) ?? key;
   }
 
   /**
@@ -484,11 +516,13 @@ export class Hash<K, V> extends Map<K, V> {
    */
   override clear(): void {
     this.modifyCheck();
+    this._eqlKeys.clear();
     super.clear();
   }
 
   override get(key: K): V | undefined {
-    if (super.has(key)) return super.get(key);
+    const stored = this.hashStlikeLookup(key);
+    if (super.has(stored)) return super.get(stored);
     return this.default(key);
   }
 
@@ -577,9 +611,16 @@ export class Hash<K, V> extends Map<K, V> {
    */
   override delete(key: K, block?: (key: K) => V): MapBoundaryReturn {
     this.modifyCheck();
-    if (super.has(key)) {
-      const val = super.get(key);
-      super.delete(key);
+    const stored = this.hashStlikeLookup(key);
+    if (super.has(stored)) {
+      const val = super.get(stored);
+      super.delete(stored);
+      if (isObjectKey(stored)) {
+        const h = rbHash(stored);
+        const bucket = this._eqlKeys.get(h)!;
+        bucket.splice(bucket.indexOf(stored), 1);
+        if (bucket.length === 0) this._eqlKeys.delete(h);
+      }
       return val;
     }
     if (block) return block(key);
@@ -607,4 +648,8 @@ export class Hash<K, V> extends Map<K, V> {
   override values(): MapBoundaryReturn {
     return [...super.values()];
   }
+}
+
+function isObjectKey(key: unknown): key is object {
+  return typeof key === "object" && key !== null;
 }

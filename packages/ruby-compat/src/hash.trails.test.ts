@@ -427,3 +427,18 @@ describe("hashDelete", () => {
     expect(hash).toEqual({ foo: 0 });
   });
 });
+
+describe("Hash keys by eql?", () => {
+  it("collapses equal Array keys into one entry and keeps the first key", () => {
+    const first = ["a", 1];
+    const h = new Hash<unknown[], string>();
+    h.set(first, "x");
+    h.set(["a", 1], "y");
+    expect(h.size).toBe(1);
+    expect(h.keys()[0]).toBe(first);
+    expect(h.get(["a", 1])).toBe("y");
+    expect(h.has(["a", 1])).toBe(true);
+    expect(h.delete(["a", 1])).toBe("y");
+    expect(h.has(first)).toBe(false);
+  });
+});

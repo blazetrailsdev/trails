@@ -1,6 +1,7 @@
-import { ActionController, controllerConstants } from "@blazetrails/actionpack";
+import { controllerConstants } from "@blazetrails/actionpack";
+import { ApplicationController } from "./application-controller.js";
 
-export class WelcomeController extends ActionController.Base {
+export class WelcomeController extends ApplicationController {
   static override controllerPath(): string {
     return "rails/welcome";
   }

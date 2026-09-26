@@ -371,23 +371,23 @@ export class Mapper {
   }
 
   get(path: string, optionsOrEndpoint: RouteOptions | string = {}): void {
-    this.addRoute("GET", path, normalizeOptions(optionsOrEndpoint));
+    this.mapMethod("GET", path, normalizeOptions(optionsOrEndpoint));
   }
 
   post(path: string, optionsOrEndpoint: RouteOptions | string = {}): void {
-    this.addRoute("POST", path, normalizeOptions(optionsOrEndpoint));
+    this.mapMethod("POST", path, normalizeOptions(optionsOrEndpoint));
   }
 
   put(path: string, optionsOrEndpoint: RouteOptions | string = {}): void {
-    this.addRoute("PUT", path, normalizeOptions(optionsOrEndpoint));
+    this.mapMethod("PUT", path, normalizeOptions(optionsOrEndpoint));
   }
 
   patch(path: string, optionsOrEndpoint: RouteOptions | string = {}): void {
-    this.addRoute("PATCH", path, normalizeOptions(optionsOrEndpoint));
+    this.mapMethod("PATCH", path, normalizeOptions(optionsOrEndpoint));
   }
 
   delete(path: string, optionsOrEndpoint: RouteOptions | string = {}): void {
-    this.addRoute("DELETE", path, normalizeOptions(optionsOrEndpoint));
+    this.mapMethod("DELETE", path, normalizeOptions(optionsOrEndpoint));
   }
 
   root(path: string, options: RouteOptions = {}): void {
@@ -893,13 +893,15 @@ export class Mapper {
   }
 
   match(path: string, options: RouteOptions & { via?: string | string[] } = {}): void {
-    const methods = Mapping.checkVia(
-      kernelArray(
-        "via" in options ? options.via : (this._scope.get("via") as string | string[] | undefined),
-      ),
-    );
+    const paths = [path];
 
-    this.addRoute(methods, path, options);
+    if ("defaults" in options) {
+      const defaults = options.defaults as Record<string, string>;
+      delete options.defaults;
+      this.defaults(defaults, () => this.mapMatch(paths, options));
+    } else {
+      this.mapMatch(paths, options);
+    }
   }
 
   options(path: string, optionsOrEndpoint: RouteOptions | string = {}): void {
@@ -1056,7 +1058,7 @@ export class Mapper {
         p,
         controller,
         routeOptions,
-        optionPath,
+        p,
         to,
         via,
         formatted,
@@ -1120,20 +1122,9 @@ export class Mapper {
         (dispatch as (cb: MapperCallback) => void).call(this, recurse);
       return;
     }
-    if (this._scope.scopeLevel === "resources") return this.withScopeLevel("nested", recurse);
+    if (this._scope.scopeLevel === "resources") return this.nested(recurse);
     if (this._scope.scopeLevel === "resource") return this.member(recurse);
-    const merged: RouteOptions & { via?: string | string[] } = { ...options, via };
-    if (isPlainObject(optionsConstraints)) {
-      const mergedConstraints = { ...optionsConstraints, ...(options.constraints ?? {}) };
-      if (Object.keys(mergedConstraints).length > 0) merged.constraints = mergedConstraints;
-    } else {
-      merged.constraints = optionsConstraints;
-    }
-    if (to) merged.to = to;
-    if (controller && !merged.to) merged.controller = controller;
-    if (formatted !== undefined) merged.format = formatted;
-    merged.anchor = anchor;
-    this.match(_path ?? path, merged);
+    this.addRoute(path, controller, options, _path, to, via, formatted, anchor, optionsConstraints);
   }
 
   /** @internal */
@@ -1190,32 +1181,29 @@ export class Mapper {
     { options: Record<string, unknown>; block?: (...args: unknown[]) => unknown }
   > = new Map();
 
-  private addRoute(verb: string | readonly string[], path: string, options: RouteOptions): void {
-    if (options.on !== undefined) assertValidOnOption(options.on);
-    if (this._scope.scopeLevel === "resources") {
-      return this.nested(() => this.addRoute(verb, path, options));
-    }
-    if (this._scope.scopeLevel === "resource") {
-      return this.member(() => this.addRoute(verb, path, options));
-    }
-    const formatted = options.format ?? (this._scope.get("format") as boolean | undefined);
+  private addRoute(
+    action: string,
+    controller: string | undefined,
+    options: RouteOptions,
+    _path: string | undefined,
+    to: string | MountableApp | undefined,
+    via: string | string[],
+    formatted: boolean | undefined,
+    anchor: boolean,
+    optionsConstraints: RouteOptions["constraints"],
+  ): void {
+    const path = _path ?? action;
     const fullPath = Mapping.normalizePath(
       RFC2396_PARSER.escape(
         ((this._scope.get("path") as string | undefined) ?? "") + "/" + path.replace(/^\/+/, ""),
       ),
       formatted,
     );
-    const scopeTo = this._scope.get("to") as string | undefined;
-    const scopeController = this._scope.get("controller") as string | undefined;
     const scopeAction = this._scope.get("action") as string | undefined;
-    const toApp = typeof options.to === "string" ? undefined : options.to;
-    const effectiveTo =
-      (typeof options.to === "string" ? options.to : undefined) ??
-      scopeTo ??
-      (scopeController && scopeAction ? `${scopeController}#${scopeAction}` : undefined);
-    const effectiveController = options.controller ?? scopeController;
+    const toApp = typeof to === "string" ? undefined : to;
     const endpoint =
-      effectiveTo ?? `${effectiveController ?? ""}#${options.action ?? scopeAction ?? ""}`;
+      (typeof to === "string" ? to : undefined) ??
+      `${controller ?? ""}#${options.action ?? scopeAction ?? ""}`;
     const scopeModulePrefix = this._scope.get("module") as string | undefined;
 
     let redirectEndpoint: Redirect | undefined;
@@ -1231,8 +1219,7 @@ export class Mapper {
     }
 
     const isRedirect = redirectEndpoint !== undefined || redirectTarget !== undefined;
-    const [parsedController, action] = isRedirect ? ["", ""] : parseEndpoint(endpoint);
-    let controller = parsedController;
+    [controller, action] = isRedirect ? ["", ""] : parseEndpoint(endpoint);
     if (!isRedirect && scopeModulePrefix && !controller) {
       controller = scopeModulePrefix;
     } else if (scopeModulePrefix && controller && !controller.includes("/")) {
@@ -1268,7 +1255,6 @@ export class Mapper {
         ? { ...(scopeDefaults ?? {}), ...(options.defaults ?? {}) }
         : undefined;
 
-    const optionsConstraints = options.constraints ?? {};
     const constraints: RouteConstraints = {
       ...((this._scope.get("constraints") as RouteConstraints | undefined) ?? {}),
     };
@@ -1286,8 +1272,10 @@ export class Mapper {
       Object.assign(constraints, optionsConstraints);
     }
 
-    const route = new Route(verb, fullPath, controller, action, {
+    const route = new Route(via, fullPath, controller, action, {
       ...options,
+      anchor,
+      format: formatted,
       constraints: Object.keys(constraints).length > 0 ? constraints : undefined,
       app: toApp ?? options.app,
       name: fullName,
@@ -1303,7 +1291,7 @@ export class Mapper {
       controller || undefined,
       action || undefined,
       route.to ?? route.redirectEndpoint,
-      typeof verb === "string" ? [verb] : verb,
+      typeof via === "string" ? [via] : via,
       formatted,
       optionsConstraints,
       route.anchor,
