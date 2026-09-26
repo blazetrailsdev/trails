@@ -121,12 +121,16 @@ export interface Car {
 
 export class CoolCar extends Car {
   static {
-    this.defaultScope((q: any) => q.order("name desc"));
+    this.defaultScope(function (this: any) {
+      return this.order("name desc");
+    });
   }
 }
 
 export class FastCar extends Car {
   static {
-    this.defaultScope((q: any) => q.order("name desc"));
+    this.defaultScope(function (this: any) {
+      return this.order("name desc");
+    });
   }
 }

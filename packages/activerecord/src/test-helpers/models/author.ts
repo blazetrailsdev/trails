@@ -987,7 +987,9 @@ export interface AuthorFavorite {
 export class AuthorFavoriteWithScope extends Base {
   static {
     this._tableName = "author_favorites";
-    this.defaultScope((q: any) => q.order({ id: "asc" }));
+    this.defaultScope(function (this: any) {
+      return this.order({ id: "asc" });
+    });
     this.belongsTo("author");
     this.belongsTo("favoriteAuthor", { className: "Author" });
   }

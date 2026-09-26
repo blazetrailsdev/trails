@@ -255,7 +255,9 @@ export class Topic extends Base {
 
 export class DefaultRejectedTopic extends Topic {
   static {
-    this.defaultScope((q: any) => q.where({ approved: false }));
+    this.defaultScope(function (this: any) {
+      return this.where({ approved: false });
+    });
   }
 }
 

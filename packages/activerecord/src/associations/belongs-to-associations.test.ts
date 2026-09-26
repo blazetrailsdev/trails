@@ -591,9 +591,9 @@ describe("BelongsToAssociationsTest", () => {
             this.tableName = "posts";
             this.inheritanceColumn = "not_there";
 
-            this.defaultScope((q: any) => {
+            this.defaultScope(function (this: any) {
               counter += 1;
-              return q.where("id = :inc", { inc: counter });
+              return this.where("id = :inc", { inc: counter });
             });
 
             this.hasMany("comments", { anonymousClass: comments });

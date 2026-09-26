@@ -91,7 +91,9 @@ export class Comment extends Base {
       },
       OopsExtension,
     );
-    this.defaultScope((q: any) => q.extending(OopsExtension));
+    this.defaultScope(function (this: any) {
+      return this.extending(OopsExtension);
+    });
 
     this.belongsTo("post", { counterCache: true });
     this.belongsTo("author", { polymorphic: true });
@@ -170,7 +172,9 @@ export class SpecialComment extends Comment {
   static {
     this.belongsTo("ordinaryPost", { foreignKey: "post_id", className: "Post" });
     this.hasOne("author", { through: "post" });
-    this.defaultScope((q: any) => q.where({ deleted_at: null }));
+    this.defaultScope(function (this: any) {
+      return this.where({ deleted_at: null });
+    });
   }
 
   static whatAreYou() {
@@ -205,9 +209,9 @@ export class CommentThatAutomaticallyAltersPostBody extends Comment {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CommentWithDefaultScopeReferencesAssociation extends Comment {
   static {
-    this.defaultScope((q: any) =>
-      q.includes(":developer").order("developers.name").references(":developer"),
-    );
+    this.defaultScope(function (this: any) {
+      return this.includes(":developer").order("developers.name").references(":developer");
+    });
     this.belongsTo("developer");
   }
 }

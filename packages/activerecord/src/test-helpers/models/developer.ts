@@ -292,21 +292,30 @@ export class DeveloperWithBeforeDestroyRaise extends Base {
 export class DeveloperWithSelect extends Base {
   static {
     this.tableName = "developers";
-    this.defaultScope((q: any) => q.select("name"));
+    this.defaultScope(function (this: any) {
+      return this.select("name");
+    });
   }
 }
 
 export class DeveloperwithDefaultMentorScopeNot extends Base {
   static {
     this.tableName = "developers";
-    this.defaultScope((q: any) => q.where({ mentor_id: 1 }));
+    this.defaultScope(function (this: any) {
+      return this.where({ mentor_id: 1 });
+    });
   }
 }
 
 export class DeveloperWithDefaultMentorScopeAllQueries extends Base {
   static {
     this.tableName = "developers";
-    this.defaultScope((q: any) => q.where({ mentor_id: 1 }), { allQueries: true });
+    this.defaultScope(
+      function (this: any) {
+        return this.where({ mentor_id: 1 });
+      },
+      { allQueries: true },
+    );
   }
 }
 
@@ -314,20 +323,28 @@ export class DeveloperWithDefaultNilableFirmScopeAllQueries extends Base {
   static {
     this.tableName = "developers";
     const firmId: number | null = null;
-    this.defaultScope((q: any) => (firmId != null ? q.where({ firm_id: firmId }) : q), {
-      allQueries: true,
-    });
+    this.defaultScope(
+      function (this: any) {
+        return firmId != null ? this.where({ firm_id: firmId }) : this;
+      },
+      { allQueries: true },
+    );
   }
 }
 
 export class DeveloperWithIncludedMentorDefaultScopeNotAllQueriesAndDefaultScopeFirmWithAllQueries extends Base {
   static {
     this.tableName = "developers";
-    this.defaultScope((q: any) => q.where({ mentor_id: 1 }));
-    const firmId = 10;
-    this.defaultScope((q: any) => (firmId != null ? q.where({ firm_id: firmId }) : q), {
-      allQueries: true,
+    this.defaultScope(function (this: any) {
+      return this.where({ mentor_id: 1 });
     });
+    const firmId = 10;
+    this.defaultScope(
+      function (this: any) {
+        return firmId != null ? this.where({ firm_id: firmId }) : this;
+      },
+      { allQueries: true },
+    );
   }
 }
 
@@ -337,7 +354,9 @@ export class DeveloperWithIncludes extends Base {
   static {
     this.tableName = "developers";
     this.hasMany("auditLogs", { foreignKey: "developer_id" });
-    this.defaultScope((q: any) => q.includes(":auditLogs"));
+    this.defaultScope(function (this: any) {
+      return this.includes(":auditLogs");
+    });
   }
 }
 
@@ -356,9 +375,9 @@ export class DeveloperFilteredOnJoins extends Base {
         joinTable: "developers_projects",
       },
     );
-    this.defaultScope((q: any) =>
-      q.joins(":projects").where({ projects: { name: "Active Controller" } }),
-    );
+    this.defaultScope(function (this: any) {
+      return this.joins(":projects").where({ projects: { name: "Active Controller" } });
+    });
   }
 }
 
@@ -371,7 +390,9 @@ export class DeveloperOrderedBySalary extends Base {
     this.aliasAttribute("updated_at", "legacy_updated_at");
     this.aliasAttribute("created_on", "legacy_created_on");
     this.aliasAttribute("updated_on", "legacy_updated_on");
-    this.defaultScope((q: any) => q.order("salary DESC"));
+    this.defaultScope(function (this: any) {
+      return this.order("salary DESC");
+    });
     this.scope("byName", function (this: any) {
       return this.order("name DESC");
     });
@@ -381,28 +402,35 @@ export class DeveloperOrderedBySalary extends Base {
 export class DeveloperCalledDavid extends Base {
   static {
     this.tableName = "developers";
-    this.defaultScope((q: any) => q.where("name = 'David'"));
+    this.defaultScope(function (this: any) {
+      return this.where("name = 'David'");
+    });
   }
 }
 
 export class LazyLambdaDeveloperCalledDavid extends Base {
   static {
     this.tableName = "developers";
-    this.defaultScope((q: any) => q.where({ name: "David" }));
+    this.defaultScope(function (this: any) {
+      return this.where({ name: "David" });
+    });
   }
 }
 
 export class LazyBlockDeveloperCalledDavid extends Base {
   static {
     this.tableName = "developers";
-    this.defaultScope((q: any) => q.where({ name: "David" }));
+    this.defaultScope(function (this: any) {
+      return this.where({ name: "David" });
+    });
   }
 }
 
 export class CallableDeveloperCalledDavid extends Base {
   static {
     this.tableName = "developers";
-    this.defaultScope((q: any) => q.where({ name: "David" }));
+    const call = this.where({ name: "David" });
+    this.defaultScope({ call: () => call });
   }
 }
 
@@ -439,7 +467,9 @@ export class LazyBlockReferencingScopeDeveloperCalledDavid extends Base {
     this.scope("david", function (this: any) {
       return this.where({ name: "David" });
     });
-    this.defaultScope((q: any) => (LazyBlockReferencingScopeDeveloperCalledDavid as any).david());
+    this.defaultScope(function (this: any) {
+      return (LazyBlockReferencingScopeDeveloperCalledDavid as any).david();
+    });
   }
 }
 
@@ -455,7 +485,9 @@ export class DeveloperCalledJamis extends Base {
     this.aliasAttribute("updated_at", "legacy_updated_at");
     this.aliasAttribute("created_on", "legacy_created_on");
     this.aliasAttribute("updated_on", "legacy_updated_on");
-    this.defaultScope((q: any) => q.where({ name: "Jamis" }));
+    this.defaultScope(function (this: any) {
+      return this.where({ name: "Jamis" });
+    });
     this.scope("poor", function (this: any) {
       return this.where("salary < 150000");
     });
@@ -471,30 +503,42 @@ export class DeveloperCalledJamis extends Base {
 export class PoorDeveloperCalledJamis extends Base {
   static {
     this.tableName = "developers";
-    this.defaultScope((q: any) => q.where({ name: "Jamis", salary: 50000 }));
+    this.defaultScope(function (this: any) {
+      return this.where({ name: "Jamis", salary: 50000 });
+    });
   }
 }
 
 export class InheritedPoorDeveloperCalledJamis extends DeveloperCalledJamis {
   static {
     this.tableName = "developers";
-    this.defaultScope((q: any) => q.where({ salary: 50000 }));
+    this.defaultScope(function (this: any) {
+      return this.where({ salary: 50000 });
+    });
   }
 }
 
 export class MultiplePoorDeveloperCalledJamis extends Base {
   static {
     this.tableName = "developers";
-    this.defaultScope((q: any) => q);
-    this.defaultScope((q: any) => q.where({ name: "Jamis" }));
-    this.defaultScope((q: any) => q.where({ salary: 50000 }));
+    this.defaultScope(function (this: any) {
+      return this;
+    });
+    this.defaultScope(function (this: any) {
+      return this.where({ name: "Jamis" });
+    });
+    this.defaultScope(function (this: any) {
+      return this.where({ salary: 50000 });
+    });
   }
 }
 
 export class ModuleIncludedPoorDeveloperCalledJamis extends DeveloperCalledJamis {
   static {
     this.tableName = "developers";
-    this.defaultScope((q: any) => q.where({ salary: 50000 }));
+    this.defaultScope(function (this: any) {
+      return this.where({ salary: 50000 });
+    });
   }
 }
 
@@ -513,7 +557,9 @@ export class EagerDeveloperWithDefaultScope extends Base {
         joinTable: "developers_projects",
       },
     );
-    this.defaultScope((q: any) => q.includes(":projects"));
+    this.defaultScope(function (this: any) {
+      return this.includes(":projects");
+    });
   }
 }
 
@@ -554,7 +600,9 @@ export class EagerDeveloperWithLambdaDefaultScope extends Base {
         joinTable: "developers_projects",
       },
     );
-    this.defaultScope((q: any) => q.includes(":projects"));
+    this.defaultScope(function (this: any) {
+      return this.includes(":projects");
+    });
   }
 }
 
@@ -573,7 +621,9 @@ export class EagerDeveloperWithBlockDefaultScope extends Base {
         joinTable: "developers_projects",
       },
     );
-    this.defaultScope((q: any) => q.includes(":projects"));
+    this.defaultScope(function (this: any) {
+      return this.includes(":projects");
+    });
   }
 }
 
@@ -592,14 +642,17 @@ export class EagerDeveloperWithCallableDefaultScope extends Base {
         joinTable: "developers_projects",
       },
     );
-    this.defaultScope((q: any) => q.includes(":projects"));
+    const call = this.includes(":projects");
+    this.defaultScope({ call: () => call });
   }
 }
 
 export class ThreadsafeDeveloper extends Base {
   static {
     this.tableName = "developers";
-    this.defaultScope((q: any) => q.limit(1));
+    this.defaultScope(function (this: any) {
+      return this.limit(1);
+    });
   }
 }
 

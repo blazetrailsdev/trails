@@ -632,7 +632,9 @@ describe("NestedThroughAssociationsTest", () => {
     for (const q of ["includes", "preload", "joins", "eagerLoad"] as const) {
       const prevDefaultScopes = ((Club as any).defaultScopes ?? []).slice();
       (Club as any).defaultScopes = [];
-      (Club as any).defaultScope((rel: any) => rel[q]("category"));
+      (Club as any).defaultScope(function (this: any) {
+        return this[q]("category");
+      });
       try {
         const result = await groucho.clubCategory;
         expect(result?.id).toBe(general.id);
