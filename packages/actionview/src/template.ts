@@ -127,7 +127,7 @@ export class Template {
   private _shortIdentifier?: string;
   private _methodName?: string;
   private readonly _objectId = ++nextObjectId;
-  private _compiled: CompiledMethodContainer | null = null;
+  private _compiled = false;
 
   constructor(opts: TemplateOptions) {
     this._source = opts.source;
@@ -284,14 +284,15 @@ export class Template {
 
   /** @internal */
   private compileBang(view: Base): void {
+    if (this._compiled) return;
+
     const mod = view.compiledMethodContainer();
-    if (this._compiled === mod) return;
 
     this.instrument<void>("!compile_template", () => {
       this.compile(mod);
     });
 
-    this._compiled = mod;
+    this._compiled = true;
   }
 
   /** @internal */

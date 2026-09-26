@@ -412,7 +412,7 @@ FT_TestController.beforeAction(_ftEnsureLogin);
 FT_TestController.afterAction(_ftCleanUp);
 
 class FT_PrependingController extends FT_TestController {}
-FT_PrependingController.beforeAction(push("wonderful_life"), { prepend: true });
+FT_PrependingController.prependBeforeAction(push("wonderful_life"));
 
 class FT_NonYieldingAroundFilterController extends Base {
   async index() {
@@ -522,13 +522,18 @@ class FT_ConditionalOptionsFilter extends FT_ConditionalFilterController {}
 FT_ConditionalOptionsFilter.beforeAction(push("ensure_login"), { if: () => true });
 FT_ConditionalOptionsFilter.beforeAction(push("clean_up_tmp"), { if: () => false });
 
-const _skipEnsureLoginFn = push("ensure_login");
-const _skipCleanUpTmpFn = push("clean_up_tmp");
-class FT_ConditionalOptionsSkipFilter extends FT_ConditionalFilterController {}
-FT_ConditionalOptionsSkipFilter.beforeAction(_skipEnsureLoginFn);
-FT_ConditionalOptionsSkipFilter.beforeAction(_skipCleanUpTmpFn);
-FT_ConditionalOptionsSkipFilter.skipBeforeAction(_skipEnsureLoginFn, { if: () => false });
-FT_ConditionalOptionsSkipFilter.skipBeforeAction(_skipCleanUpTmpFn, { if: () => true });
+class FT_ConditionalOptionsSkipFilter extends FT_ConditionalFilterController {
+  private ensureLogin() {
+    push("ensure_login")(this);
+  }
+  private cleanUpTmp() {
+    push("clean_up_tmp")(this);
+  }
+}
+FT_ConditionalOptionsSkipFilter.beforeAction("ensureLogin");
+FT_ConditionalOptionsSkipFilter.beforeAction("cleanUpTmp");
+FT_ConditionalOptionsSkipFilter.skipBeforeAction("ensureLogin", { if: () => false });
+FT_ConditionalOptionsSkipFilter.skipBeforeAction("cleanUpTmp", { if: () => true });
 
 const _sfuoaEnsureLogin = push("ensure_login");
 const _sfuoaCleanUpTmp = push("clean_up_tmp");

@@ -12,6 +12,7 @@ import {
   ConfigMethods,
   viewCacheDependencies,
   viewCacheDependency,
+  type CachingClassMethods,
   type CachingHost,
 } from "./caching.js";
 import { readFragment, writeFragment } from "./caching/fragments.js";
@@ -36,11 +37,7 @@ HostConfigurable.configAccessor("defaultStaticExtension");
 HostConfigurable.configAccessor("performCaching");
 HostConfigurable.configAccessor("enableFragmentCacheLogging");
 
-const HostConfig = HostClass as unknown as typeof HostClass & {
-  cacheStore: unknown;
-  performCaching: boolean;
-  defaultStaticExtension: string;
-};
+const HostConfig = HostClass as unknown as typeof HostClass & CachingClassMethods;
 
 function makeHost(store?: MemoryStore | null): HostClass & CachingHost & typeof ConfigMethods {
   HostConfigurable.config().clear();
@@ -99,11 +96,11 @@ describe("AbstractController::Caching", () => {
   describe("viewCacheDependency / viewCacheDependencies", () => {
     it("evaluates dependency blocks in host context and drops nullish", () => {
       const host = makeHost();
-      viewCacheDependency.call(HostClass, function (this: CachingHost) {
+      viewCacheDependency.call(HostConfig, function (this: CachingHost) {
         return (this as unknown as HostClass).greeting;
       });
-      viewCacheDependency.call(HostClass, () => null);
-      viewCacheDependency.call(HostClass, () => "v2");
+      viewCacheDependency.call(HostConfig, () => null);
+      viewCacheDependency.call(HostConfig, () => "v2");
       expect(viewCacheDependencies.call(host)).toEqual(["hello", "v2"]);
     });
     it("returns [] when none registered", () => {

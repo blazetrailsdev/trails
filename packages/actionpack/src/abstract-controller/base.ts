@@ -26,6 +26,9 @@ import {
   afterAction,
   aroundAction,
   beforeAction,
+  prependAfterAction,
+  prependAroundAction,
+  prependBeforeAction,
   skipAfterAction,
   skipAroundAction,
   skipBeforeAction,
@@ -230,8 +233,11 @@ export class AbstractController {
   static _insertCallbacks = _insertCallbacks;
 
   static beforeAction = beforeAction;
+  static prependBeforeAction = prependBeforeAction;
   static afterAction = afterAction;
+  static prependAfterAction = prependAfterAction;
   static aroundAction = aroundAction;
+  static prependAroundAction = prependAroundAction;
   static skipBeforeAction = skipBeforeAction;
   static skipAfterAction = skipAfterAction;
   static skipAroundAction = skipAroundAction;

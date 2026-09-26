@@ -5,8 +5,11 @@ import type { CacheOptions, CacheStore, Configuration } from "@blazetrails/activ
 
 export type ViewCacheDependency = (this: CachingHost) => unknown;
 
+type LookupStoreArgument = CacheStore | `:${string}` | readonly [`:${string}`, ...unknown[]] | null;
+
 export interface CachingClassMethods {
-  cacheStore?: CacheStore | null;
+  get cacheStore(): CacheStore | null;
+  set cacheStore(store: LookupStoreArgument);
   performCaching?: boolean;
   defaultStaticExtension?: string;
   enableFragmentCacheLogging?: boolean;
@@ -15,7 +18,8 @@ export interface CachingClassMethods {
 
 export interface CachingHost {
   constructor: CachingClassMethods;
-  cacheStore?: CacheStore | null;
+  get cacheStore(): CacheStore | null;
+  set cacheStore(store: LookupStoreArgument);
   performCaching?: boolean;
   isCacheConfigured(): CacheStore | boolean | null | undefined;
 }
@@ -27,7 +31,7 @@ export const ConfigMethods = {
     return (this as unknown as ConfigReceiver).config().cacheStore;
   },
 
-  set cacheStore(store: unknown) {
+  set cacheStore(store: LookupStoreArgument) {
     (this as unknown as ConfigReceiver).config().cacheStore = lookupStore(store);
   },
 
