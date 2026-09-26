@@ -1,5 +1,5 @@
 import { rbInspect, stderr } from "@blazetrails/ruby-compat";
-import { toXml, type BacktraceCleaner } from "@blazetrails/activesupport";
+import { camelize, HASH_CONVERSIONS, type BacktraceCleaner } from "@blazetrails/activesupport";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString } from "@blazetrails/rack";
 import { ExceptionWrapper } from "./exception-wrapper.js";
@@ -28,13 +28,6 @@ export interface DebugExceptionsOptions {
 }
 
 export type Interceptor = (request: Request, exception: Error) => void;
-
-function apiErrorBody(fields: Record<string, unknown>): Record<string, unknown> {
-  return Object.defineProperties(fields, {
-    toJson: { value: () => JSON.stringify(fields) },
-    toXml: { value: () => toXml(fields) },
-  });
-}
 
 export class DebugExceptions {
   /** @internal */
@@ -78,19 +71,26 @@ export class DebugExceptions {
 
   /** @internal */
   renderForApiRequest(contentType: MimeType | undefined, wrapper: ExceptionWrapper): RackResponse {
-    const body = apiErrorBody({
+    const body = {
       status: wrapper.statusCode,
       error: wrapper.statusText,
       exception: wrapper.exceptionInspect(),
       traces: wrapper.traces,
-    });
-    const symbol = contentType?.symbol?.replace(/^:/, "") ?? "";
-    const toFormat = `to${symbol.charAt(0).toUpperCase()}${symbol.slice(1)}`;
-    const serializer = body[toFormat];
-    if (contentType && typeof serializer === "function") {
-      return this.render(wrapper.statusCode, serializer(), contentType.toString());
+    };
+
+    const toFormat = camelize(`to_${contentType?.symbol?.replace(/^:/, "") ?? ""}`, false);
+
+    let formattedBody: string;
+    let format: string;
+    if (contentType && HASH_CONVERSIONS[toFormat]) {
+      formattedBody = HASH_CONVERSIONS[toFormat](body);
+      format = contentType.toString();
+    } else {
+      formattedBody = HASH_CONVERSIONS.toJson(body);
+      format = "application/json";
     }
-    return this.render(wrapper.statusCode, (body.toJson as () => string)(), "application/json");
+
+    return this.render(wrapper.statusCode, formattedBody, format);
   }
 
   /** @internal */
