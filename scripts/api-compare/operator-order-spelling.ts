@@ -62,8 +62,9 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // abstract/query_cache.rb:58 Store `def [](key)` → abstract/query-cache.ts `Store#get`.
   "ActiveRecord::ConnectionAdapters::QueryCache::Store": { "[]": ["get"] },
   // actionview template/types.rb:39 `def ==(type)` → template/types.ts
-  // `SimpleType#equals` (the class Rails aliases to `Types` at :47).
-  "ActionView::Template::SimpleType": { "==": ["equals"] },
+  // `SimpleType#equals` (the class Rails aliases to `Types` at :47), and the
+  // singleton `def [](type)` inside `class << self` (:13-14) → `static get`.
+  "ActionView::Template::SimpleType": { "self.[]": ["get"], "==": ["equals"] },
   "ActionDispatch::Journey::Path::Pattern::MatchData": { "[]": ["at"] },
   "ActionDispatch::Journey::GTG::TransitionTable": { "[]=": ["set"] },
   // arel/table.rb:82 `def [](name, table = self)` → table.ts `get`.

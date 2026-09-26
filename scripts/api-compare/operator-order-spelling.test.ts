@@ -105,5 +105,7 @@ describe("operatorSpelling", () => {
     expect(operatorSpelling("ActiveRecord::Migration", "[]", false)).toBeUndefined();
     expect(operatorSpelling("ActiveRecord::Migration", "[]")).toEqual(["get"]);
     expect(operatorSpelling("Arel::Table", "[]", true)).toBeUndefined();
+    expect(operatorSpelling("ActionView::Template::SimpleType", "[]", true)).toEqual(["get"]);
+    expect(operatorSpelling("ActionView::Template::SimpleType", "[]", false)).toBeUndefined();
   });
 });
