@@ -610,7 +610,9 @@ export class Mapper {
     if (cb) {
       const resource: ResourceLike = {
         memberName: name,
-        collectionName: pluralize(name),
+        collectionName: name,
+        nestedParam: `${name}_id`,
+        param: "id",
         resourceScope: controller,
         actions: Array.from(allowed),
         shallow: () => shallow,
