@@ -30,24 +30,6 @@ describe("DestroyCommand", () => {
     expect(cmd?.aliases()).toContain("d");
   });
 
-  it("has model subcommand", () => {
-    const program = createProgram();
-    const cmd = program.commands.find((c) => c.name() === "destroy");
-    expect(cmd?.commands.some((c) => c.name() === "model")).toBe(true);
-  });
-
-  it("has controller subcommand", () => {
-    const program = createProgram();
-    const cmd = program.commands.find((c) => c.name() === "destroy");
-    expect(cmd?.commands.some((c) => c.name() === "controller")).toBe(true);
-  });
-
-  it("has scaffold subcommand", () => {
-    const program = createProgram();
-    const cmd = program.commands.find((c) => c.name() === "destroy");
-    expect(cmd?.commands.some((c) => c.name() === "scaffold")).toBe(true);
-  });
-
   it("destroy migration anchors the filename match", async () => {
     const migrationsDir = path.join(tmpDir, "db", "migrate");
     fs.mkdirSync(migrationsDir, { recursive: true });

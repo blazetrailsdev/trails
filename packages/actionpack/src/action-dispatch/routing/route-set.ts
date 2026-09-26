@@ -325,8 +325,8 @@ export class NamedRouteCollection {
   }
 
   add(name: string, route: Route): void {
-    const pathName = `${name}Path`;
-    const urlName = `${name}Url`;
+    const pathName = camelize(`${name}_path`, "lower");
+    const urlName = camelize(`${name}_url`, "lower");
 
     if (this._routes.has(name)) {
       this.pathHelpersModule.undefMethod(pathName);
@@ -365,8 +365,8 @@ export class NamedRouteCollection {
     block: (this: PolymorphicHost, ...args: unknown[]) => Record<string, unknown> | string,
   ): this {
     const helper = new CustomUrlHelper(name, defaults, block);
-    const pathName = `${name}Path`;
-    const urlName = `${name}Url`;
+    const pathName = camelize(`${name}_path`, "lower");
+    const urlName = camelize(`${name}_url`, "lower");
 
     this.pathHelpersModule.moduleEval((mod) => {
       mod[pathName] = function (this: UrlHelperContext, ...args: unknown[]): string {

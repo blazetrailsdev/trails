@@ -81,14 +81,4 @@ describe("CLI", () => {
     expect(subNames).toContain("create");
     expect(subNames).toContain("drop");
   });
-
-  it("destroy command has subcommands", () => {
-    const program = createProgram();
-    const destroy = program.commands.find((c) => c.name() === "destroy");
-    const subNames = destroy?.commands.map((c) => c.name());
-    expect(subNames).toContain("model");
-    expect(subNames).toContain("controller");
-    expect(subNames).toContain("migration");
-    expect(subNames).toContain("scaffold");
-  });
 });

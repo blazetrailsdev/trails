@@ -30,6 +30,8 @@ export class ResourceGenerator extends ModelGenerator {
     const route = new ResourceRouteGenerator({
       cwd: this.cwd,
       output: this.output,
+      behavior: this.behavior,
+      pretend: this.options.pretend,
       name: this.name,
     });
     route.addResourceRoute({ actions: this.actions });

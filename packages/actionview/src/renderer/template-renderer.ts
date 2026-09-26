@@ -1,4 +1,4 @@
-import { h, Notifications } from "@blazetrails/activesupport";
+import { Notifications } from "@blazetrails/activesupport";
 
 import { ArgumentError, File, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
@@ -6,6 +6,9 @@ import type { LookupContext } from "../lookup-context.js";
 import { MissingTemplate } from "../template/error.js";
 import { RawFile } from "../template/raw-file.js";
 import { Inline } from "../template/inline.js";
+import { Text } from "../template/text.js";
+import { HTML } from "../template/html.js";
+import { Renderable } from "../template/renderable.js";
 import { TemplateHandlers, type TemplateHandler } from "../template/handlers.js";
 import { AbstractRenderer, RenderedTemplate } from "./abstract-renderer.js";
 import type { RenderableTemplate, ViewContext, RenderOptions } from "./abstract-renderer.js";
@@ -31,13 +34,13 @@ export class TemplateRenderer<Rendered = RenderedTemplate> extends AbstractRende
     const keys = options.locals ? Object.keys(options.locals) : [];
 
     if (Object.prototype.hasOwnProperty.call(options, "body")) {
-      return new BodyTemplate(String(options.body ?? ""));
+      return new Text(options.body);
     }
     if (Object.prototype.hasOwnProperty.call(options, "plain")) {
-      return new PlainTemplate(String(options.plain ?? ""));
+      return new Text(options.plain);
     }
     if (Object.prototype.hasOwnProperty.call(options, "html")) {
-      return new HtmlTemplate(options.html, (this.formats[0] as string) ?? ":html");
+      return new HTML(options.html, this.formats[0]) as unknown as RenderableTemplate;
     }
     if (Object.prototype.hasOwnProperty.call(options, "file")) {
       if (File.isExist(options.file as string)) {
@@ -66,7 +69,7 @@ export class TemplateRenderer<Rendered = RenderedTemplate> extends AbstractRende
       }) as unknown as RenderableTemplate;
     }
     if (Object.prototype.hasOwnProperty.call(options, "renderable") && options.renderable) {
-      return new RenderableWrapper(options.renderable);
+      return new Renderable(options.renderable) as unknown as RenderableTemplate;
     }
     if (Object.prototype.hasOwnProperty.call(options, "template") && options.template != null) {
       const tmpl = options.template;
@@ -179,55 +182,5 @@ export class TemplateRenderer<Rendered = RenderedTemplate> extends AbstractRende
       return this.resolveLayout(layout(this.lookupContext, formats, keys), keys, formats);
     }
     return layout || null;
-  }
-}
-
-class BodyTemplate implements RenderableTemplate {
-  readonly identifier = "body template";
-  readonly format = null;
-
-  constructor(private readonly content: string) {}
-
-  async render(..._args: unknown[]): Promise<string> {
-    return this.content;
-  }
-}
-
-class PlainTemplate implements RenderableTemplate {
-  readonly identifier = "plain template";
-  readonly format = ":text";
-
-  constructor(private readonly content: string) {}
-
-  async render(..._args: unknown[]): Promise<string> {
-    return this.content;
-  }
-}
-
-class HtmlTemplate implements RenderableTemplate {
-  readonly identifier = "html template";
-
-  private readonly string: unknown;
-
-  constructor(
-    string: unknown,
-    readonly format: string,
-  ) {
-    this.string = string ?? "";
-  }
-
-  async render(..._args: unknown[]): Promise<string> {
-    return h(this.string).toString();
-  }
-}
-
-class RenderableWrapper implements RenderableTemplate {
-  readonly identifier = "renderable";
-  readonly format = null;
-
-  constructor(private readonly inner: { renderIn(context: ViewContext): string }) {}
-
-  async render(context: ViewContext, ..._args: unknown[]): Promise<string> {
-    return this.inner.renderIn(context ?? {});
   }
 }

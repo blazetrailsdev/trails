@@ -32,6 +32,7 @@ export class ScaffoldGenerator extends NamedBase {
       cwd: this.cwd,
       output: this.output,
       behavior: this.behavior,
+      pretend: this.options.pretend,
     });
     this.createdFiles.push(...modelGen.run(this.name, args));
 

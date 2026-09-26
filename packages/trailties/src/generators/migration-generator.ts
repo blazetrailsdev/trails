@@ -1,4 +1,6 @@
+import { File } from "@blazetrails/ruby-compat";
 import { GeneratorBase, GeneratorOptions, migrationTimestamp } from "./base.js";
+import { CreateMigration } from "./actions/create-migration.js";
 import { GeneratedAttribute } from "./generated-attribute.js";
 import { camelize, pluralize, singularize, tableize, underscore } from "@blazetrails/activesupport";
 
@@ -17,6 +19,8 @@ function indexNameLiteral(attribute: GeneratedAttribute): string {
 let lastTimestamp: string | null = null;
 
 export class MigrationGenerator extends GeneratorBase {
+  migrationFileName = "";
+
   constructor(options: GeneratorOptions) {
     super(options);
   }
@@ -45,6 +49,12 @@ export class MigrationGenerator extends GeneratorBase {
     const filename = `db/migrate/${timestamp}_${underscore(name)}${ext}`;
     const ts = this.isTypeScript();
     const returnType = ts ? ": Promise<void>" : "";
+
+    if (this.behavior === "revoke") {
+      this.migrationFileName = underscore(name);
+      new CreateMigration(this, File.join(this.cwd, filename), "").revoke();
+      return this.getCreatedFiles();
+    }
 
     this.createFile(
       filename,

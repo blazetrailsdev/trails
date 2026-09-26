@@ -3,7 +3,7 @@ import {
   dasherize as _dasherize,
   humanize,
 } from "@blazetrails/activesupport";
-import { File, FileUtils, rbInspect } from "@blazetrails/ruby-compat";
+import { File, FileUtils, rbInspect, regexpEscape } from "@blazetrails/ruby-compat";
 import * as Actions from "./actions.js";
 import type { GeneratorActionsState } from "./actions.js";
 import * as TrailsActions from "./trails-actions.js";
@@ -12,6 +12,9 @@ export interface GeneratorOptions {
   cwd: string;
   output: (msg: string) => void;
   quiet?: boolean;
+  force?: boolean;
+  skip?: boolean;
+  pretend?: boolean;
   behavior?: "invoke" | "revoke";
 }
 
@@ -204,6 +207,11 @@ export abstract class GeneratorBase implements GeneratorActionsState {
 
   protected createFile(relativePath: string, content: string, options?: { mode?: number }): void {
     const fullPath = File.join(this.cwd, relativePath);
+    if (this.behavior === "revoke") {
+      this.output(`      remove  ${relativePath}`);
+      if (!this.options.pretend && File.isExist(fullPath)) FileUtils.rmRf(fullPath);
+      return;
+    }
     FileUtils.mkdirP(File.dirname(fullPath));
     File.write(fullPath, content);
     if (options?.mode !== undefined) File.chmod(options.mode, fullPath);
@@ -213,6 +221,10 @@ export abstract class GeneratorBase implements GeneratorActionsState {
 
   protected appendToFile(relativePath: string, content: string): void {
     const fullPath = File.join(this.cwd, relativePath);
+    if (this.behavior === "revoke") {
+      this.revokeInjection(relativePath, `(${regexpEscape(content)})([^]*)(${"$"})`, "$2$3");
+      return;
+    }
     if (!File.isExist(fullPath)) {
       this.createFile(relativePath, content);
       return;
@@ -223,6 +235,14 @@ export abstract class GeneratorBase implements GeneratorActionsState {
 
   protected insertIntoFile(relativePath: string, marker: string, content: string): void {
     const fullPath = File.join(this.cwd, relativePath);
+    if (this.behavior === "revoke") {
+      this.revokeInjection(
+        relativePath,
+        `(${regexpEscape(content)})([^]*)(${regexpEscape(marker)})`,
+        "$2$3",
+      );
+      return;
+    }
     if (!File.isExist(fullPath)) return;
     const existing = File.read(fullPath);
     const idx = existing.indexOf(marker);
@@ -230,6 +250,25 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     const updated = existing.slice(0, idx) + content + existing.slice(idx);
     File.write(fullPath, updated);
     this.output(`      insert  ${relativePath}`);
+  }
+
+  protected revokeInjection(relativePath: string, pattern: string, content: string): void {
+    const fullPath = File.join(this.cwd, relativePath);
+    this.output(`    subtract  ${relativePath}`);
+    if (!File.isExist(fullPath)) return;
+    const existing = File.read(fullPath);
+    const updated = existing.replace(new RegExp(pattern, "g"), content);
+    if (!this.options.pretend) File.write(fullPath, updated);
+  }
+
+  relativeToOriginalDestinationRoot(path: string, removeDot: boolean = true): string {
+    const root = this.cwd;
+    if (path.startsWith(root) && ["/", ""].includes(path.slice(root.length, root.length + 1))) {
+      path = "." + path.slice(root.length);
+      return removeDot ? path.slice(2) : path;
+    } else {
+      return path;
+    }
   }
 
   protected readFile(relativePath: string): string {

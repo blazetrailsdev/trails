@@ -25,7 +25,7 @@ describe("Template::Renderable", () => {
       }
     }
     const template = new Renderable(new Component());
-    expect(template.identifier()).toBe("Component");
+    expect(template.identifier).toBe("Component");
     expect(template.render("view")).toBe("rendered view");
   });
 

@@ -68,7 +68,7 @@ describe("TemplateRenderer", () => {
     it("renders html: directly", async () => {
       const renderer = new TemplateRenderer(lc);
       const result = await renderer.render(ctx, { html: "<b>bold</b>" });
-      expect(result.body).toBe("&lt;b&gt;bold&lt;/b&gt;");
+      expect(String(result.body)).toBe("&lt;b&gt;bold&lt;/b&gt;");
     });
 
     it("renders inline: through the handler for its type", async () => {

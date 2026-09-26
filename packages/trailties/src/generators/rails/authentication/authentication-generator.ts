@@ -121,7 +121,12 @@ export class AuthenticationGenerator extends GeneratorBase {
     for (const { what, args } of this.pendingGenerators.splice(0)) {
       const words = [...what.split(/\s+/), ...args].filter(Boolean);
       if (words.shift() !== "migration") continue;
-      const generator = new MigrationGenerator({ cwd: this.cwd, output: this.output });
+      const generator = new MigrationGenerator({
+        cwd: this.cwd,
+        output: this.output,
+        behavior: this.behavior,
+        pretend: this.options.pretend,
+      });
       for (const file of generator.run(words[0], words.slice(1))) this.createdFiles.push(file);
     }
   }

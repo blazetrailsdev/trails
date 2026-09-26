@@ -7,12 +7,12 @@ export class Text {
     this.string = string == null ? "" : String(string);
   }
 
-  identifier(): string {
+  get identifier(): string {
     return "text template";
   }
 
   inspect(): string {
-    return this.identifier();
+    return this.identifier;
   }
 
   toString(): string {
@@ -23,7 +23,7 @@ export class Text {
     return this.toString();
   }
 
-  format(): string {
+  get format(): string {
     return ":text";
   }
 }

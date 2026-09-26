@@ -72,7 +72,35 @@ describe("ScaffoldGeneratorTest", () => {
 
   it.skip("system tests without attributes", () => {});
 
-  it.skip("scaffold on revoke", () => {});
+  it("scaffold on revoke", () => {
+    makeGen("product_line").run();
+    new ScaffoldGenerator({
+      cwd: tmpDir,
+      output: () => {},
+      behavior: "revoke",
+      name: "product_line",
+      attributes: [],
+    }).run();
+
+    expect(fs.existsSync(path.join(tmpDir, "app/models/product-line.ts"))).toBe(false);
+    expect(fs.existsSync(path.join(tmpDir, "test/models/product-line.test.ts"))).toBe(false);
+    expect(
+      fs
+        .readdirSync(path.join(tmpDir, "db/migrate"))
+        .some((f) => /_create_product_lines\./.test(f)),
+    ).toBe(false);
+
+    expect(readFile("config/routes.ts")).not.toMatch(/resources\("product_lines"\)/);
+
+    expect(fs.existsSync(path.join(tmpDir, "app/controllers/product-lines-controller.ts"))).toBe(
+      false,
+    );
+    expect(
+      fs.existsSync(path.join(tmpDir, "test/controllers/product-lines-controller.test.ts")),
+    ).toBe(false);
+
+    expect(fs.readdirSync(path.join(tmpDir, "app/views/product_lines"))).toEqual([]);
+  });
 
   it.skip("scaffold with namespace on invoke", () => {});
 

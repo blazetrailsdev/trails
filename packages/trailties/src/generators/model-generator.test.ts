@@ -3,13 +3,17 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { ModelGenerator } from "./model-generator.js";
+import * as Assertions from "./testing/assertions.js";
 
 let tmpDir: string;
 let lines: string[];
+const destination = { destinationRoot: "" };
+const assertNoMigration = Assertions.assertNoMigration.bind(destination);
 
 beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-test-"));
   fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
+  destination.destinationRoot = tmpDir;
   lines = [];
 });
 
@@ -197,9 +201,23 @@ describe("ModelGeneratorTest", () => {
 
   it.skip("migration is skipped on skip behavior", () => {});
 
-  it.skip("migration error is not shown on revoke", () => {});
+  it("migration error is not shown on revoke", () => {
+    makeGen().run("Account", []);
+    const captured: string[] = [];
+    new ModelGenerator({
+      cwd: tmpDir,
+      output: (m) => captured.push(m),
+      behavior: "revoke",
+    }).run("Account", []);
+    const error = captured.join("\n");
+    expect(error).not.toMatch(/Another migration is already named create_accounts/);
+  });
 
-  it.skip("migration is removed on revoke", () => {});
+  it("migration is removed on revoke", () => {
+    makeGen().run("Account", []);
+    new ModelGenerator({ cwd: tmpDir, output: () => {}, behavior: "revoke" }).run("Account", []);
+    assertNoMigration("db/migrate/create_accounts.ts");
+  });
 
   it.skip("existing migration is removed on force", () => {});
 

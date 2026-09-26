@@ -2079,9 +2079,9 @@ describe("TestUrlConstraints", () => {
       _routes: Routes,
       urlOptions: () => t.urlOptions(),
     });
-  const adminRootUrl = urlHelper("admin_rootUrl");
-  const secureRootUrl = urlHelper("secure_rootUrl");
-  const alternateRootUrl = urlHelper("alternate_rootUrl");
+  const adminRootUrl = urlHelper("adminRootUrl");
+  const secureRootUrl = urlHelper("secureRootUrl");
+  const alternateRootUrl = urlHelper("alternateRootUrl");
   const searchUrl = urlHelper("searchUrl");
   const logsUrl = urlHelper("logsUrl");
 

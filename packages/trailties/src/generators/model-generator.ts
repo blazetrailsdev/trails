@@ -18,7 +18,12 @@ export class ModelGenerator extends GeneratorBase {
   }
 
   protected createMigrationGenerator(): MigrationGenerator {
-    return new MigrationGenerator({ cwd: this.cwd, output: this.output });
+    return new MigrationGenerator({
+      cwd: this.cwd,
+      output: this.output,
+      behavior: this.behavior,
+      pretend: this.options.pretend,
+    });
   }
 
   run(name: string, args: string[], options: ModelOptions = {}): string[] {
