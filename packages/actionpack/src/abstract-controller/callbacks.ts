@@ -341,26 +341,29 @@ export function prependAroundAction(
 
 export function skipBeforeAction(
   this: ActionCallbackHost,
-  cb: ActionCallback | string,
-  options: CallbackOptions = {},
+  ...names: ActionCallbackArgs<ActionCallback>
 ): void {
-  _skipActionCallback(this.prototype, "before", cb, options);
+  _insertCallbacks(names, null, (name, options) => {
+    _skipActionCallback(this.prototype, "before", name, options);
+  });
 }
 
 export function skipAfterAction(
   this: ActionCallbackHost,
-  cb: ActionCallback | string,
-  options: CallbackOptions = {},
+  ...names: ActionCallbackArgs<ActionCallback>
 ): void {
-  _skipActionCallback(this.prototype, "after", cb, options);
+  _insertCallbacks(names, null, (name, options) => {
+    _skipActionCallback(this.prototype, "after", name, options);
+  });
 }
 
 export function skipAroundAction(
   this: ActionCallbackHost,
-  cb: AroundCallback | string,
-  options: CallbackOptions = {},
+  ...names: ActionCallbackArgs<AroundCallback>
 ): void {
-  _skipActionCallback(this.prototype, "around", cb, options);
+  _insertCallbacks(names, null, (name, options) => {
+    _skipActionCallback(this.prototype, "around", name, options);
+  });
 }
 
 /** @internal */

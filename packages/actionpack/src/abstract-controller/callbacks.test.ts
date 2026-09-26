@@ -31,26 +31,26 @@ describe("TestCallbacks1", () => {
 
 class Callback2 extends AbstractController {
   text?: string;
-  second?: string;
-  aroundz?: string;
+  _secondIvar?: string;
+  _aroundzIvar?: string;
   first() {
     this.text = "Hello world";
   }
-  _second() {
-    this.second = "Goodbye";
+  second() {
+    this._secondIvar = "Goodbye";
   }
-  async _aroundz(block: () => Promise<void>) {
-    this.aroundz = "FIRST";
+  async aroundz(block: () => Promise<void>) {
+    this._aroundzIvar = "FIRST";
     await block();
-    this.aroundz += "SECOND";
+    this._aroundzIvar += "SECOND";
   }
   async index() {
     this.responseBody = this.text ?? "";
   }
 }
 Callback2.beforeAction("first");
-Callback2.afterAction("_second");
-Callback2.aroundAction("_aroundz");
+Callback2.afterAction("second");
+Callback2.aroundAction("aroundz");
 
 class Callback2Overwrite extends Callback2 {}
 Callback2Overwrite.beforeAction("first", { except: "index" });
@@ -68,12 +68,12 @@ describe("TestCallbacks2", () => {
 
   it("after_action works", async () => {
     await controller.process("index");
-    expect(controller.second).toBe("Goodbye");
+    expect(controller._secondIvar).toBe("Goodbye");
   });
 
   it("around_action works", async () => {
     await controller.process("index");
-    expect(controller.aroundz).toBe("FIRSTSECOND");
+    expect(controller._aroundzIvar).toBe("FIRSTSECOND");
   });
 
   it("before_action with overwritten condition", async () => {
