@@ -9,6 +9,7 @@ export interface RenderableTemplate {
   readonly format: string | null;
   readonly variable?: string | null;
   readonly virtualPath?: string | null;
+  supportsStreaming?(): boolean;
   render(
     view: ViewContext,
     locals: Record<string, unknown>,
@@ -206,9 +207,7 @@ export abstract class AbstractRenderer {
     this.lookupContext = lookupContext;
   }
 
-  abstract render(
-    ...args: unknown[]
-  ): Promise<RenderedTemplate> | RenderedTemplate | RenderedCollection;
+  abstract render(...args: unknown[]): unknown;
 
   templateExists(
     name: string,

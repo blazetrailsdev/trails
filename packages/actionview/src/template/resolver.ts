@@ -1,3 +1,4 @@
+import { I18n } from "@blazetrails/activesupport";
 import { Dir, File, NotImplementedError, symbolToS } from "@blazetrails/ruby-compat";
 import type { LookupDetails, PathSetResolver } from "../path-set.js";
 import { Requested, TemplateDetails, type DetailKey } from "../template-details.js";
@@ -262,7 +263,9 @@ export class PathParser {
   buildPathRegex(): RegExp {
     const handlers = union(TemplateHandlers.extensions());
     const formats = union(Template.Types.symbols().map(symbolToS));
-    const locales = "[a-z]{2}(?:[-_][A-Z]{2})?";
+    const availableLocales = I18n.availableLocales().map(String);
+    const regularLocales = [/[a-z]{2}(?:[-_][A-Z]{2})?/];
+    const locales = union([...availableLocales, ...regularLocales]);
     const variants = "[^.]*";
 
     return new RegExp(
@@ -293,7 +296,11 @@ export class PathParser {
   }
 }
 
-function union(alternatives: readonly string[]): string {
+function union(alternatives: readonly (string | RegExp)[]): string {
   if (alternatives.length === 0) return "(?!)";
-  return alternatives.map((a) => a.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+  return alternatives
+    .map((a) =>
+      a instanceof RegExp ? `(?:${a.source})` : a.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+    )
+    .join("|");
 }

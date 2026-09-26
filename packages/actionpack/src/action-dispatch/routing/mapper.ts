@@ -184,6 +184,14 @@ class Mapping {
 }
 
 export class Mapper {
+  static readonly URL_OPTIONS: readonly string[] = [
+    "protocol",
+    "subdomain",
+    "domain",
+    "host",
+    "port",
+  ];
+
   private scopeStack: ScopeFrame[] = [];
   private concerns: Map<string, ConcernCallback> = new Map();
   /** @internal */
@@ -534,9 +542,20 @@ export class Mapper {
       : this.currentPrefix();
 
     let block: unknown;
-    if (options.constraints !== undefined && !isPlainObject(options.constraints)) {
+    options = { ...options, constraints: options.constraints ?? {} };
+
+    if (isPlainObject(options.constraints)) {
+      const defaults = Object.fromEntries(
+        Object.entries(options.constraints).filter(
+          ([k, v]) =>
+            Mapper.URL_OPTIONS.includes(k) && (typeof v === "string" || Number.isInteger(v)),
+        ),
+      );
+
+      options.defaults = { ...defaults, ...((options.defaults as object | undefined) ?? {}) };
+    } else {
       block = options.constraints;
-      options = { ...options, constraints: {} };
+      options.constraints = {};
     }
 
     const previous = this._scope;
@@ -546,6 +565,12 @@ export class Mapper {
       frame.constraints = this.mergeConstraintsScope(
         this._scope.get("constraints") as RouteConstraints | undefined,
         frame.constraints as RouteConstraints,
+      );
+    }
+    if (frame.defaults !== undefined) {
+      frame.defaults = this.mergeDefaultsScope(
+        this._scope.get("defaults") as Record<string, unknown> | undefined,
+        frame.defaults as Record<string, unknown>,
       );
     }
     if (frame.shallowPath !== undefined) {
@@ -1103,7 +1128,7 @@ export class Mapper {
     }
 
     const scopeDefaults = this._scope.get("defaults") as Record<string, string> | undefined;
-    const mergedDefaults =
+    let mergedDefaults =
       scopeDefaults || options.defaults
         ? { ...(scopeDefaults ?? {}), ...(options.defaults ?? {}) }
         : undefined;
@@ -1114,6 +1139,16 @@ export class Mapper {
     };
     let blocks: readonly unknown[];
     if (isPlainObject(optionsConstraints)) {
+      mergedDefaults = {
+        ...(Object.fromEntries(
+          Object.entries(optionsConstraints).filter(
+            ([key, defaultValue]) =>
+              Mapper.URL_OPTIONS.includes(key) &&
+              (typeof defaultValue === "string" || Number.isInteger(defaultValue)),
+          ),
+        ) as Record<string, string>),
+        ...(mergedDefaults ?? {}),
+      };
       blocks = (this._scope.get("blocks") as unknown[] | undefined) ?? [];
       Object.assign(constraints, optionsConstraints);
     } else {

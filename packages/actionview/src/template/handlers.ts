@@ -7,7 +7,7 @@ export interface RenderContext {
 }
 
 export interface TemplateHandler {
-  readonly extensions: string[];
+  readonly extensions?: string[];
 
   call(template: unknown, source: string): string;
 }

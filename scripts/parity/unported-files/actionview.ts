@@ -24,6 +24,16 @@ export const ACTIONVIEW_UNPORTED_FILES: UnportedFile[] = [
       "nothing under it is ported, so the barrel has no trails counterpart.",
   },
   {
+    pattern: "template/handlers/builder.rb",
+    package: "actionview",
+    reason:
+      "`Template::Handlers::Builder#call` (builder.rb:8-14) compiles a `.builder` template " +
+      "into Ruby that drives `::Builder::XmlMarkup` from the `builder` gem, which is neither " +
+      "vendored nor available as a trails package, and trails takes no third-party runtime " +
+      "deps. A port would have no XmlMarkup to emit code against, so `Handlers.extended` " +
+      "(handlers.rb:12-18) registers the other four handlers and not `:builder`.",
+  },
+  {
     pattern: "/test_case.rb",
     package: "actionview",
     reason:
