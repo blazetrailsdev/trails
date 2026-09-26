@@ -1106,7 +1106,9 @@ export class Mapper {
       }
 
       hashDelete(options, path);
-      options = transformKeys(options, (name) => camelize(symbolToS(name), false));
+      options = transformKeys(options, (name) =>
+        isSymbol(name) ? camelize(symbolToS(name), false) : name,
+      );
       paths = [path];
     } else {
       options = (rest.pop() as Record<string, unknown> | undefined) ?? {};

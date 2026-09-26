@@ -136,6 +136,14 @@ describe("Mapper#match hash form and multi-path arms", () => {
     });
   });
 
+  it("leaves a second String key as it is", () => {
+    const m = new Mapper(new RouteSet());
+    let received: unknown;
+    vi.spyOn(m, "mapMatch").mockImplementation((_paths, options) => void (received = options));
+    m.match({ "/foo": "posts#index", extra: "x", ":via": "get" });
+    expect(received).toEqual({ extra: "x", via: "get", to: "posts#index" });
+  });
+
   it("raises when no route path is specified", () => {
     expect(() => new Mapper(new RouteSet()).match({ ":to": "posts#index", ":via": "get" })).toThrow(
       "Route path not specified",
