@@ -457,6 +457,7 @@ function inspectValue(value: unknown, recursing: Set<object>): string {
   if (typeof value === "string") return stringInspect(value);
   if (Array.isArray(value)) return inspectAry(value, recursing);
   if (isPlainHash(value) || value instanceof Map) return inspectHash(value, recursing);
+  if (value instanceof RegExp) return regDesc(value);
   const own = (value as { inspect?: unknown }).inspect;
   if (typeof own === "function") return String((own as () => unknown).call(value));
   if (
@@ -466,6 +467,18 @@ function inspectValue(value: unknown, recursing: Set<object>): string {
     return rbModToS(value as abstract new (...args: never) => unknown);
   }
   return String(value);
+}
+
+/**
+ * `rb_reg_desc` (`vendor/ruby/v3.3.11/re.c:456-481`): the source between
+ * slashes, then `option_to_str` (`re.c:322-330`) in its `m`, `i`, `x` order.
+ * Ruby's multiline option is JS's `dotAll` flag, and JS has no extended flag.
+ */
+function regDesc(re: RegExp): string {
+  let opts = "";
+  if (re.dotAll) opts += "m";
+  if (re.ignoreCase) opts += "i";
+  return `/${re.source}/${opts}`;
 }
 
 /**
