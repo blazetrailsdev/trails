@@ -418,6 +418,7 @@ describe("Time", () => {
       const eastern = t.getlocal("America/New_York");
       expect(eastern.utcOffset).toBe(-18000);
       expect(eastern.zone).toBeInstanceOf(Timezone);
+      expect(eastern.zone).toBe(eastern.zone);
       expect((eastern.zone as Timezone).identifier).toBe("America/New_York");
       expect(eastern.strftime("%Z")).toBe("EST");
     });

@@ -453,6 +453,8 @@ export class Time {
   #utcOffsetMemo: number | null;
   /** @internal */
   #subnano: Rational;
+  /** @internal */
+  #zoneObject: Timezone | null = null;
 
   /** @internal */
   get #plain(): Temporal.PlainDateTime {
@@ -1381,7 +1383,7 @@ export class Time {
   get zone(): string | Timezone | null {
     if (this.#tzmodeUtc) return "UTC";
     if (this.#timeZoneId == null) return null;
-    if (!this.#localZone) return new Timezone(this.#timeZoneId);
+    if (!this.#localZone) return (this.#zoneObject ??= new Timezone(this.#timeZoneId));
     return tzdataAbbreviation(this.#instant.toZonedDateTimeISO(this.#timeZoneId));
   }
 
