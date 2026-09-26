@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { bodyFromString } from "@blazetrails/rack";
-import { Mapper } from "../routing/mapper.js";
+import { Mapper, Mapping } from "../routing/mapper.js";
+import { Scope } from "../routing/scope.js";
+import { Parser } from "../journey/parser.js";
 import { RouteSet } from "../routing/route-set.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 
@@ -56,7 +58,25 @@ describe("MapperTest", () => {
     expect(route.verb).toBe("GET");
   });
 
-  it.skip("mapping requirements", () => {});
+  it("mapping requirements", () => {
+    const options = {};
+    const scope = new Scope({});
+    const ast = Parser.parse("/store/:name(*rest)")!;
+    const m = Mapping.build(
+      scope,
+      new FakeSet(),
+      ast,
+      "foo",
+      "bar",
+      undefined,
+      ["get"],
+      undefined,
+      {},
+      true,
+      options,
+    );
+    expect(m.requirements["rest"]).toEqual(/.+?/s);
+  });
 
   it.skip("via scope", () => {
     const fakeset = new FakeSet();
