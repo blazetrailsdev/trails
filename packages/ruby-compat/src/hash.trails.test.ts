@@ -13,6 +13,7 @@ import {
   fetch,
   hasKey,
   hashDelete,
+  keepIf,
   merge,
   mergeBang,
   reject,
@@ -214,6 +215,20 @@ describe("Hash#delete_if", () => {
       b: 2,
       c: 3,
     });
+  });
+});
+
+describe("Hash#keep_if", () => {
+  it("mutates and returns the receiver, keeping the pairs the block answers truthily for", () => {
+    const hash = { foo: 0, bar: 1, baz: 2 };
+    expect(keepIf(hash, (k) => k.startsWith("b"))).toBe(hash);
+    expect(hash).toEqual({ bar: 1, baz: 2 });
+  });
+
+  it("drops a pair whose block answers nil or false, and keeps one answering 0", () => {
+    expect(keepIf({ a: 1, b: 2, c: 3 }, (k) => (k === "a" ? 0 : k === "b" ? null : false))).toEqual(
+      { a: 1 },
+    );
   });
 });
 
