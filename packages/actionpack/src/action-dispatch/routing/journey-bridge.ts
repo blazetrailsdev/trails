@@ -9,6 +9,7 @@ import {
   type RouterRequest,
 } from "../journey/router.js";
 import { normalizePath, unescapeUri } from "../journey/router/utils.js";
+import { Request } from "../http/request.js";
 import type { Route as LocalRoute } from "./route.js";
 
 const SEPARATORS = "/.?";
@@ -70,12 +71,11 @@ export function journeyRecognize(
   path: string,
 ): JourneyMatch | null {
   const pathInfo = normalizePath(path);
-  const req: RouterRequest = {
-    pathInfo,
-    scriptName: "",
-    requestMethod: method.toUpperCase(),
-    pathParameters: {},
-  };
+  const req = new Request({
+    REQUEST_METHOD: method.toUpperCase(),
+    PATH_INFO: pathInfo,
+    SCRIPT_NAME: "",
+  }) as unknown as RouterRequest;
   let result: JourneyMatch | null = null;
   router.recognize(req, (journeyRoute) => {
     const local = JOURNEY_TO_LOCAL.get(journeyRoute);

@@ -6,6 +6,16 @@ import type { Format } from "./visitors.js";
 
 export interface VerbRequest {
   requestMethod: string;
+  isDelete(): boolean;
+  isGet(): boolean;
+  isHead(): boolean;
+  isOptions(): boolean;
+  isLink(): boolean;
+  isPatch(): boolean;
+  isPost(): boolean;
+  isPut(): boolean;
+  isTrace(): boolean;
+  isUnlink(): boolean;
 }
 
 export interface VerbMatcher {
@@ -40,7 +50,7 @@ export const VerbMatchers = {
       return this.name.split("::").at(-1)!;
     }
     static call(req: VerbRequest): boolean {
-      return req.requestMethod === "DELETE";
+      return req.isDelete();
     }
   },
   GET: class {
@@ -48,7 +58,7 @@ export const VerbMatchers = {
       return this.name.split("::").at(-1)!;
     }
     static call(req: VerbRequest): boolean {
-      return req.requestMethod === "GET";
+      return req.isGet();
     }
   },
   HEAD: class {
@@ -56,7 +66,7 @@ export const VerbMatchers = {
       return this.name.split("::").at(-1)!;
     }
     static call(req: VerbRequest): boolean {
-      return req.requestMethod === "HEAD";
+      return req.isHead();
     }
   },
   OPTIONS: class {
@@ -64,7 +74,7 @@ export const VerbMatchers = {
       return this.name.split("::").at(-1)!;
     }
     static call(req: VerbRequest): boolean {
-      return req.requestMethod === "OPTIONS";
+      return req.isOptions();
     }
   },
   LINK: class {
@@ -72,7 +82,7 @@ export const VerbMatchers = {
       return this.name.split("::").at(-1)!;
     }
     static call(req: VerbRequest): boolean {
-      return req.requestMethod === "LINK";
+      return req.isLink();
     }
   },
   PATCH: class {
@@ -80,7 +90,7 @@ export const VerbMatchers = {
       return this.name.split("::").at(-1)!;
     }
     static call(req: VerbRequest): boolean {
-      return req.requestMethod === "PATCH";
+      return req.isPatch();
     }
   },
   POST: class {
@@ -88,7 +98,7 @@ export const VerbMatchers = {
       return this.name.split("::").at(-1)!;
     }
     static call(req: VerbRequest): boolean {
-      return req.requestMethod === "POST";
+      return req.isPost();
     }
   },
   PUT: class {
@@ -96,7 +106,7 @@ export const VerbMatchers = {
       return this.name.split("::").at(-1)!;
     }
     static call(req: VerbRequest): boolean {
-      return req.requestMethod === "PUT";
+      return req.isPut();
     }
   },
   TRACE: class {
@@ -104,7 +114,7 @@ export const VerbMatchers = {
       return this.name.split("::").at(-1)!;
     }
     static call(req: VerbRequest): boolean {
-      return req.requestMethod === "TRACE";
+      return req.isTrace();
     }
   },
   UNLINK: class {
@@ -112,7 +122,7 @@ export const VerbMatchers = {
       return this.name.split("::").at(-1)!;
     }
     static call(req: VerbRequest): boolean {
-      return req.requestMethod === "UNLINK";
+      return req.isUnlink();
     }
   },
   Unknown,

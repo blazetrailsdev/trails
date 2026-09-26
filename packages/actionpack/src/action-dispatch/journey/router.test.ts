@@ -1,14 +1,31 @@
 import { describe, it, expect } from "vitest";
 import { UrlGenerationError } from "../../action-controller/metal/exceptions.js";
 import { RouteSet } from "../routing/route-set.js";
+import { StringIO } from "@blazetrails/ruby-compat";
+import { Request } from "../http/request.js";
 import type { RouterRequest } from "./router.js";
 
-function railsEnv(env: Partial<RouterRequest> & { pathInfo?: string }): RouterRequest {
+function railsEnv(env: Record<string, unknown>, klass = Request): RouterRequest {
+  return new klass(rackEnv(env)) as unknown as RouterRequest;
+}
+
+function rackEnv(env: Record<string, unknown>): Record<string, unknown> {
   return {
-    requestMethod: "GET",
-    pathInfo: "/content",
-    scriptName: "",
-    pathParameters: {},
+    "rack.version": [1, 1],
+    "rack.input": new StringIO(),
+    "rack.errors": new StringIO(),
+    "rack.multithread": true,
+    "rack.multiprocess": true,
+    "rack.run_once": false,
+    REQUEST_METHOD: "GET",
+    SERVER_NAME: "example.org",
+    SERVER_PORT: "80",
+    QUERY_STRING: "",
+    PATH_INFO: "/content",
+    "rack.url_scheme": "http",
+    HTTPS: "off",
+    SCRIPT_NAME: "",
+    CONTENT_LENGTH: "0",
     ...env,
   };
 }
@@ -40,7 +57,7 @@ describe("TestRouter", () => {
       r.get("/foo-bar-baz", { to: "foo#bar" });
     });
 
-    const env = railsEnv({ pathInfo: "/foo-bar-baz" });
+    const env = railsEnv({ PATH_INFO: "/foo-bar-baz" });
     let called = false;
     routeSet.journeyRouter.recognize(env, () => {
       called = true;
@@ -54,7 +71,7 @@ describe("TestRouter", () => {
       r.get("/ほげ", { to: "foo#bar" });
     });
 
-    const env = railsEnv({ pathInfo: "/%E3%81%BB%E3%81%92" });
+    const env = railsEnv({ PATH_INFO: "/%E3%81%BB%E3%81%92" });
     let called = false;
     routeSet.journeyRouter.recognize(env, () => {
       called = true;
@@ -69,7 +86,7 @@ describe("TestRouter", () => {
       r.get("/whois/:id(.:format)", { to: "foo#baz" });
     });
 
-    const env = railsEnv({ pathInfo: "/whois/example.com" });
+    const env = railsEnv({ PATH_INFO: "/whois/example.com" });
 
     const list: { path: { spec: unknown } }[] = [];
     routeSet.journeyRouter.recognize(env, (r) => {
@@ -164,7 +181,7 @@ describe("TestRouter", () => {
       r.get("/messages(.:format)", { to: "foo#bar" });
     });
     const resp = await routeSet.journeyRouter.serve(
-      railsEnv({ requestMethod: "GET", pathInfo: "/lol" }),
+      railsEnv({ REQUEST_METHOD: "GET", PATH_INFO: "/lol" }),
     );
     expect(resp[2]).toEqual(["Not Found"]);
     expect(resp[1]["x-cascade"]).toEqual("pass");
@@ -178,7 +195,7 @@ describe("TestRouter", () => {
       r.get("/weblog", { to: app });
     });
 
-    const env = railsEnv({ scriptName: "", pathInfo: "/weblog" });
+    const env = railsEnv({ SCRIPT_NAME: "", PATH_INFO: "/weblog" });
     const resp = await routeSet.journeyRouter.serve(env);
     expect(resp[2]).toEqual(["success!"]);
     expect(env.scriptName).toEqual("");
@@ -190,12 +207,12 @@ describe("TestRouter", () => {
       r.get("/foo(/:id)", { to: "foo#bar", defaults: { id: null } });
     });
 
-    let env = railsEnv({ pathInfo: "/foo/10" });
+    let env = railsEnv({ PATH_INFO: "/foo/10" });
     routeSet.journeyRouter.recognize(env, (_r, params) => {
       expect(params).toEqual({ id: "10", controller: "foo", action: "bar" });
     });
 
-    env = railsEnv({ pathInfo: "/foo" });
+    env = railsEnv({ PATH_INFO: "/foo" });
     routeSet.journeyRouter.recognize(env, (_r, params) => {
       expect(params).toEqual({ id: null, controller: "foo", action: "bar" });
     });
@@ -207,7 +224,7 @@ describe("TestRouter", () => {
       r.get("/foo", { anchor: false, to: "foo#bar" });
     });
 
-    const env = railsEnv({ pathInfo: "/foo/bar" });
+    const env = railsEnv({ PATH_INFO: "/foo/bar" });
 
     routeSet.journeyRouter.recognize(env, () => {});
 
@@ -221,7 +238,7 @@ describe("TestRouter", () => {
       r.get("/foo", { to: "foo#bar" });
     });
 
-    const env = railsEnv({ pathInfo: "/foo" });
+    const env = railsEnv({ PATH_INFO: "/foo" });
 
     const before = env.scriptName;
 
@@ -243,7 +260,7 @@ describe("TestRouter", () => {
         r.get(path, { to: "foo#bar" });
       }
     });
-    const env = railsEnv({ pathInfo: "/messages/unknown/path" });
+    const env = railsEnv({ PATH_INFO: "/messages/unknown/path" });
     let yielded = false;
 
     routeSet.journeyRouter.recognize(env, () => {
@@ -437,7 +454,7 @@ describe("TestRouter", () => {
     });
     const route = [...routeSet.journeyRouter.routes][0];
 
-    const env = railsEnv({ pathInfo: "/admin/users/show/10" });
+    const env = railsEnv({ PATH_INFO: "/admin/users/show/10" });
     let called = false;
     const expected = {
       controller: "admin/users",
@@ -460,7 +477,7 @@ describe("TestRouter", () => {
     });
     const route = [...routeSet.journeyRouter.routes][0];
 
-    const env = railsEnv({ pathInfo: "/books/list.rss" });
+    const env = railsEnv({ PATH_INFO: "/books/list.rss" });
     const expected = { controller: "books", action: "list", format: "rss" };
     let called = false;
     routeSet.journeyRouter.recognize(env, (r, params) => {
@@ -479,8 +496,8 @@ describe("TestRouter", () => {
     });
 
     const env = railsEnv({
-      pathInfo: "/books/list.rss",
-      requestMethod: "HEAD",
+      PATH_INFO: "/books/list.rss",
+      REQUEST_METHOD: "HEAD",
     });
 
     let called = false;
@@ -497,7 +514,7 @@ describe("TestRouter", () => {
       r.get("/books(/:action(.:format))", { to: "foo#bar" });
     });
 
-    const env = railsEnv({ pathInfo: "/books/list.rss", requestMethod: "HEAD" });
+    const env = railsEnv({ PATH_INFO: "/books/list.rss", REQUEST_METHOD: "HEAD" });
 
     let called = false;
     routeSet.journeyRouter.recognize(env, () => {
@@ -513,7 +530,7 @@ describe("TestRouter", () => {
       r.match("/books(/:action(.:format))", { to: "foo#bar", via: "get" });
     });
 
-    const env = railsEnv({ pathInfo: "/books/list.rss", requestMethod: "POST" });
+    const env = railsEnv({ PATH_INFO: "/books/list.rss", REQUEST_METHOD: "POST" });
 
     let called = false;
     routeSet.journeyRouter.recognize(env, () => {
@@ -529,7 +546,7 @@ describe("TestRouter", () => {
       r.match("/books(/:action(.:format))", { to: "foo#bar", via: "post" });
     });
 
-    const env = railsEnv({ pathInfo: "/books/list.rss", requestMethod: "POST" });
+    const env = railsEnv({ PATH_INFO: "/books/list.rss", REQUEST_METHOD: "POST" });
 
     let called = false;
     routeSet.journeyRouter.recognize(env, () => {
@@ -546,7 +563,7 @@ describe("TestRouter", () => {
     });
 
     for (const verb of ["POST", "GET"]) {
-      const env = railsEnv({ pathInfo: "/books/list.rss", requestMethod: verb });
+      const env = railsEnv({ PATH_INFO: "/books/list.rss", REQUEST_METHOD: verb });
 
       let called = false;
       routeSet.journeyRouter.recognize(env, () => {
@@ -556,7 +573,7 @@ describe("TestRouter", () => {
       expect(called).toBeTruthy();
     }
 
-    const env = railsEnv({ pathInfo: "/books/list.rss", requestMethod: "PUT" });
+    const env = railsEnv({ PATH_INFO: "/books/list.rss", REQUEST_METHOD: "PUT" });
 
     let called = false;
     routeSet.journeyRouter.recognize(env, () => {
