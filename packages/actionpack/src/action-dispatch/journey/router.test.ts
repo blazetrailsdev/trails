@@ -455,7 +455,7 @@ describe("TestRouter", () => {
     const route = [...routeSet.journeyRouter.routes][0];
 
     const expected: Record<string, string> = { controller: "content" };
-    const env = railsEnv({ pathInfo: "/content" });
+    const env = railsEnv({ PATH_INFO: "/content" });
     let called = false;
 
     routeSet.journeyRouter.recognize(env, (r, params) => {
@@ -475,7 +475,7 @@ describe("TestRouter", () => {
     const route = [...routeSet.journeyRouter.routes][0];
 
     const expected: Record<string, string> = { controller: "content", action: "list" };
-    const env = railsEnv({ pathInfo: "/content/list" });
+    const env = railsEnv({ PATH_INFO: "/content/list" });
     let called = false;
 
     routeSet.journeyRouter.recognize(env, (r, params) => {
@@ -495,7 +495,7 @@ describe("TestRouter", () => {
     const route = [...routeSet.journeyRouter.routes][0];
 
     const expected: Record<string, string> = { controller: "content", action: "show", id: "10" };
-    const env = railsEnv({ pathInfo: "/content/show/10" });
+    const env = railsEnv({ PATH_INFO: "/content/show/10" });
     let called = false;
 
     routeSet.journeyRouter.recognize(env, (r, params) => {
@@ -517,7 +517,7 @@ describe("TestRouter", () => {
         r.get("/:segment/*splat", { to: "foo#bar" });
       });
 
-      const env = railsEnv({ pathInfo: requestPath });
+      const env = railsEnv({ PATH_INFO: requestPath });
       let called = false;
       const route = [...routeSet.journeyRouter.routes][0];
 
