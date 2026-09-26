@@ -30,7 +30,6 @@ export type CallableConstraint =
 export interface RouteOptions {
   name?: string | null | false;
   constraints?: RouteConstraints | CallableConstraint;
-  blocks?: readonly unknown[];
   defaults?: Record<string, string | null>;
   format?: boolean;
   as?: string | null | false;
@@ -77,8 +76,6 @@ export class Route {
   readonly action: string;
   readonly defaults: Record<string, string | null>;
   readonly constraints: RouteConstraints;
-  /** @internal */
-  readonly blocks: readonly unknown[];
   readonly ip: string | RegExp;
   readonly redirectTarget: string | RedirectOptions | RedirectFunction | undefined;
   readonly anchor: boolean;
@@ -123,7 +120,6 @@ export class Route {
     this.name = (options.name ?? options.as) || undefined;
     this.defaults = options.defaults ?? {};
     this.constraints = (options.constraints as RouteConstraints | undefined) ?? {};
-    this.blocks = options.blocks ?? [];
     this.ip = options.ip ?? /(?:)/;
     if (options.redirect !== undefined && options.redirectEndpoint !== undefined) {
       throw new Error(

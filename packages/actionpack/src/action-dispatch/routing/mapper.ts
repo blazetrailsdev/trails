@@ -9,6 +9,8 @@ import {
 } from "./route.js";
 import { Redirect, redirect as redirectFactory } from "./redirection.js";
 import { Endpoint } from "./endpoint.js";
+import { Dispatcher, StaticDispatcher } from "./route-set.js";
+import type { DispatchableControllerClass } from "./dispatcher.js";
 import type { Request } from "../http/request.js";
 import { X_CASCADE } from "../constants.js";
 import { Scope, type ScopeFrameHash, type ScopeLevel } from "./scope.js";
@@ -151,8 +153,60 @@ export interface ConstraintsRequest {
 }
 
 /** @internal */
+interface MappingScopeParams {
+  blocks: readonly unknown[];
+  constraints: RouteConstraints;
+  defaults: Record<string, unknown>;
+  module: string | undefined;
+  options: Record<string, unknown>;
+}
+
+/** @internal */
 class Mapping {
   static readonly OPTIONAL_FORMAT_REGEX = /(?:\(\.:format\)+|\.:format|\/)(?=\n?$)/;
+
+  readonly defaults: Record<string, unknown>;
+  readonly to: unknown;
+  readonly defaultController: string | undefined;
+  readonly defaultAction: string | undefined;
+  readonly scopeOptions: Record<string, unknown>;
+  private readonly _blocks: readonly unknown[];
+
+  static build(
+    scope: Scope,
+    set: RouteSetLike | undefined,
+    ast: string,
+    controller: string | undefined,
+    defaultAction: string | undefined,
+    to: unknown,
+    via: readonly string[],
+    formatted: boolean | undefined,
+    optionsConstraints: unknown,
+    anchor: boolean,
+    options: Record<string, unknown>,
+  ): Mapping {
+    const scopeParams: MappingScopeParams = {
+      blocks: (scope.get("blocks") as unknown[] | undefined) ?? [],
+      constraints: (scope.get("constraints") as RouteConstraints | undefined) ?? {},
+      defaults: { ...((scope.get("defaults") as Record<string, unknown> | undefined) ?? {}) },
+      module: scope.get("module") as string | undefined,
+      options: (scope.get("options") as Record<string, unknown> | undefined) ?? {},
+    };
+
+    return new Mapping({
+      set,
+      ast,
+      controller,
+      defaultAction,
+      to,
+      formatted,
+      via,
+      optionsConstraints,
+      anchor,
+      scopeParams,
+      options: { ...scopeParams.options, ...options },
+    });
+  }
 
   static checkVia<T>(via: T[]): T[] {
     if (via.length === 0) {
@@ -183,8 +237,81 @@ class Mapping {
     return format !== false && !Mapping.OPTIONAL_FORMAT_REGEX.test(path);
   }
 
+  constructor({
+    controller,
+    defaultAction,
+    to,
+    optionsConstraints,
+    scopeParams,
+    options,
+  }: {
+    set: RouteSetLike | undefined;
+    ast: string;
+    controller: string | undefined;
+    defaultAction: string | undefined;
+    to: unknown;
+    formatted: boolean | undefined;
+    via: readonly string[];
+    optionsConstraints: unknown;
+    anchor: boolean;
+    scopeParams: MappingScopeParams;
+    options: Record<string, unknown>;
+  }) {
+    let defaults = scopeParams.defaults;
+    this.to = to;
+    this.defaultController = controller;
+    this.defaultAction = defaultAction;
+    this.scopeOptions = scopeParams.options;
+
+    if (isPlainObject(optionsConstraints)) {
+      defaults = {
+        ...Object.fromEntries(
+          Object.entries(optionsConstraints).filter(
+            ([key, default_]) =>
+              Mapper.URL_OPTIONS.includes(key) &&
+              (typeof default_ === "string" || Number.isInteger(default_)),
+          ),
+        ),
+        ...defaults,
+      };
+      this._blocks = scopeParams.blocks;
+    } else {
+      this._blocks = this.blocks(optionsConstraints);
+    }
+
+    this.defaults = { ...defaults, ...this.normalizeDefaults(options) };
+  }
+
+  application(): Endpoint {
+    return this.app(this._blocks);
+  }
+
   /** @internal */
-  static blocks(callableConstraint: unknown): unknown[] {
+  private normalizeDefaults(options: Record<string, unknown>): Record<string, unknown> {
+    return Object.fromEntries(
+      Object.entries(options).filter(([, default_]) => !(default_ instanceof RegExp)),
+    );
+  }
+
+  /** @internal */
+  private app(blocks: readonly unknown[]): Endpoint {
+    if (rbObjRespondTo(this.to, "action")) {
+      return new StaticDispatcher(this.to as DispatchableControllerClass);
+    } else if (rbObjRespondTo(this.to, "call")) {
+      return new Constraints(this.to, blocks, Constraints.CALL);
+    } else if (blocks.length > 0) {
+      return new Constraints(
+        this.dispatcher(Object.hasOwn(this.defaults, "controller")),
+        blocks,
+        Constraints.SERVE,
+      );
+    } else {
+      return this.dispatcher(Object.hasOwn(this.defaults, "controller"));
+    }
+  }
+
+  /** @internal */
+  private blocks(callableConstraint: unknown): unknown[] {
     if (
       !(rbObjRespondTo(callableConstraint, "call") || rbObjRespondTo(callableConstraint, "matches"))
     ) {
@@ -193,6 +320,11 @@ class Mapping {
       );
     }
     return [callableConstraint];
+  }
+
+  /** @internal */
+  private dispatcher(raiseOnNameError: boolean): Dispatcher {
+    return new Dispatcher(raiseOnNameError);
   }
 }
 
@@ -318,7 +450,7 @@ export class Mapper {
 
     if (allowed.has("index")) {
       const as = routeName(name);
-      this._set.addRoute(
+      this.addRouteToSet(
         new Route("GET", basePath, controller, "index", {
           name: as,
           constraints,
@@ -328,12 +460,12 @@ export class Mapper {
     }
 
     if (allowed.has("create")) {
-      this._set.addRoute(new Route("POST", basePath, controller, "create", { constraints }));
+      this.addRouteToSet(new Route("POST", basePath, controller, "create", { constraints }));
     }
 
     if (allowed.has("new")) {
       const as = routeName(`new_${singular}`);
-      this._set.addRoute(
+      this.addRouteToSet(
         new Route("GET", `${basePath}/${newPath}`, controller, "new", {
           name: as,
           constraints,
@@ -371,7 +503,7 @@ export class Mapper {
 
     if (allowed.has("edit")) {
       const as = shallowName(`edit_${singular}`);
-      this._set.addRoute(
+      this.addRouteToSet(
         new Route("GET", `${shallowPath}/:id/${editPath}`, controller, "edit", {
           name: as,
           constraints,
@@ -382,7 +514,7 @@ export class Mapper {
 
     if (allowed.has("show")) {
       const as = singular !== name ? shallowName(singular) : undefined;
-      this._set.addRoute(
+      this.addRouteToSet(
         new Route("GET", `${shallowPath}/:id`, controller, "show", {
           name: as,
           constraints,
@@ -392,16 +524,16 @@ export class Mapper {
     }
 
     if (allowed.has("update")) {
-      this._set.addRoute(
+      this.addRouteToSet(
         new Route("PATCH", `${shallowPath}/:id`, controller, "update", { constraints }),
       );
-      this._set.addRoute(
+      this.addRouteToSet(
         new Route("PUT", `${shallowPath}/:id`, controller, "update", { constraints }),
       );
     }
 
     if (allowed.has("destroy")) {
-      this._set.addRoute(
+      this.addRouteToSet(
         new Route("DELETE", `${shallowPath}/:id`, controller, "destroy", { constraints }),
       );
     }
@@ -439,7 +571,7 @@ export class Mapper {
 
     if (allowed.has("new")) {
       const as = routeName(`new_${name}`);
-      this._set.addRoute(
+      this.addRouteToSet(
         new Route("GET", `${basePath}/${newPath}`, controller, "new", {
           name: as,
         }),
@@ -448,12 +580,12 @@ export class Mapper {
     }
 
     if (allowed.has("create")) {
-      this._set.addRoute(new Route("POST", basePath, controller, "create"));
+      this.addRouteToSet(new Route("POST", basePath, controller, "create"));
     }
 
     if (allowed.has("show")) {
       const as = routeName(name);
-      this._set.addRoute(
+      this.addRouteToSet(
         new Route("GET", basePath, controller, "show", {
           name: as,
         }),
@@ -463,7 +595,7 @@ export class Mapper {
 
     if (allowed.has("edit")) {
       const as = routeName(`edit_${name}`);
-      this._set.addRoute(
+      this.addRouteToSet(
         new Route("GET", `${basePath}/${editPath}`, controller, "edit", {
           name: as,
         }),
@@ -472,12 +604,12 @@ export class Mapper {
     }
 
     if (allowed.has("update")) {
-      this._set.addRoute(new Route("PATCH", basePath, controller, "update"));
-      this._set.addRoute(new Route("PUT", basePath, controller, "update"));
+      this.addRouteToSet(new Route("PATCH", basePath, controller, "update"));
+      this.addRouteToSet(new Route("PUT", basePath, controller, "update"));
     }
 
     if (allowed.has("destroy")) {
-      this._set.addRoute(new Route("DELETE", basePath, controller, "destroy"));
+      this.addRouteToSet(new Route("DELETE", basePath, controller, "destroy"));
     }
 
     if (cb) {
@@ -730,17 +862,17 @@ export class Mapper {
     const controller = frame?.resourceController ?? "";
     const editPath = frame?.resourcePathNames?.edit ?? this.actionPath("edit");
     if (actions.includes("edit")) {
-      this._set.addRoute(new Route("GET", `${memberPath}/${editPath}`, controller, "edit"));
+      this.addRouteToSet(new Route("GET", `${memberPath}/${editPath}`, controller, "edit"));
     }
     if (actions.includes("show")) {
-      this._set.addRoute(new Route("GET", memberPath, controller, "show"));
+      this.addRouteToSet(new Route("GET", memberPath, controller, "show"));
     }
     if (actions.includes("update")) {
-      this._set.addRoute(new Route("PATCH", memberPath, controller, "update"));
-      this._set.addRoute(new Route("PUT", memberPath, controller, "update"));
+      this.addRouteToSet(new Route("PATCH", memberPath, controller, "update"));
+      this.addRouteToSet(new Route("PUT", memberPath, controller, "update"));
     }
     if (actions.includes("destroy")) {
-      this._set.addRoute(new Route("DELETE", memberPath, controller, "destroy"));
+      this.addRouteToSet(new Route("DELETE", memberPath, controller, "destroy"));
     }
   }
 
@@ -1153,7 +1285,6 @@ export class Mapper {
     const constraints: RouteConstraints = {
       ...((this._scope.get("constraints") as RouteConstraints | undefined) ?? {}),
     };
-    let blocks: readonly unknown[];
     if (isPlainObject(optionsConstraints)) {
       mergedDefaults = {
         ...(Object.fromEntries(
@@ -1165,26 +1296,58 @@ export class Mapper {
         ) as Record<string, string>),
         ...(mergedDefaults ?? {}),
       };
-      blocks = (this._scope.get("blocks") as unknown[] | undefined) ?? [];
       Object.assign(constraints, optionsConstraints);
-    } else {
-      blocks = Mapping.blocks(optionsConstraints);
     }
 
-    this._set.addRoute(
-      new Route(verb, fullPath, controller, action, {
-        ...options,
-        constraints: Object.keys(constraints).length > 0 ? constraints : undefined,
-        blocks,
-        app: toApp ?? options.app,
-        name: fullName,
-        redirect: redirectTarget,
-        redirectEndpoint,
-        defaults: mergedDefaults,
-        scopeOptions: (this._scope.get("options") as Record<string, unknown> | undefined) ?? {},
-      }),
-      fullName,
+    const route = new Route(verb, fullPath, controller, action, {
+      ...options,
+      constraints: Object.keys(constraints).length > 0 ? constraints : undefined,
+      app: toApp ?? options.app,
+      name: fullName,
+      redirect: redirectTarget,
+      redirectEndpoint,
+      defaults: mergedDefaults,
+      scopeOptions: (this._scope.get("options") as Record<string, unknown> | undefined) ?? {},
+    });
+    const mapping = Mapping.build(
+      this._scope,
+      this._set,
+      fullPath,
+      controller || undefined,
+      action || undefined,
+      route.to ?? route.redirectEndpoint,
+      typeof verb === "string" ? [verb] : verb,
+      formatted,
+      optionsConstraints,
+      route.anchor,
+      { ...options.defaults, ...(controller ? { controller, action } : {}) },
     );
+    this.addRouteToSet(route, fullName, mapping);
+  }
+
+  /** @internal */
+  private addRouteToSet(
+    route: Route,
+    name?: string | null,
+    mapping: Mapping = Mapping.build(
+      this._scope,
+      this._set,
+      route.path,
+      route.controller,
+      route.action,
+      route.to ?? route.redirectEndpoint,
+      route.verb.split("|"),
+      route.formatted,
+      route.constraints,
+      route.anchor,
+      {
+        ...route.defaults,
+        ...(route.controller ? { controller: route.controller, action: route.action } : {}),
+      },
+    ),
+  ): void {
+    route.app = mapping.application();
+    this._set.addRoute(route, name);
   }
 
   private currentPrefix(): string {
