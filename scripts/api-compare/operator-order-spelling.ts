@@ -64,6 +64,12 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // actionview template/types.rb:39 `def ==(type)` → template/types.ts
   // `SimpleType#equals` (the class Rails aliases to `Types` at :47).
   "ActionView::Template::SimpleType": { "==": ["equals"] },
+  // journey/path/pattern.rb:141 MatchData `def [](x)` → path/pattern.ts
+  // `MatchData#at`, the `ActiveRecord::Result#[]` spelling.
+  "ActionDispatch::Journey::Path::Pattern::MatchData": { "[]": ["at"] },
+  // journey/gtg/transition_table.rb:165 `def []=(from, to, sym)` →
+  // gtg/transition-table.ts `TransitionTable#set`.
+  "ActionDispatch::Journey::GTG::TransitionTable": { "[]=": ["set"] },
   // arel/table.rb:82 `def [](name, table = self)` → table.ts `get`.
   "Arel::Table": { "[]": ["get"] },
   // active_model/errors.rb:229 `def [](attribute)` → errors.ts `get`.

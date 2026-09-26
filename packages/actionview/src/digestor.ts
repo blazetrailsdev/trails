@@ -1,3 +1,4 @@
+import { any } from "@blazetrails/activesupport";
 import { Digest } from "@blazetrails/activesupport/digest";
 
 import { ActionView } from "./namespaces.js";
@@ -161,7 +162,7 @@ export class Node {
   toDepMap(seen: Set<Node> = new Set()): unknown {
     if (!seen.has(this)) {
       seen.add(this);
-      return this.children.length > 0
+      return any(this.children)
         ? { [this.name]: this.children.map((c) => c.toDepMap(seen)) }
         : this.name;
     } else {

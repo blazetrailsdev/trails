@@ -203,6 +203,16 @@ const AMBIENT_RAILTIE_MIXINS: Record<string, { includes: string[] }> = {
  *     `reset_callbacks`. `ActiveModel::Validations`' `included` block extends it
  *     (validations.rb:42), which is how `ActiveModel::Model` gets them.
  */
+/**
+ * Mixins every Ruby object answers because Active Support includes them into
+ * `Object` itself, so no host's own source names them.
+ * `core_ext/object/json.rb:47-49` includes `ToJsonWithActiveSupportEncoder`
+ * into `Object`, which is how `GTG::TransitionTable#visualizer` reads
+ * `to_json` off itself (`journey/gtg/transition_table.rb:132`). trails ports
+ * that include per class (`include(X, ToJsonWithActiveSupportEncoder)`).
+ */
+const OBJECT_AMBIENT_MIXINS: readonly string[] = ["ActiveSupport::ToJsonWithActiveSupportEncoder"];
+
 const HOOK_INJECTED_MIXINS: Record<string, { includes: string[] }> = {
   "ActiveModel::Callbacks": {
     includes: ["ActiveSupport::Callbacks"],
@@ -1651,6 +1661,8 @@ function collectAllowedNames(
 
     for (const inc of AMBIENT_RAILTIE_MIXINS[fqn]?.includes ?? [])
       walkMixin(inc, fqn, target, methodFile);
+
+    for (const inc of OBJECT_AMBIENT_MIXINS) walkMixin(inc, fqn, target);
 
     for (const name of PORTED_METHODS_FROM_UNPORTED_MIXINS[fqn] ?? []) addRubyName(name, target);
 

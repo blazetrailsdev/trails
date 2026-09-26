@@ -11,12 +11,11 @@ export abstract class Node {
     this.left = left;
   }
 
+  /** @noRailsEquivalent PERMANENT */
   *[globalThis.Symbol.iterator](): IterableIterator<Node> {
-    yield this;
-    const children = this.children();
-    for (const child of children) {
-      yield* child;
-    }
+    const nodes: Node[] = [];
+    this.each((node) => nodes.push(node));
+    yield* nodes;
   }
 
   grep<T extends Node>(klass: abstract new (...args: never[]) => T): T[] {

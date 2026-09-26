@@ -12,7 +12,7 @@ import { Endpoint } from "./endpoint.js";
 import type { Request } from "../http/request.js";
 import { X_CASCADE } from "../constants.js";
 import { Scope, type ScopeFrameHash, type ScopeLevel } from "./scope.js";
-import { isPlainObject, underscore } from "@blazetrails/activesupport";
+import { isPlainObject, kernelArray, underscore } from "@blazetrails/activesupport";
 import {
   getFs,
   getPath,
@@ -153,6 +153,19 @@ export interface ConstraintsRequest {
 /** @internal */
 class Mapping {
   static readonly OPTIONAL_FORMAT_REGEX = /(?:\(\.:format\)+|\.:format|\/)(?=\n?$)/;
+
+  static checkVia<T>(via: T[]): T[] {
+    if (via.length === 0) {
+      const msg =
+        "You should not use the `match` method in your router without specifying an HTTP method.\n" +
+        "If you want to expose your action to both GET and POST, add `via: [:get, :post]` option.\n" +
+        "If you want to expose your action to GET, use `get` in the router:\n" +
+        '  Instead of: match "controller#action"\n' +
+        '  Do: get "controller#action"';
+      throw new ArgumentError(msg);
+    }
+    return via;
+  }
 
   static normalizePath(path: string, format: boolean | undefined): string {
     path = Mapper.normalizePath(path);
@@ -744,11 +757,11 @@ export class Mapper {
   }
 
   match(path: string, options: RouteOptions & { via?: string | string[] } = {}): void {
-    const methods = options.via
-      ? Array.isArray(options.via)
-        ? options.via
-        : [options.via]
-      : [":all"];
+    const methods = Mapping.checkVia(
+      kernelArray(
+        "via" in options ? options.via : (this._scope.get("via") as string | string[] | undefined),
+      ),
+    );
 
     this.addRoute(methods, path, options);
   }
@@ -879,8 +892,11 @@ export class Mapper {
     delete options.path;
     let to = options.to;
     delete options.to;
-    const viaIn =
-      options.via ?? (this._scope.get("via") as string | string[] | undefined) ?? ":all";
+    const via = Mapping.checkVia(
+      kernelArray(
+        "via" in options ? options.via : (this._scope.get("via") as string | string[] | undefined),
+      ),
+    );
     delete options.via;
     const formatted = options.format ?? (this._scope.get("format") as boolean | undefined);
     delete options.format;
@@ -906,7 +922,7 @@ export class Mapper {
         routeOptions,
         optionPath,
         to,
-        viaIn,
+        via,
         formatted,
         anchor,
         optionsConstraints,

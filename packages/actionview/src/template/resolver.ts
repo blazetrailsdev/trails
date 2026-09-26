@@ -121,7 +121,7 @@ export class FileSystemResolver extends Resolver {
     this._path = File.expandPath(path);
   }
 
-  path(): string {
+  get path(): string {
     return this._path;
   }
 

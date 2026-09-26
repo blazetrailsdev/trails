@@ -145,6 +145,10 @@ export class TSETracker {
   }
 
   private explicitDependencies(): string[] {
-    return [...new Set([...this.source.matchAll(TSETracker.EXPLICIT_DEPENDENCY)].map((m) => m[1]))];
+    return [
+      ...new Set(
+        [...this.source.matchAll(TSETracker.EXPLICIT_DEPENDENCY)].map((m) => m.slice(1)).flat(),
+      ),
+    ];
   }
 }

@@ -668,11 +668,11 @@ describe("TestRoutingMapper", () => {
 
   it("match without via", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.match("/search", { to: "search#index" });
-    });
-    expect(routes.recognize("GET", "/search")).not.toBeNull();
-    expect(routes.recognize("POST", "/search")).not.toBeNull();
+    expect(() =>
+      routes.draw((r) => {
+        r.match("/foo/bar", { to: "files#show" });
+      }),
+    ).toThrow(ArgumentError);
   });
 
   it("non greedy regexp", () => {
@@ -1731,7 +1731,14 @@ describe("TestRoutingMapper", () => {
 
   it.skip("duplicate route name via resources raises error", () => {});
   it.skip("controller name with leading slash raise error", () => {});
-  it.skip("match with empty via", () => {});
+  it("match with empty via", () => {
+    const routes = new RouteSet();
+    expect(() =>
+      routes.draw((r) => {
+        r.match("/foo/bar", { to: "files#show", via: [] });
+      }),
+    ).toThrow(ArgumentError);
+  });
   it.skip("multiple roots raises error", () => {});
   it.skip("multiple namespaced roots", () => {});
 
