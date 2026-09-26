@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
+import { GeneratorError } from "./generated-attribute.js";
 import { ModelGenerator } from "./model-generator.js";
 
 let tmpDir: string;
@@ -40,5 +41,17 @@ describe("ModelGeneratorTest", () => {
     makeGen().run("User", ["recovery:digest"]);
     const content = fs.readFileSync(path.join(tmpDir, "app/models/user.ts"), "utf-8");
     expect(content).not.toContain("hasSecurePassword");
+  });
+
+  it("unknown attribute type raises GeneratedAttribute's error", () => {
+    expect(() => makeGen().run("User", ["name:unknown"])).toThrow(
+      new GeneratorError("Could not generate field 'name' with unknown type 'unknown'."),
+    );
+  });
+
+  it("unknown attribute index raises GeneratedAttribute's error", () => {
+    expect(() => makeGen().run("User", ["name:string:unknown"])).toThrow(
+      new GeneratorError("Could not generate field 'name' with unknown index 'unknown'."),
+    );
   });
 });

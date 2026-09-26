@@ -1,4 +1,5 @@
-import { GeneratorBase, GeneratorOptions, dasherize, ColumnType } from "./base.js";
+import { GeneratorBase, GeneratorOptions, dasherize } from "./base.js";
+import { GeneratedAttribute } from "./generated-attribute.js";
 import { MigrationGenerator } from "./migration-generator.js";
 import { camelize, classify, singularize, tableize, underscore } from "@blazetrails/activesupport";
 
@@ -9,25 +10,6 @@ interface ModelOptions {
   parent?: string;
   indexes?: boolean;
   primaryKeyType?: string;
-}
-
-function parseColumnsDefaultString(args: string[]): Array<{ name: string; type: ColumnType }> {
-  const columns: Array<{ name: string; type: ColumnType }> = [];
-  for (const arg of args) {
-    if (arg.startsWith("-")) continue;
-    const parts = arg.split(":");
-    const name = parts[0];
-    if (!name) continue;
-    let rawType = parts[1];
-
-    if (!rawType || rawType === "index" || rawType === "uniq") {
-      rawType = "string";
-    }
-
-    const type = rawType.replace(/\{[^}]*\}/, "").replace(/!$/, "") as ColumnType;
-    columns.push({ name, type });
-  }
-  return columns;
 }
 
 export class ModelGenerator extends GeneratorBase {
@@ -52,13 +34,9 @@ export class ModelGenerator extends GeneratorBase {
     const singularName = singularize(underscore(name));
     const className = camelize(singularName);
     const fileName = dasherize(singularName);
-    const columns = parseColumnsDefaultString(args);
-
-    const polymorphicNames = new Set(
-      args
-        .filter((a) => /:(references|belongs_to)\{polymorphic\}/.test(a))
-        .map((a) => a.split(":")[0]),
-    );
+    const attributes = args
+      .filter((arg) => !arg.startsWith("-"))
+      .map((arg) => GeneratedAttribute.parse(arg));
 
     const parentClassName = parent ?? "ApplicationRecord";
     const parentClass = classify(parentClassName.replace(/::/g, "_").replace(/\//g, "_"));
@@ -67,34 +45,26 @@ export class ModelGenerator extends GeneratorBase {
 
     const bodyLines: string[] = [];
 
-    for (const col of columns) {
-      if (col.type === "references" || col.type === "belongs_to") {
-        if (polymorphicNames.has(col.name)) {
-          bodyLines.push(`    this.belongsTo("${col.name}", { polymorphic: true });`);
-        } else {
-          bodyLines.push(`    this.belongsTo("${col.name}");`);
-        }
-      }
+    for (const attribute of attributes.filter((a) => a.reference())) {
+      bodyLines.push(
+        `    this.belongsTo("${attribute.name}"${attribute.polymorphic() ? ", { polymorphic: true }" : ""});`,
+      );
     }
-    for (const col of columns) {
-      if (col.type === "rich_text") bodyLines.push(`    this.hasRichText("${col.name}");`);
+    for (const attribute of attributes.filter((a) => a.richText())) {
+      bodyLines.push(`    this.hasRichText("${attribute.name}");`);
     }
-    for (const col of columns) {
-      if (col.type === "attachment") bodyLines.push(`    this.hasOneAttached("${col.name}");`);
+    for (const attribute of attributes.filter((a) => a.attachment())) {
+      bodyLines.push(`    this.hasOneAttached("${attribute.name}");`);
     }
-    for (const col of columns) {
-      if (col.type === "attachments") bodyLines.push(`    this.hasManyAttached("${col.name}");`);
+    for (const attribute of attributes.filter((a) => a.attachments())) {
+      bodyLines.push(`    this.hasManyAttached("${attribute.name}");`);
     }
-    for (const col of columns) {
-      if (col.type === "token") {
-        if (col.name === "token") {
-          bodyLines.push("    this.hasSecureToken();");
-        } else {
-          bodyLines.push(`    this.hasSecureToken("${col.name}");`);
-        }
-      }
+    for (const attribute of attributes.filter((a) => a.token())) {
+      bodyLines.push(
+        `    this.hasSecureToken(${attribute.name !== "token" ? `"${attribute.name}"` : ""});`,
+      );
     }
-    if (columns.some((col) => col.name === "password" && col.type === "digest")) {
+    if (attributes.some((a) => a.passwordDigest())) {
       bodyLines.push("    this.hasSecurePassword();");
     }
 
@@ -125,14 +95,16 @@ describe("${className}", () => {
     }
 
     if (migration && !parent) {
+      if (indexes === false) {
+        for (const a of attributes) {
+          if (a.reference() && !a.hasIndex()) delete a.attrOptions.index;
+        }
+      }
+
       const tableName = camelize(tableize(className));
       const migGen = this.createMigrationGenerator();
 
-      const migArgs = indexes
-        ? args
-        : args.map((a) => a.replace(/:index/, "").replace(/:uniq/, ""));
-
-      const migFiles = migGen.run(`Create${tableName}`, migArgs, { timestamps, primaryKeyType });
+      const migFiles = migGen.run(`Create${tableName}`, args, { timestamps, primaryKeyType });
       this.createdFiles.push(...migFiles);
     }
 

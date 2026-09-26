@@ -354,10 +354,10 @@ export class Base extends Metal {
     viewPathsSetFormats.call(this as never, values);
   }
 
-  get locale(): string | symbol | null {
+  get locale(): string | null {
     return viewPathsLocale.call(this as never);
   }
-  set locale(value: string | symbol | null) {
+  set locale(value: string | null) {
     viewPathsSetLocale.call(this as never, value);
   }
 

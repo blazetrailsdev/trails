@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { I18n } from "@blazetrails/activesupport";
 import { PathRegistry } from "./path-registry.js";
 import { FixtureResolver } from "./testing/resolvers.js";
 import { TemplateHandlers } from "./template/handlers.js";
@@ -69,6 +70,16 @@ describe("ViewPaths::ClassMethods", () => {
 });
 
 describe("ViewPaths", () => {
+  let enforceAvailableLocales: boolean;
+  beforeEach(() => {
+    enforceAvailableLocales = I18n.enforceAvailableLocales();
+    I18n.setEnforceAvailableLocales(false);
+  });
+  afterEach(() => {
+    I18n.setLocale("en");
+    I18n.setEnforceAvailableLocales(enforceAvailableLocales);
+  });
+
   test("lookup_context is built from the class's view paths, details and prefixes", () => {
     PostsController.viewPaths([]);
     const controller = new PostsController();

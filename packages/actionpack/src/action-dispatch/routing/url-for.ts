@@ -1,5 +1,4 @@
 import { reverseMerge } from "@blazetrails/activesupport";
-import { NO_ROUTES_MESSAGE } from "../../abstract-controller/url-for.js";
 import { Parameters } from "../../action-controller/metal/strong-parameters.js";
 import {
   HelperMethodBuilder,
@@ -54,7 +53,7 @@ export type UrlForOptions = null | undefined | string | symbol | object;
 /** @internal */
 export function fullUrlFor(this: UrlForHost, options?: UrlForOptions): string {
   if (options == null) {
-    return requireRoutes(this).urlFor({ ...this.urlOptions() });
+    return this._routes!.urlFor({ ...this.urlOptions() });
   }
   if (typeof options === "string") {
     return options;
@@ -72,7 +71,7 @@ export function fullUrlFor(this: UrlForHost, options?: UrlForOptions): string {
     const routeName = asHash["useRoute"];
     delete asHash["useRoute"];
     const mergedUrlOptions = reverseMerge({ ...asHash }, this.urlOptions());
-    return requireRoutes(this).urlFor(
+    return this._routes!.urlFor(
       mergedUrlOptions,
       routeName == null
         ? null
@@ -103,9 +102,8 @@ export function routeFor(this: UrlForHost, name: string, ...args: unknown[]): st
 
 /** @internal */
 export function optimizeRoutesGeneration(this: UrlForHost): boolean {
-  const routes = requireRoutes(this);
   return (
-    (routes.optimizeRoutesGeneration?.() ?? true) &&
+    (this._routes!.optimizeRoutesGeneration?.() ?? true) &&
     Object.keys(this.defaultUrlOptions).length === 0
   );
 }
@@ -139,14 +137,6 @@ export function _withRoutes<T>(
 /** @internal */
 export function _routesContext(this: UrlForHost): UrlForHost {
   return this;
-}
-
-/** @internal */
-function requireRoutes(host: UrlForHost): UrlForRoutes {
-  if (!host._routes) {
-    throw new Error(NO_ROUTES_MESSAGE);
-  }
-  return host._routes;
 }
 
 /** @internal */

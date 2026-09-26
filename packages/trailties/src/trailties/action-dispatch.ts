@@ -9,6 +9,7 @@ import {
   CacheConfig,
   Response,
   ContentSecurityPolicy,
+  ExceptionWrapper,
   type NonceGenerator,
 } from "@blazetrails/actionpack";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
@@ -20,7 +21,7 @@ export interface ActionDispatchConfig {
   tldLength: number;
   ignoreAcceptHeader: boolean;
   rescueTemplates: Record<string, string>;
-  rescueResponses: Record<string, number | string>;
+  rescueResponses: Record<string, string>;
   defaultCharset: string | null;
   rackCache: boolean;
   httpAuthSalt: string;
@@ -118,6 +119,9 @@ export class Trailtie extends BaseTrailtie {
       RequestUtils.performDeepMunge = cfg.performDeepMunge;
       CacheConfig.strictFreshness = cfg.strictFreshness;
       Response.defaultCharset = cfg.defaultCharset ?? "utf-8";
+
+      Object.assign(ExceptionWrapper.rescueResponses, cfg.rescueResponses);
+      Object.assign(ExceptionWrapper.rescueTemplates, cfg.rescueTemplates);
     });
   }
 }

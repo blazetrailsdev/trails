@@ -71,7 +71,7 @@ export class DebugExceptions {
       try {
         interceptor(request, exception);
       } catch {
-        this.logError(request.env, wrapper);
+        this.logError(request, wrapper);
       }
     }
   }
@@ -107,10 +107,10 @@ export class DebugExceptions {
   }
 
   /** @internal */
-  logError(request: RackEnv, wrapper: ExceptionWrapper): void {
+  logError(request: Request, wrapper: ExceptionWrapper): void {
     const logger =
-      (request["action_dispatch.logger"] as Logger | undefined) ??
-      (request["rack.logger"] as Logger | undefined) ??
+      (request.logger as Logger | undefined) ??
+      (request.getHeader("rack.logger") as Logger | undefined) ??
       this.logger ??
       this.stderrLogger();
     if (!this.isLogRescuedResponses(request) && wrapper.statusCode < 500) return;
@@ -138,11 +138,12 @@ export class DebugExceptions {
   }
 
   /** @internal */
-  logArray(logger: Logger, lines: string[], request: RackEnv): void {
+  logArray(logger: Logger, lines: string[], request: Request): void {
     if (lines.length === 0) return;
     const level =
-      (request["action_dispatch.debug_exception_log_level"] as typeof this.logLevel | undefined) ??
-      this.logLevel;
+      (request.getHeader("action_dispatch.debug_exception_log_level") as
+        | typeof this.logLevel
+        | undefined) ?? this.logLevel;
     const message = lines.join("\n");
     const fn =
       level === "warn"
@@ -175,8 +176,8 @@ export class DebugExceptions {
   }
 
   /** @internal */
-  isLogRescuedResponses(request: RackEnv): boolean {
-    const flag = request["action_dispatch.log_rescued_responses"];
+  isLogRescuedResponses(request: Request): boolean {
+    const flag = request.getHeader("action_dispatch.log_rescued_responses");
     return flag === undefined ? this.logRescuedResponses : Boolean(flag);
   }
 
@@ -198,7 +199,8 @@ export class DebugExceptions {
       const request = new Request(env);
       const exception = error instanceof Error ? error : new Error(String(error));
       const backtraceCleaner =
-        (env["action_dispatch.backtrace_cleaner"] as BacktraceCleaner | undefined) ?? null;
+        (request.getHeader("action_dispatch.backtrace_cleaner") as BacktraceCleaner | undefined) ??
+        null;
       const wrapper = new ExceptionWrapper(backtraceCleaner, exception);
 
       this.invokeInterceptors(request, exception, wrapper);
@@ -212,7 +214,7 @@ export class DebugExceptions {
     exception: Error,
     wrapper: ExceptionWrapper,
   ): RackResponse {
-    this.logError(request.env, wrapper);
+    this.logError(request, wrapper);
 
     if (!this.showDetailedExceptions) {
       throw exception;
@@ -227,7 +229,7 @@ export class DebugExceptions {
       return this.renderTextError(wrapper);
     }
 
-    return this.renderHtmlError(wrapper, request.env);
+    return this.renderHtmlError(request, wrapper);
   }
 
   private renderTextError(wrapper: ExceptionWrapper): RackResponse {
@@ -244,10 +246,10 @@ export class DebugExceptions {
     ];
   }
 
-  private renderHtmlError(wrapper: ExceptionWrapper, env: RackEnv): RackResponse {
-    const method = (env["REQUEST_METHOD"] as string) ?? "GET";
-    const path = (env["PATH_INFO"] as string) ?? "/";
-    const controller = env["action_dispatch.controller"] as string | undefined;
+  private renderHtmlError(request: Request, wrapper: ExceptionWrapper): RackResponse {
+    const method = (request.getHeader("REQUEST_METHOD") as string) ?? "GET";
+    const path = (request.getHeader("PATH_INFO") as string) ?? "/";
+    const controller = request.getHeader("action_dispatch.controller") as string | undefined;
 
     const traceHtml = wrapper.applicationTrace
       .slice(0, 20)

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, it, expect } from "vitest";
-import { DelegationError, InheritableOptions, htmlSafe } from "@blazetrails/activesupport";
+import { DelegationError, I18n, InheritableOptions, htmlSafe } from "@blazetrails/activesupport";
 import { Base } from "./base.js";
 import { LookupContext } from "./lookup-context.js";
 import { OutputBuffer } from "./buffers.js";
@@ -240,6 +240,16 @@ describe("ActionView::Base include TSE::Util", () => {
 });
 
 describe("ActionView::Base lookup_context delegation", () => {
+  let enforceAvailableLocales: boolean;
+  beforeEach(() => {
+    enforceAvailableLocales = I18n.enforceAvailableLocales();
+    I18n.setEnforceAvailableLocales(false);
+  });
+  afterEach(() => {
+    I18n.setLocale("en");
+    I18n.setEnforceAvailableLocales(enforceAvailableLocales);
+  });
+
   it("delegates formats= and locale= writes to the lookup context", () => {
     const lookupContext = new LookupContext(null, {}, []);
     const view = new (Base.withEmptyTemplateCache())(lookupContext, {}, null);

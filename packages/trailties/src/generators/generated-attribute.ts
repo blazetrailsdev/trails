@@ -132,6 +132,24 @@ export class GeneratedAttribute {
   attachments = (): boolean => this.type === "attachments";
   virtual = (): boolean => this.richText() || this.attachment() || this.attachments();
 
+  injectOptions(): string {
+    const options = Object.entries(this.optionsForMigration());
+    if (options.length === 0) return "";
+    return `, { ${options.map(([k, v]) => `${k}: ${inspectOption(v)}`).join(", ")} }`;
+  }
+
+  injectIndexOptions(): string {
+    return this.hasUniqIndex() ? ", { unique: true }" : "";
+  }
+
+  optionsForMigration(): AttrOptions {
+    const options = { ...this.attrOptions };
+    if (this.reference() && !this.polymorphic()) {
+      options.foreignKey = true;
+    }
+    return options;
+  }
+
   fieldType(): string {
     return FIELD_TYPES[this.type] ?? "text_field";
   }
@@ -163,6 +181,15 @@ function parseTypeAndOptions(type: string | undefined): [string | undefined, Att
   } else parsedType = type.replace(/!/g, "");
   if (type.endsWith("!")) opts.null = false;
   return [parsedType, opts];
+}
+
+function inspectOption(value: unknown): string {
+  if (value != null && typeof value === "object") {
+    return `{ ${Object.entries(value)
+      .map(([k, v]) => `${k}: ${inspectOption(v)}`)
+      .join(", ")} }`;
+  }
+  return JSON.stringify(value);
 }
 
 function printOptions(opts: AttrOptions): string {
