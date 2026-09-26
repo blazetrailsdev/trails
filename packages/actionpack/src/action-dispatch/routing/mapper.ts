@@ -17,11 +17,12 @@ import { Scope, type ScopeFrameHash, type ScopeLevel } from "./scope.js";
 import { Parser } from "../journey/parser.js";
 import { Ast, type Node } from "../journey/nodes/node.js";
 import {
+  camelize,
   isBlank,
   isPlainObject,
   isPresent,
   kernelArray,
-  stringifyKeys,
+  transformKeys,
   underscore,
 } from "@blazetrails/activesupport";
 import {
@@ -1105,7 +1106,7 @@ export class Mapper {
       }
 
       hashDelete(options, path);
-      options = stringifyKeys(options);
+      options = transformKeys(options, (name) => camelize(symbolToS(name), false));
       paths = [path];
     } else {
       options = (rest.pop() as Record<string, unknown> | undefined) ?? {};

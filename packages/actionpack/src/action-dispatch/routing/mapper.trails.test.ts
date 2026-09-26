@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { Constraints, Mapper, type ConstraintsRequest } from "./mapper.js";
 import { RouteSet } from "./route-set.js";
@@ -122,6 +122,18 @@ describe("Mapper#match hash form and multi-path arms", () => {
     expect(route.path).toBe("/foo(.:format)");
     expect(route.controller).toBe("posts");
     expect(route.action).toBe("index");
+  });
+
+  it("keys a multi-word Symbol option by its camelCase name", () => {
+    const m = new Mapper(new RouteSet());
+    let received: unknown;
+    vi.spyOn(m, "mapMatch").mockImplementation((_paths, options) => void (received = options));
+    m.match({ "/foo": "posts#index", ":via": "get", ":path_names": { new: "nuevo" } });
+    expect(received).toEqual({
+      via: "get",
+      pathNames: { new: "nuevo" },
+      to: "posts#index",
+    });
   });
 
   it("raises when no route path is specified", () => {
