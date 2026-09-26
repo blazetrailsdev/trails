@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Parser } from "./parser.js";
 import { Ast } from "./ast.js";
 import { Pattern } from "./path/pattern.js";
-import { Route } from "./route.js";
+import { Route, VerbMatchers } from "./route.js";
 
 const SEPARATORS = "/.?";
 
@@ -26,6 +26,19 @@ describe("ActionDispatch::Journey::Route", () => {
     expect(Route.verbMatcher("GET").verb).toBe("GET");
     expect(Route.verbMatcher("get").verb).toBe("GET");
     expect(Route.verbMatcher(":all").verb).toBe("");
+  });
+
+  it("VerbMatchers defines one class per verb, named for its verb", () => {
+    for (const verb of VerbMatchers.VERBS) {
+      const klass = VerbMatchers[verb];
+      expect(klass.verb).toBe(verb);
+      expect(Route.verbMatcher(verb)).toBe(klass);
+      expect(Route.verbMatcher(verb.toLowerCase())).toBe(klass);
+      expect(Route.verbMatcher(`:${verb.toLowerCase()}`)).toBe(klass);
+      expect(klass.call({ requestMethod: verb })).toBe(true);
+    }
+    expect(VerbMatchers.GET.call({ requestMethod: "POST" })).toBe(false);
+    expect(Route.verbMatcher(":all")).toBe(VerbMatchers.All);
   });
 
   it("Route.verbMatcher returns an Unknown matcher for novel verbs", () => {

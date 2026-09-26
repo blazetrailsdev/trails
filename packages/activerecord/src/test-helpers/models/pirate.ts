@@ -11,7 +11,6 @@ import type { PriceEstimate } from "./price-estimate.js";
 import type { Ship } from "./ship.js";
 import type { Treasure } from "./treasure.js";
 import { Base } from "../../base.js";
-import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Pirate {
@@ -91,6 +90,15 @@ export class Pirate extends Base {
     this.hasMany("birds", function (this: any) {
       return this.order("birds.id ASC");
     });
+    this.acceptsNestedAttributesFor("parrots", "birds", {
+      allowDestroy: true,
+      rejectIf: (attrs) => Object.keys(attrs).length === 0,
+    });
+    this.acceptsNestedAttributesFor("ship", {
+      allowDestroy: true,
+      rejectIf: (attrs) => Object.keys(attrs).length === 0,
+    });
+    this.acceptsNestedAttributesFor("updateOnlyShip", { updateOnly: true });
     this.hasMany("birdsWithMethodCallbacks", {
       className: "Bird",
       beforeAdd: (p: any, b: any) => p.logBeforeAdd(b),
@@ -105,7 +113,15 @@ export class Pirate extends Base {
       beforeRemove: (p: any, b: any) => p.shipLog.push(`before_removing_proc_bird_${b.id}`),
       afterRemove: (p: any, b: any) => p.shipLog.push(`after_removing_proc_bird_${b.id}`),
     });
+    this.acceptsNestedAttributesFor(
+      "parrotsWithMethodCallbacks",
+      "parrotsWithProcCallbacks",
+      "birdsWithMethodCallbacks",
+      "birdsWithProcCallbacks",
+      { allowDestroy: true },
+    );
     this.hasMany("birdsWithRejectAllBlank", { className: "Bird" });
+    this.acceptsNestedAttributesFor("birdsWithRejectAllBlank", { rejectIf: "all_blank" });
 
     this.hasOne(
       "fooBulb",
@@ -177,24 +193,6 @@ export interface Pirate {
   get attackerMatey(): Matey | null | Promise<Matey | null>;
   set attackerMatey(value: Matey | null);
 }
-
-const rejectIfEmpty = (attrs: Record<string, unknown>) => Object.keys(attrs).length === 0;
-
-acceptsNestedAttributesFor(Pirate, "parrots", "birds", {
-  allowDestroy: true,
-  rejectIf: rejectIfEmpty,
-});
-acceptsNestedAttributesFor(Pirate, "ship", { allowDestroy: true, rejectIf: rejectIfEmpty });
-acceptsNestedAttributesFor(Pirate, "updateOnlyShip", { updateOnly: true });
-acceptsNestedAttributesFor(
-  Pirate,
-  "parrotsWithMethodCallbacks",
-  "parrotsWithProcCallbacks",
-  "birdsWithMethodCallbacks",
-  "birdsWithProcCallbacks",
-  { allowDestroy: true },
-);
-acceptsNestedAttributesFor(Pirate, "birdsWithRejectAllBlank", { rejectIf: "all_blank" });
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class DestructivePirate extends Pirate {

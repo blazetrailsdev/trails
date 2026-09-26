@@ -1,5 +1,4 @@
 import { Base } from "../../base.js";
-import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
 function read<T extends Base>(eye: Eye, name: string): Promise<T | null> {
   return Promise.resolve(
@@ -32,6 +31,7 @@ export class Eye extends Base {
     });
 
     this.hasOne("iris");
+    this.acceptsNestedAttributesFor("iris");
 
     this.afterCreate(async function (this: Eye) {
       const iris = await read<Iris>(this, "iris");
@@ -50,6 +50,7 @@ export class Eye extends Base {
       className: "IrisWithReadOnlyForeignKey",
       foreignKey: "eye_id",
     });
+    this.acceptsNestedAttributesFor("irisWithReadOnlyForeignKey");
 
     this.beforeSave(async function (this: Eye) {
       const iris = await read<IrisWithReadOnlyForeignKey>(this, "irisWithReadOnlyForeignKey");
@@ -72,9 +73,6 @@ export interface Eye {
   get iris(): Iris | null | Promise<Iris | null>;
   set iris(value: Iris | null);
 }
-
-acceptsNestedAttributesFor(Eye, "iris");
-acceptsNestedAttributesFor(Eye, "irisWithReadOnlyForeignKey");
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Iris extends Base {

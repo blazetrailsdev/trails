@@ -3,7 +3,6 @@ import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Ship } from "./ship.js";
 import type { Treasure } from "./treasure.js";
 import { Base } from "../../base.js";
-import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ShipPart extends Base {
@@ -15,6 +14,8 @@ export class ShipPart extends Base {
   static {
     this.belongsTo("ship");
     this.hasMany("trinkets", { className: "Treasure", as: "looter" });
+    this.acceptsNestedAttributesFor("trinkets", { allowDestroy: true });
+    this.acceptsNestedAttributesFor("ship");
 
     this.validates("name", { presence: true });
   }
@@ -24,6 +25,3 @@ export interface ShipPart {
   get ship(): Ship | null | Promise<Ship | null>;
   set ship(value: Ship | null);
 }
-
-acceptsNestedAttributesFor(ShipPart, "trinkets", { allowDestroy: true });
-acceptsNestedAttributesFor(ShipPart, "ship");

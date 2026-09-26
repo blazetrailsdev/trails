@@ -6,6 +6,7 @@ import {
 } from "../attribute-methods.js";
 import { baseClass, isBaseClass } from "../inheritance.js";
 import type { Base } from "../base.js";
+import { AttributeMethods } from "../namespaces.js";
 
 /** @internal */
 export interface PrimaryKeyRecord {
@@ -298,3 +299,5 @@ function attributeMethod(this: any, attrName: string): boolean {
   const pk = this.primaryKey;
   return Array.isArray(pk) ? pk.includes(attrName) : attrName === pk;
 }
+
+AttributeMethods.PrimaryKey = PrimaryKey;

@@ -36,7 +36,7 @@ export interface NestedAttributeOptions {
 }
 
 export function acceptsNestedAttributesFor(
-  modelClass: typeof Base,
+  this: typeof Base,
   ...attrNames: (string | NestedAttributeOptions)[]
 ): void {
   const options: NestedAttributeOptions = { allowDestroy: false, updateOnly: false };
@@ -51,17 +51,17 @@ export function acceptsNestedAttributesFor(
   if (options.rejectIf === "all_blank") options.rejectIf = REJECT_ALL_BLANK_PROC;
 
   for (const associationName of attrNames as string[]) {
-    const reflection = (modelClass as any)._reflectOnAssociation?.(associationName);
+    const reflection = (this as any)._reflectOnAssociation?.(associationName);
     if (reflection) {
       reflection.autosave = true;
-      defineAutosaveValidationCallbacks.call(modelClass, reflection);
+      defineAutosaveValidationCallbacks.call(this, reflection);
 
-      const nestedAttributesOptions = { ...modelClass.nestedAttributesOptions };
+      const nestedAttributesOptions = { ...this.nestedAttributesOptions };
       nestedAttributesOptions[associationName] = options;
-      modelClass.nestedAttributesOptions = nestedAttributesOptions;
+      this.nestedAttributesOptions = nestedAttributesOptions;
 
       const type = reflection.isCollection() ? "collection" : "one_to_one";
-      modelClass.generateAssociationWriter(associationName, type);
+      this.generateAssociationWriter(associationName, type);
     } else {
       throw new ArgumentError(
         `No association found for name \`${associationName}'. Has it been defined yet?`,

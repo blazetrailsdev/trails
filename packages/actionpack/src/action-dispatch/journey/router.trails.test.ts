@@ -146,6 +146,27 @@ describe("ActionDispatch::Journey::Router", () => {
     expect((await router.serve(req({ pathInfo: "/x", requestMethod: "HEAD" })))[0]).toBe(200);
   });
 
+  it("HEAD prefers a route that answers HEAD directly over an earlier GET route", async () => {
+    const getRoute = new Route({
+      name: "g",
+      app: okApp("get"),
+      path: pat("/x"),
+      requestMethodMatch: [Route.verbMatcher("GET")],
+      precedence: 0,
+    });
+    const headRoute = new Route({
+      name: "h",
+      app: okApp("head"),
+      path: pat("/x"),
+      requestMethodMatch: [Route.verbMatcher("HEAD")],
+      precedence: 1,
+    });
+    const router = new Router(buildRoutes([getRoute, headRoute]));
+    expect((await router.serve(req({ pathInfo: "/x", requestMethod: "HEAD" })))[2]).toEqual([
+      "head",
+    ]);
+  });
+
   it("URI-decodes captured parameters", async () => {
     let seen: Record<string, unknown> = {};
     const app = {

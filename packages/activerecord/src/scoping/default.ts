@@ -4,6 +4,7 @@ import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import { Relation } from "../relation.js";
 import { ScopeRegistry, isScopeAttributes as baseIsScopeAttributes } from "../scoping.js";
+import { Scoping } from "../namespaces.js";
 
 type DefaultScopeBody<R = any> = ((this: R) => any) | { call(): any };
 
@@ -183,3 +184,5 @@ function evaluateDefaultScope(this: any, fn: () => unknown): unknown {
     setIgnoreDefaultScope.call(this, false);
   }
 }
+
+Scoping.Default = Default;

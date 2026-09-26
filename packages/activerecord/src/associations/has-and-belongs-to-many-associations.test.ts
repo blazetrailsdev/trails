@@ -24,7 +24,6 @@ import {
   AuditLog,
   LazyBlockDeveloperCalledDavid,
 } from "../test-helpers/models/developer.js";
-import { acceptsNestedAttributesFor } from "../nested-attributes.js";
 import { Mentor } from "../test-helpers/models/mentor.js";
 import { Tag } from "../test-helpers/models/tag.js";
 import { Tagging } from "../test-helpers/models/tagging.js";
@@ -156,9 +155,9 @@ class Sink extends Base {
       associationForeignKey: "source_id",
     });
     this.belongsTo("kitchen");
+    this.acceptsNestedAttributesFor("kitchen");
   }
 }
-acceptsNestedAttributesFor(Sink, "kitchen");
 
 class Source extends Base {
   static {

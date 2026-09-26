@@ -1050,11 +1050,7 @@ export class Base extends Model {
     import("./nested-attributes.js").NestedAttributeOptions
   >;
 
-  static acceptsNestedAttributesFor(
-    ...attrNames: (string | _NestedAttributes.NestedAttributeOptions)[]
-  ): void {
-    _NestedAttributes.acceptsNestedAttributesFor(this, ...attrNames);
-  }
+  static acceptsNestedAttributesFor = _NestedAttributes.acceptsNestedAttributesFor;
 
   declare static tokenDefinitions: _TokenDefinitionsHash;
 

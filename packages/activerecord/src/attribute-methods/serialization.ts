@@ -7,6 +7,7 @@ import { Serialized } from "../type/serialized.js";
 import { JSON as CodersJSON } from "../coders/json.js";
 import { ColumnSerializer as CodersColumnSerializer } from "../coders/column-serializer.js";
 import { YAMLColumn, type YamlColumnOptions } from "../coders/yaml-column.js";
+import { AttributeMethods } from "../namespaces.js";
 
 export const ClassMethods = {
   serialize,
@@ -127,3 +128,5 @@ export function serialize(
 
   this.decorateAttributes([attrName], decorator);
 }
+
+AttributeMethods.Serialization = Serialization;

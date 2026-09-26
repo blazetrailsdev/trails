@@ -1,6 +1,7 @@
 import { included, isBlank } from "@blazetrails/activesupport";
 import { toI } from "@blazetrails/ruby-compat";
 import { BooleanType, type ValueType } from "@blazetrails/activemodel";
+import { AttributeMethods } from "../namespaces.js";
 
 interface QueryIncludeHost {
   attributeMethodSuffix(...suffixes: Array<string | { parameters?: string | null | false }>): void;
@@ -69,3 +70,5 @@ export function queryCastAttribute(this: QueryHost, attrName: string, value: unk
     return !isBlank(value);
   }
 }
+
+AttributeMethods.Query = Query;

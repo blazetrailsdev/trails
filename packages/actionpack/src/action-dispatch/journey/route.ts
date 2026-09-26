@@ -25,16 +25,6 @@ const VERBS = [
   "TRACE",
   "UNLINK",
 ] as const;
-type Verb = (typeof VERBS)[number];
-
-function makeStaticMatcher(verb: Verb): VerbMatcher {
-  return {
-    verb,
-    call(req: VerbRequest): boolean {
-      return req.requestMethod === verb;
-    },
-  };
-}
 
 export class Unknown implements VerbMatcher {
   constructor(readonly verb: string) {}
@@ -43,20 +33,109 @@ export class Unknown implements VerbMatcher {
   }
 }
 
-const All: VerbMatcher = {
-  call: () => true,
-  verb: "",
+export const VerbMatchers = {
+  VERBS,
+  DELETE: class {
+    static get verb(): string {
+      return this.name.split("::").at(-1)!;
+    }
+    static call(req: VerbRequest): boolean {
+      return req.requestMethod === "DELETE";
+    }
+  },
+  GET: class {
+    static get verb(): string {
+      return this.name.split("::").at(-1)!;
+    }
+    static call(req: VerbRequest): boolean {
+      return req.requestMethod === "GET";
+    }
+  },
+  HEAD: class {
+    static get verb(): string {
+      return this.name.split("::").at(-1)!;
+    }
+    static call(req: VerbRequest): boolean {
+      return req.requestMethod === "HEAD";
+    }
+  },
+  OPTIONS: class {
+    static get verb(): string {
+      return this.name.split("::").at(-1)!;
+    }
+    static call(req: VerbRequest): boolean {
+      return req.requestMethod === "OPTIONS";
+    }
+  },
+  LINK: class {
+    static get verb(): string {
+      return this.name.split("::").at(-1)!;
+    }
+    static call(req: VerbRequest): boolean {
+      return req.requestMethod === "LINK";
+    }
+  },
+  PATCH: class {
+    static get verb(): string {
+      return this.name.split("::").at(-1)!;
+    }
+    static call(req: VerbRequest): boolean {
+      return req.requestMethod === "PATCH";
+    }
+  },
+  POST: class {
+    static get verb(): string {
+      return this.name.split("::").at(-1)!;
+    }
+    static call(req: VerbRequest): boolean {
+      return req.requestMethod === "POST";
+    }
+  },
+  PUT: class {
+    static get verb(): string {
+      return this.name.split("::").at(-1)!;
+    }
+    static call(req: VerbRequest): boolean {
+      return req.requestMethod === "PUT";
+    }
+  },
+  TRACE: class {
+    static get verb(): string {
+      return this.name.split("::").at(-1)!;
+    }
+    static call(req: VerbRequest): boolean {
+      return req.requestMethod === "TRACE";
+    }
+  },
+  UNLINK: class {
+    static get verb(): string {
+      return this.name.split("::").at(-1)!;
+    }
+    static call(req: VerbRequest): boolean {
+      return req.requestMethod === "UNLINK";
+    }
+  },
+  Unknown,
+  All: class {
+    static call(_: VerbRequest): boolean {
+      return true;
+    }
+    static get verb(): string {
+      return "";
+    }
+  },
+  VERB_TO_CLASS: {} as Record<string, VerbMatcher>,
 };
-
-const VERB_TO_CLASS: Record<string, VerbMatcher> = { ":all": All };
-for (const verb of VERBS) {
-  const klass = makeStaticMatcher(verb);
-  VERB_TO_CLASS[verb] = klass;
-  VERB_TO_CLASS[verb.toLowerCase()] = klass;
-  VERB_TO_CLASS[`:${verb.toLowerCase()}`] = klass;
-}
-
-export const VerbMatchers = { All, Unknown, VERB_TO_CLASS };
+VerbMatchers.VERB_TO_CLASS = VERBS.reduce<Record<string, VerbMatcher>>(
+  (hash, verb) => {
+    const klass = VerbMatchers[verb];
+    hash[verb] = klass;
+    hash[verb.toLowerCase()] = klass;
+    hash[`:${verb.toLowerCase()}`] = klass;
+    return hash;
+  },
+  { ":all": VerbMatchers.All },
+);
 
 export interface RouteOptions {
   name: string;
@@ -104,10 +183,13 @@ export class Route {
   /** @missingRailsArgs fetch — PERMANENT */
   static verbMatcher(verb: string): VerbMatcher {
     return fetch<VerbMatcher>(
-      VERB_TO_CLASS as unknown as Record<string, unknown>,
+      VerbMatchers.VERB_TO_CLASS as unknown as Record<string, unknown>,
       verb,
       block<VerbMatcher>(
-        () => new Unknown(dasherize(isSymbol(verb) ? symbolToS(verb) : verb).toUpperCase()),
+        () =>
+          new VerbMatchers.Unknown(
+            dasherize(isSymbol(verb) ? symbolToS(verb) : verb).toUpperCase(),
+          ),
       ),
     );
   }

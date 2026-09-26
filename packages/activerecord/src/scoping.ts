@@ -1,5 +1,6 @@
 import { IsolatedExecutionState } from "@blazetrails/activesupport";
 import { assertAssignedSynchronously } from "@blazetrails/activemodel";
+import { ActiveRecord, Scoping } from "./namespaces.js";
 
 const SCOPE_REGISTRY_KEY = "active_record_scope_registry";
 
@@ -141,3 +142,5 @@ export function setGlobalCurrentScope(this: ScopingClassHost, scope: any): void 
 export function scopeRegistry(): ScopeRegistry {
   return ScopeRegistry.instance();
 }
+
+ActiveRecord.Scoping = Scoping;

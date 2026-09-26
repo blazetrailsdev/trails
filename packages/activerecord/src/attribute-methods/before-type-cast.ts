@@ -1,4 +1,5 @@
 import { included } from "@blazetrails/activesupport";
+import { AttributeMethods } from "../namespaces.js";
 
 interface BeforeTypeCastIncludeHost {
   attributeMethodSuffix(...suffixes: Array<string | { parameters?: string | null | false }>): void;
@@ -74,3 +75,5 @@ export function attributeCameFromUser(this: AttributeOwner, attrName: string): b
   const name = this.constructor.attributeAliases?.[attrName] ?? attrName;
   return this._attributes.getAttribute(name).cameFromUser();
 }
+
+AttributeMethods.BeforeTypeCast = BeforeTypeCast;

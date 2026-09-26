@@ -7,6 +7,7 @@ import { isWillSaveChangeToAttribute } from "../attribute-methods/dirty.js";
 import { incrementBang as persistenceIncrementBang } from "../persistence.js";
 import { attributesWithValues } from "../attribute-methods.js";
 import type { CounterCacheCounters } from "../counter-cache.js";
+import { Locking } from "../namespaces.js";
 
 export class LockingType extends DelegateClass(ValueType) {
   constructor(subtype: ValueType) {
@@ -261,3 +262,5 @@ export const InstanceMethods = {
   _lockValueForDatabase,
   _clearLockingColumn,
 };
+
+Locking.Optimistic = Optimistic;

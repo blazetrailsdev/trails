@@ -431,7 +431,11 @@ export function setProtocolAdapters(protocolAdapters: InheritableOptions): void 
 
 export async function eagerLoadBang(): Promise<void> {
   await Autoload.eagerLoadBang.call(ActiveRecord);
+  await ActiveRecord.Locking.eagerLoadBang();
+  await import("./scoping.js");
+  await ActiveRecord.Scoping.eagerLoadBang();
   await ActiveRecord.Associations.eagerLoadBang();
+  await ActiveRecord.AttributeMethods.eagerLoadBang();
   await ActiveRecord.ConnectionAdapters.eagerLoadBang();
   const { Encryption } = await import("./encryption.js");
   await Encryption.eagerLoadBang();

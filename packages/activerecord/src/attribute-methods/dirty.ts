@@ -11,6 +11,7 @@ import type {
   NullMutationTracker,
 } from "@blazetrails/activemodel";
 import * as Timestamp from "../timestamp.js";
+import { AttributeMethods } from "../namespaces.js";
 
 interface DirtyRecord {
   mutationsFromDatabase: AttributeMutationTracker;
@@ -224,3 +225,5 @@ export function attributeNamesForPartialInserts(this: DirtyPrivateHost): string[
     return true;
   });
 }
+
+AttributeMethods.Dirty = Dirty;

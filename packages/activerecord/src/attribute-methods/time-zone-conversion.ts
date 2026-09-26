@@ -7,6 +7,7 @@ import {
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { classAttribute, included } from "@blazetrails/activesupport";
 import { DelegateClass, rbEqual } from "@blazetrails/ruby-compat";
+import { AttributeMethods } from "../namespaces.js";
 type ValueTypeInstance = InstanceType<typeof ValueType>;
 
 interface TimeValueSubtype extends ValueType {
@@ -152,3 +153,5 @@ function isCreateTimeZoneConversionAttribute(
     (this.timeZoneAwareTypes ?? ["datetime", "time"]).includes(castType.type() ?? "")
   );
 }
+
+AttributeMethods.TimeZoneConversion = TimeZoneConversion;

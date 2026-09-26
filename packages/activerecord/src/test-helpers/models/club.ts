@@ -6,7 +6,6 @@ import type { Membership } from "./membership.js";
 import type { Sponsor } from "./sponsor.js";
 import type { SuperMembership } from "./membership.js";
 import { Base } from "../../base.js";
-import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Club extends Base {
@@ -21,6 +20,7 @@ export class Club extends Base {
 
   static {
     this.hasOne("membership", { touch: true });
+    this.acceptsNestedAttributesFor("membership");
     this.hasMany("memberships", { inverseOf: false });
     this.hasMany("members", { through: "memberships" });
     this.hasOne("sponsor");
@@ -72,8 +72,6 @@ export interface Club {
   get category(): Category | null | Promise<Category | null>;
   set category(value: Category | null);
 }
-
-acceptsNestedAttributesFor(Club, "membership");
 
 export class SuperClub extends Base {
   declare memberships: AssociationProxy<SuperMembership>;

@@ -279,9 +279,7 @@ export class Route {
 
   match(method: string, requestPath: string): MatchedRoute | null {
     const m = method.toUpperCase();
-    if (!this.matchVerb(m) && !(m === "HEAD" && this.matchVerb("GET"))) {
-      return null;
-    }
+    if (!this.matchVerb(m)) return null;
     if (this._journeyRouterUnbuildable) return null;
     if (this._journeyRouter === null) {
       try {

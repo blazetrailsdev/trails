@@ -9,7 +9,6 @@ import type { NewContract } from "./contract.js";
 import type { Project } from "./project.js";
 import type { SpecialContract } from "./contract.js";
 import type { SpecialDeveloper } from "./developer.js";
-import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 import { registerModel } from "../../associations.js";
 import { registerSubclass } from "../../inheritance.js";
 import { Rollback } from "../../errors.js";
@@ -505,10 +504,9 @@ export interface RestrictedWithErrorFirm {
 export class Agency extends Firm {
   static {
     this.hasMany("projects", { foreignKey: "firm_id" });
+    this.acceptsNestedAttributesFor("projects");
   }
 }
-acceptsNestedAttributesFor(Agency, "projects");
-
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Client extends Company {
   declare accounts: AssociationProxy<Account>;
