@@ -26,7 +26,7 @@ describe("RedirectTest", () => {
     const c = new C();
     await c.dispatch("index", makeRequest(), makeResponse());
     expect(c.status).toBe(302);
-    expect(c.getHeader("location")).toBe("/posts");
+    expect(c.headers.get("location")).toBe("/posts");
   });
 
   it("redirect_to with full URL", async () => {
@@ -37,7 +37,7 @@ describe("RedirectTest", () => {
     }
     const c = new C();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.getHeader("location")).toBe("https://example.com/other");
+    expect(c.headers.get("location")).toBe("https://example.com/other");
   });
 
   it("redirect_to with 301", async () => {
@@ -70,8 +70,8 @@ describe("RedirectTest", () => {
     }
     const c = new C();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.body).toContain("/target");
-    expect(c.body).toContain("redirected");
+    expect(c.responseBody).toContain("/target");
+    expect(c.responseBody).toContain("redirected");
     expect(c.contentType).toBe("text/html; charset=utf-8");
   });
 
@@ -100,7 +100,7 @@ describe("RedirectTest", () => {
       HTTP_REFERER: "/previous-page",
     });
     await c.dispatch("index", req, makeResponse());
-    expect(c.getHeader("location")).toBe("/previous-page");
+    expect(c.headers.get("location")).toBe("/previous-page");
   });
 
   it("redirect_back uses fallback when no referer", async () => {
@@ -111,7 +111,7 @@ describe("RedirectTest", () => {
     }
     const c = new C();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.getHeader("location")).toBe("/home");
+    expect(c.headers.get("location")).toBe("/home");
   });
 
   it("redirect_back with custom status", async () => {
@@ -152,7 +152,7 @@ describe("RedirectTest", () => {
 
     const c = new C();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.getHeader("location")).toBe("/login");
+    expect(c.headers.get("location")).toBe("/login");
     expect(log).toEqual([]);
   });
 
@@ -376,7 +376,7 @@ describe("RedirectTest", () => {
     }
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.getHeader("location")).toBe("http://external.com");
+    expect(c.headers.get("location")).toBe("http://external.com");
     expect(c.status).toBe(302);
   });
 });

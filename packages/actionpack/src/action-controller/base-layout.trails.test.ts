@@ -25,7 +25,7 @@ class NamedLayoutController extends DefaultLayoutController {}
 async function dispatch(c: Base, action: string): Promise<unknown> {
   const env = { REQUEST_METHOD: "GET", PATH_INFO: "/", HTTP_HOST: "localhost" };
   await c.dispatch(action, new Request(env), new Response());
-  return c.body;
+  return c.responseBody;
 }
 
 beforeAll(() => {

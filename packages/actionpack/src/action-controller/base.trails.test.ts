@@ -43,18 +43,18 @@ describe("ActionController::Base render partial:", () => {
   it("resolves a qualified partial name from a controller whose path is unrelated", async () => {
     const c = new BadgeController();
     await c.dispatch("show", makeRequest(), new Response());
-    expect(c.body).toBe("badge");
+    expect(c.responseBody).toBe("badge");
   });
 
   it("resolves an unqualified partial against the controller's prefix", async () => {
     const c = new BadgeController();
     await c.dispatch("row", makeRequest(), new Response());
-    expect(c.body).toBe("row");
+    expect(c.responseBody).toBe("row");
   });
 
   it("reaches a partial in app/views/application from a subclass", async () => {
     const c = new BadgeController();
     await c.dispatch("footer", makeRequest(), new Response());
-    expect(c.body).toBe("footer");
+    expect(c.responseBody).toBe("footer");
   });
 });

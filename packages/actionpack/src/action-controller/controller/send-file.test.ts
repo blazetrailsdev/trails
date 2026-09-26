@@ -66,7 +66,7 @@ describe("SendFileTest", () => {
     }
     const c = new C();
     await c.dispatch("file", makeRequest(), makeResponse());
-    expect(c.getHeader("content-disposition")).toContain("attachment");
+    expect(c.headers.get("content-disposition")).toContain("attachment");
   });
 
   it("data", async () => {
@@ -77,7 +77,7 @@ describe("SendFileTest", () => {
     }
     const c = new C();
     await c.dispatch("data", makeRequest(), makeResponse());
-    expect(c.body).toBe(testFileData);
+    expect(c.responseBody).toBe(testFileData);
   });
 
   it("headers after send shouldnt include charset", async () => {
@@ -105,8 +105,8 @@ describe("SendFileTest", () => {
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
     expect(c.contentType).toBe("image/png");
-    expect(c.getHeader("content-disposition")).toContain("disposition");
-    expect(c.getHeader("content-disposition")).toContain("filename");
+    expect(c.headers.get("content-disposition")).toContain("disposition");
+    expect(c.headers.get("content-disposition")).toContain("filename");
   });
 
   it("send file headers with disposition as a symbol", async () => {
@@ -121,8 +121,8 @@ describe("SendFileTest", () => {
     }
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.getHeader("content-disposition")).toContain("disposition");
-    expect(c.getHeader("content-disposition")).toContain("filename");
+    expect(c.headers.get("content-disposition")).toContain("disposition");
+    expect(c.headers.get("content-disposition")).toContain("filename");
   });
 
   it("send file headers with mime lookup with symbol", async () => {
@@ -189,7 +189,7 @@ describe("SendFileTest", () => {
     }
     const c = new C();
     await c.dispatch("data", makeRequest(), makeResponse());
-    expect(c.getHeader("content-disposition")).toContain("attachment");
+    expect(c.headers.get("content-disposition")).toContain("attachment");
   });
 
   it("send file without content disposition header", async () => {
@@ -200,7 +200,7 @@ describe("SendFileTest", () => {
     }
     const c = new C();
     await c.dispatch("data", makeRequest(), makeResponse());
-    expect(c.getHeader("content-disposition")).toBeUndefined();
+    expect(c.headers.get("content-disposition")).toBeUndefined();
   });
 
   it("send file from before action", async () => {
@@ -278,8 +278,8 @@ describe("SendFileController", () => {
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
     expect(c.contentType).toBe("image/png");
-    expect(c.getHeader("content-disposition")).toContain("disposition");
-    expect(c.getHeader("content-disposition")).toContain("filename");
+    expect(c.headers.get("content-disposition")).toContain("disposition");
+    expect(c.headers.get("content-disposition")).toContain("filename");
   });
 
   it("send file headers with disposition as a symbol", async () => {
@@ -294,7 +294,7 @@ describe("SendFileController", () => {
     }
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.getHeader("content-disposition")).toContain("disposition");
+    expect(c.headers.get("content-disposition")).toContain("disposition");
   });
 
   it("send file headers with mime lookup with symbol", async () => {
@@ -351,7 +351,7 @@ describe("SendFileController", () => {
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
     expect(c.contentType).toBe("image/png");
-    expect(c.getHeader("Content-Disposition")).toMatch(/attachment;.*filename="x\.png"/);
-    expect(c.getHeader("Content-Transfer-Encoding")).toBe("binary");
+    expect(c.headers.get("Content-Disposition")).toMatch(/attachment;.*filename="x\.png"/);
+    expect(c.headers.get("Content-Transfer-Encoding")).toBe("binary");
   });
 });

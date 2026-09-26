@@ -54,7 +54,7 @@ export interface RenderingHost {
   };
   contentType: string | null;
   status: number;
-  setHeader(name: string, value: string): void;
+  headers: { set(name: string, value: string): unknown };
   urlFor(loc: string): string;
 }
 
@@ -95,7 +95,7 @@ export function _setVaryHeader(this: Pick<RenderingHost, "request" | "response">
 
 /** @internal */
 export function _processOptions(
-  this: Pick<RenderingHost, "status" | "contentType" | "setHeader" | "urlFor">,
+  this: Pick<RenderingHost, "status" | "contentType" | "headers" | "urlFor">,
   options: Record<string, unknown>,
 ): void {
   if (options.status != null && options.status !== false) {
@@ -105,7 +105,7 @@ export function _processOptions(
     this.contentType = String(options.contentType);
   }
   if (options.location != null && options.location !== false) {
-    this.setHeader("Location", this.urlFor(String(options.location)));
+    this.headers.set("Location", this.urlFor(String(options.location)));
   }
 }
 

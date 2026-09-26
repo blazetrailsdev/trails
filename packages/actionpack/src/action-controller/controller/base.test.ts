@@ -26,7 +26,7 @@ describe("ControllerInstanceTests", () => {
     }
     const c = new JsonController();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.body).toBe('{"hello":"world"}');
+    expect(c.responseBody).toBe('{"hello":"world"}');
     expect(c.contentType).toBe("application/json; charset=utf-8");
   });
 
@@ -38,7 +38,7 @@ describe("ControllerInstanceTests", () => {
     }
     const c = new JsonStringController();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.body).toBe('{"raw":true}');
+    expect(c.responseBody).toBe('{"raw":true}');
   });
 
   it("render plain", async () => {
@@ -49,7 +49,7 @@ describe("ControllerInstanceTests", () => {
     }
     const c = new PlainController();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.body).toBe("hello");
+    expect(c.responseBody).toBe("hello");
     expect(c.contentType).toBe("text/plain; charset=utf-8");
   });
 
@@ -61,7 +61,7 @@ describe("ControllerInstanceTests", () => {
     }
     const c = new HtmlController();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.body).toBe("<h1>Hi</h1>");
+    expect(c.responseBody).toBe("<h1>Hi</h1>");
     expect(c.contentType).toBe("text/html; charset=utf-8");
   });
 
@@ -73,7 +73,7 @@ describe("ControllerInstanceTests", () => {
     }
     const c = new BodyController();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.body).toBe("raw body");
+    expect(c.responseBody).toBe("raw body");
     expect(c.contentType).toBe("text/plain; charset=utf-8");
   });
 
@@ -85,7 +85,7 @@ describe("ControllerInstanceTests", () => {
     }
     const c = new TextController();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.body).toBe("text content");
+    expect(c.responseBody).toBe("text content");
     expect(c.contentType).toBe("text/plain; charset=utf-8");
   });
 
@@ -145,7 +145,7 @@ describe("ControllerInstanceTests", () => {
 
     const c = new TemplateController();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.body).toBe("<p>template#index</p>");
+    expect(c.responseBody).toBe("<p>template#index</p>");
   });
 
   it("double render throws DoubleRenderError", async () => {
@@ -172,7 +172,7 @@ describe("ControllerInstanceTests", () => {
     const c = new RtsController();
     await c.dispatch("index", makeRequest(), makeResponse());
     expect(c.result).toBe("preview");
-    expect(c.body).toBe("final");
+    expect(c.responseBody).toBe("final");
   });
 });
 
@@ -186,7 +186,7 @@ describe("ActionController::Base redirecting", () => {
     const c = new RedirectController();
     await c.dispatch("index", makeRequest(), makeResponse());
     expect(c.status).toBe(302);
-    expect(c.getHeader("location")).toBe("/other");
+    expect(c.headers.get("location")).toBe("/other");
     expect(c.performed).toBe(true);
   });
 
@@ -234,7 +234,7 @@ describe("ActionController::Base redirecting", () => {
     const c = new RedirectBackController();
     const req = makeRequest({ HTTP_REFERER: "/previous" });
     await c.dispatch("index", req, makeResponse());
-    expect(c.getHeader("location")).toBe("/previous");
+    expect(c.headers.get("location")).toBe("/previous");
   });
 
   it("redirectBack uses fallback when no referer", async () => {
@@ -245,7 +245,7 @@ describe("ActionController::Base redirecting", () => {
     }
     const c = new RedirectBackFallController();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.getHeader("location")).toBe("/fallback");
+    expect(c.headers.get("location")).toBe("/fallback");
   });
 });
 
@@ -346,7 +346,7 @@ describe("ActionController::Base conditional GET", () => {
     }
     const c = new FreshController();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.getHeader("etag")).toMatch(/^W\/"[a-f0-9]+"/);
+    expect(c.headers.get("etag")).toMatch(/^W\/"[a-f0-9]+"/);
   });
 
   it("freshWhen sets last-modified header", async () => {
@@ -361,7 +361,7 @@ describe("ActionController::Base conditional GET", () => {
     }
     const c = new LmController();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.getHeader("last-modified")).toBe(date.toUTCString());
+    expect(c.headers.get("last-modified")).toBe(date.toUTCString());
   });
 
   it("freshWhen returns 304 when etag matches", async () => {
@@ -375,7 +375,7 @@ describe("ActionController::Base conditional GET", () => {
     }
     const c1 = new Match304Controller();
     await c1.dispatch("index", makeRequest(), makeResponse());
-    const etag = c1.getHeader("etag")!;
+    const etag = c1.headers.get("etag")!;
 
     const c2 = new Match304Controller();
     const req = new Request({
@@ -407,14 +407,14 @@ describe("ActionController::Base conditional GET", () => {
     const c = new (class extends Base {})();
     c.setResponseBang(makeResponse());
     c.expiresIn(3600, { public: true, mustRevalidate: true });
-    expect(c.getHeader("cache-control")).toBe("max-age=3600, public, must-revalidate");
+    expect(c.headers.get("cache-control")).toBe("max-age=3600, public, must-revalidate");
   });
 
   it("expiresNow sets no-cache", () => {
     const c = new (class extends Base {})();
     c.setResponseBang(makeResponse());
     c.expiresNow();
-    expect(c.getHeader("cache-control")).toBe("no-cache");
+    expect(c.headers.get("cache-control")).toBe("no-cache");
   });
 });
 
@@ -423,9 +423,9 @@ describe("ActionController::Base sendData", () => {
     const c = new (class extends Base {})();
     c.setResponseBang(makeResponse());
     c.sendData("csv,data", { filename: "export.csv", type: "text/csv" });
-    expect(c.body).toBe("csv,data");
+    expect(c.responseBody).toBe("csv,data");
     expect(c.contentType).toBe("text/csv");
-    expect(c.getHeader("content-disposition")).toBe(
+    expect(c.headers.get("content-disposition")).toBe(
       "attachment; filename=\"export.csv\"; filename*=UTF-8''export.csv",
     );
     expect(c.performed).toBe(true);
@@ -435,7 +435,7 @@ describe("ActionController::Base sendData", () => {
     const c = new (class extends Base {})();
     c.setResponseBang(makeResponse());
     c.sendData("inline-data", { disposition: "inline", filename: "doc.pdf" });
-    expect(c.getHeader("content-disposition")).toBe(
+    expect(c.headers.get("content-disposition")).toBe(
       "inline; filename=\"doc.pdf\"; filename*=UTF-8''doc.pdf",
     );
   });
@@ -444,7 +444,7 @@ describe("ActionController::Base sendData", () => {
     const c = new (class extends Base {})();
     c.setResponseBang(makeResponse());
     c.sendData("raw");
-    expect(c.body).toBe("raw");
+    expect(c.responseBody).toBe("raw");
     expect(c.contentType).toBe("application/octet-stream");
   });
 });
@@ -458,7 +458,7 @@ describe("ActionController::API", () => {
     }
     const c = new ApiController();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.body).toBe('{"status":"ok"}');
+    expect(c.responseBody).toBe('{"status":"ok"}');
     expect(c.contentType).toBe("application/json; charset=utf-8");
   });
 
@@ -470,7 +470,7 @@ describe("ActionController::API", () => {
     }
     const c = new ApiPlainController();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.body).toBe("hello api");
+    expect(c.responseBody).toBe("hello api");
   });
 
   it("renders body", async () => {
@@ -481,7 +481,7 @@ describe("ActionController::API", () => {
     }
     const c = new ApiBodyController();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.body).toBe("raw");
+    expect(c.responseBody).toBe("raw");
   });
 
   it("render with status", async () => {
@@ -517,8 +517,8 @@ describe("ActionController::API", () => {
     const c = new ApiRedirectController();
     await c.dispatch("index", makeRequest(), makeResponse());
     expect(c.status).toBe(302);
-    expect(c.getHeader("location")).toBe("/api/v2");
-    expect(c.body).toBe("");
+    expect(c.headers.get("location")).toBe("/api/v2");
+    expect(c.responseBody).toBe("");
   });
 
   it("redirectTo with custom status", async () => {
@@ -637,7 +637,7 @@ describe("PerformActionTest", () => {
     }
     const c = new ActionMissingController();
     await c.dispatch("arbitrary_action", makeRequest(), makeResponse());
-    expect(c.body).toBe("Response for arbitrary_action");
+    expect(c.responseBody).toBe("Response for arbitrary_action");
   });
 
   it.skip("exceptions have suggestions for fix", () => {});

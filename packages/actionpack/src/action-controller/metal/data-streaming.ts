@@ -9,7 +9,7 @@ export const DEFAULT_SEND_FILE_DISPOSITION = "attachment";
 export interface SendFileHeadersHost {
   contentType: string | null;
   response: { sendingFile: boolean };
-  setHeader(name: string, value: string): void;
+  headers: { set(name: string, value: string): unknown };
 }
 
 export interface SendDataOptions extends SendFileHeadersOptions {
@@ -61,7 +61,7 @@ export function sendFileHeadersBang(
     : DEFAULT_SEND_FILE_DISPOSITION;
 
   if (disposition) {
-    this.setHeader(
+    this.headers.set(
       "Content-Disposition",
       ContentDisposition.format({
         disposition,
@@ -70,5 +70,5 @@ export function sendFileHeadersBang(
     );
   }
 
-  this.setHeader("Content-Transfer-Encoding", "binary");
+  this.headers.set("Content-Transfer-Encoding", "binary");
 }

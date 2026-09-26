@@ -266,12 +266,12 @@ export class Metal extends AbstractController {
     return this.response.headers;
   }
 
-  setHeader(name: string, value: string): void {
-    this.response.setHeader(name, value);
+  set location(value: string) {
+    this.response.location = value;
   }
 
-  getHeader(name: string): string | undefined {
-    return this.response.getHeader(name);
+  get location(): string {
+    return this.response.location;
   }
 
   set contentType(value: string) {
@@ -298,12 +298,12 @@ export class Metal extends AbstractController {
       contentType = options.content_type;
       for (const [key, value] of Object.entries(options)) {
         if (key === "location" || key === "content_type") continue;
-        this.setHeader(key.replace(/_/g, "-"), String(value));
+        this.headers.set(key.replace(/_/g, "-"), String(value));
       }
     }
     this.status = resolvedStatus;
     if (location !== undefined && location !== null) {
-      this.setHeader("location", this.urlFor(String(location)));
+      this.location = this.urlFor(String(location));
     }
     if (includeContent(this.status)) {
       if (!this.mediaType) {
@@ -319,14 +319,6 @@ export class Metal extends AbstractController {
     }
     this.responseBody = "";
     return true;
-  }
-
-  set body(value: string) {
-    this.responseBody = value;
-  }
-
-  get body(): string {
-    return this.responseBody;
   }
 
   override set responseBody(body: string | string[] | Buffer | null | undefined) {

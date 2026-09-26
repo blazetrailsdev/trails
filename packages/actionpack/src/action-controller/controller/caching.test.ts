@@ -26,7 +26,7 @@ describe("FragmentCachingTest", () => {
     }
     const c = new C();
     await c.dispatch("show", makeRequest(), makeResponse());
-    expect(c.getHeader("etag")).toMatch(/^W\/"[a-f0-9]{32}"$/);
+    expect(c.headers.get("etag")).toMatch(/^W\/"[a-f0-9]{32}"$/);
   });
 
   it("freshWhen sets Last-Modified", async () => {
@@ -39,7 +39,7 @@ describe("FragmentCachingTest", () => {
     }
     const c = new C();
     await c.dispatch("show", makeRequest(), makeResponse());
-    expect(c.getHeader("last-modified")).toBe("Sat, 15 Jun 2024 12:00:00 GMT");
+    expect(c.headers.get("last-modified")).toBe("Sat, 15 Jun 2024 12:00:00 GMT");
   });
 
   it("freshWhen accepts a Temporal.Instant lastModified", async () => {
@@ -52,7 +52,7 @@ describe("FragmentCachingTest", () => {
     }
     const c = new C();
     await c.dispatch("show", makeRequest(), makeResponse());
-    expect(c.getHeader("last-modified")).toBe("Sat, 15 Jun 2024 12:00:00 GMT");
+    expect(c.headers.get("last-modified")).toBe("Sat, 15 Jun 2024 12:00:00 GMT");
   });
 
   it("freshWhen sets Cache-Control public", async () => {
@@ -64,7 +64,7 @@ describe("FragmentCachingTest", () => {
     }
     const c = new C();
     await c.dispatch("show", makeRequest(), makeResponse());
-    expect(c.getHeader("cache-control")).toBe("public");
+    expect(c.headers.get("cache-control")).toBe("public");
   });
 
   it("freshWhen returns 304 when ETag matches", async () => {
@@ -76,7 +76,7 @@ describe("FragmentCachingTest", () => {
     }
     const c1 = new C();
     await c1.dispatch("show", makeRequest(), makeResponse());
-    const etag = c1.getHeader("etag")!;
+    const etag = c1.headers.get("etag")!;
     expect(c1.status).toBe(200);
 
     const c2 = new C();
@@ -147,7 +147,7 @@ describe("FragmentCachingTest", () => {
     const c = new C();
     await c.dispatch("show", makeRequest(), makeResponse());
     expect(result).toBe(true);
-    expect(c.body).toBe("content");
+    expect(c.responseBody).toBe("content");
   });
 
   it("stale? returns false when ETag matches", async () => {
@@ -159,7 +159,7 @@ describe("FragmentCachingTest", () => {
     }
     const c1 = new C();
     await c1.dispatch("show", makeRequest(), makeResponse());
-    const etag = c1.getHeader("etag")!;
+    const etag = c1.headers.get("etag")!;
 
     let result: boolean | undefined;
     class C2 extends Base {
@@ -191,7 +191,7 @@ describe("FragmentCachingTest", () => {
     }
     const c = new C();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.getHeader("cache-control")).toBe("max-age=3600, private");
+    expect(c.headers.get("cache-control")).toBe("max-age=3600, private");
   });
 
   it("expiresIn with public", async () => {
@@ -203,7 +203,7 @@ describe("FragmentCachingTest", () => {
     }
     const c = new C();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.getHeader("cache-control")).toBe("max-age=600, public");
+    expect(c.headers.get("cache-control")).toBe("max-age=600, public");
   });
 
   it("expiresIn with must-revalidate", async () => {
@@ -215,7 +215,7 @@ describe("FragmentCachingTest", () => {
     }
     const c = new C();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.getHeader("cache-control")).toBe("max-age=300, private, must-revalidate");
+    expect(c.headers.get("cache-control")).toBe("max-age=300, private, must-revalidate");
   });
 
   it("expiresIn with public and must-revalidate", async () => {
@@ -227,7 +227,7 @@ describe("FragmentCachingTest", () => {
     }
     const c = new C();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.getHeader("cache-control")).toBe("max-age=60, public, must-revalidate");
+    expect(c.headers.get("cache-control")).toBe("max-age=60, public, must-revalidate");
   });
 
   it("expiresNow sets no-cache", async () => {
@@ -239,7 +239,7 @@ describe("FragmentCachingTest", () => {
     }
     const c = new C();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.getHeader("cache-control")).toBe("no-cache");
+    expect(c.headers.get("cache-control")).toBe("no-cache");
   });
 });
 
