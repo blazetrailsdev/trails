@@ -274,6 +274,47 @@ describe("Ruby extractor define_method loop expansion", () => {
     expect(unexpandedLoops).toEqual(["cases/foo_test.rb:3"]);
   });
 
+  it("expands each_with_index over destructured rows, one arm per element", () => {
+    const { cases, unexpandedLoops } = extract(`
+  [
+    ["/a", [{ id: Model.new("1") }]],
+    ["/b", [{ action: "index" }, { year: 2009 }, "/b"]],
+  ].each_with_index do |(url, params), i|
+    if params.length > 1
+      define_method("test_#{url.gsub(/\\W/, '_')}_#{i}") do
+        assert_equal url, controller.url_for(params.first)
+      end
+    else
+      define_method("test_#{url.gsub(/\\W/, '_')}_#{i}") do
+        assert_equal url, url_for(params.first)
+      end
+    end
+  end
+`);
+    expect(cases.map((c) => c.description)).toEqual([" b 1", " a 0"]);
+    expect(unexpandedLoops).toEqual([]);
+  });
+
+  it("expands a hash constant whose unresolved key the name never reads", () => {
+    const { cases, unexpandedLoops } = extract(`
+  CASES = { "a" => "A", SafeBuffer.new("b") => "B" }
+
+  CASES.each_with_index do |(before, after), index|
+    define_method "test_titleize_#{index}" do
+      assert_equal after, before.titleize
+    end
+  end
+
+  CASES.each do |before, after|
+    define_method "test_named_#{before}" do
+      assert_equal after, before.titleize
+    end
+  end
+`);
+    expect(cases.map((c) => c.description)).toEqual(["titleize 0", "titleize 1"]);
+    expect(unexpandedLoops).toEqual(["cases/foo_test.rb:11"]);
+  });
+
   it("neither expands nor reports a loop that generates ordinary helpers", () => {
     const { cases, unexpandedLoops } = extract(`
   (1..3).each do |i|

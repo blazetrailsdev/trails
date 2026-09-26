@@ -367,7 +367,7 @@ export function extractTestsFromSource(content: string, relativePath: string): T
   const sourceFile = ts.createSourceFile(relativePath, content, ts.ScriptTarget.ESNext, false);
   const helpers = collectHelpers(sourceFile);
   const constDecls = collectConstDeclarations(sourceFile);
-  const bindings = new Map<string, string>();
+  const bindings = new Map<string, BoundValue>();
 
   const fileInfo: TestFileInfo = {
     file: relativePath,
@@ -767,7 +767,7 @@ function agreedGate(gates: (TestGate | undefined)[] | undefined): TestGate | und
 function getSuiteTitle(
   node: ts.CallExpression,
   index: number,
-  bindings: ReadonlyMap<string, string>,
+  bindings: ReadonlyMap<string, BoundValue>,
 ): string | null {
   const t = getArgTitle(node, index, bindings);
   if (t) return t.title;
@@ -823,7 +823,7 @@ export function collapseDynamicTitle(title: string): string {
 function getArgTitle(
   node: ts.CallExpression,
   index: number,
-  bindings: ReadonlyMap<string, string>,
+  bindings: ReadonlyMap<string, BoundValue>,
 ): { title: string; dynamic: boolean } | null {
   const staticTitle = getArgString(node, index);
   if (staticTitle !== null) return { title: staticTitle, dynamic: false };
@@ -845,7 +845,7 @@ function getArgTitle(
 function resolveTemplateTitle(
   node: ts.CallExpression,
   index: number,
-  bindings: ReadonlyMap<string, string>,
+  bindings: ReadonlyMap<string, BoundValue>,
 ): string | null {
   const arg = node.arguments[index];
   if (!arg || !ts.isTemplateExpression(arg)) return null;
@@ -861,10 +861,48 @@ function resolveTemplateTitle(
 /** A `${...}` span's value: a bound loop variable, or `JSON.stringify` / `regexpEscape` of one. */
 function evalBoundExpression(
   expr: ts.Expression,
-  bindings: ReadonlyMap<string, string>,
+  bindings: ReadonlyMap<string, BoundValue>,
 ): string | null {
   const e = unwrapExpression(expr);
-  if (ts.isIdentifier(e)) return bindings.get(e.text) ?? null;
+  if (ts.isIdentifier(e)) {
+    const bound = bindings.get(e.text);
+    return typeof bound === "string" ? bound : null;
+  }
+  if (
+    ts.isCallExpression(e) &&
+    ts.isPropertyAccessExpression(e.expression) &&
+    e.expression.name.text === "join" &&
+    e.arguments.length === 1
+  ) {
+    const receiver = unwrapExpression(e.expression.expression);
+    const separator = literalValue(e.arguments[0]);
+    if (
+      separator === null ||
+      !ts.isCallExpression(receiver) ||
+      !ts.isPropertyAccessExpression(receiver.expression) ||
+      !ts.isIdentifier(receiver.expression.expression) ||
+      receiver.expression.expression.text !== "Object" ||
+      receiver.expression.name.text !== "keys" ||
+      receiver.arguments.length !== 1
+    ) {
+      return null;
+    }
+    const target = unwrapExpression(receiver.arguments[0]);
+    const bound = ts.isIdentifier(target) ? bindings.get(target.text) : undefined;
+    return bound !== undefined && typeof bound !== "string" ? bound.keys.join(separator) : null;
+  }
+  if (
+    ts.isCallExpression(e) &&
+    ts.isPropertyAccessExpression(e.expression) &&
+    e.expression.name.text === "replaceAll" &&
+    e.arguments.length === 2
+  ) {
+    const inner = evalBoundExpression(e.expression.expression, bindings);
+    const pattern = literalValue(e.arguments[0]);
+    const replacement = literalValue(e.arguments[1]);
+    if (inner === null || pattern === null || replacement === null) return null;
+    return inner.replaceAll(pattern, replacement);
+  }
   if (
     ts.isCallExpression(e) &&
     ts.isPropertyAccessExpression(e.expression) &&
@@ -911,7 +949,14 @@ function literalValue(expr: ts.Expression): string | null {
  * not a literal (an arrow function paired with a name) resolves to null and
  * simply binds nothing, so a title naming it stays dynamic.
  */
-type IterableElement = { scalar: string | null; tuple: (string | null)[] | null };
+type IterableElement = { scalar: string | null; tuple: (BoundValue | null)[] | null };
+
+/**
+ * What a loop variable can be bound to: a string, or an object literal's
+ * statically-known keys, so `Object.keys(expected).join(" ")` over an
+ * `Object.entries` value still titles its `it()`.
+ */
+type BoundValue = string | { readonly keys: readonly string[] };
 
 /**
  * The statically-known elements of a `for...of` iterable: an array literal; an
@@ -999,7 +1044,7 @@ function staticIterableElements(
 function staticObjectEntries(
   expr: ts.Expression,
   decls: ReadonlyMap<string, ts.Expression>,
-): [string, string | null][] | null {
+): [string, BoundValue | null][] | null {
   let e = unwrapExpression(expr);
   if (ts.isIdentifier(e)) {
     const declared = decls.get(e.text);
@@ -1007,16 +1052,37 @@ function staticObjectEntries(
     e = unwrapExpression(declared);
   }
   if (!ts.isObjectLiteralExpression(e)) return null;
-  const out: [string, string | null][] = [];
+  const out: [string, BoundValue | null][] = [];
   for (const property of e.properties) {
     if (!ts.isPropertyAssignment(property)) return null;
     const key = property.name;
     if (!(ts.isIdentifier(key) || ts.isStringLiteral(key) || ts.isNumericLiteral(key))) {
       return null;
     }
-    out.push([key.text, literalValue(property.initializer)]);
+    out.push([
+      key.text,
+      literalValue(property.initializer) ?? staticObjectKeys(property.initializer),
+    ]);
   }
   return out;
+}
+
+/** An inline object literal's keys, or null when any key is not static. */
+function staticObjectKeys(expr: ts.Expression): BoundValue | null {
+  const e = unwrapExpression(expr);
+  if (!ts.isObjectLiteralExpression(e)) return null;
+  const keys: string[] = [];
+  for (const property of e.properties) {
+    if (!ts.isPropertyAssignment(property) && !ts.isShorthandPropertyAssignment(property)) {
+      return null;
+    }
+    const key = property.name;
+    if (!(ts.isIdentifier(key) || ts.isStringLiteral(key) || ts.isNumericLiteral(key))) {
+      return null;
+    }
+    keys.push(key.text);
+  }
+  return { keys };
 }
 
 /**
@@ -1027,7 +1093,7 @@ function staticObjectEntries(
  */
 function evalPredicate(
   expr: ts.Expression,
-  bindings: ReadonlyMap<string, string>,
+  bindings: ReadonlyMap<string, BoundValue>,
   decls: ReadonlyMap<string, ts.Expression>,
 ): boolean | null {
   const e = unwrapExpression(expr);

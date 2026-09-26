@@ -42,6 +42,27 @@ describe("statically expanded loop-generated it() titles", () => {
     ]);
   });
 
+  it("titles by an Object.entries value's keys and a replaceAll of a bound string", () => {
+    expect(
+      titles(`
+        for (const [requestPath, expected] of Object.entries({
+          "/content": { controller: "content" },
+          "/content/list": { controller: "content", action: "list" },
+        })) {
+          it(\`recognize \${Object.keys(expected).join(" ")}\`, () => {});
+        }
+        for (const method of ["as_json", "to_fs"]) {
+          it(\`delegates \${method.replaceAll("_", " ")} to Array\`, () => {});
+        }
+      `),
+    ).toEqual([
+      ["recognize controller", false],
+      ["recognize controller action", false],
+      ["delegates as json to Array", false],
+      ["delegates to fs to Array", false],
+    ]);
+  });
+
   it("binds the names beside a nested destructuring pattern", () => {
     expect(
       titles(`

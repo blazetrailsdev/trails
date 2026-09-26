@@ -447,65 +447,30 @@ describe("TestRouter", () => {
     expect(params).toEqual({});
   });
 
-  it("recognize controller", () => {
-    const routeSet = new RouteSet();
-    routeSet.draw((r) => {
-      r.get("/:controller(/:action(/:id))", { to: "foo#bar" });
+  for (const [requestPath, expected] of Object.entries({
+    "/content": { controller: "content" },
+    "/content/list": { controller: "content", action: "list" },
+    "/content/show/10": { controller: "content", action: "show", id: "10" },
+  } as Record<string, Record<string, string>>)) {
+    it(`recognize ${Object.keys(expected).join(" ")}`, () => {
+      const routeSet = new RouteSet();
+      routeSet.draw((r) => {
+        r.get("/:controller(/:action(/:id))", { to: "foo#bar" });
+      });
+      const route = [...routeSet.journeyRouter.routes][0];
+
+      const env = railsEnv({ PATH_INFO: requestPath });
+      let called = false;
+
+      routeSet.journeyRouter.recognize(env, (r, params) => {
+        expect(r).toEqual(route);
+        expect(params).toEqual({ action: "bar", ...expected });
+        called = true;
+      });
+
+      expect(called).toBeTruthy();
     });
-    const route = [...routeSet.journeyRouter.routes][0];
-
-    const expected: Record<string, string> = { controller: "content" };
-    const env = railsEnv({ PATH_INFO: "/content" });
-    let called = false;
-
-    routeSet.journeyRouter.recognize(env, (r, params) => {
-      expect(r).toEqual(route);
-      expect(params).toEqual({ action: "bar", ...expected });
-      called = true;
-    });
-
-    expect(called).toBeTruthy();
-  });
-
-  it("recognize controller action", () => {
-    const routeSet = new RouteSet();
-    routeSet.draw((r) => {
-      r.get("/:controller(/:action(/:id))", { to: "foo#bar" });
-    });
-    const route = [...routeSet.journeyRouter.routes][0];
-
-    const expected: Record<string, string> = { controller: "content", action: "list" };
-    const env = railsEnv({ PATH_INFO: "/content/list" });
-    let called = false;
-
-    routeSet.journeyRouter.recognize(env, (r, params) => {
-      expect(r).toEqual(route);
-      expect(params).toEqual({ action: "bar", ...expected });
-      called = true;
-    });
-
-    expect(called).toBeTruthy();
-  });
-
-  it("recognize controller action id", () => {
-    const routeSet = new RouteSet();
-    routeSet.draw((r) => {
-      r.get("/:controller(/:action(/:id))", { to: "foo#bar" });
-    });
-    const route = [...routeSet.journeyRouter.routes][0];
-
-    const expected: Record<string, string> = { controller: "content", action: "show", id: "10" };
-    const env = railsEnv({ PATH_INFO: "/content/show/10" });
-    let called = false;
-
-    routeSet.journeyRouter.recognize(env, (r, params) => {
-      expect(r).toEqual(route);
-      expect(params).toEqual({ action: "bar", ...expected });
-      called = true;
-    });
-
-    expect(called).toBeTruthy();
-  });
+  }
 
   for (const [name, [requestPath, expected]] of Object.entries({
     segment: ["/a%2Fb%20c+d/splat", { segment: "a/b c+d", splat: "splat" }],
