@@ -211,7 +211,7 @@ describe("MetalControllerInstanceTests", () => {
     (req as any).parameters = { id: "42" };
     const c = new TestController();
     await c.dispatch("index", req, makeResponse());
-    expect(c.receivedParams.get("id")).toBe("42");
+    expect(c.receivedParams).toEqual({ id: "42" });
   });
 
   it("toRackResponse returns [status, headers, body]", () => {

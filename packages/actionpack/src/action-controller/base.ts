@@ -122,7 +122,10 @@ import {
   haltedCallbackHook,
   processAction as _instrumentProcessAction,
 } from "./metal/instrumentation.js";
-import { Parameters as StrongParameters } from "./metal/strong-parameters.js";
+import {
+  Parameters as StrongParameters,
+  StrongParameters as StrongParametersModule,
+} from "./metal/strong-parameters.js";
 import {
   DEFAULT_PROTECTED_INSTANCE_VARIABLES,
   DoubleRenderError,
@@ -210,6 +213,13 @@ export const PROTECTED_IVARS: readonly string[] = [
   "_renderedFormat",
 ];
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Base {
+  get params(): StrongParameters;
+  set params(value: StrongParameters | Record<string, unknown>);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Base extends Metal {
   get flash(): FlashHash {
     return this.request.flash!;
@@ -943,6 +953,7 @@ export class Base extends Metal {
 
 include(Base, ConfigMethods);
 include(Base, Cookies);
+include(Base, StrongParametersModule);
 Base.prototype._processRenderTemplateOptions = _processRenderTemplateOptions;
 Base.prototype.isActionHasLayout = isActionHasLayout;
 Base.prototype._isConditionalLayout = _isConditionalLayout;

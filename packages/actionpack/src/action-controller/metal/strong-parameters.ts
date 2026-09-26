@@ -1012,8 +1012,31 @@ export class Parameters {
   }
 }
 
-export interface StrongParameters {
-  params: Parameters;
+interface StrongParametersHost {
+  _params: Parameters | Record<string, unknown> | null;
+  actionName: string;
+  request: {
+    parameters: Record<string, unknown>;
+    filteredParameters(): Record<string, unknown>;
+  };
+}
+
+export class StrongParameters {
+  get params(): Parameters {
+    const self = this as unknown as StrongParametersHost;
+    return (self._params ??= new Parameters(self.request.parameters, {
+      controller: this.constructor.name,
+      action: self.actionName,
+      request: self.request,
+      params: self.request.filteredParameters(),
+    })) as Parameters;
+  }
+
+  set params(value: Parameters | Record<string, unknown>) {
+    (this as unknown as StrongParametersHost)._params = isPlainObject(value)
+      ? new Parameters(value)
+      : value;
+  }
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

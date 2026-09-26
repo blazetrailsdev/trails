@@ -109,22 +109,17 @@ const _middlewareStacks = new WeakMap<object, MiddlewareStack>();
 export class Metal extends AbstractController {
   _request!: Request;
   _response!: Response;
-  _params: Parameters | null = null;
+  _params: Parameters | Record<string, unknown> | null = null;
 
   constructor() {
     super();
     initializeIncludedModules(this);
   }
 
-  get params(): Parameters {
-    return (this._params ??= new Parameters(this.request.parameters, {
-      controller: this.constructor.name,
-      action: this.actionName,
-      request: this.request,
-      params: this.request.filteredParameters(),
-    }));
+  get params(): Parameters | Record<string, unknown> {
+    return (this._params ??= this.request.parameters);
   }
-  set params(value: Parameters) {
+  set params(value: Parameters | Record<string, unknown>) {
     this._params = value;
   }
 

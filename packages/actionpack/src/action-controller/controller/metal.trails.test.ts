@@ -21,7 +21,7 @@ describe("Metal#params", () => {
     const first = c.params;
     (req as any).parameters = { id: "2" };
     expect(c.params).toBe(first);
-    expect(first.get("id")).toBe("1");
+    expect(first).toEqual({ id: "1" });
   });
 
   it("params assigned before dispatch survive it", async () => {
