@@ -46,7 +46,7 @@ describe("FileSystemResolver", () => {
 
   it("binds the requested locals, memoizing one template per locals set", () => {
     const resolver = new FileSystemResolver(dir);
-    const details = { formats: [":html"], handlers: ["tse"] };
+    const details = { formats: [":html"], handlers: [":tse"] };
 
     const [bound] = resolver.findAll("index", "posts", false, details, null, ["b", "a"]);
     expect(bound.locals).toEqual(["a", "b"]);

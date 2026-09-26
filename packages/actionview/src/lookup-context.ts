@@ -33,7 +33,7 @@ registerDetail(
   () => Base.defaultFormats ?? [":html", ":text", ":js", ":css", ":xml", ":json"],
 );
 registerDetail("variants", () => []);
-registerDetail("handlers", () => TemplateHandlers.extensions() as DetailValue);
+registerDetail("handlers", () => TemplateHandlers.extensions().map((extension) => `:${extension}`));
 
 export class DetailsKey {
   /** @internal */

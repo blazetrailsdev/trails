@@ -280,7 +280,7 @@ export class PathParser {
     const templatePath = TemplatePath.build(action, prefix ?? "", partial != null);
     const details = new TemplateDetails(
       locale ?? null,
-      handler ?? null,
+      handler != null ? `:${handler}` : null,
       format != null ? `:${format}` : null,
       variant ?? null,
     );
