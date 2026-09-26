@@ -1,6 +1,7 @@
 import { isPlainObject, symbolizeKeys, toParam } from "@blazetrails/activesupport";
 import { MockRequest, type RackEnv, type RackResponse } from "@blazetrails/rack";
 import {
+  except,
   extend,
   hasKey,
   InvalidURIError,
@@ -1211,8 +1212,7 @@ export class RouteSet {
     delete options["useRoute"];
     const generator = this.generate(routeName, options, recall);
     const pathInfo = this.pathFor(options, routeName ?? null, []);
-    const { _recall: _, ...params } = generator.params;
-    return [URI.parse(pathInfo).path!, Object.keys(params)];
+    return [URI.parse(pathInfo).path!, Object.keys(except(generator.params, "_recall"))];
   }
 
   recognize(method: string, path: string): MatchedRoute | null {
