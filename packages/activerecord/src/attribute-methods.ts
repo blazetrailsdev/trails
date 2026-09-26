@@ -21,6 +21,7 @@ import { queryAttribute as _queryAttribute } from "./attribute-methods/query.js"
 import { reload as _reload } from "./persistence.js";
 import { cachedTableExists, loadSchema } from "./model-schema.js";
 import { attributeNamesForSerialization as _attrNamesForSerialization } from "./serialization.js";
+import { AttributeMethods as AttributeMethodsNamespace } from "./namespaces.js";
 
 export interface AttributeMethods {
   hasAttribute(name: string): boolean;
@@ -769,3 +770,5 @@ export function attributeNamesForPartialUpdates(this: InstanceMethodHost): strin
 export function attributeNamesForPartialInserts(this: InstanceMethodHost): string[] {
   return _attributeNamesForPartialInserts.call(this as any);
 }
+
+ActiveRecord.AttributeMethods = AttributeMethodsNamespace;

@@ -1,7 +1,6 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { TuningPeg } from "./tuning-peg.js";
 import { Base } from "../../base.js";
-import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
 export class Guitar extends Base {
   declare tuningPegs: AssociationProxy<TuningPeg>;
@@ -9,7 +8,6 @@ export class Guitar extends Base {
 
   static {
     this.hasMany("tuningPegs", { indexErrors: true });
+    this.acceptsNestedAttributesFor("tuningPegs");
   }
 }
-
-acceptsNestedAttributesFor(Guitar, "tuningPegs");

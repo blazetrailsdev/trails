@@ -14,7 +14,6 @@ import type { Reader } from "./reader.js";
 import type { Reference } from "./reference.js";
 import type { SecureReader } from "./reader.js";
 import type { Treasure } from "./treasure.js";
-import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
 import type { CollectionProxy } from "../../associations/collection-proxy.js";
@@ -224,6 +223,7 @@ export class LoosePerson extends Base {
     this.hasOne("bestFriend", { className: "LoosePerson", foreignKey: "best_friend_id" });
     this.belongsTo("bestFriendOf", { className: "LoosePerson", foreignKey: "best_friend_of_id" });
     this.hasMany("bestFriends", { className: "LoosePerson", foreignKey: "best_friend_id" });
+    this.acceptsNestedAttributesFor("bestFriend", "bestFriendOf", "bestFriends");
   }
 }
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -233,8 +233,6 @@ export interface LoosePerson {
   get bestFriendOf(): LoosePerson | null | Promise<LoosePerson | null>;
   set bestFriendOf(value: LoosePerson | null);
 }
-acceptsNestedAttributesFor(LoosePerson, "bestFriend", "bestFriendOf", "bestFriends");
-
 export class LooseDescendant extends LoosePerson {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -247,6 +245,7 @@ export class TightPerson extends Base {
     this.hasOne("bestFriend", { className: "TightPerson", foreignKey: "best_friend_id" });
     this.belongsTo("bestFriendOf", { className: "TightPerson", foreignKey: "best_friend_of_id" });
     this.hasMany("bestFriends", { className: "TightPerson", foreignKey: "best_friend_id" });
+    this.acceptsNestedAttributesFor("bestFriend", "bestFriendOf", "bestFriends");
   }
 }
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -256,8 +255,6 @@ export interface TightPerson {
   get bestFriendOf(): TightPerson | null | Promise<TightPerson | null>;
   set bestFriendOf(value: TightPerson | null);
 }
-acceptsNestedAttributesFor(TightPerson, "bestFriend", "bestFriendOf", "bestFriends");
-
 export class TightDescendant extends TightPerson {}
 
 export class RichPerson extends Base {
@@ -295,6 +292,7 @@ export class NestedPerson extends Base {
     this._tableName = "people";
 
     this.hasOne("bestFriend", { className: "NestedPerson", foreignKey: "best_friend_id" });
+    this.acceptsNestedAttributesFor("bestFriend", { updateOnly: true });
   }
 
   set comments(_newComments: any) {
@@ -310,8 +308,6 @@ export interface NestedPerson {
   get bestFriend(): NestedPerson | null | Promise<NestedPerson | null>;
   set bestFriend(value: NestedPerson | null);
 }
-acceptsNestedAttributesFor(NestedPerson, "bestFriend", { updateOnly: true });
-
 export const Insure = {
   INSURES: ["life", "annuality"] as const,
 

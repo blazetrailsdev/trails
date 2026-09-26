@@ -1,4 +1,5 @@
 import { PrimaryKey, type PrimaryKeyInstance, type PrimaryKeyRecord } from "./primary-key.js";
+import { AttributeMethods } from "../namespaces.js";
 
 function primaryKeyOf(record: object): string[] {
   return (record as { _primaryKey: string[] })._primaryKey;
@@ -92,3 +93,5 @@ export class CompositePrimaryKey extends PrimaryKey {
     return super.idForDatabase;
   }
 }
+
+AttributeMethods.CompositePrimaryKey = CompositePrimaryKey;

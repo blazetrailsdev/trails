@@ -5,7 +5,6 @@ import type { Person } from "./person.js";
 import type { Pet } from "./pet.js";
 import type { Toy } from "./toy.js";
 import { Base } from "../../base.js";
-import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Owner extends Base {
@@ -44,6 +43,7 @@ export class Owner extends Base {
     this.afterCommit(async (owner: Owner) => {
       await owner.executeBlocks();
     });
+    this.acceptsNestedAttributesFor("pets", { allowDestroy: true });
   }
 
   get blocks(): Array<(owner: Owner) => void | Promise<void>> {
@@ -67,8 +67,6 @@ export interface Owner {
   get lastPet(): Pet | null | Promise<Pet | null>;
   set lastPet(value: Pet | null);
 }
-
-acceptsNestedAttributesFor(Owner, "pets", { allowDestroy: true });
 
 export class InvalidOwner extends Owner {
   static {

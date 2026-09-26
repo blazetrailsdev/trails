@@ -7,7 +7,6 @@ import type { Pirate } from "./pirate.js";
 import type { ShipPart } from "./ship-part.js";
 import type { Treasure } from "./treasure.js";
 import { Base } from "../../base.js";
-import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -33,6 +32,12 @@ export class Ship extends Base {
     this.belongsTo("developer", { dependent: "destroy" });
     this.hasMany("parts", { className: "ShipPart" });
     this.hasMany("treasures");
+    this.acceptsNestedAttributesFor("parts", { allowDestroy: true });
+    this.acceptsNestedAttributesFor("pirate", {
+      allowDestroy: true,
+      rejectIf: (attrs) => Object.keys(attrs).length === 0,
+    });
+    this.acceptsNestedAttributesFor("updateOnlyPirate", { updateOnly: true });
 
     this.validates("name", { presence: true });
 
@@ -57,13 +62,6 @@ export interface Ship {
   get developer(): Developer | null | Promise<Developer | null>;
   set developer(value: Developer | null);
 }
-
-acceptsNestedAttributesFor(Ship, "parts", { allowDestroy: true });
-acceptsNestedAttributesFor(Ship, "pirate", {
-  allowDestroy: true,
-  rejectIf: (attrs) => Object.keys(attrs).length === 0,
-});
-acceptsNestedAttributesFor(Ship, "updateOnlyPirate", { updateOnly: true });
 
 export class ShipWithoutNestedAttributes extends Base {
   declare prisoners: AssociationProxy<Prisoner>;

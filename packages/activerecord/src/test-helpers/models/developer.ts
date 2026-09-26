@@ -15,7 +15,6 @@ import { StringType } from "@blazetrails/activemodel";
 import { Base } from "../../base.js";
 import * as Type from "../../type.js";
 import type { Relation } from "../../relation.js";
-import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 import { Module, Range } from "@blazetrails/ruby-compat";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -92,6 +91,7 @@ export class Developer extends Base {
       foreignKey: "mentor_id",
       className: "Mentor",
     });
+    this.acceptsNestedAttributesFor("projects");
 
     this.hasAndBelongsToMany("sharedComputers", { className: "Computer" });
     this.hasMany("computers", { foreignKey: "developer" });
@@ -217,8 +217,6 @@ export interface Developer {
   get firm(): Firm | null | Promise<Firm | null>;
   set firm(value: Firm | null);
 }
-
-acceptsNestedAttributesFor(Developer, "projects");
 
 export class SubDeveloper extends Developer {}
 

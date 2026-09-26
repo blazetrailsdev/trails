@@ -8,6 +8,15 @@ import type { HasManyAssociation } from "./associations/has-many-association.js"
 import type { HasManyThroughAssociation } from "./associations/has-many-through-association.js";
 import type { HasOneAssociation } from "./associations/has-one-association.js";
 import type { HasOneThroughAssociation } from "./associations/has-one-through-association.js";
+import type { BeforeTypeCast } from "./attribute-methods/before-type-cast.js";
+import type { CompositePrimaryKey } from "./attribute-methods/composite-primary-key.js";
+import type { Dirty } from "./attribute-methods/dirty.js";
+import type { PrimaryKey } from "./attribute-methods/primary-key.js";
+import type { Query } from "./attribute-methods/query.js";
+import type { Read } from "./attribute-methods/read.js";
+import type { Serialization } from "./attribute-methods/serialization.js";
+import type { TimeZoneConversion } from "./attribute-methods/time-zone-conversion.js";
+import type { Write } from "./attribute-methods/write.js";
 import type { Base } from "./base.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import type { register, resolve } from "./connection-adapters.js";
@@ -40,20 +49,26 @@ import type { Properties } from "./encryption/properties.js";
 import type { ReadOnlyNullEncryptor } from "./encryption/read-only-null-encryptor.js";
 import type { Scheme } from "./encryption/scheme.js";
 import type { Fixture } from "./fixtures.js";
+import type { Optimistic } from "./locking/optimistic.js";
+import type * as Pessimistic from "./locking/pessimistic.js";
 import type { IrreversibleMigration, Migration } from "./migration.js";
 import type * as ModelSchema from "./model-schema.js";
 import type { Relation } from "./relation.js";
+import type { Default } from "./scoping/default.js";
+import type * as Named from "./scoping/named.js";
 
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
 const loadPath: Record<string, () => Promise<unknown>> = {
   "active_record/base": () => import("./base.js"),
   "active_record/associations": () => import("./associations.js"),
+  "active_record/attribute_methods": () => import("./attribute-methods.js"),
   "active_record/connection_adapters": () => import("./connection-adapters.js"),
   "active_record/encryption": () => import("./encryption.js"),
   "active_record/connection_handling": () => import("./connection-handling.js"),
   "active_record/fixtures": () => import("./fixtures.js"),
   "active_record/model_schema": () => import("./model-schema.js"),
+  "active_record/scoping": () => import("./scoping.js"),
   "active_record/association_relation": () => import("./association-relation.js"),
   "active_record/disable_joins_association_relation": () =>
     import("./disable-joins-association-relation.js"),
@@ -73,6 +88,23 @@ const loadPath: Record<string, () => Promise<unknown>> = {
     import("./associations/has-one-through-association.js"),
   "active_record/associations/disable_joins_association_scope": () =>
     import("./associations/disable-joins-association-scope.js"),
+  "active_record/attribute_methods/before_type_cast": () =>
+    import("./attribute-methods/before-type-cast.js"),
+  "active_record/attribute_methods/composite_primary_key": () =>
+    import("./attribute-methods/composite-primary-key.js"),
+  "active_record/attribute_methods/dirty": () => import("./attribute-methods/dirty.js"),
+  "active_record/attribute_methods/primary_key": () => import("./attribute-methods/primary-key.js"),
+  "active_record/attribute_methods/query": () => import("./attribute-methods/query.js"),
+  "active_record/attribute_methods/read": () => import("./attribute-methods/read.js"),
+  "active_record/attribute_methods/serialization": () =>
+    import("./attribute-methods/serialization.js"),
+  "active_record/attribute_methods/time_zone_conversion": () =>
+    import("./attribute-methods/time-zone-conversion.js"),
+  "active_record/attribute_methods/write": () => import("./attribute-methods/write.js"),
+  "active_record/locking/optimistic": () => import("./locking/optimistic.js"),
+  "active_record/locking/pessimistic": () => import("./locking/pessimistic.js"),
+  "active_record/scoping/default": () => import("./scoping/default.js"),
+  "active_record/scoping/named": () => import("./scoping/named.js"),
   "active_record/encryption/auto_filtered_parameters": () =>
     import("./encryption/auto-filtered-parameters.js"),
   "active_record/encryption/cipher": () => import("./encryption/cipher.js"),
@@ -123,9 +155,12 @@ export const ActiveRecord = { name: "ActiveRecord", loadPath } as AutoloadModule
   ModelSchema: typeof ModelSchema;
   AssociationRelation: typeof AssociationRelationClass;
   Associations: typeof Associations;
+  AttributeMethods: typeof AttributeMethods;
   ConnectionAdapters: typeof ConnectionAdapters;
   DisableJoinsAssociationRelation: typeof DisableJoinsAssociationRelation;
+  Locking: typeof Locking;
   Relation: typeof Relation;
+  Scoping: typeof Scoping;
   Point: new (x: number, y: number) => { x: number; y: number; equals(other: unknown): boolean };
 };
 registerConstant("ActiveRecord", ActiveRecord);
@@ -136,9 +171,11 @@ ActiveRecord.autoload("Encryption");
 ActiveRecord.autoload("Fixture", "active_record/fixtures");
 ActiveRecord.autoload("Migration");
 ActiveRecord.autoload("ModelSchema");
+ActiveRecord.autoload("Scoping");
 ActiveRecord.eagerAutoload(() => {
   ActiveRecord.autoload("AssociationRelation");
   ActiveRecord.autoload("Associations");
+  ActiveRecord.autoload("AttributeMethods");
   ActiveRecord.autoload("ConnectionAdapters");
   ActiveRecord.autoload("DisableJoinsAssociationRelation");
   ActiveRecord.autoload("Relation");
@@ -164,6 +201,54 @@ Associations.eagerAutoload(() => {
   Associations.autoload("HasOneAssociation");
   Associations.autoload("HasOneThroughAssociation");
   Associations.autoload("DisableJoinsAssociationScope");
+});
+
+export const AttributeMethods = {
+  name: "ActiveRecord::AttributeMethods",
+  loadPath,
+} as AutoloadModule & {
+  CompositePrimaryKey: typeof CompositePrimaryKey;
+  BeforeTypeCast: typeof BeforeTypeCast;
+  Dirty: typeof Dirty;
+  PrimaryKey: typeof PrimaryKey;
+  Query: typeof Query;
+  Read: typeof Read;
+  Serialization: typeof Serialization;
+  TimeZoneConversion: typeof TimeZoneConversion;
+  Write: typeof Write;
+};
+extend(AttributeMethods, Autoload);
+AttributeMethods.autoload("CompositePrimaryKey");
+AttributeMethods.eagerAutoload(() => {
+  AttributeMethods.autoload("BeforeTypeCast");
+  AttributeMethods.autoload("Dirty");
+  AttributeMethods.autoload("PrimaryKey");
+  AttributeMethods.autoload("Query");
+  AttributeMethods.autoload("Read");
+  AttributeMethods.autoload("Serialization");
+  AttributeMethods.autoload("TimeZoneConversion");
+  AttributeMethods.autoload("Write");
+});
+
+export const Locking = { name: "ActiveRecord::Locking", loadPath } as AutoloadModule & {
+  Optimistic: typeof Optimistic;
+  Pessimistic: typeof Pessimistic;
+};
+extend(Locking, Autoload);
+Locking.eagerAutoload(() => {
+  Locking.autoload("Optimistic");
+  Locking.autoload("Pessimistic");
+});
+ActiveRecord.Locking = Locking;
+
+export const Scoping = { name: "ActiveRecord::Scoping", loadPath } as AutoloadModule & {
+  Default: typeof Default;
+  Named: typeof Named;
+};
+extend(Scoping, Autoload);
+Scoping.eagerAutoload(() => {
+  Scoping.autoload("Default");
+  Scoping.autoload("Named");
 });
 
 export const ConnectionAdapters = {

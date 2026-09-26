@@ -1,6 +1,5 @@
 import type { Chef } from "./chef.js";
 import { Base } from "../../base.js";
-import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class DrinkDesigner extends Base {
@@ -8,6 +7,7 @@ export class DrinkDesigner extends Base {
 
   static {
     this.hasOne("chef", { as: "employable" });
+    this.acceptsNestedAttributesFor("chef");
   }
 }
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -15,8 +15,6 @@ export interface DrinkDesigner {
   get chef(): Chef | null | Promise<Chef | null>;
   set chef(value: Chef | null);
 }
-
-acceptsNestedAttributesFor(DrinkDesigner, "chef");
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class DrinkDesignerWithPolymorphicDependentNullifyChef extends Base {

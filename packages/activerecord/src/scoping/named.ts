@@ -5,6 +5,8 @@ import type { Base } from "../base.js";
 import { Relation } from "../relation.js";
 import { isDangerousClassMethod, isMethodDefinedWithin } from "../attribute-methods.js";
 import { Default } from "./default.js";
+import { Scoping } from "../namespaces.js";
+import * as Named from "./named.js";
 
 export type ScopeMethod<T extends Base, A extends unknown[] = []> = (...args: A) => Relation<T>;
 
@@ -104,3 +106,5 @@ export const ClassMethods = {
   defaultScoped,
   defaultExtensions,
 };
+
+Scoping.Named = Named;

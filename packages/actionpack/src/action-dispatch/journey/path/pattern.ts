@@ -141,9 +141,7 @@ export class MatchData {
   }
 
   at(x: number): string | undefined {
-    if (x === 0) return this._match[0];
-    if (x < 0 || x >= this.length) return undefined;
-    const idx = this._offsets[x - 1] + x;
+    const idx = this._offsets.at(x - 1)! + x;
     return this._match[idx];
   }
 

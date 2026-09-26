@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import { Parser } from "./parser.js";
 import { Ast } from "./ast.js";
 import { Pattern } from "./path/pattern.js";
-import { Route } from "./route.js";
+import { Request } from "@blazetrails/rack";
+import { Route, VerbMatchers } from "./route.js";
 
 const SEPARATORS = "/.?";
 
@@ -21,6 +22,10 @@ function pathFromString(p: string) {
   return buildPath(p);
 }
 
+function request(requestMethod: string, attrs: Record<string, unknown> = {}) {
+  return Object.assign(new Request({ REQUEST_METHOD: requestMethod }), attrs);
+}
+
 describe("ActionDispatch::Journey::Route", () => {
   it("Route.verbMatcher resolves canonical and lowercase forms", () => {
     expect(Route.verbMatcher("GET").verb).toBe("GET");
@@ -28,12 +33,25 @@ describe("ActionDispatch::Journey::Route", () => {
     expect(Route.verbMatcher(":all").verb).toBe("");
   });
 
+  it("VerbMatchers defines one class per verb, named for its verb", () => {
+    for (const verb of VerbMatchers.VERBS) {
+      const klass = VerbMatchers[verb];
+      expect(klass.verb).toBe(verb);
+      expect(Route.verbMatcher(verb)).toBe(klass);
+      expect(Route.verbMatcher(verb.toLowerCase())).toBe(klass);
+      expect(Route.verbMatcher(`:${verb.toLowerCase()}`)).toBe(klass);
+      expect(klass.call(request(verb))).toBe(true);
+    }
+    expect(VerbMatchers.GET.call(request("POST"))).toBe(false);
+    expect(Route.verbMatcher(":all")).toBe(VerbMatchers.All);
+  });
+
   it("Route.verbMatcher returns an Unknown matcher for novel verbs", () => {
     expect(Route.verbMatcher(":propfind").verb).toBe("PROPFIND");
     const m = Route.verbMatcher("propfind");
     expect(m.verb).toBe("PROPFIND");
-    expect(m.call({ requestMethod: "PROPFIND" })).toBe(true);
-    expect(m.call({ requestMethod: "GET" })).toBe(false);
+    expect(m.call(request("PROPFIND"))).toBe(true);
+    expect(m.call(request("GET"))).toBe(false);
   });
 
   it("matches() honors request_method_match and constraints", () => {
@@ -43,9 +61,9 @@ describe("ActionDispatch::Journey::Route", () => {
       requestMethodMatch: [Route.verbMatcher("GET")],
       constraints: { subdomain: "api" },
     });
-    expect(route.matches({ requestMethod: "GET", subdomain: "api" })).toBe(true);
-    expect(route.matches({ requestMethod: "POST", subdomain: "api" })).toBe(false);
-    expect(route.matches({ requestMethod: "GET", subdomain: "www" })).toBe(false);
+    expect(route.matches(request("GET", { subdomain: "api" }))).toBe(true);
+    expect(route.matches(request("POST", { subdomain: "api" }))).toBe(false);
+    expect(route.matches(request("GET", { subdomain: "www" }))).toBe(false);
   });
 
   it("matches() supports regex / array / boolean constraint shapes", () => {
@@ -58,17 +76,17 @@ describe("ActionDispatch::Journey::Route", () => {
         signedIn: true,
       },
     });
+    expect(route.matches(request("GET", { subdomain: "api", format: "json", signedIn: 1 }))).toBe(
+      true,
+    );
+    expect(route.matches(request("GET", { subdomain: "www", format: "json", signedIn: 1 }))).toBe(
+      false,
+    );
+    expect(route.matches(request("GET", { subdomain: "api", format: "csv", signedIn: 1 }))).toBe(
+      false,
+    );
     expect(
-      route.matches({ requestMethod: "GET", subdomain: "api", format: "json", signedIn: 1 }),
-    ).toBe(true);
-    expect(
-      route.matches({ requestMethod: "GET", subdomain: "www", format: "json", signedIn: 1 }),
-    ).toBe(false);
-    expect(
-      route.matches({ requestMethod: "GET", subdomain: "api", format: "csv", signedIn: 1 }),
-    ).toBe(false);
-    expect(
-      route.matches({ requestMethod: "GET", subdomain: "api", format: "json", signedIn: false }),
+      route.matches(request("GET", { subdomain: "api", format: "json", signedIn: false })),
     ).toBe(false);
   });
 

@@ -2,7 +2,6 @@ import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Recipe } from "./recipe.js";
 import { Base } from "../../base.js";
-import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Chef extends Base {
@@ -49,6 +48,7 @@ export class ChefWithPolymorphicInverseOf extends Chef {
 
   static {
     this.belongsTo("employable", { polymorphic: true, inverseOf: "chef" });
+    this.acceptsNestedAttributesFor("employable");
 
     this.beforeValidation(function (this: ChefWithPolymorphicInverseOf) {
       this.beforeValidationCallbacksCounter++;
@@ -75,5 +75,3 @@ export interface ChefWithPolymorphicInverseOf {
   get employable(): Base | null | Promise<Base | null>;
   set employable(value: Base | null);
 }
-
-acceptsNestedAttributesFor(ChefWithPolymorphicInverseOf, "employable");

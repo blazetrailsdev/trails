@@ -1,7 +1,6 @@
 import { kernelThrow } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { Base } from "../../base.js";
-import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
 export class CpkAuthor extends Base {
   declare books: AssociationProxy<CpkBook>;
@@ -44,6 +43,7 @@ export class CpkBook extends Base {
     });
     this.belongsTo("author", { className: "CpkAuthor" });
     this.hasMany("chapters", { className: "CpkChapter", foreignKey: ["author_id", "book_id"] });
+    this.acceptsNestedAttributesFor("chapters");
     this.beforeDestroy(function (this: CpkBook) {
       if (this.failDestroy) kernelThrow(":abort");
     });
@@ -59,7 +59,6 @@ export interface CpkBook {
   set author(value: CpkAuthor | null);
 }
 
-acceptsNestedAttributesFor(CpkBook, "chapters");
 CpkBook.generatesTokenFor("test");
 
 export class CpkBestSeller extends CpkBook {

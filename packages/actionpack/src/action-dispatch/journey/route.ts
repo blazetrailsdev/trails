@@ -6,6 +6,16 @@ import type { Format } from "./visitors.js";
 
 export interface VerbRequest {
   requestMethod: string;
+  isDelete(): boolean;
+  isGet(): boolean;
+  isHead(): boolean;
+  isOptions(): boolean;
+  isLink(): boolean;
+  isPatch(): boolean;
+  isPost(): boolean;
+  isPut(): boolean;
+  isTrace(): boolean;
+  isUnlink(): boolean;
 }
 
 export interface VerbMatcher {
@@ -25,16 +35,6 @@ const VERBS = [
   "TRACE",
   "UNLINK",
 ] as const;
-type Verb = (typeof VERBS)[number];
-
-function makeStaticMatcher(verb: Verb): VerbMatcher {
-  return {
-    verb,
-    call(req: VerbRequest): boolean {
-      return req.requestMethod === verb;
-    },
-  };
-}
 
 export class Unknown implements VerbMatcher {
   constructor(readonly verb: string) {}
@@ -43,20 +43,109 @@ export class Unknown implements VerbMatcher {
   }
 }
 
-const All: VerbMatcher = {
-  call: () => true,
-  verb: "",
+export const VerbMatchers = {
+  VERBS,
+  DELETE: class {
+    static get verb(): string {
+      return this.name.split("::").at(-1)!;
+    }
+    static call(req: VerbRequest): boolean {
+      return req.isDelete();
+    }
+  },
+  GET: class {
+    static get verb(): string {
+      return this.name.split("::").at(-1)!;
+    }
+    static call(req: VerbRequest): boolean {
+      return req.isGet();
+    }
+  },
+  HEAD: class {
+    static get verb(): string {
+      return this.name.split("::").at(-1)!;
+    }
+    static call(req: VerbRequest): boolean {
+      return req.isHead();
+    }
+  },
+  OPTIONS: class {
+    static get verb(): string {
+      return this.name.split("::").at(-1)!;
+    }
+    static call(req: VerbRequest): boolean {
+      return req.isOptions();
+    }
+  },
+  LINK: class {
+    static get verb(): string {
+      return this.name.split("::").at(-1)!;
+    }
+    static call(req: VerbRequest): boolean {
+      return req.isLink();
+    }
+  },
+  PATCH: class {
+    static get verb(): string {
+      return this.name.split("::").at(-1)!;
+    }
+    static call(req: VerbRequest): boolean {
+      return req.isPatch();
+    }
+  },
+  POST: class {
+    static get verb(): string {
+      return this.name.split("::").at(-1)!;
+    }
+    static call(req: VerbRequest): boolean {
+      return req.isPost();
+    }
+  },
+  PUT: class {
+    static get verb(): string {
+      return this.name.split("::").at(-1)!;
+    }
+    static call(req: VerbRequest): boolean {
+      return req.isPut();
+    }
+  },
+  TRACE: class {
+    static get verb(): string {
+      return this.name.split("::").at(-1)!;
+    }
+    static call(req: VerbRequest): boolean {
+      return req.isTrace();
+    }
+  },
+  UNLINK: class {
+    static get verb(): string {
+      return this.name.split("::").at(-1)!;
+    }
+    static call(req: VerbRequest): boolean {
+      return req.isUnlink();
+    }
+  },
+  Unknown,
+  All: class {
+    static call(_: VerbRequest): boolean {
+      return true;
+    }
+    static get verb(): string {
+      return "";
+    }
+  },
+  VERB_TO_CLASS: {} as Record<string, VerbMatcher>,
 };
-
-const VERB_TO_CLASS: Record<string, VerbMatcher> = { ":all": All };
-for (const verb of VERBS) {
-  const klass = makeStaticMatcher(verb);
-  VERB_TO_CLASS[verb] = klass;
-  VERB_TO_CLASS[verb.toLowerCase()] = klass;
-  VERB_TO_CLASS[`:${verb.toLowerCase()}`] = klass;
-}
-
-export const VerbMatchers = { All, Unknown, VERB_TO_CLASS };
+VerbMatchers.VERB_TO_CLASS = VERBS.reduce<Record<string, VerbMatcher>>(
+  (hash, verb) => {
+    const klass = VerbMatchers[verb];
+    hash[verb] = klass;
+    hash[verb.toLowerCase()] = klass;
+    hash[`:${verb.toLowerCase()}`] = klass;
+    return hash;
+  },
+  { ":all": VerbMatchers.All },
+);
 
 export interface RouteOptions {
   name: string;
@@ -104,10 +193,13 @@ export class Route {
   /** @missingRailsArgs fetch — PERMANENT */
   static verbMatcher(verb: string): VerbMatcher {
     return fetch<VerbMatcher>(
-      VERB_TO_CLASS as unknown as Record<string, unknown>,
+      VerbMatchers.VERB_TO_CLASS as unknown as Record<string, unknown>,
       verb,
       block<VerbMatcher>(
-        () => new Unknown(dasherize(isSymbol(verb) ? symbolToS(verb) : verb).toUpperCase()),
+        () =>
+          new VerbMatchers.Unknown(
+            dasherize(isSymbol(verb) ? symbolToS(verb) : verb).toUpperCase(),
+          ),
       ),
     );
   }

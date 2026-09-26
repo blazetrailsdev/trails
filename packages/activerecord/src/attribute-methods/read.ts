@@ -1,6 +1,7 @@
 import type { AttributeSet } from "@blazetrails/activemodel";
 import { AttrNames, AttributeMethods, completeHalfAccessor } from "@blazetrails/activemodel";
 import type { CodeGenerator } from "@blazetrails/activesupport";
+import { AttributeMethods as AttributeMethodsNamespace } from "../namespaces.js";
 
 export interface Read {
   readAttribute(name: string): unknown;
@@ -89,3 +90,5 @@ interface ReadRecord {
 function readGeneratedAttribute(record: ReadRecord, canonicalName: string): unknown {
   return record._readAttribute(canonicalName, (n) => record.missingAttribute(n));
 }
+
+AttributeMethodsNamespace.Read = Read;

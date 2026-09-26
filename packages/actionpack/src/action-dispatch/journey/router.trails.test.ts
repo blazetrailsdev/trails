@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { X_CASCADE } from "../constants.js";
+import { Request } from "../http/request.js";
 import { Parser } from "./parser.js";
 import { Ast } from "./ast.js";
 import { Pattern } from "./path/pattern.js";
@@ -27,14 +28,12 @@ function buildRoutes(routes: Route[]): Routes {
   return r;
 }
 
-function req(opts: Partial<RouterRequest> & { pathInfo: string }): RouterRequest {
-  return {
-    scriptName: "",
-    requestMethod: "GET",
-    pathParameters: {},
-    routeUriPattern: null,
-    ...opts,
-  };
+function req(opts: { pathInfo: string; requestMethod?: string }): RouterRequest {
+  return new Request({
+    REQUEST_METHOD: opts.requestMethod ?? "GET",
+    PATH_INFO: opts.pathInfo,
+    SCRIPT_NAME: "",
+  }) as unknown as RouterRequest;
 }
 
 describe("ActionDispatch::Journey::Router", () => {
@@ -144,6 +143,27 @@ describe("ActionDispatch::Journey::Router", () => {
     });
     const router = new Router(buildRoutes([getRoute]));
     expect((await router.serve(req({ pathInfo: "/x", requestMethod: "HEAD" })))[0]).toBe(200);
+  });
+
+  it("HEAD prefers a route that answers HEAD directly over an earlier GET route", async () => {
+    const getRoute = new Route({
+      name: "g",
+      app: okApp("get"),
+      path: pat("/x"),
+      requestMethodMatch: [Route.verbMatcher("GET")],
+      precedence: 0,
+    });
+    const headRoute = new Route({
+      name: "h",
+      app: okApp("head"),
+      path: pat("/x"),
+      requestMethodMatch: [Route.verbMatcher("HEAD")],
+      precedence: 1,
+    });
+    const router = new Router(buildRoutes([getRoute, headRoute]));
+    expect((await router.serve(req({ pathInfo: "/x", requestMethod: "HEAD" })))[2]).toEqual([
+      "head",
+    ]);
   });
 
   it("URI-decodes captured parameters", async () => {

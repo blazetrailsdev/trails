@@ -1,7 +1,6 @@
 import { kernelThrow } from "@blazetrails/ruby-compat";
 import type { Pirate } from "./pirate.js";
 import { Base } from "../../base.js";
-import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -17,6 +16,7 @@ export class Bird extends Base {
   static {
     this.belongsTo("pirate");
     this.validates("name", { presence: true });
+    this.acceptsNestedAttributesFor("pirate");
 
     this.beforeSave(async function (this: Bird) {
       const conn = await (this.constructor as typeof Base).leaseConnection();
@@ -49,5 +49,4 @@ export interface Bird {
   set pirate(value: Pirate | null);
 }
 
-acceptsNestedAttributesFor(Bird, "pirate");
 registerModel(Bird);

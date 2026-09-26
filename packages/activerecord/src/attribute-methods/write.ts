@@ -7,6 +7,7 @@ import {
   completeHalfAccessor,
 } from "@blazetrails/activemodel";
 import { included, type CodeGenerator } from "@blazetrails/activesupport";
+import { AttributeMethods as AttributeMethodsNamespace } from "../namespaces.js";
 
 export interface Write {
   writeAttribute(name: string, value: unknown): void;
@@ -76,3 +77,5 @@ export function setDefineMethodAttribute(
     },
   );
 }
+
+AttributeMethodsNamespace.Write = Write;

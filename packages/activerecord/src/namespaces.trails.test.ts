@@ -1,7 +1,14 @@
 import { describe, it, expect, vi } from "vitest";
 import { constantize } from "@blazetrails/activesupport";
 import "./index.js";
-import { Associations, ConnectionAdapters, Encryption } from "./namespaces.js";
+import {
+  Associations,
+  AttributeMethods,
+  ConnectionAdapters,
+  Encryption,
+  Locking,
+  Scoping,
+} from "./namespaces.js";
 import { eagerLoadBang } from "./active-record.js";
 import { Migration } from "./migration.js";
 import * as Compatibility from "./migration/compatibility.js";
@@ -14,6 +21,12 @@ import { DefaultStrategy } from "./migration/default-strategy.js";
 import { NullEncryptor } from "./encryption/null-encryptor.js";
 import { Scheme } from "./encryption/scheme.js";
 import * as Errors from "./encryption/errors.js";
+import { Optimistic } from "./locking/optimistic.js";
+import * as Pessimistic from "./locking/pessimistic.js";
+import { Default } from "./scoping/default.js";
+import * as Named from "./scoping/named.js";
+import { Dirty } from "./attribute-methods/dirty.js";
+import { TimeZoneConversion } from "./attribute-methods/time-zone-conversion.js";
 
 describe("ActiveRecord namespaces", () => {
   it("constantize resolves the namespaces nested on ActiveRecord", () => {
@@ -41,12 +54,38 @@ describe("ActiveRecord namespaces", () => {
 
   it("ActiveRecord.eager_load! eager loads its nested namespaces in Rails' order", async () => {
     const order: string[] = [];
-    for (const [name, ns] of Object.entries({ Associations, ConnectionAdapters, Encryption })) {
+    for (const [name, ns] of Object.entries({
+      Locking,
+      Scoping,
+      Associations,
+      AttributeMethods,
+      ConnectionAdapters,
+      Encryption,
+    })) {
       vi.spyOn(ns, "eagerLoadBang").mockImplementation(async () => void order.push(name));
     }
     await eagerLoadBang();
     vi.restoreAllMocks();
-    expect(order).toEqual(["Associations", "ConnectionAdapters", "Encryption"]);
+    expect(order).toEqual([
+      "Locking",
+      "Scoping",
+      "Associations",
+      "AttributeMethods",
+      "ConnectionAdapters",
+      "Encryption",
+    ]);
+  });
+
+  it("ActiveRecord.eager_load! seats the Locking, Scoping and AttributeMethods children", async () => {
+    await eagerLoadBang();
+    expect(constantize("ActiveRecord::Locking::Optimistic")).toBe(Optimistic);
+    expect(constantize("ActiveRecord::Locking::Pessimistic")).toBe(Pessimistic);
+    expect(constantize("ActiveRecord::Scoping::Default")).toBe(Default);
+    expect(constantize("ActiveRecord::Scoping::Named")).toBe(Named);
+    expect(constantize("ActiveRecord::AttributeMethods::Dirty")).toBe(Dirty);
+    expect(constantize("ActiveRecord::AttributeMethods::TimeZoneConversion")).toBe(
+      TimeZoneConversion,
+    );
   });
 
   it("constantize resolves every constant migration.rb:572-576 autoloads on Migration", () => {

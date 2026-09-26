@@ -2,16 +2,14 @@ import { merge } from "@blazetrails/ruby-compat";
 import { X_CASCADE } from "../constants.js";
 import { Builder } from "./gtg/index.js";
 import { unescapeUri } from "./router/utils.js";
-import type { Route } from "./route.js";
+import type { Route, VerbRequest } from "./route.js";
 import type { Routes } from "./routes.js";
 
-export interface RouterRequest {
+export interface RouterRequest extends VerbRequest {
   pathInfo: string;
   scriptName: string;
-  requestMethod: string;
   pathParameters: Record<string, unknown>;
   routeUriPattern?: string | null;
-  isHead?(): boolean;
   [key: string]: unknown;
 }
 
@@ -148,12 +146,10 @@ export class Router {
       ...this.customRoutes().filter((r) => r.path.isMatch(pathInfo)),
     ];
 
-    if (req.isHead?.() || req.requestMethod === "HEAD") {
+    if (req.isHead()) {
       routes = this.matchHeadRoutes(routes, req);
     } else {
-      routes = routes.filter((r) =>
-        r.matches(req as unknown as { requestMethod: string } & Record<string, unknown>),
-      );
+      routes = routes.filter((r) => r.matches(req));
     }
 
     routes.sort((a, b) => a.precedence - b.precedence);
@@ -172,19 +168,13 @@ export class Router {
 
   /** @internal */
   private matchHeadRoutes(routes: Route[], req: RouterRequest): Route[] {
-    const head = routes.filter(
-      (r) =>
-        r.isRequiresMatchingVerb() &&
-        r.matches(req as unknown as { requestMethod: string } & Record<string, unknown>),
-    );
+    const head = routes.filter((r) => r.isRequiresMatchingVerb() && r.matches(req));
     if (head.length > 0) return head;
 
     const original = req.requestMethod;
     try {
       req.requestMethod = "GET";
-      return routes.filter((r) =>
-        r.matches(req as unknown as { requestMethod: string } & Record<string, unknown>),
-      );
+      return routes.filter((r) => r.matches(req));
     } finally {
       req.requestMethod = original;
     }
