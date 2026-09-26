@@ -58,9 +58,7 @@ export class StreamingTemplateRenderer extends TemplateRenderer<Body | (string |
     }
 
     locals ??= {};
-    const layout = this.findLayout(layoutName, Object.keys(locals), [
-      (this.formats[0] as string) ?? ":html",
-    ]);
+    const layout = this.findLayout(layoutName, Object.keys(locals), [this.formats[0] as string]);
 
     return new Body((buffer) => this.delayedRender(buffer, template, layout, view, locals));
   }

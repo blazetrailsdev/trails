@@ -119,7 +119,7 @@ export class TemplateRenderer<Rendered = RenderedTemplate> extends AbstractRende
   ): Promise<RenderedTemplate> {
     const layout =
       path != null && path !== false
-        ? this.findLayout(path, Object.keys(locals), [(this.formats[0] as string) ?? ":html"])
+        ? this.findLayout(path, Object.keys(locals), [this.formats[0] as string])
         : null;
 
     let body: string;

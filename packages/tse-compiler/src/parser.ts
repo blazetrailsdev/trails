@@ -42,11 +42,11 @@ export function parse(source: string): TseAst {
         throw new TseSyntaxError(`unknown <%! ... !%> directive: ${tok.value.trim()}`);
       }
     } else {
-      const leading = tok.value.slice(0, tok.value.length - tok.value.trimStart().length);
+      const leading = /^\s*\n/.exec(tok.value)?.[0] ?? "";
       const leadingNewlines = (leading.match(/\n/g) ?? []).length;
       nodes.push({
         kind: tok.kind,
-        value: tok.value.trim(),
+        value: tok.value.slice(leading.length).replace(/[ \t]*\r?\n\s*$/, ""),
         srcLine: tok.srcLine + leadingNewlines,
       } as TseNode);
     }

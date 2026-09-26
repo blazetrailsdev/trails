@@ -54,8 +54,8 @@ describe("StatementCacheTest", () => {
   it("find or create by", async () => {
     await Book.create({ name: "my book" });
 
-    const a = await Book.findOrCreateBy({ name: "my book" });
-    const b = await Book.findOrCreateBy({ name: "my other book" });
+    const a = (await Book.findOrCreateBy({ name: "my book" }))!;
+    const b = (await Book.findOrCreateBy({ name: "my other book" }))!;
 
     expect(a.readAttribute("name")).toBe("my book");
     expect(b.readAttribute("name")).toBe("my other book");

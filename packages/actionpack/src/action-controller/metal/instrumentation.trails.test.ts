@@ -126,11 +126,10 @@ describe("ActionController::Instrumentation#process_action", () => {
     teardown.push(subscribeOnce("process_action.action_controller", events));
 
     TemplateHandlers.registerTemplateHandler("html", {
-      extensions: ["html"],
       call: (_template: unknown, source: string) => {
         const until = Date.now() + 20;
         while (Date.now() < until);
-        return JSON.stringify(source);
+        return `return ${JSON.stringify(source)};`;
       },
     });
     class SlowWidgetsController extends Base {

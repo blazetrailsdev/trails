@@ -5,8 +5,7 @@ import { Inline } from "./inline.js";
 import { TemplateHandlers, type TemplateHandler } from "./handlers.js";
 
 const echo: TemplateHandler = {
-  extensions: ["txt"],
-  call: (_template, source) => JSON.stringify(source),
+  call: (_template, source) => `return ${JSON.stringify(source)};`,
 };
 
 describe("ActionView::Template::Inline", () => {

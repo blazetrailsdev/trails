@@ -19,14 +19,11 @@ export interface TseTemplate {
   type?: unknown;
   format?: string | null;
   shortIdentifier?: string | null;
-  methodName(): string;
 }
 
 export type TseImplementation = (source: string, options?: EmitJsOptions) => EmitResult;
 
 export class Tse implements TemplateHandler {
-  readonly extensions = ["tse"];
-
   static trimMode: string = "-";
 
   static escapeIgnoreList: string[] = ["text/plain"];
@@ -68,12 +65,11 @@ export class Tse implements TemplateHandler {
       options.postamble = `_ob.safeAppend(${JSON.stringify(`<!-- END ${id} -->`)});`;
     }
     const result = ctor.implementation(prepared, options);
-    return (
-      "(" +
-      result.code
-        .replace(/^\s*export\s+default\s+/u, "")
-        .replace(/^function\s+render\b/u, `function ${template.methodName()}`) +
-      ")(this, localAssigns)"
-    );
+    return result.code
+      .replace(
+        /^\s*export\s+default\s+function\s+render\(context, locals\)\s*\{/u,
+        "const context = this;",
+      )
+      .replace(/\}\n$/u, "");
   }
 }
