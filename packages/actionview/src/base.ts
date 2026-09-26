@@ -230,8 +230,8 @@ export class Base {
           return compiled.call(this, locals, buffer, locals, block);
         } catch (argumentError) {
           if (!(argumentError instanceof ArgumentError)) throw argumentError;
-          const frame = excBacktraceLocations(argumentError)?.[0];
-          if (frame?.label === method) {
+          const frame = excBacktraceLocations(argumentError)?.[1];
+          if (frame?.label === "_run") {
             throw new StrictLocalsError(argumentError, this.currentTemplate!);
           }
           throw argumentError;

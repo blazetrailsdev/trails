@@ -11,7 +11,7 @@ import { RoutingUrlFor } from "../routing-url-for.js";
 export interface UrlHelperHost {
   controller: unknown;
   _backUrl(): string;
-  _filteredReferrer(): string | null | undefined;
+  _filteredReferrer(): string | null;
 }
 
 interface UrlHelperController {
@@ -45,7 +45,7 @@ export function _backUrl(this: UrlHelperHost): string {
 }
 
 /** @internal */
-export function _filteredReferrer(this: UrlHelperHost): string | null | undefined {
+export function _filteredReferrer(this: UrlHelperHost): string | null {
   try {
     if (rbObjRespondTo(this.controller, "request")) {
       const referrer = (this.controller as UrlHelperController).request.env["HTTP_REFERER"] as
@@ -59,5 +59,5 @@ export function _filteredReferrer(this: UrlHelperHost): string | null | undefine
   } catch (e) {
     if (!(e instanceof InvalidURIError)) throw e;
   }
-  return undefined;
+  return null;
 }
