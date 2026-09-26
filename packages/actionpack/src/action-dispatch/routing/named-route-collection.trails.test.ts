@@ -24,6 +24,23 @@ describe("NamedRouteCollection", () => {
     expect(named.isRouteDefined("posts")).toBe(false);
   });
 
+  it("camelizes a multi-word route name into its helper names", () => {
+    const routeSet = new RouteSet();
+    routeSet.draw((r) => {
+      r.get("/admin", { to: "admin#index", as: "admin_root" });
+    });
+    routeSet.namedRoutes.addUrlHelper("user_profile", {}, () => "/profile");
+    const named = routeSet.namedRoutes;
+    expect(named.helperNames()).toEqual([
+      "adminRootPath",
+      "userProfilePath",
+      "adminRootUrl",
+      "userProfileUrl",
+    ]);
+    expect(named.isRouteDefined("adminRootUrl")).toBe(true);
+    expect(named.isRouteDefined("admin_rootUrl")).toBe(false);
+  });
+
   it("generates a path from a positional argument", () => {
     const routeSet = drawn();
     const helpers = routeSet.urlHelpers() as unknown as Record<string, () => string>;
