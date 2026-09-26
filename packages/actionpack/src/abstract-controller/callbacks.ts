@@ -1,5 +1,7 @@
 import { kernelThrow } from "@blazetrails/ruby-compat";
 import {
+  extractOptionsBang,
+  MethodCall,
   defineCallbacks as asDefineCallbacks,
   setCallback as asSetCallback,
   runCallbacks as asRunCallbacks,
@@ -12,7 +14,7 @@ import { ActionNotFound, type AbstractController } from "./base.js";
 
 export type ActionCallback = (
   controller: AbstractController,
-) => void | Promise<void> | boolean | Promise<boolean>;
+) => void | boolean | Promise<void | boolean>;
 
 export type AroundCallback = (
   controller: AbstractController,
@@ -37,8 +39,11 @@ export interface CallbackOptions {
 }
 
 /** @internal */
+type CallbackFilter = ActionCallback | AroundCallback | string;
+
+/** @internal */
 type CallbackOptionsWithFilters = CallbackOptions & {
-  filters?: Array<ActionCallback | AroundCallback>;
+  filters?: CallbackFilter[];
 };
 
 /** @internal */
@@ -46,12 +51,12 @@ export const PROCESS_ACTION_CHAIN = "processAction";
 
 /** @internal */
 export class ActionFilter implements CallbackPredicateLike {
-  private readonly _filters: ReadonlyArray<ActionCallback | AroundCallback>;
+  private readonly _filters: ReadonlyArray<CallbackFilter>;
   private readonly _conditionalKey: "only" | "except";
   private readonly _actions: ReadonlySet<string>;
 
   constructor(
-    filters: ReadonlyArray<ActionCallback | AroundCallback>,
+    filters: ReadonlyArray<CallbackFilter>,
     conditionalKey: "only" | "except",
     actions: string | string[],
   ) {
@@ -123,24 +128,24 @@ export function _normalizeCallbackOption(
 
 /** @internal */
 export function _insertCallbacks(
-  callbacks: Array<ActionCallback | AroundCallback>,
-  options: CallbackOptions,
-  block: ActionCallback | AroundCallback | null,
-  yieldFn: (callback: ActionCallback | AroundCallback, options: CallbackOptions) => void,
+  callbacks: Array<CallbackFilter | CallbackOptions>,
+  block: ActionCallback | AroundCallback | null = null,
+  yieldFn: (callback: CallbackFilter, options: CallbackOptions) => void,
 ): void {
-  const list = callbacks.slice();
-  if (block) list.push(block);
-  const opts = options as CallbackOptionsWithFilters;
-  opts.filters = list;
+  const options = extractOptionsBang(callbacks) as CallbackOptionsWithFilters;
+  const filters = callbacks as CallbackFilter[];
+  if (block) filters.push(block);
+  options.filters = filters;
   _normalizeCallbackOptions(options);
-  delete opts.filters;
-  for (const callback of list) {
+  delete options.filters;
+  for (const callback of filters) {
     yieldFn(callback, options);
   }
 }
 
 /** @internal */
-function _inspectFilter(filter: ActionCallback | AroundCallback): string {
+function _inspectFilter(filter: CallbackFilter): string {
+  if (typeof filter === "string") return `:${filter}`;
   const fn = filter as { name?: string };
   return fn.name && fn.name.length > 0 ? `:${fn.name}` : "#<Proc:anonymous>";
 }
@@ -181,12 +186,14 @@ export function _defineActionCallbacks(prototype: object): void {
 export function _registerActionCallback(
   prototype: object,
   kind: CallbackKind,
-  callback: ActionCallback | AroundCallback,
+  callback: CallbackFilter,
   options: CallbackOptions,
 ): void {
   const opts: CallbackOptionsWithFilters = { ...options, filters: [callback] };
   _normalizeCallbackOptions(opts);
   delete opts.filters;
+
+  if (typeof callback === "string") options = { ...options, name: callback };
 
   if (options.name !== undefined) {
     const chain = getCallbackChains(prototype).get(PROCESS_ACTION_CHAIN);
@@ -207,7 +214,14 @@ export function _registerActionCallback(
   if (unlessFns) asOpts.unless = unlessFns;
   if (options.name !== undefined) asOpts._trailsName = options.name;
 
-  const filter = kind === "before" ? _wrapBefore(callback as ActionCallback) : callback;
+  const filter =
+    typeof callback === "string"
+      ? kind === "before"
+        ? _wrapBefore(new MethodCall(callback).makeLambda() as unknown as ActionCallback)
+        : `:${callback}`
+      : kind === "before"
+        ? _wrapBefore(callback as ActionCallback)
+        : callback;
   asSetCallback(
     prototype,
     PROCESS_ACTION_CHAIN,
@@ -269,52 +283,87 @@ export interface ActionCallbackHost {
   readonly prototype: object;
 }
 
+type ActionCallbackArgs<T> = Array<T | string | CallbackOptions>;
+
 export function beforeAction(
   this: ActionCallbackHost,
-  callback: ActionCallback,
-  options: CallbackOptions = {},
+  ...names: ActionCallbackArgs<ActionCallback>
 ): void {
-  _registerActionCallback(this.prototype, "before", callback, options);
+  _insertCallbacks(names, null, (name, options) => {
+    _registerActionCallback(this.prototype, "before", name, options);
+  });
+}
+
+export function prependBeforeAction(
+  this: ActionCallbackHost,
+  ...names: ActionCallbackArgs<ActionCallback>
+): void {
+  _insertCallbacks(names, null, (name, options) => {
+    _registerActionCallback(this.prototype, "before", name, { ...options, prepend: true });
+  });
 }
 
 export function afterAction(
   this: ActionCallbackHost,
-  callback: ActionCallback,
-  options: CallbackOptions = {},
+  ...names: ActionCallbackArgs<ActionCallback>
 ): void {
-  _registerActionCallback(this.prototype, "after", callback, options);
+  _insertCallbacks(names, null, (name, options) => {
+    _registerActionCallback(this.prototype, "after", name, options);
+  });
+}
+
+export function prependAfterAction(
+  this: ActionCallbackHost,
+  ...names: ActionCallbackArgs<ActionCallback>
+): void {
+  _insertCallbacks(names, null, (name, options) => {
+    _registerActionCallback(this.prototype, "after", name, { ...options, prepend: true });
+  });
 }
 
 export function aroundAction(
   this: ActionCallbackHost,
-  callback: AroundCallback,
-  options: CallbackOptions = {},
+  ...names: ActionCallbackArgs<AroundCallback>
 ): void {
-  _registerActionCallback(this.prototype, "around", callback, options);
+  _insertCallbacks(names, null, (name, options) => {
+    _registerActionCallback(this.prototype, "around", name, options);
+  });
+}
+
+export function prependAroundAction(
+  this: ActionCallbackHost,
+  ...names: ActionCallbackArgs<AroundCallback>
+): void {
+  _insertCallbacks(names, null, (name, options) => {
+    _registerActionCallback(this.prototype, "around", name, { ...options, prepend: true });
+  });
 }
 
 export function skipBeforeAction(
   this: ActionCallbackHost,
-  cb: ActionCallback | string,
-  options: CallbackOptions = {},
+  ...names: ActionCallbackArgs<ActionCallback>
 ): void {
-  _skipActionCallback(this.prototype, "before", cb, options);
+  _insertCallbacks(names, null, (name, options) => {
+    _skipActionCallback(this.prototype, "before", name, options);
+  });
 }
 
 export function skipAfterAction(
   this: ActionCallbackHost,
-  cb: ActionCallback | string,
-  options: CallbackOptions = {},
+  ...names: ActionCallbackArgs<ActionCallback>
 ): void {
-  _skipActionCallback(this.prototype, "after", cb, options);
+  _insertCallbacks(names, null, (name, options) => {
+    _skipActionCallback(this.prototype, "after", name, options);
+  });
 }
 
 export function skipAroundAction(
   this: ActionCallbackHost,
-  cb: AroundCallback | string,
-  options: CallbackOptions = {},
+  ...names: ActionCallbackArgs<AroundCallback>
 ): void {
-  _skipActionCallback(this.prototype, "around", cb, options);
+  _insertCallbacks(names, null, (name, options) => {
+    _skipActionCallback(this.prototype, "around", name, options);
+  });
 }
 
 /** @internal */

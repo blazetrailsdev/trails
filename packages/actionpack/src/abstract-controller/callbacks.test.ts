@@ -31,32 +31,29 @@ describe("TestCallbacks1", () => {
 
 class Callback2 extends AbstractController {
   text?: string;
-  second?: string;
-  aroundz?: string;
+  _secondIvar?: string;
+  _aroundzIvar?: string;
   first() {
     this.text = "Hello world";
   }
-  _second() {
-    this.second = "Goodbye";
+  second() {
+    this._secondIvar = "Goodbye";
+  }
+  async aroundz(block: () => Promise<void>) {
+    this._aroundzIvar = "FIRST";
+    await block();
+    this._aroundzIvar += "SECOND";
   }
   async index() {
     this.responseBody = this.text ?? "";
   }
 }
-Callback2.beforeAction((c) => (c as Callback2).first(), { name: "first" });
-Callback2.afterAction((c) => (c as Callback2)._second());
-Callback2.aroundAction(async (c, next) => {
-  const self = c as Callback2;
-  self.aroundz = "FIRST";
-  await next();
-  self.aroundz += "SECOND";
-});
+Callback2.beforeAction("first");
+Callback2.afterAction("second");
+Callback2.aroundAction("aroundz");
 
 class Callback2Overwrite extends Callback2 {}
-Callback2Overwrite.beforeAction((c) => (c as Callback2).first(), {
-  name: "first",
-  except: ["index"],
-});
+Callback2Overwrite.beforeAction("first", { except: "index" });
 
 describe("TestCallbacks2", () => {
   let controller: Callback2;
@@ -71,12 +68,12 @@ describe("TestCallbacks2", () => {
 
   it("after_action works", async () => {
     await controller.process("index");
-    expect(controller.second).toBe("Goodbye");
+    expect(controller._secondIvar).toBe("Goodbye");
   });
 
   it("around_action works", async () => {
     await controller.process("index");
-    expect(controller.aroundz).toBe("FIRSTSECOND");
+    expect(controller._aroundzIvar).toBe("FIRSTSECOND");
   });
 
   it("before_action with overwritten condition", async () => {
@@ -134,12 +131,8 @@ class CallbacksWithConditions extends AbstractController {
     this.responseBody = [...(this.list ?? []), this.authenticated].join(", ");
   }
 }
-CallbacksWithConditions.beforeAction((c) => (c as CallbacksWithConditions)._list(), {
-  only: ["index"],
-});
-CallbacksWithConditions.beforeAction((c) => (c as CallbacksWithConditions)._authenticate(), {
-  except: ["index"],
-});
+CallbacksWithConditions.beforeAction("_list", { only: "index" });
+CallbacksWithConditions.beforeAction("_authenticate", { except: "index" });
 
 describe("TestCallbacksWithConditions", () => {
   let controller: CallbacksWithConditions;
@@ -226,13 +219,8 @@ class CallbacksWithArrayConditions extends AbstractController {
     this.responseBody = [...(this.list ?? []), this.authenticated].join(", ");
   }
 }
-CallbacksWithArrayConditions.beforeAction((c) => (c as CallbacksWithArrayConditions)._list(), {
-  only: ["index", "listy"],
-});
-CallbacksWithArrayConditions.beforeAction(
-  (c) => (c as CallbacksWithArrayConditions)._authenticate(),
-  { except: ["index", "listy"] },
-);
+CallbacksWithArrayConditions.beforeAction("_list", { only: ["index", "listy"] });
+CallbacksWithArrayConditions.beforeAction("_authenticate", { except: ["index", "listy"] });
 
 describe("TestCallbacksWithArrayConditions", () => {
   let controller: CallbacksWithArrayConditions;
@@ -261,10 +249,7 @@ class ChangedConditions extends Callback2 {
     this.responseBody = this.text ?? "";
   }
 }
-ChangedConditions.beforeAction((c) => (c as Callback2).first(), {
-  name: "first",
-  only: ["index"],
-});
+ChangedConditions.beforeAction("first", { only: "index" });
 
 describe("TestCallbacksWithChangedConditions", () => {
   let controller: ChangedConditions;
@@ -291,7 +276,7 @@ class SetsResponseBody extends AbstractController {
     this.responseBody = "Success";
   }
 }
-SetsResponseBody.beforeAction((c) => (c as SetsResponseBody).setBody());
+SetsResponseBody.beforeAction("setBody");
 
 describe("TestHalting", () => {
   it("when a callback sets the response body, the action should not be invoked", async () => {
@@ -369,12 +354,14 @@ describe("TestCallbacksWithMissingConditions", () => {
 
   it("raised exception message includes the names of callback actions and missing conditional action", async () => {
     const C = makeController((k) => {
-      k.beforeAction(function callback1() {}, { only: "showw" });
-      k.beforeAction(function callback2() {}, { only: "showw" });
-      k.beforeAction(() => {}, { only: "showw" });
+      k.beforeAction("callback1", "callback2", () => {}, { only: "showw" });
     });
     const err = await runAndCatch(C);
-    for (const s of [":callback1", "only", "showw"]) expect(err.message).toContain(s);
+    expect(err.message).toContain(":callback1");
+    expect(err.message).toContain(":callback2");
+    expect(err.message).toContain("#<Proc:");
+    expect(err.message).toContain("only");
+    expect(err.message).toContain("showw");
   });
 
   it("raised exception message includes a block callback", async () => {
@@ -508,7 +495,7 @@ describe("_insertCallbacks", () => {
     const cb2 = () => {};
     const opts: CallbackOptions = { only: ["index"] };
     const seen: Array<[unknown, CallbackOptions]> = [];
-    _insertCallbacks([cb1, cb2], opts, null, (cb, o) => seen.push([cb, o]));
+    _insertCallbacks([cb1, cb2, opts], null, (cb, o) => seen.push([cb, o]));
     expect(seen.map(([c]) => c)).toEqual([cb1, cb2]);
     expect(opts.only).toBeUndefined();
     expect((opts.if as unknown[])[0]).toBeInstanceOf(ActionFilter);
@@ -519,7 +506,7 @@ describe("_insertCallbacks", () => {
     const block = () => {};
     const opts: CallbackOptions = {};
     const seen: unknown[] = [];
-    _insertCallbacks([], opts, block, (cb) => seen.push(cb));
+    _insertCallbacks([opts], block, (cb) => seen.push(cb));
     expect(seen).toEqual([block]);
   });
 });

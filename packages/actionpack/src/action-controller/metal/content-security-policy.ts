@@ -12,7 +12,7 @@ interface CspRequest {
 interface ContentSecurityPolicyClassHost {
   beforeAction(
     callback: (controller: unknown) => void | boolean | Promise<void | boolean>,
-    options?: CallbackOptions,
+    options: CallbackOptions,
   ): void;
 }
 

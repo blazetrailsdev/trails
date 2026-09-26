@@ -75,6 +75,8 @@ export class InvalidParameterKey extends Error {
   }
 }
 
+type OnUnpermitted = "log" | "raise" | false | null;
+
 /** @internal */
 const PERMITTED_SCALAR_TYPES: ((value: unknown) => boolean)[] = [
   (value) => typeof value === "string",
@@ -107,7 +109,7 @@ export class Parameters {
   private _convertedArrays?: Set<string>;
 
   static permitAllParameters = false;
-  static actionOnUnpermittedParameters: "log" | "raise" | false = false;
+  static actionOnUnpermittedParameters: OnUnpermitted = false;
   static alwaysPermittedParameters: string[] = ["controller", "action"];
 
   static hookIntoYamlLoading(): void {}
@@ -127,9 +129,11 @@ export class Parameters {
     return this._permitted;
   }
 
+  /** @missingRailsArgs permit_filters — CONVERGEABLE permit-value-is-missing-the-explicit-arrays-arm */
   permit(...filters: (string | Record<string, unknown>)[]): Parameters {
-    const result = this._permitFilters(filters.flat());
-    return result;
+    return this.permitFilters(filters, {
+      onUnpermitted: Parameters.actionOnUnpermittedParameters,
+    });
   }
 
   permitAll(): Parameters {
@@ -164,7 +168,7 @@ export class Parameters {
 
   expect(...filters: (string | Record<string, unknown>)[]): unknown {
     const flatFilters = filters.flat();
-    const params = this._permitFilters(flatFilters, { suppressUnpermitted: true });
+    const params = this.permitFilters(filters);
     const keys = flatFilters.flatMap((f) => (typeof f === "string" ? [f] : Object.keys(f)));
     const values = keys.map((k) => params.require(k));
     return values.length === 1 ? values[0] : values;
@@ -618,28 +622,6 @@ export class Parameters {
     return new Parameters(data);
   }
 
-  private _permitFilters(
-    filters: (string | Record<string, unknown>)[],
-    options: { suppressUnpermitted?: boolean } = {},
-  ): Parameters {
-    const params = new Parameters();
-    const flatFilters = filters.flat();
-
-    for (const filter of flatFilters) {
-      if (typeof filter === "string") {
-        this._permittedScalarFilter(params, filter);
-      } else if (typeof filter === "object" && filter !== null) {
-        this._hashFilter(params, filter, options);
-      }
-    }
-
-    if (!options.suppressUnpermitted) {
-      this.unpermittedParametersBang(params);
-    }
-    params._permitted = true;
-    return params;
-  }
-
   private _permittedScalarFilter(params: Parameters, permittedKey: string): void {
     if (this.hasKey(permittedKey) && isPermittedScalar(this._data[permittedKey])) {
       params._data[permittedKey] = this._data[permittedKey];
@@ -657,12 +639,14 @@ export class Parameters {
   private _hashFilter(
     params: Parameters,
     filter: Record<string, unknown>,
-    options: { suppressUnpermitted?: boolean } = {},
+    {
+      onUnpermitted = Parameters.actionOnUnpermittedParameters,
+    }: { onUnpermitted?: OnUnpermitted } = {},
   ): void {
     this.slice(...Object.keys(filter)).each((key, value) => {
       if (value == null || value === false) return;
       if (!this.hasKey(key)) return;
-      const result = this.permitValue(value, filter[key], options);
+      const result = this.permitValue(value, filter[key], { onUnpermitted });
       if (result != null) params.set(key, result);
     });
   }
@@ -746,9 +730,21 @@ export class Parameters {
   /** @internal */
   permitFilters(
     filters: (string | Record<string, unknown>)[],
-    _options: { onUnpermitted?: "raise" | "log" | null; explicitArrays?: boolean } = {},
+    { onUnpermitted = null }: { onUnpermitted?: OnUnpermitted } = {},
   ): Parameters {
-    return this._permitFilters(filters);
+    const params = new Parameters();
+
+    for (const filter of filters.flat()) {
+      if (typeof filter === "string") {
+        this._permittedScalarFilter(params, filter);
+      } else if (typeof filter === "object" && filter !== null) {
+        this._hashFilter(params, filter, { onUnpermitted });
+      }
+    }
+
+    this.unpermittedParametersBang(params, { onUnpermitted });
+
+    return params.permitBang();
   }
 
   /** @internal */
@@ -839,7 +835,7 @@ export class Parameters {
     params: Parameters,
     {
       onUnpermitted = Parameters.actionOnUnpermittedParameters,
-    }: { onUnpermitted?: "log" | "raise" | false } = {},
+    }: { onUnpermitted?: OnUnpermitted } = {},
   ): void {
     if (!onUnpermitted) return;
     const unpermittedKeys = this.unpermittedKeys(params);
@@ -882,16 +878,18 @@ export class Parameters {
   hashFilter(
     params: Parameters,
     filter: Record<string, unknown>,
-    options: { suppressUnpermitted?: boolean } = {},
+    {
+      onUnpermitted = Parameters.actionOnUnpermittedParameters,
+    }: { onUnpermitted?: OnUnpermitted } = {},
   ): void {
-    this._hashFilter(params, filter, options);
+    this._hashFilter(params, filter, { onUnpermitted });
   }
 
   /** @internal */
   permitValue(
     value: unknown,
     filter: unknown,
-    options: { suppressUnpermitted?: boolean } = {},
+    { onUnpermitted }: { onUnpermitted: OnUnpermitted },
   ): unknown {
     if (Array.isArray(filter) && filter.length === 0) {
       return this.permitArrayOfScalars(value);
@@ -902,13 +900,13 @@ export class Parameters {
       !Array.isArray(filter) &&
       Object.keys(filter as Record<string, unknown>).length === 0
     ) {
-      return this.permitHash(value, filter as Record<string, unknown>, options);
+      return this.permitHash(value, filter as Record<string, unknown>, { onUnpermitted });
     }
     if (this.isArrayFilter(filter)) {
-      return this.permitArrayOfHashes(value, (filter as unknown[])[0], options);
+      return this.permitArrayOfHashes(value, (filter as unknown[])[0], { onUnpermitted });
     }
     if (this.isNonScalar(value)) {
-      return this.permitHashOrArray(value, filter, options);
+      return this.permitHashOrArray(value, filter, { onUnpermitted });
     }
     return undefined;
   }
@@ -923,12 +921,12 @@ export class Parameters {
   permitArrayOfHashes(
     value: unknown,
     filter: unknown,
-    options: { suppressUnpermitted?: boolean } = {},
+    { onUnpermitted }: { onUnpermitted: OnUnpermitted },
   ): unknown {
     return this.eachArrayElement(value, filter, (el) =>
-      el._permitFilters(
+      el.permitFilters(
         (Array.isArray(filter) ? filter : [filter]) as (string | Record<string, unknown>)[],
-        options,
+        { onUnpermitted },
       ),
     );
   }
@@ -937,7 +935,7 @@ export class Parameters {
   permitHash(
     value: unknown,
     filter: Record<string, unknown> | unknown,
-    options: { suppressUnpermitted?: boolean } = {},
+    { onUnpermitted }: { onUnpermitted: OnUnpermitted },
   ): unknown {
     if (!(value instanceof Parameters)) return undefined;
     if (
@@ -948,9 +946,9 @@ export class Parameters {
     ) {
       return this.permitAnyInParameters(value);
     }
-    return value._permitFilters(
+    return value.permitFilters(
       (Array.isArray(filter) ? filter : [filter]) as (string | Record<string, unknown>)[],
-      options,
+      { onUnpermitted },
     );
   }
 
@@ -958,11 +956,11 @@ export class Parameters {
   permitHashOrArray(
     value: unknown,
     filter: unknown,
-    options: { suppressUnpermitted?: boolean } = {},
+    { onUnpermitted }: { onUnpermitted: OnUnpermitted },
   ): unknown {
-    const arr = this.permitArrayOfHashes(value, filter, options);
+    const arr = this.permitArrayOfHashes(value, filter, { onUnpermitted });
     if (arr != null) return arr;
-    return this.permitHash(value, filter, options);
+    return this.permitHash(value, filter, { onUnpermitted });
   }
 
   /** @internal */

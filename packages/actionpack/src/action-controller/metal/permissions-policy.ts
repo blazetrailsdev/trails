@@ -26,7 +26,7 @@ export type PermissionsPolicyBlock = (
 ) => void;
 
 interface PermissionsPolicyHost {
-  beforeAction(callback: (controller: unknown) => void | boolean, options?: CallbackOptions): void;
+  beforeAction(callback: (controller: unknown) => void | boolean, options: CallbackOptions): void;
 }
 
 export function permissionsPolicy(
