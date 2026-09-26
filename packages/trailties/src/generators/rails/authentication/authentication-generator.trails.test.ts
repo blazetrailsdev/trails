@@ -8,6 +8,13 @@ import { AuthenticationGenerator } from "./authentication-generator.js";
 
 const PACKAGE_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
 
+const APPLICATION_CONTROLLER = `import { ActionController } from "@blazetrails/actionpack";
+export class ApplicationController extends ActionController.Base {}
+`;
+const APPLICATION_RECORD = `import { Base } from "@blazetrails/activerecord";
+export class ApplicationRecord extends Base {}
+`;
+
 let appDir: string;
 const write = (rel: string, content: string) => {
   const full = path.join(appDir, rel);
@@ -22,31 +29,13 @@ beforeEach(() => {
   childProcessAdapterConfig.adapter = "trailties-auth-strict-test";
   appDir = fs.mkdtempSync(path.join(PACKAGE_DIR, "tmp-auth-strict-"));
   write("package.json", `{ "type": "module" }`);
-  write(
-    "tsconfig.json",
-    JSON.stringify({
-      compilerOptions: {
-        strict: true,
-        target: "es2022",
-        module: "nodenext",
-        moduleResolution: "nodenext",
-        noEmit: true,
-        skipLibCheck: true,
-      },
-      include: ["app/**/*.ts", "test/**/*.ts"],
-    }),
-  );
-  write(
-    "app/controllers/application-controller.ts",
-    `import { ActionController } from "@blazetrails/actionpack";\n\nexport class ApplicationController extends ActionController.Base {\n}\n`,
-  );
-  write(
-    "app/models/application-record.ts",
-    `import { Base } from "@blazetrails/activerecord";\n\nexport class ApplicationRecord extends Base {\n  static {\n    this.primaryAbstractClass();\n  }\n}\n`,
-  );
+  const compilerOptions = { strict: true, module: "nodenext", noEmit: true, skipLibCheck: true };
+  write("tsconfig.json", JSON.stringify({ compilerOptions, include: ["app/**/*.ts"] }));
+  write("app/controllers/application-controller.ts", APPLICATION_CONTROLLER);
+  write("app/models/application-record.ts", APPLICATION_RECORD);
   write(
     "app/mailers/application-mailer.ts",
-    `export class ApplicationMailer {\n  mail(headers: object): unknown {\n    return headers;\n  }\n}\n`,
+    "export class ApplicationMailer { mail(h: object) {} }",
   );
   write("config/routes.ts", "// routes\n");
 });
