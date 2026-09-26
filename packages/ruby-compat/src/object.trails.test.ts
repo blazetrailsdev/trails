@@ -34,6 +34,7 @@ describe("Object#inspect", () => {
     expect(inspect(/(david|jamis)/s)).toBe("/(david|jamis)/m");
     expect(inspect(/a\/b/is)).toBe("/a\\/b/mi");
     expect(inspect(/x/)).toBe("/x/");
+    expect(inspect(new RegExp("a/b"))).toBe("/a\\/b/");
   });
 });
 

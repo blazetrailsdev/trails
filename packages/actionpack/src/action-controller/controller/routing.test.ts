@@ -659,4 +659,12 @@ describe("RouteSetTest", () => {
       });
     }).toThrow(ArgumentError);
   });
+
+  it("route constraints with supported options must not error", () => {
+    expect(() => {
+      set.draw((r) => {
+        r.get("page/:name", { to: "pages#show", constraints: { name: /(david|jamis)/i } });
+      });
+    }).not.toThrow();
+  });
 });
