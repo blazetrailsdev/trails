@@ -139,10 +139,9 @@ export class VariantCollector {
   any(...args: (string | FormatHandler)[]): void {
     const last = args[args.length - 1];
     const block = typeof last === "function" ? (args.pop() as FormatHandler) : undefined;
-    const variants = args as string[];
     if (block) {
-      if (variants.length > 0 && !variants.some((a) => rbEqual(a, this._variant))) {
-        for (const v of variants) this._variants.set(v, block);
+      if (args.length > 0 && !args.some((a) => rbEqual(a, this._variant))) {
+        for (const v of args as string[]) this._variants.set(v, block);
       } else {
         this._variants.set("any", block);
       }
