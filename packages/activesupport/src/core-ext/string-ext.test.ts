@@ -216,7 +216,7 @@ function withEnvTz<T>(tz: string, fn: () => T): T {
 
 function epochNs(time: Temporal.ZonedDateTime | Time | undefined): bigint | undefined {
   if (time === undefined) return undefined;
-  return (time instanceof Time ? time.toTime() : time).epochNanoseconds;
+  return (time instanceof Time ? time.toZonedDateTime() : time).epochNanoseconds;
 }
 
 describe("StringConversionsTest", () => {

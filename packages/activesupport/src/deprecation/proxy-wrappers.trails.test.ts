@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Deprecation } from "../deprecation.js";
-import { DeprecatedInstanceVariableProxy } from "./proxy-wrappers.js";
+import { rbEqual } from "@blazetrails/ruby-compat";
+import { DeprecatedInstanceVariableProxy, DeprecatedObjectProxy } from "./proxy-wrappers.js";
 import { assertDeprecated } from "../testing/deprecation.js";
 
 class Record {
@@ -53,5 +54,26 @@ describe("DeprecatedInstanceVariableProxy#warn", () => {
       () => proxy().plus(1),
     );
     expect(result).toBe(2);
+  });
+});
+
+describe("DeprecationProxy#method_missing ==", () => {
+  const deprecator = new Deprecation();
+
+  it("sends == to a String target of DeprecatedObjectProxy", async () => {
+    const proxy = DeprecatedObjectProxy.new("foo", ":bomb:", deprecator);
+    expect(await assertDeprecated(/:bomb:/, deprecator, () => rbEqual(proxy, "foo"))).toBe(true);
+    expect(await assertDeprecated(/:bomb:/, deprecator, () => rbEqual(proxy, "bar"))).toBe(false);
+  });
+
+  it("sends == to an Integer target of DeprecatedInstanceVariableProxy", async () => {
+    const owner = { count: 1 };
+    const proxy = DeprecatedInstanceVariableProxy.new(owner, "count", "@count", { deprecator });
+    expect(await assertDeprecated("@count.==", deprecator, () => rbEqual(proxy, 1))).toBe(true);
+  });
+
+  it("is not reached from String#== on the target side, as rb_str_equal's to_str probe misses", () => {
+    const proxy = DeprecatedObjectProxy.new("foo", ":bomb:", deprecator);
+    expect(rbEqual("foo", proxy)).toBe(false);
   });
 });

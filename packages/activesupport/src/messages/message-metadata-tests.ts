@@ -35,7 +35,7 @@ export function freezeTime(
 
 expect.addEqualityTesters([
   function (a: unknown, b: unknown): boolean | undefined {
-    const toInstant = (x: unknown) => (x instanceof Time ? x.toTime().toInstant() : x);
+    const toInstant = (x: unknown) => (x instanceof Time ? x.toZonedDateTime().toInstant() : x);
     const [x, y] = [toInstant(a), toInstant(b)];
     const [instant, other] =
       x instanceof Temporal.Instant

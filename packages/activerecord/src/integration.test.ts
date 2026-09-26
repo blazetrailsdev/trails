@@ -15,7 +15,7 @@ registerModel(Pet);
 
 function toFs(ts: unknown, fmt: "usec" | "number"): string {
   if (!(ts instanceof RubyTime)) throw new Error("expected a Time");
-  const dt = ts.getutc().toTime();
+  const dt = ts.getutc().toZonedDateTime();
   const y = dt.year.toString().padStart(4, "0");
   const mo = dt.month.toString().padStart(2, "0");
   const day = dt.day.toString().padStart(2, "0");

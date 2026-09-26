@@ -514,6 +514,7 @@ export default defineConfig({
           // (it runs under activerecord, where the engine is ActiveRecord::Base).
           setupFiles: [
             "./packages/activesupport/src/test-case.ts",
+            "./packages/activesupport/src/test-setup-abstract-unit.ts",
             "./packages/arel/src/test-setup-engine.ts",
           ],
         },

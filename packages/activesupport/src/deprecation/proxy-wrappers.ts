@@ -64,6 +64,7 @@ export abstract class DeprecationProxy {
   private methodMissing(called: string, args: unknown[]): unknown {
     this.warn(callerLocations(), called, args);
     const target = this.target;
+    if (called === "equals") return rbEqual(target, args[0]);
     if (typeof target === "string") return rbStrSend(target, called, ...args)[0];
     const value = (target as Record<string, unknown>)[called];
     return typeof value === "function"

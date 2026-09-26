@@ -2,22 +2,21 @@ import { DelegateClass } from "@blazetrails/ruby-compat";
 import { Time as RubyTime } from "@blazetrails/date";
 import { TimeWithZone } from "@blazetrails/activesupport";
 import { TimeType as ActiveModelTime } from "@blazetrails/activemodel";
-import { isUtc, type TimezoneOptions } from "./internal/timezone.js";
+import { include } from "@blazetrails/activesupport";
+import { Timezone, type TimezoneOptions } from "./internal/timezone.js";
 
 export class Value extends DelegateClass(RubyTime) {}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include Internal::Timezone`; the class/interface merge is how `include()` surfaces on the type side.
+export interface Time extends Timezone {}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Time extends ActiveModelTime {
   static Value = Value;
 
-  private _timezone?: "utc" | "local";
-
-  constructor(options?: TimezoneOptions) {
-    super(options);
-    this._timezone = options?.timezone;
-  }
-
-  override get isUtc(): boolean {
-    return isUtc(this._timezone);
+  constructor({ timezone, ...kwargs }: TimezoneOptions = {}) {
+    super(kwargs);
+    this._timezone = timezone;
   }
 
   override serialize(value: unknown): Value | null {
@@ -37,3 +36,5 @@ export class Time extends ActiveModelTime {
     return cast instanceof Value ? (cast.__getobj__() as TimeWithZone | RubyTime) : cast;
   }
 }
+
+include(Time, Timezone);

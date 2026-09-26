@@ -149,7 +149,7 @@ export class TimeWithZone {
   }
 
   private get _zoned(): Temporal.ZonedDateTime {
-    return this.localtime(this.utcOffset).toTime();
+    return this.localtime(this.utcOffset).toZonedDateTime();
   }
 
   private get _epochMs(): number {
@@ -157,7 +157,7 @@ export class TimeWithZone {
   }
 
   private get _utcPlain(): Temporal.PlainDateTime {
-    return this.utc().toTime().toPlainDateTime();
+    return this.utc().toZonedDateTime().toPlainDateTime();
   }
 
   respondTo(sym: string, includePriv: boolean = false): boolean {
@@ -219,7 +219,7 @@ export class TimeWithZone {
     if (time instanceof Time && time.isUtc()) return time;
     const values =
       time instanceof Time
-        ? time.toTime().toPlainDateTime()
+        ? time.toZonedDateTime().toPlainDateTime()
         : time instanceof Temporal.Instant
           ? time.toZonedDateTimeISO("UTC").toPlainDateTime()
           : time instanceof Temporal.PlainDate
@@ -683,7 +683,7 @@ export class TimeWithZone {
       return signOf(this._zoned.epochNanoseconds - other.epochNanoseconds);
     }
     if (other instanceof Time) {
-      return signOf(this._zoned.epochNanoseconds - other.toTime().epochNanoseconds);
+      return signOf(this._zoned.epochNanoseconds - other.toZonedDateTime().epochNanoseconds);
     }
     // boundary: a JS `Date` compares at its own millisecond granularity.
     if (other instanceof Date) {
@@ -720,7 +720,7 @@ export class TimeWithZone {
       return this._zoned.epochNanoseconds === other.epochNanoseconds;
     }
     if (other instanceof Time) {
-      return this._zoned.epochNanoseconds === other.toTime().epochNanoseconds;
+      return this._zoned.epochNanoseconds === other.toZonedDateTime().epochNanoseconds;
     }
     return false;
   }

@@ -67,7 +67,10 @@ export class AcceptsMultiparameterTime extends Module {
 
     this.defineMethod(
       "valueFromMultiparameterAssignment",
-      function (this: { isUtc: boolean }, valuesHash: Record<string, unknown>): Time | null {
+      function (
+        this: { defaultTimezone: "utc" | "local" },
+        valuesHash: Record<string, unknown>,
+      ): Time | null {
         for (const [k, v] of Object.entries(defaults)) {
           if (valuesHash[k] == null || valuesHash[k] === false) valuesHash[k] = v;
         }
@@ -77,9 +80,7 @@ export class AcceptsMultiparameterTime extends Module {
         const values = Object.entries(valuesHash)
           .sort(([a], [b]) => Number(a) - Number(b))
           .map(([, v]) => v as number | string);
-        return this.isUtc
-          ? Time.utc(...(values as [number, number, number]))
-          : Time.local(...(values as [number, number, number]));
+        return Time[this.defaultTimezone](...(values as [number, number, number]));
       },
     );
   }

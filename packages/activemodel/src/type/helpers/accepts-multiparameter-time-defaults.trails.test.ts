@@ -3,9 +3,11 @@ import { Time as RubyTime } from "@blazetrails/date";
 import { include } from "@blazetrails/activesupport";
 import { Types, ValueType } from "../../index.js";
 import { AcceptsMultiparameterTime } from "./accepts-multiparameter-time.js";
+import { Timezone } from "./timezone.js";
 
 function typeIncluding(defaults?: Record<string, number>): { cast(value: unknown): unknown } {
   class IncludingType extends ValueType {}
+  include(IncludingType, Timezone);
   include(IncludingType, new AcceptsMultiparameterTime(defaults ? { defaults } : {}));
   return new IncludingType() as unknown as { cast(value: unknown): unknown };
 }

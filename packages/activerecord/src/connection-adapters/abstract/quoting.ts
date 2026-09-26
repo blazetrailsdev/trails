@@ -215,7 +215,7 @@ type TimeLike = TimeWithZone | RubyTime | Temporal.Instant | Temporal.ZonedDateT
 
 function instantOf(value: TimeLike): Temporal.Instant {
   if (value instanceof TimeWithZone) value = value.utc();
-  if (value instanceof RubyTime) return value.toTime().toInstant();
+  if (value instanceof RubyTime) return value.toZonedDateTime().toInstant();
   if (value instanceof Temporal.ZonedDateTime) return value.toInstant();
   return value;
 }

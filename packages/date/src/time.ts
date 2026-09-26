@@ -1370,7 +1370,13 @@ export class Time {
     );
   }
 
-  toTime(): Temporal.ZonedDateTime {
+  /** `time_to_time` (`vendor/ruby/ext/date/date_core.c:8883-8887`). */
+  toTime(): Time {
+    return this;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  toZonedDateTime(): Temporal.ZonedDateTime {
     if (this.#timeZoneId != null) return this.#instant.toZonedDateTimeISO(this.#timeZoneId);
     const utcOffset = this.#utcOffset;
     if (utcOffset % 60 !== 0) return new SubMinuteOffsetZonedDateTime(this.#instant, utcOffset);

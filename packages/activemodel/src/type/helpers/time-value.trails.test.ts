@@ -10,6 +10,9 @@ import {
 } from "./time-value.js";
 import { DateTimeType } from "../date-time.js";
 import { TimeType } from "../time.js";
+import { Timezone } from "./timezone.js";
+
+const timezone = new Timezone();
 
 describe("applySecondsPrecision", () => {
   const dt = Temporal.PlainDateTime.from("2024-01-02T03:04:05.123456789");
@@ -86,25 +89,26 @@ describe("applySecondsPrecision", () => {
 
 describe("newTime", () => {
   it("returns null for 0000-00-00 00:00:00 and rejects out-of-range components", () => {
-    expect(newTime(0, 0, 0, 0, 0, 0, 0)).toBeNull();
-    expect(newTime(2024, 13, 1, 0, 0, 0, 0)).toBeNull();
+    expect(newTime.call(timezone, 0, 0, 0, 0, 0, 0, 0)).toBeNull();
+    expect(newTime.call(timezone, 2024, 13, 1, 0, 0, 0, 0)).toBeNull();
   });
 
   it("subtracts offset (in seconds) when offset != 0", () => {
-    const i = newTime(2024, 1, 2, 12, 0, 0, 0, 3600);
+    const i = newTime.call(timezone, 2024, 1, 2, 12, 0, 0, 0, 3600);
     expect(i?.getutc().xmlschema()).toBe("2024-01-02T11:00:00Z");
   });
 
   it("splits Ruby microsec (0..999_999) across Temporal millisecond/microsecond", () => {
-    const i = newTime(2024, 1, 2, 12, 0, 0, 123456);
+    const i = newTime.call(timezone, 2024, 1, 2, 12, 0, 0, 123456);
     expect(i?.usec).toBe(123456);
   });
 
   it("carries a Rational microsec and offset exactly, as Time.utc does", () => {
-    const i = newTime(2000, 1, 1, 14, 23, 55, new Rational(123456, 1_000_000));
+    const i = newTime.call(timezone, 2000, 1, 1, 14, 23, 55, new Rational(123456, 1_000_000));
     expect(i?.getutc().xmlschema(9)).toBe("2000-01-01T14:23:55.000000123Z");
 
-    const shifted = newTime(
+    const shifted = newTime.call(
+      timezone,
       2000,
       1,
       1,
@@ -120,20 +124,20 @@ describe("newTime", () => {
 
 describe("fastStringToTime", () => {
   it("returns null for strings without '-'", () => {
-    expect(fastStringToTime("1234")).toBeNull();
+    expect(fastStringToTime.call(timezone, "1234")).toBeNull();
   });
 
   it("normalizes Postgres short offset (+00) to (+00:00)", () => {
-    const i = fastStringToTime("2026-04-26 14:23:55.123456+00");
+    const i = fastStringToTime.call(timezone, "2026-04-26 14:23:55.123456+00");
     expect(i?.getutc().xmlschema(6)).toBe("2026-04-26T14:23:55.123456Z");
   });
 
   it("returns null for a date-only string, as Time.new raises 'no time information'", () => {
-    expect(fastStringToTime("2026-04-26")).toBeNull();
+    expect(fastStringToTime.call(timezone, "2026-04-26")).toBeNull();
   });
 
   it("floors a sub-second longer than nine digits at the nanosecond", () => {
-    const i = fastStringToTime("2026-04-26 14:23:55.1234567891+00:00");
+    const i = fastStringToTime.call(timezone, "2026-04-26 14:23:55.1234567891+00:00");
     expect(i?.getutc().xmlschema(9)).toBe("2026-04-26T14:23:55.123456789Z");
   });
 
@@ -172,7 +176,7 @@ describe("userInputInTimeZone", () => {
   it("keeps sub-millisecond precision through the zone parse", () => {
     useZone("Eastern Time (US & Canada)", () => {
       const result = userInputInTimeZone("2024-06-15 14:30:00.123456789") as TimeWithZone;
-      expect(result.utc().toTime().epochNanoseconds % 1_000_000_000n).toBe(123456789n);
+      expect(result.utc().toZonedDateTime().epochNanoseconds % 1_000_000_000n).toBe(123456789n);
     });
   });
 

@@ -34,6 +34,7 @@ export {
   rbObjId,
   rbObjAsString,
   rbModSingletonP,
+  rbModToS,
   rbObjClass,
   rbObjRespondTo,
   rbObjSingletonClass,

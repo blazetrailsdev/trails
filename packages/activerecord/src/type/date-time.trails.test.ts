@@ -45,6 +45,12 @@ describe("ActiveRecord::Type::DateTime timezone dispatch", () => {
     expect(new DateTime({ timezone: "utc" }).isUtc).toBe(true);
   });
 
+  it("default_timezone follows the per-type timezone override", () => {
+    setDefaultTimezone("utc");
+    expect(new DateTime({ timezone: "local" }).defaultTimezone).toBe("local");
+    expect(new DateTime().defaultTimezone).toBe("utc");
+  });
+
   it("casts bare strings in the zone chosen by is_utc?", () => {
     const bare = "2024-01-02T12:00:00";
     const utc = RubyTime.utc(2024, 1, 2, 12, 0, 0);

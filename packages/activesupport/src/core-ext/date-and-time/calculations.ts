@@ -82,8 +82,8 @@ function compare(this: Receiver, other: Comparable | RubyTime): number {
 function toInstant(dateOrTime: Comparable | RubyTime): Temporal.Instant {
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   if (dateOrTime instanceof Date) return instantFrom(dateOrTime);
-  if (dateOrTime instanceof TimeWithZone) return dateOrTime.utc().toTime().toInstant();
-  if (dateOrTime instanceof RubyTime) return dateOrTime.toTime().toInstant();
+  if (dateOrTime instanceof TimeWithZone) return dateOrTime.utc().toZonedDateTime().toInstant();
+  if (dateOrTime instanceof RubyTime) return dateOrTime.toZonedDateTime().toInstant();
   if (dateOrTime instanceof Temporal.Instant) return dateOrTime;
   if (dateOrTime instanceof Temporal.PlainDateTime)
     return dateOrTime.toZonedDateTime("UTC").toInstant();
@@ -112,7 +112,7 @@ function change(
 }
 
 function receiver(dateOrTime: Receiver): DateOrTime {
-  if (dateOrTime instanceof RubyTime) return receiver(dateOrTime.toTime().toInstant());
+  if (dateOrTime instanceof RubyTime) return receiver(dateOrTime.toZonedDateTime().toInstant());
   // boundary: the `Time` arm's receiver is a JS `Date`, which is what this rebuilds.
   return dateOrTime instanceof Temporal.Instant
     ? new Date(dateOrTime.epochMilliseconds)

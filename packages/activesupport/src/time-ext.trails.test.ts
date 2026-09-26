@@ -29,7 +29,7 @@ describe("to_time over a receiver that carries an offset", () => {
   it("Time#to_time returns self when preserve_timezone is set", () => {
     setPreserveTimezone(true);
     const time = new RubyTime(2005, 2, 21, 17, 44, 30, 3600);
-    const result = toTime(time);
+    const result = time.toTime();
     expect(result).toBe(time);
     expect(result.hour).toBe(17);
   });
@@ -37,9 +37,9 @@ describe("to_time over a receiver that carries an offset", () => {
   it("Time#to_time returns getlocal when preserve_timezone is false", () => {
     setPreserveTimezone(false);
     const time = new RubyTime(2005, 2, 21, 17, 44, 30, 3600);
-    const result = toTime(time);
+    const result = time.toTime();
     expect(result).not.toBe(time);
-    expect(result.toTime().epochNanoseconds).toBe(time.toTime().epochNanoseconds);
+    expect(result.toZonedDateTime().epochNanoseconds).toBe(time.toZonedDateTime().epochNanoseconds);
   });
 
   it("DateTime#to_time returns getlocal(utc_offset) when preserve_timezone is set", () => {

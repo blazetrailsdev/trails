@@ -31,8 +31,8 @@ afterEach(() => {
 });
 
 function expectSameTime(actual: RubyTime, expected: RubyTime): void {
-  expect(actual.toTime().toInstant().epochNanoseconds).toBe(
-    expected.toTime().toInstant().epochNanoseconds,
+  expect(actual.toZonedDateTime().toInstant().epochNanoseconds).toBe(
+    expected.toZonedDateTime().toInstant().epochNanoseconds,
   );
 }
 

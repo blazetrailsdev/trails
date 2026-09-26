@@ -8,8 +8,6 @@ import {
   zone,
 } from "@blazetrails/activesupport";
 
-import { isUtc } from "./timezone.js";
-
 export interface TimezoneAware {
   readonly isUtc: boolean;
 }
@@ -70,7 +68,7 @@ export function userInputInTimeZone(
   if (value instanceof TimeWithZone) return value.inTimeZone();
   if (value instanceof Time) {
     const timeZone = zone();
-    return timeZone ? new TimeWithZone(value.toTime().toInstant(), timeZone) : value;
+    return timeZone ? new TimeWithZone(value.toZonedDateTime().toInstant(), timeZone) : value;
   }
   if (value instanceof Temporal.ZonedDateTime) return value;
   if (value instanceof Temporal.Instant) {
@@ -82,7 +80,7 @@ export function userInputInTimeZone(
 
 /** @internal */
 export function newTime(
-  this: TimezoneAware | void,
+  this: TimezoneAware,
   year: number | bigint | null | undefined,
   mon: number | null | undefined,
   mday: number | null | undefined,
@@ -108,8 +106,8 @@ export function newTime(
     if (!(offset === 0 || (offset instanceof Rational && offset.isZero()))) {
       time = time.minus(offset) as Time;
     }
-    return (this?.isUtc ?? isUtc()) ? time : time.getlocal();
-  } else if (this?.isUtc ?? isUtc()) {
+    return this.isUtc ? time : time.getlocal();
+  } else if (this.isUtc) {
     try {
       return Time.utc(Number(year), mon, mday, hour, min, sec, usec);
     } catch {
@@ -125,11 +123,11 @@ export function newTime(
 }
 
 /** @internal */
-export function fastStringToTime(this: TimezoneAware | void, string: string): Time | null {
+export function fastStringToTime(this: TimezoneAware, string: string): Time | null {
   if (!string.includes("-")) return null;
 
   try {
-    return (this?.isUtc ?? isUtc()) ? Time.new(string, { in: "UTC" }) : Time.new(string);
+    return this.isUtc ? Time.new(string, { in: "UTC" }) : Time.new(string);
   } catch (error) {
     if (error instanceof ArgumentError) return null;
     throw error;

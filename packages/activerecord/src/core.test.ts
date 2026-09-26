@@ -7,7 +7,7 @@ import { fixtures } from "./test-fixtures.js";
 import { Topic, TitlePrimaryKeyTopic } from "./test-helpers/models/topic.js";
 import { LoosePerson } from "./test-helpers/models/person.js";
 import { assertDifference, assertNoDifference } from "@blazetrails/activesupport";
-import { regexpEscape } from "@blazetrails/ruby-compat";
+import { regexpEscape, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import { CpkBook } from "./test-helpers/models/cpk.js";
 
 describe("CoreTest", () => {
@@ -69,7 +69,11 @@ describe("CoreTest", () => {
     expect(new Topic({}).inspect()).toMatch(/Topic id: nil/);
   });
 
-  it.skip("inspect singleton instance", () => {});
+  it("inspect singleton instance", () => {
+    expect((rbObjSingletonClass(new Topic({})) as unknown as typeof Topic).inspect()).toMatch(
+      /#<Class:#<Topic:\w+>>/,
+    );
+  });
 
   it("inspect limited select instance", async () => {
     await withAttributesForInspect(["id", "title"], async () => {

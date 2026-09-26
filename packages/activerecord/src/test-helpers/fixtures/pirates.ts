@@ -1,5 +1,5 @@
-import { Temporal } from "@blazetrails/date";
-const twoWeeksAgo = Temporal.Instant.fromEpochMilliseconds(Date.now() - 14 * 24 * 60 * 60 * 1000);
+import { Duration, toFs } from "@blazetrails/activesupport";
+import { Time } from "@blazetrails/date";
 
 export const pirateFixtureData = {
   blackbeard: {
@@ -9,8 +9,8 @@ export const pirateFixtureData = {
   redbeard: {
     catchphrase: "Avast!",
     parrot: "louis",
-    created_on: twoWeeksAgo,
-    updated_on: twoWeeksAgo,
+    created_on: toFs(Duration.weeks(2).ago(Time.now()), "db"),
+    updated_on: toFs(Duration.weeks(2).ago(Time.now()), "db"),
   },
   mark: {
     catchphrase: "X marks the spot!",

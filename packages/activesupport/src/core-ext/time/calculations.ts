@@ -9,7 +9,6 @@ import { zone as timeZone } from "../../time-zone-config.js";
 import { advance as dateAdvance } from "../date/calculations.js";
 import { compare as dateTimeCompare, since as dateTimeSince } from "../date-time/calculations.js";
 import { toF } from "../date-time/conversions.js";
-import { toTime } from "./compatibility.js";
 
 export const COMMON_YEAR_DAYS_IN_MONTH = [null, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
@@ -145,7 +144,7 @@ export function change(this: RubyTime, options: ChangeOptions): RubyTime {
     return RubyTime.utc(newYear, newMonth, newDay, newHour, newMin, newSec);
   } else if (this.isZoneObject) {
     let newTime = RubyTime.new(newYear, newMonth, newDay, newHour, newMin, newSec, null, {
-      in: this.toTime().timeZoneId,
+      in: this.toZonedDateTime().timeZoneId,
     });
 
     if (!Number.isInteger(newTime.utcOffset)) {
@@ -312,7 +311,7 @@ export function compareWithCoercion(this: RubyTime, other: unknown): number | nu
     if (typeof (other as { comparableTime?: unknown }).comparableTime === "function") {
       return compareWithoutCoercion.call(this, (other as TimeWithZone).comparableTime());
     } else {
-      return compareWithoutCoercion.call(this, toTime(other as RubyTime));
+      return compareWithoutCoercion.call(this, (other as RubyTime).toTime());
     }
   } else {
     return dateTimeCompare(this.toDatetime(), other);

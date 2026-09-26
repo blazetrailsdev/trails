@@ -84,6 +84,31 @@ export function rbModSingletonP(klass: unknown): boolean {
 }
 
 /**
+ * `rb_mod_to_s` (`vendor/ruby/object.c:1710-1742`), `Module#to_s` /
+ * `Module#inspect`: a singleton class renders `#<Class:` plus its attached
+ * object — `rb_inspect` for a class or module, `rb_any_to_s` otherwise — and
+ * `>`; any other class renders its name. Ruby's refinement arm has no JS seat.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbModToS(klass: abstract new (...args: never) => unknown): string {
+  if (rbModSingletonP(klass)) {
+    let s = "#<Class:";
+    const v = (klass as unknown as { [FL_SINGLETON]: object })[FL_SINGLETON];
+
+    if (typeof v === "function") {
+      s += rbInspect(v);
+    } else {
+      s += rbAnyToS(v);
+    }
+    s += ">";
+
+    return s;
+  }
+  return klass.name;
+}
+
+/**
  * `basic_obj_respond_to` (`vendor/ruby/vm_method.c:2864`) — the default
  * `Object#respond_to?`, which answers whether the receiver's class defines the
  * method. A JS object answers a name whether it carries a method or a
@@ -262,13 +287,23 @@ type AnyFunction = (...args: unknown[]) => unknown;
  * overridden `respond_to?` when the receiver's class defines one (as
  * `ActiveModel::AttributeMethods` does) — passing the private-methods argument
  * only where `priv` asks for it (`vm_method.c:2896-2905`) — and otherwise
- * falls back to {@link basicObjRespondTo} (`vm_method.c:2945`).
+ * falls back to {@link basicObjRespondTo} (`vm_method.c:2945`). Like
+ * `method_entry_get` there, `respond_to?` is found by descriptor lookup, never
+ * by a property read a `method_missing` Proxy's `get` trap would answer.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `rb_obj_respond_to`
  * (`vendor/ruby/vm_method.c:2934`).
  */
 export function rbObjRespondTo(obj: unknown, mid: string, priv: boolean = false): boolean {
-  const respondTo = (Object(obj) as { respondTo?: unknown }).respondTo;
+  let me: PropertyDescriptor | undefined;
+  for (
+    let o: object | null = Object(obj);
+    o && !me;
+    o = Object.getPrototypeOf(o) as object | null
+  ) {
+    me = Object.getOwnPropertyDescriptor(o, "respondTo");
+  }
+  const respondTo = me?.value;
   if (typeof respondTo === "function") {
     const result = priv
       ? (respondTo as (mid: string, priv: boolean) => unknown).call(obj, mid, true)
