@@ -19,7 +19,7 @@ export class ViewReloader {
   private _watcher: FileWatcher | null;
   private _previousChange: boolean | undefined;
 
-  constructor({ watcher }: { watcher: FileWatcherClass }) {
+  constructor({ watcher }: { watcher: FileWatcherClass }, _block?: () => void) {
     this._watcherClass = watcher;
     this._watchedDirs = null;
     this._watcher = null;
