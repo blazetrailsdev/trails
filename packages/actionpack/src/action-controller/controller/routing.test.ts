@@ -637,19 +637,37 @@ describe("RouteSetTest", () => {
   });
 
   it("route constraints with anchor chars are invalid", () => {
-    for (const id of [
-      /^\d+/,
-      new RegExp("\\A\\d+"),
-      /\d+$/,
-      new RegExp("\\d+\\Z"),
-      new RegExp("\\d+\\z"),
-    ]) {
-      expect(() => {
-        set.draw((r) => {
-          r.get("page/:id", { to: "pages#show", id } as Parameters<typeof r.get>[1]);
-        });
-      }).toThrow(ArgumentError);
-    }
+    expect(() => {
+      set.draw((r) => {
+        r.get("page/:id", { to: "pages#show", id: /^\d+/ } as Parameters<typeof r.get>[1]);
+      });
+    }).toThrow(ArgumentError);
+    expect(() => {
+      set.draw((r) => {
+        r.get("page/:id", { to: "pages#show", id: new RegExp("\\A\\d+") } as Parameters<
+          typeof r.get
+        >[1]);
+      });
+    }).toThrow(ArgumentError);
+    expect(() => {
+      set.draw((r) => {
+        r.get("page/:id", { to: "pages#show", id: /\d+$/ } as Parameters<typeof r.get>[1]);
+      });
+    }).toThrow(ArgumentError);
+    expect(() => {
+      set.draw((r) => {
+        r.get("page/:id", { to: "pages#show", id: new RegExp("\\d+\\Z") } as Parameters<
+          typeof r.get
+        >[1]);
+      });
+    }).toThrow(ArgumentError);
+    expect(() => {
+      set.draw((r) => {
+        r.get("page/:id", { to: "pages#show", id: new RegExp("\\d+\\z") } as Parameters<
+          typeof r.get
+        >[1]);
+      });
+    }).toThrow(ArgumentError);
   });
 
   it("route constraints with unsupported regexp options must error", () => {
