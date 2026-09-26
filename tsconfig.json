@@ -32,6 +32,7 @@
     { "path": "packages/rack-test" },
     { "path": "packages/actionview" },
     { "path": "packages/actionpack" },
+    { "path": "packages/actionview/tsconfig.test.json" },
     { "path": "packages/trailties" },
     { "path": "packages/globalid" },
     { "path": "packages/did-you-mean" },

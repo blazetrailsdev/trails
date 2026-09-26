@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, it, expect } from "vitest";
+import { MimeType } from "@blazetrails/actionpack";
 import { LookupContext } from "./lookup-context.js";
 import { MissingTemplate } from "./template/error.js";
 import { Resolver } from "./template/resolver.js";
@@ -12,7 +13,7 @@ describe("LookupContext", () => {
   it("handles */* formats", () => {
     const lookupContext = new LookupContext([]);
     lookupContext.formats = ["*/*"];
-    expect(lookupContext.formats).toEqual([":html", ":text", ":js", ":css", ":xml", ":json"]);
+    expect(lookupContext.formats).toEqual(MimeType.SET.symbols);
   });
 });
 
