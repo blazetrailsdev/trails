@@ -171,10 +171,9 @@ export class FileSystemResolver extends Resolver {
   }
 
   /** @internal */
-  protected buildUnboundTemplate(template: string): UnboundTemplate | null {
+  protected buildUnboundTemplate(template: string): UnboundTemplate {
     const parsed = this.pathParser.parse(template.slice(this._path.length + 1));
     const details = parsed.details;
-    if (typeof details.handler !== "string") return null;
     const source = this.sourceForTemplate(template);
 
     return new UnboundTemplate(source, template, {
@@ -193,10 +192,7 @@ export class FileSystemResolver extends Resolver {
 
     return paths
       .map((path) => this.buildUnboundTemplate(path))
-      .filter(
-        (template): template is UnboundTemplate =>
-          template !== null && template.virtualPath === path.virtual,
-      );
+      .filter((template) => template.virtualPath === path.virtual);
   }
 
   /** @internal */

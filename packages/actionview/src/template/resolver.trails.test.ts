@@ -7,6 +7,7 @@ import { LookupContext } from "../lookup-context.js";
 import { FileSystemResolver } from "./resolver.js";
 import { FixtureResolver } from "../testing/resolvers.js";
 import { TemplateHandlers } from "./handlers.js";
+import type { Template } from "../template.js";
 import { Tse } from "./handlers/tse.js";
 
 describe("FileSystemResolver", () => {
@@ -60,6 +61,44 @@ describe("FileSystemResolver", () => {
     expect(resolver.findAll("index", "posts", false, details, key, ["a", "b"])[0]).toBe(first);
     expect(resolver.findAll("index", "posts", false, details, key, [])[0]).not.toBe(first);
     expect(resolver.builtTemplates()).toContain(first);
+  });
+
+  it("can find with no extensions", async () => {
+    await getFs().writeFile!(getPath().join(dir, "posts", "hello_world"), "Hello default!");
+
+    const templates = new FileSystemResolver(dir).findAll("hello_world", "posts", false, {
+      locale: ["en"],
+      formats: [":html"],
+      variants: ["phone"],
+      handlers: [":tse"],
+    });
+    expect(templates).toHaveLength(1);
+    expect(templates[0].source).toBe("Hello default!");
+    expect(templates[0].virtualPath).toBe("posts/hello_world");
+    expect(templates[0].format).toBeNull();
+    expect(templates[0].variant).toBeNull();
+  });
+
+  it("strict locals reuses same template", async () => {
+    await getFs().writeFile!(
+      getPath().join(dir, "posts", "hello_world.html.tse"),
+      '<%# locals: (message: "hello")%>\n<%= message %>',
+    );
+    const context = new LookupContext([new FileSystemResolver(dir)]);
+
+    const template = context.findAll(
+      "hello_world",
+      ["posts"],
+      false,
+      ["message"],
+      {},
+    )[0] as Template;
+    const template2 = context.findAll("hello_world", ["posts"], false, [], {})[0];
+
+    expect(template2).toBe(template);
+
+    expect(template.isStrictLocals()).toBe(true);
+    expect(template.locals).toBeNull();
   });
 
   it("finds a partial through the same paths as exists?", () => {

@@ -1,5 +1,4 @@
 import type { DetailKey, TemplateDetails } from "./template-details.js";
-import { symbolToS } from "@blazetrails/ruby-compat";
 import { Template } from "./template.js";
 
 export class UnboundTemplate {
@@ -69,7 +68,7 @@ export class UnboundTemplate {
     return new Template({
       source: this._source,
       identifier: this._identifier,
-      extension: symbolToS(this.details.handler as string),
+      handler: this.details.handlerClass(),
 
       format: this.details.formatOrDefault() as string | null,
       variant: (this.variant as string | null) ?? null,

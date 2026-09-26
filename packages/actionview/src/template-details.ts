@@ -91,8 +91,9 @@ export class TemplateDetails {
   }
 
   handlerClass(): TemplateHandler | undefined {
-    if (typeof this.handler !== "string") return undefined;
-    return TemplateHandlers.handlerForExtension(symbolToS(this.handler));
+    return TemplateHandlers.handlerForExtension(
+      typeof this.handler === "string" ? symbolToS(this.handler) : null,
+    );
   }
 
   formatOrDefault(): DetailKey {
