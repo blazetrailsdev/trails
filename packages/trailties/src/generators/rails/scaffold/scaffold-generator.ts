@@ -21,7 +21,12 @@ export class ScaffoldGenerator extends NamedBase {
   declare _controllerClassPath: string[];
 
   constructor(options: ScaffoldGeneratorOptions) {
-    super({ ...options, name: normalizeModelName(options.name, options, options.output) });
+    super(options);
+    const singular = normalizeModelName(this.name, options, options.output);
+    if (singular !== this.name) {
+      this.name = singular;
+      this.assignNamesBang(this.name);
+    }
   }
 
   run(): string[] {

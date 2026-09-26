@@ -27,8 +27,12 @@ export function emitModelSource(className: string, fields: Array<[string, string
 export class ModelGenerator extends NamedBase {
   /** @missingRailsCall say — CONVERGEABLE generator-and-command-bodies-bypass-thor-say */
   constructor(options: ModelGeneratorOptions) {
-    const normalized = normalizeModelName(options.name, options, options.output);
-    super({ ...options, name: normalized });
+    super(options);
+    const singular = normalizeModelName(this.name, options, options.output);
+    if (singular !== this.name) {
+      this.name = singular;
+      this.assignNamesBang(this.name);
+    }
   }
 
   run(): string[] {

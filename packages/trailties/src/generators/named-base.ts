@@ -43,6 +43,7 @@ export class NamedBase extends GeneratorBase {
   pluralFileName = (): string => pluralize(this.fileName);
   fixtureFileName = (): string => this.pluralFileName();
 
+  /** @missingRailsArgs join — PERMANENT */
   routeUrl(this: NamedBase & { controllerClassPath(): string[] }): string {
     return (
       this.controllerClassPath()

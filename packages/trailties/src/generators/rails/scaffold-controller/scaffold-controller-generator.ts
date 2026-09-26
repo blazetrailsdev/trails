@@ -28,8 +28,12 @@ export class ScaffoldControllerGenerator extends NamedBase {
   declare options: ScaffoldControllerGeneratorOptions;
 
   constructor(options: ScaffoldControllerGeneratorOptions) {
-    const name = options.name.replace(/[_-]?controller$/i, "");
-    super({ ...options, name: normalizeModelName(name, options, options.output) });
+    super({ ...options, name: options.name.replace(/[_-]?controller$/i, "") });
+    const singular = normalizeModelName(this.name, options, options.output);
+    if (singular !== this.name) {
+      this.name = singular;
+      this.assignNamesBang(this.name);
+    }
   }
 
   run(): string[] {
