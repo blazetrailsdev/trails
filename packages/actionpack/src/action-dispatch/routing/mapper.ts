@@ -326,7 +326,9 @@ class Mapping {
     this.defaults = { ...defaults, ...this.normalizeDefaults(options) };
 
     if (this.ast.pathParams.includes("action") && !Object.hasOwn(constraints, "action")) {
-      this.defaults.action ??= "index";
+      if (this.defaults.action == null || this.defaults.action === false) {
+        this.defaults.action = "index";
+      }
     }
   }
 
@@ -366,7 +368,9 @@ class Mapping {
         throw new ArgumentError(":controller segment is not allowed within a namespace block");
       }
 
-      options.controller ??= /.+?/;
+      if (options.controller == null || options.controller === false) {
+        options.controller = /.+?/;
+      }
     }
 
     if (rbObjRespondTo(this.to, "action") || rbObjRespondTo(this.to, "call")) {
@@ -1375,11 +1379,19 @@ export class Mapper {
 
     action = String(action);
 
-    let defaultAction = options.action ?? (this._scope.get("action") as string | undefined);
+    let defaultAction: string | undefined =
+      options.action != null && (options.action as unknown) !== false
+        ? options.action
+        : (this._scope.get("action") as string | undefined);
     delete options.action;
 
     if (/^[\w\-/]+$/.test(action)) {
-      if (!action.includes("/")) defaultAction ??= action.replace(/-/g, "_");
+      if (
+        !action.includes("/") &&
+        (defaultAction == null || (defaultAction as unknown) === false)
+      ) {
+        defaultAction = action.replace(/-/g, "_");
+      }
     } else {
       action = undefined;
     }
