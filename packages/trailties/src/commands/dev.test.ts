@@ -38,29 +38,29 @@ async function runDevCacheCommand(): Promise<string> {
 
 describe("Rails::Command::DevTest", () => {
   it("`bin/rails dev:cache` creates both caching and restart file when restart file doesn't exist and dev caching is currently off", async () => {
-    expect(File.isExist("tmp/caching-dev.txt")).toBe(false);
-    expect(File.isExist("tmp/restart.txt")).toBe(false);
+    expect(File.isExist("tmp/caching-dev.txt")).toBeFalsy();
+    expect(File.isExist("tmp/restart.txt")).toBeFalsy();
 
     expect(await runDevCacheCommand()).toBe(
       "Action Controller caching enabled for development mode.\n",
     );
 
-    expect(File.isExist("tmp/caching-dev.txt")).toBe(true);
-    expect(File.isExist("tmp/restart.txt")).toBe(true);
+    expect(File.isExist("tmp/caching-dev.txt")).toBeTruthy();
+    expect(File.isExist("tmp/restart.txt")).toBeTruthy();
   });
 
   it("`bin/rails dev:cache` creates caching file and touches restart file when dev caching is currently off", async () => {
     appFile("tmp/restart.txt", "");
 
-    expect(File.isExist("tmp/caching-dev.txt")).toBe(false);
-    expect(File.isExist("tmp/restart.txt")).toBe(true);
+    expect(File.isExist("tmp/caching-dev.txt")).toBeFalsy();
+    expect(File.isExist("tmp/restart.txt")).toBeTruthy();
     const restartFileTimeBefore = File.mtime("tmp/restart.txt");
 
     expect(await runDevCacheCommand()).toBe(
       "Action Controller caching enabled for development mode.\n",
     );
 
-    expect(File.isExist("tmp/caching-dev.txt")).toBe(true);
+    expect(File.isExist("tmp/caching-dev.txt")).toBeTruthy();
     const restartFileTimeAfter = File.mtime("tmp/restart.txt");
     expect(restartFileTimeBefore.getTime()).toBeLessThan(restartFileTimeAfter.getTime());
   });
@@ -69,15 +69,15 @@ describe("Rails::Command::DevTest", () => {
     appFile("tmp/caching-dev.txt", "");
     appFile("tmp/restart.txt", "");
 
-    expect(File.isExist("tmp/caching-dev.txt")).toBe(true);
-    expect(File.isExist("tmp/restart.txt")).toBe(true);
+    expect(File.isExist("tmp/caching-dev.txt")).toBeTruthy();
+    expect(File.isExist("tmp/restart.txt")).toBeTruthy();
     const restartFileTimeBefore = File.mtime("tmp/restart.txt");
 
     expect(await runDevCacheCommand()).toBe(
       "Action Controller caching disabled for development mode.\n",
     );
 
-    expect(File.isExist("tmp/caching-dev.txt")).toBe(false);
+    expect(File.isExist("tmp/caching-dev.txt")).toBeFalsy();
     const restartFileTimeAfter = File.mtime("tmp/restart.txt");
     expect(restartFileTimeBefore.getTime()).toBeLessThan(restartFileTimeAfter.getTime());
   });
