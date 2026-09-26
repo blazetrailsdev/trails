@@ -103,7 +103,7 @@ describe("SchemaCacheIndexDefinitionRoundTripTest", () => {
     );
 
     const loaded = new SchemaCache();
-    loaded.marshalLoad(JSON.parse(JSON.stringify(source.marshalDump())));
+    loaded.marshalLoad(source.marshalDump());
     const [index] = await loaded.indexes(new FakePool({}), "people");
 
     expect(index).toBeInstanceOf(IndexDefinition);

@@ -67,7 +67,7 @@ describe("DatabaseTasksMigrateAfterSchemaLoadTest", () => {
     await Base.removeConnection();
     await connectTo(join(dir, "fresh.sqlite3"));
     const [fresh] = DatabaseTasks.configsFor({ envName: DatabaseTasks.env });
-    await DatabaseTasks.loadSchema(fresh, "js", schemaFile);
+    await DatabaseTasks.loadSchema(fresh, "ruby", schemaFile);
 
     const pending =
       await DatabaseTasks.migrationConnectionPool().migrationContext.pendingMigrationVersions();

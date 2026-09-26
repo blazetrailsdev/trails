@@ -2,6 +2,7 @@ import { fetch, File, hasKey } from "@blazetrails/ruby-compat";
 import { ActiveRecord } from "../namespaces.js";
 import { DatabaseConfig, type DatabaseConfigOptions } from "./database-config.js";
 import { schemaFormat } from "../active-record.js";
+import { SchemaDumper } from "../connection-adapters/abstract/schema-dumper.js";
 import type { SchemaFormat } from "../tasks/database-tasks.js";
 
 export class HashConfig extends DatabaseConfig {
@@ -116,7 +117,7 @@ export class HashConfig extends DatabaseConfig {
     );
   }
 
-  schemaDump(format: "ruby" | SchemaFormat = schemaFormat()): string | null {
+  schemaDump(format: SchemaFormat = schemaFormat()): string | null {
     if (
       hasKey(this.configurationHash, "schemaDump") &&
       this.configurationHash.schemaDump !== undefined
@@ -148,13 +149,9 @@ export class HashConfig extends DatabaseConfig {
   private schemaFileType(format: string): string | null {
     switch (format) {
       case "ruby":
-        return "schema.rb";
+        return `schema.${SchemaDumper.language}`;
       case "sql":
         return "structure.sql";
-      case "ts":
-        return "schema.ts";
-      case "js":
-        return "schema.js";
       default:
         return null;
     }

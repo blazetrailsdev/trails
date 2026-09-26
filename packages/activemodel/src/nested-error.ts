@@ -4,7 +4,7 @@ interface ErrorLike {
   attribute: string;
   type: string;
   rawType?: string | null;
-  message: string;
+  message: string | null;
   options?: Record<string, unknown>;
 }
 
@@ -18,11 +18,11 @@ export class NestedError extends ActiveModelError {
   ) {
     const attribute = overrideOptions?.attribute ?? innerError.attribute;
     const type = overrideOptions?.type ?? innerError.type;
-    super(base, attribute, type, innerError.options ?? {}, innerError.rawType ?? null);
+    super(base, attribute, type, innerError.options ?? {}, innerError.rawType);
     this.innerError = innerError;
   }
 
-  override get message(): string {
+  override get message(): string | null {
     return this.innerError.message;
   }
 }

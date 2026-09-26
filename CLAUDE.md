@@ -1036,40 +1036,50 @@ That is the whole constraint, and it splits Rails' sections in two:
 This is a genuine language shortcoming, ratified repo-wide here. If one of those
 bodies ever gains an `await`, it gains the monitor in the same change.
 
-## Method visibility is not a runtime fact in JS (`basic_obj_respond_to`'s `pub`)
+## Method visibility is a side table (`Module#private`, `basic_obj_respond_to`'s `pub`)
 
 Ruby's `basic_obj_respond_to` (`vendor/ruby/vm_method.c:2864-2879`) takes a
-`pub` flag and hands it to `method_boundp`, so `respond_to?(:m)` and
-`respond_to?(:m, true)` can answer differently for the same receiver: the first
-sees public and protected methods, the second also sees private ones. Visibility
-is a property of the method entry, readable at run time.
+`pub` flag and hands it to `method_boundp` (`:1788-1818`), so `respond_to?(:m)`
+and `respond_to?(:m, true)` can answer differently for the same receiver: a
+PRIVATE entry, and under `BOUND_RESPONDS` a PROTECTED one, answers `0` when
+`pub` is set and falls through to `respond_to_missing?`. Visibility is a
+property of the method entry, readable at run time.
 
-JS has no such fact to read, and both of its would-be carriers fail in opposite
-directions:
+JS has no such fact of its own, and both of its would-be carriers fail in
+opposite directions:
 
 - A `#private` field or method is not a string-named property at all, so
   `"#x" in obj` is false — it is invisible at BOTH `pub` values, where Ruby
-  reports it at `pub = 0`. There is no reflection API that reaches it; that is
-  the point of the syntax.
+  reports it at `pub = 0`.
 - A TS `private` / `protected` member is a compile-time annotation with no
   runtime residue: it is emitted as an ordinary property, so `in` reports it at
   BOTH `pub` values, where Ruby hides it at `pub = 1`.
 
-So the prototype-chain lookup of `mid` is the whole of `method_boundp` here —
-the nearest own descriptor answers, and an own `undefined` value is
-`Module#undefMethod`'s `VM_METHOD_TYPE_UNDEF` entry, which answers false — and
-`pub` cannot change its answer. The parameter is still declared and still plumbed — Rails'
-`ActiveModel::AttributeMethods#respond_to?`
-(`activemodel/lib/active_model/attribute_methods.rb:528-533`) makes two `super`
-calls that differ only in it, and dropping it collapses them into one call
-eslint's `no-dupe-else-if` rejects as a dead branch — and its one reader is
-the unbound-name arm, which hands `!pub` to the receiver's `respondToMissing`
-exactly as `basic_obj_respond_to_missing` does (`vm_method.c:2872-2875`).
+**The carrier is a side table in ruby-compat.** `rbModPrivate(klass, ...mids)` /
+`rbModProtected(klass, ...mids)` (`packages/ruby-compat/src/object.ts`, the
+ports of `rb_mod_private` / `rb_mod_protected`, `vm_method.c:2482-2516`) record
+`(klass.prototype, mid) → visibility`, raising `NameError` for a name the class
+does not answer as `check_and_export_method` does; a JS accessor's setter
+answers the writer `name=`. The TS `private` / `protected` keyword stays beside
+the call for the type checker; the call is what Ruby sees. Two readers consult
+the table:
 
-This is a genuine language shortcoming, not a preference, and it is ratified
-repo-wide here. `basicObjRespondTo` (`packages/ruby-compat/src/object.ts`) cites
-**this section**; a call site that passes `pub` is not re-deriving the decision,
-and there is no story to make `in` visibility-aware.
+- `basicObjRespondTo` walks the chain as before, but an entry recorded in the
+  table is the entry at that owner, and under `pub` a non-public one sends the
+  name to `respondToMissing`, exactly `method_boundp`'s `0`.
+- `rbFPublicSend` (`Kernel#public_send`, `vm_eval.c:1350`) raises
+  `NoMethodError` "private method '…' called for …" off the same table, so
+  `ActiveModel::AttributeAssignment#_assign_attribute`
+  (`attribute_assignment.rb:67-76`) is a `public_send` with its Rails rescue.
+
+The table does NOT reach a plain property access. `topic.title` carries no
+caller context, so it cannot raise while `send(:title)` succeeds; the
+`assert_raise(NoMethodError) { topic.title }` arms of "attribute
+readers/writers/predicates respect access control"
+(`activerecord/test/cases/attribute_methods_test.rb:998-1026`) remain a
+separate decision (`activerecord-private-attribute-methods-are-still-public`).
+The `pub` parameter is therefore live, and `ActiveModel::AttributeMethods`'
+two `super` calls (`attribute_methods.rb:528-533`) differ in it as in Rails.
 
 ## Schema reflection peeks at a warm cache (`load_schema!`'s `schema_cache.columns_hash`)
 
@@ -1260,7 +1270,7 @@ the capability, in a different place. Each is its own `SKIP_GROUPS` entry in
 | `active_model/attribute_methods.rb`                   | named method, no trap |
 | `active_record/attribute_methods.rb`                  | records: not a Proxy  |
 | `connection_adapters/abstract/connection_pool.rb`     | Proxy (`NullPool`)    |
-| `active_record/dynamic_matchers.rb`                   | named method, no trap |
+| `active_record/dynamic_matchers.rb`                   | Proxy (class chain)   |
 | `migration/command_recorder.rb`                       | typed forwarders      |
 | `migration/default_strategy.rb`                       | typed forwarders      |
 | `active_record/migration.rb`                          | typed forwarders      |
@@ -1290,13 +1300,27 @@ raise. The `method_missing` `super` arm stays in the port; an unanswered name
 reads `undefined`, and calling it is a `TypeError` where Ruby raises
 `NoMethodError`.
 
-A "named method, no trap" row answers only an explicit `methodMissing` call,
-which is where `finder-respond-to-dynamic-finders-invisible-to-in` sits: a
-model class is not a Proxy, so `findByTitle` dispatches to
-`DynamicMatchers#method_missing` only from a relation's Proxy, whose
-`ClassSpecificRelation#methodMissing` falls into it where Ruby's
-`public_send` would. These rows are decided per class, not ratified: a "nothing" row with a
+A "named method, no trap" row answers only an explicit `methodMissing` call.
+These rows are decided per class, not ratified: a "nothing" row with a
 dispatch-dependent Rails test is a gap, filed against its package.
+
+`active_record/dynamic_matchers.rb` is `extend`ed onto the model CLASS
+(`base.rb:292`), so its Proxy is not returned in place of anything: `base.ts`
+splices one into `Base`'s static prototype chain, directly above `Base`, so
+`Topic.findByTitle("x")` reaches `DynamicMatchers#method_missing` with no prior
+relation call. The trap forwards only a read that missed every class below it,
+only for `Base` or a subclass as receiver, and only a name `respond_to_missing?`
+claims. A static read that hits `Base` or a subclass never crosses it; one
+inherited from above `Base` (ActiveModel's class methods) does, and costs ~10×
+per read in a 200k-iteration microbenchmark (~1.5 → ~14 ms), with no measurable
+wall-time change across `persistence`, `validations`, `callbacks` and `finder`
+test files (~22 s either way). Placing it at the chain's root instead would tax
+only misses, but its identity then replaces `Function.prototype` as the root's
+parent, which ~20 chain walkers terminate on. The name is untyped (a static
+`findBy${string}` index signature breaks subclass assignability to
+`typeof Base`), so a call site reaches it through a cast — `(Topic as any).findByTitle(...)`,
+or a narrower structural type where the file bans `any` — and `in`
+still cannot see it (`finder-respond-to-dynamic-finders-invisible-to-in`).
 
 ## `inherited` is deferred to own-property memo guards (`ModelSchema.inherited`)
 

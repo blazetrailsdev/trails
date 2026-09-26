@@ -1095,7 +1095,7 @@ describe("ActiveSupportSubclassWithFixturesTest", () => {
   const { organizations } = fixtures(["organizations"]);
 
   it("foo", async () => {
-    expect((await Organization.findBy({ name: "No Such Agency" }))?.id).toBe(
+    expect((await (Organization as any).findByName("No Such Agency"))?.id).toBe(
       organizations("nsa").id,
     );
   });

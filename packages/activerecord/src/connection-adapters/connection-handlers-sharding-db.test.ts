@@ -608,16 +608,16 @@ describe("ConnectionHandlersShardingDbTest", () => {
       await ShardConnectionTestModel.createBang({ shard_key: "foo" });
 
       await Base.connectedTo({ role: "writing", shard: "default" }, async () => {
-        expect(await ShardConnectionTestModel.findBy({ shard_key: "foo" })).toBeTruthy();
+        expect(await (ShardConnectionTestModel as any).findByShardKey("foo")).toBeTruthy();
       });
 
       await Base.connectedTo({ role: "writing", shard: "one" }, async () => {
-        expect(await ShardConnectionTestModel.findBy({ shard_key: "foo" })).toBeFalsy();
+        expect(await (ShardConnectionTestModel as any).findByShardKey("foo")).toBeFalsy();
         await ShardConnectionTestModel.createBang({ shard_key: "bar" });
       });
 
-      expect(await ShardConnectionTestModel.findBy({ shard_key: "bar" })).toBeFalsy();
-      expect(await ShardConnectionTestModel.findBy({ shard_key: "foo" })).toBeTruthy();
+      expect(await (ShardConnectionTestModel as any).findByShardKey("bar")).toBeFalsy();
+      expect(await (ShardConnectionTestModel as any).findByShardKey("foo")).toBeTruthy();
     } finally {
       await Base.connectionHandler.clearAllConnectionsBang();
     }

@@ -105,8 +105,8 @@ class ProjectWithAfterCreateHook extends Base {
     });
 
     this.afterCreate(async function (record: any) {
-      const david = await DeveloperForProjectWithAfterCreateHook.findBy({ name: "David" });
-      await (david as any).projects.push(record);
+      const david = await (DeveloperForProjectWithAfterCreateHook as any).findByName("David");
+      await david.projects.push(record);
     });
   }
 }
@@ -469,7 +469,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     assertPredicate(devel, (r) => r.isPersisted());
     assertPredicate(proj2, (r) => r.isPersisted());
     expect(await devel.projects.last()).toBe(proj2);
-    const found = (await Developer.findBy({ name: "Marcel" })) as Developer;
+    const found = (await (Developer as any).findByName("Marcel")) as Developer;
     expect((await found.projects.last())?.id).toBe(proj2.id);
   });
 
@@ -794,12 +794,8 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it("new with values in collection", async () => {
-    const jamis = (await DeveloperForProjectWithAfterCreateHook.findBy({
-      name: "Jamis",
-    })) as any;
-    const david = (await DeveloperForProjectWithAfterCreateHook.findBy({
-      name: "David",
-    })) as any;
+    const jamis = await (DeveloperForProjectWithAfterCreateHook as any).findByName("Jamis");
+    const david = await (DeveloperForProjectWithAfterCreateHook as any).findByName("David");
     const project = new ProjectWithAfterCreateHook({ name: "Cooking with Bertie" });
     await (project as any).developers.push(jamis);
     await (project as any).saveBang();

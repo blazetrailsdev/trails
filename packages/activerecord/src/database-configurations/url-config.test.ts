@@ -21,7 +21,7 @@ describe("DatabaseConfigurations", () => {
       expect(config.schemaDump()).toBe("db/foo_schema.rb");
 
       config = new UrlConfig("default_env", "primary", "postgres://localhost/foo", {});
-      expect(config.schemaDump("ruby")).toBe("schema.rb");
+      expect(config.schemaDump()).toBe("schema.ts");
     });
 
     it("query cache parsing", () => {

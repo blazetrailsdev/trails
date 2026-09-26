@@ -277,7 +277,7 @@ export const ClassMethods = {
 };
 
 export interface ModelWithErrors {
-  errors: { fullMessages: string[] };
+  errors: { fullMessages: (string | null)[] };
 }
 
 export class ValidationError<TModel extends ModelWithErrors = ModelWithErrors>

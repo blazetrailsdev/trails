@@ -456,35 +456,39 @@ describe("FinderTest", () => {
   });
 
   it("find by one attribute", async () => {
-    expect(idOf(await Topic.findBy({ title: "The First Topic" }))).toBe(idOf(topics("first")));
-    expect(await Topic.findBy({ title: "The First Topic!" })).toBeNull();
+    expect(idOf(await (Topic as any).findByTitle("The First Topic"))).toBe(idOf(topics("first")));
+    expect(await (Topic as any).findByTitle("The First Topic!")).toBeNull();
   });
 
   it("find by one attribute bang", async () => {
-    expect(idOf(await Topic.findByBang({ title: "The First Topic" }))).toBe(idOf(topics("first")));
-    await expect(Topic.findByBang({ title: "The First Topic!" })).rejects.toThrow(RecordNotFound);
+    expect(idOf(await (Topic as any).findByTitleBang("The First Topic"))).toBe(
+      idOf(topics("first")),
+    );
+    await expect((Topic as any).findByTitleBang("The First Topic!")).rejects.toThrow(
+      RecordNotFound,
+    );
   });
 
   it("find by one attribute that is an alias", async () => {
-    expect(idOf(await Topic.findBy({ heading: "The First Topic" }))).toBe(idOf(topics("first")));
-    expect(await Topic.findBy({ heading: "The First Topic!" })).toBeNull();
+    expect(idOf(await (Topic as any).findByHeading("The First Topic"))).toBe(idOf(topics("first")));
+    expect(await (Topic as any).findByHeading("The First Topic!")).toBeNull();
   });
 
   it("find by two attributes", async () => {
-    expect(idOf(await Topic.findBy({ title: "The First Topic", author_name: "David" }))).toBe(
+    expect(idOf(await (Topic as any).findByTitleAndAuthorName("The First Topic", "David"))).toBe(
       idOf(topics("first")),
     );
-    expect(await Topic.findBy({ title: "The First Topic", author_name: "Mary" })).toBeNull();
+    expect(await (Topic as any).findByTitleAndAuthorName("The First Topic", "Mary")).toBeNull();
   });
 
   it("find by nil attribute", async () => {
-    const topic = await Topic.findBy({ last_read: null });
+    const topic = await (Topic as any).findByLastRead(null);
     expect(topic).not.toBeNull();
     expect(topic!.last_read).toBeNull();
   });
 
   it("find by nil and not nil attributes", async () => {
-    const topic = await Topic.findBy({ last_read: null, author_name: "Mary" });
+    const topic = await (Topic as any).findByLastReadAndAuthorName(null, "Mary");
     expect(topic!.author_name).toBe("Mary");
   });
 
@@ -712,7 +716,7 @@ describe("FinderTest", () => {
 
   it("find by id with large number", async () => {
     await assertQueriesCount(0, false, async () => {
-      expect(await Topic.findBy({ id: "9999999999999999999999999999999" as never })).toBeNull();
+      expect(await (Topic as any).findById("9999999999999999999999999999999")).toBeNull();
     });
   });
 
@@ -1059,7 +1063,7 @@ describe("FinderTest", () => {
   it("find by one attribute that is an aggregate", async () => {
     const address = (customers("david") as any).address as Address;
     expect(address).toBeInstanceOf(Address);
-    const foundCustomer = await Customer.findBy({ address });
+    const foundCustomer = await (Customer as any).findByAddress(address);
     expect(rid(foundCustomer)).toBe(rid(customers("david")));
   });
 
@@ -1067,11 +1071,11 @@ describe("FinderTest", () => {
     const address = (customers("david") as any).address as Address;
     expect(address).toBeInstanceOf(Address);
     let missing = new Address(address.street, address.city, address.country + "1");
-    expect(await Customer.findBy({ address: missing })).toBeNull();
+    expect(await (Customer as any).findByAddress(missing)).toBeNull();
     missing = new Address(address.street, address.city + "1", address.country);
-    expect(await Customer.findBy({ address: missing })).toBeNull();
+    expect(await (Customer as any).findByAddress(missing)).toBeNull();
     missing = new Address(address.street + "1", address.city, address.country);
-    expect(await Customer.findBy({ address: missing })).toBeNull();
+    expect(await (Customer as any).findByAddress(missing)).toBeNull();
   });
 
   it("find by two attributes that are both aggregates", async () => {
@@ -1079,17 +1083,17 @@ describe("FinderTest", () => {
     const address = (customers("david") as any).address as Address;
     expect(balance).toBeInstanceOf(Money);
     expect(address).toBeInstanceOf(Address);
-    const foundCustomer = await Customer.findBy({ balance, address });
+    const foundCustomer = await (Customer as any).findByBalanceAndAddress(balance, address);
     expect(rid(foundCustomer)).toBe(rid(customers("david")));
   });
 
   it("find by two attributes with one being an aggregate", async () => {
     const balance = (customers("david") as any).balance as Money;
     expect(balance).toBeInstanceOf(Money);
-    const foundCustomer = await Customer.findBy({
+    const foundCustomer = await (Customer as any).findByBalanceAndName(
       balance,
-      name: (customers("david") as any).name,
-    });
+      (customers("david") as any).name,
+    );
     expect(rid(foundCustomer)).toBe(rid(customers("david")));
   });
 
@@ -1362,7 +1366,7 @@ describe("FinderTest", () => {
 
   it("find by one attribute bang with blank defined", async () => {
     const blankTopic = await CanonicalBlankTopic.create({ title: "The Blank One" });
-    expect(rid(await CanonicalBlankTopic.findByBang({ title: "The Blank One" }))).toBe(
+    expect(rid(await (CanonicalBlankTopic as any).findByTitleBang("The Blank One"))).toBe(
       rid(blankTopic),
     );
   });
@@ -1400,9 +1404,9 @@ describe("FinderTest", () => {
   });
 
   it("find by one attribute with several options", async () => {
-    const found = await Account.order("id DESC")
-      .where("id != ?", rid(accounts("rails_core_account")))
-      .findBy({ credit_limit: 50 });
+    const found = await (
+      Account.order("id DESC").where("id != ?", rid(accounts("rails_core_account"))) as any
+    ).findByCreditLimit(50);
     expect(rid(found)).toBe(rid(accounts("unknown")));
   });
 });
@@ -1412,7 +1416,7 @@ describe("FinderTest", () => {
   registerModel("Topic", CanonicalTopic);
 
   it("find_by returns nil if the record is missing", async () => {
-    const found = await CanonicalTopic.findBy({ title: "Nobody" });
+    const found = await (CanonicalTopic as any).findByTitle("Nobody");
     expect(found).toBeNull();
   });
 });

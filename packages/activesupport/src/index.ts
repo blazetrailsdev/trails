@@ -224,6 +224,7 @@ export {
   min,
   selectBang,
   toSentence,
+  toFs as toFsArray,
   toXml as toXmlArray,
 } from "./array-utils.js";
 

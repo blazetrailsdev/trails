@@ -152,11 +152,11 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     const id = (await pirate.ship).id;
 
     assertPredicate(await pirate.ship, (r: any) => r.markedForDestruction());
-    assert(await CanonicalShip.findBy({ id }));
+    assert(await (CanonicalShip as any).findById(id));
 
     await pirate.save();
     expect(await (await pirate.reload()).ship).toBeNull();
-    expect(await CanonicalShip.findBy({ id })).toBeNull();
+    expect(await (CanonicalShip as any).findById(id)).toBeNull();
   });
 
   it("should skip validation on a child association if marked for destruction", async () => {
@@ -220,11 +220,11 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     const id = (await ship.pirate).id;
 
     assertPredicate(await ship.pirate, (r: any) => r.markedForDestruction());
-    assert(await CanonicalPirate.findBy({ id }));
+    assert(await (CanonicalPirate as any).findById(id));
 
     await ship.save();
     expect(await (await ship.reload()).pirate).toBeNull();
-    expect(await CanonicalPirate.findBy({ id })).toBeNull();
+    expect(await (CanonicalPirate as any).findById(id)).toBeNull();
   });
 
   it("autosave cpk association should destroy parent association when marked for destruction", async () => {
@@ -1013,7 +1013,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     await firm.reload();
     expect((await firm.clients).length).toEqual(2);
     expect((await firm.clients).map((c) => c.id)).toContain(
-      (await Client.findBy({ name: "New Client" }))!.id,
+      (await (Client as any).findByName("New Client"))!.id,
     );
   });
 
@@ -1027,7 +1027,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     await firm.reload();
     expect((await firm.clients).length).toEqual(2);
     expect((await firm.clients).map((c) => c.id)).toContain(
-      (await Client.findBy({ name: "New Client" }))!.id,
+      (await (Client as any).findByName("New Client"))!.id,
     );
   });
 

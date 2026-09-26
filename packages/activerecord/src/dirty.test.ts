@@ -338,19 +338,19 @@ describe("DirtyTest", () => {
     pirate.parrot_id = 1;
     await pirate.save();
 
-    pirate = (await Pirate.findBy({ catchphrase: "Yarrrr, me hearties" }))!;
+    pirate = (await (Pirate as any).findByCatchphrase("Yarrrr, me hearties"))!;
     pirate.parrot_id = "";
     expect(pirate.attributeChanged("parrot_id")).toBeTruthy();
     expect(pirate.attributeChange("parrot_id")).toEqual([1, null]);
     await pirate.save();
 
-    pirate = (await Pirate.findBy({ catchphrase: "Yarrrr, me hearties" }))!;
+    pirate = (await (Pirate as any).findByCatchphrase("Yarrrr, me hearties"))!;
     pirate.parrot_id = 0;
     expect(pirate.attributeChanged("parrot_id")).toBeTruthy();
     expect(pirate.attributeChange("parrot_id")).toEqual([null, 0]);
     await pirate.save();
 
-    pirate = (await Pirate.findBy({ catchphrase: "Yarrrr, me hearties" }))!;
+    pirate = (await (Pirate as any).findByCatchphrase("Yarrrr, me hearties"))!;
     pirate.parrot_id = "";
     expect(pirate.attributeChanged("parrot_id")).toBeTruthy();
     expect(pirate.attributeChange("parrot_id")).toEqual([0, null]);
@@ -659,7 +659,7 @@ describe("DirtyTest", () => {
     await pirate.reload();
     expect(pirate.previousChanges).toEqual(new Hash());
 
-    pirate = (await Pirate.findBy({ catchphrase: "arrr" }))!;
+    pirate = (await (Pirate as any).findByCatchphrase("arrr"))!;
     pirate.catchphrase = "Me Maties!";
     await pirate.saveBang();
 
@@ -671,7 +671,7 @@ describe("DirtyTest", () => {
     expect(pirate.previousChanges.has("parrot_id")).toBeFalsy();
     expect(pirate.previousChanges.has("created_on")).toBeFalsy();
 
-    pirate = (await Pirate.findBy({ catchphrase: "Me Maties!" }))!;
+    pirate = (await (Pirate as any).findByCatchphrase("Me Maties!"))!;
     pirate.catchphrase = "Thar She Blows!";
     await pirate.save();
 
@@ -683,7 +683,7 @@ describe("DirtyTest", () => {
     expect(pirate.previousChanges.has("parrot_id")).toBeFalsy();
     expect(pirate.previousChanges.has("created_on")).toBeFalsy();
 
-    pirate = (await Pirate.findBy({ catchphrase: "Thar She Blows!" }))!;
+    pirate = (await (Pirate as any).findByCatchphrase("Thar She Blows!"))!;
     await pirate.update({ catchphrase: "Ahoy!" });
 
     expect(pirate.previousChanges.size).toEqual(2);
@@ -694,7 +694,7 @@ describe("DirtyTest", () => {
     expect(pirate.previousChanges.has("parrot_id")).toBeFalsy();
     expect(pirate.previousChanges.has("created_on")).toBeFalsy();
 
-    pirate = (await Pirate.findBy({ catchphrase: "Ahoy!" }))!;
+    pirate = (await (Pirate as any).findByCatchphrase("Ahoy!"))!;
     await pirate.updateAttribute("catchphrase", "Ninjas suck!");
 
     expect(pirate.previousChanges.size).toEqual(2);

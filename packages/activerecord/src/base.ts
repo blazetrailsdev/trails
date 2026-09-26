@@ -2503,6 +2503,26 @@ extend(Base, {
   cachedFindByStatement: _Core.cachedFindByStatement,
 });
 extend(Base, Querying);
+Object.setPrototypeOf(
+  Base,
+  new Proxy(Object.getPrototypeOf(Base) as object, {
+    get(target, prop, receiver: typeof Base) {
+      const value = Reflect.get(target, prop, receiver);
+      if (
+        value !== undefined ||
+        typeof prop === "symbol" ||
+        Reflect.has(target, prop) ||
+        !(receiver === Base || Object.prototype.isPrototypeOf.call(Base, receiver))
+      ) {
+        return value;
+      }
+      if (receiver.respondToMissing(prop)) {
+        return (...args: unknown[]) => receiver.methodMissing(prop, ...args);
+      }
+      return value;
+    },
+  }),
+);
 extend(Base, {
   _updateRecord: _Persistence._updateRecord,
   _deleteRecord: _Persistence._deleteRecord,

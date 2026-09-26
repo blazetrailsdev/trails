@@ -37,6 +37,9 @@ export {
   rbObjClass,
   rbObjRespondTo,
   rbObjSingletonClass,
+  rbFPublicSend,
+  rbModPrivate,
+  rbModProtected,
   rtest,
 } from "./object.js";
 export {

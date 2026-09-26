@@ -15,7 +15,7 @@ interface InnerErrorLike {
   attribute: string;
   type: string;
   rawType?: string | null;
-  message: string;
+  message: string | null;
   options?: Record<string, unknown>;
   base?: unknown;
 }

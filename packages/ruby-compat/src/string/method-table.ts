@@ -240,7 +240,7 @@ export function rbStrSend(str: string, method: string, ...args: unknown[]): [unk
 /**
  * `str.respond_to?` (`vendor/ruby/vm_method.c:2977` `obj_respond_to`) over
  * {@link rbStrSend}'s names: JS's own `String.prototype` members are not
- * Ruby's. See CLAUDE.md, "Method visibility is not a runtime fact in JS".
+ * Ruby's. See CLAUDE.md, "Method visibility is a side table".
  *
  * @noRailsEquivalent PERMANENT
  */

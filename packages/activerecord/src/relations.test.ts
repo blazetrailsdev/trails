@@ -1136,7 +1136,7 @@ describe("RelationTest", () => {
 
   it("find by id with list of ar", async () => {
     const author = await Author.first();
-    const found = await Author.findBy({ id: [author] });
+    const found = await (Author as any).findById([author]);
     expect(found!.id).toBe(author!.id);
   });
 

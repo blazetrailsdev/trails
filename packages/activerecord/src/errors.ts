@@ -592,18 +592,7 @@ export class IrreversibleOrderError extends ActiveRecordError {
   }
 }
 
-export class UnknownAttributeError extends ActiveRecordError {
-  readonly record: object;
-  readonly attribute: string;
-
-  constructor(record: object, attribute: string) {
-    const model = record?.constructor?.name ?? "Record";
-    super(`unknown attribute '${attribute}' for ${model}.`);
-    this.name = "ActiveModel::UnknownAttributeError";
-    this.record = record;
-    this.attribute = attribute;
-  }
-}
+export { UnknownAttributeError } from "@blazetrails/activemodel";
 
 export { NameError } from "@blazetrails/activesupport";
 

@@ -44,7 +44,7 @@ export async function dumpTemplateSchemaCache(
 }
 
 export function dumpedTables(marshalled: unknown[]): ReadonlySet<string> {
-  return new Set(Object.keys((marshalled[4] as Record<string, boolean>) ?? {}));
+  return new Set((marshalled[4] as Map<string, boolean>).keys());
 }
 
 export async function schemaShapes(adapter: DatabaseAdapter): Promise<Map<string, string>> {

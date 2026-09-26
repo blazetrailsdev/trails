@@ -8,6 +8,7 @@ import {
   publicInstanceMethods,
   split,
   toSentence,
+  toFsArray,
   toXmlArray,
   type XmlBuilder,
 } from "@blazetrails/activesupport";
@@ -17,6 +18,7 @@ import {
   NoMethodError,
   Range,
   arySlice,
+  compact,
   include,
   rbEql,
   rbObjRespondTo,
@@ -209,7 +211,7 @@ const RECORD_DELEGATES: Record<string, RecordDelegate> = {
   isIntersect: (records, other: Base[]) =>
     records.some((record) => other.some((o) => rbEql(record, o))),
   reverse: (records) => [...records].reverse(),
-  compact: (records) => records.filter((record) => record != null),
+  compact: (records) => compact(records),
   index: (records, valueOrFn: Base | ((record: Base) => unknown)) => {
     const found =
       typeof valueOrFn === "function"
@@ -249,24 +251,12 @@ const RECORD_DELEGATES: Record<string, RecordDelegate> = {
   toSentence: (
     records,
     options?: { wordsConnector?: string; twoWordsConnector?: string; lastWordConnector?: string },
-  ) =>
-    toSentence(
-      records.map((record) => String(record)),
-      options,
-    ),
+  ) => toSentence(records, options),
   asJson: (records, options?: SerializeOptions) =>
     records.map((record) =>
       (record as unknown as { asJson(o?: SerializeOptions): unknown }).asJson(options),
     ),
-  toFs: (records, format?: string) => {
-    if (format === "db") {
-      if (records.length === 0) return "null";
-      return records.map((record) => (record as unknown as { id: unknown }).id).join(",");
-    }
-    return `[${records
-      .map((record) => (record as unknown as { inspect(): string }).inspect())
-      .join(", ")}]`;
-  },
+  toFs: (records, format?: string) => toFsArray(records, format),
   toXml: (records, options?: ToXmlOptions, block?: (builder: XmlBuilder) => void) =>
     toXmlArray(records, options, block),
 };

@@ -5,7 +5,9 @@ import {
   NotImplementedError,
   RuntimeError,
   TypeError,
+  rbFPublicSend,
   rbObjClass,
+  rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
 import { UnknownAttributeError } from "./errors.js";
 
@@ -63,46 +65,16 @@ export function _assignAttribute(
 ): Promise<void> | void {
   const setter = `${k}=`;
   try {
-    const method = publicMethod(this, setter);
-    if (method) {
-      const result: unknown = method.call(this, v);
-      return result instanceof Promise ? (result as Promise<void>) : undefined;
-    }
-    if (this.methodMissing) {
-      this.methodMissing(setter, v);
-      return;
-    }
-    throw new NoMethodError(
-      `undefined method '${setter}' for an instance of ${this.constructor.name}`,
-    );
+    const result = rbFPublicSend(this, setter, v);
+    return result instanceof Promise ? (result as Promise<void>) : undefined;
   } catch (error) {
     if (!(error instanceof NoMethodError)) throw error;
-    if (publicMethod(this, setter)) {
+    if (rbObjRespondTo(this, setter)) {
       throw error;
     } else {
       this.attributeWriterMissing(k, v);
     }
   }
-}
-
-function publicMethod(
-  model: AttributeAssignment,
-  setter: string,
-): ((this: AttributeAssignment, value: unknown) => unknown) | null {
-  const key = setter.slice(0, -1);
-  let obj: object | null = model;
-  while (obj && obj !== Object.prototype) {
-    const desc = Object.getOwnPropertyDescriptor(obj, key);
-    if (desc && typeof desc.set === "function") {
-      return desc.set as (this: AttributeAssignment, value: unknown) => unknown;
-    }
-    obj = Object.getPrototypeOf(obj);
-  }
-  const generated = (model as unknown as Record<string, unknown>)[setter];
-  if (typeof generated === "function") {
-    return generated as (this: AttributeAssignment, value: unknown) => unknown;
-  }
-  return null;
 }
 
 export interface AttributeAssignment {

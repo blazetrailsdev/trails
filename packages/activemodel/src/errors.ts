@@ -120,7 +120,11 @@ export class Errors<TBase extends object = object> {
     return this.include(attribute);
   }
 
-  delete(attribute: string, type?: string, options?: Record<string, unknown>): string[] | null {
+  delete(
+    attribute: string,
+    type?: string,
+    options?: Record<string, unknown>,
+  ): (string | null)[] | null {
     [attribute, type, options] = this.normalizeArguments(attribute, type, options);
     const matches = this.where(attribute, type, options);
     for (const error of matches) {
@@ -129,7 +133,7 @@ export class Errors<TBase extends object = object> {
     return presence(matches.map((error) => error.message)) ?? null;
   }
 
-  get(attribute: string): string[] {
+  get(attribute: string): (string | null)[] {
     return this.messagesFor(attribute);
   }
 
@@ -137,8 +141,8 @@ export class Errors<TBase extends object = object> {
     return [...new Set(this._errors.map((e) => e.attribute))];
   }
 
-  asJson(options?: Record<string, unknown> | null): Record<string, string[]> {
-    const result: Record<string, string[]> = {};
+  asJson(options?: Record<string, unknown> | null): Record<string, (string | null)[]> {
+    const result: Record<string, (string | null)[]> = {};
     for (const [attr, msgs] of this.toHash(
       options != null && (options["fullMessages"] as boolean | undefined),
     )) {
@@ -147,8 +151,8 @@ export class Errors<TBase extends object = object> {
     return result;
   }
 
-  get messages(): Map<string, readonly string[]> {
-    const hash: Hash<string, readonly string[]> = this.toHash();
+  get messages(): Map<string, readonly (string | null)[]> {
+    const hash: Hash<string, readonly (string | null)[]> = this.toHash();
     hash.setDefault(EMPTY_ARRAY);
     hash.freeze();
     return hash;
@@ -196,7 +200,7 @@ export class Errors<TBase extends object = object> {
         strict === true
           ? StrictValidationFailed
           : (strict as new (message?: string) => globalThis.Error);
-      throw new ExceptionClass(error.fullMessage);
+      throw new ExceptionClass(error.fullMessage ?? undefined);
     }
     this._errors.push(error);
     return error;
@@ -230,20 +234,20 @@ export class Errors<TBase extends object = object> {
     return this.messagesFor(attribute).includes(type);
   }
 
-  get fullMessages(): string[] {
+  get fullMessages(): (string | null)[] {
     return this._errors.map((e) => e.fullMessage);
   }
 
-  fullMessagesFor(attribute: string): string[] {
+  fullMessagesFor(attribute: string): (string | null)[] {
     return this.where(attribute).map((e) => e.fullMessage);
   }
 
-  messagesFor(attribute: string): string[] {
+  messagesFor(attribute: string): (string | null)[] {
     return this.where(attribute).map((e) => e.message);
   }
 
   /** @missingRailsName base — PERMANENT */
-  fullMessage(attribute: string, message: string): string {
+  fullMessage(attribute: string, message: string | null): string | null {
     return ActiveModelError.fullMessage(attribute, message, this._base);
   }
 
@@ -304,9 +308,9 @@ export class Errors<TBase extends object = object> {
     return this._errors.length;
   }
 
-  toHash(fullMessages = false): Hash<string, string[]> {
+  toHash(fullMessages = false): Hash<string, (string | null)[]> {
     const messageMethod = fullMessages ? "fullMessage" : "message";
-    const hash = new Hash<string, string[]>();
+    const hash = new Hash<string, (string | null)[]>();
     for (const [attribute, errors] of Object.entries(
       transformValues(this.groupByAttribute(), (errors) =>
         errors.map((error) => error[messageMethod]),
@@ -317,7 +321,7 @@ export class Errors<TBase extends object = object> {
     return hash;
   }
 
-  toArray(): string[] {
+  toArray(): (string | null)[] {
     return this.fullMessages;
   }
 
