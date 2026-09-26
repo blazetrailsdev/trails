@@ -1,5 +1,5 @@
 /**
- * trails-only cover for `rb_hash_default_value` (`vendor/ruby/hash.c:2068`)
+ * trails-only cover for `rb_hash_default_value` (`vendor/ruby/v3.3.11/hash.c:2068`)
  * yielding the RECEIVER to the default_proc: `Rack::Headers < Hash`, so the
  * block sees the headers, not an inner seat.
  */

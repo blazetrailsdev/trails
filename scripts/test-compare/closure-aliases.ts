@@ -13,7 +13,7 @@
  */
 
 export interface ClosureAlias {
-  /** Path under `vendor/rails/activesupport/test/`. */
+  /** Path under `vendor/rails/v8.0.2/activesupport/test/`. */
   testFile: string;
   /** The closure file it covers, relative to `activesupport/lib`. */
   closureFile: string;

@@ -233,7 +233,7 @@ function foldRenamedExtensionToken(token: string): string {
 const LOOSE_RAILS_KINDS: ReadonlySet<string> = new Set(["must_be_like"]);
 
 /**
- * Arel's `must_be_like` (vendor/rails/activerecord/test/cases/arel/helper.rb:10-13)
+ * Arel's `must_be_like` (vendor/rails/v8.0.2/activerecord/test/cases/arel/helper.rb:10-13)
  * squeezes runs of whitespace and strips both operands before delegating to
  * `must_equal`, so `%{\n  SELECT id FROM "users"\n}` and `SELECT id FROM
  * "users"` are the SAME assertion. Its value token must be compared the same

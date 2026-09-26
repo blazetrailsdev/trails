@@ -1,5 +1,5 @@
 // parity:schema — structural parity check of the two hand transcriptions of
-// vendor/rails/activerecord/test/schema/schema.rb against the vendored source
+// vendor/rails/v8.0.2/activerecord/test/schema/schema.rb against the vendored source
 // they are documented to mirror, and against each other:
 //   * TEST_SCHEMA (packages/activerecord/src/test-helpers/test-schema.ts) — the
 //     declarative map, read by the canonical-table ESLint rule and

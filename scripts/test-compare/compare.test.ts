@@ -247,7 +247,7 @@ describe("rejectsSiblingClassCandidate", () => {
 });
 
 describe("normalize", () => {
-  // `def test__parse__2` (vendor/date/test/date/test_date_parse.rb:477) and
+  // `def test__parse__2` (vendor/date/v3.4.1/test/date/test_date_parse.rb:477) and
   // `def test_parse__2` (:563) reach the comparer as " parse  2" and
   // "parse  2" — extract-ruby-tests.rb:648 maps each underscore to a space.
   it("keeps a leading space, so a test__x / test_x pair stays two paths", () => {

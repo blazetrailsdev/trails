@@ -73,9 +73,9 @@ export class UploadedFile {
   }
 
   /**
-   * `binmode?` (`vendor/ruby/io.c:6400`), reached through
+   * `binmode?` (`vendor/ruby/v3.3.11/io.c:6400`), reached through
    * `UploadedFile#method_missing`
-   * (`vendor/rack/lib/rack/multipart/uploaded_file.rb:39`) and so answered by
+   * (`vendor/rack/v3.1.14/lib/rack/multipart/uploaded_file.rb:39`) and so answered by
    * the tempfile — an `io:` stand-in that has no `binmode?` raises, as
    * `StringIO` does in Ruby.
    *

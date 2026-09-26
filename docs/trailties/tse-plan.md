@@ -25,7 +25,7 @@ Rails' ERB pipeline is three layers, in order of execution:
 Source: `actionview/lib/action_view/template/handlers/erb.rb` +
 `.../erb/erubi.rb`.
 
-Responsibilities (verified against `vendor/rails/actionview/lib/action_view/template/handlers/erb.rb`):
+Responsibilities (verified against `vendor/rails/v8.0.2/actionview/lib/action_view/template/handlers/erb.rb`):
 
 - Registered against the `.erb` extension by `Template::Handlers.register_template_handler`.
 - Class attributes (user-tunable):
@@ -67,7 +67,7 @@ Responsibilities (verified against `vendor/rails/actionview/lib/action_view/temp
 ### 1.2 `Erubi::Engine` (the compiler)
 
 Source: gem `erubi` upstream; actionview subclasses it in
-`vendor/rails/actionview/lib/action_view/template/handlers/erb/erubi.rb`.
+`vendor/rails/v8.0.2/actionview/lib/action_view/template/handlers/erb/erubi.rb`.
 
 - Lexer/parser walks the source emitting events for:
   - **text chunks** (everything outside `<% %>`)
@@ -471,7 +471,7 @@ export default function render(context, locals) {
 ```
 
 Rails analogue (the Ruby Erubi actually emits — verified against
-`vendor/rails/actionview/.../erb/erubi.rb`):
+`vendor/rails/v8.0.2/actionview/.../erb/erubi.rb`):
 
 ```ruby
 @output_buffer.safe_append = "<h1>"

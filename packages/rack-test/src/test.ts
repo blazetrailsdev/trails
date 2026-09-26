@@ -25,7 +25,7 @@ export class Error extends globalThis.Error {}
 /** @noRailsEquivalent PERMANENT */
 export type ResponseBlock = (response: MockResponse) => void;
 
-/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Test::Utils` (`vendor/rack-test/lib/rack/test.rb:55`); the class/interface merge is how a mixin surfaces on the type side. */
+/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Test::Utils` (`vendor/rack-test/v2.2.0/lib/rack/test.rb:55`); the class/interface merge is how a mixin surfaces on the type side. */
 export interface Session extends Included<typeof Utils> {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
@@ -242,7 +242,7 @@ export class Session {
   }
 
   /** @internal */
-  private closeBody(body: unknown): void {} // eslint-disable-line unused-imports/no-unused-vars -- `def close_body(body); end` (`vendor/rack-test/lib/rack/test.rb:266`) names the argument and does nothing with it.
+  private closeBody(body: unknown): void {} // eslint-disable-line unused-imports/no-unused-vars -- `def close_body(body); end` (`vendor/rack-test/v2.2.0/lib/rack/test.rb:266`) names the argument and does nothing with it.
 
   /** @internal */
   private parseUri(path: string, env: RackEnv): Generic {

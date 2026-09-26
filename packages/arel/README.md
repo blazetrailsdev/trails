@@ -1,6 +1,6 @@
 # @blazetrails/arel
 
-The trails port of Rails' `arel` (`vendor/rails/activerecord/lib/arel`).
+The trails port of Rails' `arel` (`vendor/rails/v8.0.2/activerecord/lib/arel`).
 
 ## Visitor dispatch reads class names
 

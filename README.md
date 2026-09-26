@@ -291,7 +291,7 @@ Connection _details_ come from discrete sub-setting env vars.
 | MySQL/MariaDB    | `ARCONN=mysql2 pnpm vitest run`     | `MYSQL_HOST` `MYSQL_PORT` `MYSQL_SOCK`  |
 
 These are exactly the keys Rails interpolates
-(`vendor/rails/activerecord/test/config.example.yml:12-20`), plus the `PG*` set
+(`vendor/rails/v8.0.2/activerecord/test/config.example.yml:12-20`), plus the `PG*` set
 its `postgresql:` entries leave to libpq by carrying no connection fields
 (`config.example.yml:74-81`). Each has a working default (`localhost` and the
 stock port), so a local server on default ports needs only `ARCONN`. An empty

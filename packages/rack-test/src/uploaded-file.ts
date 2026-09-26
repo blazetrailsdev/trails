@@ -80,7 +80,7 @@ export class UploadedFile {
    * buffer.
    *
    * Ruby's `buf` is a mutable String `readpartial` refills in place
-   * (`vendor/ruby/io.c:3590`); JS strings are immutable, so the reusable buffer
+   * (`vendor/ruby/v3.3.11/io.c:3590`); JS strings are immutable, so the reusable buffer
    * is the `Uint8Array` `IO#read`'s `str` argument already takes.
    *
    * @missingRailsArgs new — PERMANENT: a JS string is immutable, so Ruby's reusable `String.new` buffer is a sized `Uint8Array`

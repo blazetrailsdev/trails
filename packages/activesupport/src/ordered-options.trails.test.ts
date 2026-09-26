@@ -1,6 +1,6 @@
 /**
  * trails-only covers for `OrderedOptions#dig`'s inherited `rb_obj_dig` seats
- * (`vendor/ruby/object.c:3906`) — the object-that-answers-`dig` arm and
+ * (`vendor/ruby/v3.3.11/object.c:3906`) — the object-that-answers-`dig` arm and
  * `no_dig_method`'s TypeError (`:3897-3900`) — which the gem's own suite
  * reaches only through nested Hashes.
  */

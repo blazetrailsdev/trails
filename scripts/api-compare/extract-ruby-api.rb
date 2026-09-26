@@ -2763,13 +2763,13 @@ class ApiExtractor
 
   # Core Ruby methods whose return is Array UNCONDITIONALLY, regardless of
   # what receiver_kind can prove about their OWN receiver — `String#split`,
-  # `String#scan` (`vendor/ruby/string.c`). Deliberately tiny and hand-picked:
+  # `String#scan` (`vendor/ruby/v3.3.11/string.c`). Deliberately tiny and hand-picked:
   # each name's return type is fixed by the method's contract, never by an
   # argument or a subclass override in any file this extractor has seen.
   CORE_ARRAY_RETURNING_CHAIN_METHODS = %w[split scan].freeze
 
   # Hash core methods whose return is Array WHEN the receiver is already
-  # proven `hash` — `Hash#keys`, `Hash#values` (`vendor/ruby/hash.c`). Unlike
+  # proven `hash` — `Hash#keys`, `Hash#values` (`vendor/ruby/v3.3.11/hash.c`). Unlike
   # {@link CORE_ARRAY_RETURNING_CHAIN_METHODS} these need their OWN receiver
   # proven first: `x.keys` is `Hash#keys` only when `x` is.
   HASH_TO_ARRAY_CHAIN_METHODS = %w[keys values].freeze

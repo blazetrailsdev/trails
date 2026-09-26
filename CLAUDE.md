@@ -149,21 +149,24 @@ as convergence classes.
   every worktree by `start-worktree.sh`; refresh with `pnpm vendor:fetch` from
   the main worktree). Before porting or fixing anything, read the
   corresponding Rails code and test there — e.g.
-  `vendor/rails/activerecord/lib/active_record/...` and
-  `vendor/rails/activerecord/test/cases/...`. The canonical test schema is
-  `vendor/rails/activerecord/test/schema/schema.rb`, which
+  `vendor/rails/v8.0.2/activerecord/lib/active_record/...` and
+  `vendor/rails/v8.0.2/activerecord/test/cases/...`. The canonical test schema is
+  `vendor/rails/v8.0.2/activerecord/test/schema/schema.rb`, which
   `packages/activerecord/src/test-helpers/test-schema.ts` mirrors — when a
   test needs a table or column, check schema.rb first; if it's not there,
   don't invent it. Likewise, Rails' test models live in
-  `vendor/rails/activerecord/test/models/` (ours:
+  `vendor/rails/v8.0.2/activerecord/test/models/` (ours:
   `packages/activerecord/src/test-helpers/models/`) and its fixture data in
-  `vendor/rails/activerecord/test/fixtures/` (ours:
+  `vendor/rails/v8.0.2/activerecord/test/fixtures/` (ours:
   `packages/activerecord/src/test-helpers/fixtures/`) — mirror those too
   rather than making up models or fixture rows.
 - To map a trails test name or method/constant to its vendored Rails
   `file:line` instead of hand-grepping, run `pnpm rails:find <query>` — it
   reuses the test-compare / api-compare manifests and falls back to a scoped
-  grep of `vendor/rails/activerecord/`, tagging each result with the mode.
+  grep of `vendor/rails/v8.0.2/activerecord/`, tagging each result with the mode.
+- A `vendor/<source>/…` citation names the version it was verified against
+  (`vendor/rails/v8.0.2/…`, not `vendor/rails/…`); `pnpm vendor:recite`
+  rewrites unversioned or stale citations to each source's active version.
 - Two reference tables answer "what do I call this?" without guessing, and both
   are CI-verified current:
   **[docs/ruby-ts-conventions.md](docs/ruby-ts-conventions.md)** for the
@@ -1055,7 +1058,7 @@ bodies ever gains an `await`, it gains the monitor in the same change.
 
 ## Method visibility is a side table (`Module#private`, `basic_obj_respond_to`'s `pub`)
 
-Ruby's `basic_obj_respond_to` (`vendor/ruby/vm_method.c:2864-2879`) takes a
+Ruby's `basic_obj_respond_to` (`vendor/ruby/v3.3.11/vm_method.c:2864-2879`) takes a
 `pub` flag and hands it to `method_boundp` (`:1788-1818`), so `respond_to?(:m)`
 and `respond_to?(:m, true)` can answer differently for the same receiver: a
 PRIVATE entry, and under `BOUND_RESPONDS` a PROTECTED one, answers `0` when
@@ -1385,7 +1388,7 @@ retire, and there is no story to port `inherited` as a hook.
 
 ## `singleton_class` is a per-object subclass (`rbObjSingletonClass`)
 
-Ruby's `obj.singleton_class` (`vendor/ruby/object.c:288`, `class.c:2215`) is a
+Ruby's `obj.singleton_class` (`vendor/ruby/v3.3.11/object.c:288`, `class.c:2215`) is a
 class of the object's own. It sits between the object and its class, and
 `obj.class` skips it (`rb_obj_class`, `object.c:296`). So
 `t2.singleton_class.validates(:title, uniqueness: true)`

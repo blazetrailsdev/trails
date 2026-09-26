@@ -1,5 +1,5 @@
 /**
- * Re-export shim: `Tempfile` is Ruby stdlib (`vendor/ruby/lib/tempfile.rb:89`)
+ * Re-export shim: `Tempfile` is Ruby stdlib (`vendor/ruby/v3.3.11/lib/tempfile.rb:89`)
  * and lives in `@blazetrails/ruby-compat` (RFC 0129). This file keeps
  * `@blazetrails/activesupport`'s public surface unchanged until
  * `delete-ruby-compat-reexport-shims` removes it.

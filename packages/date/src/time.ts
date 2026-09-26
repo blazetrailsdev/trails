@@ -162,7 +162,7 @@ function numExact(v: unknown): Rational {
   return fToR(v);
 }
 
-/** `ndigits_denominator` (`vendor/ruby/time.c:4504`). */
+/** `ndigits_denominator` (`vendor/ruby/v3.3.11/time.c:4504`). */
 function ndigitsDenominator(ndigits: number): number | Rational {
   const nd = Math.trunc(ndigits);
   if (nd < 0) {
@@ -380,7 +380,7 @@ export class Timezone {
   }
 }
 
-/** `rb_time_zone_abbreviation` (`vendor/ruby/time.c:5746-5775`). */
+/** `rb_time_zone_abbreviation` (`vendor/ruby/v3.3.11/time.c:5746-5775`). */
 function rbTimeZoneAbbreviation(zone: unknown, time: Time): string {
   if (typeof zone === "string") return zone;
   const tzobj = zone as {
@@ -642,7 +642,7 @@ export class Time {
   }
 
   /**
-   * `vendor/ruby/lib/time.rb:39-54` — a hash of timezones mapped to hour
+   * `vendor/ruby/v3.3.11/lib/time.rb:39-54` — a hash of timezones mapped to hour
    * differences from UTC, the set RFC 2822 and ISO 8601 specify.
    */
   static readonly ZoneOffset: Record<string, number> = {
@@ -685,7 +685,7 @@ export class Time {
   };
 
   /**
-   * `vendor/ruby/lib/time.rb:81-96` — the number of seconds the specified time
+   * `vendor/ruby/v3.3.11/lib/time.rb:81-96` — the number of seconds the specified time
    * zone differs from UTC, or `nil` when the offset cannot be determined.
    */
   static zoneOffset(zone: string, year: number = Time.now().year): number | null {
@@ -725,12 +725,12 @@ export class Time {
     return off;
   }
 
-  /** `vendor/ruby/lib/time.rb:98-121` */
+  /** `vendor/ruby/v3.3.11/lib/time.rb:98-121` */
   static #isZoneUtc(zone: string): boolean {
     return /^(?:-00:00|-0000|-00|UTC|Z|UT)$/i.test(zone);
   }
 
-  /** `vendor/ruby/lib/time.rb:124-140` */
+  /** `vendor/ruby/v3.3.11/lib/time.rb:124-140` */
   static #forceZone(t: Time, zone: string, offset: number | null = null): Time {
     if (Time.#isZoneUtc(zone)) {
       return t.getutc();
@@ -745,12 +745,12 @@ export class Time {
     }
   }
 
-  /** `vendor/ruby/lib/time.rb:142` */
+  /** `vendor/ruby/v3.3.11/lib/time.rb:142` */
   static readonly #LeapYearMonthDays = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-  /** `vendor/ruby/lib/time.rb:143` */
+  /** `vendor/ruby/v3.3.11/lib/time.rb:143` */
   static readonly #CommonYearMonthDays = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
-  /** `vendor/ruby/lib/time.rb:144-150` */
+  /** `vendor/ruby/v3.3.11/lib/time.rb:144-150` */
   static #monthDays(y: number, m: number): number {
     if ((y % 4 === 0 && y % 100 !== 0) || y % 400 === 0) {
       return Time.#LeapYearMonthDays[m - 1];
@@ -759,7 +759,7 @@ export class Time {
     }
   }
 
-  /** `vendor/ruby/lib/time.rb:153-193` */
+  /** `vendor/ruby/v3.3.11/lib/time.rb:153-193` */
   static #applyOffset(
     year: number,
     mon: number,
@@ -837,7 +837,7 @@ export class Time {
   }
 
   /**
-   * `vendor/ruby/lib/time.rb:195-272`. Ruby's `now.respond_to?(:getlocal)`
+   * `vendor/ruby/v3.3.11/lib/time.rb:195-272`. Ruby's `now.respond_to?(:getlocal)`
    * guard admits any object answering `#mon`/`#day`/`#year`; `now` is typed
    * `Time` here, so the guard is statically true and the branch it protects is
    * the only one reachable. `offYear` is likewise `nil` in Ruby only when
@@ -976,7 +976,7 @@ export class Time {
   }
 
   /**
-   * `vendor/ruby/lib/time.rb:381-387` — takes a string representation of a
+   * `vendor/ruby/v3.3.11/lib/time.rb:381-387` — takes a string representation of a
    * Time and attempts to parse it using a heuristic. Missing pieces of the
    * date are inferred from `now`. Ruby's `block_given?` is the trailing
    * `block` parameter, so `comp` is `!block_given?` as in Ruby.
@@ -1006,7 +1006,7 @@ export class Time {
   }
 
   /**
-   * `vendor/ruby/lib/time.rb:456-506` — parses `date` according to `format`.
+   * `vendor/ruby/v3.3.11/lib/time.rb:456-506` — parses `date` according to `format`.
    * Ruby's `block_given?` is the trailing `block` parameter. Ruby's
    * `Date.strptime(date, format)` is spelled `dNewByFrags(Date._strptime(date,
    * format))` — RFC 0088's opt-in seam onto the gem-shaped `Date` — because
@@ -1076,7 +1076,7 @@ export class Time {
     return t;
   }
 
-  /** `vendor/ruby/lib/time.rb:485-488` */
+  /** `vendor/ruby/v3.3.11/lib/time.rb:485-488` */
   static readonly MonthValue: Record<string, number> = {
     JAN: 1,
     FEB: 2,
@@ -1093,7 +1093,7 @@ export class Time {
   };
 
   /**
-   * `vendor/ruby/lib/time.rb:508-563` — parses `date` as a date-time defined by
+   * `vendor/ruby/v3.3.11/lib/time.rb:508-563` — parses `date` as a date-time defined by
    * RFC 2822 and converts it to a Time object. Aliased as `rfc822`.
    */
   static rfc2822(date: string): Time {
@@ -1124,11 +1124,11 @@ export class Time {
     }
   }
 
-  /** `vendor/ruby/lib/time.rb:564` */
+  /** `vendor/ruby/v3.3.11/lib/time.rb:564` */
   declare static rfc822: (date: string) => Time;
 
   /**
-   * `vendor/ruby/lib/time.rb:566-598` — parses `date` as an HTTP-date defined
+   * `vendor/ruby/v3.3.11/lib/time.rb:566-598` — parses `date` as an HTTP-date defined
    * by RFC 2616 and converts it to a Time object.
    */
   static httpdate(date: string): Time {
@@ -1172,7 +1172,7 @@ export class Time {
   }
 
   /**
-   * `vendor/ruby/lib/time.rb:620-653` — parses `time` as a dateTime defined by
+   * `vendor/ruby/v3.3.11/lib/time.rb:620-653` — parses `time` as a dateTime defined by
    * the XML Schema and converts it to a Time object. Aliased as `iso8601`.
    */
   static xmlschema(time: string): Time {
@@ -1206,7 +1206,7 @@ export class Time {
     }
   }
 
-  /** `vendor/ruby/lib/time.rb:653` */
+  /** `vendor/ruby/v3.3.11/lib/time.rb:653` */
   declare static iso8601: (time: string) => Time;
 
   constructor(
@@ -1409,7 +1409,7 @@ export class Time {
     );
   }
 
-  /** `time_to_time` (`vendor/ruby/ext/date/date_core.c:8883-8887`). */
+  /** `time_to_time` (`vendor/ruby/v3.3.11/ext/date/date_core.c:8883-8887`). */
   toTime(): Time {
     return this;
   }
@@ -1538,7 +1538,7 @@ export class Time {
     );
   }
 
-  /** `time_floor` (`vendor/ruby/time.c:4595`). */
+  /** `time_floor` (`vendor/ruby/v3.3.11/time.c:4595`). */
   floor(ndigits: number | null = null): Time {
     const den = ndigits == null ? 1 : ndigitsDenominator(ndigits);
     let v = this.toR();
@@ -1546,7 +1546,7 @@ export class Time {
     return this.#timeAdd(v, -1);
   }
 
-  /** `time_ceil` (`vendor/ruby/time.c:4640`). */
+  /** `time_ceil` (`vendor/ruby/v3.3.11/time.c:4640`). */
   ceil(ndigits: number | null = null): Time {
     const den = ndigits == null ? 1 : ndigitsDenominator(ndigits);
     let v = this.toR();
@@ -1557,7 +1557,7 @@ export class Time {
     return this.#timeAdd(v, 1);
   }
 
-  /** `time_gmtime` (`vendor/ruby/time.c:4169`): converts the receiver to UTC in place. */
+  /** `time_gmtime` (`vendor/ruby/v3.3.11/time.c:4169`): converts the receiver to UTC in place. */
   utc(): Time {
     if (this.#tzmodeUtc) {
       return this;

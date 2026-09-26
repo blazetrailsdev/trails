@@ -61,7 +61,7 @@ describe("Rack::Test::UploadedFile", () => {
 
   it.skip("removes local paths on garbage collection", () => {
     // PERMANENT-SKIP: the assertion is that `GC.start` runs Tempfile's finalizer
-    // (`vendor/ruby/lib/tempfile.rb:299`) and unlinks the file. JS has no
+    // (`vendor/ruby/v3.3.11/lib/tempfile.rb:299`) and unlinks the file. JS has no
   });
 
   it("#initialize with an IO object sets the specified filename", () => {

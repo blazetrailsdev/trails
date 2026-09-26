@@ -31,7 +31,7 @@ RFC 0086 called for an audit before productionizing. It was run on 2026-08-05
   9,173-line tool itself.
 - **Whole-corpus coverage was worse than published and structurally capped.**
   Over all 305 files under
-  `vendor/rails/activerecord/lib/active_record/**` (94,543 dispatched nodes):
+  `vendor/rails/v8.0.2/activerecord/lib/active_record/**` (94,543 dispatched nodes):
   **81.8%** node coverage against the 91.8% `codegen:generate` reported on its
   10-file sample, sharply bimodal (200 files at 90–100%, 28 files at 0–10%),
   with the near-zero cohort explained by one syntactic rule

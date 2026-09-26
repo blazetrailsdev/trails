@@ -5,7 +5,7 @@
  *   pnpm parity:test:closure time_zone_test.rb    # in/out for one file
  *   pnpm parity:test:closure --check              # guard only (CI)
  *
- * The guard fails when a file under `vendor/rails/activesupport/test/` is
+ * The guard fails when a file under `vendor/rails/v8.0.2/activesupport/test/` is
  * neither auto-derived (R1/R2) nor aliased nor explicitly listed as
  * out-of-closure, so a new vendored Rails test file cannot silently land on
  * either side of the boundary.

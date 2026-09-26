@@ -236,7 +236,7 @@ function isEnumeratorReceiver(name: string, next: string | undefined): boolean {
 // form was `Map#has` and a ported options hash is an object literal, whose
 // membership test was the `in` operator or `x.k !== undefined` — a shape the
 // gate cannot tell from a dropped guard. `@blazetrails/ruby-compat`'s `hasKey`
-// (the port of `rb_hash_has_key`, `vendor/ruby/hash.c:3671`) is that missing
+// (the port of `rb_hash_has_key`, `vendor/ruby/v3.3.11/hash.c:3671`) is that missing
 // call form, so RFC 0129 discharged both entries and the ports call it.
 //
 // `catch` left the same way: `kernelCatch` (`ruby-compat/src/kernel-catch.ts`)
