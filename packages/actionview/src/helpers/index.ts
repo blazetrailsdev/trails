@@ -149,10 +149,21 @@ export type {
 export {
   BUTTON_TAG_METHOD_VERBS,
   ClassMethods as UrlHelperClassMethods,
+  buttonToGeneratesButtonTag,
+  setButtonToGeneratesButtonTag,
   urlFor,
-  tokenTag,
-  methodTag,
   _backUrl,
   _filteredReferrer,
+  linkTo,
+  buttonTo,
+  linkToUnlessCurrent,
+  linkToUnless,
+  linkToIf,
+  mailTo,
+  isCurrentPage,
+  smsTo,
+  phoneTo,
+  tokenTag,
+  methodTag,
 } from "./url-helper.js";
 export type { UrlHelperHost } from "./url-helper.js";
