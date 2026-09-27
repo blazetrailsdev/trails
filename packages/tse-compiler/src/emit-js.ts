@@ -101,21 +101,18 @@ function emit(ast: TseAst, options: EmitJsOptions): { code: string; mappings: Li
           `TSE: block-expr tag must use arrow syntax (e.g. \`(x) => {\`); function/do forms are not supported. Got: \`${trimmed}\``,
         );
       }
-      const callExpr = trimmed.replace(/\s*\{\s*$/, "").trimEnd();
       innerDepths.push(0);
-      innerCallExprParens.push(netUnclosedParens(callExpr));
-      push(`${bufRef}.${exprAppend}(${callExpr}`, node.srcLine);
-      push("context.capture(() => {");
+      innerCallExprParens.push(netUnclosedParens(node.value));
+      push(`${bufRef}.${exprAppend}(${node.value}return context.capture(() => {`, node.srcLine);
     } else if (node.kind === "code" && insideBlock) {
       const innerDepth = innerDepths[innerDepths.length - 1];
       if (BLOCK_CLOSE_RE.test(node.value) && innerDepth === 0) {
         innerDepths.pop();
         const callExprParens = innerCallExprParens.pop()!;
-        const t = node.value.trim();
-        const tClean = t.endsWith(";") ? t.slice(0, -1) : t;
-        const closingParensInT = (tClean.match(/\)/g) ?? []).length;
-        const suffix = ")".repeat(Math.max(0, 2 + callExprParens - closingParensInT)) + ";";
-        push(`${tClean}${suffix}`, node.srcLine);
+        const closer = node.value.replace(/;\s*$/, "");
+        const closingParens = (closer.match(/\)/g) ?? []).length;
+        const suffix = ")".repeat(Math.max(0, 1 + callExprParens - closingParens)) + ";";
+        push(`});${closer}${suffix}`, node.srcLine);
       } else {
         innerDepths[innerDepths.length - 1] += netBraceDepth(node.value);
         push(emitNode(node, exprAppend, "context.outputBuffer"), node.srcLine);

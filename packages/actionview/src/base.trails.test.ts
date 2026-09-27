@@ -28,7 +28,7 @@ describe("ActionView::Base#in_rendering_context", () => {
     const oldViewRenderer = view.viewRenderer;
 
     view.inRenderingContext({ formats: [":json"] }, (renderer) => {
-      expect(view.lookupContext).toBe(renderer);
+      expect(view.viewRenderer).toBe(renderer);
       expect(view.lookupContext).not.toBe(lookupContext);
       expect(view.viewRenderer).not.toBe(oldViewRenderer);
       expect(view.viewRenderer.lookupContext).toBe(view.lookupContext);

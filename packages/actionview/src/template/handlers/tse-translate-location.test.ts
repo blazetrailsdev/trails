@@ -1,4 +1,5 @@
 import { tokenize } from "@blazetrails/activesupport";
+import { compileJs } from "@blazetrails/tse-compiler";
 import { describe, it, expect } from "vitest";
 import {
   LocationParsingError,
@@ -48,6 +49,23 @@ describe("translateLocation", () => {
     expect(out).toBe(spot);
     expect(out!.firstColumn).toBe(4);
     expect(out!.scriptLines).toEqual(["line1\n", "<%= value %>\n"]);
+  });
+
+  it("translates an error raised on a block-expression line to its template column", () => {
+    const source = "<ul>\n<%= boom(items, (item) => { %>\n<li><%= item %></li>\n<% }) %>\n</ul>\n";
+    const snippet = compileJs(source).code.split("\n")[1];
+    const firstColumn = snippet.indexOf("boom");
+    const spot = {
+      snippet,
+      firstLineno: 2,
+      lastLineno: 2,
+      firstColumn,
+      lastColumn: firstColumn + 4,
+    };
+    const out = translateLocation(spot, { lineno: 2 }, source);
+    expect(out).not.toBeNull();
+    expect(out!.firstColumn).toBe(4);
+    expect(out!.lastColumn).toBe(8);
   });
 
   it("returns null when the backtrace line exceeds source line count", () => {
