@@ -50,6 +50,7 @@ export class EncryptedConfiguration extends EncryptedFile {
     }
   }
 
+  /** @missingRailsCall deep_symbolize_keys — CONVERGEABLE encrypted-configuration-options-delegation-and-validate */
   async config(): Promise<Record<string, unknown>> {
     return (this._config ??= await this.deserialize(await this.read()));
   }
