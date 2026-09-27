@@ -90,6 +90,14 @@ export class Fiber<R = unknown> {
 
   /**
    * @noRailsEquivalent PERMANENT — Ruby core `Fiber#resume` (`vendor/ruby/v3.3.11/cont.c:3543`).
+   *
+   * Resuming an async body whose segment is still in flight returns that
+   * segment's promise instead of raising `fiber_resume_kw`'s double-resume
+   * error (`cont.c:2986-2987`). A Ruby resumer is blocked until the fiber
+   * yields or terminates, so a second outside resume cannot happen there; a JS
+   * resumer is not blocked, and the later caller waits exactly as Ruby's first
+   * one would, receiving the segment's value or its error. A resume re-entered
+   * while the body is still running synchronously keeps Ruby's error.
    */
   resume(): R {
     if (this.#status === "terminated") {
