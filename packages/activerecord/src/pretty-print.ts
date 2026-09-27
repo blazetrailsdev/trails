@@ -87,6 +87,17 @@ class Group {
   isBreak(): boolean {
     return this._break;
   }
+
+  private _first?: boolean;
+
+  isFirst(): boolean {
+    if (this._first !== undefined) {
+      return false;
+    } else {
+      this._first = false;
+      return true;
+    }
+  }
 }
 
 class GroupQueue {
