@@ -23,6 +23,10 @@ const tag = _tag.bind(view);
 const contentTag = _contentTag.bind(view);
 const tagBuilder = _tagBuilder.bind(view);
 
+const assertDomEqual = (expected: string, actual: unknown): void => {
+  expect(String(actual)).toEqual(expected);
+};
+
 const renderTse = (string: string): string => {
   const template = new Template(
     string.trim(),
@@ -319,34 +323,34 @@ describe("TagHelperTest", () => {
     const buffer = renderTse(
       '<%= contentTag("div", null, null, true, () => { %>Hello world!<% }) %>',
     );
-    expect(buffer).toBe("<div>Hello world!</div>");
+    assertDomEqual("<div>Hello world!</div>", buffer);
   });
 
   it("tag builder with block in tse", () => {
     const buffer = renderTse("<%= tag().div(() => { %>Hello world!<% }) %>");
-    expect(buffer).toBe("<div>Hello world!</div>");
+    assertDomEqual("<div>Hello world!</div>", buffer);
   });
 
   it("content tag with block in tse containing non displayed tse", () => {
     const buffer = renderTse('<%= contentTag("p", null, null, true, () => { %><% 1 %><% }) %>');
-    expect(buffer).toBe("<p></p>");
+    assertDomEqual("<p></p>", buffer);
   });
 
   it("tag builder with block in tse containing non displayed tse", () => {
     const buffer = renderTse("<%= tag().p(() => { %><% 1 %><% }) %>");
-    expect(buffer).toBe("<p></p>");
+    assertDomEqual("<p></p>", buffer);
   });
 
   it("content tag with block and options in tse", () => {
     const buffer = renderTse(
       '<%= contentTag("div", { class: "green" }, null, true, () => { %>Hello world!<% }) %>',
     );
-    expect(buffer).toBe('<div class="green">Hello world!</div>');
+    assertDomEqual('<div class="green">Hello world!</div>', buffer);
   });
 
   it("tag builder with block and options in tse", () => {
     const buffer = renderTse('<%= tag().div({ class: "green" }, () => { %>Hello world!<% }) %>');
-    expect(buffer).toBe('<div class="green">Hello world!</div>');
+    assertDomEqual('<div class="green">Hello world!</div>', buffer);
   });
 
   it("content tag with block and options out of tse", () => {

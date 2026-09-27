@@ -45,9 +45,9 @@ describe("RespondToControllerTest", () => {
   });
 
   it("variant without implicit rendering from browser", async () => {
-    await expect(
-      get("variantWithoutImplicitTemplateRendering", "does_not_matter"),
-    ).rejects.toBeInstanceOf(MissingExactTemplate);
+    await expect(get("variantWithoutImplicitTemplateRendering", "does_not_matter")).rejects.toThrow(
+      MissingExactTemplate,
+    );
   });
 
   it("html", () => {
