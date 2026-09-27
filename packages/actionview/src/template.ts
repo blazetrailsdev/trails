@@ -8,7 +8,7 @@ import {
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import type { Base, CompiledMethod, CompiledMethodContainer } from "./base.js";
 import { OutputBuffer, StreamingBuffer } from "./buffers.js";
-import { SyntaxErrorInTemplate, TemplateError } from "./template/error.js";
+import { SyntaxErrorInTemplate, TemplateError, WrongEncodingError } from "./template/error.js";
 import { TemplateHandlers, type TemplateHandler } from "./template/handlers.js";
 import { Html } from "./template/handlers/html.js";
 import { Raw } from "./template/handlers/raw.js";
@@ -338,7 +338,7 @@ export class Template {
   /** @internal */
   private compiledSource(streaming = false): string {
     const setStrictLocals = this.strictLocalsBang();
-    const source = this.source;
+    let source = this.source;
     const handler = this.handler;
     let code: string;
     this._streaming = streaming;
@@ -361,9 +361,15 @@ export class Template {
     const parameters = methodParameters(methodArguments);
     const scope = setStrictLocals != null ? "__strictLocals" : "localAssigns";
 
-    return `Object.assign(${streaming ? "async " : ""}function ${streaming ? this.streamingMethodName() : this.methodName()}(localAssigns, outputBuffer, __kwargs = {}, _) {${setStrictLocals != null ? kwargsCode(parameters) : ""} this.virtualPath = ${JSON.stringify(this.virtualPath)}; const __yield = _ ? { get yield() { return _(); } } : {}; with (this) { with (__yield) { with (${scope}) {${this.localsCode()} ${code}
+    source = `Object.assign(${streaming ? "async " : ""}function ${streaming ? this.streamingMethodName() : this.methodName()}(localAssigns, outputBuffer, __kwargs = {}, _) {${setStrictLocals != null ? kwargsCode(parameters) : ""} this.virtualPath = ${JSON.stringify(this.virtualPath)}; const __yield = _ ? { get yield() { return _(); } } : {}; with (this) { with (__yield) { with (${scope}) {${this.localsCode()} ${code}
   } } }
 }, { parameters: ${JSON.stringify(parameters.map(([type, name]) => (name === undefined ? [type] : [type, name])))} })`;
+
+    if (/\p{Surrogate}/u.test(source)) {
+      throw new WrongEncodingError(source, "UTF-8");
+    }
+
+    return source;
   }
 
   /**

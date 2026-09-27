@@ -58,7 +58,7 @@ describe("compileJs", () => {
     expect(code).toContain("_ob.append(await ( yield ));");
   });
 
-  it("emits block-expr verbatim, leaving the capture to the block-taking helper", () => {
+  it("emits block-expr with capture wrapper so inner writes go to capture buffer", () => {
     const src = "<%= forEach(items, (item) => { %><li><%= item %></li><% }) %>";
     const { code } = compileJs(src);
     expect(code).toBe(

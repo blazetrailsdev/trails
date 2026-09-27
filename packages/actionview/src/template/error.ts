@@ -2,6 +2,7 @@ import { isPresent, symbolizeKeys } from "@blazetrails/activesupport";
 import { Jaro } from "@blazetrails/did-you-mean";
 import {
   ArgumentError,
+  EncodingError,
   excBacktraceLocations,
   File,
   type Location,
@@ -16,6 +17,20 @@ export class ActionViewError extends StandardError {
   constructor(message?: string) {
     super(message);
     this.name = "ActionView::ActionViewError";
+  }
+}
+
+export class WrongEncodingError extends EncodingError {
+  constructor(string: string, encoding: string) {
+    super(
+      `Your template was not saved as valid ${encoding}. Please ` +
+        `either specify ${encoding} as the encoding for your template ` +
+        "in your text editor, or mark the template with its " +
+        "encoding by inserting the following as the first line " +
+        "of the template:\n\n# encoding: <name of correct encoding>.\n\n" +
+        `The source of your template was:\n\n${string}`,
+    );
+    this.name = "ActionView::WrongEncodingError";
   }
 }
 

@@ -4,6 +4,7 @@ import { DetailsKey, LookupContext } from "./lookup-context.js";
 import { PathRegistry } from "./path-registry.js";
 import { PathSet } from "./path-set.js";
 import { Template } from "./template.js";
+import { WrongEncodingError } from "./template/error.js";
 import { TemplateHandlers } from "./template/handlers.js";
 import { Tse } from "./template/handlers/tse.js";
 import { FixtureResolver } from "./testing/resolvers.js";
@@ -57,5 +58,27 @@ describe("Template#compile", () => {
     );
     expect(String(await t.render(new (Base.withEmptyTemplateCache())(null, {}, null)))).toBe("hi");
     expect(g.__templateIdentifierEvaluated).toBeUndefined();
+  });
+});
+
+describe("Template#compiled_source", () => {
+  it("raises WrongEncodingError when the handler returns code that is not valid UTF-16", () => {
+    const t = new Template(
+      "hi",
+      "posts/show",
+      { call: () => "return 'a\uD800b';" },
+      { locals: [], format: ":html" },
+    );
+    let raised: unknown;
+    try {
+      t.render(new (Base.withEmptyTemplateCache())(null, {}, null));
+    } catch (e) {
+      raised = e;
+    }
+    const original = (raised as { original?: unknown }).original ?? raised;
+    expect(original).toBeInstanceOf(WrongEncodingError);
+    expect((original as Error).message).toMatch(
+      /^Your template was not saved as valid UTF-8\. Please either specify UTF-8/,
+    );
   });
 });
