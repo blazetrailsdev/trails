@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { EnumType } from "./enum.js";
-import { BookDestroyAsync } from "./test-helpers/models/book-destroy-async.js";
+import { Book } from "./test-helpers/models/book.js";
 import { Company } from "./test-helpers/models/company.js";
 
 describe("enum on a model whose table has not reflected", () => {
@@ -16,7 +16,7 @@ describe("enum on a model whose table has not reflected", () => {
   });
 
   it("constructs without raising", () => {
-    expect(BookDestroyAsync.columnsHash()["status"]).toBeUndefined();
-    expect(() => new BookDestroyAsync()).not.toThrow();
+    expect(Book.columnsHash()["status"]).toBeUndefined();
+    expect(() => new Book()).not.toThrow();
   });
 });

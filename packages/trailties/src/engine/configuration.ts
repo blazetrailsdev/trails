@@ -2,7 +2,7 @@ import { RouteSet, type MiddlewareStack } from "@blazetrails/actionpack";
 import { File } from "@blazetrails/ruby-compat";
 import { Configuration as RailtieConfiguration } from "../trailtie/configuration.js";
 import { Root } from "../paths.js";
-import { MiddlewareStackProxy } from "../configuration.js";
+import { Generators, MiddlewareStackProxy } from "../configuration.js";
 import { resolveEnv } from "../database.js";
 
 export type RouteSetClass = { newWithConfig(config: EngineConfiguration): RouteSet };
@@ -10,6 +10,7 @@ export type RouteSetClass = { newWithConfig(config: EngineConfiguration): RouteS
 export class EngineConfiguration extends RailtieConfiguration {
   private _root: string | null;
   private _paths?: Root;
+  private _generators?: Generators;
 
   middleware: MiddlewareStackProxy | MiddlewareStack = new MiddlewareStackProxy();
   javascriptPath = "javascript";
@@ -21,11 +22,10 @@ export class EngineConfiguration extends RailtieConfiguration {
   autoloadOncePaths: string[] = [];
   eagerLoadPaths: string[] = [];
 
-  private _generators: Record<string, unknown> = { templates: [] };
-
   constructor(root: string | null = null) {
     super();
     this._root = root;
+    this._generators = this.appGenerators().dup();
   }
 
   get root(): string | null {
@@ -76,7 +76,8 @@ export class EngineConfiguration extends RailtieConfiguration {
     return paths;
   }
 
-  generators(block?: (g: Record<string, unknown>) => void): Record<string, unknown> {
+  generators(block?: (g: Generators) => void): Generators {
+    this._generators ??= new Generators();
     if (block) block(this._generators);
     return this._generators;
   }

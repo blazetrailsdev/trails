@@ -1,7 +1,7 @@
 import { onLoad } from "@blazetrails/activesupport";
 import { NoMethodError } from "@blazetrails/ruby-compat";
 import { PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
-import { MiddlewareStackProxy } from "../configuration.js";
+import { Generators, MiddlewareStackProxy } from "../configuration.js";
 
 export type ConfigurationBlock = (this: unknown, ...args: unknown[]) => void;
 
@@ -27,6 +27,8 @@ export class Configuration {
 
   /** @internal */
   static _appMiddleware?: MiddlewareStackProxy;
+  /** @internal */
+  static _appGenerators?: Generators;
 
   constructor() {
     return new Proxy(this, {
@@ -95,8 +97,10 @@ export class Configuration {
   appMiddleware(): MiddlewareStackProxy {
     return (Configuration._appMiddleware ??= new MiddlewareStackProxy());
   }
-  appGenerators(): undefined {
-    return undefined;
+  appGenerators(block?: (g: Generators) => void): Generators {
+    Configuration._appGenerators ??= new Generators();
+    if (block) block(Configuration._appGenerators);
+    return Configuration._appGenerators;
   }
 
   get(key: string): unknown {

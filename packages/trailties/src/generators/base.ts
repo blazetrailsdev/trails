@@ -3,7 +3,8 @@ import {
   dasherize as _dasherize,
   humanize,
 } from "@blazetrails/activesupport";
-import { File, FileUtils, rbInspect, regexpEscape } from "@blazetrails/ruby-compat";
+import { File, FileUtils, hasKey, rbInspect, regexpEscape } from "@blazetrails/ruby-compat";
+import { Generators } from "../generators.js";
 import * as Actions from "./actions.js";
 import type { GeneratorActionsState } from "./actions.js";
 import * as TrailsActions from "./trails-actions.js";
@@ -104,6 +105,8 @@ export abstract class GeneratorBase implements GeneratorActionsState {
   static classOption(name: string, options: ClassOptionConfig = {}): void {
     if (!("desc" in options))
       options.desc = `Indicates when to generate ${humanize(_underscore(name)).toLowerCase()}`;
+    options.aliases = this.defaultAliasesForOption(name, options);
+    options.default = this.defaultValueForOption(name, options);
     this.classOptions()[name] = options;
   }
 
@@ -195,6 +198,59 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     if (typeof run === "function")
       await run.call(generator, remaining[0] ?? "", remaining.slice(1));
     return generator.getCreatedFiles();
+  }
+
+  /** @internal */
+  protected static baseName(): string | undefined {
+    const segments = this.name.split("::");
+    while (segments.at(-1) === "") segments.pop();
+    const base = segments[0];
+    return base != null ? _underscore(base) : undefined;
+  }
+
+  /** @internal */
+  protected static generatorName(): string | undefined {
+    const segments = this.name.split("::");
+    while (segments.at(-1) === "") segments.pop();
+    const generator = segments.at(-1);
+    return generator != null ? _underscore(generator.replace(/Generator$/, "")) : undefined;
+  }
+
+  /** @internal */
+  protected static defaultValueForOption(name: string, options: ClassOptionConfig): unknown {
+    return this.defaultForOption(Generators.options(), name, options, options.default);
+  }
+
+  /** @internal */
+  protected static defaultAliasesForOption(
+    name: string,
+    options: ClassOptionConfig,
+  ): string | string[] | undefined {
+    return this.defaultForOption(Generators.aliases(), name, options, options.aliases) as
+      | string
+      | string[]
+      | undefined;
+  }
+
+  /** @internal */
+  protected static defaultForOption(
+    config: Record<string, Record<string, unknown>>,
+    name: string,
+    _options: ClassOptionConfig,
+    defaultValue: unknown,
+  ): unknown {
+    let c: Record<string, unknown> | undefined;
+    const generatorName = this.generatorName();
+    const baseName = this.baseName();
+    if (generatorName && (c = config[generatorName]) && hasKey(c, name)) {
+      return c[name];
+    } else if (baseName && (c = config[baseName]) && hasKey(c, name)) {
+      return c[name];
+    } else if (hasKey(config["rails"], name)) {
+      return config["rails"][name];
+    } else {
+      return defaultValue;
+    }
   }
 
   protected isTypeScript(): boolean {

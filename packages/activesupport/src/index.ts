@@ -27,7 +27,12 @@ import {
   zlibAdapterConfig,
 } from "@blazetrails/ruby-compat";
 import { ErrorReporter, currentErrorReporter, _setErrorReporter } from "./error-reporter.js";
-import { testOrder, setTestOrder } from "./active-support.js";
+import {
+  cacheFormatVersion,
+  setCacheFormatVersion,
+  testOrder,
+  setTestOrder,
+} from "./active-support.js";
 
 export const ActiveSupport = {
   get errorReporter(): ErrorReporter {
@@ -96,6 +101,9 @@ export const ActiveSupport = {
   set testOrder(value: string | null) {
     setTestOrder(value);
   },
+
+  cacheFormatVersion,
+  setCacheFormatVersion,
 };
 
 export {

@@ -1,4 +1,10 @@
-import { Logger, MemoryStore, NullStore, resetLoadHooks } from "@blazetrails/activesupport";
+import {
+  ActiveSupport,
+  Logger,
+  MemoryStore,
+  NullStore,
+  resetLoadHooks,
+} from "@blazetrails/activesupport";
 import { FileStore } from "@blazetrails/activesupport/cache/file-store";
 import { Runtime } from "@blazetrails/rack";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -9,7 +15,7 @@ import { Trails } from "../rails.js";
 
 class TestApp extends Bootstrap implements BootstrapHost {
   logger: Logger | null = null;
-  config: BootstrapConfig = {};
+  config: BootstrapConfig = { activeSupport: {} };
 }
 
 describe(":initialize_cache lookup_store arms", () => {
@@ -24,14 +30,14 @@ describe(":initialize_cache lookup_store arms", () => {
 
   it("builds the store a Symbol names", async () => {
     const app = new TestApp();
-    app.config = { cacheStore: ":null_store" };
+    app.config = { activeSupport: {}, cacheStore: ":null_store" };
     await app.runInitializers("all");
     expect(Trails.cache).toBeInstanceOf(NullStore);
   });
 
   it("splats an Array store into the Symbol and its arguments", async () => {
     const app = new TestApp();
-    app.config = { cacheStore: [":file_store", "/app/tmp/cache/"] };
+    app.config = { activeSupport: {}, cacheStore: [":file_store", "/app/tmp/cache/"] };
     await app.runInitializers("all");
     expect(Trails.cache).toBeInstanceOf(FileStore);
     expect((Trails.cache as FileStore).cachePath).toBe("/app/tmp/cache/");
@@ -47,7 +53,7 @@ describe(":initialize_cache lookup_store arms", () => {
     const app = new TestApp();
     const preset = new NullStore();
     Trails.cache = preset;
-    app.config = { cacheStore: ":memory_store" };
+    app.config = { activeSupport: {}, cacheStore: ":memory_store" };
     await app.runInitializers("all");
     expect(Trails.cache).toBe(preset);
   });
@@ -61,6 +67,22 @@ describe(":initialize_cache lookup_store arms", () => {
     app.config = config as unknown as BootstrapConfig;
     await app.runInitializers("all");
     expect(insertBefore).toHaveBeenCalledWith(Runtime, middleware);
+  });
+
+  it("applies the cache format version loadDefaults(7.0) sets", async () => {
+    const previous = ActiveSupport.cacheFormatVersion();
+    try {
+      ActiveSupport.setCacheFormatVersion(7.1);
+      const app = new TestApp();
+      const config = new Configuration("/app");
+      config.loadDefaults("7.0");
+      app.config = config as unknown as BootstrapConfig;
+      await app.runInitializers("all");
+      expect(ActiveSupport.cacheFormatVersion()).toBe(7.0);
+      expect(app.config.activeSupport).not.toHaveProperty("cacheFormatVersion");
+    } finally {
+      ActiveSupport.setCacheFormatVersion(previous);
+    }
   });
 
   it("defaults config.cacheStore to a file store under root", () => {

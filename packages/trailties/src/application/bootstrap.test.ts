@@ -6,7 +6,7 @@ import { Trails } from "../rails.js";
 
 class TestApp extends Bootstrap implements BootstrapHost {
   logger: Logger | null = null;
-  config: BootstrapConfig = {};
+  config: BootstrapConfig = { activeSupport: {} };
 }
 
 describe("Bootstrap", () => {
@@ -29,7 +29,7 @@ describe("Bootstrap", () => {
     it("uses config.logger when provided", async () => {
       const app = new TestApp();
       const custom = new Logger(null);
-      app.config = { logger: custom };
+      app.config = { activeSupport: {}, logger: custom };
       await app.runInitializers("all");
       expect(app.logger).toBe(custom);
     });
@@ -42,7 +42,7 @@ describe("Bootstrap", () => {
 
     it("applies config.logLevel to the resulting logger", async () => {
       const app = new TestApp();
-      app.config = { logLevel: "warn" };
+      app.config = { activeSupport: {}, logLevel: "warn" };
       await app.runInitializers("all");
       expect(app.logger?.level).toBe(Logger.WARN);
     });
@@ -60,7 +60,7 @@ describe("Bootstrap", () => {
     it("uses config.cacheStore when provided", async () => {
       const app = new TestApp();
       const store = new NullStore();
-      app.config = { cacheStore: store };
+      app.config = { activeSupport: {}, cacheStore: store };
       await app.runInitializers("all");
       expect(Trails.cache).toBe(store);
     });

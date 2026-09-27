@@ -316,9 +316,10 @@ describe("Engine", () => {
   it("generators(block) yields a mutable options bag", () => {
     const cfg = new EngineConfiguration();
     cfg.generators((g) => {
-      g.orm = "active_record";
+      (g as unknown as { orm: string }).orm = "active_record";
     });
-    expect(cfg.generators()).toEqual({ orm: "active_record", templates: [] });
+    expect(cfg.generators().options.get("rails")).toEqual({ orm: "active_record" });
+    expect(cfg.generators().templates).toEqual([]);
   });
 
   it("railties returns a Trailties collection over registered subclasses", () => {

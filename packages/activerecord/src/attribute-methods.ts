@@ -19,7 +19,7 @@ import {
 } from "./core.js";
 import { queryAttribute as _queryAttribute } from "./attribute-methods/query.js";
 import { reload as _reload } from "./persistence.js";
-import { cachedTableExists, loadSchema } from "./model-schema.js";
+import { cachedTableExists, isSchemaLoaded, loadSchema } from "./model-schema.js";
 import { attributeNamesForSerialization as _attrNamesForSerialization } from "./serialization.js";
 import { AttributeMethods as AttributeMethodsNamespace } from "./namespaces.js";
 
@@ -289,7 +289,11 @@ export function aliasAttributeMethodDefinition(
 ): void {
   oldName = String(oldName);
 
-  if (this.abstractClass !== true && !this.hasAttribute(oldName)) {
+  if (
+    this.abstractClass !== true &&
+    !this.hasAttribute(oldName) &&
+    isSchemaLoaded.call(this as never)
+  ) {
     throw new ArgumentError(
       `${this.name} model aliases \`${oldName}\`, but \`${oldName}\` is not an attribute. ` +
         `Use \`alias_method :${newName}, :${oldName}\` or define the method manually.`,
