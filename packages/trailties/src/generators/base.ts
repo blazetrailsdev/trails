@@ -202,14 +202,18 @@ export abstract class GeneratorBase implements GeneratorActionsState {
 
   /** @internal */
   protected static baseName(): string | undefined {
-    const base = this.name.split("::")[0];
-    return base ? _underscore(base) : undefined;
+    const segments = this.name.split("::");
+    while (segments.at(-1) === "") segments.pop();
+    const base = segments[0];
+    return base != null ? _underscore(base) : undefined;
   }
 
   /** @internal */
   protected static generatorName(): string | undefined {
-    const generator = this.name.split("::").at(-1);
-    return generator ? _underscore(generator.replace(/Generator$/, "")) : undefined;
+    const segments = this.name.split("::");
+    while (segments.at(-1) === "") segments.pop();
+    const generator = segments.at(-1);
+    return generator != null ? _underscore(generator.replace(/Generator$/, "")) : undefined;
   }
 
   /** @internal */

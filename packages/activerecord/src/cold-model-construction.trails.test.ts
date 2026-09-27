@@ -16,6 +16,8 @@ describe("constructing a model whose table has not reflected", () => {
 
     const book = new Book({ name: "Agile Web Development with Rails" });
     expect((book as unknown as { title: string }).title).toBe("Agile Web Development with Rails");
+    (book as unknown as { title: string }).title = "Rails Recipes";
+    expect(book.readAttribute("name")).toBe("Rails Recipes");
   });
 
   it("default_scope attributes do not raise, and apply once the schema lands", async () => {
