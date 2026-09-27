@@ -1,5 +1,11 @@
 import { classAttribute, Concern, mattrWriter, reverseMerge } from "@blazetrails/activesupport";
-import { extend, include, Module, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import {
+  extend,
+  include,
+  initialize as moduleInitialize,
+  Module,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat";
 import { Parameters } from "../../action-controller/metal/strong-parameters.js";
 import {
   HelperMethodBuilder,
@@ -186,6 +192,8 @@ export const UrlFor = new Module((mod) => {
 
     if (rbObjRespondTo(this, "_urlForModules")) include(this, this._urlForModules!());
   });
+
+  (mod as unknown as Record<symbol, unknown>)[moduleInitialize] = initialize;
 
   mod.moduleEval((m) => {
     Object.assign(m, {

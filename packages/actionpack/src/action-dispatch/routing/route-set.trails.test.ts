@@ -234,7 +234,20 @@ describe("ActionDispatch::Routing::RouteSet#generate_url_helpers", () => {
 
     include(Child, helpers);
     expect(Child._routes).toBe(a);
-    expect(helpers._dupForReinclude).toBeDefined();
+    expect(helpers.dupForReinclude).toBeDefined();
+  });
+
+  it("answers the route set from _routes until an instance assigns its own", () => {
+    const routes = new RouteSet();
+    const other = new RouteSet();
+    class Host {}
+    include(Host, routes.urlHelpers());
+    const host = new Host() as { _routes: RouteSet | null };
+    expect(host._routes).toBe(routes);
+    host._routes = other;
+    expect(host._routes).toBe(other);
+    host._routes = null;
+    expect(host._routes).toBe(routes);
   });
 
   it("gives an includer the default_url_options class attribute", () => {

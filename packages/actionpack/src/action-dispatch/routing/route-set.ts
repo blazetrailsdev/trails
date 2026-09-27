@@ -651,7 +651,7 @@ export class NamedRouteCollection {
 
 export type UrlHelpersModule = Module & {
   _proxy: Included<typeof import("./url-for.js")> & { readonly _routes: RouteSet };
-  _dupForReinclude?: UrlHelpersModule;
+  dupForReinclude?: UrlHelpersModule;
   urlFor(options: UrlForOptions): string;
   fullUrlFor(options: UrlForOptions): string;
   routeFor(name: string, ...args: unknown[]): string;
@@ -870,8 +870,17 @@ export class RouteSet {
         Object.defineProperty(this, "_routes", { get: () => routes, configurable: true });
       });
 
+      const _routesIvar = Symbol("@_routes");
       self.moduleEval((m) => {
-        m["_routes"] = routes;
+        Object.defineProperty(m, "_routes", {
+          get(this: Record<symbol, RouteSet | null | undefined>): RouteSet {
+            return this[_routesIvar] ?? routes;
+          },
+          set(this: Record<symbol, RouteSet | null | undefined>, value: RouteSet | null) {
+            this[_routesIvar] = value;
+          },
+          configurable: true,
+        });
       });
 
       self.defineMethod("_generatePathsByDefault", () => supportsPath);
@@ -883,8 +892,8 @@ export class RouteSet {
           rbObjRespondTo(base, "_routes") &&
           (base as { _routes: unknown })._routes !== this._proxy._routes
         ) {
-          this._dupForReinclude ??= this.dup();
-          include(base as new () => unknown, this._dupForReinclude);
+          this.dupForReinclude ??= this.dup();
+          include(base as new () => unknown, this.dupForReinclude);
         }
       };
     }) as UrlHelpersModule;
