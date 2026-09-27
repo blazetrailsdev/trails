@@ -166,7 +166,8 @@ as convergence classes.
   grep of `vendor/rails/v8.0.2/activerecord/`, tagging each result with the mode.
 - A `vendor/<source>/…` citation names the version it was verified against
   (`vendor/rails/v8.0.2/…`, not `vendor/rails/…`); `pnpm vendor:recite`
-  rewrites unversioned or stale citations to each source's active version.
+  rewrites unversioned or stale citations to each source's active version, and
+  `scripts/vendor-citations.test.ts` fails CI on any citation it would rewrite.
 - Two reference tables answer "what do I call this?" without guessing, and both
   are CI-verified current:
   **[docs/ruby-ts-conventions.md](docs/ruby-ts-conventions.md)** for the
