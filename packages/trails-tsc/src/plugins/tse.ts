@@ -2,6 +2,7 @@ import {
   parse,
   parseLocalsSignature,
   LocalsSignatureError,
+  YIELD_EXPR_RE,
   type TseAst,
   type LocalEntry,
 } from "@blazetrails/tse-compiler";
@@ -66,8 +67,6 @@ function emitNodes(nodes: TseAst["nodes"]): string[] {
   }
   return lines;
 }
-
-const YIELD_EXPR_RE = /^\s*yield(?:\s*\(([\s\S]*)\)|\s+([\s\S]*?))?\s*;?\s*$/;
 
 function contextYield(value: string): string {
   const m = YIELD_EXPR_RE.exec(value);

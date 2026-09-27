@@ -142,8 +142,17 @@ function emit(ast: TseAst, options: EmitJsOptions): { code: string; mappings: Li
   return { code, mappings: lineMappings };
 }
 
+export const YIELD_EXPR_RE = /^\s*yield(?:\s*\(([\s\S]*)\)|\s+([\s\S]*?))?\s*;?\s*$/;
+
+function blockCall(value: string): string {
+  const m = YIELD_EXPR_RE.exec(value);
+  if (m === null || (m[1] === undefined && !m[2])) return value;
+  return `_(${(m[1] ?? m[2]).trim()})`;
+}
+
 function emitNode(node: TseNode, exprAppend: string, bufRef: string, awaits = false): string {
-  const value = awaits ? `await (${node.value})` : node.value;
+  const expr = node.kind === "expr" || node.kind === "rawExpr" ? blockCall(node.value) : node.value;
+  const value = awaits ? `await (${expr})` : expr;
   switch (node.kind) {
     case "text":
       return `${bufRef}.safeAppend(${JSON.stringify(node.value)});`;
