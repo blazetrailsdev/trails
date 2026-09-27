@@ -452,6 +452,7 @@ export {
   unwrappedHtmlEscape,
   htmlEscape,
   h,
+  urlEncode,
   htmlEscapeOnce,
   jsonEscape,
   xmlNameEscape,

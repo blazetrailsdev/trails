@@ -26,6 +26,22 @@ export function htmlEscape(s: unknown): SafeBuffer {
 
 export const h = htmlEscape;
 
+/**
+ * `ERB::Util.url_encode` (`vendor/ruby/v3.3.11/lib/erb/util.rb:57`), which is
+ * `CGI.escapeURIComponent(s.to_s)` (`vendor/ruby/v3.3.11/lib/cgi/util.rb:41-48`):
+ * every run of bytes outside `[a-zA-Z0-9_.\-~]` becomes upper-case `%XX`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function urlEncode(s: unknown): string {
+  return String(s ?? "").replace(/[^a-zA-Z0-9_.\-~]+/g, (m) =>
+    Array.from(
+      new TextEncoder().encode(m),
+      (b) => `%${b.toString(16).toUpperCase().padStart(2, "0")}`,
+    ).join(""),
+  );
+}
+
 /* eslint-disable no-misleading-character-class -- XML spec character ranges */
 const TAG_NAME_START_CODEPOINTS =
   "@:A-Z_a-z\\xC0-\\xD6\\xD8-\\xF6\\u00F8-\\u02FF\\u0370-\\u037D\\u037F-\\u1FFF\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD\\u{10000}-\\u{EFFFF}";
