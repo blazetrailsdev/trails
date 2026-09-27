@@ -38,6 +38,8 @@ const ARROW_BLOCK_RE = /=>\s*\{\s*$/;
 
 const FUNCTION_BLOCK_RE = /(?:=>|\bfunction\b[^{]*)\s*\{\s*$/;
 
+const STRING_LITERAL_RE = /(["'`])(?:\\.|(?!\1)[^\\])*\1/g;
+
 function netBraceDepth(code: string): number {
   let depth = 0;
   for (const ch of code) {
@@ -120,7 +122,7 @@ function emit(ast: TseAst, options: EmitJsOptions): { code: string; mappings: Li
       }
     } else {
       if (node.kind === "code" && options.async === true) {
-        braceDepth += netBraceDepth(node.value);
+        braceDepth += netBraceDepth(node.value.replace(STRING_LITERAL_RE, '""'));
         while (
           functionDepths.length > 0 &&
           braceDepth < functionDepths[functionDepths.length - 1]

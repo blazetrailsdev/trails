@@ -68,4 +68,23 @@ describe("StreamingFlow", () => {
 
     expect(chunks.join("")).toBe("foot|false");
   });
+
+  it("surfaces an error the layout raises after append! resumes it to the driver", async () => {
+    const { view, fiber, template, yielder } = setup(
+      '<%= _layoutFor("header") %><%= boom() %>',
+      '<% provide("header", "Yes, ") %>body',
+    );
+    (view as unknown as { boom(): never }).boom = () => {
+      throw new Error("boom");
+    };
+
+    await fiber.resume();
+    view.viewFlow.set("layout", template.render(view, {}, null, {}, yielder));
+    await expect(
+      (async () => {
+        while (fiber.isAlive()) await fiber.resume();
+      })(),
+    ).rejects.toThrow("boom");
+    expect(fiber.isAlive()).toBe(false);
+  });
 });
