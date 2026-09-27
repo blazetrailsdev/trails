@@ -169,6 +169,7 @@ export class FormBuilder {
   options: Record<string, unknown>;
   private _multipart: unknown;
   readonly index: unknown;
+  private _nestedChildIndex: Record<string, number>;
   private _template: FormHelperHost;
   private _defaultOptions: Record<string, unknown>;
   private _defaultHtmlOptions: Record<string, unknown>;
@@ -197,6 +198,7 @@ export class FormBuilder {
     template: unknown,
     options: Record<string, unknown>,
   ) {
+    this._nestedChildIndex = {};
     this.objectName = objectName;
     this.object = object;
     this._template = template as FormHelperHost;
@@ -228,6 +230,11 @@ export class FormBuilder {
     this._multipart = null;
     const index = options["index"];
     this.index = index != null && index !== false ? index : options["childIndex"];
+  }
+
+  private nestedChildIndex(name: string): number {
+    this._nestedChildIndex[name] ??= -1;
+    return (this._nestedChildIndex[name] += 1);
   }
 
   private convertToLegacyOptions(options: Record<string, unknown>): void {
