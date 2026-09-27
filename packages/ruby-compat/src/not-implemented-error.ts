@@ -1,7 +1,7 @@
 import { Exception } from "./exception.js";
 
 /**
- * Ruby's core `NotImplementedError` (`vendor/ruby/error.c:3346`) — a
+ * Ruby's core `NotImplementedError` (`vendor/ruby/v3.3.11/error.c:3346`) — a
  * `ScriptError`, not a `StandardError`, raised by an abstract method's
  * `raise NotImplementedError`. That bare form carries the class name as its
  * message, which is why `message` defaults to `"NotImplementedError"`.

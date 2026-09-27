@@ -1,5 +1,5 @@
 /**
- * Ruby's core `Range` class (`vendor/ruby/range.c:31`), which Rails'
+ * Ruby's core `Range` class (`vendor/ruby/v3.3.11/range.c:31`), which Rails'
  * `core_ext/range/*` files reopen. Those Rails files are ported one-for-one
  * under `activesupport/src/core-ext/range/`, and reopen this class the way
  * Ruby reopens `Range`.
@@ -14,11 +14,11 @@ import { cmp, rbCmpint } from "./comparable.js";
 import { succ } from "./string/succ.js";
 import { rbEqual } from "./rb-equal.js";
 
-/** `INT_MAX`, the value `r_less` answers for a nil `<=>` (`vendor/ruby/range.c:204`). */
+/** `INT_MAX`, the value `r_less` answers for a nil `<=>` (`vendor/ruby/v3.3.11/range.c:204`). */
 const INT_MAX = 2147483647;
 
 /**
- * `vendor/ruby/range.c:199` `r_less` — the comparison every endpoint check
+ * `vendor/ruby/v3.3.11/range.c:199` `r_less` — the comparison every endpoint check
  * below makes. It is `a <=> b` ({@link cmp}) with one extra arm: an
  * incomparable pair, whose `<=>` is nil, answers `INT_MAX` and so sorts as
  * "greater" rather than raising.
@@ -30,8 +30,8 @@ function rLess(a: unknown, b: unknown): number {
 }
 
 /**
- * `vendor/ruby/range.c:369` `check_step_domain`. The comparison goes through
- * `rb_cmpint` (`vendor/ruby/bignum.c:2959`), NOT through {@link rLess}: a step
+ * `vendor/ruby/v3.3.11/range.c:369` `check_step_domain`. The comparison goes through
+ * `rb_cmpint` (`vendor/ruby/v3.3.11/bignum.c:2959`), NOT through {@link rLess}: a step
  * that cannot be placed against 0 — `Float::NAN` — has a nil `<=>`, and
  * `rb_cmpint` raises `ArgumentError` for it where `r_less` would answer
  * `INT_MAX` and let it through. MRI: `(1..5).step(Float::NAN)` raises
@@ -45,10 +45,10 @@ function checkStepDomain(step: number): void {
 
 /**
  * `rb_funcall(v, id_succ, 0, 0)` as `range_step` and `range_each` reach it
- * (`vendor/ruby/range.c:556`). Ruby dispatches `succ` on the object; JS has no
+ * (`vendor/ruby/v3.3.11/range.c:556`). Ruby dispatches `succ` on the object; JS has no
  * such method on the built-ins a Range is built over, so the discrete types
  * trails ranges actually carry are spelled out. `Date#succ` is +1 day
- * (`vendor/ruby/ext/date/date_core.c` `d_lite_next`).
+ * (`vendor/ruby/v3.3.11/ext/date/date_core.c` `d_lite_next`).
  *
  * A type with no `succ` is Ruby's `!discrete_object_p` arm, which raises
  * `TypeError: can\'t iterate from <class>`.
@@ -66,7 +66,7 @@ function objSucc<T>(v: T): T {
  * call are defined; `begin`, `end` and `exclude_end?` are the three readers
  * every one of them reads off the receiver.
  *
- * `vendor/ruby/range.c:31` — `rb_cRange`.
+ * `vendor/ruby/v3.3.11/range.c:31` — `rb_cRange`.
  *
  * @noRailsEquivalent PERMANENT — `Range` is a core Ruby class, not a Rails
  * declaration, so no Rails file declares it; the Rails-declared `Range`
@@ -77,21 +77,21 @@ export class Range<T = unknown> {
   constructor(
     /**
      * @noRailsEquivalent PERMANENT — core Ruby `Range#begin`
-     * (`vendor/ruby/range.c:1178` `range_begin`). No Rails file declares it, so
+     * (`vendor/ruby/v3.3.11/range.c:1178` `range_begin`). No Rails file declares it, so
      * `parity:api:extra` has no Ruby name to credit it against.
      */
     readonly begin: T | null,
     readonly end: T | null,
     /**
      * @noRailsEquivalent PERMANENT — core Ruby `Range#exclude_end?`
-     * (`vendor/ruby/range.c:133` `range_exclude_end_p`). No Rails file declares
+     * (`vendor/ruby/v3.3.11/range.c:133` `range_exclude_end_p`). No Rails file declares
      * it, so `parity:api:extra` has no Ruby name to credit it against.
      */
     readonly excludeEnd: boolean = false,
   ) {}
 
   /** Raises before any other check on a beginless range, as Ruby does
-   *  (`vendor/ruby/range.c:1243` `range_first`). */
+   *  (`vendor/ruby/v3.3.11/range.c:1243` `range_first`). */
   first(): T {
     if (this.begin === null) {
       throw new RangeError("cannot get the first element of beginless range");
@@ -99,7 +99,7 @@ export class Range<T = unknown> {
     return this.begin;
   }
 
-  /** `vendor/ruby/range.c:1349` `range_last`. */
+  /** `vendor/ruby/v3.3.11/range.c:1349` `range_last`. */
   last(): T | null {
     return this.end;
   }
@@ -108,7 +108,7 @@ export class Range<T = unknown> {
    * Ruby answers nil for an empty range and raises for a beginless one, since
    * there is no least element to report.
    *
-   * @noRailsEquivalent PERMANENT — core Ruby `Range#min` (`vendor/ruby/range.c:1450`), read by
+   * @noRailsEquivalent PERMANENT — core Ruby `Range#min` (`vendor/ruby/v3.3.11/range.c:1450`), read by
    * `length.rb:18`. No Rails file declares it, so `parity:api:extra` has no
    * Ruby name to credit it against.
    */
@@ -116,7 +116,7 @@ export class Range<T = unknown> {
     if (this.begin === null) {
       throw new RangeError("cannot get the minimum of beginless range");
     }
-    /* `vendor/ruby/range.c:1450` — Ruby answers nil for an empty range, and an
+    /* `vendor/ruby/v3.3.11/range.c:1450` — Ruby answers nil for an empty range, and an
        exclusive end makes `begin == end` empty: `(1...1).min` is nil where
        `(1..1).min` is 1. */
     if (this.end !== null && rLess(this.begin, this.end) >= (this.excludeEnd ? 0 : 1)) return null;
@@ -127,7 +127,7 @@ export class Range<T = unknown> {
    * Ruby raises `TypeError` for a non-Integer excluded end rather than
    * silently reporting a fractional maximum.
    *
-   * @noRailsEquivalent PERMANENT — core Ruby `Range#max` (`vendor/ruby/range.c:1558`), read by
+   * @noRailsEquivalent PERMANENT — core Ruby `Range#max` (`vendor/ruby/v3.3.11/range.c:1558`), read by
    * `compare_range.rb:24,50`. No Rails file declares it, so `parity:api:extra` has
    * no Ruby name to credit it against.
    */
@@ -135,7 +135,7 @@ export class Range<T = unknown> {
     const end = this.end;
     if (!this.excludeEnd || end === null) return end;
     if (typeof end === "number") {
-      // `vendor/ruby/range.c:1558` — Ruby's own `Range#max` message.
+      // `vendor/ruby/v3.3.11/range.c:1558` — Ruby's own `Range#max` message.
       if (!Number.isInteger(end)) throw new TypeError("cannot exclude non Integer end value");
       return (end - 1) as T;
     }
@@ -144,7 +144,7 @@ export class Range<T = unknown> {
   }
 
   /**
-   * @noRailsEquivalent PERMANENT — core Ruby `Range#to_s` (`vendor/ruby/range.c:1782`), the fallback
+   * @noRailsEquivalent PERMANENT — core Ruby `Range#to_s` (`vendor/ruby/v3.3.11/range.c:1782`), the fallback
    * `conversions.rb:55` and `json.rb:160` reach. No Rails file declares it.
    */
   toS(): string {
@@ -156,7 +156,7 @@ export class Range<T = unknown> {
   /**
    * Endpoint comparison — true when the range covers the scalar value.
    *
-   * @noRailsEquivalent PERMANENT — core Ruby `Range#cover?` (`vendor/ruby/range.c:2107`), the method
+   * @noRailsEquivalent PERMANENT — core Ruby `Range#cover?` (`vendor/ruby/v3.3.11/range.c:2107`), the method
    * `clusivity.rb:40-50` selects between. No Rails file declares it.
    */
   cover(value: T): boolean {
@@ -171,8 +171,8 @@ export class Range<T = unknown> {
   /**
    * For a String range, membership in the `succ`-enumerated sequence from
    * `begin` to `end`, NOT a plain lexicographic cover. Ruby enumerates string
-   * ranges by `String#succ` (`vendor/ruby/range.c:1960`
-   * `range_include_internal` → `vendor/ruby/string.c:5042` `rb_str_upto_each`),
+   * ranges by `String#succ` (`vendor/ruby/v3.3.11/range.c:1960`
+   * `range_include_internal` → `vendor/ruby/v3.3.11/string.c:5042` `rb_str_upto_each`),
    * so a value is a member only if it is actually
    * *reachable* by repeatedly applying `succ` to `begin` before passing `end`.
    * This mirrors that enumeration faithfully: `("a".."bbb").include?("z")` is
@@ -183,7 +183,7 @@ export class Range<T = unknown> {
    *
    * Beginless/endless string ranges have no enumerable sequence; Ruby raises
    * `TypeError: cannot determine inclusion in beginless/endless ranges`
-   * (`vendor/ruby/range.c:1960` `range_include_internal`), so this throws to match rather than
+   * (`vendor/ruby/v3.3.11/range.c:1960` `range_include_internal`), so this throws to match rather than
    * inventing an answer Ruby never produces.
    */
   isInclude(value: T): boolean {
@@ -195,7 +195,7 @@ export class Range<T = unknown> {
       throw new TypeError("cannot determine inclusion in beginless/endless ranges");
     }
 
-    /* Faithful `vendor/ruby/string.c:5042` `rb_str_upto_each`: enumerate
+    /* Faithful `vendor/ruby/v3.3.11/string.c:5042` `rb_str_upto_each`: enumerate
        begin..end via succ, stopping at `end.succ`, when the exclusive end is
        reached, or when the current string grows past `end`'s length (succ is
        non-decreasing in length). */
@@ -214,7 +214,7 @@ export class Range<T = unknown> {
       if (current.length > end.length || current.length === 0) break;
       /* The length guard above bounds enumeration to strings no longer than
          `end`, so this only trips for spans wider than ~26^5.
-         `vendor/ruby/string.c:5042` would keep iterating (slow but correct);
+         `vendor/ruby/v3.3.11/string.c:5042` would keep iterating (slow but correct);
          throw rather than return a wrong `false`. */
       if (++guard > 5_000_000) {
         throw new RangeError("string range too large to enumerate for include?");
@@ -223,13 +223,13 @@ export class Range<T = unknown> {
     return false;
   }
 
-  /** `vendor/ruby/range.c:1889` `range_eqq`. */
+  /** `vendor/ruby/v3.3.11/range.c:1889` `range_eqq`. */
   caseEquals(value: T): boolean {
     return this.cover(value);
   }
 
   /**
-   * Ruby `Range#==` (`vendor/ruby/range.c:183` `range_eq`): another Range whose `begin`, `end`
+   * Ruby `Range#==` (`vendor/ruby/v3.3.11/range.c:183` `range_eq`): another Range whose `begin`, `end`
    * and `exclude_end?` are each `==`. Two separately-built `1..5` are equal in
    * Ruby, where JS `===` sees two distinct objects.
    */
@@ -242,7 +242,7 @@ export class Range<T = unknown> {
     );
   }
 
-  /** `vendor/ruby/range.c:934` `range_each`. */
+  /** `vendor/ruby/v3.3.11/range.c:934` `range_each`. */
   *each(): Generator<T> {
     yield* this.step(1);
   }
@@ -254,12 +254,12 @@ export class Range<T = unknown> {
     return ary;
   }
 
-  /** `vendor/ruby/range.c:439` `range_step`. */
+  /** `vendor/ruby/v3.3.11/range.c:439` `range_step`. */
   *step(n: number = 1): Generator<T> {
     checkStepDomain(n);
 
     if (typeof this.begin !== "number" && this.begin !== null) {
-      /* `step_i_iter` (`vendor/ruby/range.c:312-325`) counts DOWN from `iter[0]`,
+      /* `step_i_iter` (`vendor/ruby/v3.3.11/range.c:312-325`) counts DOWN from `iter[0]`,
          which `range_step` seeds at 1 (`:465`), and reseeds it to `step` on each
          yield. So the first element always yields, and a fractional step never
          lands on 0 again — which is exactly what MRI does here. */

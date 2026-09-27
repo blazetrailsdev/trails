@@ -1,7 +1,7 @@
 import { StandardError } from "./standard-error.js";
 
 /**
- * Ruby's core `RuntimeError` (`vendor/ruby/error.c:3365`) — what a bare
+ * Ruby's core `RuntimeError` (`vendor/ruby/v3.3.11/error.c:3365`) — what a bare
  * `raise "message"` builds, and what `RuntimeError.new(string)` is. A bare
  * `raise RuntimeError` carries the class name as its message, which is why
  * `message` defaults to `"RuntimeError"`.

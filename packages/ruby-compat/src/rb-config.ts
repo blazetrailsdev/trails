@@ -1,7 +1,7 @@
 import { getOs } from "./os-adapter.js";
 
 /**
- * `vendor/ruby/tool/mkconfig.rb:21` — `RbConfig::CONFIG`, the build configuration hash Ruby's `rbconfig.rb`
+ * `vendor/ruby/v3.3.11/tool/mkconfig.rb:21` — `RbConfig::CONFIG`, the build configuration hash Ruby's `rbconfig.rb`
  * defines. Only the keys trails' ports read are answered; `EXEEXT` is the
  * executable suffix a DOSISH build appends and the empty string everywhere
  * else, which is what `ActiveRecord::ConnectionAdapters::AbstractAdapter
@@ -13,7 +13,7 @@ import { getOs } from "./os-adapter.js";
  */
 export const RbConfig = {
   /**
-   * `vendor/ruby/tool/mkconfig.rb:394` — the config hash itself, read as
+   * `vendor/ruby/v3.3.11/tool/mkconfig.rb:394` — the config hash itself, read as
    * `RbConfig::CONFIG["EXEEXT"]` and `RbConfig::CONFIG["host_os"]`.
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `RbConfig::CONFIG`.

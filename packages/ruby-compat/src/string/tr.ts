@@ -2,7 +2,7 @@ import { ArgumentError } from "../argument-error.js";
 import { rbErrorArity, stringValue } from "./support.js";
 
 /**
- * `trnext` (`vendor/ruby/string.c:7866`): the code points a `tr` / `count` /
+ * `trnext` (`vendor/ruby/v3.3.11/string.c:7866`): the code points a `tr` / `count` /
  * `delete` / `squeeze` character set names, with `a-z` ranges expanded and a
  * backslash quoting the next character.
  *
@@ -31,7 +31,7 @@ export function* trnext(cps: number[]): Generator<number> {
 }
 
 /**
- * `tr_setup_table` (`vendor/ruby/string.c:8236`) over every set, with
+ * `tr_setup_table` (`vendor/ruby/v3.3.11/string.c:8236`) over every set, with
  * `tr_find`'s lookup: a character is selected when each set selects it; a set
  * led by `^` (and longer than one character) selects its complement.
  *
@@ -48,7 +48,7 @@ export function trSetupTable(sets: unknown[]): (cp: number) => boolean {
 }
 
 /**
- * `tr_trans` (`vendor/ruby/string.c:7924`), for `tr` and — with `sflag` —
+ * `tr_trans` (`vendor/ruby/v3.3.11/string.c:7924`), for `tr` and — with `sflag` —
  * `tr_s`, which squeezes each run of one translated character.
  *
  * @noRailsEquivalent PERMANENT
@@ -82,7 +82,7 @@ export function trTrans(str: string, src: unknown, repl: unknown, sflag: boolean
 }
 
 /**
- * `rb_str_delete_bang` (`vendor/ruby/string.c:8331`): the characters every set
+ * `rb_str_delete_bang` (`vendor/ruby/v3.3.11/string.c:8331`): the characters every set
  * selects, removed.
  *
  * @noRailsEquivalent PERMANENT
@@ -96,7 +96,7 @@ export function strDelete(str: string, sets: unknown[]): string {
 }
 
 /**
- * `rb_str_squeeze_bang` (`vendor/ruby/string.c:8424`): each run of one
+ * `rb_str_squeeze_bang` (`vendor/ruby/v3.3.11/string.c:8424`): each run of one
  * selected character (every character, with no sets) cut to one.
  *
  * @noRailsEquivalent PERMANENT
@@ -115,7 +115,7 @@ export function strSqueeze(str: string, sets: unknown[]): string {
 }
 
 /**
- * `String#count` (`vendor/ruby/string.c:8590` `rb_str_count`).
+ * `String#count` (`vendor/ruby/v3.3.11/string.c:8590` `rb_str_count`).
  *
  * @noRailsEquivalent PERMANENT
  */

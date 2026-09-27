@@ -21,11 +21,11 @@ function currentSlot(): AsyncContext<Thread> {
 }
 
 /**
- * @noRailsEquivalent PERMANENT — Ruby core `Thread` (`vendor/ruby/vm.c:4043`).
+ * @noRailsEquivalent PERMANENT — Ruby core `Thread` (`vendor/ruby/v3.3.11/vm.c:4043`).
  */
 export class Thread<R = unknown> {
   /**
-   * @noRailsEquivalent PERMANENT — Ruby core `Thread.main` (`vendor/ruby/thread.c:2962`).
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread.main` (`vendor/ruby/v3.3.11/thread.c:2962`).
    */
   static readonly main: Thread = Object.assign(Object.create(Thread.prototype) as Thread, {
     id: 0,
@@ -34,29 +34,29 @@ export class Thread<R = unknown> {
   });
 
   /**
-   * @noRailsEquivalent PERMANENT — Ruby core `Thread.current` (`vendor/ruby/thread.c:2943`).
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread.current` (`vendor/ruby/v3.3.11/thread.c:2943`).
    */
   static current(): Thread {
     return currentSlot().getStore() ?? Thread.main;
   }
 
   /**
-   * @noRailsEquivalent PERMANENT — Ruby core `Thread` object identity (`vendor/ruby/thread.c:3473`).
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread` object identity (`vendor/ruby/v3.3.11/thread.c:3473`).
    */
   readonly id: number;
   /**
-   * @noRailsEquivalent PERMANENT — Ruby core `Thread#status` (`vendor/ruby/thread.c:3480`).
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread#status` (`vendor/ruby/v3.3.11/thread.c:3480`).
    */
   status: "run" | "dead";
   /**
-   * @noRailsEquivalent PERMANENT — Ruby core `Thread#name` (`vendor/ruby/thread.c:3396`).
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread#name` (`vendor/ruby/v3.3.11/thread.c:3396`).
    */
   name: string | null = null;
   #value!: R;
   #error: { raised: unknown } | null = null;
 
   /**
-   * @noRailsEquivalent PERMANENT — Ruby core `Thread.new` (`vendor/ruby/thread.c:897`).
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread.new` (`vendor/ruby/v3.3.11/thread.c:897`).
    */
   constructor(block: () => R) {
     this.id = ++_threadIdCounter;
@@ -81,7 +81,7 @@ export class Thread<R = unknown> {
   }
 
   /**
-   * @noRailsEquivalent PERMANENT — Ruby core `Thread#value` (`vendor/ruby/thread.c:1222`).
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread#value` (`vendor/ruby/v3.3.11/thread.c:1222`).
    */
   value(): R {
     if (this.#error) throw this.#error.raised;
@@ -89,7 +89,7 @@ export class Thread<R = unknown> {
   }
 
   /**
-   * @noRailsEquivalent PERMANENT — Ruby core `Thread#join` (`vendor/ruby/thread.c:1179`),
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread#join` (`vendor/ruby/v3.3.11/thread.c:1179`),
    * which waits for the thread to finish, re-raises the exception it died of, and
    * returns the thread itself. Ruby blocks the calling thread to wait; JS has no
    * synchronous await, so a thread whose block is async answers a `Promise` of
@@ -107,7 +107,7 @@ export class Thread<R = unknown> {
 
   /**
    * @noRailsEquivalent PERMANENT — Ruby core `Thread#exit` / `#kill`
-   * (`vendor/ruby/thread.c:2710`), which terminates the thread and returns it.
+   * (`vendor/ruby/v3.3.11/thread.c:2710`), which terminates the thread and returns it.
    */
   exit(): this {
     if (this.status === "dead") return this;
@@ -116,14 +116,14 @@ export class Thread<R = unknown> {
   }
 
   /**
-   * @noRailsEquivalent PERMANENT — Ruby core `Thread#alive?` (`vendor/ruby/thread.c:5420`).
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread#alive?` (`vendor/ruby/v3.3.11/thread.c:5420`).
    */
   isAlive(): boolean {
     return this.status !== "dead";
   }
 
   /**
-   * @noRailsEquivalent PERMANENT — Ruby core `Thread#[]` (`vendor/ruby/thread.c:5408`).
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread#[]` (`vendor/ruby/v3.3.11/thread.c:5408`).
    */
   get(key: string): unknown {
     const id = isSymbol(key) ? symbolToS(key) : key;
@@ -131,7 +131,7 @@ export class Thread<R = unknown> {
   }
 
   /**
-   * @noRailsEquivalent PERMANENT — Ruby core `Thread#[]=` (`vendor/ruby/thread.c:5409`).
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread#[]=` (`vendor/ruby/v3.3.11/thread.c:5409`).
    */
   set(key: string, value: unknown): unknown {
     const id = isSymbol(key) ? symbolToS(key) : key;
@@ -147,7 +147,7 @@ export class Thread<R = unknown> {
   }
 
   /**
-   * @noRailsEquivalent PERMANENT — Ruby core `Thread#to_s` (`vendor/ruby/thread.c:3473`).
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread#to_s` (`vendor/ruby/v3.3.11/thread.c:3473`).
    */
   toString(): string {
     const location = _locations.has(this) ? ` ${_locations.get(this)}` : "";

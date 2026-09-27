@@ -5,7 +5,7 @@ import { Generic } from "./generic.js";
 
 /**
  * An atomic group, which is how the possessive quantifiers of
- * `vendor/ruby/lib/uri/rfc3986_parser.rb:5-71` (`*+`, `++`) are spelled in a
+ * `vendor/ruby/v3.3.11/lib/uri/rfc3986_parser.rb:5-71` (`*+`, `++`) are spelled in a
  * language with no possessive form: a lookahead that captures what it matched,
  * followed by an immediate backreference to that capture, matches `source`
  * once and never gives any of it back.
@@ -15,7 +15,7 @@ function atomic(name: string, source: string): string {
 }
 
 /**
- * `URI::RFC3986_Parser`'s component patterns (`vendor/ruby/lib/uri/rfc3986_parser.rb:5-34`),
+ * `URI::RFC3986_Parser`'s component patterns (`vendor/ruby/v3.3.11/lib/uri/rfc3986_parser.rb:5-34`),
  * as sources rather than Regexps so the two whole-URI patterns below can
  * interpolate them the way Ruby's `//x` literals do.
  *
@@ -54,7 +54,7 @@ const SEG = "(?:%[0-9a-fA-F]{2}|[!$&-.0-9:;=@A-Z_a-z~/])";
 const SEG_NC = "(?:%[0-9a-fA-F]{2}|[!$&-.0-9;=@A-Z_a-z~])";
 const FRAGMENT = atomic("fragmentBody", "(?:%[0-9a-fA-F]{2}|[!$&-.0-9:;=@A-Z_a-z~/?])*");
 
-/** `RFC3986_URI` (`vendor/ruby/lib/uri/rfc3986_parser.rb:36-52`). */
+/** `RFC3986_URI` (`vendor/ruby/v3.3.11/lib/uri/rfc3986_parser.rb:36-52`). */
 const RFC3986_URI = new RegExp(
   "^" +
     `(?<scheme>${SCHEME}):` +
@@ -70,7 +70,7 @@ const RFC3986_URI = new RegExp(
     "$",
 );
 
-/** `RFC3986_relative_ref` (`vendor/ruby/lib/uri/rfc3986_parser.rb:54-71`). */
+/** `RFC3986_relative_ref` (`vendor/ruby/v3.3.11/lib/uri/rfc3986_parser.rb:54-71`). */
 const RFC3986_relative_ref = new RegExp(
   "^" +
     "(?:" +
@@ -88,7 +88,7 @@ const RFC3986_relative_ref = new RegExp(
 /**
  * The nine components `URI.split` answers, in order: scheme, userinfo, host,
  * port, registry, path, opaque, query, fragment
- * (`vendor/ruby/lib/uri/rfc3986_parser.rb:87-128`).
+ * (`vendor/ruby/v3.3.11/lib/uri/rfc3986_parser.rb:87-128`).
  */
 export type SplitComponents = [
   string | null,
@@ -103,17 +103,17 @@ export type SplitComponents = [
 ];
 
 /**
- * `URI::RFC3986_Parser` (`vendor/ruby/lib/uri/rfc3986_parser.rb:3`), the parser
+ * `URI::RFC3986_Parser` (`vendor/ruby/v3.3.11/lib/uri/rfc3986_parser.rb:3`), the parser
  * `URI.parse` uses and the one every parsed URI carries. Only the members
  * trails sends are ported: `split`, `parse` and the private `convert_to_uri`
  * that `URI::Generic#merge` reaches through. `join` (`rfc3986_parser.rb:135`)
  * has no call site in this repo and is not.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `URI::RFC3986_Parser`
- * (`vendor/ruby/lib/uri/rfc3986_parser.rb:3`) ships with the interpreter.
+ * (`vendor/ruby/v3.3.11/lib/uri/rfc3986_parser.rb:3`) ships with the interpreter.
  */
 export class RFC3986Parser {
-  /** `@regexp` (`vendor/ruby/lib/uri/rfc3986_parser.rb:73`), built by
+  /** `@regexp` (`vendor/ruby/v3.3.11/lib/uri/rfc3986_parser.rb:73`), built by
    *  `default_regexp` (`rfc3986_parser.rb:151-164`). */
   readonly regexp: Record<string, RegExp> = {
     SCHEME: new RegExp(`^${SCHEME}$`),
@@ -129,7 +129,7 @@ export class RFC3986Parser {
     ),
   };
 
-  /** `split` (`vendor/ruby/lib/uri/rfc3986_parser.rb:77`). */
+  /** `split` (`vendor/ruby/v3.3.11/lib/uri/rfc3986_parser.rb:77`). */
   split(uri: string): SplitComponents {
     // eslint-disable-next-line no-control-regex
     if (!/^[\x00-\x7f]*$/.test(uri)) {
@@ -175,18 +175,18 @@ export class RFC3986Parser {
     throw new InvalidURIError(`bad URI(is not URI?): ${rbInspect(uri)}`);
   }
 
-  /** `parse` (`vendor/ruby/lib/uri/rfc3986_parser.rb:130`). */
+  /** `parse` (`vendor/ruby/v3.3.11/lib/uri/rfc3986_parser.rb:130`). */
   parse(uri: string): Generic {
     return URI.for(...this.split(uri), this);
   }
 
   /**
-   * `convert_to_uri` (`vendor/ruby/lib/uri/rfc3986_parser.rb:166`), which
+   * `convert_to_uri` (`vendor/ruby/v3.3.11/lib/uri/rfc3986_parser.rb:166`), which
    * `URI::Generic#merge` reaches through `__send__` (`generic.rb:1125`).
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails:
    * `URI::RFC3986_Parser#convert_to_uri`
-   * (`vendor/ruby/lib/uri/rfc3986_parser.rb:166`).
+   * (`vendor/ruby/v3.3.11/lib/uri/rfc3986_parser.rb:166`).
    */
   convertToUri(uri: Generic | string): Generic {
     if (uri instanceof Generic) {

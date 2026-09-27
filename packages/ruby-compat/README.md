@@ -83,7 +83,7 @@ that never got their receipt, a rule 2 violation burnt down by
 
 Each exported member needs two things in its JSDoc:
 
-- a `vendor/ruby/<file>:<line>` citation naming the MRI source it mirrors, and
+- a `vendor/ruby/<version>/<file>:<line>` citation naming the MRI source it mirrors, and
 - a `@noRailsEquivalent PERMANENT` receipt.
 
 Both, always. They answer different questions and neither substitutes for the

@@ -1,7 +1,7 @@
 import { regexpEscape } from "../regexp.js";
 
 /**
- * Ruby core `String#split` (`vendor/ruby/string.c:8757` `rb_str_split_m`). A nil or
+ * Ruby core `String#split` (`vendor/ruby/v3.3.11/string.c:8757` `rb_str_split_m`). A nil or
  * `" "` pattern is awk mode (leading whitespace dropped, runs of whitespace
  * separate); a String pattern is literal; captures are spliced into the
  * result; `limit` 0 drops trailing empty fields, a positive `limit` caps the

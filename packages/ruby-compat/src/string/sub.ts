@@ -23,7 +23,7 @@ function asRegexp(pat: RegExp | string): RegExp {
 }
 
 /**
- * `rb_pat_search` (`vendor/ruby/string.c:5723`) from UTF-16 offset `pos`.
+ * `rb_pat_search` (`vendor/ruby/v3.3.11/string.c:5723`) from UTF-16 offset `pos`.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -42,7 +42,7 @@ function spanOf(md: MatchData, n: number): [number, number] {
 }
 
 /**
- * `rb_reg_regsub` (`vendor/ruby/re.c:4394`): `\0`/`\&`, `\1`..`\9`, `\k<name>`,
+ * `rb_reg_regsub` (`vendor/ruby/v3.3.11/re.c:4394`): `\0`/`\&`, `\1`..`\9`, `\k<name>`,
  * `` \` ``, `\'`, `\+` and `\\` in `src` expanded against `md`; any other
  * escape is kept.
  *
@@ -83,7 +83,7 @@ function rbCheckHashType(val: unknown): unknown {
 }
 
 /**
- * `String#sub!` (`vendor/ruby/string.c:5759` `rb_str_sub_bang`). The block
+ * `String#sub!` (`vendor/ruby/v3.3.11/string.c:5759` `rb_str_sub_bang`). The block
  * receives the match; Ruby's frame-local `$~` has no JS counterpart.
  *
  * @noRailsEquivalent PERMANENT
@@ -108,7 +108,7 @@ export function rbStrSubBang(self: StringReceiver, ...argv: unknown[]): string |
 }
 
 /**
- * `String#sub` (`vendor/ruby/string.c:5884` `rb_str_sub`).
+ * `String#sub` (`vendor/ruby/v3.3.11/string.c:5884` `rb_str_sub`).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -135,7 +135,7 @@ function* eachMatch(pat: RegExp | string, str: string): Generator<MatchData> {
 }
 
 /**
- * `str_gsub` (`vendor/ruby/string.c:5892`): every match replaced; with neither
+ * `str_gsub` (`vendor/ruby/v3.3.11/string.c:5892`): every match replaced; with neither
  * replacement nor block, a generator over the matched strings stands for
  * `RETURN_ENUMERATOR` — JS's own external iterator.
  *
@@ -182,7 +182,7 @@ export function strGsub(
 }
 
 /**
- * `String#scan` (`vendor/ruby/string.c:10131` `rb_str_scan`).
+ * `String#scan` (`vendor/ruby/v3.3.11/string.c:10131` `rb_str_scan`).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -200,7 +200,7 @@ export function rbStrScan(self: StringReceiver, ...argv: unknown[]): unknown {
 }
 
 /**
- * `String#match` (`vendor/ruby/string.c:4577` `rb_str_match_m`, over
+ * `String#match` (`vendor/ruby/v3.3.11/string.c:4577` `rb_str_match_m`, over
  * `rb_reg_match_m`): a `MatchData` from character offset `pos`, handed to the
  * block when one is given.
  *
@@ -216,7 +216,7 @@ export function rbStrMatchM(self: StringReceiver, ...argv: unknown[]): unknown {
 }
 
 /**
- * `String#match?` (`vendor/ruby/string.c:4616` `rb_str_match_m_p`).
+ * `String#match?` (`vendor/ruby/v3.3.11/string.c:4616` `rb_str_match_m_p`).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -236,7 +236,7 @@ function regMatchPos(re: RegExp, str: string, pos: number): MatchData | null {
 }
 
 /**
- * `String#partition` (`vendor/ruby/string.c:10574` `rb_str_partition`).
+ * `String#partition` (`vendor/ruby/v3.3.11/string.c:10574` `rb_str_partition`).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -249,7 +249,7 @@ export function rbStrPartition(str: string, sep: unknown): [string, string, stri
 }
 
 /**
- * `String#rpartition` (`vendor/ruby/string.c:10611` `rb_str_rpartition`).
+ * `String#rpartition` (`vendor/ruby/v3.3.11/string.c:10611` `rb_str_rpartition`).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -271,9 +271,9 @@ export function rbStrRpartition(str: string, sep: unknown): [string, string, str
 }
 
 /**
- * `String#start_with?` (`vendor/ruby/string.c:10651` `rb_str_start_with`); a
+ * `String#start_with?` (`vendor/ruby/v3.3.11/string.c:10651` `rb_str_start_with`); a
  * Regexp prefix must match at the start (`rb_reg_start_with_p`,
- * `vendor/ruby/re.c:1818`).
+ * `vendor/ruby/v3.3.11/re.c:1818`).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -290,7 +290,7 @@ export function rbStrStartWith(str: string, ...prefixes: unknown[]): boolean {
 }
 
 /**
- * `String#end_with?` (`vendor/ruby/string.c:10691` `rb_str_end_with`).
+ * `String#end_with?` (`vendor/ruby/v3.3.11/string.c:10691` `rb_str_end_with`).
  *
  * @noRailsEquivalent PERMANENT
  */

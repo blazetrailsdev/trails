@@ -2,9 +2,9 @@ import { ArgumentError } from "./argument-error.js";
 import { StandardError } from "./standard-error.js";
 
 /**
- * Ruby's core `NameError` (`vendor/ruby/error.c:3348`), its constructor
- * (`vendor/ruby/error.c:3349` `name_err_initialize`) and its `name` reader
- * (`vendor/ruby/error.c:3350` `name_err_name`). Rails does not declare this
+ * Ruby's core `NameError` (`vendor/ruby/v3.3.11/error.c:3348`), its constructor
+ * (`vendor/ruby/v3.3.11/error.c:3349` `name_err_initialize`) and its `name` reader
+ * (`vendor/ruby/v3.3.11/error.c:3350` `name_err_name`). Rails does not declare this
  * class — `active_support/core_ext/name_error.rb` only *reopens* it to add
  * `missing_name` / `missing_name?`, which stay in `@blazetrails/activesupport`
  * and are mixed onto this prototype there. `@blazetrails/activesupport`'s index
@@ -26,7 +26,7 @@ import { StandardError } from "./standard-error.js";
  */
 export class NameError extends StandardError {
   /**
-   * Ruby's `NameError#name` (`vendor/ruby/error.c:3350`): the missing constant
+   * Ruby's `NameError#name` (`vendor/ruby/v3.3.11/error.c:3350`): the missing constant
    * *segment*, not the path.
    *
    * @noRailsEquivalent PERMANENT — JS reserves `Error#name` for the class
@@ -45,7 +45,7 @@ export class NameError extends StandardError {
   }
 
   /**
-   * Ruby's `NameError#receiver` (`vendor/ruby/error.c:2433` `name_err_receiver`).
+   * Ruby's `NameError#receiver` (`vendor/ruby/v3.3.11/error.c:2433` `name_err_receiver`).
    *
    * @noRailsEquivalent PERMANENT
    */

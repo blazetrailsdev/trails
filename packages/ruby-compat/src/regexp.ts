@@ -1,6 +1,6 @@
 /**
  * Ruby's `Regexp.escape` (`re.c` `rb_reg_s_quote`,
- * `vendor/ruby/re.c:4144`): the metacharacters of `string` escaped so it
+ * `vendor/ruby/v3.3.11/re.c:4144`): the metacharacters of `string` escaped so it
  * matches itself literally when spliced into a pattern.
  *
  * @noRailsEquivalent PERMANENT — `Regexp.escape` is Ruby CORE, implemented in

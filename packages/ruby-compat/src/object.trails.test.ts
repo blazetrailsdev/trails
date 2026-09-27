@@ -56,7 +56,7 @@ describe("Object#respond_to?", () => {
   });
 
   it("sends an overridden respond_to? and otherwise falls back to the default", () => {
-    // vendor/ruby/vm_method.c:2882 vm_respond_to, :2945 the basic_obj_respond_to fallback.
+    // vendor/ruby/v3.3.11/vm_method.c:2882 vm_respond_to, :2945 the basic_obj_respond_to fallback.
     const overriding = { respondTo: (mid: string) => mid === "name" };
     expect(rbObjRespondTo(overriding, "name")).toBe(true);
     expect(rbObjRespondTo(overriding, "respondTo")).toBe(false);
@@ -64,7 +64,7 @@ describe("Object#respond_to?", () => {
   });
 
   it("answers to_str for a String, which String.prototype does not define", () => {
-    // vendor/ruby/string.c:12177 rb_define_method(rb_cString, "to_str", rb_str_to_s, 0).
+    // vendor/ruby/v3.3.11/string.c:12177 rb_define_method(rb_cString, "to_str", rb_str_to_s, 0).
     expect(basicObjRespondTo("foo bar", "toStr")).toBe(true);
     expect(basicObjRespondTo({}, "toStr")).toBe(false);
   });

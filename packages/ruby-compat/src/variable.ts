@@ -1,8 +1,8 @@
 import { NameError } from "./name-error.js";
 
 /**
- * The miss arm of `rb_const_get_0` (`vendor/ruby/variable.c:3120`), which hands
- * an unresolved constant to `rb_const_missing` (`vendor/ruby/variable.c:2346`)
+ * The miss arm of `rb_const_get_0` (`vendor/ruby/v3.3.11/variable.c:3120`), which hands
+ * an unresolved constant to `rb_const_missing` (`vendor/ruby/v3.3.11/variable.c:2346`)
  * and so to the module's `const_missing`. JS has no hook for an unresolved
  * property but a `Proxy` trap, so this splices one into `klass`'s lookup chain,
  * directly above `klass` itself: a constant-shaped name that nothing on the
@@ -26,9 +26,9 @@ export function rbConstMissing(klass: object): void {
 }
 
 /**
- * `rb_mod_const_missing` (`vendor/ruby/variable.c:2391`), the default
+ * `rb_mod_const_missing` (`vendor/ruby/v3.3.11/variable.c:2391`), the default
  * `Module#const_missing`, which raises through `uninitialized_constant`
- * (`vendor/ruby/variable.c:2335`).
+ * (`vendor/ruby/v3.3.11/variable.c:2335`).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -41,11 +41,11 @@ export function rbModConstMissing(klass: { name?: string } | null, name: string)
 }
 
 /**
- * `rb_const_get` (`vendor/ruby/variable.c:3210`), the lookup behind
- * `Module#const_get(name)` (`vendor/ruby/object.c:2423` `rb_mod_const_get`):
+ * `rb_const_get` (`vendor/ruby/v3.3.11/variable.c:3210`), the lookup behind
+ * `Module#const_get(name)` (`vendor/ruby/v3.3.11/object.c:2423` `rb_mod_const_get`):
  * `rb_const_search` walks `klass` and then its ancestors, which in JS is the
  * prototype chain `in` reads, and a miss goes to `rb_const_missing`
- * (`vendor/ruby/variable.c:2346`), which sends `const_missing` to `klass`.
+ * (`vendor/ruby/v3.3.11/variable.c:2346`), which sends `const_missing` to `klass`.
  *
  * @noRailsEquivalent PERMANENT
  */

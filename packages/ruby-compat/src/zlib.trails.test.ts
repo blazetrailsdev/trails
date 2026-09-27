@@ -11,7 +11,7 @@ import { GzipWriter } from "./zlib-adapter.js";
 /**
  * Expected values are MRI's, from
  * `ruby -rzlib -e 'puts Zlib.crc32(...)'` against
- * `vendor/ruby/ext/zlib/zlib.c:507`.
+ * `vendor/ruby/v3.3.11/ext/zlib/zlib.c:507`.
  */
 describe("Zlib.crc32", () => {
   it("answers 0 for no argument and for the empty string", () => {
@@ -38,7 +38,7 @@ describe("Zlib.crc32", () => {
 
 /**
  * `Zlib::GzipWriter.open` / `Zlib::GzipReader.open`
- * (`vendor/ruby/ext/zlib/zlib.c:3661,3871`, both `gzfile_s_open`), the pair
+ * (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:3661,3871`, both `gzfile_s_open`), the pair
  * `SchemaCache.read` and `#dump_to` open a `.gz` through.
  */
 describe("Zlib::GzipFile.open", () => {

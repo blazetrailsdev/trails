@@ -1,7 +1,7 @@
 let verboseGlobal: unknown = false;
 
 /**
- * `$VERBOSE` (`vendor/ruby/ruby.c:2910-2913`, `verbose_getter`). The
+ * `$VERBOSE` (`vendor/ruby/v3.3.11/ruby.c:2910-2913`, `verbose_getter`). The
  * interpreter seats it `false` unless `-w`/`-v` was passed, so a trails
  * process — which has no such flag — reads `false` until something sets it.
  *
@@ -15,7 +15,7 @@ export function verbose(): unknown {
 }
 
 /**
- * `$VERBOSE=` (`vendor/ruby/ruby.c:2916-2920`, `verbose_setter`) — a truthy
+ * `$VERBOSE=` (`vendor/ruby/v3.3.11/ruby.c:2916-2920`, `verbose_setter`) — a truthy
  * assignment stores `true`, anything else stores the value itself, so `nil`
  * survives as the "no warnings at all" third state.
  *

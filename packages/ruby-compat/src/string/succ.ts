@@ -2,7 +2,7 @@ const isAsciiAlnum = (c: number): boolean =>
   (c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122);
 
 /** Inclusive [min, max] code-point bounds of the UTF-8 width encoding `cp`,
- *  the widths `vendor/ruby/string.c:4631` `enc_succ_char` steps between. */
+ *  the widths `vendor/ruby/v3.3.11/string.c:4631` `enc_succ_char` steps between. */
 function utf8WidthBounds(cp: number): [number, number] {
   if (cp < 0x80) return [0x00, 0x7f];
   if (cp < 0x800) return [0x80, 0x7ff];
@@ -11,7 +11,7 @@ function utf8WidthBounds(cp: number): [number, number] {
 }
 
 /**
- * `String#succ` (`vendor/ruby/string.c:4868`) — Ruby's successor. Increments the rightmost alphanumeric,
+ * `String#succ` (`vendor/ruby/v3.3.11/string.c:4868`) — Ruby's successor. Increments the rightmost alphanumeric,
  * carrying within its character class (`9→0`, `z→a`, `Z→A`) and skipping
  * non-alphanumerics during the carry; an overflow past the leftmost member of
  * a class inserts a new leading digit/letter (`"Zz".succ == "AAa"`,
@@ -19,7 +19,7 @@ function utf8WidthBounds(cp: number): [number, number] {
  * unit instead (`"<<".succ == "<="`).
  *
  * @noRailsEquivalent PERMANENT — Ruby core `String#succ`
- * (`vendor/ruby/string.c:4868` `rb_str_succ`), which Rails inherits rather
+ * (`vendor/ruby/v3.3.11/string.c:4868` `rb_str_succ`), which Rails inherits rather
  * than defines.
  */
 export function succ(s: string): string {
@@ -36,7 +36,7 @@ export function succ(s: string): string {
 
   if (lastAlnum === -1) {
     /* No alphanumeric: whole-code-point increment with carry, matching Ruby's
-       `enc_succ_char` (`vendor/ruby/string.c:4631`), which advances by encoded
+       `enc_succ_char` (`vendor/ruby/v3.3.11/string.c:4631`), which advances by encoded
        character — not by UTF-16 code unit, which would truncate an astral char
        to its high surrogate. */
     let i = codes.length - 1;
@@ -44,7 +44,7 @@ export function succ(s: string): string {
     while (i >= 0 && carry) {
       const [min, max] = utf8WidthBounds(codes[i]);
       if (codes[i] >= max) {
-        /* `enc_succ_char` (`vendor/ruby/string.c:4631`) reports
+        /* `enc_succ_char` (`vendor/ruby/v3.3.11/string.c:4631`) reports
            NEIGHBOR_WRAPPED whenever the successor's encoded length would
            differ, so a character at the top of its UTF-8 width wraps to that
            width's *minimum* and carries —
@@ -54,7 +54,7 @@ export function succ(s: string): string {
       } else {
         codes[i]++;
         /* Surrogates are not valid characters; `enc_succ_char`
-           (`vendor/ruby/string.c:4631`) skips past them to the next valid one
+           (`vendor/ruby/v3.3.11/string.c:4631`) skips past them to the next valid one
            rather than emitting an unpaired half. */
         if (codes[i] >= 0xd800 && codes[i] <= 0xdfff) codes[i] = 0xe000;
         carry = false;
@@ -66,7 +66,7 @@ export function succ(s: string): string {
   }
 
   /* Carry leftward from the rightmost alphanumeric, wrapping within a class.
-     `vendor/ruby/string.c:4868` stops the carry rather than crossing a
+     `vendor/ruby/v3.3.11/string.c:4868` stops the carry rather than crossing a
      non-alphanumeric gap into a *different* class (digit vs letter):
      `"z.9".succ == "z.10"`, not `"aa.0"`. */
   const DIGIT = 1;

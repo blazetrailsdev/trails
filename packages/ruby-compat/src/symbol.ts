@@ -1,9 +1,9 @@
 /**
- * Ruby's `Symbol` (`vendor/ruby/symbol.c`) as trails spells it: a JS string
+ * Ruby's `Symbol` (`vendor/ruby/v3.3.11/symbol.c`) as trails spells it: a JS string
  * that KEEPS its leading colon (`":short"`). A JS `Symbol` is reserved for
  * private keys and brands, so the colon is what carries the discriminator Ruby
  * gets from the type — and it is how the value already renders through
- * `Symbol#inspect` (`vendor/ruby/string.c:11692` `sym_inspect`, which writes
+ * `Symbol#inspect` (`vendor/ruby/v3.3.11/string.c:11692` `sym_inspect`, which writes
  * the colon back in front of the name).
  *
  * Three members, because three questions are asked of the convention across
@@ -13,7 +13,7 @@
 
 /**
  * Ruby `Symbol === x` — the type test a `case`/`when Symbol` makes
- * (`vendor/ruby/symbol.c:954` `rb_sym2str` is what answers for one), spelled
+ * (`vendor/ruby/v3.3.11/symbol.c:954` `rb_sym2str` is what answers for one), spelled
  * against the colon convention above.
  *
  * Call sites: `i18n/src/backend/base.ts`, `backend/fallbacks.ts`,
@@ -28,7 +28,7 @@ export function isSymbol(value: unknown): value is string {
 }
 
 /**
- * Ruby `Symbol#to_s` / `Symbol#name` — `vendor/ruby/symbol.c:954` `rb_sym2str`,
+ * Ruby `Symbol#to_s` / `Symbol#name` — `vendor/ruby/v3.3.11/symbol.c:954` `rb_sym2str`,
  * the frozen string representation NOT including the leading colon.
  *
  * Call sites: `i18n/src/backend/base.ts`'s `toS` and its `t()` key

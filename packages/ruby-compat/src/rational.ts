@@ -1,13 +1,13 @@
 /**
- * Ruby's `Rational` (`vendor/ruby/rational.c:481` `nurat_s_canonicalize_internal`)
+ * Ruby's `Rational` (`vendor/ruby/v3.3.11/rational.c:481` `nurat_s_canonicalize_internal`)
  * and the `Kernel#Rational()` conversion function beside it
- * (`vendor/ruby/rational.c:2691` `nurat_s_convert`). Ruby has both spellings
+ * (`vendor/ruby/v3.3.11/rational.c:2691` `nurat_s_convert`). Ruby has both spellings
  * and Rails calls the function, so both ship here.
  */
 import { FloatDomainError } from "./float-domain-error.js";
 
 /** Ruby core `ZeroDivisionError`, what `rb_num_zerodiv`
- * (`vendor/ruby/numeric.c:206`) raises for a denominator of zero.
+ * (`vendor/ruby/v3.3.11/numeric.c:206`) raises for a denominator of zero.
  *
  * @noRailsEquivalent PERMANENT — Ruby core; Rails defines no such error. */
 export class ZeroDivisionError extends Error {
@@ -17,7 +17,7 @@ export class ZeroDivisionError extends Error {
   }
 }
 
-/** @internal `vendor/ruby/rational.c:292` `i_gcd`, the greatest common divisor a
+/** @internal `vendor/ruby/v3.3.11/rational.c:292` `i_gcd`, the greatest common divisor a
  * Rational reduces by. */
 function iGcd(x: bigint, y: bigint): bigint {
   if (x < 0n) x = -x;
@@ -31,9 +31,9 @@ function iGcd(x: bigint, y: bigint): bigint {
 }
 
 /**
- * @internal `vendor/ruby/rational.c:2199` `float_to_r`, which decodes a Float
+ * @internal `vendor/ruby/v3.3.11/rational.c:2199` `float_to_r`, which decodes a Float
  * into the exact `f * 2 ** e` its bits already hold
- * (`vendor/ruby/numeric.c` `float_decode_internal`, i.e. `frexp`) and answers
+ * (`vendor/ruby/v3.3.11/numeric.c` `float_decode_internal`, i.e. `frexp`) and answers
  * `f` over `2 ** -e`. A double IS a binary fraction, so doubling until the
  * value is whole is that decode with no rounding in it, and it stops inside
  * `Number.MAX_SAFE_INTEGER` because a mantissa is 53 bits wide. An Integer — a
@@ -56,10 +56,10 @@ function floatToR(x: number | bigint): { numerator: bigint; denominator: bigint 
 }
 
 /**
- * Ruby's `Rational` (`vendor/ruby/rational.c`), as much of it as its callers
+ * Ruby's `Rational` (`vendor/ruby/v3.3.11/rational.c`), as much of it as its callers
  * need: the constructor canonicalizes to lowest terms
- * (`vendor/ruby/rational.c:481` `nurat_s_canonicalize_internal`), `+` adds an
- * Integer (`vendor/ruby/rational.c:724` `rb_rational_plus`), and
+ * (`vendor/ruby/v3.3.11/rational.c:481` `nurat_s_canonicalize_internal`), `+` adds an
+ * Integer (`vendor/ruby/v3.3.11/rational.c:724` `rb_rational_plus`), and
  * `numerator`/`denominator` read the parts back out. A Rational stays a
  * Rational under arithmetic in Ruby — on ruby 3.3.11 `(Rational(1,2) * 12).class`
  * is `Rational`, `(6/1)`, and so is `Rational(9,3)` — so a ported `FIXNUM_P`
@@ -74,7 +74,7 @@ function floatToR(x: number | bigint): { numerator: bigint; denominator: bigint 
  * `:offset`, so trails needs the value type to answer the same.
  */
 export class Rational {
-  /** `vendor/ruby/rational.c:580` `nurat_numerator` (`Rational#numerator`).
+  /** `vendor/ruby/v3.3.11/rational.c:580` `nurat_numerator` (`Rational#numerator`).
    *
    * Ruby's is an Integer — arbitrary precision — so a `bigint` is the JS
    * analogue, not a `number`: a `number` is exact only inside
@@ -84,20 +84,20 @@ export class Rational {
    * @noRailsEquivalent PERMANENT — Ruby core, part of the Rational above. */
   readonly numerator: bigint;
 
-  /** `vendor/ruby/rational.c:598` `nurat_denominator` (`Rational#denominator`).
+  /** `vendor/ruby/v3.3.11/rational.c:598` `nurat_denominator` (`Rational#denominator`).
    * @noRailsEquivalent PERMANENT — Ruby core, part of the Rational above. */
   readonly denominator: bigint;
 
   /**
-   * `vendor/ruby/rational.c:481` `nurat_s_canonicalize_internal`, the C
+   * `vendor/ruby/v3.3.11/rational.c:481` `nurat_s_canonicalize_internal`, the C
    * constructor every `Rational` goes through — there is no public
    * `Rational.new` in Ruby, so this is `rb_rational_new`
-   * (`vendor/ruby/rational.c:1969`) rather than a method with a Ruby name.
+   * (`vendor/ruby/v3.3.11/rational.c:1969`) rather than a method with a Ruby name.
    * A Float argument goes through `float_to_r` ({@link floatToR}) — the
    * `nurat_convert` division arm, so `new Rational(0.5, 86400)` is `(1/172800)`
    * on ruby 3.3.11.
    *
-   * `nurat_canonicalize` (`vendor/ruby/rational.c:457`) puts the SIGN on the
+   * `nurat_canonicalize` (`vendor/ruby/v3.3.11/rational.c:457`) puts the SIGN on the
    * numerator before `nurat_reduce` cancels: it negates BOTH parts on a
    * negative denominator, which is why `Rational(3, -4)` is `(-3/4)` on ruby
    * 3.3.11 and not `(3/-4)`, and raises `rb_num_zerodiv` on a zero one.
@@ -119,7 +119,7 @@ export class Rational {
     this.denominator = d / g;
   }
 
-  /** `vendor/ruby/rational.c:1075` `rb_rational_cmp` (`Rational#<=>`), which
+  /** `vendor/ruby/v3.3.11/rational.c:1075` `rb_rational_cmp` (`Rational#<=>`), which
    * compares `a.num * b.den` against `b.num * a.den` — exact, where a `toF`
    * comparison would not be. Its T_FLOAT arm, `f_cmp(f_to_f(self), other)`,
    * takes both sides to Float instead, and it is the only arm a non-integral
@@ -138,7 +138,7 @@ export class Rational {
     return a < c ? -1 : 1;
   }
 
-  /** `vendor/ruby/rational.c:724` `rb_rational_plus` (`Rational#+`), for the
+  /** `vendor/ruby/v3.3.11/rational.c:724` `rb_rational_plus` (`Rational#+`), for the
    * Integer and Rational addends this port needs.
    * @noRailsEquivalent PERMANENT — Ruby core, part of the Rational above. */
   add(other: number | bigint | Rational): Rational {
@@ -151,9 +151,9 @@ export class Rational {
     return new Rational(this.numerator + BigInt(other) * this.denominator, this.denominator);
   }
 
-  /** `vendor/ruby/rational.c:861` `rb_rational_mul` (`Rational#*`), for the
+  /** `vendor/ruby/v3.3.11/rational.c:861` `rb_rational_mul` (`Rational#*`), for the
    * Integer multiplier this port needs. `f_muldiv`
-   * (`vendor/ruby/rational.c:794`) cancels the multiplier against the
+   * (`vendor/ruby/v3.3.11/rational.c:794`) cancels the multiplier against the
    * denominator BEFORE it multiplies.
    * @noRailsEquivalent PERMANENT — Ruby core, part of the Rational above. */
   mul(other: number | bigint): Rational {
@@ -162,7 +162,7 @@ export class Rational {
     return new Rational(this.numerator * (o / g), this.denominator / g);
   }
 
-  /** `vendor/ruby/rational.c:903` `rb_rational_div` (`Rational#/`), for the
+  /** `vendor/ruby/v3.3.11/rational.c:903` `rb_rational_div` (`Rational#/`), for the
    * Integer divisor this port needs, cancelled the same way {@link mul} is.
    * @noRailsEquivalent PERMANENT — Ruby core, part of the Rational above. */
   quo(other: number | bigint): Rational {
@@ -171,14 +171,14 @@ export class Rational {
     return new Rational(this.numerator / g, this.denominator * (o / g));
   }
 
-  /** `vendor/ruby/numeric.c:828` `num_zero_p` (`Rational#zero?`, inherited from
+  /** `vendor/ruby/v3.3.11/numeric.c:828` `num_zero_p` (`Rational#zero?`, inherited from
    * Numeric), what `date_core.c`'s `f_zero_p` dispatches to for a Rational.
    * @noRailsEquivalent PERMANENT — Ruby core, part of the Rational above. */
   isZero(): boolean {
     return this.numerator === 0n;
   }
 
-  /** `vendor/ruby/numeric.c:659` `num_div` (`Rational#div`, inherited from
+  /** `vendor/ruby/v3.3.11/numeric.c:659` `num_div` (`Rational#div`, inherited from
    * Numeric), the floored quotient — the method `date_core.c`'s `f_idiv` macro
    * sends (`date_core.c:43`) — for the Integer divisor this port needs.
    * @noRailsEquivalent PERMANENT — Ruby core, part of the Rational above. */
@@ -188,7 +188,7 @@ export class Rational {
     return Number(this.numerator % den !== 0n && this.numerator < 0n !== den < 0n ? q - 1n : q);
   }
 
-  /** `vendor/ruby/numeric.c:700` `num_modulo` (`Rational#%`, inherited from
+  /** `vendor/ruby/v3.3.11/numeric.c:700` `num_modulo` (`Rational#%`, inherited from
    * Numeric), which is `self - other * (self.div other)` there too — what
    * `date_core.c`'s `f_mod` dispatches to for a Rational — for the Integer
    * and Rational divisors this port needs (`time.c`'s `modv`).
@@ -201,14 +201,14 @@ export class Rational {
     return this.add(new Rational(-b.numerator * q, b.denominator));
   }
 
-  /** `vendor/ruby/rational.c:1278` `nurat_truncate` (`Rational#to_i`), which
+  /** `vendor/ruby/v3.3.11/rational.c:1278` `nurat_truncate` (`Rational#to_i`), which
    * truncates toward zero.
    * @noRailsEquivalent PERMANENT — Ruby core, part of the Rational above. */
   toI(): number {
     return Number(this.numerator / this.denominator);
   }
 
-  /** `vendor/ruby/rational.c:1287` `nurat_round_half_up` (`Rational#round`),
+  /** `vendor/ruby/v3.3.11/rational.c:1287` `nurat_round_half_up` (`Rational#round`),
    * which rounds half away from zero.
    * @noRailsEquivalent PERMANENT — Ruby core, part of the Rational above. */
   round(): number {
@@ -220,20 +220,20 @@ export class Rational {
   }
 
   /** The `Float` a Rational becomes at a `number` seam —
-   * `vendor/ruby/rational.c:1576` `nurat_to_f`, which is what every reader that
+   * `vendor/ruby/v3.3.11/rational.c:1576` `nurat_to_f`, which is what every reader that
    * hands the value to a floating-point API needs.
    * @noRailsEquivalent PERMANENT — Ruby core, part of the Rational above. */
   toF(): number {
     return Number(this.numerator) / Number(this.denominator);
   }
 
-  /** `vendor/ruby/rational.c:1802` `nurat_to_s` (`Rational#to_s`).
+  /** `vendor/ruby/v3.3.11/rational.c:1802` `nurat_to_s` (`Rational#to_s`).
    * @noRailsEquivalent PERMANENT — Ruby core, part of the Rational above. */
   toString(): string {
     return `${this.numerator}/${this.denominator}`;
   }
 
-  /** `vendor/ruby/rational.c:1818` `nurat_inspect` (`Rational#inspect`), which
+  /** `vendor/ruby/v3.3.11/rational.c:1818` `nurat_inspect` (`Rational#inspect`), which
    * parenthesizes where {@link toString} does not.
    * @noRailsEquivalent PERMANENT — Ruby core, part of the Rational above. */
   inspect(): string {
@@ -242,20 +242,20 @@ export class Rational {
 }
 
 /**
- * `Kernel#Rational()` — `vendor/ruby/rational.c:2691` `nurat_s_convert`, whose
+ * `Kernel#Rational()` — `vendor/ruby/v3.3.11/rational.c:2691` `nurat_s_convert`, whose
  * `rb_scan_args(argc, argv, "11", ...)` makes the denominator optional and
- * defaults it to `ONE` (`vendor/ruby/rational.c:2674`) before handing both to
+ * defaults it to `ONE` (`vendor/ruby/v3.3.11/rational.c:2674`) before handing both to
  * `nurat_s_canonicalize_internal`. It is the spelling Rails writes — 20 call
  * sites across activesupport and activerecord — and it is NOT an Integer fold:
  * on ruby 3.3.11 `Rational(6, 1)` is `(6/1)` and its class is `Rational`.
  *
  * A Rational numerator is NOT canonicalized against the denominator:
- * `nurat_convert` (`vendor/ruby/rational.c:2621`) returns it unchanged for an
+ * `nurat_convert` (`vendor/ruby/v3.3.11/rational.c:2621`) returns it unchanged for an
  * exact-one denominator, and otherwise leaves the canonicalizer for `f_div`
- * (`vendor/ruby/rational.c:2668`), so `Rational(r, 1000000)` is a division.
+ * (`vendor/ruby/v3.3.11/rational.c:2668`), so `Rational(r, 1000000)` is a division.
  *
  * A non-numeric operand is converted through its `to_r`
- * (`vendor/ruby/rational.c:2591,2647`), and `nil` raises TypeError (`:2564-2567`).
+ * (`vendor/ruby/v3.3.11/rational.c:2591,2647`), and `nil` raises TypeError (`:2564-2567`).
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Kernel#Rational()`, which Rails
  * calls and does not define. */
