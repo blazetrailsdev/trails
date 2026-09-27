@@ -31,8 +31,11 @@ import {
 } from "./metal/rendering.js";
 
 export class MiddlewareStack extends AbstractMiddlewareStack {
-  build(action: string | RackApp | RackAppObject, app?: RackApp | RackAppObject): RackApp {
-    if (typeof action !== "string") return super.build(action);
+  override build(app: RackApp | RackAppObject): RackApp;
+  override build(action: string, app?: RackApp | RackAppObject): RackApp;
+  override build(action: string | RackApp | RackAppObject, app?: RackApp | RackAppObject): RackApp {
+    action = String(action);
+
     let current: RackApp =
       typeof app === "function" ? app : (env: RackEnv) => (app as RackAppObject).call(env);
     const middlewares = this.middlewares as Middleware[];
@@ -106,17 +109,17 @@ const _middlewareStacks = new WeakMap<object, MiddlewareStack>();
 export class Metal extends AbstractController {
   _request!: Request;
   _response!: Response;
-  _params: Parameters = new Parameters({});
+  _params: Parameters | Record<string, unknown> | null = null;
 
   constructor() {
     super();
     initializeIncludedModules(this);
   }
 
-  get params(): Parameters {
-    return this._params;
+  get params(): Parameters | Record<string, unknown> {
+    return (this._params ??= this.request.parameters);
   }
-  set params(value: Parameters) {
+  set params(value: Parameters | Record<string, unknown>) {
     this._params = value;
   }
 
@@ -231,13 +234,8 @@ export class Metal extends AbstractController {
   async dispatch(name: string, request: Request, response: Response): Promise<RackResponse> {
     this.setRequestBang(request);
     this.setResponseBang(response);
-    const reqParams = request.parameters;
-    this.params = reqParams instanceof Parameters ? reqParams : new Parameters(reqParams);
-
     await this.process(name);
-
     request.commitFlash();
-
     return this.toRackResponse();
   }
 
@@ -268,12 +266,12 @@ export class Metal extends AbstractController {
     return this.response.headers;
   }
 
-  setHeader(name: string, value: string): void {
-    this.response.setHeader(name, value);
+  set location(value: string) {
+    this.response.location = value;
   }
 
-  getHeader(name: string): string | undefined {
-    return this.response.getHeader(name);
+  get location(): string {
+    return this.response.location;
   }
 
   set contentType(value: string) {
@@ -300,12 +298,18 @@ export class Metal extends AbstractController {
       contentType = options.content_type;
       for (const [key, value] of Object.entries(options)) {
         if (key === "location" || key === "content_type") continue;
-        this.setHeader(key.replace(/_/g, "-"), String(value));
+        this.headers.set(
+          key
+            .split(/[-_]/)
+            .map((v) => v[0].toUpperCase() + v.slice(1))
+            .join("-"),
+          String(value),
+        );
       }
     }
     this.status = resolvedStatus;
     if (location !== undefined && location !== null) {
-      this.setHeader("location", this.urlFor(String(location)));
+      this.location = this.urlFor(String(location));
     }
     if (includeContent(this.status)) {
       if (!this.mediaType) {
@@ -321,14 +325,6 @@ export class Metal extends AbstractController {
     }
     this.responseBody = "";
     return true;
-  }
-
-  set body(value: string) {
-    this.responseBody = value;
-  }
-
-  get body(): string {
-    return this.responseBody;
   }
 
   override set responseBody(body: string | string[] | Buffer | null | undefined) {

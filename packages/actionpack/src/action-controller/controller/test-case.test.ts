@@ -49,7 +49,7 @@ class PostsController extends Base {
   }
 
   async setCustomHeader() {
-    this.setHeader("X-Custom", "test-value");
+    this.headers.set("X-Custom", "test-value");
     this.render({ plain: "ok" });
   }
 
@@ -369,7 +369,7 @@ describe("TestCaseTest", () => {
     it("works with Metal controllers", async () => {
       class SimpleMetal extends Metal {
         async index() {
-          this.body = "metal response";
+          this.responseBody = "metal response";
           this.contentType = "text/plain";
           this.markPerformed();
         }

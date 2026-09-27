@@ -386,7 +386,7 @@ describe("Engine", () => {
     const controller = new PostsController();
     controller.setResponseBang(new Response());
     await controller.renderAsync({ action: "index" });
-    expect(controller.body).toBe("posts#index\n");
+    expect(controller.responseBody).toBe("posts#index\n");
     resetLoadHooks();
   });
 

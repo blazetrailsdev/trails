@@ -305,7 +305,7 @@ export class IntegrationTest {
   }
 
   get responseBody(): string {
-    return this.response?.body ?? this.controller?.body ?? "";
+    return this.response?.body ?? this.controller?.responseBody ?? "";
   }
 
   get parsedBody(): unknown {
@@ -313,7 +313,7 @@ export class IntegrationTest {
   }
 
   get redirectUrl(): string | undefined {
-    return this.response?.getHeader("location") ?? this.controller?.getHeader("location");
+    return this.response?.getHeader("location") ?? this.controller?.headers.get("location");
   }
 
   get flash(): FlashHash {
@@ -625,7 +625,7 @@ export class IntegrationTest {
   }
 
   assertHeader(name: string, expected: string | RegExp): void {
-    const actual = this.response?.getHeader(name) ?? this.controller?.getHeader(name);
+    const actual = this.response?.getHeader(name) ?? this.controller?.headers.get(name);
     if (actual === undefined) {
       throw new Error(`Expected header "${name}" to be set`);
     }

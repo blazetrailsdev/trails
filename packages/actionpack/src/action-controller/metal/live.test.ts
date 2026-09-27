@@ -48,7 +48,7 @@ describe("ActionController::Live::Buffer", () => {
     const buf = new Buffer(makeResponse());
     buf.writeln("a");
     buf.writeln("b\n");
-    expect([...buf.eachChunk()]).toEqual(["a\n", "b\n"]);
+    expect([...buf.each()]).toEqual(["a\n", "b\n"]);
   });
 
   it("close pushes a null sentinel; eachChunk stops there", () => {
@@ -56,8 +56,8 @@ describe("ActionController::Live::Buffer", () => {
     buf.write("one");
     buf.write("two");
     buf.close();
-    expect([...buf.eachChunk()]).toEqual(["one", "two"]);
-    expect(buf.closed).toBe(true);
+    expect([...buf.each()]).toEqual(["one", "two"]);
+    expect(buf.isClosed).toBe(true);
   });
 
   it("write after close raises (matches Rails IOError-on-closed-stream)", () => {
@@ -78,7 +78,7 @@ describe("ActionController::Live::Buffer", () => {
     buf.write("a");
     buf.abort();
     expect(buf.isConnected).toBe(false);
-    expect([...buf.eachChunk()]).toEqual([]);
+    expect([...buf.each()]).toEqual([]);
   });
 
   it("ClientDisconnected is a RuntimeError, not an IOError", () => {
@@ -199,7 +199,7 @@ describe("ActionController::Live::Response", () => {
     res.stream.write("a");
     res.stream.write("b");
     res.stream.close();
-    expect([...res.stream.eachChunk()]).toEqual(["a", "b"]);
+    expect([...res.stream.each()]).toEqual(["a", "b"]);
   });
 
   it("inherits DispatchResponse.create factory shape (status/headers/body args)", () => {
@@ -301,7 +301,7 @@ describe("ActionController::Live#send_stream", () => {
         throw new Error("write failed");
       }),
     ).rejects.toThrow("write failed");
-    expect(host.response.stream.closed).toBe(true);
+    expect(host.response.stream.isClosed).toBe(true);
   });
 });
 

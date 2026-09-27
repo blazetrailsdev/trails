@@ -103,7 +103,7 @@ export const Authentication = defineModule(
     },
 
     async findSessionByCookie(this: any): Promise<unknown> {
-      const sessionId = this.cookies.signed["session_id"];
+      const sessionId = this.cookies().signed.get("session_id");
       return sessionId ? await Session.findBy({ id: sessionId }) : null;
     },
 
@@ -124,7 +124,7 @@ export const Authentication = defineModule(
         ip_address: this.request.remoteIp,
       });
       Current.session = session;
-      this.cookies.signed.permanent.set("session_id", {
+      this.cookies().signed.permanent.set("session_id", {
         value: session.id,
         httpOnly: true,
         sameSite: "lax",
@@ -134,7 +134,7 @@ export const Authentication = defineModule(
 
     async terminateSession(this: any): Promise<void> {
       await (Current.session as any).destroy();
-      this.cookies.delete("session_id");
+      this.cookies().delete("session_id");
     },
   },
 );

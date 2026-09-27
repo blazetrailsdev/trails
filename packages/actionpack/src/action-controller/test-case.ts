@@ -141,7 +141,7 @@ export class TestCase {
   }
 
   get responseBody(): string {
-    return this.response?.body ?? this.controller?.body ?? "";
+    return this.response?.body ?? this.controller?.responseBody ?? "";
   }
 
   get parsedBody(): unknown {
@@ -225,7 +225,8 @@ export class TestCase {
   }
 
   assertRedirectedTo(expected: string | RegExp): void {
-    const location = this.response?.getHeader("location") ?? this.controller?.getHeader("location");
+    const location =
+      this.response?.getHeader("location") ?? this.controller?.headers.get("location");
     if (!location) {
       throw new Error("Expected a redirect but no Location header was set");
     }
@@ -248,7 +249,7 @@ export class TestCase {
   }
 
   assertHeader(name: string, expected: string | RegExp): void {
-    const actual = this.response?.getHeader(name) ?? this.controller?.getHeader(name);
+    const actual = this.response?.getHeader(name) ?? this.controller?.headers.get(name);
     if (actual === undefined) {
       throw new Error(`Expected header "${name}" to be set`);
     }

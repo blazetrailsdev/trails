@@ -114,13 +114,18 @@ import {
   type ParamsWrapperHost,
 } from "./metal/params-wrapper.js";
 import { processAction as _processAction } from "./metal/rendering.js";
+import { urlOptions } from "./metal/url-for.js";
+import { Cookies } from "./metal/cookies.js";
 import {
   appendInfoToPayload,
   cleanupViewRuntime,
   haltedCallbackHook,
   processAction as _instrumentProcessAction,
 } from "./metal/instrumentation.js";
-import { Parameters as StrongParameters } from "./metal/strong-parameters.js";
+import {
+  Parameters as StrongParameters,
+  StrongParameters as StrongParametersModule,
+} from "./metal/strong-parameters.js";
 import {
   DEFAULT_PROTECTED_INSTANCE_VARIABLES,
   DoubleRenderError,
@@ -208,6 +213,13 @@ export const PROTECTED_IVARS: readonly string[] = [
   "_renderedFormat",
 ];
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Base {
+  get params(): StrongParameters;
+  set params(value: StrongParameters | Record<string, unknown>);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Base extends Metal {
   get flash(): FlashHash {
     return this.request.flash!;
@@ -241,6 +253,7 @@ export class Base extends Metal {
 
   constructor(...args: unknown[]) {
     super(...(args as []));
+    this._urlOptions = null;
     this._actionHasLayout = true;
     fireInherited(
       new.target as unknown as HelpersPathControllerClass,
@@ -304,27 +317,27 @@ export class Base extends Metal {
               typeof options.json === "string" ? JSON.stringify(options.json) : jsonStr;
             const safeJson = escapeJsonForJs(jsonPayload);
             this.contentType = options.contentType ?? "text/javascript; charset=utf-8";
-            this.body = `/**/\n${options.callback}(${safeJson})`;
+            this.responseBody = `/**/\n${options.callback}(${safeJson})`;
           } else {
             this.contentType = options.contentType ?? "application/json; charset=utf-8";
-            this.body = jsonStr;
+            this.responseBody = jsonStr;
           }
         } else if (options.plain !== undefined) {
           this.contentType = options.contentType ?? "text/plain; charset=utf-8";
-          this.body = options.plain;
+          this.responseBody = options.plain;
         } else if (options.html !== undefined) {
           this.contentType = options.contentType ?? "text/html; charset=utf-8";
-          this.body = options.html.toString();
+          this.responseBody = options.html.toString();
         } else if (options.body !== undefined) {
           if (options.contentType != null) {
             this.contentType = String(options.contentType);
           } else if (!this.response.mediaType) {
             this.contentType = "text/plain";
           }
-          this.body = options.body;
+          this.responseBody = options.body;
         } else if (options.text !== undefined) {
           this.contentType = options.contentType ?? "text/plain; charset=utf-8";
-          this.body = options.text;
+          this.responseBody = options.text;
         } else if (options.partial !== undefined) {
           this._pendingRender = { type: "partial", options };
           return;
@@ -342,7 +355,7 @@ export class Base extends Metal {
           this._renderTemplate(this.actionName, options);
           if (!this.performed) {
             this.contentType = "text/html; charset=utf-8";
-            this.body = "";
+            this.responseBody = "";
           }
         }
 
@@ -408,7 +421,7 @@ export class Base extends Metal {
     const view = this.viewContext();
 
     if (options.partial !== undefined) {
-      this.body = (await view.viewRenderer.render(view, {
+      this.responseBody = (await view.viewRenderer.render(view, {
         partial: options.partial,
         ...(options.collection !== undefined ? { collection: options.collection } : {}),
         as: options.as,
@@ -417,7 +430,7 @@ export class Base extends Metal {
     } else {
       const templateOptions: Record<string, unknown> = { ...options };
       this._processRenderTemplateOptions(templateOptions);
-      this.body = (await view.viewRenderer.render(view, {
+      this.responseBody = (await view.viewRenderer.render(view, {
         template: templateOptions.template as string,
         prefixes: (templateOptions.prefixes as string[] | undefined) ?? [],
         locals,
@@ -436,7 +449,7 @@ export class Base extends Metal {
     const oldHeaders = this.response.headers.toHash();
     try {
       this.render(options);
-      return this.body;
+      return this.responseBody;
     } finally {
       this._responseBody = oldBody;
       this._performed = oldPerformed;
@@ -477,9 +490,9 @@ export class Base extends Metal {
 
     const proposedStatus = responseOptions.status ? statusCode(responseOptions.status) : 302;
     this.status = proposedStatus;
-    this.setHeader("location", options);
+    this.headers.set("location", options);
     this.contentType = "text/html; charset=utf-8";
-    this.body = `<html><body>You are being <a href="${options}">redirected</a>.</body></html>`;
+    this.responseBody = `<html><body>You are being <a href="${options}">redirected</a>.</body></html>`;
     this.markPerformed();
   }
 
@@ -754,7 +767,7 @@ export class Base extends Metal {
   }): void {
     if (options.etag) {
       const etag = this._generateEtag(options.etag);
-      this.setHeader("etag", etag);
+      this.headers.set("etag", etag);
     }
     if (options.lastModified) {
       // boundary: Realm-safe Date check (instanceof breaks across vm/iframe
@@ -763,10 +776,10 @@ export class Base extends Metal {
       const lm = isDate
         ? (options.lastModified as Date)
         : new Date((options.lastModified as Temporal.Instant).epochMilliseconds);
-      this.setHeader("last-modified", lm.toUTCString());
+      this.headers.set("last-modified", lm.toUTCString());
     }
     if (options.public) {
-      this.setHeader("cache-control", "public");
+      this.headers.set("cache-control", "public");
     }
 
     if (this._isFresh()) {
@@ -787,11 +800,11 @@ export class Base extends Metal {
     const parts = [`max-age=${seconds}`];
     if (options.public) parts.push("public");
     if (options.mustRevalidate) parts.push("must-revalidate");
-    this.setHeader("cache-control", parts.join(", "));
+    this.headers.set("cache-control", parts.join(", "));
   }
 
   expiresNow(): void {
-    this.setHeader("cache-control", "no-cache");
+    this.headers.set("cache-control", "no-cache");
   }
 
   /** @internal */
@@ -826,6 +839,13 @@ export class Base extends Metal {
   declare expireFragment: typeof expireFragment;
 
   /** @internal */
+  declare cookies: Cookies["cookies"];
+  declare urlOptions: typeof urlOptions;
+  /** @internal */
+  declare _urlOptions: Readonly<Record<string, unknown>> | null;
+  declare defaultUrlOptions: Record<string, unknown>;
+
+  /** @internal */
   declare sendFileHeadersBang: typeof sendFileHeadersBang;
   /** @internal */
   declare appendInfoToPayload: typeof appendInfoToPayload;
@@ -857,10 +877,6 @@ export class Base extends Metal {
     });
   }
 
-  get cookies(): Record<string, string> {
-    return (this.request as any)?.cookies ?? {};
-  }
-
   private _renderTemplate(action: string, _options: RenderOptions): void {
     const resolver = (this.constructor as typeof Base).templateResolver;
     if (!resolver) return;
@@ -870,7 +886,7 @@ export class Base extends Metal {
     const template = resolver(controllerPrefix, action, format);
     if (template) {
       this.contentType = "text/html; charset=utf-8";
-      this.body = template;
+      this.responseBody = template;
       this.markPerformed();
     }
   }
@@ -921,8 +937,8 @@ export class Base extends Metal {
     if (!this.request) return false;
     const ifNoneMatch = this.request.getHeader("if-none-match");
     const ifModifiedSince = this.request.getHeader("if-modified-since");
-    const etag = this.getHeader("etag");
-    const lastModified = this.getHeader("last-modified");
+    const etag = this.headers.get("etag");
+    const lastModified = this.headers.get("last-modified");
 
     if (ifNoneMatch && etag) {
       return ifNoneMatch === etag;
@@ -936,6 +952,8 @@ export class Base extends Metal {
 }
 
 include(Base, ConfigMethods);
+include(Base, Cookies);
+include(Base, StrongParametersModule);
 Base.prototype._processRenderTemplateOptions = _processRenderTemplateOptions;
 Base.prototype.isActionHasLayout = isActionHasLayout;
 Base.prototype._isConditionalLayout = _isConditionalLayout;
@@ -989,6 +1007,9 @@ helperMethod(Base as unknown as HelpersClassMethods, "viewCacheDependencies");
 
 runLoadHooks("action_controller_base", Base);
 runLoadHooks("action_controller", Base);
+
+Base.prototype.urlOptions = urlOptions;
+classAttribute.call(Base, "defaultUrlOptions", { default: {} });
 
 Base.prototype.sendFileHeadersBang = sendFileHeadersBang;
 

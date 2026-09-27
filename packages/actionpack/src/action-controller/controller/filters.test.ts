@@ -46,7 +46,7 @@ describe("FilterTest", () => {
 
     const c = new AuthController();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.body).toBe("unauthorized");
+    expect(c.responseBody).toBe("unauthorized");
     expect(c.status).toBe(401);
   });
 

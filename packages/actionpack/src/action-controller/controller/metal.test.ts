@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import { Metal } from "../metal.js";
 import { Request } from "../../action-dispatch/request.js";
 import { Response } from "../../action-dispatch/response.js";
-import { Parameters } from "../metal/strong-parameters.js";
 
 function makeRequest(opts: Record<string, string> = {}): Request {
   return new Request({
@@ -52,22 +51,22 @@ describe("MetalControllerInstanceTests", () => {
   it("can set and get headers", () => {
     const c = new (class extends Metal {})();
     c.setResponseBang(makeResponse());
-    c.setHeader("X-Custom", "value");
-    expect(c.getHeader("x-custom")).toBe("value");
+    c.headers.set("X-Custom", "value");
+    expect(c.headers.get("x-custom")).toBe("value");
   });
 
   it("headers are case-insensitive", () => {
     const c = new (class extends Metal {})();
     c.setResponseBang(makeResponse());
-    c.setHeader("Content-Type", "text/html");
-    expect(c.getHeader("content-type")).toBe("text/html");
+    c.headers.set("Content-Type", "text/html");
+    expect(c.headers.get("content-type")).toBe("text/html");
   });
 
   it("can set and get body", () => {
     const c = new (class extends Metal {})();
     c.setResponseBang(makeResponse());
-    c.body = "hello";
-    expect(c.body).toBe("hello");
+    c.responseBody = "hello";
+    expect(c.responseBody).toBe("hello");
   });
 
   it("can set and get content type", () => {
@@ -88,7 +87,7 @@ describe("MetalControllerInstanceTests", () => {
     c.setResponseBang(makeResponse());
     c.head(204);
     expect(c.status).toBe(204);
-    expect(c.body).toBe("");
+    expect(c.responseBody).toBe("");
     expect(c.performed).toBe(true);
   });
 
@@ -125,7 +124,7 @@ describe("MetalControllerInstanceTests", () => {
   it("dispatch sets request and response", async () => {
     class TestController extends Metal {
       async index() {
-        this.body = "dispatched";
+        this.responseBody = "dispatched";
         this.contentType = "text/plain";
       }
     }
@@ -140,7 +139,7 @@ describe("MetalControllerInstanceTests", () => {
   it("dispatch exposes controller via action_controller.instance env slot", async () => {
     class TestController extends Metal {
       async index() {
-        this.body = "ok";
+        this.responseBody = "ok";
       }
     }
     const c = new TestController();
@@ -154,7 +153,7 @@ describe("MetalControllerInstanceTests", () => {
     class TestController extends Metal {
       async index() {
         this.status = 201;
-        this.body = "created";
+        this.responseBody = "created";
       }
     }
     const c = new TestController();
@@ -166,8 +165,8 @@ describe("MetalControllerInstanceTests", () => {
   it("dispatch commits headers to response", async () => {
     class TestController extends Metal {
       async index() {
-        this.setHeader("x-custom", "test");
-        this.body = "ok";
+        this.headers.set("x-custom", "test");
+        this.responseBody = "ok";
       }
     }
     const c = new TestController();
@@ -180,7 +179,7 @@ describe("MetalControllerInstanceTests", () => {
     class TestController extends Metal {
       async index() {
         this.contentType = "application/json";
-        this.body = "{}";
+        this.responseBody = "{}";
       }
     }
     const c = new TestController();
@@ -192,7 +191,7 @@ describe("MetalControllerInstanceTests", () => {
   it("dispatch commits body to response", async () => {
     class TestController extends Metal {
       async index() {
-        this.body = "hello world";
+        this.responseBody = "hello world";
       }
     }
     const c = new TestController();
@@ -209,25 +208,19 @@ describe("MetalControllerInstanceTests", () => {
       }
     }
     const req = makeRequest();
-    (req as any).parameters = new Parameters({ id: "42" });
+    (req as any).parameters = { id: "42" };
     const c = new TestController();
     await c.dispatch("index", req, makeResponse());
-    expect(c.receivedParams.get("id")).toBe("42");
-  });
-
-  it("params default to empty Parameters", () => {
-    const c = new (class extends Metal {})();
-    c.setResponseBang(makeResponse());
-    expect(c.params).toBeInstanceOf(Parameters);
+    expect(c.receivedParams).toEqual({ id: "42" });
   });
 
   it("toRackResponse returns [status, headers, body]", () => {
     const c = new (class extends Metal {})();
     c.setResponseBang(makeResponse());
     c.status = 200;
-    c.setHeader("x-test", "val");
+    c.headers.set("x-test", "val");
     c.contentType = "text/plain";
-    c.body = "hello";
+    c.responseBody = "hello";
     const [status, headers] = c.toRackResponse();
     expect(status).toBe(200);
     expect(headers["x-test"]).toBe("val");

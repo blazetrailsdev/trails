@@ -1,9 +1,4 @@
 import { Metal } from "../metal.js";
-import { urlOptions as _urlOptions, type UrlForHost } from "./url-for.js";
-
-export function urlOptions(this: UrlForHost): Record<string, unknown> {
-  return _urlOptions.call(this);
-}
 
 export class UnsafeRedirectError extends Error {
   constructor(message?: string) {

@@ -660,7 +660,6 @@ export class UrlHelpersModule {
       "polymorphicUrlForAction",
       "polymorphicPathForAction",
       "polymorphicMapping",
-      "urlOptions",
     ] as const) {
       Object.defineProperty(this, name, {
         value: (this[name] as (...a: unknown[]) => unknown).bind(this),

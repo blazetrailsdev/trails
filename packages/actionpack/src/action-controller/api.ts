@@ -3,7 +3,16 @@ import { DoubleRenderError, type RenderOptions } from "./base.js";
 import { renderForApi } from "./api/api-rendering.js";
 import { rateLimit, rateLimiting } from "./metal/rate-limiting.js";
 import { logAt } from "./metal/logging.js";
+import { include } from "@blazetrails/activesupport";
+import { StrongParameters, type Parameters as Params } from "./metal/strong-parameters.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface API {
+  get params(): Params;
+  set params(value: Params | Record<string, unknown>);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class API extends Metal {
   static withoutModules<T extends typeof API>(this: T, ..._modules: unknown[]): T {
     return this;
@@ -29,7 +38,7 @@ export class API extends Metal {
 
     const result = renderForApi(options as Record<string, unknown>);
     this.contentType = result.contentType;
-    this.body = result.body;
+    this.responseBody = result.body;
     this.markPerformed();
   }
 
@@ -40,8 +49,10 @@ export class API extends Metal {
 
     const status = options.status ? Metal.resolveStatus(options.status) : 302;
     this.status = status;
-    this.setHeader("location", url);
-    this.body = "";
+    this.headers.set("location", url);
+    this.responseBody = "";
     this.markPerformed();
   }
 }
+
+include(API, StrongParameters);

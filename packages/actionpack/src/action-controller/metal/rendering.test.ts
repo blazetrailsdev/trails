@@ -138,7 +138,7 @@ describe("_processOptions", () => {
     const host = {
       status: 200,
       contentType: null as string | null,
-      setHeader: (n: string, v: string) => setHeaderCalls.push([n, v]),
+      headers: { set: (n: string, v: string) => setHeaderCalls.push([n, v]) },
       urlFor: (s: string) => `/url/${s}`,
     };
     _processOptions.call(host, {
@@ -158,7 +158,7 @@ describe("_processOptions", () => {
     const host = {
       status: 200,
       contentType: null as string | null,
-      setHeader: () => undefined,
+      headers: { set: () => undefined },
       urlFor: (s: string) => s,
     };
     _processOptions.call(host, { status: 0, contentType: "" });

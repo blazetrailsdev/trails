@@ -25,7 +25,7 @@ describe("RenderJsonTest", () => {
     }
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.body).toBe("null");
+    expect(c.responseBody).toBe("null");
     expect(c.contentType).toContain("application/json");
   });
 
@@ -37,7 +37,7 @@ describe("RenderJsonTest", () => {
     }
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    expect(JSON.parse(c.body)).toEqual({ hello: "world" });
+    expect(JSON.parse(c.responseBody)).toEqual({ hello: "world" });
     expect(c.contentType).toContain("application/json");
   });
 
@@ -50,7 +50,7 @@ describe("RenderJsonTest", () => {
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
     expect(c.status).toBe(404);
-    expect(JSON.parse(c.body)).toEqual({ error: "not found" });
+    expect(JSON.parse(c.responseBody)).toEqual({ error: "not found" });
   });
 
   it("render json with callback", async () => {
@@ -61,8 +61,8 @@ describe("RenderJsonTest", () => {
     }
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.body).toContain("foo(");
-    expect(c.body).toContain('"hello"');
+    expect(c.responseBody).toContain("foo(");
+    expect(c.responseBody).toContain('"hello"');
     expect(c.contentType).toContain("text/javascript");
   });
 
@@ -74,9 +74,9 @@ describe("RenderJsonTest", () => {
     }
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.body).not.toContain("alert");
+    expect(c.responseBody).not.toContain("alert");
     expect(c.contentType).toContain("application/json");
-    expect(JSON.parse(c.body)).toEqual({ a: 1 });
+    expect(JSON.parse(c.responseBody)).toEqual({ a: 1 });
   });
 
   it("render json with custom content type", async () => {
@@ -98,7 +98,7 @@ describe("RenderJsonTest", () => {
     }
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.body).toBe("raw string");
+    expect(c.responseBody).toBe("raw string");
   });
 
   it("render json with render to string", async () => {
@@ -110,8 +110,8 @@ describe("RenderJsonTest", () => {
     }
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.body).toContain("rendered:");
-    expect(c.body).toContain("key");
+    expect(c.responseBody).toContain("rendered:");
+    expect(c.responseBody).toContain("key");
   });
 
   it("render json forwards extra options", async () => {
@@ -138,7 +138,7 @@ describe("RenderJsonTest", () => {
     }
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    expect(JSON.parse(c.body)).toEqual({ serialized: true });
+    expect(JSON.parse(c.responseBody)).toEqual({ serialized: true });
   });
 
   it("render json avoids view options", async () => {
@@ -149,7 +149,7 @@ describe("RenderJsonTest", () => {
     }
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    expect(JSON.parse(c.body)).toEqual([1, 2, 3]);
+    expect(JSON.parse(c.responseBody)).toEqual([1, 2, 3]);
     expect(c.contentType).toContain("application/json");
   });
 });

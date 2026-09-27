@@ -333,7 +333,7 @@ describe("RescueControllerTest", () => {
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.body).toBe("InvalidRequest");
+    expect(c.responseBody).toBe("InvalidRequest");
   });
 
   it("proc rescue handle with argument as string", async () => {
@@ -352,7 +352,7 @@ describe("RescueControllerTest", () => {
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.body).toBe("InvalidRequestStr");
+    expect(c.responseBody).toBe("InvalidRequestStr");
   });
 
   it("block rescue handler", async () => {
@@ -401,7 +401,7 @@ describe("RescueControllerTest", () => {
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.body).toBe("ResourceUnavailable");
+    expect(c.responseBody).toBe("ResourceUnavailable");
   });
 
   it("block rescue handler with argument as string", async () => {
@@ -420,7 +420,7 @@ describe("RescueControllerTest", () => {
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.body).toBe("ResourceUnavailableStr");
+    expect(c.responseBody).toBe("ResourceUnavailableStr");
   });
 
   it("rescue when wrapper has more specific handler than cause", async () => {
@@ -494,7 +494,7 @@ describe("RescueControllerTest", () => {
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
     expect(c.status).toBe(400);
-    expect(c.body).toBe("parse error");
+    expect(c.responseBody).toBe("parse error");
   });
 });
 
@@ -603,7 +603,7 @@ describe("RescueTest", () => {
     }
     const c = new C();
     await c.dispatch("foo", makeRequest(), makeResponse());
-    expect(c.body).toBe("foo");
+    expect(c.responseBody).toBe("foo");
   });
 
   it("rescue exceptions inside controller", async () => {
@@ -622,6 +622,6 @@ describe("RescueTest", () => {
     });
     const c = new C();
     await c.dispatch("invalid", makeRequest(), makeResponse());
-    expect(c.body).toBe("invalid");
+    expect(c.responseBody).toBe("invalid");
   });
 });

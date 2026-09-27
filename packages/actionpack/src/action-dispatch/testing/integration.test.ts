@@ -75,7 +75,7 @@ class PostsController extends Base {
   }
 
   async customHeader() {
-    this.setHeader("X-Custom", "integration-test");
+    this.headers.set("X-Custom", "integration-test");
     this.render({ plain: "ok" });
   }
 

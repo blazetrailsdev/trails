@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { Headers } from "@blazetrails/rack";
 import {
   sendFileHeadersBang,
   DEFAULT_SEND_FILE_TYPE,
@@ -6,18 +7,14 @@ import {
 } from "./data-streaming.js";
 
 interface TestHost extends SendFileHeadersHost {
-  headers: Record<string, string>;
+  headers: Headers;
 }
 
 function makeHost(): TestHost {
-  const headers: Record<string, string> = {};
   return {
     contentType: null,
     response: { sendingFile: false },
-    headers,
-    setHeader(name: string, value: string) {
-      headers[name] = value;
-    },
+    headers: new Headers(),
   };
 }
 
@@ -32,8 +29,8 @@ describe("sendFileHeadersBang", () => {
     sendFileHeadersBang.call(host, { filename: "data.bin" });
     expect(host.contentType).toBe(DEFAULT_SEND_FILE_TYPE);
     expect(host.response.sendingFile).toBe(true);
-    expect(host.headers["Content-Disposition"]).toMatch(/^attachment; filename="data\.bin"/);
-    expect(host.headers["Content-Transfer-Encoding"]).toBe("binary");
+    expect(host.headers.get("Content-Disposition")).toMatch(/^attachment; filename="data\.bin"/);
+    expect(host.headers.get("Content-Transfer-Encoding")).toBe("binary");
   });
 
   it("honors explicit string type", () => {
@@ -62,7 +59,7 @@ describe("sendFileHeadersBang", () => {
 
   it("emits both ASCII filename and RFC 5987 filename* when filename has non-ASCII chars", () => {
     sendFileHeadersBang.call(host, { filename: "résumé.pdf" });
-    const cd = host.headers["Content-Disposition"];
+    const cd = host.headers.get("Content-Disposition");
     expect(cd).toMatch(/filename="/);
     expect(cd).toMatch(/filename\*=UTF-8''/);
   });
@@ -73,23 +70,23 @@ describe("sendFileHeadersBang", () => {
       filename: "p.html",
       disposition: "inline",
     });
-    expect(host.headers["Content-Disposition"]).toMatch(/^inline;/);
+    expect(host.headers.get("Content-Disposition")).toMatch(/^inline;/);
   });
 
   it("omits Content-Disposition when disposition is falsy", () => {
     sendFileHeadersBang.call(host, { type: "text/plain", disposition: false });
-    expect(host.headers["Content-Disposition"]).toBeUndefined();
-    expect(host.headers["Content-Transfer-Encoding"]).toBe("binary");
+    expect(host.headers.get("Content-Disposition")).toBeUndefined();
+    expect(host.headers.get("Content-Transfer-Encoding")).toBe("binary");
   });
 
   it("omits Content-Disposition when disposition is null", () => {
     sendFileHeadersBang.call(host, { type: "text/plain", disposition: null });
-    expect(host.headers["Content-Disposition"]).toBeUndefined();
+    expect(host.headers.get("Content-Disposition")).toBeUndefined();
   });
 
   it("uses bare disposition when filename absent", () => {
     sendFileHeadersBang.call(host, { type: "text/plain" });
-    expect(host.headers["Content-Disposition"]).toBe("attachment");
+    expect(host.headers.get("Content-Disposition")).toBe("attachment");
   });
 
   it("raises when explicit type is null", () => {

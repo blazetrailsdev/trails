@@ -1,48 +1,35 @@
 import { ContentDisposition } from "../../action-dispatch/http/content-disposition.js";
 import { MimeType } from "../../action-dispatch/http/mime-type.js";
 import type { Request } from "../../action-dispatch/http/request.js";
-import { Response as DispatchResponse } from "../../action-dispatch/http/response.js";
-import type { Headers } from "@blazetrails/rack";
-import { IOError, RuntimeError, merge } from "@blazetrails/ruby-compat";
+import {
+  Response as DispatchResponse,
+  ResponseBuffer,
+} from "../../action-dispatch/http/response.js";
+import { RuntimeError, merge } from "@blazetrails/ruby-compat";
 
 export class ClientDisconnected extends RuntimeError {}
 
-interface LiveResponseLike {
-  committed: boolean;
-  headers: Headers;
-  setHeader(key: string, value: string): void;
-  deleteHeader(key: string): void;
-  commitBang(): void;
-}
-
 type ErrorCallback = () => void;
 
-export class Buffer {
+export class Buffer extends ResponseBuffer {
   static queueSize: number | null = 10;
 
-  ignoreDisconnect = false;
+  ignoreDisconnect: boolean;
 
   /** @internal */
-  protected _response: LiveResponseLike;
+  protected _errorCallback: ErrorCallback;
   /** @internal */
-  protected _buf: Array<string | null>;
-  /** @internal */
-  protected _aborted = false;
-  /** @internal */
-  protected _closed = false;
-  /** @internal */
-  protected _errorCallback: ErrorCallback = () => {};
+  protected _aborted: boolean;
 
-  constructor(response: LiveResponseLike) {
-    this._response = response;
-    this._buf = this.buildQueue((this.constructor as typeof Buffer).queueSize);
+  constructor(response: DispatchResponse) {
+    const klass = new.target;
+    super(response, klass.prototype.buildQueue(klass.queueSize));
+    this._errorCallback = () => {};
+    this._aborted = false;
+    this.ignoreDisconnect = false;
   }
 
-  get body(): string {
-    return this._buf.join("");
-  }
-
-  write(string: string): void {
+  override write(string: string): void {
     if (!this._response.committed) {
       if (this._response.headers.get("Cache-Control") === undefined) {
         this._response.headers.set("Cache-Control", "no-cache");
@@ -50,12 +37,11 @@ export class Buffer {
       this._response.deleteHeader("Content-Length");
     }
 
-    if (this._closed) throw new IOError("closed stream");
-    this._response.commitBang();
-    this._buf.push(string);
+    super.write(string);
 
     if (!this.isConnected) {
       this._buf.length = 0;
+
       if (!this.ignoreDisconnect) {
         throw new ClientDisconnected("client disconnected");
       }
@@ -66,17 +52,12 @@ export class Buffer {
     this.write(string.endsWith("\n") ? string : `${string}\n`);
   }
 
-  close(): void {
-    this._response.commitBang();
-    this._closed = true;
+  override close(): void {
+    super.close();
     this._buf.push(null);
   }
 
-  get closed(): boolean {
-    return this._closed;
-  }
-
-  abort(): void {
+  override abort(): void {
     this._aborted = true;
     this._buf.length = 0;
   }
@@ -93,16 +74,12 @@ export class Buffer {
     this._errorCallback();
   }
 
-  *each(): IterableIterator<string> {
-    yield* this.eachChunk();
-  }
-
   /** @internal */
-  *eachChunk(): IterableIterator<string> {
-    while (this._buf.length > 0) {
-      const str = this._buf.shift();
+  protected override eachChunk(block: (chunk: unknown) => void): void {
+    while (true) {
+      const str = this._buf.shift() as string | null | undefined;
       if (str === null || str === undefined) break;
-      yield str;
+      block(str);
     }
   }
 
@@ -181,7 +158,7 @@ export class Response extends DispatchResponse {
   }
 
   /** @internal */
-  buildBuffer(response: LiveResponseLike, body: unknown[]): Buffer {
+  buildBuffer(response: DispatchResponse, body: unknown[]): Buffer {
     const buf = new Buffer(response);
     for (const part of body) buf.write(String(part));
     return buf;
