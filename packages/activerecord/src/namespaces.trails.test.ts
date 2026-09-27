@@ -27,6 +27,12 @@ import { Default } from "./scoping/default.js";
 import * as Named from "./scoping/named.js";
 import { Dirty } from "./attribute-methods/dirty.js";
 import { TimeZoneConversion } from "./attribute-methods/time-zone-conversion.js";
+import { Preloader } from "./associations/preloader.js";
+import { ThroughAssociation } from "./associations/preloader/through-association.js";
+import { JoinDependency } from "./associations/join-dependency.js";
+import { JoinAssociation } from "./associations/join-dependency/join-association.js";
+import { AliasTracker } from "./associations/alias-tracker.js";
+import { AssociationScope } from "./associations/association-scope.js";
 
 describe("ActiveRecord namespaces", () => {
   it("constantize resolves the namespaces nested on ActiveRecord", () => {
@@ -100,5 +106,19 @@ describe("ActiveRecord namespaces", () => {
     expect(constantize("ActiveRecord::Encryption::NullEncryptor")).toBe(NullEncryptor);
     expect(constantize("ActiveRecord::Encryption::Scheme")).toBe(Scheme);
     expect(constantize("ActiveRecord::Encryption::Errors::Decryption")).toBe(Errors.Decryption);
+  });
+
+  it("Associations.eager_load! eager loads Preloader and JoinDependency", async () => {
+    await Associations.eagerLoadBang();
+    expect(constantize("ActiveRecord::Associations::Preloader")).toBe(Preloader);
+    expect(constantize("ActiveRecord::Associations::Preloader::ThroughAssociation")).toBe(
+      ThroughAssociation,
+    );
+    expect(constantize("ActiveRecord::Associations::JoinDependency")).toBe(JoinDependency);
+    expect(constantize("ActiveRecord::Associations::JoinDependency::JoinAssociation")).toBe(
+      JoinAssociation,
+    );
+    expect(constantize("ActiveRecord::Associations::AssociationScope")).toBe(AssociationScope);
+    expect(constantize("ActiveRecord::Associations::AliasTracker")).toBe(AliasTracker);
   });
 });

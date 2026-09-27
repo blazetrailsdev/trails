@@ -1,4 +1,4 @@
-import { Notifications } from "@blazetrails/activesupport";
+import { Autoload, extend, Notifications, type Extended } from "@blazetrails/activesupport";
 import { rbEqual } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import type { Result } from "../result.js";
@@ -6,6 +6,7 @@ import type { AssociationSpec } from "../relation/query-methods.js";
 import { Nodes, Table as ArelTable } from "@blazetrails/arel";
 import { isAssociationCached } from "../associations.js";
 import { _reflectOnAssociation } from "../reflection.js";
+import { Associations } from "../namespaces.js";
 import { JoinBase } from "./join-dependency/join-base.js";
 import { JoinAssociation } from "./join-dependency/join-association.js";
 import { JoinPart } from "./join-dependency/join-part.js";
@@ -660,3 +661,34 @@ export class JoinDependency {
     }
   }
 }
+
+// eslint-disable-next-line @typescript-eslint/no-namespace
+export declare namespace JoinDependency {
+  const loadPath: Autoload.Autoload["loadPath"];
+  let JoinBase: typeof import("./join-dependency/join-base.js").JoinBase;
+  let JoinAssociation: typeof import("./join-dependency/join-association.js").JoinAssociation;
+  const autoload: Extended<typeof Autoload>["autoload"];
+  const eagerAutoload: Extended<typeof Autoload>["eagerAutoload"];
+  const eagerLoadBang: Extended<typeof Autoload>["eagerLoadBang"];
+}
+Object.defineProperty(JoinDependency, "name", {
+  value: "ActiveRecord::Associations::JoinDependency",
+});
+Object.assign(JoinDependency, {
+  loadPath: {
+    "active_record/associations/join_dependency/join_base": () =>
+      import("./join-dependency/join-base.js"),
+    "active_record/associations/join_dependency/join_association": () =>
+      import("./join-dependency/join-association.js"),
+  },
+});
+extend(JoinDependency, Autoload);
+
+JoinDependency.eagerAutoload(() => {
+  JoinDependency.autoload("JoinBase");
+  JoinDependency.autoload("JoinAssociation");
+});
+JoinDependency.JoinBase = JoinBase;
+JoinDependency.JoinAssociation = JoinAssociation;
+
+Associations.JoinDependency = JoinDependency;

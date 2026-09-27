@@ -1,5 +1,7 @@
 import { Autoload, extend, registerConstant, type Extended } from "@blazetrails/activesupport";
 import type { AssociationRelation as AssociationRelationClass } from "./association-relation.js";
+import type { AliasTracker } from "./associations/alias-tracker.js";
+import type { AssociationScope } from "./associations/association-scope.js";
 import type { BelongsToAssociation } from "./associations/belongs-to-association.js";
 import type { BelongsToPolymorphicAssociation } from "./associations/belongs-to-polymorphic-association.js";
 import type { CollectionProxy } from "./associations/collection-proxy.js";
@@ -8,6 +10,8 @@ import type { HasManyAssociation } from "./associations/has-many-association.js"
 import type { HasManyThroughAssociation } from "./associations/has-many-through-association.js";
 import type { HasOneAssociation } from "./associations/has-one-association.js";
 import type { HasOneThroughAssociation } from "./associations/has-one-through-association.js";
+import type { JoinDependency } from "./associations/join-dependency.js";
+import type { Preloader } from "./associations/preloader.js";
 import type { BeforeTypeCast } from "./attribute-methods/before-type-cast.js";
 import type { CompositePrimaryKey } from "./attribute-methods/composite-primary-key.js";
 import type { Dirty } from "./attribute-methods/dirty.js";
@@ -86,8 +90,13 @@ const loadPath: Record<string, () => Promise<unknown>> = {
     import("./associations/has-one-association.js"),
   "active_record/associations/has_one_through_association": () =>
     import("./associations/has-one-through-association.js"),
+  "active_record/associations/preloader": () => import("./associations/preloader.js"),
+  "active_record/associations/join_dependency": () => import("./associations/join-dependency.js"),
+  "active_record/associations/association_scope": () =>
+    import("./associations/association-scope.js"),
   "active_record/associations/disable_joins_association_scope": () =>
     import("./associations/disable-joins-association-scope.js"),
+  "active_record/associations/alias_tracker": () => import("./associations/alias-tracker.js"),
   "active_record/attribute_methods/before_type_cast": () =>
     import("./attribute-methods/before-type-cast.js"),
   "active_record/attribute_methods/composite_primary_key": () =>
@@ -189,7 +198,11 @@ export const Associations = { name: "ActiveRecord::Associations", loadPath } as 
   HasManyThroughAssociation: typeof HasManyThroughAssociation;
   HasOneAssociation: typeof HasOneAssociation;
   HasOneThroughAssociation: typeof HasOneThroughAssociation;
+  Preloader: typeof Preloader;
+  JoinDependency: typeof JoinDependency;
+  AssociationScope: typeof AssociationScope;
   DisableJoinsAssociationScope: typeof DisableJoinsAssociationScope;
+  AliasTracker: typeof AliasTracker;
 };
 extend(Associations, Autoload);
 Associations.autoload("CollectionProxy");
@@ -200,7 +213,12 @@ Associations.eagerAutoload(() => {
   Associations.autoload("HasManyThroughAssociation");
   Associations.autoload("HasOneAssociation");
   Associations.autoload("HasOneThroughAssociation");
+
+  Associations.autoload("Preloader");
+  Associations.autoload("JoinDependency");
+  Associations.autoload("AssociationScope");
   Associations.autoload("DisableJoinsAssociationScope");
+  Associations.autoload("AliasTracker");
 });
 
 export const AttributeMethods = {

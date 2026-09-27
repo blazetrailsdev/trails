@@ -8,6 +8,7 @@ import { WhereClause } from "../relation/where-clause.js";
 import { constructJoinDependency } from "../relation/query-methods.js";
 import { drop } from "@blazetrails/ruby-compat";
 import { methodMissingProxy } from "@blazetrails/ruby-compat";
+import { Associations } from "../namespaces.js";
 
 export type ValueTransformation<T = unknown> = (v: T) => unknown;
 
@@ -416,3 +417,5 @@ export function unionOrderClauses(first: unknown[], second: unknown[]): unknown[
   }
   return result;
 }
+
+Associations.AssociationScope = AssociationScope;
