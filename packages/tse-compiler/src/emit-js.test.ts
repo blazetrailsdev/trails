@@ -58,15 +58,15 @@ describe("compileJs", () => {
     expect(code).toContain("_ob.append(await ( yield ));");
   });
 
-  it("emits block-expr with capture wrapper so inner writes go to capture buffer", () => {
+  it("emits block-expr verbatim, leaving the capture to the block-taking helper", () => {
     const src = "<%= forEach(items, (item) => { %><li><%= item %></li><% }) %>";
     const { code } = compileJs(src);
     expect(code).toBe(
       [
         "export default function render(context, locals) { const _ob = context.outputBuffer;" +
-          " _ob.append( forEach(items, (item) => { return context.capture(() => {" +
+          " _ob.append( forEach(items, (item) => { " +
           ' context.outputBuffer.safeAppend("<li>"); context.outputBuffer.append( item );' +
-          ' context.outputBuffer.safeAppend("</li>"); }); }) );',
+          ' context.outputBuffer.safeAppend("</li>");  }) );',
         "return _ob;",
         "}",
         "",
@@ -79,7 +79,7 @@ describe("compileJs", () => {
     const { code } = compileJs(src);
     expect(code).toContain("_ob.append( outer((x) =>");
     expect(code).toContain("context.outputBuffer.append( inner((y) =>");
-    expect(code.split("}); }) );")).toHaveLength(3);
+    expect(code.split("}) );")).toHaveLength(3);
   });
 
   it("does not close blockExpr on inner code braces", () => {
@@ -87,7 +87,7 @@ describe("compileJs", () => {
     const { code } = compileJs(src);
     expect(code).toContain("_ob.append( forEach(items, (item) =>");
     expect(code).toContain("if (x) {");
-    expect(code.split("}); }) );")).toHaveLength(2);
+    expect(code.split("}) );")).toHaveLength(2);
   });
 
   it("tracks } else { as net-zero brace delta so the blockExpr closer is recognised", () => {
@@ -95,15 +95,15 @@ describe("compileJs", () => {
       "<%= forEach(items, (item) => { %><% if (x) { %><%= item %><% } else { %><%= other %><% } %><% }) %>";
     const { code } = compileJs(src);
     expect(code).toContain("_ob.append( forEach(items, (item) =>");
-    expect(code.split("}); }) );")).toHaveLength(2);
+    expect(code.split("}) );")).toHaveLength(2);
   });
 
   it("closes correctly when the blockExpr has no wrapping helper call (zero callExpr parens)", () => {
     const src = "<%= (x) => { %><span><%= x %></span><% } %>";
     const { code } = compileJs(src);
     expect(code).toContain("_ob.append( (x) =>");
-    expect(code).toContain("context.capture(() => {");
-    expect(code).toContain("}); } );");
+    expect(code).not.toContain("context.capture");
+    expect(code).toContain("} );");
   });
 
   it("throws a clear error for function-form blockExpr (arrow syntax required)", () => {
@@ -122,7 +122,7 @@ describe("compileJs", () => {
     const src = "<%= fn((x) => { %><% }) %>";
     const { code } = compileJs(src, { escapeIgnore: true });
     expect(code).toContain("_ob.safeExprAppend( fn((x) =>");
-    expect(code).toContain("}); }) );");
+    expect(code).toContain("}) );");
   });
 
   describe("strict locals", () => {

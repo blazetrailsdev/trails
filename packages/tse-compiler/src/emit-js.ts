@@ -103,7 +103,7 @@ function emit(ast: TseAst, options: EmitJsOptions): { code: string; mappings: Li
       }
       innerDepths.push(0);
       innerCallExprParens.push(netUnclosedParens(node.value));
-      push(`${bufRef}.${exprAppend}(${node.value}return context.capture(() => {`, node.srcLine);
+      push(`${bufRef}.${exprAppend}(${node.value}`, node.srcLine);
     } else if (node.kind === "code" && insideBlock) {
       const innerDepth = innerDepths[innerDepths.length - 1];
       if (BLOCK_CLOSE_RE.test(node.value) && innerDepth === 0) {
@@ -112,7 +112,7 @@ function emit(ast: TseAst, options: EmitJsOptions): { code: string; mappings: Li
         const closer = node.value.replace(/;\s*$/, "");
         const closingParens = (closer.match(/\)/g) ?? []).length;
         const suffix = ")".repeat(Math.max(0, 1 + callExprParens - closingParens)) + ";";
-        push(`});${closer}${suffix}`, node.srcLine);
+        push(`${closer}${suffix}`, node.srcLine);
       } else {
         innerDepths[innerDepths.length - 1] += netBraceDepth(node.value);
         push(emitNode(node, exprAppend, "context.outputBuffer"), node.srcLine);

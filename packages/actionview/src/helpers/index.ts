@@ -16,7 +16,6 @@ export {
   escapeOnce,
   buildTagValues,
   TagBuilder,
-  resetTagBuilder,
 } from "./tag-helper.js";
 
 export { escapeJavascript, j, javascriptCdataSection, javascriptTag } from "./javascript-helper.js";

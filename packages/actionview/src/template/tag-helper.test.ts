@@ -1,19 +1,38 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect } from "vitest";
 import {
-  tag,
-  contentTag,
+  tag as _tag,
+  contentTag as _contentTag,
   tokenList,
   classNames,
   cdataSection,
   escapeOnce,
   TagBuilder,
-  tagBuilder,
+  tagBuilder as _tagBuilder,
   safeJoin,
   toSentence,
 } from "../helpers/tag-helper.js";
 import { htmlSafe, SafeBuffer } from "@blazetrails/activesupport";
 import { raw } from "../helpers/output-safety-helper.js";
+import { Base } from "../base.js";
+import { Template } from "../template.js";
+import { TemplateHandlers } from "./handlers.js";
+
+const view = new (Base.withEmptyTemplateCache())(null, {}, null);
+const tag = _tag.bind(view);
+const contentTag = _contentTag.bind(view);
+const tagBuilder = _tagBuilder.bind(view);
+
+const renderTse = (string: string): string => {
+  const template = new Template(
+    string.trim(),
+    "test template",
+    TemplateHandlers.handlerForExtension("tse")!,
+    { format: ":html", locals: [] },
+  );
+  const view = Base.withEmptyTemplateCache();
+  return String(template.render(view.empty(), {})).trim();
+};
 
 const COMMON_DANGEROUS_CHARS = "&<>\"' %*+,/;=^|";
 const INVALID_TAG_CHARS = "> /";
@@ -294,6 +313,40 @@ describe("TagHelperTest", () => {
         )
         .toString(),
     ).toBe('<div id="header"><div class="world"><span>hello</span></div></div>');
+  });
+
+  it("content tag with block in tse", () => {
+    const buffer = renderTse(
+      '<%= contentTag("div", null, null, true, () => { %>Hello world!<% }) %>',
+    );
+    expect(buffer).toBe("<div>Hello world!</div>");
+  });
+
+  it("tag builder with block in tse", () => {
+    const buffer = renderTse("<%= tag().div(() => { %>Hello world!<% }) %>");
+    expect(buffer).toBe("<div>Hello world!</div>");
+  });
+
+  it("content tag with block in tse containing non displayed tse", () => {
+    const buffer = renderTse('<%= contentTag("p", null, null, true, () => { %><% 1 %><% }) %>');
+    expect(buffer).toBe("<p></p>");
+  });
+
+  it("tag builder with block in tse containing non displayed tse", () => {
+    const buffer = renderTse("<%= tag().p(() => { %><% 1 %><% }) %>");
+    expect(buffer).toBe("<p></p>");
+  });
+
+  it("content tag with block and options in tse", () => {
+    const buffer = renderTse(
+      '<%= contentTag("div", { class: "green" }, null, true, () => { %>Hello world!<% }) %>',
+    );
+    expect(buffer).toBe('<div class="green">Hello world!</div>');
+  });
+
+  it("tag builder with block and options in tse", () => {
+    const buffer = renderTse('<%= tag().div({ class: "green" }, () => { %>Hello world!<% }) %>');
+    expect(buffer).toBe('<div class="green">Hello world!</div>');
   });
 
   it("content tag with block and options out of tse", () => {
@@ -827,13 +880,12 @@ describe("TagHelperTest", () => {
 
   describe("TagBuilder", () => {
     it("constructor stores view context", () => {
-      const ctx = { _outputBuffer: null };
-      const builder = new TagBuilder(ctx);
-      expect(builder.viewContext).toBe(ctx);
+      const builder = new TagBuilder(view);
+      expect(builder.viewContext).toBe(view);
     });
 
     it("tagString builds a content tag", () => {
-      const builder = new TagBuilder();
+      const builder = new TagBuilder(view);
       expect(builder.tagString("p", "Hi").toString()).toBe("<p>Hi</p>");
       expect(builder.tagString("p", null, { class: "x" }).toString()).toBe('<p class="x"></p>');
       expect(builder.tagString("p", null, undefined, { block: () => "Yo" }).toString()).toBe(
