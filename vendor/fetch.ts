@@ -107,9 +107,6 @@ export async function fetchSource(
   opts: { refresh: boolean; offline?: boolean; lockEntry?: LockEntry; dest?: string },
 ): Promise<LockEntry> {
   const dest = opts.dest ?? destFor(source);
-  // An entry for another ref is the pin being bumped, not a clone that drifted:
-  // the fetch re-locks the new ref (and adopts a `--ref` candidate already on
-  // disk) rather than aborting against the old SHA.
   const lockEntry = opts.lockEntry?.ref === source.origin.ref ? opts.lockEntry : undefined;
 
   if (opts.refresh && (await exists(dest))) {

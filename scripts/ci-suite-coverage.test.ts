@@ -36,9 +36,8 @@ const KNOWN_UNRUN: Record<string, string> = {};
 // sources.test.ts asserts exact sets over SOURCES, so it rots the moment one
 // of these declares or renames a source; matching the test file alone is not
 // enough, because the file that drifts is the one it asserts over.
-// vendor/fetch.ts is here for vendor/fetch.test.ts, which spawns it.
 //
-// These notes live here rather than in ci.yml because the changes job's inline
+// This note lives here rather than in ci.yml because the changes job's inline
 // `run:` script is ~200 bytes under a hard Actions size limit — pushing it over
 // makes the whole workflow fail at startup, with no jobs and no checks reported
 // at all.
