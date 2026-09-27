@@ -145,7 +145,6 @@ export class Generators {
     return this;
   }
 
-  /** @noRailsEquivalent PERMANENT */
   dup(): Generators {
     const copy = Object.assign(new Generators(), this);
     return copy.initializeCopy(this);
