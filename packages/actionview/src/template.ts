@@ -212,7 +212,9 @@ export class Template {
       const source = this.source;
       const m = STRICT_LOCALS_REGEX.exec(source);
       if (m) {
-        this._source = source.replace(STRICT_LOCALS_REGEX, "");
+        if (typeof this._source === "string") {
+          this._source = source.replace(STRICT_LOCALS_REGEX, "");
+        }
         const sig = m[1].trim();
         this._strictLocals = sig === "" ? "**nil" : sig;
       } else {
