@@ -1,11 +1,12 @@
 import { SafeBuffer, htmlSafe } from "@blazetrails/activesupport";
+import { Fiber } from "@blazetrails/ruby-compat";
 
 import { OutputBuffer } from "./buffers.js";
 
 export class OutputFlow {
-  readonly content: Map<string, SafeBuffer> = new Map();
+  content: Map<string, SafeBuffer> = new Map();
 
-  get(key: string): SafeBuffer {
+  get(key: string): SafeBuffer | Promise<SafeBuffer> {
     let buf = this.content.get(key);
     if (!buf) {
       buf = htmlSafe("");
@@ -20,7 +21,7 @@ export class OutputFlow {
 
   append(key: string, value: unknown): void {
     if (value == null) return;
-    const current = this.get(key);
+    const current = this.content.get(key) ?? htmlSafe("");
     let piece: string | SafeBuffer;
     if (value instanceof SafeBuffer) piece = value;
     else if (value instanceof OutputBuffer) piece = value.toString();
@@ -30,6 +31,64 @@ export class OutputFlow {
 
   appendBang(key: string, value: unknown): void {
     this.append(key, value);
+  }
+}
+
+interface StreamingFlowView {
+  outputBuffer: OutputBuffer | null;
+  viewFlow: OutputFlow;
+}
+
+export class StreamingFlow extends OutputFlow {
+  private _view: StreamingFlowView;
+  private _parent: OutputBuffer | null;
+  private _child: OutputBuffer | null;
+  private _fiber: Fiber;
+  private _root: Fiber;
+  private _waitingFor: string | null = null;
+
+  constructor(view: StreamingFlowView, fiber: Fiber) {
+    super();
+    this._view = view;
+    this._parent = null;
+    this._child = view.outputBuffer;
+    this.content = view.viewFlow.content;
+    this._fiber = fiber;
+    this._root = Fiber.current();
+  }
+
+  override get(key: string): SafeBuffer | Promise<SafeBuffer> {
+    if (this.content.has(key)) return super.get(key);
+
+    if (this.isInsideFiber()) {
+      const view = this._view;
+
+      const ensure = (): void => {
+        this._waitingFor = null;
+        [view.outputBuffer, this._child] = [this._parent, view.outputBuffer];
+      };
+      let suspended: Promise<void>;
+      try {
+        this._waitingFor = key;
+        [view.outputBuffer, this._parent] = [this._child, view.outputBuffer];
+        suspended = Fiber.yield();
+      } catch (error) {
+        ensure();
+        throw error;
+      }
+      return suspended.finally(ensure).then(() => super.get(key));
+    }
+
+    return super.get(key);
+  }
+
+  override appendBang(key: string, value: unknown): void {
+    super.appendBang(key, value);
+    if (this._waitingFor === key) void this._fiber.resume();
+  }
+
+  private isInsideFiber(): boolean {
+    return Fiber.current() !== this._root;
   }
 }
 

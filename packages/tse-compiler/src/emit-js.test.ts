@@ -32,6 +32,24 @@ describe("compileJs", () => {
     expect(compileJs("<% const x = 1 %>").code).toContain(" const x = 1 ;");
   });
 
+  it("awaits top-level expression sites of an async render, but not inside a function", () => {
+    const { code } = compileJs(
+      "<% if (x) { %><%= yield %><% } %><% items.forEach((i) => { %><%= i %><% }) %><%== y %>",
+      { async: true },
+    );
+    expect(code).toContain("export default async function render(context, locals) {");
+    expect(code).toContain("_ob.append(await ( yield ));");
+    expect(code).toContain("_ob.append( i );");
+    expect(code).toContain("_ob.safeExprAppend(await ( y ));");
+  });
+
+  it("does not count braces inside string literals when deciding what an async render awaits", () => {
+    const { code } = compileJs('<% const s = "a{b"; const t = `}`; %><%= yield %>', {
+      async: true,
+    });
+    expect(code).toContain("_ob.append(await ( yield ));");
+  });
+
   it("emits block-expr with capture wrapper so inner writes go to capture buffer", () => {
     const src = "<%= forEach(items, (item) => { %><li><%= item %></li><% }) %>";
     const { code } = compileJs(src);

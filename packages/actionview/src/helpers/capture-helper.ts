@@ -39,7 +39,7 @@ export function contentFor(
   content?: unknown,
   options?: { flush?: boolean },
   block?: () => unknown,
-): SafeBuffer | null {
+): SafeBuffer | null | Promise<SafeBuffer | null> {
   if (typeof content === "function" && block === undefined) {
     block = content as () => unknown;
     content = undefined;
@@ -63,7 +63,11 @@ export function contentFor(
     return null;
   }
   const stored = this.viewFlow.get(name);
-  return isPresent(stored.toString()) ? stored : null;
+  return stored instanceof Promise
+    ? stored.then((value) => (isPresent(value.toString()) ? value : null))
+    : isPresent(stored.toString())
+      ? stored
+      : null;
 }
 
 function isPlainOptions(value: unknown): value is { flush?: boolean } {
@@ -87,8 +91,11 @@ export function provide(
   return null;
 }
 
-export function isContentFor(this: CaptureHelperHost, name: string): boolean {
-  return isPresent(this.viewFlow.get(name).toString());
+export function isContentFor(this: CaptureHelperHost, name: string): boolean | Promise<boolean> {
+  const stored = this.viewFlow.get(name);
+  return stored instanceof Promise
+    ? stored.then((value) => isPresent(value.toString()))
+    : isPresent(stored.toString());
 }
 
 /** @internal */

@@ -29,7 +29,7 @@ export interface RenderableTemplate {
 
 export interface ViewContext {
   readonly lookupContext?: LookupContext | null;
-  _layoutFor?(...args: unknown[]): string | SafeBuffer | null;
+  _layoutFor?(...args: unknown[]): string | SafeBuffer | null | Promise<SafeBuffer>;
   viewFlow?: { set(key: string, content: string): void };
   prefixPartialPathWithControllerNamespace?: boolean;
   viewRenderer: { cacheHits: Record<string, unknown> };

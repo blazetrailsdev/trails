@@ -7,7 +7,7 @@ import {
 } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import type { Base, CompiledMethod, CompiledMethodContainer } from "./base.js";
-import { OutputBuffer } from "./buffers.js";
+import { OutputBuffer, StreamingBuffer } from "./buffers.js";
 import { SyntaxErrorInTemplate, TemplateError } from "./template/error.js";
 import { TemplateHandlers, type TemplateHandler } from "./template/handlers.js";
 import { Html } from "./template/handlers/html.js";
@@ -138,6 +138,9 @@ export class Template {
   private _methodName?: string;
   private readonly _objectId = ++nextObjectId;
   private _compiled = false;
+  private _compiledStreaming = false;
+  /** @internal */
+  _streaming = false;
 
   constructor(opts: TemplateOptions) {
     this._source = opts.source;
@@ -234,6 +237,13 @@ export class Template {
   render(
     view: Base,
     locals: Record<string, unknown>,
+    buffer: StreamingBuffer,
+    options?: { implicitLocals?: readonly string[]; addToStack?: boolean },
+    block?: (...name: unknown[]) => unknown,
+  ): Promise<null>;
+  render(
+    view: Base,
+    locals: Record<string, unknown>,
     buffer: OutputBuffer,
     options?: { implicitLocals?: readonly string[]; addToStack?: boolean },
     block?: (...name: unknown[]) => unknown,
@@ -241,16 +251,17 @@ export class Template {
   render(
     view: Base,
     locals: Record<string, unknown> = {},
-    buffer: OutputBuffer | null = null,
+    buffer: OutputBuffer | StreamingBuffer | null = null,
     {
       implicitLocals = [],
       addToStack = true,
     }: { implicitLocals?: readonly string[]; addToStack?: boolean } = {},
     block?: (...name: unknown[]) => unknown,
-  ): string | null {
+  ): string | null | Promise<null> {
+    const streaming = buffer instanceof StreamingBuffer;
     try {
-      return this.instrumentRenderTemplate<string | null>(() => {
-        this.compileBang(view);
+      const rendered = this.instrumentRenderTemplate<string | null | Promise<null>>(() => {
+        this.compileBang(view, streaming);
 
         if (this.isStrictLocals() && this._strictLocalKeys && implicitLocals.length > 0) {
           const localsToIgnore = implicitLocals.filter((l) => !this._strictLocalKeys!.includes(l));
@@ -258,15 +269,15 @@ export class Template {
         }
 
         if (buffer) {
-          view._run(
-            this.methodName(),
+          const result = view._run(
+            streaming ? this.streamingMethodName() : this.methodName(),
             this,
             locals,
-            buffer,
+            buffer as OutputBuffer,
             { addToStack, hasStrictLocals: this.isStrictLocals() },
             block,
           );
-          return null;
+          return streaming ? (result as Promise<unknown>).then(() => null) : null;
         } else {
           const result = view._run(
             this.methodName(),
@@ -281,6 +292,9 @@ export class Template {
             : (result as string);
         }
       });
+      return rendered instanceof Promise
+        ? rendered.catch((e: unknown) => this.handleRenderError(view, e))
+        : rendered;
     } catch (e) {
       return this.handleRenderError(view, e);
     }
@@ -317,21 +331,30 @@ export class Template {
     });
   }
 
-  /** @internal */
-  private compileBang(view: Base): void {
-    if (this._compiled) return;
+  /**
+   * @internal
+   * @missingRailsArgs compile — PERMANENT
+   */
+  private compileBang(view: Base, streaming = false): void {
+    if (streaming ? this._compiledStreaming : this._compiled) return;
 
     const mod = view.compiledMethodContainer();
 
     this.instrument<void>("!compile_template", () => {
-      this.compile(mod);
+      this.compile(mod, streaming);
     });
 
-    this._compiled = true;
+    if (streaming) this._compiledStreaming = true;
+    else this._compiled = true;
   }
 
   /** @internal */
-  private compiledSource(): string {
+  private streamingMethodName(): string {
+    return `${this.methodName()}_streaming`;
+  }
+
+  /** @internal */
+  private compiledSource(streaming = false): string {
     const setStrictLocals = this.strictLocalsBang();
     const source = this.source;
     const handler = this.resolveHandler();
@@ -341,7 +364,13 @@ export class Template {
           `Register one with TemplateHandlers.registerTemplateHandler(ext, handler).`,
       );
     }
-    const code = handler.call(this, source);
+    let code: string;
+    this._streaming = streaming;
+    try {
+      code = handler.call(this, source);
+    } finally {
+      this._streaming = false;
+    }
 
     let methodArguments: string;
     if (setStrictLocals != null) {
@@ -356,14 +385,18 @@ export class Template {
     const parameters = methodParameters(methodArguments);
     const scope = setStrictLocals != null ? "__strictLocals" : "localAssigns";
 
-    return `Object.assign(function ${this.methodName()}(localAssigns, outputBuffer, __kwargs = {}, _) {${setStrictLocals != null ? kwargsCode(parameters) : ""} this.virtualPath = ${JSON.stringify(this.virtualPath)}; const __yield = _ ? { get yield() { return _(); } } : {}; with (this) { with (__yield) { with (${scope}) {${this.localsCode()} ${code}
+    return `Object.assign(${streaming ? "async " : ""}function ${streaming ? this.streamingMethodName() : this.methodName()}(localAssigns, outputBuffer, __kwargs = {}, _) {${setStrictLocals != null ? kwargsCode(parameters) : ""} this.virtualPath = ${JSON.stringify(this.virtualPath)}; const __yield = _ ? { get yield() { return _(); } } : {}; with (this) { with (__yield) { with (${scope}) {${this.localsCode()} ${code}
   } } }
 }, { parameters: ${JSON.stringify(parameters.map(([type, name]) => (name === undefined ? [type] : [type, name])))} })`;
   }
 
-  /** @internal */
-  protected compile(mod: CompiledMethodContainer): void {
-    const compiledSource = this.compiledSource();
+  /**
+   * @internal
+   * @missingRailsArgs compiled_source — PERMANENT
+   */
+  protected compile(mod: CompiledMethodContainer, streaming = false): void {
+    const methodName = streaming ? this.streamingMethodName() : this.methodName();
+    const compiledSource = this.compiledSource(streaming);
     let factory: (
       argumentError: typeof ArgumentError,
       safe: typeof htmlSafe,
@@ -382,7 +415,7 @@ export class Template {
     }
 
     const method = factory(ArgumentError, htmlSafe, OutputBuffer);
-    mod._compiledMethods.set(this.methodName(), method);
+    mod._compiledMethods.set(methodName, method);
 
     if (!this.isStrictLocals()) return;
 
@@ -398,7 +431,7 @@ export class Template {
     if (last?.[0] === "block" && last[1] === "_") nonKwargParameters.pop();
 
     if (nonKwargParameters.length > 0) {
-      mod._compiledMethods.delete(this.methodName());
+      mod._compiledMethods.delete(methodName);
 
       throw new ArgumentError(
         `${toSentence(nonKwargParameters.map(([, name]) => `\`${name}\``))} set as non-keyword ` +
