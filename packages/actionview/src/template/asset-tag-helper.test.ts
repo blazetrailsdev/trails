@@ -4,9 +4,20 @@ import { assertRaise } from "@blazetrails/activesupport";
 import {
   assetPath,
   computeAssetPath,
+  imagePath,
+  imageUrl,
+  javascriptPath,
+  javascriptUrl,
+  pathToImage,
+  pathToJavascript,
   publicComputeAssetPath,
   pathToStylesheet,
   stylesheetPath,
+  stylesheetUrl,
+  urlToImage,
+  urlToJavascript,
+  urlToStylesheet,
+  type AssetPathOptions,
   type AssetUrlHelperHost,
 } from "../helpers/asset-url-helper.js";
 import {
@@ -29,6 +40,89 @@ const host = {
 const assertDomEqual = (expected: string, actual: unknown): void => {
   expect(String(actual)).toEqual(expected);
 };
+
+type PathHelper = (this: AssetUrlHelperHost, source: string, options?: AssetPathOptions) => string;
+const table = (helper: PathHelper, rows: [string, string, AssetPathOptions?][]) =>
+  rows.map(([source, tag, options]): [() => string, string] => [
+    () => helper.call(host, source, options),
+    tag,
+  ]);
+const ex = "http://www.example.com";
+
+const AssetPathToTag = table(assetPath, [
+  ["", ""],
+  ["   ", ""],
+  ["foo", "/foo"],
+  ["style.css", "/style.css"],
+  ["xmlhr.js", "/xmlhr.js"],
+  ["xml.png", "/xml.png"],
+  ["dir/xml.png", "/dir/xml.png"],
+  ["/dir/xml.png", "/dir/xml.png"],
+  ["script.min", "/script.min"],
+  ["script.min.js", "/script.min.js"],
+  ["style.min", "/style.min"],
+  ["style.min.css", "/style.min.css"],
+  ["http://www.outside.com/image.jpg", "http://www.outside.com/image.jpg"],
+  ["HTTP://www.outside.com/image.jpg", "HTTP://www.outside.com/image.jpg"],
+  ["style", "/stylesheets/style.css", { type: "stylesheet" }],
+  ["xmlhr", "/javascripts/xmlhr.js", { type: "javascript" }],
+  ["xml.png", "/images/xml.png", { type: "image" }],
+]);
+
+const JavascriptPathToTag = table(javascriptPath, [
+  ["xmlhr", "/javascripts/xmlhr.js"],
+  ["super/xmlhr", "/javascripts/super/xmlhr.js"],
+  ["/super/xmlhr.js", "/super/xmlhr.js"],
+  ["xmlhr.min", "/javascripts/xmlhr.min.js"],
+  ["xmlhr.min.js", "/javascripts/xmlhr.min.js"],
+  ["xmlhr.js?123", "/javascripts/xmlhr.js?123"],
+  ["xmlhr.js?body=1", "/javascripts/xmlhr.js?body=1"],
+  ["xmlhr.js#hash", "/javascripts/xmlhr.js#hash"],
+  ["xmlhr.js?123#hash", "/javascripts/xmlhr.js?123#hash"],
+]);
+
+const javascripts: [string, string][] = [
+  ["xmlhr", "/javascripts/xmlhr.js"],
+  ["super/xmlhr", "/javascripts/super/xmlhr.js"],
+  ["/super/xmlhr.js", "/super/xmlhr.js"],
+];
+const PathToJavascriptToTag = table(pathToJavascript, javascripts);
+const JavascriptUrlToTag = table(
+  javascriptUrl,
+  javascripts.map(([s, t]) => [s, ex + t]),
+);
+const UrlToJavascriptToTag = table(
+  urlToJavascript,
+  javascripts.map(([s, t]) => [s, ex + t]),
+);
+
+const StyleUrlToTag = table(stylesheetUrl, [
+  ["bank", `${ex}/stylesheets/bank.css`],
+  ["bank.css", `${ex}/stylesheets/bank.css`],
+  ["subdir/subdir", `${ex}/stylesheets/subdir/subdir.css`],
+  ["/subdir/subdir.css", `${ex}/subdir/subdir.css`],
+]);
+
+const UrlToStyleToTag = table(urlToStylesheet, [
+  ["style", `${ex}/stylesheets/style.css`],
+  ["style.css", `${ex}/stylesheets/style.css`],
+  ["dir/file", `${ex}/stylesheets/dir/file.css`],
+  ["/dir/file.rcss", `${ex}/dir/file.rcss`, { extname: false }],
+  ["/dir/file", `${ex}/dir/file.rcss`, { extname: ".rcss" }],
+]);
+
+const media = (dir: string, ext: string): [string, string][] => [
+  ["xml", `/${dir}/xml`],
+  [`xml.${ext}`, `/${dir}/xml.${ext}`],
+  [`dir/xml.${ext}`, `/${dir}/dir/xml.${ext}`],
+  [`/dir/xml.${ext}`, `/dir/xml.${ext}`],
+];
+const urls = (rows: [string, string][]): [string, string][] => rows.map(([s, t]) => [s, ex + t]);
+
+const ImagePathToTag = table(imagePath, media("images", "png"));
+const PathToImageToTag = table(pathToImage, media("images", "png"));
+const ImageUrlToTag = table(imageUrl, urls(media("images", "png")));
+const UrlToImageToTag = table(urlToImage, urls(media("images", "png")));
 
 const StylePathToTag: [() => string, string][] = [
   [() => stylesheetPath.call(host, "bank"), "/stylesheets/bank.css"],
@@ -77,6 +171,10 @@ const StyleLinkToTag: [() => unknown, string][] = [
 ];
 
 describe("AssetTagHelperTest", () => {
+  it("asset path tag", () => {
+    AssetPathToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
+  });
+
   it("asset path tag raises an error for nil source", () => {
     let e!: Error;
     try {
@@ -101,6 +199,22 @@ describe("AssetTagHelperTest", () => {
     assertDomEqual("http://host/some/root/foo", assetPath.call(controller, "foo"));
   });
 
+  it("javascript path", () => {
+    JavascriptPathToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
+  });
+
+  it("path to javascript alias for javascript path", () => {
+    PathToJavascriptToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
+  });
+
+  it("javascript url", () => {
+    JavascriptUrlToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
+  });
+
+  it("url to javascript alias for javascript url", () => {
+    UrlToJavascriptToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
+  });
+
   it("stylesheet path", () => {
     StylePathToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
   });
@@ -109,8 +223,32 @@ describe("AssetTagHelperTest", () => {
     PathToStyleToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
   });
 
+  it("stylesheet url", () => {
+    StyleUrlToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
+  });
+
+  it("url to stylesheet alias for stylesheet url", () => {
+    UrlToStyleToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
+  });
+
   it("stylesheet link tag", () => {
     StyleLinkToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
+  });
+
+  it("image path", () => {
+    ImagePathToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
+  });
+
+  it("path to image alias for image path", () => {
+    PathToImageToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
+  });
+
+  it("image url", () => {
+    ImageUrlToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
+  });
+
+  it("url to image alias for image url", () => {
+    UrlToImageToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
   });
 
   it("image tag does not modify options", () => {

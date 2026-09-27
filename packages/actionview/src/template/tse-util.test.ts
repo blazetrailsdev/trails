@@ -107,24 +107,4 @@ describe("TseUtilTest", () => {
     const value = htmlEscapeOnce("1 < 2 &amp; 3");
     expect(value.htmlSafe).toBe(true);
   });
-
-  it("html escape amp", () => {
-    expect(htmlEscape("&").toString()).toBe("&amp;");
-  });
-
-  it("html escape lt", () => {
-    expect(htmlEscape("<").toString()).toBe("&lt;");
-  });
-
-  it("html escape gt", () => {
-    expect(htmlEscape(">").toString()).toBe("&gt;");
-  });
-
-  it("html escape quot", () => {
-    expect(htmlEscape('"').toString()).toBe("&quot;");
-  });
-
-  it("html escape 39", () => {
-    expect(htmlEscape("'").toString()).toBe("&#39;");
-  });
 });

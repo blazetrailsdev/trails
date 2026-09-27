@@ -90,6 +90,16 @@ export function assetPath(
 
 export const pathToAsset = assetPath;
 
+export function assetUrl(
+  this: AssetUrlHelperHost,
+  source: string | null | undefined,
+  options: AssetPathOptions = {},
+): string {
+  return pathToAsset.call(this, source, { ...options, protocol: ":request" });
+}
+
+export const urlToAsset = assetUrl;
+
 export function computeAssetExtname(source: string, options: AssetPathOptions = {}): string | null {
   if (options.extname === false) return null;
   const extname =
@@ -159,6 +169,26 @@ export function computeAssetHost(
   }
 }
 
+export function javascriptPath(
+  this: AssetUrlHelperHost,
+  source: string,
+  options: AssetPathOptions = {},
+): string {
+  return pathToAsset.call(this, source, { type: "javascript", ...options });
+}
+
+export const pathToJavascript = javascriptPath;
+
+export function javascriptUrl(
+  this: AssetUrlHelperHost,
+  source: string,
+  options: AssetPathOptions = {},
+): string {
+  return urlToAsset.call(this, source, { type: "javascript", ...options });
+}
+
+export const urlToJavascript = javascriptUrl;
+
 export function stylesheetPath(
   this: AssetUrlHelperHost,
   source: string,
@@ -169,6 +199,16 @@ export function stylesheetPath(
 
 export const pathToStylesheet = stylesheetPath;
 
+export function stylesheetUrl(
+  this: AssetUrlHelperHost,
+  source: string,
+  options: AssetPathOptions = {},
+): string {
+  return urlToAsset.call(this, source, { type: "stylesheet", ...options });
+}
+
+export const urlToStylesheet = stylesheetUrl;
+
 export function imagePath(
   this: AssetUrlHelperHost,
   source: string,
@@ -178,3 +218,13 @@ export function imagePath(
 }
 
 export const pathToImage = imagePath;
+
+export function imageUrl(
+  this: AssetUrlHelperHost,
+  source: string,
+  options: AssetPathOptions = {},
+): string {
+  return urlToAsset.call(this, source, { type: "image", ...options });
+}
+
+export const urlToImage = imageUrl;

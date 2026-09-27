@@ -1,4 +1,7 @@
-import { Notifications, type SafeBuffer } from "@blazetrails/activesupport";
+import { I18n, Notifications, type SafeBuffer } from "@blazetrails/activesupport";
+import { Fiber } from "@blazetrails/ruby-compat";
+import { StreamingBuffer } from "../buffers.js";
+import { StreamingFlow } from "../flows.js";
 import { ActionView } from "../namespaces.js";
 import { TemplateRenderer } from "./template-renderer.js";
 import type {
@@ -65,10 +68,7 @@ export class StreamingTemplateRenderer extends TemplateRenderer<
     return new Body((buffer) => this.delayedRender(buffer, template, layout, view, locals));
   }
 
-  /**
-   * @internal
-   * @missingRailsCall instrument — PERMANENT
-   */
+  /** @internal */
   private async delayedRender(
     buffer: Buffer,
     template: RenderableTemplate,
@@ -76,46 +76,42 @@ export class StreamingTemplateRenderer extends TemplateRenderer<
     view: ViewContext,
     locals: Record<string, unknown>,
   ): Promise<void> {
-    const sentinel = `\x00STREAM_YIELD_${Date.now()}_${Math.random()}\x00`;
-    const streamingContext: ViewContext = {
-      ...view,
-      _layoutFor: (name?: string) => (name ? (view._layoutFor?.(name) ?? "") : sentinel),
-    };
+    const output = new StreamingBuffer(buffer);
+    const yielder = (...name: unknown[]) => view._layoutFor!(...name);
 
-    const payload: Record<string, unknown> = {
-      identifier: template.identifier,
-      layout: layout && layout.virtualPath,
-      locals,
-    };
-    const handle = Notifications.buildHandle("render_template.action_view", payload);
-    handle.start();
+    await Notifications.instrument(
+      "render_template.action_view",
+      {
+        identifier: template.identifier,
+        layout: layout && layout.virtualPath,
+        locals,
+      },
+      async () => {
+        const outerConfig = I18n.config();
+        const fiber = new Fiber(async () => {
+          I18n.setConfig(outerConfig);
+          if (layout) {
+            await layout.render(view, locals, output, {}, yielder);
+          } else {
+            output.safeConcat(await view._layoutFor!());
+          }
+        });
 
-    try {
-      if (!layout) {
-        buffer((await template.render(view, locals)).toString());
-        return;
-      }
+        view.viewFlow = new StreamingFlow(
+          view as unknown as ConstructorParameters<typeof StreamingFlow>[0],
+          fiber,
+        );
 
-      const layoutBody = (await layout.render(streamingContext, locals)).toString();
-      const sentinelIdx = layoutBody.indexOf(sentinel);
+        await fiber.resume();
 
-      if (sentinelIdx === -1) {
-        buffer(layoutBody + (await template.render(view, locals)).toString());
-        return;
-      }
+        if (fiber.isAlive()) {
+          const content = await template.render(view, locals, null, {}, yielder);
 
-      buffer(layoutBody.slice(0, sentinelIdx));
-      buffer((await template.render(view, locals)).toString());
-      buffer(layoutBody.slice(sentinelIdx + sentinel.length));
-    } catch (e) {
-      payload.exception = [
-        e instanceof Error ? e.name : String(e),
-        e instanceof Error ? e.message : String(e),
-      ];
-      payload.exception_object = e;
-      throw e;
-    } finally {
-      handle.finish();
-    }
+          view.viewFlow.set("layout", content);
+
+          while (fiber.isAlive()) await fiber.resume();
+        }
+      },
+    );
   }
 }
