@@ -25,7 +25,7 @@ const linkTo = (label: string, _href: string): SafeBuffer => raw(`<a href="#">${
 
 describe("TextHelperTest", () => {
   it("simple format should be html safe", () => {
-    expect(simpleFormat("<b> test with HTML tags </b>").htmlSafe).toBe(true);
+    expect(simpleFormat("<b> test with HTML tags </b>").htmlSafe).toBeTruthy();
   });
 
   it("simple format", () => {
@@ -167,7 +167,7 @@ describe("TextHelperTest", () => {
   });
 
   it("truncate should be html safe", () => {
-    expect(truncate("Hello World!", { length: 12 })?.htmlSafe).toBe(true);
+    expect(truncate("Hello World!", { length: 12 })?.htmlSafe).toBeTruthy();
   });
 
   it("truncate should escape the input", () => {
@@ -185,7 +185,7 @@ describe("TextHelperTest", () => {
   it("truncate with escape false should be html safe", () => {
     expect(
       truncate("Hello <script>code!</script>World!!", { length: 12, escape: false })?.htmlSafe,
-    ).toBe(true);
+    ).toBeTruthy();
   });
 
   it("truncate with block should be html safe", () => {
@@ -194,7 +194,7 @@ describe("TextHelperTest", () => {
       { length: 27 },
       () => linkTo("Continue", "#"),
     );
-    expect(out?.htmlSafe).toBe(true);
+    expect(out?.htmlSafe).toBeTruthy();
   });
 
   it("truncate with block should escape the input", () => {
@@ -223,7 +223,7 @@ describe("TextHelperTest", () => {
       { length: 27, escape: false },
       () => linkTo("Continue", "#"),
     );
-    expect(out?.htmlSafe).toBe(true);
+    expect(out?.htmlSafe).toBeTruthy();
   });
 
   it("truncate with block should escape the block", () => {
@@ -293,7 +293,7 @@ describe("TextHelperTest", () => {
   });
 
   it("highlight should be html safe", () => {
-    expect(highlight("This is a beautiful morning", "beautiful").htmlSafe).toBe(true);
+    expect(highlight("This is a beautiful morning", "beautiful").htmlSafe).toBeTruthy();
   });
 
   it("highlight", () => {
