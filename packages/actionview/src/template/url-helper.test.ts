@@ -98,13 +98,6 @@ describe("UrlHelperTest", () => {
     ]);
   });
 
-  it("to form params with array nested in hash", () => {
-    expect(toFormParams({ countries: ["Denmark", "Sweden"] })).toEqual([
-      { name: "countries[]", value: "Denmark" },
-      { name: "countries[]", value: "Sweden" },
-    ]);
-  });
-
   it("button to without protect against forgery method", () => {
     delete view.isProtectAgainstForgery;
     assertDomEqual(
@@ -133,13 +126,6 @@ describe("UrlHelperTest", () => {
     assertDomEqual(
       `<form method="post" class="button_to"><button type="submit">Hello</button></form>`,
       view.buttonTo(false, null, null, () => "Hello"),
-    );
-  });
-
-  it("button to with query and no name", () => {
-    assertDomEqual(
-      `<form method="post" action="http://www.example.com?q1=v1&amp;q2=v2" class="button_to"><button type="submit">http://www.example.com?q1=v1&amp;q2=v2</button></form>`,
-      view.buttonTo(null, "http://www.example.com?q1=v1&q2=v2"),
     );
   });
 

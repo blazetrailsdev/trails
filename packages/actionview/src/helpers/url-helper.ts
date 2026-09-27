@@ -19,6 +19,7 @@ import {
   hashDelete,
   isSymbol,
   rbObjRespondTo,
+  rtest,
 } from "@blazetrails/ruby-compat";
 
 import { RoutingUrlFor } from "../routing-url-for.js";
@@ -116,9 +117,16 @@ export function linkTo(
   htmlOptions = convertOptionsToDataAttributes.call(this, options, htmlOptions);
 
   const url = urlTarget.call(this, name, options);
-  if (htmlOptions["href"] == null || htmlOptions["href"] === false) htmlOptions["href"] = url;
+  if (!rtest(htmlOptions["href"])) htmlOptions["href"] = url;
 
-  return contentTag.call(this as never, "a", name ?? url, htmlOptions, undefined, block);
+  return contentTag.call(
+    this as never,
+    "a",
+    rtest(name) ? name : url,
+    htmlOptions,
+    undefined,
+    block,
+  );
 }
 
 export function buttonTo(
@@ -148,12 +156,13 @@ export function buttonTo(
 
   const formMethod = method === "get" ? "get" : "post";
   const formOptions = (hashDelete(htmlOptions, "form") as HtmlOptions | undefined) ?? {};
-  if (formOptions["class"] == null || formOptions["class"] === false) {
-    formOptions["class"] = hashDelete(htmlOptions, "form_class") ?? "button_to";
+  if (!rtest(formOptions["class"])) {
+    const formClass = hashDelete(htmlOptions, "form_class");
+    formOptions["class"] = rtest(formClass) ? formClass : "button_to";
   }
   formOptions["method"] = formMethod;
   formOptions["action"] = url;
-  if (remote != null && remote !== false) formOptions["data-remote"] = true;
+  if (rtest(remote)) formOptions["data-remote"] = true;
 
   let requestTokenTag: SafeBuffer | string;
   if (formMethod === "post") {
@@ -172,14 +181,14 @@ export function buttonTo(
   if (block) {
     button = contentTag.call(this as never, "button", htmlOptions, undefined, undefined, block);
   } else if (buttonToGeneratesButtonTag) {
-    button = contentTag.call(this as never, "button", name ?? url, htmlOptions);
+    button = contentTag.call(this as never, "button", rtest(name) ? name : url, htmlOptions);
   } else {
-    htmlOptions["value"] = name ?? url;
+    htmlOptions["value"] = rtest(name) ? name : url;
     button = tag("input", htmlOptions) as SafeBuffer;
   }
 
   const innerTags = methodTagValue.safeConcat(button).safeConcat(requestTokenTag);
-  if (params != null && params !== false) {
+  if (rtest(params)) {
     for (const param of toFormParams(params)) {
       innerTags.safeConcat(
         tag("input", { type: "hidden", name: param.name, value: param.value, autocomplete: "off" }),
@@ -215,14 +224,7 @@ export function linkToUnless(
   htmlOptions: HtmlOptions | null = {},
   block?: Block,
 ): SafeBuffer | null {
-  return linkToIf.call(
-    this,
-    condition == null || condition === false,
-    name,
-    options,
-    htmlOptions,
-    block,
-  );
+  return linkToIf.call(this, !rtest(condition), name, options, htmlOptions, block);
 }
 
 export function linkToIf(
@@ -233,7 +235,7 @@ export function linkToIf(
   htmlOptions: HtmlOptions | null = {},
   block?: Block,
 ): SafeBuffer | null {
-  if (condition != null && condition !== false) {
+  if (rtest(condition)) {
     return linkTo.call(this, name, options, htmlOptions);
   } else {
     if (block) {
@@ -268,7 +270,14 @@ export function mailTo(
   const encodedEmailAddress = urlEncode(emailAddress).replaceAll("%40", "@");
   htmlOptions["href"] = `mailto:${encodedEmailAddress}${extras}`;
 
-  return contentTag.call(this as never, "a", name ?? emailAddress, htmlOptions, undefined, block);
+  return contentTag.call(
+    this as never,
+    "a",
+    rtest(name) ? name : emailAddress,
+    htmlOptions,
+    undefined,
+    block,
+  );
 }
 
 export function isCurrentPage(
@@ -291,7 +300,7 @@ export function isCurrentPage(
   if (!(request.isGet() || request.isHead())) return false;
 
   options ??= optionsAsKwargs;
-  if (checkParameters == null || checkParameters === false) {
+  if (!rtest(checkParameters)) {
     checkParameters =
       isPlainObject(options) && hashDelete(options as HtmlOptions, "checkParameters");
   }
@@ -299,9 +308,7 @@ export function isCurrentPage(
   let urlString = RFC2396_PARSER.unescape(this.urlFor(options));
 
   let requestUri =
-    urlString.includes("?") || (checkParameters != null && checkParameters !== false)
-      ? request.fullpath
-      : request.path;
+    urlString.includes("?") || rtest(checkParameters) ? request.fullpath : request.path;
   requestUri = RFC2396_PARSER.unescape(requestUri);
 
   if (/^\w+:\/\//.test(urlString)) {
@@ -333,7 +340,14 @@ export function smsTo(
   const encodedPhoneNumber = urlEncode(phoneNumber);
   htmlOptions["href"] = `sms:${countryCode}${encodedPhoneNumber};${body}`;
 
-  return contentTag.call(this as never, "a", name ?? phoneNumber, htmlOptions, undefined, block);
+  return contentTag.call(
+    this as never,
+    "a",
+    rtest(name) ? name : phoneNumber,
+    htmlOptions,
+    undefined,
+    block,
+  );
 }
 
 export function phoneTo(
@@ -352,7 +366,14 @@ export function phoneTo(
   const encodedPhoneNumber = urlEncode(phoneNumber);
   htmlOptions["href"] = `tel:${countryCode}${encodedPhoneNumber}`;
 
-  return contentTag.call(this as never, "a", name ?? phoneNumber, htmlOptions, undefined, block);
+  return contentTag.call(
+    this as never,
+    "a",
+    rtest(name) ? name : phoneNumber,
+    htmlOptions,
+    undefined,
+    block,
+  );
 }
 
 /** @internal */
@@ -361,15 +382,15 @@ export function convertOptionsToDataAttributes(
   options: unknown,
   htmlOptions: HtmlOptions | null,
 ): HtmlOptions {
-  if (htmlOptions != null) {
-    htmlOptions = stringifyKeys(htmlOptions);
+  if (rtest(htmlOptions)) {
+    htmlOptions = stringifyKeys(htmlOptions!);
     if (isLinkToRemoteOptions(options) || isLinkToRemoteOptions(htmlOptions)) {
       htmlOptions["data-remote"] = "true";
     }
 
     const method = hashDelete(htmlOptions, "method");
 
-    if (method != null && method !== false) addMethodToAttributesBang(htmlOptions, method);
+    if (rtest(method)) addMethodToAttributesBang(htmlOptions, method);
 
     return htmlOptions;
   } else {
@@ -432,7 +453,7 @@ const STRINGIFIED_COMMON_METHODS: Readonly<Record<string, string>> = Object.free
 
 /** @internal */
 export function isMethodNotGetMethod(method: unknown): boolean {
-  if (method == null || method === false) return false;
+  if (!rtest(method)) return false;
   return (STRINGIFIED_COMMON_METHODS[String(method)] ?? String(method).toLowerCase()) !== "get";
 }
 
@@ -484,7 +505,7 @@ export function toFormParams(
   const params: { name: string; value: unknown }[] = [];
   if (isPlainObject(attribute)) {
     for (const [key, value] of Object.entries(attribute)) {
-      const prefix = namespace != null ? `${namespace}[${key}]` : key;
+      const prefix = rtest(namespace) ? `${namespace}[${key}]` : key;
       params.push(...toFormParams(value, prefix));
     }
   } else if (Array.isArray(attribute)) {
