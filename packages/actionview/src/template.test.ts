@@ -242,6 +242,17 @@ describe("ActionView::Template (smoke)", () => {
       expect(out).toBe("<main><p>body</p></main>");
     });
 
+    it("yields a section to the template's block, as trails-tsc's virtualizer binds it", () => {
+      const view = new (Base.withEmptyTemplateCache())(null, {}, null);
+      view.viewFlow.set("layout", "body");
+      view.viewFlow.set("sidebar", "side");
+      view.viewFlow.set("footer", "foot");
+      const out = template(
+        '<main><%= yield %></main><%= yield "sidebar" %><%= yield("footer") %><%== yield %>',
+      ).render(view, {}, null, {}, (...name: unknown[]) => view._layoutFor(...(name as [string?])));
+      expect(out).toBe("<main>body</main>sidefootbody");
+    });
+
     it("round-trips a named contentFor section", () => {
       const out = render(
         '<% contentFor("side", () => { %>aside<% }) %><%= _layoutFor("side") %>',

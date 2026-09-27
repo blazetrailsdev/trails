@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { Base, Template, TseHandler } from "@blazetrails/actionview";
 import {
   createTsePlugin,
   TseLocalsSignatureError,
@@ -296,22 +295,6 @@ describe("virtualizeTse", () => {
       expect(out).toContain('_ob.append(context.yield("footer"));');
       expect(out).toContain("_ob.safeExprAppend(context.yield());");
       expect(diagnose(out)).toEqual([]);
-    });
-
-    it("renders a yield section through the template's block and type-checks the same source", () => {
-      const source = '<main><%= yield %></main><aside><%= yield "sidebar" %></aside>';
-      const template = new Template(source, "layouts/app", new TseHandler(), {
-        locals: [],
-        format: ":html",
-      });
-      const view = new (Base.withEmptyTemplateCache())(null, {}, null);
-      view.viewFlow.set("layout", "body");
-      view.viewFlow.set("sidebar", "side");
-      const out = template.render(view, {}, null, {}, (...name) =>
-        view._layoutFor(...(name as [string?])),
-      );
-      expect(String(out)).toBe("<main>body</main><aside>side</aside>");
-      expect(diagnose(virtualizeTse(source))).toEqual([]);
     });
 
     it("accepts context.concat and context.contentFor calls", () => {

@@ -11,13 +11,7 @@ class ImplicitRenderTestController extends Base {
   async emptyAction(): Promise<void> {}
   async helloWorld(): Promise<void> {}
   async variantWithImplicitTemplateRendering(): Promise<void> {}
-  async variantWithoutImplicitTemplateRendering(): Promise<void> {}
 }
-ImplicitRenderTestController.beforeAction((c) => {
-  const controller = c as ImplicitRenderTestController;
-  const v = controller.params.get("v");
-  if (typeof v === "string") controller.request.variant = `:${v}`;
-});
 
 function makeRequest(opts: Record<string, unknown> = {}): Request {
   return new Request({
@@ -68,28 +62,6 @@ describe("RespondToControllerTest", () => {
     ).rejects.toThrow(
       /is missing a template for this request format and variant\.\n\nrequest\.formats: \[/,
     );
-  });
-
-  it("variant with implicit template rendering", async () => {
-    const c = new ImplicitRenderTestController();
-    await c.dispatch(
-      "variantWithImplicitTemplateRendering",
-      makeRequest({ QUERY_STRING: "v=mobile" }),
-      new Response(),
-    );
-    expect(c.response.mediaType).toBe("text/html");
-    expect(c.responseBody).toBe("mobile");
-  });
-
-  it("variant without implicit rendering from browser", async () => {
-    const c = new ImplicitRenderTestController();
-    await expect(
-      c.dispatch(
-        "variantWithoutImplicitTemplateRendering",
-        makeRequest({ QUERY_STRING: "v=does_not_matter" }),
-        new Response(),
-      ),
-    ).rejects.toBeInstanceOf(MissingExactTemplate);
   });
 });
 

@@ -1,8 +1,55 @@
-import { describe, it, expect } from "vitest";
+import { beforeAll, describe, it, expect } from "vitest";
+import { FixtureResolver } from "@blazetrails/actionview";
 import { respondTo, Collector } from "../../../action-dispatch/respond-to.js";
-import { UnknownFormat } from "../../metal/exceptions.js";
+import { Request } from "../../../action-dispatch/http/request.js";
+import { Response } from "../../../action-dispatch/http/response.js";
+import { Base } from "../../base.js";
+import { MissingExactTemplate, UnknownFormat } from "../../metal/exceptions.js";
+
+class RespondToController extends Base {
+  async variantWithImplicitTemplateRendering(): Promise<void> {}
+  async variantWithoutImplicitTemplateRendering(): Promise<void> {}
+}
+RespondToController.beforeAction((c) => {
+  const controller = c as RespondToController;
+  const v = controller.params.get("v");
+  if (typeof v === "string") controller.request.variant = `:${v}`;
+});
+
+async function get(action: string, v: string): Promise<RespondToController> {
+  const controller = new RespondToController();
+  const request = new Request({
+    REQUEST_METHOD: "GET",
+    PATH_INFO: "/",
+    HTTP_HOST: "localhost",
+    QUERY_STRING: `v=${v}`,
+  });
+  await controller.dispatch(action, request, new Response());
+  return controller;
+}
+
+beforeAll(() => {
+  RespondToController.prependViewPath(
+    new FixtureResolver({
+      "respond_to/variantWithImplicitTemplateRendering.html+mobile.tse": "mobile",
+    }),
+  );
+  RespondToController.layout(false);
+});
 
 describe("RespondToControllerTest", () => {
+  it("variant with implicit template rendering", async () => {
+    const controller = await get("variantWithImplicitTemplateRendering", "mobile");
+    expect(controller.response.mediaType).toBe("text/html");
+    expect(controller.responseBody).toBe("mobile");
+  });
+
+  it("variant without implicit rendering from browser", async () => {
+    await expect(
+      get("variantWithoutImplicitTemplateRendering", "does_not_matter"),
+    ).rejects.toBeInstanceOf(MissingExactTemplate);
+  });
+
   it("html", () => {
     const result = respondTo(
       (format) => {
