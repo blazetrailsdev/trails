@@ -4,7 +4,7 @@ export class ContextualCallbacksDeveloper extends Base {
   declare name: string;
   declare salary: number;
 
-  history: string[] = [];
+  declare _history: string[];
 
   static {
     this.tableName = "developers";
@@ -34,5 +34,9 @@ export class ContextualCallbacksDeveloper extends Base {
       },
       { on: ["create", "update"] },
     );
+  }
+
+  get history(): string[] {
+    return (this._history ??= []);
   }
 }

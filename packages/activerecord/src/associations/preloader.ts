@@ -1,8 +1,11 @@
 import type { Base } from "../base.js";
 import type { Relation } from "../relation.js";
-import type { Association } from "./preloader/association.js";
+import { Autoload, extend, type Extended } from "@blazetrails/activesupport";
+import { Associations } from "../namespaces.js";
+import { Association } from "./preloader/association.js";
 import { Branch } from "./preloader/branch.js";
 import { Batch } from "./preloader/batch.js";
+import { ThroughAssociation } from "./preloader/through-association.js";
 
 export interface PreloaderOptions {
   records: Base[] | Relation<Base>;
@@ -82,3 +85,42 @@ export class Preloader {
     return loaders;
   }
 }
+
+// eslint-disable-next-line @typescript-eslint/no-namespace
+export declare namespace Preloader {
+  const loadPath: Autoload.Autoload["loadPath"];
+  let Association: typeof import("./preloader/association.js").Association;
+  let Batch: typeof import("./preloader/batch.js").Batch;
+  let Branch: typeof import("./preloader/branch.js").Branch;
+  let ThroughAssociation: typeof import("./preloader/through-association.js").ThroughAssociation;
+  const autoload: Extended<typeof Autoload>["autoload"];
+  const eagerAutoload: Extended<typeof Autoload>["eagerAutoload"];
+  const eagerLoadBang: Extended<typeof Autoload>["eagerLoadBang"];
+}
+Object.defineProperty(Preloader, "name", { value: "ActiveRecord::Associations::Preloader" });
+Object.assign(Preloader, {
+  loadPath: {
+    "active_record/associations/preloader/association": () => import("./preloader/association.js"),
+    "active_record/associations/preloader/batch": () => import("./preloader/batch.js"),
+    "active_record/associations/preloader/branch": () => import("./preloader/branch.js"),
+    "active_record/associations/preloader/through_association": () =>
+      import("./preloader/through-association.js"),
+  },
+});
+extend(Preloader, Autoload);
+
+Preloader.eagerAutoload(() => {
+  Preloader.autoload("Association", "active_record/associations/preloader/association");
+  Preloader.autoload("Batch", "active_record/associations/preloader/batch");
+  Preloader.autoload("Branch", "active_record/associations/preloader/branch");
+  Preloader.autoload(
+    "ThroughAssociation",
+    "active_record/associations/preloader/through_association",
+  );
+});
+Preloader.Association = Association;
+Preloader.Batch = Batch;
+Preloader.Branch = Branch;
+Preloader.ThroughAssociation = ThroughAssociation;
+
+Associations.Preloader = Preloader;

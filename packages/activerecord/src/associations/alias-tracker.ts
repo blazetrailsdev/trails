@@ -2,6 +2,7 @@ import { ArgumentError } from "@blazetrails/activesupport";
 import { Table, Nodes } from "@blazetrails/arel";
 import { maxIdentifierLength } from "../connection-adapters/abstract/database-limits.js";
 import type { Quoting } from "../connection-adapters/abstract/quoting.js";
+import { Associations } from "../namespaces.js";
 
 const DEFAULT_TABLE_ALIAS_LENGTH = maxIdentifierLength();
 
@@ -153,3 +154,5 @@ export class AliasTracker {
     return name.slice(0, this._tableAliasLength - 2);
   }
 }
+
+Associations.AliasTracker = AliasTracker;

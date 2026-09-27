@@ -638,12 +638,10 @@ export function associationInstanceSet(this: Base, name: string, association: un
 }
 
 Object.defineProperty(AssociationsNamespace, "eagerLoadBang", {
-  /**
-   * @missingRailsCall Preloader.eager_load! — CONVERGEABLE preloader-and-join-dependency-are-not-autoload-namespaces
-   * @missingRailsCall JoinDependency.eager_load! — CONVERGEABLE preloader-and-join-dependency-are-not-autoload-namespaces
-   */
   value: async function eagerLoadBang(this: typeof AssociationsNamespace): Promise<void> {
     await Autoload.eagerLoadBang.call(this);
+    await this.Preloader.eagerLoadBang();
+    await this.JoinDependency.eagerLoadBang();
   },
   writable: true,
   configurable: true,

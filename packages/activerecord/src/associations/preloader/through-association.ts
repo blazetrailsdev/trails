@@ -2,7 +2,7 @@ import type { Nodes } from "@blazetrails/arel";
 import type { Base } from "../../base.js";
 import type { AssociationReflection, ThroughReflection } from "../../reflection.js";
 import { Association } from "./association.js";
-import { Preloader } from "../preloader.js";
+import { Associations } from "../../namespaces.js";
 import { WhereClause } from "../../relation/where-clause.js";
 import { pluralize, singularize } from "@blazetrails/activesupport";
 
@@ -161,7 +161,7 @@ export class ThroughAssociation extends Association {
       return [];
     }
 
-    const preloader = Preloader.new({
+    const preloader = Associations.Preloader.new({
       records: middleRecords,
       associations: [sourceRefl.name],
       scope: this.scope,
@@ -180,7 +180,7 @@ export class ThroughAssociation extends Association {
       return this._throughPreloaders;
     }
 
-    const preloader = Preloader.new({
+    const preloader = Associations.Preloader.new({
       records: this.owners,
       associations: [throughRefl.name],
       scope: this.throughScope(),

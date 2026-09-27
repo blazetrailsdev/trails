@@ -137,7 +137,7 @@ export class Firm extends Company {
   declare developersWithSelect: AssociationProxy<Developer>;
   declare projects: AssociationProxy<Project>;
 
-  _log: string[] = [];
+  declare _log: string[];
   declare clients: CollectionProxy<Client>;
 
   static {
