@@ -322,7 +322,7 @@ export class Base {
     }
   }
 
-  inRenderingContext<T>(options: RenderOptions, block: (renderer: LookupContext) => T): T {
+  inRenderingContext<T>(options: RenderOptions, block: (renderer: Renderer) => T): T {
     const oldViewRenderer = this._viewRenderer;
     const oldLookupContext = this._lookupContext;
 
@@ -336,7 +336,7 @@ export class Base {
     }
 
     try {
-      return block(this._lookupContext!);
+      return block(this._viewRenderer);
     } finally {
       this._viewRenderer = oldViewRenderer;
       this._lookupContext = oldLookupContext;

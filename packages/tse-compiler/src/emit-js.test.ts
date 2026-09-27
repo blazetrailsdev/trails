@@ -23,6 +23,14 @@ describe("compileJs", () => {
     expect(lines[3]).toContain('_ob.safeAppend("last\\n");');
   });
 
+  it("keeps a tag body's newline-crossing whitespace on the template's lines", () => {
+    const { code } = compileJs("<%=\n  boom()\n%>after\n");
+    const lines = code.split("\n");
+    expect(lines[0]).toMatch(/_ob\.append\($/);
+    expect(lines[1]).toBe("  boom()");
+    expect(lines[2]).toContain('); _ob.safeAppend("after\\n");');
+  });
+
   it("dispatches expression sites by escape mode and indicator", () => {
     expect(compileJs("<%= n %>").code).toContain("_ob.append( n );");
     expect(compileJs("<%= n %>", { escapeIgnore: true }).code).toContain(
@@ -56,9 +64,9 @@ describe("compileJs", () => {
     expect(code).toBe(
       [
         "export default function render(context, locals) { const _ob = context.outputBuffer;" +
-          " _ob.append(forEach(items, (item) => context.capture(() => {" +
+          " _ob.append( forEach(items, (item) => { return context.capture(() => {" +
           ' context.outputBuffer.safeAppend("<li>"); context.outputBuffer.append( item );' +
-          ' context.outputBuffer.safeAppend("</li>"); })));',
+          ' context.outputBuffer.safeAppend("</li>"); }); }) );',
         "return _ob;",
         "}",
         "",
@@ -69,33 +77,33 @@ describe("compileJs", () => {
   it("handles nested block expressions", () => {
     const src = "<%= outer((x) => { %><%= inner((y) => { %><% }) %><% }) %>";
     const { code } = compileJs(src);
-    expect(code).toContain("_ob.append(outer((x) =>");
-    expect(code).toContain("context.outputBuffer.append(inner((y) =>");
-    expect(code.split(" })));")).toHaveLength(3);
+    expect(code).toContain("_ob.append( outer((x) =>");
+    expect(code).toContain("context.outputBuffer.append( inner((y) =>");
+    expect(code.split("}); }) );")).toHaveLength(3);
   });
 
   it("does not close blockExpr on inner code braces", () => {
     const src = "<%= forEach(items, (item) => { %><% if (x) { %><%= item %><% } %><% }) %>";
     const { code } = compileJs(src);
-    expect(code).toContain("_ob.append(forEach(items, (item) =>");
+    expect(code).toContain("_ob.append( forEach(items, (item) =>");
     expect(code).toContain("if (x) {");
-    expect(code.split(" })));")).toHaveLength(2);
+    expect(code.split("}); }) );")).toHaveLength(2);
   });
 
   it("tracks } else { as net-zero brace delta so the blockExpr closer is recognised", () => {
     const src =
       "<%= forEach(items, (item) => { %><% if (x) { %><%= item %><% } else { %><%= other %><% } %><% }) %>";
     const { code } = compileJs(src);
-    expect(code).toContain("_ob.append(forEach(items, (item) =>");
-    expect(code.split(" })));")).toHaveLength(2);
+    expect(code).toContain("_ob.append( forEach(items, (item) =>");
+    expect(code.split("}); }) );")).toHaveLength(2);
   });
 
   it("closes correctly when the blockExpr has no wrapping helper call (zero callExpr parens)", () => {
     const src = "<%= (x) => { %><span><%= x %></span><% } %>";
     const { code } = compileJs(src);
-    expect(code).toContain("_ob.append((x) =>");
+    expect(code).toContain("_ob.append( (x) =>");
     expect(code).toContain("context.capture(() => {");
-    expect(code).toContain(" }));");
+    expect(code).toContain("}); } );");
   });
 
   it("throws a clear error for function-form blockExpr (arrow syntax required)", () => {
@@ -113,8 +121,8 @@ describe("compileJs", () => {
   it("respects escapeIgnore for block-expr", () => {
     const src = "<%= fn((x) => { %><% }) %>";
     const { code } = compileJs(src, { escapeIgnore: true });
-    expect(code).toContain("_ob.safeExprAppend(fn((x) =>");
-    expect(code).toContain("})));");
+    expect(code).toContain("_ob.safeExprAppend( fn((x) =>");
+    expect(code).toContain("}); }) );");
   });
 
   describe("strict locals", () => {
