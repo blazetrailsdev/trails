@@ -448,7 +448,9 @@ function _applyScopeAttributes(
   const attrs = scopeAttributes.call(ctor as any);
   if (!attrs || Object.keys(attrs).length === 0) return;
   const toApply: Record<string, unknown> = Object.create(null);
+  const cold = !ModelSchema.isSchemaLoaded.call(ctor as never);
   for (const [k, v] of Object.entries(attrs)) {
+    if (cold && !ctor.hasAttribute(k)) continue;
     if (!explicitKeys.has(k)) {
       toApply[k] = v;
     }

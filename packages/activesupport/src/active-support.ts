@@ -1,5 +1,14 @@
 import { deprecator } from "./deprecator.js";
 import { preserveTimezone, setPreserveTimezone } from "./core-ext/date-and-time/compatibility.js";
+import { formatVersion, setFormatVersion } from "./cache/store.js";
+
+export function cacheFormatVersion(): number {
+  return formatVersion();
+}
+
+export function setCacheFormatVersion(value: number): void {
+  setFormatVersion(value);
+}
 
 export function toTimePreservesTimezone(): boolean | string {
   return preserveTimezone();

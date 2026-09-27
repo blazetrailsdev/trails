@@ -552,6 +552,7 @@ function applyColumnsHash(host: SchemaHost, hash: Record<string, unknown>): void
     _cachedAttributeTypes?: unknown;
     _columnsHash?: unknown;
     _columns?: unknown;
+    _attributeNamesMemo?: unknown;
   };
   const bag = host as CacheBag;
   bag._attributesBuilder = undefined;
@@ -559,6 +560,7 @@ function applyColumnsHash(host: SchemaHost, hash: Record<string, unknown>): void
   bag._cachedDefaultAttributes = null;
   bag._cachedAttributeTypes = null;
   bag._columns = undefined;
+  bag._attributeNamesMemo = undefined;
   host._columnsHash = filteredHash;
 
   const methodHost = host as unknown as {

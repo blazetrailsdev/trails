@@ -184,7 +184,7 @@ export class Application extends Engine {
 
   /** @internal */
   async ensureGeneratorTemplatesAdded(): Promise<void> {
-    const configuredPaths = this.config.generators().templates as string[];
+    const configuredPaths = this.config.generators().templates;
     const libTemplates = (await this.paths()).get("lib/templates");
     const existent = libTemplates ? await libTemplates.existent() : [];
     configuredPaths.unshift(...existent.filter((p) => !configuredPaths.includes(p)));

@@ -1,6 +1,6 @@
 import { dasherize, underscore } from "@blazetrails/activesupport";
 import { Dir, File, LoadError, getPath, regexpEscape } from "@blazetrails/ruby-compat";
-import { GeneratorBase, type GeneratorOptions } from "./generators/base.js";
+import type { GeneratorBase, GeneratorOptions } from "./generators/base.js";
 
 export type GeneratorClass = Omit<typeof GeneratorBase, "prototype" | "start"> & {
   readonly prototype: GeneratorBase;
@@ -23,6 +23,8 @@ let _subclasses: GeneratorClass[] | undefined;
 let _hiddenNamespaces: string[] | undefined;
 let _commandType: string | undefined;
 let _lookupPaths: URL[] | undefined;
+let _aliases: Record<string, Record<string, unknown>> | undefined;
+let _options: Record<string, Record<string, unknown>> | undefined;
 
 const EXTENSION = /\.[cm]?[tj]s$/.exec(import.meta.url)![0];
 
@@ -32,8 +34,50 @@ function urlToPath(url: URL): string {
 }
 
 export class Generators {
+  static readonly DEFAULT_ALIASES: Record<string, Record<string, unknown>> = {
+    rails: {
+      actions: "-a",
+      orm: "-o",
+      javascripts: ["-j", "--js"],
+      resourceController: "-c",
+      scaffoldController: "-c",
+      stylesheets: "-y",
+      templateEngine: "-e",
+      testFramework: "-t",
+    },
+
+    test_unit: {
+      fixtureReplacement: "-r",
+    },
+  };
+
+  static readonly DEFAULT_OPTIONS: Record<string, Record<string, unknown>> = {
+    rails: {
+      api: false,
+      assets: true,
+      forcePlural: false,
+      helper: true,
+      integrationTool: null,
+      orm: false,
+      resourceController: "controller",
+      resourceRoute: true,
+      scaffoldController: "scaffold_controller",
+      systemTests: null,
+      testFramework: null,
+      templateEngine: "tse",
+    },
+  };
+
   private constructor() {
     throw new Error("Generators is a static-only namespace; do not instantiate.");
+  }
+
+  static aliases(): Record<string, Record<string, unknown>> {
+    return (_aliases ??= { ...Generators.DEFAULT_ALIASES });
+  }
+
+  static options(): Record<string, Record<string, unknown>> {
+    return (_options ??= { ...Generators.DEFAULT_OPTIONS });
   }
 
   static subclasses(): readonly GeneratorClass[] {
@@ -216,6 +260,7 @@ export class Generators {
 
 async function requireGenerator(base: URL, path: string): Promise<void> {
   if (!File.isExist(path)) throw new LoadError(`cannot load such file -- ${path}`);
+  const { GeneratorBase } = await import("./generators/base.js");
   const mod = (await import(getPath().pathToFileURL!(path).href)) as Record<string, unknown>;
   const namespace = getPath()
     .dirname(path.slice(urlToPath(base).length))
