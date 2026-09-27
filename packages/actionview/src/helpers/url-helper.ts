@@ -18,6 +18,7 @@ import {
   URI,
   hashDelete,
   isSymbol,
+  rbObjAsString,
   rbObjRespondTo,
   rtest,
 } from "@blazetrails/ruby-compat";
@@ -112,7 +113,7 @@ export function linkTo(
   block?: Block,
 ): SafeBuffer {
   if (block) [htmlOptions, options, name] = [options as HtmlOptions | null, name, block];
-  options ??= {};
+  if (!rtest(options)) options = {};
 
   htmlOptions = convertOptionsToDataAttributes.call(this, options, htmlOptions);
 
@@ -137,8 +138,8 @@ export function buttonTo(
   block?: Block,
 ): SafeBuffer {
   if (block) [htmlOptions, options] = [options as HtmlOptions | null, name];
-  htmlOptions ??= {};
-  htmlOptions = stringifyKeys(htmlOptions);
+  if (!rtest(htmlOptions)) htmlOptions = {};
+  htmlOptions = stringifyKeys(htmlOptions!);
 
   const url = options === false ? null : this.urlFor(options);
 
@@ -147,9 +148,8 @@ export function buttonTo(
 
   const authenticityToken = hashDelete(htmlOptions, "authenticity_token");
 
-  const method = String(
-    presence(hashDelete(htmlOptions, "method")) ?? methodForOptions(options) ?? "",
-  );
+  const methodOption = presence(hashDelete(htmlOptions, "method"));
+  const method = rbObjAsString(rtest(methodOption) ? methodOption : methodForOptions(options));
   const methodTagValue = BUTTON_TAG_METHOD_VERBS.includes(method)
     ? methodTag(method)
     : htmlSafe("");
@@ -299,7 +299,7 @@ export function isCurrentPage(
 
   if (!(request.isGet() || request.isHead())) return false;
 
-  options ??= optionsAsKwargs;
+  if (!rtest(options)) options = optionsAsKwargs;
   if (!rtest(checkParameters)) {
     checkParameters =
       isPlainObject(options) && hashDelete(options as HtmlOptions, "checkParameters");
