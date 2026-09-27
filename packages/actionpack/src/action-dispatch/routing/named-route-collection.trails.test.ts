@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { RouteSet, type NamedRouteHelper, type UrlHelperContext } from "./route-set.js";
+import {
+  NamedRouteCollection,
+  RouteSet,
+  type NamedRouteHelper,
+  type UrlHelperContext,
+} from "./route-set.js";
 
 function drawn(): RouteSet {
   const routeSet = new RouteSet();
@@ -65,7 +70,10 @@ describe("NamedRouteCollection", () => {
     expect(named.helperNames()).toContain("profilePath");
     expect(named.helperNames()).toContain("profileUrl");
 
-    const context = { _routes: routeSet } as unknown as UrlHelperContext;
+    const context = {
+      _routes: routeSet,
+      fullUrlFor: (options: string) => routeSet.fullUrlFor(options),
+    } as unknown as UrlHelperContext;
     expect(
       (named.pathHelpersModule.instanceMethod("profilePath")!.value as NamedRouteHelper).call(
         context,
@@ -89,5 +97,24 @@ describe("NamedRouteCollection", () => {
     expect(routeSet.urlHelpers()).toBe(helpers);
     expect(helpers["postsPath"]()).toBe("/posts");
     expect(helpers["postsUrl"]).toBeTypeOf("function");
+  });
+
+  it("each yields every name with its route and returns the collection", () => {
+    const named = drawn().namedRoutes;
+    const seen: [string, string][] = [];
+    expect(named.each((name, route) => seen.push([name, route.path.spec.toString()]))).toBe(named);
+    expect(seen).toEqual([
+      ["posts", "/posts(.:format)"],
+      ["post", "/posts/:id(.:format)"],
+    ]);
+  });
+
+  it("nests OptimizedUrlHelper in UrlHelper in NamedRouteCollection", () => {
+    const { UrlHelper } = NamedRouteCollection;
+    const route = drawn().namedRoutes.get("post")!;
+    const helper = UrlHelper.create(route, route.defaults, "post");
+    expect(helper).toBeInstanceOf(UrlHelper.OptimizedUrlHelper);
+    expect(helper).toBeInstanceOf(UrlHelper);
+    expect(helper.routeName).toBe("post");
   });
 });
