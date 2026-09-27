@@ -354,10 +354,10 @@ export class Base {
 
 /** @noRailsEquivalent CONVERGEABLE template-render-returns-output-buffer-to-s */
 function renderedBody(
-  body: string | null | Promise<string | null>,
+  body: string | SafeBuffer | null | Promise<string | SafeBuffer | null>,
 ): SafeBuffer | Promise<SafeBuffer> {
-  if (typeof (body as Promise<string | null> | null)?.then === "function") {
-    return (body as Promise<string | null>).then((b) => htmlSafe(String(b ?? "")));
+  if (typeof (body as Promise<string | SafeBuffer | null> | null)?.then === "function") {
+    return (body as Promise<string | SafeBuffer | null>).then((b) => htmlSafe(String(b ?? "")));
   }
   return htmlSafe(String(body ?? ""));
 }
