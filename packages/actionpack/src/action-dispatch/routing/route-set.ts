@@ -11,6 +11,7 @@ import {
   RFC2396_PARSER,
 } from "@blazetrails/ruby-compat";
 import { Mapper } from "./mapper.js";
+import { deprecator } from "../deprecator.js";
 import { journeyRecognize as recognizeViaJourney, type JourneyMatch } from "./journey-bridge.js";
 import {
   Router as JourneyRouter,
@@ -931,6 +932,19 @@ export class RouteSet {
     }
     const route = this.set.addRoute(name || null, mapping);
     if (name) this.namedRoutes.add(name, route);
+
+    if (route.segmentKeys.includes("controller")) {
+      deprecator().warn(
+        "Using a dynamic :controller segment in a route is deprecated and will be removed in Rails 8.1.",
+      );
+    }
+
+    if (route.segmentKeys.includes("action")) {
+      deprecator().warn(
+        "Using a dynamic :action segment in a route is deprecated and will be removed in Rails 8.1.",
+      );
+    }
+
     this.formatter.clear();
     return route;
   }

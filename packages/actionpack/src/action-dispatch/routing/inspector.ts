@@ -127,7 +127,7 @@ export class RouteWrapper {
 
   /** @internal */
   get sourceLocation(): string | undefined {
-    return undefined;
+    return this.route.sourceLocation ?? undefined;
   }
 }
 

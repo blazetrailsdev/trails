@@ -6,6 +6,8 @@ import { controllerConstants, type Request } from "../http/request.js";
 import type { DispatchableControllerClass } from "../routing/dispatcher.js";
 import { escapeSegment, unescapeUri } from "../journey/router/utils.js";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { assertDeprecated } from "@blazetrails/activesupport";
+import { deprecator } from "../deprecator.js";
 import { IntegrationTest } from "../testing/integration.js";
 import { UrlGenerationError } from "../../action-controller/metal/exceptions.js";
 
@@ -463,15 +465,12 @@ describe("TestRoutingMapper", () => {
     expect(routes.pathFor({}, "me")).toBe("/api/me");
   });
 
-  it("dynamic controller segments are deprecated", () => {
-    const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/:controller/:action");
+  it("dynamic controller segments are deprecated", async () => {
+    await assertDeprecated(deprecator(), () => {
+      new RouteSet().draw((r) => {
+        r.get("/:controller", { action: "index" });
+      });
     });
-    const m = routes.recognize("GET", "/foo/bar");
-    expect(m).not.toBeNull();
-    expect(m!.params.controller).toBe("foo");
-    expect(m!.params.action).toBe("bar");
   });
 
   it("nested resources with constraints", () => {
@@ -1812,7 +1811,13 @@ describe("TestRoutingMapper", () => {
   it.skip("mix string to controller", () => {});
   it.skip("mix string to action", () => {});
   it.skip("head fetch with mount on root", () => {});
-  it.skip("dynamic action segments are deprecated", () => {});
+  it("dynamic action segments are deprecated", async () => {
+    await assertDeprecated(deprecator(), () => {
+      new RouteSet().draw((r) => {
+        r.get("/pages/:action", { controller: "pages" });
+      });
+    });
+  });
   it.skip("routes with double colon", () => {});
 });
 
