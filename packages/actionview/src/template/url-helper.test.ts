@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Base } from "../base.js";
 import { setPrependContentExfiltrationPrevention } from "../helpers/content-exfiltration-prevention-helper.js";
-import { setButtonToGeneratesButtonTag, toFormParams } from "../helpers/url-helper.js";
+import * as UrlHelper from "../helpers/url-helper.js";
 
 function viewWith(controller: unknown): Base {
   return Base.withViewPaths([], {}, controller);
@@ -64,12 +64,12 @@ describe("UrlHelperTest", () => {
       formAuthenticityToken: { value: () => "secret" },
       requestForgeryProtectionToken: { value: "form_token" },
     });
-    setButtonToGeneratesButtonTag(true);
+    UrlHelper.setButtonToGeneratesButtonTag(true);
   });
 
   afterEach(() => {
     requestForgery = false;
-    setButtonToGeneratesButtonTag(false);
+    UrlHelper.setButtonToGeneratesButtonTag(true);
   });
 
   const requestForUrl = (url: string, { method = "get" } = {}) => ({
@@ -82,7 +82,7 @@ describe("UrlHelperTest", () => {
   });
 
   it("to form params with hash", () => {
-    expect(toFormParams({ name: "David", nationality: "Danish" })).toEqual([
+    expect(UrlHelper.toFormParams({ name: "David", nationality: "Danish" })).toEqual([
       { name: "name", value: "David" },
       { name: "nationality", value: "Danish" },
     ]);
@@ -156,11 +156,16 @@ describe("UrlHelperTest", () => {
   });
 
   it("button to generates input when button to generates button tag false", () => {
-    setButtonToGeneratesButtonTag(false);
-    assertDomEqual(
-      `<form method="post" action="http://www.example.com" class="button_to"><input type="submit" value="Save"/></form>`,
-      view.buttonTo("Save", "http://www.example.com"),
-    );
+    const oldValue = UrlHelper.buttonToGeneratesButtonTag;
+    UrlHelper.setButtonToGeneratesButtonTag(false);
+    try {
+      assertDomEqual(
+        `<form method="post" action="http://www.example.com" class="button_to"><input type="submit" value="Save"/></form>`,
+        view.buttonTo("Save", "http://www.example.com"),
+      );
+    } finally {
+      UrlHelper.setButtonToGeneratesButtonTag(oldValue);
+    }
   });
 
   it("link tag with query and no name", () => {
