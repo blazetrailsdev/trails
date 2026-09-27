@@ -147,7 +147,8 @@ as convergence classes.
   Always use `scripts/start-worktree.sh` to start a worktree.
 - **The Rails source of truth is vendored at `vendor/rails/`** (populated in
   every worktree by `start-worktree.sh`; refresh with `pnpm vendor:fetch` from
-  the main worktree). Before porting or fixing anything, read the
+  the main worktree; bumping a `ref` follows the procedure in
+  [vendor/README.md § "Upgrading a source"](vendor/README.md#upgrading-a-source-bumping-ref)). Before porting or fixing anything, read the
   corresponding Rails code and test there — e.g.
   `vendor/rails/v8.0.2/activerecord/lib/active_record/...` and
   `vendor/rails/v8.0.2/activerecord/test/cases/...`. The canonical test schema is
@@ -167,7 +168,9 @@ as convergence classes.
 - A `vendor/<source>/…` citation names the version it was verified against
   (`vendor/rails/v8.0.2/…`, not `vendor/rails/…`); `pnpm vendor:recite`
   rewrites unversioned or stale citations to each source's active version, and
-  `scripts/vendor-citations.test.ts` fails CI on any citation it would rewrite.
+  `scripts/vendor-citations.test.ts` fails CI on any citation it would rewrite
+  (`ruby-compat-needs-mri-citation` additionally resolves each
+  `vendor/ruby/<version>/<file>:<line>` against the tree).
 - Two reference tables answer "what do I call this?" without guessing, and both
   are CI-verified current:
   **[docs/ruby-ts-conventions.md](docs/ruby-ts-conventions.md)** for the

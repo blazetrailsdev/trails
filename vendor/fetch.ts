@@ -107,7 +107,7 @@ export async function fetchSource(
   opts: { refresh: boolean; offline?: boolean; lockEntry?: LockEntry; dest?: string },
 ): Promise<LockEntry> {
   const dest = opts.dest ?? destFor(source);
-  const lockEntry = opts.lockEntry;
+  const lockEntry = opts.lockEntry?.ref === source.origin.ref ? opts.lockEntry : undefined;
 
   if (opts.refresh && (await exists(dest))) {
     console.log(`[${source.name}] --refresh: removing ${dest}`);
