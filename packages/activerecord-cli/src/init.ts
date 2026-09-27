@@ -43,7 +43,7 @@ let connected = false;
  */
 export async function connect(): Promise<void> {
   if (connected) return;
-  await loadDatabaseConfig(decodeURIComponent(new URL(".", import.meta.url).pathname));
+  await loadDatabaseConfig(import.meta.dirname);
   await Base.establishConnection();
   await Promise.all(models.map((m) => m.loadSchema()));
   connected = true;

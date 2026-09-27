@@ -4,4 +4,4 @@ import "../../../all.js";
 
 export class BootApp extends Application {}
 
-Application.register(BootApp, import.meta.url);
+Application.register(BootApp, import.meta.dirname);

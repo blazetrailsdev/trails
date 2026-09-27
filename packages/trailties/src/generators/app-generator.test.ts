@@ -371,7 +371,7 @@ describe("AppGenerator", () => {
     const appConfig = fs.readFileSync(appPath("config/application.ts"), "utf-8");
     expect(appConfig).toContain(`import { Application } from "@blazetrails/trailties";`);
     expect(appConfig).toContain("export class MyApp extends Application {");
-    expect(appConfig).toContain("Application.register(MyApp, import.meta.url);");
+    expect(appConfig).toContain("Application.register(MyApp, import.meta.dirname);");
 
     const environment = fs.readFileSync(appPath("config/environment.ts"), "utf-8");
     expect(environment).toContain(`import "./application.js";`);

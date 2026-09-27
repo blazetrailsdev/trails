@@ -432,7 +432,7 @@ export class ${this.appConstBase()} extends Application {
   // config.eagerLoadPaths.push("extras");
 }
 
-Application.register(${this.appConstBase()}, import.meta.url);
+Application.register(${this.appConstBase()}, import.meta.dirname);
 `,
     );
 

@@ -170,7 +170,7 @@ import { Base } from "@blazetrails/activerecord";
 import { loadDatabaseConfig } from "@blazetrails/activerecord-cli";
 import "./app/models/index.js"; // side-effect: registers all models
 
-await loadDatabaseConfig(decodeURIComponent(new URL(".", import.meta.url).pathname));
+await loadDatabaseConfig(import.meta.dirname);
 await Base.establishConnection();
 ```
 
