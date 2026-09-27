@@ -168,7 +168,8 @@ as convergence classes.
 - A `vendor/<source>/…` citation names the version it was verified against
   (`vendor/rails/v8.0.2/…`, not `vendor/rails/…`); `pnpm vendor:recite`
   rewrites unversioned or stale citations to each source's active version, and
-  `scripts/vendor-citations.test.ts` fails CI on any citation it would rewrite
+  `scripts/vendor-citations.test.ts` (Preflight, so docs-only PRs too) fails
+  CI on any citation it would rewrite
   (`ruby-compat-needs-mri-citation` additionally resolves each
   `vendor/ruby/<version>/<file>:<line>` against the tree).
 - Two reference tables answer "what do I call this?" without guessing, and both
