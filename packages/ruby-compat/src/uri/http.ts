@@ -2,7 +2,7 @@ import { URI } from "./common.js";
 import { Generic } from "./generic.js";
 
 /**
- * `URI::HTTP` (`vendor/ruby/lib/uri/http.rb:22`), the class `URI.parse`
+ * `URI::HTTP` (`vendor/ruby/v3.3.11/lib/uri/http.rb:22`), the class `URI.parse`
  * answers for an `http:` URI, and the superclass of {@link HTTPS}.
  *
  * Only `DEFAULT_PORT` is ported; `COMPONENT` (`http.rb:27`) is unsent. `build` (`http.rb:59`) is
@@ -13,10 +13,10 @@ import { Generic } from "./generic.js";
  * array `merge` splats, which TypeScript will not let a subclass do.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `URI::HTTP`
- * (`vendor/ruby/lib/uri/http.rb:22`) ships with the interpreter.
+ * (`vendor/ruby/v3.3.11/lib/uri/http.rb:22`) ships with the interpreter.
  */
 export class HTTP extends Generic {
-  /** `DEFAULT_PORT` (`vendor/ruby/lib/uri/http.rb:24`). */
+  /** `DEFAULT_PORT` (`vendor/ruby/v3.3.11/lib/uri/http.rb:24`). */
   static override readonly DEFAULT_PORT: number | null = 80;
 }
 

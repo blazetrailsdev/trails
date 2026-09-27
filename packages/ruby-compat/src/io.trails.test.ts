@@ -35,7 +35,7 @@ describe("IO", () => {
   });
 
   it("read answers nil rather than an empty String once the stream is at EOF", () => {
-    // vendor/ruby/io.c:3774 — a positive length past the end is nil.
+    // vendor/ruby/v3.3.11/io.c:3774 — a positive length past the end is nil.
     const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "bytes");
     writeFileSync(path, "abcdef");
     File.open(path, "rb", (file) => {
@@ -47,7 +47,7 @@ describe("IO", () => {
   });
 
   it("read fills the str buffer it is handed, and empties it at EOF", () => {
-    // vendor/ruby/io.c:3778 — `read(length, str)` fills str; io.c:3800 resizes
+    // vendor/ruby/v3.3.11/io.c:3778 — `read(length, str)` fills str; io.c:3800 resizes
     const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "buffered");
     writeFileSync(path, "abcdef");
     const str = new Uint8Array(3);
@@ -99,7 +99,7 @@ describe("IO", () => {
   });
 
   it("read answers the mode string's external encoding, and write transcodes to it", () => {
-    // vendor/ruby/io.c:6883-6886 — everything after the mode's `:` is the encoding.
+    // vendor/ruby/v3.3.11/io.c:6883-6886 — everything after the mode's `:` is the encoding.
     const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "latin1.txt");
     writeFileSync(path, Uint8Array.from([0x68, 0xe9, 0x6c]));
     File.open(path, "r:ISO-8859-1", (file) => {
@@ -112,7 +112,7 @@ describe("IO", () => {
   });
 
   it("write raises rather than sending the bytes of an encoding the stream did not ask for", () => {
-    // vendor/ruby/io.c:1904 do_writeconv — TextEncoder produces UTF-8 and nothing else.
+    // vendor/ruby/v3.3.11/io.c:1904 do_writeconv — TextEncoder produces UTF-8 and nothing else.
     const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "conv.txt");
     const file = File.open(path, "w:ISO-8859-1");
     expect(() => file.write("hél")).toThrow("code converter not found (UTF-8 to ISO-8859-1)");
@@ -120,7 +120,7 @@ describe("IO", () => {
   });
 
   it("read decodes the UTF-32 seats, and raises rather than leaking TextDecoder's RangeError", () => {
-    // vendor/ruby/transcode.c:2097 rb_econv_open_exc — a converter this platform lacks.
+    // vendor/ruby/v3.3.11/transcode.c:2097 rb_econv_open_exc — a converter this platform lacks.
     const dir = mkdtempSync(join(tmpdir(), "trails-io-"));
     const utf32le = join(dir, "u32le.bin");
     writeFileSync(
@@ -151,7 +151,7 @@ describe("IO", () => {
   });
 
   it("read dispatches the UTF-16 and UTF-32 dummy seats on the BOM", () => {
-    // vendor/ruby/enc/trans/utf_16_32.trans:278,327 fun_si_from_utf_16 / fun_si_from_utf_32.
+    // vendor/ruby/v3.3.11/enc/trans/utf_16_32.trans:278,327 fun_si_from_utf_16 / fun_si_from_utf_32.
     const dir = mkdtempSync(join(tmpdir(), "trails-io-"));
     const cases: [string, string, number[]][] = [
       ["u16be.bin", "UTF-16", [0xfe, 0xff, 0, 0x68, 0, 0x69]],
@@ -246,7 +246,7 @@ describe("IO", () => {
   });
 
   it("read falls back to Encoding.default_external where the stream carries none", () => {
-    // vendor/ruby/io.c:1010 io_read_encoding.
+    // vendor/ruby/v3.3.11/io.c:1010 io_read_encoding.
     const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "default.txt");
     writeFileSync(path, "héllo");
     const file = File.open(path, "r");
@@ -256,7 +256,7 @@ describe("IO", () => {
   });
 
   it("set_encoding parses a one-argument 'enc2:enc' the way a mode string's encoding half is", () => {
-    // vendor/ruby/io.c:11704-11707 io_encoding_set routes a String through parse_mode_enc.
+    // vendor/ruby/v3.3.11/io.c:11704-11707 io_encoding_set routes a String through parse_mode_enc.
     const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "pair.txt");
     writeFileSync(path, "hi");
     const cases: [string, string | null, string | null][] = [
@@ -279,7 +279,7 @@ describe("IO", () => {
   });
 
   it("a bom| mode prefix opens under the encoding it names", () => {
-    // vendor/ruby/io.c:6480-6483, 6671-6681
+    // vendor/ruby/v3.3.11/io.c:6480-6483, 6671-6681
     const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "bom.txt");
     writeFileSync(path, "hi");
     File.open(path, "r:bom|utf-8", (file) => {
@@ -288,7 +288,7 @@ describe("IO", () => {
   });
 
   it("a bom| mode strips a UTF-8 byte order mark before the read", () => {
-    // vendor/ruby/io.c:7085-7163, 7196
+    // vendor/ruby/v3.3.11/io.c:7085-7163, 7196
     const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "bom.txt");
     writeFileSync(path, Uint8Array.from([0xef, 0xbb, 0xbf, 0x68, 0x69]));
     File.open(path, "r:bom|utf-8", (file) => {
@@ -297,7 +297,7 @@ describe("IO", () => {
   });
 
   it("a bom| mode on a file with no mark clears the external half of the pair", () => {
-    // vendor/ruby/io.c:7161 — ruby 3.3 answers EUC-JP and nil.
+    // vendor/ruby/v3.3.11/io.c:7161 — ruby 3.3 answers EUC-JP and nil.
     const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "bom.txt");
     writeFileSync(path, "hi");
     File.open(path, "r:bom|utf-8:euc-jp", (file) => {
@@ -308,7 +308,7 @@ describe("IO", () => {
   });
 
   it("a bom| prefix on a non-UTF encoding warns and keeps that encoding", () => {
-    // vendor/ruby/io.c:6678 — rb_enc_warn "BOM with non-UTF encoding %s is nonsense".
+    // vendor/ruby/v3.3.11/io.c:6678 — rb_enc_warn "BOM with non-UTF encoding %s is nonsense".
     const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "bom.txt");
     writeFileSync(path, "hi");
     const write = vi.spyOn(stderr, "write").mockReturnValue(true);

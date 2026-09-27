@@ -8,21 +8,21 @@ import { ArgumentError } from "./argument-error.js";
 import { stderr, stdout, type WriteStream } from "./process-adapter.js";
 import { verbose } from "./verbose.js";
 
-/** The `rb_exec_recursive` guard `io_puts_ary` (`vendor/ruby/io.c:8880`) is called through. */
+/** The `rb_exec_recursive` guard `io_puts_ary` (`vendor/ruby/v3.3.11/io.c:8880`) is called through. */
 const putsAryInFlight = new Set<unknown[]>();
 
-/** The receiver `rb_io_puts` sends to (`vendor/ruby/io.c:8947`). */
+/** The receiver `rb_io_puts` sends to (`vendor/ruby/v3.3.11/io.c:8947`). */
 export interface GenericWritable {
   write(string: string): number;
 }
 
 /**
- * `rb_io_puts` (`vendor/ruby/io.c:8947`), reached both as `IO#puts`
+ * `rb_io_puts` (`vendor/ruby/v3.3.11/io.c:8947`), reached both as `IO#puts`
  * (`io.c:15459`) and, through `IO::generic_writable`, as `StringIO#puts`
- * (`vendor/ruby/ext/stringio/stringio.c:1530`) — one body, two receivers, which
+ * (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:1530`) — one body, two receivers, which
  * is why it lives here rather than beside `StringIO`.
  *
- * @noRailsEquivalent PERMANENT — Ruby core `IO#puts` (`vendor/ruby/io.c:8947`).
+ * @noRailsEquivalent PERMANENT — Ruby core `IO#puts` (`vendor/ruby/v3.3.11/io.c:8947`).
  */
 export function puts(this: GenericWritable, ...args: unknown[]): null {
   if (args.length === 0) {
@@ -52,11 +52,11 @@ export function puts(this: GenericWritable, ...args: unknown[]): null {
 }
 
 /**
- * `io_puts_ary` (`vendor/ruby/io.c:8880`), the recursion guard `rb_io_puts`
+ * `io_puts_ary` (`vendor/ruby/v3.3.11/io.c:8880`), the recursion guard `rb_io_puts`
  * reaches an Array argument through.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `io_puts_ary`
- * (`vendor/ruby/io.c:8880`).
+ * (`vendor/ruby/v3.3.11/io.c:8880`).
  */
 export function ioPutsAry(this: GenericWritable, ary: unknown[]): void {
   if (putsAryInFlight.has(ary)) {
@@ -74,23 +74,23 @@ export function ioPutsAry(this: GenericWritable, ary: unknown[]): void {
 }
 
 /**
- * `rb_io_print` (`vendor/ruby/io.c:8715`) with `$,` and `$\` nil: each
+ * `rb_io_print` (`vendor/ruby/v3.3.11/io.c:8715`) with `$,` and `$\` nil: each
  * argument's `to_s`, written with no separator, answering `nil`. Shared by
  * `IO#print` and `StringIO#print` the way {@link puts} is.
  *
- * @noRailsEquivalent PERMANENT — Ruby core `IO#print` (`vendor/ruby/io.c:8715`).
+ * @noRailsEquivalent PERMANENT — Ruby core `IO#print` (`vendor/ruby/v3.3.11/io.c:8715`).
  */
 export function print(this: GenericWritable, ...args: unknown[]): null {
   for (const arg of args) this.write(arg == null ? "" : String(arg));
   return null;
 }
 
-/** `vendor/ruby/io.c:160` `IO_RBUF_CAPA_MIN`, the read buffer Ruby fills. */
+/** `vendor/ruby/v3.3.11/io.c:160` `IO_RBUF_CAPA_MIN`, the read buffer Ruby fills. */
 const READ_CHUNK = 8192;
 
 /**
  * The ASCII-8BIT String a binary read answers (`rb_ascii8bit_encoding`,
- * `vendor/ruby/io.c:12257`): one character per byte. It is assembled a
+ * `vendor/ruby/v3.3.11/io.c:12257`): one character per byte. It is assembled a
  * character at a time because no `TextDecoder` encoding gives it — its
  * "latin1" is windows-1252, which remaps 0x80-0x9F.
  */
@@ -100,7 +100,7 @@ function binaryString(bytes: Uint8Array, length: number): string {
   return part;
 }
 
-/** The bytes `io_write_m` (`vendor/ruby/io.c:2263`) sends an ASCII-8BIT String as. */
+/** The bytes `io_write_m` (`vendor/ruby/v3.3.11/io.c:2263`) sends an ASCII-8BIT String as. */
 function binaryBytes(string: string): Uint8Array {
   const buffer = new Uint8Array(string.length);
   for (let i = 0; i < string.length; i++) buffer[i] = string.charCodeAt(i) & 0xff;
@@ -108,12 +108,12 @@ function binaryBytes(string: string): Uint8Array {
 }
 
 /**
- * `io_enc_str` (`vendor/ruby/io.c:3123`), which tags the String a read
+ * `io_enc_str` (`vendor/ruby/v3.3.11/io.c:3123`), which tags the String a read
  * assembled with `io_read_encoding` (`io.c:1010`). ASCII-8BIT is the one
  * encoding assembled a character at a time (see {@link binaryString}); every
  * other reaches the platform decoder its registry row names. An encoding whose
  * row names no decoder is a converter this platform lacks and MRI has, so it
- * raises what `rb_econv_open_exc` (`vendor/ruby/transcode.c:2097-2105`) raises
+ * raises what `rb_econv_open_exc` (`vendor/ruby/v3.3.11/transcode.c:2097-2105`) raises
  * — the treatment {@link doWriteconv} already gives the write half — rather
  * than leaking `TextDecoder`'s own `RangeError`; the two UTF-32 seats are
  * decoded here instead, being a four-byte-per-code-point read, and the two
@@ -168,9 +168,9 @@ function ioEncStr(
 }
 
 /**
- * `rb_str_dump` (`vendor/ruby/string.c:6901`) over the bytes of an ASCII-8BIT
+ * `rb_str_dump` (`vendor/ruby/v3.3.11/string.c:6901`) over the bytes of an ASCII-8BIT
  * String, as `rb_econv_open_exc`'s sibling `make_econv_exception`
- * (`vendor/ruby/transcode.c:2116`) quotes the bytes a converter rejected.
+ * (`vendor/ruby/v3.3.11/transcode.c:2116`) quotes the bytes a converter rejected.
  */
 function rbStrDump(bytes: Uint8Array): string {
   const escapes: Record<number, string> = {
@@ -203,9 +203,9 @@ function rbStrDump(bytes: Uint8Array): string {
 
 /**
  * The `econv_invalid_byte_sequence` / `econv_incomplete_input` arm of
- * `make_econv_exception` (`vendor/ruby/transcode.c:2111-2144`): a dummy seat's
+ * `make_econv_exception` (`vendor/ruby/v3.3.11/transcode.c:2111-2144`): a dummy seat's
  * converter rejects its first code unit, or runs out of input before one is
- * whole (`vendor/ruby/enc/trans/utf_16_32.trans:290,310`).
+ * whole (`vendor/ruby/v3.3.11/enc/trans/utf_16_32.trans:290,310`).
  */
 function invalidByteSequence(
   errorBytes: Uint8Array,
@@ -224,14 +224,14 @@ function invalidByteSequence(
   return exc;
 }
 
-/** `BE` (`vendor/ruby/enc/trans/utf_16_32.trans:281`). */
+/** `BE` (`vendor/ruby/v3.3.11/enc/trans/utf_16_32.trans:281`). */
 const BE = 1;
 
-/** `LE` (`vendor/ruby/enc/trans/utf_16_32.trans:282`). */
+/** `LE` (`vendor/ruby/v3.3.11/enc/trans/utf_16_32.trans:282`). */
 const LE = 2;
 
 /**
- * `fun_si_from_utf_16` (`vendor/ruby/enc/trans/utf_16_32.trans:278`) — the
+ * `fun_si_from_utf_16` (`vendor/ruby/v3.3.11/enc/trans/utf_16_32.trans:278`) — the
  * state function MRI's dummy `UTF-16` decodes through: a leading `FE FF`
  * re-points the stream at the `UTF-16BE` seat and `FF FE` at the `UTF-16LE`
  * one, the BOM itself producing no output (`ZERObt`), and a stream carrying
@@ -248,7 +248,7 @@ function funSiFromUtf16(s: Uint8Array): number {
 }
 
 /**
- * `fun_si_from_utf_32` (`vendor/ruby/enc/trans/utf_16_32.trans:327`), the
+ * `fun_si_from_utf_32` (`vendor/ruby/v3.3.11/enc/trans/utf_16_32.trans:327`), the
  * four-byte twin of {@link funSiFromUtf16}: `00 00 FE FF` re-points at the
  * `UTF-32BE` seat and `FF FE 00 00` at the `UTF-32LE` one.
  */
@@ -262,7 +262,7 @@ function funSiFromUtf32(s: Uint8Array): number {
 
 /**
  * The `UTF-32BE` / `UTF-32LE` decode `TextDecoder` has no label for: four
- * bytes per code point (`vendor/ruby/enc/utf_32le.c:44` `utf32le_mbc_to_code`,
+ * bytes per code point (`vendor/ruby/v3.3.11/enc/utf_32le.c:44` `utf32le_mbc_to_code`,
  * `enc/utf_32be.c:43`), which is a small enough transcode to carry rather
  * than raising where MRI reads. A code point outside Unicode takes the
  * replacement character its sibling arm's `TextDecoder` substitutes for
@@ -280,7 +280,7 @@ function utf32Str(bytes: Uint8Array, littleEndian: boolean): string {
 }
 
 /**
- * `do_writeconv` (`vendor/ruby/io.c:1904`) over `NEED_WRITECONV`
+ * `do_writeconv` (`vendor/ruby/v3.3.11/io.c:1904`) over `NEED_WRITECONV`
  * (`io.c:714`): a stream carrying an external encoding other than ASCII-8BIT
  * transcodes the String to it (`common_encoding`, `io.c:1925-1926`), and one
  * carrying none — or carrying ASCII-8BIT — writes the String's own bytes,
@@ -290,7 +290,7 @@ function utf32Str(bytes: Uint8Array, littleEndian: boolean): string {
  * `TextEncoder` produces UTF-8 and nothing else, so UTF-8 is the only
  * `common_encoding` the transcode arm can reach; every other raises what
  * `rb_econv_open` raises for a pair it has no converter for
- * (`rb_econv_open_exc`, `vendor/ruby/transcode.c:2097-2105`) rather than
+ * (`rb_econv_open_exc`, `vendor/ruby/v3.3.11/transcode.c:2097-2105`) rather than
  * writing the bytes of an encoding the stream did not ask for.
  */
 function doWriteconv(string: string, enc: Encoding | null): Uint8Array {
@@ -300,55 +300,55 @@ function doWriteconv(string: string, enc: Encoding | null): Uint8Array {
   return new TextEncoder().encode(string);
 }
 
-/** `FMODE_READABLE` (`vendor/ruby/include/ruby/io.h:270`). */
+/** `FMODE_READABLE` (`vendor/ruby/v3.3.11/include/ruby/io.h:270`). */
 const FMODE_READABLE = 0x00000001;
 
-/** `FMODE_WRITABLE` (`vendor/ruby/include/ruby/io.h:273`). */
+/** `FMODE_WRITABLE` (`vendor/ruby/v3.3.11/include/ruby/io.h:273`). */
 const FMODE_WRITABLE = 0x00000002;
 
-/** `FMODE_READWRITE` (`vendor/ruby/include/ruby/io.h:276`). */
+/** `FMODE_READWRITE` (`vendor/ruby/v3.3.11/include/ruby/io.h:276`). */
 const FMODE_READWRITE = FMODE_READABLE | FMODE_WRITABLE;
 
-/** `FMODE_BINMODE` (`vendor/ruby/include/ruby/io.h:287`). */
+/** `FMODE_BINMODE` (`vendor/ruby/v3.3.11/include/ruby/io.h:287`). */
 const FMODE_BINMODE = 0x00000004;
 
-/** `FMODE_APPEND` (`vendor/ruby/include/ruby/io.h:315`). */
+/** `FMODE_APPEND` (`vendor/ruby/v3.3.11/include/ruby/io.h:315`). */
 const FMODE_APPEND = 0x00000040;
 
-/** `FMODE_CREATE` (`vendor/ruby/include/ruby/io.h:323`). */
+/** `FMODE_CREATE` (`vendor/ruby/v3.3.11/include/ruby/io.h:323`). */
 const FMODE_CREATE = 0x00000080;
 
-/** `FMODE_EXCL` (`vendor/ruby/include/ruby/io.h:331`). */
+/** `FMODE_EXCL` (`vendor/ruby/v3.3.11/include/ruby/io.h:331`). */
 const FMODE_EXCL = 0x00000400;
 
-/** `FMODE_TRUNC` (`vendor/ruby/include/ruby/io.h:337`). */
+/** `FMODE_TRUNC` (`vendor/ruby/v3.3.11/include/ruby/io.h:337`). */
 const FMODE_TRUNC = 0x00000800;
 
-/** `FMODE_TEXTMODE` (`vendor/ruby/include/ruby/io.h:351`). */
+/** `FMODE_TEXTMODE` (`vendor/ruby/v3.3.11/include/ruby/io.h:351`). */
 const FMODE_TEXTMODE = 0x00001000;
 
-/** `FMODE_SETENC_BY_BOM` (`vendor/ruby/include/ruby/io.h:368`). */
+/** `FMODE_SETENC_BY_BOM` (`vendor/ruby/v3.3.11/include/ruby/io.h:368`). */
 const FMODE_SETENC_BY_BOM = 0x00100000;
 
-/** `bom_prefix` (`vendor/ruby/io.c:6431`). */
+/** `bom_prefix` (`vendor/ruby/v3.3.11/io.c:6431`). */
 const bomPrefix = "bom|";
 
-/** `utf_prefix` (`vendor/ruby/io.c:6432`). */
+/** `utf_prefix` (`vendor/ruby/v3.3.11/io.c:6432`). */
 const utfPrefix = "utf-";
 
-/** `bom_prefix_len` (`vendor/ruby/io.c:6433`). */
+/** `bom_prefix_len` (`vendor/ruby/v3.3.11/io.c:6433`). */
 const bomPrefixLen = bomPrefix.length;
 
-/** `utf_prefix_len` (`vendor/ruby/io.c:6434`). */
+/** `utf_prefix_len` (`vendor/ruby/v3.3.11/io.c:6434`). */
 const utfPrefixLen = utfPrefix.length;
 
-/** `io_encname_bom_p` (`vendor/ruby/io.c:6437`). */
+/** `io_encname_bom_p` (`vendor/ruby/v3.3.11/io.c:6437`). */
 function ioEncnameBomP(name: string, len: number): boolean {
   return len > bomPrefixLen && name.slice(0, bomPrefixLen).toLowerCase() === bomPrefix;
 }
 
 /**
- * `rb_enc_warn` (`vendor/ruby/error.c:443`), which writes nothing at all while
+ * `rb_enc_warn` (`vendor/ruby/v3.3.11/error.c:443`), which writes nothing at all while
  * `$VERBOSE` is `nil` and terminates the message with a newline.
  */
 function rbEncWarn(message: string): void {
@@ -357,7 +357,7 @@ function rbEncWarn(message: string): void {
 }
 
 /**
- * `rb_io_modestr_fmode` (`vendor/ruby/io.c:6443`) — the `FMODE_*` flags a mode
+ * `rb_io_modestr_fmode` (`vendor/ruby/v3.3.11/io.c:6443`) — the `FMODE_*` flags a mode
  * string names, which `rb_io_extract_modeenc` (`io.c:6881`) records on the
  * stream as `fptr->mode`.
  */
@@ -415,7 +415,7 @@ function rbIoModestrFmode(modestr: string): number {
 }
 
 /**
- * `rb_io_ext_int_to_encs` (`vendor/ruby/io.c:6604`) — the pair of encodings a
+ * `rb_io_ext_int_to_encs` (`vendor/ruby/v3.3.11/io.c:6604`) — the pair of encodings a
  * stream records, given an external and an internal one. `enc` is the INTERNAL
  * of a transcoding pair and `enc2` the external, which is why
  * {@link IO#externalEncoding} answers `enc2` first.
@@ -446,7 +446,7 @@ function rbIoExtIntToEncs(
 }
 
 /**
- * `parse_mode_enc` (`vendor/ruby/io.c:6657`), which reads one string as `"enc"`,
+ * `parse_mode_enc` (`vendor/ruby/v3.3.11/io.c:6657`), which reads one string as `"enc"`,
  * `"enc2:enc"` or `"enc:-"` — the form both a mode string's encoding half and
  * `IO#set_encoding`'s one-argument String take — and strips the `"bom|"` prefix
  * `rb_io_modestr_fmode` already flagged, keeping `FMODE_SETENC_BY_BOM` only for
@@ -491,39 +491,39 @@ function parseModeEnc(
 }
 
 /**
- * `IO` (`vendor/ruby/io.c:15371` `rb_cIO`), the sliver of it trails calls.
+ * `IO` (`vendor/ruby/v3.3.11/io.c:15371` `rb_cIO`), the sliver of it trails calls.
  *
  * Rails writes a credentials file through this class —
  * `IO.binwrite "#{content_path}.tmp", encrypt(contents)`
- * (`vendor/rails/activesupport/lib/active_support/encrypted_file.rb:79`) — so
+ * (`vendor/rails/v8.0.2/activesupport/lib/active_support/encrypted_file.rb:79`) — so
  * trails writes it through a class of the same name. The backend is the
  * `FsAdapter` contract in `./fs-adapter.js`, the same one `File` writes through.
  *
- * @noRailsEquivalent PERMANENT — Ruby core `IO` (`vendor/ruby/io.c:15371`),
+ * @noRailsEquivalent PERMANENT — Ruby core `IO` (`vendor/ruby/v3.3.11/io.c:15371`),
  * which Rails calls without defining, so no Rails or gem file declares the
  * class this file's export lives in.
  */
 export class IO {
   /**
-   * The descriptor `rb_io_s_open` (`vendor/ruby/io.c:8148`) opened the stream
+   * The descriptor `rb_io_s_open` (`vendor/ruby/v3.3.11/io.c:8148`) opened the stream
    * on, and the offset `rb_io_seek_m` (`io.c:2495`) moves — Ruby's `rb_io_t`
    * holds both.
    */
   protected fd: number;
 
-  /** `fptr->pathv` (`vendor/ruby/io.c:2943` reads it back as `IO#path`). */
+  /** `fptr->pathv` (`vendor/ruby/v3.3.11/io.c:2943` reads it back as `IO#path`). */
   protected pathv: string | null;
 
-  /** `fptr->mode`, the `FMODE_*` flags (`vendor/ruby/io.c:6881`). */
+  /** `fptr->mode`, the `FMODE_*` flags (`vendor/ruby/v3.3.11/io.c:6881`). */
   protected mode: number;
 
   protected enc: Encoding | null = null;
 
-  /** `fptr->encs.enc2` (`vendor/ruby/io.c:11718`). */
+  /** `fptr->encs.enc2` (`vendor/ruby/v3.3.11/io.c:11718`). */
   protected enc2: Encoding | null = null;
 
   /**
-   * `fptr->stdio_file` (`vendor/ruby/io.c:9328`), the C stream `prep_stdio`
+   * `fptr->stdio_file` (`vendor/ruby/v3.3.11/io.c:9328`), the C stream `prep_stdio`
    * attaches to a standard descriptor. In trails the process adapter owns the
    * standard streams, so a write reaches them through it rather than the fs.
    */
@@ -533,7 +533,7 @@ export class IO {
   private _pos = 0;
 
   /**
-   * `rb_io_initialize` (`vendor/ruby/io.c:9207`), reached as `IO.new(fd)`. It
+   * `rb_io_initialize` (`vendor/ruby/v3.3.11/io.c:9207`), reached as `IO.new(fd)`. It
    * is protected because `File.open` (`io.c:8148`) is the only way trails
    * opens a stream, and a public TS constructor is measured surface.
    */
@@ -544,14 +544,14 @@ export class IO {
   }
 
   /**
-   * `vendor/ruby/io.c:6379` `rb_io_binmode_m`, which puts the stream in binary
+   * `vendor/ruby/v3.3.11/io.c:6379` `rb_io_binmode_m`, which puts the stream in binary
    * mode and answers the stream. A String written to a binary stream goes out
    * as its own bytes rather than being transcoded, so after this {@link write}
    * takes an ASCII-8BIT String — one character per byte, the encoding
    * {@link IO#read} already answers in.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#binmode`
-   * (`vendor/ruby/io.c:6379`).
+   * (`vendor/ruby/v3.3.11/io.c:6379`).
    */
   binmode(): this {
     this.mode |= FMODE_BINMODE;
@@ -561,12 +561,12 @@ export class IO {
   }
 
   /**
-   * `vendor/ruby/io.c:13474` `rb_io_set_encoding` — the external encoding the
+   * `vendor/ruby/v3.3.11/io.c:13474` `rb_io_set_encoding` — the external encoding the
    * stream reads and writes through, which {@link binmode} also sets but which
    * carries no `FMODE_BINMODE` of its own, and, in the two-argument form, the
    * internal one it transcodes to. It answers the stream.
    *
-   * `io_encoding_set` (`vendor/ruby/io.c:11659`) records whatever
+   * `io_encoding_set` (`vendor/ruby/v3.3.11/io.c:11659`) records whatever
    * `find_encoding` answered, so a name that resolves to
    * `UNSPECIFIED_ENCODING` — the `internal` alias while
    * `Encoding.default_internal` is unset (`ruby -e 'p
@@ -574,7 +574,7 @@ export class IO {
    * leaves the stream with no external encoding.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#set_encoding`
-   * (`vendor/ruby/io.c:13474`).
+   * (`vendor/ruby/v3.3.11/io.c:13474`).
    */
   setEncoding(extEnc: Encoding | string, intEnc?: Encoding | string): this {
     let enc: Encoding | null;
@@ -603,12 +603,12 @@ export class IO {
   }
 
   /**
-   * `rb_io_external_encoding` (`vendor/ruby/io.c:13407`) — the transcoding
+   * `rb_io_external_encoding` (`vendor/ruby/v3.3.11/io.c:13407`) — the transcoding
    * pair's source encoding, the recorded one on a writable stream, and
    * `io_read_encoding` (`io.c:1010`) on a readable one.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#external_encoding`
-   * (`vendor/ruby/io.c:13407`).
+   * (`vendor/ruby/v3.3.11/io.c:13407`).
    */
   externalEncoding(): Encoding | null {
     if (this.enc2) {
@@ -622,11 +622,11 @@ export class IO {
   }
 
   /**
-   * `rb_io_internal_encoding` (`vendor/ruby/io.c:13440`) — the transcoding
+   * `rb_io_internal_encoding` (`vendor/ruby/v3.3.11/io.c:13440`) — the transcoding
    * pair's destination encoding, and `nil` where no conversion is specified.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#internal_encoding`
-   * (`vendor/ruby/io.c:13440`).
+   * (`vendor/ruby/v3.3.11/io.c:13440`).
    */
   internalEncoding(): Encoding | null {
     if (!this.enc2) return null;
@@ -634,54 +634,54 @@ export class IO {
   }
 
   /**
-   * `vendor/ruby/io.c:6400` `rb_io_binmode_p`, which answers whether
+   * `vendor/ruby/v3.3.11/io.c:6400` `rb_io_binmode_p`, which answers whether
    * `FMODE_BINMODE` is set on the stream.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#binmode?`
-   * (`vendor/ruby/io.c:6400`).
+   * (`vendor/ruby/v3.3.11/io.c:6400`).
    */
   isBinmode(): boolean {
     return (this.mode & FMODE_BINMODE) !== 0;
   }
 
   /**
-   * `vendor/ruby/io.c:2943` `rb_io_path`, registered as both `IO#path` and
+   * `vendor/ruby/v3.3.11/io.c:2943` `rb_io_path`, registered as both `IO#path` and
    * `IO#to_path` (`io.c:15544-15545`) — the path the stream was opened on.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#path`
-   * (`vendor/ruby/io.c:2943`).
+   * (`vendor/ruby/v3.3.11/io.c:2943`).
    */
   path(): string | null {
     return this.pathv;
   }
 
   /**
-   * `vendor/ruby/io.c:2943` `rb_io_path`, registered as `IO#to_path`
+   * `vendor/ruby/v3.3.11/io.c:2943` `rb_io_path`, registered as `IO#to_path`
    * (`io.c:15545`).
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#to_path`
-   * (`vendor/ruby/io.c:15545`).
+   * (`vendor/ruby/v3.3.11/io.c:15545`).
    */
   toPath(): string | null {
     return this.pathv;
   }
 
   /**
-   * `vendor/ruby/io.c:5093` `rb_io_to_io`, which answers the stream itself.
+   * `vendor/ruby/v3.3.11/io.c:5093` `rb_io_to_io`, which answers the stream itself.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#to_io`
-   * (`vendor/ruby/io.c:5093`).
+   * (`vendor/ruby/v3.3.11/io.c:5093`).
    */
   toIo(): this {
     return this;
   }
 
   /**
-   * `vendor/ruby/io.c:12121` `rb_io_s_readlines`, in its whole-file form:
+   * `vendor/ruby/v3.3.11/io.c:12121` `rb_io_s_readlines`, in its whole-file form:
    * every line of the file, each keeping its trailing separator.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO.readlines`
-   * (`vendor/ruby/io.c:12121`).
+   * (`vendor/ruby/v3.3.11/io.c:12121`).
    */
   static readlines(name: string): string[] {
     const lines = getFs()
@@ -692,13 +692,13 @@ export class IO {
   }
 
   /**
-   * `vendor/ruby/io.c:12242` `rb_io_s_binread`, which opens the stream
+   * `vendor/ruby/v3.3.11/io.c:12242` `rb_io_s_binread`, which opens the stream
    * `FMODE_BINMODE` under `rb_ascii8bit_encoding()` (`io.c:12257`) and so
    * answers the file's BYTES — one character per byte, never a decoded
    * String. `IO.read` (`io.c:12200`) is the member that decodes.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO.binread`
-   * (`vendor/ruby/io.c:12242`).
+   * (`vendor/ruby/v3.3.11/io.c:12242`).
    */
   static binread(name: string): string {
     const bytes = getFs().readFileSync(name);
@@ -706,14 +706,14 @@ export class IO {
   }
 
   /**
-   * `vendor/ruby/io.c:12396` `rb_io_s_binwrite`, which is `IO.write`
+   * `vendor/ruby/v3.3.11/io.c:12396` `rb_io_s_binwrite`, which is `IO.write`
    * (`io.c:12377`) with the stream opened in binary mode: `string` is an
    * ASCII-8BIT String and its characters go to the file as bytes, so
    * {@link IO.binread} answers it back unchanged. The byte count is the return
    * value either way (`io_s_write`, `io.c:12285`).
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO.binwrite`
-   * (`vendor/ruby/io.c:12396`).
+   * (`vendor/ruby/v3.3.11/io.c:12396`).
    */
   static binwrite(name: string, string: string): number {
     const buffer = binaryBytes(string);
@@ -722,8 +722,8 @@ export class IO {
   }
 
   /**
-   * `vendor/ruby/io.c:13365` `rb_io_s_copy_stream`, in the IO-to-IO form
-   * `Entry_#copy_file` calls (`vendor/ruby/lib/fileutils.rb:2280`). With no
+   * `vendor/ruby/v3.3.11/io.c:13365` `rb_io_s_copy_stream`, in the IO-to-IO form
+   * `Entry_#copy_file` calls (`vendor/ruby/v3.3.11/lib/fileutils.rb:2280`). With no
    * `src_length` and no `src_offset`, `nogvl_copy_stream_read_write`
    * (`io.c:12997-13050`) reads the source 16 KiB at a time until EOF and writes
    * each chunk to the destination, so the bytes pass through unchanged
@@ -731,7 +731,7 @@ export class IO {
    * (`io.c:13392`).
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO.copy_stream`
-   * (`vendor/ruby/io.c:13365`).
+   * (`vendor/ruby/v3.3.11/io.c:13365`).
    */
   static copyStream(src: IO, dst: IO): number {
     const buf = new Uint8Array(1024 * 16);
@@ -746,23 +746,23 @@ export class IO {
   }
 
   /**
-   * `vendor/ruby/io.c:2858` `rb_io_fileno` — the integer descriptor the
+   * `vendor/ruby/v3.3.11/io.c:2858` `rb_io_fileno` — the integer descriptor the
    * stream was opened on.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#fileno`
-   * (`vendor/ruby/io.c:2858`).
+   * (`vendor/ruby/v3.3.11/io.c:2858`).
    */
   fileno(): number {
     return this.fd;
   }
 
   /**
-   * `vendor/ruby/io.c:2495` `rb_io_seek_m` in its one-argument form, where
+   * `vendor/ruby/v3.3.11/io.c:2495` `rb_io_seek_m` in its one-argument form, where
    * `whence` is `IO::SEEK_SET` — the absolute offset the next read starts at.
    * It answers `0`.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#seek`
-   * (`vendor/ruby/io.c:2495`).
+   * (`vendor/ruby/v3.3.11/io.c:2495`).
    */
   seek(amount: number): number {
     this._pos = amount;
@@ -770,46 +770,46 @@ export class IO {
   }
 
   /**
-   * `vendor/ruby/io.c:2039` `rb_io_tell` — the offset the next read or write
+   * `vendor/ruby/v3.3.11/io.c:2039` `rb_io_tell` — the offset the next read or write
    * starts at, which is what `Rack::Test::UploadedFile#append_to` leaves at `0`
-   * (`vendor/rack-test/lib/rack/test/uploaded_file.rb:66`).
+   * (`vendor/rack-test/v2.2.0/lib/rack/test/uploaded_file.rb:66`).
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#pos`
-   * (`vendor/ruby/io.c:2039`).
+   * (`vendor/ruby/v3.3.11/io.c:2039`).
    */
   get pos(): number {
     return this._pos;
   }
 
   /**
-   * `vendor/ruby/io.c:2565` `rb_io_rewind` — the offset goes back to the start
+   * `vendor/ruby/v3.3.11/io.c:2565` `rb_io_rewind` — the offset goes back to the start
    * of the stream, and it answers `0`.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#rewind`
-   * (`vendor/ruby/io.c:2565`).
+   * (`vendor/ruby/v3.3.11/io.c:2565`).
    */
   rewind(): number {
     return this.seek(0);
   }
 
   /**
-   * `vendor/ruby/io.c:5842` `rb_io_closed_p`, which is `fptr->fd < 0` — the
+   * `vendor/ruby/v3.3.11/io.c:5842` `rb_io_closed_p`, which is `fptr->fd < 0` — the
    * same test `rb_io_close_m` (`io.c:5779`) short-circuits on.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#closed?`
-   * (`vendor/ruby/io.c:5842`).
+   * (`vendor/ruby/v3.3.11/io.c:5842`).
    */
   isClosed(): boolean {
     return this.fd < 0;
   }
 
   /**
-   * `vendor/ruby/io.c:2075` `rb_io_stat` — `fstat(2)` of the descriptor, where
+   * `vendor/ruby/v3.3.11/io.c:2075` `rb_io_stat` — `fstat(2)` of the descriptor, where
    * `File.stat` names a path. It raises on a closed stream, and on an adapter
    * with no `fstat` there is no descriptor identity to answer with.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#stat`
-   * (`vendor/ruby/io.c:2075`).
+   * (`vendor/ruby/v3.3.11/io.c:2075`).
    */
   stat(): FsStatResult {
     const fstatSync = getFs().fstatSync;
@@ -819,7 +819,7 @@ export class IO {
   }
 
   /**
-   * `vendor/ruby/io.c:3774` `io_read`, which behaves like C's `fread` and so
+   * `vendor/ruby/v3.3.11/io.c:3774` `io_read`, which behaves like C's `fread` and so
    * retries `read(2)` until `length` bytes are in hand or the stream hits EOF
    * (`io.c:3760-3763`) — a short read is not an answer. It answers `nil` —
    * never `""` — once the stream is at EOF and `length` is positive. The bytes
@@ -838,7 +838,7 @@ export class IO {
    * (`io.c:3800`) empties the String before the `nil`, it is zero-filled.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#read`
-   * (`vendor/ruby/io.c:3774`).
+   * (`vendor/ruby/v3.3.11/io.c:3774`).
    */
   read(): string;
   read(length: number | null, str?: Uint8Array | null): string | null;
@@ -866,7 +866,7 @@ export class IO {
   }
 
   /**
-   * `vendor/ruby/io.c:3317` `read_all`, which `io_read` (`io.c:3774`) takes
+   * `vendor/ruby/v3.3.11/io.c:3317` `read_all`, which `io_read` (`io.c:3774`) takes
    * when `length` is `nil`: the rest of the stream, and `""` rather than `nil`
    * at EOF. Ruby sizes the read from `remain_size(fptr)`, an `fstat` the
    * `FsAdapter` contract has no member for, so the bytes come in chunks.
@@ -899,7 +899,7 @@ export class IO {
   }
 
   /**
-   * `rb_io_getbyte` (`vendor/ruby/io.c:5056`) — the next byte, or `nil` at EOF.
+   * `rb_io_getbyte` (`vendor/ruby/v3.3.11/io.c:5056`) — the next byte, or `nil` at EOF.
    */
   private getbyte(): number | null {
     const buffer = new Uint8Array(1);
@@ -909,7 +909,7 @@ export class IO {
   }
 
   /**
-   * `rb_io_ungetbyte` (`vendor/ruby/io.c:5150`). There is no read buffer behind
+   * `rb_io_ungetbyte` (`vendor/ruby/v3.3.11/io.c:5150`). There is no read buffer behind
    * an `FsAdapter` to push `b` into, so the offset steps back over it instead,
    * which is the same stream for the byte {@link getbyte} just answered — the
    * only byte `io_strip_bom` ever ungets.
@@ -919,7 +919,7 @@ export class IO {
     this._pos -= 1;
   }
 
-  /** `io_strip_bom` (`vendor/ruby/io.c:7085-7145`). */
+  /** `io_strip_bom` (`vendor/ruby/v3.3.11/io.c:7085-7145`). */
   private ioStripBom(): Encoding | null {
     let b2: number | null, b3: number | null, b4: number | null;
     if (!(this.mode & FMODE_READABLE)) return null;
@@ -980,7 +980,7 @@ export class IO {
   }
 
   /**
-   * `io_set_encoding_by_bom` (`vendor/ruby/io.c:7148-7163`), which
+   * `io_set_encoding_by_bom` (`vendor/ruby/v3.3.11/io.c:7148-7163`), which
    * `rb_file_open_generic` runs under `FMODE_SETENC_BY_BOM` (`io.c:7196`).
    */
   protected ioSetEncodingByBom(): Encoding | null {
@@ -995,7 +995,7 @@ export class IO {
   }
 
   /**
-   * `io_read_encoding` (`vendor/ruby/io.c:1010`) — the encoding a read tags
+   * `io_read_encoding` (`vendor/ruby/v3.3.11/io.c:1010`) — the encoding a read tags
    * its String with: the stream's own external encoding, or
    * `Encoding.default_external` where none was recorded.
    */
@@ -1007,7 +1007,7 @@ export class IO {
   }
 
   /**
-   * `vendor/ruby/io.c:3590` `io_readpartial`, which is `io_getpartial` with a
+   * `vendor/ruby/v3.3.11/io.c:3590` `io_readpartial`, which is `io_getpartial` with a
    * `rb_eof_error()` (`io.c:756`) where that answers `nil` — so it reads at
    * most `maxlen` bytes and raises `EOFError` rather than returning `nil` at
    * the end of the stream. `outbuf` is the buffer `io_getpartial` fills, the
@@ -1017,7 +1017,7 @@ export class IO {
    * `io_getpartial`'s short read IS {@link read}'s length arm here.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#readpartial`
-   * (`vendor/ruby/io.c:3590`).
+   * (`vendor/ruby/v3.3.11/io.c:3590`).
    */
   readpartial(maxlen: number, outbuf?: Uint8Array | null): string {
     const ret = this.read(maxlen, outbuf);
@@ -1026,13 +1026,13 @@ export class IO {
   }
 
   /**
-   * `vendor/ruby/io.c:2668` `rb_io_eof` — true when `io_fillbuf` cannot get a
+   * `vendor/ruby/v3.3.11/io.c:2668` `rb_io_eof` — true when `io_fillbuf` cannot get a
    * byte at the current offset. There is no read buffer behind an `FsAdapter`,
    * so the two `READ_*_PENDING` short-circuits (`io.c:2674-2675`) have nothing
    * to answer for and the fill is a one-byte read that leaves the offset alone.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#eof?`
-   * (`vendor/ruby/io.c:2668`).
+   * (`vendor/ruby/v3.3.11/io.c:2668`).
    */
   isEof(): boolean {
     if (this.fd < 0) throw new IOError("closed stream");
@@ -1040,7 +1040,7 @@ export class IO {
   }
 
   /**
-   * `vendor/ruby/io.c:2263` `io_write_m` in its one-argument form, which
+   * `vendor/ruby/v3.3.11/io.c:2263` `io_write_m` in its one-argument form, which
    * answers the number of bytes written. On a binary stream — {@link binmode},
    * or a mode carrying `b` (`rb_io_binmode`, `io.c:6311`) — `string` goes out
    * as its own bytes, its UTF-8; otherwise `do_writeconv` (`io.c:1904`)
@@ -1049,7 +1049,7 @@ export class IO {
    * over its bytes.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#write`
-   * (`vendor/ruby/io.c:2263`).
+   * (`vendor/ruby/v3.3.11/io.c:2263`).
    */
   write(string: string | Uint8Array): number {
     const buffer = typeof string === "string" ? doWriteconv(string, this.enc) : string;
@@ -1067,25 +1067,25 @@ export class IO {
 
   /**
    * @noRailsEquivalent PERMANENT — Ruby core `IO#puts`
-   * (`vendor/ruby/io.c:15459`).
+   * (`vendor/ruby/v3.3.11/io.c:15459`).
    */
   puts = puts;
 
   /**
    * @noRailsEquivalent PERMANENT — Ruby core `IO#print`
-   * (`vendor/ruby/io.c:15457`).
+   * (`vendor/ruby/v3.3.11/io.c:15457`).
    */
   print = print;
 
   /**
-   * `vendor/ruby/io.c:5777` `rb_io_close_m`, which answers `nil` — and answers
+   * `vendor/ruby/v3.3.11/io.c:5777` `rb_io_close_m`, which answers `nil` — and answers
    * it without closing anything when `fptr->fd < 0` (`io.c:5779-5781`), so a
    * second close is a no-op rather than an error — which `atomic_write` leans
    * on, closing the temp file at `core_ext/file/atomic.rb:30` inside a
    * `Tempfile.open` whose `ensure` closes it again (`tempfile.rb:372`).
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#close`
-   * (`vendor/ruby/io.c:5777`).
+   * (`vendor/ruby/v3.3.11/io.c:5777`).
    */
   close(): null {
     if (this.fd < 0) return null;
@@ -1096,7 +1096,7 @@ export class IO {
 }
 
 /**
- * `prep_stdio` (`vendor/ruby/io.c:9313`): an `IO` over a standard descriptor,
+ * `prep_stdio` (`vendor/ruby/v3.3.11/io.c:9313`): an `IO` over a standard descriptor,
  * `rb_io_open_descriptor` (`io.c:9290`) standing in for trails' protected
  * constructor.
  */
@@ -1111,10 +1111,10 @@ function prepStdio(f: WriteStream, fd: number, fmode: string, klass: typeof IO, 
 }
 
 /**
- * `STDOUT` / `$stdout`, `rb_io_prep_stdout` (`vendor/ruby/io.c:9338`), defined
+ * `STDOUT` / `$stdout`, `rb_io_prep_stdout` (`vendor/ruby/v3.3.11/io.c:9338`), defined
  * at `io.c:15586`: an `IO` answering `write` / `puts` / `print` over the process
  * adapter's stdout.
  *
- * @noRailsEquivalent PERMANENT — Ruby core `STDOUT` (`vendor/ruby/io.c:15586`).
+ * @noRailsEquivalent PERMANENT — Ruby core `STDOUT` (`vendor/ruby/v3.3.11/io.c:15586`).
  */
 export const STDOUT: IO = prepStdio(stdout, 1, "w", IO, "<STDOUT>");

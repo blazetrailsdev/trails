@@ -1,10 +1,10 @@
 import { StandardError } from "./standard-error.js";
 
 /**
- * Ruby's core `IOError` (`vendor/ruby/io.c:15342`), a `StandardError`
+ * Ruby's core `IOError` (`vendor/ruby/v3.3.11/io.c:15342`), a `StandardError`
  * subclass — what `rb_io_check_closed` raises with `"closed stream"` when a
  * stream method is reached on a descriptor that is already gone
- * (`vendor/ruby/io.c:744`).
+ * (`vendor/ruby/v3.3.11/io.c:744`).
  *
  * @noRailsEquivalent PERMANENT — Ruby core `IOError`, which Rails inherits
  * rather than defines.

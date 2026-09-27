@@ -21,7 +21,7 @@ const FPREC0 = 128;
 const DEFAULT_FLOAT_PRECISION = 6;
 
 /**
- * `sign_bits` (`vendor/ruby/sprintf.c:41`) — the digit a negative two's
+ * `sign_bits` (`vendor/ruby/v3.3.11/sprintf.c:41`) — the digit a negative two's
  * complement conversion pads with.
  */
 function signBits(base: number, p: string): string {
@@ -37,7 +37,7 @@ function signBits(base: number, p: string): string {
   }
 }
 
-/** `check_next_arg` (`vendor/ruby/sprintf.c:155`). */
+/** `check_next_arg` (`vendor/ruby/v3.3.11/sprintf.c:155`). */
 function checkNextArg(posarg: number, nextarg: number): void {
   if (posarg === -1) {
     throw new ArgumentError(`unnumbered(${nextarg}) mixed with numbered`);
@@ -47,34 +47,34 @@ function checkNextArg(posarg: number, nextarg: number): void {
   }
 }
 
-/** `check_pos_arg` (`vendor/ruby/sprintf.c:167`). */
+/** `check_pos_arg` (`vendor/ruby/v3.3.11/sprintf.c:167`). */
 function checkPosArg(posarg: number, n: number): void {
   if (posarg > 0) throw new ArgumentError(`numbered(${n}) after unnumbered(${posarg})`);
   if (posarg === -2) throw new ArgumentError(`numbered(${n}) after named`);
   if (n < 1) throw new ArgumentError(`invalid index - ${n}$`);
 }
 
-/** `check_name_arg` (`vendor/ruby/sprintf.c:181`). */
+/** `check_name_arg` (`vendor/ruby/v3.3.11/sprintf.c:181`). */
 function checkNameArg(posarg: number, name: string): void {
   if (posarg > 0) throw new ArgumentError(`named${name} after unnumbered(${posarg})`);
   if (posarg === -1) throw new ArgumentError(`named${name} after numbered`);
 }
 
 /**
- * `rb_str_format` (`vendor/ruby/sprintf.c:212`) — the body of Ruby's
+ * `rb_str_format` (`vendor/ruby/v3.3.11/sprintf.c:212`) — the body of Ruby's
  * `Kernel#format` and its `Kernel#sprintf` alias
- * (`vendor/ruby/sprintf.c:206`).
+ * (`vendor/ruby/v3.3.11/sprintf.c:206`).
  *
  * The scanner, its flag/width/precision validation, the integer conversions
  * and the `%f` digit assembly are ported line for line from that file; the
  * `%e` / `%g` / `%a` conversions, which MRI hands to `BSD__dtoa` through
- * `fmt_setup` (`sprintf.c:918`, `vendor/ruby/vsnprintf.c:903`), are rendered
+ * `fmt_setup` (`sprintf.c:918`, `vendor/ruby/v3.3.11/vsnprintf.c:903`), are rendered
  * from the same exact decimal expansion this file computes for `%f`, so all
  * of them round half to even the way the C library does rather than the way
  * `Number#toFixed` does.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Kernel#format`
- * (`vendor/ruby/sprintf.c:206`), which Rails calls without defining, so there
+ * (`vendor/ruby/v3.3.11/sprintf.c:206`), which Rails calls without defining, so there
  * is no Ruby file in any gem for the port to mirror.
  */
 export function format(fmt: string, ...argv: unknown[]): string {
@@ -289,7 +289,7 @@ export function format(fmt: string, ...argv: unknown[]): string {
 }
 
 /**
- * `Kernel#sprintf` (`vendor/ruby/sprintf.c:206`), the alias `Kernel#format` is
+ * `Kernel#sprintf` (`vendor/ruby/v3.3.11/sprintf.c:206`), the alias `Kernel#format` is
  * defined from — the same C function under both names.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Kernel#sprintf`, which Rails calls
@@ -299,7 +299,7 @@ export const sprintf = format;
 
 const UNDEF = Symbol("Qundef");
 
-/** `get_num` (`vendor/ruby/sprintf.c:138`), under the `GETNUM` (`:130`) that raises for it. */
+/** `get_num` (`vendor/ruby/v3.3.11/sprintf.c:138`), under the `GETNUM` (`:130`) that raises for it. */
 function getNum(fmt: string, p: number, nextN: number, val: string): [number, number] {
   for (; p < fmt.length && fmt[p] >= "0" && fmt[p] <= "9"; p++) {
     nextN = nextN * 10 + (fmt.charCodeAt(p) - 48);
@@ -309,7 +309,7 @@ function getNum(fmt: string, p: number, nextN: number, val: string): [number, nu
   return [nextN, p];
 }
 
-/** `GETASTER` (`vendor/ruby/sprintf.c:135`). */
+/** `GETASTER` (`vendor/ruby/v3.3.11/sprintf.c:135`). */
 function getAster(
   fmt: string,
   p: number,
@@ -323,7 +323,7 @@ function getAster(
 
 /**
  * The `%<name>` / `%{name}` lookup — `rb_hash_lookup2(hash, sym, Qundef)`
- * (`vendor/ruby/sprintf.c:403`). The key is the Symbol `:name`, never the
+ * (`vendor/ruby/v3.3.11/sprintf.c:403`). The key is the Symbol `:name`, never the
  * String `"name"`, so a String-keyed hash raises `KeyError` here exactly as it
  * does in Ruby.
  */
@@ -334,8 +334,8 @@ function hashLookup(hash: Record<string, unknown> | Map<unknown, unknown>, name:
 }
 
 /**
- * `rb_hash_default_value(hash, sym)` (`vendor/ruby/hash.c:2068`), the arm
- * `%<name>` takes before it raises (`vendor/ruby/sprintf.c:388`): a
+ * `rb_hash_default_value(hash, sym)` (`vendor/ruby/v3.3.11/hash.c:2068`), the arm
+ * `%<name>` takes before it raises (`vendor/ruby/v3.3.11/sprintf.c:388`): a
  * `Hash.new(0)` answers `0` for a missing key and a `Hash.new { … }` runs its
  * block, so only a `nil` default reaches the `KeyError`. A plain object and a
  * bare `Map` have nowhere to store a default, so they have none.
@@ -347,7 +347,7 @@ function hashDefaultValue(
   return hash instanceof Hash ? hash.default(`:${name}`) : undefined;
 }
 
-/** `NUM2INT` — `rb_num2int` (`vendor/ruby/numeric.c:3241`). */
+/** `NUM2INT` — `rb_num2int` (`vendor/ruby/v3.3.11/numeric.c:3241`). */
 function num2int(val: unknown): number {
   if (typeof val === "bigint") return Number(val);
   if (typeof val === "number") {
@@ -357,7 +357,7 @@ function num2int(val: unknown): number {
   throw new RbTypeError(`no implicit conversion from ${rbBuiltinClassName(val)} to integer`);
 }
 
-/** The `'c'` conversion (`vendor/ruby/sprintf.c:449`). */
+/** The `'c'` conversion (`vendor/ruby/v3.3.11/sprintf.c:449`). */
 function formatC(val: unknown, flags: number, width: number): string {
   let str: string;
   if (typeof val === "string") {
@@ -372,7 +372,7 @@ function formatC(val: unknown, flags: number, width: number): string {
   return flags & FMINUS ? str + fill : fill + str;
 }
 
-/** The `'s'` / `'p'` conversions (`vendor/ruby/sprintf.c:489`). */
+/** The `'s'` / `'p'` conversions (`vendor/ruby/v3.3.11/sprintf.c:489`). */
 function formatS(val: unknown, conv: string, flags: number, width: number, prec: number): string {
   let str = conv === "p" ? rbInspect(val) : rbObjAsString(val);
   if (flags & FPREC) {
@@ -390,7 +390,7 @@ function formatS(val: unknown, conv: string, flags: number, width: number, prec:
 }
 
 /**
- * `bin_retry` (`vendor/ruby/sprintf.c:589`) — the argument of an integer
+ * `bin_retry` (`vendor/ruby/v3.3.11/sprintf.c:589`) — the argument of an integer
  * conversion is a Float truncated toward zero, a String read by
  * `rb_str_to_inum` with base 0 and `badcheck` true, or anything else put
  * through `rb_Integer`.
@@ -405,9 +405,9 @@ function toInteger(val: unknown): bigint {
 
 /**
  * The `'d'`/`'i'`/`'u'`/`'o'`/`'x'`/`'X'`/`'b'`/`'B'` conversions
- * (`vendor/ruby/sprintf.c:541`), including the `..` two's complement form a
+ * (`vendor/ruby/v3.3.11/sprintf.c:541`), including the `..` two's complement form a
  * negative value takes in a non-decimal base without a sign flag
- * (`vendor/ruby/sprintf.c:659`).
+ * (`vendor/ruby/v3.3.11/sprintf.c:659`).
  */
 function formatInteger(
   val: unknown,
@@ -512,7 +512,7 @@ function formatInteger(
  *
  * A double is a binary rational, so its decimal expansion terminates and can
  * be written down exactly — which is what `BSD__dtoa`
- * (`vendor/ruby/util.c:1108`) does for the C library conversions this file
+ * (`vendor/ruby/v3.3.11/util.c:1108`) does for the C library conversions this file
  * stands in for. `Number#toFixed` and `Number#toExponential` cannot be used
  * for them: they round half away from zero and fall back to exponent notation
  * above 1e21.
@@ -530,7 +530,7 @@ function exactDecimal(x: number): { digits: string; exp: number } {
 
 /**
  * `|x| = m * 2 ** exp2` — the IEEE 754 fields `word0` / `word1`
- * (`vendor/ruby/missing/dtoa.c:2740`) read for a finite, non-zero double.
+ * (`vendor/ruby/v3.3.11/missing/dtoa.c:2740`) read for a finite, non-zero double.
  */
 function decompose(x: number): { m: bigint; exp2: number } {
   const view = new DataView(new ArrayBuffer(8));
@@ -546,7 +546,7 @@ function decompose(x: number): { m: bigint; exp2: number } {
 
 /**
  * Round an {@link exactDecimal} to `keep` leading digits, half to even — the
- * rounding mode `BSD__dtoa` uses (`vendor/ruby/util.c:1379`), and the reason
+ * rounding mode `BSD__dtoa` uses (`vendor/ruby/v3.3.11/util.c:1379`), and the reason
  * `%.0f` of `2.5` is `2` where `(2.5).toFixed(0)` is `3`.
  */
 function roundAt(digits: string, exp: number, keep: number): { digits: string; exp: number } {
@@ -567,16 +567,16 @@ function roundAt(digits: string, exp: number, keep: number): { digits: string; e
 }
 
 /**
- * The `'f'` conversion (`vendor/ruby/sprintf.c:790`), whose Integer and
+ * The `'f'` conversion (`vendor/ruby/v3.3.11/sprintf.c:790`), whose Integer and
  * Rational arm stays exact in `bigint` and rounds half-up on the rational
  * (`sprintf.c:817-820`), and the `'e'`/`'E'`/
  * `'g'`/`'G'`/`'a'`/`'A'` ones MRI hands to `BSD_vfprintf`
- * (`vendor/ruby/sprintf.c:884`).
+ * (`vendor/ruby/v3.3.11/sprintf.c:884`).
  *
  * A non-finite value is `Inf`, never `Infinity`, and is space-filled whatever
- * the `0` flag says (`vendor/ruby/sprintf.c:886`). `%a`'s `0x` prefix stands
+ * the `0` flag says (`vendor/ruby/v3.3.11/sprintf.c:886`). `%a`'s `0x` prefix stands
  * where an integer conversion's does, so a `0` flag fills BETWEEN it and the
- * digits (`vendor/ruby/vsnprintf.c:1183`).
+ * digits (`vendor/ruby/v3.3.11/vsnprintf.c:1183`).
  */
 function formatFloat(
   val: unknown,
@@ -657,7 +657,7 @@ function formatFloat(
   return pad(body, flags, width, sc);
 }
 
-/** The width fill shared by the float conversions (`vendor/ruby/vsnprintf.c:1148`). */
+/** The width fill shared by the float conversions (`vendor/ruby/v3.3.11/vsnprintf.c:1148`). */
 function pad(body: string, flags: number, width: number, sc: string): string {
   const fill = Math.max(width - body.length - sc.length, 0);
   if (flags & FMINUS) return sc + body + " ".repeat(fill);
@@ -675,19 +675,19 @@ const BLETCH = 0x10;
 const QUICK_MAX = 14;
 
 /**
- * `BSD__dtoa` (`vendor/ruby/missing/dtoa.c:2670`) restricted to the two modes
+ * `BSD__dtoa` (`vendor/ruby/v3.3.11/missing/dtoa.c:2670`) restricted to the two modes
  * the float conversions ask for: mode 3 (`ndigits` after the decimal point,
  * for `%f`) and mode 2 (`ndigits` significant, for `%e` and `%g`). The result
  * is `|x| = 0.digits * 10 ** exp`.
  *
- * The floating-point fast path (`vendor/ruby/missing/dtoa.c:2895`) is ported rather than skipped
+ * The floating-point fast path (`vendor/ruby/v3.3.11/missing/dtoa.c:2895`) is ported rather than skipped
  * because it is observable: its rounding decision is taken on the SCALED
  * DOUBLE within a tolerance `eps`, so a value whose exact expansion is a hair
  * under a tie — `0.35`, whose double is `0.34999999999999997…` — still reads
  * as a tie there and rounds half to even on the last generated digit, giving
  * `format("%.1f", 0.35) == "0.4"` where rounding the exact expansion gives
  * `"0.3"`. Where the fast path cannot decide within `eps` it gives up
- * (`fast_failed`, `vendor/ruby/missing/dtoa.c:2994`) and the exact expansion answers, which is why
+ * (`fast_failed`, `vendor/ruby/v3.3.11/missing/dtoa.c:2994`) and the exact expansion answers, which is why
  * `format("%.1f", 0.05)` is `"0.1"`.
  */
 function dtoa(x: number, mode: 2 | 3, ndigits: number): { digits: string; exp: number } {
@@ -710,7 +710,7 @@ function dtoa(x: number, mode: 2 | 3, ndigits: number): { digits: string; exp: n
   return roundAt(exact.digits, exact.exp, ilim);
 }
 
-/** The fast path of {@link dtoa} (`vendor/ruby/missing/dtoa.c:2895`), `leftright` 0. */
+/** The fast path of {@link dtoa} (`vendor/ruby/v3.3.11/missing/dtoa.c:2895`), `leftright` 0. */
 function dtoaQuick(
   x: number,
   k: number,
@@ -776,7 +776,7 @@ function dtoaQuick(
   }
 }
 
-/** `bump_up` (`vendor/ruby/missing/dtoa.c:3060`). */
+/** `bump_up` (`vendor/ruby/v3.3.11/missing/dtoa.c:3060`). */
 function bumpUp(s: string, k: number): { digits: string; exp: number } {
   let i = s.length - 1;
   for (; s[i] === "9"; i--) {
@@ -785,13 +785,13 @@ function bumpUp(s: string, k: number): { digits: string; exp: number } {
   return { digits: s.slice(0, i) + String(Number(s[i]) + 1), exp: k + 1 };
 }
 
-/** `%f` (`vendor/ruby/sprintf.c:790`). */
+/** `%f` (`vendor/ruby/v3.3.11/sprintf.c:790`). */
 function fixed(x: number, flags: number, prec: number): string {
   const { digits, exp } = x === 0 ? { digits: "", exp: 1 } : dtoa(x, 3, prec);
   return renderFixed(digits, exp, prec, flags);
 }
 
-/** The `%f` digit assembly (`vendor/ruby/sprintf.c:833-869`). */
+/** The `%f` digit assembly (`vendor/ruby/v3.3.11/sprintf.c:833-869`). */
 function renderFixed(digits: string, exp: number, prec: number, flags: number): string {
   const int = exp > 0 ? digits.slice(0, exp).padEnd(exp, "0") : "0";
   const tail = exp > 0 ? digits.slice(exp) : "0".repeat(Math.min(-exp, prec)) + digits;
@@ -799,13 +799,13 @@ function renderFixed(digits: string, exp: number, prec: number, flags: number): 
   return `${int}.${tail.padEnd(prec, "0").slice(0, prec)}`;
 }
 
-/** `%e` (`vendor/ruby/vsnprintf.c:930`). */
+/** `%e` (`vendor/ruby/v3.3.11/vsnprintf.c:930`). */
 function exponential(x: number, flags: number, prec: number): string {
   const { digits, exp } = x === 0 ? { digits: "", exp: 1 } : dtoa(x, 2, prec + 1);
   return renderExp(digits, exp, prec, flags);
 }
 
-/** The `%e` digit assembly (`vendor/ruby/vsnprintf.c:1215`). */
+/** The `%e` digit assembly (`vendor/ruby/v3.3.11/vsnprintf.c:1215`). */
 function renderExp(digits: string, exp: number, prec: number, flags: number): string {
   const mantissa = (digits === "" ? "0" : digits).padEnd(prec + 1, "0");
   const point = prec > 0 ? `.${mantissa.slice(1, prec + 1)}` : (flags & FSHARP) !== 0 ? "." : "";
@@ -813,7 +813,7 @@ function renderExp(digits: string, exp: number, prec: number, flags: number): st
   return `${mantissa[0]}${point}e${e < 0 ? "-" : "+"}${String(Math.abs(e)).padStart(2, "0")}`;
 }
 
-/** `%g` (`vendor/ruby/vsnprintf.c:903`) — the style is chosen after rounding. */
+/** `%g` (`vendor/ruby/v3.3.11/vsnprintf.c:903`) — the style is chosen after rounding. */
 function general(x: number, flags: number, prec: number): string {
   const P = prec === 0 ? 1 : prec;
   const { digits, exp } = x === 0 ? { digits: "", exp: 1 } : dtoa(x, 2, P);
@@ -830,7 +830,7 @@ function general(x: number, flags: number, prec: number): string {
 }
 
 /**
- * `%a` (`vendor/ruby/vsnprintf.c:816` through `__hdtoa`) — the hexadecimal
+ * `%a` (`vendor/ruby/v3.3.11/vsnprintf.c:816` through `__hdtoa`) — the hexadecimal
  * float literal. MRI normalizes it, so a subnormal is `0x1p-1074` rather than
  * `0x0.0000000000001p-1022`, and a carry out of the rounded digits is
  * renormalized to `0x1` at the next exponent.

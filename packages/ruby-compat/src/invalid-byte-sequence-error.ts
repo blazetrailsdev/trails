@@ -3,9 +3,9 @@ import { EncodingError } from "./encoding-error.js";
 
 /**
  * Ruby's core `Encoding::InvalidByteSequenceError`
- * (`vendor/ruby/transcode.c:4506` `rb_eInvalidByteSequenceError`), an
+ * (`vendor/ruby/v3.3.11/transcode.c:4506` `rb_eInvalidByteSequenceError`), an
  * `EncodingError` subclass — what `make_econv_exception`
- * (`vendor/ruby/transcode.c:2139-2144`) raises on bytes a converter cannot
+ * (`vendor/ruby/v3.3.11/transcode.c:2139-2144`) raises on bytes a converter cannot
  * read, carrying the readers `transcode.c:4627-4633` defines.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Encoding::InvalidByteSequenceError`,
@@ -19,7 +19,7 @@ export class InvalidByteSequenceError extends EncodingError {
   _destinationEncoding: Encoding | null = null;
 
   /**
-   * `ecerr_source_encoding_name` (`vendor/ruby/transcode.c:4627`).
+   * `ecerr_source_encoding_name` (`vendor/ruby/v3.3.11/transcode.c:4627`).
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Encoding::InvalidByteSequenceError#source_encoding_name`.
    */
@@ -28,7 +28,7 @@ export class InvalidByteSequenceError extends EncodingError {
   }
 
   /**
-   * `ecerr_destination_encoding_name` (`vendor/ruby/transcode.c:4628`).
+   * `ecerr_destination_encoding_name` (`vendor/ruby/v3.3.11/transcode.c:4628`).
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Encoding::InvalidByteSequenceError#destination_encoding_name`.
    */
@@ -37,7 +37,7 @@ export class InvalidByteSequenceError extends EncodingError {
   }
 
   /**
-   * `ecerr_source_encoding` (`vendor/ruby/transcode.c:4629`).
+   * `ecerr_source_encoding` (`vendor/ruby/v3.3.11/transcode.c:4629`).
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Encoding::InvalidByteSequenceError#source_encoding`.
    */
@@ -46,7 +46,7 @@ export class InvalidByteSequenceError extends EncodingError {
   }
 
   /**
-   * `ecerr_destination_encoding` (`vendor/ruby/transcode.c:4630`).
+   * `ecerr_destination_encoding` (`vendor/ruby/v3.3.11/transcode.c:4630`).
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Encoding::InvalidByteSequenceError#destination_encoding`.
    */
@@ -55,7 +55,7 @@ export class InvalidByteSequenceError extends EncodingError {
   }
 
   /**
-   * `ecerr_error_bytes` (`vendor/ruby/transcode.c:4631`).
+   * `ecerr_error_bytes` (`vendor/ruby/v3.3.11/transcode.c:4631`).
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Encoding::InvalidByteSequenceError#error_bytes`.
    */
@@ -64,7 +64,7 @@ export class InvalidByteSequenceError extends EncodingError {
   }
 
   /**
-   * `ecerr_readagain_bytes` (`vendor/ruby/transcode.c:4632`).
+   * `ecerr_readagain_bytes` (`vendor/ruby/v3.3.11/transcode.c:4632`).
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Encoding::InvalidByteSequenceError#readagain_bytes`.
    */
@@ -73,7 +73,7 @@ export class InvalidByteSequenceError extends EncodingError {
   }
 
   /**
-   * `ecerr_incomplete_input` (`vendor/ruby/transcode.c:4633`).
+   * `ecerr_incomplete_input` (`vendor/ruby/v3.3.11/transcode.c:4633`).
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Encoding::InvalidByteSequenceError#incomplete_input?`.
    */

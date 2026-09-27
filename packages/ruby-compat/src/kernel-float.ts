@@ -10,7 +10,7 @@ const HEXADECIMAL_REGEX =
 const DIGIT_SEPARATOR_REGEX = /_/g;
 
 /**
- * `vendor/ruby/object.c:3605` `rb_convert_to_float` with `raise_exception`
+ * `vendor/ruby/v3.3.11/object.c:3605` `rb_convert_to_float` with `raise_exception`
  * true — the arm every Rails call site reaches. A Numeric answers itself, a
  * String is parsed by `rb_str_to_dbl` and raises `ArgumentError` when it does
  * not parse, and anything else is converted through `to_f`, raising
@@ -23,7 +23,7 @@ const DIGIT_SEPARATOR_REGEX = /_/g;
  * `1_000` separators and `0x1p3` hex floats Ruby reads.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Kernel#Float`
- * (`vendor/ruby/object.c:3648`), which Rails calls without defining, so there
+ * (`vendor/ruby/v3.3.11/object.c:3648`), which Rails calls without defining, so there
  * is no Ruby file in any gem for the port to mirror.
  */
 export function kernelFloat(val: unknown): number {

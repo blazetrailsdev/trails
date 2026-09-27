@@ -32,18 +32,18 @@ function heldBy(data: MonData): symbol | null {
 }
 
 /**
- * `vendor/ruby/ext/monitor/lib/monitor.rb:191` `mon_owned?`, true when the
+ * `vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:191` `mon_owned?`, true when the
  * current execution context holds the monitor.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib `MonitorMixin#mon_owned?`
- * (`vendor/ruby/ext/monitor/lib/monitor.rb:191`).
+ * (`vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:191`).
  */
 export function isMonOwned(this: object): boolean {
   return heldBy(monData(this)) !== null;
 }
 
 /**
- * `vendor/ruby/ext/monitor/lib/monitor.rb:200` `mon_synchronize`, aliased
+ * `vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:200` `mon_synchronize`, aliased
  * `synchronize` at `:203`.
  *
  * Ruby's monitor is owned by a thread, and one thread runs one call at a time,
@@ -55,7 +55,7 @@ export function isMonOwned(this: object): boolean {
  * threads would.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib `MonitorMixin#synchronize`
- * (`vendor/ruby/ext/monitor/lib/monitor.rb:200,203`).
+ * (`vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:200,203`).
  */
 export async function synchronize<T>(this: object, block: () => T | Promise<T>): Promise<T> {
   const data = monData(this);
@@ -84,10 +84,10 @@ export async function synchronize<T>(this: object, block: () => T | Promise<T>):
 }
 
 /**
- * `vendor/ruby/ext/monitor/lib/monitor.rb:91` `module MonitorMixin`.
+ * `vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:91` `module MonitorMixin`.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib `MonitorMixin`
- * (`vendor/ruby/ext/monitor/lib/monitor.rb:91`).
+ * (`vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:91`).
  */
 export interface MonitorMixin {
   isMonOwned(): boolean;
@@ -95,11 +95,11 @@ export interface MonitorMixin {
 }
 
 /**
- * `vendor/ruby/ext/monitor/lib/monitor.rb:256` `class Monitor`, which is
+ * `vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:256` `class Monitor`, which is
  * `MonitorMixin` on a bare object.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib `Monitor`
- * (`vendor/ruby/ext/monitor/lib/monitor.rb:256`).
+ * (`vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:256`).
  */
 export class Monitor implements MonitorMixin {
   isMonOwned = isMonOwned;

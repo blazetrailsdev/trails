@@ -1,5 +1,5 @@
 /**
- * `vendor/ruby/random.c:1003` `limited_rand`, whose `limit` is INCLUSIVE:
+ * `vendor/ruby/v3.3.11/random.c:1003` `limited_rand`, whose `limit` is INCLUSIVE:
  * whole 32-bit words are drawn under a mask of `limit`'s width and any value
  * above `limit` is retried, so the distribution stays uniform rather than
  * skewing the low residues a bare modulo would favour.
@@ -19,7 +19,7 @@ function limitedRand(limit: bigint): bigint {
 }
 
 /**
- * `vendor/ruby/random.c:1684` `rb_f_rand`: a non-nil, non-zero `max` draws an
+ * `vendor/ruby/v3.3.11/random.c:1684` `rb_f_rand`: a non-nil, non-zero `max` draws an
  * Integer through `rand_int` (`random.c:1375`, `restrictive` false — so a
  * negative `max` is negated at `random.c:1385,1395` and drawn over its
  * magnitude), which asks `random_ulong_limited` for `0..max-1`
@@ -27,7 +27,7 @@ function limitedRand(limit: bigint): bigint {
  * `random_real`, a Float in `[0, 1)` (`random.c:1699`).
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Kernel.rand`
- * (`vendor/ruby/random.c:1684`), which no Ruby file in any gem defines for the
+ * (`vendor/ruby/v3.3.11/random.c:1684`), which no Ruby file in any gem defines for the
  * port to mirror.
  */
 export function kernelRand(max?: number | bigint | null): number | bigint {

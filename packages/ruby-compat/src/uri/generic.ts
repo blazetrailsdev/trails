@@ -4,7 +4,7 @@ import type { RFC2396Parser } from "./rfc2396-parser.js";
 import type { RFC3986Parser } from "./rfc3986-parser.js";
 
 /**
- * `URI::Generic` (`vendor/ruby/lib/uri/generic.rb:21`), the base class of every
+ * `URI::Generic` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:21`), the base class of every
  * scheme class and what `URI.parse` answers for a scheme it does not know.
  * Only the members trails sends are ported: the component readers and their
  * mutable setters, `merge` and the private helpers it reaches through. The
@@ -32,18 +32,18 @@ import type { RFC3986Parser } from "./rfc3986-parser.js";
  * ported body reaches.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `URI::Generic`
- * (`vendor/ruby/lib/uri/generic.rb:21`) ships with the interpreter.
+ * (`vendor/ruby/v3.3.11/lib/uri/generic.rb:21`) ships with the interpreter.
  */
 export class Generic {
-  /** `DEFAULT_PORT` (`vendor/ruby/lib/uri/generic.rb:27`). */
+  /** `DEFAULT_PORT` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:27`). */
   static readonly DEFAULT_PORT: number | null = null;
 
-  /** `self.default_port` (`vendor/ruby/lib/uri/generic.rb:32`). */
+  /** `self.default_port` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:32`). */
   static get defaultPort(): number | null {
     return this.DEFAULT_PORT;
   }
 
-  /** `default_port` (`vendor/ruby/lib/uri/generic.rb:39`). */
+  /** `default_port` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:39`). */
   get defaultPort(): number | null {
     return (this.constructor as typeof Generic).defaultPort;
   }
@@ -59,7 +59,7 @@ export class Generic {
   protected _fragment: string | null = null;
   protected _parser: RFC2396Parser | RFC3986Parser | null;
 
-  /** `initialize` (`vendor/ruby/lib/uri/generic.rb:169`). */
+  /** `initialize` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:169`). */
   constructor(
     scheme: string | null,
     userinfo: string | null,
@@ -93,47 +93,47 @@ export class Generic {
     if (this.defaultPort != null && this._port == null) this.setPort(this.defaultPort);
   }
 
-  /** `scheme` (`vendor/ruby/lib/uri/generic.rb:221`). */
+  /** `scheme` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:221`). */
   get scheme(): string | null {
     return this._scheme;
   }
 
-  /** `host` (`vendor/ruby/lib/uri/generic.rb:243`). */
+  /** `host` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:243`). */
   get host(): string | null {
     return this._host;
   }
 
-  /** `port` (`vendor/ruby/lib/uri/generic.rb:250`). */
+  /** `port` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:250`). */
   get port(): number | null {
     return this._port;
   }
 
-  /** `path` (`vendor/ruby/lib/uri/generic.rb:260`). */
+  /** `path` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:260`). */
   get path(): string | null {
     return this._path;
   }
 
-  /** `query` (`vendor/ruby/lib/uri/generic.rb:266`). */
+  /** `query` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:266`). */
   get query(): string | null {
     return this._query;
   }
 
   /**
-   * `fragment` (`vendor/ruby/lib/uri/generic.rb:283`).
+   * `fragment` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:283`).
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails:
-   * `URI::Generic#fragment` (`vendor/ruby/lib/uri/generic.rb:283`).
+   * `URI::Generic#fragment` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:283`).
    */
   get fragment(): string | null {
     return this._fragment;
   }
 
-  /** `parser` (`vendor/ruby/lib/uri/generic.rb:289`). */
+  /** `parser` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:289`). */
   get parser(): RFC2396Parser | RFC3986Parser {
     return this._parser ?? DEFAULT_PARSER;
   }
 
-  /** `check_scheme` (`vendor/ruby/lib/uri/generic.rb:320`). */
+  /** `check_scheme` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:320`). */
   private checkScheme(v: string | null): boolean {
     if (v != null && !this.parser.regexp.SCHEME.test(v)) {
       throw new InvalidComponentError(`bad component(expected scheme component): ${v}`);
@@ -142,18 +142,18 @@ export class Generic {
     return true;
   }
 
-  /** `set_scheme` (`vendor/ruby/lib/uri/generic.rb:334`). */
+  /** `set_scheme` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:334`). */
   protected setScheme(v: string | null): void {
     this._scheme = v?.toLowerCase() ?? null;
   }
 
-  /** `scheme=` (`vendor/ruby/lib/uri/generic.rb:360`). */
+  /** `scheme=` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:360`). */
   set scheme(v: string | null) {
     this.checkScheme(v);
     this.setScheme(v);
   }
 
-  /** `set_userinfo` (`vendor/ruby/lib/uri/generic.rb:509`). */
+  /** `set_userinfo` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:509`). */
   protected setUserinfo(
     user: string | null,
     password: string | null = null,
@@ -167,7 +167,7 @@ export class Generic {
     return [this._user, this._password];
   }
 
-  /** `split_userinfo` (`vendor/ruby/lib/uri/generic.rb:542`). */
+  /** `split_userinfo` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:542`). */
   private splitUserinfo(ui: string | null): [string | null, string | null] {
     if (ui == null) return [null, null];
     const i = ui.indexOf(":");
@@ -177,11 +177,11 @@ export class Generic {
   }
 
   /**
-   * `userinfo` (`vendor/ruby/lib/uri/generic.rb:557`) — `user`, or
+   * `userinfo` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:557`) — `user`, or
    * `user:password` where both are set.
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails:
-   * `URI::Generic#userinfo` (`vendor/ruby/lib/uri/generic.rb:557`).
+   * `URI::Generic#userinfo` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:557`).
    */
   get userinfo(): string | null {
     if (this._user == null) {
@@ -193,7 +193,7 @@ export class Generic {
     }
   }
 
-  /** `authority` (`vendor/ruby/lib/uri/generic.rb:579`) — the array of user,
+  /** `authority` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:579`) — the array of user,
    *  password, host and port, or `nil` when none of them is set. */
   get authority(): [string | null, string | null, string | null, number | null] | null {
     if (this._user != null || this._password != null || this._host != null || this._port != null) {
@@ -202,7 +202,7 @@ export class Generic {
     return null;
   }
 
-  /** `check_host` (`vendor/ruby/lib/uri/generic.rb:600`). */
+  /** `check_host` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:600`). */
   private checkHost(v: string | null): boolean | null {
     if (v == null) return v;
 
@@ -215,12 +215,12 @@ export class Generic {
     return true;
   }
 
-  /** `set_host` (`vendor/ruby/lib/uri/generic.rb:619`). */
+  /** `set_host` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:619`). */
   protected setHost(v: string | null): void {
     this._host = v;
   }
 
-  /** `set_authority` (`vendor/ruby/lib/uri/generic.rb:626`). */
+  /** `set_authority` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:626`). */
   protected setAuthority(
     user: string | null,
     password: string | null,
@@ -235,14 +235,14 @@ export class Generic {
     ];
   }
 
-  /** `host=` (`vendor/ruby/lib/uri/generic.rb:652`). */
+  /** `host=` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:652`). */
   set host(v: string | null) {
     this.checkHost(v);
     this.setHost(v);
     this.setUserinfo(null);
   }
 
-  /** `check_port` (`vendor/ruby/lib/uri/generic.rb:697`). */
+  /** `check_port` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:697`). */
   private checkPort(v: string | number | null): boolean | null {
     if (v == null) return v;
 
@@ -258,10 +258,10 @@ export class Generic {
   }
 
   /**
-   * `set_port` (`vendor/ruby/lib/uri/generic.rb:716`).
+   * `set_port` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:716`).
    *
    * The conversion is `String#to_i` (`rb_str_to_i`,
-   * `vendor/ruby/string.c:6602`), which answers `0` for a string with no
+   * `vendor/ruby/v3.3.11/string.c:6602`), which answers `0` for a string with no
    * leading digit run — `regexp[:PORT]` admits one made only of whitespace —
    * where `parseInt` would answer `NaN`.
    */
@@ -272,14 +272,14 @@ export class Generic {
     this._port = v;
   }
 
-  /** `port=` (`vendor/ruby/lib/uri/generic.rb:743`). */
+  /** `port=` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:743`). */
   set port(v: string | number | null) {
     this.checkPort(v);
     this.setPort(v);
     this.setUserinfo(null);
   }
 
-  /** `check_path` (`vendor/ruby/lib/uri/generic.rb:772`). */
+  /** `check_path` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:772`). */
   private checkPath(v: string | null): boolean {
     if (v != null && this._opaque != null) {
       throw new InvalidURIError("path conflicts with opaque");
@@ -303,18 +303,18 @@ export class Generic {
     return true;
   }
 
-  /** `set_path` (`vendor/ruby/lib/uri/generic.rb:804`). */
+  /** `set_path` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:804`). */
   protected setPath(v: string | null): void {
     this._path = v;
   }
 
-  /** `path=` (`vendor/ruby/lib/uri/generic.rb:830`). */
+  /** `path=` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:830`). */
   set path(v: string | null) {
     this.checkPath(v);
     this.setPath(v);
   }
 
-  /** `query=` (`vendor/ruby/lib/uri/generic.rb:854`). */
+  /** `query=` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:854`). */
   set query(v: string | null) {
     if (v == null) {
       this._query = null;
@@ -334,12 +334,12 @@ export class Generic {
     });
   }
 
-  /** `set_opaque` (`vendor/ruby/lib/uri/generic.rb:898`). */
+  /** `set_opaque` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:898`). */
   protected setOpaque(v: string | null): void {
     this._opaque = v;
   }
 
-  /** `fragment=` (`vendor/ruby/lib/uri/generic.rb:944`). */
+  /** `fragment=` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:944`). */
   set fragment(v: string | null) {
     if (v == null) {
       this._fragment = null;
@@ -357,10 +357,10 @@ export class Generic {
   }
 
   /**
-   * `absolute?` (`vendor/ruby/lib/uri/generic.rb:987`).
+   * `absolute?` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:987`).
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails:
-   * `URI::Generic#absolute?` (`vendor/ruby/lib/uri/generic.rb:987`).
+   * `URI::Generic#absolute?` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:987`).
    */
   isAbsolute(): boolean {
     if (this._scheme != null) {
@@ -371,23 +371,23 @@ export class Generic {
   }
 
   /**
-   * `relative?` (`vendor/ruby/lib/uri/generic.rb:999`).
+   * `relative?` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:999`).
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails:
-   * `URI::Generic#relative?` (`vendor/ruby/lib/uri/generic.rb:999`).
+   * `URI::Generic#relative?` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:999`).
    */
   isRelative(): boolean {
     return !this.isAbsolute();
   }
 
-  /** `split_path` (`vendor/ruby/lib/uri/generic.rb:1006`) — Ruby's
+  /** `split_path` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:1006`) — Ruby's
    *  `String#split("/", -1)` keeps trailing empties and answers `[]` for `""`,
    *  neither of which JS's `String#split` does. */
   private splitPath(path: string): string[] {
     return path === "" ? [] : path.split("/");
   }
 
-  /** `merge_path` (`vendor/ruby/lib/uri/generic.rb:1015`). */
+  /** `merge_path` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:1015`). */
   private mergePath(base: string, rel: string): string {
     const basePath = this.splitPath(base);
     const relPath = this.splitPath(rel);
@@ -441,7 +441,7 @@ export class Generic {
     return basePath.join("/");
   }
 
-  /** `merge` / `+` (`vendor/ruby/lib/uri/generic.rb:1124`). */
+  /** `merge` / `+` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:1124`). */
   merge(oth: Generic | string): Generic {
     const rel = this.parser.convertToUri(oth);
 
@@ -478,13 +478,13 @@ export class Generic {
     return base;
   }
 
-  /** `Object#dup` (`vendor/ruby/object.c:2205`) of a URI — the shallow copy
+  /** `Object#dup` (`vendor/ruby/v3.3.11/object.c:2205`) of a URI — the shallow copy
    *  `merge` mutates in place (`generic.rb:1140`). */
   protected dup(): this {
     return Object.assign(Object.create(Object.getPrototypeOf(this) as object), this) as this;
   }
 
-  /** `to_s` (`vendor/ruby/lib/uri/generic.rb:1355`). */
+  /** `to_s` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:1355`). */
   toString(): string {
     let str = "";
     if (this._scheme != null) {
