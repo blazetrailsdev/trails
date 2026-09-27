@@ -151,6 +151,8 @@ export {
   ClassMethods as UrlHelperClassMethods,
   setButtonToGeneratesButtonTag,
   urlFor,
+  tokenTag,
+  methodTag,
   _backUrl,
   _filteredReferrer,
   linkTo,
@@ -162,7 +164,5 @@ export {
   isCurrentPage,
   smsTo,
   phoneTo,
-  tokenTag,
-  methodTag,
 } from "./url-helper.js";
 export type { UrlHelperHost } from "./url-helper.js";

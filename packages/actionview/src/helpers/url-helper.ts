@@ -52,7 +52,8 @@ interface UrlHelperRequest {
 }
 
 type HtmlOptions = Record<string, unknown>;
-type UrlForHost = UrlHelperHost & { urlFor(options: unknown): string };
+type UrlForHost = UrlHelperHost &
+  CaptureHelperHost & { urlFor(options: unknown): string; contentTag: typeof contentTag };
 type Block = (...args: unknown[]) => unknown;
 
 export const BUTTON_TAG_METHOD_VERBS = ["patch", "put", "delete"];
@@ -120,14 +121,7 @@ export function linkTo(
   const url = urlTarget.call(this, name, options);
   if (!rtest(htmlOptions["href"])) htmlOptions["href"] = url;
 
-  return contentTag.call(
-    this as never,
-    "a",
-    rtest(name) ? name : url,
-    htmlOptions,
-    undefined,
-    block,
-  );
+  return this.contentTag("a", rtest(name) ? name : url, htmlOptions, undefined, block);
 }
 
 export function buttonTo(
@@ -179,9 +173,9 @@ export function buttonTo(
 
   let button: SafeBuffer;
   if (block) {
-    button = contentTag.call(this as never, "button", htmlOptions, undefined, undefined, block);
+    button = this.contentTag("button", htmlOptions, undefined, undefined, block);
   } else if (buttonToGeneratesButtonTag) {
-    button = contentTag.call(this as never, "button", rtest(name) ? name : url, htmlOptions);
+    button = this.contentTag("button", rtest(name) ? name : url, htmlOptions);
   } else {
     htmlOptions["value"] = rtest(name) ? name : url;
     button = tag("input", htmlOptions) as SafeBuffer;
@@ -195,7 +189,7 @@ export function buttonTo(
       );
     }
   }
-  const html = contentTag("form", innerTags, formOptions);
+  const html = this.contentTag("form", innerTags, formOptions);
   return preventContentExfiltration(html);
 }
 
@@ -240,8 +234,8 @@ export function linkToIf(
   } else {
     if (block) {
       return block.length <= 1
-        ? capture.call(this as unknown as CaptureHelperHost, block, name)
-        : capture.call(this as unknown as CaptureHelperHost, block, name, options, htmlOptions);
+        ? capture.call(this, block, name)
+        : capture.call(this, block, name, options, htmlOptions);
     } else {
       return htmlEscape(name);
     }
@@ -270,14 +264,7 @@ export function mailTo(
   const encodedEmailAddress = urlEncode(emailAddress).replaceAll("%40", "@");
   htmlOptions["href"] = `mailto:${encodedEmailAddress}${extras}`;
 
-  return contentTag.call(
-    this as never,
-    "a",
-    rtest(name) ? name : emailAddress,
-    htmlOptions,
-    undefined,
-    block,
-  );
+  return this.contentTag("a", rtest(name) ? name : emailAddress, htmlOptions, undefined, block);
 }
 
 export function isCurrentPage(
@@ -340,14 +327,7 @@ export function smsTo(
   const encodedPhoneNumber = urlEncode(phoneNumber);
   htmlOptions["href"] = `sms:${countryCode}${encodedPhoneNumber};${body}`;
 
-  return contentTag.call(
-    this as never,
-    "a",
-    rtest(name) ? name : phoneNumber,
-    htmlOptions,
-    undefined,
-    block,
-  );
+  return this.contentTag("a", rtest(name) ? name : phoneNumber, htmlOptions, undefined, block);
 }
 
 export function phoneTo(
@@ -366,14 +346,7 @@ export function phoneTo(
   const encodedPhoneNumber = urlEncode(phoneNumber);
   htmlOptions["href"] = `tel:${countryCode}${encodedPhoneNumber}`;
 
-  return contentTag.call(
-    this as never,
-    "a",
-    rtest(name) ? name : phoneNumber,
-    htmlOptions,
-    undefined,
-    block,
-  );
+  return this.contentTag("a", rtest(name) ? name : phoneNumber, htmlOptions, undefined, block);
 }
 
 /** @internal */

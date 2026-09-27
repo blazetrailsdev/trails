@@ -1,11 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Base } from "../base.js";
-import {
-  buttonToGeneratesButtonTag,
-  setButtonToGeneratesButtonTag,
-  toFormParams,
-} from "../helpers/url-helper.js";
+import { setPrependContentExfiltrationPrevention } from "../helpers/content-exfiltration-prevention-helper.js";
+import { setButtonToGeneratesButtonTag, toFormParams } from "../helpers/url-helper.js";
 
 function viewWith(controller: unknown): Base {
   return Base.withViewPaths([], {}, controller);
@@ -59,7 +56,6 @@ describe("UrlHelperTest", () => {
 
   let requestForgery = false;
   let view: any;
-  let savedButtonTag: boolean;
 
   beforeEach(() => {
     view = viewWith(null);
@@ -68,27 +64,22 @@ describe("UrlHelperTest", () => {
       formAuthenticityToken: { value: () => "secret" },
       requestForgeryProtectionToken: { value: "form_token" },
     });
-    savedButtonTag = buttonToGeneratesButtonTag;
     setButtonToGeneratesButtonTag(true);
   });
 
   afterEach(() => {
     requestForgery = false;
-    setButtonToGeneratesButtonTag(savedButtonTag);
+    setButtonToGeneratesButtonTag(false);
   });
 
-  const requestForUrl = (url: string, opts: { method?: string } = {}) => {
-    const [path, query] = url.split("?");
-    const method = (opts.method ?? "get").toUpperCase();
-    return {
-      isGet: () => method === "GET",
-      isHead: () => method === "HEAD",
-      path,
-      fullpath: query === undefined ? path : `${path}?${query}`,
-      protocol: "http://",
-      hostWithPort: "www.example.com",
-    };
-  };
+  const requestForUrl = (url: string, { method = "get" } = {}) => ({
+    isGet: () => method === "get",
+    isHead: () => method === "head",
+    path: url.split("?")[0],
+    fullpath: url,
+    protocol: "http://",
+    hostWithPort: "www.example.com",
+  });
 
   it("to form params with hash", () => {
     expect(toFormParams({ name: "David", nationality: "Danish" })).toEqual([
@@ -128,6 +119,28 @@ describe("UrlHelperTest", () => {
     );
   });
 
+  it("button to with remote and form options", () => {
+    assertDomEqual(
+      `<form method="post" action="http://www.example.com" class="custom-class" data-remote="true" data-type="json"><button type="submit">Hello</button></form>`,
+      view.buttonTo("Hello", "http://www.example.com", {
+        remote: true,
+        form: { class: "custom-class", "data-type": "json" },
+      }),
+    );
+  });
+
+  it("button to with content exfiltration prevention", () => {
+    setPrependContentExfiltrationPrevention(true);
+    try {
+      assertDomEqual(
+        `<!-- '"\` --><!-- </textarea></xmp> --></option></form><form method="post" action="http://www.example.com" class="button_to"><button type="submit">Hello</button></form>`,
+        view.buttonTo("Hello", "http://www.example.com"),
+      );
+    } finally {
+      setPrependContentExfiltrationPrevention(false);
+    }
+  });
+
   it("button to with method delete", () => {
     assertDomEqual(
       `<form method="post" action="http://www.example.com" class="button_to"><input type="hidden" name="_method" value="delete" autocomplete="off" /><button type="submit">Hello</button></form>`,
@@ -161,6 +174,18 @@ describe("UrlHelperTest", () => {
     const env = { HTTP_REFERER: "http://www.example.com/referer" };
     view = viewWith(controllerWithReferer(env));
     assertDomEqual(`<a href="${env.HTTP_REFERER}">go back</a>`, view.linkTo("go back", ":back"));
+  });
+
+  it("link tag using post javascript and rel", () => {
+    assertDomEqual(
+      `<a href="http://www.example.com" data-method="post" rel="example nofollow">Hello</a>`,
+      view.linkTo("Hello", "http://www.example.com", { method: "post", rel: "example" }),
+    );
+
+    assertDomEqual(
+      `<a href="http://www.example.com" data-method="post" rel="example nofollow">Hello</a>`,
+      view.linkTo("Hello", "http://www.example.com", { method: "post", rel: "example" }),
+    );
   });
 
   it("link tag using delete javascript and href and confirm", () => {
