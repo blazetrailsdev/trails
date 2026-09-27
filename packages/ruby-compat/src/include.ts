@@ -92,11 +92,19 @@ export class Module {
    * Mirrors: Ruby's Module#include into a module — vendor/ruby/v3.3.11/class.c:1179
    * `rb_include_module`, which splices `mod` BELOW this module, so a method
    * this module defines itself outranks the included one. A module already
-   * included is skipped (`include_modules_at`, class.c:1281,1291,1296).
+   * included is skipped (`include_modules_at`, class.c:1281,1291,1296). A
+   * module defining `appendFeatures` gets that call instead, then `included`,
+   * as `rb_mod_include` sends both (vendor/ruby/v3.3.11/eval.c:1159-1160).
    *
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
   include(mod: ModuleObject): this {
+    const appendFeatures = featureHook(mod, "appendFeatures");
+    if (appendFeatures) {
+      appendFeatures(this);
+      featureHook(mod, "included")?.(this);
+      return this;
+    }
     const carrier = carrierOf(this);
     if (!isModuleMethodTablePresent({ prototype: carrier }, mod)) {
       trackIncludedModule(carrier, mod);
@@ -109,7 +117,7 @@ export class Module {
       const installed = trackedKeys(carrier);
       const members = mod as Record<string, unknown>;
       for (const key of Object.keys(members)) {
-        if (typeof members[key] !== "function" || /^[A-Z]/.test(key)) continue;
+        if (/^[A-Z]/.test(key) || typeof members[key] !== "function") continue;
         if (Object.prototype.hasOwnProperty.call(carrier, key) && !installed.has(key)) continue;
         installed.add(key);
         Object.defineProperty(carrier, key, {

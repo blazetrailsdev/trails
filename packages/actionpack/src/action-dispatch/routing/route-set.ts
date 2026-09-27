@@ -1,5 +1,4 @@
 import {
-  classAttribute,
   Concern,
   extractOptionsBang,
   isBlank,
@@ -50,8 +49,8 @@ import {
   type UrlForHost,
   type UrlForOptions,
   type UrlForRoutes,
+  UrlFor,
 } from "./url-for.js";
-import * as UrlFor from "./url-for.js";
 import { Endpoint } from "./endpoint.js";
 import { X_CASCADE } from "../constants.js";
 import type { DispatchableControllerClass } from "./dispatcher.js";
@@ -651,7 +650,7 @@ export class NamedRouteCollection {
 }
 
 export type UrlHelpersModule = Module & {
-  _proxy: Included<typeof UrlFor> & { readonly _routes: RouteSet };
+  _proxy: Included<typeof import("./url-for.js")> & { readonly _routes: RouteSet };
   _dupForReinclude?: UrlHelpersModule;
   urlFor(options: UrlForOptions): string;
   fullUrlFor(options: UrlForOptions): string;
@@ -795,7 +794,6 @@ export class RouteSet {
 
       const proxyClass = class {
         readonly _routes: RouteSet;
-        defaultUrlOptions: Record<string, unknown> = {};
 
         constructor(routes: RouteSet) {
           this._routes = routes;
@@ -868,11 +866,7 @@ export class RouteSet {
         extend(self, pathHelpers);
       }
 
-      self.included(null, function (this: { prototype: object }) {
-        if (!("defaultUrlOptions" in this.prototype)) {
-          classAttribute.call(this, "defaultUrlOptions");
-          (this as unknown as { defaultUrlOptions: object }).defaultUrlOptions = {};
-        }
+      self.included(null, function (this: object) {
         Object.defineProperty(this, "_routes", { get: () => routes, configurable: true });
       });
 

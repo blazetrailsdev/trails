@@ -1,6 +1,6 @@
 {
   "actioncontroller": 6,
-  "actiondispatch": 2,
+  "actiondispatch": 3,
   "actionview": 1,
   "activemodel": 2,
   "activerecord": 12,

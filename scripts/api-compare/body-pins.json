@@ -11237,36 +11237,8 @@
   {
     "package": "actiondispatch",
     "rubyFile": "routing/route_set.rb",
-    "rubyName": "polymorphic_mapping",
-    "digest": "e694e309eacb0761",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "routing/route_set.rb",
-    "rubyName": "polymorphic_path",
-    "digest": "0791eca870ce4adf",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "routing/route_set.rb",
-    "rubyName": "polymorphic_path_for_action",
-    "digest": "4b3b411529542ef9",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "routing/route_set.rb",
     "rubyName": "polymorphic_url",
     "digest": "3a8bf155f29f19d9",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "routing/route_set.rb",
-    "rubyName": "polymorphic_url_for_action",
-    "digest": "bc1d628ce9f31923",
     "ref": "v8.0.2"
   },
   {
