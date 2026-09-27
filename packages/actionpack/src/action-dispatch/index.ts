@@ -13,6 +13,7 @@ export {
   Mapper,
   RouteSet,
   RoutesInspector,
+  RouteWrapper,
   ConsoleFormatter,
   type RoutesFilter,
   type RoutesFormatter,

@@ -59,6 +59,7 @@ export interface ActiveRecordConfig {
   cacheQueryLogTags: boolean;
   raiseOnAssignToAttrReadonly: boolean;
   partialInserts?: boolean;
+  belongsToRequiredByDefault?: boolean;
   belongsToRequiredValidatesForeignKey: boolean;
   generateSecureTokenOn: "create" | "initialize";
   queues: Record<string, unknown>;

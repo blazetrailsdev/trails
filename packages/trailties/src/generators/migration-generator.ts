@@ -2,7 +2,13 @@ import { File } from "@blazetrails/ruby-compat";
 import { GeneratorBase, GeneratorOptions, migrationTimestamp } from "./base.js";
 import { CreateMigration } from "./actions/create-migration.js";
 import { GeneratedAttribute } from "./generated-attribute.js";
-import { camelize, pluralize, singularize, tableize, underscore } from "@blazetrails/activesupport";
+import {
+  camelize,
+  foreignKey,
+  pluralize,
+  singularize,
+  underscore,
+} from "@blazetrails/activesupport";
 
 export interface MigrationRunOptions {
   timestamps?: boolean;
@@ -16,6 +22,11 @@ function indexNameLiteral(attribute: GeneratedAttribute): string {
     : `"${indexName}"`;
 }
 
+function kwargs(...options: Array<string | undefined>): string {
+  const pairs = options.join("");
+  return pairs === "" ? "" : `, { ${pairs.slice(2)} }`;
+}
+
 let lastTimestamp: string | null = null;
 
 export class MigrationGenerator extends GeneratorBase {
@@ -27,6 +38,14 @@ export class MigrationGenerator extends GeneratorBase {
 
   static exitOnFailure = true;
 
+  private attributes: GeneratedAttribute[] = [];
+  private timestamps = true;
+  private primaryKeyTypeOption: string | undefined;
+  private migrationTemplate = "migration.rb";
+  private migrationAction: string | undefined;
+  private tableName = "";
+  private joinTables: string[] = [];
+
   run(name: string, args: string[], options: MigrationRunOptions = {}): string[] {
     if (!/^\w+$/.test(name)) {
       throw new Error(
@@ -35,11 +54,17 @@ export class MigrationGenerator extends GeneratorBase {
     }
 
     const { timestamps = true, primaryKeyType } = options;
-    const attributes = args
+    this.timestamps = timestamps;
+    this.primaryKeyTypeOption = primaryKeyType;
+    this.attributes = args
       .filter((arg) => !arg.startsWith("-"))
       .map((arg) => GeneratedAttribute.parse(arg));
     const className = camelize(underscore(name));
-    const body = this.inferBody(name, className, attributes, args, timestamps, primaryKeyType);
+    this.setLocalAssignsBang(underscore(name));
+    const body =
+      this.migrationTemplate === "create_table_migration.rb"
+        ? this.createTableMigration()
+        : this.migration();
     let timestamp = migrationTimestamp();
     if (lastTimestamp && timestamp <= lastTimestamp) {
       timestamp = (parseInt(lastTimestamp, 10) + 1).toString();
@@ -71,148 +96,151 @@ ${body}
     return this.getCreatedFiles();
   }
 
-  private inferBody(
-    _name: string,
-    _className: string,
-    attributes: GeneratedAttribute[],
-    rawArgs: string[],
-    timestamps: boolean = true,
-    primaryKeyType?: string,
-  ): string {
-    const createMatch = _name.match(/^create[_-]?(.+)$/i);
-    if (createMatch) {
-      const table = tableize(createMatch[1]);
-      const colLines: string[] = [];
-      for (const attribute of attributes) {
-        if (attribute.passwordDigest()) {
-          colLines.push(`      t.string("password_digest"${attribute.injectOptions()});`);
-        } else if (attribute.token()) {
-          colLines.push(`      t.string("${attribute.name}"${attribute.injectOptions()});`);
-        } else if (attribute.reference()) {
-          colLines.push(
-            `      t.${camelize(attribute.type, false)}("${attribute.name}"${attribute.injectOptions()});`,
-          );
-        } else if (!attribute.virtual()) {
-          colLines.push(
-            `      t.${attribute.type}("${attribute.name}"${attribute.injectOptions()});`,
-          );
-        }
-      }
-      const tsLine = timestamps ? "\n      t.timestamps();" : "";
-      const idOpt = primaryKeyType ? `, { id: "${primaryKeyType}" }` : "";
-      const parts = [
-        `    await this.createTable("${table}"${idOpt}, (t) => {\n${colLines.join("\n")}${tsLine}\n    });`,
-      ];
-      for (const attribute of attributes.filter((a) => a.token())) {
-        parts.push(
-          `    await this.addIndex("${table}", ${indexNameLiteral(attribute)}${attribute.injectIndexOptions() || ", { unique: true }"});`,
+  private createTableMigration(): string {
+    const table = this.tableName;
+    const colLines: string[] = [];
+    for (const attribute of this.attributes) {
+      if (attribute.passwordDigest()) {
+        colLines.push(`      t.string("password_digest"${kwargs(attribute.injectOptions())});`);
+      } else if (attribute.token()) {
+        colLines.push(`      t.string("${attribute.name}"${kwargs(attribute.injectOptions())});`);
+      } else if (attribute.reference()) {
+        colLines.push(
+          `      t.${camelize(attribute.type, false)}("${attribute.name}"${kwargs(attribute.injectOptions(), this.foreignKeyType())});`,
+        );
+      } else if (!attribute.virtual()) {
+        colLines.push(
+          `      t.${attribute.type}("${attribute.name}"${kwargs(attribute.injectOptions())});`,
         );
       }
-      for (const attribute of attributes.filter((a) => !a.reference() && a.hasIndex())) {
-        parts.push(
-          `    await this.addIndex("${table}", ${indexNameLiteral(attribute)}${attribute.injectIndexOptions()});`,
-        );
-      }
-      return parts.join("\n");
     }
-
-    const joinMatch = _name.match(/^(?:add|create)[_-]?(.+)[_-]join[_-]table$/i);
-    if (joinMatch) {
-      return this.joinTableBody(rawArgs);
+    if (this.timestamps) colLines.push("      t.timestamps();");
+    const parts = [
+      `    await this.createTable("${table}"${kwargs(this.primaryKeyType())}, (t) => {\n${colLines.join("\n")}\n    });`,
+    ];
+    for (const attribute of this.attributes.filter((a) => a.token())) {
+      parts.push(
+        `    await this.addIndex("${table}", ${indexNameLiteral(attribute)}${kwargs(attribute.injectIndexOptions() || ", unique: true")});`,
+      );
     }
+    for (const attribute of this.attributesWithIndex()) {
+      parts.push(
+        `    await this.addIndex("${table}", ${indexNameLiteral(attribute)}${kwargs(attribute.injectIndexOptions())});`,
+      );
+    }
+    return parts.join("\n");
+  }
 
-    const addMatch = _name.match(/^add[_-]?(.+?)[_-]?to[_-]?(.+)$/i);
-    if (addMatch) {
-      const table = tableize(addMatch[2]);
-      const lines: string[] = [];
-      for (const attribute of attributes) {
+  private migration(): string {
+    const table = this.tableName;
+    const lines: string[] = [];
+    if (this.migrationAction === "add") {
+      for (const attribute of this.attributes) {
         if (attribute.reference()) {
           lines.push(
-            `    await this.addReference("${table}", "${attribute.name}"${attribute.injectOptions()});`,
+            `    await this.addReference("${table}", "${attribute.name}"${kwargs(attribute.injectOptions(), this.foreignKeyType())});`,
           );
         } else if (attribute.token()) {
           lines.push(
-            `    await this.addColumn("${table}", "${attribute.name}", "string"${attribute.injectOptions()});`,
+            `    await this.addColumn("${table}", "${attribute.name}", "string"${kwargs(attribute.injectOptions())});`,
           );
           lines.push(
-            `    await this.addIndex("${table}", ${indexNameLiteral(attribute)}${attribute.injectIndexOptions() || ", { unique: true }"});`,
+            `    await this.addIndex("${table}", ${indexNameLiteral(attribute)}${kwargs(attribute.injectIndexOptions() || ", unique: true")});`,
           );
         } else if (!attribute.virtual()) {
           lines.push(
-            `    await this.addColumn("${table}", "${attribute.name}", "${attribute.type}"${attribute.injectOptions()});`,
+            `    await this.addColumn("${table}", "${attribute.name}", "${attribute.type}"${kwargs(attribute.injectOptions())});`,
           );
           if (attribute.hasIndex()) {
             lines.push(
-              `    await this.addIndex("${table}", ${indexNameLiteral(attribute)}${attribute.injectIndexOptions()});`,
+              `    await this.addIndex("${table}", ${indexNameLiteral(attribute)}${kwargs(attribute.injectIndexOptions())});`,
             );
           }
         }
       }
-      return lines.join("\n");
-    }
-
-    const removeMatch = _name.match(/^remove[_-]?(.+?)[_-]?from[_-]?(.+)$/i);
-    if (removeMatch) {
-      const table = tableize(removeMatch[2]);
-      const lines: string[] = [];
-      for (const attribute of attributes) {
+    } else if (this.migrationAction === "join") {
+      lines.push(
+        `    await this.createJoinTable("${this.joinTables[0]}", "${this.joinTables[1]}", (t) => {`,
+      );
+      for (const attribute of this.attributes) {
         if (attribute.reference()) {
           lines.push(
-            `    await this.removeReference("${table}", "${attribute.name}"${attribute.injectOptions()});`,
+            `      t.references("${attribute.name}"${kwargs(attribute.injectOptions(), this.foreignKeyType())});`,
+          );
+        } else if (!attribute.virtual()) {
+          lines.push(
+            `      ${attribute.hasIndex() ? "" : "// "}t.index(${indexNameLiteral(attribute)}${kwargs(attribute.injectIndexOptions())});`,
+          );
+        }
+      }
+      lines.push("    });");
+    } else if (this.migrationAction) {
+      for (const attribute of this.attributes) {
+        if (attribute.reference()) {
+          lines.push(
+            `    await this.removeReference("${table}", "${attribute.name}"${kwargs(attribute.injectOptions(), this.foreignKeyType())});`,
           );
         } else {
           if (attribute.hasIndex()) {
             lines.push(
-              `    await this.removeIndex("${table}", ${indexNameLiteral(attribute)}${attribute.injectIndexOptions()});`,
+              `    await this.removeIndex("${table}", ${indexNameLiteral(attribute)}${kwargs(attribute.injectIndexOptions())});`,
             );
           }
           if (!attribute.virtual()) {
             lines.push(
-              `    await this.removeColumn("${table}", "${attribute.name}", "${attribute.type}"${attribute.injectOptions()});`,
+              `    await this.removeColumn("${table}", "${attribute.name}", "${attribute.type}"${kwargs(attribute.injectOptions())});`,
             );
           }
         }
       }
-      return lines.join("\n");
     }
-
-    return "";
+    return lines.join("\n");
   }
 
-  private joinTableBody(rawArgs: string[]): string {
-    const entries: Array<{ name: string; unique: boolean }> = [];
-    for (const arg of rawArgs) {
-      if (arg.startsWith("-")) continue;
-      const parts = arg.split(":");
-      const name = parts[0].replace(/_id$/, "");
-      const unique = parts.includes("uniq");
-      entries.push({ name, unique });
+  private primaryKeyType(): string | undefined {
+    const keyType = this.primaryKeyTypeOption;
+    if (keyType) return `, id: "${keyType}"`;
+  }
+
+  private foreignKeyType(): string | undefined {
+    const keyType = this.primaryKeyTypeOption;
+    if (keyType) return `, type: "${keyType}"`;
+  }
+
+  private setLocalAssignsBang(fileName: string): void {
+    this.migrationTemplate = "migration.rb";
+    let m: RegExpMatchArray | null;
+    if ((m = fileName.match(/^(add)_.*_to_(.*)/) ?? fileName.match(/^(remove)_.*?_from_(.*)/))) {
+      this.migrationAction = m[1];
+      this.tableName = this.normalizeTableName(m[2]);
+    } else if (/join_table/.test(fileName)) {
+      if (this.attributes.length === 2) {
+        this.migrationAction = "join";
+        this.joinTables = this.attributes.map((a) => a.pluralName());
+
+        this.setIndexNames();
+      }
+    } else if ((m = fileName.match(/^create_(.+)/))) {
+      this.tableName = this.normalizeTableName(m[1]);
+      this.migrationTemplate = "create_table_migration.rb";
     }
+  }
 
-    if (entries.length !== 2) {
-      throw new Error(
-        `Join table migration requires exactly 2 table arguments, got ${entries.length}`,
-      );
-    }
-    const [e1, e2] = entries;
-    const t1Singular = singularize(e1.name);
-    const t2Singular = singularize(e2.name);
-    const t1Id = `${t1Singular}_id`;
-    const t2Id = `${t2Singular}_id`;
-    const t1Plural = pluralize(e1.name);
-    const t2Plural = pluralize(e2.name);
+  private setIndexNames(): void {
+    this.attributes.forEach((attr, i) => {
+      attr.setIndexName([attr, this.attributes.at(i - 1)!].map((a) => this.indexNameFor(a)));
+    });
+  }
 
-    const lines: string[] = [];
-    lines.push(`    await this.createJoinTable("${t1Plural}", "${t2Plural}", (t) => {`);
-    lines.push(`      // t.index(["${t1Id}", "${t2Id}"]);`);
+  private indexNameFor(attribute: GeneratedAttribute): string {
+    return attribute.foreignKey() ? attribute.name : foreignKey(singularize(attribute.name));
+  }
 
-    if (e1.unique || e2.unique) {
-      lines.push(`      t.index(["${t2Id}", "${t1Id}"], { unique: true });`);
-    } else {
-      lines.push(`      // t.index(["${t2Id}", "${t1Id}"]);`);
-    }
-    lines.push("    });");
+  private attributesWithIndex(): GeneratedAttribute[] {
+    return this.attributes.filter((a) => !a.reference() && a.hasIndex());
+  }
 
-    return lines.join("\n");
+  private normalizeTableName(tableName: string): string {
+    return pluralize(tableName);
   }
 }

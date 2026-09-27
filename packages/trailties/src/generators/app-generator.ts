@@ -169,6 +169,7 @@ export class AppGenerator extends AppBase {
           dependencies: {
             "@blazetrails/activerecord": "*",
             "@blazetrails/activemodel": "*",
+            "@blazetrails/date": "*",
             "@blazetrails/activesupport": "*",
             "@blazetrails/rack": "*",
             "@blazetrails/ruby-compat": "*",
@@ -180,6 +181,7 @@ export class AppGenerator extends AppBase {
           devDependencies: {
             "@blazetrails/activerecord-cli": "*",
             "@blazetrails/trails-tsc": "*",
+            "@types/node": "^22.0.0",
             tsx: "^4.20.0",
             typescript: "^5.7.0",
             vite: "^7.0.0",
@@ -204,6 +206,7 @@ export class AppGenerator extends AppBase {
             esModuleInterop: true,
             skipLibCheck: true,
             allowArbitraryExtensions: true,
+            types: ["node"],
             rootDir: ".",
             outDir: "dist",
             plugins: [{ name: "@blazetrails/trails-tsc/ts-plugin", viewsDir: "app/views" }],
@@ -429,7 +432,7 @@ export class ${this.appConstBase()} extends Application {
   // config.eagerLoadPaths.push("extras");
 }
 
-Application.register(${this.appConstBase()});
+Application.register(${this.appConstBase()}, import.meta.url);
 `,
     );
 

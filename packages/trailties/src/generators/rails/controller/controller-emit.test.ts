@@ -69,17 +69,6 @@ describe("controllerPathHelpers", () => {
 });
 
 describe("emitControllerClass (direct helper surface)", () => {
-  it("emits a class extending ActionController.Base with the namespace import covered", () => {
-    const src = emitControllerClass({
-      className: "PostsController",
-      methods: [actionMethod("index", true)],
-    });
-    expect(src).toContain('import { ActionController } from "@blazetrails/actionpack";');
-    expect(src).toContain("export class PostsController extends ActionController.Base");
-    expect(parseTs(src).diagnostics).toEqual([]);
-    assertNoRubySource(src);
-  });
-
   it("emits a relative parent import when parent ref is provided", () => {
     const parent = parentRefForRelative("admin_controller", 0);
     const src = emitControllerClass({

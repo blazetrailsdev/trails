@@ -38,7 +38,7 @@ describe("ControllerGeneratorTest", () => {
     const gen = makeGen();
     gen.run("Account", ["foo", "bar"]);
     const content = readFile("app/controllers/account-controller.ts");
-    expect(content).toContain("class AccountController");
+    expect(content).toMatch(/class AccountController extends ApplicationController/);
   });
 
   it.skip("check class collision", () => {});
@@ -215,7 +215,9 @@ describe("ControllerGeneratorTest (JavaScript project)", () => {
       path.join(jsTmpDir, "app/controllers/posts-controller.js"),
       "utf-8",
     );
-    expect(content).toContain('import { ActionController } from "@blazetrails/actionpack"');
+    expect(content).toContain(
+      'import { ApplicationController } from "./application-controller.js"',
+    );
     expect(content).toContain("export class PostsController");
   });
 });

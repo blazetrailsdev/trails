@@ -16,7 +16,6 @@ describe("test_help wires a booted app into the test case classes", () => {
   beforeAll(async () => {
     previousEnv = env.TRAILS_ENV;
     await import("./__fixtures__/boot-app/config/application.js");
-    Trails.application!.config.setRoot(root);
     await import("./__fixtures__/boot-app/test/test-helper.js");
   }, 15_000);
 

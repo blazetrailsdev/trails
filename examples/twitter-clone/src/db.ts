@@ -1,4 +1,6 @@
+import { fileURLToPath } from "node:url";
 import { Base, registerModel } from "@blazetrails/activerecord";
+import { loadDatabaseConfig } from "@blazetrails/activerecord-cli";
 import { User, Tweet, Follow, Like } from "./models/index.js";
 
 const MODELS = [User, Tweet, Follow, Like];
@@ -8,12 +10,14 @@ let connected = false;
 /**
  * Establish the connection (idempotent within a process).
  *
- * No config lives here — `Base.establishConnection()` with no arguments
- * reads `config/database.ts` for the current `TRAILS_ENV`, exactly like
- * Rails reads `config/database.yml`. To change databases, edit that file.
+ * No config lives here — `loadDatabaseConfig` populates `Base.configurations`
+ * from `config/database.ts`, as Rails' railtie does from `config/database.yml`,
+ * and `Base.establishConnection()` with no arguments picks the current
+ * `TRAILS_ENV`. To change databases, edit that file.
  */
 export async function connect(): Promise<void> {
   if (connected) return;
+  await loadDatabaseConfig(fileURLToPath(new URL("..", import.meta.url)));
   await Base.establishConnection();
   connected = true;
 }

@@ -3,7 +3,9 @@ import { GeneratedAttribute, GeneratorError } from "./generated-attribute.js";
 
 describe("GeneratedAttribute", () => {
   it("test_field_name_with_dangerous_attribute_raises_error", () => {
+    const message = "Could not generate field 'save', as it is already defined by Active Record.";
     expect(() => GeneratedAttribute.parse("save:string")).toThrow(GeneratorError);
+    expect(() => GeneratedAttribute.parse("save:string")).toThrow(message);
   });
 
   it("test_field_type_returns_number_field", () => {
@@ -97,7 +99,8 @@ describe("GeneratedAttribute", () => {
   });
 
   it("test_default_value_for_type", () => {
-    expect(new GeneratedAttribute("type", "string").default()).toBe("");
+    const att = GeneratedAttribute.parse("type:string");
+    expect(att.default()).toBe("");
   });
 
   it("test_default_value_is_text", () => {

@@ -216,6 +216,8 @@ describe("AppGenerator", () => {
     expect(pkg.scripts.prepare).toBe("trails-tsc-views build --views app/views");
     expect(pkg.scripts.postinstall).toBeUndefined();
     expect(pkg.devDependencies["@blazetrails/trails-tsc"]).toBeDefined();
+    expect(pkg.dependencies["@blazetrails/date"]).toBeDefined();
+    expect(pkg.devDependencies["@types/node"]).toBeDefined();
     const gitignore = fs.readFileSync(appPath(".gitignore"), "utf-8");
     expect(gitignore).toContain("/.trails/");
   });
@@ -238,6 +240,7 @@ describe("AppGenerator", () => {
     expect(tsconfig.include).toEqual(expect.arrayContaining(["app", "config", "db"]));
     expect(tsconfig.compilerOptions.rootDir).toBe(".");
     expect(tsconfig.compilerOptions.allowArbitraryExtensions).toBe(true);
+    expect(tsconfig.compilerOptions.types).toEqual(["node"]);
     expect(tsconfig.compilerOptions.plugins).toEqual([
       { name: "@blazetrails/trails-tsc/ts-plugin", viewsDir: "app/views" },
     ]);
@@ -368,7 +371,7 @@ describe("AppGenerator", () => {
     const appConfig = fs.readFileSync(appPath("config/application.ts"), "utf-8");
     expect(appConfig).toContain(`import { Application } from "@blazetrails/trailties";`);
     expect(appConfig).toContain("export class MyApp extends Application {");
-    expect(appConfig).toContain("Application.register(MyApp);");
+    expect(appConfig).toContain("Application.register(MyApp, import.meta.url);");
 
     const environment = fs.readFileSync(appPath("config/environment.ts"), "utf-8");
     expect(environment).toContain(`import "./application.js";`);

@@ -43,9 +43,11 @@ and migrates it from scratch.
 
 All connection settings live in **`config/database.ts`** — the single
 source of truth, like Rails' `config/database.yml`. It's keyed by
-environment; `TRAILS_ENV` (default `development`) picks the entry, and
-`Base.establishConnection()` reads the file with no arguments (see
-`src/db.ts`, which contains no config of its own):
+environment; `TRAILS_ENV` (default `development`) picks the entry.
+`loadDatabaseConfig` from `@blazetrails/activerecord-cli` loads the file into
+`Base.configurations`, and `Base.establishConnection()` with no arguments then
+resolves the current environment through that registry (see `src/db.ts`, which
+contains no config of its own):
 
 ```ts
 const config = {

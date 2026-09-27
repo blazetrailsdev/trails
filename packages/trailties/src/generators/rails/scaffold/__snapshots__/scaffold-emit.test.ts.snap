@@ -1,9 +1,9 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`ScaffoldGenerator emit > matches snapshot for the controller and validates as TS without Ruby 1`] = `
-"import { ActionController } from "@blazetrails/actionpack";
+"import { ApplicationController } from "./application-controller.js";
 
-export class PostsController extends ActionController.Base {
+export class PostsController extends ApplicationController {
   async index(): Promise<void> {
     // const posts = await Post.all();
     const posts: any[] = [];

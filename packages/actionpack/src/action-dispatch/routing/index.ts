@@ -3,6 +3,7 @@ export { RouteSet, Dispatcher, StaticDispatcher, type DrawCallback } from "./rou
 export { escapePath, escapeSegment, escapeFragment, unescapeUri } from "../journey/router/utils.js";
 export {
   RoutesInspector,
+  RouteWrapper,
   ConsoleFormatter,
   type RoutesFilter,
   type RoutesFormatter,

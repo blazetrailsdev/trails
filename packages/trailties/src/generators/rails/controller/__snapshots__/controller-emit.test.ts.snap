@@ -12,9 +12,9 @@ export class AdminDashboardController extends AdminController {
 `;
 
 exports[`ControllerGenerator emit > matches snapshot for simple controller 1`] = `
-"import { ActionController } from "@blazetrails/actionpack";
+"import { ApplicationController } from "./application-controller.js";
 
-export class AccountController extends ActionController.Base {
+export class AccountController extends ApplicationController {
   async index(): Promise<void> {
     // TODO: implement
   }

@@ -6,7 +6,7 @@ import type { ModelHelpersOptions } from "../../model-helpers.js";
 import { ResourceHelpers } from "../../resource-helpers.js";
 import { ModelGenerator } from "../../model-generator.js";
 import { tsBody, tsMethod, type Method } from "../../../template-builder/index.js";
-import { emitControllerClass } from "../controller/controller-paths.js";
+import { emitControllerClass, parentRefForRelative } from "../controller/controller-paths.js";
 import { emitResourceRouteSnippet } from "../resource-route/resource-route-generator.js";
 
 export interface ScaffoldGeneratorOptions extends NamedBaseOptions, ModelHelpersOptions {
@@ -45,6 +45,7 @@ export class ScaffoldGenerator extends NamedBase {
       `app/controllers/${controllerFileName}${ext}`,
       emitControllerClass({
         className: controllerClassName,
+        parent: parentRefForRelative("ApplicationController", this.controllerClassPath().length),
         methods: crudMethods(className, singular, plural, this.routeUrl(), ts),
       }),
     );
