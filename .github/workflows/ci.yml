@@ -527,8 +527,6 @@ jobs:
       # (#7083, #5976). Gate it here instead: a PR declaring `Closes-story: <id>`
       # must carry no pending citation of `<id>`. Same scan, same extractor, so
       # a finding is a guaranteed red on main.
-      # Every event, not only pull_request: the vendor-citations step below
-      # needs pnpm on push and the weekly sweep too.
       - name: Set up pnpm
         id: setup-pnpm
         # !cancelled() as above, so an earlier step's failure can't skip it.
@@ -542,14 +540,6 @@ jobs:
           pnpm install --frozen-lockfile --prefer-offline
           pnpm check:closing-story-refs --pr "$PR_NUMBER"
 
-      # Vendor citations (RFC 0159). Every `vendor/<source>/…` citation in a
-      # tracked file names its source's active version. It runs here rather
-      # than in unit-tests because unit-tests is skipped on a docs-only PR, and
-      # a `.md` is where most citations live: a docs-only PR could land an
-      # unversioned citation green and red the next code PR against an
-      # unrelated diff — the #6980 → #6989 shape recorded at
-      # UNIT_TESTS_PKGS_RE. It reads only vendor/sources.lock.json and
-      # `git ls-files`, so it needs no build and no fetched vendor/ tree.
       - name: Vendor citations
         id: vendor-citations
         if: ${{ !cancelled() }}
