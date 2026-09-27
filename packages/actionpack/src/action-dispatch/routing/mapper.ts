@@ -4,7 +4,6 @@ import { Dispatcher, StaticDispatcher } from "./route-set.js";
 import type { DispatchableControllerClass } from "./dispatcher.js";
 import type { Request } from "../http/request.js";
 import { X_CASCADE } from "../constants.js";
-import { Scope, type ScopeFrameHash, type ScopeLevel } from "./scope.js";
 import { Parser } from "../journey/parser.js";
 import { Ast, type Node } from "../journey/nodes/node.js";
 import { Pattern } from "../journey/path/pattern.js";
@@ -73,6 +72,7 @@ export interface RouteOptions {
   shallow?: boolean;
   internal?: boolean;
   on?: string;
+  concerns?: string | string[];
 }
 
 export type ResourceAction = "index" | "show" | "new" | "create" | "edit" | "update" | "destroy";
@@ -88,7 +88,10 @@ export interface RedirectOptions {
 }
 
 type MapperCallback = (mapper: Mapper) => void;
-type ConcernCallback = (mapper: Mapper) => void;
+type ConcernCallback = (mapper: Mapper, options: Record<string, unknown>) => void;
+type ConcernCallable =
+  | ConcernCallback
+  | { call(mapper: Mapper, options: Record<string, unknown>): void };
 type MapMethodArgs = (string | RouteOptions | Record<string, unknown>)[];
 
 /** @internal */
@@ -684,6 +687,140 @@ export class Mapping {
   }
 }
 
+export type ScopeLevel =
+  | "resource"
+  | "resources"
+  | "collection"
+  | "member"
+  | "new"
+  | "nested"
+  | "root"
+  | null;
+
+export type ScopeFrameHash = Record<string, unknown>;
+
+export class Scope {
+  static readonly OPTIONS: readonly string[] = [
+    "path",
+    "shallowPath",
+    "as",
+    "shallowPrefix",
+    "module",
+    "controller",
+    "action",
+    "pathNames",
+    "constraints",
+    "shallow",
+    "blocks",
+    "defaults",
+    "via",
+    "format",
+    "options",
+    "to",
+  ];
+
+  static readonly RESOURCE_SCOPES: readonly ScopeLevel[] = ["resource", "resources"];
+  static readonly RESOURCE_METHOD_SCOPES: readonly ScopeLevel[] = ["collection", "member", "new"];
+
+  readonly parent: Scope | null;
+  readonly scopeLevel: ScopeLevel;
+  private readonly hash: ScopeFrameHash;
+
+  constructor(
+    hash: ScopeFrameHash,
+    parent: Scope | null = Scope.ROOT,
+    scopeLevel: ScopeLevel = null,
+  ) {
+    this.parent = parent;
+    this.hash = parent ? { ...parent.frame, ...hash } : hash;
+    this.scopeLevel = scopeLevel;
+  }
+
+  isNested(): boolean {
+    return this.scopeLevel === "nested";
+  }
+
+  isNull(): boolean {
+    return this.hash == null && this.parent == null;
+  }
+
+  isRoot(): boolean {
+    return this.parent === Scope.ROOT;
+  }
+
+  isResources(): boolean {
+    return this.scopeLevel === "resources";
+  }
+
+  isResourceMethodScope(): boolean {
+    return Scope.RESOURCE_METHOD_SCOPES.includes(this.scopeLevel);
+  }
+
+  actionName(
+    namePrefix: string | undefined,
+    prefix: string | undefined,
+    collectionName: string | undefined,
+    memberName: string | undefined,
+  ): Array<string | undefined> {
+    switch (this.scopeLevel) {
+      case "nested":
+        return [namePrefix, prefix];
+      case "collection":
+        return [prefix, namePrefix, collectionName];
+      case "new":
+        return [prefix, "new", namePrefix, memberName];
+      case "member":
+        return [prefix, namePrefix, memberName];
+      case "root":
+        return [namePrefix, collectionName, prefix];
+      default:
+        return [namePrefix, memberName, prefix];
+    }
+  }
+
+  isResourceScope(): boolean {
+    return Scope.RESOURCE_SCOPES.includes(this.scopeLevel);
+  }
+
+  options(): readonly string[] {
+    return Scope.OPTIONS;
+  }
+
+  new(hash: ScopeFrameHash): Scope {
+    return new (this.constructor as typeof Scope)(hash, this, this.scopeLevel);
+  }
+
+  newLevel(level: ScopeLevel): Scope {
+    return new (this.constructor as typeof Scope)(this.frame, this, level);
+  }
+
+  get(key: string): unknown {
+    return this.frame[key];
+  }
+
+  get frame(): ScopeFrameHash {
+    return this.hash;
+  }
+
+  each(block: (node: Scope) => void): void {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    let node: Scope = this;
+    while (node !== Scope.ROOT) {
+      block(node);
+      node = node.parent!;
+    }
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  [Symbol.iterator](): Iterator<Scope> {
+    const nodes: Scope[] = [];
+    this.each((node) => nodes.push(node));
+    return nodes[Symbol.iterator]();
+  }
+
+  static readonly ROOT: Scope = new Scope({}, null);
+}
+
 export class Mapper {
   static readonly URL_OPTIONS: readonly string[] = [
     "protocol",
@@ -693,7 +830,10 @@ export class Mapper {
     "port",
   ];
 
-  private concerns: Map<string, ConcernCallback> = new Map();
+  static Scope = Scope;
+
+  /** @internal */
+  _concerns: Map<string, ConcernCallable> = new Map();
   /** @internal */
   _set: RouteSetLike;
   /** @internal */
@@ -811,24 +951,28 @@ export class Mapper {
     const newPath = this.actionPath("new");
     const editPath = this.actionPath("edit");
 
-    if (cb) {
-      const resource: ResourceLike = {
-        memberName: singular,
-        collectionName: name,
-        nestedParam: `${singular}_id`,
-        param: "id",
-        path: String((options as { path?: string }).path ?? name),
-        resourceScope: controller,
-        actions: Array.from(allowed),
-        shallow: () => shallow,
-        singleton: () => false,
-        collectionScope: name,
-        memberScope: `${name}/:id`,
-        nestedScope: `${name}/:${singular}_id`,
-        newScope: (newPath) => `${name}/${newPath}`,
-      };
-      this.withScopeLevel("resources", () => this.resourceScope(resource, () => cb(this)));
-    }
+    const resource: ResourceLike = {
+      memberName: singular,
+      collectionName: name,
+      nestedParam: `${singular}_id`,
+      param: "id",
+      path: String((options as { path?: string }).path ?? name),
+      resourceScope: controller,
+      actions: Array.from(allowed),
+      shallow: () => shallow,
+      singleton: () => false,
+      collectionScope: name,
+      memberScope: `${name}/:id`,
+      nestedScope: `${name}/:${singular}_id`,
+      newScope: (newPath) => `${name}/${newPath}`,
+    };
+    this.withScopeLevel("resources", () =>
+      this.resourceScope(resource, () => {
+        if (cb) cb(this);
+
+        if (options.concerns) this.concerns(options.concerns);
+      }),
+    );
 
     if (allowed.has("index")) {
       const as = routeName(name);
@@ -914,24 +1058,28 @@ export class Mapper {
     const newPath = this.actionPath("new");
     const editPath = this.actionPath("edit");
 
-    if (cb) {
-      const resource: ResourceLike = {
-        memberName: name,
-        collectionName: name,
-        nestedParam: `${name}_id`,
-        param: "id",
-        path: String((options as { path?: string }).path ?? name),
-        resourceScope: controller,
-        actions: Array.from(allowed),
-        shallow: () => shallow,
-        singleton: () => true,
-        collectionScope: name,
-        memberScope: name,
-        nestedScope: name,
-        newScope: (newPath) => `${name}/${newPath}`,
-      };
-      this.withScopeLevel("resource", () => this.resourceScope(resource, () => cb(this)));
-    }
+    const resource: ResourceLike = {
+      memberName: name,
+      collectionName: name,
+      nestedParam: `${name}_id`,
+      param: "id",
+      path: String((options as { path?: string }).path ?? name),
+      resourceScope: controller,
+      actions: Array.from(allowed),
+      shallow: () => shallow,
+      singleton: () => true,
+      collectionScope: name,
+      memberScope: name,
+      nestedScope: name,
+      newScope: (newPath) => `${name}/${newPath}`,
+    };
+    this.withScopeLevel("resource", () =>
+      this.resourceScope(resource, () => {
+        if (cb) cb(this);
+
+        if (options.concerns) this.concerns(options.concerns);
+      }),
+    );
 
     if (allowed.has("new")) {
       const as = routeName(`new_${name}`);
@@ -1202,14 +1350,20 @@ export class Mapper {
     this.scope({ constraints }, block);
   }
 
-  concern(name: string, callable: ConcernCallback): void {
-    this.concerns.set(name, callable);
+  concern(name: string, callable: ConcernCallable | null = null, block?: ConcernCallback): void {
+    callable ??= (mapper, options) => block!(mapper, options);
+    this._concerns.set(name, callable);
   }
 
-  useConcerns(...names: string[]): void {
-    for (const name of names) {
-      const cb = this.concerns.get(name);
-      if (cb) cb(this);
+  concerns(...args: Array<string | string[] | Record<string, unknown>>): void {
+    const options = extractOptionsBang(args);
+    for (const name of args.flat(Infinity) as string[]) {
+      const concern = this._concerns.get(name);
+      if (concern != null) {
+        callableOf(concern).call(concern, this, options);
+      } else {
+        throw new ArgumentError(`No concern named ${name} was found!`);
+      }
     }
   }
 
@@ -1797,8 +1951,8 @@ export class Mapper {
   /** @internal */
   shallowNestingDepth(): number {
     return [...this._scope]
-      .filter((node) => node.frame?.scopeLevelResource)
-      .filter((node) => (node.frame!.scopeLevelResource as ResourceLike).shallow()).length;
+      .filter((node) => node.frame.scopeLevelResource)
+      .filter((node) => (node.frame.scopeLevelResource as ResourceLike).shallow()).length;
   }
 
   /** @internal */

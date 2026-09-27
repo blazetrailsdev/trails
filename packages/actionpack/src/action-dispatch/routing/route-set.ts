@@ -951,7 +951,6 @@ export class RouteSet {
       );
     }
 
-    this.formatter.clear();
     return route;
   }
 

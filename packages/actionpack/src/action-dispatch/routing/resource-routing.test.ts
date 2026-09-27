@@ -393,7 +393,7 @@ describe("Resource routing", () => {
           c.resources("comments");
         });
         map.resources("posts", {}, (posts) => {
-          posts.useConcerns("commentable");
+          posts.concerns("commentable");
         });
       });
       const m = routes.recognize("GET", "/posts/1/comments");
@@ -408,10 +408,10 @@ describe("Resource routing", () => {
           c.resources("comments");
         });
         map.resources("posts", {}, (posts) => {
-          posts.useConcerns("commentable");
+          posts.concerns("commentable");
         });
         map.resources("articles", {}, (articles) => {
-          articles.useConcerns("commentable");
+          articles.concerns("commentable");
         });
       });
       expect(routes.recognize("GET", "/posts/1/comments")).not.toBeNull();
