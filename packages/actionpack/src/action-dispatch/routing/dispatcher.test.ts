@@ -62,7 +62,7 @@ describe("RouteDispatcher", () => {
       }),
     );
 
-    const res = await routes.serve(makeReq("/posts/42"));
+    const res = await routes.router.serve(makeReq("/posts/42"));
     expect(res[0]).toBe(200);
     expect(calls).toEqual([{ action: "show", id: "42" }]);
   });
@@ -71,7 +71,7 @@ describe("RouteDispatcher", () => {
     const routes = new RouteSet();
     routes.draw((r) => r.get("/:controller/:action"));
 
-    const res = await routes.serve(makeReq("/posts/index"));
+    const res = await routes.router.serve(makeReq("/posts/index"));
     expect(res[0]).toBe(404);
     expect(res[1]["x-cascade"]).toBe("pass");
   });
@@ -80,7 +80,7 @@ describe("RouteDispatcher", () => {
     const routes = new RouteSet();
     routes.draw((r) => r.get("/posts", { to: "posts#index" }));
 
-    await expect(routes.serve(makeReq("/posts"))).rejects.toThrow(
+    await expect(routes.router.serve(makeReq("/posts"))).rejects.toThrow(
       /uninitialized constant PostsController/,
     );
   });
@@ -89,7 +89,7 @@ describe("RouteDispatcher", () => {
     const routes = new RouteSet();
     routes.draw((r) => r.get("/x/:action", { controller: "posts" }));
 
-    await expect(routes.serve(makeReq("/x/index"))).rejects.toThrow(
+    await expect(routes.router.serve(makeReq("/x/index"))).rejects.toThrow(
       /uninitialized constant PostsController/,
     );
   });
@@ -102,7 +102,7 @@ describe("RouteDispatcher", () => {
       makeControllerClass(() => [200, {}, []]),
     );
 
-    const res = await routes.serve(makeReq("/nope"));
+    const res = await routes.router.serve(makeReq("/nope"));
     expect(res[0]).toBe(404);
     expect(res[1]["x-cascade"]).toBe("pass");
   });
@@ -123,7 +123,7 @@ describe("RouteDispatcher", () => {
       makeControllerClass(() => [200, {}, ["second"]]),
     );
 
-    const res = await routes.serve(makeReq("/x"));
+    const res = await routes.router.serve(makeReq("/x"));
     expect(res[0]).toBe(200);
   });
 
@@ -161,7 +161,7 @@ describe("RouteDispatcher", () => {
       makeControllerClass(() => [200, {}, []]),
     );
     controllerConstants.delete("posts");
-    const res = await routes.serve(makeReq("/posts/index"));
+    const res = await routes.router.serve(makeReq("/posts/index"));
     expect(res[0]).toBe(404);
   });
 });

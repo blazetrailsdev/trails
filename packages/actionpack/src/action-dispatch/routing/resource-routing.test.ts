@@ -82,7 +82,7 @@ describe("Resource routing", () => {
       routes.draw((map) => {
         map.resources("posts");
       });
-      const named = routes.getNamedRoutes();
+      const named = routes.namedRoutes.routes;
       expect(named.has("posts")).toBe(true);
       expect(named.has("post")).toBe(true);
       expect(named.has("new_post")).toBe(true);
@@ -155,7 +155,7 @@ describe("Resource routing", () => {
       routes.draw((map) => {
         map.resource("session");
       });
-      const all = routes.getRoutes();
+      const all = routes.routes.routes;
       const actions = all.map((r) => r.defaults.action);
       expect(actions).not.toContain("index");
     });
@@ -165,7 +165,7 @@ describe("Resource routing", () => {
       routes.draw((map) => {
         map.resource("session");
       });
-      const named = routes.getNamedRoutes();
+      const named = routes.namedRoutes.routes;
       expect(named.has("session")).toBe(true);
       expect(named.has("new_session")).toBe(true);
       expect(named.has("edit_session")).toBe(true);
@@ -240,7 +240,7 @@ describe("Resource routing", () => {
           posts.resources("comments");
         });
       });
-      const named = routes.getNamedRoutes();
+      const named = routes.namedRoutes.routes;
       expect(named.has("post_comments")).toBe(true);
       expect(named.has("post_comment")).toBe(true);
     });
@@ -303,7 +303,7 @@ describe("Resource routing", () => {
           admin.resources("posts");
         });
       });
-      const named = routes.getNamedRoutes();
+      const named = routes.namedRoutes.routes;
       expect(named.has("admin_posts")).toBe(true);
       expect(named.has("admin_post")).toBe(true);
     });
@@ -436,7 +436,7 @@ describe("Resource routing", () => {
       routes.draw((map) => {
         map.resources("posts");
       });
-      const named = routes.getNamedRoutes();
+      const named = routes.namedRoutes.routes;
       expect(named.size).toBeGreaterThanOrEqual(4);
     });
   });
@@ -464,7 +464,7 @@ describe("Resource routing", () => {
           map.resources("sheep");
         });
       }).not.toThrow();
-      const named = routes.getNamedRoutes();
+      const named = routes.namedRoutes.routes;
       expect(named.has("sheep")).toBe(true);
     });
 
@@ -473,7 +473,7 @@ describe("Resource routing", () => {
       routes.draw((map) => {
         map.resources("messages");
       });
-      const all = routes.getRoutes();
+      const all = routes.routes.routes;
       const seen = new Set<string>();
       for (const r of all) {
         const key = `${r.verb} ${r.path.spec}`;

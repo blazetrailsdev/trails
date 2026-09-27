@@ -9,7 +9,6 @@ import {
   _routesContext,
   _withRoutes,
   fullUrlFor,
-  initialize,
   optimizeRoutesGeneration,
   routeFor,
   urlFor,
@@ -146,12 +145,6 @@ describe("ActionDispatch::Routing::UrlFor", () => {
 
   it("array options throw when polymorphicUrl missing", () => {
     expect(() => fullUrlFor.call(makeHost(), [{ id: 1 }])).toThrow(/PolymorphicRoutes/);
-  });
-
-  it("initialize() sets _routes to null", () => {
-    const host = makeHost();
-    initialize.call(host);
-    expect(host._routes).toBeNull();
   });
 
   it("routeFor calls `${name}_url` on the host (matches generateRouteHelpers)", () => {

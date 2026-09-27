@@ -7,7 +7,7 @@ describe("RouteSet — Journey bridge", () => {
     routes.draw((r) => {
       r.get("/posts", { to: "posts#index" });
     });
-    const m = routes.journeyRecognize("GET", "/posts");
+    const m = routes.recognize("GET", "/posts");
     expect(m).not.toBeNull();
     expect(m!.route.defaults.controller).toBe("posts");
     expect(m!.route.defaults.action).toBe("index");
@@ -18,7 +18,7 @@ describe("RouteSet — Journey bridge", () => {
     routes.draw((r) => {
       r.get("/posts/:id", { to: "posts#show" });
     });
-    const m = routes.journeyRecognize("GET", "/posts/42");
+    const m = routes.recognize("GET", "/posts/42");
     expect(m).not.toBeNull();
     expect(m!.params["id"]).toBe("42");
     expect(m!.route.defaults.controller).toBe("posts");
@@ -30,8 +30,8 @@ describe("RouteSet — Journey bridge", () => {
       r.get("/x", { to: "a#index" });
       r.post("/x", { to: "b#create" });
     });
-    expect(routes.journeyRecognize("GET", "/x")!.route.defaults.action).toBe("index");
-    expect(routes.journeyRecognize("POST", "/x")!.route.defaults.action).toBe("create");
+    expect(routes.recognize("GET", "/x")!.route.defaults.action).toBe("index");
+    expect(routes.recognize("POST", "/x")!.route.defaults.action).toBe("create");
   });
 
   it("journeyRecognize returns null for unmatched paths", () => {
@@ -39,7 +39,7 @@ describe("RouteSet — Journey bridge", () => {
     routes.draw((r) => {
       r.get("/posts", { to: "posts#index" });
     });
-    expect(routes.journeyRecognize("GET", "/nope")).toBeNull();
+    expect(routes.recognize("GET", "/nope")).toBeNull();
   });
 
   it("journeyRecognize honors regex constraints", () => {
@@ -47,8 +47,8 @@ describe("RouteSet — Journey bridge", () => {
     routes.draw((r) => {
       r.get("/posts/:id", { to: "posts#show", constraints: { id: /\d+/ } });
     });
-    expect(routes.journeyRecognize("GET", "/posts/42")).not.toBeNull();
-    expect(routes.journeyRecognize("GET", "/posts/abc")).toBeNull();
+    expect(routes.recognize("GET", "/posts/42")).not.toBeNull();
+    expect(routes.recognize("GET", "/posts/abc")).toBeNull();
   });
 
   it("journeyRecognize preserves escaped \\$ in constraints (only strips true anchors)", () => {
@@ -56,8 +56,8 @@ describe("RouteSet — Journey bridge", () => {
     routes.draw((r) => {
       r.get("/posts/:id", { to: "posts#show", constraints: { id: /\$\d+/ } });
     });
-    expect(routes.journeyRecognize("GET", "/posts/$5")).not.toBeNull();
-    expect(routes.journeyRecognize("GET", "/posts/abc")).toBeNull();
+    expect(routes.recognize("GET", "/posts/$5")).not.toBeNull();
+    expect(routes.recognize("GET", "/posts/abc")).toBeNull();
   });
 
   it("journeyRecognize URI-decodes captured parameters", () => {
@@ -65,7 +65,7 @@ describe("RouteSet — Journey bridge", () => {
     routes.draw((r) => {
       r.get("/posts/:slug", { to: "posts#show" });
     });
-    const m = routes.journeyRecognize("GET", "/posts/hello%20world");
+    const m = routes.recognize("GET", "/posts/hello%20world");
     expect(m!.params["slug"]).toBe("hello world");
   });
 
@@ -74,7 +74,7 @@ describe("RouteSet — Journey bridge", () => {
     routes.draw((r) => {
       r.get("/:controller/:action", {});
     });
-    const m = routes.journeyRecognize("GET", "/users/show");
+    const m = routes.recognize("GET", "/users/show");
     expect(m).not.toBeNull();
     expect(m!.params).toEqual({ controller: "users", action: "show" });
   });
@@ -84,7 +84,7 @@ describe("RouteSet — Journey bridge", () => {
     routes.draw((r) => {
       r.get("/posts(/:id)", { to: "posts#index", defaults: { id: "1" } });
     });
-    const m = routes.journeyRecognize("GET", "/posts");
+    const m = routes.recognize("GET", "/posts");
     expect(m).not.toBeNull();
     expect(m!.params).not.toHaveProperty("id");
   });
@@ -94,8 +94,8 @@ describe("RouteSet — Journey bridge", () => {
     routes.draw((r) => {
       r.get("/posts", { to: "posts#index" });
     });
-    expect(routes.journeyRecognize("GET", "/posts/")).not.toBeNull();
-    expect(routes.journeyRecognize("GET", "posts")).not.toBeNull();
+    expect(routes.recognize("GET", "/posts/")).not.toBeNull();
+    expect(routes.recognize("GET", "posts")).not.toBeNull();
   });
 
   it("journeyRecognize params hold only path captures (defaults stripped)", () => {
@@ -103,7 +103,7 @@ describe("RouteSet — Journey bridge", () => {
     routes.draw((r) => {
       r.get("/posts/:id", { to: "posts#show" });
     });
-    const m = routes.journeyRecognize("GET", "/posts/1")!;
+    const m = routes.recognize("GET", "/posts/1")!;
     expect(m.params).toEqual({ id: "1" });
     expect(m.params).not.toHaveProperty("controller");
     expect(m.params).not.toHaveProperty("action");

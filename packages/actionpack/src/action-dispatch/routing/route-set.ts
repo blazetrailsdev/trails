@@ -590,6 +590,10 @@ export class NamedRouteCollection {
     return this._routes.has(name);
   }
 
+  clear(): void {
+    this.clearBang();
+  }
+
   each(block: (name: string, route: Route) => void): this {
     this.routes.forEach((route, name) => block(name, route));
     return this;
@@ -966,7 +970,7 @@ export class RouteSet {
 
   clearBang(): void {
     this._finalized = false;
-    this.namedRoutes.clearBang();
+    this.namedRoutes.clear();
     this.set.clear();
     this.formatter.clear();
     this.polymorphicMappings.clear();
@@ -1222,14 +1226,6 @@ export class RouteSet {
     return undefined;
   }
 
-  journeyRecognize(method: string, path: string): JourneyMatch | null {
-    return recognizeViaJourney(this.router, method, path);
-  }
-
-  serve(req: RouterRequest): Promise<RackishResponse> {
-    return this.router.serve(req);
-  }
-
   recognizePath(
     path: string,
     environment: { method?: string | null; extras?: Record<string, unknown> } = {},
@@ -1271,23 +1267,6 @@ export class RouteSet {
 
   setDefaultUrlOptions(options: { host?: string }): void {
     this.defaultUrlOptions = { ...this.defaultUrlOptions, ...options };
-  }
-
-  clear(): void {
-    this._finalized = false;
-    this.namedRoutes.clearBang();
-    this.set.clear();
-    this.formatter.clear();
-    this.polymorphicMappings.clear();
-    this._defaultEnv = undefined;
-  }
-
-  getNamedRoutes(): ReadonlyMap<string, Route> {
-    return this.namedRoutes.routes;
-  }
-
-  getRoutes(): readonly Route[] {
-    return this.routes.routes;
   }
 
   async call(env: RackEnv): Promise<RackResponse> {

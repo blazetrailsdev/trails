@@ -44,7 +44,7 @@ describe("ActionDispatch::Routing::Mapper::Mapping#app", () => {
       });
       r.get("/comments", { to: "comments#index" });
     });
-    const [posts, comments] = routes.getRoutes();
+    const [posts, comments] = routes.routes.routes;
     expect(posts.app).toBeInstanceOf(Constraints);
     expect((posts.app as Constraints).dispatcher()).toBe(true);
     expect((posts.app as Constraints).constraints).toEqual([constraint]);
@@ -79,7 +79,7 @@ describe("ActionDispatch::Routing::Mapper::Mapping#app", () => {
         r.resources("posts", { only: ["index", "show"] });
       });
     });
-    const apps = routes.getRoutes().map((route) => route.app);
+    const apps = routes.routes.routes.map((route) => route.app);
     expect(apps).toHaveLength(2);
     for (const app of apps) {
       expect(app).toBeInstanceOf(Constraints);
@@ -93,7 +93,7 @@ describe("ActionDispatch::Routing::Mapper::Mapping#app", () => {
     routes.draw((r) => {
       r.mount(app as never, { at: "/static" });
     });
-    expect(routes.getRoutes()[0].app).toBeInstanceOf(StaticDispatcher);
+    expect(routes.routes.routes[0].app).toBeInstanceOf(StaticDispatcher);
   });
 
   it("merges nested Hash scope constraints onto a matched route", () => {
@@ -105,7 +105,7 @@ describe("ActionDispatch::Routing::Mapper::Mapping#app", () => {
         });
       });
     });
-    const [route] = routes.getRoutes();
+    const [route] = routes.routes.routes;
     expect(route.constraints).toEqual({ subdomain: "api" });
     expect(route.path.requirements).toEqual({ id: /\d+/, format: "json" });
   });

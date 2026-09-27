@@ -155,7 +155,7 @@ describe("Controller routing integration", () => {
     routes.draw((map) => {
       map.get("/posts", { to: "posts#index" });
     });
-    routes.clear();
+    routes.clearBang();
     expect(routes.recognize("GET", "/posts")).toBeNull();
   });
 
@@ -260,7 +260,7 @@ describe("Controller routing integration", () => {
       map.get("/posts", { to: "posts#index", as: "posts" });
       map.get("/posts/:id", { to: "posts#show", as: "post" });
     });
-    expect(routes.getRoutes().length).toBe(2);
+    expect(routes.routes.routes.length).toBe(2);
   });
 
   it("named routes map", () => {
@@ -269,7 +269,7 @@ describe("Controller routing integration", () => {
       map.get("/posts", { to: "posts#index", as: "posts" });
       map.get("/about", { to: "pages#about", as: "about" });
     });
-    const named = routes.getNamedRoutes();
+    const named = routes.namedRoutes.routes;
     expect(named.has("posts")).toBe(true);
     expect(named.has("about")).toBe(true);
   });

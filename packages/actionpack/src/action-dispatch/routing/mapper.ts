@@ -351,9 +351,9 @@ export class Mapping {
   }) {
     let defaults = scopeParams.defaults;
     this._set = set;
-    this.to = to;
-    this.defaultController = controller;
-    this.defaultAction = defaultAction;
+    this.to = this.intern(to);
+    this.defaultController = this.intern(controller);
+    this.defaultAction = this.intern(defaultAction);
     this._anchor = anchor;
     this._via = via;
     this._formatted = formatted;
@@ -455,6 +455,11 @@ export class Mapping {
   /** @internal */
   private requestMethod(): VerbMatcher[] {
     return this._via.map((x) => JourneyRoute.verbMatcher(x));
+  }
+
+  /** @internal */
+  private intern<T>(object: T): T {
+    return typeof object === "string" ? object : object;
   }
 
   /** @internal */
