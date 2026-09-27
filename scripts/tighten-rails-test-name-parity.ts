@@ -74,7 +74,9 @@ async function main(args: string[]) {
   for (const result of await eslint.lintFiles(ENROLLED)) {
     const rel = repoRel(result.filePath);
     if (!rel) continue;
-    counts[rel] = result.messages.length;
+    counts[rel] = result.messages.filter(
+      (m) => m.ruleId === "blazetrails/rails-test-name-parity",
+    ).length;
   }
 
   const marks = await currentMarks();

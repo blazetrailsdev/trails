@@ -24,11 +24,11 @@ function newHost(initial = ""): TextHelperHost {
 const linkTo = (label: string, _href: string): SafeBuffer => raw(`<a href="#">${label}</a>`);
 
 describe("TextHelperTest", () => {
-  it("simple_format should be html_safe", () => {
+  it("simple format should be html safe", () => {
     expect(simpleFormat("<b> test with HTML tags </b>").htmlSafe).toBe(true);
   });
 
-  it("simple_format", () => {
+  it("simple format", () => {
     expect(simpleFormat(null).toString()).toBe("<p></p>");
     expect(simpleFormat("ridiculous\r\n cross\r platform linebreaks").toString()).toBe(
       "<p>ridiculous\n<br /> cross\n<br /> platform linebreaks</p>",
@@ -54,13 +54,13 @@ describe("TextHelperTest", () => {
     );
   });
 
-  it("simple_format should sanitize input when sanitize option is not false", () => {
+  it("simple format should sanitize input when sanitize option is not false", () => {
     expect(simpleFormat("<b> test with unsafe string </b><script>code!</script>").toString()).toBe(
       "<p><b> test with unsafe string </b>code!</p>",
     );
   });
 
-  it("simple_format should sanitize input when sanitize option is true", () => {
+  it("simple format should sanitize input when sanitize option is true", () => {
     expect(
       simpleFormat(
         "<b> test with unsafe string </b><script>code!</script>",
@@ -70,7 +70,7 @@ describe("TextHelperTest", () => {
     ).toBe("<p><b> test with unsafe string </b>code!</p>");
   });
 
-  it("simple_format should not sanitize input when sanitize option is false", () => {
+  it("simple format should not sanitize input when sanitize option is false", () => {
     expect(
       simpleFormat(
         "<b> test with unsafe string </b><script>code!</script>",
@@ -80,12 +80,12 @@ describe("TextHelperTest", () => {
     ).toBe("<p><b> test with unsafe string </b><script>code!</script></p>");
   });
 
-  it("simple_format with custom wrapper", () => {
+  it("simple format with custom wrapper", () => {
     expect(simpleFormat(null, {}, { wrapperTag: "div" }).toString()).toBe("<div></div>");
     expect(simpleFormat(null, {}, { wrapperTag: undefined }).toString()).toBe("<p></p>");
   });
 
-  it("simple_format with custom wrapper and multi line breaks", () => {
+  it("simple format with custom wrapper and multi line breaks", () => {
     expect(
       simpleFormat(
         "We want to put a wrapper...\n\n...right there.",
@@ -95,21 +95,21 @@ describe("TextHelperTest", () => {
     ).toBe("<div>We want to put a wrapper...</div>\n\n<div>...right there.</div>");
   });
 
-  it("simple_format should not change the text passed", () => {
+  it("simple format should not change the text passed", () => {
     const text = "<b>Ok</b><script>code!</script>";
     const before = text;
     simpleFormat(text);
     expect(text).toBe(before);
   });
 
-  it("simple_format does not modify the html_options hash", () => {
+  it("simple format does not modify the html options hash", () => {
     const options = { class: "foobar" };
     const passed = { ...options };
     simpleFormat("some text", passed);
     expect(passed).toEqual(options);
   });
 
-  it("simple_format does not modify the options hash", () => {
+  it("simple format does not modify the options hash", () => {
     const options = { wrapperTag: "div", sanitize: false };
     const passed = { ...options };
     simpleFormat("some text", {}, passed);
@@ -166,7 +166,7 @@ describe("TextHelperTest", () => {
     ).toBe('Here is a long test and ...<a href="#">Continue</a>');
   });
 
-  it("truncate should be html_safe", () => {
+  it("truncate should be html safe", () => {
     expect(truncate("Hello World!", { length: 12 })?.htmlSafe).toBe(true);
   });
 
@@ -182,13 +182,13 @@ describe("TextHelperTest", () => {
     ).toBe("Hello <sc...");
   });
 
-  it("truncate with escape false should be html_safe", () => {
+  it("truncate with escape false should be html safe", () => {
     expect(
       truncate("Hello <script>code!</script>World!!", { length: 12, escape: false })?.htmlSafe,
     ).toBe(true);
   });
 
-  it("truncate with block should be html_safe", () => {
+  it("truncate with block should be html safe", () => {
     const out = truncate(
       "Here's a long test and I need a continue to read link",
       { length: 27 },
@@ -217,7 +217,7 @@ describe("TextHelperTest", () => {
     ).toBe('<script>code!</script>He...<a href="#">Continue</a>');
   });
 
-  it("truncate with block with escape false should be html_safe", () => {
+  it("truncate with block with escape false should be html safe", () => {
     const out = truncate(
       "<script>code!</script>Here's a long test and I need a continue to read link",
       { length: 27, escape: false },
@@ -292,7 +292,7 @@ describe("TextHelperTest", () => {
     expect(pluralize(12, "berry")).toBe("12 berries");
   });
 
-  it("highlight should be html_safe", () => {
+  it("highlight should be html safe", () => {
     expect(highlight("This is a beautiful morning", "beautiful").htmlSafe).toBe(true);
   });
 
@@ -313,7 +313,7 @@ describe("TextHelperTest", () => {
     ).toBe("This text is not changed because we supplied an empty phrase");
   });
 
-  it("highlight pending (blank text returned verbatim)", () => {
+  it("highlight pending", () => {
     expect(highlight("   ", "blank text is returned verbatim").toString()).toBe("   ");
   });
 
