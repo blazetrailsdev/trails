@@ -60,10 +60,7 @@ export class TemplateRenderer<Rendered = RenderedTemplate> extends AbstractRende
       const format = rbObjRespondTo(handler, "defaultFormat")
         ? (handler as TemplateHandler & { defaultFormat: string }).defaultFormat
         : ((this.lookupContext.formats[0] as string | undefined) ?? null);
-      return new Inline({
-        source: options.inline as string,
-        identifier: "inline template",
-        handler,
+      return new Inline(options.inline as string, "inline template", handler!, {
         locals: keys,
         format,
       });

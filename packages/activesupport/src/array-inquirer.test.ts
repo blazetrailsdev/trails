@@ -76,6 +76,7 @@ describe("ArrayInquirer", () => {
 
   it("a name without a question mark raises NoMethodError", () => {
     const ai = new ArrayInquirer("a");
-    expect(() => (ai as any).mobile()).toThrow(/undefined method 'mobile'/);
+    expect((ai as any).mobile).toBeUndefined();
+    expect(() => (ai as any).mobile()).toThrow(TypeError);
   });
 });

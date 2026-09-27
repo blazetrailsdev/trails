@@ -235,11 +235,9 @@ describe("Base#render (trails)", () => {
   it("is reachable from a template rendered through renderTemplate", async () => {
     const ctx = contextWith({ "posts/_form": "form!" });
     const out = await render(ctx, {
-      template: new Template({
-        source: '<%= render({ partial: "form" }) %>',
-        identifier: "posts/index",
+      template: new Template('<%= render({ partial: "form" }) %>', "posts/index", new Tse(), {
+        locals: [],
         virtualPath: "posts/index",
-        extension: "tse",
         format: ":html",
       }) as unknown as RenderableTemplate,
     });

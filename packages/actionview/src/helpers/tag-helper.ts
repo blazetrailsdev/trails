@@ -12,6 +12,11 @@ import {
   type ToSentenceOptions,
 } from "./output-safety-helper.js";
 import { ArgumentError, rbInspect } from "@blazetrails/ruby-compat";
+import { capture, type CaptureHelperHost } from "./capture-helper.js";
+
+export interface TagHelperHost extends CaptureHelperHost {
+  _tagBuilder?: TagBuilder;
+}
 
 const BOOLEAN_ATTRIBUTES = new Set([
   "allowfullscreen",
@@ -299,13 +304,14 @@ function tagOptions(options: Record<string, unknown> | undefined, escape: boolea
 }
 
 export function tag(
+  this: TagHelperHost | void,
   name?: string,
   options?: Record<string, unknown> | null,
   open?: boolean,
   escape?: boolean,
 ): SafeBuffer | TagBuilder {
   if (name === undefined) {
-    return getTagBuilder();
+    return tagBuilder.call(this as TagHelperHost);
   }
   ensureValidHtml5TagName(name);
   const esc = escape !== undefined ? escape : true;
@@ -315,6 +321,7 @@ export function tag(
 }
 
 export function contentTag(
+  this: TagHelperHost | void,
   name: string,
   contentOrOptionsWithBlock?: unknown,
   options?: Record<string, unknown> | null,
@@ -331,7 +338,12 @@ export function contentTag(
       !(contentOrOptionsWithBlock instanceof SafeBuffer) &&
       !Array.isArray(contentOrOptionsWithBlock);
     const opts = isPlainOpts ? (contentOrOptionsWithBlock as Record<string, unknown>) : options;
-    return contentTagString(name, block(), opts ?? undefined, esc);
+    return contentTagString(
+      name,
+      capture.call(this as TagHelperHost, block),
+      opts ?? undefined,
+      esc,
+    );
   }
 
   return contentTagString(name, contentOrOptionsWithBlock, options ?? undefined, esc);
@@ -399,9 +411,9 @@ export function escapeOnce(html: string): SafeBuffer {
 
 export class TagBuilder {
   /** @internal */
-  viewContext: unknown;
+  viewContext: TagHelperHost;
 
-  constructor(viewContext?: unknown) {
+  constructor(viewContext: TagHelperHost) {
     this.viewContext = viewContext;
   }
 
@@ -419,13 +431,12 @@ export class TagBuilder {
   ): SafeBuffer {
     const escape = opts?.escape !== false;
     let actualContent: unknown = content;
-    if (opts?.block) {
-      const vc = this.viewContext as { capture?: (b: TagBuilder, fn: () => unknown) => unknown };
-      actualContent =
-        vc && typeof vc.capture === "function"
-          ? vc.capture(this, () => opts.block!(this))
-          : opts.block(this);
-    }
+    if (opts?.block)
+      actualContent = capture.call(
+        this.viewContext,
+        opts.block as (...args: unknown[]) => unknown,
+        this,
+      );
     return contentTagString(name, actualContent, options ?? undefined, escape);
   }
 
@@ -453,8 +464,8 @@ export class TagBuilder {
 }
 
 /** @internal */
-export function tagBuilder(): TagBuilder {
-  return getTagBuilder();
+export function tagBuilder(this: TagHelperHost): TagBuilder {
+  return (this._tagBuilder ??= createTagBuilderProxy(this));
 }
 
 export function raw(stringish: unknown): SafeBuffer {
@@ -469,8 +480,8 @@ export function toSentence(array: unknown[], options?: ToSentenceOptions): SafeB
   return _toSentence(array, options);
 }
 
-function createTagBuilderProxy(): TagBuilder {
-  const builder = new TagBuilder();
+function createTagBuilderProxy(viewContext: TagHelperHost): TagBuilder {
+  const builder = new TagBuilder(viewContext);
 
   return new Proxy(builder, {
     get(target, prop, receiver) {
@@ -541,20 +552,23 @@ function createTagBuilderProxy(): TagBuilder {
         if (SELF_CLOSING_ELEMENTS.has(tagName) || SELF_CLOSING_ELEMENTS.has(methodName)) {
           const actualTagName = SELF_CLOSING_ELEMENTS.has(methodName) ? methodName : tagName;
           if (content !== undefined || block) {
-            const blockContent = block ? block(receiver) : content;
-            return contentTagString(
+            return (receiver as TagBuilder).tagString(
               actualTagName,
-              blockContent,
+              content,
               hasOptions ? options : undefined,
-              escape,
+              { escape, block },
             );
           }
           return selfClosingTagString(actualTagName, options, escape);
         }
 
         if (block) {
-          const blockContent = block(receiver);
-          return contentTagString(tagName, blockContent, hasOptions ? options : undefined, escape);
+          return (receiver as TagBuilder).tagString(
+            tagName,
+            undefined,
+            hasOptions ? options : undefined,
+            { escape, block },
+          );
         }
 
         return contentTagString(
@@ -580,17 +594,4 @@ function selfClosingTagString(
 ): SafeBuffer {
   const opts = Object.keys(options).length > 0 ? tagOptions(options, escape) : "";
   return htmlSafe(`<${name}${opts}${tagSuffix}`);
-}
-
-let _tagBuilder: TagBuilder | null = null;
-
-function getTagBuilder(): TagBuilder {
-  if (!_tagBuilder) {
-    _tagBuilder = createTagBuilderProxy();
-  }
-  return _tagBuilder;
-}
-
-export function resetTagBuilder(): void {
-  _tagBuilder = null;
 }

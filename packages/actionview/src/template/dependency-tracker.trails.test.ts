@@ -14,12 +14,16 @@ describe("TSETracker reads Template#source", () => {
   it("returns the same dependencies after the template has been compiled", () => {
     TemplateHandlers.registerTemplateHandler("tse", new Tse());
 
-    const template = new Template({
-      source: `<%= render("comments/comment") %>`,
-      identifier: "messages/_message",
-      virtualPath: "messages/_message.html.tse",
-      extension: "tse",
-    });
+    const template = new Template(
+      `<%= render("comments/comment") %>`,
+      "messages/_message",
+      new Tse(),
+      {
+        locals: [],
+        format: ":html",
+        virtualPath: "messages/_message.html.tse",
+      },
+    );
 
     const before = new TSETracker("messages/_message", template, null).dependencies();
     expect(before).toEqual(["comments/comment"]);

@@ -29,10 +29,7 @@ const routesWith = (helpers: object): ViewContextRoutes => ({
 });
 
 const renderTse = (source: string, locals: Record<string, unknown>, view: Base): string =>
-  new Template({ source, identifier: "t", extension: "tse", handler: new Tse() }).render(
-    view,
-    locals,
-  );
+  new Template(source, "t", new Tse(), { locals: [], format: ":html" }).render(view, locals);
 
 describe("ActionView::Rendering::ClassMethods", () => {
   it("builds on DetailsKey.view_context_class, per rendering.rb:53", () => {

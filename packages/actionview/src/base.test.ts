@@ -9,10 +9,7 @@ import { Template } from "./template.js";
 import { FixtureResolver } from "./testing/resolvers.js";
 
 const renderTse = (source: string, locals: Record<string, unknown>, view: Base): string =>
-  new Template({ source, identifier: "t", extension: "tse", handler: new Tse() }).render(
-    view,
-    locals,
-  );
+  new Template(source, "t", new Tse(), { locals: [], format: ":html" }).render(view, locals);
 
 describe("ActionView::Base", () => {
   it("prepares the context with an output buffer, a view flow and no virtual path", () => {

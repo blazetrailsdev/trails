@@ -2,13 +2,6 @@
   {
     "package": "actionview",
     "tsFile": "helpers/tag-helper.ts",
-    "rubyName": "content_tag",
-    "call": "capture",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actionview",
-    "tsFile": "helpers/tag-helper.ts",
     "rubyName": "tag_builder",
     "call": "new",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

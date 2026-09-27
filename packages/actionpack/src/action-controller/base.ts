@@ -120,6 +120,7 @@ import {
   _setHtmlContentType,
   _setRenderedContentType,
   _setVaryHeader,
+  _processVariant,
   processAction as _processAction,
 } from "./metal/rendering.js";
 import { Renderers } from "./metal/renderers.js";
@@ -307,6 +308,7 @@ export class Base extends Metal {
   viewRuntime: number | null = null;
 
   render(options: RenderOptions = {}): void {
+    this._processVariant(options as Record<string, unknown>);
     this.viewRuntime = this.cleanupViewRuntime(() =>
       Benchmark.realtime(":float_millisecond", () => {
         if (this.performed) {
@@ -827,6 +829,8 @@ export class Base extends Metal {
   /** @internal */
   declare _renderTemplate: typeof _renderTemplate;
   /** @internal */
+  declare _processVariant: typeof _processVariant;
+  /** @internal */
   _renderedFormat?: unknown;
   declare isActionHasLayout: typeof isActionHasLayout;
   /** @internal */
@@ -972,6 +976,7 @@ include(Base, StrongParametersModule);
 Base.prototype._processRenderTemplateOptions = _processRenderTemplateOptions;
 Base.prototype._processOptions = _processOptions;
 Base.prototype._renderTemplate = _renderTemplate;
+Base.prototype._processVariant = _processVariant;
 Base.prototype.isActionHasLayout = isActionHasLayout;
 Base.prototype._isConditionalLayout = _isConditionalLayout;
 Base.prototype._layoutForOption = _layoutForOption;

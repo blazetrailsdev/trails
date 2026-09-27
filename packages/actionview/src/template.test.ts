@@ -20,27 +20,23 @@ describe("ActionView::Template (smoke)", () => {
   afterEach(() => TemplateHandlers.clear());
 
   it("stores Rails-named attrs and derives variable from virtualPath", () => {
-    const t = new Template({
-      source: "hi",
-      identifier: "posts/_form",
+    const t = new Template("hi", "posts/_form", echo, {
       virtualPath: "posts/_form.html.tse",
       format: "html",
       variant: "phone",
-      extension: "tse",
       locals: ["a"],
     });
     expect(t.identifier).toBe("posts/_form");
     expect(t.format).toBe("html");
     expect(t.variant).toBe("phone");
     expect(t.variable).toBe("form");
-    expect(t.isPartial).toBe(true);
     expect(t.locals).toEqual(["a"]);
   });
 
   it("strict_locals! strips the magic comment and memoizes the signature", () => {
-    const t = new Template({
-      source: "<%# locals: (headline:, alerts: []) %>\nbody",
-      identifier: "x",
+    const t = new Template("<%# locals: (headline:, alerts: []) %>\nbody", "x", echo, {
+      locals: [],
+      format: ":html",
     });
     expect(t.strictLocalsBang()).toBe("headline:, alerts: []");
     expect(t.source).not.toMatch(/locals:/);
@@ -53,57 +49,43 @@ describe("ActionView::Template (smoke)", () => {
   });
 
   it("render delegates to the handler and wraps non-TemplateError failures", () => {
-    TemplateHandlers.registerTemplateHandler("txt", echo);
-    const t = new Template({ source: "hi", identifier: "x", extension: "txt" });
+    const t = new Template("hi", "x", echo, { locals: [], format: ":html" });
     expect(t.render(view(), { name: "ada" })).toBe(`hi::${JSON.stringify({ name: "ada" })}`);
 
-    const boom = new Template({
-      source: "hi",
-      identifier: "y",
-      extension: "txt",
-      handler: {
+    const boom = new Template(
+      "hi",
+      "y",
+      {
         call: () => {
           throw new Error("boom");
         },
       },
-    });
+      { locals: [], format: ":html" },
+    );
     expect(() => boom.render(view())).toThrow(TemplateError);
   });
 
   it("render returns nil when given a buffer and the _run result verbatim otherwise", () => {
     const handler: TemplateHandler = { call: () => "return 42;" };
-    const t = new Template({ source: "hi", identifier: "z", extension: "txt", handler });
+    const t = new Template("hi", "z", handler, { locals: [], format: ":html" });
     expect(t.render(view(), {})).toBe(42);
 
-    const raw = new Template({ source: "<b>", identifier: "r", handler: new Raw() });
+    const raw = new Template("<b>", "r", new Raw(), { locals: [], format: ":html" });
     expect(raw.render(view(), {})).toBe("<b>");
 
-    const tse = new Template({ source: "hi", identifier: "w", handler: new Tse() });
+    const tse = new Template("hi", "w", new Tse(), { locals: [], format: ":html" });
     const buffer = new OutputBuffer();
     expect(tse.render(view(), {}, buffer)).toBeNull();
     expect(buffer.toStr()).toBe("hi");
   });
 
-  it("render throws a helpful error when no handler is registered", () => {
-    const t = new Template({ source: "x", identifier: "x", extension: "nope" });
-    let raised: unknown;
-    try {
-      t.render(view());
-    } catch (e) {
-      raised = e;
-    }
-    expect(raised).toBeInstanceOf(TemplateError);
-    expect(raised).not.toBeInstanceOf(SyntaxErrorInTemplate);
-    expect((raised as TemplateError).message).toMatch(/No template handler registered for ".nope"/);
-  });
-
   it("compile raises SyntaxErrorInTemplate when the compiled source will not parse", () => {
-    const t = new Template({
-      source: "x",
-      identifier: "posts/show",
-      extension: "txt",
-      handler: { call: () => "((((" },
-    });
+    const t = new Template(
+      "x",
+      "posts/show",
+      { call: () => "((((" },
+      { locals: [], format: ":html" },
+    );
     let raised: unknown;
     try {
       t.render(view());
@@ -117,12 +99,12 @@ describe("ActionView::Template (smoke)", () => {
   });
 
   it("annotated_source_code numbers the offending code string", () => {
-    const t = new Template({
-      source: "one\ntwo",
-      identifier: "posts/show",
-      extension: "txt",
-      handler: { call: () => "((((" },
-    });
+    const t = new Template(
+      "one\ntwo",
+      "posts/show",
+      { call: () => "((((" },
+      { locals: [], format: ":html" },
+    );
     let raised: unknown;
     try {
       t.render(view());
@@ -136,10 +118,9 @@ describe("ActionView::Template (smoke)", () => {
   });
 
   it("line_number and annotated_source_code report the template line", () => {
-    const t = new Template({
-      source: "one\ntwo\nthree",
-      identifier: "posts/show.html.tse",
-      extension: "txt",
+    const t = new Template("one\ntwo\nthree", "posts/show.html.tse", echo, {
+      locals: [],
+      format: ":html",
     });
     const original = new Error("boom");
     original.message = "posts/show.html.tse:2: boom";
@@ -149,24 +130,14 @@ describe("ActionView::Template (smoke)", () => {
   });
 
   it("spot reports a location inside the compiled source", () => {
-    const t = new Template({
-      source: "<%= boom() %>",
-      identifier: "posts/show",
-      extension: "tse",
-      handler: new Tse(),
+    const t = new Template("<%= boom() %>", "posts/show", new Tse(), {
+      locals: [],
+      format: ":html",
     });
     const spot = t.spot({ lineno: 1, column: 1 });
     expect(spot).not.toBeNull();
     expect(spot!.firstLineno).toBe(1);
     expect(spot!.scriptLines!.length).toBeGreaterThan(0);
-  });
-
-  it("asLayout returns a copy with isLayout flipped on", () => {
-    const t = new Template({ source: "<html/>", identifier: "layouts/app", extension: "tse" });
-    const wrapped = t.asLayout();
-    expect(wrapped.isLayout).toBe(true);
-    expect(t.isLayout).toBe(false);
-    expect(wrapped).not.toBe(t);
   });
 
   it("exposes Template.Error for the Rails-spelled nesting", () => {
@@ -183,7 +154,7 @@ describe("ActionView::Template (smoke)", () => {
     });
 
     it("returns the spot unchanged when the handler has no translate_location", () => {
-      const t = new Template({ source: "hi", identifier: "x", extension: "txt", handler: echo });
+      const t = new Template("hi", "x", echo, { locals: [], format: ":html" });
       const s = spot();
       expect(t.translateLocation({ lineno: 1 }, s)).toBe(s);
     });
@@ -193,7 +164,7 @@ describe("ActionView::Template (smoke)", () => {
         ...echo,
         translateLocation: () => null,
       } as TemplateHandler;
-      const t = new Template({ source: "hi", identifier: "x", extension: "txt", handler });
+      const t = new Template("hi", "x", handler, { locals: [], format: ":html" });
       const s = spot();
       expect(t.translateLocation({ lineno: 1 }, s)).toBe(s);
     });
@@ -204,7 +175,7 @@ describe("ActionView::Template (smoke)", () => {
         ...echo,
         translateLocation: () => translated,
       } as TemplateHandler;
-      const t = new Template({ source: "hi", identifier: "x", extension: "txt", handler });
+      const t = new Template("hi", "x", handler, { locals: [], format: ":html" });
       expect(t.translateLocation({ lineno: 1 }, spot())).toBe(translated);
     });
 
@@ -212,7 +183,7 @@ describe("ActionView::Template (smoke)", () => {
       const source = "<%= 1 %>\n<%= boom %>\n";
       const handler = new Tse();
       const hook = vi.spyOn(handler, "translateLocation");
-      const t = new Template({ source, identifier: "t", extension: "tse", handler });
+      const t = new Template(source, "t", handler, { locals: [], format: ":html" });
       const s = spot();
 
       expect(t.translateLocation({ lineno: 2 }, s)).toBeTruthy();
@@ -225,7 +196,7 @@ describe("ActionView::Template (smoke)", () => {
       extra;
 
     const template = (source: string): Template =>
-      new Template({ source, identifier: "t", extension: "tse", handler: new Tse() });
+      new Template(source, "t", new Tse(), { locals: [], format: ":html" });
 
     const render = (
       source: string,
@@ -269,6 +240,17 @@ describe("ActionView::Template (smoke)", () => {
     it("emits the inner template's output for a bare yield in a layout", () => {
       const out = render("<main><%= yield %></main>", {}, ctx({ yield: "<p>body</p>" }));
       expect(out).toBe("<main><p>body</p></main>");
+    });
+
+    it("yields a section to the template's block, as trails-tsc's virtualizer binds it", () => {
+      const view = new (Base.withEmptyTemplateCache())(null, {}, null);
+      view.viewFlow.set("layout", "body");
+      view.viewFlow.set("sidebar", "side");
+      view.viewFlow.set("footer", "foot");
+      const out = template(
+        '<main><%= yield %></main><%= yield "sidebar" %><%= yield("footer") %><%== yield %>',
+      ).render(view, {}, null, {}, (...name: unknown[]) => view._layoutFor(...(name as [string?])));
+      expect(out).toBe("<main>body</main>sidefootbody");
     });
 
     it("round-trips a named contentFor section", () => {

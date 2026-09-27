@@ -1,5 +1,5 @@
 import { isBlank } from "@blazetrails/activesupport";
-import { isSymbol, symbolToS } from "@blazetrails/ruby-compat";
+import { isSymbol, NoMethodError, symbolToS } from "@blazetrails/ruby-compat";
 
 const SYMBOLS: readonly string[] = [":html", ":text", ":js", ":css", ":xml", ":json"];
 
@@ -24,6 +24,11 @@ export class SimpleType {
   readonly symbol: string;
 
   constructor(symbol: string | null) {
+    if (symbol == null) {
+      throw new NoMethodError("undefined method 'to_sym' for nil", "to_sym", [], false, {
+        receiver: null,
+      });
+    }
     this.symbol = isSymbol(symbol) ? symbol : `:${symbol}`;
   }
 

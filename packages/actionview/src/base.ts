@@ -70,8 +70,12 @@ export class Base {
 
   static automaticallyDisableSubmitTag: boolean = true;
 
-  static fieldErrorProc: (htmlTag: unknown, instance: unknown) => unknown = (htmlTag) =>
-    Helpers.contentTag("div", htmlTag, { class: "field_with_errors" });
+  static fieldErrorProc: (this: Base, htmlTag: unknown, instance: unknown) => unknown = function (
+    this: Base,
+    htmlTag: unknown,
+  ) {
+    return this.contentTag("div", htmlTag, { class: "field_with_errors" });
+  };
 
   static _routes: unknown = null;
 

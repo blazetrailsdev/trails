@@ -4,6 +4,7 @@ import { DetailsKey, LookupContext } from "./lookup-context.js";
 import { PathRegistry } from "./path-registry.js";
 import { PathSet } from "./path-set.js";
 import { Template } from "./template.js";
+import { EncodingError, WrongEncodingError } from "./template/error.js";
 import { TemplateHandlers } from "./template/handlers.js";
 import { Tse } from "./template/handlers/tse.js";
 import { FixtureResolver } from "./testing/resolvers.js";
@@ -49,12 +50,36 @@ describe("Template#compile", () => {
   it("names the compiled source after the identifier without evaluating it", async () => {
     TemplateHandlers.registerTemplateHandler("tse", new Tse());
     const g = globalThis as { __templateIdentifierEvaluated?: boolean };
-    const t = new Template({
-      source: "hi",
-      identifier: "posts/show.html.tse\nglobalThis.__templateIdentifierEvaluated = true;",
-      extension: "tse",
-    });
+    const t = new Template(
+      "hi",
+      "posts/show.html.tse\nglobalThis.__templateIdentifierEvaluated = true;",
+      new Tse(),
+      { locals: [], format: ":html" },
+    );
     expect(String(await t.render(new (Base.withEmptyTemplateCache())(null, {}, null)))).toBe("hi");
     expect(g.__templateIdentifierEvaluated).toBeUndefined();
+  });
+});
+
+describe("Template#compiled_source", () => {
+  it("raises WrongEncodingError when the handler returns code that is not valid UTF-16", () => {
+    const t = new Template(
+      "hi",
+      "posts/show",
+      { call: () => "return 'a\uD800b';" },
+      { locals: [], format: ":html" },
+    );
+    let raised: unknown;
+    try {
+      t.render(new (Base.withEmptyTemplateCache())(null, {}, null));
+    } catch (e) {
+      raised = e;
+    }
+    const original = (raised as { original?: unknown }).original ?? raised;
+    expect(original).toBeInstanceOf(WrongEncodingError);
+    expect(original).toBeInstanceOf(EncodingError);
+    expect((original as Error).message).toMatch(
+      /^Your template was not saved as valid \. Please either specify {2}as the encoding/,
+    );
   });
 });

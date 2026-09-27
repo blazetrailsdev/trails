@@ -8,10 +8,7 @@ describe("TestTSETemplate", () => {
   afterEach(() => TemplateHandlers.clear());
 
   const newTemplate = (body: string): Template =>
-    new Template({
-      source: body,
-      identifier: "hello template",
-      handler: new Tse(),
+    new Template(body, "hello template", new Tse(), {
       virtualPath: "hello",
       format: "html",
       locals: [],

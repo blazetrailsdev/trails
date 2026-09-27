@@ -103,7 +103,7 @@ function emit(ast: TseAst, options: EmitJsOptions): { code: string; mappings: Li
       }
       innerDepths.push(0);
       innerCallExprParens.push(netUnclosedParens(node.value));
-      push(`${bufRef}.${exprAppend}(${node.value}return context.capture(() => {`, node.srcLine);
+      push(`${bufRef}.${exprAppend}(${node.value}`, node.srcLine);
     } else if (node.kind === "code" && insideBlock) {
       const innerDepth = innerDepths[innerDepths.length - 1];
       if (BLOCK_CLOSE_RE.test(node.value) && innerDepth === 0) {
@@ -112,7 +112,7 @@ function emit(ast: TseAst, options: EmitJsOptions): { code: string; mappings: Li
         const closer = node.value.replace(/;\s*$/, "");
         const closingParens = (closer.match(/\)/g) ?? []).length;
         const suffix = ")".repeat(Math.max(0, 1 + callExprParens - closingParens)) + ";";
-        push(`});${closer}${suffix}`, node.srcLine);
+        push(`${closer}${suffix}`, node.srcLine);
       } else {
         innerDepths[innerDepths.length - 1] += netBraceDepth(node.value);
         push(emitNode(node, exprAppend, "context.outputBuffer"), node.srcLine);
@@ -142,8 +142,17 @@ function emit(ast: TseAst, options: EmitJsOptions): { code: string; mappings: Li
   return { code, mappings: lineMappings };
 }
 
+export const YIELD_EXPR_RE = /^\s*yield(?:\s*\(([\s\S]*)\)|\s+([\s\S]*?))?\s*;?\s*$/;
+
+function blockCall(value: string): string {
+  const m = YIELD_EXPR_RE.exec(value);
+  if (m === null || (m[1] === undefined && !m[2])) return value;
+  return `_(${(m[1] ?? m[2]).trim()})`;
+}
+
 function emitNode(node: TseNode, exprAppend: string, bufRef: string, awaits = false): string {
-  const value = awaits ? `await (${node.value})` : node.value;
+  const expr = node.kind === "expr" || node.kind === "rawExpr" ? blockCall(node.value) : node.value;
+  const value = awaits ? `await (${expr})` : expr;
   switch (node.kind) {
     case "text":
       return `${bufRef}.safeAppend(${JSON.stringify(node.value)});`;
