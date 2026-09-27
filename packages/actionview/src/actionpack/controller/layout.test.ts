@@ -33,17 +33,18 @@ LayoutTest.viewPaths(
 );
 
 async function withTemplateHandler(
-  extension: string,
-  handler: TemplateHandler,
-  block: () => Promise<void>,
+  ...args: [...extensions: string[], handler: TemplateHandler, block: () => Promise<void>]
 ): Promise<void> {
-  TemplateHandlers.registerTemplateHandler(extension, handler);
+  const block = args.pop() as () => Promise<void>;
+  const handler = args.pop() as TemplateHandler;
+  const extensions = args as string[];
+  TemplateHandlers.registerTemplateHandler(...extensions, handler);
   ActionController.Base.viewPaths().paths.forEach((path) => path.clearCache?.());
   DetailsKey.clear();
   try {
     await block();
   } finally {
-    TemplateHandlers.unregisterTemplateHandler(extension);
+    TemplateHandlers.unregisterTemplateHandler(...extensions);
     ActionController.Base.viewPaths().paths.forEach((path) => path.clearCache?.());
     DetailsKey.clear();
   }

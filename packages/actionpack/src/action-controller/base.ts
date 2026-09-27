@@ -117,6 +117,7 @@ import {
 import {
   _processOptions,
   _renderInPriorities,
+  _setHtmlContentType,
   _setRenderedContentType,
   _setVaryHeader,
   processAction as _processAction,
@@ -428,7 +429,11 @@ export class Base extends Metal {
     }
 
     const renderedBody = await this.renderToBody({ ...options });
-    _setRenderedContentType.call(this, this._renderedFormat as string | null | undefined);
+    if (options.html != null && (options.html as unknown) !== false) {
+      _setHtmlContentType.call(this);
+    } else {
+      _setRenderedContentType.call(this, this._renderedFormat as string | null | undefined);
+    }
     _setVaryHeader.call(this as never);
     this.responseBody = renderedBody as string;
     this.markPerformed();
