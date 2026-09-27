@@ -1,6 +1,29 @@
-import { describe, it, expect } from "vitest";
+import { beforeAll, describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { RouteSet } from "./route-set.js";
+import { controllerConstants } from "../http/request.js";
+import type { DispatchableControllerClass } from "./dispatcher.js";
+import { RoutingError } from "../../action-controller/metal/exceptions.js";
+
+class StubController {}
+
+beforeAll(() => {
+  for (const name of [
+    "pages",
+    "posts",
+    "comments",
+    "profiles",
+    "sessions",
+    "articles",
+    "users",
+    "admin/posts",
+    "api/posts",
+    "api/v1/articles",
+    "api/v1/posts",
+  ]) {
+    controllerConstants.set(name, StubController as unknown as DispatchableControllerClass);
+  }
+});
 
 describe("Resource routing", () => {
   describe("resources()", () => {
@@ -9,10 +32,9 @@ describe("Resource routing", () => {
       routes.draw((map) => {
         map.resources("posts");
       });
-      const m = routes.recognize("GET", "/posts");
-      expect(m).not.toBeNull();
-      expect(m!.route.defaults.action).toBe("index");
-      expect(m!.route.defaults.controller).toBe("posts");
+      const m = routes.recognizePath("/posts");
+      expect(m.action).toBe("index");
+      expect(m.controller).toBe("posts");
     });
 
     it("generates show route with id", () => {
@@ -20,9 +42,9 @@ describe("Resource routing", () => {
       routes.draw((map) => {
         map.resources("posts");
       });
-      const m = routes.recognize("GET", "/posts/42");
-      expect(m!.route.defaults.action).toBe("show");
-      expect(m!.params.id).toBe("42");
+      const m = routes.recognizePath("/posts/42");
+      expect(m.action).toBe("show");
+      expect(m.id).toBe("42");
     });
 
     it("generates new route", () => {
@@ -30,9 +52,8 @@ describe("Resource routing", () => {
       routes.draw((map) => {
         map.resources("posts");
       });
-      const m = routes.recognize("GET", "/posts/new");
-      expect(m).not.toBeNull();
-      expect(m!.route.defaults.action).toBe("new");
+      const m = routes.recognizePath("/posts/new");
+      expect(m.action).toBe("new");
     });
 
     it("generates create route", () => {
@@ -40,7 +61,7 @@ describe("Resource routing", () => {
       routes.draw((map) => {
         map.resources("posts");
       });
-      expect(routes.recognize("POST", "/posts")!.route.defaults.action).toBe("create");
+      expect(routes.recognizePath("/posts", { method: "post" }).action).toBe("create");
     });
 
     it("generates edit route", () => {
@@ -48,9 +69,9 @@ describe("Resource routing", () => {
       routes.draw((map) => {
         map.resources("posts");
       });
-      const m = routes.recognize("GET", "/posts/42/edit");
-      expect(m!.route.defaults.action).toBe("edit");
-      expect(m!.params.id).toBe("42");
+      const m = routes.recognizePath("/posts/42/edit");
+      expect(m.action).toBe("edit");
+      expect(m.id).toBe("42");
     });
 
     it("generates update route (PUT)", () => {
@@ -58,7 +79,7 @@ describe("Resource routing", () => {
       routes.draw((map) => {
         map.resources("posts");
       });
-      expect(routes.recognize("PUT", "/posts/42")!.route.defaults.action).toBe("update");
+      expect(routes.recognizePath("/posts/42", { method: "put" }).action).toBe("update");
     });
 
     it("generates update route (PATCH)", () => {
@@ -66,7 +87,7 @@ describe("Resource routing", () => {
       routes.draw((map) => {
         map.resources("posts");
       });
-      expect(routes.recognize("PATCH", "/posts/42")!.route.defaults.action).toBe("update");
+      expect(routes.recognizePath("/posts/42", { method: "patch" }).action).toBe("update");
     });
 
     it("generates destroy route", () => {
@@ -74,7 +95,7 @@ describe("Resource routing", () => {
       routes.draw((map) => {
         map.resources("posts");
       });
-      expect(routes.recognize("DELETE", "/posts/42")!.route.defaults.action).toBe("destroy");
+      expect(routes.recognizePath("/posts/42", { method: "delete" }).action).toBe("destroy");
     });
 
     it("generates named routes", () => {
@@ -107,7 +128,7 @@ describe("Resource routing", () => {
       routes.draw((map) => {
         map.resource("session");
       });
-      expect(routes.recognize("GET", "/session")!.route.defaults.action).toBe("show");
+      expect(routes.recognizePath("/session").action).toBe("show");
     });
 
     it("generates create route", () => {
@@ -115,7 +136,7 @@ describe("Resource routing", () => {
       routes.draw((map) => {
         map.resource("session");
       });
-      expect(routes.recognize("POST", "/session")!.route.defaults.action).toBe("create");
+      expect(routes.recognizePath("/session", { method: "post" }).action).toBe("create");
     });
 
     it("generates destroy route", () => {
@@ -123,7 +144,7 @@ describe("Resource routing", () => {
       routes.draw((map) => {
         map.resource("session");
       });
-      expect(routes.recognize("DELETE", "/session")!.route.defaults.action).toBe("destroy");
+      expect(routes.recognizePath("/session", { method: "delete" }).action).toBe("destroy");
     });
 
     it("generates update route", () => {
@@ -131,7 +152,7 @@ describe("Resource routing", () => {
       routes.draw((map) => {
         map.resource("session");
       });
-      expect(routes.recognize("PUT", "/session")!.route.defaults.action).toBe("update");
+      expect(routes.recognizePath("/session", { method: "put" }).action).toBe("update");
     });
 
     it("generates new route", () => {
@@ -139,7 +160,7 @@ describe("Resource routing", () => {
       routes.draw((map) => {
         map.resource("session");
       });
-      expect(routes.recognize("GET", "/session/new")!.route.defaults.action).toBe("new");
+      expect(routes.recognizePath("/session/new").action).toBe("new");
     });
 
     it("generates edit route", () => {
@@ -147,7 +168,7 @@ describe("Resource routing", () => {
       routes.draw((map) => {
         map.resource("session");
       });
-      expect(routes.recognize("GET", "/session/edit")!.route.defaults.action).toBe("edit");
+      expect(routes.recognizePath("/session/edit").action).toBe("edit");
     });
 
     it("has no index route", () => {
@@ -178,10 +199,10 @@ describe("Resource routing", () => {
       routes.draw((map) => {
         map.resources("posts", { only: ["index", "show"] });
       });
-      expect(routes.recognize("GET", "/posts")).not.toBeNull();
-      expect(routes.recognize("GET", "/posts/1")).not.toBeNull();
-      expect(routes.recognize("POST", "/posts")).toBeNull();
-      expect(routes.recognize("DELETE", "/posts/1")).toBeNull();
+      expect(() => routes.recognizePath("/posts")).not.toThrow();
+      expect(() => routes.recognizePath("/posts/1")).not.toThrow();
+      expect(() => routes.recognizePath("/posts", { method: "post" })).toThrow(RoutingError);
+      expect(() => routes.recognizePath("/posts/1", { method: "delete" })).toThrow(RoutingError);
     });
 
     it("except excludes specified routes", () => {
@@ -189,9 +210,9 @@ describe("Resource routing", () => {
       routes.draw((map) => {
         map.resources("posts", { except: ["destroy", "edit", "update"] });
       });
-      expect(routes.recognize("GET", "/posts")).not.toBeNull();
-      expect(routes.recognize("POST", "/posts")).not.toBeNull();
-      expect(routes.recognize("DELETE", "/posts/1")).toBeNull();
+      expect(() => routes.recognizePath("/posts")).not.toThrow();
+      expect(() => routes.recognizePath("/posts", { method: "post" })).not.toThrow();
+      expect(() => routes.recognizePath("/posts/1", { method: "delete" })).toThrow(RoutingError);
     });
 
     it("only on singular resource", () => {
@@ -199,9 +220,9 @@ describe("Resource routing", () => {
       routes.draw((map) => {
         map.resource("session", { only: ["show", "create"] });
       });
-      expect(routes.recognize("GET", "/session")).not.toBeNull();
-      expect(routes.recognize("POST", "/session")).not.toBeNull();
-      expect(routes.recognize("DELETE", "/session")).toBeNull();
+      expect(() => routes.recognizePath("/session")).not.toThrow();
+      expect(() => routes.recognizePath("/session", { method: "post" })).not.toThrow();
+      expect(() => routes.recognizePath("/session", { method: "delete" })).toThrow(RoutingError);
     });
   });
 
@@ -213,11 +234,10 @@ describe("Resource routing", () => {
           posts.resources("comments");
         });
       });
-      const m = routes.recognize("GET", "/posts/1/comments");
-      expect(m).not.toBeNull();
-      expect(m!.params.post_id).toBe("1");
-      expect(m!.route.defaults.action).toBe("index");
-      expect(m!.route.defaults.controller).toBe("comments");
+      const m = routes.recognizePath("/posts/1/comments");
+      expect(m.post_id).toBe("1");
+      expect(m.action).toBe("index");
+      expect(m.controller).toBe("comments");
     });
 
     it("nests member route under parent", () => {
@@ -227,10 +247,10 @@ describe("Resource routing", () => {
           posts.resources("comments");
         });
       });
-      const m = routes.recognize("GET", "/posts/1/comments/5");
-      expect(m!.params.post_id).toBe("1");
-      expect(m!.params.id).toBe("5");
-      expect(m!.route.defaults.action).toBe("show");
+      const m = routes.recognizePath("/posts/1/comments/5");
+      expect(m.post_id).toBe("1");
+      expect(m.id).toBe("5");
+      expect(m.action).toBe("show");
     });
 
     it("generates named routes for nested resources", () => {
@@ -265,9 +285,8 @@ describe("Resource routing", () => {
           posts.resources("comments");
         });
       });
-      const m = routes.recognize("GET", "/posts/1/comments");
-      expect(m).not.toBeNull();
-      expect(m!.params.post_id).toBe("1");
+      const m = routes.recognizePath("/posts/1/comments");
+      expect(m.post_id).toBe("1");
     });
 
     it("member routes are at top level", () => {
@@ -277,9 +296,8 @@ describe("Resource routing", () => {
           posts.resources("comments");
         });
       });
-      const m = routes.recognize("GET", "/comments/5");
-      expect(m).not.toBeNull();
-      expect(m!.params.id).toBe("5");
+      const m = routes.recognizePath("/comments/5");
+      expect(m.id).toBe("5");
     });
   });
 
@@ -291,9 +309,8 @@ describe("Resource routing", () => {
           admin.resources("posts");
         });
       });
-      const m = routes.recognize("GET", "/admin/posts");
-      expect(m).not.toBeNull();
-      expect(m!.route.defaults.controller).toBe("admin/posts");
+      const m = routes.recognizePath("/admin/posts");
+      expect(m.controller).toBe("admin/posts");
     });
 
     it("prefixes named routes with namespace", () => {
@@ -317,8 +334,8 @@ describe("Resource routing", () => {
           });
         });
       });
-      const m = routes.recognize("GET", "/api/v1/articles");
-      expect(m!.route.defaults.controller).toBe("api/v1/articles");
+      const m = routes.recognizePath("/api/v1/articles");
+      expect(m.controller).toBe("api/v1/articles");
     });
 
     it("generates paths for namespaced resources", () => {
@@ -339,9 +356,8 @@ describe("Resource routing", () => {
       routes.draw((map) => {
         map.resources("posts", { pathNames: { new: "nuevo" } });
       });
-      const m = routes.recognize("GET", "/posts/nuevo");
-      expect(m).not.toBeNull();
-      expect(m!.route.defaults.action).toBe("new");
+      const m = routes.recognizePath("/posts/nuevo");
+      expect(m.action).toBe("new");
     });
 
     it("customizes edit path", () => {
@@ -349,9 +365,8 @@ describe("Resource routing", () => {
       routes.draw((map) => {
         map.resources("posts", { pathNames: { edit: "editar" } });
       });
-      const m = routes.recognize("GET", "/posts/1/editar");
-      expect(m).not.toBeNull();
-      expect(m!.route.defaults.action).toBe("edit");
+      const m = routes.recognizePath("/posts/1/editar");
+      expect(m.action).toBe("edit");
     });
   });
 
@@ -365,9 +380,8 @@ describe("Resource routing", () => {
           });
         });
       });
-      const m = routes.recognize("POST", "/posts/1/publish");
-      expect(m).not.toBeNull();
-      expect(m!.params.id).toBe("1");
+      const m = routes.recognizePath("/posts/1/publish", { method: "post" });
+      expect(m.id).toBe("1");
     });
 
     it("collection route adds action on collection", () => {
@@ -379,9 +393,8 @@ describe("Resource routing", () => {
           });
         });
       });
-      const m = routes.recognize("GET", "/posts/search");
-      expect(m).not.toBeNull();
-      expect(m!.route.defaults.action).toBe("search");
+      const m = routes.recognizePath("/posts/search");
+      expect(m.action).toBe("search");
     });
   });
 
@@ -396,9 +409,8 @@ describe("Resource routing", () => {
           posts.concerns("commentable");
         });
       });
-      const m = routes.recognize("GET", "/posts/1/comments");
-      expect(m).not.toBeNull();
-      expect(m!.params.post_id).toBe("1");
+      const m = routes.recognizePath("/posts/1/comments");
+      expect(m.post_id).toBe("1");
     });
 
     it("reuses concerns across multiple resources", () => {
@@ -414,8 +426,8 @@ describe("Resource routing", () => {
           articles.concerns("commentable");
         });
       });
-      expect(routes.recognize("GET", "/posts/1/comments")).not.toBeNull();
-      expect(routes.recognize("GET", "/articles/1/comments")).not.toBeNull();
+      expect(() => routes.recognizePath("/posts/1/comments")).not.toThrow();
+      expect(() => routes.recognizePath("/articles/1/comments")).not.toThrow();
     });
   });
 
@@ -425,8 +437,8 @@ describe("Resource routing", () => {
       routes.draw((map) => {
         map.resources("posts", { constraints: { id: /\d+/ } });
       });
-      expect(routes.recognize("GET", "/posts/123")).not.toBeNull();
-      expect(routes.recognize("GET", "/posts/abc")).toBeNull();
+      expect(() => routes.recognizePath("/posts/123")).not.toThrow();
+      expect(() => routes.recognizePath("/posts/abc")).toThrow(RoutingError);
     });
   });
 
@@ -449,10 +461,9 @@ describe("Resource routing", () => {
           users.resource("profile");
         });
       });
-      const m = routes.recognize("GET", "/users/1/profile");
-      expect(m).not.toBeNull();
-      expect(m!.params.user_id).toBe("1");
-      expect(m!.route.defaults.action).toBe("show");
+      const m = routes.recognizePath("/users/1/profile");
+      expect(m.user_id).toBe("1");
+      expect(m.action).toBe("show");
     });
   });
 
