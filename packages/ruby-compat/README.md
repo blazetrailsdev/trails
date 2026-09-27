@@ -33,6 +33,7 @@ Every export, with the call site that justifies it (rule 1).
 | `symbolToS`             | `symbol.c:954` `rb_sym2str`                      | `i18n/src/backend/base.ts:242,444`                                                                                                                                                                                                                                                         |
 | `Location`              | `vm_backtrace.c:1345` `rb_cBacktraceLocation`    | `actionpack/src/action-dispatch/middleware/exception-wrapper.ts` (`build_backtrace`'s `loc.label`, `SourceMapLocation#spot`)                                                                                                                                                               |
 | `excBacktraceLocations` | `error.c:1789` `exc_backtrace_locations`         | `actionview/src/template/error.ts` (`Template::Error#backtrace_locations`), `exception-wrapper.ts` (`build_backtrace`)                                                                                                                                                                     |
+| `StringScanner`         | `ext/strscan/strscan.c:681` `strscan_scan`       | `actionpack/src/action-dispatch/journey/gtg/simulator.ts` (`Simulator#memos`)                                                                                                                                                                                                              |
 
 ## The contract
 

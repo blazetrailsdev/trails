@@ -53,6 +53,15 @@ export class Unknown implements VerbMatcher {
   }
 }
 
+export class All {
+  static call(_: VerbRequest): boolean {
+    return true;
+  }
+  static get verb(): string {
+    return "";
+  }
+}
+
 export const VerbMatchers = {
   VERBS,
   DELETE: class {
@@ -136,14 +145,7 @@ export const VerbMatchers = {
     }
   },
   Unknown,
-  All: class {
-    static call(_: VerbRequest): boolean {
-      return true;
-    }
-    static get verb(): string {
-      return "";
-    }
-  },
+  All,
   VERB_TO_CLASS: {} as Record<string, VerbMatcher>,
 };
 VerbMatchers.VERB_TO_CLASS = VERBS.reduce<Record<string, VerbMatcher>>(
