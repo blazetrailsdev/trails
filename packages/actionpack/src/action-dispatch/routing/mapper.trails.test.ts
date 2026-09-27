@@ -192,9 +192,9 @@ describe("Mapper HTTP verb helpers forward args through map_method", () => {
     const m = new Mapper(set);
     expect(m.get({ "/foo": "posts#index" })).toBe(m);
     const [route] = set.getRoutes();
-    expect(route.path).toBe("/foo(.:format)");
+    expect(route.path.spec.toString()).toBe("/foo(.:format)");
     expect(route.verb).toBe("GET");
-    expect([route.controller, route.action]).toEqual(["posts", "index"]);
+    expect([route.defaults.controller, route.defaults.action]).toEqual(["posts", "index"]);
   });
 
   it("maps every path of the multi-path form", () => {
@@ -208,7 +208,7 @@ describe("Mapper HTTP verb helpers forward args through map_method", () => {
     } finally {
       dep.behavior = previous;
     }
-    expect(set.getRoutes().map((r) => [r.verb, r.path])).toEqual([
+    expect(set.getRoutes().map((r) => [r.verb, r.path.spec.toString()])).toEqual([
       ["POST", "/one(.:format)"],
       ["POST", "/two(.:format)"],
     ]);
