@@ -44,7 +44,7 @@ import type { Response as AdResponse } from "../http/response.js";
 import { RoutingError, UrlGenerationError } from "../../action-controller/metal/exceptions.js";
 import { RoutesProxy, type ScriptNamer } from "./routes-proxy.js";
 import { Request as AdRequest } from "../http/request.js";
-import { camelize, NameError } from "@blazetrails/activesupport";
+import { camelize, NameError, squish } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { normalizePath } from "../journey/router/utils.js";
 import { URL, type UrlOptions } from "../http/url.js";
@@ -935,13 +935,19 @@ export class RouteSet {
 
     if (route.segmentKeys.includes("controller")) {
       deprecator().warn(
-        "Using a dynamic :controller segment in a route is deprecated and will be removed in Rails 8.1.",
+        squish(`
+          Using a dynamic :controller segment in a route is deprecated and
+          will be removed in Rails 8.1.
+        `),
       );
     }
 
     if (route.segmentKeys.includes("action")) {
       deprecator().warn(
-        "Using a dynamic :action segment in a route is deprecated and will be removed in Rails 8.1.",
+        squish(`
+          Using a dynamic :action segment in a route is deprecated and
+          will be removed in Rails 8.1.
+        `),
       );
     }
 
