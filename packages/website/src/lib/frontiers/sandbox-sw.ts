@@ -309,7 +309,14 @@ async function handleFetch(request: Request, url: URL): Promise<Response> {
   const method = request.method.toUpperCase();
 
   // Try Rack app server first if a route matches this request
-  if (appServer.routes.recognize(method, `/${rawPath}`)) {
+  let routeMatches = true;
+  try {
+    appServer.routes.recognizePath(`/${rawPath}`, { method });
+  } catch (error) {
+    if (!(error instanceof ActionController.RoutingError)) throw error;
+    routeMatches = false;
+  }
+  if (routeMatches) {
     try {
       const env = await requestToRackEnvWithBody(request, "/~dev");
       const rackResponse = await appServer.call(env);

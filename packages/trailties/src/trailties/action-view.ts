@@ -1,6 +1,5 @@
 import { include, onLoad, type Deprecators, type Reloader } from "@blazetrails/activesupport";
 import { UrlFor } from "@blazetrails/actionpack";
-import { Module } from "@blazetrails/ruby-compat";
 import {
   Base,
   deprecator,
@@ -108,10 +107,7 @@ export class Trailtie extends BaseTrailtie {
 
     this.initializer("action_view.setup_action_pack", () => {
       onLoad("action_controller", () => {
-        include(
-          RoutingUrlFor as unknown as new (...args: never[]) => unknown,
-          new Module((mod) => mod.include(UrlFor)),
-        );
+        include(RoutingUrlFor as unknown as new (...args: never[]) => unknown, UrlFor);
       });
     });
 

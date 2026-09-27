@@ -45,8 +45,8 @@ export {
   type RedirectCallable,
   type OptionRedirectOptions,
 } from "./redirection.js";
-export * as UrlFor from "./url-for.js";
 export {
+  UrlFor,
   urlFor,
   fullUrlFor,
   urlOptions,

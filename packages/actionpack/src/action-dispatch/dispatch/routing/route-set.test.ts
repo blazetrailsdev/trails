@@ -8,7 +8,9 @@ import { escapeSegment } from "../../journey/router/utils.js";
 class StubController {}
 
 beforeAll(() => {
-  controllerConstants.set("posts", StubController as unknown as DispatchableControllerClass);
+  for (const name of ["posts", "late", "seed"]) {
+    controllerConstants.set(name, StubController as unknown as DispatchableControllerClass);
+  }
 });
 
 describe("RouteSetTest", () => {
@@ -44,18 +46,18 @@ describe("RouteSetTest", () => {
       r.resources("foo");
       r.resources("bar");
     });
-    const m = routes.recognize("GET", "/bar");
-    expect(m).not.toBeNull();
-    expect(m!.route.defaults.controller).toBe("bar");
-    expect(m!.route.defaults.action).toBe("index");
+    const route = routes.fromRequirements({ controller: "bar", action: "index" });
+    expect(route!.name).toBe("bar_index");
   });
 
   it("find a route for the given requirements returns nil for no match", () => {
     const routes = new RouteSet();
     routes.draw((r) => {
       r.resources("foo");
+      r.resources("bar");
     });
-    expect(routes.recognize("GET", "/baz")).toBeNull();
+    const route = routes.fromRequirements({ controller: "baz", action: "index" });
+    expect(route).toBeUndefined();
   });
 
   it("URL helpers are removed when route is removed", () => {
@@ -117,8 +119,12 @@ describe("RouteSetTest", () => {
     routes.draw((r) => {
       r.resources("posts");
     });
-    expect(routes.recognize("GET", "/posts")).not.toBeNull();
-    expect(routes.recognize("GET", "/posts/1")).not.toBeNull();
+    expect(routes.recognizePath("/posts")).toEqual({ controller: "posts", action: "index" });
+    expect(routes.recognizePath("/posts/1")).toEqual({
+      controller: "posts",
+      action: "show",
+      id: "1",
+    });
   });
 
   it("implicit path components consistently return the same result", () => {
@@ -152,10 +158,10 @@ describe("RouteSetTest", () => {
     const routes = new RouteSet();
     routes.append((r) => r.get("/late", { to: "late#i" }));
     routes.finalizeBang();
-    expect(routes.recognize("GET", "/late")).not.toBeNull();
+    expect(routes.recognizePath("/late")).toEqual({ controller: "late", action: "i" });
     routes.prepend((r) => r.get("/seed", { to: "seed#i" }));
     routes.clearBang();
-    expect(routes.recognize("GET", "/seed")).not.toBeNull();
+    expect(routes.recognizePath("/seed")).toEqual({ controller: "seed", action: "i" });
   });
 
   it("addRoute rejects invalid names", () => {

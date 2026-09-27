@@ -958,7 +958,7 @@ export class Mapper {
 
     const resource: ResourceLike = {
       memberName: singular,
-      collectionName: name,
+      collectionName: singular === name ? `${name}_index` : name,
       nestedParam: `${singular}_id`,
       param: "id",
       path: String((options as { path?: string }).path ?? name),
@@ -980,7 +980,7 @@ export class Mapper {
     );
 
     if (allowed.has("index")) {
-      const as = routeName(name);
+      const as = routeName(resource.collectionName!);
       this.addRouteToSet("GET", basePath, controller, "index", as, constraints);
     }
 
@@ -1006,7 +1006,7 @@ export class Mapper {
     }
 
     if (allowed.has("show")) {
-      const as = singular !== name ? shallowName(singular) : undefined;
+      const as = shallowName(singular);
       this.addRouteToSet("GET", `${shallowPath}/:id`, controller, "show", as, constraints);
     }
 

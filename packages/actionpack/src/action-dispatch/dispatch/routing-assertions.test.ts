@@ -1,5 +1,14 @@
-import { describe, it, expect } from "vitest";
+import { beforeAll, describe, it, expect } from "vitest";
 import { RouteSet } from "../routing/route-set.js";
+import { controllerConstants } from "../http/request.js";
+import type { DispatchableControllerClass } from "../routing/dispatcher.js";
+import { assertRecognizes, assertRouting } from "../testing/assertions/routing.js";
+
+class StubController {}
+
+beforeAll(() => {
+  controllerConstants.set("posts", StubController as unknown as DispatchableControllerClass);
+});
 
 describe("ActionDispatch::Routing::Assertions", () => {
   it("assert generates", () => {
@@ -15,11 +24,7 @@ describe("ActionDispatch::Routing::Assertions", () => {
     routes.draw((r) => {
       r.get("/posts/:id", { to: "posts#show" });
     });
-    const m = routes.recognize("GET", "/posts/1");
-    expect(m).not.toBeNull();
-    expect(m!.route.defaults.controller).toBe("posts");
-    expect(m!.route.defaults.action).toBe("show");
-    expect(m!.params.id).toBe("1");
+    assertRecognizes.call({ routes }, { controller: "posts", action: "show", id: "1" }, "/posts/1");
   });
 
   it("assert routing", () => {
@@ -27,9 +32,7 @@ describe("ActionDispatch::Routing::Assertions", () => {
     routes.draw((r) => {
       r.get("/posts/:id", { to: "posts#show", as: "post" });
     });
-    expect(routes.pathFor({ id: 1 }, "post")).toBe("/posts/1");
-    const m = routes.recognize("GET", "/posts/1");
-    expect(m!.route.defaults.controller).toBe("posts");
+    assertRouting.call({ routes }, "/posts/1", { controller: "posts", action: "show", id: "1" });
   });
 
   it("with routing", () => {

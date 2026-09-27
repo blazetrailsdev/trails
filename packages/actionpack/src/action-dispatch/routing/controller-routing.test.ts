@@ -1,9 +1,30 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { RouteSet } from "./route-set.js";
 import type { RackEnv } from "@blazetrails/rack";
 import { Response } from "../http/response.js";
 import { controllerConstants, type Request } from "../http/request.js";
 import type { DispatchableControllerClass } from "./dispatcher.js";
+import { RoutingError } from "../../action-controller/metal/exceptions.js";
+
+class StubController {}
+
+beforeEach(() => {
+  for (const name of [
+    "pages",
+    "posts",
+    "comments",
+    "profiles",
+    "sessions",
+    "articles",
+    "users",
+    "admin/posts",
+    "api/posts",
+    "api/v1/articles",
+    "api/v1/posts",
+  ]) {
+    controllerConstants.set(name, StubController as unknown as DispatchableControllerClass);
+  }
+});
 
 afterEach(() => {
   controllerConstants.delete("posts");
@@ -32,10 +53,9 @@ describe("Controller routing integration", () => {
     routes.draw((map) => {
       map.root("pages#home");
     });
-    const match = routes.recognize("GET", "/");
-    expect(match).not.toBeNull();
-    expect(match!.route.defaults.controller).toBe("pages");
-    expect(match!.route.defaults.action).toBe("home");
+    const match = routes.recognizePath("/");
+    expect(match.controller).toBe("pages");
+    expect(match.action).toBe("home");
   });
 
   it("dispatches resource routes to correct actions", () => {
@@ -44,13 +64,13 @@ describe("Controller routing integration", () => {
       map.resources("posts");
     });
 
-    expect(routes.recognize("GET", "/posts")!.route.defaults.action).toBe("index");
-    expect(routes.recognize("POST", "/posts")!.route.defaults.action).toBe("create");
-    expect(routes.recognize("GET", "/posts/1")!.route.defaults.action).toBe("show");
-    expect(routes.recognize("GET", "/posts/1")!.params.id).toBe("1");
-    expect(routes.recognize("PUT", "/posts/1")!.route.defaults.action).toBe("update");
-    expect(routes.recognize("PATCH", "/posts/1")!.route.defaults.action).toBe("update");
-    expect(routes.recognize("DELETE", "/posts/1")!.route.defaults.action).toBe("destroy");
+    expect(routes.recognizePath("/posts").action).toBe("index");
+    expect(routes.recognizePath("/posts", { method: "post" }).action).toBe("create");
+    expect(routes.recognizePath("/posts/1").action).toBe("show");
+    expect(routes.recognizePath("/posts/1").id).toBe("1");
+    expect(routes.recognizePath("/posts/1", { method: "put" }).action).toBe("update");
+    expect(routes.recognizePath("/posts/1", { method: "patch" }).action).toBe("update");
+    expect(routes.recognizePath("/posts/1", { method: "delete" }).action).toBe("destroy");
   });
 
   it("path params include route parameters", () => {
@@ -58,8 +78,8 @@ describe("Controller routing integration", () => {
     routes.draw((map) => {
       map.get("/posts/:id", { to: "posts#show" });
     });
-    const match = routes.recognize("GET", "/posts/42");
-    expect(match!.params.id).toBe("42");
+    const match = routes.recognizePath("/posts/42");
+    expect(match.id).toBe("42");
   });
 
   it("named route generates path", () => {
@@ -85,8 +105,8 @@ describe("Controller routing integration", () => {
       map.get("/posts/special", { to: "posts#special", as: "special_post" });
       map.get("/posts/:id", { to: "posts#show" });
     });
-    const match = routes.recognize("GET", "/posts/special");
-    expect(match!.route.defaults.action).toBe("special");
+    const match = routes.recognizePath("/posts/special");
+    expect(match.action).toBe("special");
   });
 
   it("unmatched route returns null", () => {
@@ -94,7 +114,7 @@ describe("Controller routing integration", () => {
     routes.draw((map) => {
       map.get("/posts", { to: "posts#index" });
     });
-    expect(routes.recognize("GET", "/users")).toBeNull();
+    expect(() => routes.recognizePath("/users")).toThrow(RoutingError);
   });
 
   it("wrong method returns null", () => {
@@ -102,7 +122,7 @@ describe("Controller routing integration", () => {
     routes.draw((map) => {
       map.get("/posts", { to: "posts#index" });
     });
-    expect(routes.recognize("POST", "/posts")).toBeNull();
+    expect(() => routes.recognizePath("/posts", { method: "post" })).toThrow(RoutingError);
   });
 
   it("namespace prefixes path and controller", () => {
@@ -112,10 +132,9 @@ describe("Controller routing integration", () => {
         admin.resources("posts");
       });
     });
-    const match = routes.recognize("GET", "/admin/posts");
-    expect(match).not.toBeNull();
-    expect(match!.route.defaults.controller).toBe("admin/posts");
-    expect(match!.route.defaults.action).toBe("index");
+    const match = routes.recognizePath("/admin/posts");
+    expect(match.controller).toBe("admin/posts");
+    expect(match.action).toBe("index");
   });
 
   it("scope with module option", () => {
@@ -125,8 +144,8 @@ describe("Controller routing integration", () => {
         scope.get("/posts", { to: "posts#index" });
       });
     });
-    const match = routes.recognize("GET", "/api/posts");
-    expect(match!.route.defaults.controller).toBe("api/posts");
+    const match = routes.recognizePath("/api/posts");
+    expect(match.controller).toBe("api/posts");
   });
 
   it("constraints filter routes", () => {
@@ -134,8 +153,8 @@ describe("Controller routing integration", () => {
     routes.draw((map) => {
       map.get("/posts/:id", { to: "posts#show", constraints: { id: /\d+/ } });
     });
-    expect(routes.recognize("GET", "/posts/123")).not.toBeNull();
-    expect(routes.recognize("GET", "/posts/abc")).toBeNull();
+    expect(() => routes.recognizePath("/posts/123")).not.toThrow();
+    expect(() => routes.recognizePath("/posts/abc")).toThrow(RoutingError);
   });
 
   it("multiple draw calls append routes", () => {
@@ -146,8 +165,8 @@ describe("Controller routing integration", () => {
     routes.draw((map) => {
       map.get("/b", { to: "pages#home" });
     });
-    expect(routes.recognize("GET", "/a")).not.toBeNull();
-    expect(routes.recognize("GET", "/b")).not.toBeNull();
+    expect(() => routes.recognizePath("/a")).not.toThrow();
+    expect(() => routes.recognizePath("/b")).not.toThrow();
   });
 
   it("clear removes all routes", () => {
@@ -156,7 +175,7 @@ describe("Controller routing integration", () => {
       map.get("/posts", { to: "posts#index" });
     });
     routes.clearBang();
-    expect(routes.recognize("GET", "/posts")).toBeNull();
+    expect(() => routes.recognizePath("/posts")).toThrow(RoutingError);
   });
 
   it("nested resources generate correct paths", () => {
@@ -166,15 +185,13 @@ describe("Controller routing integration", () => {
         posts.resources("comments");
       });
     });
-    const match = routes.recognize("GET", "/posts/1/comments");
-    expect(match).not.toBeNull();
-    expect(match!.params.post_id).toBe("1");
-    expect(match!.route.defaults.action).toBe("index");
+    const match = routes.recognizePath("/posts/1/comments");
+    expect(match.post_id).toBe("1");
+    expect(match.action).toBe("index");
 
-    const show = routes.recognize("GET", "/posts/1/comments/2");
-    expect(show).not.toBeNull();
-    expect(show!.params.post_id).toBe("1");
-    expect(show!.params.id).toBe("2");
+    const show = routes.recognizePath("/posts/1/comments/2");
+    expect(show.post_id).toBe("1");
+    expect(show.id).toBe("2");
   });
 
   it("member routes within resources", () => {
@@ -186,9 +203,8 @@ describe("Controller routing integration", () => {
         });
       });
     });
-    const match = routes.recognize("POST", "/posts/1/publish");
-    expect(match).not.toBeNull();
-    expect(match!.params.id).toBe("1");
+    const match = routes.recognizePath("/posts/1/publish", { method: "post" });
+    expect(match.id).toBe("1");
   });
 
   it("collection routes within resources", () => {
@@ -200,9 +216,8 @@ describe("Controller routing integration", () => {
         });
       });
     });
-    const match = routes.recognize("GET", "/posts/search");
-    expect(match).not.toBeNull();
-    expect(match!.route.defaults.action).toBe("search");
+    const match = routes.recognizePath("/posts/search");
+    expect(match.action).toBe("search");
   });
 
   it("singular resource routes", () => {
@@ -210,10 +225,10 @@ describe("Controller routing integration", () => {
     routes.draw((map) => {
       map.resource("session");
     });
-    expect(routes.recognize("GET", "/session")).not.toBeNull();
-    expect(routes.recognize("POST", "/session")).not.toBeNull();
-    expect(routes.recognize("DELETE", "/session")).not.toBeNull();
-    expect(routes.recognize("GET", "/session")!.route.defaults.action).toBe("show");
+    expect(() => routes.recognizePath("/session")).not.toThrow();
+    expect(() => routes.recognizePath("/session", { method: "post" })).not.toThrow();
+    expect(() => routes.recognizePath("/session", { method: "delete" })).not.toThrow();
+    expect(routes.recognizePath("/session").action).toBe("show");
   });
 
   it("route defaults are merged into params", () => {
@@ -221,9 +236,8 @@ describe("Controller routing integration", () => {
     routes.draw((map) => {
       map.get("/posts", { to: "posts#index", defaults: { format: "json" } });
     });
-    const route = routes.recognize("GET", "/posts");
-    expect(route).not.toBeNull();
-    expect(route!.route.defaults?.format).toBe("json");
+    const route = routes.recognizePath("/posts");
+    expect(route.format).toBe("json");
   });
 
   it("call returns 404 for unmatched", async () => {
@@ -286,13 +300,11 @@ describe("Controller routing integration", () => {
         posts.resources("comments");
       });
     });
-    const index = routes.recognize("GET", "/posts/1/comments");
-    expect(index).not.toBeNull();
-    expect(index!.params.post_id).toBe("1");
+    const index = routes.recognizePath("/posts/1/comments");
+    expect(index.post_id).toBe("1");
 
-    const show = routes.recognize("GET", "/comments/5");
-    expect(show).not.toBeNull();
-    expect(show!.params.id).toBe("5");
+    const show = routes.recognizePath("/comments/5");
+    expect(show.id).toBe("5");
   });
 
   it("resources with only option", () => {
@@ -300,10 +312,10 @@ describe("Controller routing integration", () => {
     routes.draw((map) => {
       map.resources("posts", { only: ["index", "show"] });
     });
-    expect(routes.recognize("GET", "/posts")).not.toBeNull();
-    expect(routes.recognize("GET", "/posts/1")).not.toBeNull();
-    expect(routes.recognize("POST", "/posts")).toBeNull();
-    expect(routes.recognize("DELETE", "/posts/1")).toBeNull();
+    expect(() => routes.recognizePath("/posts")).not.toThrow();
+    expect(() => routes.recognizePath("/posts/1")).not.toThrow();
+    expect(() => routes.recognizePath("/posts", { method: "post" })).toThrow(RoutingError);
+    expect(() => routes.recognizePath("/posts/1", { method: "delete" })).toThrow(RoutingError);
   });
 
   it("resources with except option", () => {
@@ -311,8 +323,8 @@ describe("Controller routing integration", () => {
     routes.draw((map) => {
       map.resources("posts", { except: ["destroy"] });
     });
-    expect(routes.recognize("GET", "/posts")).not.toBeNull();
-    expect(routes.recognize("DELETE", "/posts/1")).toBeNull();
+    expect(() => routes.recognizePath("/posts")).not.toThrow();
+    expect(() => routes.recognizePath("/posts/1", { method: "delete" })).toThrow(RoutingError);
   });
 
   it("deeply nested namespace", () => {
@@ -324,9 +336,8 @@ describe("Controller routing integration", () => {
         });
       });
     });
-    const match = routes.recognize("GET", "/api/v1/posts");
-    expect(match).not.toBeNull();
-    expect(match!.route.defaults.controller).toBe("api/v1/posts");
+    const match = routes.recognizePath("/api/v1/posts");
+    expect(match.controller).toBe("api/v1/posts");
   });
 
   it("resources generate named routes for path generation", () => {
@@ -345,8 +356,8 @@ describe("Controller routing integration", () => {
     routes.draw((map) => {
       map.match("/login", { to: "sessions#create", via: ["get", "post"] });
     });
-    expect(routes.recognize("GET", "/login")).not.toBeNull();
-    expect(routes.recognize("POST", "/login")).not.toBeNull();
-    expect(routes.recognize("PUT", "/login")).toBeNull();
+    expect(() => routes.recognizePath("/login")).not.toThrow();
+    expect(() => routes.recognizePath("/login", { method: "post" })).not.toThrow();
+    expect(() => routes.recognizePath("/login", { method: "put" })).toThrow(RoutingError);
   });
 });
