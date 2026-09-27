@@ -6,6 +6,7 @@ import { UnboundTemplate } from "../unbound-template.js";
 import { TemplateHandlers } from "../template/handlers.js";
 import { TemplatePath } from "../template-path.js";
 import { Template } from "../template.js";
+import * as Sources from "./sources/file.js";
 
 export abstract class Resolver implements PathSetResolver {
   declare static caching: boolean;
@@ -176,12 +177,9 @@ export class FileSystemResolver extends Resolver {
     );
   }
 
-  /**
-   * @internal
-   * @missingRailsCall new — CONVERGEABLE port-template-sources-file-for-lazy-resolver-sources
-   */
-  protected sourceForTemplate(template: string): string {
-    return File.read(template);
+  /** @internal */
+  protected sourceForTemplate(template: string): string | Sources.File {
+    return new Sources.File(template);
   }
 
   /** @internal */

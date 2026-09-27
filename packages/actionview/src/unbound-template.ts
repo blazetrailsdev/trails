@@ -1,17 +1,18 @@
 import type { DetailKey, TemplateDetails } from "./template-details.js";
 import { Template } from "./template.js";
+import type { File as SourcesFile } from "./template/sources/file.js";
 import { symbolToS } from "@blazetrails/ruby-compat";
 
 export class UnboundTemplate {
   readonly virtualPath: string;
   readonly details: TemplateDetails;
-  private readonly _source: string;
+  private readonly _source: string | SourcesFile;
   private readonly _identifier: string;
   private _templates = new Map<string, Template>();
   private _templatesDefault: Template | undefined;
 
   constructor(
-    source: string,
+    source: string | SourcesFile,
     identifier: string,
     { details, virtualPath }: { details: TemplateDetails; virtualPath: string },
   ) {
