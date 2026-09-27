@@ -55,17 +55,26 @@ export function fetch<T>(hash: Record<string, unknown>, key: string, block: Bloc
  */
 export function fetch<T>(hash: Record<string, unknown>, key: string, defaultValue: T): T;
 /**
+ * The Map arm: a Hash keyed by objects, looked up the same way.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#fetch` (`vendor/ruby/v3.3.11/hash.c:2176`).
+ */
+export function fetch<K, V, T>(hash: Map<K, V>, key: K, defaultValue: T): V | T;
+/**
  * `rb_hash_fetch_m` dispatches on `argc` and `rb_block_given_p`, so the arms
  * share one body over a rest parameter: an absent second argument is the
  * raising arm, and an explicitly-passed `undefined` is a default, exactly as
  * Ruby's `nil` is.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#fetch` (`vendor/ruby/v3.3.11/hash.c:2176`).
  */
-export function fetch(hash: Record<string, unknown>, key: string, ...rest: unknown[]): unknown {
+export function fetch(
+  hash: Record<string, unknown> | Map<unknown, unknown>,
+  key: unknown,
+  ...rest: unknown[]
+): unknown {
   const blockGiven = rbBlockGivenP(rest[0]);
-  if (!hasKey(hash, key)) {
+  if (!(hash instanceof Map ? hash.has(key) : hasKey(hash, key as string))) {
     if (blockGiven) {
-      return (rest[0] as Block<unknown>)(key);
+      return (rest[0] as Block<unknown>)(key as string);
     } else if (rest.length === 0) {
       throw new KeyError(`key not found: ${strEllipsize(rbInspect(key), 65)}`, {
         receiver: hash,
@@ -75,7 +84,7 @@ export function fetch(hash: Record<string, unknown>, key: string, ...rest: unkno
       return rest[0];
     }
   }
-  return hash[key];
+  return hash instanceof Map ? hash.get(key) : hash[key as string];
 }
 
 /**
