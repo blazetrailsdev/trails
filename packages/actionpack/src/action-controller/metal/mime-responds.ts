@@ -52,7 +52,6 @@ export class Collector extends AbstractCollector {
     return response;
   }
 
-  /** @missingRailsCall fetch — PERMANENT */
   isAnyResponse(): boolean {
     const own = fetch(this.#responses, this.format, false);
     return !(own != null && own !== false) && this.#responses.get(MimeType.ALL) != null;
