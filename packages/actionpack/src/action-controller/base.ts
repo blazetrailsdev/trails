@@ -117,6 +117,8 @@ import {
 import {
   _processOptions,
   _renderInPriorities,
+  _setRenderedContentType,
+  _setVaryHeader,
   processAction as _processAction,
 } from "./metal/rendering.js";
 import { Renderers } from "./metal/renderers.js";
@@ -425,9 +427,10 @@ export class Base extends Metal {
       this.status = options.status;
     }
 
-    this.responseBody = (await this.renderToBody({ ...options })) as string;
-
-    this.contentType = options.contentType ?? "text/html; charset=utf-8";
+    const renderedBody = await this.renderToBody({ ...options });
+    _setRenderedContentType.call(this, this._renderedFormat as string | null | undefined);
+    _setVaryHeader.call(this as never);
+    this.responseBody = renderedBody as string;
     this.markPerformed();
   }
 

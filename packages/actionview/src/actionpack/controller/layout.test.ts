@@ -62,6 +62,9 @@ Object.defineProperty(NestedController, "name", { value: "ControllerNameSpace::N
 
 class MultipleExtensions extends LayoutTest {}
 
+let testCase: InstanceType<typeof ActionController.TestCase>;
+const assertResponse = (type: number | string): void => testCase.assertResponse(type);
+
 async function get(controller: LayoutTest, action: string): Promise<string> {
   const env = { REQUEST_METHOD: "GET", PATH_INFO: "/", HTTP_HOST: "www.nextangle.com" };
   await controller.dispatch(action, new Request(env), new Response());
@@ -79,10 +82,10 @@ describe("LayoutAutoDiscoveryTest", () => {
 
   test("third party template library auto discovers layout", async () => {
     await withTemplateHandler("mab", mab, async () => {
-      const controller = new ThirdPartyTemplateLibraryController();
-      await get(controller, "hello");
-      expect(controller.response.status).toBe(200);
-      expect(controller.body).toBe("layouts/third_party_template_library.mab");
+      testCase = new ActionController.TestCase(ThirdPartyTemplateLibraryController);
+      await testCase.get("hello");
+      assertResponse("success");
+      expect(testCase.responseBody).toBe("layouts/third_party_template_library.mab");
     });
   });
 
@@ -234,9 +237,9 @@ class LayoutStatusIsRendered extends LayoutTest {
 
 describe("LayoutStatusIsRenderedTest", () => {
   test("layout status is rendered", async () => {
-    const controller = new LayoutStatusIsRendered();
-    await get(controller, "hello");
-    expect(controller.response.status).toBe(401);
+    testCase = new ActionController.TestCase(LayoutStatusIsRendered);
+    await testCase.get("hello");
+    assertResponse(401);
   });
 });
 
@@ -248,9 +251,9 @@ class LayoutSymlinkedTest extends LayoutTest {
 
 describe("LayoutSymlinkedIsRenderedTest", () => {
   test("symlinked layout is rendered", async () => {
-    const controller = new LayoutSymlinkedTest();
-    await get(controller, "hello");
-    expect(controller.response.status).toBe(200);
-    expect(controller.body).toContain("This is my layout");
+    testCase = new ActionController.TestCase(LayoutSymlinkedTest);
+    await testCase.get("hello");
+    assertResponse(200);
+    expect(testCase.responseBody).toContain("This is my layout");
   });
 });
