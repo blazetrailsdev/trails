@@ -1,4 +1,11 @@
-import { reverseMerge } from "@blazetrails/activesupport";
+import { classAttribute, Concern, mattrWriter, reverseMerge } from "@blazetrails/activesupport";
+import {
+  extend,
+  include,
+  initialize as moduleInitialize,
+  Module,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat";
 import { Parameters } from "../../action-controller/metal/strong-parameters.js";
 import {
   HelperMethodBuilder,
@@ -8,6 +15,7 @@ import {
   type PolymorphicMappingEntry,
   type ToModel,
 } from "./polymorphic-routes.js";
+import * as PolymorphicRoutes from "./polymorphic-routes.js";
 import type { RouteSet } from "./route-set.js";
 
 export {
@@ -159,3 +167,43 @@ function extractOptions(arr: unknown[]): Record<string, unknown> {
   }
   return {};
 }
+
+type UrlForIncluder = (new (...args: never[]) => unknown) & {
+  defaultUrlOptions: Record<string, unknown>;
+  _urlForModules?(): new (...args: never[]) => unknown;
+};
+
+export const UrlFor = new Module((mod) => {
+  extend(mod, Concern);
+  mod.include(PolymorphicRoutes);
+
+  (
+    mod as unknown as { included(base: null, block: (this: UrlForIncluder) => void): void }
+  ).included(null, function (this: UrlForIncluder) {
+    if (!("defaultUrlOptions" in this.prototype)) {
+      if (typeof this === "function") {
+        classAttribute.call(this, "defaultUrlOptions");
+      } else {
+        mattrWriter.call(this, "defaultUrlOptions");
+      }
+
+      this.defaultUrlOptions = {};
+    }
+
+    if (rbObjRespondTo(this, "_urlForModules")) include(this, this._urlForModules!());
+  });
+
+  (mod as unknown as Record<symbol, unknown>)[moduleInitialize] = initialize;
+
+  mod.moduleEval((m) => {
+    Object.assign(m, {
+      urlOptions,
+      urlFor,
+      fullUrlFor,
+      routeFor,
+      optimizeRoutesGeneration,
+      _withRoutes,
+      _routesContext,
+    });
+  });
+});

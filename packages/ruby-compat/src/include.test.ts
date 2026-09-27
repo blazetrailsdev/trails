@@ -1076,3 +1076,53 @@ describe("rbObjClone", () => {
     expect(Object.isFrozen(clone)).toBe(true);
   });
 });
+
+describe("Module#include of a Module", () => {
+  it("splices the included module beneath the includer, live", () => {
+    const inner = new Module();
+    const outer = new Module((mod) => mod.include(inner));
+    outer.defineMethod("who", () => "outer");
+    inner.defineMethod("who", () => "inner");
+    class Host {}
+    include(Host, outer);
+    inner.defineMethod("later", () => "later");
+    const host = new Host() as DynMethods;
+    expect(host.who()).toBe("outer");
+    expect(host.later()).toBe("later");
+    expect(isModuleIncluded(Host, inner)).toBe(true);
+  });
+
+  it("extends an object with the included module too", () => {
+    const inner = new Module((mod) => mod.defineMethod("fromInner", () => "inner"));
+    const outer = new Module((mod) => mod.include(inner));
+    const obj = {} as DynMethods;
+    extend(obj, outer);
+    expect(obj.fromInner()).toBe("inner");
+  });
+});
+
+describe("include with an append_features hook", () => {
+  it("calls included after append_features", () => {
+    const calls: string[] = [];
+    const mod = new Module() as Module & DynMethods;
+    mod.appendFeatures = function (this: Module, base: new () => unknown) {
+      calls.push("appendFeatures");
+      Module.prototype.appendFeatures.call(this, base);
+    };
+    mod.included = () => calls.push("included");
+    include(class {}, mod);
+    expect(calls).toEqual(["appendFeatures", "included"]);
+  });
+});
+
+describe("Module#dup", () => {
+  it("copies the method table and singleton methods without sharing the table", () => {
+    const mod = new Module((m) => m.defineMethod("greet", () => "hi")) as Module & DynProps;
+    mod.label = "original";
+    const copy = mod.dup();
+    copy.defineMethod("extra", () => "extra");
+    expect(copy.label).toBe("original");
+    expect(copy.instanceMethods()).toEqual(["greet", "extra"]);
+    expect(mod.instanceMethods()).toEqual(["greet"]);
+  });
+});

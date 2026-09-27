@@ -1,4 +1,5 @@
 import {
+  Concern,
   extractOptionsBang,
   isBlank,
   isPlainObject,
@@ -11,6 +12,8 @@ import {
   except,
   extend,
   hasKey,
+  include,
+  type Included,
   InvalidURIError,
   merge,
   mergeBang,
@@ -32,7 +35,6 @@ import {
 import type { Route } from "../journey/route.js";
 import {
   polymorphicUrl as polymorphicUrlFn,
-  polymorphicMapping as polymorphicMappingFn,
   type PolymorphicArg,
   type PolymorphicHost,
   type PolymorphicMappingEntry,
@@ -47,6 +49,7 @@ import {
   type UrlForHost,
   type UrlForOptions,
   type UrlForRoutes,
+  UrlFor,
 } from "./url-for.js";
 import { Endpoint } from "./endpoint.js";
 import { X_CASCADE } from "../constants.js";
@@ -646,108 +649,19 @@ export class NamedRouteCollection {
   }
 }
 
-export class UrlHelpersModule {
-  /** @internal */
-  private readonly _proxy: RoutesProxy;
-  /** @internal */
-  readonly _supportsPath: boolean;
-  declare readonly _routes: RouteSet;
-
-  constructor(routes: RouteSet, supportsPath: boolean) {
-    this._supportsPath = supportsPath;
-    Object.defineProperty(this, "_routes", {
-      get: () => routes,
-      enumerable: true,
-      configurable: true,
-    });
-    const target = routes._routes;
-    const scope: UrlForHost = {
-      _routes: target,
-      get defaultUrlOptions(): Record<string, unknown> {
-        return routes.defaultUrlOptions;
-      },
-      urlOptions: () => ({ ...routes.defaultUrlOptions }),
-    };
-    this._proxy = new RoutesProxy(target, scope, {});
-    const urlHelpers = routes.namedRoutes.urlHelpersModule;
-
-    extend(this, urlHelpers);
-
-    if (supportsPath) {
-      const pathHelpers = routes.namedRoutes.pathHelpersModule;
-
-      extend(this, pathHelpers);
-    }
-
-    for (const name of [
-      "urlFor",
-      "fullUrlFor",
-      "routeFor",
-      "optimizeRoutesGeneration",
-      "polymorphicUrl",
-      "polymorphicPath",
-      "polymorphicUrlForAction",
-      "polymorphicPathForAction",
-      "polymorphicMapping",
-    ] as const) {
-      Object.defineProperty(this, name, {
-        value: (this[name] as (...a: unknown[]) => unknown).bind(this),
-        enumerable: true,
-        writable: true,
-        configurable: true,
-      });
-    }
-  }
-
-  urlFor(options: UrlForOptions): string {
-    return this._proxy.urlFor(options);
-  }
-  fullUrlFor(options: UrlForOptions): string {
-    return this._proxy.fullUrlFor(options);
-  }
-  routeFor(name: string, ...args: unknown[]): string {
-    return this._proxy.routeFor(name, ...args);
-  }
-  optimizeRoutesGeneration(): boolean {
-    return this._proxy.optimizeRoutesGeneration();
-  }
-  polymorphicUrl(recordOrHashOrArray: PolymorphicArg, options: PolymorphicOptions = {}): string {
-    return polymorphicUrlFn.call(
-      this._proxy as unknown as PolymorphicHost,
-      recordOrHashOrArray,
-      options,
-    );
-  }
-  polymorphicPath(recordOrHashOrArray: PolymorphicArg, options: PolymorphicOptions = {}): string {
-    return polymorphicUrlFn.call(this._proxy as unknown as PolymorphicHost, recordOrHashOrArray, {
-      ...options,
-      onlyPath: true,
-    });
-  }
-  /** @internal */
-  polymorphicUrlForAction(
-    action: string,
-    recordOrHash: PolymorphicArg,
-    options: PolymorphicOptions = {},
-  ): string {
-    return this.polymorphicUrl(recordOrHash, { ...options, action });
-  }
-  /** @internal */
-  polymorphicPathForAction(
-    action: string,
-    recordOrHash: PolymorphicArg,
-    options: PolymorphicOptions = {},
-  ): string {
-    return this.polymorphicPath(recordOrHash, { ...options, action });
-  }
-  /** @internal */
-  polymorphicMapping(record: unknown): PolymorphicMappingEntry | undefined {
-    return polymorphicMappingFn(this._proxy as unknown as PolymorphicHost, record);
-  }
-  urlOptions(): Record<string, unknown> {
-    return {};
-  }
-}
+export type UrlHelpersModule = Module & {
+  _proxy: Included<typeof import("./url-for.js")> & { readonly _routes: RouteSet };
+  dupForReinclude?: UrlHelpersModule;
+  urlFor(options: UrlForOptions): string;
+  fullUrlFor(options: UrlForOptions): string;
+  routeFor(name: string, ...args: unknown[]): string;
+  optimizeRoutesGeneration(): boolean;
+  polymorphicUrl(recordOrHashOrArray: PolymorphicArg, options?: PolymorphicOptions): string;
+  polymorphicPath(recordOrHashOrArray: PolymorphicArg, options?: PolymorphicOptions): string;
+  readonly _routes: RouteSet;
+  urlOptions(): Record<string, unknown>;
+  included(base: unknown, block?: (this: any) => void): void;
+};
 
 export class RouteSet {
   namedRoutes: NamedRouteCollection = new NamedRouteCollection();
@@ -868,8 +782,121 @@ export class RouteSet {
     return (this._urlHelpersWithoutPaths ??= this.generateUrlHelpers(false));
   }
 
+  /** @missingRailsArgs extend — PERMANENT */
   generateUrlHelpers(supportsPath: boolean): UrlHelpersModule {
-    return new UrlHelpersModule(this, supportsPath);
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const routes = this;
+
+    return new Module((mod) => {
+      const self = mod as UrlHelpersModule;
+      extend(self, Concern);
+      self.include(UrlFor);
+
+      const proxyClass = class {
+        readonly _routes: RouteSet;
+
+        constructor(routes: RouteSet) {
+          this._routes = routes;
+        }
+
+        optimizeRoutesGeneration(): boolean {
+          return this._routes.isOptimizeRoutesGeneration();
+        }
+      };
+      include(proxyClass, UrlFor);
+      include(proxyClass, routes.namedRoutes.pathHelpersModule);
+      include(proxyClass, routes.namedRoutes.urlHelpersModule);
+
+      self._proxy = new proxyClass(routes) as unknown as UrlHelpersModule["_proxy"];
+
+      Object.defineProperties(
+        self,
+        Object.getOwnPropertyDescriptors({
+          urlFor(this: UrlHelpersModule, options: UrlForOptions): string {
+            return this._proxy.urlFor(options);
+          },
+
+          fullUrlFor(this: UrlHelpersModule, options: UrlForOptions): string {
+            return this._proxy.fullUrlFor(options);
+          },
+
+          routeFor(this: UrlHelpersModule, name: string, ...args: unknown[]): string {
+            return this._proxy.routeFor(name, ...args);
+          },
+
+          optimizeRoutesGeneration(this: UrlHelpersModule): boolean {
+            return this._proxy.optimizeRoutesGeneration();
+          },
+
+          polymorphicUrl(
+            this: UrlHelpersModule,
+            recordOrHashOrArray: PolymorphicArg,
+            options: PolymorphicOptions = {},
+          ): string {
+            return this._proxy.polymorphicUrl(recordOrHashOrArray, options);
+          },
+
+          polymorphicPath(
+            this: UrlHelpersModule,
+            recordOrHashOrArray: PolymorphicArg,
+            options: PolymorphicOptions = {},
+          ): string {
+            return this._proxy.polymorphicPath(recordOrHashOrArray, options);
+          },
+
+          get _routes(): RouteSet {
+            return (this as unknown as UrlHelpersModule)._proxy._routes;
+          },
+          urlOptions(): Record<string, unknown> {
+            return {};
+          },
+        }),
+      );
+
+      const urlHelpers = routes.namedRoutes.urlHelpersModule;
+
+      extend(self, urlHelpers);
+
+      self.include(urlHelpers);
+
+      if (supportsPath) {
+        const pathHelpers = routes.namedRoutes.pathHelpersModule;
+
+        self.include(pathHelpers);
+        extend(self, pathHelpers);
+      }
+
+      self.included(null, function (this: object) {
+        Object.defineProperty(this, "_routes", { get: () => routes, configurable: true });
+      });
+
+      const _routesIvar = Symbol("@_routes");
+      self.moduleEval((m) => {
+        Object.defineProperty(m, "_routes", {
+          get(this: Record<symbol, RouteSet | null | undefined>): RouteSet {
+            return this[_routesIvar] ?? routes;
+          },
+          set(this: Record<symbol, RouteSet | null | undefined>, value: RouteSet | null) {
+            this[_routesIvar] = value;
+          },
+          configurable: true,
+        });
+      });
+
+      self.defineMethod("_generatePathsByDefault", () => supportsPath);
+
+      const concernIncluded = self.included;
+      self.included = function (this: UrlHelpersModule, base: unknown): void {
+        concernIncluded.call(this, base);
+        if (
+          rbObjRespondTo(base, "_routes") &&
+          (base as { _routes: unknown })._routes !== this._proxy._routes
+        ) {
+          this.dupForReinclude ??= this.dup();
+          include(base as new () => unknown, this.dupForReinclude);
+        }
+      };
+    }) as UrlHelpersModule;
   }
 
   mountedHelpers(): typeof MountedHelpers {

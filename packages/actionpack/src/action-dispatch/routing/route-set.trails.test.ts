@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import { include } from "@blazetrails/ruby-compat";
 import { RouteSet, StaticDispatcher } from "./route-set.js";
 import { Constraints } from "./mapper.js";
 import { X_CASCADE } from "../constants.js";
@@ -213,5 +214,47 @@ describe("ActionDispatch::Routing::RouteSet#default_env", () => {
       "api.example.com",
       "/app",
     ]);
+  });
+});
+
+describe("ActionDispatch::Routing::RouteSet#generate_url_helpers", () => {
+  it("includes a copy of the module into an includer whose _routes is another route set", () => {
+    const a = new RouteSet();
+    const b = new RouteSet();
+    const helpers = a.urlHelpers();
+    class Parent {
+      declare static _routes: unknown;
+    }
+    include(Parent, helpers);
+    expect(Parent._routes).toBe(a);
+
+    class Child extends Parent {}
+    include(Child, b.urlHelpers());
+    expect(Child._routes).toBe(b);
+
+    include(Child, helpers);
+    expect(Child._routes).toBe(a);
+    expect(helpers.dupForReinclude).toBeDefined();
+  });
+
+  it("answers the route set from _routes until an instance assigns its own", () => {
+    const routes = new RouteSet();
+    const other = new RouteSet();
+    class Host {}
+    include(Host, routes.urlHelpers());
+    const host = new Host() as { _routes: RouteSet | null };
+    expect(host._routes).toBe(routes);
+    host._routes = other;
+    expect(host._routes).toBe(other);
+    host._routes = null;
+    expect(host._routes).toBe(routes);
+  });
+
+  it("gives an includer the default_url_options class attribute", () => {
+    class Host {
+      declare static defaultUrlOptions: Record<string, unknown>;
+    }
+    include(Host, new RouteSet().urlHelpers());
+    expect(Host.defaultUrlOptions).toEqual({});
   });
 });

@@ -92,18 +92,32 @@ export class Module {
    * Mirrors: Ruby's Module#include into a module — vendor/ruby/v3.3.11/class.c:1179
    * `rb_include_module`, which splices `mod` BELOW this module, so a method
    * this module defines itself outranks the included one. A module already
-   * included is skipped (`include_modules_at`, class.c:1281,1291,1296).
+   * included is skipped (`include_modules_at`, class.c:1281,1291,1296). A
+   * module defining `appendFeatures` gets that call instead, then `included`,
+   * as `rb_mod_include` sends both (vendor/ruby/v3.3.11/eval.c:1159-1160).
    *
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
   include(mod: ModuleObject): this {
+    const appendFeatures = featureHook(mod, "appendFeatures");
+    if (appendFeatures) {
+      appendFeatures(this);
+      featureHook(mod, "included")?.(this);
+      return this;
+    }
     const carrier = carrierOf(this);
     if (!isModuleMethodTablePresent({ prototype: carrier }, mod)) {
       trackIncludedModule(carrier, mod);
+      if (mod instanceof Module) {
+        let nested = nestedModules.get(this);
+        if (!nested) nestedModules.set(this, (nested = []));
+        nested.push(mod);
+        return this;
+      }
       const installed = trackedKeys(carrier);
       const members = mod as Record<string, unknown>;
       for (const key of Object.keys(members)) {
-        if (typeof members[key] !== "function" || /^[A-Z]/.test(key)) continue;
+        if (/^[A-Z]/.test(key) || typeof members[key] !== "function") continue;
         if (Object.prototype.hasOwnProperty.call(carrier, key) && !installed.has(key)) continue;
         installed.add(key);
         Object.defineProperty(carrier, key, {
@@ -229,10 +243,16 @@ export class Module {
   /**
    * Mirrors: Ruby's Module#append_features — vendor/ruby/v3.3.11/eval.c:1110
    * `rb_mod_append_features`, the splice `include` runs before `included`.
+   * A `Module` this module included is spliced beneath it, as
+   * `include_modules_at` (vendor/ruby/v3.3.11/class.c:1253) walks the included
+   * module's own ancestry, skipping one already in `base`'s.
    *
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
   appendFeatures(base: AnyClass): void {
+    for (const mod of nestedModules.get(this) ?? []) {
+      if (!isModuleMethodTablePresent(base, mod)) Module.prototype.appendFeatures.call(mod, base);
+    }
     trackIncludedModule(base.prototype, this);
     const instanceInitializer = (this as ModuleHooks)[initialize];
     if (typeof instanceInitializer === "function") {
@@ -291,6 +311,7 @@ export class Module {
       if (isLinkOf(this, proto)) return;
       proto = Object.getPrototypeOf(proto) as object | null;
     }
+    for (const mod of nestedModules.get(this) ?? []) Module.prototype.extendObject.call(mod, obj);
     trackIncludedModule(obj, this);
     const parent = Object.getPrototypeOf(obj) as object | null;
     const link: object =
@@ -360,9 +381,36 @@ export class Module {
     const carrier = carrierOf(this);
     return Object.prototype.hasOwnProperty.call(carrier, name) && !isUndefEntry(carrier, name);
   }
+
+  /**
+   * Mirrors: Ruby's Module#dup — vendor/ruby/v3.3.11/object.c:591 `rb_obj_dup`,
+   * whose `initialize_copy` is vendor/ruby/v3.3.11/class.c:524 `rb_mod_init_copy`:
+   * the copy gets its own method table and a clone of the singleton class
+   * (`rb_singleton_class_clone`, :545-548), and shares the modules it includes.
+   * Nothing that already includes the original includes the copy.
+   *
+   * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+   */
+  dup(): this {
+    const copy = rbObjClone(this);
+    const table = Object.getOwnPropertyDescriptors(carrierOf(this)) as Record<
+      string | symbol,
+      PropertyDescriptor
+    >;
+    for (const registry of [includedKeys, includedModulesKey]) {
+      const set = table[registry];
+      if (set) table[registry] = { ...set, value: new Set(set.value as Set<unknown>) };
+    }
+    carriers.set(copy, Object.create(null, table) as Record<string, unknown>);
+    const nested = nestedModules.get(this);
+    if (nested) nestedModules.set(copy, [...nested]);
+    return copy;
+  }
 }
 
 const carriers = new WeakMap<Module, Record<string, unknown>>();
+
+const nestedModules = new WeakMap<Module, Module[]>();
 
 function carrierOf(mod: Module): Record<string, unknown> {
   let carrier = carriers.get(mod);
@@ -787,7 +835,11 @@ function featureHook(mod: unknown, name: string): ((base: unknown) => void) | un
  */
 export function include(klass: AnyClass, mod: ModuleObject | AnyClass | Module): void {
   const appendFeatures = featureHook(mod, "appendFeatures");
-  if (appendFeatures) return appendFeatures(klass);
+  if (appendFeatures) {
+    appendFeatures(klass);
+    featureHook(mod, "included")?.(klass);
+    return;
+  }
   if (isModuleMethodTablePresent(klass, mod)) {
     if (typeof (mod as ModuleHooks)[included] === "function") {
       (mod as ModuleHooks)[included]!(klass);
