@@ -11,6 +11,7 @@ import {
 import { isBlank } from "./core-ext/object/blank.js";
 import * as XmlMini from "./xml-mini.js";
 import { XMLConverter } from "./core-ext/hash/conversions.js";
+import { ActiveSupportJSON } from "./json.js";
 import type { StringIO } from "@blazetrails/ruby-compat";
 
 type AnyObject = Record<string, unknown>;
@@ -539,3 +540,14 @@ export function fromXml(
 export function fromTrustedXml(xml: string | StringIO | null | undefined): unknown {
   return fromXml(xml, []);
 }
+
+/** @noRailsEquivalent PERMANENT */
+export const HASH_CONVERSIONS: Record<string, (hash: AnyObject) => string> = Object.assign(
+  Object.create(null) as Record<string, (hash: AnyObject) => string>,
+  {
+    toJson: (hash: AnyObject) => ActiveSupportJSON.encode(hash),
+    toXml: (hash: AnyObject) => toXml(hash),
+    toQuery: (hash: AnyObject) => toQuery(hash),
+    toParam: (hash: AnyObject) => String(toParam(hash)),
+  },
+);

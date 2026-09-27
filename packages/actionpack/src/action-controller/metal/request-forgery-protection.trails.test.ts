@@ -4,7 +4,7 @@ import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
 
 import { CookieJar, cookieJar } from "../../action-dispatch/middleware/cookies.js";
 import { Response } from "@blazetrails/rack";
-import { SessionHash } from "@blazetrails/rack-session";
+import { SessionHash, SessionId } from "@blazetrails/rack-session";
 import {
   CookieStore,
   type CsrfRequest,
@@ -75,8 +75,8 @@ describe("NullSession", () => {
     const jar = new CookieJar(request);
     cookieJar.call(request, jar);
     const session = {
-      id: () => ({ publicId: "sid-1" }),
-      idWas: () => ({ publicId: "sid-1" }),
+      id: () => new SessionId("sid-1"),
+      idWas: () => new SessionId("sid-1"),
     };
     const csrfRequest = {
       method: "POST",
@@ -103,7 +103,7 @@ describe("NullSession", () => {
       method: "POST",
       baseUrl: "https://example.com",
       cookieJar: () => jar,
-      session: { id: () => ({ publicId: "sid-1" }), idWas: () => ({ publicId: "sid-2" }) },
+      session: { id: () => new SessionId("sid-1"), idWas: () => new SessionId("sid-2") },
     } as unknown as CsrfRequest;
     const store = new CookieStore("csrf_token");
 
@@ -125,5 +125,23 @@ describe("NullSession", () => {
     jar.encrypted.set("csrf_token", "not json");
 
     expect(new CookieStore("csrf_token").fetch(csrfRequest)).toBeNull();
+  });
+
+  it("CookieStore writes the envelope Rails writes, keyed session_id / public_id", () => {
+    const request = buildRequest();
+    const jar = new CookieJar(request);
+    cookieJar.call(request, jar);
+    const csrfRequest = {
+      method: "POST",
+      baseUrl: "https://example.com",
+      cookieJar: () => jar,
+      session: { id: () => new SessionId("sid-1"), idWas: () => new SessionId("sid-1") },
+    } as unknown as CsrfRequest;
+
+    new CookieStore("csrf_token").store(csrfRequest, "the-token");
+
+    expect(jar.encrypted.get("csrf_token")).toBe(
+      '{"token":"the-token","session_id":{"public_id":"sid-1"}}',
+    );
   });
 });

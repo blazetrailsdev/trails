@@ -7,6 +7,8 @@ import {
   Resolver,
   RoutingUrlFor,
   setApplyStylesheetMediaDefault,
+  setImageDecoding,
+  setImageLoading,
   setPreloadLinksHeader,
   ViewReloader,
 } from "@blazetrails/actionview";
@@ -16,8 +18,8 @@ export interface ActionViewConfig {
   embedAuthenticityTokenInRemoteForms: boolean | null;
   debugMissingTranslation: boolean;
   defaultEnforceUtf8: boolean | null;
-  imageLoading: string | null;
-  imageDecoding: string | null;
+  imageLoading?: string | null;
+  imageDecoding?: string | null;
   applyStylesheetMediaDefault?: boolean;
   preloadLinksHeader?: boolean | null;
   prependContentExfiltrationPrevention: boolean;
@@ -56,6 +58,12 @@ export class Trailtie extends BaseTrailtie {
 
     this.config.afterInitialize((app) => {
       const actionView = (app as TrailtieApp).config.get("actionView") as ActionViewConfig;
+      const imageLoading = actionView.imageLoading;
+      delete actionView.imageLoading;
+      setImageLoading(imageLoading ?? null);
+      const imageDecoding = actionView.imageDecoding;
+      delete actionView.imageDecoding;
+      setImageDecoding(imageDecoding ?? null);
       const preloadLinksHeader = actionView.preloadLinksHeader;
       delete actionView.preloadLinksHeader;
       setPreloadLinksHeader(preloadLinksHeader ?? null);

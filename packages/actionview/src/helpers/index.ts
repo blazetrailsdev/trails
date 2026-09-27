@@ -106,6 +106,8 @@ export {
   publicComputeAssetPath,
   stylesheetPath,
   pathToStylesheet,
+  imagePath,
+  pathToImage,
   ASSET_EXTENSIONS,
   ASSET_PUBLIC_DIRECTORIES,
   URI_REGEXP,
@@ -114,9 +116,14 @@ export type { AssetPathOptions, AssetUrlHelperHost } from "./asset-url-helper.js
 
 export {
   stylesheetLinkTag,
+  imageTag,
   sendPreloadLinksHeader,
+  imageLoading,
+  imageDecoding,
   preloadLinksHeader,
   applyStylesheetMediaDefault,
+  setImageLoading,
+  setImageDecoding,
   setPreloadLinksHeader,
   setApplyStylesheetMediaDefault,
   MAX_HEADER_SIZE,

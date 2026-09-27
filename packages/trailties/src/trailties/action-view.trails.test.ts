@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterAll, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -24,8 +24,11 @@ import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
 import {
   applyStylesheetMediaDefault,
   computeAssetPath,
+  imageLoading,
+  imageTag,
   publicComputeAssetPath,
   setApplyStylesheetMediaDefault,
+  setImageLoading,
   stylesheetLinkTag,
   type AssetTagHelperHost,
 } from "@blazetrails/actionview";
@@ -114,9 +117,13 @@ describe("ActionView::Railtie view reloader (trails)", () => {
 });
 
 describe("ActionView::Railtie asset tag wiring (trails)", () => {
+  afterAll(() => {
+    resetLoadHooks();
+  });
+
   afterEach(() => {
     setApplyStylesheetMediaDefault(null);
-    resetLoadHooks();
+    setImageLoading(null);
     Trailtie.config.set("actionView", {
       applyStylesheetMediaDefault: true,
       annotateRenderedViewWithFilenames: false,
@@ -132,6 +139,21 @@ describe("ActionView::Railtie asset tag wiring (trails)", () => {
 
     expect(applyStylesheetMediaDefault).toBe(true);
     expect(String(stylesheetLinkTag.call(host, "style"))).toContain('media="screen"');
+  });
+
+  it("after_initialize applies config.action_view.image_loading so image_tag emits it", () => {
+    Trailtie.config.set("actionView", {
+      ...(Trailtie.config.get("actionView") as ActionViewConfig),
+      imageLoading: "lazy",
+    });
+    const app = { config: Trailtie.config };
+    runLoadHooks("after_initialize", app);
+
+    expect(imageLoading).toBe("lazy");
+    expect("imageLoading" in (Trailtie.config.get("actionView") as ActionViewConfig)).toBe(false);
+    expect(String(imageTag.call(host, "icon.png"))).toBe(
+      '<img src="/images/icon.png" loading="lazy" />',
+    );
   });
 });
 
