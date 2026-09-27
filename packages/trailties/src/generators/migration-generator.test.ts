@@ -255,7 +255,6 @@ describe("MigrationGeneratorTest", () => {
     Trails.application!.config.activeRecord.belongsToRequiredByDefault = false;
 
     const migration = "add_references_to_books";
-
     makeGen().run(migration, ["author:belongs_to", "distributor:references{polymorphic}"]);
 
     await assertMigration(`db/migrate/${migration}.ts`, (content) =>

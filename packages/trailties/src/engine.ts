@@ -59,7 +59,9 @@ export class Engine extends Trailtie {
   static override register(base: typeof Trailtie, calledFrom?: string): void {
     if (!base.isAbstractRailtie() && calledFrom !== undefined) {
       (base as typeof Engine).calledFrom(
-        File.dirname(decodeURIComponent(new URL(calledFrom).pathname)),
+        File.dirname(
+          decodeURIComponent(new URL(calledFrom).pathname).replace(/^\/(?=[A-Za-z]:)/, ""),
+        ),
       );
     }
     super.register(base);
