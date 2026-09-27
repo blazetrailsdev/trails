@@ -149,7 +149,6 @@ export type {
 export {
   BUTTON_TAG_METHOD_VERBS,
   ClassMethods as UrlHelperClassMethods,
-  buttonToGeneratesButtonTag,
   setButtonToGeneratesButtonTag,
   urlFor,
   _backUrl,

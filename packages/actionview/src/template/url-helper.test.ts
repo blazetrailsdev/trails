@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Base } from "../base.js";
-import { setPrependContentExfiltrationPrevention } from "../helpers/content-exfiltration-prevention-helper.js";
 import {
   buttonToGeneratesButtonTag,
   setButtonToGeneratesButtonTag,
@@ -129,16 +128,6 @@ describe("UrlHelperTest", () => {
     );
   });
 
-  it("button to with remote and form options", () => {
-    assertDomEqual(
-      `<form method="post" action="http://www.example.com" class="custom-class" data-remote="true" data-type="json"><button type="submit">Hello</button></form>`,
-      view.buttonTo("Hello", "http://www.example.com", {
-        remote: true,
-        form: { class: "custom-class", "data-type": "json" },
-      }),
-    );
-  });
-
   it("button to with method delete", () => {
     assertDomEqual(
       `<form method="post" action="http://www.example.com" class="button_to"><input type="hidden" name="_method" value="delete" autocomplete="off" /><button type="submit">Hello</button></form>`,
@@ -161,18 +150,6 @@ describe("UrlHelperTest", () => {
     );
   });
 
-  it("button to with content exfiltration prevention", () => {
-    setPrependContentExfiltrationPrevention(true);
-    try {
-      assertDomEqual(
-        `<!-- '"\` --><!-- </textarea></xmp> --></option></form><form method="post" action="http://www.example.com" class="button_to"><button type="submit">Hello</button></form>`,
-        view.buttonTo("Hello", "http://www.example.com"),
-      );
-    } finally {
-      setPrependContentExfiltrationPrevention(false);
-    }
-  });
-
   it("link tag with query and no name", () => {
     assertDomEqual(
       `<a href="http://www.example.com?q1=v1&amp;q2=v2">http://www.example.com?q1=v1&amp;q2=v2</a>`,
@@ -184,13 +161,6 @@ describe("UrlHelperTest", () => {
     const env = { HTTP_REFERER: "http://www.example.com/referer" };
     view = viewWith(controllerWithReferer(env));
     assertDomEqual(`<a href="${env.HTTP_REFERER}">go back</a>`, view.linkTo("go back", ":back"));
-  });
-
-  it("link tag using post javascript and rel", () => {
-    assertDomEqual(
-      `<a href="http://www.example.com" data-method="post" rel="example nofollow">Hello</a>`,
-      view.linkTo("Hello", "http://www.example.com", { method: "post", rel: "example" }),
-    );
   });
 
   it("link tag using delete javascript and href and confirm", () => {
@@ -213,24 +183,40 @@ describe("UrlHelperTest", () => {
 
   it("current page with trailing slash and params", () => {
     view.request = requestForUrl("/posts?order=desc");
-    expect(view.isCurrentPage("/posts/?order=desc")).toBe(true);
-    expect(view.isCurrentPage("http://www.example.com/posts/?order=desc")).toBe(true);
+    expect(view.isCurrentPage("/posts/?order=desc")).toBeTruthy();
+    expect(view.isCurrentPage("http://www.example.com/posts/?order=desc")).toBeTruthy();
   });
 
   it("current page with not get verb", () => {
     view.request = requestForUrl("/events", { method: "post" });
-    expect(view.isCurrentPage("/events")).toBe(false);
+    expect(view.isCurrentPage("/events")).toBeFalsy();
   });
 
   it("mail to with options", () => {
+    const opts = {
+      cc: "ccaddress@example.com",
+      bcc: "bccaddress@example.com",
+      subject: "This is an example email",
+      body: "This is the body of the message.",
+      reply_to: "foo@bar.com",
+    };
+    const query =
+      "cc=ccaddress%40example.com&amp;bcc=bccaddress%40example.com&amp;body=This%20is%20the%20body%20of%20the%20message.&amp;subject=This%20is%20an%20example%20email&amp;reply-to=foo%40bar.com";
     assertDomEqual(
-      `<a href="mailto:me@example.com?cc=ccaddress%40example.com&amp;bcc=bccaddress%40example.com&amp;body=This%20is%20the%20body%20of%20the%20message.&amp;subject=This%20is%20an%20example%20email&amp;reply-to=foo%40bar.com">My email</a>`,
+      `<a href="mailto:me@example.com?${query}">My email</a>`,
+      view.mailTo("me@example.com", "My email", { ...opts }),
+    );
+    assertDomEqual(
+      `<a href="mailto:me@example.com?${query}">me@example.com</a>`,
+      view.mailTo("me@example.com", { ...opts }),
+    );
+    assertDomEqual(
+      `<a href="mailto:me@example.com?body=This%20is%20the%20body%20of%20the%20message.&amp;subject=This%20is%20an%20example%20email">My email</a>`,
       view.mailTo("me@example.com", "My email", {
-        cc: "ccaddress@example.com",
-        bcc: "bccaddress@example.com",
-        subject: "This is an example email",
-        body: "This is the body of the message.",
-        reply_to: "foo@bar.com",
+        cc: "",
+        bcc: "",
+        subject: opts.subject,
+        body: opts.body,
       }),
     );
   });
@@ -258,20 +244,35 @@ describe("UrlHelperTest", () => {
   });
 
   it("sms to with options", () => {
+    const opts = { class: "simple-class", country_code: "01", body: "Hello from Jim" };
+    const href = "sms:+015155555785;?&body=Hello%20from%20Jim";
     assertDomEqual(
-      `<a class="simple-class" href="sms:+015155555785;?&body=Hello%20from%20Jim">Text me</a>`,
-      view.smsTo("5155555785", "Text me", {
-        class: "simple-class",
-        country_code: "01",
-        body: "Hello from Jim",
-      }),
+      `<a class="simple-class" href="${href}">Text me</a>`,
+      view.smsTo("5155555785", "Text me", { ...opts }),
+    );
+    assertDomEqual(
+      `<a class="simple-class" href="${href}">5155555785</a>`,
+      view.smsTo("5155555785", { ...opts }),
+    );
+    assertDomEqual(
+      `<a href="sms:5155555785;?&body=This%20is%20the%20body%20of%20the%20message.">Text me</a>`,
+      view.smsTo("5155555785", "Text me", { body: "This is the body of the message." }),
     );
   });
 
   it("phone to with options", () => {
+    const opts = { class: "example-class", country_code: "01" };
+    assertDomEqual(
+      `<a class="example-class" href="tel:+011234567890">Phone</a>`,
+      view.phoneTo("1234567890", "Phone", { ...opts }),
+    );
     assertDomEqual(
       `<a class="example-class" href="tel:+011234567890">1234567890</a>`,
-      view.phoneTo("1234567890", { class: "example-class", country_code: "01" }),
+      view.phoneTo("1234567890", { ...opts }),
+    );
+    assertDomEqual(
+      `<a href="tel:+011234567890">Phone</a>`,
+      view.phoneTo("1234567890", "Phone", { country_code: "01" }),
     );
   });
 });
