@@ -1,4 +1,4 @@
-import { Notifications, type SafeBuffer } from "@blazetrails/activesupport";
+import { I18n, Notifications, type SafeBuffer } from "@blazetrails/activesupport";
 import { Fiber } from "@blazetrails/ruby-compat";
 import { StreamingBuffer } from "../buffers.js";
 import { StreamingFlow } from "../flows.js";
@@ -78,7 +78,6 @@ export class StreamingTemplateRenderer extends TemplateRenderer<
   ): Promise<void> {
     const output = new StreamingBuffer(buffer);
     const yielder = (...name: unknown[]) => view._layoutFor!(...name);
-    const streamingView = view as ViewContext & ConstructorParameters<typeof StreamingFlow>[0];
 
     await Notifications.instrument(
       "render_template.action_view",
@@ -88,7 +87,9 @@ export class StreamingTemplateRenderer extends TemplateRenderer<
         locals,
       },
       async () => {
+        const outerConfig = I18n.config();
         const fiber = new Fiber(async () => {
+          I18n.setConfig(outerConfig);
           if (layout) {
             await layout.render(view, locals, output, {}, yielder);
           } else {
@@ -96,14 +97,17 @@ export class StreamingTemplateRenderer extends TemplateRenderer<
           }
         });
 
-        streamingView.viewFlow = new StreamingFlow(streamingView, fiber);
+        view.viewFlow = new StreamingFlow(
+          view as unknown as ConstructorParameters<typeof StreamingFlow>[0],
+          fiber,
+        );
 
         await fiber.resume();
 
         if (fiber.isAlive()) {
           const content = await template.render(view, locals, null, {}, yielder);
 
-          streamingView.viewFlow.set("layout", content);
+          view.viewFlow.set("layout", content);
 
           while (fiber.isAlive()) await fiber.resume();
         }
