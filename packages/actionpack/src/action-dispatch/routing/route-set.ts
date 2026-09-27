@@ -524,8 +524,6 @@ export interface UrlHelperContext {
 export type NamedRouteHelper = (this: UrlHelperContext, ...args: unknown[]) => string;
 
 export class NamedRouteCollection {
-  static UrlHelper = UrlHelper;
-
   /** @internal */
   private readonly _routes: Map<string, Route> = new Map();
   readonly pathHelpersModule: Module = new Module();
@@ -628,6 +626,8 @@ export class NamedRouteCollection {
 
     return this;
   }
+
+  static UrlHelper = UrlHelper;
 
   private defineUrlHelper(
     mod: Module,
