@@ -62,7 +62,6 @@ export class Engine extends Trailtie {
         File.dirname(decodeURIComponent(new URL(calledFrom).pathname)),
       );
     }
-
     super.register(base);
   }
 

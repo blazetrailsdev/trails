@@ -2,6 +2,7 @@ import { File } from "@blazetrails/ruby-compat";
 import { GeneratorBase, GeneratorOptions, migrationTimestamp } from "./base.js";
 import { CreateMigration } from "./actions/create-migration.js";
 import { GeneratedAttribute } from "./generated-attribute.js";
+import { Base } from "@blazetrails/activerecord";
 import {
   camelize,
   foreignKey,
@@ -39,8 +40,7 @@ export class MigrationGenerator extends GeneratorBase {
   static exitOnFailure = true;
 
   private attributes: GeneratedAttribute[] = [];
-  private timestamps = true;
-  private primaryKeyTypeOption: string | undefined;
+  private runOptions: MigrationRunOptions = {};
   private migrationTemplate = "migration.rb";
   private migrationAction: string | undefined;
   private tableName = "";
@@ -53,9 +53,7 @@ export class MigrationGenerator extends GeneratorBase {
       );
     }
 
-    const { timestamps = true, primaryKeyType } = options;
-    this.timestamps = timestamps;
-    this.primaryKeyTypeOption = primaryKeyType;
+    this.runOptions = options;
     this.attributes = args
       .filter((arg) => !arg.startsWith("-"))
       .map((arg) => GeneratedAttribute.parse(arg));
@@ -114,7 +112,7 @@ ${body}
         );
       }
     }
-    if (this.timestamps) colLines.push("      t.timestamps();");
+    if (this.runOptions.timestamps ?? true) colLines.push("      t.timestamps();");
     const parts = [
       `    await this.createTable("${table}"${kwargs(this.primaryKeyType())}, (t) => {\n${colLines.join("\n")}\n    });`,
     ];
@@ -198,12 +196,12 @@ ${body}
   }
 
   private primaryKeyType(): string | undefined {
-    const keyType = this.primaryKeyTypeOption;
+    const keyType = this.runOptions.primaryKeyType;
     if (keyType) return `, id: "${keyType}"`;
   }
 
   private foreignKeyType(): string | undefined {
-    const keyType = this.primaryKeyTypeOption;
+    const keyType = this.runOptions.primaryKeyType;
     if (keyType) return `, type: "${keyType}"`;
   }
 
@@ -216,7 +214,9 @@ ${body}
     } else if (/join_table/.test(fileName)) {
       if (this.attributes.length === 2) {
         this.migrationAction = "join";
-        this.joinTables = this.attributes.map((a) => a.pluralName());
+        this.joinTables = this.isPluralizeTableNames()
+          ? this.attributes.map((a) => a.pluralName())
+          : this.attributes.map((a) => a.singularName());
 
         this.setIndexNames();
       }
@@ -241,6 +241,10 @@ ${body}
   }
 
   private normalizeTableName(tableName: string): string {
-    return pluralize(tableName);
+    return this.isPluralizeTableNames() ? pluralize(tableName) : singularize(tableName);
+  }
+
+  private isPluralizeTableNames(): boolean {
+    return Base.pluralizeTableNames;
   }
 }

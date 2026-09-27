@@ -55,15 +55,12 @@ export class InfoController extends ApplicationController {
 
   private matchingRoutes({ query, exactMatch }: { query: string; exactMatch: boolean }): string[] {
     if (isBlank(query)) return [];
-
     const normalizedPath = ("/" + query).replace(/\/+/g, "/");
     const queryWithoutUrlOrPathSuffix = query
       .replace(/(\w)(_path$)/, "$1")
       .replace(/(\w)(_url$)/, "$1");
-
     return [...(this as unknown as { _routes: RouteSet })._routes.routes].flatMap((route) => {
       const routeWrapper = new RouteWrapper(route);
-
       let match: unknown;
       if (exactMatch) {
         match = route.path.match(normalizedPath);
@@ -72,14 +69,11 @@ export class InfoController extends ApplicationController {
         match = routeWrapper.path.match(new RegExp(query));
         match ||= routeWrapper.name.includes(queryWithoutUrlOrPathSuffix);
       }
-
       match ||= query === routeWrapper.verb;
-
       if (!match) {
         const controllerAction = RFC2396_PARSER.escape(routeWrapper.reqs);
         match = exactMatch ? query === controllerAction : controllerAction.includes(query);
       }
-
       return match ? [routeWrapper.path] : [];
     });
   }
