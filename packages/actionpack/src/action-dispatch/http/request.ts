@@ -628,10 +628,6 @@ export class Request {
     this.env["action_dispatch.route_uri_pattern"] = pattern;
   }
 
-  get originalScriptName(): string | undefined {
-    return this.getHeader("ORIGINAL_SCRIPT_NAME") as string | undefined;
-  }
-
   /** @internal */
   get routes(): unknown {
     return this.getHeader("action_dispatch.routes");

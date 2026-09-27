@@ -119,14 +119,15 @@ describe("AssetTagHelperTest", () => {
   });
 
   it("image tag raises an error for competing size arguments", () => {
-    expect(() =>
-      imageTag.call(host, "gold.png", { height: "100", width: "200", size: "45x70" }),
-    ).toThrow(
-      expect.objectContaining({
-        constructor: ArgumentError,
-        message: "Cannot pass a :size option with a :height or :width option",
-      }),
-    );
+    const options = { height: "100", width: "200", size: "45x70" };
+    let exception!: Error;
+    try {
+      imageTag.call(host, "gold.png", options);
+    } catch (error) {
+      exception = error as Error;
+    }
+    expect(() => imageTag.call(host, "gold.png", options)).toThrow(ArgumentError);
+    expect(exception.message).toEqual("Cannot pass a :size option with a :height or :width option");
   });
 
   it("image tag loading attribute default value", () => {
