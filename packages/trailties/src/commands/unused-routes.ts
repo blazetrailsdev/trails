@@ -12,6 +12,7 @@ import { glob } from "@blazetrails/activesupport/glob";
 import { exit } from "@blazetrails/ruby-compat";
 import { Command } from "commander";
 import { bootApplicationBang } from "../command/actions.js";
+import { Base } from "../command/base.js";
 import { Trails } from "../rails.js";
 
 interface ViewPathRoot {
@@ -80,21 +81,18 @@ export class RouteInfo {
   }
 }
 
-export class UnusedRoutesCommand {
-  /** @internal */
-  private options: UnusedRoutesOptions;
+export class UnusedRoutesCommand extends Base {
   /** @internal */
   private _routes: Journey.Route[] | null = null;
 
   constructor(options: UnusedRoutesOptions) {
-    this.options = options;
+    super(options);
   }
 
-  /** @missingRailsCall say — CONVERGEABLE generator-and-command-bodies-bypass-thor-say */
   async perform(): Promise<void> {
     await bootApplicationBang();
 
-    console.log((await this.inspector()).format(this.formatter(), this.routesFilter()));
+    this.say((await this.inspector()).format(this.formatter(), this.routesFilter()));
 
     if ((await this.routes()).length > 0) exit(1);
   }
@@ -123,9 +121,10 @@ export class UnusedRoutesCommand {
 
   /** @internal */
   private routesFilter(): RoutesFilter {
+    const options = this.options as UnusedRoutesOptions;
     const filter: RoutesFilter = {};
-    if (this.options.controller !== undefined) filter.controller = this.options.controller;
-    if (this.options.grep !== undefined) filter.grep = this.options.grep;
+    if (options.controller !== undefined) filter.controller = options.controller;
+    if (options.grep !== undefined) filter.grep = options.grep;
     return filter;
   }
 }

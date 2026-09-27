@@ -25,18 +25,6 @@
   },
   {
     "package": "activesupport",
-    "name": "InvalidContentError",
-    "rubyFile": "active_support/encrypted_configuration.rb",
-    "reason": "active_support/encrypted_configuration.rb (encryption) is unported."
-  },
-  {
-    "package": "activesupport",
-    "name": "InvalidKeyError",
-    "rubyFile": "active_support/encrypted_configuration.rb",
-    "reason": "active_support/encrypted_configuration.rb (encryption) is unported."
-  },
-  {
-    "package": "activesupport",
     "name": "SoleItemExpectedError",
     "rubyFile": "active_support/core_ext/enumerable.rb",
     "reason": "active_support/core_ext/enumerable.rb (Enumerable#sole/#pick) is unported."

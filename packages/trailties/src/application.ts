@@ -2,7 +2,7 @@ import {
   ArgumentError,
   dasherize,
   deepMerge,
-  EncryptedFile,
+  EncryptedConfiguration,
   getEnv,
   isPlainObject,
   OrderedOptions,
@@ -40,7 +40,7 @@ export class Application extends Engine {
   private _routesReloader?: RoutesReloader;
   private _orderedRailties?: Array<Trailtie | Trailtie[] | string>;
   private _keyGenerators = new Map<string, CachingKeyGenerator>();
-  private _credentials?: EncryptedFile;
+  private _credentials?: EncryptedConfiguration;
   private _deprecators?: Deprecators;
   readonly executor: typeof Executor = class extends Executor {};
   readonly reloader: typeof Reloader = class extends Reloader {};
@@ -224,7 +224,7 @@ export class Application extends Engine {
     return new MessageVerifier(this.keyGenerator().generateKey(verifierName));
   }
 
-  async credentials(): Promise<EncryptedFile> {
+  async credentials(): Promise<EncryptedConfiguration> {
     if (this._credentials) return this._credentials;
     const c = this.config.credentials;
     await this.root();
@@ -237,11 +237,11 @@ export class Application extends Engine {
   async encrypted(
     path: string,
     opts: { keyPath?: string; envKey?: string } = {},
-  ): Promise<EncryptedFile> {
+  ): Promise<EncryptedConfiguration> {
     const p = getPath();
     const root = await this.root();
-    return new EncryptedFile({
-      contentPath: p.resolve(root, path),
+    return new EncryptedConfiguration({
+      configPath: p.resolve(root, path),
       keyPath: p.resolve(root, opts.keyPath ?? "config/master.key"),
       envKey: opts.envKey ?? "RAILS_MASTER_KEY",
       raiseIfMissingKey: this.config.requireMasterKey,

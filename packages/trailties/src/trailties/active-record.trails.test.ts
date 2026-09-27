@@ -1,10 +1,12 @@
 import { describe, it, expect } from "vitest";
+import { getFs, getOsAsync, getPath } from "@blazetrails/ruby-compat";
 import { useInMemoryDatabaseUrl } from "../support/in-memory-database-url.js";
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
 import { Trailtie } from "./active-record.js";
 import { Trailtie as ActionDispatchTrailtie } from "./action-dispatch.js";
 import {
   Deprecators,
+  EncryptedConfiguration,
   Logger,
   NotificationEvent,
   Notifications,
@@ -35,22 +37,62 @@ import {
   setQueryTransformers,
   setVerboseQueryLogs,
 } from "@blazetrails/activerecord";
+import { Configurable, Encryption } from "@blazetrails/activerecord/encryption";
 import { Configuration } from "../application/configuration.js";
 import { Configuration as TrailtieConfiguration } from "../trailtie/configuration.js";
 import { MiddlewareStackProxy } from "../configuration.js";
 import { Trails } from "../rails.js";
 import type { ActiveRecordConfig } from "./active-record.js";
 
+const credentials = async (dir = "/nonexistent"): Promise<EncryptedConfiguration> =>
+  new EncryptedConfiguration({
+    configPath: `${dir}/credentials.yml.enc`,
+    keyPath: `${dir}/master.key`,
+    envKey: "RAILS_MASTER_KEY",
+    raiseIfMissingKey: false,
+  });
+
 const blogApp = (): {
   config: { filterParameters: Array<string | RegExp> };
   deprecators: Deprecators;
+  credentials: typeof credentials;
 } => ({
   deprecators: new Deprecators(),
   config: { filterParameters: [] },
+  credentials,
 });
 
 describe("RailtieTest (trails-only)", () => {
   useInMemoryDatabaseUrl();
+
+  it("runInitializers configures Encryption with the active_record_encryption credentials", async () => {
+    const primaryKey = Configurable.config.hasPrimaryKey();
+    const deterministicKey = Configurable.config.hasDeterministicKey();
+    const keyDerivationSalt = Configurable.config.hasKeyDerivationSalt();
+    try {
+      const fs = getFs();
+      const dir = await fs.mkdtemp!(`${(await getOsAsync()).tmpdir()}${getPath().sep}config-`);
+      await fs.writeFile!(`${dir}/master.key`, EncryptedConfiguration.generateKey());
+      await (
+        await credentials(dir)
+      ).write(
+        "active_record_encryption:\n" +
+          "  primary_key: credentials-primary-key\n" +
+          "  deterministic_key: credentials-deterministic-key\n" +
+          "  key_derivation_salt: credentials-salt\n",
+      );
+      await runTrailtieInitializers(Trailtie, {
+        ...blogApp(),
+        credentials: () => credentials(dir),
+      });
+      runLoadHooks("active_record_encryption", Encryption);
+      expect(Configurable.config.primaryKey).toBe("credentials-primary-key");
+      expect(Configurable.config.deterministicKey).toBe("credentials-deterministic-key");
+      expect(Configurable.config.keyDerivationSalt).toBe("credentials-salt");
+    } finally {
+      Object.assign(Configurable.config, { primaryKey, deterministicKey, keyDerivationSalt });
+    }
+  });
 
   it("runInitializers includes ControllerRuntime into ActionController::Base", async () => {
     await runTrailtieInitializers(Trailtie, blogApp());
@@ -203,7 +245,7 @@ describe("RailtieTest (trails-only)", () => {
         Trailtie.config.set("activeRecord", { ...saved, ...cfg });
         const config = new Configuration();
         if (loadDefaults) config.loadDefaults(loadDefaults);
-        const app = { deprecators: new Deprecators(), config };
+        const app = { deprecators: new Deprecators(), config, credentials };
         await runTrailtieInitializers(Trailtie, app);
         runLoadHooks("after_initialize", app);
         return {
