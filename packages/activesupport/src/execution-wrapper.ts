@@ -66,7 +66,10 @@ export class ExecutionWrapper {
     | Promise<CompletableExecution> {
     if (reset) {
       const lostInstance = IsolatedExecutionState.delete<CompletableExecution>(this.activeKey());
-      lostInstance?.completeBang();
+      const lostCompleted = lostInstance?.completeBang();
+      if (isThenable(lostCompleted)) {
+        return Promise.resolve(lostCompleted).then(() => this.runBang({ reset }));
+      }
     } else {
       if (this.active()) return this.Null;
     }

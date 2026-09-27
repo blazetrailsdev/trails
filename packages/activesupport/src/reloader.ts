@@ -85,10 +85,16 @@ export class Reloader extends ExecutionWrapper {
           }
         })() as T;
       }
+      let deferred = false;
       try {
-        return block();
+        const result = block();
+        if (isThenable(result)) {
+          deferred = true;
+          return Promise.resolve(result).finally(() => instance.completeBang()) as T;
+        }
+        return result;
       } finally {
-        instance.completeBang();
+        if (!deferred) instance.completeBang();
       }
     }, kwargs);
   }

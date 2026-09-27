@@ -64,4 +64,34 @@ describe("Reloader (trails)", () => {
     await AppReloader.reloadBang();
     expect(called).toEqual(["run", "prepare", "complete", "prepare"]);
   });
+
+  it("run!(reset: true) awaits the lost instance's async to_complete before running", async () => {
+    class AppReloader extends Reloader {}
+    AppReloader.check = () => true;
+    const called: string[] = [];
+    AppReloader.toRun(() => called.push("run"));
+    AppReloader.toComplete(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      called.push("complete");
+    });
+
+    await AppReloader.runBang();
+    const instance = await AppReloader.runBang({ reset: true });
+    expect(called).toEqual(["run", "complete", "run"]);
+    await instance.completeBang();
+  });
+
+  it("wrap completes after an async block settles", async () => {
+    class AppReloader extends Reloader {}
+    AppReloader.check = () => true;
+    const called: string[] = [];
+    AppReloader.toRun(() => called.push("run"));
+    AppReloader.toComplete(() => called.push("complete"));
+
+    await AppReloader.wrap(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      called.push("body");
+    });
+    expect(called).toEqual(["run", "body", "complete"]);
+  });
 });
