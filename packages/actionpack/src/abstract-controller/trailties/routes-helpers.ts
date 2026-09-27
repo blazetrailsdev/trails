@@ -1,6 +1,17 @@
 /** @internal */
 
+import { Module } from "@blazetrails/ruby-compat";
+
 import type { HelperMethodsModule, HelpersClassMethods } from "../helpers.js";
+
+const URL_HELPERS_SINGLETON_METHODS = new Set([
+  "urlFor",
+  "fullUrlFor",
+  "routeFor",
+  "optimizeRoutesGeneration",
+  "polymorphicUrl",
+  "polymorphicPath",
+]);
 
 export interface UrlHelpersRouteSet {
   urlHelpers(includePathHelpers?: boolean): HelperMethodsModule;
@@ -50,6 +61,11 @@ export interface RoutesHelpersControllerClass extends RoutesHelpersClassMethods 
 
 function includedMember(mod: HelperMethodsModule, key: string): unknown {
   let current: object | null = mod;
+  if (mod instanceof Module) {
+    if (key === "_routes") return mod[key];
+    if (URL_HELPERS_SINGLETON_METHODS.has(key)) return mod[key].bind(mod);
+    current = Object.getPrototypeOf(mod) as object | null;
+  }
   while (current && current !== Object.prototype) {
     const own = Object.getOwnPropertyDescriptor(current, key);
     if (own && (own.enumerable || !Object.prototype.hasOwnProperty.call(current, "constructor"))) {

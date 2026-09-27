@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
+import { include, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { URL } from "../../action-dispatch/http/url.js";
+import { RouteSet } from "../../action-dispatch/routing/route-set.js";
 
 describe("UrlForTest", () => {
   it("exception is thrown without host", () => {
@@ -178,11 +180,45 @@ describe("UrlForTest", () => {
   });
 
   it("named routes", () => {
-    expect(true).toBe(true);
+    const set = new RouteSet();
+    set.draw((r) => {
+      r.get("this/is/verbose", { to: "home#index", as: "no_args" });
+      r.get("home/sweet/home/:user", { to: "home#index", as: "home" });
+    });
+
+    const kls = class {};
+    include(kls, set.urlHelpers());
+
+    const controller = new kls() as Record<string, (options: object) => string>;
+    expect(rbObjRespondTo(controller, "homeUrl")).toBe(true);
+    expect(controller.homeUrl({ host: "www.basecamphq.com", user: "again" })).toBe(
+      "http://www.basecamphq.com/home/sweet/home/again",
+    );
+
+    expect(controller.homePath({ user: "alabama", host: "unused" })).toBe(
+      "/home/sweet/home/alabama",
+    );
+    expect(controller.homeUrl({ user: "alabama", host: "www.basecamphq.com" })).toBe(
+      "http://www.basecamphq.com/home/sweet/home/alabama",
+    );
+    expect(controller.noArgsUrl({ host: "www.basecamphq.com" })).toBe(
+      "http://www.basecamphq.com/this/is/verbose",
+    );
   });
 
   it("relative url root is respected for named routes", () => {
-    expect(true).toBe(true);
+    const set = new RouteSet();
+    set.draw((r) => {
+      r.get("/home/sweet/home/:user", { to: "home#index", as: "home" });
+    });
+
+    const kls = class {};
+    include(kls, set.urlHelpers());
+    const controller = new kls() as Record<string, (options: object) => string>;
+
+    expect(
+      controller.homeUrl({ host: "www.basecamphq.com", user: "again", scriptName: "/subdir" }),
+    ).toBe("http://www.basecamphq.com/subdir/home/sweet/home/again");
   });
 
   it("path params with default url options", () => {
