@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/ruby-compat";
+import { assertRaise } from "@blazetrails/activesupport";
 import {
   assetPath,
   computeAssetPath,
@@ -118,15 +119,11 @@ describe("AssetTagHelperTest", () => {
     expect(options).toEqual({ size: "16x10" });
   });
 
-  it("image tag raises an error for competing size arguments", () => {
-    const options = { height: "100", width: "200", size: "45x70" };
-    let exception!: Error;
-    try {
-      imageTag.call(host, "gold.png", options);
-    } catch (error) {
-      exception = error as Error;
-    }
-    expect(() => imageTag.call(host, "gold.png", options)).toThrow(ArgumentError);
+  it("image tag raises an error for competing size arguments", async () => {
+    const exception = await assertRaise([ArgumentError], {}, () =>
+      imageTag.call(host, "gold.png", { height: "100", width: "200", size: "45x70" }),
+    );
+
     expect(exception.message).toEqual("Cannot pass a :size option with a :height or :width option");
   });
 
