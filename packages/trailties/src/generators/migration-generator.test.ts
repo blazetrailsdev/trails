@@ -27,7 +27,6 @@ beforeEach(() => {
   lines = [];
   Trails.application = MigrationGeneratorTestApp.instance();
   oldBelongsToRequiredByDefault = Trails.application.config.activeRecord.belongsToRequiredByDefault;
-
   Trails.application.config.activeRecord.belongsToRequiredByDefault = true;
 });
 
@@ -164,7 +163,6 @@ describe("MigrationGeneratorTest", () => {
   it("remove migration with references removes foreign keys when primary key uuid", async () => {
     const migration = "remove_references_from_books";
     makeGen().run(migration, ["author:belongs_to"], { primaryKeyType: "uuid" });
-
     await assertMigration(`db/migrate/${migration}.ts`, (content) =>
       assertMethod("change", content, (change) => {
         assertMatch(

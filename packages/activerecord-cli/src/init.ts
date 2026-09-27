@@ -37,9 +37,8 @@ let connected = false;
 
 /**
  * Establish the connection and reflect each model's columns (idempotent).
- * \`loadDatabaseConfig\` populates \`Base.configurations\` from
- * \`config/database.ts\`, as Rails' railtie does from \`config/database.yml\`;
- * \`establishConnection()\` then picks the current \`TRAILS_ENV\`. Run after
+ * \`loadDatabaseConfig\` reads \`config/database.ts\` into \`Base.configurations\`
+ * for \`establishConnection()\` to resolve the current \`TRAILS_ENV\`. Run after
  * migrating, before any read/write.
  */
 export async function connect(): Promise<void> {

@@ -37,7 +37,6 @@ export class InfoController extends ApplicationController {
     let query = this.params.get("query") as string | undefined;
     if (query != null) {
       query = RFC2396_PARSER.escape(query);
-
       this.render({
         json: {
           exact: this.matchingRoutes({ query, exactMatch: true }),

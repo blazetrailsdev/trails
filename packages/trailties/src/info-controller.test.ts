@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { ActionController, type RouteSet } from "@blazetrails/actionpack";
-import { assert, include } from "@blazetrails/activesupport";
+import { assert, assertNil, include } from "@blazetrails/activesupport";
 import { Application } from "./application.js";
 import { InfoController } from "./info-controller.js";
 import { Info, PropertyList } from "./info.js";
@@ -212,6 +212,12 @@ describe("InfoControllerTest", () => {
     assert(fuzzyResults(tc).includes("/rails/info/properties(.:format)"));
     assert(fuzzyResults(tc).includes("/rails/:test/properties(.:format)"));
     assert(fuzzyResults(tc).includes("/rails/:test/named_properties(.:format)"));
+  });
+
+  test("internal routes do not have a default params[:internal] value", async () => {
+    await get("properties");
+    expect(tc.response.status).toBe(200);
+    assertNil((tc.controller as unknown as ActionController.Base).params.get("internal"));
   });
 
   test("index redirects to /rails/info/routes", async () => {

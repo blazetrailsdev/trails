@@ -217,7 +217,6 @@ ${body}
         this.joinTables = this.isPluralizeTableNames()
           ? this.attributes.map((a) => a.pluralName())
           : this.attributes.map((a) => a.singularName());
-
         this.setIndexNames();
       }
     } else if ((m = fileName.match(/^create_(.+)/))) {

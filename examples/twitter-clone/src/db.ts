@@ -10,10 +10,9 @@ let connected = false;
 /**
  * Establish the connection (idempotent within a process).
  *
- * No config lives here — `loadDatabaseConfig` populates `Base.configurations`
- * from `config/database.ts`, as Rails' railtie does from `config/database.yml`,
- * and `Base.establishConnection()` with no arguments picks the current
- * `TRAILS_ENV`. To change databases, edit that file.
+ * No config lives here — `loadDatabaseConfig` reads `config/database.ts` into
+ * `Base.configurations`, exactly like Rails reads `config/database.yml`, for
+ * `Base.establishConnection()`. To change databases, edit that file.
  */
 export async function connect(): Promise<void> {
   if (connected) return;
