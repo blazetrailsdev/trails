@@ -5,7 +5,7 @@ import {
   SafeBuffer,
   toSentence,
 } from "@blazetrails/activesupport";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, Encoding } from "@blazetrails/ruby-compat";
 import type { Base, CompiledMethod, CompiledMethodContainer } from "./base.js";
 import { OutputBuffer, StreamingBuffer } from "./buffers.js";
 import { SyntaxErrorInTemplate, TemplateError, WrongEncodingError } from "./template/error.js";
@@ -366,7 +366,7 @@ export class Template {
 }, { parameters: ${JSON.stringify(parameters.map(([type, name]) => (name === undefined ? [type] : [type, name])))} })`;
 
     if (/\p{Surrogate}/u.test(source)) {
-      throw new WrongEncodingError(source, "UTF-8");
+      throw new WrongEncodingError(source, Encoding.defaultInternal);
     }
 
     return source;

@@ -4,7 +4,7 @@ import { DetailsKey, LookupContext } from "./lookup-context.js";
 import { PathRegistry } from "./path-registry.js";
 import { PathSet } from "./path-set.js";
 import { Template } from "./template.js";
-import { WrongEncodingError } from "./template/error.js";
+import { EncodingError, WrongEncodingError } from "./template/error.js";
 import { TemplateHandlers } from "./template/handlers.js";
 import { Tse } from "./template/handlers/tse.js";
 import { FixtureResolver } from "./testing/resolvers.js";
@@ -77,8 +77,9 @@ describe("Template#compiled_source", () => {
     }
     const original = (raised as { original?: unknown }).original ?? raised;
     expect(original).toBeInstanceOf(WrongEncodingError);
+    expect(original).toBeInstanceOf(EncodingError);
     expect((original as Error).message).toMatch(
-      /^Your template was not saved as valid UTF-8\. Please either specify UTF-8/,
+      /^Your template was not saved as valid \. Please either specify {2}as the encoding/,
     );
   });
 });
