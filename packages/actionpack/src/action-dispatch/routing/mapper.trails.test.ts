@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { Constraints, Mapper, type ConstraintsRequest } from "./mapper.js";
+import { Constraints, Mapper, Scope, type ConstraintsRequest } from "./mapper.js";
 import { RouteSet } from "./route-set.js";
 import type { Request } from "../http/request.js";
 import { X_CASCADE } from "../constants.js";
@@ -218,5 +218,62 @@ describe("Mapper HTTP verb helpers forward args through map_method", () => {
     const set = new RouteSet();
     new Mapper(set).connect("/live", { to: "live#index" });
     expect(set.getRoutes()[0].verb).toBe("GET|CONNECT");
+  });
+});
+
+describe("Mapper::Scope", () => {
+  it("root is the ROOT sentinel; isRoot reports children of ROOT", () => {
+    expect(Scope.ROOT.isNull()).toBe(false);
+    const child = new Scope({ path: "/admin" });
+    expect(child.isRoot()).toBe(true);
+    expect(child.isNull()).toBe(false);
+  });
+
+  it("newChild merges over parent frame and inherits scopeLevel", () => {
+    const a = new Scope({ path: "/admin", as: "admin" }, Scope.ROOT, "resources");
+    const b = a.new({ as: "users" });
+    expect(b.get("path")).toBe("/admin");
+    expect(b.get("as")).toBe("users");
+    expect(b.scopeLevel).toBe("resources");
+    expect(b.parent).toBe(a);
+  });
+
+  it("newLevel preserves frame, changes scopeLevel", () => {
+    const a = new Scope({ path: "/admin" }, Scope.ROOT, "resources");
+    const b = a.newLevel("nested");
+    expect(b.get("path")).toBe("/admin");
+    expect(b.scopeLevel).toBe("nested");
+    expect(b.isNested()).toBe(true);
+  });
+
+  it("scope-level predicates match Rails RESOURCE_SCOPES / RESOURCE_METHOD_SCOPES", () => {
+    expect(new Scope({}, Scope.ROOT, "resource").isResourceScope()).toBe(true);
+    expect(new Scope({}, Scope.ROOT, "resources").isResourceScope()).toBe(true);
+    expect(new Scope({}, Scope.ROOT, "member").isResourceScope()).toBe(false);
+    expect(new Scope({}, Scope.ROOT, "collection").isResourceMethodScope()).toBe(true);
+    expect(new Scope({}, Scope.ROOT, "member").isResourceMethodScope()).toBe(true);
+    expect(new Scope({}, Scope.ROOT, "new").isResourceMethodScope()).toBe(true);
+    expect(new Scope({}, Scope.ROOT, "nested").isResourceMethodScope()).toBe(false);
+  });
+
+  it("actionName returns Rails-ordered tuples per scope level", () => {
+    const s = (lvl: Parameters<Scope["newLevel"]>[0]) => new Scope({}, Scope.ROOT, lvl);
+    expect(s("nested").actionName("np", "pre", "coll", "mem")).toEqual(["np", "pre"]);
+    expect(s("collection").actionName("np", "pre", "coll", "mem")).toEqual(["pre", "np", "coll"]);
+    expect(s("new").actionName("np", "pre", "coll", "mem")).toEqual(["pre", "new", "np", "mem"]);
+    expect(s("member").actionName("np", "pre", "coll", "mem")).toEqual(["pre", "np", "mem"]);
+    expect(s("root").actionName("np", "pre", "coll", "mem")).toEqual(["np", "coll", "pre"]);
+    expect(s(null).actionName("np", "pre", "coll", "mem")).toEqual(["np", "mem", "pre"]);
+  });
+
+  it("each yields each frame up to (not including) ROOT", () => {
+    const a = new Scope({ path: "/a" });
+    const b = a.new({ as: "b" });
+    const c = b.new({ controller: "c" });
+    const nodes: Scope[] = [];
+    c.each((node) => nodes.push(node));
+    expect(nodes).toEqual([c, b, a]);
+    expect([...c]).toEqual([c, b, a]);
+    expect([...Scope.ROOT]).toEqual([]);
   });
 });

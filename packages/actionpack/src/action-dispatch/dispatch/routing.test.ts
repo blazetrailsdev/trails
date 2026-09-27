@@ -1327,7 +1327,7 @@ describe("TestRoutingMapper", () => {
         r.resources("comments");
       });
       r.resources("posts", (r) => {
-        r.useConcerns("commentable");
+        r.concerns("commentable");
       });
     });
     expect(routes.recognize("GET", "/posts/1/comments")).not.toBeNull();
