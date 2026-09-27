@@ -335,12 +335,20 @@ export class Base {
       this._viewRenderer = new Renderer(this._lookupContext);
     }
 
-    try {
-      return block(this._viewRenderer);
-    } finally {
+    const restore = (): void => {
       this._viewRenderer = oldViewRenderer;
       this._lookupContext = oldLookupContext;
+    };
+    let result: T;
+    try {
+      result = block(this._viewRenderer);
+    } catch (error) {
+      restore();
+      throw error;
     }
+    if (result instanceof Promise) return result.finally(restore) as T;
+    restore();
+    return result;
   }
 }
 

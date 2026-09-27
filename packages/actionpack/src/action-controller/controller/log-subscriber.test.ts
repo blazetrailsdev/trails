@@ -5,67 +5,36 @@ import {
   Notifications,
 } from "@blazetrails/activesupport";
 import { Dir, FileUtils } from "@blazetrails/ruby-compat";
-import { Base as ActionViewBase, type CacheHelperHost } from "@blazetrails/actionview";
 import { LogSubscriber } from "../log-subscriber.js";
 import { Base } from "../base.js";
 import { TestCase } from "../test-case.js";
 import type { CachingClassMethods } from "../../abstract-controller/caching.js";
 
-type CachingView = ActionViewBase & CacheHelperHost;
-
-function renderInline(controller: Base, block: (view: CachingView) => void): void {
-  const view = new ActionViewBase(null, {}, controller) as CachingView;
-  block(view);
-  controller.render({ plain: view.outputBuffer.toStr() });
-}
-
 class LogSubscribersController extends Base {
   async withFragmentCache() {
-    renderInline(this, (view) => {
-      view.cache("foo", {}, () => {
-        view.outputBuffer.append("bar");
-      });
-    });
+    this.render({ inline: '<%= context.cache("foo", {}, () => { %>bar<% }) %>' });
   }
 
   async withFragmentCacheAndPercentInKey() {
-    renderInline(this, (view) => {
-      view.cache("foo%bar", {}, () => {
-        view.outputBuffer.append("Contains % sign in key");
-      });
+    this.render({
+      inline: '<%= context.cache("foo%bar", {}, () => { %>Contains % sign in key<% }) %>',
     });
   }
 
   async withFragmentCacheIfWithTrueCondition() {
-    renderInline(this, (view) => {
-      view.cacheIf(true, "foo", {}, () => {
-        view.outputBuffer.append("bar");
-      });
-    });
+    this.render({ inline: '<%= context.cacheIf(true, "foo", {}, () => { %>bar<% }) %>' });
   }
 
   async withFragmentCacheIfWithFalseCondition() {
-    renderInline(this, (view) => {
-      view.cacheIf(false, "foo", {}, () => {
-        view.outputBuffer.append("bar");
-      });
-    });
+    this.render({ inline: '<%= context.cacheIf(false, "foo", {}, () => { %>bar<% }) %>' });
   }
 
   async withFragmentCacheUnlessWithFalseCondition() {
-    renderInline(this, (view) => {
-      view.cacheUnless(false, "foo", {}, () => {
-        view.outputBuffer.append("bar");
-      });
-    });
+    this.render({ inline: '<%= context.cacheUnless(false, "foo", {}, () => { %>bar<% }) %>' });
   }
 
   async withFragmentCacheUnlessWithTrueCondition() {
-    renderInline(this, (view) => {
-      view.cacheUnless(true, "foo", {}, () => {
-        view.outputBuffer.append("bar");
-      });
-    });
+    this.render({ inline: '<%= context.cacheUnless(true, "foo", {}, () => { %>bar<% }) %>' });
   }
 }
 
