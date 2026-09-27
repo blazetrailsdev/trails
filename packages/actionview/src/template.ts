@@ -101,6 +101,8 @@ export class Template {
     });
   }
 
+  static frozenStringLiteral: boolean | null | undefined = false;
+
   static Error = TemplateError;
 
   static Types: TypesImplementation = SimpleType;

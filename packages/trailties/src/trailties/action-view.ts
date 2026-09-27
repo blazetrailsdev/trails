@@ -17,6 +17,7 @@ import {
   setPreloadLinksHeader,
   setPrependContentExfiltrationPrevention,
   setSanitizerVendor,
+  Template,
   ViewReloader,
 } from "@blazetrails/actionview";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
@@ -36,6 +37,7 @@ export interface ActionViewConfig {
   formWithGeneratesIds?: boolean | null;
   sanitizerVendor?: Parameters<typeof setSanitizerVendor>[0] | null;
   buttonToGeneratesButtonTag?: boolean | null;
+  frozenStringLiteral?: boolean | null;
 }
 
 declare module "../trailtie/configuration.js" {
@@ -122,6 +124,13 @@ export class Trailtie extends BaseTrailtie {
       if (buttonToGeneratesButtonTag != null) {
         setButtonToGeneratesButtonTag(buttonToGeneratesButtonTag);
       }
+    });
+
+    this.config.afterInitialize((app) => {
+      const actionView = (app as TrailtieApp).config.get("actionView") as ActionViewConfig;
+      const frozenStringLiteral = actionView.frozenStringLiteral;
+      delete actionView.frozenStringLiteral;
+      Template.frozenStringLiteral = frozenStringLiteral;
     });
 
     this.config.afterInitialize((app) => {

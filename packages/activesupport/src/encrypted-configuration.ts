@@ -39,6 +39,7 @@ export class EncryptedConfiguration extends EncryptedFile {
   private _config: Record<string, unknown> | null = null;
   private _options: OrderedOptions | null = null;
 
+  /** @missingRailsArgs delegate_missing_to — PERMANENT */
   constructor({
     configPath,
     keyPath,

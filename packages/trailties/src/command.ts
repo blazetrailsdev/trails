@@ -1,6 +1,9 @@
 import type { Command as Program } from "commander";
 import { createProgram } from "./cli.js";
 
+export const HELP_MAPPINGS: ReadonlySet<string> = new Set(["-h", "-?", "--help"]);
+export const VERSION_MAPPINGS: ReadonlySet<string> = new Set(["-v", "--version"]);
+
 /** @missingRailsArgs invoke_rake — PERMANENT */
 export async function invoke(fullNamespace: string, args: string[] = []): Promise<void> {
   const [namespace, commandName] = splitNamespace(fullNamespace);
@@ -30,6 +33,9 @@ export function findByNamespace(namespace: string, commandName?: string): Progra
 function splitNamespace(namespace: string): [string, string] {
   const m = /^(.+):(\w+)$/.exec(namespace);
   if (m) return [m[1], m[2]];
+  if (namespace === "") return ["help", "help"];
+  if (HELP_MAPPINGS.has(namespace) || namespace === "help") return ["help", "help_extended"];
+  if (VERSION_MAPPINGS.has(namespace)) return ["version", "version"];
   return [namespace, namespace];
 }
 
