@@ -63,14 +63,20 @@ export class StreamingFlow extends OutputFlow {
     if (this.isInsideFiber()) {
       const view = this._view;
 
-      this._waitingFor = key;
-      [view.outputBuffer, this._parent] = [this._child, view.outputBuffer];
-      return Fiber.yield()
-        .finally(() => {
-          this._waitingFor = null;
-          [view.outputBuffer, this._child] = [this._parent, view.outputBuffer];
-        })
-        .then(() => super.get(key));
+      const ensure = (): void => {
+        this._waitingFor = null;
+        [view.outputBuffer, this._child] = [this._parent, view.outputBuffer];
+      };
+      let suspended: Promise<void>;
+      try {
+        this._waitingFor = key;
+        [view.outputBuffer, this._parent] = [this._child, view.outputBuffer];
+        suspended = Fiber.yield();
+      } catch (error) {
+        ensure();
+        throw error;
+      }
+      return suspended.finally(ensure).then(() => super.get(key));
     }
 
     return super.get(key);
