@@ -316,9 +316,8 @@ class UrlHelper {
     }
   }
 
-  /** @missingRailsCall requirements — CONVERGEABLE mapping-requirements-normalize-format-feed-optimize-helper */
   static isOptimizeHelper(route: Route): boolean {
-    return Object.keys(route.pathConstraints).length === 0 && !route.isGlob();
+    return Object.keys(route.pattern.requirements).length === 0 && !route.isGlob();
   }
 
   readonly routeName: string;

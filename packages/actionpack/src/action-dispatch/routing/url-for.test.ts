@@ -17,6 +17,7 @@ import {
   type UrlForHost,
   type UrlForRoutes,
 } from "./url-for.js";
+import { RouteSet } from "./route-set.js";
 
 function makeRoutes(): UrlForRoutes & {
   calls: Array<[Record<string, unknown>, string | null | undefined]>;
@@ -28,7 +29,7 @@ function makeRoutes(): UrlForRoutes & {
       calls.push([opts, routeName ?? null]);
       return `/generated?${Object.keys(opts).sort().join(",")}`;
     },
-    optimizeRoutesGeneration() {
+    isOptimizeRoutesGeneration() {
       return true;
     },
   };
@@ -200,6 +201,14 @@ describe("ActionDispatch::Routing::UrlFor", () => {
     expect(optimizeRoutesGeneration.call(makeHost({ defaultUrlOptions: { host: "x" } }))).toBe(
       false,
     );
+  });
+
+  it("optimizeRoutesGeneration asks the RouteSet predicate", () => {
+    const routes = new RouteSet();
+    const host = makeHost({ _routes: routes });
+    expect(optimizeRoutesGeneration.call(host)).toBe(true);
+    routes.defaultUrlOptions = { host: "example.com" };
+    expect(optimizeRoutesGeneration.call(host)).toBe(false);
   });
 
   it("_withRoutes swaps _routes for the block and restores", () => {

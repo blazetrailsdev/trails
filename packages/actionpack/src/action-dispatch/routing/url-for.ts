@@ -8,6 +8,7 @@ import {
   type PolymorphicMappingEntry,
   type ToModel,
 } from "./polymorphic-routes.js";
+import type { RouteSet } from "./route-set.js";
 
 export {
   polymorphicUrl,
@@ -21,12 +22,9 @@ export {
   polymorphicMapping,
 } from "./polymorphic-routes.js";
 
-export interface UrlForRoutes {
-  urlFor(options: Record<string, unknown>, routeName?: string | null): string;
-  /** @internal */
-  optimizeRoutesGeneration?(): boolean;
+export type UrlForRoutes = Pick<RouteSet, "urlFor" | "isOptimizeRoutesGeneration"> & {
   polymorphicMappings?: Map<string, PolymorphicMappingEntry>;
-}
+};
 
 export interface UrlForHost {
   /** @internal */
@@ -103,8 +101,7 @@ export function routeFor(this: UrlForHost, name: string, ...args: unknown[]): st
 /** @internal */
 export function optimizeRoutesGeneration(this: UrlForHost): boolean {
   return (
-    (this._routes!.optimizeRoutesGeneration?.() ?? true) &&
-    Object.keys(this.defaultUrlOptions).length === 0
+    this._routes!.isOptimizeRoutesGeneration() && Object.keys(this.defaultUrlOptions).length === 0
   );
 }
 

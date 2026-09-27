@@ -322,7 +322,7 @@ describe("TestRouter", () => {
     const params: Record<string, string> = { controller: "tasks", action: "show" };
     const routeSet = new RouteSet();
     routeSet.draw((r) => {
-      r.get("/", params);
+      r.get("/", { ...params });
     });
 
     const [path] = _generate(routeSet, null, params, {});

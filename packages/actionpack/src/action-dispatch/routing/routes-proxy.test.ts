@@ -6,6 +6,7 @@ import { urlOptions, type UrlForHost, type UrlForRoutes } from "./url-for.js";
 function makeRoutes(label = "R1"): UrlForRoutes {
   return {
     urlFor: () => `/${label}`,
+    isOptimizeRoutesGeneration: () => true,
   };
 }
 

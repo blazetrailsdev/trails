@@ -180,3 +180,38 @@ describe("Mapper#match hash form and multi-path arms", () => {
     expect(warnings[0]).toContain("Mapping a route with multiple paths is deprecated");
   });
 });
+
+describe("Mapper HTTP verb helpers forward args through map_method", () => {
+  it("draws the hash form through match's hash arm", () => {
+    const set = new RouteSet();
+    const m = new Mapper(set);
+    expect(m.get({ "/foo": "posts#index" })).toBe(m);
+    const [route] = set.getRoutes();
+    expect(route.path).toBe("/foo(.:format)");
+    expect(route.verb).toBe("GET");
+    expect([route.controller, route.action]).toEqual(["posts", "index"]);
+  });
+
+  it("maps every path of the multi-path form", () => {
+    const set = new RouteSet();
+    const m = new Mapper(set);
+    const dep = deprecator();
+    const previous = dep.behavior;
+    dep.behavior = () => {};
+    try {
+      m.post("/one", "/two", { to: "posts#create" });
+    } finally {
+      dep.behavior = previous;
+    }
+    expect(set.getRoutes().map((r) => [r.verb, r.path])).toEqual([
+      ["POST", "/one(.:format)"],
+      ["POST", "/two(.:format)"],
+    ]);
+  });
+
+  it("connect maps GET and CONNECT", () => {
+    const set = new RouteSet();
+    new Mapper(set).connect("/live", { to: "live#index" });
+    expect(set.getRoutes()[0].verb).toBe("GET|CONNECT");
+  });
+});

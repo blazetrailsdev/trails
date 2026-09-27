@@ -19,6 +19,7 @@ import { Ast, type Node } from "../journey/nodes/node.js";
 import { Pattern } from "../journey/path/pattern.js";
 import {
   camelize,
+  extractOptionsBang,
   isBlank,
   isPlainObject,
   isPresent,
@@ -50,6 +51,7 @@ import { deprecator } from "../deprecator.js";
 
 type MapperCallback = (mapper: Mapper) => void;
 type ConcernCallback = (mapper: Mapper) => void;
+type MapMethodArgs = (string | RouteOptions | Record<string, unknown>)[];
 
 /** @internal */
 interface ResourceLike {
@@ -391,6 +393,7 @@ export class Mapping {
         internal: this._internal,
         scopeOptions: this.scopeOptions,
         requiredDefaults: this.requiredDefaults,
+        pattern: this.path,
       },
     );
     route.app = this.application();
@@ -678,24 +681,24 @@ export class Mapper {
     return this._set.defaultUrlOptions;
   }
 
-  get(path: string, optionsOrEndpoint: RouteOptions | string = {}): void {
-    this.mapMethod("GET", path, normalizeOptions(optionsOrEndpoint));
+  get(...args: MapMethodArgs): this {
+    return this.mapMethod("GET", args);
   }
 
-  post(path: string, optionsOrEndpoint: RouteOptions | string = {}): void {
-    this.mapMethod("POST", path, normalizeOptions(optionsOrEndpoint));
+  post(...args: MapMethodArgs): this {
+    return this.mapMethod("POST", args);
   }
 
-  put(path: string, optionsOrEndpoint: RouteOptions | string = {}): void {
-    this.mapMethod("PUT", path, normalizeOptions(optionsOrEndpoint));
+  put(...args: MapMethodArgs): this {
+    return this.mapMethod("PUT", args);
   }
 
-  patch(path: string, optionsOrEndpoint: RouteOptions | string = {}): void {
-    this.mapMethod("PATCH", path, normalizeOptions(optionsOrEndpoint));
+  patch(...args: MapMethodArgs): this {
+    return this.mapMethod("PATCH", args);
   }
 
-  delete(path: string, optionsOrEndpoint: RouteOptions | string = {}): void {
-    this.mapMethod("DELETE", path, normalizeOptions(optionsOrEndpoint));
+  delete(...args: MapMethodArgs): this {
+    return this.mapMethod("DELETE", args);
   }
 
   root(path: string | RouteOptions, options: RouteOptions = {}): void {
@@ -1258,17 +1261,20 @@ export class Mapper {
     }
   }
 
-  options(path: string, optionsOrEndpoint: RouteOptions | string = {}): void {
-    this.mapMethod("OPTIONS", path, normalizeOptions(optionsOrEndpoint));
+  options(...args: MapMethodArgs): this {
+    return this.mapMethod("OPTIONS", args);
   }
 
-  connect(path: string, optionsOrEndpoint: RouteOptions | string = {}): void {
-    this.match(path, { ...normalizeOptions(optionsOrEndpoint), via: ["GET", "CONNECT"] });
+  connect(...args: MapMethodArgs): this {
+    return this.mapMethod(["GET", "CONNECT"], args);
   }
 
   /** @internal */
-  mapMethod(method: string, path: string, options: RouteOptions): void {
-    this.match(path, { ...options, via: method });
+  mapMethod(method: string | string[], args: MapMethodArgs): this {
+    const options = extractOptionsBang(args);
+    options[args.length === 0 ? ":via" : "via"] = method;
+    this.match(...(args as [string]), options as RouteOptions);
+    return this;
   }
 
   controller(controller: string, callback: MapperCallback): void {
@@ -2044,13 +2050,6 @@ function allowedActions(options: RouteOptions, all: ResourceAction[]): Set<Resou
     return new Set(all.filter((a) => !except.includes(a)));
   }
   return new Set(all);
-}
-
-function normalizeOptions(optionsOrEndpoint: RouteOptions | string): RouteOptions {
-  if (typeof optionsOrEndpoint === "string") {
-    return { to: optionsOrEndpoint };
-  }
-  return optionsOrEndpoint;
 }
 
 function singularize(word: string): string {

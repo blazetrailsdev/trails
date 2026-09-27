@@ -73,6 +73,7 @@ import {
   misplacedClusterVerdict,
   rubyMethodToTsForFqn,
   copyHookClaimed,
+  rubyCallToTsForReceivers,
 } from "./compare.js";
 import {
   COPY_HOOKS,
@@ -3873,5 +3874,32 @@ describe("rubyDefinitionBreakdown", () => {
     );
     expect(breakdown.definitions).toBe(1);
     expect(breakdown.ownRow).toBe(1);
+  });
+});
+
+describe("rubyCallToTsForReceivers", () => {
+  it("accepts a TS `.new` call for an ivar-receiver `new` in a file defining an instance `new`", () => {
+    expect(rubyCallToTsForReceivers("new", "actiondispatch", { new: ["ivar"] }, true)).toEqual([
+      "constructor",
+      "new",
+    ]);
+  });
+
+  it("keeps expecting constructor alone for `Klass.new`", () => {
+    expect(rubyCallToTsForReceivers("new", "actiondispatch", { new: ["const"] }, true)).toEqual([
+      "constructor",
+    ]);
+    expect(
+      rubyCallToTsForReceivers("new", "actiondispatch", { new: ["const", "ivar"] }, true),
+    ).toEqual(["constructor"]);
+  });
+
+  it("keeps expecting constructor alone where the file defines no instance `new`", () => {
+    expect(rubyCallToTsForReceivers("new", "actiondispatch", { new: ["ivar"] }, false)).toEqual([
+      "constructor",
+    ]);
+    expect(rubyCallToTsForReceivers("new", "actiondispatch", undefined, true)).toEqual([
+      "constructor",
+    ]);
   });
 });

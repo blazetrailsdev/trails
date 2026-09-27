@@ -89,15 +89,13 @@ ${cases}
       }
       const inner = "  ".repeat(indent);
       for (const a of actions) {
-        lines.push(
-          `${inner}router.get("/${controllerSegment}/${a}", "${controllerSegment}#${a}");`,
-        );
+        lines.push(`${inner}router.get("${controllerSegment}/${a}");`);
       }
       for (let i = namespaces.length; i > 0; i--) lines.push(`${"  ".repeat(i)}});`);
       this.insertIntoFile(routesFile, "// routes", lines.join("\n") + "\n");
     } else {
       const routeLines = actions
-        .map((a) => `  router.get("/${controllerSegment}/${a}", "${controllerSegment}#${a}");`)
+        .map((a) => `  router.get("${controllerSegment}/${a}");`)
         .join("\n");
       this.insertIntoFile(routesFile, "// routes", routeLines + "\n");
     }

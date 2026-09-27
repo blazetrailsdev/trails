@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { RouteSet, StaticDispatcher } from "./route-set.js";
 import { Constraints } from "./mapper.js";
 import { X_CASCADE } from "../constants.js";
@@ -118,5 +118,44 @@ describe("ActionDispatch::Routing::Mapper::Mapping#app", () => {
         r.get("/posts", { to: "posts#index", constraints: 1 as never });
       }),
     ).toThrow("Invalid constraint: 1 must respond to :call or :matches?");
+  });
+});
+
+describe("ActionDispatch::Routing::RouteSet::NamedRouteCollection::UrlHelper.optimize_helper?", () => {
+  function helperGoesThroughUrlFor(
+    draw: (r: Parameters<Parameters<RouteSet["draw"]>[0]>[0]) => void,
+    ...args: unknown[]
+  ): boolean {
+    const routes = new RouteSet();
+    routes.draw(draw);
+    const spy = vi.spyOn(routes, "urlFor");
+    (routes.urlHelpers() as unknown as Record<string, (...a: unknown[]) => string>).fooPath(
+      ...args,
+    );
+    return spy.mock.calls.length > 0;
+  }
+
+  it("optimizes a route whose path carries no requirements", () => {
+    expect(
+      helperGoesThroughUrlFor((r) => r.get("/foo/:id", { to: "foo#show", as: "foo" }), 1),
+    ).toBe(false);
+  });
+
+  it("uses the generic helper for a format: true route", () => {
+    expect(
+      helperGoesThroughUrlFor(
+        (r) => r.get("/foo", { to: "foo#index", as: "foo", format: true }),
+        "json",
+      ),
+    ).toBe(true);
+  });
+
+  it("uses the generic helper when a :controller requirement is not a path segment", () => {
+    expect(
+      helperGoesThroughUrlFor(
+        (r) => r.get("/foo/:id", { to: "foo#show", as: "foo", constraints: { controller: /foo/ } }),
+        1,
+      ),
+    ).toBe(true);
   });
 });
