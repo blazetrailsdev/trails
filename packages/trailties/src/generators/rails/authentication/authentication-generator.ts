@@ -2,6 +2,7 @@ import { TopLevel } from "@blazetrails/activesupport";
 import { File } from "@blazetrails/ruby-compat";
 import { GeneratorBase, type GeneratorOptions } from "../../base.js";
 import { MigrationGenerator } from "../../migration-generator.js";
+import { AuthenticationGenerator as TseAuthenticationGenerator } from "../../tse/authentication/authentication-generator.js";
 import { TEMPLATES } from "./templates.js";
 
 export interface AuthenticationGeneratorOptions extends GeneratorOptions {
@@ -25,6 +26,15 @@ export class AuthenticationGenerator extends GeneratorBase {
   run(): string[] {
     if (!this.isTypeScript())
       throw new Error("AuthenticationGenerator currently emits TypeScript only.");
+    if (!this.options.api) {
+      const templateEngine = new TseAuthenticationGenerator({
+        cwd: this.cwd,
+        output: this.output,
+        behavior: this.behavior,
+        pretend: this.options.pretend,
+      });
+      this.createdFiles.push(...templateEngine.run());
+    }
     this.createAuthenticationFiles();
     this.configureApplicationController();
     this.configureAuthenticationRoutes();

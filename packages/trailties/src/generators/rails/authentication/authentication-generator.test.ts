@@ -11,6 +11,8 @@ import { parseTs, assertNoRubySource } from "../../../template-builder/testing.j
 const TS_EMIT = ["app/models/session.ts","app/models/user.ts","app/models/current.ts","app/controllers/sessions-controller.ts","app/controllers/concerns/authentication.ts","app/controllers/passwords-controller.ts","app/channels/application-cable/connection.ts","app/mailers/passwords-mailer.ts","test/mailers/previews/passwords-mailer-preview.ts"];
 // prettier-ignore
 const VIEWS = ["app/views/passwords-mailer/reset.html.tse","app/views/passwords-mailer/reset.text.tse"];
+// prettier-ignore
+const TEMPLATE_ENGINE_VIEWS = ["app/views/passwords/new.html.tse","app/views/passwords/edit.html.tse","app/views/sessions/new.html.tse"];
 const APP_CTRL_PATH = "app/controllers/application-controller.ts";
 const APP_CTRL_EMPTY = `import { ActionController } from "@blazetrails/actionpack";\n\nexport class ApplicationController extends ActionController.Base {\n}\n`;
 
@@ -56,7 +58,7 @@ afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
 describe("AuthenticationGenerator", () => {
   it("emits the full file set; each .ts file parses + carries no Ruby source", () => {
     withActionCableEngine(() => makeGen().run());
-    for (const rel of VIEWS) expect(exists(rel), rel).toBe(true);
+    for (const rel of [...VIEWS, ...TEMPLATE_ENGINE_VIEWS]) expect(exists(rel), rel).toBe(true);
     const combined: string[] = [];
     for (const rel of TS_EMIT) {
       const src = read(rel);
@@ -71,6 +73,7 @@ describe("AuthenticationGenerator", () => {
     await AuthenticationGenerator.start(["--api"], { cwd: tmpDir, output: () => {} });
     expect(exists("app/mailers/passwords-mailer.ts")).toBe(true);
     for (const rel of VIEWS) expect(exists(rel), rel).toBe(true);
+    for (const rel of TEMPLATE_ENGINE_VIEWS) expect(exists(rel), rel).toBe(false);
     expect(exists("test/mailers/previews/passwords-mailer-preview.ts")).toBe(true);
   });
 

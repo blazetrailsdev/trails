@@ -113,6 +113,7 @@ const setPostgresqlDecodeDates = (adapter: typeof PostgreSQLAdapter): void => {
 interface TrailtieApp {
   deprecators: Deprecators;
   config: { get(key: string): unknown; fileWatcher: unknown };
+  credentials(): Promise<{ config(): Promise<Record<string, unknown>> }>;
 }
 
 /** @noRailsEquivalent PERMANENT */
@@ -270,13 +271,18 @@ export class Trailtie extends BaseTrailtie {
       });
     });
 
-    this.initializer("active_record_encryption.configuration", (app) => {
+    this.initializer("active_record_encryption.configuration", async (app) => {
+      const credentials = await (await (app as TrailtieApp).credentials()).config();
       onLoad("active_record_encryption", () => {
-        const cfg = this.config.get("activeRecord") as ActiveRecordConfig;
-        const enc = cfg.encryption;
-        if (enc && Object.keys(enc).length > 0) {
-          Encryption.configure(enc);
-        }
+        const activeRecordEncryption = credentials["active_record_encryption"] as
+          | Record<string, string | undefined>
+          | undefined;
+        Encryption.configure({
+          primaryKey: activeRecordEncryption?.["primary_key"],
+          deterministicKey: activeRecordEncryption?.["deterministic_key"],
+          keyDerivationSalt: activeRecordEncryption?.["key_derivation_salt"],
+          ...(this.config.get("activeRecord") as ActiveRecordConfig).encryption,
+        });
 
         const autoFilteredParameters = new AutoFilteredParameters(app as AutoFilteredParametersApp);
         if (Encryption.config.addToFilterParameters) autoFilteredParameters.enable();

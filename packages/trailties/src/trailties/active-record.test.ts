@@ -28,12 +28,18 @@ import {
   setRaiseOnAssignToAttrReadonly,
 } from "@blazetrails/activerecord";
 
+const credentials = async (
+  config: Record<string, unknown> = {},
+): Promise<{ config(): Promise<Record<string, unknown>> }> => ({ config: async () => config });
+
 const blogApp = (): {
   config: { filterParameters: Array<string | RegExp> };
   deprecators: Deprecators;
+  credentials: typeof credentials;
 } => ({
   deprecators: new Deprecators(),
   config: { filterParameters: [] },
+  credentials,
 });
 
 describe("RailtieTest", () => {
@@ -183,6 +189,7 @@ describe("RailtieTest", () => {
     const app = {
       deprecators: new Deprecators(),
       config: { filterParameters: [] as Array<string | RegExp> },
+      credentials,
     };
     EncryptionConfigurable.config.addToFilterParameters = true;
 
@@ -196,6 +203,7 @@ describe("RailtieTest", () => {
     const app = {
       deprecators: new Deprecators(),
       config: { filterParameters: [] as Array<string | RegExp> },
+      credentials,
     };
     EncryptionConfigurable.config.addToFilterParameters = false;
 

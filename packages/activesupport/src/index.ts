@@ -12,6 +12,11 @@ export {
   InvalidKeyLengthError,
 } from "./encrypted-file.js";
 export type { EncryptedFileOptions } from "./encrypted-file.js";
+export {
+  EncryptedConfiguration,
+  InvalidContentError,
+  InvalidKeyError,
+} from "./encrypted-configuration.js";
 
 export { Tempfile } from "./tempfile.js";
 export type { TempfileBasename } from "./tempfile.js";
