@@ -144,7 +144,12 @@ export class Template {
     this._locals = locals;
     this.virtualPath = virtualPath;
 
-    this.variable = deriveVariable(this.virtualPath);
+    if (this.virtualPath) {
+      const base = this.virtualPath.endsWith("/") ? "" : basename(this.virtualPath);
+      this.variable = VARIABLE_FROM_BASENAME.exec(base)?.[1] || null;
+    } else {
+      this.variable = null;
+    }
 
     this.format = format;
     this.variant = variant;
@@ -558,13 +563,6 @@ function stringHash(value: string): number {
     hash = Math.imul(hash, 0x01000193) >>> 0;
   }
   return hash;
-}
-
-function deriveVariable(virtualPath: string | null): string | null {
-  if (!virtualPath) return null;
-  const base = virtualPath.endsWith("/") ? "" : basename(virtualPath);
-  const m = VARIABLE_FROM_BASENAME.exec(base);
-  return m?.[1] || null;
 }
 
 function basename(path: string): string {
