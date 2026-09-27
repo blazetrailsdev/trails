@@ -39,34 +39,40 @@ export interface ChefList {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ChefWithPolymorphicInverseOf extends Chef {
-  beforeValidationCallbacksCounter: number = 0;
-  beforeCreateCallbacksCounter: number = 0;
-  beforeSaveCallbacksCounter: number = 0;
-  afterValidationCallbacksCounter: number = 0;
-  afterCreateCallbacksCounter: number = 0;
-  afterSaveCallbacksCounter: number = 0;
+  declare beforeValidationCallbacksCounter: number;
+  declare beforeCreateCallbacksCounter: number;
+  declare beforeSaveCallbacksCounter: number;
+  declare afterValidationCallbacksCounter: number;
+  declare afterCreateCallbacksCounter: number;
+  declare afterSaveCallbacksCounter: number;
 
   static {
     this.belongsTo("employable", { polymorphic: true, inverseOf: "chef" });
     this.acceptsNestedAttributesFor("employable");
 
     this.beforeValidation(function (this: ChefWithPolymorphicInverseOf) {
-      this.beforeValidationCallbacksCounter++;
+      this.beforeValidationCallbacksCounter ??= 0;
+      this.beforeValidationCallbacksCounter += 1;
     });
     this.beforeCreate(function (this: ChefWithPolymorphicInverseOf) {
-      this.beforeCreateCallbacksCounter++;
+      this.beforeCreateCallbacksCounter ??= 0;
+      this.beforeCreateCallbacksCounter += 1;
     });
     this.beforeSave(function (this: ChefWithPolymorphicInverseOf) {
-      this.beforeSaveCallbacksCounter++;
+      this.beforeSaveCallbacksCounter ??= 0;
+      this.beforeSaveCallbacksCounter += 1;
     });
     this.afterValidation(function (this: ChefWithPolymorphicInverseOf) {
-      this.afterValidationCallbacksCounter++;
+      this.afterValidationCallbacksCounter ??= 0;
+      this.afterValidationCallbacksCounter += 1;
     });
     this.afterCreate(function (this: ChefWithPolymorphicInverseOf) {
-      this.afterCreateCallbacksCounter++;
+      this.afterCreateCallbacksCounter ??= 0;
+      this.afterCreateCallbacksCounter += 1;
     });
     this.afterSave(function (this: ChefWithPolymorphicInverseOf) {
-      this.afterSaveCallbacksCounter++;
+      this.afterSaveCallbacksCounter ??= 0;
+      this.afterSaveCallbacksCounter += 1;
     });
   }
 }

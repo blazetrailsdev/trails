@@ -11,23 +11,23 @@ function read<T extends Base>(eye: Eye, name: string): Promise<T | null> {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Eye extends Base {
-  afterCreateCallbacksStack: boolean[] = [];
-  afterUpdateCallbacksStack: boolean[] = [];
-  afterSaveCallbacksStack: boolean[] = [];
-  overrideIrisWithReadOnlyForeignKeyColor: boolean = false;
+  declare afterCreateCallbacksStack: boolean[];
+  declare afterUpdateCallbacksStack: boolean[];
+  declare afterSaveCallbacksStack: boolean[];
+  declare overrideIrisWithReadOnlyForeignKeyColor: boolean;
 
   static {
     this.afterCreate(async function (this: Eye) {
       const iris = await read<Iris>(this, "iris");
-      if (iris) this.afterCreateCallbacksStack.push(!iris.isPersisted());
+      if (iris) (this.afterCreateCallbacksStack ??= []).push(!iris.isPersisted());
     });
     this.afterUpdate(async function (this: Eye) {
       const iris = await read<Iris>(this, "iris");
-      if (iris) this.afterUpdateCallbacksStack.push(iris.hasChangesToSave);
+      if (iris) (this.afterUpdateCallbacksStack ??= []).push(iris.hasChangesToSave);
     });
     this.afterSave(async function (this: Eye) {
       const iris = await read<Iris>(this, "iris");
-      if (iris) this.afterSaveCallbacksStack.push(iris.hasChangesToSave);
+      if (iris) (this.afterSaveCallbacksStack ??= []).push(iris.hasChangesToSave);
     });
 
     this.hasOne("iris");
@@ -35,15 +35,15 @@ export class Eye extends Base {
 
     this.afterCreate(async function (this: Eye) {
       const iris = await read<Iris>(this, "iris");
-      if (iris) this.afterCreateCallbacksStack.push(!iris.isPersisted());
+      if (iris) (this.afterCreateCallbacksStack ??= []).push(!iris.isPersisted());
     });
     this.afterUpdate(async function (this: Eye) {
       const iris = await read<Iris>(this, "iris");
-      if (iris) this.afterUpdateCallbacksStack.push(iris.hasChangesToSave);
+      if (iris) (this.afterUpdateCallbacksStack ??= []).push(iris.hasChangesToSave);
     });
     this.afterSave(async function (this: Eye) {
       const iris = await read<Iris>(this, "iris");
-      if (iris) this.afterSaveCallbacksStack.push(iris.hasChangesToSave);
+      if (iris) (this.afterSaveCallbacksStack ??= []).push(iris.hasChangesToSave);
     });
 
     this.hasOne("irisWithReadOnlyForeignKey", {
@@ -79,33 +79,39 @@ export class Iris extends Base {
   declare color: string;
   declare eye_id: number;
 
-  beforeValidationCallbacksCounter: number = 0;
-  beforeCreateCallbacksCounter: number = 0;
-  beforeSaveCallbacksCounter: number = 0;
-  afterValidationCallbacksCounter: number = 0;
-  afterCreateCallbacksCounter: number = 0;
-  afterSaveCallbacksCounter: number = 0;
+  declare beforeValidationCallbacksCounter: number;
+  declare beforeCreateCallbacksCounter: number;
+  declare beforeSaveCallbacksCounter: number;
+  declare afterValidationCallbacksCounter: number;
+  declare afterCreateCallbacksCounter: number;
+  declare afterSaveCallbacksCounter: number;
 
   static {
     this.belongsTo("eye");
 
     this.beforeValidation(function (this: Iris) {
-      this.beforeValidationCallbacksCounter++;
+      this.beforeValidationCallbacksCounter ??= 0;
+      this.beforeValidationCallbacksCounter += 1;
     });
     this.beforeCreate(function (this: Iris) {
-      this.beforeCreateCallbacksCounter++;
+      this.beforeCreateCallbacksCounter ??= 0;
+      this.beforeCreateCallbacksCounter += 1;
     });
     this.beforeSave(function (this: Iris) {
-      this.beforeSaveCallbacksCounter++;
+      this.beforeSaveCallbacksCounter ??= 0;
+      this.beforeSaveCallbacksCounter += 1;
     });
     this.afterValidation(function (this: Iris) {
-      this.afterValidationCallbacksCounter++;
+      this.afterValidationCallbacksCounter ??= 0;
+      this.afterValidationCallbacksCounter += 1;
     });
     this.afterCreate(function (this: Iris) {
-      this.afterCreateCallbacksCounter++;
+      this.afterCreateCallbacksCounter ??= 0;
+      this.afterCreateCallbacksCounter += 1;
     });
     this.afterSave(function (this: Iris) {
-      this.afterSaveCallbacksCounter++;
+      this.afterSaveCallbacksCounter ??= 0;
+      this.afterSaveCallbacksCounter += 1;
     });
   }
 }
