@@ -1,5 +1,3 @@
-import { NoMethodError } from "@blazetrails/ruby-compat";
-
 export class ArrayInquirer<T extends string | symbol> extends Array<T> {
   constructor(...items: T[]) {
     super(...items);
@@ -12,11 +10,7 @@ export class ArrayInquirer<T extends string | symbol> extends Array<T> {
           const methodName = prop;
           return () => target.any(methodName.slice(0, -1));
         }
-        return () => {
-          throw new NoMethodError(
-            `undefined method '${prop}' for an instance of ${target.constructor.name}`,
-          );
-        };
+        return undefined;
       },
       has(target, prop) {
         return (typeof prop === "string" && prop.endsWith("?")) || Reflect.has(target, prop);
