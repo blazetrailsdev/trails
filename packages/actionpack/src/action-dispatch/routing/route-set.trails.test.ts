@@ -157,3 +157,61 @@ describe("ActionDispatch::Routing::RouteSet::NamedRouteCollection::UrlHelper.opt
     ).toBe(true);
   });
 });
+
+describe("ActionDispatch::Routing::RouteSet::Config", () => {
+  it("is a positional struct of relative_url_root, api_only and default_scope", () => {
+    const config = new RouteSet.Config("/app", true, { module: "admin" });
+    expect([config.relativeUrlRoot, config.apiOnly, config.defaultScope]).toEqual([
+      "/app",
+      true,
+      { module: "admin" },
+    ]);
+    expect(new RouteSet.Config().apiOnly).toBeNull();
+  });
+
+  it("new_with_config copies only the keys the config responds to", () => {
+    const routes = RouteSet.newWithConfig({ apiOnly: true });
+    expect(routes.isApiOnly()).toBe(true);
+    expect(routes.relativeUrlRoot).toBeNull();
+    expect(RouteSet.DEFAULT_CONFIG.apiOnly).toBe(false);
+  });
+
+  it("each route set gets its own copy of DEFAULT_CONFIG", () => {
+    const routes = new RouteSet();
+    routes.defaultScope = { module: "admin" };
+    expect(RouteSet.DEFAULT_CONFIG.defaultScope).toBeNull();
+    expect(new RouteSet().defaultScope).toBeNull();
+  });
+});
+
+describe("ActionDispatch::Routing::RouteSet#default_env", () => {
+  function envFor(defaultUrlOptions: Record<string, unknown>) {
+    const routes = new RouteSet();
+    routes.defaultUrlOptions = defaultUrlOptions;
+    const env = routes.defaultEnv();
+    return [env["HTTPS"], env["rack.url_scheme"], env["HTTP_HOST"], env["SCRIPT_NAME"]];
+  }
+
+  it("defaults to http://example.org", () => {
+    expect(envFor({})).toEqual(["off", "http", "example.org", ""]);
+  });
+
+  it("normalizes the protocol through Http::URL.full_url_for", () => {
+    expect(envFor({ protocol: "https://" })).toEqual(["on", "https", "example.org", ""]);
+  });
+
+  it("drops the port only when it is the scheme's default", () => {
+    expect(envFor({ protocol: "https", port: 443 })).toEqual(["on", "https", "example.org", ""]);
+    expect(envFor({ port: 8080 })).toEqual(["off", "http", "example.org:8080", ""]);
+    expect(envFor({ host: "example.com:3000" })).toEqual(["off", "http", "example.com:3000", ""]);
+  });
+
+  it("applies subdomain and script_name", () => {
+    expect(envFor({ host: "example.com", subdomain: "api", scriptName: "/app/" })).toEqual([
+      "off",
+      "http",
+      "api.example.com",
+      "/app",
+    ]);
+  });
+});

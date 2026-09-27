@@ -2,21 +2,7 @@
   {
     "package": "actiondispatch",
     "tsFile": "routing/route-set.ts",
-    "rubyName": "add_route",
-    "call": "match",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "routing/route-set.ts",
-    "rubyName": "call",
-    "call": "eval_block",
-    "reason": "Surfaced when the call-set gate began comparing every same-name Ruby owner in a file, not only the first-seen one (compare.ts direct-match arm); pre-existing, triage and convergence tracked by story `converge-same-name-second-owner-call-rows` (RFC 0130)."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "routing/route-set.ts",
-    "rubyName": "default_env",
+    "rubyName": "generate_url_helpers",
     "call": "full_url_for",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -24,8 +10,8 @@
     "package": "actiondispatch",
     "tsFile": "routing/route-set.ts",
     "rubyName": "generate_url_helpers",
-    "call": "full_url_for",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "call": "optimize_routes_generation?",
+    "reason": "route_set.rb:578-580 defines `optimize_routes_generation?` on the generated module; trails' `UrlHelpersModule` class answers it outside `generateUrlHelpers`' body. Surfaced once `OptimizedUrlHelper` (which also defines the name) was extracted; convergence tracked by story `route-set-generate-url-helpers-rails-module-shape` (RFC 0139)."
   },
   {
     "package": "actiondispatch",

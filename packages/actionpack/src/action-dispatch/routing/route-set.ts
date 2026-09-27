@@ -1,13 +1,24 @@
-import { isPlainObject, symbolizeKeys, toParam } from "@blazetrails/activesupport";
+import {
+  extractOptionsBang,
+  isBlank,
+  isPlainObject,
+  symbolizeKeys,
+  toParam,
+} from "@blazetrails/activesupport";
 import { MockRequest, type RackEnv, type RackResponse } from "@blazetrails/rack";
 import {
+  chomp,
   except,
   extend,
   hasKey,
   InvalidURIError,
+  merge,
+  mergeBang,
   Module,
   URI,
   rbInspect,
+  rbObjClone,
+  rbObjRespondTo,
   RFC2396_PARSER,
 } from "@blazetrails/ruby-compat";
 import { Mapper } from "./mapper.js";
@@ -55,8 +66,6 @@ import {
   type RouteWithParams,
 } from "../journey/formatter.js";
 
-const ROUTE_NAME_RE = /^[_a-z]\w*$/i;
-
 /** @internal */
 function toS(v: unknown): string {
   return v == null ? "" : String(v);
@@ -86,24 +95,30 @@ export class CustomUrlHelper implements PolymorphicMappingEntry {
   }
 
   call(t: PolymorphicHost, args: unknown[], onlyPath = false): string {
-    const rest = args.slice();
-    const last = rest[rest.length - 1];
-    const isPlainHash =
-      last != null &&
-      typeof last === "object" &&
-      !Array.isArray(last) &&
-      (Object.getPrototypeOf(last) === Object.prototype || Object.getPrototypeOf(last) === null);
-    const options = isPlainHash ? (rest.pop() as Record<string, unknown>) : {};
-    const merged = { ...this.defaults, ...options };
-    const result = this.block.apply(t, [...rest, merged]);
-    const url =
-      typeof result === "string"
-        ? result
-        : ((t as unknown as { fullUrlFor: (o: unknown) => string }).fullUrlFor?.(result) ??
-          String(result));
-    if (!onlyPath) return url;
-    const m = url.match(/(?<!\/)\/(?!\/)(.*)$/);
-    return m ? "/" + m[1] : url;
+    const options = extractOptionsBang(args);
+    const url = (t as unknown as { fullUrlFor(options: unknown): string }).fullUrlFor(
+      this.evalBlock(t, args, options),
+    );
+
+    if (onlyPath) {
+      return "/" + (url.match(/(?<!\/)\/(?!\/)(.*)$/s)?.[1] ?? "");
+    } else {
+      return url;
+    }
+  }
+
+  /** @internal */
+  private evalBlock(
+    t: PolymorphicHost,
+    args: unknown[],
+    options: Record<string, unknown>,
+  ): Record<string, unknown> | string {
+    return this.block.apply(t, [...args, this.mergeDefaults(options)]);
+  }
+
+  /** @internal */
+  private mergeDefaults(options: Record<string, unknown>): Record<string, unknown> {
+    return this.defaults ? merge(this.defaults, options) : options;
   }
 }
 
@@ -286,26 +301,28 @@ export class StaticDispatcher extends Dispatcher {
   }
 }
 
-export interface RouteSetConfig {
+export class Config {
   relativeUrlRoot: string | null;
-  apiOnly: boolean;
+  apiOnly: boolean | null;
   defaultScope: Record<string, unknown> | null;
-}
 
-/** @internal */
-export const DEFAULT_CONFIG: RouteSetConfig = {
-  relativeUrlRoot: null,
-  apiOnly: false,
-  defaultScope: null,
-};
+  constructor(
+    relativeUrlRoot: string | null = null,
+    apiOnly: boolean | null = null,
+    defaultScope: Record<string, unknown> | null = null,
+  ) {
+    this.relativeUrlRoot = relativeUrlRoot;
+    this.apiOnly = apiOnly;
+    this.defaultScope = defaultScope;
+  }
+}
 
 export class MountedHelpers {}
 
-/** @internal */
-class UrlHelper {
+export class UrlHelper {
   static create(route: Route, options: Record<string, unknown>, routeName: string): UrlHelper {
     if (this.isOptimizeHelper(route)) {
-      return new OptimizedUrlHelper(route, options, routeName);
+      return new UrlHelper.OptimizedUrlHelper(route, options, routeName);
     } else {
       return new this(route, options, routeName);
     }
@@ -316,10 +333,13 @@ class UrlHelper {
   }
 
   readonly routeName: string;
+
+  declare static OptimizedUrlHelper: typeof OptimizedUrlHelper;
+
   /** @internal */
   protected readonly options: Record<string, unknown>;
   /** @internal */
-  private readonly segmentKeys: readonly string[];
+  private readonly segmentKeys: string[];
   /** @internal */
   protected readonly route: Route;
 
@@ -338,10 +358,14 @@ class UrlHelper {
     urlStrategy: UrlStrategy,
   ): string {
     const controllerOptions = t.urlOptions();
-    const options: Record<string, unknown> = { ...controllerOptions, ...this.options };
-    const hash = this.handlePositionalArgs(controllerOptions, innerOptions ?? {}, args, options, [
-      ...this.segmentKeys,
-    ]);
+    const options = merge(controllerOptions, this.options);
+    const hash = this.handlePositionalArgs(
+      controllerOptions,
+      innerOptions ?? {},
+      args,
+      options,
+      this.segmentKeys,
+    );
     return t._routes.urlFor(hash, this.routeName, urlStrategy, methodName);
   }
 
@@ -358,13 +382,14 @@ class UrlHelper {
         : pathParams.length;
 
       if (args.length < pathParamsSize) {
-        const supplied = {
-          ...((result["path_params"] as Record<string, unknown> | undefined) ?? {}),
-          ...result,
-        };
-        pathParams = pathParams.filter(
-          (k) => !Object.hasOwn(controllerOptions, k) && !Object.hasOwn(supplied, k),
+        pathParams = pathParams.filter((k) => !Object.hasOwn(controllerOptions, k));
+        const supplied = merge(
+          (result["path_params"] as Record<string, unknown> | undefined) ?? {},
+          result,
         );
+        pathParams = pathParams.filter((k) => !Object.hasOwn(supplied, k));
+      } else {
+        pathParams = [...pathParams];
       }
       for (const key of Object.keys(innerOptions)) {
         const at = pathParams.indexOf(key);
@@ -377,12 +402,11 @@ class UrlHelper {
       });
     }
 
-    return Object.assign(result, innerOptions);
+    return mergeBang(result, innerOptions);
   }
 }
 
-/** @internal */
-class OptimizedUrlHelper extends UrlHelper {
+export class OptimizedUrlHelper extends UrlHelper {
   readonly argSize: number;
   /** @internal */
   private readonly requiredParts: readonly string[];
@@ -449,13 +473,16 @@ class OptimizedUrlHelper extends UrlHelper {
     return params;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsArgs merge — PERMANENT
+   */
   private raiseGenerationError(args: unknown[]): never {
     const missingKeys: string[] = [];
     const params = this.parameterizeArgs(args, (missingKey) => {
       missingKeys.push(missingKey);
     });
-    const merged: Record<string, unknown> = { ...this.route.requirements, ...params };
+    const merged = merge(this.route.requirements, params);
     const constraints = Object.fromEntries(
       Object.entries(merged).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
     );
@@ -465,6 +492,7 @@ class OptimizedUrlHelper extends UrlHelper {
     throw new UrlGenerationError(message);
   }
 }
+UrlHelper.OptimizedUrlHelper = OptimizedUrlHelper;
 
 type UrlStrategy = (options: UrlOptions) => string;
 
@@ -559,6 +587,11 @@ export class NamedRouteCollection {
     return this._routes.has(name);
   }
 
+  each(block: (name: string, route: Route) => void): this {
+    this.routes.forEach((route, name) => block(name, route));
+    return this;
+  }
+
   names(): string[] {
     return [...this._routes.keys()];
   }
@@ -593,6 +626,8 @@ export class NamedRouteCollection {
 
     return this;
   }
+
+  static UrlHelper = UrlHelper;
 
   private defineUrlHelper(
     mod: Module,
@@ -717,7 +752,7 @@ export class UrlHelpersModule {
 export class RouteSet {
   namedRoutes: NamedRouteCollection = new NamedRouteCollection();
   /** @internal */
-  private _config: RouteSetConfig;
+  private _config: Config;
   disableClearAndFinalize = false;
   resourcesPathNames: Record<string, string> = { new: "new", edit: "edit" };
   drawPaths: string[] = [];
@@ -738,23 +773,37 @@ export class RouteSet {
   /** @internal */
   _routes: UrlForRoutes = this;
 
-  constructor(config: RouteSetConfig = { ...DEFAULT_CONFIG }) {
-    this._config = { ...config };
-  }
-
   static defaultResourcesPathNames(): Record<string, string> {
     return { new: "new", edit: "edit" };
   }
 
   static newWithConfig(
-    this: new (config?: RouteSetConfig) => RouteSet,
-    config: Partial<RouteSetConfig>,
+    this: new (config?: Config) => RouteSet,
+    config: Partial<Record<"relativeUrlRoot" | "apiOnly" | "defaultScope", unknown>>,
   ): RouteSet {
-    const merged: RouteSetConfig = { ...DEFAULT_CONFIG };
-    if ("relativeUrlRoot" in config) merged.relativeUrlRoot = config.relativeUrlRoot ?? null;
-    if ("apiOnly" in config) merged.apiOnly = config.apiOnly ?? false;
-    if ("defaultScope" in config) merged.defaultScope = config.defaultScope ?? null;
-    return new this(merged);
+    const routeSetConfig = rbObjClone(RouteSet.DEFAULT_CONFIG);
+
+    if (rbObjRespondTo(config, "relativeUrlRoot")) {
+      routeSetConfig.relativeUrlRoot = config.relativeUrlRoot as string | null;
+    }
+
+    if (rbObjRespondTo(config, "apiOnly")) {
+      routeSetConfig.apiOnly = config.apiOnly as boolean | null;
+    }
+
+    if (rbObjRespondTo(config, "defaultScope")) {
+      routeSetConfig.defaultScope = config.defaultScope as Record<string, unknown> | null;
+    }
+
+    return new this(routeSetConfig);
+  }
+
+  static Config = Config;
+
+  static readonly DEFAULT_CONFIG: Config = new Config(null, false, null);
+
+  constructor(config: Config = rbObjClone(RouteSet.DEFAULT_CONFIG)) {
+    this._config = config;
   }
 
   get routes(): JourneyRoutes {
@@ -764,7 +813,7 @@ export class RouteSet {
   get relativeUrlRoot(): string | null {
     return this._config.relativeUrlRoot;
   }
-  isApiOnly(): boolean {
+  isApiOnly(): boolean | null {
     return this._config.apiOnly;
   }
   get defaultScope(): Record<string, unknown> | null {
@@ -783,6 +832,7 @@ export class RouteSet {
     return new (this.requestClass())(env);
   }
 
+  /** @missingRailsArgs chomp — PERMANENT */
   defaultEnv(): RackEnv {
     const cachedOpts = this._defaultEnv?.["action_dispatch.routes.default_url_options"] as
       | Record<string, unknown>
@@ -791,21 +841,15 @@ export class RouteSet {
       return this._defaultEnv;
     }
     const urlOptions = Object.freeze({ ...this.defaultUrlOptions });
-    const host = typeof urlOptions["host"] === "string" ? urlOptions["host"] : "example.org";
-    const protocol = typeof urlOptions["protocol"] === "string" ? urlOptions["protocol"] : "http";
-    const scheme = protocol.replace(/:?\/*$/, "");
-    const port = typeof urlOptions["port"] === "number" ? urlOptions["port"] : undefined;
-    const defaultPort = scheme === "https" ? 443 : 80;
-    const httpHost = port == null || port === defaultPort ? host : `${host}:${port}`;
-    const scriptName =
-      typeof urlOptions["script_name"] === "string" ? urlOptions["script_name"] : "";
+    const uri = URI.parse(URL.fullUrlFor({ host: "example.org", ...urlOptions } as UrlOptions));
+
     this._defaultEnv = Object.freeze({
       "action_dispatch.routes": this,
       "action_dispatch.routes.default_url_options": urlOptions,
-      HTTPS: scheme === "https" ? "on" : "off",
-      "rack.url_scheme": scheme,
-      HTTP_HOST: httpHost,
-      SCRIPT_NAME: scriptName.replace(/\/$/, ""),
+      HTTPS: uri.scheme === "https" ? "on" : "off",
+      "rack.url_scheme": uri.scheme,
+      HTTP_HOST: uri.port === uri.defaultPort ? uri.host : `${uri.host}:${uri.port}`,
+      SCRIPT_NAME: chomp(uri.path!, "/"),
       "rack.input": "",
     });
     return this._defaultEnv;
@@ -917,7 +961,7 @@ export class RouteSet {
     mapping: { makeRoute(name: string | null, precedence: number): Route },
     name?: string | null | false,
   ): Route {
-    if (name && !ROUTE_NAME_RE.test(name)) {
+    if (!(isBlank(name) || String(name).match(/^[_a-z]\w*$/i))) {
       throw new ArgumentError(`Invalid route name: '${name}'`);
     }
 
