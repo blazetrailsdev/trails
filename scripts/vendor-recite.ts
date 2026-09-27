@@ -25,6 +25,7 @@ export const EXCLUDED: Readonly<Record<string, string>> = {
   "scripts/parity/legacy-script-names.ts": "SKIPPED_PATHS is a path prefix, not a citation",
   "scripts/vendor-recite.ts": "this codemod",
   "scripts/vendor-recite.test.ts": "the codemod's input-shape fixtures",
+  "scripts/vendor-citations.test.ts": "the citation gate's input-shape fixtures",
 };
 
 export function isExcluded(path: string): boolean {

@@ -5,11 +5,6 @@ import { describe, expect, it } from "vitest";
 
 import { lockedVersions, REPO_ROOT, trackedFiles, unrecitedCitations } from "./vendor-recite.js";
 
-// RFC 0159: every tracked `vendor/<source>/…` citation names its source's
-// active version. Reads vendor/sources.lock.json only — the Unit Tests job has
-// no fetched vendor/ tree. Sits beside eslint/ruby-compat-needs-mri-citation.mjs,
-// which resolves MRI citations against the fetched tree and so runs only in
-// rails-comparison.
 describe("vendor citations", () => {
   it("every tracked citation names its source's active version", async () => {
     const versions = await lockedVersions(REPO_ROOT);
