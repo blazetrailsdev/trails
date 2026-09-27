@@ -120,6 +120,7 @@ import {
   _setHtmlContentType,
   _setRenderedContentType,
   _setVaryHeader,
+  _processVariant,
   processAction as _processAction,
 } from "./metal/rendering.js";
 import { Renderers } from "./metal/renderers.js";
@@ -307,6 +308,7 @@ export class Base extends Metal {
   viewRuntime: number | null = null;
 
   render(options: RenderOptions = {}): void {
+    _processVariant.call(this, options as Record<string, unknown>);
     this.viewRuntime = this.cleanupViewRuntime(() =>
       Benchmark.realtime(":float_millisecond", () => {
         if (this.performed) {
