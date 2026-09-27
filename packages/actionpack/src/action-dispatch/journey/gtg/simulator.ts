@@ -1,3 +1,5 @@
+import { StringScanner } from "@blazetrails/ruby-compat";
+
 export type GtgState = ReadonlyArray<readonly [state: number, dataIndex: number | null]>;
 
 export interface TransitionTableLike {
@@ -14,7 +16,7 @@ export class MatchData {
   }
 }
 
-const TOKEN = /([/.?]|[^/.?]+)/y;
+const SYM = /[/.?]|[^/.?]+/;
 
 export class Simulator {
   static readonly INITIAL_STATE: GtgState = [[0, null]];
@@ -26,24 +28,27 @@ export class Simulator {
   }
 
   memos(string: string, onNoMatch: () => readonly unknown[]): readonly unknown[] {
+    const input = new StringScanner(string);
     let state: GtgState = Simulator.INITIAL_STATE;
     let startIndex = 0;
 
-    TOKEN.lastIndex = 0;
-    let match: RegExpExecArray | null;
-    while ((match = TOKEN.exec(string)) !== null) {
-      const endIndex = startIndex + match[0].length;
+    let sym: string | null;
+    while ((sym = input.scan(SYM)) !== null) {
+      const endIndex = startIndex + sym.length;
+
       state = this.tt.move(state, string, startIndex, endIndex);
+
       startIndex = endIndex;
-      TOKEN.lastIndex = endIndex;
     }
 
-    const acceptance: unknown[] = [];
-    for (const [s, idx] of state) {
+    const acceptanceStates: unknown[] = [];
+    for (const sD of state) {
+      const [s, idx] = sD;
       if (idx === null && this.tt.isAccepting(s)) {
-        acceptance.push(...this.tt.memo(s));
+        for (const memo of this.tt.memo(s)) acceptanceStates.push(memo);
       }
     }
-    return acceptance.length === 0 ? onNoMatch() : acceptance;
+
+    return acceptanceStates.length === 0 ? onNoMatch() : acceptanceStates;
   }
 }

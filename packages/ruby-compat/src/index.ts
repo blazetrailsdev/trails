@@ -221,6 +221,7 @@ export {
   type StringReceiver,
 } from "./string/method-table.js";
 export { MatchData } from "./match-data.js";
+export { StringScanner } from "./string-scanner.js";
 export { stringSplit } from "./string/split.js";
 export { forceEncoding } from "./string/force-encoding.js";
 export { Encoding } from "./encoding.js";
