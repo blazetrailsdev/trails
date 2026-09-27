@@ -14,6 +14,7 @@ import { Html } from "./template/handlers/html.js";
 import { Raw } from "./template/handlers/raw.js";
 import { Tse } from "./template/handlers/tse.js";
 import { SimpleType } from "./template/types.js";
+import type { File as SourcesFile } from "./template/sources/file.js";
 import {
   sourceLines,
   type BacktraceLocation,
@@ -84,7 +85,7 @@ const VALID_LOCAL_NAME = /^(?![A-Z0-9])[\p{L}\p{N}_]+$/u;
 let nextObjectId = 0;
 
 export interface TemplateOptions {
-  source: string;
+  source: string | SourcesFile;
   identifier: string;
   handler?: TemplateHandler | null;
   locals?: readonly string[];
@@ -128,7 +129,7 @@ export class Template {
   isLayout: boolean;
   readonly isPartial: boolean;
 
-  private _source: string;
+  private _source: string | SourcesFile;
   private readonly _locals: readonly string[];
   private _strictLocals: string | null | typeof NONE = NONE;
   /** @internal */
@@ -159,7 +160,7 @@ export class Template {
   }
 
   get source(): string {
-    return this._source;
+    return this._source.toString();
   }
 
   get locals(): readonly string[] | null {
@@ -211,9 +212,12 @@ export class Template {
 
   strictLocalsBang(): string | null {
     if (this._strictLocals === NONE) {
-      const m = STRICT_LOCALS_REGEX.exec(this._source);
+      const source = this.source;
+      const m = STRICT_LOCALS_REGEX.exec(source);
       if (m) {
-        this._source = this._source.replace(STRICT_LOCALS_REGEX, "");
+        if (typeof this._source === "string") {
+          this._source = source.replace(STRICT_LOCALS_REGEX, "");
+        }
         const sig = m[1].trim();
         this._strictLocals = sig === "" ? "**nil" : sig;
       } else {

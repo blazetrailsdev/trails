@@ -45,6 +45,16 @@ describe("FileSystemResolver", () => {
     expect((ctx.findTemplate("index", ["posts"]) as Template).source).toBe("<h1>Posts</h1>");
   });
 
+  it("reads a template's source only when it is asked for", async () => {
+    const ctx = new LookupContext(null, {}, []);
+    ctx.appendViewPaths([new FileSystemResolver(dir)]);
+    const template = ctx.findTemplate("index", ["posts"]) as Template;
+
+    await getFs().writeFile!(getPath().join(dir, "posts", "index.html.tse"), "<h1>Later</h1>");
+
+    expect(template.source).toBe("<h1>Later</h1>");
+  });
+
   it("binds the requested locals, memoizing one template per locals set", () => {
     const resolver = new FileSystemResolver(dir);
     const details = { formats: [":html"], handlers: [":tse"] };
