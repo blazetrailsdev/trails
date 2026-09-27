@@ -11,19 +11,14 @@ import {
   RFC2396_PARSER,
 } from "@blazetrails/ruby-compat";
 import { Mapper } from "./mapper.js";
-import type { MatchedRoute } from "./route.js";
-import { Route } from "./route.js";
+import { deprecator } from "../deprecator.js";
+import { journeyRecognize as recognizeViaJourney, type JourneyMatch } from "./journey-bridge.js";
 import {
-  buildJourneyRouter,
-  journeyRecognize as recognizeViaJourney,
-  type JourneyMatch,
-} from "./journey-bridge.js";
-import type {
   Router as JourneyRouter,
-  RackishResponse,
-  RoutableApp,
-  RouterRequest,
+  type RackishResponse,
+  type RouterRequest,
 } from "../journey/router.js";
+import type { Route } from "../journey/route.js";
 import {
   polymorphicUrl as polymorphicUrlFn,
   polymorphicMapping as polymorphicMappingFn,
@@ -49,7 +44,7 @@ import type { Response as AdResponse } from "../http/response.js";
 import { RoutingError, UrlGenerationError } from "../../action-controller/metal/exceptions.js";
 import { RoutesProxy, type ScriptNamer } from "./routes-proxy.js";
 import { Request as AdRequest } from "../http/request.js";
-import { camelize, NameError } from "@blazetrails/activesupport";
+import { camelize, NameError, squish } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { normalizePath } from "../journey/router/utils.js";
 import { URL, type UrlOptions } from "../http/url.js";
@@ -219,7 +214,7 @@ export class Generator {
 
   /** @internal */
   private segmentKeys(): readonly string[] {
-    return this.set.namedRoutes.get(this.namedRoute!)!.pathParamNames;
+    return this.set.namedRoutes.get(this.namedRoute!)!.segmentKeys;
   }
 }
 
@@ -317,7 +312,7 @@ class UrlHelper {
   }
 
   static isOptimizeHelper(route: Route): boolean {
-    return Object.keys(route.pattern.requirements).length === 0 && !route.isGlob();
+    return Object.keys(route.path.requirements).length === 0 && !route.isGlob();
   }
 
   readonly routeName: string;
@@ -330,7 +325,7 @@ class UrlHelper {
 
   constructor(route: Route, options: Record<string, unknown>, routeName: string) {
     this.options = options;
-    this.segmentKeys = [...new Set(route.pathParamNames)];
+    this.segmentKeys = [...new Set(route.segmentKeys)];
     this.route = route;
     this.routeName = routeName;
   }
@@ -720,7 +715,6 @@ export class UrlHelpersModule {
 }
 
 export class RouteSet {
-  private routes: Route[] = [];
   namedRoutes: NamedRouteCollection = new NamedRouteCollection();
   /** @internal */
   private _config: RouteSetConfig;
@@ -730,19 +724,8 @@ export class RouteSet {
   readonly envKey: string = `ROUTES_${(RouteSet._envSeq = (RouteSet._envSeq ?? 0) + 1)}_SCRIPT_NAME`;
   private static _envSeq?: number;
   set: JourneyRoutes = new JourneyRoutes();
-  formatter: JourneyFormatter = ((set: RouteSet) =>
-    new JourneyFormatter({
-      get routes() {
-        return set.journeyRouter.routes;
-      },
-      namedRoutes: {
-        has: (name) => set.namedRoutes.isKey(name),
-        get: (name) => {
-          const route = set.namedRoutes.get(name);
-          return route && set.journeyRouter.routes.routes[set.routes.indexOf(route)];
-        },
-      },
-    }))(this);
+  router: JourneyRouter = new JourneyRouter(this.set);
+  formatter: JourneyFormatter = new JourneyFormatter(this);
   /** @internal */
   private _urlHelpersWithPaths?: UrlHelpersModule;
   /** @internal */
@@ -754,9 +737,6 @@ export class RouteSet {
   readonly polymorphicMappings: Map<string, PolymorphicMappingEntry> = new Map();
   /** @internal */
   _routes: UrlForRoutes = this;
-  /** @internal */
-  private _journeyRouter: JourneyRouter | null = null;
-  /** @internal */
 
   constructor(config: RouteSetConfig = { ...DEFAULT_CONFIG }) {
     this._config = { ...config };
@@ -777,11 +757,8 @@ export class RouteSet {
     return new this(merged);
   }
 
-  get router(): JourneyRouter {
-    return this.journeyRouter;
-  }
-  set router(value: JourneyRouter) {
-    this._journeyRouter = value;
+  get routes(): JourneyRoutes {
+    return this.set;
   }
 
   get relativeUrlRoot(): string | null {
@@ -835,7 +812,7 @@ export class RouteSet {
   }
 
   fromRequirements(requirements: Record<string, unknown>): Route | undefined {
-    return this.routes.find((r) =>
+    return this.routes.routes.find((r) =>
       shallowEqual(r.requirements, requirements as Record<string, string | RegExp>),
     );
   }
@@ -900,7 +877,6 @@ export class RouteSet {
   evalBlock(block: DrawCallback): void {
     const mapper = new Mapper(this);
     block(mapper);
-    this._journeyRouter = null;
   }
 
   append(block: DrawCallback): void {
@@ -919,28 +895,26 @@ export class RouteSet {
 
   clearBang(): void {
     this._finalized = false;
-    this.routes = [];
     this.namedRoutes.clearBang();
     this.set.clear();
     this.formatter.clear();
     this.polymorphicMappings.clear();
     this._defaultEnv = undefined;
-    this._journeyRouter = null;
     for (const blk of this._prepend) this.evalBlock(blk);
   }
 
   eagerLoadBang(): void {
-    const router = this.journeyRouter as JourneyRouter & { eagerLoadBang?(): void };
-    router.eagerLoadBang?.();
+    this.router.eagerLoadBang();
+    this.routes.each((route) => route.eagerLoadBang());
     this.formatter.eagerLoadBang();
   }
 
   isEmpty(): boolean {
-    return this.routes.length === 0;
+    return this.routes.isEmpty();
   }
 
   addRoute(
-    mapping: { makeRoute(name: string | null | false | undefined, precedence: number): Route },
+    mapping: { makeRoute(name: string | null, precedence: number): Route },
     name?: string | null | false,
   ): Route {
     if (name && !ROUTE_NAME_RE.test(name)) {
@@ -956,10 +930,27 @@ export class RouteSet {
           "https://guides.rubyonrails.org/routing.html#restricting-the-routes-created",
       );
     }
-    const route = mapping.makeRoute(name, this.routes.length);
-    this.routes.push(route);
+    const route = this.set.addRoute(name || null, mapping);
     if (name) this.namedRoutes.add(name, route);
-    this._journeyRouter = null;
+
+    if (route.segmentKeys.includes("controller")) {
+      deprecator().warn(
+        squish(`
+          Using a dynamic :controller segment in a route is deprecated and
+          will be removed in Rails 8.1.
+        `),
+      );
+    }
+
+    if (route.segmentKeys.includes("action")) {
+      deprecator().warn(
+        squish(`
+          Using a dynamic :action segment in a route is deprecated and
+          will be removed in Rails 8.1.
+        `),
+      );
+    }
+
     this.formatter.clear();
     return route;
   }
@@ -1161,21 +1152,12 @@ export class RouteSet {
     return undefined;
   }
 
-  get journeyRouter(): JourneyRouter {
-    if (!this._journeyRouter) {
-      this._journeyRouter = buildJourneyRouter(this.routes, {
-        app: (r) => r.app as unknown as RoutableApp,
-      });
-    }
-    return this._journeyRouter;
-  }
-
   journeyRecognize(method: string, path: string): JourneyMatch | null {
-    return recognizeViaJourney(this.journeyRouter, method, path);
+    return recognizeViaJourney(this.router, method, path);
   }
 
   serve(req: RouterRequest): Promise<RackishResponse> {
-    return this.journeyRouter.serve(req);
+    return this.router.serve(req);
   }
 
   recognizePath(
@@ -1213,8 +1195,8 @@ export class RouteSet {
     return [URI.parse(pathInfo).path!, Object.keys(except(generator.params, "_recall"))];
   }
 
-  recognize(method: string, path: string): MatchedRoute | null {
-    return recognizeViaJourney(this.journeyRouter, method, path);
+  recognize(method: string, path: string): JourneyMatch | null {
+    return recognizeViaJourney(this.router, method, path);
   }
 
   setDefaultUrlOptions(options: { host?: string }): void {
@@ -1223,13 +1205,11 @@ export class RouteSet {
 
   clear(): void {
     this._finalized = false;
-    this.routes = [];
     this.namedRoutes.clearBang();
     this.set.clear();
     this.formatter.clear();
     this.polymorphicMappings.clear();
     this._defaultEnv = undefined;
-    this._journeyRouter = null;
   }
 
   getNamedRoutes(): ReadonlyMap<string, Route> {
@@ -1237,7 +1217,7 @@ export class RouteSet {
   }
 
   getRoutes(): readonly Route[] {
-    return this.routes;
+    return this.routes.routes;
   }
 
   async call(env: RackEnv): Promise<RackResponse> {

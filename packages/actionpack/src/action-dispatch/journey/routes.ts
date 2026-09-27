@@ -14,7 +14,7 @@ import type { Route } from "./route.js";
  * shape stands in until that class is ported.
  */
 export interface Mapping {
-  makeRoute(name: string, index: number): Route;
+  makeRoute(name: string | null, index: number): Route;
 }
 
 export class Routes implements Iterable<Route> {
@@ -85,7 +85,7 @@ export class Routes implements Iterable<Route> {
     return this._simulator;
   }
 
-  addRoute(name: string, mapping: Mapping): Route {
+  addRoute(name: string | null, mapping: Mapping): Route {
     const route = mapping.makeRoute(name, this.routes.length);
     this.routes.push(route);
     this.partitionRoute(route);

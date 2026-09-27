@@ -1,3 +1,4 @@
+import type { SafeBuffer } from "@blazetrails/activesupport";
 import type { LookupContext } from "../lookup-context.js";
 import type { ViewContext, RenderOptions } from "./abstract-renderer.js";
 import { EmptyCollection, RenderedCollection, RenderedTemplate } from "./abstract-renderer.js";
@@ -17,7 +18,10 @@ export class Renderer {
     this.lookupContext = lookupContext;
   }
 
-  render(context: ViewContext, options: RenderOptions): string | null | Promise<string | null> {
+  render(
+    context: ViewContext,
+    options: RenderOptions,
+  ): string | SafeBuffer | null | Promise<string | SafeBuffer | null> {
     const rendered = this.renderToObject(context, options);
     return isThenable(rendered) ? rendered.then((r) => r.body) : rendered.body;
   }
@@ -40,7 +44,7 @@ export class Renderer {
   async renderBody(
     context: ViewContext,
     options: RenderOptions,
-  ): Promise<Body | (string | null)[]> {
+  ): Promise<Body | (string | SafeBuffer | null)[]> {
     if (Object.prototype.hasOwnProperty.call(options, "partial")) {
       return [await this.renderPartial(context, options)];
     }
@@ -52,7 +56,7 @@ export class Renderer {
     context: ViewContext,
     options: RenderOptions,
     block?: (...args: unknown[]) => unknown,
-  ): string | null | Promise<string | null> {
+  ): string | SafeBuffer | null | Promise<string | SafeBuffer | null> {
     const rendered = this.renderPartialToObject(context, options, block);
     return isThenable(rendered) ? rendered.then((r) => r.body) : rendered.body;
   }

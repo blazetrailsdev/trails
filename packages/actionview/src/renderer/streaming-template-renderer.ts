@@ -1,4 +1,4 @@
-import { Notifications } from "@blazetrails/activesupport";
+import { Notifications, type SafeBuffer } from "@blazetrails/activesupport";
 import { ActionView } from "../namespaces.js";
 import { TemplateRenderer } from "./template-renderer.js";
 import type {
@@ -44,14 +44,16 @@ export class Body {
 }
 
 /** @internal */
-export class StreamingTemplateRenderer extends TemplateRenderer<Promise<Body | (string | null)[]>> {
+export class StreamingTemplateRenderer extends TemplateRenderer<
+  Promise<Body | (string | SafeBuffer | null)[]>
+> {
   /** @internal */
   protected override async renderTemplate(
     view: ViewContext,
     template: RenderableTemplate,
     layoutName: RenderOptions["layout"] = null,
     locals: Record<string, unknown> = {},
-  ): Promise<Body | (string | null)[]> {
+  ): Promise<Body | (string | SafeBuffer | null)[]> {
     if (!(layoutName != null && layoutName !== false && template.supportsStreaming?.())) {
       const rendered = super.renderTemplate(view, template, layoutName, locals);
       return [(rendered as unknown as RenderedTemplate).body];
@@ -90,20 +92,20 @@ export class StreamingTemplateRenderer extends TemplateRenderer<Promise<Body | (
 
     try {
       if (!layout) {
-        buffer(await template.render(view, locals));
+        buffer((await template.render(view, locals)).toString());
         return;
       }
 
-      const layoutBody = await layout.render(streamingContext, locals);
+      const layoutBody = (await layout.render(streamingContext, locals)).toString();
       const sentinelIdx = layoutBody.indexOf(sentinel);
 
       if (sentinelIdx === -1) {
-        buffer(layoutBody + (await template.render(view, locals)));
+        buffer(layoutBody + (await template.render(view, locals)).toString());
         return;
       }
 
       buffer(layoutBody.slice(0, sentinelIdx));
-      buffer(await template.render(view, locals));
+      buffer((await template.render(view, locals)).toString());
       buffer(layoutBody.slice(sentinelIdx + sentinel.length));
     } catch (e) {
       payload.exception = [

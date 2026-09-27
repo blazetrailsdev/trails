@@ -34,8 +34,8 @@ describe("Controller routing integration", () => {
     });
     const match = routes.recognize("GET", "/");
     expect(match).not.toBeNull();
-    expect(match!.route.controller).toBe("pages");
-    expect(match!.route.action).toBe("home");
+    expect(match!.route.defaults.controller).toBe("pages");
+    expect(match!.route.defaults.action).toBe("home");
   });
 
   it("dispatches resource routes to correct actions", () => {
@@ -44,13 +44,13 @@ describe("Controller routing integration", () => {
       map.resources("posts");
     });
 
-    expect(routes.recognize("GET", "/posts")!.route.action).toBe("index");
-    expect(routes.recognize("POST", "/posts")!.route.action).toBe("create");
-    expect(routes.recognize("GET", "/posts/1")!.route.action).toBe("show");
+    expect(routes.recognize("GET", "/posts")!.route.defaults.action).toBe("index");
+    expect(routes.recognize("POST", "/posts")!.route.defaults.action).toBe("create");
+    expect(routes.recognize("GET", "/posts/1")!.route.defaults.action).toBe("show");
     expect(routes.recognize("GET", "/posts/1")!.params.id).toBe("1");
-    expect(routes.recognize("PUT", "/posts/1")!.route.action).toBe("update");
-    expect(routes.recognize("PATCH", "/posts/1")!.route.action).toBe("update");
-    expect(routes.recognize("DELETE", "/posts/1")!.route.action).toBe("destroy");
+    expect(routes.recognize("PUT", "/posts/1")!.route.defaults.action).toBe("update");
+    expect(routes.recognize("PATCH", "/posts/1")!.route.defaults.action).toBe("update");
+    expect(routes.recognize("DELETE", "/posts/1")!.route.defaults.action).toBe("destroy");
   });
 
   it("path params include route parameters", () => {
@@ -86,7 +86,7 @@ describe("Controller routing integration", () => {
       map.get("/posts/:id", { to: "posts#show" });
     });
     const match = routes.recognize("GET", "/posts/special");
-    expect(match!.route.action).toBe("special");
+    expect(match!.route.defaults.action).toBe("special");
   });
 
   it("unmatched route returns null", () => {
@@ -114,8 +114,8 @@ describe("Controller routing integration", () => {
     });
     const match = routes.recognize("GET", "/admin/posts");
     expect(match).not.toBeNull();
-    expect(match!.route.controller).toBe("admin/posts");
-    expect(match!.route.action).toBe("index");
+    expect(match!.route.defaults.controller).toBe("admin/posts");
+    expect(match!.route.defaults.action).toBe("index");
   });
 
   it("scope with module option", () => {
@@ -126,7 +126,7 @@ describe("Controller routing integration", () => {
       });
     });
     const match = routes.recognize("GET", "/api/posts");
-    expect(match!.route.controller).toBe("api/posts");
+    expect(match!.route.defaults.controller).toBe("api/posts");
   });
 
   it("constraints filter routes", () => {
@@ -169,7 +169,7 @@ describe("Controller routing integration", () => {
     const match = routes.recognize("GET", "/posts/1/comments");
     expect(match).not.toBeNull();
     expect(match!.params.post_id).toBe("1");
-    expect(match!.route.action).toBe("index");
+    expect(match!.route.defaults.action).toBe("index");
 
     const show = routes.recognize("GET", "/posts/1/comments/2");
     expect(show).not.toBeNull();
@@ -202,7 +202,7 @@ describe("Controller routing integration", () => {
     });
     const match = routes.recognize("GET", "/posts/search");
     expect(match).not.toBeNull();
-    expect(match!.route.action).toBe("search");
+    expect(match!.route.defaults.action).toBe("search");
   });
 
   it("singular resource routes", () => {
@@ -213,7 +213,7 @@ describe("Controller routing integration", () => {
     expect(routes.recognize("GET", "/session")).not.toBeNull();
     expect(routes.recognize("POST", "/session")).not.toBeNull();
     expect(routes.recognize("DELETE", "/session")).not.toBeNull();
-    expect(routes.recognize("GET", "/session")!.route.action).toBe("show");
+    expect(routes.recognize("GET", "/session")!.route.defaults.action).toBe("show");
   });
 
   it("route defaults are merged into params", () => {
@@ -326,7 +326,7 @@ describe("Controller routing integration", () => {
     });
     const match = routes.recognize("GET", "/api/v1/posts");
     expect(match).not.toBeNull();
-    expect(match!.route.controller).toBe("api/v1/posts");
+    expect(match!.route.defaults.controller).toBe("api/v1/posts");
   });
 
   it("resources generate named routes for path generation", () => {

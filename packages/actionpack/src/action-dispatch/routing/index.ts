@@ -1,5 +1,4 @@
-export { Route, type MatchedRoute, type RouteOptions, type RouteConstraints } from "./route.js";
-export { Mapper } from "./mapper.js";
+export { Mapper, type RouteOptions, type RouteConstraints } from "./mapper.js";
 export { RouteSet, Dispatcher, StaticDispatcher, type DrawCallback } from "./route-set.js";
 export { escapePath, escapeSegment, escapeFragment, unescapeUri } from "../journey/router/utils.js";
 export {

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { TopLevel } from "@blazetrails/activesupport";
 import { stringSplit } from "@blazetrails/ruby-compat";
 import { Mapper } from "../../routing/mapper.js";
-import type { MountableApp } from "../../routing/route.js";
+import type { MountableApp } from "../../routing/mapper.js";
 import { RouteSet } from "../../routing/route-set.js";
 import { ConsoleFormatter, RoutesFormatter, RoutesInspector } from "../../routing/inspector.js";
 

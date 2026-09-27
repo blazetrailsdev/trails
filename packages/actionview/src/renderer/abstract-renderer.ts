@@ -1,5 +1,5 @@
 import { ArgumentError, File, rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
-import type { SafeBuffer } from "@blazetrails/activesupport";
+import { kernelArray, type SafeBuffer } from "@blazetrails/activesupport";
 import type { LookupContext } from "../lookup-context.js";
 import type { Template } from "../template.js";
 
@@ -7,7 +7,7 @@ export type { Template };
 
 export interface RenderableTemplate {
   readonly identifier: string;
-  readonly format: string | null;
+  readonly format: unknown;
   readonly variable?: string | null;
   readonly virtualPath?: string | null;
   supportsStreaming?(): boolean;
@@ -17,20 +17,20 @@ export interface RenderableTemplate {
     buffer?: null,
     options?: { implicitLocals?: readonly string[]; addToStack?: boolean },
     block?: (...name: unknown[]) => unknown,
-  ): string | Promise<string>;
+  ): string | SafeBuffer | Promise<string | SafeBuffer>;
   render(
     view: ViewContext,
     locals: Record<string, unknown>,
     buffer: unknown,
     options?: { implicitLocals?: readonly string[]; addToStack?: boolean },
     block?: (...name: unknown[]) => unknown,
-  ): string | null | Promise<string | null>;
+  ): string | SafeBuffer | null | Promise<string | SafeBuffer | null>;
 }
 
 export interface ViewContext {
   readonly lookupContext?: LookupContext | null;
   _layoutFor?(...args: unknown[]): string | SafeBuffer | null | Promise<SafeBuffer>;
-  viewFlow?: { set(key: string, content: string): void };
+  viewFlow?: { set(key: string, content: string | SafeBuffer): void };
   prefixPartialPathWithControllerNamespace?: boolean;
   viewRenderer: { cacheHits: Record<string, unknown> };
 }
@@ -72,11 +72,11 @@ export class RenderedTemplate {
   static readonly EMPTY_SPACER: RenderedTemplate = new RenderedTemplate("", null);
 
   constructor(
-    readonly body: string,
+    readonly body: string | SafeBuffer,
     readonly template: RenderableTemplate | null,
   ) {}
 
-  get format(): string | null {
+  get format(): unknown {
     return this.template?.format ?? null;
   }
 }
@@ -92,10 +92,10 @@ export class RenderedCollection {
   ) {}
 
   get body(): string {
-    return this.renderedTemplates.map((t) => t.body).join(this.spacer.body);
+    return this.renderedTemplates.map((t) => t.body).join(this.spacer.body.toString());
   }
 
-  get format(): string | null {
+  get format(): unknown {
     return this.renderedTemplates[0].format;
   }
 }
@@ -247,15 +247,18 @@ export abstract class AbstractRenderer {
   }
 
   /** @internal */
-  protected prependFormats(formats: string | string[] | null | undefined): void {
-    const arr = formats ? (Array.isArray(formats) ? formats : [formats]) : [];
+  protected prependFormats(formats: unknown): void {
+    const arr = kernelArray(formats) as string[];
     if (arr.length === 0 || this.lookupContext.htmlFallbackForJs) return;
     const existing = this.lookupContext.formats as readonly string[];
     this.lookupContext.formats = [...new Set([...arr, ...existing])];
   }
 
   /** @internal */
-  buildRenderedTemplate(content: string, template: RenderableTemplate | null): RenderedTemplate {
+  buildRenderedTemplate(
+    content: string | SafeBuffer,
+    template: RenderableTemplate | null,
+  ): RenderedTemplate {
     return new RenderedTemplate(content, template);
   }
 

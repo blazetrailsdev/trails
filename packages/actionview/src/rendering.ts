@@ -1,5 +1,6 @@
 /** @internal */
 
+import type { SafeBuffer } from "@blazetrails/activesupport";
 import { include } from "@blazetrails/ruby-compat/include";
 import { Base } from "./base.js";
 import { DetailsKey, type LookupContext } from "./lookup-context.js";
@@ -133,13 +134,13 @@ export interface RenderToBodyHost {
   /** @internal */
   _processRenderTemplateOptions(options: Record<string, unknown>): void;
   /** @internal */
-  _renderTemplate(options: Record<string, unknown>): Promise<string | null>;
+  _renderTemplate(options: Record<string, unknown>): Promise<string | SafeBuffer | null>;
 }
 
 export async function renderToBody(
   this: RenderToBodyHost,
   options: Record<string, unknown> = {},
-): Promise<string | null> {
+): Promise<string | SafeBuffer | null> {
   this._processOptions(options);
   this._processRenderTemplateOptions(options);
   return this._renderTemplate(options);
@@ -149,7 +150,7 @@ export async function renderToBody(
 export async function _renderTemplate(
   this: RenderToBodyHost,
   options: Record<string, unknown>,
-): Promise<string | null> {
+): Promise<string | SafeBuffer | null> {
   const variant = options["variant"];
   delete options["variant"];
   const assigns = options["assigns"];

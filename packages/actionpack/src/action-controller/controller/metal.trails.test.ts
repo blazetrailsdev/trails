@@ -3,6 +3,7 @@ import { Metal } from "../metal.js";
 import { Request } from "../../action-dispatch/request.js";
 import { Response } from "../../action-dispatch/response.js";
 import { Parameters } from "../metal/strong-parameters.js";
+import { htmlSafe } from "@blazetrails/activesupport";
 
 function makeRequest(): Request {
   return new Request({ REQUEST_METHOD: "GET", PATH_INFO: "/", HTTP_HOST: "localhost" });
@@ -38,5 +39,15 @@ describe("Metal#params", () => {
     c.params = assigned;
     await c.dispatch("index", req, makeResponse());
     expect(c.receivedParams).toBe(assigned);
+  });
+});
+
+describe("Metal#response_body=", () => {
+  it("takes the String arm for an html-safe SafeBuffer, as Ruby's is_a?(String) does", () => {
+    const c = new (class extends Metal {})();
+    c.setResponseBang(makeResponse());
+    c.responseBody = htmlSafe("<p>hi</p>");
+    expect(c.response.body).toBe("<p>hi</p>");
+    expect(c.response.getHeader("content-length")).toBe("9");
   });
 });

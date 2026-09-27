@@ -2,7 +2,7 @@ import { underscore } from "@blazetrails/activesupport";
 import { pluralize } from "@blazetrails/activesupport/core-ext/string/inflections";
 import { RFC2396_PARSER, rbInspect } from "@blazetrails/ruby-compat";
 import type { Endpoint } from "./endpoint.js";
-import type { Route } from "./route.js";
+import type { Route } from "../journey/route.js";
 import { RouteSet } from "./route-set.js";
 
 export interface InspectedRoute {
@@ -48,14 +48,14 @@ export class RouteWrapper {
   }
 
   get app(): Endpoint {
-    return this.route.app!;
+    return this.route.app as Endpoint;
   }
 
   /** @internal */
   isMatchesFilter(filter: string, value: RegExp | string): boolean {
     if (filter === "exact_path_match") {
       if (typeof value !== "string") return false;
-      return this.route.match(this.route.verb, value) !== null;
+      return this.route.path.match(value) !== undefined;
     }
     const re = value instanceof RegExp ? value : new RegExp(String(value));
     const target = (this as unknown as Record<string, unknown>)[filter];
@@ -82,11 +82,7 @@ export class RouteWrapper {
 
   /** @internal */
   get requirements(): Record<string, unknown> {
-    const out: Record<string, unknown> = Object.create(null);
-    for (const k of Object.keys(this.route.constraints)) out[k] = this.route.constraints[k];
-    out.controller = this.route.controller;
-    out.action = this.route.action;
-    return out;
+    return this.route.requirements;
   }
 
   get rackApp(): unknown {
@@ -94,9 +90,7 @@ export class RouteWrapper {
   }
 
   get path(): string {
-    const p = this.route.path;
-    if (!this.route.formatted || p.endsWith("/") || p.endsWith("(.:format)")) return p;
-    return `${p}(.:format)`;
+    return this.route.path.spec.toString();
   }
   get name(): string {
     return this.route.name ?? "";
@@ -105,14 +99,12 @@ export class RouteWrapper {
     return this.route.verb;
   }
   get controller(): string {
-    return this.route.pathParamNames.includes("controller")
+    return this.route.parts.includes("controller")
       ? ":controller"
       : (this.requirements.controller as string);
   }
   get action(): string {
-    return this.route.pathParamNames.includes("action")
-      ? ":action"
-      : (this.requirements.action as string);
+    return this.route.parts.includes("action") ? ":action" : (this.requirements.action as string);
   }
 
   get reqs(): string {
@@ -135,7 +127,7 @@ export class RouteWrapper {
 
   /** @internal */
   get sourceLocation(): string | undefined {
-    return undefined;
+    return this.route.sourceLocation ?? undefined;
   }
 }
 
@@ -149,13 +141,16 @@ export class RoutesInspector {
   }
 
   inspect(): InspectedRoute[] {
-    return this.routes.map((route) => ({
-      name: route.name ?? "",
-      verb: route.verb,
-      path: route.path,
-      controller: route.controller,
-      action: route.action,
-    }));
+    return this.routes.map((route) => {
+      const w = new RouteWrapper(route);
+      return {
+        name: w.name,
+        verb: w.verb,
+        path: w.path,
+        controller: w.controller,
+        action: w.action,
+      };
+    });
   }
 
   format(formatter: RoutesFormatter = new Sheet(), filter: RoutesFilter = {}): string {

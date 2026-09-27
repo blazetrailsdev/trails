@@ -1,4 +1,4 @@
-import { Notifications } from "@blazetrails/activesupport";
+import { Notifications, type SafeBuffer } from "@blazetrails/activesupport";
 
 import { ArgumentError, File, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
@@ -25,7 +25,7 @@ export class TemplateRenderer<Rendered = RenderedTemplate> extends AbstractRende
   render(context: ViewContext, options: RenderOptions): Rendered {
     this.details = this.extractDetails(options as Record<string, unknown>);
     const template = this.determineTemplate(options);
-    this.prependFormats(template.format ? [template.format] : null);
+    this.prependFormats(template.format);
     return this.renderTemplate(context, template, options.layout, options.locals ?? {});
   }
 
@@ -40,7 +40,7 @@ export class TemplateRenderer<Rendered = RenderedTemplate> extends AbstractRende
       return new Text(options.plain);
     }
     if (Object.prototype.hasOwnProperty.call(options, "html")) {
-      return new HTML(options.html, this.formats[0]) as unknown as RenderableTemplate;
+      return new HTML(options.html, this.formats[0]);
     }
     if (Object.prototype.hasOwnProperty.call(options, "file")) {
       if (File.isExist(options.file as string)) {
@@ -66,10 +66,10 @@ export class TemplateRenderer<Rendered = RenderedTemplate> extends AbstractRende
         handler,
         locals: keys,
         format,
-      }) as unknown as RenderableTemplate;
+      });
     }
     if (Object.prototype.hasOwnProperty.call(options, "renderable") && options.renderable) {
-      return new Renderable(options.renderable) as unknown as RenderableTemplate;
+      return new Renderable(options.renderable);
     }
     if (Object.prototype.hasOwnProperty.call(options, "template") && options.template != null) {
       const tmpl = options.template;
@@ -97,7 +97,7 @@ export class TemplateRenderer<Rendered = RenderedTemplate> extends AbstractRende
     locals: Record<string, unknown>,
   ): Rendered {
     return this.renderWithLayout(view, template, layoutName, locals, (layout) =>
-      Notifications.instrument<string>(
+      Notifications.instrument<string | SafeBuffer>(
         "render_template.action_view",
         {
           identifier: template.identifier,
@@ -105,7 +105,9 @@ export class TemplateRenderer<Rendered = RenderedTemplate> extends AbstractRende
           locals,
         },
         () =>
-          template.render(view, locals, null, {}, (...name) => view._layoutFor!(...name)) as string,
+          template.render(view, locals, null, {}, (...name) => view._layoutFor!(...name)) as
+            | string
+            | SafeBuffer,
       ),
     ) as unknown as Rendered;
   }
@@ -116,23 +118,23 @@ export class TemplateRenderer<Rendered = RenderedTemplate> extends AbstractRende
     template: RenderableTemplate,
     path: RenderOptions["layout"],
     locals: Record<string, unknown>,
-    block: (layout: RenderableTemplate | null) => string,
+    block: (layout: RenderableTemplate | null) => string | SafeBuffer,
   ): RenderedTemplate {
     const layout =
       path != null && path !== false
         ? this.findLayout(path, Object.keys(locals), [this.formats[0] as string])
         : null;
 
-    let body: string;
+    let body: string | SafeBuffer;
     if (layout) {
-      body = Notifications.instrument<string>(
+      body = Notifications.instrument<string | SafeBuffer>(
         "render_layout.action_view",
         { identifier: layout.identifier },
         () => {
           view.viewFlow?.set("layout", block(layout));
-          return layout.render(view, locals, null, {}, (...name) =>
-            view._layoutFor!(...name),
-          ) as string;
+          return layout.render(view, locals, null, {}, (...name) => view._layoutFor!(...name)) as
+            | string
+            | SafeBuffer;
         },
       );
     } else {

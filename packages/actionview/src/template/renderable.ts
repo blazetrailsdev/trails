@@ -1,4 +1,4 @@
-import { tryCall } from "@blazetrails/activesupport";
+import { tryCall, type SafeBuffer } from "@blazetrails/activesupport";
 import { ArgumentError, rbInspect } from "@blazetrails/ruby-compat";
 
 export class Renderable {
@@ -12,8 +12,13 @@ export class Renderable {
     return this.renderable == null ? "NilClass" : (this.renderable as object).constructor.name;
   }
 
-  render(context: unknown, ..._args: unknown[]): unknown {
-    const renderable = this.renderable as { renderIn?: (context: unknown) => unknown } | null;
+  render(
+    context: unknown,
+    ..._args: unknown[]
+  ): string | SafeBuffer | Promise<string | SafeBuffer> {
+    const renderable = this.renderable as {
+      renderIn?: (context: unknown) => string | SafeBuffer | Promise<string | SafeBuffer>;
+    } | null;
     try {
       return renderable!.renderIn!(context);
     } catch (error) {

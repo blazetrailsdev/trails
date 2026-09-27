@@ -111,8 +111,10 @@ describe("Mapper#nested under a singleton resource", () => {
     });
     const index = set
       .getRoutes()
-      .find((r) => r.action === "index" && r.controller.endsWith("infos"));
-    expect(index?.path).toBe("/session/infos");
+      .find(
+        (r) => r.defaults.action === "index" && String(r.defaults.controller).endsWith("infos"),
+      );
+    expect(index?.path.spec.toString()).toBe("/session/infos(.:format)");
     expect(index?.name).toBe("session_infos");
     expect((nestedConstraints as Record<string, unknown>)["session_id"]).toEqual(/\d+/);
   });
@@ -123,9 +125,9 @@ describe("Mapper#match hash form and multi-path arms", () => {
     const set = new RouteSet();
     new Mapper(set).match({ "/foo": "posts#index", ":via": "get" });
     const [route] = set.getRoutes();
-    expect(route.path).toBe("/foo(.:format)");
-    expect(route.controller).toBe("posts");
-    expect(route.action).toBe("index");
+    expect(route.path.spec.toString()).toBe("/foo(.:format)");
+    expect(route.defaults.controller).toBe("posts");
+    expect(route.defaults.action).toBe("index");
   });
 
   it("keys a multi-word Symbol option by its camelCase name", () => {
@@ -160,8 +162,8 @@ describe("Mapper#match hash form and multi-path arms", () => {
     m.controller("posts", () => m.match({ "/all": ":index", ":via": "get" }));
     m.match({ "/comments/:action": "comments", ":via": "get" });
     const [all, comments] = set.getRoutes();
-    expect([all.controller, all.action]).toEqual(["posts", "index"]);
-    expect(comments.controller).toBe("comments");
+    expect([all.defaults.controller, all.defaults.action]).toEqual(["posts", "index"]);
+    expect(comments.defaults.controller).toBe("comments");
   });
 
   it("maps every path of the multi-path form and warns that it is deprecated", () => {
@@ -176,7 +178,10 @@ describe("Mapper#match hash form and multi-path arms", () => {
     } finally {
       dep.behavior = previous;
     }
-    expect(set.getRoutes().map((r) => r.path)).toEqual(["/one(.:format)", "/two(.:format)"]);
+    expect(set.getRoutes().map((r) => r.path.spec.toString())).toEqual([
+      "/one(.:format)",
+      "/two(.:format)",
+    ]);
     expect(warnings[0]).toContain("Mapping a route with multiple paths is deprecated");
   });
 });
@@ -187,9 +192,9 @@ describe("Mapper HTTP verb helpers forward args through map_method", () => {
     const m = new Mapper(set);
     expect(m.get({ "/foo": "posts#index" })).toBe(m);
     const [route] = set.getRoutes();
-    expect(route.path).toBe("/foo(.:format)");
+    expect(route.path.spec.toString()).toBe("/foo(.:format)");
     expect(route.verb).toBe("GET");
-    expect([route.controller, route.action]).toEqual(["posts", "index"]);
+    expect([route.defaults.controller, route.defaults.action]).toEqual(["posts", "index"]);
   });
 
   it("maps every path of the multi-path form", () => {
@@ -203,7 +208,7 @@ describe("Mapper HTTP verb helpers forward args through map_method", () => {
     } finally {
       dep.behavior = previous;
     }
-    expect(set.getRoutes().map((r) => [r.verb, r.path])).toEqual([
+    expect(set.getRoutes().map((r) => [r.verb, r.path.spec.toString()])).toEqual([
       ["POST", "/one(.:format)"],
       ["POST", "/two(.:format)"],
     ]);

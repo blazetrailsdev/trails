@@ -38,7 +38,7 @@ function buildHost(named: Record<string, Route>, routesList: Route[] = Object.va
   return {
     routes,
     namedRoutes: {
-      has: (n: string) => Object.hasOwn(named, n),
+      isKey: (n: string) => Object.hasOwn(named, n),
       get: (n: string) => named[n],
     },
   };

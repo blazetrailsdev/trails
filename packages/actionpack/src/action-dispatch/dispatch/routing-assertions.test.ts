@@ -17,8 +17,8 @@ describe("ActionDispatch::Routing::Assertions", () => {
     });
     const m = routes.recognize("GET", "/posts/1");
     expect(m).not.toBeNull();
-    expect(m!.route.controller).toBe("posts");
-    expect(m!.route.action).toBe("show");
+    expect(m!.route.defaults.controller).toBe("posts");
+    expect(m!.route.defaults.action).toBe("show");
     expect(m!.params.id).toBe("1");
   });
 
@@ -29,7 +29,7 @@ describe("ActionDispatch::Routing::Assertions", () => {
     });
     expect(routes.pathFor({ id: 1 }, "post")).toBe("/posts/1");
     const m = routes.recognize("GET", "/posts/1");
-    expect(m!.route.controller).toBe("posts");
+    expect(m!.route.defaults.controller).toBe("posts");
   });
 
   it("with routing", () => {
