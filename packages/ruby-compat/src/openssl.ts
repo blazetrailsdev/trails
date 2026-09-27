@@ -6,15 +6,15 @@ import { SecureRandom } from "./secure-random.js";
 const AEAD_MODES = ["gcm", "ccm", "ocb", "chacha20-poly1305", "siv"];
 
 /**
- * `OpenSSL::Cipher` (`vendor/ruby/ext/openssl/lib/openssl/cipher.rb:16`), the
+ * `OpenSSL::Cipher` (`vendor/ruby/v3.3.11/ext/openssl/lib/openssl/cipher.rb:16`), the
  * sliver Rails drives (`message_encryptor.rb:276-290`).
  *
  * @noRailsEquivalent PERMANENT — Ruby's openssl extension
- * (`vendor/ruby/ext/openssl/lib/openssl/cipher.rb:16`), which Rails calls
+ * (`vendor/ruby/v3.3.11/ext/openssl/lib/openssl/cipher.rb:16`), which Rails calls
  * without defining.
  */
 export class Cipher {
-  /** @noRailsEquivalent PERMANENT — vendor/ruby/ext/openssl/ossl_cipher.c:355 */
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/ossl_cipher.c:355 */
   readonly name: string;
 
   private mode: "encrypt" | "decrypt" | null = null;
@@ -22,62 +22,62 @@ export class Cipher {
   private currentIv: Uint8Array | null = null;
   private impl: CipherAdapter | DecipherAdapter | null = null;
 
-  /** @noRailsEquivalent PERMANENT — vendor/ruby/ext/openssl/ossl_cipher.c:139 */
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/ossl_cipher.c:139 */
   constructor(name: string) {
     this.name = name;
   }
 
-  /** @noRailsEquivalent PERMANENT — vendor/ruby/ext/openssl/ossl_cipher.c:824 */
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/ossl_cipher.c:824 */
   get keyLen(): number {
     return this.cipherInfo().keyLength;
   }
 
-  /** @noRailsEquivalent PERMANENT — vendor/ruby/ext/openssl/ossl_cipher.c:868 */
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/ossl_cipher.c:868 */
   get ivLen(): number {
     return this.cipherInfo().ivLength;
   }
 
   /**
-   * `OpenSSL::Cipher#authenticated?` (`vendor/ruby/ext/openssl/ossl_cipher.c:547`),
+   * `OpenSSL::Cipher#authenticated?` (`vendor/ruby/v3.3.11/ext/openssl/ossl_cipher.c:547`),
    * `EVP_CIPH_FLAG_AEAD_CIPHER` on the cipher — the AEAD modes the adapter
    * names.
    *
-   * @noRailsEquivalent PERMANENT — vendor/ruby/ext/openssl/ossl_cipher.c:547
+   * @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/ossl_cipher.c:547
    */
   authenticated(): boolean {
     return AEAD_MODES.includes(this.cipherInfo().mode);
   }
 
-  /** @noRailsEquivalent PERMANENT — vendor/ruby/ext/openssl/ossl_cipher.c:283 */
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/ossl_cipher.c:283 */
   encrypt(): this {
     this.mode = "encrypt";
     return this;
   }
 
-  /** @noRailsEquivalent PERMANENT — vendor/ruby/ext/openssl/ossl_cipher.c:302 */
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/ossl_cipher.c:302 */
   decrypt(): this {
     this.mode = "decrypt";
     return this;
   }
 
-  /** @noRailsEquivalent PERMANENT — vendor/ruby/ext/openssl/ossl_cipher.c:840 */
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/ossl_cipher.c:840 */
   set key(key: Uint8Array) {
     this.currentKey = key;
   }
 
-  /** @noRailsEquivalent PERMANENT — vendor/ruby/ext/openssl/ossl_cipher.c:884 */
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/ossl_cipher.c:884 */
   set iv(iv: Uint8Array) {
     this.currentIv = iv;
   }
 
-  /** @noRailsEquivalent PERMANENT — vendor/ruby/ext/openssl/lib/openssl/cipher.rb:56 */
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/lib/openssl/cipher.rb:56 */
   randomIv(): Bytes {
     const str = SecureRandom.randomBytes(this.ivLen);
     this.currentIv = str;
     return str;
   }
 
-  /** @noRailsEquivalent PERMANENT — vendor/ruby/ext/openssl/ossl_cipher.c:920 */
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/ossl_cipher.c:920 */
   set authTag(tag: Uint8Array) {
     const impl = this.started();
     if (!impl.setAuthTag) {
@@ -86,7 +86,7 @@ export class Cipher {
     impl.setAuthTag(tag);
   }
 
-  /** @noRailsEquivalent PERMANENT — vendor/ruby/ext/openssl/ossl_cipher.c:898 */
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/ossl_cipher.c:898 */
   get authTag(): Bytes {
     const impl = this.started() as CipherAdapter;
     if (!impl.getAuthTag) {
@@ -95,7 +95,7 @@ export class Cipher {
     return impl.getAuthTag();
   }
 
-  /** @noRailsEquivalent PERMANENT — vendor/ruby/ext/openssl/ossl_cipher.c:958 */
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/ossl_cipher.c:958 */
   set authData(data: Uint8Array | string) {
     const impl = this.started();
     if (!impl.setAAD) {
@@ -104,12 +104,12 @@ export class Cipher {
     impl.setAAD(typeof data === "string" ? new TextEncoder().encode(data) : data);
   }
 
-  /** @noRailsEquivalent PERMANENT — vendor/ruby/ext/openssl/ossl_cipher.c:504 */
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/ossl_cipher.c:504 */
   update(data: Uint8Array): Bytes {
     return (this.started() as CipherAdapter).update(data);
   }
 
-  /** @noRailsEquivalent PERMANENT — vendor/ruby/ext/openssl/ossl_cipher.c:568 */
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/ossl_cipher.c:568 */
   final(): Bytes {
     return (this.started() as CipherAdapter).final();
   }
@@ -142,16 +142,16 @@ function digestName(digest: string | DigestInstance): string {
 }
 
 /**
- * `OpenSSL::HMAC` (`vendor/ruby/ext/openssl/lib/openssl/hmac.rb:4`), the two
+ * `OpenSSL::HMAC` (`vendor/ruby/v3.3.11/ext/openssl/lib/openssl/hmac.rb:4`), the two
  * class methods Rails calls (`request_forgery_protection.rb:466`,
  * `message_verifier.rb:353`).
  *
  * @noRailsEquivalent PERMANENT — Ruby's openssl extension
- * (`vendor/ruby/ext/openssl/lib/openssl/hmac.rb:4`), which Rails calls without
+ * (`vendor/ruby/v3.3.11/ext/openssl/lib/openssl/hmac.rb:4`), which Rails calls without
  * defining.
  */
 export const HMAC = {
-  /** @noRailsEquivalent PERMANENT — vendor/ruby/ext/openssl/lib/openssl/hmac.rb:34 */
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/lib/openssl/hmac.rb:34 */
   digest(
     digest: string | DigestInstance,
     key: string | Uint8Array,
@@ -160,7 +160,7 @@ export const HMAC = {
     return getCrypto().createHmac(digestName(digest), key).update(data).digest();
   },
 
-  /** @noRailsEquivalent PERMANENT — vendor/ruby/ext/openssl/lib/openssl/hmac.rb:56 */
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/lib/openssl/hmac.rb:56 */
   hexdigest(
     digest: string | DigestInstance,
     key: string | Uint8Array,
@@ -171,21 +171,21 @@ export const HMAC = {
 };
 
 /**
- * `OpenSSL` (`vendor/ruby/ext/openssl/lib/openssl.rb:16`), so a ported body
+ * `OpenSSL` (`vendor/ruby/v3.3.11/ext/openssl/lib/openssl.rb:16`), so a ported body
  * spells `OpenSSL::HMAC.digest` the way the Ruby does.
  *
  * @noRailsEquivalent PERMANENT — Ruby's openssl extension
- * (`vendor/ruby/ext/openssl/lib/openssl.rb:16`), which no Rails file defines.
+ * (`vendor/ruby/v3.3.11/ext/openssl/lib/openssl.rb:16`), which no Rails file defines.
  */
 export const OpenSSL = {
   Cipher,
   HMAC,
   Digest: {
-    /** @noRailsEquivalent PERMANENT — vendor/ruby/ext/openssl/ossl_digest.c:400 */
+    /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/ossl_digest.c:400 */
     MD5: new DigestClass("md5", "OpenSSL::Digest::MD5"),
-    /** @noRailsEquivalent PERMANENT — vendor/ruby/ext/openssl/ossl_digest.c:400 */
+    /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/ossl_digest.c:400 */
     SHA1: new DigestClass("sha1", "OpenSSL::Digest::SHA1"),
-    /** @noRailsEquivalent PERMANENT — vendor/ruby/ext/openssl/ossl_digest.c:400 */
+    /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/ossl_digest.c:400 */
     SHA256: new DigestClass("sha256", "OpenSSL::Digest::SHA256"),
   },
 };

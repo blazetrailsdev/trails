@@ -6,7 +6,7 @@ import { Generic } from "./generic.js";
 import type { SplitComponents } from "./rfc3986-parser.js";
 
 /**
- * `URI::REGEXP::PATTERN` (`vendor/ruby/lib/uri/rfc2396_parser.rb:19-54`), the
+ * `URI::REGEXP::PATTERN` (`vendor/ruby/v3.3.11/lib/uri/rfc2396_parser.rb:19-54`), the
  * RFC 2396 character classes `initialize_pattern` reads through
  * `PATTERN::`-qualified names.
  */
@@ -20,7 +20,7 @@ const DOMLABEL = `(?:[${ALNUM}](?:[-${ALNUM}]*[${ALNUM}])?)`;
 const TOPLABEL = `(?:[${ALPHA}](?:[-${ALNUM}]*[${ALNUM}])?)`;
 
 /**
- * Ruby's possessive `\A\s*+` (`vendor/ruby/lib/uri/rfc2396_parser.rb:500-501`)
+ * Ruby's possessive `\A\s*+` (`vendor/ruby/v3.3.11/lib/uri/rfc2396_parser.rb:500-501`)
  * as JS spells an atomic group: a lookahead that captures what it matched
  * followed by an immediate backreference, which matches once and never gives
  * any of it back. Without it the leading run is retried at every offset and a
@@ -32,7 +32,7 @@ const ATOMIC_LEADING_SPACE = "(?=(\\s*))\\1";
 
 const COMPONENT_GROUP_START = 2;
 
-/** `initialize_pattern`'s `opts` (`vendor/ruby/lib/uri/rfc2396_parser.rb:338-345`). */
+/** `initialize_pattern`'s `opts` (`vendor/ruby/v3.3.11/lib/uri/rfc2396_parser.rb:338-345`). */
 export interface RFC2396ParserOptions {
   ESCAPED?: string;
   UNRESERVED?: string;
@@ -43,28 +43,28 @@ export interface RFC2396ParserOptions {
 }
 
 /**
- * `URI::RFC2396_Parser` (`vendor/ruby/lib/uri/rfc2396_parser.rb:63`), the
+ * `URI::RFC2396_Parser` (`vendor/ruby/v3.3.11/lib/uri/rfc2396_parser.rb:63`), the
  * parser `URI::RFC2396_PARSER` and `URI::DEFAULT_PARSER` are instances of.
  * `join` / `extract` / `make_regexp` / `to_s` / `inspect`
  * (`rfc2396_parser.rb:220,246,265,325,331`) have no call site here.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `URI::RFC2396_Parser`
- * (`vendor/ruby/lib/uri/rfc2396_parser.rb:63`) ships with the interpreter.
+ * (`vendor/ruby/v3.3.11/lib/uri/rfc2396_parser.rb:63`) ships with the interpreter.
  */
 export class RFC2396Parser {
-  /** `@pattern` (`vendor/ruby/lib/uri/rfc2396_parser.rb:112`). */
+  /** `@pattern` (`vendor/ruby/v3.3.11/lib/uri/rfc2396_parser.rb:112`). */
   readonly pattern: Record<string, string>;
 
-  /** `@regexp` (`vendor/ruby/lib/uri/rfc2396_parser.rb:117`). */
+  /** `@regexp` (`vendor/ruby/v3.3.11/lib/uri/rfc2396_parser.rb:117`). */
   readonly regexp: Record<string, RegExp>;
 
-  /** `initialize` (`vendor/ruby/lib/uri/rfc2396_parser.rb:98`). */
+  /** `initialize` (`vendor/ruby/v3.3.11/lib/uri/rfc2396_parser.rb:98`). */
   constructor(opts: RFC2396ParserOptions = {}) {
     this.pattern = this.initializePattern(opts);
     this.regexp = this.initializeRegexp(this.pattern);
   }
 
-  /** `split` (`vendor/ruby/lib/uri/rfc2396_parser.rb:119`). */
+  /** `split` (`vendor/ruby/v3.3.11/lib/uri/rfc2396_parser.rb:119`). */
   split(uri: string): SplitComponents {
     let scheme: string | null = null;
     let opaque: string | null = null;
@@ -110,13 +110,13 @@ export class RFC2396Parser {
     return [scheme, userinfo, host, port, registry, path, opaque, query, fragment];
   }
 
-  /** `parse` (`vendor/ruby/lib/uri/rfc2396_parser.rb:205`). */
+  /** `parse` (`vendor/ruby/v3.3.11/lib/uri/rfc2396_parser.rb:205`). */
   parse(uri: string): Generic {
     return URI.for(...this.split(uri), this);
   }
 
   /**
-   * `escape` (`vendor/ruby/lib/uri/rfc2396_parser.rb:287`).
+   * `escape` (`vendor/ruby/v3.3.11/lib/uri/rfc2396_parser.rb:287`).
    *
    * The second `else if` arm is not in the Ruby: `gsub` replaces every match
    * whatever the Regexp is, where a JS `replace` replaces one unless the
@@ -138,7 +138,7 @@ export class RFC2396Parser {
   }
 
   /**
-   * `unescape` (`vendor/ruby/lib/uri/rfc2396_parser.rb:318`).
+   * `unescape` (`vendor/ruby/v3.3.11/lib/uri/rfc2396_parser.rb:318`).
    *
    * Ruby's block yields one raw byte per escape and tags the result with the
    * String's own encoding, so the bytes are accumulated across the whole
@@ -162,7 +162,7 @@ export class RFC2396Parser {
     return new TextDecoder().decode(new Uint8Array(bytes));
   }
 
-  /** `initialize_pattern` (`vendor/ruby/lib/uri/rfc2396_parser.rb:338`). */
+  /** `initialize_pattern` (`vendor/ruby/v3.3.11/lib/uri/rfc2396_parser.rb:338`). */
   private initializePattern(opts: RFC2396ParserOptions = {}): Record<string, string> {
     const ret: Record<string, string> = {};
     const escaped = (ret.ESCAPED = opts.ESCAPED ?? ESCAPED);
@@ -234,7 +234,7 @@ export class RFC2396Parser {
     return ret;
   }
 
-  /** `initialize_regexp` (`vendor/ruby/lib/uri/rfc2396_parser.rb:496`). */
+  /** `initialize_regexp` (`vendor/ruby/v3.3.11/lib/uri/rfc2396_parser.rb:496`). */
   private initializeRegexp(pattern: Record<string, string>): Record<string, RegExp> {
     const ret: Record<string, RegExp> = {};
 
@@ -263,7 +263,7 @@ export class RFC2396Parser {
   }
 
   /**
-   * `convert_to_uri` (`vendor/ruby/lib/uri/rfc2396_parser.rb:527`), which
+   * `convert_to_uri` (`vendor/ruby/v3.3.11/lib/uri/rfc2396_parser.rb:527`), which
    * `URI::Generic#merge` reaches through `__send__` (`generic.rb:1125`).
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails.

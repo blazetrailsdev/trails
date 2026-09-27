@@ -7,7 +7,7 @@ import { Zlib } from "./zlib.js";
  * at the call rather than at bundle time.
  *
  * @noRailsEquivalent PERMANENT — the platform seam under Ruby stdlib `Zlib`
- * (`vendor/ruby/ext/zlib/zlib.c:4659`); Rails calls `Zlib`, and neither Rails
+ * (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:4659`); Rails calls `Zlib`, and neither Rails
  * nor Ruby declares the backend registry a JS runtime needs.
  */
 export interface ZlibAdapter {
@@ -20,7 +20,7 @@ export interface ZlibAdapter {
 }
 
 /**
- * The object `::Zlib::GzipWriter.new` wraps (`vendor/ruby/ext/zlib/zlib.c:3841`
+ * The object `::Zlib::GzipWriter.new` wraps (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:3841`
  * `rb_gzwriter_initialize`) — anything that responds to `write`.
  *
  * @noRailsEquivalent PERMANENT
@@ -38,7 +38,7 @@ export interface GzipWriterHandle {
 }
 
 /**
- * The object `::Zlib::GzipReader.new` wraps (`vendor/ruby/ext/zlib/zlib.c:3944`
+ * The object `::Zlib::GzipReader.new` wraps (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:3944`
  * `rb_gzreader_initialize`) — anything that responds to `read(length)`, which
  * `gzfile_read_raw` pulls `GZFILE_READ_SIZE` bytes at a time from
  * (`zlib.c:2376,2542`).
@@ -51,7 +51,7 @@ export interface GzipReaderIO {
 
 /**
  * The inflate half of the streaming pair: `read` feeds the associated IO into
- * the zstream chunk by chunk (`gzfile_read_more`, `vendor/ruby/ext/zlib/zlib.c:2823`)
+ * the zstream chunk by chunk (`gzfile_read_more`, `vendor/ruby/v3.3.11/ext/zlib/zlib.c:2823`)
  * and answers what `gzfile_read_all` (`zlib.c:2946`) detaches.
  *
  * @noRailsEquivalent PERMANENT
@@ -61,14 +61,14 @@ export interface GzipReaderHandle {
 }
 
 /**
- * Ruby stdlib's `Zlib::GzipWriter` (`vendor/ruby/ext/zlib/zlib.c:3841`), the
+ * Ruby stdlib's `Zlib::GzipWriter` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:3841`), the
  * streaming counterpart of one-shot `Zlib.gzip` — `Rack::Deflater::GzipStream#each`
  * writes into it and reads the compressed bytes back through the io it wraps
- * (`vendor/rack/lib/rack/deflater.rb:101`). Node's gzip stream is asynchronous,
+ * (`vendor/rack/v3.1.14/lib/rack/deflater.rb:101`). Node's gzip stream is asynchronous,
  * so `finish` is awaited where Ruby's returns.
  *
  * @noRailsEquivalent PERMANENT — the platform seam under Ruby stdlib `Zlib`
- * (`vendor/ruby/ext/zlib/zlib.c:3841`); Rails calls `Zlib`, and neither Rails
+ * (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:3841`); Rails calls `Zlib`, and neither Rails
  * nor Ruby declares the backend registry a JS runtime needs.
  */
 export class GzipWriter implements GzipWriterHandle {
@@ -147,10 +147,10 @@ function syncBuiltinLoader(): ((id: string) => unknown) | null {
 
 /**
  * `gzfile_make_header` writes the mtime as a 4-byte little-endian field at
- * offset 4 of the 10-byte gzip header (`vendor/ruby/ext/zlib/zlib.c:2648,2672`).
+ * offset 4 of the 10-byte gzip header (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2648,2672`).
  * Node's `createGzip` has no option for it, so the backend patches the field
  * into the first emitted chunk — which carries that header — to reproduce
- * `Zlib::GzipWriter#mtime=` (`vendor/ruby/ext/zlib/zlib.c:3356`).
+ * `Zlib::GzipWriter#mtime=` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:3356`).
  */
 const GZIP_HEADER_LENGTH = 10;
 

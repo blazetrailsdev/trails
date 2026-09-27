@@ -3,7 +3,7 @@ import type { Bytes } from "./fs-adapter.js";
 import { NotImplementedError } from "./not-implemented-error.js";
 
 /**
- * `SecureRandom` (`vendor/ruby/lib/securerandom.rb:41`), extended with
+ * `SecureRandom` (`vendor/ruby/v3.3.11/lib/securerandom.rb:41`), extended with
  * `Random::Formatter` (`securerandom.rb:93`) so `random_bytes`, `hex` and
  * `uuid` are available on it the way every caller uses them.
  *
@@ -20,12 +20,12 @@ import { NotImplementedError } from "./not-implemented-error.js";
  * seat that constant without it.
  */
 export const SecureRandom = {
-  /** @noRailsEquivalent PERMANENT — vendor/ruby/lib/securerandom.rb:50 */
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/lib/securerandom.rb:50 */
   bytes(n: number): Bytes {
     return SecureRandom.genRandom(n);
   },
 
-  /** @noRailsEquivalent PERMANENT — vendor/ruby/lib/securerandom.rb:64 */
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/lib/securerandom.rb:64 */
   genRandom(n: number): Bytes {
     let ret: Bytes | undefined;
     try {
@@ -44,18 +44,18 @@ export const SecureRandom = {
     return ret;
   },
 
-  /** @noRailsEquivalent PERMANENT — vendor/ruby/lib/random/formatter.rb:72 */
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/lib/random/formatter.rb:72 */
   randomBytes(n: number | null = null): Bytes {
     n = n != null ? n : 16;
     return SecureRandom.genRandom(n);
   },
 
-  /** @noRailsEquivalent PERMANENT — vendor/ruby/lib/random/formatter.rb:93 */
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/lib/random/formatter.rb:93 */
   hex(n: number | null = null): string {
     return SecureRandom.randomBytes(n).toString("hex");
   },
 
-  /** @noRailsEquivalent PERMANENT — vendor/ruby/lib/random/formatter.rb:170 */
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/lib/random/formatter.rb:170 */
   uuid(): string {
     const bytes = SecureRandom.randomBytes(16);
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);

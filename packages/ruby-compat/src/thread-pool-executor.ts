@@ -6,10 +6,10 @@ import { Thread } from "./thread.js";
  * `connection_adapters/abstract/connection_pool.rb:716-726`). A task beyond
  * `maxThreads` waits in a queue of at most `maxQueue` (0 is unbounded), and one
  * beyond that runs on the caller (`fallback_policy: :caller_runs`). Each worker
- * is a `Thread.new` (`vendor/ruby/thread.c:897` `thread_s_new`).
+ * is a `Thread.new` (`vendor/ruby/v3.3.11/thread.c:897` `thread_s_new`).
  *
  * @noRailsEquivalent PERMANENT — concurrent-ruby `Concurrent::ThreadPoolExecutor`
- * (`vendor/ruby/thread.c:897`).
+ * (`vendor/ruby/v3.3.11/thread.c:897`).
  */
 export class ThreadPoolExecutor {
   private readonly minThreads: number;

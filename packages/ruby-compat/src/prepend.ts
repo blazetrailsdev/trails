@@ -10,8 +10,8 @@
  * module short-circuit or delegate via `originalFoo(...)` — the link arrives
  * bound to the receiver, as Ruby's `super` is.
  *
- * Mirrors: Ruby's `Module#prepend` — vendor/ruby/eval.c:1196
- * `rb_mod_prepend`, backed by vendor/ruby/class.c:1430 `rb_prepend_module` —
+ * Mirrors: Ruby's `Module#prepend` — vendor/ruby/v3.3.11/eval.c:1196
+ * `rb_mod_prepend`, backed by vendor/ruby/v3.3.11/class.c:1430 `rb_prepend_module` —
  * with the caveat that `super`
  * becomes an explicit first argument because TypeScript has no
  * language-level `super` equivalent for runtime-wrapped methods.
@@ -49,8 +49,8 @@ export interface PrependModule {
 const NO_METHOD_ROOT = function (): void {};
 
 /**
- * Mirrors: Ruby's Module#prepend — vendor/ruby/eval.c:1196 `rb_mod_prepend`,
- * backed by vendor/ruby/class.c:1430 `rb_prepend_module`.
+ * Mirrors: Ruby's Module#prepend — vendor/ruby/v3.3.11/eval.c:1196 `rb_mod_prepend`,
+ * backed by vendor/ruby/v3.3.11/class.c:1430 `rb_prepend_module`.
  *
  * @noRailsEquivalent PERMANENT — a Ruby core-language primitive, which Rails
  * uses but does not define.

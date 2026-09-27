@@ -1,7 +1,7 @@
 /**
- * Ruby's `empty?` — `Array#empty?` (`vendor/ruby/array.c:2686`
- * `rb_ary_empty_p`), `Hash#empty?` (`vendor/ruby/hash.c:3023`
- * `rb_hash_empty_p`) and `String#empty?` (`vendor/ruby/string.c:2243`
+ * Ruby's `empty?` — `Array#empty?` (`vendor/ruby/v3.3.11/array.c:2686`
+ * `rb_ary_empty_p`), `Hash#empty?` (`vendor/ruby/v3.3.11/hash.c:3023`
+ * `rb_hash_empty_p`) and `String#empty?` (`vendor/ruby/v3.3.11/string.c:2243`
  * `rb_str_empty`). All three are C primitives, so they have no counterpart
  * file for the port to mirror.
  *
@@ -18,7 +18,7 @@
  *
  * @internal
  * @noRailsEquivalent PERMANENT `empty?` is Ruby core, not Rails
- * (`vendor/ruby/array.c:2686`, `hash.c:3023`, `string.c:2243`), so it has no
+ * (`vendor/ruby/v3.3.11/array.c:2686`, `hash.c:3023`, `string.c:2243`), so it has no
  * counterpart file; it exists so a ported body emits the call the RFC 0047
  * call-set gate credits (blank.rb:96, 111).
  */

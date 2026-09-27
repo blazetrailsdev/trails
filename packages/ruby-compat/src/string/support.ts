@@ -7,7 +7,7 @@ import { TypeError } from "../type-error.js";
 /**
  * A `STRING_METHOD_TABLE` entry's receiver. A JS string is immutable, so a
  * destructive entry writes back to `string`, as `rb_str_update`
- * (`vendor/ruby/string.c:5378`) writes the receiver's bytes.
+ * (`vendor/ruby/v3.3.11/string.c:5378`) writes the receiver's bytes.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -16,7 +16,7 @@ export interface StringReceiver {
 }
 
 /**
- * Split a trailing block off `args` (`rb_block_given_p`, `vendor/ruby/eval.c:866`),
+ * Split a trailing block off `args` (`rb_block_given_p`, `vendor/ruby/v3.3.11/eval.c:866`),
  * for the methods whose MRI body takes one. JS has no block syntax apart from
  * its arguments, so a trailing function IS the block there; every other table
  * entry reads a function as an ordinary argument.
@@ -32,7 +32,7 @@ export function blockArg(args: unknown[]): [unknown[], ((...args: unknown[]) => 
 }
 
 /**
- * `rb_str_length` (`vendor/ruby/string.c:2211`): the character count.
+ * `rb_str_length` (`vendor/ruby/v3.3.11/string.c:2211`): the character count.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -41,7 +41,7 @@ export function strlen(str: string): number {
 }
 
 /**
- * `rb_str_sublen` (`vendor/ruby/string.c:2841`): a UTF-16 offset as a character offset.
+ * `rb_str_sublen` (`vendor/ruby/v3.3.11/string.c:2841`): a UTF-16 offset as a character offset.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -50,7 +50,7 @@ export function rbStrSublen(str: string, pos: number): number {
 }
 
 /**
- * `str_offset` (`vendor/ruby/string.c:2786`): a character offset as a UTF-16 offset.
+ * `str_offset` (`vendor/ruby/v3.3.11/string.c:2786`): a character offset as a UTF-16 offset.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -59,7 +59,7 @@ export function strOffset(str: string, pos: number): number {
 }
 
 /**
- * `StringValue` (`vendor/ruby/string.c:2551` `rb_string_value`): a String, or its `to_str`.
+ * `StringValue` (`vendor/ruby/v3.3.11/string.c:2551` `rb_string_value`): a String, or its `to_str`.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -71,7 +71,7 @@ export function stringValue(val: unknown): string {
 }
 
 /**
- * `rb_check_string_type` (`vendor/ruby/string.c:2690`): a String, its `to_str`, or nil.
+ * `rb_check_string_type` (`vendor/ruby/v3.3.11/string.c:2690`): a String, its `to_str`, or nil.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -83,7 +83,7 @@ export function rbCheckStringType(val: unknown): string | null {
 }
 
 /**
- * `NUM2LONG` (`vendor/ruby/numeric.c:3135` `rb_num2long`).
+ * `NUM2LONG` (`vendor/ruby/v3.3.11/numeric.c:3135` `rb_num2long`).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -94,7 +94,7 @@ export function num2long(val: unknown): number {
 }
 
 /**
- * `rb_error_arity` (`vendor/ruby/vm_insnhelper.c:466` `rb_arity_error_new`).
+ * `rb_error_arity` (`vendor/ruby/v3.3.11/vm_insnhelper.c:466` `rb_arity_error_new`).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -104,7 +104,7 @@ export function rbErrorArity(argc: number, min: number, max: number): never {
 }
 
 /**
- * `rb_check_arity` (`vendor/ruby/include/ruby/internal/intern/error.h:280`).
+ * `rb_check_arity` (`vendor/ruby/v3.3.11/include/ruby/internal/intern/error.h:280`).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -113,7 +113,7 @@ export function checkArity(argc: number, min: number, max: number): void {
 }
 
 /**
- * A bang form's nil-when-unchanged return (`vendor/ruby/string.c:7535` `rb_str_upcase_bang`).
+ * A bang form's nil-when-unchanged return (`vendor/ruby/v3.3.11/string.c:7535` `rb_str_upcase_bang`).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -124,7 +124,7 @@ export function bang(self: StringReceiver, string: string): string | null {
 }
 
 /**
- * `rb_reg_prepare_re` (`vendor/ruby/re.c:1587`): a pattern matched by character, not
+ * `rb_reg_prepare_re` (`vendor/ruby/v3.3.11/re.c:1587`): a pattern matched by character, not
  * UTF-16 unit, with `flags` added.
  *
  * @noRailsEquivalent PERMANENT
@@ -140,7 +140,7 @@ export function rbRegexp(re: RegExp, flags: string): RegExp {
 }
 
 /**
- * `rb_reg_search` (`vendor/ruby/re.c:1796`) from character offset `pos`, forward or reverse.
+ * `rb_reg_search` (`vendor/ruby/v3.3.11/re.c:1796`) from character offset `pos`, forward or reverse.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -165,7 +165,7 @@ export function rbRegSearch(
 }
 
 /**
- * `rb_reg_backref_number` (`vendor/ruby/re.c:1235`).
+ * `rb_reg_backref_number` (`vendor/ruby/v3.3.11/re.c:1235`).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -179,7 +179,7 @@ export function rbRegBackrefNumber(match: RegExpExecArray, backref: unknown): nu
 }
 
 /**
- * `get_pat_quoted` (`vendor/ruby/string.c:5698`): a Regexp as is, else a String
+ * `get_pat_quoted` (`vendor/ruby/v3.3.11/string.c:5698`): a Regexp as is, else a String
  * (or `to_str`) matched literally, else `Check_Type`'s `TypeError`.
  *
  * @noRailsEquivalent PERMANENT
@@ -194,7 +194,7 @@ export function getPatQuoted(pat: unknown): RegExp | string {
 }
 
 /**
- * `get_pat` (`vendor/ruby/string.c:5675`): {@link getPatQuoted}, with a String
+ * `get_pat` (`vendor/ruby/v3.3.11/string.c:5675`): {@link getPatQuoted}, with a String
  * compiled as a pattern (`rb_reg_regcomp`).
  *
  * @noRailsEquivalent PERMANENT
@@ -205,7 +205,7 @@ export function getPat(pat: unknown): RegExp {
 }
 
 /**
- * A literal String as the Regexp `rb_pat_search` (`vendor/ruby/string.c:5723`)
+ * A literal String as the Regexp `rb_pat_search` (`vendor/ruby/v3.3.11/string.c:5723`)
  * searches for it by.
  *
  * @noRailsEquivalent PERMANENT
@@ -215,7 +215,7 @@ export function literalRegexp(str: string): RegExp {
 }
 
 /**
- * `rb_range_beg_len` (`vendor/ruby/range.c:1744`), `err` 0 or 2.
+ * `rb_range_beg_len` (`vendor/ruby/v3.3.11/range.c:1744`), `err` 0 or 2.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -239,7 +239,7 @@ export function rbRangeBegLen(range: Range, len: number, err: number): [number, 
 }
 
 /**
- * `rb_str_cmp` (`vendor/ruby/string.c:3696`): byte order, then length. UTF-8
+ * `rb_str_cmp` (`vendor/ruby/v3.3.11/string.c:3696`): byte order, then length. UTF-8
  * byte order is code point order.
  *
  * @noRailsEquivalent PERMANENT

@@ -1,7 +1,7 @@
 import { Range } from "../range.js";
 
 /**
- * Ruby core `String#slice!` (`vendor/ruby/string.c:5588` `rb_str_slice_bang`): the
+ * Ruby core `String#slice!` (`vendor/ruby/v3.3.11/string.c:5588` `rb_str_slice_bang`): the
  * substring `str[*args]` selects — an Integer index, an index and length, a
  * `Range`, a `Regexp` (with an optional capture) or a String — removed from
  * the receiver. A JS string is immutable, so the remaining string is returned

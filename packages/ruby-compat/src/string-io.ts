@@ -15,7 +15,7 @@ import { print as ioPrint, puts as ioPuts } from "./io.js";
  * Ruby does.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `StringIO`
- * (`vendor/ruby/ext/stringio/stringio.c:1432`) ships with the interpreter, so
+ * (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:1432`) ships with the interpreter, so
  * no Rails file defines it and no port can remove the need for it while
  * `_parse_file` and `Rack::MockRequest` hand callers an IO.
  */
@@ -23,7 +23,7 @@ export class StringIO {
   private _string: string;
   private _pos = 0;
   private _closed = false;
-  /** `ptr->enc` (`vendor/ruby/ext/stringio/stringio.c:1823`). */
+  /** `ptr->enc` (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:1823`). */
   private enc: Encoding | null = null;
 
   constructor(string = "") {
@@ -39,13 +39,13 @@ export class StringIO {
   }
 
   /**
-   * `strio_read` (`vendor/ruby/ext/stringio/stringio.c:1539`). The `str` buffer
+   * `strio_read` (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:1539`). The `str` buffer
    * of its two-argument form (`stringio.c:1548-1552`) receives the bytes, and
    * at EOF Ruby empties it with `rb_str_resize(str, 0)` (`stringio.c:1561`)
    * before answering `nil`.
    *
    * A `Uint8Array` cannot be resized, so — exactly as {@link IO.read} already
-   * does for `io_read`'s identical `str` argument (`vendor/ruby/io.c:3800`) —
+   * does for `io_read`'s identical `str` argument (`vendor/ruby/v3.3.11/io.c:3800`) —
    * it is filled up to its own length instead, and zero-filled where Ruby
    * truncates. That deviation is recorded once there; this is the same fact
    * about the same buffer.
@@ -84,26 +84,26 @@ export class StringIO {
   }
 
   /**
-   * `IO::generic_writable#puts` (`vendor/ruby/ext/stringio/stringio.c:1530`
-   * aliases it to `rb_io_puts`, `vendor/ruby/io.c:8947`), which is how
+   * `IO::generic_writable#puts` (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:1530`
+   * aliases it to `rb_io_puts`, `vendor/ruby/v3.3.11/io.c:8947`), which is how
    * `Rack::Session::Abstract::Persisted#commit_session` writes to
    * `rack.errors`. One body, shared with `IO#puts` — see `./io.js`.
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails:
-   * `IO::generic_writable#puts` (`vendor/ruby/ext/stringio/stringio.c:1530`).
+   * `IO::generic_writable#puts` (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:1530`).
    */
   puts = ioPuts;
 
   /**
    * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails:
-   * `IO::generic_writable#print` (`vendor/ruby/ext/stringio/stringio.c:1956`
-   * aliases it to `rb_io_print`, `vendor/ruby/io.c:8715`).
+   * `IO::generic_writable#print` (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:1956`
+   * aliases it to `rb_io_print`, `vendor/ruby/v3.3.11/io.c:8715`).
    */
   print = ioPrint;
 
   /**
    * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `strio_flush`
-   * (`vendor/ruby/ext/stringio/stringio.c:1891`) returns the StringIO itself,
+   * (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:1891`) returns the StringIO itself,
    * which is how `Rack::ShowExceptions#call` flushes `rack.errors`.
    */
   flush(): this {
@@ -111,11 +111,11 @@ export class StringIO {
   }
 
   /**
-   * `strio_get_pos` (`vendor/ruby/ext/stringio/stringio.c:940`), the offset
+   * `strio_get_pos` (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:940`), the offset
    * {@link rewind} puts back to zero.
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `StringIO#pos`
-   * (`vendor/ruby/ext/stringio/stringio.c:940`).
+   * (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:940`).
    */
   get pos(): number {
     return this._pos;
@@ -127,14 +127,14 @@ export class StringIO {
   }
 
   /**
-   * `strio_binmode` (`vendor/ruby/ext/stringio/stringio.c:1863`) — it records
+   * `strio_binmode` (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:1863`) — it records
    * ASCII-8BIT on the stream and, when the StringIO is writable, associates it
    * with the buffer String, then answers the StringIO. The buffer already IS a
    * Ruby binary String (see the class comment), so the association is the
    * identity here, exactly as it is in {@link setEncoding}.
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `StringIO#binmode`
-   * (`vendor/ruby/ext/stringio/stringio.c:1879`).
+   * (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:1879`).
    */
   binmode(): this {
     this.enc = Encoding.ASCII_8BIT;
@@ -142,7 +142,7 @@ export class StringIO {
   }
 
   /**
-   * `strio_set_encoding` (`vendor/ruby/ext/stringio/stringio.c:1801`) in its
+   * `strio_set_encoding` (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:1801`) in its
    * one-argument form — the encoding is recorded on the stream and, when the
    * StringIO is writable, associated with the buffer String
    * (`stringio.c:1823-1826`); it answers the StringIO. `int_enc` and `opt` are
@@ -152,9 +152,9 @@ export class StringIO {
    * the class comment — so the association `rb_enc_associate` performs is the
    * identity here, and the recorded encoding is what
    * `Rack::Test::Utils.build_file_part`'s `set_encoding(Encoding::BINARY)`
-   * (`vendor/rack-test/lib/rack/test/utils.rb:148`) is asking for.
+   * (`vendor/rack-test/v2.2.0/lib/rack/test/utils.rb:148`) is asking for.
    *
-   * `rb_find_encoding` (`vendor/ruby/encoding.c:325-332`) answers a NULL
+   * `rb_find_encoding` (`vendor/ruby/v3.3.11/encoding.c:325-332`) answers a NULL
    * `rb_encoding *` for a name that resolves to `UNSPECIFIED_ENCODING` — the
    * `internal` alias while `Encoding.default_internal` is unset — and
    * `strio_set_encoding` then falls through the mode-string path to no
@@ -163,7 +163,7 @@ export class StringIO {
    * .external_encoding` is `#<Encoding:ASCII-8BIT>`).
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `StringIO#set_encoding`
-   * (`vendor/ruby/ext/stringio/stringio.c:1801`).
+   * (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:1801`).
    */
   setEncoding(extEnc: Encoding | string): this {
     this.enc = Encoding.find(extEnc) ?? Encoding.BINARY;
@@ -171,16 +171,16 @@ export class StringIO {
   }
 
   /**
-   * `strio_sysread` (`vendor/ruby/ext/stringio/stringio.c:1664`), which
+   * `strio_sysread` (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:1664`), which
    * `StringIO#readpartial` is defined as (`stringio.c:1949`): `read` with a
-   * `rb_eof_error()` (`vendor/ruby/io.c:756`) where that answers `nil` — the
+   * `rb_eof_error()` (`vendor/ruby/v3.3.11/io.c:756`) where that answers `nil` — the
    * member
    * `Rack::Test::UploadedFile#append_to`
-   * (`vendor/rack-test/lib/rack/test/uploaded_file.rb:64`) walks a StringIO
+   * (`vendor/rack-test/v2.2.0/lib/rack/test/uploaded_file.rb:64`) walks a StringIO
    * body with.
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `StringIO#readpartial`
-   * (`vendor/ruby/ext/stringio/stringio.c:1949`).
+   * (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:1949`).
    */
   readpartial(maxlen: number, outbuf?: Uint8Array | null): string {
     const ret = this.read(maxlen, outbuf);

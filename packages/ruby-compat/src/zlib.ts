@@ -3,18 +3,18 @@ import type { Tempfile } from "./tempfile.js";
 import { getZlib, type GzipReaderHandle, type GzipWriterHandle } from "./zlib-adapter.js";
 
 /**
- * `Zlib::GzipFile` (`vendor/ruby/ext/zlib/zlib.c:4838`). `gzfile_s_open`
+ * `Zlib::GzipFile` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:4838`). `gzfile_s_open`
  * (`zlib.c:3233`) opens `filename` in the subclass' mode and hands the stream
  * to `gzfile_wrap` (`zlib.c:3178`), which closes it on the way out of a block.
  */
 class GzipFile<IO extends { close(): void } = File> {
-  /** `cGzError` (`vendor/ruby/ext/zlib/zlib.c:4828`). */
+  /** `cGzError` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:4828`). */
   static Error = class Error extends globalThis.Error {};
 
-  /** `GZFILE_FLAG_HEADER_FINISHED` (`vendor/ruby/ext/zlib/zlib.c:2369`), set by `gzfile_make_header`. */
+  /** `GZFILE_FLAG_HEADER_FINISHED` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2369`), set by `gzfile_make_header`. */
   protected headerFinished = false;
 
-  /** `ZSTREAM_FLAG_READY` (`vendor/ruby/ext/zlib/zlib.c:575`), cleared by `zstream_end`. */
+  /** `ZSTREAM_FLAG_READY` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:575`), cleared by `zstream_end`. */
   protected zstreamReady = true;
 
   constructor(protected io: IO) {}
@@ -29,7 +29,7 @@ class GzipFile<IO extends { close(): void } = File> {
 }
 
 /**
- * `Zlib::GzipReader` (`vendor/ruby/ext/zlib/zlib.c:4877`); `open` is
+ * `Zlib::GzipReader` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:4877`); `open` is
  * `gzfile_s_open(argc, argv, klass, "rb")` (`zlib.c:3871`).
  */
 class GzipReader extends GzipFile<File> {
@@ -58,7 +58,7 @@ class GzipReader extends GzipFile<File> {
 }
 
 /**
- * `Zlib::GzipWriter` (`vendor/ruby/ext/zlib/zlib.c:4859`); `open` is
+ * `Zlib::GzipWriter` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:4859`); `open` is
  * `gzfile_s_open(argc, argv, klass, "wb")` (`zlib.c:3661`).
  */
 class GzipWriter extends GzipFile<File | Tempfile> {
@@ -71,7 +71,7 @@ class GzipWriter extends GzipFile<File | Tempfile> {
 
   /**
    * `rb_gzfile_mtime` / `rb_gzfile_set_mtime`
-   * (`vendor/ruby/ext/zlib/zlib.c:3356,3576`) — the MTIME field of the gzip
+   * (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:3356,3576`) — the MTIME field of the gzip
    * header, which `SchemaCache#open` zeroes so two dumps of the same cache are
    * byte-identical (`schema_cache.rb:468`).
    */
@@ -104,7 +104,7 @@ class GzipWriter extends GzipFile<File | Tempfile> {
     return new TextEncoder().encode(string).length;
   }
 
-  /** `rb_gzwriter_flush` (`vendor/ruby/ext/zlib/zlib.c:3720`). */
+  /** `rb_gzwriter_flush` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:3720`). */
   async flush(): Promise<this> {
     this.headerFinished = true;
     await this.z.flush();
@@ -120,7 +120,7 @@ class GzipWriter extends GzipFile<File | Tempfile> {
   }
 }
 
-/** `gzfile_ensure_close` (`vendor/ruby/ext/zlib/zlib.c:3165-3175`). */
+/** `gzfile_ensure_close` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:3165-3175`). */
 function gzfileEnsureClose(gz: GzipReader | GzipWriter): Promise<void> | void {
   if (gz["zstreamReady"]) {
     return gz.close();
@@ -139,23 +139,23 @@ async function gzfileWrap<G extends GzipReader | GzipWriter, T>(
 }
 
 /**
- * `Zlib` (`vendor/ruby/ext/zlib/zlib.c:4659`), the sliver of it trails calls.
+ * `Zlib` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:4659`), the sliver of it trails calls.
  *
  * Rails reaches this module from more than one file — `Zlib.crc32(db_name_hash)`
  * for the advisory-lock id in
- * `vendor/rails/activerecord/lib/active_record/migration.rb:1617`, and
+ * `vendor/rails/v8.0.2/activerecord/lib/active_record/migration.rb:1617`, and
  * `host % (Zlib.crc32(source) % 4)` in
- * `vendor/rails/actionview/lib/action_view/helpers/asset_url_helper.rb:295`
+ * `vendor/rails/v8.0.2/actionview/lib/action_view/helpers/asset_url_helper.rb:295`
  * (its `require "zlib"` at `asset_url_helper.rb:3`) — and Ruby has exactly one
  * `Zlib`, so trails has exactly one too.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib `Zlib`
- * (`vendor/ruby/ext/zlib/zlib.c:4659`), which Rails calls without defining, so
+ * (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:4659`), which Rails calls without defining, so
  * no Rails or gem file declares the module this file's single export lives in.
  */
 export const Zlib = {
   /**
-   * `vendor/ruby/ext/zlib/zlib.c:1004` — zlib.h's `Z_DEFAULT_COMPRESSION`, the
+   * `vendor/ruby/v3.3.11/ext/zlib/zlib.c:1004` — zlib.h's `Z_DEFAULT_COMPRESSION`, the
    * level `ActiveSupport::Gzip.compress` defaults to (`gzip.rb:32`).
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Zlib::DEFAULT_COMPRESSION`.
@@ -163,7 +163,7 @@ export const Zlib = {
   DEFAULT_COMPRESSION: -1,
 
   /**
-   * `vendor/ruby/ext/zlib/zlib.c:1035` — zlib.h's `Z_DEFAULT_STRATEGY`
+   * `vendor/ruby/v3.3.11/ext/zlib/zlib.c:1035` — zlib.h's `Z_DEFAULT_STRATEGY`
    * (`gzip.rb:32`).
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Zlib::DEFAULT_STRATEGY`.
@@ -171,35 +171,35 @@ export const Zlib = {
   DEFAULT_STRATEGY: 0,
 
   /**
-   * `vendor/ruby/ext/zlib/zlib.c:4827` `cGzipFile`.
+   * `vendor/ruby/v3.3.11/ext/zlib/zlib.c:4827` `cGzipFile`.
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Zlib::GzipFile`.
    */
   GzipFile,
 
   /**
-   * `vendor/ruby/ext/zlib/zlib.c:4877` `rb_cGzipReader`.
+   * `vendor/ruby/v3.3.11/ext/zlib/zlib.c:4877` `rb_cGzipReader`.
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Zlib::GzipReader`.
    */
   GzipReader,
 
   /**
-   * `vendor/ruby/ext/zlib/zlib.c:4859` `rb_cGzipWriter`.
+   * `vendor/ruby/v3.3.11/ext/zlib/zlib.c:4859` `rb_cGzipWriter`.
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Zlib::GzipWriter`.
    */
   GzipWriter,
 
   /**
-   * `vendor/ruby/ext/zlib/zlib.c:507` `rb_zlib_crc32`, which is
+   * `vendor/ruby/v3.3.11/ext/zlib/zlib.c:507` `rb_zlib_crc32`, which is
    * `do_checksum(argc, argv, crc32)` (`zlib.c:410`): `crc` seeds `sum`, an
    * omitted `string` answers that seed unchanged (`zlib.c:428`), and otherwise
    * `sum` is folded over the String's BYTES (`zlib.c:441`) — so a multibyte
    * String is digested as its UTF-8 encoding.
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Zlib.crc32`
-   * (`vendor/ruby/ext/zlib/zlib.c:507`).
+   * (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:507`).
    */
   crc32(string = "", crc = 0): number {
     let sum = ~crc >>> 0;

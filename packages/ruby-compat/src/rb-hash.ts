@@ -1,8 +1,8 @@
 /**
- * Ruby's `Object#hash` (`vendor/ruby/object.c:4375`, `rb_define_method(rb_mKernel,
+ * Ruby's `Object#hash` (`vendor/ruby/v3.3.11/object.c:4375`, `rb_define_method(rb_mKernel,
  * "hash", rb_obj_hash, 0)`), with the `Array#hash`
- * (`vendor/ruby/array.c:5205` `rb_ary_hash`) and `String#hash`
- * (`vendor/ruby/string.c:3629` `rb_str_hash`) arms the ports send — the value
+ * (`vendor/ruby/v3.3.11/array.c:5205` `rb_ary_hash`) and `String#hash`
+ * (`vendor/ruby/v3.3.11/string.c:3629` `rb_str_hash`) arms the ports send — the value
  * every `eql?`-pairing `hash` body composes with. Ported node bodies spell
  * `[self.class, @left, @right].hash`, and JS has no `hash` on Object, Array,
  * String or Class at all, so one copy serves every ported `hash`.
@@ -11,7 +11,7 @@
  * alike, and an object whose class defines no `hash` falls back to identity.
  *
  * @noRailsEquivalent PERMANENT — `Object#hash` / `Array#hash` / `String#hash`
- *   are C primitives (`vendor/ruby/object.c:4375`, `array.c:5205`,
+ *   are C primitives (`vendor/ruby/v3.3.11/object.c:4375`, `array.c:5205`,
  *   `string.c:3629`), not Ruby methods, so they have no counterpart file.
  */
 export function rbHash(value: unknown): number {
@@ -27,7 +27,7 @@ export function rbHash(value: unknown): number {
     case "symbol":
       return stringHash(String(value));
     case "function":
-      /* A class object — Ruby's `self.class.hash` (`vendor/ruby/object.c:4375`). */
+      /* A class object — Ruby's `self.class.hash` (`vendor/ruby/v3.3.11/object.c:4375`). */
       return stringHash(`class:${value.name}`);
   }
   if (Array.isArray(value)) {
@@ -52,14 +52,14 @@ export function rbHash(value: unknown): number {
   }
   /* A value object whose Ruby `==` is `equals` (Temporal, Duration) has to hash
      by that same value, or two `==` objects land in different buckets — Ruby's
-     `hash`/`eql?` contract (`vendor/ruby/object.c:4375`). */
+     `hash`/`eql?` contract (`vendor/ruby/v3.3.11/object.c:4375`). */
   if (typeof (value as { equals?: unknown }).equals === "function") {
     return stringHash(`${(value as object).constructor.name}(${String(value)})`);
   }
   /* boundary: a JS Date reaches a ported `hash` the same way it reaches
      `rbEqual`, and Ruby hashes it by value. */
   if (value instanceof Date) return stringHash(`Date(${value.toISOString()})`);
-  /* A Ruby Hash, whose `hash` (`vendor/ruby/hash.c:3865` `rb_hash_hash`) folds
+  /* A Ruby Hash, whose `hash` (`vendor/ruby/v3.3.11/hash.c:3865` `rb_hash_hash`) folds
      every key and value; the sort keeps it insertion-order independent, as
      Ruby's is. It has two JS seats — a plain object and a `Map` — and `rbEqual`
      answers true across them, so both must hash alike or the `hash`/`eql?`
@@ -90,7 +90,7 @@ const identityHashes = new WeakMap<object, number>();
 let nextIdentityHash = 1;
 
 /**
- * `Kernel#hash`'s identity arm (`vendor/ruby/hash.c:344` `rb_obj_hash`, over
+ * `Kernel#hash`'s identity arm (`vendor/ruby/v3.3.11/hash.c:344` `rb_obj_hash`, over
  * `objid_hash`): a per-object Integer that `super` from a `hash` override
  * reaches.
  *

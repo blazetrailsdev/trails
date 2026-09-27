@@ -1,7 +1,7 @@
 import { Exception } from "./exception.js";
 
 /**
- * Ruby's core `StandardError` (`vendor/ruby/error.c:3319` `rb_eStandardError`)
+ * Ruby's core `StandardError` (`vendor/ruby/v3.3.11/error.c:3319` `rb_eStandardError`)
  * — the root of the ordinary rescuable hierarchy, and what a bare
  * `raise StandardError, "message"` builds.
  *

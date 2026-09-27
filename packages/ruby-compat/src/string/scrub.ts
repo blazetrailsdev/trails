@@ -2,7 +2,7 @@ import { ArgumentError } from "../argument-error.js";
 import { bytes, sequenceLength } from "./bytes.js";
 
 /**
- * `String#scrub` (`vendor/ruby/string.c:11354` `str_scrub`, over
+ * `String#scrub` (`vendor/ruby/v3.3.11/string.c:11354` `str_scrub`, over
  * `enc_str_scrub` at `:11104`): every invalid UTF-8 byte sequence of `str`,
  * in the byte convention {@link bytes} documents, replaced by `repl`, by what
  * `block` answers for it, or by `"�"`. A truncated but otherwise

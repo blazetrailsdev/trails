@@ -6,56 +6,56 @@ interface SystemCallError extends Error {
 }
 
 /**
- * `Process` (`vendor/ruby/process.c:9129` `rb_mProcess`), the sliver of it
+ * `Process` (`vendor/ruby/v3.3.11/process.c:9129` `rb_mProcess`), the sliver of it
  * trails calls.
  *
  * Every elapsed-time measurement in Rails is
  * `Process.clock_gettime(Process::CLOCK_MONOTONIC)` — 28 call sites, from
  * `ConnectionPool::Queue#internal_poll`
- * (`vendor/rails/activerecord/lib/active_record/connection_adapters/abstract/connection_pool/queue.rb:114`)
+ * (`vendor/rails/v8.0.2/activerecord/lib/active_record/connection_adapters/abstract/connection_pool/queue.rb:114`)
  * to `Notifications::Instrumenter#monotonic_now`
- * (`vendor/rails/activesupport/lib/active_support/notifications/instrumenter.rb:204`)
+ * (`vendor/rails/v8.0.2/activesupport/lib/active_support/notifications/instrumenter.rb:204`)
  * — so trails measures elapsed time through a module of the same name rather
  * than through a bare `performance.now()` that reads as neither.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Process`
- * (`vendor/ruby/process.c:9129`), which Rails calls without defining, so no
+ * (`vendor/ruby/v3.3.11/process.c:9129`), which Rails calls without defining, so no
  * Rails or gem file declares the module this file's export lives in.
  */
 export class Process {
   /**
-   * `vendor/ruby/process.c:9404` — the clock that cannot go backwards, which is
+   * `vendor/ruby/v3.3.11/process.c:9404` — the clock that cannot go backwards, which is
    * every Rails elapsed-time measurement's clock id.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Process::CLOCK_MONOTONIC`
-   * (`vendor/ruby/process.c:9404`).
+   * (`vendor/ruby/v3.3.11/process.c:9404`).
    */
   static readonly CLOCK_MONOTONIC = ":CLOCK_MONOTONIC";
 
   /**
-   * `vendor/ruby/process.c:9422` — the calling thread's CPU time, which
+   * `vendor/ruby/v3.3.11/process.c:9422` — the calling thread's CPU time, which
    * `Instrumenter#cpu_time` reads (`instrumenter.rb:208`).
    *
    * @noRailsEquivalent PERMANENT — Ruby core
-   * `Process::CLOCK_THREAD_CPUTIME_ID` (`vendor/ruby/process.c:9422`).
+   * `Process::CLOCK_THREAD_CPUTIME_ID` (`vendor/ruby/v3.3.11/process.c:9422`).
    */
   static readonly CLOCK_THREAD_CPUTIME_ID = ":CLOCK_THREAD_CPUTIME_ID";
 
   /**
-   * `vendor/ruby/process.c:9195`, where `rb_mProcess` registers
+   * `vendor/ruby/v3.3.11/process.c:9195`, where `rb_mProcess` registers
    * `proc_get_pid` (`process.c:530`) as `Process.pid` — `getpid(2)`, which
    * `Dir::Tmpname.create` stamps into a candidate name as `$$`
-   * (`vendor/ruby/lib/tmpdir.rb:154`).
+   * (`vendor/ruby/v3.3.11/lib/tmpdir.rb:154`).
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Process.pid`
-   * (`vendor/ruby/process.c:530`).
+   * (`vendor/ruby/v3.3.11/process.c:530`).
    */
   static get pid(): number {
     return getProcessAdapter().pid();
   }
 
   /**
-   * `vendor/ruby/process.c:8283` `rb_clock_gettime`, which reads the tick for
+   * `vendor/ruby/v3.3.11/process.c:8283` `rb_clock_gettime`, which reads the tick for
    * `clockId` and then hands it to `make_clock_result` for `unit`.
    *
    * `CLOCK_THREAD_CPUTIME_ID` reads the monotonic tick — `performance.now()` is
@@ -64,7 +64,7 @@ export class Process {
    * `Errno::EINVAL` MRI answers for one the host does not implement.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Process.clock_gettime`
-   * (`vendor/ruby/process.c:8283`).
+   * (`vendor/ruby/v3.3.11/process.c:8283`).
    */
   static clockGettime(clockId: string, unit = ":float_second"): number {
     if (clockId !== Process.CLOCK_MONOTONIC && clockId !== Process.CLOCK_THREAD_CPUTIME_ID) {
@@ -77,7 +77,7 @@ export class Process {
 }
 
 /**
- * `make_clock_result` (`vendor/ruby/process.c:8048-8080`) — seven unit arms and
+ * `make_clock_result` (`vendor/ruby/v3.3.11/process.c:8048-8080`) — seven unit arms and
  * a raise, over a tick trails already holds as float milliseconds. The four
  * Integer arms go through `timetick2integer` (`process.c:8000`), whose `/` is
  * Ruby's integer division, and the three Float arms through `timetick2dblnum`.

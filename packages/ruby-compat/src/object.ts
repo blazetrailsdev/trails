@@ -6,7 +6,7 @@ import { NameError } from "./name-error.js";
 import { NoMethodError } from "./no-method-error.js";
 
 /**
- * `rb_obj_class` (`vendor/ruby/object.c:296`) over the values trails carries:
+ * `rb_obj_class` (`vendor/ruby/v3.3.11/object.c:296`) over the values trails carries:
  * the immediates Ruby answers a class for without a heap object, the
  * {@link rubyClass} brand, and otherwise the constructor's own name.
  *
@@ -14,7 +14,7 @@ import { NoMethodError } from "./no-method-error.js";
  *  which one it is is read off the value; a Temporal value carrying an instant
  *  is a Ruby `Time`, by the same reading `cmp` orders it with.
  *
- * @noRailsEquivalent PERMANENT — Ruby core `rb_obj_class` (`vendor/ruby/object.c:296`).
+ * @noRailsEquivalent PERMANENT — Ruby core `rb_obj_class` (`vendor/ruby/v3.3.11/object.c:296`).
  */
 export function rbObjClass(x: unknown): string {
   if (x === null || x === undefined) return "NilClass";
@@ -41,15 +41,15 @@ function hasEpochNanoseconds(value: unknown): value is { epochNanoseconds: bigin
 const FL_SINGLETON = Symbol.for("@blazetrails/ruby-compat:FL_SINGLETON");
 
 /**
- * `rb_obj_singleton_class` (`vendor/ruby/object.c:288`), Ruby's
- * `Kernel#singleton_class`, over `singleton_class_of` (`vendor/ruby/class.c:2215`):
+ * `rb_obj_singleton_class` (`vendor/ruby/v3.3.11/object.c:288`), Ruby's
+ * `Kernel#singleton_class`, over `singleton_class_of` (`vendor/ruby/v3.3.11/class.c:2215`):
  * the receiver's own class, created on first call and inserted between the
  * object and its class. The JS seat is a subclass of `obj.constructor` that
  * becomes the object's prototype. Its `prototype.constructor` stays the
  * attached object's class, because `rb_obj_class` skips a singleton class
- * (`vendor/ruby/object.c:296`): `obj.constructor` keeps answering Ruby's
+ * (`vendor/ruby/v3.3.11/object.c:296`): `obj.constructor` keeps answering Ruby's
  * `obj.class`. Ruby gives a class receiver a metaclass
- * (`vendor/ruby/class.c:2240`); a JS class has none apart from its own
+ * (`vendor/ruby/v3.3.11/class.c:2240`); a JS class has none apart from its own
  * statics, so a class receiver is unsupported here and raises `TypeError`,
  * a trails limitation rather than Ruby behavior.
  *
@@ -75,7 +75,7 @@ export function rbObjSingletonClass(obj: object): abstract new (...args: never) 
 }
 
 /**
- * `rb_mod_singleton_p` (`vendor/ruby/object.c:3050`), `Module#singleton_class?`.
+ * `rb_mod_singleton_p` (`vendor/ruby/v3.3.11/object.c:3050`), `Module#singleton_class?`.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -84,7 +84,7 @@ export function rbModSingletonP(klass: unknown): boolean {
 }
 
 /**
- * `rb_mod_to_s` (`vendor/ruby/object.c:1710-1742`), `Module#to_s` /
+ * `rb_mod_to_s` (`vendor/ruby/v3.3.11/object.c:1710-1742`), `Module#to_s` /
  * `Module#inspect`: a singleton class renders `#<Class:` plus its attached
  * object — `rb_inspect` for a class or module, `rb_any_to_s` otherwise — and
  * `>`; any other class renders its name. Ruby's refinement arm has no JS seat.
@@ -109,7 +109,7 @@ export function rbModToS(klass: abstract new (...args: never) => unknown): strin
 }
 
 /**
- * `basic_obj_respond_to` (`vendor/ruby/vm_method.c:2864`) — the default
+ * `basic_obj_respond_to` (`vendor/ruby/v3.3.11/vm_method.c:2864`) — the default
  * `Object#respond_to?`, which answers whether the receiver's class defines the
  * method. A JS object answers a name whether it carries a method or a
  * property, so the prototype-chain lookup is the whole `method_boundp` here,
@@ -134,7 +134,7 @@ export function rbModToS(klass: abstract new (...args: never) => unknown): strin
  * the entry's is what {@link rbModPrivate} / {@link rbModProtected} recorded.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `basic_obj_respond_to`
- * (`vendor/ruby/vm_method.c:2864`).
+ * (`vendor/ruby/v3.3.11/vm_method.c:2864`).
  */
 export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true): boolean {
   if (typeof obj === "string" && mid === "toStr") return true;
@@ -221,12 +221,12 @@ function lookupSetter(obj: object, name: string): ((value: unknown) => unknown) 
 }
 
 /**
- * `Module#private` with method names (`rb_mod_private`, `vendor/ruby/vm_method.c:2516`,
+ * `Module#private` with method names (`rb_mod_private`, `vendor/ruby/v3.3.11/vm_method.c:2516`,
  * through `set_method_visibility`, `:2388`): records each instance method of
  * `module` as PRIVATE, where {@link basicObjRespondTo} and {@link rbFPublicSend}
  * read it. A JS accessor's setter answers the Ruby writer `name=`.
  *
- * @noRailsEquivalent PERMANENT — Ruby core `Module#private` (`vendor/ruby/vm_method.c:2516`).
+ * @noRailsEquivalent PERMANENT — Ruby core `Module#private` (`vendor/ruby/v3.3.11/vm_method.c:2516`).
  */
 export function rbModPrivate(module: { prototype: object; name: string }, ...mids: string[]): void {
   setMethodVisibility(module, mids, "private");
@@ -234,9 +234,9 @@ export function rbModPrivate(module: { prototype: object; name: string }, ...mid
 
 /**
  * `Module#protected` with method names (`rb_mod_protected`,
- * `vendor/ruby/vm_method.c:2482`); see {@link rbModPrivate}.
+ * `vendor/ruby/v3.3.11/vm_method.c:2482`); see {@link rbModPrivate}.
  *
- * @noRailsEquivalent PERMANENT — Ruby core `Module#protected` (`vendor/ruby/vm_method.c:2482`).
+ * @noRailsEquivalent PERMANENT — Ruby core `Module#protected` (`vendor/ruby/v3.3.11/vm_method.c:2482`).
  */
 export function rbModProtected(
   module: { prototype: object; name: string },
@@ -246,25 +246,25 @@ export function rbModProtected(
 }
 
 /**
- * `Kernel#public_send` (`rb_f_public_send`, `vendor/ruby/vm_eval.c:1350`): `send`
+ * `Kernel#public_send` (`rb_f_public_send`, `vendor/ruby/v3.3.11/vm_eval.c:1350`): `send`
  * restricted to public methods, so a PRIVATE or PROTECTED entry raises
  * `NoMethodError` instead of being called. The nearest entry answers: a writer
  * `name=` is either a `name=` method or a JS accessor's `name` setter. An
  * unbound name goes to the receiver's `method_missing`.
  *
- * @noRailsEquivalent PERMANENT — Ruby core `Kernel#public_send` (`vendor/ruby/vm_eval.c:1350`).
+ * @noRailsEquivalent PERMANENT — Ruby core `Kernel#public_send` (`vendor/ruby/v3.3.11/vm_eval.c:1350`).
  */
 export function rbFPublicSend(recv: unknown, mid: string, ...args: unknown[]): unknown {
   return sendInternal(args.length, [mid, ...args], recv, "public");
 }
 
 /**
- * `Kernel#send` (`rb_f_send`, `vendor/ruby/vm_eval.c:1330`): calls the nearest
+ * `Kernel#send` (`rb_f_send`, `vendor/ruby/v3.3.11/vm_eval.c:1330`): calls the nearest
  * entry for `mid` whatever its visibility. A zero-argument reader ported as a
  * JS accessor or a field answers through its getter or its value, as the Ruby
  * reader it ports would.
  *
- * @noRailsEquivalent PERMANENT — Ruby core `Kernel#send` (`vendor/ruby/vm_eval.c:1330`).
+ * @noRailsEquivalent PERMANENT — Ruby core `Kernel#send` (`vendor/ruby/v3.3.11/vm_eval.c:1330`).
  */
 export function rbFSend(recv: unknown, mid: string, ...args: unknown[]): unknown {
   return sendInternal(args.length, [mid, ...args], recv, "fcall");
@@ -307,7 +307,7 @@ function sendInternal(
 type AnyFunction = (...args: unknown[]) => unknown;
 
 /**
- * `rb_obj_respond_to` (`vendor/ruby/vm_method.c:2934`) — the SEND of
+ * `rb_obj_respond_to` (`vendor/ruby/v3.3.11/vm_method.c:2934`) — the SEND of
  * `respond_to?`, which `vm_respond_to` (`vm_method.c:2882`) routes through an
  * overridden `respond_to?` when the receiver's class defines one (as
  * `ActiveModel::AttributeMethods` does) — passing the private-methods argument
@@ -317,7 +317,7 @@ type AnyFunction = (...args: unknown[]) => unknown;
  * by a property read a `method_missing` Proxy's `get` trap would answer.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `rb_obj_respond_to`
- * (`vendor/ruby/vm_method.c:2934`).
+ * (`vendor/ruby/v3.3.11/vm_method.c:2934`).
  */
 export function rbObjRespondTo(obj: unknown, mid: string, priv: boolean = false): boolean {
   let me: PropertyDescriptor | undefined;
@@ -339,13 +339,13 @@ export function rbObjRespondTo(obj: unknown, mid: string, priv: boolean = false)
 }
 
 /**
- * `rb_builtin_class_name` (`vendor/ruby/error.c:1216`), which the conversion
+ * `rb_builtin_class_name` (`vendor/ruby/v3.3.11/error.c:1216`), which the conversion
  * errors name their operand by: `builtin_class_name` (`error.c:1189`) answers
  * the LOWERCASE `"nil"` / `"true"` / `"false"` for those three immediates —
  * `Float(nil)` is `can't convert nil into Float`, not `NilClass` — and
  * everything else falls through to {@link rbObjClass}.
  *
- * @noRailsEquivalent PERMANENT — Ruby core `rb_builtin_class_name` (`vendor/ruby/error.c:1216`).
+ * @noRailsEquivalent PERMANENT — Ruby core `rb_builtin_class_name` (`vendor/ruby/v3.3.11/error.c:1216`).
  */
 export function rbBuiltinClassName(x: unknown): string {
   if (x === null || x === undefined) return "nil";
@@ -355,23 +355,23 @@ export function rbBuiltinClassName(x: unknown): string {
 }
 
 /**
- * `rb_inspect` (`vendor/ruby/object.c:704`) over the core classes a JS value
+ * `rb_inspect` (`vendor/ruby/v3.3.11/object.c:704`) over the core classes a JS value
  * can be: `nil`, `true` / `false`, Integer and Float, Symbol, String, Array and
  * Hash. Anything else falls through to the receiver's own `inspect`.
  *
  * The default arm is `to_s`, not Ruby's `#<Foo:0x… @a=1>` (`rb_obj_inspect`,
- * `vendor/ruby/object.c:764`): reproducing that needs an object id JS does not
+ * `vendor/ruby/v3.3.11/object.c:764`): reproducing that needs an object id JS does not
  * expose. Callers hand this plain data structures only, so the arm is unreached
  * today — a caller that does pass a class instance gets its `to_s`.
  *
- * @noRailsEquivalent PERMANENT — Ruby core `rb_inspect` (`vendor/ruby/object.c:704`).
+ * @noRailsEquivalent PERMANENT — Ruby core `rb_inspect` (`vendor/ruby/v3.3.11/object.c:704`).
  */
 export function rbInspect(value: unknown): string {
   return inspectValue(value, new Set());
 }
 
 /**
- * `rb_obj_inspect` (`vendor/ruby/object.c:783-795`), Ruby's `Kernel#inspect`:
+ * `rb_obj_inspect` (`vendor/ruby/v3.3.11/object.c:783-795`), Ruby's `Kernel#inspect`:
  * `#<Class:0x… @ivar=value, …>`, or `rb_any_to_s` when there are no ivars.
  * A trails field `fooBar` / `_fooBar` is Ruby's `@foo_bar`. JS exposes no
  * object address, so each object is assigned a stable one on first inspection.
@@ -400,10 +400,10 @@ export function rbObjInspect(obj: object): string {
 }
 
 /**
- * `rb_any_to_s` (`vendor/ruby/object.c:693-701`), `Kernel#to_s`:
+ * `rb_any_to_s` (`vendor/ruby/v3.3.11/object.c:693-701`), `Kernel#to_s`:
  * `#<Class:0x…>`. JS exposes no object address, so each object is assigned a
  * stable one on first use. A JS function is Ruby's `Proc`, whose `to_s`
- * (`proc_to_s`, `vendor/ruby/proc.c:1595`) opens the same way.
+ * (`proc_to_s`, `vendor/ruby/v3.3.11/proc.c:1595`) opens the same way.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -418,7 +418,7 @@ export function rbAnyToS(obj: object): string {
 }
 
 /**
- * `rb_obj_id` (`vendor/ruby/gc.c:4975`), `Kernel#object_id`: a stable integer
+ * `rb_obj_id` (`vendor/ruby/v3.3.11/gc.c:4975`), `Kernel#object_id`: a stable integer
  * handed out on first use by `rb_find_object_id` (`gc.c:4883`), starting at
  * `OBJ_ID_INITIAL` and `OBJ_ID_INCREMENT` apart (`gc.c:3826-3827`, a 40-byte
  * `RVALUE` on 64-bit).
@@ -445,7 +445,7 @@ let nextObjAddress = 0x7f0000000000;
 
 /**
  * The dispatch under the `rb_exec_recursive` stack its collection arms are
- * wrapped in (`vendor/ruby/hash.c:3487`, `vendor/ruby/array.c:2918`).
+ * wrapped in (`vendor/ruby/v3.3.11/hash.c:3487`, `vendor/ruby/v3.3.11/array.c:2918`).
  * `recursing` is that stack, which `rb_exec_recursive` keeps per-thread.
  */
 function inspectValue(value: unknown, recursing: Set<object>): string {
@@ -482,7 +482,7 @@ function regDesc(re: RegExp): string {
 }
 
 /**
- * `inspect_hash` (`vendor/ruby/hash.c:3459`) under the `rb_exec_recursive`
+ * `inspect_hash` (`vendor/ruby/v3.3.11/hash.c:3459`) under the `rb_exec_recursive`
  * (`hash.c:3487`) its caller wraps it in: a hash already on the recursion
  * stack renders as `"{...}"` rather than recursing forever.
  *
@@ -509,7 +509,7 @@ function inspectHash(
 }
 
 /**
- * `inspect_ary` (`vendor/ruby/array.c:2888`) under the `rb_exec_recursive`
+ * `inspect_ary` (`vendor/ruby/v3.3.11/array.c:2888`) under the `rb_exec_recursive`
  * `rb_ary_inspect` (`array.c:2918`) wraps it in — the Array twin of
  * {@link inspectHash}, down to the `"[...]"` recursive slot.
  */
@@ -530,7 +530,7 @@ function isPlainHash(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * `RTEST` (`vendor/ruby/include/ruby/internal/special_consts.h:138` `RB_TEST`):
+ * `RTEST` (`vendor/ruby/v3.3.11/include/ruby/internal/special_consts.h:138` `RB_TEST`):
  * false only for `nil` and `false`, where a JS truthiness test is also false
  * for `0`, `""` and `NaN`.
  *
@@ -541,14 +541,14 @@ export function rtest(obj: unknown): boolean {
 }
 
 /**
- * `rb_obj_as_string` (`vendor/ruby/string.c:1653`) — the `to_s` of any value.
+ * `rb_obj_as_string` (`vendor/ruby/v3.3.11/string.c:1653`) — the `to_s` of any value.
  * `Array#to_s` and `Hash#to_s` are aliases of `inspect`
- * (`vendor/ruby/array.c:8616`, `vendor/ruby/hash.c:7197`), so those two classes
+ * (`vendor/ruby/v3.3.11/array.c:8616`, `vendor/ruby/v3.3.11/hash.c:7197`), so those two classes
  * render through {@link rbInspect}; every other value — a String above all,
  * which `rb_obj_as_string` returns unquoted — is its own `to_s`.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `rb_obj_as_string`
- * (`vendor/ruby/string.c:1653`); JS `String(x)` is not the same function, since
+ * (`vendor/ruby/v3.3.11/string.c:1653`); JS `String(x)` is not the same function, since
  * it gives the comma-joined form for a nested Array and `[object Object]` for a
  * Hash.
  */
@@ -561,7 +561,7 @@ export function rbObjAsString(value: unknown): string {
 }
 
 /**
- * `flo_to_s` (`vendor/ruby/numeric.c:1059`), `Float#to_s`: always a decimal
+ * `flo_to_s` (`vendor/ruby/v3.3.11/numeric.c:1059`), `Float#to_s`: always a decimal
  * point, and the exponent form outside `1e-4 ... 1e16`.
  *
  * JS has one `number` where Ruby has Integer and Float, and `1.0 === 1`, so the

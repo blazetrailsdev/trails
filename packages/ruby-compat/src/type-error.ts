@@ -1,7 +1,7 @@
 import { StandardError } from "./standard-error.js";
 
 /**
- * Ruby's core `TypeError` (`vendor/ruby/error.c:3322`) — what an implicit
+ * Ruby's core `TypeError` (`vendor/ruby/v3.3.11/error.c:3322`) — what an implicit
  * conversion failure and `Integer()`/`Float()` raise. It extends
  * `StandardError`, mirroring Ruby's `TypeError < StandardError`, rather than the
  * native `TypeError`, because JS reserves that name for its own runtime faults

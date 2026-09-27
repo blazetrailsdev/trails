@@ -6,7 +6,7 @@ const OS_TOKENS: Record<string, string> = {
 };
 
 /**
- * `RUBY_PLATFORM` (`vendor/ruby/version.c:103`), the global constant naming the
+ * `RUBY_PLATFORM` (`vendor/ruby/v3.3.11/version.c:103`), the global constant naming the
  * platform the interpreter was built for — what
  * `Rack::RewindableInput#filesystem_has_posix_semantics?`
  * (`rack/lib/rack/rewindable_input.rb:109-111`) matches
@@ -25,7 +25,7 @@ const OS_TOKENS: Record<string, string> = {
  * MRI's own default Windows build, rather than the host's `"win32"`.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `RUBY_PLATFORM`
- * (`vendor/ruby/version.c:103`), which Rails reads without defining.
+ * (`vendor/ruby/v3.3.11/version.c:103`), which Rails reads without defining.
  */
 export function RUBY_PLATFORM(): string {
   const platform = getProcessAdapter().platform();
