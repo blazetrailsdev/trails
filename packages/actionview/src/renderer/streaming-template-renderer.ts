@@ -44,7 +44,7 @@ export class Body {
 }
 
 /** @internal */
-export class StreamingTemplateRenderer extends TemplateRenderer<Body | (string | null)[]> {
+export class StreamingTemplateRenderer extends TemplateRenderer<Promise<Body | (string | null)[]>> {
   /** @internal */
   protected override async renderTemplate(
     view: ViewContext,
@@ -53,7 +53,7 @@ export class StreamingTemplateRenderer extends TemplateRenderer<Body | (string |
     locals: Record<string, unknown> = {},
   ): Promise<Body | (string | null)[]> {
     if (!(layoutName != null && layoutName !== false && template.supportsStreaming?.())) {
-      const rendered = await super.renderTemplate(view, template, layoutName, locals);
+      const rendered = super.renderTemplate(view, template, layoutName, locals);
       return [(rendered as unknown as RenderedTemplate).body];
     }
 

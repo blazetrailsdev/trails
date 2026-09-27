@@ -22,7 +22,7 @@ export class TemplateRenderer<Rendered = RenderedTemplate> extends AbstractRende
     super(lookupContext);
   }
 
-  async render(context: ViewContext, options: RenderOptions): Promise<Rendered> {
+  render(context: ViewContext, options: RenderOptions): Rendered {
     this.details = this.extractDetails(options as Record<string, unknown>);
     const template = this.determineTemplate(options);
     this.prependFormats(template.format ? [template.format] : null);
@@ -90,33 +90,34 @@ export class TemplateRenderer<Rendered = RenderedTemplate> extends AbstractRende
   }
 
   /** @internal */
-  protected async renderTemplate(
+  protected renderTemplate(
     view: ViewContext,
     template: RenderableTemplate,
     layoutName: RenderOptions["layout"],
     locals: Record<string, unknown>,
-  ): Promise<Rendered> {
-    return (await this.renderWithLayout(view, template, layoutName, locals, (layout) =>
-      Notifications.instrument<Promise<string>>(
+  ): Rendered {
+    return this.renderWithLayout(view, template, layoutName, locals, (layout) =>
+      Notifications.instrument<string>(
         "render_template.action_view",
         {
           identifier: template.identifier,
           layout: layout && layout.virtualPath,
           locals,
         },
-        async () => template.render(view, locals, null, {}, (...name) => view._layoutFor!(...name)),
+        () =>
+          template.render(view, locals, null, {}, (...name) => view._layoutFor!(...name)) as string,
       ),
-    )) as unknown as Rendered;
+    ) as unknown as Rendered;
   }
 
   /** @internal */
-  private async renderWithLayout(
+  private renderWithLayout(
     view: ViewContext,
     template: RenderableTemplate,
     path: RenderOptions["layout"],
     locals: Record<string, unknown>,
-    block: (layout: RenderableTemplate | null) => Promise<string>,
-  ): Promise<RenderedTemplate> {
+    block: (layout: RenderableTemplate | null) => string,
+  ): RenderedTemplate {
     const layout =
       path != null && path !== false
         ? this.findLayout(path, Object.keys(locals), [this.formats[0] as string])
@@ -124,16 +125,18 @@ export class TemplateRenderer<Rendered = RenderedTemplate> extends AbstractRende
 
     let body: string;
     if (layout) {
-      body = await Notifications.instrument<Promise<string>>(
+      body = Notifications.instrument<string>(
         "render_layout.action_view",
         { identifier: layout.identifier },
-        async () => {
-          view.viewFlow?.set("layout", await block(layout));
-          return layout.render(view, locals, null, {}, (...name) => view._layoutFor!(...name));
+        () => {
+          view.viewFlow?.set("layout", block(layout));
+          return layout.render(view, locals, null, {}, (...name) =>
+            view._layoutFor!(...name),
+          ) as string;
         },
       );
     } else {
-      body = await block(null);
+      body = block(null);
     }
     return this.buildRenderedTemplate(body, template);
   }

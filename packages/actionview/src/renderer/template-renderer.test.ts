@@ -9,7 +9,7 @@ function makeFakeTemplate(body: string, format = ":html"): RenderableTemplate {
   return {
     identifier: "fake",
     format,
-    render: vi.fn().mockResolvedValue(body),
+    render: vi.fn().mockReturnValue(body),
   };
 }
 
@@ -99,9 +99,7 @@ describe("TemplateRenderer", () => {
   describe("raises on missing template", () => {
     it("raises MissingTemplate when template cannot be found", async () => {
       const renderer = new TemplateRenderer(lc);
-      await expect(renderer.render(ctx, { template: "posts/missing" })).rejects.toBeInstanceOf(
-        MissingTemplate,
-      );
+      expect(() => renderer.render(ctx, { template: "posts/missing" })).toThrow(MissingTemplate);
     });
   });
 
@@ -124,7 +122,7 @@ describe("TemplateRenderer", () => {
   describe("raises without a render option", () => {
     it("raises ArgumentError when no render option is given", async () => {
       const renderer = new TemplateRenderer(lc);
-      await expect(renderer.render(ctx, {})).rejects.toThrow("render");
+      expect(() => renderer.render(ctx, {})).toThrow("render");
     });
   });
 });

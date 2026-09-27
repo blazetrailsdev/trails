@@ -3,7 +3,7 @@ import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { ExceptionWrapper } from "./exception-wrapper.js";
 
 export interface ExecutorState {
-  completeBang(): void;
+  completeBang(): unknown;
 }
 
 export interface ErrorReporterLike {
@@ -11,7 +11,7 @@ export interface ErrorReporterLike {
 }
 
 export interface ExecutorLike {
-  runBang(opts?: { reset?: boolean }): ExecutorState;
+  runBang(opts?: { reset?: boolean }): ExecutorState | PromiseLike<ExecutorState>;
   errorReporter(): ErrorReporterLike;
 }
 
@@ -25,7 +25,7 @@ export class Executor {
   }
 
   async call(env: RackEnv): Promise<RackResponse> {
-    const state = this.executor.runBang({ reset: true });
+    const state = await this.executor.runBang({ reset: true });
     let returned = false;
     try {
       const response = await this.app(env);

@@ -17,15 +17,20 @@ export class Renderer {
     this.lookupContext = lookupContext;
   }
 
-  async render(context: ViewContext, options: RenderOptions): Promise<string | null> {
-    return (await this.renderToObject(context, options)).body;
+  render(context: ViewContext, options: RenderOptions): string | null | Promise<string | null> {
+    const rendered = this.renderToObject(context, options);
+    return isThenable(rendered) ? rendered.then((r) => r.body) : rendered.body;
   }
 
   /** @internal */
-  async renderToObject(
+  renderToObject(
     context: ViewContext,
     options: RenderOptions,
-  ): Promise<RenderedTemplate | RenderedCollection | EmptyCollection> {
+  ):
+    | RenderedTemplate
+    | RenderedCollection
+    | EmptyCollection
+    | Promise<RenderedTemplate | RenderedCollection | EmptyCollection> {
     if (Object.prototype.hasOwnProperty.call(options, "partial")) {
       return this.renderPartialToObject(context, options);
     }
@@ -43,20 +48,18 @@ export class Renderer {
   }
 
   /** @internal */
-  async renderPartial(
+  renderPartial(
     context: ViewContext,
     options: RenderOptions,
     block?: (...args: unknown[]) => unknown,
-  ): Promise<string | null> {
-    return (await this.renderPartialToObject(context, options, block)).body;
+  ): string | null | Promise<string | null> {
+    const rendered = this.renderPartialToObject(context, options, block);
+    return isThenable(rendered) ? rendered.then((r) => r.body) : rendered.body;
   }
 
   cacheHits: Record<string, unknown> = {};
 
-  private renderTemplateToObject(
-    context: ViewContext,
-    options: RenderOptions,
-  ): Promise<RenderedTemplate> {
+  private renderTemplateToObject(context: ViewContext, options: RenderOptions): RenderedTemplate {
     return new TemplateRenderer(this.lookupContext).render(context, options);
   }
 
@@ -111,6 +114,10 @@ export class Renderer {
       block,
     );
   }
+}
+
+function isThenable<T>(value: T | Promise<T>): value is Promise<T> {
+  return typeof (value as Promise<T> | null)?.then === "function";
 }
 
 /** @internal */

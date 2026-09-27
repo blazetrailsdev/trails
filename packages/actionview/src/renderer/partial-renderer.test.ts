@@ -11,7 +11,7 @@ function makeFakeTemplate(body = "body"): RenderableTemplate {
   return {
     identifier: "fake",
     format: "html",
-    render: vi.fn().mockResolvedValue(body),
+    render: vi.fn().mockReturnValue(body),
   };
 }
 
@@ -51,16 +51,19 @@ describe("PartialRenderer", () => {
 
   it("looks up partial with underscore prefix", async () => {
     const spy = vi.spyOn(lc, "find");
-    await new PartialRenderer(lc, { locals: { name: "Alice" }, formats: ["html"] })
-      .render("users/card", ctx, undefined)
-      .catch(() => {});
+    await (async () =>
+      new PartialRenderer(lc, { locals: { name: "Alice" }, formats: ["html"] }).render(
+        "users/card",
+        ctx,
+        undefined,
+      ))().catch(() => {});
     expect(spy).toHaveBeenCalledWith("users/card", [], true, ["name"], { formats: ["html"] });
   });
 
   it("raises MissingTemplate when partial cannot be found", async () => {
-    await expect(
-      new PartialRenderer(lc).render("users/missing", ctx, undefined),
-    ).rejects.toBeInstanceOf(MissingTemplate);
+    expect(() => new PartialRenderer(lc).render("users/missing", ctx, undefined)).toThrow(
+      MissingTemplate,
+    );
   });
 });
 
@@ -117,9 +120,7 @@ describe("ObjectRenderer", () => {
   });
 
   it("raises when object has no toPartialPath", async () => {
-    await expect(
-      new ObjectRenderer(lc).renderObjectDerivePartial(null, ctx, undefined),
-    ).rejects.toThrow(
+    expect(() => new ObjectRenderer(lc).renderObjectDerivePartial(null, ctx, undefined)).toThrow(
       new ArgumentError(
         "'nil' is not an ActiveModel-compatible object. It must implement #to_partial_path.",
       ),

@@ -13,7 +13,7 @@ import { TemplatePath } from "./template-path.js";
 import { TemplateHandlers } from "./template/handlers.js";
 import { Tse } from "./template/handlers/tse.js";
 
-function render(ctx: LookupContext, options: RenderOptions): Promise<string | null> {
+function render(ctx: LookupContext, options: RenderOptions) {
   const view = new (DetailsKey.viewContextClass())(ctx, {}, null);
   return view.viewRenderer.render(view, options);
 }
@@ -175,16 +175,20 @@ describe("LookupContext allCandidatePaths wiring", () => {
   });
 });
 
-describe("LookupContext#renderPartialSync", () => {
+describe("Base#render (trails)", () => {
   function contextWith(templates: Record<string, string>): LookupContext {
     const resolver = new FixtureResolver(
       Object.fromEntries(
         Object.entries(templates).map(([key, source]) => [`${key}.html.tse`, source]),
       ),
     );
-    const ctx = new LookupContext(null, {}, []);
+    const ctx = new LookupContext(null, {}, ["posts"]);
     ctx.appendViewPaths([resolver]);
     return ctx;
+  }
+
+  function renderPartial(ctx: LookupContext, partial: string, locals = {}): string {
+    return String(new (DetailsKey.viewContextClass())(ctx, {}, null).render(partial, locals));
   }
 
   beforeEach(() => {
@@ -202,19 +206,17 @@ describe("LookupContext#renderPartialSync", () => {
       "shared/_spacer": "spacer",
       "posts/_byline": "byline",
     });
-    expect(ctx.renderPartialSync("post", "posts", ":html")).toBe("spacer|byline");
+    expect(renderPartial(ctx, "post")).toBe("spacer|byline");
   });
 
   it("renders a partial by bare name against the given prefix", () => {
     const ctx = contextWith({ "posts/_form": "<%= title %>" });
-    expect(ctx.renderPartialSync("form", "posts", ":html", { title: "New" })).toBe("New");
+    expect(renderPartial(ctx, "form", { title: "New" })).toBe("New");
   });
 
   it("takes the prefix from a qualified name", () => {
     const ctx = contextWith({ "users/_user": "<li><%= user %></li>" });
-    expect(ctx.renderPartialSync("users/user", "posts", ":html", { user: "Ada" })).toBe(
-      "<li>Ada</li>",
-    );
+    expect(renderPartial(ctx, "users/user", { user: "Ada" })).toBe("<li>Ada</li>");
   });
 
   it("resolves a partial nested inside a partial", () => {
@@ -222,12 +224,12 @@ describe("LookupContext#renderPartialSync", () => {
       "posts/_post": '<%= render({ partial: "posts/byline", locals: { name: name } }) %>',
       "posts/_byline": "by <%= name %>",
     });
-    expect(ctx.renderPartialSync("post", "posts", ":html", { name: "Ada" })).toBe("by Ada");
+    expect(renderPartial(ctx, "post", { name: "Ada" })).toBe("by Ada");
   });
 
   it("raises MissingTemplate when the partial does not resolve", () => {
     const ctx = contextWith({ "posts/_form": "" });
-    expect(() => ctx.renderPartialSync("frm", "posts", ":html")).toThrow(MissingTemplate);
+    expect(() => renderPartial(ctx, "frm")).toThrow(MissingTemplate);
   });
 
   it("is reachable from a template rendered through renderTemplate", async () => {

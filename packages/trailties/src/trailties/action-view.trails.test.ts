@@ -1,8 +1,18 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { Deprecators, Reloader, runLoadHooks, resetLoadHooks } from "@blazetrails/activesupport";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import {
+  Deprecators,
+  FileUpdateChecker,
+  Reloader,
+  runLoadHooks,
+  resetLoadHooks,
+} from "@blazetrails/activesupport";
 import { ActionController, RouteSet } from "@blazetrails/actionpack";
 import {
   Base,
+  DetailsKey,
   PathRegistry,
   Resolver,
   ViewReloader,
@@ -36,7 +46,11 @@ describe("ActionView::Railtie view reloader (trails)", () => {
     } as ActionViewConfig);
   });
 
-  function bootApp(reloadingEnabled: boolean, cacheTemplateLoading?: boolean) {
+  function bootApp(
+    reloadingEnabled: boolean,
+    cacheTemplateLoading?: boolean,
+    fileWatcher: unknown = class {},
+  ) {
     if (cacheTemplateLoading !== undefined) {
       (Trailtie.config.get("actionView") as ActionViewConfig).cacheTemplateLoading =
         cacheTemplateLoading;
@@ -44,7 +58,7 @@ describe("ActionView::Railtie view reloader (trails)", () => {
     const app = {
       config: Object.assign(Object.create(Trailtie.config), {
         isReloadingEnabled: () => reloadingEnabled,
-        fileWatcher: class {},
+        fileWatcher,
       }),
       reloaders: [] as unknown[],
       reloader: class extends Reloader {},
@@ -69,6 +83,33 @@ describe("ActionView::Railtie view reloader (trails)", () => {
   it("cache_template_loading overrides reloading_enabled?", () => {
     expect(bootApp(true, true).reloaders).toEqual([]);
     expect(bootApp(false, false).reloaders).toHaveLength(1);
+  });
+
+  it("an awaited reloader run clears the digest caches after a watched view is touched", async () => {
+    const viewsDir = fs.mkdtempSync(path.join(os.tmpdir(), "view_reloader-"));
+    try {
+      const view = path.join(viewsDir, "index.html.tse");
+      const touch = (secondsAgo: number) => {
+        fs.writeFileSync(view, "x");
+        const when = new Date(Date.now() - secondsAgo * 1000);
+        fs.utimesSync(view, when, when);
+      };
+      touch(10);
+      PathRegistry.castFileSystemResolvers([viewsDir]);
+      const app = bootApp(true, undefined, FileUpdateChecker);
+      const viewReloader = app.reloaders[0] as ViewReloader;
+      app.reloader.check = () => viewReloader.isUpdated();
+      expect(viewReloader.isUpdated()).toBe(false);
+
+      touch(1);
+      DetailsKey.digestCache({ formats: ["html"] }).set("template", "digest");
+      const instance = await app.reloader.runBang();
+      expect(DetailsKey.digestCaches()).toEqual([]);
+      await instance.completeBang();
+    } finally {
+      DetailsKey.clear();
+      fs.rmSync(viewsDir, { recursive: true, force: true });
+    }
   });
 });
 
