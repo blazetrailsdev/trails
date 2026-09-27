@@ -67,11 +67,7 @@ export class UnboundTemplate {
 
   /** @internal */
   private buildTemplate(locals: ReadonlyArray<string>): Template {
-    return new Template({
-      source: this._source,
-      identifier: this._identifier,
-      handler: this.details.handlerClass(),
-
+    return new Template(this._source, this._identifier, this.details.handlerClass()!, {
       format: this.details.formatOrDefault() as string | null,
       variant: this.variant != null ? symbolToS(this.variant as string) : null,
       virtualPath: this.virtualPath,

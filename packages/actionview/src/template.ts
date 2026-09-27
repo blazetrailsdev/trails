@@ -85,17 +85,10 @@ const VALID_LOCAL_NAME = /^(?![A-Z0-9])[\p{L}\p{N}_]+$/u;
 let nextObjectId = 0;
 
 export interface TemplateOptions {
-  source: string | SourcesFile;
-  identifier: string;
-  handler?: TemplateHandler | null;
-  locals?: readonly string[];
+  locals: readonly string[];
   format?: string | null;
   variant?: string | null;
   virtualPath?: string | null;
-  extension?: string;
-  fullPath?: string;
-  isLayout?: boolean;
-  isPartial?: boolean;
 }
 
 export class Template {
@@ -119,15 +112,11 @@ export class Template {
   }
 
   readonly identifier: string;
-  readonly handler: TemplateHandler | null;
+  readonly handler: TemplateHandler;
   readonly variable: string | null;
   readonly format: string | null;
   readonly variant: string | null;
   readonly virtualPath: string | null;
-  readonly extension: string;
-  readonly fullPath?: string;
-  isLayout: boolean;
-  readonly isPartial: boolean;
 
   private _source: string | SourcesFile;
   private readonly _locals: readonly string[];
@@ -143,20 +132,22 @@ export class Template {
   /** @internal */
   _streaming = false;
 
-  constructor(opts: TemplateOptions) {
-    this._source = opts.source;
-    this.identifier = opts.identifier;
-    this.handler = opts.handler ?? null;
-    this._locals = opts.locals ?? [];
-    this.virtualPath = opts.virtualPath ?? null;
-    this.format = opts.format ?? null;
-    this.variant = opts.variant ?? null;
-    this.extension = opts.extension ?? "";
-    this.fullPath = opts.fullPath;
-    this.isLayout = opts.isLayout ?? false;
-    this.isPartial =
-      opts.isPartial ?? basename(this.virtualPath ?? this.identifier).startsWith("_");
+  constructor(
+    source: string | SourcesFile,
+    identifier: string,
+    handler: TemplateHandler,
+    { locals, format = null, variant = null, virtualPath = null }: TemplateOptions,
+  ) {
+    this._source = source;
+    this.identifier = identifier;
+    this.handler = handler;
+    this._locals = locals;
+    this.virtualPath = virtualPath;
+
     this.variable = deriveVariable(this.virtualPath);
+
+    this.format = format;
+    this.variant = variant;
   }
 
   get source(): string {
@@ -176,10 +167,8 @@ export class Template {
   }
 
   supportsStreaming(): boolean {
-    const h = this.resolveHandler();
-    return Boolean(
-      h && (h as { supportsStreaming?: () => boolean }).supportsStreaming?.() === true,
-    );
+    const handler = this.handler as { supportsStreaming?: () => boolean };
+    return typeof handler.supportsStreaming === "function" && handler.supportsStreaming();
   }
 
   /**
@@ -202,8 +191,8 @@ export class Template {
   }
 
   translateLocation(backtraceLocation: BacktraceLocation, spot: Spot): Spot {
-    const handler = this.resolveHandler() as LocationTranslatingHandler | undefined;
-    if (typeof handler?.translateLocation === "function") {
+    const handler = this.handler as LocationTranslatingHandler;
+    if (typeof handler.translateLocation === "function") {
       return handler.translateLocation(spot, backtraceLocation, this.source) ?? spot;
     } else {
       return spot;
@@ -319,22 +308,6 @@ export class Template {
     return this.inspect();
   }
 
-  asLayout(): Template {
-    return new Template({
-      source: this._source,
-      identifier: this.identifier,
-      handler: this.handler,
-      locals: this._locals,
-      format: this.format,
-      variant: this.variant,
-      virtualPath: this.virtualPath,
-      extension: this.extension,
-      fullPath: this.fullPath,
-      isPartial: this.isPartial,
-      isLayout: true,
-    });
-  }
-
   /**
    * @internal
    * @missingRailsArgs compile — PERMANENT
@@ -361,13 +334,7 @@ export class Template {
   private compiledSource(streaming = false): string {
     const setStrictLocals = this.strictLocalsBang();
     const source = this.source;
-    const handler = this.resolveHandler();
-    if (!handler) {
-      throw new Error(
-        `No template handler registered for ".${this.extension}". ` +
-          `Register one with TemplateHandlers.registerTemplateHandler(ext, handler).`,
-      );
-    }
+    const handler = this.handler;
     let code: string;
     this._streaming = streaming;
     try {
@@ -497,11 +464,6 @@ export class Template {
 
   private instrumentPayload(): Record<string, unknown> {
     return { virtual_path: this.virtualPath, identifier: this.identifier };
-  }
-
-  /** @internal */
-  private resolveHandler(): TemplateHandler | undefined {
-    return this.handler ?? TemplateHandlers.handlerForExtension(this.extension);
   }
 }
 

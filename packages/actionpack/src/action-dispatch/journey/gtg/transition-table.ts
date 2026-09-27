@@ -231,10 +231,7 @@ export class TransitionTable implements TransitionTableLike, DotHost {
     const svg = this.toSvg();
     const javascripts = [states, fsmJs];
 
-    const template = new Template({
-      source: tse,
-      identifier: File.join(vizDir, "index.html.tse"),
-      handler: new TseHandler(),
+    const template = new Template(tse, File.join(vizDir, "index.html.tse"), new TseHandler(), {
       format: "html",
       locals: ["title", "funRoutes", "stylesheets", "svg", "javascripts", "paths"],
     });

@@ -22,12 +22,12 @@ describe("ExceptionWrapper template spots", () => {
 
   it("remaps a compiled-template frame onto the template's own source", () => {
     TemplateHandlers.registerTemplateHandler("tse", new TseHandler());
-    const template = new Template({
-      source: "first line\n<%= [].boom.length %>\nlast line\n",
-      identifier: "posts/show.html.tse",
-      virtualPath: "posts/show",
-      extension: "tse",
-    });
+    const template = new Template(
+      "first line\n<%= [].boom.length %>\nlast line\n",
+      "posts/show.html.tse",
+      new TseHandler(),
+      { locals: [], format: ":html", virtualPath: "posts/show" },
+    );
     const resolver = { findAll: () => [], builtTemplates: () => [template] };
     PathRegistry.setViewPaths(Holder, new PathSet([resolver]));
 

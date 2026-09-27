@@ -41,11 +41,9 @@ function renderLayout(root: string): string {
   );
   const view = new (Base.withEmptyTemplateCache())(null, {}, null);
   (view as unknown as Record<string, unknown>)["computeAssetPath"] = computeAssetPath;
-  return new Template({
-    source,
-    identifier: "application.html.tse",
-    extension: "tse",
-    handler: new TseHandler(),
+  return new Template(source, "application.html.tse", new TseHandler(), {
+    locals: [],
+    format: ":html",
   })
     .render(view, {})
     .toString();

@@ -49,11 +49,12 @@ describe("Template#compile", () => {
   it("names the compiled source after the identifier without evaluating it", async () => {
     TemplateHandlers.registerTemplateHandler("tse", new Tse());
     const g = globalThis as { __templateIdentifierEvaluated?: boolean };
-    const t = new Template({
-      source: "hi",
-      identifier: "posts/show.html.tse\nglobalThis.__templateIdentifierEvaluated = true;",
-      extension: "tse",
-    });
+    const t = new Template(
+      "hi",
+      "posts/show.html.tse\nglobalThis.__templateIdentifierEvaluated = true;",
+      new Tse(),
+      { locals: [], format: ":html" },
+    );
     expect(String(await t.render(new (Base.withEmptyTemplateCache())(null, {}, null)))).toBe("hi");
     expect(g.__templateIdentifierEvaluated).toBeUndefined();
   });
