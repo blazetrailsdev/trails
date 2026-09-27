@@ -142,3 +142,5 @@ If the headline number bothers you: extend `unported-files.ts` to
 include the entire "Explicitly out" list above. The denominator drops
 ~700, and the displayed coverage realigns with what's actually being
 maintained.
+
+Probe: see `vendor/rails/activerecord/lib/active_record.rb:1`.
