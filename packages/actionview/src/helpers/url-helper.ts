@@ -1,3 +1,4 @@
+import { SafeBuffer } from "@blazetrails/activesupport";
 import {
   ArgumentError,
   InvalidURIError,
@@ -7,11 +8,15 @@ import {
 } from "@blazetrails/ruby-compat";
 
 import { RoutingUrlFor } from "../routing-url-for.js";
+import { tag } from "./tag-helper.js";
 
 export interface UrlHelperHost {
   controller: unknown;
   _backUrl(): string;
   _filteredReferrer(): string | null;
+  isProtectAgainstForgery?(): boolean;
+  formAuthenticityToken?(options: { formOptions: Record<string, unknown> }): string;
+  requestForgeryProtectionToken?: unknown;
 }
 
 interface UrlHelperController {
@@ -60,4 +65,40 @@ export function _filteredReferrer(this: UrlHelperHost): string | null {
     if (!(e instanceof InvalidURIError)) throw e;
   }
   return null;
+}
+
+/** @internal */
+export function tokenTag(
+  this: UrlHelperHost,
+  token: unknown = null,
+  { formOptions = {} }: { formOptions?: Record<string, unknown> } = {},
+): SafeBuffer | string {
+  if (
+    token !== false &&
+    rbObjRespondTo(this, "isProtectAgainstForgery", true) &&
+    this.isProtectAgainstForgery!()
+  ) {
+    token =
+      token === true || token == null
+        ? this.formAuthenticityToken!({ formOptions: { ...formOptions, authenticityToken: token } })
+        : token;
+    return tag("input", {
+      type: "hidden",
+      name: String(this.requestForgeryProtectionToken),
+      value: token,
+      autocomplete: "off",
+    }) as SafeBuffer;
+  } else {
+    return "";
+  }
+}
+
+/** @internal */
+export function methodTag(method: unknown): SafeBuffer {
+  return tag("input", {
+    type: "hidden",
+    name: "_method",
+    value: String(method),
+    autocomplete: "off",
+  }) as SafeBuffer;
 }
