@@ -3,6 +3,7 @@
 import { include } from "@blazetrails/ruby-compat/include";
 import { Base } from "./base.js";
 import { DetailsKey, type LookupContext } from "./lookup-context.js";
+import { Template } from "./template.js";
 
 export interface RenderOptions {
   template?: string;
@@ -119,6 +120,53 @@ export function viewContext(this: ViewContextHost): Base {
     this.viewAssigns(),
     this as unknown as null,
   );
+}
+
+/** @internal */
+export interface RenderToBodyHost {
+  lookupContext: LookupContext;
+  viewContext(): Base;
+  /** @internal */
+  _renderedFormat?: unknown;
+  /** @internal */
+  _processOptions(options: Record<string, unknown>): void;
+  /** @internal */
+  _processRenderTemplateOptions(options: Record<string, unknown>): void;
+  /** @internal */
+  _renderTemplate(options: Record<string, unknown>): Promise<string | null>;
+}
+
+export async function renderToBody(
+  this: RenderToBodyHost,
+  options: Record<string, unknown> = {},
+): Promise<string | null> {
+  this._processOptions(options);
+  this._processRenderTemplateOptions(options);
+  return this._renderTemplate(options);
+}
+
+/** @internal */
+export async function _renderTemplate(
+  this: RenderToBodyHost,
+  options: Record<string, unknown>,
+): Promise<string | null> {
+  const variant = options["variant"];
+  delete options["variant"];
+  const assigns = options["assigns"];
+  delete options["assigns"];
+  const context = this.viewContext();
+
+  if (assigns != null && assigns !== false) context.assign(assigns as Record<string, unknown>);
+  if (variant != null && variant !== false) this.lookupContext.variants = variant as string[];
+
+  const renderedTemplate = await context.inRenderingContext(options, (renderer) =>
+    renderer.renderToObject(context, options),
+  );
+
+  const renderedFormat = renderedTemplate.format ?? this.lookupContext.formats[0];
+  this._renderedFormat = Template.Types.get(renderedFormat as string);
+
+  return renderedTemplate.body;
 }
 
 /** @internal */

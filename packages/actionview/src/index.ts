@@ -28,12 +28,15 @@ export { Base } from "./base.js";
 export type {
   RenderOptions as RenderingOptions,
   ViewContextClassMethods,
+  RenderToBodyHost,
   ViewContextHost,
   ViewContextRoutes,
 } from "./rendering.js";
 
 export {
+  _renderTemplate,
   buildViewContextClass,
+  renderToBody,
   isInheritViewContextClass,
   viewContext,
   viewContextClass,

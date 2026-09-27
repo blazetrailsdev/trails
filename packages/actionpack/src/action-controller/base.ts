@@ -47,13 +47,14 @@ import {
 } from "@blazetrails/actionview";
 import {
   Base as ActionViewBase,
+  _renderTemplate,
   buildViewContextClass,
   isInheritViewContextClass,
+  renderToBody as actionViewRenderToBody,
   viewContext,
   viewContextClass,
 } from "@blazetrails/actionview";
 import type {
-  RendererOptions,
   PathSet,
   ViewPathsInput,
   ViewContextHost,
@@ -113,7 +114,15 @@ import {
   _wrapperEnabled,
   type ParamsWrapperHost,
 } from "./metal/params-wrapper.js";
-import { processAction as _processAction } from "./metal/rendering.js";
+import {
+  _processOptions,
+  _renderInPriorities,
+  _setHtmlContentType,
+  _setRenderedContentType,
+  _setVaryHeader,
+  processAction as _processAction,
+} from "./metal/rendering.js";
+import { Renderers } from "./metal/renderers.js";
 import { urlOptions } from "./metal/url-for.js";
 import { Cookies } from "./metal/cookies.js";
 import {
@@ -142,6 +151,7 @@ export type RenderOptions = {
   text?: string;
   action?: string;
   template?: string;
+  inline?: string;
   partial?: string;
   locals?: Record<string, unknown>;
   collection?: unknown[];
@@ -343,6 +353,7 @@ export class Base extends Metal {
           return;
         } else if (
           options.template !== undefined ||
+          options.inline !== undefined ||
           options.action !== undefined ||
           options.collection !== undefined
         ) {
@@ -352,7 +363,7 @@ export class Base extends Metal {
           this._pendingRender = { type: "template", options };
           return;
         } else {
-          this._renderTemplate(this.actionName, options);
+          this._resolveTemplate(this.actionName, options);
           if (!this.performed) {
             this.contentType = "text/html; charset=utf-8";
             this.responseBody = "";
@@ -417,29 +428,27 @@ export class Base extends Metal {
       this.status = options.status;
     }
 
-    const locals = { ...options.locals };
-    const view = this.viewContext();
-
-    if (options.partial !== undefined) {
-      this.responseBody = (await view.viewRenderer.render(view, {
-        partial: options.partial,
-        ...(options.collection !== undefined ? { collection: options.collection } : {}),
-        as: options.as,
-        locals,
-      })) as string;
+    const renderedBody = await this.renderToBody({ ...options });
+    if (options.html != null && (options.html as unknown) !== false) {
+      _setHtmlContentType.call(this);
     } else {
-      const templateOptions: Record<string, unknown> = { ...options };
-      this._processRenderTemplateOptions(templateOptions);
-      this.responseBody = (await view.viewRenderer.render(view, {
-        template: templateOptions.template as string,
-        prefixes: (templateOptions.prefixes as string[] | undefined) ?? [],
-        locals,
-        layout: templateOptions.layout as RendererOptions["layout"],
-      })) as string;
+      _setRenderedContentType.call(this, this._renderedFormat as string | null | undefined);
     }
-
-    this.contentType = options.contentType ?? "text/html; charset=utf-8";
+    _setVaryHeader.call(this as never);
+    this.responseBody = renderedBody as string;
     this.markPerformed();
+  }
+
+  /** @internal */
+  override async renderToBody(options: Record<string, unknown> = {}): Promise<unknown> {
+    const truthy = (v: unknown): boolean => v != null && v !== false;
+    const renderer = Renderers._renderToBodyWithRenderer(options);
+    if (truthy(renderer)) return renderer;
+    const body = await actionViewRenderToBody.call(this as never, options);
+    if (truthy(body)) return body;
+    const priority = _renderInPriorities(options);
+    if (truthy(priority)) return priority;
+    return " ";
   }
 
   renderToString(options: RenderOptions = {}): string {
@@ -813,6 +822,12 @@ export class Base extends Metal {
   declare _layoutConditions: Record<string, string[]>;
   /** @internal */
   declare _processRenderTemplateOptions: typeof _processRenderTemplateOptions;
+  /** @internal */
+  declare _processOptions: typeof _processOptions;
+  /** @internal */
+  declare _renderTemplate: typeof _renderTemplate;
+  /** @internal */
+  _renderedFormat?: unknown;
   declare isActionHasLayout: typeof isActionHasLayout;
   /** @internal */
   declare _isConditionalLayout: typeof _isConditionalLayout;
@@ -877,7 +892,7 @@ export class Base extends Metal {
     });
   }
 
-  private _renderTemplate(action: string, _options: RenderOptions): void {
+  private _resolveTemplate(action: string, _options: RenderOptions): void {
     const resolver = (this.constructor as typeof Base).templateResolver;
     if (!resolver) return;
 
@@ -955,6 +970,8 @@ include(Base, ConfigMethods);
 include(Base, Cookies);
 include(Base, StrongParametersModule);
 Base.prototype._processRenderTemplateOptions = _processRenderTemplateOptions;
+Base.prototype._processOptions = _processOptions;
+Base.prototype._renderTemplate = _renderTemplate;
 Base.prototype.isActionHasLayout = isActionHasLayout;
 Base.prototype._isConditionalLayout = _isConditionalLayout;
 Base.prototype._layoutForOption = _layoutForOption;
