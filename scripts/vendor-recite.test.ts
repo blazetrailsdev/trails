@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -103,6 +103,7 @@ describe("vendor:recite", () => {
       "vendor/sources.test.ts",
       "vendor/README.md",
       "vendor/sources.lock.json",
+      "docs/activerecord/rfc-0027-join-dependency-audit.md",
     ]) {
       expect(isExcluded(path), path).toBe(true);
     }
@@ -119,11 +120,8 @@ describe("vendor:recite", () => {
 
   it("every excluded file exists in the checkout", async () => {
     for (const path of Object.keys(EXCLUDED)) {
-      const text = await readFile(
-        join(REPO_ROOT, path.endsWith("/") ? `${path}sources.ts` : path),
-        "utf8",
-      );
-      expect(text.length, path).toBeGreaterThan(0);
+      const entry = await stat(join(REPO_ROOT, path));
+      expect(path.endsWith("/") ? entry.isDirectory() : entry.size > 0, path).toBe(true);
     }
   });
 });

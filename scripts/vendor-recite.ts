@@ -5,11 +5,11 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
-import { activeVersion, SOURCES } from "../vendor/sources.js";
+import { activeVersion, SOURCES, versionDir } from "../vendor/sources.js";
 
 const execFileAsync = promisify(execFile);
 
-const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 /**
  * Tracked paths the rewrite never touches, because what they hold is code that
@@ -18,6 +18,7 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
  */
 export const EXCLUDED: Readonly<Record<string, string>> = {
   "vendor/": "registry data, not citations",
+  "docs/activerecord/": "frozen by RFC 0011 Phase 4; CI rejects any edit there",
   "eslint/ruby-compat-needs-mri-citation.mjs": "matches and builds citations",
   "eslint/ruby-compat-needs-mri-citation.test.mjs": "fixtures for the citation rule's resolver",
   "scripts/api-compare/jsdoc-tag-line.test.ts": "fixtures for the tag-line parser",
@@ -32,6 +33,23 @@ export function isExcluded(path: string): boolean {
   );
 }
 
+function activeVersions(): Record<string, string> {
+  return Object.fromEntries(SOURCES.map((s) => [s.name, activeVersion(s)]));
+}
+
+/**
+ * Each source's active version read from `vendor/sources.lock.json` alone, so
+ * a caller needs no fetched `vendor/<source>/` tree.
+ */
+export async function lockedVersions(root: string): Promise<Record<string, string>> {
+  const lock = JSON.parse(await readFile(join(root, "vendor/sources.lock.json"), "utf8")) as {
+    sources: Record<string, { ref: string }>;
+  };
+  return Object.fromEntries(
+    Object.entries(lock.sources).map(([name, { ref }]) => [name, versionDir(ref)]),
+  );
+}
+
 const VERSION_SEGMENT = /^v\d[\w.-]*$/;
 
 function citationPattern(): RegExp {
@@ -39,10 +57,14 @@ function citationPattern(): RegExp {
   return new RegExp(`\\bvendor\\/(${names.join("|")})\\/([\\w.+-]+)(\\/?)`, "g");
 }
 
-/** `text` with every citation naming its source's active version. */
-export function reciteText(text: string): string {
+/** `text` with every citation naming its source's version in `versions`. */
+export function reciteText(
+  text: string,
+  versions: Readonly<Record<string, string>> = activeVersions(),
+): string {
   return text.replace(citationPattern(), (_match, name: string, segment: string, slash: string) => {
-    const version = activeVersion(SOURCES.find((s) => s.name === name)!);
+    const version = versions[name];
+    if (version === undefined) throw new Error(`no active version for vendor source "${name}"`);
     if (VERSION_SEGMENT.test(segment)) return `vendor/${name}/${version}${slash}`;
     return `vendor/${name}/${version}/${segment}${slash}`;
   });
@@ -63,20 +85,46 @@ export async function recite(
 ): Promise<string[]> {
   const changed: string[] = [];
   for (const path of paths) {
-    if (isExcluded(path)) continue;
-    const file = join(root, path);
-    if (!(await lstat(file)).isFile()) continue;
-    const text = await readFile(file, "utf8");
-    if (text.includes("\0")) continue;
+    const text = await citable(root, path);
+    if (text === null) continue;
     const next = reciteText(text);
     if (next === text) continue;
     changed.push(path);
-    if (!opts.check) await writeFile(file, next);
+    if (!opts.check) await writeFile(join(root, path), next);
   }
   return changed;
 }
 
-async function trackedFiles(root: string): Promise<string[]> {
+/**
+ * The `file:line` of every citation in `paths` (relative to `root`) whose
+ * version segment is missing or names a version other than `versions`' — the
+ * lines `recite` would rewrite.
+ */
+export async function unrecitedCitations(
+  root: string,
+  paths: readonly string[],
+  versions: Readonly<Record<string, string>>,
+): Promise<string[]> {
+  const found: string[] = [];
+  for (const path of paths) {
+    const text = await citable(root, path);
+    if (text === null) continue;
+    text.split("\n").forEach((line, i) => {
+      if (reciteText(line, versions) !== line) found.push(`${path}:${i + 1}`);
+    });
+  }
+  return found;
+}
+
+async function citable(root: string, path: string): Promise<string | null> {
+  if (isExcluded(path)) return null;
+  const file = join(root, path);
+  if (!(await lstat(file)).isFile()) return null;
+  const text = await readFile(file, "utf8");
+  return text.includes("\0") ? null : text;
+}
+
+export async function trackedFiles(root: string): Promise<string[]> {
   const { stdout } = await execFileAsync("git", ["ls-files", "-z"], {
     cwd: root,
     maxBuffer: 256 * 1024 * 1024,

@@ -3,7 +3,7 @@
  * to a vendored Rails `file:line`, so fidelity work needn't hand-grep
  * `vendor/rails/`. Reuses the manifests the existing pipelines emit
  * (test-compare's `rails-tests.json`, api-compare's `rails-api.json`) and falls
- * back to a scoped grep of `vendor/rails/activerecord/` when neither hits.
+ * back to a scoped grep of `vendor/rails/v8.0.2/activerecord/` when neither hits.
  *
  * Constraints (mirrors scripts/api-compare/shared-cache.ts): async fs only, no
  * `node:` specifiers, no `process` — pure I/O over the root bin.ts supplies, so
@@ -26,7 +26,7 @@ export type FindMode = "test" | "method" | "constant" | "grep";
 
 export interface FindResult {
   mode: FindMode;
-  /** Path relative to the worktree root (POSIX), e.g. `vendor/rails/...`. */
+  /** Path relative to the worktree root (POSIX), e.g. `vendor/rails/v8.0.2/...`. */
   file: string;
   line: number;
   /** Test path, qualified method name, or the matched source line. */
@@ -179,7 +179,7 @@ export function findMethods(manifest: ApiManifest, query: string): FindResult[] 
   return sortResults(results);
 }
 
-// ── Grep fallback (pure fs walk of vendor/rails/activerecord) ──
+// ── Grep fallback (pure fs walk of vendor/rails/v8.0.2/activerecord) ──
 
 async function walk(dir: string): Promise<string[]> {
   let entries;

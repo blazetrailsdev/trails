@@ -808,6 +808,7 @@ jobs:
           scripts/generate-canonical-zone-identifiers.test.ts
           scripts/generate-tzdata-isdst.test.ts
           scripts/vendor-recite.test.ts
+          scripts/vendor-citations.test.ts
           vendor/sources.test.ts
 
   # Consolidated leaf-test job. The cheapest sub-minute leaf suites — rack
