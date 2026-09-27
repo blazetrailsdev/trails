@@ -4,7 +4,7 @@ import { Response } from "../action-dispatch/http/response.js";
 import type { Session } from "../action-dispatch/request/session.js";
 import { Parameters } from "./metal/strong-parameters.js";
 import type { RackResponse } from "@blazetrails/rack";
-import { initializeIncludedModules, underscore } from "@blazetrails/activesupport";
+import { initializeIncludedModules, SafeBuffer, underscore } from "@blazetrails/activesupport";
 import { ArgumentError, rbInspect } from "@blazetrails/ruby-compat";
 import {
   MiddlewareStack as AbstractMiddlewareStack,
@@ -327,14 +327,14 @@ export class Metal extends AbstractController {
     return true;
   }
 
-  override set responseBody(body: string | string[] | Buffer | null | undefined) {
+  override set responseBody(body: string | SafeBuffer | string[] | Buffer | null | undefined) {
     if (body === null || body === undefined) {
       this.response.resetBodyBang();
       return;
     }
     const str = Array.isArray(body)
       ? body.join("")
-      : Buffer.isBuffer(body)
+      : Buffer.isBuffer(body) || body instanceof SafeBuffer
         ? body.toString()
         : body;
     this._responseBody = str;
