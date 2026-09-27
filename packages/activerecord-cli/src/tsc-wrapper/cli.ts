@@ -54,8 +54,11 @@ export function loadSchemaColumns(
   if (!schemaProvided || !schemaPath) return undefined;
   const resolved = path.resolve(schemaPath);
   if (!fs.existsSync(resolved)) {
-    process.stderr.write(`trails-tsc: --schema file not found: ${resolved}\n`);
-    process.exit(1);
+    process.stderr.write(
+      `trails-tsc: --schema file not found: ${resolved}; ` +
+        `proceeding without schema-driven declares.\n`,
+    );
+    return undefined;
   }
   let source: string;
   try {

@@ -1011,13 +1011,6 @@ Trails.application!.config.filterParameters = Trails.application!.config.filterP
 //   await User.create({ name: "Admin", email: "admin@example.com" });
 `,
     );
-
-    this.createFile(
-      "db/schema.ts",
-      `// This file is auto-generated from the current state of the database.
-// Instead of editing this file, use migrations to change your schema.
-`,
-    );
   }
 
   private createTestFiles(): void {

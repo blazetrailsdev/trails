@@ -25,7 +25,7 @@ describe("AppGenerator (trails-only)", () => {
     const pkg = JSON.parse(File.read(File.join(tmpDir, "my-app", "package.json")));
     expect(pkg.scripts.build).toBe("trails-tsc --schema db/schema.ts");
     expect(pkg.devDependencies["@blazetrails/activerecord-cli"]).toBeDefined();
-    expect(File.isExist(File.join(tmpDir, "my-app", "db", "schema.ts"))).toBe(true);
+    expect(File.isExist(File.join(tmpDir, "my-app", "db", "schema.ts"))).toBe(false);
   });
 
   it("guards each namespaced environment setting the way the Rails templates do", async () => {
