@@ -23,10 +23,10 @@ describe("Renderer dispatch", () => {
   });
 
   it("routes to TemplateRenderer when no partial: key is present", async () => {
-    vi.spyOn(TemplateRenderer.prototype, "render").mockRejectedValue(
-      new Error("TemplateRenderer reached"),
-    );
-    await expect(renderer.render(ctx, { template: "posts/show" })).rejects.toThrow(
+    vi.spyOn(TemplateRenderer.prototype, "render").mockImplementation(() => {
+      throw new Error("TemplateRenderer reached");
+    });
+    expect(() => renderer.render(ctx, { template: "posts/show" })).toThrow(
       "TemplateRenderer reached",
     );
   });
@@ -35,7 +35,7 @@ describe("Renderer dispatch", () => {
     vi.spyOn(PartialRenderer.prototype, "render").mockImplementation(() => {
       throw new Error("PartialRenderer reached");
     });
-    await expect(renderer.render(ctx, { partial: "posts/card" })).rejects.toThrow(
+    expect(() => renderer.render(ctx, { partial: "posts/card" })).toThrow(
       "PartialRenderer reached",
     );
   });
@@ -44,16 +44,16 @@ describe("Renderer dispatch", () => {
     vi.spyOn(CollectionRenderer.prototype, "renderCollectionWithPartial").mockImplementation(() => {
       throw new Error("CollectionRenderer reached");
     });
-    await expect(
-      renderer.render(ctx, { partial: "posts/card", collection: [1, 2] }),
-    ).rejects.toThrow("CollectionRenderer reached");
+    expect(() => renderer.render(ctx, { partial: "posts/card", collection: [1, 2] })).toThrow(
+      "CollectionRenderer reached",
+    );
   });
 
   it("routes to CollectionRenderer for string partial with empty collection", async () => {
     vi.spyOn(CollectionRenderer.prototype, "renderCollectionWithPartial").mockImplementation(() => {
       throw new Error("CollectionRenderer reached");
     });
-    await expect(renderer.render(ctx, { partial: "posts/card", collection: [] })).rejects.toThrow(
+    expect(() => renderer.render(ctx, { partial: "posts/card", collection: [] })).toThrow(
       "CollectionRenderer reached",
     );
   });
@@ -62,9 +62,9 @@ describe("Renderer dispatch", () => {
     vi.spyOn(ObjectRenderer.prototype, "renderObjectWithPartial").mockImplementation(() => {
       throw new Error("ObjectRenderer reached");
     });
-    await expect(
-      renderer.render(ctx, { partial: "posts/card", object: { id: 1 } }),
-    ).rejects.toThrow("ObjectRenderer reached");
+    expect(() => renderer.render(ctx, { partial: "posts/card", object: { id: 1 } })).toThrow(
+      "ObjectRenderer reached",
+    );
   });
 
   it("routes to CollectionRenderer for object partial with toAry()", async () => {
@@ -74,7 +74,7 @@ describe("Renderer dispatch", () => {
       },
     );
     const objectWithToAry = { toAry: () => [1, 2] };
-    await expect(renderer.render(ctx, { partial: objectWithToAry })).rejects.toThrow(
+    expect(() => renderer.render(ctx, { partial: objectWithToAry })).toThrow(
       "CollectionRenderer derive reached",
     );
   });
@@ -83,9 +83,9 @@ describe("Renderer dispatch", () => {
     vi.spyOn(ObjectRenderer.prototype, "renderObjectDerivePartial").mockImplementation(() => {
       throw new Error("ObjectRenderer derive reached");
     });
-    await expect(
-      renderer.render(ctx, { partial: { toPartialPath: () => "posts/card" } }),
-    ).rejects.toThrow("ObjectRenderer derive reached");
+    expect(() => renderer.render(ctx, { partial: { toPartialPath: () => "posts/card" } })).toThrow(
+      "ObjectRenderer derive reached",
+    );
   });
 
   it("cacheHits accumulates across renders", () => {

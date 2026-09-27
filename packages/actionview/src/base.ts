@@ -25,14 +25,10 @@ import {
   ArgumentError,
   excBacktraceLocations,
   extend,
-  File,
   include,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
-import { Inline } from "./template/inline.js";
 import { Resolver } from "./template/resolver.js";
-import { RawFile } from "./template/raw-file.js";
-import { TemplateHandlers, type TemplateHandler } from "./template/handlers.js";
 
 export type CompiledMethod = ((
   this: Base,
@@ -276,104 +272,42 @@ export class Base {
     }
   }
 
-  /** @missingRailsCall render_partial — PERMANENT */
   render(
-    options: RenderOptions | string = {},
+    options: RenderOptions | string | object = {},
     locals: Record<string, unknown> = {},
     block?: () => unknown,
-  ): SafeBuffer {
-    const lookupContext = this.lookupContext;
-    if (!lookupContext) {
-      throw new Error(
-        `Cannot render ${JSON.stringify(options)} — this view has no ` +
-          "lookup context. Render through LookupContext so nested partials resolve.",
-      );
-    }
-    const prefix = this.virtualPathPrefix();
-    const viewFormat = this.currentFormat();
-
-    if ((options as object | null)?.constructor !== Object) {
-      return htmlSafe(
-        lookupContext.renderPartialSync(String(options), prefix, viewFormat, { ...locals }, this),
-      );
-    }
-
-    const hash = options as RenderOptions;
-    return this.inRenderingContext(hash, (renderer) => {
-      const format = hash.formats ? String([...renderer.formats][0] ?? viewFormat) : viewFormat;
-      if (block) {
-        this.viewFlow.set("layout", String(block() ?? ""));
-        return htmlSafe(
-          renderer.renderPartialSync(
-            String(hash.layout),
-            prefix,
-            format,
-            { ...(hash.locals ?? {}) },
-            this,
-          ),
-        );
-      }
-      if (Object.hasOwn(hash, "partial")) {
-        return htmlSafe(
-          renderer.renderPartialSync(
-            String(hash.partial),
-            prefix,
-            format,
-            { ...(hash.locals ?? {}) },
-            this,
-          ),
-        );
-      }
-      if (Object.hasOwn(hash, "body")) return htmlSafe(String(hash.body ?? ""));
-      if (Object.hasOwn(hash, "plain")) return htmlSafe(String(hash.plain ?? ""));
-      if (Object.hasOwn(hash, "html")) return htmlEscape(hash.html ?? "");
-      if (Object.hasOwn(hash, "file")) {
-        if (File.isExist(hash.file!)) {
-          return htmlSafe(new RawFile(hash.file!).render());
+  ): SafeBuffer | Promise<SafeBuffer> {
+    if ((options as object | null)?.constructor === Object) {
+      const hash = options as RenderOptions;
+      return this.inRenderingContext(hash, () => {
+        if (block) {
+          return renderedBody(
+            this.viewRenderer.renderPartial(
+              this,
+              { ...hash, partial: hash.layout as RenderOptions["partial"] },
+              block,
+            ),
+          );
         } else {
-          if (File.isAbsolutePath(hash.file!)) {
-            throw new ArgumentError(`File ${hash.file} does not exist`);
-          } else {
-            throw new ArgumentError(
-              `\`render file:\` should be given the absolute path to a file. '${hash.file}' was given instead`,
-            );
-          }
+          return renderedBody(this.viewRenderer.render(this, hash));
         }
-      }
-      if (Object.hasOwn(hash, "inline")) {
-        const handler = TemplateHandlers.handlerForExtension(hash.type ?? "tse");
-        const inlineFormat = rbObjRespondTo(handler, "defaultFormat")
-          ? (handler as TemplateHandler & { defaultFormat: string }).defaultFormat
-          : ((renderer.formats[0] as string | undefined) ?? null);
-        const template = new Inline({
-          source: hash.inline!,
-          identifier: "inline template",
-          handler,
-          locals: Object.keys(hash.locals ?? {}),
-          format: inlineFormat,
-        });
-        return htmlSafe(template.render(this, { ...(hash.locals ?? {}) }));
-      }
-      if (Object.hasOwn(hash, "renderable")) {
-        const renderable = hash.renderable as { renderIn(context: unknown): string };
-        return htmlSafe(renderable.renderIn(this));
-      }
-      if (Object.hasOwn(hash, "template")) {
-        return htmlSafe(
-          renderer.renderTemplateSync(
-            String(hash.template),
-            prefix,
-            format,
-            { ...(hash.locals ?? {}) },
+      });
+    } else {
+      if (rbObjRespondTo(options, "renderIn")) {
+        return (options as { renderIn(context: Base, block?: () => unknown): SafeBuffer }).renderIn(
+          this,
+          block,
+        );
+      } else {
+        return renderedBody(
+          this.viewRenderer.renderPartial(
             this,
+            { partial: options as RenderOptions["partial"], locals },
+            block,
           ),
         );
       }
-      throw new ArgumentError(
-        "You invoked render but did not give any of :body, :file, :html, :inline, " +
-          ":partial, :plain, :renderable, or :template option.",
-      );
-    });
+    }
   }
 
   inRenderingContext<T>(options: RenderOptions, block: (renderer: LookupContext) => T): T {
@@ -396,18 +330,16 @@ export class Base {
       this._lookupContext = oldLookupContext;
     }
   }
+}
 
-  /** @internal */
-  private virtualPathPrefix(): string {
-    const path = this.virtualPath ?? "";
-    const slash = path.lastIndexOf("/");
-    return slash === -1 ? "" : path.slice(0, slash);
+/** @noRailsEquivalent CONVERGEABLE template-render-returns-output-buffer-to-s */
+function renderedBody(
+  body: string | null | Promise<string | null>,
+): SafeBuffer | Promise<SafeBuffer> {
+  if (typeof (body as Promise<string | null> | null)?.then === "function") {
+    return (body as Promise<string | null>).then((b) => htmlSafe(String(b ?? "")));
   }
-
-  /** @internal */
-  private currentFormat(): string {
-    return this.currentTemplate?.format ?? (this.lookupContext!.formats[0] as string);
-  }
+  return htmlSafe(String(body ?? ""));
 }
 
 const TseUtil = { h, htmlEscape, htmlEscapeOnce, jsonEscape, xmlNameEscape };

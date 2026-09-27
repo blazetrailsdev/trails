@@ -14,7 +14,6 @@ import { Template } from "./template.js";
 import { PathRegistry } from "./path-registry.js";
 import { PathSet, type PathSetResolver } from "./path-set.js";
 import { Requested } from "./template-details.js";
-import { MissingTemplate } from "./template/error.js";
 
 type DetailValue = ReadonlyArray<string | symbol>;
 type DetailsMap = Record<string, DetailValue>;
@@ -373,58 +372,6 @@ export class LookupContext {
     const base = name.slice(idx + 1);
     const pfxs = prefixes.length === 0 ? [pathPrefix] : prefixes.map((p) => `${p}/${pathPrefix}`);
     return [base, pfxs];
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  renderPartialSync(
-    name: string,
-    prefix: string,
-    format: string,
-    locals: Record<string, unknown> = {},
-    view?: Base,
-  ): string {
-    const slash = name.lastIndexOf("/");
-    const partialPrefix = slash === -1 ? prefix : name.slice(0, slash);
-    const partialName = slash === -1 ? name : name.slice(slash + 1);
-
-    const template = this.findAll(partialName, [partialPrefix], true, [], {
-      formats: [format],
-    })[0] as Template | undefined;
-    if (!template) {
-      throw new MissingTemplate(this._viewPaths, partialName, [partialPrefix], true, {
-        ...this._details,
-        formats: [format],
-      });
-    }
-
-    const partialView = view ?? this.buildViewContext();
-
-    return template.render(partialView, locals);
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  renderTemplateSync(
-    name: string,
-    prefix: string,
-    format: string,
-    locals: Record<string, unknown> = {},
-    view?: Base,
-  ): string {
-    const slash = name.lastIndexOf("/");
-    const templatePrefix = slash === -1 ? prefix : name.slice(0, slash);
-    const templateName = slash === -1 ? name : name.slice(slash + 1);
-
-    const template = this.findAll(templateName, [templatePrefix], false, [], {
-      formats: [format],
-    })[0] as Template | undefined;
-    if (!template) {
-      throw new MissingTemplate(this._viewPaths, templateName, [templatePrefix], false, {
-        ...this._details,
-        formats: [format],
-      });
-    }
-
-    return template.render(view ?? this.buildViewContext(), locals);
   }
 
   private buildViewContext(): Base {

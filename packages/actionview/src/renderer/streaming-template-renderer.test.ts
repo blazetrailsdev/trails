@@ -11,7 +11,7 @@ function makeFakeTemplate(body: string, format = ":html"): RenderableTemplate {
     identifier: "fake",
     format,
     supportsStreaming: () => true,
-    render: vi.fn().mockResolvedValue(body),
+    render: vi.fn().mockReturnValue(body),
   };
 }
 
@@ -105,7 +105,7 @@ describe("StreamingTemplateRenderer", () => {
       const layoutFake: RenderableTemplate = {
         identifier: "layout",
         format: ":html",
-        render: vi.fn().mockResolvedValue("<wrapper>no yield here</wrapper>"),
+        render: vi.fn().mockReturnValue("<wrapper>no yield here</wrapper>"),
       };
       vi.spyOn(lc, "find")
         .mockReturnValueOnce(templateFake as never)
@@ -250,8 +250,8 @@ describe("StreamingTemplateRenderer", () => {
         format: ":html",
         render: vi
           .fn()
-          .mockImplementation(() =>
-            Promise.resolve(`<header>HEAD</header>${flow.get("layout")}<footer>FOOT</footer>`),
+          .mockImplementation(
+            () => `<header>HEAD</header>${flow.get("layout")}<footer>FOOT</footer>`,
           ),
       };
       vi.spyOn(lc, "find")

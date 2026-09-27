@@ -26,22 +26,22 @@ export class ObjectRenderer extends PartialRenderer implements ObjectRenderingHo
     this.contextPrefix = lookupContext.prefixes[0] ?? "";
   }
 
-  async renderObjectWithPartial(
+  renderObjectWithPartial(
     object: unknown,
     partial: string,
     context: ViewContext,
     block: ((...args: unknown[]) => unknown) | null | undefined,
-  ): Promise<RenderedTemplate> {
+  ): RenderedTemplate {
     this.object = object;
     this.localName = this.localVariable(partial);
     return this.render(partial, context, block);
   }
 
-  async renderObjectDerivePartial(
+  renderObjectDerivePartial(
     object: unknown,
     context: ViewContext,
     block: ((...args: unknown[]) => unknown) | null | undefined,
-  ): Promise<RenderedTemplate> {
+  ): RenderedTemplate {
     const path = this.partialPath(object, context);
     return this.renderObjectWithPartial(object, path, context, block);
   }
@@ -52,13 +52,13 @@ export class ObjectRenderer extends PartialRenderer implements ObjectRenderingHo
   }
 
   /** @internal */
-  protected override async renderPartialTemplate(
+  protected override renderPartialTemplate(
     view: ViewContext,
     locals: Record<string, unknown>,
     template: RenderableTemplate,
     layout: RenderableTemplate | null,
     block: ((...args: unknown[]) => unknown) | null | undefined,
-  ): Promise<RenderedTemplate> {
+  ): RenderedTemplate {
     locals[this.localName ?? template.variable!] = this.object;
     return super.renderPartialTemplate(view, locals, template, layout, block);
   }

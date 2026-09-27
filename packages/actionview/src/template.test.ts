@@ -334,7 +334,7 @@ describe("ActionView::Template (smoke)", () => {
 
     it("does not let the compiled function's own name shadow the render helper", () => {
       expect(() => render('<%= render({ partial: "p" }) %>', {}, ctx())).toThrow(
-        /has no lookup context/,
+        /Cannot read properties of null/,
       );
     });
 
