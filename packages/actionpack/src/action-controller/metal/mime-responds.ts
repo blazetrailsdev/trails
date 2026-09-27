@@ -9,6 +9,7 @@ export type FormatHandler = () => unknown;
 type VariantBlock = (variant: VariantCollector) => unknown;
 type Response = FormatHandler | VariantBlock | VariantCollector;
 type Format = MimeType | NullType;
+type MimeMethod = (block?: FormatHandler | VariantBlock) => Response;
 
 export class Collector extends AbstractCollector {
   format: Format | null = null;
@@ -23,7 +24,7 @@ export class Collector extends AbstractCollector {
     for (const mime of mimes) this.#responses.set(Mime.get(mime) as MimeType, null);
   }
 
-  any(...args: (string | FormatHandler | VariantBlock)[]): Response {
+  any(...args: (string | FormatHandler | VariantBlock)[]): Response | string[] {
     const last = args[args.length - 1];
     const block =
       typeof last === "function" ? (args.pop() as FormatHandler | VariantBlock) : undefined;
@@ -31,13 +32,13 @@ export class Collector extends AbstractCollector {
       for (const type of args as string[]) {
         (this as unknown as Record<string, (block?: unknown) => Response>)[type](block);
       }
-      return args as unknown as Response;
+      return args as string[];
     } else {
       return this.custom(MimeType.ALL, block);
     }
   }
 
-  all(...args: (string | FormatHandler | VariantBlock)[]): Response {
+  all(...args: (string | FormatHandler | VariantBlock)[]): Response | string[] {
     return this.any(...args);
   }
 
@@ -113,8 +114,6 @@ export function respondTo(
     throw new UnknownFormat();
   }
 }
-
-type MimeMethod = (block?: FormatHandler | VariantBlock) => Response;
 
 export class VariantCollector {
   private _variant: readonly string[] | null;
