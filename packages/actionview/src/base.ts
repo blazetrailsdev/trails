@@ -254,26 +254,38 @@ export class Base {
     const oldTemplate = this.currentTemplate;
     if (addToStack) this.currentTemplate = template;
     this.outputBuffer = buffer;
-    try {
-      if (hasStrictLocals) {
-        try {
-          return compiled.call(this, locals, buffer, locals, block);
-        } catch (argumentError) {
-          if (!(argumentError instanceof ArgumentError)) throw argumentError;
-          const frame = excBacktraceLocations(argumentError)?.[1];
-          if (frame?.label === "_run") {
-            throw new StrictLocalsError(argumentError, this.currentTemplate!);
-          }
-          throw argumentError;
-        }
-      } else {
-        return compiled.call(this, locals, buffer, undefined, block);
+    const rescueArgumentError = (argumentError: unknown): never => {
+      if (!(argumentError instanceof ArgumentError)) throw argumentError;
+      const frame = excBacktraceLocations(argumentError)?.[1];
+      if (frame?.label === "_run") {
+        throw new StrictLocalsError(argumentError, this.currentTemplate!);
       }
-    } finally {
+      throw argumentError;
+    };
+    const ensure = (): void => {
       this.outputBuffer = oldOutputBuffer;
       this.virtualPath = oldVirtualPath;
       this.currentTemplate = oldTemplate;
+    };
+    let result: unknown;
+    try {
+      if (hasStrictLocals) {
+        try {
+          result = compiled.call(this, locals, buffer, locals, block);
+        } catch (argumentError) {
+          rescueArgumentError(argumentError);
+        }
+        if (result instanceof Promise) result = result.catch(rescueArgumentError);
+      } else {
+        result = compiled.call(this, locals, buffer, undefined, block);
+      }
+    } catch (error) {
+      ensure();
+      throw error;
     }
+    if (result instanceof Promise) return result.finally(ensure);
+    ensure();
+    return result;
   }
 
   /** @missingRailsCall render_partial — PERMANENT */
@@ -425,7 +437,7 @@ for (const [name, value] of Object.entries(Helpers)) {
 }
 
 Object.defineProperty(Base.prototype, "yield", {
-  get(this: Base): SafeBuffer {
+  get(this: Base): SafeBuffer | Promise<SafeBuffer> {
     return this._layoutFor();
   },
   enumerable: false,

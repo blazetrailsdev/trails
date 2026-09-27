@@ -19,6 +19,7 @@ export interface TseTemplate {
   type?: unknown;
   format?: string | null;
   shortIdentifier?: string | null;
+  _streaming?: boolean;
 }
 
 export type TseImplementation = (source: string, options?: EmitJsOptions) => EmitResult;
@@ -54,6 +55,7 @@ export class Tse implements TemplateHandler {
     const prepared = ctor.stripTrailingNewlines ? chomp(source) : source;
     const options: EmitJsOptions = {
       escapeIgnore: ctor.escapeIgnoreList.some((type) => rbEqual(type, template.type)),
+      async: template._streaming === true,
     };
     if (
       ActionView.Base.annotateRenderedViewWithFilenames &&
@@ -67,7 +69,7 @@ export class Tse implements TemplateHandler {
     const result = ctor.implementation(prepared, options);
     return result.code
       .replace(
-        /^\s*export\s+default\s+function\s+render\(context, locals\)\s*\{/u,
+        /^\s*export\s+default\s+(?:async\s+)?function\s+render\(context, locals\)\s*\{/u,
         "const context = this;",
       )
       .replace(/\}\n$/u, "");

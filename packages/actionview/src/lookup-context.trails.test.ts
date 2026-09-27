@@ -7,8 +7,10 @@ describe("LookupContext", () => {
     const registered = LookupContext.registeredDetails as string[];
     const idx = registered.indexOf("foo");
     if (idx >= 0) registered.splice(idx, 1);
-    delete LookupContext._defaultProcs().foo;
-    delete (LookupContext.prototype as unknown as Record<string, unknown>).defaultFoo;
+    if (LookupContext.Accessors.DEFAULT_PROCS.foo) {
+      delete LookupContext.Accessors.DEFAULT_PROCS.foo;
+      LookupContext.Accessors.removeMethod("defaultFoo", "foo");
+    }
   });
 
   it("defines a default_<name> reader for each registered detail", () => {
@@ -23,6 +25,25 @@ describe("LookupContext", () => {
     LookupContext.registerDetail("foo", () => [":bar"]);
     const ctx = new LookupContext([]) as LookupContext & { defaultFoo(): string[] };
     expect(ctx.defaultFoo()).toEqual([":bar"]);
+  });
+
+  it("register_detail defines the <name> reader and writer for a later detail", () => {
+    LookupContext.registerDetail("foo", () => [":bar"]);
+    const ctx = new LookupContext([]) as LookupContext & { foo: unknown };
+    expect(ctx.foo).toEqual([":bar"]);
+    const key = ctx.detailsKey();
+    ctx.foo = ":baz";
+    expect(ctx.foo).toEqual([":baz"]);
+    expect(ctx.detailsKey()).not.toBe(key);
+    ctx.foo = null;
+    expect(ctx.foo).toEqual([":bar"]);
+  });
+
+  it("the <name> writer keeps the details key when the value is unchanged", () => {
+    const ctx = new LookupContext([], { variants: [":phone"] });
+    const key = ctx.detailsKey();
+    ctx.variants = [":phone"];
+    expect(ctx.detailsKey()).toBe(key);
   });
 
   it("falls back to default_<name> when a detail is set blank", () => {

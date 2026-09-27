@@ -5,6 +5,7 @@ export interface EmitJsOptions {
   escapeIgnore?: boolean;
   preamble?: string;
   postamble?: string;
+  async?: boolean;
   fileName?: string;
   sourceFileName?: string;
 }
@@ -34,6 +35,8 @@ export function compileJs(source: string, options: EmitJsOptions = {}): EmitResu
 const BLOCK_CLOSE_RE = /^\s*\}\)*\s*;?\s*$/;
 
 const ARROW_BLOCK_RE = /=>\s*\{\s*$/;
+
+const FUNCTION_BLOCK_RE = /(?:=>|\bfunction\b[^{]*)\s*\{\s*$/;
 
 function netBraceDepth(code: string): number {
   let depth = 0;
@@ -78,14 +81,17 @@ function emit(ast: TseAst, options: EmitJsOptions): { code: string; mappings: Li
     lineStart = false;
   };
 
-  push("export default function render(context, locals) {");
+  push(`export default ${options.async ? "async " : ""}function render(context, locals) {`);
   push("const _ob = context.outputBuffer;");
   if (options.preamble) push(options.preamble);
   const innerDepths: number[] = [];
   const innerCallExprParens: number[] = [];
+  let braceDepth = 0;
+  const functionDepths: number[] = [];
   for (const node of ast.nodes) {
     const insideBlock = innerDepths.length > 0;
     const bufRef = insideBlock ? "context.outputBuffer" : "_ob";
+    const awaits = options.async === true && !insideBlock && functionDepths.length === 0;
     if (node.kind === "blockExpr") {
       const trimmed = node.value.trim();
       if (!ARROW_BLOCK_RE.test(trimmed)) {
@@ -113,7 +119,17 @@ function emit(ast: TseAst, options: EmitJsOptions): { code: string; mappings: Li
         push(emitNode(node, exprAppend, "context.outputBuffer"), node.srcLine);
       }
     } else {
-      push(emitNode(node, exprAppend, bufRef), node.srcLine);
+      if (node.kind === "code" && options.async === true) {
+        braceDepth += netBraceDepth(node.value);
+        while (
+          functionDepths.length > 0 &&
+          braceDepth < functionDepths[functionDepths.length - 1]
+        ) {
+          functionDepths.pop();
+        }
+        if (FUNCTION_BLOCK_RE.test(node.value.trimEnd())) functionDepths.push(braceDepth);
+      }
+      push(emitNode(node, exprAppend, bufRef, awaits), node.srcLine);
     }
   }
   if (innerDepths.length > 0) {
@@ -127,7 +143,8 @@ function emit(ast: TseAst, options: EmitJsOptions): { code: string; mappings: Li
   return { code, mappings: lineMappings };
 }
 
-function emitNode(node: TseNode, exprAppend: string, bufRef: string): string {
+function emitNode(node: TseNode, exprAppend: string, bufRef: string, awaits = false): string {
+  const value = awaits ? `await (${node.value})` : node.value;
   switch (node.kind) {
     case "text":
       return `${bufRef}.safeAppend(${JSON.stringify(node.value)});`;
@@ -136,9 +153,9 @@ function emitNode(node: TseNode, exprAppend: string, bufRef: string): string {
       return node.value + (t.endsWith(";") || t.endsWith("{") || t.endsWith("}") ? "" : ";");
     }
     case "expr":
-      return `${bufRef}.${exprAppend}(${node.value});`;
+      return `${bufRef}.${exprAppend}(${value});`;
     case "rawExpr":
-      return `${bufRef}.safeExprAppend(${node.value});`;
+      return `${bufRef}.safeExprAppend(${value});`;
     case "blockExpr":
       throw new Error(
         "unreachable: blockExpr nodes are handled in the emit() loop, not emitNode()",

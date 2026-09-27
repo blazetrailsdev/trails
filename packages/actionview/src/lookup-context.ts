@@ -1,7 +1,10 @@
-import { I18n, camelize } from "@blazetrails/activesupport";
+import { I18n, camelize, isPresent, kernelArray } from "@blazetrails/activesupport";
 import {
   ArgumentError,
+  Module,
+  include,
   isSymbol,
+  rbEqual,
   rbInspect,
   rbObjRespondTo,
   stringToSym,
@@ -20,8 +23,28 @@ type DetailValue = ReadonlyArray<string | symbol>;
 type DetailsMap = Record<string, DetailValue>;
 type DefaultProc = () => DetailValue;
 
-const DEFAULT_PROCS: Record<string, DefaultProc> = {};
 const REGISTERED_DETAILS: string[] = [];
+
+type DetailWriter = DetailValue | string | symbol | null | undefined;
+
+export const Accessors = Object.assign(new Module(), {
+  DEFAULT_PROCS: {} as Record<string, DefaultProc>,
+});
+
+type Accessors = {
+  get formats(): DetailValue;
+  set formats(value: DetailWriter);
+  get variants(): DetailValue;
+  set variants(value: DetailWriter);
+  get handlers(): DetailValue;
+  set handlers(value: DetailWriter);
+  get locale(): unknown;
+  set locale(value: DetailWriter);
+  defaultLocale(): DetailValue;
+  defaultFormats(): DetailValue;
+  defaultVariants(): DetailValue;
+  defaultHandlers(): DetailValue;
+};
 
 type DigestCache = Map<string | NestedDependencies, string | NestedDependencies>;
 
@@ -107,34 +130,36 @@ export class DetailsKey {
   }
 }
 
-export class LookupContext {
+export class LookupContext extends (Object as unknown as new () => Accessors) {
   static DetailsKey: typeof DetailsKey;
+  static Accessors: typeof Accessors;
 
   static get registeredDetails(): ReadonlyArray<string> {
     return REGISTERED_DETAILS;
   }
 
   /** @internal */
-  static registerDetail(name: string, proc: DefaultProc): void {
+  static registerDetail(name: string, block: DefaultProc): void {
     REGISTERED_DETAILS.push(name);
-    DEFAULT_PROCS[name] = proc;
+    Accessors.DEFAULT_PROCS[name] = block;
 
-    Object.defineProperty(LookupContext.prototype, camelize(`default_${name}`, false), {
-      value: proc,
-      writable: true,
-      configurable: true,
+    const defaultName = camelize(`default_${name}`, false);
+    Accessors.defineMethod(defaultName, block);
+    Accessors.moduleEval((mod) => {
+      Object.defineProperty(mod, camelize(name, false), {
+        get(this: LookupContext): DetailValue {
+          return this._details[name] ?? [];
+        },
+        set(this: LookupContext, value: DetailWriter) {
+          const detail: DetailValue = isPresent(value)
+            ? kernelArray(value as (string | symbol)[])
+            : (this as unknown as Record<string, DefaultProc>)[defaultName]();
+          if (!rbEqual(detail, this._details[name])) this._setDetail(name, detail);
+        },
+        configurable: true,
+      });
     });
   }
-
-  /** @internal */
-  static _defaultProcs(): Record<string, DefaultProc> {
-    return DEFAULT_PROCS;
-  }
-
-  declare defaultLocale: DefaultProc;
-  declare defaultFormats: DefaultProc;
-  declare defaultVariants: DefaultProc;
-  declare defaultHandlers: DefaultProc;
 
   private _details: DetailsMap;
   private _prefixes: string[];
@@ -149,6 +174,7 @@ export class LookupContext {
     details: DetailsMap = {},
     prefixes: string[] = [],
   ) {
+    super();
     this._prefixes = prefixes;
     this._details = this.initializeDetails({}, details);
     this._viewPaths = this.buildViewPaths(viewPaths);
@@ -157,7 +183,7 @@ export class LookupContext {
   /** @internal */
   initializeDetails(target: DetailsMap, details: DetailsMap): DetailsMap {
     for (const k of REGISTERED_DETAILS) {
-      target[k] = details[k] ?? DEFAULT_PROCS[k]();
+      target[k] = details[k] ?? Accessors.DEFAULT_PROCS[k].call(undefined);
     }
     return target;
   }
@@ -169,10 +195,10 @@ export class LookupContext {
     this._prefixes = value;
   }
 
-  get locale(): string | null {
+  override get locale(): string | null {
     return (this._details.locale[0] as string | undefined) ?? null;
   }
-  set locale(value: string | null) {
+  override set locale(value: string | null) {
     if (value != null) {
       const config = rbObjRespondTo(I18n.config(), "originalConfig")
         ? (I18n.config() as unknown as { originalConfig: ReturnType<typeof I18n.config> })
@@ -181,56 +207,39 @@ export class LookupContext {
       config.locale = isSymbol(value) ? symbolToS(value) : value;
     }
 
-    this._setDetail("locale", this.defaultLocale());
+    super.locale = this.defaultLocale();
   }
 
-  get formats(): DetailValue {
-    return this._details.formats;
+  override get formats(): DetailValue {
+    return super.formats;
   }
-  set formats(values: DetailValue | null | undefined) {
-    if (!values) {
-      this._setDetail("formats", this.defaultFormats());
-      return;
+  override set formats(values: DetailValue | null | undefined) {
+    if (values) {
+      let arr = [...values];
+      if (arr.includes("*/*")) arr = arr.filter((v) => v !== "*/*").concat(this.defaultFormats());
+      arr = Array.from(new Set(arr));
+
+      if (!Template.Types.isValidSymbols(arr)) {
+        const invalidValues = arr.filter(
+          (f) => typeof f !== "string" || !Template.Types.symbols().includes(f),
+        );
+        throw new ArgumentError(`Invalid formats: ${invalidValues.map(rbInspect).join(", ")}`);
+      }
+
+      if (arr.length === 1 && arr[0] === ":js") {
+        arr.push(":html");
+        this._htmlFallbackForJs = true;
+      }
+      values = arr;
     }
-    let arr = [...values];
-    const hadWildcard = arr.includes("*/*");
-    if (hadWildcard) {
-      arr = arr.filter((v) => v !== "*/*").concat(this.defaultFormats());
-    }
-    arr = Array.from(new Set(arr));
-    if (!Template.Types.isValidSymbols(arr)) {
-      const invalidValues = arr.filter(
-        (f) => typeof f !== "string" || !Template.Types.symbols().includes(f),
-      );
-      throw new ArgumentError(`Invalid formats: ${invalidValues.map(rbInspect).join(", ")}`);
-    }
-    if (arr.length === 1 && arr[0] === ":js") {
-      arr.push(":html");
-      this._htmlFallbackForJs = true;
-    }
-    this._setDetail("formats", arr);
+    super.formats = values;
   }
   get htmlFallbackForJs(): boolean {
     return this._htmlFallbackForJs;
   }
 
-  get variants(): DetailValue {
-    return this._details.variants;
-  }
-  set variants(values: DetailValue | null | undefined) {
-    this._setDetail("variants", values && values.length > 0 ? [...values] : this.defaultVariants());
-  }
-
-  get handlers(): DetailValue {
-    return this._details.handlers;
-  }
-  set handlers(values: DetailValue | null | undefined) {
-    this._setDetail("handlers", values && values.length > 0 ? [...values] : this.defaultHandlers());
-  }
-
   /** @internal */
   private _setDetail(key: string, value: DetailValue): void {
-    if (this._details[key] === value) return;
     this._detailsKey = null;
     this._details = { ...this._details, [key]: value };
   }
@@ -350,7 +359,7 @@ export class LookupContext {
     if (this._detailArgsForAny) return this._detailArgsForAny;
     const details: DetailsMap = {};
     for (const k of REGISTERED_DETAILS) {
-      details[k] = DEFAULT_PROCS[k]();
+      details[k] = Accessors.DEFAULT_PROCS[k]();
     }
     const key = this._detailsCache
       ? new Requested({
@@ -433,6 +442,8 @@ export class LookupContext {
 }
 
 (LookupContext as { DetailsKey: typeof DetailsKey }).DetailsKey = DetailsKey;
+LookupContext.Accessors = Accessors;
+include(LookupContext, Accessors);
 
 LookupContext.registerDetail("locale", () => {
   const locales: (string | symbol)[] = [stringToSym(I18n.locale() as string)];

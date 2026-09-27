@@ -19,6 +19,22 @@ function currentSlot(): AsyncContext<Fiber> {
   return _current;
 }
 
+interface Transfer {
+  promise: Promise<unknown>;
+  resolve(value: unknown): void;
+  reject(error: unknown): void;
+}
+
+function newTransfer(): Transfer {
+  let resolve!: (value: unknown) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<unknown>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
 /**
  * @noRailsEquivalent PERMANENT — Ruby core `Fiber` (`vendor/ruby/v3.3.11/cont.c:3530`).
  */
@@ -38,9 +54,32 @@ export class Fiber<R = unknown> {
     return root;
   }
 
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby core `Fiber.yield` (`vendor/ruby/v3.3.11/cont.c:3263`).
+   *
+   * A JS body cannot be switched away from, so the fiber's body suspends by
+   * awaiting the returned promise, which the next `resume` settles.
+   */
+  static yield(): Promise<void> {
+    const fiber = Fiber.current();
+    const transfer = fiber.#transfer;
+    if (transfer === null) {
+      throw new FiberError("attempt to yield on a not resumed fiber");
+    }
+    fiber.#status = "suspended";
+    fiber.#transfer = null;
+    return new Promise<void>((resolve) => {
+      fiber.#continue = resolve;
+      transfer.resolve(undefined);
+    });
+  }
+
   readonly #thread: Thread = Thread.current();
   readonly #block: () => R;
-  #status: "created" | "resumed" | "terminated" = "created";
+  #status: "created" | "resumed" | "suspended" | "terminated" = "created";
+  #running = false;
+  #transfer: Transfer | null = null;
+  #continue: (() => void) | null = null;
 
   /**
    * @noRailsEquivalent PERMANENT — Ruby core `Fiber.new` (`vendor/ruby/v3.3.11/cont.c:3539`).
@@ -58,26 +97,49 @@ export class Fiber<R = unknown> {
     } else if (this === Fiber.current()) {
       throw new FiberError("attempt to resume the current fiber");
     } else if (this.#status === "resumed") {
+      if (this.#transfer !== null && !this.#running) return this.#transfer.promise as R;
       throw new FiberError("attempt to resume a resumed fiber (double resume)");
     }
     if (this.#thread !== Thread.current()) {
       throw new FiberError("fiber called across threads");
     }
 
+    const transfer = (this.#transfer = newTransfer());
+    if (this.#status === "suspended") {
+      this.#status = "resumed";
+      const resume = this.#continue!;
+      this.#continue = null;
+      resume();
+      return transfer.promise as R;
+    }
+
     this.#status = "resumed";
     let value: R;
+    this.#running = true;
     try {
       value = currentSlot().run(this as Fiber, this.#block);
     } catch (error) {
       this.#status = "terminated";
+      this.#transfer = null;
       throw error;
+    } finally {
+      this.#running = false;
     }
     if (value && typeof (value as unknown as PromiseLike<unknown>).then === "function") {
-      const terminate = () => void (this.#status = "terminated");
-      (value as unknown as PromiseLike<unknown>).then(terminate, terminate);
-    } else {
-      this.#status = "terminated";
+      const terminate = (settle: (current: Transfer) => void) => {
+        this.#status = "terminated";
+        const current = this.#transfer;
+        this.#transfer = null;
+        if (current !== null) settle(current);
+      };
+      (value as unknown as PromiseLike<unknown>).then(
+        (result) => terminate((current) => current.resolve(result)),
+        (error) => terminate((current) => current.reject(error)),
+      );
+      return transfer.promise as R;
     }
+    this.#status = "terminated";
+    this.#transfer = null;
     return value;
   }
 

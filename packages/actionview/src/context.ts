@@ -14,8 +14,11 @@ export class Context {
     (this as unknown as { virtualPath: string | null }).virtualPath = null;
   }
 
-  _layoutFor(name: string | null = null): SafeBuffer {
+  _layoutFor(name: string | null = null): SafeBuffer | Promise<SafeBuffer> {
     name ??= "layout";
-    return htmlSafe(this.viewFlow.get(name).toString());
+    const content = this.viewFlow.get(name);
+    return content instanceof Promise
+      ? content.then((value) => htmlSafe(value.toString()))
+      : htmlSafe(content.toString());
   }
 }

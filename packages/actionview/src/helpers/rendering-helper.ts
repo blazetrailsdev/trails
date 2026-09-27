@@ -7,7 +7,7 @@ import { capture, type CaptureHelperHost } from "./capture-helper.js";
 export function _layoutFor(
   this: CaptureHelperHost,
   ...args: (string | null | undefined | ((...args: unknown[]) => unknown))[]
-): SafeBuffer | null {
+): SafeBuffer | null | Promise<SafeBuffer> {
   const block =
     typeof args[args.length - 1] === "function"
       ? (args.pop() as (...args: unknown[]) => unknown)
