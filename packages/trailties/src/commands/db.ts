@@ -11,7 +11,6 @@ import {
   loadDatabaseConfig,
   loadDatabaseConfigModule,
   loadAllDatabaseConfigs,
-  resolveEnv,
   resolveSchemaFormat,
   type DatabaseConfig as RawConfig,
 } from "../database.js";
@@ -102,7 +101,7 @@ interface DatabaseEntry {
 
 async function taskableDatabaseEntries(
   opts: DatabaseOpts,
-  envName: string = resolveEnv(),
+  envName: string = DatabaseTasks.env,
 ): Promise<DatabaseEntry[]> {
   const dbName = validateDatabaseFlag(opts);
   const allConfigs = await loadAllDatabaseConfigs(envName);
@@ -221,7 +220,7 @@ function inferAdapterFromUrl(url: string): string | undefined {
   }
 }
 
-function toDbConfig(raw: RawConfig, envName: string = resolveEnv()): HashConfig {
+function toDbConfig(raw: RawConfig, envName: string = DatabaseTasks.env): HashConfig {
   const normalized = normalizeRawConfig(raw);
   return new HashConfig(envName, "primary", normalized as Record<string, unknown>);
 }
@@ -485,7 +484,7 @@ async function withTargetVersionEnv(
 }
 
 async function runMigrateAll(): Promise<void> {
-  const envName = resolveEnv();
+  const envName = DatabaseTasks.env;
   const entries = await taskableDatabaseEntries({}, envName);
   const migrationsDirsFor = new Map<string, string[]>();
   for (const { name, raw } of entries) {
@@ -524,7 +523,7 @@ async function runMigrateAll(): Promise<void> {
 }
 
 async function establishTaskConnection(): Promise<void> {
-  const envName = resolveEnv();
+  const envName = DatabaseTasks.env;
   const loaded = await loadDatabaseConfigModule();
   if (!loaded || (loaded.module as Record<string, unknown>)[envName] === undefined) return;
   const raw = normalizeRawConfig(await loadDatabaseConfig(envName));
@@ -618,7 +617,7 @@ export function dbCommand(): Command {
     .option("--database <name>", "Target a specific named database")
     .action(async (opts: DatabaseOpts) => {
       await forEachDatabase(opts, async ({ adapter, prefix }) => {
-        const envName = resolveEnv();
+        const envName = DatabaseTasks.env;
         const internalMetadata = new InternalMetadata(adapter.pool);
         if (!internalMetadata.enabled) {
           const { EnvironmentStorageError } = await import("@blazetrails/activerecord");
@@ -635,7 +634,7 @@ export function dbCommand(): Command {
       "Abort if the stored schema environment is protected or does not match the current environment",
     )
     .action(async () => {
-      const envName = resolveEnv();
+      const envName = DatabaseTasks.env;
       const raw = normalizeRawConfig(await loadDatabaseConfig(envName));
       const config = toDbConfig(raw, envName);
       try {
@@ -749,7 +748,7 @@ export function dbCommand(): Command {
       "Create the database if it doesn't exist, run pending migrations, and seed when fresh",
     )
     .action(async () => {
-      const envName = resolveEnv();
+      const envName = DatabaseTasks.env;
       const entriesByEnv: Awaited<ReturnType<typeof taskableDatabaseEntries>>[] = [];
       await eachCurrentEnvironment(envName, async (environment) => {
         entriesByEnv.push(await taskableDatabaseEntries({}, environment));
@@ -948,7 +947,7 @@ export function dbCommand(): Command {
       "Dump db/schema_cache.yml for every database configuration in the current environment",
     )
     .action(async () => {
-      const envName = resolveEnv();
+      const envName = DatabaseTasks.env;
       const named = await loadAllDatabaseConfigs(envName);
       const configs = named.map(
         ({ name, config }) =>
@@ -973,7 +972,7 @@ export function dbCommand(): Command {
     )
     .action(async () => {
       const fs = getFs();
-      const envName = resolveEnv();
+      const envName = DatabaseTasks.env;
       const named = await loadAllDatabaseConfigs(envName);
       const configs = named.map(
         ({ name, config }) =>

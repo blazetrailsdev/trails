@@ -41,16 +41,20 @@ import { Configurable, Encryption } from "@blazetrails/activerecord/encryption";
 import { Configuration } from "../application/configuration.js";
 import { Configuration as TrailtieConfiguration } from "../trailtie/configuration.js";
 import { MiddlewareStackProxy } from "../configuration.js";
-import { Trails } from "../rails.js";
+import { Trails, _resetTrailsEnv } from "../rails.js";
+import { Application } from "../application.js";
 import type { ActiveRecordConfig } from "./active-record.js";
 
-const credentials = async (dir = "/nonexistent"): Promise<EncryptedConfiguration> =>
-  new EncryptedConfiguration({
+const credentials = async (dir = "/nonexistent"): Promise<EncryptedConfiguration> => {
+  const encrypted = new EncryptedConfiguration({
     configPath: `${dir}/credentials.yml.enc`,
     keyPath: `${dir}/master.key`,
     envKey: "RAILS_MASTER_KEY",
     raiseIfMissingKey: false,
   });
+  await encrypted.config();
+  return encrypted;
+};
 
 const blogApp = (): {
   config: { filterParameters: Array<string | RegExp> };
@@ -163,7 +167,9 @@ describe("RailtieTest (trails-only)", () => {
     };
     try {
       Trailtie.config.set("activeRecord", { ...(saved as object), verboseQueryLogs: true });
-      Trails.backtraceCleaner.setRoot("/srv/blog");
+      class BlogApp extends Application {}
+      Application.register(BlogApp);
+      Trails.application!.config.setRoot("/srv/blog");
       Base.logger = logger;
 
       await runTrailtieInitializers(Trailtie, blogApp());
@@ -182,7 +188,9 @@ describe("RailtieTest (trails-only)", () => {
       expect(debug[debug.length - 1]).toBe("  ↳ app/models/post.js:3:in 'eval'");
     } finally {
       Trailtie.config.set("activeRecord", saved);
-      Trails.backtraceCleaner.setRoot(undefined);
+      Trails.application = null;
+      Application.appClass = null;
+      _resetTrailsEnv();
       LogSubscriber.backtraceCleaner = savedCleaner;
       Base.logger = savedLogger;
       setVerboseQueryLogs(false);

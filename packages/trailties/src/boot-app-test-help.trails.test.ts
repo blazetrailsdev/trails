@@ -1,7 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ActionController } from "@blazetrails/actionpack";
 import { TestCase } from "@blazetrails/activesupport/test-case";
-import { DatabaseTasks } from "@blazetrails/activerecord";
 import { TestDatabases } from "@blazetrails/activerecord/test-databases";
 import { QueryAssertions } from "@blazetrails/activerecord/testing/query-assertions";
 import { env, includedModules, setEnv } from "@blazetrails/ruby-compat";
@@ -18,8 +17,6 @@ describe("test_help wires a booted app into the test case classes", () => {
     previousEnv = env.TRAILS_ENV;
     await import("./__fixtures__/boot-app/config/application.js");
     Trails.application!.config.setRoot(root);
-    DatabaseTasks.root = root;
-    DatabaseTasks.dbDir = `${root}/db`;
     await import("./__fixtures__/boot-app/test/test-helper.js");
   }, 15_000);
 

@@ -121,6 +121,9 @@ trails:
 | `rb`       | `js`         |
 | `ERB`      | `TSE`        |
 | `Erb`      | `Tse`        |
+| `rubocop`  | `eslint`     |
+| `RuboCop`  | `ESLint`     |
+| `Rubocop`  | `Eslint`     |
 
 Test names are not an exception. Rails'
 `test "ERB::Util.html_escape should escape unsafe characters"`

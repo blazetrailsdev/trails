@@ -151,6 +151,27 @@ describe("snakeToCamel", () => {
     }
   });
 
+  it("renames the `rubocop` token to `eslint` (trails lints with ESLint)", () => {
+    expect(rubyMethodToTs("apply_rubocop_autocorrect_after_generate!")).toContain(
+      "applyEslintAutocorrectAfterGenerateBang",
+    );
+    expect(snakeToCamel("skip_rubocop")).toBe("skipEslint");
+    expect(snakeToCamel("create_rubocop_file")).toBe("createEslintFile");
+    expect(snakeToCamel("rubocop")).toBe("eslint");
+    expect(snakeToCamel("RuboCop")).toBe("ESLint");
+    expect(snakeToCamel("RuboCopConfig")).toBe("ESLintConfig");
+    expect(snakeToCamel("Rubocop_Runner")).toBe("EslintRunner");
+    expect(rubyFileToTs("templates/rubocop.yml.tt")).toBe("templates/eslint.yml.tt.ts");
+    expect(rubyFileToTs("bin/rubocop.tt")).toBe("bin/eslint.tt.ts");
+  });
+
+  it("does NOT rename `rubocop` inside another token", () => {
+    expect(snakeToCamel("rubocops")).toBe("rubocops");
+    expect(snakeToCamel("run_rubocopper")).toBe("runRubocopper");
+    expect(snakeToCamel("NotRuboCop")).toBe("NotRuboCop");
+    expect(rubyFileToTs("rubocopper.rb")).toBe("rubocopper.ts");
+  });
+
   it("does NOT rename a file-path token that appears as a substring", () => {
     expect(rubyFileToTs("http_verb.rb")).toBe("http-verb.ts");
     expect(rubyFileToTs("superb/thing.rb")).toBe("superb/thing.ts");

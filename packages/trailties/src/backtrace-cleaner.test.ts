@@ -1,5 +1,7 @@
 import { describe, expect, test, beforeEach } from "vitest";
 import { BacktraceCleaner } from "./backtrace-cleaner.js";
+import { Application } from "./application.js";
+import { Trails } from "./rails.js";
 
 describe("BacktraceCleanerTest", () => {
   let cleaner: BacktraceCleaner;
@@ -114,9 +116,17 @@ describe("BacktraceCleanerTest", () => {
     expect(frame).toBe("app/views/application/index.html.tse:4");
   });
 
-  test("setRoot strips application root from absolute paths", () => {
-    cleaner.setRoot("/my/app");
-    const result = cleaner.clean(["/my/app/app/models/user.rb:10"]);
-    expect(result[0]).toBe("app/models/user.rb:10");
+  test("strips the configured application root from absolute paths", () => {
+    class RootApp extends Application {}
+    Application.register(RootApp);
+    try {
+      expect(cleaner.clean(["/my/app/app/models/user.rb:10"])).toEqual([]);
+      Trails.application!.config.setRoot("/my/app");
+      const result = cleaner.clean(["/my/app/app/models/user.rb:10"]);
+      expect(result[0]).toBe("app/models/user.rb:10");
+    } finally {
+      Trails.application = null;
+      Application.appClass = null;
+    }
   });
 });

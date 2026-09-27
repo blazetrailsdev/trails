@@ -96,6 +96,7 @@ describe("ArInitTest", () => {
       },
       devDependencies: {
         "@blazetrails/trails-tsc": "*",
+        tsx: "^4.20.0",
       },
     };
     await writeFile(join(root, "package.json"), JSON.stringify(original, null, 2) + "\n", "utf8");

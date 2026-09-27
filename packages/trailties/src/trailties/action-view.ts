@@ -7,9 +7,16 @@ import {
   Resolver,
   RoutingUrlFor,
   setApplyStylesheetMediaDefault,
+  setButtonToGeneratesButtonTag,
+  setDefaultEnforceUtf8,
+  setEmbedAuthenticityTokenInRemoteForms,
+  setFormWithGeneratesIds,
+  setFormWithGeneratesRemoteForms,
   setImageDecoding,
   setImageLoading,
   setPreloadLinksHeader,
+  setPrependContentExfiltrationPrevention,
+  setSanitizerVendor,
   ViewReloader,
 } from "@blazetrails/actionview";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
@@ -25,6 +32,10 @@ export interface ActionViewConfig {
   prependContentExfiltrationPrevention: boolean;
   annotateRenderedViewWithFilenames: boolean;
   cacheTemplateLoading?: boolean | null;
+  formWithGeneratesRemoteForms?: boolean;
+  formWithGeneratesIds?: boolean | null;
+  sanitizerVendor?: Parameters<typeof setSanitizerVendor>[0] | null;
+  buttonToGeneratesButtonTag?: boolean | null;
 }
 
 declare module "../trailtie/configuration.js" {
@@ -58,6 +69,63 @@ export class Trailtie extends BaseTrailtie {
 
     this.config.afterInitialize((app) => {
       const actionView = (app as TrailtieApp).config.get("actionView") as ActionViewConfig;
+      const embedAuthenticityTokenInRemoteForms = actionView.embedAuthenticityTokenInRemoteForms;
+      delete (actionView as Partial<ActionViewConfig>).embedAuthenticityTokenInRemoteForms;
+      setEmbedAuthenticityTokenInRemoteForms(embedAuthenticityTokenInRemoteForms ?? null);
+    });
+
+    this.config.afterInitialize((app) => {
+      const actionView = (app as TrailtieApp).config.get("actionView") as ActionViewConfig;
+      const formWithGeneratesRemoteForms = actionView.formWithGeneratesRemoteForms;
+      delete actionView.formWithGeneratesRemoteForms;
+      setFormWithGeneratesRemoteForms(formWithGeneratesRemoteForms as boolean);
+    });
+
+    this.config.afterInitialize((app) => {
+      const actionView = (app as TrailtieApp).config.get("actionView") as ActionViewConfig;
+      const formWithGeneratesIds = actionView.formWithGeneratesIds;
+      delete actionView.formWithGeneratesIds;
+      if (formWithGeneratesIds != null) {
+        setFormWithGeneratesIds(formWithGeneratesIds);
+      }
+    });
+
+    this.config.afterInitialize((app) => {
+      const actionView = (app as TrailtieApp).config.get("actionView") as ActionViewConfig;
+      const defaultEnforceUtf8 = actionView.defaultEnforceUtf8;
+      delete (actionView as Partial<ActionViewConfig>).defaultEnforceUtf8;
+      if (defaultEnforceUtf8 != null) {
+        setDefaultEnforceUtf8(defaultEnforceUtf8);
+      }
+    });
+
+    this.config.afterInitialize((app) => {
+      const actionView = (app as TrailtieApp).config.get("actionView") as ActionViewConfig;
+      const prependContentExfiltrationPrevention = actionView.prependContentExfiltrationPrevention;
+      delete (actionView as Partial<ActionViewConfig>).prependContentExfiltrationPrevention;
+      setPrependContentExfiltrationPrevention(prependContentExfiltrationPrevention);
+    });
+
+    this.config.afterInitialize((app) => {
+      const actionView = (app as TrailtieApp).config.get("actionView") as ActionViewConfig;
+      const klass = actionView.sanitizerVendor;
+      delete actionView.sanitizerVendor;
+      if (klass != null) {
+        setSanitizerVendor(klass);
+      }
+    });
+
+    this.config.afterInitialize((app) => {
+      const actionView = (app as TrailtieApp).config.get("actionView") as ActionViewConfig;
+      const buttonToGeneratesButtonTag = actionView.buttonToGeneratesButtonTag;
+      delete actionView.buttonToGeneratesButtonTag;
+      if (buttonToGeneratesButtonTag != null) {
+        setButtonToGeneratesButtonTag(buttonToGeneratesButtonTag);
+      }
+    });
+
+    this.config.afterInitialize((app) => {
+      const actionView = (app as TrailtieApp).config.get("actionView") as ActionViewConfig;
       const imageLoading = actionView.imageLoading;
       delete actionView.imageLoading;
       setImageLoading(imageLoading ?? null);
@@ -70,6 +138,15 @@ export class Trailtie extends BaseTrailtie {
       const applyStylesheetMediaDefault = actionView.applyStylesheetMediaDefault;
       delete actionView.applyStylesheetMediaDefault;
       setApplyStylesheetMediaDefault(applyStylesheetMediaDefault ?? null);
+    });
+
+    this.config.afterInitialize((app) => {
+      onLoad("action_view", (base: typeof Base) => {
+        const actionView = (app as TrailtieApp).config.get("actionView") as ActionViewConfig;
+        for (const [k, v] of Object.entries(actionView)) {
+          (base as unknown as Record<string, unknown>)[k] = v;
+        }
+      });
     });
 
     this.config.afterInitialize((app) => {
@@ -113,11 +190,6 @@ export class Trailtie extends BaseTrailtie {
           new Module((mod) => mod.include(UrlFor)),
         );
       });
-    });
-
-    this.initializer("action_view.annotate_rendered_view_with_filenames", () => {
-      const cfg = this.config.get("actionView") as ActionViewConfig;
-      Base.annotateRenderedViewWithFilenames = cfg.annotateRenderedViewWithFilenames;
     });
   }
 }

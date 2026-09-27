@@ -254,6 +254,7 @@ export abstract class CollectionAssociation extends Association {
       return records;
     }
 
+    await this.klass.ensureSchemaLoaded();
     let yielded: unknown;
     const record = this.buildRecord(
       attributes,

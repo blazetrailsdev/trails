@@ -2,14 +2,9 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
-  assertRaises,
-  OrderedOptions,
-  resetLoadHooks,
-  runLoadHooks,
-} from "@blazetrails/activesupport";
+import { assertRaises, OrderedOptions, runLoadHooks } from "@blazetrails/activesupport";
 import { Base, Resolver } from "@blazetrails/actionview";
-import "../trailties/action-view.js";
+import { Trailtie as ActionViewTrailtie } from "../trailties/action-view.js";
 import { env, RuntimeError, setEnv } from "@blazetrails/ruby-compat";
 import { Application } from "../application.js";
 import { Trails, _resetTrailsEnv } from "../rails.js";
@@ -53,7 +48,6 @@ describe("ConfigurationTest", () => {
   const trailsEnv = env.TRAILS_ENV;
 
   beforeEach(async () => {
-    resetLoadHooks();
     appPath = await mkdtemp(join(tmpdir(), "trails-config-for-"));
     await mkdir(join(appPath, "config"));
     await writeFile(join(appPath, "config.ts"), "");
@@ -62,7 +56,7 @@ describe("ConfigurationTest", () => {
   afterEach(async () => {
     Resolver.caching = true;
     Application.appClass = null;
-    resetLoadHooks();
+    delete ActionViewTrailtie.config.actionView.cacheTemplateLoading;
     setEnv("TRAILS_ENV", trailsEnv);
     _resetTrailsEnv();
     await rm(appPath, { recursive: true, force: true });
@@ -189,5 +183,25 @@ describe("ConfigurationTest", () => {
     runLoadHooks("action_view", Base);
 
     expect(Resolver.isCaching()).toBe(false);
+  });
+
+  it("config.action_view.cache_template_loading = false", async () => {
+    const application = await app("development");
+    application.config.enableReloading = false;
+    application.config.actionView.cacheTemplateLoading = false;
+    await application.initialize();
+    runLoadHooks("action_view", Base);
+
+    expect(Resolver.isCaching()).toBe(false);
+  });
+
+  it("config.action_view.cache_template_loading = true", async () => {
+    const application = await app("development");
+    application.config.enableReloading = true;
+    application.config.actionView.cacheTemplateLoading = true;
+    await application.initialize();
+    runLoadHooks("action_view", Base);
+
+    expect(Resolver.isCaching()).toBe(true);
   });
 });

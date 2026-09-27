@@ -385,6 +385,7 @@ export class Association<Target extends Base | Base[] = Base | Base[]> {
     raise = false,
     block?: (record: Base) => void | Promise<void>,
   ): Promise<Base | Base[] | null> {
+    await this.klass.ensureSchemaLoaded();
     let yielded: unknown;
     const record = this.buildRecord(
       attributes as Record<string, unknown> | undefined,

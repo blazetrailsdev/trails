@@ -42,6 +42,13 @@ export const TOKEN_RENAMES: Record<string, string> = {
   rb: "js",
   ERB: "TSE",
   Erb: "Tse",
+  // trails lints with ESLint, never RuboCop: `apply_rubocop_autocorrect_after_generate!`
+  // (railties/lib/rails/configuration.rb:134-139), `skip_rubocop?`
+  // (generators/app_base.rb:392-393) and `create_rubocop_file`
+  // (generators/rails/app/app_generator.rb:393-395) credit at the ESLint spelling.
+  rubocop: "eslint",
+  RuboCop: "ESLint",
+  Rubocop: "Eslint",
 };
 
 /**
