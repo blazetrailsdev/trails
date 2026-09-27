@@ -306,7 +306,7 @@ describe("Engine", () => {
     Trailtie.register(MountedEngine);
     expect(MountedEngine.instance().hasRoutes()).toBe(false);
     const r1 = MountedEngine.instance().routes((mapper) => {
-      mapper.get("/mounted", "mounted#index");
+      mapper.get("/mounted", { to: "mounted#index" });
     });
     expect(r1).toBeInstanceOf(RouteSet);
     expect(MountedEngine.instance().routes(() => {})).toBe(r1);

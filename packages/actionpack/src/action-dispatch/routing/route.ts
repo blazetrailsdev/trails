@@ -49,6 +49,7 @@ export interface RouteOptions {
   internal?: boolean;
   on?: string;
   app?: MountableApp;
+  pattern?: Pattern;
 }
 
 export type ResourceAction = "index" | "show" | "new" | "create" | "edit" | "update" | "destroy";
@@ -105,6 +106,8 @@ export class Route {
   private _pathRequirements: Record<string, RegExp> | null = null;
   /** @internal */
   private _journeyRouterUnbuildable = false;
+  /** @internal */
+  private _pattern: Pattern | undefined;
 
   constructor(
     verb: string | readonly string[],
@@ -136,6 +139,7 @@ export class Route {
     this.scopeOptions = options.scopeOptions ?? {};
     this.requiredDefaults = options.requiredDefaults ?? [];
     this.to = options.app;
+    this._pattern = options.pattern;
 
     this.paramNames = collectParamNamesFromJourneyAst(this.path);
   }
@@ -212,6 +216,19 @@ export class Route {
       if (!paths.has(k) && k in Request.prototype) out[k] = this.constraints[k];
     }
     return out;
+  }
+
+  get pattern(): Pattern {
+    if (this._pattern === undefined) {
+      const reqs: Record<string, RegExp> = Object.create(null);
+      for (const [k, v] of Object.entries(this.pathConstraints)) {
+        if (v instanceof RegExp) reqs[k] = v;
+        else if (typeof v === "string") reqs[k] = new RegExp(v);
+      }
+      const ast = new Ast(new Parser().parse(this.path)!, this.formatted);
+      this._pattern = new Pattern(ast, reqs, PATHFOR_SEPARATORS, this.anchor);
+    }
+    return this._pattern;
   }
 
   get pathConstraints(): Record<string, unknown> {

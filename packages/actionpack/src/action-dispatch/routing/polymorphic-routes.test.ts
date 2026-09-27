@@ -126,7 +126,7 @@ describe("polymorphic dispatch with leading RoutesProxy", () => {
         return `/mounted/posts/${(args[0] as Post).id}`;
       },
     };
-    const routes: UrlForRoutes = { urlFor: () => "" };
+    const routes: UrlForRoutes = { urlFor: () => "", isOptimizeRoutesGeneration: () => true };
     const scope: UrlForHost = {
       _routes: routes,
       defaultUrlOptions: { locale: "en" },

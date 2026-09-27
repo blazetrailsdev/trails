@@ -82,8 +82,8 @@ describe("ControllerGeneratorTest", () => {
     const gen = makeGen();
     gen.run("Account", ["foo", "bar"]);
     const routes = readFile("config/routes.ts");
-    expect(routes).toContain('router.get("/account/foo", "account#foo")');
-    expect(routes).toContain('router.get("/account/bar", "account#bar")');
+    expect(routes).toContain('router.get("account/foo")');
+    expect(routes).toContain('router.get("account/bar")');
   });
 
   it("skip routes", () => {
@@ -125,7 +125,7 @@ describe("ControllerGeneratorTest", () => {
     gen.run("admin/dashboard", ["index"]);
     const routes = readFile("config/routes.ts");
     expect(routes).toContain('router.namespace("admin"');
-    expect(routes).toContain('router.get("/dashboard/index", "dashboard#index")');
+    expect(routes).toContain('router.get("dashboard/index")');
   });
 
   it("namespaced routes with multiple actions are created in routes", () => {
@@ -133,8 +133,8 @@ describe("ControllerGeneratorTest", () => {
     gen.run("admin/dashboard", ["index", "show"]);
     const routes = readFile("config/routes.ts");
     expect(routes).toContain('router.namespace("admin"');
-    expect(routes).toContain('router.get("/dashboard/index", "dashboard#index")');
-    expect(routes).toContain('router.get("/dashboard/show", "dashboard#show")');
+    expect(routes).toContain('router.get("dashboard/index")');
+    expect(routes).toContain('router.get("dashboard/show")');
   });
 
   it("deeply nested namespace routes are created in routes", () => {
@@ -144,7 +144,7 @@ describe("ControllerGeneratorTest", () => {
     expect(routes).toContain('router.namespace("admin"');
     expect(routes).toContain('router.namespace("api"');
     expect(routes).toMatch(/router\.namespace\("admin"[\s\S]*router\.namespace\("api"/);
-    expect(routes).toContain('router.get("/dashboard/index", "dashboard#index")');
+    expect(routes).toContain('router.get("dashboard/index")');
   });
 
   it("does not add routes when action is not specified", () => {

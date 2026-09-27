@@ -71,7 +71,7 @@ describe("createAppServer", () => {
 
     server.registerController("broken", BrokenController);
     server.drawRoutes((r: any) => {
-      r.get("/broken", "broken#index");
+      r.get("/broken", { to: "broken#index" });
     });
 
     const [status, _headers, body] = await server.call(makeEnv("GET", "/broken"));

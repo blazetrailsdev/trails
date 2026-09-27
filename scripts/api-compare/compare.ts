@@ -1105,6 +1105,28 @@ export const SAME_FILE_CLOSURE_DEPTH = 3;
 const SYNTHETIC_CALL_NAMES: ReadonlySet<string> = new Set(["constructor"]);
 
 /**
+ * {@link rubyCallToTs} for one body's call, given the receiver kinds its sites
+ * had. In a file defining an instance `def new`, a `recv.new(...)` whose
+ * receivers are never a constant may be that method — `@scope.new(...)`
+ * (mapper.rb:1046) calls `Scope#new` (mapper.rb:2351), which a TS
+ * `this._scope.new(...)` ports — so a TS `new` call answers it beside
+ * `constructor`. `Klass.new` keeps expecting `constructor` alone.
+ */
+export function rubyCallToTsForReceivers(
+  rc: string,
+  pkg: string | undefined,
+  receivers: Record<string, string[]> | undefined,
+  fileDefinesInstanceNew: boolean,
+): string[] | null {
+  const mapped = rubyCallToTs(rc, pkg);
+  const kinds = receivers?.[rc];
+  if (rc !== "new" || !fileDefinesInstanceNew || kinds === undefined || kinds.includes("const")) {
+    return mapped;
+  }
+  return [...(mapped ?? []), "new"];
+}
+
+/**
  * The same-file methods a TS body reaches transitively, up to `depth` hops.
  *
  * `sameFileCalls` resolves a method name to its call-set ONLY when that method
@@ -4369,6 +4391,8 @@ export function main() {
       const rubyReaderNames = new Set<string>();
       const rubyOwnerShortNames = new Set<string>();
       const rubyOwnersDefiningInitialize = new Set<string>();
+      // See rubyCallToTsForReceivers.
+      let rubyFileDefinesInstanceNew = false;
       // (owner, name) pairs the extractor bucketed as CLASS methods — the
       // singleton seat wherever the owner FQN does not already say so (see
       // rubyOwnerSeat).
@@ -4387,6 +4411,7 @@ export function main() {
         if (rubyMethods.some((rm) => rm.name === "initialize")) {
           rubyOwnersDefiningInitialize.add(itemShort);
         }
+        if (f.instance.some((rm) => rm.name === "new")) rubyFileDefinesInstanceNew = true;
         for (const rm of rubyMethods) {
           // Collected ahead of the mode filter: a Rails `attr_reader` is
           // usually private while the bodies reading it are public, so a
@@ -4582,6 +4607,12 @@ export function main() {
       // (b) are absent from the TS body's call-set. A coarse body-fidelity
       // signal — never affects the parity %. Lossy: legitimate restructuring
       // (extracted helper, inlined call) shows up here, so it's advisory.
+      const rubyCallToTsForBody = (
+        rc: string,
+        receivers: Record<string, string[]> | undefined,
+      ): string[] | null =>
+        rubyCallToTsForReceivers(rc, pkg, receivers, rubyFileDefinesInstanceNew);
+
       const checkCalls = (
         rubyName: string,
         tsName: string,
@@ -4670,7 +4701,7 @@ export function main() {
           // promote zero-arg readers (`spawn`, `isReadonlyAttribute`) past the
           // gate the moment alias bindings started carrying real params.
           (c) => portedWithArgsSigs(tsFile, c).some((sig) => stripThis(sig).length > 0),
-          (rc) => rubyCallToTs(rc, pkg),
+          (rc) => rubyCallToTsForBody(rc, rubyOwned?.receivers),
           significantCallsForReceivers(rubyOwned?.receivers, callsSignificant),
           (rc) => jsEnumerableAliases(rc, rubyOwned?.receivers?.[rc]),
           negatedTsCalls,
@@ -4721,7 +4752,7 @@ export function main() {
               rubyCalls,
               [...partitionNegatedCalls(seqSets[0]).calls],
               (c) => portedWithArgsSigs(tsFile, c).some((sig) => stripThis(sig).length > 0),
-              (rc) => rubyCallToTs(rc, pkg),
+              (rc) => rubyCallToTsForBody(rc, rubyOwned?.receivers),
               callsSignificant,
               rubyOwned?.calls ?? rubyCalls,
             ),
