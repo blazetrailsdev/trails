@@ -1,10 +1,12 @@
 import { describe, it, expect } from "vitest";
+import { getFs, getOsAsync, getPath } from "@blazetrails/ruby-compat";
 import { useInMemoryDatabaseUrl } from "../support/in-memory-database-url.js";
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
 import { Trailtie } from "./active-record.js";
 import { Trailtie as ActionDispatchTrailtie } from "./action-dispatch.js";
 import {
   Deprecators,
+  EncryptedConfiguration,
   Logger,
   NotificationEvent,
   Notifications,
@@ -42,9 +44,13 @@ import { MiddlewareStackProxy } from "../configuration.js";
 import { Trails } from "../rails.js";
 import type { ActiveRecordConfig } from "./active-record.js";
 
-const credentials = async (
-  config: Record<string, unknown> = {},
-): Promise<{ config(): Promise<Record<string, unknown>> }> => ({ config: async () => config });
+const credentials = async (dir = "/nonexistent"): Promise<EncryptedConfiguration> =>
+  new EncryptedConfiguration({
+    configPath: `${dir}/credentials.yml.enc`,
+    keyPath: `${dir}/master.key`,
+    envKey: "RAILS_MASTER_KEY",
+    raiseIfMissingKey: false,
+  });
 
 const blogApp = (): {
   config: { filterParameters: Array<string | RegExp> };
@@ -64,16 +70,20 @@ describe("RailtieTest (trails-only)", () => {
     const deterministicKey = Configurable.config.hasDeterministicKey();
     const keyDerivationSalt = Configurable.config.hasKeyDerivationSalt();
     try {
+      const fs = getFs();
+      const dir = await fs.mkdtemp!(`${(await getOsAsync()).tmpdir()}${getPath().sep}config-`);
+      await fs.writeFile!(`${dir}/master.key`, EncryptedConfiguration.generateKey());
+      await (
+        await credentials(dir)
+      ).write(
+        "active_record_encryption:\n" +
+          "  primary_key: credentials-primary-key\n" +
+          "  deterministic_key: credentials-deterministic-key\n" +
+          "  key_derivation_salt: credentials-salt\n",
+      );
       await runTrailtieInitializers(Trailtie, {
         ...blogApp(),
-        credentials: () =>
-          credentials({
-            active_record_encryption: {
-              primary_key: "credentials-primary-key",
-              deterministic_key: "credentials-deterministic-key",
-              key_derivation_salt: "credentials-salt",
-            },
-          }),
+        credentials: () => credentials(dir),
       });
       runLoadHooks("active_record_encryption", Encryption);
       expect(Configurable.config.primaryKey).toBe("credentials-primary-key");

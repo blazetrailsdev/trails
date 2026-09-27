@@ -22,15 +22,19 @@ import {
 import { ExtendedDeterministicUniquenessValidator } from "@blazetrails/activerecord";
 import { UniquenessValidator } from "@blazetrails/activerecord";
 import { deprecator } from "@blazetrails/activerecord";
-import { Deprecators, Executor } from "@blazetrails/activesupport";
+import { Deprecators, EncryptedConfiguration, Executor } from "@blazetrails/activesupport";
 import {
   raiseOnAssignToAttrReadonly,
   setRaiseOnAssignToAttrReadonly,
 } from "@blazetrails/activerecord";
 
-const credentials = async (
-  config: Record<string, unknown> = {},
-): Promise<{ config(): Promise<Record<string, unknown>> }> => ({ config: async () => config });
+const credentials = async (dir = "/nonexistent"): Promise<EncryptedConfiguration> =>
+  new EncryptedConfiguration({
+    configPath: `${dir}/credentials.yml.enc`,
+    keyPath: `${dir}/master.key`,
+    envKey: "RAILS_MASTER_KEY",
+    raiseIfMissingKey: false,
+  });
 
 const blogApp = (): {
   config: { filterParameters: Array<string | RegExp> };

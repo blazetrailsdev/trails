@@ -3,6 +3,7 @@ import "./action-controller.js";
 import {
   constantize,
   include,
+  type EncryptedConfiguration,
   isPresent,
   onLoad,
   TopLevel,
@@ -113,7 +114,7 @@ const setPostgresqlDecodeDates = (adapter: typeof PostgreSQLAdapter): void => {
 interface TrailtieApp {
   deprecators: Deprecators;
   config: { get(key: string): unknown; fileWatcher: unknown };
-  credentials(): Promise<{ config(): Promise<Record<string, unknown>> }>;
+  credentials(): Promise<EncryptedConfiguration>;
 }
 
 /** @noRailsEquivalent PERMANENT */
