@@ -109,11 +109,9 @@ describe("Mapper#nested under a singleton resource", () => {
         nestedConstraints = m._scope.get("constraints");
       });
     });
-    const index = set
-      .getRoutes()
-      .find(
-        (r) => r.defaults.action === "index" && String(r.defaults.controller).endsWith("infos"),
-      );
+    const index = set.routes.routes.find(
+      (r) => r.defaults.action === "index" && String(r.defaults.controller).endsWith("infos"),
+    );
     expect(index?.path.spec.toString()).toBe("/session/infos(.:format)");
     expect(index?.name).toBe("session_infos");
     expect((nestedConstraints as Record<string, unknown>)["session_id"]).toEqual(/\d+/);
@@ -124,7 +122,7 @@ describe("Mapper#match hash form and multi-path arms", () => {
   it("takes the route path from the one key that is not a Symbol", () => {
     const set = new RouteSet();
     new Mapper(set).match({ "/foo": "posts#index", ":via": "get" });
-    const [route] = set.getRoutes();
+    const [route] = set.routes.routes;
     expect(route.path.spec.toString()).toBe("/foo(.:format)");
     expect(route.defaults.controller).toBe("posts");
     expect(route.defaults.action).toBe("index");
@@ -161,7 +159,7 @@ describe("Mapper#match hash form and multi-path arms", () => {
     const m = new Mapper(set);
     m.controller("posts", () => m.match({ "/all": ":index", ":via": "get" }));
     m.match({ "/comments/:action": "comments", ":via": "get" });
-    const [all, comments] = set.getRoutes();
+    const [all, comments] = set.routes.routes;
     expect([all.defaults.controller, all.defaults.action]).toEqual(["posts", "index"]);
     expect(comments.defaults.controller).toBe("comments");
   });
@@ -178,7 +176,7 @@ describe("Mapper#match hash form and multi-path arms", () => {
     } finally {
       dep.behavior = previous;
     }
-    expect(set.getRoutes().map((r) => r.path.spec.toString())).toEqual([
+    expect(set.routes.routes.map((r) => r.path.spec.toString())).toEqual([
       "/one(.:format)",
       "/two(.:format)",
     ]);
@@ -191,7 +189,7 @@ describe("Mapper HTTP verb helpers forward args through map_method", () => {
     const set = new RouteSet();
     const m = new Mapper(set);
     expect(m.get({ "/foo": "posts#index" })).toBe(m);
-    const [route] = set.getRoutes();
+    const [route] = set.routes.routes;
     expect(route.path.spec.toString()).toBe("/foo(.:format)");
     expect(route.verb).toBe("GET");
     expect([route.defaults.controller, route.defaults.action]).toEqual(["posts", "index"]);
@@ -208,7 +206,7 @@ describe("Mapper HTTP verb helpers forward args through map_method", () => {
     } finally {
       dep.behavior = previous;
     }
-    expect(set.getRoutes().map((r) => [r.verb, r.path.spec.toString()])).toEqual([
+    expect(set.routes.routes.map((r) => [r.verb, r.path.spec.toString()])).toEqual([
       ["POST", "/one(.:format)"],
       ["POST", "/two(.:format)"],
     ]);
@@ -217,7 +215,7 @@ describe("Mapper HTTP verb helpers forward args through map_method", () => {
   it("connect maps GET and CONNECT", () => {
     const set = new RouteSet();
     new Mapper(set).connect("/live", { to: "live#index" });
-    expect(set.getRoutes()[0].verb).toBe("GET|CONNECT");
+    expect(set.routes.routes[0].verb).toBe("GET|CONNECT");
   });
 });
 

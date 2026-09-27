@@ -106,7 +106,7 @@ export class UnusedRoutesCommand extends Base {
   private async routes(): Promise<Journey.Route[]> {
     if (this._routes === null) {
       const routes: Journey.Route[] = [];
-      for (const route of Trails.application!.routes().getRoutes()) {
+      for (const route of Trails.application!.routes().routes.routes) {
         if (await new RouteInfo(route).unused()) routes.push(route);
       }
       this._routes = routes;

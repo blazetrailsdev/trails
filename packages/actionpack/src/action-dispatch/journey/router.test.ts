@@ -38,7 +38,7 @@ function _generate(
 ): [string, Record<string, string>] {
   const path = routeSet.generate(routeName, options, recall).path(null);
   const captures = new Set<string>();
-  for (const route of routeSet.getRoutes()) {
+  for (const route of routeSet.routes.routes) {
     for (const name of route.segmentKeys) captures.add(name);
   }
   const params: Record<string, string> = {};

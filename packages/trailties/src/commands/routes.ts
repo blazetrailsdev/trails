@@ -41,7 +41,7 @@ interface RoutesOptions {
 
 /** @internal */
 function inspector(): RoutesInspector {
-  return new RoutesInspector(Trails.application!.routes().getRoutes());
+  return new RoutesInspector(Trails.application!.routes().routes.routes);
 }
 
 /** @internal */

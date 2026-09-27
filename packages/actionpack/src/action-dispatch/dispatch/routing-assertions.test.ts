@@ -38,7 +38,7 @@ describe("ActionDispatch::Routing::Assertions", () => {
       r.get("/temp", { to: "temp#index", as: "temp" });
     });
     expect(routes.pathFor({}, "temp")).toBe("/temp");
-    routes.clear();
+    routes.clearBang();
     expect(() => routes.pathFor({}, "temp")).toThrow();
   });
 });

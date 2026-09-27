@@ -217,7 +217,7 @@ describe("TestRoutingMapper", () => {
       r.root("pages#home");
       r.resources("posts");
     });
-    expect(routes.getRoutes().length).toBe(9);
+    expect(routes.routes.routes.length).toBe(9);
   });
 
   it("returns 404 for unmatched routes", async () => {

@@ -14,11 +14,11 @@ beforeAll(() => {
 describe("RouteSetTest", () => {
   it("not being empty when route is added", () => {
     const routes = new RouteSet();
-    expect(routes.getRoutes().length).toBe(0);
+    expect(routes.routes.routes.length).toBe(0);
     routes.draw((r) => {
       r.get("/foo", { to: "foo#index" });
     });
-    expect(routes.getRoutes().length).toBeGreaterThan(0);
+    expect(routes.routes.routes.length).toBeGreaterThan(0);
   });
 
   it("URL helpers are added when route is added", () => {
@@ -64,9 +64,9 @@ describe("RouteSetTest", () => {
       r.get("/foo", { to: "foo#index", as: "foo" });
     });
     expect(routes.pathFor({}, "foo")).toBe("/foo");
-    routes.clear();
+    routes.clearBang();
     expect(() => routes.pathFor({}, "foo")).toThrow();
-    expect(routes.getRoutes().length).toBe(0);
+    expect(routes.routes.routes.length).toBe(0);
   });
 
   it("only_path: true with *_url and no :host option", () => {
@@ -145,7 +145,7 @@ describe("RouteSetTest", () => {
     expect(routes.isEmpty()).toBe(false);
     routes.clearBang();
     expect(routes.isEmpty()).toBe(true);
-    expect(routes.getNamedRoutes().has("x")).toBe(false);
+    expect(routes.namedRoutes.routes.has("x")).toBe(false);
   });
 
   it("append/finalizeBang and prepend/clearBang", () => {

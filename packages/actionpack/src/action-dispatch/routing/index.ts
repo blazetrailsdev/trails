@@ -8,12 +8,6 @@ export {
   type RoutesFormatter,
 } from "./inspector.js";
 export {
-  generateRouteHelpers,
-  type RouteHelpersMap,
-  type PathHelper,
-  type UrlHelper,
-} from "./route-helpers.js";
-export {
   polymorphicUrl,
   polymorphicPath,
   editPolymorphicUrl,
@@ -58,7 +52,6 @@ export {
   urlOptions,
   routeFor,
   optimizeRoutesGeneration,
-  initialize,
   _withRoutes,
   _routesContext,
   type UrlForHost,

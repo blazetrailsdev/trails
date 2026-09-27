@@ -30,7 +30,7 @@ describe("MapperTest", () => {
     const fakeset = new FakeSet();
     const m = new Mapper(fakeset);
     m.get("/foo", { to: "posts#index", as: "main", format: true });
-    const route = fakeset.getRoutes()[0];
+    const route = fakeset.routes.routes[0];
     expect(route.defaults).toEqual({ controller: "posts", action: "index" });
     expect(route.path.spec.toString()).toBe("/foo.:format");
   });
@@ -41,7 +41,7 @@ describe("MapperTest", () => {
     m.scope({ format: true } as Parameters<Mapper["scope"]>[0], () => {
       m.get("/foo", { to: "posts#index", as: "main" });
     });
-    const route = fakeset.getRoutes()[0];
+    const route = fakeset.routes.routes[0];
     expect(route.defaults).toEqual({ controller: "posts", action: "index" });
     expect(route.path.spec.toString()).toBe("/foo.:format");
   });
@@ -52,7 +52,7 @@ describe("MapperTest", () => {
     m.scope({ omg: "awesome" } as Parameters<Mapper["scope"]>[0], () => {
       m.get("/", { to: "posts#index", as: "main" });
     });
-    const route = fakeset.getRoutes()[0];
+    const route = fakeset.routes.routes[0];
     expect(route.defaults).toMatchObject({ omg: "awesome", controller: "posts", action: "index" });
     expect(route.verb).toBe("GET");
   });
@@ -83,7 +83,7 @@ describe("MapperTest", () => {
     m.scope({ via: "put" } as Parameters<Mapper["scope"]>[0], () => {
       m.match("/", { to: "posts#index", as: "main" });
     });
-    expect(fakeset.getRoutes()[0].verb).toBe("PUT");
+    expect(fakeset.routes.routes[0].verb).toBe("PUT");
   });
 
   it.skip("to scope", () => {
@@ -93,29 +93,29 @@ describe("MapperTest", () => {
       m.get("all");
       m.post("most");
     });
-    expect(fakeset.getRoutes()[0].defaults["to"]).toBe("posts#index");
-    expect(fakeset.getRoutes()[1].defaults["to"]).toBe("posts#index");
+    expect(fakeset.routes.routes[0].defaults["to"]).toBe("posts#index");
+    expect(fakeset.routes.routes[1].defaults["to"]).toBe("posts#index");
   });
 
   it("map slash", () => {
     const fakeset = new FakeSet();
     const m = new Mapper(fakeset);
     m.get("/", { to: "posts#index", as: "main" });
-    expect(fakeset.getRoutes()[0].path.spec.toString()).toBe("/");
+    expect(fakeset.routes.routes[0].path.spec.toString()).toBe("/");
   });
 
   it("map more slashes", () => {
     const fakeset = new FakeSet();
     const m = new Mapper(fakeset);
     m.get("/one/two/", { to: "posts#index", as: "main" });
-    expect(fakeset.getRoutes()[0].path.spec.toString()).toBe("/one/two(.:format)");
+    expect(fakeset.routes.routes[0].path.spec.toString()).toBe("/one/two(.:format)");
   });
 
   it.skip("map wildcard", () => {
     const fakeset = new FakeSet();
     const m = new Mapper(fakeset);
     m.get("/*path", { to: "pages#show" });
-    const route = fakeset.getRoutes()[0];
+    const route = fakeset.routes.routes[0];
     expect(route.path.spec.toString()).toBe("/*path(.:format)");
     expect((route.requirements as Record<string, RegExp>)["path"]).toEqual(/.+?/ms);
   });
@@ -124,7 +124,7 @@ describe("MapperTest", () => {
     const fakeset = new FakeSet();
     const m = new Mapper(fakeset);
     m.get("/*path/foo/:bar", { to: "pages#show" });
-    const route = fakeset.getRoutes()[0];
+    const route = fakeset.routes.routes[0];
     expect(route.path.spec.toString()).toBe("/*path/foo/:bar(.:format)");
     expect((route.requirements as Record<string, RegExp>)["path"]).toEqual(/.+?/ms);
   });
@@ -133,7 +133,7 @@ describe("MapperTest", () => {
     const fakeset = new FakeSet();
     const m = new Mapper(fakeset);
     m.get("/*foo/*bar", { to: "pages#show" });
-    const route = fakeset.getRoutes()[0];
+    const route = fakeset.routes.routes[0];
     expect(route.path.spec.toString()).toBe("/*foo/*bar(.:format)");
     expect((route.requirements as Record<string, RegExp>)["foo"]).toEqual(/.+?/ms);
     expect((route.requirements as Record<string, RegExp>)["bar"]).toEqual(/.+?/ms);
@@ -143,7 +143,7 @@ describe("MapperTest", () => {
     const fakeset = new FakeSet();
     const m = new Mapper(fakeset);
     m.get("/*path", { to: "pages#show", format: false });
-    const route = fakeset.getRoutes()[0];
+    const route = fakeset.routes.routes[0];
     expect(route.path.spec.toString()).toBe("/*path");
     expect(route.requirements["path"]).toBeUndefined();
   });
@@ -152,7 +152,7 @@ describe("MapperTest", () => {
     const fakeset = new FakeSet();
     const m = new Mapper(fakeset);
     m.get("/*path", { to: "pages#show", format: true });
-    expect(fakeset.getRoutes()[0].path.spec.toString()).toBe("/*path.:format");
+    expect(fakeset.routes.routes[0].path.spec.toString()).toBe("/*path.:format");
   });
 
   const app = (_env: Record<string, unknown>) => [200, {}, bodyFromString("")] as const;
@@ -161,8 +161,8 @@ describe("MapperTest", () => {
     const fakeset = new FakeSet();
     const m = new Mapper(fakeset);
     m.mount(app, { at: "/path", anchor: true });
-    expect(fakeset.getRoutes()[0].path.spec.toString()).toBe("/path");
-    expect(fakeset.getRoutes()[0].path.anchored).toBeTruthy();
+    expect(fakeset.routes.routes[0].path.spec.toString()).toBe("/path");
+    expect(fakeset.routes.routes[0].path.anchored).toBeTruthy();
   });
 
   it("raising error when path is not passed", () => {

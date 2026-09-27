@@ -42,10 +42,6 @@ export interface UrlForHost {
   polymorphicUrl?(record: unknown, options: Record<string, unknown>): string;
 }
 
-export function initialize(this: UrlForHost): void {
-  this._routes = null;
-}
-
 export function urlOptions(this: UrlForHost): Record<string, unknown> {
   return this.defaultUrlOptions;
 }
@@ -193,7 +189,9 @@ export const UrlFor = new Module((mod) => {
     if (rbObjRespondTo(this, "_urlForModules")) include(this, this._urlForModules!());
   });
 
-  (mod as unknown as Record<symbol, unknown>)[moduleInitialize] = initialize;
+  (mod as unknown as Record<symbol, unknown>)[moduleInitialize] = function (this: UrlForHost) {
+    this._routes = null;
+  };
 
   mod.moduleEval((m) => {
     Object.assign(m, {
