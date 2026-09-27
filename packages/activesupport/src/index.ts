@@ -95,15 +95,15 @@ export const ActiveSupport = {
     return processAdapterConfig.adapter;
   },
 
-  cacheFormatVersion,
-  setCacheFormatVersion,
-
   get testOrder(): string | null {
     return testOrder();
   },
   set testOrder(value: string | null) {
     setTestOrder(value);
   },
+
+  cacheFormatVersion,
+  setCacheFormatVersion,
 };
 
 export {
