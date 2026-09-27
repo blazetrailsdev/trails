@@ -127,7 +127,7 @@ jobs:
           # never ran — #6980 closed a story cited in
           # connection-adapters/column.ts, and the red surfaced a push later
           # on main against an unrelated diff (#6989).
-          UNIT_TESTS_PKGS_RE='^(packages/|scripts/|eslint/|eslint\.config\.mjs$|vendor/(sources\.ts|sources\.lock\.json|sources\.test\.ts|fetch\.ts)$)'
+          UNIT_TESTS_PKGS_RE='^(packages/|scripts/|eslint/|eslint\.config\.mjs$|vendor/(sources\.ts|sources\.lock\.json|sources\.test\.ts|fetch(\.test)?\.ts)$)'
           GUIDES_PKGS_RE='^(packages/(activerecord|activemodel|activesupport|arel|globalid|date|did-you-mean|trails-tsc)/|packages/website/docs/guides/|scripts/guides-typecheck/)'
           GUIDES_EXCL_RE='(/src/test-helpers(/|\.ts$)|/test-fixtures?(/|\.ts$)|/__fixtures__/|/__snapshots__/|\.test\.ts$)'
           WEBSITE_PKGS_RE='^packages/website/'
@@ -810,6 +810,7 @@ jobs:
           scripts/vendor-recite.test.ts
           scripts/vendor-citations.test.ts
           vendor/sources.test.ts
+          vendor/fetch.test.ts
 
   # Consolidated leaf-test job. The cheapest sub-minute leaf suites — rack
   # (~27 s), actionview (~26 s), tse-compiler (~22 s), and the DX type tests

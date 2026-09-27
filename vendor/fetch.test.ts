@@ -213,6 +213,30 @@ describe("vendor/fetch.ts version directories", () => {
     }
   });
 
+  it("bumping ref adopts the candidate and re-locks it instead of aborting", async () => {
+    const root = await mkdtemp(join(tmpdir(), "vendor-fetch-"));
+    try {
+      const upstream = await makeUpstream(root);
+      const versionsDir = join(root, "vendor", "fake");
+      const old = await fetchSource(fakeSource(upstream, "v1.0.0"), {
+        refresh: false,
+        dest: join(versionsDir, "v1.0.0"),
+      });
+      const dest = await fetchCandidate(fakeSource(upstream, "v1.0.0"), "v2.0.0", {
+        refresh: false,
+        versionsDir,
+      });
+      const bumped = await fetchSource(fakeSource(upstream, "v2.0.0"), {
+        refresh: false,
+        dest,
+        lockEntry: old,
+      });
+      expect(bumped).toEqual({ ref: "v2.0.0", sha: await git(["rev-parse", "v2.0.0"], upstream) });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("--prune removes every inactive version directory and is then a no-op", async () => {
     const root = await mkdtemp(join(tmpdir(), "vendor-fetch-"));
     try {

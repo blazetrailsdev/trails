@@ -11,8 +11,8 @@
  * carries BOTH halves of the package contract (see the README):
  *
  *   - a `vendor/ruby/<version>/<file>:<line>` citation, RESOLVED against the
- *     pinned tree rather than pattern-matched: the version segment has to name
- *     the lockfile's active version, the file has to exist at the pinned SHA
+ *     pinned tree rather than pattern-matched: the version segment is required
+ *     and has to name the lockfile's active version, the file has to exist at the pinned SHA
  *     and the line has to be within it; and
  *   - a `@noRailsEquivalent PERMANENT` receipt, which re-enters the member into
  *     the measured surface (RFC 0121) and is `PERMANENT` because there is no
@@ -141,7 +141,11 @@ function check(context, node, name) {
     return;
   }
   for (const [, cited, rel, lineText] of citations) {
-    if (cited !== undefined && cited !== version) {
+    if (cited === undefined) {
+      context.report({ node: target, messageId: "unversioned", data: { name, rel, version } });
+      return;
+    }
+    if (cited !== version) {
       context.report({
         node: target,
         messageId: "staleVersion",
@@ -179,6 +183,8 @@ const rule = {
         "`{{name}}` is exported from ruby-compat without a `@noRailsEquivalent PERMANENT` receipt. Every name in this package is extra surface by construction and none of them can converge onto a Rails method.",
       missingCitation:
         "`{{name}}` is exported from ruby-compat without a `vendor/ruby/{{version}}/<file>:<line>` citation. Name the MRI source this mirrors — the citation is this package's fidelity anchor, in place of the `parity:api` comparison it can never have.",
+      unversioned:
+        "`{{name}}` cites `vendor/ruby/{{rel}}` with no version segment. Run `pnpm vendor:recite` to rewrite it to `vendor/ruby/{{version}}/{{rel}}`, then re-check the line against that tree.",
       staleVersion:
         "`{{name}}` cites `vendor/ruby/{{cited}}/{{rel}}`, but the active ruby/ruby version is `{{version}}`. Run `pnpm vendor:recite` to rewrite it to `vendor/ruby/{{version}}/{{rel}}`, then re-check the line against that tree.",
       unknownFile:

@@ -58,7 +58,7 @@ the in-tree `spec/ruby/` mirror of the ruby/spec suite (which is why no
 separate `ruby/spec` clone is needed).
 
 **Clone cost:** a `--depth=1` clone of `v3_3_11` is **130 MiB** on disk (20 MiB
-of it `.git`) and takes ~5-8s — smaller than `vendor/rails` at 225 MiB, and
+of it `.git`) and takes ~5-8s — larger than `vendor/rails` at ~53 MiB, and
 each worktree symlinks it rather than re-cloning. No `--filter=blob:none` or
 sparse checkout is needed, so `fetch.ts` is unchanged.
 
@@ -161,14 +161,88 @@ ported doesn't count — that drift isn't ours to act on. The diff core lives in
 Bumping the pin itself (editing `sources.ts` to the new tag) is a separate
 decision, not something the report does.
 
-Re-pinning the body-hash floor is a step of **every** bump.
-`scripts/api-compare/body-pins.json` pins each matched pair's normalized Ruby
-body digest, and records the `ref` at the pin's last write (the floor was taken
-against `v8.0.2`; a pin whose body a bump leaves unchanged keeps its old `ref`). After the bump, `pnpm parity:api:pins` reports every pinned body that
-changed upstream as DRIFT — that list is the re-verification worklist. Re-verify
-each port, then re-pin (`pnpm tsx scripts/api-compare/body-pins.ts --pin
-<ruby-file>`, or `pnpm parity:api:pins:all` once the list is burnt down). See
-CONTRIBUTING.md "Body pins".
+Re-pinning the body-hash floor is a step of **every** bump — see step 6 of
+[Upgrading a source](#upgrading-a-source-bumping-ref) below.
+
+## Upgrading a source (bumping `ref`)
+
+Each source's clones live in version directories (`vendor/<source>/<version>/`,
+RFC 0159), so a candidate version can sit on disk beside the active one while
+the upgrade is scoped. The active version is always `versionDir(ref)` of the
+`ref` in `sources.ts`; nothing else is. In order:
+
+1. **Fetch the candidate beside the active version.**
+   `pnpm vendor:fetch --source <name> --ref <new-tag>` clones the tag into
+   `vendor/<name>/<versionDir(new-tag)>/`. It never reads or writes
+   `sources.lock.json`, and no `--print-*` manifest ever answers it, so every
+   gate keeps measuring the active version while the candidate is on disk.
+2. **Diff the two trees.** For example
+   `git diff --no-index --stat vendor/rails/v8.0.2/activerecord/lib vendor/rails/v8.1.0/activerecord/lib`,
+   narrowed to the files trails ports; for Rails, the drift report above scopes
+   the same diff at method granularity.
+3. **Bump `ref` in `sources.ts`.** That one edit moves the active version for
+   every consumer — `fetch.ts`, the `--print-*` manifests, the compare tooling,
+   the citation gate and `vendor:recite`.
+4. **Re-fetch.** `pnpm vendor:fetch --source <name>`. The lockfile entry still
+   names the old `ref`, so the fetch treats it as the pin being bumped: it
+   adopts the candidate clone from step 1 (or clones the tag) and re-locks
+   `sources.lock.json` to the new SHA. Commit the lockfile with the `ref`.
+5. **Rewrite the citations.** Save the stale list first —
+   `pnpm vendor:recite --check` prints every file carrying a
+   `vendor/<name>/<old-version>/…` citation, the same set
+   `scripts/vendor-citations.test.ts` now fails on — then run
+   `pnpm vendor:recite` to rewrite them to the new version. Make this sweep its
+   own commit, separate from any port changes, so a reviewer can read it as the
+   mechanical rewrite it is.
+6. **Read both worklists, then re-verify and re-pin.**
+   - **The citation gate's stale list** (step 5) answers _did the path move?_
+     `vendor:recite` rewrites only the version segment, so each rewritten
+     citation still has to name a file and line that exist, and hold the same
+     code, in the new tree. For `vendor/ruby/` the
+     `ruby-compat-needs-mri-citation` lint checks the file and line range
+     mechanically (`unknownFile` / `lineOutOfRange`); elsewhere it is a read.
+   - **`pnpm parity:api:pins`** (`scripts/api-compare/lint-body-pins.ts`)
+     answers _did the body change?_ Its DRIFT rows are the pinned, ported pairs
+     whose normalized Ruby body no longer matches its pin. Re-verify each TS
+     port against the new body, fix it, then re-pin with
+     `pnpm tsx scripts/api-compare/body-pins.ts --pin <ruby-file>` (or
+     `pnpm parity:api:pins:all` once the list is burnt down). See
+     CONTRIBUTING.md "Body pins".
+
+   **A green citation gate is not evidence a port is still faithful.** It goes
+   green the moment `vendor:recite` runs, and a citation that still resolves
+   can point at a body that changed under it. The DRIFT list is the fidelity
+   worklist; the citation list only keeps the pointers honest.
+
+7. **Prune.** `pnpm vendor:fetch --prune` (optionally `--source <name>`)
+   deletes every inactive version directory. It is manual — nothing prunes on
+   its own, so the old tree stays on disk until you run it.
+
+### What the parity gates do across a bump
+
+- `parity:api` / `parity:test` deltas move, in both directions: upstream adds,
+  removes and renames methods and tests, so a bump PR reports movement it did
+  not port.
+- The call, argument, parameter, predicate and extra-surface baselines stay
+  **only-shrink**. A row a bump makes stale is deleted by hand (and the mark
+  tightened); a bump never licenses a reseed or a wider baseline.
+- A method new upstream surfaces as **missing** — a Ruby name with no TS
+  counterpart — never as extra surface; `parity:api:extra` moves only when a
+  method trails already ports is removed upstream.
+
+### Disk cost
+
+Coexistence costs one extra clone per candidate: ~53 MiB for `rails`, 130 MiB
+for `ruby`, under 3 MiB for each gem. Nothing reclaims it until `--prune` runs.
+
+### Build vendor paths through the registry
+
+`sources.ts` is the only place a vendor path is built: `versionDir`,
+`activeVersion`, `vendoredRoot`, `resolvePath` / `resolveSourcePath` and the
+`--print-*` manifests. A script that needs a vendored path asks the registry
+(or spawns `pnpm vendor:fetch --print-paths`). Never write a
+`vendor/<source>/<version>` literal into code: it silently keeps reading the
+old tree after a bump.
 
 ## Status
 
