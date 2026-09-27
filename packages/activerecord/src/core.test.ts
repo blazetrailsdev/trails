@@ -7,7 +7,7 @@ import { fixtures } from "./test-fixtures.js";
 import { Topic, TitlePrimaryKeyTopic } from "./test-helpers/models/topic.js";
 import { LoosePerson } from "./test-helpers/models/person.js";
 import { assertDifference, assertNoDifference } from "@blazetrails/activesupport";
-import { regexpEscape, rbObjSingletonClass } from "@blazetrails/ruby-compat";
+import { rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import { CpkBook } from "./test-helpers/models/cpk.js";
 
 describe("CoreTest", () => {
@@ -132,12 +132,27 @@ describe("CoreTest", () => {
   it("pretty print new", async () => {
     const topic = new Topic({});
     const actual = await ppString(topic);
-    const expected =
-      `#<Topic:0xXXXXXX id: nil, title: nil, author_name: nil, ` +
-      `author_email_address: "test@test.com", written_on: nil, bonus_time: nil, ` +
-      `last_read: nil, content: nil, important: nil, binary_content: nil, ` +
-      `approved: true, replies_count: 0, unique_replies_count: 0, parent_id: nil, ` +
-      `parent_title: nil, type: nil, group: nil, created_at: nil, updated_at: nil>\n`;
+    const expected = `#<Topic:0xXXXXXX
+ id: nil,
+ title: nil,
+ author_name: nil,
+ author_email_address: "test@test.com",
+ written_on: nil,
+ bonus_time: nil,
+ last_read: nil,
+ content: nil,
+ important: nil,
+ binary_content: nil,
+ approved: true,
+ replies_count: 0,
+ unique_replies_count: 0,
+ parent_id: nil,
+ parent_title: nil,
+ type: nil,
+ group: nil,
+ created_at: nil,
+ updated_at: nil>
+`;
     expect(actual.startsWith(expected.split("XXXXXX")[0])).toBeTruthy();
     expect(actual.endsWith(expected.split("XXXXXX").at(-1)!)).toBeTruthy();
   });
@@ -145,18 +160,56 @@ describe("CoreTest", () => {
   it("pretty print persisted", async () => {
     const topic = topics("first") as any;
     const actual = await ppString(topic);
-    expect(actual).toMatch(
-      new RegExp(`^#<Topic:0x\\w+ ${regexpEscape(fullInspectString(topic).slice(8))}\n$`),
-    );
+    const expected = `#<Topic:0x\\w+
+ id: 1,
+ title: "The First Topic",
+ author_name: "David",
+ author_email_address: "david@loudthinking.com",
+ written_on: "2003-07-16 14:28:11\\.223300000 \\+0000",
+ bonus_time: "2000-01-01 14:28:00\\.000000000 \\+0000",
+ last_read: "2004-04-15",
+ content: "Have a nice day",
+ important: nil,
+ binary_content: nil,
+ approved: false,
+ replies_count: 1,
+ unique_replies_count: 0,
+ parent_id: nil,
+ parent_title: nil,
+ type: nil,
+ group: nil,
+ created_at: [^,]+,
+ updated_at: [^,>]+>
+`;
+    expect(actual).toMatch(new RegExp(`^${expected}$`));
   });
 
   it("pretty print full", async () => {
     await withAttributesForInspect("all", async () => {
       const topic = topics("first") as any;
       const actual = await ppString(topic);
-      expect(actual).toMatch(
-        new RegExp(`^#<Topic:0x\\w+ ${regexpEscape(fullInspectString(topic).slice(8))}\n$`),
-      );
+      const expected = `#<Topic:0x\\w+
+ id: 1,
+ title: "The First Topic",
+ author_name: "David",
+ author_email_address: "david@loudthinking.com",
+ written_on: "2003-07-16 14:28:11\\.223300000 \\+0000",
+ bonus_time: "2000-01-01 14:28:00\\.000000000 \\+0000",
+ last_read: "2004-04-15",
+ content: "Have a nice day",
+ important: nil,
+ binary_content: nil,
+ approved: false,
+ replies_count: 1,
+ unique_replies_count: 0,
+ parent_id: nil,
+ parent_title: nil,
+ type: nil,
+ group: nil,
+ created_at: [^,]+,
+ updated_at: [^,>]+>
+`;
+      expect(actual).toMatch(new RegExp(`^${expected}$`));
     });
   });
 
