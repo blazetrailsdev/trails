@@ -40,8 +40,6 @@ export const ACTIONVIEW_UNPORTED_FILES: UnportedFile[] = [
       "Minitest harness for rendering views (`ActionView::TestCase`) — a Rails test-suite " +
       "support class for a layer trails does not port.",
   },
-  { pattern: "helpers/form_helper.rb", package: "actionview", reason: FORM_HELPER_REASON },
-  { pattern: "helpers/form_tag_helper.rb", package: "actionview", reason: FORM_HELPER_REASON },
   { pattern: "helpers/form_options_helper.rb", package: "actionview", reason: FORM_HELPER_REASON },
   { pattern: "helpers/tags/base.rb", package: "actionview", reason: FORM_HELPER_REASON },
   {
