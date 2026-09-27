@@ -5,16 +5,19 @@ import {
 import { RespondToMismatchError, UnknownFormat } from "./exceptions.js";
 import { _processFormat } from "../../abstract-controller/rendering.js";
 import { _setRenderedContentType } from "./rendering.js";
-import { ArgumentError, symbolToS } from "@blazetrails/ruby-compat";
+import { ArgumentError, rbEqual, symbolToS } from "@blazetrails/ruby-compat";
 export { type FormatHandler };
 
-export class Collector extends DispatchCollector {
-  private _requestVariant: string | string[] | null;
-  private _response: FormatHandler | undefined;
+type VariantBlock = (variant: VariantCollector) => unknown;
+type Response = FormatHandler | VariantBlock | VariantCollector;
 
-  constructor(mimes: string[] = [], variant: string | string[] | null = null) {
+export class Collector extends DispatchCollector<Response, Response, Response | string[]> {
+  #variant: readonly string[] | null;
+  private _response: Response | undefined;
+
+  constructor(mimes: string[] = [], variant: readonly string[] | null = null) {
     super();
-    this._requestVariant = variant;
+    this.#variant = variant;
     for (const mime of mimes) this.custom(mime);
   }
 
@@ -22,31 +25,34 @@ export class Collector extends DispatchCollector {
     return this.resolvedFormat;
   }
 
-  override any(...args: (string | FormatHandler | undefined)[]): this {
+  override any(...args: (string | Response | undefined)[]): Response | string[] {
     const last = args[args.length - 1];
-    const handler = typeof last === "function" ? (args.pop() as FormatHandler) : undefined;
-    const types = args.filter((arg): arg is string => typeof arg === "string");
-
-    if (types.length > 0) {
-      for (const type of types) {
-        this.custom(type, handler);
-      }
-      return this;
+    const block =
+      typeof last === "function" ? (args.pop() as FormatHandler | VariantBlock) : undefined;
+    if (args.length > 0) {
+      for (const type of args as string[]) this.custom(type, block);
+      return args as string[];
+    } else {
+      if (!this.anyHandler) super.any(block ?? new VariantCollector(this.#variant));
+      return this.anyHandler!;
     }
-    return super.any(handler);
   }
 
-  all(...args: (string | FormatHandler | undefined)[]): this {
+  all(...args: (string | Response | undefined)[]): Response | string[] {
     return this.any(...args);
   }
 
-  custom(mimeType: string, handler?: FormatHandler): this {
-    return this.on(mimeType, handler);
+  custom(mimeType: string, block?: FormatHandler | VariantBlock): Response {
+    let response = this.handlerFor(mimeType);
+    if (!response) {
+      response = block ?? new VariantCollector(this.#variant);
+      super.on(mimeType, response);
+    }
+    return response;
   }
 
-  override on(format: string, handler?: FormatHandler): this {
-    if (this.handlerFor(format)) return this;
-    return super.on(format, handler);
+  override on(format: string, handler?: Response): Response {
+    return this.custom(format, handler as FormatHandler | VariantBlock | undefined);
   }
 
   isAnyResponse(): boolean {
@@ -60,9 +66,7 @@ export class Collector extends DispatchCollector {
   }): string | null {
     const requested = Array.isArray(request.variant) ? request.variant[0] : request.variant;
     const variant =
-      (typeof requested === "string" ? requested : undefined) ??
-      (Array.isArray(this._requestVariant) ? this._requestVariant[0] : this._requestVariant) ??
-      undefined;
+      (typeof requested === "string" ? requested : undefined) ?? this.#variant?.[0] ?? undefined;
     const format =
       typeof request.format === "string"
         ? request.format
@@ -74,18 +78,24 @@ export class Collector extends DispatchCollector {
     return result?.format ?? null;
   }
 
-  /**
-   * @missingRailsCall fetch — PERMANENT
-   * @missingRailsCall new — CONVERGEABLE collector-response-drops-the-variant-collector-arms
-   */
+  /** @missingRailsCall fetch — PERMANENT */
   get response(): FormatHandler | undefined {
-    return this._response;
+    const response = this._response;
+    if (response instanceof VariantCollector) {
+      return response.variant;
+    } else if (response == null || response.length === 0) {
+      return response as FormatHandler | undefined;
+    } else {
+      const variantCollector = new VariantCollector(this.#variant);
+      response.call(null, variantCollector);
+      return variantCollector.variant;
+    }
   }
 }
 
 export function respondTo(
   this: {
-    request?: { variant?: string | string[] | null; accept?: string } | null;
+    request?: { variant?: readonly string[] | null; accept?: string } | null;
     mediaType?: string | null;
     contentType: string | null;
     response: { contentType?: string };
@@ -116,13 +126,54 @@ export function respondTo(
 }
 
 export class VariantCollector {
-  private _variants = new Map<string, () => void>();
+  private _variant: readonly string[] | null;
+  private _variants = new Map<string, FormatHandler>();
 
-  variant(name: string, handler: () => void): void {
-    this._variants.set(name, handler);
+  constructor(variant: readonly string[] | null = null) {
+    this._variant = variant;
+    return new Proxy(this, VARIANT_COLLECTOR_HANDLER) as this;
   }
 
-  get(name: string): (() => void) | undefined {
-    return this._variants.get(name);
+  any(...args: (string | FormatHandler)[]): void {
+    const last = args[args.length - 1];
+    const block = typeof last === "function" ? (args.pop() as FormatHandler) : undefined;
+    if (block) {
+      if (args.length > 0 && !args.some((a) => rbEqual(a, this._variant))) {
+        for (const v of args as string[]) this._variants.set(v, block);
+      } else {
+        this._variants.set("any", block);
+      }
+    }
+  }
+
+  all(...args: (string | FormatHandler)[]): void {
+    this.any(...args);
+  }
+
+  methodMissing(name: string, block?: FormatHandler): void {
+    if (block) this._variants.set(name, block);
+  }
+
+  get variant(): FormatHandler | undefined {
+    if (this._variant!.length === 0) {
+      return this._variants.get("none") ?? this._variants.get("any");
+    } else {
+      return this._variants.get(this.variantKey());
+    }
+  }
+
+  /** @internal */
+  private variantKey(): string {
+    return this._variant!.find((variant) => this._variants.has(variant)) ?? "any";
   }
 }
+
+const RESERVED_KEYS = new Set<string | symbol>(["then", "catch", "finally", "toJSON", "inspect"]);
+
+const VARIANT_COLLECTOR_HANDLER: ProxyHandler<VariantCollector> = {
+  get(target, prop, receiver) {
+    if (Reflect.has(target, prop)) return Reflect.get(target, prop, receiver);
+    if (RESERVED_KEYS.has(prop) || typeof prop !== "string") return undefined;
+    return (block?: FormatHandler): void => target.methodMissing(prop, block);
+  },
+};

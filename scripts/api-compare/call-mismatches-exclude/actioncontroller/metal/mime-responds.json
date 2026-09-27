@@ -5,12 +5,5 @@
     "rubyName": "any_response?",
     "call": "fetch",
     "reason": "Ruby `@responses.fetch(format, false)`; the port calls the protected `handlerFor(format)` helper on the ActionDispatch Collector, which does the Map lookup internally. Same semantics, no `fetch` call at this site."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/mime-responds.ts",
-    "rubyName": "custom",
-    "call": "new",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

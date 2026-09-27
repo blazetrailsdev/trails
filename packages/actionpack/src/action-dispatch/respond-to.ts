@@ -4,56 +4,58 @@ import { MimeType } from "./http/mime-type.js";
 
 export type FormatHandler = () => unknown;
 
-export class Collector {
-  private handlers: Map<string, FormatHandler> = new Map();
-  private anyHandler: FormatHandler | null = null;
+type Chain<R, T> = [R] extends [never] ? T : R;
+
+export class Collector<H = FormatHandler, R = never, A = never> {
+  private handlers: Map<string, H> = new Map();
+  protected anyHandler: H | null = null;
   private _format: string | null = null;
   private _variant: string | null = null;
   private variantHandlers: Map<string, Map<string, FormatHandler>> = new Map();
   private anyVariantHandler: FormatHandler | null = null;
 
-  html(handler?: FormatHandler): this {
+  html(handler?: H): Chain<R, this> {
     return this.on("html", handler);
   }
-  json(handler?: FormatHandler): this {
+  json(handler?: H): Chain<R, this> {
     return this.on("json", handler);
   }
-  xml(handler?: FormatHandler): this {
+  xml(handler?: H): Chain<R, this> {
     return this.on("xml", handler);
   }
-  js(handler?: FormatHandler): this {
+  js(handler?: H): Chain<R, this> {
     return this.on("js", handler);
   }
-  text(handler?: FormatHandler): this {
+  text(handler?: H): Chain<R, this> {
     return this.on("text", handler);
   }
-  csv(handler?: FormatHandler): this {
+  csv(handler?: H): Chain<R, this> {
     return this.on("csv", handler);
   }
-  atom(handler?: FormatHandler): this {
+  atom(handler?: H): Chain<R, this> {
     return this.on("atom", handler);
   }
-  rss(handler?: FormatHandler): this {
+  rss(handler?: H): Chain<R, this> {
     return this.on("rss", handler);
   }
-  yaml(handler?: FormatHandler): this {
+  yaml(handler?: H): Chain<R, this> {
     return this.on("yaml", handler);
   }
-  pdf(handler?: FormatHandler): this {
+  pdf(handler?: H): Chain<R, this> {
     return this.on("pdf", handler);
   }
 
-  on(format: string, handler?: FormatHandler): this {
-    this.handlers.set(format, handler ?? (() => undefined));
-    return this;
+  on(format: string, handler?: H): Chain<R, this> {
+    this.handlers.set(format, handler ?? ((() => undefined) as H));
+    return this as unknown as Chain<R, this>;
   }
 
-  any(handler?: FormatHandler): this {
-    this.anyHandler = handler ?? (() => undefined);
-    return this;
+  any(handler?: H): Chain<A, this> {
+    this.anyHandler = handler ?? ((() => undefined) as H);
+    return this as unknown as Chain<A, this>;
   }
 
-  protected handlerFor(format: string | null): FormatHandler | undefined {
+  protected handlerFor(format: string | null): H | undefined {
     return format === null ? undefined : this.handlers.get(format);
   }
 
@@ -90,7 +92,7 @@ export class Collector {
       format?: string;
       variant?: string;
     } = {},
-  ): { format: string; handler: FormatHandler } | null {
+  ): { format: string; handler: H } | null {
     const { accept, format, variant } = options;
     this._variant = variant ?? null;
 
@@ -145,7 +147,7 @@ export class Collector {
     return this._format;
   }
 
-  private resolveFormat(format: string): { format: string; handler: FormatHandler } | null {
+  private resolveFormat(format: string): { format: string; handler: H } | null {
     const handler = this.handlers.get(format);
     if (handler) {
       this._format = format;
