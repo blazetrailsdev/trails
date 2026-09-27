@@ -1,12 +1,3 @@
-import {
-  Route,
-  type RouteOptions,
-  type RouteConstraints,
-  type ResourceAction,
-  type RedirectFunction,
-  type RedirectOptions,
-  type MountableApp,
-} from "./route.js";
 import { Redirect, redirect as redirectFactory } from "./redirection.js";
 import { Endpoint } from "./endpoint.js";
 import { Dispatcher, StaticDispatcher } from "./route-set.js";
@@ -17,6 +8,8 @@ import { Scope, type ScopeFrameHash, type ScopeLevel } from "./scope.js";
 import { Parser } from "../journey/parser.js";
 import { Ast, type Node } from "../journey/nodes/node.js";
 import { Pattern } from "../journey/path/pattern.js";
+import { Route as JourneyRoute, type VerbMatcher } from "../journey/route.js";
+import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import {
   camelize,
   extractOptionsBang,
@@ -48,6 +41,51 @@ import {
   symbolToS,
 } from "@blazetrails/ruby-compat";
 import { deprecator } from "../deprecator.js";
+
+export interface RouteConstraints {
+  [key: string]: string | RegExp | number | boolean;
+}
+
+export type MountableApp =
+  | ((env: RackEnv) => RackResponse | Promise<RackResponse>)
+  | { call: (env: RackEnv) => RackResponse | Promise<RackResponse> };
+
+export type CallableConstraint =
+  | ((...args: never[]) => unknown)
+  | { matches(req: Request): unknown }
+  | { call(...args: never[]): unknown };
+
+export interface RouteOptions {
+  name?: string | null | false;
+  constraints?: RouteConstraints | CallableConstraint;
+  defaults?: Record<string, string | null>;
+  format?: boolean;
+  as?: string | null | false;
+  to?: string | MountableApp | Redirect;
+  controller?: string | RegExp;
+  action?: string;
+  only?: ResourceAction | ResourceAction[];
+  except?: ResourceAction | ResourceAction[];
+  ip?: string | RegExp;
+  redirect?: string | RedirectOptions | RedirectFunction;
+  pathNames?: { new?: string; edit?: string };
+  anchor?: boolean;
+  shallow?: boolean;
+  internal?: boolean;
+  on?: string;
+}
+
+export type ResourceAction = "index" | "show" | "new" | "create" | "edit" | "update" | "destroy";
+
+export type RedirectFunction = (params: Record<string, string>, request: Request) => string;
+
+export interface RedirectOptions {
+  path?: string;
+  host?: string;
+  subdomain?: string;
+  domain?: string;
+  status?: number;
+}
 
 type MapperCallback = (mapper: Mapper) => void;
 type ConcernCallback = (mapper: Mapper) => void;
@@ -377,27 +415,20 @@ export class Mapping {
 
   static readonly JOINED_SEPARATORS = SEPARATORS.join("");
 
-  makeRoute(name: string | null | false | undefined, _precedence: number): Route {
-    const route = new Route(
-      this._via,
-      this.ast.tree.toString(),
-      (this.defaults.controller as string | undefined) ?? "",
-      (this.defaults.action as string | undefined) ?? "",
-      {
-        name,
-        redirectEndpoint: this.to instanceof Redirect ? this.to : undefined,
-        constraints: { ...this.requirements, ...this.conditions() } as RouteConstraints,
-        defaults: this.defaults as Record<string, string | null>,
-        anchor: this._anchor,
-        format: this._formatted,
-        internal: this._internal,
-        scopeOptions: this.scopeOptions,
-        requiredDefaults: this.requiredDefaults,
-        pattern: this.path,
-      },
-    );
-    route.app = this.application();
-    return route;
+  /** @missingRailsArgs new — CONVERGEABLE mapping-make-route-source-location */
+  makeRoute(name: string | null, precedence: number): JourneyRoute {
+    return new JourneyRoute({
+      name,
+      app: this.application(),
+      path: this.path,
+      constraints: this.conditions(),
+      requiredDefaults: this.requiredDefaults,
+      defaults: this.defaults,
+      requestMethodMatch: this.requestMethod(),
+      precedence,
+      scopeOptions: this.scopeOptions,
+      internal: this._internal,
+    });
   }
 
   application(): Endpoint {
@@ -416,6 +447,11 @@ export class Mapping {
     const conditions = dup(currentConditions);
 
     return keepIf(conditions, (k) => k in requestClass.prototype);
+  }
+
+  /** @internal */
+  private requestMethod(): VerbMatcher[] {
+    return this._via.map((x) => JourneyRoute.verbMatcher(x));
   }
 
   /** @internal */
@@ -796,64 +832,55 @@ export class Mapper {
 
     if (allowed.has("index")) {
       const as = routeName(name);
-      this.addRouteToSet(
-        new Route("GET", basePath, controller, "index", {
-          name: as,
-          constraints,
-        }),
-        as,
-      );
+      this.addRouteToSet("GET", basePath, controller, "index", as, constraints);
     }
 
     if (allowed.has("create")) {
-      this.addRouteToSet(new Route("POST", basePath, controller, "create", { constraints }));
+      this.addRouteToSet("POST", basePath, controller, "create", undefined, constraints);
     }
 
     if (allowed.has("new")) {
       const as = routeName(`new_${singular}`);
-      this.addRouteToSet(
-        new Route("GET", `${basePath}/${newPath}`, controller, "new", {
-          name: as,
-          constraints,
-        }),
-        as,
-      );
+      this.addRouteToSet("GET", `${basePath}/${newPath}`, controller, "new", as, constraints);
     }
 
     if (allowed.has("edit")) {
       const as = shallowName(`edit_${singular}`);
       this.addRouteToSet(
-        new Route("GET", `${shallowPath}/:id/${editPath}`, controller, "edit", {
-          name: as,
-          constraints,
-        }),
+        "GET",
+        `${shallowPath}/:id/${editPath}`,
+        controller,
+        "edit",
         as,
+        constraints,
       );
     }
 
     if (allowed.has("show")) {
       const as = singular !== name ? shallowName(singular) : undefined;
-      this.addRouteToSet(
-        new Route("GET", `${shallowPath}/:id`, controller, "show", {
-          name: as,
-          constraints,
-        }),
-        as,
-      );
+      this.addRouteToSet("GET", `${shallowPath}/:id`, controller, "show", as, constraints);
     }
 
     if (allowed.has("update")) {
       this.addRouteToSet(
-        new Route("PATCH", `${shallowPath}/:id`, controller, "update", { constraints }),
+        "PATCH",
+        `${shallowPath}/:id`,
+        controller,
+        "update",
+        undefined,
+        constraints,
       );
-      this.addRouteToSet(
-        new Route("PUT", `${shallowPath}/:id`, controller, "update", { constraints }),
-      );
+      this.addRouteToSet("PUT", `${shallowPath}/:id`, controller, "update", undefined, constraints);
     }
 
     if (allowed.has("destroy")) {
       this.addRouteToSet(
-        new Route("DELETE", `${shallowPath}/:id`, controller, "destroy", { constraints }),
+        "DELETE",
+        `${shallowPath}/:id`,
+        controller,
+        "destroy",
+        undefined,
+        constraints,
       );
     }
   }
@@ -908,45 +935,30 @@ export class Mapper {
 
     if (allowed.has("new")) {
       const as = routeName(`new_${name}`);
-      this.addRouteToSet(
-        new Route("GET", `${basePath}/${newPath}`, controller, "new", {
-          name: as,
-        }),
-        as,
-      );
+      this.addRouteToSet("GET", `${basePath}/${newPath}`, controller, "new", as);
     }
 
     if (allowed.has("create")) {
-      this.addRouteToSet(new Route("POST", basePath, controller, "create"));
+      this.addRouteToSet("POST", basePath, controller, "create");
     }
 
     if (allowed.has("show")) {
       const as = routeName(name);
-      this.addRouteToSet(
-        new Route("GET", basePath, controller, "show", {
-          name: as,
-        }),
-        as,
-      );
+      this.addRouteToSet("GET", basePath, controller, "show", as);
     }
 
     if (allowed.has("edit")) {
       const as = routeName(`edit_${name}`);
-      this.addRouteToSet(
-        new Route("GET", `${basePath}/${editPath}`, controller, "edit", {
-          name: as,
-        }),
-        as,
-      );
+      this.addRouteToSet("GET", `${basePath}/${editPath}`, controller, "edit", as);
     }
 
     if (allowed.has("update")) {
-      this.addRouteToSet(new Route("PATCH", basePath, controller, "update"));
-      this.addRouteToSet(new Route("PUT", basePath, controller, "update"));
+      this.addRouteToSet("PATCH", basePath, controller, "update");
+      this.addRouteToSet("PUT", basePath, controller, "update");
     }
 
     if (allowed.has("destroy")) {
-      this.addRouteToSet(new Route("DELETE", basePath, controller, "destroy"));
+      this.addRouteToSet("DELETE", basePath, controller, "destroy");
     }
   }
 
@@ -1164,17 +1176,17 @@ export class Mapper {
       const controller = parent.resourceScope ?? "";
       const editPath = this.actionPath("edit");
       if (actions.includes("edit")) {
-        this.addRouteToSet(new Route("GET", `${memberPath}/${editPath}`, controller, "edit"));
+        this.addRouteToSet("GET", `${memberPath}/${editPath}`, controller, "edit");
       }
       if (actions.includes("show")) {
-        this.addRouteToSet(new Route("GET", memberPath, controller, "show"));
+        this.addRouteToSet("GET", memberPath, controller, "show");
       }
       if (actions.includes("update")) {
-        this.addRouteToSet(new Route("PATCH", memberPath, controller, "update"));
-        this.addRouteToSet(new Route("PUT", memberPath, controller, "update"));
+        this.addRouteToSet("PATCH", memberPath, controller, "update");
+        this.addRouteToSet("PUT", memberPath, controller, "update");
       }
       if (actions.includes("destroy")) {
-        this.addRouteToSet(new Route("DELETE", memberPath, controller, "destroy"));
+        this.addRouteToSet("DELETE", memberPath, controller, "destroy");
       }
     });
   }
@@ -1611,19 +1623,27 @@ export class Mapper {
   }
 
   /** @internal */
-  private addRouteToSet(route: Route, name?: string | null): void {
+  private addRouteToSet(
+    via: string,
+    path: string,
+    controller: string,
+    action: string,
+    name?: string | null,
+    constraints?: RouteConstraints,
+  ): void {
+    const formatted = this._scope.get("format") as boolean | undefined;
     const mapping = Mapping.build(
       this._scope,
       this._set,
-      Parser.parse(route.path)!,
-      route.controller,
-      route.action,
+      Parser.parse(Mapping.normalizePath(RFC2396_PARSER.escape(path), formatted))!,
+      controller,
+      action,
       undefined,
-      route.verb.split("|"),
-      this._scope.get("format") as boolean | undefined,
-      route.constraints,
-      route.anchor,
-      { ...route.defaults },
+      [via],
+      formatted,
+      constraints ?? {},
+      true,
+      {},
     );
     this._set.addRoute(mapping, name);
   }

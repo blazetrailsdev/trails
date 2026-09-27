@@ -46,8 +46,8 @@ describe("RouteSetTest", () => {
     });
     const m = routes.recognize("GET", "/bar");
     expect(m).not.toBeNull();
-    expect(m!.route.controller).toBe("bar");
-    expect(m!.route.action).toBe("index");
+    expect(m!.route.defaults.controller).toBe("bar");
+    expect(m!.route.defaults.action).toBe("index");
   });
 
   it("find a route for the given requirements returns nil for no match", () => {

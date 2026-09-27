@@ -45,7 +45,7 @@ describe("ActionDispatch::Routing::Mapper::Mapping#app", () => {
     });
     const [posts, comments] = routes.getRoutes();
     expect(posts.app).toBeInstanceOf(Constraints);
-    expect(posts.app!.dispatcher()).toBe(true);
+    expect((posts.app as Constraints).dispatcher()).toBe(true);
     expect((posts.app as Constraints).constraints).toEqual([constraint]);
     expect(comments.app).not.toBeInstanceOf(Constraints);
   });
@@ -104,11 +104,9 @@ describe("ActionDispatch::Routing::Mapper::Mapping#app", () => {
         });
       });
     });
-    expect(routes.getRoutes()[0].constraints).toEqual({
-      subdomain: "api",
-      id: /\d+/,
-      format: "json",
-    });
+    const [route] = routes.getRoutes();
+    expect(route.constraints).toEqual({ subdomain: "api" });
+    expect(route.path.requirements).toEqual({ id: /\d+/, format: "json" });
   });
 
   it("raises for a constraint answering neither call nor matches?", () => {

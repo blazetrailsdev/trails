@@ -10,14 +10,12 @@ import { LogSubscriber as _LogSubscriber } from "./log-subscriber.js";
 _LogSubscriber.attachTo("action_dispatch");
 
 export {
-  Route,
   Mapper,
   RouteSet,
   RoutesInspector,
   ConsoleFormatter,
   type RoutesFilter,
   type RoutesFormatter,
-  type MatchedRoute,
   type RouteOptions,
   type RouteConstraints,
   type DrawCallback,

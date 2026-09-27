@@ -1,9 +1,9 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { ActionView, controllerConstants, type Route } from "@blazetrails/actionpack";
+import { ActionView, controllerConstants, type Journey } from "@blazetrails/actionpack";
 import { RouteInfo } from "./unused-routes.js";
 
-function route(requirements: Record<string, string>): Route {
-  return { requirements } as unknown as Route;
+function route(requirements: Record<string, string>): Journey.Route {
+  return { requirements } as unknown as Journey.Route;
 }
 
 describe("UnusedRoutesCommand", () => {

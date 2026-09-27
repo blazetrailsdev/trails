@@ -130,7 +130,7 @@ describe("Mapper public DSL additions", () => {
 
     await m.draw("external");
 
-    expect(set.getRoutes().map((r) => r.path)).toContain("/external(.:format)");
+    expect(set.getRoutes().map((r) => r.path.spec.toString())).toContain("/external(.:format)");
   });
 
   it("root routes through match_root_route and keeps the bare slash", () => {
@@ -138,8 +138,8 @@ describe("Mapper public DSL additions", () => {
     const m = new Mapper(set);
     m.root("pages#home");
 
-    expect(set.getRoutes().map((r) => r.path)).toContain("/");
-    expect(set.getRoutes().find((r) => r.path === "/")!.name).toBe("root");
+    expect(set.getRoutes().map((r) => r.path.spec.toString())).toContain("/");
+    expect(set.getRoutes().find((r) => r.path.spec.toString() === "/")!.name).toBe("root");
   });
 
   it("draw raises when the external file is not found", async () => {
@@ -176,14 +176,14 @@ describe("Mapper public DSL additions", () => {
       m.setMemberMappingsForResource();
     });
     const added = set.getRoutes().slice(before, before + 5);
-    expect(added.map((r) => `${r.verb} ${r.path}#${r.action}`)).toEqual([
-      "GET /posts/:id/edit#edit",
-      "GET /posts/:id#show",
-      "PATCH /posts/:id#update",
-      "PUT /posts/:id#update",
-      "DELETE /posts/:id#destroy",
+    expect(added.map((r) => `${r.verb} ${r.path.spec}#${r.defaults.action}`)).toEqual([
+      "GET /posts/:id/edit(.:format)#edit",
+      "GET /posts/:id(.:format)#show",
+      "PATCH /posts/:id(.:format)#update",
+      "PUT /posts/:id(.:format)#update",
+      "DELETE /posts/:id(.:format)#destroy",
     ]);
-    expect(added.every((r) => r.controller === "posts")).toBe(true);
+    expect(added.every((r) => r.defaults.controller === "posts")).toBe(true);
   });
 
   it("shallow inside a namespace preserves the namespace prefix on member paths", () => {
@@ -196,8 +196,10 @@ describe("Mapper public DSL additions", () => {
     });
     const commentShow = set
       .getRoutes()
-      .find((r) => r.action === "show" && r.controller.endsWith("comments"));
-    expect(commentShow?.path).toBe("/admin/comments/:id");
+      .find(
+        (r) => r.defaults.action === "show" && String(r.defaults.controller).endsWith("comments"),
+      );
+    expect(commentShow?.path.spec.toString()).toBe("/admin/comments/:id(.:format)");
   });
 
   it("setMemberMappingsForResource is a safe no-op outside a resource scope", () => {
@@ -217,7 +219,9 @@ describe("Mapper public DSL additions", () => {
     });
     const commentShow = set
       .getRoutes()
-      .find((r) => r.action === "show" && r.controller.endsWith("comments"));
+      .find(
+        (r) => r.defaults.action === "show" && String(r.defaults.controller).endsWith("comments"),
+      );
     expect(commentShow?.name).toBe("admin_comment");
   });
 
@@ -225,7 +229,7 @@ describe("Mapper public DSL additions", () => {
     const set = new RouteSet();
     const m = new Mapper(set);
     m.resources("posts");
-    const updates = set.getRoutes().filter((r) => r.action === "update");
+    const updates = set.getRoutes().filter((r) => r.defaults.action === "update");
     expect(updates.map((r) => r.verb)).toEqual(["PATCH", "PUT"]);
   });
 
@@ -257,7 +261,7 @@ describe("Mapper public DSL additions", () => {
     });
     const tagIndex = set
       .getRoutes()
-      .find((r) => r.action === "index" && r.controller.includes("tags"));
-    expect(tagIndex?.path).toBe("/posts/:post_id/admin/tags");
+      .find((r) => r.defaults.action === "index" && String(r.defaults.controller).includes("tags"));
+    expect(tagIndex?.path.spec.toString()).toBe("/posts/:post_id/admin/tags(.:format)");
   });
 });

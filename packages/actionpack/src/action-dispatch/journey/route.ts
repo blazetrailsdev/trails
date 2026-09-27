@@ -158,7 +158,7 @@ VerbMatchers.VERB_TO_CLASS = VERBS.reduce<Record<string, VerbMatcher>>(
 );
 
 export interface RouteOptions {
-  name: string;
+  name: string | null;
   app?: unknown;
   path: Pattern;
   constraints?: Record<string, unknown>;
@@ -176,7 +176,7 @@ export interface Dispatchable {
 }
 
 export class Route {
-  readonly name: string;
+  readonly name: string | null;
   readonly app: unknown;
   readonly path: Pattern;
   readonly constraints: Record<string, unknown>;

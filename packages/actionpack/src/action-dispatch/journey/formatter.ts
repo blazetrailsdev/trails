@@ -7,7 +7,7 @@ export { UrlGenerationError };
 
 export interface FormatterHost {
   routes: { routes: readonly Route[] };
-  namedRoutes: { has(name: string): boolean; get(name: string): Route | undefined };
+  namedRoutes: { isKey(name: string): boolean; get(name: string): Route | undefined };
 }
 
 export class RouteWithParams {
@@ -173,7 +173,7 @@ export class Formatter {
 
   /** @internal */
   private *matchRoute(name: string | null, options: Record<string, unknown>): Generator<Route> {
-    if (name != null && this.namedRoutes.has(name)) {
+    if (name != null && this.namedRoutes.isKey(name)) {
       const r = this.namedRoutes.get(name);
       if (r) yield r;
       return;

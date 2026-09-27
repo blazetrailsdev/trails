@@ -15,7 +15,7 @@ export function generateRouteHelpers(
   const namedRoutes = routeSet.getNamedRoutes();
 
   for (const [name, route] of namedRoutes) {
-    const paramNames = extractParamNames(route.path);
+    const paramNames = [...route.requiredParts];
 
     helpers[`${name}_path`] = createPathHelper(routeSet, name, paramNames);
 
@@ -23,19 +23,6 @@ export function generateRouteHelpers(
   }
 
   return helpers;
-}
-
-function extractParamNames(path: string): string[] {
-  const names: string[] = [];
-  const parts = path.split("/");
-  for (const part of parts) {
-    if (part.startsWith(":")) {
-      names.push(part.slice(1));
-    } else if (part.startsWith("*")) {
-      names.push(part.slice(1));
-    }
-  }
-  return names;
 }
 
 function createPathHelper(routeSet: RouteSet, routeName: string, paramNames: string[]): PathHelper {

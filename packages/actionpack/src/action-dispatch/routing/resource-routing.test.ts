@@ -11,8 +11,8 @@ describe("Resource routing", () => {
       });
       const m = routes.recognize("GET", "/posts");
       expect(m).not.toBeNull();
-      expect(m!.route.action).toBe("index");
-      expect(m!.route.controller).toBe("posts");
+      expect(m!.route.defaults.action).toBe("index");
+      expect(m!.route.defaults.controller).toBe("posts");
     });
 
     it("generates show route with id", () => {
@@ -21,7 +21,7 @@ describe("Resource routing", () => {
         map.resources("posts");
       });
       const m = routes.recognize("GET", "/posts/42");
-      expect(m!.route.action).toBe("show");
+      expect(m!.route.defaults.action).toBe("show");
       expect(m!.params.id).toBe("42");
     });
 
@@ -32,7 +32,7 @@ describe("Resource routing", () => {
       });
       const m = routes.recognize("GET", "/posts/new");
       expect(m).not.toBeNull();
-      expect(m!.route.action).toBe("new");
+      expect(m!.route.defaults.action).toBe("new");
     });
 
     it("generates create route", () => {
@@ -40,7 +40,7 @@ describe("Resource routing", () => {
       routes.draw((map) => {
         map.resources("posts");
       });
-      expect(routes.recognize("POST", "/posts")!.route.action).toBe("create");
+      expect(routes.recognize("POST", "/posts")!.route.defaults.action).toBe("create");
     });
 
     it("generates edit route", () => {
@@ -49,7 +49,7 @@ describe("Resource routing", () => {
         map.resources("posts");
       });
       const m = routes.recognize("GET", "/posts/42/edit");
-      expect(m!.route.action).toBe("edit");
+      expect(m!.route.defaults.action).toBe("edit");
       expect(m!.params.id).toBe("42");
     });
 
@@ -58,7 +58,7 @@ describe("Resource routing", () => {
       routes.draw((map) => {
         map.resources("posts");
       });
-      expect(routes.recognize("PUT", "/posts/42")!.route.action).toBe("update");
+      expect(routes.recognize("PUT", "/posts/42")!.route.defaults.action).toBe("update");
     });
 
     it("generates update route (PATCH)", () => {
@@ -66,7 +66,7 @@ describe("Resource routing", () => {
       routes.draw((map) => {
         map.resources("posts");
       });
-      expect(routes.recognize("PATCH", "/posts/42")!.route.action).toBe("update");
+      expect(routes.recognize("PATCH", "/posts/42")!.route.defaults.action).toBe("update");
     });
 
     it("generates destroy route", () => {
@@ -74,7 +74,7 @@ describe("Resource routing", () => {
       routes.draw((map) => {
         map.resources("posts");
       });
-      expect(routes.recognize("DELETE", "/posts/42")!.route.action).toBe("destroy");
+      expect(routes.recognize("DELETE", "/posts/42")!.route.defaults.action).toBe("destroy");
     });
 
     it("generates named routes", () => {
@@ -107,7 +107,7 @@ describe("Resource routing", () => {
       routes.draw((map) => {
         map.resource("session");
       });
-      expect(routes.recognize("GET", "/session")!.route.action).toBe("show");
+      expect(routes.recognize("GET", "/session")!.route.defaults.action).toBe("show");
     });
 
     it("generates create route", () => {
@@ -115,7 +115,7 @@ describe("Resource routing", () => {
       routes.draw((map) => {
         map.resource("session");
       });
-      expect(routes.recognize("POST", "/session")!.route.action).toBe("create");
+      expect(routes.recognize("POST", "/session")!.route.defaults.action).toBe("create");
     });
 
     it("generates destroy route", () => {
@@ -123,7 +123,7 @@ describe("Resource routing", () => {
       routes.draw((map) => {
         map.resource("session");
       });
-      expect(routes.recognize("DELETE", "/session")!.route.action).toBe("destroy");
+      expect(routes.recognize("DELETE", "/session")!.route.defaults.action).toBe("destroy");
     });
 
     it("generates update route", () => {
@@ -131,7 +131,7 @@ describe("Resource routing", () => {
       routes.draw((map) => {
         map.resource("session");
       });
-      expect(routes.recognize("PUT", "/session")!.route.action).toBe("update");
+      expect(routes.recognize("PUT", "/session")!.route.defaults.action).toBe("update");
     });
 
     it("generates new route", () => {
@@ -139,7 +139,7 @@ describe("Resource routing", () => {
       routes.draw((map) => {
         map.resource("session");
       });
-      expect(routes.recognize("GET", "/session/new")!.route.action).toBe("new");
+      expect(routes.recognize("GET", "/session/new")!.route.defaults.action).toBe("new");
     });
 
     it("generates edit route", () => {
@@ -147,7 +147,7 @@ describe("Resource routing", () => {
       routes.draw((map) => {
         map.resource("session");
       });
-      expect(routes.recognize("GET", "/session/edit")!.route.action).toBe("edit");
+      expect(routes.recognize("GET", "/session/edit")!.route.defaults.action).toBe("edit");
     });
 
     it("has no index route", () => {
@@ -156,7 +156,7 @@ describe("Resource routing", () => {
         map.resource("session");
       });
       const all = routes.getRoutes();
-      const actions = all.map((r) => r.action);
+      const actions = all.map((r) => r.defaults.action);
       expect(actions).not.toContain("index");
     });
 
@@ -216,8 +216,8 @@ describe("Resource routing", () => {
       const m = routes.recognize("GET", "/posts/1/comments");
       expect(m).not.toBeNull();
       expect(m!.params.post_id).toBe("1");
-      expect(m!.route.action).toBe("index");
-      expect(m!.route.controller).toBe("comments");
+      expect(m!.route.defaults.action).toBe("index");
+      expect(m!.route.defaults.controller).toBe("comments");
     });
 
     it("nests member route under parent", () => {
@@ -230,7 +230,7 @@ describe("Resource routing", () => {
       const m = routes.recognize("GET", "/posts/1/comments/5");
       expect(m!.params.post_id).toBe("1");
       expect(m!.params.id).toBe("5");
-      expect(m!.route.action).toBe("show");
+      expect(m!.route.defaults.action).toBe("show");
     });
 
     it("generates named routes for nested resources", () => {
@@ -293,7 +293,7 @@ describe("Resource routing", () => {
       });
       const m = routes.recognize("GET", "/admin/posts");
       expect(m).not.toBeNull();
-      expect(m!.route.controller).toBe("admin/posts");
+      expect(m!.route.defaults.controller).toBe("admin/posts");
     });
 
     it("prefixes named routes with namespace", () => {
@@ -318,7 +318,7 @@ describe("Resource routing", () => {
         });
       });
       const m = routes.recognize("GET", "/api/v1/articles");
-      expect(m!.route.controller).toBe("api/v1/articles");
+      expect(m!.route.defaults.controller).toBe("api/v1/articles");
     });
 
     it("generates paths for namespaced resources", () => {
@@ -341,7 +341,7 @@ describe("Resource routing", () => {
       });
       const m = routes.recognize("GET", "/posts/nuevo");
       expect(m).not.toBeNull();
-      expect(m!.route.action).toBe("new");
+      expect(m!.route.defaults.action).toBe("new");
     });
 
     it("customizes edit path", () => {
@@ -351,7 +351,7 @@ describe("Resource routing", () => {
       });
       const m = routes.recognize("GET", "/posts/1/editar");
       expect(m).not.toBeNull();
-      expect(m!.route.action).toBe("edit");
+      expect(m!.route.defaults.action).toBe("edit");
     });
   });
 
@@ -381,7 +381,7 @@ describe("Resource routing", () => {
       });
       const m = routes.recognize("GET", "/posts/search");
       expect(m).not.toBeNull();
-      expect(m!.route.action).toBe("search");
+      expect(m!.route.defaults.action).toBe("search");
     });
   });
 
@@ -452,7 +452,7 @@ describe("Resource routing", () => {
       const m = routes.recognize("GET", "/users/1/profile");
       expect(m).not.toBeNull();
       expect(m!.params.user_id).toBe("1");
-      expect(m!.route.action).toBe("show");
+      expect(m!.route.defaults.action).toBe("show");
     });
   });
 
@@ -476,7 +476,7 @@ describe("Resource routing", () => {
       const all = routes.getRoutes();
       const seen = new Set<string>();
       for (const r of all) {
-        const key = `${r.verb} ${r.path}`;
+        const key = `${r.verb} ${r.path.spec}`;
         expect(seen.has(key)).toBe(false);
         seen.add(key);
       }

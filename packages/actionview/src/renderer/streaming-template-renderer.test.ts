@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { Notifications } from "@blazetrails/activesupport";
+import { Notifications, type SafeBuffer } from "@blazetrails/activesupport";
 import { Base } from "../base.js";
 import { Body, StreamingTemplateRenderer } from "./streaming-template-renderer.js";
 import { Renderer } from "./renderer.js";
@@ -22,8 +22,8 @@ function makeLookupContext(): LookupContext {
 const ctx: ViewContext = { viewRenderer: { cacheHits: {} } };
 
 async function collectChunks(
-  body: Body | (string | null)[] | Promise<Body | (string | null)[]>,
-): Promise<(string | null)[]> {
+  body: Body | (string | SafeBuffer | null)[] | Promise<Body | (string | SafeBuffer | null)[]>,
+): Promise<(string | SafeBuffer | null)[]> {
   const resolved = await body;
   if (Array.isArray(resolved)) return resolved;
   const chunks: string[] = [];
@@ -243,7 +243,7 @@ describe("StreamingTemplateRenderer", () => {
         supportsStreaming: () => false,
       };
 
-      const flow = new Map<string, string>();
+      const flow = new Map<string, unknown>();
       const view: ViewContext = { ...ctx, viewFlow: { set: (k, v) => void flow.set(k, v) } };
       const layoutFake: RenderableTemplate = {
         identifier: "layout",

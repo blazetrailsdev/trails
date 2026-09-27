@@ -2,7 +2,7 @@ import {
   ConsoleFormatter,
   RoutesInspector,
   controllerConstants,
-  type Route,
+  type Journey,
   type RoutesFilter,
   type RoutesFormatter,
 } from "@blazetrails/actionpack";
@@ -36,7 +36,7 @@ export class RouteInfo {
   /** @internal */
   private controllerClass: ControllerClass | undefined;
 
-  constructor(route: Route) {
+  constructor(route: Journey.Route) {
     const requirements = route.requirements;
     this.controllerName = requirements["controller"] as string | undefined;
     this.actionName = requirements["action"] as string | undefined;
@@ -84,7 +84,7 @@ export class UnusedRoutesCommand {
   /** @internal */
   private options: UnusedRoutesOptions;
   /** @internal */
-  private _routes: Route[] | null = null;
+  private _routes: Journey.Route[] | null = null;
 
   constructor(options: UnusedRoutesOptions) {
     this.options = options;
@@ -105,9 +105,9 @@ export class UnusedRoutesCommand {
   }
 
   /** @internal */
-  private async routes(): Promise<Route[]> {
+  private async routes(): Promise<Journey.Route[]> {
     if (this._routes === null) {
-      const routes: Route[] = [];
+      const routes: Journey.Route[] = [];
       for (const route of Trails.application!.routes().getRoutes()) {
         if (await new RouteInfo(route).unused()) routes.push(route);
       }

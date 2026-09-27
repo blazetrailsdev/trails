@@ -107,7 +107,7 @@ describe("ActionDispatch::Journey::Router", () => {
       defaults: { controller: "posts" },
     });
     const router = new Router(buildRoutes([route]));
-    const found: [string, Record<string, unknown>][] = [];
+    const found: [string | null, Record<string, unknown>][] = [];
     router.recognize(req({ pathInfo: "/posts/7" }), (r, params) => {
       found.push([r.name, params]);
     });
@@ -184,7 +184,7 @@ describe("ActionDispatch::Journey::Router", () => {
     const r1 = new Route({ name: "a", app: okApp("a"), path: pat("/x") });
     const r2 = new Route({ name: "b", app: okApp("b"), path: pat("/x") });
     const router = new Router(buildRoutes([r1, r2]));
-    const seen: string[] = [];
+    const seen: (string | null)[] = [];
     router.recognize(req({ pathInfo: "/x" }), (route) => {
       seen.push(route.name);
       return true;
@@ -196,7 +196,7 @@ describe("ActionDispatch::Journey::Router", () => {
     const r1 = new Route({ name: "a", app: okApp("a"), path: pat("/x") });
     const r2 = new Route({ name: "b", app: okApp("b"), path: pat("/x") });
     const router = new Router(buildRoutes([r1, r2]));
-    const seen: string[] = [];
+    const seen: (string | null)[] = [];
     router.recognize(req({ pathInfo: "/x" }), (route) => {
       seen.push(route.name);
     });
@@ -207,7 +207,7 @@ describe("ActionDispatch::Journey::Router", () => {
     const r1 = new Route({ name: "a", app: okApp("a"), path: pat("/x") });
     const r2 = new Route({ name: "b", app: okApp("b"), path: pat("/x") });
     const router = new Router(buildRoutes([r1, r2]));
-    const seen: string[] = [];
+    const seen: (string | null)[] = [];
     router.recognize(req({ pathInfo: "/x" }), (route) => {
       seen.push(route.name);
       return false;
@@ -219,7 +219,7 @@ describe("ActionDispatch::Journey::Router", () => {
     const r1 = new Route({ name: "a", app: okApp("a"), path: pat("/x") });
     const r2 = new Route({ name: "b", app: okApp("b"), path: pat("/x") });
     const router = new Router(buildRoutes([r1, r2]));
-    const seen: string[] = [];
+    const seen: (string | null)[] = [];
     router.recognize(req({ pathInfo: "/x" }), (route) => seen.push(route.name));
     expect(seen).toEqual(["a", "b"]);
   });
