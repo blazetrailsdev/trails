@@ -69,7 +69,9 @@ export function formWith(
     }
 
     model = convertToModel(_objectForFormBuilder(model));
-    scope ??= modelNameFromRecordOrClass(model).paramKey;
+    if (scope == null || (scope as unknown) === false) {
+      scope = modelNameFromRecordOrClass(model).paramKey;
+    }
   }
 
   if (block !== undefined) {
@@ -116,7 +118,7 @@ export function htmlOptionsForFormWith(
   );
   const remote = hashDelete(html, "remote");
   htmlOptions["remote"] =
-    (remote != null && remote !== false) || !(local != null && local !== false);
+    remote != null && remote !== false ? remote : !(local != null && local !== false);
   if (rbObjRespondTo(model, "isPersisted") && (model as { isPersisted(): boolean }).isPersisted()) {
     if (htmlOptions["method"] == null || htmlOptions["method"] === false) {
       htmlOptions["method"] = "patch";
@@ -151,15 +153,20 @@ export function instantiateBuilder(
     }
   }
 
-  const builder = (options["builder"] ?? defaultFormBuilderClass.call(this)) as typeof FormBuilder;
+  const builder = (
+    options["builder"] != null && options["builder"] !== false
+      ? options["builder"]
+      : defaultFormBuilderClass.call(this)
+  ) as typeof FormBuilder;
   return new builder(objectName, object, this, options);
 }
 
 /** @internal */
 export function defaultFormBuilderClass(this: FormHelperHost): typeof FormBuilder {
   const builder =
-    this._defaultFormBuilder ??
-    (ActionView.Base as unknown as { defaultFormBuilder: unknown }).defaultFormBuilder;
+    this._defaultFormBuilder != null && this._defaultFormBuilder !== false
+      ? this._defaultFormBuilder
+      : (ActionView.Base as unknown as { defaultFormBuilder: unknown }).defaultFormBuilder;
   return (typeof builder === "string" ? constantize(builder) : builder) as typeof FormBuilder;
 }
 
@@ -215,9 +222,11 @@ export class FormBuilder {
     this.convertToLegacyOptions(this.options);
 
     if (this.objectName?.endsWith("[]")) {
-      object ??= (this._template as unknown as Record<string, unknown>)[
-        this.objectName.slice(0, -2)
-      ];
+      if (object == null || object === false) {
+        object = (this._template as unknown as Record<string, unknown>)[
+          this.objectName.slice(0, -2)
+        ];
+      }
       if (object != null && object !== false && rbObjRespondTo(object, "toParam")) {
         this._autoIndex = (object as { toParam(): unknown }).toParam();
       } else {

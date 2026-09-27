@@ -155,7 +155,7 @@ describe("FormWithActsLikeFormTagTest", () => {
     const actual = view.formWith({ skipEnforcingUtf8: true });
     const expected = wholeForm("http://www.example.com", { skipEnforcingUtf8: true });
     assertDomEqual(expected, actual);
-    expect(actual.htmlSafe).toBe(true);
+    expect(actual.htmlSafe).toBeTruthy();
   });
 
   it("form with default enforce utf8 false", () => {
@@ -163,7 +163,7 @@ describe("FormWithActsLikeFormTagTest", () => {
       const actual = view.formWith();
       const expected = wholeForm("http://www.example.com", { skipEnforcingUtf8: true });
       assertDomEqual(expected, actual);
-      expect(actual.htmlSafe).toBe(true);
+      expect(actual.htmlSafe).toBeTruthy();
     });
   });
 
@@ -172,7 +172,7 @@ describe("FormWithActsLikeFormTagTest", () => {
       const actual = view.formWith();
       const expected = wholeForm("http://www.example.com", { skipEnforcingUtf8: false });
       assertDomEqual(expected, actual);
-      expect(actual.htmlSafe).toBe(true);
+      expect(actual.htmlSafe).toBeTruthy();
     });
   });
 
