@@ -6,7 +6,7 @@ const AF_UNSPEC = 0;
 const AF_INET = 2;
 const AF_INET6 = 10;
 
-/** Ruby's `addr.to_i` send (`vendor/ruby/lib/ipaddr.rb:598`): `Integer#to_i`, `Float#to_i` (`vendor/ruby/numeric.c` `flo_to_i`, FloatDomainError off the finite range), else the operand's own `toI`. */
+/** Ruby's `addr.to_i` send (`vendor/ruby/v3.3.11/lib/ipaddr.rb:598`): `Integer#to_i`, `Float#to_i` (`vendor/ruby/v3.3.11/numeric.c` `flo_to_i`, FloatDomainError off the finite range), else the operand's own `toI`. */
 function toI(addr: unknown): bigint | number {
   if (typeof addr === "bigint") return addr;
   if (typeof addr === "number") {
@@ -20,33 +20,33 @@ function toI(addr: unknown): bigint | number {
 }
 
 /**
- * Ruby stdlib `IPAddr` (`vendor/ruby/lib/ipaddr.rb`), the part Rails reaches
+ * Ruby stdlib `IPAddr` (`vendor/ruby/v3.3.11/lib/ipaddr.rb`), the part Rails reaches
  * from `OID::Cidr` (`postgresql/oid/cidr.rb`).
  *
- * @noRailsEquivalent PERMANENT — Ruby's ipaddr library (`vendor/ruby/lib/ipaddr.rb:42`), which
+ * @noRailsEquivalent PERMANENT — Ruby's ipaddr library (`vendor/ruby/v3.3.11/lib/ipaddr.rb:42`), which
  * Rails calls without defining.
  */
 export class IPAddr {
-  /** @noRailsEquivalent PERMANENT — `vendor/ruby/lib/ipaddr.rb:46` */
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/ipaddr.rb:46` */
   static readonly IN4MASK = 0xffffffffn;
-  /** @noRailsEquivalent PERMANENT — `vendor/ruby/lib/ipaddr.rb:48` */
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/ipaddr.rb:48` */
   static readonly IN6MASK = 0xffffffffffffffffffffffffffffffffn;
-  /** @noRailsEquivalent PERMANENT — `vendor/ruby/lib/ipaddr.rb:53` */
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/ipaddr.rb:53` */
   static readonly RE_IPV4ADDRLIKE = /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/;
-  /** @noRailsEquivalent PERMANENT — `vendor/ruby/lib/ipaddr.rb:60` */
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/ipaddr.rb:60` */
   static readonly RE_IPV6ADDRLIKE_FULL =
     /^(?:(?:[\da-f]{1,4}:){7}[\da-f]{1,4}|((?:[\da-f]{1,4}:){6})(\d+)\.(\d+)\.(\d+)\.(\d+))$/i;
-  /** @noRailsEquivalent PERMANENT — `vendor/ruby/lib/ipaddr.rb:72` */
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/ipaddr.rb:72` */
   static readonly RE_IPV6ADDRLIKE_COMPRESSED =
     /^((?:(?:[\da-f]{1,4}:)*[\da-f]{1,4})?)::(((?:[\da-f]{1,4}:)*)(?:[\da-f]{1,4}|(\d+)\.(\d+)\.(\d+)\.(\d+)))?$/i;
 
-  /** @noRailsEquivalent PERMANENT — `vendor/ruby/lib/ipaddr.rb:103` */
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/ipaddr.rb:103` */
   family: number | null = null;
   private _addr: bigint | null = null;
   private _maskAddr: bigint | null = null;
   private _zoneId: string | null = null;
 
-  /** @noRailsEquivalent PERMANENT — `vendor/ruby/lib/ipaddr.rb:150` */
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/ipaddr.rb:150` */
   equals(other: unknown): boolean {
     let coerced: IPAddr;
     try {
@@ -57,19 +57,19 @@ export class IPAddr {
     return this.family === coerced.family && this._addr === coerced.toI();
   }
 
-  /** @noRailsEquivalent PERMANENT — `vendor/ruby/lib/ipaddr.rb:176`, aliased `===` */
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/ipaddr.rb:176`, aliased `===` */
   includes(other: unknown): boolean {
     const coerced = this.coerceOther(other);
     if (coerced.family !== this.family) return false;
     return this.beginAddr() <= coerced.beginAddr() && this.endAddr() >= coerced.endAddr();
   }
 
-  /** @noRailsEquivalent PERMANENT — `vendor/ruby/lib/ipaddr.rb:184` */
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/ipaddr.rb:184` */
   toI(): bigint {
     return this._addr!;
   }
 
-  /** @noRailsEquivalent PERMANENT — `vendor/ruby/lib/ipaddr.rb:189` */
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/ipaddr.rb:189` */
   toString(): string {
     let str = this._toString(this._addr!);
     if (this.family === AF_INET6) str += this._zoneId ?? "";
@@ -101,17 +101,17 @@ export class IPAddr {
     return str;
   }
 
-  /** @noRailsEquivalent PERMANENT — `vendor/ruby/lib/ipaddr.rb:240` */
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/ipaddr.rb:240` */
   isIpv4(): boolean {
     return this.family === AF_INET;
   }
 
   /**
-   * Ruby compares `hash` (`vendor/ruby/lib/ipaddr.rb:401-403`, built from
+   * Ruby compares `hash` (`vendor/ruby/v3.3.11/lib/ipaddr.rb:401-403`, built from
    * `@addr`, `@mask_addr`, `@zone_id` and the family); JS has no `hash`
    * protocol, so the same components are compared directly.
    *
-   * @noRailsEquivalent PERMANENT — `vendor/ruby/lib/ipaddr.rb:396`
+   * @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/ipaddr.rb:396`
    */
   eql(other: unknown): boolean {
     return (
@@ -125,7 +125,7 @@ export class IPAddr {
     );
   }
 
-  /** @noRailsEquivalent PERMANENT — `vendor/ruby/lib/ipaddr.rb:411` */
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/ipaddr.rb:411` */
   get prefix(): number {
     let n: bigint;
     let i: number;
@@ -232,7 +232,7 @@ export class IPAddr {
     return this;
   }
 
-  /** @noRailsEquivalent PERMANENT — `vendor/ruby/lib/ipaddr.rb:593` */
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/ipaddr.rb:593` */
   constructor(addr: unknown = "::", family: number = AF_UNSPEC) {
     this._maskAddr = null;
     if (typeof addr !== "string") {
@@ -372,12 +372,12 @@ export class IPAddr {
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace IPAddr {
-  /** @noRailsEquivalent PERMANENT — `vendor/ruby/lib/ipaddr.rb:89` */
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/ipaddr.rb:89` */
   export class Error extends ArgumentError {}
-  /** @noRailsEquivalent PERMANENT — `vendor/ruby/lib/ipaddr.rb:92` */
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/ipaddr.rb:92` */
   export class InvalidAddressError extends Error {}
-  /** @noRailsEquivalent PERMANENT — `vendor/ruby/lib/ipaddr.rb:97` */
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/ipaddr.rb:97` */
   export class AddressFamilyError extends Error {}
-  /** @noRailsEquivalent PERMANENT — `vendor/ruby/lib/ipaddr.rb:100` */
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/ipaddr.rb:100` */
   export class InvalidPrefixError extends InvalidAddressError {}
 }

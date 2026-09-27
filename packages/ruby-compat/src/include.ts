@@ -6,8 +6,8 @@
  * the TypeScript equivalent: assigns each method from the module object
  * onto `klass.prototype`.
  *
- * Mirrors: Ruby's Module#include — vendor/ruby/eval.c:1139 `rb_mod_include`,
- * backed by vendor/ruby/class.c:1179 `rb_include_module`.
+ * Mirrors: Ruby's Module#include — vendor/ruby/v3.3.11/eval.c:1139 `rb_mod_include`,
+ * backed by vendor/ruby/v3.3.11/class.c:1179 `rb_include_module`.
  *
  * Usage:
  *   // Define a module as a plain object of this-typed functions
@@ -51,13 +51,13 @@ type ModuleHooks = {
  * module's methods are reached through the Ruby-named Module API below, which
  * operates on the carrier.
  *
- * Mirrors: Ruby's Module.new — vendor/ruby/object.c:1950 `rb_mod_initialize`.
+ * Mirrors: Ruby's Module.new — vendor/ruby/v3.3.11/object.c:1950 `rb_mod_initialize`.
  *
  * @noRailsEquivalent PERMANENT — a Ruby core class, not a Rails one.
  */
 export class Module {
   /**
-   * Mirrors: Ruby's Module.new — vendor/ruby/object.c:1950
+   * Mirrors: Ruby's Module.new — vendor/ruby/v3.3.11/object.c:1950
    * `rb_mod_initialize`, which hands a given block the new module
    * (`rb_mod_module_exec(1, &module, module)`, object.c:1959).
    *
@@ -68,7 +68,7 @@ export class Module {
   }
 
   /**
-   * Mirrors: Ruby's Module#module_eval — vendor/ruby/vm_eval.c:2128
+   * Mirrors: Ruby's Module#module_eval — vendor/ruby/v3.3.11/vm_eval.c:2128
    * `rb_mod_module_eval` — yields the module's method table.
    *
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
@@ -89,7 +89,7 @@ export class Module {
   }
 
   /**
-   * Mirrors: Ruby's Module#include into a module — vendor/ruby/class.c:1179
+   * Mirrors: Ruby's Module#include into a module — vendor/ruby/v3.3.11/class.c:1179
    * `rb_include_module`, which splices `mod` BELOW this module, so a method
    * this module defines itself outranks the included one. A module already
    * included is skipped (`include_modules_at`, class.c:1281,1291,1296).
@@ -121,7 +121,7 @@ export class Module {
   }
 
   /**
-   * Mirrors: Ruby's Module#define_method — vendor/ruby/proc.c:2325
+   * Mirrors: Ruby's Module#define_method — vendor/ruby/v3.3.11/proc.c:2325
    * `rb_mod_define_method`.
    *
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
@@ -143,7 +143,7 @@ export class Module {
    * which `Object.defineProperty` re-installs and which — unlike a bare
    * function — also carries an accessor pair.
    *
-   * vendor/ruby/proc.c:2190 `rb_mod_instance_method`.
+   * vendor/ruby/v3.3.11/proc.c:2190 `rb_mod_instance_method`.
    *
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
@@ -152,7 +152,7 @@ export class Module {
   }
 
   /**
-   * Mirrors: Ruby's Module#instance_methods — vendor/ruby/class.c:1889
+   * Mirrors: Ruby's Module#instance_methods — vendor/ruby/v3.3.11/class.c:1889
    * `rb_class_instance_methods`.
    *
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
@@ -163,7 +163,7 @@ export class Module {
   }
 
   /**
-   * Mirrors: Ruby's Module#remove_method — vendor/ruby/vm_method.c:1728
+   * Mirrors: Ruby's Module#remove_method — vendor/ruby/v3.3.11/vm_method.c:1728
    * `rb_mod_remove_method`.
    *
    * @noRailsEquivalent PERMANENT
@@ -184,7 +184,7 @@ export class Module {
   }
 
   /**
-   * Mirrors: Ruby's Module#undef_method — vendor/ruby/vm_method.c:1973
+   * Mirrors: Ruby's Module#undef_method — vendor/ruby/v3.3.11/vm_method.c:1973
    * `rb_mod_undef_method`.
    *
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
@@ -210,7 +210,7 @@ export class Module {
   }
 
   /**
-   * Mirrors: Ruby's Module#alias_method — vendor/ruby/vm_method.c:2366
+   * Mirrors: Ruby's Module#alias_method — vendor/ruby/v3.3.11/vm_method.c:2366
    * `rb_mod_alias_method`.
    *
    * @noRailsEquivalent PERMANENT
@@ -227,7 +227,7 @@ export class Module {
   }
 
   /**
-   * Mirrors: Ruby's Module#append_features — vendor/ruby/eval.c:1110
+   * Mirrors: Ruby's Module#append_features — vendor/ruby/v3.3.11/eval.c:1110
    * `rb_mod_append_features`, the splice `include` runs before `included`.
    *
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
@@ -248,7 +248,7 @@ export class Module {
   }
 
   /**
-   * Mirrors: Ruby's Module#prepend_features — vendor/ruby/eval.c:1175
+   * Mirrors: Ruby's Module#prepend_features — vendor/ruby/v3.3.11/eval.c:1175
    * `rb_mod_prepend_features`, the splice `prepend` runs before `prepended`.
    *
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
@@ -267,13 +267,13 @@ export class Module {
   }
 
   /**
-   * Mirrors: Ruby's Module#extend_object — vendor/ruby/eval.c:1746
+   * Mirrors: Ruby's Module#extend_object — vendor/ruby/v3.3.11/eval.c:1746
    * `rb_mod_extend_object`, which `rb_extend_object` (:1713) runs as
    * `rb_include_module(rb_singleton_class(obj), module)`: the module's link is
    * spliced between `obj` and its class, so a later `extend` sits above it and
    * `superMethod` resumes the lookup at the next link. A module already in
    * `obj`'s ancestry is skipped, as `include_modules_at` skips one
-   * (vendor/ruby/class.c:1281,1291,1296).
+   * (vendor/ruby/v3.3.11/class.c:1281,1291,1296).
    *
    * One link is made per extended object, so singleton links are held through
    * `WeakRef`s that `relinkIncluders` still walks, keeping a later
@@ -309,8 +309,8 @@ export class Module {
 
   /**
    * Mirrors: Ruby's `super` from one of this module's methods —
-   * vendor/ruby/vm_insnhelper.c:4648 `vm_search_super_method`, the lookup
-   * `Method#super_method` exposes (vendor/ruby/proc.c:3391): resume the method
+   * vendor/ruby/v3.3.11/vm_insnhelper.c:4648 `vm_search_super_method`, the lookup
+   * `Method#super_method` exposes (vendor/ruby/v3.3.11/proc.c:3391): resume the method
    * search at `RCLASS_SUPER` of the iclass this module contributed to
    * `receiver`'s ancestry. Answers the next method bound to `receiver`, or
    * `undefined` where Ruby's `super_method` answers nil.
@@ -351,7 +351,7 @@ export class Module {
   }
 
   /**
-   * Mirrors: Ruby's Module#method_defined? — vendor/ruby/vm_method.c:2055
+   * Mirrors: Ruby's Module#method_defined? — vendor/ruby/v3.3.11/vm_method.c:2055
    * `rb_mod_method_defined`.
    *
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
@@ -422,7 +422,7 @@ function relinkIncluders(mod: Module): void {
 /**
  * Symbol key for Ruby's Module#included callback, which `rb_mod_include` fires
  * on the module once `append_features` has spliced it into the ancestry
- * (vendor/ruby/eval.c:1160). Using a symbol avoids collisions with real method
+ * (vendor/ruby/v3.3.11/eval.c:1160). Using a symbol avoids collisions with real method
  * names.
  *
  * @noRailsEquivalent PERMANENT — Ruby names the hook with an ordinary method
@@ -434,7 +434,7 @@ export const included = Symbol.for("@blazetrails/ruby-compat:included");
 /**
  * Symbol key for Ruby's Module#extended callback, which `rb_obj_extend` fires
  * on the module after `extend_object` has copied its methods onto the object
- * (vendor/ruby/eval.c:1795).
+ * (vendor/ruby/v3.3.11/eval.c:1795).
  *
  * @noRailsEquivalent PERMANENT — the TypeScript spelling of a Ruby lifecycle
  * hook, which the language has no equivalent of.
@@ -443,7 +443,7 @@ export const extended = Symbol.for("@blazetrails/ruby-compat:extended");
 
 /**
  * Symbol key for a module's `initialize`, the per-instance half of Ruby's
- * `include`. `rb_include_module` (vendor/ruby/class.c:1179) splices the module
+ * `include`. `rb_include_module` (vendor/ruby/v3.3.11/class.c:1179) splices the module
  * into the lookup chain, so a module that defines `initialize` and calls
  * `super` runs against every new instance of the including class — which is
  * how `ActiveRecord::Railties::ControllerRuntime#initialize`
@@ -480,10 +480,10 @@ const prependedInstanceInitializers = Symbol.for(
  * included later sits higher in the ancestry and so completes last. A module
  * already in the ancestry contributes one initializer, not two, because
  * `include_modules_at` skips a module whose method table it finds in the
- * superclass chain (vendor/ruby/class.c:1281,1291,1296).
+ * superclass chain (vendor/ruby/v3.3.11/class.c:1281,1291,1296).
  *
  * Mirrors: the `super` call in a class whose ancestry carries module
- * `initialize` definitions — vendor/ruby/class.c:1179 `rb_include_module`.
+ * `initialize` definitions — vendor/ruby/v3.3.11/class.c:1179 `rb_include_module`.
  *
  * @noRailsEquivalent PERMANENT — Ruby reaches these through `super`;
  * JavaScript has no construction hook a mixin can splice into.
@@ -593,7 +593,7 @@ function isModuleMethodTablePresent(klass: { prototype: object }, mod: unknown):
  * (`AcceptanceValidator::LazilyDefineAttributes#==`, acceptance.rb:71-73), so a
  * module carrying an `equals` is asked that too and not identity alone.
  *
- * Mirrors: Ruby's Module#include? — vendor/ruby/class.c:1538
+ * Mirrors: Ruby's Module#include? — vendor/ruby/v3.3.11/class.c:1538
  * `rb_mod_include_p`.
  *
  * @noRailsEquivalent PERMANENT — Ruby spells this `<`, an operator TypeScript
@@ -624,7 +624,7 @@ export function isModuleIncluded(
  * static chain, so `includedModules({ prototype: klass })` answers
  * `klass.singleton_class.included_modules`.
  *
- * Mirrors: Ruby's Module#included_modules — vendor/ruby/class.c:1508
+ * Mirrors: Ruby's Module#included_modules — vendor/ruby/v3.3.11/class.c:1508
  * `rb_mod_included_modules`.
  *
  * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
@@ -649,7 +649,7 @@ export function includedModules(mod: { prototype: object }): unknown[] {
  * real method name, and so `Object.keys()` consumers see the module unchanged.
  *
  * The sections it records are the ones Ruby reads back through
- * `Module#private_instance_methods` — vendor/ruby/class.c:1927
+ * `Module#private_instance_methods` — vendor/ruby/v3.3.11/class.c:1927
  * `rb_class_private_instance_methods`.
  *
  * @noRailsEquivalent PERMANENT — Ruby carries visibility on the method entry
@@ -676,7 +676,7 @@ export interface ModuleVisibility {
  * won by the last spread, which aliases like `buildHavingClause: buildWhereClause`
  * (query_methods.rb:1654) make plausible, so it is asserted rather than trusted.
  *
- * Mirrors: Ruby's Module.new body — vendor/ruby/object.c:1950
+ * Mirrors: Ruby's Module.new body — vendor/ruby/v3.3.11/object.c:1950
  * `rb_mod_initialize`.
  *
  * @noRailsEquivalent PERMANENT — Ruby declares member visibility with
@@ -720,7 +720,7 @@ function assertSectionsDisjoint(sections: ModuleVisibility): void {
 }
 
 /**
- * Mirrors: Ruby's Module#public_instance_methods — vendor/ruby/class.c:1942
+ * Mirrors: Ruby's Module#public_instance_methods — vendor/ruby/v3.3.11/class.c:1942
  * `rb_class_public_instance_methods` — the module's public instance methods,
  * own-only when `includeSuper` is false.
  *
@@ -779,8 +779,8 @@ function featureHook(mod: unknown, name: string): ((base: unknown) => void) | un
 }
 
 /**
- * Mirrors: Ruby's Module#include — vendor/ruby/eval.c:1139 `rb_mod_include`,
- * backed by vendor/ruby/class.c:1179 `rb_include_module`.
+ * Mirrors: Ruby's Module#include — vendor/ruby/v3.3.11/eval.c:1139 `rb_mod_include`,
+ * backed by vendor/ruby/v3.3.11/class.c:1179 `rb_include_module`.
  *
  * @noRailsEquivalent PERMANENT — a Ruby core-language primitive, which Rails
  * uses but does not define.
@@ -867,7 +867,7 @@ export function include(klass: AnyClass, mod: ModuleObject | AnyClass | Module):
 export type Extended<M extends object> = CallableMethods<M>;
 
 /**
- * Mirrors: Ruby's Object#clone — vendor/ruby/object.c:536 `rb_obj_clone`, via
+ * Mirrors: Ruby's Object#clone — vendor/ruby/v3.3.11/object.c:536 `rb_obj_clone`, via
  * `rb_obj_clone_setup` (:457-527): a new object of the same class carrying a
  * copy of the receiver's singleton class and instance variables, frozen when
  * the receiver is. The singleton class is copied, not shared, so the clone's
@@ -909,10 +909,10 @@ export function rbObjClone<T extends object>(obj: T): T {
  * ABOVE the class, so its post-`super` body completes after every included
  * module's. A module whose method table is already in the ancestry is skipped
  * whole, the way `include_modules_at` skips one
- * (vendor/ruby/class.c:1281,1291,1296).
+ * (vendor/ruby/v3.3.11/class.c:1281,1291,1296).
  *
- * Mirrors: Ruby's Module#prepend — vendor/ruby/eval.c:1196 `rb_mod_prepend`,
- * backed by vendor/ruby/class.c:1430 `rb_prepend_module`.
+ * Mirrors: Ruby's Module#prepend — vendor/ruby/v3.3.11/eval.c:1196 `rb_mod_prepend`,
+ * backed by vendor/ruby/v3.3.11/class.c:1430 `rb_prepend_module`.
  *
  * @noRailsEquivalent PERMANENT — a Ruby core-language primitive, which Rails
  * uses but does not define.
@@ -950,7 +950,7 @@ export function prepend(klass: AnyClass, mod: ModuleObject | AnyClass | Module):
  * getter (`key`) and a setter (`key=`) as two methods where TypeScript shares
  * one property name between them.
  *
- * Mirrors: Ruby's Object#extend — vendor/ruby/eval.c:1778 `rb_obj_extend`.
+ * Mirrors: Ruby's Object#extend — vendor/ruby/v3.3.11/eval.c:1778 `rb_obj_extend`.
  *
  * @noRailsEquivalent PERMANENT — a Ruby core-language primitive, which Rails
  * uses but does not define.

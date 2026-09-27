@@ -20,7 +20,7 @@ const globalJSON = globalThis.JSON;
  * itself, functions, symbols) where MRI writes `"null"`.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `JSON.dump`
- * (`vendor/ruby/ext/json/lib/json/common.rb:541`) and `JSON.load` (`:615`) ship
+ * (`vendor/ruby/v3.3.11/ext/json/lib/json/common.rb:541`) and `JSON.load` (`:615`) ship
  * with the interpreter, so no Rails file defines them.
  */
 export namespace JSON {

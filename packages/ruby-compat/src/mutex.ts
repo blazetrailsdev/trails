@@ -32,18 +32,18 @@ function mutexData(self: object): MutexData {
 }
 
 /**
- * `vendor/ruby/thread_sync.c:1650` `rb_cMutex`, Ruby's non-reentrant mutual
+ * `vendor/ruby/v3.3.11/thread_sync.c:1650` `rb_cMutex`, Ruby's non-reentrant mutual
  * exclusion primitive.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Mutex`
- * (`vendor/ruby/thread_sync.c:1650`).
+ * (`vendor/ruby/v3.3.11/thread_sync.c:1650`).
  */
 export class Mutex {
   /**
-   * `vendor/ruby/thread_sync.c:292` `rb_mutex_trylock`.
+   * `vendor/ruby/v3.3.11/thread_sync.c:292` `rb_mutex_trylock`.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Mutex#try_lock`
-   * (`vendor/ruby/thread_sync.c:292`).
+   * (`vendor/ruby/v3.3.11/thread_sync.c:292`).
    */
   tryLock(): boolean {
     const data = mutexData(this);
@@ -70,10 +70,10 @@ export class Mutex {
   }
 
   /**
-   * `vendor/ruby/thread_sync.c:548` `rb_mutex_unlock`.
+   * `vendor/ruby/v3.3.11/thread_sync.c:548` `rb_mutex_unlock`.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Mutex#unlock`
-   * (`vendor/ruby/thread_sync.c:548`).
+   * (`vendor/ruby/v3.3.11/thread_sync.c:548`).
    */
   unlock(): this {
     const data = mutexData(this);
@@ -87,14 +87,14 @@ export class Mutex {
   }
 
   /**
-   * `vendor/ruby/thread_sync.c:697` `rb_mutex_synchronize_m`.
+   * `vendor/ruby/v3.3.11/thread_sync.c:697` `rb_mutex_synchronize_m`.
    *
    * Unlike `Monitor#synchronize` this is NOT reentrant: `rb_mutex_lock` raises
    * `ThreadError, "deadlock; recursive locking"` when the locking fiber already
-   * owns the mutex (`vendor/ruby/thread_sync.c:350-352`).
+   * owns the mutex (`vendor/ruby/v3.3.11/thread_sync.c:350-352`).
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Mutex#synchronize`
-   * (`vendor/ruby/thread_sync.c:697`).
+   * (`vendor/ruby/v3.3.11/thread_sync.c:697`).
    */
   async synchronize<T>(block: () => T | Promise<T>): Promise<T> {
     const data = mutexData(this);

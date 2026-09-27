@@ -62,7 +62,7 @@ type StringMethod = (self: StringReceiver, ...args: never[]) => unknown;
 type Method = (self: StringReceiver, ...args: unknown[]) => unknown;
 
 /**
- * The public methods `Init_String` (`vendor/ruby/string.c:12119`) defines on
+ * The public methods `Init_String` (`vendor/ruby/v3.3.11/string.c:12119`) defines on
  * `rb_cString`, keyed by the camelCased Ruby name: an operator by the
  * spelling trails gives it elsewhere (`<=>` `compareTo`, `==` `equals`, `===`
  * `caseEquals`, `+` `plus`, `*` `multiply`, `%` `format`, `[]` `get`, `[]=`
@@ -216,7 +216,7 @@ export const STRING_METHOD_TABLE: Record<string, StringMethod> = Object.assign(
 const JS_STRING_METHODS = new Set(Object.getOwnPropertyNames(String.prototype));
 
 /**
- * `str.__send__(method, *args)` (`vendor/ruby/vm_eval.c:1330` `rb_f_send`): the
+ * `str.__send__(method, *args)` (`vendor/ruby/v3.3.11/vm_eval.c:1330` `rb_f_send`): the
  * {@link STRING_METHOD_TABLE} entry, else a member String is reopened with, else
  * `NoMethodError`. The receiver's contents after the call come back beside the
  * result.
@@ -238,7 +238,7 @@ export function rbStrSend(str: string, method: string, ...args: unknown[]): [unk
 }
 
 /**
- * `str.respond_to?` (`vendor/ruby/vm_method.c:2977` `obj_respond_to`) over
+ * `str.respond_to?` (`vendor/ruby/v3.3.11/vm_method.c:2977` `obj_respond_to`) over
  * {@link rbStrSend}'s names: JS's own `String.prototype` members are not
  * Ruby's. See CLAUDE.md, "Method visibility is a side table".
  *
@@ -253,7 +253,7 @@ export function rbStrRespondTo(str: string, method: string, includeAll: boolean 
 }
 
 /**
- * `String#=~` (`vendor/ruby/string.c:4523` `rb_str_match`): a match's character
+ * `String#=~` (`vendor/ruby/v3.3.11/string.c:4523` `rb_str_match`): a match's character
  * offset. This is Ruby core's String method, which Rails' `Chars#=~` delegates
  * to (`activesupport/lib/active_support/multibyte/chars.rb:53`, ported as
  * `Chars#matchOperator`); ruby-compat's package contract receipts every export,
@@ -271,7 +271,7 @@ export function rbStrMatch(x: string, y: unknown): unknown {
 }
 
 /**
- * `rb_define_method` (`vendor/ruby/class.c:2134`) with a fixed `argc`, which MRI
+ * `rb_define_method` (`vendor/ruby/v3.3.11/class.c:2134`) with a fixed `argc`, which MRI
  * checks.
  */
 function rbDefineMethod<A extends unknown[]>(
@@ -288,7 +288,7 @@ const LSTRIP = /^[\0\t\n\v\f\r ]+/;
 const RSTRIP = /[\0\t\n\v\f\r ]+$/;
 const LONE_SURROGATE = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/;
 
-/** `String#<=>` (`vendor/ruby/string.c:3803` `rb_str_cmp_m`, `rb_invcmp` at `vendor/ruby/compar.c:50`). */
+/** `String#<=>` (`vendor/ruby/v3.3.11/string.c:3803` `rb_str_cmp_m`, `rb_invcmp` at `vendor/ruby/v3.3.11/compar.c:50`). */
 function rbStrCmpM(str1: string, str2: unknown): number | null {
   const s = rbCheckStringType(str2);
   if (s === null) {
@@ -298,7 +298,7 @@ function rbStrCmpM(str1: string, str2: unknown): number | null {
   return rbStrCmp(str1, s);
 }
 
-/** `String#==` (`vendor/ruby/string.c:3742` `rb_str_equal`). */
+/** `String#==` (`vendor/ruby/v3.3.11/string.c:3742` `rb_str_equal`). */
 function rbStrEqual(str1: string, str2: unknown): boolean {
   if (typeof str2 !== "string") {
     if (typeof (str2 as { toStr?: unknown } | null)?.toStr !== "function") return false;
@@ -307,7 +307,7 @@ function rbStrEqual(str1: string, str2: unknown): boolean {
   return str1 === str2;
 }
 
-/** `String#*` (`vendor/ruby/string.c:2331` `rb_str_times`). */
+/** `String#*` (`vendor/ruby/v3.3.11/string.c:2331` `rb_str_times`). */
 function rbStrTimes(str: string, times: unknown): string {
   const len = num2long(times);
   if (len < 0) throw new ArgumentError("negative argument");
@@ -315,7 +315,7 @@ function rbStrTimes(str: string, times: unknown): string {
   return str.repeat(len);
 }
 
-/** `String#chomp` (`vendor/ruby/string.c:9786` `rb_str_chomp`, `chomp_rs` at `:9728`). */
+/** `String#chomp` (`vendor/ruby/v3.3.11/string.c:9786` `rb_str_chomp`, `chomp_rs` at `:9728`). */
 function rbStrChomp(str: string, argv: unknown[]): string {
   if (argv.length === 0) return chomp(str);
   checkArity(argv.length, 0, 1);
@@ -323,25 +323,25 @@ function rbStrChomp(str: string, argv: unknown[]): string {
   return chomp(str, stringValue(argv[0]));
 }
 
-/** `String#chop` (`vendor/ruby/string.c:9613` `rb_str_chop`): a trailing `"\r\n"` as one. */
+/** `String#chop` (`vendor/ruby/v3.3.11/string.c:9613` `rb_str_chop`): a trailing `"\r\n"` as one. */
 function rbStrChop(str: string): string {
   if (str.endsWith("\r\n")) return str.slice(0, -2);
   return [...str].slice(0, -1).join("");
 }
 
-/** `String#delete_prefix` (`vendor/ruby/string.c:10795` `rb_str_delete_prefix`). */
+/** `String#delete_prefix` (`vendor/ruby/v3.3.11/string.c:10795` `rb_str_delete_prefix`). */
 function deletePrefix(str: string, prefix: unknown): string {
   const p = stringValue(prefix);
   return str.startsWith(p) ? str.slice(p.length) : str;
 }
 
-/** `String#delete_suffix` (`vendor/ruby/string.c:10878` `rb_str_delete_suffix`). */
+/** `String#delete_suffix` (`vendor/ruby/v3.3.11/string.c:10878` `rb_str_delete_suffix`). */
 function deleteSuffix(str: string, suffix: unknown): string {
   const s = stringValue(suffix);
   return s.length && str.endsWith(s) ? str.slice(0, -s.length) : str;
 }
 
-/** `String#<<` (`vendor/ruby/string.c:3511` `rb_str_concat`): an Integer is a code point. */
+/** `String#<<` (`vendor/ruby/v3.3.11/string.c:3511` `rb_str_concat`): an Integer is a code point. */
 function rbStrConcat(str1: string, str2: unknown): string {
   if (typeof str2 === "number" || typeof str2 === "bigint") {
     const code = Number(str2);
@@ -355,13 +355,13 @@ function rbStrConcat(str1: string, str2: unknown): string {
   return str1 + stringValue(str2);
 }
 
-/** `String#concat` (`vendor/ruby/string.c:3472` `rb_str_concat_multi`). */
+/** `String#concat` (`vendor/ruby/v3.3.11/string.c:3472` `rb_str_concat_multi`). */
 function rbStrConcatMulti(self: StringReceiver, ...args: unknown[]): string {
   self.string += args.reduce<string>((arg, value) => rbStrConcat(arg, value), "");
   return self.string;
 }
 
-/** `String#split` (`vendor/ruby/string.c:8757` `rb_str_split_m`): with a block, each field yielded. */
+/** `String#split` (`vendor/ruby/v3.3.11/string.c:8757` `rb_str_split_m`): with a block, each field yielded. */
 function rbStrSplitM(self: StringReceiver, ...argv: unknown[]): unknown {
   const [args, block] = blockArg(argv);
   checkArity(args.length, 0, 2);
@@ -371,7 +371,7 @@ function rbStrSplitM(self: StringReceiver, ...argv: unknown[]): unknown {
   return self.string;
 }
 
-/** `String#slice!` (`vendor/ruby/string.c:5588` `rb_str_slice_bang`). */
+/** `String#slice!` (`vendor/ruby/v3.3.11/string.c:5588` `rb_str_slice_bang`). */
 function rbStrSliceBang(self: StringReceiver, ...args: unknown[]): string | null {
   checkArity(args.length, 1, 2);
   const [sliced, rest] = sliceBang(
@@ -382,7 +382,7 @@ function rbStrSliceBang(self: StringReceiver, ...args: unknown[]): string | null
   return sliced;
 }
 
-/** `String#scrub` (`vendor/ruby/string.c:11354` `str_scrub`). */
+/** `String#scrub` (`vendor/ruby/v3.3.11/string.c:11354` `str_scrub`). */
 function strScrub(str: string, argv: unknown[]): string {
   const [args, block] = blockArg(argv);
   checkArity(args.length, 0, 1);
@@ -398,8 +398,8 @@ const NORMALIZATION_FORMS: Record<string, "NFC" | "NFD" | "NFKC" | "NFKD"> = {
 };
 
 /**
- * `String#unicode_normalize` (`vendor/ruby/string.c:11432`, raising from
- * `vendor/ruby/lib/unicode_normalize/normalize.rb:140`).
+ * `String#unicode_normalize` (`vendor/ruby/v3.3.11/string.c:11432`, raising from
+ * `vendor/ruby/v3.3.11/lib/unicode_normalize/normalize.rb:140`).
  */
 function unicodeNormalize(str: string, argv: unknown[]): string {
   checkArity(argv.length, 0, 1);
@@ -412,7 +412,7 @@ function unicodeNormalize(str: string, argv: unknown[]): string {
   return str.normalize(js);
 }
 
-/** `str_substr` (`vendor/ruby/string.c:2994`) over `rb_str_subpos`. */
+/** `str_substr` (`vendor/ruby/v3.3.11/string.c:2994`) over `rb_str_subpos`. */
 function strSubstr(str: string, beg: number, len: number, empty: boolean): string | null {
   const chars = [...str];
   const slen = chars.length;
@@ -427,14 +427,14 @@ function strSubstr(str: string, beg: number, len: number, empty: boolean): strin
   return chars.slice(beg, beg + len).join("");
 }
 
-/** `rb_str_subpat` (`vendor/ruby/string.c:5220`). */
+/** `rb_str_subpat` (`vendor/ruby/v3.3.11/string.c:5220`). */
 function rbStrSubpat(str: string, re: RegExp, backref: unknown): string | null {
   const match = rbRegSearch(re, str, 0, false);
   if (!match) return null;
   return match[rbRegBackrefNumber(match, backref)] ?? null;
 }
 
-/** `rb_str_aref` (`vendor/ruby/string.c:5231`). */
+/** `rb_str_aref` (`vendor/ruby/v3.3.11/string.c:5231`). */
 function rbStrAref(str: string, indx: unknown): string | null {
   let idx: number;
   if (typeof indx === "number") {
@@ -455,7 +455,7 @@ function rbStrAref(str: string, indx: unknown): string | null {
   return strSubstr(str, idx, 1, false);
 }
 
-/** `String#[]` / `String#slice` (`vendor/ruby/string.c:5279` `rb_str_aref_m`). */
+/** `String#[]` / `String#slice` (`vendor/ruby/v3.3.11/string.c:5279` `rb_str_aref_m`). */
 function rbStrArefM(self: StringReceiver, ...args: unknown[]): string | null {
   if (args.length === 2) {
     if (args[0] instanceof RegExp) {
@@ -470,7 +470,7 @@ function rbStrArefM(self: StringReceiver, ...args: unknown[]): string | null {
   return rbStrAref(self.string, args[0]);
 }
 
-/** `rb_str_update` (`vendor/ruby/string.c:5378`), in character offsets. */
+/** `rb_str_update` (`vendor/ruby/v3.3.11/string.c:5378`), in character offsets. */
 function rbStrUpdate(self: StringReceiver, beg: number, len: number, val: unknown): void {
   if (len < 0) throw new IndexError(`negative length ${len}`);
   const str2 = stringValue(val);
@@ -485,7 +485,7 @@ function rbStrUpdate(self: StringReceiver, beg: number, len: number, val: unknow
   self.string = chars.join("");
 }
 
-/** `rb_str_subpat_set` (`vendor/ruby/string.c:5418`). */
+/** `rb_str_subpat_set` (`vendor/ruby/v3.3.11/string.c:5418`). */
 function rbStrSubpatSet(self: StringReceiver, re: RegExp, backref: unknown, val: unknown): void {
   const match = rbRegSearch(re, self.string, 0, false);
   if (!match) throw new IndexError("regexp not matched");
@@ -502,7 +502,7 @@ function rbStrSubpatSet(self: StringReceiver, re: RegExp, backref: unknown, val:
   self.string = self.string.slice(0, start) + str2 + self.string.slice(end);
 }
 
-/** `rb_str_aset` (`vendor/ruby/string.c:5443`). */
+/** `rb_str_aset` (`vendor/ruby/v3.3.11/string.c:5443`). */
 function rbStrAset(self: StringReceiver, indx: unknown, val: unknown): unknown {
   if (indx instanceof RegExp) {
     rbStrSubpatSet(self, indx, 0, val);
@@ -523,7 +523,7 @@ function rbStrAset(self: StringReceiver, indx: unknown, val: unknown): unknown {
   return val;
 }
 
-/** `String#[]=` (`vendor/ruby/string.c:5516` `rb_str_aset_m`). */
+/** `String#[]=` (`vendor/ruby/v3.3.11/string.c:5516` `rb_str_aset_m`). */
 function rbStrAsetM(self: StringReceiver, ...args: unknown[]): unknown {
   if (args.length === 3) {
     if (args[0] instanceof RegExp) {
@@ -537,7 +537,7 @@ function rbStrAsetM(self: StringReceiver, ...args: unknown[]): unknown {
   return rbStrAset(self, args[0], args[1]);
 }
 
-/** `String#insert` (`vendor/ruby/string.c:5550` `rb_str_insert`). */
+/** `String#insert` (`vendor/ruby/v3.3.11/string.c:5550` `rb_str_insert`). */
 function rbStrInsert(self: StringReceiver, idx: unknown, str2: unknown): string {
   let pos = num2long(idx);
   if (pos === -1) {
@@ -550,7 +550,7 @@ function rbStrInsert(self: StringReceiver, idx: unknown, str2: unknown): string 
   return self.string;
 }
 
-/** `String#index` (`vendor/ruby/string.c:4034` `rb_str_index_m`). */
+/** `String#index` (`vendor/ruby/v3.3.11/string.c:4034` `rb_str_index_m`). */
 function rbStrIndexM(self: StringReceiver, ...args: unknown[]): number | null {
   checkArity(args.length, 1, 2);
   const str = self.string;
@@ -573,7 +573,7 @@ function rbStrIndexM(self: StringReceiver, ...args: unknown[]): number | null {
   return null;
 }
 
-/** `String#rindex` (`vendor/ruby/string.c:4320` `rb_str_rindex_m`). */
+/** `String#rindex` (`vendor/ruby/v3.3.11/string.c:4320` `rb_str_rindex_m`). */
 function rbStrRindexM(self: StringReceiver, ...args: unknown[]): number | null {
   checkArity(args.length, 1, 2);
   const str = self.string;
@@ -597,7 +597,7 @@ function rbStrRindexM(self: StringReceiver, ...args: unknown[]): number | null {
   return null;
 }
 
-/** `ljust` / `rjust` / `center` (`vendor/ruby/string.c:10424` `rb_str_justify`). */
+/** `ljust` / `rjust` / `center` (`vendor/ruby/v3.3.11/string.c:10424` `rb_str_justify`). */
 function rbStrJustify(argv: unknown[], str: string, jflag: "l" | "r" | "c"): string {
   checkArity(argv.length, 1, 2);
   const width = num2long(argv[0]);
@@ -615,7 +615,7 @@ function rbStrJustify(argv: unknown[], str: string, jflag: "l" | "r" | "c"): str
   return fill(llen) + str + fill(rlen);
 }
 
-/** `String#ord` (`vendor/ruby/string.c:10355` `rb_str_ord`). */
+/** `String#ord` (`vendor/ruby/v3.3.11/string.c:10355` `rb_str_ord`). */
 function rbStrOrd(self: StringReceiver): number {
   if (self.string.length === 0) throw new ArgumentError("empty string");
   return self.string.codePointAt(0)!;

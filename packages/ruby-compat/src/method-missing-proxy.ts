@@ -20,7 +20,7 @@ import { NoMethodError } from "./no-method-error.js";
  * @noRailsEquivalent PERMANENT — the same language shortcoming as
  * {@link methodMissingProxy} below, which this set exists for and which spells
  * it out: Ruby resolves an undefined method through `method_missing`
- * (`vendor/ruby/vm_eval.c:2570`), JS has only `Proxy`, and a `get` trap must
+ * (`vendor/ruby/v3.3.11/vm_eval.c:2570`), JS has only `Proxy`, and a `get` trap must
  * stay silent for the names JS itself probes. Exported so the other
  * `method_missing` mirrors — `Delegation.generate_method_missing`'s trap and
  * `Deprecation::Proxy`'s — read the one list rather than repeating it.
@@ -39,7 +39,7 @@ export const PROTOCOL_PROBES = new Set([
 ]);
 
 /**
- * The public methods `Kernel` defines on every object (`vendor/ruby/object.c:4360`,
+ * The public methods `Kernel` defines on every object (`vendor/ruby/v3.3.11/object.c:4360`,
  * `Init_Object` at `:4527`), camelCased as trails spells them. Ruby finds them
  * on the receiver before `method_missing` is consulted, so a trap forwarding
  * to a delegate must not forward these: `chars.eql?(chars)` is Kernel's
@@ -96,7 +96,7 @@ export const KERNEL_METHODS = new Set([
 ]);
 
 /**
- * Mirrors `Kernel#respond_to?` (`vendor/ruby/vm_method.c:3017`) — public
+ * Mirrors `Kernel#respond_to?` (`vendor/ruby/v3.3.11/vm_method.c:3017`) — public
  * members only, as its `include_all = false` default is.
  */
 function respondsTo(delegate: unknown, prop: string | symbol): boolean {
@@ -107,7 +107,7 @@ function respondsTo(delegate: unknown, prop: string | symbol): boolean {
 
 /**
  * Whether `prop` resolves to a method rather than a reader: Ruby's
- * `target.__send__(m)` (`vendor/ruby/lib/delegate.rb:88`) returns a reader's
+ * `target.__send__(m)` (`vendor/ruby/v3.3.11/lib/delegate.rb:88`) returns a reader's
  * value as-is, so only a data descriptor on the delegate's prototype chain is
  * bound — a getter returning a class hands back the class itself.
  */
@@ -147,7 +147,7 @@ function isMethod(delegate: object, prop: string | symbol): boolean {
  * `method_missing` raises.
  *
  * @noRailsEquivalent PERMANENT — Ruby core's
- * `BasicObject#method_missing` (`vendor/ruby/vm_eval.c:2570`) resolves an
+ * `BasicObject#method_missing` (`vendor/ruby/v3.3.11/vm_eval.c:2570`) resolves an
  * undefined method at the language level; JS has no such hook, only `Proxy`.
  * No amount of porting removes the need for a TS-side shape, so this is the one
  * shared one, the way `include()` is the one shape for Ruby `include`.

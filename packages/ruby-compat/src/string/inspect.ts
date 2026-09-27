@@ -1,5 +1,5 @@
 /**
- * Ruby `String#inspect` (`vendor/ruby/string.c:6825` `rb_str_inspect`), the
+ * Ruby `String#inspect` (`vendor/ruby/v3.3.11/string.c:6825` `rb_str_inspect`), the
  * receiver-qualified spelling `Symbol#to_s`'s `symbolToS` already establishes:
  * `Hash#inspect` takes the unqualified `inspect`, so the String one carries its
  * class in the name.
@@ -11,7 +11,7 @@
  * (`string.c:6862-6867`); a bare `#` stays literal.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `String#inspect`
- * (`vendor/ruby/string.c:6825`).
+ * (`vendor/ruby/v3.3.11/string.c:6825`).
  */
 export function stringInspect(str: string): string {
   let result = '"';
@@ -46,7 +46,7 @@ export function stringInspect(str: string): string {
 
 const ESCAPED_AFTER_HASH = ["$", "@", "{"];
 
-/** The `switch (c)` of `rb_str_inspect` (`vendor/ruby/string.c:6877-6886`). */
+/** The `switch (c)` of `rb_str_inspect` (`vendor/ruby/v3.3.11/string.c:6877-6886`). */
 const ESCAPE_ALIASES: Record<number, string> = {
   0x0a: "n",
   0x0d: "r",
@@ -59,7 +59,7 @@ const ESCAPE_ALIASES: Record<number, string> = {
 };
 
 /**
- * `rb_enc_isprint(c, enc) && c != 0x85` (`vendor/ruby/string.c:6902`) for
+ * `rb_enc_isprint(c, enc) && c != 0x85` (`vendor/ruby/v3.3.11/string.c:6902`) for
  * UTF-8: the C0 controls, DEL and the C1 controls are not printable, and
  * everything above them is — Onigmo answers `print` for U+200B and U+FFFD
  * alike, and `"\u200b".inspect` keeps the literal character.
@@ -75,7 +75,7 @@ function isPrint(c: number): boolean {
 }
 
 /**
- * `rb_str_buf_cat_escaped_char` (`vendor/ruby/string.c:6671`), the
+ * `rb_str_buf_cat_escaped_char` (`vendor/ruby/v3.3.11/string.c:6671`), the
  * `unicode_p` arm: `\uXXXX` below U+10000 and `\u{XXXX}` above it, in
  * uppercase hex.
  */

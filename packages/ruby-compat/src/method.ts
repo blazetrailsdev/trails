@@ -2,7 +2,7 @@ import { NameError } from "./name-error.js";
 import { rbObjClass } from "./object.js";
 
 /**
- * Ruby core `Method` (`vendor/ruby/proc.c:1657` `mnew_missing` builds the
+ * Ruby core `Method` (`vendor/ruby/v3.3.11/proc.c:1657` `mnew_missing` builds the
  * `method_missing`-backed kind): a method bound to its receiver.
  *
  * @noRailsEquivalent PERMANENT
@@ -13,7 +13,7 @@ export class Method {
   readonly #func: (...args: unknown[]) => unknown;
 
   /**
-   * `mnew_internal` (`vendor/ruby/proc.c:1689`): the receiver, name and body a
+   * `mnew_internal` (`vendor/ruby/v3.3.11/proc.c:1689`): the receiver, name and body a
    * `Method` binds.
    *
    * @noRailsEquivalent PERMANENT
@@ -25,7 +25,7 @@ export class Method {
   }
 
   /**
-   * `Method#call` (`vendor/ruby/proc.c:2500` `rb_method_call`).
+   * `Method#call` (`vendor/ruby/v3.3.11/proc.c:2500` `rb_method_call`).
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -34,7 +34,7 @@ export class Method {
   }
 
   /**
-   * `Method#receiver` (`vendor/ruby/proc.c:1923` `method_receiver`).
+   * `Method#receiver` (`vendor/ruby/v3.3.11/proc.c:1923` `method_receiver`).
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -43,7 +43,7 @@ export class Method {
   }
 
   /**
-   * `Method#name` (`vendor/ruby/proc.c:1939` `method_name`).
+   * `Method#name` (`vendor/ruby/v3.3.11/proc.c:1939` `method_name`).
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -52,7 +52,7 @@ export class Method {
   }
 
   /**
-   * `Method#arity` (`vendor/ruby/proc.c:2872` `method_arity`, over
+   * `Method#arity` (`vendor/ruby/v3.3.11/proc.c:2872` `method_arity`, over
    * `method_def_arity` at `:2808`): the required count when it is also the
    * maximum, else `-min-1`. JS `Function#length` stops counting at the first
    * default, so `(gid)` and `(gid, options = {})` both report 1; the parameter
@@ -96,7 +96,7 @@ export class Method {
 }
 
 /**
- * `Kernel#method` (`vendor/ruby/proc.c:2079` `rb_obj_method`, over `obj_method`
+ * `Kernel#method` (`vendor/ruby/v3.3.11/proc.c:2079` `rb_obj_method`, over `obj_method`
  * at `:2025`): the receiver's own method, else a `method_missing`-backed one
  * when `respond_to_missing?` answers for the name (`mnew_missing_by_name`,
  * `:1680`), else `rb_method_name_error`'s `NameError` (`:1996`).

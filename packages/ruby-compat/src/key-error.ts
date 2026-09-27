@@ -2,8 +2,8 @@ import { ArgumentError } from "./argument-error.js";
 import { IndexError } from "./index-error.js";
 
 /**
- * Ruby's core `KeyError` (`vendor/ruby/error.c:3325`) — what `Hash#fetch`
- * raises for an absent key (`vendor/ruby/hash.c:2203` `rb_key_err_raise`).
+ * Ruby's core `KeyError` (`vendor/ruby/v3.3.11/error.c:3325`) — what `Hash#fetch`
+ * raises for an absent key (`vendor/ruby/v3.3.11/hash.c:2203` `rb_key_err_raise`).
  * `@blazetrails/activesupport`'s index re-exports it, so that package's
  * public surface is unchanged.
  *
@@ -12,7 +12,7 @@ import { IndexError } from "./index-error.js";
  * `key not found: "expression"`.
  *
  * Ruby's chain is `KeyError < IndexError < StandardError`
- * (`vendor/ruby/error.c:3325`).
+ * (`vendor/ruby/v3.3.11/error.c:3325`).
  *
  * @noRailsEquivalent PERMANENT — Ruby core `KeyError`, which Rails inherits
  * rather than defines.
@@ -25,7 +25,7 @@ export class KeyError extends IndexError {
 
   /**
    * Ruby's `KeyError.new(message=nil, receiver: nil, key: nil)`
-   * (`vendor/ruby/error.c:2537` `key_err_initialize`), which sets each
+   * (`vendor/ruby/v3.3.11/error.c:2537` `key_err_initialize`), which sets each
    * attribute only when its keyword was passed.
    *
    * @noRailsEquivalent PERMANENT
@@ -39,7 +39,7 @@ export class KeyError extends IndexError {
   }
 
   /**
-   * Ruby's `KeyError#receiver` (`vendor/ruby/error.c:2491` `key_err_receiver`).
+   * Ruby's `KeyError#receiver` (`vendor/ruby/v3.3.11/error.c:2491` `key_err_receiver`).
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -49,7 +49,7 @@ export class KeyError extends IndexError {
   }
 
   /**
-   * Ruby's `KeyError#key` (`vendor/ruby/error.c:2508` `key_err_key`).
+   * Ruby's `KeyError#key` (`vendor/ruby/v3.3.11/error.c:2508` `key_err_key`).
    *
    * @noRailsEquivalent PERMANENT
    */

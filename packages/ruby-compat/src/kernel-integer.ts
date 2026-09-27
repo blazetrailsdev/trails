@@ -7,19 +7,19 @@ const BASE_BY_PREFIX: Record<string, number> = { x: 16, b: 2, o: 8, d: 10 };
 const DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz";
 
 /**
- * `rb_convert_to_integer` (`vendor/ruby/object.c:3257`) with `raise_exception`
+ * `rb_convert_to_integer` (`vendor/ruby/v3.3.11/object.c:3257`) with `raise_exception`
  * true — the arm every `Kernel#Integer` call site reaches. An explicit base is
  * only meaningful for a String, a Float answers its truncation and raises
  * `FloatDomainError` when it is not finite, a String is parsed by
- * `rb_str_convert_to_inum` (`vendor/ruby/bignum.c:4302`), and anything else is
+ * `rb_str_convert_to_inum` (`vendor/ruby/v3.3.11/bignum.c:4302`), and anything else is
  * converted through `to_int`, then `to_str`, then `to_i`.
  *
  * The base itself arrives through `NUM2INT` (`rb_f_integer`,
- * `vendor/ruby/object.c:3355-3358`), so it is converted before any parsing: a
+ * `vendor/ruby/v3.3.11/object.c:3355-3358`), so it is converted before any parsing: a
  * fractional base truncates, a non-finite or out-of-`int` one is a
  * `RangeError`, and one that is not Integer-convertible is a `TypeError`.
  *
- * `rb_int_parse_cstr` (`vendor/ruby/bignum.c:4045`) is why the String arm is a
+ * `rb_int_parse_cstr` (`vendor/ruby/v3.3.11/bignum.c:4045`) is why the String arm is a
  * grammar rather than a `Number.parseInt`: it strips surrounding whitespace,
  * reads an optional sign and a radix prefix (`0x`/`0b`/`0o`/`0d`, plus bare
  * `0` for octal when the base is unspecified), allows a single `_` BETWEEN
@@ -28,7 +28,7 @@ const DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz";
  * `_` all raise, none of which `Number.parseInt` reproduces.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Kernel#Integer`
- * (`vendor/ruby/object.c:3355`), which Rails calls without defining, so there
+ * (`vendor/ruby/v3.3.11/object.c:3355`), which Rails calls without defining, so there
  * is no Ruby file in any gem for the port to mirror.
  */
 export function kernelInteger(val: unknown, base: unknown = 0): number {
@@ -105,7 +105,7 @@ function rbCheckStringType(val: unknown): string | null {
 }
 
 /**
- * `rb_check_to_int` (`vendor/ruby/object.c:3239`): `to_int` counts only when it
+ * `rb_check_to_int` (`vendor/ruby/v3.3.11/object.c:3239`): `to_int` counts only when it
  * answers an Integer, so a receiver whose `to_int` answers anything else falls
  * through to the `to_str` and `to_i` arms rather than being accepted.
  */
@@ -116,7 +116,7 @@ function rbCheckToInt(val: unknown): number | null {
   return rbIntegerTypeP(tmp) ? Number(tmp) : null;
 }
 
-/** `rb_to_integer(val, "to_i", idTo_i)` (`vendor/ruby/object.c:3213`). */
+/** `rb_to_integer(val, "to_i", idTo_i)` (`vendor/ruby/v3.3.11/object.c:3213`). */
 function rbToInteger(val: unknown): number {
   const klass = rbBuiltinClassName(val);
   const toI = (val as { toI?: unknown }).toI;
@@ -131,7 +131,7 @@ function rbToInteger(val: unknown): number {
 }
 
 /**
- * `rb_int_parse_cstr` (`vendor/ruby/bignum.c:4045`) under `rb_str_convert_to_inum`'s
+ * `rb_int_parse_cstr` (`vendor/ruby/v3.3.11/bignum.c:4045`) under `rb_str_convert_to_inum`'s
  * `badcheck` — a base at or below zero reads the radix off the literal's own
  * prefix (falling back to `-base` below -1, then to 10), and any base outside
  * `valid_radix_p`'s 2..36 raises.

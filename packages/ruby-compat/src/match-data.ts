@@ -6,7 +6,7 @@ import { stringInspect } from "./string/inspect.js";
 import { num2long, rbStrSublen } from "./string/support.js";
 
 /**
- * Ruby core `MatchData` (`vendor/ruby/re.c:4724`, `Init_Regexp`), built over a
+ * Ruby core `MatchData` (`vendor/ruby/v3.3.11/re.c:4724`, `Init_Regexp`), built over a
  * `d`-flagged JS match. Offsets are characters, as Onigmo's are for a UTF-8
  * String. A pattern with named groups captures only those, as Onigmo does when
  * `ONIG_OPTION_CAPTURE_GROUP` is off.
@@ -20,7 +20,7 @@ export class MatchData {
   readonly #names: string[];
 
   /**
-   * `match_alloc` (`vendor/ruby/re.c:970`) filled from a JS match, as
+   * `match_alloc` (`vendor/ruby/v3.3.11/re.c:970`) filled from a JS match, as
    * `rb_reg_search_set_match` fills the registers.
    *
    * @noRailsEquivalent PERMANENT
@@ -55,7 +55,7 @@ export class MatchData {
   }
 
   /**
-   * `MatchData#regexp` (`vendor/ruby/re.c:1128` `match_regexp`).
+   * `MatchData#regexp` (`vendor/ruby/v3.3.11/re.c:1128` `match_regexp`).
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -64,7 +64,7 @@ export class MatchData {
   }
 
   /**
-   * `MatchData#names` (`vendor/ruby/re.c:1163` `match_names`).
+   * `MatchData#names` (`vendor/ruby/v3.3.11/re.c:1163` `match_names`).
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -73,7 +73,7 @@ export class MatchData {
   }
 
   /**
-   * `MatchData#size` / `#length` (`vendor/ruby/re.c:1184` `match_size`).
+   * `MatchData#size` / `#length` (`vendor/ruby/v3.3.11/re.c:1184` `match_size`).
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -82,7 +82,7 @@ export class MatchData {
   }
 
   /**
-   * `MatchData#offset` (`vendor/ruby/re.c:1250` `match_offset`).
+   * `MatchData#offset` (`vendor/ruby/v3.3.11/re.c:1250` `match_offset`).
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -91,7 +91,7 @@ export class MatchData {
   }
 
   /**
-   * `MatchData#byteoffset` (`vendor/ruby/re.c:1285` `match_byteoffset`).
+   * `MatchData#byteoffset` (`vendor/ruby/v3.3.11/re.c:1285` `match_byteoffset`).
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -103,7 +103,7 @@ export class MatchData {
   }
 
   /**
-   * `MatchData#begin` (`vendor/ruby/re.c:1309` `match_begin`).
+   * `MatchData#begin` (`vendor/ruby/v3.3.11/re.c:1309` `match_begin`).
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -113,7 +113,7 @@ export class MatchData {
   }
 
   /**
-   * `MatchData#end` (`vendor/ruby/re.c:1335` `match_end`).
+   * `MatchData#end` (`vendor/ruby/v3.3.11/re.c:1335` `match_end`).
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -123,7 +123,7 @@ export class MatchData {
   }
 
   /**
-   * `MatchData#match` (`vendor/ruby/re.c:1377` `match_nth`).
+   * `MatchData#match` (`vendor/ruby/v3.3.11/re.c:1377` `match_nth`).
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -132,7 +132,7 @@ export class MatchData {
   }
 
   /**
-   * `MatchData#match_length` (`vendor/ruby/re.c:1421` `match_nth_length`).
+   * `MatchData#match_length` (`vendor/ruby/v3.3.11/re.c:1421` `match_nth_length`).
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -142,7 +142,7 @@ export class MatchData {
   }
 
   /**
-   * `MatchData#to_a` (`vendor/ruby/re.c:2053` `match_to_a`).
+   * `MatchData#to_a` (`vendor/ruby/v3.3.11/re.c:2053` `match_to_a`).
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -151,7 +151,7 @@ export class MatchData {
   }
 
   /**
-   * `MatchData#captures` (`vendor/ruby/re.c:2075` `match_captures`).
+   * `MatchData#captures` (`vendor/ruby/v3.3.11/re.c:2075` `match_captures`).
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -160,7 +160,7 @@ export class MatchData {
   }
 
   /**
-   * `MatchData#[]` (`vendor/ruby/re.c:2187` `match_aref`): an index, a name, a
+   * `MatchData#[]` (`vendor/ruby/v3.3.11/re.c:2187` `match_aref`): an index, a name, a
    * `(start, length)` pair or a Range, as `Array#[]` reads `to_a`.
    *
    * @noRailsEquivalent PERMANENT
@@ -186,7 +186,7 @@ export class MatchData {
   }
 
   /**
-   * `MatchData#values_at` (`vendor/ruby/re.c:2256` `match_values_at`).
+   * `MatchData#values_at` (`vendor/ruby/v3.3.11/re.c:2256` `match_values_at`).
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -195,7 +195,7 @@ export class MatchData {
   }
 
   /**
-   * `MatchData#named_captures` (`vendor/ruby/re.c:2377` `match_named_captures`),
+   * `MatchData#named_captures` (`vendor/ruby/v3.3.11/re.c:2377` `match_named_captures`),
    * keyed by `":name"` under `symbolizeNames`.
    *
    * @noRailsEquivalent PERMANENT
@@ -207,7 +207,7 @@ export class MatchData {
   }
 
   /**
-   * `MatchData#deconstruct_keys` (`vendor/ruby/re.c:2430` `match_deconstruct_keys`).
+   * `MatchData#deconstruct_keys` (`vendor/ruby/v3.3.11/re.c:2430` `match_deconstruct_keys`).
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -223,7 +223,7 @@ export class MatchData {
   }
 
   /**
-   * `MatchData#pre_match` (`vendor/ruby/re.c:1906` `rb_reg_match_pre`).
+   * `MatchData#pre_match` (`vendor/ruby/v3.3.11/re.c:1906` `rb_reg_match_pre`).
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -232,7 +232,7 @@ export class MatchData {
   }
 
   /**
-   * `MatchData#post_match` (`vendor/ruby/re.c:1939` `rb_reg_match_post`).
+   * `MatchData#post_match` (`vendor/ruby/v3.3.11/re.c:1939` `rb_reg_match_post`).
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -241,7 +241,7 @@ export class MatchData {
   }
 
   /**
-   * `MatchData#to_s` (`vendor/ruby/re.c:2301` `match_to_s`).
+   * `MatchData#to_s` (`vendor/ruby/v3.3.11/re.c:2301` `match_to_s`).
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -250,7 +250,7 @@ export class MatchData {
   }
 
   /**
-   * `MatchData#string` (`vendor/ruby/re.c:2496` `match_string`).
+   * `MatchData#string` (`vendor/ruby/v3.3.11/re.c:2496` `match_string`).
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -259,7 +259,7 @@ export class MatchData {
   }
 
   /**
-   * `MatchData#inspect` (`vendor/ruby/re.c:2543` `match_inspect`).
+   * `MatchData#inspect` (`vendor/ruby/v3.3.11/re.c:2543` `match_inspect`).
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -273,7 +273,7 @@ export class MatchData {
   }
 
   /**
-   * `MatchData#hash` (`vendor/ruby/re.c:3510` `match_hash`).
+   * `MatchData#hash` (`vendor/ruby/v3.3.11/re.c:3510` `match_hash`).
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -282,7 +282,7 @@ export class MatchData {
   }
 
   /**
-   * `MatchData#==` / `#eql?` (`vendor/ruby/re.c:3536` `match_equal`).
+   * `MatchData#==` / `#eql?` (`vendor/ruby/v3.3.11/re.c:3536` `match_equal`).
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -297,7 +297,7 @@ export class MatchData {
   }
 
   /**
-   * `MatchData#eql?` (`vendor/ruby/re.c:3536` `match_equal`).
+   * `MatchData#eql?` (`vendor/ruby/v3.3.11/re.c:3536` `match_equal`).
    *
    * @noRailsEquivalent PERMANENT
    */
