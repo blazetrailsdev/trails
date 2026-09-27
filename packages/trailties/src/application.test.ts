@@ -187,7 +187,7 @@ describe("Application", () => {
       Application.register(TemplatesApp);
       const app = TemplatesApp.instance();
       app.config.setRoot("/app");
-      const templates = app.config.generators().templates as string[];
+      const templates = app.config.generators().templates;
       templates.push("/configured");
 
       await app.ensureGeneratorTemplatesAdded();
@@ -201,7 +201,7 @@ describe("Application", () => {
       Application.register(NoTemplatesApp);
       const app = NoTemplatesApp.instance();
       app.config.setRoot("/app");
-      const templates = app.config.generators().templates as string[];
+      const templates = app.config.generators().templates;
 
       await app.ensureGeneratorTemplatesAdded();
 
